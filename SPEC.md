@@ -1855,6 +1855,35 @@ verificable de la fecha de lanzamiento.
 
 ---
 
+**C-GEN-06 · El timestamp del génesis MUST ser plausible.** `ts(0) ≥ TIMESTAMP_MINIMO_GENESIS =
+1 767 225 600` (2026-01-01 00:00:00 UTC). Un génesis anterior **MUST** abortar el arranque.
+
+> **No es cosmética: el timestamp del génesis entra en la ventana del primer retarget.** Para
+> `H = N+1 = 91`, C-DIFF-01 consume `ts(H−N−1 .. H−1) = ts(0..90)`, y `ts(0)` es el del génesis.
+>
+> Con `ts(0) = 0` el primer solvetime reconstruido satura en `ST_CAP = 720` en lugar de valer
+> `T = 120`, así que `t` sube exactamente `ST_CAP − T = 600` —con el peso más bajo, `j = 1`— y el
+> primer target calculado sale **un 0,122 % más fácil** de lo que debería. Medido en
+> `zx-consensus`, test `un_genesis_en_el_ano_cero_sesga_el_primer_retarget`.
+>
+> **Su función real es que un marcador de posición no pueda lanzarse por descuido.** Los parámetros
+> de mainnet llevan `timestamp: 0` **a propósito** mientras P-017 siga abierto: así un nodo que
+> intente arrancar mainnet sin rellenarlos **aborta citando P-017**, en vez de levantar una cadena
+> sobre un génesis no intencionado. Test: `el_genesis_de_mainnet_todavia_no_arranca`.
+
+**C-GEN-07 · El hash del génesis está congelado en el binario.** Cada red cuyo génesis esté
+decidido **MUST** llevar su hash como constante, y el arranque **MUST** compararlo.
+
+```
+testnet:  fe56845a01bafa5a51ae43dd43d16584966f65a2acb41bc6fac281814062b6f1
+mainnet:  🔴 sin congelar — P-017
+```
+
+> Sin la aserción, dos nodos con builds distintas levantarían **cadenas distintas creyendo que son
+> la misma**, y el síntoma aparecería mucho más tarde y muy lejos de la causa. Mainnet **no debe**
+> tener su constante todavía: congelar el hash de un marcador de posición es congelar el error.
+
+
 ## 16 · Parámetros de red
 
 > Esta sección puede migrar a un SPEC de P2P independiente. Se recoge aquí porque C-NET-01 es lo
@@ -1878,7 +1907,167 @@ testnet:  bb 79 64 3f
 > con un peer de otra.** El génesis distinto (C-GEN-04) evita que las cadenas se confundan; el
 > prefijo evita que los nodos siquiera se saluden.
 
-**`<<PENDIENTE: puerto por defecto y versión de protocolo P2P — Fase 3>>`**
+**C-NET-02 · Puertos e identidad de protocolo.**
+
+```
+mainnet   TCP/QUIC 9833   ·  testnet   TCP/QUIC 19833
+gossipsub topics:  /zerox/blocks/1  ·  /zerox/txs/1
+request-response:  /zerox/sync/1
+kademlia:          /zerox/kad/1
+identify agent:    zerox/<version>
+```
+
+> **El nombre de protocolo de Kademlia NO es cosmético.** `kad::Config::default()` usa
+> `/ipfs/kad/1.0.0` —la DHT **pública de IPFS**— y no falla al compilar. Verificado en
+> `rust-libp2p@v0.56.0`, `protocols/kad/src/behaviour.rs:196-241`. Ver `research/libp2p-arquitectura.md` §0.
+
+### 16.1 · Sincronización de cadena — headers-first CON umbral de trabajo
+
+**C-NET-03 · Headers-first: el cuerpo NO se pide hasta validar la cabecera.** Un nodo **MUST**
+descargar y validar la cadena de cabeceras —PoW (§7.1), continuidad de `prev_hash`, timestamps
+(§7.4)— **antes** de solicitar ningún cuerpo de bloque.
+
+> **Aquí ZEROX diverge de Zebra a propósito, y conviene dejar escrito por qué.**
+>
+> La hoja de ruta decía "headers-first, referencia Zebra". **Es falso que Zebra lo haga**: Zebra pide
+> *hashes* con `getblocks`/`FindBlocks`, nunca emite `getheaders` como cliente, y compensa acotando
+> altura y memoria en la descarga de cuerpos. Verificado en `zebra@b685fbe3`,
+> `zebra-network/src/protocol/internal/request.rs:100-138`. Y **no existe RFC de Zebra** que explique
+> la elección — la razón está dispersa en comentarios, así que "Zebra lo hace así" no vale como
+> argumento.
+>
+> Para ZEROX la aritmética decide sola: **una cabecera mide 112 bytes y un cuerpo típico 100-200 KB**,
+> una relación de ~1:1000. Validar el PoW de una cabecera cuesta **un SHA3-256**. Descargar cuerpos
+> para descubrir después que la cadena no llevaba a ninguna parte cuesta mil veces más ancho de banda
+> por bloque. Ver `research/sync-cadena.md`.
+
+**C-NET-04 · Umbral anti-DoS de trabajo para cabeceras.** Un nodo **MUST NOT** retener en memoria una
+cadena de cabeceras que no demuestre trabajo acumulado suficiente. El umbral **MUST** ser **relativo
+al tip propio**, nunca una constante absoluta:
+
+```
+umbral = max( trabajo(tip) − 144·trabajo_de_un_bloque(tip),  TRABAJO_MINIMO_CADENA )
+```
+
+Por debajo del umbral, la cadena de cabeceras **MUST** mantenerse como resumen acotado, **MUST NOT**
+materializarse en un índice por cabecera, y el peer **MUST NOT** ser penalizado por ello.
+
+> **Esta regla existe porque headers-first tuvo su propio agujero: CVE-2019-25220**, divulgado el
+> 2024-09-18. Bitcoin Core guardaba un `CBlockIndex` por cada cabecera con PoW válido **sin exigir
+> trabajo acumulado**, y una cadena de cabeceras de baja dificultad tumbaba el nodo por OOM.
+>
+> Lo instructivo no es el fallo sino su deriva: **el coste del ataque bajó solo, con el tiempo**,
+> porque el umbral era absoluto y la dificultad de red subía — de ~4,12 BTC (32 % de un bloque, enero
+> 2019) a **~0,14 BTC** (4,4 % de un bloque, septiembre 2024). De ahí que el umbral **MUST** ser
+> relativo al tip: un umbral fijo caduca sin que nadie lo note.
+>
+> Fuente: `bitcoin/bitcoin@4519933391`, `src/net_processing.cpp:749-753` (`GetAntiDoSWorkThreshold`),
+> PR #25717 y #26355. El buffer de 144 bloques es suyo, y su razón es aceptar bifurcaciones cercanas
+> al tip. **zcashd nunca portó el arreglo** (no encontrado; confianza media, búsqueda dirigida).
+>
+> ZEROX lo construye desde el día uno en vez de retrofitearlo, que es la única ventaja real de nacer
+> después.
+
+**C-NET-05 · Lento y malicioso son cosas distintas.** Un peer que **no responde a tiempo** o devuelve
+respuestas vacías **MUST** desconectarse sin puntuar. Solo una **violación de consenso positivamente
+identificada** puntúa hacia el baneo.
+
+> Copiado de Zebra con su razón, que es más sutil de lo que parece. Su comentario, literal:
+>
+> > *"`AboveLookaheadHeightLimit` deliberately falls through unscored, and must stay that way
+> > (GHSA-qhr3-cvch-5fh2): `FindBlocks` responses carry no address, so the follow-up request goes to
+> > an independently chosen, honest peer that served the block but did not choose its height."*
+>
+> Es decir: **quien te entrega un bloque no es quien eligió su altura.** Penalizar al mensajero por
+> el contenido de una respuesta que no controló es un vector para que un tercero haga que banees a
+> peers honestos. Zebra puntúa 0 casi todos los errores blandos, y 100 —ban de un golpe— los de
+> consenso duro. Separa por mecanismo: los lentos caen por `FindResponseStallTracker` (umbral 3,
+> desconecta y olvida), los maliciosos por score por IP.
+
+### 16.2 · Relé compacto (BIP 152 adaptado) — transporte, NO consenso
+
+**C-NET-06 · Validar la cabecera antes de emitir un bloque compacto.** Un nodo **MUST NOT** emitir un
+anuncio compacto sin haber validado que la cabecera compromete cada transacción del bloque y que
+construye sobre la cadena válida con PoW correcto. **MAY** emitirlo antes de validar que cada
+transacción gasta UTXO existentes.
+
+> Literal de BIP 152, y es la única de sus reglas que es **independiente del transporte**: habla del
+> orden causal *interno* del nodo, no del canal. Ver `research/bip152.md` §7-§8.
+
+**C-NET-07 · Derivación del ID corto.** Sobre `txid`:
+
+```
+h  = SHA3-256( cabecera(112 B) ‖ nonce(8 B LE) )      ← divergencia deliberada, ver abajo
+k0 = h[0..8]  como u64 LE
+k1 = h[8..16] como u64 LE
+id = los 6 bytes bajos de SipHash-2-4(k0, k1, txid)
+```
+
+> **BIP 152 usa SHA256 *simple*** —no doble, a diferencia del blockhash de Bitcoin— y esa asimetría
+> es una trampa documentada: quien lo implemente "como el blockhash" produce IDs incompatibles y el
+> síntoma es que los bloques **nunca reconstruyen**, sin ningún error de protocolo. ZEROX no hereda
+> la trampa porque su función de hash de cabecera ya es una sola pasada de SHA3-256.
+>
+> **El nonce no es decorativo.** Cita del BIP: *"by using the block hash as a key to SipHash, an
+> attacker cannot predict what keys will be used […] so that even block creators cannot control where
+> collisions occur"*. Sin él, un minero podría fabricar transacciones que colisionen con las del
+> mempool ajeno y degradar la propagación de la red entera.
+>
+> 🔶 `SipHash-2-4` **no está definido en BIP 152** — remite a Aumasson & Bernstein. Es una laguna
+> declarada, no una omisión nuestra.
+
+**C-NET-08 · Las colisiones se recuperan, NO se castigan.** Un ID corto colisionado **MUST** resolverse
+pidiendo la transacción completa, y el peer **MUST NOT** ser penalizado.
+
+> Literal: *"short transaction IDs are expected to occasionally collide, and nodes MUST NOT be
+> penalized for such collisions, wherever they appear."* Con 48 bits, bloques de ≤10 000 tx y mempools
+> de ≤100 000, el BIP calcula un fallo de reconstrucción cada **281 474 bloques**.
+
+**C-NET-09 · El receptor MUST verificar la raíz de Merkle del bloque reconstruido.**
+
+> 🔴 **Esto NO está en BIP 152, y es una laguna suya.** El BIP obliga al **emisor** a comprometer la
+> raíz, y del receptor solo dice que el bloque "shall be processed as normal". Pero existe un caso
+> ciego: una colisión que produce **exactamente una coincidencia, y equivocada**. En ese caso el
+> receptor ensambla un bloque distinto del real y no tiene forma de saberlo salvo comprobando la raíz.
+>
+> Se hace explícito aquí porque una regla que solo se cumple "por la vía de la validación ordinaria"
+> es una regla que alguien puede optimizar sin darse cuenta de lo que quita.
+
+**C-NET-10 · Máximo 3 peers en modo de alto ancho de banda.** Literal del BIP: *"Nodes MUST NOT send
+such sendcmpct messages to more than three peers, as it encourages wasting outbound bandwidth across
+the network."* Se eligen por **histórico de entrega rápida**, no al azar.
+
+> 🔶 **La negociación de `sendcmpct` NO se porta.** Depende de una conexión TCP persistente con
+> **orden total** entre `sendcmpct`, `getdata`, `cmpctblock`, `ping`/`pong`. libp2p multiplexa streams
+> independientes sobre yamux y no garantiza ese orden. Lo que se adopta de BIP 152 es la derivación
+> del ID corto, las estructuras, el algoritmo de reconstrucción y C-NET-06; el saludo se rediseña
+> sobre el protocolo de request-response propio. Ver `research/bip152.md` §8.
+
+### 16.3 · Límites de la capa de red — todos explícitos
+
+**C-NET-11 · Ningún límite de transporte se deja en su valor por defecto.** En particular:
+
+| Límite | Default de libp2p | Por qué NO sirve |
+|---|---|---|
+| `gossipsub::max_transmit_size` | **65 536 B** | Un bloque típico de ZEROX mide **100-200 KB**. Con el default, **ningún bloque normal se propaga** |
+| `gossipsub::validate_messages` | **`false`** | El mensaje se **reenvía al mesh antes** de que lo validemos: amplificación regalada |
+| `ConnectionLimits` | todo `None` | Sin límite de conexiones |
+| Tamaño en `request_response::Codec` | **no existe** | El trait no impone ninguno; el `.take(MAX)` es responsabilidad de cada implementación |
+
+> Los cuatro están verificados contra `rust-libp2p@v0.56.0` en `research/libp2p-arquitectura.md` §0
+> y §3. **Ninguno de los cuatro falla al compilar**, y de ahí la regla: no es una recomendación de
+> estilo, es que la capa de transporte de libp2p **no es segura por defecto** para una cadena.
+
+**C-NET-12 · Validar antes de retransmitir.** Un bloque o transacción recibido por difusión **MUST**
+validarse contra `zx-consensus` **antes** de reenviarse. Un bloque **huérfano** —cuyo padre aún no se
+conoce— **MUST** descartarse **sin penalizar**, no rechazarse.
+
+> La distinción es la que Ethereum codifica como `GossipIgnore` frente a `GossipReject`
+> (`consensus-specs`, `p2p-interface.md:640-700`), y en libp2p es literalmente la diferencia entre
+> `MessageAcceptance::Ignore` y `::Reject`: solo el segundo aplica la penalización P₄.
+>
+> **Un bloque huérfano no es un bloque inválido: es un bloque que llegó antes de tiempo.** Castigarlo
+> penaliza a peers honestos con otro timing.
 
 ### 16.2 · Propagación de bloques — requisito de Fase 3, NO consenso
 
@@ -1951,8 +2140,10 @@ debajo**.
 | **P-015** | §11 | ¿Puede un minero *grindear* el nonce buscando hash bajo para ganar desempates (C-FORK-04)? | **D8** |
 | **P-016** | §12 | Camino de recuperación de un nodo detenido por C-REORG-07 tras una partición larga | **D3** |
 | **P-017** | §15, §16 | Mensaje, timestamp y nonce del génesis (mainnet y testnet) · puerto por defecto | Katana, el día del lanzamiento |
-| **P-018** | §16.2 | Mecanismo exacto de BIP 152: función con clave de los IDs cortos, derivación de la sal, saludo de negociación, modos alto/bajo ancho de banda. **No escribir de memoria** | Investigación, Fase 3 |
-| **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB. Las cifras de §16.2 son estimaciones | **D3** |
+| **P-022** | §16.2 | 🆕 Rediseño del saludo de `sendcmpct` sobre request-response de libp2p: la negociación del BIP depende de orden total entre mensajes, que yamux no da | **D3**, Fase 5 |
+| **P-023** | §16.3 | 🆕 `PeerScoreParams`/`TopicScoreParams` de gossipsub. **No existe precedente**: ninguna cadena PoW con bloques de 100-200 KB cada 120 s usa gossipsub v1.1. Hay que derivarlo y medirlo | **D3** + **D8**, Fase 5 |
+| **P-024** | §16.1 | 🆕 Valor de `TRABAJO_MINIMO_CADENA` (C-NET-04) para una cadena que arranca sin historia | **D2** + **D8** |
+| **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB, **y de ahí derivar `D`/`D_low`/`D_high`/`heartbeat`**. Los de Ethereum son para slots de 12 s, no de 120 | **D3** |
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
@@ -1963,6 +2154,7 @@ debajo**.
 | ID | Decisión | Dónde vive |
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-018** | **BIP 152 extraído verbatim** → `research/bip152.md`. Lo portable y lo que no, delimitado | C-NET-06..10 |
 | **P-020** | **P2K**, no P2KH. La respuesta post-cuántica es un network upgrade con una variante nueva de `Lock`, no el formato de dirección | C-ENC-07, C-TX-06b, C-TX-09b |
 | **P-004c** | `TARGET_INICIAL` **por red**: mainnet `0x1c07fff8` (primer bloque en `T` = 120 s con ≈1,15 GH/s), testnet `0x1d00ffff`. La constante estima el hashrate del día 1 y nada más. Recalibrable con benchmark hasta el génesis | C-DIFF-02 |
 
@@ -1977,8 +2169,8 @@ cadena**. Los seis huecos están escritos:
 | §12 · Reorganizaciones | C-REORG-01..07 |
 | §13 · Profundidad de confirmación | política de producto, no normativa |
 | §14 · Activación de cambios de consenso | C-UPG-01..08 |
-| §15 · Bloque génesis | C-GEN-01..05 |
-| §16 · Parámetros de red | C-NET-01 |
+| §15 · Bloque génesis | C-GEN-01..07 |
+| §16 · Parámetros de red | C-NET-01..12 |
 
 ### Aparcadas — evaluadas, con factura desglosada, NO adoptadas
 
