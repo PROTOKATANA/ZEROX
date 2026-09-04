@@ -46,6 +46,7 @@
 //! En construcción (Fase 5). Hecho: parámetros de red, límites, composición de behaviours.
 
 pub mod behaviour;
+pub mod codec;
 pub mod config;
 pub mod error;
 pub mod limites;

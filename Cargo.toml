@@ -56,6 +56,11 @@ tokio     = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "tim
 cxx       = "=1.0.199"
 cxx-build = "=1.0.199"
 
+# --- async, solo para la frontera de libp2p ---
+# El trait `Codec` de request-response usa `#[async_trait]`, así que no es opcional.
+async-trait = "=0.1.92"
+futures     = "=0.3.34"
+
 # --- errores, logging, CLI ---
 thiserror          = "=2.0.20"
 anyhow             = "=1.0.104"
@@ -65,7 +70,10 @@ clap               = { version = "=4.6.6", features = ["derive"] }
 hex                = "=0.4.3"
 
 # --- test ---
-proptest  = "=1.11.0"
+proptest        = "=1.11.0"
+# Par de extremos AsyncRead/AsyncWrite en memoria: testear un Codec sin levantar un Swarm.
+# Es el patrón que usa el propio rust-libp2p en `request-response/src/cbor.rs`.
+futures_ringbuf = "=0.4.0"
 criterion = "=0.8.2"
 
 # ─────────────────────────────────────────────────────────────────────────
