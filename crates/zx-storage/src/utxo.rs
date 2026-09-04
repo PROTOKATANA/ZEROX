@@ -232,6 +232,7 @@ mod tests {
     use crate::error::StorageError;
     use zx_consensus::validacion::{ConjuntoUtxo, EntradaUtxo, VERSION_TX};
     use zx_core::amount::Amount;
+    use zx_core::firma::ClavePublica;
     use zx_core::preimage::tx::txid;
     use zx_core::tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
 
@@ -239,7 +240,7 @@ mod tests {
         TxOut {
             value: Amount::nuevo(brek).unwrap(),
             lock: Lock::PubKey {
-                pubkey_hash: [k; 32],
+                pubkey: ClavePublica::desde_bytes([k; 32]),
             },
         }
     }
@@ -348,7 +349,7 @@ mod tests {
         assert_eq!(
             consumido.salida.lock,
             Lock::PubKey {
-                pubkey_hash: [7; 32]
+                pubkey: ClavePublica::desde_bytes([7; 32])
             },
             "condición de bloqueo"
         );
@@ -438,7 +439,7 @@ mod tests {
             salida: SpentOutput {
                 value: Amount::nuevo(1).unwrap(),
                 lock: Lock::PubKey {
-                    pubkey_hash: [0; 32],
+                    pubkey: ClavePublica::desde_bytes([0; 32]),
                 },
             },
             altura_creacion: 0,

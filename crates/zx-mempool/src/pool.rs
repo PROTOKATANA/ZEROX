@@ -249,6 +249,7 @@ mod tests {
     use zx_consensus::peso::{MAX_TX_WEIGHT, MedianaLarga, ZONA_LIBRE};
     use zx_core::amount::Amount;
     use zx_core::digest::{Digest, TxId};
+    use zx_core::firma::ClavePublica;
     use zx_core::tx::{Lock, Tx, TxOut};
 
     fn ctx() -> ContextoMempool {
@@ -270,7 +271,7 @@ mod tests {
             outputs: vec![TxOut {
                 value: Amount::CERO,
                 lock: Lock::PubKey {
-                    pubkey_hash: [0; 32],
+                    pubkey: ClavePublica::desde_bytes([0; 32]),
                 },
             }],
             lock_time: 0,

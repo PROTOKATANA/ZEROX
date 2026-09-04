@@ -16,6 +16,7 @@ pub mod tx;
 
 use crate::digest::Digest;
 use crate::encoding::compact_size;
+use crate::firma::ClavePublica;
 use crate::hash::{DomainTag, h_d};
 use crate::tx::Lock;
 
@@ -63,9 +64,19 @@ impl PreimageWriter {
         self
     }
 
-    /// Escribe 32 bytes crudos: un hash de clave, una preimagen de HTLC.
+    /// Escribe 32 bytes crudos: el hash de la preimagen de un HTLC.
     pub(crate) fn h32(&mut self, v: &[u8; 32]) -> &mut Self {
         self.0.extend_from_slice(v);
+        self
+    }
+
+    /// Escribe una clave pública Ed25519 (32 bytes).
+    ///
+    /// Existe aparte de [`Self::h32`] a propósito: los dos escriben 32 bytes, pero confundir una
+    /// clave con un hash es exactamente el error que P-020 hacía posible mientras eran el mismo
+    /// tipo. Aquí el tipo lo impide.
+    pub(crate) fn clave(&mut self, k: &ClavePublica) -> &mut Self {
+        self.0.extend_from_slice(k.bytes());
         self
     }
 
@@ -83,14 +94,14 @@ impl PreimageWriter {
     pub(crate) fn lock(&mut self, l: &Lock) -> &mut Self {
         self.u8(l.discriminante());
         match l {
-            Lock::PubKey { pubkey_hash } => {
-                self.h32(pubkey_hash);
+            Lock::PubKey { pubkey } => {
+                self.clave(pubkey);
             }
-            Lock::MultiSig { k, pubkey_hashes } => {
+            Lock::MultiSig { k, pubkeys } => {
                 self.u8(*k);
-                self.compact_size(pubkey_hashes.len() as u64);
-                for h in pubkey_hashes {
-                    self.h32(h);
+                self.compact_size(pubkeys.len() as u64);
+                for p in pubkeys {
+                    self.clave(p);
                 }
             }
             Lock::Htlc {
@@ -100,8 +111,8 @@ impl PreimageWriter {
                 timeout,
             } => {
                 self.h32(hash);
-                self.h32(receiver);
-                self.h32(sender);
+                self.clave(receiver);
+                self.clave(sender);
                 self.u32(*timeout);
             }
         }

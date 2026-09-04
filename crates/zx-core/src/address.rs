@@ -33,8 +33,7 @@ use bech32::primitives::decode::CheckedHrpstring;
 use bech32::{Bech32m, Hrp};
 
 use crate::error::EncodingError;
-use crate::hash::sha3_256;
-use crate::tx::HashClave;
+use crate::firma::{ClavePublica, LONGITUD_CLAVE};
 
 /// HRP de mainnet, pool transparente (C-ENC-06).
 pub const HRP_MAINNET: &str = "zzk";
@@ -74,32 +73,30 @@ impl Red {
     }
 }
 
-/// Dirección transparente: red + `SHA3-256(pubkey)` completo (C-ENC-07).
+/// Dirección transparente: red + **la clave pública Ed25519** (C-ENC-07).
+///
+/// # P2K, no P2KH (P-020)
+///
+/// La dirección lleva la clave en claro, no `SHA3-256(pubkey)`. El hash de ZEROX mide 32 bytes y
+/// una clave Ed25519 mide **exactamente** 32 bytes, así que hashear no acortaba la dirección ni un
+/// carácter: solo obligaba a repetir la clave en el testigo al gastar, 32 bytes por entrada.
+///
+/// La contrapartida —la clave queda expuesta al **recibir**, no al gastar— está asumida y razonada
+/// en P-020: la defensa post-cuántica de ZEROX es un network upgrade con una variante nueva de
+/// `Lock`, no el formato de dirección.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Address {
     /// Red a la que pertenece.
     pub red: Red,
-    /// `SHA3-256(pubkey)`, 32 bytes sin truncar.
-    pub pubkey_hash: HashClave,
+    /// La clave pública, 32 bytes.
+    pub pubkey: ClavePublica,
 }
 
 impl Address {
-    /// Deriva la dirección de una clave pública (C-ENC-07).
-    ///
-    /// El hash va **completo**. 20 bytes darían 80 bits de resistencia a colisiones, insuficiente
-    /// para una cadena que nace en 2026, y el coste de los 12 bytes extra es irrelevante.
+    /// Construye la dirección de una clave pública (C-ENC-07).
     #[must_use]
-    pub fn de_pubkey(red: Red, pubkey: &[u8]) -> Self {
-        Self {
-            red,
-            pubkey_hash: *sha3_256(pubkey).as_bytes(),
-        }
-    }
-
-    /// Construye desde un hash ya calculado.
-    #[must_use]
-    pub const fn de_hash(red: Red, pubkey_hash: HashClave) -> Self {
-        Self { red, pubkey_hash }
+    pub const fn de_pubkey(red: Red, pubkey: ClavePublica) -> Self {
+        Self { red, pubkey }
     }
 
     /// Codifica en bech32m, en minúsculas.
@@ -113,7 +110,7 @@ impl Address {
                 motivo: "HRP inválido",
             }
         })?;
-        bech32::encode_lower::<Bech32m>(hrp, &self.pubkey_hash).map_err(|_| {
+        bech32::encode_lower::<Bech32m>(hrp, self.pubkey.bytes()).map_err(|_| {
             EncodingError::DireccionInvalida {
                 motivo: "fallo al codificar bech32m",
             }
@@ -135,11 +132,16 @@ impl Address {
         let red = Red::desde_hrp(checked.hrp().as_str()).ok_or_else(|| malo("HRP desconocido"))?;
 
         let datos: Vec<u8> = checked.byte_iter().collect();
-        let pubkey_hash: HashClave = datos
+        let bytes: [u8; LONGITUD_CLAVE] = datos
             .try_into()
             .map_err(|_| malo("una dirección transparente MUST llevar 32 bytes exactos"))?;
 
-        Ok(Self { red, pubkey_hash })
+        // No se valida que los bytes decodifiquen a un punto de la curva: ZIP-215 exige aceptar
+        // codificaciones no canónicas, y rechazarlas aquí sería una divergencia con `verificar`.
+        Ok(Self {
+            red,
+            pubkey: ClavePublica::desde_bytes(bytes),
+        })
     }
 }
 
@@ -151,11 +153,11 @@ impl Address {
 )]
 mod tests {
     use super::{Address, HRP_MAINNET, HRP_TESTNET, Red};
-    use crate::tx::LONGITUD_HASH_CLAVE;
+    use crate::firma::{ClavePublica, LONGITUD_CLAVE};
     use bech32::{Bech32, Bech32m, Hrp};
 
     fn dir(red: Red, n: u8) -> Address {
-        Address::de_hash(red, [n; LONGITUD_HASH_CLAVE])
+        Address::de_pubkey(red, ClavePublica::desde_bytes([n; LONGITUD_CLAVE]))
     }
 
     #[test]
@@ -227,7 +229,7 @@ mod tests {
     #[test]
     fn se_rechaza_el_checksum_bech32_antiguo() {
         let hrp = Hrp::parse(HRP_MAINNET).unwrap();
-        let datos = [0x5au8; LONGITUD_HASH_CLAVE];
+        let datos = [0x5au8; LONGITUD_CLAVE];
 
         let con_m = bech32::encode_lower::<Bech32m>(hrp, &datos).unwrap();
         let sin_m = bech32::encode_lower::<Bech32>(hrp, &datos).unwrap();
@@ -263,7 +265,7 @@ mod tests {
         // Buscar una carga útil cuya codificación bech32 termine en 'p'.
         let mut encontrado = None;
         for n in 0u32..4096 {
-            let mut datos = [0u8; LONGITUD_HASH_CLAVE];
+            let mut datos = [0u8; LONGITUD_CLAVE];
             let n_bytes = n.to_le_bytes();
             if let Some(cabeza) = datos.get_mut(..n_bytes.len()) {
                 cabeza.copy_from_slice(&n_bytes);

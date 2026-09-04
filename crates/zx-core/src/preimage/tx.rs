@@ -319,13 +319,14 @@ mod tests {
     use crate::amount::Amount;
     use crate::digest::{Digest, TxId};
     use crate::error::EncodingError;
+    use crate::firma::ClavePublica;
     use crate::preimage::PreimageWriter;
-    use crate::tx::{HashClave, Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
+    use crate::tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
 
     const CBID: u32 = 0xc478_80ea;
 
-    fn clave(n: u8) -> HashClave {
-        [n; 32]
+    fn clave(n: u8) -> ClavePublica {
+        ClavePublica::desde_bytes([n; 32])
     }
 
     fn entrada(n: u8, seq: u32) -> TxIn {
@@ -341,18 +342,14 @@ mod tests {
     fn salida(brek: i64, k: u8) -> TxOut {
         TxOut {
             value: Amount::nuevo(brek).unwrap(),
-            lock: Lock::PubKey {
-                pubkey_hash: clave(k),
-            },
+            lock: Lock::PubKey { pubkey: clave(k) },
         }
     }
 
     fn gastada(brek: i64, k: u8) -> SpentOutput {
         SpentOutput {
             value: Amount::nuevo(brek).unwrap(),
-            lock: Lock::PubKey {
-                pubkey_hash: clave(k),
-            },
+            lock: Lock::PubKey { pubkey: clave(k) },
         }
     }
 
@@ -413,9 +410,7 @@ mod tests {
         assert_ne!(txid(&v, CBID), original, "value de salida");
 
         let mut v = base.clone();
-        v.outputs.first_mut().unwrap().lock = Lock::PubKey {
-            pubkey_hash: clave(99),
-        };
+        v.outputs.first_mut().unwrap().lock = Lock::PubKey { pubkey: clave(99) };
         assert_ne!(txid(&v, CBID), original, "lock de salida");
 
         // El orden importa: reordenar las salidas es otra transacción.
@@ -572,9 +567,7 @@ mod tests {
 
         let mut w2 = PreimageWriter::new();
         w2.lock(&Lock::multisig(1, vec![clave(1)]).unwrap());
-        w2.lock(&Lock::PubKey {
-            pubkey_hash: clave(2),
-        });
+        w2.lock(&Lock::PubKey { pubkey: clave(2) });
         let dos = w2.bytes().to_vec();
 
         assert_ne!(
@@ -588,12 +581,10 @@ mod tests {
     fn las_variantes_de_lock_no_colisionan() {
         let mut vistos: Vec<Vec<u8>> = Vec::new();
         let locks = [
-            Lock::PubKey {
-                pubkey_hash: clave(1),
-            },
+            Lock::PubKey { pubkey: clave(1) },
             Lock::multisig(1, vec![clave(1)]).unwrap(),
             Lock::Htlc {
-                hash: clave(1),
+                hash: [1u8; 32],
                 receiver: clave(1),
                 sender: clave(1),
                 timeout: 0,

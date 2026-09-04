@@ -1,5 +1,12 @@
 //! Satisfacción de las condiciones de gasto (SPEC §5.3, C-TX-06b, C-TX-06c).
 //!
+//! # P2K: el testigo NO lleva la clave (P-020)
+//!
+//! La clave pública vive en el `Lock` de la salida que se gasta, así que el testigo solo aporta la
+//! firma. Eso ahorra **32 bytes por entrada** frente a P2KH, y elimina de raíz la comprobación
+//! "¿la clave del testigo corresponde a la salida?": la clave *es* la de la salida, no hay nada que
+//! comparar y por tanto nada que se pueda dejar sin comparar.
+//!
 //! # Dos reglas que no son opcionales
 //!
 //! **Índices estrictamente crecientes en `MultiSig`.** Cierran dos agujeros a la vez: no hay dos
@@ -12,7 +19,7 @@
 
 use zx_core::digest::SigHash;
 use zx_core::encoding::compact_size;
-use zx_core::firma::{ClavePublica, Firma, LONGITUD_CLAVE, LONGITUD_FIRMA, verificar};
+use zx_core::firma::{ClavePublica, Firma, LONGITUD_FIRMA, verificar};
 use zx_core::sha3_256_publico;
 use zx_core::tx::Lock;
 
@@ -36,16 +43,22 @@ fn tomar<'a>(
         .ok_or(ConsensusError::TestigoMalFormado { motivo: que })
 }
 
-fn leer_clave_y_firma(bytes: &[u8]) -> Result<(ClavePublica, Firma, &[u8]), ConsensusError> {
-    let (k, resto) = tomar(bytes, LONGITUD_CLAVE, "falta la clave pública")?;
-    let (f, resto) = tomar(resto, LONGITUD_FIRMA, "falta la firma")?;
-
-    let mut kb = [0u8; LONGITUD_CLAVE];
-    kb.copy_from_slice(k);
+/// Lee una firma de 64 bytes. **No hay clave que leer**: la aporta el `Lock` (P2K, P-020).
+fn leer_firma(bytes: &[u8]) -> Result<(Firma, &[u8]), ConsensusError> {
+    let (f, resto) = tomar(bytes, LONGITUD_FIRMA, "falta la firma")?;
     let mut fb = [0u8; LONGITUD_FIRMA];
     fb.copy_from_slice(f);
+    Ok((Firma::desde_bytes(fb), resto))
+}
 
-    Ok((ClavePublica::desde_bytes(kb), Firma::desde_bytes(fb), resto))
+/// Verifica una firma contra la clave que declara la salida, con el motivo de error a medida.
+fn comprobar(
+    clave: &ClavePublica,
+    firma: &Firma,
+    msg: &[u8],
+    motivo: &'static str,
+) -> Result<(), ConsensusError> {
+    verificar(clave, firma, msg).map_err(|_| ConsensusError::CondicionNoSatisfecha { motivo })
 }
 
 /// Comprueba que un testigo satisface la condición de gasto de la salida (C-TX-06b, C-TX-06c).
@@ -63,20 +76,13 @@ pub fn satisface(
 ) -> Result<(), ConsensusError> {
     let msg = sighash.as_bytes();
     let resto = match lock {
-        Lock::PubKey { pubkey_hash } => {
-            let (clave, firma, resto) = leer_clave_y_firma(testigo)?;
-            if !clave.coincide_con(pubkey_hash) {
-                return Err(ConsensusError::CondicionNoSatisfecha {
-                    motivo: "la clave no corresponde al hash de la salida",
-                });
-            }
-            verificar(&clave, &firma, msg).map_err(|_| ConsensusError::CondicionNoSatisfecha {
-                motivo: "firma inválida",
-            })?;
+        Lock::PubKey { pubkey } => {
+            let (firma, resto) = leer_firma(testigo)?;
+            comprobar(pubkey, &firma, msg, "firma inválida")?;
             resto
         }
 
-        Lock::MultiSig { k, pubkey_hashes } => {
+        Lock::MultiSig { k, pubkeys } => {
             let mut resto = testigo;
             let mut anterior: Option<u8> = None;
 
@@ -96,23 +102,15 @@ pub fn satisface(
                 }
                 anterior = Some(idx);
 
-                let esperado = pubkey_hashes.get(usize::from(idx)).ok_or(
-                    ConsensusError::TestigoMalFormado {
-                        motivo: "índice de clave fuera de rango",
-                    },
-                )?;
+                let clave =
+                    pubkeys
+                        .get(usize::from(idx))
+                        .ok_or(ConsensusError::TestigoMalFormado {
+                            motivo: "índice de clave fuera de rango",
+                        })?;
 
-                let (clave, firma, r2) = leer_clave_y_firma(r)?;
-                if !clave.coincide_con(esperado) {
-                    return Err(ConsensusError::CondicionNoSatisfecha {
-                        motivo: "la clave no corresponde al índice declarado",
-                    });
-                }
-                verificar(&clave, &firma, msg).map_err(|_| {
-                    ConsensusError::CondicionNoSatisfecha {
-                        motivo: "firma inválida en MultiSig",
-                    }
-                })?;
+                let (firma, r2) = leer_firma(r)?;
+                comprobar(clave, &firma, msg, "firma inválida en MultiSig")?;
                 resto = r2;
             }
             resto
@@ -146,17 +144,13 @@ pub fn satisface(
                             motivo: "SHA3-256(preimagen) no coincide con el hash del HTLC",
                         });
                     }
-                    let (clave, firma, r2) = leer_clave_y_firma(r)?;
-                    if !clave.coincide_con(receiver) {
-                        return Err(ConsensusError::CondicionNoSatisfecha {
-                            motivo: "la vía de preimagen exige la firma del receptor",
-                        });
-                    }
-                    verificar(&clave, &firma, msg).map_err(|_| {
-                        ConsensusError::CondicionNoSatisfecha {
-                            motivo: "firma inválida",
-                        }
-                    })?;
+                    let (firma, r2) = leer_firma(r)?;
+                    comprobar(
+                        receiver,
+                        &firma,
+                        msg,
+                        "la vía de preimagen exige la firma del receptor",
+                    )?;
                     r2
                 }
 
@@ -167,17 +161,13 @@ pub fn satisface(
                             motivo: "la vía de timeout aún no está abierta",
                         });
                     }
-                    let (clave, firma, r2) = leer_clave_y_firma(r)?;
-                    if !clave.coincide_con(sender) {
-                        return Err(ConsensusError::CondicionNoSatisfecha {
-                            motivo: "la vía de timeout exige la firma del emisor",
-                        });
-                    }
-                    verificar(&clave, &firma, msg).map_err(|_| {
-                        ConsensusError::CondicionNoSatisfecha {
-                            motivo: "firma inválida",
-                        }
-                    })?;
+                    let (firma, r2) = leer_firma(r)?;
+                    comprobar(
+                        sender,
+                        &firma,
+                        msg,
+                        "la vía de timeout exige la firma del emisor",
+                    )?;
                     r2
                 }
 
@@ -211,7 +201,7 @@ mod tests {
     use zx_core::encoding::compact_size;
     use zx_core::firma::ClavePublica;
     use zx_core::sha3_256_publico;
-    use zx_core::tx::{HashClave, Lock};
+    use zx_core::tx::Lock;
 
     fn sighash() -> SigHash {
         SigHash::from_digest(Digest::from_bytes([0x5a; 32]))
@@ -223,13 +213,10 @@ mod tests {
         (sk, ClavePublica::desde_bytes(vk.into()))
     }
 
-    /// `pubkey(32) ‖ sig(64)` sobre el sighash dado.
-    fn testigo_pubkey(sk: &SigningKey, pk: &ClavePublica, sh: &SigHash) -> Vec<u8> {
-        let mut w = Vec::with_capacity(96);
-        w.extend_from_slice(pk.bytes());
+    /// `sig(64)` sobre el sighash dado. **P2K: sin clave** (P-020).
+    fn testigo_pubkey(sk: &SigningKey, sh: &SigHash) -> Vec<u8> {
         let firma: [u8; 64] = sk.sign(sh.as_bytes()).into();
-        w.extend_from_slice(&firma);
-        w
+        firma.to_vec()
     }
 
     fn ctx(altura: u32) -> ContextoGasto {
@@ -241,21 +228,17 @@ mod tests {
     #[test]
     fn pubkey_valida() {
         let (sk, pk) = par(1);
-        let lock = Lock::PubKey {
-            pubkey_hash: pk.hash(),
-        };
-        let w = testigo_pubkey(&sk, &pk, &sighash());
+        let lock = Lock::PubKey { pubkey: pk };
+        let w = testigo_pubkey(&sk, &sighash());
         assert!(satisface(&lock, &w, &sighash(), ctx(0)).is_ok());
     }
 
     #[test]
     fn pubkey_con_la_clave_equivocada() {
-        let (sk, pk) = par(2);
+        let (sk, _) = par(2);
         let (_, otra) = par(3);
-        let lock = Lock::PubKey {
-            pubkey_hash: otra.hash(),
-        };
-        let w = testigo_pubkey(&sk, &pk, &sighash());
+        let lock = Lock::PubKey { pubkey: otra };
+        let w = testigo_pubkey(&sk, &sighash());
         assert!(matches!(
             satisface(&lock, &w, &sighash(), ctx(0)),
             Err(ConsensusError::CondicionNoSatisfecha { .. })
@@ -266,10 +249,8 @@ mod tests {
     #[test]
     fn una_firma_no_sirve_para_otro_sighash() {
         let (sk, pk) = par(4);
-        let lock = Lock::PubKey {
-            pubkey_hash: pk.hash(),
-        };
-        let w = testigo_pubkey(&sk, &pk, &sighash());
+        let lock = Lock::PubKey { pubkey: pk };
+        let w = testigo_pubkey(&sk, &sighash());
         let otro = SigHash::from_digest(Digest::from_bytes([0x11; 32]));
         assert!(satisface(&lock, &w, &otro, ctx(0)).is_err());
     }
@@ -281,10 +262,8 @@ mod tests {
     #[test]
     fn el_relleno_sobrante_se_rechaza() {
         let (sk, pk) = par(5);
-        let lock = Lock::PubKey {
-            pubkey_hash: pk.hash(),
-        };
-        let mut w = testigo_pubkey(&sk, &pk, &sighash());
+        let lock = Lock::PubKey { pubkey: pk };
+        let mut w = testigo_pubkey(&sk, &sighash());
         assert!(
             satisface(&lock, &w, &sighash(), ctx(0)).is_ok(),
             "el testigo limpio vale"
@@ -305,11 +284,9 @@ mod tests {
     #[test]
     fn un_testigo_truncado_se_rechaza() {
         let (sk, pk) = par(6);
-        let lock = Lock::PubKey {
-            pubkey_hash: pk.hash(),
-        };
-        let w = testigo_pubkey(&sk, &pk, &sighash());
-        for n in [0usize, 1, 31, 32, 95] {
+        let lock = Lock::PubKey { pubkey: pk };
+        let w = testigo_pubkey(&sk, &sighash());
+        for n in [0usize, 1, 31, 32, 63] {
             assert!(
                 satisface(&lock, w.get(..n).unwrap(), &sighash(), ctx(0)).is_err(),
                 "{n} bytes debería rechazarse"
@@ -319,9 +296,9 @@ mod tests {
 
     // ── MultiSig ─────────────────────────────────────────────────────────────
 
-    fn entrada_multisig(idx: u8, sk: &SigningKey, pk: &ClavePublica, sh: &SigHash) -> Vec<u8> {
+    /// `indice(1) ‖ sig(64)`. **P2K: sin clave** (P-020).
+    fn entrada_multisig(idx: u8, sk: &SigningKey, sh: &SigHash) -> Vec<u8> {
         let mut e = vec![idx];
-        e.extend_from_slice(pk.bytes());
         let firma: [u8; 64] = sk.sign(sh.as_bytes()).into();
         e.extend_from_slice(&firma);
         e
@@ -332,11 +309,10 @@ mod tests {
         let (sk0, pk0) = par(10);
         let (_, pk1) = par(11);
         let (sk2, pk2) = par(12);
-        let hashes: Vec<HashClave> = vec![pk0.hash(), pk1.hash(), pk2.hash()];
-        let lock = Lock::multisig(2, hashes).unwrap();
+        let lock = Lock::multisig(2, vec![pk0, pk1, pk2]).unwrap();
 
-        let mut w = entrada_multisig(0, &sk0, &pk0, &sighash());
-        w.extend(entrada_multisig(2, &sk2, &pk2, &sighash()));
+        let mut w = entrada_multisig(0, &sk0, &sighash());
+        w.extend(entrada_multisig(2, &sk2, &sighash()));
         assert!(satisface(&lock, &w, &sighash(), ctx(0)).is_ok());
     }
 
@@ -346,11 +322,11 @@ mod tests {
         let (sk0, pk0) = par(10);
         let (_, pk1) = par(11);
         let (sk2, pk2) = par(12);
-        let lock = Lock::multisig(2, vec![pk0.hash(), pk1.hash(), pk2.hash()]).unwrap();
+        let lock = Lock::multisig(2, vec![pk0, pk1, pk2]).unwrap();
 
         // Las mismas dos firmas, en el otro orden: MUST rechazarse.
-        let mut w = entrada_multisig(2, &sk2, &pk2, &sighash());
-        w.extend(entrada_multisig(0, &sk0, &pk0, &sighash()));
+        let mut w = entrada_multisig(2, &sk2, &sighash());
+        w.extend(entrada_multisig(0, &sk0, &sighash()));
         let e = satisface(&lock, &w, &sighash(), ctx(0)).unwrap_err();
         assert!(
             matches!(e, ConsensusError::TestigoMalFormado { .. }),
@@ -363,10 +339,10 @@ mod tests {
     fn multisig_rechaza_la_misma_clave_dos_veces() {
         let (sk0, pk0) = par(10);
         let (_, pk1) = par(11);
-        let lock = Lock::multisig(2, vec![pk0.hash(), pk1.hash()]).unwrap();
+        let lock = Lock::multisig(2, vec![pk0, pk1]).unwrap();
 
-        let mut w = entrada_multisig(0, &sk0, &pk0, &sighash());
-        w.extend(entrada_multisig(0, &sk0, &pk0, &sighash()));
+        let mut w = entrada_multisig(0, &sk0, &sighash());
+        w.extend(entrada_multisig(0, &sk0, &sighash()));
         assert!(
             satisface(&lock, &w, &sighash(), ctx(0)).is_err(),
             "una sola firma no puede contar dos veces"
@@ -377,8 +353,8 @@ mod tests {
     fn multisig_rechaza_menos_firmas_de_las_exigidas() {
         let (sk0, pk0) = par(10);
         let (_, pk1) = par(11);
-        let lock = Lock::multisig(2, vec![pk0.hash(), pk1.hash()]).unwrap();
-        let w = entrada_multisig(0, &sk0, &pk0, &sighash());
+        let lock = Lock::multisig(2, vec![pk0, pk1]).unwrap();
+        let w = entrada_multisig(0, &sk0, &sighash());
         assert!(
             satisface(&lock, &w, &sighash(), ctx(0)).is_err(),
             "1 de 2 no basta"
@@ -390,10 +366,10 @@ mod tests {
     fn multisig_rechaza_una_firma_de_mas() {
         let (sk0, pk0) = par(10);
         let (sk1, pk1) = par(11);
-        let lock = Lock::multisig(1, vec![pk0.hash(), pk1.hash()]).unwrap();
+        let lock = Lock::multisig(1, vec![pk0, pk1]).unwrap();
 
-        let mut w = entrada_multisig(0, &sk0, &pk0, &sighash());
-        w.extend(entrada_multisig(1, &sk1, &pk1, &sighash()));
+        let mut w = entrada_multisig(0, &sk0, &sighash());
+        w.extend(entrada_multisig(1, &sk1, &sighash()));
         assert!(
             satisface(&lock, &w, &sighash(), ctx(0)).is_err(),
             "k = 1 exige exactamente 1"
@@ -403,8 +379,8 @@ mod tests {
     #[test]
     fn multisig_rechaza_indice_fuera_de_rango() {
         let (sk0, pk0) = par(10);
-        let lock = Lock::multisig(1, vec![pk0.hash()]).unwrap();
-        let w = entrada_multisig(7, &sk0, &pk0, &sighash());
+        let lock = Lock::multisig(1, vec![pk0]).unwrap();
+        let w = entrada_multisig(7, &sk0, &sighash());
         assert!(satisface(&lock, &w, &sighash(), ctx(0)).is_err());
     }
 
@@ -418,30 +394,23 @@ mod tests {
     ) -> Lock {
         Lock::Htlc {
             hash: *sha3_256_publico(preimagen).as_bytes(),
-            receiver: receptor.hash(),
-            sender: emisor.hash(),
+            receiver: *receptor,
+            sender: *emisor,
             timeout,
         }
     }
 
-    fn testigo_htlc_preimagen(
-        preimagen: &[u8],
-        sk: &SigningKey,
-        pk: &ClavePublica,
-        sh: &SigHash,
-    ) -> Vec<u8> {
+    fn testigo_htlc_preimagen(preimagen: &[u8], sk: &SigningKey, sh: &SigHash) -> Vec<u8> {
         let mut w = vec![0x00];
         compact_size::escribir(&mut w, preimagen.len() as u64);
         w.extend_from_slice(preimagen);
-        w.extend_from_slice(pk.bytes());
         let firma: [u8; 64] = sk.sign(sh.as_bytes()).into();
         w.extend_from_slice(&firma);
         w
     }
 
-    fn testigo_htlc_timeout(sk: &SigningKey, pk: &ClavePublica, sh: &SigHash) -> Vec<u8> {
+    fn testigo_htlc_timeout(sk: &SigningKey, sh: &SigHash) -> Vec<u8> {
         let mut w = vec![0x01];
-        w.extend_from_slice(pk.bytes());
         let firma: [u8; 64] = sk.sign(sh.as_bytes()).into();
         w.extend_from_slice(&firma);
         w
@@ -454,7 +423,7 @@ mod tests {
         let secreto = b"el secreto del canal de pago";
         let lock = htlc(secreto, &pk_r, &pk_s, 1000);
 
-        let w = testigo_htlc_preimagen(secreto, &sk_r, &pk_r, &sighash());
+        let w = testigo_htlc_preimagen(secreto, &sk_r, &sighash());
         assert!(
             satisface(&lock, &w, &sighash(), ctx(0)).is_ok(),
             "antes del timeout, con secreto"
@@ -466,7 +435,7 @@ mod tests {
         let (sk_r, pk_r) = par(20);
         let (_, pk_s) = par(21);
         let lock = htlc(b"el secreto", &pk_r, &pk_s, 1000);
-        let w = testigo_htlc_preimagen(b"otro secreto", &sk_r, &pk_r, &sighash());
+        let w = testigo_htlc_preimagen(b"otro secreto", &sk_r, &sighash());
         assert!(matches!(
             satisface(&lock, &w, &sighash(), ctx(0)),
             Err(ConsensusError::CondicionNoSatisfecha { .. })
@@ -481,7 +450,7 @@ mod tests {
         let secreto = b"secreto";
         let lock = htlc(secreto, &pk_r, &pk_s, 1000);
         // El emisor conoce el secreto pero no puede usar esta vía.
-        let w = testigo_htlc_preimagen(secreto, &sk_s, &pk_s, &sighash());
+        let w = testigo_htlc_preimagen(secreto, &sk_s, &sighash());
         assert!(satisface(&lock, &w, &sighash(), ctx(0)).is_err());
     }
 
@@ -491,7 +460,7 @@ mod tests {
         let (_, pk_r) = par(20);
         let (sk_s, pk_s) = par(21);
         let lock = htlc(b"x", &pk_r, &pk_s, 1000);
-        let w = testigo_htlc_timeout(&sk_s, &pk_s, &sighash());
+        let w = testigo_htlc_timeout(&sk_s, &sighash());
 
         assert!(
             satisface(&lock, &w, &sighash(), ctx(999)).is_err(),
@@ -509,7 +478,7 @@ mod tests {
         let (sk_r, pk_r) = par(20);
         let (_, pk_s) = par(21);
         let lock = htlc(b"x", &pk_r, &pk_s, 1000);
-        let w = testigo_htlc_timeout(&sk_r, &pk_r, &sighash());
+        let w = testigo_htlc_timeout(&sk_r, &sighash());
         assert!(satisface(&lock, &w, &sighash(), ctx(2000)).is_err());
     }
 
@@ -518,7 +487,7 @@ mod tests {
         let (_, pk_r) = par(20);
         let (sk_s, pk_s) = par(21);
         let lock = htlc(b"x", &pk_r, &pk_s, 0);
-        let mut w = testigo_htlc_timeout(&sk_s, &pk_s, &sighash());
+        let mut w = testigo_htlc_timeout(&sk_s, &sighash());
         if let Some(v) = w.first_mut() {
             *v = 0x02;
         }
@@ -534,7 +503,7 @@ mod tests {
         let (sk_r, pk_r) = par(20);
         let (_, pk_s) = par(21);
         let lock = htlc(b"", &pk_r, &pk_s, 1000);
-        let w = testigo_htlc_preimagen(b"", &sk_r, &pk_r, &sighash());
+        let w = testigo_htlc_preimagen(b"", &sk_r, &sighash());
         assert!(satisface(&lock, &w, &sighash(), ctx(0)).is_ok());
     }
 }

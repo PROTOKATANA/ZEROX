@@ -267,6 +267,7 @@ mod tests {
     use crate::validacion::{ConjuntoUtxo, EntradaUtxo, VERSION_TX};
     use zx_core::amount::Amount;
     use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
+    use zx_core::firma::ClavePublica;
     use zx_core::preimage::block::{BlockHeader, merkle_root};
     use zx_core::preimage::tx::txid;
     use zx_core::target::{CompactBits, min_target, pow_limit};
@@ -311,7 +312,7 @@ mod tests {
             outputs: vec![TxOut {
                 value: Amount::nuevo(brek).unwrap(),
                 lock: Lock::PubKey {
-                    pubkey_hash: [0xAA; 32],
+                    pubkey: ClavePublica::desde_bytes([0xAA; 32]),
                 },
             }],
             lock_time: 0,

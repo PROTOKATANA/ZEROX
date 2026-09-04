@@ -7,18 +7,10 @@
 use crate::amount::Amount;
 use crate::digest::TxId;
 use crate::error::EncodingError;
-
-/// Longitud de un hash de clave pública: `SHA3-256(pubkey)` **completo** (C-ENC-07).
-///
-/// 32 bytes, sin truncar. 20 bytes darían 80 bits de resistencia a colisiones, insuficiente para
-/// una cadena que nace en 2026.
-pub const LONGITUD_HASH_CLAVE: usize = 32;
+use crate::firma::ClavePublica;
 
 /// Máximo de claves en un `MultiSig` (C-TX-11).
 pub const MAX_MULTISIG_KEYS: usize = 16;
-
-/// Hash de una clave pública: `SHA3-256(pubkey)`.
-pub type HashClave = [u8; LONGITUD_HASH_CLAVE];
 
 /// Referencia a una salida concreta de una transacción anterior.
 ///
@@ -52,17 +44,21 @@ pub struct TxIn {
 /// campo `version` de la transacción, no un intérprete.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Lock {
-    /// Gastable con la firma de la clave cuyo hash coincide.
+    /// Gastable con la firma de esta clave.
+    ///
+    /// **P2K, no P2KH** (P-020): la salida guarda la clave Ed25519 en claro, no su hash. Como
+    /// `SHA3-256` produce 32 bytes y una clave Ed25519 mide **exactamente** 32 bytes, hashear no
+    /// ahorraba un solo byte aquí y costaba 32 bytes por entrada en el testigo.
     PubKey {
-        /// `SHA3-256(pubkey)`.
-        pubkey_hash: HashClave,
+        /// La clave pública Ed25519, 32 bytes.
+        pubkey: ClavePublica,
     },
     /// Gastable con `k` firmas de `k` claves distintas del conjunto.
     MultiSig {
         /// Umbral de firmas necesarias.
         k: u8,
-        /// Hashes de las claves admitidas.
-        pubkey_hashes: Vec<HashClave>,
+        /// Las claves admitidas, en claro (P2K, ver [`Lock::PubKey`]).
+        pubkeys: Vec<ClavePublica>,
     },
     /// Hash Time-Locked Contract.
     ///
@@ -74,10 +70,10 @@ pub enum Lock {
     Htlc {
         /// `SHA3-256(preimagen)`.
         hash: [u8; 32],
-        /// Quien puede gastar presentando la preimagen.
-        receiver: HashClave,
-        /// Quien recupera los fondos pasado el `timeout`.
-        sender: HashClave,
+        /// Clave de quien puede gastar presentando la preimagen.
+        receiver: ClavePublica,
+        /// Clave de quien recupera los fondos pasado el `timeout`.
+        sender: ClavePublica,
         /// Altura a partir de la cual `sender` puede recuperar.
         timeout: u32,
     },
@@ -107,8 +103,8 @@ impl Lock {
     /// # Errores
     /// [`EncodingError::MultiSigInvalido`] si `k` está fuera de `1..=n`, si `n > MAX_MULTISIG_KEYS`,
     /// o si hay claves repetidas.
-    pub fn multisig(k: u8, pubkey_hashes: Vec<HashClave>) -> Result<Self, EncodingError> {
-        let n = pubkey_hashes.len();
+    pub fn multisig(k: u8, pubkeys: Vec<ClavePublica>) -> Result<Self, EncodingError> {
+        let n = pubkeys.len();
         let fallo = |motivo| EncodingError::MultiSigInvalido { k, n, motivo };
 
         if n == 0 || n > MAX_MULTISIG_KEYS {
@@ -119,14 +115,14 @@ impl Lock {
         }
         // C-TX-11: las claves MUST ser distintas entre sí. Con n ≤ 16 la comparación cuadrática es
         // más barata y más simple de auditar que ordenar.
-        let mut vistas: Vec<&HashClave> = Vec::with_capacity(n);
-        for h in &pubkey_hashes {
+        let mut vistas: Vec<&ClavePublica> = Vec::with_capacity(n);
+        for h in &pubkeys {
             if vistas.contains(&h) {
                 return Err(fallo("las claves deben ser distintas"));
             }
             vistas.push(h);
         }
-        Ok(Self::MultiSig { k, pubkey_hashes })
+        Ok(Self::MultiSig { k, pubkeys })
     }
 }
 
@@ -172,21 +168,15 @@ pub struct SpentOutput {
 
 #[cfg(test)]
 mod tests {
-    use super::{HashClave, Lock, MAX_MULTISIG_KEYS};
+    use super::{ClavePublica, Lock, MAX_MULTISIG_KEYS};
 
-    fn clave(n: u8) -> HashClave {
-        [n; 32]
+    fn clave(n: u8) -> ClavePublica {
+        ClavePublica::desde_bytes([n; 32])
     }
 
     #[test]
     fn los_discriminantes_son_los_del_spec() {
-        assert_eq!(
-            Lock::PubKey {
-                pubkey_hash: clave(0)
-            }
-            .discriminante(),
-            0x00
-        );
+        assert_eq!(Lock::PubKey { pubkey: clave(0) }.discriminante(), 0x00);
         assert_eq!(Lock::DISC_MULTISIG, 0x01);
         assert_eq!(Lock::DISC_HTLC, 0x02);
     }
@@ -209,7 +199,7 @@ mod tests {
     #[test]
     fn multisig_rechaza_n_fuera_de_rango() {
         assert!(Lock::multisig(1, vec![]).is_err(), "n = 0");
-        let demasiadas: Vec<HashClave> = (0..=u8::try_from(MAX_MULTISIG_KEYS).unwrap_or(16))
+        let demasiadas: Vec<ClavePublica> = (0..=u8::try_from(MAX_MULTISIG_KEYS).unwrap_or(16))
             .map(clave)
             .collect();
         assert!(
@@ -228,7 +218,7 @@ mod tests {
 
     #[test]
     fn dieciseis_claves_es_el_limite_exacto() {
-        let justas: Vec<HashClave> = (0..16).map(clave).collect();
+        let justas: Vec<ClavePublica> = (0..16).map(clave).collect();
         assert_eq!(justas.len(), MAX_MULTISIG_KEYS);
         assert!(Lock::multisig(16, justas).is_ok());
     }

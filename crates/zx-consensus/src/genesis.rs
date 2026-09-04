@@ -16,6 +16,7 @@
 
 use zx_core::amount::Amount;
 use zx_core::digest::{BlockHash, Digest, TxId};
+use zx_core::firma::ClavePublica;
 use zx_core::preimage::block::{BlockHeader, merkle_root};
 use zx_core::preimage::tx::txid;
 use zx_core::target::{CompactBits, TARGET_INICIAL_BITS};
@@ -78,6 +79,11 @@ pub const GENESIS_TESTNET: ParametrosGenesis = ParametrosGenesis {
 pub fn coinbase_genesis(mensaje: &[u8]) -> Tx {
     // El mensaje se compacta a 32 bytes con XOR por posición. No es criptográfico ni pretende
     // serlo: el mensaje íntegro vive en los parámetros, que son públicos y reproducibles.
+    //
+    // Los 32 bytes ocupan el hueco de una clave pública, y casi con certeza NO son una clave válida
+    // — que es justo lo que se quiere: la salida es inconectable por C-GEN-03 y además nadie tiene
+    // la privada. Con P2K (P-020) esto es más honesto que antes: ya no finge ser el hash de una
+    // clave que existe en alguna parte.
     let mut marca = [0u8; 32];
     for (i, b) in mensaje.iter().enumerate() {
         if let Some(d) = marca.get_mut(i % 32) {
@@ -89,7 +95,9 @@ pub fn coinbase_genesis(mensaje: &[u8]) -> Tx {
         inputs: vec![],
         outputs: vec![TxOut {
             value: Amount::CERO,
-            lock: Lock::PubKey { pubkey_hash: marca },
+            lock: Lock::PubKey {
+                pubkey: ClavePublica::desde_bytes(marca),
+            },
         }],
         lock_time: 0,
         // C-EMIT-04: la coinbase declara su altura. El génesis está en la 0.

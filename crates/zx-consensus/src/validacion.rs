@@ -58,11 +58,11 @@ const fn tam_compact_size(v: u64) -> u64 {
 #[must_use]
 pub fn tam_lock(lock: &Lock) -> u64 {
     match lock {
-        // 0x00 ‖ hash(32)
+        // 0x00 ‖ pubkey(32)
         Lock::PubKey { .. } => 33,
-        // 0x01 ‖ k(1) ‖ CompactSize(n) ‖ n × hash(32)
-        Lock::MultiSig { pubkey_hashes, .. } => {
-            let n = pubkey_hashes.len() as u64;
+        // 0x01 ‖ k(1) ‖ CompactSize(n) ‖ n × pubkey(32)
+        Lock::MultiSig { pubkeys, .. } => {
+            let n = pubkeys.len() as u64;
             2 + tam_compact_size(n) + 32 * n
         }
         // 0x02 ‖ hash(32) ‖ receiver(32) ‖ sender(32) ‖ timeout(4)
@@ -227,7 +227,8 @@ mod tests {
     use crate::peso::MAX_TX_WEIGHT;
     use zx_core::amount::Amount;
     use zx_core::digest::{Digest, TxId};
-    use zx_core::tx::{HashClave, Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
+    use zx_core::firma::ClavePublica;
+    use zx_core::tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
 
     /// UTXO set de juguete: una lista, que para un test es más auditable que un mapa.
     struct UtxosFalsos(Vec<(OutPoint, EntradaUtxo)>);
@@ -238,8 +239,8 @@ mod tests {
         }
     }
 
-    fn clave(n: u8) -> HashClave {
-        [n; 32]
+    fn clave(n: u8) -> ClavePublica {
+        ClavePublica::desde_bytes([n; 32])
     }
 
     fn outpoint(n: u8) -> OutPoint {
@@ -260,7 +261,7 @@ mod tests {
         TxOut {
             value: Amount::nuevo(brek).unwrap(),
             lock: Lock::PubKey {
-                pubkey_hash: clave(0xEE),
+                pubkey: clave(0xEE),
             },
         }
     }
@@ -269,9 +270,7 @@ mod tests {
         EntradaUtxo {
             salida: SpentOutput {
                 value: Amount::nuevo(brek).unwrap(),
-                lock: Lock::PubKey {
-                    pubkey_hash: clave(1),
-                },
+                lock: Lock::PubKey { pubkey: clave(1) },
             },
             altura_creacion,
             es_coinbase,
@@ -446,15 +445,50 @@ mod tests {
 
     // ── Peso ─────────────────────────────────────────────────────────────────
 
+    /// **P-020 · el ahorro de P2K, en bytes concretos.**
+    ///
+    /// El testigo de una entrada `PubKey` mide 64 B (solo la firma), no 96 B (clave ‖ firma). Este
+    /// test fija la cuenta completa de una transacción 2-in/2-out y **calcula también** lo que
+    /// pesaría con P2KH, para que el número del 17 % no sea una afirmación de un documento sino algo
+    /// que el código reproduce. Si alguien reintroduce la clave en el testigo, esto falla.
+    #[test]
+    fn p2k_ahorra_32_bytes_por_entrada() {
+        const TESTIGO_P2K: usize = 64; // sig(64)
+        const TESTIGO_P2KH: usize = 96; // pubkey(32) ‖ sig(64)
+
+        let tx = Tx {
+            version: VERSION_TX,
+            inputs: vec![entrada(1), entrada(2)],
+            outputs: vec![salida(1_000), salida(2_000)],
+            lock_time: 0,
+            expiry_height: 0,
+        };
+
+        let p2k = peso_tx(&tx, &[vec![0u8; TESTIGO_P2K], vec![0u8; TESTIGO_P2K]]);
+        let p2kh = peso_tx(&tx, &[vec![0u8; TESTIGO_P2KH], vec![0u8; TESTIGO_P2KH]]);
+
+        // 12 + CS(2) + 2·40 + CS(2) + 2·(8+33) + CS(2) + 2·(CS(64)+64)
+        assert_eq!(
+            p2k,
+            12 + 1 + 80 + 1 + 82 + 1 + 2 * (1 + 64),
+            "cuenta de P2K"
+        );
+        assert_eq!(p2k, 307);
+        assert_eq!(p2kh, 371);
+
+        assert_eq!(p2kh - p2k, 64, "32 bytes por cada una de las 2 entradas");
+        // El ahorro está entre el 17 % y el 18 %, comprobado sin dividir ni usar floats:
+        // 17·p2kh ≤ 100·(p2kh − p2k) < 18·p2kh.
+        let ahorro = p2kh - p2k;
+        assert!(
+            17 * p2kh <= 100 * ahorro && 100 * ahorro < 18 * p2kh,
+            "el ahorro MUST rondar el 17 % en una 2-in/2-out: {ahorro}/{p2kh}"
+        );
+    }
+
     #[test]
     fn el_tamano_de_lock_es_el_de_su_codificacion_canonica() {
-        assert_eq!(
-            tam_lock(&Lock::PubKey {
-                pubkey_hash: clave(0)
-            }),
-            33,
-            "1 + 32"
-        );
+        assert_eq!(tam_lock(&Lock::PubKey { pubkey: clave(0) }), 33, "1 + 32");
         assert_eq!(
             tam_lock(&Lock::multisig(1, vec![clave(1), clave(2)]).unwrap()),
             2 + 1 + 64,
@@ -462,7 +496,7 @@ mod tests {
         );
         assert_eq!(
             tam_lock(&Lock::Htlc {
-                hash: clave(1),
+                hash: [1u8; 32],
                 receiver: clave(2),
                 sender: clave(3),
                 timeout: 0

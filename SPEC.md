@@ -179,15 +179,38 @@ usarse un decodificador permisivo que acepte cualquiera de los dos.
 > dirección, y un sistema de pagos que las trate como identificadores distintos se descuadra.
 > Verificado en el código del crate, `bech32-0.12.0/src/lib.rs:218-233`.
 
-**C-ENC-07** · Una dirección transparente codifica `SHA3-256(pubkey)` **completo, 32 bytes**.
-**MUST NOT** truncarse. Un decodificador **MUST** rechazar cualquier longitud distinta de 32.
+**C-ENC-07 · Una dirección transparente codifica la CLAVE PÚBLICA Ed25519, 32 bytes.** No su hash.
+Un decodificador **MUST** rechazar cualquier longitud distinta de 32.
 
-> Decidido 2026-09-04. 20 bytes (estilo Bitcoin) dan 80 bits de resistencia a colisiones,
-> insuficiente para una cadena que nace en 2026. El coste son 12 bytes por salida y ~17 caracteres
-> más en la representación bech32 — irrelevante para un QR de checkout. Elimina una clase entera
-> de análisis de seguridad.
+Los 32 bytes **MUST NOT** validarse como punto de la curva al decodificar la dirección: ZIP-215
+exige aceptar codificaciones no canónicas (C-SIG-03), y rechazarlas aquí divergiría del verificador.
 
-### 2.4 · Serialización de wire vs preimagen de hashing
+> ⚠️ **Cambiado 2026-09-04 — P-020 cerrado: ZEROX usa P2K, no P2KH.** Antes decía
+> `SHA3-256(pubkey)`.
+>
+> **El hallazgo que lo desencadenó.** `SHA3-256` produce 32 bytes y una clave Ed25519 mide
+> **exactamente** 32 bytes. Hashear no acortaba la dirección **ni un carácter**: solo obligaba a
+> repetir la clave en el testigo al gastar. Coste medido: **32 bytes por entrada**, verificado por el
+> test `p2k_ahorra_32_bytes_por_entrada` (una 2-in/2-out pasa de **371 a 307** unidades de peso,
+> **−17,2 %**).
+>
+> **Por qué la contrapartida post-cuántica no compensa aquí.** P2KH retrasa la exposición de la clave
+> del momento de *recibir* al de *gastar*, lo que en Bitcoin se cita como capa de defensa frente a un
+> CRQC. En ZEROX ese argumento no se sostiene, y la razón es el pool blindado: **Halo2 sobre Pallas
+> es solo *computacionalmente* binding bajo logaritmo discreto.** Un adversario cuántico no se limita
+> a desanonimizar el pool — **forja pruebas**, es decir, inflación ilimitada. Proteger con un hash un
+> subconjunto del pool transparente (solo las UTXO nunca gastadas) mientras el otro pool cae entero
+> por un fallo peor es poner una cerradura al lado de un hueco sin pared.
+>
+> **Dónde vive de verdad la defensa post-cuántica de ZEROX:** en un **network upgrade** que añada una
+> variante de `Lock` con un esquema de firma PQ, activada por altura con su propio
+> `CONSENSUS_BRANCH_ID` (§14). Esa maquinaria ya está construida y probada. Añadir la variante
+> después **no cuesta nada**: es exactamente para lo que sirve el branch id. La respuesta PQ es un
+> plan versionado, no un formato de dirección.
+>
+> **Lo que sí se pierde, dicho sin rodeos:** con P2K la clave queda expuesta al **recibir**. Para una
+> moneda de ahorro eso pesaría; para un raíl de pagos cuya vía recomendada de tenencia es el pool
+> blindado, no.
 
 **C-ENC-08** · La serialización de wire y almacenamiento (Cap'n Proto) **NO es
 consensus-critical**. Lo que se hashea y se firma es la **preimagen canónica** definida en §4,
@@ -396,17 +419,25 @@ auth_digest = H_d("ZZKTxAuthHash___", ⋃ᵢ witness_encoding_i)
 **C-TX-06** · `witness_encoding` de una entrada es `CompactSize(len) ‖ witness_bytes`. El
 contenido depende del tipo de salida gastada (§5.3).
 
-**C-TX-06b · Formato del testigo, por tipo de `Lock`.**
+**C-TX-06b · Formato del testigo, por tipo de `Lock`. El testigo NO lleva la clave** (P2K, P-020):
+la aporta el `Lock` de la salida que se gasta.
 
 ```
-PubKey   := pubkey(32) ‖ sig(64)                                       96 B
+PubKey   := sig(64)                                                    64 B
 
-MultiSig := k × [ indice(1) ‖ pubkey(32) ‖ sig(64) ]                   k·97 B
+MultiSig := k × [ indice(1) ‖ sig(64) ]                                k·65 B
             con los índices ESTRICTAMENTE CRECIENTES
 
-Htlc     := 0x00 ‖ CompactSize(n) ‖ preimagen(n) ‖ pubkey(32) ‖ sig(64)   vía preimagen
-          | 0x01 ‖ pubkey(32) ‖ sig(64)                                   vía timeout
+Htlc     := 0x00 ‖ CompactSize(n) ‖ preimagen(n) ‖ sig(64)                vía preimagen
+          | 0x01 ‖ sig(64)                                                vía timeout
 ```
+
+> ⚠️ **Cambiado 2026-09-04 con P-020.** Antes cada rama empezaba por `pubkey(32)`. Con P2K esa clave
+> es **redundante** —está en el `Lock`— y su presencia costaba 32 B por entrada.
+>
+> Efecto lateral de seguridad, no solo de tamaño: desaparece la comprobación *"¿la clave del testigo
+> corresponde a la salida?"*. La clave **es** la de la salida. Una comprobación que no existe no se
+> puede olvidar, ni implementar mal en un segundo nodo.
 
 **C-TX-06c · El testigo MUST consumirse por completo.** Tras interpretar el testigo según su tipo,
 **MUST NOT** quedar ningún byte sin consumir. Un testigo con relleno sobrante **MUST** rechazarse.
@@ -494,14 +525,17 @@ La autorización (firma) **no** forma parte de la entrada a efectos de txid — 
 cerrado**. No hay lenguaje de script en v1.0.
 
 ```
-Lock ::= 0x00 PubKey  { pubkey_hash: [u8; L] }
-       | 0x01 MultiSig{ k: u8, pubkey_hashes: [[u8; L]] }
-       | 0x02 Htlc    { hash: [u8;32], receiver: [u8;L], sender: [u8;L], timeout: u32 }
+Lock ::= 0x00 PubKey  { pubkey: [u8; 32] }
+       | 0x01 MultiSig{ k: u8, pubkeys: [[u8; 32]] }
+       | 0x02 Htlc    { hash: [u8;32], receiver: [u8;32], sender: [u8;32], timeout: u32 }
 ```
+
+Las claves van **en claro**, no hasheadas: **P2K, no P2KH** (P-020, razonado en C-ENC-07). El
+`hash` del `Htlc` sí es un hash — `SHA3-256(preimagen)` — y no debe confundirse con una clave.
 
 | Tipo | Condición de gasto |
 |---|---|
-| `PubKey` | Firma válida de la clave cuyo hash coincide |
+| `PubKey` | Firma válida de **la** clave que la salida declara |
 | `MultiSig` | `k` firmas válidas de `k` claves distintas del conjunto |
 | `Htlc` | *(a)* preimagen `p` con `SHA3-256(p) = hash` **y** firma de `receiver`; o *(b)* altura del bloque `≥ timeout` **y** firma de `sender` |
 
@@ -510,10 +544,14 @@ Lock ::= 0x00 PubKey  { pubkey_hash: [u8; L] }
 `MultiSig` va precedida de su longitud en `CompactSize`:
 
 ```
-PubKey   := 0x00 ‖ pubkey_hash(32)
-MultiSig := 0x01 ‖ k(1) ‖ CompactSize(n) ‖ pubkey_hash₀(32) ‖ … ‖ pubkey_hashₙ₋₁(32)
-Htlc     := 0x02 ‖ hash(32) ‖ receiver(32) ‖ sender(32) ‖ timeout(4 LE)
+PubKey   := 0x00 ‖ pubkey(32)
+MultiSig := 0x01 ‖ k(1) ‖ CompactSize(n) ‖ pubkey₀(32) ‖ … ‖ pubkeyₙ₋₁(32)
+Htlc     := 0x02 ‖ hash(32) ‖ receiver_pubkey(32) ‖ sender_pubkey(32) ‖ timeout(4 LE)
 ```
+
+Los tamaños **no cambian** respecto a P2KH —32 bytes en ambos casos—, solo el contenido: la clave en
+claro en lugar de su hash (P-020). El `hash(32)` del `Htlc` **sigue siendo un hash**: es
+`SHA3-256(preimagen)`, no una clave.
 
 > Añadido 2026-09-04 al implementar §4. El SPEC definía la estructura de `Lock` pero no la
 > codificación de la lista de `MultiSig`, y eso **no puede quedar implícito**: `scripts_digest`
@@ -525,7 +563,7 @@ Htlc     := 0x02 ‖ hash(32) ‖ receiver(32) ‖ sender(32) ‖ timeout(4 LE)
 **C-TX-10** · El byte discriminante **MUST** estar en el conjunto definido. Valores desconocidos
 **MUST** rechazarse (no tratarse como "gastable por cualquiera").
 
-**C-TX-11** · En `MultiSig`, `1 ≤ k ≤ n` donde `n = len(pubkey_hashes)`, y
+**C-TX-11** · En `MultiSig`, `1 ≤ k ≤ n` donde `n = len(pubkeys)`, y
 `n ≤ MAX_MULTISIG_KEYS = 16`. Las claves **MUST** ser distintas entre sí.
 
 **C-TX-12** · `value` **MUST** estar en `[0, ZX_VALUE_SANITY_LIMIT]`, con
@@ -794,6 +832,17 @@ peso(tx) = 12                                             // version ‖ lock_ti
 
 `|lock|` es la longitud de la codificación canónica de C-TX-09b: 33 para `PubKey`, `2 + |CompactSize(n)| + 32n`
 para `MultiSig`, y 101 para `Htlc`.
+
+Con P2K (P-020) el término del testigo es el que encoge: una entrada `PubKey` aporta
+`|CompactSize(64)| + 64 = 65` en vez de `97`. Cuenta completa de una transacción 2-in/2-out:
+
+```
+12 + CS(2) + 2·40 + CS(2) + 2·(8+33) + CS(2) + 2·(CS(64)+64)  =  307      (P2K)
+12 + CS(2) + 2·40 + CS(2) + 2·(8+33) + CS(2) + 2·(CS(96)+96)  =  371      (P2KH)
+```
+
+**−64 unidades, −17,2 %.** Reproducido en `zx-consensus`, test `p2k_ahorra_32_bytes_por_entrada`, que
+calcula las dos cifras en vez de citarlas.
 
 > ⚠️ **Corregido 2026-09-04 al implementar §5.4. Antes decía `weight(tx) = tamaño_serializado(tx)`,
 > y eso contradecía directamente a C-ENC-08.**
@@ -1125,36 +1174,72 @@ divisiones intermedias.
 next := (S · t · BIAS_NUM) / (NK · BIAS_DEN)
 ```
 
-con `BIAS_NUM / BIAS_DEN` = `<<PENDIENTE: racional exacto — D9 debe fijarlo>>`, aproximando
-`1 − e⁻⁶ = 0,99752124…`
+con **`BIAS_NUM = BIAS_DEN = 1`**: **el sesgo del clamp NO se corrige.** Los dos factores se
+conservan en la fórmula, y no se colapsan a `next := S·t/NK`, para que la ausencia de corrección sea
+una decisión visible y no una omisión.
 
-> 🔴 **P-005 BLOQUEADO (2026-09-04). `BIAS_NUM/BIAS_DEN = 1/1`: no se corrige nada.**
+> ✅ **P-005 CERRADO 2026-09-04 (Katana) → no se corrige. Sesgo documentado de +0,30 s.**
 >
-> Esta nota decía antes que el racional sería `99752/100000 ≈ 1 − e⁻⁶`, es decir **menor que 1**.
-> **D9 refutó la dirección**, y la refutación se verificó de forma independiente:
+> **Historia, porque el error importa más que el resultado.** Esta regla decía antes que el racional
+> sería `99752/100000 ≈ 1 − e⁻⁶`, es decir **menor que 1**. **D9 refutó la dirección**, y la
+> refutación se verificó de forma independiente:
 >
 > - El clamp recorta por arriba, así que `E[min(X, 6T)] = T(1 − e⁻⁶) = 119,70 s < T`.
 > - Luego `t < k`, el target **baja**, y los bloques salen **más lentos**. El punto fijo está en
 >   `ρ·(1 − e^(−6/ρ)) = 1` → `ρ = 1,00252` → **120,30 s**, que es exactamente la cifra que esta
 >   misma nota citaba: el modelo se valida solo.
-> - Para llevar `ρ` a 1 hace falta `r = 1/(1 − e⁻⁶) = 1,002486`, es decir **`r > 1`: aflojar**.
+> - Para llevar `ρ` a 1 haría falta `r = 1/(1 − e⁻⁶) = 1,002486`, es decir **`r > 1`: aflojar**.
 >
-> Multiplicar por `0,9975` empuja al revés: desplaza el punto fijo a **120,61 s**, *más lejos* de
+> Multiplicar por `0,9975` empujaba al revés: desplazaba el punto fijo a **120,61 s**, *más lejos* de
 > 120 que no corregir. Peor todavía, la implementación llevaba una aserción de compilación
 > `BIAS_NUM < BIAS_DEN` "para que la corrección apriete" — **protegiendo la dirección equivocada**.
+> Un candado mal orientado es peor que ningún candado: da confianza en la propiedad contraria a la
+> que hace falta.
 >
-> **La dirección está demostrada; el valor no.** El campo medio da `1,002486`, el Monte Carlo de D9
-> sitúa el punto fijo empírico en `≈1,0045`. Discrepan, así que hay efectos de segundo orden sin
-> capturar y **la cifra no puede presentarse como demostrada**.
+> **Por qué se cierra en "no corregir" y no en "invertirlo".** La **dirección** está demostrada; el
+> **valor** no. El campo medio de primer orden da `1,002486`; el Monte Carlo de D9 —float y
+> aritmética entera, varias semillas, hasta 300 000 bloques— sitúa el punto fijo empírico en
+> `≈1,0045`. **Discrepan**, luego hay efectos de segundo orden sin capturar y, por la regla de
+> independencia matemática, esa cifra **no puede presentarse como demostrada**. Fijar en el consenso,
+> para siempre, un número que no sabemos justificar, a cambio de un error del 0,25 %, es un mal
+> cambio.
 >
-> Interim: `BIAS = 1`, sin corrección, como Flux/TENT/Tari. Sesgo documentado de ~0,25 %. Es
-> estrictamente mejor que enviar una corrección invertida, y deja la decisión visible.
+> **Y el 0,25 % es pequeño en su contexto.** Durante cualquier periodo de crecimiento de hashrate
+> LWMA va por detrás y los bloques salen *más rápido* que `T`; ese efecto es de un orden de magnitud
+> mayor que el sesgo del clamp. Corregir el clamp con precisión de cuarto decimal en un sistema cuyo
+> ruido normal es de varios puntos porcentuales es precisión falsa.
 >
-> **Cota de overflow con la corrección:** el peor caso real es `S·t·BIAS_NUM < 2²⁶⁹`, no 2²⁶⁵ como
-> decía antes esta nota — con `S ≤ N·POW_LIMIT < 2²³¹`, `t ≤ ST_CAP·N(N+1)/2 < 2²²` y
-> `BIAS_NUM < 2¹⁷`. Ambas cifras caben holgadamente en U512; la corrección es de precisión, no de
-> riesgo. Verificado en `zx-consensus`, test `el_numerador_de_c_diff_07_cabe_en_u512`.
-> Es la razón de mandar U512 y no U256 en C-DIFF-06.
+> **Consecuencias declaradas, para que estén escritas y no se descubran después:**
+>
+> | | Valor con `BIAS = 1` |
+> |---|---|
+> | Solvetime medio en régimen estacionario | **120,30 s**, no 120,00 |
+> | Desviación | **+0,25 %** (+0,30 s por bloque) |
+> | Bloques al año | 262 139 en vez de 262 800 — **661 menos** |
+> | Efecto sobre la emisión | la curva es **por bloque**, así que el calendario se estira un 0,25 %: el hito de los 1000 M llega ~18 días más tarde de lo nominal |
+> | Efecto sobre `N_LARGO` | la ventana "de un año" mide en realidad **366 días** |
+>
+> Ninguna de esas cifras es un fallo: son la definición del sistema, y ahora están escritas.
+>
+> **Precedente.** Flux, TENT y Tari usan LWMA-1 con clamp y **no corrigen** el sesgo.
+>
+> **Efecto lateral bueno:** con `BIAS = 1` las cifras de C-DIFF-05 (×120 sin suelo, ×10 con él)
+> vuelven a ser **exactas**, verificado por D9 con aritmética de fracciones. Cualquier corrección las
+> volvería a ensuciar.
+>
+> **Alternativa descartada explícitamente:** mover `T` a 119,70 s para que el punto fijo caiga en 120.
+> Es la misma constante no demostrada con otro disfraz, y además rompe las cuatro constantes que
+> cuelgan de `T` (`FTL`, `N_LARGO`, `T_FLOOR`, `ST_CAP`).
+>
+> **Qué haría falta para reabrirlo:** un modelo que capture los efectos de segundo orden
+> —ponderación no uniforme de la ventana, Jensen sobre `S`— y **reconcilie** el campo medio con el
+> Monte Carlo. Mientras las dos estimaciones discrepen, la respuesta correcta es no tocar nada.
+>
+> **Cota de overflow:** el peor caso real es `S·t·BIAS_NUM < 2²⁶⁹`, no 2²⁶⁵ como decía antes esta
+> nota — con `S ≤ N·POW_LIMIT < 2²³¹`, `t ≤ ST_CAP·N(N+1)/2 < 2²²` y `BIAS_NUM < 2¹⁷`. La cota se
+> mantiene calculada para `BIAS_NUM` arbitrario, no para 1, porque es la que valdría si P-005 se
+> reabriera. Verificado en `zx-consensus`, test `el_numerador_de_c_diff_07_cabe_en_u512`. Es la razón
+> de mandar U512 y no U256 en C-DIFF-06.
 
 **C-DIFF-08 · Acotado.** `next := clamp(next, MIN_TARGET, POW_LIMIT)`.
 
@@ -1823,7 +1908,6 @@ debajo**.
 
 | ID | Bloquea | Resumen | Para quién |
 |---|---|---|---|
-| **P-005** | §7.3 | Racional exacto de la corrección del sesgo del clamp (≈0,9975) | **D9** — matemáticas, no a ojo |
 | **P-006** | §11 | ¿Sirve `Σ 2^256/(target+1)` con dificultad muy variable? D2 argumenta que el sesgo `(N−1)/N` de zawy afecta a la *estimación* de hashrate, no al *acumulador* — falta relectura verbatim de #58/#82 | **D9** |
 | **P-014** | §13 | 🆕 La rama privada del atacante tiene su **propio LWMA** y se abarata sola tras `N=90`. Las tablas de confirmación asumen dificultad constante ⇒ las filas `q ≥ 40 %` podrían ser optimistas | **D9** |
 | **P-015** | §11 | ¿Puede un minero *grindear* el nonce buscando hash bajo para ganar desempates (C-FORK-04)? | **D8** |
@@ -1831,11 +1915,17 @@ debajo**.
 | **P-017** | §15, §16 | Mensaje, timestamp y nonce del génesis (mainnet y testnet) · puerto por defecto | Katana, el día del lanzamiento |
 | **P-018** | §16.2 | Mecanismo exacto de BIP 152: función con clave de los IDs cortos, derivación de la sal, saludo de negociación, modos alto/bajo ancho de banda. **No escribir de memoria** | Investigación, Fase 3 |
 | **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB. Las cifras de §16.2 son estimaciones | **D3** |
-| **P-020** | §11–§13 | ¿P2K o P2KH? 17 % de throughput contra una capa de defensa post-cuántica. **Gratis hasta el génesis** | Katana |
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
-| **P-004c** | §7.3 | `TARGET_INICIAL` — fijado en `POW_LIMIT`, revisable hasta crear el génesis | Katana, antes del lanzamiento |
+| **P-004c** | §7.3 | `TARGET_INICIAL` — fijado en `0x1d00ffff`, revisable hasta crear el génesis | Katana, antes del lanzamiento |
+
+### Cerradas en esta revisión
+
+| ID | Decisión | Dónde vive |
+|---|---|---|
+| **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-020** | **P2K**, no P2KH. La respuesta post-cuántica es un network upgrade con una variante nueva de `Lock`, no el formato de dirección | C-ENC-07, C-TX-06b, C-TX-09b |
 
 ### Cubiertas desde la auditoría de cobertura
 

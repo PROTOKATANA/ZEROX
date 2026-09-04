@@ -23,8 +23,6 @@
 use ed25519_zebra::{Signature, VerificationKey};
 
 use crate::error::EncodingError;
-use crate::hash::sha3_256;
-use crate::tx::HashClave;
 
 /// Longitud de una clave pública Ed25519.
 pub const LONGITUD_CLAVE: usize = 32;
@@ -36,6 +34,9 @@ pub const LONGITUD_FIRMA: usize = 64;
 ///
 /// **No se valida al construir.** ZIP-215 exige aceptar codificaciones no canónicas, así que
 /// rechazar aquí sería una divergencia. La validez del punto se decide en [`verificar`].
+///
+/// Desde P-020 este tipo es también lo que guarda una salida `PubKey`: ZEROX usa **P2K, no P2KH**,
+/// así que no existe ningún `HashClave`. Ver [`crate::tx::Lock`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ClavePublica([u8; LONGITUD_CLAVE]);
 
@@ -50,20 +51,6 @@ impl ClavePublica {
     #[must_use]
     pub const fn bytes(&self) -> &[u8; LONGITUD_CLAVE] {
         &self.0
-    }
-
-    /// `SHA3-256(pubkey)` — lo que una salida `PubKey` guarda (C-ENC-07, C-TX-09).
-    #[must_use]
-    pub fn hash(&self) -> HashClave {
-        *sha3_256(&self.0).as_bytes()
-    }
-
-    /// ¿Es esta la clave cuyo hash guarda la salida que se gasta?
-    #[must_use]
-    pub fn coincide_con(&self, esperado: &HashClave) -> bool {
-        // Comparación de hashes públicos: no hay secreto que proteger, así que no hace falta
-        // tiempo constante.
-        self.hash() == *esperado
     }
 }
 
@@ -171,15 +158,18 @@ mod tests {
         assert!(verificar(&pk, &f, b"x").is_err());
     }
 
-    /// El enlace clave→salida: `SHA3-256(pubkey)` es lo que guarda un `Lock::PubKey`.
+    /// **P-020, P2K.** El enlace clave→salida es la **igualdad de la clave**, no un hash.
+    ///
+    /// Este test existe para que el cambio a P2K quede fijado: si alguien reintroduce un
+    /// `SHA3-256(pubkey)` en el camino de gasto, la comparación deja de ser esta y hay que volver a
+    /// pasar por P-020.
     #[test]
-    fn el_hash_de_la_clave_enlaza_con_la_salida() {
+    fn la_clave_enlaza_con_la_salida_por_igualdad() {
         let (_, pk) = par(6);
-        let h = pk.hash();
-        assert!(pk.coincide_con(&h));
+        assert_eq!(pk, ClavePublica::desde_bytes(*pk.bytes()));
 
         let (_, otra) = par(7);
-        assert!(!otra.coincide_con(&h), "otra clave MUST NOT coincidir");
+        assert_ne!(otra, pk, "otra clave MUST NOT coincidir");
     }
 
     /// Firmas de mensajes distintos con la misma clave son distintas — descarta un stub que

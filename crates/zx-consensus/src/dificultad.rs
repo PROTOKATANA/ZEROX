@@ -72,9 +72,12 @@ pub const MTP_W: usize = 11;
 
 /// Numerador de la corrección del sesgo del clamp (C-DIFF-07).
 ///
-/// # 🔴 BLOQUEADO — P-005. Ahora mismo vale 1: **no se corrige nada**.
+/// # ✅ P-005 CERRADO 2026-09-04 (Katana) → **no se corrige.** Vale 1, y así se queda.
 ///
-/// ## Qué pasó
+/// Los dos factores se conservan en la fórmula en vez de colapsarla a `S·t/NK` para que la
+/// **ausencia** de corrección sea visible en el código y no parezca un descuido.
+///
+/// ## Qué pasó, porque el error importa más que el resultado
 ///
 /// Este módulo llegó a implementar `99752/100000 ≈ 0,9975`, aproximando `1 − e⁻⁶`, con una
 /// aserción de compilación que exigía `BIAS_NUM < BIAS_DEN` para "que la corrección apriete, nunca
@@ -89,42 +92,60 @@ pub const MTP_W: usize = 11;
 /// - Luego `E[t] = 0,9975·k`, el target **baja**, y los bloques salen **más lentos**. El punto fijo
 ///   está en `ρ·(1 − e^(−6/ρ)) = 1` → `ρ = 1,00252` → **120,30 s**, exactamente la cifra que el
 ///   propio SPEC citaba, lo que valida el modelo.
-/// - Para llevar `ρ` a 1 hace falta `r = 1/(1 − e⁻⁶) = 1,002486`, es decir **`r > 1`: aflojar**.
+/// - Para llevar `ρ` a 1 haría falta `r = 1/(1 − e⁻⁶) = 1,002486`, es decir **`r > 1`: aflojar**.
 ///
-/// Multiplicar por `0,9975` empuja en el sentido contrario: desplaza el punto fijo a **120,61 s**,
-/// *más lejos* de 120 que no corregir. Y la aserción de compilación estaba **protegiendo la
-/// dirección equivocada**.
+/// Multiplicar por `0,9975` empujaba en el sentido contrario: desplazaba el punto fijo a
+/// **120,61 s**, *más lejos* de 120 que no corregir. Y la aserción de compilación estaba
+/// **protegiendo la dirección equivocada**.
 ///
-/// ## Por qué el valor sigue abierto y no basta con invertirlo
+/// ## Por qué se cierra en "no corregir" y no en "invertirlo"
 ///
 /// La dirección está demostrada. **El valor no.** El campo medio de primer orden da `r ≈ 1,002486`;
 /// el Monte Carlo de D9 —float y aritmética entera, varias semillas, hasta 300 000 bloques— sitúa
 /// el punto fijo empírico en `r ≈ 1,0045`. **Discrepan**, así que hay efectos de segundo orden que
 /// el modelo simple no captura, y por la regla de independencia matemática una cifra que dos
-/// métodos no reproducen **no puede presentarse como demostrada**.
+/// métodos no reproducen **no puede presentarse como demostrada**. Fijar en el consenso, para
+/// siempre, un número que no sabemos justificar, a cambio de un error del 0,25 %, es un mal cambio.
 ///
-/// ## Qué se hace mientras tanto
+/// Además el 0,25 % es pequeño en su contexto: durante cualquier crecimiento de hashrate LWMA va
+/// por detrás y los bloques salen *más rápido* que `T`, un efecto un orden de magnitud mayor.
 ///
-/// `BIAS = 1`: **no se corrige**. Es lo que hacen Flux, TENT y Tari, deja un sesgo documentado de
-/// ~0,25 % (120,30 s en vez de 120,00), y es estrictamente mejor que enviar una corrección en el
-/// sentido equivocado. Deja además la decisión **visible** en lugar de escondida tras una constante
-/// de aspecto plausible.
+/// ## Consecuencias declaradas
 ///
-/// El algoritmo funciona con cualquier racional: cuando P-005 se cierre son dos líneas.
+/// | | Con `BIAS = 1` |
+/// |---|---|
+/// | Solvetime medio estacionario | **120,30 s**, no 120,00 |
+/// | Desviación | **+0,25 %** (+0,30 s/bloque) |
+/// | Bloques al año | 262 139 en vez de 262 800 — **661 menos** |
+/// | Calendario de emisión | se estira un 0,25 %: el hito de 1000 M llega ~18 días tarde |
+/// | `N_LARGO` | la ventana "de un año" mide en realidad **366 días** |
+///
+/// No son fallos: son la definición del sistema, y ahora están escritas.
+///
+/// Precedente: Flux, TENT y Tari usan LWMA-1 con clamp y **no corrigen**.
+///
+/// Efecto lateral bueno: con `BIAS = 1` las cifras de C-DIFF-05 (×120 sin suelo, ×10 con él)
+/// vuelven a ser **exactas** — verificado por D9 con aritmética de fracciones.
+///
+/// ## Si algún día se reabre
+///
+/// Haría falta un modelo que capture los efectos de segundo orden —ponderación no uniforme de la
+/// ventana, Jensen sobre `S`— y **reconcilie** campo medio con Monte Carlo. El algoritmo funciona
+/// con cualquier racional: serían dos líneas, y la aserción de abajo ya protege la dirección buena.
 pub const BIAS_NUM: u64 = 1;
 
-/// Denominador de la corrección del sesgo. Ver [`BIAS_NUM`]. 🔴 **BLOQUEADO — P-005.**
+/// Denominador de la corrección del sesgo. Ver [`BIAS_NUM`]. ✅ **P-005 cerrado: no se corrige.**
 pub const BIAS_DEN: u64 = 1;
 
-// La corrección, cuando exista, MUST **aflojar** —`BIAS_NUM ≥ BIAS_DEN`— porque el clamp recorta
-// por arriba y sesga el target a la baja.
+// Si la corrección se reabre alguna vez, MUST **aflojar** —`BIAS_NUM ≥ BIAS_DEN`— porque el clamp
+// recorta por arriba y sesga el target a la baja.
 //
 // Esta aserción estaba **al revés** y por tanto protegía activamente la dirección equivocada. Queda
 // como recordatorio de que un candado mal orientado es peor que no tener candado: da confianza en
 // la propiedad contraria a la que hace falta.
 const _: () = assert!(
     BIAS_NUM >= BIAS_DEN,
-    "C-DIFF-07: la corrección del sesgo debe aflojar (>= 1), no apretar — ver P-005"
+    "C-DIFF-07: si la corrección del sesgo se reabre, debe aflojar (>= 1), no apretar — ver P-005"
 );
 
 /// La ventana que consume el retarget (C-DIFF-01).
@@ -478,18 +499,20 @@ mod tests {
         );
     }
 
-    /// 🔴 **P-005 BLOQUEADO.** Mientras lo esté, `BIAS = 1` y no se corrige nada.
+    /// ✅ **P-005 cerrado: no se corrige.** `BIAS = 1/1`, y este test lo fija.
     ///
-    /// La **dirección** ya la fija una aserción de compilación (`BIAS_NUM >= BIAS_DEN`), que es más
-    /// fuerte que un test. Lo que este comprueba es que sigue en la identidad: cuando P-005 se
-    /// cierre, este test fallará y obligará a mirarlo, que es justo lo que se quiere.
+    /// La **dirección** —si alguna vez se reabre— ya la impone una aserción de compilación
+    /// (`BIAS_NUM >= BIAS_DEN`), que es más fuerte que un test. Lo que este comprueba es que la
+    /// decisión sigue siendo la tomada: si alguien introduce una corrección, este test falla y
+    /// obliga a reabrir P-005 explícitamente en vez de deslizar una constante.
     #[test]
-    fn la_correccion_del_sesgo_esta_bloqueada_en_la_identidad() {
+    fn la_correccion_del_sesgo_sigue_en_la_identidad() {
         assert_eq!(
             (BIAS_NUM, BIAS_DEN),
             (1, 1),
-            "P-005 sin cerrar: no se corrige. Si esto falla, alguien fijó la corrección — \
-             comprueba que la dirección es AFLOJAR y actualiza P-005"
+            "P-005 se cerró en NO corregir (sesgo documentado de +0,30 s). Si esto falla, alguien \
+             fijó una corrección — reabre P-005, comprueba que la dirección es AFLOJAR, y \
+             actualiza SPEC C-DIFF-07 con las consecuencias declaradas"
         );
     }
 
