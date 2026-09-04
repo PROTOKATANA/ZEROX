@@ -85,6 +85,13 @@ pub enum EncodingError {
         salidas: usize,
     },
 
+    /// C-ENC-06/07: dirección bech32m inválida.
+    #[error("C-ENC-06: dirección inválida: {motivo}")]
+    DireccionInvalida {
+        /// Por qué se rechaza.
+        motivo: &'static str,
+    },
+
     /// C-POW-04: `bits` no está en forma canónica.
     #[error("C-POW-04: bits {bits:#010x} no canónico: {motivo}")]
     BitsNoCanonico {

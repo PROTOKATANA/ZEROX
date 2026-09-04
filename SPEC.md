@@ -152,7 +152,7 @@ Las codificaciones no mínimas **MUST** rechazarse.
 
 ### 2.3 · Direcciones — bech32
 
-**C-ENC-06** · Las direcciones se codifican en **bech32** (BIP-173) con estos HRP:
+**C-ENC-06** · Las direcciones se codifican en **bech32m** (BIP-350) con estos HRP:
 
 | HRP | Red y pool |
 |---|---|
@@ -160,8 +160,27 @@ Las codificaciones no mínimas **MUST** rechazarse.
 | `zzs` | mainnet, blindada *(reservado, v1.1)* |
 | `tzzk` | testnet, transparente |
 
+**C-ENC-06b · El algoritmo de checksum MUST exigirse explícitamente.** Un decodificador **MUST**
+rechazar una dirección cuyo checksum sea bech32 (BIP-173) aunque el resto sea válido. **MUST NOT**
+usarse un decodificador permisivo que acepte cualquiera de los dos.
+
+> ⚠️ **Cambiado 2026-09-04 al implementar. Antes decía bech32 (BIP-173).**
+>
+> **Por qué bech32m.** BIP-350 existe precisamente porque bech32 tiene un defecto de inserción
+> documentado: en una cadena cuyo último carácter de datos es `p`, insertar o borrar caracteres `q`
+> justo antes **no invalida el checksum**. Bitcoin conserva bech32 en segwit v0 por compatibilidad
+> hacia atrás; ZEROX nace sin ningún legado que respetar. La diferencia es una constante —`1` frente
+> a `0x2bc830a3`— y cuesta cero. Hay un test en `zx-core` que **reproduce el defecto** en bech32 y
+> comprueba su ausencia en bech32m, en vez de citar el BIP y confiar.
+>
+> **Por qué C-ENC-06b, que es lo menos obvio.** La función de conveniencia `bech32::decode()` del
+> crate acepta **los dos** algoritmos: prueba bech32m y, si falla, se conforma con bech32. Para un
+> parser de direcciones eso es **maleabilidad** — dos cadenas distintas decodificarían a la misma
+> dirección, y un sistema de pagos que las trate como identificadores distintos se descuadra.
+> Verificado en el código del crate, `bech32-0.12.0/src/lib.rs:218-233`.
+
 **C-ENC-07** · Una dirección transparente codifica `SHA3-256(pubkey)` **completo, 32 bytes**.
-**MUST NOT** truncarse.
+**MUST NOT** truncarse. Un decodificador **MUST** rechazar cualquier longitud distinta de 32.
 
 > Decidido 2026-09-04. 20 bytes (estilo Bitcoin) dan 80 bits de resistencia a colisiones,
 > insuficiente para una cadena que nace en 2026. El coste son 12 bytes por salida y ~17 caracteres

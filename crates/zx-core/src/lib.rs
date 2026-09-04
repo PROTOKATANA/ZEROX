@@ -20,6 +20,7 @@
 
 #![doc = include_str!("../README.md")]
 
+pub mod address;
 pub mod amount;
 pub mod digest;
 pub mod encoding;
@@ -29,6 +30,7 @@ pub mod preimage;
 pub mod target;
 pub mod tx;
 
+pub use address::{Address, Red};
 pub use amount::{Amount, ZX_VALUE_SANITY_LIMIT};
 pub use digest::{AuthDigest, BlockHash, Digest, MerkleRoot, SigHash, TxId};
 pub use error::{CoreError, EncodingError};
