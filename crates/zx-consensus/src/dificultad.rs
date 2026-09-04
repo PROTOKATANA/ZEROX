@@ -8,14 +8,21 @@
 //!
 //! # El patrón prohibido
 //!
-//! `C-DIFF-03` reconstruye los solvetimes de forma **monótona**, no saturada. La diferencia no es
+//! `C-DIFF-03` reconstruye los solvetimes de forma **monótona**. La diferencia con saturar no es
 //! estilística: `if st < 1 { st = 1 }` es exactamente el patrón que produjo un ataque real, en el
 //! que una moneda perdió 4 800 bloques en 5 horas porque los timestamps retrasados se convertían en
 //! solvetimes largos artificiales que hundían la dificultad.
 //!
-//! Aquí el invariante `1 ≤ st[j] ≤ ST_CAP` se cumple **por construcción**: cada timestamp se
-//! normaliza contra el anterior ya normalizado antes de restar, así que la diferencia nunca puede
-//! ser ≤ 0 y no hay nada que saturar.
+//! Del invariante `1 ≤ st[j] ≤ ST_CAP`, **las dos mitades son distintas** —lo precisó D9, porque el
+//! comentario anterior decía "por construcción" a secas y solo es cierto de una de ellas:
+//!
+//! - **`st ≥ 1` sí es por construcción.** Cada timestamp se normaliza contra el anterior **ya
+//!   normalizado** antes de restar, así que la diferencia nunca puede ser ≤ 0. Lo importante no es
+//!   solo que el valor salga ≥ 1: es que `previo` **nunca queda contaminado** por un timestamp
+//!   retrasado. Ahí está la diferencia con el patrón que hundió aquella cadena.
+//! - **`st ≤ ST_CAP` es saturación**, literalmente `.min(ST_CAP)`. Y es segura precisamente porque
+//!   **no toca `previo`**: recorta el valor que entra en la suma sin desincronizar el reloj de la
+//!   reconstrucción.
 //!
 //! # Determinismo
 //!
@@ -65,27 +72,59 @@ pub const MTP_W: usize = 11;
 
 /// Numerador de la corrección del sesgo del clamp (C-DIFF-07).
 ///
-/// # 🔶 PENDIENTE — P-005
+/// # 🔴 BLOQUEADO — P-005. Ahora mismo vale 1: **no se corrige nada**.
 ///
-/// El clamp `min(6T, ST)` recorta por arriba y no por abajo, así que sesga la media: sin corregir,
-/// el tiempo real de bloque sería ≈120,30 s en vez de 120,00. Se decidió **corregirlo** —Flux, TENT
-/// y Tari no lo hacen; ZEROX sí—, pero **el racional exacto lo fija D9, no este código**.
+/// ## Qué pasó
 ///
-/// El valor de aquí es el candidato que el propio SPEC nombra como el de menor error residual
-/// (0,00012 % frente al 0,0021 % de `9975/10000`), aproximando `1 − e⁻⁶ = 0,99752124…`.
-/// **Cambiarlo es un cambio de consenso.** El algoritmo funciona con cualquier racional: sustituir
-/// estas dos constantes es todo lo que hace falta cuando D9 se pronuncie.
-pub const BIAS_NUM: u64 = 99_752;
+/// Este módulo llegó a implementar `99752/100000 ≈ 0,9975`, aproximando `1 − e⁻⁶`, con una
+/// aserción de compilación que exigía `BIAS_NUM < BIAS_DEN` para "que la corrección apriete, nunca
+/// afloje".
+///
+/// **D9 refutó la dirección, y la refutación se verificó de forma independiente.** La derivación:
+///
+/// - En régimen estable `S = N·T_tgt`, así que `next = T_tgt · t / k`, y la estabilidad exige
+///   `t = k`, es decir `E[st] = T`.
+/// - Pero el clamp `min(6T, ST)` recorta **por arriba y no por abajo**:
+///   `E[min(X, 6T)] = T(1 − e⁻⁶) = 119,70 s < T`.
+/// - Luego `E[t] = 0,9975·k`, el target **baja**, y los bloques salen **más lentos**. El punto fijo
+///   está en `ρ·(1 − e^(−6/ρ)) = 1` → `ρ = 1,00252` → **120,30 s**, exactamente la cifra que el
+///   propio SPEC citaba, lo que valida el modelo.
+/// - Para llevar `ρ` a 1 hace falta `r = 1/(1 − e⁻⁶) = 1,002486`, es decir **`r > 1`: aflojar**.
+///
+/// Multiplicar por `0,9975` empuja en el sentido contrario: desplaza el punto fijo a **120,61 s**,
+/// *más lejos* de 120 que no corregir. Y la aserción de compilación estaba **protegiendo la
+/// dirección equivocada**.
+///
+/// ## Por qué el valor sigue abierto y no basta con invertirlo
+///
+/// La dirección está demostrada. **El valor no.** El campo medio de primer orden da `r ≈ 1,002486`;
+/// el Monte Carlo de D9 —float y aritmética entera, varias semillas, hasta 300 000 bloques— sitúa
+/// el punto fijo empírico en `r ≈ 1,0045`. **Discrepan**, así que hay efectos de segundo orden que
+/// el modelo simple no captura, y por la regla de independencia matemática una cifra que dos
+/// métodos no reproducen **no puede presentarse como demostrada**.
+///
+/// ## Qué se hace mientras tanto
+///
+/// `BIAS = 1`: **no se corrige**. Es lo que hacen Flux, TENT y Tari, deja un sesgo documentado de
+/// ~0,25 % (120,30 s en vez de 120,00), y es estrictamente mejor que enviar una corrección en el
+/// sentido equivocado. Deja además la decisión **visible** en lugar de escondida tras una constante
+/// de aspecto plausible.
+///
+/// El algoritmo funciona con cualquier racional: cuando P-005 se cierre son dos líneas.
+pub const BIAS_NUM: u64 = 1;
 
-/// Denominador de la corrección del sesgo. Ver [`BIAS_NUM`]. 🔶 Pendiente de P-005.
-pub const BIAS_DEN: u64 = 100_000;
+/// Denominador de la corrección del sesgo. Ver [`BIAS_NUM`]. 🔴 **BLOQUEADO — P-005.**
+pub const BIAS_DEN: u64 = 1;
 
-// La corrección MUST apretar, nunca aflojar: si `BIAS_NUM ≥ BIAS_DEN` el "arreglo" del sesgo lo
-// empeoraría en lugar de corregirlo. Se verifica en compilación, así que un valor mal puesto por
-// D9 —o por quien sea— no llega a ejecutarse.
+// La corrección, cuando exista, MUST **aflojar** —`BIAS_NUM ≥ BIAS_DEN`— porque el clamp recorta
+// por arriba y sesga el target a la baja.
+//
+// Esta aserción estaba **al revés** y por tanto protegía activamente la dirección equivocada. Queda
+// como recordatorio de que un candado mal orientado es peor que no tener candado: da confianza en
+// la propiedad contraria a la que hace falta.
 const _: () = assert!(
-    BIAS_NUM < BIAS_DEN,
-    "la corrección del sesgo de C-DIFF-07 debe ser < 1"
+    BIAS_NUM >= BIAS_DEN,
+    "C-DIFF-07: la corrección del sesgo debe aflojar (>= 1), no apretar — ver P-005"
 );
 
 /// La ventana que consume el retarget (C-DIFF-01).
@@ -439,16 +478,62 @@ mod tests {
         );
     }
 
-    /// La corrección del sesgo está activa y es la documentada. 🔶 Si D9 cambia P-005, este test
-    /// cambia con ella — está aquí para que el cambio sea visible, no silencioso.
+    /// 🔴 **P-005 BLOQUEADO.** Mientras lo esté, `BIAS = 1` y no se corrige nada.
+    ///
+    /// La **dirección** ya la fija una aserción de compilación (`BIAS_NUM >= BIAS_DEN`), que es más
+    /// fuerte que un test. Lo que este comprueba es que sigue en la identidad: cuando P-005 se
+    /// cierre, este test fallará y obligará a mirarlo, que es justo lo que se quiere.
     #[test]
-    fn la_correccion_del_sesgo_es_la_declarada() {
-        // 1 − e⁻⁶ = 0,99752124…
-        let ratio = f64::from(u32::try_from(BIAS_NUM).unwrap())
-            / f64::from(u32::try_from(BIAS_DEN).unwrap());
+    fn la_correccion_del_sesgo_esta_bloqueada_en_la_identidad() {
+        assert_eq!(
+            (BIAS_NUM, BIAS_DEN),
+            (1, 1),
+            "P-005 sin cerrar: no se corrige. Si esto falla, alguien fijó la corrección — \
+             comprueba que la dirección es AFLOJAR y actualiza P-005"
+        );
+    }
+
+    /// La derivación que refutó la dirección anterior, ejecutada de verdad para que no se repita.
+    ///
+    /// El clamp `min(6T, ST)` recorta por arriba, así que la media observada del solvetime es
+    /// `T(1 − e⁻⁶) < T`. Eso hace que `t < k`, el target baje y los bloques salgan **más lentos**.
+    /// Corregirlo exige multiplicar por **más** de 1, no por menos.
+    ///
+    /// Se calcula `1 − e⁻⁶` con una serie de Taylor en aritmética racional entera, para no meter
+    /// coma flotante en un crate de consenso ni siquiera en un test.
+    #[test]
+    fn el_clamp_sesga_el_solvetime_a_la_baja() {
+        // e⁻⁶ = Σ (−6)ⁿ/n!, en punto fijo de 12 decimales con acumuladores con signo.
+        const ESCALA: i128 = 1_000_000_000_000;
+        let mut termino: i128 = ESCALA;
+        let mut suma: i128 = 0;
+        for n in 0..64_i128 {
+            suma += termino;
+            termino = termino * -6 / (n + 1);
+        }
+        let e_menos_6 = suma; // ≈ 0,002478752 · ESCALA
+        let factor = ESCALA - e_menos_6; // 1 − e⁻⁶
+
         assert!(
-            (ratio - 0.997_521_24).abs() < 1e-5,
-            "BIAS = {ratio}, se esperaba ≈0,99752124"
+            (997_500_000_000..=997_530_000_000).contains(&factor),
+            "1 − e⁻⁶ debería ser ≈0,99752; salió {factor}/{ESCALA}"
+        );
+
+        // La media truncada es MENOR que T: ese es el sesgo, y va hacia abajo.
+        let t_ms: i128 = 120_000;
+        let media_truncada = t_ms * factor / ESCALA;
+        assert!(
+            media_truncada < t_ms,
+            "el clamp recorta por arriba: la media observada ({media_truncada} ms) MUST ser menor \
+             que T ({t_ms} ms). Si fuera mayor, la corrección iría en el otro sentido"
+        );
+
+        // Y por tanto el factor corrector es T / media_truncada > 1: AFLOJA.
+        let corrector = t_ms * ESCALA / media_truncada;
+        assert!(
+            corrector > ESCALA,
+            "el factor corrector es {corrector}/{ESCALA} > 1 — ponerlo < 1, como estaba, empeora \
+             el sesgo en vez de corregirlo"
         );
     }
 

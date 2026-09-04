@@ -150,7 +150,14 @@ impl CompactBits {
 
     /// Codifica un target en su forma compacta **canónica** (C-POW-04).
     ///
-    /// Es la inversa de [`Self::decodificar`] para todo target representable.
+    /// Es la inversa de [`Self::decodificar`] para todo target en `[MIN_TARGET, POW_LIMIT]` —
+    /// demostrado exhaustivamente por D9 sobre los 167 116 800 pares (exponente, mantisa) válidos
+    /// del rango: cero fallos de identidad, cero colisiones.
+    ///
+    /// ⚠️ **No lo es fuera de ese rango.** Para todo `target < 2¹⁶` produce un `bits` con exponente
+    /// `< 3` que `decodificar` rechaza: su propia salida no vuelve a decodificar a nada. Hoy es
+    /// inalcanzable —`MIN_TARGET = 2⁶⁴` está `2⁴⁸` por encima— pero **la propiedad vale sobre el
+    /// subrango, no sobre los 256 bits**, y dejaría de valer si `MIN_TARGET` bajara de `2¹⁶`.
     #[must_use]
     pub fn codificar(target: U256) -> Self {
         if target.is_zero() {

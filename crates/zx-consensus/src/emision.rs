@@ -65,8 +65,28 @@ pub fn recompensa_base(emitido: u128) -> u128 {
 /// ```
 ///
 /// Toda la aritmética en `u128`, y las **dos divisiones son sucesivas**, no una división por `M²`.
+/// Que eso sea equivalente no es evidente y D9 lo **demostró**: para enteros no negativos,
+/// `⌊⌊a/m⌋/n⌋ = ⌊a/(m·n)⌋`. La demostración es corta —escribir `a = mn·Q + R` y descomponer `R`—
+/// y está verificada además sobre 200 000 pares aleatorios.
+///
 /// El producto intermedio desborda `u64` con holgura: Monero tuvo ese bug en producción y su
 /// comentario sigue en el código —*"BUGFIX: 32-bit saturation bug (e.g. ARM7)"*—.
+///
+/// # ⚠️ `u128` no es "sin condiciones": hay un techo real, y se falla seguro
+///
+/// Decir "en Rust, `u128` nativo" y quedarse ahí sería impreciso. D9 calculó el techo exacto: con
+/// `base = recompensa_base(0) = 190 734 863 281`, el numerador máximo `base·M²` **desborda `u128`
+/// en cuanto `M > 42 238 129 881 480`**. Eso es solo el `2,3·10⁻⁶` inferior del rango de `u64`, así
+/// que el tipo del parámetro no protege.
+///
+/// No es un agujero de acuñación: `checked_mul` devuelve error y **se falla cerrado**. Pero sí es
+/// una **denegación de validación** si `M` llegara ahí: todo bloque con `x ∈ (M, 2M]` fallaría en
+/// vez de calcular. Bajo el ataque de llenado máximo sostenido del punto 9 de D9 —2,89× al año—,
+/// `M` cruzaría ese umbral hacia el **año 7 de ataque continuo**, no dentro de siglos.
+///
+/// Lo que lo hace inalcanzable en la práctica no es el tipo: es la física. Un bloque en ese umbral
+/// pesaría ~84,5 TB, y sostenerlo serían ~22 200 PB/año. Queda documentado como **límite conocido**,
+/// no como problema resuelto.
 ///
 /// El caso `x > 2M` no llega aquí: [`PesoValidado`] no puede construirse, así que el bloque ya fue
 /// rechazado por C-WGT-09. Esa es toda la gracia de exigir el tipo en la firma.

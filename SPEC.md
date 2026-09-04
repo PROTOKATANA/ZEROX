@@ -865,7 +865,23 @@ valores sintéticos.
 M(H) := max( min( max(Mlt(H), Mst(H)), FACTOR_SURGE · Mlt(H) ), ZONA_LIBRE )
 ```
 
-El orden de `min`/`max` **MUST NOT** reordenarse: cambia la semántica en los empates.
+El orden de `min`/`max` **MUST NOT** reordenarse.
+
+> ⚠️ **Justificación corregida 2026-09-04 por D9.** Esta regla decía *"cambia la semántica en los
+> empates"*. **Es falso**: bajo el invariante `Mlt ≥ ZONA_LIBRE` que impone C-WGT-05, los
+> reordenamientos razonables —conmutar el `max` interno, aplicar la ley distributiva de retículo,
+> mover el suelo antes del techo— dan resultados **idénticos** en 200 000 casos, con empates
+> exactos incluidos. Y el `max(…, ZONA_LIBRE)` final es, dado ese invariante,
+> **matemáticamente redundante**.
+>
+> La razón real es otra y es más interesante: la equivalencia **depende de una precondición que
+> vive fuera de esta regla**. Violando `Mlt ≥ ZONA_LIBRE` —por ejemplo `Mlt = 1000`, `Mst = 10⁸`—
+> el orden original da `M = 100 000` y un reordenamiento da `42 900`: **2,3× menos**, porque el
+> techo de ráfaga `50·1000` atrapa el valor antes de que el suelo lo rescate.
+>
+> Una regla de consenso no debe apoyarse en una condición que no puede comprobar. En `zx-consensus`
+> la precondición pasó a estar **en el tipo** (`MedianaLarga`), igual que C-WGT-10 hizo con la resta
+> `2M − x`.
 
 **C-WGT-09 · Límite duro.**
 
@@ -966,6 +982,19 @@ ser cero, la mantisa **MUST NOT** ser cero, y el resultado **MUST NOT** desborda
 >
 > Definir la canonicidad como punto fijo del codificador no puede desincronizarse de él, porque
 > **es** él. Enumerar reglas estructurales sí puede, y en el primer intento ya se equivocó.
+>
+> **D9 verificó la propiedad de forma exhaustiva, no muestreada:** los 167 116 800 pares
+> (exponente, mantisa) válidos dentro de `[MIN_TARGET, POW_LIMIT]`. Cero fallos de identidad, cero
+> colisiones. Inyectividad y `decodificar ∘ codificar = id` quedan **demostradas** sobre el dominio
+> que ZEROX usa.
+>
+> ⚠️ **Y refutadas fuera de él.** Para todo `target < 2¹⁶`, `codificar` produce un `bits` con
+> exponente `< 3` que `decodificar` **rechaza**: su propia salida no vuelve a decodificar a nada.
+> Ejemplo mínimo: `codificar(0) = 0x00000000`, que `decodificar` rechaza por exponente cero.
+>
+> Hoy es inalcanzable —`MIN_TARGET = 2⁶⁴` está `2⁴⁸` veces por encima del umbral— pero **la
+> propiedad no vale sobre los 256 bits, solo sobre el subrango**. Si algún día se rebajara
+> `MIN_TARGET` por debajo de `2¹⁶`, `codificar` produciría `bits` indecodificables.
 
 **C-POW-05** · El target decodificado **MUST** estar en `[MIN_TARGET, POW_LIMIT]`, con
 
@@ -1043,8 +1072,15 @@ para j = 1..N:
     p := c
 ```
 
-Invariante: `1 ≤ st[j] ≤ 720`, **por construcción**, no por saturación.
-**MUST NOT** implementarse como `if st < 1 then st = 1`.
+Invariante: `1 ≤ st[j] ≤ 720`. **MUST NOT** implementarse como `if st < 1 then st = 1`.
+
+> ⚠️ **Precisado 2026-09-04 por D9.** Esta nota decía "por construcción, no por saturación", y solo
+> es cierto de una de las dos mitades:
+> - **`st ≥ 1` sí es por construcción**: cada timestamp se normaliza contra el anterior **ya
+>   normalizado**, así que la resta nunca puede dar ≤ 0 y —lo que de verdad importa— `p` **nunca
+>   queda contaminado** por un timestamp retrasado. Ahí está la diferencia con el patrón prohibido.
+> - **`st ≤ 720` es saturación**, literalmente `min(ST_CAP, ·)`. Es segura porque **no toca `p`**:
+>   recorta el valor que entra en la suma sin desincronizar la reconstrucción.
 
 > *Motivación:* el patrón prohibido es exactamente el que produjo un ataque real — una moneda
 > perdió 4 800 bloques en 5 horas porque los timestamps retrasados se convertían en solvetimes
@@ -1057,6 +1093,12 @@ Invariante: `1 ≤ st[j] ≤ 720`, **por construcción**, no por saturación.
 > ✅ **P-003 RESUELTO (2026-09-04): el suelo se incluye.** Sin él, un atacante que controle la
 > ventana con timestamps a `padre+1` multiplica la dificultad por **120 en un solo bloque** y
 > congela la cadena al retirarse. Con el suelo, el techo es **×10**.
+>
+> D9 verificó ambas cifras con aritmética de fracciones exactas: `K/4095 = 120` y `T_FLOOR/K = 1/10`,
+> las dos **exactas**. (Con la corrección de sesgo activa serían ×120,3 y ×10,02; como P-005 dejó
+> `BIAS = 1`, vuelven a ser exactas.) El mínimo absoluto de `t` es `N(N+1)/2 = 4095`, alcanzado con
+> todos los `st[j] = 1`, y `next(t)` es no decreciente en `t`, así que **ninguna secuencia de
+> timestamps puede superar el ×10** en un solo bloque.
 
 **C-DIFF-06 · Suma de targets.** `S := Σ_{j=1..N} decode(bits(H − N − 1 + j))` en **U512**, sin
 divisiones intermedias.
@@ -1070,12 +1112,27 @@ next := (S · t · BIAS_NUM) / (NK · BIAS_DEN)
 con `BIAS_NUM / BIAS_DEN` = `<<PENDIENTE: racional exacto — D9 debe fijarlo>>`, aproximando
 `1 − e⁻⁶ = 0,99752124…`
 
-> ✅ **P-005 RESUELTO (2026-09-04): SÍ se corrige el sesgo.** El clamp `min(6T, ST)` recorta por
-> arriba y no por abajo, sesgando la media: sin corregir, el tiempo real de bloque sería
-> ≈120,30 s en vez de 120,00 s. Flux, TENT y Tari no lo corrigen; ZEROX sí.
+> 🔴 **P-005 BLOQUEADO (2026-09-04). `BIAS_NUM/BIAS_DEN = 1/1`: no se corrige nada.**
 >
-> El racional concreto lo fija D9. Referencia: `9975/10000` deja 0,0021% de error residual;
-> `99752/100000` deja 0,00012%. El coste computacional es idéntico.
+> Esta nota decía antes que el racional sería `99752/100000 ≈ 1 − e⁻⁶`, es decir **menor que 1**.
+> **D9 refutó la dirección**, y la refutación se verificó de forma independiente:
+>
+> - El clamp recorta por arriba, así que `E[min(X, 6T)] = T(1 − e⁻⁶) = 119,70 s < T`.
+> - Luego `t < k`, el target **baja**, y los bloques salen **más lentos**. El punto fijo está en
+>   `ρ·(1 − e^(−6/ρ)) = 1` → `ρ = 1,00252` → **120,30 s**, que es exactamente la cifra que esta
+>   misma nota citaba: el modelo se valida solo.
+> - Para llevar `ρ` a 1 hace falta `r = 1/(1 − e⁻⁶) = 1,002486`, es decir **`r > 1`: aflojar**.
+>
+> Multiplicar por `0,9975` empuja al revés: desplaza el punto fijo a **120,61 s**, *más lejos* de
+> 120 que no corregir. Peor todavía, la implementación llevaba una aserción de compilación
+> `BIAS_NUM < BIAS_DEN` "para que la corrección apriete" — **protegiendo la dirección equivocada**.
+>
+> **La dirección está demostrada; el valor no.** El campo medio da `1,002486`, el Monte Carlo de D9
+> sitúa el punto fijo empírico en `≈1,0045`. Discrepan, así que hay efectos de segundo orden sin
+> capturar y **la cifra no puede presentarse como demostrada**.
+>
+> Interim: `BIAS = 1`, sin corrección, como Flux/TENT/Tari. Sesgo documentado de ~0,25 %. Es
+> estrictamente mejor que enviar una corrección invertida, y deja la decisión visible.
 >
 > **Cota de overflow con la corrección:** el peor caso real es `S·t·BIAS_NUM < 2²⁶⁹`, no 2²⁶⁵ como
 > decía antes esta nota — con `S ≤ N·POW_LIMIT < 2²³¹`, `t ≤ ST_CAP·N(N+1)/2 < 2²²` y
@@ -1084,6 +1141,15 @@ con `BIAS_NUM / BIAS_DEN` = `<<PENDIENTE: racional exacto — D9 debe fijarlo>>`
 > Es la razón de mandar U512 y no U256 en C-DIFF-06.
 
 **C-DIFF-08 · Acotado.** `next := clamp(next, MIN_TARGET, POW_LIMIT)`.
+
+> **`next(t)` es no decreciente en `t`, no estrictamente creciente** — precisado por D9. `⌊·⌋` y los
+> clamps preservan el orden **no estricto**, así que `t₁ ≤ t₂ ⟹ next(t₁) ≤ next(t₂)` **siempre**;
+> eso es lo que el consenso necesita y está demostrado algebraicamente. Pero la versión estricta
+> falla en dos sitios: por debajo de `T_FLOOR` todos los `t` dan el mismo `next` (es lo que el suelo
+> hace), y saturado en `MIN_TARGET` bloques mucho más lentos no ablandan nada.
+>
+> Consecuencia práctica: **el retarget nunca puede invertirse** —endurecer cuando debería aflojar—,
+> que es la propiedad de seguridad. Pero no debe afirmarse "siempre estrictamente".
 
 **C-DIFF-09 · Ida y vuelta por `bits`.** `bits(H)` es válido **si y solo si**
 `bits(H) == compact(next)`. El valor que consume C-DIFF-06 para bloques anteriores es **siempre**
@@ -1168,7 +1234,22 @@ truncadas hacia cero. El caso `x > 2M` no llega aquí: el bloque ya es inválido
 > El producto intermedio `recompensa_base · x · (2M − x)` desborda `u64` con holgura. Monero tuvo
 > este bug en producción; el comentario sigue en su código:
 > *"BUGFIX: 32-bit saturation bug (e.g. ARM7), the result was being treated as 32-bit by default."*
-> (`cryptonote_basic_impl.cpp:111-112`). En Rust, `u128` nativo.
+> (`cryptonote_basic_impl.cpp:111-112`).
+>
+> **Las dos divisiones son sucesivas y eso es equivalente a dividir por `M²`** — D9 lo demostró
+> formalmente: para enteros no negativos, `⌊⌊a/m⌋/n⌋ = ⌊a/(m·n)⌋`.
+>
+> **La función es NO CRECIENTE, no estrictamente decreciente.** D9 lo precisó: `⌊·⌋` de una función
+> estrictamente decreciente nunca sube, pero **puede tener mesetas**. Con los parámetros reales de
+> ZEROX no aparecen —la resolución de `base` frente a `M²` sobra—, pero eso depende de esa relación
+> y no es garantía general. Lo que el consenso necesita sí está demostrado: **un minero nunca cobra
+> más por hacer un bloque más grande**.
+>
+> ⚠️ **`u128` tiene un techo real, y no es infinito.** Con `base = recompensa_base(0)`, el numerador
+> máximo `base·M²` **desborda `u128` en cuanto `M > 42 238 129 881 480`**. No es un agujero de
+> acuñación —`checked_mul` **falla cerrado**— pero sí sería una **denegación de validación** si `M`
+> llegara ahí. Lo que lo hace inalcanzable no es el tipo, es la física: un bloque en ese umbral
+> pesaría ~84,5 TB. Queda como **límite conocido documentado**, no como problema resuelto.
 
 **C-EMIT-07 · Orden de aplicación — el tail NO es un suelo por bloque.** El suelo `TAIL_EMISSION`
 se aplica **dentro** de `recompensa_base` (C-EMIT-01), es decir **antes** de la penalización

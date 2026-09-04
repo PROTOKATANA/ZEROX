@@ -107,6 +107,20 @@ pub fn mediana(valores: &[u64]) -> Result<u64, ConsensusError> {
 /// exactitud: es el **margen de desbordamiento**. `Mlt·17` desborda `u64` a partir de `1,09·10¹⁸`
 /// y `Mlt·7` a partir de `2,64·10¹⁸`, 2,4× más holgura. Y mantiene identidad byte a byte con los
 /// valores intermedios de la implementación de referencia.
+///
+/// # ⚠️ El clamp INFERIOR no admite la simetría, y esa es la trampa
+///
+/// Que el superior sea intercambiable invita a pensar que el inferior también lo es. **No lo es.**
+/// La identidad `⌊x⌋ + n = ⌊x + n⌋` vale para la suma; para la resta el equivalente correcto es
+/// `⌊n − x⌋ = n − ⌈x⌉`, con **techo**, no con piso.
+///
+/// D9 lo verificó: `Mlt − (Mlt·7)/17` difiere de `(Mlt·10)/17` en **49 805 de 53 005 casos**
+/// (94 %). Con `Mlt = 3`: `(3·10)/17 = 1`, pero `3 − (3·7)/17 = 2`. Solo con techo coinciden al
+/// 100 %.
+///
+/// Y un segundo peligro, más clásico y más probable: **`(Mlt/17)·10` no es `(Mlt·10)/17`** —
+/// difieren en el 88 % de los casos. Dividir antes de multiplicar sesga sistemáticamente a la baja.
+/// La forma del código multiplica primero, en `u128`.
 #[must_use]
 pub fn peso_largo_plazo(weight: u64, mlt: u64) -> u64 {
     let mlt128 = u128::from(mlt);
@@ -138,15 +152,56 @@ pub fn mediana_corta(pesos: &[u64]) -> Result<u64, ConsensusError> {
     mediana(pesos)
 }
 
+/// Mediana de largo plazo con su suelo **ya aplicado** (C-WGT-05).
+///
+/// # Por qué es un tipo y no un `u64`
+///
+/// D9 intentó refutar la regla "no reordenar los `min`/`max` de C-WGT-08 porque cambia la
+/// semántica en los empates" y **la refutó**: bajo el invariante `Mlt ≥ ZONA_LIBRE`, los
+/// reordenamientos razonables dan resultados idénticos en 200 000 casos, empates exactos incluidos.
+/// La ley distributiva de retículo se cumple, y el `max(…, ZONA_LIBRE)` final resulta
+/// **matemáticamente redundante**.
+///
+/// Pero encontró que sí hay una razón real, y es otra: `mediana_efectiva` dependía en silencio de
+/// una precondición que **otra** función garantiza y que el tipo `u64` no forzaba. Violándola
+/// —`Mlt = 1000`, `Mst = 10⁸`— el original da `M = 100 000` y un reordenamiento da `42 900`: 2,3×
+/// menos, porque el techo de ráfaga `50·1000` atrapa el valor antes de que el suelo lo rescate.
+///
+/// Así que la precondición pasa a estar en el tipo. Es el mismo patrón que [`PesoValidado`] para la
+/// resta `2M − x`: una invariante que vivía en el orden de las llamadas ahora vive en la firma.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct MedianaLarga(u64);
+
+impl MedianaLarga {
+    /// Aplica el suelo de C-WGT-05. Es la **única** forma de construir el tipo.
+    #[must_use]
+    pub fn nueva(mediana_cruda: u64) -> Self {
+        Self(mediana_cruda.max(ZONA_LIBRE))
+    }
+
+    /// El valor, garantizado `≥ ZONA_LIBRE`.
+    #[must_use]
+    pub const fn valor(self) -> u64 {
+        self.0
+    }
+}
+
 /// Mediana efectiva (C-WGT-08).
 ///
 /// ```text
 /// M := max( min( max(Mlt, Mst), FACTOR_SURGE · Mlt ), ZONA_LIBRE )
 /// ```
 ///
-/// **El orden de `min`/`max` MUST NOT reordenarse**: cambia la semántica en los empates.
+/// El `max(…, ZONA_LIBRE)` final es **redundante** dado que [`MedianaLarga`] ya trae el suelo
+/// —verificado por D9 sobre 200 000 casos—, pero se conserva escrito porque es lo que dice
+/// C-WGT-08 y porque hace la función correcta aunque algún día el invariante se relaje.
+///
+/// El orden **MUST NOT** reordenarse. No por los empates —eso se refutó— sino porque la
+/// equivalencia de los reordenamientos depende del invariante de `Mlt`, y una regla de consenso no
+/// debe apoyarse en una condición que vive fuera de ella.
 #[must_use]
-pub fn mediana_efectiva(mlt: u64, mst: u64) -> u64 {
+pub fn mediana_efectiva(mlt: MedianaLarga, mst: u64) -> u64 {
+    let mlt = mlt.valor();
     let surge = u128::from(mlt) * u128::from(FACTOR_SURGE);
     let acotado = u128::from(mlt.max(mst)).min(surge);
     (acotado as u64).max(ZONA_LIBRE)
@@ -214,8 +269,8 @@ impl PesoValidado {
 #[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
 mod tests {
     use super::{
-        FACTOR_SURGE, MAX_TX_WEIGHT, N_CORTO, N_LARGO, PesoValidado, ZONA_LIBRE, get_mid, limite,
-        mediana, mediana_corta, mediana_efectiva, mediana_larga, peso_largo_plazo,
+        FACTOR_SURGE, MAX_TX_WEIGHT, MedianaLarga, N_CORTO, N_LARGO, PesoValidado, ZONA_LIBRE,
+        get_mid, limite, mediana, mediana_corta, mediana_efectiva, mediana_larga, peso_largo_plazo,
     };
     use crate::error::ConsensusError;
 
@@ -326,23 +381,131 @@ mod tests {
         assert_eq!(mediana_larga(&[alto, alto, alto]).unwrap(), alto);
     }
 
-    /// C-WGT-08: la mediana efectiva respeta el suelo, el techo de ráfaga y el orden de min/max.
+    /// C-WGT-08: la mediana efectiva respeta el suelo y el techo de ráfaga.
     #[test]
     fn la_mediana_efectiva_respeta_suelo_y_techo() {
-        // Suelo: por debajo de la zona libre siempre sale la zona libre.
-        assert_eq!(mediana_efectiva(1, 1), ZONA_LIBRE);
+        // Suelo: `MedianaLarga` ya lo aplica, así que un Mlt crudo pequeño sube a ZONA_LIBRE.
+        assert_eq!(mediana_efectiva(MedianaLarga::nueva(1), 1), ZONA_LIBRE);
 
         // Sin ráfaga: gana la mayor de las dos.
         let mlt = ZONA_LIBRE * 2;
-        assert_eq!(mediana_efectiva(mlt, ZONA_LIBRE), mlt, "max(Mlt, Mst)");
-        assert_eq!(mediana_efectiva(ZONA_LIBRE, mlt), mlt);
+        assert_eq!(
+            mediana_efectiva(MedianaLarga::nueva(mlt), ZONA_LIBRE),
+            mlt,
+            "max(Mlt, Mst)"
+        );
+        assert_eq!(mediana_efectiva(MedianaLarga::nueva(ZONA_LIBRE), mlt), mlt);
 
         // Techo de ráfaga: la corta no puede pasar de FACTOR_SURGE · Mlt.
-        let mst_desbocada = mlt * 1000;
         assert_eq!(
-            mediana_efectiva(mlt, mst_desbocada),
+            mediana_efectiva(MedianaLarga::nueva(mlt), mlt * 1000),
             mlt * FACTOR_SURGE,
             "C-WGT-08: surge"
+        );
+    }
+
+    /// **El tipo hace imposible el caso que D9 encontró.**
+    ///
+    /// Con `Mlt = 1000` crudo y `Mst = 10⁸`, un reordenamiento de C-WGT-08 daría `42 900` en vez de
+    /// `100 000` — 2,3× menos, porque el techo de ráfaga `50·1000` atraparía el valor antes de que
+    /// el suelo lo rescatara. `MedianaLarga` no permite construir ese `Mlt`.
+    #[test]
+    fn mediana_larga_impide_el_caso_patologico_de_d9() {
+        let cruda = 1_000u64;
+        assert!(
+            cruda < ZONA_LIBRE,
+            "el caso solo existe por debajo del suelo"
+        );
+
+        let mlt = MedianaLarga::nueva(cruda);
+        assert_eq!(
+            mlt.valor(),
+            ZONA_LIBRE,
+            "el constructor aplica el suelo, siempre"
+        );
+
+        // Con el suelo aplicado, el techo de ráfaga ya no puede atrapar nada por debajo de él.
+        let m = mediana_efectiva(mlt, 100_000_000);
+        assert_eq!(
+            m,
+            ZONA_LIBRE * FACTOR_SURGE,
+            "el surge muerde, pero desde el suelo correcto"
+        );
+        assert!(
+            m > 42_900,
+            "no puede darse el valor degradado que D9 encontró"
+        );
+    }
+
+    /// D9 refutó que reordenar cambie algo **bajo el invariante**. Se comprueba aquí para que la
+    /// afirmación del SPEC quede respaldada por un test y no por una creencia.
+    #[test]
+    fn bajo_el_invariante_reordenar_no_cambia_nada() {
+        for mlt_crudo in [0u64, 1, ZONA_LIBRE, ZONA_LIBRE * 3, ZONA_LIBRE * 1000] {
+            for mst in [0u64, 1, ZONA_LIBRE, ZONA_LIBRE * 7, u64::from(u32::MAX)] {
+                let mlt = MedianaLarga::nueva(mlt_crudo).valor();
+                let original = {
+                    let surge = u128::from(mlt) * u128::from(FACTOR_SURGE);
+                    ((u128::from(mlt.max(mst)).min(surge)) as u64).max(ZONA_LIBRE)
+                };
+                // Ley distributiva de retículo: max(Mlt, min(Mst, S)) = min(max(Mlt, Mst), S),
+                // válida porque S = 50·Mlt ≥ Mlt.
+                let distributiva = {
+                    let surge = u128::from(mlt) * u128::from(FACTOR_SURGE);
+                    let interno = u128::from(mst).min(surge);
+                    ((u128::from(mlt).max(interno)) as u64).max(ZONA_LIBRE)
+                };
+                assert_eq!(
+                    original, distributiva,
+                    "con Mlt={mlt} y Mst={mst} los reordenamientos deben coincidir"
+                );
+            }
+        }
+    }
+
+    /// **La asimetría suma/resta del clamp**, que D9 encontró y que el superior no tenía.
+    ///
+    /// `⌊x⌋ + n = ⌊x + n⌋` vale para la suma. Para la resta hace falta **techo**:
+    /// `⌊n − x⌋ = n − ⌈x⌉`. Quien "simplifique" el clamp inferior por analogía con el superior
+    /// obtiene otro número.
+    #[test]
+    fn el_clamp_inferior_no_admite_la_forma_por_resta() {
+        let mut difieren = 0u32;
+        for mlt in 0u64..3_000 {
+            let correcto = (mlt * 10) / 17;
+            let por_resta_mal = mlt - (mlt * 7) / 17;
+            if correcto != por_resta_mal {
+                difieren += 1;
+            }
+            // Con techo sí coincide. `div_ceil` es exactamente ⌈7·Mlt/17⌉.
+            let por_resta_con_techo = mlt - (mlt * 7).div_ceil(17);
+            assert_eq!(
+                correcto, por_resta_con_techo,
+                "con Mlt={mlt}: la forma por resta solo vale con TECHO, no con piso"
+            );
+        }
+        assert!(
+            difieren > 2_000,
+            "la forma ingenua por resta difiere casi siempre: {difieren}/3000"
+        );
+
+        // El caso mínimo que lo enseña de un vistazo.
+        assert_eq!((3 * 10) / 17, 1);
+        assert_eq!(3 - (3 * 7) / 17, 2, "un 2 donde debería salir 1");
+    }
+
+    /// Y el error clásico de orden de operaciones: dividir antes de multiplicar sesga a la baja.
+    #[test]
+    fn dividir_antes_de_multiplicar_sesga_el_clamp_inferior() {
+        let mut difieren = 0u32;
+        for mlt in 1u64..3_000 {
+            if (mlt * 10) / 17 != (mlt / 17) * 10 {
+                difieren += 1;
+            }
+        }
+        assert!(
+            difieren > 2_000,
+            "(Mlt/17)·10 difiere de (Mlt·10)/17 en casi todos los casos: {difieren}/2999"
         );
     }
 
