@@ -627,9 +627,25 @@ de prioridades sigue existiendo por encima del mínimo.
 
 #### Calibración pendiente
 
-Con `REF_WEIGHT = 3000`, `Mf = ZONA_LIBRE = 100 000` y `recompensa_base = 32 ZZK` (régimen de cola),
-sale `tarifa_por_byte ≈ 912` brek, de modo que una transacción transparente típica de ~350 B paga
-≈ **0,0032 ZZK**, y sostener 100 KB/bloque de spam cuesta ≈ **656 ZZK/día**.
+Con `REF_WEIGHT = 3000` y `Mf = ZONA_LIBRE = 100 000`:
+
+| Régimen | `recompensa_base` | tarifa/peso | tx típica de 350 B |
+|---|---|---|---|
+| Lanzamiento | 1,907·10¹¹ brek | 54 359 brek | **0,19 ZZK** |
+| Cola (año 8,16+) | 3,2·10⁹ brek | 912 brek | **0,0032 ZZK** |
+
+> ⚠️ **La tarifa varía ~60× a lo largo de la vida de la cadena**, porque escala con la recompensa
+> base. Esta nota citaba solo la cifra de cola; un test que la comprobaba contra la recompensa de
+> lanzamiento **falló**, y así se descubrió que faltaba la mitad del cuadro. Ambos números son
+> correctos, cada uno en su régimen.
+>
+> ⚠️ **La tarifa satura en 1 brek por unidad de peso cuando `Mlt > √(base·REF_WEIGHT) ≈ 23,9 MB`.**
+> Por encima de esa mediana el mínimo deja de escalar, y todo el antispam recae en la penalización
+> de C-EMIT-06. Es una propiedad real del diseño que conviene tener presente si la cadena creciera
+> hasta medianas de decenas de megabytes.
+>
+> Y una consecuencia del suelo: con `Mlt` ya en `ZONA_LIBRE`, la tarifa mínima **está en su máximo**
+> y no puede subir más, porque `MedianaLarga` no admite valores por debajo del suelo.
 
 `REF_WEIGHT = 3000` es el valor de Monero, adoptado como punto de partida por ser el único
 precedente en producción. **Su calibración para ZEROX requiere un modelo de coste de atacante
