@@ -28,6 +28,7 @@ pub mod error;
 pub mod firma;
 mod hash;
 pub mod preimage;
+pub mod red;
 pub mod target;
 pub mod tx;
 

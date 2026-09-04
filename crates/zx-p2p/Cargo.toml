@@ -11,7 +11,19 @@ repository.workspace   = true
 workspace = true
 
 [dependencies]
-thiserror = { workspace = true }
+zx-core      = { path = "../zx-core" }
+libp2p       = { workspace = true, features = [
+    "tokio", "tcp", "quic", "noise", "yamux", "dns",
+    "identify", "ping", "kad", "mdns", "gossipsub", "request-response",
+    "macros", "ed25519",
+] }
+tokio        = { workspace = true }
+thiserror    = { workspace = true }
+tracing      = { workspace = true }
 
 [dev-dependencies]
-proptest = { workspace = true }
+# SOLO en dev: los tests comprueban que los límites de transporte son coherentes con las
+# constantes de consenso, pero el CÓDIGO de este crate no puede llamar a consenso ni por accidente.
+# Ver el diagrama de dependencias en `lib.rs`.
+zx-consensus = { path = "../zx-consensus" }
+proptest     = { workspace = true }

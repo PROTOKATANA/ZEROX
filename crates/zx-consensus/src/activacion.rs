@@ -25,14 +25,11 @@
 
 use crate::error::ConsensusError;
 
-/// Red.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Red {
-    /// Cadena principal.
-    Mainnet,
-    /// Cadena de pruebas.
-    Testnet,
-}
+/// La red. **Definida en `zx-core`**, reexportada aquí por comodidad.
+///
+/// Llegó a haber dos `Red` distintos en el workspace —este y el de `zx-core::address`— con el
+/// mismo nombre y el mismo significado, y sin ninguna relación para el compilador. Unificados.
+pub use zx_core::red::Red;
 
 /// Una rama de consenso: su identificador y la altura desde la que rige (C-UPG-02).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -62,36 +59,17 @@ pub const RAMAS_MAINNET: &[Rama] = &[RAMA_V1_MAINNET];
 /// tendrá su propio identificador.
 pub const RAMAS_TESTNET: &[Rama] = &[RAMA_V1_MAINNET];
 
-/// Prefijo mágico de mainnet (C-NET-01).
+pub use zx_core::red::{MAGIC_MAINNET, MAGIC_TESTNET};
+
+/// Tabla de ramas de una red.
 ///
-/// Primeros 4 bytes de `SHA3-256("ZEROX/mainnet/magic")`. Verificado: no es UTF-8 válido, que es el
-/// criterio que Bitcoin documenta para los suyos.
-pub const MAGIC_MAINNET: [u8; 4] = [0x9e, 0x0f, 0x10, 0x44];
-
-/// Prefijo mágico de testnet (C-NET-01). De `SHA3-256("ZEROX/testnet/magic")`.
-pub const MAGIC_TESTNET: [u8; 4] = [0xbb, 0x79, 0x64, 0x3f];
-
-impl Red {
-    /// Tabla de ramas de esta red.
-    #[must_use]
-    pub const fn ramas(self) -> &'static [Rama] {
-        match self {
-            Self::Mainnet => RAMAS_MAINNET,
-            Self::Testnet => RAMAS_TESTNET,
-        }
-    }
-
-    /// Prefijo mágico de esta red.
-    ///
-    /// **Este prefijo, y no el hash del génesis, es lo que impide que un nodo hable con un peer de
-    /// otra red.** El génesis distinto evita que las cadenas se confundan; el prefijo evita que los
-    /// nodos siquiera se saluden.
-    #[must_use]
-    pub const fn magic(self) -> [u8; 4] {
-        match self {
-            Self::Mainnet => MAGIC_MAINNET,
-            Self::Testnet => MAGIC_TESTNET,
-        }
+/// Función libre y no método porque [`Red`] vive ahora en `zx-core`: la tabla de ramas **sí** es
+/// consenso y se queda aquí, pero no puede colgar de un tipo de otro crate.
+#[must_use]
+pub const fn ramas(red: Red) -> &'static [Rama] {
+    match red {
+        Red::Mainnet => RAMAS_MAINNET,
+        Red::Testnet => RAMAS_TESTNET,
     }
 }
 
@@ -103,7 +81,7 @@ impl Red {
 /// [`ConsensusError::SinRamaActiva`] si ninguna rama cubre esa altura — imposible con una tabla
 /// bien formada, cuya primera entrada arranca en 0, pero se trata como valor.
 pub fn rama_activa(red: Red, altura: u32) -> Result<u32, ConsensusError> {
-    red.ramas()
+    ramas(red)
         .iter()
         .rev()
         .find(|r| altura >= r.desde_altura)
@@ -178,7 +156,7 @@ pub fn comprobar_tabla(ramas: &[Rama]) -> Result<(), ConsensusError> {
 mod tests {
     use super::{
         MAGIC_MAINNET, MAGIC_TESTNET, RAMA_V1_MAINNET, RAMAS_MAINNET, Rama, Red,
-        comprobar_branch_id, comprobar_tabla, rama_activa,
+        comprobar_branch_id, comprobar_tabla, rama_activa, ramas,
     };
     use crate::error::ConsensusError;
     use zx_core::sha3_256_publico;
@@ -241,7 +219,7 @@ mod tests {
     #[test]
     fn la_tabla_real_esta_bien_formada() {
         assert!(comprobar_tabla(RAMAS_MAINNET).is_ok());
-        assert!(comprobar_tabla(Red::Testnet.ramas()).is_ok());
+        assert!(comprobar_tabla(ramas(Red::Testnet)).is_ok());
     }
 
     /// La tabla se editará a mano en cada hard fork. Estas son las formas de estropearla.

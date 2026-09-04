@@ -42,22 +42,17 @@ pub const HRP_MAINNET_BLINDADA: &str = "zzs";
 /// HRP de testnet, pool transparente.
 pub const HRP_TESTNET: &str = "tzzk";
 
-/// Red a la que pertenece una dirección.
-///
-/// Es parte de la dirección, no un ajuste del nodo: una dirección de testnet **no puede** leerse
-/// como de mainnet, porque el HRP entra en el checksum.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Red {
-    /// Cadena principal.
-    Mainnet,
-    /// Cadena de pruebas.
-    Testnet,
+pub use crate::red::Red;
+
+/// El HRP de cada red. La red es parte de la dirección, no un ajuste del nodo: una dirección de
+/// testnet **no puede** leerse como de mainnet, porque el HRP entra en el checksum.
+trait HrpDeRed {
+    fn hrp_transparente(self) -> &'static str;
+    fn desde_hrp(h: &str) -> Option<Red>;
 }
 
-impl Red {
-    /// HRP del pool transparente de esta red.
-    #[must_use]
-    pub const fn hrp_transparente(self) -> &'static str {
+impl HrpDeRed for Red {
+    fn hrp_transparente(self) -> &'static str {
         match self {
             Self::Mainnet => HRP_MAINNET,
             Self::Testnet => HRP_TESTNET,
