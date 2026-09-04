@@ -80,7 +80,7 @@ impl DomainTag {
         ])
     }
 
-    const fn as_bytes(&self) -> &[u8; 16] {
+    pub(crate) const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
     }
 }
@@ -102,6 +102,10 @@ pub(crate) fn h_d(tag: DomainTag, msg: &[u8]) -> Digest {
 /// Solo para lo que la propia especificación define sin etiqueta: el hash de clave pública de una
 /// dirección (C-ENC-07) y la preimagen de un HTLC (C-TX-09). **No** se usa para nada que entre en
 /// un txid, un sighash o un hash de bloque — eso pasa siempre por [`h_d`].
+#[allow(
+    dead_code,
+    reason = "lo usará crate::address (C-ENC-07) y la verificación de HTLC (C-TX-09)"
+)]
 pub(crate) fn sha3_256(msg: &[u8]) -> Digest {
     Digest::from_bytes(Sha3_256::digest(msg).into())
 }
@@ -139,6 +143,10 @@ pub(crate) const TAG_BLK_MERKLE: DomainTag = DomainTag::fija(*b"ZZKBlkMerkle____
 pub(crate) const TAG_BLK_HEADER: DomainTag = DomainTag::fija(*b"ZZKBlkHeader____");
 
 /// Las once etiquetas ASCII fijas, para las comprobaciones de invariante.
+#[allow(
+    dead_code,
+    reason = "solo lo usan los tests de invariante de este módulo"
+)]
 pub(crate) const TAGS_FIJAS: [DomainTag; 11] = [
     TAG_TXID_HEADER,
     TAG_TXID_INPUTS,

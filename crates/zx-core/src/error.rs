@@ -39,6 +39,60 @@ pub enum EncodingError {
         /// Byte de prefijo que se usó.
         prefijo: u8,
     },
+
+    /// C-TX-12: un importe negativo o por encima de `ZX_VALUE_SANITY_LIMIT`.
+    #[error("C-TX-12: importe fuera de rango: {brek} brek")]
+    ImporteFueraDeRango {
+        /// Valor rechazado.
+        brek: i64,
+    },
+
+    /// C-TX-10: byte discriminante de `Lock` desconocido.
+    ///
+    /// **MUST** rechazarse, nunca tratarse como "gastable por cualquiera".
+    #[error("C-TX-10: discriminante de Lock desconocido: {discriminante:#04x}")]
+    LockDesconocido {
+        /// Byte leído.
+        discriminante: u8,
+    },
+
+    /// C-TX-11: `MultiSig` con parámetros inválidos.
+    #[error("C-TX-11: MultiSig inválido — k={k}, n={n}: {motivo}")]
+    MultiSigInvalido {
+        /// Umbral de firmas.
+        k: u8,
+        /// Número de claves.
+        n: usize,
+        /// Por qué se rechaza.
+        motivo: &'static str,
+    },
+
+    /// C-SIG-03: `hash_type` fuera del conjunto definido.
+    #[error("C-SIG-03: hash_type inválido: {valor:#04x}")]
+    HashTypeInvalido {
+        /// Byte leído.
+        valor: u8,
+    },
+
+    /// C-SIG-04: `SIGHASH_SINGLE` sin salida correspondiente.
+    #[error(
+        "C-SIG-04: SIGHASH_SINGLE en la entrada {indice} sin salida en ese índice ({salidas} salidas)"
+    )]
+    SingleSinSalida {
+        /// Índice de la entrada que se firma.
+        indice: usize,
+        /// Número de salidas de la transacción.
+        salidas: usize,
+    },
+
+    /// Índice de entrada fuera del rango de la transacción.
+    #[error("índice de entrada {indice} fuera de rango ({entradas} entradas)")]
+    IndiceDeEntradaFueraDeRango {
+        /// Índice pedido.
+        indice: usize,
+        /// Entradas que tiene la transacción.
+        entradas: usize,
+    },
 }
 
 /// Error agregado de `zx-core`.

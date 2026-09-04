@@ -20,10 +20,16 @@
 
 #![doc = include_str!("../README.md")]
 
+pub mod amount;
 pub mod digest;
 pub mod encoding;
 pub mod error;
 mod hash;
+pub mod preimage;
+pub mod tx;
 
+pub use amount::{Amount, ZX_VALUE_SANITY_LIMIT};
 pub use digest::{AuthDigest, BlockHash, Digest, MerkleRoot, SigHash, TxId};
 pub use error::{CoreError, EncodingError};
+pub use preimage::tx::{HashType, auth_digest, sighash, txid};
+pub use tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};

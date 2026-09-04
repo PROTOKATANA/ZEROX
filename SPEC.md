@@ -307,6 +307,19 @@ signature_digest(k) = H_d("ZZKTxIdHash_" ‖ CBID, header_digest ‖ inputs_sig_
 entradas transparentes, `sighash == txid`. Se separan por longitud del contenido, que es
 siempre 96 bytes.
 
+> 🔶 **C-SIG-01b · El `outputs_digest` de la raíz es el MODULADO.** Detectado 2026-09-04 al
+> implementar. Leída al pie de la letra, la frase "idéntico al txid salvo que `inputs_digest` se
+> sustituye" dejaría en la raíz el `outputs_digest` **sin modular**, es decir, el de todas las
+> salidas. Con esa lectura, **`SIGHASH_NONE` y `SIGHASH_SINGLE` no harían nada**: la firma seguiría
+> comprometiendo todas las salidas por la rama de la raíz, y la tabla de C-SIG-05 sería letra
+> muerta.
+>
+> Por tanto el `outputs_digest` de la raíz **MUST** ser el modulado por `hash_type`, el mismo que
+> entra en `inputs_sig_digest`. Bajo `SIGHASH_ALL` —el caso normal— ambas lecturas coinciden byte a
+> byte, así que la corrección no afecta al camino habitual.
+>
+> Implementado así en `zx-core`. **Pendiente de confirmación humana → P-021.**
+
 ```
 inputs_sig_digest(k) = H_d("ZZKTxIdInputs___",
       hash_type(1) ‖ prevouts_digest(32) ‖ amounts_digest(32) ‖
@@ -440,6 +453,23 @@ Lock ::= 0x00 PubKey  { pubkey_hash: [u8; L] }
 | `PubKey` | Firma válida de la clave cuyo hash coincide |
 | `MultiSig` | `k` firmas válidas de `k` claves distintas del conjunto |
 | `Htlc` | *(a)* preimagen `p` con `SHA3-256(p) = hash` **y** firma de `receiver`; o *(b)* altura del bloque `≥ timeout` **y** firma de `sender` |
+
+**C-TX-09b · Codificación canónica de `Lock`.** Un `Lock` se codifica como
+`discriminante(1) ‖ campos`, con los campos en el orden de la declaración de arriba. La lista de
+`MultiSig` va precedida de su longitud en `CompactSize`:
+
+```
+PubKey   := 0x00 ‖ pubkey_hash(32)
+MultiSig := 0x01 ‖ k(1) ‖ CompactSize(n) ‖ pubkey_hash₀(32) ‖ … ‖ pubkey_hashₙ₋₁(32)
+Htlc     := 0x02 ‖ hash(32) ‖ receiver(32) ‖ sender(32) ‖ timeout(4 LE)
+```
+
+> Añadido 2026-09-04 al implementar §4. El SPEC definía la estructura de `Lock` pero no la
+> codificación de la lista de `MultiSig`, y eso **no puede quedar implícito**: `scripts_digest`
+> (§4.3) concatena varios locks seguidos, así que sin un delimitador de longitud dos secuencias
+> distintas de locks podrían producir los mismos bytes y por tanto el mismo digest. `CompactSize` es
+> la única lectura coherente con §2.2, que lo define justamente para "contadores y longitudes", y
+> su minimalidad ya está cubierta por C-ENC-05.
 
 **C-TX-10** · El byte discriminante **MUST** estar en el conjunto definido. Valores desconocidos
 **MUST** rechazarse (no tratarse como "gastable por cualquiera").
@@ -592,11 +622,37 @@ un campo de "versión de bloque" separado: la rama de consenso *es* la versión.
 > absorción única. Ver `research/sha3-kernel-audit.md` — el kernel actual asume esto sin
 > documentarlo, y aquí queda documentado como contrato.
 
-**C-HDR-04** · El **nonce ocupa los bytes `[92, 100)` de la preimagen** (offset 16 de la etiqueta
-+ 76 del inicio del campo `nonce` en la cabecera). El minero GPU **MUST** iterar exactamente ese
+**C-HDR-04** · El **nonce ocupa los bytes `[96, 104)` de la preimagen** (offset 16 de la etiqueta
++ 80 del inicio del campo `nonce` en la cabecera). El minero GPU **MUST** iterar exactamente ese
 rango. Este offset es **regla de consenso**, no detalle de implementación.
 
-> El kernel actual clava el nonce en los bytes `[48,56)` por accidente histórico y, si la cabecera
+Offsets de los campos dentro de la cabecera, para que no haya que contarlos a mano:
+
+| Campo | Offset en cabecera | Offset en preimagen |
+|---|---|---|
+| `consensus_branch_id` | `[0, 4)` | `[16, 20)` |
+| `prev_hash` | `[4, 36)` | `[20, 52)` |
+| `merkle_root` | `[36, 68)` | `[52, 84)` |
+| `timestamp` | `[68, 76)` | `[84, 92)` |
+| `bits` | `[76, 80)` | `[92, 96)` |
+| **`nonce`** | **`[80, 88)`** | **`[96, 104)`** |
+| `height` | `[88, 92)` | `[104, 108)` |
+
+> ⚠️ **Corregido 2026-09-04 · hallazgo H-005.** Esta regla decía `[92, 100)` con offset 76. El 76
+> venía de cuando `timestamp` era `u32` (`4+32+32+4+4 = 76`); P-004 lo fijó en `u64` y **este offset
+> no se actualizó**.
+>
+> La consecuencia no era cosmética: `[92, 100)` cubre **los últimos 4 bytes de `bits`** y solo los
+> 4 primeros del `nonce`. Un minero que siguiera la regla al pie de la letra estaría **mutando el
+> target mientras mina**, así que todo bloque que produjera violaría C-BLK-05 (`bits` **MUST** ser
+> exactamente el valor del retarget) y sería rechazado. Nunca habría encontrado un bloque válido, y
+> el síntoma —"el minero no saca bloques"— no habría apuntado a la causa.
+>
+> En `zx-core` este offset **se deriva de los tamaños de los campos**, no se escribe a mano, y un
+> test lo fija (`el_nonce_esta_donde_dice_c_hdr_04`). Si alguien vuelve a cambiar el ancho de un
+> campo, el test falla en vez de romper el minero en silencio.
+
+> El kernel heredado clava el nonce en los bytes `[48,56)` por accidente histórico y, si la cabecera
 > midiera menos de 56 bytes, **todos los hilos calcularían el mismo hash**. Ver
 > `research/sha3-kernel-audit.md` hallazgo 7.
 
