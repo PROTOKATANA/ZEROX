@@ -75,6 +75,8 @@ proptest        = "=1.11.0"
 # Es el patrón que usa el propio rust-libp2p en `request-response/src/cbor.rs`.
 futures_ringbuf = "=0.4.0"
 criterion = "=0.8.2"
+# Directorios temporales para los tests del almacén en disco.
+tempfile  = "=3.24.0"
 
 # ─────────────────────────────────────────────────────────────────────────
 # Lints: en código de consenso un panic es un vector de DoS.

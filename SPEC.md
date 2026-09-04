@@ -1975,6 +1975,47 @@ mainnet:  🔴 sin congelar — P-017
 > comprueba que impide arrancar.
 
 
+## 15.1 · Almacenamiento — `C-STORE`
+
+**C-STORE-01 · La punta MUST escribirse después del dato, nunca antes.** Un almacén **MUST**
+rechazar fijar la punta en una cabecera que no tenga guardada.
+
+> **La asimetría es lo que importa.** Si el proceso muere entre medias:
+>
+> | | Resultado |
+> |---|---|
+> | Cabeceras escritas, punta no | **Recuperable.** Sobra información, se ignora |
+> | Punta escrita, cabecera no | **Corrupto.** El nodo arranca creyendo estar en una altura de la que no tiene datos |
+>
+> Y el segundo caso no da la cara al arrancar: da la cara mucho después, cuando alguien pide esa
+> altura. Por eso la comprobación se hace **leyendo**, no confiando.
+>
+> Es la misma razón por la que `revertir_bloque` aplica el undo data antes de mover el tip.
+
+**C-STORE-02 · Guardar una cabecera es una operación ATÓMICA.** Toca dos índices —por hash y por
+altura— y **MUST NOT** poder quedar a medias.
+
+> Sin atomicidad hay una ventana en la que el índice de alturas apunta a una cabecera que aún no
+> existe. En RocksDB se resuelve con `WriteBatch`.
+
+**C-STORE-03 · Las alturas se indexan en BIG-endian.**
+
+> RocksDB ordena las claves por bytes, así que big-endian hace que el orden lexicográfico coincida
+> con el numérico. Con little-endian, la altura 256 —`00 01 00 00`— quedaría **antes** que la 2
+> —`02 00 00 00`—, y cualquier recorrido por rango daría la cadena desordenada.
+>
+> Es la clase de fallo que no se ve hasta que la cadena pasa de 256 bloques. Hay un test que
+> compara los dos órdenes explícitamente.
+
+**C-STORE-04 · Todo backend MUST comportarse igual que la implementación de referencia.**
+
+> `AlmacenEnMemoria` es la referencia; `AlmacenEnDisco` el backend real. Un test diferencial corre
+> la misma secuencia contra los dos y exige respuestas **idénticas**, incluidas las de "no lo
+> tengo".
+>
+> Es la disciplina que faltó en **H-001**: aquel kernel no tenía contra qué compararse, y por eso
+> falló los 237 vectores CAVP sin que nadie lo notara.
+
 ## 16 · Parámetros de red
 
 > Esta sección puede migrar a un SPEC de P2P independiente. Se recoge aquí porque C-NET-01 es lo
@@ -2336,6 +2377,7 @@ cadena**. Los seis huecos están escritos:
 | §14 · Activación de cambios de consenso | C-UPG-01..08 |
 | §15 · Bloque génesis | C-GEN-01..07 |
 | §2.4 · Serialización de red | C-WIRE-01..06 |
+| §15.1 · Almacenamiento | C-STORE-01..04 |
 | §16 · Parámetros de red | C-NET-01..15 |
 
 ### Aparcadas — evaluadas, con factura desglosada, NO adoptadas

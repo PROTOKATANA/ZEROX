@@ -24,6 +24,20 @@ jobs:
       - run: cargo build --workspace --all-features --locked
       - run: cargo test --workspace --all-features --locked
 
+  almacen:
+    name: Almacén — el backend de disco y su test diferencial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # RocksDB necesita libclang para bindgen.
+      - run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      # El backend de disco está tras una feature para no ralentizar el ciclo normal, pero eso
+      # significa que `cargo test --workspace` NO lo prueba. Si no se corre aquí, no se corre nunca.
+      - run: cargo test -p zx-storage --features rocksdb --locked
+      - run: cargo clippy -p zx-storage --features rocksdb --all-targets --locked -- -D warnings
+
   deps:
     name: Dependencias — versiones pineadas
     runs-on: ubuntu-latest

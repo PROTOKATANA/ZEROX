@@ -29,4 +29,27 @@ pub enum StorageError {
     /// Índice de salida fuera del rango de `u32`.
     #[error("índice de salida fuera de rango")]
     IndiceFueraDeRango,
+
+    /// Se intentó mover la punta a una cabecera que no está guardada.
+    ///
+    /// **Es la comprobación que convierte un almacén corrupto en un error visible.** Sin ella, un
+    /// proceso que muriera entre "escribir la punta" y "escribir la cabecera" dejaría un nodo que
+    /// arranca creyendo estar en una altura de la que no tiene datos — y el síntoma aparecería
+    /// mucho después, al intentar servirla.
+    #[error("C-STORE-01: se intentó fijar la punta en {altura} sin haber guardado su cabecera")]
+    PuntaSinCabecera {
+        /// La altura que se pedía.
+        altura: u32,
+    },
+
+    /// Los bytes guardados no decodifican. El almacén está corrupto.
+    #[error("almacén corrupto: {que} no decodifica")]
+    Corrupto {
+        /// Qué no decodificaba.
+        que: &'static str,
+    },
+
+    /// Fallo del backend de disco.
+    #[error("fallo del almacén: {0}")]
+    Backend(String),
 }

@@ -10,10 +10,19 @@ repository.workspace   = true
 [lints]
 workspace = true
 
+[features]
+# RocksDB es una dependencia enorme (bindgen, libclang, minutos de compilación). Dejarla opcional
+# mantiene rápido el ciclo de todo lo que no la necesita — que es casi todo, porque la lógica se
+# prueba contra `AlmacenEnMemoria`.
+default = []
+rocksdb = ["dep:rocksdb"]
+
 [dependencies]
 thiserror    = { workspace = true }
 zx-core      = { path = "../zx-core" }
 zx-consensus = { path = "../zx-consensus" }
+rocksdb      = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
+tempfile = { workspace = true }
