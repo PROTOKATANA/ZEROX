@@ -1043,7 +1043,8 @@ ser cero, la mantisa **MUST NOT** ser cero, y el resultado **MUST NOT** desborda
 > la lectura natural de eso —"el byte alto de la mantisa **MUST** ser distinto de cero"— **es
 > incorrecta**: rechazaría `0x1d00ffff`, que es canónico. Ese byte cero no es un descuido, es el
 > resultado del desplazamiento que evita invadir el bit de signo. Y `0x1d00ffff` es precisamente el
-> `TARGET_INICIAL` de ZEROX y el `powLimit` de Bitcoin.
+> `TARGET_INICIAL` de **testnet** y el `powLimit` de Bitcoin. El de mainnet, `0x1c00ffff`, tiene el
+> mismo byte alto a cero y por la misma razón.
 >
 > Definir la canonicidad como punto fijo del codificador no puede desincronizarse de él, porque
 > **es** él. Enumerar reglas estructurales sí puede, y en el primer intento ya se equivocó.
@@ -1098,33 +1099,70 @@ Sus **únicas** entradas son la altura `H`, los `N+1` timestamps y los `N` targe
 `decode(bits(h))`. **MUST NOT** leer reloj local, hora de red, mempool, configuración, ni ninguna
 cabecera fuera de esa ventana.
 
-**C-DIFF-02 · Arranque.** Si `1 ≤ H ≤ N`, `siguiente_target(H) = TARGET_INICIAL`, con
+**C-DIFF-02 · Arranque.** Si `1 ≤ H ≤ N`, `siguiente_target(H) = TARGET_INICIAL(red)`. **Cada red
+lleva su propio valor:**
 
 ```
-TARGET_INICIAL_BITS = 0x1d00ffff
-TARGET_INICIAL      = 2^224 − 2^208    // el mayor target REPRESENTABLE bajo POW_LIMIT
+mainnet:  TARGET_INICIAL_BITS = 0x1c00ffff    TARGET_INICIAL = 0xffff · 2^200 ≈ 2^216
+testnet:  TARGET_INICIAL_BITS = 0x1d00ffff    TARGET_INICIAL = 0xffff · 2^208 ≈ 2^224
 ```
+
+Mainnet arranca **exactamente 256 veces más difícil** que testnet: las dos comparten la mantisa
+`0xffff` y difieren en un solo paso de exponente, que vale `2^8` limpio.
+
+El primer retarget calculado es el de `H = N+1`. La ventana es siempre exactamente `N`;
+**MUST NOT** encogerse dinámicamente.
 
 > ⚠️ **Corregido 2026-09-04 al implementar.** Esta regla decía `TARGET_INICIAL = POW_LIMIT =
 > 2^224 − 1`, y **eso es inalcanzable**: el formato compacto de C-POW-03 solo representa valores de
 > la forma `mantisa × 256^k` con la mantisa de 3 bytes, y `2^224 − 1` son 28 bytes de `0xFF`
 > seguidos. Ningún `bits` decodifica a él, así que **el bloque génesis no habría podido llevar el
-> target que la regla exigía**.
+> target que la regla exigía**. `POW_LIMIT` sigue siendo la **cota** —C-POW-05 rechaza cualquier
+> target por encima— y `TARGET_INICIAL` es un valor representable por debajo.
+
+> 🔶 **P-004c · valor de mainnet decidido 2026-09-04 (Katana): que el primer bloque tarde ~10
+> minutos, no segundos.**
 >
-> `POW_LIMIT` sigue siendo la **cota** —C-POW-05 rechaza cualquier target por encima— y
-> `TARGET_INICIAL` es el mayor valor representable por debajo. La diferencia en dificultad es de
-> 1,5·10⁻⁵: irrelevante. Es exactamente la situación de Bitcoin, cuyo `powLimit` es también
-> `0x1d00ffff`.
-
-El primer retarget calculado es el de `H = N+1`. La ventana es siempre exactamente `N`;
-**MUST NOT** encogerse dinámicamente.
-
-> 🔶 **Revisable hasta el momento de crear el génesis** — y solo hasta entonces. No hay cadena
-> viva que romper mientras el bloque 0 no exista, y testnet puede llevar un valor distinto.
-> La elección es asimétrica: arrancar demasiado **difícil** impide lanzar (los primeros bloques
-> tardarían horas o días); arrancar demasiado **fácil** se autocorrige, porque con `N = 90` la
-> ventana se llena en minutos y LWMA toma el control. Arrancar exactamente en `POW_LIMIT` es el
-> extremo seguro de esa asimetría, y ahorra justificar una constante más.
+> **Qué se descartó y por qué.** El valor anterior era `0x1d00ffff`, el target más fácil
+> representable, elegido por la asimetría: arrancar demasiado **difícil** no deja lanzar la cadena y
+> solo se arregla rehaciendo el génesis; arrancar demasiado **fácil** se autocorrige en cuanto LWMA
+> llena su ventana. La asimetría sigue siendo cierta, pero **el extremo fácil resultó absurdo**: con
+> una GPU moderna los bloques salen en **1-4 segundos**, y los 90 que esta misma regla mina a
+> dificultad fija se despachan en minutos, casi gratis, para quien encienda primero.
+>
+> | `bits` | ×dif | 0,5 GH/s | 1 GH/s | **2 GH/s** | 3 GH/s | 10 GH/s | 30 GH/s |
+> |---|---|---|---|---|---|---|---|
+> | `0x1d00ffff` | 1 | 8,6 s | 4,3 s | 2,1 s | 1,4 s | 0,4 s | 0,1 s |
+> | `0x1c03ffff` | 64 | 9,2 min | 4,6 min | 2,3 min | 1,5 min | 27,5 s | 9,2 s |
+> | **`0x1c00ffff`** | **256** | 36,7 min | 18,3 min | **9,2 min** | 6,1 min | 1,8 min | 36,7 s |
+> | `0x1b7fffff` | 512 | 1,2 h | 36,7 min | 18,3 min | 12,2 min | 3,7 min | 1,2 min |
+>
+> Con **2 GH/s —una GPU sola— salen 9,2 min**, que es el punto pedido. ×64 se queda en minutos
+> sueltos; ×512 se pasa de media hora si aparece menos hashrate del previsto.
+>
+> **Es un slow-start sin regla de consenso.** `T` nominal son 120 s, así que arrancar en ~10 min
+> significa que los primeros 90 bloques van **5 veces más lentos** de lo que la cadena irá después.
+> Es deliberado: hace que el puñado de bloques a dificultad fija cueste **horas reales** y quita el
+> incentivo de la carrera del día 1. Zcash resuelve lo mismo rampando el subsidio durante 20 000
+> bloques; aquí sale gratis, eligiendo bien una constante que ya existía.
+>
+> **El riesgo que queda.** Durante esos 90 bloques LWMA no corrige nada, así que si el día del
+> lanzamiento aparece menos hashrate del previsto **nada puede acelerarlos**:
+>
+> | Hashrate real el día 1 | 10 GH/s | 3 GH/s | 2 GH/s | 1 GH/s | 0,5 GH/s |
+> |---|---|---|---|---|---|
+> | Hasta que LWMA toma el control | 2,7 h | 9,2 h | 13,7 h | 1,1 días | 2,3 días |
+>
+> La cadena arranca igual, solo despacio, y se acelera sola en cuanto LWMA entra.
+>
+> **Por qué testnet se queda en el mínimo.** Una red local de tres nodos tiene que producir bloques
+> en segundos o los tests de integración no son utilizables. Ahí, que una GPU mine 90 bloques en
+> minutos es exactamente la propiedad que se quiere. El aislamiento entre redes **no** depende de la
+> dificultad: lo garantizan el génesis distinto (C-GEN-04) y el prefijo mágico (C-NET-01).
+>
+> **Sigue revisable hasta el minuto antes de crear el génesis** — y solo hasta entonces. Para
+> entonces existirá `zx-miner` (Fase 8) y el número podrá fijarse desde un hashrate **medido** en
+> vez de estimado.
 
 **C-DIFF-03 · Reconstrucción monótona de solvetimes.** Todo en `i64`:
 
@@ -1918,7 +1956,6 @@ debajo**.
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
-| **P-004c** | §7.3 | `TARGET_INICIAL` — fijado en `0x1d00ffff`, revisable hasta crear el génesis | Katana, antes del lanzamiento |
 
 ### Cerradas en esta revisión
 
@@ -1926,6 +1963,7 @@ debajo**.
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
 | **P-020** | **P2K**, no P2KH. La respuesta post-cuántica es un network upgrade con una variante nueva de `Lock`, no el formato de dirección | C-ENC-07, C-TX-06b, C-TX-09b |
+| **P-004c** | `TARGET_INICIAL` **por red**: mainnet `0x1c00ffff` (~10 min el primer bloque con una GPU), testnet `0x1d00ffff`. Recalibrable con hashrate medido hasta el génesis | C-DIFF-02 |
 
 ### Cubiertas desde la auditoría de cobertura
 

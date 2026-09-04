@@ -191,7 +191,7 @@ mod tests {
     use crate::error::ConsensusError;
     use primitive_types::U256;
     use zx_core::digest::{BlockHash, Digest};
-    use zx_core::target::{TrabajoAcumulado, target_inicial, trabajo_bloque};
+    use zx_core::target::{TrabajoAcumulado, target_inicial_testnet, trabajo_bloque};
 
     fn hash(primer_byte: u8) -> BlockHash {
         let mut b = [0u8; 32];
@@ -266,9 +266,9 @@ mod tests {
     /// C-FORK-02: el trabajo acumulado se reconstruye desde los targets. Un caché no es la verdad.
     #[test]
     fn el_trabajo_acumulado_se_puede_recalcular() {
-        let targets = vec![target_inicial(); 5];
+        let targets = vec![target_inicial_testnet(); 5];
         let acc = trabajo_acumulado(&targets).unwrap();
-        let uno = trabajo_bloque(target_inicial()).unwrap();
+        let uno = trabajo_bloque(target_inicial_testnet()).unwrap();
         assert_eq!(acc.valor(), uno * U256::from(5_u32));
 
         // Y sumar de uno en uno da lo mismo que la función de conveniencia.

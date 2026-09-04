@@ -32,29 +32,81 @@ pub fn min_target() -> U256 {
     U256::one() << 64usize
 }
 
-/// `bits` del génesis y de los primeros `N` bloques (C-DIFF-02).
+/// `bits` inicial de **mainnet** — la dificultad de arranque (C-DIFF-02, P-004c).
 ///
-/// `0x1d00ffff`, que decodifica a `2^224 − 2^208` — **el mayor target representable** bajo
-/// [`pow_limit`].
+/// `0x1c00ffff` = `0xffff · 2²⁰⁰ ≈ 2²¹⁶`: **exactamente 256 veces más difícil** que el mínimo
+/// representable. Un bloque cuesta `2²⁵⁶/target ≈ 1,10·10¹²` hashes esperados.
 ///
-/// # Por qué no es `2^224 − 1` exactamente
+/// El factor es exacto, no aproximado: `0x1c00ffff` y `0x1d00ffff` comparten la mantissa `0xffff` y
+/// difieren en un solo paso de exponente, que vale `2⁸`. Verificado en
+/// `mainnet_arranca_256_veces_mas_dificil_que_testnet`.
 ///
-/// El formato compacto solo representa valores de la forma `mantisa × 256^k` con la mantisa de 3
-/// bytes. `2^224 − 1` son 28 bytes de `0xFF` seguidos: **no es representable**. Si el SPEC exigiera
-/// literalmente `TARGET_INICIAL = POW_LIMIT`, el bloque génesis no podría llevar un `bits` que
-/// decodificara a ese valor.
+/// # El objetivo: que el primer bloque tarde ~10 minutos, no segundos
 ///
-/// `POW_LIMIT` sigue siendo la **cota** —ningún target puede superarla— y `TARGET_INICIAL` es el
-/// mayor valor representable por debajo. La diferencia es de 1,5·10⁻⁵ en dificultad: irrelevante.
-/// Es la misma situación que en Bitcoin, cuyo `powLimit` es justamente `0x1d00ffff`.
-pub const TARGET_INICIAL_BITS: u32 = 0x1d00_ffff;
+/// La primera versión ponía `0x1d00ffff` —el target más fácil representable— razonando que
+/// equivocarse por difícil no arranca la cadena y equivocarse por fácil solo cuesta unos bloques
+/// prematuros. La asimetría sigue siendo cierta, pero **el extremo fácil resultó absurdo**: con una
+/// GPU moderna los bloques salen en **1-4 segundos**, y los 90 que C-DIFF-02 mina a dificultad fija
+/// se despachan en minutos, casi gratis, para quien encienda primero.
+///
+/// | `bits` | ×dif | 0,5 GH/s | 1 GH/s | 2 GH/s | 3 GH/s | 10 GH/s | 30 GH/s |
+/// |---|---|---|---|---|---|---|---|
+/// | `0x1d00ffff` | 1 | 8,6 s | 4,3 s | 2,1 s | 1,4 s | 0,4 s | 0,1 s |
+/// | `0x1c03ffff` | 64 | 9,2 min | 4,6 min | 2,3 min | 1,5 min | 27,5 s | 9,2 s |
+/// | **`0x1c00ffff`** | **256** | **36,7 min** | **18,3 min** | **9,2 min** | **6,1 min** | **1,8 min** | **36,7 s** |
+/// | `0x1b7fffff` | 512 | 1,2 h | 36,7 min | 18,3 min | 12,2 min | 3,7 min | 1,2 min |
+///
+/// Con **2 GH/s —una GPU sola— sale 9,2 min**, que es el punto pedido. La fila de ×64 se queda en
+/// minutos sueltos y la de ×512 se pasa de media hora si aparece menos hashrate del previsto.
+///
+/// # Es un slow-start sin regla de consenso
+///
+/// `T` nominal son 120 s, así que arrancar en ~10 min significa que los primeros 90 bloques van
+/// **5 veces más lentos** de lo que la cadena irá después, hasta que LWMA los alcance. Eso es
+/// deliberado: hace que el puñado de bloques a dificultad fija cueste **horas reales**, no minutos,
+/// y quita el incentivo de la carrera del día 1. Zcash resuelve lo mismo rampando el subsidio
+/// durante 20 000 bloques; aquí se consigue el mismo efecto **sin añadir ninguna regla de
+/// consenso** — solo eligiendo bien una constante que ya existía.
+///
+/// # El riesgo que queda, y por qué es aceptable
+///
+/// C-DIFF-02 mantiene este target **fijo durante los primeros 90 bloques**: LWMA no corrige nada
+/// hasta entonces. Si el día del lanzamiento aparece mucho menos hashrate del previsto, esos 90
+/// bloques van lentos y **nada puede acelerarlos**:
+///
+/// | Hashrate real el día 1 | Hasta que LWMA toma el control |
+/// |---|---|
+/// | 10 GH/s | 2,7 h |
+/// | 3 GH/s | 9,2 h |
+/// | 2 GH/s | 13,7 h |
+/// | 1 GH/s | 1,1 días |
+/// | 0,5 GH/s | 2,3 días |
+///
+/// La cadena **arranca igual**, solo despacio, y se acelera sola en cuanto LWMA entra. Es aceptable
+/// porque el número es **revisable hasta el minuto antes de crear el génesis**, y para entonces
+/// existirá `zx-miner` (Fase 8): se podrá fijar desde un hashrate **medido** en vez de estimado.
+/// 🔶 P-004c.
+pub const TARGET_INICIAL_BITS_MAINNET: u32 = 0x1c00_ffff;
 
-/// Target del génesis, ya decodificado (C-DIFF-02).
+/// `bits` inicial de **testnet** — deliberadamente el mínimo, `0x1d00ffff`.
 ///
-/// La elección es asimétrica —pasarse de difícil impide lanzar, pasarse de fácil se autocorrige en
-/// minutos porque con `N = 90` la ventana se llena enseguida— y este es el extremo seguro.
-/// 🔶 Revisable **solo hasta crear el génesis**.
-pub fn target_inicial() -> U256 {
+/// Testnet existe para que las cosas pasen rápido: una red local de tres nodos tiene que producir
+/// bloques en segundos o los tests de integración no son utilizables. Aquí el "problema" de que una
+/// GPU mine 90 bloques en minutos es exactamente la propiedad que se quiere.
+///
+/// Que las dos redes lleven valores distintos no es una excepción: C-DIFF-02 lo contempla, y el
+/// aislamiento entre redes ya lo garantizan el génesis (C-GEN-04) y el prefijo mágico (C-NET-01).
+pub const TARGET_INICIAL_BITS_TESTNET: u32 = 0x1d00_ffff;
+
+/// Target inicial de mainnet como entero. Ver [`TARGET_INICIAL_BITS_MAINNET`].
+#[must_use]
+pub fn target_inicial_mainnet() -> U256 {
+    U256::from(0x0000_ffff_u32) << (8usize * (0x1c - 3))
+}
+
+/// Target inicial de testnet como entero. Ver [`TARGET_INICIAL_BITS_TESTNET`].
+#[must_use]
+pub fn target_inicial_testnet() -> U256 {
     U256::from(0x0000_ffff_u32) << (8usize * (0x1d - 3))
 }
 
@@ -254,8 +306,9 @@ impl TrabajoAcumulado {
 )]
 mod tests {
     use super::{
-        CompactBits, TARGET_INICIAL_BITS, TrabajoAcumulado, cumple_pow, hash_como_entero,
-        min_target, pow_limit, target_inicial, trabajo_bloque,
+        CompactBits, TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET, TrabajoAcumulado,
+        cumple_pow, hash_como_entero, min_target, pow_limit, target_inicial_mainnet,
+        target_inicial_testnet, trabajo_bloque,
     };
     use crate::digest::{BlockHash, Digest};
     use primitive_types::U256;
@@ -302,7 +355,8 @@ mod tests {
     #[test]
     fn ida_y_vuelta_de_bits_canonico() {
         for t in [
-            target_inicial(),
+            target_inicial_mainnet(),
+            target_inicial_testnet(),
             min_target(),
             U256::one() << 200usize,
             U256::one() << 100usize,
@@ -349,19 +403,51 @@ mod tests {
 
     /// `TARGET_INICIAL` **MUST** ser representable en forma compacta: el génesis tiene que poder
     /// llevar un `bits` que decodifique a él. `2^224 − 1` no lo es.
+    ///
+    /// Se comprueba en **las dos redes**, porque desde P-004c llevan valores distintos y un error de
+    /// transcripción en una no lo cazaría el test de la otra.
     #[test]
     fn el_target_inicial_es_representable_y_cabe_bajo_pow_limit() {
-        let bits = CompactBits::from_u32(TARGET_INICIAL_BITS);
-        assert_eq!(bits.decodificar().unwrap(), target_inicial());
-        assert_eq!(
-            CompactBits::codificar(target_inicial()).to_u32(),
-            TARGET_INICIAL_BITS
-        );
-        assert!(
-            target_inicial() < pow_limit(),
-            "TARGET_INICIAL MUST estar bajo la cota"
-        );
+        for (bits_u32, target) in [
+            (TARGET_INICIAL_BITS_MAINNET, target_inicial_mainnet()),
+            (TARGET_INICIAL_BITS_TESTNET, target_inicial_testnet()),
+        ] {
+            let bits = CompactBits::from_u32(bits_u32);
+            assert_eq!(bits.decodificar().unwrap(), target, "0x{bits_u32:08x}");
+            assert_eq!(
+                CompactBits::codificar(target).to_u32(),
+                bits_u32,
+                "punto fijo del codificador, 0x{bits_u32:08x}"
+            );
+            assert!(target < pow_limit(), "MUST estar bajo la cota");
+            assert!(target > min_target(), "MUST estar sobre el suelo");
+        }
         assert!(CompactBits::codificar(pow_limit()).decodificar().unwrap() <= pow_limit());
+    }
+
+    /// **P-004c.** Mainnet arranca **más difícil** que testnet, y por el factor que se decidió.
+    ///
+    /// El sentido de la desigualdad es lo que importa: si alguien la invirtiera, mainnet arrancaría
+    /// a dificultad de juguete y los primeros 90 bloques —fijos por C-DIFF-02— se regalarían.
+    ///
+    /// # El ×256 es exacto, y eso no es casualidad
+    ///
+    /// Un candidato anterior, `0x1c03ffff`, prometía ×64 y **daba 63,999267**: `0x03ffff` es
+    /// `2¹⁸ − 1`, no `2¹⁸`. El test lo cazó afirmando la igualdad exacta y fallando.
+    ///
+    /// `0x1c00ffff` no tiene ese problema: comparte la mantissa `0xffff` con `0x1d00ffff` y difiere
+    /// **solo en un paso de exponente**, que vale `2⁸` limpio. Por eso aquí sí se puede escribir
+    /// `assert_eq!` y no una cota.
+    #[test]
+    fn mainnet_arranca_256_veces_mas_dificil_que_testnet() {
+        let m = target_inicial_mainnet();
+        let t = target_inicial_testnet();
+        assert!(m < t, "menos target = más difícil");
+        assert_eq!(t, m * 256u32, "un paso de exponente = 2⁸ exacto");
+
+        let w_m = trabajo_bloque(m).unwrap();
+        let w_t = trabajo_bloque(t).unwrap();
+        assert_eq!(w_m / w_t, U256::from(256u32), "×256 exacto en trabajo");
     }
 
     #[test]
@@ -382,7 +468,7 @@ mod tests {
     #[test]
     fn el_trabajo_es_2_elevado_256_entre_target_mas_uno() {
         // target = 2^224 − 2^208  ⇒  trabajo ≈ 2^32
-        let w = trabajo_bloque(target_inicial()).unwrap();
+        let w = trabajo_bloque(target_inicial_testnet()).unwrap();
         assert!(
             w >= (U256::one() << 32usize) && w <= (U256::one() << 33usize),
             "{w}"
@@ -400,7 +486,7 @@ mod tests {
     /// premiaría la cadena más débil.
     #[test]
     fn menos_target_es_mas_trabajo() {
-        let facil = trabajo_bloque(target_inicial()).unwrap();
+        let facil = trabajo_bloque(target_inicial_testnet()).unwrap();
         let medio = trabajo_bloque(U256::one() << 200usize).unwrap();
         let dificil = trabajo_bloque(min_target()).unwrap();
         assert!(facil < medio, "{facil} < {medio}");
@@ -410,7 +496,7 @@ mod tests {
     #[test]
     fn el_trabajo_acumulado_no_desborda_en_silencio() {
         let acc = TrabajoAcumulado::cero();
-        let w = trabajo_bloque(target_inicial()).unwrap();
+        let w = trabajo_bloque(target_inicial_testnet()).unwrap();
         let acc = acc.sumar(w).unwrap().sumar(w).unwrap();
         assert_eq!(acc.valor(), w * 2u32);
 

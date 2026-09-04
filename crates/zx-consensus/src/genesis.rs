@@ -19,7 +19,7 @@ use zx_core::digest::{BlockHash, Digest, TxId};
 use zx_core::firma::ClavePublica;
 use zx_core::preimage::block::{BlockHeader, merkle_root};
 use zx_core::preimage::tx::txid;
-use zx_core::target::{CompactBits, TARGET_INICIAL_BITS};
+use zx_core::target::{CompactBits, TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET};
 use zx_core::tx::{Lock, Tx, TxOut};
 
 use crate::activacion::{Red, rama_activa};
@@ -105,6 +105,24 @@ pub fn coinbase_genesis(mensaje: &[u8]) -> Tx {
     }
 }
 
+/// `bits` de arranque de cada red (C-DIFF-02, P-004c).
+///
+/// **Las dos redes llevan valores distintos a propósito.** Mainnet arranca 256 veces más difícil
+/// que el mínimo representable, para que los primeros 90 bloques —que C-DIFF-02 mina a dificultad
+/// fija, sin que LWMA pueda corregir nada— cuesten ~10 min con una GPU en vez de segundos. Testnet
+/// se queda en el mínimo, porque una red local de tres nodos tiene que producir bloques deprisa o
+/// los tests de integración no sirven.
+///
+/// El aislamiento entre redes **no** depende de esto: lo garantizan el génesis distinto (C-GEN-04)
+/// y el prefijo mágico (C-NET-01). Aquí solo se decide la dificultad de arranque.
+#[must_use]
+pub const fn target_inicial_bits(red: Red) -> u32 {
+    match red {
+        Red::Mainnet => TARGET_INICIAL_BITS_MAINNET,
+        Red::Testnet => TARGET_INICIAL_BITS_TESTNET,
+    }
+}
+
 /// Construye el bloque génesis a partir de sus parámetros (C-GEN-01).
 ///
 /// # Errores
@@ -121,7 +139,7 @@ pub fn construir(p: ParametrosGenesis) -> Result<(BlockHeader, Tx), ConsensusErr
             prev_hash: BlockHash::from_digest(Digest::from_bytes([0u8; 32])),
             merkle_root: raiz,
             timestamp: p.timestamp,
-            bits: TARGET_INICIAL_BITS,
+            bits: target_inicial_bits(p.red),
             nonce: p.nonce,
             height: 0,
         },
@@ -204,6 +222,7 @@ pub fn txid_coinbase(p: ParametrosGenesis) -> Result<TxId, ConsensusError> {
     reason = "los tests fallan con panic por diseño"
 )]
 mod tests {
+    use super::target_inicial_bits;
     use super::{
         GENESIS_MAINNET, GENESIS_TESTNET, coinbase_genesis, comprobar, construir, hash,
         txid_coinbase,
@@ -212,7 +231,7 @@ mod tests {
     use crate::error::ConsensusError;
     use zx_core::amount::Amount;
     use zx_core::digest::{BlockHash, Digest};
-    use zx_core::target::TARGET_INICIAL_BITS;
+    use zx_core::target::{TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET};
 
     #[test]
     fn el_genesis_construido_es_valido() {
@@ -227,7 +246,35 @@ mod tests {
         let (cab, _) = construir(GENESIS_MAINNET).unwrap();
         assert_eq!(cab.height, 0);
         assert_eq!(cab.prev_hash.as_bytes(), &[0u8; 32]);
-        assert_eq!(cab.bits, TARGET_INICIAL_BITS, "C-DIFF-02");
+    }
+
+    /// **P-004c.** Cada red arranca con SU dificultad, y mainnet es la difícil.
+    ///
+    /// Sin este test, cambiar una de las dos constantes y olvidar la otra pasaría desapercibido:
+    /// los demás tests del génesis no miran `bits`.
+    #[test]
+    fn cada_red_arranca_con_su_propia_dificultad() {
+        for p in [GENESIS_MAINNET, GENESIS_TESTNET] {
+            let (cab, _) = construir(p).unwrap();
+            assert_eq!(
+                cab.bits,
+                target_inicial_bits(p.red),
+                "C-DIFF-02, {:?}",
+                p.red
+            );
+        }
+        assert_eq!(
+            target_inicial_bits(Red::Mainnet),
+            TARGET_INICIAL_BITS_MAINNET
+        );
+        assert_eq!(
+            target_inicial_bits(Red::Testnet),
+            TARGET_INICIAL_BITS_TESTNET
+        );
+        assert_ne!(
+            TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET,
+            "si se igualan, o testnet va lenta o mainnet se regala"
+        );
     }
 
     /// **C-GEN-03 / C-EMIT-02.** Sin premine, sin dev tax, sin founder reward.
