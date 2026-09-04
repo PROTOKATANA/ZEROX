@@ -1,0 +1,17 @@
+[package]
+name         = "zx-rpc"
+description  = "JSON-RPC del nodo: getblocktemplate, submitblock, gettip, getblock, sendrawtx"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -1,0 +1,58 @@
+name: ZEROX CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  rust:
+    name: Rust — fmt, clippy, build, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features --locked
+      - run: cargo build --workspace --all-features --locked
+      - run: cargo test --workspace --all-features --locked
+
+  deps:
+    name: Dependencias — versiones pineadas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Regla del proyecto: las dependencias van con versión EXACTA (`=`).
+      # Un rango en workspace.dependencies deja que `cargo update` mueva consenso.
+      - name: Rechazar rangos de versión en [workspace.dependencies]
+        run: |
+          python3 - <<'PY'
+          import re, sys, tomllib
+          with open("Cargo.toml","rb") as f: doc = tomllib.load(f)
+          deps = doc.get("workspace",{}).get("dependencies",{})
+          bad = []
+          for name, spec in deps.items():
+              v = spec if isinstance(spec,str) else spec.get("version","")
+              if not re.fullmatch(r"=\d+\.\d+\.\d+", v or ""):
+                  bad.append(f"{name} = {v!r}")
+          if bad:
+              print("Dependencias sin versión exacta:"); [print("  -",b) for b in bad]; sys.exit(1)
+          print(f"OK — {len(deps)} dependencias, todas con versión exacta")
+          PY
+
+  cpp:
+    name: C++/HIP — el minero compila
+    runs-on: ubuntu-latest
+    continue-on-error: true   # requiere toolchain ROCm/CUDA; informativo hasta la Fase 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y cmake g++ capnproto libcapnp-dev
+      - name: Placeholder — kernels HIP se integran en la Fase 8
+        run: echo "zx-miner: sin fuentes C++ todavía (Fase 8)"

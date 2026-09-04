@@ -1,0 +1,92 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/zx-core",
+    "crates/zx-consensus",
+    "crates/zx-storage",
+    "crates/zx-p2p",
+    "crates/zx-mempool",
+    "crates/zx-rpc",
+    "crates/zx-wallet",
+    "crates/zx-node",
+    "crates/zx-lightwalletd",
+    "crates/zx-scanner",
+    "crates/zx-miner",
+]
+
+[workspace.package]
+version    = "0.0.0"
+edition    = "2024"
+rust-version = "1.90"
+license    = "AGPL-3.0-or-later"
+repository = "https://github.com/PROTOKATANA/ZEROX"
+
+# ─────────────────────────────────────────────────────────────────────────
+# Versiones EXACTAS (`=`), no rangos. Regla del proyecto: adoptar cripto
+# auditada sin tocarla, y que un `cargo update` no pueda mover consenso.
+# Versiones consultadas en crates.io el 2026-09-04.
+# ─────────────────────────────────────────────────────────────────────────
+[workspace.dependencies]
+# --- cripto / consenso — pineado duro, no tocar sin revisión humana ---
+# NOTA (auditoría 2026-09-04, zx-implementaciones): pinear `sha3 = "=x"` NO pinea la
+# permutación — `sha3` delega en `keccak` y `sponge-cursor` como RANGOS. Por eso el
+# Cargo.lock se committea (fuera de .gitignore) y la CI corre con `--locked`: el lock es
+# la única fuente de verdad del árbol transitivo consensus-critical. Ver research/sha3-referencias.md.
+orchard               = "=0.15.5"
+halo2_proofs          = "=0.3.5"
+incrementalmerkletree = "=0.8.2"
+ed25519-zebra         = "=4.2.0"
+sha3                  = "=0.12.0"
+bech32                = "=0.12.0"
+primitive-types       = "=0.14.0"
+blake2b_simd          = "=1.0.5"
+
+# --- serialización ---
+capnp   = "=0.27.0"
+capnpc  = "=0.27.0"
+serde   = { version = "=1.0.229", features = ["derive"] }
+
+# --- infraestructura ---
+rocksdb   = "=0.25.0"
+libp2p    = "=0.56.0"
+jsonrpsee = "=0.26.0"
+tokio     = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+
+# --- FFI (solo zx-miner) ---
+cxx       = "=1.0.199"
+cxx-build = "=1.0.199"
+
+# --- errores, logging, CLI ---
+thiserror          = "=2.0.20"
+anyhow             = "=1.0.104"
+tracing            = "=0.1.44"
+tracing-subscriber = "=0.3.23"
+clap               = { version = "=4.6.6", features = ["derive"] }
+hex                = "=0.4.3"
+
+# --- test ---
+proptest  = "=1.11.0"
+criterion = "=0.8.2"
+
+# ─────────────────────────────────────────────────────────────────────────
+# Lints: en código de consenso un panic es un vector de DoS.
+# ─────────────────────────────────────────────────────────────────────────
+[workspace.lints.clippy]
+unwrap_used      = "deny"
+expect_used      = "deny"
+wildcard_imports = "deny"
+panic            = "deny"
+todo             = "warn"
+indexing_slicing = "warn"
+integer_division = "warn"
+
+[workspace.lints.rust]
+unsafe_code       = "warn"
+missing_docs      = "warn"
+unused_must_use   = "deny"
+
+[profile.release]
+opt-level     = 3
+lto           = true
+codegen-units = 1
+panic         = "abort"
