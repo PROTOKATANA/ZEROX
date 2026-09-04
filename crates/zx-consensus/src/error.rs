@@ -28,6 +28,24 @@ pub enum ConsensusError {
     #[error("C-ENC-03: desbordamiento aritmético en una ruta de consenso")]
     DesbordamientoAritmetico,
 
+    /// C-WGT-09: el peso del bloque excede el límite duro. El bloque es **inválido**.
+    #[error("C-WGT-09: peso {peso} excede el límite {limite}")]
+    PesoExcedeLimite {
+        /// Peso del bloque.
+        peso: u64,
+        /// `2 · M(H)`.
+        limite: u64,
+    },
+
+    /// C-WGT-11: una transacción excede `MAX_TX_WEIGHT`.
+    #[error("C-WGT-11: la transacción pesa {peso}, máximo {maximo}")]
+    TxExcedeMaximo {
+        /// Peso de la transacción.
+        peso: u64,
+        /// `MAX_TX_WEIGHT`.
+        maximo: u64,
+    },
+
     /// C-TS-01: el timestamp no avanza respecto al padre. Rechazo **permanente**.
     #[error("C-TS-01: ts({altura}) = {ts} no supera ts(padre) = {ts_padre}")]
     TimestampNoMonotono {

@@ -767,9 +767,18 @@ lt_weight(b) := min( max(weight(b), inferior), superior )
 Todas las operaciones en `u128`, división entera truncada, **en exactamente este orden**.
 
 > Equivale a acotar cada bloque al rango `[0,588·Mlt, 1,7·Mlt]` de cara al histórico largo. El
-> `1,7×` da ≈14,2× de expansión anual. La forma `Mlt + (Mlt·7)/10` **MUST** respetarse literalmente:
-> no es idéntica a `(Mlt·17)/10` bajo truncamiento entero, y es la que fija los vectores de
-> referencia de Monero.
+> `1,7×` da ≈14,2× de expansión anual en Monero; con nuestra ventana de un año, ≈2,9×.
+>
+> ⚠️ **Corregido 2026-09-04.** Esta nota decía que `Mlt + (Mlt·7)/10` **no** es idéntica a
+> `(Mlt·17)/10` bajo truncamiento entero. **Es falso**: como `Mlt` es entero y `⌊x+n⌋ = ⌊x⌋+n`,
+> las dos formas coinciden siempre. Verificado sobre 300 000 valores, incluidos aleatorios hasta
+> 2⁶³. La afirmación venía de `research/dynamic-blocksize.md` y se propagó aquí sin comprobarse; la
+> cazó un test de `zx-consensus` que intentaba encontrar un contraejemplo y no lo encontró.
+>
+> **Se conserva la forma literal igualmente, por una razón distinta y real:** el margen de
+> desbordamiento. `Mlt·17` desborda `u64` a partir de `1,09·10¹⁸`, `Mlt·7` a partir de
+> `2,64·10¹⁸` — 2,4× más holgura — y mantiene identidad byte a byte con los valores intermedios de
+> la implementación de referencia.
 
 **C-WGT-05 · Mediana de largo plazo.**
 

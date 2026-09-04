@@ -71,6 +71,15 @@ Comentario del código, que enlaza el paper de origen:
 Nótese que la versión moderna añadió un **suelo** (`10/17`) que la original no tenía: la mediana
 de largo plazo ya no puede desplomarse arbitrariamente rápido, solo hasta 0,588× por bloque.
 
+> **Nota 2026-09-04, al implementar.** Más abajo este informe afirma que la forma
+> `Mlt + (Mlt·7)/10` **MUST** respetarse porque "no es idéntica a `(Mlt·17)/10` bajo truncamiento
+> entero". **Eso es incorrecto**: `Mlt` es entero y `⌊x+n⌋ = ⌊x⌋+n`, así que las dos formas
+> coinciden siempre — comprobado sobre 300 000 valores. La afirmación llegó al SPEC y al código
+> antes de verificarse, y la cazó un test que buscaba un contraejemplo.
+>
+> Se conserva la forma literal por una razón distinta y sí válida: `Mlt·17` desborda `u64` 2,4×
+> antes que `Mlt·7`. Ver `SPEC.md` C-WGT-04.
+
 ### Cálculo de la mediana
 
 `epee::misc_utils::median` (`contrib/epee/include/misc_language.h:53-70`). Con número par de
