@@ -281,6 +281,23 @@ los incluye, y eso es lo que la hace no maleable (C-TX-01).
 > los umbrales de `CompactSize` (252/253, 65 535/65 536) construidos a mano. Test diferencial
 > `wire_peso_differential`. Si un día divergen, falla un test — no el consenso, en producción.
 
+**C-WIRE-07 · Codificación de un bloque completo.**
+
+```
+cabecera(92) ‖ CompactSize(n_tx) ‖ n_tx × [ transacción con sus testigos (C-WIRE-03) ]
+```
+
+Los testigos van **dentro de cada transacción**, no en una lista paralela.
+
+> Que la correspondencia `tx ↔ testigo` sea **posicional por construcción** elimina una clase entera
+> de fallo: con dos listas separadas, una puede tener más elementos que la otra, y decidir qué hacer
+> entonces es una regla más que escribir y otra que dos implementaciones pueden interpretar
+> distinto.
+>
+> **El códec no opina sobre validez.** Un bloque sin transacciones da la vuelta aunque C-BLK-07 exija
+> coinbase: mezclar codificación y reglas de consenso es lo que hace que un cambio de reglas rompa
+> el formato.
+
 **C-WIRE-04 · Todo contador declarado MUST acotarse ANTES de reservar memoria por él.** Un lector
 **MUST** rechazar un `CompactSize` que declare más de `MAX_ELEMENTOS_DECLARADOS = 1 000 000`
 elementos, **antes** de leer ninguno.
@@ -2469,7 +2486,7 @@ cadena**. Los seis huecos están escritos:
 | §13 · Profundidad de confirmación | política de producto, no normativa |
 | §14 · Activación de cambios de consenso | C-UPG-01..08 |
 | §15 · Bloque génesis | C-GEN-01..07 |
-| §2.4 · Serialización de red | C-WIRE-01..06 |
+| §2.4 · Serialización de red | C-WIRE-01..07 |
 | §15.1 · Almacenamiento | C-STORE-01..04 |
 | §16 · Parámetros de red | C-NET-01..20 |
 
