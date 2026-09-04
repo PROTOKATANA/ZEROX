@@ -295,6 +295,41 @@ impl Cadena {
         n
     }
 
+    /// Guarda el cuerpo de un bloque.
+    ///
+    /// # Errores
+    /// Lo que devuelva el almacén.
+    pub fn guardar_bloque(&self, b: &BloqueRed) -> Result<(), zx_storage::StorageError> {
+        let mut bytes = Vec::new();
+        zx_core::wire::cuerpo_a_bytes(&mut bytes, &b.cabecera, &b.txs, &b.testigos);
+        self.almacen
+            .guardar_cuerpo(&b.cabecera.block_hash(), &bytes)
+    }
+
+    /// Recupera un bloque completo, o `None` si no lo tenemos.
+    ///
+    /// Un cuerpo que no decodifica se trata como **ausente** y se registra: es corrupción del
+    /// almacén, no del peer que lo pide, y devolver basura sería peor que decir "no lo tengo".
+    #[must_use]
+    pub fn bloque(&self, hash: BlockHash) -> Option<BloqueRed> {
+        let bytes = self.almacen.cuerpo(&hash).ok().flatten()?;
+        match zx_core::wire::cuerpo_desde_bytes(&bytes) {
+            Ok(((cabecera, txs, testigos), [])) => Some(BloqueRed {
+                cabecera,
+                txs,
+                testigos,
+            }),
+            Ok(_) => {
+                tracing::error!(?hash, "cuerpo con bytes sobrantes: almacén corrupto");
+                None
+            }
+            Err(e) => {
+                tracing::error!(?hash, %e, "cuerpo que no decodifica: almacén corrupto");
+                None
+            }
+        }
+    }
+
     /// El almacén sobre el que corre esta cadena.
     #[must_use]
     pub fn almacen(&self) -> &Arc<dyn AlmacenCadena> {
@@ -403,9 +438,14 @@ impl ManejadorEntrante for Cadena {
         Vec::new()
     }
 
-    fn bloques_por_hash(&self, _hashes: &[BlockHash]) -> Vec<BloqueRed> {
-        // TODO(zx-storage): los cuerpos vivirán en disco. Hoy el nodo solo tiene cabeceras.
-        Vec::new()
+    fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed> {
+        // Se recorta al límite del protocolo **antes** de leer nada del almacén: un peer que pida
+        // mil bloques no debe conseguir que hagamos mil lecturas de disco para luego tirar 984.
+        hashes
+            .iter()
+            .take(MAX_BLOQUES_SERVIDOS)
+            .filter_map(|h| self.bloque(*h))
+            .collect()
     }
 }
 
@@ -414,6 +454,13 @@ impl ManejadorEntrante for Cadena {
 /// Coincide con el límite de transporte de `zx-p2p`, y se aplica **antes de clonar**: recortar
 /// después, como hacía la primera versión, significa que la asignación grande ya ocurrió.
 const MAX_CABECERAS_SERVIDAS: usize = 2_000;
+
+/// Cuántos cuerpos se sirven como mucho en una respuesta.
+///
+/// Se aplica **antes** de leer del almacén: un peer que pida mil bloques no debe conseguir que
+/// hagamos mil lecturas para tirar 984 después. El recorte tardío convierte un límite en un
+/// amplificador.
+const MAX_BLOQUES_SERVIDOS: usize = 16;
 
 /// Trabajo acumulado de una secuencia de cabeceras.
 ///

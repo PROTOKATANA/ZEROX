@@ -302,3 +302,152 @@ async fn el_estado_anunciado_refleja_la_cadena() {
     assert_eq!(U256::from_big_endian(&e.trabajo), c.trabajo());
     assert!(U256::from_big_endian(&e.trabajo) > U256::zero());
 }
+
+/// **Los cuerpos de bloque, de extremo a extremo.**
+///
+/// El servidor guarda un bloque completo; el cliente lo pide por hash y lo recibe con sus
+/// transacciones y testigos intactos. Es lo que faltaba para que la sincronización sea de la
+/// cadena y no solo de sus cabeceras.
+#[tokio::test]
+async fn un_cuerpo_de_bloque_viaja_entero() {
+    use zx_core::amount::Amount;
+    use zx_core::firma::ClavePublica;
+    use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use zx_p2p::mensaje::BloqueRed;
+
+    let servidor = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let cs = cabeceras_tras(&servidor, 1);
+    servidor.extender_sin_validar_solo_para_pruebas(&cs);
+
+    let cabecera = *cs.first().expect("una");
+    let bloque = BloqueRed {
+        cabecera,
+        txs: vec![Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: zx_core::digest::TxId::from_digest(Digest::from_bytes([7; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0xffff_fffe,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(50_000).expect("importe"),
+                lock: Lock::PubKey {
+                    pubkey: ClavePublica::desde_bytes([9; 32]),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: 1,
+        }],
+        testigos: vec![vec![vec![0x5a; 64]]],
+    };
+    servidor.guardar_bloque(&bloque).expect("guarda");
+
+    let cliente = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+
+    let (sw_s, _) = nodo(Arc::clone(&servidor));
+    let (sw_c, _) = nodo(Arc::clone(&cliente));
+    let id_s = *sw_s.local_peer_id();
+
+    let ps = arrancar(sw_s, Arc::clone(&servidor));
+    let pc = arrancar(sw_c, Arc::clone(&cliente));
+    let manejo_s = ps.manejo.clone();
+    let manejo_c = pc.manejo.clone();
+    let mut ev_c = pc.eventos;
+    let _ev_s = ps.eventos;
+    let t1 = tokio::spawn(ps.bucle.correr());
+    let t2 = tokio::spawn(pc.bucle.correr());
+
+    let a = addr();
+    manejo_s.escuchar(a.clone()).await.expect("escucha");
+    manejo_c.marcar(a).await.expect("marca");
+    assert!(
+        esperar(&mut ev_c, |e| matches!(e, EventoRed::PeerConectado(_)))
+            .await
+            .is_some()
+    );
+
+    manejo_c
+        .pedir(
+            id_s,
+            Peticion::Bloques {
+                hashes: vec![cabecera.block_hash()],
+            },
+        )
+        .await
+        .expect("pide");
+
+    let e = esperar(&mut ev_c, |e| matches!(e, EventoRed::Respuesta { .. }))
+        .await
+        .expect("responde");
+    let EventoRed::Respuesta { respuesta, .. } = e else {
+        panic!("se esperaba respuesta");
+    };
+    match *respuesta {
+        Respuesta::Bloques(bs) => {
+            assert_eq!(bs.len(), 1);
+            let recibido = bs.first().expect("uno");
+            assert_eq!(recibido.cabecera, bloque.cabecera, "misma cabecera");
+            assert_eq!(recibido.txs, bloque.txs, "mismas transacciones");
+            assert_eq!(recibido.testigos, bloque.testigos, "mismos testigos");
+        }
+        otra => panic!("se esperaba Bloques, llegó {otra:?}"),
+    }
+
+    t1.abort();
+    t2.abort();
+}
+
+/// Pedir un bloque que el servidor no tiene devuelve `NoDisponible`, no una lista vacía.
+///
+/// La diferencia importa por C-NET-05: "no lo tengo" es legítimo y no invita a reintentar; una
+/// lista vacía sí lo haría.
+#[tokio::test]
+async fn pedir_un_bloque_ausente_devuelve_no_disponible() {
+    let servidor = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let cliente = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+
+    let (sw_s, _) = nodo(Arc::clone(&servidor));
+    let (sw_c, _) = nodo(Arc::clone(&cliente));
+    let id_s = *sw_s.local_peer_id();
+
+    let ps = arrancar(sw_s, Arc::clone(&servidor));
+    let pc = arrancar(sw_c, Arc::clone(&cliente));
+    let manejo_s = ps.manejo.clone();
+    let manejo_c = pc.manejo.clone();
+    let mut ev_c = pc.eventos;
+    let _ev_s = ps.eventos;
+    let t1 = tokio::spawn(ps.bucle.correr());
+    let t2 = tokio::spawn(pc.bucle.correr());
+
+    let a = addr();
+    manejo_s.escuchar(a.clone()).await.expect("escucha");
+    manejo_c.marcar(a).await.expect("marca");
+    assert!(
+        esperar(&mut ev_c, |e| matches!(e, EventoRed::PeerConectado(_)))
+            .await
+            .is_some()
+    );
+
+    manejo_c
+        .pedir(
+            id_s,
+            Peticion::Bloques {
+                hashes: vec![BlockHash::from_digest(Digest::from_bytes([0xcc; 32]))],
+            },
+        )
+        .await
+        .expect("pide");
+
+    let e = esperar(&mut ev_c, |e| matches!(e, EventoRed::Respuesta { .. }))
+        .await
+        .expect("responde");
+    let EventoRed::Respuesta { respuesta, .. } = e else {
+        panic!("se esperaba respuesta");
+    };
+    assert_eq!(*respuesta, Respuesta::NoDisponible);
+
+    t1.abort();
+    t2.abort();
+}

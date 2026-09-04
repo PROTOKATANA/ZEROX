@@ -318,6 +318,51 @@ pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingEr
     ))
 }
 
+/// Un bloque completo tal y como se guarda y viaja.
+pub type CuerpoBloque = (BlockHeader, Vec<Tx>, Vec<Vec<Vec<u8>>>);
+
+/// Escribe un bloque completo: cabecera, transacciones y testigos (C-WIRE-07).
+///
+/// ```text
+/// cabecera(92) ‖ CompactSize(n_tx) ‖ n_tx × [ tx con sus testigos (C-WIRE-03) ]
+/// ```
+///
+/// Los testigos van **dentro de cada transacción** y no en una lista aparte, porque así la
+/// correspondencia tx↔testigo es posicional por construcción: no hay forma de que una lista tenga
+/// más elementos que la otra.
+pub fn cuerpo_a_bytes(
+    salida: &mut Vec<u8>,
+    cabecera: &BlockHeader,
+    txs: &[Tx],
+    testigos: &[Vec<Vec<u8>>],
+) {
+    salida.extend_from_slice(&cabecera_a_bytes(cabecera));
+    compact_size::escribir(salida, txs.len() as u64);
+    let vacio: Vec<Vec<u8>> = Vec::new();
+    for (i, tx) in txs.iter().enumerate() {
+        tx_a_bytes(salida, tx, testigos.get(i).unwrap_or(&vacio));
+    }
+}
+
+/// Lee un bloque completo (C-WIRE-07).
+///
+/// # Errores
+/// El error de codificación que corresponda. **Nunca entra en pánico** (C-WIRE-05).
+pub fn cuerpo_desde_bytes(bytes: &[u8]) -> Result<(CuerpoBloque, &[u8]), EncodingError> {
+    let (cabecera, r) = cabecera_desde_bytes(bytes)?;
+    let (n, mut r) = leer_contador(r)?;
+
+    let mut txs = Vec::with_capacity(n.min(4_096));
+    let mut testigos = Vec::with_capacity(n.min(4_096));
+    for _ in 0..n {
+        let ((tx, t), resto) = tx_desde_bytes(r)?;
+        txs.push(tx);
+        testigos.push(t);
+        r = resto;
+    }
+    Ok(((cabecera, txs, testigos), r))
+}
+
 /// Lee un contador y lo acota **antes** de que nadie reserve memoria por él.
 ///
 /// Este es el punto exacto donde un peer hostil intentaría que reservásemos gigabytes declarando un
@@ -718,5 +763,119 @@ mod tests {
             tx_desde_bytes(&b),
             Err(EncodingError::ImporteFueraDeRango { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
+mod tests_cuerpo {
+    use super::{cuerpo_a_bytes, cuerpo_desde_bytes};
+    use crate::amount::Amount;
+    use crate::digest::{BlockHash, Digest, MerkleRoot, TxId};
+    use crate::encoding::compact_size;
+    use crate::error::EncodingError;
+    use crate::firma::ClavePublica;
+    use crate::preimage::block::BlockHeader;
+    use crate::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+
+    fn cabecera() -> BlockHeader {
+        BlockHeader {
+            consensus_branch_id: 0xc478_80ea,
+            prev_hash: BlockHash::from_digest(Digest::from_bytes([3; 32])),
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([4; 32])),
+            timestamp: 1_788_480_000,
+            bits: 0x1d00_ffff,
+            nonce: 42,
+            height: 7,
+        }
+    }
+
+    fn tx(n: u8) -> Tx {
+        Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
+                    prev_index: u32::from(n),
+                },
+                sequence: 0,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(i64::from(n) * 1_000).unwrap(),
+                lock: Lock::PubKey {
+                    pubkey: ClavePublica::desde_bytes([n; 32]),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: 0,
+        }
+    }
+
+    #[test]
+    fn un_bloque_da_la_vuelta_completa() {
+        let txs: Vec<_> = (1..=4u8).map(tx).collect();
+        let testigos: Vec<Vec<Vec<u8>>> = (1..=4u8).map(|n| vec![vec![n; 64]]).collect();
+
+        let mut b = Vec::new();
+        cuerpo_a_bytes(&mut b, &cabecera(), &txs, &testigos);
+
+        let ((c, t, w), resto) = cuerpo_desde_bytes(&b).unwrap();
+        assert_eq!(c, cabecera());
+        assert_eq!(t, txs);
+        assert_eq!(w, testigos);
+        assert!(resto.is_empty());
+    }
+
+    /// Un bloque sin transacciones da la vuelta igual. No es válido por consenso —C-BLK-07 exige
+    /// coinbase— pero el **códec** no debe opinar sobre eso: mezclar codificación y validez es lo
+    /// que hace que un cambio de reglas rompa el formato.
+    #[test]
+    fn un_bloque_vacio_da_la_vuelta() {
+        let mut b = Vec::new();
+        cuerpo_a_bytes(&mut b, &cabecera(), &[], &[]);
+        let ((c, t, w), resto) = cuerpo_desde_bytes(&b).unwrap();
+        assert_eq!(c, cabecera());
+        assert!(t.is_empty() && w.is_empty() && resto.is_empty());
+    }
+
+    /// **C-WIRE-04.** El contador mentiroso, también aquí.
+    #[test]
+    fn un_contador_de_transacciones_mentiroso_se_rechaza() {
+        let mut b = Vec::new();
+        b.extend_from_slice(&super::cabecera_a_bytes(&cabecera()));
+        compact_size::escribir(&mut b, u64::MAX);
+        assert!(matches!(
+            cuerpo_desde_bytes(&b),
+            Err(EncodingError::DemasiadosElementos { .. })
+        ));
+    }
+
+    /// **C-WIRE-05.** Basura arbitraria no hace entrar en pánico al lector.
+    #[test]
+    fn ningun_byte_arbitrario_hace_entrar_en_panico() {
+        let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+        for _ in 0..1_000 {
+            let mut buf = Vec::new();
+            for _ in 0..(x % 400) {
+                x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                buf.push((x >> 33) as u8);
+            }
+            let _ = cuerpo_desde_bytes(&buf);
+            x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        }
+    }
+
+    /// Truncar en cualquier punto se rechaza, nunca se acepta a medias.
+    #[test]
+    fn un_bloque_truncado_nunca_se_acepta_a_medias() {
+        let txs: Vec<_> = (1..=3u8).map(tx).collect();
+        let testigos: Vec<Vec<Vec<u8>>> = (1..=3u8).map(|n| vec![vec![n; 64]]).collect();
+        let mut b = Vec::new();
+        cuerpo_a_bytes(&mut b, &cabecera(), &txs, &testigos);
+
+        for n in 0..b.len() {
+            let _ = cuerpo_desde_bytes(b.get(..n).unwrap());
+        }
+        assert!(cuerpo_desde_bytes(&b).is_ok());
     }
 }
