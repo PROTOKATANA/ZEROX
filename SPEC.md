@@ -2058,6 +2058,18 @@ materializarse en un índice por cabecera, y el peer **MUST NOT** ser penalizado
 >
 > ZEROX lo construye desde el día uno en vez de retrofitearlo, que es la única ventaja real de nacer
 > después.
+>
+> ✅ **`TRABAJO_MINIMO_CADENA = 0`, y P-024 queda cerrada así.** Es el análogo de `nMinimumChainWork`
+> de Bitcoin: un suelo que se sube en cada release según la cadena real crece. Para una cadena **que
+> todavía no existe**, el único valor correcto es cero — cualquier otro rechazaría la cadena real en
+> el arranque. **No es una constante permanente de consenso**: dos nodos con valores distintos no se
+> bifurcan, solo difieren en cuánta basura retienen antes de descartarla.
+>
+> ⚠️ **El trabajo se cuenta desde el ANCLA, no desde el tip.** Un test lo destapó: la primera
+> implementación sumaba el trabajo de la cadena candidata al del **tip**, y con esa cuenta una
+> bifurcación que colgara de hace cinco mil bloques sumaba trabajo que **no es de esa rama** y
+> superaba el umbral siempre. La defensa quedaba desactivada justo para el caso que existe para
+> cubrir. `zx-consensus::antidos`, `zx-node::sync`.
 
 **C-NET-05 · Lento y malicioso son cosas distintas.** Un peer que **no responde a tiempo** o devuelve
 respuestas vacías **MUST** desconectarse sin puntuar. Solo una **violación de consenso positivamente
@@ -2292,7 +2304,6 @@ debajo**.
 | **P-017** | §15, §16 | Mensaje, timestamp y nonce del génesis (mainnet y testnet) · puerto por defecto | Katana, el día del lanzamiento |
 | **P-022** | §16.2 | 🆕 Rediseño del saludo de `sendcmpct` sobre request-response de libp2p: la negociación del BIP depende de orden total entre mensajes, que yamux no da | **D3**, Fase 5 |
 | **P-023** | §16.3 | 🆕 `PeerScoreParams`/`TopicScoreParams` de gossipsub. **No existe precedente**: ninguna cadena PoW con bloques de 100-200 KB cada 120 s usa gossipsub v1.1. Hay que derivarlo y medirlo | **D3** + **D8**, Fase 5 |
-| **P-024** | §16.1 | 🆕 Valor de `TRABAJO_MINIMO_CADENA` (C-NET-04) para una cadena que arranca sin historia | **D2** + **D8** |
 | **P-025** | §16.3 | 🆕 **Límites por IP, no solo por `PeerId`.** `connection_limits` de libp2p no tiene ningún campo por IP (verificado en el crate): un atacante con **una** IP genera `PeerId` gratis e ilimitados y llena el cupo entrante entero, o abre 32 conexiones a medio negociar y deja al nodo sordo. Hace falta un behaviour propio sobre `handle_pending_inbound_connection`, que sí recibe la IP | **D3** + **D8** |
 | **P-026** | §16.3 | 🆕 ¿Debe `MotivoDesconexion::Excedido` puntuar? C-NET-05 no examinó este caso: la razón de Zebra para no puntuar es el *mensajero inocente*, y superar un límite de tamaño **sí** es atribuible al emisor. Hoy permite sondear los límites gratis e indefinidamente | **D8** |
 | **P-027** | §16.3 | 🆕 Presupuesto de memoria **agregado**. `MAX_RESPUESTA_BYTES × max_concurrent_streams(100) × peers` da decenas de GB reservables. El `.take(MAX)` por petición no basta: hace falta un contador global en vuelo | **D3** + **D8** |
@@ -2307,6 +2318,7 @@ debajo**.
 | ID | Decisión | Dónde vive |
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-024** | **`TRABAJO_MINIMO_CADENA = 0`.** Es el análogo de `nMinimumChainWork`: para una cadena que no existe todavía, cero es el único valor correcto. Se sube por release, y **no es consenso** | C-NET-04 |
 | **P-018** | **BIP 152 extraído verbatim** → `research/bip152.md`. Lo portable y lo que no, delimitado | C-NET-06..10 |
 | **P-020** | **P2K**, no P2KH. La respuesta post-cuántica es un network upgrade con una variante nueva de `Lock`, no el formato de dirección | C-ENC-07, C-TX-06b, C-TX-09b |
 | **P-004c** | `TARGET_INICIAL` **por red**: mainnet `0x1c07fff8` (primer bloque en `T` = 120 s con ≈1,15 GH/s), testnet `0x1d00ffff`. La constante estima el hashrate del día 1 y nada más. Recalibrable con benchmark hasta el génesis | C-DIFF-02 |

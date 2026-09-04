@@ -16,10 +16,12 @@
 
 use std::sync::RwLock;
 
+use primitive_types::U256;
 use zx_consensus::activacion::rama_activa;
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
 use zx_core::red::Red;
+use zx_core::target::{CompactBits, trabajo_bloque};
 use zx_p2p::entrante::{ManejadorEntrante, Veredicto};
 use zx_p2p::mensaje::{BloqueRed, Estado};
 
@@ -94,6 +96,59 @@ impl Cadena {
         rama_activa(self.red, self.altura())
     }
 
+    /// Trabajo acumulado de nuestra cadena hasta la punta.
+    #[must_use]
+    pub fn trabajo(&self) -> U256 {
+        self.cabeceras
+            .read()
+            .map(|cs| trabajo_de(&cs))
+            .unwrap_or_default()
+    }
+
+    /// Trabajo acumulado **hasta un hash concreto** de nuestra cadena, o `None` si no lo conocemos.
+    ///
+    /// Es lo que C-NET-04 necesita para juzgar una cadena candidata: el trabajo de la rama que el
+    /// peer propone es *lo que compartimos hasta el ancla* más lo que él añade. Sumar al trabajo de
+    /// la **punta** —que fue el primer intento— cuenta trabajo que no es de esa rama, y deja pasar
+    /// cualquier bifurcación profunda.
+    #[must_use]
+    pub fn trabajo_hasta(&self, h: BlockHash) -> Option<U256> {
+        let cs = self.cabeceras.read().ok()?;
+        let pos = cs.iter().position(|c| c.block_hash() == h)?;
+        Some(trabajo_de(cs.get(..=pos)?))
+    }
+
+    /// Trabajo de un solo bloque a la dificultad de la punta, para el umbral de C-NET-04.
+    #[must_use]
+    pub fn trabajo_de_un_bloque(&self) -> U256 {
+        self.cabeceras
+            .read()
+            .ok()
+            .and_then(|cs| cs.last().copied())
+            .and_then(|c| CompactBits::from_u32(c.bits).decodificar().ok())
+            .and_then(trabajo_bloque)
+            .unwrap_or_else(U256::one)
+    }
+
+    /// Añade cabeceras **ya validadas** a la punta.
+    ///
+    /// Devuelve cuántas se añadieron. Las que no continúen la punta se ignoran en silencio: llegar
+    /// tarde con cabeceras que ya teníamos es normal cuando se pide a varios peers a la vez.
+    pub fn extender(&self, nuevas: &[BlockHeader]) -> usize {
+        let Ok(mut cs) = self.cabeceras.write() else {
+            return 0;
+        };
+        let mut n = 0;
+        for c in nuevas {
+            let punta = cs.last().map(BlockHeader::block_hash);
+            if punta == Some(c.prev_hash) {
+                cs.push(*c);
+                n += 1;
+            }
+        }
+        n
+    }
+
     /// Un locator de la punta hacia atrás: denso al principio, espaciado después.
     ///
     /// La densidad no es estética. Un locator lineal necesitaría tantas peticiones como bloques de
@@ -101,17 +156,6 @@ impl Cadena {
     /// `O(log n)`. Es el mecanismo de Bitcoin desde el principio, y la razón de que la petición de
     /// cabeceras lleve una **lista** y no una altura: pedir "desde la altura N" supondría que los
     /// dos estamos en la misma cadena, que es justo lo que hay que averiguar.
-    // `cfg_attr(not(test), ...)` y no un `expect` a secas: en la compilación de tests **sí** se
-    // usa —hay un test del locator—, así que allí la expectativa quedaría sin cumplir y clippy lo
-    // señalaría, con razón.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "lo usará el sincronizador; ya está escrito y probado, no se borra para \
-                      reescribirlo dentro de dos días"
-        )
-    )]
     #[must_use]
     pub fn locator(&self) -> Vec<BlockHash> {
         let Ok(cs) = self.cabeceras.read() else {
@@ -154,9 +198,7 @@ impl ManejadorEntrante for Cadena {
                 .and_then(|c| c.last().map(BlockHeader::block_hash))
                 .unwrap_or(self.genesis),
             altura: self.altura(),
-            // TODO: el trabajo acumulado real sale de `zx_core::target::TrabajoAcumulado` cuando
-            // exista el sincronizador. Cero es honesto mientras no haya cadena que acumular.
-            trabajo: [0u8; 32],
+            trabajo: self.trabajo().to_big_endian(),
         }
     }
 
@@ -196,6 +238,18 @@ impl ManejadorEntrante for Cadena {
         // TODO(zx-storage): los cuerpos vivirán en disco. Hoy el nodo solo tiene cabeceras.
         Vec::new()
     }
+}
+
+/// Trabajo acumulado de una secuencia de cabeceras.
+///
+/// Una cabecera cuyo `bits` no decodifica aporta cero en vez de abortar: aquí solo se suma, y
+/// rechazar `bits` inválidos es de la validación, no de la contabilidad. Aportar cero es
+/// conservador — nunca infla el trabajo de una cadena.
+fn trabajo_de(cs: &[BlockHeader]) -> U256 {
+    cs.iter()
+        .filter_map(|c| CompactBits::from_u32(c.bits).decodificar().ok())
+        .filter_map(trabajo_bloque)
+        .fold(U256::zero(), |a, w| a.saturating_add(w))
 }
 
 /// El hash cero, para lo que todavía no existe.

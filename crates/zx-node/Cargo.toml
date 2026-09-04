@@ -21,6 +21,7 @@ zx-p2p       = { path = "../zx-p2p" }
 
 libp2p    = { workspace = true, features = ["tokio", "tcp", "quic", "noise", "yamux", "ed25519"] }
 tokio     = { workspace = true, features = ["signal", "rt-multi-thread", "macros", "time", "sync"] }
+primitive-types = { workspace = true }
 thiserror = { workspace = true }
 tracing   = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

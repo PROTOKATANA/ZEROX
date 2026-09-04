@@ -7,6 +7,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod activacion;
+pub mod antidos;
 pub mod bloque;
 pub mod dificultad;
 pub mod emision;

@@ -4285,6 +4285,7 @@ version = "0.0.0"
 dependencies = [
  "clap",
  "libp2p",
+ "primitive-types",
  "proptest",
  "thiserror 2.0.20",
  "tokio",
