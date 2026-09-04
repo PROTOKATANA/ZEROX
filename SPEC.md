@@ -2323,6 +2323,35 @@ asíncrono** —encola un comando—, así que el sincronizador **MUST** olvidar
 > Sin esto, el peer que acaba de ser condenado por violar consenso se llevaba **una ronda extra** de
 > interacción antes de que la desconexión se procesara.
 
+**C-NET-20 · Los límites de conexión y el baneo MUST contarse por PREFIJO DE RED, no por `PeerId`.**
+IPv4 se agrupa por **/24** e IPv6 por **/64**.
+
+> **Un `PeerId` es gratis.** `Keypair::generate_ed25519()` es instantáneo: sin PoW, sin registro, sin
+> coste. Así que `MAX_CONEXIONES_POR_PEER = 1` no limita nada — basta con generar una identidad
+> nueva por conexión.
+>
+> Y `connection_limits` de libp2p **no tiene ningún ajuste por IP**: verificado en el crate, sus
+> únicos setters son globales o por `PeerId`. Hay que escribirlo, y por eso existe
+> `zx-p2p::limites_ip`.
+>
+> Dos ataques que esto cierra, ambos desde **una sola máquina**:
+>
+> | Ataque | Cómo | Efecto sin la defensa |
+> |---|---|---|
+> | *Slowloris* | Abrir conexiones y no completar el handshake | El contador global de pendientes se llena y el nodo **rechaza a todo el mundo** |
+> | Relleno de cupo | 72 `PeerId` desde la misma IP | Se ocupa el cupo entrante entero |
+>
+> **Por qué prefijo y no IP exacta.** Contar por IP se evade con cualquier VPS barato, y un /64 de
+> IPv6 son 18 trillones de direcciones asignadas **a un solo cliente**. Agrupar hace que evadir
+> cueste alquilar redes distintas, no pedir una IP más.
+>
+> **Una violación de consenso banea de un solo golpe** (100 de 100 puntos). Fabricarla cuesta
+> trabajo real: no ocurre por accidente. El registro de baneos está **acotado a 20 000 con desalojo
+> FIFO** — sin la cota, hacer crecer la tabla sería el ataque.
+>
+> Y sigue valiendo C-NET-05: **solo la violación de consenso puntúa.** Lento, ilegible o excedido,
+> no.
+
 **C-NET-12 · Validar antes de retransmitir.** Un bloque o transacción recibido por difusión **MUST**
 validarse contra `zx-consensus` **antes** de reenviarse. Un bloque **huérfano** —cuyo padre aún no se
 conoce— **MUST** descartarse **sin penalizar**, no rechazarse.
@@ -2407,7 +2436,6 @@ debajo**.
 | **P-017** | §15, §16 | Mensaje, timestamp y nonce del génesis (mainnet y testnet) · puerto por defecto | Katana, el día del lanzamiento |
 | **P-022** | §16.2 | 🆕 Rediseño del saludo de `sendcmpct` sobre request-response de libp2p: la negociación del BIP depende de orden total entre mensajes, que yamux no da | **D3**, Fase 5 |
 | **P-023** | §16.3 | 🆕 `PeerScoreParams`/`TopicScoreParams` de gossipsub. **No existe precedente**: ninguna cadena PoW con bloques de 100-200 KB cada 120 s usa gossipsub v1.1. Hay que derivarlo y medirlo | **D3** + **D8**, Fase 5 |
-| **P-025** | §16.3 | 🆕 **Límites por IP, no solo por `PeerId`.** `connection_limits` de libp2p no tiene ningún campo por IP (verificado en el crate): un atacante con **una** IP genera `PeerId` gratis e ilimitados y llena el cupo entrante entero, o abre 32 conexiones a medio negociar y deja al nodo sordo. Hace falta un behaviour propio sobre `handle_pending_inbound_connection`, que sí recibe la IP | **D3** + **D8** |
 | **P-026** | §16.3 | 🆕 ¿Debe `MotivoDesconexion::Excedido` puntuar? C-NET-05 no examinó este caso: la razón de Zebra para no puntuar es el *mensajero inocente*, y superar un límite de tamaño **sí** es atribuible al emisor. Hoy permite sondear los límites gratis e indefinidamente | **D8** |
 | **P-027** | §16.3 | 🆕 Presupuesto de memoria **agregado**. `MAX_RESPUESTA_BYTES × max_concurrent_streams(100) × peers` da decenas de GB reservables. El `.take(MAX)` por petición no basta: hace falta un contador global en vuelo | **D3** + **D8** |
 | **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB, **y de ahí derivar `D`/`D_low`/`D_high`/`heartbeat`**. Los de Ethereum son para slots de 12 s, no de 120 | **D3** |
@@ -2423,6 +2451,7 @@ debajo**.
 | ID | Decisión | Dónde vive |
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-025** | **Límites y baneo por prefijo de red** (/24 y /64), en un behaviour propio: `connection_limits` de libp2p no mira la IP y un `PeerId` es gratis | C-NET-20 |
 | **P-024** | **`TRABAJO_MINIMO_CADENA = 0`.** Es el análogo de `nMinimumChainWork`: para una cadena que no existe todavía, cero es el único valor correcto. Se sube por release, y **no es consenso** | C-NET-04 |
 | **P-018** | **BIP 152 extraído verbatim** → `research/bip152.md`. Lo portable y lo que no, delimitado | C-NET-06..10 |
 | **P-020** | **P2K**, no P2KH. La respuesta post-cuántica es un network upgrade con una variante nueva de `Lock`, no el formato de dirección | C-ENC-07, C-TX-06b, C-TX-09b |
@@ -2442,7 +2471,7 @@ cadena**. Los seis huecos están escritos:
 | §15 · Bloque génesis | C-GEN-01..07 |
 | §2.4 · Serialización de red | C-WIRE-01..06 |
 | §15.1 · Almacenamiento | C-STORE-01..04 |
-| §16 · Parámetros de red | C-NET-01..19 |
+| §16 · Parámetros de red | C-NET-01..20 |
 
 ### Aparcadas — evaluadas, con factura desglosada, NO adoptadas
 

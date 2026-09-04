@@ -31,6 +31,7 @@ use libp2p::{
 use zx_core::red::Red;
 
 use crate::codec::ZxCodec;
+use crate::limites_ip::LimitesPorIp;
 
 use crate::config::ParametrosRed;
 use crate::error::P2pError;
@@ -94,6 +95,12 @@ pub struct ZxBehaviour {
     /// apreciable en esa fase. El orden vale como defensa en profundidad para el día en que se
     /// añada uno que sí lo haga, no como optimización actual.
     pub limites: connection_limits::Behaviour,
+    /// Límites y baneo **por prefijo de red** (C-NET-20).
+    ///
+    /// Va junto al anterior porque hace lo que aquel no puede: `connection_limits` de libp2p no
+    /// tiene **ningún** ajuste por IP, y como un `PeerId` es gratis, limitar por `PeerId` no limita
+    /// nada. Ver [`crate::limites_ip`].
+    pub limites_ip: LimitesPorIp,
     /// Intercambio de direcciones y protocolos soportados.
     pub identify: identify::Behaviour,
     /// Detecta peers muertos, y **mantiene viva** la conexión frente al `idle_connection_timeout`
@@ -153,6 +160,8 @@ impl ZxBehaviour {
                 .with_max_established(Some(limites::MAX_CONEXIONES)),
         );
 
+        let limites_ip = LimitesPorIp::nuevo();
+
         let identify = identify::Behaviour::new(
             identify::Config::new(PROTOCOLO_IDENTIFY.to_owned(), clave.public())
                 .with_agent_version(p.agent_version()),
@@ -204,6 +213,7 @@ impl ZxBehaviour {
 
         Ok(Self {
             limites,
+            limites_ip,
             identify,
             ping,
             kademlia,

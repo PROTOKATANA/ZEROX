@@ -447,7 +447,28 @@ impl<M: ManejadorEntrante> BucleRed<M> {
             }
             Comando::Desconectar { peer, motivo } => {
                 tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
-                // TODO(P-025): aquí irá el registro de score por IP. Hoy solo se corta.
+
+                // C-NET-05 + C-NET-20 · solo una violación de consenso puntúa, y puntúa contra el
+                // **prefijo de red**, no contra el `PeerId` — que es gratis de renovar.
+                if motivo.puntua() {
+                    let prefijos: Vec<_> = self
+                        .swarm
+                        .behaviour_mut()
+                        .limites_ip
+                        .prefijos_de(peer)
+                        .into_iter()
+                        .collect();
+                    for p in prefijos {
+                        if self
+                            .swarm
+                            .behaviour_mut()
+                            .limites_ip
+                            .puntuar(p, crate::limites_ip::PUNTOS_VIOLACION_CONSENSO)
+                        {
+                            tracing::warn!(?p, "prefijo de red baneado por violación de consenso");
+                        }
+                    }
+                }
                 let _ = self.swarm.disconnect_peer_id(peer);
             }
         }

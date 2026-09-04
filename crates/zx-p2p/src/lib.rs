@@ -51,5 +51,6 @@ pub mod config;
 pub mod entrante;
 pub mod error;
 pub mod limites;
+pub mod limites_ip;
 pub mod mensaje;
 pub mod servicio;
