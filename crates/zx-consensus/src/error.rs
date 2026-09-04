@@ -46,6 +46,51 @@ pub enum ConsensusError {
         maximo: u64,
     },
 
+    /// C-TX-07: versión de transacción fuera del conjunto activo a esa altura.
+    #[error("C-TX-07: versión de tx {version} no admitida")]
+    VersionDeTxNoAdmitida {
+        /// Versión leída.
+        version: u32,
+    },
+
+    /// C-TX-17: la transacción no tiene entradas o no tiene salidas.
+    #[error("C-TX-17: la transacción MUST tener al menos una entrada y una salida")]
+    TxSinEntradasOSalidas,
+
+    /// C-TX-08: la transacción caducó.
+    #[error("C-TX-08: tx expirada — altura {altura} > expiry_height {expiry_height}")]
+    TxExpirada {
+        /// Altura del bloque.
+        altura: u32,
+        /// Altura de expiración declarada.
+        expiry_height: u32,
+    },
+
+    /// C-TX-13: la entrada no existe en el UTXO set, o ya está gastada.
+    #[error("C-TX-13: la entrada no existe en el UTXO set o ya se gastó")]
+    EntradaInexistenteOGastada,
+
+    /// C-TX-16: la misma transacción gasta dos veces el mismo outpoint.
+    #[error("C-TX-16: doble gasto dentro de la misma transacción")]
+    DobleGastoInterno,
+
+    /// C-BLK-09: dos transacciones del bloque gastan el mismo outpoint.
+    #[error("C-BLK-09: dos transacciones del bloque gastan el mismo outpoint")]
+    DobleGastoEnBloque,
+
+    /// C-TX-14: las salidas suman más que las entradas.
+    #[error("C-TX-14: Σ salidas excede Σ entradas")]
+    SalidasExcedenEntradas,
+
+    /// C-EMIT-05: se intenta gastar una coinbase que aún no ha madurado.
+    #[error("C-EMIT-05: coinbase inmaduro — altura {altura}, madura en {maduro_en}")]
+    CoinbaseInmaduro {
+        /// Altura del bloque que intenta gastarla.
+        altura: u32,
+        /// Altura a partir de la cual se puede gastar.
+        maduro_en: u32,
+    },
+
     /// C-TX-06b/06c: el testigo no tiene el formato que exige el `Lock`.
     #[error("C-TX-06b: testigo mal formado: {motivo}")]
     TestigoMalFormado {

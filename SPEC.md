@@ -766,7 +766,34 @@ MAX_TX_WEIGHT = 100 000      // bytes — igual a ZONA_LIBRE, ver C-WGT-11
 **C-WGT-01** · El **weight** de un bloque es `weight(coinbase) + Σ weight(tx_i)`. La cabecera de
 bloque y la lista de hashes de transacción **MUST NOT** contarse.
 
-**C-WGT-02** · En v1 (solo pool transparente), `weight(tx) = tamaño_serializado(tx)` en bytes.
+**C-WGT-02 · El peso se calcula con una fórmula del protocolo, NO con el tamaño que produzca el
+serializador.**
+
+```
+peso(tx) = 12                                             // version ‖ lock_time ‖ expiry_height
+         + |CompactSize(n_in)|  + n_in  · 40              // prev_txid(32) ‖ index(4) ‖ sequence(4)
+         + |CompactSize(n_out)| + Σⱼ (8 + |lock_j|)       // value(8) ‖ lock canónico (C-TX-09b)
+         + |CompactSize(n_wit)| + Σᵢ (|CompactSize(lenᵢ)| + lenᵢ)
+```
+
+`|lock|` es la longitud de la codificación canónica de C-TX-09b: 33 para `PubKey`, `2 + |CompactSize(n)| + 32n`
+para `MultiSig`, y 101 para `Htlc`.
+
+> ⚠️ **Corregido 2026-09-04 al implementar §5.4. Antes decía `weight(tx) = tamaño_serializado(tx)`,
+> y eso contradecía directamente a C-ENC-08.**
+>
+> C-ENC-08 declara que la serialización Cap'n Proto **no es consensus-critical**, y su propia
+> motivación dice que su modo canónico *"no garantiza bytes idénticos entre implementaciones"*. Pero
+> el peso alimenta C-WGT-09 (validez de bloque) y C-EMIT-06 (subsidio del minero): si el peso
+> dependiera del serializador, **dos nodos calcularían límites y subsidios distintos para el mismo
+> bloque**. Split de cadena, y por una vía que ninguna suite de tests de hashing detectaría.
+>
+> La fórmula de arriba es determinista, está definida por el protocolo y es independiente de
+> cualquier serializador. Incluye el testigo porque el testigo ocupa banda y disco reales, que es lo
+> que el peso existe para acotar.
+>
+> Consecuencia práctica: el tamaño en el cable puede diferir del peso de consenso. **Es correcto y
+> deliberado.** El peso es una magnitud del protocolo, no una medida del encoder.
 
 > Monero añade aquí un *clawback* que penaliza las bulletproofs agregadas, porque su tamaño crece
 > **logarítmicamente** con el número de outputs y agrupar sale desproporcionadamente barato. En
