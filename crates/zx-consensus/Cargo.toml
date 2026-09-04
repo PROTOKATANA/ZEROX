@@ -11,7 +11,9 @@ repository.workspace   = true
 workspace = true
 
 [dependencies]
-thiserror = { workspace = true }
+thiserror       = { workspace = true }
+primitive-types = { workspace = true }
+zx-core         = { path = "../zx-core" }
 
 [dev-dependencies]
 proptest = { workspace = true }

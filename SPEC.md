@@ -1009,8 +1009,11 @@ con `BIAS_NUM / BIAS_DEN` = `<<PENDIENTE: racional exacto — D9 debe fijarlo>>`
 > El racional concreto lo fija D9. Referencia: `9975/10000` deja 0,0021% de error residual;
 > `99752/100000` deja 0,00012%. El coste computacional es idéntico.
 >
-> **Cota de overflow con la corrección:** `S·t·BIAS_NUM ≈ 2²⁶⁵` en el peor caso. Cabe holgadamente
-> en U512 — razón adicional para mandar U512 y no U256 en C-DIFF-06.
+> **Cota de overflow con la corrección:** el peor caso real es `S·t·BIAS_NUM < 2²⁶⁹`, no 2²⁶⁵ como
+> decía antes esta nota — con `S ≤ N·POW_LIMIT < 2²³¹`, `t ≤ ST_CAP·N(N+1)/2 < 2²²` y
+> `BIAS_NUM < 2¹⁷`. Ambas cifras caben holgadamente en U512; la corrección es de precisión, no de
+> riesgo. Verificado en `zx-consensus`, test `el_numerador_de_c_diff_07_cabe_en_u512`.
+> Es la razón de mandar U512 y no U256 en C-DIFF-06.
 
 **C-DIFF-08 · Acotado.** `next := clamp(next, MIN_TARGET, POW_LIMIT)`.
 

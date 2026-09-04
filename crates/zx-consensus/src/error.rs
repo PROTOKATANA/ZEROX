@@ -1,0 +1,66 @@
+//! Errores de consenso.
+
+use thiserror::Error;
+
+/// Fallo al aplicar una regla de consenso.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum ConsensusError {
+    /// La ventana del retarget no tiene el tamaño exacto que exige C-DIFF-02.
+    ///
+    /// **MUST NOT** encogerse dinámicamente: una ventana más corta produce un target distinto y
+    /// por tanto un split.
+    #[error(
+        "ventana de tamaño incorrecto: {timestamps} timestamps y {targets} targets \
+         (se esperan N+1 y N)"
+    )]
+    VentanaDeTamanoIncorrecto {
+        /// Timestamps recibidos.
+        timestamps: usize,
+        /// Targets recibidos.
+        targets: usize,
+    },
+
+    /// Ventana vacía donde se esperaba al menos un elemento.
+    #[error("ventana vacía")]
+    VentanaVacia,
+
+    /// C-ENC-03: desbordamiento detectado. **Nunca en silencio.**
+    #[error("C-ENC-03: desbordamiento aritmético en una ruta de consenso")]
+    DesbordamientoAritmetico,
+
+    /// C-TS-01: el timestamp no avanza respecto al padre. Rechazo **permanente**.
+    #[error("C-TS-01: ts({altura}) = {ts} no supera ts(padre) = {ts_padre}")]
+    TimestampNoMonotono {
+        /// Altura del bloque.
+        altura: u32,
+        /// Timestamp del bloque.
+        ts: i64,
+        /// Timestamp del padre.
+        ts_padre: i64,
+    },
+
+    /// C-TS-03: el timestamp está demasiado en el futuro.
+    ///
+    /// Rechazo **NO permanente**: el bloque se difiere y se reintenta. **MUST NOT** cachearse como
+    /// inválido ni banearse al par — hacerlo produce un split garantizado ante partición temporal.
+    #[error("C-TS-03: ts = {ts} excede reloj_local + FTL = {limite} (diferible, NO permanente)")]
+    TimestampDemasiadoFuturo {
+        /// Timestamp del bloque.
+        ts: i64,
+        /// Límite admitido.
+        limite: i64,
+    },
+}
+
+impl ConsensusError {
+    /// ¿Es un rechazo **permanente**?
+    ///
+    /// La distinción es de consenso, no cosmética. Un rechazo diferible **MUST NOT** cachearse como
+    /// inválido: si un nodo marca permanentemente un bloque que solo llegó pronto, y luego su reloj
+    /// se pone al día, se queda fuera de la cadena buena para siempre. C-TS-03 lo dice
+    /// explícitamente.
+    #[must_use]
+    pub const fn es_permanente(&self) -> bool {
+        !matches!(self, Self::TimestampDemasiadoFuturo { .. })
+    }
+}

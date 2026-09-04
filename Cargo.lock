@@ -816,8 +816,10 @@ dependencies = [
 name = "zx-consensus"
 version = "0.0.0"
 dependencies = [
+ "primitive-types",
  "proptest",
  "thiserror",
+ "zx-core",
 ]
 
 [[package]]
