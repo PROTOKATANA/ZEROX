@@ -26,10 +26,12 @@ pub mod encoding;
 pub mod error;
 mod hash;
 pub mod preimage;
+pub mod target;
 pub mod tx;
 
 pub use amount::{Amount, ZX_VALUE_SANITY_LIMIT};
 pub use digest::{AuthDigest, BlockHash, Digest, MerkleRoot, SigHash, TxId};
 pub use error::{CoreError, EncodingError};
 pub use preimage::tx::{HashType, auth_digest, sighash, txid};
+pub use target::{CompactBits, TrabajoAcumulado, cumple_pow, trabajo_bloque};
 pub use tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};

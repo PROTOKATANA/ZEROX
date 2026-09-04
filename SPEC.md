@@ -861,8 +861,24 @@ es de 8 bits (saltos de dificultad de ×256), incompatible con un retarget por b
 **C-POW-03** · `bits` es un `u32` que codifica un target de 256 bits como
 `mantisa (3 bytes) × 256^(exponente − 3)`, con el exponente en el byte más significativo.
 
-**C-POW-04** · `bits` **MUST** ser la codificación **canónica** del target: mantisa normalizada,
-sin bit de signo, sin exponente cero. Codificaciones no canónicas **MUST** rechazarse.
+**C-POW-04 · Canonicidad de `bits`, definida como punto fijo.** `bits` **MUST** ser exactamente el
+valor que produce el codificador canónico aplicado al target que decodifica:
+
+```
+canónico(bits)  ⟺  codificar(decodificar(bits)) == bits
+```
+
+Además, y como condición previa: el bit de signo **MUST** estar a cero, el exponente **MUST NOT**
+ser cero, la mantisa **MUST NOT** ser cero, y el resultado **MUST NOT** desbordar 256 bits.
+
+> ⚠️ **Reformulado 2026-09-04 al implementar.** La redacción anterior decía "mantisa normalizada", y
+> la lectura natural de eso —"el byte alto de la mantisa **MUST** ser distinto de cero"— **es
+> incorrecta**: rechazaría `0x1d00ffff`, que es canónico. Ese byte cero no es un descuido, es el
+> resultado del desplazamiento que evita invadir el bit de signo. Y `0x1d00ffff` es precisamente el
+> `TARGET_INICIAL` de ZEROX y el `powLimit` de Bitcoin.
+>
+> Definir la canonicidad como punto fijo del codificador no puede desincronizarse de él, porque
+> **es** él. Enumerar reglas estructurales sí puede, y en el primer intento ya se equivocó.
 
 **C-POW-05** · El target decodificado **MUST** estar en `[MIN_TARGET, POW_LIMIT]`, con
 
@@ -904,8 +920,20 @@ cabecera fuera de esa ventana.
 **C-DIFF-02 · Arranque.** Si `1 ≤ H ≤ N`, `siguiente_target(H) = TARGET_INICIAL`, con
 
 ```
-TARGET_INICIAL = POW_LIMIT = 2^224 − 1
+TARGET_INICIAL_BITS = 0x1d00ffff
+TARGET_INICIAL      = 2^224 − 2^208    // el mayor target REPRESENTABLE bajo POW_LIMIT
 ```
+
+> ⚠️ **Corregido 2026-09-04 al implementar.** Esta regla decía `TARGET_INICIAL = POW_LIMIT =
+> 2^224 − 1`, y **eso es inalcanzable**: el formato compacto de C-POW-03 solo representa valores de
+> la forma `mantisa × 256^k` con la mantisa de 3 bytes, y `2^224 − 1` son 28 bytes de `0xFF`
+> seguidos. Ningún `bits` decodifica a él, así que **el bloque génesis no habría podido llevar el
+> target que la regla exigía**.
+>
+> `POW_LIMIT` sigue siendo la **cota** —C-POW-05 rechaza cualquier target por encima— y
+> `TARGET_INICIAL` es el mayor valor representable por debajo. La diferencia en dificultad es de
+> 1,5·10⁻⁵: irrelevante. Es exactamente la situación de Bitcoin, cuyo `powLimit` es también
+> `0x1d00ffff`.
 
 El primer retarget calculado es el de `H = N+1`. La ventana es siempre exactamente `N`;
 **MUST NOT** encogerse dinámicamente.

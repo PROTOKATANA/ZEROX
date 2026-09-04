@@ -85,6 +85,22 @@ pub enum EncodingError {
         salidas: usize,
     },
 
+    /// C-POW-04: `bits` no está en forma canónica.
+    #[error("C-POW-04: bits {bits:#010x} no canónico: {motivo}")]
+    BitsNoCanonico {
+        /// Valor leído.
+        bits: u32,
+        /// Por qué se rechaza.
+        motivo: &'static str,
+    },
+
+    /// C-POW-05: el target decodificado sale de `[MIN_TARGET, POW_LIMIT]`.
+    #[error("C-POW-05: {motivo}")]
+    TargetFueraDeRango {
+        /// Por qué se rechaza.
+        motivo: &'static str,
+    },
+
     /// Índice de entrada fuera del rango de la transacción.
     #[error("índice de entrada {indice} fuera de rango ({entradas} entradas)")]
     IndiceDeEntradaFueraDeRango {
