@@ -2414,6 +2414,8 @@ debajo**.
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
+| **P-028** | §16.1 | 🆕 **Reorg de cabeceras.** `validar_cadena_de_cabeceras` juzga bien una bifurcación profunda, y `extender` no sabe adoptarla: `fork_choice` existe y no está conectado. Mitigado a medias por C-NET-18 | **D2** + **D4** |
+| **P-029** | §16.1 | 🆕 ¿Un `RwLock` envenenado debe degradar —altura 0, tip = génesis— o **parar el nodo**? Hoy degrada, y eso contradice a C-GEN-06 y C-NET-13 | Katana |
 | **P-004d** | §7.3 | 🆕 ¿Puede LWMA adaptarse desde el bloque 1 **sembrando** la ventana con ancestros sintéticos, en vez de 90 bloques a dificultad fija? Encoger `N` está prohibido por varianza; sembrarla no. Regla de consenso nueva | Investigación + **D9** + **D8**, Fase 10 |
 
 ### Cerradas en esta revisión
