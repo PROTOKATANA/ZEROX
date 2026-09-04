@@ -7,6 +7,14 @@ rust-version.workspace = true
 license.workspace      = true
 repository.workspace   = true
 
+[lib]
+name = "zx_node"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zx-node"
+path = "src/main.rs"
+
 [lints]
 workspace = true
 

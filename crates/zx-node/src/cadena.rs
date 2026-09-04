@@ -66,8 +66,6 @@ impl Cadena {
 
     /// La red de esta cadena.
     ///
-    /// Todavía sin consumidor: lo usará el sincronizador.
-    #[expect(dead_code, reason = "lo usará el sincronizador")]
     #[must_use]
     pub const fn red(&self) -> Red {
         self.red
@@ -94,6 +92,19 @@ impl Cadena {
     /// [`zx_consensus::error::ConsensusError::SinRamaActiva`] con una tabla mal formada.
     pub fn rama(&self) -> Result<u32, zx_consensus::error::ConsensusError> {
         rama_activa(self.red, self.altura())
+    }
+
+    /// Añade cabeceras **sin validar**, para arnés de pruebas.
+    ///
+    /// `cfg(test)` no basta: los tests de integración son otro crate, así que este constructor es
+    /// público y lleva el aviso en el nombre y en la firma. Saltarse la validación es exactamente
+    /// lo que un test de sincronización necesita —el nodo servidor debe *tener* una cadena sin
+    /// haberla minado— y exactamente lo que producción no debe hacer nunca.
+    #[doc(hidden)]
+    pub fn extender_sin_validar_solo_para_pruebas(&self, nuevas: &[BlockHeader]) {
+        if let Ok(mut cs) = self.cabeceras.write() {
+            cs.extend_from_slice(nuevas);
+        }
     }
 
     /// Trabajo acumulado de nuestra cadena hasta la punta.

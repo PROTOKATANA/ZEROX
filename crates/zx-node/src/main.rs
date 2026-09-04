@@ -29,9 +29,6 @@
 //! servicio de red necesita el verificador **ya construido** para aceptar handshakes desde el
 //! segundo cero. Aquí no, así que la inicialización es estrictamente lineal.
 
-mod cadena;
-mod sync;
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -48,8 +45,8 @@ use zx_p2p::mensaje::{Peticion, Respuesta};
 
 use zx_p2p::entrante::ManejadorEntrante;
 
-use crate::cadena::Cadena;
-use crate::sync::{Fase, Sincronizador, validar_cadena_de_cabeceras};
+use zx_node::cadena::Cadena;
+use zx_node::sync::{Fase, Sincronizador, validar_cadena_de_cabeceras};
 
 /// Nodo de ZEROX.
 #[derive(Parser, Debug)]

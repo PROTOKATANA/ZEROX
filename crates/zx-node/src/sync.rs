@@ -133,13 +133,6 @@ impl Sincronizador {
     }
 
     /// De quién descarga.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "lo consumirá la descarga de cuerpos (fase Cuerpos)"
-        )
-    )]
     #[must_use]
     pub const fn peer(&self) -> Option<PeerId> {
         self.peer
@@ -197,7 +190,6 @@ impl Sincronizador {
     /// Pasa a descargar cuerpos. **Solo se llama tras validar las cabeceras** (C-NET-03).
     ///
     /// 🔶 Sin consumidor todavía: ver la nota de [`Fase::Cuerpos`].
-    #[expect(dead_code, reason = "lo llamará la descarga de cuerpos (fase Cuerpos)")]
     pub const fn cabeceras_validadas(&mut self) {
         if matches!(self.fase, Fase::Cabeceras) {
             self.fase = Fase::Cuerpos;
