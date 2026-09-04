@@ -25,6 +25,7 @@ pub mod amount;
 pub mod digest;
 pub mod encoding;
 pub mod error;
+pub mod firma;
 mod hash;
 pub mod preimage;
 pub mod target;
@@ -34,6 +35,11 @@ pub use address::{Address, Red};
 pub use amount::{Amount, ZX_VALUE_SANITY_LIMIT};
 pub use digest::{AuthDigest, BlockHash, Digest, MerkleRoot, SigHash, TxId};
 pub use error::{CoreError, EncodingError};
+pub use firma::{ClavePublica, Firma, verificar};
+// El módulo `hash` sigue privado: `h_d` MUST ser inalcanzable desde fuera. Se reexporta únicamente
+// `sha3_256_publico`, que no acepta etiqueta de dominio y por tanto no puede producir un digest de
+// consenso. Ver la nota de diseño de `crate::hash`.
+pub use hash::sha3_256_publico;
 pub use preimage::tx::{HashType, auth_digest, sighash, txid};
 pub use target::{CompactBits, TrabajoAcumulado, cumple_pow, trabajo_bloque};
 pub use tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};

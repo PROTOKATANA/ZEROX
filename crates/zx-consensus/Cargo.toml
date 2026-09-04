@@ -16,4 +16,5 @@ primitive-types = { workspace = true }
 zx-core         = { path = "../zx-core" }
 
 [dev-dependencies]
-proptest = { workspace = true }
+proptest      = { workspace = true }
+ed25519-zebra = { workspace = true }

@@ -85,6 +85,13 @@ pub enum EncodingError {
         salidas: usize,
     },
 
+    /// La firma no verifica bajo las reglas de ZIP-215.
+    #[error("firma inválida: {motivo}")]
+    FirmaInvalida {
+        /// Por qué se rechaza.
+        motivo: &'static str,
+    },
+
     /// C-ENC-06/07: dirección bech32m inválida.
     #[error("C-ENC-06: dirección inválida: {motivo}")]
     DireccionInvalida {

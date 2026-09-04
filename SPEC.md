@@ -396,6 +396,38 @@ auth_digest = H_d("ZZKTxAuthHash___", ⋃ᵢ witness_encoding_i)
 **C-TX-06** · `witness_encoding` de una entrada es `CompactSize(len) ‖ witness_bytes`. El
 contenido depende del tipo de salida gastada (§5.3).
 
+**C-TX-06b · Formato del testigo, por tipo de `Lock`.**
+
+```
+PubKey   := pubkey(32) ‖ sig(64)                                       96 B
+
+MultiSig := k × [ indice(1) ‖ pubkey(32) ‖ sig(64) ]                   k·97 B
+            con los índices ESTRICTAMENTE CRECIENTES
+
+Htlc     := 0x00 ‖ CompactSize(n) ‖ preimagen(n) ‖ pubkey(32) ‖ sig(64)   vía preimagen
+          | 0x01 ‖ pubkey(32) ‖ sig(64)                                   vía timeout
+```
+
+**C-TX-06c · El testigo MUST consumirse por completo.** Tras interpretar el testigo según su tipo,
+**MUST NOT** quedar ningún byte sin consumir. Un testigo con relleno sobrante **MUST** rechazarse.
+
+> ⚠️ **Añadido 2026-09-04 al implementar §5.** El SPEC decía "el contenido depende del tipo" y no lo
+> definía. No podía quedar así: sin formato fijado no hay dos implementaciones que coincidan.
+>
+> **Por qué índices estrictamente crecientes en `MultiSig`**, y no un escaneo ordenado estilo
+> Bitcoin: los índices explícitos hacen la verificación `O(k)` en vez de `O(n·k)`, y la
+> **monotonía estricta** cierra dos agujeros de una vez — elimina la maleabilidad por reordenación
+> (solo hay un orden válido para el mismo conjunto de firmas) y hace imposible repetir una clave sin
+> necesidad de comprobarlo aparte. Además evita reproducir el escaneo de `OP_CHECKMULTISIG`, con su
+> conocido error de desplazamiento. El testigo **MUST** traer exactamente `k` entradas: ni menos, ni
+> una de más.
+>
+> **Por qué C-TX-06c.** Sin ella, rellenar el testigo con basura no invalida la transacción: el
+> `txid` no cambia —el testigo es dato de autorización— y el atacante consigue **banda y disco
+> ilimitados, gratis**. Es exactamente el patrón de GHSA-2x4w-pxqw-58v9, el CVE real de Orchard
+> donde `sizeProofs` no se validaba como regla de consenso. La longitud de la preimagen del HTLC
+> queda acotada por `MAX_TX_WEIGHT` (C-WGT-11), así que no necesita una constante propia.
+
 ### 4.5 · Tabla de etiquetas de dominio
 
 **C-HASH-06** · Estas son **todas** las etiquetas de dominio de ZEROX v1.0. Cada una mide

@@ -46,6 +46,20 @@ pub enum ConsensusError {
         maximo: u64,
     },
 
+    /// C-TX-06b/06c: el testigo no tiene el formato que exige el `Lock`.
+    #[error("C-TX-06b: testigo mal formado: {motivo}")]
+    TestigoMalFormado {
+        /// Qué falla.
+        motivo: &'static str,
+    },
+
+    /// El testigo está bien formado pero no satisface la condición de gasto.
+    #[error("condición de gasto no satisfecha: {motivo}")]
+    CondicionNoSatisfecha {
+        /// Qué falla.
+        motivo: &'static str,
+    },
+
     /// C-REORG-07: la reorganización excede la profundidad máxima.
     ///
     /// Quien reciba esto **MUST** detener el nodo y alertar al operador. **MUST NOT** limitarse a

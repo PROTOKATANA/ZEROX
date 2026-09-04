@@ -110,6 +110,18 @@ pub(crate) fn sha3_256(msg: &[u8]) -> Digest {
     Digest::from_bytes(Sha3_256::digest(msg).into())
 }
 
+/// SHA3-256 desnudo, expuesto **solo** para las dos cosas que el SPEC define sin etiqueta de
+/// dominio: el hash de clave pública de una dirección (C-ENC-07) y la preimagen de un HTLC
+/// (C-TX-09).
+///
+/// No es una puerta trasera a [`h_d`]: no acepta etiqueta, así que no puede producir un digest con
+/// dominio. Un digest de consenso —txid, sighash, hash de bloque— **MUST** salir de
+/// [`crate::preimage`], nunca de aquí.
+#[must_use]
+pub fn sha3_256_publico(msg: &[u8]) -> Digest {
+    sha3_256(msg)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tabla de etiquetas de dominio — SPEC §4.5, C-HASH-06.
 //
