@@ -67,6 +67,20 @@ pub enum EncodingError {
         motivo: &'static str,
     },
 
+    /// C-WIRE-04: un contador declarado absurdamente grande.
+    ///
+    /// **No es una regla de consenso, es una cota del *parser*.** Sin ella, un peer puede declarar
+    /// un `CompactSize` de 2⁶⁴−1 elementos con un cuerpo de veinte bytes y provocar una reserva de
+    /// memoria enorme **antes** de que nadie lea un solo elemento — y mucho antes de que el
+    /// consenso llegue a opinar sobre el peso.
+    #[error("C-WIRE-04: se declararon {declarados} elementos y el máximo del lector es {maximo}")]
+    DemasiadosElementos {
+        /// Cuántos declaró el emisor.
+        declarados: u64,
+        /// Cota del lector.
+        maximo: u64,
+    },
+
     /// C-SIG-03: `hash_type` fuera del conjunto definido.
     #[error("C-SIG-03: hash_type inválido: {valor:#04x}")]
     HashTypeInvalido {

@@ -31,6 +31,7 @@ pub mod preimage;
 pub mod red;
 pub mod target;
 pub mod tx;
+pub mod wire;
 
 pub use address::{Address, Red};
 pub use amount::{Amount, ZX_VALUE_SANITY_LIMIT};

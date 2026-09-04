@@ -56,3 +56,50 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y cmake g++ capnproto libcapnp-dev
       - name: Placeholder — kernels HIP se integran en la Fase 8
         run: echo "zx-miner: sin fuentes C++ todavía (Fase 8)"
+
+  frontera:
+    name: Arquitectura — la frontera red/consenso
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # zx-p2p NO puede depender de consenso, estado ni mempool.
+      #
+      # Red y consenso se necesitan en las DOS direcciones: la red valida lo que recibe, y el
+      # sincronizador pide bloques por la red. Si zx-p2p puede ver zx-consensus, ese ciclo se
+      # cierra poco a poco y sin que nadie lo decida. El ciclo se rompe en zx-node, que es el
+      # único que ve las cuatro cosas a la vez.
+      #
+      # Esto ya se coló una vez, el primer día del crate. Un README no lo habría impedido.
+      - name: zx-p2p solo puede ver zx-core
+        run: |
+          python3 - <<'PY'
+          import sys, tomllib
+
+          # crate -> dependencias internas permitidas en [dependencies] (produccion)
+          REGLAS = {
+              "zx-p2p": {"zx-core"},
+          }
+
+          fallos = []
+          for crate, permitidas in REGLAS.items():
+              with open(f"crates/{crate}/Cargo.toml", "rb") as f:
+                  doc = tomllib.load(f)
+              internas = {d for d in doc.get("dependencies", {}) if d.startswith("zx-")}
+              prohibidas = internas - permitidas
+              if prohibidas:
+                  fallos.append(
+                      f"{crate} depende de {sorted(prohibidas)} en [dependencies];\n"
+                      f"    solo puede depender de {sorted(permitidas)}.\n"
+                      f"    Si lo necesitas para un test, va en [dev-dependencies].\n"
+                      f"    Si lo necesitas en el codigo, la frontera esta mal: define un trait\n"
+                      f"    en {crate} y que zx-node lo implemente. Ver crates/{crate}/src/lib.rs."
+                  )
+              else:
+                  print(f"OK - {crate}: {sorted(internas) or 'sin dependencias internas'}")
+
+          if fallos:
+              print("\nFRONTERA ROTA:\n")
+              for f_ in fallos:
+                  print("  -", f_)
+              sys.exit(1)
+          PY

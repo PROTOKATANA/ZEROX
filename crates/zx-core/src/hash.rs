@@ -99,20 +99,26 @@ pub(crate) fn h_d(tag: DomainTag, msg: &[u8]) -> Digest {
 
 /// SHA3-256 desnudo, sin dominio.
 ///
-/// Solo para lo que la propia especificación define sin etiqueta: el hash de clave pública de una
-/// dirección (C-ENC-07) y la preimagen de un HTLC (C-TX-09). **No** se usa para nada que entre en
-/// un txid, un sighash o un hash de bloque — eso pasa siempre por [`h_d`].
+/// Solo para lo que la propia especificación define sin etiqueta: la preimagen de un HTLC
+/// (C-TX-09) y los prefijos derivados de red (C-NET-01). **No** se usa para nada que entre en un
+/// txid, un sighash o un hash de bloque — eso pasa siempre por [`h_d`].
+///
+/// ⚠️ **Ya no incluye el hash de clave pública de una dirección.** Lo incluía cuando ZEROX usaba
+/// P2KH; desde **P-020** la dirección lleva la clave **en claro** y no se hashea nada
+/// (C-ENC-07). Se deja escrito porque un comentario obsoleto es peor que ninguno: hace creer que
+/// alguien lo comprobó, y una segunda implementación que lo leyera podría reintroducir P2KH.
 #[allow(
     dead_code,
-    reason = "lo usará crate::address (C-ENC-07) y la verificación de HTLC (C-TX-09)"
+    reason = "lo usa la verificación de HTLC (C-TX-09) vía sha3_256_publico"
 )]
 pub(crate) fn sha3_256(msg: &[u8]) -> Digest {
     Digest::from_bytes(Sha3_256::digest(msg).into())
 }
 
-/// SHA3-256 desnudo, expuesto **solo** para las dos cosas que el SPEC define sin etiqueta de
-/// dominio: el hash de clave pública de una dirección (C-ENC-07) y la preimagen de un HTLC
-/// (C-TX-09).
+/// SHA3-256 desnudo, expuesto **solo** para lo que el SPEC define sin etiqueta de dominio: la
+/// preimagen de un HTLC (C-TX-09) y la derivación de los prefijos mágicos de red (C-NET-01).
+///
+/// **No** para direcciones: desde P-020 no se hashea la clave pública (C-ENC-07).
 ///
 /// No es una puerta trasera a [`h_d`]: no acepta etiqueta, así que no puede producir un digest con
 /// dominio. Un digest de consenso —txid, sighash, hash de bloque— **MUST** salir de

@@ -228,6 +228,87 @@ unicidad de los *bytes* la tiene que dar el parser.
 
 ---
 
+### 2.4 · Serialización de red y disco — `C-WIRE`
+
+> **No es la preimagen, y la diferencia importa.** La preimagen (§4) es un **árbol de hashes**: el
+> txid no es la concatenación de los campos de una transacción, sino la raíz de un árbol de digests
+> con separación de dominio. De una preimagen no se puede recuperar el objeto, porque no contiene
+> los datos sino sus hashes. Esto de aquí es lo otro: lo que viaja por la red y se guarda en disco.
+
+**C-WIRE-01 · La cabecera que viaja son los MISMOS bytes que se hashean.** La codificación de una
+`BlockHeader` es exactamente la preimagen del PoW (§7.1) **sin su etiqueta de dominio**: 112 bytes,
+mismo orden de campos.
+
+> No es una optimización, es una restricción: impide que exista una **segunda descripción** del
+> formato de cabecera capaz de divergir de la primera. Es la lección de **H-005**, donde un offset
+> transcrito a mano dejó de cuadrar al cambiar el tipo de `timestamp`.
+>
+> Corolario: **el decodificador MUST vivir junto al codificador** (`zx-core::wire`). Un
+> decodificador en el crate de red re-describe el orden de los campos, y eso es exactamente el
+> patrón que se quiere prohibir.
+
+**C-WIRE-02 · Codificación de `Lock`.** La de C-TX-09b, sin cambios. Longitudes: 33 para `PubKey`,
+`3 + 32n` para `MultiSig` con `n ≤ 16`, 101 para `Htlc`.
+
+**C-WIRE-03 · Codificación de una transacción con sus testigos.**
+
+```
+version(4 LE) ‖ lock_time(4 LE) ‖ expiry_height(4 LE)
+‖ CompactSize(n_in)  ‖ n_in  × [ prev_txid(32) ‖ prev_index(4 LE) ‖ sequence(4 LE) ]
+‖ CompactSize(n_out) ‖ n_out × [ value(8 LE, i64) ‖ lock (C-WIRE-02) ]
+‖ CompactSize(n_wit) ‖ n_wit × [ CompactSize(len) ‖ bytes(len) ]
+```
+
+Los testigos van **fuera** de la transacción, no dentro: son datos de **autorización**, el txid no
+los incluye, y eso es lo que la hace no maleable (C-TX-01).
+
+> **La invariante que ata esto al consenso:** la longitud de esta codificación **MUST** ser igual al
+> peso que calcula la fórmula de C-WGT-02.
+>
+> Y son **dos definiciones independientes a propósito**. Definir el peso como `bytes.len()` las
+> haría coincidir por construcción y volvería a atar el consenso al serializador — cambiar un byte
+> del formato cambiaría el peso de todas las transacciones, y con él la validez de los bloques y el
+> subsidio. Es exactamente lo que **H-006** arregló.
+>
+> Así que no se acoplan: se comprueban una contra otra sobre transacciones generadas al azar, y en
+> los umbrales de `CompactSize` (252/253, 65 535/65 536) construidos a mano. Test diferencial
+> `wire_peso_differential`. Si un día divergen, falla un test — no el consenso, en producción.
+
+**C-WIRE-04 · Todo contador declarado MUST acotarse ANTES de reservar memoria por él.** Un lector
+**MUST** rechazar un `CompactSize` que declare más de `MAX_ELEMENTOS_DECLARADOS = 1 000 000`
+elementos, **antes** de leer ninguno.
+
+> **No es una regla de consenso, es una cota del *parser*.** El límite real lo pone `MAX_TX_WEIGHT`,
+> pero ese se comprueba mucho más tarde — y "más tarde" es demasiado tarde cuando la reserva ya
+> ocurrió. Un peer declara 2⁶⁴−1 entradas, manda veinte bytes, y el nodo reserva por lo declarado.
+>
+> Es el mismo patrón que lighthouse prueba **mintiendo en el prefijo de longitud** en vez de
+> construir el payload real, y por la misma razón: el rechazo debe ocurrir leyendo el contador, no
+> leyendo el cuerpo.
+
+**C-WIRE-05 · Ningún dato de red puede hacer entrar en pánico a un lector.** Los lectores **MUST**
+devolver `Result` ante cualquier entrada, incluida basura arbitraria.
+
+> El workspace prohíbe `panic`, `unwrap` y `expect` en código de producción, pero eso **no** cubre
+> un índice fuera de rango. Un parser de datos de red que entra en pánico es un DoS remoto de una
+> línea. Se comprueba con property tests que alimentan bytes aleatorios a los tres lectores.
+
+**C-WIRE-06 · Por qué a mano y no Cap'n Proto, para los mensajes de sincronización.**
+`DECISIONES.md` eligió Cap'n Proto para wire y disco, y **sigue siendo la elección** para el
+almacenamiento y para el intercambio de plantillas con el minero C++, donde el código generado para
+dos lenguajes paga su precio. Para los **mensajes de sincronización** se decidió distinto:
+
+| | Razón |
+|---|---|
+| **Superficie de ataque** | Estos bytes vienen de un peer no autenticado. El parser de Cap'n Proto hace aritmética de punteros sobre datos hostiles; su crate de Rust tuvo `RUSTSEC-2025-0143` (UB en `get_root_unchecked`) y el bug de canonicalización de 2018 vivía en el manejo de *far pointers* |
+| **Una sola descripción** | Un `BlockHeader` ya tiene un orden de campos byte a byte fijado por el SPEC. Describirlo otra vez en un `.capnp` crea **dos** descripciones del mismo objeto — H-005 y H-006 otra vez |
+| **Sin paso de compilación** | Ni `capnpc`, ni esquema, ni código generado que auditar |
+
+> Coste asumido: se pierde el acceso *zero-copy*. No está en el camino caliente — procesar un bloque
+> cuesta verificar firmas, no copiar 200 KB. Ver `research/capnproto-canon.md`, cuya conclusión ya
+> era que ningún proyecto que necesite esto para consenso confía en el modo canónico de un
+> serializador de propósito general.
+
 ## 3 · Función hash
 
 ### 3.1 · La función de consenso
@@ -1882,6 +1963,16 @@ mainnet:  🔴 sin congelar — P-017
 > Sin la aserción, dos nodos con builds distintas levantarían **cadenas distintas creyendo que son
 > la misma**, y el síntoma aparecería mucho más tarde y muy lejos de la causa. Mainnet **no debe**
 > tener su constante todavía: congelar el hash de un marcador de posición es congelar el error.
+>
+> Y una red **sin** hash congelado **MUST NOT** arrancar. Son dos candados independientes con
+> C-GEN-06 —uno por el timestamp, otro por el hash ausente— y es deliberado: cerrar P-017 exige
+> tocar los dos, así que no basta con rellenar la fecha y olvidarse de congelar el hash.
+>
+> ⚠️ **Corregido 2026-09-05 tras la primera auditoría de trazabilidad.** La comparación existía
+> **solo en un test**, y "el arranque" no es `cargo test`: un binario compilado con parámetros
+> tocados habría levantado una cadena distinta sin decir nada. Ahora vive en
+> `zx-consensus::genesis::comprobar_al_arrancar`, con un test que **toca cada parámetro** y
+> comprueba que impide arrancar.
 
 
 ## 16 · Parámetros de red
@@ -2170,6 +2261,7 @@ cadena**. Los seis huecos están escritos:
 | §13 · Profundidad de confirmación | política de producto, no normativa |
 | §14 · Activación de cambios de consenso | C-UPG-01..08 |
 | §15 · Bloque génesis | C-GEN-01..07 |
+| §2.4 · Serialización de red | C-WIRE-01..06 |
 | §16 · Parámetros de red | C-NET-01..12 |
 
 ### Aparcadas — evaluadas, con factura desglosada, NO adoptadas

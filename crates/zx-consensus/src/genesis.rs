@@ -235,6 +235,53 @@ pub fn comprobar(cabecera: &BlockHeader, coinbase: &Tx) -> Result<(), ConsensusE
     Ok(())
 }
 
+/// Hash congelado de una red, o `None` si esa red todavía no lo tiene (C-GEN-07).
+///
+/// Mainnet devuelve `None` **a propósito** mientras P-017 siga abierto: congelar el hash de un
+/// marcador de posición sería congelar el error.
+#[must_use]
+pub const fn hash_congelado(red: Red) -> Option<[u8; 32]> {
+    match red {
+        Red::Testnet => Some(HASH_GENESIS_TESTNET),
+        Red::Mainnet => None,
+    }
+}
+
+/// **La comprobación de arranque completa (C-GEN-01, C-GEN-07).** Es lo que un nodo llama antes de
+/// tocar nada más, y lo que aborta el arranque si algo no cuadra.
+///
+/// Hace tres cosas, en este orden:
+/// 1. construye el génesis a partir de sus parámetros,
+/// 2. comprueba todas las invariantes de §15 con [`comprobar`],
+/// 3. **compara su hash contra la constante congelada** del binario.
+///
+/// # Por qué el paso 3 no puede vivir solo en un test
+///
+/// Lo hacía, y una auditoría de trazabilidad lo cazó: C-GEN-07 dice *"el arranque MUST
+/// compararlo"*, y una comparación que solo ocurre en `cargo test` **no es el arranque**. Un
+/// binario compilado con parámetros tocados habría levantado una cadena distinta sin decir nada,
+/// y el síntoma —nodos que no se sincronizan entre sí— aparecería lejísimos de la causa.
+///
+/// # Errores
+/// [`ConsensusError::GenesisInvalido`] con el motivo concreto, o el error de [`construir`].
+pub fn comprobar_al_arrancar(p: ParametrosGenesis) -> Result<BlockHash, ConsensusError> {
+    let (cabecera, coinbase) = construir(p)?;
+    comprobar(&cabecera, &coinbase)?;
+
+    let obtenido = cabecera.block_hash();
+    match hash_congelado(p.red) {
+        Some(esperado) if obtenido.as_bytes() == &esperado => Ok(obtenido),
+        Some(_) => Err(ConsensusError::GenesisInvalido {
+            motivo: "C-GEN-07: el génesis construido NO coincide con el hash congelado del \
+                     binario — o alguien tocó los parámetros, o este binario no es de esta red",
+        }),
+        // Una red sin hash congelado no puede arrancar. Hoy es mainnet, por P-017.
+        None => Err(ConsensusError::GenesisInvalido {
+            motivo: "C-GEN-07: esta red no tiene hash de génesis congelado todavía — ver P-017",
+        }),
+    }
+}
+
 /// Hash del génesis de una red, tal y como se hardcodearía para la aserción de C-GEN-01.
 ///
 /// # Errores
@@ -258,14 +305,16 @@ pub fn txid_coinbase(p: ParametrosGenesis) -> Result<TxId, ConsensusError> {
 #[cfg(test)]
 #[expect(
     clippy::unwrap_used,
+    clippy::expect_used,
     clippy::panic,
     reason = "los tests fallan con panic por diseño"
 )]
 mod tests {
     use super::target_inicial_bits;
     use super::{
-        GENESIS_MAINNET, GENESIS_TESTNET, HASH_GENESIS_TESTNET, TIMESTAMP_MINIMO_GENESIS,
-        coinbase_genesis, comprobar, construir, hash, txid_coinbase,
+        GENESIS_MAINNET, GENESIS_TESTNET, HASH_GENESIS_TESTNET, ParametrosGenesis,
+        TIMESTAMP_MINIMO_GENESIS, coinbase_genesis, comprobar, comprobar_al_arrancar, construir,
+        hash, hash_congelado, txid_coinbase,
     };
     use crate::activacion::Red;
     use crate::dificultad::{N, ST_CAP, T};
@@ -299,6 +348,56 @@ mod tests {
             texto.contains("C-GEN-06") && texto.contains("P-017"),
             "el error debe decir qué falta y dónde está anotado: {texto}"
         );
+    }
+
+    /// **C-GEN-07.** El arranque de testnet valida y compara el hash. Ruta real, no un test aparte.
+    #[test]
+    fn el_arranque_de_testnet_valida_y_compara_el_hash() {
+        let h = comprobar_al_arrancar(GENESIS_TESTNET).expect("testnet arranca");
+        assert_eq!(h.as_bytes(), &HASH_GENESIS_TESTNET);
+    }
+
+    /// **C-GEN-07.** Tocar un parámetro sin recalcular el hash **impide arrancar**.
+    ///
+    /// Este es el test que da valor a la regla. Sin la comparación en el arranque, un binario con
+    /// parámetros tocados levantaría una cadena distinta en silencio, y el síntoma —nodos que no
+    /// se sincronizan— aparecería lejísimos de la causa.
+    #[test]
+    fn un_parametro_tocado_impide_arrancar() {
+        for tocar in [
+            |mut p: ParametrosGenesis| {
+                p.timestamp += 1;
+                p
+            },
+            |mut p: ParametrosGenesis| {
+                p.nonce += 1;
+                p
+            },
+            |mut p: ParametrosGenesis| {
+                p.mensaje = b"otro mensaje cualquiera";
+                p
+            },
+        ] {
+            let p = tocar(GENESIS_TESTNET);
+            let Err(e) = comprobar_al_arrancar(p) else {
+                panic!("un parámetro tocado MUST impedir el arranque");
+            };
+            assert!(format!("{e}").contains("C-GEN-07"), "{e}");
+        }
+    }
+
+    /// **C-GEN-07 · P-017.** Mainnet no puede arrancar: no tiene hash congelado.
+    ///
+    /// Son dos candados independientes —C-GEN-06 por el timestamp y C-GEN-07 por el hash ausente—
+    /// y eso es deliberado: cerrar P-017 exige tocar los dos, así que no basta con rellenar la
+    /// fecha y olvidar congelar el hash.
+    #[test]
+    fn mainnet_no_arranca_porque_no_tiene_hash_congelado() {
+        assert!(
+            hash_congelado(Red::Mainnet).is_none(),
+            "P-017 sigue abierto"
+        );
+        assert!(comprobar_al_arrancar(GENESIS_MAINNET).is_err());
     }
 
     /// **C-GEN-01.** El hash del génesis de testnet está congelado.
