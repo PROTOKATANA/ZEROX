@@ -46,6 +46,15 @@ pub enum ConsensusError {
         maximo: u64,
     },
 
+    /// El bloque génesis no cumple alguna invariante de §15.
+    ///
+    /// C-GEN-01 exige que esto **aborte el arranque del nodo**, no que se registre y se siga.
+    #[error("§15: génesis inválido: {motivo}")]
+    GenesisInvalido {
+        /// Qué invariante se rompe.
+        motivo: &'static str,
+    },
+
     /// El timestamp de la cabecera no cabe en `i64`.
     ///
     /// La cabecera lo lleva en `u64` y la aritmética de dificultad va en `i64`. Un `as` lo
