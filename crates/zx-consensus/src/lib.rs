@@ -9,10 +9,12 @@
 pub mod dificultad;
 pub mod emision;
 pub mod error;
+pub mod fork_choice;
 pub mod peso;
 pub mod timestamps;
 
 pub use dificultad::{VentanaRetarget, siguiente_target};
 pub use emision::{recompensa_base, subsidio};
 pub use error::ConsensusError;
+pub use fork_choice::{ClaveVentana, MAX_REORG_LENGTH, Preferencia, Tip, preferir};
 pub use peso::{PesoValidado, limite, mediana_efectiva};

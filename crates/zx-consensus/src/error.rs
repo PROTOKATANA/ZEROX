@@ -46,6 +46,21 @@ pub enum ConsensusError {
         maximo: u64,
     },
 
+    /// C-REORG-07: la reorganización excede la profundidad máxima.
+    ///
+    /// Quien reciba esto **MUST** detener el nodo y alertar al operador. **MUST NOT** limitarse a
+    /// rechazar el bloque y seguir: eso deja al nodo en una minoría de red sin saberlo.
+    #[error(
+        "C-REORG-07: reorg de {profundidad} bloques excede el máximo de {maximo} — \
+         DETENER el nodo y alertar al operador"
+    )]
+    ReorgDemasiadoProfunda {
+        /// Bloques que habría que desconectar.
+        profundidad: u32,
+        /// `MAX_REORG_LENGTH`.
+        maximo: u32,
+    },
+
     /// C-TS-01: el timestamp no avanza respecto al padre. Rechazo **permanente**.
     #[error("C-TS-01: ts({altura}) = {ts} no supera ts(padre) = {ts_padre}")]
     TimestampNoMonotono {
