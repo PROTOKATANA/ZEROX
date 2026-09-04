@@ -107,9 +107,9 @@ pub fn coinbase_genesis(mensaje: &[u8]) -> Tx {
 
 /// `bits` de arranque de cada red (C-DIFF-02, P-004c).
 ///
-/// **Las dos redes llevan valores distintos a propósito.** Mainnet arranca 256 veces más difícil
-/// que el mínimo representable, para que los primeros 90 bloques —que C-DIFF-02 mina a dificultad
-/// fija, sin que LWMA pueda corregir nada— cuesten ~10 min con una GPU en vez de segundos. Testnet
+/// **Las dos redes llevan valores distintos a propósito.** Mainnet arranca 32 veces más difícil que
+/// el mínimo representable, que es la estimación de hashrate con la que el primer bloque dura `T`
+/// = 120 s — **lo mismo que cualquier bloque después**, sin arranque artificialmente lento. Testnet
 /// se queda en el mínimo, porque una red local de tres nodos tiene que producir bloques deprisa o
 /// los tests de integración no sirven.
 ///

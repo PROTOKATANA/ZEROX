@@ -1043,8 +1043,7 @@ ser cero, la mantisa **MUST NOT** ser cero, y el resultado **MUST NOT** desborda
 > la lectura natural de eso —"el byte alto de la mantisa **MUST** ser distinto de cero"— **es
 > incorrecta**: rechazaría `0x1d00ffff`, que es canónico. Ese byte cero no es un descuido, es el
 > resultado del desplazamiento que evita invadir el bit de signo. Y `0x1d00ffff` es precisamente el
-> `TARGET_INICIAL` de **testnet** y el `powLimit` de Bitcoin. El de mainnet, `0x1c00ffff`, tiene el
-> mismo byte alto a cero y por la misma razón.
+> `TARGET_INICIAL` de **testnet** y el `powLimit` de Bitcoin.
 >
 > Definir la canonicidad como punto fijo del codificador no puede desincronizarse de él, porque
 > **es** él. Enumerar reglas estructurales sí puede, y en el primer intento ya se equivocó.
@@ -1103,12 +1102,11 @@ cabecera fuera de esa ventana.
 lleva su propio valor:**
 
 ```
-mainnet:  TARGET_INICIAL_BITS = 0x1c00ffff    TARGET_INICIAL = 0xffff · 2^200 ≈ 2^216
-testnet:  TARGET_INICIAL_BITS = 0x1d00ffff    TARGET_INICIAL = 0xffff · 2^208 ≈ 2^224
+mainnet:  TARGET_INICIAL_BITS = 0x1c07fff8    TARGET_INICIAL = 0x07fff8 · 2^200
+testnet:  TARGET_INICIAL_BITS = 0x1d00ffff    TARGET_INICIAL = 0x00ffff · 2^208
 ```
 
-Mainnet arranca **exactamente 256 veces más difícil** que testnet: las dos comparten la mantisa
-`0xffff` y difieren en un solo paso de exponente, que vale `2^8` limpio.
+Mainnet arranca **exactamente 32 veces más difícil** que testnet, sin resto.
 
 El primer retarget calculado es el de `H = N+1`. La ventana es siempre exactamente `N`;
 **MUST NOT** encogerse dinámicamente.
@@ -1120,49 +1118,51 @@ El primer retarget calculado es el de `H = N+1`. La ventana es siempre exactamen
 > target que la regla exigía**. `POW_LIMIT` sigue siendo la **cota** —C-POW-05 rechaza cualquier
 > target por encima— y `TARGET_INICIAL` es un valor representable por debajo.
 
-> 🔶 **P-004c · valor de mainnet decidido 2026-09-04 (Katana): que el primer bloque tarde ~10
-> minutos, no segundos.**
+> 🔶 **P-004c · decidido 2026-09-04 (Katana): que el primer bloque dure lo que dura cualquier otro.**
 >
-> **Qué se descartó y por qué.** El valor anterior era `0x1d00ffff`, el target más fácil
-> representable, elegido por la asimetría: arrancar demasiado **difícil** no deja lanzar la cadena y
-> solo se arregla rehaciendo el génesis; arrancar demasiado **fácil** se autocorrige en cuanto LWMA
-> llena su ventana. La asimetría sigue siendo cierta, pero **el extremo fácil resultó absurdo**: con
-> una GPU moderna los bloques salen en **1-4 segundos**, y los 90 que esta misma regla mina a
-> dificultad fija se despachan en minutos, casi gratis, para quien encienda primero.
+> **Qué es esta constante, y qué no es.** Es **una estimación del hashrate del día 1 escrita como un
+> target**, y no debe hacer nada más que eso. `0x1c07fff8` está elegida para que el primer bloque
+> tarde **`T` = 120 s** si el día del lanzamiento hay **≈1,15 GH/s**.
 >
-> | `bits` | ×dif | 0,5 GH/s | 1 GH/s | **2 GH/s** | 3 GH/s | 10 GH/s | 30 GH/s |
-> |---|---|---|---|---|---|---|---|
-> | `0x1d00ffff` | 1 | 8,6 s | 4,3 s | 2,1 s | 1,4 s | 0,4 s | 0,1 s |
-> | `0x1c03ffff` | 64 | 9,2 min | 4,6 min | 2,3 min | 1,5 min | 27,5 s | 9,2 s |
-> | **`0x1c00ffff`** | **256** | 36,7 min | 18,3 min | **9,2 min** | 6,1 min | 1,8 min | 36,7 s |
-> | `0x1b7fffff` | 512 | 1,2 h | 36,7 min | 18,3 min | 12,2 min | 3,7 min | 1,2 min |
+> | Hashrate real el día 1 | Primer bloque | LWMA entra en |
+> |---|---|---|
+> | 0,25 GH/s | 9,2 min | 13,7 h |
+> | 0,5 GH/s | 4,6 min | 6,9 h |
+> | **1,15 GH/s** | **2,0 min** ← nominal | **3,0 h** |
+> | 2 GH/s | 69 s | 1,7 h |
+> | 3 GH/s | 46 s | 1,1 h |
+> | 10 GH/s | 14 s | 21 min |
+> | 30 GH/s | 4,6 s | 6,9 min |
 >
-> Con **2 GH/s —una GPU sola— salen 9,2 min**, que es el punto pedido. ×64 se queda en minutos
-> sueltos; ×512 se pasa de media hora si aparece menos hashrate del previsto.
+> 1,15 GH/s es el extremo **conservador** de lo que rinde una GPU sola en SHA3-256. Se elige el
+> extremo conservador y no el central por la asimetría de esta misma regla: si la estimación se queda
+> **corta**, los bloques salen rápido y LWMA lo arregla en una hora; si se pasa de **larga**, los 90
+> bloques a dificultad fija van lentos y **nada puede acelerarlos**.
 >
-> **Es un slow-start sin regla de consenso.** `T` nominal son 120 s, así que arrancar en ~10 min
-> significa que los primeros 90 bloques van **5 veces más lentos** de lo que la cadena irá después.
-> Es deliberado: hace que el puñado de bloques a dificultad fija cueste **horas reales** y quita el
-> incentivo de la carrera del día 1. Zcash resuelve lo mismo rampando el subsidio durante 20 000
-> bloques; aquí sale gratis, eligiendo bien una constante que ya existía.
+> **Dos intentos anteriores, y por qué los dos estaban mal.**
 >
-> **El riesgo que queda.** Durante esos 90 bloques LWMA no corrige nada, así que si el día del
-> lanzamiento aparece menos hashrate del previsto **nada puede acelerarlos**:
+> `0x1d00ffff` — el target más fácil representable, justificado por la asimetría de arriba pero
+> **sin medir**: con una GPU los bloques salen en 1-4 segundos, no en 120.
 >
-> | Hashrate real el día 1 | 10 GH/s | 3 GH/s | 2 GH/s | 1 GH/s | 0,5 GH/s |
-> |---|---|---|---|---|---|
-> | Hasta que LWMA toma el control | 2,7 h | 9,2 h | 13,7 h | 1,1 días | 2,3 días |
+> `0x1c00ffff` (×256) — elegido para que el primer bloque tardase ~10 min y encarecer así la carrera
+> del día 1. **Descartado.** Le daba a esta constante **dos trabajos** —estimar el hashrate y frenar
+> el arranque— y cuando dos propósitos comparten una constante deja de poder saberse cuál se está
+> ajustando. Es la misma clase de acoplamiento oculto que produjo H-005 y H-006. Además volvía el
+> arranque 5× más lento que el régimen normal, un comportamiento artificial que el protocolo no pide
+> en ninguna parte.
 >
-> La cadena arranca igual, solo despacio, y se acelera sola en cuanto LWMA entra.
+> Si algún día se quiere desincentivar la carrera del día 1, el instrumento correcto es un
+> **slow-start explícito sobre la emisión** —una regla propia, visible y discutible, como la de
+> Zcash— no un target torcido.
+>
+> **El límite que no se puede quitar.** Ninguna cadena conoce su hashrate antes de existir, así que
+> este número **es un pronóstico**. La única defensa real es **medir en vez de estimar**: cuando
+> `zx-miner` funcione (Fase 8) se recalibra desde un benchmark. Revisable hasta el minuto antes de
+> crear el génesis, y solo hasta entonces.
 >
 > **Por qué testnet se queda en el mínimo.** Una red local de tres nodos tiene que producir bloques
-> en segundos o los tests de integración no son utilizables. Ahí, que una GPU mine 90 bloques en
-> minutos es exactamente la propiedad que se quiere. El aislamiento entre redes **no** depende de la
-> dificultad: lo garantizan el génesis distinto (C-GEN-04) y el prefijo mágico (C-NET-01).
->
-> **Sigue revisable hasta el minuto antes de crear el génesis** — y solo hasta entonces. Para
-> entonces existirá `zx-miner` (Fase 8) y el número podrá fijarse desde un hashrate **medido** en
-> vez de estimado.
+> en segundos o los tests de integración no son utilizables. El aislamiento entre redes **no** depende
+> de la dificultad: lo garantizan el génesis distinto (C-GEN-04) y el prefijo mágico (C-NET-01).
 
 **C-DIFF-03 · Reconstrucción monótona de solvetimes.** Todo en `i64`:
 
@@ -1956,6 +1956,7 @@ debajo**.
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
+| **P-004d** | §7.3 | 🆕 ¿Puede LWMA adaptarse desde el bloque 1 **sembrando** la ventana con ancestros sintéticos, en vez de 90 bloques a dificultad fija? Encoger `N` está prohibido por varianza; sembrarla no. Regla de consenso nueva | Investigación + **D9** + **D8**, Fase 10 |
 
 ### Cerradas en esta revisión
 
@@ -1963,7 +1964,7 @@ debajo**.
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
 | **P-020** | **P2K**, no P2KH. La respuesta post-cuántica es un network upgrade con una variante nueva de `Lock`, no el formato de dirección | C-ENC-07, C-TX-06b, C-TX-09b |
-| **P-004c** | `TARGET_INICIAL` **por red**: mainnet `0x1c00ffff` (~10 min el primer bloque con una GPU), testnet `0x1d00ffff`. Recalibrable con hashrate medido hasta el génesis | C-DIFF-02 |
+| **P-004c** | `TARGET_INICIAL` **por red**: mainnet `0x1c07fff8` (primer bloque en `T` = 120 s con ≈1,15 GH/s), testnet `0x1d00ffff`. La constante estima el hashrate del día 1 y nada más. Recalibrable con benchmark hasta el génesis | C-DIFF-02 |
 
 ### Cubiertas desde la auditoría de cobertura
 

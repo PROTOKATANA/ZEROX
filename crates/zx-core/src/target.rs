@@ -34,59 +34,53 @@ pub fn min_target() -> U256 {
 
 /// `bits` inicial de **mainnet** — la dificultad de arranque (C-DIFF-02, P-004c).
 ///
-/// `0x1c00ffff` = `0xffff · 2²⁰⁰ ≈ 2²¹⁶`: **exactamente 256 veces más difícil** que el mínimo
-/// representable. Un bloque cuesta `2²⁵⁶/target ≈ 1,10·10¹²` hashes esperados.
+/// `0x1c07fff8` = `0x07fff8 · 2²⁰⁰`: **exactamente 32 veces más difícil** que el mínimo
+/// representable. Un bloque cuesta `2²⁵⁶/target ≈ 1,374·10¹¹` hashes esperados.
 ///
-/// El factor es exacto, no aproximado: `0x1c00ffff` y `0x1d00ffff` comparten la mantissa `0xffff` y
-/// difieren en un solo paso de exponente, que vale `2⁸`. Verificado en
-/// `mainnet_arranca_256_veces_mas_dificil_que_testnet`.
+/// # Qué significa realmente esta constante
 ///
-/// # El objetivo: que el primer bloque tarde ~10 minutos, no segundos
+/// **Es una estimación del hashrate del día 1, escrita como un target.** No es más que eso, y no
+/// debe hacer nada más que eso. Elegida para que el primer bloque tarde **`T` = 120 s** —lo mismo
+/// que tardará cualquier bloque después— si el día del lanzamiento hay **≈1,15 GH/s**.
 ///
-/// La primera versión ponía `0x1d00ffff` —el target más fácil representable— razonando que
-/// equivocarse por difícil no arranca la cadena y equivocarse por fácil solo cuesta unos bloques
-/// prematuros. La asimetría sigue siendo cierta, pero **el extremo fácil resultó absurdo**: con una
-/// GPU moderna los bloques salen en **1-4 segundos**, y los 90 que C-DIFF-02 mina a dificultad fija
-/// se despachan en minutos, casi gratis, para quien encienda primero.
+/// | Hashrate real el día 1 | Primer bloque | LWMA entra en |
+/// |---|---|---|
+/// | 0,25 GH/s | 9,2 min | 13,7 h |
+/// | 0,5 GH/s | 4,6 min | 6,9 h |
+/// | **1,15 GH/s** | **2,0 min** ← nominal | **3,0 h** |
+/// | 2 GH/s | 69 s | 1,7 h |
+/// | 3 GH/s | 46 s | 1,1 h |
+/// | 10 GH/s | 14 s | 21 min |
+/// | 30 GH/s | 4,6 s | 6,9 min |
 ///
-/// | `bits` | ×dif | 0,5 GH/s | 1 GH/s | 2 GH/s | 3 GH/s | 10 GH/s | 30 GH/s |
-/// |---|---|---|---|---|---|---|---|
-/// | `0x1d00ffff` | 1 | 8,6 s | 4,3 s | 2,1 s | 1,4 s | 0,4 s | 0,1 s |
-/// | `0x1c03ffff` | 64 | 9,2 min | 4,6 min | 2,3 min | 1,5 min | 27,5 s | 9,2 s |
-/// | **`0x1c00ffff`** | **256** | **36,7 min** | **18,3 min** | **9,2 min** | **6,1 min** | **1,8 min** | **36,7 s** |
-/// | `0x1b7fffff` | 512 | 1,2 h | 36,7 min | 18,3 min | 12,2 min | 3,7 min | 1,2 min |
+/// 1,15 GH/s es el extremo **conservador** de lo que rinde una GPU sola en SHA3-256. Se elige ese
+/// extremo y no el central por la asimetría de C-DIFF-02: si la estimación se queda **corta** los
+/// bloques salen rápido y LWMA lo arregla en una hora; si se pasa de **larga**, los 90 bloques a
+/// dificultad fija van lentos y **nada puede acelerarlos**.
 ///
-/// Con **2 GH/s —una GPU sola— sale 9,2 min**, que es el punto pedido. La fila de ×64 se queda en
-/// minutos sueltos y la de ×512 se pasa de media hora si aparece menos hashrate del previsto.
+/// # Dos intentos anteriores, y por qué los dos estaban mal
 ///
-/// # Es un slow-start sin regla de consenso
+/// **`0x1d00ffff`** — el target más fácil representable. Justificado por la asimetría de arriba,
+/// pero sin medir: con una GPU los bloques salen en **1-4 segundos**, no en 120.
 ///
-/// `T` nominal son 120 s, así que arrancar en ~10 min significa que los primeros 90 bloques van
-/// **5 veces más lentos** de lo que la cadena irá después, hasta que LWMA los alcance. Eso es
-/// deliberado: hace que el puñado de bloques a dificultad fija cueste **horas reales**, no minutos,
-/// y quita el incentivo de la carrera del día 1. Zcash resuelve lo mismo rampando el subsidio
-/// durante 20 000 bloques; aquí se consigue el mismo efecto **sin añadir ninguna regla de
-/// consenso** — solo eligiendo bien una constante que ya existía.
+/// **`0x1c00ffff`** (×256) — elegido para que el primer bloque tardase ~10 min y así encarecer la
+/// carrera del día 1. **Descartado por Katana**, y con razón: hacía que esta constante tuviera dos
+/// trabajos —estimar el hashrate y frenar el arranque— y cuando dos propósitos comparten una
+/// constante deja de poder saberse cuál se está ajustando. Además volvía el arranque **5× más lento
+/// que el régimen normal**, un comportamiento artificial que el protocolo no pide en ninguna parte.
 ///
-/// # El riesgo que queda, y por qué es aceptable
+/// Lo que queda es lo honesto: la constante estima el hashrate, y **nada más**. Si algún día se
+/// quiere desincentivar la carrera del día 1, eso es un slow-start explícito sobre la emisión —una
+/// decisión propia, visible y discutible— no un target torcido.
 ///
-/// C-DIFF-02 mantiene este target **fijo durante los primeros 90 bloques**: LWMA no corrige nada
-/// hasta entonces. Si el día del lanzamiento aparece mucho menos hashrate del previsto, esos 90
-/// bloques van lentos y **nada puede acelerarlos**:
+/// # El límite que no se puede quitar
 ///
-/// | Hashrate real el día 1 | Hasta que LWMA toma el control |
-/// |---|---|
-/// | 10 GH/s | 2,7 h |
-/// | 3 GH/s | 9,2 h |
-/// | 2 GH/s | 13,7 h |
-/// | 1 GH/s | 1,1 días |
-/// | 0,5 GH/s | 2,3 días |
-///
-/// La cadena **arranca igual**, solo despacio, y se acelera sola en cuanto LWMA entra. Es aceptable
-/// porque el número es **revisable hasta el minuto antes de crear el génesis**, y para entonces
-/// existirá `zx-miner` (Fase 8): se podrá fijar desde un hashrate **medido** en vez de estimado.
-/// 🔶 P-004c.
-pub const TARGET_INICIAL_BITS_MAINNET: u32 = 0x1c00_ffff;
+/// Ninguna cadena conoce su hashrate antes de existir, así que este número **es un pronóstico**.
+/// C-DIFF-02 lo mantiene fijo durante 90 bloques y LWMA no corrige nada hasta el 91. La única
+/// defensa real es **medir en vez de estimar**: cuando `zx-miner` funcione (Fase 8) se recalibra
+/// desde un benchmark. 🔶 Revisable hasta el minuto antes de crear el génesis, y solo hasta
+/// entonces. P-004c.
+pub const TARGET_INICIAL_BITS_MAINNET: u32 = 0x1c07_fff8;
 
 /// `bits` inicial de **testnet** — deliberadamente el mínimo, `0x1d00ffff`.
 ///
@@ -101,7 +95,7 @@ pub const TARGET_INICIAL_BITS_TESTNET: u32 = 0x1d00_ffff;
 /// Target inicial de mainnet como entero. Ver [`TARGET_INICIAL_BITS_MAINNET`].
 #[must_use]
 pub fn target_inicial_mainnet() -> U256 {
-    U256::from(0x0000_ffff_u32) << (8usize * (0x1c - 3))
+    U256::from(0x0007_fff8_u32) << (8usize * (0x1c - 3))
 }
 
 /// Target inicial de testnet como entero. Ver [`TARGET_INICIAL_BITS_TESTNET`].
@@ -430,24 +424,47 @@ mod tests {
     /// El sentido de la desigualdad es lo que importa: si alguien la invirtiera, mainnet arrancaría
     /// a dificultad de juguete y los primeros 90 bloques —fijos por C-DIFF-02— se regalarían.
     ///
-    /// # El ×256 es exacto, y eso no es casualidad
+    /// # El ×32 es exacto, y se eligió así a propósito
     ///
     /// Un candidato anterior, `0x1c03ffff`, prometía ×64 y **daba 63,999267**: `0x03ffff` es
-    /// `2¹⁸ − 1`, no `2¹⁸`. El test lo cazó afirmando la igualdad exacta y fallando.
-    ///
-    /// `0x1c00ffff` no tiene ese problema: comparte la mantissa `0xffff` con `0x1d00ffff` y difiere
-    /// **solo en un paso de exponente**, que vale `2⁸` limpio. Por eso aquí sí se puede escribir
-    /// `assert_eq!` y no una cota.
+    /// `2¹⁸ − 1`, no `2¹⁸`. El test lo cazó afirmando la igualdad exacta y fallando. Desde entonces
+    /// los candidatos se eligen entre los que **dividen exacto** al mínimo (`0x0ffff0`, `0x07fff8`,
+    /// `0x03fffc`), para que la relación entre las dos redes se pueda escribir con `assert_eq!` en
+    /// vez de con una cota aproximada.
     #[test]
-    fn mainnet_arranca_256_veces_mas_dificil_que_testnet() {
+    fn mainnet_arranca_32_veces_mas_dificil_que_testnet() {
         let m = target_inicial_mainnet();
         let t = target_inicial_testnet();
         assert!(m < t, "menos target = más difícil");
-        assert_eq!(t, m * 256u32, "un paso de exponente = 2⁸ exacto");
+        assert_eq!(t, m * 32u32, "×32 exacto en target, sin resto");
 
         let w_m = trabajo_bloque(m).unwrap();
         let w_t = trabajo_bloque(t).unwrap();
-        assert_eq!(w_m / w_t, U256::from(256u32), "×256 exacto en trabajo");
+        assert_eq!(w_m / w_t, U256::from(32u32), "×32 exacto en trabajo");
+    }
+
+    /// **P-004c.** La constante es una estimación de hashrate: se comprueba que dice lo que dice.
+    ///
+    /// `0x1c07fff8` se eligió para que el primer bloque dure `T = 120 s` con ≈1,15 GH/s. Si alguien
+    /// cambia el valor sin querer, este test dice **en qué se ha convertido la suposición**, que es
+    /// más útil que decir solamente que el número cambió.
+    #[test]
+    fn el_target_inicial_apunta_a_un_bloque_de_t_segundos() {
+        // W = 2^256 / (target+1) hashes esperados por bloque.
+        let w = trabajo_bloque(target_inicial_mainnet()).unwrap();
+
+        // T = 120 s ⇒ el hashrate implícito es W/120. Se compara en hashes/s, con enteros.
+        const T: u64 = 120;
+        let h_implicito = w / U256::from(T);
+
+        // 1,10-1,20 GH/s. Un rango, no un punto: el objetivo es cazar un cambio de orden de
+        // magnitud, no fijar la tercera cifra.
+        assert!(
+            h_implicito > U256::from(1_100_000_000u64)
+                && h_implicito < U256::from(1_200_000_000u64),
+            "el hashrate implícito ({h_implicito}) MUST rondar 1,15 GH/s — si cambia, actualiza \
+             P-004c y la tabla de C-DIFF-02"
+        );
     }
 
     #[test]
