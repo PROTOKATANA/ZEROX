@@ -23,28 +23,64 @@ pub const PUERTO_TESTNET: u16 = 19833;
 
 /// Parámetros de red de una cadena.
 ///
-/// Se construye siempre desde una [`Red`], nunca campo a campo: así no existe la combinación
-/// "prefijo de mainnet con puerto de testnet".
+/// # Los campos son privados, y eso es la garantía
+///
+/// El único constructor es [`ParametrosRed::de`], así que **no existe** la combinación "me
+/// identifico como mainnet pero hablo el prefijo de testnet". Con los campos públicos esa
+/// combinación se podía escribir con un literal de struct y el compilador la aceptaba sin
+/// rechistar — que es exactamente la confusión de red que C-NET-01 dice que debe ser imposible.
+///
+/// Lo cazó la primera revisión adversarial: el docstring **afirmaba** que no se construía campo a
+/// campo, y nada lo impedía. Una invariante que solo vive en un comentario no es una invariante.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ParametrosRed {
-    /// La red a la que pertenecen.
-    pub red: Red,
-    /// Prefijo mágico de 4 bytes (C-NET-01).
-    pub magic: [u8; 4],
-    /// Puerto TCP/QUIC por defecto (C-NET-02).
-    pub puerto: u16,
-    /// Tópico de gossipsub para bloques.
-    pub topic_bloques: &'static str,
-    /// Tópico de gossipsub para transacciones.
-    pub topic_txs: &'static str,
-    /// Protocolo de request-response para sincronización.
-    pub protocolo_sync: &'static str,
-    /// Protocolo de Kademlia. **Nunca el de IPFS.**
-    pub protocolo_kad: &'static str,
+    red: Red,
+    magic: [u8; 4],
+    puerto: u16,
+    topic_bloques: &'static str,
+    topic_txs: &'static str,
+    protocolo_sync: &'static str,
+    protocolo_kad: &'static str,
 }
 
 impl ParametrosRed {
-    /// Los parámetros de una red.
+    /// La red.
+    #[must_use]
+    pub const fn red(&self) -> Red {
+        self.red
+    }
+    /// Prefijo mágico de 4 bytes (C-NET-01).
+    #[must_use]
+    pub const fn magic(&self) -> [u8; 4] {
+        self.magic
+    }
+    /// Puerto TCP/QUIC por defecto (C-NET-02).
+    #[must_use]
+    pub const fn puerto(&self) -> u16 {
+        self.puerto
+    }
+    /// Tópico de gossipsub para bloques.
+    #[must_use]
+    pub const fn topic_bloques(&self) -> &'static str {
+        self.topic_bloques
+    }
+    /// Tópico de gossipsub para transacciones.
+    #[must_use]
+    pub const fn topic_txs(&self) -> &'static str {
+        self.topic_txs
+    }
+    /// Protocolo de request-response para sincronización.
+    #[must_use]
+    pub const fn protocolo_sync(&self) -> &'static str {
+        self.protocolo_sync
+    }
+    /// Protocolo de Kademlia. **Nunca el de IPFS.**
+    #[must_use]
+    pub const fn protocolo_kad(&self) -> &'static str {
+        self.protocolo_kad
+    }
+
+    /// Los parámetros de una red. **Único constructor.**
     #[must_use]
     pub const fn de(red: Red) -> Self {
         match red {
@@ -92,7 +128,7 @@ mod tests {
     #[test]
     fn los_prefijos_vienen_de_la_red_y_no_de_una_copia() {
         for red in [Red::Mainnet, Red::Testnet] {
-            assert_eq!(ParametrosRed::de(red).magic, red.magic(), "{red:?}");
+            assert_eq!(ParametrosRed::de(red).magic(), red.magic(), "{red:?}");
         }
     }
 
@@ -102,12 +138,12 @@ mod tests {
         let m = ParametrosRed::de(Red::Mainnet);
         let t = ParametrosRed::de(Red::Testnet);
 
-        assert_ne!(m.magic, t.magic);
-        assert_ne!(m.puerto, t.puerto);
-        assert_ne!(m.topic_bloques, t.topic_bloques);
-        assert_ne!(m.topic_txs, t.topic_txs);
-        assert_ne!(m.protocolo_sync, t.protocolo_sync);
-        assert_ne!(m.protocolo_kad, t.protocolo_kad);
+        assert_ne!(m.magic(), t.magic());
+        assert_ne!(m.puerto(), t.puerto());
+        assert_ne!(m.topic_bloques(), t.topic_bloques());
+        assert_ne!(m.topic_txs(), t.topic_txs());
+        assert_ne!(m.protocolo_sync(), t.protocolo_sync());
+        assert_ne!(m.protocolo_kad(), t.protocolo_kad());
         assert_ne!(m.agent_version(), t.agent_version());
     }
 
@@ -120,12 +156,12 @@ mod tests {
         for red in [Red::Mainnet, Red::Testnet] {
             let p = ParametrosRed::de(red);
             assert!(
-                p.protocolo_kad.starts_with("/zerox"),
+                p.protocolo_kad().starts_with("/zerox"),
                 "{:?}: el protocolo de Kademlia MUST ser propio, no {}",
                 red,
-                p.protocolo_kad
+                p.protocolo_kad()
             );
-            assert!(!p.protocolo_kad.contains("ipfs"));
+            assert!(!p.protocolo_kad().contains("ipfs"));
         }
     }
 
@@ -135,10 +171,10 @@ mod tests {
         for red in [Red::Mainnet, Red::Testnet] {
             let p = ParametrosRed::de(red);
             for nombre in [
-                p.topic_bloques,
-                p.topic_txs,
-                p.protocolo_sync,
-                p.protocolo_kad,
+                p.topic_bloques(),
+                p.topic_txs(),
+                p.protocolo_sync(),
+                p.protocolo_kad(),
             ] {
                 assert!(nombre.starts_with('/'), "{nombre} debe empezar por /");
                 assert!(!nombre.ends_with('/'), "{nombre} no debe acabar en /");

@@ -22,6 +22,23 @@ pub enum P2pError {
     /// La dirección de escucha no es válida.
     #[error("dirección de escucha inválida")]
     DireccionInvalida,
+
+    /// C-NET-13: la cadena ha crecido más de lo que este binario puede transportar.
+    ///
+    /// **No es un fallo de configuración: es un binario que se ha quedado viejo.** El límite de
+    /// gossipsub se fija al construir el behaviour y no cambia en caliente, así que seguir
+    /// funcionando significaría dejar de ver bloques válidos sin decirlo. Parar y avisar es
+    /// estrictamente mejor.
+    #[error(
+        "C-NET-13: el límite de bloque de la cadena ({limite_bloque}) se ha acercado demasiado a lo \
+         que este binario transporta ({limite_transporte}) — actualiza el nodo"
+    )]
+    MargenDeTransporteInsuficiente {
+        /// `LIMITE(H)` vigente.
+        limite_bloque: u64,
+        /// Lo que este binario puede transportar.
+        limite_transporte: usize,
+    },
 }
 
 /// Por qué se corta con un peer.

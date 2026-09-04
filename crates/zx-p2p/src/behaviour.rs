@@ -26,8 +26,9 @@ use std::time::Duration;
 
 use libp2p::{
     StreamProtocol, connection_limits, gossipsub, identify, identity, kad, mdns, ping,
-    swarm::NetworkBehaviour,
+    swarm::NetworkBehaviour, swarm::behaviour::toggle::Toggle,
 };
+use zx_core::red::Red;
 
 use crate::config::ParametrosRed;
 use crate::error::P2pError;
@@ -71,9 +72,15 @@ const _: () = assert!(
 /// explícitamente (`swarm-derive/src/lib.rs:41-48`).
 #[derive(NetworkBehaviour)]
 pub struct ZxBehaviour {
-    /// Rechaza conexiones por encima de los límites. **Primero en la lista a propósito**: los
-    /// behaviours se consultan en orden de declaración, así que rechazar antes de que los demás
-    /// hagan trabajo es más barato.
+    /// Rechaza conexiones por encima de los límites. **Primero en la lista a propósito.**
+    ///
+    /// El macro genera las llamadas a `handle_pending_inbound_connection` en orden de declaración,
+    /// cada una con `?`, así que denegar aquí corta antes de invocar a los demás. Verificado en
+    /// `libp2p-swarm-derive-0.35.1/src/lib.rs:272-284`.
+    ///
+    /// Honestamente: **hoy el ahorro es cero**, porque ninguno de los otros cinco hace trabajo
+    /// apreciable en esa fase. El orden vale como defensa en profundidad para el día en que se
+    /// añada uno que sí lo haga, no como optimización actual.
     pub limites: connection_limits::Behaviour,
     /// Intercambio de direcciones y protocolos soportados.
     pub identify: identify::Behaviour,
@@ -82,8 +89,12 @@ pub struct ZxBehaviour {
     pub ping: ping::Behaviour,
     /// Descubrimiento por DHT.
     pub kademlia: kad::Behaviour<kad::store::MemoryStore>,
-    /// Descubrimiento en LAN. Es lo que hace utilizable el arnés multinodo local.
-    pub mdns: mdns::tokio::Behaviour,
+    /// Descubrimiento en LAN. **Solo testnet** — ver [`ZxBehaviour::nueva`].
+    ///
+    /// `Toggle` y no `Option`: `Toggle<B>` implementa `NetworkBehaviour` y se puede desactivar sin
+    /// cambiar el tipo del struct, que es lo que permite tener un solo `ZxBehaviour` para las dos
+    /// redes en vez de dos composiciones que se desincronizarían.
+    pub mdns: Toggle<mdns::tokio::Behaviour>,
     /// Difusión de bloques y transacciones.
     pub gossipsub: gossipsub::Behaviour,
 }
@@ -91,10 +102,23 @@ pub struct ZxBehaviour {
 impl ZxBehaviour {
     /// Construye la composición con **todos** los límites de C-NET-11 fijados explícitamente.
     ///
+    /// `limite_bloque` es `LIMITE(H)` de la cadena **en el momento de arrancar** (C-WGT-09). No es
+    /// una constante: el tamaño de bloque de ZEROX crece con la mediana larga, y un límite de
+    /// transporte fijo se convierte en una partición de red silenciosa en un par de años. Ver
+    /// [`limites::limite_gossip`].
+    ///
+    /// Quien lo calcula es `zx-node`, que sí ve el estado de la cadena. Este crate solo aplica el
+    /// margen.
+    ///
     /// # Errores
-    /// [`P2pError::Configuracion`] si algún nombre de protocolo o parámetro es inválido. Solo puede
-    /// ocurrir con una [`ParametrosRed`] mal formada, y hay tests que lo cubren.
-    pub fn nueva(clave: &identity::Keypair, p: ParametrosRed) -> Result<Self, P2pError> {
+    /// [`P2pError::Configuracion`] si algún nombre de protocolo o parámetro es inválido, o
+    /// [`P2pError::MargenDeTransporteInsuficiente`] si el límite de bloque ya se ha acercado
+    /// demasiado a lo que este binario puede transportar.
+    pub fn nueva(
+        clave: &identity::Keypair,
+        p: ParametrosRed,
+        limite_bloque: u64,
+    ) -> Result<Self, P2pError> {
         let peer_id = clave.public().to_peer_id();
 
         // ── C-NET-11 · límites de conexión. El default es `None` en todos los campos. ──
@@ -115,7 +139,7 @@ impl ZxBehaviour {
         let ping = ping::Behaviour::default();
 
         // ── C-NET-02 · protocolo propio. El default es la DHT PÚBLICA de IPFS. ──
-        let proto_kad = StreamProtocol::try_from_owned(p.protocolo_kad.to_owned())
+        let proto_kad = StreamProtocol::try_from_owned(p.protocolo_kad().to_owned())
             .map_err(|_| P2pError::Configuracion("nombre de protocolo de Kademlia inválido"))?;
         let kademlia = kad::Behaviour::with_config(
             peer_id,
@@ -123,10 +147,21 @@ impl ZxBehaviour {
             kad::Config::new(proto_kad),
         );
 
-        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
-            .map_err(|_| P2pError::Configuracion("no se pudo iniciar mDNS"))?;
+        // mDNS **solo en testnet**. En mainnet un nodo anunciaría por multicast su presencia a
+        // todo el segmento L2 — que en un VPS barato o en un datacenter compartido significa
+        // decirle a los vecinos "aquí corre un nodo ZEROX". Es fuga de información gratuita, y un
+        // punto de partida barato para un eclipse: descubrir nodos sin pasar por Kademlia ni por
+        // los bootstrap. En testnet es justo lo que se quiere: el arnés multinodo local depende de
+        // que tres nodos se encuentren sin configurar nada.
+        let mdns = match p.red() {
+            Red::Testnet => Toggle::from(Some(
+                mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
+                    .map_err(|_| P2pError::Configuracion("no se pudo iniciar mDNS"))?,
+            )),
+            Red::Mainnet => Toggle::from(None),
+        };
 
-        let gossipsub = Self::gossipsub(clave)?;
+        let gossipsub = Self::gossipsub(clave, limite_bloque)?;
 
         Ok(Self {
             limites,
@@ -139,10 +174,26 @@ impl ZxBehaviour {
     }
 
     /// Gossipsub con los dos defaults peligrosos corregidos.
-    fn gossipsub(clave: &identity::Keypair) -> Result<gossipsub::Behaviour, P2pError> {
+    fn gossipsub(
+        clave: &identity::Keypair,
+        limite_bloque: u64,
+    ) -> Result<gossipsub::Behaviour, P2pError> {
+        let techo = limites::limite_gossip(limite_bloque);
+
+        // C-NET-13 · se comprueba ANTES de construir nada. El límite de gossipsub se fija al crear
+        // el behaviour y no se puede cambiar en caliente, así que si ya vamos justos, arrancar sería
+        // arrancar roto.
+        if !limites::margen_suficiente(limite_bloque, techo) {
+            return Err(P2pError::MargenDeTransporteInsuficiente {
+                limite_bloque,
+                limite_transporte: techo,
+            });
+        }
+
         let cfg = gossipsub::ConfigBuilder::default()
             // C-NET-11 · el default son 65 536 B y un bloque típico mide 100-200 KB.
-            .max_transmit_size(limites::MAX_GOSSIP_BYTES)
+            // C-NET-13 · derivado de LIMITE(H), no una constante: el bloque crece con la mediana.
+            .max_transmit_size(techo)
             // C-NET-12 · el default es `false`: reenviaría antes de que validemos.
             .validate_messages()
             // Exige firma y `PeerId` válido en cada mensaje.
@@ -177,6 +228,7 @@ mod tests {
         MESH_N, MESH_N_ALTO, MESH_N_BAJO, PROTOCOLO_IDENTIFY, ZxBehaviour, id_por_contenido,
     };
     use crate::config::ParametrosRed;
+    use crate::limites;
     use libp2p::{gossipsub, identity};
     use zx_core::red::Red;
 
@@ -189,7 +241,12 @@ mod tests {
     async fn se_construye_en_las_dos_redes() {
         for red in [Red::Mainnet, Red::Testnet] {
             assert!(
-                ZxBehaviour::nueva(&clave(), ParametrosRed::de(red)).is_ok(),
+                ZxBehaviour::nueva(
+                    &clave(),
+                    ParametrosRed::de(red),
+                    limites::LIMITE_BLOQUE_GENESIS
+                )
+                .is_ok(),
                 "{red:?}"
             );
         }

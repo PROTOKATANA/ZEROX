@@ -2149,6 +2149,65 @@ the network."* Se eligen por **histórico de entrega rápida**, no al azar.
 > y §3. **Ninguno de los cuatro falla al compilar**, y de ahí la regla: no es una recomendación de
 > estilo, es que la capa de transporte de libp2p **no es segura por defecto** para una cadena.
 
+**C-NET-13 · El límite de transporte MUST derivarse de `LIMITE(H)`, nunca ser una constante.** El
+tamaño máximo de un mensaje de difusión **MUST** calcularse como `FACTOR_MARGEN · LIMITE(H)` con el
+`LIMITE(H)` vigente al arrancar. Un nodo cuyo margen caiga por debajo de `MARGEN_MINIMO` **MUST**
+negarse a funcionar.
+
+> **Esta regla nace de un fallo propio, encontrado en la primera revisión adversarial del crate de
+> red.** El límite era una constante, `8 × ZONA_LIBRE = 800 000 B`, y el razonamiento parecía
+> sobrado. No lo era.
+>
+> `LIMITE(H) = 2·M(H)` crece con la mediana larga, **sin techo**, y el propio SPEC estima el
+> crecimiento anual máximo de `Mlt` en ≈2,9× (C-WGT-04):
+>
+> | | `Mlt` | `LIMITE(H)` | ¿cabía en 800 000? |
+> |---|---|---|---|
+> | año 0 | 100 000 | 200 000 | sí |
+> | año 1 | 290 000 | 580 000 | sí |
+> | año 2 | 841 000 | **1 682 000** | **NO** |
+>
+> **En el año 2, un bloque perfectamente válido deja de poder propagarse.** Sin ataque, sin nada
+> raro: es exactamente el caso para el que existe la mediana larga.
+>
+> Y el límite que decide es el del **receptor**, no el del emisor (verificado en
+> `libp2p-gossipsub`, `src/protocol.rs`: el códec de lectura se construye con el
+> `default_max_transmit_size` propio). Así que nodos con versiones distintas de la constante **se
+> particionan entre sí en silencio**: unos aceptan el bloque, otros lo tiran por tamaño de frame, y
+> ninguno emite un error de consenso.
+>
+> Lo más instructivo: el comentario del código **describía este escenario** —"se convierte en una
+> partición de red silenciosa el día que los bloques crezcan"— y el arreglo que implementaba era
+> multiplicar por 8 la zona libre de **hoy**, que no está atada a nada que crezca. **El aviso estaba
+> escrito y el arreglo no.** Un comentario que identifica un riesgo no lo mitiga.
+>
+> La negativa a funcionar es el mismo patrón que C-GEN-06: el límite de gossipsub se fija al
+> construir el behaviour y no cambia en caliente, así que un nodo que lleva meses encendido mientras
+> la cadena crece puede quedarse corto. Parar diciendo "actualiza" es infinitamente mejor que seguir
+> y dejar de ver la mitad de los bloques.
+
+**C-NET-14 · mDNS MUST estar desactivado en mainnet.** El descubrimiento por multicast **MUST**
+limitarse a testnet.
+
+> Un nodo de mainnet con mDNS anuncia su presencia a todo su segmento L2 — que en un VPS barato o en
+> un datacenter compartido significa decirle a los vecinos "aquí corre un nodo ZEROX". Es fuga de
+> información gratuita, y un punto de partida barato para un eclipse: enumerar nodos sin pasar por
+> Kademlia ni por los bootstrap.
+>
+> En testnet es justo lo que se quiere: el arnés multinodo local depende de que tres nodos se
+> encuentren sin configurar nada.
+
+**C-NET-15 · Las invariantes de los parámetros de red MUST vivir en el tipo, no en un comentario.**
+Un `ParametrosRed` **MUST NOT** poder construirse campo a campo.
+
+> Otro hallazgo de la misma revisión, y de la misma familia: el docstring **afirmaba** que los
+> parámetros se construían siempre desde una `Red` y que por eso no existía la combinación "prefijo
+> de mainnet con puerto de testnet"… y todos los campos eran `pub`, así que esa combinación se
+> escribía con un literal de struct y el compilador la aceptaba.
+>
+> **Una invariante que solo vive en un comentario no es una invariante.** Es el mismo error que
+> C-NET-13, en otra escala.
+
 **C-NET-12 · Validar antes de retransmitir.** Un bloque o transacción recibido por difusión **MUST**
 validarse contra `zx-consensus` **antes** de reenviarse. Un bloque **huérfano** —cuyo padre aún no se
 conoce— **MUST** descartarse **sin penalizar**, no rechazarse.
@@ -2234,6 +2293,9 @@ debajo**.
 | **P-022** | §16.2 | 🆕 Rediseño del saludo de `sendcmpct` sobre request-response de libp2p: la negociación del BIP depende de orden total entre mensajes, que yamux no da | **D3**, Fase 5 |
 | **P-023** | §16.3 | 🆕 `PeerScoreParams`/`TopicScoreParams` de gossipsub. **No existe precedente**: ninguna cadena PoW con bloques de 100-200 KB cada 120 s usa gossipsub v1.1. Hay que derivarlo y medirlo | **D3** + **D8**, Fase 5 |
 | **P-024** | §16.1 | 🆕 Valor de `TRABAJO_MINIMO_CADENA` (C-NET-04) para una cadena que arranca sin historia | **D2** + **D8** |
+| **P-025** | §16.3 | 🆕 **Límites por IP, no solo por `PeerId`.** `connection_limits` de libp2p no tiene ningún campo por IP (verificado en el crate): un atacante con **una** IP genera `PeerId` gratis e ilimitados y llena el cupo entrante entero, o abre 32 conexiones a medio negociar y deja al nodo sordo. Hace falta un behaviour propio sobre `handle_pending_inbound_connection`, que sí recibe la IP | **D3** + **D8** |
+| **P-026** | §16.3 | 🆕 ¿Debe `MotivoDesconexion::Excedido` puntuar? C-NET-05 no examinó este caso: la razón de Zebra para no puntuar es el *mensajero inocente*, y superar un límite de tamaño **sí** es atribuible al emisor. Hoy permite sondear los límites gratis e indefinidamente | **D8** |
+| **P-027** | §16.3 | 🆕 Presupuesto de memoria **agregado**. `MAX_RESPUESTA_BYTES × max_concurrent_streams(100) × peers` da decenas de GB reservables. El `.take(MAX)` por petición no basta: hace falta un contador global en vuelo | **D3** + **D8** |
 | **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB, **y de ahí derivar `D`/`D_low`/`D_high`/`heartbeat`**. Los de Ethereum son para slots de 12 s, no de 120 | **D3** |
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
@@ -2262,7 +2324,7 @@ cadena**. Los seis huecos están escritos:
 | §14 · Activación de cambios de consenso | C-UPG-01..08 |
 | §15 · Bloque génesis | C-GEN-01..07 |
 | §2.4 · Serialización de red | C-WIRE-01..06 |
-| §16 · Parámetros de red | C-NET-01..12 |
+| §16 · Parámetros de red | C-NET-01..15 |
 
 ### Aparcadas — evaluadas, con factura desglosada, NO adoptadas
 
