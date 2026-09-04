@@ -64,20 +64,47 @@ pub const LIMITE_BLOQUE_GENESIS: u64 = 2 * ZONA_LIBRE_CONSENSO;
 /// **describía este mismo escenario** —"se convierte en una partición de red silenciosa el día que
 /// los bloques crezcan"— y la solución que implementaba era multiplicar por 8 la zona libre de
 /// **hoy**, que no está atada a nada que crezca. El aviso estaba escrito; el arreglo no.
+/// Techo absoluto que ningún `LIMITE(H)` legítimo puede alcanzar: **1 TiB**.
+///
+/// A un crecimiento máximo de 2,9×/año desde `LIMITE(0) = 200 000 B`, llegar aquí llevaría más de
+/// **quince años** de demanda al tope. Si un nodo ve un límite de bloque mayor, no está viendo una
+/// cadena que ha crecido: está viendo un valor corrupto, un desbordamiento o una cadena que no es
+/// la suya.
+pub const LIMITE_BLOQUE_ABSURDO: u64 = 1 << 40;
+
+/// Techo de gossip derivado del límite de bloque, o `None` si el límite es absurdo.
+///
+/// # Por qué devuelve `Option` y no satura
+///
+/// La primera versión hacía `saturating_mul` y devolvía `usize::MAX` ante un límite disparatado.
+/// Eso parecía prudente y era lo contrario: **`usize::MAX` como `max_transmit_size` significa "sin
+/// límite"**, que es exactamente el fallo que C-NET-11 existe para impedir. Un valor corrupto no
+/// debe traducirse en desactivar la defensa; debe traducirse en no arrancar.
+///
+/// Lo cazó un test que intentaba comprobar que un límite absurdo impedía construir el behaviour, y
+/// descubrió que lo permitía — con el límite de transporte apagado.
 #[must_use]
-pub const fn limite_gossip(limite_bloque: u64) -> usize {
-    // `saturating_mul` y no `*`: un `limite_bloque` absurdo debe dar un techo enorme, no envolver.
-    let bytes = limite_bloque.saturating_mul(FACTOR_MARGEN);
-    // En un objetivo de 64 bits esto nunca trunca; en uno de 32 satura, que es lo correcto.
+pub const fn limite_gossip(limite_bloque: u64) -> Option<usize> {
+    if limite_bloque == 0 || limite_bloque > LIMITE_BLOQUE_ABSURDO {
+        return None;
+    }
+    // Con `limite_bloque ≤ 2^40` y `FACTOR_MARGEN = 8`, el producto cabe en 2^43: sin desbordar.
+    let bytes = limite_bloque * FACTOR_MARGEN;
     if bytes > usize::MAX as u64 {
-        usize::MAX
+        // Solo alcanzable en un objetivo de 32 bits.
+        None
     } else {
-        bytes as usize
+        Some(bytes as usize)
     }
 }
 
 /// Límite de gossip en el arranque de una cadena nueva. Es `limite_gossip(LIMITE_BLOQUE_GENESIS)`.
-pub const MAX_GOSSIP_BYTES_GENESIS: usize = limite_gossip(LIMITE_BLOQUE_GENESIS);
+pub const MAX_GOSSIP_BYTES_GENESIS: usize = match limite_gossip(LIMITE_BLOQUE_GENESIS) {
+    Some(v) => v,
+    // Inalcanzable: `LIMITE_BLOQUE_GENESIS` es 200 000. Si esto fallara al compilar, es que alguien
+    // ha tocado la zona libre hasta un valor imposible.
+    None => panic!("LIMITE_BLOQUE_GENESIS debe dar un techo de gossip válido"),
+};
 
 /// A partir de qué fracción del margen el nodo **se niega a seguir**.
 ///
@@ -149,6 +176,17 @@ pub const MAX_CONEXIONES_POR_PEER: u32 = 1;
 /// Es la defensa contra *slowloris*: abrir conexiones y no terminar nunca el handshake.
 pub const MAX_CONEXIONES_PENDIENTES: u32 = 32;
 
+/// Peticiones de sincronización simultáneas que se aceptan de **un mismo peer**.
+///
+/// El default de `request_response::Config` son **100**. Con respuestas de hasta
+/// [`MAX_RESPUESTA_BYTES`], eso son `100 × 12,8 MB = 1,28 GB` reservables **por peer** — y con
+/// [`MAX_PEERS_ENTRANTES`] peers, decenas de gigabytes.
+///
+/// Bajarlo a 8 es **la mitad** de la mitigación. La otra mitad es un presupuesto de memoria
+/// **agregado** —un contador global de bytes en vuelo— que todavía no existe: 🔶 **P-027**.
+/// Conviene tenerlo escrito porque `8 × 12,8 MB × 72 peers` siguen siendo 7,4 GB en el peor caso.
+pub const MAX_STREAMS_SYNC: usize = 8;
+
 /// Peers en modo de **alto ancho de banda** para el relé compacto (C-NET-10).
 ///
 /// Literal de BIP 152: *"Nodes MUST NOT send such sendcmpct messages to more than three peers, as
@@ -197,12 +235,13 @@ const _: () = assert!(
 
 #[cfg(test)]
 #[expect(
+    clippy::expect_used,
     clippy::integer_division,
     reason = "aritmética entera deliberada: modelar el crecimiento con enteros evita floats"
 )]
 mod tests {
     use super::{
-        LIMITE_BLOQUE_GENESIS, MARGEN_MINIMO, MAX_BLOQUES_POR_RESPUESTA,
+        LIMITE_BLOQUE_ABSURDO, LIMITE_BLOQUE_GENESIS, MARGEN_MINIMO, MAX_BLOQUES_POR_RESPUESTA,
         MAX_CABECERAS_POR_RESPUESTA, MAX_GOSSIP_BYTES_GENESIS, MAX_PEERS_ALTO_ANCHO_BANDA,
         MAX_RESPUESTA_BYTES, limite_gossip, margen_suficiente,
     };
@@ -219,7 +258,7 @@ mod tests {
         // ≈2,9×/año es el crecimiento máximo de Mlt que estima el propio SPEC (C-WGT-04).
         let mut limite = LIMITE_BLOQUE_GENESIS;
         for anio in 0..6u32 {
-            let techo = limite_gossip(limite);
+            let techo = limite_gossip(limite).expect("un límite realista da techo");
             assert!(
                 techo as u64 >= limite,
                 "año {anio}: un bloque de {limite} B no cabe en un techo de {techo} B"
@@ -243,7 +282,7 @@ mod tests {
     /// **C-NET-13.** Cuando el margen se agota, el nodo debe **negarse**, no seguir a medias.
     #[test]
     fn sin_margen_suficiente_se_detecta() {
-        let techo = limite_gossip(LIMITE_BLOQUE_GENESIS);
+        let techo = MAX_GOSSIP_BYTES_GENESIS;
 
         // Justo en el borde: el límite consume exactamente 1/MARGEN_MINIMO del techo.
         let borde = techo as u64 / MARGEN_MINIMO;
@@ -253,9 +292,26 @@ mod tests {
             "un byte más allá del borde MUST detectarse"
         );
 
-        // Y un límite absurdo no envuelve, satura.
+        // Y un límite absurdo **no da techo**: `None`, no `usize::MAX`.
+        //
+        // La diferencia importa: `usize::MAX` como `max_transmit_size` significa "sin límite", que
+        // es justo la defensa que C-NET-11 existe para mantener encendida.
         assert!(!margen_suficiente(u64::MAX, techo));
-        assert!(limite_gossip(u64::MAX) > 0, "satura, no envuelve a cero");
+        assert_eq!(
+            limite_gossip(u64::MAX),
+            None,
+            "absurdo ⇒ sin techo, no techo infinito"
+        );
+        assert_eq!(limite_gossip(LIMITE_BLOQUE_ABSURDO + 1), None);
+        assert_eq!(
+            limite_gossip(0),
+            None,
+            "un límite de cero también es absurdo"
+        );
+        assert!(
+            limite_gossip(LIMITE_BLOQUE_ABSURDO).is_some(),
+            "el borde justo vale"
+        );
     }
 
     /// **C-NET-11.** El límite de gossip supera un bloque típico con margen de sobra.

@@ -26,9 +26,11 @@ use std::time::Duration;
 
 use libp2p::{
     StreamProtocol, connection_limits, gossipsub, identify, identity, kad, mdns, ping,
-    swarm::NetworkBehaviour, swarm::behaviour::toggle::Toggle,
+    request_response, swarm::NetworkBehaviour, swarm::behaviour::toggle::Toggle,
 };
 use zx_core::red::Red;
+
+use crate::codec::ZxCodec;
 
 use crate::config::ParametrosRed;
 use crate::error::P2pError;
@@ -58,6 +60,16 @@ const MESH_N: usize = 8;
 const MESH_N_BAJO: usize = 6;
 /// Marca de agua superior de la malla.
 const MESH_N_ALTO: usize = 12;
+
+/// Cuánto se espera una respuesta de sincronización.
+///
+/// El default de `request_response::Config` son **10 s**, pensados para peticiones pequeñas. Un
+/// lote de bloques puede ser de megabytes: por un enlace lento, 10 s se agotan y el peer parece
+/// muerto cuando solo iba despacio — y eso, por C-NET-05, se clasificaría como `Lento` y se
+/// desconectaría a peers perfectamente útiles.
+///
+/// 🔶 30 s es una estimación conservadora, no una medición. P-019.
+const TIMEOUT_SYNC: Duration = Duration::from_secs(30);
 
 // La coherencia de la malla es una aserción de compilación, no un test: gossipsub acepta valores
 // incoherentes en tiempo de ejecución y se comporta de forma difícil de diagnosticar.
@@ -97,6 +109,16 @@ pub struct ZxBehaviour {
     pub mdns: Toggle<mdns::tokio::Behaviour>,
     /// Difusión de bloques y transacciones.
     pub gossipsub: gossipsub::Behaviour,
+    /// Sincronización punto a punto: `GetHeaders`/`Headers`, `GetBlocks`/`Blocks`.
+    ///
+    /// **Separado de gossipsub a propósito.** Gossipsub difunde hacia la malla actual y no es un
+    /// almacén direccionable: no hay forma de pedirle "el bloque de la altura N de hace seis
+    /// meses", y su caché de deduplicación dura 60 s. Un nodo que arrancara de cero esperando el
+    /// historial por gossip **se quedaría atascado en el génesis para siempre**.
+    ///
+    /// Es la misma separación que hace Ethereum entre el dominio *gossip* —solo bloques nuevos— y
+    /// el dominio *Req/Resp* —historial— (`consensus-specs`, `p2p-interface.md`).
+    pub sync: request_response::Behaviour<ZxCodec>,
 }
 
 impl ZxBehaviour {
@@ -163,6 +185,23 @@ impl ZxBehaviour {
 
         let gossipsub = Self::gossipsub(clave, limite_bloque)?;
 
+        let proto_sync = StreamProtocol::try_from_owned(p.protocolo_sync().to_owned())
+            .map_err(|_| P2pError::Configuracion("nombre de protocolo de sync inválido"))?;
+        let sync = request_response::Behaviour::with_codec(
+            ZxCodec,
+            [(proto_sync, request_response::ProtocolSupport::Full)],
+            request_response::Config::default()
+                // El default son 10 s. Un lote de bloques por un enlace lento no cabe en 10 s, y un
+                // timeout corto se manifiesta como "los peers lentos no sirven nunca", que es
+                // difícil de diagnosticar. 🔶 Medir en P-019, no adivinar más allá de esto.
+                .with_request_timeout(TIMEOUT_SYNC)
+                // El default son 100 streams concurrentes. Con respuestas de hasta
+                // MAX_RESPUESTA_BYTES, 100 × 12,8 MB = 1,28 GB reservables **por peer**. Bajarlo es
+                // la mitad de la mitigación de P-027; la otra mitad es un presupuesto agregado que
+                // todavía no existe.
+                .with_max_concurrent_streams(limites::MAX_STREAMS_SYNC),
+        );
+
         Ok(Self {
             limites,
             identify,
@@ -170,6 +209,7 @@ impl ZxBehaviour {
             kademlia,
             mdns,
             gossipsub,
+            sync,
         })
     }
 
@@ -178,11 +218,18 @@ impl ZxBehaviour {
         clave: &identity::Keypair,
         limite_bloque: u64,
     ) -> Result<gossipsub::Behaviour, P2pError> {
-        let techo = limites::limite_gossip(limite_bloque);
-
         // C-NET-13 · se comprueba ANTES de construir nada. El límite de gossipsub se fija al crear
         // el behaviour y no se puede cambiar en caliente, así que si ya vamos justos, arrancar sería
         // arrancar roto.
+        //
+        // `limite_gossip` devuelve `None` ante un límite de bloque absurdo, y eso también aborta:
+        // un valor corrupto NO debe traducirse en un techo infinito.
+        let techo = limites::limite_gossip(limite_bloque).ok_or(
+            P2pError::MargenDeTransporteInsuficiente {
+                limite_bloque,
+                limite_transporte: 0,
+            },
+        )?;
         if !limites::margen_suficiente(limite_bloque, techo) {
             return Err(P2pError::MargenDeTransporteInsuficiente {
                 limite_bloque,
@@ -223,11 +270,13 @@ fn id_por_contenido(m: &gossipsub::Message) -> gossipsub::MessageId {
 }
 
 #[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
 mod tests {
     use super::{
         MESH_N, MESH_N_ALTO, MESH_N_BAJO, PROTOCOLO_IDENTIFY, ZxBehaviour, id_por_contenido,
     };
     use crate::config::ParametrosRed;
+    use crate::error::P2pError;
     use crate::limites;
     use libp2p::{gossipsub, identity};
     use zx_core::red::Red;
@@ -290,6 +339,61 @@ mod tests {
     fn la_malla_es_la_de_produccion_y_no_la_de_fabrica() {
         assert_eq!((MESH_N, MESH_N_BAJO, MESH_N_ALTO), (8, 6, 12));
         assert_ne!(MESH_N, 6, "6 es el default de libp2p");
+    }
+
+    /// **C-NET-14.** mDNS está en testnet y **NO** en mainnet.
+    ///
+    /// Un nodo de mainnet con mDNS anuncia por multicast su presencia a todo su segmento L2 — en un
+    /// VPS barato o un datacenter compartido, eso es decirle a los vecinos "aquí corre un nodo
+    /// ZEROX". Fuga gratis, y punto de partida barato para un eclipse.
+    #[tokio::test]
+    async fn mdns_solo_esta_en_testnet() {
+        let t = ZxBehaviour::nueva(
+            &clave(),
+            ParametrosRed::de(Red::Testnet),
+            limites::LIMITE_BLOQUE_GENESIS,
+        )
+        .unwrap();
+        assert!(
+            t.mdns.is_enabled(),
+            "testnet lo necesita para el arnés local"
+        );
+
+        let m = ZxBehaviour::nueva(
+            &clave(),
+            ParametrosRed::de(Red::Mainnet),
+            limites::LIMITE_BLOQUE_GENESIS,
+        )
+        .unwrap();
+        assert!(
+            !m.mdns.is_enabled(),
+            "C-NET-14: mainnet MUST NOT anunciarse por multicast"
+        );
+    }
+
+    /// **C-NET-13.** Sin margen de transporte, el behaviour **no se construye**.
+    ///
+    /// Es lo que convierte una partición silenciosa en una negativa a arrancar.
+    #[tokio::test]
+    async fn sin_margen_de_transporte_no_se_construye() {
+        // Escribir este test destapó un fallo: la primera versión saturaba el techo a `usize::MAX`
+        // ante un límite absurdo, o sea **desactivaba** el límite de transporte en vez de abortar.
+        for absurdo in [u64::MAX, limites::LIMITE_BLOQUE_ABSURDO + 1, 0] {
+            let e = ZxBehaviour::nueva(&clave(), ParametrosRed::de(Red::Testnet), absurdo);
+            assert!(
+                matches!(e, Err(P2pError::MargenDeTransporteInsuficiente { .. })),
+                "un límite de bloque de {absurdo} MUST impedir construir el behaviour"
+            );
+        }
+        // Y un límite realista sí construye.
+        assert!(
+            ZxBehaviour::nueva(
+                &clave(),
+                ParametrosRed::de(Red::Testnet),
+                limites::LIMITE_BLOQUE_GENESIS
+            )
+            .is_ok()
+        );
     }
 
     /// La identidad de `identify` es de ZEROX y nombra la red.
