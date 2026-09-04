@@ -7,7 +7,7 @@
 //!
 //! | Familia | Clave → valor | Por qué separada |
 //! |---|---|---|
-//! | `cabeceras` | hash(32) → 112 B | Se lee constantemente y es diminuta: comparte caché con todo lo demás si va junta |
+//! | `cabeceras` | hash(32) → 92 B | Se lee constantemente y es diminuta: comparte caché con todo lo demás si va junta |
 //! | `alturas` | altura(4 BE) → hash(32) | El índice de la cadena principal. **Cambia en cada reorg**, y las otras no |
 //! | `cuerpos` | hash(32) → bytes | Grandes y de acceso raro. Mezclarlos con las cabeceras arruinaría la caché |
 //! | `meta` | clave corta → valor | La punta, y lo que venga |

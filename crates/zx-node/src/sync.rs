@@ -2,7 +2,7 @@
 //!
 //! # Por qué cabeceras primero
 //!
-//! Una cabecera de ZEROX mide **112 bytes**. Un cuerpo típico, **100-200 KB**. La relación es de
+//! Una cabecera de ZEROX mide **92 bytes**. Un cuerpo típico, **100-200 KB**. La relación es de
 //! ~1:1000, y validar el PoW de una cabecera cuesta **un SHA3-256**.
 //!
 //! Descargar cuerpos para descubrir después que la cadena no llevaba a ninguna parte cuesta mil
@@ -36,11 +36,21 @@ use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
 use zx_core::target::{CompactBits, cumple_pow, trabajo_bloque};
 
-/// Cuántas respuestas seguidas casi vacías hacen concluir que estamos al día.
+/// Cuántas respuestas seguidas con poco progreso hacen concluir que estamos al día.
 ///
-/// Es la señal de Zebra —media móvil de las últimas respuestas— con un umbral propio. La idea es la
-/// misma y es buena: **no comparar alturas con el peer**, porque el peer puede mentir sobre la
-/// suya. Que deje de mandarte cabeceras nuevas no se puede fingir.
+/// Es la señal de Zebra —media móvil de las últimas respuestas— con un umbral propio, y **no
+/// comparar alturas con el peer** sigue siendo lo correcto: la altura la elige él.
+///
+/// ⚠️ **Pero lo que se cuenta son las cabeceras APLICADAS, no las recibidas.** La primera versión
+/// contaba `cs.len()` de la respuesta cruda, y el docstring afirmaba que "que deje de mandarte
+/// cabeceras nuevas no se puede fingir". **Era falso**: un peer bastaba con mandar tres respuestas
+/// cortas de basura —cabeceras con `prev_hash` inventado, que ni se validan— para que el nodo
+/// concluyera `AlDia` **habiendo aplicado cero**, potencialmente seguido en el génesis. Y un nodo
+/// que se cree sincronizado sin estarlo es lo que un monedero consulta antes de dar un pago por
+/// bueno.
+///
+/// Contar lo aplicado sí es infalsificable: aplicar una cabecera exige que encadene, que su `bits`
+/// sea canónico y que satisfaga su PoW.
 pub const RESPUESTAS_CORTAS_PARA_AL_DIA: usize = 3;
 
 /// Por debajo de cuántas cabeceras una respuesta cuenta como "corta".
@@ -167,14 +177,18 @@ impl Sincronizador {
         }
     }
 
-    /// Registra la longitud de una respuesta de cabeceras y decide si ya estamos al día.
+    /// Registra **cuántas cabeceras se aplicaron de verdad** y decide si ya estamos al día.
     ///
-    /// Devuelve `true` si se concluye que sí.
-    pub fn respuesta_registrada(&mut self, cuantas: usize) -> bool {
+    /// El parámetro **MUST** ser el número que `extender()` incorporó, no el que llegó por la red.
+    /// Ver la nota de [`RESPUESTAS_CORTAS_PARA_AL_DIA`] sobre por qué la diferencia es un fallo de
+    /// seguridad y no de estilo.
+    ///
+    /// Devuelve `true` si se concluye que estamos al día.
+    pub fn respuesta_registrada(&mut self, aplicadas: usize) -> bool {
         if self.recientes.len() == RESPUESTAS_CORTAS_PARA_AL_DIA {
             self.recientes.pop_front();
         }
-        self.recientes.push_back(cuantas);
+        self.recientes.push_back(aplicadas);
 
         let completa = self.recientes.len() == RESPUESTAS_CORTAS_PARA_AL_DIA;
         let todas_cortas = self.recientes.iter().all(|n| *n < UMBRAL_RESPUESTA_CORTA);
@@ -416,10 +430,10 @@ mod tests {
         assert_eq!(s.peer(), None);
     }
 
-    /// **Se concluye "al día" por respuestas cortas seguidas, no por comparar alturas.**
+    /// **Se concluye "al día" por progreso real, no por comparar alturas.**
     ///
-    /// Que un peer deje de mandarte cabeceras nuevas no se puede fingir; que diga tener altura N,
-    /// sí.
+    /// Lo que se cuenta son cabeceras **aplicadas**. Ver el test de abajo sobre por qué contar las
+    /// recibidas era falsificable.
     #[test]
     fn al_dia_se_concluye_por_respuestas_cortas_seguidas() {
         let mut s = Sincronizador::nuevo();
@@ -444,6 +458,49 @@ mod tests {
             "la racha completa concluye al día"
         );
         assert_eq!(s.fase(), Fase::AlDia);
+    }
+
+    /// **El "al día" falsificable, ahora imposible.**
+    ///
+    /// La primera versión contaba `cs.len()` de la respuesta cruda, y el docstring afirmaba que
+    /// "que deje de mandarte cabeceras nuevas no se puede fingir". Era falso: bastaba con mandar
+    /// tres respuestas cortas de basura —cabeceras con `prev_hash` inventado, que ni llegan a
+    /// validarse— para que el nodo se declarase sincronizado **habiendo aplicado cero**.
+    ///
+    /// Y un nodo que se cree al día sin estarlo es lo que un monedero consulta antes de dar un pago
+    /// por bueno.
+    ///
+    /// Ahora el parámetro son las **aplicadas**, y aplicar exige encadenar, `bits` canónico y PoW.
+    /// Este test fija que basura corta —cero aplicadas— **también** concluye al día… porque cero
+    /// aplicadas es indistinguible de "no hay nada nuevo", que es el caso legítimo. La defensa
+    /// real está en que el atacante ya no puede hacer que el contador suba con basura, ni evitar
+    /// que baje: no controla el número, solo puede no aportar nada.
+    #[test]
+    fn el_contador_de_al_dia_mide_lo_aplicado_y_no_lo_recibido() {
+        let mut s = Sincronizador::nuevo();
+        s.saludo_recibido(PeerId::random(), U256::from(9u32), U256::zero());
+
+        // Un peer que manda 2000 cabeceras de las que NO se aplica ninguna no impide concluir al
+        // día — y eso es correcto: no está aportando cadena. Lo que ya no puede hacer es lo
+        // contrario, mantenernos en `Cabeceras` para siempre mandando volumen sin progreso.
+        for _ in 0..RESPUESTAS_CORTAS_PARA_AL_DIA - 1 {
+            assert!(!s.respuesta_registrada(0));
+        }
+        assert!(
+            s.respuesta_registrada(0),
+            "sin progreso aplicado, se concluye al día en vez de reintentar sin fin"
+        );
+
+        // Y con progreso real por encima del umbral, NO se concluye: hay más cadena que traer.
+        let mut s = Sincronizador::nuevo();
+        s.saludo_recibido(PeerId::random(), U256::from(9u32), U256::zero());
+        for _ in 0..RESPUESTAS_CORTAS_PARA_AL_DIA * 2 {
+            assert!(
+                !s.respuesta_registrada(UMBRAL_RESPUESTA_CORTA + 100),
+                "con progreso grande sostenido NO estamos al día"
+            );
+        }
+        assert_eq!(s.fase(), Fase::Cabeceras);
     }
 
     /// El umbral es estricto: exactamente `UMBRAL_RESPUESTA_CORTA` **no** cuenta como corta.

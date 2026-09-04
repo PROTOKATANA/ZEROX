@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace      = true
 repository.workspace   = true
 
+[features]
+# Reexpuesta desde zx-storage: un nodo con `--features disco` guarda la cadena, uno sin ella la
+# mantiene en RAM y la pierde al cerrar. Útil para tests y para arrancar rápido.
+default = []
+disco = ["zx-storage/rocksdb"]
+
 [lib]
 name = "zx_node"
 path = "src/lib.rs"

@@ -236,12 +236,19 @@ unicidad de los *bytes* la tiene que dar el parser.
 > los datos sino sus hashes. Esto de aquí es lo otro: lo que viaja por la red y se guarda en disco.
 
 **C-WIRE-01 · La cabecera que viaja son los MISMOS bytes que se hashean.** La codificación de una
-`BlockHeader` es exactamente la preimagen del PoW (§7.1) **sin su etiqueta de dominio**: 112 bytes,
+`BlockHeader` es exactamente la preimagen del PoW (§7.1) **sin su etiqueta de dominio**: 92 bytes,
 mismo orden de campos.
 
 > No es una optimización, es una restricción: impide que exista una **segunda descripción** del
 > formato de cabecera capaz de divergir de la primera. Es la lección de **H-005**, donde un offset
 > transcrito a mano dejó de cuadrar al cambiar el tipo de `timestamp`.
+>
+> ⚠️ **Y volvió a pasar con el tamaño, en la documentación.** Este SPEC decía "112 bytes" en tres
+> sitios, y los comentarios del código en tres más. El tamaño real es
+> `4 + 32 + 32 + 8 + 4 + 8 + 4 = `**92**, y ninguna de las seis menciones lo derivaba de
+> `TAMANO_CABECERA`: todas eran el número escrito a mano. No era explotable —los límites de wire
+> usan la constante, no el comentario— pero es exactamente la misma clase de fallo, en la capa de
+> la documentación. Corregido 2026-09-05 tras la revisión adversarial del sincronizador.
 >
 > Corolario: **el decodificador MUST vivir junto al codificador** (`zx-core::wire`). Un
 > decodificador en el crate de red re-describe el orden de los campos, y eso es exactamente el
@@ -2068,7 +2075,7 @@ descargar y validar la cadena de cabeceras —PoW (§7.1), continuidad de `prev_
 > la elección — la razón está dispersa en comentarios, así que "Zebra lo hace así" no vale como
 > argumento.
 >
-> Para ZEROX la aritmética decide sola: **una cabecera mide 112 bytes y un cuerpo típico 100-200 KB**,
+> Para ZEROX la aritmética decide sola: **una cabecera mide 92 bytes y un cuerpo típico 100-200 KB**,
 > una relación de ~1:1000. Validar el PoW de una cabecera cuesta **un SHA3-256**. Descargar cuerpos
 > para descubrir después que la cadena no llevaba a ninguna parte cuesta mil veces más ancho de banda
 > por bloque. Ver `research/sync-cadena.md`.
@@ -2141,7 +2148,7 @@ transacción gasta UTXO existentes.
 **C-NET-07 · Derivación del ID corto.** Sobre `txid`:
 
 ```
-h  = SHA3-256( cabecera(112 B) ‖ nonce(8 B LE) )      ← divergencia deliberada, ver abajo
+h  = SHA3-256( cabecera(92 B) ‖ nonce(8 B LE) )       ← divergencia deliberada, ver abajo
 k0 = h[0..8]  como u64 LE
 k1 = h[8..16] como u64 LE
 id = los 6 bytes bajos de SipHash-2-4(k0, k1, txid)
@@ -2261,6 +2268,61 @@ Un `ParametrosRed` **MUST NOT** poder construirse campo a campo.
 > **Una invariante que solo vive en un comentario no es una invariante.** Es el mismo error que
 > C-NET-13, en otra escala.
 
+**C-NET-16 · Servir una petición MUST ser O(1) en el tamaño de la cadena.** Toda búsqueda que un
+peer pueda provocar **MUST** ir por índice, y ninguna **MUST** recalcular hashes ya conocidos.
+
+> **Nace de un DoS asimétrico encontrado en la primera revisión adversarial del sincronizador**, y
+> es de los baratos de explotar y caros de sufrir.
+>
+> `cabeceras_desde` buscaba con `iter().position(|c| c.block_hash() == h)`. Dos cosas se juntaban:
+> `block_hash()` **no está cacheado** —cada llamada reserva un `Vec` y computa un SHA3-256— y un
+> locator trae **hasta 64 hashes**, ninguno de los cuales tiene por qué ser real.
+>
+> Un peer manda 64 hashes aleatorios en un mensaje de 2 KB y el servidor hace **64·n SHA3** y 64·n
+> reservas, **dentro del bucle del `Swarm`** — con toda la red parada mientras tanto. Con una cadena
+> de un año, decenas de millones de hashes por dos kilobytes, repetibles gratis. Ni siquiera hacía
+> falta ser el peer de sincronización: bastaba estar conectado.
+>
+> Y una variante peor: colocando el hash del génesis —público, va en el saludo— en la **última**
+> posición del locator, se pagaban 63 escaneos completos y además se clonaba la cadena entera antes
+> de que el recorte la truncara. **El recorte MUST aplicarse antes de clonar, no después.**
+>
+> Corolario que también es regla: **`trabajo_hasta` MUST ser O(1)**. Se ejecutaba sobre el
+> `prev_hash` que el peer elige, **antes** de validar nada — un escaneo completo de nuestra cadena a
+> petición de cualquiera.
+
+**C-NET-17 · "Estar al día" MUST medirse por cabeceras APLICADAS, nunca por recibidas.**
+
+> El diseño original contaba la longitud de la respuesta cruda, y el comentario afirmaba que "que un
+> peer deje de mandarte cabeceras nuevas no se puede fingir". **Era falso.** Bastaba con mandar tres
+> respuestas cortas de basura —cabeceras con `prev_hash` inventado, que ni llegan a validarse— para
+> que el nodo se declarase sincronizado **habiendo aplicado cero**, potencialmente seguido en el
+> génesis.
+>
+> Y un nodo que se cree al día sin estarlo es exactamente lo que un monedero consulta antes de dar
+> un pago por bueno. Contar lo aplicado sí es infalsificable: aplicar exige encadenar, `bits`
+> canónico y PoW.
+
+**C-NET-18 · Sin progreso, MUST cortarse; nunca reintentar con el mismo locator.** Si una respuesta
+válida no aporta ninguna cabecera aplicable, o si no cuelga de nada nuestro, el nodo **MUST** dejar
+de pedir a ese peer.
+
+> Con el mismo locator, el peer respondería **lo mismo indefinidamente** — gratis para él, un
+> escaneo por ronda para nosotros. Es un bucle infinito con la víctima pagando.
+>
+> El caso más incómodo es el de una cadena **válida que no encaja**: una bifurcación que cuelga por
+> debajo de la punta. `validar_cadena_de_cabeceras` la juzga bien, y `extender` no sabe adoptarla
+> —solo añade a la punta— así que devuelve 0. 🔶 **El soporte de reorganización de cabeceras no
+> existe todavía**: `fork_choice` sabe decidir entre ramas pero no está conectado, y conectarlo
+> exige poder deshacer hasta el ancla. Hasta entonces, cortar es la respuesta honesta; reintentar
+> sería fingir que se está progresando.
+
+**C-NET-19 · A un peer condenado no se le vuelve a pedir en la misma vuelta.** Desconectar **es
+asíncrono** —encola un comando—, así que el sincronizador **MUST** olvidarlo de inmediato.
+
+> Sin esto, el peer que acaba de ser condenado por violar consenso se llevaba **una ronda extra** de
+> interacción antes de que la desconexión se procesara.
+
 **C-NET-12 · Validar antes de retransmitir.** Un bloque o transacción recibido por difusión **MUST**
 validarse contra `zx-consensus` **antes** de reenviarse. Un bloque **huérfano** —cuyo padre aún no se
 conoce— **MUST** descartarse **sin penalizar**, no rechazarse.
@@ -2378,7 +2440,7 @@ cadena**. Los seis huecos están escritos:
 | §15 · Bloque génesis | C-GEN-01..07 |
 | §2.4 · Serialización de red | C-WIRE-01..06 |
 | §15.1 · Almacenamiento | C-STORE-01..04 |
-| §16 · Parámetros de red | C-NET-01..15 |
+| §16 · Parámetros de red | C-NET-01..19 |
 
 ### Aparcadas — evaluadas, con factura desglosada, NO adoptadas
 

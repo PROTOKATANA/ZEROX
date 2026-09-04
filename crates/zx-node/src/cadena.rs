@@ -14,7 +14,8 @@
 //! propagación de bloques de todo el nodo. Nada de I/O de disco sin acotar, nada de verificar mil
 //! firmas en línea.
 
-use std::sync::RwLock;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 use primitive_types::U256;
 use zx_consensus::activacion::rama_activa;
@@ -24,12 +25,12 @@ use zx_core::red::Red;
 use zx_core::target::{CompactBits, trabajo_bloque};
 use zx_p2p::entrante::{ManejadorEntrante, Veredicto};
 use zx_p2p::mensaje::{BloqueRed, Estado};
+use zx_storage::almacen::{AlmacenCadena, Punta};
 
 /// Lo que el nodo sabe de su propia cadena.
 ///
 /// De momento solo la punta y las cabeceras que ha visto. El UTXO set y el mempool se conectarán
 /// cuando exista el sincronizador — meterlos ahora sería cablear algo que todavía no se usa.
-#[derive(Debug)]
 pub struct Cadena {
     red: Red,
     genesis: BlockHash,
@@ -39,7 +40,57 @@ pub struct Cadena {
     /// consulta el estado— y las escrituras raras, una por bloque aceptado. Es exactamente el
     /// patrón para el que un `RwLock` es la respuesta correcta, y montar un actor aquí sería
     /// complejidad sin problema que resolver.
-    cabeceras: RwLock<Vec<BlockHeader>>,
+    cabeceras: RwLock<Indice>,
+    /// Dónde persiste la cadena.
+    ///
+    /// El índice en memoria de arriba **no se sustituye** por el almacén: se mantiene como caché de
+    /// lectura. Servir un locator o buscar el ancla de una petición recorre la cadena, y hacer eso
+    /// contra disco en cada petición entrante sería un DoS asimétrico regalado — el peer paga un
+    /// mensaje y nosotros pagamos N lecturas.
+    almacen: Arc<dyn AlmacenCadena>,
+}
+
+/// La cadena en memoria, con su índice.
+///
+/// # Por qué hay un índice y por qué el hash va guardado
+///
+/// La primera versión guardaba solo un `Vec<BlockHeader>` y buscaba con
+/// `iter().position(|c| c.block_hash() == h)`. La revisión adversarial encontró que eso es un
+/// **DoS asimétrico regalado**, y tenía razón por partida doble:
+///
+/// 1. **`block_hash()` no está cacheado.** Cada llamada reserva un `Vec` y computa un SHA3-256
+///    completo. Una búsqueda que no encuentra nada recorre `n` cabeceras y hace `n` hashes.
+/// 2. **Un locator trae hasta 64 hashes**, y ninguno tiene por qué ser real. Un peer manda 64
+///    hashes aleatorios en un mensaje de 2 KB, y el servidor hace **64·n** hashes y 64·n
+///    reservas — todo dentro del bucle del `Swarm`, con la red entera parada mientras tanto.
+///
+/// Con una cadena de un año —~260 000 bloques— eso son **decenas de millones de SHA3 por
+/// petición de dos kilobytes**, repetibles sin coste. El atacante ni siquiera necesita ser el
+/// peer de sincronización: le basta con estar conectado.
+///
+/// Ahora el hash se calcula **una vez, al insertar**, y el índice lo resuelve en `O(1)`.
+#[derive(Debug, Default)]
+struct Indice {
+    /// Las cabeceras en orden, con su hash ya calculado.
+    cadena: Vec<(BlockHash, BlockHeader)>,
+    /// Hash → posición. Convierte una búsqueda de `O(n)` con hashes en una de `O(1)` sin ninguno.
+    posicion: HashMap<BlockHash, usize>,
+}
+
+impl Indice {
+    fn empujar(&mut self, c: BlockHeader) {
+        let h = c.block_hash();
+        self.posicion.insert(h, self.cadena.len());
+        self.cadena.push((h, c));
+    }
+
+    fn punta(&self) -> Option<(BlockHash, BlockHeader)> {
+        self.cadena.last().copied()
+    }
+
+    fn len(&self) -> usize {
+        self.cadena.len()
+    }
 }
 
 impl Cadena {
@@ -48,6 +99,17 @@ impl Cadena {
     /// # Errores
     /// Lo que devuelva la comprobación de arranque del génesis (C-GEN-01, C-GEN-06, C-GEN-07).
     pub fn nueva(red: Red) -> Result<Self, zx_consensus::error::ConsensusError> {
+        Self::con_almacen(red, Arc::new(zx_storage::AlmacenEnMemoria::nuevo()))
+    }
+
+    /// Arranca sobre un almacén concreto, recuperando lo que ya hubiera guardado.
+    ///
+    /// # Errores
+    /// Lo que devuelva la comprobación de arranque del génesis, o un fallo del almacén.
+    pub fn con_almacen(
+        red: Red,
+        almacen: Arc<dyn AlmacenCadena>,
+    ) -> Result<Self, zx_consensus::error::ConsensusError> {
         let params = match red {
             Red::Mainnet => zx_consensus::genesis::GENESIS_MAINNET,
             Red::Testnet => zx_consensus::genesis::GENESIS_TESTNET,
@@ -57,10 +119,33 @@ impl Cadena {
         let genesis = zx_consensus::genesis::comprobar_al_arrancar(params)?;
         let (cabecera, _) = zx_consensus::genesis::construir(params)?;
 
+        // El génesis se guarda siempre: es el ancla de todo locator y debe estar aunque el almacén
+        // venga vacío. Guardarlo dos veces es inofensivo — la clave es su hash.
+        let _ = almacen.guardar_cabecera(&cabecera);
+
+        // Recuperar lo que hubiera. Un almacén sin punta es uno recién creado, no uno roto.
+        let mut indice = Indice::default();
+        indice.empujar(cabecera);
+        if let Ok(Some(punta)) = almacen.punta() {
+            for h in 1..=punta.altura {
+                match almacen.hash_en_altura(h).ok().flatten() {
+                    Some(hash) => match almacen.cabecera(&hash).ok().flatten() {
+                        Some(c) => indice.empujar(c),
+                        // Un hueco en el índice significa almacén incompleto. Se para de recuperar
+                        // ahí en vez de seguir con una cadena con agujeros: mejor arrancar más
+                        // atrás y resincronizar que creer que se tiene lo que no se tiene.
+                        None => break,
+                    },
+                    None => break,
+                }
+            }
+        }
+
         Ok(Self {
             red,
             genesis,
-            cabeceras: RwLock::new(vec![cabecera]),
+            cabeceras: RwLock::new(indice),
+            almacen,
         })
     }
 
@@ -72,6 +157,9 @@ impl Cadena {
     }
 
     /// El hash del génesis.
+    ///
+    /// Es el ancla de todo locator: garantiza que dos nodos de la misma cadena siempre tengan al
+    /// menos un punto en común.
     #[must_use]
     pub const fn genesis(&self) -> BlockHash {
         self.genesis
@@ -82,7 +170,7 @@ impl Cadena {
     pub fn altura(&self) -> u32 {
         self.cabeceras
             .read()
-            .map(|c| u32::try_from(c.len().saturating_sub(1)).unwrap_or(u32::MAX))
+            .map(|i| u32::try_from(i.len().saturating_sub(1)).unwrap_or(u32::MAX))
             .unwrap_or(0)
     }
 
@@ -102,8 +190,17 @@ impl Cadena {
     /// haberla minado— y exactamente lo que producción no debe hacer nunca.
     #[doc(hidden)]
     pub fn extender_sin_validar_solo_para_pruebas(&self, nuevas: &[BlockHeader]) {
-        if let Ok(mut cs) = self.cabeceras.write() {
-            cs.extend_from_slice(nuevas);
+        if let Ok(mut i) = self.cabeceras.write() {
+            for c in nuevas {
+                let _ = self.almacen.guardar_cabecera(c);
+                i.empujar(*c);
+            }
+            if let Some((h, c)) = i.punta() {
+                let _ = self.almacen.fijar_punta(Punta {
+                    hash: h,
+                    altura: c.height,
+                });
+            }
         }
     }
 
@@ -112,7 +209,7 @@ impl Cadena {
     pub fn trabajo(&self) -> U256 {
         self.cabeceras
             .read()
-            .map(|cs| trabajo_de(&cs))
+            .map(|i| trabajo_de(&i.cadena))
             .unwrap_or_default()
     }
 
@@ -124,9 +221,12 @@ impl Cadena {
     /// cualquier bifurcación profunda.
     #[must_use]
     pub fn trabajo_hasta(&self, h: BlockHash) -> Option<U256> {
-        let cs = self.cabeceras.read().ok()?;
-        let pos = cs.iter().position(|c| c.block_hash() == h)?;
-        Some(trabajo_de(cs.get(..=pos)?))
+        let i = self.cabeceras.read().ok()?;
+        // `O(1)` gracias al índice. Antes era `O(n)` **con un SHA3 por cabecera**, y se ejecutaba
+        // sobre un `prev_hash` que el peer elige — o sea, un escaneo completo de nuestra cadena a
+        // petición de cualquiera, antes de haber validado nada.
+        let pos = *i.posicion.get(&h)?;
+        Some(trabajo_de(i.cadena.get(..=pos)?))
     }
 
     /// Trabajo de un solo bloque a la dificultad de la punta, para el umbral de C-NET-04.
@@ -135,29 +235,70 @@ impl Cadena {
         self.cabeceras
             .read()
             .ok()
-            .and_then(|cs| cs.last().copied())
-            .and_then(|c| CompactBits::from_u32(c.bits).decodificar().ok())
+            .and_then(|i| i.punta())
+            .and_then(|(_, c)| CompactBits::from_u32(c.bits).decodificar().ok())
             .and_then(trabajo_bloque)
             .unwrap_or_else(U256::one)
     }
 
     /// Añade cabeceras **ya validadas** a la punta.
     ///
-    /// Devuelve cuántas se añadieron. Las que no continúen la punta se ignoran en silencio: llegar
-    /// tarde con cabeceras que ya teníamos es normal cuando se pide a varios peers a la vez.
+    /// Devuelve cuántas se añadieron. Las que no continúen la punta se ignoran: llegar tarde con
+    /// cabeceras que ya teníamos es normal cuando se pide a varios peers a la vez.
+    ///
+    /// # 🔶 Esto NO sabe reorganizar, y hay que decirlo
+    ///
+    /// Solo añade a la punta actual. Una cadena **competidora válida** que cuelgue de un ancla por
+    /// debajo del tip —justo el caso que `validar_cadena_de_cabeceras` fue corregido para juzgar
+    /// bien— se valida como `Ok` y aquí se descarta entera, devolviendo 0.
+    ///
+    /// `zx-consensus::fork_choice` existe y sabe decidir entre ramas, pero **no está conectado**:
+    /// esta estructura es una lista, no un árbol de puntas competidoras. Conectarlo exige poder
+    /// deshacer hasta el ancla y reaplicar, y eso necesita el `UndoData` del almacén.
+    ///
+    /// Mientras tanto, quien llama **debe detectar `0` con una respuesta no vacía y cortar** en vez
+    /// de reintentar: con el mismo locator, el peer respondería lo mismo indefinidamente. Lo hace
+    /// `main.rs`, y esa es hoy la diferencia entre un hueco conocido y un bucle infinito.
     pub fn extender(&self, nuevas: &[BlockHeader]) -> usize {
-        let Ok(mut cs) = self.cabeceras.write() else {
+        let Ok(mut i) = self.cabeceras.write() else {
             return 0;
         };
         let mut n = 0;
+        let mut ultima = None;
+
         for c in nuevas {
-            let punta = cs.last().map(BlockHeader::block_hash);
-            if punta == Some(c.prev_hash) {
-                cs.push(*c);
-                n += 1;
+            let punta = i.punta().map(|(h, _)| h);
+            if punta != Some(c.prev_hash) {
+                continue;
             }
+            // C-STORE-01 · **el dato primero, la punta al final.** Si el proceso muere aquí, sobra
+            // una cabecera que la punta no menciona: recuperable. Al revés sería corrupción.
+            if let Err(e) = self.almacen.guardar_cabecera(c) {
+                tracing::error!(%e, altura = c.height, "no se pudo guardar la cabecera");
+                break;
+            }
+            i.empujar(*c);
+            ultima = Some(*c);
+            n += 1;
+        }
+
+        // La punta, una sola vez y al final: mover el tip por cada cabecera sería N escrituras
+        // donde basta una, y ninguna de las intermedias aporta nada.
+        if let Some(c) = ultima
+            && let Err(e) = self.almacen.fijar_punta(Punta {
+                hash: c.block_hash(),
+                altura: c.height,
+            })
+        {
+            tracing::error!(%e, "no se pudo fijar la punta");
         }
         n
+    }
+
+    /// El almacén sobre el que corre esta cadena.
+    #[must_use]
+    pub fn almacen(&self) -> &Arc<dyn AlmacenCadena> {
+        &self.almacen
     }
 
     /// Un locator de la punta hacia atrás: denso al principio, espaciado después.
@@ -169,17 +310,17 @@ impl Cadena {
     /// dos estamos en la misma cadena, que es justo lo que hay que averiguar.
     #[must_use]
     pub fn locator(&self) -> Vec<BlockHash> {
-        let Ok(cs) = self.cabeceras.read() else {
+        let Ok(idx) = self.cabeceras.read() else {
             return Vec::new();
         };
         let mut v = Vec::new();
         let mut paso = 1usize;
-        let mut i = cs.len();
+        let mut i = idx.len();
 
         while i > 0 {
             i = i.saturating_sub(paso);
-            if let Some(c) = cs.get(i) {
-                v.push(c.block_hash());
+            if let Some((h, _)) = idx.cadena.get(i) {
+                v.push(*h);
             }
             // Los diez primeros van de uno en uno; a partir de ahí, el paso se duplica.
             if v.len() >= 10 {
@@ -206,7 +347,7 @@ impl ManejadorEntrante for Cadena {
                 .cabeceras
                 .read()
                 .ok()
-                .and_then(|c| c.last().map(BlockHeader::block_hash))
+                .and_then(|i| i.punta().map(|(h, _)| h))
                 .unwrap_or(self.genesis),
             altura: self.altura(),
             trabajo: self.trabajo().to_big_endian(),
@@ -232,14 +373,31 @@ impl ManejadorEntrante for Cadena {
         locator: &[BlockHash],
         _hasta: Option<BlockHash>,
     ) -> Vec<BlockHeader> {
-        let Ok(cs) = self.cabeceras.read() else {
+        let Ok(idx) = self.cabeceras.read() else {
             return Vec::new();
         };
         // El primer hash del locator que reconozcamos marca desde dónde servir. Que no
         // reconozcamos ninguno es una respuesta legítima: significa que no compartimos historia.
+        //
+        // Cada consulta es `O(1)` contra el índice, así que un locator entero cuesta 64 búsquedas
+        // en tabla. Con la versión anterior —`position` con `block_hash()` por elemento— costaba
+        // 64·n SHA3, y era un DoS trivial: ver la nota de [`Indice`].
         for h in locator {
-            if let Some(pos) = cs.iter().position(|c| c.block_hash() == *h) {
-                return cs.get(pos + 1..).unwrap_or_default().to_vec();
+            if let Some(pos) = idx.posicion.get(h) {
+                // Se recorta **aquí, antes de clonar**. Recortar después, como hacía la primera
+                // versión, significa que la asignación grande ya ocurrió: reconocer el génesis en
+                // la última posición del locator clonaba la cadena entera.
+                let desde = pos.saturating_add(1);
+                let hasta = desde
+                    .saturating_add(MAX_CABECERAS_SERVIDAS)
+                    .min(idx.cadena.len());
+                return idx
+                    .cadena
+                    .get(desde..hasta)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|(_, c)| *c)
+                    .collect();
             }
         }
         Vec::new()
@@ -251,14 +409,20 @@ impl ManejadorEntrante for Cadena {
     }
 }
 
+/// Cuántas cabeceras se sirven como mucho en una respuesta.
+///
+/// Coincide con el límite de transporte de `zx-p2p`, y se aplica **antes de clonar**: recortar
+/// después, como hacía la primera versión, significa que la asignación grande ya ocurrió.
+const MAX_CABECERAS_SERVIDAS: usize = 2_000;
+
 /// Trabajo acumulado de una secuencia de cabeceras.
 ///
 /// Una cabecera cuyo `bits` no decodifica aporta cero en vez de abortar: aquí solo se suma, y
 /// rechazar `bits` inválidos es de la validación, no de la contabilidad. Aportar cero es
 /// conservador — nunca infla el trabajo de una cadena.
-fn trabajo_de(cs: &[BlockHeader]) -> U256 {
+fn trabajo_de(cs: &[(BlockHash, BlockHeader)]) -> U256 {
     cs.iter()
-        .filter_map(|c| CompactBits::from_u32(c.bits).decodificar().ok())
+        .filter_map(|(_, c)| CompactBits::from_u32(c.bits).decodificar().ok())
         .filter_map(trabajo_bloque)
         .fold(U256::zero(), |a, w| a.saturating_add(w))
 }
@@ -324,6 +488,81 @@ mod tests {
     }
 
     /// Y desde el génesis, que sí reconocemos, devuelve lo que hay después — hoy, nada.
+    /// **La cadena se recupera de su almacén al arrancar.**
+    ///
+    /// Es la propiedad que justifica la persistencia: sin ella, cada reinicio resincronizaría desde
+    /// el génesis. Con doce cabeceras es instantáneo; con un año de cadena serían horas.
+    #[test]
+    fn la_cadena_se_recupera_del_almacen_al_arrancar() {
+        use std::sync::Arc;
+        use zx_storage::AlmacenEnMemoria;
+
+        let almacen: Arc<dyn zx_storage::almacen::AlmacenCadena> =
+            Arc::new(AlmacenEnMemoria::nuevo());
+
+        // Primera vida: se extiende a 6.
+        {
+            let c = Cadena::con_almacen(Red::Testnet, Arc::clone(&almacen)).unwrap();
+            let mut prev = c.genesis();
+            let mut nuevas = Vec::new();
+            for i in 1..=6u32 {
+                let h = zx_core::preimage::block::BlockHeader {
+                    consensus_branch_id: 0xc478_80ea,
+                    prev_hash: prev,
+                    merkle_root: zx_core::digest::MerkleRoot::from_digest(
+                        zx_core::digest::Digest::from_bytes([i as u8; 32]),
+                    ),
+                    timestamp: 1_788_480_000 + u64::from(i) * 120,
+                    bits: 0x1d00_ffff,
+                    nonce: u64::from(i),
+                    height: i,
+                };
+                prev = h.block_hash();
+                nuevas.push(h);
+            }
+            assert_eq!(c.extender(&nuevas), 6);
+            assert_eq!(c.altura(), 6);
+        }
+
+        // Segunda vida: el mismo almacén, una Cadena nueva.
+        let c2 = Cadena::con_almacen(Red::Testnet, almacen).unwrap();
+        assert_eq!(c2.altura(), 6, "la cadena se recuperó del almacén");
+        assert_eq!(c2.genesis(), c2.genesis());
+        assert!(c2.trabajo() > primitive_types::U256::zero());
+    }
+
+    /// Extender guarda **el dato antes que la punta** (C-STORE-01).
+    #[test]
+    fn extender_deja_el_almacen_coherente() {
+        use std::sync::Arc;
+        use zx_storage::AlmacenEnMemoria;
+        use zx_storage::almacen::AlmacenCadena;
+
+        let almacen: Arc<dyn AlmacenCadena> = Arc::new(AlmacenEnMemoria::nuevo());
+        let c = Cadena::con_almacen(Red::Testnet, Arc::clone(&almacen)).unwrap();
+
+        let h = zx_core::preimage::block::BlockHeader {
+            consensus_branch_id: 0xc478_80ea,
+            prev_hash: c.genesis(),
+            merkle_root: zx_core::digest::MerkleRoot::from_digest(
+                zx_core::digest::Digest::from_bytes([1; 32]),
+            ),
+            timestamp: 1_788_480_120,
+            bits: 0x1d00_ffff,
+            nonce: 1,
+            height: 1,
+        };
+        assert_eq!(c.extender(&[h]), 1);
+
+        // La punta existe Y su cabecera está guardada. Lo contrario sería corrupción.
+        let p = almacen.punta().unwrap().expect("hay punta");
+        assert_eq!(p.altura, 1);
+        assert!(
+            almacen.cabecera(&p.hash).unwrap().is_some(),
+            "C-STORE-01: la punta MUST apuntar a una cabecera guardada"
+        );
+    }
+
     #[test]
     fn un_locator_con_el_genesis_se_reconoce() {
         let c = Cadena::nueva(Red::Testnet).unwrap();

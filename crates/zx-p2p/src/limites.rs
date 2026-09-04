@@ -145,7 +145,7 @@ pub const MAX_RESPUESTA_BYTES: u64 = MAX_GOSSIP_BYTES_GENESIS as u64 * 16;
 
 /// Cabeceras por respuesta de `Headers`.
 ///
-/// A 112 bytes por cabecera son ~224 KB por respuesta llena. Bitcoin usa 2000 y zcashd 160 —este
+/// A 92 bytes por cabecera son ~184 KB por respuesta llena. Bitcoin usa 2000 y zcashd 160 —este
 /// último por el tamaño de las soluciones Equihash, que ZEROX no tiene.
 pub const MAX_CABECERAS_POR_RESPUESTA: usize = 2_000;
 

@@ -63,6 +63,11 @@ struct Args {
     /// Peers a los que conectarse al arrancar, como multiaddr.
     #[arg(long = "peer")]
     peers: Vec<String>,
+
+    /// Dónde guardar la cadena. Sin esto, la cadena vive en RAM y se pierde al cerrar.
+    #[cfg(feature = "disco")]
+    #[arg(long)]
+    datos: Option<std::path::PathBuf>,
 }
 
 #[tokio::main]
@@ -85,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     // Si esto falla, el nodo no ha abierto un socket ni ha tocado el disco. Con mainnet falla hoy
     // a propósito: C-GEN-06 y C-GEN-07 lo bloquean mientras P-017 siga abierto.
-    let cadena = Arc::new(Cadena::nueva(red)?);
+    let cadena = Arc::new(abrir_cadena(red, &args)?);
     tracing::info!(
         red = red.nombre(),
         genesis = %hex(cadena.genesis().as_bytes()),
@@ -202,6 +207,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Abre la cadena, sobre disco si se pidió y hay soporte compilado.
+fn abrir_cadena(red: Red, args: &Args) -> Result<Cadena, Box<dyn std::error::Error>> {
+    #[cfg(feature = "disco")]
+    if let Some(ruta) = &args.datos {
+        let almacen = zx_storage::AlmacenEnDisco::abrir(ruta)?;
+        tracing::info!(ruta = %ruta.display(), "almacén en disco");
+        return Ok(Cadena::con_almacen(red, Arc::new(almacen))?);
+    }
+    let _ = args;
+    tracing::warn!("sin --datos: la cadena vive en RAM y se pierde al cerrar");
+    Ok(Cadena::nueva(red)?)
+}
+
 /// Qué hacer con lo que un peer responde.
 ///
 /// Vive aparte del `select!` para que el bucle principal se lea de un vistazo: el `select!` decide
@@ -247,6 +265,14 @@ async fn atender_respuesta(
             let n = cs.len();
             tracing::debug!(peer = %peer, n, "cabeceras recibidas");
 
+            // Lo que se cuenta hacia "al día" es lo APLICADO, no lo recibido. Contar lo recibido
+            // deja que un peer finja que estamos sincronizados mandando basura corta.
+            let mut aplicadas = 0usize;
+            // Y si al peer se le condena por mala fe, no se le vuelve a pedir en esta misma vuelta:
+            // `Comando::Desconectar` solo encola, así que sin esta bandera el condenado se llevaba
+            // una ronda extra de interacción.
+            let mut condenado = false;
+
             // El ancla es de dónde cuelgan: el `prev_hash` de la primera, que MUST ser algo
             // nuestro. Si no lo conocemos, la respuesta no continúa nuestro locator.
             let ancla = cs.first().map(|c| c.prev_hash);
@@ -263,18 +289,35 @@ async fn atender_respuesta(
                     );
                     match r {
                         Ok(_) => {
-                            let anadidas = cadena.extender(&cs);
+                            aplicadas = cadena.extender(&cs);
                             tracing::info!(
                                 peer = %peer,
-                                anadidas,
+                                aplicadas,
+                                recibidas = n,
                                 altura = cadena.altura(),
-                                "cabeceras aplicadas"
+                                "cabeceras"
                             );
+                            // Validaron pero no se aplicó ninguna: cuelgan de un punto que no es
+                            // nuestra punta, o sea una **bifurcación** que este nodo todavía no
+                            // sabe adoptar (ver la nota de `Cadena::extender`). Reintentar con el
+                            // mismo locator daría exactamente la misma respuesta, para siempre.
+                            if aplicadas == 0 && n > 0 {
+                                tracing::warn!(
+                                    peer = %peer,
+                                    "cabeceras válidas que no encajan en nuestra punta: sin \
+                                     soporte de reorg todavía, se corta para no reintentar en bucle"
+                                );
+                                condenado = true;
+                                let _ = manejo
+                                    .desconectar(peer, zx_p2p::error::MotivoDesconexion::Ilegible)
+                                    .await;
+                            }
                         }
                         Err(e) => {
                             tracing::warn!(peer = %peer, ?e, mala_fe = e.es_mala_fe(), "rechazadas");
                             // C-NET-05 · solo la mala fe corta. Ir por detrás, no.
                             if e.es_mala_fe() {
+                                condenado = true;
                                 let _ = manejo
                                     .desconectar(
                                         peer,
@@ -287,12 +330,24 @@ async fn atender_respuesta(
                 }
                 Some(_) => {}
                 None if n > 0 => {
+                    // Su `prev_hash` no está en nuestra cadena. **No se penaliza** —puede ser
+                    // desincronización— pero tampoco se le sigue pidiendo: con el mismo locator
+                    // respondería lo mismo indefinidamente.
                     tracing::debug!(peer = %peer, "sus cabeceras no cuelgan de nada nuestro");
+                    sinc.peer_perdido(peer);
+                    return;
                 }
                 None => {}
             }
 
-            if sinc.respuesta_registrada(n) {
+            if condenado {
+                // Al peer condenado no se le pide nada más, y deja de ser nuestro sincronizador
+                // **ahora**, sin esperar al evento de desconexión.
+                sinc.peer_perdido(peer);
+                return;
+            }
+
+            if sinc.respuesta_registrada(aplicadas) {
                 tracing::info!(altura = cadena.altura(), "al día");
             } else if sinc.fase() == Fase::Cabeceras {
                 // Seguir pidiendo desde la punta nueva.
