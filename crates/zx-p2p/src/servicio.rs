@@ -34,10 +34,12 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{Multiaddr, PeerId, Swarm};
 use tokio::sync::{mpsc, oneshot};
 
+use libp2p::{gossipsub, request_response};
+
 use crate::behaviour::{ZxBehaviour, ZxBehaviourEvent};
-use crate::entrante::ManejadorEntrante;
+use crate::entrante::{ManejadorEntrante, Veredicto};
 use crate::error::{MotivoDesconexion, P2pError};
-use crate::mensaje::Peticion;
+use crate::mensaje::{Peticion, Respuesta};
 
 /// Capacidad del canal de comandos.
 ///
@@ -99,6 +101,23 @@ pub enum EventoRed {
     PeerDesconectado(PeerId),
     /// Estamos escuchando en una dirección.
     Escuchando(Multiaddr),
+    /// Un peer respondió a una petición de sincronización.
+    ///
+    /// La respuesta va en `Box` porque `Respuesta::Bloques` puede ser grande, y un enum cuyo tamaño
+    /// lo fija su variante mayor haría que **cada** evento de red ocupara eso.
+    Respuesta {
+        /// Quién respondió.
+        peer: PeerId,
+        /// Identificador de la petición que se contesta.
+        peticion: u64,
+        /// Lo que respondió.
+        respuesta: Box<Respuesta>,
+    },
+    /// Una petición no llegó a completarse. **No puntúa** (C-NET-05).
+    PeticionFallida {
+        /// A quién se le había pedido.
+        peer: PeerId,
+    },
 }
 
 /// El handle con el que el resto del nodo habla con la red.
@@ -256,12 +275,140 @@ impl<M: ManejadorEntrante> BucleRed<M> {
             SwarmEvent::ConnectionClosed { peer_id, .. } => {
                 self.avisar(EventoRed::PeerDesconectado(peer_id));
             }
-            // El resto de eventos del swarm todavía no se atienden: el sincronizador y el manejo de
-            // gossip llegan en la tanda siguiente. Se registran a nivel traza y se descartan, que
-            // es mejor que un `todo!()` en un bucle que no puede entrar en pánico.
+            SwarmEvent::Behaviour(ZxBehaviourEvent::Sync(e)) => self.atender_sync(e),
+            SwarmEvent::Behaviour(ZxBehaviourEvent::Gossipsub(e)) => self.atender_gossip(e),
             otro => {
-                tracing::trace!(?otro, "evento de swarm todavía no atendido");
+                tracing::trace!(?otro, "evento de swarm sin manejo específico");
             }
+        }
+    }
+
+    /// Atiende el protocolo de sincronización.
+    ///
+    /// **Servir una petición es trabajo del manejador, no del bucle.** El bucle solo traduce entre
+    /// los tipos de libp2p y los nuestros.
+    fn atender_sync(&mut self, e: request_response::Event<Peticion, Respuesta>) {
+        match e {
+            request_response::Event::Message { peer, message, .. } => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    let respuesta = self.servir(&request);
+                    // Que el canal esté cerrado significa que el peer se fue mientras
+                    // preparábamos la respuesta. Es normal, no es culpa de nadie.
+                    if self
+                        .swarm
+                        .behaviour_mut()
+                        .sync
+                        .send_response(channel, respuesta)
+                        .is_err()
+                    {
+                        tracing::debug!(%peer, "el peer se fue antes de recibir la respuesta");
+                    }
+                }
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    self.avisar(EventoRed::Respuesta {
+                        peer,
+                        peticion: request_id_a_u64(request_id),
+                        respuesta: Box::new(response),
+                    });
+                }
+            },
+            // Un peer que no responde o falla **no puntúa** (C-NET-05): puede ir lento, puede
+            // haberse caído, puede hablar otra versión. Nada de eso es violación de consenso.
+            request_response::Event::OutboundFailure { peer, error, .. } => {
+                tracing::debug!(%peer, %error, "petición de sync fallida");
+                self.avisar(EventoRed::PeticionFallida { peer });
+            }
+            request_response::Event::InboundFailure { peer, error, .. } => {
+                tracing::debug!(%peer, %error, "petición entrante fallida");
+            }
+            request_response::Event::ResponseSent { .. } => {}
+        }
+    }
+
+    /// Construye la respuesta a una petición entrante preguntándole al manejador.
+    fn servir(&self, p: &Peticion) -> Respuesta {
+        match p {
+            Peticion::Estado => Respuesta::Estado(self.manejador.estado()),
+            Peticion::Cabeceras { locator, hasta } => {
+                let cs = self.manejador.cabeceras_desde(locator, *hasta);
+                Respuesta::Cabeceras(recortar(cs, crate::limites::MAX_CABECERAS_POR_RESPUESTA))
+            }
+            Peticion::Bloques { hashes } => {
+                let bs = self.manejador.bloques_por_hash(hashes);
+                if bs.is_empty() {
+                    // Distinto de una lista vacía: "no tengo eso" es una respuesta legítima que
+                    // **no puntúa**, mientras que una lista vacía invitaría a reintentar.
+                    Respuesta::NoDisponible
+                } else {
+                    Respuesta::Bloques(recortar(bs, crate::limites::MAX_BLOQUES_POR_RESPUESTA))
+                }
+            }
+        }
+    }
+
+    /// Atiende la difusión. **C-NET-12: validar antes de retransmitir.**
+    fn atender_gossip(&mut self, e: gossipsub::Event) {
+        let gossipsub::Event::Message {
+            propagation_source,
+            message_id,
+            message,
+        } = e
+        else {
+            return;
+        };
+
+        let veredicto = self.juzgar(&message);
+
+        let acceptance = match veredicto {
+            Veredicto::Aceptar => gossipsub::MessageAcceptance::Accept,
+            Veredicto::Ignorar => gossipsub::MessageAcceptance::Ignore,
+            Veredicto::Rechazar => gossipsub::MessageAcceptance::Reject,
+        };
+
+        // Sin esta llamada el mensaje se queda **pendiente para siempre** en la cola de validación:
+        // ni se reenvía ni se descarta. Es la consecuencia de haber activado `validate_messages`,
+        // y olvidarla convierte una defensa en una fuga de memoria.
+        // Devuelve `bool`, no `Result`: `false` significa que el mensaje ya no estaba en la caché
+        // de validación —normalmente porque expiró—. No es un error, pero sí una señal de que
+        // estamos tardando demasiado en juzgar.
+        if !self
+            .swarm
+            .behaviour_mut()
+            .gossipsub
+            .report_message_validation_result(&message_id, &propagation_source, acceptance)
+        {
+            tracing::debug!(
+                ?veredicto,
+                "el mensaje ya no estaba en la caché de validación"
+            );
+        }
+    }
+
+    /// Decide qué es el mensaje y se lo pasa al manejador.
+    ///
+    /// Un mensaje que no decodifica es `Rechazar`: no es ambigüedad de *timing* como un huérfano,
+    /// es basura. Pero ojo — `Rechazar` penaliza al que **lo propagó**, no al que lo creó, así que
+    /// se reserva para lo indiscutiblemente inválido.
+    fn juzgar(&self, m: &gossipsub::Message) -> Veredicto {
+        let topico = m.topic.as_str();
+        if topico.contains("/blocks/") {
+            match crate::codec::respuesta_desde_bytes(&m.data) {
+                Ok(Respuesta::Bloques(bs)) => bs
+                    .first()
+                    .map_or(Veredicto::Rechazar, |b| self.manejador.bloque_difundido(b)),
+                _ => Veredicto::Rechazar,
+            }
+        } else if topico.contains("/txs/") {
+            self.manejador.tx_difundida(&m.data)
+        } else {
+            // Un tópico al que no estamos suscritos no debería llegar. Ignorar sin penalizar:
+            // puede ser una versión nueva del protocolo, no un ataque.
+            Veredicto::Ignorar
         }
     }
 
@@ -326,4 +473,31 @@ impl<M: ManejadorEntrante> BucleRed<M> {
     pub fn manejador(&self) -> &Arc<M> {
         &self.manejador
     }
+}
+
+/// Recorta una lista al límite del protocolo.
+///
+/// Se aplica **aquí** y no se confía en que el manejador lo respete: el límite es de transporte, y
+/// el transporte es responsabilidad de este crate. Un manejador que devolviera de más produciría
+/// una respuesta que el otro extremo rechaza por tamaño — un fallo difícil de rastrear hasta aquí.
+fn recortar<T>(mut v: Vec<T>, max: usize) -> Vec<T> {
+    if v.len() > max {
+        tracing::warn!(
+            devueltos = v.len(),
+            max,
+            "el manejador devolvió más elementos de los que caben; se recorta"
+        );
+        v.truncate(max);
+    }
+    v
+}
+
+/// Convierte un `OutboundRequestId` en algo que pueda cruzar la frontera del crate.
+///
+/// El identificador de libp2p no debe asomar fuera —ver la nota de módulo—, pero el nodo necesita
+/// **algo** para correlacionar su petición con la respuesta. Un `u64` opaco basta.
+fn request_id_a_u64(id: request_response::OutboundRequestId) -> u64 {
+    // `OutboundRequestId` no expone su valor; su `Display` sí. Es feo, y la alternativa —filtrar el
+    // tipo de libp2p hacia `zx-node`— sería peor.
+    id.to_string().parse().unwrap_or(0)
 }
