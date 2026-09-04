@@ -77,7 +77,13 @@ jobs:
 
           # crate -> dependencias internas permitidas en [dependencies] (produccion)
           REGLAS = {
+              # zx-p2p solo ve tipos puros. El ciclo red<->consenso se rompe en zx-node.
               "zx-p2p": {"zx-core"},
+              # zx-consensus no puede depender de la red ni del almacenamiento: es la capa de
+              # decision pura, y debe poder testearse sin ninguna de las dos.
+              "zx-consensus": {"zx-core"},
+              # zx-mempool decide admision, asi que ve consenso, pero NO red ni disco.
+              "zx-mempool": {"zx-core", "zx-consensus"},
           }
 
           fallos = []
