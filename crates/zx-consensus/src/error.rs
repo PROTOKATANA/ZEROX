@@ -46,6 +46,36 @@ pub enum ConsensusError {
         maximo: u64,
     },
 
+    /// C-UPG-02: ninguna rama de consenso cubre esa altura.
+    #[error("C-UPG-02: no hay rama de consenso activa a la altura {altura}")]
+    SinRamaActiva {
+        /// Altura consultada.
+        altura: u32,
+    },
+
+    /// C-HDR-02b: la cabecera declara una rama de consenso que no es la activa.
+    ///
+    /// Es lo que da la protección contra *wipe-out*: un bloque de la rama vieja no puede competir
+    /// a alturas donde rige otra rama.
+    #[error(
+        "C-HDR-02b: a la altura {altura} rige la rama {esperado:#010x}, la cabecera dice {encontrado:#010x}"
+    )]
+    BranchIdIncorrecto {
+        /// Altura del bloque.
+        altura: u32,
+        /// Identificador que debería llevar.
+        esperado: u32,
+        /// El que lleva.
+        encontrado: u32,
+    },
+
+    /// La tabla de ramas está mal formada.
+    #[error("tabla de ramas inválida: {motivo}")]
+    TablaDeRamasInvalida {
+        /// Qué invariante se rompe.
+        motivo: &'static str,
+    },
+
     /// C-TX-07: versión de transacción fuera del conjunto activo a esa altura.
     #[error("C-TX-07: versión de tx {version} no admitida")]
     VersionDeTxNoAdmitida {

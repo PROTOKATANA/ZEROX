@@ -6,6 +6,7 @@
 
 #![doc = include_str!("../README.md")]
 
+pub mod activacion;
 pub mod dificultad;
 pub mod emision;
 pub mod error;
@@ -15,6 +16,7 @@ pub mod testigo;
 pub mod timestamps;
 pub mod validacion;
 
+pub use activacion::{Rama, Red, comprobar_branch_id, rama_activa};
 pub use dificultad::{VentanaRetarget, siguiente_target};
 pub use emision::{recompensa_base, subsidio};
 pub use error::ConsensusError;
