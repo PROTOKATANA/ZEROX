@@ -1192,9 +1192,20 @@ cero.
 **C-EMIT-03** · La coinbase es la primera transacción del bloque, no tiene entradas, y su
 `Σ value(salidas) ≤ subsidio(H) + Σ fees(bloque)`, con `subsidio(H)` según C-EMIT-06.
 
-**C-EMIT-04 · Unicidad del txid de coinbase.** La coinbase **MUST** incluir un campo `height: u32`
-igual a la altura del bloque, y ese campo **MUST** formar parte de los datos de efecto (entra en
-el txid).
+**C-EMIT-04 · Unicidad del txid de coinbase.** El campo `expiry_height` de una coinbase **MUST** ser
+igual a la altura de su bloque.
+
+> ⚠️ **Precisado 2026-09-04 al implementar §6.4.** Esta regla pedía "un campo `height: u32`", lo que
+> se leía como un campo **nuevo** en la transacción. No hace falta: `expiry_height` ya existe
+> (§5.1), ya forma parte de los datos de efecto —entra en `header_digest`, §4.2— y reutilizarlo
+> evita tocar el árbol del txid, que ya está especificado y probado.
+>
+> Es además **exactamente la solución de la referencia**: Zcash Protocol Specification §7.1.2 dice
+> *"[NU5 onward] The nExpiryHeight field of a coinbase transaction MUST be equal to its block
+> height."*
+>
+> Propiedad adicional que sale gratis: por C-TX-08, una coinbase con `expiry_height = H` no es
+> válida en ningún bloque de altura mayor, así que tampoco puede reproducirse más adelante.
 
 > ⚠️ **Regla crítica, fácil de omitir.** Como el testigo de la coinbase es dato de autorización y
 > no entra en el txid, **dos coinbases de alturas distintas tendrían el mismo txid** sin esta

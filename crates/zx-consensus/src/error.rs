@@ -46,6 +46,62 @@ pub enum ConsensusError {
         maximo: u64,
     },
 
+    /// El timestamp de la cabecera no cabe en `i64`.
+    ///
+    /// La cabecera lo lleva en `u64` y la aritmética de dificultad va en `i64`. Un `as` lo
+    /// convertiría en negativo en silencio, que es justo lo que C-ENC-03 prohíbe.
+    #[error("timestamp {ts} fuera del rango representable")]
+    TimestampFueraDeRango {
+        /// Valor leído.
+        ts: u64,
+    },
+
+    /// C-BLK-04: el hash de cabecera no satisface el PoW.
+    #[error("C-BLK-04: el PoW no se satisface")]
+    PowInsuficiente,
+
+    /// C-BLK-05: `bits` no es el valor que devuelve el retarget.
+    #[error("C-BLK-05: bits esperado {esperado:#010x}, encontrado {encontrado:#010x}")]
+    BitsIncorrectos {
+        /// El que debería llevar.
+        esperado: u32,
+        /// El que lleva.
+        encontrado: u32,
+    },
+
+    /// C-BLK-07: el bloque no empieza por una coinbase.
+    #[error("C-BLK-07: la primera transacción MUST ser una coinbase")]
+    BloqueSinCoinbase,
+
+    /// C-BLK-07: hay una coinbase que no es la primera.
+    #[error("C-BLK-07: solo la primera transacción puede ser coinbase")]
+    CoinbaseFueraDeSitio,
+
+    /// C-EMIT-04: la coinbase no declara su altura en `expiry_height`.
+    ///
+    /// Sin esta regla, dos coinbases de alturas distintas con las mismas salidas tendrían **el
+    /// mismo txid**, porque el testigo no entra en el txid.
+    #[error("C-EMIT-04: la coinbase de la altura {altura} declara expiry_height {expiry_height}")]
+    CoinbaseSinAltura {
+        /// Altura del bloque.
+        altura: u32,
+        /// Lo que declara la coinbase.
+        expiry_height: u32,
+    },
+
+    /// C-BLK-01: la raíz de Merkle no compromete estas transacciones.
+    #[error("C-BLK-01: la raíz de Merkle no coincide con las transacciones del bloque")]
+    MerkleRootIncorrecta,
+
+    /// C-EMIT-03: la coinbase reclama más que el subsidio más las comisiones.
+    #[error("C-EMIT-03: la coinbase cobra {cobrado} brek, máximo {maximo}")]
+    CoinbaseCobraDeMas {
+        /// Lo que reclama.
+        cobrado: u128,
+        /// Subsidio + fees.
+        maximo: u128,
+    },
+
     /// C-UPG-02: ninguna rama de consenso cubre esa altura.
     #[error("C-UPG-02: no hay rama de consenso activa a la altura {altura}")]
     SinRamaActiva {
