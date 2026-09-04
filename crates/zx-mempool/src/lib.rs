@@ -4,6 +4,10 @@
 
 #![doc = include_str!("../README.md")]
 
+pub mod error;
+pub mod pool;
 pub mod tarifa;
 
+pub use error::MempoolError;
+pub use pool::{ContextoMempool, Entrada, Mempool};
 pub use tarifa::{se_admite, tarifa_minima, tarifa_por_peso};
