@@ -51,6 +51,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libclang-dev
       # El backend de disco está tras una feature para no ralentizar el ciclo normal, pero eso
       # significa que `cargo test --workspace` NO lo prueba. Si no se corre aquí, no se corre nunca.
+      # Incluye el test de `kill -9`: lanza subprocesos de verdad y los mata a mitad de escribir.
+      # Comprueba que el almacén reabre coherente, no que RocksDB sea atómico —eso ya lo prueba
+      # RocksDB—. Lo que C-STORE-07 pide de verdad lo comprueba `tests_estructura`, leyendo el
+      # código: el test de matar NO caza una escritura partida, y está escrito en su cabecera.
       - run: cargo test -p zx-storage --features rocksdb --locked
       - run: cargo clippy -p zx-storage --features rocksdb --all-targets --locked -- -D warnings
 

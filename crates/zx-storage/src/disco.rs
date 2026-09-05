@@ -345,3 +345,43 @@ impl AlmacenCadena for AlmacenEnDisco {
         self.db.flush().map_err(backend)
     }
 }
+
+#[cfg(test)]
+#[expect(clippy::panic, reason = "los tests fallan con panic por diseño")]
+mod tests_estructura {
+    /// **C-STORE-07 leído en el código: una operación lógica, una sola llamada a `write`.**
+    ///
+    /// Existe porque el test de `kill -9` **no puede** demostrarlo. Se comprobó: mutando
+    /// `aplicar_lote` para partir la escritura en dos, aquel test pasó tres veces de tres — la
+    /// ventana entre las dos llamadas dura nanosegundos y ningún golpe repartido por milisegundos
+    /// cae dentro.
+    ///
+    /// Una propiedad estructural se comprueba mirando la estructura. Es el mismo recurso que
+    /// `spec_numeros.rs` usa para atar el SPEC al código: leer el fuente y contar.
+    ///
+    /// Si algún día una de estas funciones necesita de verdad dos escrituras, habrá que cambiar
+    /// también C-STORE-07 — que es exactamente la conversación que este test fuerza a tener.
+    #[test]
+    fn una_operacion_logica_es_una_sola_escritura() {
+        let fuente = include_str!("disco.rs");
+
+        for nombre in ["fn aplicar_lote", "fn finalizar"] {
+            let desde = fuente
+                .find(nombre)
+                .unwrap_or_else(|| panic!("no se encuentra `{nombre}` en disco.rs"));
+            let cuerpo = fuente.get(desde..).unwrap_or_default();
+            // Hasta el cierre de la función: la primera línea que empieza en la columna 4 con `}`.
+            let hasta = cuerpo.find("\n    }\n").unwrap_or(cuerpo.len());
+            let cuerpo = cuerpo.get(..hasta).unwrap_or_default();
+
+            let escrituras = cuerpo.matches("self.db.write(").count();
+            assert_eq!(
+                escrituras, 1,
+                "`{nombre}` hace {escrituras} llamadas a `self.db.write(` y C-STORE-07 exige una.\n\
+                 Dos escrituras son dos átomos, no uno: entre ellas hay una ventana en la que un \
+                 componente del estado va por delante de otro, y un corte ahí no se arregla \
+                 ignorando lo que sobra."
+            );
+        }
+    }
+}
