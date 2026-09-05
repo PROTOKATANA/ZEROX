@@ -87,6 +87,11 @@ impl AlmacenCadena for AlmacenEnMemoria {
         Ok(i.cuerpos.get(hash).cloned())
     }
 
+    fn tiene_cuerpo(&self, hash: &BlockHash) -> Result<bool, StorageError> {
+        let i = self.interior.read().map_err(|_| envenenado())?;
+        Ok(i.cuerpos.contains_key(hash))
+    }
+
     fn punta(&self) -> Result<Option<Punta>, StorageError> {
         let i = self.interior.read().map_err(|_| envenenado())?;
         Ok(i.punta)

@@ -145,6 +145,17 @@ impl AlmacenCadena for AlmacenEnDisco {
             .map_err(backend)
     }
 
+    fn tiene_cuerpo(&self, hash: &BlockHash) -> Result<bool, StorageError> {
+        // `get_pinned_cf` devuelve una vista sobre el bloque de RocksDB en vez de copiar el valor
+        // al montón. Para un cuerpo de cientos de kilobytes, la diferencia entre esto y `get_cf`
+        // es toda la copia — y aquí solo interesa si existe.
+        Ok(self
+            .db
+            .get_pinned_cf(self.cf(CF_CUERPOS)?, hash.as_bytes())
+            .map_err(backend)?
+            .is_some())
+    }
+
     fn punta(&self) -> Result<Option<Punta>, StorageError> {
         let Some(bytes) = self
             .db

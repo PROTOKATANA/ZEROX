@@ -432,6 +432,32 @@ impl Cadena {
         Ok(())
     }
 
+    /// Los hashes de la cadena cuyo **cuerpo** todavía no tenemos, hasta `max`, de menor altura a
+    /// mayor.
+    ///
+    /// De abajo arriba a propósito: la cadena se completa desde el principio, así que un nodo a
+    /// medias tiene un prefijo íntegro y un sufijo por descargar, en vez de agujeros repartidos.
+    /// Con agujeros, cualquier consulta histórica falla de forma impredecible; con un prefijo, se
+    /// sabe exactamente hasta dónde se puede responder.
+    ///
+    /// El génesis no cuenta: no tiene cuerpo que descargar.
+    #[must_use]
+    pub fn cuerpos_que_faltan(&self, max: usize) -> Vec<BlockHash> {
+        let i = leer(&self.cabeceras);
+        let mut faltan = Vec::with_capacity(max.min(i.cadena.len()));
+        for (hash, _) in i.cadena.iter().skip(1) {
+            if faltan.len() == max {
+                break;
+            }
+            // Un fallo del almacén se trata como "no lo tengo": volver a pedirlo es inofensivo,
+            // y darlo por presente dejaría un agujero que nadie volvería a mirar.
+            if !self.almacen.tiene_cuerpo(hash).unwrap_or(false) {
+                faltan.push(*hash);
+            }
+        }
+        faltan
+    }
+
     /// Recupera un bloque completo, o `None` si no lo tenemos.
     ///
     /// Un cuerpo que no decodifica se trata como **ausente** y se registra: es corrupción del

@@ -65,10 +65,10 @@ pub enum Fase {
     Cabeceras,
     /// Cabeceras validadas; descargando los cuerpos que faltan.
     ///
-    /// 🔶 **Todavía no se alcanza.** La descarga de cuerpos necesita almacenamiento persistente
-    /// —hoy el nodo solo guarda cabeceras en memoria—, así que la fase existe en el enum y nada la
-    /// construye. Se deja escrita porque el diseño la contempla y porque un enum incompleto miente
-    /// sobre el ciclo de vida del sincronizador.
+    /// Se entra aquí cuando las cabeceras están al día y quedan cuerpos por descargar, y se sale a
+    /// [`Fase::AlDia`] cuando no falta ninguno. Un nodo que reinicia con las cabeceras guardadas y
+    /// los cuerpos a medias entra aquí directamente desde el saludo, sin pasar por
+    /// [`Fase::Cabeceras`]: no le falta cadena, le faltan cuerpos.
     Cuerpos,
     /// Al día. Los bloques nuevos llegan por difusión, no por sincronización.
     AlDia,
@@ -216,10 +216,17 @@ impl Sincronizador {
 
     /// Pasa a descargar cuerpos. **Solo se llama tras validar las cabeceras** (C-NET-03).
     ///
-    /// 🔶 Sin consumidor todavía: ver la nota de [`Fase::Cuerpos`].
-    pub const fn cabeceras_validadas(&mut self) {
-        if matches!(self.fase, Fase::Cabeceras) {
-            self.fase = Fase::Cuerpos;
+    /// Se acepta desde cualquier fase, no solo desde [`Fase::Cabeceras`]: un nodo que reinicia con
+    /// las cabeceras completas concluye `AlDia` en el saludo y aun así puede tener cuerpos que
+    /// bajar.
+    pub const fn descargando_cuerpos(&mut self) {
+        self.fase = Fase::Cuerpos;
+    }
+
+    /// No falta ningún cuerpo: la sincronización terminó.
+    pub const fn cuerpos_al_dia(&mut self) {
+        if matches!(self.fase, Fase::Cuerpos) {
+            self.fase = Fase::AlDia;
         }
     }
 }

@@ -2463,6 +2463,28 @@ desconocida **MUST** descartarse sin penalizar — puede ser una carrera con una
 > Cuesta un recorrido de Merkle y no necesita estado: es la barrera **anterior** a la validación
 > completa del cuerpo (§6.4), que necesita el conjunto UTXO y todavía no está cableada.
 
+**C-NET-24 · La descarga de cuerpos va de menor altura a mayor, en lotes acotados.** Cumplida
+C-NET-03, el nodo **MUST** pedir los cuerpos que le faltan **en orden ascendente de altura**, en
+lotes de como mucho `MAX_BLOQUES_POR_RESPUESTA = 16`, y **MUST** mantener como mucho una petición
+de cuerpos en vuelo por peer: la siguiente se emite al recibir la anterior.
+
+Un nodo con las cabeceras completas y cuerpos a medias **MUST** entrar en la fase de cuerpos
+directamente desde el saludo, sin pasar por la de cabeceras. No le falta cadena; le faltan cuerpos.
+
+> **De abajo arriba, no en cualquier orden.** Un nodo a medias queda con un prefijo íntegro y un
+> sufijo por descargar, en vez de agujeros repartidos. Con agujeros, cualquier consulta histórica
+> falla de forma impredecible; con un prefijo, se sabe exactamente hasta dónde se puede responder.
+>
+> **El lote es 16 porque es lo que la respuesta puede traer.** Pedir más significa que el servidor
+> recorta y que los que sobran se piden otra vez en la vuelta siguiente, habiéndolos nombrado dos
+> veces.
+>
+> **Encadenar la siguiente petición a la respuesta anterior es el control de flujo.** No hace falta
+> un temporizador ni una ventana: un peer lento retrasa su propia descarga y nada más.
+>
+> Hasta que esta regla se implementó, el nodo **no pedía ningún cuerpo jamás**: sincronizaba
+> cabeceras y paraba. La fase existía en el enum del sincronizador y nada la construía.
+
 > **El límite por petición no acota el producto.** Cada lectura del códec está acotada por
 > `.take(MAX)`, y eso no basta:
 >

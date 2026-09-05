@@ -72,6 +72,17 @@ pub trait AlmacenCadena: Send + Sync {
     /// [`StorageError`] si el backend falla.
     fn cuerpo(&self, hash: &BlockHash) -> Result<Option<Vec<u8>>, StorageError>;
 
+    /// ¿Tenemos el cuerpo de este bloque?
+    ///
+    /// Existe aparte de [`Self::cuerpo`] porque la pregunta se hace en bucle sobre la cadena
+    /// entera —"¿qué cuerpos me faltan?"— y responderla leyendo cada cuerpo significaría mover
+    /// gigabytes por el bus para acabar mirando solo si había algo. Las implementaciones **MUST**
+    /// responder sin materializar el valor.
+    ///
+    /// # Errores
+    /// [`StorageError`] si el backend falla.
+    fn tiene_cuerpo(&self, hash: &BlockHash) -> Result<bool, StorageError>;
+
     /// La punta actual, o `None` si el almacén está vacío.
     ///
     /// # Errores

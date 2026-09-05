@@ -80,6 +80,11 @@ fn los_dos_almacenes_responden_igual() {
         mem.cabecera(&ajeno).unwrap()
     );
     assert_eq!(disco.cuerpo(&ajeno).unwrap(), mem.cuerpo(&ajeno).unwrap());
+    assert_eq!(
+        disco.tiene_cuerpo(&ajeno).unwrap(),
+        mem.tiene_cuerpo(&ajeno).unwrap(),
+        "un cuerpo que no está: los dos backends deben decir que no"
+    );
 
     // Cuerpos, incluido uno vacío y uno grande.
     for (i, c) in cs.iter().enumerate().take(5) {
@@ -87,6 +92,17 @@ fn los_dos_almacenes_responden_igual() {
         let cuerpo = vec![(i % 256) as u8; i * 5_000];
         disco.guardar_cuerpo(&h, &cuerpo).unwrap();
         mem.guardar_cuerpo(&h, &cuerpo).unwrap();
+        // `tiene_cuerpo` responde sin materializar el valor, así que es una ruta de código
+        // distinta de `cuerpo` en el backend de disco (`get_pinned_cf` frente a `get_cf`). Tiene
+        // que dar el mismo resultado, y por eso se comprueba aquí y no solo en uno.
+        assert!(
+            disco.tiene_cuerpo(&h).unwrap(),
+            "disco dice que no lo tiene"
+        );
+        assert!(
+            mem.tiene_cuerpo(&h).unwrap(),
+            "memoria dice que no lo tiene"
+        );
         assert_eq!(
             disco.cuerpo(&h).unwrap(),
             mem.cuerpo(&h).unwrap(),

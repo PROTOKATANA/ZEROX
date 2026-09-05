@@ -164,20 +164,25 @@ fn direccion() -> Multiaddr {
         .expect("multiaddr")
 }
 
+/// Una cabecera encadenada a `prev`, con raíz de relleno.
+fn cab_base(i: u32, prev: zx_core::digest::BlockHash) -> BlockHeader {
+    BlockHeader {
+        consensus_branch_id: 0xc478_80ea,
+        prev_hash: prev,
+        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([i as u8; 32])),
+        timestamp: 1_788_480_000 + u64::from(i) * 120,
+        bits: 0x1d00_ffff,
+        nonce: u64::from(i),
+        height: i,
+    }
+}
+
 /// Una cadena de `n` cabeceras encadenadas tras el génesis.
 fn cabeceras_tras(c: &Cadena, n: u32) -> Vec<BlockHeader> {
     let mut v = Vec::with_capacity(n as usize);
     let mut prev = c.genesis();
     for i in 1..=n {
-        let h = BlockHeader {
-            consensus_branch_id: 0xc478_80ea,
-            prev_hash: prev,
-            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([i as u8; 32])),
-            timestamp: 1_788_480_000 + u64::from(i) * 120,
-            bits: 0x1d00_ffff,
-            nonce: u64::from(i),
-            height: i,
-        };
+        let h = cab_base(i, prev);
         prev = h.block_hash();
         v.push(h);
     }
@@ -410,6 +415,100 @@ async fn el_nodo_real_rechaza_cabeceras_sin_pow() {
          consenso, no un test que se ha quedado viejo."
     );
     assert_eq!(a.altura(), 12, "A conserva la suya");
+
+    na.matar();
+    nb.matar();
+}
+
+/// **La descarga de cuerpos, de extremo a extremo, con el driver real.**
+///
+/// Esta sí corre hoy, y el motivo es instructivo: B **ya tiene las cabeceras**, así que no hay PoW
+/// que validar y la pared de P-031 no aparece. El saludo concluye que nadie va por delante —mismo
+/// trabajo— y aun así B pide cuerpos, que es exactamente el caso de un nodo que se reinició a
+/// mitad de la descarga.
+///
+/// Antes de esto el nodo **nunca pedía un cuerpo**: sincronizaba cabeceras y paraba. `Fase::Cuerpos`
+/// existía en el enum y nada la construía.
+#[tokio::test]
+async fn un_nodo_con_las_cabeceras_pero_sin_cuerpos_los_descarga() {
+    use zx_core::amount::Amount;
+    use zx_core::digest::TxId;
+    use zx_core::firma::ClavePublica;
+    use zx_core::preimage::block::merkle_root;
+    use zx_core::preimage::tx::txid;
+    use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use zx_p2p::mensaje::BloqueRed;
+
+    const N: u32 = 5;
+
+    let a = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let b = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+
+    // Las cabeceras se construyen a partir de los cuerpos, no al revés: la raíz de Merkle las ata
+    // (C-BLK-03, C-NET-23), y con una raíz de relleno el receptor rechazaría los cuerpos.
+    let mut cabeceras = Vec::new();
+    let mut bloques = Vec::new();
+    let mut prev = a.genesis();
+    for i in 1..=N {
+        let tx = Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([i as u8; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0xffff_fffe,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(1_000 + i64::from(i)).expect("importe"),
+                lock: Lock::PubKey {
+                    pubkey: ClavePublica::desde_bytes([9; 32]),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: i,
+        };
+        let mut cab = cab_base(i, prev);
+        cab.merkle_root = merkle_root(&[txid(&tx, cab.consensus_branch_id)]);
+        prev = cab.block_hash();
+        cabeceras.push(cab);
+        bloques.push(BloqueRed {
+            cabecera: cab,
+            txs: vec![tx],
+            testigos: vec![vec![vec![0x5a; 64]]],
+        });
+    }
+
+    // A: cabeceras y cuerpos. B: solo cabeceras — el estado de quien se reinició a media descarga.
+    a.extender_sin_validar_solo_para_pruebas(&cabeceras);
+    for bl in &bloques {
+        a.guardar_bloque(bl).expect("A guarda los suyos");
+    }
+    b.extender_sin_validar_solo_para_pruebas(&cabeceras);
+
+    assert_eq!(a.cuerpos_que_faltan(64).len(), 0, "A los tiene todos");
+    assert_eq!(
+        b.cuerpos_que_faltan(64).len(),
+        N as usize,
+        "a B le faltan los {N}"
+    );
+    assert_eq!(a.trabajo(), b.trabajo(), "nadie va por delante en cabeceras");
+
+    let na = levantar(Arc::clone(&a)).await;
+    let nb = levantar(Arc::clone(&b)).await;
+    nb.manejo.marcar(na.addr.clone()).await.expect("B marca A");
+
+    hasta_que("B descargue todos los cuerpos", || {
+        b.cuerpos_que_faltan(64).is_empty()
+    })
+    .await;
+
+    // Y son los cuerpos buenos, no cualquier cosa que quepa bajo esos hashes.
+    for bl in &bloques {
+        let recuperado = b.bloque(bl.cabecera.block_hash()).expect("B lo tiene");
+        assert_eq!(recuperado.txs, bl.txs, "las transacciones deben ser las de A");
+        assert_eq!(recuperado.testigos, bl.testigos);
+    }
 
     na.matar();
     nb.matar();

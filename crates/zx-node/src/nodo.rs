@@ -30,6 +30,7 @@ use libp2p::PeerId;
 use primitive_types::U256;
 use zx_p2p::entrante::ManejadorEntrante;
 use zx_p2p::error::MotivoDesconexion;
+use zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA;
 use zx_p2p::mensaje::{Peticion, Respuesta};
 use zx_p2p::servicio::{EventoRed, ManejoRed};
 
@@ -137,6 +138,10 @@ impl Nodo {
                 if self.sinc.fase() == Fase::Cabeceras {
                     tracing::info!(peer = %peer, "va por delante: pidiendo cabeceras");
                     self.pedir_cabeceras(peer).await;
+                } else {
+                    // No va por delante en cabeceras, pero podemos tener cuerpos a medias: es el
+                    // estado normal de un nodo que se reinició durante la descarga.
+                    self.pedir_cuerpos(peer).await;
                 }
                 Fin::Seguir
             }
@@ -171,6 +176,10 @@ impl Nodo {
                         }
                     }
                 }
+                // El siguiente lote. Si no queda ninguno, `pedir_cuerpos` concluye la
+                // sincronización. Encadenar aquí en vez de en un temporizador mantiene exactamente
+                // una petición de cuerpos en vuelo por peer: el control de flujo es la respuesta.
+                self.pedir_cuerpos(peer).await;
                 Fin::Seguir
             }
             Respuesta::NoDisponible => {
@@ -297,12 +306,40 @@ impl Nodo {
         }
 
         if self.sinc.respuesta_registrada(aplicadas) {
-            tracing::info!(altura = self.cadena.altura(), "al día");
+            tracing::info!(altura = self.cadena.altura(), "cabeceras al día");
+            // Headers-first: los cuerpos se piden DESPUÉS, y solo de cabeceras ya validadas
+            // (C-NET-03). Pedirlos antes sería gastar banda en bloques de una cadena que todavía
+            // no sabemos si vamos a adoptar.
+            self.pedir_cuerpos(peer).await;
         } else if self.sinc.fase() == Fase::Cabeceras {
             // Seguir pidiendo desde la punta nueva.
             self.pedir_cabeceras(peer).await;
         }
         Fin::Seguir
+    }
+
+    /// Pide el siguiente lote de cuerpos que faltan, o concluye la sincronización si no falta
+    /// ninguno.
+    ///
+    /// El lote se acota a [`MAX_BLOQUES_POR_RESPUESTA`], que es lo que la respuesta puede traer:
+    /// pedir más significaría que el servidor recorta y que los que sobran se piden otra vez en la
+    /// vuelta siguiente, con el coste de haberlos nombrado dos veces.
+    async fn pedir_cuerpos(&mut self, peer: PeerId) {
+        let faltan = self.cadena.cuerpos_que_faltan(MAX_BLOQUES_POR_RESPUESTA);
+        if faltan.is_empty() {
+            self.sinc.cuerpos_al_dia();
+            tracing::info!(altura = self.cadena.altura(), "al día: cadena completa");
+            return;
+        }
+        self.sinc.descargando_cuerpos();
+        tracing::debug!(peer = %peer, n = faltan.len(), "pidiendo cuerpos");
+        if let Err(e) = self
+            .manejo
+            .pedir(peer, Peticion::Bloques { hashes: faltan })
+            .await
+        {
+            tracing::debug!(peer = %peer, %e, "no se pudieron pedir cuerpos");
+        }
     }
 
     async fn pedir_cabeceras(&self, peer: PeerId) {
