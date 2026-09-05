@@ -41,6 +41,13 @@ bech32                = "=0.12.0"
 primitive-types       = "=0.14.0"
 blake2b_simd          = "=1.0.5"
 
+# --- relé compacto (BIP 152) ---
+# SipHash-2-4 para los identificadores cortos (C-NET-07). Se adopta en vez de escribirla: es una
+# primitiva con vectores oficiales, y el propio SPEC anota que BIP 152 no la define y remite a
+# Aumasson & Bernstein. No es consensus-critical —un ID mal derivado provoca una re-petición, no un
+# fork— pero eso no es motivo para reimplementarla.
+siphasher = "=1.0.3"
+
 # --- serialización ---
 capnp   = "=0.27.0"
 capnpc  = "=0.27.0"

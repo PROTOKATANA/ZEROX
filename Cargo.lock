@@ -4473,6 +4473,7 @@ dependencies = [
  "futures_ringbuf",
  "libp2p",
  "proptest",
+ "siphasher",
  "thiserror 2.0.20",
  "tokio",
  "tracing",

@@ -15,12 +15,15 @@ C-DIFF-10
 # Prohíbe el criterio de "contar bytes cero a la cabeza" para el PoW.
 C-POW-02
 
-# ── Relé compacto de bloques (BIP 152): investigado, sin implementar ──────────────────────────
+# ── Relé compacto de bloques (BIP 152): a medias ──────────────────────────────────────────────
 #
 # research/bip152.md tiene el diseño con fuente primaria. Es lo que falta para cerrar la Fase 5
 # junto con el peer scoring. No sube el TPS: reduce huérfanos y reorgs de un bloque.
+#
+# C-NET-07 (derivación del identificador corto) YA está: crates/zx-p2p/src/id_corto.rs, con los
+# vectores oficiales de SipHash-2-4. Lo que falta es todo lo demás — anuncio, reconstrucción y
+# recuperación de colisiones.
 C-NET-06
-C-NET-07
 C-NET-08
 C-NET-09
 R-NET-01
