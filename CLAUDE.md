@@ -15,7 +15,20 @@ Obsidian, en un árbol separado.
 | `/home/katana/zeo/NODOS/ZEROX/CARACTERISTICAS.md` | Hoja de características y de dónde viene cada una |
 | `/home/katana/zeo/NODOS/ZEROX/PLAN-CRATES.md` | **El plan de ejecución crate a crate** hasta la beta, con la definición de terminado y el orden de dependencia |
 | `research/` (aquí) | 17 informes con fuente primaria verificada. **La memoria de los agentes** |
-| `PDF/` (aquí) | **Las fuentes primarias de Chia, en local.** Greenpaper, paper de compromisos tiempo-memoria, whitepaper de negocio, y el repositorio `chia-blockchain` **v2.7.4** clonado entero. Se leen **antes** que buscar en la web: están anclados a una versión concreta y la web no |
+| `PDF/` (aquí) | **Fuentes primarias de Chia, en local — con la salvedad de abajo.** Se leen **antes** que la web: están ancladas a una versión y la web no |
+
+### ⚠️ Estado real de cada fichero de `PDF/` — comprobado el 2026-09-05
+
+| Fichero | Estado |
+|---|---|
+| `ChiaGreenPaper.pdf` | **ES EL DOCUMENTO EQUIVOCADO.** Precursor de jul. 2019, diseño **nunca implementado**. De aquí salió el 61,5 %. El vigente (12 jun 2026) **no está en local**: se descarga de `docs.chia.net/files/ChiaGreenPaper_20260612.pdf` |
+| `chia-blockchain/` v2.7.4 | Leído. Informe en `research/chia-parcelas-comprimidas.md` |
+| `time-memory-tre-off-proof-space.pdf` | Informe en `research/time-memory-tradeoff.md` |
+| `Chia-Business-Whitepaper-2022-02-02-v2.0.pdf` | **Sin leer.** Documento de negocio; no se ha necesitado para consenso |
+
+**La versión es parte de la cita.** Y con el código, la lección equivalente: comprobar que la rama
+está **activa**. `HARD_FORK2_HEIGHT = 0xFFFFFFFA` significa que Proof of Space 2.0 existe en el
+repositorio y **no corre en ningún nodo**.
 
 ⚠️ `ZEROX.md` y `Sin título.md` del vault son notas en crudo de Katana. **NO SE MODIFICAN.**
 `Sin título.md` está **obsoleta** (describe un diseño v1 descartado: modelo de cuentas, sin pool dual).
