@@ -7,7 +7,7 @@
 //!
 //! Es el equivalente del `ContextualCheckBlockHeader` de Bitcoin Core.
 //!
-//! # `height` es una AFIRMACIÓN del peer, no un hecho
+//! # `height` es una AFIRMACIÓN del peer, no un hecho — C-NET-22a
 //!
 //! Lo primero que hace este módulo es derivar la altura real de cada cabecera —`ancla + 1 + i`— y
 //! exigir que el campo `height` coincida. Es la comprobación de la que dependen todas las demás, y
@@ -121,7 +121,8 @@ pub fn comprobar_contexto(
         .ok_or(RechazoCabeceras::VentanaIncompleta)?;
 
     for (i, cab) in cabeceras.iter().enumerate() {
-        // **La altura se DERIVA, no se cree.** `height` lo escribe quien construye la cabecera; su
+        // C-NET-22a · **la altura se DERIVA, no se cree.** `height` lo escribe quien construye la
+        // cabecera; su
         // posición real sale del ancla y del índice en el lote. Que el campo mienta es mala fe, y
         // dejar que decida algo —como qué dificultad se le exige— vacía todo lo que viene después.
         let h = u32::try_from(i)

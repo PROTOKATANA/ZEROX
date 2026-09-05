@@ -2418,15 +2418,23 @@ juzgar mirándola sola:
 
 | | Regla | ¿Mala fe? |
 |---|---|---|
+| **`height` es la posición real: `ancla + 1 + i`** | **C-NET-22a** | **sí** |
 | `bits` es exactamente `compact(siguiente_target(H))` | C-BLK-05, C-DIFF-09 | **sí** |
 | `consensus_branch_id` es el activo a esa altura | C-HDR-02b | **sí** |
 | el timestamp avanza respecto al del padre | C-TS-01 | **sí** |
 | el timestamp no pasa del FTL | C-TS-03 | **no** |
 | (faltan ancestros para calcular la ventana) | — | **no** |
 
+**C-NET-22a · La altura de una cabecera es su POSICIÓN, no su campo `height`.** Para la cabecera
+`i`-ésima de un lote anclado en la altura `A`, su altura es `A + 1 + i`. El campo `height`
+**MUST** coincidir con ese valor, y una cabecera que declare otro se rechaza como mala fe. Ninguna
+comprobación de este documento **MAY** tomar `height` como entrada: `height` lo escribe quien
+construye la cabecera.
+
 La ventana del retarget se arma sobre la **rama candidata**: las alturas por encima del ancla salen
 del lote, y las que están en el ancla o por debajo, de la cadena propia. El padre de la primera
-cabecera del lote es el ancla.
+cabecera del lote es el ancla. Los índices dentro del lote se calculan **desde el ancla**, nunca
+desde el `height` de su primer elemento.
 
 Las tres primeras son mala fe porque son **deterministas**: dos nodos con los mismos ancestros
 obtienen el mismo valor, así que no hay forma inocente de discrepar. El FTL no lo es porque el reloj
@@ -2453,6 +2461,24 @@ válida un minuto después. El reloj es **local**, nunca de red (C-TS-04).
 >
 > **Va después del PoW a propósito.** Reconstruir una ventana de 91 ancestros cuesta bastante más
 > que un SHA3, y no merece gastarla en cabeceras que ni siquiera cumplen su propio `bits`.
+>
+> ⚠️ **C-NET-22a existe porque la primera implementación no la tenía, y eso vació todo lo demás
+> — H-007.** El código usaba `cabecera.height` para saber qué target exigir. Una cabecera que
+> cuelga de la punta real de una cadena con meses de dificultad acumulada, pero que declara altura
+> 1, cae en la rama de arranque de C-DIFF-02 y solo se le exige `TARGET_INICIAL`: la dificultad del
+> día uno de la red, que se mina en segundos. Verificado con una sonda:
+>
+> ```
+> altura declarada 1, bits del día 1, colgando de la altura 150: Ok(())
+> altura declarada 151 con esos mismos bits:            DificultadIncorrecta
+> ```
+>
+> Era **peor que no comprobar la dificultad**, porque el módulo afirmaba haberla comprobado. Un
+> hueco conocido se cierra; uno que parece cerrado, no.
+>
+> Es la lección de H-005 un piso más arriba. Allí fue transcribir a mano un número derivable; aquí,
+> **creerle** a un tercero un número derivable. Un valor que se puede derivar no se acepta de quien
+> tiene interés en mentir.
 
 **C-NET-23 · Un cuerpo MUST demostrar que es el de su cabecera antes de guardarse.** Antes de
 escribir un cuerpo en el almacén, el nodo **MUST** recalcular la raíz de Merkle desde las

@@ -83,7 +83,7 @@ struct Indice {
 }
 
 impl Indice {
-    /// Añade una cabecera al final, **si su altura declarada es su posición real**.
+    /// Añade una cabecera al final, **si su altura declarada es su posición real** (C-NET-22a).
     ///
     /// Devuelve `false` y no toca nada si no lo es. Es el segundo candado del mismo problema: la
     /// validación contextual ya rechaza las cabeceras que mienten sobre su altura, pero el índice
