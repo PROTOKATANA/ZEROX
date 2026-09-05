@@ -492,7 +492,11 @@ async fn un_nodo_con_las_cabeceras_pero_sin_cuerpos_los_descarga() {
         N as usize,
         "a B le faltan los {N}"
     );
-    assert_eq!(a.trabajo(), b.trabajo(), "nadie va por delante en cabeceras");
+    assert_eq!(
+        a.trabajo(),
+        b.trabajo(),
+        "nadie va por delante en cabeceras"
+    );
 
     let na = levantar(Arc::clone(&a)).await;
     let nb = levantar(Arc::clone(&b)).await;
@@ -506,7 +510,10 @@ async fn un_nodo_con_las_cabeceras_pero_sin_cuerpos_los_descarga() {
     // Y son los cuerpos buenos, no cualquier cosa que quepa bajo esos hashes.
     for bl in &bloques {
         let recuperado = b.bloque(bl.cabecera.block_hash()).expect("B lo tiene");
-        assert_eq!(recuperado.txs, bl.txs, "las transacciones deben ser las de A");
+        assert_eq!(
+            recuperado.txs, bl.txs,
+            "las transacciones deben ser las de A"
+        );
         assert_eq!(recuperado.testigos, bl.testigos);
     }
 

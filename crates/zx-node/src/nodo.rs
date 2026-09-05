@@ -35,7 +35,7 @@ use zx_p2p::mensaje::{Peticion, Respuesta};
 use zx_p2p::servicio::{EventoRed, ManejoRed};
 
 use crate::cadena::{Adopcion, Cadena, ErrorCuerpo};
-use crate::dificultad::comprobar_dificultad;
+use crate::contextual::comprobar_contexto;
 use crate::sync::{Fase, Sincronizador, validar_cadena_de_cabeceras};
 
 /// Si el nodo debe seguir o pararse tras atender un evento.
@@ -48,6 +48,20 @@ pub enum Fin {
     Seguir,
     /// Condición no recuperable: el nodo se detiene y avisa al operador.
     Detener,
+}
+
+/// El reloj **local**, en segundos desde la época.
+///
+/// Local y nunca de red (C-TS-04): usar una hora acordada con los peers deja que una mayoría de
+/// nodos hostiles mueva el reloj de todos, que es exactamente el ataque que el FTL existe para
+/// acotar. Si el reloj de la máquina está mal, el problema es de la máquina y se nota.
+///
+/// Un reloj anterior a la época daría `0`, que es el peor caso seguro: rechazaría cabeceras
+/// legítimas por venir "del futuro" en vez de aceptar basura.
+fn ahora() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
 }
 
 /// El nodo: una cadena, un sincronizador y un asa a la red.
@@ -221,16 +235,16 @@ impl Nodo {
                     self.cadena.trabajo(),
                     self.cadena.trabajo_de_un_bloque(),
                 )
-                // C-BLK-05, C-DIFF-09 · y que el `bits` sea el que el retarget exige. Va DESPUÉS
-                // del PoW a propósito: comprobar la dificultad esperada cuesta reconstruir una
-                // ventana de 91 ancestros, y no merece la pena gastarla en cabeceras que ni
-                // siquiera cumplen su propio `bits`.
+                // Y la validación contextual: dificultad esperada (C-BLK-05, C-DIFF-09), rama de
+                // consenso (C-HDR-02b) y timestamps (C-BLK-06). Va DESPUÉS del PoW a propósito:
+                // reconstruir una ventana de 91 ancestros cuesta bastante más que un SHA3, y no
+                // merece gastarla en cabeceras que ni siquiera cumplen su propio `bits`.
                 .and_then(|w| {
                     let altura_ancla = self
                         .cadena
                         .altura_de(hash_ancla)
                         .ok_or(crate::sync::RechazoCabeceras::VentanaIncompleta)?;
-                    comprobar_dificultad(&self.cadena, &cs, altura_ancla).map(|()| w)
+                    comprobar_contexto(&self.cadena, &cs, altura_ancla, ahora()).map(|()| w)
                 });
                 match r {
                     Ok(_) => match self.cadena.adoptar(&cs) {

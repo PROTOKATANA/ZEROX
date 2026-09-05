@@ -2412,20 +2412,33 @@ IPv4 se agrupa por **/24** e IPv6 por **/64**.
 cupo de un contador **compartido** antes de leer, y **MUST** devolverlo al terminar. Techo:
 `PRESUPUESTO_BYTES = 256 MiB`.
 
-**C-NET-22 · La sincronización headers-first MUST comprobar la dificultad esperada.** Antes de
-adoptar un lote de cabeceras, el nodo **MUST** verificar C-BLK-05 sobre cada una: que su `bits` es
-exactamente `compact(siguiente_target(H))` (C-DIFF-09). La ventana del retarget se arma sobre la
-**rama candidata**: las alturas por encima del ancla salen del lote, y las que están en el ancla o
-por debajo, de la cadena propia.
+**C-NET-22 · La sincronización headers-first MUST hacer la validación CONTEXTUAL de cada cabecera.**
+Antes de adoptar un lote, el nodo **MUST** comprobar sobre cada cabecera todo lo que no se puede
+juzgar mirándola sola:
 
-Si faltan ancestros para calcularlo, el lote se rechaza **sin penalizar** — es una limitación
-propia, no mala fe. Un `bits` distinto del que toca **sí** es mala fe (C-NET-05): el retarget es
-una función pura (C-DIFF-01), así que dos nodos con los mismos ancestros obtienen el mismo valor.
+| | Regla | ¿Mala fe? |
+|---|---|---|
+| `bits` es exactamente `compact(siguiente_target(H))` | C-BLK-05, C-DIFF-09 | **sí** |
+| `consensus_branch_id` es el activo a esa altura | C-HDR-02b | **sí** |
+| el timestamp avanza respecto al del padre | C-TS-01 | **sí** |
+| el timestamp no pasa del FTL | C-TS-03 | **no** |
+| (faltan ancestros para calcular la ventana) | — | **no** |
 
-> **Esto no es una regla nueva, es un cable que faltaba.** C-BLK-05 y C-DIFF-09 ya estaban, y
-> `zx-consensus` implementaba LWMA-1 entero y probado. Lo que no existía era ninguna llamada desde
-> el nodo: el camino de sincronización pasaba por `validar_cadena_de_cabeceras`, cuyo propio
-> docstring dice que no comprueba la dificultad esperada.
+La ventana del retarget se arma sobre la **rama candidata**: las alturas por encima del ancla salen
+del lote, y las que están en el ancla o por debajo, de la cadena propia. El padre de la primera
+cabecera del lote es el ancla.
+
+Las tres primeras son mala fe porque son **deterministas**: dos nodos con los mismos ancestros
+obtienen el mismo valor, así que no hay forma inocente de discrepar. El FTL no lo es porque el reloj
+que puede estar mal es el propio, y su rechazo **MUST NOT** cachearse: la misma cabecera puede ser
+válida un minuto después. El reloj es **local**, nunca de red (C-TS-04).
+
+> **Esto no es una regla nueva, es un cable que faltaba.** Las cinco comprobaciones ya estaban
+> escritas y probadas en `zx-consensus`, y `validar_cabecera` las hace todas. Lo que no existía era
+> ninguna llamada desde el nodo: el camino de sincronización pasaba por
+> `validar_cadena_de_cabeceras`, que tenía su propia ruta más corta. **La diferencia entre las dos
+> rutas era exactamente lo que no se comprobaba** — otra vez dos fuentes para una sola verdad, esta
+> vez en el comportamiento y no en los números.
 >
 > El agujero era que un peer podía servir cabeceras con **cualquier `bits` canónico** —uno más
 > barato del que LWMA exige— y el nodo las adoptaba. La defensa que quedaba era el umbral de

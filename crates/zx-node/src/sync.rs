@@ -98,6 +98,16 @@ pub enum RechazoCabeceras {
     /// (C-DIFF-01), así que dos nodos con los mismos ancestros calculan el mismo valor. Un `bits`
     /// distinto es una cadena que el resto de la red no acepta.
     DificultadIncorrecta,
+    /// El `consensus_branch_id` no es el activo a esa altura (C-HDR-02b). **Mala fe.**
+    RamaIncorrecta,
+    /// Un timestamp no avanza respecto al de su padre (C-TS-01). **Mala fe.**
+    TimestampNoMonotono,
+    /// Un timestamp viene de más allá del FTL (C-TS-03).
+    ///
+    /// **NO es mala fe.** El reloj que puede estar mal es el nuestro, y penalizar por ello
+    /// desconectaría a peers honestos que minan en hora. Tampoco es permanente: la misma cabecera
+    /// puede ser válida dentro de un minuto.
+    TimestampFuturo,
     /// Faltan ancestros para reconstruir la ventana del retarget.
     ///
     /// **NO es mala fe**, es una limitación nuestra: no podemos juzgar lo que no podemos calcular.
@@ -118,6 +128,8 @@ impl RechazoCabeceras {
                 | Self::PowInvalido
                 | Self::BitsNoCanonico
                 | Self::DificultadIncorrecta
+                | Self::RamaIncorrecta
+                | Self::TimestampNoMonotono
         )
     }
 }
@@ -308,7 +320,7 @@ pub fn comprobar_pow(cabeceras: &[BlockHeader]) -> Result<(), RechazoCabeceras> 
 /// Decirlo importa: **pasar este filtro no significa que la cadena sea válida**, solo que merece la
 /// memoria de examinarla.
 ///
-/// Eso **sí** se comprueba ahora, un paso más allá, en [`crate::dificultad::comprobar_dificultad`]
+/// Eso **sí** se comprueba ahora, un paso más allá, en [`crate::contextual::comprobar_contexto`]
 /// (C-NET-22), que es quien tiene acceso a la cadena para armar la ventana. Durante un tiempo no lo
 /// comprobó nadie, y ese fue el hueco: un peer podía servir cabeceras con cualquier `bits` canónico
 /// más barato del que toca y el nodo las adoptaba.

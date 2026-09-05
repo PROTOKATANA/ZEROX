@@ -1,6 +1,13 @@
-//! **Que el `bits` que llega sea el que el retarget exige** (C-BLK-05, C-DIFF-09).
+//! **Validación contextual de cabeceras**: lo que no se puede juzgar mirando una cabecera sola.
 //!
-//! # El hueco que esto cierra
+//! Que su `bits` sea el que el retarget exige (C-BLK-05, C-DIFF-09), que su rama de consenso sea la
+//! activa a su altura (C-HDR-02b) y que su timestamp avance y no venga del futuro (C-BLK-06). Las
+//! tres necesitan la cadena de alrededor, y por eso no viven en `sync::validar_estructura`, que es
+//! pura sobre el lote.
+//!
+//! Es el equivalente del `ContextualCheckBlockHeader` de Bitcoin Core.
+//!
+//! # El hueco que esto cerró
 //!
 //! `zx-consensus` implementa LWMA-1 entero y probado (`siguiente_target`), y `validar_cabecera`
 //! comprueba C-BLK-05 contra el target esperado. Pero **el nodo no llamaba a ninguno de los dos**:
@@ -14,7 +21,10 @@
 //! una divergencia de consenso en el peor sitio posible.
 //!
 //! No hay regla nueva aquí. C-BLK-05 y C-DIFF-09 ya estaban en el SPEC; lo que faltaba era el
-//! cable.
+//! cable. Lo mismo vale para C-HDR-02b y C-BLK-06: `zx_consensus::bloque::validar_cabecera` las
+//! comprueba desde el principio, y el nodo **nunca la llamaba** — tenía su propia ruta de
+//! validación de cabeceras, más corta, y la diferencia entre las dos era exactamente lo que no se
+//! comprobaba.
 //!
 //! # Por qué la ventana se arma sobre la rama CANDIDATA, no sobre la nuestra
 //!
@@ -36,19 +46,22 @@
 //!
 //! # Lo que este módulo NO valida
 //!
-//! Solo `bits`. Los timestamps (C-BLK-06, C-TS-01/03) y el cuerpo son de la validación completa de
-//! bloque. Aquí se hace lo que se puede hacer con cabeceras sueltas, en la fase headers-first, que
-//! es exactamente donde interesa descartar una cadena antes de gastar banda en sus cuerpos.
+//! El cuerpo: transacciones, firmas, gastos, importes, peso, coinbase. Eso es
+//! `zx_consensus::bloque::validar_cuerpo` y necesita el conjunto UTXO, que la cadena todavía no
+//! mantiene. Aquí se hace lo que se puede hacer con cabeceras sueltas, en la fase headers-first,
+//! que es exactamente donde interesa descartar una cadena antes de gastar banda en sus cuerpos.
 
 use primitive_types::U256;
+use zx_consensus::activacion::rama_activa;
 use zx_consensus::dificultad::{N, VentanaRetarget, siguiente_target};
+use zx_consensus::timestamps::{comprobar_ftl, comprobar_monotonia};
 use zx_core::preimage::block::BlockHeader;
 use zx_core::target::CompactBits;
 
 use crate::cadena::Cadena;
 use crate::sync::RechazoCabeceras;
 
-/// Comprueba el `bits` de cada cabecera del lote contra lo que el retarget exige.
+/// Comprueba cada cabecera del lote contra el contexto de la cadena.
 ///
 /// `cabeceras` deben venir ya validadas estructuralmente: encadenadas entre sí, con `bits`
 /// canónico y colgando de `ancla_altura` (eso lo hace `sync::validar_estructura`).
@@ -59,16 +72,41 @@ use crate::sync::RechazoCabeceras;
 /// - [`RechazoCabeceras::VentanaIncompleta`] si nos faltan ancestros para calcularlo. **No** es
 ///   mala fe: es una limitación nuestra.
 /// - [`RechazoCabeceras::BitsNoCanonico`] si algún `bits` de la ventana no decodifica.
-pub fn comprobar_dificultad(
+/// - [`RechazoCabeceras::RamaIncorrecta`] si el `consensus_branch_id` no es el activo (C-HDR-02b).
+/// - [`RechazoCabeceras::TimestampNoMonotono`] si un timestamp no avanza (C-TS-01).
+/// - [`RechazoCabeceras::TimestampFuturo`] si viene de más allá del FTL (C-TS-03). **No** es mala
+///   fe: el reloj que puede estar mal es el nuestro.
+pub fn comprobar_contexto(
     cadena: &Cadena,
     cabeceras: &[BlockHeader],
     ancla_altura: u32,
+    reloj_local: i64,
 ) -> Result<(), RechazoCabeceras> {
     let inicial = target_inicial(cadena)?;
     let n_u32 = u32::try_from(N).map_err(|_| RechazoCabeceras::VentanaIncompleta)?;
 
+    // El padre de la primera del lote es el ancla. De ahí en adelante, la anterior del lote.
+    let mut ts_padre = cadena
+        .cabecera_en(ancla_altura)
+        .and_then(|c| i64::try_from(c.timestamp).ok())
+        .ok_or(RechazoCabeceras::VentanaIncompleta)?;
+
     for cab in cabeceras {
         let h = cab.height;
+
+        // C-HDR-02b · la rama de consenso activa a esa altura. Es la protección contra wipe-out:
+        // una cabecera de otra rama no es una cabecera de esta cadena.
+        rama_activa(cadena.red(), h)
+            .ok()
+            .filter(|r| *r == cab.consensus_branch_id)
+            .ok_or(RechazoCabeceras::RamaIncorrecta)?;
+
+        // C-BLK-06 · timestamps. El de futuro NO es permanente y NO puntúa: si nuestro reloj va
+        // atrasado, el peer honesto que mina en hora nos parecería un atacante.
+        let ts = i64::try_from(cab.timestamp).map_err(|_| RechazoCabeceras::TimestampNoMonotono)?;
+        comprobar_monotonia(h, ts, ts_padre).map_err(|_| RechazoCabeceras::TimestampNoMonotono)?;
+        comprobar_ftl(ts, reloj_local).map_err(|_| RechazoCabeceras::TimestampFuturo)?;
+        ts_padre = ts;
 
         // C-DIFF-02 · arranque. Para `1 ≤ H ≤ N` no hay ventana que mirar: rige TARGET_INICIAL.
         let esperado = if h == 0 || h <= n_u32 {
@@ -165,9 +203,10 @@ fn buscar_en_lote(lote: &[BlockHeader], altura: u32) -> Option<BlockHeader> {
     reason = "los tests fallan con panic por diseño"
 )]
 mod tests {
-    use super::{comprobar_dificultad, target_inicial};
+    use super::{comprobar_contexto, target_inicial};
     use crate::cadena::Cadena;
     use crate::sync::RechazoCabeceras;
+    use zx_consensus::activacion::rama_activa;
     use zx_consensus::dificultad::{N, T, VentanaRetarget, siguiente_target};
     use zx_core::digest::{Digest, MerkleRoot};
     use zx_core::preimage::block::BlockHeader;
@@ -176,10 +215,17 @@ mod tests {
 
     const TS0: u64 = 1_788_480_000;
 
+    /// Un reloj muy posterior a cualquier timestamp sintético de estos tests.
+    ///
+    /// Fijo y no `SystemTime::now()`: un test que depende del reloj de la máquina falla el día que
+    /// alguien lo ejecuta en otra zona horaria, o en una máquina con la hora mal, y el fallo no
+    /// dice nada de lo que el test pretendía comprobar. El FTL tiene sus propios tests.
+    const RELOJ: i64 = TS0 as i64 + 10_000_000;
+
     /// Una cabecera con el `bits` que se le diga, encadenada a `prev`.
     fn cab(altura: u32, prev: zx_core::digest::BlockHash, bits: u32) -> BlockHeader {
         BlockHeader {
-            consensus_branch_id: 0xc478_80ea,
+            consensus_branch_id: rama_activa(Red::Testnet, altura).unwrap(),
             prev_hash: prev,
             merkle_root: MerkleRoot::from_digest(Digest::from_bytes([altura as u8; 32])),
             // Solvetimes exactos de T: es el caso en que LWMA no debe mover nada.
@@ -243,7 +289,7 @@ mod tests {
     fn hasta_n_rige_el_target_inicial() {
         let c = Cadena::nueva(Red::Testnet).unwrap();
         let l = lote(&c, 5);
-        comprobar_dificultad(&c, &l, 0).expect("el bits inicial es el que toca");
+        comprobar_contexto(&c, &l, 0, RELOJ).expect("el bits inicial es el que toca");
     }
 
     /// **El ataque que este módulo existe para parar: cabeceras baratas.**
@@ -271,13 +317,13 @@ mod tests {
             "el bits del ataque debe ser canónico y estar en rango"
         );
 
-        let e = comprobar_dificultad(&c, &[cab(n + 1, prev, facil)], n)
+        let e = comprobar_contexto(&c, &[cab(n + 1, prev, facil)], n, RELOJ)
             .expect_err("un bits más fácil MUST rechazarse");
         assert_eq!(e, RechazoCabeceras::DificultadIncorrecta);
         assert!(e.es_mala_fe(), "no hay forma inocente de traer otro bits");
 
         // Y el correcto sí pasa, para que el test no pueda aprobar por el motivo equivocado.
-        comprobar_dificultad(&c, &[cab(n + 1, prev, esperado)], n)
+        comprobar_contexto(&c, &[cab(n + 1, prev, esperado)], n, RELOJ)
             .expect("el bits que LWMA exige debe aceptarse");
     }
 
@@ -312,14 +358,14 @@ mod tests {
 
         let prev = c.cabecera_en(n).unwrap().block_hash();
         let buena = cab(n + 1, prev, CompactBits::codificar(esperado).to_u32());
-        comprobar_dificultad(&c, &[buena], n).expect("el bits de LWMA es el que toca");
+        comprobar_contexto(&c, &[buena], n, RELOJ).expect("el bits de LWMA es el que toca");
 
         // Y el inicial, si difiere, ya no vale a esta altura.
         let inicial = CompactBits::codificar(target_inicial(&c).unwrap()).to_u32();
         if inicial != buena.bits {
             let mala = cab(n + 1, prev, inicial);
             assert_eq!(
-                comprobar_dificultad(&c, &[mala], n),
+                comprobar_contexto(&c, &[mala], n, RELOJ),
                 Err(RechazoCabeceras::DificultadIncorrecta),
                 "pasada la altura N, TARGET_INICIAL deja de ser una respuesta válida"
             );
@@ -336,7 +382,7 @@ mod tests {
         let bits = CompactBits::codificar(target_inicial(&c).unwrap()).to_u32();
         let suelta = cab(10_000, c.genesis(), bits);
 
-        let e = comprobar_dificultad(&c, &[suelta], 0).expect_err("no se puede calcular");
+        let e = comprobar_contexto(&c, &[suelta], 0, RELOJ).expect_err("no se puede calcular");
         assert_eq!(e, RechazoCabeceras::VentanaIncompleta);
         assert!(
             !e.es_mala_fe(),
@@ -374,13 +420,90 @@ mod tests {
 
         // La segunda de la rama está a la altura N+1, así que su ventana ya es de LWMA y toma del
         // lote la cabecera de altura N — la de la rama, no la nuestra.
-        let e = comprobar_dificultad(&c, &rama, ancla_altura);
+        let e = comprobar_contexto(&c, &rama, ancla_altura, RELOJ);
         assert_eq!(
             e,
             Err(RechazoCabeceras::DificultadIncorrecta),
             "con solvetimes diez veces mayores el target esperado cambia, así que reutilizar el \
              `bits` del ancla ya no vale. Si esto pasara, la ventana se estaría armando con \
              nuestras cabeceras en vez de con las del lote."
+        );
+    }
+
+    /// **C-HDR-02b · una cabecera de otra rama de consenso no es de esta cadena.**
+    ///
+    /// Es la protección contra wipe-out: tras una actualización de red, las dos ramas producen
+    /// cadenas distintas, y aceptar cabeceras de la que no toca es adoptar la cadena equivocada.
+    #[test]
+    fn una_rama_de_consenso_ajena_es_mala_fe() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let mut l = lote(&c, 3);
+        l.get_mut(1).unwrap().consensus_branch_id = 0xdead_beef;
+        // Reencadenar: cambiar la rama cambia el hash.
+        let h1 = l.first().unwrap().block_hash();
+        l.get_mut(1).unwrap().prev_hash = h1;
+        let h2 = l.get(1).unwrap().block_hash();
+        l.get_mut(2).unwrap().prev_hash = h2;
+
+        let e = comprobar_contexto(&c, &l, 0, RELOJ).expect_err("otra rama");
+        assert_eq!(e, RechazoCabeceras::RamaIncorrecta);
+        assert!(e.es_mala_fe());
+    }
+
+    /// **C-TS-01 · el timestamp MUST avanzar.**
+    #[test]
+    fn un_timestamp_que_no_avanza_es_mala_fe() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let mut l = lote(&c, 3);
+        // El segundo retrocede al mismo instante que el primero.
+        let t0 = l.first().unwrap().timestamp;
+        l.get_mut(1).unwrap().timestamp = t0;
+        let h1 = l.first().unwrap().block_hash();
+        l.get_mut(1).unwrap().prev_hash = h1;
+        let h2 = l.get(1).unwrap().block_hash();
+        l.get_mut(2).unwrap().prev_hash = h2;
+
+        let e = comprobar_contexto(&c, &l, 0, RELOJ).expect_err("no avanza");
+        assert_eq!(e, RechazoCabeceras::TimestampNoMonotono);
+        assert!(e.es_mala_fe());
+    }
+
+    /// **C-TS-03 · del futuro no, pero sin castigar.**
+    ///
+    /// El reloj que puede estar mal es el nuestro. Penalizar por esto desconectaría a peers
+    /// honestos que minan en hora mientras nuestra máquina va atrasada — y nos dejaría aislados
+    /// justo cuando más falta hace sincronizar.
+    #[test]
+    fn un_timestamp_del_futuro_se_rechaza_pero_no_puntua() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let l = lote(&c, 2);
+        // Un reloj muy anterior a las cabeceras: para nosotros vienen del futuro.
+        let reloj_atrasado = TS0 as i64 - 100_000;
+
+        let e = comprobar_contexto(&c, &l, 0, reloj_atrasado).expect_err("del futuro");
+        assert_eq!(e, RechazoCabeceras::TimestampFuturo);
+        assert!(
+            !e.es_mala_fe(),
+            "el reloj que puede estar mal es el nuestro, no el suyo"
+        );
+
+        // Y con el reloj en hora, las mismas cabeceras pasan: el rechazo NO es permanente.
+        comprobar_contexto(&c, &l, 0, RELOJ).expect("con el reloj bien, valen");
+    }
+
+    /// El FTL da margen: justo dentro pasa, justo fuera no.
+    #[test]
+    fn el_ftl_es_el_margen_exacto() {
+        use zx_consensus::dificultad::FTL;
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let l = lote(&c, 1);
+        let ts = i64::try_from(l.first().unwrap().timestamp).unwrap();
+
+        comprobar_contexto(&c, &l, 0, ts - FTL).expect("justo en el límite entra");
+        assert_eq!(
+            comprobar_contexto(&c, &l, 0, ts - FTL - 1),
+            Err(RechazoCabeceras::TimestampFuturo),
+            "un segundo más allá, no"
         );
     }
 }
