@@ -1,20 +1,34 @@
-//! **El hito de la fase de red: dos nodos se sincronizan.**
+//! **Las piezas del protocolo de sincronización, extremo a extremo entre dos nodos.**
 //!
 //! Un nodo con cadena y otro sin ella, hablando por red real —en memoria, no por sockets del
 //! sistema—, y el segundo acaba con las cabeceras del primero.
 //!
 //! # Qué demuestra que no demostraban los tests anteriores
 //!
-//! Los de `zx-p2p` prueban que dos nodos se conectan y que el códec da la vuelta. Este prueba el
-//! camino completo con **lógica de cadena de verdad** a los dos lados: saludo → comparación de
-//! trabajo → locator → cabeceras → validación → extensión del estado.
+//! Los de `zx-p2p` prueban que dos nodos se conectan y que el códec da la vuelta. Este recorre el
+//! camino entero con estado de cadena real a los dos lados: saludo → comparación de trabajo →
+//! locator → cabeceras → validación → extensión del estado.
+//!
+//! Con una salvedad que importa y que está detallada abajo: **el protocolo se conduce a mano desde
+//! el test**, no con el driver del nodo, y la copia escrita aquí valida menos que el original.
 //!
 //! # Lo que sigue sin cubrir
 //!
 //! - **PoW real.** Minar a la dificultad mínima del protocolo exige 2³² hashes por cabecera. El
 //!   nodo servidor carga su cadena con `extender_sin_validar_solo_para_pruebas`, y el cliente la
 //!   valida con `validar_estructura` —encadenado, `bits` canónico, trabajo— pero **no** con
-//!   `comprobar_pow`. Esa parte la cubrirá el arnés con minero de la Fase 8.
+//!   `comprobar_pow`.
+//!
+//!   ⚠️ **Y esa carencia era mayor de lo que esta nota daba a entender.** Estaba escrito que aquí
+//!   no se comprueba el PoW; no estaba escrito lo que se sigue de ello: que el nodo real **sí** lo
+//!   comprueba, así que ante estas mismas cabeceras haría lo contrario de lo que este archivo
+//!   demuestra — rechazarlas y desconectar al peer por violación de consenso (C-NET-05). Es decir,
+//!   estos tests prueban que las piezas del protocolo encajan, **no** que el nodo se sincronice.
+//!
+//!   Lo encontró el arnés de tres nodos (`tres_nodos.rs`) el día que se escribió, porque aquel
+//!   conduce el driver de verdad —`zx_node::nodo::Nodo`— en vez de reescribir el protocolo a mano.
+//!   El hito de verdad está allí, bloqueado por **P-031**, y allí hay un test que fija el hallazgo:
+//!   `el_nodo_real_rechaza_cabeceras_sin_pow`.
 //! - **Cuerpos de bloque.** Todavía no hay almacenamiento persistente.
 
 #![expect(
@@ -113,7 +127,8 @@ where
     }
 }
 
-/// **El hito.** Un nodo vacío se pone al día con uno que tiene 12 cabeceras.
+/// Un nodo vacío se pone al día con uno que tiene 12 cabeceras — **con el protocolo conducido a
+/// mano**. Ver la nota del módulo: el driver real rechazaría estas cabeceras por falta de PoW.
 #[tokio::test]
 async fn un_nodo_vacio_se_pone_al_dia_con_uno_que_tiene_cadena() {
     // ── Servidor: una cadena de 12 cabeceras ─────────────────────────────────

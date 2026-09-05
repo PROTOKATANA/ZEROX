@@ -16,4 +16,5 @@
 //! `crates/zx-p2p/src/lib.rs` para el diagrama y el job de CI que lo vigila.
 
 pub mod cadena;
+pub mod nodo;
 pub mod sync;

@@ -2532,6 +2532,7 @@ debajo**.
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
 | **P-030** | §14 | 🆕 **C-UPG-06 y C-UPG-07 sin implementar.** No hay altura de activación en el mempool ni detección de "he seguido bloques inválidos". Son `SHOULD` y no hay hard fork que las ejercite todavía: se cierran con la segunda rama de consenso | **D2** |
+| **P-031** | §7.2 | 🔴 **Ningún test puede minar PoW real.** `POW_LIMIT = 2²²⁴−1` hace que la cabecera más barata cueste ~2³² hashes, así que el hito de tres nodos no se puede demostrar. Bitcoin y Zcash lo rodean con una red `regtest` de dificultad trivial; añadir una red es decisión de consenso, y queda **bloqueada** a la espera de autoridad | **Katana** |
 | **P-004d** | §7.3 | 🆕 ¿Puede LWMA adaptarse desde el bloque 1 **sembrando** la ventana con ancestros sintéticos, en vez de 90 bloques a dificultad fija? Encoger `N` está prohibido por varianza; sembrarla no. Regla de consenso nueva | Investigación + **D9** + **D8**, Fase 10 |
 
 ### Cerradas en esta revisión

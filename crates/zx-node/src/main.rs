@@ -38,16 +38,10 @@ use zx_core::red::Red;
 use zx_p2p::behaviour::ZxBehaviour;
 use zx_p2p::config::ParametrosRed;
 use zx_p2p::limites;
-use zx_p2p::servicio::{EventoRed, arrancar};
+use zx_p2p::servicio::arrancar;
 
-use primitive_types::U256;
-use zx_p2p::mensaje::{Peticion, Respuesta};
-
-use zx_p2p::entrante::ManejadorEntrante;
-
-use zx_node::cadena::Adopcion;
 use zx_node::cadena::Cadena;
-use zx_node::sync::{Fase, Sincronizador, validar_cadena_de_cabeceras};
+use zx_node::nodo::{Fin, Nodo};
 
 /// Nodo de ZEROX.
 #[derive(Parser, Debug)]
@@ -157,7 +151,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `biased` para que la señal de apagado se compruebe **primero**: sin ello, un flujo constante
     // de eventos de red podría dejar la señal sin atender indefinidamente. Es el patrón de
     // `zebrad/src/components/tokio.rs`.
-    let mut sinc = Sincronizador::nuevo();
+    let mut nodo = Nodo::nuevo(Arc::clone(&cadena), manejo.clone());
 
     loop {
         tokio::select! {
@@ -167,29 +161,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
             e = eventos.recv() => match e {
-                Some(EventoRed::PeerConectado(p)) => {
-                    tracing::info!(peer = %p, "conectado");
-                    // Lo primero que se le dice a un peer nuevo es "¿quién eres?" (§16.1). Sin el
-                    // saludo no se sabe quién va por delante, ni si es de esta cadena.
-                    if let Err(e) = manejo.pedir(p, Peticion::Estado).await {
-                        tracing::warn!(peer = %p, %e, "no se pudo saludar");
-                    }
-                }
-                Some(EventoRed::PeerDesconectado(p)) => {
-                    tracing::info!(peer = %p, "desconectado");
-                    // Perder al peer del que descargábamos vuelve a saludar; NO penaliza.
-                    sinc.peer_perdido(p);
-                }
-                Some(EventoRed::Escuchando(a)) => tracing::info!(addr = %a, "escuchando en"),
-                Some(EventoRed::PeticionFallida { peer }) => {
-                    // C-NET-05 · una petición fallida no puntúa: puede ser lentitud o una caída.
-                    tracing::debug!(peer = %peer, "petición fallida");
-                    sinc.peer_perdido(peer);
-                }
-                Some(EventoRed::Respuesta { peer, respuesta, .. }) => {
-                    if atender_respuesta(&mut sinc, &cadena, peer, *respuesta, &manejo).await
-                        == Fin::Detener
-                    {
+                // Todo lo que el nodo hace ante un evento vive en `zx_node::nodo`, no aquí: es la
+                // única forma de que los tests de integración conduzcan el MISMO código que corre
+                // en producción, en vez de una segunda copia del protocolo escrita a mano.
+                Some(evento) => {
+                    if nodo.atender(evento).await == Fin::Detener {
                         break;
                     }
                 }
@@ -223,184 +199,6 @@ fn abrir_cadena(red: Red, args: &Args) -> Result<Cadena, Box<dyn std::error::Err
     let _ = args;
     tracing::warn!("sin --datos: la cadena vive en RAM y se pierde al cerrar");
     Ok(Cadena::nueva(red)?)
-}
-
-/// Qué hacer con lo que un peer responde.
-///
-/// Vive aparte del `select!` para que el bucle principal se lea de un vistazo: el `select!` decide
-/// **qué** pasó, esto decide **qué se hace**.
-/// Si el nodo debe seguir o pararse tras atender una respuesta.
-///
-/// Un `enum` de dos variantes en vez de un `bool` porque el que para es **C-REORG-07**, y un `bool`
-/// en la firma no dice cuál de los dos valores es el excepcional.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Fin {
-    /// Todo normal.
-    Seguir,
-    /// Condición no recuperable: el nodo se detiene y avisa al operador.
-    Detener,
-}
-
-async fn atender_respuesta(
-    sinc: &mut Sincronizador,
-    cadena: &Arc<Cadena>,
-    peer: libp2p::PeerId,
-    respuesta: Respuesta,
-    manejo: &zx_p2p::servicio::ManejoRed,
-) -> Fin {
-    match respuesta {
-        Respuesta::Estado(e) => {
-            if e.genesis != cadena.genesis() {
-                // Otra cadena. El prefijo mágico (C-NET-01) evita que dos REDES se saluden; esto
-                // detecta que, dentro de la misma red, no compartimos génesis. Desconectar sin
-                // penalizar: no es mala fe, es que no tenemos nada que hablar.
-                tracing::warn!(peer = %peer, "génesis distinto: no es nuestra cadena");
-                let _ = manejo
-                    .desconectar(peer, zx_p2p::error::MotivoDesconexion::Ilegible)
-                    .await;
-                return Fin::Seguir;
-            }
-            tracing::info!(peer = %peer, altura = e.altura, "saludo");
-
-            // La comparación es por TRABAJO, no por altura: la altura la elige el peer.
-            let suyo = U256::from_big_endian(&e.trabajo);
-            let nuestro = U256::from_big_endian(&cadena.estado().trabajo);
-            sinc.saludo_recibido(peer, suyo, nuestro);
-
-            if sinc.fase() == Fase::Cabeceras {
-                tracing::info!(peer = %peer, "va por delante: pidiendo cabeceras");
-                let p = Peticion::Cabeceras {
-                    locator: cadena.locator(),
-                    hasta: None,
-                };
-                if let Err(err) = manejo.pedir(peer, p).await {
-                    tracing::warn!(peer = %peer, %err, "no se pudieron pedir cabeceras");
-                }
-            }
-        }
-        Respuesta::Cabeceras(cs) => {
-            let n = cs.len();
-            tracing::debug!(peer = %peer, n, "cabeceras recibidas");
-
-            // Lo que se cuenta hacia "al día" es lo APLICADO, no lo recibido. Contar lo recibido
-            // deja que un peer finja que estamos sincronizados mandando basura corta.
-            let mut aplicadas = 0usize;
-            // C-NET-19 · a un peer condenado no se le vuelve a pedir en esta misma vuelta.
-            // `Comando::Desconectar` solo **encola**, así que sin esta bandera el condenado se
-            // llevaba una ronda extra de interacción antes de que la desconexión se procesara.
-            let mut condenado = false;
-
-            // El ancla es de dónde cuelgan: el `prev_hash` de la primera, que MUST ser algo
-            // nuestro. Si no lo conocemos, la respuesta no continúa nuestro locator.
-            let ancla = cs.first().map(|c| c.prev_hash);
-            let hasta_ancla = ancla.and_then(|a| cadena.trabajo_hasta(a));
-
-            match hasta_ancla {
-                Some(w_ancla) if n > 0 => {
-                    let r = validar_cadena_de_cabeceras(
-                        &cs,
-                        ancla.unwrap_or_else(|| cadena.genesis()),
-                        w_ancla,
-                        cadena.trabajo(),
-                        cadena.trabajo_de_un_bloque(),
-                    );
-                    match r {
-                        Ok(_) => match cadena.adoptar(&cs) {
-                            Ok(Adopcion::Extendida { aplicadas: a }) => {
-                                aplicadas = a;
-                                tracing::info!(
-                                    peer = %peer, aplicadas = a, recibidas = n,
-                                    altura = cadena.altura(), "cabeceras"
-                                );
-                            }
-                            Ok(Adopcion::Reorganizada {
-                                aplicadas: a,
-                                desechadas,
-                            }) => {
-                                aplicadas = a;
-                                // Una reorg no es un error, pero **sí** merece nivel de aviso: es
-                                // el momento en que un pago que un comerciante daba por confirmado
-                                // puede dejar de estarlo.
-                                tracing::warn!(
-                                    peer = %peer, aplicadas = a, desechadas,
-                                    altura = cadena.altura(), "REORGANIZACIÓN"
-                                );
-                            }
-                            Ok(otra) => {
-                                // `NoGana` o `NoCuelgaDeNada`: **no es mala fe** —es lo que propone
-                                // cualquiera que vaya por otra rama— pero reintentar con el mismo
-                                // locator daría lo mismo indefinidamente (C-NET-18).
-                                tracing::debug!(peer = %peer, ?otra, "no se adopta; se deja de pedir");
-                                condenado = true;
-                            }
-                            // C-REORG-07 · una reorg de más de 99 bloques **detiene el nodo**. No
-                            // es una condición recuperable: o hay un ataque de mayoría, o esta
-                            // cadena no es la que creíamos. Seguir sería elegir en silencio.
-                            Err(e) => {
-                                tracing::error!(
-                                    peer = %peer, %e,
-                                    "C-REORG-07: reorganización demasiado profunda. EL NODO SE \
-                                     DETIENE. Revisa la cadena antes de reiniciar."
-                                );
-                                return Fin::Detener;
-                            }
-                        },
-                        Err(e) => {
-                            tracing::warn!(peer = %peer, ?e, mala_fe = e.es_mala_fe(), "rechazadas");
-                            // C-NET-05 · solo la mala fe corta. Ir por detrás, no.
-                            if e.es_mala_fe() {
-                                condenado = true;
-                                let _ = manejo
-                                    .desconectar(
-                                        peer,
-                                        zx_p2p::error::MotivoDesconexion::ViolacionDeConsenso,
-                                    )
-                                    .await;
-                            }
-                        }
-                    }
-                }
-                Some(_) => {}
-                None if n > 0 => {
-                    // Su `prev_hash` no está en nuestra cadena. **No se penaliza** —puede ser
-                    // desincronización— pero tampoco se le sigue pidiendo: con el mismo locator
-                    // respondería lo mismo indefinidamente.
-                    tracing::debug!(peer = %peer, "sus cabeceras no cuelgan de nada nuestro");
-                    sinc.peer_perdido(peer);
-                    return Fin::Seguir;
-                }
-                None => {}
-            }
-
-            if condenado {
-                // Al peer condenado no se le pide nada más, y deja de ser nuestro sincronizador
-                // **ahora**, sin esperar al evento de desconexión.
-                sinc.peer_perdido(peer);
-                return Fin::Seguir;
-            }
-
-            if sinc.respuesta_registrada(aplicadas) {
-                tracing::info!(altura = cadena.altura(), "al día");
-            } else if sinc.fase() == Fase::Cabeceras {
-                // Seguir pidiendo desde la punta nueva.
-                let p = Peticion::Cabeceras {
-                    locator: cadena.locator(),
-                    hasta: None,
-                };
-                if let Err(err) = manejo.pedir(peer, p).await {
-                    tracing::debug!(peer = %peer, %err, "no se pudo seguir pidiendo");
-                }
-            }
-        }
-        Respuesta::Bloques(bs) => {
-            tracing::debug!(peer = %peer, n = bs.len(), "bloques recibidos");
-        }
-        Respuesta::NoDisponible => {
-            // No es un error y no puntúa (C-NET-05).
-            tracing::debug!(peer = %peer, "el peer no tiene lo que se le pidió");
-        }
-    }
-    Fin::Seguir
 }
 
 /// Hexadecimal, para los logs.
