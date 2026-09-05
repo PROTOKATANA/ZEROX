@@ -1,0 +1,5 @@
+Documentación : https://docs.chia.net/chia-blockchain/introduction/
+
+Documentación : https://chiapower.org/chia-proofs-of-space/PoST
+
+Repositorio : https://github.com/Chia-Network/chia-blockchain
