@@ -108,12 +108,17 @@ impl ConjuntoEnMemoria {
 /// `txs[0]` **MUST** ser la coinbase. Sus salidas se insertan como cualquier otra, marcadas como
 /// coinbase para que C-EMIT-05 pueda aplicar la madurez.
 ///
+/// `rama` es el `consensus_branch_id` de la cabecera del bloque, y **no es opcional**: el txid
+/// depende de él (C-TX-05), así que es lo que decide la clave con la que cada salida queda
+/// indexada.
+///
 /// # Errores
 /// [`StorageError`] si alguna entrada no existe o algún outpoint creado ya estaba.
 pub fn aplicar_bloque(
     conjunto: &mut ConjuntoEnMemoria,
     txs: &[Tx],
     altura: u32,
+    rama: u32,
 ) -> Result<UndoData, StorageError> {
     // Copia de trabajo: la atomicidad de C-REORG-03 sale de aquí.
     let mut trabajo = conjunto.clone();
@@ -137,7 +142,15 @@ pub fn aplicar_bloque(
 
     for (i, tx) in txs.iter().enumerate() {
         let es_coinbase = i == 0;
-        let txid = zx_core::preimage::tx::txid(tx, 0);
+        // C-TX-05 · la rama de consenso entra en el txid, así que la clave del UTXO **MUST**
+        // calcularse con la rama que estaba activa cuando se minó el bloque que creó la salida.
+        //
+        // Esto estuvo clavado a `0`, y era un fallo latente que ningún test podía ver porque los
+        // tests usaban `txid(tx, 0)` también: autoconsistentes con el error. En cuanto el nodo lo
+        // hubiera cableado, la clave de inserción y la de búsqueda habrían sido distintas —la de
+        // búsqueda viene del `prev_txid` de la red, calculado con la rama real— y **ninguna salida
+        // se habría podido gastar nunca**.
+        let txid = zx_core::preimage::tx::txid(tx, rama);
         for (j, salida) in tx.outputs.iter().enumerate() {
             let o = OutPoint {
                 prev_txid: txid,
@@ -226,6 +239,14 @@ pub fn revertir_hasta_el_fork(
     reason = "los tests fallan con panic por diseño"
 )]
 mod tests {
+    /// Una rama de consenso **real**, no cero.
+    ///
+    /// Los tests usaban `txid(tx, 0)` igual que la producción, y por eso no podían ver que la rama
+    /// estaba clavada a cero: eran autoconsistentes con el fallo. Con un valor real, si alguien
+    /// vuelve a clavarla, la clave de inserción deja de coincidir con la de búsqueda y los tests
+    /// se caen.
+    const RAMA: u32 = 0xc478_80ea;
+
     use super::{
         ConjuntoEnMemoria, UndoData, aplicar_bloque, revertir_bloque, revertir_hasta_el_fork,
     };
@@ -273,7 +294,7 @@ mod tests {
 
     fn punto(tx: &Tx, i: u32) -> OutPoint {
         OutPoint {
-            prev_txid: txid(tx, 0),
+            prev_txid: txid(tx, RAMA),
             prev_index: i,
         }
     }
@@ -288,7 +309,7 @@ mod tests {
 
         // Bloque 1: solo coinbase.
         let cb1 = coinbase(1, vec![salida(1000, 1), salida(500, 2)]);
-        let undo1 = aplicar_bloque(&mut c, core::slice::from_ref(&cb1), 1).unwrap();
+        let undo1 = aplicar_bloque(&mut c, core::slice::from_ref(&cb1), 1, RAMA).unwrap();
         assert_eq!(c.len(), 2);
         let tras_b1: Vec<_> = {
             let mut v: Vec<_> = [punto(&cb1, 0), punto(&cb1, 1)]
@@ -302,7 +323,7 @@ mod tests {
         // Bloque 2: gasta una de las dos.
         let cb2 = coinbase(2, vec![salida(10, 3)]);
         let tx = gasta(vec![punto(&cb1, 0)], vec![salida(900, 4)]);
-        let undo2 = aplicar_bloque(&mut c, &[cb2, tx], 2).unwrap();
+        let undo2 = aplicar_bloque(&mut c, &[cb2, tx], 2, RAMA).unwrap();
         assert_ne!(c.len(), 2, "el bloque 2 cambió el conjunto");
 
         // Deshacer el 2: vuelta exacta al estado tras el 1.
@@ -328,11 +349,11 @@ mod tests {
     fn el_undo_data_guarda_el_utxo_completo() {
         let mut c = ConjuntoEnMemoria::nuevo();
         let cb1 = coinbase(1, vec![salida(1000, 7)]);
-        aplicar_bloque(&mut c, core::slice::from_ref(&cb1), 1).unwrap();
+        aplicar_bloque(&mut c, core::slice::from_ref(&cb1), 1, RAMA).unwrap();
 
         let cb2 = coinbase(2, vec![salida(10, 3)]);
         let tx = gasta(vec![punto(&cb1, 0)], vec![salida(900, 4)]);
-        let undo = aplicar_bloque(&mut c, &[cb2, tx], 2).unwrap();
+        let undo = aplicar_bloque(&mut c, &[cb2, tx], 2, RAMA).unwrap();
 
         let (_, consumido) = undo
             .consumidos
@@ -360,7 +381,7 @@ mod tests {
     fn un_bloque_que_falla_no_deja_el_conjunto_a_medias() {
         let mut c = ConjuntoEnMemoria::nuevo();
         let cb1 = coinbase(1, vec![salida(1000, 1)]);
-        aplicar_bloque(&mut c, core::slice::from_ref(&cb1), 1).unwrap();
+        aplicar_bloque(&mut c, core::slice::from_ref(&cb1), 1, RAMA).unwrap();
         let antes = c.len();
 
         // Segunda tx gasta algo inexistente: el bloque entero debe fallar.
@@ -368,13 +389,13 @@ mod tests {
         let buena = gasta(vec![punto(&cb1, 0)], vec![salida(900, 4)]);
         let mala = gasta(
             vec![OutPoint {
-                prev_txid: txid(&cb1, 0),
+                prev_txid: txid(&cb1, RAMA),
                 prev_index: 99,
             }],
             vec![salida(1, 5)],
         );
 
-        let r = aplicar_bloque(&mut c, &[cb2, buena, mala], 2);
+        let r = aplicar_bloque(&mut c, &[cb2, buena, mala], 2, RAMA);
         assert!(matches!(r, Err(StorageError::OutpointAusente)), "{r:?}");
         assert_eq!(
             c.len(),
@@ -392,7 +413,7 @@ mod tests {
     fn un_undo_incoherente_no_deja_el_conjunto_a_medias() {
         let mut c = ConjuntoEnMemoria::nuevo();
         let cb = coinbase(1, vec![salida(1000, 1)]);
-        aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1).unwrap();
+        aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
         let antes = c.len();
 
         let falso = UndoData {
@@ -409,7 +430,7 @@ mod tests {
     fn deshacer_lo_que_no_esta_es_un_error() {
         let mut c = ConjuntoEnMemoria::nuevo();
         let cb = coinbase(1, vec![salida(1000, 1)]);
-        let undo = aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1).unwrap();
+        let undo = aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
 
         revertir_bloque(&mut c, &undo).unwrap();
         // Deshacerlo dos veces: la segunda MUST fallar.
@@ -462,7 +483,7 @@ mod tests {
 
         // Cadena que vive el reorg.
         let mut vivido = ConjuntoEnMemoria::nuevo();
-        aplicar_bloque(&mut vivido, core::slice::from_ref(&cb0), 0).unwrap();
+        aplicar_bloque(&mut vivido, core::slice::from_ref(&cb0), 0, RAMA).unwrap();
         let en_el_fork = vivido.len();
 
         // Rama A: tres bloques.
@@ -472,7 +493,7 @@ mod tests {
             let cb = coinbase(h, vec![salida(10, u8::try_from(h).unwrap())]);
             let tx = gasta(vec![ultimo], vec![salida(100, 9)]);
             ultimo = punto(&tx, 0);
-            undos_a.push(aplicar_bloque(&mut vivido, &[cb, tx], h).unwrap());
+            undos_a.push(aplicar_bloque(&mut vivido, &[cb, tx], h, RAMA).unwrap());
         }
         assert_ne!(vivido.len(), en_el_fork, "la rama A cambió el estado");
 
@@ -482,7 +503,7 @@ mod tests {
 
         // Un nodo limpio que solo vio el bloque 0.
         let mut limpio = ConjuntoEnMemoria::nuevo();
-        aplicar_bloque(&mut limpio, core::slice::from_ref(&cb0), 0).unwrap();
+        aplicar_bloque(&mut limpio, core::slice::from_ref(&cb0), 0, RAMA).unwrap();
 
         assert_eq!(vivido.len(), limpio.len());
         assert_eq!(
@@ -501,7 +522,7 @@ mod tests {
         let tx = gasta(vec![], vec![salida(1, 2)]);
         // Una tx sin entradas que no sea la primera no debería existir en un bloque válido, pero
         // aquí se comprueba solo el marcado del almacén.
-        aplicar_bloque(&mut c, &[cb.clone(), tx.clone()], 5).unwrap();
+        aplicar_bloque(&mut c, &[cb.clone(), tx.clone()], 5, RAMA).unwrap();
 
         let de_coinbase = c.buscar(&punto(&cb, 0)).unwrap();
         assert!(
@@ -512,5 +533,64 @@ mod tests {
 
         let normal = c.buscar(&punto(&tx, 0)).unwrap();
         assert!(!normal.es_coinbase, "las demás no");
+    }
+
+    /// **La clave del UTXO se calcula con la rama del bloque que lo creó** (C-TX-05).
+    ///
+    /// El test que el fallo anterior no podía tener. `aplicar_bloque` clavaba la rama a `0`, y los
+    /// tests calculaban sus `prev_txid` con `txid(tx, 0)` también: autoconsistentes con el error,
+    /// verdes para siempre.
+    ///
+    /// Aquí el gasto referencia la salida por su txid **real**, el que calcularía cualquier otro
+    /// nodo de la red a partir del bloque. Si `aplicar_bloque` indexara con otra rama, la búsqueda
+    /// no encontraría nada y ninguna salida sería gastable jamás.
+    #[test]
+    fn la_clave_sale_de_la_rama_del_bloque_no_de_cero() {
+        let mut c = ConjuntoEnMemoria::nuevo();
+        let cb = coinbase(1, vec![salida(50_000, 1)]);
+
+        aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
+
+        // El txid REAL: el que produce la rama activa, no cero.
+        let real = txid(&cb, RAMA);
+        assert_ne!(
+            real,
+            txid(&cb, 0),
+            "la rama tiene que cambiar el txid, o este test no prueba nada"
+        );
+
+        let o = OutPoint {
+            prev_txid: real,
+            prev_index: 0,
+        };
+        assert!(
+            c.buscar(&o).is_some(),
+            "la salida debe estar indexada por su txid real; si no, nadie podría gastarla"
+        );
+
+        // Y con la rama equivocada, no está. Es el estado en el que quedaba el conjunto antes.
+        let con_rama_mala = OutPoint {
+            prev_txid: txid(&cb, 0),
+            prev_index: 0,
+        };
+        assert!(c.buscar(&con_rama_mala).is_none());
+    }
+
+    /// Y dos bloques con ramas distintas indexan la misma transacción en claves distintas — que es
+    /// lo correcto: son txid distintos, y por tanto salidas distintas.
+    #[test]
+    fn ramas_distintas_dan_claves_distintas() {
+        let cb = coinbase(1, vec![salida(1, 1)]);
+        let mut a = ConjuntoEnMemoria::nuevo();
+        let mut b = ConjuntoEnMemoria::nuevo();
+        aplicar_bloque(&mut a, core::slice::from_ref(&cb), 1, RAMA).unwrap();
+        aplicar_bloque(&mut b, core::slice::from_ref(&cb), 1, RAMA.wrapping_add(1)).unwrap();
+
+        let o = OutPoint {
+            prev_txid: txid(&cb, RAMA),
+            prev_index: 0,
+        };
+        assert!(a.buscar(&o).is_some());
+        assert!(b.buscar(&o).is_none(), "otra rama, otra clave");
     }
 }
