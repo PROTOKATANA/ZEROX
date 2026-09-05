@@ -800,19 +800,34 @@ explícito** — encargo abierto para **D2** y **D8**, no una constante cerrada.
 
 ### 6.1 · Cabecera
 
-| Campo | Tipo | Bytes | Notas |
-|---|---|---|---|
-| `consensus_branch_id` | `u32` | 4 | identificador de rama de consenso, §14 |
-| `prev_hash` | `u256` | 32 | hash de la cabecera del padre |
-| `merkle_root` | `u256` | 32 | §6.3 |
-| `timestamp` | `u64` | 8 | segundos Unix |
-| `bits` | `u32` | 4 | target compacto, §7.2 |
-| `nonce` | `u64` | 8 | |
-| `height` | `u32` | 4 | altura del bloque |
-| **Total** | | **92** | con `timestamp: u64` |
+> ⚠️ **Reescrita el 2026-09-05 por el cambio a Proof of Archival Storage** (`DECISIONES.md` §14).
+> Mueren `bits` y `nonce`. Entran el slot, la salida del PoT, el rango de solución, la solución y
+> el sello. `timestamp` **se queda**: bajo §19 recalibra la velocidad del PoT.
 
-**C-HDR-01** · La cabecera tiene tamaño **fijo**. Su codificación es la concatenación de los
-campos en el orden de la tabla, cada uno en little-endian.
+| Campo | Tipo | Bytes | Offset |
+|---|---|---|---|
+| `consensus_branch_id` | `u32` | 4 | `[0, 4)` |
+| `prev_hash` | `u256` | 32 | `[4, 36)` |
+| `merkle_root` | `u256` | 32 | `[36, 68)` |
+| `timestamp` | `u64` | 8 | `[68, 76)` |
+| `height` | `u32` | 4 | `[76, 80)` |
+| `slot` | `u64` | 8 | `[80, 88)` |
+| `pot_output` | `[u8;16]` | 16 | `[88, 104)` |
+| `rango_solucion` | `u64` | 8 | `[104, 112)` |
+| `sol.public_key` | `[u8;32]` | 32 | `[112, 144)` |
+| `sol.sector_index` | `u16` | 2 | `[144, 146)` |
+| `sol.history_size` | `u64` | 8 | `[146, 154)` |
+| `sol.piece_offset` | `u16` | 2 | `[154, 156)` |
+| `sol.record_commitment` | `[u8;48]` | 48 | `[156, 204)` |
+| `sol.record_witness` | `[u8;48]` | 48 | `[204, 252)` |
+| `sol.chunk` | `[u8;32]` | 32 | `[252, 284)` |
+| `sol.chunk_witness` | `[u8;48]` | 48 | `[284, 332)` |
+| `sol.proof_of_space` | `[u8;160]` | 160 | `[332, 492)` |
+| `sello` | `[u8;64]` | 64 | `[492, 556)` |
+| **Total** | | **556** | |
+
+**C-HDR-01** · La cabecera tiene tamaño **fijo**, `TAMANO_CABECERA = 556`. Su codificación es la
+concatenación de los campos en el orden de la tabla, cada uno en little-endian.
 
 **C-HDR-02** · `height` **MUST** ser `height(padre) + 1`. El génesis tiene `height = 0`.
 
@@ -820,51 +835,51 @@ campos en el orden de la tabla, cada uno en little-endian.
 altura del bloque, según la tabla de C-UPG-02. Cualquier otro valor **MUST** rechazarse. No existe
 un campo de "versión de bloque" separado: la rama de consenso *es* la versión.
 
-> Incluir la altura en la cabecera hace que el hash de cabecera dependa de ella, lo que simplifica
-> C-EMIT-04 (unicidad de txid de coinbase) y elimina una clase de ambigüedad en reorgs.
+**C-HDR-05** · `slot` **MUST** ser estrictamente mayor que `slot(padre)`. El génesis tiene
+`slot = 0`.
 
-### 6.2 · Hash de cabecera
+> Esta regla es la que hace que el reloj de slot sirva de reloj: con ella, la diferencia de slots
+> entre padre e hijo es `≥ 1` **por construcción**, y desaparece la normalización monótona defensiva
+> que LWMA-1 necesitaba sobre timestamps (`DECISIONES.md` §19). Autonomys la tiene en
+> `block_import.rs:368` (`SlotMustIncrease`).
 
-**C-HDR-03** · `block_hash = H_d("ZZKBlkHeader____", header_encoding)`.
+**C-HDR-06** · `rango_solucion` viaja en la cabecera y **MUST** ser exactamente
+`rango_esperado(padre)`, función pura de la cadena de cabeceras. Cualquier otro valor invalida el
+bloque. Es **redundancia comprobada** para clientes ligeros, nunca fuente de verdad.
 
-> La **preimagen del PoW son estos 108 bytes** (16 de etiqueta + 92 de cabecera). Cabe holgadamente
-> en un solo bloque de rate de SHA3-256 (136 bytes), lo que permite mantener un kernel GPU de
-> absorción única. Ver `research/sha3-kernel-audit.md` — el kernel actual asume esto sin
-> documentarlo, y aquí queda documentado como contrato.
+**C-HDR-07** · La **justificación del PoT no va en la cabecera**, pero **MUST** acompañar al bloque
+para que sea válido. Un bloque sin justificación verificable es **inválido**, no "pendiente".
 
-**C-HDR-04** · El **nonce ocupa los bytes `[96, 104)` de la preimagen** (offset 16 de la etiqueta
-+ 80 del inicio del campo `nonce` en la cabecera). El minero GPU **MUST** iterar exactamente ese
-rango. Este offset es **regla de consenso**, no detalle de implementación.
+> Decidido en `DECISIONES.md` §22 con los números delante: meterla dentro no ahorra tráfico
+> —3,88 GiB/año en los dos casos— y multiplica por 32 la cadena de cabeceras, 77,64 GiB frente a
+> 2,45 a veinte años. Lo que se perdería es la capacidad de separar la fase barata de la cara, que
+> es para lo que existe *headers-first*.
 
-Offsets de los campos dentro de la cabecera, para que no haya que contarlos a mano:
+**C-HDR-08** · La cabecera **MUST NOT** contener la dirección de recompensa. La recompensa es la
+salida de la coinbase, ya comprometida en `merkle_root` (C-EMIT-04).
 
-| Campo | Offset en cabecera | Offset en preimagen |
-|---|---|---|
-| `consensus_branch_id` | `[0, 4)` | `[16, 20)` |
-| `prev_hash` | `[4, 36)` | `[20, 52)` |
-| `merkle_root` | `[36, 68)` | `[52, 84)` |
-| `timestamp` | `[68, 76)` | `[84, 92)` |
-| `bits` | `[76, 80)` | `[92, 96)` |
-| **`nonce`** | **`[80, 88)`** | **`[96, 104)`** |
-| `height` | `[88, 92)` | `[104, 108)` |
+> Autonomys lleva `reward_address` en la solución porque en Substrate la recompensa va a una cuenta.
+> ZEROX es UTXO: un solo sitio donde va el dinero. Ahorro medido: 160 MiB a veinte años.
 
-> ⚠️ **Corregido 2026-09-04 · hallazgo H-005.** Esta regla decía `[92, 100)` con offset 76. El 76
-> venía de cuando `timestamp` era `u32` (`4+32+32+4+4 = 76`); P-004 lo fijó en `u64` y **este offset
-> no se actualizó**.
+### 6.2 · Hash de cabecera y sello
+
+**C-HDR-03** · `prefirma = header_encoding[0, 492)` — la cabecera entera **menos el sello**.
+`pre_hash = H_d("ZZKBlkPreHash___", prefirma)`.
+
+**C-HDR-04** · `sello` **MUST** ser una firma Ed25519 válida sobre `pre_hash` bajo
+`sol.public_key`, verificada con las reglas de ZIP-215 (C-SIG-01).
+
+> El sello liga la solución a **este** bloque. Sin él, cualquiera que vea una solución difundida la
+> reutiliza con su propia coinbase.
 >
-> La consecuencia no era cosmética: `[92, 100)` cubre **los últimos 4 bytes de `bits`** y solo los
-> 4 primeros del `nonce`. Un minero que siguiera la regla al pie de la letra estaría **mutando el
-> target mientras mina**, así que todo bloque que produjera violaría C-BLK-05 (`bits` **MUST** ser
-> exactamente el valor del retarget) y sería rechazado. Nunca habría encontrado un bloque válido, y
-> el síntoma —"el minero no saca bloques"— no habría apuntado a la causa.
->
-> En `zx-core` este offset **se deriva de los tamaños de los campos**, no se escribe a mano, y un
-> test lo fija (`el_nonce_esta_donde_dice_c_hdr_04`). Si alguien vuelve a cambiar el ancho de un
-> campo, el test falla en vez de romper el minero en silencio.
+> **Ed25519 es determinista** (RFC 8032: el nonce es `SHA-512(prefijo ‖ mensaje)`). Misma clave y
+> mismo mensaje dan siempre la misma firma, así que **volver a firmar no genera un `block_hash`
+> nuevo**. Autonomys usa schnorrkel, que firma con nonce aleatorio, y por eso su desempate por menor
+> hash es gratis de moler. El nuestro no lo es por esta vía. ⚠️ **Sí lo es variando la coinbase**,
+> que cambia `merkle_root`: por eso C-FORK-04 desempata primero por `solution_distance`.
 
-> El kernel heredado clava el nonce en los bytes `[48,56)` por accidente histórico y, si la cabecera
-> midiera menos de 56 bytes, **todos los hilos calcularían el mismo hash**. Ver
-> `research/sha3-kernel-audit.md` hallazgo 7.
+**C-HDR-09** · `block_hash = H_d("ZZKBlkHeader____", header_encoding)` — sobre los **556** bytes,
+sello incluido.
 
 ### 6.3 · Árbol de Merkle
 

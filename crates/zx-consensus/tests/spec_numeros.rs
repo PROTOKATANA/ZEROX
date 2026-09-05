@@ -72,9 +72,30 @@ fn no_reaparece(viejo: &[&str], que_paso: &str) {
 ///
 /// C-SPEC-01 · toda cifra derivada que el SPEC afirme pasa por aquí o por una comprobación que la
 /// recalcule. Añadir una al documento sin añadir su test es una violación de la regla.
-fn afirma(fragmento: &str, porque: &str) {
+/// Para cifras que el SPEC **no debe** fijar en texto normativo porque son **instancias
+/// derivadas**, no constantes. Ejemplo: `MAX_RESPUESTA_BYTES` vale 25,6 MB en el génesis, pero
+/// C-NET-13 exige que se derive de `LIMITE(H)` y **prohíbe** que sea constante — escribirla como
+/// regla contradiría la regla. Su sitio legítimo es una nota ilustrativa.
+///
+/// Se sigue comprobando que la cifra esté y cuadre; lo que cambia es dónde se admite que viva.
+fn afirma_ilustrativa(fragmento: &str, porque: &str) {
     assert!(
         SPEC.contains(fragmento),
+        "\n\nEl SPEC ya no ilustra «{fragmento}» en ningún sitio.\n\
+         Motivo por el que debería: {porque}\n\n\
+         Es una cifra DERIVADA: su sitio es una nota, no una regla. Pero si desaparece del todo, \
+         nadie puede comprobar a ojo que la derivación da lo que dice que da.\n"
+    );
+}
+
+/// ⚠️ Mira **solo texto normativo**: las citas en bloque (`>`) son narrativa histórica y el SPEC
+/// cuenta a propósito sus propios errores pasados. Antes miraba el SPEC entero, y por eso el
+/// 2026-09-05 la aserción de «92 bytes» siguió en verde después de que §6.1 pasara a 556: tres
+/// menciones viejas —dos de ellas en notas— la sostenían. Es el fallo que este fichero existe para
+/// impedir, cometido por el propio fichero.
+fn afirma(fragmento: &str, porque: &str) {
+    assert!(
+        normativo().contains(fragmento),
         "\n\nEl SPEC ya no dice «{fragmento}».\n\
          Motivo por el que debería: {porque}\n\n\
          Si has cambiado una CONSTANTE, el SPEC se quedó atrás: actualízalo.\n\
@@ -86,39 +107,70 @@ fn afirma(fragmento: &str, porque: &str) {
 /// **El tamaño de cabecera.** Estuvo mal en seis sitios como 112.
 #[test]
 fn el_spec_dice_el_tamano_real_de_la_cabecera() {
+    // ⚠️ MIGRACIÓN EN CURSO (2026-09-05). El SPEC §6.1 ya describe la cabecera de PoAS: 556 B.
+    // `zx-core` sigue en los 92 B de PoW. Este test es ROJO A PROPÓSITO hasta que se reescriba
+    // `crates/zx-core/src/preimage/block.rs`. Es spec-first funcionando: el SPEC va delante y este
+    // test es lo que obliga al código a alcanzarlo. Ver DECISIONES.md §22.
     assert_eq!(
-        TAMANO_CABECERA, 92,
-        "si esto cambia, el SPEC entero lo dice mal"
+        TAMANO_CABECERA, 556,
+        "SPEC §6.1 dice 556 B (112 base + 380 solución + 64 sello). El código sigue en 92, que era \
+         la cabecera de PoW. Reescribe zx-core/src/preimage/block.rs."
     );
     afirma(
-        "92 bytes",
-        "TAMANO_CABECERA = 4+32+32+8+4+8+4. Decía 112 en tres sitios del SPEC y tres del código.",
+        "**556**",
+        "TAMANO_CABECERA = 112 + 380 + 64, derivado de la tabla de campos de §6.1.",
     );
     no_reaparece(
         &["112 bytes", "cabecera(112"],
-        "TAMANO_CABECERA son 92. El 112 estuvo en tres sitios del SPEC y tres del código, y \
-         ninguno lo derivaba de la constante.",
+        "El 112 estuvo en tres sitios del SPEC y tres del código, y ninguno lo derivaba de la \
+         constante. Ojo: 112 vuelve a aparecer en §6.1, pero como el tamaño de la BASE de la \
+         cabecera, no de la cabecera entera.",
     );
 }
 
-/// **El offset del nonce.** Es H-005 literal: quedó obsoleto al cambiar el tipo de `timestamp`.
 #[test]
-fn el_spec_dice_el_offset_real_del_nonce() {
-    assert_eq!(OFFSET_NONCE_CABECERA, 80);
-    assert_eq!(OFFSET_NONCE_PREIMAGEN, 96);
-    assert_eq!(TAMANO_PREIMAGEN_POW, 108);
-
-    afirma(
-        "[96, 104)",
-        "OFFSET_NONCE_PREIMAGEN = 96 y el nonce mide 8 bytes. H-005 fue decir [92,100).",
-    );
+fn el_spec_ya_no_habla_de_nonce_ni_de_pow() {
+    // Bajo PoAS no hay nonce que iterar ni preimagen de PoW. H-005 —el offset del nonce escrito a
+    // mano en vez de derivado— deja de estar en el camino crítico, pero la lección se conserva:
+    // por eso este fichero existe.
     no_reaparece(
-        &["[92, 100)", "[92,100)"],
-        "Eso es H-005. El rango [92,100) cubre los últimos 4 bytes de `bits` y solo la mitad del \
-         nonce: el minero habría mutado la dificultad mientras minaba.",
+        &["OFFSET_NONCE", "preimagen del PoW", "el minero GPU"],
+        "PoW se retiró el 2026-09-05 (DECISIONES.md §14). Si esto reaparece en texto normativo, \
+         alguien está escribiendo reglas de un consenso que ya no existe.",
     );
 }
 
+#[test]
+fn el_spec_dice_las_cifras_reales_del_transporte() {
+    // Se recalculan desde las constantes de consenso, sin depender de zx-p2p —que este crate no
+    // ve— pero con la misma aritmética que él usa.
+    let limite_bloque_genesis = 2 * ZONA_LIBRE; // C-WGT-09: LIMITE(0) = 2·M(0)
+    let gossip = limite_bloque_genesis * 8; // FACTOR_MARGEN
+    let respuesta = gossip * 16;
+    let peor_caso = respuesta * 8 * 72; // MAX_STREAMS_SYNC × MAX_PEERS_ENTRANTES
+
+    assert_eq!(respuesta, 25_600_000, "25,6 MB");
+    assert!(
+        (14_000_000_000..15_000_000_000).contains(&peor_caso),
+        "el peor caso son ~14,7 GB, no los 7,2 que el SPEC llegó a decir: {peor_caso}"
+    );
+
+    afirma_ilustrativa(
+        "25,6 MB",
+        "MAX_RESPUESTA_BYTES real. El SPEC llegó a decir 12,8 porque C-NET-13 dobló la constante \
+         de la que sale y la prosa se quedó atrás.",
+    );
+    afirma_ilustrativa("14,7 GB", "el peor caso agregado real, que motivó C-NET-21");
+    no_reaparece(
+        &["7,2 GB"],
+        "C-NET-13 dobló MAX_GOSSIP_BYTES, así que el peor caso agregado pasó de 7,2 a 14,7 GB.",
+    );
+}
+
+/// **Cada regla numerada del SPEC es única.**
+///
+/// Dos reglas con el mismo número serían dos cosas distintas citadas igual, y una cita ambigua es
+/// peor que ninguna: el código diría cumplir una y cumpliría la otra.
 /// **La profundidad máxima de reorg** y su relación con la madurez de coinbase.
 #[test]
 fn el_spec_dice_la_profundidad_real_de_reorg() {
@@ -141,44 +193,10 @@ fn el_spec_dice_los_parametros_reales_de_peso() {
     assert_eq!(N_LARGO as u64 * 120, 365 * 24 * 60 * 60);
 
     afirma("262 800", "N_LARGO, la ventana de la mediana larga");
-    afirma("100 KB", "ZONA_LIBRE = 100 000 unidades de peso");
+    afirma("ZONA_LIBRE    = 100 000", "es constante de consenso: va en texto normativo, no en una nota");
+    afirma_ilustrativa("100 KB", "la forma legible de ZONA_LIBRE, para leer el SPEC sin calculadora");
 }
 
-/// **El límite de transporte y el peor caso de memoria.**
-///
-/// Es la tercera instancia del patrón: `MAX_RESPUESTA_BYTES` se dobló y cuatro comentarios se
-/// quedaron atrás. Aquí las cifras se **derivan**, no se copian.
-#[test]
-fn el_spec_dice_las_cifras_reales_del_transporte() {
-    // Se recalculan desde las constantes de consenso, sin depender de zx-p2p —que este crate no
-    // ve— pero con la misma aritmética que él usa.
-    let limite_bloque_genesis = 2 * ZONA_LIBRE; // C-WGT-09: LIMITE(0) = 2·M(0)
-    let gossip = limite_bloque_genesis * 8; // FACTOR_MARGEN
-    let respuesta = gossip * 16;
-    let peor_caso = respuesta * 8 * 72; // MAX_STREAMS_SYNC × MAX_PEERS_ENTRANTES
-
-    assert_eq!(respuesta, 25_600_000, "25,6 MB");
-    assert!(
-        (14_000_000_000..15_000_000_000).contains(&peor_caso),
-        "el peor caso son ~14,7 GB, no los 7,2 que el SPEC llegó a decir: {peor_caso}"
-    );
-
-    afirma(
-        "25,6 MB",
-        "MAX_RESPUESTA_BYTES real. El SPEC llegó a decir 12,8 porque C-NET-13 dobló la constante \
-         de la que sale y la prosa se quedó atrás.",
-    );
-    afirma("14,7 GB", "el peor caso agregado real, que motivó C-NET-21");
-    no_reaparece(
-        &["7,2 GB"],
-        "C-NET-13 dobló MAX_GOSSIP_BYTES, así que el peor caso agregado pasó de 7,2 a 14,7 GB.",
-    );
-}
-
-/// **Cada regla numerada del SPEC es única.**
-///
-/// Dos reglas con el mismo número serían dos cosas distintas citadas igual, y una cita ambigua es
-/// peor que ninguna: el código diría cumplir una y cumpliría la otra.
 #[test]
 fn ninguna_regla_esta_numerada_dos_veces() {
     let mut vistas: Vec<&str> = Vec::new();

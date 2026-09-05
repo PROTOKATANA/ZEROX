@@ -61,3 +61,13 @@ C-UPG-08
 # Explica por qué los mensajes de sincronización se serializan a mano en vez de con Cap'n Proto.
 # El código que resulta de esa decisión es todo crates/zx-core/src/wire.rs, que cita C-WIRE-01..05.
 C-WIRE-06
+
+# ── Cabecera de PoAS · SPEC §6.1-6.2 reescritas el 2026-09-05 (DECISIONES.md §22) ──
+# Spec-first: el SPEC va delante y el código lo alcanza. Estas cinco caen cuando se reescriba
+# crates/zx-core/src/preimage/block.rs. El test `el_spec_dice_el_tamano_real_de_la_cabecera`
+# está ROJO A PROPÓSITO hasta entonces y es lo que fuerza el trabajo.
+C-HDR-05   # slot estrictamente creciente
+C-HDR-06   # rango_solucion en cabecera, redundancia comprobada contra rango_esperado(padre)
+C-HDR-07   # la justificación del PoT va fuera de la cabecera pero es obligatoria
+C-HDR-08   # la cabecera NO lleva dirección de recompensa: va en la coinbase
+C-HDR-09   # block_hash sobre los 556 bytes, sello incluido
