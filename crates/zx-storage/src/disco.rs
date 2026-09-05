@@ -22,7 +22,7 @@
 //! operaciones deja una ventana donde el índice de alturas apunta a algo que aún no existe. Se usa
 //! `WriteBatch`, que RocksDB aplica de forma atómica.
 
-use rocksdb::{ColumnFamilyDescriptor, DB, Options, WriteBatch};
+use rocksdb::{ColumnFamilyDescriptor, DB, DBRecoveryMode, Options, WriteBatch};
 use std::path::Path;
 
 use zx_core::digest::{BlockHash, Digest};
@@ -59,6 +59,22 @@ impl AlmacenEnDisco {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
+
+        // C-STORE-10 · el modo de recuperación se fija **explícitamente**, aunque hoy coincida con
+        // el valor por omisión de RocksDB. Depender de un default es depender de que nadie lo
+        // mueva, y este ya se movió una vez: en RocksDB 6.6 pasó de tolerar la cola corrupta a
+        // `PointInTimeRecovery`.
+        //
+        // Y NO se usa `AbsoluteConsistency`, aunque el nombre suene a más seguro: convierte la cola
+        // truncada normal de un `kill -9` en una base de datos **que no abre**. Reproducido por
+        // PingCAP en facebook/rocksdb#2871. Un nodo que no arranca es peor que uno que resincroniza
+        // los últimos bloques.
+        opts.set_wal_recovery_mode(DBRecoveryMode::PointInTime);
+
+        // El WAL se queda activo —es lo que da la atomicidad entre familias— y por eso NO hace
+        // falta `atomic_flush`. Comentario textual de `options.h`: "it is not necessary to set
+        // atomic_flush to true if WAL is always enabled […] This option is useful when there are
+        // column families with writes NOT protected by WAL". Aquí no hay ninguna así.
 
         let familias = [CF_CABECERAS, CF_ALTURAS, CF_CUERPOS, CF_META]
             .into_iter()
@@ -194,6 +210,48 @@ impl AlmacenCadena for AlmacenEnDisco {
         self.db
             .put_cf(self.cf(CF_META)?, CLAVE_PUNTA, v)
             .map_err(backend)
+    }
+
+    fn aplicar_lote(&self, cabeceras: &[BlockHeader], punta: Punta) -> Result<(), StorageError> {
+        // C-STORE-07 · un `WriteBatch`, una llamada a `write`. RocksDB garantiza atomicidad entre
+        // familias de columnas porque **comparten el WAL** —cita de su wiki: "By sharing
+        // write-ahead logs we get awesome benefit of atomic writes"— pero esa garantía es **por
+        // lote**, no por operación lógica. Dos `write()` seguidos son dos átomos, no uno.
+        let mut lote = WriteBatch::default();
+        let mut en_el_lote = false;
+
+        for c in cabeceras {
+            let hash = c.block_hash();
+            if hash == punta.hash {
+                en_el_lote = true;
+            }
+            lote.put_cf(
+                self.cf(CF_CABECERAS)?,
+                hash.as_bytes(),
+                wire::cabecera_a_bytes(c),
+            );
+            lote.put_cf(
+                self.cf(CF_ALTURAS)?,
+                clave_altura(c.height),
+                hash.as_bytes(),
+            );
+        }
+
+        // C-STORE-01 · la punta MUST apuntar a algo que existe. Si viene en el lote, existirá
+        // cuando el lote se aplique; si no, tiene que estar ya guardada. Se comprueba **antes** de
+        // escribir: una punta colgando es lo único que este almacén no sabe recuperar.
+        if !en_el_lote && self.cabecera(&punta.hash)?.is_none() {
+            return Err(StorageError::PuntaSinCabecera {
+                altura: punta.altura,
+            });
+        }
+
+        let mut v = Vec::with_capacity(36);
+        v.extend_from_slice(punta.hash.as_bytes());
+        v.extend_from_slice(&punta.altura.to_be_bytes());
+        lote.put_cf(self.cf(CF_META)?, CLAVE_PUNTA, v);
+
+        self.db.write(lote).map_err(backend)
     }
 
     fn sincronizar(&self) -> Result<(), StorageError> {

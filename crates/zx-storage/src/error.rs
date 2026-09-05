@@ -49,6 +49,18 @@ pub enum StorageError {
         que: &'static str,
     },
 
+    /// Una entrada del UTXO set guardada no decodifica (C-STORE-05).
+    ///
+    /// Va aparte de [`Self::Corrupto`] para no perder el error de dentro: si el `Lock` es lo que
+    /// falla, saberlo es la diferencia entre diagnosticar en un minuto y en una tarde.
+    #[error("almacén corrupto: entrada de UTXO ({que}): {causa}")]
+    UtxoCorrupto {
+        /// En qué parte de la entrada falló.
+        que: &'static str,
+        /// El error de dentro.
+        causa: String,
+    },
+
     /// Fallo del backend de disco.
     #[error("fallo del almacén: {0}")]
     Backend(String),

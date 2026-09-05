@@ -2057,6 +2057,143 @@ altura— y **MUST NOT** poder quedar a medias.
 > Es la disciplina que faltó en **H-001**: aquel kernel no tenía contra qué compararse, y por eso
 > falló los 237 vectores CAVP sin que nadie lo notara.
 
+**C-STORE-05 · Codificación de una entrada del UTXO set.** Una entrada se guarda como un
+par clave/valor:
+
+```
+clave = prev_txid(32) ‖ prev_index(4, BIG-ENDIAN)                          → 36 B
+valor = value(8, i64 LE) ‖ altura_creacion(4, LE) ‖ es_coinbase(1) ‖ Lock  → 46 B con `PubKey`
+```
+
+El `Lock` usa **la misma codificación que en el cable** (C-WIRE-02), sin una variante propia: dos
+formas de escribir un `Lock` serían dos sitios donde equivocarse, y la segunda envejecería sola.
+
+> **Vive aquí y no en §2.4 con las demás codificaciones**, y la diferencia no es de orden: §2.4 es
+> codificación **canónica**, con reglas que dos nodos MUST cumplir igual. Esta no lo es.
+>
+> **`prev_index` va en big-endian y el resto no.** No es incoherencia: es la misma razón que
+> C-STORE-03 da para las alturas. El orden lexicográfico de las claves en RocksDB **es** el orden de
+> los bytes, así que con big-endian todas las salidas de una misma transacción quedan contiguas y
+> recorrerlas es un barrido de prefijo en vez de 4 000 millones de búsquedas. Los campos del
+> **valor** no se ordenan por nada, así que ahí manda la coherencia con el resto del formato.
+>
+> **Esto NO es consenso.** Ningún byte de esta codificación entra jamás en un hash ni en una firma:
+> el UTXO set es estado local reconstruible, y dos nodos pueden guardarlo de formas distintas sin
+> divergir. Decirlo importa porque todo lo demás en §2.4 sí es normativo, y tratar esta regla como
+> si lo fuera llevaría a alguien a bloquear un cambio de formato de disco por miedo a un fork que no
+> existe. Lo único que **MUST** cumplirse es que la codificación sea **inyectiva**: dos entradas
+> distintas no pueden producir los mismos bytes, o el almacén perdería UTXOs en silencio.
+>
+> **Sin compresión, y a propósito.** Bitcoin Core comprime cada `Coin`: la altura y el flag de
+> coinbase en un solo `VARINT`, el importe reescalado en base 10, y el script en 21 o 33 bytes
+> reconociendo P2PKH, P2SH y P2PK (`src/compressor.h`, v27.0). Aquí no se copia por dos motivos. El
+> de fondo: su compresión de script **no aplica** — ZEROX tiene un enum `Lock` cerrado, no scripts,
+> así que habría que diseñar un esquema nuevo, y un esquema nuevo es una segunda forma de escribir
+> los mismos valores. El práctico: empaquetar `altura·2 + coinbase` ahorra **1 byte de 82**, y ese
+> 1,2 % no compra el riesgo de que alguien lo decodifique mal.
+>
+> Lo que cuesta la decisión, medido con la fórmula real de C-WGT-02: una salida `PubKey` pesa 41
+> unidades, así que `ZONA_LIBRE` da un techo de **2 439 salidas por bloque**, y a 262 800 bloques al
+> año son **641 M entradas y ~52,6 GB anuales** en el peor caso adversarial. Ese peor caso no se
+> sostiene —una transacción 2-in/2-out tiene crecimiento neto **cero**— pero basta para fijar lo
+> importante: **el UTXO set no cabe en RAM**, y por eso hace falta una caché delante del disco.
+
+**C-STORE-06 · El disco guarda solo el estado FINALIZADO, y NUNCA revierte.** Un bloque se
+considera finalizado cuando su profundidad alcanza `MAX_REORG_LENGTH = 99`. Solo entonces su efecto
+sobre el UTXO set se escribe. Los bloques más recientes viven en memoria, y una reorganización
+—que por C-REORG-07 **MUST NOT** superar esa profundidad— se resuelve sin tocar el disco.
+
+Al arrancar, el nodo **MUST** reconstruir el solapamiento no finalizado reproduciendo los cuerpos de
+los bloques posteriores a la punta finalizada. Son como mucho 99, así que el trabajo está **acotado
+por construcción**.
+
+> **Por qué 99 y no un número elegido.** Más allá de `MAX_REORG_LENGTH` el nodo **se detiene**
+> (C-REORG-07): no está reorganizando, está parado esperando a un humano. Así que fuera de esa
+> ventana no existe reversión que soportar. La ventana de la política y la ventana del
+> almacenamiento son la misma por necesidad, no por conveniencia.
+>
+> **Y toda salida gastable está siempre en disco**, porque `COINBASE_MATURITY = 100` es mayor que
+> `MAX_REORG_LENGTH = 99`. Tampoco es casualidad: las dos constantes salen del mismo límite, ya que
+> `MAX_REORG_LENGTH = COINBASE_MATURITY − 1`.
+>
+> **Lo que esta regla elimina** es una clase entera de fallo: la reversión **parcial** de estado ya
+> persistido. Es la que produjo el hueco entre el freezer y LevelDB de Geth en 2019
+> (`go-ethereum#20238`), **y otra vez en 2025** al relajar la durabilidad por rendimiento
+> (`#31499`); y la que llevó a sipa a escribir sobre el consumo de memoria en la recuperación de
+> Bitcoin que *"in general this problem is not solvable"* (`bitcoin#10693`).
+>
+> **El coste, medido y no estimado:** el solapamiento son 99 bloques × 2 439 salidas × 82 B = **18
+> MB** en el techo adversarial de C-WGT-02. Si `MAX_REORG_LENGTH` creciera, la factura crece
+> linealmente: a 1 000 serían 190 MB. Queda escrito para que nadie lo suba sin verla.
+>
+> zebra hace esto mismo con una ventana de 1 000 y **sin datos de undo en absoluto**: al gastarse
+> una salida, su entrada se borra (`zebra_db/transparent.rs:695-699`, v6.3.0).
+
+**C-STORE-07 · Una operación lógica es UN SOLO `WriteBatch`.** Avanzar la punta toca la cabecera, el
+índice de alturas, el UTXO set y la propia punta. Los cuatro **MUST** entrar en el mismo lote y
+escribirse con una sola llamada. Repartirlos en dos escrituras, aunque cada una sea atómica, deja
+una ventana en la que un componente va por delante de otro.
+
+> **La garantía existe y está citada.** Wiki de RocksDB, Column-Families: *"Atomic writes across
+> Column Families are supported"*, y el porqué: *"By sharing write-ahead logs we get awesome benefit
+> of atomic writes."* Por eso todo vive en **una sola** base de datos con varias familias, y no en
+> varias bases.
+>
+> **El riesgo no es el motor, es la frontera del lote.** La atomicidad es **por batch**, no por
+> operación lógica: dos `db.write()` seguidos son dos átomos, no uno. TiKV documenta el mismo
+> problema desde el otro lado — al tener `raftdb` y `kvdb` como bases separadas, `tikv#6540`
+> describe tener que ordenar los `fsync` **a mano**.
+>
+> ⚠️ **Esta regla se escribe con un incumplimiento presente.** `fijar_punta` es hoy una escritura
+> suelta, fuera del lote de `guardar_cabecera`. Es recuperable —C-STORE-01 pone la punta después del
+> dato, así que lo que sobra se ignora— pero deja de serlo en cuanto el UTXO set entra en juego.
+
+**C-STORE-08 · Ningún índice derivado MAY ir por delante de la punta finalizada.** Cualquier
+estructura que se derive del UTXO set —índices por dirección, estadísticas, lo que sea— **MUST**
+persistirse en el mismo lote que la punta que la produjo, nunca en uno propio y más frecuente.
+
+> Es un fallo de **2025**, no histórico: `bitcoin#33208`. Cita del arreglo, `#33212`: *"The committed
+> state of an index should never be ahead of the flushed chainstate. Otherwise, in the case of an
+> unclean shutdown, the blocks necessary to revert from the prematurely committed state are not
+> available."* El síntoma en producción era `best block of the index not found. Please rebuild the
+> index.`
+
+**C-STORE-09 · Ningún límite incidental del motor de almacenamiento MAY decidir si un bloque se
+acepta.** Tamaños de lote, límites de escritura, comportamiento de compactación: nada de eso entra
+en la validez. Todo límite que afecte a la aceptación **MUST** estar escrito como regla de consenso
+en este documento.
+
+> Es la lección del **único fork de red real** causado por la capa de almacenamiento. BIP-50, marzo
+> de 2013: Bitcoin 0.8 pasó de BerkeleyDB a LevelDB, y el límite de ~10 000 locks de BDB —que nunca
+> fue una regla, solo un detalle del motor— se había convertido en consenso de facto. El bloque
+> 225430 lo superó: los nodos 0.7 lo rechazaron, los 0.8 lo aceptaron, y la red se partió.
+>
+> La corrupción de un almacén es molesta: el nodo se cae y resincroniza. Esto es lo otro.
+
+**C-STORE-10 · El WAL MUST estar activo, y el modo de recuperación es `PointInTimeRecovery`.** No se
+sincroniza a disco en cada bloque: perder los últimos bloques **enteros** tras un corte de corriente
+es recuperable resincronizando, y un estado incoherente no lo es. El modo de recuperación se fija
+**explícitamente** aunque coincida con el valor por omisión.
+
+> **Proceso y máquina no son lo mismo**, y el FAQ de RocksDB los trata como dos preguntas
+> separadas. Con el WAL activo, que muera el proceso **no pierde nada**: el `write()` ya entregó los
+> bytes al sistema operativo. Solo un corte de corriente puede perder la cola de lotes no
+> sincronizados — y siempre lotes **enteros**, nunca a medias.
+>
+> **`kAbsoluteConsistency` NO**, aunque el nombre suene a más seguro. `facebook/rocksdb#2871`,
+> reproducido por PingCAP: convierte la cola truncada normal de un `kill -9` en una base de datos
+> **que no abre**. Un nodo que no arranca es peor que un nodo que resincroniza.
+>
+> **`atomic_flush` tampoco hace falta.** Comentario textual de `options.h`: *"it is not necessary to
+> set atomic_flush to true if WAL is always enabled… This option is useful when there are column
+> families with writes NOT protected by WAL."* No hay ninguna así.
+>
+> **Y se fija explícito porque el valor por omisión ya cambió una vez**, en RocksDB 6.6. Depender de
+> un default es depender de que nadie lo mueva.
+>
+> Geth relajó esto por rendimiento y reintrodujo en 2025 un fallo de 2019. Conclusión del propio
+> mantenedor: *"Probably sync mode is a safer choice anyway."*
+
 ## 16 · Parámetros de red
 
 > Esta sección puede migrar a un SPEC de P2P independiente. Se recoge aquí porque C-NET-01 es lo

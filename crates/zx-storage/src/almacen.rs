@@ -72,6 +72,25 @@ pub trait AlmacenCadena: Send + Sync {
     /// [`StorageError`] si el backend falla.
     fn cuerpo(&self, hash: &BlockHash) -> Result<Option<Vec<u8>>, StorageError>;
 
+    /// **Guarda un lote de cabeceras y avanza la punta, en UNA SOLA escritura atómica**
+    /// (C-STORE-07).
+    ///
+    /// Existe porque [`Self::guardar_cabecera`] y [`Self::fijar_punta`] son dos escrituras, y entre
+    /// las dos hay una ventana: un corte deja las cabeceras escritas y la punta sin mover. Hoy eso
+    /// es **recuperable** —C-STORE-01 pone la punta después del dato, así que lo que sobra se
+    /// ignora y el nodo resincroniza— pero deja de serlo en cuanto el UTXO set entre en el mismo
+    /// avance: entonces una mitad del estado iría por delante de la otra, y eso no se arregla
+    /// ignorando nada.
+    ///
+    /// Un lote y no una cabecera porque es como se usa: extender la cadena con `n` cabeceras y
+    /// mover la punta una vez. Hacerlo cabecera a cabecera serían `n` escrituras donde basta una, y
+    /// ninguna de las intermedias aporta nada.
+    ///
+    /// # Errores
+    /// [`StorageError::PuntaSinCabecera`] si la punta no es ninguna de las cabeceras del lote ni
+    /// algo que ya tuviéramos; [`StorageError`] del backend si la escritura falla.
+    fn aplicar_lote(&self, cabeceras: &[BlockHeader], punta: Punta) -> Result<(), StorageError>;
+
     /// ¿Tenemos el cuerpo de este bloque?
     ///
     /// Existe aparte de [`Self::cuerpo`] porque la pregunta se hace en bucle sobre la cadena

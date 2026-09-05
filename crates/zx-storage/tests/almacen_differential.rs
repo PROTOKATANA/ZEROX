@@ -217,3 +217,82 @@ fn las_alturas_se_ordenan_numericamente() {
         "little-endian lo haría al revés — este es el fallo que se evita"
     );
 }
+
+/// **C-STORE-07 · `aplicar_lote` da el mismo resultado en los dos backends.**
+///
+/// La operación que en disco es un `WriteBatch` y en memoria es un solo `lock`. Si divergen, el
+/// almacén real hace algo distinto de la implementación de referencia — y la de referencia es la
+/// que dice qué es correcto.
+#[test]
+fn aplicar_lote_deja_a_los_dos_igual() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let disco = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+    let mem = AlmacenEnMemoria::nuevo();
+
+    let cs: Vec<_> = (1..=6).map(cabecera).collect();
+    let ultima = cs.last().expect("hay cabeceras");
+    let p = Punta {
+        hash: ultima.block_hash(),
+        altura: ultima.height,
+    };
+
+    disco.aplicar_lote(&cs, p).expect("disco aplica");
+    mem.aplicar_lote(&cs, p).expect("memoria aplica");
+
+    assert_eq!(disco.punta().unwrap(), mem.punta().unwrap());
+    assert_eq!(disco.punta().unwrap(), Some(p));
+    for c in &cs {
+        let h = c.block_hash();
+        assert_eq!(disco.cabecera(&h).unwrap(), mem.cabecera(&h).unwrap());
+        assert_eq!(
+            disco.hash_en_altura(c.height).unwrap(),
+            mem.hash_en_altura(c.height).unwrap(),
+            "altura {}",
+            c.height
+        );
+    }
+}
+
+/// **Y si la punta no cuadra, ninguno escribe NADA.**
+///
+/// Es la mitad de la atomicidad que se olvida. Comprobar la punta al final y dejar las cabeceras
+/// puestas sería exactamente la escritura parcial que C-STORE-07 prohíbe — y el nodo arrancaría con
+/// cabeceras que su punta no referencia, sin ningún error que lo delate.
+#[test]
+fn un_lote_con_punta_invalida_no_escribe_nada() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let disco = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+    let mem = AlmacenEnMemoria::nuevo();
+
+    let cs: Vec<_> = (1..=4).map(cabecera).collect();
+    // Una punta que no está en el lote ni guardada de antes.
+    let ajena = Punta {
+        hash: cabecera(99).block_hash(),
+        altura: 99,
+    };
+
+    assert!(
+        disco.aplicar_lote(&cs, ajena).is_err(),
+        "disco MUST rechazar"
+    );
+    assert!(
+        mem.aplicar_lote(&cs, ajena).is_err(),
+        "memoria MUST rechazar"
+    );
+
+    for c in &cs {
+        let h = c.block_hash();
+        assert_eq!(
+            disco.cabecera(&h).unwrap(),
+            None,
+            "disco no debe haber escrito"
+        );
+        assert_eq!(
+            mem.cabecera(&h).unwrap(),
+            None,
+            "memoria no debe haber escrito"
+        );
+    }
+    assert_eq!(disco.punta().unwrap(), None);
+    assert_eq!(mem.punta().unwrap(), None);
+}

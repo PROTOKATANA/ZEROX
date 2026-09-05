@@ -8,6 +8,7 @@ pub mod almacen;
 #[cfg(feature = "rocksdb")]
 pub mod disco;
 pub mod error;
+pub mod formato;
 pub mod memoria;
 pub mod utxo;
 

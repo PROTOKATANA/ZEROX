@@ -109,6 +109,29 @@ impl AlmacenCadena for AlmacenEnMemoria {
         Ok(())
     }
 
+    fn aplicar_lote(&self, cabeceras: &[BlockHeader], punta: Punta) -> Result<(), StorageError> {
+        // C-STORE-07 · un solo lock para todo el lote: el equivalente en memoria de un WriteBatch.
+        // Si la punta no cuadra, no se escribe **nada** — comprobar al final y dejar las cabeceras
+        // puestas sería justo la atomicidad parcial que esta regla existe para prohibir.
+        let mut i = self.interior.write().map_err(|_| envenenado())?;
+
+        let conocida =
+            |h| i.cabeceras.contains_key(h) || cabeceras.iter().any(|c| &c.block_hash() == h);
+        if !conocida(&punta.hash) {
+            return Err(StorageError::PuntaSinCabecera {
+                altura: punta.altura,
+            });
+        }
+
+        for c in cabeceras {
+            let h = c.block_hash();
+            i.cabeceras.insert(h, *c);
+            i.por_altura.insert(c.height, h);
+        }
+        i.punta = Some(punta);
+        Ok(())
+    }
+
     fn sincronizar(&self) -> Result<(), StorageError> {
         // En RAM no hay nada que sincronizar. No es un no-op vacío: documenta que el contrato se
         // cumple trivialmente, en vez de dejar a quien lea preguntándose si falta algo.

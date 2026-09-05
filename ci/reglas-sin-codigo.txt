@@ -14,6 +14,10 @@
 C-DIFF-10
 # Prohíbe el criterio de "contar bytes cero a la cabeza" para el PoW.
 C-POW-02
+# Prohíbe que un límite incidental del motor de almacenamiento decida si un bloque se acepta. Es la
+# lección de BIP-50: el límite de locks de BerkeleyDB se volvió consenso de facto y partió la red en
+# marzo de 2013. No hay línea que citar; lo que hay es la ausencia de esa línea.
+C-STORE-09
 
 # ── Relé compacto de bloques (BIP 152): a medias ──────────────────────────────────────────────
 #
@@ -28,6 +32,18 @@ C-NET-08
 C-NET-09
 R-NET-01
 R-NET-02
+
+# ── Bloque B1/B2: el estado del nodo ─────────────────────────────────────────────────────────
+#
+# El almacén ya sabe guardar el UTXO set (C-STORE-05) y aplicar un lote atómico (C-STORE-07). Lo
+# que falta es que la CADENA lo use: mantener el conjunto, finalizar a profundidad 99 y reconstruir
+# el solapamiento al arrancar. Es el bloque B2 del plan.
+
+# Finalización a profundidad MAX_REORG_LENGTH; el disco nunca revierte.
+C-STORE-06
+# Ningún índice derivado por delante de la punta finalizada. Hoy no hay ningún índice derivado, así
+# que la regla no tiene sujeto todavía — se cierra cuando lo haya.
+C-STORE-08
 
 # ── Fases que no han llegado ──────────────────────────────────────────────────────────────────
 
