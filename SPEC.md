@@ -2613,3 +2613,43 @@ Cada sección de este documento se apoya en investigación con fuente primaria v
 | §5.5 Tarifa | `research/dynamic-fee.md` | Código de 2 implementaciones; corrigió un error de capa en este SPEC |
 | §11–§13 Fork choice, reorgs | `research/fork-choice-reorg.md` | 4 implementaciones (bitcoin, zebra, zcashd, monero); 3 papers con tablas numéricas |
 | §14–§16 Upgrades, génesis, red | `research/upgrades-genesis.md` | ZIP-200, BIP-9/8, código de bitcoin/zcash/monero |
+| §18.1 Coherencia SPEC↔código | — (patrón interno, 3 reincidencias) | `spec_numeros.rs`: 6 tests; 2 mutaciones comprobadas |
+
+## 18.1 · Este documento no puede contradecir al código
+
+**C-SPEC-01 · Toda cifra que este SPEC afirme y que sea función de una constante del código DEBE
+estar comprobada por un test que la derive.** El test vive en
+`crates/zx-consensus/tests/spec_numeros.rs`, lee este archivo con `include_str!` y falla si el texto
+y las constantes discrepan. Añadir una cifra derivada al SPEC sin añadir su comprobación es una
+violación de esta regla.
+
+> **Por qué existe una regla sobre el propio documento.**
+>
+> Este proyecto ha cometido **tres veces** el mismo error, y las tres lo encontró una auditoría, no
+> el compilador:
+>
+> | | Decía | Era | Cómo se rompió |
+> |---|---|---|---|
+> | **H-005** | nonce en `[92,100)`, offset 76 | `[96,104)`, offset 80 | `timestamp` pasó de `u32` a `u64` |
+> | Tamaño de cabecera | 112, en **seis** sitios | **92** | nunca fue cierto; se copió |
+> | `MAX_RESPUESTA_BYTES` | 12,8 MB, en **cuatro** sitios | **25,6 MB** | C-NET-13 dobló su base |
+>
+> El patrón no varía: **un número que es función de una constante, transcrito a mano en prosa.** El
+> compilador no lo ve porque la prosa no compila; los tests no lo veían porque probaban el código,
+> no lo que el código dice de sí mismo. Derivar el offset y añadir un test por módulo cerró cada
+> instancia sin cerrar el patrón — por eso la tercera ocurrió igual que las dos anteriores.
+>
+> **Lo que cierra el patrón es que el SPEC entre en la suite de tests.** El test recalcula desde las
+> constantes reales y comprueba que este documento dice el resultado. Mutar `ZONA_LIBRE` a su doble
+> hace fallar dos tests en el acto, que es exactamente lo que no pasó cuando se dobló
+> `MAX_GOSSIP_BYTES`.
+>
+> **Las cifras equivocadas siguen apareciendo en este archivo, a propósito**, dentro de las notas
+> citadas como esta. Esa memoria es lo que impide que alguien "corrija" una regla devolviéndola al
+> valor que ya falló. Por eso el test distingue: las comprobaciones de "esto no debe volver a
+> decirse" miran solo el texto normativo —descarta toda línea que empiece por `>`—, y las de "esto
+> debe seguir diciéndose" miran el archivo entero.
+>
+> **Lo que el test no hace** es entender el SPEC: comprueba que una cadena concreta aparece. Si
+> alguien reescribe la frase, falla aunque el número siga bien. Es deliberado: una frase reescrita
+> merece que alguien vuelva a mirar si el número cuadra.
