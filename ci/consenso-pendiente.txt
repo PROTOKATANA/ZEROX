@@ -1,0 +1,21 @@
+# Puntos de entrada de zx-consensus que todavía no alcanza nadie, y por qué.
+#
+# Los comprueba ci/alcance-consenso.sh. La lista es corta a propósito: si crece, es que se está
+# escribiendo consenso que nadie ejecuta. Cuando uno se cablea, hay que quitarlo de aquí — el
+# guardián falla también en ese sentido, para que el archivo no describa un pasado que ya pasó.
+#
+# Lo que NO aparece aquí son las auxiliares internas: el guardián las filtra solo, porque alguien
+# dentro de zx-consensus las llama. Cablear `validar_bloque` cablea de golpe `validar_cuerpo`,
+# `validar_tx`, `subsidio`, `mediana_efectiva` y las demás que cuelgan de él.
+
+# Validación completa de bloque: cuerpo, transacciones, firmas, gastos, peso, coinbase y emisión.
+# Necesita que la cadena mantenga el conjunto UTXO con datos de deshacer, que hoy no mantiene
+# —hay un TODO(sincronizador) en crates/zx-node/src/cadena.rs señalándolo—. Hasta entonces el nodo
+# valida cabeceras (C-NET-22) y comprueba que cada cuerpo sea el de la suya (C-NET-23), que es la
+# barrera anterior y no necesita estado. Se cierra en la Fase 6.
+bloque::validar_bloque
+
+# El timestamp que un minero debe poner en la cabecera que construye. Lo consume el minero, que
+# todavía no existe: zx-miner es la Fase 8. El nodo no lo necesita — el nodo COMPRUEBA timestamps
+# ajenos (C-TS-01, C-TS-03, ya cableado), no elige el suyo.
+timestamps::timestamp_del_minero

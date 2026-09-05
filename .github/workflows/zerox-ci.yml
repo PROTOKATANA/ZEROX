@@ -24,6 +24,18 @@ jobs:
       - run: cargo build --workspace --all-features --locked
       - run: cargo test --workspace --all-features --locked
 
+  alcance:
+    name: Alcance — ¿hay consenso que el nodo no ejecuta?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Cuatro veces la respuesta ha sido que sí, y las cuatro el hueco era grave: la dificultad
+      # esperada no se comprobaba, ni la rama, ni los timestamps, y el nodo no pedía un cuerpo
+      # jamás. Las cuatro reglas estaban escritas y probadas; faltaba la llamada. Un `cargo test`
+      # verde no dice nada de esto, porque los tests de zx-consensus prueban las funciones
+      # directamente — que es justo por lo que el hueco sobrevivió tanto.
+      - run: ./ci/alcance-consenso.sh
+
   almacen:
     name: Almacén — el backend de disco y su test diferencial
     runs-on: ubuntu-latest
