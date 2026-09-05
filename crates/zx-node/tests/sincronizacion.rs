@@ -44,6 +44,7 @@ use libp2p::core::transport::{MemoryTransport, Transport};
 use libp2p::core::upgrade;
 use libp2p::{Multiaddr, PeerId, Swarm, identity, noise, yamux};
 use primitive_types::U256;
+use zx_consensus::activacion::rama_activa;
 use zx_core::digest::{BlockHash, Digest, MerkleRoot};
 use zx_core::preimage::block::BlockHeader;
 use zx_core::red::Red;
@@ -62,7 +63,11 @@ fn cabeceras_tras(c: &Cadena, n: u32) -> Vec<BlockHeader> {
     let mut prev = c.genesis();
     for i in 1..=n {
         let h = BlockHeader {
-            consensus_branch_id: 0xc478_80ea,
+            // Derivada, no transcrita: desde C-NET-22a la validación contextual comprueba que la
+            // rama sea la activa a esa altura, así que un literal aquí es una segunda fuente para un
+            // valor que ya tiene una. El día que la tabla gane una segunda rama, esto se adapta solo
+            // en vez de romper los tests con `RamaIncorrecta` y hacer perder media hora.
+            consensus_branch_id: rama_activa(Red::Testnet, i).expect("rama activa"),
             prev_hash: prev,
             merkle_root: MerkleRoot::from_digest(Digest::from_bytes([i as u8; 32])),
             timestamp: 1_788_480_000 + u64::from(i) * 120,

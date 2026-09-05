@@ -136,6 +136,10 @@ mod tests {
 
     fn cabecera(nonce: u64) -> BlockHeader {
         BlockHeader {
+            // Literal a propósito, y es el único sitio del proyecto donde se acepta: `zx-p2p` no
+            // puede depender de `zx-consensus` —lo vigila un job de CI— así que no hay `rama_activa`
+            // que llamar. Da igual: el identificador corto se deriva de los BYTES de la cabecera,
+            // sin interpretarlos, así que aquí cualquier valor sirve mientras sea estable.
             consensus_branch_id: 0xc478_80ea,
             prev_hash: BlockHash::from_digest(Digest::from_bytes([1; 32])),
             merkle_root: MerkleRoot::from_digest(Digest::from_bytes([2; 32])),
