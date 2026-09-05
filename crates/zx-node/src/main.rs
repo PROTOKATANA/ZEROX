@@ -45,6 +45,7 @@ use zx_p2p::mensaje::{Peticion, Respuesta};
 
 use zx_p2p::entrante::ManejadorEntrante;
 
+use zx_node::cadena::Adopcion;
 use zx_node::cadena::Cadena;
 use zx_node::sync::{Fase, Sincronizador, validar_cadena_de_cabeceras};
 
@@ -186,7 +187,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     sinc.peer_perdido(peer);
                 }
                 Some(EventoRed::Respuesta { peer, respuesta, .. }) => {
-                    atender_respuesta(&mut sinc, &cadena, peer, *respuesta, &manejo).await;
+                    if atender_respuesta(&mut sinc, &cadena, peer, *respuesta, &manejo).await
+                        == Fin::Detener
+                    {
+                        break;
+                    }
                 }
                 None => {
                     tracing::error!("el bucle de red terminó solo");
@@ -224,13 +229,25 @@ fn abrir_cadena(red: Red, args: &Args) -> Result<Cadena, Box<dyn std::error::Err
 ///
 /// Vive aparte del `select!` para que el bucle principal se lea de un vistazo: el `select!` decide
 /// **qué** pasó, esto decide **qué se hace**.
+/// Si el nodo debe seguir o pararse tras atender una respuesta.
+///
+/// Un `enum` de dos variantes en vez de un `bool` porque el que para es **C-REORG-07**, y un `bool`
+/// en la firma no dice cuál de los dos valores es el excepcional.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Fin {
+    /// Todo normal.
+    Seguir,
+    /// Condición no recuperable: el nodo se detiene y avisa al operador.
+    Detener,
+}
+
 async fn atender_respuesta(
     sinc: &mut Sincronizador,
     cadena: &Arc<Cadena>,
     peer: libp2p::PeerId,
     respuesta: Respuesta,
     manejo: &zx_p2p::servicio::ManejoRed,
-) {
+) -> Fin {
     match respuesta {
         Respuesta::Estado(e) => {
             if e.genesis != cadena.genesis() {
@@ -241,7 +258,7 @@ async fn atender_respuesta(
                 let _ = manejo
                     .desconectar(peer, zx_p2p::error::MotivoDesconexion::Ilegible)
                     .await;
-                return;
+                return Fin::Seguir;
             }
             tracing::info!(peer = %peer, altura = e.altura, "saludo");
 
@@ -288,31 +305,46 @@ async fn atender_respuesta(
                         cadena.trabajo_de_un_bloque(),
                     );
                     match r {
-                        Ok(_) => {
-                            aplicadas = cadena.extender(&cs);
-                            tracing::info!(
-                                peer = %peer,
-                                aplicadas,
-                                recibidas = n,
-                                altura = cadena.altura(),
-                                "cabeceras"
-                            );
-                            // Validaron pero no se aplicó ninguna: cuelgan de un punto que no es
-                            // nuestra punta, o sea una **bifurcación** que este nodo todavía no
-                            // sabe adoptar (ver la nota de `Cadena::extender`). Reintentar con el
-                            // mismo locator daría exactamente la misma respuesta, para siempre.
-                            if aplicadas == 0 && n > 0 {
-                                tracing::warn!(
-                                    peer = %peer,
-                                    "cabeceras válidas que no encajan en nuestra punta: sin \
-                                     soporte de reorg todavía, se corta para no reintentar en bucle"
+                        Ok(_) => match cadena.adoptar(&cs) {
+                            Ok(Adopcion::Extendida { aplicadas: a }) => {
+                                aplicadas = a;
+                                tracing::info!(
+                                    peer = %peer, aplicadas = a, recibidas = n,
+                                    altura = cadena.altura(), "cabeceras"
                                 );
-                                condenado = true;
-                                let _ = manejo
-                                    .desconectar(peer, zx_p2p::error::MotivoDesconexion::Ilegible)
-                                    .await;
                             }
-                        }
+                            Ok(Adopcion::Reorganizada {
+                                aplicadas: a,
+                                desechadas,
+                            }) => {
+                                aplicadas = a;
+                                // Una reorg no es un error, pero **sí** merece nivel de aviso: es
+                                // el momento en que un pago que un comerciante daba por confirmado
+                                // puede dejar de estarlo.
+                                tracing::warn!(
+                                    peer = %peer, aplicadas = a, desechadas,
+                                    altura = cadena.altura(), "REORGANIZACIÓN"
+                                );
+                            }
+                            Ok(otra) => {
+                                // `NoGana` o `NoCuelgaDeNada`: **no es mala fe** —es lo que propone
+                                // cualquiera que vaya por otra rama— pero reintentar con el mismo
+                                // locator daría lo mismo indefinidamente (C-NET-18).
+                                tracing::debug!(peer = %peer, ?otra, "no se adopta; se deja de pedir");
+                                condenado = true;
+                            }
+                            // C-REORG-07 · una reorg de más de 99 bloques **detiene el nodo**. No
+                            // es una condición recuperable: o hay un ataque de mayoría, o esta
+                            // cadena no es la que creíamos. Seguir sería elegir en silencio.
+                            Err(e) => {
+                                tracing::error!(
+                                    peer = %peer, %e,
+                                    "C-REORG-07: reorganización demasiado profunda. EL NODO SE \
+                                     DETIENE. Revisa la cadena antes de reiniciar."
+                                );
+                                return Fin::Detener;
+                            }
+                        },
                         Err(e) => {
                             tracing::warn!(peer = %peer, ?e, mala_fe = e.es_mala_fe(), "rechazadas");
                             // C-NET-05 · solo la mala fe corta. Ir por detrás, no.
@@ -335,7 +367,7 @@ async fn atender_respuesta(
                     // respondería lo mismo indefinidamente.
                     tracing::debug!(peer = %peer, "sus cabeceras no cuelgan de nada nuestro");
                     sinc.peer_perdido(peer);
-                    return;
+                    return Fin::Seguir;
                 }
                 None => {}
             }
@@ -344,7 +376,7 @@ async fn atender_respuesta(
                 // Al peer condenado no se le pide nada más, y deja de ser nuestro sincronizador
                 // **ahora**, sin esperar al evento de desconexión.
                 sinc.peer_perdido(peer);
-                return;
+                return Fin::Seguir;
             }
 
             if sinc.respuesta_registrada(aplicadas) {
@@ -368,6 +400,7 @@ async fn atender_respuesta(
             tracing::debug!(peer = %peer, "el peer no tiene lo que se le pidió");
         }
     }
+    Fin::Seguir
 }
 
 /// Hexadecimal, para los logs.

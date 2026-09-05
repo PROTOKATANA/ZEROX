@@ -451,3 +451,112 @@ async fn pedir_un_bloque_ausente_devuelve_no_disponible() {
     t1.abort();
     t2.abort();
 }
+
+/// **Una reorganización, de extremo a extremo por red.**
+///
+/// El cliente sincroniza una cadena de 3, y después llega un peer con una rama de 6 que cuelga del
+/// génesis. El cliente **adopta la rama ganadora**, deshaciendo la suya.
+///
+/// Es el caso que antes se validaba bien y se descartaba entero, dejando al nodo en la cadena
+/// perdedora sin error y sin aviso — la peor forma de divergir.
+#[tokio::test]
+async fn el_cliente_adopta_una_rama_mejor_que_llega_por_red() {
+    use zx_node::cadena::Adopcion;
+    use zx_node::sync::validar_estructura;
+
+    // Servidor con la rama larga.
+    let servidor = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let rama_larga = cabeceras_tras(&servidor, 6);
+    servidor.extender_sin_validar_solo_para_pruebas(&rama_larga);
+
+    // Cliente con una rama corta y **distinta**, colgando del mismo génesis.
+    let cliente = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let rama_corta: Vec<_> = cabeceras_tras(&cliente, 3)
+        .into_iter()
+        .scan(cliente.genesis(), |prev, mut c| {
+            c.prev_hash = *prev;
+            c.nonce ^= 0xdead; // la hace distinta de la del servidor
+            *prev = c.block_hash();
+            Some(c)
+        })
+        .collect();
+    cliente.extender_sin_validar_solo_para_pruebas(&rama_corta);
+    assert_eq!(cliente.altura(), 3);
+    let tip_viejo = cliente.estado().tip;
+
+    let (sw_s, _) = nodo(Arc::clone(&servidor));
+    let (sw_c, _) = nodo(Arc::clone(&cliente));
+    let id_s = *sw_s.local_peer_id();
+
+    let ps = arrancar(sw_s, Arc::clone(&servidor));
+    let pc = arrancar(sw_c, Arc::clone(&cliente));
+    let manejo_s = ps.manejo.clone();
+    let manejo_c = pc.manejo.clone();
+    let mut ev_c = pc.eventos;
+    let _ev_s = ps.eventos;
+    let t1 = tokio::spawn(ps.bucle.correr());
+    let t2 = tokio::spawn(pc.bucle.correr());
+
+    let a = addr();
+    manejo_s.escuchar(a.clone()).await.expect("escucha");
+    manejo_c.marcar(a).await.expect("marca");
+    assert!(
+        esperar(&mut ev_c, |e| matches!(e, EventoRed::PeerConectado(_)))
+            .await
+            .is_some()
+    );
+
+    // El cliente pide con su locator, que incluye el génesis.
+    manejo_c
+        .pedir(
+            id_s,
+            Peticion::Cabeceras {
+                locator: cliente.locator(),
+                hasta: None,
+            },
+        )
+        .await
+        .expect("pide");
+
+    let e = esperar(&mut ev_c, |e| matches!(e, EventoRed::Respuesta { .. }))
+        .await
+        .expect("responde");
+    let EventoRed::Respuesta { respuesta, .. } = e else {
+        panic!("se esperaba respuesta");
+    };
+    let Respuesta::Cabeceras(cs) = *respuesta else {
+        panic!("se esperaba Cabeceras");
+    };
+    assert_eq!(
+        cs.len(),
+        6,
+        "el servidor sirve su rama entera desde el génesis"
+    );
+
+    // Validar y adoptar, que es lo que hace el nodo real.
+    let ancla = cs.first().expect("no vacía").prev_hash;
+    assert_eq!(ancla, cliente.genesis());
+    validar_estructura(&cs, ancla).expect("estructuralmente válida");
+
+    let r = cliente
+        .adoptar(&cs)
+        .expect("no excede la profundidad máxima");
+    assert_eq!(
+        r,
+        Adopcion::Reorganizada {
+            aplicadas: 6,
+            desechadas: 3
+        },
+        "se adopta la rama larga y se desecha la corta"
+    );
+    assert_eq!(cliente.altura(), 6);
+    assert_ne!(cliente.estado().tip, tip_viejo, "la punta cambió");
+    assert_eq!(
+        cliente.estado().tip,
+        servidor.estado().tip,
+        "cliente y servidor convergen en la misma punta"
+    );
+
+    t1.abort();
+    t2.abort();
+}

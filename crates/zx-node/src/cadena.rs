@@ -19,10 +19,12 @@ use std::sync::{Arc, RwLock};
 
 use primitive_types::U256;
 use zx_consensus::activacion::rama_activa;
+use zx_consensus::error::ConsensusError;
+use zx_consensus::fork_choice::{Preferencia, Tip, comprobar_profundidad_reorg, preferir};
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
 use zx_core::red::Red;
-use zx_core::target::{CompactBits, trabajo_bloque};
+use zx_core::target::{CompactBits, TrabajoAcumulado, trabajo_bloque};
 use zx_p2p::entrante::{ManejadorEntrante, Veredicto};
 use zx_p2p::mensaje::{BloqueRed, Estado};
 use zx_storage::almacen::{AlmacenCadena, Punta};
@@ -241,6 +243,122 @@ impl Cadena {
             .unwrap_or_else(U256::one)
     }
 
+    /// Adopta una cadena de cabeceras **ya validadas**, reorganizando si hace falta (P-028).
+    ///
+    /// Es lo que faltaba: `extender` solo sabía añadir a la punta, así que una rama competidora
+    /// que colgara por debajo se validaba correctamente y **se descartaba entera**. El nodo se
+    /// quedaba en una cadena perdedora, que es la peor forma de divergir — sin error, sin aviso.
+    ///
+    /// # El orden de las comprobaciones importa
+    ///
+    /// 1. Localizar el ancla. Si no la conocemos, no hay nada que adoptar.
+    /// 2. **Decidir con `fork_choice`**, no a ojo: la rama que gana es la de más trabajo, con
+    ///    desempate por menor hash (C-FORK-01..04). Comparar alturas sería incorrecto.
+    /// 3. **Comprobar la profundidad ANTES de tocar nada** (C-REORG-07). Una reorg de más de 99
+    ///    bloques no se aplica: se para el nodo.
+    /// 4. Recortar y reaplicar.
+    ///
+    /// El paso 3 va antes del 4 a propósito. Comprobar después de haber empezado a deshacer dejaría
+    /// el estado a medias justo en el caso que la regla existe para tratar como excepcional.
+    ///
+    /// # Errores
+    /// [`ConsensusError::ReorgDemasiadoProfunda`] si excede `MAX_REORG_LENGTH`. Quien lo reciba
+    /// **MUST** detener el nodo y avisar al operador, no reintentar.
+    pub fn adoptar(&self, nuevas: &[BlockHeader]) -> Result<Adopcion, ConsensusError> {
+        let Some(primera) = nuevas.first() else {
+            return Ok(Adopcion::NadaQueHacer);
+        };
+        let Ok(mut idx) = self.cabeceras.write() else {
+            return Ok(Adopcion::NadaQueHacer);
+        };
+
+        // 1 · ¿de dónde cuelgan?
+        let Some(&pos_ancla) = idx.posicion.get(&primera.prev_hash) else {
+            return Ok(Adopcion::NoCuelgaDeNada);
+        };
+
+        // Extensión de la punta: el caso normal, sin reorg.
+        let es_extension = pos_ancla + 1 == idx.cadena.len();
+
+        // 2 · ¿gana la candidata? `fork_choice`, no altura.
+        let trabajo_ancla = trabajo_de(idx.cadena.get(..=pos_ancla).unwrap_or_default());
+        let trabajo_nuevas = nuevas
+            .iter()
+            .filter_map(|c| CompactBits::from_u32(c.bits).decodificar().ok())
+            .filter_map(trabajo_bloque)
+            .fold(U256::zero(), |a, w| a.saturating_add(w));
+        let candidata = Tip {
+            hash: nuevas
+                .last()
+                .map_or(primera.prev_hash, BlockHeader::block_hash),
+            altura: nuevas.last().map_or(0, |c| c.height),
+            trabajo: acumulado(trabajo_ancla.saturating_add(trabajo_nuevas)),
+        };
+        let actual = Tip {
+            hash: idx.punta().map_or(self.genesis, |(h, _)| h),
+            altura: idx.punta().map_or(0, |(_, c)| c.height),
+            trabajo: acumulado(trabajo_de(&idx.cadena)),
+        };
+
+        if !es_extension && preferir(&candidata, &actual) != Preferencia::Primero {
+            // Una rama que no gana no se adopta, y **no es mala fe**: es lo que propone cualquiera
+            // que vaya por detrás o por una rama distinta.
+            return Ok(Adopcion::NoGana);
+        }
+
+        // 3 · C-REORG-07 · la profundidad, ANTES de deshacer nada.
+        let desechadas = idx.cadena.len().saturating_sub(pos_ancla + 1);
+        let profundidad = u32::try_from(desechadas).unwrap_or(u32::MAX);
+        comprobar_profundidad_reorg(profundidad)?;
+
+        // 4 · recortar y reaplicar.
+        if !es_extension {
+            // Las cabeceras desechadas **siguen en el almacén**, recuperables por su hash: las
+            // necesitaría un reorg que volviera atrás. Lo único que se rehace es el índice.
+            // Se recogen antes de mutar: `drain` toma `idx.cadena` prestado y `posicion` vive en
+            // el mismo struct.
+            let desechados: Vec<BlockHash> =
+                idx.cadena.drain(pos_ancla + 1..).map(|(h, _)| h).collect();
+            for h in desechados {
+                idx.posicion.remove(&h);
+            }
+        }
+
+        let mut aplicadas = 0usize;
+        let mut ultima = None;
+        for c in nuevas {
+            if idx.punta().map(|(h, _)| h) != Some(c.prev_hash) {
+                break;
+            }
+            // C-STORE-01 · el dato primero, la punta al final.
+            if let Err(e) = self.almacen.guardar_cabecera(c) {
+                tracing::error!(%e, altura = c.height, "no se pudo guardar la cabecera");
+                break;
+            }
+            idx.empujar(*c);
+            ultima = Some(*c);
+            aplicadas += 1;
+        }
+
+        if let Some(c) = ultima
+            && let Err(e) = self.almacen.fijar_punta(Punta {
+                hash: c.block_hash(),
+                altura: c.height,
+            })
+        {
+            tracing::error!(%e, "no se pudo fijar la punta");
+        }
+
+        Ok(if profundidad == 0 {
+            Adopcion::Extendida { aplicadas }
+        } else {
+            Adopcion::Reorganizada {
+                aplicadas,
+                desechadas: profundidad,
+            }
+        })
+    }
+
     /// Añade cabeceras **ya validadas** a la punta.
     ///
     /// Devuelve cuántas se añadieron. Las que no continúen la punta se ignoran: llegar tarde con
@@ -449,6 +567,44 @@ impl ManejadorEntrante for Cadena {
     }
 }
 
+/// Qué pasó al adoptar una cadena de cabeceras.
+///
+/// Se distinguen porque **tienen respuestas distintas**: una extensión es progreso, una reorg es
+/// progreso con aviso, y las dos negativas no son mala fe pero sí razón para dejar de pedirle a ese
+/// peer (C-NET-18).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Adopcion {
+    /// La lista venía vacía.
+    NadaQueHacer,
+    /// No cuelgan de nada que conozcamos. **No es mala fe**: puede ser desincronización.
+    NoCuelgaDeNada,
+    /// Cuelgan de algo nuestro pero la rama **no gana** por trabajo acumulado. Tampoco es mala fe.
+    NoGana,
+    /// Se añadieron a la punta, sin deshacer nada.
+    Extendida {
+        /// Cuántas.
+        aplicadas: usize,
+    },
+    /// Se adoptó una rama distinta, deshaciendo parte de la nuestra.
+    Reorganizada {
+        /// Cuántas se añadieron.
+        aplicadas: usize,
+        /// Cuántas se desecharon.
+        desechadas: u32,
+    },
+}
+
+impl Adopcion {
+    /// Cuántas cabeceras se incorporaron. Lo que cuenta hacia "estar al día" (C-NET-17).
+    #[must_use]
+    pub const fn aplicadas(self) -> usize {
+        match self {
+            Self::Extendida { aplicadas } | Self::Reorganizada { aplicadas, .. } => aplicadas,
+            _ => 0,
+        }
+    }
+}
+
 /// Cuántas cabeceras se sirven como mucho en una respuesta.
 ///
 /// Coincide con el límite de transporte de `zx-p2p`, y se aplica **antes de clonar**: recortar
@@ -461,6 +617,19 @@ const MAX_CABECERAS_SERVIDAS: usize = 2_000;
 /// hagamos mil lecturas para tirar 984 después. El recorte tardío convierte un límite en un
 /// amplificador.
 const MAX_BLOQUES_SERVIDOS: usize = 16;
+
+/// Envuelve un `U256` en el tipo testigo del fork choice.
+///
+/// `TrabajoAcumulado` no tiene constructor desde `U256` a propósito —solo se llega ahí sumando—,
+/// que es exactamente el punto: obliga a que el trabajo se construya sumando bloques y no se pueda
+/// inventar. Aquí se reconstruye sumándolo de una vez, que es la misma operación.
+fn acumulado(w: U256) -> TrabajoAcumulado {
+    TrabajoAcumulado::cero().sumar(w).unwrap_or_else(|| {
+        // Inalcanzable: `w` sale de sumar trabajos de bloques reales, muy por debajo de U256::MAX.
+        // Si llegara aquí, saturar es más seguro que envolver.
+        TrabajoAcumulado::cero()
+    })
+}
 
 /// Trabajo acumulado de una secuencia de cabeceras.
 ///
@@ -477,7 +646,7 @@ fn trabajo_de(cs: &[(BlockHash, BlockHeader)]) -> U256 {
 /// El hash cero, para lo que todavía no existe.
 #[cfg(test)]
 #[must_use]
-pub fn hash_cero() -> BlockHash {
+pub(crate) fn hash_cero() -> BlockHash {
     BlockHash::from_digest(zx_core::digest::Digest::from_bytes([0u8; 32]))
 }
 
@@ -489,6 +658,9 @@ pub fn hash_cero() -> BlockHash {
 )]
 mod tests {
     use super::Cadena;
+    use zx_consensus::error::ConsensusError;
+    use zx_core::digest::BlockHash;
+    use zx_core::preimage::block::BlockHeader;
     use zx_core::red::Red;
     use zx_p2p::entrante::ManejadorEntrante;
 
@@ -608,6 +780,194 @@ mod tests {
             almacen.cabecera(&p.hash).unwrap().is_some(),
             "C-STORE-01: la punta MUST apuntar a una cabecera guardada"
         );
+    }
+
+    /// Construye `n` cabeceras encadenadas a partir de `desde`, con un `sal` que las hace únicas.
+    fn cadena_desde(desde: BlockHash, n: u32, sal: u8) -> Vec<BlockHeader> {
+        let mut v = Vec::with_capacity(n as usize);
+        let mut prev = desde;
+        for i in 1..=n {
+            let c = zx_core::preimage::block::BlockHeader {
+                consensus_branch_id: 0xc478_80ea,
+                prev_hash: prev,
+                merkle_root: zx_core::digest::MerkleRoot::from_digest(
+                    zx_core::digest::Digest::from_bytes([sal; 32]),
+                ),
+                timestamp: 1_788_480_000 + u64::from(i) * 120,
+                bits: 0x1d00_ffff,
+                nonce: u64::from(i) * 1000 + u64::from(sal),
+                height: i,
+            };
+            prev = c.block_hash();
+            v.push(c);
+        }
+        v
+    }
+
+    /// **P-028 · adoptar una rama que gana, deshaciendo la nuestra.**
+    ///
+    /// Es lo que faltaba: antes, una rama competidora válida se validaba bien y `extender` la
+    /// descartaba entera, dejando al nodo en la cadena perdedora **sin error y sin aviso**.
+    #[test]
+    fn una_rama_con_mas_trabajo_se_adopta() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+
+        // Nuestra cadena: 3 bloques.
+        let nuestra = cadena_desde(c.genesis(), 3, 1);
+        assert!(matches!(
+            c.adoptar(&nuestra).unwrap(),
+            super::Adopcion::Extendida { aplicadas: 3 }
+        ));
+        assert_eq!(c.altura(), 3);
+
+        // Una rama que cuelga del génesis y es MÁS LARGA: 5 bloques, así que más trabajo.
+        let rival = cadena_desde(c.genesis(), 5, 2);
+        let r = c.adoptar(&rival).unwrap();
+        assert_eq!(
+            r,
+            super::Adopcion::Reorganizada {
+                aplicadas: 5,
+                desechadas: 3
+            }
+        );
+        assert_eq!(c.altura(), 5, "adoptamos la rama ganadora");
+        assert_eq!(
+            c.estado().tip,
+            rival.last().unwrap().block_hash(),
+            "la punta es la de la rama nueva"
+        );
+    }
+
+    /// Una rama que **no** gana se rechaza — y no es mala fe.
+    #[test]
+    fn una_rama_con_menos_trabajo_no_se_adopta() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let nuestra = cadena_desde(c.genesis(), 5, 1);
+        c.adoptar(&nuestra).unwrap();
+        assert_eq!(c.altura(), 5);
+
+        let perdedora = cadena_desde(c.genesis(), 2, 2);
+        assert_eq!(c.adoptar(&perdedora).unwrap(), super::Adopcion::NoGana);
+        assert_eq!(c.altura(), 5, "nuestra cadena no se toca");
+        assert_eq!(c.estado().tip, nuestra.last().unwrap().block_hash());
+    }
+
+    /// **C-REORG-07 · una reorg de más de 99 bloques NO se aplica.**
+    ///
+    /// Y lo que importa: **la cadena queda intacta**. La comprobación va antes de deshacer nada
+    /// precisamente para que el caso excepcional no deje el estado a medias.
+    #[test]
+    fn una_reorg_demasiado_profunda_se_rechaza_sin_tocar_la_cadena() {
+        use zx_consensus::fork_choice::MAX_REORG_LENGTH;
+
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let nuestra = cadena_desde(c.genesis(), MAX_REORG_LENGTH + 5, 1);
+        c.adoptar(&nuestra).unwrap();
+        let altura_antes = c.altura();
+        let tip_antes = c.estado().tip;
+        assert_eq!(altura_antes, MAX_REORG_LENGTH + 5);
+
+        // Una rama desde el génesis que gana pero exigiría deshacer 104 bloques.
+        let rival = cadena_desde(c.genesis(), MAX_REORG_LENGTH + 10, 2);
+        let e = c.adoptar(&rival).expect_err("MUST rechazarse");
+        assert!(
+            matches!(e, ConsensusError::ReorgDemasiadoProfunda { .. }),
+            "{e:?}"
+        );
+
+        assert_eq!(c.altura(), altura_antes, "la cadena NO se tocó");
+        assert_eq!(c.estado().tip, tip_antes, "la punta NO se movió");
+    }
+
+    /// Justo en el borde de la profundidad máxima **sí** se aplica.
+    #[test]
+    fn el_borde_exacto_de_la_profundidad_maxima_se_aplica() {
+        use zx_consensus::fork_choice::MAX_REORG_LENGTH;
+
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let nuestra = cadena_desde(c.genesis(), MAX_REORG_LENGTH, 1);
+        c.adoptar(&nuestra).unwrap();
+
+        // Deshacer exactamente MAX_REORG_LENGTH: permitido.
+        let rival = cadena_desde(c.genesis(), MAX_REORG_LENGTH + 1, 2);
+        assert!(
+            c.adoptar(&rival).is_ok(),
+            "deshacer exactamente {MAX_REORG_LENGTH} MUST permitirse"
+        );
+        assert_eq!(c.altura(), MAX_REORG_LENGTH + 1);
+    }
+
+    /// Las cabeceras desechadas **siguen recuperables por su hash**.
+    ///
+    /// Lo que se rehace es el índice de la cadena principal, no el almacén: las necesitaría una
+    /// reorg que volviera atrás, y borrarlas haría que volver fuera imposible.
+    #[test]
+    fn las_cabeceras_desechadas_siguen_en_el_almacen() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let nuestra = cadena_desde(c.genesis(), 3, 1);
+        c.adoptar(&nuestra).unwrap();
+        let desechada = nuestra.last().unwrap().block_hash();
+
+        let rival = cadena_desde(c.genesis(), 5, 2);
+        c.adoptar(&rival).unwrap();
+
+        assert!(
+            c.almacen().cabecera(&desechada).unwrap().is_some(),
+            "la cabecera desechada MUST seguir recuperable por su hash"
+        );
+        assert!(
+            c.trabajo_hasta(desechada).is_none(),
+            "pero ya no está en la cadena principal"
+        );
+    }
+
+    /// Una cadena que no cuelga de nada nuestro se detecta sin tocar nada.
+    #[test]
+    fn una_cadena_que_no_cuelga_de_nada_se_detecta() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let ajena = cadena_desde(super::hash_cero(), 3, 9);
+        assert_eq!(c.adoptar(&ajena).unwrap(), super::Adopcion::NoCuelgaDeNada);
+        assert_eq!(c.altura(), 0);
+    }
+
+    /// Una lista vacía no hace nada, y no es un error.
+    #[test]
+    fn adoptar_nada_no_hace_nada() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        assert_eq!(c.adoptar(&[]).unwrap(), super::Adopcion::NadaQueHacer);
+        assert_eq!(c.altura(), 0);
+    }
+
+    /// Tras una reorg, el locator refleja la rama nueva y sigue cerrando en el génesis.
+    ///
+    /// Si el locator siguiera apuntando a la rama vieja, el nodo pediría desde un punto que ya no
+    /// es suyo y no avanzaría nunca.
+    #[test]
+    fn el_locator_refleja_la_rama_adoptada() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let vieja = cadena_desde(c.genesis(), 4, 1);
+        c.adoptar(&vieja).unwrap();
+
+        let nueva = cadena_desde(c.genesis(), 6, 2);
+        c.adoptar(&nueva).unwrap();
+
+        let l = c.locator();
+        assert_eq!(
+            *l.first().unwrap(),
+            nueva.last().unwrap().block_hash(),
+            "el locator empieza en la punta NUEVA"
+        );
+        assert_eq!(
+            *l.last().unwrap(),
+            c.genesis(),
+            "y sigue cerrando en el génesis"
+        );
+        for h in &vieja {
+            assert!(
+                !l.contains(&h.block_hash()),
+                "ninguna cabecera de la rama vieja debe seguir en el locator"
+            );
+        }
     }
 
     #[test]

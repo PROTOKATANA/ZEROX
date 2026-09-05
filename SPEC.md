@@ -1725,6 +1725,11 @@ MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 99 bloques
 Un nodo que detecte una reorganización que retrocedería más de `MAX_REORG_LENGTH` bloques
 **MUST NOT** aplicarla. **MUST** detenerse y alertar al operador de forma explícita y ruidosa.
 
+**La comprobación MUST hacerse ANTES de deshacer nada.** Comprobar a mitad de la reorganización
+dejaría el estado a medias precisamente en el caso que esta regla existe para tratar como
+excepcional. Implementado en `zx-node::cadena::adoptar`, con un test que verifica que tras el
+rechazo **la cadena y la punta quedan intactas**.
+
 > 🔶 **Decidido 2026-09-04, y es tanto decisión de producto como de consenso.**
 >
 > Las tres posturas reales: Bitcoin no tiene límite; Monero tampoco en consenso (solo checkpoints
@@ -2327,12 +2332,14 @@ de pedir a ese peer.
 > Con el mismo locator, el peer respondería **lo mismo indefinidamente** — gratis para él, un
 > escaneo por ronda para nosotros. Es un bucle infinito con la víctima pagando.
 >
-> El caso más incómodo es el de una cadena **válida que no encaja**: una bifurcación que cuelga por
-> debajo de la punta. `validar_cadena_de_cabeceras` la juzga bien, y `extender` no sabe adoptarla
-> —solo añade a la punta— así que devuelve 0. 🔶 **El soporte de reorganización de cabeceras no
-> existe todavía**: `fork_choice` sabe decidir entre ramas pero no está conectado, y conectarlo
-> exige poder deshacer hasta el ancla. Hasta entonces, cortar es la respuesta honesta; reintentar
-> sería fingir que se está progresando.
+> ✅ **El caso de la bifurcación ya está cubierto (P-028, cerrada).** `Cadena::adoptar` decide con
+> `fork_choice::preferir` —trabajo acumulado, con desempate por menor hash— y **reorganiza** cuando
+> la rama candidata gana. Antes, una rama válida que colgara por debajo de la punta se validaba
+> bien y se descartaba entera, dejando al nodo en la cadena perdedora **sin error y sin aviso**:
+> la peor forma de divergir.
+>
+> Cortar sigue siendo la respuesta cuando la rama **no gana** o no cuelga de nada nuestro: reintentar
+> con el mismo locator daría lo mismo indefinidamente.
 
 **C-NET-19 · A un peer condenado no se le vuelve a pedir en la misma vuelta.** Desconectar **es
 asíncrono** —encola un comando—, así que el sincronizador **MUST** olvidarlo de inmediato.
@@ -2459,7 +2466,6 @@ debajo**.
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
-| **P-028** | §16.1 | 🆕 **Reorg de cabeceras.** `validar_cadena_de_cabeceras` juzga bien una bifurcación profunda, y `extender` no sabe adoptarla: `fork_choice` existe y no está conectado. Mitigado a medias por C-NET-18 | **D2** + **D4** |
 | **P-029** | §16.1 | 🆕 ¿Un `RwLock` envenenado debe degradar —altura 0, tip = génesis— o **parar el nodo**? Hoy degrada, y eso contradice a C-GEN-06 y C-NET-13 | Katana |
 | **P-004d** | §7.3 | 🆕 ¿Puede LWMA adaptarse desde el bloque 1 **sembrando** la ventana con ancestros sintéticos, en vez de 90 bloques a dificultad fija? Encoger `N` está prohibido por varianza; sembrarla no. Regla de consenso nueva | Investigación + **D9** + **D8**, Fase 10 |
 
@@ -2468,6 +2474,7 @@ debajo**.
 | ID | Decisión | Dónde vive |
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-028** | **Reorganización de cabeceras**, con `fork_choice` conectado y la parada dura de C-REORG-07 comprobada **antes** de deshacer nada | C-NET-18, C-REORG-07 |
 | **P-025** | **Límites y baneo por prefijo de red** (/24 y /64), en un behaviour propio: `connection_limits` de libp2p no mira la IP y un `PeerId` es gratis | C-NET-20 |
 | **P-024** | **`TRABAJO_MINIMO_CADENA = 0`.** Es el análogo de `nMinimumChainWork`: para una cadena que no existe todavía, cero es el único valor correcto. Se sube por release, y **no es consenso** | C-NET-04 |
 | **P-018** | **BIP 152 extraído verbatim** → `research/bip152.md`. Lo portable y lo que no, delimitado | C-NET-06..10 |
