@@ -21,8 +21,9 @@ use primitive_types::U256;
 use zx_consensus::activacion::rama_activa;
 use zx_consensus::error::ConsensusError;
 use zx_consensus::fork_choice::{Preferencia, Tip, comprobar_profundidad_reorg, preferir};
-use zx_core::digest::BlockHash;
-use zx_core::preimage::block::BlockHeader;
+use zx_core::digest::{BlockHash, TxId};
+use zx_core::preimage::block::{BlockHeader, merkle_root};
+use zx_core::preimage::tx::txid;
 use zx_core::red::Red;
 use zx_core::target::{CompactBits, TrabajoAcumulado, trabajo_bloque};
 use zx_p2p::entrante::{ManejadorEntrante, Veredicto};
@@ -417,15 +418,18 @@ impl Cadena {
         n
     }
 
-    /// Guarda el cuerpo de un bloque.
+    /// Guarda el cuerpo de un bloque, **después de comprobar que es el de su cabecera**.
     ///
     /// # Errores
-    /// Lo que devuelva el almacén.
-    pub fn guardar_bloque(&self, b: &BloqueRed) -> Result<(), zx_storage::StorageError> {
+    /// [`ErrorCuerpo::Rechazado`] si el cuerpo no corresponde a la cabecera; [`ErrorCuerpo::Almacen`]
+    /// con lo que devuelva el almacén.
+    pub fn guardar_bloque(&self, b: &BloqueRed) -> Result<(), ErrorCuerpo> {
+        comprobar_cuerpo(b)?;
         let mut bytes = Vec::new();
         zx_core::wire::cuerpo_a_bytes(&mut bytes, &b.cabecera, &b.txs, &b.testigos);
         self.almacen
-            .guardar_cuerpo(&b.cabecera.block_hash(), &bytes)
+            .guardar_cuerpo(&b.cabecera.block_hash(), &bytes)?;
+        Ok(())
     }
 
     /// Recupera un bloque completo, o `None` si no lo tenemos.
@@ -502,6 +506,87 @@ impl Cadena {
         }
         v
     }
+}
+
+/// Por qué un cuerpo puede no ser el de su cabecera.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum RechazoCuerpo {
+    /// La raíz de Merkle de las transacciones no es la que la cabecera compromete (C-BLK-03).
+    #[error("la raíz de Merkle del cuerpo no es la de su cabecera (C-BLK-03)")]
+    RaizNoCoincide,
+    /// Hay un número distinto de listas de testigos que de transacciones.
+    #[error("{testigos} listas de testigos para {txs} transacciones")]
+    TestigosDescuadrados {
+        /// Transacciones que trae el cuerpo.
+        txs: usize,
+        /// Listas de testigos que trae el cuerpo.
+        testigos: usize,
+    },
+    /// Un bloque sin transacciones no existe: siempre lleva coinbase (C-BLK-07).
+    #[error("el bloque no trae ninguna transacción: falta la coinbase (C-BLK-07)")]
+    SinCoinbase,
+}
+
+/// Lo que puede salir mal al guardar un cuerpo.
+#[derive(Debug, thiserror::Error)]
+pub enum ErrorCuerpo {
+    /// El cuerpo no es el de su cabecera.
+    #[error(transparent)]
+    Rechazado(#[from] RechazoCuerpo),
+    /// El almacén falló.
+    #[error(transparent)]
+    Almacen(#[from] zx_storage::StorageError),
+}
+
+/// **Comprueba que un cuerpo es el de su cabecera** (C-NET-23).
+///
+/// # Por qué esto no es opcional
+///
+/// Un cuerpo se guarda y se indexa **por el hash de su cabecera**. Sin esta comprobación, un peer
+/// que responde a `Peticion::Bloques` puede mandar la cabecera correcta —la que le pedimos, la que
+/// ya validamos— con un cuerpo cualquiera: lo guardaríamos bajo el hash bueno, lo serviríamos a
+/// otros peers como si fuera el bloque real, y `Cadena::bloque` lo devolvería sin una queja.
+///
+/// Lo que lo impide es que la cabecera **compromete** la lista de transacciones a través de la raíz
+/// de Merkle (C-BLK-03). Recalcularla desde las transacciones que llegan y compararla es lo que
+/// convierte "el peer dice que este es el cuerpo" en "este es el cuerpo".
+///
+/// # Lo que NO comprueba
+///
+/// La validez de las transacciones: firmas, gastos, importes, peso, coinbase. Eso es
+/// `zx_consensus::bloque::validar_cuerpo` y necesita el conjunto UTXO, que la cadena todavía no
+/// mantiene. Esto es la barrera **anterior**: que el cuerpo sea el que la cabecera dice, que es
+/// barato y no depende de tener estado.
+///
+/// # Errores
+/// El [`RechazoCuerpo`] correspondiente. Todos son atribuibles a mala fe: la raíz es determinista.
+pub fn comprobar_cuerpo(b: &BloqueRed) -> Result<(), RechazoCuerpo> {
+    // C-BLK-07 · siempre hay coinbase. Además, sin esto la raíz de la lista vacía sería un valor
+    // legítimo y un "bloque" sin transacciones podría cuadrar con una cabecera fabricada para él.
+    if b.txs.is_empty() {
+        return Err(RechazoCuerpo::SinCoinbase);
+    }
+    // Los testigos van en paralelo a las transacciones (§2.4). Descuadrados, el cuerpo no es
+    // codificable de vuelta a lo mismo, y guardarlo dejaría el almacén con algo que no se puede
+    // releer con sentido.
+    if b.testigos.len() != b.txs.len() {
+        return Err(RechazoCuerpo::TestigosDescuadrados {
+            txs: b.txs.len(),
+            testigos: b.testigos.len(),
+        });
+    }
+    // C-BLK-03 · la raíz. El `consensus_branch_id` sale de la CABECERA, no de nuestra tabla: el
+    // txid depende de él (C-TX-05), y usar el nuestro compararía manzanas con peras en cuanto
+    // hubiera una rama nueva activa.
+    let txids: Vec<TxId> = b
+        .txs
+        .iter()
+        .map(|t| txid(t, b.cabecera.consensus_branch_id))
+        .collect();
+    if merkle_root(&txids) != b.cabecera.merkle_root {
+        return Err(RechazoCuerpo::RaizNoCoincide);
+    }
+    Ok(())
 }
 
 impl ManejadorEntrante for Cadena {
@@ -1060,5 +1145,142 @@ mod tests {
         // No hay bloques tras el génesis todavía, así que la lista es vacía; lo que importa es que
         // el camino de "sí te reconozco" se recorre sin error.
         assert!(c.cabeceras_desde(&[c.genesis()], None).is_empty());
+    }
+}
+
+#[cfg(test)]
+#[expect(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "los tests fallan con panic por diseño"
+)]
+mod tests_cuerpo {
+    use super::{RechazoCuerpo, comprobar_cuerpo};
+    use zx_core::amount::Amount;
+    use zx_core::digest::{Digest, MerkleRoot, TxId};
+    use zx_core::firma::ClavePublica;
+    use zx_core::preimage::block::{BlockHeader, merkle_root};
+    use zx_core::preimage::tx::txid;
+    use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use zx_p2p::mensaje::BloqueRed;
+
+    const RAMA: u32 = 0xc478_80ea;
+
+    fn tx(valor: i64) -> Tx {
+        Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([7; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0xffff_fffe,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(valor).unwrap(),
+                lock: Lock::PubKey {
+                    pubkey: ClavePublica::desde_bytes([9; 32]),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: 1,
+        }
+    }
+
+    /// Un bloque coherente: la cabecera compromete exactamente estas transacciones.
+    fn bloque(txs: Vec<Tx>) -> BloqueRed {
+        let txids: Vec<TxId> = txs.iter().map(|t| txid(t, RAMA)).collect();
+        let testigos = txs.iter().map(|_| vec![vec![0x5a; 64]]).collect();
+        BloqueRed {
+            cabecera: BlockHeader {
+                consensus_branch_id: RAMA,
+                prev_hash: zx_core::digest::BlockHash::from_digest(Digest::from_bytes([0; 32])),
+                merkle_root: merkle_root(&txids),
+                timestamp: 1_788_480_120,
+                bits: 0x1d00_ffff,
+                nonce: 1,
+                height: 1,
+            },
+            txs,
+            testigos,
+        }
+    }
+
+    #[test]
+    fn un_cuerpo_que_corresponde_a_su_cabecera_pasa() {
+        comprobar_cuerpo(&bloque(vec![tx(50_000)])).expect("es el suyo");
+        comprobar_cuerpo(&bloque(vec![tx(1), tx(2), tx(3)])).expect("también con varias");
+    }
+
+    /// **El ataque.** La cabecera correcta —la que pedimos y ya validamos— con otro cuerpo.
+    ///
+    /// Sin esta comprobación lo guardábamos bajo el hash bueno y se lo servíamos a otros peers como
+    /// si fuera el bloque real.
+    #[test]
+    fn la_cabecera_buena_con_otro_cuerpo_se_rechaza() {
+        let bueno = bloque(vec![tx(50_000)]);
+        let mut falso = bloque(vec![tx(999_999)]);
+        // Se conserva la cabecera del bueno: el hash bajo el que se indexaría es el correcto.
+        falso.cabecera = bueno.cabecera;
+
+        assert_eq!(
+            comprobar_cuerpo(&falso),
+            Err(RechazoCuerpo::RaizNoCoincide),
+            "un cuerpo distinto bajo la cabecera buena MUST rechazarse"
+        );
+    }
+
+    /// Cambiar **una sola** transacción de un bloque de varias también se ve.
+    #[test]
+    fn cambiar_una_transaccion_de_muchas_tambien_se_ve() {
+        let mut b = bloque(vec![tx(1), tx(2), tx(3)]);
+        *b.txs.get_mut(1).unwrap() = tx(20);
+        assert_eq!(comprobar_cuerpo(&b), Err(RechazoCuerpo::RaizNoCoincide));
+    }
+
+    /// **La rama de consenso sale de la cabecera, no de nuestra tabla.**
+    ///
+    /// El txid depende de `consensus_branch_id` (C-TX-05). Si la comprobación usara la rama que
+    /// nosotros creemos activa, un bloque de otra rama fallaría por el motivo equivocado — y, peor,
+    /// tras una actualización de red dejarían de cuadrar bloques históricos perfectamente válidos.
+    #[test]
+    fn la_raiz_se_calcula_con_la_rama_de_la_cabecera() {
+        let mut b = bloque(vec![tx(50_000)]);
+        // Mismo cuerpo, otra rama: la raíz comprometida ya no es la que producen estos txids.
+        b.cabecera.consensus_branch_id = 0x1234_5678;
+        assert_eq!(
+            comprobar_cuerpo(&b),
+            Err(RechazoCuerpo::RaizNoCoincide),
+            "cambiar la rama cambia los txids y por tanto la raíz"
+        );
+
+        // Y si la raíz se recalcula con la rama nueva, vuelve a cuadrar.
+        let txids: Vec<TxId> = b.txs.iter().map(|t| txid(t, 0x1234_5678)).collect();
+        b.cabecera.merkle_root = merkle_root(&txids);
+        comprobar_cuerpo(&b).expect("con su propia rama, cuadra");
+    }
+
+    #[test]
+    fn un_bloque_sin_transacciones_no_existe() {
+        let mut b = bloque(vec![tx(1)]);
+        b.txs.clear();
+        b.testigos.clear();
+        // La raíz de la lista vacía es un valor legítimo, así que sin la comprobación de C-BLK-07
+        // una cabecera fabricada para ella cuadraría.
+        b.cabecera.merkle_root = MerkleRoot::from_digest(merkle_root(&[]).digest().to_owned());
+        assert_eq!(comprobar_cuerpo(&b), Err(RechazoCuerpo::SinCoinbase));
+    }
+
+    #[test]
+    fn los_testigos_van_en_paralelo_a_las_transacciones() {
+        let mut b = bloque(vec![tx(1), tx(2)]);
+        b.testigos.pop();
+        assert_eq!(
+            comprobar_cuerpo(&b),
+            Err(RechazoCuerpo::TestigosDescuadrados {
+                txs: 2,
+                testigos: 1
+            })
+        );
     }
 }

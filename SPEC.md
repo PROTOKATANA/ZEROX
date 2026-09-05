@@ -2441,6 +2441,28 @@ una función pura (C-DIFF-01), así que dos nodos con los mismos ancestros obtie
 > **Va después del PoW a propósito.** Reconstruir una ventana de 91 ancestros cuesta bastante más
 > que un SHA3, y no merece gastarla en cabeceras que ni siquiera cumplen su propio `bits`.
 
+**C-NET-23 · Un cuerpo MUST demostrar que es el de su cabecera antes de guardarse.** Antes de
+escribir un cuerpo en el almacén, el nodo **MUST** recalcular la raíz de Merkle desde las
+transacciones que llegan y comprobar que es la que la cabecera compromete (C-BLK-03). El
+`consensus_branch_id` con el que se calculan los txid sale de **la cabecera**, no de la tabla de
+ramas del nodo (C-TX-05).
+
+Además: un cuerpo sin transacciones se rechaza (C-BLK-07), y el número de listas de testigos
+**MUST** ser igual al de transacciones (§2.4). Todo esto es mala fe (C-NET-05): la raíz es
+determinista.
+
+Solo se guardan cuerpos de cabeceras que el nodo ya tiene y ha validado. Un cuerpo de una cabecera
+desconocida **MUST** descartarse sin penalizar — puede ser una carrera con una reorganización.
+
+> **El agujero que cierra.** Un cuerpo se indexa **por el hash de su cabecera**. Sin esta
+> comprobación, un peer que responde a `Peticion::Bloques` puede mandar la cabecera correcta —la que
+> le pedimos, la que ya validamos, así que la clave del almacén es la buena— con un cuerpo
+> cualquiera. Lo guardaríamos, se lo serviríamos a otros peers como si fuera el bloque real, y
+> `Cadena::bloque` lo devolvería sin una queja.
+>
+> Cuesta un recorrido de Merkle y no necesita estado: es la barrera **anterior** a la validación
+> completa del cuerpo (§6.4), que necesita el conjunto UTXO y todavía no está cableada.
+
 > **El límite por petición no acota el producto.** Cada lectura del códec está acotada por
 > `.take(MAX)`, y eso no basta:
 >

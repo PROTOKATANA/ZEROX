@@ -33,7 +33,7 @@ use zx_p2p::error::MotivoDesconexion;
 use zx_p2p::mensaje::{Peticion, Respuesta};
 use zx_p2p::servicio::{EventoRed, ManejoRed};
 
-use crate::cadena::{Adopcion, Cadena};
+use crate::cadena::{Adopcion, Cadena, ErrorCuerpo};
 use crate::dificultad::comprobar_dificultad;
 use crate::sync::{Fase, Sincronizador, validar_cadena_de_cabeceras};
 
@@ -143,6 +143,34 @@ impl Nodo {
             Respuesta::Cabeceras(cs) => self.atender_cabeceras(peer, cs).await,
             Respuesta::Bloques(bs) => {
                 tracing::debug!(peer = %peer, n = bs.len(), "bloques recibidos");
+                for b in &bs {
+                    let hash = b.cabecera.block_hash();
+                    // Solo se guardan cuerpos de cabeceras que ya tenemos y hemos validado. Un
+                    // cuerpo de una cabecera desconocida no se puede juzgar —no sabemos si su PoW
+                    // ni su dificultad valen— y aceptarlo sería dejar que un peer nos llene el
+                    // almacén con lo que quiera. No puntúa: puede ser una carrera con una reorg.
+                    if self.cadena.altura_de(hash).is_none() {
+                        tracing::debug!(peer = %peer, ?hash, "cuerpo de una cabecera que no tenemos");
+                        continue;
+                    }
+                    // C-NET-23 · y que sea el cuerpo de ESA cabecera.
+                    if let Err(e) = self.cadena.guardar_bloque(b) {
+                        match e {
+                            ErrorCuerpo::Rechazado(r) => {
+                                tracing::warn!(peer = %peer, %r, "cuerpo que no es el de su cabecera");
+                                let _ = self
+                                    .manejo
+                                    .desconectar(peer, MotivoDesconexion::ViolacionDeConsenso)
+                                    .await;
+                                return Fin::Seguir;
+                            }
+                            // Que el disco falle no es culpa del peer.
+                            ErrorCuerpo::Almacen(a) => {
+                                tracing::error!(%a, "no se pudo guardar el cuerpo");
+                            }
+                        }
+                    }
+                }
                 Fin::Seguir
             }
             Respuesta::NoDisponible => {

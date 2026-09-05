@@ -331,30 +331,41 @@ async fn un_cuerpo_de_bloque_viaja_entero() {
     use zx_p2p::mensaje::BloqueRed;
 
     let servidor = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
-    let cs = cabeceras_tras(&servidor, 1);
-    servidor.extender_sin_validar_solo_para_pruebas(&cs);
 
-    let cabecera = *cs.first().expect("una");
+    // La cabecera compromete las transacciones por su raíz de Merkle (C-BLK-03), así que el cuerpo
+    // se construye PRIMERO y la raíz sale de él. Antes este test ponía una raíz de relleno y
+    // guardaba el cuerpo igual: `guardar_bloque` no comprobaba la correspondencia, y por tanto el
+    // test tampoco demostraba que el bloque que viaja sea el que la cabecera dice (C-NET-23).
+    let txs = vec![Tx {
+        version: 1,
+        inputs: vec![TxIn {
+            outpoint: OutPoint {
+                prev_txid: zx_core::digest::TxId::from_digest(Digest::from_bytes([7; 32])),
+                prev_index: 0,
+            },
+            sequence: 0xffff_fffe,
+        }],
+        outputs: vec![TxOut {
+            value: Amount::nuevo(50_000).expect("importe"),
+            lock: Lock::PubKey {
+                pubkey: ClavePublica::desde_bytes([9; 32]),
+            },
+        }],
+        lock_time: 0,
+        expiry_height: 1,
+    }];
+
+    let mut cabecera = *cabeceras_tras(&servidor, 1).first().expect("una");
+    let txids: Vec<zx_core::digest::TxId> = txs
+        .iter()
+        .map(|t| zx_core::preimage::tx::txid(t, cabecera.consensus_branch_id))
+        .collect();
+    cabecera.merkle_root = zx_core::preimage::block::merkle_root(&txids);
+    servidor.extender_sin_validar_solo_para_pruebas(&[cabecera]);
+
     let bloque = BloqueRed {
         cabecera,
-        txs: vec![Tx {
-            version: 1,
-            inputs: vec![TxIn {
-                outpoint: OutPoint {
-                    prev_txid: zx_core::digest::TxId::from_digest(Digest::from_bytes([7; 32])),
-                    prev_index: 0,
-                },
-                sequence: 0xffff_fffe,
-            }],
-            outputs: vec![TxOut {
-                value: Amount::nuevo(50_000).expect("importe"),
-                lock: Lock::PubKey {
-                    pubkey: ClavePublica::desde_bytes([9; 32]),
-                },
-            }],
-            lock_time: 0,
-            expiry_height: 1,
-        }],
+        txs,
         testigos: vec![vec![vec![0x5a; 64]]],
     };
     servidor.guardar_bloque(&bloque).expect("guarda");
