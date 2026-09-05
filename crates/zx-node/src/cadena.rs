@@ -170,10 +170,7 @@ impl Cadena {
     /// Altura de la punta.
     #[must_use]
     pub fn altura(&self) -> u32 {
-        self.cabeceras
-            .read()
-            .map(|i| u32::try_from(i.len().saturating_sub(1)).unwrap_or(u32::MAX))
-            .unwrap_or(0)
+        u32::try_from(leer(&self.cabeceras).len().saturating_sub(1)).unwrap_or(u32::MAX)
     }
 
     /// La rama de consenso activa a la altura actual.
@@ -192,27 +189,23 @@ impl Cadena {
     /// haberla minado— y exactamente lo que producción no debe hacer nunca.
     #[doc(hidden)]
     pub fn extender_sin_validar_solo_para_pruebas(&self, nuevas: &[BlockHeader]) {
-        if let Ok(mut i) = self.cabeceras.write() {
-            for c in nuevas {
-                let _ = self.almacen.guardar_cabecera(c);
-                i.empujar(*c);
-            }
-            if let Some((h, c)) = i.punta() {
-                let _ = self.almacen.fijar_punta(Punta {
-                    hash: h,
-                    altura: c.height,
-                });
-            }
+        let mut i = escribir(&self.cabeceras);
+        for c in nuevas {
+            let _ = self.almacen.guardar_cabecera(c);
+            i.empujar(*c);
+        }
+        if let Some((h, c)) = i.punta() {
+            let _ = self.almacen.fijar_punta(Punta {
+                hash: h,
+                altura: c.height,
+            });
         }
     }
 
     /// Trabajo acumulado de nuestra cadena hasta la punta.
     #[must_use]
     pub fn trabajo(&self) -> U256 {
-        self.cabeceras
-            .read()
-            .map(|i| trabajo_de(&i.cadena))
-            .unwrap_or_default()
+        trabajo_de(&leer(&self.cabeceras).cadena)
     }
 
     /// Trabajo acumulado **hasta un hash concreto** de nuestra cadena, o `None` si no lo conocemos.
@@ -223,7 +216,7 @@ impl Cadena {
     /// cualquier bifurcación profunda.
     #[must_use]
     pub fn trabajo_hasta(&self, h: BlockHash) -> Option<U256> {
-        let i = self.cabeceras.read().ok()?;
+        let i = leer(&self.cabeceras);
         // `O(1)` gracias al índice. Antes era `O(n)` **con un SHA3 por cabecera**, y se ejecutaba
         // sobre un `prev_hash` que el peer elige — o sea, un escaneo completo de nuestra cadena a
         // petición de cualquiera, antes de haber validado nada.
@@ -234,10 +227,8 @@ impl Cadena {
     /// Trabajo de un solo bloque a la dificultad de la punta, para el umbral de C-NET-04.
     #[must_use]
     pub fn trabajo_de_un_bloque(&self) -> U256 {
-        self.cabeceras
-            .read()
-            .ok()
-            .and_then(|i| i.punta())
+        leer(&self.cabeceras)
+            .punta()
             .and_then(|(_, c)| CompactBits::from_u32(c.bits).decodificar().ok())
             .and_then(trabajo_bloque)
             .unwrap_or_else(U256::one)
@@ -268,9 +259,7 @@ impl Cadena {
         let Some(primera) = nuevas.first() else {
             return Ok(Adopcion::NadaQueHacer);
         };
-        let Ok(mut idx) = self.cabeceras.write() else {
-            return Ok(Adopcion::NadaQueHacer);
-        };
+        let mut idx = escribir(&self.cabeceras);
 
         // 1 · ¿de dónde cuelgan?
         let Some(&pos_ancla) = idx.posicion.get(&primera.prev_hash) else {
@@ -378,9 +367,7 @@ impl Cadena {
     /// de reintentar: con el mismo locator, el peer respondería lo mismo indefinidamente. Lo hace
     /// `main.rs`, y esa es hoy la diferencia entre un hueco conocido y un bucle infinito.
     pub fn extender(&self, nuevas: &[BlockHeader]) -> usize {
-        let Ok(mut i) = self.cabeceras.write() else {
-            return 0;
-        };
+        let mut i = escribir(&self.cabeceras);
         let mut n = 0;
         let mut ultima = None;
 
@@ -448,6 +435,16 @@ impl Cadena {
         }
     }
 
+    /// Acceso al lock, **solo para el test de envenenamiento**.
+    ///
+    /// Existe porque envenenar un lock exige tomarlo y entrar en pánico, y eso no se puede hacer
+    /// desde fuera sin verlo. La alternativa —no probar la política de envenenamiento— es peor:
+    /// sería una decisión de diseño sin nada que la respalde.
+    #[cfg(test)]
+    pub(crate) const fn cabeceras_para_envenenar(&self) -> &RwLock<impl Sized> {
+        &self.cabeceras
+    }
+
     /// El almacén sobre el que corre esta cadena.
     #[must_use]
     pub fn almacen(&self) -> &Arc<dyn AlmacenCadena> {
@@ -463,9 +460,7 @@ impl Cadena {
     /// dos estamos en la misma cadena, que es justo lo que hay que averiguar.
     #[must_use]
     pub fn locator(&self) -> Vec<BlockHash> {
-        let Ok(idx) = self.cabeceras.read() else {
-            return Vec::new();
-        };
+        let idx = leer(&self.cabeceras);
         let mut v = Vec::new();
         let mut paso = 1usize;
         let mut i = idx.len();
@@ -496,12 +491,9 @@ impl ManejadorEntrante for Cadena {
     fn estado(&self) -> Estado {
         Estado {
             genesis: self.genesis,
-            tip: self
-                .cabeceras
-                .read()
-                .ok()
-                .and_then(|i| i.punta().map(|(h, _)| h))
-                .unwrap_or(self.genesis),
+            tip: leer(&self.cabeceras)
+                .punta()
+                .map_or(self.genesis, |(h, _)| h),
             altura: self.altura(),
             trabajo: self.trabajo().to_big_endian(),
         }
@@ -526,9 +518,7 @@ impl ManejadorEntrante for Cadena {
         locator: &[BlockHash],
         _hasta: Option<BlockHash>,
     ) -> Vec<BlockHeader> {
-        let Ok(idx) = self.cabeceras.read() else {
-            return Vec::new();
-        };
+        let idx = leer(&self.cabeceras);
         // El primer hash del locator que reconozcamos marca desde dónde servir. Que no
         // reconozcamos ninguno es una respuesta legítima: significa que no compartimos historia.
         //
@@ -618,6 +608,46 @@ const MAX_CABECERAS_SERVIDAS: usize = 2_000;
 /// amplificador.
 const MAX_BLOQUES_SERVIDOS: usize = 16;
 
+/// Lee el índice, o **recupera** el contenido de un lock envenenado (P-029).
+///
+/// # La decisión, y por qué esta y no la otra
+///
+/// Un `RwLock` se envenena cuando un hilo entra en pánico mientras lo tiene. La versión anterior
+/// hacía `.read().ok()` y devolvía valores por defecto: altura 0, trabajo 0, tip = génesis. **El
+/// nodo seguía anunciando esos valores a la red**, o sea, mintiendo sobre su cadena.
+///
+/// Eso contradice todo lo demás del proyecto: C-GEN-06 impide arrancar con un génesis dudoso,
+/// C-NET-13 para el nodo cuando el transporte se queda corto. La coherencia pedía **parar**.
+///
+/// Pero parar por un lock envenenado tiene un problema: el workspace **prohíbe `panic`, `unwrap` y
+/// `expect` en producción**, así que el pánico que envenenaría el lock no debería poder ocurrir. Si
+/// ocurriera igual —un desbordamiento aritmético en modo debug, un índice fuera de rango en una
+/// dependencia—, el estado protegido **no está corrupto**: los datos que hay dentro son válidos,
+/// solo que quien los tocaba murió.
+///
+/// Así que la decisión es la tercera opción, y es mejor que las dos: **recuperar el contenido y
+/// seguir, registrando el suceso como error**. Los datos son buenos, el nodo no miente, y el
+/// operador se entera. Es lo que `PoisonError::into_inner` existe para hacer.
+///
+/// Lo que **no** se hace es lo que se hacía antes: devolver valores falsos en silencio.
+fn leer<'a>(l: &'a RwLock<Indice>) -> std::sync::RwLockReadGuard<'a, Indice> {
+    l.read().unwrap_or_else(|e| {
+        tracing::error!(
+            "lock de la cadena envenenado: otro hilo entró en pánico. Los datos son válidos y se \
+             recuperan, pero esto NO debería poder pasar — el workspace prohíbe panic en producción."
+        );
+        e.into_inner()
+    })
+}
+
+/// Escribe en el índice, o recupera un lock envenenado. Ver [`leer`].
+fn escribir<'a>(l: &'a RwLock<Indice>) -> std::sync::RwLockWriteGuard<'a, Indice> {
+    l.write().unwrap_or_else(|e| {
+        tracing::error!("lock de la cadena envenenado al escribir; se recupera el contenido");
+        e.into_inner()
+    })
+}
+
 /// Envuelve un `U256` en el tipo testigo del fork choice.
 ///
 /// `TrabajoAcumulado` no tiene constructor desde `U256` a propósito —solo se llega ahí sumando—,
@@ -654,7 +684,8 @@ pub(crate) fn hash_cero() -> BlockHash {
 #[expect(
     clippy::unwrap_used,
     clippy::expect_used,
-    reason = "los tests fallan con panic por diseño"
+    clippy::panic,
+    reason = "los tests fallan con panic por diseño, y uno envenena un lock a propósito"
 )]
 mod tests {
     use super::Cadena;
@@ -928,6 +959,42 @@ mod tests {
         let ajena = cadena_desde(super::hash_cero(), 3, 9);
         assert_eq!(c.adoptar(&ajena).unwrap(), super::Adopcion::NoCuelgaDeNada);
         assert_eq!(c.altura(), 0);
+    }
+
+    /// **P-029 · un lock envenenado NO hace que el nodo mienta sobre su cadena.**
+    ///
+    /// La versión anterior devolvía altura 0, trabajo 0 y tip = génesis, y **el nodo seguía
+    /// anunciando esos valores a la red**. Ahora se recupera el contenido —que es válido: los datos
+    /// están bien, solo murió quien los tocaba— y se registra el suceso como error.
+    ///
+    /// El test envenena el lock a propósito desde otro hilo y comprueba que la cadena sigue
+    /// diciendo la verdad.
+    #[test]
+    fn un_lock_envenenado_no_hace_mentir_al_nodo() {
+        use std::sync::Arc;
+
+        let c = Arc::new(Cadena::nueva(Red::Testnet).unwrap());
+        let cs = cadena_desde(c.genesis(), 4, 1);
+        c.adoptar(&cs).unwrap();
+
+        let altura_antes = c.altura();
+        let tip_antes = c.estado().tip;
+        let trabajo_antes = c.trabajo();
+        assert_eq!(altura_antes, 4);
+
+        // Envenenar el lock: un hilo que entra en pánico teniéndolo.
+        let c2 = Arc::clone(&c);
+        let h = std::thread::spawn(move || {
+            let _guard = c2.cabeceras_para_envenenar().write();
+            panic!("envenenando el lock a propósito");
+        });
+        assert!(h.join().is_err(), "el hilo debía entrar en pánico");
+
+        // Y ahora la comprobación que importa: el nodo sigue diciendo la verdad.
+        assert_eq!(c.altura(), altura_antes, "la altura NO se degrada a 0");
+        assert_eq!(c.estado().tip, tip_antes, "el tip NO se degrada al génesis");
+        assert_eq!(c.trabajo(), trabajo_antes, "el trabajo NO se degrada a 0");
+        assert!(!c.locator().is_empty(), "el locator sigue funcionando");
     }
 
     /// Una lista vacía no hace nada, y no es un error.

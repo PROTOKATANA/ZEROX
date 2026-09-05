@@ -2466,7 +2466,6 @@ debajo**.
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
-| **P-029** | §16.1 | 🆕 ¿Un `RwLock` envenenado debe degradar —altura 0, tip = génesis— o **parar el nodo**? Hoy degrada, y eso contradice a C-GEN-06 y C-NET-13 | Katana |
 | **P-004d** | §7.3 | 🆕 ¿Puede LWMA adaptarse desde el bloque 1 **sembrando** la ventana con ancestros sintéticos, en vez de 90 bloques a dificultad fija? Encoger `N` está prohibido por varianza; sembrarla no. Regla de consenso nueva | Investigación + **D9** + **D8**, Fase 10 |
 
 ### Cerradas en esta revisión
@@ -2474,6 +2473,7 @@ debajo**.
 | ID | Decisión | Dónde vive |
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-029** | Un `RwLock` envenenado **recupera su contenido** —que es válido— y registra el error. Ni degrada en silencio ni tira un nodo sano | `zx-node::cadena` |
 | **P-028** | **Reorganización de cabeceras**, con `fork_choice` conectado y la parada dura de C-REORG-07 comprobada **antes** de deshacer nada | C-NET-18, C-REORG-07 |
 | **P-025** | **Límites y baneo por prefijo de red** (/24 y /64), en un behaviour propio: `connection_limits` de libp2p no mira la IP y un `PeerId` es gratis | C-NET-20 |
 | **P-024** | **`TRABAJO_MINIMO_CADENA = 0`.** Es el análogo de `nMinimumChainWork`: para una cadena que no existe todavía, cero es el único valor correcto. Se sube por release, y **no es consenso** | C-NET-04 |
