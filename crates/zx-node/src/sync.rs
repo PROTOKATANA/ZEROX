@@ -92,6 +92,16 @@ pub enum RechazoCabeceras {
     TrabajoInsuficiente,
     /// No arranca donde dijimos. Puede ser desincronización, no ataque.
     NoContinuaElLocator,
+    /// El `bits` no es el que el retarget exige a esa altura (C-BLK-05, C-DIFF-09). **Mala fe.**
+    ///
+    /// No hay forma inocente de traer esto: el retarget es una función pura de la ventana
+    /// (C-DIFF-01), así que dos nodos con los mismos ancestros calculan el mismo valor. Un `bits`
+    /// distinto es una cadena que el resto de la red no acepta.
+    DificultadIncorrecta,
+    /// Faltan ancestros para reconstruir la ventana del retarget.
+    ///
+    /// **NO es mala fe**, es una limitación nuestra: no podemos juzgar lo que no podemos calcular.
+    VentanaIncompleta,
 }
 
 impl RechazoCabeceras {
@@ -104,7 +114,10 @@ impl RechazoCabeceras {
     pub const fn es_mala_fe(self) -> bool {
         matches!(
             self,
-            Self::NoEncadenan | Self::PowInvalido | Self::BitsNoCanonico
+            Self::NoEncadenan
+                | Self::PowInvalido
+                | Self::BitsNoCanonico
+                | Self::DificultadIncorrecta
         )
     }
 }
@@ -284,9 +297,14 @@ pub fn comprobar_pow(cabeceras: &[BlockHeader]) -> Result<(), RechazoCabeceras> 
 /// # Lo que esta función NO hace
 ///
 /// **No comprueba la dificultad esperada.** Que `bits` sea el que LWMA exige a esa altura depende
-/// de la ventana de 90 cabeceras anteriores, y aquí puede que todavía no las tengamos. Eso es de la
-/// validación de bloque completa (§7.3). Decirlo importa: **pasar este filtro no significa que la
-/// cadena sea válida**, solo que merece la memoria de examinarla.
+/// de la ventana de 90 cabeceras anteriores, y esta función es pura sobre el lote: no ve la cadena.
+/// Decirlo importa: **pasar este filtro no significa que la cadena sea válida**, solo que merece la
+/// memoria de examinarla.
+///
+/// Eso **sí** se comprueba ahora, un paso más allá, en [`crate::dificultad::comprobar_dificultad`]
+/// (C-NET-22), que es quien tiene acceso a la cadena para armar la ventana. Durante un tiempo no lo
+/// comprobó nadie, y ese fue el hueco: un peer podía servir cabeceras con cualquier `bits` canónico
+/// más barato del que toca y el nodo las adoptaba.
 ///
 /// # El trabajo se cuenta desde el ANCLA, no desde el tip
 ///

@@ -34,6 +34,7 @@ use zx_p2p::mensaje::{Peticion, Respuesta};
 use zx_p2p::servicio::{EventoRed, ManejoRed};
 
 use crate::cadena::{Adopcion, Cadena};
+use crate::dificultad::comprobar_dificultad;
 use crate::sync::{Fase, Sincronizador, validar_cadena_de_cabeceras};
 
 /// Si el nodo debe seguir o pararse tras atender un evento.
@@ -175,13 +176,25 @@ impl Nodo {
 
         match hasta_ancla {
             Some(w_ancla) if n > 0 => {
+                let hash_ancla = ancla.unwrap_or_else(|| self.cadena.genesis());
                 let r = validar_cadena_de_cabeceras(
                     &cs,
-                    ancla.unwrap_or_else(|| self.cadena.genesis()),
+                    hash_ancla,
                     w_ancla,
                     self.cadena.trabajo(),
                     self.cadena.trabajo_de_un_bloque(),
-                );
+                )
+                // C-BLK-05, C-DIFF-09 · y que el `bits` sea el que el retarget exige. Va DESPUÉS
+                // del PoW a propósito: comprobar la dificultad esperada cuesta reconstruir una
+                // ventana de 91 ancestros, y no merece la pena gastarla en cabeceras que ni
+                // siquiera cumplen su propio `bits`.
+                .and_then(|w| {
+                    let altura_ancla = self
+                        .cadena
+                        .altura_de(hash_ancla)
+                        .ok_or(crate::sync::RechazoCabeceras::VentanaIncompleta)?;
+                    comprobar_dificultad(&self.cadena, &cs, altura_ancla).map(|()| w)
+                });
                 match r {
                     Ok(_) => match self.cadena.adoptar(&cs) {
                         Ok(Adopcion::Extendida { aplicadas: a }) => {

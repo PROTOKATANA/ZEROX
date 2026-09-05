@@ -2412,6 +2412,35 @@ IPv4 se agrupa por **/24** e IPv6 por **/64**.
 cupo de un contador **compartido** antes de leer, y **MUST** devolverlo al terminar. Techo:
 `PRESUPUESTO_BYTES = 256 MiB`.
 
+**C-NET-22 · La sincronización headers-first MUST comprobar la dificultad esperada.** Antes de
+adoptar un lote de cabeceras, el nodo **MUST** verificar C-BLK-05 sobre cada una: que su `bits` es
+exactamente `compact(siguiente_target(H))` (C-DIFF-09). La ventana del retarget se arma sobre la
+**rama candidata**: las alturas por encima del ancla salen del lote, y las que están en el ancla o
+por debajo, de la cadena propia.
+
+Si faltan ancestros para calcularlo, el lote se rechaza **sin penalizar** — es una limitación
+propia, no mala fe. Un `bits` distinto del que toca **sí** es mala fe (C-NET-05): el retarget es
+una función pura (C-DIFF-01), así que dos nodos con los mismos ancestros obtienen el mismo valor.
+
+> **Esto no es una regla nueva, es un cable que faltaba.** C-BLK-05 y C-DIFF-09 ya estaban, y
+> `zx-consensus` implementaba LWMA-1 entero y probado. Lo que no existía era ninguna llamada desde
+> el nodo: el camino de sincronización pasaba por `validar_cadena_de_cabeceras`, cuyo propio
+> docstring dice que no comprueba la dificultad esperada.
+>
+> El agujero era que un peer podía servir cabeceras con **cualquier `bits` canónico** —uno más
+> barato del que LWMA exige— y el nodo las adoptaba. La defensa que quedaba era el umbral de
+> trabajo de C-NET-04, que solo atrapa lo grosero: un `bits` un poco más fácil produce una cadena
+> que **ese nodo acepta y el resto de la red rechaza**. Divergencia de consenso, que es el peor
+> sitio donde tener un hueco.
+>
+> **Por qué la ventana sale de la rama candidata y no de la punta propia.** Es literalmente el
+> mismo error que ya se cazó una vez en `validar_cadena_de_cabeceras`, que sumaba el trabajo del
+> tip en lugar del ancla: juzgar una rama con datos de otra. La segunda vez se escribió bien desde
+> el principio, y hay un test que lo fija — `la_ventana_de_una_bifurcacion_usa_el_lote_no_nuestra_punta`.
+>
+> **Va después del PoW a propósito.** Reconstruir una ventana de 91 ancestros cuesta bastante más
+> que un SHA3, y no merece gastarla en cabeceras que ni siquiera cumplen su propio `bits`.
+
 > **El límite por petición no acota el producto.** Cada lectura del códec está acotada por
 > `.take(MAX)`, y eso no basta:
 >

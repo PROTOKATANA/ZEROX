@@ -202,6 +202,23 @@ impl Cadena {
         }
     }
 
+    /// La cabecera que tenemos a una altura concreta, si la tenemos.
+    ///
+    /// `O(1)`: el índice guarda la cadena como un vector cuya posición **es** la altura, con el
+    /// génesis en la 0. Hace falta para reconstruir la ventana del retarget (C-DIFF-01), que mira
+    /// `N+1` ancestros y no puede permitirse un recorrido por cada cabecera que llega.
+    #[must_use]
+    pub fn cabecera_en(&self, altura: u32) -> Option<BlockHeader> {
+        let i = leer(&self.cabeceras);
+        i.cadena.get(usize::try_from(altura).ok()?).map(|(_, c)| *c)
+    }
+
+    /// La altura a la que tenemos un hash, si lo tenemos. `O(1)`.
+    #[must_use]
+    pub fn altura_de(&self, h: BlockHash) -> Option<u32> {
+        u32::try_from(*leer(&self.cabeceras).posicion.get(&h)?).ok()
+    }
+
     /// Trabajo acumulado de nuestra cadena hasta la punta.
     #[must_use]
     pub fn trabajo(&self) -> U256 {
