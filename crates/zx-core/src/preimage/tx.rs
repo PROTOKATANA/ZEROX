@@ -102,6 +102,7 @@ fn header_digest(tx: &Tx) -> Digest {
 /// `H_d("ZZKTxIdPrevout__", ⋃ᵢ (txid_i ‖ index_i))` — 36 bytes por entrada.
 fn prevouts_digest(tx: &Tx) -> Digest {
     let mut w = PreimageWriter::con_capacidad(tx.inputs.len() * 36);
+    // C-TX-05 · el orden de concatenación es el de índice, por construcción del bucle.
     for e in &tx.inputs {
         w.h32(e.outpoint.prev_txid.as_bytes())
             .u32(e.outpoint.prev_index);

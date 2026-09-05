@@ -285,9 +285,9 @@ async fn atender_respuesta(
             // Lo que se cuenta hacia "al día" es lo APLICADO, no lo recibido. Contar lo recibido
             // deja que un peer finja que estamos sincronizados mandando basura corta.
             let mut aplicadas = 0usize;
-            // Y si al peer se le condena por mala fe, no se le vuelve a pedir en esta misma vuelta:
-            // `Comando::Desconectar` solo encola, así que sin esta bandera el condenado se llevaba
-            // una ronda extra de interacción.
+            // C-NET-19 · a un peer condenado no se le vuelve a pedir en esta misma vuelta.
+            // `Comando::Desconectar` solo **encola**, así que sin esta bandera el condenado se
+            // llevaba una ronda extra de interacción antes de que la desconexión se procesara.
             let mut condenado = false;
 
             // El ancla es de dónde cuelgan: el `prev_hash` de la primera, que MUST ser algo

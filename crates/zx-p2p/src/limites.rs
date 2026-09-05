@@ -179,12 +179,13 @@ pub const MAX_CONEXIONES_PENDIENTES: u32 = 32;
 /// Peticiones de sincronización simultáneas que se aceptan de **un mismo peer**.
 ///
 /// El default de `request_response::Config` son **100**. Con respuestas de hasta
-/// [`MAX_RESPUESTA_BYTES`], eso son `100 × 12,8 MB = 1,28 GB` reservables **por peer** — y con
+/// [`MAX_RESPUESTA_BYTES`], eso son `100 × 25,6 MB = 2,56 GB` reservables **por peer** — y con
 /// [`MAX_PEERS_ENTRANTES`] peers, decenas de gigabytes.
 ///
 /// Bajarlo a 8 es **la mitad** de la mitigación. La otra mitad es un presupuesto de memoria
 /// **agregado** —un contador global de bytes en vuelo— que todavía no existe: 🔶 **P-027**.
-/// Conviene tenerlo escrito porque `8 × 12,8 MB × 72 peers` siguen siendo 7,4 GB en el peor caso.
+/// Conviene tenerlo escrito porque `8 × 25,6 MB × 72 peers` siguen siendo **14,7 GB** en el peor
+/// caso. Lo cierra C-NET-21, no este límite.
 pub const MAX_STREAMS_SYNC: usize = 8;
 
 /// Peers en modo de **alto ancho de banda** para el relé compacto (C-NET-10).

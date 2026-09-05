@@ -23,7 +23,7 @@ pub const PUERTO_TESTNET: u16 = 19833;
 
 /// Parámetros de red de una cadena.
 ///
-/// # Los campos son privados, y eso es la garantía
+/// # Los campos son privados, y eso es la garantía (C-NET-15)
 ///
 /// El único constructor es [`ParametrosRed::de`], así que **no existe** la combinación "me
 /// identifico como mainnet pero hablo el prefijo de testnet". Con los campos públicos esa

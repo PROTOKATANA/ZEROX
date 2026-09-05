@@ -57,6 +57,8 @@ fn envenenado() -> StorageError {
 
 impl AlmacenCadena for AlmacenEnMemoria {
     fn guardar_cabecera(&self, cabecera: &BlockHeader) -> Result<(), StorageError> {
+        // C-STORE-02 · atómico por construcción: los dos índices se tocan bajo el mismo lock de
+        // escritura, así que ningún lector puede ver uno actualizado y el otro no.
         let mut i = self.interior.write().map_err(|_| envenenado())?;
         let h = cabecera.block_hash();
         i.cabeceras.insert(h, *cabecera);

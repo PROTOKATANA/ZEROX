@@ -76,7 +76,7 @@ impl AlmacenEnDisco {
     }
 }
 
-/// La altura como clave, **big-endian**: ver la nota de módulo.
+/// La altura como clave, **big-endian** (C-STORE-03): ver la nota de módulo.
 fn clave_altura(a: u32) -> [u8; 4] {
     a.to_be_bytes()
 }
@@ -86,7 +86,8 @@ impl AlmacenCadena for AlmacenEnDisco {
         let hash = cabecera.block_hash();
         let bytes = wire::cabecera_a_bytes(cabecera);
 
-        // Atómico: sin esto, el índice de alturas puede apuntar a una cabecera que no está.
+        // C-STORE-02 · atómico: sin esto, el índice de alturas puede apuntar a una cabecera que
+        // todavía no está guardada.
         let mut lote = WriteBatch::default();
         lote.put_cf(self.cf(CF_CABECERAS)?, hash.as_bytes(), bytes);
         lote.put_cf(

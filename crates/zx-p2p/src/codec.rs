@@ -585,7 +585,7 @@ mod tests {
     /// **C-NET-21 · sin presupuesto, no se lee.**
     ///
     /// Es la defensa que el `.take(MAX)` por petición no da: aquel acota **una** lectura, este
-    /// acota la **suma**. Sin él, `12,8 MB × 8 streams × 72 peers` son 7,2 GB reservables por
+    /// acota la **suma**. Sin él, `25,6 MB × 8 streams × 72 peers` son 14,7 GB reservables por
     /// peticiones que un atacante emite gratis.
     #[tokio::test]
     async fn sin_presupuesto_la_lectura_se_rechaza() {

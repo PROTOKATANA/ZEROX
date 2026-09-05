@@ -7,11 +7,17 @@
 //! producto**:
 //!
 //! ```text
-//! MAX_RESPUESTA_BYTES (12,8 MB) × MAX_STREAMS_SYNC (8) × MAX_PEERS_ENTRANTES (72) = 7,2 GB
+//! MAX_RESPUESTA_BYTES (25,6 MB) × MAX_STREAMS_SYNC (8) × MAX_PEERS_ENTRANTES (72) = 14,7 GB
 //! ```
 //!
-//! Bajar `MAX_STREAMS_SYNC` de 100 a 8 quitó un orden de magnitud y dejó el problema. Siete
+//! Bajar `MAX_STREAMS_SYNC` de 100 a 8 quitó un orden de magnitud y dejó el problema. Casi quince
 //! gigabytes reservables por peticiones que un atacante emite gratis siguen siendo un OOM.
+//!
+//! ⚠️ **Ese 14,7 empezó siendo 7,2 en estos comentarios, y estaba mal.** El arreglo de C-NET-13
+//! dobló `MAX_GOSSIP_BYTES` —pasó de derivarse de `ZONA_LIBRE` a derivarse de `LIMITE_BLOQUE_GENESIS`,
+//! que es el doble— y los comentarios que narraban la aritmética se quedaron con el número viejo.
+//! Tercera vez que este proyecto escribe a mano un número que es función de una constante. Por eso
+//! ahora hay un test que **deriva** las cifras en vez de repetirlas.
 //!
 //! # Por qué un contador global y no más límites por peer
 //!
@@ -252,7 +258,15 @@ mod tests {
         assert_eq!(p.en_vuelo(), 0, "todo vuelve");
     }
 
-    /// El presupuesto por defecto acota el peor caso muy por debajo de los 7,2 GB de antes.
+    /// **El presupuesto acota el peor caso, y las cifras se DERIVAN.**
+    ///
+    /// Este test existe por un fallo concreto: los comentarios de este módulo decían 12,8 MB y
+    /// 7,2 GB, y los valores reales son **25,6 MB y 14,7 GB**. El arreglo de C-NET-13 dobló la
+    /// constante de la que salen, y la narración se quedó atrás.
+    ///
+    /// Así que aquí no se escribe ningún número a mano salvo el techo: todo lo demás se calcula
+    /// desde las constantes reales, y las cotas comprueban el **orden de magnitud**, que es lo que
+    /// de verdad importa y lo que un cambio futuro no debe romper en silencio.
     #[test]
     fn el_presupuesto_por_defecto_acota_el_peor_caso() {
         use crate::limites::{MAX_PEERS_ENTRANTES, MAX_RESPUESTA_BYTES, MAX_STREAMS_SYNC};

@@ -1895,6 +1895,18 @@ continuar en silencio.
 > ZIP-200: *"if there are a significant number of invalid blocks it SHOULD shut down and alert the
 > user of the issue."*
 
+> 🔶 **C-UPG-06 y C-UPG-07 NO están implementadas, y conviene que quede escrito aquí.**
+>
+> La auditoría de trazabilidad las encontró como el único hueco **no declarado** del SPEC: no hay
+> lógica de altura de activación en `zx-mempool`, ni detección de "he seguido bloques inválidos" en
+> `zx-node`. Todos los demás huecos —el relé compacto, el kernel GPU, la validación de dificultad de
+> cabeceras— sí venían marcados; estas dos parecían completas sin serlo, que es peor.
+>
+> Severidad baja y por una razón concreta: **son `SHOULD`, y ZEROX no tiene todavía ningún hard fork
+> real que las ejercite** — solo existe la rama v1. Se cierran cuando exista la segunda, que es
+> cuando por primera vez habrá dos conjuntos de reglas y por tanto algo que purgar del mempool. →
+> **P-030**.
+
 **C-UPG-08 · Parámetros ajustables.** Se declaran explícitamente ajustables por hard fork, sin que
 ello los convierta en variables de ejecución: `N_CORTO`, `N_LARGO`, `ZONA_LIBRE`, `FACTOR_SURGE`,
 `MAX_TX_WEIGHT`, `REF_WEIGHT`, `FEE_MASK`. A cualquier altura concreta son constantes.
@@ -2404,11 +2416,18 @@ cupo de un contador **compartido** antes de leer, y **MUST** devolverlo al termi
 > `.take(MAX)`, y eso no basta:
 >
 > ```
-> MAX_RESPUESTA_BYTES (12,8 MB) × MAX_STREAMS_SYNC (8) × MAX_PEERS_ENTRANTES (72) = 7,2 GB
+> MAX_RESPUESTA_BYTES (25,6 MB) × MAX_STREAMS_SYNC (8) × MAX_PEERS_ENTRANTES (72) = 14,7 GB
 > ```
 >
-> Bajar los streams concurrentes de 100 a 8 quitó un orden de magnitud y dejó el problema: siete
-> gigabytes reservables por peticiones que un atacante emite gratis siguen siendo un OOM.
+> Bajar los streams concurrentes de 100 a 8 quitó un orden de magnitud y dejó el problema: casi
+> quince gigabytes reservables por peticiones que un atacante emite gratis siguen siendo un OOM.
+>
+> ⚠️ **Esa cifra empezó siendo 7,2 GB en este SPEC, y estaba mal.** El arreglo de C-NET-13 dobló
+> `MAX_GOSSIP_BYTES` —pasó de derivarse de `ZONA_LIBRE` a derivarse de `LIMITE_BLOQUE_GENESIS`, que
+> es el doble— y los cuatro comentarios que narraban la aritmética se quedaron con el número
+> anterior. **Tercera vez** que este proyecto escribe a mano un número que es función de una
+> constante: H-005 (el offset del nonce), el tamaño de cabecera (112 frente a 92), y ahora esto.
+> Encontrado por la auditoría de trazabilidad, y ahora hay un test que **deriva** las cifras.
 >
 > **Por qué un contador global y no más límites por peer.** Porque el recurso que se agota es
 > global. Repartirlo por peer obliga a elegir entre dos males: o el reparto es generoso y la suma
@@ -2512,6 +2531,7 @@ debajo**.
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
 | **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
+| **P-030** | §14 | 🆕 **C-UPG-06 y C-UPG-07 sin implementar.** No hay altura de activación en el mempool ni detección de "he seguido bloques inválidos". Son `SHOULD` y no hay hard fork que las ejercite todavía: se cierran con la segunda rama de consenso | **D2** |
 | **P-004d** | §7.3 | 🆕 ¿Puede LWMA adaptarse desde el bloque 1 **sembrando** la ventana con ancestros sintéticos, en vez de 90 bloques a dificultad fija? Encoger `N` está prohibido por varianza; sembrarla no. Regla de consenso nueva | Investigación + **D9** + **D8**, Fase 10 |
 
 ### Cerradas en esta revisión
@@ -2520,7 +2540,7 @@ debajo**.
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
 | **P-026** | **`Excedido` puntúa 20**, cinco avisos hasta el baneo. Es atribuible al emisor, pero admite una explicación inocente que el score **por prefijo** distingue sola | C-NET-05, C-NET-20 |
-| **P-027** | **Presupuesto agregado de 256 MiB**, con reserva antes de leer y devolución por `Drop`. El peor caso baja de 7,2 GB a 256 MiB, sin importar peers ni streams | C-NET-21 |
+| **P-027** | **Presupuesto agregado de 256 MiB**, con reserva antes de leer y devolución por `Drop`. El peor caso baja de 14,7 GB a 256 MiB, sin importar peers ni streams | C-NET-21 |
 | **P-029** | Un `RwLock` envenenado **recupera su contenido** —que es válido— y registra el error. Ni degrada en silencio ni tira un nodo sano | `zx-node::cadena` |
 | **P-028** | **Reorganización de cabeceras**, con `fork_choice` conectado y la parada dura de C-REORG-07 comprobada **antes** de deshacer nada | C-NET-18, C-REORG-07 |
 | **P-025** | **Límites y baneo por prefijo de red** (/24 y /64), en un behaviour propio: `connection_limits` de libp2p no mira la IP y un `PeerId` es gratis | C-NET-20 |

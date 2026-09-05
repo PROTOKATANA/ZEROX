@@ -54,7 +54,7 @@ pub struct Cadena {
 
 /// La cadena en memoria, con su índice.
 ///
-/// # Por qué hay un índice y por qué el hash va guardado
+/// # Por qué hay un índice y por qué el hash va guardado (C-NET-16)
 ///
 /// La primera versión guardaba solo un `Vec<BlockHeader>` y buscaba con
 /// `iter().position(|c| c.block_hash() == h)`. La revisión adversarial encontró que eso es un

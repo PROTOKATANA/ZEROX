@@ -1,4 +1,4 @@
-//! Test diferencial: **memoria y disco deben responder igual** (SPEC §12).
+//! Test diferencial: **memoria y disco deben responder igual** (SPEC §15.1, **C-STORE-04**).
 //!
 //! # Por qué este archivo es el que de verdad prueba RocksDB
 //!
@@ -169,7 +169,7 @@ fn los_datos_sobreviven_a_reabrir_el_almacen() {
     assert_eq!(a.cuerpo(&ultima.block_hash()).unwrap(), Some(cuerpo));
 }
 
-/// **El orden de las claves de altura es el numérico, no el lexicográfico.**
+/// **C-STORE-03 · el orden de las claves de altura es el numérico, no el lexicográfico.**
 ///
 /// La altura se codifica en big-endian a propósito. Con little-endian, la altura 256 se ordenaría
 /// antes que la 2 —sus bytes son `00 01 00 00` frente a `02 00 00 00`— y cualquier recorrido por

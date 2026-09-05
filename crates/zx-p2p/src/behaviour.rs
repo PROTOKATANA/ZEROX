@@ -219,7 +219,7 @@ impl ZxBehaviour {
                 // difícil de diagnosticar. 🔶 Medir en P-019, no adivinar más allá de esto.
                 .with_request_timeout(TIMEOUT_SYNC)
                 // El default son 100 streams concurrentes. Con respuestas de hasta
-                // MAX_RESPUESTA_BYTES, 100 × 12,8 MB = 1,28 GB reservables **por peer**. Bajarlo es
+                // MAX_RESPUESTA_BYTES, 100 × 25,6 MB = 2,56 GB reservables **por peer**. Bajarlo es
                 // la mitad de la mitigación de P-027; la otra mitad es un presupuesto agregado que
                 // todavía no existe.
                 .with_max_concurrent_streams(limites::MAX_STREAMS_SYNC),
