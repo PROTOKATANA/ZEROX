@@ -13,11 +13,14 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 
+use zx_consensus::validacion::{ConjuntoUtxo, EntradaUtxo};
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
+use zx_core::tx::OutPoint;
 
 use crate::almacen::{AlmacenCadena, Punta};
 use crate::error::StorageError;
+use crate::utxo::{ConjuntoEnMemoria, DeltaUtxo};
 
 /// Almacén en RAM.
 #[derive(Debug, Default)]
@@ -31,6 +34,10 @@ struct Interior {
     por_altura: HashMap<u32, BlockHash>,
     cuerpos: HashMap<BlockHash, Vec<u8>>,
     punta: Option<Punta>,
+    /// El UTXO set **finalizado**. Solo avanza (C-STORE-06).
+    utxo: ConjuntoEnMemoria,
+    /// Hasta dónde llega ese conjunto. Va por detrás de `punta` hasta `MAX_REORG_LENGTH` bloques.
+    altura_finalizada: Option<u32>,
 }
 
 impl AlmacenEnMemoria {
@@ -130,6 +137,35 @@ impl AlmacenCadena for AlmacenEnMemoria {
         }
         i.punta = Some(punta);
         Ok(())
+    }
+
+    fn utxo(&self, o: &OutPoint) -> Result<Option<EntradaUtxo>, StorageError> {
+        let i = self.interior.read().map_err(|_| envenenado())?;
+        Ok(i.utxo.buscar(o))
+    }
+
+    fn finalizar(&self, altura: u32, delta: &DeltaUtxo) -> Result<(), StorageError> {
+        let mut i = self.interior.write().map_err(|_| envenenado())?;
+
+        // C-STORE-07 · o entra todo o no entra nada. En disco eso lo da el `WriteBatch`; aquí, una
+        // copia de trabajo que solo se publica al final. Aplicar sobre el conjunto real y abortar a
+        // medias dejaría el estado en un punto que ningún bloque describe.
+        let mut trabajo = i.utxo.clone();
+        for o in delta.gastados_planos() {
+            trabajo.retirar(o)?;
+        }
+        for (o, e) in &delta.creados {
+            trabajo.insertar(*o, e.clone())?;
+        }
+
+        i.utxo = trabajo;
+        i.altura_finalizada = Some(altura);
+        Ok(())
+    }
+
+    fn altura_finalizada(&self) -> Result<Option<u32>, StorageError> {
+        let i = self.interior.read().map_err(|_| envenenado())?;
+        Ok(i.altura_finalizada)
     }
 
     fn sincronizar(&self) -> Result<(), StorageError> {

@@ -2107,6 +2107,12 @@ Al arrancar, el nodo **MUST** reconstruir el solapamiento no finalizado reproduc
 los bloques posteriores a la punta finalizada. Son como mucho 99, así que el trabajo está **acotado
 por construcción**.
 
+> 🔶 **Implementada a medias, y conviene saber qué mitad.** El almacén ya cumple la suya: guarda el
+> UTXO set finalizado, lleva su altura, y `finalizar` **no tiene operación inversa** — el disco no
+> sabe revertir porque no hay código con el que hacerlo. Lo que falta es la mitad del nodo: decidir
+> *cuándo* finalizar (a profundidad 99), mantener el solapamiento de los bloques recientes y
+> reproducirlo al arrancar. Es el bloque **B2**, y hasta entonces nadie llama a `finalizar`.
+
 > **Por qué 99 y no un número elegido.** Más allá de `MAX_REORG_LENGTH` el nodo **se detiene**
 > (C-REORG-07): no está reorganizando, está parado esperando a un humano. Así que fuera de esa
 > ventana no existe reversión que soportar. La ventana de la política y la ventana del

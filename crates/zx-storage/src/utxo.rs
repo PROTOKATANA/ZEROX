@@ -42,6 +42,82 @@ pub struct UndoData {
     pub creados: Vec<OutPoint>,
 }
 
+/// **Lo que un bloque cambia en el UTXO set**, calculado una sola vez.
+///
+/// Existe para que el recorrido del bloque —qué se gasta, qué se crea y con qué clave— tenga **un
+/// solo sitio**. La versión de memoria lo aplica a un `HashMap`; la de disco lo mete en un
+/// `WriteBatch`. Si cada una recorriera el bloque por su cuenta, serían dos fuentes para una sola
+/// verdad, y la segunda envejecería sola — que es el fallo que este proyecto lleva encontrándose
+/// todo el día.
+///
+/// Es **puro**: no mira el conjunto, así que se puede calcular antes de tener nada abierto.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct DeltaUtxo {
+    /// `gastados[i]` son los outpoints que gasta la transacción `i+1` del bloque, en el orden de
+    /// sus entradas. La 0 es la coinbase y no gasta nada.
+    ///
+    /// Agrupado por transacción y no aplanado porque [`UndoData`] lo necesita así, y aplanarlo para
+    /// el disco es una línea.
+    pub gastados: Vec<Vec<OutPoint>>,
+    /// Las salidas que el bloque crea, con su clave y su contenido.
+    pub creados: Vec<(OutPoint, EntradaUtxo)>,
+}
+
+impl DeltaUtxo {
+    /// Recorre el bloque y calcula qué toca.
+    ///
+    /// `rama` es el `consensus_branch_id` de la cabecera: el txid depende de él (C-TX-05), así que
+    /// decide la clave de cada salida creada.
+    ///
+    /// # Errores
+    /// [`StorageError::BloqueSinTransacciones`] si no hay coinbase;
+    /// [`StorageError::IndiceFueraDeRango`] si una transacción declara más salidas de las que caben
+    /// en un `u32`.
+    pub fn de_bloque(txs: &[Tx], altura: u32, rama: u32) -> Result<Self, StorageError> {
+        let (_coinbase, resto) = txs
+            .split_first()
+            .ok_or(StorageError::BloqueSinTransacciones)?;
+
+        let gastados = resto
+            .iter()
+            .map(|tx| tx.inputs.iter().map(|e| e.outpoint).collect())
+            .collect();
+
+        let mut creados = Vec::new();
+        for (i, tx) in txs.iter().enumerate() {
+            let es_coinbase = i == 0;
+            // C-TX-05 · la rama entra en el txid. Estuvo clavada a `0` y habría hecho que ninguna
+            // salida fuera gastable: la clave de inserción no coincidía con la de búsqueda, que
+            // sale del `prev_txid` que llega por la red.
+            let txid = zx_core::preimage::tx::txid(tx, rama);
+            for (j, salida) in tx.outputs.iter().enumerate() {
+                let o = OutPoint {
+                    prev_txid: txid,
+                    prev_index: u32::try_from(j).map_err(|_| StorageError::IndiceFueraDeRango)?,
+                };
+                creados.push((
+                    o,
+                    EntradaUtxo {
+                        salida: SpentOutput {
+                            value: salida.value,
+                            lock: salida.lock.clone(),
+                        },
+                        altura_creacion: altura,
+                        es_coinbase,
+                    },
+                ));
+            }
+        }
+
+        Ok(Self { gastados, creados })
+    }
+
+    /// Los outpoints gastados, sin agrupar. Es lo que el disco necesita para borrar.
+    pub fn gastados_planos(&self) -> impl Iterator<Item = &OutPoint> {
+        self.gastados.iter().flatten()
+    }
+}
+
 /// Conjunto de UTXO en memoria.
 ///
 /// El backend persistente (RocksDB) implementará el mismo contrato; esta versión existe para que la
@@ -120,57 +196,29 @@ pub fn aplicar_bloque(
     altura: u32,
     rama: u32,
 ) -> Result<UndoData, StorageError> {
-    // Copia de trabajo: la atomicidad de C-REORG-03 sale de aquí.
+    let delta = DeltaUtxo::de_bloque(txs, altura, rama)?;
+
+    // Copia de trabajo: la atomicidad de C-REORG-03 sale de aquí. En disco no se puede clonar un
+    // conjunto de millones de entradas, y por eso allí la atomicidad la da el `WriteBatch` — pero
+    // el delta que se aplica es **el mismo**, calculado por el mismo código.
     let mut trabajo = conjunto.clone();
     let mut undo = UndoData::default();
 
-    let (coinbase, resto) = txs
-        .split_first()
-        .ok_or(StorageError::BloqueSinTransacciones)?;
-
-    // Se gastan primero todas las entradas y solo después se crean las salidas. Al revés, una
+    // Se gastan primero TODAS las entradas y solo después se crean las salidas. Al revés, una
     // transacción del bloque podría gastar una salida creada por otra del mismo bloque, que
     // C-BLK-09 prohíbe y que aquí quedaría permitida por accidente.
-    for tx in resto {
-        let mut de_esta = Vec::with_capacity(tx.inputs.len());
-        for entrada in &tx.inputs {
-            let consumido = trabajo.retirar(&entrada.outpoint)?;
-            de_esta.push((entrada.outpoint, consumido));
+    for de_una_tx in &delta.gastados {
+        let mut de_esta = Vec::with_capacity(de_una_tx.len());
+        for o in de_una_tx {
+            de_esta.push((*o, trabajo.retirar(o)?));
         }
         undo.consumidos.push(de_esta);
     }
 
-    for (i, tx) in txs.iter().enumerate() {
-        let es_coinbase = i == 0;
-        // C-TX-05 · la rama de consenso entra en el txid, así que la clave del UTXO **MUST**
-        // calcularse con la rama que estaba activa cuando se minó el bloque que creó la salida.
-        //
-        // Esto estuvo clavado a `0`, y era un fallo latente que ningún test podía ver porque los
-        // tests usaban `txid(tx, 0)` también: autoconsistentes con el error. En cuanto el nodo lo
-        // hubiera cableado, la clave de inserción y la de búsqueda habrían sido distintas —la de
-        // búsqueda viene del `prev_txid` de la red, calculado con la rama real— y **ninguna salida
-        // se habría podido gastar nunca**.
-        let txid = zx_core::preimage::tx::txid(tx, rama);
-        for (j, salida) in tx.outputs.iter().enumerate() {
-            let o = OutPoint {
-                prev_txid: txid,
-                prev_index: u32::try_from(j).map_err(|_| StorageError::IndiceFueraDeRango)?,
-            };
-            trabajo.insertar(
-                o,
-                EntradaUtxo {
-                    salida: SpentOutput {
-                        value: salida.value,
-                        lock: salida.lock.clone(),
-                    },
-                    altura_creacion: altura,
-                    es_coinbase,
-                },
-            )?;
-            undo.creados.push(o);
-        }
+    for (o, e) in &delta.creados {
+        trabajo.insertar(*o, e.clone())?;
+        undo.creados.push(*o);
     }
-    let _ = coinbase;
 
     *conjunto = trabajo;
     Ok(undo)

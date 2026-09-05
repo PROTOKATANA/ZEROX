@@ -10,7 +10,8 @@
 //! | `cabeceras` | hash(32) → 92 B | Se lee constantemente y es diminuta: comparte caché con todo lo demás si va junta |
 //! | `alturas` | altura(4 BE) → hash(32) | El índice de la cadena principal. **Cambia en cada reorg**, y las otras no |
 //! | `cuerpos` | hash(32) → bytes | Grandes y de acceso raro. Mezclarlos con las cabeceras arruinaría la caché |
-//! | `meta` | clave corta → valor | La punta, y lo que venga |
+//! | `meta` | clave corta → valor | La punta, la altura finalizada, y lo que venga |
+//! | `utxo` | outpoint(36 B) → entrada | El UTXO set **finalizado**. Enorme y de acceso aleatorio: separarlo es lo que evita que se coma la caché de las cabeceras |
 //!
 //! La altura se codifica en **big-endian a propósito**: RocksDB ordena las claves por bytes, así
 //! que big-endian hace que el orden lexicográfico coincida con el numérico. Con little-endian, la
@@ -25,20 +26,33 @@
 use rocksdb::{ColumnFamilyDescriptor, DB, DBRecoveryMode, Options, WriteBatch};
 use std::path::Path;
 
+use zx_consensus::validacion::EntradaUtxo;
 use zx_core::digest::{BlockHash, Digest};
 use zx_core::preimage::block::{BlockHeader, TAMANO_CABECERA};
+use zx_core::tx::OutPoint;
 use zx_core::wire;
 
 use crate::almacen::{AlmacenCadena, Punta};
 use crate::error::StorageError;
+use crate::formato;
+use crate::utxo::DeltaUtxo;
 
 const CF_CABECERAS: &str = "cabeceras";
 const CF_ALTURAS: &str = "alturas";
 const CF_CUERPOS: &str = "cuerpos";
 const CF_META: &str = "meta";
+/// El UTXO set finalizado: clave de 36 B → entrada serializada (C-STORE-05).
+const CF_UTXO: &str = "utxo";
 
 /// Clave de la punta dentro de `meta`.
 const CLAVE_PUNTA: &[u8] = b"punta";
+
+/// Clave de la altura finalizada dentro de `meta`.
+///
+/// Va aparte de la punta a propósito: son **dos marcadores de progreso distintos** que difieren
+/// hasta en `MAX_REORG_LENGTH` bloques. La punta es hasta dónde llega la cadena de cabeceras; esta
+/// es hasta dónde llega el UTXO set (C-STORE-06).
+const CLAVE_FINALIZADA: &[u8] = b"finalizada";
 
 /// Almacén persistente.
 #[derive(Debug)]
@@ -76,7 +90,7 @@ impl AlmacenEnDisco {
         // atomic_flush to true if WAL is always enabled […] This option is useful when there are
         // column families with writes NOT protected by WAL". Aquí no hay ninguna así.
 
-        let familias = [CF_CABECERAS, CF_ALTURAS, CF_CUERPOS, CF_META]
+        let familias = [CF_CABECERAS, CF_ALTURAS, CF_CUERPOS, CF_META, CF_UTXO]
             .into_iter()
             .map(|n| ColumnFamilyDescriptor::new(n, Options::default()))
             .collect::<Vec<_>>();
@@ -252,6 +266,79 @@ impl AlmacenCadena for AlmacenEnDisco {
         lote.put_cf(self.cf(CF_META)?, CLAVE_PUNTA, v);
 
         self.db.write(lote).map_err(backend)
+    }
+
+    fn utxo(&self, o: &OutPoint) -> Result<Option<EntradaUtxo>, StorageError> {
+        let Some(bytes) = self
+            .db
+            .get_pinned_cf(self.cf(CF_UTXO)?, formato::clave(o))
+            .map_err(backend)?
+        else {
+            return Ok(None);
+        };
+        formato::entrada_desde_bytes(&bytes).map(Some)
+    }
+
+    fn finalizar(&self, altura: u32, delta: &DeltaUtxo) -> Result<(), StorageError> {
+        let cf_utxo = self.cf(CF_UTXO)?;
+        let mut lote = WriteBatch::default();
+
+        // Se comprueba **leyendo** antes de escribir, igual que C-STORE-01 hace con la punta.
+        // RocksDB no avisa de una sobrescritura: un `put` sobre una clave que ya existe la pisa en
+        // silencio, y eso perdería un UTXO que solo se echaría de menos el día que alguien lo
+        // intentara gastar. Es la defensa de BIP-30, y aquí además C-EMIT-04 la hace imposible —
+        // pero comprobarla cuesta una lectura y no comprobarla costó a Bitcoin una regla de
+        // consenso con dos excepciones grabadas por hash.
+        for o in delta.gastados_planos() {
+            let clave = formato::clave(o);
+            if self
+                .db
+                .get_pinned_cf(cf_utxo, clave)
+                .map_err(backend)?
+                .is_none()
+            {
+                return Err(StorageError::OutpointAusente);
+            }
+            lote.delete_cf(cf_utxo, clave);
+        }
+
+        for (o, e) in &delta.creados {
+            let clave = formato::clave(o);
+            if self
+                .db
+                .get_pinned_cf(cf_utxo, clave)
+                .map_err(backend)?
+                .is_some()
+            {
+                return Err(StorageError::OutpointDuplicado);
+            }
+            let mut valor = Vec::with_capacity(64);
+            formato::entrada_a_bytes(&mut valor, e);
+            lote.put_cf(cf_utxo, clave, valor);
+        }
+
+        // C-STORE-07 · la altura finalizada entra en el MISMO lote que las mutaciones. Escribirla
+        // aparte dejaría una ventana en la que el marcador dice una cosa y el conjunto otra.
+        lote.put_cf(self.cf(CF_META)?, CLAVE_FINALIZADA, altura.to_be_bytes());
+
+        self.db.write(lote).map_err(backend)
+    }
+
+    fn altura_finalizada(&self) -> Result<Option<u32>, StorageError> {
+        let Some(bytes) = self
+            .db
+            .get_pinned_cf(self.cf(CF_META)?, CLAVE_FINALIZADA)
+            .map_err(backend)?
+        else {
+            return Ok(None);
+        };
+        let arr: [u8; 4] = bytes
+            .as_ref()
+            .try_into()
+            .map_err(|_| StorageError::Corrupto {
+                que: "la altura finalizada",
+            })?;
+        Ok(Some(u32::from_be_bytes(arr)))
     }
 
     fn sincronizar(&self) -> Result<(), StorageError> {

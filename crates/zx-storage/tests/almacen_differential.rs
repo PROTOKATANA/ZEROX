@@ -23,6 +23,7 @@
 use zx_core::digest::{BlockHash, Digest, MerkleRoot};
 use zx_core::preimage::block::BlockHeader;
 use zx_storage::almacen::{AlmacenCadena, Punta};
+use zx_storage::utxo::DeltaUtxo;
 use zx_storage::{AlmacenEnDisco, AlmacenEnMemoria};
 
 fn cabecera(altura: u32) -> BlockHeader {
@@ -295,4 +296,196 @@ fn un_lote_con_punta_invalida_no_escribe_nada() {
     }
     assert_eq!(disco.punta().unwrap(), None);
     assert_eq!(mem.punta().unwrap(), None);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// El UTXO set: C-STORE-04 extendido a lo que se añadió en B1.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Una rama de consenso real. Nunca cero: el txid depende de ella (C-TX-05), y clavarla a cero fue
+/// un fallo latente que ningún test veía porque los tests la clavaban también.
+const RAMA: u32 = 0xc478_80ea;
+
+fn salida(brek: i64, k: u8) -> zx_core::tx::TxOut {
+    zx_core::tx::TxOut {
+        value: zx_core::amount::Amount::nuevo(brek).unwrap(),
+        lock: zx_core::tx::Lock::PubKey {
+            pubkey: zx_core::firma::ClavePublica::desde_bytes([k; 32]),
+        },
+    }
+}
+
+fn coinbase(altura: u32, salidas: Vec<zx_core::tx::TxOut>) -> zx_core::tx::Tx {
+    zx_core::tx::Tx {
+        version: 1,
+        inputs: vec![],
+        outputs: salidas,
+        lock_time: 0,
+        expiry_height: altura,
+    }
+}
+
+fn gasta(
+    entradas: Vec<zx_core::tx::OutPoint>,
+    salidas: Vec<zx_core::tx::TxOut>,
+) -> zx_core::tx::Tx {
+    zx_core::tx::Tx {
+        version: 1,
+        inputs: entradas
+            .into_iter()
+            .map(|o| zx_core::tx::TxIn {
+                outpoint: o,
+                sequence: 0xffff_fffe,
+            })
+            .collect(),
+        outputs: salidas,
+        lock_time: 0,
+        expiry_height: 0,
+    }
+}
+
+/// Los outpoints que un delta crea, para poder consultarlos después.
+fn creados(d: &DeltaUtxo) -> Vec<zx_core::tx::OutPoint> {
+    d.creados.iter().map(|(o, _)| *o).collect()
+}
+
+/// **C-STORE-04 sobre el UTXO set.** Misma secuencia, respuestas idénticas.
+///
+/// Se comparan también las **ausencias**: que los dos digan "no lo tengo" para lo mismo es la mitad
+/// del contrato, y es la mitad que un test descuidado se salta.
+#[test]
+fn los_dos_conjuntos_utxo_responden_igual() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let disco = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+    let mem = AlmacenEnMemoria::nuevo();
+
+    assert_eq!(
+        disco.altura_finalizada().unwrap(),
+        mem.altura_finalizada().unwrap(),
+        "los dos empiezan sin finalizar nada"
+    );
+
+    // Bloque 1: solo coinbase, con dos salidas.
+    let cb1 = coinbase(1, vec![salida(50_000, 1), salida(25_000, 2)]);
+    let d1 = DeltaUtxo::de_bloque(core::slice::from_ref(&cb1), 1, RAMA).unwrap();
+    disco.finalizar(1, &d1).unwrap();
+    mem.finalizar(1, &d1).unwrap();
+
+    let nacidos = creados(&d1);
+    for o in &nacidos {
+        assert_eq!(
+            disco.utxo(o).unwrap(),
+            mem.utxo(o).unwrap(),
+            "la entrada recién creada tiene que ser idéntica"
+        );
+        assert!(disco.utxo(o).unwrap().is_some());
+    }
+    assert_eq!(
+        disco.altura_finalizada().unwrap(),
+        mem.altura_finalizada().unwrap()
+    );
+    assert_eq!(disco.altura_finalizada().unwrap(), Some(1));
+
+    // Un outpoint que no existe: los dos deben decir que no.
+    let fantasma = zx_core::tx::OutPoint {
+        prev_txid: zx_core::digest::TxId::from_digest(Digest::from_bytes([0xee; 32])),
+        prev_index: 3,
+    };
+    assert_eq!(disco.utxo(&fantasma).unwrap(), mem.utxo(&fantasma).unwrap());
+    assert_eq!(disco.utxo(&fantasma).unwrap(), None);
+
+    // Bloque 2: gasta la primera salida del 1 y crea otra.
+    let primera = *nacidos.first().unwrap();
+    let cb2 = coinbase(2, vec![salida(10, 3)]);
+    let tx = gasta(vec![primera], vec![salida(49_000, 4)]);
+    let d2 = DeltaUtxo::de_bloque(&[cb2, tx], 2, RAMA).unwrap();
+    disco.finalizar(2, &d2).unwrap();
+    mem.finalizar(2, &d2).unwrap();
+
+    // La gastada desaparece **en los dos**.
+    assert_eq!(disco.utxo(&primera).unwrap(), mem.utxo(&primera).unwrap());
+    assert_eq!(disco.utxo(&primera).unwrap(), None, "gastada");
+
+    // La otra del bloque 1 sigue ahí, y las nuevas también.
+    let segunda = *nacidos.get(1).unwrap();
+    assert_eq!(disco.utxo(&segunda).unwrap(), mem.utxo(&segunda).unwrap());
+    assert!(disco.utxo(&segunda).unwrap().is_some(), "no se tocó");
+    for o in creados(&d2) {
+        assert_eq!(disco.utxo(&o).unwrap(), mem.utxo(&o).unwrap());
+        assert!(disco.utxo(&o).unwrap().is_some());
+    }
+    assert_eq!(disco.altura_finalizada().unwrap(), Some(2));
+    assert_eq!(mem.altura_finalizada().unwrap(), Some(2));
+}
+
+/// **Los dos rechazan gastar lo que no existe, y los dos rechazan crear lo que ya está.**
+///
+/// Lo segundo es la defensa de BIP-30. Aquí no puede ocurrir —C-EMIT-04 hace único el txid de
+/// coinbase— pero se comprueba igual: un `put` de RocksDB sobre una clave existente la pisa **en
+/// silencio**, y el UTXO perdido solo se echaría de menos el día que alguien intentara gastarlo.
+#[test]
+fn ninguno_gasta_lo_que_no_hay_ni_crea_lo_que_ya_esta() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let disco = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+    let mem = AlmacenEnMemoria::nuevo();
+
+    let cb = coinbase(1, vec![salida(1, 1)]);
+    let d = DeltaUtxo::de_bloque(core::slice::from_ref(&cb), 1, RAMA).unwrap();
+    disco.finalizar(1, &d).unwrap();
+    mem.finalizar(1, &d).unwrap();
+
+    // Aplicar el MISMO delta otra vez: crea algo que ya está.
+    assert!(
+        disco.finalizar(2, &d).is_err(),
+        "disco MUST rechazar el duplicado"
+    );
+    assert!(
+        mem.finalizar(2, &d).is_err(),
+        "memoria MUST rechazar el duplicado"
+    );
+
+    // Gastar algo inexistente.
+    let fantasma = zx_core::tx::OutPoint {
+        prev_txid: zx_core::digest::TxId::from_digest(Digest::from_bytes([0x77; 32])),
+        prev_index: 0,
+    };
+    let cb2 = coinbase(2, vec![salida(1, 2)]);
+    let mala = DeltaUtxo::de_bloque(&[cb2, gasta(vec![fantasma], vec![])], 2, RAMA).unwrap();
+    assert!(disco.finalizar(2, &mala).is_err(), "disco MUST rechazar");
+    assert!(mem.finalizar(2, &mala).is_err(), "memoria MUST rechazar");
+
+    // Y tras los rechazos, los dos siguen exactamente donde estaban.
+    assert_eq!(
+        disco.altura_finalizada().unwrap(),
+        mem.altura_finalizada().unwrap()
+    );
+    assert_eq!(disco.altura_finalizada().unwrap(), Some(1), "no avanzó");
+}
+
+/// **El UTXO set sobrevive a cerrar y reabrir.** Lo único que memoria no puede demostrar.
+#[test]
+fn el_utxo_set_sobrevive_a_reabrir() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cb = coinbase(1, vec![salida(50_000, 1)]);
+    let d = DeltaUtxo::de_bloque(core::slice::from_ref(&cb), 1, RAMA).unwrap();
+    let o = *creados(&d).first().unwrap();
+
+    {
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        a.finalizar(1, &d).unwrap();
+        a.sincronizar().unwrap();
+    }
+
+    let b = AlmacenEnDisco::abrir(dir.path()).expect("reabre");
+    assert_eq!(
+        b.altura_finalizada().unwrap(),
+        Some(1),
+        "la altura persiste"
+    );
+    let recuperada = b.utxo(&o).unwrap().expect("el UTXO sigue ahí");
+    assert_eq!(
+        recuperada,
+        d.creados.first().unwrap().1,
+        "y es byte a byte el que se guardó"
+    );
 }

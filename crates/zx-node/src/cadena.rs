@@ -1314,6 +1314,22 @@ mod tests_atomicidad {
         fn sincronizar(&self) -> Result<(), StorageError> {
             self.0.sincronizar()
         }
+        fn utxo(
+            &self,
+            o: &zx_core::tx::OutPoint,
+        ) -> Result<Option<zx_consensus::validacion::EntradaUtxo>, StorageError> {
+            self.0.utxo(o)
+        }
+        fn finalizar(
+            &self,
+            altura: u32,
+            delta: &zx_storage::utxo::DeltaUtxo,
+        ) -> Result<(), StorageError> {
+            self.0.finalizar(altura, delta)
+        }
+        fn altura_finalizada(&self) -> Result<Option<u32>, StorageError> {
+            self.0.altura_finalizada()
+        }
 
         fn aplicar_lote(&self, _: &[BlockHeader], _: Punta) -> Result<(), StorageError> {
             Err(StorageError::Backend("disco lleno, por ejemplo".to_owned()))

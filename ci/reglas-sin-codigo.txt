@@ -39,8 +39,9 @@ R-NET-02
 # que falta es que la CADENA lo use: mantener el conjunto, finalizar a profundidad 99 y reconstruir
 # el solapamiento al arrancar. Es el bloque B2 del plan.
 
-# Finalización a profundidad MAX_REORG_LENGTH; el disco nunca revierte.
-C-STORE-06
+# (C-STORE-06 salió de esta lista: el almacén ya cumple su mitad —guarda el estado finalizado y no
+# tiene operación inversa—. La mitad del nodo, decidir cuándo finalizar y reproducir al arrancar,
+# está marcada con 🔶 en el propio SPEC, que es más visible que una línea aquí.)
 
 # ── Fases que no han llegado ──────────────────────────────────────────────────────────────────
 

@@ -24,8 +24,11 @@
 
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
+use zx_core::tx::OutPoint;
 
 use crate::error::StorageError;
+use crate::utxo::DeltaUtxo;
+use zx_consensus::validacion::EntradaUtxo;
 
 /// Dónde está la punta de la cadena.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -117,6 +120,38 @@ pub trait AlmacenCadena: Send + Sync {
     /// [`StorageError::PuntaSinCabecera`] si la cabecera no está guardada — la comprobación que
     /// convierte un almacén corrupto en un error visible.
     fn fijar_punta(&self, punta: Punta) -> Result<(), StorageError>;
+
+    /// El UTXO **finalizado** que corresponde a un outpoint, si existe y no está gastado.
+    ///
+    /// Solo ve el estado finalizado (C-STORE-06): lo que hayan hecho los últimos bloques vive en
+    /// memoria y lo resuelve quien llame, mirando su solapamiento antes de bajar aquí.
+    ///
+    /// # Errores
+    /// [`StorageError`] si el backend falla o si lo guardado no decodifica.
+    fn utxo(&self, o: &OutPoint) -> Result<Option<EntradaUtxo>, StorageError>;
+
+    /// **Finaliza un bloque**: aplica su delta al UTXO set y avanza la altura finalizada, en UNA
+    /// SOLA escritura atómica (C-STORE-06, C-STORE-07).
+    ///
+    /// No hay operación inversa, y es deliberado: el disco **nunca revierte**. Un bloque solo se
+    /// finaliza cuando su profundidad alcanza `MAX_REORG_LENGTH`, y más allá de ahí C-REORG-07
+    /// detiene el nodo — así que no existe reorganización que soportar sobre lo ya escrito.
+    ///
+    /// # Errores
+    /// [`StorageError::OutpointDuplicado`] si el delta crea algo que ya estaba —es la defensa de
+    /// BIP-30, y aquí no puede pasar porque C-EMIT-04 hace único el txid de coinbase, pero se
+    /// comprueba igual: una sobrescritura silenciosa perdería un UTXO y solo se notaría el día que
+    /// alguien intentara gastarlo—; [`StorageError::OutpointAusente`] si gasta algo que no está.
+    fn finalizar(&self, altura: u32, delta: &DeltaUtxo) -> Result<(), StorageError>;
+
+    /// Hasta qué altura está finalizado el UTXO set, o `None` si no se ha finalizado nada.
+    ///
+    /// Es lo que dice cuántos bloques hay que reproducir al arrancar para reconstruir el
+    /// solapamiento en memoria (C-STORE-06). Como mucho serán `MAX_REORG_LENGTH`.
+    ///
+    /// # Errores
+    /// [`StorageError`] si el backend falla.
+    fn altura_finalizada(&self) -> Result<Option<u32>, StorageError>;
 
     /// Fuerza a que lo escrito llegue a disco.
     ///
