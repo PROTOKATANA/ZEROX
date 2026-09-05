@@ -52,6 +52,34 @@ same challenge (in Chia this is set to at least 16)"*.
 *"a secure (under dynamic availability) longest-chain protocol based on proofs of space **alone does
 not exist**"* — greenpaper 2026, citando Baig y Pietrzak (FC 2025, arXiv 2505.14891).
 
+**Esta cita cualitativa es correcta.** Verificada contra el paper el 2026-09-05.
+
+### ⚠️ Pero el greenpaper cita MAL la parte cuantitativa — no copiarla de ahí
+
+El greenpaper vigente (12 jun 2026, §6.2.3) reformula el teorema como un fork de longitud
+`R·ε/f²`. **El paper dice otra cosa**, y en la dirección contraria en las dos variables:
+
+| | Longitud del fork que el adversario logra | Cota inferior |
+|---|---|---|
+| **Paper (arXiv:2505.14891v1)** | **`ϕ²·ρ/ε`** | `ϕ·ρ/ε` |
+| Greenpaper §6.2.3 | `R·ε/f²` | — |
+
+con `ϕ` = razón de espacio honesto a adversario, `ρ` = **tiempo de replot medido en bloques**,
+`ε` = factor de disponibilidad dinámica.
+
+Contraejemplo con los parámetros de la propia figura 1 del paper (`ε=0,01`, `ϕ=2`, `ρ=4`):
+el paper da **1 600 pasos**; la fórmula del greenpaper da **0,01 pasos**, o sea un fork de una
+centésima de bloque. Sin sentido.
+
+**Verificado dos veces**, de forma independiente: por D9 leyendo el PDF del paper, y por el hilo
+principal contra el resumen en arXiv.
+
+**Por qué nos importa aunque llevemos PoT** (y el teorema sea para PoSpace *sin* VDF): la variable
+`ρ` es el **tiempo de replot en bloques**, y es justo la magnitud que `P-034(a)` tiene que fijar.
+El sentido de la cota importa: replot **más rápido** (`ρ` pequeño) exige forks **más cortos**, o
+sea ataques más baratos. Medido en `research/coste-ploteo-medido.md`: replotear 1 TiB son 300
+bloques con 32 núcleos y ~44 con GPU, frente a `MAX_REORG_LENGTH = 99`.
+
 ## 4 · El timelord es el problema, no la solución
 
 Documentación oficial: *"only the **fastest** timelord on the network will broadcast proofs at any
@@ -124,7 +152,9 @@ consenso**. Se puede tener en PoW.
 
 ## Lagunas declaradas
 
-- El paper de imposibilidad (Baig y Pietrzak 2025) se leyó vía resumen, no el PDF completo.
+- ~~El paper de imposibilidad (Baig y Pietrzak 2025) se leyó vía resumen, no el PDF completo.~~
+  **Cerrado el 2026-09-05:** D9 leyó el PDF completo y el hilo principal verificó el resumen en
+  arXiv. De ahí salió el error de reformulación del greenpaper documentado en §3.
 - No hay cifra medida de milisegundos de verificación de PoSpace: el coste es O(1) por construcción,
   pero nadie publica el número.
 - No se verificó si el Proof-of-Time de Autonomys tiene la misma dinámica de "solo importa el más
