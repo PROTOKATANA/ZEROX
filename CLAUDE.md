@@ -50,23 +50,82 @@ Hasta entonces se quedan como referencia viva.
 `/home/katana/zeo/.trash/ZEROX/` es una **copia de respaldo** del repositorio en el mismo commit
 (`ee7d443`), no la fuente. Si alguna ruta de este documento no resuelve, mira aquí primero, no allí.
 
-## ⚠️ Cambio de consenso en evaluación — PoW → Proof of Space and Time
+## ⚠️ Cambio de consenso DECIDIDO — PoW → Proof of Space and Time (Autonomys)
 
-**2026-09-05.** Katana ha decidido cambiar el consenso de Proof of Work (SHA3-256) a **Proof of
-Space and Time**, al estilo Chia. Está en fase de investigación con fuente primaria; nada
-implementado todavía.
+**2026-09-05.** Fuera Proof of Work. Dentro **Proof of Space and Time**, variante **Autonomys**
+(antes Subspace), no Chia. Decidido con los cinco informes delante; el detalle y el porqué están en
+`DECISIONES.md §14` y en `research/proof-of-space-tiempo.md`.
 
-Lo verificado hasta ahora, leyendo `PDF/ChiaGreenPaper.pdf` directamente:
+| | Elegido |
+|---|---|
+| Familia | **Autonomys / Proof of Archival Storage** — Rust puro, sin C++ ni GMP |
+| Granjero objetivo | **PC dedicado con disco** |
+| Timelord | **Lo operamos, con diseño abierto** |
+| Pool blindado | **Sí, después de la beta** — sin cambios |
 
-- El umbral es **≈61,5 %** de espacio honesto, **peor que el >50 % de Bitcoin**. La causa es el
-  *double dipping*: el espacio se puede reutilizar para probar varias cadenas a la vez, y el
-  trabajo no.
-- Ese 61,5 % **no sale solo del diseño**: sin la contramedida haría falta **73,1 %**. Baja a 61,5 %
-  porque los granjeros honestos también hacen *double dipping*, sobre los `κ = 3` mejores caminos.
-- Y `κ` **no es parte de la especificación**: es una *convención social* entre granjeros. Cita
-  literal del paper, Remark 1.
-- El análisis idealiza cuatro cosas que en producción son falsas, y una es crítica: supone que las
-  pruebas de espacio **no admiten ningún compromiso tiempo-memoria**.
+Lo decisivo fue el Proof-of-Time: el de Autonomys es Rust puro (`aes`, `no_std`, 0BSD); el de Chia
+obliga a C++ y GMP en la ruta de consenso de **todos** los nodos, y no existe ningún vector de
+interoperabilidad entre implementaciones de VDF de grupos de clases — H-001 otra vez.
+
+**Lo que se paga:** su verificación **no es sucinta**, recomputa una cadena AES en paralelo. Todo el
+anti-DoS (`C-NET-03`, `C-NET-04`) se calibró asumiendo que validar cuesta un SHA3. Hay que medirlo.
+
+**El hueco nuevo:** PoAS ata el espacio a la historia archivada de la cadena, y una cadena nueva no
+tiene historia. Cómo arranca en el bloque 1 es la primera pregunta de diseño.
+
+Agentes: **`zx-autonomys`** para la implementación de referencia, **`zx-chia`** para la teoría y el
+algoritmo de pruebas de espacio que Autonomys reimplementa.
+
+### El contexto de por qué NO Chia, que sigue siendo válido
+
+### ⚠️ El PDF de `PDF/ChiaGreenPaper.pdf` describe un diseño que Chia NUNCA implementó
+
+Verificado en la web oficial de Chia: ese documento se publica allí como
+**`Precursor-ChiaGreenPaper.pdf`**, y el greenpaper vigente dice de él, textualmente, *"a precursor
+consensus **which was never implemented**"*. Es de julio de 2019. **El greenpaper vigente es del 12
+de junio de 2026.**
+
+De ahí sale el 61,5 %, y por eso no es el número que protege a Chia:
+
+| | Atacante | Honesto |
+|---|---|---|
+| Precursor 2019, sin contramedida | 26,9 % | 73,1 % |
+| Precursor 2019, con `κ=3` | 38,5 % | **61,5 %** ← el número citado |
+| **Desplegado** | ver abajo — **no es un porcentaje** | |
+
+### La condición de seguridad REAL, del greenpaper vigente
+
+```
+Chia is provably secure if:  space_h · vdf_h  >  space_a · vdf_a · 1.47
+```
+
+**No es una fracción de espacio: es un producto de espacio POR velocidad de VDF.** El espacio
+honesto necesario depende de lo rápido que sea el timelord del atacante:
+
+| VDF del atacante | Espacio honesto necesario |
+|---|---|
+| igual que el honesto | 59,5 % |
+| 2× más rápido | **74,6 %** |
+| 3× más rápido | **81,5 %** |
+| 10× más rápido | 93,6 % |
+
+Bitcoin necesita >50 % y **no depende de ningún reloj**.
+
+**Lo bueno:** el factor 1,47 sale del *double dipping* y es **ajustable**. Cita literal: *"there's
+nothing special about the constant 1.47, it can be lowered to 1+ε for any ε>0 by increasing the
+number of blocks that depend on the same challenge (in Chia this is set to at least 16)"*.
+
+**Y un teorema de imposibilidad:** sin componente temporal, **ningún** protocolo de cadena-más-larga
+basado solo en pruebas de espacio puede ser seguro bajo disponibilidad dinámica (Baig y Pietrzak,
+FC 2025). La VDF no es una elección de diseño, es obligatoria.
+
+### Lo que la práctica rompió
+
+El análisis idealiza que las pruebas de espacio **no admiten ningún compromiso tiempo-memoria**
+(§1.6.iii). Falso en producción: los plots comprimidos lograron ~50 % de reducción, y Chia Network
+lo reconoce — *"GPUs could rapidly generate and discard plots, effectively farming without
+storage"*. Su respuesta es **Proof of Space 2.0**, un formato nuevo que ya está en el código
+(`PLOT_SIZE_V2 = 28`) pero **sin altura de activación** (`HARD_FORK2_HEIGHT = 0xFFFFFFFA`).
 
 **Consecuencia inmediata:** H-001 deja de estar en el camino crítico. El kernel SHA3 en GPU ya no
 es el minero.
