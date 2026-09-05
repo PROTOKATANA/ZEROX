@@ -189,6 +189,51 @@ fn cabeceras_tras(c: &Cadena, n: u32) -> Vec<BlockHeader> {
     v
 }
 
+/// `n` cabeceras con sus cuerpos coherentes: la raíz de Merkle sale de las transacciones.
+fn cadena_con_cuerpos(c: &Cadena, n: u32) -> (Vec<BlockHeader>, Vec<zx_p2p::mensaje::BloqueRed>) {
+    use zx_core::amount::Amount;
+    use zx_core::digest::TxId;
+    use zx_core::firma::ClavePublica;
+    use zx_core::preimage::block::merkle_root;
+    use zx_core::preimage::tx::txid;
+    use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use zx_p2p::mensaje::BloqueRed;
+
+    let mut cabeceras = Vec::new();
+    let mut bloques = Vec::new();
+    let mut prev = c.genesis();
+    for i in 1..=n {
+        let tx = Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([i as u8; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0xffff_fffe,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(1_000 + i64::from(i)).expect("importe"),
+                lock: Lock::PubKey {
+                    pubkey: ClavePublica::desde_bytes([9; 32]),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: i,
+        };
+        let mut cab = cab_base(i, prev);
+        cab.merkle_root = merkle_root(&[txid(&tx, cab.consensus_branch_id)]);
+        prev = cab.block_hash();
+        cabeceras.push(cab);
+        bloques.push(BloqueRed {
+            cabecera: cab,
+            txs: vec![tx],
+            testigos: vec![vec![vec![0x5a; 64]]],
+        });
+    }
+    (cabeceras, bloques)
+}
+
 /// Espera a que una condición se cumpla, o falla con un mensaje que dice dónde se quedó.
 ///
 /// Sondea en vez de escuchar eventos porque lo que se afirma es **el estado final de la cadena**,
@@ -431,55 +476,11 @@ async fn el_nodo_real_rechaza_cabeceras_sin_pow() {
 /// existía en el enum y nada la construía.
 #[tokio::test]
 async fn un_nodo_con_las_cabeceras_pero_sin_cuerpos_los_descarga() {
-    use zx_core::amount::Amount;
-    use zx_core::digest::TxId;
-    use zx_core::firma::ClavePublica;
-    use zx_core::preimage::block::merkle_root;
-    use zx_core::preimage::tx::txid;
-    use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
-    use zx_p2p::mensaje::BloqueRed;
-
     const N: u32 = 5;
-
     let a = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
     let b = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let (cabeceras, bloques) = cadena_con_cuerpos(&a, N);
 
-    // Las cabeceras se construyen a partir de los cuerpos, no al revés: la raíz de Merkle las ata
-    // (C-BLK-03, C-NET-23), y con una raíz de relleno el receptor rechazaría los cuerpos.
-    let mut cabeceras = Vec::new();
-    let mut bloques = Vec::new();
-    let mut prev = a.genesis();
-    for i in 1..=N {
-        let tx = Tx {
-            version: 1,
-            inputs: vec![TxIn {
-                outpoint: OutPoint {
-                    prev_txid: TxId::from_digest(Digest::from_bytes([i as u8; 32])),
-                    prev_index: 0,
-                },
-                sequence: 0xffff_fffe,
-            }],
-            outputs: vec![TxOut {
-                value: Amount::nuevo(1_000 + i64::from(i)).expect("importe"),
-                lock: Lock::PubKey {
-                    pubkey: ClavePublica::desde_bytes([9; 32]),
-                },
-            }],
-            lock_time: 0,
-            expiry_height: i,
-        };
-        let mut cab = cab_base(i, prev);
-        cab.merkle_root = merkle_root(&[txid(&tx, cab.consensus_branch_id)]);
-        prev = cab.block_hash();
-        cabeceras.push(cab);
-        bloques.push(BloqueRed {
-            cabecera: cab,
-            txs: vec![tx],
-            testigos: vec![vec![vec![0x5a; 64]]],
-        });
-    }
-
-    // A: cabeceras y cuerpos. B: solo cabeceras — el estado de quien se reinició a media descarga.
     a.extender_sin_validar_solo_para_pruebas(&cabeceras);
     for bl in &bloques {
         a.guardar_bloque(bl).expect("A guarda los suyos");
@@ -519,4 +520,91 @@ async fn un_nodo_con_las_cabeceras_pero_sin_cuerpos_los_descarga() {
 
     na.matar();
     nb.matar();
+}
+
+/// **Un peer que sirve un cuerpo corrupto no puede dejar la descarga parada para siempre.**
+///
+/// La primera versión de `Respuesta::Bloques` salía de la función en el primer cuerpo rechazado, y
+/// con ella se iba también la petición del siguiente lote. Un solo cuerpo malo detenía la descarga
+/// **indefinidamente**: no hay temporizador que la reanude, y el único disparador que quedaba era
+/// el saludo de un peer nuevo. Un nodo así se queda creyendo que está a punto de terminar.
+///
+/// # Cómo está construido para que PRUEBE el arreglo
+///
+/// La primera versión de este test tenía a B hablando con A y C a la vez, y **pasaba igual con el
+/// fallo restaurado**: el saludo de C disparaba la descarga por su cuenta y tapaba el problema.
+/// Comprobado revirtiendo el arreglo, que es la única forma de saber si un test prueba algo.
+///
+/// Así que aquí B habla **primero solo con A**, y lo que se afirma es el estado intermedio: con el
+/// arreglo, B se queda con tres de los cuatro cuerpos —el corrupto es el primero del lote, y los
+/// tres siguientes se procesan igual—; sin él, se queda con **cero**, porque la función salía
+/// antes de mirarlos. Solo después entra C y B tiene que completarse.
+///
+/// El cuerpo corrupto se planta escribiendo directo en el almacén de A: un nodo que se comporta
+/// **no puede producirlo**, porque `guardar_bloque` comprueba la raíz antes de escribir (C-NET-23).
+#[tokio::test]
+async fn un_cuerpo_corrupto_no_detiene_la_descarga_para_siempre() {
+    const N: u32 = 4;
+    let a = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let b = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let c = Arc::new(Cadena::nueva(Red::Testnet).expect("génesis"));
+    let (cabeceras, bloques) = cadena_con_cuerpos(&a, N);
+
+    for cadena in [&a, &b, &c] {
+        cadena.extender_sin_validar_solo_para_pruebas(&cabeceras);
+    }
+    for bl in &bloques {
+        c.guardar_bloque(bl).expect("C es honesto");
+    }
+
+    // A: el cuerpo del bloque 2 puesto bajo el hash del bloque 1; el resto, bueno.
+    let primero = bloques.first().expect("hay bloques");
+    let segundo = bloques.get(1).expect("hay dos");
+    let mut basura = Vec::new();
+    zx_core::wire::cuerpo_a_bytes(
+        &mut basura,
+        &primero.cabecera,
+        &segundo.txs,
+        &segundo.testigos,
+    );
+    a.almacen()
+        .guardar_cuerpo(&primero.cabecera.block_hash(), &basura)
+        .expect("se planta la corrupción");
+    for bl in bloques.iter().skip(1) {
+        a.guardar_bloque(bl).expect("el resto de A es bueno");
+    }
+
+    let na = levantar(Arc::clone(&a)).await;
+    let nb = levantar(Arc::clone(&b)).await;
+    nb.manejo.marcar(na.addr.clone()).await.expect("B marca A");
+
+    // ── Lo que discrimina: tres de cuatro, no cero ───────────────────────────
+    hasta_que("B guarde los tres cuerpos buenos de A", || {
+        b.cuerpos_que_faltan(64).len() == 1
+    })
+    .await;
+    assert_eq!(
+        b.cuerpos_que_faltan(64),
+        vec![primero.cabecera.block_hash()],
+        "el único que debe faltar es aquel cuyo cuerpo A corrompió. Si faltan los cuatro, la \
+         función volvió a salir en el primer rechazo y se llevó por delante los tres buenos."
+    );
+
+    // ── Y ahora entra alguien honesto ────────────────────────────────────────
+    let nc = levantar(Arc::clone(&c)).await;
+    nb.manejo.marcar(nc.addr.clone()).await.expect("B marca C");
+
+    hasta_que("B se complete con C", || {
+        b.cuerpos_que_faltan(64).is_empty()
+    })
+    .await;
+    let recuperado = b.bloque(primero.cabecera.block_hash()).expect("B lo tiene");
+    assert_eq!(
+        recuperado.txs, primero.txs,
+        "y con el cuerpo BUENO, el que sirvió C"
+    );
+
+    na.matar();
+    nb.matar();
+    nc.matar();
 }

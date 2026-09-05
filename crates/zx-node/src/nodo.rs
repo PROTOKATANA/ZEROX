@@ -69,6 +69,11 @@ pub struct Nodo {
     cadena: Arc<Cadena>,
     sinc: Sincronizador,
     manejo: ManejoRed,
+    /// Con quién estamos hablando ahora mismo.
+    ///
+    /// Hace falta para poder cambiar de peer cuando uno falla, en vez de esperar a que alguien
+    /// salude. `Sincronizador` guarda solo el peer del que descargamos; esto es todos.
+    conectados: std::collections::BTreeSet<PeerId>,
 }
 
 impl Nodo {
@@ -78,6 +83,7 @@ impl Nodo {
             cadena,
             sinc: Sincronizador::nuevo(),
             manejo,
+            conectados: std::collections::BTreeSet::new(),
         }
     }
 
@@ -99,6 +105,7 @@ impl Nodo {
         match evento {
             EventoRed::PeerConectado(p) => {
                 tracing::info!(peer = %p, "conectado");
+                self.conectados.insert(p);
                 // Lo primero que se le dice a un peer nuevo es "¿quién eres?" (§16.1). Sin el
                 // saludo no se sabe quién va por delante, ni si es de esta cadena.
                 if let Err(e) = self.manejo.pedir(p, Peticion::Estado).await {
@@ -108,6 +115,7 @@ impl Nodo {
             }
             EventoRed::PeerDesconectado(p) => {
                 tracing::info!(peer = %p, "desconectado");
+                self.conectados.remove(&p);
                 // Perder al peer del que descargábamos vuelve a saludar; NO penaliza.
                 self.sinc.peer_perdido(p);
                 Fin::Seguir
@@ -162,6 +170,7 @@ impl Nodo {
             Respuesta::Cabeceras(cs) => self.atender_cabeceras(peer, cs).await,
             Respuesta::Bloques(bs) => {
                 tracing::debug!(peer = %peer, n = bs.len(), "bloques recibidos");
+                let mut condenado = false;
                 for b in &bs {
                     let hash = b.cabecera.block_hash();
                     // Solo se guardan cuerpos de cabeceras que ya tenemos y hemos validado. Un
@@ -173,23 +182,35 @@ impl Nodo {
                         continue;
                     }
                     // C-NET-23 · y que sea el cuerpo de ESA cabecera.
-                    if let Err(e) = self.cadena.guardar_bloque(b) {
-                        match e {
-                            ErrorCuerpo::Rechazado(r) => {
-                                tracing::warn!(peer = %peer, %r, "cuerpo que no es el de su cabecera");
-                                let _ = self
-                                    .manejo
-                                    .desconectar(peer, MotivoDesconexion::ViolacionDeConsenso)
-                                    .await;
-                                return Fin::Seguir;
-                            }
-                            // Que el disco falle no es culpa del peer.
-                            ErrorCuerpo::Almacen(a) => {
-                                tracing::error!(%a, "no se pudo guardar el cuerpo");
-                            }
+                    match self.cadena.guardar_bloque(b) {
+                        Ok(()) => {}
+                        // Un cuerpo corrupto **no invalida los otros quince**. La primera versión
+                        // salía de la función aquí mismo, y con ella se iba también la petición
+                        // del siguiente lote: un solo cuerpo malo dejaba la descarga parada para
+                        // siempre, porque nada la reanuda salvo el saludo de un peer nuevo.
+                        Err(ErrorCuerpo::Rechazado(r)) => {
+                            tracing::warn!(peer = %peer, %r, "cuerpo que no es el de su cabecera");
+                            condenado = true;
+                        }
+                        // Que el disco falle no es culpa del peer.
+                        Err(ErrorCuerpo::Almacen(a)) => {
+                            tracing::error!(%a, "no se pudo guardar el cuerpo");
                         }
                     }
                 }
+
+                if condenado {
+                    let _ = self
+                        .manejo
+                        .desconectar(peer, MotivoDesconexion::ViolacionDeConsenso)
+                        .await;
+                    // Y se sigue con OTRO, no se espera a que alguien salude. Al condenado no se
+                    // le pide nada más en esta vuelta (C-NET-19).
+                    self.sinc.peer_perdido(peer);
+                    self.reanudar_cuerpos_con_otro(peer).await;
+                    return Fin::Seguir;
+                }
+
                 // El siguiente lote. Si no queda ninguno, `pedir_cuerpos` concluye la
                 // sincronización. Encadenar aquí en vez de en un temporizador mantiene exactamente
                 // una petición de cuerpos en vuelo por peer: el control de flujo es la respuesta.
@@ -197,8 +218,10 @@ impl Nodo {
                 Fin::Seguir
             }
             Respuesta::NoDisponible => {
-                // No es un error y no puntúa (C-NET-05).
+                // No es un error y no puntúa (C-NET-05). Pero tampoco se le sigue pidiendo lo
+                // mismo: si es él quien no lo tiene, insistir da la misma respuesta para siempre.
                 tracing::debug!(peer = %peer, "el peer no tiene lo que se le pidió");
+                self.reanudar_cuerpos_con_otro(peer).await;
                 Fin::Seguir
             }
         }
@@ -354,6 +377,19 @@ impl Nodo {
         {
             tracing::debug!(peer = %peer, %e, "no se pudieron pedir cuerpos");
         }
+    }
+
+    /// Reanuda la descarga de cuerpos con **cualquier peer menos** el que acaba de fallar.
+    ///
+    /// Sin esto, la descarga depende de que llegue el saludo de un peer nuevo — y si no hay
+    /// ninguno a punto de conectarse, el nodo se queda en `Fase::Cuerpos` indefinidamente, sin
+    /// error visible, creyendo que está a punto de terminar.
+    async fn reanudar_cuerpos_con_otro(&mut self, evitar: PeerId) {
+        let Some(otro) = self.conectados.iter().copied().find(|p| *p != evitar) else {
+            tracing::info!("sin otro peer al que pedir cuerpos; se reanudará al conectar alguno");
+            return;
+        };
+        self.pedir_cuerpos(otro).await;
     }
 
     async fn pedir_cabeceras(&self, peer: PeerId) {

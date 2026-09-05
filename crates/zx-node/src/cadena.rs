@@ -21,6 +21,8 @@ use primitive_types::U256;
 use zx_consensus::activacion::rama_activa;
 use zx_consensus::error::ConsensusError;
 use zx_consensus::fork_choice::{Preferencia, Tip, comprobar_profundidad_reorg, preferir};
+use zx_consensus::peso::MAX_TX_WEIGHT;
+use zx_consensus::validacion::peso_tx;
 use zx_core::digest::{BlockHash, TxId};
 use zx_core::preimage::block::{BlockHeader, merkle_root};
 use zx_core::preimage::tx::txid;
@@ -81,10 +83,32 @@ struct Indice {
 }
 
 impl Indice {
-    fn empujar(&mut self, c: BlockHeader) {
+    /// Añade una cabecera al final, **si su altura declarada es su posición real**.
+    ///
+    /// Devuelve `false` y no toca nada si no lo es. Es el segundo candado del mismo problema: la
+    /// validación contextual ya rechaza las cabeceras que mienten sobre su altura, pero el índice
+    /// de alturas del almacén se escribe con `cabecera.height`, así que una que se colara por
+    /// cualquier otra vía dejaría el almacén apuntando la altura equivocada a un hash — y al
+    /// reiniciar, la cadena se reconstruye leyendo ese índice.
+    ///
+    /// Aquí la comprobación es de una línea y hace el estado imposible por construcción, en vez de
+    /// depender de que todos los caminos de entrada se acuerden.
+    fn empujar(&mut self, c: BlockHeader) -> bool {
+        let Ok(pos) = u32::try_from(self.cadena.len()) else {
+            return false;
+        };
+        if c.height != pos {
+            tracing::error!(
+                declarada = c.height,
+                real = pos,
+                "cabecera con altura que no es su posición: se descarta"
+            );
+            return false;
+        }
         let h = c.block_hash();
         self.posicion.insert(h, self.cadena.len());
         self.cadena.push((h, c));
+        true
     }
 
     fn punta(&self) -> Option<(BlockHash, BlockHeader)> {
@@ -128,16 +152,25 @@ impl Cadena {
 
         // Recuperar lo que hubiera. Un almacén sin punta es uno recién creado, no uno roto.
         let mut indice = Indice::default();
-        indice.empujar(cabecera);
+        // El génesis MUST estar en la altura 0. Si no lo estuviera, todo el índice —que es un
+        // vector cuya posición es la altura— quedaría desplazado en uno.
+        if !indice.empujar(cabecera) {
+            return Err(ConsensusError::GenesisInvalido {
+                motivo: "el génesis no declara altura 0",
+            });
+        }
         if let Ok(Some(punta)) = almacen.punta() {
             for h in 1..=punta.altura {
                 match almacen.hash_en_altura(h).ok().flatten() {
+                    // Que `empujar` diga que no es un almacén cuyo índice de alturas apunta a
+                    // una cabecera que declara otra altura: incoherente, se para igual que ante un
+                    // hueco. Recuperar a partir de ahí sería construir un índice que miente.
                     Some(hash) => match almacen.cabecera(&hash).ok().flatten() {
-                        Some(c) => indice.empujar(c),
+                        Some(c) if indice.empujar(c) => {}
                         // Un hueco en el índice significa almacén incompleto. Se para de recuperar
                         // ahí en vez de seguir con una cadena con agujeros: mejor arrancar más
                         // atrás y resincronizar que creer que se tiene lo que no se tiene.
-                        None => break,
+                        _ => break,
                     },
                     None => break,
                 }
@@ -212,6 +245,27 @@ impl Cadena {
     pub fn cabecera_en(&self, altura: u32) -> Option<BlockHeader> {
         let i = leer(&self.cabeceras);
         i.cadena.get(usize::try_from(altura).ok()?).map(|(_, c)| *c)
+    }
+
+    /// Las cabeceras que tenemos entre dos alturas, ambas incluidas, con **una sola** toma del
+    /// lock.
+    ///
+    /// Existe porque la validación contextual necesita hasta 91 ancestros por cabecera de un lote
+    /// que puede traer 2000. Pedirlos de uno en uno tomaba el lock decenas de miles de veces
+    /// dentro del bucle de eventos —donde vive el Swarm—, y eso convertía un mensaje de 184 KB en
+    /// un trabajo desproporcionado que un peer compra barato.
+    #[must_use]
+    pub fn cabeceras_en_rango(&self, desde: u32, hasta: u32) -> Vec<BlockHeader> {
+        let i = leer(&self.cabeceras);
+        let (Ok(d), Ok(h)) = (usize::try_from(desde), usize::try_from(hasta)) else {
+            return Vec::new();
+        };
+        i.cadena
+            .get(d..=h.min(i.cadena.len().saturating_sub(1)))
+            .unwrap_or_default()
+            .iter()
+            .map(|(_, c)| *c)
+            .collect()
     }
 
     /// La altura a la que tenemos un hash, si lo tenemos. `O(1)`.
@@ -551,6 +605,14 @@ pub enum RechazoCuerpo {
     /// Un bloque sin transacciones no existe: siempre lleva coinbase (C-BLK-07).
     #[error("el bloque no trae ninguna transacción: falta la coinbase (C-BLK-07)")]
     SinCoinbase,
+    /// Una transacción pesa más de lo que el protocolo admite (C-WGT-11).
+    #[error("una transacción pesa {peso} y el máximo es {maximo} (C-WGT-11)")]
+    TxDemasiadoPesada {
+        /// Peso de la transacción infractora.
+        peso: u64,
+        /// `MAX_TX_WEIGHT`.
+        maximo: u64,
+    },
 }
 
 /// Lo que puede salir mal al guardar un cuerpo.
@@ -579,10 +641,17 @@ pub enum ErrorCuerpo {
 ///
 /// # Lo que NO comprueba
 ///
-/// La validez de las transacciones: firmas, gastos, importes, peso, coinbase. Eso es
+/// La validez de las transacciones: firmas, gastos, importes, coinbase. Eso es
 /// `zx_consensus::bloque::validar_cuerpo` y necesita el conjunto UTXO, que la cadena todavía no
 /// mantiene. Esto es la barrera **anterior**: que el cuerpo sea el que la cabecera dice, que es
 /// barato y no depende de tener estado.
+///
+/// 🔶 **Del peso solo se comprueba C-WGT-11**, el máximo por transacción, que es una constante.
+/// El límite del bloque entero —C-WGT-09, `LIMITE(H) = 2·M(H)`— depende de la mediana efectiva, y
+/// la cadena no lleva todavía el historial de pesos que hace falta para calcularla. Mientras
+/// tanto, lo que acota el crecimiento del disco por bloque es el límite de transporte
+/// (`MAX_RESPUESTA_BYTES`), que es mucho más flojo. Lo señaló una auditoría adversarial y se cierra
+/// con la validación completa de cuerpo.
 ///
 /// # Errores
 /// El [`RechazoCuerpo`] correspondiente. Todos son atribuibles a mala fe: la raíz es determinista.
@@ -611,6 +680,17 @@ pub fn comprobar_cuerpo(b: &BloqueRed) -> Result<(), RechazoCuerpo> {
         .collect();
     if merkle_root(&txids) != b.cabecera.merkle_root {
         return Err(RechazoCuerpo::RaizNoCoincide);
+    }
+    // C-WGT-11 · ninguna transacción pasa del máximo. Va DESPUÉS de la raíz: si el cuerpo no es
+    // el de esta cabecera, pesarlo es trabajo tirado.
+    for (tx, testigos) in b.txs.iter().zip(b.testigos.iter()) {
+        let peso = peso_tx(tx, testigos);
+        if peso > MAX_TX_WEIGHT {
+            return Err(RechazoCuerpo::TxDemasiadoPesada {
+                peso,
+                maximo: MAX_TX_WEIGHT,
+            });
+        }
     }
     Ok(())
 }
@@ -1308,5 +1388,101 @@ mod tests_cuerpo {
                 testigos: 1
             })
         );
+    }
+}
+
+#[cfg(test)]
+#[expect(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "los tests fallan con panic por diseño"
+)]
+mod tests_peso {
+    use super::{RechazoCuerpo, comprobar_cuerpo};
+    use zx_consensus::peso::MAX_TX_WEIGHT;
+    use zx_core::amount::Amount;
+    use zx_core::digest::{Digest, TxId};
+    use zx_core::firma::ClavePublica;
+    use zx_core::preimage::block::{BlockHeader, merkle_root};
+    use zx_core::preimage::tx::txid;
+    use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use zx_p2p::mensaje::BloqueRed;
+
+    const RAMA: u32 = 0xc478_80ea;
+
+    /// Una transacción con `n` salidas, para poder hacerla arbitrariamente pesada.
+    fn tx_con_salidas(n: usize) -> Tx {
+        Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([7; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0xffff_fffe,
+            }],
+            outputs: (0..n)
+                .map(|i| TxOut {
+                    value: Amount::nuevo(1 + i as i64).unwrap(),
+                    lock: Lock::PubKey {
+                        pubkey: ClavePublica::desde_bytes([9; 32]),
+                    },
+                })
+                .collect(),
+            lock_time: 0,
+            expiry_height: 1,
+        }
+    }
+
+    fn bloque_con(tx: Tx) -> BloqueRed {
+        let id = txid(&tx, RAMA);
+        BloqueRed {
+            cabecera: BlockHeader {
+                consensus_branch_id: RAMA,
+                prev_hash: zx_core::digest::BlockHash::from_digest(Digest::from_bytes([0; 32])),
+                merkle_root: merkle_root(&[id]),
+                timestamp: 1_788_480_120,
+                bits: 0x1d00_ffff,
+                nonce: 1,
+                height: 1,
+            },
+            txs: vec![tx],
+            testigos: vec![vec![vec![0x5a; 64]]],
+        }
+    }
+
+    /// **C-WGT-11 · una transacción que pasa del máximo no se guarda.**
+    ///
+    /// Antes de esto un cuerpo se escribía a disco sin mirar cuánto pesaba. Con una cabecera
+    /// aceptada, un peer podía servir un cuerpo tan grande como el límite de transporte permitiera,
+    /// bloque tras bloque — el ataque de *big bang* de tamaño de bloque que Monero sufrió en 2014.
+    #[test]
+    fn una_transaccion_que_pasa_del_maximo_se_rechaza() {
+        // Se busca por duplicación el número de salidas que cruza el umbral, en vez de calcularlo
+        // a mano: el peso es función de la fórmula de C-WGT-02, y transcribirlo aquí sería otra
+        // constante escrita a mano que envejece cuando la fórmula cambie.
+        let mut n = 1usize;
+        while zx_consensus::validacion::peso_tx(&tx_con_salidas(n), &[vec![0x5a; 64]])
+            <= MAX_TX_WEIGHT
+        {
+            n *= 2;
+            assert!(
+                n < 1_000_000,
+                "el peso no crece con las salidas: revisa C-WGT-02"
+            );
+        }
+
+        let gorda = bloque_con(tx_con_salidas(n));
+        match comprobar_cuerpo(&gorda) {
+            Err(RechazoCuerpo::TxDemasiadoPesada { peso, maximo }) => {
+                assert!(peso > maximo);
+                assert_eq!(maximo, MAX_TX_WEIGHT);
+            }
+            otro => panic!("se esperaba TxDemasiadoPesada, salió {otro:?}"),
+        }
+
+        // Y una de tamaño normal sigue pasando: el límite no rechaza lo legítimo.
+        comprobar_cuerpo(&bloque_con(tx_con_salidas(2))).expect("una tx normal cabe de sobra");
     }
 }

@@ -100,6 +100,18 @@ pub enum RechazoCabeceras {
     DificultadIncorrecta,
     /// El `consensus_branch_id` no es el activo a esa altura (C-HDR-02b). **Mala fe.**
     RamaIncorrecta,
+    /// El campo `height` no coincide con la posición real de la cabecera en la rama. **Mala fe.**
+    ///
+    /// `height` lo escribe quien construye la cabecera, así que es una **afirmación del peer**, no
+    /// un hecho. Su posición real sale del ancla y del índice en el lote, y las dos tienen que
+    /// coincidir. Sin esta comprobación, mentir sobre la altura elige qué dificultad se te exige.
+    AlturaMentida,
+    /// Un fallo NUESTRO impidió juzgar la cabecera.
+    ///
+    /// **No es mala fe** y merece nivel `error!`: si la tabla de ramas de este nodo estuviera mal
+    /// formada, todos los peers parecerían mentir a la vez y el nodo se aislaría de la red entera
+    /// creyendo que la atacan. Un fallo interno no puede parecer un ataque ajeno.
+    FalloInterno,
     /// Un timestamp no avanza respecto al de su padre (C-TS-01). **Mala fe.**
     TimestampNoMonotono,
     /// Un timestamp viene de más allá del FTL (C-TS-03).
@@ -129,6 +141,7 @@ impl RechazoCabeceras {
                 | Self::BitsNoCanonico
                 | Self::DificultadIncorrecta
                 | Self::RamaIncorrecta
+                | Self::AlturaMentida
                 | Self::TimestampNoMonotono
         )
     }

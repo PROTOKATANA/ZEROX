@@ -7,6 +7,23 @@
 //!
 //! Es el equivalente del `ContextualCheckBlockHeader` de Bitcoin Core.
 //!
+//! # `height` es una AFIRMACIÓN del peer, no un hecho
+//!
+//! Lo primero que hace este módulo es derivar la altura real de cada cabecera —`ancla + 1 + i`— y
+//! exigir que el campo `height` coincida. Es la comprobación de la que dependen todas las demás, y
+//! su ausencia costó cara.
+//!
+//! **La primera versión de este módulo usaba `cab.height` directamente**, y por tanto era
+//! esquivable de la forma más simple posible: una cabecera que cuelga de la punta real de una
+//! cadena con meses de dificultad acumulada, pero que **declara altura 1**, cae en la rama de
+//! arranque de C-DIFF-02 y solo se le exige `TARGET_INICIAL` — la dificultad calibrada para el día
+//! uno de la red. Minar eso cuesta segundos.
+//!
+//! El resultado era peor que no comprobar la dificultad: el módulo afirmaba cerrar un agujero que
+//! seguía abierto por otra puerta, y encima hacía que la comprobación pareciera hecha. Lo encontró
+//! una auditoría adversarial el mismo día. El test `una_cabecera_que_miente_sobre_su_altura` lo
+//! reproduce exactamente.
+//!
 //! # El hueco que esto cerró
 //!
 //! `zx-consensus` implementa LWMA-1 entero y probado (`siguiente_target`), y `validar_cabecera`
@@ -83,23 +100,48 @@ pub fn comprobar_contexto(
     reloj_local: i64,
 ) -> Result<(), RechazoCabeceras> {
     let inicial = target_inicial(cadena)?;
-    let n_u32 = u32::try_from(N).map_err(|_| RechazoCabeceras::VentanaIncompleta)?;
+    let n_u32 = u32::try_from(N).map_err(|_| RechazoCabeceras::FalloInterno)?;
 
-    // El padre de la primera del lote es el ancla. De ahí en adelante, la anterior del lote.
-    let mut ts_padre = cadena
-        .cabecera_en(ancla_altura)
+    // Los ancestros que hagan falta de NUESTRA cadena, leídos **de una vez**.
+    //
+    // La versión anterior llamaba a `cadena.cabecera_en()` dentro del bucle de la ventana, y cada
+    // llamada tomaba el `RwLock` por su cuenta: hasta 91 tomas por cabecera. Con un lote de 2000
+    // eso son decenas de miles de adquisiciones dentro del bucle de eventos, que es donde vive el
+    // Swarm — un mensaje de 184 KB compraba un trabajo desproporcionado. Ahora es un lock.
+    let mas_bajo = ancla_altura.saturating_sub(n_u32).saturating_sub(1);
+    let nuestras = cadena.cabeceras_en_rango(mas_bajo, ancla_altura);
+    let de_la_cadena = |altura: u32| -> Option<BlockHeader> {
+        nuestras
+            .get(usize::try_from(altura.checked_sub(mas_bajo)?).ok()?)
+            .copied()
+    };
+
+    let mut ts_padre = de_la_cadena(ancla_altura)
         .and_then(|c| i64::try_from(c.timestamp).ok())
         .ok_or(RechazoCabeceras::VentanaIncompleta)?;
 
-    for cab in cabeceras {
-        let h = cab.height;
+    for (i, cab) in cabeceras.iter().enumerate() {
+        // **La altura se DERIVA, no se cree.** `height` lo escribe quien construye la cabecera; su
+        // posición real sale del ancla y del índice en el lote. Que el campo mienta es mala fe, y
+        // dejar que decida algo —como qué dificultad se le exige— vacía todo lo que viene después.
+        let h = u32::try_from(i)
+            .ok()
+            .and_then(|i| ancla_altura.checked_add(1)?.checked_add(i))
+            .ok_or(RechazoCabeceras::AlturaMentida)?;
+        if cab.height != h {
+            return Err(RechazoCabeceras::AlturaMentida);
+        }
 
         // C-HDR-02b · la rama de consenso activa a esa altura. Es la protección contra wipe-out:
         // una cabecera de otra rama no es una cabecera de esta cadena.
-        rama_activa(cadena.red(), h)
-            .ok()
-            .filter(|r| *r == cab.consensus_branch_id)
-            .ok_or(RechazoCabeceras::RamaIncorrecta)?;
+        //
+        // El error de `rama_activa` NO se confunde con una rama ajena: si la tabla de este nodo
+        // estuviera mal formada, todos los peers parecerían mentir a la vez y el nodo se aislaría
+        // de la red entera creyendo que la atacan.
+        let activa = rama_activa(cadena.red(), h).map_err(|_| RechazoCabeceras::FalloInterno)?;
+        if activa != cab.consensus_branch_id {
+            return Err(RechazoCabeceras::RamaIncorrecta);
+        }
 
         // C-BLK-06 · timestamps. El de futuro NO es permanente y NO puntúa: si nuestro reloj va
         // atrasado, el peer honesto que mina en hora nos parecería un atacante.
@@ -112,12 +154,12 @@ pub fn comprobar_contexto(
         let esperado = if h == 0 || h <= n_u32 {
             inicial
         } else {
-            let v = ventana(cadena, cabeceras, ancla_altura, h)?;
+            let v = ventana(&de_la_cadena, cabeceras, ancla_altura, h)?;
             siguiente_target(VentanaRetarget {
                 timestamps: &v.0,
                 targets: &v.1,
             })
-            .map_err(|_| RechazoCabeceras::VentanaIncompleta)?
+            .map_err(|_| RechazoCabeceras::FalloInterno)?
         };
 
         // C-DIFF-09 · la comparación es por `bits`, ida y vuelta, no por target. Dos `bits`
@@ -139,12 +181,12 @@ fn target_inicial(cadena: &Cadena) -> Result<U256, RechazoCabeceras> {
 
 /// Los `N+1` timestamps y los `N` targets de la ventana de `h`, tomados de la rama candidata.
 fn ventana(
-    cadena: &Cadena,
+    de_la_cadena: &dyn Fn(u32) -> Option<BlockHeader>,
     lote: &[BlockHeader],
     ancla_altura: u32,
     h: u32,
 ) -> Result<(Vec<i64>, Vec<U256>), RechazoCabeceras> {
-    let n_u32 = u32::try_from(N).map_err(|_| RechazoCabeceras::VentanaIncompleta)?;
+    let n_u32 = u32::try_from(N).map_err(|_| RechazoCabeceras::FalloInterno)?;
     let desde = h
         .checked_sub(n_u32)
         .and_then(|x| x.checked_sub(1))
@@ -157,9 +199,9 @@ fn ventana(
         // Por encima del ancla manda el lote; en el ancla y por debajo, nuestra cadena. Ese corte
         // es lo que hace que la ventana sea de la rama candidata y no de la nuestra.
         let cab = if altura > ancla_altura {
-            buscar_en_lote(lote, altura)
+            buscar_en_lote(lote, altura, ancla_altura)
         } else {
-            cadena.cabecera_en(altura)
+            de_la_cadena(altura)
         }
         .ok_or(RechazoCabeceras::VentanaIncompleta)?;
 
@@ -184,16 +226,15 @@ fn ventana(
 
 /// La cabecera del lote a una altura dada.
 ///
-/// Búsqueda directa por índice: el lote llega encadenado y con alturas consecutivas —lo garantiza
-/// `validar_estructura`—, así que la posición se calcula, no se busca. Recorrerlo sería `O(n²)`
-/// sobre datos que un peer elige.
-fn buscar_en_lote(lote: &[BlockHeader], altura: u32) -> Option<BlockHeader> {
-    let primera = lote.first()?.height;
-    let idx = usize::try_from(altura.checked_sub(primera)?).ok()?;
-    let cab = lote.get(idx)?;
-    // Cinturón: si las alturas no fueran consecutivas, el índice apuntaría a otra cabecera y la
-    // ventana se calcularía con datos equivocados en silencio.
-    (cab.height == altura).then_some(*cab)
+/// La posición se calcula desde el **ancla**, no desde `lote[0].height`. Es la misma lección que el
+/// resto del módulo: `height` es una afirmación del peer, y derivar el índice de un valor que él
+/// elige le deja mover la ventana. Desde el ancla, el índice es un hecho.
+///
+/// Búsqueda directa y no recorrido: el lote llega encadenado y con alturas consecutivas, así que
+/// recorrerlo sería `O(n²)` sobre datos que un peer elige.
+fn buscar_en_lote(lote: &[BlockHeader], altura: u32, ancla_altura: u32) -> Option<BlockHeader> {
+    let idx = usize::try_from(altura.checked_sub(ancla_altura)?.checked_sub(1)?).ok()?;
+    lote.get(idx).copied()
 }
 
 #[cfg(test)]
@@ -372,22 +413,71 @@ mod tests {
         }
     }
 
-    /// **Sin ancestros no se juzga, y no se castiga.**
+    /// **El ataque que se coló en la primera versión: mentir sobre la altura.**
     ///
-    /// Una cabecera a una altura alta cuya ventana no tenemos no es un ataque: es que nos faltan
-    /// datos. Tratarlo como mala fe desconectaría a peers honestos durante la descarga inicial.
+    /// Una cabecera que cuelga de la punta real de una cadena con dificultad acumulada, pero que
+    /// **declara altura 1**. Con `cab.height` como fuente, caía en la rama de arranque de
+    /// C-DIFF-02 y solo se le exigía `TARGET_INICIAL` — la dificultad del día uno de la red, que
+    /// se mina en segundos.
+    ///
+    /// Era peor que no comprobar la dificultad, porque el módulo afirmaba haberla comprobado. Lo
+    /// encontró una auditoría adversarial el mismo día en que se escribió.
     #[test]
-    fn sin_ventana_no_es_mala_fe() {
+    fn una_cabecera_que_miente_sobre_su_altura() {
         let c = Cadena::nueva(Red::Testnet).unwrap();
-        let bits = CompactBits::codificar(target_inicial(&c).unwrap()).to_u32();
-        let suelta = cab(10_000, c.genesis(), bits);
+        // 150 bloques a dificultad DURA: la cadena lleva trabajo real encima.
+        c.extender_sin_validar_solo_para_pruebas(&lote_con(&c, 150, DURO));
+        let punta = c.cabecera_en(150).unwrap();
+        let reloj = i64::try_from(punta.timestamp).unwrap() + 600;
+        let facil = CompactBits::codificar(target_inicial(&c).unwrap()).to_u32();
 
-        let e = comprobar_contexto(&c, &[suelta], 0, RELOJ).expect_err("no se puede calcular");
-        assert_eq!(e, RechazoCabeceras::VentanaIncompleta);
+        let mut mentirosa = cab(1, punta.block_hash(), facil);
+        mentirosa.timestamp = punta.timestamp + 60;
+        mentirosa.consensus_branch_id = rama_activa(Red::Testnet, 151).unwrap();
+
+        let e = comprobar_contexto(&c, &[mentirosa], 150, reloj)
+            .expect_err("declarar altura 1 colgando de la 150 MUST rechazarse");
+        assert_eq!(e, RechazoCabeceras::AlturaMentida);
         assert!(
-            !e.es_mala_fe(),
-            "faltarnos ancestros es limitación nuestra, no culpa del peer"
+            e.es_mala_fe(),
+            "no hay forma inocente de equivocarse en esto"
         );
+
+        // Y con la altura honesta, esos mismos `bits` ya no valen: se le exige lo que LWMA dice.
+        let mut honesta = cab(151, punta.block_hash(), facil);
+        honesta.timestamp = punta.timestamp + 60;
+        assert_eq!(
+            comprobar_contexto(&c, &[honesta], 150, reloj),
+            Err(RechazoCabeceras::DificultadIncorrecta),
+            "con la altura real, la dificultad del día uno no cuela"
+        );
+    }
+
+    /// **Toda cabecera del lote tiene que declarar su posición, no solo la primera.**
+    #[test]
+    fn la_altura_se_comprueba_en_todo_el_lote() {
+        let c = Cadena::nueva(Red::Testnet).unwrap();
+        let mut l = lote(&c, 4);
+        // La tercera se salta un número.
+        l.get_mut(2).unwrap().height = 7;
+        assert_eq!(
+            comprobar_contexto(&c, &l, 0, RELOJ),
+            Err(RechazoCabeceras::AlturaMentida)
+        );
+    }
+
+    /// **Un fallo nuestro no puede parecer un ataque ajeno.**
+    ///
+    /// `VentanaIncompleta` y `FalloInterno` describen que **nosotros** no pudimos juzgar. Tratarlos
+    /// como mala fe desconectaría a peers honestos por un problema de esta máquina — y si el
+    /// problema fuera la tabla de ramas, todos los peers parecerían mentir a la vez y el nodo se
+    /// aislaría de la red entera creyendo que la atacan.
+    #[test]
+    fn los_fallos_propios_no_son_mala_fe() {
+        assert!(!RechazoCabeceras::VentanaIncompleta.es_mala_fe());
+        assert!(!RechazoCabeceras::FalloInterno.es_mala_fe());
+        assert!(!RechazoCabeceras::TimestampFuturo.es_mala_fe());
+        assert!(!RechazoCabeceras::TrabajoInsuficiente.es_mala_fe());
     }
 
     /// **La ventana de una bifurcación sale de la rama candidata, no de nuestra punta.**
