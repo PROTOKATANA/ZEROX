@@ -181,8 +181,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // tuviera entre manos. Abortarlo sin más podría cortarlo a mitad de una escritura.
     drop(manejo);
     match tokio::time::timeout(Duration::from_secs(10), bucle).await {
-        Ok(_) => tracing::info!("apagado limpio"),
+        Ok(_) => tracing::info!("bucle de red detenido"),
         Err(_) => tracing::warn!("el bucle no terminó en 10 s; se abandona"),
+    }
+
+    // Y AHORA se fuerza el volcado a disco, con la red ya parada para que nada escriba después.
+    //
+    // C-STORE-10 dice que no se sincroniza en cada bloque: perder los últimos bloques enteros tras
+    // un corte de corriente es recuperable resincronizando. Pero un apagado **deliberado** es otra
+    // cosa: aquí el volcado es gratis —ocurre una vez— y convierte "pierdes los últimos bloques"
+    // en "no pierdes nada". No hacerlo era desperdiciar la única ocasión en que sale de balde.
+    if let Err(e) = cadena.almacen().sincronizar() {
+        tracing::error!(%e, "no se pudo volcar el almacén a disco");
+    } else {
+        tracing::info!("apagado limpio");
     }
 
     Ok(())

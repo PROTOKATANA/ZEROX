@@ -7,8 +7,13 @@
 # era la llamada.
 #
 # Este guardián busca funciones públicas de `zx-consensus` que:
-#   1. no llama nadie desde los crates de arriba (zx-node, zx-mempool, zx-p2p, zx-storage), Y
-#   2. tampoco las llama nadie dentro de `zx-consensus` — es decir, no son auxiliares internas.
+#   1. no llama nadie desde los crates de arriba, Y
+#   2. tampoco las llama nadie dentro de su propio crate — es decir, no son auxiliares internas.
+#
+# ⚠️ Vigila `zx-consensus` Y `zx-storage`. Al principio solo miraba el primero, y el mismo día en que
+# se escribió el guardián se añadió a `zx-storage` un método público —`aplicar_lote`— que no llamaba
+# nadie: el guardián construido para detectar exactamente eso no lo vio, porque el código muerto
+# estaba en el crate que no miraba. Si mañana `zx-mempool` gana superficie pública, va en la lista.
 #
 # Eso las deja en un solo sitio: puntos de entrada que nadie usa. Cada uno es o un hueco o una
 # decisión consciente, y las conscientes van en `ci/consenso-pendiente.txt` con su motivo.
@@ -20,22 +25,40 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-CONSUMIDORES=(crates/zx-node/src crates/zx-mempool/src crates/zx-p2p/src crates/zx-storage/src)
+VIGILADOS=(zx-consensus zx-storage)
 PENDIENTE=ci/consenso-pendiente.txt
 huerfanas=()
 
-for archivo in crates/zx-consensus/src/*.rs; do
-  modulo=$(basename "$archivo" .rs)
-  while read -r f; do
-    [ -z "$f" ] && continue
-    # ¿La llama alguien de arriba?
-    if grep -rqE "\b$f\s*\(" "${CONSUMIDORES[@]}" 2>/dev/null; then continue; fi
-    # ¿La llama alguien dentro de zx-consensus, fuera de su propia definición?
-    usos=$(grep -rhoE "\b$f\s*\(" crates/zx-consensus/src 2>/dev/null | wc -l)
-    defs=$(grep -rhoE "fn\s+$f\s*\(" crates/zx-consensus/src 2>/dev/null | wc -l)
-    if [ "$usos" -gt "$defs" ]; then continue; fi
-    huerfanas+=("$modulo::$f")
-  done < <(grep -oP '^pub (const )?(async )?fn \K\w+' "$archivo" 2>/dev/null)
+for crate in "${VIGILADOS[@]}"; do
+  # Los consumidores de un crate son todos los demás, él mismo excluido.
+  consumidores=()
+  for otro in zx-core zx-consensus zx-storage zx-mempool zx-p2p zx-node; do
+    [ "$otro" = "$crate" ] && continue
+    [ -d "crates/$otro/src" ] && consumidores+=("crates/$otro/src")
+  done
+
+  for archivo in "crates/$crate"/src/*.rs; do
+    [ -e "$archivo" ] || continue
+    modulo=$(basename "$archivo" .rs)
+    while read -r f; do
+      [ -z "$f" ] && continue
+      # ¿La llama alguien de fuera del crate?
+      if grep -rqE "\b$f\s*\(" "${consumidores[@]}" 2>/dev/null; then continue; fi
+      # ¿La llama alguien dentro del propio crate, fuera de su definición?
+      usos=$(grep -rhoE "\b$f\s*\(" "crates/$crate/src" 2>/dev/null | wc -l)
+      defs=$(grep -rhoE "fn\s+$f\s*\(" "crates/$crate/src" 2>/dev/null | wc -l)
+      if [ "$usos" -gt "$defs" ]; then continue; fi
+      huerfanas+=("$crate::$modulo::$f")
+    done < <({
+        # Funciones libres y métodos inherentes públicos.
+        grep -oP '^\s*pub (const )?(async )?fn \K\w+' "$archivo" 2>/dev/null
+        # Y los métodos declarados en un trait, que NO llevan `pub` y por eso se escapaban: se
+        # reconocen porque la declaración termina en `;` en vez de abrir cuerpo. Un trait público
+        # es API pública igual que una función libre — y esto lo aprendimos por las malas, con
+        # `aplicar_lote` invisible para su propio guardián.
+        grep -oP '^\s*fn \K\w+(?=.*;\s*$)' "$archivo" 2>/dev/null
+      } | sort -u)
+  done
 done
 
 no_declaradas=()
@@ -69,4 +92,4 @@ if [ "${#obsoletas[@]}" -gt 0 ]; then
   exit 1
 fi
 
-echo "Alcance de consenso: todo punto de entrada o se usa, o está declarado. OK"
+echo "Alcance: ${#VIGILADOS[@]} crates vigilados, todo punto de entrada se usa o está declarado. OK"

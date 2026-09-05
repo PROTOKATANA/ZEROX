@@ -13,9 +13,9 @@
 # —hay un TODO(sincronizador) en crates/zx-node/src/cadena.rs señalándolo—. Hasta entonces el nodo
 # valida cabeceras (C-NET-22) y comprueba que cada cuerpo sea el de la suya (C-NET-23), que es la
 # barrera anterior y no necesita estado. Se cierra en la Fase 6.
-bloque::validar_bloque
+zx-consensus::bloque::validar_bloque
 
 # El timestamp que un minero debe poner en la cabecera que construye. Lo consume el minero, que
 # todavía no existe: zx-miner es la Fase 8. El nodo no lo necesita — el nodo COMPRUEBA timestamps
 # ajenos (C-TS-01, C-TS-03, ya cableado), no elige el suyo.
-timestamps::timestamp_del_minero
+zx-consensus::timestamps::timestamp_del_minero

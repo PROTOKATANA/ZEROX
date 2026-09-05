@@ -41,9 +41,6 @@ R-NET-02
 
 # Finalización a profundidad MAX_REORG_LENGTH; el disco nunca revierte.
 C-STORE-06
-# Ningún índice derivado por delante de la punta finalizada. Hoy no hay ningún índice derivado, así
-# que la regla no tiene sujeto todavía — se cierra cuando lo haya.
-C-STORE-08
 
 # ── Fases que no han llegado ──────────────────────────────────────────────────────────────────
 

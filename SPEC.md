@@ -2148,10 +2148,18 @@ una ventana en la que un componente va por delante de otro.
 > suelta, fuera del lote de `guardar_cabecera`. Es recuperable —C-STORE-01 pone la punta después del
 > dato, así que lo que sobra se ignora— pero deja de serlo en cuanto el UTXO set entra en juego.
 
-**C-STORE-08 · Ningún índice derivado MAY ir por delante de la punta finalizada.** Cualquier
-estructura que se derive del UTXO set —índices por dirección, estadísticas, lo que sea— **MUST**
-persistirse en el mismo lote que la punta que la produjo, nunca en uno propio y más frecuente.
+**C-STORE-08 · Ninguna estructura derivada MAY ir por delante del estado del que se deriva.**
+Cualquier cosa reconstruible a partir de la cadena o del UTXO set —el índice de cabeceras en
+memoria, índices por dirección, estadísticas, lo que sea— **MUST** actualizarse **después** de que
+el estado del que depende esté escrito, nunca antes y nunca en un lote propio más frecuente.
 
+Quedarse **por detrás** es recuperable: se reconstruye. Ir por delante, no — describe un estado que
+no existe.
+
+> **Aplica ya, no en el futuro.** La estructura derivada que existe hoy es el índice de cabeceras
+> en memoria de `Cadena`, y el orden correcto es escribir el lote primero y tocar el índice solo si
+> la escritura salió bien. Hacerlo al revés dejaría la memoria diciendo una altura y el disco otra.
+>
 > Es un fallo de **2025**, no histórico: `bitcoin#33208`. Cita del arreglo, `#33212`: *"The committed
 > state of an index should never be ahead of the flushed chainstate. Otherwise, in the case of an
 > unclean shutdown, the blocks necessary to revert from the prematurely committed state are not

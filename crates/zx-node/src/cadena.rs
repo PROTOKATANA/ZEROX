@@ -224,16 +224,7 @@ impl Cadena {
     #[doc(hidden)]
     pub fn extender_sin_validar_solo_para_pruebas(&self, nuevas: &[BlockHeader]) {
         let mut i = escribir(&self.cabeceras);
-        for c in nuevas {
-            let _ = self.almacen.guardar_cabecera(c);
-            i.empujar(*c);
-        }
-        if let Some((h, c)) = i.punta() {
-            let _ = self.almacen.fijar_punta(Punta {
-                hash: h,
-                altura: c.height,
-            });
-        }
+        persistir_y_empujar(&self.almacen, &mut i, nuevas);
     }
 
     /// La cabecera que tenemos a una altura concreta, si la tenemos.
@@ -385,30 +376,18 @@ impl Cadena {
             }
         }
 
-        let mut aplicadas = 0usize;
-        let mut ultima = None;
+        // Se decide qué encadena ANTES de escribir nada: la escritura es una sola (C-STORE-07) y
+        // tiene que saber ya cuál es su punta.
+        let mut esperado = idx.punta().map(|(h, _)| h);
+        let mut aceptadas: Vec<BlockHeader> = Vec::with_capacity(nuevas.len());
         for c in nuevas {
-            if idx.punta().map(|(h, _)| h) != Some(c.prev_hash) {
+            if esperado != Some(c.prev_hash) {
                 break;
             }
-            // C-STORE-01 · el dato primero, la punta al final.
-            if let Err(e) = self.almacen.guardar_cabecera(c) {
-                tracing::error!(%e, altura = c.height, "no se pudo guardar la cabecera");
-                break;
-            }
-            idx.empujar(*c);
-            ultima = Some(*c);
-            aplicadas += 1;
+            esperado = Some(c.block_hash());
+            aceptadas.push(*c);
         }
-
-        if let Some(c) = ultima
-            && let Err(e) = self.almacen.fijar_punta(Punta {
-                hash: c.block_hash(),
-                altura: c.height,
-            })
-        {
-            tracing::error!(%e, "no se pudo fijar la punta");
-        }
+        let aplicadas = persistir_y_empujar(&self.almacen, &mut idx, &aceptadas);
 
         Ok(if profundidad == 0 {
             Adopcion::Extendida { aplicadas }
@@ -440,36 +419,21 @@ impl Cadena {
     /// `main.rs`, y esa es hoy la diferencia entre un hueco conocido y un bucle infinito.
     pub fn extender(&self, nuevas: &[BlockHeader]) -> usize {
         let mut i = escribir(&self.cabeceras);
-        let mut n = 0;
-        let mut ultima = None;
 
+        // Igual que en `adoptar`: primero se decide el lote entero, después se escribe una vez.
+        // Ojo, aquí las que no encadenan se SALTAN y no cortan —llegar tarde con cabeceras que ya
+        // teníamos es normal— pero en cuanto una encadena, las siguientes cuelgan de ella.
+        let mut esperado = i.punta().map(|(h, _)| h);
+        let mut aceptadas: Vec<BlockHeader> = Vec::with_capacity(nuevas.len());
         for c in nuevas {
-            let punta = i.punta().map(|(h, _)| h);
-            if punta != Some(c.prev_hash) {
+            if esperado != Some(c.prev_hash) {
                 continue;
             }
-            // C-STORE-01 · **el dato primero, la punta al final.** Si el proceso muere aquí, sobra
-            // una cabecera que la punta no menciona: recuperable. Al revés sería corrupción.
-            if let Err(e) = self.almacen.guardar_cabecera(c) {
-                tracing::error!(%e, altura = c.height, "no se pudo guardar la cabecera");
-                break;
-            }
-            i.empujar(*c);
-            ultima = Some(*c);
-            n += 1;
+            esperado = Some(c.block_hash());
+            aceptadas.push(*c);
         }
 
-        // La punta, una sola vez y al final: mover el tip por cada cabecera sería N escrituras
-        // donde basta una, y ninguna de las intermedias aporta nada.
-        if let Some(c) = ultima
-            && let Err(e) = self.almacen.fijar_punta(Punta {
-                hash: c.block_hash(),
-                altura: c.height,
-            })
-        {
-            tracing::error!(%e, "no se pudo fijar la punta");
-        }
-        n
+        persistir_y_empujar(&self.almacen, &mut i, &aceptadas)
     }
 
     /// Guarda el cuerpo de un bloque, **después de comprobar que es el de su cabecera**.
@@ -586,6 +550,56 @@ impl Cadena {
         }
         v
     }
+}
+
+/// Escribe un lote en el almacén y, **solo si eso sale bien**, lo aplica al índice en memoria
+/// (C-STORE-07, C-STORE-08).
+///
+/// # El orden importa, y es al revés de lo que era
+///
+/// Antes cada ruta escribía la cabecera dentro del bucle y empujaba al índice después. Con
+/// C-STORE-07 la escritura es **una sola** para todo el lote, y eso obliga a decidir qué pasa si
+/// falla: si el índice ya estuviera actualizado, la memoria iría por delante del disco, que es
+/// exactamente lo que C-STORE-08 prohíbe entre dos componentes del estado.
+///
+/// Así que primero el disco y luego la memoria. Si la escritura falla, no se ha tocado nada y el
+/// nodo sigue coherente consigo mismo — más atrasado de lo que podría, que es recuperable.
+///
+/// Devuelve cuántas se aplicaron: cero si el almacén falló.
+fn persistir_y_empujar(
+    almacen: &Arc<dyn AlmacenCadena>,
+    idx: &mut Indice,
+    aceptadas: &[BlockHeader],
+) -> usize {
+    let Some(ultima) = aceptadas.last() else {
+        return 0;
+    };
+    let punta = Punta {
+        hash: ultima.block_hash(),
+        altura: ultima.height,
+    };
+
+    // C-STORE-07 · una operación lógica, una escritura.
+    if let Err(e) = almacen.aplicar_lote(aceptadas, punta) {
+        tracing::error!(%e, n = aceptadas.len(), "no se pudo aplicar el lote; no se toca el índice");
+        return 0;
+    }
+
+    let mut n = 0;
+    for c in aceptadas {
+        // No puede fallar: quien llama ya comprobó que encadenan y que su altura es su posición.
+        // Si fallara aun así, parar aquí deja el índice por DETRÁS del disco, que es el lado
+        // recuperable de la incoherencia.
+        if !idx.empujar(*c) {
+            tracing::error!(
+                altura = c.height,
+                "el índice rechazó una cabecera ya escrita"
+            );
+            break;
+        }
+        n += 1;
+    }
+    n
 }
 
 /// Por qué un cuerpo puede no ser el de su cabecera.
@@ -1251,6 +1265,105 @@ mod tests {
         // No hay bloques tras el génesis todavía, así que la lista es vacía; lo que importa es que
         // el camino de "sí te reconozco" se recorre sin error.
         assert!(c.cabeceras_desde(&[c.genesis()], None).is_empty());
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
+mod tests_atomicidad {
+    use super::{Cadena, Punta};
+    use std::sync::Arc;
+    use zx_core::digest::BlockHash;
+    use zx_core::preimage::block::BlockHeader;
+    use zx_core::red::Red;
+    use zx_storage::almacen::AlmacenCadena;
+    use zx_storage::{AlmacenEnMemoria, StorageError};
+
+    /// Un almacén que hace todo bien menos escribir lotes.
+    ///
+    /// Existe para probar la única propiedad que `persistir_y_empujar` promete y que ningún test de
+    /// camino feliz puede demostrar: **si el disco falla, la memoria no avanza.**
+    #[derive(Debug)]
+    struct AlmacenQueFallaAlEscribir(AlmacenEnMemoria);
+
+    impl AlmacenCadena for AlmacenQueFallaAlEscribir {
+        fn guardar_cabecera(&self, c: &BlockHeader) -> Result<(), StorageError> {
+            self.0.guardar_cabecera(c)
+        }
+        fn cabecera(&self, h: &BlockHash) -> Result<Option<BlockHeader>, StorageError> {
+            self.0.cabecera(h)
+        }
+        fn hash_en_altura(&self, a: u32) -> Result<Option<BlockHash>, StorageError> {
+            self.0.hash_en_altura(a)
+        }
+        fn guardar_cuerpo(&self, h: &BlockHash, b: &[u8]) -> Result<(), StorageError> {
+            self.0.guardar_cuerpo(h, b)
+        }
+        fn cuerpo(&self, h: &BlockHash) -> Result<Option<Vec<u8>>, StorageError> {
+            self.0.cuerpo(h)
+        }
+        fn tiene_cuerpo(&self, h: &BlockHash) -> Result<bool, StorageError> {
+            self.0.tiene_cuerpo(h)
+        }
+        fn punta(&self) -> Result<Option<Punta>, StorageError> {
+            self.0.punta()
+        }
+        fn fijar_punta(&self, p: Punta) -> Result<(), StorageError> {
+            self.0.fijar_punta(p)
+        }
+        fn sincronizar(&self) -> Result<(), StorageError> {
+            self.0.sincronizar()
+        }
+
+        fn aplicar_lote(&self, _: &[BlockHeader], _: Punta) -> Result<(), StorageError> {
+            Err(StorageError::Backend("disco lleno, por ejemplo".to_owned()))
+        }
+    }
+
+    /// **Si el almacén falla, el índice no se toca** (C-STORE-07, C-STORE-08).
+    ///
+    /// La versión anterior de este camino escribía cada cabecera dentro del bucle y empujaba al
+    /// índice después. Al pasar a una sola escritura por lote hubo que decidir el orden, y el orden
+    /// correcto es disco primero: si se hiciera al revés, un fallo de escritura dejaría la memoria
+    /// diciendo una altura y el disco otra — un componente del estado por delante del otro, que es
+    /// justo lo que corrompió los índices de Bitcoin tras un apagado sucio (`bitcoin#33208`, 2025).
+    ///
+    /// Quedarse **atrás** es recuperable: el nodo resincroniza. Ir por delante, no.
+    #[test]
+    fn si_el_almacen_falla_la_memoria_no_avanza() {
+        let almacen = Arc::new(AlmacenQueFallaAlEscribir(AlmacenEnMemoria::nuevo()));
+        let c = Cadena::con_almacen(Red::Testnet, almacen).expect("génesis");
+        assert_eq!(c.altura(), 0, "arranca en el génesis");
+
+        let cabeceras = encadenadas(&c, 5);
+        let n = c.extender(&cabeceras);
+
+        assert_eq!(n, 0, "no se aplica ninguna si el almacén no las acepta");
+        assert_eq!(c.altura(), 0, "y la altura en memoria NO avanza");
+        use zx_p2p::entrante::ManejadorEntrante;
+        assert_eq!(c.estado().tip, c.genesis(), "la punta sigue en el génesis");
+    }
+
+    /// Cabeceras encadenadas tras el génesis, con altura = posición (C-NET-22a).
+    fn encadenadas(c: &Cadena, n: u32) -> Vec<BlockHeader> {
+        use zx_consensus::activacion::rama_activa;
+        use zx_core::digest::{Digest, MerkleRoot};
+        let mut v = Vec::new();
+        let mut prev = c.genesis();
+        for i in 1..=n {
+            let h = BlockHeader {
+                consensus_branch_id: rama_activa(Red::Testnet, i).expect("rama"),
+                prev_hash: prev,
+                merkle_root: MerkleRoot::from_digest(Digest::from_bytes([i as u8; 32])),
+                timestamp: 1_788_480_000 + u64::from(i) * 120,
+                bits: 0x1d00_ffff,
+                nonce: u64::from(i),
+                height: i,
+            };
+            prev = h.block_hash();
+            v.push(h);
+        }
+        v
     }
 }
 
