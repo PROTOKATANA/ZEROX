@@ -32,6 +32,7 @@ use libp2p::request_response;
 
 use crate::limites;
 use crate::mensaje::{BloqueRed, Estado, Peticion, Respuesta};
+use crate::presupuesto::Presupuesto;
 use zx_core::digest::{BlockHash, Digest};
 use zx_core::encoding::{compact_size, int};
 use zx_core::error::EncodingError;
@@ -45,8 +46,30 @@ use zx_core::wire;
 pub const MAX_LOCATOR: usize = 64;
 
 /// El códec de ZEROX para `request-response`.
-#[derive(Clone, Copy, Default, Debug)]
-pub struct ZxCodec;
+///
+/// Lleva el [`Presupuesto`] porque **es aquí donde se reserva la memoria**. Ponerlo más arriba
+/// significaría contabilizar después de haber leído, que es contabilizar tarde.
+#[derive(Clone, Default, Debug)]
+pub struct ZxCodec {
+    presupuesto: Presupuesto,
+}
+
+impl ZxCodec {
+    /// Uno que comparte presupuesto con los demás.
+    ///
+    /// **Comparten el contador a propósito**: el recurso que se agota es global, así que repartirlo
+    /// por conexión no acotaría la suma. Ver [`crate::presupuesto`].
+    #[must_use]
+    pub fn con_presupuesto(presupuesto: Presupuesto) -> Self {
+        Self { presupuesto }
+    }
+
+    /// El presupuesto que usa.
+    #[must_use]
+    pub const fn presupuesto(&self) -> &Presupuesto {
+        &self.presupuesto
+    }
+}
 
 #[async_trait]
 impl request_response::Codec for ZxCodec {
@@ -58,7 +81,7 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let bytes = leer_acotado(io, limites::MAX_PETICION_BYTES).await?;
+        let bytes = leer_acotado(io, limites::MAX_PETICION_BYTES, &self.presupuesto).await?;
         peticion_desde_bytes(&bytes).map_err(a_io)
     }
 
@@ -66,7 +89,7 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let bytes = leer_acotado(io, limites::MAX_RESPUESTA_BYTES).await?;
+        let bytes = leer_acotado(io, limites::MAX_RESPUESTA_BYTES, &self.presupuesto).await?;
         respuesta_desde_bytes(&bytes).map_err(a_io)
     }
 
@@ -118,10 +141,20 @@ impl request_response::Codec for ZxCodec {
 /// Se pide `max + 1`: si llegan `max + 1`, es que había más de lo permitido y se rechaza como
 /// exceso. Con `take(max)` a secas, el mismo caso llegaría al parser como datos corruptos, y el
 /// peer se clasificaría como `Ilegible` en vez de `Excedido` (C-NET-05).
-async fn leer_acotado<T>(io: &mut T, max: u64) -> io::Result<Vec<u8>>
+async fn leer_acotado<T>(io: &mut T, max: u64, p: &Presupuesto) -> io::Result<Vec<u8>>
 where
     T: AsyncRead + Unpin + Send,
 {
+    // C-NET-21 · **reservar ANTES de leer.** Reservar después de haber leído contabilizaría memoria
+    // que ya está ocupada: el techo no acotaría nada, solo llevaría la cuenta del desastre.
+    let cupo = usize::try_from(max.saturating_add(1)).unwrap_or(usize::MAX);
+    let _reserva = p.reservar(cupo).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::OutOfMemory,
+            "C-NET-21: no queda presupuesto de memoria en vuelo",
+        )
+    })?;
+
     let mut buf = Vec::new();
     io.take(max.saturating_add(1)).read_to_end(&mut buf).await?;
 
@@ -132,6 +165,7 @@ where
         ));
     }
     Ok(buf)
+    // `_reserva` se suelta aquí y devuelve el cupo — también por los `?` de arriba.
 }
 
 fn a_io(e: EncodingError) -> io::Error {
@@ -490,7 +524,7 @@ mod tests {
     async fn el_codec_da_la_vuelta_por_un_stream() {
         for p in todas_las_peticiones() {
             let (mut a, mut b) = Endpoint::pair(4096, 4096);
-            let mut codec = ZxCodec;
+            let mut codec = ZxCodec::default();
 
             codec
                 .write_request(&proto(), &mut a, p.clone())
@@ -504,7 +538,7 @@ mod tests {
 
         for r in todas_las_respuestas() {
             let (mut a, mut b) = Endpoint::pair(65_536, 65_536);
-            let mut codec = ZxCodec;
+            let mut codec = ZxCodec::default();
 
             codec
                 .write_response(&proto(), &mut a, r.clone())
@@ -537,7 +571,7 @@ mod tests {
         a.write_all(&basura).await.unwrap();
         a.close().await.unwrap();
 
-        let e = ZxCodec
+        let e = ZxCodec::default()
             .read_request(&proto(), &mut b)
             .await
             .expect_err("MUST rechazarse");
@@ -546,6 +580,60 @@ mod tests {
             e.to_string().contains("C-NET-11"),
             "el error debe decir que es por tamaño, no por parseo: {e}"
         );
+    }
+
+    /// **C-NET-21 · sin presupuesto, no se lee.**
+    ///
+    /// Es la defensa que el `.take(MAX)` por petición no da: aquel acota **una** lectura, este
+    /// acota la **suma**. Sin él, `12,8 MB × 8 streams × 72 peers` son 7,2 GB reservables por
+    /// peticiones que un atacante emite gratis.
+    #[tokio::test]
+    async fn sin_presupuesto_la_lectura_se_rechaza() {
+        use crate::presupuesto::Presupuesto;
+
+        // Un presupuesto ridículo: no cabe ni una petición.
+        let p = Presupuesto::nuevo(10);
+        let mut codec = ZxCodec::con_presupuesto(p.clone());
+
+        let (mut a, mut b) = Endpoint::pair(4096, 4096);
+        let bytes = peticion_a_bytes(&Peticion::Estado);
+        futures::AsyncWriteExt::write_all(&mut a, &bytes)
+            .await
+            .unwrap();
+        a.close().await.unwrap();
+
+        let e = codec
+            .read_request(&proto(), &mut b)
+            .await
+            .expect_err("MUST rechazarse por presupuesto");
+        assert_eq!(e.kind(), std::io::ErrorKind::OutOfMemory);
+        assert!(e.to_string().contains("C-NET-21"), "{e}");
+
+        // Y la reserva se devolvió: el rechazo no deja el contador tocado.
+        assert_eq!(p.en_vuelo(), 0);
+    }
+
+    /// **La reserva se devuelve tras una lectura correcta.**
+    ///
+    /// Sin esto, el presupuesto se agotaría solo con tráfico legítimo — un DoS diferido que se
+    /// dispara sin que esté pasando nada.
+    #[tokio::test]
+    async fn una_lectura_correcta_devuelve_su_reserva() {
+        use crate::presupuesto::Presupuesto;
+
+        let p = Presupuesto::nuevo(crate::presupuesto::PRESUPUESTO_BYTES);
+        let mut codec = ZxCodec::con_presupuesto(p.clone());
+
+        for _ in 0..50 {
+            let (mut a, mut b) = Endpoint::pair(4096, 4096);
+            codec
+                .write_request(&proto(), &mut a, Peticion::Estado)
+                .await
+                .unwrap();
+            a.close().await.unwrap();
+            codec.read_request(&proto(), &mut b).await.unwrap();
+            assert_eq!(p.en_vuelo(), 0, "cada lectura devuelve lo suyo");
+        }
     }
 
     /// **El contador mentiroso, el ataque más barato.**

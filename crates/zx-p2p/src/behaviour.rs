@@ -32,6 +32,7 @@ use zx_core::red::Red;
 
 use crate::codec::ZxCodec;
 use crate::limites_ip::LimitesPorIp;
+use crate::presupuesto::Presupuesto;
 
 use crate::config::ParametrosRed;
 use crate::error::P2pError;
@@ -148,6 +149,19 @@ impl ZxBehaviour {
         p: ParametrosRed,
         limite_bloque: u64,
     ) -> Result<Self, P2pError> {
+        Self::con_presupuesto(clave, p, limite_bloque, Presupuesto::default())
+    }
+
+    /// Igual, pero con un presupuesto de memoria concreto. Para tests que quieran agotarlo.
+    ///
+    /// # Errores
+    /// Las de [`Self::nueva`].
+    pub fn con_presupuesto(
+        clave: &identity::Keypair,
+        p: ParametrosRed,
+        limite_bloque: u64,
+        presupuesto: Presupuesto,
+    ) -> Result<Self, P2pError> {
         let peer_id = clave.public().to_peer_id();
 
         // ── C-NET-11 · límites de conexión. El default es `None` en todos los campos. ──
@@ -197,7 +211,7 @@ impl ZxBehaviour {
         let proto_sync = StreamProtocol::try_from_owned(p.protocolo_sync().to_owned())
             .map_err(|_| P2pError::Configuracion("nombre de protocolo de sync inválido"))?;
         let sync = request_response::Behaviour::with_codec(
-            ZxCodec,
+            ZxCodec::con_presupuesto(presupuesto),
             [(proto_sync, request_response::ProtocolSupport::Full)],
             request_response::Config::default()
                 // El default son 10 s. Un lote de bloques por un enlace lento no cabe en 10 s, y un

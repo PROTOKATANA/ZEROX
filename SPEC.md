@@ -2376,6 +2376,34 @@ IPv4 se agrupa por **/24** e IPv6 por **/64**.
 > Y sigue valiendo C-NET-05: **solo la violación de consenso puntúa.** Lento, ilegible o excedido,
 > no.
 
+**C-NET-21 · Presupuesto AGREGADO de memoria en vuelo.** Toda lectura de red **MUST** reservar su
+cupo de un contador **compartido** antes de leer, y **MUST** devolverlo al terminar. Techo:
+`PRESUPUESTO_BYTES = 256 MiB`.
+
+> **El límite por petición no acota el producto.** Cada lectura del códec está acotada por
+> `.take(MAX)`, y eso no basta:
+>
+> ```
+> MAX_RESPUESTA_BYTES (12,8 MB) × MAX_STREAMS_SYNC (8) × MAX_PEERS_ENTRANTES (72) = 7,2 GB
+> ```
+>
+> Bajar los streams concurrentes de 100 a 8 quitó un orden de magnitud y dejó el problema: siete
+> gigabytes reservables por peticiones que un atacante emite gratis siguen siendo un OOM.
+>
+> **Por qué un contador global y no más límites por peer.** Porque el recurso que se agota es
+> global. Repartirlo por peer obliga a elegir entre dos males: o el reparto es generoso y la suma
+> sigue sin acotar, o es estrecho y un nodo con muchos peers honestos se estrangula a sí mismo. Con
+> un presupuesto compartido, **el techo es el techo**.
+>
+> **Se reserva ANTES de leer.** Reservar después contabilizaría memoria ya ocupada: el techo no
+> acotaría nada, solo llevaría la cuenta del desastre.
+>
+> **Y se devuelve al soltarse la reserva**, incluido si el futuro se cancela o quien la tenía entra
+> en pánico. No existe un método para liberar a mano: el único camino es el `Drop`. Un contador que
+> hubiera que decrementar tendría una fuga por cada `return` temprano que alguien no viera, y **una
+> fuga en un contador de presupuesto es un DoS diferido** — el nodo deja de aceptar peticiones sin
+> que esté pasando nada.
+
 **C-NET-12 · Validar antes de retransmitir.** Un bloque o transacción recibido por difusión **MUST**
 validarse contra `zx-consensus` **antes** de reenviarse. Un bloque **huérfano** —cuyo padre aún no se
 conoce— **MUST** descartarse **sin penalizar**, no rechazarse.
@@ -2461,7 +2489,6 @@ debajo**.
 | **P-022** | §16.2 | 🆕 Rediseño del saludo de `sendcmpct` sobre request-response de libp2p: la negociación del BIP depende de orden total entre mensajes, que yamux no da | **D3**, Fase 5 |
 | **P-023** | §16.3 | 🆕 `PeerScoreParams`/`TopicScoreParams` de gossipsub. **No existe precedente**: ninguna cadena PoW con bloques de 100-200 KB cada 120 s usa gossipsub v1.1. Hay que derivarlo y medirlo | **D3** + **D8**, Fase 5 |
 | **P-026** | §16.3 | 🆕 ¿Debe `MotivoDesconexion::Excedido` puntuar? C-NET-05 no examinó este caso: la razón de Zebra para no puntuar es el *mensajero inocente*, y superar un límite de tamaño **sí** es atribuible al emisor. Hoy permite sondear los límites gratis e indefinidamente | **D8** |
-| **P-027** | §16.3 | 🆕 Presupuesto de memoria **agregado**. `MAX_RESPUESTA_BYTES × max_concurrent_streams(100) × peers` da decenas de GB reservables. El `.take(MAX)` por petición no basta: hace falta un contador global en vuelo | **D3** + **D8** |
 | **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB, **y de ahí derivar `D`/`D_low`/`D_high`/`heartbeat`**. Los de Ethereum son para slots de 12 s, no de 120 | **D3** |
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
@@ -2473,6 +2500,7 @@ debajo**.
 | ID | Decisión | Dónde vive |
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-027** | **Presupuesto agregado de 256 MiB**, con reserva antes de leer y devolución por `Drop`. El peor caso baja de 7,2 GB a 256 MiB, sin importar peers ni streams | C-NET-21 |
 | **P-029** | Un `RwLock` envenenado **recupera su contenido** —que es válido— y registra el error. Ni degrada en silencio ni tira un nodo sano | `zx-node::cadena` |
 | **P-028** | **Reorganización de cabeceras**, con `fork_choice` conectado y la parada dura de C-REORG-07 comprobada **antes** de deshacer nada | C-NET-18, C-REORG-07 |
 | **P-025** | **Límites y baneo por prefijo de red** (/24 y /64), en un behaviour propio: `connection_limits` de libp2p no mira la IP y un `PeerId` es gratis | C-NET-20 |
@@ -2495,7 +2523,7 @@ cadena**. Los seis huecos están escritos:
 | §15 · Bloque génesis | C-GEN-01..07 |
 | §2.4 · Serialización de red | C-WIRE-01..07 |
 | §15.1 · Almacenamiento | C-STORE-01..04 |
-| §16 · Parámetros de red | C-NET-01..20 |
+| §16 · Parámetros de red | C-NET-01..21 |
 
 ### Aparcadas — evaluadas, con factura desglosada, NO adoptadas
 
