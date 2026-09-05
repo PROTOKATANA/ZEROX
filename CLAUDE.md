@@ -72,7 +72,7 @@ Hasta entonces se quedan como referencia viva.
 | | Elegido |
 |---|---|
 | Familia | **Autonomys / Proof of Archival Storage** — Rust puro, sin C++ ni GMP |
-| Granjero objetivo | **PC dedicado con disco** |
+| Granjero objetivo | **PC dedicado con SSD** — ⚠️ los discos duros NO sirven, ver §21 |
 | Timelord | **Lo operamos, con diseño abierto** |
 | Pool blindado | **Sí, después de la beta** — sin cambios |
 
