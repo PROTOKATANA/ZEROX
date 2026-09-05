@@ -25,7 +25,7 @@ jobs:
       - run: cargo test --workspace --all-features --locked
 
   alcance:
-    name: Alcance — ¿hay consenso que el nodo no ejecuta?
+    name: Alcance — consenso que nadie ejecuta, reglas que nadie cita
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +35,10 @@ jobs:
       # verde no dice nada de esto, porque los tests de zx-consensus prueban las funciones
       # directamente — que es justo por lo que el hueco sobrevivió tanto.
       - run: ./ci/alcance-consenso.sh
+      # Y la otra mitad: reglas del SPEC que ningún código cita. Encontró tres citas ausentes
+      # sobre código que sí existía, una de ellas porque estaba escrita en rango —`C-BLK-01..03`—
+      # y ninguna búsqueda por número la ve.
+      - run: ./ci/citas-spec.sh
 
   almacen:
     name: Almacén — el backend de disco y su test diferencial

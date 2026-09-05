@@ -1,4 +1,4 @@
-//! Direcciones transparentes en bech32 (SPEC §2.3, C-ENC-06, C-ENC-07).
+//! Direcciones transparentes en bech32 (SPEC §2.3, C-ENC-06, C-ENC-06b, C-ENC-07).
 //!
 //! # Dos decisiones que el SPEC no fijaba, y que importan
 //!
@@ -13,7 +13,9 @@
 //! Hay un test que **demuestra el defecto** en bech32 y su ausencia en bech32m, en vez de dar la
 //! afirmación por buena.
 //!
-//! **2 · Nunca se usa `bech32::decode()`.**
+//! **2 · Nunca se usa `bech32::decode()`** — es C-ENC-06b: el algoritmo de checksum se exige
+//! explícitamente, y una dirección con checksum bech32 (BIP-173) se rechaza aunque el resto esté
+//! bien formado.
 //!
 //! Esa función de conveniencia acepta **cualquiera de los dos checksums**:
 //!

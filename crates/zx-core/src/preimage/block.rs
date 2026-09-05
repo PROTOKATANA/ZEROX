@@ -140,7 +140,14 @@ impl BlockHeader {
 /// Hoja nula con la que se empareja un nodo suelto (C-BLK-03).
 const HOJA_NULA: [u8; 32] = [0u8; 32];
 
-/// Raíz del árbol de Merkle sobre los txid del bloque, en orden de aparición (C-BLK-01..03).
+/// Raíz del árbol de Merkle sobre los txid del bloque, en orden de aparición.
+///
+/// Implementa C-BLK-01 (las hojas son los txid, en orden), C-BLK-02 (los nodos internos son
+/// `H_d("ZZKBlkMerkle____", izq ‖ der)`) y C-BLK-03 (un nodo suelto se empareja con la hoja nula,
+/// nunca se duplica).
+///
+/// Las tres se citan por su número entero y no como `C-BLK-01..03`: un rango no lo encuentra
+/// ninguna búsqueda por número, y la trazabilidad de este proyecto se comprueba buscando.
 ///
 /// # Relleno con nulo, no duplicación
 ///
@@ -175,6 +182,8 @@ pub fn merkle_root(txids: &[TxId]) -> MerkleRoot {
         for par in nivel.chunks(2) {
             let mut w = PreimageWriter::con_capacidad(64);
             match par {
+                // C-BLK-02 · el nodo interno es el digest de la concatenación, con la etiqueta
+                // de dominio del árbol de bloque.
                 [izq, der] => {
                     w.digest(izq).digest(der);
                 }

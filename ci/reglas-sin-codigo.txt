@@ -1,0 +1,46 @@
+# Reglas del SPEC que ningún código cita, y por qué está bien.
+#
+# Las comprueba ci/citas-spec.sh, que falla en las dos direcciones: si aparece una regla sin cita
+# que no esté aquí, y si algo declarado aquí ya se cita. Lo segundo evita que el archivo describa
+# un pasado que ya pasó.
+
+# ── Prohibiciones: dicen qué NO hacer, así que no hay línea que citar ─────────────────────────
+#
+# Citarlas obligaría a inventar un comentario en el sitio donde no está el código que prohíben,
+# y "aquí no hago X" es un comentario que envejece sin que nadie lo note. Lo que sí existe es un
+# test por cada una que comprueba que el criterio prohibido daría un resultado distinto.
+
+# Prohíbe la jump rule de LWMA-2/4, tempering, clamps por bloque, límites de timespan y redondeo.
+C-DIFF-10
+# Prohíbe el criterio de "contar bytes cero a la cabeza" para el PoW.
+C-POW-02
+
+# ── Relé compacto de bloques (BIP 152): investigado, sin implementar ──────────────────────────
+#
+# research/bip152.md tiene el diseño con fuente primaria. Es lo que falta para cerrar la Fase 5
+# junto con el peer scoring. No sube el TPS: reduce huérfanos y reorgs de un bloque.
+C-NET-06
+C-NET-07
+C-NET-08
+C-NET-09
+R-NET-01
+R-NET-02
+
+# ── Fases que no han llegado ──────────────────────────────────────────────────────────────────
+
+# Paridad bit a bit CPU↔GPU. Necesita el kernel del minero, que es la Fase 8. Es la regla que
+# H-001 incumplió: el kernel heredado no pasa ninguno de los 237 vectores CAVP.
+C-HASH-03
+# Altura de activación en el mempool y detección de "he seguido bloques inválidos". Son SHOULD y
+# no hay hard fork que las ejercite: se cierran con la segunda rama de consenso. Es P-030.
+C-UPG-06
+C-UPG-07
+# Declara qué parámetros son ajustables por hard fork. Es una declaración sobre el proceso, no
+# una comprobación que un programa pueda hacer.
+C-UPG-08
+
+# ── Justificaciones de diseño, no comportamiento ──────────────────────────────────────────────
+
+# Explica por qué los mensajes de sincronización se serializan a mano en vez de con Cap'n Proto.
+# El código que resulta de esa decisión es todo crates/zx-core/src/wire.rs, que cita C-WIRE-01..05.
+C-WIRE-06

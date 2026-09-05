@@ -333,7 +333,7 @@ impl Nodo {
     }
 
     /// Pide el siguiente lote de cuerpos que faltan, o concluye la sincronización si no falta
-    /// ninguno.
+    /// ninguno (C-NET-24).
     ///
     /// El lote se acota a [`MAX_BLOQUES_POR_RESPUESTA`], que es lo que la respuesta puede traer:
     /// pedir más significaría que el servidor recorta y que los que sobran se piden otra vez en la

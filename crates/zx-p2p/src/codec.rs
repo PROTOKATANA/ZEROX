@@ -231,8 +231,10 @@ pub fn peticion_desde_bytes(bytes: &[u8]) -> Result<Peticion, EncodingError> {
                     let (h, r) = int::leer_32(r)?;
                     (Some(BlockHash::from_digest(Digest::from_bytes(h))), r)
                 }
-                // Un booleano que no es 0 ni 1 es codificación no canónica: se rechaza en vez de
-                // interpretarse como "cualquier cosa distinta de cero es verdadero".
+                // C-ENC-09 · un booleano que no es 0 ni 1 es una segunda codificación del mismo
+                // valor lógico, y solo se acepta una. Se rechaza en vez de interpretarse como
+                // "cualquier cosa distinta de cero es verdadero": si dos nodos difieren en esa
+                // interpretación, difieren en qué mensajes existen.
                 _ => return Err(truncado("booleano no canónico en `hasta`")),
             };
             (Peticion::Cabeceras { locator, hasta }, r)

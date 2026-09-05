@@ -1,4 +1,4 @@
-//! **El SPEC no puede decir un número que el código contradiga.**
+//! **El SPEC no puede decir un número que el código contradiga** (C-SPEC-01).
 //!
 //! # Por qué existe este archivo
 //!
@@ -69,6 +69,9 @@ fn no_reaparece(viejo: &[&str], que_paso: &str) {
 }
 
 /// Comprueba que el SPEC contiene una afirmación, y explica qué hacer si no.
+///
+/// C-SPEC-01 · toda cifra derivada que el SPEC afirme pasa por aquí o por una comprobación que la
+/// recalcule. Añadir una al documento sin añadir su test es una violación de la regla.
 fn afirma(fragmento: &str, porque: &str) {
     assert!(
         SPEC.contains(fragmento),

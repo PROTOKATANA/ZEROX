@@ -433,7 +433,7 @@ impl Cadena {
     }
 
     /// Los hashes de la cadena cuyo **cuerpo** todavía no tenemos, hasta `max`, de menor altura a
-    /// mayor.
+    /// mayor (C-NET-24).
     ///
     /// De abajo arriba a propósito: la cadena se completa desde el principio, así que un nodo a
     /// medias tiene un prefijo íntegro y un sufijo por descargar, en vez de agujeros repartidos.
