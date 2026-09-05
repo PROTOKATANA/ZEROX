@@ -450,22 +450,17 @@ impl<M: ManejadorEntrante> BucleRed<M> {
 
                 // C-NET-05 + C-NET-20 · solo una violación de consenso puntúa, y puntúa contra el
                 // **prefijo de red**, no contra el `PeerId` — que es gratis de renovar.
-                if motivo.puntua() {
-                    let prefijos: Vec<_> = self
-                        .swarm
-                        .behaviour_mut()
-                        .limites_ip
-                        .prefijos_de(peer)
-                        .into_iter()
-                        .collect();
+                let puntos = motivo.puntos();
+                if puntos > 0 {
+                    let prefijos = self.swarm.behaviour_mut().limites_ip.prefijos_de(peer);
                     for p in prefijos {
-                        if self
-                            .swarm
-                            .behaviour_mut()
-                            .limites_ip
-                            .puntuar(p, crate::limites_ip::PUNTOS_VIOLACION_CONSENSO)
-                        {
-                            tracing::warn!(?p, "prefijo de red baneado por violación de consenso");
+                        if self.swarm.behaviour_mut().limites_ip.puntuar(p, puntos) {
+                            tracing::warn!(
+                                ?p,
+                                ?motivo,
+                                "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
+                                 distintos con motivo Excedido, el nodo desactualizado eres tú."
+                            );
                         }
                     }
                 }

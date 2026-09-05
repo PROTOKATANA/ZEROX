@@ -58,15 +58,51 @@ pub enum MotivoDesconexion {
 }
 
 impl MotivoDesconexion {
-    /// ¿Este motivo cuenta hacia el baneo por IP?
+    /// Cuántos puntos suma este motivo hacia el baneo del prefijo de red (C-NET-05, C-NET-20).
     ///
-    /// **Solo una violación de consenso identificada.** La razón está en el comentario de Zebra
-    /// sobre GHSA-qhr3-cvch-5fh2: *quien te entrega un bloque no es quien eligió su altura*. Un
-    /// peer honesto puede entregarte contenido malo que él no fabricó, y penalizarlo por eso deja
-    /// que un tercero haga que banees a peers honestos.
+    /// # Los tres niveles, y por qué `Excedido` no es como los demás
+    ///
+    /// | Motivo | Puntos | Por qué |
+    /// |---|---|---|
+    /// | `ViolacionDeConsenso` | **100** — baneo de un golpe | Fabricarla cuesta trabajo real: no ocurre por accidente |
+    /// | `Excedido` | **20** — cinco avisos | Es atribuible al emisor, pero admite una explicación inocente |
+    /// | `Lento`, `Ilegible` | **0** | No son atribuibles a mala fe |
+    ///
+    /// **Por qué `Excedido` puntúa, si C-NET-05 dice que solo la violación de consenso lo hace.**
+    /// Porque la razón de C-NET-05 no cubre este caso. Esa razón es la de Zebra sobre
+    /// GHSA-qhr3-cvch-5fh2 —*quien te entrega un bloque no es quien eligió su altura*— y describe
+    /// al **mensajero inocente**: un peer que reenvía contenido que él no fabricó.
+    ///
+    /// Mandar una respuesta de 20 MB cuando el límite pactado son 12,8 **no es reenviar**: es una
+    /// acción del emisor. No hay ambigüedad sobre quién la causó.
+    ///
+    /// # Por qué 20 y no 100
+    ///
+    /// Porque **sí existe una explicación inocente**: un peer con una versión más nueva, cuyos
+    /// límites son mayores porque la cadena creció (C-NET-13). Ahí el desactualizado somos nosotros,
+    /// y banearlo sería exactamente al revés.
+    ///
+    /// Cinco avisos separan los dos casos **solos**, y esa es la parte elegante: como el score va
+    /// por **prefijo de red** (C-NET-20), un desajuste de versión aparece como un `Excedido` desde
+    /// **muchos prefijos distintos** —toda la red es más nueva que nosotros— mientras que sondear
+    /// los límites aparece como muchos **desde el mismo**. La misma señal, leída por prefijo,
+    /// distingue las dos causas sin que nadie tenga que decidirlo.
+    ///
+    /// Y el caso inocente deja además una huella que el operador puede leer: `Excedido` repetido
+    /// desde prefijos distintos significa *"tu nodo se ha quedado viejo"*, no *"te están atacando"*.
+    #[must_use]
+    pub const fn puntos(self) -> u32 {
+        match self {
+            Self::ViolacionDeConsenso => 100,
+            Self::Excedido => 20,
+            Self::Lento | Self::Ilegible => 0,
+        }
+    }
+
+    /// ¿Este motivo cuenta hacia el baneo?
     #[must_use]
     pub const fn puntua(self) -> bool {
-        matches!(self, Self::ViolacionDeConsenso)
+        self.puntos() > 0
     }
 }
 
@@ -74,19 +110,44 @@ impl MotivoDesconexion {
 mod tests {
     use super::MotivoDesconexion;
 
-    /// **C-NET-05.** Lento y malicioso no son lo mismo, y esto lo fija.
+    /// **C-NET-05.** Lento e ilegible **nunca** puntúan.
     ///
-    /// Si alguien hiciera que `Lento` puntuara, un peer con mala conexión acabaría baneado y —peor—
-    /// un atacante podría provocar que baneemos a peers honestos ralentizándolos.
+    /// Si `Lento` puntuara, un peer con mala conexión acabaría baneado — y, peor, un atacante
+    /// podría provocar que baneemos a peers honestos ralentizándolos.
     #[test]
-    fn solo_la_violacion_de_consenso_puntua() {
-        assert!(MotivoDesconexion::ViolacionDeConsenso.puntua());
-        for m in [
-            MotivoDesconexion::Lento,
-            MotivoDesconexion::Ilegible,
-            MotivoDesconexion::Excedido,
-        ] {
-            assert!(!m.puntua(), "{m:?} MUST NOT puntuar hacia el baneo");
+    fn lento_e_ilegible_nunca_puntuan() {
+        for m in [MotivoDesconexion::Lento, MotivoDesconexion::Ilegible] {
+            assert!(!m.puntua(), "{m:?} MUST NOT puntuar");
+            assert_eq!(m.puntos(), 0);
         }
+    }
+
+    /// **Una violación de consenso banea de un golpe.** Fabricarla cuesta trabajo real.
+    #[test]
+    fn la_violacion_de_consenso_banea_de_un_golpe() {
+        assert_eq!(MotivoDesconexion::ViolacionDeConsenso.puntos(), 100);
+    }
+
+    /// **P-026 · `Excedido` puntúa, pero no banea de un golpe.**
+    ///
+    /// Puntúa porque la razón de C-NET-05 para no hacerlo —el mensajero inocente— **no cubre este
+    /// caso**: mandar más bytes de los pactados es una acción del emisor, no un reenvío.
+    ///
+    /// Pero no de un golpe, porque sí hay una explicación inocente: un peer con versión más nueva
+    /// cuyos límites son mayores porque la cadena creció. Cinco avisos separan los dos casos, y el
+    /// score por prefijo lo hace solo — un desajuste de versión llega desde **muchos** prefijos, y
+    /// sondear los límites desde **uno**.
+    #[test]
+    fn excedido_puntua_pero_admite_cinco_avisos() {
+        let e = MotivoDesconexion::Excedido;
+        assert!(e.puntua(), "es atribuible al emisor: MUST puntuar");
+        assert_eq!(e.puntos(), 20);
+
+        // Cinco avisos alcanzan el umbral de baneo; cuatro, no.
+        assert!(e.puntos() * 4 < 100, "cuatro avisos NO banean");
+        assert!(e.puntos() * 5 >= 100, "cinco sí");
+
+        // Y sigue siendo menos grave que una violación de consenso.
+        assert!(e.puntos() < MotivoDesconexion::ViolacionDeConsenso.puntos());
     }
 }

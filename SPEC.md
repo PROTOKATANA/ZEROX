@@ -2373,8 +2373,28 @@ IPv4 se agrupa por **/24** e IPv6 por **/64**.
 > trabajo real: no ocurre por accidente. El registro de baneos está **acotado a 20 000 con desalojo
 > FIFO** — sin la cota, hacer crecer la tabla sería el ataque.
 >
-> Y sigue valiendo C-NET-05: **solo la violación de consenso puntúa.** Lento, ilegible o excedido,
-> no.
+> **Los puntos por motivo** (P-026 cerrada):
+>
+> | Motivo | Puntos | Por qué |
+> |---|---|---|
+> | Violación de consenso | **100** — baneo de un golpe | Fabricarla cuesta trabajo real: no ocurre por accidente |
+> | **Excedido** | **20** — cinco avisos | Atribuible al emisor, pero admite explicación inocente |
+> | Lento, ilegible | **0** | No son atribuibles a mala fe |
+>
+> **Por qué `Excedido` puntúa aunque C-NET-05 diga que solo la violación de consenso lo hace.** La
+> razón de C-NET-05 es la de Zebra sobre GHSA-qhr3-cvch-5fh2 —*quien te entrega un bloque no es
+> quien eligió su altura*— y describe al **mensajero inocente**. Mandar 20 MB cuando el límite son
+> 12,8 **no es reenviar**: es una acción del emisor, sin ambigüedad sobre quién la causó.
+>
+> **Por qué 20 y no 100.** Porque sí existe una explicación inocente: un peer con versión más nueva
+> cuyos límites son mayores porque la cadena creció (C-NET-13). Ahí el desactualizado somos
+> nosotros, y banearlo sería exactamente al revés.
+>
+> **Y los cinco avisos separan los dos casos solos.** Como el score va por **prefijo**, un desajuste
+> de versión aparece como `Excedido` desde **muchos prefijos distintos** —toda la red es más nueva
+> que nosotros— mientras que sondear los límites aparece como muchos **desde el mismo**. La misma
+> señal, leída por prefijo, distingue las dos causas sin que nadie tenga que decidirlo. El log lo
+> dice explícitamente para que el operador lo lea.
 
 **C-NET-21 · Presupuesto AGREGADO de memoria en vuelo.** Toda lectura de red **MUST** reservar su
 cupo de un contador **compartido** antes de leer, y **MUST** devolverlo al terminar. Techo:
@@ -2488,7 +2508,6 @@ debajo**.
 | **P-017** | §15, §16 | Mensaje, timestamp y nonce del génesis (mainnet y testnet) · puerto por defecto | Katana, el día del lanzamiento |
 | **P-022** | §16.2 | 🆕 Rediseño del saludo de `sendcmpct` sobre request-response de libp2p: la negociación del BIP depende de orden total entre mensajes, que yamux no da | **D3**, Fase 5 |
 | **P-023** | §16.3 | 🆕 `PeerScoreParams`/`TopicScoreParams` de gossipsub. **No existe precedente**: ninguna cadena PoW con bloques de 100-200 KB cada 120 s usa gossipsub v1.1. Hay que derivarlo y medirlo | **D3** + **D8**, Fase 5 |
-| **P-026** | §16.3 | 🆕 ¿Debe `MotivoDesconexion::Excedido` puntuar? C-NET-05 no examinó este caso: la razón de Zebra para no puntuar es el *mensajero inocente*, y superar un límite de tamaño **sí** es atribuible al emisor. Hoy permite sondear los límites gratis e indefinidamente | **D8** |
 | **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB, **y de ahí derivar `D`/`D_low`/`D_high`/`heartbeat`**. Los de Ethereum son para slots de 12 s, no de 120 | **D3** |
 | **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
 | **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
@@ -2500,6 +2519,7 @@ debajo**.
 | ID | Decisión | Dónde vive |
 |---|---|---|
 | **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
+| **P-026** | **`Excedido` puntúa 20**, cinco avisos hasta el baneo. Es atribuible al emisor, pero admite una explicación inocente que el score **por prefijo** distingue sola | C-NET-05, C-NET-20 |
 | **P-027** | **Presupuesto agregado de 256 MiB**, con reserva antes de leer y devolución por `Drop`. El peor caso baja de 7,2 GB a 256 MiB, sin importar peers ni streams | C-NET-21 |
 | **P-029** | Un `RwLock` envenenado **recupera su contenido** —que es válido— y registra el error. Ni degrada en silencio ni tira un nodo sano | `zx-node::cadena` |
 | **P-028** | **Reorganización de cabeceras**, con `fork_choice` conectado y la parada dura de C-REORG-07 comprobada **antes** de deshacer nada | C-NET-18, C-REORG-07 |
