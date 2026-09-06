@@ -197,6 +197,54 @@ fn el_spec_dice_los_parametros_reales_de_peso() {
     afirma_ilustrativa("100 KB", "la forma legible de ZONA_LIBRE, para leer el SPEC sin calculadora");
 }
 
+/// El checkpoint firmado (SPEC §12.1, DECISIONES.md §25).
+///
+/// ⚠️ Este test existe por un fallo del 2026-09-05: `UMBRAL_CHECKPOINT` se escribió mil veces bajo
+/// —«3,2 PiB» etiquetando 3,277 TiB— y **ningún guardián lo cazó, porque la constante estaba solo
+/// en `DECISIONES.md` y este fichero lee `SPEC.md`**. La lección no es el factor 1000: es que una
+/// constante de consenso escrita fuera del SPEC está donde la defensa no mira.
+///
+/// Así que aquí no se comprueba solo que el número esté: se comprueba que **la etiqueta en petabytes
+/// no pueda volver a mentir**, rederivando el espacio desde el rango.
+#[test]
+fn el_umbral_del_checkpoint_dice_el_espacio_que_dice() {
+    const UMBRAL: u64 = 90_185_365;
+    const CADUCIDAD: u64 = 525_600;
+
+    // pieces_to_solution_range invertida, con el orden EXACTO de solutions.rs:30-40.
+    // Se rederiva aquí en vez de importarse: si alguien cambia la fórmula, este test debe romperse.
+    let base = ((u64::MAX / 120) / (1 << 15)) * (1 << 16);
+    let piezas = base / UMBRAL;
+    let sectores = piezas / 1000; // MAX_PIECES_IN_SECTOR
+    // Un sector mide 1007,90 MiB (research/coste-ploteo-medido.md). En MiB para no perder precisión.
+    let mib = sectores * 100_790 / 100;
+    let pib = mib as f64 / 1024.0 / 1024.0 / 1024.0;
+
+    assert!(
+        (3.15..3.25).contains(&pib),
+        "UMBRAL_CHECKPOINT dice ser 3,2 PiB y son {pib:.4} PiB. Si esto falla por un factor 1000, \
+         alguien ha vuelto a confundir piezas con sectores: un sector son 1000 piezas."
+    );
+
+    // Y que esté por ENCIMA del cruce de 10,3 TiB, que es lo que hace que el ancla sirva de algo.
+    let tib = mib as f64 / 1024.0 / 1024.0;
+    assert!(
+        tib > 10.3,
+        "el umbral ({tib:.1} TiB) está por debajo del cruce de 10,3 TiB: se emitiría el checkpoint \
+         donde forjar todavía cuesta menos que verificar, que es justo lo que §25 descartó."
+    );
+
+    assert_eq!(CADUCIDAD * 120, 63_072_000, "525 600 bloques son dos años exactos a T = 120 s");
+
+    afirma("90 185 365", "UMBRAL_CHECKPOINT, SPEC §12.1");
+    afirma("525 600", "ALTURA_CADUCIDAD, SPEC §12.1 — literal, NO 2·N_LARGO");
+    no_reaparece(
+        &["90 185 375 997", "2 · N_LARGO"],
+        "el umbral estuvo mil veces bajo y la caducidad colgaba de N_LARGO, que un network \
+         upgrade puede cambiar (SPEC:1926). Los dos corregidos el 2026-09-06.",
+    );
+}
+
 #[test]
 fn ninguna_regla_esta_numerada_dos_veces() {
     let mut vistas: Vec<&str> = Vec::new();

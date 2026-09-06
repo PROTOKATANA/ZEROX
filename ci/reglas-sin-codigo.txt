@@ -78,3 +78,24 @@ C-HDR-06
 C-HDR-07
 C-HDR-08
 C-HDR-09
+
+# ── Checkpoint firmado · SPEC §12.1, decidido el 2026-09-05 (DECISIONES.md §25) ──
+#
+# Spec-first. Caen cuando se implemente el checkpoint. Sus DOS constantes sí están cubiertas ya
+# por el test `el_umbral_del_checkpoint_dice_el_espacio_que_dice`, que rederiva el espacio desde
+# el rango para que la etiqueta en petabytes no pueda volver a mentir.
+#
+#   C-CHK-01  un único checkpoint en la vida de la cadena; la clave se destruye después
+#   C-CHK-02  solo válido si rango_solucion <= UMBRAL_CHECKPOINT
+#   C-CHK-03  la autorización caduca en ALTURA_CADUCIDAD
+#   C-CHK-04  fija la rama canónica por encima del peso acumulado
+#   C-CHK-05  por debajo se puede omitir el PoT; por encima se verifica entero. Sin muestreo
+#   C-CHK-06  no puede acuñar, cobrar ni alterar la validez de ninguna transacción
+#   C-CHK-07  la autoría es libre desde el bloque 1
+C-CHK-01
+C-CHK-02
+C-CHK-03
+C-CHK-04
+C-CHK-05
+C-CHK-06
+C-CHK-07

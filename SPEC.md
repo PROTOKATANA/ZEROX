@@ -1775,6 +1775,53 @@ rechazo **la cadena y la punta quedan intactas**.
 
 ---
 
+## 12.1 · Checkpoint firmado del periodo frágil — `C-CHK`
+
+> Origen y derivación completa en `DECISIONES.md` §25. Aquí van **las reglas y las constantes**,
+> que es donde el contrato vive y donde los guardianes de CI alcanzan.
+
+Una red joven de pruebas de espacio no se defiende sola: forjar peso de cadena cuesta auditar
+(**9,32 µs por sector**, medido), así que por debajo de cierto tamaño un atacante reescribe historia
+más rápido de lo que la red la escribe. El punto de cruce está en **~10,3 TiB**.
+
+```
+UMBRAL_CHECKPOINT  = 90 185 365       // rango_solucion; equivale a 3,2 PiB
+ALTURA_CADUCIDAD   = 525 600          // bloques; dos años exactos a T = 120 s
+```
+
+**C-CHK-01** · Existe **un único** checkpoint firmado en la vida de la cadena. Una vez emitido, la
+clave que lo firma se destruye y **MUST NOT** emitirse ningún otro.
+
+**C-CHK-02** · El checkpoint es válido solo si `rango_solucion` de su bloque es
+`≤ UMBRAL_CHECKPOINT`. Un checkpoint emitido por encima de ese rango —o sea, con la red más
+pequeña que el umbral— **MUST** rechazarse.
+
+> El rango **estrecha** al crecer la red, así que la condición se escribe al revés de como se
+> piensa. `RANGO_INICIAL = 307 445 734 561 808` es **3 409 042×** más ancho que el umbral.
+
+**C-CHK-03** · La autorización caduca en `ALTURA_CADUCIDAD`. Un checkpoint cuyo bloque esté a altura
+`≥ ALTURA_CADUCIDAD` **MUST** rechazarse, aunque la firma sea válida y el rango cumpla C-CHK-02.
+
+**C-CHK-04** · Un checkpoint válido fija la rama canónica: toda cadena que **no** contenga ese
+bloque a esa altura **MUST** rechazarse, sin importar su peso acumulado.
+
+**C-CHK-05** · Por debajo de la altura del checkpoint, un nodo **MAY** omitir la verificación de la
+justificación del PoT. Por encima, **MUST** verificarla entera. **No hay muestreo.**
+
+> ZEROX **no porta** el muestreo probabilístico de Autonomys (`verifier.rs:178-199`). Su constante
+> `3 162` no tiene derivación pública —la especificación está en un Notion privado— y sus bordes no
+> cierran: en `diff = 6 235` la tasa de muestreo **baja** al crecer la cadena. Ver `DECISIONES.md`
+> §24.
+
+**C-CHK-06** · El checkpoint **MUST NOT** poder acuñar, cobrar recompensa, ni alterar la validez de
+ninguna transacción. Su único efecto es el de C-CHK-04.
+
+**C-CHK-07** · La autoría de bloques es **libre desde el bloque 1**. El checkpoint dice cuál es la
+cadena canónica, **no** quién puede producir bloques.
+
+> Es la diferencia con el lanzamiento de Autonomys, que arrancó con
+> `AllowAuthoringBy::RootFarmer` y las recompensas desactivadas a mano.
+
 ## 13 · Profundidad de confirmación — política de producto, NO consenso
 
 > Esta sección **no es normativa**. Es la guía para Cortex y para el wallet. Se apoya en Nakamoto
