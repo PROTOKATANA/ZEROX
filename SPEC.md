@@ -1775,6 +1775,69 @@ rechazo **la cadena y la punta quedan intactas**.
 
 ---
 
+## 7.5 · Ritmo de desafío y caducidad de sectores — `C-SLOT`, `C-EXP`
+
+> Derivación en `DECISIONES.md` §20 y §21. Aquí van las reglas y las constantes.
+
+```
+SIGMA                 = 1        // segundos por slot
+SLOT_PROBABILITY      = (1, 120) // q = T/SIGMA
+DELTA_SLOTS           = 4        // ventana explotable, en slots
+VIDA_MINIMA_BLOQUES   = 65 536   // 2^16
+DISPERSION_BLOQUES    = 1 048 576 // 2^20
+```
+
+**C-SLOT-01** · Un slot dura `SIGMA = 1` segundo. `q = T / SIGMA = 120`, y por tanto
+`SLOT_PROBABILITY = (1, 120)`.
+
+**C-SLOT-02** · `q` **MUST** ser `≥ 20`. Por debajo, LWMA-1 sobre slots no converge en el modelo
+determinista y la tasa de huérfanos por colisión de slot supera el 2,5 %. Con `q = 1` la propia
+función de calibración **desborda `u64`**.
+
+**C-SLOT-03** · La ventana explotable —desde que el desafío es público hasta que una solución deja
+de aceptarse— es `DELTA_SLOTS = 4` slots.
+
+> Es `Δ`, y **no `σ`, la magnitud de seguridad**: el greenpaper define el ataque sobre un desafío
+> **fijo**, así que lo que cuenta es cuánto tiempo tiene el atacante con ese desafío, no cada cuánto
+> llega el siguiente. Autonomys usa `Δ = 4 s`; Chia, 28,1–37,5 s.
+
+**C-EXP-01** · Todo sector lleva `altura_ploteo`, válido solo si `altura_ploteo < altura_actual`.
+
+**C-EXP-02** · `desplazamiento = blake3(sector_id ‖ hash_bloque[altura_ploteo]) mod DISPERSION_BLOQUES`.
+Como `DISPERSION_BLOQUES = 2^20`, el módulo es **exactamente una máscara de 20 bits** sobre la salida
+de blake3: `bytes[0] | (bytes[1] << 8) | ((bytes[2] & 0x0F) << 16)`.
+
+> Potencia de dos **no es estética**: sin división ni bignum no hay endianness que acordar.
+> Autonomys hace `U256::from_le_bytes(...) % ...` (`sectors.rs:145`), y con un módulo cualquiera
+> habría que replicar ese `U256` bit a bit en toda implementación o divergir.
+> **Si alguien cambia `DISPERSION_BLOQUES` a un valor que no sea potencia de dos, esa clase de bug
+> vuelve.**
+
+**C-EXP-03** · `caducidad_altura = altura_ploteo + VIDA_MINIMA_BLOQUES + desplazamiento`. El sector
+es válido para producir bloques si y solo si `altura_ploteo ≤ altura_actual < caducidad_altura`.
+
+**C-EXP-04** · `hash_bloque[altura_ploteo]` **MUST** tomarse de la **cadena que se está validando**,
+nunca de «la cadena activa del nodo».
+
+> Es la fuente de no-determinismo más peligrosa de esta familia: leerlo de la cadena activa hace que
+> dos nodos discrepen al validar una rama lateral. **Split garantizado.**
+
+**C-EXP-05** · `VIDA_MINIMA_BLOQUES` **MUST** ser mayor que `MAX_REORG_LENGTH`.
+
+> Con `65 536 > 99`, cuando un sector puede caducar su bloque de ploteo lleva ≥ 65 437 bloques de
+> profundidad. **Ninguna caducidad depende jamás de un hash todavía mutable.**
+
+**C-EXP-06** · Todo nodo **MUST** retener los hashes de bloque de al menos las últimas
+`VIDA_MINIMA_BLOQUES + DISPERSION_BLOQUES = 1 114 112` alturas (35,65 MB). Un sector cuyo
+`altura_ploteo` caiga fuera de esa ventana está caducado por construcción.
+
+> ⚠️ **La dispersión no es exigible, y el SPEC no debe fingir que lo es.** Un granjero puede moler su
+> propia `altura_ploteo` —manteniendo huecos de disco vacíos hasta que salga un buen sorteo— y
+> quedarse con el 99,9 % de `DISPERSION_BLOQUES`. Los tres cierres posibles fallan (`DECISIONES.md`
+> §20). **La vida de diseño es `VIDA_MINIMA + DISPERSION − 1`; la dispersión es una red de seguridad
+> para el granjero ingenuo, no una garantía.** Las constantes están dimensionadas contra los dos
+> regímenes.
+
 ## 12.1 · Checkpoint firmado del periodo frágil — `C-CHK`
 
 > Origen y derivación completa en `DECISIONES.md` §25. Aquí van **las reglas y las constantes**,

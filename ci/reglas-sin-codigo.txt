@@ -99,3 +99,15 @@ C-CHK-04
 C-CHK-05
 C-CHK-06
 C-CHK-07
+
+# ── Ritmo de desafío y caducidad · SPEC §7.5 (DECISIONES.md §20 y §21) ──
+# Spec-first. Caen al implementar el consenso nuevo.
+C-SLOT-01
+C-SLOT-02
+C-SLOT-03
+C-EXP-01
+C-EXP-02
+C-EXP-03
+C-EXP-04
+C-EXP-05
+C-EXP-06

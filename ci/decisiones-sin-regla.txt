@@ -1,0 +1,12 @@
+# Secciones de DECISIONES.md que legítimamente NO tienen regla en el SPEC, y por qué.
+#
+# Formato: la etiqueta de sección exacta, «§N», sola en su línea. El motivo va en comentario.
+# Lo comprueba ci/decisiones-sin-spec.sh.
+
+# §14 es la decisión de CAMBIAR de consenso, no una regla. Sus consecuencias sí están en el SPEC,
+# repartidas en §6.1, §7.5, §11, §12.1 y las familias C-HDR, C-SLOT, C-EXP, C-CHK.
+§14
+
+# §18 es el toolchain de compilación (nightly pineado). No es consenso: dos nodos compilados con
+# toolchains distintos deben producir la misma cadena. Vive en rust-toolchain.toml.
+§18
