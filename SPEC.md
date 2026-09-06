@@ -1843,9 +1843,15 @@ nunca de «la cadena activa del nodo».
 > Origen y derivación completa en `DECISIONES.md` §25. Aquí van **las reglas y las constantes**,
 > que es donde el contrato vive y donde los guardianes de CI alcanzan.
 
-Una red joven de pruebas de espacio no se defiende sola: forjar peso de cadena cuesta auditar
-(**9,32 µs por sector**, medido), así que por debajo de cierto tamaño un atacante reescribe historia
-más rápido de lo que la red la escribe. El punto de cruce está en **~10,3 TiB**.
+Una red joven de pruebas de espacio no se defiende sola: **con el PoT sin verificar, el atacante
+elige el desafío**, y entonces forjar peso de cadena cuesta lo mismo que auditar. Por debajo de
+cierto tamaño de red eso sale más barato que defenderse.
+
+⚠️ **El SPEC no fija aquí el coste por auditoría, y es deliberado.** La banda medida va de 2,82 µs
+(atacante con lote SIMD) a 42,92 µs (granjero honesto con la implementación de referencia), y la
+cota inferior **no tiene techo conocido** —blake3 en GPU está órdenes de magnitud por encima y nadie
+lo ha medido. Un umbral derivado de ese número sería provisional; `UMBRAL_CHECKPOINT` se fija por
+**coste económico del espacio honesto**, no por core-horas. Ver `DECISIONES.md` §25.
 
 ```
 UMBRAL_CHECKPOINT  = 90 185 365       // rango_solucion; equivale a 3,2 PiB

@@ -67,7 +67,39 @@ auditing/disk/sync      time:   [92.825 µs  93.221 µs  93.558 µs]   (10 secto
                         thrpt:  [106.89 Kelem/s  107.27 Kelem/s  107.73 Kelem/s]
 ```
 
-**9,32 µs por sector auditado desde disco.**
+~~**9,32 µs por sector auditado desde disco.**~~
+
+> ## ⚠️ ESA CIFRA ESTÁ MAL. Corregido el 2026-09-06.
+>
+> `audit_plot_sync` usa **`.par_iter()`** sobre los sectores
+> (`subspace-farmer-components/src/auditing.rs:128`). Los 92,8 µs son de **una llamada que audita
+> 10 sectores en 32 hilos**, así que dividir entre 10 da **throughput, no coste serie**.
+>
+> Re-medido con el paralelismo desactivado:
+>
+> ```
+> SECTORS_COUNT=1 RAYON_NUM_THREADS=1 cargo bench --bench auditing
+> auditing/disk/sync   time: [42.874 µs  42.916 µs  43.006 µs]   ← UN sector, UN hilo
+> ```
+>
+> **42,92 µs.** Mi cifra era 4,6× más baja.
+>
+> ### Y no hay un solo número: hay una banda de 15×, según de quién hablemos
+>
+> | Quién | Coste por auditoría | Cómo se obtuvo |
+> |---|---:|---|
+> | Granjero honesto, implementación de referencia | **42,92 µs** | medido aquí, un hilo, rango ancho |
+> | Solo el bucle interno (500 blake3 + distancia) | 27,5 µs | medido por D9 |
+> | **Atacante con lote SIMD de 16 vías** | **2,82 µs** | cota inferior por throughput bulk de blake3 |
+> | ~~9,32 µs~~ | — | **throughput paralelo, no es un coste** |
+>
+> ⚠️ **Para un análisis de seguridad hay que usar la del atacante (2,82 µs), no la del granjero.**
+> Y ese 2,82 es una **cota inferior sin techo**: blake3 en GPU está órdenes de magnitud por encima
+> y nadie lo ha medido. Cualquier umbral derivado de este número es provisional.
+>
+> La cifra vieja se propagó a `SPEC.md` §12.1, y a `DECISIONES.md` §24 y §25. Corregida en los tres.
+
+
 
 ⚠️ El resultado `auditing/memory/sync = 404 ps` **es un banco roto de ellos, no una medición.** Usa
 `b.iter(|| async { … })`: el bloque `async` construye un futuro que **nadie awaitea ni sondea**, así
