@@ -735,6 +735,73 @@ rehacerla en esas unidades. Es lo primero que D9 debe mirar, antes que nada.
 
 ---
 
+## 10 quater · TAREA 2 ejecutada — y corrige dos afirmaciones mías
+
+### Corrección 3 · «El error de la ronda 7 fue subir `c` a 500» — FALSO
+
+La ronda 3 dejó escrito, y lo llamó su mejor resultado: *«`c` cuenta niveles del árbol privado entre
+godfathers… contar la época en bloques de la cadena seleccionada del propio pasado hace que el árbol
+privado tenga también 50 niveles entre fronteras»*. Y la ronda 4 dio la fórmula del *steering*:
+
+```
+g = c_m / √(α·λ·I)      valor de elegir entre m entropías, como fracción del ingreso de la época
+```
+
+`g` va como **`1/√I`**: **épocas cortas ⇒ más steering.** Con `α = 0,33`, `λ = 1`, `m = 4`:
+
+| `I` | `g` |
+|---:|---:|
+| 2 490 s (la ronda 7) | **3,6 %** ← lo que la propuesta declaró aceptable («del orden del 3 %») |
+| 249 s | 11,4 % |
+| 80 s (`c=16` en cadena) | **20,1 %** |
+| 16 s (`c=16` en orden) | **44,8 %** |
+
+**`c = 500` no era un error: estaba comprando steering barato.** Mi recomendación de `c = 16` habría
+multiplicado el steering por 6 (cadena) o por 12 (orden). Retiro esa recomendación.
+
+### Corrección 4 · «El ancla en el orden da `W/κ = 1,016`» — artefacto de unidades
+
+`W/κ = 1 + I/F` y `g = c_m/√(αλI)` **dependen solo de `I`**, no del ancla. Comprobado: `c = 500` en
+cadena e `c = 2490` en orden dan **el mismo `I = 2490 s`, el mismo `g = 3,59 %` y el mismo
+`W/κ = 3,49`**. El ancla solo cambia **en qué unidad se expresa `c`**.
+
+Mi «`c=16` → `W/κ = 1,016`» comparaba `I = 16 s` contra `I = 2 490 s`. No era una mejora del ancla:
+era acortar la época 156× — y eso dispara el steering del 3,6 % al 44,8 %.
+
+**El parámetro real es `I`, la duración de la época en tiempo.** El cambio de ancla sigue siendo
+correcto, pero **solo por la razón de cimiento** (teorema frente a no teorema), no por los números.
+Y `c_a = c_h` hay que rederivarlo: el argumento de la ronda 3 se apoya en contar sobre *la cadena
+seleccionada del propio pasado*, y el índice del orden cuenta otra cosa.
+
+### El resultado real de la tarea 2: una pinza nueva, independiente del ancla
+
+| | quiere |
+|---|---|
+| **Steering** `g = c_m/√(αλI)` | `I` **grande** |
+| **Ventana de predicción** `W/κ = 1 + I/F` | `I` **pequeña** |
+
+Solo se resuelve con **`F` grande**. Fijando `g` en el 3,6 % que la propia ronda 7 aceptó
+(`I = 2 490 s`):
+
+| `F` | `W/κ` | lookahead `F+I` | margen vs `A*` (41,1 h) |
+|---|---:|---:|---:|
+| 1 000 s | 3,49 | 0,97 h | 42× |
+| 1 h | 1,69 | 1,69 h | 24× |
+| **3,2 h** (la rama de la ec. (2), `k=793`) | **1,22** | **3,87 h** | **10,6×** |
+| 3,3 h (= la lineal) | 1,21 | 3,99 h | 10,3× |
+
+**Convergencia de tres restricciones independientes en `F ≈ 3,2 h`:** el steering, la ventana de
+predicción y la rama conservadora de la ec. (2) piden lo mismo. Y la propuesta **ya lo había
+calculado** en su §5.2: *«Fijar `F = 3,3 h` empuja el lookahead a ~4 h y el margen económico a
+~10×»*.
+
+**Lo que eso cambia en el argumento del DAG.** Con `F ≈ 3,2 h`, el DAG deja de comprar finalidad más
+rápida que la lineal (3,3 h). Sigue comprando: latencia **a inclusión** de 120 s, cero huérfanos
+honestos (medido: `1,2·10⁻⁶`), y varianza del granjero pequeño dividida por `q`. Eso es real, pero
+es un argumento distinto del que se venía haciendo.
+
+---
+
 ## 11 · Reproducción
 
 ```bash
