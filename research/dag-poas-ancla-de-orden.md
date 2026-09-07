@@ -248,18 +248,53 @@ Y **no toca el PoT ni la prueba de espacio**: cambia de dónde se lee el inyecto
 
 ---
 
-## 6 · La bifurcación que no es mía: `q`
+## 6 · `q = 1` — DECIDIDO por Katana, 2026-09-08
 
-| | `q = 1` | `q = 10` |
-|---|---|---|
-| Latencia a inclusión | 120 s | 1 200 s |
-| Cabeceras/año | 17,5 GB | 1,75 GB |
-| **Cliente ligero** | **inviable** | ~0,15 GB/mes, **viable** |
-| Huérfanos honestos | 1,2·10⁻⁶ | 1,8·10⁻⁴ |
-| Coinbases/año | 31,5 M | 3,15 M |
+`λ = 1/q` con slot de 1 s, así que el tiempo entre bloques **es `q` segundos**. (La ronda 7 escribe
+«latencia a inclusión `120/q` s»: es un desliz de unidades — la ronda 1 lo dice bien, `120/q` es el
+**factor de mejora** sobre la lineal, no los segundos.)
 
-`q = 1` maximiza lo que el DAG compra y mata el cliente ligero. `q = 10` lo salva y paga 10× la
-latencia. **Ninguno está elegido.**
+| | **`q = 1`** | `q = 10` | lineal (`q=120`) |
+|---|---:|---:|---:|
+| Tiempo entre bloques | **1 s** | 10 s | 120 s |
+| Cabeceras/año | 21,5 GB | 2,2 GB | 0,18 GB |
+| Frente a Bitcoin (4,2 MB/año) | 5 100× | 510× | 44× |
+| Huérfanos honestos | 1,2·10⁻⁶ | 1,8·10⁻⁴ | 80 % |
+| **`g` (steering) con `I = 2 490 s`** | **3,6 %** | **11,4 %** | — |
+| **`I` para `g = 3,6 %`** | **2 476 s** | **24 758 s (6,9 h)** | — |
+| **`W/κ` con `F = 3,2 h`** | **1,21** ✓ | **3,15** ✗ | — |
+
+**Por qué `q = 1` y no `q = 10`.** `q = 10` **no compra lo que parecía comprar**: no salva el cliente
+ligero —510× Bitcoin sigue sin ser una cartera de móvil— y **sí rompe el punto de diseño**, porque
+`g = c_m/√(αλI)` con `λ = 1/q` triplica el steering, y corregirlo exige épocas de 6,9 h que disparan
+`W/κ` a 3,15. Paga los dos costes y no cobra el beneficio.
+
+**Corrección de dato:** los 17,5 GB/año que citaba la ronda 7 son la cota con **un solo padre**. Con
+`λΔ = 4` puntas simultáneas la cabecera lleva ~4 padres (32 B cada uno): **~683 B y 21,5 GB/año.**
+
+### Lo que se acepta al elegir `q = 1`, escrito sin adornos
+
+**Ninguna cartera de ZEROX podrá verificar sus propios pagos sin confiar en un servidor o correr un
+nodo completo.** SPV sin confianza no existe en GHOSTDAG y no lo arregla ningún parámetro.
+
+El modelo pasa a ser el de Zcash, que **ya estaba en el plan de crates** (`zx-lightwalletd`,
+`zx-scanner`): la cartera habla con un servidor que hace el trabajo pesado. El servidor **no puede
+robar** —no tiene las claves— pero **sí puede mentir**: ocultar pagos o afirmar confirmaciones
+falsas.
+
+**Y sí: quien no quiera confiar puede montar su propio servidor.** Es cierto y es la respuesta
+correcta. Pero conviene escribir su precio, porque *«monta tu propio servidor»* significa
+**«corre un nodo completo»**:
+
+| Suelo de la autosoberanía | Coste |
+|---|---|
+| Bitcoin, SPV en un móvil | **71 MB**, sin confiar en nadie |
+| ZEROX `q=1`, lightwalletd propio | **nodo completo: >21,5 GB/año, 59 MB/día solo de cabeceras, coloreado GHOSTDAG a 1 bloque/s, 24/7** |
+
+Las dos opciones son **sin confianza**. Lo que cambia es el **precio de entrada**: de un móvil a una
+máquina permanente. Es una propiedad de descentralización (P-036), no un detalle de producto, y hay
+que anotarla como tal. La experiencia de Zcash es el dato relevante: casi nadie corre su propio
+`lightwalletd`.
 
 ---
 
