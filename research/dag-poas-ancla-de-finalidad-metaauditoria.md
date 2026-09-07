@@ -591,6 +591,119 @@ por los autores, y siete rondas la han dado por supuesta sin citarla.
 
 ---
 
+## 10 ter · ¿Es viable un DAG sobre PoAS? SÍ — y dos correcciones a mi propio análisis
+
+Katana: «el DAG se tiene que implementar sí o sí». Comprobada la puerta que dejé abierta en §10 bis,
+**es viable**, y al comprobarla aparecen **dos errores míos** que pintaron el cuadro más negro de lo
+que es. Los corrijo primero, porque cambian la decisión.
+
+### Corrección 1 · La magnitud de `W/κ` la fija `c`, no la arquitectura
+
+Dije «3,5× dentro del régimen de soborno» y lo presenté como propiedad del diseño. La identidad
+`W/κ = 1 + I/F` con `I = c/λ_chain` es correcta, pero **su magnitud depende enteramente de `c`**:
+
+| `c` | `I` (s) | `W/κ` con `F = 1000 s` | margen vs `A*` | umbral (Δ=0) |
+|---:|---:|---:|---:|---:|
+| **16** (el desplegado de Chia) | 80 | **1,08** | **137×** | 40,5 % |
+| 32 | 159 | 1,16 | 128× | 42,7 % |
+| 50 | 249 | 1,25 | 118× | 43,8 % |
+| 100 | 498 | 1,50 | 99× | 45,3 % |
+| **500** (ronda 7) | 2 490 | **3,49** | **42×** | 47,6 % |
+
+**`c = 500` es peor en las dos dimensiones a la vez** —régimen de predicción y margen económico— y a
+cambio compra 7 puntos de umbral. Con `c = 16`, el valor que Chia lleva desplegado (de ahí su
+constante 1,47 = `φ₁₆`), la ventana de predicción queda **8 % por encima de `κ`, no 250 %**.
+
+**El error de la ronda 7 no fue la arquitectura: fue subir `c` a 500.**
+
+### Corrección 2 · Mi umbral del 13,2 % estaba mal
+
+Apliqué a GHOSTDAG el factor `e^(−λ_hΔ)` de BDK. Ese factor penaliza a los honestos **por
+bifurcarse**, que es un fenómeno de cadena lineal — en un DAG los bloques honestos no se pierden por
+bifurcación; ésa es su razón de ser. **GHOSTDAG tiene su propio factor de retardo**, Lema 9 del
+paper (verificado, líneas 1090-1101):
+
+> crecimiento honesto `≥ (1−α)(1−δ)·r·λ`, con `δ = 2Dλ/(k + 2Dλ)`
+
+Compuesto honestamente con `φ_c` (crecimiento del árbol privado `= φ_c·α·λ`):
+`α* = (1−δ)/(φ_c + 1−δ)`.
+
+| `k` | `δ` | `c=16` | `c=50` | `c=100` | `c=500` |
+|---:|---:|---:|---:|---:|---:|
+| 24 | 0,250 | **33,8 %** | 36,9 % | 38,3 % | 40,5 % |
+| 100 | 0,074 | 38,7 % | 41,9 % | 43,4 % | 45,7 % |
+| 793 | 0,010 | 40,3 % | 43,6 % | 45,1 % | **47,3 %** |
+
+El número honesto está entre **33,8 % y 47,3 %**. Ni el 47,6 % de la propuesta (que ignora el
+retardo) ni mi 13,2 % (que le aplicaba el retardo equivocado). Sigue siendo el «empalme» sin
+demostrar, pero ahora usa el tratamiento del retardo **de cada paper**, en vez de mezclarlos.
+
+Nota útil que sale de aquí: **`k` grande mejora el umbral** (`δ` cae de 0,25 a 0,01). La rama
+conservadora de la ec. (2) no solo cuesta `F` más largo — también paga mejor umbral.
+
+### El cimiento: el índice del orden total SÍ está demostrado
+
+La Definición 2 del paper de GHOSTDAG, literal:
+
+> `Risk_u(B,t,r) := Pr[∃s > t+r, ∃C ∈ G_s^u : B ≺_{G_{t+r}^u} C ∧ C ≺_{G_s^u} B]`
+
+y la nota que la hace decisiva, también literal:
+
+> *«For convenience, we use the same notation `B ≺ C` when `B ∈ G` but `C ∉ G`.»*
+
+Es decir: **un bloque que todavía no existe cuenta como "posterior a `B`"**, así que el evento de
+riesgo **incluye la inserción de bloques futuros por delante de `B`**. Property 1 y Prop. 7 lo acotan
+por `O(e^{−cr})`. De donde:
+
+```
+índice(B) = |{C : C ≺ B}|
+  conjunto de predecesores se estabiliza exponencialmente   (Def. 2 + Prop. 7)
+  ⇒ su cardinal se estabiliza exponencialmente
+  ⇒ el ÍNDICE DEL ORDEN TOTAL se estabiliza exponencialmente     [FUNDADO]
+```
+
+Contraste con lo que usa la ronda 7: la **posición de la cadena seleccionada** no está cubierta por
+ninguna propiedad, y el paper afirma lo contrario en «Blue set growth» (*«the blue score of the
+virtual node actually decreases»*). La cadena seleccionada puede ser **sustituida entera**; el orden
+total solo se **extiende**, salvo el evento de riesgo, que está acotado.
+
+**Cambiar el ancla de «posición `c·j` de la cadena seleccionada» a «índice `c·j` del orden total»
+sustituye un supuesto sin teorema por un teorema del propio paper.** Es un cambio de una línea en
+R-FIN-1.
+
+### El punto de diseño viable
+
+| | Valor | Procedencia |
+|---|---|---|
+| Ancla | índice `c·j` del **orden total** | Prop. 7 + Def. 2, GHOSTDAG |
+| `c` | **16** | valor desplegado de Chia (`φ₁₆` = su 1,47) |
+| `I` | 80 s | `c/λ_chain` |
+| `F` | por derivar de Prop. 8 | **hay teorema del que derivarlo**, a diferencia de antes |
+| `W/κ` | **1,08** | 8 % sobre el límite, frente a 3,49 |
+| Lookahead | ~1 080 s (18 min) | `F + I` |
+| Margen vs `A*` | **137×** (13,7× frente a plotter 10×) | `lookahead_economico.py` |
+| Umbral | 33,8 %–40,3 % según `k` | Lema 9 ⊗ `φ₁₆` |
+
+### Lo que sigue costando, sin rebajas
+
+1. **Cliente ligero:** no sobrevive. Coste estructural del DAG, no lo arregla ningún parámetro.
+2. **Cabeceras:** 17,5 GB/año a `q = 1`. Depende de `q`, no de `c`.
+3. **Timelord único (B7):** vulnerabilidad de vivacidad, sin fallback especificado.
+4. **El empalme `φ_c` ⊗ `δ` de GHOSTDAG:** sigue sin demostrar. Es la deuda teórica principal.
+5. **Umbral < 50 %:** el DAG sobre PoAS es estructuralmente más débil que Nakamoto. Chia también.
+6. **`F` sin derivar:** Prop. 8 da decaimiento exponencial pero la constante hay que sacarla de
+   Lema 10, que no está hecho.
+
+### Lo primero que hay que atacar de la octava propuesta
+
+El índice del orden total **cuenta también los rojos**. Cerca de la punta, un atacante influye en qué
+bloque cae en el índice `c·j` modulando cuántos bloques publica. Es la misma clase de *grinding* que
+`φ_c` ya tarifa —y por eso `φ_c` sigue siendo la herramienta correcta— pero **`c` pasa a contarse en
+índices del orden, no en posiciones de cadena**, y la Q3 de la ronda 3 (que fijó `c_a = c_h`) hay que
+rehacerla en esas unidades. Es lo primero que D9 debe mirar, antes que nada.
+
+---
+
 ## 11 · Reproducción
 
 ```bash
@@ -606,6 +719,10 @@ python3 verif_margen_eq2.py         # hallazgo F: margen bajo ec. (2) completa
 python3 verif_pinza.py              # la pinza: W>kappa es identidad con L=F
 python3 verif_recomendacion.py      # auditoria de mi propia recomendacion
 python3 verif_q2_deriva_nula.py     # respuesta a Q2 bajo cobertura total
+python3 verif_orden_indice.py       # el indice del orden total SI esta demostrado
+python3 verif_espacio_diseno.py     # espacio de diseno: c=16 vs c=500
+python3 verif_umbral_correcto.py    # umbral con el delta propio de GHOSTDAG
+./COMPRUEBA.sh                      # 9 hechos objetivos, sin juicios
 ```
 
 **Fuente primaria leída:** `…/0cfccf9e-…/scratchpad/papers/bdk19.txt` — «Proof-of-Stake Longest
