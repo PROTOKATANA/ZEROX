@@ -802,6 +802,103 @@ es un argumento distinto del que se venía haciendo.
 
 ---
 
+## 10 quinquies · LA EC. (2) ATACADA — resuelta, y en contra de la premisa
+
+**La premisa que había que comprobar:** *«Kaspa responde por fe y nadie lo ha demostrado.»*
+**Resultado: es falsa.** Seguir el término literalmente selecciona la `k` que hace **vacua** la
+garantía del propio paper.
+
+### El enunciado, literal (§4.2)
+
+```
+k(Dmax,λ,δ) := min { k̂ ∈ ℕ : f(k̂,Dmax,λ) < δ }                              (1)
+f(k̂,Dmax,λ) := max{ Σ_{j=k̂+1}^∞ e^{−2c}(2c)^j/j!  ,  2c/(k̂+2c) },  c := Dmax·λ   (2)
+```
+
+### Hallazgo 1 · La ec. (2) toma el máximo de dos magnitudes **no comparables**
+
+| Término | Qué es | Con `Dmax=4 s`, `λ=1`, `δ=0,01` exige |
+|---|---|---:|
+| `Σ e^{−2c}(2c)^j/j!` | `P(anticono > k̂)` — una **probabilidad de fallo** | **k = 15** |
+| `2c/(k̂+2c)` | el `δ` del **Lema 9** — un **factor de merma** del crecimiento honesto | **k = 793** |
+
+**El 793 no sale de ninguna probabilidad de fallo.** Sale de exigir que la *merma* sea ≤ 1 %.
+Exigirle `0,01` a un cociente de crecimiento es una **elección de cuánto margen se está dispuesto a
+perder**, no un umbral de seguridad. El paper lo avisa él mismo:
+
+> *«We note one caveat here: the probability `2C/(k+2C)` **does not vanish exponentially fast** with
+> k. To fix this, a tighter analysis of the effect of these attacks is needed; **we leave this
+> challenge to future work.**»*
+
+### Hallazgo 2 · `k` tiene un compromiso de **dos lados** que la ec. (2) ignora
+
+Subir `k` baja la merma `δ = 2c/(k+2c)` — **bueno**. Pero sube la ventaja de *freeloading* del
+atacante, que el mismo paper acota en **`3k`** (§*Freeloading and Bounded Advantage*, Lema 10:
+*«up to **3k** blocks which it can freeload»*, `score(C) ≤ score(B) + 3k`) — **malo**.
+
+**La ec. (2) solo minimiza el primer lado.**
+
+### Hallazgo 3 · Con las dos cosas a la vez, el óptimo es `k ≈ 25`
+
+Carrera de Nakamoto con crecimiento honesto `(1−α)(1−δ(k))` y ventaja inicial `3k`, `α = 0,25`,
+`δ(k) = 8/(k+8)` **autoconsistente**:
+
+| `k` | `δ` | reversión a 600 s | umbral (`c=500`) |
+|---:|---:|---:|---:|
+| 18 | 0,308 | 2,45·10⁻⁷ | 38,6 % |
+| 22 | 0,267 | 7,87·10⁻⁸ | 39,9 % |
+| **24** | 0,250 | **6,59·10⁻⁸** | 40,5 % |
+| **25** | 0,242 | **óptimo** | 40,7 % |
+| 30 | 0,211 | 1,11·10⁻⁷ | 41,7 % |
+| **793** | **0,010** | **1,000** | 47,3 % |
+
+Y a `k = 793` el vacío no es puntual: **1,000 a 600 s, a 1 800 s y a 3 600 s**; solo baja a las
+3,2 h.
+
+**La ronda 3 derivó `k = 24` por otra vía** (punto fijo del retarget). Dos caminos independientes
+convergen en el mismo valor.
+
+### Conclusión
+
+**«Ignorar el segundo término» no es fe: es evitar el valor que vacía el teorema.** Con `k = 793`
+la cota de Prop. 8 permite al atacante 2 379 bloques de ventaja, y la garantía deja de decir nada
+por debajo de las 3,2 h. Kaspa está en el lado correcto del compromiso; la ec. (2) tomada al pie de
+la letra, en el equivocado.
+
+**Matiz exacto, para no pasarse:** `3k` es una **cota superior** del paper. Que la cota se vuelva
+vacua a `k=793` **no demuestra que el protocolo falle** ahí — demuestra que **se pierde la
+garantía**. Es suficiente para descartar `k=793` como «la opción conservadora»: es la opción que
+deja el análisis mudo.
+
+### Corrección 5 · Mi «20 órdenes de magnitud» estaba mal
+
+Emparejé `k=24` con `δ=0,01`. Son incompatibles: `k=24` obliga a `δ=0,25`. Con el emparejamiento
+autoconsistente:
+
+| | a 600 s, `α = 0,25` |
+|---|---:|
+| DAG, `k=24`, `δ=0,25` | **6,59·10⁻⁸** |
+| Cadena lineal de ZEROX (`q=120`) | **0,140** |
+| Ventaja | **2,1·10⁶ ≈ 6,3 órdenes** |
+
+Seis órdenes, no veinte. Sigue siendo la ventaja real del DAG, y ahora está bien calculada.
+
+### El punto de diseño 8, ya cerrado en sus cuatro constantes
+
+| | Valor | De dónde |
+|---|---|---|
+| `k` | **25** (24 dentro del ruido) | óptimo autoconsistente **y** punto fijo del retarget (ronda 3) |
+| `I` | **2 490 s** | steering `g = 3,6 %` (ronda 4) |
+| `F` | **3,2 h** | ventana de predicción `W/κ = 1,22` |
+| Ancla | índice del orden total | Def. 2 + Prop. 7 |
+| Confirmación a 600 s | 6,6·10⁻⁸ | 6,3 órdenes mejor que la lineal |
+| Lookahead / margen | 3,89 h / **10,6×** | `A*` esc. B |
+| Umbral | ~40,5 % | Lema 9 ⊗ `φ₅₀₀` |
+
+`F = 3,2 h` es el **límite de reorg**, no el tiempo de confirmación: se confirma en minutos.
+
+---
+
 ## 11 · Reproducción
 
 ```bash
