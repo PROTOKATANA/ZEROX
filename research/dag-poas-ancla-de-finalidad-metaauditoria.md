@@ -482,6 +482,115 @@ y soborno).
 
 ---
 
+## 10 bis · Auditoría de la recomendación de §10, a petición de Katana
+
+Sometí mi propia recomendación («una sola pregunta a D9: rehacer Q2 con `L < F` y el coste de
+cobertura medido») al mismo criterio. Resultado: **dos de las tres afirmaciones se sostienen; la
+tercera es falsa.** Y al verificar la alternativa apareció la raíz de todo.
+
+### (a) «La pregunta está sin responder» — VERIFICADO, y peor de lo que dije
+
+`r7_q2.simulate_skellam_drift` documenta *«la diferencia de peso es Skellam de **deriva nula**»* pero
+implementa:
+
+```python
+if random.random() < (1 - alpha):  diff += 1
+else:                              diff -= 1
+```
+
+es decir, una caminata con deriva `(1−2α) = 0,34` **a favor del honesto**. Y `mean_final = h0 +
+mu_h − mu_a` arrastra el mismo término. **La rama `L < F` nunca se analizó bajo el peor caso que la
+propia propuesta declara** (cobertura total ⇒ ambos flujos crecen a `λ` ⇒ deriva nula). Se analizó
+el caso fácil. **Quinto defecto**, y justo en la rama que yo recomendaba auditar.
+
+### (b) «Es acotada» — VERIFICADO, con una corrección a §6 de la propuesta
+
+El rincón `(F, L, c)` que cumple a la vez la seguridad de cobertura y `L + I ≤ F` **existe y no es
+estrecho** (`verif_recomendacion.py`, `q=1`, `α=0,33`, `ε=10⁻⁹`):
+
+| `F` | `L_min` | `L/F` | `c` máx. para `W ≤ κ` | umbral (Δ=0) |
+|---:|---:|---:|---:|---:|
+| 1 000 s | 537 | 0,54 | 93 | 45,2 % |
+| 1 500 s | 704 | 0,47 | 160 | 46,1 % |
+| 3 600 s | 1 218 | 0,34 | 478 | 47,5 % |
+| 11 430 s | 2 374 | 0,21 | 1 818 | 48,6 % |
+
+`L_min` crece como `√F` y `F` crece lineal, así que a partir de `F ≈ 1 500 s` sobra sitio.
+
+**Corrección a §6 de la propuesta:** dice «`L ≈ F/3` a `F/5`». Es falso en general — `L/F` **depende
+de `F`**. A `F = 1 000 s` sale `0,54`; el `F/3` solo aparece hacia `F = 3 600 s`. Calculada la
+probabilidad de primer paso con deriva nula (principio de reflexión, factor 2 que §6 omite),
+`L = F/3` a `F = 1 000 s` da `P = 1,9·10⁻³`, seis órdenes por encima del objetivo `10⁻⁹`.
+
+### (c) «Decide P-038 en los dos sentidos» — **FALSO. Me equivoqué.**
+
+Calculada la respuesta (`verif_q2_deriva_nula.py`), en el rincón de (b) la rama `L < F` **pasa** bajo
+deriva nula, en los dos modelos de `h0` (`≈ 2·10⁻⁹` y `≈ 2,7·10⁻¹⁵`). Es decir:
+
+- La pregunta es **respondible en minutos, no en una sesión de agente** — «barata» era cierto, pero
+  tanto que no justifica lanzar nada.
+- Su respuesta esperada es **«sobrevive»**, que es precisamente la que **no decide nada**.
+
+Y en el sentido positivo no puede decidir, porque quedan seis lagunas intactas: prefijo común (§9),
+empalme `φ_c`, umbral con Δ, `k` sin decidir, timelord, cliente ligero. **Mi frase era falsa: esa
+pregunta solo puede cerrar, nunca abrir, y su resultado probable es que no haga ni lo uno ni lo
+otro.**
+
+### Lo que apareció al verificar la alternativa: la raíz
+
+Antes de proponer «auditar primero el prefijo común» comprobé que esa pregunta no tuviera el mismo
+defecto. Leído el paper de PHANTOM/GHOSTDAG en local
+(`…/papers/phantom-ghostdag.clean.txt`, 1 439 líneas):
+
+| Búsqueda | Ocurrencias |
+|---|---:|
+| `common prefix` | **0** |
+| `prefix` | **0** |
+| `stabiliz` | **0** |
+| `chain converg` | **0** |
+
+Todo lo que el paper demuestra converge es **el orden**: §3.4 *«Convergence of the order»*;
+Property 1 *«An ordering rule ord is said to (1−α)-converge»*; Prop. 7 *«the probability that **the
+ordering of two blocks** published before time t will change after t+r is O(e^{−cr})»*.
+
+Y sobre la cadena seleccionada el paper dice **lo contrario** de lo que la propuesta necesita:
+
+> *«In Nakamoto Consensus… the score of a Bitcoin node increases monotonically. **In GHOSTDAG this
+> no longer holds.** Indeed, there are cases where by learning of new blocks, the blue score of the
+> virtual node actually **decreases**.»*
+
+**Esto es la raíz, y no es un defecto de la ronda 7.** El inyector se lee de «el ancestro de la
+cadena seleccionada en la posición `c·j`». GHOSTDAG garantiza el **orden total** de los bloques; no
+garantiza **qué bloque ocupa una posición dada de la cadena seleccionada**. Son objetos distintos:
+la cadena seleccionada de Kaspa se reorganiza de forma rutinaria sin que el orden cambie, y eso es
+normal y benigno *para el orden* — pero es fatal para una entropía leída de una posición.
+
+R-FIN-1a no lo arregla: es una regla de **validez** que obliga a que los slots crezcan dentro de una
+cadena; no impide que la cadena seleccionada sea **sustituida** por otra cadena válida.
+
+**Afecta a todas las rondas desde la 3**, que es cuando D9 introdujo la corrección «inyector =
+posición `c·j` de la cadena seleccionada». Las siete rondas construyeron sobre el único objeto de
+GHOSTDAG que su paper no estabiliza.
+
+**Matiz honesto:** que el paper no lo demuestre no prueba que sea falso — Kaspa funciona en
+producción. Pero la propiedad no está enunciada, el análogo de Bitcoin está explícitamente negado
+por los autores, y siete rondas la han dado por supuesta sin citarla.
+
+### Recomendación corregida
+
+1. **La pregunta de Q2 con deriva nula: contestarla aquí, no lanzarla.** Ya está contestada arriba
+   (`verif_q2_deriva_nula.py`). Transcribir el resultado y corregir el `L ≈ F/3` de §6, que es falso
+   a `F` pequeño.
+2. **La pregunta que sí decide P-038 es la del prefijo común**, y su respuesta primaria ya está: el
+   paper no la da. Lo que queda es una decisión, no una investigación: **o se demuestra**, que es
+   trabajo de teoría original y no de auditoría, **o se cierra P-038 por desajuste estructural**.
+3. **La única dirección de reparación que no queda cerrada** —y la anoto como observación, no como
+   propuesta— es anclar el inyector en el objeto que GHOSTDAG **sí** demuestra: el **índice del
+   orden total**, no la posición de la cadena seleccionada. Prop. 7 le da convergencia exponencial.
+   Exigiría rehacer R-FIN-1 y Q1 enteras, y merece el mismo escrutinio que todo lo anterior.
+
+---
+
 ## 11 · Reproducción
 
 ```bash
@@ -494,6 +603,9 @@ python3 verif_cobertura.py          # hallazgo C: coste real de cubrir un 2.o fl
 python3 verif_umbral_delta.py       # hallazgo D: umbral con Delta = 4 s
 python3 verif_ventana_prediccion.py # hallazgo E: W frente a kappa
 python3 verif_margen_eq2.py         # hallazgo F: margen bajo ec. (2) completa
+python3 verif_pinza.py              # la pinza: W>kappa es identidad con L=F
+python3 verif_recomendacion.py      # auditoria de mi propia recomendacion
+python3 verif_q2_deriva_nula.py     # respuesta a Q2 bajo cobertura total
 ```
 
 **Fuente primaria leída:** `…/0cfccf9e-…/scratchpad/papers/bdk19.txt` — «Proof-of-Stake Longest
