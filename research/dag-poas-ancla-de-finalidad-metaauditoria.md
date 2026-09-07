@@ -390,6 +390,53 @@ es «`P` pequeña, sin teorema».
 
 ---
 
+## 9 bis · La pinza — resultado estructural nuevo
+
+Ninguna ronda comprobó si la condición `W ≤ κ` es **alcanzable con algún parámetro**. Lo es, pero
+solo en una rama, y esa rama es incompatible con el argumento que sostiene la ronda 7.
+
+`λ_chain` se cancela en la comparación, así que la condición es puramente estructural:
+
+```
+W ≤ κ   ⟺   (L + I)·λ_chain ≤ F·λ_chain   ⟺   L + I ≤ F
+```
+
+con `I = c/λ_chain > 0` siempre. De donde (`verif_pinza.py`, `q = 1`, `F = 1000 s`):
+
+| Elección de `L` | `c` máximo para `W ≤ κ` | `φ_c` | Umbral (Δ=0) |
+|---|---:|---:|---:|
+| **`L = F`** (incondicional, la de la ronda 7) | **IMPOSIBLE** | — | — |
+| `L = F/2` | 100 | 1,2070 | 45,3 % |
+| `L = F/3` (§6, probabilística) | 134 | 1,1824 | 45,8 % |
+| `L = F/5` (§6, probabilística) | 161 | 1,1684 | 46,1 % |
+
+**Jaw 1 — con `L = F`, `W > κ` es una identidad.** No es un parámetro mal elegido ni un `c`
+demasiado grande: para cualquier `c > 0`, cualquier `q` y cualquier `F`, `L + I = F + I > F`. El
+diseño está en el régimen de soborno encubierto **por construcción**, y no hay ajuste que lo saque.
+
+**Jaw 2 — con `L < F` sí se sale, y sale barato.** Bajar `c` de 500 a 134 cuesta **1,7 puntos de
+umbral** (47,6 % → 45,8 %, ambos con Δ=0). Es un precio pequeño.
+
+**Y las dos mandíbulas se cierran una sobre otra.** `L = F` es precisamente lo que hace funcionar el
+argumento de Q2: *«un flujo divergente nace en un bloque ya final, cubrirlo vale cero»*. Con `L < F`
+ese argumento desaparece y vuelve la **cobertura racional**, que es lo que mató las rondas 3, 4 y 5.
+Y el único análisis de cobertura con `L < F` que existe es el de Q2 — el que tiene el coste cableado
+a `0,5` cuando lo medido es ≈ 0 (§3).
+
+> **La ronda 7 no eligió `L = F` por casualidad: es la única elección que cierra la cobertura. Y es
+> exactamente la elección que hace inevitable `W > κ`.**
+
+Esto reduce todo el problema a **una** pregunta, por primera vez en siete rondas:
+
+> ¿Sobrevive el argumento de cobertura con `L < F` cuando el coste de cubrir un segundo flujo se
+> pone en su valor medido (≈ 0) en vez de en `0,5`?
+
+Si sobrevive, existe una octava propuesta bien definida: `L = F/3`, `c ≤ 134`, fuera del régimen de
+soborno, pagando 1,7 puntos de umbral. Si no sobrevive, **P-038 queda cerrada por un argumento
+estructural**, no por acumulación de refutaciones de mecanismos.
+
+---
+
 ## 10 · Conclusión y recomendación
 
 ### Qué está establecido
