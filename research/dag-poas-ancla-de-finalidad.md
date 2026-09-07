@@ -103,6 +103,11 @@ inyector de la época `j` visto desde `B` es `I_j(B) :=` el ancestro de la caden
 `B` en la posición `c·j`. Único por cadena, siempre existe, sin campo de cabecera, y `sp(B)` nunca
 discrepa de `B` (es la corrección que D9 dio en la ronda 3, con demostración).
 
+**R-FIN-1a · Monotonicidad de slot en la cadena seleccionada.** Para todo bloque `B` en la cadena
+seleccionada: `slot(sp(B)) < slot(B)`. Un bloque cuyo padre seleccionado tenga slot mayor o igual
+es inválido. Esto garantiza que la cadena seleccionada es estrictamente creciente en tiempo,
+cerrando el ataque de desplazamiento de inyector (D8, ronda 7, A1).
+
 **R-FIN-2 · Entropía e instante.** `entropía_j = blake3(chunk(I_j) ‖ pot_output(I_j))`;
 `t_j = slot(I_j) + L`. Antes de `t_j` la entropía no se mezcla (verificado en código, ronda 4:
 `sp-consensus-subspace/src/lib.rs:118-126`, solo en el slot exacto), así que **durante `[slot(I_j),
