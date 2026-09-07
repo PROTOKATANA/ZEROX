@@ -694,6 +694,37 @@ R-FIN-1.
 6. **`F` sin derivar:** Prop. 8 da decaimiento exponencial pero la constante hay que sacarla de
    Lema 10, que no está hecho.
 
+### Rebaja de la etiqueta «FUNDADO» — el teorema es sobre GHOSTDAG **puro**
+
+Al ejecutar `ghostdag_mini.py` (el simulador de D8 que llevaba en disco sin usar) salió su
+«contraejemplo U3»: un bloque `X` en la cadena seleccionada de `H2` **y rojo a la vez**. Comprobado:
+**no aplica a la ronda 7.** Ese contraejemplo prueba la forma **U3** («ambas copias rojas»), que
+D9 ya refutó en la ronda 1; la ronda 7 usa **U3′** —*«de varias copias, la primera en el orden de
+GHOSTDAG es azul y las demás rojas»* (`dag-poas-inyeccion-anclada.md:56-58`)— y con ella `X` sigue
+azul y el invariante «cadena seleccionada ⊆ azules» se conserva.
+
+Pero la ronda 1 dejó escrito, sobre U3, el principio exacto que aquí importa:
+
+> *«Con U3 como posproceso, el coloreado sigue siendo función determinista del DAG (no depende del
+> orden de llegada), pero **no es el objeto sobre el que está el teorema**.»*
+
+**Eso se aplica también a mi ancla.** Prop. 7 y la Definición 2 están demostradas sobre **GHOSTDAG
+puro**. La ronda 7 le añade U3′ (posproceso de coloreado), R-FIN-5 (filtro estructural de flujo) y
+R-FIN-8 (rojos sin estado). Que el orden total siga convergiendo bajo esas tres modificaciones
+**no está comprobado**.
+
+Corrijo por tanto la etiqueta que puse: no es **FUNDADO** a secas, es **FUNDADO SOBRE GHOSTDAG
+PURO, pendiente de comprobar bajo U3′ + R-FIN-5 + R-FIN-8**. Sigue siendo estrictamente mejor que
+la cadena seleccionada —allí no hay teorema **ninguno**, aquí hay uno cuya hipótesis hay que
+revalidar— pero la diferencia entre «tiene teorema» y «tiene teorema aplicable» es justo la que se
+saltó la auditoría anterior.
+
+**Segunda rebaja, sobre el umbral.** La ronda 1 documentó que bajo U3′ el atacante puede decrementar
+la puntuación a voluntad publicando copias contra billetes ya contados (`score(H2) = score(H1) − 1`),
+y que eso queda *«fuera del caso peor que acota el Lema 9»* —aunque de efecto neto cero respecto a
+retener. **El Lema 9 es exactamente lo que usé** para el umbral corregido de 33,8 %–47,3 %. Ese
+rango hereda la misma salvedad.
+
 ### Lo primero que hay que atacar de la octava propuesta
 
 El índice del orden total **cuenta también los rojos**. Cerca de la punta, un atacante influye en qué
