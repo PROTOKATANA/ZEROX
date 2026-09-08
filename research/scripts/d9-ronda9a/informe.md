@@ -515,3 +515,90 @@ es el resultado operativo de esta ronda: **el número que hay que medir no es `�
 de **red**, no de espacio, y el modelo del paper no lo cubre (L1024-1027)— la frontera cae por debajo
 del umbral operativo del 33 %.
 
+---
+
+## L6 · VEREDICTO
+
+### La respuesta a la pregunta única
+
+> **¿Es correcto el argumento de presupuestos disjuntos de `dag-poas-tras-d8-palancas.md` §1?**
+>
+> **SÍ. Y no encontré dónde se rompe, después de buscarlo por seis vías distintas.** La corrección es
+> **más fuerte** que la que el agente principal escribe: no es solo que el atacante no pueda estar en
+> dos sitios a la vez —es que la magnitud `(1−α)(1−δ)λ` **nunca fue** el denominador de la carrera, y
+> `δ` es una palanca **de red**, no de espacio.
+
+### Tabla de veredictos
+
+| # | Afirmación | Etiqueta | Evidencia |
+|---|---|---|---|
+| 1 | El diseño usó `(1−α)(1−δ)λ` donde la carrera pide `wH` = score del **bloque virtual honesto**, que **incluye los azules del atacante** | **DEMOSTRADO** | `phantom-ghostdag.txt` L1034-1036, cita literal. Es la raíz del error, anterior a las rondas 3-8 |
+| 2 | Cota por evento `R ≤ A + \|Y_h \ X_h\|` | **DEMOSTRADO** | Álgebra rehecha por mí (§Relanzamiento). El L1 heredado la enunció bien; su caracterización de la holgura era falsa y está corregida |
+| 3 | «Uno a uno como máximo» en la versión **literal** | **REFUTADO por el paper** | Lema 9, L1138-1147: `R = k+2Dλ = 38` por `A = k+1 = 31`, `R/A = 1,226`. De ahí sale el `δ = 0,2105` |
+| 4 | …pero ese evento **no es realizable** con `k = 30` | **DEMOSTRADO** | `salida_a5.txt` §5.2: `J = k+1` gana solo si `α > (k+1)/(3k+2) = 0,337`, y ahí `R/A` ya vale 0,889. El paper no comprueba su propia condición de victoria |
+| 5 | **Teorema de la ráfaga:** para `α ∈ (0,½)`, «ráfaga con `R ≥ A`» ⟺ «ráfaga que PIERDE» | **DEMOSTRADO** | Álgebra cerrada + barrido exhaustivo `J = 1..1000 × 10 α` = 10 000 casos, **0 discrepancias**, ambas ramas (1 080/9 920) |
+| 6 | Parasitar **nunca** ayuda al que corre, incluso **concediendo** la holgura `2Dλ` del paper | **DEMOSTRADO** | `argmax_β r(β) = 0` en las 11 filas; analíticamente para todo `α < 1/(1+c) = 0,795` con `c = 2Dλ/(k+1) = 0,2581` |
+| 7 | `R/A_azul ≤ 1` y `W_pub/H ≥ 1` sobre 37 maniobras (parásita, cadena, abanico, dos parásitas alternas, copias U3″) | **VERIFICADO** | `salida_a1.txt`, 3 996 corridas. Máximo absoluto **0,995** (a `α = 0,70`). Mínimo `W_pub/H` = 0,9999 (celda con 0,4 ráfagas: ruido) |
+| 8 | Reparto `α = α_p + α_f`: la deriva es **máxima en `α_p = 0`** y monótona decreciente | **VERIFICADO** | `salida_a2.txt`, 7 200 corridas, 12 semillas, 4 controles pasados. `W_pub/H ≥ 1,0000` en las 30 celdas |
+| 9 | Maniobra (ii)-b: publicar **parte** de la privada compra `δ` gratis | **REFUTADA** | `salida_a4.txt`, 1 152 corridas: `δ` **cae** 0,3065→0,1033 (`α=0,35`), los cambios de cadena caen 19,9→0,8, `adv_max ≤ 43,4 < 3k = 90` |
+| 10 | Maniobra (ii): el flujo privado hereda parásitos publicados | **REFUTADA** | Están en el pasado de las dos cadenas (se cancelan en `adv`), y lo de fuera está acotado por `3k` (Lema 12, L1200-1206), constante **ya dentro** de `prev()`. Además, en simulación el flujo **pierde el padre seleccionado** y deja de ser cadena competidora (contador `sprob`) |
+| 11 | «Rojos de rojos» / cascada | **REFUTADA** | `protocol.rs:194-212`: solo `mergeset_blues` cuenta en el anticono azul. Un rojo **libera** presupuesto `k`, no lo consume |
+| 12 | Frontera de flujo único con `δ = 0` = **46,88 %** | **VERIFICADO** | `salida_a6.txt`. El agente escribió 46,9 % |
+| 13 | Parásito ajeno 10/20/33 % → 42,0 / 37,2 / 30,9 % | **VERIFICADO** | `salida_a6.txt`: **42,0270 / 37,1840 / 30,9036 %**. Reproducidos a la cuarta cifra |
+| 14 | Un parásito ajeno de cuota `α_p` = un granjero de cuota `α_p` **apagado** | **DEMOSTRADO** | Su aportación azul se compensa exactamente con sus rojos en el óptimo (§L1-bis), y por debajo del óptimo **sube** `W_pub` |
+| 15 | El `δ` real no lo impone el adversario de espacio: lo impone **`Δ`** | **VERIFICADO** | `salida_a1b.txt`: `δ₀(Δ=4) = 0,0000`, `δ₀(20) = 0,4428` **con `α = 0`**, sin gastar un bloque |
+| 16 | **`Δ` sigue sin medir**, y un atacante de RED sí lo mueve (fuera del modelo del paper) | **LAGUNA** | `salida_a6.txt`: la frontera cae a 38,3 % con `Δ = 16 s` y a **32,4 % con `Δ = 20 s`** — por debajo del umbral operativo del 33 % |
+| 17 | La conservación `W_pub/H ≥ 1` **se rompe** con `Δ` grande incluso con atacante | **VERIFICADO** | `salida_a1b.txt`, `Δ = 20`, `α = 0,35`: `R/A_azul = 1,121`, `W_pub/H = 0,936`. **El teorema de la ráfaga vale mientras `2Δλ ≪ k`, no siempre** |
+
+### Lo que hay que corregir en `dag-poas-tras-d8-palancas.md` §1
+
+1. **El argumento escrito es correcto pero incompleto.** «Con la parásita en su óptimo los rojos por
+   bloque publicado son ≤ 1» es cierto, y la razón es más fuerte de lo que dice: **`R < A` es
+   *equivalente* a que la ráfaga gane**, no una coincidencia del óptimo.
+2. **Falta declarar la condición `2Δλ ≪ k`.** El «`δ` natural medido a `α=0` es 0,0000» es cierto **a
+   `Δ = 4 s`** y solo ahí. A `Δ = 20 s` es 0,443 y toda la corrección se desploma. La frase «`Δ` sigue
+   sin medir» aparece al final del documento como una nota; con estos números es **la** condición de
+   validez del 46,9 %, y debe ir en la misma frase que el 46,9 %.
+3. **El 46,9 % no es «la frontera real», es la frontera contra un atacante de espacio.** Contra un
+   atacante que además degrade la red hasta `Δ_ef = 20 s`, es 32,4 %.
+
+### Errores propios (regla 10)
+
+1. **Mío:** en la primera versión de `r9a_a5_cota.py` §5.1 conté la fila `α = 0` en las discrepancias y
+   salieron **400 falsas**. A `α = 0` el atacante no tiene bloques: no hay ráfaga y «`R < A`» es cierto
+   de forma vacua. Corregido: la equivalencia se enuncia para `α > 0`, la fila `α = 0` se conserva
+   (regla 1) y se marca. Salida corregida y re-ejecutada.
+2. **Del D9 anterior, encontrados por mí:** (a) L1 sitúa la holgura en «honestos creados en `(t−Δ, t]`»
+   cuando el intervalo correcto es `(t_{B′}−Δ, t]`; (b) L1 declara nula la rama «honestos ya rojos en la
+   vista de `B′`» invocando que «el `δ` natural es 0», que es **circular** dentro de una demostración
+   (es lo que L2b mide, no un supuesto); (c) L1 no cita el contraejemplo que está en el propio Lema 9
+   (§L1-bis); (d) commiteó `__pycache__` (sacado del índice en `239a9dc`).
+3. **Limitación del instrumento, declarada:** `MundoParcial` (A4) **no** lleva el guardián `sprob` que
+   `MundoSplit` sí lleva, así que su `adv_max` es una **cota inferior** de lo que un atacante estricto
+   retendría. No cambia la conclusión: el teorema de la ráfaga (L1-bis) y el `3k` del Lema 12 acotan esa
+   ventaja por arriba, y `prev()` ya se la concede entera.
+
+### Cobertura y método
+
+- **Regla 1** (`α = 0` en toda tabla): cumplida en A1, A1b, A2, A4, A5, A6.
+- **Regla 3** (≥ 12 semillas literales): 12 en A1, A1b, A2, A4. A5/A6 son deterministas.
+- **Regla 4** (control positivo antes de medir): A1b (`Δ` grande) para la conservación; `frac_pub = 1,0`
+  para A4; los 4 controles del encargo en A2; `prev()` literal de D8 en A5/A6.
+- **Regla 5** (`AUDITA_SCRIPTS.py`): 8 scripts, **4 marcas `[T3b]`**, `r9a_lib.py:132, 267, 321, 393`.
+  **Leídas una a una:** las cuatro son `padres = self._padres(...)` en la rama `quien == "h"` (bloque
+  honesto, vista completa) frente a `ph = self._padres(...)` en la rama del atacante, que fusiona la
+  vista honesta **a propósito** y luego antepone su punta privada. Es el mecanismo, no una tautología —
+  el mismo falso positivo que D8 ya declaró en `d8_lib.py:109`. **0 marcas T1/T2/T3/T4.**
+- **Regla 7** (adversario del paper, sin retardo, L1024-1027): respetado en A1/A2/A4; A1b y §5.3
+  **salen** de ese modelo a propósito y lo declaran.
+- **Regla 8** (volcado incremental): 4 commits, solo en `research/scripts/d9-ronda9a/`.
+
+### Lo que queda abierto
+
+1. **`Δ`. Sigue sin medir, y ahora se sabe cuánto vale medirlo:** es la diferencia entre una frontera
+   de 46,9 % y una de 32,4 %. Es la primera medición que este diseño necesita.
+2. **El atacante de red no está modelado.** Todo el análisis usa el adversario del paper, que no puede
+   retrasar honesto↔honesto por encima de `Dmax`. La línea A3 de D8 (partición) es el único trabajo que
+   lo toca, y no está compuesta con esta frontera.
+3. **La verificación no sucinta del PoT de Autonomys** (`CLAUDE.md`, cambio de consenso) sube el coste
+   de validar y por tanto **`Δ`**. No está medida, y ahora se ve que va directa a la frontera.
