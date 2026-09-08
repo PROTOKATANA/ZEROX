@@ -50,7 +50,15 @@ def prev_rapido(a, lam, t, offset, hf, nsig=16.0):
     ma = a * lam * t
     r = a / ((1 - a) * hf)
     mu, sg = mh - ma, np.sqrt(mh + ma)
-    lo = max(-400, int(mu - nsig * sg) - 2)
+    # ERROR PROPIO CORREGIDO (declarado en el informe): la primera version ponia
+    #   lo = mu - nsig*sigma  y  cola_izq = skellam.cdf(lo-1),
+    # es decir, sumaba TODA la cola izquierda con catch = 1. Falso: catch vale 1 solo
+    # para ds < offset; entre offset y lo vale r^(ds-offset+1), que es ~0. El sesgo era
+    # de 1e-58 (irrelevante frente al umbral 1,3e-15 de la frontera, y por eso las
+    # fronteras no cambiaron), pero la comprobacion `prev_rapido == prev_lento` fallaba.
+    # Arreglo: se baja `lo` hasta `offset`, de modo que TODO lo que queda por debajo
+    # tiene catch = 1 exactamente y `cola_izq = skellam.cdf(lo-1)` es correcto.
+    lo = max(-400, min(int(mu - nsig * sg) - 2, int(offset)))
     hi = min(60000, int(mu + nsig * sg) + 2)
     if hi <= lo:
         return 0.0
@@ -59,7 +67,6 @@ def prev_rapido(a, lam, t, offset, hf, nsig=16.0):
     d = ds - offset
     with np.errstate(over="ignore"):
         catch = np.where(d >= 0, np.power(r, np.minimum(d + 1.0, 700)), 1.0)
-    # todo ds < lo aporta catch = 1 (si lo > offset no aporta nada de masa relevante)
     cola_izq = float(skellam.cdf(lo - 1, mh, ma)) if lo > -400 else 0.0
     return float(np.sum(p * catch)) + cola_izq
 
@@ -68,7 +75,7 @@ def union10(a, hf, f=prev_rapido):
     return min(1.0, f(a, 1.0, F_SEG, 3 * K, hf) * EP_ANO * ANOS)
 
 
-def frontera(hf_de_alpha, lo=0.05, hi=0.499, paso=0.0005):
+def frontera(hf_de_alpha, lo=0.05, hi=0.499, paso=0.001):
     g = lambda a: np.log10(max(union10(a, hf_de_alpha(a)), 1e-320)) + 10.0
     ant = None
     for a in np.arange(lo, hi + 1e-9, paso):
@@ -110,7 +117,9 @@ if __name__ == "__main__":
             if hf == 1.0:
                 print(f"{a:>7.3f} {hf:>7.3f} | {pl:>14.6e} {pr:>14.6e} {er:>11.2e}")
     print(f"  peor error relativo sobre las 27 combinaciones: {peor:.3e}  ->  "
-          f"{'VALE' if peor < 1e-9 else 'NO VALE'}\n")
+          f"{'VALE' if peor < 1e-9 else 'NO VALE'}")
+    print("  (rejilla del barrido: 0,001 + brentq; la frontera la refina brentq, la\n"
+          "   rejilla solo tiene que ACOTAR el primer cruce)\n")
 
     print("--- control 1 (positivo): reproducir los numeros YA PUBLICADOS ---")
     fa = frontera(lambda a: 1 - d_interp(a))

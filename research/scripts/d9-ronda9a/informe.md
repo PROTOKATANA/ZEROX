@@ -94,7 +94,12 @@ flujo único pasaría de 36,5 % a **46,9 %**.
 > atacante gaste **un solo bloque**, `δ₀ = 0,443` y `Wpub/H = 0,557`. **El `δ` real del diseño no es una
 > palanca del adversario: es `Δ`.** Y `Δ` sigue sin medir.
 >
-> **Frontera de flujo único, recalculada:** ver §4. Con `δ = 0`, **46,88 %**.
+> **Frontera de flujo único, recalculada:** ver **§L5**. Con `δ = 0`, **46,88 %**.
+>
+> *(Nota del relanzamiento: este veredicto adelantado es del D9 anterior. Lo suscribo, con dos
+> correcciones —la holgura de L1 está mal caracterizada y el propio paper contiene un contraejemplo
+> declarado a la versión literal «uno a uno», §L1-bis— y con la frontera ya calculada, §L5. El
+> veredicto completo y etiquetado está en **§L6**.)*
 
 ---
 
@@ -568,12 +573,20 @@ del umbral operativo del 33 %.
    salieron **400 falsas**. A `α = 0` el atacante no tiene bloques: no hay ráfaga y «`R < A`» es cierto
    de forma vacua. Corregido: la equivalencia se enuncia para `α > 0`, la fila `α = 0` se conserva
    (regla 1) y se marca. Salida corregida y re-ejecutada.
-2. **Del D9 anterior, encontrados por mí:** (a) L1 sitúa la holgura en «honestos creados en `(t−Δ, t]`»
+2. **Mío:** en `r9a_a7_frontera_rapida.py` (el contraste independiente) restringí el soporte de la
+   Skellam a `μ ± 16σ` y sumé toda la cola izquierda con `catch = 1`. **Falso:** `catch` vale 1 solo
+   para `d < offset = 3k`; entre `offset` y el borde vale `r^(d−offset+1) ≈ 0`. El control 0 lo cazó
+   (`prev_rapido ≠ prev_lento` a `α = 0,33-0,40`) — **el control positivo funcionó contra mí, que es
+   para lo que está**. Sesgo absoluto: `~10⁻⁵⁸`, frente al `1,3·10⁻¹⁵` del umbral de la frontera: **las
+   fronteras publicadas no cambian** (y de hecho A6 y A7 coinciden a la cuarta cifra en las 12 celdas).
+   Corregido bajando el borde hasta `offset`, y re-ejecutado.
+3. **Mío:** lancé A3 con `timeout 900` cuando tarda ~40 min y la maté yo (código 143). Relanzada.
+4. **Del D9 anterior, encontrados por mí:** (a) L1 sitúa la holgura en «honestos creados en `(t−Δ, t]`»
    cuando el intervalo correcto es `(t_{B′}−Δ, t]`; (b) L1 declara nula la rama «honestos ya rojos en la
    vista de `B′`» invocando que «el `δ` natural es 0», que es **circular** dentro de una demostración
    (es lo que L2b mide, no un supuesto); (c) L1 no cita el contraejemplo que está en el propio Lema 9
    (§L1-bis); (d) commiteó `__pycache__` (sacado del índice en `239a9dc`).
-3. **Limitación del instrumento, declarada:** `MundoParcial` (A4) **no** lleva el guardián `sprob` que
+5. **Limitación del instrumento, declarada:** `MundoParcial` (A4) **no** lleva el guardián `sprob` que
    `MundoSplit` sí lleva, así que su `adv_max` es una **cota inferior** de lo que un atacante estricto
    retendría. No cambia la conclusión: el teorema de la ráfaga (L1-bis) y el `3k` del Lema 12 acotan esa
    ventaja por arriba, y `prev()` ya se la concede entera.

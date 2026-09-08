@@ -1,0 +1,7 @@
+=== A3 · frontera de flujo unico, cuatro modelos ===
+prev() = d8_a1c_riesgo.py:29-40 (Skellam, ventaja 3k=90), F=19080 s, I=4200 s, 7509 epocas/ano, 10 anos, umbral union < 1e-10.
+
+(e) delta GRATIS (sin gastar un bloque del atacante): delta_0 = P(anticono honesto > k) = P(Poisson(2*D*lam=8) > 30) = 5.370e-10
+    -> a efectos de la carrera es CERO (mueve la frontera menos de 1e-6 puntos).
+
+                                          modelo | frontera 1e-10 |    r = 1
