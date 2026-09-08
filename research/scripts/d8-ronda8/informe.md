@@ -893,3 +893,25 @@ ese coste se paga **una vez por slot**, no por bloque, y queda en el 9,6 % de un
 dice el documento. **No lo he medido**, y es la diferencia entre 0,096 núcleos y 14,4. Quien
 cierre `C-NET-03/04` tiene que resolverlo antes.
 
+
+---
+
+**Nota de reproducibilidad.** `d8_a4_cruce.py`, `d8_a4b_horizonte.py` y `d8_a4c_rachas.py`
+seguían corriendo al cerrar este informe; sus ficheros de salida pueden ganar filas después
+del último commit. Todas las filas citadas aquí están en el fichero tal como se comprometió.
+Todo lo demás está completo. Orden de ejecución para reproducir de cero:
+
+```
+python3 d9-ronda8f/r8f_b1_slot.py 1.0     # A0, validación del instrumento (~10 min)
+python3 d8_a1_lema9.py                    # A1  (~6 min)
+python3 d8_a1b_umbral.py 1800             # A1b (~5 min)
+python3 d8_a1c_riesgo.py                  # A1c (segundos)
+python3 d8_a1d_rfin1a.py                  # A1d (~6 min)
+python3 d8_a1e_coste.py                   # A1e (~1 min)
+python3 d8_a2_dosvistas.py                # A2  (~3 min)
+python3 d8_a3_smax.py ; python3 d8_a3b_eclipse.py   # A3 (~20 + ~13 min)
+python3 d8_a4b_horizonte.py ; python3 d8_a4c_rachas.py   # A4
+python3 d8_a5_soborno.py ; python3 d8_a5b_equilibrio.py  # A5 (~13 min + segundos)
+python3 d8_a6_presupuesto.py ; python3 d8_a6b_lineas.py ; python3 d8_a6c_shuffle.py  # A6
+python3 ../AUDITA_SCRIPTS.py .            # regla 5
+```
