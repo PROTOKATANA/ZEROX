@@ -1,0 +1,16 @@
+=== A1d · control de modelo: el atacante TAMBIEN sufre Delta = 4 s ===
+
+--- paper (atacante sin retardo) ---
+ alpha  lambda_chain  % cadena atac.   m GRATIS   m +retraso   m +retencion
+  0.00        0.1986            0.0%       1.00         1.00           1.00
+  0.10        0.3284           31.2%       4.12         5.38           6.88
+  0.25        0.4933           49.8%       4.88         8.12           9.38
+  0.40        0.6438           59.0%       5.00         8.75          10.25
+
+--- CONTROL (atacante con Delta) ---
+ alpha  lambda_chain  % cadena atac.   m GRATIS   m +retraso   m +retencion
+  0.00        0.1986            0.0%       1.00         1.00           1.00
+  0.10        0.1986           12.6%       1.38         1.62           1.88
+  0.25        0.1986           27.8%       2.00         2.25           2.88
+  0.40        0.1986           41.7%       2.62         3.00           3.38
+

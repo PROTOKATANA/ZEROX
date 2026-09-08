@@ -109,32 +109,29 @@ def t5_cadena_subset_azules():
 
 
 def t6_limites_kaspa():
-    """R-FIN-12: >12 padres y mergeset>180 -> bloque invalido."""
-    d = DAG(k=25, u2=False, u3_mode="off")
+    """R-FIN-12: mas de `max_parents` padres -> TooManyParents; mergeset > 180 -> MergeSetTooBig."""
+    from r8c_gd import MAX_PARENTS, MERGESET_LIMIT, K_DEFAULT
+    d = DAG(k=K_DEFAULT, u2=False, u3_mode="off")
     g = d.genesis()
     sibs = []
-    for i in range(200):
+    for i in range(400):
         d.add(f"S{i}", [g], t=1 + i * 1e-4, sd=i)
         sibs.append(f"S{i}")
-    ok, why = d.add("P13", sibs[:13], t=5)
+    ok, why = d.add("PX", sibs[:MAX_PARENTS + 1], t=5)
     assert (not ok) and why == "TooManyParents", (ok, why)
-    # 12 padres pero mergeset gigante: cadenitas para inflar el mergeset
-    ok, why = d.add("M", sibs[:12], t=5)
-    assert ok
-    # construimos un portador con mergeset > 180 usando 12 padres que cubran 200 hermanos
-    d2 = DAG(k=25, u2=False, u3_mode="off")
-    g2 = d2.genesis()
-    sib2 = []
-    for i in range(200):
-        d2.add(f"S{i}", [g2], t=1 + i * 1e-4, sd=i)
-        sib2.append(f"S{i}")
+    ok, why = d.add("PO", sibs[:MAX_PARENTS], t=5)
+    assert ok, why
+    # portadores que cubren > MERGESET_LIMIT hermanos -> el fusionador es INVALIDO
     caps = []
-    for j in range(12):
-        grupo = sib2[j * 16:(j + 1) * 16] or [g2]
-        d2.add(f"K{j}", grupo[:12] if len(grupo) > 12 else grupo, t=5 + j * 1e-3, sd=1000 + j)
+    for j in range(MAX_PARENTS):
+        grupo = sibs[j * MAX_PARENTS:(j + 1) * MAX_PARENTS]
+        d.add(f"K{j}", grupo, t=6 + j * 1e-3, sd=1000 + j)
         caps.append(f"K{j}")
-    ok, why = d2.add("BIG", caps, t=9)
-    return f"t6 R-FIN-12: 13 padres -> TooManyParents OK; portador de 12 caps -> ok={ok} ({why})"
+    ok, why = d.add("BIG", caps, t=9)
+    tam = MAX_PARENTS * MAX_PARENTS + MAX_PARENTS
+    assert (not ok) and why == "MergeSetTooBig", (ok, why, tam, MERGESET_LIMIT)
+    return (f"t6 R-FIN-12: {MAX_PARENTS+1} padres -> TooManyParents; "
+            f"mergeset {tam} > {MERGESET_LIMIT} -> MergeSetTooBig OK")
 
 
 if __name__ == "__main__":

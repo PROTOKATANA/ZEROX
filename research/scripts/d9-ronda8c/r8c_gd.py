@@ -36,9 +36,9 @@ Reglas de ZEROX que se pueden activar/desactivar para auditarlas:
 """
 from dataclasses import dataclass, field
 
-K_DEFAULT = 25
-MAX_PARENTS = 12          # bps.rs:57-72 con k=25 -> max(10, min(16, 25/2)) = 12
-MERGESET_LIMIT = 180      # bps.rs:75-80 con k=25 -> max(180, min(512, 50)) = 180
+K_DEFAULT = 30            # actualizado por el coordinador (dag-poas-delta-real.md): era 25
+MAX_PARENTS = 15          # bps.rs:57-72 con k=30 -> max(10, min(16, 30/2)) = 15
+MERGESET_LIMIT = 180      # bps.rs:75-80 con k=30 -> max(180, min(512, 60)) = 180
 
 
 @dataclass
