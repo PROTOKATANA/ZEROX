@@ -855,6 +855,10 @@ y el criterio `α` de las tablas se comprueba precisamente **comparando** las do
 8. **No he vuelto a medir `W_dec`**: uso la de 9c (`salida_c4.txt`), con su LAGUNA de resolución
    declarada (rejilla `{0,10,20,45,…}`, tope de 10 candidatos). Todo el punto A y la pinza corregida
    heredan esa resolución.
-9. **`L ≥ F_carrera` (§E) es un argumento, no una medición.** No he simulado la discrepancia de ancla
+9. **Aritmética al vuelo mal hecha en la primera redacción:** escribí que «`ρ = 1,001` da el 99,7 %
+   de lo que da `ρ = 10`» comparando `a_min` con `cap` en vez de los dos máximos en régimen. El valor
+   correcto es **82,4 % / 90,4 % / 96,1 %** según `F` (1 h / 2 h / 5,3 h). El argumento del acantilado
+   no cambia; el número sí.
+10. **`L ≥ F_carrera` (§E) es un argumento, no una medición.** No he simulado la discrepancia de ancla
    con dos vistas honestas distintas, que es el defecto `d8b_b3` que la propuesta ya señala. Por eso
    §E es PLAUSIBLE y no VERIFICADO.
