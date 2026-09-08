@@ -238,3 +238,93 @@ para `m ≤ 151`); **REFUTADO el enunciado de P4 en su parte de `α_ef`** («el 
 `√(n_eval/I)`» es cierto **a `I` fija**, pero la propuesta *deriva* `I` del steering: a `g`
 objetivo fijo, `α_ef` no se mueve). **DEMOSTRADO** el beneficio real: es en `I`, `F` y el
 margen económico.
+
+---
+
+## E · Contraataques — `r9c_e1_contraataques.py`, `salida_e1.txt`
+
+### E.1 · ¿Puede precomputar los candidatos ANTES de `T_j`? — **No los candidatos; SÍ la cadena común. Y eso es lo que decide todo.**
+
+El candidato `X` no cambia nada de la cadena de PoT **hasta `t_j = slot(X) + L`**. Su semilla ahí
+es `blake3(entropía_X ‖ pot_out(t_j − 1))` (Autonomys `PotOutput::seed_with_entropy`,
+`crates/subspace-core-primitives/src/pot.rs:288-294`, aplicada solo en el slot exacto,
+`crates/sp-consensus-subspace/src/lib.rs:118-129`). Luego **evaluar un solo slot de un candidato
+exige estar YA en el slot `t_j − 1` de la cadena común.** Eso es una carrera de VDF.
+
+**La cota de conocimiento (nueva, y P4 no la vio).** En el instante `u` el atacante conoce
+`entropía_i` para toda época `i` con ancla cerrada, es decir `T_i + W_dec ≤ u`; la última inyección
+que puede calcular es la siguiente a esa, en el slot `≈ u − W_dec + L + I`. Luego su
+**ventaja máxima sobre el timekeeper es `L + I − W_dec` slots = 23 130 slots** con `L = 5,3 h`,
+`I = 4 200 s`, `W_dec = 150 s`. Necesita ventaja `L = 19 080` para estar en `t_j − 1` en el
+instante `T_j`. **La cota lo permite** (porque `L + I − W_dec > L` ⟺ `I > W_dec`).
+
+**La cota de velocidad la cierra.** La cota de conocimiento avanza a **1 slot/s de media** (salta
+`I` slots cada `I` s). Luego:
+
+| `ρ` | ¿crece la ventaja? | bootstrap hasta el tope (`W_dec = 150`) | `n_eval` por candidato |
+|---:|---|---:|---:|
+| **≤ 1,0** | **no** — se queda en la que tenga; si empieza en 0, sigue en 0 | ∞ | **0** |
+| 1,01 | sí, a 0,01 slot/s | 642,5 h (26,8 días) | 152 |
+| 1,05 | sí | 128,5 h (5,4 días) | 158 |
+| 1,15 | sí | 42,8 h | 172 |
+| 1,5 | sí | 12,8 h | 225 |
+| 3,0 | sí | 3,2 h | 450 |
+
+**Hallazgo E1 (corrige P4).** `n_eval = ρ·W_dec` **solo si `ρ > 1`** y tras un *bootstrap* de días.
+Con `ρ ≤ 1` el steering por elección de ancla es **exactamente 0**, no `W_dec`. P4 escribe
+«ρ ∈ {1; 1,5; 3}» y la fila `ρ = 1` es **0, no 150**.
+Y las cadenas post-inyección de candidatos distintos son **independientes** ⇒ paralelizables:
+con `m` unidades AES el atacante consigue `ρ·W_dec` slots **por candidato**, no repartidos.
+
+### E.2 · ¿Mantener varios candidatos abiertos más allá de `W_dec`?
+
+`W_dec` es, por definición, el último instante en que **una acción suya** cambia el ancla. Dos
+puntas propias en el anticono de `T_j`, si las publica y deja que los honestos elijan, **no son
+steering**: no elige él. Para elegir tiene que actuar (publicar una y retener la otra), y esa
+acción cae dentro de `W_dec`. La cota estructural es R-FIN-1a: un bloque retenido más de `S_max`
+segundos **no puede ser extendido por ningún bloque válido posterior** (`slot(B) − slot(sp(B)) ≤ S_max`
+con `slot` en tiempo real), luego deja de ser candidato a estar en la cadena seleccionada.
+Medido en C.
+
+### E.3 · ¿Cuánto `ρ` para evaluar la ÉPOCA ENTERA dentro de `W_dec`? — `ρ ≥ I/W_dec`
+
+| `I` | `W_dec=45` | `W_dec=150` | `W_dec=225` | `W_dec=300` |
+|---:|---:|---:|---:|---:|
+| 461 s | 10,2 | 3,1 | 2,0 | **1,5** |
+| 897 s | 19,9 | 6,0 | 4,0 | 3,0 |
+| 4 200 s | 93,3 | 28,0 | 18,7 | 14,0 |
+
+**Cota física de `ρ`:** la cadena de PoT es AES-128 **secuencial**; `ρ = reloj_atacante /
+reloj_referencia`. Autonomys calibra `pot_slot_iterations = 206 557 520` para ≈ 1 s en un
+**14900KS a 6,2 GHz** (`crates/subspace-node/src/chain_spec.rs:128-130`), que es el tope del
+mercado ⇒ `ρ ∈ [1; ~1,2]`. **`ρ ≥ 3` no es alcanzable con silicio de consumo.** Aviso: si `I` se
+recalibra a ~460 s (la fila `g = 7 %` acotada), un `ρ = 1,5` con `W_dec = 300` **sí** evaluaría la
+época entera y P4 se anularía a sí misma. **`I` no debe bajar de `≈ ρ_max·W_dec`.**
+
+### E.4 · ¿Acortar `S_max` solo por esto? — se responde con la medida de C (§C)
+
+Coste conocido (D8 A3, `dag-poas-ancla-de-orden-auditoria-7.md`): `S_max = 20 s` invalida el
+**71-75 %** de los bloques de un granjero con 20 s de retraso; el agente principal lo re-instrumentó
+y en régimen sale **77 %**. Es un precio de censura de granjeros lentos, no de seguridad.
+
+### E.5 · La palanca que SÍ cierra `n_eval` a 0 para cualquier `ρ` — **revelación retardada**
+
+`dag-poas-ancla-de-finalidad.md:319-322` la describió y la **descartó**
+(«`entropía_j = VDF(chunk ‖ pot_output, L·iter)`, al estilo del ICC de Chia … se deja fuera del
+núcleo»). Con ella, `entropía_j` **no se conoce hasta `t_j`**, y la cota de conocimiento pasa de
+`L + I − W_dec` a **`I`** (solo puede calcular hasta la siguiente inyección aún no revelada).
+Como el atacante necesita ventaja `L`:
+
+```
+ventaja disponible = I = 4 200   <   ventaja necesaria = L = 19 080     ⇒   n_eval = 0
+```
+
+**La condición es exactamente `L > I`** — la misma que la ronda 7 marcó como problema
+(`ancla-de-finalidad.md:243`: «si `L ≥ I`, D9 debe mirar qué gana el atacante conociendo
+`entropía_j` antes de que se elija `I_{j+1}`»). Con revelación retardada, `L > I` deja de ser un
+problema y pasa a ser **la garantía**. Coste: un VDF más (el `L·iter` del ICC), que hay que
+producir y verificar. **PLAUSIBLE, no medido.**
+
+**Veredicto E: PLAUSIBLE con una corrección DEMOSTRADA a P4** (la fila `ρ = 1` es `n_eval = 0`,
+no `n_eval = W_dec`) y **una LAGUNA nueva**: `I ≥ ρ_max·W_dec` es una restricción de diseño que
+nadie escribió, y que se viola si `I` baja a ~460 s.
