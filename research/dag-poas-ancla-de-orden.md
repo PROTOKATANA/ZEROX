@@ -1,6 +1,6 @@
 # Ancla de orden — octava propuesta para un DAG sobre PoAS
 
-**Fecha:** 2026-09-08 · **PROPUESTA SIN AUDITAR.** Es la **séptima propuesta**
+**Fecha:** 2026-09-08 · **PROPUESTA AUDITADA (D9 línea 1, ronda 8): REFUTADA y CORREGIDA con R-FIN-11; pendiente de re-auditar.** Es la **séptima propuesta**
 (`dag-poas-ancla-de-finalidad.md`) con **una regla reescrita y cuatro constantes derivadas**. Nueve
 de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio está en
 `dag-poas-ancla-de-finalidad-metaauditoria.md`; sus scripts, en `/tmp/d9-ronda7/`.
@@ -133,11 +133,10 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 ## 2 · El algoritmo
 
-Constantes: `k = 25`, `I = 2 490 s` (`c = 2 490` índices a `q=1`), `F = L = 3,2 h`, `q` **por decidir**
+Constantes: `k = 25`, `I = 2 490 s` (`c = 2 490` índices a `q=1`), `F = L = 3,2 h`, `q = 1` **decidido**
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
-desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′** (*«de varias
-copias, la primera en el orden de GHOSTDAG es azul y las demás rojas»* — **no** «ambas rojas», que
-D9 refutó en la ronda 1), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
+desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
+(R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
 por gossip.
 
 **R-FIN-1 · Índice e inyector. ⟵ LA ÚNICA REGLA QUE CAMBIA.**
@@ -165,6 +164,26 @@ bloques de `past(B)` son válidos, y cumple R-FIN-5. Función de `past(B)` y de 
 **R-FIN-5 · Pasado consistente de flujo.** Para todo `X ∈ past(B)`: `flujo(X, slot(X)) = flujo(B,
 slot(X))`. Un bloque **MUST NOT** referenciar un bloque de otro flujo. Comprobación **estructural**,
 antes de tocar ningún PoT: **un nodo honesto jamás verifica el PoT de un flujo ajeno.**
+
+**R-FIN-11 · Unicidad de billete: U2 + U3′ como FILTRO. (NUEVA — D9 ronda 8 refutó la forma anterior.)**
+Identidad de billete: `(public_key, sector_index, history_size, chunk, slot)`.
+- **U2 · Repetición en el pasado.** Si `X, B` tienen la misma identidad y `X ∈ past(B)`, entonces
+  `B` es **INVÁLIDO**. Es **consenso**, no filtro de retransmisión: como filtro divergiría el
+  coloreado entre nodos. Sin U2 se rompe «cadena seleccionada ⊆ azules» — contraejemplo de 7
+  bloques ejecutable en `r8_u2.py`, con R-FIN-1a cumplida y el bloque fusionador **rojo en su
+  propio coloreado**.
+- **U3′ · Copias en anticono, como FILTRO DE CANDIDATURA.** De varias copias con la misma
+  identidad, solo la primera en el orden de GHOSTDAG es **candidata** a azul; las demás se marcan
+  rojas **ANTES** de entrar en el voraz k-cluster, no después.
+
+> **Por qué el orden importa, y es la refutación de D9.** El voraz de Kaspa recorre el mergeset de
+> **menor a mayor `blue_work`** (`ordering.rs` `SortableBlock::cmp`; `mergeset.rs`
+> `ordered_mergeset_… = sort_blocks(…)`; `protocol.rs:140-142`), así que colorea **lo barato
+> primero**. Con U3′ como *posproceso*, las copias baratas de un mismo billete entran en el voraz,
+> **agotan el presupuesto de `k`** y expulsan a los honestos recientes; solo *después* se degradan.
+> La demostración del Lema 9 supone **1 billete = 1 bloque** (paper, línea 1135) y ahí se rompe.
+> Medido (`r8_lema9e.py`): `δ_ef` = 0,106 / **0,250** / **0,366** / **0,424** a α = 0,10 / 0,25 /
+> 0,33 / 0,40 con posproceso, frente a **0,000 en todas** con filtro. Cota del paper: 0,2424.
 
 **R-FIN-6 · Color.** El k-cluster de GHOSTDAG con `k = 25`, sin condición de color por flujo
 (R-FIN-5 la hace innecesaria). «Cadena seleccionada ⊆ azules» se conserva —U3′ lo respeta, U3 no.
