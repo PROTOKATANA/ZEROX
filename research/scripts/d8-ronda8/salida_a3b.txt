@@ -29,3 +29,7 @@ k=30, mp=15, lambda=1, Delta=4, u3=dynamic, horizonte 900 s, 12 semillas.
 
 --- (M1) la fila que faltaba: alpha = 0,40 ---
  alpha |          S=4         S=20         S=30        S=150 |  gap max   n_hon
+  0.40 |      0.90714      0.01121      0.00000      0.00000 |       22     574
+   -> invalidados/hora = 24.2 (S_max=20 s), 0.0 (30 s), 0.0 (150 s)
+
+[753 s]

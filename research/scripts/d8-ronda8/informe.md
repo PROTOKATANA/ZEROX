@@ -539,6 +539,7 @@ estrategias del atacante (7 políticas × 4 retrasos + retención total), 12 sem
 | 0,10 | 0,76788 | **0,00000** | 0,00000 | 0,00000 | 17 | 837 |
 | 0,25 | 0,81719 | **0,00434** | 0,00000 | 0,00000 | 22 | 706 |
 | 0,33 | 0,86426 | **0,00510** | 0,00000 | 0,00000 | 23 | 634 |
+| 0,40 | 0,90714 | **0,01121** | 0,00000 | 0,00000 | 22 | 574 |
 
 **Capacidad ✓** — el control `S = 4 s` marca el 72-86 %: el instrumento **sí** detecta
 invalidaciones cuando existen. **Criterio `α` ✓** — la columna S=20 crece con `α`.
@@ -546,6 +547,7 @@ invalidaciones cuando existen. **Criterio `α` ✓** — la columna S=20 crece c
 **Bloques honestos invalidados por hora** (`fracción × 3 600 × (1−α)`):
 `α = 0,25` → **11,7/h** con `S_max = 20 s`; **0/h** con `S_max ≥ 30 s`.
 `α = 0,33` → **12,3/h** con `S_max = 20 s`; **0/h** con `S_max ≥ 30 s`.
+`α = 0,40` → **24,2/h** con `S_max = 20 s`; **0/h** con `S_max ≥ 30 s` (`d8_a3b_eclipse.py`).
 
 **Sin partición real, el atacante NO puede provocar invalidaciones si `S_max ≥ 30 s`.** Con
 `S_max = 20 s` sí, pero a ritmo bajo (una docena de bloques/hora sobre 2 700 honestos/hora:
@@ -706,7 +708,7 @@ lado pierde el **16,5 %** de sus bloques por invalidez.
 
 | | `S_max = 20 s` | `S_max = 30 s` | `S_max = 150 s` |
 |---|---:|---:|---:|
-| Honestos invalidados/h **sin eclipse**, `α=0,33` (M1) | 12,3 | 0 | 0 |
+| Honestos invalidados/h **sin eclipse**, `α=0,33` / `0,40` (M1) | 12,3 / 24,2 | 0 | 0 |
 | Granjero con 20 s de retraso: bloques inválidos (M2) | **71-75 %** | 0,2 % | 0 |
 | Granjero con 200 s de retraso (M2) | 77 % | 73 % | **68 %** |
 | Partición con `f = 0,09`: inválidos (M3) | 16,5 % | 6,7 % | ~0 |
