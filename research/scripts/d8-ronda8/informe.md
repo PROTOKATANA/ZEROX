@@ -406,3 +406,60 @@ coste real del soborno sea exactamente una recompensa (es la cota inferior; con 
 `p×` el `b` rentable cae a `b_max/p` y `m*` con él). Con `p = 3`, `m* ≈ 12` y el lookahead a
 `α=0,10` sigue en 34 h (margen 1,2× frente a `A*`, 0,12× frente al plotter 10×).
 
+
+## A6 (líneas 5 y 3 de §7) · `3k` y el `shuffle` — **SIN VECTOR (a favor del diseño)**
+
+**Scripts:** `d8_a6b_lineas.py` → `salida_a6b.txt`; `d8_a6c_shuffle.py` → `salida_a6c.txt`.
+
+### Línea 5 · ¿es `3k` la ventaja real o sólo una cota? — **sólo una cota, y holgada**
+
+Toda la tabla de riesgo desplaza la carrera por `3k = 90` (Lema 10, `phantom-ghostdag.txt`
+L1226-1236). D9-b midió 26 con estrategias que publican al instante. **Con la maniobra
+parásita de A1, que es la que más ventaja acumula, tampoco se llega:**
+
+| `α` | ventaja máx (mejor `J`) | `/k` | `/3k` | n_medidas |
+|---:|---:|---:|---:|---:|
+| **0,00** | — (`n_medidas = 0`: sin atacante no hay ventaja que medir) | — | — | **0** |
+| 0,10 | 17 | 0,57 | 0,19 | 2 190 |
+| 0,25 | 30 | 1,00 | 0,33 | 5 408 |
+| 0,33 | **50** | 1,67 | **0,56** | 7 144 |
+| 0,40 | 41 | 1,37 | 0,46 | 8 614 |
+
+**Máximo absoluto 50 = 1,67 `k` = 0,56 · `3k`.** La cota `3k` **no se alcanza**, ni siquiera
+con la maniobra que refuta el Lema 9. **Etiqueta: SIN VECTOR** — y es un punto **a favor** del
+diseño: la tabla de riesgo de A1.3, que usa `3k`, es **pesimista** en este eje, lo que
+amortigua en parte el `δ` mayor.
+
+### Línea 3 · rojos cerca del cruce con U3″: ¿basta el `shuffle`? — **la pregunta no se decide en este régimen**
+
+**Hallazgo previo, que hay que declarar:** el simulador de D9
+(`r8c_sim.Mundo._padres`) **no implementa el `shuffle`** que R-FIN-12 declara obligatorio
+(`processor.rs:1069-1089`). Lo implementé fiel (`MundoL9Shuffle`) y medí las dos:
+
+| `α` | `J` | `δ` SIN shuffle | `δ` CON shuffle | `n_shuffles` |
+|---:|---:|---:|---:|---:|
+| 0,00 | 31 | 0,0000 | 0,0000 | 2 199 |
+| 0,25 | 31 | 0,1084 | 0,1084 | 677 |
+| 0,33 | 31 | 0,2867 | 0,2867 | 377 |
+| 0,40 | 48 | 0,4366 | 0,4366 | 261 |
+
+**Idénticos a cuatro decimales.** La causa, medida (`salida_a6c.txt`, 10 790 selecciones de
+padres por fila, 12 semillas):
+
+| `α` | padres distintos | de | puntas máx | puntas medias | veces puntas > `mp` |
+|---:|---:|---:|---:|---:|---:|
+| 0,00 | **0** | 10 790 | 13 | 4,92 | **0** |
+| 0,25 | **0** | 10 790 | 12 | 2,89 | **0** |
+| 0,40 | **0** | 10 790 | 9 | 2,22 | **0** |
+
+Con `λΔ = 4` el número de puntas **nunca** alcanza `max_block_parents = 15`, así que el
+`shuffle` no llega a activarse y da exactamente los mismos padres. Dos consecuencias:
+
+1. **La pregunta de la línea 3 no se decide aquí.** Las «~550 puntas» de D9-d A3.1 vienen de
+   un escenario de fabricación masiva de puntas, no del régimen de operación.
+2. **Que el simulador de D9-c/d/e/f no lo implemente NO invalida sus medidas** — en su
+   régimen es un no-op. Es la primera vez que esto se comprueba en vez de suponerse.
+
+**Etiqueta: SIN VECTOR con esta familia + LAGUNA** (el régimen donde el `shuffle` sí importa
+—>15 puntas simultáneas— no está cubierto por ninguna medida de esta ronda ni de las de D9).
+

@@ -1,0 +1,14 @@
+=== A6c · el `shuffle` de R-FIN-12 no llega a activarse con lambda*Delta = 4 ===
+k=30, mp=15 (max_block_parents), max_candidates = 4*mp = 60, horizonte 900 s, 12 semillas.
+
+ alpha |  padres distintos      de |  puntas max  puntas medias |  veces puntas > mp
+  0.00 |                 0   10790 |          13           4.92 |                  0
+  0.10 |                 0   10790 |          12           3.90 |                  0
+  0.25 |                 0   10790 |          12           2.89 |                  0
+  0.40 |                 0   10790 |           9           2.22 |                  0
+
+Conclusion: el shuffle NUNCA cambia el conjunto de padres en este regimen, luego
+(a) la pregunta «¿basta el shuffle?» no se decide aqui, y (b) que el simulador de
+D9-c/d/e/f no lo implemente NO invalida sus medidas.
+Las «~550 puntas» de D9-d A3.1 vienen de otro escenario (fabricacion masiva de
+puntas), no del regimen de operacion con lambda*Delta = 4.
