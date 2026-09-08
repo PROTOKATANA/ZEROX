@@ -15,7 +15,8 @@ t2 tope k+1 en mergeset_blues OK (k=2,3,5,25)
 t3 blue_work estrictamente creciente sobre el past: 0 violaciones en 121 bloques
 t4 orden topologico, 66 bloques, cadena de 20: el bloque va tras su mergeset OK
 t5 cadena seleccionada subset de azules OK
-t6 R-FIN-12: 13 padres -> TooManyParents OK
+t6 R-FIN-12: 16 padres -> TooManyParents; mergeset 240 > 180 -> MergeSetTooBig OK
+Todas las pruebas del simulador pasan.
 ```
 
 **VERIFICADO (código+paper) · La fórmula del orden del principal es correcta.**
