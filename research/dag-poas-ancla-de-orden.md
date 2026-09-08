@@ -237,8 +237,17 @@ apaga el proceso. Sustituye a C-REORG-07 en el DAG.
 > R-FIN-1a y la letra antigua de R-FIN-7 a la vez — **contradicción DEMOSTRADA**.
 > **Escala (D9-f B0):** `F` se expresa en **segundos** (`F = 5,3 h` medido; `≤ 68,5 h` garantizado), **no en slots**:
 > «slot» aparecía en R-FIN-1a, R-FIN-7 y R-FIN-13 con tres escalas incompatibles. Punto viable: **`τ ≈ 0,1 s`**
-> (10 slots de PoT por intervalo de bloque). **La duración real del slot de PoT de Autonomys es LAGUNA** hasta
-> leerla en su código.
+> (10 slots de PoT por intervalo de bloque). **LAGUNA CERRADA (2026-09-08, fuente):** en Autonomys mainnet
+> `SLOT_DURATION = 1000` ms, `SLOT_PROBABILITY = (1, 6)` (un bloque cada 6 slots), `BLOCK_AUTHORING_DELAY = 4`,
+> `POT_ENTROPY_INJECTION_INTERVAL = 50` bloques (≈ 300 s), `POT_ENTROPY_INJECTION_LOOKBACK_DEPTH = 2`,
+> `POT_ENTROPY_INJECTION_DELAY = 15` slots, con `const_assert!(INTERVAL > DELAY)` y `const_assert!(DELAY >
+> AUTHORING_DELAY + 1)` (`/home/katana/zeo/fuentes/subspace/crates/subspace-runtime/src/lib.rs:145-165`,
+> `subspace-runtime-primitives/src/lib.rs:48,147`). **Autonomys tiene 6 slots por bloque con τ = 1 s;** ZEROX
+> a `λ = 1 bloque/s` con `τ = 1 s` tendría **1 slot por bloque** — justo el régimen donde R-FIN-1a estricta
+> invalida el 24-29 % de la cadena (D9-f B0). **Elección real:** `τ ≈ 0,1-0,17 s` (6-10 slots por bloque, la
+> proporción de Autonomys) **o** `λ ≈ 1/6` bloques/s. Comparación directa: Autonomys `I = 300 s`, `L = 15 s`,
+> lookback 2 intervalos; ZEROX `I = 4 200 s`, `F = L = 5,3 h`. **El «11 s» que citaban siete rondas es**
+> **`DELAY − AUTHORING_DELAY = 15 − 4 = 11` slots.**
 
 **R-FIN-8 · Rojos.** Ni la coinbase ni las transacciones de un bloque rojo se aplican al estado.
 Cierra la inflación ×10 (ronda 1) y el espacio de bloque gratis (ronda 3). **Coste medido:**
