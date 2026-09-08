@@ -153,7 +153,7 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 ## 2 · El algoritmo
 
-Constantes: `k = 30`, `q = 1`, `τ = 1 s` (A″), **`S_max = 150 s`** (DECIDIDO por Katana 2026-09-08: garantía `F ≤ 68,5 h` y tolerancia a particiones con `f ≥ 9 %`), `W_RETARGET ≥ 3 083`, **`F = 5,3 h` medido / `≤ 68,5 h` garantizado — se publican los dos con etiqueta y se diseña con el medido** (DECIDIDO), `I = 4 200 s`. **Umbral publicado: el de flujo único, ~35 %** (DECIDIDO; el de orden, 40,0 %, se declara al lado). **D8 CERRADO** (`dag-poas-ancla-de-orden-auditoria-7.md`): `S_max = 150 s` **se mantiene**; la `m` medida con retención hasta `S_max` es **2,822** (A4.2) ⇒ `I = 4 890 s`, **`F = 6,17 h`** si se diseña con ella (pendiente de Katana); el «68,5 h garantizado» es garantía de consenso **sin respaldo económico** (0,49× frente a la GPU de hoy); el umbral de orden **es 37,1 %, no 40,0 %** (cadena parásita, `δ(0,35) = 0,318` con retarget); la frontera de flujo único es **36,25 %** y el 35 % sobrevive con 1,25 puntos; **desviarse es rentable desde 33 %** (R-FIN-8 no paga rojos). Pendientes de Katana: umbral (33 % recomendado), `F` con `m = 2,822`, etiqueta del 68,5 h, pagar rojos.
+Constantes: `k = 30`, `q = 1`, `τ = 1 s` (A″), **`S_max = 150 s`** (DECIDIDO por Katana 2026-09-08: garantía `F ≤ 68,5 h` y tolerancia a particiones con `f ≥ 9 %`), `W_RETARGET ≥ 3 083`, **`F = 5,3 h` medido / `≤ 68,5 h` garantizado — se publican los dos con etiqueta y se diseña con el medido** (DECIDIDO), `I = 4 200 s`. **Umbral operativo publicado: 33 %** (DECIDIDO por Katana tras D8, 2026-09-08; confirmado por 9a: **frontera de flujo único 46,9 % contra un atacante de espacio**, condicionada a `2Δλ ≪ k` — a `Δ = 16 s` es 38,3 %, a `Δ = 20 s` 32,4 %; el 36,5 % de la auditoría 7 contaba dos veces el `α` del atacante). **D8 CERRADO** (`dag-poas-ancla-de-orden-auditoria-7.md`): `S_max = 150 s` **se mantiene**; la `m` medida con retención hasta `S_max` es **2,822** (A4.2) ⇒ `I = 4 890 s`, **`F = 6,17 h`** si se diseña con ella (pendiente de Katana); el «68,5 h garantizado» es garantía de consenso **sin respaldo económico** (0,49× frente a la GPU de hoy); el umbral de orden **es 37,1 %, no 40,0 %** (cadena parásita, `δ(0,35) = 0,318` con retarget); la frontera de flujo único es **36,25 %** y el 35 % sobrevive con 1,25 puntos; **desviarse es rentable desde 33 %** (R-FIN-8 no paga rojos). Pendientes de Katana: umbral (33 % recomendado), `F` con `m = 2,822`, etiqueta del 68,5 h, pagar rojos. **Rondas 9a/9b/9c cerradas** (`auditoria-8a/8b/8c.md`): R-FIN-8′, R-FIN-13′ y R-FIN-14 escritas; **`I` y `F` pendientes de recalibrar** con `W_dec ≤ 45 s` (candidatos en `auditoria-8c.md` §3: `I ≈ 490-850 s`, `F = max(F_carrera, I/(W/κ−1))`, lookahead 0,76-1,31 h, margen 3-5×; la elección de `ρ_max` y de `F` es de Katana). `Δ` sigue sin medir y es la primera medición que el diseño necesita.
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
 desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
@@ -225,6 +225,39 @@ con etiqueta.
 retarget es falsificable por *timewarp* y reaparece la palanca de heredar el `SR` de otra ventana (A1b). `N_obs`
 cuenta azules del flujo canónico en la ventana de `W` índices de PoT.
 
+**R-FIN-13′ · Enmienda (ronda 9b).** `N_obs` cuenta, en la ventana de `W` índices de PoT del flujo canónico,
+**exactamente los bloques que cobran por R-FIN-8′** — azules y `rojo_k`, es decir **un bloque por identidad de
+billete**; los `rojo_U3` no cuentan. Invariante: *el conjunto que el retarget cuenta y el que la emisión paga son
+el mismo* (si el pagado excede al contado, la emisión corre por delante y el exceso se lo lleva quien lo provoca;
+si el contado excede al pagado, `λ_real` se infla). **Medido (9b):** inflación del retarget bajo la parásita
+×1,452 (contando azules) → **×1,005**; `dag-poas-delta-real.md` deja de aplicar; umbral de orden 40,0 → 41,7 %.
+LAGUNA: qué pasa con un bloque fusionado cuyo `slot` cae fuera de la ventana vigente (`mergeset_non_daa` en Kaspa).
+
+**R-FIN-14 · Reto por slot desde el PoT re-sembrado. (NUEVA, ronda 9c, 2026-09-08.)** Cierra la laguna de que
+R-FIN-2/3/4 fijan *bajo qué flujo* se verifica una solución pero no *cómo* se obtiene el reto de cada slot (con
+R-FIN-3 el `flujo` es constante dentro de la época: «reto = flujo» daría el mismo ganador 4 200 slots seguidos).
+**(a)** Cada flujo `f` tiene una única cadena de PoT **secuencial** indexada por slot: `semilla(f, s) =
+blake3(entropía_j ‖ salida(f, s−1))[0..16)` si `s = t_j` para alguna inyección `j` de `f` (R-FIN-2), y
+`salida(f, s−1)` en otro caso; `salida(f, s) = AES128_chain^{N(s)}(semilla(f, s))` (`subspace-proof-of-time::prove`),
+con `N(s)` el `slot_iterations` vigente (R-FIN-9), aplicado en el mismo `t_j` que la entropía; a lo sumo una
+inyección por slot. **(b)** `aleatoriedad(f, s) = blake3(salida(f, s))`; `reto(f, s) = blake3(aleatoriedad(f, s) ‖
+LE64(s))` (Autonomys `pot.rs:277-280`, `lib.rs:108-112`). **(c)** `B` con `slot(B) = s` y `f = flujo(B, s)` es válido
+solo si, con `sector_id = H(pk ‖ sector_index ‖ history_size)` y `ssc = derive_sector_slot_challenge(sector_id,
+reto(f, s))`, la prueba de espacio verifica en `s_bucket_audit_index(ssc)` y `solution_distance(reto, chunk ⊕
+hash(PoS), ssc) ≤ solution_range(B)/2` (`subspace-verification/src/lib.rs:234-260`). **(d)** `B` MUST incluir los
+puntos de control que encadenan `salida(f, slot(sp(B)) + D)` → `salida(f, s + D)`, `D` = retardo de autoría;
+R-FIN-1a acota esa cadena a `S_max` slots (≤ `S_max · 96,1 ms` de verificación en el peor caso); la comprobación
+de flujo es **anterior** a la de PoT (R-FIN-5). **(e) PROHIBIDO** derivar el reto de cualquier función que permita
+saltar slots — en particular `reto(f, s) = H(flujo(f) ‖ s)` y toda PRF de `s` a partir de un valor fijo de la
+época. La secuencialidad es lo único que impide evaluar la época entera de un candidato a ancla antes de tener que
+elegirlo. **(f)** Calibración: `I ≥ ρ_max · W_dec`, con `W_dec ≤ 45 s` medida (9c) y `ρ_max` la cota admitida para
+la velocidad de AES de un atacante frente al timekeeper. **(g)** Los `t_j` son distintos dos a dos (dado
+`S_max < I`). **(h)** Opción, no núcleo: **revelación retardada** (`entropía_j = VDF(chunk(I_j) ‖ salida(I_j),
+L·iter)`, revelada en `t_j`), que lleva la evaluación del atacante a 0 para cualquier `ρ` al coste de un VDF más.
+**Lo que compra (9c, verificado):** con `ρ ≤ 1` el steering por elección de ancla es **0** (evaluar un candidato
+exige conocer la cadena común `L` slots por delante); con `ρ > 1`, `n_eval = ρ·W_dec` tras un *bootstrap* de días.
+`I` deja de escalar como `1/g²`: `I = c_m·√(n_eval/(αλ))/g`, y `F = max(F_carrera, I/(W/κ − 1))`.
+
 **R-FIN-6 · Color.** El k-cluster de GHOSTDAG con `k = 25`, sin condición de color por flujo
 (R-FIN-5 la hace innecesaria). «Cadena seleccionada ⊆ azules» se conserva —U3′ lo respeta, U3 no.
 
@@ -271,10 +304,29 @@ apaga el proceso. Sustituye a C-REORG-07 en el DAG.
 
 **Coste del PoT, MEDIDO (2026-09-08, `cargo bench -p subspace-proof-of-time`, clon `subspace` @ `f8842d0`, Ryzen 9 9950X3D, ruta `verify_sequential_avx512f_vaes`, 8 checkpoints, 200 032 000 iteraciones por slot — 3 % menos que mainnet):** `prove` = **1,561 s/slot**, `verify` = **96,1 ms/slot** (Criterion, 100 muestras, IC ±0,07 %). Consecuencias: (i) verificar el PoT cuesta ~9,6 % de un núcleo de forma continua a `τ = 1 s` — es el coste «no sucinto» que `CLAUDE.md` pedía medir y del que dependen `C-NET-03/04`; (ii) la asimetría `prove/verify ≈ 16×` va a favor del verificador: quien quiera forzar verificaciones tiene que pagar 16× más en calcular la cadena que el nodo en comprobarla, y las cabeceras con `slot` por delante del PoT verificado no fuerzan nada (se retienen); (iii) **esta máquina no llega a 1 s/slot**: el timekeeper de ZEROX a `τ = 1 s` necesita latencia AES de clase 14900KS o un `pot_slot_iterations` menor — `τ` lo define el número de iteraciones, no el reloj de pared.
 
-**R-FIN-8 · Rojos.** Ni la coinbase ni las transacciones de un bloque rojo se aplican al estado.
-Cierra la inflación ×10 (ronda 1) y el espacio de bloque gratis (ronda 3). **Coste medido:**
-`P(bloque honesto acabe rojo) = P(Poisson(2λΔ) > k) = 1,2·10⁻⁶` a `q=1` — ~37 huérfanos honestos al
-año de 31,5 M bloques, frente al **80 %** que pierde una cadena lineal a la misma tasa.
+**R-FIN-8′ · Rojos: cobran y aplican, salvo las copias. (Sustituye a R-FIN-8; ronda 9b, 2026-09-08.)**
+Dos causas de rojez, que U3″ ya distingue al colorear: **`rojo_k`** (rojo por el k-cluster, `protocol.rs:246-283`,
+con identidad de billete que no era azul en `past(sp(B))` ni fue coloreada de azul antes en el mergeset) y
+**`rojo_U3`** (copia: su identidad ya era azul). (1) **Cobran** los azules y los `rojo_k`; un `rojo_U3` no cobra
+nada. (2) Se aplica **la coinbase propia** del bloque cobrador, sujeta a `C-EMIT-03` con su propio `H` — **no** el
+`red_reward` de Kaspa (`coinbase.rs:121-131`, donde cobra el fusionador: medido en 9b, esa variante multiplica
+por 1,5-2,8 la rentabilidad de la cadena parásita); `C-HDR-08` y `C-EMIT-03` no se tocan. (3) Se aplican las
+transacciones de azules y `rojo_k`; el cuerpo de un `rojo_U3` es inerte (ocupa plaza de `mergeset_size_limit` y
+nada más). (4) Orden de consenso de Kaspa: por cada bloque `C` de la cadena seleccionada, `[sp(C)] ++ mergeset(C)`
+con el mergeset en `blue_work` ascendente, desempate por menor `solution_distance` y luego hash, azules y `rojo_k`
+entrelazados (`ghostdag.rs:115-136`, `utxo_validation.rs:120-123`); los `rojo_U3` se saltan. (5) Una transacción
+que no valide contra `UTXO(sp(C)) ⊕ diff(mergeset hasta ella)` se descarta en silencio, sin invalidar al bloque ni
+al fusionador (`utxo_validation.rs:311-313`); gana el gasto que aparece primero; `fees(X)` suma solo las aceptadas.
+(6) Cada bloque se aplica exactamente una vez, en el primer bloque de cadena que lo fusiona. (7) Sin cláusula de
+profundidad: un rojo fuera de `merge_depth` no kosherizado invalida al fusionador (R-FIN-12); uno kosherizado
+(`block_depth.rs:109-119`) se fusiona y cobra. (8) Inválido ≠ rojo: no existe (R-FIN-4). (9) `COINBASE_MATURITY`
+desde el bloque de cadena que fusionó. Solo el dueño del billete puede producir un `rojo_U3` (dos firmas Ed25519
+bajo la misma `public_key`, `C-HDR-03/04`). **Lo que cierra, medido (9b, 12 semillas):** rentabilidad de la parásita
+1,16-1,55 → **0,99-1,00**; ningún honesto pierde recompensa (`S1_h = 1,0000`): se acaban las reversiones de 64-142 s.
+**Lo que no cierra:** el ataque en sí (`δ` igual) y que parasitar es gratis también a `α` pequeño. Sin la cláusula
+`rojo_U3` vuelven la inflación ×15 (`max_block_parents`) y el espacio gratis (9b §A, medido 699 copias rojas por
+51 billetes). *Texto anterior (R-FIN-8):* «Ni la coinbase ni las transacciones de un bloque rojo se aplican al
+estado» — cerraba la inflación ×10 (ronda 1) y el espacio gratis (ronda 3); `P(honesto rojo) = 1,2·10⁻⁶` a `Δ = 4 s`.
 
 **R-FIN-9 · Recalibración del PoT.** Los cambios de `slot_iterations` se leen también del índice `c·j`
 y se aplican en `t_j`.
