@@ -1,0 +1,42 @@
+=== A5 · rederivacion de I, c y F con el ancla BLUE_SCORE ===
+
+(1) `m` GRATIS medida (tier 1), rejilla fina de alpha, 12 semillas
+ alpha |   m_POS |    m_BS |  c_m(BS)
+  0.00 |    1.00 |    1.00 |   0.0000
+  0.05 |    3.17 |    1.47 |   0.2642
+  0.10 |    4.50 |    2.33 |   0.6560
+  0.15 |    4.50 |    2.49 |   0.7030
+  0.25 |    5.00 |    3.03 |   0.8521
+  0.33 |    5.17 |    3.17 |   0.8775
+  0.40 |    5.25 |    3.25 |   0.8928
+
+(2) lambda_blue: ?puede el atacante mover la DURACION de la epoca?
+    (con el ancla POS, lambda_chain iba de 0,199 a 0,628: la epoca se acortaba x3,2)
+ alpha |  lam_blue    Ip/I |  lam_chain   Ip/I (POS)
+  0.00 |    0.9706   1.030 |     0.2005        0.992
+  0.05 |    0.9730   1.028 |     0.2615        0.760
+  0.10 |    0.9726   1.028 |     0.3228        0.616
+  0.15 |    0.9754   1.025 |     0.3844        0.517
+  0.25 |    0.9778   1.023 |     0.5056        0.393
+  0.33 |    0.9766   1.024 |     0.5970        0.333
+  0.40 |    0.9750   1.026 |     0.6605        0.301
+
+(3) LA PINZA: ?existe (I, F) con g <= 3,6 % y W/kappa <= 1,22?
+ alpha |      m     c_m |  I minima (g<=3,6%) |  F minima (W/k<=1,22)
+  0.00 |   1.00  0.0000 |   0 (no hay ataque) |                     -
+  0.05 |   1.47  0.2642 |         1,077 s (0.30 h) |         4,896 s ( 1.36 h)
+  0.10 |   2.33  0.6560 |         3,320 s (0.92 h) |        15,092 s ( 4.19 h)
+  0.15 |   2.49  0.7030 |         2,542 s (0.71 h) |        11,556 s ( 3.21 h)
+  0.25 |   3.03  0.8521 |         2,241 s (0.62 h) |        10,186 s ( 2.83 h)
+  0.33 |   3.17  0.8775 |         1,801 s (0.50 h) |         8,184 s ( 2.27 h)
+  0.40 |   3.25  0.8928 |         1,538 s (0.43 h) |         6,989 s ( 1.94 h)
+
+  DIMENSIONANDO POR EL PEOR alpha:  I = 3,320 s = 0.92 h,  F = 15,092 s = 4.19 h,  c = I*lambda_blue = 3,297 azules
+  Comparacion:  ronda 8 publicaba I = 2 490 s (0,69 h), F = 3,2 h
+                D9-c con el ancla POS pedia I = 9 272 s (2,58 h), F = 11,7 h
+
+(4) Sensibilidad del techo: que (I, F) salen con otros techos de g y W/kappa
+ techo g |          W/k<=1.10          W/k<=1.22          W/k<=1.50
+    2.0% |  I= 2.99 h F= 29.88 h  I= 2.99 h F= 13.58 h  I= 2.99 h F=  5.98 h
+    3.6% |  I= 0.92 h F=  9.22 h  I= 0.92 h F=  4.19 h  I= 0.92 h F=  1.84 h
+    5.0% |  I= 0.48 h F=  4.78 h  I= 0.48 h F=  2.17 h  I= 0.48 h F=  0.96 h

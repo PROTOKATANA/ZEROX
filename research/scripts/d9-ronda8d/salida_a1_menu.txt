@@ -1,0 +1,12 @@
+=== A1 · menu del ancla BLUE_SCORE frente al ancla POS (D9-c) ===
+k=30, mp=15, lambda=1, Delta=4, horizonte 260 s, u3_mode=dynamic, copias=0
+P=30; T0 = blue_score del ocupante honesto de P; T recorre T0+-10 (21 umbrales)
+Menu contado sobre `seed`, fijado en la creacion. Adversario del paper (sin retardo).
+
+ alpha |     m_POS GRATIS      m_BS GRATIS |   m_POS +retraso    m_BS +retraso | m_POS +retencion  m_BS +retencion |
+       |           (D9-c)       medio  max |           (D9-c)       medio  max |           (D9-c)       medio  max |
+  0.00 |             1.00      1.00      1 |             1.00      1.00      1 |             1.00      1.00      1 |
+  0.10 |             4.50      2.33      5 |             5.92      3.38      7 |             7.33      4.35      9 |
+  0.25 |             5.00      3.03      5 |             8.25      4.29      7 |             9.50      7.53     13 |
+  0.33 |             5.17      3.17      6 |             9.00      4.32      7 |            10.50      8.24     15 |
+  0.40 |             5.25      3.25      6 |             9.17      4.34      7 |            10.67      8.17     18 |

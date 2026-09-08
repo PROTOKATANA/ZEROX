@@ -1,0 +1,15 @@
+=== A5b · la pinza (I, F) por nivel de coste del atacante ===
+g = c_m/sqrt(alpha*lambda*I) <= 3.6%;  W/kappa = 1 + I/F <= 1.22
+
+                 nivel | peor alpha |     m     c_m |                I |                F |  c (azules)
+   reactivo (en linea) |       0.10 |  1.77  0.4344 |    1,456 s (0.40 h) |    6,619 s ( 1.84 h) |       1,420
+      gratis (ex post) |       0.10 |  2.33  0.6573 |    3,333 s (0.93 h) |   15,152 s ( 4.21 h) |       3,250
+              +retraso |       0.10 |  3.38  0.9159 |    6,472 s (1.80 h) |   29,419 s ( 8.17 h) |       6,310
+            +retencion |       0.10 |  4.35  1.0761 |    8,936 s (2.48 h) |   40,617 s (11.28 h) |       8,712
+
+Referencias:
+  ronda 8 publica            I = 2 490 s (0,69 h), F = 3,20 h,  c = 2 490
+  D9-c con el ancla POS pide I = 9 272 s (2,58 h), F = 11,70 h
+
+Y con el ancla POS, la epoca REAL se acortaba (D9-c A1.4: I' = c/lambda_chain, x0,30 a
+alpha=0,40). Con blue_score NO: lambda_blue medida 0,971-0,978 para todo alpha, I'/I = 1,03.

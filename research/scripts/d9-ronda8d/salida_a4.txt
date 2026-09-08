@@ -1,0 +1,37 @@
+=== A4 · S_max: suelo de vivacidad frente a techo de DoS ===
+
+(a) SUELO en operacion normal — salto de slot en la cadena seleccionada (medido)
+ alpha |   medio   p50   p90    p99    max |  P(salto>30 s)  P(salto>60 s)
+  0.00 |    4.97   4.7   6.2    8.2   12.3 |         0.0000         0.0000
+  0.10 |    3.01   2.9   5.7    8.1   10.9 |         0.0000         0.0000
+  0.25 |    1.97   1.4   4.8    7.4   10.9 |         0.0000         0.0000
+  0.33 |    1.67   1.1   4.2    6.8   10.9 |         0.0000         0.0000
+  0.40 |    1.50   1.0   3.8    6.4   10.9 |         0.0000         0.0000
+
+   Cola geometrica: P(salto > S) ~ e^{-lambda_chain*S}. Para 10 anos a lambda_chain=0,199 (alpha=0) hacen falta
+      P(salto > S) < 1e-06  ->  S_max >=      69 slots
+      P(salto > S) < 1e-09  ->  S_max >=     104 slots
+      P(salto > S) < 1e-12  ->  S_max >=     139 slots
+
+(b) SUELO por PARTICION — R-FIN-7 tolera particiones de hasta F = 3.2 h = 11520 s
+ f (espacio del lado) |  mayor hueco esperado |  S_max necesario (P<1%)
+                 0.02 |                   301 s |                   522 s
+                 0.05 |                   139 s |                   222 s
+                 0.10 |                    76 s |                   119 s
+                 0.20 |                    42 s |                    65 s
+                 0.33 |                    27 s |                    40 s
+                 0.50 |                    18 s |                    28 s
+
+(c) TECHO por DoS de verificacion de PoT (no sucinta: coste lineal en slots)
+    presupuesto en regimen = 1 slot de PoT por segundo (lambda = 1, 1 slot/s)
+   S_max |      x0.10      x0.25      x0.40 |   x0.25,14cop   x0.40,14cop |  B/s que envia
+      10 |          1          2          4 |            35            56 |        0.01 MB
+      30 |          3          8         12 |           105           168 |        0.02 MB
+      60 |          6         15         24 |           210           336 |        0.04 MB
+     300 |         30         75        120 |          1050          1680 |        0.22 MB
+    3600 |        360        900       1440 |         12600         20160 |        2.58 MB
+   11520 |       1152       2880       4608 |         40320         64512 |        8.26 MB
+
+(d) LA PINZA
+   lado con f=0.10 del espacio sobrevive una particion de 3.2 h si S_max >= 119 s  ->  amplificacion de DoS a alpha=0,40: x48
+   lado con f=0.33 del espacio sobrevive una particion de 3.2 h si S_max >= 40 s  ->  amplificacion de DoS a alpha=0,40: x16

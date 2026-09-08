@@ -1,0 +1,22 @@
+### AVISO: normalizado por la ESPERANZA (1-alpha)*lambda*r -> el suelo a alpha=0 es RUIDO de Poisson
+### Los numeros validos de A3 estan en salida_a3g.txt (normalizado por los honestos REALMENTE creados). Ver informe.md, Mis propios errores nº 3.
+
+=== A3(6) · el SHUFFLE de pick_virtual_parents frente a la inundacion de copias ===
+ventana [80, 300] s, horizonte 400 s, 5 semillas. delta nominal 0,2105 / real 0,267
+
+      u3  cop        pol | alpha |            SIN shuffle |      CON shuffle (Kaspa)
+ dynamic    0       tips |  0.00 | d= 0.0309 nofus=  0.0 | d= 0.0309 nofus=  0.0
+ dynamic    0       tips |  0.10 | d= 0.0434 nofus=  0.0 | d= 0.0434 nofus=  0.0
+ dynamic    0       tips |  0.25 | d= 0.0594 nofus=  0.0 | d= 0.0594 nofus=  0.0
+ dynamic    0       tips |  0.40 | d= 0.0470 nofus=  0.0 | d= 0.0470 nofus=  0.0
+
+ dynamic   14 ('retro', 1) |  0.00 | d= 0.0309 nofus=  0.0 | d= 0.0309 nofus=  0.0
+ dynamic   14 ('retro', 1) |  0.10 | d= 0.0606 nofus=  0.0 | d= 0.0434 nofus=  0.0
+ dynamic   14 ('retro', 1) |  0.25 | d= 0.1806 nofus= 14.0 | d= 0.1188 nofus=  0.0
+ dynamic   14 ('retro', 1) |  0.40 | d= 0.2030 nofus= 20.6 | d= 0.1561 nofus=  2.2
+
+  filter   14 ('retro', 1) |  0.00 | d= 0.0309 nofus=  0.0 | d= 0.0309 nofus=  0.0
+  filter   14 ('retro', 1) |  0.10 | d= 0.1949 nofus=  0.0 | d= 0.1545 nofus=  0.0
+  filter   14 ('retro', 1) |  0.25 | d= 0.4000 nofus= 23.4 | d= 0.3164 nofus=  0.0
+  filter   14 ('retro', 1) |  0.40 | d= 0.4470 nofus= 25.2 | d= 0.3955 nofus=  5.2
+

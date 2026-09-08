@@ -1,0 +1,9 @@
+=== A2d · precision del hallazgo «cadena congelada» ===
+Ejecuciones cuya cadena seleccionada es la MISMA LISTA DE BIDS que la de referencia.
+
+ alpha |  n congeladas |  con PADRES distintos |  menu POS |  menu BS medio   max
+  0.00 |           5.0 |                   0.0 |      1.00 |           1.00     1
+  0.10 |           7.2 |                   3.0 |      1.00 |           1.35     2
+  0.25 |          16.8 |                   5.2 |      1.00 |           1.47     3
+  0.33 |          21.0 |                   6.2 |      1.00 |           1.52     3
+  0.40 |          25.1 |                   6.1 |      1.00 |           1.57     3
