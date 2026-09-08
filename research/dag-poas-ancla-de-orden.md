@@ -1,6 +1,6 @@
 # Ancla de orden — octava propuesta para un DAG sobre PoAS
 
-**Fecha:** 2026-09-08 · **ESTADO (tras D9-d):** ancla **`blue_score`** — grindable pero **la mejor de las tres** (menú gratis 2,3-3,3 frente a 4,5-5,3 de `pos`), con U3″ dinámica **verificada en simulación** (Lema 9 sobrevive), `S_max = 150`, R-FIN-7 reescrita, R-FIN-12 con `shuffle`. Constantes **`I = 3 330 s`, `c = 3 250` azules, `F = 4,2 h`**, etiquetadas «contra atacante que no retiene» (con retención: `F = 11,3 h`). Ver `dag-poas-ancla-de-orden-auditoria-4.md`. **Pendiente: peso real `Σ w(SR)` en el simulador (laguna mayor) y `Δ` sin medir.** Es la **séptima propuesta**
+**Fecha:** 2026-09-08 · **ESTADO (tras D9-e):** ancla **`blue_score`** con Prop. 7 **transferida** (Lemas A4/A4b, D9-e), U3″ dinámica verificada, `S_max=150`, R-FIN-7 reescrita, `shuffle` en R-FIN-12, `slot` = índice de PoT en R-FIN-13, `altura := blue_work` en R-FIN-10. **El peso real no cambia nada. Pero `m` NO tiene cota superior conocida** (5,0 → 3,03 → 5,77 según la familia de estrategias): **`I`, `c`, `F` NO están dimensionadas** (con `m=5,77`: `I≈3,4 h`, `F≈15,5 h`, y subirá). Ver `dag-poas-ancla-de-orden-auditoria-5.md`. Es la **séptima propuesta**
 (`dag-poas-ancla-de-finalidad.md`) con **una regla reescrita y cuatro constantes derivadas**. Nueve
 de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio está en
 `dag-poas-ancla-de-finalidad-metaauditoria.md`; sus scripts, en `/tmp/d9-ronda7/`.
@@ -105,10 +105,12 @@ Va como **`1/√I`**: **épocas cortas ⇒ más steering.**
 |---|---:|---:|---:|---:|
 | `g` | 44,8 % | 20,1 % | 11,4 % | **3,6 %** |
 
-> ✅ **Rederivada por D9-d A5** con la `m` gratis del adversario del paper (2,33 a `α=0,10`, el peor):
-> **`I = 3 330 s`, `c = 3 250` azules, `F = 4,2 h`** para `g ≤ 3,6 %` y `W/κ ≤ 1,22`. Los 2 490 s / 3,2 h
-> de abajo quedan como registro (34 % y 31 % cortos). Contra un atacante que **retiene**: `m = 4,35`,
-> `I = 2,5 h`, `F = 11,3 h`.
+> ⚠️ **NO DIMENSIONADAS (D9-e).** D9-d rederivó `I = 3 330 s`, `F = 4,2 h` con `m = 2,33` gratis — pero `m` es
+> una **cota inferior por familia de estrategias**, y cada agente que amplía la familia la sube: D9-c 5,0
+> (`pos`), D9-d 3,03, **D9-e 5,77** (`retro ≤ 64`, copias). Con `m = 5,77`: `I ≈ 12 250 s (3,4 h)`,
+> `c ≈ 9 300` azules, **`F ≈ 15,5 h`**. **Sin una cota superior de `m` por argumento —o un ancla con `m`
+> acotado por construcción— ningún `I`, `c`, `F` está dimensionado.** Los 2 490 s / 3,2 h de abajo quedan
+> como registro.
 
 `I = 2 490 s` es el punto donde `g = 3,6 %`, el nivel que la ronda 7 declaró aceptable
 (*«del orden del 3 %, en ≤ 22 % de las épocas»*).
@@ -152,7 +154,7 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 ## 2 · El algoritmo
 
-Constantes: `k = 30`, **`I = 3 330 s`** (`c = 3 250` azules), **`F = L = 4,2 h`**, `q = 1` **decidido**, `S_max = 150`, `W_RETARGET ≥ 3 083` — `I` y `F` **contra un atacante que no retiene** (D9-d A5); con retención serían `I = 2,5 h`, `F = 11,3 h`: **elección de modelo de amenaza, con etiqueta**.
+Constantes: `k = 30`, `q = 1` **decidido**, `S_max = 150`, `W_RETARGET ≥ 3 083` — y **`I`, `c`, `F` SIN DIMENSIONAR** (D9-e): dependen de `m`, que no tiene cota superior conocida. Último punto medido (D9-d, `m=2,33`): `I = 3 330 s`, `c = 3 250` azules, `F = 4,2 h`; con `m = 5,77` (D9-e): `F ≈ 15,5 h`.
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
 desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
@@ -167,6 +169,12 @@ por gossip.
 > atacante mueve qué honesto cae en `c·j` solo eligiendo padres; `m` = 4,5-5,25 gratis, hasta 10,7
 > (D9-c A1). (3) **`blue_score`**: es la magnitud que GHOSTDAG maximiza y que un salto no infla.
 > Atacada por D9-d: **grindable, pero la mejor** (`dag-poas-ancla-de-orden-auditoria-4.md`).
+> **Prop. 7 transferida al ancla (D9-e A4, DEMOSTRADO):** **Lema A4** — `blue_score` es estrictamente creciente
+> **por la cadena seleccionada**, luego «el ancla cambia ⇒ la cadena ya difiere en `p ≤ idx(ancla)`», y ahí
+> aplica el Lema A2 de D9-c (`∃C` de la Def. 2, sin cota de la unión); 579/579 cambios comprobados.
+> **Lema A4b** — `blue_work` es monótono bajo ancestría con peso real (141 967/141 967 parejas). El peso real
+> `Σ w(SR)` **no cambia `m`** (±4 %) ni el sesgo. **Ojo:** `blue_score` **no** es monótono bajo ancestría con
+> peso real (contraejemplo D9-e); solo por la cadena.
 
 **Qué protege `blue_score` y qué no (D9-d A1-A2).** Cada bloque de cadena «posee» tantos umbrales `c·j`
 como su **incremento** de `blue_score`; la protección frente al ancla de saltos es exactamente
@@ -228,6 +236,9 @@ Identidad `(public_key, sector_index, history_size, chunk, slot)`.
 **peso** (`blue_work = Σ w(SR)`): la discrepancia sobre el horizonte `F` queda `< 1 %` y el umbral se
 mueve `< 0,4` puntos. Derivación y tabla en `dag-poas-empalme-peso.md`. Es una elección de diseño,
 con etiqueta.
+**`slot` es el ÍNDICE DE PoT, no el sello de tiempo de la cabecera** (D9-e LAGUNA 5, cerrada): con el sello el
+retarget es falsificable por *timewarp* y reaparece la palanca de heredar el `SR` de otra ventana (A1b). `N_obs`
+cuenta azules del flujo canónico en la ventana de `W` índices de PoT.
 
 **R-FIN-6 · Color.** El k-cluster de GHOSTDAG con `k = 25`, sin condición de color por flujo
 (R-FIN-5 la hace innecesaria). «Cadena seleccionada ⊆ azules» se conserva —U3′ lo respeta, U3 no.
@@ -248,10 +259,11 @@ año de 31,5 M bloques, frente al **80 %** que pierde una cadena lineal a la mis
 **R-FIN-9 · Recalibración del PoT.** Los cambios de `slot_iterations` se leen también del índice `c·j`
 y se aplican en `t_j`.
 
-**R-FIN-10 · `C-EXP-04` sobre el orden. (NUEVA, consecuencia de R-FIN-1.)** `altura := idx`, y
-`altura_ploteo ≤ idx(punta) − F·λ` para que el mapeo `altura → hash` sea inmutable. Responde a la
-SOSPECHA de la ronda 2 con el mismo mecanismo de profundidad, ahora sobre el objeto que tiene
-teorema. `VIDA_MINIMA` y `DISPERSION` se rederivan en tiempo.
+**R-FIN-10 · `C-EXP-04` sobre la cadena seleccionada. (Corregida tras D9-e A4b.)** `altura := blue_work` de la
+cadena seleccionada —**no** `idx` ni `blue_score`—, porque `blue_work` es monótono bajo ancestría con peso real
+(Lema A4b) y `blue_score` no lo es. `altura_ploteo ≤ blue_work(punta) − F·λ·w̄` para que el mapeo sea inmutable.
+Responde a la SOSPECHA de la ronda 2 con profundidad, ahora sobre la magnitud monótona. `VIDA_MINIMA` y
+`DISPERSION` se rederivan en tiempo.
 
 ---
 

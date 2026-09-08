@@ -90,6 +90,23 @@ conteo↔peso sobre todo el horizonte de finalidad es `< 1 %` y `φ_c` aplica co
    cero.
 3. La condición `λ_objetivo < k/(2D)` de existencia del punto fijo (ronda 3) sigue siendo previa.
 
+## 4 bis · CORRECCIÓN (D9-e, 2026-09-08): la nota acotaba la magnitud equivocada — Lema E1
+
+**Lema E1 (cancelación del factor común, DEMOSTRADO por D9-e).** Sean `A`, `B` dos candidatos a padre
+seleccionado, `S = blues(A)∖blues(B)`, `T = blues(B)∖blues(A)`. Entonces `bw(A) − bw(B) = w(S) − w(T)`
+y `bs(A) − bs(B) = |S| − |T|`. `S ∪ T` son bloques **contemporáneos** cerca de las puntas, y el retarget
+es función del pasado **compartido**: les asigna el mismo `SR`. **La deriva del retarget es un factor
+común a las dos ramas y se cancela en `find_selected_parent`.** Confirmado sin hueco: `empates_bs ==
+empates_bw` en 24/24 filas.
+
+Consecuencia: el `ε` de §2-3 es `ε_común`, que **no decide** la selección. Lo que decide es
+`ε_diferencial` —la variación de `w` **dentro** de `S ∪ T`—, medido por D9-e en **1,0020**. La
+restricción **`W_RETARGET ≥ 3 083`, `γ ≤ 0,25` se queda, por otra razón y con más margen**: acota la
+deriva común (que importa para la cota del Lema 9 en peso, A3 de D9-e: con retarget activo `δ_ef`
+sube +41 %) y, de rebote, mantiene `ε_diferencial ≈ 1`. Y la LAGUNA 1 de §4 es cierta en su
+literalidad —bajo ataque el sesgo rompe la cota de `ε_común` por 2,8-5,3×— pero sobre la magnitud
+que no importa. Detalle: `dag-poas-ancla-de-orden-auditoria-5.md` §3.
+
 ## 5 · Consecuencia para la propuesta
 
 Añadir a `dag-poas-ancla-de-orden.md` §2 una constante con procedencia: **`W_RETARGET ≥ 3 083 slots`
