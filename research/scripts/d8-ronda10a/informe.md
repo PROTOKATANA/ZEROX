@@ -1,6 +1,6 @@
 # D8 — Ronda 10a: romper la **revelación retardada por VDF**, R-FIN-14 (h)
 
-**Agente:** D8 (adversarial), Opus 5 · **Fecha:** 2026-09-08 · **Método:** `research/scripts/METODO-AGENTES.md`
+**Agente:** D8 (adversarial), Opus 5 · **Fecha:** 2026-09-08/09 · **Método:** `research/scripts/METODO-AGENTES.md`
 **Directorio:** `research/scripts/d8-ronda10a/` (no se toca ningún otro fichero del repositorio).
 
 **Objeto.** La opción (h) de R-FIN-14 (`research/dag-poas-ancla-de-orden.md:284-287`):
@@ -30,12 +30,36 @@ presenta con la cota **«steering 0 salvo `ρ ≥ L/W_dec`» (80 con `L = 1 h`, 
 > `α^(n*−1)`: a `ρ = 1,5` y `α = 0,40`, **1,6·10⁻² épocas al año**. El techo físico estimado del
 > reloj AES es **1,5-2,5×** (`pot-aes-asic-chacha.md` §3).
 >
-> **Lo que lo hunde como núcleo no es el reloj: es el coste.** (h) multiplica por **`1 + L/I` = 9,46**
-> la verificación de PoT de **cada nodo** (0,91 núcleos continuos frente a 0,096) y por **`q+1` = 10**
-> las líneas de AES del timekeeper — y, sobre todo, **un lado de partición sin esas 10 líneas queda
-> muerto aunque conserve todo su espacio** (§B.4). Veredicto en §D.
+> **Lo que decide si puede ser núcleo no es el reloj: es el coste, y el coste tiene forma cerrada.**
+> `ρ* = (1 + L/I)·I/(I + W_dec)`: **la protección de (h) y su precio son literalmente el mismo
+> número** (§C.5). A la calibración vigente (`I = 851 s`, `F = 2 h`) compra `ρ* = 9,24` y cobra
+> **0,91 núcleos continuos por nodo** (frente a 0,096) más **`q+1` = 10** líneas de AES por
+> timekeeper — y **un lado de partición sin esas 10 líneas queda muerto aunque conserve todo su
+> espacio** (§B.4). Como el techo físico del reloj es 1,5-2,5×, **se está pagando 3,7× de más**: con
+> `ρ_max = 2,5` basta `I = 4 725 s`, 0,147 núcleos y `q+1 = 3` líneas.
+>
+> **Veredicto (§D): sí puede ser núcleo, con cinco correcciones y `I` recalibrada.** La más grave:
+> `entropía_j` **no se publica, se calcula** — cualquier regla condicionada a «si la revelación está
+> disponible» hace `flujo` dependiente de la vista y parte el DAG entre honestos.
 
 ---
+
+## Índice
+
+| § | Punto del encargo | Veredicto en una línea |
+|---|---|---|
+| [A](#a--la-regla-operativa-completa-antes-de-atacarla) | la regla, escrita del todo | seis piezas (h.1-h.6); **retiro** la (h.3) de mi intento anterior: rompía R-FIN-5 |
+| [B.1](#b1--el-reloj-rápido-y-la-cota-ρ--lw_dec--la-cota-es-correcta-y-es-incompleta) | reloj rápido y `ρ ≥ L/W_dec` | correcta para el candidato **ajeno** (160), ciega para el **propio** (**8,99**) |
+| [B.2](#b2--dos-de-verificación--refutado-como-ataque-el-coste-que-queda-es-el-honesto) | DoS de verificación | **REFUTADO**; 16,24× medido, 32,4× en orden aleatorio |
+| [B.3](#b3--vivacidad-del-timekeeper--el-coste-de-cpu-no-es-el-problema-la-barrera-de-entrada-sí) | vivacidad del timekeeper | **25 líneas de AES cuestan 1,7 %**; el problema es la barrera ×(q+1) |
+| [B.4](#b4--partición-y-s_max--sí-h-introduce-un-vector-nuevo-y-es-de-hardware) | partición y `S_max` | **vector nuevo**: lado con < `q+1` núcleos muere con todo su espacio |
+| [B.5](#b5--carrera-de-bloques--demostrado-que-h-no-cambia-la-frontera-de-flujo-único) | carrera de bloques | **DEMOSTRADO** que (h) no la toca |
+| [B.6](#b6--el-adelanto-l1--1ρ--refutado-como-daño-a-la-frontera-la-laguna-ráfagas-queda-cerrada) | el adelanto `L(1−1/ρ)` | **REFUTADO**; LAGUNA «ráfagas» cerrada en **0,46 puntos** |
+| [C](#c--coste-de-h-con-número) | coste con número | `ρ*` y el coste **son el mismo número**; se paga 3,7× de más |
+| [D](#d--veredicto--puede-h-ser-núcleo-del-diseño) | veredicto | **sí, con cinco correcciones y `I` recalibrada** |
+
+---
+
 
 
 ## A · La regla operativa completa, antes de atacarla
