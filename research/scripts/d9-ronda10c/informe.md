@@ -284,3 +284,66 @@ NÚCLEO :  F ≥ (I(1−1/ρ) − W_dec) / (tope − 1)      y NO EXISTE si  I(1
   (`λ = 1/s`) y `κ` en bloques de la cadena seleccionada (`λ_chain = 0,200/s`, ronda 1
   `chain_growth.py`), la razón se multiplicaría **por ~5,2-5,8**. Aquí se ha usado el mismo `λ` en
   los dos, como la metaauditoría. **Residuo declarado.**
+
+<a name="c"></a>
+## C · Lo que espera el usuario — `r10c_c_reversion.py`, `r10c_c2_frontera.py`
+
+### C.1 · La tabla de reversión (`salida_c.txt`)
+
+`k = 30`, `λ = 1 bloque/s`, ventaja inicial `3k = 90` (Lema 10 de GHOSTDAG). **`prev()` no lleva `F`
+en su firma**: el riesgo del comerciante que espera `t` segundos **no depende de `F` en absoluto**.
+`F` solo entra en la unión a 10 años y en la frontera (C.2).
+
+**Modelo CORREGIDO (9a, `δ = 0`):**
+
+| `α` | `r` | 60 s | 300 s | 600 s | 1 800 s | 3 600 s |
+|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | 0,000 | **0** | **0** | **0** | **0** | **0** |
+| 0,10 | 0,111 | 1,000 | 6,376e-21 | 1,305e-68 | 3,768e-316 | 0 |
+| 0,25 | 0,333 | 1,000 | 2,234e-04 | 7,413e-19 | 9,476e-87 | 4,394e-191 |
+| 0,33 | 0,493 | 1,000 | 2,539e-01 | 1,516e-06 | 7,071e-36 | 4,264e-82 |
+
+**Modelo PESIMISTA (`δ(α)` medido por D8):**
+
+| `α` | `δ` | `r` | 60 s | 300 s | 600 s | 1 800 s | 3 600 s |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | 0,0000 | 0,000 | **0** | **0** | **0** | **0** | **0** |
+| 0,10 | 0,0618 | 0,118 | 1,000 | 1,252e-17 | 2,138e-60 | 1,527e-261 | 0 |
+| 0,25 | 0,1544 | 0,394 | 1,000 | 6,118e-02 | 3,009e-10 | 6,291e-54 | 3,813e-122 |
+| 0,33 | 0,2867 | 0,691 | 1,000 | 9,986e-01 | **5,538e-01** | 2,375e-06 | 1,322e-16 |
+
+> El **1,000 a 60 s** en todas las filas no es un fallo: es la ventaja `3k = 90` bloques del Lema 10.
+> En 60 s los honestos producen `(1−α)·60 ≈ 40-54` bloques, menos que la ventaja regalada. **Ninguna
+> confirmación es posible por debajo de ≈ `3k/((1−α)λ) = 100-134 s`, sea cual sea `F`.** Es una
+> consecuencia directa de la cota de *freeloading*, y conviene escribirla en la documentación de
+> producto: el mínimo absoluto de espera de ZEROX está en el orden de los 2 minutos.
+
+### C.1b · Lo que el comerciante espera de verdad
+
+Segundos hasta que la reversión baja de cada umbral (`brentq` sobre `t`):
+
+| Modelo | `α` | `< 10⁻³` | `< 10⁻⁶` | `< 10⁻⁹` | `< 10⁻¹²` |
+|---|---:|---:|---:|---:|---:|
+| CORREGIDO (`δ=0`) | 0,10 | 159 s | 190 s | **217 s** | 241 s |
+| CORREGIDO | 0,25 | 283 s | 356 s | **421 s** | 482 s |
+| CORREGIDO | 0,33 | 460 s | 608 s | **742 s** | 871 s |
+| PESIMISTA (`δ` D8) | 0,10 | 172 s | 206 s | **234 s** | 260 s |
+| PESIMISTA | 0,25 | 381 s | 489 s | **584 s** | 674 s |
+| PESIMISTA | 0,33 | 1 298 s | 1 869 s | **2 406 s** | 2 931 s |
+
+**El comerciante espera entre 4 y 40 minutos. Nunca 1 h ni 2 h.**
+
+### C.3 · Qué gana el usuario con `F = 1 h` frente a `F = 2 h`
+
+1. **En riesgo probabilístico: exactamente nada.** `prev(α, t)` es idéntica; a `t = 3 600 s` ya vale
+   `4,264e-82` (`α = 0,33`, `δ=0`) y `1,322e-16` (pesimista). Adelantar la garantía por regla de 2 h
+   a 1 h convierte un `10⁻¹⁶` en un `0`. **VERIFICADO.**
+2. **En la garantía por regla (R-FIN-7): llega 1 h antes.** Real, pero solo importa a quien necesite
+   irreversibilidad *categórica* (una bolsa acreditando un depósito grande), no a un comercio.
+3. **Lo que se PAGA por acortarla: la frontera baja.** Ver C.2. Y la **tolerancia a particiones**,
+   que es exactamente `F` (R-FIN-7), **se reduce a la mitad**.
+
+**Conclusión C: el argumento «`F` corta para el usuario» está REFUTADO.** El usuario no espera `F`,
+y su riesgo no depende de `F`. Los dos motivos legítimos para acortar `F` son **el sembrador**
+(A, y solo si `ρ > 1`) y la latencia de la garantía categórica. — **VERIFICADO** (el instrumento es
+el que publica los números del diseño, controlado en P1/P2).

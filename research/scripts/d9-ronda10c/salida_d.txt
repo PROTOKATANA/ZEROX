@@ -1,0 +1,91 @@
+==========================================================================================================================
+D · alpha objetivo = 0.33 · modelo de carrera = CORREGIDO delta=0 (9a) · A*_10x = 14760 s (esc. B) · W_dec = 20 s · tope W/kappa = 1.22
+==========================================================================================================================
+                   configuracion |   F_carrera (min)       pinza (min)  usuario |  F max sembrador 3x                5x |             MANDA  viable 3x
+     rho_max = 1   (n_eval = 45) |   1028 s (0.29 h)      0 s (0.00 h)     nada |          sin limite        sin limite |  F_carrera 0.29 h         SI
+     rho_max = 1,5 (n_eval = 68) |   1025 s (0.28 h)    821 s (0.23 h)     nada |     4740 s (1.32 h)   2772 s (0.77 h) |  F_carrera 0.28 h         SI
+    rho_max = 3   (n_eval = 135) |   1019 s (0.28 h)   2488 s (0.69 h)     nada |     4374 s (1.21 h)   2406 s (0.67 h) |      pinza 0.69 h         SI
+             rho_max = 3 CON (h) |   1019 s (0.28 h)    465 s (0.13 h)     nada |          sin limite        sin limite |  F_carrera 0.28 h         SI
+            rho_max = 10 CON (h) |   1019 s (0.28 h)    628 s (0.17 h)     nada |          sin limite        sin limite |  F_carrera 0.28 h         SI
+   (h), I libre = 300 s, rho = 3 |   1019 s (0.28 h)    164 s (0.05 h)     nada |          sin limite        sin limite |  F_carrera 0.28 h         SI
+
+==========================================================================================================================
+D · alpha objetivo = 0.33 · modelo de carrera = PESIMISTA delta D8 · A*_10x = 14760 s (esc. B) · W_dec = 20 s · tope W/kappa = 1.22
+==========================================================================================================================
+                   configuracion |   F_carrera (min)       pinza (min)  usuario |  F max sembrador 3x                5x |             MANDA  viable 3x
+     rho_max = 1   (n_eval = 45) |   3588 s (1.00 h)      0 s (0.00 h)     nada |          sin limite        sin limite |  F_carrera 1.00 h         SI
+     rho_max = 1,5 (n_eval = 68) |   3573 s (0.99 h)    821 s (0.23 h)     nada |     4740 s (1.32 h)   2772 s (0.77 h) |  F_carrera 0.99 h         SI
+    rho_max = 3   (n_eval = 135) |   3547 s (0.99 h)   2488 s (0.69 h)     nada |     4374 s (1.21 h)   2406 s (0.67 h) |  F_carrera 0.99 h         SI
+             rho_max = 3 CON (h) |   3547 s (0.99 h)    465 s (0.13 h)     nada |          sin limite        sin limite |  F_carrera 0.99 h         SI
+            rho_max = 10 CON (h) |   3547 s (0.99 h)    628 s (0.17 h)     nada |          sin limite        sin limite |  F_carrera 0.99 h         SI
+   (h), I libre = 300 s, rho = 3 |   3547 s (0.99 h)    164 s (0.05 h)     nada |          sin limite        sin limite |  F_carrera 0.99 h         SI
+
+==========================================================================================================================
+D · alpha objetivo = 0.35 · modelo de carrera = CORREGIDO delta=0 (9a) · A*_10x = 14760 s (esc. B) · W_dec = 20 s · tope W/kappa = 1.22
+==========================================================================================================================
+                   configuracion |   F_carrera (min)       pinza (min)  usuario |  F max sembrador 3x                5x |             MANDA  viable 3x
+     rho_max = 1   (n_eval = 45) |   1262 s (0.35 h)      0 s (0.00 h)     nada |          sin limite        sin limite |  F_carrera 0.35 h         SI
+     rho_max = 1,5 (n_eval = 68) |   1257 s (0.35 h)    821 s (0.23 h)     nada |     4740 s (1.32 h)   2772 s (0.77 h) |  F_carrera 0.35 h         SI
+    rho_max = 3   (n_eval = 135) |   1249 s (0.35 h)   2488 s (0.69 h)     nada |     4374 s (1.21 h)   2406 s (0.67 h) |      pinza 0.69 h         SI
+             rho_max = 3 CON (h) |   1249 s (0.35 h)    465 s (0.13 h)     nada |          sin limite        sin limite |  F_carrera 0.35 h         SI
+            rho_max = 10 CON (h) |   1249 s (0.35 h)    628 s (0.17 h)     nada |          sin limite        sin limite |  F_carrera 0.35 h         SI
+   (h), I libre = 300 s, rho = 3 |   1249 s (0.35 h)    164 s (0.05 h)     nada |          sin limite        sin limite |  F_carrera 0.35 h         SI
+
+==========================================================================================================================
+D · alpha objetivo = 0.35 · modelo de carrera = PESIMISTA delta D8 · A*_10x = 14760 s (esc. B) · W_dec = 20 s · tope W/kappa = 1.22
+==========================================================================================================================
+                   configuracion |   F_carrera (min)       pinza (min)  usuario |  F max sembrador 3x                5x |             MANDA  viable 3x
+     rho_max = 1   (n_eval = 45) |   6987 s (1.94 h)      0 s (0.00 h)     nada |          sin limite        sin limite |  F_carrera 1.94 h         SI
+     rho_max = 1,5 (n_eval = 68) |   6955 s (1.93 h)    821 s (0.23 h)     nada |     4740 s (1.32 h)   2772 s (0.77 h) |  F_carrera 1.93 h         NO
+    rho_max = 3   (n_eval = 135) |   6900 s (1.92 h)   2488 s (0.69 h)     nada |     4374 s (1.21 h)   2406 s (0.67 h) |  F_carrera 1.92 h         NO
+             rho_max = 3 CON (h) |   6900 s (1.92 h)    465 s (0.13 h)     nada |          sin limite        sin limite |  F_carrera 1.92 h         SI
+            rho_max = 10 CON (h) |   6900 s (1.92 h)    628 s (0.17 h)     nada |          sin limite        sin limite |  F_carrera 1.92 h         SI
+   (h), I libre = 300 s, rho = 3 |   6900 s (1.92 h)    164 s (0.05 h)     nada |          sin limite        sin limite |  F_carrera 1.92 h         SI
+
+==========================================================================================================================
+D2 · La misma tabla con el tope LITERAL de BDK (W/kappa <= 1,00), alpha = 0,33, delta = 0
+==========================================================================================================================
+                   configuracion |         F_carrera      pinza W/k<=1 |                MANDA
+     rho_max = 1   (n_eval = 45) |   1028 s (0.29 h)      0 s (0.00 h) |      1028 s (0.29 h)
+     rho_max = 1,5 (n_eval = 68) |   1025 s (0.28 h)        sin limite | IMPOSIBLE (W>kappa siempre)
+    rho_max = 3   (n_eval = 135) |   1019 s (0.28 h)        sin limite | IMPOSIBLE (W>kappa siempre)
+             rho_max = 3 CON (h) |   1019 s (0.28 h)    567 s (0.16 h) |      1019 s (0.28 h)
+            rho_max = 10 CON (h) |   1019 s (0.28 h)    766 s (0.21 h) |      1019 s (0.28 h)
+   (h), I libre = 300 s, rho = 3 |   1019 s (0.28 h)    200 s (0.06 h) |      1019 s (0.28 h)
+
+==========================================================================================================================
+D3 · Sensibilidad del margen del sembrador: que F admite cada margen objetivo
+==========================================================================================================================
+                   configuracion |           1.5x           2.0x           3.0x           5.0x          10.0x
+     rho_max = 1   (n_eval = 45) |     sin limite     sin limite     sin limite     sin limite     sin limite
+     rho_max = 1,5 (n_eval = 68) | 9660 s (2.68 h) 7200 s (2.00 h) 4740 s (1.32 h) 2772 s (0.77 h) 1296 s (0.36 h)
+    rho_max = 3   (n_eval = 135) | 9294 s (2.58 h) 6834 s (1.90 h) 4374 s (1.21 h) 2406 s (0.67 h) 930 s (0.26 h)
+             rho_max = 3 CON (h) |     sin limite     sin limite     sin limite     sin limite     sin limite
+            rho_max = 10 CON (h) |     sin limite     sin limite     sin limite     sin limite     sin limite
+   (h), I libre = 300 s, rho = 3 |     sin limite     sin limite     sin limite     sin limite     sin limite
+
+==========================================================================================================================
+D4 · EL PRECIO DE (h), cuantificado con el coste de PoT MEDIDO (nadie lo habia hecho)
+==========================================================================================================================
+R-FIN-14 (h): `entropia_j = VDF(chunk(I_j) || salida(I_j), L*iter)`, revelada en t_j.
+Es un segundo VDF de `L` slots por epoca. Coste MEDIDO por slot en el clon subspace @ f8842d0,
+Ryzen 9 9950X3D, ruta verify_sequential_avx512f_vaes, 8 checkpoints, 200 032 000 iteraciones:
+   prove = 1.561 s/slot · verify = 0.0961 s/slot (razon 16.2x)
+La cadena principal de PoT ya cuesta verify/tau = 9,6 % de un nucleo continuo a tau = 1 s.
+
+ F (L slots)   I (s) |  verificar el VDF de (h)   por epoca  % de un nucleo continuo  total con la cadena
+        1224     491 |                  117.6 s 1 por epoca                   24.0%               33.6%
+        1224     851 |                  117.6 s 1 por epoca                   13.8%               23.4%
+        2488     491 |                  239.1 s 1 por epoca                   48.7%               58.3%
+        2488     851 |                  239.1 s 1 por epoca                   28.1%               37.7%
+        3600     491 |                  346.0 s 1 por epoca                   70.5%               80.1%
+        3600     851 |                  346.0 s 1 por epoca                   40.7%               50.3%
+        7200     491 |                  691.9 s 1 por epoca                  140.9%              150.5%
+        7200     851 |                  691.9 s 1 por epoca                   81.3%               90.9%
+       19080     491 |                 1833.6 s 1 por epoca                  373.4%              383.0%
+       19080     851 |                 1833.6 s 1 por epoca                  215.5%              225.1%
+
+   Lectura: (h) hace que una F LARGA sea cara en CPU de verificacion (crece como F/I).
+   A F = 1 h e I = 851 s son 346 s de CPU por epoca = 40,7 % de un nucleo, ADEMAS del 9,6 %
+   de la cadena principal. A F = 2 h, 81,3 %. A F = 5,3 h, 215 %: mas de dos nucleos.
+   Es una DERIVACION del coste medido por slot, no una medicion de punta a punta: PLAUSIBLE.

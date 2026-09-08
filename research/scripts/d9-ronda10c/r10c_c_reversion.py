@@ -109,15 +109,23 @@ def montecarlo():
     print("     en vez de sumar la serie de Skellam. Tope de abandono = 400 bloques de ventaja")
     print("     honesta (r^401 < 1e-30 en el peor r de la tabla).")
     print("=" * 104)
-    print(f"{'alpha':>6} {'hf':>6} {'t':>6} | {'MC media':>11} {'MC min':>11} {'MC max':>11} "
-          f"{'analitico':>11} {'razon':>7}")
+    print(f"{'alpha':>6} {'hf':>6} {'t':>6} | {'MC media':>12} {'MC min':>12} {'MC max':>12} "
+          f"{'analitico':>12} {'razon':>7}")
+    # celdas ELEGIDAS en el regimen medible (0,005 < p < 0,95): si p ~ 1 el MC no valida nada.
+    CELDAS = [(0.33, 1.0, 300.0, 8000), (0.33, 1.0, 400.0, 40000),
+              (0.35, 1.0, 300.0, 8000), (0.35, 1.0, 400.0, 20000),
+              (0.40, 1.0, 500.0, 8000), (0.40, 1.0, 600.0, 12000),
+              (0.40, 1.0, 800.0, 60000),
+              (0.45, 1.0, 1000.0, 8000), (0.45, 1.0, 1500.0, 20000),
+              (0.45, 1 - L.delta_interp(0.45), 600.0, 8000),
+              (0.30, 1 - L.delta_interp(0.30), 400.0, 20000),
+              (0.00, 1.0, 600.0, 4000)]
     tareas = []
     casos = []
-    for a, hf in ((0.40, 1.0), (0.45, 1.0), (0.48, 1.0), (0.45, 1 - L.delta_interp(0.45))):
-        for t in (60.0, 300.0):
-            casos.append((a, hf, t))
-            for s in SEMILLAS:
-                tareas.append((a, hf, t, s, 4000, 400))
+    for a, hf, t, n in CELDAS:
+        casos.append((a, hf, t))
+        for s in SEMILLAS:
+            tareas.append((a, hf, t, s, n, 400))
     with mp.Pool() as pool:
         res = pool.map(_mc, tareas)
     idx = 0
@@ -128,8 +136,8 @@ def montecarlo():
             ps.append(g / n)
         an = L.prev(a, 1.0, t, 3 * L.K, hf)
         m = float(np.mean(ps))
-        print(f"{a:>6.2f} {hf:>6.3f} {t:>6.0f} | {m:>11.4f} {min(ps):>11.4f} {max(ps):>11.4f} "
-              f"{an:>11.4f} {m/an if an > 0 else float('nan'):>7.3f}")
+        print(f"{a:>6.2f} {hf:>6.3f} {t:>6.0f} | {m:>12.6f} {min(ps):>12.6f} {max(ps):>12.6f} "
+              f"{an:>12.6f} {m/an if an > 0 else float('nan'):>7.4f}")
     print("   Control negativo alpha = 0 (analitico): "
           f"{L.prev(0.0, 1.0, 600.0, 3*L.K, 1.0):.3e}")
 
