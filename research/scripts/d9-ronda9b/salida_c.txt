@@ -1,0 +1,49 @@
+====================================================================================================
+C1 · Que ve el retarget: solo AZULES (R-FIN-13 vigente) vs TODOS los FUSIONADOS (enmienda P1)
+====================================================================================================
+k=30, mp=15, lambda=1, Delta=4.0, horizonte 1800 s, ventana [60,1740] s,
+semillas=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], maniobra parasita de D8 A1.2.
+
+  lambda_obs/lambda = N_obs / N_producidos  ->  inflacion = lambda / lambda_obs
+  El modelo de dag-poas-delta-real.md exige lambda_obs/lambda = k/(k+2D*lambda_real).
+
+ alpha    J |  azul/prod  infl_azul |   fus/prod   infl_fus |  N_prod  N_azul   N_fus   rojos
+---------------------------------------------------------------------------------------------
+  0.00   16 |     1.0000     1.0000 |     1.0000     1.0000 |   19978   19978   19978       0
+  0.10   16 |     0.9093     1.0998 |     0.9975     1.0025 |   19978   18165   19928    1838
+  0.25   16 |     0.8449     1.1836 |     0.9997     1.0003 |   19978   16879   19973    3268
+  0.30   31 |     0.7630     1.3106 |     0.9993     1.0007 |   19978   15243   19964    4937
+  0.33   31 |     0.7518     1.3302 |     0.9987     1.0013 |   19978   15019   19953    5168
+  0.35   31 |     0.7601     1.3156 |     0.9989     1.0011 |   19978   15186   19957    4982
+  0.37   48 |     0.6946     1.4398 |     0.9971     1.0029 |   19978   13876   19920    6313
+  0.40   48 |     0.6887     1.4521 |     0.9952     1.0048 |   19978   13758   19883    6365
+
+CONTROL POSITIVO (regla 4): la columna azul/prod es 1-delta_global de D8 A1b/A1e.
+  alpha=0.40 -> azul/prod = 0.6887 ; D8 A1e da ing_h=0.5634, ing_a=0.8727
+  (aqui es el agregado de los dos lados, no cada lado por separado)
+
+CRITERIO alpha=0 (regla 1): azul/prod = 1.0000, fus/prod = 1.0000, rojos = 0
+
+LECTURA C1:
+  Contando solo azules, la inflacion medida a alpha=0.40 es x1.452 -- del mismo orden que
+  el x1.36 (k=30) que dag-poas-delta-real.md deriva del modelo del Lema 9.
+
+====================================================================================================
+C2 · ¿Es inflable el retarget por COPIAS si R-FIN-13 cuenta todos los bloques validos?
+====================================================================================================
+   m    n |  N_billetes  N_azules  N_fusionados  N_1xident |  infl_azul   infl_fus  infl_1xid
+---------------------------------------------------------------------------------------------
+   1    0 |           3         2             2          2 |      0.667      0.667      0.667
+   1   14 |           3         3            16          3 |      1.000      5.333      1.000
+   5   14 |           7         7            76          7 |      1.000     10.857      1.000
+  10   14 |          12        12           151         12 |      1.000     12.583      1.000
+  50   14 |          52        52           751         52 |      1.000     14.442      1.000
+
+LECTURA C2: la columna infl_fus es el factor por el que el retarget SOBREESTIMA la tasa
+  de bloques si cuenta todos los validos. Tiende a max_block_parents = 15. Es EXACTAMENTE
+  la mitad (a) del ATAQUE 3 de la ronda 1: 'el DAA ve x11 bloques por billete'.
+  La columna infl_azul se queda en ~1: contar azules es inmune por U3'' dinamica.
+  infl_1xid es la REGLA CORREGIDA (R-FIN-13', un bloque por IDENTIDAD): tambien inmune,
+  y ademas -- ver C1 -- cuenta a los rojos-k, que es lo que mata la inflacion del retarget.
+
+[86 s]

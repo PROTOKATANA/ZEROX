@@ -15,7 +15,7 @@ Regla vigente (`research/dag-poas-ancla-de-orden.md:274`):
 ## Estado del volcado
 - [x] A · los motivos originales (ronda 1 «×10», ronda 3 «espacio gratis») y si siguen vivos
 - [x] B · qué hace Kaspa de verdad (rusty-kaspa @ c338d495), fichero y línea
-- [ ] C · vectores nuevos con rojos pagados
+- [x] C · vectores nuevos con rojos pagados
 - [x] D · rentabilidad medida (control positivo + modo «rojos pagados»)
 - [ ] E · texto de R-FIN-8′ y enmienda a R-FIN-13
 - [ ] F · veredicto y errores propios
@@ -265,3 +265,148 @@ los que aquí hay cero). **LAGUNA declarada:** no he medido la parásita **y** l
 
 **Veredicto D: DEMOSTRADO** que P1 en su redacción (S1) anula la rentabilidad (1,16–1,55 → 0,99);
 **REFUTADO** que la vía sea «la semántica de Kaspa» (S2: 1,50–2,79, peor que no hacer nada).
+
+---
+
+## C · Vectores nuevos con los rojos pagados
+
+**Script:** `research/scripts/d9-ronda9b/r9b_c_retarget.py` → `salida_c.txt`.
+
+### C.1 · El invariante que P1 rompe
+
+> **La regla que el retarget CUENTA y la regla que la emisión PAGA tienen que definir el mismo
+> conjunto.** Si el conjunto pagado es mayor que el contado, la emisión corre por delante del
+> calendario y el atacante se lleva la diferencia. Si es menor, el retarget infla `λ_real`.
+
+| Diseño | conjunto CONTADO (R-FIN-13) | conjunto PAGADO (R-FIN-8) | ¿coinciden? |
+|---|---|---|---|
+| Vigente | azules | azules | **sí** |
+| **P1 literal** | todos los válidos | todos los rojos+azules fusionados | **no** — difieren en las **copias** |
+| **R-FIN-8′ + R-FIN-13′** (§E) | un bloque por **identidad**, fusionado | un bloque por **identidad**, fusionado | **sí** |
+
+### C.2 · ¿Hay inflación? — **sí, ×15, y por las copias; no por los rojos-`k`**
+
+Medido, **sin** copias (`r9b_d_coste.py`, maniobra parásita, 12 semillas): la fracción de bloques
+producidos que acaban **fusionados** es 0,9952–1,0000 para todo `α`. **Pagar a los rojos-`k` no
+emite ni un bloque de más por segundo.**
+
+Medido, **con** copias (`r9b_c_retarget.py` C2, construcción determinista):
+
+| `m` | `n` | `N_billetes` | `N_azules` | `N_fusionados` | `N_1×identidad` | infl. azul | **infl. fusionados** | infl. 1×id |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | **0** | 3 | 2 | 2 | 2 | 0,667 | **0,667** | 0,667 |
+| 1 | 14 | 3 | 3 | 16 | 3 | 1,000 | **5,333** | 1,000 |
+| 5 | 14 | 7 | 7 | 76 | 7 | 1,000 | **10,857** | 1,000 |
+| 10 | 14 | 12 | 12 | 151 | 12 | 1,000 | **12,583** | 1,000 |
+| 50 | 14 | 52 | 52 | 751 | 52 | 1,000 | **14,442** | 1,000 |
+
+**Precisión sobre «inflación».** `C-EMIT-01` (`SPEC.md:1458-1464`) usa `emitido(H)` **acumulado**,
+así que el suministro **no** se desborda: lo que pasa es que la curva se recorre ×15 más rápido y
+**el atacante captura la diferencia**. Es exactamente lo que decía la ronda 1: *«inflación ×10
+**sobre la cuota del atacante**»* (`dag-poas-auditoria.md:370`). **Redistribución, no ruptura del
+`SOFT_CAP`.** Y la elección de conteo del retarget **no salva**, sólo elige el daño:
+
+- R-FIN-13 vigente (azules) + P1 (paga rojos) ⇒ dificultad estable, **emisión ×15** → captura.
+- R-FIN-13 enmendada (todos los válidos) + P1 ⇒ emisión al ritmo, **dificultad ×15** →
+  *«congelación progresiva del ritmo de bloques»* (`dag-poas-auditoria.md:370`), censura económica.
+
+### C.3 · ¿Hay «espacio de bloque gratis»? — **sí, el mismo ×15**
+
+Es el motivo 2 (ronda 3) sin cambios: `N−1 = 14` copias por bloque del atacante, cada una con un
+**cuerpo distinto**, todas aplicadas al UTXO en el orden del mergeset. `mergeset_size_limit = 180`
+no muerde (el mergeset de cada `B_j` es 15). Con comisión cero (el consenso no exige mínimo) es
+**crecimiento de estado gratis**. La mitigación alternativa que la ronda 3 dejó escrita —*«contar
+la masa de los rojos contra el límite del fusionador»*— **sigue sin estar escrita** y **no la
+resuelve para las copias** (sólo la encarece). Etiqueta: **CONFIRMADO**.
+
+### C.4 · La parásita con rojos pagados — el premio se va, el castigo también
+
+- **Los bloques fallidos NO cobran.** Un bloque retenido y nunca publicado no está en `past` de la
+  punta ⇒ no se fusiona ⇒ no cobra bajo ninguna semántica. Medido: `perd` = 5–95 bloques,
+  `S1_a = 0,988–0,999`. **Intentarlo cuesta 0,1–1,2 %.**
+- **Pero deja de castigar.** A `α = 0,10` el ratio pasa de **0,319** (R-FIN-8) a **0,976** (P1).
+  Bajo R-FIN-8 un granjero pequeño que parasita **pierde dos tercios de su ingreso**; bajo P1 no
+  pierde nada. **P1 quita el premio y también el disuasorio.** El `δ` que la parásita impone
+  —y que entra en `(1−α)(1−δ)` de la frontera de flujo único— sigue siendo el mismo: **P1 no
+  cierra el ataque, cierra su rentabilidad.** Etiqueta: **DEMOSTRADO** (medido en D).
+- **Efecto colateral (PLAUSIBLE, no medido):** si un bloque cobra igual siendo rojo, desaparece la
+  presión económica hacia la **puntualidad**. Hoy un granjero tardío pierde la coinbase; con P1 no.
+  Un `δ` «natural» mayor por pereza rebaja `(1−α)(1−δ)` sin ningún atacante. **No lo he medido.**
+
+### C.5 · Interacción con R-FIN-1a: P1 concentra TODO el *griefing* en la invalidación
+
+R-FIN-1a **no enrojece: invalida** (`slot(B) − slot(sp(B)) > S_max` ⇒ bloque inválido). Por R-FIN-4
+un bloque inválido no está en el `past` de ningún bloque válido, luego **nunca se fusiona y nunca
+cobra**, bajo cualquier semántica. No hay interacción directa. **Pero sí una indirecta y mala:**
+con P1, enrojecer a un honesto deja de quitarle dinero, así que **la única forma de negarle el pago
+pasa a ser invalidarlo** — es decir, R-FIN-1a. D8 A3 M1 midió esa superficie:
+**11,7 bloques honestos/h** invalidados a `α = 0,25` y **24,2/h** a `α = 0,40` con `S_max = 20 s`,
+y **0/h** con `S_max ≥ 30 s`. **P1 sube la apuesta de elegir `S_max ≥ 30 s`.** Etiqueta:
+**PLAUSIBLE** (la superficie está medida por D8; que el atacante se desplace a ella es inferencia).
+
+### C.6 · Interacción con `merge_depth` — la cláusula de P1 es vacua **y además errónea**
+
+En Kaspa un rojo fuera de `merge_depth_root` **no es que no cobre: es que invalida al fusionador**
+(`post_pow_validation.rs:79-101`, `RuleError::ViolatingBoundedMergeDepth` en `:96`). No existe la
+categoría «rojo fusionado fuera de `merge_depth`». **Excepción:** los *kosherizing blues*
+(`block_depth.rs:109-119`) — un rojo que sea ancestro de un azul del mergeset descendiente de
+`merge_depth_root` **sí se fusiona legalmente**, y en Kaspa **sí cobra**. La cláusula de P1
+«dentro de `merge_depth`» le negaría el pago sin ninguna razón. Etiqueta: **VERIFICADO** (código).
+
+### C.7 · Interacción con U3″ dinámica — es el agujero, ya cubierto en A
+
+Un rojo cuya identidad **ya fue coloreada de azul** en `past(sp)` o **en el mismo mergeset** es una
+**copia**. Bajo P1 cobra y aplica su cuerpo ⇒ ×15 (A, C.2, C.3). **R-FIN-8′ tiene que distinguir
+las dos causas de rojez.** Nombro la distinción para poder escribirla:
+
+- **`rojo_k`** — rojo por el `k`-cluster de GHOSTDAG (`check_blue_candidate`, `protocol.rs:246-283`).
+  Su billete es **único** en la vista del fusionador. **Cobra y aplica.**
+- **`rojo_U3`** — rojo porque su identidad ya está azul en `past(sp)` o antes en el mismo mergeset
+  (R-FIN-11 U3″). Es una **copia**. **Ni cobra, ni aplica, ni cuenta en el retarget.**
+
+La distinción es **determinista y función de `past(B)`** (R-FIN-4): U3″ ya la calcula al colorear,
+`r8c_gd.py:222-231`. No cuesta nada implementarla.
+
+### C.8 · El retarget y la nota de `dag-poas-delta-real.md` — **deja de aplicar, y está MEDIDO**
+
+`dag-poas-delta-real.md:17-20` deriva `λ_real = k·λ_obj/(k − 2D·λ_obj)` de la premisa
+`λ_obs = λ·k/(k + 2Dλ)`, es decir **«el retarget sólo ve azules»**. Medido sobre la maniobra
+parásita de D8 (12 semillas, `k = 30`, `Δ = 4 s`, `λ = 1/s`):
+
+| `α` | azul/producido | **infl. contando azules** | fusionado/producido | **infl. contando fusionados** | `N_prod` | rojos |
+|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | 1,0000 | **1,0000** | 1,0000 | **1,0000** | 19 978 | **0** |
+| 0,10 | 0,9093 | 1,0998 | 0,9975 | 1,0025 | 19 978 | 1 838 |
+| 0,25 | 0,8449 | 1,1836 | 0,9997 | 1,0003 | 19 978 | 3 268 |
+| 0,30 | 0,7630 | 1,3106 | 0,9993 | 1,0007 | 19 978 | 4 937 |
+| 0,33 | 0,7518 | 1,3302 | 0,9987 | 1,0013 | 19 978 | 5 168 |
+| 0,35 | 0,7601 | 1,3156 | 0,9989 | 1,0011 | 19 978 | 4 982 |
+| 0,37 | 0,6946 | 1,4398 | 0,9971 | 1,0029 | 19 978 | 6 313 |
+| **0,40** | 0,6887 | **1,4521** | 0,9952 | **1,0048** | 19 978 | 6 365 |
+
+- **Criterio `α` ✓** — `α = 0`: inflación 1,0000 por las dos reglas, 0 rojos.
+- **Control positivo ✓** — contando azules, la inflación medida a `α = 0,40` es **×1,452**, del
+  mismo orden que el **×1,36** que el modelo de `delta-real.md` deriva para `k = 30` (la medida es
+  algo mayor porque el `δ` parásito de D8 supera la cota del Lema 9 — es el hallazgo A1 de D8).
+
+**Conclusión, MEDIDA:** si el retarget cuenta a los rojos-`k`, la inflación cae de **×1,45 a
+×1,005**, y `λ_real ≈ λ_obj`, `δ_real ≈ δ_nominal`. **La nota `dag-poas-delta-real.md` deja de
+aplicar.** Lo que compra, con los números de ese mismo fichero (`k = 30`): `δ_real` 0,267 → `δ`
+nominal 0,211; umbral de **orden** 40,0 % → **41,7 %**; `r = 1` en 42,3 % → **43,1 %**.
+**Etiqueta: DEMOSTRADO** (medido a 12 semillas, con `α = 0` y control positivo). **Es el beneficio
+más grande de P1, y P1 lo menciona de pasada.**
+
+### C.9 · Coste arquitectónico que P1 **no** declara
+
+`C-EMIT-03` (`SPEC.md:1532-1533`) dice `Σ salidas(coinbase) ≤ subsidio(H) + Σ fees(bloque)` **del
+propio bloque**, y `C-HDR-08` (`:858-861`) mantiene la dirección fuera de la cabecera porque *«la
+recompensa es la salida de la coinbase»*. Las dos sobreviven **sólo** con la variante
+«**se aplica la coinbase propia de todo bloque fusionado**» (§E). Con la variante **Kaspa literal**
+(`coinbase.rs:121-131`, el fusionador cobra) hay que reescribir `C-EMIT-03` a
+`Σ salidas ≤ Σ_{X ∈ mergeset(B)} (subsidio(X) + fees_aceptadas(X))` — que es lo que la ronda 1
+llamaba *«rediseño de §22 y C-EMIT»* (`dag-poas-auditoria.md:372`). **P1 la vende como «la palanca
+más barata: una regla». Con la variante recomendada lo es; con la de Kaspa, no.**
+**Residuo PLAUSIBLE, no medido:** con la coinbase propia, **nadie cobra por fusionar a un rojo**.
+Kaspa paga al fusionador precisamente para incentivar la inclusión. En ZEROX el algoritmo de padres
+está adoptado como consenso (R-FIN-12, `pick_virtual_parents`), así que la conducta no depende del
+incentivo, pero **no he medido si un granjero racional se desviaría**.
