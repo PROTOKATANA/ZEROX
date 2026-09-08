@@ -1,6 +1,6 @@
 # Ancla de orden — octava propuesta para un DAG sobre PoAS
 
-**Fecha:** 2026-09-08 · **ESTADO (tras D9-e):** ancla **`blue_score`** con Prop. 7 **transferida** (Lemas A4/A4b, D9-e), U3″ dinámica verificada, `S_max=150`, R-FIN-7 reescrita, `shuffle` en R-FIN-12, `slot` = índice de PoT en R-FIN-13, `altura := blue_work` en R-FIN-10. **El peso real no cambia nada. Pero `m` NO tiene cota superior conocida** (5,0 → 3,03 → 5,77 según la familia de estrategias): **`I`, `c`, `F` NO están dimensionadas** (con `m=5,77`: `I≈3,4 h`, `F≈15,5 h`, y subirá). Ver `dag-poas-ancla-de-orden-auditoria-5.md`. Es la **séptima propuesta**
+**Fecha:** 2026-09-08 · **ESTADO (tras D9-f):** ancla **por `slot`** (índice de PoT) — la cuarta y la única con **`m` acotado por construcción**: `m ≤ 1 + λ·S_max[s]`. `F ∝ ln m`, así que las constantes **sí están dimensionadas, contra su cota**: **`I = 4 200 s`, `F = 5,3 h` medidos** (familia de D9-e), **`F ≤ 68,5 h` garantizado** (`S_max = 150 s`); **`c` desaparece**. Prop. 7 la cubre (Lema A4-slot). `τ ≈ 0,1 s`, R-FIN-1a **no estricta**, `S_max` **en segundos**. Ver `dag-poas-ancla-de-orden-auditoria-6.md`. **Pendiente: D8 sobre el diseño completo; la duración real del slot de PoT de Autonomys; `Δ`.** Es la **séptima propuesta**
 (`dag-poas-ancla-de-finalidad.md`) con **una regla reescrita y cuatro constantes derivadas**. Nueve
 de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio está en
 `dag-poas-ancla-de-finalidad-metaauditoria.md`; sus scripts, en `/tmp/d9-ronda7/`.
@@ -105,12 +105,11 @@ Va como **`1/√I`**: **épocas cortas ⇒ más steering.**
 |---|---:|---:|---:|---:|
 | `g` | 44,8 % | 20,1 % | 11,4 % | **3,6 %** |
 
-> ⚠️ **NO DIMENSIONADAS (D9-e).** D9-d rederivó `I = 3 330 s`, `F = 4,2 h` con `m = 2,33` gratis — pero `m` es
-> una **cota inferior por familia de estrategias**, y cada agente que amplía la familia la sube: D9-c 5,0
-> (`pos`), D9-d 3,03, **D9-e 5,77** (`retro ≤ 64`, copias). Con `m = 5,77`: `I ≈ 12 250 s (3,4 h)`,
-> `c ≈ 9 300` azules, **`F ≈ 15,5 h`**. **Sin una cota superior de `m` por argumento —o un ancla con `m`
-> acotado por construcción— ningún `I`, `c`, `F` está dimensionado.** Los 2 490 s / 3,2 h de abajo quedan
-> como registro.
+> ✅ **DIMENSIONADAS CONTRA SU COTA (D9-f).** «`m` sin cota» era una sobreafirmación mía: `c_m ≃ √(2 ln m)`,
+> luego **`I ∝ 2 ln m` y `F ∝ ln m`** (`m = 10⁴` ⇒ `F = 143 h`, no ∞). Con el ancla por `slot`: **medido**
+> `m = 2,54` ⇒ `I = 4 200 s (1,17 h)`, `F = 5,3 h`; **garantizado por construcción** `m ≤ 1 + λ·S_max[s] = 151`
+> ⇒ `F ≤ 68,5 h` (`S_max = 150 s`), o `35-41 h` con `S_max = 20-30 s`. **`c` ya no existe**: el ancla no
+> es un contador. Los 2 490 s / 3,2 h / 3 330 s / 4,2 h anteriores quedan como registro.
 
 `I = 2 490 s` es el punto donde `g = 3,6 %`, el nivel que la ronda 7 declaró aceptable
 (*«del orden del 3 %, en ≤ 22 % de las épocas»*).
@@ -143,7 +142,7 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 **`F` es el límite de reorg, no el tiempo de confirmación.** Se confirma en minutos (§3).
 
-### 1.4 · `c` — la época expresada en la unidad del ancla
+### 1.4 · `c` — ⚠️ OBSOLETA (D9-f): con el ancla por `slot` no hay contador; la época es `I` en índices de PoT
 
 `c` no es un parámetro libre: es `I` en unidades del ancla. A `q = 1`:
 
@@ -154,54 +153,40 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 ## 2 · El algoritmo
 
-Constantes: `k = 30`, `q = 1` **decidido**, `S_max = 150`, `W_RETARGET ≥ 3 083` — y **`I`, `c`, `F` SIN DIMENSIONAR** (D9-e): dependen de `m`, que no tiene cota superior conocida. Último punto medido (D9-d, `m=2,33`): `I = 3 330 s`, `c = 3 250` azules, `F = 4,2 h`; con `m = 5,77` (D9-e): `F ≈ 15,5 h`.
+Constantes: `k = 30`, `q = 1` **decidido**, `S_max ∈ [20, 150] s` (elección), `W_RETARGET ≥ 3 083`, `τ ≈ 0,1 s` — y **`I = 4 200 s`, `F = 5,3 h` medidos** contra la familia de D9-e, **`F ≤ 68,5 h` garantizado** por construcción (`S_max = 150 s`). **No hay `c`.**
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
 desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
 por gossip.
 
-**R-FIN-1 · Inyector por `blue_score` de la cadena seleccionada — TERCER ANCLA (2026-09-08, tras D9-c A1).**
-`I_j(B) :=` el **primer** bloque de la cadena seleccionada de `B` con `blue_score ≥ c·j`, con `c` en
-**azules**, no en saltos. Único por cadena, siempre existe, sin campo de cabecera, función de `past(B)`.
+**R-FIN-1 · Inyector por `slot` — CUARTA ANCLA (2026-09-08, tras D9-f).**
+`I_j(B) :=` el bloque de la cadena seleccionada de `B` con **menor `blue_work` entre los de `slot ≥ T_j`**, con
+`T_j = j·I` un **índice de PoT** fijo (R-FIN-13). Único por cadena, siempre existe (si ningún bloque de cadena
+tiene `slot ∈ [T_j, T_j + S_max)`, el primero posterior), sin campo de cabecera, función de `past(B)`.
 
-> **Historial de anclas.** (1) Índice del orden total: **cuenta rojos** → grindable con copias (D9-b).
-> (2) Posición de cadena `pos(B)=pos(sp(B))+1`: **cuenta saltos**, y `blue_work` no ve saltos → el
-> atacante mueve qué honesto cae en `c·j` solo eligiendo padres; `m` = 4,5-5,25 gratis, hasta 10,7
-> (D9-c A1). (3) **`blue_score`**: es la magnitud que GHOSTDAG maximiza y que un salto no infla.
-> Atacada por D9-d: **grindable, pero la mejor** (`dag-poas-ancla-de-orden-auditoria-4.md`).
-> **Prop. 7 transferida al ancla (D9-e A4, DEMOSTRADO):** **Lema A4** — `blue_score` es estrictamente creciente
-> **por la cadena seleccionada**, luego «el ancla cambia ⇒ la cadena ya difiere en `p ≤ idx(ancla)`», y ahí
-> aplica el Lema A2 de D9-c (`∃C` de la Def. 2, sin cota de la unión); 579/579 cambios comprobados.
-> **Lema A4b** — `blue_work` es monótono bajo ancestría con peso real (141 967/141 967 parejas). El peso real
-> `Σ w(SR)` **no cambia `m`** (±4 %) ni el sesgo. **Ojo:** `blue_score` **no** es monótono bajo ancestría con
-> peso real (contraejemplo D9-e); solo por la cadena.
+> **Cota E, por construcción (D9-f, DEMOSTRADO el enunciado):** por R-FIN-1a, `slot(I_j) ∈ [T_j, T_j + S_max)` sin
+> ninguna hipótesis estadística; como `slot` lo fija el PoT y `λ` el retarget, **`m ≤ 1 + λ·S_max[s]`** (PLAUSIBLE
+> el conteo). Medido, mismas semillas y familia que D9-e: **`m = 2,54`** donde `blue_score` daba 6,05; con
+> retención 3,64 ↔ 8,54. **Prop. 7 la cubre** (Lema A4-slot, 13 110/13 110, sin necesitar monotonía).
 
-**Qué protege `blue_score` y qué no (D9-d A1-A2).** Cada bloque de cadena «posee» tantos umbrales `c·j`
-como su **incremento** de `blue_score`; la protección frente al ancla de saltos es exactamente
-`E[incremento] = λ_azul/λ_chain` (4,81 sin ataque). El atacante del paper —sin retardo— fusiona más,
-**acorta la cadena** (`λ_chain` 0,199 → 0,484 a `α=0,25`) y baja el incremento medio a **1,49**; a
-incremento 1 el ancla es el ancla `pos`. Menú gratis medido **2,33-3,25** (`pos`: 4,50-5,25); con
-retención hasta 8,2. **Sesgo:** el ancla cae en un bloque del atacante el **59,3 %** de los umbrales a
-`α=0,25` (49,3 % de los bloques), **80,6 %** eligiendo padres — su palanca sigue siendo el menú `m`,
-no la identidad del bloque (`blake3(chunk ‖ pot_output)` no es moldeable), pero el sesgo está sin
-explotar. **Lo que sí arregla:** `λ_azul` es plana (0,97) ⇒ la duración de la época **no es
-manipulable** (cierra el A1.4 de D9-c).
+> **Historial de anclas.** (1) Índice del orden total: **cuenta rojos** (D9-b). (2) Posición de cadena: **cuenta
+> saltos** (D9-c). (3) `blue_score`: cuenta azules, **no es un reloj** — el atacante fabrica bloques en la banda
+> `[T, T+k]` cuando quiere; cota solo por finalidad, `F ≈ 227 h` (D9-f). (4) **`slot`: reloj infalsificable.**
+> La lección: el inyector se lee de una magnitud que el atacante **no puede fabricar a coste cero**.
 
 **R-FIN-12 · Reglas de Kaspa, adoptadas COMPLETAS. (Corregida tras D9-c A4/A5.)** No solo los dos
 límites (`max_block_parents = 15`, `mergeset_size_limit = 180` a `k=30`), sino también:
 - **`pick_virtual_parents`** con presupuesto (`virtual_processor/processor.rs:1053`, `:974`): un honesto
   **nunca** emite `MergeSetTooBig` — el griefing no existe *si se adopta el algoritmo*.
-- **`merge_depth_bound`** (`processes/block_depth.rs`, `post_pow_validation.rs:81-98`,
-  `calc_merge_depth_root` + `kosherizing_blues`) y **`pruning_depth`** (`params.rs:189`): son lo que
-  acota la retrolectura de U2, no el slot de la identidad.
+- **`merge_depth_bound`** y **`pruning_depth`** (`params.rs:189`). **Corrección D9-f:** `merge_depth_bound` acota lo que un bloque **fusiona** (`check_bounded_merge_depth` recorre solo `mergeset_reds`, `post_pow_validation.rs:85`), **no de dónde cuelga**; lo que acota de dónde cuelga es la **finalidad** (`processor.rs:1033`), y es la finalidad la que acota la retrolectura de U2.
 - **El `shuffle` de `pick_virtual_parents`** (`processor.rs:1069-1089`: mitad por `blue_work`, resto **al azar** «to ensure diversity between nodes»): **obligatorio**, no opcional. D9-d A3.1: el daño no viene del presupuesto de mergeset sino del tope de 15 padres frente a ~550 puntas; **sin el shuffle, 14-21 bloques honestos quedan fuera del DAG para siempre**.
 
-**R-FIN-1a · Monotonicidad de slot en la cadena seleccionada.** `slot(sp(B)) < slot(B)`; estricta.
+**R-FIN-1a · Monotonicidad de slot en la cadena seleccionada — NO ESTRICTA (D9-f B0).** `slot(sp(B)) ≤ slot(B)`.
 Un bloque cuyo padre seleccionado tenga slot mayor o igual es inválido. (D8 ronda 7, ataque A1;
 D9 demostró que `≤` reabre el ataque.) **Se conserva:** aunque el inyector ya no se lea de la cadena
 seleccionada, la monotonicidad sigue siendo necesaria para R-FIN-7.
-**Y cota superior (D9-c A4, fijada por D9-d A4): `slot(B) − slot(sp(B)) ≤ S_max = 150 slots`.**
-Cubre la cola de operación normal a `10⁻¹²` (139), una partición de `F` para todo lado con `f ≥ 0,09` del espacio, y deja la amplificación del DoS de verificación de PoT en ×60 a `α=0,40` (×4 608 si `S_max = F`). **PLAUSIBLE.**
+**Y cota superior en SEGUNDOS: `slot(B) − slot(sp(B)) ≤ S_max`, con `S_max ∈ [20 s, 150 s]`.** D9-f B4bis: `S_max` **se co-determina con el steering** (`m ≤ 1 + λ·S_max[s]`): `≥ 20 s` por el gap medido de cadena (15,9 s a `α=0,40`), `150 s` para tolerar particiones con `f ≥ 0,09` (D9-d) a costa de garantía `F ≤ 68,5 h`; `20-30 s` da `F ≤ 35-41 h`. **Elección con etiqueta.**
+Con `τ = 1 s` la versión estricta invalidaría el 23,7-29,3 % de las aristas de cadena bajo ataque (D9-f B0); con `τ ≈ 0,1 s` y `≤` queda el 4,1 %, que la relajación absorbe. `S_max` cubre además la cola de operación normal a `10⁻¹²` y deja el DoS de verificación de PoT en ×60 (D9-d).
 
 **R-FIN-2 · Entropía e instante.** `entropía_j = blake3(chunk(I_j) ‖ pot_output(I_j))`;
 `t_j = slot(I_j) + L`. Antes de `t_j` la entropía no se mezcla, así que durante `[slot(I_j), t_j)`
@@ -250,6 +235,10 @@ apaga el proceso. Sustituye a C-REORG-07 en el DAG.
 > letra exigiría `S_max ≥ F = 11 520` (DoS ×4 608). **Tolerancia real: una partición de hasta `F`,
 > siempre que el lado conserve ≥ 9 % del espacio** (`S_max=150`). No existe `S_max` que cumpla
 > R-FIN-1a y la letra antigua de R-FIN-7 a la vez — **contradicción DEMOSTRADA**.
+> **Escala (D9-f B0):** `F` se expresa en **segundos** (`F = 5,3 h` medido; `≤ 68,5 h` garantizado), **no en slots**:
+> «slot» aparecía en R-FIN-1a, R-FIN-7 y R-FIN-13 con tres escalas incompatibles. Punto viable: **`τ ≈ 0,1 s`**
+> (10 slots de PoT por intervalo de bloque). **La duración real del slot de PoT de Autonomys es LAGUNA** hasta
+> leerla en su código.
 
 **R-FIN-8 · Rojos.** Ni la coinbase ni las transacciones de un bloque rojo se aplican al estado.
 Cierra la inflación ×10 (ronda 1) y el espacio de bloque gratis (ronda 3). **Coste medido:**
