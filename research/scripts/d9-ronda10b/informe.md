@@ -186,3 +186,139 @@ ese modelo no es el correcto para diseñar.
 
 **Criterio `α`** en el modelo (ii) con `k=30`: `F_carrera` = 0 · 292 · 797 · **2 267** · 3 463 ·
 28 916 s para `α` = 0 · 0,10 · 0,25 · 0,33 · 0,35 · 0,40. Se mueve, y explota hacia `r=1` (0,909 a 0,40).
+
+### (iii-bis) La LAGUNA de (iii), CERRADA: el `δ` de D8 re-medido a cada `k` — **VERIFICADO**
+
+**Error propio.** El párrafo anterior cerraba (iii) con «no se hizo por presupuesto». La regla 3 del
+método (`METODO-AGENTES.md:8-13`, 2026-09-08) lo prohíbe: *LAGUNA nunca por falta de tiempo*. Se ha
+medido.
+
+**Script:** `r10b_b2b_delta_k.py` → `salida_b2b.txt` (69 s, **1 920 corridas**, 32 procesos).
+Reutiliza `d8_lib.MundoL9` y `d8_lib.delta_hon` **sin reescribirlos** y repite el protocolo exacto de
+`d8-ronda8/d8_a1b_umbral.py:60-95`: 12 semillas, `J ∈ {16,31,48,64,96}` tomando el `J` que
+**maximiza** `δ`, horizonte 1 800 s, ventana `[60, 1 740]`, `modo='parasito'`, `d_fork=1`. Único
+cambio: `k` es parámetro y con él viajan las constantes que R-FIN-12 le ata
+(`mp = max(10,⌊k/2⌋)`, `msl = max(180,2k)`, `dag-poas-delta-real.md:88-90`). A `k = 30` eso da
+`mp=15, msl=180`, los de D8: la fila `k = 30` es **control positivo**.
+
+**Control: las 8 filas de `k = 30` reproducen `d8-ronda8/salida_a1b.txt` exactamente**
+(`salida_b2b.txt` L30-37: 0,0000 / 0,1544 / 0,2079 / 0,2867 / 0,3065 / 0,3448 / 0,4366 / 0,5834, las
+ocho marcadas `OK`). Cobertura: `raf` > 0 en toda fila con `α > 0` (la maniobra se ejecuta), `rech = 0`.
+
+| `α` | `δ` (`k=20`) | `δ` (`k=25`) | **`δ` (`k=30`)** | `δ` (`k=40`) |
+|---:|---:|---:|---:|---:|
+| 0,00 | 0,0005 | 0,0000 | **0,0000** | 0,0000 |
+| 0,25 | 0,1498 | 0,1528 | **0,1544** | 0,1553 |
+| 0,30 | 0,2035 | 0,1897 | **0,2079** | 0,2187 |
+| **0,33** | 0,2425 `[0,2145; 0,2706]` | 0,2824 `[0,2594; 0,3055]` | **0,2867 `[0,2650; 0,3085]`** | 0,2514 `[0,2197; 0,2831]` |
+| 0,35 | 0,2903 | 0,3279 | **0,3065** | 0,3171 |
+| 0,40 | 0,4022 | 0,3915 | **0,4366** | 0,4619 |
+
+*(intervalos de confianza al 95 %, `t₀,₉₇₅;₁₁ = 2,201`, 12 semillas)*
+
+**Hallazgo: el `δ` parásito NO depende de `k` de forma medible.** Los cuatro intervalos al 33 % se
+solapan (`[0,2145; 0,3085]` es la envolvente). La variación aparente entre `k` (0,2425 → 0,2867)
+**es ruido de semilla**, no una tendencia. Así que en el modelo (iii) `k` actúa **solo** por `3k`,
+que es justo lo que la tabla (iii) suponía: **la suposición era correcta, y ahora está medida.**
+
+**`F_carrera` con el `δ` medido a cada `k`** (`r10b_b2c_iii.py` → `salida_b2c.txt`):
+
+| `k` | `3k` | `δ(0,33)` medido | `F_carrera` 33 % | 35 % | *(tabla anterior, `δ` no recalibrada)* |
+|---:|---:|---:|---:|---:|---:|
+| 20 | 60 | 0,2425 | 2 374 s = **0,66 h** | 1,49 h | 0,89 h |
+| 25 | 75 | 0,2824 | 3 269 s = **0,91 h** | 2,38 h | 0,94 h |
+| **30** | 90 | 0,2867 | 3 547 s = **0,99 h** | 1,92 h | 0,99 h |
+| 40 | 120 | 0,2514 | 3 097 s = **0,86 h** | 2,32 h | 1,08 h |
+
+**Y el dato que importa para C: la incertidumbre de la medida pesa más que la palanca.** Moviendo `δ`
+entre los extremos del IC95 a `k = 30`, `F_carrera` va de **0,85 h a 1,16 h** (±0,15 h = ±9 min).
+La palanca B.1 entera (de `3k` a `1,68k`) valía 3,2 min. **El ruido de la medida de `δ` es tres veces
+mayor que la mejor palanca de ventaja.**
+
+---
+
+## B.3 · Palanca «objetivo de riesgo» — **VERIFICADO** (y el objetivo actual es extremadamente conservador)
+
+**Script:** `r10b_b3_riesgo.py` → `salida_b3.txt` (97 s).
+
+### Controles positivos, los tres pasados antes de mirar nada
+
+| Control | Resultado |
+|---|---|
+| **Tabla 4 de Grunspan & Pérez-Marco** (`research/fork-choice-reorg.md:199-208`), `z` con `P < 10⁻³` para `q = 10…45 %` | **8/8 OK** con `P(z) = I₄ₚq(z, ½)` (`scipy.special.betainc`) |
+| **Tabla 1 de Rosenfeld** (`research/fork-choice-reorg.md:212-215`), `q ∈ {0,10; 0,20}`, `n ∈ {1,2,3,4,6}` | **10/10 OK** |
+| `F_carrera(33 %)` del instrumento de esta ronda | 1 019 s / 3 547 s **OK** |
+
+**Estado de la fuente primaria de Bitcoin: LAGUNA parcial, declarada.** El PDF de Nakamoto **no está**
+en `research/fuentes/` (solo hay `bdk19` y `phantom-ghostdag`), así que no se cita §11 directamente:
+se cita la transcripción del repositorio (`fork-choice-reorg.md:193-208`) **y se reproduce su tabla
+entera desde la fórmula cerrada**, que es la forma más fuerte de validar una transcripción sin el
+original. Para cerrarla del todo haría falta `bitcoin.pdf` en `research/fuentes/`. Lo mismo con
+Grunspan y Rosenfeld: los arXiv (1702.02867, 1402.2009) están citados, los PDF no están.
+
+### Qué garantiza de hecho cada uno, en sus propias unidades
+
+| Sistema | Garantía real | Fuente |
+|---|---|---|
+| **Bitcoin, práctica** | 6 confirmaciones a `q = 10 %` → `P = 5,91·10⁻⁴` **por transacción**, ~60 min | `fork-choice-reorg.md:199-201`, reproducido |
+| Bitcoin a `q = 33 %`, 6 conf. | `P = 2,34·10⁻¹` — el `10⁻³` **desaparece por completo** | calculado |
+| Bitcoin a `q = 33 %` para `P < 10⁻³` | `z = 45` bloques = **7,5 h** | calculado |
+| **GHOSTDAG (el propio paper)** | *«an attacker with α ≤ 0.25, and an allowed error of **ε = 0.1 %**»* → 45 s | `research/fuentes/phantom-ghostdag.txt:827-830` (literal) |
+| **Chia** | 6 bloques (~2 min) natural; **32 bloques (~10 min)** contra *foliage re-org*, bajo «< 42,7 % colluding». **No publica ningún `ε`** | `research/chia-documentacion-oficial.md:308-321` |
+| **ZEROX hoy** | unión a 10 años `< 10⁻¹⁰` ⇒ **2,70·10⁻¹⁶ por época** | `verif_frontera_vs_F.py` |
+
+**ZEROX se está imponiendo un objetivo `2,2·10¹²` veces más estricto por evento que la práctica de
+Bitcoin, y `4·10¹²` veces más estricto que el `ε` del propio paper de GHOSTDAG.**
+
+### Los dos sistemas bajo el MISMO criterio (unión a 10 años)
+
+`I = 851 s` ⇒ 370 576 épocas en 10 años; Bitcoin, 525 600 bloques.
+
+| Objetivo (10 años) | ZEROX `F_carrera` `δ=0` | ZEROX `δ` D8 | **Bitcoin `z` (33 %)** | **Bitcoin horas** | Bitcoin `z` (10 %) | horas |
+|---:|---:|---:|---:|---:|---:|---:|
+| `10⁻⁶` | 852 s = **0,24 h** | 0,79 h | 203 | **33,8** | 25 | 4,2 |
+| `10⁻⁸` | 936 s = 0,26 h | 0,89 h | 239 | 39,8 | 29 | 4,8 |
+| **`10⁻¹⁰`** | **1 019 s = 0,28 h** | **0,99 h** | **276** | **46,0** | 34 | 5,7 |
+| `10⁻¹²` | 1 100 s = 0,31 h | 1,08 h | 313 | 52,2 | 38 | 6,3 |
+
+**Bitcoin, sometido al criterio que ZEROX se aplica a sí mismo, necesitaría 46 horas de confirmación
+a `q = 33 %` — y 5,7 h incluso a `q = 10 %`.** ZEROX lo cumple con 0,28-0,99 h. La comparación no es
+retórica: es la misma unión, el mismo horizonte y el mismo objetivo, calculados con la fórmula exacta.
+
+### La palanca: bajar el objetivo casi no compra nada
+
+| | `δ = 0`, 33 % | `δ` D8, 33 % | `δ = 0`, 35 % | `δ` D8, 35 % |
+|---|---:|---:|---:|---:|
+| `10⁻⁶` → `10⁻¹⁰` | +167 s | +720 s | +212 s | +1 476 s |
+| **todo el rango `10⁻⁶`…`10⁻¹²`** | **+248 s = 4,1 min** | +1 044 s = 17,4 min | +317 s | +2 196 s |
+
+**Relajar el objetivo cuatro órdenes de magnitud (de `10⁻¹²` a `10⁻⁶`) ahorra 4,1 minutos de `F` en el
+modelo verificado y 17,4 en el pesimista.** Es la palanca más barata de todas y por eso la más
+peligrosa de tocar: se paga muy poco por conservarla. La razón es estructural: `p_F` cae
+exponencialmente en `F`, así que cuatro décadas de riesgo son cuatro décadas de exponencial, es decir,
+un múltiplo pequeño y constante del tiempo característico `1/ln(1/r)`.
+
+**Criterio `α`** (`δ=0`): el coste `10⁻⁶ → 10⁻¹²` es 0 s (α=0) · 44 s (0,10) · 116 s (0,25) ·
+**248 s (0,33)** · 317 s (0,35) · 702 s (0,40). Se mueve con `α` y crece al acercarse a `r = 1`.
+
+### Y al revés: qué `F` bastaría con el criterio POR EVENTO que usan Bitcoin y el paper
+
+*(error propio: la primera versión pidió esto con `f_carrera`, que aplica la unión y satura en 1;
+corregido con `f_evento`, que exige `prev` por época `< ε` sin unión — `r10b_b3_riesgo.py:60-70`)*
+
+| `α` | modelo | `F` con `ε = 10⁻³` (el de Bitcoin y el del paper) | `F` con `ε = 10⁻⁶` |
+|---:|---|---:|---:|
+| 0,33 | `δ = 0` | 460 s = **7,7 min** | 608 s = 10,1 min |
+| 0,33 | `δ` D8 | 1 298 s = 21,6 min | 1 869 s = 31,1 min |
+| 0,35 | `δ = 0` | 541 s = 9,0 min | 727 s = 12,1 min |
+| 0,35 | `δ` D8 | 2 221 s = 37,0 min | 3 383 s = 56,4 min |
+
+**Con el criterio de Bitcoin, `F` sería de 8 a 37 minutos.** La diferencia entre 8 min y 2 h **no es
+física, es la elección del objetivo**: unión sistémica sobre toda la historia frente a riesgo por
+transacción. Las dos son defendibles; hay que decir cuál se está comprando.
+
+**Recomendación B.3: mantener `10⁻¹⁰` a 10 años, y publicar las dos cifras.** Cuesta 4 minutos sobre
+`10⁻⁶` en el modelo de diseño, y a cambio da una propiedad que Bitcoin no da: *ninguna* reversión más
+allá de `F` en toda la vida de la cadena, no solo *esta* transacción a salvo. Lo que **sí** hay que
+corregir es la retórica: `F` no es «lo que Bitcoin llama 6 confirmaciones»; es varios órdenes de
+magnitud más fuerte, y conviene decirlo cuando se compare con Chia (10 min) o con Bitcoin (60 min).
