@@ -22,5 +22,8 @@ print(f"P(sector gana en la ventana de lookahead) = {p_win_look:.3e}")
 print(f"sectores ploteados por GPU·h = {sect_per_h:.0f}  ->  ganadores por GPU·h = {winners_h:.4f}")
 print(f"ganadores vivos por GPU (régimen) = {held_GiB:.4f} GiB  ->  coste SSD = {c_store_h:.2e} $/h")
 print(f"coste GPU = {C_GPU_H:.4f} $/h   =>  almacenamiento de ganadores / GPU = {c_store_h/C_GPU_H:.2e}")
-print("\nConclusión: el término iii es < 1e-6 del coste de la GPU. A* no se mueve; el 1,05x se queda.")
-print("Sensibilidad: con S_total 100x menor (32 TiB) el cociente sigue < 1e-4.")
+ratio = c_store_h/C_GPU_H
+print(f"\nConclusión: el término iii vale {ratio:.1e} del coste de la GPU ({ratio:.2%}). A* no se mueve; el 1,05x se queda.")
+for tib in (32, 320, 3200):
+    g = tib*1024; pw = 1-(1-LAM/g)**LOOK; held = sect_per_h*pw*(LOOK/3600); r = held/1024*C_SSD_TIB_H/C_GPU_H
+    print(f"Sensibilidad: S_total = {tib:5d} TiB -> almacenamiento/GPU = {r:.2e} ({r:.1%})")
