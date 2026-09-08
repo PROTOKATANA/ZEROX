@@ -1,0 +1,59 @@
+====================================================================================================================
+E1 · CONTROL: L_min = F_carrera, con el mismo instrumento (debe reproducir C2a)
+====================================================================================================================
+   alpha = 0.33  delta = 0:  L_min =    1019 s = 0.28 h
+   alpha = 0.33   delta D8:  L_min =    3547 s = 0.99 h
+   alpha = 0.35  delta = 0:  L_min =    1249 s = 0.35 h
+   alpha = 0.35   delta D8:  L_min =    6900 s = 1.92 h
+
+====================================================================================================================
+E2 · DESATAR L DE F: que compra cada pareja (I = 851 s, alpha objetivo = 0,33)
+====================================================================================================================
+                 L                  F   rho |  lookahead (s)  margen A*10x  W/kappa = look/F  BDK 1,00? |  tol. particion
+F_carrera d=0 0,28 h                1 h     1 |            5.0       2952.0x            0.0014         SI |           0.28 h
+F_carrera d=0 0,28 h                1 h   1.5 |         1281.7         11.5x            0.3560         SI |           0.28 h
+F_carrera d=0 0,28 h                1 h     3 |         1565.3          9.4x            0.4348         SI |           0.28 h
+F_carrera d=0 0,28 h                2 h     1 |            5.0       2952.0x            0.0007         SI |           0.28 h
+F_carrera d=0 0,28 h                2 h   1.5 |         1281.7         11.5x            0.1780         SI |           0.28 h
+F_carrera d=0 0,28 h                2 h     3 |         1565.3          9.4x            0.2174         SI |           0.28 h
+F_carrera d=0 0,28 h              5,3 h     1 |            5.0       2952.0x            0.0003         SI |           0.28 h
+F_carrera d=0 0,28 h              5,3 h   1.5 |         1281.7         11.5x            0.0672         SI |           0.28 h
+F_carrera d=0 0,28 h              5,3 h     3 |         1565.3          9.4x            0.0820         SI |           0.28 h
+F_carrera D8 0,99 h                1 h     1 |            5.0       2952.0x            0.0014         SI |           0.99 h
+F_carrera D8 0,99 h                1 h   1.5 |         3809.7          3.9x            1.0582         no |           0.99 h
+F_carrera D8 0,99 h                1 h     3 |         4093.3          3.6x            1.1370         no |           0.99 h
+F_carrera D8 0,99 h                2 h     1 |            5.0       2952.0x            0.0007         SI |           0.99 h
+F_carrera D8 0,99 h                2 h   1.5 |         3809.7          3.9x            0.5291         SI |           0.99 h
+F_carrera D8 0,99 h                2 h     3 |         4093.3          3.6x            0.5685         SI |           0.99 h
+F_carrera D8 0,99 h              5,3 h     1 |            5.0       2952.0x            0.0003         SI |           0.99 h
+F_carrera D8 0,99 h              5,3 h   1.5 |         3809.7          3.9x            0.1997         SI |           0.99 h
+F_carrera D8 0,99 h              5,3 h     3 |         4093.3          3.6x            0.2145         SI |           0.99 h
+               1 h                1 h     1 |            5.0       2952.0x            0.0014         SI |           1.00 h
+               1 h                1 h   1.5 |         3862.7          3.8x            1.0730         no |           1.00 h
+               1 h                1 h     3 |         4146.3          3.6x            1.1518         no |           1.00 h
+               1 h                2 h     1 |            5.0       2952.0x            0.0007         SI |           1.00 h
+               1 h                2 h   1.5 |         3862.7          3.8x            0.5365         SI |           1.00 h
+               1 h                2 h     3 |         4146.3          3.6x            0.5759         SI |           1.00 h
+               1 h              5,3 h     1 |            5.0       2952.0x            0.0003         SI |           1.00 h
+               1 h              5,3 h   1.5 |         3862.7          3.8x            0.2024         SI |           1.00 h
+               1 h              5,3 h     3 |         4146.3          3.6x            0.2173         SI |           1.00 h
+       2 h (atado)                2 h     1 |            5.0       2952.0x            0.0007         SI |           2.00 h
+       2 h (atado)                2 h   1.5 |         7462.7          2.0x            1.0365         no |           2.00 h
+       2 h (atado)                2 h     3 |         7746.3          1.9x            1.0759         no |           2.00 h
+       2 h (atado)              5,3 h     1 |            5.0       2952.0x            0.0003         SI |           2.00 h
+       2 h (atado)              5,3 h   1.5 |         7462.7          2.0x            0.3911         SI |           2.00 h
+       2 h (atado)              5,3 h     3 |         7746.3          1.9x            0.4060         SI |           2.00 h
+
+====================================================================================================================
+E3 · LA CONFIGURACION QUE SALE DE AHI, contra las dos atadas
+====================================================================================================================
+                     configuracion |   lookahead  margen 10x   W/kappa  frontera fijada por  tol. particion  garantia
+         ATADA  L = F = 1 h, rho=3 |        4146        3.6x    1.1518           F = 1.00 h           1.00 h     1.00 h
+         ATADA  L = F = 2 h, rho=3 |        7746        1.9x    1.0759           F = 2.00 h           2.00 h     2.00 h
+  DESATADA L = 1 h, F = 2 h, rho=3 |        4146        3.6x    0.5759           F = 2.00 h           1.00 h     2.00 h
+DESATADA L = 1 h, F = 2 h, rho=1,5 |        3863        3.8x    0.5365           F = 2.00 h           1.00 h     2.00 h
+DESATADA L = 0,99 h, F = 5,3 h, rho=3 |        4093        3.6x    0.2145           F = 5.30 h           0.99 h     5.30 h
+            (h) L = F = 2 h, rho=3 |         567       26.0x    0.0787           F = 2.00 h           2.00 h     2.00 h
+
+   `frontera fijada por F` y `garantia por regla = F` no cambian al desatar; lo que cambia
+   es que el SEMBRADOR paga L y la PARTICION tolerada baja de F a L.

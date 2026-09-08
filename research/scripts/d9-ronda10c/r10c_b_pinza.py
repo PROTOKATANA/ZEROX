@@ -105,3 +105,38 @@ for rho in (1.5, 3.0):
         lk = L.cinematica_rapida(rho, F, 851.0, wd, False)[0]
         print(f"   rho={rho:.1f} F={F:.0f}s: W/kappa mismo lambda = {lk/F:.4f} · "
               f"lambda vs lambda_chain = {(lk*L.LAM)/(F*LAMC):.4f}")
+
+print()
+print("=" * 112)
+print("B5 · QUE W/kappa PERMITE QUE F, con I in {300, 851} s (pregunta literal del encargo)")
+print("=" * 112)
+print("   La pinza en su forma corregida:  F >= (I(1-1/rho) - W_dec)/(tope - 1)   [nucleo]")
+print("                                    F >=  I(1-1/rho)/tope                  [(h)]")
+print("   Y la PUBLICADA, para comparar:   F >=  I/(tope - 1)")
+for I in (300.0, 851.0):
+    print(f"\n--- I = {I:.0f} s ---")
+    print(f"{'tope W/kappa':>12} | {'PUBLICADA I/(t-1)':>18} | "
+          f"{'nucleo rho=1':>13} {'rho=1,5':>10} {'rho=3':>10} {'rho=10':>10} | "
+          f"{'(h) rho=3':>10} {'(h) rho=10':>11}")
+    for tope in (1.00, 1.05, 1.10, 1.22, 1.50, 2.00, 2.50, 3.50):
+        pub = float("inf") if tope <= 1.0 else I / (tope - 1.0)
+        cel = []
+        for rho in (1.0, 1.5, 3.0, 10.0):
+            exc = (I * (1 - 1 / rho) - wd) if rho > 1 else -1.0
+            if exc <= 0:
+                cel.append("no existe")
+            elif tope <= 1.0:
+                cel.append("imposible")
+            else:
+                cel.append(f"{exc/(tope-1.0):.0f} s")
+        celh = [f"{I*(1-1/r)/tope:.0f} s" for r in (3.0, 10.0)]
+        sp = "inf" if pub == float("inf") else f"{pub:.0f} s"
+        print(f"{tope:>12.2f} | {sp:>18} | {cel[0]:>13} {cel[1]:>10} {cel[2]:>10} {cel[3]:>10} | "
+              f"{celh[0]:>10} {celh[1]:>11}")
+print()
+print("   Nota de procedencia del tope: BDK marca 1,00 (`W > kappa` habilita el soborno encubierto).")
+print("   El 1,22 del diseno es el VALOR que salio a F = 3,2 h e I = 2 490 s en la ronda 7, adoptado")
+print("   despues como tope; la propuesta lo etiqueta «una eleccion, no una derivacion» (§4.3), y")
+print("   compara «un 22 % en vez de un 250 %» — ese 250 % es el W/kappa = 3,49-3,50 de los dos")
+print("   puntos de ejemplo de la ronda 7 (metaauditoria L215-222), que la propia metaauditoria")
+print("   declaro «soborno encubierto posible». Ni 1,22 ni 2,5 son umbrales del paper.")

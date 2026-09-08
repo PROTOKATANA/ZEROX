@@ -128,3 +128,39 @@ B4 · SENSIBILIDAD: y si W se contara en bloques del DAG y kappa en bloques de c
    rho=1.5 F=7200s: W/kappa mismo lambda = 1.0365 · lambda vs lambda_chain = 5.1824
    rho=3.0 F=3600s: W/kappa mismo lambda = 1.1518 · lambda vs lambda_chain = 5.7588
    rho=3.0 F=7200s: W/kappa mismo lambda = 1.0759 · lambda vs lambda_chain = 5.3794
+
+================================================================================================================
+B5 · QUE W/kappa PERMITE QUE F, con I in {300, 851} s (pregunta literal del encargo)
+================================================================================================================
+   La pinza en su forma corregida:  F >= (I(1-1/rho) - W_dec)/(tope - 1)   [nucleo]
+                                    F >=  I(1-1/rho)/tope                  [(h)]
+   Y la PUBLICADA, para comparar:   F >=  I/(tope - 1)
+
+--- I = 300 s ---
+tope W/kappa |  PUBLICADA I/(t-1) |  nucleo rho=1    rho=1,5      rho=3     rho=10 |  (h) rho=3  (h) rho=10
+        1.00 |                inf |     no existe  imposible  imposible  imposible |      200 s       270 s
+        1.05 |             6000 s |     no existe     1600 s     3600 s     5000 s |      190 s       257 s
+        1.10 |             3000 s |     no existe      800 s     1800 s     2500 s |      182 s       245 s
+        1.22 |             1364 s |     no existe      364 s      818 s     1136 s |      164 s       221 s
+        1.50 |              600 s |     no existe      160 s      360 s      500 s |      133 s       180 s
+        2.00 |              300 s |     no existe       80 s      180 s      250 s |      100 s       135 s
+        2.50 |              200 s |     no existe       53 s      120 s      167 s |       80 s       108 s
+        3.50 |              120 s |     no existe       32 s       72 s      100 s |       57 s        77 s
+
+--- I = 851 s ---
+tope W/kappa |  PUBLICADA I/(t-1) |  nucleo rho=1    rho=1,5      rho=3     rho=10 |  (h) rho=3  (h) rho=10
+        1.00 |                inf |     no existe  imposible  imposible  imposible |      567 s       766 s
+        1.05 |            17020 s |     no existe     5273 s    10947 s    14918 s |      540 s       729 s
+        1.10 |             8510 s |     no existe     2637 s     5473 s     7459 s |      516 s       696 s
+        1.22 |             3868 s |     no existe     1198 s     2488 s     3390 s |      465 s       628 s
+        1.50 |             1702 s |     no existe      527 s     1095 s     1492 s |      378 s       511 s
+        2.00 |              851 s |     no existe      264 s      547 s      746 s |      284 s       383 s
+        2.50 |              567 s |     no existe      176 s      365 s      497 s |      227 s       306 s
+        3.50 |              340 s |     no existe      105 s      219 s      298 s |      162 s       219 s
+
+   Nota de procedencia del tope: BDK marca 1,00 (`W > kappa` habilita el soborno encubierto).
+   El 1,22 del diseno es el VALOR que salio a F = 3,2 h e I = 2 490 s en la ronda 7, adoptado
+   despues como tope; la propuesta lo etiqueta «una eleccion, no una derivacion» (§4.3), y
+   compara «un 22 % en vez de un 250 %» — ese 250 % es el W/kappa = 3,49-3,50 de los dos
+   puntos de ejemplo de la ronda 7 (metaauditoria L215-222), que la propia metaauditoria
+   declaro «soborno encubierto posible». Ni 1,22 ni 2,5 son umbrales del paper.

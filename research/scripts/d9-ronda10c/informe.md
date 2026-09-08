@@ -21,6 +21,7 @@ debajo de `10⁻⁹` a los **217-2 406 s** según `α` y modelo.
 - [B · La pinza `F ≥ I/(W/κ − 1)`](#b)
 - [C · Lo que espera el usuario](#c)
 - [D · Tabla configuración × término → `F`](#d)
+- [E · `L` desatada de `F`: la palanca que faltaba](#e)
 - [Auditoría de scripts](#auditoria)
 - [Veredicto](#veredicto) · [Errores propios](#errores)
 
@@ -285,6 +286,35 @@ NÚCLEO :  F ≥ (I(1−1/ρ) − W_dec) / (tope − 1)      y NO EXISTE si  I(1
   `chain_growth.py`), la razón se multiplicaría **por ~5,2-5,8**. Aquí se ha usado el mismo `λ` en
   los dos, como la metaauditoría. **Residuo declarado.**
 
+### B.6 · Qué `W/κ` permite qué `F`, con `I ∈ {300, 851} s` (`salida_b.txt` B5)
+
+**`I = 851 s`** — `F` mínima que exige cada tope:
+
+| tope `W/κ` | **PUBLICADA** `I/(t−1)` | núcleo `ρ ≤ 1,024` | `ρ = 1,5` | `ρ = 3` | `ρ = 10` | **(h)** `ρ = 3` | (h) `ρ = 10` |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| **1,00** (BDK) | ∞ | **no existe** | imposible | imposible | imposible | 567 s | 766 s |
+| 1,05 | 17 020 s | no existe | 5 273 s | 10 947 s | 14 918 s | 540 s | 729 s |
+| 1,10 | 8 510 s | no existe | 2 637 s | 5 473 s | 7 459 s | 516 s | 696 s |
+| **1,22** | **3 868 s** | **no existe** | **1 198 s** | **2 488 s** | 3 390 s | **465 s** | 628 s |
+| 1,50 | 1 702 s | no existe | 527 s | 1 095 s | 1 492 s | 378 s | 511 s |
+| 2,00 | 851 s | no existe | 264 s | 547 s | 746 s | 284 s | 383 s |
+
+**`I = 300 s`** (la época de Autonomys, para escala): tope 1,22 → publicada 1 364 s; núcleo
+`ρ=1,5` **364 s**, `ρ=3` **818 s**; (h) `ρ=3` **164 s**.
+
+**Y la respuesta a «por qué 1,22 y no 2,5».** Ninguno de los dos es un umbral del paper: **BDK marca
+1,00**. El 1,22 es el **valor que salió** al fijar `g = 3,6 %` (⇒ `I = 2 490 s`) y `F = 3,2 h`, y la
+propuesta lo etiqueta ella misma *«Es una elección, no una derivación»*
+(`dag-poas-ancla-de-orden.md` §4.3). El «2,5» de la pregunta es el otro polo de esa misma frase —
+*«un 22 % en vez de un 250 %»*—, y ese 250 % son los `W/κ = 3,49-3,50` de los dos puntos de ejemplo
+de la ronda 7 (`dag-poas-ancla-de-finalidad-metaauditoria.md:215-222`), que la propia metaauditoría
+declaró **«soborno encubierto posible»**. Es decir: se eligió 1,22 porque **era menos malo que 3,5**,
+no porque 1,22 sea seguro y 2,5 no. **Con la `W` corregida la pregunta cambia de sitio:** con
+`ρ ≤ 1,024` se cumple **1,00**, el umbral de verdad; con (h) se cumple 1,00 con `F ≥ 567 s`; y con
+`ρ > 1,024` en el núcleo **no se cumple 1,00 con ninguna `F`** y hay que elegir un tope > 1 a
+sabiendas, como hasta ahora, pero pagando **3,1× menos `F`** de la que se creía.
+
+
 <a name="c"></a>
 ## C · Lo que espera el usuario — `r10c_c_reversion.py`, `r10c_c2_frontera.py`
 
@@ -476,3 +506,44 @@ larga sea cara en CPU de verificación, y el coste crece como `F/I`.** Es una **
 medido por slot, no una medición de punta a punta: **PLAUSIBLE**, y es el número que 9c dejó sin
 poner (*«un VDF más … PLAUSIBLE, no medido»*). Falta medir: el `prove` del segundo VDF en el
 timelord y si sus checkpoints se pueden solapar con los de la cadena principal.
+
+<a name="e"></a>
+## E · Hallazgo adicional (no pedido): **`L` es una palanca aparte de `F`, y es LA palanca del sembrador** — `r10c_e_palanca_L.py`, `salida_e.txt`
+
+El lookahead del sembrador es `(L − W_dec) + I(1 − 1/ρ)`: **depende de `L`, no de `F`.** Hoy el
+diseño los ata (`dag-poas-ancla-de-orden.md`, nota de R-FIN-7: *«ZEROX `I = 4 200 s`, `F = L = 5,3 h`»*),
+y la ronda 7 ya había dejado escrita la alternativa sin explotarla
+(`dag-poas-ancla-de-finalidad.md:99`: *«`L` rezago de aplicación; candidatos: `L = F`
+(incondicional) o `L ≈ F/4` (probabilístico, §6)»*). Nadie la revisó después de R-FIN-14, que es
+cuando pasa a importar.
+
+**Qué exige `L` por sí sola.** `L` es la profundidad a la que el ancla `I_j` tiene que estar
+**acordada** cuando se aplica en `t_j = slot(I_j) + L`. Si dos honestos leen anclas distintas el
+flujo se parte (R-FIN-5: los flujos no se fusionan, nunca). Esa probabilidad es **la misma
+reorganización que mide `prev()`**, evaluada en `L`. Luego **`L ≥ F_carrera(α_obj, modelo)`** — el
+mismo número que C.2a calcula para `F`. Control E1: `L_min` reproduce C2a **exacto** (1 019 / 3 547 /
+1 249 / 6 900 s).
+
+**Qué se paga.** La **tolerancia a particiones pasa de `F` a `L`**: una partición más larga que `L`
+puede dar dos anclas distintas y dos flujos irreconciliables aunque dure menos que `F`.
+
+| Configuración (`I = 851 s`, `α_obj = 0,33`) | lookahead | margen 10× | `W/κ` | ¿BDK 1,00? | frontera la fija | tol. partición | garantía |
+|---|---:|---:|---:|:--:|---|---:|---:|
+| ATADA `L = F = 1 h`, `ρ = 3` | 4 146 s | 3,6× | 1,1518 | no | `F = 1 h` | 1,00 h | 1,00 h |
+| ATADA `L = F = 2 h`, `ρ = 3` | 7 746 s | **1,9×** | 1,0759 | no | `F = 2 h` | 2,00 h | 2,00 h |
+| **DESATADA `L = 1 h`, `F = 2 h`, `ρ = 3`** | **4 146 s** | **3,6×** | **0,5759** | **SÍ** | **`F = 2 h`** | 1,00 h | 2,00 h |
+| DESATADA `L = 1 h`, `F = 2 h`, `ρ = 1,5` | 3 863 s | 3,8× | 0,5365 | SÍ | `F = 2 h` | 1,00 h | 2,00 h |
+| DESATADA `L = 0,99 h`, `F = 5,3 h`, `ρ = 3` | 4 093 s | 3,6× | 0,2145 | SÍ | `F = 5,3 h` | 0,99 h | 5,30 h |
+| (h), `L = F = 2 h`, `ρ = 3` | 567 s | **26,0×** | 0,0787 | SÍ | `F = 2 h` | 2,00 h | 2,00 h |
+
+**La fila «DESATADA `L = 1 h`, `F = 2 h`» domina a las dos atadas:** tiene el margen de sembrador de
+`F = 1 h` (**3,6×**), la frontera y la garantía de `F = 2 h`, y además **cumple la condición literal
+de BDK (`W/κ = 0,576 ≤ 1`) sin necesidad del segundo VDF de (h)**. Lo único que pierde frente a
+`L = F = 2 h` es la tolerancia a particiones, que baja de 2 h a 1 h.
+
+**Etiqueta: PLAUSIBLE.** El mecanismo es directo y la aritmética está verificada, pero
+`L ≥ F_carrera` es un **argumento** sobre `prev()` (la misma extrapolación que el diseño ya usa para
+`F`), no una simulación de la discrepancia de ancla con dos vistas honestas distintas. **Lo que haría
+falta para subirlo a VERIFICADO:** medir `P(dos honestos leen anclas distintas)` con `L < F` en un
+simulador con dos vistas de verdad — el defecto `d8b_b3` que la propuesta ya señala (§7.4). No lo he
+hecho en esta ronda.
