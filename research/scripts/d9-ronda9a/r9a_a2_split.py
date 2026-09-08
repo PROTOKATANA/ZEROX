@@ -37,7 +37,7 @@ SEMS = list(range(1, 13))
 ALPHAS = [0.00, 0.30, 0.35, 0.40, 0.45, 0.55]
 FRACS = [1.0, 0.75, 0.5, 0.25, 0.0]          # alpha_f/alpha
 JS = [16, 31, 48, 64]
-FLUJOS = ["puro", "hereda", "parasito"]
+FLUJOS = ["puro", "hereda", "hereda_est", "parasito", "parasito_est"]
 HOR = 1800.0
 T0 = 60.0
 
@@ -49,7 +49,8 @@ def una(args):
                                         semilla_split=sem)
     c = contabilidad(d, tip, llega, T0, HOR - 60.0)
     c.update(n_f=m.n_f, n_p=m.n_p, n_pub=m.n_pub, n_raf=m.n_raf,
-             n_hereda=m.n_hereda, n_freeload=m.n_freeload,
+             n_hereda=m.n_hereda, n_freeload=m.n_freeload, n_sp_robado=m.n_sp_robado,
+             div_prof=m.div_prof, div_seg=m.div_seg,
              adv_fin=(m.adv_fin if ftip else 0.0),
              adv_max=(m.adv_max if ftip else 0.0))
     return (alpha, frac_f, J, flujo, c)
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     print(f"{'alpha':>6} {'a_p':>6} {'a_f':>6} {'flujo':>9} {'J':>4} | {'adv_fin':>8} "
           f"{'adv_max':>8} {'deriva':>8} | {'tasa Wpub':>9} {'1-alpha':>8} {'delta':>7} | "
           f"{'r medido':>8} {'r disj':>7} {'r D8':>7} | {'n_f':>5} {'n_pub':>6} {'raf':>4} "
-          f"{'her':>4} {'frl':>4}")
+          f"{'her':>4} {'frl':>4} {'sprob':>6} {'divblk':>6} {'div_s':>7}")
     tabla = {}
     for a in ALPHAS:
         for f in FRACS:
@@ -100,16 +101,22 @@ if __name__ == "__main__":
                       f"{c['adv_fin']:>8.1f} {c['adv_max']:>8.1f} {c['adv_fin']/dur:>8.4f} | "
                       f"{tw:>9.4f} {1-a:>8.4f} {c['delta']:>7.4f} | {rm:>8.3f} {rd:>7.3f} "
                       f"{r8:>7.3f} | {c['n_f']:>5.0f} {c['n_pub']:>6.0f} {c['n_raf']:>4.1f} "
-                      f"{c['n_hereda']:>4.0f} {c['n_freeload']:>4.0f}")
+                      f"{c['n_hereda']:>4.0f} {c['n_freeload']:>4.0f} {c['n_sp_robado']:>6.0f} "
+                      f"{c['div_prof']:>6.0f} {c['div_seg']:>7.0f}")
         print()
 
     print("--- CONTROLES ---")
     for a in ALPHAS:
         J, c, tw, rm, rd, r8 = tabla[(a, 1.0, "puro")]
         pred = 2 * a - 1
+        if a == 0:
+            print(f"  alpha_p=0, flujo puro, alpha=0,00: no hay bloques del atacante "
+                  f"(n_f=0): la prediccion 2a-1 no aplica, la fila solo comprueba que "
+                  f"adv=0 y que ninguna rama se ejecuta")
+            continue
         print(f"  alpha_p=0, flujo puro, alpha={a:.2f}: deriva medida "
               f"{c['adv_fin']/dur:+.4f}  vs  2a-1 = {pred:+.4f}  "
-              f"(n_f={c['n_f']:.0f}, n_pub={c['n_pub']:.0f})")
+              f"(n_f={c['n_f']:.0f}, n_pub={c['n_pub']:.0f}, div_seg={c['div_seg']:.0f} s)")
     J, c, tw, rm, rd, r8 = tabla[(0.0, 1.0, "puro")]
     print(f"  alpha=0: adv_fin={c['adv_fin']:.1f}, n_f={c['n_f']:.0f}, "
           f"n_pub={c['n_pub']:.0f}, raf={c['n_raf']:.1f}  (debe ser todo 0)")
@@ -118,14 +125,42 @@ if __name__ == "__main__":
           f"(debe ser > 0: el flujo GANA)")
 
     print("\n--- la pregunta directa: para cada alpha, que reparto maximiza la deriva? ---")
-    print(f"{'alpha':>6} | " + " ".join(f"{'a_p='+('%.0f%%'%(100*a*(1-f))):>12}" for f in FRACS))
+    print("    SOLO variantes que siguen siendo CADENA COMPETIDORA: div_seg >= 0,5*(horizonte).")
+    print("    Las variantes 'hereda'/'parasito' no estrictas pierden el padre seleccionado")
+    print("    (columna sprob > 0) y su cadena se FUNDE con la publica (div_seg de 8 a 208 s):")
+    print("    su deriva ~0 no es una carrera ganada, es que ya no hay carrera.")
+    print(f"{'alpha':>6} | " + " ".join(f"{'a_p/a='+('%.0f%%'%(100*(1-f))):>13}" for f in FRACS))
+    for a in ALPHAS:
+        if a == 0:
+            continue
+        fila = []
+        for f in FRACS:
+            cands = [tabla[(a, f, fl)][1] for fl in FLUJOS
+                     if tabla[(a, f, fl)][1]["div_seg"] >= 0.5 * dur]
+            if not cands:
+                fila.append(f"{'—':>13}")
+            else:
+                fila.append(f"{max(c['adv_fin'] for c in cands)/dur:>13.4f}")
+        print(f"{a:>6.2f} | " + " ".join(fila))
+
+    print("\n--- las mismas celdas SIN filtrar (para que se vea el artefacto) ---")
+    print(f"{'alpha':>6} | " + " ".join(f"{'a_p/a='+('%.0f%%'%(100*(1-f))):>13}" for f in FRACS))
     for a in ALPHAS:
         if a == 0:
             continue
         fila = []
         for f in FRACS:
             best = max((tabla[(a, f, fl)][1]["adv_fin"] for fl in FLUJOS))
-            fila.append(f"{best/dur:>12.4f}")
+            fila.append(f"{best/dur:>13.4f}")
+        print(f"{a:>6.2f} | " + " ".join(fila))
+
+    print("\n--- Wpub/H por reparto (conservacion): debe ser >= 1 en toda celda ---")
+    print(f"{'alpha':>6} | " + " ".join(f"{'a_p/a='+('%.0f%%'%(100*(1-f))):>13}" for f in FRACS))
+    for a in ALPHAS:
+        fila = []
+        for f in FRACS:
+            c = tabla[(a, f, "puro")][1]
+            fila.append(f"{(c['Wpub']/c['H'] if c['H'] else 1.0):>13.4f}")
         print(f"{a:>6.2f} | " + " ".join(fila))
     print("\nLECTURA: si la deriva es MAXIMA en alpha_p = 0 para todo alpha, parasitar nunca "
           "ayuda al que corre,\ny la base de la carrera es alpha/(1-alpha), no "

@@ -109,6 +109,7 @@ class MundoSplit(MundoL9):
         self.adv_traza = []
         self.n_hereda = 0          # cobertura de la rama 'hereda'
         self.n_freeload = 0        # cobertura de la rama 'parasito' del flujo
+        self.n_sp_robado = 0       # veces que el sp del bloque del flujo NO fue la punta privada
 
     def corre_split(self, frac_f=1.0, J=31, t0=60.0, flujo="puro", d_fork=1, semilla_split=0):
         """frac_f = alpha_f/alpha. frac_f=1 -> carrera simple (control). frac_f=0 -> solo parasita."""
@@ -122,6 +123,7 @@ class MundoSplit(MundoL9):
         flujo_tip = None     # punta del flujo privado
         self.n_f = self.n_p = self.n_pub = self.n_raf = self.n_intentos = 0
         self.n_rech_f = self.n_rech_p = self.n_hereda = self.n_freeload = 0
+        self.n_sp_robado = 0
         self.adv_traza = []
 
         for i, (t, quien, sd, sde, ident) in enumerate(self.ev):
@@ -144,19 +146,28 @@ class MundoSplit(MundoL9):
                     padres = [d.virtual_sp(visibles)]          # bifurca de la punta publica en t0
                 else:
                     padres = [flujo_tip]
-                    if flujo == "hereda":
+                    if flujo in ("hereda", "hereda_est"):
                         # maniobra (ii): fusionar las puntas PUBLICADAS de la parasita
                         pubs = [h for h in llega
                                 if d.B[h].creator == "a" and llega[h] <= t
                                 and not d.is_ancestor(h, flujo_tip) and h != flujo_tip]
+                        if flujo == "hereda_est":
+                            # ESTRICTO: solo lo que NO le robe el padre seleccionado. Si un
+                            # padre tiene mas blue_work que la punta del flujo,
+                            # find_selected_parent (protocol.rs:99-106) lo elige a EL y el
+                            # flujo deja de ser una cadena competidora: se funde con la publica.
+                            pubs = [h for h in pubs if d._key(h) < d._key(flujo_tip)]
                         pubs.sort(key=lambda h: -d.gd[h].blue_work)
                         extra = [h for h in pubs[:self.mp - 1]]
                         if extra:
                             self.n_hereda += 1
                         padres = padres + extra
-                    elif flujo == "parasito":
+                    elif flujo in ("parasito", "parasito_est"):
                         ph = self._padres(d, visibles)
-                        extra = [x for x in ph if x != flujo_tip][:self.mp - 1]
+                        extra = [x for x in ph if x != flujo_tip]
+                        if flujo == "parasito_est":
+                            extra = [x for x in extra if d._key(x) < d._key(flujo_tip)]
+                        extra = extra[:self.mp - 1]
                         if extra:
                             self.n_freeload += 1
                         padres = padres + extra
@@ -165,9 +176,9 @@ class MundoSplit(MundoL9):
                 if not ok:
                     self.n_rech_f += 1
                     continue
-                flujo_tip = bid if d._key(bid) > d._key(flujo_tip or bid) or flujo_tip is None \
-                    else flujo_tip
-                flujo_tip = bid          # cadena: la punta es siempre el ultimo
+                flujo_tip = bid          # cadena privada: la punta es siempre el ultimo
+                if d.gd[bid].sp != (padres[0] if padres else None):
+                    self.n_sp_robado += 1   # el padre seleccionado NO fue la punta del flujo
                 self.n_f += 1
             else:
                 # ---- parasita: publica en rafagas (modo 'parasito' de MundoL9) ----
@@ -203,9 +214,20 @@ class MundoSplit(MundoL9):
                 self.adv_traza.append((t, adv))
 
         tip = d.virtual_sp([h for h in llega])
+        self.div_prof = 0
+        self.div_seg = 0.0
         if flujo_tip is not None:
             self.adv_fin = d.gd[flujo_tip].blue_work - d.gd[tip].blue_work
             self.adv_max = max(a for _, a in self.adv_traza)
+            # PROFUNDIDAD DE DIVERGENCIA: bloques de la cadena seleccionada del flujo que NO
+            # estan en la cadena seleccionada publica. Si es ~0 el 'flujo' no es una cadena
+            # competidora: se ha fundido con la publica y no puede reorganizar nada.
+            pub_ch = set(d.selected_chain(tip))
+            f_ch = d.selected_chain(flujo_tip)
+            excl = [b for b in f_ch if b not in pub_ch]
+            self.div_prof = len(excl)
+            if excl:
+                self.div_seg = d.B[flujo_tip].t - min(d.B[b].t for b in excl)
         return d, tip, llega, flujo_tip
 
 
@@ -324,4 +346,75 @@ class MundoParasitaCopias(MundoL9):
                 self.tam_rafagas.append(len(priv))
                 priv = []
         tip = d.virtual_sp([h for h in llega])
+        return d, tip, llega
+
+
+# =======================================================================================
+# MANIOBRA (ii)-b: PUBLICAR SOLO UNA PARTE DE LA CADENA PRIVADA
+# =======================================================================================
+class MundoParcial(MundoL9):
+    """Sub-pregunta (ii) del encargo, literal: "puede el atacante publicar parte de la cadena
+    privada para enrojecer y seguir con el resto en privado SIN perder la ventaja?"
+
+    Una sola cadena privada parasita (cada bloque fusiona la vista honesta). Cuando
+    `len(priv) >= J` y la punta privada supera al sp honesto, se publican los `frac_pub` mas
+    VIEJOS y se conserva el resto en privado, encadenando sobre el ultimo privado.
+    `frac_pub = 1.0` reproduce la parasita de D8 (control).
+
+    Se mide, ademas de la contabilidad: la ventaja retenida `adv` (blue_work de la punta
+    privada menos la de la punta publica) y su maximo, y `div_prof` (bloques de la cadena
+    seleccionada privada que no estan en la publica) — si la publicacion parcial NO hace
+    cambiar de cadena a la red, no hay rojos y la maniobra no existe: `n_cambios` lo cuenta.
+    """
+
+    def corre_parcial(self, J=31, frac_pub=0.5):
+        d = DAG(k=self.k, u2=True, u3_mode=self.u3_mode,
+                max_parents=self.mp, mergeset_limit=self.msl)
+        g = d.genesis()
+        llega = {g: 0.0}
+        priv = []
+        self.n_rafagas = self.n_intentos = self.n_bloques_priv = self.n_rechazados = 0
+        self.n_publicados = 0
+        self.n_cambios = 0          # veces que la publicacion parcial SI gano al sp honesto
+        self.adv_traza = []
+        self.tam_rafagas = []
+        for i, (t, quien, sd, sde, ident) in enumerate(self.ev):
+            visibles = [h for h, ta in llega.items() if ta <= t]
+            if quien == "h":
+                padres = self._padres(d, visibles)
+                bid = f"b{i}"
+                ok, _ = d.add(bid, padres, t=t, creator="h", ident=ident, sd=sd, seed=sde)
+                if ok:
+                    llega[bid] = t + DELTA
+                continue
+            sp_h = d.virtual_sp(visibles)
+            if not priv:
+                self.n_intentos += 1
+            ph = self._padres(d, visibles)
+            padres = ([priv[-1]] + [x for x in ph if x != priv[-1]][:self.mp - 1]) if priv \
+                else ph[:self.mp]
+            bid = f"a{i}"
+            ok, motivo = d.add(bid, padres, t=t, creator="a", ident=ident, sd=sd, seed=sde)
+            if not ok:
+                self.n_rechazados += 1
+                continue
+            priv.append(bid)
+            self.n_bloques_priv += 1
+            self.adv_traza.append((t, d.gd[priv[-1]].blue_work - d.gd[sp_h].blue_work))
+            tip_p = max(priv, key=d._key)
+            if len(priv) >= J and d._key(tip_p) > d._key(sp_h):
+                n_pub = max(1, int(round(frac_pub * len(priv))))
+                soltar, quedan = priv[:n_pub], priv[n_pub:]
+                for b in soltar:
+                    llega[b] = t
+                self.n_publicados += len(soltar)
+                self.n_rafagas += 1
+                self.tam_rafagas.append(len(soltar))
+                # se la red cambia de cadena? el ultimo publicado debe ganar al sp honesto
+                if d._key(soltar[-1]) > d._key(sp_h):
+                    self.n_cambios += 1
+                priv = quedan
+        tip = d.virtual_sp([h for h in llega])
+        self.adv_max = max((a for _, a in self.adv_traza), default=0)
+        self.adv_fin = (d.gd[priv[-1]].blue_work - d.gd[tip].blue_work) if priv else 0
         return d, tip, llega
