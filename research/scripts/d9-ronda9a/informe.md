@@ -638,7 +638,7 @@ del umbral operativo del 33 %.
 - **Regla 3** (≥ 12 semillas literales): 12 en A1, A1b, A2, A4. A5/A6 son deterministas.
 - **Regla 4** (control positivo antes de medir): A1b (`Δ` grande) para la conservación; `frac_pub = 1,0`
   para A4; los 4 controles del encargo en A2; `prev()` literal de D8 en A5/A6.
-- **Regla 5** (`AUDITA_SCRIPTS.py`): 8 scripts, **4 marcas `[T3b]`**, `r9a_lib.py:132, 267, 321, 393`.
+- **Regla 5** (`AUDITA_SCRIPTS.py`, ejecutado al entregar): **9 scripts, 4 marcas `[T3b]`**, `r9a_lib.py:132, 267, 321, 393`.
   **Leídas una a una:** las cuatro son `padres = self._padres(...)` en la rama `quien == "h"` (bloque
   honesto, vista completa) frente a `ph = self._padres(...)` en la rama del atacante, que fusiona la
   vista honesta **a propósito** y luego antepone su punta privada. Es el mecanismo, no una tautología —
