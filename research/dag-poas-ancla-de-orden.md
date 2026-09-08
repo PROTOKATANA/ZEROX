@@ -108,6 +108,14 @@ Va como **`1/√I`**: **épocas cortas ⇒ más steering.**
 `I = 2 490 s` es el punto donde `g = 3,6 %`, el nivel que la ronda 7 declaró aceptable
 (*«del orden del 3 %, en ≤ 22 % de las épocas»*).
 
+> **Dos precisiones (2026-09-08).** (i) El «≤ 22 % de las épocas» **no es de este diseño**: la ronda 4
+> lo midió para su mecanismo de voto (`dag-poas-voto-auditoria.md` L179, `voto_epifenomeno.py`,
+> `α=1/3`, `V=120`, `m=2`: el atacante desplaza al ganador en ≥22 % de las inyecciones). Con el ancla
+> en la cadena seleccionada el cualificador equivalente es la `m` con billetes genuinos que mide
+> D9-c (A1), no ese 22 %. (ii) La fórmula completa de la ronda 4 es `g = c_m√(αλn)/(αλI)` con
+> `n ≤ I` los slots que el atacante evalúa por flujo (L197-199): el `g = c_m/√(αλI)` de arriba es
+> el caso `n = I`, es decir, la **cota superior**. Los números de esta sección son conservadores.
+
 ### 1.3 · `F = 3,2 h` — de la ventana de predicción
 
 BDK+19 §2 define la ventana `W` en bloques y advierte:
