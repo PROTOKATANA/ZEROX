@@ -145,7 +145,9 @@ El steering **mejora** respecto al 3,6 % que la ronda 7 asumía con `m=4`: el me
 3. **D9-b A1, laguna (b):** U2 y el filtro exigen retrolectura sin cota, y chocan con la poda.
 4. **D9-b A4:** la recursión por épocas entre R-FIN-5/R-FIN-7 y la Propiedad 1 —real, no viciosa, sin
    escribir.
-5. **El empalme `φ_c` ⊗ `δ`** (conteo contra peso). Sin demostrar desde la ronda 3.
+5. **El empalme `φ_c` ⊗ `δ`** (conteo contra peso): **reducido a una restricción de diseño** —exacto
+   salvo `ε < 1 %` con `W_RETARGET ≥ 3 083 slots`, `γ ≤ 0,25` (R-FIN-13; `dag-poas-empalme-peso.md`).
+   Queda LAGUNA el sesgo del retarget bajo ataque (ronda 3, PLAUSIBLE).
 6. **Cliente ligero sin confianza:** muerto, permanente. **Timelord único:** B7.
 
 ---

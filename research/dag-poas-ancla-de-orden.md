@@ -200,6 +200,12 @@ Identidad de billete: `(public_key, sector_index, history_size, chunk, slot)`.
 > Medido (`r8_lema9e.py`): `δ_ef` = 0,106 / **0,250** / **0,366** / **0,424** a α = 0,10 / 0,25 /
 > 0,33 / 0,40 con posproceso, frente a **0,000 en todas** con filtro. Cota del paper: 0,2424.
 
+**R-FIN-13 · Ventana del retarget. (NUEVA, 2026-09-08.)** `W_RETARGET ≥ 3 083 slots` con `γ ≤ 0,25`
+(o `W ≥ 12 331` con `γ ≤ 1`). Es lo que hace que `φ_c`, probado sobre **conteo**, valga sobre
+**peso** (`blue_work = Σ w(SR)`): la discrepancia sobre el horizonte `F` queda `< 1 %` y el umbral se
+mueve `< 0,4` puntos. Derivación y tabla en `dag-poas-empalme-peso.md`. Es una elección de diseño,
+con etiqueta.
+
 **R-FIN-6 · Color.** El k-cluster de GHOSTDAG con `k = 25`, sin condición de color por flujo
 (R-FIN-5 la hace innecesaria). «Cadena seleccionada ⊆ azules» se conserva —U3′ lo respeta, U3 no.
 
