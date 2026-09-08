@@ -16,7 +16,7 @@ Regla vigente (`research/dag-poas-ancla-de-orden.md:274`):
 - [x] A · los motivos originales (ronda 1 «×10», ronda 3 «espacio gratis») y si siguen vivos
 - [x] B · qué hace Kaspa de verdad (rusty-kaspa @ c338d495), fichero y línea
 - [ ] C · vectores nuevos con rojos pagados
-- [ ] D · rentabilidad medida (control positivo + modo «rojos pagados»)
+- [x] D · rentabilidad medida (control positivo + modo «rojos pagados»)
 - [ ] E · texto de R-FIN-8′ y enmienda a R-FIN-13
 - [ ] F · veredicto y errores propios
 
@@ -189,3 +189,79 @@ Se mide en D.
 
 **Veredicto B: VERIFICADO** (fichero y línea). P1 coincide con Kaspa en las transacciones,
 diverge en el destinatario de la recompensa del rojo, y su cláusula de `merge_depth` es vacua.
+
+---
+
+## D · Rentabilidad, MEDIDA — P1 cierra el incentivo; **Kaspa literal lo duplica**
+
+**Script:** `research/scripts/d9-ronda9b/r9b_d_coste.py` → `salida_d.txt`.
+Reutiliza **sin reescribirla** la maniobra parásita de `d8_lib.MundoL9.corre_l9(modo='parasito')`
+(adversario del paper, `phantom-ghostdag.txt` L1024-1027: sin retardo), con las **12 semillas
+literales** `[1..12]`, horizonte 1 800 s, ventana `[60, 1 740] s`, `k = 30`, `mp = 15`,
+`J` exactamente el de `d8-ronda8/salida_a1e.txt`.
+
+Tres semánticas de pago, en unidades de recompensa **por bloque producido**:
+
+- **S0 · R-FIN-8 vigente** — `paga(x) = #{bloques de x AZULES en la vista honesta final}`.
+- **S1 · P1 tal como está escrita** («los rojos … cobran» ⇒ cobra el **productor** del rojo)
+  — `paga(x) = #{bloques de x VÁLIDOS y FUSIONADOS}` (azules + rojos del orden de consenso).
+- **S2 · Kaspa literal** (`coinbase.rs:121-131`: el rojo **no** cobra, cobra el **fusionador**)
+  — `paga(x) = #{azules de x} + #{rojos en el mergeset de bloques de CADENA creados por x}`.
+  Contabilidad fiel: la recompensa fluye **solo** por la coinbase de los bloques de la cadena
+  seleccionada (`utxo_validation.rs:106-123` y `.skip(1)` en `:308`/`:335`).
+
+| `α` | `J` | S0 h | S0 a | **ratio S0** | S1 h | S1 a | **ratio S1** | S2 h | S2 a | **ratio S2** | `n_h` | `n_a` | rojos | cad_a | cad_h | perd |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | 16 | 1,0000 | *(n_a=0)* | — | 1,0000 | *(n_a=0)* | — | 1,0000 | *(n_a=0)* | — | 19 978 | **0** | **0** | 0 | 4 050 | 0 |
+| 0,10 | 16 | 0,9777 | 0,3116 | 0,319 | 1,0000 | 0,9757 | **0,976** | 1,0007 | 0,9966 | **0,996** | 17 924 | 2 054 | 1 818 | 274 | 3 792 | 50 |
+| 0,25 | 16 | 0,8458 | 0,8422 | 0,996 | 1,0000 | 0,9990 | **0,999** | 0,8894 | 1,3324 | **1,498** | 14 921 | 5 057 | 3 130 | 2 996 | 2 110 | 5 |
+| 0,30 | 31 | 0,7918 | 0,6969 | 0,880 | 1,0000 | 0,9977 | **0,998** | 0,8350 | 1,3777 | **1,650** | 13 907 | 6 071 | 4 733 | 2 650 | 2 423 | 14 |
+| **0,33** | 31 | 0,7136 | 0,8277 | **1,160** | 1,0000 | 0,9963 | **0,996** | 0,7445 | 1,5103 | **2,029** | 13 297 | 6 681 | 4 970 | 4 337 | 1 645 | 25 |
+| **0,35** | 31 | 0,6934 | 0,8813 | **1,271** | 1,0000 | 0,9970 | **0,997** | 0,7255 | 1,5008 | **2,069** | 12 882 | 7 096 | 4 810 | 5 390 | 1 197 | 21 |
+| **0,37** | 48 | 0,6558 | 0,7593 | **1,158** | 1,0000 | 0,9922 | **0,992** | 0,6846 | 1,5335 | **2,240** | 12 499 | 7 479 | 6 150 | 4 470 | 1 669 | 58 |
+| **0,40** | 48 | 0,5643 | 0,8733 | **1,548** | 1,0000 | 0,9882 | **0,988** | 0,5817 | 1,6242 | **2,792** | 11 937 | 8 041 | 6 246 | 6 380 | 937 | 95 |
+
+**Control positivo (regla 4), ANTES de medir S1/S2** — S0 reproduce `salida_a1e.txt`:
+
+| `α` | medido | esperado | \|dif\| |
+|---:|---:|---:|---:|
+| 0,25 | 0,996 | 0,995 | 0,0008 |
+| 0,33 | 1,160 | 1,159 | 0,0009 |
+| 0,35 | 1,271 | 1,270 | 0,0011 |
+| 0,40 | 1,548 | 1,549 | 0,0015 |
+
+**SUPERADO.** (La diferencia < 0,002 es que aquí agrego sumando sobre las 12 semillas y `a1e`
+promediaba fracciones por semilla; misma maniobra, mismos bloques.)
+
+- **Criterio `α` ✓** — `α = 0`: `n_a = 0`, columnas del atacante vacías; `rojos = 0`.
+- **Cobertura de rama ✓** — `rojos` de 1 818 a 6 246 y `cad_a` de 274 a 6 380 en toda fila con
+  `α > 0`: las ramas de S1 y S2 se ejercitan de verdad.
+
+### D.1 · Lectura
+
+1. **S1 (P1 tal como está escrita) cierra el incentivo por completo: ratio 0,988–0,999 para todo
+   `α`.** La rentabilidad de 1,16–1,55 que D8 A1.5 midió **desaparece**. `S1_h = 1,0000` exacto:
+   **ningún** bloque honesto pierde su recompensa, luego la reversión de transacciones de 64-142 s
+   también se cierra. Y `S1_a < 1` sólo por los `perd` = 5–95 bloques retenidos que nunca se
+   publicaron. **P1 hace lo que promete… con su propia redacción, que no es la de Kaspa.**
+2. **S2 (Kaspa literal) es estrictamente PEOR que el statu quo en toda fila.** Ratio 1,50–2,79
+   frente a 0,996–1,548 de S0. Adoptar la semántica de Kaspa *fielmente* **duplica** la
+   rentabilidad de la parásita: el atacante fusiona a los honestos que enrojece y **se queda con
+   su subsidio** (`S2_a > 1`: cobra más de una unidad por bloque propio). A `α = 0,25` la maniobra
+   pasa de neutra (0,996) a **claramente rentable (1,498)**.
+3. **Lo que P1 no cierra:** a `α = 0,10` el ratio sube de 0,319 (S0) a 0,976 (S1). Bajo R-FIN-8
+   parasitar **cuesta** al granjero pequeño; bajo P1 es **gratis** (neutro) a todo `α`. El
+   *griefing* deja de tener coste de oportunidad, aunque deja de tener premio. El daño residual
+   —`δ` sigue existiendo y sigue restando `blue_work` al crecimiento honesto— es el que entra en
+   la frontera de flujo único. **P1 quita el premio, no el ataque.**
+
+### D.2 · Alcance de la medida (honesto)
+
+En `MundoL9` cada evento lleva `ident = (quien, i)` **única** (`r8c_sim.py:46-48`): **la
+simulación de D no contiene copias de billete.** D y A son experimentos **ortogonales**: A mide el
+×15 por copias, D mide la rentabilidad de la parásita. Por eso, numéricamente, S1 aquí coincide con
+la variante corregida R-FIN-8′ de §E (que sólo se diferencia en cómo trata a los rojos por U3″, de
+los que aquí hay cero). **LAGUNA declarada:** no he medido la parásita **y** las copias a la vez.
+
+**Veredicto D: DEMOSTRADO** que P1 en su redacción (S1) anula la rentabilidad (1,16–1,55 → 0,99);
+**REFUTADO** que la vía sea «la semántica de Kaspa» (S2: 1,50–2,79, peor que no hacer nada).
