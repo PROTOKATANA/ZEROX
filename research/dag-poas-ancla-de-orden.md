@@ -269,6 +269,8 @@ apaga el proceso. Sustituye a C-REORG-07 en el DAG.
 > **verificar** (`aes::verify_sequential`, paralelizable por `PotCheckpoints`) se está midiendo en esta máquina
 > (`cargo bench -p subspace-proof-of-time --bench pot`). De él dependen `C-NET-03/04` y el ×60 de `S_max`.
 
+**Coste del PoT, MEDIDO (2026-09-08, `cargo bench -p subspace-proof-of-time`, clon `subspace` @ `f8842d0`, Ryzen 9 9950X3D, ruta `verify_sequential_avx512f_vaes`, 8 checkpoints, 200 032 000 iteraciones por slot — 3 % menos que mainnet):** `prove` = **1,561 s/slot**, `verify` = **96,1 ms/slot** (Criterion, 100 muestras, IC ±0,07 %). Consecuencias: (i) verificar el PoT cuesta ~9,6 % de un núcleo de forma continua a `τ = 1 s` — es el coste «no sucinto» que `CLAUDE.md` pedía medir y del que dependen `C-NET-03/04`; (ii) la asimetría `prove/verify ≈ 16×` va a favor del verificador: quien quiera forzar verificaciones tiene que pagar 16× más en calcular la cadena que el nodo en comprobarla, y las cabeceras con `slot` por delante del PoT verificado no fuerzan nada (se retienen); (iii) **esta máquina no llega a 1 s/slot**: el timekeeper de ZEROX a `τ = 1 s` necesita latencia AES de clase 14900KS o un `pot_slot_iterations` menor — `τ` lo define el número de iteraciones, no el reloj de pared.
+
 **R-FIN-8 · Rojos.** Ni la coinbase ni las transacciones de un bloque rojo se aplican al estado.
 Cierra la inflación ×10 (ronda 1) y el espacio de bloque gratis (ronda 3). **Coste medido:**
 `P(bloque honesto acabe rojo) = P(Poisson(2λΔ) > k) = 1,2·10⁻⁶` a `q=1` — ~37 huérfanos honestos al
