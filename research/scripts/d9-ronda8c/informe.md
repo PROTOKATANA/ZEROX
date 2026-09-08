@@ -428,10 +428,20 @@ Satura entre 200 y 400. **Sigue siendo cota inferior**: una familia distinta pod
 mismo menú (`[4,4,4,4,4]`, `[1,1,1,1,1]`, `[11,11,11,11,11]`, `[7,7,7,7,7]`). El DAG no depende del
 orden de enumeración; el menú no es ruido.
 
-**Con copias (U3′-filtro tal como está escrita), `α = 0,10`**: `m` gratis 4,67 (era 4,50), con
-retención **8,92** (era 7,33), máximo 15. Las copias **suman** al menú porque compran `blue_work`
-(§A3 (3)) y con él saltos de cadena. **Solo tengo la fila `α = 0,10`: el resto seguía corriendo al
-cerrar el informe. LAGUNA.**
+**Con copias (U3′-filtro tal como está escrita, 14 copias por cada bloque del atacante):**
+
+```
+ alpha |            m GRATIS |          m +retraso |        m +retencion
+       |    medio   max   >1 |    medio   max   >1 |    medio   max   >1
+  0.00 |    1.00     1  0/12|    1.00     1  0/12|    1.00     1  0/12|
+  0.10 |    4.67     7 11/12|    6.75    11 11/12|    8.92    15 11/12|
+  0.25 |    4.75     7 12/12|    8.08     9 12/12|    9.50    10 12/12|
+```
+
+Las copias **suman** al menú (`α = 0,10`: retención **8,92** frente a 7,33 sin copias, máximo **15**)
+porque compran `blue_work` (§A3 (3)) y con él saltos de cadena. **Las filas `α = 0,33` y `0,40`
+seguían corriendo al cerrar (cada ejecución con copias construye ~1 500 bloques × 230 estrategias):
+LAGUNA menor, la salida completa quedará en `salida_a1_menu.txt`.**
 
 ### (c) ¿Es realizable EN LÍNEA? Sí — y este es el número conservador (`r8c_a1e_reactivo.py`)
 
