@@ -248,6 +248,14 @@ apaga el proceso. Sustituye a C-REORG-07 en el DAG.
 > proporción de Autonomys) **o** `λ ≈ 1/6` bloques/s. Comparación directa: Autonomys `I = 300 s`, `L = 15 s`,
 > lookback 2 intervalos; ZEROX `I = 4 200 s`, `F = L = 5,3 h`. **El «11 s» que citaban siete rondas es**
 > **`DELAY − AUTHORING_DELAY = 15 − 4 = 11` slots.**
+> **Las dos ramas, con número (`verif_tau_vs_lambda.py`, óptimo autoconsistente con punto fijo de Poisson):**
+> (A) `λ = 1/s`, `τ ≈ 0,1-0,17 s` (6-10 slots/bloque): `k* = 29`, `δ_real = 0,276`, reversión a 600 s
+> **`4,3·10⁻¹⁰`**, 21,5 GB/año, latencia 1 s; coste: ×6-10 slots de PoT por segundo (justificación y
+> verificación de PoT, y el DoS de `S_max` se mide en slots de PoT). (B) `λ = 1/6`, `τ = 1 s` (la de Autonomys):
+> `k* = 7`, `δ_real = 0,190`, reversión a 600 s **`1,3·10⁻²`** (600 s son ~100 bloques), 3,6 GB/año (cliente
+> ligero 850× Bitcoin en vez de 5 100×), latencia 6 s. **(B) tira la ventaja de reversión del DAG (7 órdenes)**
+> y obliga a rederivar `I`, `F`, `m` con `λ = 1/6`. **Recomendación (autónoma): (A).** Es una bifurcación de
+> Katana.
 
 **R-FIN-8 · Rojos.** Ni la coinbase ni las transacciones de un bloque rojo se aplican al estado.
 Cierra la inflación ×10 (ronda 1) y el espacio de bloque gratis (ronda 3). **Coste medido:**

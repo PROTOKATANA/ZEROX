@@ -23,7 +23,7 @@ hace falta un ancla con `m` acotado por construcción?** · **Fecha:** 2026-09-0
 | `AUDITA_SCRIPTS.py` (8 scripts) | **0 marcas** · criterio α en los 8 · **12 semillas en todo número** |
 | **`F ∝ ln m`**, recalculado por mí (Blom) | `m=2,54` → 5,6 h · `5,77` → 15,5 h · `151` → **68,0 h** · `10⁴` → **143 h**. Coincide |
 | **B3** `r8f_b3_prop7.py`, ejecutado por mí | **Reproduce:** Lema A4-slot en todas las filas (769/769, 455/455, 142/142, 85/85), incluidas las que violan la monotonía estricta |
-| **B1** (`m_SLOT` vs `m_BS`, mismas semillas) | Re-ejecución completa **en curso** (`salida_b1_slot.rerun-principal.txt`) |
+| **B1** (`m_SLOT` vs `m_BS`, mismas semillas) | **Re-ejecutada por mí completa** (619 s, `salida_b1_slot.rerun-principal.txt`): **IDÉNTICA** fila a fila a `salida_b1_gran1.txt` |
 | Citas de Kaspa | **Reales:** `protocol.rs:153` (`blue_score = bs(sp) + |mergeset_blues|`), `:250` (tope `k+1`), y **su propia corrección**: `post_pow_validation.rs:85` recorre **solo `mergeset_reds`** |
 
 ---
