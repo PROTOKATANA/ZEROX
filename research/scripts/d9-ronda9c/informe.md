@@ -328,3 +328,66 @@ producir y verificar. **PLAUSIBLE, no medido.**
 **Veredicto E: PLAUSIBLE con una corrección DEMOSTRADA a P4** (la fila `ρ = 1` es `n_eval = 0`,
 no `n_eval = W_dec`) y **una LAGUNA nueva**: `I ≥ ρ_max·W_dec` es una restricción de diseño que
 nadie escribió, y que se viola si `I` baja a ~460 s.
+
+---
+
+## F · Texto propuesto de **R-FIN-14** (no aplicado; `dag-poas-ancla-de-orden.md` no se toca)
+
+> **R-FIN-14 · Reto por slot desde el PoT re-sembrado. (NUEVA, D9 ronda 9c.)**
+> Cierra la laguna de que R-FIN-2/3/4 fijan *bajo qué flujo* se verifica una solución pero no
+> *cómo* se obtiene el reto de cada slot. Es la regla de la que depende toda la cota `n_eval`.
+>
+> **(a) Cadena de PoT por flujo — SECUENCIAL.** Cada flujo `f` tiene una única cadena de PoT
+> indexada por slot. Para todo slot `s > s₀(f)`:
+> ```
+> semilla(f, s) = blake3( entropía_j ‖ salida(f, s−1) )[0..16)     si s = t_j para alguna
+>                                                                   inyección j de f (R-FIN-2)
+>               = salida(f, s−1)                                   en cualquier otro caso
+> salida(f, s)  = AES128_chain^{N(s)} ( semilla(f, s) )            (subspace-proof-of-time::prove)
+> ```
+> con `N(s)` el `slot_iterations` vigente en `s` (R-FIN-9), aplicado en el **mismo** slot `t_j`
+> que la entropía, y `salida(f, s₀)` la salida heredada del flujo padre en la bifurcación.
+> A lo sumo **una** inyección por slot.
+>
+> **(b) Reto global del slot.**
+> ```
+> aleatoriedad(f, s) = blake3( salida(f, s) )
+> reto(f, s)         = blake3( aleatoriedad(f, s) ‖ LE64(s) )
+> ```
+>
+> **(c) Validez de la solución.** Un bloque `B` con `slot(B) = s` y `f = flujo(B, s)` (R-FIN-3) es
+> válido solo si, con `sector_id = H(pk ‖ sector_index ‖ history_size)` y
+> `ssc = derive_sector_slot_challenge(sector_id, reto(f, s))`:
+> (i) la prueba de espacio verifica en el s-bucket `s_bucket_audit_index(ssc)`;
+> (ii) `solution_distance( reto(f,s), chunk ⊕ hash(PoS), ssc ) ≤ solution_range(B) / 2`.
+> El `solution_range` es el del retarget de R-FIN-13.
+>
+> **(d) Justificación de PoT.** `B` **MUST** incluir los puntos de control que encadenan
+> `salida(f, slot(sp(B)) + D)` → `salida(f, s + D)`, con `D` el retardo de autoría
+> (`BLOCK_AUTHORING_DELAY` de Autonomys). R-FIN-1a acota esa cadena a `S_max` slots, luego a
+> `S_max · 96,1 ms` de verificación en el peor caso. Un nodo **MUST NOT** verificar PoT de un
+> flujo distinto del suyo (R-FIN-5): la comprobación de flujo es **anterior** a la de PoT.
+>
+> **(e) Prohibición explícita — es el contenido de seguridad de la regla.** El reto **MUST NOT**
+> derivarse de ninguna función que permita **saltar slots**. En particular, `reto(f, s) =
+> H(flujo(f) ‖ s)` y cualquier variante que sea PRF de `s` a partir de un valor fijo de la época
+> están **PROHIBIDAS**. La secuencialidad de (a) es lo único que impide que el atacante evalúe la
+> época entera de un candidato a ancla **antes** de tener que elegirlo, y es la hipótesis sobre la
+> que se calcula `n_eval` y, con él, `I` y `F`.
+>
+> **(f) Restricción de calibración.** `I ≥ ρ_max · W_dec`, con `W_dec` la ventana de decisión del
+> ancla (§C) y `ρ_max` la cota superior admitida para la velocidad de AES de un atacante frente al
+> timekeeper. Con `W_dec` medida y `ρ_max = 1,5`, `I ≥ 450 s`. Si `I` baja de esa cota, el
+> atacante evalúa la época entera dentro de `W_dec` y (e) deja de comprar nada.
+>
+> **(g) Unicidad de `t_j`.** Los `t_j` de inyecciones distintas **MUST** ser distintos dos a dos.
+> Se cumple por construcción: `slot(I_j) ∈ [j·I, j·I + S_max)` (Cota E de R-FIN-1) y
+> `S_max < I`, luego `slot(I_j)` es estrictamente creciente en `j` y `t_j = slot(I_j) + L`
+> también. **DEMOSTRADO** dado `S_max < I` (150 < 4 200).
+>
+> **(h) Nota de diseño, con etiqueta.** Con `L > I` hay `⌈L/I⌉ = 5` inyecciones pendientes a la
+> vez y sus entropías son **públicas antes de aplicarse**. Eso permite a un atacante con `ρ > 1`
+> adelantar la cadena común hasta `L + I − W_dec` slots (§E.1). La variante **revelación
+> retardada** —`entropía_j = VDF(chunk(I_j) ‖ salida(I_j), L·iteraciones)`, revelada en `t_j`—
+> reduce esa ventaja a `I` y hace `n_eval = 0` para cualquier `ρ`, al coste de un VDF adicional.
+> Queda como **opción**, no como núcleo.
