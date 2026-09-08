@@ -585,7 +585,7 @@ invalidaciones cuando existen. **Criterio `α` ✓** — la columna S=20 crece c
 | A1.5 · coste para el atacante | **REFUTADO (incentivos)** | ratio ingreso a/h = **1,16-1,55** para `α ≥ 0,33` | `d8_a1e_coste.py` |
 | **A2** · dos vistas honestas | **SIN VECTOR** + LAGUNA de modelo | `P(desacuerdo) = 0` en 3 168 muestras a `D ≥ 128 s`; `F` es 149× más profundo | `d8_a2_dosvistas.py` |
 | **A3** · `S_max` y R-FIN-7 | **TENSIÓN** | 11,7-12,3 bloques honestos invalidados/h con `S_max=20 s`; **0** con `≥30 s` | `d8_a3_smax.py` |
-| **A4** · cruce del ancla en régimen | **SIN VECTOR** + **TENSIÓN** | `m` no crece con el horizonte (2,540 → 2,421); pero con retención hasta `S_max`, `m = 2,822 > 2,548` | `d8_a4_cruce.py`, `d8_a4b_horizonte.py`, `d8_a4c_rachas.py` |
+| **A4** · cruce del ancla en régimen | **SIN VECTOR** + **TENSIÓN** | `m` no crece con el horizonte (2,540 → 2,421 → 2,429); pero con retención hasta `S_max`, `m = 2,955 > 2,548` ⇒ lookahead 8,26 h y margen 10× **< 1 en los tres escenarios** | `d8_a4b_horizonte.py`, `d8_a4c_rachas.py` |
 | **A5** · soborno BDK | **REFUTADO** | `m = b+1` (incluso a `α=0`); valor/coste 12-23×; `m* = 23` | `d8_a5_soborno.py`, `d8_a5b_equilibrio.py` |
 | **A6** · margen económico | **REFUTADO** | margen 10× plotter **0,67×** (era 1,05×); garantía `S_max=150` → **0,49×** | `d8_a6_presupuesto.py` |
 | A6 · línea 5 (`3k`) | **SIN VECTOR** (a favor) | ventaja real máx 50 = **0,56 · 3k** | `d8_a6b_lineas.py` |
@@ -599,9 +599,11 @@ invalidaciones cuando existen. **Criterio `α` ✓** — la columna S=20 crece c
 - **`P(desacuerdo)` con dos vistas (A2):** `1,000 / 0,504 / 0,106 / 0,015 / 0 / 0 / 0 / 0`
   a `D = 4/8/16/32/64/128/256/512 s` (`α = 0,40`, máximo sobre 24 estrategias). Resolución
   del instrumento `3,2·10⁻⁴`; `F = 19 080 s`.
-- **Margen económico recalculado (A6):** lookahead `I + F = 6,14 h`; margen **10,26× / 6,68×
-  / 11,24×** frente a `A*` de hoy (escenarios A/B/C) y **1,03× / 0,67× / 1,12×** frente al
-  plotter 10×. Con la garantía (`S_max = 150 s`): **0,75× / 0,49× / 0,83×** frente a hoy.
+- **Margen económico recalculado (A6):** con la `m` publicada (2,548), lookahead `I+F = 6,14 h`
+  y margen **10,26× / 6,68× / 11,24×** frente a `A*` de hoy (A/B/C) y **1,03× / 0,67× / 1,12×**
+  frente al plotter 10×. **Con la `m` que mide D8 (2,955, retención hasta `S_max`), lookahead
+  8,26 h y margen 10× de 0,76× / 0,50× / 0,84×: por debajo de 1 en los tres escenarios.**
+  Con la garantía (`S_max = 150 s`, `m ≤ 151`): **0,75× / 0,49× / 0,83× frente a hoy.**
 
 ## Salida de `AUDITA_SCRIPTS.py` (regla 5) — DECLARADA
 
@@ -751,11 +753,12 @@ infradimensionadas. Familia **fija** (la literal de D9-f), profundidad escalada:
 | 260 | 30 | 0,40 | **3,024** | 5 | 150 | 0 |
 | 500 | 60 | 0,10 | **2,131** | 5 | 49 | 0 |
 | 500 | 60 | 0,25 | **2,421** | 5 | 100 | 0 |
+| 900 | 110 | 0,25 | **2,429** | 5 | 100 | 0 |
 
 **Reproducción exacta de D9-f** en las tres celdas comparables (2,238 / 2,540 / 3,024) — dos
 implementaciones independientes (`d8_a4_cruce.py` y `d8_a4b_horizonte.py`) dan el mismo
-2,421 a HOR = 500. Y **`m` no crece: baja** (2,540 → 2,421 a `α=0,25`; 2,238 → 2,131 a
-`α=0,10`). El cruce del ancla es un fenómeno **local** a la banda `[T_j, T_j + gap)`, no
+2,421 a HOR = 500. Y **`m` no crece: baja y se estabiliza** (2,540 → 2,421 → **2,429** a `α=0,25` para
+HOR = 260 → 500 → 900 s; 2,238 → 2,131 a `α=0,10`). El cruce del ancla es un fenómeno **local** a la banda `[T_j, T_j + gap)`, no
 depende de la profundidad a la que se lea. `equiv!=` = 0 siempre: «primer bloque con
 `slot ≥ S`» ≡ «menor `blue_work` con `slot ≥ S`» se cumple en toda ejecución.
 
@@ -799,27 +802,43 @@ retención total, 37 estrategias:
 | **0,00** | **1,000** | 1 | **0** | 0 | 0 | 0 | 0 | 444 |
 | 0,10 | **2,282** | 7 | 343 | 75 | 2 | 99 | **4** | 444 |
 | 0,25 | **2,822** | 6 | 795 | 154 | 4 | 225 | **6** | 444 |
+| 0,33 | **2,905** | 6 | 1 085 | 190 | 6 | 287 | **16** | 444 |
+| 0,40 | **2,955** | 6 | 1 376 | 224 | 11 | 338 | **16** | 444 |
 
-Retener y soltar justo antes de `S_max` sube `m` de **1,694 a 2,282** a `α = 0,10` (+35 %) y
-de **2,029 a 2,822** a `α = 0,25` (**+39 %**), y las capturas dirigidas de 163 a 225.
+Retener y soltar justo antes de `S_max` sube `m` un **35-40 %**: 1,694 → 2,282 (`α=0,10`),
+2,029 → 2,822 (`α=0,25`), 2,117 → 2,905 (`α=0,33`), 2,122 → **2,955** (`α=0,40`). Y las
+capturas dirigidas pasan de 243 a **338 de 444** (76 %) a `α = 0,40`.
 
-> **A `α = 0,25` la retención hasta `S_max` da `m = 2,822`, POR ENCIMA de la `m = 2,548` con
-> la que el diseño dimensiona `I` y `F`.** No es un vector nuevo —el mecanismo ya estaba
-> contemplado—, pero **la constante se queda corta**: con `m = 2,822`, `I = 4 890 s` (1,36 h),
-> `F = 6,17 h`, lookahead **7,53 h**, y el margen frente al plotter 10× cae de **0,67× a
-> 0,54×** (escenario B). Hay que rehacer las constantes con esta `m`, no con 2,548.
-> **Etiqueta: TENSIÓN** — el ancla aguanta, la constante no.
+> **La retención hasta `S_max` da `m = 2,822-2,955`, POR ENCIMA de la `m = 2,548` con la que
+> el diseño dimensiona `I` y `F`.** No es un vector nuevo —el mecanismo estaba contemplado—,
+> **es que la constante se quedó corta**. Rehecha con `m = 2,955`:
+>
+> | | diseño (`m`=2,548) | **D8 (`m`=2,955)** |
+> |---|---:|---:|
+> | `I` | 3 986 s (1,11 h) | **5 362 s (1,49 h)** |
+> | `F` | 5,03 h | **6,77 h** |
+> | lookahead `I+F` | 6,14 h | **8,26 h** |
+> | margen vs `A*` hoy (A / B / C) | 10,26× / 6,68× / 11,24× | 7,63× / **4,96×** / 8,35× |
+> | **margen vs plotter 10× (A / B / C)** | 1,03× / 0,67× / 1,12× | **0,76× / 0,50× / 0,84×** |
+>
+> **Con la `m` correcta, el margen frente a un plotter 10× cae por debajo de 1 en LOS TRES
+> escenarios de precios**, no sólo en el que favorece al atacante. **Etiqueta: TENSIÓN** —
+> el ancla aguanta el cruce; la constante que cuelga de ella, no.
+>
+> Las rachas siguen siendo compatibles con independencia: con `p = 0,761` (`α=0,40`
+> dirigido), `P(racha ≥ 16)` en 37 épocas ≈ `37·0,761¹⁶ ≈ 0,55` por corrida, luego una racha
+> de 16 en 12 corridas es lo esperado.
 
-> **DECLARACIÓN DE EJECUCIÓN INCOMPLETA (regla 10).** Las filas `α ∈ {0,33; 0,40}` de
-> esta tabla y las celdas `HOR ∈ {900, 1500, 2400}` de A4.1 **no terminaron**. Motivo medido,
+> **DECLARACIÓN DE EJECUCIÓN INCOMPLETA (regla 10).** A4.2 terminó completa; de A4.1 faltan
+> las celdas `HOR ∈ {1 500, 2 400}`. Motivo medido,
 > no supuesto: con `copias = 14` (R-FIN-11) y `α = 0,25` el DAG llega a ~4 000 bloques a
 > horizonte 900 s, y el `DAG` heredado de D9 (`r8c_gd.py`) calcula alcanzabilidad por **cierre
 > transitivo con conjuntos**, coste `O(n²)` en memoria y tiempo. **No es una laguna del
 > diseño: es un límite del instrumento**, y quien continúe esta línea debería sustituir el
 > cierre transitivo por índices de intervalo (lo que hace Kaspa de verdad,
 > `reachability/`) antes de subir el horizonte. Lo que **sí** está cerrado con datos:
-> `m` **baja** de 260 s a 500 s en las dos `α` medidas, y la retención sube `m` un 35-39 %,
-> **pasando de 2,548 a `α = 0,25`**.
+> `m` **baja y se estabiliza** de 260 s a 900 s (2,540 → 2,421 → 2,429), y la retención la
+> sube un 35-40 %, **pasando de 2,548 desde `α = 0,25`**.
 
 
 ---
@@ -851,10 +870,11 @@ de precios. **Hay que escribirlo con esa etiqueta.**
 ### 2 · `F = 5,3 h` medido / `≤ 68,5 h` garantizado, «se diseña con el medido» — **CONFIRMADA, con el precio subido**
 
 Diseñar con el medido es lo correcto: A4 muestra que `m` **no crece** con el horizonte
-(2,540 → 2,421 de 260 s a 500 s) y que el horizonte no la sube.
-**Pero la retención hasta `S_max` sí: `m = 2,822` a `α = 0,25`, por encima de 2,548** — con
-ella `I = 4 890 s`, `F = 6,17 h`, lookahead 7,53 h y margen 0,54× frente al plotter 10×.
-**La constante hay que rehacerla.** **Pero el precio de esa elección ha subido**: con
+(2,540 → 2,421 → 2,429 de 260 s a 900 s). **Pero la `m` medida está mal elegida: con
+retención hasta `S_max` —que es legal y `S_max = 150 s` la habilita— sale `m = 2,955`, no
+2,548.** Rehecha: `I = 5 362 s`, `F = 6,77 h`, lookahead **8,26 h**, y el margen frente al
+plotter 10× es **0,76× / 0,50× / 0,84×** en los escenarios A/B/C: **por debajo de 1 en los
+tres**. **La constante hay que rehacerla, y al hacerlo el «número delgado» desaparece.** **Pero el precio de esa elección ha subido**: con
 `I + F = 6,14 h` el margen frente a un plotter 10× mejor que la extrapolación es **0,67×** en
 el escenario que el propio documento marca como favorable al atacante (era 1,05× con las
 constantes viejas). **El «número delgado» del diseño ya no es delgado: es negativo.**
