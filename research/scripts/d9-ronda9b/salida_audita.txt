@@ -1,0 +1,7 @@
+Scripts analizados: 3
+
+research/scripts/d9-ronda9b/r9b_a_copias.py
+   [T3b] L105: ['d', 'd2'] = MISMA expresión: DAG(k=K, u2=True, u3_mode='dynamic', max_parents=MAXP)
+
+======================================================================
+Sospechas totales: 1

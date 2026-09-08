@@ -17,8 +17,8 @@ Regla vigente (`research/dag-poas-ancla-de-orden.md:274`):
 - [x] B · qué hace Kaspa de verdad (rusty-kaspa @ c338d495), fichero y línea
 - [x] C · vectores nuevos con rojos pagados
 - [x] D · rentabilidad medida (control positivo + modo «rojos pagados»)
-- [ ] E · texto de R-FIN-8′ y enmienda a R-FIN-13
-- [ ] F · veredicto y errores propios
+- [x] E · texto de R-FIN-8′ y enmienda a R-FIN-13
+- [x] F · veredicto y errores propios
 
 
 
@@ -410,3 +410,197 @@ más barata: una regla». Con la variante recomendada lo es; con la de Kaspa, no
 Kaspa paga al fusionador precisamente para incentivar la inclusión. En ZEROX el algoritmo de padres
 está adoptado como consenso (R-FIN-12, `pick_virtual_parents`), así que la conducta no depende del
 incentivo, pero **no he medido si un granjero racional se desviaría**.
+
+---
+
+## E · Texto propuesto — R-FIN-8′ y R-FIN-13′
+
+*(No he tocado `research/dag-poas-ancla-de-orden.md`. Este es el texto para que lo aplique el
+agente principal.)*
+
+### E.1 · Las dos causas de rojez, nombradas
+
+Sea `B` un bloque de la **cadena seleccionada** y `mergeset(B) = past(B) \ (past(sp(B)) ∪ {sp(B)})`.
+El coloreado de R-FIN-6 + R-FIN-11 asigna a cada `X ∈ mergeset(B)` exactamente una etiqueta,
+**función de `past(B)` y de nada más** (R-FIN-4):
+
+- **azul** — `X ∈ mergeset_blues(B)`.
+- **`rojo_k`** — `X ∈ mergeset_reds(B)` **y** su identidad de billete (R-FIN-11) no era azul en
+  `past(sp(B))` ni fue coloreada de azul antes que `X` en el orden `sort_blocks` del mergeset.
+  Es rojo **por el `k`-cluster** (`protocol.rs:246-283`): su billete es único.
+- **`rojo_U3`** — `X ∈ mergeset_reds(B)` **y** su identidad sí lo era. Es una **copia** (R-FIN-11 U3″).
+
+La distinción ya la calcula U3″ al colorear (`r8c_gd.py:222-231`); no cuesta nada implementarla.
+
+> **Por qué la penalización sólo puede caer sobre quien se equivoca a sí mismo.** Producir dos
+> bloques con la misma identidad exige dos firmas Ed25519 válidas sobre dos `pre_hash` distintos
+> bajo la **misma** `sol.public_key` (`C-HDR-03`/`C-HDR-04`, `SPEC.md:865-870`), y `merkle_root`
+> está dentro de la prefirma: **cambiar el cuerpo obliga a refirmar**. Nadie puede convertir el
+> bloque de un tercero en `rojo_U3`; sólo el dueño del billete, equivocándose. **DEMOSTRADO.**
+
+### E.2 · R-FIN-8′ · Rojos
+
+> **R-FIN-8′ · Rojos: cobran y aplican, salvo las copias. (Sustituye a R-FIN-8, ronda 9b.)**
+>
+> 1. **Quién cobra.** Un bloque **azul** o **`rojo_k`** cobra. Un **`rojo_U3`** **no cobra nada**:
+>    ni subsidio ni comisiones.
+> 2. **Cuánto y a quién.** Se aplica **la coinbase del propio bloque cobrador**, tal como está
+>    escrita en él, sujeta a `C-EMIT-03` con su propio `H`. **NO se adopta el `red_reward` de
+>    Kaspa** —donde el rojo no cobra y cobra el fusionador (`coinbase.rs:121-131`)—: medido en §D,
+>    esa variante **multiplica por 1,50–2,79** la rentabilidad de la cadena parásita, porque el
+>    atacante fusiona a los honestos que enrojece y se queda con su subsidio. Con esta redacción
+>    **`C-HDR-08` y `C-EMIT-03` no se tocan**.
+> 3. **Qué se aplica al estado.** Las transacciones de los bloques **azules** y **`rojo_k`** se
+>    aplican. Las de un **`rojo_U3`** **no**: su cuerpo es inerte —ni UTXO, ni comisiones, ni peso
+>    contra ningún límite— salvo que sigue ocupando una plaza de `mergeset_size_limit`.
+> 4. **En qué orden.** Por cada bloque `C` de la cadena seleccionada, en el orden
+>    `[sp(C)] ++ mergeset(C)` con el mergeset en **`blue_work` ascendente**, desempate por
+>    `solution_distance` menor y luego por hash — **azules y `rojo_k` entrelazados en esa única
+>    clave**, no primero unos y luego otros (`ghostdag.rs:115-136`, `ordering.rs:38-42`,
+>    `utxo_validation.rs:120-123`). Los `rojo_U3` se **saltan**.
+> 5. **Conflictos.** Una transacción que no valide contra `UTXO(sp(C)) ⊕ diff(mergeset hasta ella)`
+>    **se descarta en silencio**: no invalida ni al bloque que la contiene ni al fusionador
+>    (`utxo_validation.rs:311-313`, `.filter_map(...ok()...)`). Gana el gasto que aparece **primero**
+>    en el orden de (4). `fees(X)` en (2) suma **sólo** las transacciones aceptadas de `X`.
+> 6. **Una sola vez.** La coinbase de `X` y cada transacción de `X` se intentan **exactamente una
+>    vez**: en el primer —y único— bloque de la cadena seleccionada que tiene a `X` en su mergeset.
+> 7. **`merge_depth`.** **No hay cláusula de pago por profundidad.** Un rojo que no descienda de
+>    `merge_depth_root` y no sea ancestro de un *kosherizing blue* **invalida al bloque fusionador**
+>    (R-FIN-12; `post_pow_validation.rs:79-101`, `RuleError::ViolatingBoundedMergeDepth`), luego
+>    nunca llega a cobrar. Un rojo **kosherizado** (`block_depth.rs:109-119`) **sí se fusiona y sí
+>    cobra** por (1).
+> 8. **Inválidos.** Un bloque inválido (R-FIN-1a, R-FIN-4, R-FIN-5, U2) **no es rojo: no existe**.
+>    Por R-FIN-4 no está en el `past` de ningún bloque válido: no se fusiona, no cobra, no cuenta.
+> 9. **Madurez.** `COINBASE_MATURITY` (`C-EMIT-05`) se cuenta desde el bloque de **cadena** que
+>    fusionó a `X`, no desde `X`: antes de fusionarse, el color de `X` —y por tanto si cobra— no
+>    está decidido.
+>
+> **Lo que cierra, medido (§D, 12 semillas, adversario del paper):** la rentabilidad de la cadena
+> parásita de D8 A1.5 pasa de **1,16 / 1,27 / 1,16 / 1,55** (`α = 0,33 / 0,35 / 0,37 / 0,40`) a
+> **0,996 / 0,997 / 0,992 / 0,988**, y ningún bloque honesto pierde su recompensa (`S1_h = 1,0000`
+> exacto): **se acaban también las reversiones de transacciones de 64-142 s**.
+> **Lo que NO cierra:** el ataque sigue existiendo y ahora es **gratis** también a `α` pequeño
+> (ratio 0,319 → 0,976 a `α = 0,10`): quita el premio y también el castigo.
+> **Lo que sustituye a los dos motivos de R-FIN-8:** la cláusula `rojo_U3` de (1) y (3) — sin ella
+> la inflación ×15 de la ronda 1 y el espacio de bloque gratis de la ronda 3 **vuelven** (§A, ×14,7
+> medido).
+
+### E.3 · R-FIN-13′ · Enmienda a la ventana del retarget
+
+> **R-FIN-13′ (enmienda, ronda 9b).** Donde R-FIN-13 dice «`N_obs` cuenta **azules** del flujo
+> canónico en la ventana de `W` índices de PoT», debe decir:
+>
+> «`N_obs` cuenta, en la ventana de `W` índices de PoT del flujo canónico, **exactamente los
+> bloques que cobran por R-FIN-8′** — azules y `rojo_k` —, es decir **un bloque por identidad de
+> billete**. Los `rojo_U3` (copias) **no cuentan**, igual que no cobran.»
+>
+> **Invariante de diseño que la enmienda instituye:** *el conjunto que el retarget CUENTA y el
+> conjunto que la emisión PAGA son el mismo conjunto.* Si el pagado excede al contado, la emisión
+> corre por delante del calendario y el exceso se lo lleva quien lo provoca; si el contado excede
+> al pagado, `λ_real` se infla. Las dos direcciones están medidas en §C.2 y §C.8.
+>
+> **Consecuencia, MEDIDA (§C.8, 12 semillas, `k = 30`, `α = 0`…0,40):** la inflación del retarget
+> bajo ataque parásito cae de **×1,452** (contando azules) a **×1,005** (contando también los
+> `rojo_k`). **La nota `research/dag-poas-delta-real.md` deja de aplicar**: `λ_real ≈ λ_obj` y
+> `δ_real ≈ δ_nominal`. Con los propios números de ese fichero (`k = 30`): `δ` 0,267 → **0,211**,
+> umbral de **orden** 40,0 % → **41,7 %**, `r = 1` en 42,3 % → **43,1 %**.
+>
+> **LAGUNA declarada:** Kaspa además excluye del conteo (y del subsidio del rojo) los bloques del
+> mergeset con `blue_score < lowest_daa_blue_score` (`mergeset_non_daa`, `difficulty.rs:155-163`;
+> `coinbase.rs:123`). R-FIN-13 define su ventana sobre **índices de PoT**, no sobre `blue_score`, y
+> **no está escrito** qué pasa con un bloque fusionado cuyo `slot` cae fuera de la ventana vigente.
+> Hay que redactarlo; no lo he medido.
+
+---
+
+## F · Veredicto y errores propios
+
+### F.1 · Veredicto por punto
+
+| Punto | Afirmación | **Etiqueta** | Número que la sostiene |
+|---|---|---|---|
+| **A** | «Los dos motivos de R-FIN-8 son obsoletos con U2 + U3″ porque cada billete paga una vez» | **REFUTADO** | U3″ da **1 azul** por identidad pero **13–699 rojos válidos y fusionados**; **×14,706** por billete a `m = 50`; asíntota **×15** = `max_block_parents` |
+| **A** | El ×N está acotado por `max_block_parents − 1 = 14` copias por bloque del atacante | **DEMOSTRADO** (construcción determinista + control positivo `U2` / `TooManyParents`) | `salida_a.txt` |
+| **B(i)** | «Los rojos cobran» = semántica de Kaspa | **REFUTADO** | `coinbase.rs:121-131`: el rojo **no** cobra; su subsidio+comisiones van agregados a la `script_public_key` del **fusionador** |
+| **B(ii)** | «Sus transacciones se aplican en el orden del mergeset si no entran en conflicto» = Kaspa | **VERIFICADO** | `utxo_validation.rs:106-176` + `ghostdag.rs:115-136` + `:311-313` (conflicto ⇒ descarte silencioso); `.skip(1)` en `:308`/`:335` (la coinbase del fusionado no se aplica) |
+| **B** | «dentro de `merge_depth`» | **REFUTADO** como cláusula: es **vacua** (fuera de profundidad el fusionador es inválido, `post_pow_validation.rs:96`) **y errónea** para los *kosherizing blues* (`block_depth.rs:109-119`), que sí se fusionan y sí cobran | — |
+| **C.2/C.3** | Con P1 literal hay inflación de cuota y espacio de bloque gratis | **CONFIRMADO** | retarget ×**14,442** contando todos los válidos; ×**1,000** contando 1 por identidad |
+| **C.4** | Con P1 la parásita deja de ser rentable pero también deja de costar | **DEMOSTRADO** | 1,16-1,55 → 0,99; y 0,319 → 0,976 a `α = 0,10` |
+| **C.4** | P1 quita la presión económica hacia la puntualidad (δ «natural» mayor) | **PLAUSIBLE** — no medido | — |
+| **C.5** | P1 desplaza todo el *griefing* a R-FIN-1a (invalidar en vez de enrojecer) | **PLAUSIBLE** (la superficie está medida por D8 A3: 11,7-24,2 bloques/h a `S_max = 20 s`, **0/h** a `S_max ≥ 30 s`) | — |
+| **C.8** | Si R-FIN-13 cuenta los rojos-`k`, `dag-poas-delta-real.md` deja de aplicar | **DEMOSTRADO** | inflación **×1,452 → ×1,005**; `α = 0` da 1,0000 por las dos reglas |
+| **C.9** | P1 es «la palanca más barata: una regla» | **PLAUSIBLE sólo con la variante recomendada.** Con la variante Kaspa hay que reescribir `C-EMIT-03` y revisar `C-HDR-08` (`SPEC.md:858-861`, `:1532-1533`) | — |
+| **D** | Control positivo | **SUPERADO** | 0,996 / 1,160 / 1,271 / 1,548 vs 0,995 / 1,159 / 1,270 / 1,549; \|dif\| ≤ 0,0015 |
+| **D** | P1 (tal como está escrita) anula la rentabilidad de la parásita | **DEMOSTRADO** | ratio **0,988–0,999** en todo `α`; `S1_h = 1,0000` |
+| **D** | «Llevar R-FIN-8 a la semántica de **Kaspa**» | **REFUTADO** | ratio **1,498 / 1,650 / 2,029 / 2,069 / 2,240 / 2,792** — peor que el statu quo en **toda** fila |
+| **E** | Texto de R-FIN-8′ y R-FIN-13′ | entregado arriba | — |
+
+### F.2 · Respuesta a la pregunta del encargo
+
+- **¿Es P1 segura?** **No como está escrita.** Le falta la cláusula `rojo_U3`; sin ella reabre los
+  dos motivos originales de R-FIN-8 con un factor **×15**, mayor que el ×10 de la ronda 1 porque
+  `max_block_parents` subió de 10 a 15.
+- **¿Es exacta en su texto?** **No.** «Semántica de Kaspa» y «los rojos cobran» son reglas
+  **distintas**, y la que P1 quiere es la que **no** es de Kaspa. La cláusula «dentro de
+  `merge_depth`» es vacua y errónea. Y no declara su efecto sobre `C-EMIT-03` / `C-HDR-08`.
+- **¿Cuánto cierra?** Con la cláusula `rojo_U3` añadida (R-FIN-8′), **cierra las tres**: (i) la
+  ganancia (1,16-1,55 → 0,99), (ii) la reversión de transacciones (`S1_h = 1,0000`), (iii) la
+  inflación del retarget (×1,452 → ×1,005, y con ella la nota `delta-real`, que vale +1,7 puntos
+  de umbral de orden y +0,8 de `r = 1`). **No cierra** el ataque en sí: `δ` sigue igual, y ahora
+  parasitar es gratis también a `α` pequeño.
+
+### F.3 · Mis errores y las lagunas que dejo (regla 10)
+
+1. **Acepté sin comprobar el encuadre del encargo durante media hora.** El encargo dice «llevar
+   R-FIN-8 a la semántica de Kaspa», y el texto de P1 **no es** la semántica de Kaspa. Debí verlo
+   al leer `coinbase.rs:131` y no al medir S2. La medida existe porque desconfié tarde.
+2. **La ruta del encargo `consensus/src/processes/coinbase/mod.rs` no existe**; el fichero es
+   `consensus/src/processes/coinbase.rs`. Lo corregí sin decirlo hasta §B.
+3. **Mi agregación en §D no es la de `a1e`:** yo sumo sobre las 12 semillas, `d8_a1e_coste.py`
+   promedia fracciones por semilla. De ahí la diferencia de 0,0008-0,0015 del control. **Es una
+   discrepancia real, no ruido**, y la declaro en vez de esconderla; no cambia ninguna conclusión.
+4. **La fila `m = 1, n = 0` de C2 da inflación 0,667 (< 1)**: es un artefacto de contar génesis y
+   `H0` como billetes en un DAG de 3 bloques. **No mide nada**; sólo la tendencia de la columna es
+   interpretable. La dejo impresa en vez de recortarla.
+5. **`r8c_gd.py` no implementa `check_bounded_merge_depth`.** La construcción de §A supone
+   `m ≤ merge_depth` sin comprobarlo. Con `merge_depth = 3 600·bps` (`constants.rs:81`) hay margen
+   de sobra, pero **es una suposición, no una medida**.
+6. **LAGUNA — no he medido la parásita Y las copias a la vez.** §A y §D son experimentos
+   ortogonales (en `MundoL9` cada evento lleva `ident` única, `r8c_sim.py:46-48`). Un atacante
+   podría componer las dos maniobras; **no sé cuánto suman**.
+7. **LAGUNA — el residuo de incentivo a fusionar.** Con la coinbase propia (E.2 punto 2) nadie
+   cobra por incluir a un rojo. Kaspa paga al fusionador **precisamente por eso**. R-FIN-12 adopta
+   `pick_virtual_parents` como consenso, así que la conducta no depende del incentivo, pero **no he
+   medido si un granjero racional se desviaría**. Si hubiera que darle algo, la variante mínima
+   sería *sólo las comisiones* del rojo al fusionador, dejándole el subsidio al productor — y **eso
+   tampoco lo he medido**.
+8. **LAGUNA — `mergeset_non_daa`.** R-FIN-13′ no dice qué pasa con un bloque fusionado cuyo `slot`
+   cae fuera de la ventana vigente (§E.3).
+9. **LAGUNA — C.4 y C.5 son PLAUSIBLE, no medidos**: el `δ` por pereza y el desplazamiento del
+   *griefing* hacia R-FIN-1a.
+
+### F.4 · `AUDITA_SCRIPTS.py` (regla 5)
+
+```
+$ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d9-ronda9b
+Scripts analizados: 3
+
+research/scripts/d9-ronda9b/r9b_a_copias.py
+   [T3b] L105: ['d', 'd2'] = MISMA expresión: DAG(k=K, u2=True, u3_mode='dynamic', max_parents=MAXP)
+
+======================================================================
+Sospechas totales: 1
+```
+Salida completa en `salida_audita.txt`. **Marca leída:** `d` y `d2` son dos DAG **independientes**
+de la sección de control positivo — `d` para el control de `U2` (copia colgada de otra copia) y
+`d2` para el de `TooManyParents` (21 padres). **No se comparan entre sí** ni se usa una para
+derivar la otra: T3b busca el patrón de `d8b_b3` (dos variables «distintas» con el mismo valor,
+comparadas después) y aquí ese patrón no está. **Falso positivo, declarado.**
+Los otros dos scripts (`r9b_d_coste.py`, `r9b_c_retarget.py`) salen **sin marcas**; ambos llevan
+`SEMS = list(range(1, 13))` (12 semillas literales, T4 no dispara) y `alpha` vivo en toda función.
+
+---
+
+**Ficheros de esta ronda:** `research/scripts/d9-ronda9b/` — `informe.md` (este),
+`r9b_a_copias.py` / `salida_a.txt`, `r9b_c_retarget.py` / `salida_c.txt`,
+`r9b_d_coste.py` / `salida_d.txt`, `salida_audita.txt`.
