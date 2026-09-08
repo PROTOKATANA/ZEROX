@@ -95,7 +95,7 @@ seleccionada bajo ataque** (12 semillas, 2 055 aristas a `α=0,40`):
 Y con `τ = 0,02 s`, `S_max = 150 slots` son **3 s**: R-FIN-1a mordería la operación normal (gap medio ~2 s,
 cola 15 s). **Punto viable medido: `τ ≈ 0,1 s`** (10 slots de PoT por intervalo de bloque), **R-FIN-1a
 relajada a `slot(sp) ≤ slot(B)`** (el Lema A4-slot lo soporta), y **`S_max` en segundos**.
-**LAGUNA:** la duración real de un slot de PoT de Autonomys no está en ninguna fuente local.
+**LAGUNA CERRADA (`b8f3268`):** Autonomys mainnet tiene `SLOT_DURATION = 1 s` y 6 slots por bloque (`subspace-runtime/src/lib.rs:145-165`); ZEROX a `λ=1/s` necesita `τ ≈ 0,1-0,17 s` o `λ ≈ 1/6` — las dos ramas con número en R-FIN-7 y `verif_tau_vs_lambda.py`.
 
 ## 4 · Las constantes (peor `α = 0,10`)
 
