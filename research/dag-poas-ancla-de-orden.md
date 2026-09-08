@@ -153,7 +153,7 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 ## 2 · El algoritmo
 
-Constantes: `k = 30`, `q = 1` **decidido**, `S_max ∈ [20, 150] s` (elección), `W_RETARGET ≥ 3 083`, `τ ≈ 0,1 s` — y **`I = 4 200 s`, `F = 5,3 h` medidos** contra la familia de D9-e, **`F ≤ 68,5 h` garantizado** por construcción (`S_max = 150 s`). **No hay `c`.**
+Constantes: `k = 30`, `q = 1` **decidido**, `S_max ∈ [20, 150] s` (elección), `W_RETARGET ≥ 3 083`, **`τ = 1 s` (A″, decidido)** — y **`I = 4 200 s`, `F = 5,3 h` medidos** contra la familia de D9-e, **`F ≤ 68,5 h` garantizado** por construcción (`S_max = 150 s`). **No hay `c`.**
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
 desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
@@ -255,7 +255,15 @@ apaga el proceso. Sustituye a C-REORG-07 en el DAG.
 > `k* = 7`, `δ_real = 0,190`, reversión a 600 s **`1,3·10⁻²`** (600 s son ~100 bloques), 3,6 GB/año (cliente
 > ligero 850× Bitcoin en vez de 5 100×), latencia 6 s. **(B) tira la ventaja de reversión del DAG (7 órdenes)**
 > y obliga a rederivar `I`, `F`, `m` con `λ = 1/6`. **Recomendación (autónoma): (A).** Es una bifurcación de
-> Katana.
+> Katana. **DECIDIDO por Katana (2026-09-08): rama (A).** Y dentro de (A), la variante **(A″): `λ = 1/s`, `τ = 1 s`,
+> R-FIN-1a `≤`** — medida (`research/scripts/verif_a2prima.py`, instrumento de D9-f, 12 semillas, adversario del
+> paper): con `≤`, **0 violaciones** de R-FIN-1a a `τ = 1 s` en `α = 0 / 0,25 / 0,40`; lo que D9-f B0 contaba
+> como «invalida 24-29 %» son **empates** (0,6 % / 24,4 % / 30,1 %), que `≤` admite; salto máximo 10,9 s ≪
+> `S_max`. Y `m = 2,54` ya estaba medido **a `gran = 1`** (`salida_b1_gran1.txt`). Coste de PoT (128 B/slot,
+> ronda 2 L425): **(A″) 1 slot/s, 4,0 GB/año** — el de Autonomys —; `τ = 1/6 s`: ×6, 24,2 GB/año; `τ = 0,1 s`:
+> ×10, 40,4 GB/año. **(A″) domina.** Residuo declarado: con 1 slot por bloque varios bloques de cadena
+> comparten slot; el ancla los resuelve por `menor blue_work` (bien definido, Lema A4b), y el steering está
+> medido en ese régimen.
 
 **R-FIN-8 · Rojos.** Ni la coinbase ni las transacciones de un bloque rojo se aplican al estado.
 Cierra la inflación ×10 (ronda 1) y el espacio de bloque gratis (ronda 3). **Coste medido:**
