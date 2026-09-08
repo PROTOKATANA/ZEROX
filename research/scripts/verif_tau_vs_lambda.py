@@ -14,11 +14,16 @@ def prev(a,lam,t,offset,hf):
     with np.errstate(over="ignore"): catch=np.where(d>=0,np.power(r,np.minimum(d+1.0,700)),1.0)
     return float(np.sum(p*catch))
 def kopt(lam):
+    """óptimo autoconsistente: k >= k_Poisson(2·D·λ_real, 1e-3) y λ_real <= 2λ (fuera del polo k -> 2Dλ)"""
     best=None
     for k in range(6,80):
-        lr=k*lam/(k-2*D*lam) if k>2*D*lam else None
-        if lr is None: continue
+        if k<=2*D*lam: continue
+        lr=k*lam/(k-2*D*lam)
+        if lr>2*lam: continue                      # demasiado cerca del polo: no es un punto de operación
+        kp=next(kk for kk in range(1,500) if poisson.sf(kk,2*D*lr)<1e-3)
+        if k<kp: continue                          # punto fijo del retarget (ronda 3)
         dr=2*D*lr/(k+2*D*lr); p=prev(0.25,lr,600,3*k,1-dr)
+        if not math.isfinite(p): continue
         if best is None or p<best[1]: best=(k,p,dr,lr)
     return best
 print(f"{'rama':>22} {'lambda':>7} {'tau':>6} {'slots/bloque':>12} {'k*':>4} {'delta_real':>10} {'rev 600s':>10} {'cabeceras/año':>14} {'latencia':>9} {'slots PoT/s':>11}")
