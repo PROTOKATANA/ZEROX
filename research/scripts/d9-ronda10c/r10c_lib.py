@@ -152,7 +152,6 @@ def cinematica(rho, L_seg, I_seg, w_dec, retardada, horizonte_s, dt=1.0, delta_a
     us = _np.arange(0.0, horizonte_s, dt)
     ad = _np.empty(len(us))
     boot = float("nan")
-    tope_visto = 0.0
     for i, u in enumerate(us):
         # ultima inyeccion cuya entropia conoce en el instante u
         if retardada:
@@ -168,10 +167,6 @@ def cinematica(rho, L_seg, I_seg, w_dec, retardada, horizonte_s, dt=1.0, delta_a
         pos = min(pos + rho * dt, frontera)
         pos = max(pos, u)                     # nunca por detras de la cadena canonica (la ve publicada)
         ad[i] = pos - u
-        if not math.isnan(boot):
-            pass
-        elif ad[i] > tope_visto:
-            tope_visto = ad[i]
         if math.isnan(boot) and i > 0 and ad[i] <= ad[i - 1] and ad[i] > 1.0:
             boot = u                          # primer instante en que deja de crecer: saturo
     n0 = len(us) // 2                          # regimen: segunda mitad del horizonte
@@ -237,7 +232,7 @@ def cinematica_rapida(rho, L_seg, I_seg, w_dec, retardada, n_epocas=None, delta_
                 ad = cap * (I_seg - tcorte) - (I_seg * I_seg - tcorte * tcorte) / 2.0
                 med = (ar + ad) / I_seg
                 a = max(0.0, cap - I_seg)
-                if boot != boot:
+                if math.isnan(boot):
                     boot = (e + tcorte / I_seg) * I_seg
         ult.append((mx, med))
     reg = ult[len(ult) // 2:]

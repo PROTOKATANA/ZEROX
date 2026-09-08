@@ -347,3 +347,132 @@ Segundos hasta que la reversión baja de cada umbral (`brentq` sobre `t`):
 y su riesgo no depende de `F`. Los dos motivos legítimos para acortar `F` son **el sembrador**
 (A, y solo si `ρ > 1`) y la latencia de la garantía categórica. — **VERIFICADO** (el instrumento es
 el que publica los números del diseño, controlado en P1/P2).
+
+### C.1c · Validación independiente del instrumento (regla 5) — Monte Carlo, 12 semillas
+
+Segundo instrumento, **distinto**: se simula la carrera bloque a bloque (Poisson para el
+adelanto en `t`, luego paseo aleatorio con `p = m_a/(m_a+m_h)` hasta alcanzar o hasta 400 bloques de
+ventaja honesta), en vez de sumar la serie de Skellam. Celdas **elegidas en el régimen medible**
+(`0,005 < p < 0,95`): un Monte Carlo no puede validar un `10⁻⁸`, y se dice.
+
+| `α` | `hf` | `t` | MC media | MC mín | MC máx | analítico | razón |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0,33 | 1,000 | 300 | 0,252104 | 0,243250 | 0,262625 | 0,253942 | 0,9928 |
+| 0,33 | 1,000 | 400 | 0,011131 | 0,010275 | 0,012400 | 0,011240 | 0,9904 |
+| 0,35 | 1,000 | 300 | 0,516010 | 0,505750 | 0,529250 | 0,516328 | 0,9994 |
+| 0,35 | 1,000 | 400 | 0,071050 | 0,069050 | 0,073050 | 0,071462 | 0,9942 |
+| 0,40 | 1,000 | 500 | 0,352260 | 0,343125 | 0,362250 | 0,353035 | 0,9978 |
+| 0,40 | 1,000 | 600 | 0,122444 | 0,117917 | 0,127083 | 0,123363 | 0,9926 |
+| 0,40 | 1,000 | 800 | 0,007697 | 0,007417 | 0,008050 | 0,007823 | 0,9840 |
+| 0,45 | 1,000 | 1 000 | 0,422969 | 0,415625 | 0,435625 | 0,425354 | 0,9944 |
+| 0,45 | 1,000 | 1 500 | 0,074492 | 0,071350 | 0,080400 | 0,075780 | 0,9830 |
+| 0,30 | 0,792 (`δ` D8) | 400 | 0,275921 | 0,273600 | 0,279200 | 0,275135 | **1,0029** |
+| **0,00** | 1,000 | 600 | **0,000000** | 0,000000 | 0,000000 | **0,000000** | — |
+
+**Razones 0,983-1,003 en 11 celdas independientes**, con la fila `α = 0` exactamente 0 en los dos
+instrumentos. El sesgo sistemático de −1 a −2 % en las celdas de `p` pequeño está dentro de 0,5 σ
+del propio muestreo (375-900 aciertos esperados). **VERIFICADO.** La extrapolación a `p ~ 10⁻⁸`
+sigue siendo **analítica**, no medida: **cota ≠ realidad**, declarado.
+
+<a name="d"></a>
+## D · Configuración × término → `F` — `r10c_d_tabla.py`, `salida_d.txt`
+
+### D.0 · Los cuatro términos no tiran en el mismo sentido
+
+Es la corrección de forma más importante del punto: **el encargo pide «la `F` mínima que impone cada
+término», pero el sembrador impone un MÁXIMO, no un mínimo.**
+
+| Término | Sentido | De dónde |
+|---|---|---|
+| `F_carrera` | **mínimo** | unión a 10 años `< 10⁻¹⁰` al `α` objetivo (`r10c_c2_frontera.py` C2a) |
+| pinza `W/κ` | **mínimo** | ventana de predicción de BDK con la `W` corregida (§B.3) |
+| **sembrador** | **MÁXIMO** | `margen = A*₁₀ₓ / lookahead ≥ objetivo` (§A.4) |
+| usuario | **ninguno** | el riesgo del comerciante no depende de `F` (§C.1) |
+
+Manda `max(F_carrera, pinza)`, y hay que comprobar que **cabe por debajo** del máximo del sembrador.
+Constantes: `A*₁₀ₓ = 14 760 s` (4,1 h, escenario B, el que favorece al atacante), `W_dec = 20 s`
+(medida por 9c a `α ≤ 0,33`), tope `W/κ = 1,22` (el publicado).
+
+### D.1 · La tabla, `α` objetivo = 0,33 (el umbral operativo publicado)
+
+**Modelo CORREGIDO (`δ = 0`, 9a):**
+
+| Configuración | `I` | `F_carrera` (mín) | pinza (mín) | usuario | `F` máx sembrador 3× | 5× | **MANDA** | viable 3× |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| `ρ_max = 1` (`n_eval=45`) | 491 | 1 028 s (0,29 h) | **0** (no existe) | nada | sin límite | sin límite | `F_carrera` **0,29 h** | SÍ |
+| `ρ_max = 1,5` (`n_eval=68`) | 602 | 1 025 s (0,28 h) | 821 s (0,23 h) | nada | 4 740 s (1,32 h) | 2 772 s (0,77 h) | `F_carrera` **0,28 h** | SÍ |
+| **`ρ_max = 3`** (`n_eval=135`) | 851 | 1 019 s (0,28 h) | **2 488 s (0,69 h)** | nada | 4 374 s (1,21 h) | 2 406 s (0,67 h) | **pinza 0,69 h** | SÍ |
+| `ρ_max = 3` **CON (h)** | 851 | 1 019 s (0,28 h) | 465 s (0,13 h) | nada | sin límite | sin límite | `F_carrera` **0,28 h** | SÍ |
+| `ρ_max = 10` **CON (h)** | 851 | 1 019 s (0,28 h) | 628 s (0,17 h) | nada | sin límite | sin límite | `F_carrera` **0,28 h** | SÍ |
+| **(h)**, `I` libre = 300 s | 300 | 1 019 s (0,28 h) | 164 s (0,05 h) | nada | sin límite | sin límite | `F_carrera` **0,28 h** | SÍ |
+
+**Modelo PESIMISTA (`δ` medido por D8):**
+
+| Configuración | `F_carrera` (mín) | pinza (mín) | `F` máx sembrador 3× | **MANDA** | viable 3× |
+|---|---:|---:|---:|---|---|
+| `ρ_max = 1` | 3 588 s (1,00 h) | 0 | sin límite | `F_carrera` **1,00 h** | SÍ |
+| `ρ_max = 1,5` | 3 573 s (0,99 h) | 821 s (0,23 h) | 4 740 s (1,32 h) | `F_carrera` **0,99 h** | SÍ |
+| **`ρ_max = 3`** | 3 547 s (0,99 h) | 2 488 s (0,69 h) | 4 374 s (1,21 h) | `F_carrera` **0,99 h** | **SÍ** (pasillo [0,99; 1,21] h) |
+| `ρ_max = 3` **CON (h)** | 3 547 s (0,99 h) | 465 s (0,13 h) | sin límite | `F_carrera` **0,99 h** | SÍ |
+
+### D.2 · La misma tabla al `α` de diseño 0,35 — aquí es donde el núcleo se rompe
+
+**Modelo PESIMISTA, `α = 0,35`:** `F_carrera = 6 900-6 987 s = 1,92-1,94 h` en todas las
+configuraciones.
+
+| Configuración | `F` máx sembrador 1,5× | 2× | 3× | 5× | ¿cabe `F_carrera = 1,92 h`? |
+|---|---:|---:|---:|---:|---|
+| `ρ_max = 1` | sin límite | sin límite | sin límite | sin límite | **SÍ** |
+| `ρ_max = 1,5` | 2,68 h | 2,00 h | 1,32 h | 0,77 h | solo con margen **≤ 2×** |
+| **`ρ_max = 3`** | 2,58 h | **1,90 h** | 1,21 h | 0,67 h | **solo con margen ≤ 1,5×** |
+| `ρ_max ≤ 10` **CON (h)** | sin límite | sin límite | sin límite | sin límite | **SÍ, con cualquier margen** |
+
+> **Este es el resultado que decide `F`.** Si se quiere que el modelo **pesimista** cubra `α = 0,35`
+> **y** un margen `≥ 3×` frente al plotter 10×, **el núcleo es inviable para todo `ρ > 1`**: hace
+> falta (h), o aceptar `ρ_max ≤ 1`, o bajar el margen objetivo a 1,5-2×.
+> **Y explica exactamente qué es `F = 2 h` frente a `F = 1 h`:**
+> · `F = 2 h` ≈ `F_carrera(0,35, pesimista) = 1,92 h` **con margen de sembrador 1,91×**;
+> · `F = 1 h` ≈ `F_carrera(0,33, pesimista) = 0,99 h` **con margen de sembrador 3,56×**.
+> **Bajar `F` de 2 h a 1 h es gastar los dos puntos de colchón (35 % → 33 %) del modelo pesimista
+> para comprar el margen del sembrador de 1,9× a 3,6×.** No es una mejora para el usuario: es un
+> intercambio entre dos riesgos, y hay que escribirlo así.
+
+### D.3 · Con el tope LITERAL de BDK (`W/κ ≤ 1,00`), `α = 0,33`, `δ = 0`
+
+| Configuración | `F_carrera` | pinza `W/κ ≤ 1` | MANDA |
+|---|---:|---:|---|
+| `ρ_max = 1` | 1 028 s (0,29 h) | 0 (se cumple siempre) | 1 028 s (0,29 h) |
+| `ρ_max = 1,5` | 1 025 s | **sin límite: ninguna `F` lo cumple** | **IMPOSIBLE** (`W > κ` para toda `F`) |
+| `ρ_max = 3` | 1 019 s | **sin límite** | **IMPOSIBLE** |
+| `ρ_max = 3` **CON (h)** | 1 019 s | 567 s (0,16 h) | 1 019 s (0,28 h) |
+| `ρ_max = 10` **CON (h)** | 1 019 s | 766 s (0,21 h) | 1 019 s (0,28 h) |
+
+**Con (h) el diseño puede cumplir la condición literal de BDK; el núcleo no puede, para ningún
+`ρ > 1,024`, con ninguna `F`.** — DEMOSTRADO (aritmética sobre el modelo de `W` de §B.2).
+
+> Y hay una coincidencia que no es casual: bajo (h), «`W ≤ κ`» y «*steering* = 0» son **la misma
+> condición**. Que el atacante no pueda evaluar candidatos exige `lookahead < L − W_dec`
+> (9c E.5, `L > I`); que la ventana de predicción no exceda la confirmación exige `lookahead ≤ F`.
+> Con `L = F` es la misma desigualdad. **Una sola constante, `F ≥ I(1−1/ρ_max) + W_dec`, cierra las
+> dos cosas.**
+
+### D.4 · El precio de (h), cuantificado por primera vez
+
+R-FIN-14 (h) es **un segundo VDF de `L = F` slots por época**. Con el coste de PoT **medido**
+(`dag-poas-ancla-de-orden.md`, bloque «Coste del PoT, MEDIDO»: `prove` 1,561 s/slot, `verify`
+96,1 ms/slot en un 9950X3D, ruta `verify_sequential_avx512f_vaes`, 8 checkpoints), **verificarlo**
+cuesta `F × 96,1 ms` por época:
+
+| `F` | `I = 851 s` | `I = 491 s` |
+|---:|---:|---:|
+| 0,34 h (1 224 s) | 117,6 s/época = **13,8 %** de un núcleo | 24,0 % |
+| 0,69 h (2 488 s) | 239,1 s = **28,1 %** | 48,7 % |
+| **1 h** (3 600 s) | 346,0 s = **40,7 %** | 70,5 % |
+| **2 h** (7 200 s) | 691,9 s = **81,3 %** | 140,9 % |
+| 5,3 h (19 080 s) | 1 833,6 s = **215,5 %** | 373,4 % |
+
+…**además** del 9,6 % de un núcleo que ya cuesta la cadena principal de PoT. **(h) hace que una `F`
+larga sea cara en CPU de verificación, y el coste crece como `F/I`.** Es una **derivación** del coste
+medido por slot, no una medición de punta a punta: **PLAUSIBLE**, y es el número que 9c dejó sin
+poner (*«un VDF más … PLAUSIBLE, no medido»*). Falta medir: el `prove` del segundo VDF en el
+timelord y si sus checkpoints se pueden solapar con los de la cadena principal.

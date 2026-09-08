@@ -15,6 +15,7 @@ A0 valida el segundo contra el primero. Solo despues se contrastan las formas ce
 Criterio alpha (regla 4): `W_dec` es funcion de alpha (MEDIDA por 9c C.2), asi que el lookahead
 del nucleo cambia con alpha; la fila alpha = 0 esta en la tabla.
 """
+import math
 import os
 import sys
 
@@ -76,7 +77,7 @@ for nom, F in CONFIGS:
                 mx, me, bo = L.cinematica_rapida(rho, F, I, wd, False)
                 mxh, meh, _ = L.cinematica_rapida(rho, F, I, wd, True)
                 cn, ch = cerrada_nucleo(rho, F, I, wd), cerrada_h(rho, I)
-                bo_s = "nunca" if bo != bo else f"{bo/3600:.2f} h"
+                bo_s = "nunca" if math.isnan(bo) else f"{bo/3600:.2f} h"
                 mrk = "" if (abs(mx - cn) < 1.5 and abs(mxh - ch) < 1.5) else "  <-- CERRADA DISCREPA"
                 print(f"{a:>6.2f} {wd:>6.0f} {rho:>7.4g} | {mx:>11.1f} {cn:>9.1f} {me:>9.1f} "
                       f"{bo_s:>11} | {mxh:>9.1f} {ch:>9.1f} {meh:>10.1f}{mrk}")
