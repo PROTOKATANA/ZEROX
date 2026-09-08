@@ -1,3 +1,17 @@
+> **Verificación del agente principal (2026-09-08, tras el reinicio, con el clon de Autonomys en
+> `/home/katana/zeo/fuentes/subspace`).** Este informe se escribió en una sesión anterior sin clon local.
+> Sus tres afirmaciones que dependen de fuente **se sostienen**: (1) cualquier nodo puede ser timekeeper —
+> es una opción de arranque, `--timekeeper`, sin identidad ni registro
+> (`crates/subspace-node/src/commands/run/consensus.rs:285-295`); (2) `PotCheckpoints` existe
+> (`crates/subspace-core-primitives/src/pot.rs:328`) y viaja en el gossip de PoT
+> (`crates/sc-proof-of-time/src/lib.rs:30`, `on_proof(slot, checkpoints)`); (3) el PoT es determinista —
+> `prove(seed, iterations) -> PotCheckpoints` vía `aes::create`, y `verify` recomputa con
+> `aes::verify_sequential` (`crates/subspace-proof-of-time/src/lib.rs:30-64`) — luego dos timelords
+> honestos producen bytes idénticos y un nodo acepta el primero válido. **§1 (Chia, drand, F3, Ethereum) es
+> contexto sin verificar aquí**; no lleva afirmaciones de consenso. Responde a **B7** (D8 ronda 7) y no toca
+> ninguna regla R-FIN. Lo que sigue pendiente es **el coste absoluto de `verify_sequential` por slot**, que
+> es lo que decide el presupuesto anti-DoS (`C-NET-03/04`) y que se está midiendo.
+
 # Informe: Redundancia del Timelord en ZEROX
 
 **Fecha:** 2026-09-07 · Agente de Diseño, Problema 4 (B7)
