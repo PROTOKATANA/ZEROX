@@ -481,3 +481,66 @@ violaciones), no en este script.
 > **estaría por debajo** de ese segundo valor. La constante que hay que fijar es
 > `F = max(F_carrera, I/(W/κ−1))`, y con P4 el primer término manda. **No es «F = 0,62 h»: es
 > «F ya no lo decide el steering».** Eso, y solo eso, es lo que P4 compra en `F`.
+
+---
+
+## Auditoría de scripts (regla de método 5)
+
+`python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d9-ronda9c`
+
+```
+Scripts analizados: 9
+research/scripts/d9-ronda9c/r9c_c4_wdec.py
+   [T3b] L65: ['base', 'pref'] = MISMA expresión: {i: (0.0, 'tips_pub') for i in todos_a}
+research/scripts/d9-ronda9c/r9c_lib.py
+   [T3b] L138: ['p', 'padres'] = MISMA expresión: self._padres_r1a(d, todos, t, 'a')
+Sospechas totales: 2
+```
+
+**Las dos leídas, las dos falsos positivos:**
+
+1. `r9c_c4_wdec.py:65` — `pref` y `base` **parten** del mismo diccionario («todo el atacante en
+   `tips_pub`») porque es el prefijo común de las dos vías, y **divergen inmediatamente**: `pref`
+   pone los candidatos en `(None,"tips")` (vía i) y `base` se copia en `e1`/`e2` con la cadena
+   privada (vía ii). Si fueran realmente lo mismo, la vía (ii) no daría `W_dec = 45` donde la (i)
+   da 20 a `α = 0,40` — y lo da.
+2. `r9c_lib.py:138` — `padres` (rama `pol == "tips"`) y `p` (rama `pol == "sp"`) son la misma
+   llamada en **ramas mutuamente excluyentes** y con uso distinto: `tips` usa el conjunto entero de
+   padres, `sp` se queda **solo con `p[0]`**. La rama `tips_pub`, que es la que importa para la
+   consistencia, usa `visibles`, **no** `todos` (comprobado en el fichero, L132).
+   0 marcas T1 / T2 / T3 / T4.
+
+---
+
+## G · Veredicto
+
+| Punto | Etiqueta | En una línea |
+|---|---|---|
+| **A** · el reto por slot en el diseño | **LAGUNA** | No está escrito. R-FIN-3 define un `flujo` **constante dentro de la época**; un reto igual al flujo daría el mismo ganador 4 200 slots seguidos. R-FIN-4 («la justificación de PoT cubre … bajo ese flujo») y R-FIN-9 (`slot_iterations` con la entropía) apuntan a «como Autonomys», pero **nadie lo escribió**, y la ronda 7 razonaba en la lectura contraria (§A2) |
+| **B** · la cadena de derivación de Autonomys | **VERIFICADO** | `entropía → seed_with_entropy → AES^N secuencial → blake3(pot_output) → blake3(randomness‖LE64(slot)) → sector_slot_challenge → solution_distance`, con fichero y línea (§B.2). El `slot` del reto es **el del propio bloque**, no `slot − DELAY` (§B.3). **Corrección:** el lookahead de Autonomys no es 11 s sino ≈ **615 s** (§B.4) |
+| **C** · `W_dec` | **VERIFICADO** (más fuerte que P4) | **`W_dec ≤ 45 s`** medida (≤ 20 s para `α ≤ 0,33`), 12 semillas, dos instrumentos independientes. **`S_max` no la fija** (idéntica con 20 y con 150 s): la fija la carrera. El menú vive en los primeros 10-20 s. Fila `α = 0`: `W_dec = −1` |
+| **D** · el steering acotado | **VERIFICADO** la fórmula, **REFUTADO** el enunciado | `c_m·√(αλ·n_eval)` es exacta a `m` pequeña (razón 0,998-1,002) y **conservadora** ≤ 5,3 % a `m = 151`. Pero **`α_ef` no baja**: a `g` objetivo fijo es una identidad. Lo que P4 compra es `I` y `F`: **`I+F` de 8,26 h a 0,76 h** y el margen económico de **0,50× a 5,4×** |
+| **E** · contraataques | **PLAUSIBLE**, con una corrección **DEMOSTRADA** | Precomputar los candidatos es imposible (necesita `pot_output(t_j−1)`), pero **la cadena común sí se puede adelantar**: la cota de conocimiento permite `L + I − W_dec = 23 130` slots de ventaja. **Con `ρ ≤ 1` esa ventaja no se construye nunca ⇒ `n_eval = 0`, no `W_dec`** — la fila `ρ = 1` de P4 está mal. Con `ρ > 1` hace falta un *bootstrap* de 5,4-27 días. `ρ ≥ 6` (evaluar la época entera) **no es alcanzable**: la referencia de Autonomys es ya el tope del mercado |
+| **F** · R-FIN-14 | **entregada** | Texto de spec en §F, con la **prohibición explícita** de `reto = H(flujo ‖ s)` y la restricción de calibración `I ≥ ρ_max·W_dec` |
+
+**Veredicto global sobre P4: la afirmación es CORRECTA en su mecanismo y CONSERVADORA en su
+número (`W_dec ≤ 45 s`, no 150 s), pero su conclusión está mal enunciada.** No baja el steering
+`α_ef`; baja el **precio** del steering. Y tiene dos errores propios: la fila `ρ = 1` (es 0) y
+atribuir la cota a `S_max` (es la carrera).
+
+### Mis errores en esta ronda (regla 10)
+
+1. **`r9c_c1_wdec.py` es inválido entero.** Comparé el menú contra una corrida `base` que no
+   compartía prefijo. Resultado publicado en `salida_c1.txt`: `W_dec = 300 s` saturando la
+   rejilla — falso. 6,5 h de reloj tiradas.
+2. **La primera pasada de `r9c_c2` también.** El simulador heredado permitía retener un bloque y
+   publicar un hijo suyo. Lo detecté porque el bloque que volteaba el ancla a `d = 600` era
+   **siempre el primero del lote** — una regularidad que no tenía explicación física. Corregido
+   con la clausura de publicación. **Y afecta a los simuladores de D8 y D9-c…f, que no la
+   tienen**: sus `m` con retención pueden estar infladas. No lo he cuantificado.
+3. **Sobre-corregí en la segunda pasada de `r9c_c2`** (retener la ventana entera), lo que da una
+   cota inferior, no la medida. `r9c_c4` es la buena.
+4. En D.1 la independencia del resto de la época **la asumí en la simulación**, no la medí: es
+   argumento sobre la construcción del PoT, PLAUSIBLE, no DEMOSTRADO.
+5. `sp_filtrado_a` y `sin_sp_a` quedaron a **0** en todas las corridas: dos ramas del instrumento
+   sin ejercitar.

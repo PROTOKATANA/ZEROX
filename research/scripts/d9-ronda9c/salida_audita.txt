@@ -1,0 +1,10 @@
+Scripts analizados: 9
+
+research/scripts/d9-ronda9c/r9c_c4_wdec.py
+   [T3b] L65: ['base', 'pref'] = MISMA expresión: {i: (0.0, 'tips_pub') for i in todos_a}
+
+research/scripts/d9-ronda9c/r9c_lib.py
+   [T3b] L138: ['p', 'padres'] = MISMA expresión: self._padres_r1a(d, todos, t, 'a')
+
+======================================================================
+Sospechas totales: 2
