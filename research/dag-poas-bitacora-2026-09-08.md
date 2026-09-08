@@ -38,7 +38,7 @@ vivo en `research/dag-poas-ancla-de-orden.md`. Commits del día en ZEROX: 93 (ra
 | **D8** (relanzado 09:56; el primero murió por cuota) | `d8-ronda8/` · `auditoria-7.md` | Diseño completo con constantes | **Cadena parásita** (`δ(0,35) = 0,307`; rentable desde 0,33; umbrales 37,1/36,7 %), **soborno** `m = b+1`, economía 0,67× → 0,50×, `S_max` como arma de censura (20 s → 71-75 % inválidos), `m = 2,955` con retención. Sin vector: dos vistas, cruce en régimen, `3k`, `shuffle`. Todo reproducido idéntico |
 | **9a** (relanzado tras cuota; continuó desde disco) | `d9-ronda9a/` · `auditoria-8a.md` | ¿Doble conteo del `α`? | **CORRECTO.** Frontera 46,88 % (`δ = 0`); teorema de la ráfaga (`R < A ⟺ gana`); el contraejemplo del propio Lema 9 no es realizable; parásito ajeno = granjero apagado; **`Δ` decide** (20 s → 32,4 %). 8 scripts reproducidos idénticos |
 | **9b** | `d9-ronda9b/` · `auditoria-8b.md` | Palanca P1 (R-FIN-8) | Mi premisa **falsa** (copias rojas válidas: ×15); Kaspa paga al fusionador (duplica la parásita). Correcto: **R-FIN-8′** (`rojo_k` cobra su coinbase; `rojo_U3` inerte) + **R-FIN-13′**. Parásita 1,16-1,55 → 0,99; retarget ×1,45 → ×1,005; orden 40,0 → 41,7 %. 3 scripts idénticos |
-| **9c** | `d9-ronda9c/` · `auditoria-8c.md` | Palanca P4 (reto por slot) | **LAGUNA** (reto por slot no escrito); Autonomys secuencial (verificado); **`W_dec ≤ 45 s`**, no depende de `S_max`; `ρ ≤ 1 ⇒` steering 0; **R-FIN-14**; `I+F` 8,26 h → 0,76-1,31 h; `F = max(F_carrera, I/(W/κ−1))`; `I ≥ ρ_max·W_dec`; opción de revelación retardada. c0/d1/e1 idénticos; **c4/d2/c3 sin reproducir por el principal al cierre** |
+| **9c** | `d9-ronda9c/` · `auditoria-8c.md` | Palanca P4 (reto por slot) | **LAGUNA** (reto por slot no escrito); Autonomys secuencial (verificado); **`W_dec ≤ 45 s`**, no depende de `S_max`; `ρ ≤ 1 ⇒` steering 0; **R-FIN-14**; `I+F` 8,26 h → 0,76-1,31 h; `F = max(F_carrera, I/(W/κ−1))`; `I ≥ ρ_max·W_dec`; opción de revelación retardada. c0/d1/e1 y **c4/d2 reproducidos idénticos** por el principal (c4: 33 min) |
 
 ---
 
@@ -67,7 +67,7 @@ vivo en `research/dag-poas-ancla-de-orden.md`. Commits del día en ZEROX: 93 (ra
 11. **Autonomys es secuencial** (9c, citas verificadas por mí): `seed_with_entropy` → AES^N → `blake3(pot)` →
     `blake3(rand ‖ slot)`. Lookahead real de Autonomys ≈ 615 s, no 11 s. VERIFICADO.
 12. **`W_dec ≤ 45 s`** (9c): la ventana de decisión del ancla la cierra la carrera, no `S_max`; el menú vive en los
-    primeros 10-20 s. VERIFICADO por 9c; reproducción del principal pendiente (c4).
+    primeros 10-20 s. VERIFICADO (c4 reproducido idéntico por el principal, 33 min).
 13. **`ρ ≤ 1 ⇒` steering 0** (9c E1, rehecho por mí): evaluar un candidato exige `pot_out(t_j − 1)`, `L` por delante.
     DEMOSTRADO. Con `ρ > 1`, *bootstrap* de días y `n_eval = ρ·W_dec`.
 14. **P4 compra precio, no `α_ef`** (9c D): `I = c_m·√(n_eval/(αλ))/g`; `I+F` 8,26 h → 0,76-1,31 h; margen 0,50× → 3,1-5,4×.
@@ -136,7 +136,7 @@ vivo en `research/dag-poas-ancla-de-orden.md`. Commits del día en ZEROX: 93 (ra
    lookahead 1,2-2,2 h, margen 3,5×/1,9×. Escribirlo en la propuesta cuando Katana decida.
 2. **Medir `Δ`.** Requiere `zx-node` con el DAG implementado: decenas de instancias con latencias inyectadas, carga
    y atacante de red; cola (p99), no media. Es la primera medición que el diseño necesita.
-3. **Reproducir `r9c_c4_wdec.py` y `r9c_d2_final.py`** (la re-ejecución del principal no terminó al cerrar la sesión).
+3. ~~Reproducir `r9c_c4`/`r9c_d2`~~ **Hecho tras el cierre: idénticos** (c3 difiere porque diagnosticaba el instrumento antes de corregirlo).
 4. **Cuantificar el artefacto de retención** (descubrimiento 16) sobre D8 A4.2 y D9-f: añadir la clausura de
    publicación de `r9c_lib.py` a `r8c_sim.py`/`d8_lib.py` y re-medir `m` con retención.
 5. **Ronda adversarial contra el diseño corregido** (R-FIN-8′/13′/14 + 33 % + constantes P3): nadie ha atacado las
@@ -175,5 +175,5 @@ Fuentes: `research/fuentes/{bdk19,phantom-ghostdag}.{pdf,txt}`; Kaspa `/home/kat
 ## 10 · Cómo retomar
 
 Leer §0, §5 y §6 de este documento; luego `dag-poas-ancla-de-orden.md` §2 (reglas y constantes) y las auditorías 8a/8b/8c.
-Primer trabajo: la decisión P3 de Katana (§6.1) y la reproducción de `r9c_c4`/`r9c_d2`. Después, la ronda adversarial
+Primer trabajo: la decisión P3 de Katana (§6.1). Después, la ronda adversarial
 contra el diseño corregido. `Δ` espera al nodo.
