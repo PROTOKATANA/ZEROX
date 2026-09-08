@@ -74,13 +74,13 @@ def main():
     print("B.2.a — COSTE HONESTO EN REGIMEN de verificar UNA revelacion por epoca (regla (h.2c))")
     print("        el multiplicador de la verificacion de PoT de CADA nodo es 1 + L/I")
     print(f"{'L (h)':>6} {'I':>5} | {'L (slots)':>10} {'CPU/epoca (s)':>14} {'nucleos continuos':>18} "
-          f"{'x la cadena principal':>22} | {'pared con 32 nucleos':>21}")
+          f"{'multiplicador 1+L/I':>22} | {'pared con 32 nucleos':>21}")
     for L in (3600.0, 7200.0):
         for I in (300.0, 851.0):
             cpu = L * verify
             nuc = cpu / I
             print(f"{L/3600:>6.2f} {I:>5.0f} | {L:>10.0f} {cpu:>14.1f} {nuc:>18.3f} "
-                  f"{L/I:>22.2f} | {cpu/NUCLEOS:>18.1f} s")
+                  f"{1 + L/I:>22.2f} | {cpu/NUCLEOS:>18.1f} s")
     print(f"  cadena principal sola: {verify:.4f} s/slot a tau = 1 s = {verify*100:.2f} % de un nucleo")
 
     print(ancho)

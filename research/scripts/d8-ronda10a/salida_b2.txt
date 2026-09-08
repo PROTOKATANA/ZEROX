@@ -7,27 +7,33 @@ CONTROL C0 — los dos costes, leidos del artefacto de Criterion de ESTA maquina
 ================================================================================================================
 B.2.a — COSTE HONESTO EN REGIMEN de verificar UNA revelacion por epoca (regla (h.2c))
         el multiplicador de la verificacion de PoT de CADA nodo es 1 + L/I
- L (h)     I |  L (slots)  CPU/epoca (s)  nucleos continuos  x la cadena principal |  pared con 32 nucleos
-  1.00   300 |       3600          346.1              1.154                  12.00 |               10.8 s
-  1.00   851 |       3600          346.1              0.407                   4.23 |               10.8 s
-  2.00   300 |       7200          692.3              2.308                  24.00 |               21.6 s
-  2.00   851 |       7200          692.3              0.813                   8.46 |               21.6 s
+ L (h)     I |  L (slots)  CPU/epoca (s)  nucleos continuos    multiplicador 1+L/I |  pared con 32 nucleos
+  1.00   300 |       3600          346.1              1.154                  13.00 |               10.8 s
+  1.00   851 |       3600          346.1              0.407                   5.23 |               10.8 s
+  2.00   300 |       7200          692.3              2.308                  25.00 |               21.6 s
+  2.00   851 |       7200          692.3              0.813                   9.46 |               21.6 s
   cadena principal sola: 0.0961 s/slot a tau = 1 s = 9.61 % de un nucleo
 ================================================================================================================
 B.2.b — REVELACION FALSA: que le cuesta al verificador y que le cuesta al atacante
-        el atacante hace correctos los `p` primeros slots y corrompe el siguiente
- L (h)    p/L |  orden secuencial: verif (s)  atacante (s)    razon |  orden ALEATORIO: verif (s)    razon  cerrado (L+1)/2
-  1.00   0.00 |                         0.10           0.0     0.00 |                      172.89     0.00           173.11
-  1.00   0.25 |                        86.63        1405.2    16.22 |                      172.89     8.13           173.11
-  1.00   0.50 |                       173.16        2810.4    16.23 |                      172.89    16.26           173.11
-  1.00   0.90 |                       311.61        5058.8    16.23 |                      172.89    29.26           173.11
-  1.00   1.00 |                       346.22        5620.8    16.23 |                      172.89    32.51           173.11
-  2.00   0.00 |                         0.10           0.0     0.00 |                      348.03     0.00           346.18
-  2.00   0.25 |                       173.16        2810.4    16.23 |                      348.03     8.08           346.18
-  2.00   0.50 |                       346.22        5620.8    16.23 |                      348.03    16.15           346.18
-  2.00   0.90 |                       623.13       10117.5    16.24 |                      348.03    29.07           346.18
-  2.00   1.00 |                       692.35       11241.7    16.24 |                      348.03    32.30           346.18
-  Nota: sin prefijo correcto (p = 0) el verificador paga UN slot = 96.1 ms; no hay grano mas fino (x86_64.rs:75-107, sin salida temprana).
+        lo que NO calcula sale mal: con prefijo `p` correcto quedan L-p slots malos
+ L (h)    p/L   malos |   en orden: verif (s)  atacante (s)    razon | ALEATORIO: verif (s)      razon cerrado (L+1)/(j+1)
+  1.00   0.00    3600 |                  0.10           0.0     0.00 |                 0.15       0.00                0.10
+  1.00   0.25    2700 |                 86.63        1405.2    16.22 |                 0.18    7709.11                0.13
+  1.00   0.50    1800 |                173.16        2810.4    16.23 |                 0.24   11476.38                0.19
+  1.00   0.90     360 |                311.61        5058.8    16.23 |                 1.01    5011.44                0.96
+  1.00   0.99      36 |                342.76        5564.6    16.23 |                 9.41     591.36                9.36
+  1.00   1.00       1 |                346.22        5620.8    16.23 |               173.31      32.43              173.11
+  2.00   0.00    7200 |                  0.10           0.0     0.00 |                 0.15       0.00                0.10
+  2.00   0.25    5400 |                173.16        2810.4    16.23 |                 0.18   15400.72                0.13
+  2.00   0.50    3600 |                346.22        5620.8    16.23 |                 0.24   22972.97                0.19
+  2.00   0.90     720 |                623.13       10117.5    16.24 |                 1.02    9964.61                0.96
+  2.00   0.99      72 |                685.43       11129.3    16.24 |                 9.52    1169.02                9.48
+  2.00   1.00       1 |                692.35       11241.7    16.24 |               346.58      32.44              346.18
+  Sin prefijo correcto (p = 0, L slots malos) el verificador paga UN slot = 96.1 ms: no hay grano mas fino (x86_64.rs:75-107, sin salida temprana).
+  El optimo del atacante es UN solo slot malo (fila p/L = 0,99..1,00 con malos = 1):
+  maximiza el coste absoluto del verificador, y aun asi paga 16x (en orden) o 32x
+  (en orden aleatorio) mas que el. Verificar en orden aleatorio es GRATIS y anula el
+  ataque por prefijo largo: con L-p slots malos el verificador para en (L+1)/(L-p+1).
 ================================================================================================================
 B.2.c — CUANTAS revelaciones falsas puede meter a verificar por epoca (regla (h.2))
         solo se verifica la de una semilla que el nodo tenga por candidato:

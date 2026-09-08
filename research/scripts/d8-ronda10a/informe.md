@@ -342,13 +342,15 @@ lo que no calcula, no le sale bien). Medido con 12 semillas × 20 000 búsquedas
 
 | `L` | `p/L` | slots malos | verif. **en orden** | coste del atacante | razón | verif. **en orden aleatorio** | razón |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 2 h | 0,00 | 7 200 | 0,10 s | 0 s | — | 0,10 s | — |
-| 2 h | 0,50 | 3 600 | 346,2 s | 5 620,8 s | 16,2× | 0,19 s | 29 000× |
-| 2 h | 0,90 | 720 | 623,1 s | 10 117,5 s | 16,2× | 0,96 s | 10 500× |
-| 2 h | 0,99 | 72 | 685,4 s | 11 129,3 s | 16,2× | 9,5 s | 1 170× |
-| 2 h | 1,00 | 1 | 692,4 s | 11 241,7 s | 16,2× | 346,4 s | 32,5× |
+| 2 h | 0,00 | 7 200 | 0,10 s | 0 s | — | 0,15 s | — |
+| 2 h | 0,25 | 5 400 | 173,2 s | 2 810,4 s | 16,2× | 0,18 s | 15 401× |
+| 2 h | 0,50 | 3 600 | 346,2 s | 5 620,8 s | 16,2× | 0,24 s | 22 973× |
+| 2 h | 0,90 | 720 | 623,1 s | 10 117,5 s | 16,2× | 1,02 s | 9 965× |
+| 2 h | 0,99 | 72 | 685,4 s | 11 129,3 s | 16,2× | 9,52 s | 1 169× |
+| 2 h | 1,00 | **1** | **692,4 s** | **11 241,7 s** | **16,2×** | **346,6 s** | **32,4×** |
 
-*(la columna «en orden aleatorio» es `(L+1)/(j+1)` slots, medida y reproducida por el cerrado)*
+*(la columna «en orden aleatorio» está **medida** con 12 semillas × 20 000 búsquedas; el cerrado
+`(L+1)/(j+1)` la reproduce con error ≤ 0,4 %: 346,18 frente a 346,58 s en la última fila)*
 
 **Tres conclusiones.**
 - **La asimetría 16,2× basta**, y con una regla gratis sube a **32,5×**: verificar los `L` slots de
@@ -360,6 +362,15 @@ lo que no calcula, no le sale bien). Medido con 12 semillas × 20 000 búsquedas
 - El número de semillas de revelación que puede reclamar legítimamente por época es
   `α·λ·S_max` = **60 a `α = 0,40`** (necesita un bloque válido en la banda del ancla, que cuesta
   **espacio**, no CPU): 5,8 s por época sin la regla (h.2c), 0,096 s con ella.
+
+> **Precedente en producción, y no lo esperaba: Autonomys ya implementa esta defensa.**
+> `sc-proof-of-time/src/source/gossip.rs:438-440`:
+> `// If we have too many unique proofs to verify it might be cheaper to prove it ourselves`
+> `let correct_proof = if potentially_matching_proofs.len() < EXPECTED_POT_VERIFICATION_SPEEDUP {`
+> con `const EXPECTED_POT_VERIFICATION_SPEEDUP: usize = 7` (`:32`). Es exactamente el argumento de
+> la asimetría, cableado: si le llegan más pruebas distintas de las que compensa verificar, **se la
+> calcula él**. **Y su constante es 7 donde yo mido 16,24**, luego su presupuesto es conservador por
+> un factor 2,3. Para (h) la misma regla se aplica tal cual, con el umbral en la asimetría medida.
 
 ### B.2.3 · El coste que sí duele es el honesto
 
@@ -491,3 +502,92 @@ PoT (h.4). Al reunirse, R-FIN-5/7 funcionan igual que sin (h). **DEMOSTRADO por 
 inyección en el primer slot en que la revelación esté disponible en `past(B)`»— hace `flujo`
 dependiente de **cuándo llegó un mensaje** y parte el DAG entre honestos. Retirada en §A.3.
 **Etiqueta del vector nuevo: VERIFICADO** (aritmética sobre la medida de B.3.1).
+
+---
+
+## C · Coste de (h), con número
+
+Instrumento `r10a_c_coste.py`, salida `salida_c.txt`. Mismo control C0 que en B.2 (los dos costes
+unitarios leídos del artefacto de Criterion de esta máquina, no recitados).
+
+### C.1 · La tabla que pide el encargo
+
+| `I` | `F = L` | `q = ⌈L/I⌉` | VDF en vuelo (i) | (ii) `m = 1,83` | núcleos del timekeeper | núcleo/nodo de verificación | × sin (h) | justif. **P1** | gossip **P2** |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 851 s | 2,00 h | 9 | 9 | 17 | **10** | **0,813** | **9,46×** | 900 kB | 1 152 B/s |
+| 300 s | 2,00 h | 24 | 24 | 44 | **25** | **2,308** | **25,0×** | 900 kB | 3 072 B/s |
+| 851 s | 1,00 h | 5 | 5 | 10 | 6 | 0,407 | 5,23× | 450 kB | 640 B/s |
+| 300 s | 1,00 h | 12 | 12 | 22 | 13 | 1,154 | 13,0× | 450 kB | 1 536 B/s |
+| 4 200 s | 5,30 h | 5 | 5 | 10 | 6 | 0,437 | 5,54× | 2 385 kB | 640 B/s |
+| 851 s | 0,28 h | 2 | 2 | 4 | 3 | 0,115 | 2,20× | 127 kB | 256 B/s |
+
+Referencia **sin (h)**: 1 línea en el timekeeper, 0,0961 s/slot = **9,61 %** de un núcleo por nodo,
+18,8 kB de justificación por bloque (R-FIN-14 (d), `S_max × 128 B`).
+
+### C.2 · Latencia añadida — **cero con (P2), 18,4 % de `Δ` con (P1)**
+
+Meter la cadena entera en la justificación de un bloque (**P1**) es `L·128 B`: **900 kB** con
+`L = 2 h`, que a 10 Mbit/s son **0,74 s** de propagación extra para un bloque por época, un
+**18,4 % de `Δ = 4 s`**. `Δ` es la variable de la que depende toda la frontera (46,9 % a 4 s;
+**32,4 % a 20 s**, 9a), así que no es un detalle de ingeniería.
+
+Vía **P2** —gossip de los `PotCheckpoints` según se calculan, como el PoT ordinario— el caudal es
+**1 152 B/s** con `(I, F) = (851 s, 2 h)` y el bloque lleva 16 B de compromiso: **latencia añadida
+cero**. **P2 es la única vía admisible**, y va a la regla (h.2b).
+
+### C.3 · Presupuesto de un nodo completo, en núcleos continuos a `τ = 1 s`
+
+| `I` | `F = L` | cadena principal | revelación (h) | total | % de un 9950X3D (32 hilos) |
+|---:|---:|---:|---:|---:|---:|
+| 851 s | 2 h | 0,0961 | **0,813** | **0,910** | 2,84 % |
+| 300 s | 2 h | 0,0961 | **2,308** | **2,404** | 7,51 % |
+| 851 s | 1 h | 0,0961 | 0,407 | 0,503 | 1,57 % |
+| 851 s | 0,28 h | 0,0961 | 0,115 | 0,211 | 0,66 % |
+
+En absoluto no es prohibitivo en una máquina de escritorio (2,8 % de un 9950X3D). Sí lo es como
+**suelo de participación**: casi un núcleo dedicado, permanentemente, sólo a PoT.
+
+### C.4 · Presupuesto del timekeeper
+
+| `I` | `F = L` | disciplina (i) | (ii) `m = 1,83` | (ii) `m` máximo `1 + λ·S_max` |
+|---:|---:|---:|---:|---:|
+| 851 s | 2 h | **10** | 18 | **1 360** |
+| 300 s | 2 h | **25** | 45 | **3 625** |
+| 851 s | 1 h | 6 | 11 | 756 |
+
+Y B.3.1 dice que **25 líneas caben en un 9950X3D con un 1,7 % de degradación**. Luego (i) y (ii) con
+el menú medido son **un PC**; (ii) con el `m` máximo es **un centro de datos**. La regla (h.1)
+**tiene** que acotar `m`.
+
+### C.5 · La identidad que decide el punto D — **protección y coste son el mismo número**
+
+```
+ρ*  = (L + I)/(I + W_dec)          (B.1, verificado, 14 semillas)
+coste de verificación = 1 + L/I    (B.2, medido)
+⇒   ρ* = (1 + L/I) · I/(I + W_dec) ≈ el multiplicador de coste, con W_dec ≪ I
+```
+
+Comprobado en las seis filas de C.1: `(851, 2 h)` → `ρ* = 9,24` y coste 9,46×; `(300, 2 h)` → 23,44 y
+25,0×; `(851, 1 h)` → 5,11 y 5,23×. **La razón es 0,977 en todas.** (h) no tiene palanca: cada punto
+de tolerancia a `ρ` cuesta exactamente un punto de CPU de verificación en cada nodo de la red.
+
+**Consecuencia práctica, y es la recomendación de calibración.** Dado un `ρ_max` que se quiera
+tolerar, la `I` que lo iguala es `I* = (L − ρ_max·W_dec)/(ρ_max − 1)`:
+
+| `ρ_max` | `L` | `I*` | `q` | `ρ*` comprobado | coste | núcleos/nodo | `I+F` |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1,5 | 2 h | 14 265 s (3,96 h) | 1 | 1,50 | 1,50× | **0,049** | 5,96 h |
+| 2,0 | 2 h | 7 110 s (1,98 h) | 2 | 2,00 | 2,01× | **0,097** | 3,98 h |
+| **2,5** | **2 h** | **4 725 s (1,31 h)** | **2** | **2,50** | **2,52×** | **0,147** | **3,31 h** |
+| 3,0 | 2 h | 3 532 s (0,98 h) | 3 | 3,00 | 3,04× | 0,196 | 2,98 h |
+| 2,5 | 1 h | 2 325 s (0,65 h) | 2 | 2,50 | 2,55× | 0,149 | 1,65 h |
+
+**La calibración vigente (`I = 851 s`, `F = 2 h`) compra `ρ* = 9,24` y paga 0,813 núcleos por nodo.
+El techo físico estimado del reloj AES es 1,5-2,5× (`pot-aes-asic-chacha.md` §3). Está pagando
+5,5× de más por una protección que nadie va a necesitar.** Con `ρ_max = 2,5` basta `I = 4 725 s`:
+**0,147 núcleos**, `q = 2` líneas en el timekeeper, y ningún cambio en la seguridad útil.
+
+**Lo que se paga a cambio, dicho en voz alta:** `I + F` sube de 0,93 h a **3,31 h**. `I + F` es el
+lookahead que un *plotter* rápido puede aprovechar (9c §D, margen económico frente a un plotter 10×).
+**Es una bifurcación de calibración, no una consecuencia de (h), y la decide Katana:** CPU de todos
+los nodos contra margen económico frente al plotter.

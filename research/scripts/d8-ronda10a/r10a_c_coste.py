@@ -39,6 +39,33 @@ def lee_criterion(nombre):
         return json.load(f)["mean"]["point_estimate"] / 1e9
 
 
+def calibracion(prove, verify):
+    """C.5 — la identidad que decide el punto D: proteccion y coste son el MISMO numero.
+
+      rho* = (L + I)/(I + W_dec)      (B.1, verificado con 14 semillas)
+      coste de verificacion = 1 + L/I  (B.2, medido)
+      => rho* = (1 + L/I) * I/(I + W_dec)   con W_dec << I, rho* ~= el multiplicador de coste.
+
+    Luego, dado un `rho_max` que se quiera tolerar, la `I` MINIMA que hace falta es
+      I <= (L - rho_max*W_dec)/(rho_max - 1)
+    y el coste queda clavado en ~rho_max. Pagar mas coste que `rho_max` es tirar CPU."""
+    print("=" * 132)
+    print("C.5 — CALIBRACION: la proteccion de (h) y su coste son el mismo numero")
+    print("      I* = (L - rho_max*W_dec)/(rho_max - 1) es la I que iguala rho* a rho_max exactamente")
+    print(f"{'rho_max':>8} {'L (h)':>7} {'W_dec':>6} | {'I* (s)':>9} {'I* (h)':>7} {'q':>3} | "
+          f"{'rho* comprobado':>16} {'coste 1+L/I':>12} {'nucleos/nodo':>13} | {'I+F (h)':>8}")
+    for rmax in (1.5, 2.0, 2.5, 3.0):
+        for L, W in ((7200.0, 45.0), (3600.0, 45.0), (7200.0, 20.0)):
+            I = (L - rmax * W) / (rmax - 1.0)
+            print(f"{rmax:>8.1f} {L/3600:>7.2f} {W:>6.0f} | {I:>9.0f} {I/3600:>7.2f} "
+                  f"{math.ceil(L/I):>3d} | {(L+I)/(I+W):>16.2f} {1+L/I:>12.2f} "
+                  f"{L*verify/I:>13.3f} | {(I+L)/3600:>8.2f}")
+    print("  Comparacion con la calibracion vigente (I = 851 s, F = 2 h): rho* = 9,24 (mucho mas de lo")
+    print("  que hace falta: el techo fisico estimado es 1,5-2,5x) y coste 9,46x / 0,813 nucleos.")
+    print("  Con rho_max = 2,5 basta I = 4 725 s: mismo techo util, coste 2,52x / 0,147 nucleos (5,5x menos).")
+    print("  Lo que se paga a cambio: I+F pasa de 0,93 h a 3,31 h (lookahead del plotter, 9c §D).")
+
+
 def main():
     prove = lee_criterion("prove")
     verify = lee_criterion("verify")
@@ -100,6 +127,8 @@ def main():
               f"{math.ceil((1+LAM*S_MAX)*q)+1:>28d}")
     print("  La disciplina (ii) con el `m` maximo NO es una maquina: es un centro de datos.")
     print("  La regla (h.1) tiene que acotar `m` por politica, o la disciplina (i) con Lrev < L.")
+
+    calibracion(prove, verify)
 
 
 if __name__ == "__main__":

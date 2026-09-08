@@ -47,3 +47,23 @@ C.4 — PRESUPUESTO DEL TIMEKEEPER, en nucleos, y que maquina hace falta
   851     0.28     3 |               3                       5                          303
   La disciplina (ii) con el `m` maximo NO es una maquina: es un centro de datos.
   La regla (h.1) tiene que acotar `m` por politica, o la disciplina (i) con Lrev < L.
+====================================================================================================================================
+C.5 — CALIBRACION: la proteccion de (h) y su coste son el mismo numero
+      I* = (L - rho_max*W_dec)/(rho_max - 1) es la I que iguala rho* a rho_max exactamente
+ rho_max   L (h)  W_dec |    I* (s)  I* (h)   q |  rho* comprobado  coste 1+L/I  nucleos/nodo |  I+F (h)
+     1.5    2.00     45 |     14265    3.96   1 |             1.50         1.50         0.049 |     5.96
+     1.5    1.00     45 |      7065    1.96   1 |             1.50         1.51         0.049 |     2.96
+     1.5    2.00     20 |     14340    3.98   1 |             1.50         1.50         0.048 |     5.98
+     2.0    2.00     45 |      7110    1.98   2 |             2.00         2.01         0.097 |     3.98
+     2.0    1.00     45 |      3510    0.97   2 |             2.00         2.03         0.099 |     1.98
+     2.0    2.00     20 |      7160    1.99   2 |             2.00         2.01         0.097 |     3.99
+     2.5    2.00     45 |      4725    1.31   2 |             2.50         2.52         0.147 |     3.31
+     2.5    1.00     45 |      2325    0.65   2 |             2.50         2.55         0.149 |     1.65
+     2.5    2.00     20 |      4767    1.32   2 |             2.50         2.51         0.145 |     3.32
+     3.0    2.00     45 |      3532    0.98   3 |             3.00         3.04         0.196 |     2.98
+     3.0    1.00     45 |      1732    0.48   3 |             3.00         3.08         0.200 |     1.48
+     3.0    2.00     20 |      3570    0.99   3 |             3.00         3.02         0.194 |     2.99
+  Comparacion con la calibracion vigente (I = 851 s, F = 2 h): rho* = 9,24 (mucho mas de lo
+  que hace falta: el techo fisico estimado es 1,5-2,5x) y coste 9,46x / 0,813 nucleos.
+  Con rho_max = 2,5 basta I = 4 725 s: mismo techo util, coste 2,52x / 0,147 nucleos (5,5x menos).
+  Lo que se paga a cambio: I+F pasa de 0,93 h a 3,31 h (lookahead del plotter, 9c §D).
