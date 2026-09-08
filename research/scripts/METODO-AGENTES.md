@@ -5,9 +5,12 @@
 2. **Volcado incremental.** Escribes `informe.md` en tu directorio desde el primer punto y lo actualizas al cerrar cada
    punto. Commiteas por punto (`git add research/scripts/<ronda>/ && git commit -m "<ronda>: <punto> — <resultado>"`),
    solo tu directorio. **`git push` prohibido.** Si mueres a mitad, lo escrito sobrevive.
-3. **Presupuesto de tiempo: 2-3 h de reloj en total.** Ninguna corrida individual > 10 min: usa `multiprocessing.Pool`,
-   rejillas gruesas primero y refinamiento después, y lanza lo largo en segundo plano (`nohup … &`) mientras sigues con
-   otro punto. Si un punto no cabe, entrega la cota y declara LAGUNA con lo que faltó.
+3. **Sin presupuesto de tiempo: resultado completo.** Katana prefiere un resultado completo a uno rápido (decidido
+   2026-09-08, noche). No recortes rejillas, semillas, filas de tabla ni configuraciones para acabar antes. Las corridas
+   largas se lanzan en segundo plano (`nohup … &`) y se sigue con otro punto mientras terminan; se releen al final. Sí se
+   mantiene, porque no pierde precisión: rejilla gruesa para localizar y fina (o `brentq`) para refinar, y
+   `multiprocessing.Pool` para usar todos los núcleos. La etiqueta LAGUNA es solo para lo que no se puede saber con las
+   fuentes y los instrumentos disponibles (y entonces se dice qué haría falta), **nunca por falta de tiempo**.
 4. **Criterio α.** Todo resultado de simulación debe cambiar al cambiar `α` (y al cambiar el parámetro que se estudia).
    Control positivo antes de medir: reproduce primero un número ya publicado con el mismo instrumento.
 5. **≥ 12 semillas** en todo lo estocástico; reporta media e intervalo. Contadores de cobertura de rama (si la rama que
