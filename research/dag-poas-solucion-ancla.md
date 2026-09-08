@@ -126,7 +126,7 @@ explícitamente.
 | Teorema del ancla | Prop. 7 directo | Prop. 7 **vía** construcción del orden (§0) |
 | `c_a = c_h` (BDK Lema 13) | por rederivar | **restaurado**: la ronda 3 lo demostró para posiciones de cadena |
 | `c` en unidades del ancla | 2 490 índices | **500 posiciones** (= `I·λ_chain`) |
-| `I`, `F`, `k`, `q` | 2 490 s · 3,2 h · 25 · 1 | **sin cambio** |
+| `I`, `F`, `k`, `q` | 2 490 s · 3,2 h · 25 · 1 | 2 490 s · 3,2 h · **30** · 1 (`k` corregido en `dag-poas-delta-real.md`) |
 | Steering `g` con `m` medido | `m≈40` → 8,7 % | **`m≈1,3-2,0` → 1,0-2,4 %** |
 | `W/κ` con `F = 3,2 h` | 1,22 | **1,22, sin cambio** |
 

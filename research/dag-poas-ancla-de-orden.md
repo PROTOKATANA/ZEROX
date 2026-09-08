@@ -80,6 +80,12 @@ Con `δ(k) = 2c/(k+2c)` **autoconsistente** y ventaja inicial `3k` (`α = 0,25`,
 **`k = 25`.** Y la ronda 3 derivó `k = 24` por otra vía (punto fijo del retarget): dos caminos
 independientes, el mismo valor.
 
+> ⚠️ **Corregido el 2026-09-08 (`dag-poas-delta-real.md`): `k = 30`.** La tabla de arriba usa `δ = 0,2424`
+> con `λ = 1/s`, pero bajo el sesgo sostenido del retarget (ronda 3 §7) la tasa real se infla a
+> `λ_real = k/(k−2D)` y `δ_real = 2Dλ_real/(k+2Dλ_real)` = **0,320 a `k=25`**. Con `(λ_real(k), δ_real(k))`
+> autoconsistentes, el óptimo de la reversión a 600 s es **`k = 30`** (`4,3·10⁻¹⁰`), el punto fijo del
+> retarget lo admite (`k_Poisson = 22`), y `δ_real = 0,267`. Los dos umbrales mejoran ~2 puntos.
+
 > **`k = 793` no es «la opción conservadora»: es la que deja mudo el teorema.** A `k=793` la cota de
 > Prop. 8 permite 2 379 bloques de ventaja y la garantía no dice nada por debajo de 3,2 h.
 > **Matiz:** `3k` es una **cota superior**, así que eso no prueba que el protocolo falle a `k=793`,
@@ -133,7 +139,7 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 ## 2 · El algoritmo
 
-Constantes: `k = 25`, `I = 2 490 s` (`c = 2 490` índices a `q=1`), `F = L = 3,2 h`, `q = 1` **decidido**
+Constantes: `k = 30` (era 25; `dag-poas-delta-real.md`), `I = 2 490 s` (`c = 2 490` índices a `q=1`), `F = L = 3,2 h`, `q = 1` **decidido**
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
 desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
@@ -155,7 +161,7 @@ de cabecera, función de `past(B)`.
 > `dag-poas-solucion-ancla.md`. `c` vuelve a contarse en **posiciones de cadena**: `c = I·λ_chain = 500`.
 
 **R-FIN-12 · Límites de Kaspa, adoptados. (NUEVA.)** `max_block_parents = max(10, min(16, ⌊k/2⌋))`
-= **12** a `k=25` (`bps.rs:57-72`); `mergeset_size_limit = max(180, min(512, 2k))` = **180**
+= **15** a `k=30` (`bps.rs:57-72`); `mergeset_size_limit = max(180, min(512, 2k))` = **180**
 (`bps.rs:75-80`), contando azules **y** rojos, y superarlo hace el bloque **inválido**
 (`MergeSetTooBig`, `post_pow_validation.rs:30-37`). Acotan la vía de vivacidad de las copias: un
 portador de 200 copias es inválido; un honesto fusiona ≤ 12 por bloque.

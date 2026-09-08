@@ -100,8 +100,8 @@ El umbral de seguridad del DAG sobre PoAS **no es un número, son dos**:
 
 | | valor | de dónde |
 |---|---:|---|
-| Umbral de **orden** (reversión de transacciones) | ~40,7 % | `Lema 9 ⊗ φ₅₀₀`, `dag-poas-ancla-de-orden.md` §1 |
-| Umbral de **flujo único** (que no nazca partición en 10 años) | **~35 %** | esta nota, §3-4 |
+| Umbral de **orden** (reversión de transacciones) | ~40,7 % nominal → **40,0 %** con `δ_real` y `k=30` | `Lema 9 ⊗ φ₅₀₀`; `dag-poas-delta-real.md` |
+| Umbral de **flujo único** (que no nazca partición en 10 años) | **~35 %** (`r=1` en 43,1 % nominal → **42,3 %** real, `k=30`) | esta nota, §3-4; `dag-poas-delta-real.md` §3 |
 
 El segundo es más restrictivo, y es el que hay que publicar como umbral del sistema mientras
 R-FIN-5/R-FIN-7 hagan las particiones permanentes. Chia desplegado está en 40,5 %; Bitcoin en 50 %.
