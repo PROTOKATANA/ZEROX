@@ -1,4 +1,7 @@
-Scripts analizados: 11
+Scripts analizados: 17
+
+/home/katana/zeo/ZEROX/research/scripts/d8-ronda8/d8_a1d_rfin1a.py
+   [T3b] L53: ['padres', 'ph'] = MISMA expresión: self._padres(d, visibles)
 
 /home/katana/zeo/ZEROX/research/scripts/d8-ronda8/d8_a6b_lineas.py
    [T3b] L93: ['padres', 'ph'] = MISMA expresión: m._padres(d, visibles)
@@ -7,4 +10,4 @@ Scripts analizados: 11
    [T3b] L109: ['padres', 'ph'] = MISMA expresión: self._padres(d, visibles)
 
 ======================================================================
-Sospechas totales: 2
+Sospechas totales: 3

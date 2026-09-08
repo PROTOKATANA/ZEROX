@@ -607,15 +607,18 @@ invalidaciones cuando existen. **Criterio `α` ✓** — la columna S=20 crece c
 
 ```
 $ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d8-ronda8
-Scripts analizados: 11
-  d8_a6b_lineas.py  [T3b] L93: ['padres', 'ph'] = MISMA expresión: m._padres(d, visibles)
-  d8_lib.py         [T3b] L109: ['padres', 'ph'] = MISMA expresión: self._padres(d, visibles)
-Sospechas totales: 2
-```
-*(la salida guardada en `salida_audita.txt` es la de 11 scripts; con los tres añadidos
-después —`d8_a1d`, `d8_a1e`, `d8_a4b`— el recuento sube, las marcas no cambian)*
+Scripts analizados: 17
 
-**Las dos marcas, leídas una a una.** Son el **mismo patrón** y son **falsos positivos
+d8_a1d_rfin1a.py   [T3b] L53: ['padres', 'ph'] = MISMA expresión: self._padres(d, visibles)
+d8_a6b_lineas.py   [T3b] L93: ['padres', 'ph'] = MISMA expresión: m._padres(d, visibles)
+d8_lib.py          [T3b] L109: ['padres', 'ph'] = MISMA expresión: self._padres(d, visibles)
+
+======================================================================
+Sospechas totales: 3
+```
+*(guardada en `salida_audita.txt`; es la ejecución final, sobre los 17 scripts)*
+
+**Las tres marcas, leídas una a una.** Son el **mismo patrón** y son **falsos positivos
 justificados**: en `corre_l9` la rama honesta hace `padres = self._padres(d, visibles)` (los
 padres del bloque **honesto**) y la rama del atacante hace `ph = self._padres(d, visibles)`
 (las puntas honestas que el **parásito** fusiona, antes de anteponer su punta privada). El
