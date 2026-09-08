@@ -354,6 +354,16 @@ dr/dβ|₀ < 0  ⟺  −(1−α) + c·α < 0  ⟺  α < 1/(1+c) = 0,7949
 `α < 1/2`. **Etiqueta: DEMOSTRADO. La tesis del agente principal sobrevive incluso concediendo el
 exceso de `2Dλ` rojos por evento que el paper reclama.** `r = α/(1−α)` es la base correcta.
 
+### 1-bis.5 · «Rojos de rojos»: no existe — cerrado con el código, no con simulación
+
+Sub-pregunta (i) del encargo. En `rusty-kaspa` @ `c338d495`, `check_blue_candidate_with_chain_block`
+(`consensus/src/processes/ghostdag/protocol.rs:194`) recorre **`chain_block.data.mergeset_blues`** —
+solo los AZULES— para contar el anticono azul del candidato, y solo incrementa
+`candidate_blue_anticone_size` con ellos (L205-212). **Un bloque rojo nunca cuenta en el anticono azul
+de otro.** Consecuencia: enrojecer un bloque **libera** presupuesto `k` para los demás; la redness no
+se propaga, y no puede existir una cascada «un bloque publicado enrojece 1, que enrojece 2, que
+enrojece 4». **Etiqueta: DEMOSTRADO (por código de referencia).**
+
 ---
 
 ## L3 · Simulación del reparto `α = α_p + α_f` — punto B del encargo · **VERIFICADO**
@@ -440,4 +450,68 @@ la ventaja con los que se quedan en privado — los presupuestos dejarían de se
    `score(C) ≤ score(B) + 3k`). Retener no crea ventaja fuera de lo ya contabilizado.
 
 **Etiqueta: REFUTADA la maniobra (ii)-b.** No existe la publicación parcial que compre `δ` gratis.
+
+---
+
+## L5 · La frontera recalculada — punto C del encargo · **VERIFICADO**
+
+**Scripts:** `r9a_a6_frontera_delta.py` → `salida_a6.txt` (mío) y `r9a_a3_frontera.py` → `salida_a3.txt`
+(heredado, ejecutado por mí), contrastados con `r9a_a7_frontera_rapida.py` → `salida_a7.txt`.
+Los tres usan el **`prev()` literal de `d8-ronda8/d8_a1c_riesgo.py:29-40`** (Skellam del Lema 10,
+ventaja inicial `3k = 90`, `F = 19 080 s`, `I = 4 200 s`, 7 509 épocas/año, unión a 10 años `< 10⁻¹⁰`).
+
+### 5.1 · La frontera con el `δ` que el atacante SÍ puede imponer gratis: **no hay ninguno**
+
+L1-bis lo demuestra y L2b lo mide: con `Δ = 4 s` el `δ` que el atacante compra **sin gastar espacio**
+es `δ₀ = 0,0000` (medido a `α = 0`; la cola de Poisson da `5,4·10⁻¹⁰`). Y el `δ` que compra **gastando
+espacio** le sale del mismo presupuesto de la carrera y le sale a pérdida (L3). Luego el modelo correcto
+para un atacante único es **`δ = 0`**:
+
+| Modelo | Frontera `10⁻¹⁰` | `r = 1` | Colchón sobre 33 % |
+|---|---:|---:|---:|
+| (a) `δ` de D8 con el **mismo `α`** en los dos sitios (auditoría 7) | 36,5 % | 0,381 | +3,5 |
+| (b) Lema 9 como tasa, `δ = 0,2105` (rondas 3-8) | 40,8 % | — | +7,8 |
+| **(c) atacante único, `δ = 0`** | **46,8784 %** | 0,5000 | **+13,88** |
+
+**La tesis del agente principal se confirma con su número exacto: 46,88 %.** El 36,5 % de la auditoría
+7 es el resultado de meter `α` dos veces.
+
+### 5.2 · El parásito racional AJENO (sub-pregunta (iii)) — reproducidos sus tres números
+
+Un parásito de cuota `α_p` que corre la parásita en su óptimo hace que la tasa pública valga
+`(1−α_f−α_p)λ` (L1-bis: su aportación azul se compensa exactamente con los rojos que produce). Es decir:
+**un parásito ajeno de cuota `α_p` hace el mismo daño que un granjero de cuota `α_p` APAGADO.** Ni más.
+
+| `α_p` ajeno | Frontera **del atacante** | Suma `α_f + α_p` | `r = 1` en | vs 33 % |
+|---:|---:|---:|---:|---:|
+| **0 %** | **46,8784 %** | 46,88 % | >0,50 | +13,88 |
+| 10 % | **42,0270 %** | 52,03 % | 0,4500 | +9,03 |
+| 20 % | **37,1840 %** | 57,18 % | 0,4000 | +4,18 |
+| 33 % | **30,9036 %** | 63,90 % | 0,3350 | −2,10 |
+
+El agente principal escribió «42,0 / 37,2 / 30,9 %». **Reproducidos a la cuarta cifra.** Y la lectura
+que él no escribe: para bajar la frontera al 33 % hacen falta **63,9 % del espacio total** entre
+atacante y parásito — y el parásito **no es del atacante**: es un tercero racional que hay que suponer
+coordinado o simultáneo.
+
+### 5.3 · La palanca que SÍ existe, y que no es el espacio: `Δ` · **LAGUNA**
+
+Con el `δ₀` **medido** en L2b a `α = 0` (no con la cola de Poisson, que sobreestima: a `Δ = 16` da 0,59
+frente a 0,286 medido):
+
+| `Δ` (s) | `δ₀` medido a `α = 0` | Frontera `10⁻¹⁰` | `r = 1` | vs 33 % |
+|---:|---:|---:|---:|---:|
+| **4** *(diseño)* | **0,0000** | **46,8784 %** | >0,50 | **+13,88** |
+| 8 *(LAGUNA de D8)* | 0,0020 | 46,8268 % | 0,4995 | +13,83 |
+| 12 | 0,0828 | 44,6542 % | 0,4784 | +11,65 |
+| 16 | 0,2858 | 38,3337 % | 0,4166 | +5,33 |
+| **20** | 0,4428 | **32,3788 %** | 0,3578 | **−0,62** |
+| 24 | 0,5401 | 28,0899 % | 0,3150 | −4,91 |
+| 32 | 0,6526 | 22,4269 % | 0,2578 | −10,57 |
+
+**`k = 30` con `λ = 1` aguanta hasta `Δ ≈ 16 s` con colchón, y el 33 % se pierde en `Δ ≈ 20 s`.** Esto
+es el resultado operativo de esta ronda: **el número que hay que medir no es `α`, es `Δ`.** Con `Δ = 8`
+(la LAGUNA que D8 dejó abierta) el diseño está holgado; con `Δ_ef ≥ 20 s` —alcanzable por un atacante
+de **red**, no de espacio, y el modelo del paper no lo cubre (L1024-1027)— la frontera cae por debajo
+del umbral operativo del 33 %.
 

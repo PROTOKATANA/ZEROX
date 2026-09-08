@@ -1,0 +1,27 @@
+=== A6 · la frontera bajo la LAGUNA de Delta (delta que NO cuesta espacio) ===
+prev() = d8_a1c_riesgo.py:29-40 (Skellam, ventaja 3k=90), F=19080 s, 7509 epocas/ano, 10 anos, umbral 1e-10.
+delta_0 MEDIDO en L2b a alpha=0 (no la cola de Poisson, que sobreestima).
+
+ Delta (s)  delta_0 medido |  frontera 1e-10     r = 1 |  colchon sobre 33 %
+         4          0.0000 |       46.8784%     >0,50 |            +13.88%  <- DISENO
+         8          0.0020 |       46.8268%    0.4995 |            +13.83%  <- LAGUNA de D8
+        12          0.0828 |       44.6542%    0.4784 |            +11.65%
+        16          0.2858 |       38.3337%    0.4166 |             +5.33%
+        20          0.4428 |       32.3788%    0.3578 |             -0.62%
+        24          0.5401 |       28.0899%    0.3150 |             -4.91%
+        32          0.6526 |       22.4269%    0.2578 |            -10.57%
+
+--- control delta = 0 exacto (la tesis del agente principal) ---
+ delta = 0          0.0000 |       46.8784%    0.5000 |            +13.88%
+
+--- (d) parasito racional AJENO de cuota alpha_p, con delta = 0 ---
+    la tasa publica baja a (1 - alpha_f - alpha_p): hf = (1-af-ap)/(1-af)
+ alpha_p |  frontera del atacante |  suma af+ap |  r = 1 en |   vs 33 %
+      0% |              46.8784% |     46.88% |     >0,50 |  +13.88%
+     10% |              42.0270% |     52.03% |    0.4500 |   +9.03%
+     20% |              37.1840% |     57.18% |    0.4000 |   +4.18%
+     33% |              30.9036% |     63.90% |    0.3350 |   -2.10%
+
+LECTURA: el atacante de ESPACIO no mueve la frontera de 46,9 % (L1-bis: parasitar
+le quita espacio a la carrera). Quien la mueve es (i) un atacante de RED que suba
+Delta y (ii) un parasito racional AJENO, que es espacio que no es del atacante.
