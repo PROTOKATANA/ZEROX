@@ -4,13 +4,20 @@
 **Encargo:** `ENCARGO.md` · **Método:** `research/scripts/METODO-AGENTES.md` (sin presupuesto de tiempo).
 
 **En una línea.** Bajo R-FIN-14 el lookahead real es **`(F − W_dec) + I·(1 − 1/ρ)`** en el núcleo y
-**`I·(1 − 1/ρ)`** con la opción (h) — las dos **cero si `ρ ≤ 1`**. El argumento del sembrador
-**sobrevive intacto para cualquier `ρ > 1` con paciencia** (no se reduce a `I`, como se sospechaba),
-**desaparece con `ρ ≤ 1`** y **se hunde a `I(1−1/ρ)` con (h)**. La pinza `F ≥ I/(W/κ − 1)`
+**`(F + I)·(1 − 1/ρ) − W_dec`** con la opción (h) — las dos **cero si `ρ ≤ 1`**. El argumento del
+sembrador **sobrevive intacto para cualquier `ρ > 1` con paciencia** (no se reduce a `I`, como se
+sospechaba), **desaparece con `ρ ≤ 1`** y **con (h) baja al 36-71 % del núcleo, no al 5 %**. La pinza `F ≥ I/(W/κ − 1)`
 **no es un artefacto, pero su número sí lo es**: el `W` correcto no es `F + I`, y la pinza cae de
-1,07 h a **0,33-0,69 h** (núcleo, `ρ = 1,5`-3) y a **0,13 h** con (h). Y para el **usuario**, `F = 1 h`
+1,07 h a **0,33-0,69 h** (núcleo, `ρ = 1,5`-3) y a **0,27 h** con (h). Y para el **usuario**, `F = 1 h`
 frente a `2 h` **no vale nada**: el riesgo del comerciante no depende de `F` en absoluto y ya está por
 debajo de `10⁻⁹` a los **217-2 406 s** según `α` y modelo.
+
+> ⚠️ **Este informe contiene una corrección de sí mismo, §F.** Mis columnas «(h)» de A, B, D y E
+> se calcularon con la premisa de 9c §E.5 («`entropía_j` no se conoce hasta `t_j`»), que es **falsa**:
+> el VDF de (h) tiene entradas públicas y **cada cual lo calcula**. §F rehace esas columnas con la
+> fórmula que la propia ronda 7 ya tenía (`ancla-de-finalidad.md:319-322`). Las tablas afectadas
+> llevan la marca ⚠️ **§F** en la fila correspondiente. **Nada de A, B, C, D o E cambia fuera de las
+> columnas «(h)»** — en particular §E, que es una configuración del núcleo, sobrevive intacta.
 
 **Y un hallazgo que el encargo no pedía (§E):** el lookahead depende de **`L`** (el rezago de
 aplicación de la inyección), **no de `F`** — y hoy el diseño los ata. Desatándolos,
@@ -30,6 +37,7 @@ los **2,08** de `F = 2 h` (35,08 %) — medido en §C.2.
 - [C · Lo que espera el usuario](#c)
 - [D · Tabla configuración × término → `F`](#d)
 - [E · `L` desatada de `F`: la palanca que faltaba](#e)
+- [**F · Corrección: mis columnas «(h)» estaban mal**](#f)
 - [Recomendación](#reco)
 - [Auditoría de scripts](#auditoria)
 - [Veredicto](#veredicto) · [Errores propios](#errores)
@@ -77,8 +85,7 @@ VALIDADO. Solo después se contrastan las formas cerradas.
 ```
 NÚCLEO (R-FIN-14 a-g):   lookahead_max = (L − 1 − W_dec) + I·(1 − 1/ρ)      si ρ > 1;  0 si ρ ≤ 1
                          lookahead_medio = (L − 1 − W_dec) + I·(1 − 1/ρ)/2
-OPCIÓN (h) retardada:    lookahead_max = I·(1 − 1/ρ)                        si ρ > 1;  0 si ρ ≤ 1
-                         lookahead_medio = I·(1 − 1/ρ)/2                     — INDEPENDIENTE de F
+OPCIÓN (h) retardada:    lookahead_max = I·(1 − 1/ρ)   ⚠️ MAL — CORREGIDA EN §F a (L+I)(1−1/ρ) − W_dec
 ```
 con `L = F` (R-FIN-2 y R-FIN-7: `t_j = slot(I_j) + L`). En la rejilla completa
 (`α ∈ {0; 0,10; 0,25; 0,33; 0,40}` × `ρ ∈ {0,5; 1; 1,001; 1,05; 1,2; 1,5; 3; 10}` ×
@@ -111,7 +118,7 @@ ZEROX **no tiene**.
 | Atacante `ρ = 3` | **7 746,3 s = 2,152 h** (medio 7 462,7 s), *bootstrap* **1,06 h** | VERIFICADO |
 | Atacante `ρ = 1,05` | **7 219,5 s = 2,005 h**, *bootstrap* **39,95 h** | VERIFICADO |
 | Atacante `ρ = 1,001` | **7 179,9 s = 1,994 h**, *bootstrap* **1 994 h = 83 días** | VERIFICADO |
-| **Con (h), cualquier `F`** | `ρ=1,5`: **283,3 s** · `ρ=3`: **566,7 s** · `ρ=10`: **765,0 s** | VERIFICADO |
+| ~~Con (h), cualquier `F`~~ | ~~`ρ=1,5`: 283,3 s · `ρ=3`: 566,7 s · `ρ=10`: 765,0 s~~ ⚠️ **MAL, ver §F**: los valores correctos son **2 662,7 / 5 346,3 / 7 224,9 s** a `F = 2 h`, y **dependen de `F`** | corregido en §F |
 
 **El hallazgo que decide todo: el término `(F − W_dec)` NO escala con `ρ`.** Es un acantilado, no una
 rampa: `ρ = 1` da 0 y `ρ = 1,001` da el **99,7 %** de lo que da `ρ = 10`. Lo único que compra `ρ`
@@ -145,8 +152,8 @@ son **841,1 GiB/h por GPU**. El espacio que puede fabricar *y probar* es `lookah
 |---|---:|---:|
 | **`ρ ≤ 1`, núcleo Y (h)** | **0,0** | **0,0000** |
 | 1 slot (solo el reto actual) | 0,2 | 0,0002 |
-| (h), `ρ = 1,5`, `I = 851 s` | 66,2 | 0,0646 |
-| (h), `ρ = 3`, `I = 851 s` | 132,4 | 0,1293 |
+| ~~(h), `ρ = 1,5`, `I = 851 s`~~ ⚠️ **§F** | ~~66,2~~ → **622,1** (`L = 2 h`) | 0,6075 |
+| ~~(h), `ρ = 3`, `I = 851 s`~~ ⚠️ **§F** | ~~132,4~~ → **1 249,1** (`L = 2 h`) | 1,2198 |
 | núcleo, `ρ = 1,5`, `F = 1 h` | 902,5 | 0,8813 |
 | núcleo, `ρ = 3`, `F = 1 h` | 968,8 | 0,9461 |
 | núcleo, `ρ = 1,5`, `F = 2 h` | 1 743,6 | 1,7027 |
@@ -154,12 +161,12 @@ son **841,1 GiB/h por GPU**. El espacio que puede fabricar *y probar* es `lookah
 
 Y el margen frente a `A*` (esc. B, el que **favorece al atacante**), `α = 0,33`:
 
-| `F` | `ρ = 1` | `ρ = 1,5` | `ρ = 3` | con **(h)**, cualquier `ρ ≤ 3` |
-|---|---:|---:|---:|---:|
-| 0,34 h | ∞ | 9,93× | 8,34× | 26,0-52,1× |
-| **1 h** | **∞** | **3,82×** | **3,56×** | **26,0-52,1×** |
-| **2 h** | **∞** | **1,98×** | **1,91×** | **26,0-52,1×** |
-| 5,3 h | ∞ | 0,76× | 0,75× | 26,0-52,1× |
+| `F` | `ρ = 1` | `ρ = 1,5` | `ρ = 3` | ~~con **(h)**~~ ⚠️ **MAL, ver §F** | **(h) corregida**, `ρ = 1,5` / `3` |
+|---|---:|---:|---:|---:|---:|
+| 0,34 h | ∞ | 9,93× | 8,34× | ~~26,0-52,1×~~ | 22,0× / 10,8× |
+| **1 h** | **∞** | **3,82×** | **3,56×** | ~~26,0-52,1×~~ | **10,1× / 5,0×** |
+| **2 h** | **∞** | **1,98×** | **1,91×** | ~~26,0-52,1×~~ | **5,5× / 2,8×** |
+| 5,3 h | ∞ | 0,76× | 0,75× | ~~26,0-52,1×~~ | 2,2× / 1,1× |
 
 **Conclusión A (etiqueta por caso):**
 - Con **`ρ ≤ 1`**, el sembrador **no puede sembrar nada**: no conoce ni un reto futuro. El argumento
@@ -169,9 +176,9 @@ Y el margen frente a `A*` (esc. B, el que **favorece al atacante**), `α = 0,33`
   *bootstrap* de 1 h a 83 días. Con `F = 2 h` el margen frente al plotter 10× es **1,91-1,98×**; con
   `F = 1 h`, **3,56-3,82×**. **El argumento SOBREVIVE y acortar `F` casi duplica el margen.** —
   **VERIFICADO**.
-- Con **(h)**, el lookahead deja de depender de `F` y el margen es **26-52×** para todo `ρ ≤ 3`.
-  **El argumento desaparece por otra vía.** — **VERIFICADO** (la cinemática; el coste del VDF extra
-  sigue **sin medir**, PLAUSIBLE, como lo dejó 9c E.5).
+- Con **(h)** ⚠️ **CORREGIDO EN §F**: el lookahead **sí depende de `F`** y el margen es **2,8-5,5×**
+  a `F = 2 h` (5,0-10,1× a `F = 1 h`), no 26-52×. **El argumento del sembrador NO desaparece con (h):
+  se reduce al 36-71 % del núcleo.** — la cifra vieja venía de una premisa falsa de 9c §E.5; ver §F.
 - ¿Es `ρ > 1` real? `research/pot-aes-asic-chacha.md:38-50`: un 19× **no es físicamente alcanzable**
   (exigiría 25 ps por ronda AES); la estimación propia del principal para un ASIC de latencia es
   **~1,5-2,5×**, y Autonomys cita a Supranational (*«no significant speedup … even with an ASIC»*,
@@ -244,8 +251,8 @@ retos futuros. Así que `W = lookahead_max(ρ_max)·λ` (A.1). Con `I = 851 s`, 
 | Núcleo | 1,05 | 1 243,5 | 1,0160 | 1,0054 | 1,0027 | 1,0010 |
 | Núcleo | 1,5 | 3 862,7 / 7 462,7 | 1,2146 | 1,0730 | **1,0365** | 1,0138 |
 | Núcleo | 3 | 4 146,3 / 7 746,3 | 1,4464 | 1,1518 | **1,0759** | 1,0286 |
-| **(h)** | 1,5 | 283,3 | 0,2315 | 0,0787 | **0,0394** | 0,0148 |
-| **(h)** | 3 | 566,7 | 0,4630 | 0,1574 | **0,0787** | 0,0297 |
+| ~~(h)~~ ⚠️ **§F** | 1,5 | ~~283,3~~ → 2 662,7 (`F=2h`) | 0,5480 | 0,4063 | **0,3698** | 0,3471 |
+| ~~(h)~~ ⚠️ **§F** | 3 | ~~566,7~~ → 5 346,3 (`F=2h`) | 1,1130 | 0,8184 | **0,7425** | 0,6952 |
 
 > **Nota sobre el `W = 5` de la fila `ρ ≤ 1`.** Es la lectura **conservadora**: `1 + λ·D` con
 > `D = 4 s`, el `BLOCK_AUTHORING_DELAY` de Autonomys (ZEROX **no ha fijado `D`**; R-FIN-14 (d) lo
@@ -288,11 +295,12 @@ NÚCLEO :  F ≥ (I(1−1/ρ) − W_dec) / (tope − 1)      y NO EXISTE si  I(1
 2. **Su NÚMERO sí es un artefacto.** `W = F + I` es el rincón `ρ → ∞` de la fórmula correcta.
    La `F` que la pinza exige de verdad es **1 198-2 488 s (0,33-0,69 h)** con `I = 851 s` y
    `ρ ∈ [1,5; 3]`, **no 3 868 s (1,07 h)**: entre **1,55× y 3,2× menos**. — **VERIFICADO**.
-3. **Con `ρ ≤ 1,024` la pinza no existe** (`W ≤ κ` para toda `F`), y **con (h) es irrelevante**
-   (`≤ 465 s`). — **VERIFICADO**.
+3. **Con `ρ ≤ 1,024` la pinza no existe** (`W ≤ κ` para toda `F`). ~~Y con (h) es irrelevante
+   (≤ 465 s).~~ ⚠️ **CORREGIDO EN §F.3:** con (h) la pinza sí existe y vale **989 s** (`ρ=3`,
+   tope 1,22) o **1 642 s** (tope 1,00). — **VERIFICADO** lo primero; corregido lo segundo.
 4. **`W/κ = 1,22` como criterio hay que retirarlo o reetiquetarlo.** BDK marca 1,0; 1,22 fue el valor
    que salió en la ronda 7 y quedó como tope. Bajo la fórmula corregida, **1,0 es alcanzable** con
-   `ρ ≤ 1,024` en el núcleo y con `F ≥ I(1−1/ρ)` bajo (h) — es decir, **con (h) el diseño puede
+   `ρ ≤ 1,024` en el núcleo y con `F ≥ 1 642 s` bajo (h) (§F.3) — es decir, **con (h) el diseño puede
    cumplir la condición literal del paper, y el núcleo no puede para ningún `ρ > 1,024`**. — DEMOSTRADO
    (aritmética) sobre el modelo de `W` de B.2.
 
@@ -489,9 +497,8 @@ Constantes: `A*₁₀ₓ = 14 760 s` (4,1 h, escenario B, el que favorece al ata
 | `ρ_max = 1` (`n_eval=45`) | 491 | 1 028 s (0,29 h) | **0** (no existe) | nada | sin límite | sin límite | `F_carrera` **0,29 h** | SÍ |
 | `ρ_max = 1,5` (`n_eval=68`) | 602 | 1 025 s (0,28 h) | 821 s (0,23 h) | nada | 4 740 s (1,32 h) | 2 772 s (0,77 h) | `F_carrera` **0,28 h** | SÍ |
 | **`ρ_max = 3`** (`n_eval=135`) | 851 | 1 019 s (0,28 h) | **2 488 s (0,69 h)** | nada | 4 374 s (1,21 h) | 2 406 s (0,67 h) | **pinza 0,69 h** | SÍ |
-| `ρ_max = 3` **CON (h)** | 851 | 1 019 s (0,28 h) | 465 s (0,13 h) | nada | sin límite | sin límite | `F_carrera` **0,28 h** | SÍ |
-| `ρ_max = 10` **CON (h)** | 851 | 1 019 s (0,28 h) | 628 s (0,17 h) | nada | sin límite | sin límite | `F_carrera` **0,28 h** | SÍ |
-| **(h)**, `I` libre = 300 s | 300 | 1 019 s (0,28 h) | 164 s (0,05 h) | nada | sin límite | sin límite | `F_carrera` **0,28 h** | SÍ |
+| `ρ_max = 3` **CON (h)** ⚠️ **§F.6** | 851 | 1 019 s (0,28 h) | ~~465~~ → **989 s (0,27 h)** | nada | ~~sin límite~~ → **6 559 s (1,82 h)** | **3 607 s (1,00 h)** | `F_carrera` **0,28 h** | SÍ |
+| `ρ_max = 1,5` **CON (h)** ⚠️ **§F.6** | 851 | 1 019 s (0,28 h) | ~~233~~ → **297 s** | nada | ~~sin límite~~ → **13 969 s (3,88 h)** | **8 065 s (2,24 h)** | `F_carrera` **0,28 h** | SÍ |
 
 **Modelo PESIMISTA (`δ` medido por D8):**
 
@@ -500,7 +507,7 @@ Constantes: `A*₁₀ₓ = 14 760 s` (4,1 h, escenario B, el que favorece al ata
 | `ρ_max = 1` | 3 588 s (1,00 h) | 0 | sin límite | `F_carrera` **1,00 h** | SÍ |
 | `ρ_max = 1,5` | 3 573 s (0,99 h) | 821 s (0,23 h) | 4 740 s (1,32 h) | `F_carrera` **0,99 h** | SÍ |
 | **`ρ_max = 3`** | 3 547 s (0,99 h) | 2 488 s (0,69 h) | 4 374 s (1,21 h) | `F_carrera` **0,99 h** | **SÍ** (pasillo [0,99; 1,21] h) |
-| `ρ_max = 3` **CON (h)** | 3 547 s (0,99 h) | 465 s (0,13 h) | sin límite | `F_carrera` **0,99 h** | SÍ |
+| `ρ_max = 3` **CON (h)** ⚠️ **§F.6** | 3 547 s (0,99 h) | **989 s** | **6 559 s (1,82 h)** | `F_carrera` **0,99 h** | SÍ |
 
 ### D.2 · La misma tabla al `α` de diseño 0,35 — aquí es donde el núcleo se rompe
 
@@ -512,7 +519,8 @@ configuraciones.
 | `ρ_max = 1` | sin límite | sin límite | sin límite | sin límite | **SÍ** |
 | `ρ_max = 1,5` | 2,68 h | 2,00 h | 1,32 h | 0,77 h | solo con margen **≤ 2×** |
 | **`ρ_max = 3`** | 2,58 h | **1,90 h** | 1,21 h | 0,67 h | **solo con margen ≤ 1,5×** |
-| `ρ_max ≤ 10` **CON (h)** | sin límite | sin límite | sin límite | sin límite | **SÍ, con cualquier margen** |
+| `ρ_max = 3` **CON (h)** ⚠️ **§F.6** | 3,87 h | 2,85 h | **1,82 h** | 1,00 h | solo con margen **≤ 2×** (2,85 h) |
+| `ρ_max = 1,5` **CON (h)** ⚠️ **§F.6** | 7,98 h | 5,93 h | 3,88 h | 2,24 h | **SÍ**, hasta margen 5× |
 
 > **Este es el resultado que decide `F`.** Si se quiere que el modelo **pesimista** cubra `α = 0,35`
 > **y** un margen `≥ 3×` frente al plotter 10×, **el núcleo es inviable para todo `ρ > 1`**: hace
@@ -531,8 +539,8 @@ configuraciones.
 | `ρ_max = 1` | 1 028 s (0,29 h) | 0 (se cumple siempre) | 1 028 s (0,29 h) |
 | `ρ_max = 1,5` | 1 025 s | **sin límite: ninguna `F` lo cumple** | **IMPOSIBLE** (`W > κ` para toda `F`) |
 | `ρ_max = 3` | 1 019 s | **sin límite** | **IMPOSIBLE** |
-| `ρ_max = 3` **CON (h)** | 1 019 s | 567 s (0,16 h) | 1 019 s (0,28 h) |
-| `ρ_max = 10` **CON (h)** | 1 019 s | 766 s (0,21 h) | 1 019 s (0,28 h) |
+| `ρ_max = 3` **CON (h)** ⚠️ **§F.3** | 1 019 s | ~~567~~ → **1 642 s (0,46 h)** | **1 642 s (0,46 h)** |
+| `ρ_max = 10` **CON (h)** ⚠️ **§F.3** | 1 019 s | ~~766~~ → **7 459 s (2,07 h)** | **7 459 s (2,07 h)** |
 
 **Con (h) el diseño puede cumplir la condición literal de BDK; el núcleo no puede, para ningún
 `ρ > 1,024`, con ninguna `F`.** — DEMOSTRADO (aritmética sobre el modelo de `W` de §B.2).
@@ -591,7 +599,8 @@ puede dar dos anclas distintas y dos flujos irreconciliables aunque dure menos q
 | **DESATADA `L = 1 h`, `F = 2 h`, `ρ = 3`** | **4 146 s** | **3,6×** | **0,5759** | **SÍ** | **`F = 2 h`** | 1,00 h | 2,00 h |
 | DESATADA `L = 1 h`, `F = 2 h`, `ρ = 1,5` | 3 863 s | 3,8× | 0,5365 | SÍ | `F = 2 h` | 1,00 h | 2,00 h |
 | DESATADA `L = 0,99 h`, `F = 5,3 h`, `ρ = 3` | 4 093 s | 3,6× | 0,2145 | SÍ | `F = 5,3 h` | 0,99 h | 5,30 h |
-| (h), `L = F = 2 h`, `ρ = 3` | 567 s | **26,0×** | 0,0787 | SÍ | `F = 2 h` | 2,00 h | 2,00 h |
+| (h), `L = F = 2 h`, `ρ = 3` ⚠️ **§F** | ~~567~~ → **5 346 s** | ~~26,0×~~ → **2,8×** | 0,7425 | SÍ | `F = 2 h` | 2,00 h | 2,00 h |
+| **(h) + desatada, `L = 1 h`, `F = 2 h`, `ρ = 3`** (§F.4) | **2 946 s** | **5,0×** | 0,4092 | SÍ | `F = 2 h` | 1,00 h | 2,00 h |
 
 **La fila «DESATADA `L = 1 h`, `F = 2 h`» domina a las dos atadas:** tiene el margen de sembrador de
 `F = 1 h` (**3,6×**), la frontera y la garantía de `F = 2 h`, y además **cumple la condición literal
@@ -604,6 +613,109 @@ de BDK (`W/κ = 0,576 ≤ 1`) sin necesidad del segundo VDF de (h)**. Lo único 
 falta para subirlo a VERIFICADO:** medir `P(dos honestos leen anclas distintas)` con `L < F` en un
 simulador con dos vistas de verdad — el defecto `d8b_b3` que la propuesta ya señala (§7.4). No lo he
 hecho en esta ronda.
+
+<a name="f"></a>
+## F · **CORRECCIÓN DE MI PROPIO PUNTO A/B/D/E EN SUS COLUMNAS «(h)»** — `r10c_f_correccion_h.py`, `salida_f.txt`
+
+**Lo que tenía mal.** Modelé la opción (h) heredando la premisa de 9c §E.5: *«`entropía_j` no se
+conoce hasta `t_j`»*. **Es falsa.** `entropía_j = VDF(chunk(I_j) ‖ salida(I_j), L·iter)` (R-FIN-14 (h))
+es función de **dos entradas públicas en `slot(I_j)`**: nadie la revela — **cada cual la calcula**. Un
+VDF retrasa por *trabajo secuencial*, no por *secreto*, y quien calcula más rápido la tiene antes.
+
+**La fuente primaria del repositorio ya lo decía**, y es de la ronda 7:
+`research/dag-poas-ancla-de-finalidad.md:319-322` — la revelación retardada *«reduce el lookahead de
+`L + I(1−1/v)` a **`(L + I)(1−1/v)`** para `v` finito, sin cambiar la cota con `v → ∞`»*. Es decir:
+con `v = ρ > 1` el lookahead **no** es `I(1−1/ρ)`. **9c §E.5 y la ronda 7 se contradicen, y la ronda 7
+tiene razón.** (Convergencia, no fuente: D8 ronda 10a llega a lo mismo por su cuenta el mismo día —
+`research/scripts/d8-ronda10a/`, commit `34157a2`, «la revelación NO se publica, se calcula». Adopto
+la corrección por la fuente primaria, y lo cito como convergencia independiente.)
+
+**El modelo corregido, sin instrumento nuevo.** El atacante necesita (i) saber **qué** bloque es el
+ancla — instante `T_j + W_dec` — y (ii) completar `L` slots de VDF a velocidad `ρ`, en **paralelo**
+con su cadena principal de PoT (dos líneas de AES independientes). Conoce `entropía_j` en
+`T_j + W_dec + L/ρ`. Eso es **el modelo del núcleo con `W_dec` sustituida por `W_dec + L/ρ`**, así que
+se resuelve con el mismo integrador ya validado en A0. Forma cerrada, **reproducida por el
+integrador sin una sola discrepancia**:
+
+```
+(h) CORREGIDA:   lookahead_max = (L + I)(1 − 1/ρ) − W_dec − 1      si ρ > 1;   0 si ρ ≤ 1
+```
+— la fórmula de la ronda 7, menos el `W_dec` (mi versión es `W_dec` más ajustada; el atacante
+también tiene que esperar a que el ancla cierre para saber qué VDF arrancar).
+
+### F.1 · Lo que cambia, número a número (`I = 851 s`, `α = 0,33` ⇒ `W_dec = 20 s`)
+
+| `L = F` | `ρ` | **(h) que publiqué** | **(h) CORREGIDA** | ronda 7 `(L+I)(1−1/ρ)` | núcleo | (h)/núcleo |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 h | 1,5 | 283,3 s | **1 462,7 s** | 1 483,7 | 3 862,7 | 37,9 % |
+| 1 h | 3 | 566,7 s | **2 946,3 s** | 2 967,3 | 4 146,3 | 71,1 % |
+| **2 h** | **1,5** | **283,3 s** | **2 662,7 s** | 2 683,7 | 7 462,7 | **35,7 %** |
+| **2 h** | **3** | **566,7 s** | **5 346,3 s** | 5 367,3 | 7 746,3 | **69,0 %** |
+| 2 h | 10 | 765,0 s | 7 224,9 s | 7 245,9 | 7 944,9 | 90,9 % |
+| 5,3 h | 3 | 566,7 s | 13 266,3 s | 13 287,3 | 19 626,3 | 67,6 % |
+
+**Y una afirmación mía que queda REFUTADA por completo:** «con (h) el lookahead es **independiente de
+`F`**». **No lo es**: escala con `L` (y con `F` si están atados). `F4` lo confirma: `L = 1 224 →
+1 362 s`, `L = 3 600 → 2 946 s`, `L = 7 200 → 5 346 s` a `ρ = 3`.
+
+### F.2 · Margen del sembrador y `W/κ`, corregidos
+
+| `L = F` | `ρ` | margen (h) **que publiqué** | margen (h) **CORREGIDO** | margen núcleo | `W/κ` (h) corregida | ¿BDK 1,00? |
+|---:|---:|---:|---:|---:|---:|:--:|
+| 1 h | 1,5 | 52,1× | **10,1×** | 3,8× | 0,4063 | SÍ |
+| 1 h | 3 | 26,0× | **5,0×** | 3,6× | 0,8184 | SÍ |
+| 1 h | 10 | 19,3× | 3,7× | 3,4× | 1,1069 | **no** |
+| **2 h** | **1,5** | 52,1× | **5,5×** | 2,0× | 0,3698 | SÍ |
+| **2 h** | **3** | 26,0× | **2,8×** | 1,9× | 0,7425 | SÍ |
+| 2 h | 10 | 19,3× | 2,0× | 1,9× | 1,0035 | **no** |
+
+**(h) sigue comprando, pero mucho menos de lo que dije:** reduce el lookahead al **36-71 %** del
+núcleo (no al 4-7 %), y el margen del sembrador sube de 1,9× a **2,8×** a `F = 2 h` con `ρ = 3` (no a
+26×). **Y deja de cumplir el umbral literal de BDK a `ρ = 10`.**
+
+### F.3 · La pinza con (h), corregida (sustituye a la fila «(h)» de §B.3)
+
+```
+(h) ATADA (L = F):   F ≥ (I(1−1/ρ) − W_dec) / (tope − 1 + 1/ρ)
+(h) DESATADA:        F ≥ [(L+I)(1−1/ρ) − W_dec] / tope
+```
+
+| tope | `I` | `ρ` | `F` pinza (h) **corregida** | (h) que publiqué | núcleo |
+|---:|---:|---:|---:|---:|---:|
+| **1,00** | 851 | 1,5 | **396 s** | 284 s | ∞ (imposible) |
+| **1,00** | 851 | 3 | **1 642 s** | 567 s | ∞ (imposible) |
+| **1,00** | 851 | 10 | **7 459 s (2,07 h)** | 766 s | ∞ (imposible) |
+| 1,22 | 851 | 1,5 | 297 s | 233 s | 1 198 s |
+| 1,22 | 851 | 3 | **989 s** | 465 s | 2 488 s |
+| 1,22 | 851 | 10 | 2 331 s | 628 s | 3 390 s |
+
+Sigue en pie lo esencial de §B: **con (h) se puede cumplir el umbral literal de BDK y sin (h) no**,
+solo que ahora cuesta `F ≥ 1 642 s` (`ρ=3`) en vez de 567 s, y a `ρ = 10` cuesta 2,07 h.
+
+### F.4 · Y (h) sobre la configuración desatada de §E — la que sale mejor parada
+
+| `L` | `F` | `ρ` | núcleo | (h) corregida | margen núcleo | margen (h) | `W/κ` núcleo | `W/κ` (h) |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 h | 2 h | 1,5 | 3 863 s | **1 463 s** | 3,8× | **10,1×** | 0,5365 | 0,2031 |
+| **1 h** | **2 h** | **3** | 4 146 s | **2 946 s** | 3,6× | **5,0×** | 0,5759 | 0,4092 |
+| 1 h | 5,3 h | 3 | 4 146 s | 2 946 s | 3,6× | 5,0× | 0,2173 | 0,1544 |
+
+**§E sobrevive intacta** (es una configuración del núcleo) y **(h) se compone con ella**: `L = 1 h`,
+`F = 2 h`, `ρ_max = 3` sube el margen de 3,6× a 5,0× **si además se paga el VDF** (40,7 % de un
+núcleo de verificación, §D.4). Sin él ya vale 3,6×, que era el objetivo.
+
+### F.5 · Controles y criterio de variación (`salida_f.txt` F4)
+
+`ρ = 1,0` → **0,0 s**; `ρ = 0,5` → **0,0 s** (sin reloj más rápido no adelanta ni el VDF ni la
+cadena). Depende de `L` (1 362 / 2 946 / 5 346 s) **y** de `I` (4 979 / 5 346 / 7 579 s a
+`I = 300 / 851 / 4 200`). La forma cerrada la reproduce el integrador en **las 24 filas** de F1, sin
+una sola marca de discrepancia.
+
+**Lo que NO he explorado y queda anotado:** la palanca `Lrev = L − S_max` que propone D8-10a (acortar
+el VDF de revelación). Medida aquí como comprobación: mueve el resultado de 5 346 s a 5 396 s
+(**+0,94 %**) a `ρ = 3`, `L = 7 200 s` — con **mi** parametrización va en la dirección contraria (un
+VDF más corto se termina antes y **adelanta** el conocimiento). Que D8-10a la proponga como mejora
+sugiere que su modelo de dónde arranca el VDF no es el mío; **no lo he reconciliado. LAGUNA.**
 
 <a name="reco"></a>
 ## Recomendación (con etiqueta)
@@ -626,9 +738,10 @@ hecho en esta ronda.
    **`W/κ = 0,576`, dentro del umbral literal de BDK**, sin segundo VDF. Se paga: tolerancia a
    particiones **1 h** en vez de 2 h.
 5. **Si se exige tolerancia a particiones de 2 h**, las opciones son `L = F = 2 h` (margen **1,9×**,
-   `W/κ = 1,08`, fuera de BDK) o **(h)** (margen **26×**, `W/κ = 0,079`), y (h) cuesta **81,3 % de un
+   `W/κ = 1,08`, fuera de BDK) o **(h)** — que, **corregida en §F**, da margen **2,8×** y
+   `W/κ = 0,743` (no 26× y 0,079, como escribí antes de la corrección) y cuesta **81,3 % de un
    núcleo** de verificación continua a `F = 2 h` / `I = 851 s` (**40,7 %** a `F = 1 h`) — §D.4,
-   PLAUSIBLE.
+   PLAUSIBLE. **(h) ya no es una bala de plata: reduce el lookahead al 36-71 % del núcleo, no al 5 %.**
 6. **Retirar `W/κ ≤ 1,22` como criterio** y sustituirlo por el literal `W ≤ κ` calculado sobre el
    lookahead real. Con `L` desatada **es alcanzable**; con `L = F` y `ρ > 1,024` **no lo es con
    ninguna `F`**. — DEMOSTRADO sobre el modelo de `W` de §B.2.
@@ -650,7 +763,7 @@ hecho en esta ronda.
 
 ```
 $ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d9-ronda10c/
-Scripts analizados: 9
+Scripts analizados: 10
 
 research/scripts/d9-ronda10c/r10c_lib.py
    [T1] L41: hf_delta0() recibe 'alpha' y NO lo usa
@@ -682,10 +795,11 @@ y el criterio `α` de las tablas se comprueba precisamente **comparando** las do
 |---|---|---|
 | **A** · lookahead honesto (`ρ = 1`) | **DEMOSTRADO** (R-FIN-14 a/b/e + código de Autonomys vía 9c §B.2) **+ VERIFICADO** | **0 slots.** `dag-poas-ancla-de-orden.md:374` (§4.8, «todo granjero conoce sus victorias `L` por adelantado») queda **REFUTADO** bajo R-FIN-14 |
 | **A** · lookahead del atacante, núcleo | **VERIFICADO** (dos instrumentos, 0,274 % de discrepancia) | `(L − W_dec) + I(1 − 1/ρ)`; a `F = 2 h`, `I = 851`, `α = 0,33`: **7 462,7 s (`ρ=1,5`)**, **7 746,3 s (`ρ=3`)**; **0 si `ρ ≤ 1`** |
-| **A** · lookahead con (h) | **VERIFICADO** | `I(1 − 1/ρ)`, **independiente de `F`**: 283,3 s (`ρ=1,5`), 566,7 s (`ρ=3`), 765,0 s (`ρ=10`) |
-| **A** · ¿sobrevive el sembrador? | **VERIFICADO** | **Sí para todo `ρ > 1`** (margen 1,91× a `F=2 h`, 3,56× a `F=1 h`, con `ρ=3`); **no para `ρ ≤ 1`** (margen ∞); **casi no, con (h)** (26-52×) |
+| **A** · lookahead con (h) | **REFUTADO por mí mismo en §F** | Publiqué `I(1−1/ρ)` («independiente de `F`»). Lo correcto es **`(L+I)(1−1/ρ) − W_dec`**, que **sí depende de `F`**: **2 662,7 / 5 346,3 / 7 224,9 s** (`ρ = 1,5 / 3 / 10`, `F = 2 h`). La premisa falsa venía de 9c §E.5; la ronda 7 (`ancla-de-finalidad.md:319-322`) ya lo tenía bien |
+| **A** · ¿sobrevive el sembrador? | **VERIFICADO** | **Sí para todo `ρ > 1`** (margen 1,91× a `F=2 h`, 3,56× a `F=1 h`, con `ρ=3`); **no para `ρ ≤ 1`** (margen ∞); **sí también con (h)**, con margen 2,8× a `F=2 h` (§F, corregido: no 26×) |
 | **A** · `δ_ancla` medido (12 semillas) | **VERIFICADO** | media 1,05-3,25 s, máx **10 s**; propaga **+0,13 %** al lookahead. Despreciable |
 | **B** · ¿es la pinza un artefacto? | **el mecanismo, PLAUSIBLE; el número, REFUTADO** | `W = F + I` es el rincón `ρ→∞`. Pinza real: **1 198 s (`ρ=1,5`) / 2 488 s (`ρ=3`)** con `I = 851`, frente a **3 868 s** publicados: **1,55-3,2× menos** |
+| **F** · mi propia corrección de (h) | **REFUTADO** lo que publiqué, **VERIFICADO** lo corregido | `(L+I)(1−1/ρ) − W_dec` reproduce la fórmula de la ronda 7 en las 24 filas de F1; margen (h) 2,8-5,5× a `F=2 h`; pinza (h) 989 s (tope 1,22) / 1 642 s (tope 1,00); (h) deja de cumplir BDK a `ρ = 10` |
 | **B** · `W/κ` con `ρ ≤ 1` | **VERIFICADO** | **0,0007 a `F = 2 h`** (`W = 1 + λD = 5` bloques). Tres órdenes **dentro** de BDK, no un 22 % fuera |
 | **B** · el 1,22 | **DEMOSTRADO que no es un umbral** | BDK marca **1,00**; `W/κ = 1 + I/F > 1` siempre ⇒ criterio insatisfacible bajo la `W` vieja. El 1,22 es el valor que salió a `F = 3,2 h` |
 | **B** · porte del ataque de BDK a PoAS | **LAGUNA** | Nadie lo ha modelado; con R-FIN-8′ el sobornado **pierde su coinbase**, lo que rompe el «arbitrarily small stake». Hace falta el modelo de soborno con coste de oportunidad |
@@ -721,9 +835,17 @@ y el criterio `α` de las tablas se comprueba precisamente **comparando** las do
    en `r9c_lib` significa **retener para siempre**, no publicar con retraso; por eso `tips_pub = 0` y
    `liberados = 0`. Lo que mide es «el atacante retiene todos sus bloques», que es el peor caso para
    `δ_ancla`, pero **no es una retención temporal**. Declarado en el propio informe.
-7. **No he vuelto a medir `W_dec`**: uso la de 9c (`salida_c4.txt`), con su LAGUNA de resolución
+7. **El error más grande de la ronda: mis columnas «(h)» de A, B, D y E estaban mal** (§F). Heredé
+   la premisa de 9c §E.5 sin rederivarla, y era falsa: el VDF de revelación retardada tiene entradas
+   públicas, así que **no lo revela nadie, lo calcula cada cual**, y un reloj `ρ` veces más rápido lo
+   termina `L(1−1/ρ)` antes. **La fuente que lo desmentía estaba en el repositorio desde la ronda 7**
+   (`dag-poas-ancla-de-finalidad.md:319-322`) y yo la había leído y citado **en la propia §A.3, para
+   otra cosa**. Coste del error: publiqué margenes de sembrador de 26-52× donde son 2,8-5,5×, un
+   factor 9. Corregido en §F con el mismo integrador ya validado; el resto del informe no cambia.
+   La misma corrección la encontró D8-10a el mismo día por su cuenta (`34157a2`).
+8. **No he vuelto a medir `W_dec`**: uso la de 9c (`salida_c4.txt`), con su LAGUNA de resolución
    declarada (rejilla `{0,10,20,45,…}`, tope de 10 candidatos). Todo el punto A y la pinza corregida
    heredan esa resolución.
-8. **`L ≥ F_carrera` (§E) es un argumento, no una medición.** No he simulado la discrepancia de ancla
+9. **`L ≥ F_carrera` (§E) es un argumento, no una medición.** No he simulado la discrepancia de ancla
    con dos vistas honestas distintas, que es el defecto `d8b_b3` que la propuesta ya señala. Por eso
    §E es PLAUSIBLE y no VERIFICADO.
