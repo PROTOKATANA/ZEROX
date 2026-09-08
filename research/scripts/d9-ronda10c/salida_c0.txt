@@ -19,12 +19,13 @@ N1 · CONTROL NEGATIVO alpha = 0
    prev(0, ...) = 0.000e+00   (debe ser 0)
 
 P4 · criterio de variacion sobre el instrumento nuevo (lookahead, punto A)
-     rho  F=1h nucleo  F=2h nucleo  F=2h con (h)  (s)
-     0.5            0            0             0
-       1            0            0             0
-       1         4406         8006           851
-     1.5         4406         8006           851
-       3         4406         8006           851
-   -> cambia con rho (0 <-> saturado) y con F (nucleo) y NO cambia con F bajo (h): correcto.
+       rho  F=1h nucleo  F=2h nucleo  F=1h con (h)  F=2h con (h)  (s)
+       0.5            0            0             0             0
+         1            0            0             0             0
+         1         3554         7154             0             0
+       1.5         3838         7438           283           283
+         3         4121         7721           567           567
+        10         4320         7920           765           765
+   -> cambia con rho (0 <-> saturado) y con F (nucleo), y bajo (h) NO cambia con F: correcto.
 
-[265 s]
+[272 s]

@@ -49,62 +49,11 @@ def hf_d8(alpha):
 
 
 # ------------------------------------------------- A · frente de conocimiento del PoT (R-FIN-14)
-def tope_conocimiento(F_seg, I_seg, w_dec, retardada):
-    """Cota SUPERIOR del lookahead en slots, en el peor instante del diente de sierra.
-
-    Nucleo (R-FIN-14 a-g): en el instante u el atacante conoce `entropia_j` de toda epoca cuya
-    ancla este cerrada (T_j + w_dec <= u); esa inyeccion surte efecto en t_j ~ T_j + F, luego la
-    ultima que conoce cumple t_j <= u + F - w_dec, y puede encadenar AES hasta t_{j+1} - 1.
-    Opcion (h) (revelacion retardada): `entropia_j` no existe hasta t_j, luego t_j <= u.
-    """
-    base = 0.0 if retardada else (F_seg - w_dec)
-    return base + I_seg          # peor instante del diente de sierra
-
-
-def tope_conocimiento_medio(F_seg, I_seg, w_dec, retardada):
-    """Media del diente de sierra: la cota cae linealmente de tope a tope - I entre inyecciones."""
-    return tope_conocimiento(F_seg, I_seg, w_dec, retardada) - I_seg / 2.0
-
-
-def lookahead(rho, F_seg, I_seg, w_dec, retardada, t_desde_inicio=None):
-    """Lookahead REAL = min(tope de conocimiento, ventaja de computo acumulada).
-
-    La cadena de PoT es AES-128 secuencial: el atacante avanza `rho` slots por segundo y la
-    cadena canonica 1 slot/s, luego gana (rho - 1) slots por segundo. Con rho <= 1 no gana
-    ninguno y su lookahead se queda donde estaba (0 si empieza en 0).
-    """
-    tope = tope_conocimiento(F_seg, I_seg, w_dec, retardada)
-    if rho <= 1.0:
-        return 0.0
-    if t_desde_inicio is None:
-        return tope
-    return min(tope, (rho - 1.0) * t_desde_inicio)
-
-
-def bootstrap(rho, F_seg, I_seg, w_dec, retardada):
-    """Segundos de reloj hasta saturar el tope. Infinito si rho <= 1."""
-    if rho <= 1.0:
-        return float("inf")
-    return tope_conocimiento(F_seg, I_seg, w_dec, retardada) / (rho - 1.0)
-
-
-# ------------------------------------------------------------------- B · ventana de prediccion
-def w_sobre_kappa(look_seg, F_seg):
-    """BDK Def. 6: W y kappa en BLOQUES. kappa = F * lambda; W = lookahead * lambda."""
-    return (look_seg * LAM) / (F_seg * LAM)
-
-
-def F_de_la_pinza(I_seg, w_dec, tope_wk, retardada):
-    """F minima que impone la pinza si se exige W/kappa <= tope_wk con el lookahead del nucleo.
-
-    Nucleo: W/kappa = (F + I - w_dec)/F = 1 + (I - w_dec)/F  =>  F >= (I - w_dec)/(tope_wk - 1).
-    (h): W = I, independiente de F  =>  F >= I/tope_wk.
-    """
-    if retardada:
-        return I_seg / tope_wk
-    if tope_wk <= 1.0:
-        return float("inf")
-    return max(0.0, (I_seg - w_dec)) / (tope_wk - 1.0)
+# (Las funciones `tope_conocimiento`, `tope_conocimiento_medio`, `lookahead`, `bootstrap` y
+#  `F_de_la_pinza` del primer esbozo de esta ronda se han BORRADO: eran formas cerradas con la
+#  opcion (h) mal acotada (devolvia `I` en vez de `I(1-1/rho)`) y una pinza escrita sobre ellas.
+#  Se sustituyen por `cinematica` / `cinematica_rapida`, que simulan y no postulan. El error va
+#  declarado en el informe, seccion "Errores propios", punto 1.)
 
 
 # =============================================================================================

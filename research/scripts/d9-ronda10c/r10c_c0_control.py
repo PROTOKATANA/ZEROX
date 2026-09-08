@@ -51,11 +51,12 @@ print(f"   prev(0, ...) = {L.prev(0.0, 1.0, 600, 3*L.K, 1.0):.3e}   (debe ser 0)
 
 # ---- P4 · criterio alpha/rho sobre el instrumento NUEVO (lookahead)
 print("\nP4 · criterio de variacion sobre el instrumento nuevo (lookahead, punto A)")
-print(f"   {'rho':>5} {'F=1h nucleo':>12} {'F=2h nucleo':>12} {'F=2h con (h)':>13}  (s)")
-for rho in (0.5, 1.0, 1.0001, 1.5, 3.0):
-    l1 = L.lookahead(rho, 3600.0, 851.0, L.W_DEC, False)
-    l2 = L.lookahead(rho, 7200.0, 851.0, L.W_DEC, False)
-    l3 = L.lookahead(rho, 7200.0, 851.0, L.W_DEC, True)
-    print(f"   {rho:>5.4g} {l1:>12.0f} {l2:>12.0f} {l3:>13.0f}")
-print("   -> cambia con rho (0 <-> saturado) y con F (nucleo) y NO cambia con F bajo (h): correcto.")
+print(f"   {'rho':>7} {'F=1h nucleo':>12} {'F=2h nucleo':>12} {'F=1h con (h)':>13} {'F=2h con (h)':>13}  (s)")
+for rho in (0.5, 1.0, 1.0001, 1.5, 3.0, 10.0):
+    l1 = L.cinematica_rapida(rho, 3600.0, 851.0, L.W_DEC, False)[0]
+    l2 = L.cinematica_rapida(rho, 7200.0, 851.0, L.W_DEC, False)[0]
+    l3 = L.cinematica_rapida(rho, 3600.0, 851.0, L.W_DEC, True)[0]
+    l4 = L.cinematica_rapida(rho, 7200.0, 851.0, L.W_DEC, True)[0]
+    print(f"   {rho:>7.4g} {l1:>12.0f} {l2:>12.0f} {l3:>13.0f} {l4:>13.0f}")
+print("   -> cambia con rho (0 <-> saturado) y con F (nucleo), y bajo (h) NO cambia con F: correcto.")
 print(f"\n[{time.time()-t0:.0f} s]")

@@ -650,7 +650,7 @@ hecho en esta ronda.
 
 ```
 $ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d9-ronda10c/
-Scripts analizados: 8
+Scripts analizados: 9
 
 research/scripts/d9-ronda10c/r10c_lib.py
    [T1] L41: hf_delta0() recibe 'alpha' y NO lo usa
@@ -669,6 +669,11 @@ y el criterio `α` de las tablas se comprueba precisamente **comparando** las do
 
 > Dos marcas T3 (`bo != bo`, el test de NaN idiomático) aparecieron en la primera pasada y se
 > **eliminaron reescribiendo con `math.isnan`**, que es más claro y no dispara al detector.
+> Y se **borraron de la librería** las formas cerradas del primer esbozo (`tope_conocimiento`,
+> `lookahead`, `bootstrap`, `F_de_la_pinza`), que tenían la opción (h) mal acotada: no debe viajar
+> en el entregable una función equivocada junto a la buena. Tras borrarlas, `r10c_b`, `r10c_d` y
+> `r10c_e` se re-ejecutaron y dan salidas **idénticas** (`diff` limpio), y `r10c_c0` se reescribió
+> para que su control P4 use `cinematica_rapida`.
 
 <a name="veredicto"></a>
 ## Veredicto
