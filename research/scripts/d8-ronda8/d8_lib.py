@@ -79,9 +79,15 @@ class MundoL9(Mundo):
         self.n_intentos = 0
         self.n_bloques_priv = 0
         self.n_bloques_perdidos = 0
+        self.n_score_ok = 0
         self.tam_rafagas = []
 
-    def corre_l9(self, J=31, d_fork=1, giveup=None, modo="cadena"):
+    def corre_l9(self, J=31, d_fork=1, giveup=None, modo="cadena", vista_sp="honesta"):
+        """`vista_sp`: 'honesta' = el sp que el nodo honesto USA en t (solo lo ya entregado)
+        — es contra ese contra el que hay que ganar para que la red cambie de cadena.
+        'paper'   = la vista omnisciente del atacante, INCLUIDO lo que aun viaja. Es lo que
+        hacia el codigo heredado; sobreestima al honesto y RETRASA la publicacion.
+        D8 corrige a 'honesta' por defecto y mide las dos (defecto declarado, informe §0.3)."""
         d = DAG(k=self.k, u2=True, u3_mode=self.u3_mode,
                 max_parents=self.mp, mergeset_limit=self.msl)
         g = d.genesis()
@@ -90,6 +96,7 @@ class MundoL9(Mundo):
         ancla = None
         self.n_rafagas = self.n_abandonos = self.n_intentos = 0
         self.n_bloques_priv = self.n_bloques_perdidos = 0
+        self.n_score_ok = 0
         self.tam_rafagas = []
 
         for i, (t, quien, sd, sde, ident) in enumerate(self.ev):
@@ -103,8 +110,8 @@ class MundoL9(Mundo):
                 continue
 
             # ---- atacante: ve TODO lo entregado al instante (paper L1024-1027) ----
-            pub = [h for h in llega]                       # lo que el honesto ya tiene o tendra
-            sp_h = d.virtual_sp(pub)                       # padre seleccionado honesto B
+            pub = [h for h in llega]                       # vista omnisciente (paper L1024-1027)
+            sp_h = d.virtual_sp(pub if vista_sp == "paper" else visibles)
 
             if not priv:                                   # abrir rafaga nueva
                 ch = d.selected_chain(sp_h)
@@ -119,6 +126,17 @@ class MundoL9(Mundo):
                     padres = [ancla]
                 else:
                     padres = list(priv[-(self.mp):])       # cierre: fusiona los ultimos
+            elif modo == "parasito":
+                # NUEVO EN D8. Cadena privada PARASITA: cada bloque fusiona la vista HONESTA
+                # del instante (todo lo ya entregado, con retardo Delta) MAS la punta privada.
+                # Asi el atacante hereda el blue_work honesto y su ventaja crece a ritmo alpha,
+                # sin carrera. Ninguna estrategia de D9-c/d/e/f hace esto: todas publican
+                # inmediatamente o con retraso fijo, nunca acumulan una cadena que fusione.
+                ph = self._padres(d, visibles)
+                if priv:
+                    padres = [priv[-1]] + [x for x in ph if x != priv[-1]][:self.mp - 1]
+                else:
+                    padres = ph[:self.mp]
             else:
                 raise ValueError(modo)
             bid = f"a{i}"
@@ -130,6 +148,8 @@ class MundoL9(Mundo):
 
             # ---- condicion de publicacion del Lema 9 ----
             tip_p = max(priv, key=d._key)
+            if d._key(tip_p) > d._key(sp_h):
+                self.n_score_ok += 1
             if len(priv) >= J and d._key(tip_p) > d._key(sp_h):
                 for b in priv:
                     llega[b] = t                            # entrega instantanea (paper)
@@ -180,15 +200,32 @@ class MundoDosVistas(Mundo):
 
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
+        self.sem = a[2] if len(a) > 2 else kw.get("seed", 0)
         self.n_div_tip = 0
         self.n_muestras = 0
+        self.n_sesgados = 0
+        self.n_ambos = 0
+
+    @staticmethod
+    def _entrega(d, llega, bid, t):
+        """Entregar un bloque implica entregar TODO su pasado: un nodo no puede validar
+        `bid` sin sus ancestros (headers-first). Es la correccion de D8 al modelo heredado,
+        y limita el poder de retencion: en cuanto un honesto construye sobre un bloque
+        sesgado, el OTRO nodo lo recibe al pedir los ancestros."""
+        if bid in llega and llega[bid] <= t:
+            return
+        llega[bid] = min(llega.get(bid, float("inf")), t)
+        for a in d.anc[bid]:
+            if a not in llega or llega[a] > t:
+                llega[a] = t
 
     def corre_2v(self, sesgo="A", pol="tips", frac_sesgada=1.0):
         """`sesgo`: 'ambos' (control), 'A' (todo al nodo A), 'B', 'alterna'.
         `frac_sesgada`: fraccion de bloques del atacante que se sesgan; el resto va a los dos.
         Devuelve (d, llegaA, llegaB)."""
         import random
-        rng = random.Random(hash((self.alpha, self.T, sesgo)) & 0xFFFF)
+        rng = random.Random(hash((self.alpha, self.T, sesgo, self.sem)) & 0xFFFFFF)
+        self.n_sesgados = self.n_ambos = 0
         d = DAG(k=self.k, u2=True, u3_mode=self.u3_mode,
                 max_parents=self.mp, mergeset_limit=self.msl)
         g = d.genesis()
@@ -205,11 +242,11 @@ class MundoDosVistas(Mundo):
                 if not ok:
                     continue
                 if nodo == "A":
-                    llegaA[bid] = t
-                    llegaB[bid] = t + DELTA
+                    self._entrega(d, llegaA, bid, t)
+                    self._entrega(d, llegaB, bid, t + DELTA)
                 else:
-                    llegaB[bid] = t
-                    llegaA[bid] = t + DELTA
+                    self._entrega(d, llegaB, bid, t)
+                    self._entrega(d, llegaA, bid, t + DELTA)
             else:
                 # atacante: vista completa de LO ENTREGADO A CUALQUIERA (sin retardo)
                 todos = list(set(llegaA) | set(llegaB))
@@ -232,12 +269,15 @@ class MundoDosVistas(Mundo):
                 if sesgo == "alterna":
                     dest = "A" if rng.random() < 0.5 else "B"
                 if not sesgar or sesgo == "ambos":
-                    llegaA[bid] = t
-                    llegaB[bid] = t
+                    self._entrega(d, llegaA, bid, t)
+                    self._entrega(d, llegaB, bid, t)
+                    self.n_ambos += 1
                 elif dest == "A":
-                    llegaA[bid] = t                 # B no lo ve NUNCA
+                    self._entrega(d, llegaA, bid, t)   # B solo por cierre de ancestros
+                    self.n_sesgados += 1
                 else:
-                    llegaB[bid] = t
+                    self._entrega(d, llegaB, bid, t)
+                    self.n_sesgados += 1
         return d, llegaA, llegaB
 
 

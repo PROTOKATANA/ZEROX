@@ -59,3 +59,41 @@ Resultado: PENDIENTE (§A0).
 TENSIÓN / LAGUNA. 7. Fichero y línea, o LAGUNA. 11. Adversario del paper, sin retardo.
 
 ---
+
+## A0 · Validación del instrumento — **REPRODUCIDO**
+
+Encargo: reproducir `m_SLOT = 2,54` en las 12 semillas de `d9-ronda8f/salida_b1_gran1.txt`.
+
+Ejecutado `python3 d9-ronda8f/r8f_b1_slot.py 1.0` de cero (`salida_a0_reproduccion.txt`).
+`diff` contra `salida_b1_gran1.txt` **a partir de la línea 9: idéntico salvo el tiempo de
+ejecución** (623 s vs 652 s). En particular:
+
+| copias | α | `m_BS` | **`m_SLOT`** | `ancla!=` | `equiv!=` |
+|---:|---:|---:|---:|---:|---:|
+| 14 | 0,00 | 1,000 | **1,000** | 462 / 1 764 | 0 |
+| 14 | 0,25 | 6,052 | **2,540** | 18 404 / 26 838 | 0 |
+| 14 | 0,40 | 6,167 | **3,024** | 28 938 / 37 674 | 0 |
+
+Criterio `α` ✓ (`α=0 ⇒ m=1`). Capacidad ✓ (`ancla!=` ≫ 0: las dos anclas **no** son la misma
+columna). Equivalencia «primer bloque con `slot ≥ S`» ≡ «menor `blue_work` con `slot ≥ S`» ✓
+(0 discrepancias en 26 838 comprobaciones).
+
+**Qué hice con `d8_lib.py`** (el fichero del D8 muerto): lo **leí entero, encontré un defecto,
+lo corregí y lo extendí**. No lo di por bueno. En detalle:
+
+1. **Defecto corregido.** `corre_l9` usaba `sp_h = d.virtual_sp(todo lo entregado)`, que
+   incluye los bloques **aún en vuelo** (`llega = t+Δ`). Eso no es el padre seleccionado que
+   el honesto usa en `t`: sobreestima al honesto y **retrasa la publicación de la ráfaga**,
+   es decir, debilita al atacante. Ahora es un parámetro `vista_sp` con `'honesta'` por
+   defecto (la vista real del nodo) y `'paper'` como control.
+2. **Extensión: `modo='parasito'`** (nuevo, no existía en D9-c/d/e/f). Cada bloque privado
+   fusiona la **vista honesta del instante** más la punta privada, así que el atacante
+   hereda el `blue_work` honesto y su ventaja crece a ritmo `α` **sin carrera**. Toda la
+   familia de D9 publica inmediatamente o con retraso fijo; ninguna acumula una cadena que
+   fusione. Es la maniobra que hace ejecutable el Lema 9 con `α < 1/2` (§A1).
+3. **Extensión: cierre de ancestros en la entrega** (`MundoDosVistas._entrega`). Entregar un
+   bloque entrega **todo su pasado**: un nodo no valida sin ancestros. El código heredado
+   entregaba bloques sueltos, lo que **sobreestimaba** el poder de retención selectiva.
+4. **Contadores nuevos:** `n_score_ok` (veces que se cumplió la condición de score del Lema 9
+   aunque faltaran bloques), `n_sesgados`, `n_ambos`.
+
