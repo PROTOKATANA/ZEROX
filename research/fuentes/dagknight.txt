@@ -1,0 +1,1703 @@
+The DAG KNIGHT Protocol: A Parameterless Generalization of
+Nakamoto Consensus
+February 23, 2023
+Michael Sutton
+msutton@cs.huji.ac.il
+Independent Researcher
+Yonatan Sompolinsky
+ysompolinsky@fas.harvard.edu
+Harvard University
+ABSTRACT
+In 2008 Satoshi wrote the first permissionless consensus protocol,
+known as Nakamoto Consensus (NC), and implemented in Bitcoin.
+A large body of research was dedicated since to modify and extend
+NC, in various aspects: speed, throughput, energy consumption,
+computation model, and more [ 4]. One line of work focused on
+alleviating the security-speed tradeoff which NC suffers from by
+generalizing Satoshi’s blockchain into a directed acyclic graph of
+blocks, a block DAG. Indeed, the block creation rate in Bitcoin must
+be suppressed in order to ensure that the block interval is much
+longer than the worst case latency in the network. In contrast, the
+block DAG paradigm allows for arbitrarily high block creation rate
+and block sizes, as long as the capacity of nodes and of the net-
+work backbone are not exceeded. Still, these protocols, as well as
+other permissionless protocols, assume an a priori bound on the
+worst case latency, and hardcode a corresponding parameter in
+the protocol. Confirmation times then depend on this worst case
+bound, even when the network is healthy and messages propagate
+very fast. In this work we set out to alleviate this constraint, and
+create the first permissionless protocol which contains no a pri-
+ori in-protocol bound over latency. KNIGHT is thus responsive to
+network conditions, while tolerating a corruption of up to 50% of
+the computational power (hashrate) in the network. To circumvent
+an impossibility result by Pass and Shi [ 16], we require that the
+client specifies locally an upper bound over the maximum adver-
+sarial recent latency in the network. KNIGHT is an evolution of
+the PHANTOM paradigm [20], which in turn is a parameterized
+generalization of NC.
+1 INTRODUCTION
+The first permissionless consensus protocol, Nakamoto Consensus
+(NC), was created in 2008 by Bitcoin’s originator Satoshi Nakamoto
+[13]. Permissionless is defined as an environment where the set of
+participants is not a priori known and fixed. Since its introduction,
+the research community offered many variants that improve upon
+NC in terms of speed, throughput, energy consumption, computa-
+tion model, and more [4].
+One line of work focused on alleviating the speed-security trade-
+off, by generalizing Satoshi’s blockchain into a directed acyclic
+graph of blocks – a block DAG [11, 19, 20]. Whereas in NC each
+block references a single predecessor, and a single chain within
+the resulting tree is extended, in DAG-based constructions blocks
+reference multiple predecessors. Blocks are thus created much more
+frequently than Bitcoin’s 10 minutes interval, typically multiple
+blocks per one unit of network delay. This asynchronous operation
+mode opens up the possibility of conflicts across blocks created in
+parallel. The heart of the consensus protocol is its conflict resolution
+rule, which is written in the form of a DAG ordering algorithm—
+each node runs locally a procedure that takes as input the block
+DAG visible to it and returns a linear ordering over its blocks, and
+by implication over its transactions. This ordering ensures and
+recovers consistency: The first of any set of conflicting transactions
+is accepted, and the rest are ignored and skipped over. As any
+consensus protocol, this procedure must satisfy the property that
+all nodes eventually agree on the ordering.
+KNIGHT is a parameterless DAG-based consensus—the protocol
+assumes no upper bound on the network’s latency. In other words,
+the ordering procedure of KNIGHT does not take as input parame-
+ters representing the network’s assumed latency. To the best of our
+knowledge, KNIGHT is the first permissionless parameterless con-
+sensus protocol that is secure against any attacker with less than
+50% of the computational power in the network. These properties
+put KNIGHT at an inherently stronger spot than its counterparts:
+It is both faster and more secure, since it makes fewer assumptions
+and operates properly despite varying network conditions.
+1.1 KNIGHT optimization framework
+Conceptually, KNIGHT is an evolution of the PHANTOM opti-
+mization framework [20], which in turn is an evolution of NC. In
+NC, the longest chain of blocks within the tree is selected and ex-
+tended. PHANTOM generalizes the longest chain rule: Rather than
+selecting the longest chain, it selects the largest sufficiently con-
+nected subset of blocks. The following definition from [20] captures
+“well-connectedness”:
+Definition 1. Given a DAG𝐺 =(C,𝐸), a subset𝑆⊆C is called a
+𝑘-cluster, if∀𝐵∈𝑆 :|𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵)∩𝑆|≤𝑘.
+Here, the anticone of a block is the set of blocks whose order
+with respect to it is not dictated by the DAG topology; see Figure 2.
+Formally, PHANTOM solves the following optimization problem:
+PHANTOM Optimization: Maximum 𝑘-cluster sub-
+DAG (𝑀𝐶𝑆𝑘 )
+Input: DAG𝐺 =(C,𝐸),𝑘
+Output: A subset𝑆★⊂C of maximum size, s.t.𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵)∩
+𝑆★≤𝑘 for all𝐵∈𝑆★.
+Similarly to other parameterized consensus protocols, the param-
+eter k of PHANTOM represents an upper bound on the network’s
+latency (technically, on the number of blocks per one unit of delay,
+with high probability). Observe that for𝑘 = 0, PHANTOM coincides
+with NC, as the longest chain is the largest 0-cluster. Indeed, when
+the block interval is large (e.g., Bitcoin’s 10 minutes per block), the
+latency parameter𝑘 can be set to 0. In contrast, a system enjoying a
+1
+Michael Sutton and Yonatan Sompolinsky
+(a)𝛼 = 0.05,𝑘 = 2
+ (b)𝛼 = 0.25,𝑘 = 4
+ (c)𝛼 = 0.45,𝑘 = 7
+Figure 1: KNIGHT optimization illustrated. The figures show a fixed honest DAG on the left, alongside an attacker on the right.
+The attacker’s byzantine fraction grows from𝛼 = 0.05 in 1a to𝛼 = 0.45 in 1c. The algorithm finds a𝑘-cluster of minimum width
+(𝑘+ 1) sufficient to cover at least 50% of the DAG, thereby outweighing the minority attacker.
+high block creation rate would require setting𝑘 to be much larger.
+For instance, in Kaspa, a cryptocurrency based on PHANTOM, the
+block interval was set to 1 second, and 𝑘 was hardcoded with a
+value of 18, reflecting an assumption of𝐷≤ 10 seconds; see [2] for
+a live visualization of the live DAG of Kaspa.
+In contrast, KNIGHT offers an alternative optimization frame-
+work, which does not pre-assume a latency bound:
+KNIGHT Optimization: Minimal 𝑘 Majority Cluster
+sub-DAG (𝑀𝑘𝑀𝐶 )
+Input: DAG𝐺 =(C,𝐸)
+Output: A subset 𝑆★ = 𝑀𝐶𝑆𝑘(𝐺), s.t. 𝑘 is minimal and
+|𝑆★|≥ |𝐶|
+2 .
+B
+g
+B
+g g
+B
+Figure 2: The topology of a block-DAG induces a partial or-
+dering over blocks. The figure on the left marks blocks prov-
+ably created after block 𝐵, which are called its future set.
+Similarly, the figure on the middle marks blocks provably
+created before 𝐵, its past set. The right-most figure marks
+blocks whose ordering with respect to 𝐵 is ambiguous and
+must be dictated and agreed by the consensus protocol.
+That is, rather than selecting the largest𝑘-cluster for one prede-
+termined value of𝑘, we select the largest𝑘-cluster for each value
+of𝑘, and pick the minimal𝑘 whose maximizing cluster covers 50%
+of the DAG. We thus utilize the honest majority assumption to
+recognize a subset of blocks that are sufficient to counter an attack.
+In this way, we avoid the need to know𝑘 in advance, and allow the
+protocol to self-adjust to the real time latency. The actual KNIGHT
+protocol contains more components than the optimization problem
+𝑀𝑘𝑀𝐶 , not merely for efficiency but also for security consider-
+ations – primarily, natural or malicious changes in the latency 1
+– as will be described formally in Section 2. See Figure 1 for an
+illustration of KNIGHT’s optimization dynamics.
+1.2 Parameterlessness
+KNIGHT differs from previous work on proof-of-work-based con-
+sensus protocols which typically operate in the synchronous setup
+and assume an a priori upper bound over 𝐷, either explicitly or
+implicitly. For instance, Bitcoin’s difficulty adjustment algorithm
+is targeting a block creation rate of𝜆 = 1/600 blocks per second,
+which reflects an underlying assumption that 𝐷≪ 600 seconds.
+Similarly, when instantiating the PHANTOM protocol, one must
+pre-configure the protocol’s𝑘 parameter which represents the ex-
+pected number of blocks created in one unit of delay, reflecting an
+assumption that𝐷≪ 𝑘+1
+𝜆 .
+Parameterlessness has two implications. First, confirmation times
+in parameterized protocols are typically limited by their parameter—
+they are a function of the hardcoded parameter, regardless of the
+network’s actual latency. Thus, even when the actual latency of
+blocks in Bitcoin is 1 or 2 seconds (as is the situation for most of
+the time, see [1]), the protocol’s convergence times is in the order
+of tens of minutes. Similarly, Kaspa’s convergence time remains in
+the order of tens of seconds even when its latency is way below 10
+seconds.
+As a parameterless protocol, KNIGHT avoids this shortcoming
+and allows the network to converge according to its actual condi-
+tions. Thus, when the network’s adversarial latency is very low, the
+ordering of KNIGHT will converge immediately, allowing clients
+to confirm transactions within a few Internet RTTs (Round Trip
+Times); and when the network is slow and clogged, the ordering
+will take longer to converge and transactions longer to confirm.
+Crucially, we emphasize that this responsiveness is with respect to
+the worst-case adversarial latency; in Subsection 1.4 we distill this
+nuance.
+Figures 3 and 4 demonstrate this effect. In the former, a DAG of
+various “widths” is presented, corresponding to different network
+latencies. When the network is speedy, miners are aware of almost
+1When the delay is roughly constant, KNIGHT coincides with PHANTOM, and in
+particular when the delay is negligible, it coincides with NC.
+2
+The DAG KNIGHT Protocol: A Parameterless Generalization of Nakamoto Consensus
+(a)𝐷 = 2,𝑘 = 4, conf. time = 12
+0
+12
+ (b)𝐷 = 1,𝑘 = 1, conf. time = 6
+0
+6
+ (c)𝐷 = 0.1,𝑘 = 0, conf. time = 1.2
+0
+1.2
+time (seconds)
+Figure 3: Confirmation times of KNIGHT under various network conditions. As the latency decreases from 2 seconds per block
+message in (3a) to 0.1 seconds in (3c), 𝑘 decreases from 4 to 0, and confirmation times improve from 12 to 1.2 seconds. Observe
+that the algorithm correctly recognizes a cluster of minimal width (=𝑘+ 1) which still covers at least 50% of the corresponding
+DAGs (𝑘 = 4, 1, 0 in 3a, 3b, 3c, respectively) as required by KNIGHT’s optimization framework. The depicted DAGs are a result
+of a simulation of a network mining 𝜆 = 3.75 blocks per second and an (invisible, secret) attacker with 𝛼 = 0.2; the required
+confidence parameter was set to 𝜖 = 0.05.
+all blocks created by their peers, blocks enjoy small anticones (or
+“gaps”) of size 1 at most, and transactions can be confirmed quickly.
+On the other extreme, many blocks are created in parallel, blocks
+suffer from larger anticones, and transactions take longer to con-
+firm. This scenario represents either a slow down in the network,
+or a system intentionally parameterized with a high block rate,
+e.g.,𝜆 = 10 blocks per second. Figure 4 further compares the effect
+of varying network conditions on parameterized protocols (e.g.,
+NC, PHANTOM) and parameterless ones (e.g., KNIGHT). The con-
+firmation times in the former protocols are constant, accounting
+to the hardcoded latency-dependent parameter; worse yet, when
+the network suffers an anomaly, and message delays violate the
+bound, transactions cannot be confirmed altogether. In contrast,
+the confirmation times of parameterless protocols correspond to
+the (bound of the client over the maximum) current latency in the
+0
+Network latency (sec)
+0
+4
+8
+12Confirmation time (sec)
+Responsive
+Not responsive
+Figure 4: A qualitative comparison of the confirmation time
+behaviour of parameterized protocols and parameterless
+ones. Confirmation times in the latter case are fast when
+the network is smooth and speedy, whereas in the former
+confirmation time is still limited by the constant hardcoded
+worst-case bound. Additionally, when the bound of a pa-
+rameterized protocol is violated, transactions may not be
+confirmed safely, whereas parameterless protocols adapt to
+the anomaly and allow confirming transactions more slowly
+than usual, yet safely.
+network, and, in particular, the network remains fully operational,
+yet slow, during periods of network anomaly.
+A second implication of parameterlessness is added security:
+KNIGHT enjoys a stronger security than existing permissionless
+protocols, as network hiccups do not interrupt consensus, because
+they do not violate assumptions necessary for its proper operation.
+1.3 Partial Synchrony
+Traditionally, a consensus protocol is said to be partially synchro-
+nous if an upper bound on the network latency exists but is un-
+known to the protocol [6]. However, proof-of-work consensus in-
+troduces some ambiguity into this classification, as it decouples
+the transaction ordering protocol from the finality protocol : The
+core of consensus is the transaction ordering rule (e.g., Bitcoin’s
+longest chain rule, KNIGHT’s DAG ordering). This is the canonical
+algorithm which defines the system, and which all participants run
+in the same way, including adversarial nodes—individual interpre-
+tations of the ledger which differ from the canonical procedure are
+pointless. In contrast, transaction finality (e.g., the confirmation
+count in Bitcoin) is a non-binding procedure which each client or
+user configures and calculates locally according to their own beliefs
+and needs, and bears the consequence. E.g., a Bitcoin user who be-
+lieves that malicious miners possess currently less than 33% of the
+hashrate will confirm transactions faster than one who believes the
+bound to be 49%, and a 34% attacker will harm the former but not
+the latter. Another example is SPECTRE, wherein the user needs to
+additionally specify her belief on the latency bound via a parameter
+which is configured individually, and which is inconsequential –
+and, in fact, not-communicated – to the rest of the network.
+For these considerations, we believe that a consensus system
+whose transaction-ordering rule is agnostic to latency should be
+referred to as partially synchronous and parameterless, interchange-
+ably, even if transaction-finality depends on a latency bound (con-
+figured by the user locally). We leave the question on terminology
+for the Distributed Systems academic community to decide on, and
+in this paper use the term “parameterless” to describe KNIGHT’s
+operation mode.
+3
+Michael Sutton and Yonatan Sompolinsky
+1.4 Responsiveness
+In the lack of an a priori latency assumption, confirmation times in
+a parameterless consensus system correspond to the real network
+latency. However, “real latency” has two profoundly different inter-
+pretations: the observable latency in the network, and the worst
+case latency that an attacker may cause. Indeed, a capable attacker
+may allow – or even assist – the network to operate smoothly, se-
+lectively, and disrupt it during a later stage of the attack. A protocol
+that has the strong property of confirming transactions according
+to the observable latency is called responsive [16].
+Despite being parameterless, KNIGHT is not responsive in this
+sense of performing tightly with the current observable latency,
+rather is responsive in the weaker sense of performing tightly with
+the current maximum latency causable by an adversary. Indeed, in
+KNIGHT, it is not enough for the client to set a local bound on the
+observable latency, rather the bound should reflect the maximum
+latency that may be caused by the attacker. That is, even if messages
+currently propagate fully within 1 or 2 seconds, if an attacker may
+disrupt the network and cause messages to take up to 30 seconds
+to go through,𝐷 should be set by the client to 30 seconds.
+This limitation of KNIGHT is unavoidable, since no parame-
+terless protocol with 50% byzantine tolerance threshold can be
+responsive [16]:
+Theorem 14 (Responsive protocols cannot tolerate 1/3 corruption)
+[Pass and Shi]. No secure permissionless consensus protocol that is
+also responsive can tolerate 1/3 or more corruption.
+1.5 Consensus protocols, principal categories
+Consensus protocols are generally classified and compared accord-
+ing to the following aspects:
+• What are the assumptions made by the protocol on the un-
+derlying network and behaviour of nodes. The stronger the
+assumptions the weaker the protocol.
+• When its assumptions are preserved, how does it perform,
+specifically, how fast is consensus reached.
+• When its assumptions are violated, does the protocol recover,
+and how fast it recovers. A protocol guaranteed to recover
+from past failures is called self-stabilizing [5].
+• If the underlying system is used to settle a live queue of trans-
+actions, we also ask: How many transactions can the protocol
+serve, i.e., what constraint on the transaction throughput
+the protocol imposes or its assumptions require.
+Through these categories we now survey, with some brevity,
+KNIGHT ’s main properties:
+1.5.1 Model assumptions. KNIGHT ’s fault model is the byzantine
+setup, which allows the attacker to deviate arbitrarily from the pro-
+tocol’s rules. We follow the proof-of-work model which assumes a
+computationally bounded attacker which possesses less than 50%
+of the computational power in the network. This assumption is con-
+sidered to be weaker (hence more secure) compared to traditional
+permissioned setups which require a priori knowledge of participat-
+ing nodes, and compared to proof-of-stake which typically requires
+a fixed and identifiable set of nodes at the beginning of each epoch.
+The attacker is not assumed to suffer any communication delays
+in its incoming or outgoing links, and may further disrupt honest
+nodes’ communication by delaying messages between them for up
+to𝐷 seconds; however, the𝐷 is not known to the protocol. Con-
+versely, the attacker is also capable of speeding up communication
+between honest nodes down to no-latency; such manipulations are
+specifically relevant to and challenging in the context of KNIGHT.
+1.5.2 Confirmation times (asymptotic). The parameterlessess of
+the protocol is tightly related to its speed of confirmation: Transac-
+tion confirmation times are a function of the actual latency in the
+network (Subsection 1.3 contains an important reservation of this
+statement in our context).
+Confirmation times are commonly discussed in two modes –
+optimistic performance and pessimistic performance. The former
+accounts to the scenario where all participating nodes behave prop-
+erly, and there is no visible attack. In this optimistic scenario,
+KNIGHT confirms transactions in O
+ ln(1/𝜖)
+𝜆 +𝐷
+
+/(1− 2𝛼) +
+𝐷2𝜆 seconds, where𝜆 is the block creation rate in units of blocks/sec
+(adjusted via a “difficulty adjustment” algorithm adapted from Bit-
+coin [13]),𝐷 is an upper bound on the recent delay in the network,
+0≤ 𝛼 < 1/2 is the attacker’s size, and 0≤ 𝜖 < 1 is the required
+confidence. As in any proof-of-work protocol, the parameters𝛼 and
+𝜖 are set by the client. Uniquely to KNIGHT (and to SPECTRE [19]),
+the parameter 𝐷 too is set by the client—an underestimation by
+the client will lead to her premature acceptance of transactions,
+whereas an overestimation will cause her to wait more time than
+necessary before confirming.
+In the pessimistic scenario, a visible manipulation of the DAG
+is ongoing, and confirmation times are significantly slowed down.
+Analyzing the convergence time in this case in a tight manner is
+intractable, and we are thus left with an exponential bound on con-
+firmation times:O
+
+1
+𝜆(exp(𝑐·𝐷𝜆/(1− 2𝛼))+ ln(1/𝜖)/( 1− 2𝛼))
+
+seconds. We emphasize, however, that this bound is far from tight,
+assumes an unrealistically strong attacker, and furthermore pay-
+ments of honest users can still be confirmed in quadratic time as
+in the optimistic case. Indeed, as long as the user did not publish a
+visible conflict (aka double spend), her transaction is commutative
+with other recent transactions in the DAG, hence the receiving
+client may confirm it despite the ordering still converging.
+1.5.3 Self stabilization. Similarly to NC and other proof-of-work
+consensus protocols, KNIGHT is self-stabilizing: If the 50% thresh-
+old was violated at some point in the past, KNIGHT recovers and
+transactions may be confirmed safely once the conditions are met;
+the recovery time is linear in the length of the violation phase. Sim-
+ilarly, the latency parameter𝐷 which is set by each client locally
+should correspond to the recent delay in the network, and need not
+account for the worst case historical latency. Contrast these prop-
+erties to proof-of-stake protocols, which rely heavily on finality,
+and which fail therefore to recover from historical catastrophes.
+1.5.4 Throughput. In contrast to NC, and similar to other DAG-
+based consensus protocols, KNIGHT remains secure under arbitrar-
+ily high throughput configurations—the block rate, and the block
+size, should be constrained only according to the capacity of nodes’
+hardware and that of the network’s backbone.
+All in all, in this work we propose a novel proof-of-work based
+parameterless consensus protocol. As far as we are aware, KNIGHT
+4
+The DAG KNIGHT Protocol: A Parameterless Generalization of Nakamoto Consensus
+is the first proof-of-work protocol to solve consensus under the
+parameterless model; the only other protocol to operate under
+this model is SPECTRE, which solves a weaker version of the con-
+sensus problem (“weak liveness”), and which supports therefore
+only the use case of payments where transactions of honest users
+are commutative [ 19]. KNIGHT is a parameterless evolution of
+PHANTOM—save some nuances, the two coincide when the de-
+lay is constant; when the delay is negligible relative to the block
+creation rate, the two protocols further coincide with NC.
+1.6 Structure of this paper
+The remainder of this paper is organized as follows. Section 2
+contains the full description of the KNIGHT protocol. Section 3
+formalizes the model and the statement of KNIGHT’s properties.
+Section 4 discusses confirmation procedure for clients, and confir-
+mation times. In Section 5 we present implementation details. We
+conclude with surveying related work in Section 6.
+2 THE DAG KNIGHT PROTOCOL
+2.1 Preliminaries
+The following terminology is used extensively throughout this
+paper. We follow terminology established by previous works con-
+cerning DAG protocols [19, 20].
+In a block DAG𝐺 =(C,𝐸),C represents blocks and𝐸 represents
+hash references to previous blocks—edges thus point backwards in
+time.𝑝𝑎𝑠𝑡(𝐵,𝐺) denotes the set of blocks reachable from 𝐵, and
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵,𝐺) the set of blocks from which 𝐵 is reachable; these
+blocks were provably created before and after𝐵, correspondingly.
+𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵,𝐺) denotes the set of blocks outside 𝑝𝑎𝑠𝑡(𝐵,𝐺) and
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵,𝐺); the time-relation between 𝐵 and blocks in its an-
+ticone cannot be derived explicitly from the DAG topology. See
+Figure 2. When context is clear, we write𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵) instead of
+𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵,𝐺). We denote by 𝑡𝑖𝑝𝑠(𝐺) the set of blocks with in-
+degree 0, that is, which are not referenced by any other block in the
+DAG. The system is initialized with some known block𝑔𝑒𝑛𝑒𝑠𝑖𝑠 ; if a
+sub-DAG𝐺′⊆𝐺 has only one block with out-degree 0, we denote
+it by𝑔𝑒𝑛𝑒𝑠𝑖𝑠(𝐺′).
+For convenience, we additionally regard the virtual block of the
+DAG,𝑣𝑖𝑟𝑡𝑢𝑎𝑙(𝐺), which is a hypothetical (un-mined) block which
+points to the DAG’s tips as its parents. Thus,𝑝𝑎𝑠𝑡(𝑣𝑖𝑟𝑡𝑢𝑎𝑙(𝐺)) =𝐺.
+Essentially,𝑣𝑖𝑟𝑡𝑢𝑎𝑙(𝐺) represent the block template for the next
+block to be created by the miner, if it is honest.
+2.2 PHANTOM optimization paradigm
+The PHANTOM protocol [20] proposed an optimization problem
+as a generalization of NC (see box in Section 1). The optimization
+targets the largest𝑘-cluster, for a predetermined fixed parameter
+𝑘 which is a function of the worst case latency in the network. In
+a𝑘-cluster, each block is connected via the DAG topology to all
+but at most𝑘 blocks. Since honest nodes possess a majority of the
+hashrate, and since blocks created by honest nodes reference one
+another, the largest𝑘-cluster contains recent honest blocks with
+high probability, which suffices to secure the ordering.
+B
+virtual        AttackerHonest       
+(a)
+B
+virtual        AttackerHonest       (b)
+Figure 5: 5a shows a successful freeloading scheme against
+PHANTOM with 𝑘 = 5. The largest 5-cluster contains (also)
+attacker blocks which were withheld till now, and excludes
+honest blocks which were mined correctly above 𝐵 and
+published immediately. 5b demonstrates the failure of this
+scheme against KNIGHT. The protocol recognizes that the
+largest𝑘-cluster, for𝑘 = 0, suffices to cover a majority of the
+DAG, selects this 0-cluster, and excludes the attack blocks.
+2.3 KNIGHT optimization paradigm
+KNIGHT adds another layer to the optimization problem (as pre-
+sented in Section 1). Rather than assuming 𝑘 as an input to the
+problem, KNIGHT searches for the minimal𝑘 such that the largest
+𝑘-cluster covers at least 50% of the DAG.
+This dual minmax optimization (min 𝑘, max𝑘-cluster) allows
+us to tolerate just enough latency and disconnectivity among the
+selected set of blocks: Intuitively, selecting the cluster of a smaller𝑘
+would compromise safety, exposing the ordering to manipulations
+by a minority attacker whose blocks do not cover 50% of the graph;
+selecting the cluster of a larger𝑘 would compromise liveness, as it
+would allow adversary blocks to inject themselves into the order
+even after honest blocks have settled.
+Building on this parameterless optimization paradigm, we are
+able to devise a secure consensus DAG ordering rule that is re-
+sponsive to the network’s actual adversarial latency and is not
+constrained to a priori hardcoded bounds on the adversarial latency
+which require large safety margins and perform suboptimally. We
+reiterate, however, that KNIGHT is not responsive in the strong
+sense of performing according to the network’s observable latency,
+rather according to the maximum latency that an adversary may
+cause in the current network; still, under normal Internet condi-
+tions, and with sufficient redundancy between peers, this should
+be in the order of a few seconds at most. In fact, no protocol that
+is secure against corruption of up to 50% of the nodes can achieve
+responsiveness in this strong sense, as was proven by Pass and
+Shi [16].
+5
+Michael Sutton and Yonatan Sompolinsky
+Figure 5 provides a visual insight into the different behaviour
+of PHANTOM vs KNIGHT’s optimization paradigms. It illustrates
+a∼ 35% attacker attempting a “freeloading” manipulation on the
+respective protocols. Consider the case where PHANTOM was pa-
+rameterized with𝑘 = 5, say, and where the honest network enjoys
+a period of extreme connectivity in the network such that its blocks
+form a chain (a 0-cluster, in PHANTOM terminology). In a freeload-
+ing scheme, the attacker builds her blocks with a certain artificial
+gap from the rest of the network, 5 in our example. PHANTOM
+then considers these blocks as part of the largest 5-cluster, and they
+will precede the second half of the honest chain in the final ordering.
+KNIGHT, in contrast, is not easily misled—it will recognize that
+𝑘 = 0 suffices to cover the majority of the DAG. The same intu-
+ition applies generally to any scenario where the network’s current
+(adversarial) latency is smaller than the worst case (adversarial)
+latency. Moreover, if the network suffers excessive delays due to
+some anomaly, and PHANTOM’s latency bound is violated, trans-
+actions may not be confirmed. KNIGHT’s operation, in contrast,
+will remain intact, albeit inevitably slower.
+2.4 Vanilla version
+Turning KNIGHT’s optimization paradigm into a DAG ordering
+rule seems straightforward:
+Algorithm 1 Naïve ordering algorithm
+Input: 𝐺 – the DAG to order
+Output: Ordering of𝐺
+1: function Order-DAG(𝐺)
+2: for𝑘 = 0, 1... ∞ do
+3: 𝑆←𝑀𝐶𝑆𝑘
+4: if|𝑆|≥ |𝐶|
+2 then
+5: Order𝐺 according to some (deterministic) topologi-
+cal sort that gives precedence to𝑆
+6: return the ordered DAG
+However, Algorithm 1 is secure only in setups with constant
+latency and a naïve attacker.2 We will now describe the full ver-
+sion of KNIGHT, which is secure against both spontaneous and
+malicious changes in network latency.
+2.5 Formal specification
+We are now ready to present the holy grail of this work, the DAG-
+KNIGHT protocol, as specified formally in Algorithm 2. Faithful to
+its optimization paradigm, the complex of KNIGHT ’s procedures
+(Algorithms 2-6) is designed to recognize the minimal𝑘 for which
+there exists a𝑘-cluster that covers a majority of the DAG. Yet, the
+choice of cluster entails more than merely finding a large enough
+cluster, and produces a rather involved algorithm; these complexi-
+ties will be explained and justified in Subsection 2.6. But first let us
+provide a bird’s-eye view of the algorithm.
+2.5.1 Overview. The algorithm receives as input a blockDAG𝐺,
+and outputs a selected tip of 𝐺 and an ordering over its blocks,
+following these steps:
+2Additionally, line 3 involves solving an NP-hard problem [20].
+• Compute the orderings of each tip on its past, and its selected
+parent, recursively. (Alg. 2)
+• Recognize iteratively the next conflict point between the
+remaining tipsP, namely, their latest common chain ances-
+tor𝑔. The induced hierarchy implies that disagreements, or
+chain-splits, are dealt with from early to recent. (Alg. 2)
+• For each conflict point𝑔, decide between competing sets of
+tips𝑃𝑖’s (which agree with one another on this conflict) by
+computing each set’s rank (see below), removing the losers
+from the set of tips; if needed, run a tie-breaking procedure
+(Alg. 4).
+This elimination process terminates when a single tip re-
+mains (|P| = 1) following the resolution of the most recent
+conflict point, which is then returned as 𝐺’s selected tip.
+(Alg. 2)
+• The winning set is that for which at least one representative3
+achieves the lowest rank among all representatives of all sets.
+(Alg. 3)
+• The rank of a block, per a given conflict context, is the mini-
+mal𝑘 for which the𝑘-cluster returned by the algorithm has
+a subset which uniformly covers at least 50% of the DAG.
+(Alg. 3)
+• The𝑘-cluster returned by the algorithm is computed recur-
+sively, similarly to the GHOSTDAG cluster-selection (aka
+colouring) procedure. A subtle condition, represented by the
+boolean flag 𝑓𝑟𝑒𝑒 _𝑠𝑒𝑎𝑟𝑐ℎ , further dictates whether the re-
+cursion is called for all parents of the block or only for those
+which agree with it (on this conflict).4 (Alg. 5)
+• A set of blocks – a subset of the returned cluster – uniformly
+covers 50% of G if for each block in the set, at least 50% of
+its future belongs to the set (minus at most 𝑔(𝑘) ∈𝑜(𝑘)).
+Checking for the existence of a subset which satisfies this
+property can be done efficiently, by traversing the DAG topo-
+logically from tips to genesis, computing each block’s “vote”
+between -1 and 1 (minus 1 represents a block that either does
+not belong to the original cluster, or violates the coverage
+condition), and returning genesis’ vote.5 (Alg. 6)
+2.5.2 Formal specification. We proceed to present the main proce-
+dure of KNIGHT, Algorithm 2, and its subprocedures (Algorithms 3-
+6). We begin with some formal definitions that the algorithms make
+use of.
+Definition 2. For a block 𝐵, chain-parent(𝐵) is a unique parent of
+𝐵, set by KNIGHT’s chain-selection rule (line 5 in Algorithm 2). The
+chain of𝐵 is defined recursively by 𝑐ℎ𝑎𝑖𝑛(𝐵) :=(chain-parent(𝐵),
+chain-parent(chain-parent(𝐵)),...,𝑔𝑒𝑛𝑒𝑠𝑖𝑠 ).
+Observe that𝑝𝑎𝑠𝑡(𝐵) fully determines chain-parent(𝐵).
+Definition 3. A set of blocks𝑋⊂𝐺 is said to agree in𝐺 if their latest
+common chain ancestor is a chain-descendant of 𝑔 = 𝑔𝑒𝑛𝑒𝑠𝑖𝑠(𝐺):
+∃𝑔′ :𝑔∈𝑐ℎ𝑎𝑖𝑛(𝑔′)∧∀𝐵∈𝑋 :𝑔′∈𝑐ℎ𝑎𝑖𝑛(𝐵).
+3A representative is any block in the inclusive past of the set of tips which does not
+belong to the inclusive past of the other sets.
+4In short, a block may inherit the cluster from a disagreeing parent thereof only if the
+latter’s rank is smaller than former’s rank, or if such a condition was met in a previous
+recursion call.
+5This procedure borrows from the cascade voting of SPECTRE.
+6
+The DAG KNIGHT Protocol: A Parameterless Generalization of Nakamoto Consensus
+Intuitively, two blocks agree in𝐺 if they agree on𝑔’s successor
+in the chain.
+Definition 4. For a set𝑋⊂𝑡𝑖𝑝𝑠(𝐺) agreeing in𝐺, the set𝑟𝑒𝑝𝑠𝐺(𝑋)
+(representatives) is defined by
+
+𝑥∈𝑝𝑎𝑠𝑡(𝑋)\𝑝𝑎𝑠𝑡(𝑡𝑖𝑝𝑠(𝐺)\𝑋) :𝑥 agrees with𝑋
+	
+.6
+Definition 5. For a block 𝐵 and chain-ancestor 𝑔 ∈ 𝑐ℎ𝑎𝑖𝑛(𝐵)
+s.t.∃𝑝1,𝑝 2 ∈ 𝑝𝑎𝑟𝑒𝑛𝑡𝑠(𝐵) which do not agree over 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑔),
+𝑟𝑎𝑛𝑘𝑓𝑢𝑡𝑢𝑟𝑒 (𝑔)(𝐵) is defined to be the rank calculated by KNIGHT or-
+dering when recursively executing Order-DAG(𝑝𝑎𝑠𝑡(𝐵)) and for the
+iteration of the While loop where𝑔 was found (line 12 in Algorithm 2).
+Definition 6. For𝑈 ⊆ 𝐺,𝑑 ≥ 0, we say that 𝑈 is a 𝑑-UMC of
+𝐺 (Uniform Majority Coverage), if 𝑔𝑒𝑛𝑒𝑠𝑖𝑠(𝐺)∈ 𝑈 AND∀𝐵∈ 𝑈 ,
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵)∩𝑈+𝑑≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵)∩(𝐺\𝑈)
+For any non-negative integer 𝑘,𝑔(𝑘) = 𝑜(𝑘) is a function re-
+turning a non-negative integer, used throughout the protocol. We
+set𝑔(𝑘) B⌊
+√
+𝑘⌋. When applied to sets of blocks, max and min 7
+operators represent topology relations. That is, if𝐵 = max𝐺 then
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵)∩𝐺 =∅, and likewise if𝐵 = min𝐺 then𝑝𝑎𝑠𝑡(𝐵)∩𝐺 =∅.
+Algorithm 2 KNIGHT DAG ordering algorithm
+Input: 𝐺 – a block DAG
+Output: Selected tip of𝐺, Ordering over𝐺’s blocks
+1: function Order-DAG(𝐺)
+2: if𝐺 is
+
+𝑔𝑒𝑛𝑒𝑠𝑖𝑠
+	
+then
+3: return𝑔𝑒𝑛𝑒𝑠𝑖𝑠,
+
+𝑔𝑒𝑛𝑒𝑠𝑖𝑠
+
+4: for𝐵∈𝑡𝑖𝑝𝑠(𝐺) do
+5: chain-parent(𝐵),𝑜𝑟𝑑𝑒𝑟 𝐵← Order-DAG 𝑝𝑎𝑠𝑡(𝐵) 
+6: P← 𝑡𝑖𝑝𝑠(𝐺)
+7: while
+P
+ > 1 do
+8: 𝑔← latest common chain ancestor of all𝐵∈P
+9: PartitionP into maximal disjoint setsP1,..., P𝑛⊂P
+s.t. latest common chain ancestor ofP𝑖 is in𝑓𝑢𝑡𝑢𝑟𝑒 (𝑔)
+10: forP𝑖∈
+
+P1,..., P𝑛
+	
+do
+11: rank𝑖← Calculate-Rank
+
+P𝑖,𝑓𝑢𝑡𝑢𝑟𝑒 𝐺(𝑔)
+
+12: 𝑟𝑎𝑛𝑘𝐺,𝑔← min𝑖∈
+
+1,...,𝑛
+	 rank𝑖
+13: P ← Tie-Breaking
+
+𝑓𝑢𝑡𝑢𝑟𝑒 𝐺(𝑔),
+
+P𝑖 : rank𝑖 =
+𝑟𝑎𝑛𝑘𝐺,𝑔
+	
+14: 𝑝← the single element inP
+15: return𝑝,
+
+𝑜𝑟𝑑𝑒𝑟𝑝∥𝑝∥𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑝)
+
+⊲ operator∥ is sequence
+concatenation;𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒 (𝑝) is iterated in hash-based bottom-up topological order
+2.6 Reviewing the components of KNIGHT
+The algorithms presented above are admittedly involved. In this sub-
+section we review their core components. The full version, which
+will appear online, includes a line by line explanation of the three
+procedures.
+6The𝑝𝑎𝑠𝑡 operator is used on a set here and reflects the union over 𝑝𝑎𝑠𝑡(𝐵) for
+every block in the set.
+7As well as argmax, argmin.
+8Meaning that in this call to K-Colouring,𝑣𝑖𝑟𝑡𝑢𝑎𝑙 (𝐺) is considered to agree with
+P𝑖 .
+Algorithm 3 Rank calculation procedure
+Input: 𝐺 – a block DAG,P – a set of blocks in 𝐺 (typicallyP ⊂
+𝑡𝑖𝑝𝑠(𝐺))
+Output: The rank ofP in𝐺
+1: function Calculate-Rank(P,𝐺 )
+2: for𝑘 = 0, 1... ∞ do
+3: for𝑟∈𝑟𝑒𝑝𝑠𝐺(P) do
+4: C𝑘(𝑟), _← K-Colouring 𝑟,𝐺,𝑘, false
+5: if UMC-Voting 𝐺\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑟),C𝑘(𝑟),𝑔(𝑘) > 0
+then
+6: return𝑘
+Algorithm 4 Rank tie-breaking procedure
+Input: 𝐺 – a block DAG,P1,..., P𝑚⊂𝑡𝑖𝑝𝑠(𝐺)
+Output: A set of tipsP𝑖 wining the tie-breaking
+1: function Tie-Breaking(𝐺,P1,..., P𝑚)
+2: 𝑘← the mutual rank ofP1,..., P𝑚 in𝐺
+3: F, _← K-Colouring 𝑣𝑖𝑟𝑡𝑢𝑎𝑙(𝐺),𝐺,𝑔(𝑘), true
+4: forP𝑖∈
+
+P1,..., P𝑚
+	
+do
+5: for𝑘′∈
+
+⌊𝑘/2⌋,...,𝑘
+	
+do
+6: _,𝑐ℎ𝑎𝑖𝑛𝑖,𝑘′← K-Colouring 𝑣𝑖𝑟𝑡𝑢𝑎𝑙(𝐺),𝐺,𝑘 ′, false
+conditioned8 on𝑣𝑖𝑟𝑡𝑢𝑎𝑙(𝐺) agreeing withP𝑖
+7: 𝐶𝑖← —
+𝑘′
+
+𝐵∈F :𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵)∩𝑐ℎ𝑎𝑖𝑛𝑖,𝑘′ >𝑘′	
+8: 𝑗← argmin𝑖∈1,...,𝑚 max{𝐶𝑖} (break ties according to hash)
+9: returnP𝑗
+2.6.1 Greedy maximization. To cope with the intractable nature of
+finding the maximal𝑘-cluster, we take an approach similar to [20]
+where the NP-hard version was replaced with a greedy procedure,
+called therein GHOSTDAG. We thus limit the search to extensions
+of𝑘-clusters of the previous tips of the DAG (K-Colouring, line 7).
+2.6.2 Revisiting the Majority condition. Instead of requiring that
+the selected 𝑘-cluster covers a majority of the DAG (equiv., the
+majority of the future set of the genesis block), we check whether
+it covers a majority of the future set of each of its member blocks,
+including genesis; we refer to this property as uniform majority
+coverage, or UMC. Blocks whose future the cluster fails to cover by
+majority are cast out as outliers, and the procedure counts them
+outside the cluster. The procedure induces a cascading majority
+vote (borrowed from [19]) from recent blocks down to the genesis
+block, and the latter’s vote dictates whether the majority cover is
+satisfactory.
+By extending the majority coverage requirement from genesis to
+any (non-outlier) block in the𝑘-cluster, we recover the “Markovian”
+nature of the coverage property: Any new honest block “resets” the
+process by posing an additional challenge to the attacker, namely, to
+cover the majority of this new block. Indeed, honest miners possess
+a majority of the hashrate, and blocks of honest miners are refer-
+enced by their honest counterparts after at most𝐷 seconds, after
+which honest blocks are expected to win the block race with high
+probability. To account for these𝐷 seconds, we allow the cluster to
+cover almost a majority—a deficit of𝑔(𝑘) blocks is permitted (line 5
+in Calculate-Rank); this relaxed property is called𝑔(𝑘)-UMC.
+7
+Michael Sutton and Yonatan Sompolinsky
+Algorithm 5𝑘-colouring algorithm
+Input: 𝐺 – a block DAG, 𝐶 – a block in 𝐺,𝑘 – a non-negative
+integer, free_search – a Boolean indicating if the search can
+maximize freely
+Output: 𝑘-colouring of𝑝𝑎𝑠𝑡𝐺(𝐶),𝑘-chain of𝑝𝑎𝑠𝑡𝐺(𝐶)
+1: function K-Colouring(𝐶,𝐺,𝑘, free_search)
+2: if𝑝𝑎𝑠𝑡𝐺(𝐶) =∅ then
+3: return∅,∅
+4: P←∅
+5: for𝐵∈𝑝𝑎𝑟𝑒𝑛𝑡𝑠(𝐶) do
+6: if𝐵 agrees with𝐶 then
+7: 𝑏𝑙𝑢𝑒𝑠𝐵,𝑐ℎ𝑎𝑖𝑛𝐵 ← K-Colouring 𝐵,𝑝𝑎𝑠𝑡 (𝐵) ∩
+𝐺,𝑘, free_search
+8: P←P∪ 𝐵
+9: else if free_search OR𝑘 >𝑟𝑎𝑛𝑘𝐺(𝐶) then
+10: 𝑏𝑙𝑢𝑒𝑠𝐵,𝑐ℎ𝑎𝑖𝑛𝐵 ← K-Colouring 𝐵,𝑝𝑎𝑠𝑡 (𝐵) ∩
+𝐺,𝑘, true
+11: P←P∪ 𝐵
+12: 𝐵max← arg max{|𝑏𝑙𝑢𝑒𝑠𝐵| :𝐵∈P} (break ties according to hash)
+13: 𝑏𝑙𝑢𝑒𝑠𝐺,𝑐ℎ𝑎𝑖𝑛𝐺←𝑏𝑙𝑢𝑒𝑠𝐵max∪
+
+𝐵max
+	
+,𝑐ℎ𝑎𝑖𝑛𝐵max∪
+
+𝐵max
+	
+14: for𝐵∈𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵max,𝐺) do in hash-based topological ordering
+15: if
+𝑐ℎ𝑎𝑖𝑛𝐺 ∩ 𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵)
+ ≤ 𝑘 AND 𝑏𝑙𝑢𝑒𝑠𝐺 ∩
+𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵max) <𝑘 then
+16: 𝑏𝑙𝑢𝑒𝑠𝐺←𝑏𝑙𝑢𝑒𝑠𝐺∪
+
+𝐵
+	
+17: return𝑏𝑙𝑢𝑒𝑠𝐺,𝑐ℎ𝑎𝑖𝑛𝐺
+Algorithm 6 UMC cascade voting procedure
+Input: 𝐺 – a block DAG,𝑈 ⊆ 𝐺 (typically a𝑘-colouring),𝑒 – a
+non-negative integer representing the deficit threshold
+Output: The voting result𝑣𝑜𝑡𝑒∈
+
+− 1, 1
+	
+of𝑈⊆𝐺
+1: function UMC-Voting(𝐺,𝑈,𝑒 )
+2: 𝑣← ˝
+𝐵∈𝑈 UMC-Voting 𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵),𝑈∩𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵),𝑒 
+3: return sign  𝑣−
+𝐺\𝑈
++𝑒 ⊲ where sign(𝑥) B
+1 𝑥≥ 0
+−1 𝑥 < 0
+2.6.3 Decouple ordering from colouring. Recall that our assump-
+tions allow for an attacker to control the propagation time of any
+message in the network up to some (unknown) bound𝐷. It follows
+that the largest𝑘-cluster, for𝑘≈ 2·𝐷·𝜆 (which bounds the expected
+size of an honest block’s natural anticone) is expected to satisfy
+the majority coverage property (𝑔(𝑘)-UMC). One would expect,
+therefore, that the following procedure would suffice to secure the
+ordering: Find the minimal 𝑘 for which the largest 𝑘-cluster satisfies
+the𝑔(𝑘)-UMC property, and order the DAG according to that cluster.9
+Albeit, this approach would undermine the stability of the order-
+ing: If the network’s latency changes, spontaneously or maliciously,
+from𝑑≪𝐷 to𝐷 the ordering of the DAG would change retroac-
+tively from the largest 𝑘(𝑑)-cluster to the largest 𝑘(𝐷)-cluster,
+undermining the convergence guarantee.
+To cope with this challenge, we (re)introduce the notion of a
+main chain, and order the DAG according to this chain. We show
+this chain to be robust even under changes of delays, rendering the
+ordering robust. The chain is formed as follows: Each block picks as
+9In other words, for𝑘 = 0, 1,... run𝑘-GHOSTDAG, and return the first output that
+satisfies the𝑔(𝑘)-UMC property.
+its chain predecessor the block which minimizes its own𝑘, or more
+accurately, its rank (Order-DAG, line 11). That is, we utilize the
+optimization problem of KNIGHT to select the chain-predecessor
+of each block rather than to order the entire historical DAG. This
+decoupling allows the chain to “represent” different𝑘’s along its
+growth, which correspond to the effective latency at the time. For
+example, if at chain-level 200 the attacker exposed a side-DAG that
+required increasing𝑘 from 5 to 7, the ordering of past blocks would
+still be dictated by the chain below level 198, say.
+This decoupling of cluster-selection from DAG-ordering spawns
+an intricate design space with different inter-dependencies between
+cluster-selection and chain-ordering. Interestingly, some natural
+candidates turn out to be insecure, erring either on over-stability
+(thereby compromising liveness) or on over-flexibility (compro-
+mising safety). We strike a balance between these two necessary
+objectives by allowing the cluster-selection to deviate from the
+chain-selection of lower-ranked blocks (K-Colouring, line 9).
+2.6.4 Tie-breaking for recovery. Consider a temporary anomaly
+(“Poisson burst”) in the block creation process which led to an ab-
+normally high rank𝐾. After the network resumes normal operation,
+we would like to recover the normal rank, denoted 𝑘★, or other-
+wise liveness would be compromised (the waiting time for liveness
+depends on a non-diverging upper bound over the rank); we thus
+must guarantee healthy growth of the𝑘★-cluster, even when the
+current rank𝐾 is excessively high.
+In this context the tie-breaking rule between two chain-tip can-
+didates of the same rank turns out to be crucial. A naïve rule would
+prefer the larger 𝐾-cluster, yet such a design would allow an at-
+tacker to keep the network at its current rank and prevent it from
+recovering towards 𝑘★. Instead, we identify the tip whose clus-
+ter utilized the excessive rank latest, and prefer its counterpart
+(Tie-Breaking algorithm, line 8). The resulting chain-selection rule
+forces a tie-preserving attacker to compete on ranks much lower
+than the current one, and eventually to compete on the natural
+rank,𝑘★.
+2.6.5 Adaptiveness to long-term delay changes. In the lack of an
+a priori latency bound, a parameterless protocol necessarily per-
+forms according to the actual (adversarial) latency, as discussed
+in Section 1. However, in the context of a consensus protocol that
+serves a continuous queue of transactions, the latency might change
+with time. It would then be undesirable if the protocol performs
+according to the worst case historical latency rather than the recent
+latency in the network. We formalize this requirement in Section 3.
+To achieve this property, the protocol defines aconflict hierarchy,
+eliminates iteratively the losing candidates, and selects the final
+survival as the chain-predecessor. This logic is implemented in the
+While loop in Order-DAG (line 7).
+2.6.6 Representatives and monotonicity. In theory, an attacker may
+attempt to artificially increase the rank of honest blocks by wasting
+part of her hashrate to mine blocks that agree with honest blocks
+but which do not belong to their𝑘-cluster, where𝑘 is the current
+rank of honest blocks. While this scheme can be shown (yet, at
+the expense of further complication of the analysis) to be overall
+suboptimal on her part, it does undermine a desired “monotonous”
+behaviour of the protocol. Consider a DAG𝐺 with two tips𝐵 and𝐶,
+8
+The DAG KNIGHT Protocol: A Parameterless Generalization of Nakamoto Consensus
+and assume that𝐵 “won” and is𝐺’s selected chain tip. Consider the
+effect of adding to𝐺 a new block𝐸, which references𝐵 only. Since
+𝐸 acknowledges𝐵 but not𝐶, one would expect the addition of𝐸 to
+only increase the chance of𝐵 to win over𝐶, and definitely not to
+harm it. Alas, if a set of disconnected𝐸’s are added to𝐵’s future in
+this manner, they may increase the rank of their part of the DAG,
+and in particular may flip the choice and lead to the chain going
+through𝐶. To recover the desired monotonous behaviour (thereby
+simplifying our security analysis, as a byproduct), we dictate that
+𝐶 competes with𝐵 even if𝐵 is no longer a tip of𝐺 (!) Thus, to win
+the chain over𝐸,𝐶 must enjoy a rank lower than𝐸 (the new tip)
+but also of all blocks in 𝐸’s past (which are not in 𝐶’s past), and
+𝐵 in particular; this exemplifies the role of the representative set
+(Definition 4) used in line 3 of Calculate-Rank.
+2.7 Runtime complexity
+The algorithms specified in the previous article terminate in poly-
+nomial time:
+Proposition 1. Algorithm 2 terminates in polynomial time in |𝐺|,
+and returns a tip and an ordering of 𝐺.
+Proof. Observe the following facts:
+• The while loop in line 7 decreases the size of P at each
+iteration.
+• Following line 13 it remains thatP ≠∅, thus, after the loop,P
+ = 1 (line 14); thus, the return argument is not null, and
+is an element inP.
+• The overall recursion (line 5) terminates since∀𝐵∈𝑡𝑖𝑝𝑠(𝐺),
+𝑝𝑎𝑠𝑡(𝐵) ⊊𝐺.
+• The procedure Calculate-Rank terminates in polynomial
+time, since the output of K-Colouring(𝐶,𝐺,𝑘, ·), for any
+block𝐶∈𝐺, returns a k-UMC10, for𝑘 =|𝐺|, since all blocks
+in𝐺 belong to its largest|𝐺|-cluster (there are, obviously,
+much tighter arguments).
+□
+In a future version of this paper, we will present an equivalent
+specification that takes as input two blocks and returns their respec-
+tive ordering. This procedure is useful for certain types of clients
+(e.g., what are known as “liteclients”), and can be shown to ter-
+minate within a constant (in time) number of steps, concretely, in
+O(𝐷·𝜆)2 steps.
+3 MODEL AND FORMAL STATEMENT
+We follow the prevalent models for a proof-of-work governed net-
+work [13, 15] and its extensions to the block DAG framework [11, 19,
+20]. A network of nodes (orminers) is denotedN, each node𝑢 main-
+taining a replica of the DAG observable to it𝐺𝑢
+𝑡 . The setH denotes
+nodes that follow the mining protocol, which dictates that every
+new block references all tips of the DAG observable to its miner
+at its creation, and is broadcast by it immediately to the network.
+The attacker deviates arbitrarily from the mining protocol, and can
+further accelerate or delay messages from or to honest nodes up to
+10As shown in the full proof in Appendix A, UMC-Voting returns a positive sign if𝑈
+is a𝑑-UMC.
+𝐷𝑡 seconds (𝐷𝑡 depends on time since network conditions and con-
+nectivity might change with time); we denote by𝐷max, or simply
+𝐷, the maximal𝐷𝑡 across𝑡∈[ 0,∞). Importantly,𝐷 = 𝐷max is a
+function of the block size limit denoted𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡 (KB), since
+large messages take longer to propagate. For brevity, we ignore
+this parameter, and regard the block size as fixed. We emphasize
+that𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡 can be increased in the same manner than
+the block rate𝜆 may be increased, as discussed in Subsection 5.1.
+The proof-of-work mechanism targets a certain block creation
+rate of𝜆 blocks per second, kept (roughly) constant via a difficulty
+adjustment algorithm, similarly to Bitcoin [ 13]. We denote the
+proof-of-work protocol by 𝑝𝑜𝑤(𝜆). Block creation thus follows
+a Poisson process with parameter 𝜆, and the next block in the
+network is created by an honest node with probability 1−𝛼𝑡 , for
+some (unknown, potentially dynamic) 0≤𝛼𝑡 <𝛼 (for𝑡∈[ 0,∞)).
+If this inequality is guaranteed to hold for some range 𝑡≥𝑠, We
+say that𝛼 is an𝑠-updated bound over the attacker’s computational
+power; this definition is used below to emphasize a self-stabilizing
+property which allows to recover from “51% attacks”.
+The DAG ordering rule𝑂𝑅𝐷 is an algorithm that takes as input
+a DAG of blocks and returns a linear ordering over its blocks. In our
+parameterless model, as in the closely-related partial synchrony
+model, the algorithm may take no parameters as input arguments
+(such as𝐷,𝛼,𝑘, etc.). We require that all blocks in the DAG were
+mined correctly according to𝑝𝑜𝑤(𝜆). If block𝑎 admits a path to
+block𝑏 in the DAG,𝑎 was necessarily created after 𝑏. The DAG
+topology induces therefore a natural partial ordering, and the gist
+of the ordering rule is to extend this to a full ordering over the
+DAG.
+3.1 Convergence of the ordering
+The following definitions adapt and extend the model from PHAN-
+TOM:
+Property 1. An ordering rule𝑂𝑅𝐷 is said to be:
+• Parameterless if its only input argument is a block DAG 𝐺; all
+blocks in𝐺 must be mined correctly according to the proof-of-
+work protocol𝑝𝑜𝑤(𝜆).
+• (1−𝛼)-convergent, if∀𝑡 > 0,∀𝑢∈H and∀𝑏∈𝐺𝑢
+𝑡 :
+lim𝑟→∞𝑟𝑖𝑠𝑘(𝑏,𝑡,𝑟) = 0,
+even when a fraction of at most𝛼 of the mining power is byzan-
+tine; the convergence rate of𝑟𝑖𝑠𝑘(·) should be inO(𝑓(𝐷,𝜆,𝛼)),
+for some function 𝑓 , and, in particular, may not grow indefi-
+nitely with𝑡.11
+• Scalable if there exists a constant 𝛼 > 0 such that it(1−𝛼)-
+converges for all 𝜆 > 0; the maximal such 𝛼 is called the
+security threshold of𝑂𝑅𝐷 .
+• Self stabilizing if the security threshold of𝑂𝑅𝐷 depends on the
+𝑡-updated bound over the attacker’s computational power. 12
+11Growing indefinitely with𝑡 would imply that confirmation times are not bounded.
+12This property, which is satisfied by many proof-of-work consensus protocols, implies
+that the protocol recovers from periods where the attacker’s computational power
+exceeded the allowed threshold, and specifically from what is known as “51% attacks”.
+In fact, some of these protocols, including KNIGHT, satisfy a stronger property and
+allow the computational power of the attacker to exceed the bound for some limited
+time-intervals in the future. Delving into these nuances is outside our scope.
+9
+Michael Sutton and Yonatan Sompolinsky
+• Adaptive if the convergence rate of 𝑟𝑖𝑠𝑘(𝑏,𝑡,𝑟) depends on
+the recent delay rather than the historical delay; formally, if
+it is inO(max𝑠≥𝑡((𝑔(𝑠−𝑡,𝛼)· 𝑓(𝐷𝑠,𝜆,𝛼)))) . The function
+𝑔 represents the “memory” of the process, i.e., how far into the
+past current values of 𝐷 (𝐷𝑠 ) impact convergence.
+Here,𝑟𝑖𝑠𝑘(𝑏,𝑡,𝑟) is the probability that the ordering between𝑏
+and any other block𝑐 changes between time𝑡 and𝑡+𝑟 [20].
+3.2 Formal statement
+We are finally ready to formally state the achievement of the KNIGHT
+protocol:
+Theorem 2. KNIGHT’s ordering rule (Algorithm 2) is parameter-
+less, scalable, self-stabilizing, and adaptive.
+To the best of our knowledge, KNIGHT is the first proof-of-work
+based protocol to satisfy all of these properties. For some compar-
+isons: NC is not scalable, since its security threshold deteriorates
+as the block creation rate𝜆 grows; PHANTOM is not parameter-
+less, since its ordering rule takes as input𝑘, corresponding to the
+network’s worst case latency, and for the same reason it is not
+adaptive.13 SPECTRE does not guarantee convergence altogether
+[19].
+In Section 4 we will further shed light on the convergence rate
+of KNIGHT, specifically, on the order of the functions𝑓 and𝑔. In
+Appendix A we will provide a rigorous proof of Theorem 2.
+4 CONFIRMATION TIMES
+As common in proof-of-work protocols, the procedure for deter-
+mining the robustness of the ordering – i.e., evaluating the func-
+tion𝑟𝑖𝑠𝑘 – is done by the client locally, outside the context of
+consensus. The performance of the protocol in terms of speed is
+captured by the convergence rate of 𝑟𝑖𝑠𝑘 . This metric should ar-
+guably be dissected into two modes, optimistic and pessimistic.
+In the former scenario, all participating nodes (miners) seem to
+behave properly, and in particular there is no visible split in the
+DAG; formally: all blocks agree on and amplify the entire chain
+selection, save perhaps a constant-size suffix. In this optimistic sce-
+nario, KNIGHT performs very fast, and transactions may be safely
+confirmed after at mostO  (ln(1/𝜖)+ 𝐷·𝜆)/(1− 2𝛼)+( 𝐷·𝜆)2
+steps, orO
+ ln(1/𝜖)
+𝜆 +𝐷
+
+/(1− 2𝛼)+ 𝐷2·𝜆
+
+seconds. In terms of
+Definition 1, the latter expression describes the asymptotic be-
+haviour of the function 𝑓 . The function𝑔 defined therein can be
+shown to decay exponentially fast in its argument, implying that
+confirmation times are highly dependent on the recent worst-case
+latency in the network, and are insensitive to past or future network
+hiccups.
+In the pessimistic case, where an attacker continuously publishes
+late blocks and thereby slows down chain solidification, our bounds
+over confirmation times present an order-of-magnitude slow down:
+O( exp(𝑐·𝐷·𝜆/(1− 2·𝛼))+ ln(1/𝜖)/( 1− 2𝛼))) steps. This de-
+scribes the asymptotic behaviour of𝑓 in the pessimistic scenario
+(the behaviour of𝑔 remains the same). We stress that these bounds
+are far from tight—they result from the intractability of analyzing
+13Indeed, any latency-parameterized protocol would not be adaptive. However, one
+may conceive a parameterless protocol that is not adaptive.
+the chain solidification under the most sophisticated attack, and
+further grant the attacker unrealistic communication capabilities.
+To overcome the intractability, and inspired by a technique from
+PHANTOM paper, our analysis waits for a rare event in which
+the honest network mined𝑍·𝐷·𝜆 consecutive blocks in a chain,
+for some predetermined constant 𝑍. This event is guaranteed to
+happen within a constant number of steps. While this condition is
+an overkill, relaxing it and tightening the confirmation times is a
+complex task, and we defer it to future work.
+Notwithstanding, an attacker cannot slow down the confirmation
+times of regular transactions, even if it carries out a visible attack.
+As long as the user did not publish an explicit visible conflict to her
+transaction, its receiver will be able to accept it in the same order-
+of-magnitude as in the optimistic scenario. Indeed, in this case, the
+ordering between the published transaction and other transactions
+would be commutative, and thus the pending chain solidification
+would be inconsequential to this transaction. Admittedly, in the
+case of trading against a smart contract, this commutative property
+might not hold.14
+The reader may find the comparison between asymptotic con-
+firmation times in KNIGHT and other proof-of-work protocols in
+Table 1 insightful. Among the protocols under comparison, NC is
+the fastest to converge under visible (liveness) attacks, yet it con-
+verges only for the range𝛼∈( 0, 1/(1+𝐷·𝜆)) [21]. SPECTRE is the
+fastest to converge under no visible attacks, it converges according
+to the current (adversarial) latency𝐷𝑡 , and does so slightly faster
+than KNIGHT does. KNIGHT, in turn, converges in the invisible
+and visible attack cases, and does so corresponding to𝐷𝑡 as well,
+in contrast to PHANTOM which converges in terms of𝐷max =𝐷
+only. In Section 6 we will survey additional protocols.
+Finally, we note that confirmation time analysis of KNIGHT can
+be tightened significantly when restricted to the attacker range
+𝛼 < 1/3. We defer this improvement to future work.
+5 IMPLEMENTATION DETAILS
+An implementation of Algorithm 2 and its subprocedures will be
+made available online.
+5.1 Block size limit
+So far we treated synchronous protocols as assuming a bound
+on latency𝐷. In fact, increasing𝐷 and decreasing𝜆 by the same
+multiplicative factor has no effect and could be regarded as mere
+change in units. Thus, in truth, the latency assumption takes the
+form of a bound over𝐷·𝜆.
+Recall that𝐷 depends on the size of messages𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡
+(Section 3). Thus, increasing the block size would have a similar
+effect to that of increasing the block rate 𝜆.15 Consequently, in
+the same manner in which scalable protocols (Definition 1) re-
+main secure under any𝜆, they remain secure under any block size
+𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡 . In the following subsection we discuss whether
+scalable parameterless protocols, such as KNIGHT, need to limit𝜆
+or𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡 .
+14These scenarios correspond, essentially, to the consensus properties safety, liveness,
+and weak liveness, the latter defined in [19].
+15Notwithstanding, the function𝐷(𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡) is nonhomogeneous.
+10
+The DAG KNIGHT Protocol: A Parameterless Generalization of Nakamoto Consensus
+Visible attack No visible attack
+NC O
+ 
+(ln(1/𝜖)+𝐷𝑡𝜆)
+max
+n
+0, 1−𝛼
+1+𝐷𝑡·𝜆−𝛼
+o
+!
+(same as the visible attack case, asymptotically)
+PHANTOM O
+
+exp
+
+𝑐1 𝑫max𝜆
+1−2𝛼
+
++ ln(1/𝜖)
+1−2𝛼
+
+O
+ ln(1/𝜖)+𝑫max𝜆
+1−2𝛼
+
+SPECTRE ∞ O
+ ln(1/𝜖)+𝑫𝒕𝜆
+1−2𝛼
+
+KNIGHT O
+
+exp
+
+𝑐2 𝑫𝒕𝜆
+1−2𝛼
+
++ ln(1/𝜖)
+1−2𝛼
+
+O
+ ln(1/𝜖)+𝑫𝒕𝜆
+1−2𝛼 +(𝑫𝒕𝜆)2
+
+Table 1: A comparison of the convergence rates of different proof-of-work protocols, in terms of time-steps (equiv., number
+of blocks), in the presence of a visible ongoing liveness attack (left column) and when no such attack is carried visibly (right
+column).𝐷max denotes an a priori upper bound on the worst case latency, whereas 𝐷𝑡 denotes an upper bound on the current
+latency (including possible delays by an adversary). To get expected confirmation times in seconds, multiply each expression
+by the expected block interval 𝜆−1.
+5.2 Difficulty Adjustment Algorithm (DAA)
+NC and other proof-of-work protocols employ a DAA that increases
+the difficulty-target of creating new blocks when the computational
+power contributed to block creation (aka hashrate) increases, and
+vice versa when it decreases; refer to [8] for a formal treatment. It is
+common to ascribe the Sybil-resiliency of the system to this mech-
+anism. However, in truth, proof-of-work suffices to protect against
+Sybil-nodes even without any DAA. In fact, even if nodes were
+free to choose the difficulty of their own blocks, one could devise a
+secure consensus protocol by granting each block a weight, or “vot-
+ing power”, in proportion to its difficulty. Instead, the motivation
+for DAA is threefold:
+• Existing protocols operate in the synchronous setup which
+assumes an a priori bound over the number of blocks created
+per one unit of delay, i.e.,𝐷·𝜆. For instance, NC assumes
+𝐷·𝜆≪ 1, and PHANTOM assumes𝐷·𝜆≪𝑘+1. To preserve
+these bounds and keep the protocol secure,𝜆 cannot increase
+indefinitely, and must be regulated by the protocol.
+• DoS prevention: The capacity of the network and of nodes
+is limited. The DAA throttles the block creation rate and
+ensures that the maximum capacity is not exceeded.
+• Some application considerations necessitate access to abso-
+lute time, such as the regulation of minting, or timelocks.
+These applications use the block count as a proxy for abso-
+lute time.
+The first consideration above is irrelevant to KNIGHT, which can
+cope with dynamic𝐷 and𝜆 (and𝐷·𝜆). While KNIGHT still requires
+DAA for the latter considerations – particularly DoS prevention
+– it could be satisfied perhaps with relaxed versions of DAA. we
+hope that this discussion spurs new ideas for proof-of-work system
+designs in the parameterless setup.
+6 RELATED WORK
+We conclude this paper with a survey of related work. DAG-based
+protocols have been mentioned extensively throughout the pa-
+per, see for example Table 1. Additional relevant protocols in-
+clude GHOST, which is an alternative chain-selection rule to NC’s
+longest chain, and which performs similarly (in qualitative terms)
+to NC [9, 10].
+Thunderella [17] is a permissionless protocol that is responsive
+in the strong sense of performing according to the network’s actual
+latency; it requires a super majority of 75% to be honest for this
+optimistic mode (compared to KNIGHT’s 51% majority), as well
+as the pre-selection of a special “accelerator” node, which com-
+promises the permissionless property of the system. The works
+in [3, 7, 22] maintain 𝑘 parallel NC chains, where each block is
+assigned in random to one of these chains. The ordering rule must
+then specify the respective ordering between blocks in different
+chains. These works operate in the synchronous setup, as they
+pre-assume𝑘 so as to ensure that each chain grows with negli-
+gible latency; conceptually, as observed by [ 20], these protocols
+require𝐷·𝜆/(𝑘+ 1)≪ 1. Prism [3] claim a confirmation time of
+O( max(𝑐1(𝛼)· 𝐷,𝑐 2(𝛼)· 𝐵𝑣· ln(1/𝜖))) seconds; here,𝐵𝑣/𝐶 effec-
+tively represents the number of blocks per second (𝜆, in our work).
+Importantly, in the above term𝐷 stands as a function that depends
+only on network latency and does not depend on the block message
+size (denoted𝐵𝑣, and in our work𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡 ). We find this
+claim questionable, and argue that if indeed 𝐷 does not depend
+on𝑏𝑙𝑜𝑐𝑘 _𝑠𝑖𝑧𝑒 _𝑙𝑖𝑚𝑖𝑡 , then “proposer blocks” and “voter blocks” in
+Prism do not in fact attest that “transaction blocks” referenced by
+them have been fully published, which opens up data availability
+attacks. The number of chains in Prism further depends on the
+parameter𝜖.
+The work in [18] proposes a series of protocols, Slush, Snowflake,
+and Snowball, which use a network sampling technique to resolve
+conflicts between nodes. The paper claims very fast confirmation
+times (1.35 seconds). Yet, these protocols operate in the synchronous
+model (see Section 2, “Achieving Liveness”), and thus confirmation
+times in the pessimistic case are not responsive to the network’s
+latency. The protocols are further limited to a fixed confidence
+parameter𝜖 (see e.g. Subsection 3.2 therein), similarly to Prism.
+Finally, this line of work builds on novel assumptions on nodes’
+ability to sample the network.
+Our work was motivated by Pass and Shi’s impossibility result
+regarding responsive consensus protocols [16], which is an adap-
+tation of the classic 34% byzantine threshold bound on partially
+synchronous protocols by Dwork et al. [6] to permissionless set-
+tings. To circumvent this impossibility, we focused on a relaxed
+property that aims to be responsive to the maximal latency causable
+by an adversary, rather than to the observable latency; accordingly,
+11
+Michael Sutton and Yonatan Sompolinsky
+Theorem 2 does not state KNIGHT as being responsive. KNIGHT
+respects the bound of [6, 16] in that it is responsive to the current
+worst-case adversarial latency ( Δ, in their model) but not to the
+actual observable one (𝛿 therein). Indeed, the impossibility result
+(Section 9.2 in [16]) relies directly on the attacker increasing the
+delay from𝛿 to Δ after transactions have been confirmed. In our
+model, however, transaction confirmation times depend on Δ (𝐷𝑡 ,
+in our notation).
+For discussion of tighter transaction confirmation policies, which
+employ absolute time in addition to the ledger state, see [14]. The
+results therein apply, qualitatively, to KNIGHT as well.
+The achievement of KNIGHT is made possible by the decoupling
+of the canonical protocol dictating the ordering over all transactions,
+and the client protocol for estimating its finality (Subsection 1.4).
+A similar decoupling was previously proposed in the Flexible BFT
+paper [12]. That work operates in the traditional permissioned
+setup, and is still restricted by the 34% threshold for byzantine
+resilience of partially synchronous protocols, by Dwork et al. [6].
+To reason about the fundamental difference in paradigm, observe
+that the consensus participants in Flexible BFT are not agnostic
+to the finality of transactions—they reach eventual agreement on
+finality. In contrast, proof-of-work miners running KNIGHT need
+not reach any agreement on finality of transactions, and are in fact
+not required to interpret the state whatsoever. We believe that this
+agnosticism towards the state is necessary when designing a 50%
+BFT parameterless consensus protocol.
+REFERENCES
+[1] http://bitcoinfibre.org/stats.html.
+[2] http://kgi.kaspad.net/.
+[3] Vivek Bagaria, Sreeram Kannan, David Tse, Giulia Fanti, and Pramod Viswanath.
+Prism: Deconstructing the blockchain to approach physical limits. In Proceedings
+of the 2019 ACM SIGSAC Conference on Computer and Communications Security ,
+pages 585–602, 2019.
+[4] Shehar Bano, Alberto Sonnino, Mustafa Al-Bassam, Sarah Azouvi, Patrick Mc-
+Corry, Sarah Meiklejohn, and George Danezis. Sok: Consensus in the age of
+blockchains. In Proceedings of the 1st ACM Conference on Advances in Financial
+Technologies, pages 183–198, 2019.
+[5] Edsger W Dijkstra. Self-stabilizing systems in spite of distributed control. Com-
+munications of the ACM, 17(11):643–644, 1974.
+[6] Cynthia Dwork, Nancy Lynch, and Larry Stockmeyer. Consensus in the presence
+of partial synchrony. Journal of the ACM (JACM) , 35(2):288–323, 1988.
+[7] Matthias Fitzi, Peter Gazi, Aggelos Kiayias, and Alexander Russell. Parallel
+chains: Improving throughput and latency of blockchain protocols via parallel
+composition. IACR Cryptology ePrint Archive, 2018:1119, 2018.
+[8] Juan Garay, Aggelos Kiayias, and Nikos Leonardos. The bitcoin backbone protocol
+with chains of variable difficulty. In Annual International Cryptology Conference,
+pages 291–323. Springer, 2017.
+[9] Aggelos Kiayias and Giorgos Panagiotakos. On trees, chains and fast transactions
+in the blockchain. Cryptology ePrint Archive, Report 2016/545, 2016.
+[10] Lucianna Kiffer, Rajmohan Rajaraman, and Abhi Shelat. A better method to ana-
+lyze blockchain consistency. In Proceedings of the 2018 ACM SIGSAC Conference
+on Computer and Communications Security , pages 729–744, 2018.
+[11] Yoad Lewenberg, Yonatan Sompolinsky, and Aviv Zohar. Inclusive block chain
+protocols. In International Conference on Financial Cryptography and Data Secu-
+rity, pages 528–547. Springer, 2015.
+[12] Dahlia Malkhi, Kartik Nayak, and Ling Ren. Flexible byzantine fault tolerance. In
+Proceedings of the 2019 ACM SIGSAC conference on computer and communications
+security, pages 1041–1053, 2019.
+[13] Satoshi Nakamoto. Bitcoin: A peer-to-peer electronic cash system, 2008.
+[14] Seb Neumayer, Mayank Varia, and Ittay Eyal. An analysis of acceptance policies
+for blockchain transactions. Cryptology ePrint Archive, 2018.
+[15] Rafael Pass, Lior Seeman, and Abhi Shelat. Analysis of the blockchain protocol
+in asynchronous networks. IACR Cryptology ePrint Archive, 2016:454, 2016.
+[16] Rafael Pass and Elaine Shi. Hybrid consensus: Efficient consensus in the permis-
+sionless model, 2016.
+[17] Rafael Pass and Elaine Shi. Thunderella: Blockchains with optimistic instant
+confirmation. In Annual International Conference on the Theory and Applications
+of Cryptographic Techniques, pages 3–33. Springer, 2018.
+[18] Team Rocket, Maofan Yin, Kevin Sekniqi, Robbert van Renesse, and Emin Gün
+Sirer. Scalable and probabilistic leaderless bft consensus through metastability.
+arXiv preprint arXiv:1906.08936, 2019.
+[19] Yonatan Sompolinsky, Yoad Lewenberg, and Aviv Zohar. SPECTRE: A fast and
+scalable cryptocurrency protocol. IACR Cryptology ePrint Archive , 2016:1159,
+2016.
+[20] Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar. PHANTOM and
+GHOSTDAG: A scalable generalization of nakamoto consensus. Cryptology
+ePrint Archive, Report 2018/104, 2018. https://eprint.iacr.org/2018/104.
+[21] Yonatan Sompolinsky and Aviv Zohar. Secure high-rate transaction processing in
+bitcoin. In International Conference on Financial Cryptography and Data Security ,
+pages 507–527. Springer, 2015.
+[22] Haifeng Yu, Ivica Nikolic, Ruomu Hou, and Prateek Saxena. Ohie: Blockchain
+scaling made simple. arXiv preprint arXiv:1811.12628, 2018.
+A SECURITY PROOF
+A.1 Definitions and Notation
+Definition 7. 𝐺𝑡 is the oracle DAG at time 𝑡. Similarly, for block 𝐵
+mined at𝑡𝑖𝑚𝑒(𝐵), we abuse notation and define 𝐺𝐵 B𝐺𝑡𝑖𝑚𝑒(𝐵) .
+Definition 8. F𝑘(𝐵,𝐺) is the maximization-free𝑘-cluster of block
+𝐵 as calculated by the call K-Colouring(𝐵,𝐺,𝑘, true) in Alg. 5.
+Definition 9. C𝑘(𝐵,𝐺) is the 𝑘-cluster of block 𝐵 as calculated
+by K-Colouring(𝐵,𝐺,𝑘, false) in Alg. 5. We use C(𝐵) to denote
+C𝑘(𝐵,𝐺) for the special case 𝑘 =𝑘★. When the context is clear we
+abbreviate and write simplyC𝑘(𝐵).
+Definition 10. 𝑘-chain(𝐵,𝐺) is the chain of 𝑘-maximizing blocks
+used by K-Colouring(𝐵,𝐺,𝑘,𝑓𝑎𝑙𝑠𝑒 ) in order to composeC𝑘(𝐵,𝐺).
+More concretely, the𝑘-chain parent of block 𝐵 is𝐵max, assigned at
+line 12 of Alg. 5, and so on, recursively.
+Definition 11. C𝑘(𝐵) is the complementary set of C𝑘(𝐵) at
+𝑡𝑖𝑚𝑒(𝐵). More formally,C𝑘(𝐵) B𝐺𝐵\C𝑘(𝐵)
+Definition 12. The merge set of block 𝑥 is defined by
+𝑚𝑒𝑟𝑔𝑒𝑠𝑒𝑡(𝑥) B 𝑝𝑎𝑠𝑡(𝑥)\𝑝𝑎𝑠𝑡(chain-parent(𝑥)). We say block
+𝑥 is merging block𝑦 if𝑦∈𝑚𝑒𝑟𝑔𝑒𝑠𝑒𝑡(𝑥).
+The set of blocks mined after and before block𝑥 (in absolute time,
+as seen by an external oracle), are denoted before(𝑥) and after(𝑥)
+respectively. We use subscript notation𝑋𝑥⟩,𝑋⟨𝑥 and𝑋⟨𝑥,𝑦⟩ over
+a set of blocks𝑋 , to indicate𝑋\ after(𝑥),𝑋 ∩ after(𝑥) and𝑋∩
+after(𝑥)\ after(𝑦) respectively.
+We notate 𝑥 ⇒ 𝑦 if𝑦 = chain-parent(𝑥). Similarly, we use
+𝑥 ⇒𝑘 𝑦 if𝑦 is the𝑘-chain parent of𝑥.
+A.2 K-cluster Combinatorics
+Unlike the GHOSTDAG 𝑘-colouring algorithm (Algorithm 1 in
+[20]), the K-Colouring procedure in Algorithm 5 uses weaker
+colouring rules which give precedence to past and current chain
+blocks (line 15 therein). Nonetheless, as we show below, for some
+larger𝐾 >𝑘 the resulting cluster is still a valid𝐾-cluster. Denote
+𝐾(𝑘) B(2𝑘+ 1)(𝑘+ 1).
+Lemma 1. For any block 𝐵 and DAG𝐺, the cluster 𝐶 returned by
+K-Colouring(𝐵,𝐺,𝑘, ·) is a𝐾(𝑘)-cluster.
+Proof. The first condition in line 15 implies that a block added to
+the colouring cannot have more than𝑘 chain-blocks in its anticone.
+12
+The DAG KNIGHT Protocol: A Parameterless Generalization of Nakamoto Consensus
+Hence by the time 𝐵 is coloured and added to 𝐶, is holds that
+|𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵)∩𝐶|≤(𝑘+ 1)(𝑘+ 1). This follows from the fact that
+each of the𝑘 chain blocks prior to the chain-block merging𝐵 has
+merged at most𝑘 blocks (from the second condition in line 15).
+Likewise, only the next 𝑘 chain-blocks can colour blocks ∈
+𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵), resulting in𝑘(𝑘+ 1) more blocks. Combined we get
+|𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵)∩𝐶|≤(2𝑘+ 1)(𝑘+ 1) =𝐾(𝑘) □
+Lemma 2. Let𝐵1,𝐵 2,...,𝐵 𝑛−1,𝐵𝑛 be a sequence of 𝑘-chain blocks
+s.t.𝐵𝑖−1 ⇒𝑘 𝐵𝑖 and let𝐵∈C𝑘(𝐵1)\C𝑘(𝐵2) s.t.𝐵𝑛 is the maximal
+element∈𝑘-chain(𝐵1)∩𝑝𝑎𝑠𝑡(𝐵); thenC𝑘(𝐵1)\C𝑘(𝐵𝑛)≤ 4𝐾(𝑘).
+Proof. 16 The set𝑝𝑎𝑠𝑡(𝐵1)\𝑝𝑎𝑠𝑡(𝐵𝑛) is covered by the anti-
+cones of𝐵,𝐵 2,𝐵𝑛−1,𝐵𝑛∈C𝑘(𝐵1), which immediately implies its
+intersection withC𝑘(𝐵1) is≤ 4𝐾(𝑘). To see the covering, assume
+there exists a block 𝐷 not in any anticone, so 𝐷 ∉ 𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵);
+if 𝐷 ∈ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵) then it must be ∈ 𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵2), otherwise
+𝐵 ∈ 𝑝𝑎𝑠𝑡(𝐵2); if on the other hand 𝐷 ∈ 𝑝𝑎𝑠𝑡(𝐵) it cannot be
+in𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵𝑛−1) since that will contradict maximality of𝐵𝑛, thus
+it must be∈𝑝𝑎𝑠𝑡(𝐵𝑛−1) which implies𝐷∈𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵𝑛), a con-
+tradiction. □
+Lemma 3. Let𝐵1,...,𝐵 𝑛−1,𝐵𝑛 be a sequence of 𝑘-chain blocks s.t.
+𝐵𝑖−1 ⇒𝑘 𝐵𝑖 and let 𝐵∈C 𝑘(𝐵1) s.t.𝐵𝑛 is the maximal element ∈
+𝑘-chain(𝐵1)∩𝑝𝑎𝑠𝑡(𝐵), then  𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵𝑛)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵) ∩C𝑘(𝐵1)≤
+2𝐾(𝑘).
+Proof. The set𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵𝑛)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵) is covered by the an-
+ticones of𝐵,𝐵𝑛−1∈C𝑘(𝐵1), which immediately implies its inter-
+section withC𝑘(𝐵1) is≤ 2𝐾(𝑘). To see the covering, assume there
+exists a block in this set s.t. 𝐷 ∉𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵), ∉𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝐵𝑛−1);
+so𝐷∈𝑝𝑎𝑠𝑡(𝐵) hence it cannot be in𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵𝑛−1) since that will
+contradict maximality of 𝐵𝑛, so it must be ∈ 𝑝𝑎𝑠𝑡(𝐵𝑛−1) which
+implies𝐷 ∉ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵𝑛), a contradiction. □
+A.3 Main theorem
+We are now ready to prove our main result. For the reader’s conve-
+nience, we first restate the claim:
+Theorem 2. KNIGHT’s ordering rule (Algorithm 2) is parameter-
+less, scalable, self-stabilizing, and adaptive.
+A.4 Proof
+We fix an arbitrary honest node𝑢∈ℎ𝑜𝑛𝑒𝑠𝑡 and assume its point of
+view. We thus abbreviate𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡 to represent the virtual block of
+node𝑢 at time𝑡. We additionally regard the pov of a hypothetical
+oracle node that sees all blocks immediately upon their creation,
+including the attacker; in fact, the omnipotent attacker in our model
+enjoys the same pov as the oracle node.
+Below, we will skip proofs of the more straightforward claims.
+We will close this gap in a future version of this paper.
+A.4.1 Chain growth. We begin by analyzing the growth rate of the
+maximization-free colouringF𝑘(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡) and show that there ex-
+ists a “natural”𝑘 for which this colouring yields> 50% growth. This
+“free-search” algorithm can be seen as a modified GHOSTDAG [20],
+where by weakening the colouring rules we were able to strengthen
+16The proofs of the current and following lemmas are in spirit of PHANTOM’s
+freeloader bound [20].
+the growth-rate proven for GHOSTDAG from achieving a relative
+majority (over the attacker), to achieving an absolute majority.
+Claim 1. There exists𝑘𝑛𝑎𝑡𝑢𝑟𝑎𝑙 , depending only on 𝐷,𝛼 and𝜆, s.t.
+the expected growth ofF𝑘𝑛𝑎𝑡𝑢𝑟𝑎𝑙(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡) is strictly larger than 0.5;
+that is,
+E F𝑘𝑛𝑎𝑡𝑢𝑟𝑎𝑙(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡+𝑟)
+−
+F𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡)
+ > 0.5𝑟𝜆.
+We now use the maximization-free expected growth-rate, and
+utilize the Tie-Breaking algorithm, to show that larger-than 50%
+growth-rate is achieved also for the non-free colouring, albeit with
+a larger𝑘 parameter.
+Proposition 3. There exists𝑘★, depending only on 𝐷,𝛼 and𝜆 s.t.
+the expected growth ofC𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡) is strictly larger than 0.5; that
+is,
+E C𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡+𝑟)
+−
+C𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡)
+ > 0.5𝑟𝜆.
+Corollary 2. If𝑈 is𝑑-UMC of𝐺, then UMC-Voting 𝐺,𝑈,𝑑  > 0.
+Claim 3. UMC-Voting 𝐺𝑡,C𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡),𝑔(𝑘★) has positive
+value in expectation.
+A.4.2 Liveness collapse.
+Definition 13. The attacker advantage 𝑎𝑑𝑣(𝑡) at time 𝑡 as
+𝑎𝑑𝑣(𝑡) B max𝐵∈C𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡) 𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵)∩(𝐺𝑡\C𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡))−
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝐵)∩C𝑘★(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡).
+Lemma 4. The attacker advantage 𝑎𝑑𝑣(𝑡) is upper bounded by a
+stochastic process which admits a stationary distribution with 𝐶0 =
+O(𝑘𝑛𝑎𝑡𝑢𝑟𝑎𝑙) skew and an exponentially decaying tail.
+Definition 14. A burst eventB𝑡,𝑍 is an honest chain burst of size
+𝐶0+ 3𝑍 starting at time𝑡, where𝑍 is a function of 𝐾(𝑘★).
+LetB denote the sequence of blocks constituting the burst event
+B𝑡,𝑍 and letB𝑖 be the𝑖’th block from the start of the event. Denote
+the particular blocks s BB1,𝜙 BB𝐶0, d BB𝐶0+𝑍, e BB𝐶0+2𝑍 .
+These blocks represent the starting point s of the event, the pivot
+block𝜙 which we claim to be on any future honest chain, thedefeat
+block d representing the point where the attacker is in sufficient
+deficit, and the end block of the burst, e.
+Definition 15. An honest block-race win eventW𝑡 is the event that
+starting from time𝑡,∀𝑠 >𝑡,C(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠)⟨𝑡≥C(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠)⟨𝑡
+Definition 16. The event-sequenceE𝑡,𝑍 is defined to be the sequence
+of events (i)𝑎𝑑𝑣(𝑡)≤𝐶0, (ii) followed by a burst B𝑡,𝑍 , (iii) followed
+by a block-race winW𝑡𝑖𝑚𝑒(e) . Note that all events are independent
+and have positive probability.
+Definition 17. A is the set of non-convinced blocks following the
+burst event, i.e., the set
+
+𝐵∈𝐺⟨e,∞⟩ :𝜙 ∉𝑐ℎ𝑎𝑖𝑛(𝐵)
+	
+.
+Definition 18.H𝑐 is the set of chain blocks of honest node𝑢, starting
+from block d of the burst event, i.e., the set
+
+𝐵 ∈ 𝐺⟨d,∞⟩ :∃𝑡 >
+𝑡𝑖𝑚𝑒(d),𝐵∈𝑐ℎ𝑎𝑖𝑛(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑡)
+	
+.
+Claim 4. For block𝑎∈A , denote𝑎1 = min𝑐ℎ𝑎𝑖𝑛(𝑎)∩after(e) and
+𝑎2 = max𝑐ℎ𝑎𝑖𝑛(𝑎)∩ before(s). Then it holds that ∀𝑝∈B ⟨𝜙,𝑝 ∈
+𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑎1)∪𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑎2).
+13
+Michael Sutton and Yonatan Sompolinsky
+Proof. Assume there exists such 𝑝 ∉ 𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑎1) ∪
+𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑎2), then𝑝∈ 𝑝𝑎𝑠𝑡(𝑎1)∩𝑓𝑢𝑡𝑢𝑟𝑒 (𝑎2), so𝑝∈ 𝑐ℎ𝑎𝑖𝑛(𝑎),
+contradicting𝑎∈A . □
+Claim 5. For block𝑎∈A ,C𝑘(𝑎)∩B⟨𝜙≤ 2𝐾(𝑘).
+Proof. Follows from Claim 4 and from the definition of a 𝑘-
+cluster. □
+The proof of the claim below assumes that the colouring of
+𝑐ℎ𝑎𝑖𝑛(𝐵) coincides with𝑘-chain(𝐵,𝐺), for any𝑘 and for any sub-
+DAG𝐺. Following the proof we alleviate this assumption. Addition-
+ally, for legibility, the proof does not distinguish explicitly between
+𝑘★ and𝐾(𝑘★). This merely means that some of the constants such
+as𝑍 need to be set larger and with respect to 𝐾(𝑘★) rather than
+𝑘★.
+Claim 6. (main claim) Conditioned on the occurrence of event-
+sequenceE𝑡,𝑍 , it holds that for any ℎ∈H𝑐\A , and for any 𝑎∈A
+mergingℎ,
+𝑝𝑎𝑠𝑡(𝑎)∩ after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)≥C (ℎ)⟨d−C(ℎ)⟨d.
+Proof. Assume for contradiction the claim is false. We look at
+the minimal eventℎ,𝑎 violating the claim statement, i.e.,𝑎∈A is a
+merging block ofℎ∈H𝑐\A and𝑝𝑎𝑠𝑡(𝑎)∩after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ) <
+C(ℎ)⟨d−C(ℎ)⟨d.
+Denote𝑔 to be the most recent shared chain-ancestor ofℎ and𝑎,
+i.e.,𝑔 = max𝑐ℎ𝑎𝑖𝑛(ℎ)∩𝑐ℎ𝑎𝑖𝑛(𝑎). We analyze the run of Algorithm
+2 for the recursive call where 𝐺 = 𝑝𝑎𝑠𝑡(𝑎) (line 5), and for the
+iteration of the While loop at which 𝑔 is obtained (line 8), and
+reach a contradiction to the algorithm’s decision. Throughout the
+proof and sub-claims, we implicitly use a context DAG C which
+all sets are intersected with. We set the broader context to be C =
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑔)∩𝑝𝑎𝑠𝑡(𝑎), however at some inner arguments we narrow
+the context further.
+From minimality of 𝑎 we have that 𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)∩A = ∅. To
+see this, assume otherwise and let 𝑎′ = min𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)∩A .
+So ℎ ∈ 𝑚𝑒𝑟𝑔𝑒𝑠𝑒𝑡(𝑎′) since ℎ ∉ A,𝑎′ ∈ A. Additionally,
+since 𝑎′ ∈ 𝑝𝑎𝑠𝑡(𝑎) it holds that 𝑝𝑎𝑠𝑡(𝑎′) ⊂ 𝑝𝑎𝑠𝑡(𝑎), hence
+𝑝𝑎𝑠𝑡(𝑎′)∩after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)⊂𝑝𝑎𝑠𝑡(𝑎)∩after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ) <
+C(ℎ)⟨d−C(ℎ)⟨d, contradicting minimality of𝑎.
+We now prove that ∀𝑞 ∈ 𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(ℎ)∩A ,𝑟𝑎𝑛𝑘 C(ℎ) <
+𝑟𝑎𝑛𝑘 C(𝑞).
+Claim 6.1. C(ℎ) is a  4𝑘★+ 2-UMC of C\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ).
+Proof. In the following, we narrow the implicit context to be
+C\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ).
+By definition of a UMC it needs to be shown that every block
+inC(ℎ) has bounded negative score (within the context). More
+formally, we need to show that for every block𝑏∈C (ℎ), it holds
+that𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)∩C(ℎ)+ 4𝑘★+ 2≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)\C(ℎ).
+Intuitively, while blocks before and during the start of the burst
+enjoy the natural advantage of the burst, for blocks following
+𝑡𝑖𝑚𝑒(d) a more sophisticated argument, using the contradiction
+hypothesis, is required. We thus begin by proving a tighter result for
+chain blocks mined after𝑡𝑖𝑚𝑒(d), subsequently using it to prove
+the bound for all blocks inC(ℎ)⟨d.
+Claim 6.1.1. ∀𝑝 ∈ 𝑐ℎ𝑎𝑖𝑛(ℎ)⟨d,𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)∩C (ℎ)+ 2𝑘★+ 2≥
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)\C(ℎ).
+Proof. Note that𝑝∈H𝑐\A since𝑝∈𝑐ℎ𝑎𝑖𝑛(ℎ),ℎ∈H𝑐\A ,
+thus from minimality ofℎ,𝑎 we have that after(𝑝)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)≥
+C(𝑝)⟨d−C(𝑝)⟨d.
+Partition after(𝑝) into the following disjoint sets: 𝑚 B
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)∩C(ℎ),𝑣 B after(𝑝)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝) and𝑢 B 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)\
+C(ℎ). Additionally, defineℓ B after(ℎ). The following claims show
+relations regarding these definitions.
+Claim 6.1.1.1. C(ℎ)−C(𝑝)≥𝑢+𝑣−ℓ−𝑘★− 1.
+Proof. Since𝑝∈𝑐ℎ𝑎𝑖𝑛(ℎ) it follows by incrementality ofC(ℎ)
+over𝑐ℎ𝑎𝑖𝑛(ℎ) thatC(𝑝) ⊂ C(ℎ). It also follows by 𝑘★-cluster
+anticone bound that𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑝)∩C(ℎ)≤𝑘★+ 1.
+We now contrast both expressionsC(ℎ)−C(𝑝) and𝑢+𝑣−ℓ
+with the set𝐺⟨𝑝,ℎ⟩\C(ℎ) and show that they differ only by𝑘★+ 1.
+Observe thatC(𝑝) =𝐺𝑝\C(𝑝) =𝐺𝑝\C(ℎ)+𝐺𝑝∩(C (ℎ)\
+C(𝑝)), and thatC(ℎ) =𝐺ℎ\C(ℎ). Thus by subtraction we obtain
+C(ℎ)−C(𝑝) =(𝐺ℎ\𝐺𝑝)\C (ℎ)−𝐺𝑝∩(C(ℎ)\C(𝑝)) =𝐺⟨𝑝,ℎ⟩\
+C(ℎ)−( before(𝑝)\𝑝𝑎𝑠𝑡(𝑝))∩C (ℎ).
+On the other hand𝑣+𝑢−ℓ = after(𝑝)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)\
+C(ℎ)− after(ℎ) =(after(𝑝)\ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝))\C (ℎ)+( after(𝑝)\
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝))∩C (ℎ)+ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)\C (ℎ)− after(ℎ) = 𝐺⟨𝑝,ℎ⟩\
+C(ℎ)+( after(𝑝)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝))∩C (ℎ).
+Combining both parts we have C(ℎ)− C(𝑝)+( before(𝑝)\
+𝑝𝑎𝑠𝑡(𝑝))∩C (ℎ) = 𝐺⟨𝑝,ℎ⟩\C (ℎ) = 𝑣+𝑢− ℓ−( after(𝑝)\
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝))∩C (ℎ), thusC(ℎ)−C(𝑝) =𝑣+𝑢−ℓ−𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑝)∩
+C(ℎ)≥𝑣+𝑢−ℓ−𝑘★− 1. □
+Claim 6.1.1.2. 𝑚+𝑘★+ 1≥C (ℎ)−C(𝑝).
+Proof. As shown in the previous claim,C(𝑝)⊂C (ℎ). It follows
+by elementary set logic thatC(ℎ)−C(𝑝) =C(ℎ)\C(𝑝) =C(ℎ)\
+𝑝𝑎𝑠𝑡(𝑝) =C(ℎ)∩𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(𝑝)+C(ℎ)∩𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)≤𝑘★+ 1+𝑚;
+where the last transition is from𝑘★-cluster anticone bound. □
+Using the above definitions and the contradiction hypothesis we
+have𝑣≥C (𝑝)⟨d−C(𝑝)⟨d andℓ <C(ℎ)⟨d−C(ℎ)⟨d. Negating
+the first inequality and summing the expressions we obtain
+C(ℎ)⟨d−C(𝑝)⟨d >ℓ−𝑣+C(ℎ)⟨d−C(𝑝)⟨d.
+Applying Claims 6.1.1.1, 6.1.1.2 on both sides we get that𝑚+𝑘★+1 >
+ℓ−𝑣+𝑣+𝑢−ℓ−𝑘★− 1 =𝑢−𝑘★− 1, which translates to the desired
+result:𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)∩C(ℎ)+ 2𝑘★+ 2≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)\C(ℎ).
+□
+For a non-chain block 𝑏 ∈ C(ℎ)⟨d\𝑐ℎ𝑎𝑖𝑛(ℎ), denote 𝑝 =
+max𝑐ℎ𝑎𝑖𝑛(ℎ)⟨d∩𝑝𝑎𝑠𝑡(𝑏). Plugging 𝐵1 = ℎ,𝐵𝑛 = 𝑝,𝐵 = 𝑏 into
+Lemma 3 we get that 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)∩C (ℎ)+ 2𝑘★ ≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)∩
+C(ℎ). Combining with Claim 6.1.1 we conclude that𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)∩
+C(ℎ)+ 4𝑘★+ 2≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)∩C (ℎ)+ 2𝑘★+ 2≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)\
+C(ℎ) > 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)\C(ℎ); where that last inequality follows from
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑝)⊃ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏).
+It remains to prove the bound for blocks before and during the
+start of the burst. For a block 𝑏 ∈C (ℎ)s⟩, we have from event-
+sequenceE𝑡,𝑍 that𝑎𝑑𝑣(s)≤𝐶0, thus by definition𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)s⟩∩
+14
+The DAG KNIGHT Protocol: A Parameterless Generalization of Nakamoto Consensus
+C(ℎ)+𝐶0≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)s⟩\C(ℎ). Additionally, by construction of
+the burst event,𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)⟨s,d⟩∩C(ℎ) =𝐶0+𝑍 > 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)⟨s,d⟩\
+C(ℎ) = 0. Finally, since after(ℎ) <C(ℎ)⟨d−C(ℎ)⟨d, it follows
+that𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)⟨d∩C(ℎ)≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)⟨d\C(ℎ). Summing over all
+time periods we get that 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)∩C(ℎ)≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)\C(ℎ),
+as claimed.
+For blocks𝑏∈C (ℎ)⟨s,d⟩, similar arguments hold. □
+Claim 6.2. ∀𝑞∈ 𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(ℎ)∩A,∀𝑘≤ 𝑍−5𝑘★
+4 ,C𝑘(𝑞) is not a
+𝑍−5𝑘★
+4 -UMC of C\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞).
+Proof. We seek to show the existence of a weak block inC𝑘(𝑞)
+which has negative score greater than 𝑍−5𝑘★
+4 , thus disobeying the
+UMC requirement. We show this over a maximal pre-burst block
+in the intersectionC(ℎ)∩C𝑘(𝑞).
+We begin by showing that the attacker cannot effectively freeload
+following the burst event. To that end, we show in the following
+claim thatC𝑘(𝑞)⟨e is bounded in size by the number of blocks out
+ofC(ℎ)⟨e.
+Claim 6.2.1. C𝑘(𝑞)⟨e≤𝑝𝑎𝑠𝑡(𝑞)⟨e\C(ℎ)⟨e.
+Proof. First, in the simple case whereC𝑘(𝑞)⟨e∩C(ℎ)⟨e =∅
+the proof is immediate sinceC𝑘(𝑞)⟨e⊆𝑝𝑎𝑠𝑡(𝑞)⟨e\C(ℎ)⟨e.
+For the more complex case, whereC𝑘(𝑞)⟨e∩C(ℎ)⟨e ≠∅, we
+define a counting process and reach the desired result using the
+bound𝑘≤ 𝑍−5𝑘★
+4 .
+Define a sequence of chain blocks 𝑞 = 𝑞0,...,𝑞 𝑛 ∈A in the
+following way:
+• Denote Δ𝑖−1 BC(ℎ)∩C𝑘(𝑞)∩𝑚𝑒𝑟𝑔𝑒𝑠𝑒𝑡(𝑞𝑖−1)
+• Given𝑞𝑖−1, if Δ𝑖−1 ≠∅, select𝑞𝑖 to be max𝑐ℎ𝑎𝑖𝑛(𝑞𝑖−1)∩
+𝑝𝑎𝑠𝑡(Δ𝑖−1).
+• Otherwise if Δ𝑖−1 =∅, select𝑞𝑖 to be max𝑐ℎ𝑎𝑖𝑛(𝑞𝑖−1) s.t.
+C(ℎ)∩C𝑘(𝑞)∩𝑚𝑒𝑟𝑔𝑒𝑠𝑒𝑡(𝑞𝑖) ≠∅ if such a block exists, or
+max𝑐ℎ𝑎𝑖𝑛(𝑞𝑖−1)∩ before(𝜙) otherwise.
+• If𝑞𝑖∈ before(𝜙), halt the process and set𝑛 =𝑖.
+It is true by construction that ⁄—𝑛
+𝑖=1𝑝𝑎𝑠𝑡(𝑞𝑖−1)⟨e\𝑝𝑎𝑠𝑡(𝑞𝑖)⟨e is
+a partitioning of𝑝𝑎𝑠𝑡(𝑞)⟨e. It thus remains to show that for each
+partition𝑖,C𝑘(𝑞)∩𝑝𝑎𝑠𝑡(𝑞𝑖−1)\𝑝𝑎𝑠𝑡(𝑞𝑖)≤𝑝𝑎𝑠𝑡(𝑞𝑖−1)\𝑝𝑎𝑠𝑡(𝑞𝑖)\
+C(ℎ).
+For the first case where Δ𝑖−1 ≠∅, let𝑏 be any element of Δ𝑖−1.
+Plugging 𝐵1 = 𝑞𝑖−1,𝐵𝑛 = 𝑞𝑖,𝐵 = 𝑏 into Lemma 2 we get that
+C𝑘(𝑞)∩𝑝𝑎𝑠𝑡(𝑞𝑖−1)\𝑝𝑎𝑠𝑡(𝑞𝑖)≤ 4𝑘≤𝑍− 5𝑘★. Additionally, it can
+be shown (from minimality ofℎ,𝑎 and from block-race condition)
+that𝑝𝑎𝑠𝑡(𝑞𝑖−1)∩after(𝑏)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑏)≥𝑍−4𝑘★, thus𝑝𝑎𝑠𝑡(𝑞𝑖−1)\
+𝑝𝑎𝑠𝑡(𝑞𝑖)\C (ℎ) ≥ 𝑍− 5𝑘★. Combined, C𝑘(𝑞)∩𝑝𝑎𝑠𝑡(𝑞𝑖−1)\
+𝑝𝑎𝑠𝑡(𝑞𝑖)≤𝑍− 5𝑘★≤𝑝𝑎𝑠𝑡(𝑞𝑖−1)\𝑝𝑎𝑠𝑡(𝑞𝑖)\C(ℎ), as claimed.
+In the second case where Δ𝑖−1 =∅, the result is immediate since
+by constructionC𝑘(𝑞)∩𝑝𝑎𝑠𝑡(𝑞𝑖−1)\𝑝𝑎𝑠𝑡(𝑞𝑖) ⊆ 𝑝𝑎𝑠𝑡(𝑞𝑖−1)\
+𝑝𝑎𝑠𝑡(𝑞𝑖)\C(ℎ).
+□
+We proceed by using the above to show thatC𝑘(𝑞) has smaller
+than𝑍 advantage within post-burst blocks.
+Claim 6.2.2. C𝑘(𝑞)⟨e <𝑝𝑎𝑠𝑡(𝑎)⟨e\C𝑘(𝑞)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞)+𝑍 .
+Proof. Recall that after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ) <𝑍+C(ℎ)⟨e−C(ℎ)⟨e.
+Reorganizing terms we obtain thatafter(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)+C(ℎ)⟨e <
+𝑍+C(ℎ)⟨e; noting that by definition𝑝𝑎𝑠𝑡(𝑎)⟨e\C(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ) =
+C(ℎ)⟨e+ after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ) we derive that𝑝𝑎𝑠𝑡(𝑎)⟨e\C(ℎ)\
+𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ) <C(ℎ)⟨e+𝑍.
+Define𝑚 B C(ℎ)⟨e,𝑢 B 𝑝𝑎𝑠𝑡(𝑎)⟨e\C (ℎ)\ 𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)\
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞) and𝑣 BC𝑘(𝑞)⟨e. We get that𝑢≤𝑝𝑎𝑠𝑡(𝑎)⟨e\C(ℎ)\
+𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ) <C(ℎ)⟨e+𝑍 =𝑚+𝑍. Adding𝑢 to both sides we have
+2𝑢 <𝑚+𝑢+𝑍≤𝑝𝑎𝑠𝑡(𝑎)⟨e\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞)+𝑍.
+From Claim 6.2.1 we have thatC𝑘(𝑞)⟨e≤ 𝑝𝑎𝑠𝑡(𝑞)⟨e\C(ℎ)⟨e.
+Noting that 𝑣 =C𝑘(𝑞)⟨e ≤ 𝑝𝑎𝑠𝑡(𝑞)⟨e\C (ℎ)⟨e ⊂ 𝑝𝑎𝑠𝑡(𝑎)⟨e\
+C(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞) =𝑢, we get that𝑣≤𝑢. Thus 2𝑣 <
+𝑝𝑎𝑠𝑡(𝑎)⟨e\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞)+𝑍. Reorganizing terms and noting that𝑣⊂
+𝑝𝑎𝑠𝑡(𝑎)⟨e\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞), we conclude thatC𝑘(𝑞)⟨e < 𝑝𝑎𝑠𝑡(𝑎)⟨e\
+C𝑘(𝑞)\𝑓𝑢𝑡𝑢𝑟𝑒 (𝑞)+𝑍, as claimed. □
+To complete the argument, we determine the attacker’s weak
+block. Let 𝑤 B maxC(ℎ)𝜙⟩∩C 𝑘(𝑞)𝜙⟩ (this intersection is
+not empty as it contains 𝑔). If 𝑤 ∈ after(s), then 𝑤 ∈ B, so
+from maximality and burst structure 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)𝜙⟩∩C 𝑘(𝑞)−
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)𝜙⟩\C𝑘(𝑞) ≤ 0. Otherwise, 𝑤 ∈ before(s). We have
+from event-sequenceE𝑡,𝑍 that𝑎𝑑𝑣(s) ≤ 𝐶0, thus by definition
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩∩C(ℎ)+𝐶0≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩\C(ℎ). From maximality,
+we have that𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩∩C(ℎ) and𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩∩C𝑘(𝑞) are dis-
+joint, thus𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩\C𝑘(𝑞)+𝐶0≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩∩C(ℎ)+𝐶0≥
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩\C(ℎ)≥ 𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)s⟩∩C𝑘(𝑞). Noticing (again, by
+maximality) that all 𝐶0 blocks ofB⟨s,𝜙⟩ are not inC𝑘(𝑞) we obtain
+that𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)𝜙⟩∩C𝑘(𝑞)−𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)𝜙⟩\C𝑘(𝑞)≤𝐶0−𝐶0 = 0.
+Since𝑞∈A we have from Claim 5 thatC𝑘(𝑞)∩B⟨𝜙≤ 2𝑘≤
+𝑍−5𝑘★
+2 . Noting that the remainder of the burst is not in C𝑘(𝑞)
+we get that𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)⟨𝜙,e⟩∩C𝑘(𝑞)−𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)⟨𝜙,e⟩\C𝑘(𝑞)≤
+−3𝑍+𝑍− 5𝑘★≤− 2𝑍.
+Using Claim 6.2.2 and summing over all time periods we get
+𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)∩C𝑘(𝑞)−𝑓𝑢𝑡𝑢𝑟𝑒 (𝑤)\C𝑘(𝑞) <−𝑍 <−𝑍−5𝑘★
+4 , as we
+need. □
+To conclude , it remains to set𝑍 large enough s.t. 4𝑘★≤ 𝑍−5𝑘★
+4
+and thus∀𝑞∈𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(ℎ)∩A,𝑟𝑎𝑛𝑘𝑝𝑎𝑠𝑡(𝑎)(ℎ) <𝑟𝑎𝑛𝑘𝑝𝑎𝑠𝑡(𝑎)(𝑞).
+Recall that 𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)∩ 𝑝𝑎𝑠𝑡(𝑎)∩A = ∅, so by definition
+𝑡 ∈ 𝑟𝑒𝑝𝑠(P\A ), thus 𝑟𝑎𝑛𝑘𝑝𝑎𝑠𝑡(𝑎)(P\A ) ≤ 𝑟𝑎𝑛𝑘𝑝𝑎𝑠𝑡(𝑎)(ℎ).
+On the other hand, for any P𝑖 disagreeing withP\A , it holds
+that 𝑟𝑒𝑝𝑠(P𝑖) ⊆ 𝑎𝑛𝑡𝑖𝑐𝑜𝑛𝑒(ℎ)∩A , thus 𝑟𝑎𝑛𝑘𝑝𝑎𝑠𝑡(𝑎)(P𝑖) >
+𝑟𝑎𝑛𝑘𝑝𝑎𝑠𝑡(𝑎)(ℎ), contradicting𝑎∈A , since𝑎 must select a chain
+parent fromP\A . □
+As stated earlier, the above proof relies on some simplifying
+assumptions. We now set out to show how it can be generalized to
+the actual colouring algorithm. We first deal with the case where the
+recursive call withinK-Colouring has never setfree_search =𝑡𝑟𝑢𝑒 .
+This means that∀𝑎∈A ,𝑘 -chain(𝑎)⟨d⊂A , thus all inequalities
+in the above proof trivially hold.
+The more challenging case is the one where a recursive call
+to K-Colouring switches to free_search =𝑡𝑟𝑢𝑒 (line 10), hence by
+that allowing the attacker to “inherit” the honest colouring. Observe
+that this can only happen if𝑘 >𝑟𝑎𝑛𝑘𝐺(𝐶), thus implicitly forcing
+15
+Michael Sutton and Yonatan Sompolinsky
+a rank increase. The following extended argument captures exactly
+this property:
+Claim 7. (generalized main claim) Conditioned on the occurrence
+of event-sequenceE𝑡,𝑍 , it holds that for any ℎ∈H𝑐\A , and for any
+𝑎∈A mergingℎ,
+𝑝𝑎𝑠𝑡(𝑎)∩ after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)
+≥C (ℎ)⟨d−C(ℎ)⟨d
++ max  0, 4𝑘★−𝑟𝑎𝑛𝑘𝐺(𝑎) ·𝑍.
+(1)
+A full proof of this claim will appear in a future version of the
+paper.
+To conclude the proof of Theorem 2, the following Corollary
+shows that, indeed, following event-sequence E𝑡,𝑍 , the attacker
+can never regain an advantage:
+Corollary 8. Conditioned on the occurrence of event-sequence E𝑡,𝑍 ,
+the attacker cannot reorg below the burst event. More formally, ∀𝑠≥
+𝑡𝑖𝑚𝑒(e),𝜙 ∈𝑐ℎ𝑎𝑖𝑛(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠). 17
+Proof. All sets within the current proof are implicitly inter-
+sected with after(e).
+We first observe that at the starting point, i.e., at time 𝑠 =
+𝑡𝑖𝑚𝑒(e), it holds by construction of the burst event that 𝜙 ∈
+𝑐ℎ𝑎𝑖𝑛(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠). Assume for contradiction there exists a minimal
+time𝑠 >𝑡𝑖𝑚𝑒(e) s.t.𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠∈A .
+We will use the properties of the event-sequence (specifically,
+block race win and the initial burst advantage) to provide an upper
+bound on𝐺𝑠−1 and a lower bound on𝐺𝑠, and arrive at a contradic-
+tion.
+From minimality of 𝑠, there exists a block ℎ ∈ H𝑐\A s.t.
+𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠−1 ⇒ ℎ. Additionally, from block-race win we have that
+C(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠−1) ≥ C(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠−1), thus 2C(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠−1) ≥ 𝐺𝑠−1,
+which leads to 2C(ℎ)+ 2𝑘★≥𝐺𝑠−1
+On the other hand, at time𝑠, let𝑎∈A be the merging block of
+ℎ (be it any𝑎∈𝑐ℎ𝑎𝑖𝑛(𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠) or𝑣𝑖𝑟𝑡𝑢𝑎𝑙𝑠 itself), then by Claim 6
+it holds that𝑝𝑎𝑠𝑡(𝑎)∩ after(ℎ)\𝑓𝑢𝑡𝑢𝑟𝑒 (ℎ)≥𝑍+C(ℎ)−C(ℎ).
+It follows that𝐺𝑠≥𝐺𝑡𝑖𝑚𝑒(ℎ)+C(ℎ)−C(ℎ)+𝑍 =C(ℎ)+C(ℎ)+
+C(ℎ)−C(ℎ)+𝑍 = 2C(ℎ)+𝑍.
+Combined, we get that 2C(ℎ)+ 2𝑘★≥𝐺𝑠−1 =𝐺𝑠− 1≥ 2C(ℎ)+
+𝑍− 1, which yields 2𝑘★≥𝑍− 1, a contradiction. □
+17Equivalently:H𝑐∩A =∅.
+16
