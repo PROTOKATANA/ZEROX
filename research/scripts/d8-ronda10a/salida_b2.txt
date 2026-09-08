@@ -1,0 +1,62 @@
+================================================================================================================
+CONTROL C0 — los dos costes, leidos del artefacto de Criterion de ESTA maquina
+  prove  = 1.561347 s/slot  (sd 0.003265)   [ancla-de-orden.md publica 1,561 s]
+  verify = 0.096147 s/slot  (sd 0.000344)   [ancla-de-orden.md publica 96,1 ms]
+  asimetria prove/verify = 16.24x    [ancla-de-orden.md publica ~16x]
+  [IDENTICO]  nucleos de esta maquina: 32
+================================================================================================================
+B.2.a — COSTE HONESTO EN REGIMEN de verificar UNA revelacion por epoca (regla (h.2c))
+        el multiplicador de la verificacion de PoT de CADA nodo es 1 + L/I
+ L (h)     I |  L (slots)  CPU/epoca (s)  nucleos continuos  x la cadena principal |  pared con 32 nucleos
+  1.00   300 |       3600          346.1              1.154                  12.00 |               10.8 s
+  1.00   851 |       3600          346.1              0.407                   4.23 |               10.8 s
+  2.00   300 |       7200          692.3              2.308                  24.00 |               21.6 s
+  2.00   851 |       7200          692.3              0.813                   8.46 |               21.6 s
+  cadena principal sola: 0.0961 s/slot a tau = 1 s = 9.61 % de un nucleo
+================================================================================================================
+B.2.b — REVELACION FALSA: que le cuesta al verificador y que le cuesta al atacante
+        el atacante hace correctos los `p` primeros slots y corrompe el siguiente
+ L (h)    p/L |  orden secuencial: verif (s)  atacante (s)    razon |  orden ALEATORIO: verif (s)    razon  cerrado (L+1)/2
+  1.00   0.00 |                         0.10           0.0     0.00 |                      172.89     0.00           173.11
+  1.00   0.25 |                        86.63        1405.2    16.22 |                      172.89     8.13           173.11
+  1.00   0.50 |                       173.16        2810.4    16.23 |                      172.89    16.26           173.11
+  1.00   0.90 |                       311.61        5058.8    16.23 |                      172.89    29.26           173.11
+  1.00   1.00 |                       346.22        5620.8    16.23 |                      172.89    32.51           173.11
+  2.00   0.00 |                         0.10           0.0     0.00 |                      348.03     0.00           346.18
+  2.00   0.25 |                       173.16        2810.4    16.23 |                      348.03     8.08           346.18
+  2.00   0.50 |                       346.22        5620.8    16.23 |                      348.03    16.15           346.18
+  2.00   0.90 |                       623.13       10117.5    16.24 |                      348.03    29.07           346.18
+  2.00   1.00 |                       692.35       11241.7    16.24 |                      348.03    32.30           346.18
+  Nota: sin prefijo correcto (p = 0) el verificador paga UN slot = 96.1 ms; no hay grano mas fino (x86_64.rs:75-107, sin salida temprana).
+================================================================================================================
+B.2.c — CUANTAS revelaciones falsas puede meter a verificar por epoca (regla (h.2))
+        solo se verifica la de una semilla que el nodo tenga por candidato:
+        candidatos suyos por epoca = alpha * lambda * S_max
+ alpha  W_dec |  candidatos propios  coste verif. sin regla (s/epoca)  con (h.2c): 1 sola
+  0.00     -1 |                 0.0                             0.000              0.0961
+  0.10     10 |                15.0                             1.442              0.0961
+  0.25     20 |                37.5                             3.606              0.0961
+  0.33     20 |                49.5                             4.759              0.0961
+  0.40     45 |                60.0                             5.769              0.0961
+  El limite duro no es la regla, es el espacio: para reclamar una semilla hace falta
+  un bloque valido en [T_j, T_j + S_max), y eso cuesta espacio, no CPU.
+================================================================================================================
+B.2.d — EL COSTE DE PUBLICARLA: bytes de la justificacion (R-FIN-14 (d) y (h.2b))
+ L (h)     I |  checkpoints completos (L*128 B)  solo salida final (16 B) |  verif. en paralelo  verif. forzosamente serie
+  1.00   300 |                       450.0 kB                     16 B |             10.8 s                   346.1 s
+  1.00   851 |                       450.0 kB                     16 B |             10.8 s                   346.1 s
+  2.00   300 |                       900.0 kB                     16 B |             21.6 s                   692.3 s
+  2.00   851 |                       900.0 kB                     16 B |             21.6 s                   692.3 s
+  R-FIN-14 (d) para un bloque normal: S_max = 150 slots x 128 B = 18.8 kB. La revelacion con L = 2 h es 48x eso.
+  Y 8 checkpoints por slot es el formato de Autonomys (pot.rs:332); publicar menos rompe `verify`.
+================================================================================================================
+B.2.e — EL ATAQUE QUE SI ESCALA: forzar RE-verificacion por reorganizacion
+        con (h.2c) el nodo verifica la revelacion del ancla de SU cadena; una reorg
+        que cambie el ancla de las ultimas F/I epocas obliga a verificar de nuevo
+ L (h)     I  F (h) |  epocas en F  CPU por reorg (s)  pared 32 nucleos  coste del atacante (s)
+  2.00   851   2.00 |          8.5             5856.9          183.0 s                   95112
+  2.00   300   2.00 |         24.0            16614.2          519.2 s                  269801
+  1.00   851   1.00 |          4.2             1464.2           45.8 s                   23778
+  1.00   851   2.00 |          8.5             2928.5           91.5 s                   47556
+  R-FIN-7 acota la reorg a F, luego el numero de epocas re-verificadas esta acotado;
+  y el atacante paga `prove` por cada una que quiera hacer valida: la asimetria se mantiene.
