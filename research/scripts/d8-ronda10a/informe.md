@@ -312,3 +312,182 @@ hace es llevarlo a 0 «para cualquier `ρ`», como decía 9c §E.5.
 | ¿Reutilizar el VDF de candidatos anteriores? | La semilla depende de `(chunk(X), salida(f, slot(X)))`. Dos candidatos distintos difieren en al menos uno ⇒ semillas distintas ⇒ **cero reutilización**. Y el corolario **a favor** de (h): dos bloques con el **mismo** `chunk` y el mismo slot dan la **misma** entropía, luego **barajar transacciones o padres no es una palanca de grinding** | REFUTADO (el ataque) |
 | ¿Retener candidatos y arrancar su VDF antes de publicarlos? | Es exactamente la rama «ancla propia»: **sí, y es la que rompe la cota del encargo** (§B.1.2 y B.1.3) | **CONFIRMADO** |
 | Con `m ≤ 1 + λ·S_max` candidatos, ¿cuántos VDF en paralelo y qué compra? | Una línea AES por candidato y por época en vuelo: `q = ⌈L/I⌉ = 9` para la cadena común, `+q` por cada candidato que evalúe. **10** líneas para seguir la cadena, **19** para evaluar un candidato propio, **27** con el menú medido `m(0,40) = 1,83`, **1 369** con el `m` máximo. Y **no compra nada** evaluar candidatos ajenos por debajo de `ρ = 160`: las 1 350 líneas extra son dinero tirado | VERIFICADO (B.1.f) |
+
+---
+
+## B.2 · DoS de verificación — **REFUTADO como ataque; el coste que queda es el honesto**
+
+Instrumento `r10a_b2_dos.py`, salida `salida_b2.txt`. **Control C0:** los dos costes unitarios no se
+recitan, se leen del artefacto que dejó `cargo bench -p subspace-proof-of-time` en esta máquina
+(`target/criterion/{prove,verify}/new/estimates.json`): `prove = 1,561347 s/slot` (sd 0,003265),
+`verify = 0,096147 s/slot` (sd 0,000344), **asimetría 16,24×**. Coincide con lo publicado en
+`dag-poas-ancla-de-orden.md`.
+
+### B.2.1 · Dos cosas leídas en el código que cambian el análisis
+
+1. **`verify_sequential` NO tiene salida temprana dentro de un slot.** Procesa los 8 checkpoints en
+   paralelo con SIMD y en **encuentro por el medio** (cifra desde la entrada, descifra desde la
+   salida, `checkpoint_iterations/2` cada mitad) y compara **al final**
+   (`subspace-proof-of-time/src/aes/x86_64.rs:75-107`). **El grano mínimo de verificación es un slot
+   entero = 96,1 ms**, no un checkpoint. La afirmación del encargo «paralelizable por checkpoints»
+   es cierta *dentro* de la implementación (ya lo está), no como granularidad de rechazo.
+2. **Entre slots sí hay salida temprana y paralelismo total.** La semilla del slot `i` es la salida
+   del `i−1`, publicada en los `PotCheckpoints` (`pot.rs:328,332`), luego los `L` slots de una
+   revelación se verifican **en cualquier orden y en paralelo**.
+
+### B.2.2 · La cuenta del ataque
+
+El atacante calcula de verdad un prefijo de `p` slots y falsifica el resto (`L − p` slots malos:
+lo que no calcula, no le sale bien). Medido con 12 semillas × 20 000 búsquedas:
+
+| `L` | `p/L` | slots malos | verif. **en orden** | coste del atacante | razón | verif. **en orden aleatorio** | razón |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 h | 0,00 | 7 200 | 0,10 s | 0 s | — | 0,10 s | — |
+| 2 h | 0,50 | 3 600 | 346,2 s | 5 620,8 s | 16,2× | 0,19 s | 29 000× |
+| 2 h | 0,90 | 720 | 623,1 s | 10 117,5 s | 16,2× | 0,96 s | 10 500× |
+| 2 h | 0,99 | 72 | 685,4 s | 11 129,3 s | 16,2× | 9,5 s | 1 170× |
+| 2 h | 1,00 | 1 | 692,4 s | 11 241,7 s | 16,2× | 346,4 s | 32,5× |
+
+*(la columna «en orden aleatorio» es `(L+1)/(j+1)` slots, medida y reproducida por el cerrado)*
+
+**Tres conclusiones.**
+- **La asimetría 16,2× basta**, y con una regla gratis sube a **32,5×**: verificar los `L` slots de
+  la revelación **en orden de slot aleatorio**. Entonces el óptimo del atacante es dejar **un solo**
+  slot malo —lo que le obliga a calcular `L−1` slots de verdad, 11 242 s de CPU— para arrancarle al
+  verificador 346 s. Cualquier otra estrategia le sale peor.
+- **Una revelación completamente falsa cuesta 96,1 ms** y `GOSSIP_INVALID_PROOF` es
+  `new_fatal` en Autonomys (`gossip.rs:43-49` leído): un solo intento por par.
+- El número de semillas de revelación que puede reclamar legítimamente por época es
+  `α·λ·S_max` = **60 a `α = 0,40`** (necesita un bloque válido en la banda del ancla, que cuesta
+  **espacio**, no CPU): 5,8 s por época sin la regla (h.2c), 0,096 s con ella.
+
+### B.2.3 · El coste que sí duele es el honesto
+
+**El multiplicador de la verificación de PoT de cada nodo es `1 + L/I`.** Medido:
+
+| `L` | `I` | CPU/época | núcleos continuos | × la cadena principal |
+|---:|---:|---:|---:|---:|
+| 2 h | 851 s | 692,3 s | **0,813** | **9,46×** |
+| 2 h | 300 s | 692,3 s | **2,308** | **25,0×** |
+| 1 h | 851 s | 346,1 s | 0,407 | 5,23× |
+
+La cadena principal sola cuesta 9,61 % de un núcleo. **(h) lleva a un nodo completo de 0,096 a 0,91
+núcleos continuos** sólo en PoT. Etiqueta: **VERIFICADO** (aritmética sobre una medida de Criterion).
+
+### B.2.4 · El vector que sí escala, y su cota
+
+Con (h.2c) el nodo verifica la revelación del ancla de **su** cadena. Una reorganización que cambie
+el ancla de las últimas `F/I` épocas obliga a re-verificarlas: **8,5 épocas × 692 s = 5 857 s** de CPU
+(183 s de pared con 32 núcleos) a `(I, F) = (851 s, 2 h)`, y **16 614 s** con `I = 300 s`. R-FIN-7 acota
+la reorg a `F`, luego el número está acotado; y el atacante paga `prove` por cada época que quiera
+hacer válida (**95 112 s**, 26,4 horas-núcleo). La asimetría se mantiene. **PLAUSIBLE** (no simulado
+en red; es aritmética sobre la cota de R-FIN-7).
+
+---
+
+## B.3 · Vivacidad del timekeeper — **el coste de CPU no es el problema; la barrera de entrada sí**
+
+Instrumentos: `r10a_b3_lineas.c` (microbanco en C que replica literalmente el núcleo de
+`subspace-proof-of-time/src/aes/x86_64.rs:22-33`: nueve `_mm_aesenc_si128` más un
+`_mm_aesenclast_si128` encadenados) y `r10a_b34_vivacidad.py`. Salida `salida_b34.txt`.
+
+**Por qué hacía falta medir:** el bench de Autonomys `pot-compare-cpu-cores.rs` **fija la afinidad a
+un núcleo cada vez y mide de uno en uno** (leído en el fuente); no dice nada sobre `q+1` líneas
+simultáneas, que es justo lo que (h) pide.
+
+**Control positivo:** 1 hilo → **1,484 s/slot**, frente a `prove` de Criterion **1,561 s/slot** en la
+misma máquina: razón **0,950**, y el microbanco no guarda checkpoints ni pasa por Criterion, luego
+tenía que salir algo por debajo. El instrumento está calibrado.
+
+### B.3.1 · **HALLAZGO, y va a favor de (h): 25 líneas de AES simultáneas cuestan un 1,7 %**
+
+| hilos | s/slot | degradación |
+|---:|---:|---:|
+| 1 | 1,486 | 1,001 |
+| 10 | 1,513 | 1,020 |
+| 16 | 1,513 | 1,020 |
+| **25** | **1,509** | **1,017** |
+| 32 | 1,623 | 1,094 |
+| 48 | 2,126 | 1,433 |
+
+Un 9950X3D (16 núcleos físicos, SMT ×2) sostiene **25 cadenas de PoT independientes con un 1,7 % de
+degradación** — más líneas que núcleos físicos. La razón es física y está en el propio informe
+`pot-aes-asic-chacha.md` §1: cada iteración son **diez `AESENC` dependientes**, luego una línea está
+**limitada por latencia**, no por rendimiento, y el SMT la esconde entera. A 32 hilos la degradación
+salta a 9,4 %, pero esta máquina tenía dos procesos de otros agentes encima durante la medida
+(declarado; por eso se toma la **mejor de 5 corridas** y se reporta la peor).
+
+> **Corrijo mi propia expectativa.** Iba a escribir que `q+1 = 10` líneas eran un coste serio para el
+> timekeeper. **No lo son:** caben en un PC de sobremesa con margen. Lo que no cabe es la disciplina
+> especulativa con el menú máximo: **1 360 líneas** a `(I, F) = (851 s, 2 h)` (§C.4). La regla (h.1)
+> **tiene** que acotar `m`, o usar la disciplina (i) con `Lrev < L`.
+
+### B.3.2 · Cadenas en vuelo y puntualidad
+
+| `I` | `F = L` | `q = ⌈L/I⌉` | (i) líneas | (ii) `m = 1,83` | (ii) `m` máximo | ¿llega con `Lrev = L`? |
+|---:|---:|---:|---:|---:|---:|---|
+| 851 s | 2 h | 9 | **10** | 18 | 1 360 | **NO**, falta 0,62 % |
+| 300 s | 2 h | 24 | **25** | 45 | 3 625 | **NO**, falta 0,62 % |
+| 851 s | 1 h | 5 | **6** | 11 | 756 | **NO**, falta 1,25 % |
+
+**Qué pasa si el timekeeper real va a 1,561 s/slot (esta máquina).** Nada: `t_j` es un **índice de
+slot**, no un instante de pared. Si el timekeeper va 1,56× más lento, su slot dura 1,56× más **y su
+revelación también**; la carrera es contra su propia cadena principal, en el mismo silicio. Lo
+absoluto es que **cada línea necesita su núcleo**. (Este es el punto que corregí de mi intento
+anterior, §A.1.)
+
+La palanca `Lrev` (medida, B.3.c): `ρ* = (Lrev + I)/(I + W_dec)`.
+
+| `Lrev/L` | holgura | `ρ*` a `W_dec = 20 s` | `ρ*` a `W_dec = 45 s` |
+|---:|---:|---:|---:|
+| 1,00 | 1,000× (no llega) | 9,24 | 8,99 |
+| 0,99 | 1,010× | 9,16 | 8,91 |
+| 0,90 | 1,111× | 8,42 | 8,18 |
+| 0,50 | 2,000× | 5,11 | 4,97 |
+
+**`Lrev = 0,99 L` cuesta el 0,9 % de `ρ*` y resuelve la puntualidad.** DEMOSTRADO (aritmética) +
+VERIFICADO (la forma cerrada reproduce la simulación de B.1 con error ≤ 1,3 %).
+
+### B.3.3 · `autonomys/subspace#2141` — **no empeora por velocidad; empeora por barrera de entrada**
+
+Dos efectos, separados:
+- **Velocidad (el issue en sí):** **ninguno**. La carrera de #2141 es por publicar antes el mismo
+  slot. La revelación es determinista y también la gana el más rápido, sin darle nada más que a la
+  cadena principal. `ρ` no cambia.
+- **Barrera de entrada:** la multiplica por **`q+1`** — de 1 núcleo a **10** (`I = 851 s`, `F = 2 h`)
+  o **25** (`I = 300 s`). Menos gente puede correr un timekeeper ⇒ **menos timekeepers ⇒ más #2141**.
+  Es un empeoramiento **cualitativo, no de velocidad**, y B.3.1 dice que el número absoluto (10-25
+  núcleos) sigue siendo un PC. **PLAUSIBLE**: el efecto sobre el *número real* de timekeepers no se
+  puede medir sin red. LAGUNA declarada.
+
+---
+
+## B.4 · Partición y `S_max` — **sí, (h) introduce un vector nuevo, y es de hardware**
+
+Con la formulación correcta (§A.3, (h.3′)) `entropía_j` es función de `past(B)`: los bloques del otro
+lado son **válidos**. Pero un lado que no pueda calcularla **no sabe cuál es el reto de sus propios
+slots** y deja de farmear, aunque conserve todo su espacio.
+
+| `I` | `F = L` | líneas necesarias | núcleos del lado | retraso de cada revelación | `d/I` |
+|---:|---:|---:|---:|---:|---:|
+| 851 s | 2 h | 10 | 1 | **64 800 s = 18 h** | 76,1 |
+| 851 s | 2 h | 10 | 2 | 28 800 s = 8 h | 33,8 |
+| 851 s | 2 h | 10 | 4 | 10 800 s = 3 h | 12,7 |
+| 851 s | 2 h | 10 | **10** | **0** | 0 |
+| 300 s | 2 h | 25 | 4 | 37 800 s = 10,5 h | 126 |
+| 851 s | 1 h | 6 | 4 | 1 800 s = 0,5 h | 2,1 |
+
+**El vector, escrito:** *sin* (h) un lado de partición necesitaba **una** línea de AES para seguir
+viva; *con* (h) necesita **`q+1`**. Con 4 núcleos y `(851 s, 2 h)` el retraso es de 3 h > `F = 2 h`:
+**el lado queda por detrás de su propia finalidad y muere con todo su espacio intacto.** Es
+exactamente el modo de fallo que R-FIN-7 quería evitar (tolerar una partición de hasta `F` con
+`≥ 9 %` del espacio), y (h) lo reintroduce **por el lado del hardware, no del espacio**.
+
+**Lo que NO introduce:** ningún vector de flujo. `V(X)` se siembra con `salida(f, slot(X))`, luego la
+revelación es **por flujo** y R-FIN-5 sigue siendo una comprobación estructural previa a cualquier
+PoT (h.4). Al reunirse, R-FIN-5/7 funcionan igual que sin (h). **DEMOSTRADO por construcción.**
+
+**Y lo que casi introduce, si se escribe mal:** la regla (h.3) de mi intento anterior —«aplicar la
+inyección en el primer slot en que la revelación esté disponible en `past(B)`»— hace `flujo`
+dependiente de **cuándo llegó un mensaje** y parte el DAG entre honestos. Retirada en §A.3.
+**Etiqueta del vector nuevo: VERIFICADO** (aritmética sobre la medida de B.3.1).
