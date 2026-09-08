@@ -1,0 +1,2 @@
+=== A2 · presupuesto repartido: parasita publicada + flujo privado ===
+k=30, lambda=1, Delta=4.0, mp=15, u3=dynamic, horizonte 1800 s, t0=60 s, ventana [60,1740] s, 12 semillas, 4320 corridas.
