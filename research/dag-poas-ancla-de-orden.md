@@ -1,6 +1,6 @@
 # Ancla de orden — octava propuesta para un DAG sobre PoAS
 
-**Fecha:** 2026-09-08 · **PROPUESTA AUDITADA (D9 línea 1, ronda 8): REFUTADA y CORREGIDA con R-FIN-11; pendiente de re-auditar.** Es la **séptima propuesta**
+**Fecha:** 2026-09-08 · ⚠️ **REFUTADA DOS VECES.** D9-a refutó la forma posproceso de U3′ (arreglada con R-FIN-11); D9-b refutó **R-FIN-11 misma**: el filtro deja las copias **rojas pero vivas en el orden**, y R-FIN-1 lee de ese orden. Ver `dag-poas-ancla-de-orden-auditoria.md` y `-auditoria-2.md`. Es la **séptima propuesta**
 (`dag-poas-ancla-de-finalidad.md`) con **una regla reescrita y cuatro constantes derivadas**. Nueve
 de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio está en
 `dag-poas-ancla-de-finalidad-metaauditoria.md`; sus scripts, en `/tmp/d9-ronda7/`.
