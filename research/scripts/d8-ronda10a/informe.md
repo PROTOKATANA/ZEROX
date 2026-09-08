@@ -172,6 +172,40 @@ Chia ya opera una segunda cadena de VDF cuyo resultado se inyecta en el reto. Le
 
 ---
 
+### A.6 · El texto de la regla candidata, junto — **PLAUSIBLE** (mío, no verificado en red)
+
+> **R-FIN-14 (h) · Revelación retardada por VDF. OPCIÓN.** *(No aplicada a la propuesta.)*
+>
+> **(h.1) Definición.** Con `Lrev` una constante de consenso en slots, `Lrev = L − S_max`:
+> ```
+> entropía_j = blake3( AES128_chain^{Lrev·N(slot(I_j))} ( blake3(chunk(I_j) ‖ salida(f, slot(I_j)))[0..16) ) )
+> ```
+> aplicada en `t_j = slot(I_j) + L` (R-FIN-2, sin cambios). `entropía_j` es **función de `past(B)` y
+> de nada más**: no es un mensaje, no se «publica», **se calcula**. Cualquier nodo con un núcleo
+> libre la produce.
+> **(h.2) Pista de verificación.** Los `PotCheckpoints` de esa cadena viajan por el gossip de PoT
+> bajo tema propio, **según se calculan** (nunca en bloque: `L·128 B` = 900 kB añadirían un 18,4 %
+> de `Δ`). Un nodo **MUST NOT** verificar una revelación cuya semilla no corresponda a un candidato
+> a `I_j` que él mismo tenga. Verifica **una** por época —la del ancla de su cadena— y **en orden de
+> slot aleatorio**. Si le llegan más revelaciones distintas de las que compensa verificar, **se la
+> calcula él** (es literalmente lo que hace Autonomys con el PoT ordinario,
+> `sc-proof-of-time/src/source/gossip.rs:438-440`, con el umbral en la asimetría medida, 16,24).
+> **(h.3) Validez incondicional.** La validez de un bloque con `slot(B) ≥ t_j` **NO** depende de que
+> los checkpoints estén publicados: quien no los tenga, recomputa (×16,24). No existe ninguna rama
+> de consenso condicionada a la disponibilidad de un mensaje. *(Es lo que impide que `flujo` dependa
+> de la vista y parta el DAG entre honestos.)*
+> **(h.4) Por flujo.** `V(X)` se siembra con `salida(f, slot(X))`: dos flujos dan revelaciones
+> distintas del mismo `X`, y R-FIN-5 sigue siendo estructural y previa a cualquier PoT.
+> **(h.5) Iteraciones congeladas.** El `N` de la cadena de revelación es el vigente en `slot(I_j)`,
+> **no** el de `t_j`: si no, el retarget de R-FIN-9 desplazaría el instante de revelación y `t_j`
+> dejaría de ser determinista.
+> **(h.6) Calibración.** `I ≤ (L − ρ_max·W_dec)/(ρ_max − 1)`. Es la condición que hace `ρ* ≥ ρ_max`,
+> y fija a la vez el coste: `1 + L/I ≈ ρ_max` (§C.5). **Pagar más `L/I` que `ρ_max` es tirar CPU.**
+
+**Etiquetas por pieza:** (h.1) PLAUSIBLE · (h.2) PLAUSIBLE, con el precedente de Autonomys VERIFICADO ·
+(h.3) DEMOSTRADO que elimina la dependencia de la vista · (h.4) DEMOSTRADO por construcción ·
+(h.5) DEMOSTRADO por construcción · (h.6) DEMOSTRADO (aritmética) + VERIFICADO (§B.1, 14 semillas).
+
 ---
 
 ## B.1 · El reloj rápido y la cota `ρ ≥ L/W_dec` — **la cota es correcta y es incompleta**
@@ -505,6 +539,131 @@ dependiente de **cuándo llegó un mensaje** y parte el DAG entre honestos. Reti
 
 ---
 
+## B.5 · Carrera de bloques — **DEMOSTRADO que (h) no cambia la frontera de flujo único**
+
+Instrumentos: `r10a_b56_frontera.py` y `r10a_b5b_intentos.py`, que **reutilizan sin tocar** el
+`prev()` de `d9-ronda9a/r9a_a3_frontera.py` (el mismo que usa `verif_frontera_vs_F.py`, y que a su
+vez es el de D8 y el de `verif_constantes.py`). Salidas `salida_b56.txt` y `salida_b5b.txt`.
+**Control:** con `(F, I) = (19 080, 4 200)` y `offset = 3k = 90` salen **46,8784 % / 36,5432 %**,
+idénticos a `verif_frontera_vs_F.salida.txt`. En los dos scripts.
+
+**La demostración es de una línea, y por eso es una demostración.** La frontera se calcula con
+`prev(α, λ, t, offset, hf)`. Sus cinco argumentos son: la fracción de espacio, la tasa de bloques, el
+horizonte `F`, la ventaja inicial `3k` del Lema 10, y el `δ`. **No aparece `ρ`, ni el reto del slot,
+ni la entropía, ni cómo se deriva.** (h) sólo puede entrar por dos puertas:
+
+1. **Por `offset`** — si el adelanto `L(1−1/ρ)` le comprase ventaja inicial. Es B.6: **REFUTADO**.
+2. **Por las `(I, F)` admisibles** — que es una decisión de calibración, no un efecto de (h).
+
+Medido, para las parejas que (h) hace posibles (`offset = 3k`):
+
+| `F` | `I` | frontera `δ = 0` | frontera `δ` D8 | unión10 a 33 %, `δ = 0` | `δ` D8 |
+|---:|---:|---:|---:|---:|---:|
+| 5,30 h | 4 200 s | 46,8784 % | 36,5432 % | 3,8·10⁻²¹¹ | 2,1·10⁻¹⁰³ |
+| **2,00 h** | **851 s** | **44,5722 %** | **35,0824 %** | 1,4·10⁻¹⁶⁹ | 3,1·10⁻³² |
+| 2,00 h | 300 s | 44,4989 % | 35,0369 % | 4,1·10⁻¹⁶⁹ | 8,7·10⁻³² |
+| 1,00 h | 851 s | 41,9756 % | 33,0542 % | 1,6·10⁻⁷⁶ | 4,9·10⁻¹¹ |
+| 0,28 h | 851 s | 33,0049 % | 27,3598 % | 9,7·10⁻¹¹ | 1,000 |
+
+Es la misma dependencia de `F` que el principal midió el 2026-09-08 (bitácora §11.4): reproducida.
+**La conclusión que importa: `F` la fija el corredor, no el steering, y (h) no toca al corredor.**
+
+---
+
+## B.6 · El adelanto `L(1−1/ρ)` — **REFUTADO como daño a la frontera; la LAGUNA «ráfagas» queda cerrada**
+
+### B.6.1 · Cuánto adelanto es, medido
+
+| `ρ` | sin (h): `L + I(1−1/ρ)` | con (h): `(L+I)(1−1/ρ)` | cociente |
+|---:|---:|---:|---:|
+| 1,00 | 7 200 slots | **0** | ∞ |
+| 1,20 | 7 342 | 1 342 | **5,5×** |
+| 1,50 | 7 484 | 2 684 | 2,8× |
+| 2,00 | 7 626 | 4 026 | 1,9× |
+| 2,50 | 7 711 | 4 831 | 1,6× |
+| 3,00 | 7 767 | 5 367 | 1,4× |
+
+**En el rango físicamente alcanzable (`ρ ≤ 2,5`) (h) divide el adelanto por 1,6-5,5×**, y a `ρ = 1`
+lo lleva a **cero exacto**. Ésta es la ganancia real de (h) y coincide **exactamente** con lo que la
+ronda 7 escribió (control C2, razón 1,000).
+
+### B.6.2 · Qué compra ese adelanto — la ráfaga planificada, medida
+
+Con `V` slots de adelanto el atacante conoce **sus propias** victorias futuras durante `V` segundos
+(las ajenas no: no tiene los *plots* de nadie más). Deslizando la ventana mientras espera, elige el
+instante de arrancar su cadena privada donde su cosecha sea mayor. Medido, 14 semillas × 200
+realizaciones, espera de 1 mes, `α = 0,33`:
+
+| régimen | `ρ` | `V` | ventanas | exceso medido (bloques) | cerrado `√(2 ln n)·√(αλV)` | razón | % de `3k` |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| sin (h) | 1,2 | 7 342 | 358 | **146,1** | 168,8 | 0,866 | **162 %** |
+| con (h) | 1,2 | 1 342 | 1 959 | **73,7** | 81,9 | 0,900 | 82 % |
+| sin (h) | 2,0 | 7 626 | 344 | 148,4 | 171,5 | 0,865 | 165 % |
+| con (h) | 2,0 | 4 026 | 653 | 115,1 | 131,2 | 0,877 | 128 % |
+| — `α = 0,00` — | — | — | — | **0,00 en las 24 filas** | 0,00 | — | 0,0 % |
+
+El exceso es **grande**: hasta 171 bloques frente a los 90 de `3k`. Si se sumara al `offset`, la
+frontera caería **1,15 puntos** (44,5722 % → 43,4210 %) sin (h) y **0,58** con (h) (`salida_b56.txt`,
+B.6.c). **Y eso sería contarlo dos veces.**
+
+### B.6.3 · Por qué no cuenta: la cota de la unión ya se lo regaló
+
+```
+union10(α) = prev(α) · N,   N = épocas en 10 años = 370 576   (`d9-ronda9a/r9a_a3_frontera.py:65-68`)
+```
+es **una cota de la unión sobre `N` instantes de arranque**. Para cualquier conjunto `S` de
+instantes, `P(⋃_{t∈S} éxito_t) ≤ |S|·prev(α)`. **Elegir la mejor ventana dentro del adelanto es
+elegir un `S`, no cambiar `prev(α)`.** Mientras `|S| ≤ N`, la frontera publicada **ya lo cubre**, y
+sumar el exceso al `offset` cuenta la misma fluctuación dos veces: una en el Skellam de la carrera y
+otra en la ventaja inicial. **DEMOSTRADO.**
+
+Y con número, porque `|S| ≤ N` no siempre se cumple (`salida_b5b.txt`, B.5.c): con `V` pequeño el
+atacante distingue **más** ventanas que épocas hay.
+
+| régimen | `ρ` | `V` | ventanas `\|S\|` | `\|S\|/N` | ¿cubierto? |
+|---|---:|---:|---:|---:|---|
+| sin (h) | 1,05-3,0 | 7 241-7 767 | 4,1-4,4·10⁴ | 0,110-0,118 | **sí** |
+| con (h) | 1,05 | 383 | 8,2·10⁵ | **2,220** | no |
+| con (h) | 1,2 | 1 342 | 2,4·10⁵ | 0,634 | sí |
+| con (h), `L = 1 h` | 1,05 | 212 | 1,5·10⁶ | **4,015** | no |
+
+Para los casos no cubiertos, la sensibilidad de la frontera al número de intentos está **medida**
+(`salida_b5b.txt`, B.5.b), y es la cota rigurosa de todo el punto:
+
+| factor de intentos | intentos en 10 años | frontera `δ = 0` (`F = 2 h`) | vs factor 1 |
+|---:|---:|---:|---:|
+| 1 | 3,71·10⁵ | 44,5722 % | — |
+| 2,22 | 8,23·10⁵ | 44,5160 % | **−0,056 pt** |
+| 10 | 3,71·10⁶ | 44,4116 % | −0,161 pt |
+| 100 | 3,71·10⁷ | 44,2560 % | −0,316 pt |
+| **851** (una carrera **por segundo** durante 10 años) | 3,15·10⁸ | **44,1155 %** | **−0,457 pt** |
+
+> **Cierre de la LAGUNA «ráfagas» de 9c.** Aunque el atacante pudiera arrancar una carrera **cada
+> segundo durante diez años** —el máximo concebible, `3,15·10⁸` intentos— la frontera de flujo único
+> baja **0,46 puntos** (0,64 con `F = 1 h`; 0,35 con `F = 5,3 h`). El caso real del adelanto está
+> entre 1× y 4,0× de intentos, es decir **menos de 0,08 puntos**. Los 1,15 puntos de B.6.c son un
+> doble conteo. **REFUTADO como daño a la frontera; VERIFICADO el tamaño de la cota.**
+>
+> **Detalle honesto que va en contra de (h):** en este eje (h) es **ligerísimamente peor**, porque al
+> encoger `V` multiplica el número de ventanas distinguibles (`|S|/N` pasa de 0,11 a 0,63-4,0). El
+> efecto neto está acotado por los 0,46 puntos de arriba, así que da igual, pero conviene decirlo.
+
+### B.6.4 · Lo que el adelanto sí compra y no está modelado — **LAGUNA, acotada**
+
+Queda una cosa que ni `prev()` ni los simuladores de DAG de las rondas 8-9 modelan: **la retención
+selectiva con información perfecta sobre uno mismo** dentro de GHOSTDAG (publicar o no cada bloque
+sabiendo qué vas a ganar en los próximos `V` segundos). Es literalmente el pendiente 4 de la ronda 7
+(`dag-poas-ancla-de-finalidad.md:303-305`: «qué hace un granjero que conoce sus victorias 15-60 min
+antes; retención con información perfecta propia dentro de GHOSTDAG»), y sigue abierto.
+
+**Lo que (h) hace con él:** encoge la ventana de **7 342 → 1 342 s** a `ρ = 1,2` (5,5×) y a **0** con
+`ρ = 1`. **Lo que haría falta para cerrarlo:** un simulador de GHOSTDAG con una política de retención
+que consulte las victorias futuras del atacante —`d9-ronda8c/r8c_sim.py` lo permitiría añadiendo un
+oráculo de victorias— y medir `δ_ef` y la rentabilidad de la parásita con y sin oráculo, con las 12
+semillas. **LAGUNA declarada; no es por falta de tiempo: es que el instrumento no existe.**
+
+---
+
 ## C · Coste de (h), con número
 
 Instrumento `r10a_c_coste.py`, salida `salida_c.txt`. Mismo control C0 que en B.2 (los dos costes
@@ -591,3 +750,220 @@ El techo físico estimado del reloj AES es 1,5-2,5× (`pot-aes-asic-chacha.md` �
 lookahead que un *plotter* rápido puede aprovechar (9c §D, margen económico frente a un plotter 10×).
 **Es una bifurcación de calibración, no una consecuencia de (h), y la decide Katana:** CPU de todos
 los nodos contra margen económico frente al plotter.
+
+---
+
+## D · Veredicto — ¿puede (h) ser núcleo del diseño?
+
+### D.1 · Respuesta
+
+> **Sí, puede ser núcleo — pero no con el texto que tiene, no por la razón que 9c dio, y no a la
+> calibración vigente.** Con las seis piezas de §A.6 y `I` recalibrada, (h) es una regla sana, con
+> precedente en producción y con un precio que se puede escribir en una línea. Sin ellas, tiene un
+> agujero de vivacidad, un vector de partición y un coste 3,7× mayor del necesario.
+
+**Lo que hay que corregir antes de que sea núcleo, en orden de gravedad:**
+
+| # | Qué | Por qué | Coste de la corrección |
+|---|---|---|---|
+| 1 | **`entropía_j` es función de `past(B)`, no un mensaje publicado** (h.3) | Cualquier regla condicionada a «si la revelación está disponible» hace `flujo` dependiente de **cuándo llegó un mensaje** y parte el DAG entre honestos vía R-FIN-5 | ninguno; es una forma de escribirlo |
+| 2 | **`Lrev = L − S_max`, no `Lrev = L`** (h.1b) | Con `Lrev = L` la disciplina (i) del timekeeper **no llega**: le falta `W_dec/L` = 0,62 % y no se compra con hardware, porque la carrera es contra su propia cadena en el mismo silicio | **1,8 % de `ρ*`** (9,24 → 9,07) |
+| 3 | **`I ≤ (L − ρ_max·W_dec)/(ρ_max − 1)`** (h.6) | `ρ*` y el coste son el mismo número (§C.5). Con `I = 851 s` se compra `ρ* = 9,24` y se paga 9,46× cuando el techo físico estimado es 1,5-2,5× | `I + F` sube de 0,93 h a **3,31 h**: es una **bifurcación de calibración para Katana**, CPU de todos los nodos contra margen frente al *plotter* |
+| 4 | **Publicar por gossip, nunca en bloque** (h.2b) | 900 kB en un bloque por época = **18,4 % de `Δ = 4 s`**, y `Δ` decide la frontera entera | ninguno |
+| 5 | **Verificar una por época y en orden de slot aleatorio** (h.2c) | Sube la asimetría de 16,2× a **32,4×** | ninguno |
+
+**Lo que hay que aceptar y escribir en voz alta si se adopta:**
+
+- **El multiplicador `1 + L/I` sobre la verificación de PoT de *cada* nodo.** A la calibración
+  vigente, **0,91 núcleos continuos** frente a 0,096. A la recomendada (`ρ_max = 2,5`), **0,24**.
+- **El suelo de hardware de un lado de partición sube de 1 línea de AES a `q+1`.** Con `q+1 = 10` y
+  4 núcleos, la revelación llega 3 h tarde con `F = 2 h`: **el lado muere con todo su espacio
+  intacto**. Es un modo de fallo nuevo, contradice la letra de R-FIN-7 («tolerar una partición de
+  hasta `F` con `≥ 9 %` del espacio») y **no se compensa con espacio**. A `ρ_max = 2,5` el suelo baja
+  a **`q+1 = 3` líneas**, que es cualquier PC.
+- **Sube la barrera de entrada del timekeeper ×(q+1)**, luego empeora `autonomys/subspace#2141` por
+  centralización (no por velocidad: por velocidad no cambia nada).
+
+### D.2 · Lo que (h) compra de verdad, y lo que 9c prometió de más
+
+| | 9c §E.5 | Medido aquí |
+|---|---|---|
+| steering | «**0 para cualquier `ρ`**» | **0 hasta `ρ* = 9,24`** en régimen; residuo `α^(n*−1)` por debajo |
+| adelanto | «la cota de conocimiento pasa a `I`» | `(L+I)(1−1/ρ)`, exactamente lo que dijo la **ronda 7** |
+| a `ρ ≤ 2,5`, `α = 0,33` | — | `ḡ` por época **1,953 % → 0,007 %**, factor **279×** |
+| a `ρ = 1` | «0» | **0 exacto** ✔ |
+
+**9c §E.5 contradice a la ronda 7 y la ronda 7 tiene razón.** No es un matiz: es la diferencia entre
+«(h) cierra el steering» y «(h) lo divide por 279 en el rango físico». La segunda sigue siendo un
+argumento excelente para adoptarla; la primera habría llevado a calibrar `I` y `F` sobre una
+garantía que no existe.
+
+### D.3 · La contramedida más barata, si Katana no quiere pagar (h)
+
+`ρ*` **sin** (h) es 1 (cualquier reloj más rápido acaba haciendo steering, tras un *bootstrap* de
+`L/(ρ−1)`). Las tres palancas alternativas, con su precio:
+
+| Palanca | `ρ*` que compra | Precio |
+|---|---:|---|
+| **(h) a `I = 4 725 s`** | 2,50 | 0,15 núcleos/nodo · `q+1 = 3` líneas · `I+F` = 3,31 h |
+| **(h) a `I = 851 s`** (vigente) | 9,24 | 0,81 núcleos/nodo · `q+1 = 10` líneas · `I+F` = 0,93 h |
+| **subir `I` sin (h)** | 1 (no cambia) | no compra `ρ*`; sólo diluye `n_eval = ρ·W_dec` como `1/√I` |
+| **bajar `W_dec`** (acortar la ventana de decisión) | 1 (no cambia) | tampoco: `W_dec` la fija la carrera, no `S_max` (9c §C) |
+| **admitir `ρ_max = 3` y no hacer nada** | — | `n_eval = 135`, `I = 851 s`, `F = 1,07 h`, margen 3,13× (9c §D.2, tabla ya calculada) |
+
+**Recomendación de D8, marcada como tal:** si el objetivo es cerrar el steering, **(h) con las cinco
+correcciones y `I` calibrada a `ρ_max = 2,5`**. Si el objetivo es no añadir una pieza de consenso,
+**admitir `ρ_max = 3` sin (h)** es defendible y ya está cuantificado por 9c — pero entonces el
+adelanto se queda en `L + I(1−1/ρ)` = 7 767 slots y la LAGUNA de retención selectiva (§B.6.4) se
+queda entera, que es lo que (h) sí encoge 5,5×.
+
+**Lo que ninguna de las dos arregla:** `ρ_max` sigue siendo una **ESTIMACIÓN** sin paper (§B.1.3), y
+`Δ` sigue sin medir. Las dos son precondiciones de todo lo demás.
+
+---
+
+## Veredicto por punto
+
+| Punto | Resultado | Etiqueta | Número que decide |
+|---|---|---|---|
+| **A** regla operativa | Escrita entera (h.1-h.6); retirada mi (h.3) del intento anterior, que rompía R-FIN-5 | **PLAUSIBLE** (regla candidata) · (h.3)-(h.5) DEMOSTRADO por construcción | `Lrev = L − S_max`: holgura 2,1 %, coste 1,8 % de `ρ*` |
+| **B.1** reloj rápido | La cota `ρ ≥ L/W_dec` es **correcta para candidatos ajenos** y **ciega para el propio** | **VERIFICADO** (14 semillas, 4 000 épocas) + **DEMOSTRADO** (forma cerrada) | `ρ*` = **160 → 8,99**, factor **17,8×**; residuo `α^(n*−1)`, razón sim/cerrado 0,93-1,01 |
+| **B.2** DoS de verificación | El ataque no existe; el coste honesto sí | **REFUTADO** (el ataque) · **VERIFICADO** (el coste) | asimetría **16,24×**, y **32,4×** verificando en orden aleatorio; coste honesto **0,813 núcleos** |
+| **B.3** vivacidad | La CPU no es el problema; la barrera de entrada sí | **VERIFICADO** (microbanco propio, control contra Criterion) | **25 líneas de AES simultáneas → 1,7 % de degradación**; barrera ×(q+1) = 10 |
+| **B.4** partición | **Vector nuevo, de hardware** | **VERIFICADO** (aritmética sobre B.3) · el vector de flujo, **REFUTADO** | con 4 núcleos y `q+1 = 10`, revelación **3 h tarde** con `F = 2 h`: lado muerto |
+| **B.5** carrera de bloques | (h) **no** cambia la frontera de flujo único | **DEMOSTRADO** (`prev()` no contiene `ρ` ni el reto) + control idéntico | 46,8784 % / 36,5432 % reproducidos |
+| **B.6** el adelanto | Cierra la LAGUNA «ráfagas»: la cota de la unión ya lo cubre | **REFUTADO** (daño a la frontera) · **VERIFICADO** (tamaño) · **LAGUNA** (retención selectiva) | una carrera **por segundo** durante 10 años cuesta **0,46 puntos**; el caso real, **< 0,08** |
+| **C** coste | Protección y coste son el mismo número | **DEMOSTRADO** (identidad) + **VERIFICADO** (medida) | `ρ* = (1+L/I)·I/(I+W_dec)`, razón **0,977**; con `ρ_max = 2,5`, `I = 4 725 s` y **0,147** núcleos |
+| **D** veredicto | **Sí puede ser núcleo, con cinco correcciones y `I` recalibrada** | — | el precio: **`1 + L/I`** por nodo y **`q+1`** líneas por lado de partición |
+
+---
+
+## Errores propios (regla de método 9)
+
+**Del intento anterior de esta misma ronda, que quedó a medias y he revisado con ojo crítico:**
+
+1. **Titular sobreafirmado.** Escribí «esa cota es **FALSA** y sobra un factor ~18×». **La cota es
+   correcta** para el steering completo sobre candidatos ajenos (`ρ ≥ 160`, confirmado con 14
+   semillas); lo que faltaba era **la rama del candidato propio**. Y no era un hallazgo mío contra
+   9c: **la ronda 7 ya lo había escrito** (`ancla-de-finalidad.md:319-322`) y yo no lo había leído
+   al escribirlo. *Cambió:* el titular entero y el marco de §B.1.
+2. **A.1 mal leída.** «El timekeeper necesita ser un 0,63 % más rápido que el nominal, y el nominal
+   ya es el tope del mercado» — el número es correcto, la lectura era falsa: `t_j` es un **índice de
+   slot**, no un instante de pared, y la carrera es contra su propia cadena principal en el mismo
+   silicio. *Cambió:* la palanca deja de ser «comprar una CPU más rápida» (imposible) y pasa a ser
+   **`Lrev < L`** (§A.1, §B.3.c), que cuesta 1,8 % de `ρ*`.
+3. **A.3 rota, y retirada.** Mi regla **(h.3) «continuidad por defecto»** —aplicar la inyección en el
+   primer slot en que la revelación esté disponible **en `past(B)`**— hace `flujo` dependiente de
+   **cuándo llegó un mensaje** y **parte el DAG entre honestos** vía R-FIN-5. *Cambió:* sustituida
+   por **(h.3′) validez incondicional**, y con ella desaparece la pregunta «qué pasa si falta».
+4. **Script con expresión muerta.** `r10a_b1_reloj.py` del intento anterior tenía
+   `ent_ok = R - L/rho + L/rho <= t_dec ... else R <= t_dec`: **las dos ramas idénticas**. No
+   cambiaba ningún número, pero es exactamente el tipo de cosa que `AUDITA_SCRIPTS.py` busca.
+   *Cambió:* script rehecho de cero sobre `r10a_lib.py`.
+5. **Recorte no declarado.** El intento anterior corría 400 épocas por semilla y no medía el
+   *bootstrap*: lo recitaba. Ahora son **4 000** (39 días de red por semilla) y el *bootstrap* se
+   **mide** (control C1, razón 1,000).
+
+**De este intento:**
+
+6. **Bug propio en el simulador, detectado por un control que falló.** Puse
+   `E_hon = max(arr_hon, D)` en la rama **sin (h)**: hacía al atacante esperar a que **la red**
+   decidiera el ancla, lo que daba `n_eval = 0` por construcción y hacía que el **control C3 diera
+   `nan`** en las seis filas. Es un adversario más débil que el del paper (regla de método 8).
+   *Cambió:* corregido a especulación sobre todos los candidatos; C3 pasó de `nan` a `ρ* = 1`, y la
+   cota sin (h) pasó de `L − W_dec + I(1−1/ρ)` a **`L + I(1−1/ρ)`** — que es exactamente la de la
+   ronda 7. **El control positivo pagó su precio.**
+7. **Error de ±1 en la forma cerrada de las rachas.** `n* = ⌈n⌉ + 1` en vez de `⌈n⌉`, que daba tasas
+   `α` veces más pequeñas. Detectado al contrastar con la simulación (razón 0,30 en vez de 1,00).
+   *Cambió:* corregido; la razón sim/cerrado quedó en **0,93-1,01** en las filas con estadística.
+8. **`boot90` medido desde un origen desplazado.** El simulador arranca con
+   `paso[0] = t[0] = L`, y yo reportaba el instante absoluto: inflaba el *bootstrap* en `L` segundos
+   (8,0 h en vez de 2,7 h a `ρ = 3`). *Cambió:* se resta `paso[0]`; ahora reproduce `x/(ρ−1)` con
+   razón 1,000-1,021.
+9. **Modelo de B.2.b incompleto en la primera pasada.** Suponía **siempre un solo slot malo**, con
+   lo que la fila `p = 0` daba 348 s en vez de 0,10 s. *Cambió:* los slots malos son `L − p`, y con
+   ello aparece el resultado bueno: verificar **en orden aleatorio** deja el ataque por prefijo largo
+   en 0,18-1,02 s.
+10. **Etiqueta de columna incorrecta.** B.2.a imprimía `L/I` bajo el rótulo del multiplicador
+    `1 + L/I` (8,46 donde debía poner 9,46). *Cambió:* corregido en el script y en el informe.
+11. **`c_interp` sin memoizar.** Cada llamada a `frontera_pot` recalculaba la integración de Simpson
+    de 400 000 pasos de `d9-ronda8c/r8c_steering.py:20-34`. No cambió ningún número; hizo inviable
+    la primera corrida de B.1. *Cambió:* `functools.lru_cache` en `r10a_lib.py`.
+
+**Contaminación declarada, no error:** el microbanco de B.3 se midió con **otros dos agentes
+corriendo en la misma máquina**. Por eso toma la **mejor de 5 corridas** (9 en el control) y reporta
+la peor al lado; el control de 1 hilo contra Criterion (razón 0,950) dice que la contaminación
+residual es pequeña hasta 25 hilos. Por encima de 32 hilos la degradación medida **incluye** a los
+otros agentes y no debe leerse como propiedad del hardware.
+
+## Lagunas que quedan abiertas (y qué haría falta para cerrarlas)
+
+| Laguna | Por qué no se cierra aquí | Qué haría falta |
+|---|---|---|
+| **`ρ_max` real** | El estudio de Supranational que Autonomys cita **no está localizado** (LAGUNA heredada de `pot-aes-asic-chacha.md` §5). El 1,5-2,5× es una ESTIMACIÓN del principal, sin paper | Localizar el estudio, o un análisis de latencia de S-box en un proceso concreto |
+| **Retención selectiva con información perfecta propia** (§B.6.4) | Ni `prev()` ni `r8c_sim.py` modelan una política de retención que consulte las victorias futuras del atacante | Añadir un oráculo de victorias futuras a `d9-ronda8c/r8c_sim.py` y medir `δ_ef` y la rentabilidad de la parásita con y sin él, 12 semillas |
+| **Efecto de la barrera ×(q+1) sobre el número real de timekeepers** | No es medible sin red | Datos operativos, o una encuesta de hardware de granjeros |
+| **`Δ`** | Heredada; sólo se mide con nodos corriendo | Nodos en red |
+| **`m` con retención inflada** (9c §2, hallazgo de instrumento) | `W_dec` y `m` que uso vienen de 9c y arrastran ese aviso | Reproducir `r9c_c4_wdec.py` con la clausura de publicación en los simuladores de D8/D9-c..f |
+
+---
+
+## Auditoría de scripts (regla de método 10)
+
+```
+$ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d8-ronda10a/
+Scripts analizados: 7
+
+research/scripts/d8-ronda10a/r10a_b56_frontera.py
+   [T3b] L84: ['base0', 'f0'] = MISMA expresión: frontera(hf0, 3 * K)
+   [T3b] L85: ['baseD', 'fD'] = MISMA expresión: frontera(hfD, 3 * K)
+
+research/scripts/d8-ronda10a/r10a_b5b_intentos.py
+   [T3b] L59: ['b0', 'f0'] = MISMA expresión: frontera_factor(hf0, 1.0)
+   [T3b] L60: ['bD', 'fD'] = MISMA expresión: frontera_factor(hfD, 1.0)
+
+research/scripts/d8-ronda10a/r10a_c_coste.py
+   [T3b] L87: ['nucleo_verif', 'rev'] = MISMA expresión: L * verify / I
+
+research/scripts/d8-ronda10a/r10a_lib.py
+   [T3b] L135: ['off', 'paso'] = MISMA expresión: [0.0] * (n_ep + 2)
+
+======================================================================
+Sospechas totales: 6
+```
+
+**Cada marca, leída.** Las seis son T3b («dos variables con el mismo lado derecho largo, y luego
+comparadas»). Las seis son **falsos positivos**, y por dos motivos distintos:
+
+| Marca | Lectura |
+|---|---|
+| `r10a_b56_frontera.py:84-85` (`base0`/`f0`, `baseD`/`fD`) | Misma **expresión**, distinto **estado global**: `f0` se calcula tras `set_F_I(19 080, 4 200)` (el control) y `base0` tras `set_F_I(F, I)` dentro del bucle. Dan 46,8784 % y 44,5722 % respectivamente en la salida, luego **no** son el mismo valor. No se comparan entre sí |
+| `r10a_b5b_intentos.py:59-60` (`b0`/`f0`, `bD`/`fD`) | Idéntico caso: `f0` es el control a `(19 080, 4 200)`, `b0` la línea base de cada pareja `(F, I)` del bucle. Y `frontera_factor` **sí** recibe un parámetro distinto en las filas de la tabla (`factor`) |
+| `r10a_c_coste.py:87` (`nucleo_verif`/`rev`) | La **misma magnitud impresa en dos tablas distintas** (C.1 y C.3), a propósito: en C.1 como columna de coste por nodo y en C.3 dentro del presupuesto total. Nunca se comparan; si difirieran, sería un error |
+| `r10a_lib.py:135` (`off`/`paso`) | Dos arrays distintos que se inicializan igual: `off` son los offsets `slot(I_j) − T_j` en el modo `"cero"` y `paso` son los instantes de paso por barrera. Se llenan con contenidos completamente distintos y **nunca se comparan** |
+
+**Lo que AUDITA no puede ver, y aquí sí se cumple (criterio complementario del propio fichero):**
+todos los resultados **cambian con `α`**, y por tres vías independientes —`W_dec(α)` medida por 9c,
+`m(α)` medida por 9c y `p_propia = α`—. La fila `α = 0,00` da **0** en las siete `ρ` de B.1.c, en las
+nueve de B.1.e, en las 24 de B.6.b y en las dos columnas de B.6.d. **Contadores de cobertura de rama
+(B.1, 4,03·10⁶ épocas simuladas):** `ancla_honesta` 3 203 118 · `ancla_propia` 828 882 ·
+`bloqueado_entropia` 2 838 293 · `bloqueado_llegada` 1 193 707 · `steer_honesto` 1 060 919 ·
+`steer_propio` 327 587 · `sin_steer` 1 031 450. **Ninguna rama a cero**: la comparación vale.
+
+---
+
+## Cómo reproducir
+
+| Fichero | Qué produce | Coste |
+|---|---|---|
+| `r10a_lib.py` | la recursión de la frontera de PoT y las formas cerradas | — |
+| `r10a_b1_reloj.py` → `salida_b1.txt` | B.1 entero, 3 controles, 14 semillas × 4 000 épocas | ~25 min con 32 hilos |
+| `r10a_b2_dos.py` → `salida_b2.txt` | B.2, control C0 leído de Criterion | < 1 min |
+| `r10a_b3_lineas.c` | microbanco de líneas AES; `gcc -O3 -maes -mavx2 -pthread` | — |
+| `r10a_b34_vivacidad.py` → `salida_b34.txt` | B.3 y B.4; necesita el binario anterior (`R10A_BIN`) | ~3 min |
+| `r10a_b56_frontera.py` → `salida_b56.txt` | B.5 y B.6, control contra `verif_frontera_vs_F.salida.txt` | ~45 min |
+| `r10a_b5b_intentos.py` → `salida_b5b.txt` | B.5.b/B.5.c, sensibilidad al número de intentos | ~15 min |
+| `r10a_c_coste.py` → `salida_c.txt` | C entero, incluida la calibración C.5 | < 1 min |
+
+Fuentes de los dos costes unitarios: `/home/katana/zeo/fuentes/subspace/target/criterion/{prove,verify}/new/estimates.json`
+(artefacto de `cargo bench -p subspace-proof-of-time` en esta máquina, 9950X3D).
