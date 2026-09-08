@@ -5,3 +5,4 @@ prev() = d8_a1c_riesgo.py:29-40 (Skellam, ventaja 3k=90), F=19080 s, I=4200 s, 7
     -> a efectos de la carrera es CERO (mueve la frontera menos de 1e-6 puntos).
 
                                           modelo | frontera 1e-10 |    r = 1
+  (a) delta de D8, mismo alpha en los dos sitios |      36.5431% |   0.3821

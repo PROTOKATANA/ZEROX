@@ -499,7 +499,25 @@ que él no escribe: para bajar la frontera al 33 % hacen falta **63,9 % del espa
 atacante y parásito — y el parásito **no es del atacante**: es un tercero racional que hay que suponer
 coordinado o simultáneo.
 
-### 5.3 · La palanca que SÍ existe, y que no es el espacio: `Δ` · **LAGUNA**
+### 5.3 · Composición con la ronda 9b: el parásito ajeno **deja de existir como agente racional**
+
+La ronda 9b (`dag-poas-ancla-de-orden-auditoria-8b.md`, ya cerrada) mide que con **R-FIN-8′** —`rojo_k`
+cobra su propia coinbase— la rentabilidad relativa de la parásita cae de **1,16-1,55 a 0,99-1,00** (su
+§2, tabla S1), con `S1_h = 1,0000` exacto. Compuesto con lo de esta ronda:
+
+| Quién corre la parásita | ¿Le sale a cuenta? | ¿Baja la frontera del atacante? |
+|---|---|---|
+| **El propio atacante** (`α_p` de su `α`) | Indiferente (S1 ≈ 1,00) | **NO**: le quita a la carrera exactamente el espacio que gasta (L3, `argmax β = 0`) |
+| **Un tercero racional** (`α_p` ajeno) | **NO** con R-FIN-8′ (0,99-1,00): no gana nada | Sí, si aun así la corre: 42,0 / 37,2 / 30,9 % |
+| **Un tercero que hace *griefing*** | Le cuesta | Sí, y es el único caso vivo |
+
+**Consecuencia:** el escenario del parásito ajeno —la única vía que baja la frontera por debajo del
+46,9 % sin tocar la red— **exige un tercero que queme espacio sin ganar nada**, y con `α_p = 33 %` para
+llegar al 33 %. Con R-FIN-8 vigente (que **no** paga rojos) ese tercero sí gana el 16-55 % extra y el
+escenario es real; **con R-FIN-8′ deja de serlo.** Eso convierte P1 de «palanca barata» en
+**precondición de la frontera de 46,9 %**, y hay que escribirlo así.
+
+### 5.4 · La palanca que SÍ existe, y que no es el espacio: `Δ` · **LAGUNA**
 
 Con el `δ₀` **medido** en L2b a `α = 0` (no con la cola de Poisson, que sobreestima: a `Δ = 16` da 0,59
 frente a 0,286 medido):
