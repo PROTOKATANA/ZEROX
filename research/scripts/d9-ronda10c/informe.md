@@ -123,7 +123,8 @@ terminándolo `L(1−1/ρ)` antes. El reset **existe pero es parcial**: la front
 | ~~Con (h), cualquier `F`~~ | ~~`ρ=1,5`: 283,3 s · `ρ=3`: 566,7 s · `ρ=10`: 765,0 s~~ ⚠️ **MAL, ver §F**: los valores correctos son **2 662,7 / 5 346,3 / 7 224,9 s** a `F = 2 h`, y **dependen de `F`** | corregido en §F |
 
 **El hallazgo que decide todo: el término `(F − W_dec)` NO escala con `ρ`.** Es un acantilado, no una
-rampa: `ρ = 1` da 0 y `ρ = 1,001` da el **99,7 %** de lo que da `ρ = 10`. Lo único que compra `ρ`
+rampa: `ρ = 1` da **0** y `ρ = 1,001` da el **82,4 %** (`F = 1 h`), **90,4 %** (`F = 2 h`) o
+**96,1 %** (`F = 5,3 h`) de lo que da `ρ = 10`. Lo único que compra `ρ`
 grande es **acortar el *bootstrap*** (83 días → 13 min). Un atacante paciente con un reloj
 marginalmente más rápido tiene el lookahead entero.
 
@@ -733,7 +734,7 @@ sugiere que su modelo de dónde arranca el VDF no es el mío; **no lo he reconci
    ≈ 100-134 s no hay confirmación posible con ningún `F` (la ventaja `3k`). Lo que sí es cierto es
    que la garantía **categórica** llega en `F`, y eso solo le importa a quien la necesite categórica.
 2. **La decisión de `ρ_max` es binaria, no un gradiente.** — **VERIFICADO** (§A.2). `ρ = 1` da 0 y
-   `ρ = 1,001` da el 99,7 % de lo que da `ρ = 10`. Lo único que compra `ρ` grande es acortar el
+   `ρ = 1,001` da el **82-96 %** de lo que da `ρ = 10` (según `F`). Lo único que compra `ρ` grande es acortar el
    *bootstrap* (83 días → 13 min). Elegir entre **1,5 y 3 mueve el lookahead un ~5 % y el margen del
    sembrador un ~4 %**, no lo que sugería la tabla P3 publicada (5,42× / 4,42× / 3,13×), cuyo abanico
    venía enteramente de la pinza del *steering* que este informe corrige. **La pregunta real para
