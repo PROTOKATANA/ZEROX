@@ -264,6 +264,10 @@ apaga el proceso. Sustituye a C-REORG-07 en el DAG.
 > ×10, 40,4 GB/año. **(A″) domina.** Residuo declarado: con 1 slot por bloque varios bloques de cadena
 > comparten slot; el ancla los resuelve por `menor blue_work` (bien definido, Lema A4b), y el steering está
 > medido en ese régimen.
+> **Coste del slot, con fuente:** `pot_slot_iterations = 206 557 520` en mainnet, *«About 1s on 6.2 GHz Raptor Lake
+> CPU (14900KS)»* (`subspace-node/src/chain_spec.rs:128-130`). Es el coste del **timelord** por slot; el de
+> **verificar** (`aes::verify_sequential`, paralelizable por `PotCheckpoints`) se está midiendo en esta máquina
+> (`cargo bench -p subspace-proof-of-time --bench pot`). De él dependen `C-NET-03/04` y el ×60 de `S_max`.
 
 **R-FIN-8 · Rojos.** Ni la coinbase ni las transacciones de un bloque rojo se aplican al estado.
 Cierra la inflación ×10 (ronda 1) y el espacio de bloque gratis (ronda 3). **Coste medido:**
