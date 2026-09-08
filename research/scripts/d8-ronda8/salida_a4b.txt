@@ -1,0 +1,9 @@
+=== A4b · ¿crece `m` con el horizonte? (familia FIJA, la literal de D9-f) ===
+k=30, mp=15, lambda=1, Delta=4, u3=dynamic, copias=14, 12 semillas, 21 umbrales, ancla `slot` (gran = 1 s).
+Referencia D9-f (HOR=260, P=30): m = 2,238 / 2,540 / 3,024 a alpha = 0,10/0,25/0,40.
+
+   HOR     P  alpha |  m medio  m max  estrat  equiv!=
+   260    30   0.00 |    1.000      1       7        0
+   260    30   0.25 |    2.540      5     106        0
+   [164 s]
+   500    60   0.00 |    1.000      1       7        0

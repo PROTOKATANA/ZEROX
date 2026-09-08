@@ -521,3 +521,149 @@ el 33 % apuntando granjeros a su cadena privada, y **pagarles con su propia coin
 cobran igual. El umbral de 35-37 % deja de ser una barrera de capital y pasa a ser un
 problema de coordinación de una tarde.
 
+
+## A3 · Partición + `S_max` + R-FIN-7 — **TENSIÓN** *(medidas parciales; se cierra abajo)*
+
+**Script:** `d8_a3_smax.py` → `salida_a3.txt`.
+
+R-FIN-1a no orfana: **invalida**. Un bloque con `slot(B) − slot(sp(B)) > S_max` es rechazado
+por la red; R-FIN-8 ni se le aplica. D9-d A4.2 lo leyó como tolerancia a particiones; D8 le da
+la vuelta: **es una regla de censura**. Tres medidas.
+
+**(M1) Sin eclipse — peor fracción de bloques honestos con `gap > S_max`, sobre 30
+estrategias del atacante (7 políticas × 4 retrasos + retención total), 12 semillas, 900 s:**
+
+| `α` | S=4 s *(control)* | **S=20 s** | S=30 s | S=150 s | gap máx | `n_hon` |
+|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | 0,72216 | **0,00000** | 0,00000 | 0,00000 | 12 | 948 |
+| 0,10 | 0,76788 | **0,00000** | 0,00000 | 0,00000 | 17 | 837 |
+| 0,25 | 0,81719 | **0,00434** | 0,00000 | 0,00000 | 22 | 706 |
+| 0,33 | 0,86426 | **0,00510** | 0,00000 | 0,00000 | 23 | 634 |
+
+**Capacidad ✓** — el control `S = 4 s` marca el 72-86 %: el instrumento **sí** detecta
+invalidaciones cuando existen. **Criterio `α` ✓** — la columna S=20 crece con `α`.
+
+**Bloques honestos invalidados por hora** (`fracción × 3 600 × (1−α)`):
+`α = 0,25` → **11,7/h** con `S_max = 20 s`; **0/h** con `S_max ≥ 30 s`.
+`α = 0,33` → **12,3/h** con `S_max = 20 s`; **0/h** con `S_max ≥ 30 s`.
+
+**Sin partición real, el atacante NO puede provocar invalidaciones si `S_max ≥ 30 s`.** Con
+`S_max = 20 s` sí, pero a ritmo bajo (una docena de bloques/hora sobre 2 700 honestos/hora:
+0,4-0,5 %). **Etiqueta de M1: SIN VECTOR** (con esta familia) para `S_max ≥ 30 s`;
+**TENSIÓN** para `S_max = 20 s`, que es el extremo que el presupuesto económico de A6 exige.
+
+
+---
+
+# VEREDICTO
+
+> **Sí: hay un ataque que rompe el diseño con sus constantes, y son dos, que se refuerzan.**
+> **(1)** La cota `δ` del Lema 9 no es el caso peor: una **cadena parásita** la supera, es
+> **legal** bajo R-FIN-1a/11/12, R-FIN-7 no la ve, y a partir de `α = 0,33` **es rentable**
+> — un granjero racional del 33 % la ejecutaría por dinero. Baja el umbral de orden de
+> 40,0 % a **37,1 %** y la frontera de flujo único de ≈39,3 % a **≈36,7 %**.
+> **(2)** El **soborno** desacopla `m` de `α` (`m = b+1` medido, `α = 0` incluido) a
+> 1-23 recompensas por época, con retorno de 12-23×; y `m` gobierna `I`, `F` y el lookahead,
+> que tiene techo económico. Con `α = 0,10` el lookahead de equilibrio es **44 h > `A*` = 41 h**.
+> Y la **«garantía por construcción» `m ≤ 1+λ·S_max` es inviable en todo el rango de
+> R-FIN-1a**: margen 0,49-0,97× frente a la GPU de **hoy**.
+>
+> **Lo que NO se rompe:** la región de operación publicada `α ≲ 35 %` sobrevive a (1)
+> (`P(partición) = 4·10⁻⁴⁵` en 10 años). El acuerdo entre vistas honestas no tiene vector
+> (A2). `3k` es holgada (A6b). El `shuffle` es un no-op en régimen (A6c).
+
+## Tabla de veredictos
+
+| Línea | Etiqueta | Número que la sostiene | Script |
+|---|---|---|---|
+| **A1** · sostenibilidad de `δ` | **REFUTADO** | `δ(0,33) = 0,287 > 0,267`; `δ(0,40) = 0,437`; umbral 40,0 → **37,1 %** | `d8_a1_lema9.py`, `d8_a1b_umbral.py`, `d8_a1c_riesgo.py` |
+| A1.4 · legalidad de la maniobra | confirmada | `> S_max=20 s`: 0,00012-0,00074 de sus bloques | `d8_a1d_rfin1a.py` |
+| A1.5 · coste para el atacante | **REFUTADO (incentivos)** | ratio ingreso a/h = **1,16-1,55** para `α ≥ 0,33` | `d8_a1e_coste.py` |
+| **A2** · dos vistas honestas | **SIN VECTOR** + LAGUNA de modelo | `P(desacuerdo) = 0` en 3 168 muestras a `D ≥ 128 s`; `F` es 149× más profundo | `d8_a2_dosvistas.py` |
+| **A3** · `S_max` y R-FIN-7 | **TENSIÓN** | 11,7-12,3 bloques honestos invalidados/h con `S_max=20 s`; **0** con `≥30 s` | `d8_a3_smax.py` |
+| **A4** · cruce del ancla en régimen | ver §A4 | `m` reproduce 2,540 a `α=0,25`; escalado con el horizonte, §A4 | `d8_a4_cruce.py`, `d8_a4b_horizonte.py` |
+| **A5** · soborno BDK | **REFUTADO** | `m = b+1` (incluso a `α=0`); valor/coste 12-23×; `m* = 23` | `d8_a5_soborno.py`, `d8_a5b_equilibrio.py` |
+| **A6** · margen económico | **REFUTADO** | margen 10× plotter **0,67×** (era 1,05×); garantía `S_max=150` → **0,49×** | `d8_a6_presupuesto.py` |
+| A6 · línea 5 (`3k`) | **SIN VECTOR** (a favor) | ventaja real máx 50 = **0,56 · 3k** | `d8_a6b_lineas.py` |
+| A6 · línea 3 (`shuffle`) | **SIN VECTOR** + LAGUNA | 0 diferencias en 10 790 selecciones; puntas máx 13 < `mp`=15 | `d8_a6c_shuffle.py` |
+
+## Los números pedidos, en una línea cada uno
+
+- **`δ` sostenible real (A1):** `δ(α) = 0 / 0,154 / 0,208 / 0,287 / 0,307 / 0,345 / 0,437 /
+  0,583` para `α = 0 / 0,25 / 0,30 / 0,33 / 0,35 / 0,37 / 0,40 / 0,45`. **No es una
+  constante.** Cruza la cota del paper (0,2105) en `α ≈ 0,30` y `δ_real` (0,267) en `α ≈ 0,32`.
+- **`P(desacuerdo)` con dos vistas (A2):** `1,000 / 0,504 / 0,106 / 0,015 / 0 / 0 / 0 / 0`
+  a `D = 4/8/16/32/64/128/256/512 s` (`α = 0,40`, máximo sobre 24 estrategias). Resolución
+  del instrumento `3,2·10⁻⁴`; `F = 19 080 s`.
+- **Margen económico recalculado (A6):** lookahead `I + F = 6,14 h`; margen **10,26× / 6,68×
+  / 11,24×** frente a `A*` de hoy (escenarios A/B/C) y **1,03× / 0,67× / 1,12×** frente al
+  plotter 10×. Con la garantía (`S_max = 150 s`): **0,75× / 0,49× / 0,83×** frente a hoy.
+
+## Salida de `AUDITA_SCRIPTS.py` (regla 5) — DECLARADA
+
+```
+$ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d8-ronda8
+Scripts analizados: 11
+  d8_a6b_lineas.py  [T3b] L93: ['padres', 'ph'] = MISMA expresión: m._padres(d, visibles)
+  d8_lib.py         [T3b] L109: ['padres', 'ph'] = MISMA expresión: self._padres(d, visibles)
+Sospechas totales: 2
+```
+*(la salida guardada en `salida_audita.txt` es la de 11 scripts; con los tres añadidos
+después —`d8_a1d`, `d8_a1e`, `d8_a4b`— el recuento sube, las marcas no cambian)*
+
+**Las dos marcas, leídas una a una.** Son el **mismo patrón** y son **falsos positivos
+justificados**: en `corre_l9` la rama honesta hace `padres = self._padres(d, visibles)` (los
+padres del bloque **honesto**) y la rama del atacante hace `ph = self._padres(d, visibles)`
+(las puntas honestas que el **parásito** fusiona, antes de anteponer su punta privada). El
+detector marca dos variables distintas con el mismo RHS textual; aquí están en ramas
+distintas del `if` y alimentan bloques de creadores distintos. **No es la tautología de
+`d8b_b3`** (donde `Ij_A` e `Ij_B` eran literalmente el mismo valor comparado consigo mismo):
+el atacante usa deliberadamente la vista honesta, que **es** el mecanismo del ataque.
+Ninguna marca T1 (parámetro `alpha` muerto), T2 (literal cableado), T3 ni T4 (semillas).
+
+## Errores propios (regla 10)
+
+1. **Heredé un instrumento con un defecto y no lo vi al primer vistazo.** `d8_lib.corre_l9`
+   comparaba contra `virtual_sp(todo lo entregado)`, incluidos los bloques en vuelo. Lo
+   encontré al releer, lo corregí y lo dejé parametrizado (§0.3). Debilitaba al atacante, así
+   que no invalidaba resultados anteriores — pero era una lectura incorrecta del modelo.
+2. **Mi primer instrumento de A2 no podía detectar lo que buscaba, y tardé en verlo.** El
+   adversario del paper (sin retardo) **sincroniza** las dos vistas honestas en vez de
+   partirlas; por eso la fila `α = 0` es la peor. Lo declaro como límite del modelo, no como
+   resultado (§A2).
+3. **Comparé mi `δ` (sin retarget) con `δ_real` (con retarget) sin decirlo en la primera
+   pasada.** Corregido: la comparación estricta es contra `δ = 0,2105`; contra `δ_real` el
+   cruce ocurre un poco más arriba (`α ≈ 0,32` en vez de 0,30). La composición de mi `δ` con
+   la inflación del retarget **no está medida** — es LAGUNA, y va en la dirección mala.
+4. **A4 lo escribí demasiado caro** (familia completa a horizonte 1 500 s) y tuve que
+   reescalarlo a mitad de ronda; el resultado dirigido está en `d8_a4b_horizonte.py`.
+5. **En A5 el coste del soborno lo puse en 1 recompensa por granjero, que es la cota
+   inferior.** Además, el sobornador tiene que pagar a los **ganadores** de la ventana, no a
+   los **bloques de cadena** (`λ` vs `λ_chain ≈ 0,76`), así que el coste real es ~1,3× el que
+   uso. Con una prima `p`, el `b` rentable cae a `b_max/p`: con `p = 3·1,3 ≈ 4` sigue siendo
+   rentable hasta `b ≈ 20` a `α = 0,25`.
+
+## LAGUNAS (regla 7: lo que no se puede afirmar con fichero y línea)
+
+1. **Composición de `δ_parásita` con la inflación del retarget.** `dag-poas-delta-real.md` §1
+   infla `λ` porque el observador ve `λ(1−δ)`. Mi simulador no tiene retarget. Con
+   `δ = 0,29` en vez de 0,21, `λ_real = k/(k−2Dλ_obj)` no cambia (es función de `λ_obj`), pero
+   `δ_real = 2Dλ_real/(k+2Dλ_real)` sí subestima si el `δ` de partida es mayor. **No medido.**
+2. **Partir dos vistas honestas de verdad** exige retardar el enlace honesto↔honesto: fuera
+   del modelo del paper y de este simulador (§A2).
+3. **El régimen donde el `shuffle` importa** (>15 puntas simultáneas) no lo cubre ninguna
+   medida, ni mía ni de D9 (§A6c).
+4. **`Dmax` sigue sin medir.** Todo usa `Δ = 4 s`. `δ` es proporcional a `2Dλ`: si `Dmax`
+   fuera 8 s, `δ` nominal pasa a 0,348 y el umbral cae otros ~4 puntos. Es la variable más
+   sensible del diseño **y la única que nadie ha medido.**
+5. **`τ` (duración del slot de PoT) y las dos ramas A/B.** Todo lo que he medido usa
+   `slot = ⌊t⌋` con `λ = 1` (rama A con `τ = 1 s`, que el propio diseño descarta). Con
+   `τ ≈ 0,1 s` los gaps de R-FIN-1a se miden en 10× más slots, y `S_max` en segundos no
+   cambia — pero el DoS de verificación de PoT sí (×10). **No medido en ninguna rama.**
+6. **`m ≤ 1 + λ·S_max` con `τ ≠ 1 s`.** La tabla de D9-f (`salida_c.txt` §3) escribe
+   `m ≤ 1 + λ·τ·S_max`, que da 16 con `τ = 0,1 s`. Eso sólo vale si `S_max` está en **slots**;
+   R-FIN-1a lo escribe en **segundos**, y entonces `m ≤ 151` con independencia de `τ`.
+   **Las dos lecturas están en el mismo documento y dan `F` de 30 h y de 68 h.** Es una
+   ambigüedad de la regla, no un resultado: **hay que decidirla.**
+7. **El precio del soborno** (A5) es un supuesto, como los precios de `A*`. Ambos se mueven.
+
