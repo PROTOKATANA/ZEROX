@@ -45,7 +45,8 @@ COB = {
     "bloques_a": 0,
     "retenidos": 0,
     "liberados": 0,
-    "rfin1a_ok": 0,         # aristas de cadena comprobadas y validas
+    "rfin1a_ok": 0,
+    "clausura_publicacion": 0,         # aristas de cadena comprobadas y validas
 }
 
 
@@ -150,6 +151,14 @@ class MundoR9(Mundo):
                     continue
                 extra = 0.0 if self.atacante_sin_retardo else DELTA
                 llega[bid] = t + retraso + extra
+                # CLAUSURA DE PUBLICACION (corregida en la ronda 9c): publicar un bloque
+                # PUBLICA TAMBIEN todos sus ancestros — un nodo no puede validar `bid` sin
+                # ellos. Sin esto el atacante «retiene» un bloque y a la vez publica un hijo
+                # suyo, imposible en la red real. Es el artefacto que inflaba `W_dec` a 600 s.
+                for _p in d.anc[bid]:
+                    if llega.get(_p, float("inf")) > llega[bid]:
+                        llega[_p] = llega[bid]
+                        COB["clausura_publicacion"] += 1
                 COB["bloques_a"] += 1
         tip = d.virtual_sp(list(llega))
         return d, tip
