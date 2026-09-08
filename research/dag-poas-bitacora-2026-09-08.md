@@ -22,6 +22,7 @@ vivo en `research/dag-poas-ancla-de-orden.md`. Commits del día en ZEROX: 93 (ra
    con `ρ ≤ 1` el steering es 0; con `ρ = 1,5`, 68 slots tras días de *bootstrap*).
 5. **La economía se arregla por R-FIN-14:** `I` deja de escalar como `1/g²`; `I + F` baja de 8,26 h a 0,76-1,31 h y
    el margen frente a un plotter 10× sube de 0,50× a 3,1-5,4×. **Queda por decidir `ρ_max` y `F`** (palanca P3).
+   *(Línea base corregida en §11: el «antes» es 6,14 h / 0,67×, no 8,26 h / 0,50×.)*
 6. **Coste del PoT medido:** `verify` 96,1 ms/slot, `prove` 1,561 s/slot (9950X3D). Esta máquina no hace 1 s/slot.
 
 ---
@@ -70,7 +71,8 @@ vivo en `research/dag-poas-ancla-de-orden.md`. Commits del día en ZEROX: 93 (ra
     primeros 10-20 s. VERIFICADO (c4 reproducido idéntico por el principal, 33 min).
 13. **`ρ ≤ 1 ⇒` steering 0** (9c E1, rehecho por mí): evaluar un candidato exige `pot_out(t_j − 1)`, `L` por delante.
     DEMOSTRADO. Con `ρ > 1`, *bootstrap* de días y `n_eval = ρ·W_dec`.
-14. **P4 compra precio, no `α_ef`** (9c D): `I = c_m·√(n_eval/(αλ))/g`; `I+F` 8,26 h → 0,76-1,31 h; margen 0,50× → 3,1-5,4×.
+14. **P4 compra precio, no `α_ef`** (9c D): `I = c_m·√(n_eval/(αλ))/g`; `I+F` 8,26 h → 0,76-1,31 h; margen 0,50× → 3,1-5,4×
+    (línea base corregida en §11: 6,14 h / 0,67×).
     Y `F = max(F_carrera, I/(W/κ−1))`; restricción `I ≥ ρ_max·W_dec`. VERIFICADO (d1/d2).
 15. **Revelación retardada por VDF** (9c E5; la ronda 7 la descartó): `entropía_j = VDF(chunk ‖ pot_out, L·iter)`
     revelada en `t_j` ⇒ la cadena común no es calculable más allá de `I`; como `L > I`, evaluación 0 para cualquier `ρ`.
@@ -177,3 +179,27 @@ Fuentes: `research/fuentes/{bdk19,phantom-ghostdag}.{pdf,txt}`; Kaspa `/home/kat
 Leer §0, §5 y §6 de este documento; luego `dag-poas-ancla-de-orden.md` §2 (reglas y constantes) y las auditorías 8a/8b/8c.
 Primer trabajo: la decisión P3 de Katana (§6.1). Después, la ronda adversarial
 contra el diseño corregido. `Δ` espera al nodo.
+
+---
+
+## 11 · Addendum, noche del 2026-09-08 (sesión nueva tras el /clear)
+
+1. **Retractación de D8 (A4d), integrada.** `d8-ronda8/d8_a4d_correccion.py` y `salida_a4d.txt` (escritos a las 21:17,
+   tras el cierre; reproducidos idénticos por el principal): «`m = 2,955` obliga a subir `I` y `F`» comparaba una `m`
+   medida a `α = 0,40` con una `I` a `α = 0,10`. Con la pareja consistente, el peor caso sigue siendo la `m = 2,548` del
+   diseño: **lookahead 6,14 h, margen 0,67×** (no 8,26 h / 0,50×). Corregido en `auditoria-8c.md` §3 y en la nota de
+   palancas. La tabla de P3 no cambia.
+2. **Decisiones de Katana:**
+   - **P-038 sigue abierta**: «aún no cerramos, seguimos afinando».
+   - **`F = 2 h` provisional**, a bajar a **1 h** cuando el diseño corregido sobreviva a su ronda adversarial. **Anotado
+     como obligación: `F` se baja en producción** — cuanto más corta, mejor para el usuario y contra el plotter rápido.
+     Tarea nueva: **investigar cómo acortar `F`** (palancas conocidas: `F = max(F_carrera, I/(W/κ−1))` ⇒ revelación
+     retardada (`n_eval = 0` ⇒ `F = F_carrera ≈ 0,34 h` con el modelo de 9a), `W/κ`, `k`, `Δ`).
+   - **`ρ_max`: pendiente.** Katana entre «admitir 3×» y «segundo VDF» (revelación retardada). Sus dos preguntas, con
+     fuente en `research/pot-aes-asic-chacha.md`: un reloj 19× para AES **no es alcanzable ni por un Estado** (exige
+     ~25 ps por ronda AES; la instrucción `AESENC` ya es hardware a 3 ciclos y 6,2 GHz; Autonomys/Supranational: «no
+     significant speedup … even with an ASIC»); **sustituir AES por (X)ChaCha20(-Poly1305) empeora el reloj**, porque
+     ChaCha no tiene instrucción de hardware en las CPU y el hueco CPU↔ASIC crece; la «seguridad» de ChaCha en los
+     artículos citados es de cifrado AEAD (nonces, canales laterales) y no aplica a un PoT cuya semilla es pública.
+3. **Cabecera de P-038 en el vault actualizada** (decía «ancla por corregir», de la ronda 7).
+

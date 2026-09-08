@@ -1,0 +1,30 @@
+=== A4d · la cuenta bien hecha: max sobre alpha de I(m(alpha), alpha) ===
+g = 0.036, W/kappa = 1.22, lambda = 1.0. I = (c_m/g)^2/(alpha*lambda); F = I/(W/kappa - 1); lookahead = I + F.
+
+--- D8 (familia global + retencion hasta S_max) ---
+ alpha        m      c_m     I (s)   I (h)   F (h)  look (h)  margen B 10x
+  0.10    2.282   0.6437      3198    0.89    4.04      4.93          0.83
+  0.25    2.822   0.7961      1956    0.54    2.47      3.01          1.36
+  0.33    2.905   0.8195      1570    0.44    1.98      2.42          1.70
+  0.40    2.955   0.8336      1340    0.37    1.69      2.06          1.99
+   -> PEOR CASO: alpha = 0.10, I = 3198 s (0.89 h), F = 4.04 h, lookahead = 4.93 h
+
+--- D9-f (familia bloque a bloque, sin retencion) ---
+ alpha        m      c_m     I (s)   I (h)   F (h)  look (h)  margen B 10x
+  0.10    2.238   0.6313      3075    0.85    3.88      4.74          0.87
+  0.25    2.540   0.7165      1585    0.44    2.00      2.44          1.68
+  0.40    3.024   0.8507      1396    0.39    1.76      2.15          1.91
+   -> PEOR CASO: alpha = 0.10, I = 3075 s (0.85 h), F = 3.88 h, lookahead = 4.74 h
+
+--- D9-f «+retencion» — LA QUE USA EL DISENO ---
+ alpha        m      c_m     I (s)   I (h)   F (h)  look (h)  margen B 10x
+  0.10    2.548   0.7188      3986    1.11    5.03      6.14          0.67
+   -> PEOR CASO: alpha = 0.10, I = 3986 s (1.11 h), F = 5.03 h, lookahead = 6.14 h
+
+CONCLUSION. El peor caso de la familia de D8 (alpha = 0,10) da un lookahead MENOR
+que el del diseno, porque mi familia a alpha = 0,10 es MAS PEQUENA que la de D9-f
+(37 estrategias globales frente a global + bloque a bloque con ventana +-30 s).
+Luego A4 NO obliga a rehacer las constantes: la `m = 2,548` del diseno sigue siendo
+la cota mas alta medida en el punto que manda, que es alpha = 0,10.
+Mi afirmacion anterior («m = 2,955 obliga a subir I y F») era una comparacion entre
+alphas distintos y es INCORRECTA. Queda retirada.

@@ -47,7 +47,8 @@ Aceptando más steering en `α = 0,10`:
 | 10 % | 634 s | 0,80 h | 0,98 h | 4,20× | 42,0× | 34,3 / 37,0 % |
 
 (`m = 2,822`; con la `m = 2,955` final de D8 los tiempos suben ~10 %: `g = 7 %` → `I ≈ 1 500 s`, `F ≈ 1,9 h`,
-lookahead ≈ 2,3 h, margen ≈ 1,8×.) Coste: un granjero del 10 % que compre `m ≈ 20` gana ~16 % más bloques por
+lookahead ≈ 2,3 h, margen ≈ 1,8×. **Retirado por D8 A4d:** la `m = 2,955` es a `α = 0,40` y no manda; en el peor `α` la
+`m` del diseño sigue siendo 2,548 — ver `auditoria-8c.md` §3.) Coste: un granjero del 10 % que compre `m ≈ 20` gana ~16 % más bloques por
 época — desigualdad, no seguridad.
 
 **P4 · Ventana de decisión del steering acotada por el PoT (a verificar en el diseño).** Autonomys re-siembra el
@@ -65,7 +66,7 @@ referenciados» crea un vector de griefing con `α` pequeño (12 % de bloques ho
 
 ## 3 · Orden recomendado
 
-P1 y P2 ya. Verificar P4 en la propuesta (una lectura). Después P3 con la `m = 2,955` y el `g` que P4 permita.
+P1 y P2 ya. Verificar P4 en la propuesta (una lectura). Después P3 con la `m` del diseño (2,548 a `α = 0,10`; la 2,955 quedó retirada por D8 A4d) y el `g` que P4 permita.
 Y lanzar **una** pregunta a D9: ¿es correcto el argumento de presupuestos disjuntos de §1? Si lo es, la frontera
 real es 41-47 % y el 33 % tiene el colchón que a 35 % no tenía. `Δ` sigue sin medir.
 

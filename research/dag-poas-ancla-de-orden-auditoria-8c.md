@@ -77,6 +77,12 @@ escalar como `1/g²` y como `I` mismo, y pasa a `I = c_m·√(n_eval/(αλ))/g`:
 | `n_eval = 68` (`ρ = 1,5`) | 3,6 % | 602 s | 0,76 h | 0,93 h | 4,42× |
 | `n_eval = 135` (`ρ = 3`) | 3,6 % | 851 s | 1,07 h | 1,31 h | 3,13× |
 
+> **Corrección posterior (D8 A4d, `d8-ronda8/d8_a4d_correccion.py`, reproducido idéntico por el principal el 2026-09-08 por la
+> noche):** la fila LIBRE empareja una `m = 2,955` medida a `α = 0,40` con una `I` calculada a `α = 0,10`; el mapa `I ∝ 1/α`
+> exige la pareja consistente `(m(α), α)`. La línea base correcta es la del diseño, `m = 2,548` a `α = 0,10`: **`I = 3 986 s`,
+> `F = 5,03 h`, lookahead 6,14 h, margen 0,67×** (la familia de D8 en su peor `α` da 4,93 h / 0,83×). Las filas con `n_eval`
+> no cambian. La mejora de P4 es de ~6× en lookahead, no de ~11×.
+
 **Aviso de 9c que hay que respetar:** con la pinza del steering desactivada, `F` la fija la carrera:
 `F = max(F_carrera, I/(W/κ − 1))`. Con el modelo de 9a (`δ = 0`), `F_carrera(α = 0,35) = 0,34 h`; con el `δ`
 pesimista de D8, 1,85 h. Y la restricción nueva **`I ≥ ρ_max·W_dec`** (si `I` baja de ahí, el atacante evalúa la
