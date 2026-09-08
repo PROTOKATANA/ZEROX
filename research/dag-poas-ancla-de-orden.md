@@ -153,7 +153,7 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 ## 2 · El algoritmo
 
-Constantes: `k = 30`, `q = 1` **decidido**, `S_max ∈ [20, 150] s` (elección), `W_RETARGET ≥ 3 083`, **`τ = 1 s` (A″, decidido)** — y **`I = 4 200 s`, `F = 5,3 h` medidos** contra la familia de D9-e, **`F ≤ 68,5 h` garantizado** por construcción (`S_max = 150 s`). **No hay `c`.**
+Constantes: `k = 30`, `q = 1`, `τ = 1 s` (A″), **`S_max = 150 s`** (DECIDIDO por Katana 2026-09-08: garantía `F ≤ 68,5 h` y tolerancia a particiones con `f ≥ 9 %`), `W_RETARGET ≥ 3 083`, **`F = 5,3 h` medido / `≤ 68,5 h` garantizado — se publican los dos con etiqueta y se diseña con el medido** (DECIDIDO), `I = 4 200 s`. **Umbral publicado: el de flujo único, ~35 %** (DECIDIDO; el de orden, 40,0 %, se declara al lado). **Las tres decisiones son provisionales hasta el cierre de D8:** su A1 (sesgo del Lema 9) puede mover los umbrales y su A6 el margen económico.
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
 desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
