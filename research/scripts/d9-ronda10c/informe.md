@@ -83,6 +83,14 @@ con `L = F` (R-FIN-2 y R-FIN-7: `t_j = slot(I_j) + L`). En la rejilla completa
 `F ∈ {0,34; 1; 2; 5,3} h` × `I ∈ {491; 602; 851} s`) **la simulación reproduce las dos formas
 cerradas sin una sola discrepancia** (`grep -c DISCREPA salida_a1.txt` = 0).
 
+> **Corrección al enunciado del encargo.** El encargo escribe «adelanto `L(1 − 1/ρ)` acotado por la
+> inyección». **El factor `(1 − 1/ρ) multiplica `I`, no `L`**, y hay además un término aditivo
+> `(L − W_dec)` que **no depende de `ρ`**. `L(1 − 1/ρ)` sería lo correcto si la cadena de PoT se
+> reiniciara en cada `t_j` y el atacante tuviera que recorrer los `L` slots desde cero cada época —
+> que es exactamente lo que hace **(h)**, pero con `I` en lugar de `L`, porque bajo (h) el bloqueo
+> está en `t_j` y no en `T_j`. En el núcleo **no hay reinicio**: el atacante se queda pegado al tope
+> de conocimiento y solo lo pierde si deja de calcular.
+
 **Por qué el mecanismo es ese.** En el núcleo el atacante conoce `entropía_j` en `T_j + W_dec` (el
 ancla ya no puede cambiar, 9c C.0) pero esa entropía **se aplica `L` slots más tarde**: puede
 encadenar AES hasta `t_{j+1} − 1`, es decir, hasta `L + I − W_dec` por delante. Esa frontera avanza
@@ -376,6 +384,39 @@ Segundos hasta que la reversión baja de cada umbral (`brentq` sobre `t`):
 | PESIMISTA | 0,33 | 1 298 s | 1 869 s | **2 406 s** | 2 931 s |
 
 **El comerciante espera entre 4 y 40 minutos. Nunca 1 h ni 2 h.**
+
+### C.2 · Lo que se paga por acortar `F`: la frontera — `r10c_c2_frontera.py`, `salida_c2.txt`
+
+Instrumento: `frontera`/`union10` de `d9-ronda9a/r9a_a3_frontera.py` **sin tocar**, igual que
+`research/scripts/verif_frontera_vs_F.py` del agente principal, pero con la rejilla fina de 9a
+(0,0005 + `brentq`) en vez de la gruesa (0,005). **Control:** `F = 19 080 s`, `I = 4 200 s` reproduce
+**46,8784 % / 36,5431 %**, los dos valores de 9a.
+
+| `F` | `I` | frontera `δ = 0` | frontera `δ` D8 | unión 10 años a `α=0,33`, `δ=0` | `δ` D8 |
+|---|---:|---:|---:|---:|---:|
+| 0,34 h | 491 | 34,72 % | 28,67 % | 1,50e-15 | **1,00** |
+| 0,34 h | 851 | **34,81 %** | **28,74 %** | 8,65e-16 | **1,00** |
+| 1 h | 491 | 41,92 % | 33,01 % | 2,74e-76 | 8,49e-11 |
+| **1 h** | **851** | **41,98 %** | **33,05 %** | 1,58e-76 | 4,90e-11 |
+| 1,07 h | 491 | 42,25 % | 33,27 % | 3,33e-83 | 2,32e-12 |
+| 1,07 h | 851 | **42,30 %** | **33,31 %** | 1,92e-83 | 1,34e-12 |
+| 2 h | 491 | 44,53 % | 35,06 % | 2,50e-169 | 5,29e-32 |
+| **2 h** | **851** | **44,57 %** | **35,08 %** | 1,44e-169 | 3,05e-32 |
+| 5,3 h | 491 | 46,78 % | 36,48 % | 3,27e-210 | 1,76e-102 |
+| 5,3 h | 851 | 46,81 % | 36,50 % | 1,89e-210 | 1,02e-102 |
+
+**Controles cruzados con lo ya publicado** (`dag-poas-bitacora-2026-09-08.md` §11, tabla de
+`verif_frontera_vs_F.py`): `0,34 h / 851` → **34,81 % / 28,74 %** (publicado 34,81 / 28,74) ·
+`1,07 h / 851` → **42,30 % / 33,31 %** (publicado 42,28 / 33,29, con rejilla más gruesa) ·
+`2 h / 851` → **44,57 % / 35,08 %** y uniones **1,44e-169 / 3,05e-32** (publicado 44,57 / 35,08 y
+1,4e-169 / 3,1e-32). **Reproducido.**
+
+**La lectura:** de `F = 2 h` a `F = 1 h` la frontera baja **2,59 puntos** (`δ=0`: 44,57 → 41,98) y
+**2,03 puntos** (pesimista: 35,08 → 33,05). Con `F = 1 h` el umbral operativo del 33 % conserva
+**0,05 puntos** en el modelo pesimista — es decir, **no conserva nada**. Con `F = 2 h` conserva
+**2,08 puntos**. Y a `F = 0,34 h` el 33 % **cae** en el modelo pesimista (unión = 1,00). **Este es el
+precio real de acortar `F`, y se paga en la única dimensión que le importa al usuario: cuánto espacio
+adversario aguanta la cadena.**
 
 ### C.3 · Qué gana el usuario con `F = 1 h` frente a `F = 2 h`
 
