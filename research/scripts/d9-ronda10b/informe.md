@@ -322,3 +322,142 @@ transacción. Las dos son defendibles; hay que decir cuál se está comprando.
 allá de `F` en toda la vida de la cadena, no solo *esta* transacción a salvo. Lo que **sí** hay que
 corregir es la retórica: `F` no es «lo que Bitcoin llama 6 confirmaciones»; es varios órdenes de
 magnitud más fuerte, y conviene decirlo cuando se compare con Chia (10 min) o con Bitcoin (60 min).
+
+---
+
+## B.4 · ¿Cuál es el modelo de `δ` correcto para diseñar `F`? — **DEMOSTRADO** que no es ninguno de los dos publicados
+
+La pregunta del encargo es «`δ = 0`, la `δ` pesimista de D8, o algo intermedio». La respuesta corta:
+**ninguna de las tres, tal como están planteadas. El modelo correcto es `δ = δ₀(Δ_ef)`** — el `δ` que
+un atacante impone **sin gastar espacio**, en función del retardo honesto↔honesto efectivo. A
+`Δ = 4 s` ese modelo **es** `δ = 0` (medido 0,0000), pero por una razón distinta de la que se le
+atribuye, y con una condición de validez que `δ = 0` a secas no lleva escrita.
+
+### Los cuatro candidatos, y por qué caen tres
+
+| Candidato | Qué es | Veredicto |
+|---|---|---|
+| **`δ = 0`** (9a) | El `δ` no entra en la carrera | **Correcto como valor, incompleto como modelo.** Es el caso `Δ → 0` de M4, no un axioma |
+| **`δ` de D8** (0,2867 a 33 %) | El `δ` parásito medido | **REFUTADO como modelo de la carrera:** es doble conteo |
+| **`δ_real(k)`** (0,267) | El sesgo del retarget | **Anulado por regla:** R-FIN-13′ |
+| **`δ₀(Δ)`** (9a A6) | El `δ` que compra un atacante de RED, gratis | **El correcto.** Es el único que no compite por el presupuesto de espacio |
+
+**1. Por qué la `δ` de D8 no puede ir en la carrera — la fuente, literal.** La carrera del paper se
+corre contra `w_H`, y `w_H` es el score del **bloque virtual honesto**, que ya suma los azules del
+atacante: `research/fuentes/phantom-ghostdag.txt` **L1034-1036**, leído por el principal y transcrito
+en `dag-poas-ancla-de-orden-auditoria-8a.md` §0. `(1−α)(1−δ)λ` es el ritmo de **bloques honestos
+azules**, una magnitud distinta y menor. Poner esa `δ` en el denominador es contar el mismo `α` dos
+veces: una para enrojecer honestos (exige bloques **publicados**) y otra para correr en privado
+(exige bloques **retenidos**). **Y no es solo un argumento: 9a lo midió.** Repartiendo
+`α = α_p + α_f` entre parasitar y correr, «la deriva máxima está en `α_p = 0` en las 5 filas»
+(7 200 corridas, `auditoria-8a.md` §0 y §2): al atacante le conviene **no** parasitar. El modelo
+pesimista describe a un atacante **estrictamente dominado**.
+
+**2. Por qué `δ_real(k)` ya no aplica.** `dag-poas-delta-real.md` §1 lo deriva del sesgo que el Lema 9
+mete en el retarget (`λ_obs = λ·k/(k+2Δλ)` ⇒ `λ_real = 1,364`, `δ_real = 0,267` a `k = 30`). La
+ronda 9b lo cerró **por regla**: con **R-FIN-13′** el retarget cuenta un bloque por identidad, y la
+inflación medida cae de **×1,45 a ×1,005** (`dag-poas-ancla-de-orden-auditoria-8b.md` §3, tabla
+L73-78). Cita literal de esa auditoría, L80-82: *«Con R-FIN-13′ esa nota deja de aplicar:
+`δ_real → δ` nominal (0,267 → 0,211), umbral de orden 40,0 → 41,7 %»*. El modelo M6 se conserva en la
+tabla de C **solo como referencia histórica**.
+
+**3. Por qué `δ₀(Δ)` sí sobrevive a las dos objeciones.** Es la única `δ` que **no consume el
+presupuesto del atacante de espacio**: la impone un atacante de **red** (eclipse parcial, inundación)
+que está fuera del modelo del paper (`phantom-ghostdag.txt` L1024-1027, adversario sin retardo) y que
+no gasta ni un bloque. Por tanto se **compone** con la carrera privada sin doble conteo: el mismo `α`
+corre en privado mientras la red honesta va lenta. 9a lo midió a `α = 0` precisamente para aislarlo
+(`r9a_a6_frontera_delta.py:36-38`): 0,0000 a 4 s · 0,0020 a 8 s · 0,0828 a 12 s · 0,2858 a 16 s ·
+0,4428 a 20 s. Y **eligió la medida y no la cola de Poisson** `P(Poisson(2Δλ) > k)`, que sobreestima
+(a `Δ = 16` da 0,59 frente a 0,286 medido) — su propio comentario, `r9a_a6_frontera_delta.py:28-31`.
+
+### La condición de validez que hay que escribir junto al número
+
+El teorema de la ráfaga de 9a (`R < A ⟺ gana`), que es lo que permite tirar la `δ` parásita, **vale
+mientras `2Δλ ≪ k`**. La propia 9a lo declara: *«la conservación `W_pub/H ≥ 1` se rompe con `Δ` grande
+(`Δ = 20`, `α = 0,35`: 0,936)»* (`auditoria-8a.md` §4). Es decir: **a `Δ` pequeña, `δ₀` y la `δ`
+parásita no se suman porque la segunda es dominada; a `Δ` grande, la separación deja de estar
+demostrada.** Cómo se componen exactamente por encima de `Δ ≈ 16 s` es una **LAGUNA**: se cerraría
+midiendo el reparto `α_p/α_f` (el A2 de 9a) con `Δ ∈ {12, 16, 20}` en lugar de 4 s. No se hace aquí
+porque cae fuera del encargo y porque la conclusión de diseño no cambia: por encima de 16 s el diseño
+ya está fuera de colchón por el propio `δ₀`.
+
+### El modelo que se debe usar — **recomendación**
+
+> **`δ = δ₀(Δ_diseño)`, con `Δ_diseño = 12 s` como valor central y `Δ = 16 s` como caso de esfuerzo.**
+
+El porqué, en orden:
+
+1. **`Δ = 4 s` es una hipótesis, no una medida.** `dag-poas-bitacora-2026-09-08.md` §5: «**`Δ`: sin
+   medir**», y §6.2 lo pone como *«la primera medición que el diseño necesita»*. Diseñar `F` con
+   `δ = 0` es diseñar con `Δ = 4 s` **exacto** y sin margen.
+2. **El margen que hace falta no es en `δ`, es en `Δ`.** «Algo intermedio» entre 0 y 0,2867 no
+   corresponde a ningún atacante: la interpolación no tiene significado físico. `δ₀(12 s) = 0,0828`
+   sí lo tiene — es un retardo efectivo tres veces peor que el supuesto.
+3. **Cuesta poco.** `F_carrera(33 %)`: 0,28 h a 4 s → **0,36 h a 12 s** → 0,98 h a 16 s. El margen
+   central cuesta **5 minutos**; el de esfuerzo, 42 minutos.
+4. **La `δ` de D8 sigue siendo útil, pero para otra cosa.** Como cota superior de «qué pasaría si el
+   teorema de la ráfaga fallara», que es exactamente el régimen `Δ` grande. Es notable —y es lo que
+   cierra el argumento— que **`δ` D8 (0,2867) y `δ₀(16 s)` (0,2858) coinciden a la tercera cifra**:
+   `F_carrera` 0,99 h frente a 0,98 h. **El modelo pesimista de D8 y el modelo de red a `Δ = 16 s`
+   dan la misma `F`.** Quien quiera el pesimista y quien quiera el margen de red hasta 16 s están
+   pidiendo, numéricamente, la misma cosa. Esto convierte la discusión de B.4 en una sola pregunta:
+   **¿hasta qué `Δ` se quiere aguantar?**
+
+Etiqueta: **DEMOSTRADO** que la `δ` de D8 no va en el denominador de la carrera (fuente literal +
+medida de dominancia de 9a) · **VERIFICADO** que `δ_real` queda anulada por R-FIN-13′ (9b, ×1,005) ·
+**PLAUSIBLE** que `δ₀(Δ)` sea *toda* la `δ` que hay a `Δ ≥ 16 s` (ahí la separación no está
+demostrada: LAGUNA declarada arriba).
+
+---
+
+## B.5 · Palanca `Δ` — **VERIFICADO** (y es, con diferencia, la que más pesa)
+
+**Script:** `r10b_b5_delta_red.py` → `salida_b5.txt` (149 s). `δ₀(Δ)` **medido**, de
+`r9a_a6_frontera_delta.py:36-38`; interpolación lineal entre los puntos medidos, igual que
+`A.delta_interp` hace con `δ(α)`.
+
+**Control positivo: la tabla de fronteras de 9a (`auditoria-8a.md` §4) reproducida 5/5** —
+46,8784 / 46,8268 / 44,6544 / 38,3337 / 32,3788 % a `Δ` = 4 / 8 / 12 / 16 / 20 s.
+
+### `F_carrera` por `Δ` (`I = 851 s`, ventaja `3k = 90`, objetivo `10⁻¹⁰` a 10 años)
+
+| `Δ` | `δ₀` medido | `r(0,33)` | `F_carrera` 33 % | 35 % | frontera a `F = 2 h` |
+|---:|---:|---:|---:|---:|---:|
+| **4 s** (diseño) | 0,0000 | 0,493 | 1 019 s = **0,28 h** | 0,35 h | 44,57 % |
+| 8 s | 0,0020 | 0,494 | 1 024 s = **0,28 h** | 0,35 h | 44,52 % |
+| **12 s** | 0,0828 | 0,537 | 1 314 s = **0,36 h** | 0,46 h | 42,30 % |
+| **16 s** | 0,2858 | 0,690 | 3 524 s = **0,98 h** | 1,55 h | 35,87 % |
+| 20 s | 0,4428 | 0,884 | 29 002 s = **8,06 h** | *sin cruce* | 29,86 % |
+| 24 s, 32 s | 0,5401 · 0,6526 | 1,071 · 1,418 | **COTA VACUA (`r ≥ 1`)** | — | — |
+
+*(**Error propio, declarado y corregido:** la primera ejecución imprimió 37,59 h para `Δ = 24 s` y
+2,93 h para `Δ = 32 s` — no monótono, y una frontera de 48,92 % a `Δ = 32 s`. Son el artefacto del
+recorte a `r^700` que D8 declaró y que aparece siempre que `r ≥ 1`: `prev()` cae a ~0 y la cota se
+vuelve vacua. El script ahora calcula `Δ` donde `r(0,33) = 1` — **22,7 s** — y marca esas filas en
+lugar de imprimir números.)*
+
+### El hallazgo: **`F` no puede comprar `Δ`**
+
+| `F` | `Δ_max` tolerable al 33 % | ganancia sobre `Δ = 4 s` |
+|---:|---:|---:|
+| 0,25 h | **ninguno** (ni con `Δ = 4 s`) | — |
+| 0,50 h | 13,6 s | +9,6 s |
+| 0,75 h | 15,2 s | +11,2 s |
+| **1,00 h** | **16,1 s** | +12,1 s |
+| 1,50 h | 17,3 s | +13,3 s |
+| **2,00 h** | **18,0 s** | +14,0 s |
+| 3,00 h | 18,8 s | +14,8 s |
+| 5,30 h | 19,6 s | +15,6 s |
+
+**Duplicar `F` de 1 h a 2 h compra 1,9 segundos de `Δ`. Quintuplicarla de 1 h a 5,3 h compra 3,5.**
+El techo es duro: por encima de `Δ ≈ 22,7 s` la base de la carrera `r` pasa de 1 y **ninguna `F`
+basta**, porque el atacante deja de perder la carrera en media. Alargar `F` es una palanca
+**logarítmica** contra `Δ`, y `Δ` entra en `r` de forma **lineal**.
+
+**Consecuencia de diseño, y es la más importante de toda la ronda:** discutir si `F` vale 1 h o 2 h
+es discutir 1,9 s de tolerancia a `Δ`, mientras que `Δ` **no está medido** y la diferencia entre 4 s
+y 16 s cambia `F_carrera` en un factor **3,5**. **La ronda correcta no es afinar `F`: es medir `Δ`.**
+
+**Criterio `α`** (`salida_b5.txt`, última tabla): `F_carrera` a `Δ = 4/8/12/16/20 s` para
+`α = 0,10` → 267/268/298/413/586 s; `α = 0,25` → 551/554/655/1 163/2 506 s;
+`α = 0,33` → 1 019/1 024/1 314/3 524/29 002 s. Se mueve con las dos variables y explota hacia `r = 1`.

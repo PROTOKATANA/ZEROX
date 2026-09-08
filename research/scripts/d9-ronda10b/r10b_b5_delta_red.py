@@ -44,9 +44,23 @@ def d0_interp(D):
             return D0[xs[i]] + w * (D0[xs[i + 1]] - D0[xs[i]])
 
 
-def delta_max(F, alpha=0.33, obj=1e-10, I=None, lo=4.0, hi=32.0):
-    """Delta maximo tolerable: el mayor Delta con union(10 anos) < obj a `alpha`."""
+def delta_r1(alpha=0.33):
+    """El Delta donde r = alpha/((1-alpha)(1-delta_0)) llega a 1. Por encima, `prev()` es una
+    COTA VACUA (el recorte a r^700 que D8 declaro) y todo numero que salga de ella es artefacto."""
+    from scipy.optimize import brentq as _b
+    g = lambda D: L.r_base(alpha, 1 - d0_interp(D)) - 1.0
+    if g(32.0) < 0:
+        return 32.0
+    return _b(g, 4.0, 32.0, xtol=0.01)
+
+
+def delta_max(F, alpha=0.33, obj=1e-10, I=None, lo=4.0, hi=None):
+    """Delta maximo tolerable: el mayor Delta con union(10 anos) < obj a `alpha`.
+    ERROR PROPIO CORREGIDO: la primera version buscaba hasta Delta = 32 s y devolvia 32,0 para
+    F >= 3 h, porque por encima de `delta_r1` la cota es vacua y `prev()` cae a ~0. El techo de
+    la busqueda es ahora `delta_r1(alpha)`."""
     I = I or L.I_DIS
+    hi = hi if hi is not None else delta_r1(alpha) - 0.05
     def g(D):
         L.set_F_I(F, I)
         u = L.union_lam(alpha, 1 - d0_interp(D))
@@ -77,9 +91,16 @@ if __name__ == "__main__":
           f"obj 1e-10) ---")
     print(f"{'Delta (s)':>10} {'delta_0':>9} {'r(0,33)':>8} | {'F_carrera 33 %':>16} {'(h)':>7} "
           f"| {'35 %':>12} {'(h)':>7} | {'frontera a F=2 h':>17}")
+    Dr1 = delta_r1(0.33)
+    print(f"    (r(0,33) = 1 en Delta = {Dr1:.1f} s; por encima la cota es VACUA y las filas "
+          f"NO son resultados)")
     for D in sorted(D0):
         d = D0[D]
         L.set_ventaja(90)
+        if L.r_base(0.33, 1 - d) >= 1.0:
+            print(f"{D:>10.0f} {d:>9.4f} {L.r_base(0.33,1-d):>8.3f} | "
+                  f"{'COTA VACUA (r >= 1): ninguna F basta; el numero que saldria es artefacto':>60}")
+            continue
         f33 = L.f_carrera(0.33, 1 - d)
         f35 = L.f_carrera(0.35, 1 - d)
         L.set_F_I(7200, L.I_DIS)
@@ -100,11 +121,16 @@ if __name__ == "__main__":
 
     print("\n--- criterio alpha: F_carrera(alpha) para cada Delta ---")
     print(f"{'alpha':>6} | " + " ".join(f"{'D=%d' % D:>11}" for D in (4, 8, 12, 16, 20)))
+    print("    (`r>=1` marca las celdas donde la cota es vacua: no son resultados)")
     for a in (0.0, 0.10, 0.25, 0.33, 0.35, 0.40):
         fila = []
         for D in (4, 8, 12, 16, 20):
             L.set_ventaja(90)
-            f = L.f_carrera(a, 1 - D0[float(D)])
+            d = D0[float(D)]
+            if a > 0 and L.r_base(a, 1 - d) >= 1.0:
+                fila.append(f"{'r>=1':>11}")
+                continue
+            f = L.f_carrera(a, 1 - d)
             fila.append(f"{f:>11.0f}" if np.isfinite(f) else f"{'sin cruce':>11}")
         print(f"{a:>6.2f} | " + " ".join(fila))
     print(f"\n[{time.time()-t0:.0f} s]")
