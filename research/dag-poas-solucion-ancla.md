@@ -3,8 +3,7 @@
 **Fecha:** 2026-09-08 · **Encargo de Katana:** «encuentra una solución» al hallazgo A3 de D9-b
 (`dag-poas-ancla-de-orden-auditoria-2.md`): el orden total cuenta los rojos, R-FIN-1 lee de ese
 orden, y un billete ya gastado compra posiciones de índice sin límite.
-**Scripts:** `.../scratchpad/d9-ronda8b/sol_*.py`, reutilizan el simulador GD de D9-b con desempate
-por `solution_distance` (`r8b_gd_sd.py`).
+**Scripts:** los `sol_*.py` originales estaban en `/tmp` y **se perdieron en el reinicio del 2026-09-08 ~03:30**; los números de abajo quedan registrados aquí y D9-c reconstruye el simulador fiel a Kaspa en `research/scripts/d9-ronda8c/` (rutas duraderas, commiteadas).
 
 > **La solución es revertir el ancla a la de la ronda 7 —posición en la cadena seleccionada— y
 > conservar todo lo demás de la ronda 8. El cambio de ancla que introduje en la ronda 8 fue un
