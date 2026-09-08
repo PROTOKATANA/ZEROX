@@ -1,0 +1,40 @@
+====================================================================================================
+A2 · delta_ancla = slot(I_j) - T_j  MEDIDO (12 semillas literales, simulador de 9c)
+     semillas = [11, 23, 37, 41, 59, 67, 73, 89, 97, 101, 113, 127]
+     horizonte 1200 s, T_j en [200.0, 400.0, 600.0, 800.0, 1000.0]
+====================================================================================================
+ S_max  alpha |    n   media    p90   max |  con retencion: media    p90   max
+   150   0.00 |   60    2.00      4     6 |                  2.00      4     6
+   150   0.10 |   60    1.58      4     6 |                  2.33      5     6
+   150   0.25 |   60    1.22      4     7 |                  2.77      5     8
+   150   0.33 |   60    1.23      4     7 |                  2.90      6     8
+   150   0.40 |   60    1.05      4     7 |                  3.25      7    10
+    20   0.00 |   60    2.00      4     6 |                  2.00      4     6
+    20   0.10 |   60    1.58      4     6 |                  2.33      5     6
+    20   0.25 |   60    1.22      4     7 |                  2.77      5     8
+    20   0.33 |   60    1.23      4     7 |                  2.90      6     8
+    20   0.40 |   60    1.05      4     7 |                  3.25      7    10
+
+Cobertura de rama (COB, acumulada):
+                bloques_a = 30828
+                bloques_h = 225575
+     clausura_publicacion = 44388
+                liberados = 0
+                retenidos = 30828
+                rfin1a_ok = 0
+                 sin_sp_a = 0
+                 sin_sp_h = 9
+            sp_filtrado_a = 0
+            sp_filtrado_h = 3
+                 tips_pub = 0
+   Ramas con 0: se declaran en el informe (no ejercitadas).
+
+====================================================================================================
+A2b · propagacion a la cota de A1: cuanto mueve delta_ancla el lookahead del sembrador
+====================================================================================================
+   delta_ancla maximo medido (peor alpha, peor S_max, con retencion) = 10 s
+       F     I   rho |  look (delta=0)  look (delta=max)   dif rel
+    3600   851   1.5 |          3862.7            3872.7    0.26%
+    3600   851     3 |          4146.3            4156.3    0.24%
+    7200   851   1.5 |          7462.7            7472.7    0.13%
+    7200   851     3 |          7746.3            7756.3    0.13%

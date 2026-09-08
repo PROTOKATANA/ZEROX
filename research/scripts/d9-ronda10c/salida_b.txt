@@ -1,0 +1,130 @@
+================================================================================================================
+B1 · LA IDENTIDAD PUBLICADA, reproducida (control): W/kappa = 1 + I/F  con W = (F + I)*lambda
+================================================================================================================
+         F   I (s) |  W (bloques)    kappa   W/kappa |  F para W/kappa<=1,22
+    0,34 h    2490 |         3714     1224    3.0343 |               11318 s
+    0,34 h    4200 |         5424     1224    4.4314 |               19091 s
+    0,34 h     851 |         2075     1224    1.6953 |                3868 s
+       1 h    2490 |         6090     3600    1.6917 |               11318 s
+       1 h    4200 |         7800     3600    2.1667 |               19091 s
+       1 h     851 |         4451     3600    1.2364 |                3868 s
+       2 h    2490 |         9690     7200    1.3458 |               11318 s
+       2 h    4200 |        11400     7200    1.5833 |               19091 s
+       2 h     851 |         8051     7200    1.1182 |                3868 s
+     5,3 h    2490 |        21570    19080    1.1305 |               11318 s
+     5,3 h    4200 |        23280    19080    1.2201 |               19091 s
+     5,3 h     851 |        19931    19080    1.0446 |                3868 s
+
+   Control contra lo publicado: F = 3,2 h (11 520 s) e I = 2 490 s dan W/kappa = 1.2161  (ancla-de-orden.md §1.3 publica 1,22)
+   Y F = 3 600 s, I = 2 490 s dan 1.6917 (publica 1,69); F = 1 000 s: 3.4900 (publica 3,49)
+
+   OBSERVACION 1 (aritmetica, DEMOSTRADA): W/kappa = 1 + I/F > 1 para toda I > 0. La
+   condicion de BDK (W <= kappa) es INSATISFACIBLE bajo esta lectura de W, para cualquier F.
+   El 1,22 no es un umbral del paper: es el VALOR que salio a F = 3,2 h, adoptado despues
+   como tope. BDK marca 1,0.
+
+================================================================================================================
+B2 · W RECALCULADA con R-FIN-14: W = lookahead_max * lambda (el de A1, medido)
+================================================================================================================
+   Quien fija W no es la epoca: es quien tenga el reloj de PoT mas rapido Y comparta su
+   cadena con los sobornados. Con rho <= 1 en toda la red, W = 1 + lambda*D bloques.
+
+                    config    rho     I        F |  lookahead (s)        W   kappa   W/kappa   >1?
+                    NUCLEO      1   851   0,34 h |            5.0      5.0    1224    0.0041    no
+                    NUCLEO      1   851      1 h |            5.0      5.0    3600    0.0014    no
+                    NUCLEO      1   851      2 h |            5.0      5.0    7200    0.0007    no
+                    NUCLEO      1   851    5,3 h |            5.0      5.0   19080    0.0003    no
+                    NUCLEO  1.024   851   0,34 h |         1223.0   1223.0    1224    0.9992    no
+                    NUCLEO  1.024   851      1 h |         3599.0   3599.0    3600    0.9997    no
+                    NUCLEO  1.024   851      2 h |         7199.0   7199.0    7200    0.9999    no
+                    NUCLEO  1.024   851    5,3 h |        19079.0  19079.0   19080    0.9999    no
+                    NUCLEO   1.05   851   0,34 h |         1243.5   1243.5    1224    1.0160    SI
+                    NUCLEO   1.05   851      1 h |         3619.5   3619.5    3600    1.0054    SI
+                    NUCLEO   1.05   851      2 h |         7219.5   7219.5    7200    1.0027    SI
+                    NUCLEO   1.05   851    5,3 h |        19099.5  19099.5   19080    1.0010    SI
+                    NUCLEO    1.5   851   0,34 h |         1486.7   1486.7    1224    1.2146    SI
+                    NUCLEO    1.5   851      1 h |         3862.7   3862.7    3600    1.0730    SI
+                    NUCLEO    1.5   851      2 h |         7462.7   7462.7    7200    1.0365    SI
+                    NUCLEO    1.5   851    5,3 h |        19342.7  19342.7   19080    1.0138    SI
+                    NUCLEO      3   851   0,34 h |         1770.3   1770.3    1224    1.4464    SI
+                    NUCLEO      3   851      1 h |         4146.3   4146.3    3600    1.1518    SI
+                    NUCLEO      3   851      2 h |         7746.3   7746.3    7200    1.0759    SI
+                    NUCLEO      3   851    5,3 h |        19626.3  19626.3   19080    1.0286    SI
+                    NUCLEO     10   851   0,34 h |         1968.9   1968.9    1224    1.6086    SI
+                    NUCLEO     10   851      1 h |         4344.9   4344.9    3600    1.2069    SI
+                    NUCLEO     10   851      2 h |         7944.9   7944.9    7200    1.1035    SI
+                    NUCLEO     10   851    5,3 h |        19824.9  19824.9   19080    1.0390    SI
+             (h) retardada      1   851   0,34 h |            5.0      5.0    1224    0.0041    no
+             (h) retardada      1   851      1 h |            5.0      5.0    3600    0.0014    no
+             (h) retardada      1   851      2 h |            5.0      5.0    7200    0.0007    no
+             (h) retardada      1   851    5,3 h |            5.0      5.0   19080    0.0003    no
+             (h) retardada  1.024   851   0,34 h |           20.0     20.0    1224    0.0163    no
+             (h) retardada  1.024   851      1 h |           20.0     20.0    3600    0.0056    no
+             (h) retardada  1.024   851      2 h |           20.0     20.0    7200    0.0028    no
+             (h) retardada  1.024   851    5,3 h |           20.0     20.0   19080    0.0010    no
+             (h) retardada   1.05   851   0,34 h |           40.5     40.5    1224    0.0331    no
+             (h) retardada   1.05   851      1 h |           40.5     40.5    3600    0.0112    no
+             (h) retardada   1.05   851      2 h |           40.5     40.5    7200    0.0056    no
+             (h) retardada   1.05   851    5,3 h |           40.5     40.5   19080    0.0021    no
+             (h) retardada    1.5   851   0,34 h |          283.3    283.3    1224    0.2315    no
+             (h) retardada    1.5   851      1 h |          283.3    283.3    3600    0.0787    no
+             (h) retardada    1.5   851      2 h |          283.3    283.3    7200    0.0394    no
+             (h) retardada    1.5   851    5,3 h |          283.3    283.3   19080    0.0148    no
+             (h) retardada      3   851   0,34 h |          566.7    566.7    1224    0.4630    no
+             (h) retardada      3   851      1 h |          566.7    566.7    3600    0.1574    no
+             (h) retardada      3   851      2 h |          566.7    566.7    7200    0.0787    no
+             (h) retardada      3   851    5,3 h |          566.7    566.7   19080    0.0297    no
+             (h) retardada     10   851   0,34 h |          765.0    765.0    1224    0.6250    no
+             (h) retardada     10   851      1 h |          765.0    765.0    3600    0.2125    no
+             (h) retardada     10   851      2 h |          765.0    765.0    7200    0.1062    no
+             (h) retardada     10   851    5,3 h |          765.0    765.0   19080    0.0401    no
+
+================================================================================================================
+B3 · LA PINZA CORREGIDA: F minima que impone la ventana de prediccion
+================================================================================================================
+   NUCLEO:  W/kappa = 1 + (I(1-1/rho) - W_dec)/F   =>  F >= (I(1-1/rho) - W_dec)/(tope - 1)
+            y si I(1-1/rho) <= W_dec la pinza NO EXISTE (W <= kappa para toda F).
+   (h):     W/kappa = I(1-1/rho)/F                 =>  F >= I(1-1/rho)/tope
+
+ tope W/kappa     I    rho |  F pinza NUCLEO (s)     (h) |  F pinza (h) opcion (h)     (h) |  publicada I/(WK-1)
+         1.00   491      1 |           no existe       - |                       0    0.00 |               inf s
+         1.00   491  1.024 |           no existe       - |                      12    0.00 |               inf s
+         1.00   491    1.5 |                 inf       - |                     164    0.05 |               inf s
+         1.00   491      3 |                 inf       - |                     327    0.09 |               inf s
+         1.00   491     10 |                 inf       - |                     442    0.12 |               inf s
+         1.00   602      1 |           no existe       - |                       0    0.00 |               inf s
+         1.00   602  1.024 |           no existe       - |                      14    0.00 |               inf s
+         1.00   602    1.5 |                 inf       - |                     201    0.06 |               inf s
+         1.00   602      3 |                 inf       - |                     401    0.11 |               inf s
+         1.00   602     10 |                 inf       - |                     542    0.15 |               inf s
+         1.00   851      1 |           no existe       - |                       0    0.00 |               inf s
+         1.00   851  1.024 |                 inf       - |                      20    0.01 |               inf s
+         1.00   851    1.5 |                 inf       - |                     284    0.08 |               inf s
+         1.00   851      3 |                 inf       - |                     567    0.16 |               inf s
+         1.00   851     10 |                 inf       - |                     766    0.21 |               inf s
+         1.22   491      1 |           no existe       - |                       0    0.00 |              2232 s
+         1.22   491  1.024 |           no existe       - |                       9    0.00 |              2232 s
+         1.22   491    1.5 |                 653    0.18 |                     134    0.04 |              2232 s
+         1.22   491      3 |                1397    0.39 |                     268    0.07 |              2232 s
+         1.22   491     10 |                1918    0.53 |                     362    0.10 |              2232 s
+         1.22   602      1 |           no existe       - |                       0    0.00 |              2736 s
+         1.22   602  1.024 |           no existe       - |                      12    0.00 |              2736 s
+         1.22   602    1.5 |                 821    0.23 |                     164    0.05 |              2736 s
+         1.22   602      3 |                1733    0.48 |                     329    0.09 |              2736 s
+         1.22   602     10 |                2372    0.66 |                     444    0.12 |              2736 s
+         1.22   851      1 |           no existe       - |                       0    0.00 |              3868 s
+         1.22   851  1.024 |                   0    0.00 |                      16    0.00 |              3868 s
+         1.22   851    1.5 |                1198    0.33 |                     233    0.06 |              3868 s
+         1.22   851      3 |                2488    0.69 |                     465    0.13 |              3868 s
+         1.22   851     10 |                3390    0.94 |                     628    0.17 |              3868 s
+
+================================================================================================================
+B4 · SENSIBILIDAD: y si W se contara en bloques del DAG y kappa en bloques de cadena
+================================================================================================================
+   En una cadena lineal (BDK) no hay diferencia. En el DAG, si se tomara W en bloques del
+   DAG (lambda = 1/s) y kappa en bloques de la cadena seleccionada (lambda_chain = 0,200/s,
+   ronda 1 `chain_growth.py`), la razon se multiplicaria por 5. Se declara como residuo.
+   rho=1.5 F=3600s: W/kappa mismo lambda = 1.0730 · lambda vs lambda_chain = 5.3648
+   rho=1.5 F=7200s: W/kappa mismo lambda = 1.0365 · lambda vs lambda_chain = 5.1824
+   rho=3.0 F=3600s: W/kappa mismo lambda = 1.1518 · lambda vs lambda_chain = 5.7588
+   rho=3.0 F=7200s: W/kappa mismo lambda = 1.0759 · lambda vs lambda_chain = 5.3794

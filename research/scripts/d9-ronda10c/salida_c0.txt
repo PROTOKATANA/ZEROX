@@ -1,0 +1,30 @@
+=== r10c C0 · controles positivos ===
+
+P1 · verif_constantes.py §3 — reversion a 600 s, alpha = 0,25, ventaja 3k
+   k=  18 delta=0.308  reversion=2.446e-07   publicado=2.45e-07  OK
+   k=  24 delta=0.250  reversion=6.590e-08   publicado=6.59e-08  OK
+   k=  25 delta=0.242  reversion=6.516e-08   publicado=None
+   k=  30 delta=0.211  reversion=1.115e-07   publicado=1.11e-07  OK
+   k= 793 delta=0.010  reversion=1.000e+00   publicado=1.0  OK
+
+P2 · d8_a1c_riesgo.py — alpha = 0,33, delta medido D8 = 0,2867, F = 19 080 s, I = 4 200 s
+   delta_interp(0,33) = 0.2867  (D8 MED: 0,2867)
+   reversion 600 s = 5.538e-01   union 10 anos = 2.059e-103
+
+P3 · frontera de flujo unico (9a A3), F = 19 080 s, I = 4 200 s
+   delta = 0  : 46.8784%   (9a publica 46,8784 %)  OK
+   delta D8   : 36.5431%   (9a publica 36,5431 %)  OK
+
+N1 · CONTROL NEGATIVO alpha = 0
+   prev(0, ...) = 0.000e+00   (debe ser 0)
+
+P4 · criterio de variacion sobre el instrumento nuevo (lookahead, punto A)
+     rho  F=1h nucleo  F=2h nucleo  F=2h con (h)  (s)
+     0.5            0            0             0
+       1            0            0             0
+       1         4406         8006           851
+     1.5         4406         8006           851
+       3         4406         8006           851
+   -> cambia con rho (0 <-> saturado) y con F (nucleo) y NO cambia con F bajo (h): correcto.
+
+[265 s]
