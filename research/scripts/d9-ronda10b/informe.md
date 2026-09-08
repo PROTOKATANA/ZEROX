@@ -24,9 +24,13 @@ Dos globales del módulo de 9a se manipulan y hay que decirlo claro:
   porque `A.union10` cablea `λ = 1` y el modelo `δ_real(k)` de `dag-poas-delta-real.md` §1 infla la
   tasa a `λ_real = k/(k−2Δ)`.
 
-**Nada estocástico en esta ronda.** Todo es evaluación numérica determinista de una fórmula cerrada
-(Skellam + ruina del jugador). La regla de las ≥ 12 semillas no aplica y `AUDITA_SCRIPTS.py` marcará
-`T4` por ello; se declara aquí y se lee al final. El criterio `α` sí aplica y está en cada tabla.
+**Casi nada estocástico en esta ronda.** Diez de los once scripts son evaluación numérica
+determinista de fórmulas cerradas (Skellam + ruina del jugador; y la beta incompleta de Grunspan en
+B.3): la regla de las ≥ 12 semillas no les aplica. El undécimo, `r10b_b2b_delta_k.py` (cierre de la
+LAGUNA de B.2 (iii)), **sí lo es**: 12 semillas, 1 920 corridas, intervalos de confianza al 95 %.
+`AUDITA_SCRIPTS.py` da **0 sospechas** sobre los once. El criterio `α` aplica a todos y está en cada
+tabla. *(Esta cabecera decía en el primer intento que la ronda no tenía nada estocástico y que
+`AUDITA` marcaría `T4`; ver «Errores propios» 2.)*
 
 ---
 
@@ -664,6 +668,9 @@ Sospechas totales: 0
    `Δ ≥ 14 s`; con el modelo que yo mismo recomiendo en B.4 el suelo lo pone el término de *steering*
    `I/(W/κ−1)`, y eso cambia la lectura de tres de las cinco palancas (dejan de comprar nada). Lo vi
    al construir la tabla de C, no antes.
+6. **Un `.pyc` commiteado.** El commit de C se llevó `__pycache__/r10b_b5_delta_red.cpython-313.pyc`
+   (y el índice arrastraba además el `r10b_lib.cpython-313.pyc` del primer intento). Es exactamente
+   el fallo que 9a tuvo que corregir en su ronda. **Sacados del índice** en el commit siguiente.
 
 ## Lagunas que quedan, con lo que haría falta para cerrarlas
 
