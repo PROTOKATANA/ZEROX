@@ -1,0 +1,33 @@
+============================================================================================
+C1 · c_m contra los valores publicados (dag-poas-voto-auditoria.md L199)
+   c_2 = 0.5642   publicado = 0.564   OK
+   c_4 = 1.0294   publicado = 1.029   OK
+
+============================================================================================
+C2/C3 · el instrumento ve (o no ve) el cambio de ancla.  TJ = 200 s, horizonte 600 s
+ alpha  S_max |  C2 menu(alpha=0) |  C3 mundos con ancla cambiada | anclas distintas (max)
+  0.00    150 |         menu=1 OK |        0/12 mundos           |                      1
+  0.10    150 |                 - |        6/12 mundos           |                      3
+  0.25    150 |                 - |       12/12 mundos           |                      3
+  0.33    150 |                 - |       12/12 mundos           |                      4
+  0.40    150 |                 - |       12/12 mundos           |                      3
+  0.00     20 |         menu=1 OK |        0/12 mundos           |                      1
+  0.10     20 |                 - |        6/12 mundos           |                      3
+  0.25     20 |                 - |       12/12 mundos           |                      3
+  0.33     20 |                 - |       12/12 mundos           |                      4
+  0.40     20 |                 - |       12/12 mundos           |                      3
+
+C4 · violaciones de R-FIN-1a en TODAS las corridas: 0 (debe ser 0)
+C4 · cobertura de rama:
+         sp_filtrado_h = 124
+              sin_sp_h = 12
+         sp_filtrado_a = 2
+              sin_sp_a = 0
+             bloques_h = 1201200
+             bloques_a = 385886
+             retenidos = 17438
+             liberados = 15518
+             rfin1a_ok = 751053
+
+C5 · equivalencia 'menor blue_work' vs 'primero de la cadena' con slot >= T
+      comprobaciones = 540   discrepancias = 0

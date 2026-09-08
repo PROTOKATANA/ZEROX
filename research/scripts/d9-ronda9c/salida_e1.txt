@@ -1,0 +1,39 @@
+====================================================================================================
+E1 · la carrera de VDF: ventaja maxima, bootstrap y n_eval
+   L = 19080 s  ·  I = 4200 s  ·  tau = 1 s/slot
+  W_dec  ventaja tope (slots) |      bootstrap rho=1.0      bootstrap rho=1.01      bootstrap rho=1.05      bootstrap rho=1.15       bootstrap rho=1.5       bootstrap rho=3.0
+      0                 23280 |    INFINITO (n_eval=0)             646.7 h                 129.3 h                  43.1 h                  12.9 h                   3.2 h    
+     45                 23235 |    INFINITO (n_eval=0)             645.4 h                 129.1 h                  43.0 h                  12.9 h                   3.2 h    
+    150                 23130 |    INFINITO (n_eval=0)             642.5 h                 128.5 h                  42.8 h                  12.8 h                   3.2 h    
+    225                 23055 |    INFINITO (n_eval=0)             640.4 h                 128.1 h                  42.7 h                  12.8 h                   3.2 h    
+    300                 22980 |    INFINITO (n_eval=0)             638.3 h                 127.7 h                  42.6 h                  12.8 h                   3.2 h    
+
+   n_eval por candidato, una vez alcanzado el tope (m unidades AES en paralelo):
+  W_dec |    rho=1.0    rho=1.01    rho=1.05    rho=1.15     rho=1.5     rho=3.0
+      0 |          0           0           0           0           0           0
+     45 |          0          45          47          52          68         135
+    150 |          0         152         158         172         225         450
+    225 |          0         227         236         259         338         675
+    300 |          0         303         315         345         450         900
+
+====================================================================================================
+E3 · rho para evaluar la EPOCA ENTERA dentro de W_dec (rho >= I/W_dec)
+   I =   461 s  W= 45s: rho>=  10.2  W=150s: rho>=   3.1  W=225s: rho>=   2.0  W=300s: rho>=   1.5
+   I =   856 s  W= 45s: rho>=  19.0  W=150s: rho>=   5.7  W=225s: rho>=   3.8  W=300s: rho>=   2.9
+   I =  1293 s  W= 45s: rho>=  28.7  W=150s: rho>=   8.6  W=225s: rho>=   5.7  W=300s: rho>=   4.3
+   I =  2500 s  W= 45s: rho>=  55.6  W=150s: rho>=  16.7  W=225s: rho>=  11.1  W=300s: rho>=   8.3
+   I =  4200 s  W= 45s: rho>=  93.3  W=150s: rho>=  28.0  W=225s: rho>=  18.7  W=300s: rho>=  14.0
+   I =  4890 s  W= 45s: rho>= 108.7  W=150s: rho>=  32.6  W=225s: rho>=  21.7  W=300s: rho>=  16.3
+   Cota fisica de rho: la cadena de PoT es AES-128 SECUENCIAL; rho = reloj_atacante /
+   reloj_referencia. Autonomys calibra `pot_slot_iterations` para ~1 s en el 14900KS a
+   6,2 GHz (subspace-node/src/chain_spec.rs:128-130), que es el TOPE del mercado:
+   rho realista ~1,0-1,2. rho >= 6 exigiria un reloj 6x el mejor del mercado.
+
+====================================================================================================
+E5 · coste del atacante que mantiene la ventaja (m unidades + 1 comun), MEDIDO
+   prove = 1.561 s/slot en el Ryzen 9 9950X3D (no llega a tau=1 s: rho_esa_maquina = 0.641 < 1)
+   verify = 96.1 ms/slot  ·  asimetria prove/verify = 16.2x
+   iteraciones/slot mainnet = 206,557,520
+   m =   2.955  ->     4 nucleos dedicados solo a la evaluacion
+   m =  23.000  ->    24 nucleos dedicados solo a la evaluacion
+   m = 151.000  ->   152 nucleos dedicados solo a la evaluacion
