@@ -607,6 +607,24 @@ es la tabla de arriba.
 
 ---
 
+## Revisión del trabajo heredado del primer intento
+
+Los puntos **A, B.1 y B.2** los escribió un intento anterior de esta misma ronda, interrumpido y
+commiteado. Antes de continuar se revisaron y **se re-ejecutaron los cuatro scripts heredados**:
+
+| Script | Salida | Resultado |
+|---|---|---|
+| `r10b_a_control.py` | `salida_a.txt` | **IDÉNTICA** línea a línea (salvo el tiempo) |
+| `r10b_b1_ventaja.py` | `salida_b1.txt` | **IDÉNTICA** |
+| `r10b_b1_extremos.py` | `salida_b1_extremos.txt` | **IDÉNTICA** |
+| `r10b_b2_k.py` | `salida_b2.txt` | **IDÉNTICA** |
+
+**Lo que sí estaba recortado, y se ha completado:** la tabla (iii) de B.2 cerraba con una LAGUNA
+declarada «por presupuesto» (ver «Errores propios» 1). Es la única. Ni A, ni B.1, ni las tablas (i) y
+(ii) de B.2 recortaron filas, `α` ni modelos: A barre siete `α`, B.1 las cuatro ventajas del encargo
+más dos de referencia y seis `α`, B.2 los cuatro `k` en los tres modelos. Cada número tiene su script
+y su salida en el directorio.
+
 ## AUDITA_SCRIPTS
 
 ```
