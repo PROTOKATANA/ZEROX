@@ -144,14 +144,14 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 `c` no es un parámetro libre: es `I` en unidades del ancla. A `q = 1`:
 
-- índices de orden: `c = I·λ = 2 490`
-- (posiciones de cadena, para comparar con la ronda 7: `c = I·λ_chain = 500`)
+- **azules** (ancla `blue_score`, R-FIN-1 vigente): `c = I·λ_azul ≈ 2 490 × 0,758 ≈ 1 890` — **provisional**, `I` no derivada
+- (anclas refutadas, solo para comparar: índices de orden `I·λ = 2 490`; posiciones de cadena `I·λ_chain = 500`)
 
 ---
 
 ## 2 · El algoritmo
 
-Constantes: `k = 30` (era 25; `dag-poas-delta-real.md`), `I = 2 490 s` (`c = 2 490` índices a `q=1`), `F = L = 3,2 h`, `q = 1` **decidido**
+Constantes: `k = 30` (era 25; `dag-poas-delta-real.md`), `I = 2 490 s` (`c ≈ 1 890` **azules**, provisional), `F = L = 3,2 h`, `q = 1` **decidido**
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
 desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
