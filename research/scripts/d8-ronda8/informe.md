@@ -463,3 +463,61 @@ Con `λΔ = 4` el número de puntas **nunca** alcanza `max_block_parents = 15`, 
 **Etiqueta: SIN VECTOR con esta familia + LAGUNA** (el régimen donde el `shuffle` sí importa
 —>15 puntas simultáneas— no está cubierto por ninguna medida de esta ronda ni de las de D9).
 
+
+### A1.4 · Autocrítica: ¿es LEGAL la maniobra parásita bajo R-FIN-1a? — **sí**
+
+**Script:** `d8_a1d_rfin1a.py` → `salida_a1d.txt`.
+
+El simulador heredado (`r8c_gd.DAG.add`) valida `max_block_parents`, `mergeset_size_limit`,
+U2 y U3″, **pero no R-FIN-1a**. Es un hueco del instrumento que juega **a mi favor**, así que
+había que cerrarlo antes de firmar A1. Medida de `slot(B) − slot(sp(B))` de los bloques del
+**atacante** bajo la maniobra parásita, y `δ` recalculado rechazando los ilegales:
+
+| `α` | frac. > 4 s (control) | **> 20 s** | > 30 s | > 150 s | gap máx | gap medio | `n_a` |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | *(n_a = 0: la fila no dice nada)* | | | | | | **0** |
+| 0,10 | 0,4845 | 0,00000 | 0 | 0 | 15 | 4,36 | 2 190 |
+| 0,25 | 0,3118 | 0,00074 | 0 | 0 | 26 | 3,47 | 5 408 |
+| 0,33 | 0,2269 | 0,00014 | 0 | 0 | 24 | 2,87 | 7 144 |
+| 0,40 | 0,1661 | 0,00012 | 0 | 0 | 24 | 2,46 | 8 614 |
+
+`δ` con R-FIN-1a aplicada (`S_max = 20 s`, el más restrictivo): 0,1091 vs 0,1084 (`α=0,25`);
+0,2871 vs 0,2867 (`α=0,33`); 0,3283 vs 0,3217 (`α=0,37`) — **idéntico dentro del ruido, y en
+algún caso mayor**. Ilegales: 1-15 bloques de 5 000-8 000. Control `S=4 s`: 17-48 % de
+violaciones, luego el instrumento **sí detecta** ilegalidad cuando la hay.
+
+**La maniobra parásita es legal bajo R-FIN-1a, R-FIN-11 y R-FIN-12.** No hay regla del
+diseño que la impida.
+
+### A1.5 · Lo que le CUESTA al atacante — **nada; a partir de `α = 0,33` le paga**
+
+**Script:** `d8_a1e_coste.py` → `salida_a1e.txt`. `ing_x` = fracción de los bloques de `x`
+que acaban **azules** en la vista honesta final (= su ingreso relativo).
+
+| `α` | `J` | `ing_h` (=1−δ) | `ing_a` | **ratio a/h** | `n_h` | `n_a` | perdidos | % perdidos |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | 16 | 1,0000 | *(n_a=0)* | — | 19 978 | 0 | 0 | — |
+| 0,10 | 16 | 0,9777 | 0,3108 | 0,318 | 17 924 | 2 054 | 50 | 2,43 % |
+| 0,25 | 16 | 0,8456 | 0,8414 | **0,995** | 14 921 | 5 057 | 5 | 0,10 % |
+| 0,30 | 31 | 0,7921 | 0,6961 | 0,879 | 13 907 | 6 071 | 14 | 0,23 % |
+| **0,33** | 31 | 0,7133 | 0,8264 | **1,159** | 13 297 | 6 681 | 25 | 0,37 % |
+| **0,35** | 31 | 0,6935 | 0,8804 | **1,270** | 12 882 | 7 096 | 21 | 0,30 % |
+| **0,37** | 48 | 0,6552 | 0,7572 | **1,156** | 12 499 | 7 479 | 58 | 0,78 % |
+| **0,40** | 48 | 0,5634 | 0,8727 | **1,549** | 11 937 | 8 041 | 95 | 1,18 % |
+
+**Dos consecuencias que cambian la naturaleza del hallazgo:**
+
+1. **A `α = 0,25` la maniobra es GRATIS** (ratio 0,995: el atacante no pierde ingreso) y aun
+   así impone `δ = 0,11-0,15`. Es *griefing* sin coste de oportunidad.
+2. **A partir de `α = 0,33` es ESTRICTAMENTE RENTABLE** (ratio 1,16 a 1,55): la maniobra
+   **aumenta la cuota de ingreso** del atacante. No es un ataque que alguien deba querer
+   pagar: es lo que un granjero racional del 33 % **haría por dinero**. Los bloques del
+   atacante no se tiran —forman la cadena ganadora y cobran su coinbase—; sólo pierde el
+   0,1-1,2 % por retenciones fallidas.
+
+**Y aquí engrana con A5:** si la maniobra se autofinancia, el `α` necesario **se puede
+alquilar**. Los ganadores se conocen `L = 5,3 h` antes, así que un coordinador puede reunir
+el 33 % apuntando granjeros a su cadena privada, y **pagarles con su propia coinbase**, que
+cobran igual. El umbral de 35-37 % deja de ser una barrera de capital y pasa a ser un
+problema de coordinación de una tarde.
+

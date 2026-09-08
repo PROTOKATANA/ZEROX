@@ -1,0 +1,17 @@
+=== A1e · coste real de la maniobra parasita para el atacante ===
+k=30, mp=15, lambda=1, Delta=4.0, horizonte 1800 s, ventana [60, 1740] s, 12 semillas, modo parasito.
+
+ alpha    J |  ing_h (=1-delta)    ing_a  ratio a/h |    n_h    n_a  perdidos  % perdidos
+  0.00   16 |            1.0000 (n_a = 0)          - |  19978      0         0           -
+  0.10   16 |            0.9777   0.3108      0.318 |  17924   2054        50        2.43
+  0.25   16 |            0.8456   0.8414      0.995 |  14921   5057         5        0.10
+  0.30   31 |            0.7921   0.6961      0.879 |  13907   6071        14        0.23
+  0.33   31 |            0.7133   0.8264      1.159 |  13297   6681        25        0.37
+  0.35   31 |            0.6935   0.8804      1.270 |  12882   7096        21        0.30
+  0.37   48 |            0.6552   0.7572      1.156 |  12499   7479        58        0.78
+  0.40   48 |            0.5634   0.8727      1.549 |  11937   8041        95        1.18
+
+`ratio > 1` = la maniobra AUMENTA la cuota de ingreso del atacante: no hay coste
+de oportunidad que la disuada, y el `alpha` necesario puede ALQUILARSE (A5).
+
+[55 s]
