@@ -1,0 +1,37 @@
+=== B.2 · la palanca k ===
+CONTROL del modelo (ii) contra dag-poas-delta-real.md L30-33:
+   k=25: lambda_real=1.471 (pub 1.471), delta_real=0.320 (pub 0.32)  OK
+   k=30: lambda_real=1.364 (pub 1.364), delta_real=0.267 (pub 0.267)  OK
+   k=40: lambda_real=1.250 (pub 1.25), delta_real=0.200 (pub 0.2)  OK
+
+--- (i) delta = 0 (modelo de 9a): k entra solo por la ventaja 3k. I = 851 s ---
+   k    3k |   F_carrera 33 %    (h) |       35 %    (h)
+  20    60 |            875 s   0.24 |     1084 s   0.30
+  25    75 |            948 s   0.26 |     1168 s   0.32
+  30    90 |           1019 s   0.28 |     1249 s   0.35
+  40   120 |           1157 s   0.32 |     1408 s   0.39
+
+--- (ii) delta_real(k) y lambda_real(k) autoconsistentes (k-coherente) ---
+   k  lam_real  delta_real  k_Poisson  admisible |   F_carrera 33 %    (h) |         35 %    (h) |  r(0,33)
+  20     1.667       0.400         26         NO |           6600 s   1.83 |      20292 s   5.64 |    0.821
+  25     1.471       0.320         24         SI |           2996 s   0.83 |       5276 s   1.47 |    0.724
+  30     1.364       0.267         22         SI |           2267 s   0.63 |       3463 s   0.96 |    0.672
+  40     1.250       0.200         21         SI |           1885 s   0.52 |       2591 s   0.72 |    0.616
+
+--- (iii) delta de D8 (medida SOLO a k=30): LAGUNA fuera de k=30 ---
+   k  delta(0,33)  delta(0,35) |   F_carrera 33 %    (h) |         35 %    (h)
+  20       0.2867       0.3065 |           3196 s   0.89 |       6368 s   1.77  <- LAGUNA (delta no recalibrada)
+  25       0.2867       0.3065 |           3373 s   0.94 |       6636 s   1.84  <- LAGUNA (delta no recalibrada)
+  30       0.2867       0.3065 |           3547 s   0.99 |       6900 s   1.92  <- k de la medida
+  40       0.2867       0.3065 |           3886 s   1.08 |       7417 s   2.06  <- LAGUNA (delta no recalibrada)
+
+--- criterio alpha en el modelo (ii), k = 30 ---
+ alpha       r  F_carrera (s)
+  0.00   0.000              0
+  0.10   0.152            292
+  0.25   0.455            797
+  0.33   0.672           2267
+  0.35   0.734           3463
+  0.40   0.909          28916
+
+[56 s]

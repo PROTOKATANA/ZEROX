@@ -121,3 +121,68 @@ Tres razones, en orden de peso:
 **Recomendación B.1: mantener `3k`.** Es la única de las cinco palancas que se puede tocar sin coste
 externo y es la que menos da. Se anota como colchón oculto: el diseño está pagando ~3 min de `F`
 por conservar una cota demostrada, y ese es un precio bueno.
+
+---
+
+## B.2 · Palanca `k` — **VERIFICADO** (y la palanca **cambia de signo** según el modelo)
+
+**Script:** `r10b_b2_k.py` → `salida_b2.txt` (56 s). **Control del modelo (ii)** contra la tabla
+publicada en `research/dag-poas-delta-real.md` **L30-33**: `k=25 → λ_real 1,471 / δ_real 0,320`;
+`k=30 → 1,364 / 0,267`; `k=40 → 1,250 / 0,200`. **Los tres OK** antes de usarlo.
+
+`k` entra en la carrera por **tres sitios distintos** y hay que decir en cuál se cree:
+
+| Modelo | Qué depende de `k` | Fuente |
+|---|---|---|
+| (i) `δ = 0` (9a) | **solo** la ventaja `3k` | `d9-ronda9a/informe.md` §L5.1 |
+| (ii) `δ_real(k)`, `λ_real(k)` | ventaja `3k` **+** `δ` **+** `λ` | `dag-poas-delta-real.md` §1 |
+| (iii) `δ` de D8 | solo la ventaja `3k`; el `δ` está **medido a `k = 30` y solo ahí** | `d8-ronda8/salida_a1b.txt` |
+
+### (i) `δ = 0` — `k` grande **empeora** `F` (`I = 851 s`)
+
+| `k` | `3k` | `F_carrera` 33 % | 35 % |
+|---:|---:|---:|---:|
+| 20 | 60 | 875 s = **0,24 h** | 0,30 h |
+| 25 | 75 | 948 s = 0,26 h | 0,32 h |
+| **30** | 90 | **1 019 s = 0,28 h** | 0,35 h |
+| 40 | 120 | 1 157 s = 0,32 h | 0,39 h |
+
+Es la palanca de B.1 con otro nombre: 20 → 40 mueve `F_carrera` **282 s**. Débil.
+
+### (ii) `δ_real(k)` y `λ_real(k)` autoconsistentes — `k` grande **mejora** `F`, y mucho
+
+| `k` | `λ_real` | `δ_real` | `k_Poisson` | ¿admisible? | `F_carrera` 33 % | 35 % | `r(0,33)` |
+|---:|---:|---:|---:|:---:|---:|---:|---:|
+| 20 | 1,667 | 0,400 | 26 | **NO** | 6 600 s = 1,83 h | 5,64 h | 0,821 |
+| 25 | 1,471 | 0,320 | 24 | sí | 2 996 s = 0,83 h | 1,47 h | 0,724 |
+| **30** | 1,364 | 0,267 | 22 | sí | **2 267 s = 0,63 h** | 0,96 h | 0,672 |
+| 40 | 1,250 | 0,200 | 21 | sí | **1 885 s = 0,52 h** | 0,72 h | 0,616 |
+
+Dos hallazgos:
+
+1. **`k = 20` no es admisible**: el punto fijo del retarget exige `k ≥ k_Poisson(2Δλ_real) = 26`
+   (`dag-poas-delta-real.md` §1, condición «`k ≥ k_Poisson(2Dλ_real, 10⁻³)`»). La fila está para
+   mostrar que si se bajara `k` para acortar `F` en el modelo (i), en el modelo (ii) `F_carrera`
+   **se multiplicaría por 6,5**. Bajar `k` es la peor idea de las cinco palancas.
+2. **Subir `k` de 30 a 40 acorta `F_carrera` un 17 %** (0,63 → 0,52 h) en el modelo pesimista
+   coherente, y lo **alarga** un 14 % en el modelo `δ=0`. **La palanca `k` no tiene un signo: lo
+   tiene el modelo de `δ`.** Por eso B.4 (elegir el modelo) manda sobre B.2.
+   Y `k=40` tiene coste propio fuera de esta cuenta: `3k = 120` en la ventaja, `mergeset_size_limit`
+   y `max_block_parents` (`R-FIN-12`: `max(10,⌊k/2⌋)`, `max(180,2k)`) y una `Δ` tolerable mayor.
+
+### (iii) `δ` de D8, con `k` movido — **LAGUNA declarada**
+
+| `k` | `δ(0,33)` | `F_carrera` 33 % | 35 % |
+|---:|---:|---:|---:|
+| 20 | 0,2867 *(no recalibrada)* | 0,89 h | 1,77 h |
+| 25 | 0,2867 *(no recalibrada)* | 0,94 h | 1,84 h |
+| **30** | 0,2867 *(la medida)* | **0,99 h** | 1,92 h |
+| 40 | 0,2867 *(no recalibrada)* | 1,08 h | 2,06 h |
+
+Aquí `k` solo mueve `3k`, porque el `δ` de D8 **no se ha vuelto a medir con otro `k`**. Es una
+**LAGUNA**: para cerrarla habría que re-correr `d8_a1b_umbral.py` con `k ∈ {20,25,40}` (~5 min por `k`
+según `salida_a6b.txt`, 280 s con 4 `J` y 5 `α`). No se hizo por presupuesto y porque B.4 concluye que
+ese modelo no es el correcto para diseñar.
+
+**Criterio `α`** en el modelo (ii) con `k=30`: `F_carrera` = 0 · 292 · 797 · **2 267** · 3 463 ·
+28 916 s para `α` = 0 · 0,10 · 0,25 · 0,33 · 0,35 · 0,40. Se mueve, y explota hacia `r=1` (0,909 a 0,40).
