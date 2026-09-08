@@ -1,6 +1,6 @@
 # D8 · ronda 8 — ataques contra el diseño completo (ancla por `slot`, constantes fijadas)
 
-**Fecha:** 2026-09-08 · **Agente:** D8 (adversarial, fresco) · **Estado:** EN CURSO
+**Fecha:** 2026-09-08 · **Agente:** D8 (adversarial, fresco) · **Estado:** CERRADO
 
 > **Regla 8 (volcado incremental).** Un D8 anterior murió por cuota sin escribir nada. Este
 > fichero se escribe ANTES de A1 y se cierra tras CADA línea con veredicto y números.
@@ -20,13 +20,15 @@
 
 | Línea | Objetivo | Estado |
 |---|---|---|
-| A0 | Validar el instrumento heredado (`d8_lib.py` del D8 muerto) | PENDIENTE |
-| A1 | ¿Se **sostiene** el sesgo `δ` del Lema 9 con `α < 1/2`? `δ` sostenible real | PENDIENTE |
-| A2 | Acuerdo honesto con **dos vistas** separadas por `Δ`: `P(I_j distinto)` | PENDIENTE |
-| A3 | Partición + `S_max` + R-FIN-7: ¿se puede **provocar** sin partición real? | PENDIENTE |
-| A4 | Cruce del ancla `slot` en régimen (`I = 4 200 s`, `F = 5,3 h`); retención hasta `S_max` | PENDIENTE |
-| A5 | Soborno BDK+19 §2 portado a PoAS (`W/κ = 1,22`) | PENDIENTE |
-| A6 | Líneas 3/5/6 de §7 + **margen económico** con lookahead `F + I = 6,5 h` | PENDIENTE |
+| A0 | Validar el instrumento heredado (`d8_lib.py` del D8 muerto) | **REPRODUCIDO** |
+| A1 | ¿Se **sostiene** el sesgo `δ` del Lema 9 con `α < 1/2`? `δ` sostenible real | **REFUTADO** |
+| A2 | Acuerdo honesto con **dos vistas** separadas por `Δ`: `P(I_j distinto)` | **SIN VECTOR** + LAGUNA |
+| A3 | Partición + `S_max` + R-FIN-7: ¿se puede **provocar** sin partición real? | **REFUTADO** (eclipse parcial) |
+| A4 | Cruce del ancla `slot` en régimen (`I = 4 200 s`, `F = 5,3 h`); retención hasta `S_max` | **SIN VECTOR** |
+| A5 | Soborno BDK+19 §2 portado a PoAS (`W/κ = 1,22`) | **REFUTADO** |
+| A6 | Líneas 3/5/6 de §7 + **margen económico** con lookahead `F + I = 6,5 h` | **REFUTADO** (economía); líneas 3 y 5 SIN VECTOR |
+
+> **El veredicto completo, con los números, está al final del documento.**
 
 ### 0.3 · Estado del instrumento — declaración sobre `d8_lib.py`
 
@@ -49,7 +51,7 @@ honesto usará en `t`; es la vista omnisciente del atacante. La maniobra del Lem
 
 **Validación obligatoria antes de reutilizar** (encargo explícito): reproducir `m_SLOT = 2,54`
 en las 12 semillas de `d9-ronda8f/salida_b1_gran1.txt` (`copias=14`, `α=0,25`, `gran=1,0`).
-Resultado: PENDIENTE (§A0).
+Resultado: **REPRODUCIDO exactamente** (§A0).
 
 ### 0.4 · Reglas que este informe respeta
 
