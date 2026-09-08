@@ -725,3 +725,61 @@ cualquier granjero cuya conectividad sea peor que 20 s **es inválido por consen
 huérfano**. No pierde una carrera: la red le rechaza los bloques. Es presión de
 centralización de la misma clase que P-036.
 
+
+## A4 · El cruce del ancla `slot` en régimen — **SIN VECTOR con esta familia**
+
+**Scripts:** `d8_a4_cruce.py` → `salida_a4.txt`; `d8_a4b_horizonte.py` → `salida_a4b.txt`;
+`d8_a4c_rachas.py` → `salida_a4c.txt`.
+
+### A4.1 · ¿Sube `m` al pasar de horizontes ≤ 700 s al régimen?
+
+`I = 4 200 s` y `F = 5,3 h` salen de `m = 2,548`, medida con horizonte 260 s y `P = 30`. Como
+`I ∝ c_m²` y `F ∝ c_m²`, si `m` creciera con el horizonte las constantes estarían
+infradimensionadas. Familia **fija** (la literal de D9-f), profundidad escalada:
+
+| HOR | `P` | `α` | `m` medio | `m` máx | estrat | `equiv!=` |
+|---:|---:|---:|---:|---:|---:|---:|
+| 260 | 30 | **0,00** | **1,000** | 1 | 7 | 0 |
+| 260 | 30 | 0,10 | 2,238 | 5 | 48 | 0 |
+| 260 | 30 | 0,25 | **2,540** | 5 | 106 | 0 |
+| 260 | 30 | 0,33 | 2,929 | 5 | 128 | 0 |
+| 260 | 30 | 0,40 | **3,024** | 5 | 150 | 0 |
+| 500 | 60 | 0,10 | **2,131** | 5 | 49 | 0 |
+| 500 | 60 | 0,25 | **2,421** | 5 | 100 | 0 |
+
+**Reproducción exacta de D9-f** en las tres celdas comparables (2,238 / 2,540 / 3,024) — dos
+implementaciones independientes (`d8_a4_cruce.py` y `d8_a4b_horizonte.py`) dan el mismo
+2,421 a HOR = 500. Y **`m` no crece: baja** (2,540 → 2,421 a `α=0,25`; 2,238 → 2,131 a
+`α=0,10`). El cruce del ancla es un fenómeno **local** a la banda `[T_j, T_j + gap)`, no
+depende de la profundidad a la que se lea. `equiv!=` = 0 siempre: «primer bloque con
+`slot ≥ S`» ≡ «menor `blue_work` con `slot ≥ S`» se cumple en toda ejecución.
+
+**`I` y `F` no están infradimensionadas por el horizonte.** Lo que sí las mueve es el
+soborno (§A5), que no es un efecto de horizonte sino de modelo de atacante.
+
+### A4.2 · ¿Puede retener y soltar justo antes de `S_max`? · A4.3 · ¿Cuántas épocas seguidas captura?
+
+`d8_a4c_rachas.py`: 37 épocas por corrida (umbrales cada 20 s), 12 semillas = **444 épocas**,
+9 estrategias sin retraso / 37 con retraso barrido hasta `S_max = 150 s` + retención total.
+
+**Sin retraso (control):**
+
+| `α` | `m` medio | `m` máx | `nA` | capturas sin dirigir | racha máx | capturas dirigidas | racha máx | de |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | **1,000** | 1 | **0** | **0** | **0** | **0** | **0** | 444 |
+| 0,10 | 1,694 | 4 | 238 | 75 (16,9 %) | 2 | 82 | 2 | 444 |
+| 0,25 | 2,029 | 5 | 485 | 154 (34,7 %) | 4 | 163 | 4 | 444 |
+| 0,33 | 2,117 | 4 | 594 | 190 (42,8 %) | 6 | 201 | 7 | 444 |
+| 0,40 | 2,122 | 4 | 708 | 224 (50,5 %) | **11** | 243 | **11** | 444 |
+
+**Lectura.** (i) La captura del ancla es **más frecuente que `α`** (50,5 % a `α = 0,40`):
+el atacante está sobrerrepresentado en la cadena seleccionada, no sólo en el DAG. (ii) Las
+rachas son **compatibles con independencia**: con `p = 0,505` y 37 épocas por corrida,
+`P(racha ≥ 11) ≈ 37·0,505¹¹ ≈ 0,019` por corrida, ≈ 0,22 en 12 corridas — una racha de 11 es
+lo esperado, no una anomalía. **El supuesto de épocas independientes del modelo de steering
+(`g = c_m/√(αλI)`) se sostiene.** (iii) Dirigir la estrategia añade poco (243 vs 224): el
+grueso de la captura es estructural.
+
+**Etiqueta: SIN VECTOR con esta familia.** El ancla por `slot` aguanta lo que se le pide en
+régimen; su punto débil no es el cruce, es **quién puede pagar por moverlo** (§A5).
+
