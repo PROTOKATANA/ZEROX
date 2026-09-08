@@ -585,7 +585,7 @@ invalidaciones cuando existen. **Criterio `α` ✓** — la columna S=20 crece c
 | A1.5 · coste para el atacante | **REFUTADO (incentivos)** | ratio ingreso a/h = **1,16-1,55** para `α ≥ 0,33` | `d8_a1e_coste.py` |
 | **A2** · dos vistas honestas | **SIN VECTOR** + LAGUNA de modelo | `P(desacuerdo) = 0` en 3 168 muestras a `D ≥ 128 s`; `F` es 149× más profundo | `d8_a2_dosvistas.py` |
 | **A3** · `S_max` y R-FIN-7 | **TENSIÓN** | 11,7-12,3 bloques honestos invalidados/h con `S_max=20 s`; **0** con `≥30 s` | `d8_a3_smax.py` |
-| **A4** · cruce del ancla en régimen | ver §A4 | `m` reproduce 2,540 a `α=0,25`; escalado con el horizonte, §A4 | `d8_a4_cruce.py`, `d8_a4b_horizonte.py` |
+| **A4** · cruce del ancla en régimen | **SIN VECTOR** + **TENSIÓN** | `m` no crece con el horizonte (2,540 → 2,421); pero con retención hasta `S_max`, `m = 2,822 > 2,548` | `d8_a4_cruce.py`, `d8_a4b_horizonte.py`, `d8_a4c_rachas.py` |
 | **A5** · soborno BDK | **REFUTADO** | `m = b+1` (incluso a `α=0`); valor/coste 12-23×; `m* = 23` | `d8_a5_soborno.py`, `d8_a5b_equilibrio.py` |
 | **A6** · margen económico | **REFUTADO** | margen 10× plotter **0,67×** (era 1,05×); garantía `S_max=150` → **0,49×** | `d8_a6_presupuesto.py` |
 | A6 · línea 5 (`3k`) | **SIN VECTOR** (a favor) | ventaja real máx 50 = **0,56 · 3k** | `d8_a6b_lineas.py` |
@@ -798,13 +798,19 @@ retención total, 37 estrategias:
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | **0,00** | **1,000** | 1 | **0** | 0 | 0 | 0 | 0 | 444 |
 | 0,10 | **2,282** | 7 | 343 | 75 | 2 | 99 | **4** | 444 |
+| 0,25 | **2,822** | 6 | 795 | 154 | 4 | 225 | **6** | 444 |
 
-Retener y soltar justo antes de `S_max` sube `m` de **1,694 a 2,282** a `α = 0,10`
-(**+35 %**) y las capturas dirigidas de 82 a 99. **Sigue por debajo de la `m = 2,548` con la
-que el diseño dimensiona `I` y `F`**, así que la retención hasta `S_max` **no** las
-infradimensiona.
+Retener y soltar justo antes de `S_max` sube `m` de **1,694 a 2,282** a `α = 0,10` (+35 %) y
+de **2,029 a 2,822** a `α = 0,25` (**+39 %**), y las capturas dirigidas de 163 a 225.
 
-> **DECLARACIÓN DE EJECUCIÓN INCOMPLETA (regla 10).** Las filas `α ∈ {0,25; 0,33; 0,40}` de
+> **A `α = 0,25` la retención hasta `S_max` da `m = 2,822`, POR ENCIMA de la `m = 2,548` con
+> la que el diseño dimensiona `I` y `F`.** No es un vector nuevo —el mecanismo ya estaba
+> contemplado—, pero **la constante se queda corta**: con `m = 2,822`, `I = 4 890 s` (1,36 h),
+> `F = 6,17 h`, lookahead **7,53 h**, y el margen frente al plotter 10× cae de **0,67× a
+> 0,54×** (escenario B). Hay que rehacer las constantes con esta `m`, no con 2,548.
+> **Etiqueta: TENSIÓN** — el ancla aguanta, la constante no.
+
+> **DECLARACIÓN DE EJECUCIÓN INCOMPLETA (regla 10).** Las filas `α ∈ {0,33; 0,40}` de
 > esta tabla y las celdas `HOR ∈ {900, 1500, 2400}` de A4.1 **no terminaron**. Motivo medido,
 > no supuesto: con `copias = 14` (R-FIN-11) y `α = 0,25` el DAG llega a ~4 000 bloques a
 > horizonte 900 s, y el `DAG` heredado de D9 (`r8c_gd.py`) calcula alcanzabilidad por **cierre
@@ -812,8 +818,8 @@ infradimensiona.
 > diseño: es un límite del instrumento**, y quien continúe esta línea debería sustituir el
 > cierre transitivo por índices de intervalo (lo que hace Kaspa de verdad,
 > `reachability/`) antes de subir el horizonte. Lo que **sí** está cerrado con datos:
-> `m` **baja** de 260 s a 500 s en las dos `α` medidas, y la retención sube `m` un 35 % sin
-> pasar de 2,548.
+> `m` **baja** de 260 s a 500 s en las dos `α` medidas, y la retención sube `m` un 35-39 %,
+> **pasando de 2,548 a `α = 0,25`**.
 
 
 ---
@@ -845,8 +851,10 @@ de precios. **Hay que escribirlo con esa etiqueta.**
 ### 2 · `F = 5,3 h` medido / `≤ 68,5 h` garantizado, «se diseña con el medido» — **CONFIRMADA, con el precio subido**
 
 Diseñar con el medido es lo correcto: A4 muestra que `m` **no crece** con el horizonte
-(2,540 → 2,421 de 260 s a 500 s) y que la retención hasta `S_max` la sube sólo un 35 %
-(1,694 → 2,282), sin pasar de 2,548. **Pero el precio de esa elección ha subido**: con
+(2,540 → 2,421 de 260 s a 500 s) y que el horizonte no la sube.
+**Pero la retención hasta `S_max` sí: `m = 2,822` a `α = 0,25`, por encima de 2,548** — con
+ella `I = 4 890 s`, `F = 6,17 h`, lookahead 7,53 h y margen 0,54× frente al plotter 10×.
+**La constante hay que rehacerla.** **Pero el precio de esa elección ha subido**: con
 `I + F = 6,14 h` el margen frente a un plotter 10× mejor que la extrapolación es **0,67×** en
 el escenario que el propio documento marca como favorable al atacante (era 1,05× con las
 constantes viejas). **El «número delgado» del diseño ya no es delgado: es negativo.**
