@@ -68,3 +68,32 @@ referenciados» crea un vector de griefing con `α` pequeño (12 % de bloques ho
 P1 y P2 ya. Verificar P4 en la propuesta (una lectura). Después P3 con la `m = 2,955` y el `g` que P4 permita.
 Y lanzar **una** pregunta a D9: ¿es correcto el argumento de presupuestos disjuntos de §1? Si lo es, la frontera
 real es 41-47 % y el 33 % tiene el colchón que a 35 % no tenía. `Δ` sigue sin medir.
+
+---
+
+## 4 · Correcciones tras las rondas 9a, 9b y 9c (2026-09-08, tarde-noche)
+
+**§1, por 9a (`dag-poas-ancla-de-orden-auditoria-8a.md`) — la tesis es CORRECTA, y hay que escribirla así:**
+1. «Rojos por bloque publicado ≤ 1 en el óptimo» no es una coincidencia: **`R < A` es equivalente a que la ráfaga
+   gane** (teorema de la ráfaga); las que dejan más rojos que azules son las que pierden, y las que pierden no
+   dejan rojos. La razón de fondo es más fuerte: el paper define la carrera contra `w_H`, el score del **bloque
+   virtual honesto**, que incluye los azules del atacante (`phantom-ghostdag.txt` L1034-1036); `(1−α)(1−δ)λ`
+   nunca fue el denominador.
+2. **La condición `2Δλ ≪ k` va en la misma frase que el 46,9 %.** El `δ` natural es 0,0000 a `Δ = 4 s` y solo ahí:
+   a `Δ = 16 s` la frontera es 38,3 %; a **`Δ = 20 s`, 32,4 %**.
+3. **El 46,9 % es la frontera contra un atacante de espacio.** Contra uno que degrade la red hasta `Δ_ef = 20 s`,
+   es 32,4 %. `Δ` es la medición que el diseño necesita antes que ninguna otra.
+
+**P1, por 9b (`auditoria-8b.md`) — mal escrita, bien de fondo:** «con U2 + U3″ cada billete paga una vez» es falso
+(las copias son rojas pero válidas: ×15 si se pagan sin distinguir); «semántica de Kaspa» no es lo que queremos
+(en Kaspa cobra el fusionador, y eso duplica la parásita). Lo correcto es **R-FIN-8′** (`rojo_k` cobra su propia
+coinbase y aplica; `rojo_U3` inerte) + **R-FIN-13′** (un bloque por identidad). Y P1 no es «la palanca más
+barata»: es **precondición** del 46,9 % (sin ella un tercero racional parasita por dinero y resta frontera).
+
+**P4, por 9c (`auditoria-8c.md`) — correcta en mecanismo, conservadora en número, mal enunciada:** la ventana de
+decisión es **`W_dec ≤ 45 s`** y no la fija `S_max` sino la carrera; con `ρ ≤ 1` el steering es **0**, no
+`W_dec` (la fila `ρ = 1` de §2 estaba mal); y lo que P4 compra no es bajar `α_ef` (a `g` fijo es una identidad)
+sino el **precio** de `g`: `I + F` de 8,26 h a 0,76-1,31 h, margen 0,50× → 3,1-5,4×. Regla nueva **R-FIN-14** y
+restricción `I ≥ ρ_max·W_dec`. Con la pinza desactivada, `F = max(F_carrera, I/(W/κ − 1))`.
+
+**P3 queda por decidir con estos números** (elección de `ρ_max` y de `F`): tabla en `auditoria-8c.md` §3.
