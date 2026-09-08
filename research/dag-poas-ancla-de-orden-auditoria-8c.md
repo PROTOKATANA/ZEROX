@@ -30,7 +30,7 @@ directorio:** `research/scripts/d9-ronda9c/`.
 | Citas de Autonomys @ `f8842d0`, leídas por mí | `pallet-subspace/src/lib.rs:940-972` (cosecha cada 50 bloques, `target_slot = slot + 15` fijado 100 bloques después) ✓ · `sp-consensus-subspace/src/lib.rs:116-150` (`seed_with_entropy` solo si `parameters_change.slot == next_slot`; `PotParametersChange {slot, slot_iterations, entropy}`) ✓ · `subspace-verification/src/lib.rs:230-262, 440-447` (`derive_global_randomness` del `proof_of_time` del propio slot → `derive_global_challenge(slot)` → `sector_slot_challenge` → `solution_distance ≤ solution_range/2`; `derive_pot_entropy = blake3(chunk ‖ pot)`) ✓ · `sc-proof-of-time/src/lib.rs:106` (`slot_to_claim = slot − block_authoring_delay`) ✓ · `slot_worker.rs:400` ✓ · `subspace-core-primitives/src/lib.rs:110` (`blake3(randomness ‖ slot.to_le_bytes())`) ✓ |
 | Argumento E1 (`ρ ≤ 1 ⇒ n_eval = 0`), rehecho por mí | La semilla del candidato en `t_j` es `blake3(entropía_X ‖ pot_out(t_j − 1))`, y `pot_out(t_j − 1)` está `L − W_dec ≈ 5,3 h` de PoT por delante en el instante de decidir. Sin `ρ > 1` no hay forma de tenerlo. Y mantener la elección abierta más allá de `W_dec` exigiría una reorganización de profundidad `F`, que es lo que `F` impide. Se sostiene |
 | Scripts commiteados antes del cierre (`c0`, `d1`, `e1`), re-ejecutados por mí | **IDÉNTICOS** (139 s, 73 s, 0,01 s) |
-<<REPRO9C>>
+| **`c4` / `d2` / `c3` (la medida de `W_dec` y la tabla recalibrada)** | **Re-ejecución del principal en curso al cerrar la sesión: NO reproducidas aún.** Los números de §2-3 son los de 9c; la cobertura de rama y el criterio `α` (fila `α = 0` → `W_dec = −1`) están en su salida. Pendiente 3 de la bitácora |
 
 ---
 
