@@ -87,9 +87,9 @@ class MundoEclipse(Mundo):
     (el atacante le retiene la entrada, no la salida: es el caso que mas le conviene, porque
     los bloques invalidos de C se propagan y se rechazan)."""
 
-    def corre_ecl(self, E, fc=0.05, pol="tips", retraso=0.0):
+    def corre_ecl(self, E, sem=0, fc=0.05, pol="tips", retraso=0.0):
         from r8f_lib import DAG
-        rng = random.Random((self.T, self.alpha, E, fc))
+        rng = random.Random(f"{sem}|{self.T}|{self.alpha}|{E}|{fc}")
         d = DAG(k=self.k, u2=True, u3_mode=self.u3_mode,
                 max_parents=self.mp, mergeset_limit=self.msl)
         g = d.genesis()

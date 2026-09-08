@@ -667,3 +667,59 @@ Ninguna marca T1 (parámetro `alpha` muerto), T2 (literal cableado), T3 ni T4 (s
    ambigüedad de la regla, no un resultado: **hay que decidirla.**
 7. **El precio del soborno** (A5) es un supuesto, como los precios de `A*`. Ambos se mueven.
 
+
+### A3 (M2) · Eclipse parcial — **REFUTADO: `S_max` es un arma de censura, y no necesita espacio**
+
+**Script:** `d8_a3b_eclipse.py` → `salida_a3b.txt`. Un honesto `H_C` con el **5 %** del
+espacio recibe **todo** con `E` segundos de retraso extra (el atacante le retiene las puntas;
+no le corta la red). Fracción de **sus** bloques que R-FIN-1a **invalida**:
+
+| `E` (s) | `α` | S=4 s *(control)* | **S=20 s** | **S=30 s** | **S=150 s** | `n_C` |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0,00 | 0,6096 | 0,0000 | 0,0000 | 0,0000 | 561 |
+| 0 | 0,25 | 0,2222 | 0,0000 | 0,0000 | 0,0000 | 414 |
+| 10 | 0,25 | 0,8847 | 0,0025 | 0,0000 | 0,0000 | 399 |
+| **20** | **0,00** | 0,8038 | **0,7150** | 0,0017 | 0,0000 | 586 |
+| **20** | 0,25 | 0,9021 | **0,7474** | 0,0000 | 0,0000 | 388 |
+| **40** | 0,25 | 0,8886 | 0,8481 | **0,8430** | 0,0000 | 395 |
+| **200** | 0,25 | 0,8806 | 0,7687 | 0,7289 | **0,6816** | 402 |
+
+**Un retraso de entrega apenas mayor que `S_max` silencia al granjero: el 68-85 % de sus
+bloques queda INVÁLIDO**, no huérfano. Y la fila **`α = 0`** es igual de mala que la de
+`α = 0,25`: **el atacante no necesita ni un byte de espacio.** Es un ataque de red
+—eclipse parcial, retención de puntas, o simplemente estar mal conectado—, no de consenso.
+
+**(M3) Eclipse total de un grupo con fracción `f`** (forma cerrada `P = e^{−fλS_max}`,
+comprobada por Monte Carlo: medido 0,36732 vs cerrado 0,36788):
+
+| `f` | S=20 s | S=30 s | S=150 s |
+|---:|---:|---:|---:|
+| 0,01 | 0,8187 | 0,7408 | 0,2231 |
+| 0,05 | 0,3679 | 0,2231 | 0,00055 |
+| **0,09** (el de R-FIN-7) | **0,1653** | 0,0672 | ~0 |
+| 0,20 | 0,0183 | 0,0025 | ~0 |
+
+El «`f ≥ 0,09`» de R-FIN-7 **sólo vale con `S_max = 150 s`**: con `S_max = 20 s` ese mismo
+lado pierde el **16,5 %** de sus bloques por invalidez.
+
+### A3 · Veredicto y la pinza que cierra
+
+| | `S_max = 20 s` | `S_max = 30 s` | `S_max = 150 s` |
+|---|---:|---:|---:|
+| Honestos invalidados/h **sin eclipse**, `α=0,33` (M1) | 12,3 | 0 | 0 |
+| Granjero con 20 s de retraso: bloques inválidos (M2) | **71-75 %** | 0,2 % | 0 |
+| Granjero con 200 s de retraso (M2) | 77 % | 73 % | **68 %** |
+| Partición con `f = 0,09`: inválidos (M3) | 16,5 % | 6,7 % | ~0 |
+| **Margen económico del lookahead que exige su garantía (A6)** | **0,97×** | **0,82×** | **0,49×** |
+
+**Etiqueta: REFUTADO.** No porque `S_max` esté mal elegida, sino porque **no hay elección
+buena**: `S_max` pequeña hace que un retraso de red de 20 s invalide al 75 % de los bloques
+de un granjero; `S_max` grande hace que la garantía `m ≤ 1+λ·S_max` no quepa en el
+presupuesto económico. R-FIN-1a queda atrapada entre la red y la economía, igual que
+D9-d la dejó atrapada entre R-FIN-7 y el DoS de PoT.
+
+**Y una consecuencia de descentralización que hay que escribir:** con `S_max = 20 s`,
+cualquier granjero cuya conectividad sea peor que 20 s **es inválido por consenso, no
+huérfano**. No pierde una carrera: la red le rechaza los bloques. Es presión de
+centralización de la misma clase que P-036.
+
