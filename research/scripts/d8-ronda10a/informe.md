@@ -60,13 +60,13 @@ presenta con la cota **«steering 0 salvo `ρ ≥ L/W_dec`» (80 con `L = 1 h`, 
 
 ---
 
-
-
 ## A · La regla operativa completa, antes de atacarla
 
-9c dejó (h) en dos líneas de nota. Sin las cuatro decisiones que siguen no hay nada que atacar, así que las
-fijo yo, en la lectura **más favorable al diseño** que sea consistente (atacar la versión fuerte, no un
-hombre de paja). **Etiqueta del texto entero: PLAUSIBLE** — es una regla candidata mía, no verificada en red.
+9c dejó (h) en dos líneas de nota. Sin las decisiones que siguen no hay nada que atacar, así que las fijo
+yo, en la lectura **más favorable al diseño** que sea consistente (atacar la versión fuerte, no un hombre
+de paja). El texto consolidado está en **§A.6**; las etiquetas, pieza a pieza, al final de esa sección.
+**Este intento rehace la §A del anterior:** dos de sus cuatro decisiones estaban mal y las declaro en
+«Errores propios» (1-3).
 
 ### A.0 · Notación
 
