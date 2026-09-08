@@ -58,7 +58,7 @@ vez es literalmente `research/scripts/verif_constantes.py:44-50` y
 | P2 · `d8-ronda8/salida_a1c.txt:17`, `α = 0,33`, `δ = 0,2867` | reversión 600 s **5,538e-01**, unión 10 años **2,059e-103** | 5,538e-01 · 2,059e-103 | **OK** |
 | P3 · frontera de flujo único (9a A3), `F = 19 080 s`, `I = 4 200 s` | 46,8784 % (`δ=0`) · 36,5431 % (`δ` D8) | 46,8784 % · 36,5431 % | **OK** |
 | N1 · negativo, `α = 0` | 0 | 0,000e+00 | **OK** |
-| P4 · criterio de variación del instrumento nuevo | — | el lookahead cambia con `ρ` (0 ↔ saturado), con `F` (núcleo) y **no** con `F` bajo (h) | **OK** |
+| P4 · criterio de variación del instrumento nuevo | — | el lookahead cambia con `ρ` (0 ↔ saturado) y con `F`, **en el núcleo y con (h)** (`salida_c0.txt`, reejecutado con el modelo de (h) corregido en §F) | **OK** |
 
 <a name="a"></a>
 ## A · El lookahead real bajo R-FIN-14 — `r10c_a1_lookahead.py`, `r10c_a2_ancla_mc.py`
@@ -96,18 +96,20 @@ cerradas sin una sola discrepancia** (`grep -c DISCREPA salida_a1.txt` = 0).
 > inyección». **El factor `(1 − 1/ρ) multiplica `I`, no `L`**, y hay además un término aditivo
 > `(L − W_dec)` que **no depende de `ρ`**. `L(1 − 1/ρ)` sería lo correcto si la cadena de PoT se
 > reiniciara en cada `t_j` y el atacante tuviera que recorrer los `L` slots desde cero cada época —
-> que es exactamente lo que hace **(h)**, pero con `I` en lugar de `L`, porque bajo (h) el bloqueo
-> está en `t_j` y no en `T_j`. En el núcleo **no hay reinicio**: el atacante se queda pegado al tope
+> que es exactamente lo que hace **(h)** — ⚠️ y aquí la fórmula del encargo **acierta**: corregida en
+> §F, la de (h) es `(L+I)(1−1/ρ) − W_dec`, que contiene el `L(1−1/ρ)` del enunciado. En el núcleo **no hay reinicio**: el atacante se queda pegado al tope
 > de conocimiento y solo lo pierde si deja de calcular.
 
 **Por qué el mecanismo es ese.** En el núcleo el atacante conoce `entropía_j` en `T_j + W_dec` (el
 ancla ya no puede cambiar, 9c C.0) pero esa entropía **se aplica `L` slots más tarde**: puede
 encadenar AES hasta `t_{j+1} − 1`, es decir, hasta `L + I − W_dec` por delante. Esa frontera avanza
 a 1 slot/s de media, así que **no lo alcanza nunca si `ρ ≤ 1`**, y si `ρ > 1` lo alcanza y ahí se
-queda, en diente de sierra. Con (h) la entropía **no existe** hasta `t_j`, así que la frontera está
-siempre a `≤ I` y su ventaja **se resetea en cada inyección** — es exactamente el *«the advantage is
-reset»* que Autonomys reclama para su PoT (`research/pot-aes-asic-chacha.md:47`) y que el núcleo de
-ZEROX **no tiene**.
+queda, en diente de sierra. ⚠️ **Lo que sigue está corregido en §F:** escribí que con (h) *«la
+entropía no existe hasta `t_j`, así que la frontera está siempre a `≤ I` y su ventaja se resetea en
+cada inyección»*. **Es falso**: el VDF de (h) tiene entradas públicas y el atacante lo calcula él,
+terminándolo `L(1−1/ρ)` antes. El reset **existe pero es parcial**: la frontera queda a
+`≤ L(1−1/ρ) + I`, no a `≤ I`. El *«the advantage is reset»* que Autonomys reclama
+(`research/pot-aes-asic-chacha.md:47`) **tampoco se obtiene entero con (h)**.
 
 ### A.2 · Las tres respuestas del encargo
 
@@ -267,7 +269,8 @@ velocidad de reloj **la condición del paper se cumple estrictamente**, para cua
 
 ### B.3 · La pinza corregida
 
-De `W/κ = 1 + (I(1−1/ρ) − W_dec)/F` (núcleo) y `W/κ = I(1−1/ρ)/F` (con (h)):
+De `W/κ = 1 + (I(1−1/ρ) − W_dec)/F` (núcleo) y ~~`W/κ = I(1−1/ρ)/F`~~ (con (h) — ⚠️ **la fila (h)
+de esta tabla está superada por §F.3**, donde `W/κ = [(F+I)(1−1/ρ) − W_dec]/F`):
 
 ```
 NÚCLEO :  F ≥ (I(1−1/ρ) − W_dec) / (tope − 1)      y NO EXISTE si  I(1−1/ρ) ≤ W_dec
@@ -332,7 +335,8 @@ NÚCLEO :  F ≥ (I(1−1/ρ) − W_dec) / (tope − 1)      y NO EXISTE si  I(1
 | 2,00 | 851 s | no existe | 264 s | 547 s | 746 s | 284 s | 383 s |
 
 **`I = 300 s`** (la época de Autonomys, para escala): tope 1,22 → publicada 1 364 s; núcleo
-`ρ=1,5` **364 s**, `ρ=3` **818 s**; (h) `ρ=3` **164 s**.
+`ρ=1,5` **364 s**, `ρ=3` **818 s**; (h) `ρ=3` ~~164 s~~ ⚠️ **ver §F.3** (las dos columnas «(h)» de
+esta tabla usan el modelo superado).
 
 **Y la respuesta a «por qué 1,22 y no 2,5».** Ninguno de los dos es un umbral del paper: **BDK marca
 1,00**. El 1,22 es el **valor que salió** al fijar `g = 3,6 %` (⇒ `I = 2 490 s`) y `F = 3,2 h`, y la
@@ -342,7 +346,8 @@ propuesta lo etiqueta ella misma *«Es una elección, no una derivación»*
 de la ronda 7 (`dag-poas-ancla-de-finalidad-metaauditoria.md:215-222`), que la propia metaauditoría
 declaró **«soborno encubierto posible»**. Es decir: se eligió 1,22 porque **era menos malo que 3,5**,
 no porque 1,22 sea seguro y 2,5 no. **Con la `W` corregida la pregunta cambia de sitio:** con
-`ρ ≤ 1,024` se cumple **1,00**, el umbral de verdad; con (h) se cumple 1,00 con `F ≥ 567 s`; y con
+`ρ ≤ 1,024` se cumple **1,00**, el umbral de verdad; con (h) se cumple 1,00 con `F ≥ 1 642 s`
+(§F.3, corregido); y con
 `ρ > 1,024` en el núcleo **no se cumple 1,00 con ninguna `F`** y hay que elegir un tope > 1 a
 sabiendas, como hasta ahora, pero pagando **3,1× menos `F`** de la que se creía.
 
@@ -524,7 +529,10 @@ configuraciones.
 
 > **Este es el resultado que decide `F`.** Si se quiere que el modelo **pesimista** cubra `α = 0,35`
 > **y** un margen `≥ 3×` frente al plotter 10×, **el núcleo es inviable para todo `ρ > 1`**: hace
-> falta (h), o aceptar `ρ_max ≤ 1`, o bajar el margen objetivo a 1,5-2×.
+> falta (h), o aceptar `ρ_max ≤ 1`, o bajar el margen objetivo a 1,5-2×. ⚠️ **Y con (h) corregida
+> (§F.6) tampoco basta a `ρ_max = 3`:** el máximo del sembrador con (h) es 1,82 h (margen 3×) frente
+> a `F_carrera = 1,92 h`, así que también ahí hay que bajar a margen ≤ 2× (2,85 h). Con `ρ_max = 1,5`
+> y (h) sí cabe hasta margen 5×.
 > **Y explica exactamente qué es `F = 2 h` frente a `F = 1 h`:**
 > · `F = 2 h` ≈ `F_carrera(0,35, pesimista) = 1,92 h` **con margen de sembrador 1,91×**;
 > · `F = 1 h` ≈ `F_carrera(0,33, pesimista) = 0,99 h` **con margen de sembrador 3,56×**.
@@ -543,13 +551,13 @@ configuraciones.
 | `ρ_max = 10` **CON (h)** ⚠️ **§F.3** | 1 019 s | ~~766~~ → **7 459 s (2,07 h)** | **7 459 s (2,07 h)** |
 
 **Con (h) el diseño puede cumplir la condición literal de BDK; el núcleo no puede, para ningún
-`ρ > 1,024`, con ninguna `F`.** — DEMOSTRADO (aritmética sobre el modelo de `W` de §B.2).
+`ρ > 1,024`, con ninguna `F`.** — DEMOSTRADO (aritmética sobre el modelo de `W` de §B.2), y **sigue
+en pie tras §F**: solo cambia el precio, de `F ≥ 567 s` a `F ≥ 1 642 s` (`ρ = 3`).
 
-> Y hay una coincidencia que no es casual: bajo (h), «`W ≤ κ`» y «*steering* = 0» son **la misma
-> condición**. Que el atacante no pueda evaluar candidatos exige `lookahead < L − W_dec`
-> (9c E.5, `L > I`); que la ventana de predicción no exceda la confirmación exige `lookahead ≤ F`.
-> Con `L = F` es la misma desigualdad. **Una sola constante, `F ≥ I(1−1/ρ_max) + W_dec`, cierra las
-> dos cosas.**
+> ⚠️ **Retirado por §F.** Escribí aquí que bajo (h) «`W ≤ κ`» y «*steering* = 0» eran la misma
+> condición y que una sola constante `F ≥ I(1−1/ρ_max) + W_dec` cerraba las dos. Eso descansaba en la
+> premisa falsa de 9c §E.5. Con la (h) corregida el *steering* bajo (h) **no** es 0 para `ρ > 1`
+> (D8-10a lo estudia en su ronda), y la condición `W ≤ κ` es la de §F.3. **La coincidencia no existe.**
 
 ### D.4 · El precio de (h), cuantificado por primera vez
 

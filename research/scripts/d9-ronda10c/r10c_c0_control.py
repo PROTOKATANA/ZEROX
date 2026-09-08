@@ -51,12 +51,17 @@ print(f"   prev(0, ...) = {L.prev(0.0, 1.0, 600, 3*L.K, 1.0):.3e}   (debe ser 0)
 
 # ---- P4 · criterio alpha/rho sobre el instrumento NUEVO (lookahead)
 print("\nP4 · criterio de variacion sobre el instrumento nuevo (lookahead, punto A)")
+print("   (h) se calcula con el modelo CORREGIDO de r10c_f: W_dec efectiva = W_dec + L/rho,")
+print("   porque la entropia de (h) no se revela, se CALCULA (fuente: ancla-de-finalidad.md:319-322).")
 print(f"   {'rho':>7} {'F=1h nucleo':>12} {'F=2h nucleo':>12} {'F=1h con (h)':>13} {'F=2h con (h)':>13}  (s)")
 for rho in (0.5, 1.0, 1.0001, 1.5, 3.0, 10.0):
     l1 = L.cinematica_rapida(rho, 3600.0, 851.0, L.W_DEC, False)[0]
     l2 = L.cinematica_rapida(rho, 7200.0, 851.0, L.W_DEC, False)[0]
-    l3 = L.cinematica_rapida(rho, 3600.0, 851.0, L.W_DEC, True)[0]
-    l4 = L.cinematica_rapida(rho, 7200.0, 851.0, L.W_DEC, True)[0]
+    wh1 = L.W_DEC + 3600.0 / rho
+    wh2 = L.W_DEC + 7200.0 / rho
+    l3 = 0.0 if rho <= 1 else L.cinematica_rapida(rho, 3600.0, 851.0, wh1, False)[0]
+    l4 = 0.0 if rho <= 1 else L.cinematica_rapida(rho, 7200.0, 851.0, wh2, False)[0]
     print(f"   {rho:>7.4g} {l1:>12.0f} {l2:>12.0f} {l3:>13.0f} {l4:>13.0f}")
-print("   -> cambia con rho (0 <-> saturado) y con F (nucleo), y bajo (h) NO cambia con F: correcto.")
+print("   -> cambia con rho (0 <-> saturado) y con F, en el nucleo Y con (h) corregida: correcto.")
+print("      (con (h) el lookahead es menor que en el nucleo, pero NO es independiente de F)")
 print(f"\n[{time.time()-t0:.0f} s]")
