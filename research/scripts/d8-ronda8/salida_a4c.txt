@@ -15,3 +15,4 @@ Retrasos barridos: 0, 4, 12, 40, 150 s (S_max = 150 s, R-FIN-1a) + retencion tot
  alpha |  m medio  m max      nA  estrat |  capt. sin dirigir  racha |  capt. dirigidas  racha     de
   0.00 |    1.000      1       0      37 |                  0      0 |                0      0    444
   0.10 |    2.282      7     343      37 |                 75      2 |               99      4    444
+  0.25 |    2.822      6     795      37 |                154      4 |              225      6    444

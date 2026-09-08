@@ -815,3 +815,73 @@ infradimensiona.
 > `m` **baja** de 260 s a 500 s en las dos `α` medidas, y la retención sube `m` un 35 % sin
 > pasar de 2,548.
 
+
+---
+
+# Las tres decisiones provisionales de Katana, respondidas
+
+`dag-poas-ancla-de-orden.md` §2 (commit `82a9f8e`) dice: *«Las tres decisiones son
+provisionales hasta el cierre de D8: su A1 (sesgo del Lema 9) puede mover los umbrales y su
+A6 el margen económico.»* Esto es lo que dicen mis medidas sobre cada una.
+
+### 1 · `S_max = 150 s` — **CONFIRMADA en el eje de red, REFUTADA en el eje económico**
+
+| Eje | `S_max = 20 s` | `S_max = 30 s` | **`S_max = 150 s`** |
+|---|---:|---:|---:|
+| Honestos invalidados/h sin eclipse (`α=0,40`) | 24,2 | **0** | **0** |
+| Eclipse parcial de 20 s: bloques inválidos | 75 % | 0,2 % | **0 %** |
+| Eclipse parcial de 200 s | 77 % | 73 % | 68 % |
+| Partición con `f = 0,09` (R-FIN-7) | 16,5 % inválidos | 6,7 % | **~0** |
+| **Margen económico de su garantía frente a `A*`=41 h** | 0,97× | 0,82× | **0,49×** |
+
+**`S_max = 150 s` es la elección correcta contra la red y la peor contra la economía.** No hay
+valor que gane en los dos ejes: el mínimo que R-FIN-1a permite (20 s) sigue dando margen
+0,97×, y para llegar a 1× haría falta `S_max ≤ 18,6 s`, **fuera del intervalo de la propia
+regla**. La decisión es defendible **sólo si se acepta explícitamente que la garantía
+`F ≤ 68,5 h` no tiene respaldo económico** — es una garantía de consenso que, si alguna vez
+hubiera que usarla, dejaría el ploteo dirigido más barato que el SSD en los tres escenarios
+de precios. **Hay que escribirlo con esa etiqueta.**
+
+### 2 · `F = 5,3 h` medido / `≤ 68,5 h` garantizado, «se diseña con el medido» — **CONFIRMADA, con el precio subido**
+
+Diseñar con el medido es lo correcto: A4 muestra que `m` **no crece** con el horizonte
+(2,540 → 2,421 de 260 s a 500 s) y que la retención hasta `S_max` la sube sólo un 35 %
+(1,694 → 2,282), sin pasar de 2,548. **Pero el precio de esa elección ha subido**: con
+`I + F = 6,14 h` el margen frente a un plotter 10× mejor que la extrapolación es **0,67×** en
+el escenario que el propio documento marca como favorable al atacante (era 1,05× con las
+constantes viejas). **El «número delgado» del diseño ya no es delgado: es negativo.**
+
+Y hay un tercer supuesto que se cae: `m = 2,548` mide lo que consigue un atacante **con sus
+propios bloques**. Con soborno, `m = b+1` a 1 recompensa por unidad (§A5) y el `m` de
+equilibrio es **23**, que empuja `I+F` a **44 h** con `α = 0,10`. **`m` no es una propiedad
+del protocolo mientras el ancla se pueda mover pagando.**
+
+### 3 · Umbral publicado ~35 % (flujo único) — **CONFIRMADA, con menos margen del que parecía**
+
+| | Antes de D8 | **Después de D8** |
+|---|---:|---:|
+| Umbral publicado (flujo único, `P<10⁻¹⁰`/10 años) | ~35 % | **~35 % — sobrevive** (4,0·10⁻⁴⁵) |
+| Frontera real de esa garantía | ≈ 39,3 % | **≈ 36,7 %** |
+| Umbral de orden (declarado al lado) | 40,0 % | **37,1 %** |
+| `r` cruza 1 (la cota se vuelve vacua) | 43,1 % | **38,1 %** |
+| **Colchón entre lo publicado y lo vacuo** | 8,1 puntos | **3,1 puntos** |
+
+**Publicar 35 % sigue siendo honesto**, pero el colchón se ha reducido a la mitad larga.
+Y el **40,0 %** que se declara al lado **ya no es correcto: es 37,1 %.** Hay que corregirlo.
+
+### 4 · `τ = 1 s` (rama A″) — mis medidas están **en esa rama**
+
+Todo lo que he medido usa `slot = ⌊t⌋` con `λ = 1`, es decir **`τ = 1 s`, 1 slot por bloque**,
+que es exactamente la rama decidida — y con R-FIN-1a en su forma **no estricta**, que es la
+vigente. El 24-29 % de aristas de cadena invalidadas que D9-f midió con la forma **estricta**
+no aparece: con `≤` y `S_max ≥ 30 s` la invalidación es **0** (§A3 M1). **La relajación a `≤`
+hace su trabajo.**
+
+**Una comprobación que dejo abierta (LAGUNA, no hallazgo).** Con el `verify = 96,1 ms/slot`
+recién medido (commit `6edb903`) y `S_max = 150 s` = 150 slots a `τ = 1 s`, un bloque cuya
+justificación de PoT cubra el salto máximo son **14,4 s de CPU** de verificación. Si los
+`PotCheckpoints` del flujo canónico están cacheados —y R-FIN-5 impide tocar flujos ajenos—
+ese coste se paga **una vez por slot**, no por bloque, y queda en el 9,6 % de un núcleo que
+dice el documento. **No lo he medido**, y es la diferencia entre 0,096 núcleos y 14,4. Quien
+cierre `C-NET-03/04` tiene que resolverlo antes.
+
