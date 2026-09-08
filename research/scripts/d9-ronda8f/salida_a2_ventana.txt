@@ -1,0 +1,10 @@
+=== A2(2) · VENTANA TEMPORAL DEL MENU y calidad de la cota analitica ===
+Familia SATURADA (D=32, W=60 s, sin copias), 12 semillas, 21 umbrales.
+
+ alpha |  m medio  m max |  ancho medio (s)  ancho max (s) |  max bs(ancla)-T |  lam_azul  cota 2k/l_az  #bloques
+  0.00 |    1.000      1 |             0.00           0.00 |                8 |    0.9728          61.9      59.1
+  0.10 |    4.333      8 |            12.22          28.59 |                9 |    0.9793          61.5      60.0
+  0.25 |    4.901      8 |            17.54          32.93 |                8 |    0.9834          61.2      62.2
+  0.40 |    4.599      7 |            15.36          38.19 |               12 |    0.9866          61.0      62.4
+
+[58 s]

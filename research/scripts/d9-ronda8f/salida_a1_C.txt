@@ -1,0 +1,30 @@
+=== A1 · SATURACION del menu `m` del ancla blue_score ===
+k=30, mp=15, lambda=1, Delta=4, horizonte 260 s, u3_mode=dynamic, P=30, T0+-10 (21 umbrales), semillas 1..12.
+Peso 1 (D9-e reprodujo a D9-d cifra a cifra con peso real: +-3 %). Adversario del
+paper (sin retardo). Menu contado sobre `seed`, fijado en la creacion.
+`viol.banda` = veces que blue_score(ancla)-T salio FUERA de [0,k] (Lema B1).
+
+=== Barrido C · copias del mismo billete (D=32 SATURADA, W=30 s) ===
+  nivel  alpha |   m medio  m max |  nuevas  aporta/21 | viol.banda |cad(tP)|   nota
+      0   0.00 |     1.000      1 |      12      21.00 |                31.0       
+      6   0.00 |     1.000      1 |      12       0.00 |                31.0       
+     14   0.00 |     1.000      1 |      12       0.00 |                31.0       
+     30   0.00 |     1.000      1 |      12       0.00 |          0     31.0       
+
+      0   0.10 |     3.246      6 |     342      21.00 |                31.0       
+      6   0.10 |     3.337      7 |     342       1.83 |                31.0       
+     14   0.10 |     3.909      8 |     342       8.92 |                31.0       
+     30   0.10 |     4.698     10 |     342      11.58 |          0     31.0       
+
+      0   0.25 |     4.464      7 |     693      21.00 |                31.0       
+      6   0.25 |     5.306      8 |     693      13.00 |                31.0       
+     14   0.25 |     6.762     11 |     693      17.00 |                31.0       
+     30   0.25 |     8.385     12 |     693      18.58 |          0     31.0       
+
+      0   0.40 |     4.532      7 |     951      21.00 |                31.0       
+      6   0.40 |     5.770     10 |     951      15.92 |                31.0       
+     14   0.40 |     7.913     13 |     951      19.17 |                31.0       
+     30   0.40 |     9.536     15 |     951      18.50 |          0     31.0       
+
+
+[1643 s]

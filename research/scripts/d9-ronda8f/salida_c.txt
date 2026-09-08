@@ -1,0 +1,74 @@
+=== C · las constantes que salen de la `m` de D9-f ===
+g <= 0.036, W/kappa <= 1.22, lambda = 1. `c_m` por integracion numerica (c_2=0.5642, c_4=1.0294, publicados 0,564 y 1,029).
+
+--- (1) el mapa m -> (I, F), peor alpha = 0,10 ---
+         m      c_m      I (s)    I (h)     F (h)  F (dias)
+     1.500   0.2821        614     0.17      0.78      0.03
+     2.079   0.5865       2654     0.74      3.35      0.14
+     2.330   0.6573       3333     0.93      4.21      0.18
+     2.548   0.7188       3986     1.11      5.03      0.21
+     3.655   0.9662       7203     2.00      9.10      0.38
+     4.000   1.0294       8176     2.27     10.32      0.43
+     4.813   1.1380       9992     2.78     12.62      0.53
+     5.770   1.2432      11926     3.31     15.06      0.63
+    10.000   1.5388      18270     5.07     23.07      0.96
+    30.000   2.0428      32198     8.94     40.65      1.69
+    63.000   2.3378      42170    11.71     53.24      2.22
+   100.000   2.5076      48519    13.48     61.26      2.55
+   300.000   2.8778      63901    17.75     80.68      3.36
+  1000.000   3.2414      81072    22.52    102.36      4.27
+  1484.000   3.3531      86753    24.10    109.54      4.56
+ 10000.000   3.8516     114467    31.80    144.53      6.02
+
+--- (2) constantes por nivel de coste y por ancla (peor alpha) ---
+       nivel      ancla  alpha*       m     c_m     I (s)   I (h)   F (h)  c (azules)  c (slots)
+      gratis blue_score    0.10   3.655  0.9662      7203    2.00    9.10        7054       7203
+      gratis       slot    0.10   2.079  0.5865      2654    0.74    3.35        2599       2654
+
+gratis+14copias blue_score    0.10   4.194  1.0553      8593    2.39   10.85        8415       8593
+gratis+14copias       slot    0.10   2.238  0.6313      3075    0.85    3.88        3012       3075
+
+    +retraso blue_score    0.10   4.286  1.0676      8794    2.44   11.10        8612       8794
+    +retraso       slot    0.10   2.460  0.6940      3716    1.03    4.69        3639       3716
+
+  +retencion blue_score    0.10   4.813  1.1380      9992    2.78   12.62        9785       9992
+  +retencion       slot    0.10   2.548  0.7188      3986    1.11    5.03        3904       3986
+
+--- (3) lo que cuesta NO tener cota: las cotas superpuestas ---
+                  medida, saturada, gratis (slot)  m=    2.08  I=  0.74 h  F=   3.35 h (0.14 d)
+            medida, saturada, gratis (blue_score)  m=    3.65  I=  2.00 h  F=   9.10 h (0.38 d)
+              medida, saturada, +retencion (slot)  m=    2.55  I=  1.11 h  F=   5.03 h (0.21 d)
+        medida, saturada, +retencion (blue_score)  m=    4.81  I=  2.78 h  F=  12.62 h (0.53 d)
+   cota de la VENTANA (2k/lambda_azul, PLAUSIBLE)  m=   63.00  I= 11.71 h  F=  53.24 h (2.22 d)
+   cota CRUDA por merge_depth_bound (determinista)  m= 1484.00  I= 24.10 h  F= 109.54 h (4.56 d)
+   cota POR CONSTRUCCION del ancla slot: 1+lambda*tau*S_max, tau=1 s  m=  151.00  I= 15.07 h  F=  68.49 h (2.85 d)
+                              ... con tau = 0,1 s  m=   16.00  I=  6.68 h  F=  30.38 h (1.27 d)
+                             ... con tau = 0,02 s  m=    4.00  I=  2.27 h  F=  10.32 h (0.43 d)
+
+--- (4) criterio alpha ---
+   alpha=0,00: m=1,000 -> c_m=0.0000  I=0 s  F=0 s (sin atacante NO hay steering)
+   alpha=0.10: m_SLOT=2.079 -> c_m=0.5865  I=2654 s  F=3.35 h
+   alpha=0.25: m_SLOT=2.452 -> c_m=0.6917  I=1477 s  F=1.86 h
+   alpha=0.40: m_SLOT=2.917 -> c_m=0.8229  I=1306 s  F=1.65 h
+
+--- (5) COTA DETERMINISTA AUTOCONSISTENTE: m <= 1 + lambda*F (R-FIN-7) ---
+  alpha      F* (s)    F* (h)      m <=       c_m    I* (h)
+   0.05     1733244    481.46    1733245   4.9708    105.92
+   0.10      815616    226.56     815617   4.8223     49.84
+   0.25      299165     83.10     299166   4.6178     18.28
+   0.33      220402     61.22     220403   4.5539     13.47
+   0.40      178261     49.52     178262   4.5089     10.89
+   (peor alpha = el mas pequeno; a alpha=0 no hay steering y la cota no aplica)
+
+--- (6) la familia que NO satura: copias. m ~ a + b log2(C), techo C = 180 ---
+  ancla blue_score:  m = 1.881 + 0.491*log2(C)
+      C=    60 -> m= 4.779  c_m=1.1334  I= 2.75 h  F= 12.52 h
+      C=   180 -> m= 5.556  c_m=1.2209  I= 3.20 h  F= 14.52 h
+      C=  1000 -> m= 6.770  c_m=1.3326  I= 3.81 h  F= 17.30 h
+      C= 10000 -> m= 8.399  c_m=1.4481  I= 4.49 h  F= 20.43 h
+  ancla       slot:  m = 1.735 + 0.091*log2(C)
+      C=    60 -> m= 2.271  c_m=0.6406  I= 0.88 h  F=  4.00 h
+      C=   180 -> m= 2.415  c_m=0.6812  I= 0.99 h  F=  4.52 h
+      C=  1000 -> m= 2.640  c_m=0.7446  I= 1.19 h  F=  5.40 h
+      C= 10000 -> m= 2.941  c_m=0.8297  I= 1.48 h  F=  6.71 h
+  (F crece como ln log C: multiplicar las copias por 167 sube F un ~40 %.)

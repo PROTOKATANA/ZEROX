@@ -1,0 +1,27 @@
+=== B2 · los tres niveles de coste, para las DOS anclas, misma ejecucion ===
+k=30, mp=15, horizonte 260 s, u3_mode=dynamic, P=30, 21 umbrales,
+semillas 1..12, granularidad de slot = 0.02 s. S_max = 150 (R-FIN-1a).
+Referencia D9-d (A5): m_BS 3,03 gratis / 4,29 +retraso / 7,53 +retencion a alpha=0,25.
+
+       nivel  alpha |  m_BS med  m_BS max |  m_SLOT med  m_SLOT max |  ancla!=       de | gap med s gap max s  gap>=Smax |  lam_ch  lam_az
+      gratis   0.00 |     1.000         1 |       1.000           1 | 
+    +retraso   0.00 |     1.000         1 |       1.000           1 | 
+  +retencion   0.00 |     1.000         1 |       1.000           1 |     1932     7056 |      2.45      7.00       2828 |  0.2021  0.9728
+
+      gratis   0.10 |     3.655         7 |       2.079           5 | 
+    +retraso   0.10 |     4.286         8 |       2.456           5 | 
+  +retencion   0.10 |     4.813        10 |       2.552           6 |    25674    38052 |      2.55     10.00      15699 |  0.3385  0.9793
+
+      gratis   0.25 |     4.766         8 |       2.437           4 | 
+    +retraso   0.25 |     6.508        11 |       3.194           6 | 
+  +retencion   0.25 |     8.544        14 |       3.635           7 |    70026    82278 |      2.58     15.72      31060 |  0.5103  0.9834
+
+      gratis   0.33 |     4.881         8 |       2.810           6 | 
+    +retraso   0.33 |     7.317        12 |       3.615           7 | 
+  +retencion   0.33 |     9.663        16 |       4.206           9 |    86237    98532 |      2.52     15.68      36448 |  0.5947  0.9862
+
+      gratis   0.40 |     4.615         7 |       2.885           6 | 
+    +retraso   0.40 |     7.639        12 |       3.631           6 | 
+  +retencion   0.40 |    10.163        18 |       4.552          10 |   104122   114786 |      2.59     15.94      42761 |  0.6610  0.9866
+
+[132 s]
