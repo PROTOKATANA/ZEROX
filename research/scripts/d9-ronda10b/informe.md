@@ -461,3 +461,221 @@ y 16 s cambia `F_carrera` en un factor **3,5**. **La ronda correcta no es afinar
 **Criterio `α`** (`salida_b5.txt`, última tabla): `F_carrera` a `Δ = 4/8/12/16/20 s` para
 `α = 0,10` → 267/268/298/413/586 s; `α = 0,25` → 551/554/655/1 163/2 506 s;
 `α = 0,33` → 1 019/1 024/1 314/3 524/29 002 s. Se mueve con las dos variables y explota hacia `r = 1`.
+
+---
+
+## C · Entrega — la `F` más corta con ≥ 2 puntos de colchón, y la recomendación
+
+**Scripts:** `r10b_c_entrega.py` → `salida_c.txt` (435 s) y `r10b_c2_delta35.py` → `salida_c2.txt` (128 s).
+
+### La identidad que hace la cuenta, comprobada antes de usarla
+
+«frontera(`F`) = 35 %» y «`F_carrera(35 %) = F`» son **la misma ecuación** (las dos dicen
+`union10 = 10⁻¹⁰` en el punto `(F, 35 %)`), y por tanto **la `F` mínima con 2 puntos de colchón sobre
+el 33 % es exactamente `F_carrera(35 %)`**. Vale mientras `r(0,35) < 1`, porque la frontera es el
+*primer* cruce. **Comprobado numéricamente en los seis modelos** (`salida_c.txt`, CONTROL 2:
+35,0005 / 35,0005 / 34,9995 / 35,0000 / 35,0000 / 35,0000 %). Y el CONTROL 1 reproduce la fila
+`F = 2 h` de la bitácora: 44,57 % / 35,08 %, **OK**.
+
+### TABLA C — la `F` mínima por modelo (`I = 851 s`, ventaja `3k = 90`, objetivo `10⁻¹⁰` a 10 años)
+
+| Modelo | Qué supone | `F_carrera` (33 %) | **`F` MÍNIMA (+2 pts)** | `r(0,35)` |
+|---|---|---:|---:|---:|
+| **M1** `δ = 0` (9a) | `Δ = 4 s` **exacto**, sin margen | 0,28 h | **0,35 h = 21 min** | 0,538 |
+| **M2** `δ₀(Δ=8 s)` = 0,0020 | `Δ` el doble del supuesto | 0,28 h | **0,35 h = 21 min** | 0,540 |
+| **M3** `δ₀(Δ=12 s)` = 0,0828 | `Δ` el triple — **el modelo que B.4 recomienda** | 0,36 h | **0,46 h = 28 min** | 0,587 |
+| **M4** `δ₀(Δ=16 s)` = 0,2858 | `Δ` cuádruple; el límite que `k = 30` aguanta | 0,98 h | **1,55 h** | 0,754 |
+| **M5** `δ` de D8 (pesimista) | Que el teorema de la ráfaga de 9a **falle** | 0,99 h | **1,92 h** | 0,776 |
+| **M6** `δ_real(k)` + `λ_real` | Que R-FIN-13′ **no** se aplique | 0,63 h | **0,96 h** | 0,735 |
+
+### El colchón real de cada `F` candidata (frontera − 33 %)
+
+| Modelo | `F = 0,5 h` | `0,75 h` | **`1 h`** | `1,5 h` | **`2 h`** | `3 h` |
+|---|---:|---:|---:|---:|---:|---:|
+| M1 `δ=0` | +5,0 p | +7,5 p | **+9,0 p** | +10,6 p | **+11,6 p** | +12,7 p |
+| M2 `Δ=8 s` | +4,9 p | +7,5 p | +8,9 p | +10,6 p | +11,5 p | +12,6 p |
+| **M3 `Δ=12 s`** | +2,6 p | +5,2 p | **+6,7 p** | +8,3 p | **+9,3 p** | +10,4 p |
+| M4 `Δ=16 s` | **−4,2 p** | **−1,4 p** | +0,1 p | +1,9 p | **+2,9 p** | +4,0 p |
+| M5 D8 | **−2,2 p** | **−0,8 p** | +0,1 p | +1,4 p | **+2,1 p** | +2,8 p |
+| M6 `δ_real` | −1,3 p | +0,9 p | +2,1 p | +3,6 p | +4,4 p | +5,4 p |
+
+**`F = 2 h` es, al segundo, la `F` más corta que conserva ≥ 2 puntos en TODOS los modelos, incluidos
+los dos que las rondas 9a y 9b refutaron.** La elección provisional de Katana no era conservadora por
+casualidad: es exactamente el mínimo de la columna «sobrevive a todo».
+
+### Lo que hay que medir para poder bajarla — y es una sola cosa
+
+| `Δ` medido | `δ₀` | `F_carrera` (33 %) | **`F` mínima (+2 pts)** |
+|---:|---:|---:|---:|
+| 4-8 s | ≤ 0,0020 | 0,28 h | **0,35 h = 21 min** |
+| 10 s | 0,0424 | 0,32 h | 0,40 h = 24 min |
+| **12 s** | 0,0828 | 0,36 h | **0,46 h = 28 min** |
+| 13 s | 0,1336 | 0,44 h | 0,58 h = 35 min |
+| 14 s | 0,1843 | 0,55 h | 0,75 h = 45 min |
+| 15 s | 0,2350 | 0,71 h | 1,03 h = 62 min |
+| **16 s** | 0,2858 | 0,98 h | **1,55 h = 93 min** |
+| 18 s | 0,3643 | 2,00 h | 4,29 h = 257 min |
+| 20 s | 0,4428 | 8,06 h | *sin cruce* |
+
+Y al revés, el `Δ` que cada `F` compra (`salida_c2.txt`; control 3/3 contra B.5):
+
+| `F` | `Δ_max` al 33 % | **`Δ_max` con +2 pts (35 %)** |
+|---:|---:|---:|
+| 0,35 h | 11,4 s | 8,0 s |
+| 0,5 h | 13,6 s | 12,4 s |
+| **1 h** | 16,1 s | **14,9 s** |
+| **2 h** | 18,0 s | **16,6 s** |
+| 5,3 h | 19,6 s | 18,3 s |
+
+### ⚠️ Corrección al encuadre del encargo: por debajo de `Δ ≈ 14 s`, **el suelo de `F` NO lo pone la carrera**
+
+`F = max(F_carrera, I/(W/κ − 1))` (`dag-poas-ancla-de-orden-auditoria-8c.md:87`), con `W/κ = 1,22`
+(bitácora §5). El segundo término vale `4,545·I` y **no depende de `Δ` ni de la carrera**:
+
+| Configuración | `I` | `F` por *steering* = `I/(W/κ−1)` | `F` por carrera (+2 pts), `Δ ≤ 12 s` | **`F` = max** |
+|---|---:|---:|---:|---:|
+| `ρ_max = 1` | 491 s | **0,62 h** | 0,35-0,46 h | **0,62 h** ← manda el *steering* |
+| **`ρ_max = 1,5`** | 602 s | **0,76 h** | 0,35-0,46 h | **0,76 h** ← manda el *steering* |
+| `ρ_max = 3` | 851 s | **1,07 h** | 0,35-0,46 h | **1,07 h** ← manda el *steering* |
+| Revelación retardada | libre | **0** | 0,35-0,46 h | **0,35-0,46 h** ← manda la carrera |
+
+*(las `F` por steering son las de `auditoria-8c.md:76-78`, reproducidas: `491/0,22 = 2 232 s = 0,62 h`)*
+
+**El cruce está en `Δ ≈ 14 s` para `ρ_max = 1,5`** (ahí `F_carrera(+2 pts) = 0,75 h ≈ 0,76 h). Es
+decir: **la afirmación «el suelo de `F` lo pone la carrera» de la bitácora §11.4 es cierta con el `δ`
+pesimista y a `Δ ≥ 14 s`, y falsa con el modelo de diseño a `Δ ≤ 12 s`**, donde el suelo lo pone el
+*steering* y acortar `F_carrera` no compra nada. Solo con **revelación retardada** (R-FIN-14 (h)) la
+carrera vuelve a ser el único suelo — y entonces, y solo entonces, `F = 21-28 min` es alcanzable.
+
+### El peso de `I` — **medido: es despreciable**
+
+`I` entra **solo** por el número de épocas de la unión (`EP_ANO = 365·86400/I`), no en `prev()`:
+
+| `I` | épocas/año | épocas en 10 años | `F_carrera` 33 % (M1) | `F` mín. M1 | `F_carrera` 33 % (M5) | `F` mín. M5 |
+|---:|---:|---:|---:|---:|---:|---:|
+| **300 s** | 105 120 | 1 051 200 | 1 037 s | 1 273 s | 3 625 s | 7 065 s |
+| 491 s | 64 228 | 642 281 | 1 028 s | 1 262 s | 3 588 s | 6 987 s |
+| 602 s | 52 385 | 523 854 | 1 025 s | 1 257 s | 3 573 s | 6 955 s |
+| **851 s** | 37 058 | 370 576 | 1 019 s | 1 249 s | 3 547 s | 6 900 s |
+| 4 200 s | 7 509 | 75 086 | 990 s | 1 213 s | 3 428 s | 6 648 s |
+
+**De `I = 851 s` a `I = 300 s` (2,84× más épocas) `F` sube 24 s en M1 y 165 s en M5: +1,9 % y
++2,4 %.** Todo el rango `I ∈ [300, 4 200]` (14×) mueve `F` un **4,7 %**. La razón es que el número de
+épocas entra en logaritmo (`F ∝ ln N / ln(1/r)`) mientras `Δ` y `α` entran en `r`. **`I` no es una
+palanca de `F` por la vía de la carrera**; lo es, y mucho, por la vía del *steering* (`4,545·I`), que
+es la tabla de arriba.
+
+### RECOMENDACIÓN
+
+> **`F` provisional: 2 h. Mantener, sin cambios.** Es la `F` más corta con ≥ 2 puntos de colchón en
+> los seis modelos, incluidos M5 y M6 (refutados por 9a y 9b, pero no medidos en red). Supone
+> únicamente `Δ ≤ 16,6 s`, y no depende de que 9a ni 9b tengan razón. Cuesta 1,24 h sobre lo que el
+> modelo de diseño pediría, y ese es el precio de no haber medido `Δ`.
+>
+> **`F` de producción: 1 h**, con **`ρ_max = 1,5`, `I = 602 s`** (`F` por steering 0,76 h ⇒ 1 h la
+> cubre con holgura). Condiciones que hay que cumplir **antes** de bajarla, todas comprobables:
+> 1. **`Δ` medido en red con carga y con verificación de PoT dentro, y `Δ_p99 ≤ 14,9 s`.** Es la
+>    condición dura: a `Δ = 14,9 s` el colchón es exactamente 2 puntos; a 16 s cae a +0,1 p.
+> 2. **R-FIN-8′ y R-FIN-13′ en vigor** (precondición del 46,9 % y de que M6 no aplique).
+> 3. Objetivo de riesgo `10⁻¹⁰` a 10 años y ventaja `3k` **conservados** (B.1 y B.3: cambiarlos
+>    ahorra 3,2 y 4,1 minutos respectivamente; no vale la pena tocarlos).
+> 4. `k = 30` (B.2: bajarlo es la peor idea de las cinco palancas; `k = 20` ni siquiera es admisible).
+>
+> **`F` de 21-28 min: solo con revelación retardada** (R-FIN-14 (h)) **y `Δ ≤ 12 s`**. Sin ella, el
+> término de *steering* impide bajar de 0,62-1,07 h aunque la carrera lo permita.
+>
+> **Suelo absoluto:** ninguna `F` conserva el 33 % por debajo de **0,28 h** ni siquiera en M1, y por
+> debajo de **0,35 h** ninguna conserva los 2 puntos. `F = 20 min` (la fila de la bitácora §11.4)
+> está **por debajo del suelo en todos los modelos**.
+
+### La palanca que más pesa, en una tabla
+
+| Palanca | Rango explorado | Movimiento de `F` a 33 % | Veredicto |
+|---|---|---:|---|
+| **`Δ`** | 4 → 16 s | **0,28 h → 0,98 h (×3,5)** | **domina todo** |
+| Modelo de `δ` (B.4) | M1 → M5 | 0,28 h → 0,99 h (×3,5) | *es la misma palanca*: `δ` D8 ≡ `δ₀(16 s)` |
+| `k` (modelo `δ_real`) | 30 → 40 | 0,63 h → 0,52 h (−17 %) | real pero el modelo está anulado |
+| **Incertidumbre de la medida de `δ`** | IC95 a `k=30` | 0,85 h → 1,16 h (±9 min) | mayor que las dos siguientes juntas |
+| Objetivo de riesgo | `10⁻¹²` → `10⁻⁶` | −4,1 min (M1) / −17,4 min (M5) | barata de conservar |
+| Ventaja inicial | `3k` → `1,68k` | −3,2 min (M1) / −7,8 min (M5) | la más débil; **no tocar** |
+| `I` (vía carrera) | 4 200 → 300 s | +4,7 % | despreciable |
+| `I` (vía *steering*) | 851 → 491 s | **1,07 h → 0,62 h** | la segunda que más pesa |
+
+---
+
+## AUDITA_SCRIPTS
+
+```
+$ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d9-ronda10b/
+Scripts analizados: 11
+
+======================================================================
+Sospechas totales: 0
+```
+
+**Cada marca, leída: no hay ninguna.** Los 11 scripts (`r10b_lib`, `a_control`, `b1_ventaja`,
+`b1_extremos`, `b2_k`, `b2b_delta_k`, `b2c_iii`, `b3_riesgo`, `b5_delta_red`, `c_entrega`,
+`c2_delta35`) pasan T1, T2, T3, T3b y T4. En particular:
+
+- **T1 (parámetro del atacante muerto):** 0. Toda función que recibe `a`/`alpha` lo usa; el criterio
+  `α` está además comprobado a mano en cada punto, con tabla que se mueve con `α`.
+- **T4 (< 12 semillas):** 0. El único script estocástico de la ronda es `r10b_b2b_delta_k.py`, con
+  `SEMS = [1..12]` literales (12) y 1 920 corridas. **Corrección a la cabecera de este informe**,
+  escrita en el primer intento: decía que `AUDITA` marcaría T4 «porque nada es estocástico»; al
+  cerrar la LAGUNA de B.2(iii) la ronda sí tiene una medida estocástica, con 12 semillas e IC95, y
+  no hay marca.
+- Los otros diez scripts son evaluación numérica determinista de fórmulas cerradas (Skellam + ruina
+  del jugador, y la beta incompleta de Grunspan): la regla de las 12 semillas no les aplica.
+
+## Veredicto
+
+| Punto | Etiqueta | Número que se lleva |
+|---|---|---|
+| **A** · control | **VERIFICADO** | 46,8784 % / 36,5432 %; `F = 2 h` → 44,57 % / 35,08 %; `F_carrera(33 %)` = 1 019 s / 3 547 s, idénticos al segundo por un camino distinto |
+| **B.1** · ventaja inicial | **VERIFICADO** (palanca débil) · **REFUTADO** que convenga usar la medida | `3k → 1,68k` ahorra **191 s = 3,2 min**. Fuente del 0,56·3k: `d8-ronda8/salida_a6b.txt` L14-18. Extrapolada a 10 años la ventaja real sería ~2,1k, no 1,68k (PLAUSIBLE) |
+| **B.2** · `k` | **VERIFICADO** | `k` **no tiene signo propio**: con `δ=0`, `k`↑ alarga `F` (+282 s de 20 a 40); con `δ_real(k)`, `k`↑ la acorta 17 %. `k = 20` **inadmisible** (`k_Poisson = 26`) |
+| **B.2 (iii)** · LAGUNA | **CERRADA — VERIFICADO** | `δ` re-medido a `k ∈ {20,25,30,40}` (1 920 corridas, 12 semillas; `k=30` reproduce `salida_a1b.txt` 8/8): **`δ` no depende de `k`** (IC95 solapados). La incertidumbre de la medida vale **±9 min** de `F` |
+| **B.3** · objetivo de riesgo | **VERIFICADO** | Bitcoin bajo el criterio de ZEROX pediría **46 h** a `q=33 %` (5,7 h a 10 %). Relajar `10⁻¹²→10⁻⁶` ahorra **4,1 min**. `ε` de Chia: **LAGUNA** (no publica). PDF de Nakamoto ausente: **LAGUNA parcial**, mitigada reproduciendo su tabla 8/8 |
+| **B.4** · modelo de `δ` | **DEMOSTRADO** (la `δ` de D8 no va en la carrera) · **PLAUSIBLE** (que `δ₀` sea toda la `δ` a `Δ ≥ 16 s`) | Diseñar con **`δ = δ₀(Δ)`**, `Δ_diseño = 12 s`, esfuerzo 16 s. Y `δ` D8 (0,2867) ≡ `δ₀(16 s)` (0,2858): **son el mismo número** |
+| **B.5** · `Δ` | **VERIFICADO** | `F` **no compra `Δ`**: de 1 h a 2 h son **1,9 s**; techo duro en `Δ = 22,7 s` (`r = 1`). Control 5/5 contra `auditoria-8a.md` §4 |
+| **C** · entrega | **VERIFICADO** | `F` mínima (+2 pts): **0,35 h** (M1/M2) · **0,46 h** (M3) · **1,55 h** (M4) · **1,92 h** (M5) · 0,96 h (M6). `I` por la carrera pesa **+4,7 %** en todo el rango. Por debajo de `Δ ≈ 14 s` **el suelo lo pone el *steering*, no la carrera** |
+| **Recomendación** | — | **`F` provisional 2 h (mantener)**; **`F` producción 1 h** condicionada a `Δ_p99 ≤ 14,9 s` medido; **21-28 min solo con revelación retardada** |
+
+## Errores propios
+
+1. **LAGUNA declarada por falta de tiempo** (B.2 (iii), primer intento): «No se hizo por presupuesto».
+   La regla 3 del método lo prohíbe explícitamente. **Corregido:** medido en 69 s con 1 920 corridas y
+   32 procesos. El resultado no cambia la tabla (el `δ` no depende de `k`), pero **eso había que
+   medirlo, no suponerlo**, y el IC95 que la medida trae resultó ser mayor que dos de las cinco
+   palancas del encargo.
+2. **Cabecera equivocada:** el primer intento escribió que la ronda no tenía nada estocástico y que
+   `AUDITA` marcaría T4. Al cerrar (iii) sí lo tiene, con 12 semillas, y `AUDITA` da 0 sospechas.
+3. **`f_carrera` usada para un criterio por evento** (B.3 §4): pedí `F` con `ε = 10⁻³` *por
+   transacción* pasándole `obj = 10⁻³·N_épocas > 1`, que la unión satura en 1 y devolvió 0 s en las
+   cuatro filas. **Corregido** con `f_evento` (`r10b_b3_riesgo.py:60-70`), que exige `prev < ε` sin
+   unión: 7,7-37 min, no 0.
+4. **Barrido de `Δ` por encima de `r = 1`** (B.5, primera ejecución): imprimí 37,59 h para `Δ = 24 s`
+   y 2,93 h para `Δ = 32 s` —no monótono— y una frontera de 48,92 %. Es el artefacto del recorte a
+   `r^700` que D8 ya había declarado, y `delta_max` devolvía 32,0 s para `F ≥ 3 h` por la misma causa.
+   **Corregido:** el script calcula `Δ` donde `r = 1` (22,7 s al 33 %; 20,8 s al 35 %) y marca esas
+   filas como **cota vacua** en vez de imprimir números.
+5. **Encuadre heredado y no comprobado hasta C:** trabajé los puntos B.1-B.5 dando por buena la frase
+   del encargo «el suelo de `F` lo pone la carrera». Es cierta solo con el `δ` pesimista o con
+   `Δ ≥ 14 s`; con el modelo que yo mismo recomiendo en B.4 el suelo lo pone el término de *steering*
+   `I/(W/κ−1)`, y eso cambia la lectura de tres de las cinco palancas (dejan de comprar nada). Lo vi
+   al construir la tabla de C, no antes.
+
+## Lagunas que quedan, con lo que haría falta para cerrarlas
+
+1. **`Δ` no está medido.** Es la única palanca que decide, y la única que no se puede medir sin
+   `zx-node` corriendo el DAG. Hace falta: decenas de instancias, latencias inyectadas, carga, la
+   verificación real del PoT (96,1 ms/slot) dentro del camino, y la cola **p99**, no la media.
+2. **Composición de `δ₀(Δ)` con la `δ` parásita a `Δ ≥ 16 s`.** El teorema de la ráfaga de 9a vale
+   mientras `2Δλ ≪ k`, y la propia 9a midió `W_pub/H = 0,936 < 1` a `Δ = 20 s`. Haría falta repetir
+   el A2 de 9a (reparto `α_p/α_f`, 7 200 corridas) con `Δ ∈ {12, 16, 20}` en vez de 4 s.
+3. **Fuentes primarias ausentes:** `bitcoin.pdf` (Nakamoto), Grunspan & Pérez-Marco (1702.02867) y
+   Rosenfeld (1402.2009) no están en `research/fuentes/`. Mitigado reproduciendo sus dos tablas
+   (8/8 y 10/10) desde la forma cerrada; se cierra descargándolos.
+4. **El `ε` de Chia no existe públicamente.** Solo hay profundidades recomendadas (6 y 32 bloques)
+   y tres umbrales distintos (54 %, 42,7 %, 40,5 %) que su propia documentación no reconcilia
+   (`chia-documentacion-oficial.md:325-334`).

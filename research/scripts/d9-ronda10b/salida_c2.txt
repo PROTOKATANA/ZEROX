@@ -1,0 +1,36 @@
+=== C.2 · el Delta que cada F tolera, con y sin los 2 puntos de colchon ===
+
+--- CONTROL: reproducir la columna Delta_max(33 %) de salida_b5.txt ---
+    F = 0.50 h: Delta_max = 13.6 s (publicado 13.6)  OK
+    F = 1.00 h: Delta_max = 16.1 s (publicado 16.1)  OK
+    F = 2.00 h: Delta_max = 18.0 s (publicado 18.0)  OK
+    -> 3/3 OK
+    r = 1 en Delta = 22.7 s (33 %) y 20.8 s (35 %)
+
+--- Delta maximo tolerable por F: al 33 % (sin colchon) y al 35 % (+2 puntos) ---
+  F (h)    F (s) |  Delta_max 33 % |  Delta_max 35 % (+2 pts)
+   0.35     1260 |            11.4 |                      8.0
+   0.50     1800 |            13.6 |                     12.4
+   0.75     2700 |            15.2 |                     14.0
+   1.00     3600 |            16.1 |                     14.9
+   1.25     4500 |            16.8 |                     15.5
+   1.50     5400 |            17.3 |                     15.9
+   2.00     7200 |            18.0 |                     16.6
+   3.00    10800 |            18.8 |                     17.4
+   5.30    19080 |            19.6 |                     18.3
+
+--- y al reves: la F minima con +2 puntos, en funcion del Delta que se mida ---
+ Delta (s)   delta_0 |  F_carrera 33 %     (h) |  F MINIMA +2 pts     (h)   (min)
+         4    0.0000 |          1019 s    0.28 |           1249 s    0.35      21
+         6    0.0010 |          1021 s    0.28 |           1253 s    0.35      21
+         8    0.0020 |          1024 s    0.28 |           1257 s    0.35      21
+        10    0.0424 |          1153 s    0.32 |           1438 s    0.40      24
+        12    0.0828 |          1314 s    0.36 |           1670 s    0.46      28
+        13    0.1336 |          1582 s    0.44 |           2075 s    0.58      35
+        14    0.1843 |          1966 s    0.55 |           2688 s    0.75      45
+        15    0.2350 |          2551 s    0.71 |           3701 s    1.03      62
+        16    0.2858 |          3524 s    0.98 |           5597 s    1.55      93
+        18    0.3643 |          7203 s    2.00 |          15438 s    4.29     257
+        20    0.4428 |         29002 s    8.06 |      sin cruce                 
+
+[128 s]
