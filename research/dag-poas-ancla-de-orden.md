@@ -1,6 +1,6 @@
 # Ancla de orden — octava propuesta para un DAG sobre PoAS
 
-**Fecha:** 2026-09-08 · **ESTADO:** ancla **revertida a la cadena seleccionada** tras dos refutaciones (D9-a: U3′ posproceso → R-FIN-11; D9-b: el orden cuenta rojos → R-FIN-1 vuelve a la ronda 7 + R-FIN-12). Solución en `dag-poas-solucion-ancla.md`. **Pendiente de auditar en su forma actual.** Es la **séptima propuesta**
+**Fecha:** 2026-09-08 · **ESTADO:** ⚠️ **REFUTADA TRES VECES** (D9-a: U3′ posproceso; D9-b: el orden cuenta rojos; **D9-c: la posición de cadena cuenta SALTOS y U3′-filtro no filtra**). Ancla actual: **`blue_score` de la cadena seleccionada**, con U3″ dinámica, `S_max` y R-FIN-12 completa — **SIN AUDITAR**. `I`, `c`, `F` **no derivadas** hasta rederivarlas con la `m` del adversario del paper. Ver `dag-poas-ancla-de-orden-auditoria-3.md`. Es la **séptima propuesta**
 (`dag-poas-ancla-de-finalidad.md`) con **una regla reescrita y cuatro constantes derivadas**. Nueve
 de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio está en
 `dag-poas-ancla-de-finalidad-metaauditoria.md`; sus scripts, en `/tmp/d9-ronda7/`.
@@ -105,6 +105,10 @@ Va como **`1/√I`**: **épocas cortas ⇒ más steering.**
 |---|---:|---:|---:|---:|
 | `g` | 44,8 % | 20,1 % | 11,4 % | **3,6 %** |
 
+> ⚠️ **NO DERIVADA (D9-c A1).** El `g` de abajo usaba `m≈4`; con la `m` gratis del adversario del paper
+> (4,5-5,25) y `λ_chain` inflada por el atacante, `g` = 3,8-8,7 %. Primer orden para `g ≤ 3,6 %`:
+> `I ≈ 2,6 h`. Por rederivar con el ancla `blue_score`.
+
 `I = 2 490 s` es el punto donde `g = 3,6 %`, el nivel que la ronda 7 declaró aceptable
 (*«del orden del 3 %, en ≤ 22 % de las épocas»*).
 
@@ -153,31 +157,31 @@ desempate por menor `solution_distance` y nunca por hash, unicidad de billete **
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
 por gossip.
 
-**R-FIN-1 · Posición e inyector — REVERTIDA A LA DE LA RONDA 7 (2026-09-08, tras D9-b A3).**
-`pos(B) = pos(sp(B)) + 1`. El inyector de la época `j` visto desde `B` es `I_j(B) :=` el ancestro de
-la **cadena seleccionada** de `B` en la posición `c·j`. Único por cadena, siempre existe, sin campo
-de cabecera, función de `past(B)`.
+**R-FIN-1 · Inyector por `blue_score` de la cadena seleccionada — TERCER ANCLA (2026-09-08, tras D9-c A1).**
+`I_j(B) :=` el **primer** bloque de la cadena seleccionada de `B` con `blue_score ≥ c·j`, con `c` en
+**azules**, no en saltos. Único por cadena, siempre existe, sin campo de cabecera, función de `past(B)`.
 
-> **Por qué se revierte.** El ancla en el índice del orden total (que esta ronda introdujo) es
-> grindable con copias de billetes ya gastados: el orden **cuenta los rojos**
-> (`model/stores/ghostdag.rs:115-135`, `merge_join_by` de azules y rojos), D9-b lo refutó con
-> contraejemplo determinista. La cadena seleccionada **⊆ azules**, y las copias son rojas en toda
-> vista bajo U3′-filtro: **no pueden estar en la cadena, a ninguna profundidad.** Medido con el
-> mismo ataque: menú real 1,3-2,0 (cadena) frente a 31-41 (orden). Y la cadena **sí tiene
-> teorema**: el paper construye el orden a lo largo de la cadena (§2.4), luego Prop. 7 la cubre.
-> La justificación de §0 de esta ronda era una sobreafirmación mía. Detalle en
-> `dag-poas-solucion-ancla.md`. `c` vuelve a contarse en **posiciones de cadena**: `c = I·λ_chain = 500`.
+> **Historial de anclas.** (1) Índice del orden total: **cuenta rojos** → grindable con copias (D9-b).
+> (2) Posición de cadena `pos(B)=pos(sp(B))+1`: **cuenta saltos**, y `blue_work` no ve saltos → el
+> atacante mueve qué honesto cae en `c·j` solo eligiendo padres; `m` = 4,5-5,25 gratis, hasta 10,7
+> (D9-c A1). (3) **`blue_score`**: es la magnitud que GHOSTDAG maximiza y que un salto no infla.
+> Sugerida por D9-c, **no atacada todavía**.
 
-**R-FIN-12 · Límites de Kaspa, adoptados. (NUEVA.)** `max_block_parents = max(10, min(16, ⌊k/2⌋))`
-= **15** a `k=30` (`bps.rs:57-72`); `mergeset_size_limit = max(180, min(512, 2k))` = **180**
-(`bps.rs:75-80`), contando azules **y** rojos, y superarlo hace el bloque **inválido**
-(`MergeSetTooBig`, `post_pow_validation.rs:30-37`). Acotan la vía de vivacidad de las copias: un
-portador de 200 copias es inválido; un honesto fusiona ≤ 12 por bloque.
+**R-FIN-12 · Reglas de Kaspa, adoptadas COMPLETAS. (Corregida tras D9-c A4/A5.)** No solo los dos
+límites (`max_block_parents = 15`, `mergeset_size_limit = 180` a `k=30`), sino también:
+- **`pick_virtual_parents`** con presupuesto (`virtual_processor/processor.rs:1053`, `:974`): un honesto
+  **nunca** emite `MergeSetTooBig` — el griefing no existe *si se adopta el algoritmo*.
+- **`merge_depth_bound`** (`processes/block_depth.rs`, `post_pow_validation.rs:81-98`,
+  `calc_merge_depth_root` + `kosherizing_blues`) y **`pruning_depth`** (`params.rs:189`): son lo que
+  acota la retrolectura de U2, no el slot de la identidad.
+Pendiente: `pick_virtual_parents` **baraja** (`:1076-1090`); su efecto sobre `m` no está medido.
 
 **R-FIN-1a · Monotonicidad de slot en la cadena seleccionada.** `slot(sp(B)) < slot(B)`; estricta.
 Un bloque cuyo padre seleccionado tenga slot mayor o igual es inválido. (D8 ronda 7, ataque A1;
 D9 demostró que `≤` reabre el ataque.) **Se conserva:** aunque el inyector ya no se lea de la cadena
 seleccionada, la monotonicidad sigue siendo necesaria para R-FIN-7.
+**Y cota superior (D9-c A4): `slot(B) − slot(sp(B)) ≤ S_max`.** Sin ella la justificación de PoT es
+arbitrariamente larga (DoS de verificación) y U2 no tiene ventana. `S_max` por fijar.
 
 **R-FIN-2 · Entropía e instante.** `entropía_j = blake3(chunk(I_j) ‖ pot_output(I_j))`;
 `t_j = slot(I_j) + L`. Antes de `t_j` la entropía no se mezcla, así que durante `[slot(I_j), t_j)`
@@ -194,25 +198,18 @@ bloques de `past(B)` son válidos, y cumple R-FIN-5. Función de `past(B)` y de 
 slot(X))`. Un bloque **MUST NOT** referenciar un bloque de otro flujo. Comprobación **estructural**,
 antes de tocar ningún PoT: **un nodo honesto jamás verifica el PoT de un flujo ajeno.**
 
-**R-FIN-11 · Unicidad de billete: U2 + U3′ como FILTRO. (NUEVA — D9 ronda 8 refutó la forma anterior.)**
-Identidad de billete: `(public_key, sector_index, history_size, chunk, slot)`.
-- **U2 · Repetición en el pasado.** Si `X, B` tienen la misma identidad y `X ∈ past(B)`, entonces
-  `B` es **INVÁLIDO**. Es **consenso**, no filtro de retransmisión: como filtro divergiría el
-  coloreado entre nodos. Sin U2 se rompe «cadena seleccionada ⊆ azules» — contraejemplo de 7
-  bloques ejecutable en `r8_u2.py`, con R-FIN-1a cumplida y el bloque fusionador **rojo en su
-  propio coloreado**.
-- **U3′ · Copias en anticono, como FILTRO DE CANDIDATURA.** De varias copias con la misma
-  identidad, solo la primera en el orden de GHOSTDAG es **candidata** a azul; las demás se marcan
-  rojas **ANTES** de entrar en el voraz k-cluster, no después.
+**R-FIN-11 · Unicidad de billete: U2 + U3″ DINÁMICA. (Corregida tras D9-c A3.)**
+Identidad `(public_key, sector_index, history_size, chunk, slot)`.
+- **U2:** misma identidad con `X ∈ past(B)` ⇒ `B` **inválido**. Consenso, no filtro de retransmisión.
+- **U3″ dinámica:** una copia es candidata a azul solo si su identidad **no es azul en `past(sp)` ni
+  ha sido ya coloreada de azul en este mismo mergeset** (el orden del mergeset es determinista:
+  `sort_blocks` por `(blue_work, desempate)`, luego sigue siendo función de `past(B)`).
 
-> **Por qué el orden importa, y es la refutación de D9.** El voraz de Kaspa recorre el mergeset de
-> **menor a mayor `blue_work`** (`ordering.rs` `SortableBlock::cmp`; `mergeset.rs`
-> `ordered_mergeset_… = sort_blocks(…)`; `protocol.rs:140-142`), así que colorea **lo barato
-> primero**. Con U3′ como *posproceso*, las copias baratas de un mismo billete entran en el voraz,
-> **agotan el presupuesto de `k`** y expulsan a los honestos recientes; solo *después* se degradan.
-> La demostración del Lema 9 supone **1 billete = 1 bloque** (paper, línea 1135) y ahí se rompe.
-> Medido (`r8_lema9e.py`): `δ_ef` = 0,106 / **0,250** / **0,366** / **0,424** a α = 0,10 / 0,25 /
-> 0,33 / 0,40 con posproceso, frente a **0,000 en todas** con filtro. Cota del paper: 0,2424.
+> **Por qué no U3′-filtro.** Miraba solo `past(sp)`: publicando las copias en el **anticono del `sp`**
+> ninguna tiene su original en `past(sp)` y **todas son candidatas** — `filter` ≡ GHOSTDAG sin regla.
+> Un billete = 14 azules (`max_block_parents−1`), 3 de 4 puntas honestas rojas (D9-c, contraejemplo
+> determinista `r8c_a3_filtro.py`). U3″ deja 1 azul por identidad y 0 honestos rojos de más.
+> **PLAUSIBLE, no demostrada** que no reabra otra cosa.
 
 **R-FIN-13 · Ventana del retarget. (NUEVA, 2026-09-08.)** `W_RETARGET ≥ 3 083 slots` con `γ ≤ 0,25`
 (o `W ≥ 12 331` con `γ ≤ 1`). Es lo que hace que `φ_c`, probado sobre **conteo**, valga sobre

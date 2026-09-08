@@ -6,9 +6,7 @@ orden, y un billete ya gastado compra posiciones de índice sin límite.
 **Scripts:** los `sol_*.py` originales estaban en `/tmp` y **se perdieron en el reinicio del 2026-09-08 ~03:30**; los números de abajo quedan registrados aquí y D9-c reconstruye el simulador fiel a Kaspa en `research/scripts/d9-ronda8c/` (rutas duraderas, commiteadas).
 
 > **La solución es revertir el ancla a la de la ronda 7 —posición en la cadena seleccionada— y
-> conservar todo lo demás de la ronda 8. El cambio de ancla que introduje en la ronda 8 fue un
-> error mío, y el ataque de D9-b es su consecuencia directa.**
-
+> ⚠️ **REFUTADA por D9-c (2026-09-08):** la cadena es inmune a que una copia la *ocupe*, pero el ancla no es un bloque, es un **contador de saltos** que `blue_work` no protege; `m` real 4,5-5,25 gratis (mi 1,3-2,0 era contra un atacante retardado, no el del paper). Y U3′-filtro no filtra copias en el anticono del `sp`. Ver `dag-poas-ancla-de-orden-auditoria-3.md`. Sigue en pie de esta nota: §0 (corregido por el Lema A2 de D9-c), §1.3 y R-FIN-12 (ahora completa).
 ---
 
 ## 0 · La corrección que tengo que hacer primero
