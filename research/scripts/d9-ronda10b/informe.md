@@ -52,3 +52,72 @@ monótona (error propio ya declarado por 9a en `r9a_a3_frontera.py:70-76`).
 **Criterio `α`** (`salida_a.txt` §4, `δ=0`, `I = 851 s`): `F_carrera` = 0 s (α=0) · 267 s (0,10) ·
 551 s (0,25) · **1 019 s (0,33)** · 1 249 s (0,35) · 2 462 s (0,40) · 8 352 s (0,45). Se mueve con `α`
 y explota al acercarse a `r = 1`.
+
+---
+
+## B.1 · Palanca «ventaja inicial `3k`» — **VERIFICADO** (la palanca existe y es **débil**)
+
+**Scripts:** `r10b_b1_ventaja.py` → `salida_b1.txt` (69 s); `r10b_b1_extremos.py` → `salida_b1_extremos.txt`.
+
+### La fuente exacta del «máximo real 0,56·3k»
+
+| Dónde | Qué dice |
+|---|---|
+| `research/scripts/d8-ronda8/salida_a6b.txt` **L14-18** (bloque `alpha = 0.33`) | fila `J = 64`: `ventaja MAX = 50`, `/k = 1.67`, **`/3k = 0.56`**, `n_medidas = 7144` |
+| ídem **L2** (cabecera) | **condiciones**: `k=30, 3k=90, mp=15, lambda=1, Delta=4.0, horizonte 1800 s, 12 semillas, maniobra parasita` |
+| `research/scripts/d8-ronda8/d8_a6b_lineas.py:73-80` | definición: `ventaja(t) = blue_work(punta privada) − blue_work(sp honesto)`, máximo sobre la corrida |
+| `research/scripts/d8-ronda8/informe.md:427-430` | transcripción: «Máximo absoluto 50 = 1,67 `k` = 0,56 · `3k`» |
+| `research/dag-poas-ancla-de-orden-auditoria-7.md:183` | «ventaja máxima real **50 = 0,56·3k**, incluso con la parásita» |
+| `research/scripts/d9-ronda9a/informe.md` §L6 fila 9 | segunda medida, otra maniobra: `adv_max ≤ 43,4 < 3k = 90` (`salida_a4.txt`, 1 152 corridas) |
+
+`1,68k = 0,56·3k = 50,4`; la medida entera es 50.
+
+### `F_carrera` con cada ventaja (`k` físico = 30 en todas las filas, `I = 851 s`)
+
+| Ventaja | valor | 33 %, `δ=0` | 35 %, `δ=0` | 33 %, `δ` D8 | 35 %, `δ` D8 |
+|---|---:|---:|---:|---:|---:|
+| **`3k`** (cota del paper) | 90 | **1 019 s = 0,28 h** | 0,35 h | **0,99 h** | 1,92 h |
+| `2k` | 60 | 875 s = 0,24 h | 0,30 h | 0,89 h | 1,77 h |
+| **`1,68k`** (lo medido) | 50,4 | **828 s = 0,23 h** | 0,29 h | **0,86 h** | 1,72 h |
+| `k` | 30 | 723 s = 0,20 h | 0,25 h | 0,79 h | 1,62 h |
+| *(ventaja 0, referencia)* | 0 | 559 s = 0,16 h | — | — | — |
+
+**Criterio `α`** (`δ=0`): el ahorro de pasar de `3k` a `1,68k` es 27,4 % a `α=0,10`, 22,4 % a 0,25,
+**18,7 % a 0,33**, 17,5 % a 0,35 y 13,9 % a 0,40 — se mueve con `α` y **decrece** cuando `α` sube, que
+es lo esperado (cerca de `r=1` manda la deriva, no el desplazamiento inicial).
+
+**Sensibilidad:** `dF_carrera/d(ventaja) ≈ 4,6-5,6 s por bloque` a `α = 0,33`. Los 40 bloques que hay
+entre `3k` y `1,68k` valen **191 s = 3,2 minutos**.
+
+### ¿Es legítimo diseñar con la ventaja medida? — **NO. Etiqueta: PLAUSIBLE que no lo sea, y en todo caso IRRELEVANTE**
+
+Tres razones, en orden de peso:
+
+1. **No compra casi nada.** 3,2 minutos de `F` en el modelo `δ=0` y 7,8 min en el pesimista. Cambiar
+   una cota **demostrada** por una medida para ganar tres minutos es un mal negocio de auditoría.
+2. **El paper no usa `3k` como «la ventaja típica», sino como una hipótesis explícitamente saturada.**
+   `research/fuentes/phantom-ghostdag.txt` **L1234-1238**: *«the Freeloader Bound guarantees that if the
+   selected tip at time t was freeloading, adv(t) is bounded by a constant 3k. Therefore, **by assuming
+   the attacker always manages to saturate this constant, so that their advantage never goes below 3k**,
+   we can shift the process adv′(t) by 3k and analyze it as a block race»*. La cota es lo que hace que
+   el resto del análisis sea una carrera de Nakamoto limpia. Sustituirla por una medida obliga a rehacer
+   el argumento de Lema 10, no solo a cambiar un número.
+3. **La medida es un máximo sobre 6 h de tiempo simulado; `F_carrera` es una unión sobre 10 años.**
+   D8 observó `12 × 1 800 s = 21 600` bloques; diez años son `3,15·10⁸`, **14 600×** más. La cola de
+   `adv` es geométrica de base `r` (el propio L1232-1236), luego el máximo crece como `ln N/ln(1/r)`:
+
+   | `α` | `r` (`δ=0`) | medido (1 800 s) | incremento a 10 años | máx. 10 años estimado | vs `3k=90` |
+   |---:|---:|---:|---:|---:|---|
+   | 0,10 | 0,111 | 17 | +4,4 | 21,4 | por debajo |
+   | 0,25 | 0,333 | 30 | +8,7 | 38,7 | por debajo |
+   | **0,33** | 0,493 | **50** | **+13,5** | **63,5** | por debajo |
+   | 0,40 | 0,667 | 41 | +23,6 | 64,6 | por debajo |
+
+   El margen a `α = 0,33` no es de 40 bloques (90−50) sino de ~26 (90−63,5), y a `α = 0,40` de 25. La
+   cota **sigue sin saturarse**, lo que confirma que es conservadora — pero **1,68k no es el número que
+   habría que poner** si se decidiera diseñar con la ventaja real: sería ~2,1k, y con una extrapolación
+   PLAUSIBLE, no medida.
+
+**Recomendación B.1: mantener `3k`.** Es la única de las cinco palancas que se puede tocar sin coste
+externo y es la que menos da. Se anota como colchón oculto: el diseño está pagando ~3 min de `F`
+por conservar una cota demostrada, y ese es un precio bueno.

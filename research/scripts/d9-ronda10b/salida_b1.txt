@@ -1,0 +1,32 @@
+=== B.1 · ventaja inicial de la carrera (Lema 10) ===
+k fisico = 30 en todas las filas; solo cambia el desplazamiento 3k de la carrera.
+I = 851 s, objetivo union 10 anos < 1e-10.
+
+                     ventaja   valor |   F_carrera 33 % d=0     35 % d=0 |     33 % dD8     35 % dD8
+                          3k    90.0 |          1019 s  0.28 h       0.35 h |       0.99 h       1.92 h
+                          2k    60.0 |           875 s  0.24 h       0.30 h |       0.89 h       1.77 h
+  1,68k (0,56*3k, medida D8)    50.4 |           828 s  0.23 h       0.29 h |       0.86 h       1.72 h
+                           k    30.0 |           723 s  0.20 h       0.25 h |       0.79 h       1.62 h
+
+--- criterio alpha: ventaja 3k vs 1,68k a lo largo de alpha (delta = 0) ---
+ alpha |      3k = 90   1,68k = 50,4     k = 30 |  ahorro 3k->1,68k
+  0.00 |          0 s            0 s        0 s |             0.0%
+  0.10 |        267 s          194 s      152 s |            27.4%
+  0.25 |        551 s          428 s      358 s |            22.4%
+  0.33 |       1019 s          828 s      723 s |            18.7%
+  0.35 |       1249 s         1031 s      910 s |            17.5%
+  0.40 |       2462 s         2121 s     1935 s |            13.9%
+
+--- sensibilidad: cuanta F compra cada bloque de ventaja (delta = 0, alpha = 0,33) ---
+ ventaja  F_carrera (s)   dF/dventaja (s/bloque)
+     0.0            559 
+    15.0            642                      5.6
+    30.0            723                      5.4
+    45.0            800                      5.2
+    50.4            828                      5.2
+    60.0            875                      4.9
+    75.0            948                      4.8
+    90.0           1019                      4.7
+   120.0           1157                      4.6
+
+[69 s]
