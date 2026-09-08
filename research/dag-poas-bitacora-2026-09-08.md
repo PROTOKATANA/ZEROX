@@ -202,4 +202,21 @@ contra el diseño corregido. `Δ` espera al nodo.
      ChaCha no tiene instrucción de hardware en las CPU y el hueco CPU↔ASIC crece; la «seguridad» de ChaCha en los
      artículos citados es de cifrado AEAD (nonces, canales laterales) y no aplica a un PoT cuya semilla es pública.
 3. **Cabecera de P-038 en el vault actualizada** (decía «ancla por corregir», de la ronda 7).
+4. **La frontera SÍ depende de `F` — medido** (`research/scripts/verif_frontera_vs_F.py`, instrumento de 9a sin tocar,
+   control reproduce 46,8784 % / 36,5431 %). Katana preguntó si acortar `F` es «mejor para la seguridad»: lo es contra el
+   *sembrador* (plotter rápido: lookahead `I+F` más corto) y **peor contra el *corredor*** (carrera de bloques dentro de `F`):
+
+   | `F` | `I` | frontera `δ = 0` (9a) | frontera `δ` D8 (pesimista) | unión 10 años a 33 %, `δ = 0` / `δ` D8 |
+   |---:|---:|---:|---:|---|
+   | 5,3 h | 4 200 s | 46,88 % | 36,54 % | 3,8e-211 / 2,1e-103 |
+   | **2 h** | 851 s | **44,57 %** | **35,08 %** | 1,4e-169 / 3,1e-32 |
+   | 1,07 h | 851 s | 42,28 % | 33,29 % | 5,0e-83 / 1,7e-12 |
+   | 0,34 h | 851 s | 34,81 % | **28,74 %** | 8,7e-16 / **1,0** |
+
+   `F_carrera` (unión 10 años = 1e-10, `I = 851 s`): 33 % → 0,28 h (`δ=0`) / 0,99 h (`δ` D8); 35 % → 0,35 h / 1,92 h.
+   **Consecuencia:** el suelo de `F` lo pone el corredor, no el steering. Con `F = 2 h` el 33 % conserva 11,6 puntos
+   (`δ=0`) y 2,1 puntos (pesimista); con 20 min el 33 % **cae** en el modelo pesimista. La revelación retardada quita el
+   plazo del steering pero no puede bajar `F` por debajo de `F_carrera`; «F corta» tiene un suelo de ~1 h si se quiere
+   colchón en el modelo pesimista, ~0,3 h si solo se cree el verificado. Todo a `Δ = 4 s` (`k = 30`).
+
 
