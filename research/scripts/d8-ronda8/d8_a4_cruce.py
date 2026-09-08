@@ -136,23 +136,36 @@ if __name__ == "__main__":
           f"S_max={S_MAX:.0f} s (R-FIN-1a).\n")
     t0 = time.time()
 
-    print("--- (1)+(2) `m` frente al HORIZONTE, con y sin retencion/retraso ---")
+    print("--- (1) `m` frente al HORIZONTE, familia FIJA (la literal de D9-f, sin "
+          "retencion): si `m` no crece con el horizonte, I y F no estan infradimensionadas ---")
     print(f"{'HOR':>6} {'P':>4} {'alpha':>6} | {'m medio':>8} {'m max':>6} {'nA':>6} "
-          f"{'estrat':>7} {'equiv!=':>8} | {'m medio (sin ret.)':>18}")
+          f"{'estrat':>7} {'equiv!=':>8}")
     for HOR, P in ((260.0, 30), (500.0, 60), (900.0, 110), (1500.0, 190)):
         for alpha in ALPHAS:
-            rs = [mide(alpha, s, HOR, P) for s in SEMS]
-            rs = [r for r in rs if r]
-            r2 = [mide(alpha, s, HOR, P, con_retraso=False, con_retencion=False)
+            rs = [mide(alpha, s, HOR, P, con_retraso=False, con_retencion=False)
                   for s in SEMS]
-            r2 = [r for r in r2 if r]
+            rs = [r for r in rs if r]
             if not rs:
                 print(f"{HOR:>6.0f} {P:>4} {alpha:>6.2f} | sin datos"); continue
             n = len(rs)
             print(f"{HOR:>6.0f} {P:>4} {alpha:>6.2f} | {sum(x[0] for x in rs)/n:>8.3f} "
                   f"{max(x[1] for x in rs):>6} {sum(x[2] for x in rs):>6} "
-                  f"{sum(x[3] for x in rs)/n:>7.0f} {sum(x[4] for x in rs):>8} | "
-                  f"{sum(x[0] for x in r2)/max(len(r2),1):>18.3f}")
+                  f"{sum(x[3] for x in rs)/n:>7.0f} {sum(x[4] for x in rs):>8}")
+        print()
+
+    print("--- (2) RETENCION hasta S_max = 150 s: familia completa, horizonte 260 y 500 s ---")
+    print(f"{'HOR':>6} {'P':>4} {'alpha':>6} | {'m medio':>8} {'m max':>6} {'nA':>6} "
+          f"{'estrat':>7} {'equiv!=':>8}")
+    for HOR, P in ((260.0, 30), (500.0, 60)):
+        for alpha in ALPHAS:
+            rs = [mide(alpha, s, HOR, P) for s in SEMS]
+            rs = [r for r in rs if r]
+            if not rs:
+                print(f"{HOR:>6.0f} {P:>4} {alpha:>6.2f} | sin datos"); continue
+            n = len(rs)
+            print(f"{HOR:>6.0f} {P:>4} {alpha:>6.2f} | {sum(x[0] for x in rs)/n:>8.3f} "
+                  f"{max(x[1] for x in rs):>6} {sum(x[2] for x in rs):>6} "
+                  f"{sum(x[3] for x in rs)/n:>7.0f} {sum(x[4] for x in rs):>8}")
         print()
 
     print("--- (3) rachas de epocas consecutivas capturadas por el atacante ---")

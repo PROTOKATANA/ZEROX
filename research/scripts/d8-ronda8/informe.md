@@ -314,3 +314,95 @@ las tablas de precios del propio proyecto. El diseño **sólo se sostiene sobre 
 (2,548), no sobre su garantía**; y aun así su margen frente al escenario tecnológico que él
 mismo enumera es **0,67×**.
 
+
+## A5 · Soborno BDK+19 §2 portado a PoAS — **REFUTADO (por otra vía que la del paper)**
+
+**Scripts:** `d8_a5_soborno.py` → `salida_a5.txt`; `d8_a5b_equilibrio.py` → `salida_a5b.txt`.
+
+### A5.1 · La aritmética de BDK **no** porta — y hay que decirlo primero
+
+`bdk19.txt` L284-296: *«If the adversary gets more than κ+1 miners to respond… it only
+requires κ+1 out of the next 2κ miners each holding a potentially infinitesimal fraction of
+stake»*. Eso funciona porque **en Ouroboros cada slot tiene un líder exclusivo**: vaciando
+κ+1 de 2κ+1 slots, la cadena honesta sólo puede tener κ bloques y la bifurcación sobornada
+es más larga por construcción.
+
+**En PoAS no hay calendario exclusivo.** Ganar es un Poisson sobre el espacio: sobornar `β`
+da tasa `βλ` y los no sobornados siguen a `(1−β)λ`. Para superar a la cadena honesta hace
+falta `β` por encima del umbral del sistema (35-40 %, §A1), no `κ+1` granjeros
+infinitesimales. **El doble gasto de BDK §2 NO se compra con la ventana de predicción.**
+
+### A5.2 · Lo que sí se compra: el ancla, a precio de saldo
+
+R-FIN-1 lee `I_j` = el bloque de cadena con menor `blue_work` con `slot ≥ T_j`. R-FIN-2 fija
+la entropía en `slot(I_j)` y la aplica `L = F = 5,3 h` después: **todo granjero conoce sus
+victorias con 5,3 h de antelación**. El sobornador también. Le basta con pagar a los pocos
+que van a producir los bloques del cruce para que **retengan** — no para que equivoquen: sin
+doble firma, la negabilidad de BDK (L299-301) queda intacta y U3″ ni se entera.
+
+**Medido** (`salida_a5.txt`, `MundoSoborno`, 12 semillas × 21 umbrales, horizonte 400 s):
+
+| `α` | b=0 | b=1 | b=2 | b=3 | b=5 | b=8 |
+|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | **1,000** | 2,000 | 3,000 | 4,000 | 6,000 | 9,000 |
+| 0,10 | 1,000 | 2,000 | 3,000 | 4,000 | 6,000 | 9,000 |
+| 0,25 | 1,000 | 2,000 | 3,000 | 4,000 | 6,000 | 9,000 |
+| 0,33 | 1,000 | 2,000 | 3,000 | 4,000 | 6,000 | 9,000 |
+
+**`m = b + 1`, exactamente, y con independencia de `α`.** Capacidad ✓ (`b=0 ⇒ m=1`: sin
+soborno no hay menú). El resultado más importante es la **columna `α = 0`**: el sobornador
+**no necesita espacio propio para fabricar candidatos, sólo dinero para retirarlos**. Toda la
+derivación de `I` y `F` supone lo contrario: `m` es la que un atacante consigue **produciendo
+sus propios bloques** (`m = 2,548`, D9-f). Con soborno **`m` es una variable de decisión del
+atacante**, no una propiedad del protocolo.
+
+### A5.3 · El balance, con las constantes publicadas
+
+`valor = c_m·√(αλI)` bloques/época (el modelo del propio diseño,
+`dag-poas-voto-auditoria.md` L197-199); `coste ≥ b = m−1` bloques (una recompensa por
+granjero retirado — **cota inferior del coste**, así que el resultado es el favorable al
+atacante y hay que leerlo como tal).
+
+| `α` | b=1 | b=2 | b=4 | b=8 | b=16 | b=32 | b=64 | **b máx rentable** |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0,10 | 11,6 | 8,7 | 6,0 | 3,8 | 2,3 | 1,3 | 0,75 | **45** |
+| 0,25 | 18,3 | 13,7 | 9,4 | 6,0 | 3,6 | 2,1 | 1,19 | **78** |
+| 0,40 | 23,1 | 17,3 | 11,9 | 7,6 | 4,6 | 2,7 | 1,50 | **103** |
+
+**Un solo soborno rinde 12-23× su coste.** El steering deja de ser un `g = 3,6 %` acotado por
+la capacidad del atacante y pasa a ser un mercado.
+
+### A5.4 · El punto fijo que rompe el diseño
+
+Si `m` la elige el sobornador, `I = (c_m/g)²/(αλ)` hay que redimensionarla para **su** `m`, y
+`F = I/(W/κ − 1)`, y `lookahead = I + F` — que tiene techo económico (§A6). Punto fijo del
+sobornador racional (`argmax` valor − coste), `salida_a5b.txt`:
+
+| `α` | **`m*`** | `c_m*` | `I` (h) | `F` (h) | **lookahead (h)** | margen vs `A*`=41 h |
+|---:|---:|---:|---:|---:|---:|---:|
+| **0,10** (el que usa el diseño) | **23** | 1,929 | 7,98 | 36,26 | **44,24** | **0,93×** |
+| 0,25 | 23 | 1,929 | 3,19 | 14,50 | 17,69 | 2,32× |
+| 0,33 | 23 | 1,929 | 2,42 | 10,99 | 13,40 | 3,06× |
+| 0,40 | 23 | 1,929 | 1,99 | 9,06 | 11,06 | 3,71× |
+
+Y el **tope duro es R-FIN-1a, que resulta ser la propia «garantía por construcción»**:
+retirar `b` bloques de cadena consecutivos abre un hueco de `b/λ` segundos, y R-FIN-1a lo
+corta en `S_max`. Luego `m ≤ 1 + λ·S_max` — **la misma cota que el diseño trata como lejana**.
+
+| `S_max` | `m ≤ 1+λ·S_max` | `I` (h) | `F` (h) | lookahead (h) | margen vs `A*`=41 h |
+|---:|---:|---:|---:|---:|---:|
+| 20 s | 21 | 7,65 | 34,77 | 42,42 | **0,97×** |
+| 30 s | 31 | 9,06 | 41,20 | 50,27 | **0,82×** |
+| 150 s | 151 | 15,07 | 68,49 | 83,56 | **0,49×** |
+
+**Etiqueta: REFUTADO.** No por el mecanismo del paper, sino por el que la ventana de
+predicción habilita en PoAS: **el soborno desacopla `m` de `α`**, y `m` es la variable de la
+que cuelgan `I`, `F` y el lookahead. El diseño mide `m = 2,548` suponiendo un atacante que
+sólo puede usar sus propios bloques; con `1-23` recompensas por época esa suposición no se
+sostiene, y el lookahead resultante (44 h con `α = 0,10`) **cae por debajo de `A*` = 41 h**.
+
+**Lo que NO afirmo:** que el sobornador consiga un doble gasto (A5.1 dice que no), ni que el
+coste real del soborno sea exactamente una recompensa (es la cota inferior; con una prima de
+`p×` el `b` rentable cae a `b_max/p` y `m*` con él). Con `p = 3`, `m* ≈ 12` y el lookahead a
+`α=0,10` sigue en 34 h (margen 1,2× frente a `A*`, 0,12× frente al plotter 10×).
+
