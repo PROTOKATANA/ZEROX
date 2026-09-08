@@ -8,6 +8,7 @@ Detector de tautologías en scripts de auditoría. Reescrito tras el reinicio de
       éxitos» con un adversario que no existía.
   T2  Un resultado asignado a un literal numérico/booleano DESPUÉS de haberse calculado en la misma
       función (payoffs cableados: r7_q2 `payoffs[2] = 0.5`).
+  T4  Menos de 12 semillas literales en `seeds`/`semillas` (D9-e casi firmó +11,8 % con 3).
   T3  Comparación de una expresión consigo misma (`x != x`), o dos variables distintas asignadas
       con la MISMA expresión larga y luego comparadas (d8b_b3: `Ij_A`, `Ij_B` = misma variable).
 
@@ -54,6 +55,13 @@ def revisa(path):
             nombres = {t[0] for t in ts}
             if len(nombres) > 1 and not any(tok in src for tok in ("random", "rng", "np.")):
                 out.append(("T3b", ts[0][1], f"{sorted(nombres)} = MISMA expresión: {src[:70]}"))
+    # T4 · semillas insuficientes (lección D9-e: casi firmó un +11,8 % con 3 semillas)
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name) \
+           and n.targets[0].id.lower() in ("seeds", "semillas", "seed_list") and isinstance(n.value, (ast.List, ast.Tuple)):
+            k = len(n.value.elts)
+            if 0 < k < 12:
+                out.append(("T4", n.lineno, f"solo {k} semillas literales en '{n.targets[0].id}' (mínimo del método: 12)"))
     # T3 · comparación consigo mismo
     for n in ast.walk(tree):
         if isinstance(n, ast.Compare) and len(n.comparators) == 1 and ast.unparse(n.left) == ast.unparse(n.comparators[0]):
