@@ -139,3 +139,102 @@ lookahead de Autonomys, no 2 100×.
 
 **Veredicto B: VERIFICADO** (cadena de derivación completa, con fichero y línea; secuencialidad
 demostrada por construcción de la cadena AES).
+
+---
+
+## Controles (regla de método 4) — `r9c_c0_control.py`, `salida_c0.txt`
+
+| Control | Resultado |
+|---|---|
+| C1 · `c_m` contra lo publicado (`dag-poas-voto-auditoria.md` L199) | `c_2 = 0,5642` (pub. 0,564), `c_4 = 1,0294` (pub. 1,029) — **OK** |
+| C2 · negativo, `α = 0` | menú del ancla = **1** en las 12 semillas y en los dos `S_max`. El instrumento no inventa cambios |
+| C3 · positivo, `α > 0`, decisión libre | el ancla **sí** cambia: 6/12 mundos a `α=0,10`; **12/12** a 0,25 / 0,33 / 0,40; hasta **4 anclas distintas**. El instrumento no es ciego |
+| C4 · R-FIN-1a | **0 violaciones** en 751 053 aristas de cadena comprobadas |
+| C5 · lectura del ancla | «menor `blue_work` con `slot ≥ T`» ≡ «primero de la cadena con `slot ≥ T`»: 540 comprobaciones, **0 discrepancias** |
+
+**Cobertura de rama** (`COB`, tras C0): `sp_filtrado_h = 124`, `sin_sp_h = 12`,
+`sp_filtrado_a = 2`, **`sin_sp_a = 0` — rama NO EJERCITADA**, se declara: nunca ocurrió que el
+atacante se quedase sin ningún padre válido bajo R-FIN-1a. `bloques_h = 1 201 200`,
+`bloques_a = 385 886`, `retenidos = 17 438`, `liberados = 15 518`.
+
+---
+
+## D · El steering con evaluación acotada — `r9c_d1_steering.py`, `salida_d1.txt`
+
+### D.1 · ¿Es exacta la fórmula `c_m·√(αλ·n_eval)`? — sí, y ligeramente **conservadora**
+
+Simulación de la lotería: `m` corrientes Poisson independientes, se observan los `n_eval`
+primeros slots de cada una, se elige la de más victorias, y se suman las victorias del resto
+de la época. 12 semillas literales × 40 000 épocas, `I = 4 200`, Poisson exacto (numpy).
+
+| `α` | `m` | `n_eval` | ganancia medida | `c_m·√(αλn)` | razón | `E[resto]` medido | teórico |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | 3 | 150 | **0,000** | 0,000 | — | 0,00 | 0,00 |
+| 0,10 | 3 | 150 | 3,285 | 3,278 | **1,002** | 404,99 | 405,00 |
+| 0,10 | 3 | 4 200 | 17,345 | 17,344 | **1,000** | 0,00 | 0,00 |
+| 0,25 | 3 | 150 | 5,184 | 5,182 | **1,000** | 1 012,48 | 1 012,50 |
+| 0,33 | 3 | 150 | 5,951 | 5,954 | **0,999** | 1 336,47 | 1 336,50 |
+| 0,40 | 3 | 150 | 6,540 | 6,555 | 0,998 | 1 619,96 | 1 620,00 |
+| 0,33 | 23 | 150 | 14,023 | 13,573 | 1,033 | 1 336,48 | 1 336,50 |
+| 0,33 | 151 | 150 | 19,646 | 18,655 | **1,053** | 1 336,51 | 1 336,50 |
+
+- **Exacta para `m` pequeña** (razón 0,998-1,002), la que decide el diseño.
+- **Subestima 3-10 % para `m` grande** (23, 151): `c_m` es la esperanza del máximo de `m`
+  **normales**, y el máximo de `m` Poisson con media 15-60 es algo mayor por la asimetría.
+  Es un error **a favor del atacante** en las tablas publicadas — pequeño, y se declara.
+- `E[resto]` coincide con `(I − n_eval)·αλ` en las 4 cifras: **la selección no contamina el
+  resto de la época**.
+
+> **Corrección de mi propio método (regla 10).** Que `E[resto]` salga exacto **no lo demuestra**:
+> en mi simulación el resto se sortea independiente **por construcción**. Lo que sí es
+> argumento: por R-FIN-2/R-FIN-3 la entropía es **una sola por época** y el reto de cada slot
+> sale del PoT, que no depende de qué bloques se hayan minado; modelando `blake3∘AES` como
+> oráculo aleatorio, los slots `> n_eval` son independientes de los `≤ n_eval`.
+> **PLAUSIBLE, no DEMOSTRADO.** Residuo declarado: el **retarget** sí acopla (una racha
+> temprana estrecha `solution_range`), y el acoplamiento va **en contra** del atacante.
+
+### D.2 · Control de reproducción, y la tabla recalculada
+
+Control (lectura LIBRE, `m_dis = 2,822`, `α_cal = 0,10`, `A* = 4,1 h` esc. B con plotter 10×):
+
+| `g` | `I` | `F` | `I+F` | `α_ef(m=2,8)` | `α_ef(m=151)` | margen |
+|---:|---:|---:|---:|---:|---:|---:|
+| 3,6 % | 4 890 s | 6,17 h | 7,53 h | 33,4 % | 34,5 % | 0,54× |
+| 7,0 % | 1 293 s | 1,63 h | 1,99 h | 33,9 % | 35,8 % | 2,06× |
+
+**Idénticos a los publicados** en `dag-poas-tras-d8-palancas.md` §2 P3. El instrumento reproduce.
+
+**Hallazgo D2 (el que importa, y que P4 no dice).** `α_ef` a un `g` objetivo dado **no cambia**
+con la evaluación acotada: es una identidad, `g(33 %) = g_obj·(c_{m_compra}/c_{m_dis})·√(α_cal/0,33)`
+en las dos lecturas. **Lo que cambia es el PRECIO de ese `g`:** `I` deja de escalar como `1/g²`
+y pasa a escalar como `1/g`, y sobre todo deja de escalar con `I` mismo:
+
+```
+LIBRE   :  I = (c_m/g)² / (αλ)                    (n_eval = I, autoreferente)
+ACOTADA :  I = c_m·√(n_eval/(αλ)) / g             (n_eval constante, exógena)
+```
+
+Tabla P3 **recalculada** (`m_dis = 2,955`; `α_ef` a `α = 0,33`; `A* = 4,1 h`):
+
+| lectura | `g` | `I` | `F` | `I+F` | `α_ef(m=2,955)` | `α_ef(m=23)` | `α_ef(m=151)` | margen |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| LIBRE (hoy) | 3,6 % | 5 362 s | 6,77 h | 8,26 h | 33,44 % | 34,01 % | 34,39 % | **0,50×** |
+| LIBRE | 7,0 % | 1 418 s | 1,79 h | 2,18 h | 33,85 % | 34,97 % | 35,71 % | 1,88× |
+| **`n_eval`=150** | **3,6 %** | **897 s** | **1,13 h** | **1,38 h** | 33,44 % | 34,01 % | 34,39 % | **2,97×** |
+| `n_eval`=150 | 7,0 % | 461 s | 0,58 h | 0,71 h | 33,85 % | 34,97 % | 35,71 % | 5,77× |
+| `n_eval`=225 (ρ=1,5) | 3,6 % | 1 099 s | 1,39 h | 1,69 h | 33,44 % | 34,01 % | 34,39 % | 2,42× |
+| `n_eval`=450 (ρ=3) | 3,6 % | 1 554 s | 1,96 h | 2,39 h | 33,44 % | 34,01 % | 34,39 % | 1,71× |
+| `n_eval`=45 (carrera `k`) | 3,6 % | 491 s | 0,62 h | 0,76 h | 33,44 % | 34,01 % | 34,39 % | 5,42× |
+
+**Lo que compra P4, en una línea:** con el **mismo** steering (3,6 %) y el **mismo** `α_ef`,
+`I+F` baja de **8,26 h a 1,38 h** (×6,0) y el margen económico frente a un plotter 10× pasa de
+**0,50× (INSUFICIENTE) a 2,97× (suficiente)**. `F = 5,3 h` se convierte en `F ≈ 1,1 h`.
+
+`c_m` usados (integración numérica, `r8c_steering.c_m`): `c_2,822 = 0,7961`,
+`c_2,955 = 0,8336`, `c_23 = 1,9292`, `c_151 = 2,6515`.
+
+**Veredicto D: VERIFICADO** que la fórmula `c_m·√(αλ·n_eval)` es correcta (conservadora ≤ 5,3 %
+para `m ≤ 151`); **REFUTADO el enunciado de P4 en su parte de `α_ef`** («el steering baja por
+`√(n_eval/I)`» es cierto **a `I` fija**, pero la propuesta *deriva* `I` del steering: a `g`
+objetivo fijo, `α_ef` no se mueve). **DEMOSTRADO** el beneficio real: es en `I`, `F` y el
+margen económico.
