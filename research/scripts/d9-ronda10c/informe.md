@@ -16,7 +16,9 @@ debajo de `10⁻⁹` a los **217-2 406 s** según `α` y modelo.
 aplicación de la inyección), **no de `F`** — y hoy el diseño los ata. Desatándolos,
 **`L = 1 h`, `F = 2 h`** da el margen de sembrador de `F = 1 h` (**3,6×**), la frontera y la garantía
 de `F = 2 h`, **y cumple la condición literal de BDK (`W/κ = 0,576 ≤ 1`) sin segundo VDF**. Se paga
-en tolerancia a particiones (2 h → 1 h).
+en tolerancia a particiones (2 h → 1 h). Importa porque, **atados**, `F = 1 h` deja al umbral
+operativo del 33 % con **0,05 puntos** de colchón en el modelo pesimista (frontera 33,05 %) frente a
+los **2,08** de `F = 2 h` (35,08 %) — medido en §C.2.
 
 ---
 
@@ -630,9 +632,18 @@ hecho en esta ronda.
 6. **Retirar `W/κ ≤ 1,22` como criterio** y sustituirlo por el literal `W ≤ κ` calculado sobre el
    lookahead real. Con `L` desatada **es alcanzable**; con `L = F` y `ρ > 1,024` **no lo es con
    ninguna `F`**. — DEMOSTRADO sobre el modelo de `W` de §B.2.
-7. **No bajar `F` (ni `L`) por debajo de `F_carrera` del modelo pesimista para perseguir al
-   sembrador.** Bajar de 2 h a 1 h **atados** es gastar los dos puntos de colchón (35 % → 33 %) para
-   subir el margen de 1,9× a 3,6×; desatando `L` se consigue el margen **sin** gastar el colchón.
+7. **No bajar `F` a 1 h atado.** — **VERIFICADO** (§C.2). Con `F = 1 h` la frontera del modelo
+   pesimista es **33,05 %** frente al umbral operativo publicado de **33 %**: **0,05 puntos de
+   colchón, es decir ninguno.** Con `F = 2 h` son **2,08 puntos** (35,08 %). Bajar de 2 h a 1 h
+   **atados** es gastar todo el colchón del umbral para subir el margen del sembrador de 1,9× a 3,6×.
+   **Desatando `L` se consigue exactamente ese margen sin gastar un solo punto de colchón**, y ese es
+   el argumento decisivo a favor de §E.
+8. **Consecuencia para la obligación anotada por Katana** («`F` se baja a 1 h en producción cuando el
+   diseño corregido sobreviva a su ronda adversarial», `dag-poas-bitacora-2026-09-08.md` §11.2):
+   **la obligación, tal como está escrita, hay que reformularla.** Lo que hay que bajar a 1 h es
+   **`L`**, no `F` — y con eso se obtiene todo lo que se buscaba (margen de sembrador, `W/κ` dentro de
+   BDK) sin tocar la frontera ni la garantía. — **VERIFICADO** el número; **PLAUSIBLE** el mecanismo
+   de `L` (§E).
 
 <a name="auditoria"></a>
 ## Auditoría de scripts (regla de método 10)
@@ -678,6 +689,7 @@ y el criterio `α` de las tablas se comprueba precisamente **comparando** las do
 | **C** · suelo de espera | **VERIFICADO** | `≈ 3k/((1−α)λ) = 100-134 s`: **ninguna confirmación es posible antes**, con ningún `F` |
 | **D** · qué término manda | **VERIFICADO** | `α=0,33`, `δ=0`: **`F_carrera` 0,28-0,29 h**, salvo `ρ_max=3` donde manda la **pinza, 0,69 h**. `α=0,33` pesimista: **`F_carrera` 0,99-1,00 h** en todas. `α=0,35` pesimista: `F_carrera` **1,92-1,94 h**, y el núcleo con `ρ>1` **no cabe** con margen ≥ 3× |
 | **D** · el precio de (h) | **PLAUSIBLE** (derivado del coste medido por slot) | **40,7 %** de un núcleo a `F = 1 h`, **81,3 %** a `F = 2 h`, **215 %** a `F = 5,3 h` (con `I = 851 s`), además del 9,6 % de la cadena principal |
+| **C** · frontera vs `F` | **VERIFICADO** (reproduce lo publicado) | `δ=0` / pesimista con `I=851`: 0,34 h **34,81 / 28,74 %** · 1 h **41,98 / 33,05 %** · 2 h **44,57 / 35,08 %** · 5,3 h **46,81 / 36,50 %**. Con `F = 1 h` el umbral del 33 % conserva **0,05 puntos**; con 2 h, **2,08** |
 | **E** · `L` desatada de `F` | **PLAUSIBLE** | `L = 1 h`, `F = 2 h`, `ρ=3`: lookahead **4 146 s**, margen **3,6×**, **`W/κ = 0,576` (dentro de BDK)**; coste: tolerancia a particiones 2 h → 1 h |
 
 <a name="errores"></a>
