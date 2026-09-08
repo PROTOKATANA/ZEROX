@@ -899,6 +899,25 @@ Seis órdenes, no veinte. Sigue siendo la ventaja real del DAG, y ahora está bi
 
 ---
 
+## 10 sexies · CORRECCIÓN 6 — la cadena seleccionada SÍ tiene teorema; mi cambio de ancla fue el error
+
+En §9 y §10 bis afirmé que *«GHOSTDAG garantiza el orden total; no garantiza qué bloque ocupa una
+posición dada de la cadena seleccionada»* y sobre eso cambié el ancla al índice del orden en la
+ronda 8. **Era una sobreafirmación.** El paper (§2.4, líneas 290-300 del fichero local) construye
+el orden **a lo largo de la cadena seleccionada**: *«We order the blockDAG by **first inheriting
+the order of Bmax on blocks in past(Bmax), then adding Bmax itself**… the order over blocks becomes
+robust as the colouring»*. Si la cadena cambia a profundidad `d`, el orden cambia a profundidad
+≤ `d`; luego **orden estable ⇒ cadena estable**, y **Prop. 7 cubre la cadena** como consecuencia.
+Lo no monótono es el *blue score del virtual* (la punta), no el prefijo profundo.
+
+Consecuencia: el ancla en el índice del orden **no tenía mejor cimiento** que la de la ronda 7, y
+sí un fallo nuevo — el orden cuenta los rojos (D9-b, A3). **La solución es revertir el ancla a la
+cadena seleccionada**, que es inmune a las copias porque cadena ⊆ azules y las copias son rojas
+en toda vista (verificado: menú real 1,3-2,0 frente a 31-41 del orden). Detalle y scripts en
+`dag-poas-solucion-ancla.md`.
+
+---
+
 ## 11 · Reproducción
 
 ```bash

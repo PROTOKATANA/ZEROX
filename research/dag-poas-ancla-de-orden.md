@@ -1,6 +1,6 @@
 # Ancla de orden — octava propuesta para un DAG sobre PoAS
 
-**Fecha:** 2026-09-08 · ⚠️ **REFUTADA DOS VECES.** D9-a refutó la forma posproceso de U3′ (arreglada con R-FIN-11); D9-b refutó **R-FIN-11 misma**: el filtro deja las copias **rojas pero vivas en el orden**, y R-FIN-1 lee de ese orden. Ver `dag-poas-ancla-de-orden-auditoria.md` y `-auditoria-2.md`. Es la **séptima propuesta**
+**Fecha:** 2026-09-08 · **ESTADO:** ancla **revertida a la cadena seleccionada** tras dos refutaciones (D9-a: U3′ posproceso → R-FIN-11; D9-b: el orden cuenta rojos → R-FIN-1 vuelve a la ronda 7 + R-FIN-12). Solución en `dag-poas-solucion-ancla.md`. **Pendiente de auditar en su forma actual.** Es la **séptima propuesta**
 (`dag-poas-ancla-de-finalidad.md`) con **una regla reescrita y cuatro constantes derivadas**. Nueve
 de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio está en
 `dag-poas-ancla-de-finalidad-metaauditoria.md`; sus scripts, en `/tmp/d9-ronda7/`.
@@ -9,7 +9,7 @@ de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio 
 
 | | Ronda 7 | Aquí |
 |---|---|---|
-| **R-FIN-1** · inyector | ancestro en la **posición `c·j` de la cadena seleccionada** | bloque en el **índice `c·j` del orden total** |
+| **R-FIN-1** · inyector | ancestro en la **posición `c·j` de la cadena seleccionada** | ~~índice del orden total~~ → **revertido a la cadena seleccionada** (R-FIN-1, tras D9-b) |
 | `k` | «punto fijo del retarget», sin cerrar frente a la ec. (2) | **25**, derivada |
 | `I` (época) | dos puntos de ejemplo, «ninguno elegido» | **2 490 s**, derivada |
 | `F` (finalidad) | 1 000 s / 4 300 s, ejemplos | **3,2 h**, derivada |
@@ -17,7 +17,7 @@ de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio 
 
 ---
 
-## 0 · Por qué el ancla
+## 0 · Por qué el ancla — ⚠️ SECCIÓN SUPERADA: el argumento de abajo llevó a un ancla grindable (D9-b A3). Se conserva como registro; la justificación vigente está en `dag-poas-solucion-ancla.md` §0
 
 La ronda 7 leía la entropía de «el ancestro en la posición `c·j` de la cadena seleccionada». Leído
 el paper de PHANTOM/GHOSTDAG en local: **«common prefix» aparece 0 veces; «prefix», 0; «stabiliz»,
@@ -139,11 +139,26 @@ desempate por menor `solution_distance` y nunca por hash, unicidad de billete **
 (R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
 por gossip.
 
-**R-FIN-1 · Índice e inyector. ⟵ LA ÚNICA REGLA QUE CAMBIA.**
-`idx(B, X) :=` posición de `X` en el orden total de GHOSTDAG calculado sobre `past(B) ∪ {B}`. El
-inyector de la época `j` visto desde `B` es `I_j(B) :=` el bloque con `idx(B, ·) = c·j`. Único por
-DAG, sin campo de cabecera, función de `past(B)` y de nada más. Sustituye a «ancestro de la cadena
-seleccionada en la posición `c·j`».
+**R-FIN-1 · Posición e inyector — REVERTIDA A LA DE LA RONDA 7 (2026-09-08, tras D9-b A3).**
+`pos(B) = pos(sp(B)) + 1`. El inyector de la época `j` visto desde `B` es `I_j(B) :=` el ancestro de
+la **cadena seleccionada** de `B` en la posición `c·j`. Único por cadena, siempre existe, sin campo
+de cabecera, función de `past(B)`.
+
+> **Por qué se revierte.** El ancla en el índice del orden total (que esta ronda introdujo) es
+> grindable con copias de billetes ya gastados: el orden **cuenta los rojos**
+> (`model/stores/ghostdag.rs:115-135`, `merge_join_by` de azules y rojos), D9-b lo refutó con
+> contraejemplo determinista. La cadena seleccionada **⊆ azules**, y las copias son rojas en toda
+> vista bajo U3′-filtro: **no pueden estar en la cadena, a ninguna profundidad.** Medido con el
+> mismo ataque: menú real 1,3-2,0 (cadena) frente a 31-41 (orden). Y la cadena **sí tiene
+> teorema**: el paper construye el orden a lo largo de la cadena (§2.4), luego Prop. 7 la cubre.
+> La justificación de §0 de esta ronda era una sobreafirmación mía. Detalle en
+> `dag-poas-solucion-ancla.md`. `c` vuelve a contarse en **posiciones de cadena**: `c = I·λ_chain = 500`.
+
+**R-FIN-12 · Límites de Kaspa, adoptados. (NUEVA.)** `max_block_parents = max(10, min(16, ⌊k/2⌋))`
+= **12** a `k=25` (`bps.rs:57-72`); `mergeset_size_limit = max(180, min(512, 2k))` = **180**
+(`bps.rs:75-80`), contando azules **y** rojos, y superarlo hace el bloque **inválido**
+(`MergeSetTooBig`, `post_pow_validation.rs:30-37`). Acotan la vía de vivacidad de las copias: un
+portador de 200 copias es inválido; un honesto fusiona ≤ 12 por bloque.
 
 **R-FIN-1a · Monotonicidad de slot en la cadena seleccionada.** `slot(sp(B)) < slot(B)`; estricta.
 Un bloque cuyo padre seleccionado tenga slot mayor o igual es inválido. (D8 ronda 7, ataque A1;
