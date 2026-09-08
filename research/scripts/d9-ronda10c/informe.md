@@ -12,6 +12,12 @@
 frente a `2 h` **no vale nada**: el riesgo del comerciante no depende de `F` en absoluto y ya está por
 debajo de `10⁻⁹` a los **217-2 406 s** según `α` y modelo.
 
+**Y un hallazgo que el encargo no pedía (§E):** el lookahead depende de **`L`** (el rezago de
+aplicación de la inyección), **no de `F`** — y hoy el diseño los ata. Desatándolos,
+**`L = 1 h`, `F = 2 h`** da el margen de sembrador de `F = 1 h` (**3,6×**), la frontera y la garantía
+de `F = 2 h`, **y cumple la condición literal de BDK (`W/κ = 0,576 ≤ 1`) sin segundo VDF**. Se paga
+en tolerancia a particiones (2 h → 1 h).
+
 ---
 
 ## Índice
@@ -22,6 +28,7 @@ debajo de `10⁻⁹` a los **217-2 406 s** según `α` y modelo.
 - [C · Lo que espera el usuario](#c)
 - [D · Tabla configuración × término → `F`](#d)
 - [E · `L` desatada de `F`: la palanca que faltaba](#e)
+- [Recomendación](#reco)
 - [Auditoría de scripts](#auditoria)
 - [Veredicto](#veredicto) · [Errores propios](#errores)
 
@@ -115,7 +122,7 @@ marginalmente más rápido tiene el lookahead entero.
 | `lookahead = L + I(1−1/v) ≤ L + I` | `dag-poas-ancla-de-finalidad.md:188` (ronda 7 §5.1) | **La cota `L+I` es el rincón `v → ∞`.** Correcta como cota, **8 % holgada** a `ρ=1,5` (7 463 s frente a 8 051 s) y **ciega al acantilado**: esconde que `v=1` da 0 |
 | `W = (L + I)·λ` en la ventana de predicción | `dag-poas-ancla-de-finalidad-metaauditoria.md:215-222` | Hereda el rincón `v → ∞`. Ver B |
 | `I + F` como lookahead publicado (8,26 h → 0,76-1,31 h) | `dag-poas-ancla-de-orden-auditoria-8c.md:80-85`, 9c §C.3 | **Sobrevive como cota**, sobra un 4-8 % |
-| `A* = 41 h` (esc. B, GPU tope ALU) y `A*/10 = 4,1 h` | `dag-poas-ancla-de-finalidad.md:54-70`; `t_plot = 4,28 s` de `research/coste-ploteo-medido.md:228-231` | **Sobrevive sin cambios** (no depende del consenso) |
+| `A* = 41 h` (esc. B, GPU tope ALU) y `A*/10 = 4,1 h` | `dag-poas-ancla-de-finalidad.md:54-70`; `t_plot = 4,28 s` de `research/coste-ploteo-medido.md:231` | **Sobrevive sin cambios** (no depende del consenso) |
 | «margen B, plotter 10×» = `A*_10× / (I+F)` | 9c §D.2/C.3, auditoría 8c §3 | **Sobrevive**, y mejora un 4-8 % al usar el lookahead exacto |
 
 ### A.4 · ¿Puede el sembrador sembrar a tiempo? — con número
@@ -229,6 +236,13 @@ retos futuros. Así que `W = lookahead_max(ρ_max)·λ` (A.1). Con `I = 851 s`, 
 | Núcleo | 3 | 4 146,3 / 7 746,3 | 1,4464 | 1,1518 | **1,0759** | 1,0286 |
 | **(h)** | 1,5 | 283,3 | 0,2315 | 0,0787 | **0,0394** | 0,0148 |
 | **(h)** | 3 | 566,7 | 0,4630 | 0,1574 | **0,0787** | 0,0297 |
+
+> **Nota sobre el `W = 5` de la fila `ρ ≤ 1`.** Es la lectura **conservadora**: `1 + λ·D` con
+> `D = 4 s`, el `BLOCK_AUTHORING_DELAY` de Autonomys (ZEROX **no ha fijado `D`**; R-FIN-14 (d) lo
+> nombra y no le pone valor: LAGUNA menor). La lectura **estricta** es `W = 1`: en el instante `t` el
+> granjero tiene el PoT hasta `t`, así que puede producir el bloque del slot `t` y **ninguno
+> posterior**; el retardo de autoría desplaza la publicación **hacia atrás**, no el reto hacia
+> delante (9c §B.3: el granjero reclama `slot_probado − D`). Con `W = 1` la razón es aún 5× menor.
 
 **Con `ρ ≤ 1` el diseño está tres órdenes de magnitud DENTRO de la zona segura de BDK**, no un 22 %
 fuera. Y el cruce `W = κ` ocurre en `ρ = 1/(1 − W_dec/I) = 1,024` con `I = 851 s`: por debajo de esa
@@ -511,9 +525,9 @@ timelord y si sus checkpoints se pueden solapar con los de la cadena principal.
 ## E · Hallazgo adicional (no pedido): **`L` es una palanca aparte de `F`, y es LA palanca del sembrador** — `r10c_e_palanca_L.py`, `salida_e.txt`
 
 El lookahead del sembrador es `(L − W_dec) + I(1 − 1/ρ)`: **depende de `L`, no de `F`.** Hoy el
-diseño los ata (`dag-poas-ancla-de-orden.md`, nota de R-FIN-7: *«ZEROX `I = 4 200 s`, `F = L = 5,3 h`»*),
+diseño los ata (`dag-poas-ancla-de-orden.md:282`, nota de R-FIN-7: *«ZEROX `I = 4 200 s`, `F = L = 5,3 h`»*),
 y la ronda 7 ya había dejado escrita la alternativa sin explotarla
-(`dag-poas-ancla-de-finalidad.md:99`: *«`L` rezago de aplicación; candidatos: `L = F`
+(`dag-poas-ancla-de-finalidad.md:89`: *«`L` rezago de aplicación; candidatos: `L = F`
 (incondicional) o `L ≈ F/4` (probabilístico, §6)»*). Nadie la revisó después de R-FIN-14, que es
 cuando pasa a importar.
 
@@ -609,7 +623,7 @@ y el criterio `α` de las tablas se comprueba precisamente **comparando** las do
 
 | Punto | Etiqueta | Número |
 |---|---|---|
-| **A** · lookahead honesto (`ρ = 1`) | **DEMOSTRADO** (R-FIN-14 a/b/e + código de Autonomys vía 9c §B.2) **+ VERIFICADO** | **0 slots.** `dag-poas-ancla-de-orden.md` §4.8 («todo granjero conoce sus victorias `L` por adelantado») queda **REFUTADO** bajo R-FIN-14 |
+| **A** · lookahead honesto (`ρ = 1`) | **DEMOSTRADO** (R-FIN-14 a/b/e + código de Autonomys vía 9c §B.2) **+ VERIFICADO** | **0 slots.** `dag-poas-ancla-de-orden.md:374` (§4.8, «todo granjero conoce sus victorias `L` por adelantado») queda **REFUTADO** bajo R-FIN-14 |
 | **A** · lookahead del atacante, núcleo | **VERIFICADO** (dos instrumentos, 0,274 % de discrepancia) | `(L − W_dec) + I(1 − 1/ρ)`; a `F = 2 h`, `I = 851`, `α = 0,33`: **7 462,7 s (`ρ=1,5`)**, **7 746,3 s (`ρ=3`)**; **0 si `ρ ≤ 1`** |
 | **A** · lookahead con (h) | **VERIFICADO** | `I(1 − 1/ρ)`, **independiente de `F`**: 283,3 s (`ρ=1,5`), 566,7 s (`ρ=3`), 765,0 s (`ρ=10`) |
 | **A** · ¿sobrevive el sembrador? | **VERIFICADO** | **Sí para todo `ρ > 1`** (margen 1,91× a `F=2 h`, 3,56× a `F=1 h`, con `ρ=3`); **no para `ρ ≤ 1`** (margen ∞); **casi no, con (h)** (26-52×) |
