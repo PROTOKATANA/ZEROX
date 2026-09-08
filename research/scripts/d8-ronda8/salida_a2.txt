@@ -1,0 +1,23 @@
+=== A2 · P(dos honestos leen I_j distinto) con DOS vistas separadas por Delta ===
+k=30, lambda=1, Delta=4, mp=15, u3=dynamic, horizonte 900 s, 12 semillas, 11 umbrales de PoT, ancla por `slot` (gran = 1 s).
+Familia del atacante: pol in {tips, sp, retro2, retro8} x sesgo in {ambos, A, alterna} x frac in {1,0, 0,5}. Se reporta el MAXIMO sobre la familia.
+Referencia: `p_F` por epoca de dag-poas-recursion-flujos.md §3 (carrera de Nakamoto, base r = alpha/((1-alpha)(1-delta))).
+
+--- MAXIMO sobre la familia del atacante (la fila que cuenta) ---
+ alpha |        D=4        D=8       D=16       D=32       D=64      D=128      D=256      D=512 |  div_sp  sesgados
+--------------------------------------------------------------------------------------------------------------------
+  0.00 |    1.00000    0.88550    0.64394    0.34848    0.08333    0.00758    0.00000    0.00000 |   0.980         0
+  0.10 |    1.00000    0.87023    0.45455    0.17424    0.03788    0.00000    0.00000    0.00000 |   0.952     13304
+  0.25 |    1.00000    0.60800    0.21970    0.01515    0.00000    0.00000    0.00000    0.00000 |   0.895     32412
+  0.33 |    1.00000    0.55285    0.14394    0.01515    0.00000    0.00000    0.00000    0.00000 |   0.866     43044
+  0.40 |    1.00000    0.50407    0.10606    0.01515    0.00000    0.00000    0.00000    0.00000 |   0.839     51344
+
+--- media sobre toda la familia (no el maximo) ---
+ alpha |        D=4        D=8       D=16       D=32       D=64      D=128      D=256      D=512 |  div_sp  sesgados
+  0.00 |    1.00000    0.88550    0.64394    0.34848    0.08333    0.00758    0.00000    0.00000 |   0.980
+  0.10 |    0.86622    0.66762    0.28441    0.08744    0.01042    0.00000    0.00000    0.00000 |   0.952
+  0.25 |    0.70508    0.35980    0.09691    0.00631    0.00000    0.00000    0.00000    0.00000 |   0.895
+  0.33 |    0.64319    0.29670    0.05650    0.00379    0.00000    0.00000    0.00000    0.00000 |   0.866
+  0.40 |    0.60385    0.25967    0.03851    0.00410    0.00000    0.00000    0.00000    0.00000 |   0.839
+
+[188 s]

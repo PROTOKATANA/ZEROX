@@ -1,0 +1,7 @@
+=== A4 · el cruce del ancla `slot` en regimen ===
+k=30, mp=15, lambda=1, Delta=4, u3=dynamic, copias=14, 12 semillas, S_max=150 s (R-FIN-1a).
+
+--- (1)+(2) `m` frente al HORIZONTE, con y sin retencion/retraso ---
+   HOR    P  alpha |  m medio  m max     nA  estrat  equiv!= | m medio (sin ret.)
+   260   30   0.00 |    1.000      1      0      38        0 |              1.000
+   260   30   0.10 |    2.520      5   2189     202        0 |              2.238

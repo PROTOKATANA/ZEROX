@@ -1,0 +1,33 @@
+=== A6 · margen economico del lookahead con las constantes NUEVAS ===
+g <= 0.036, W/kappa <= 1.22, lambda = 1.0, alpha = 0.1 (el peor: epocas mas largas). Lookahead = I + F.
+
+caso                                                       m     c_m   I (h)   F (h)  look (h)
+m MEDIDA, gratis (D9-f slot)                           2.079  0.5865    0.74    3.35      4.09
+m MEDIDA, +retencion — LA DEL DISENO                   2.548  0.7188    1.11    5.03      6.14
+GARANTIA por construccion, S_max = 20 s  (m <= 21)    21.000  1.8892    7.65   34.77     42.42
+GARANTIA por construccion, S_max = 30 s  (m <= 31)    31.000  2.0565    9.06   41.20     50.27
+GARANTIA por construccion, S_max = 150 s (m <= 151)  151.000  2.6515   15.07   68.49     83.56
+
+Comprobacion del numero del diseno (I = 2 490 s, F = 3,2 h): lookahead = 3.89 h ; 41,1/3,89 = 10.57x ; 4,1/3,89 = 1.054x  -> reproduce el «10,6x y 1,05x» de §4.2.
+
+--- MARGEN = A* / lookahead.  < 1 = plotear dirigido con GPU sale MAS BARATO que comprar SSD ---
+caso                                                    A hoy    A 10x    B hoy    B 10x    C hoy    C 10x
+----------------------------------------------------------------------------------------------------------
+m MEDIDA, gratis (D9-f slot)                            15.41     1.54    10.03     1.00    16.88     1.69
+m MEDIDA, +retencion — LA DEL DISENO                    10.26     1.03     6.68     0.67    11.24     1.12
+GARANTIA por construccion, S_max = 20 s  (m <= 21)       1.49     0.15     0.97     0.10     1.63     0.16
+GARANTIA por construccion, S_max = 30 s  (m <= 31)       1.25     0.13     0.82     0.08     1.37     0.14
+GARANTIA por construccion, S_max = 150 s (m <= 151)      0.75     0.08     0.49     0.05     0.83     0.08
+
+--- inversion: que lookahead admite el presupuesto, y que `m` (y `S_max`) lo da ---
+exigencia                                    look max (h)    I (s)   F (h)  c_m max    m max S_max max (s)
+margen 1x frente a A HOY                            63.00    40898   51.64   2.3023    57.39          56.4
+margen 1x frente a A 10x                             6.30     4090    5.16   0.7280     2.58           1.6
+margen 1x frente a B HOY                            41.00    26616   33.61   1.8573    19.56          18.6
+margen 1x frente a B 10x                             4.10     2662    3.36   0.5873     2.08           1.1
+margen 1x frente a C HOY                            69.00    44793   56.56   2.4094    76.31          75.3
+margen 1x frente a C 10x                             6.90     4479    5.66   0.7619     2.70           1.7
+
+  `S_max max` sale de la propia garantia del diseno `m <= 1 + lambda*S_max[s]`:
+  es el S_max mas grande cuya GARANTIA cabe en el presupuesto economico.
+  R-FIN-1a exige S_max in [20, 150] s y R-FIN-7 pide 150 s para tolerar particiones con f >= 0,09.

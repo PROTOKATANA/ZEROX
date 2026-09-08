@@ -1,0 +1,22 @@
+=== A1b · el `delta` parasito propagado a los umbrales del diseno ===
+k=30, lambda=1, Delta=4.0, mp=15, u3=dynamic, horizonte 1800 s, ventana [60, 1740] s, 12 semillas, modo = parasito, d_fork=1.
+Cotas del diseno: delta_Lema9 = 0.2105, delta_real = 0,267, r cruza 1 en 43,1 %, umbral de orden 40,0 %.
+
+ alpha   J* | delta medio delta max | (1-a)(1-d)       r alpha* orden |   raf    sok  rech  prof (s)
+  0.00   16 |      0.0000    0.0000 |     1.0000   0.000       0.4757 |     0      0     0         0
+  0.25   16 |      0.1544    0.2010 |     0.6342   0.394       0.4341 |   333   5408     0        64
+  0.30   31 |      0.2079    0.2727 |     0.5544   0.541       0.4181 |   205   6491     0       103
+  0.33   31 |      0.2867    0.3351 |     0.4779   0.691       0.3929 |   225   7144     0        94
+  0.35   31 |      0.3065    0.3644 |     0.4508   0.776       0.3862 |   239   7591     0        89
+  0.37   48 |      0.3448    0.4751 |     0.4128   0.896       0.3728 |   162   8007     0       130
+  0.40   48 |      0.4366    0.4984 |     0.3381   1.183       0.3382 |   173   8614     0       120
+  0.45   64 |      0.5834    0.6511 |     0.2291   1.964       0.2743 |   146   9676     0       142
+
+R-FIN-7 prohibe reorg por debajo de F = 19080 s. La columna `prof` es la profundidad de cada rafaga: si prof << F, R-FIN-7 no la ve.
+
+--- punto fijo: el alpha donde el atacante DEJA de perder la carrera (r = 1, es decir alpha = (1-alpha)(1-delta)) ---
+   r cruza 1 entre alpha=0.37 (r=0.896) y alpha=0.40 (r=1.183)  ->  alpha_critico ~ 0.381
+--- punto fijo del umbral de orden: alpha = alpha*(delta(alpha)) ---
+   cruce entre alpha=0.37 (alpha*=0.3728) y alpha=0.40 (alpha*=0.3382)  ->  umbral de orden ~ 0.371
+
+[273 s]

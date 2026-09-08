@@ -95,14 +95,13 @@ if __name__ == "__main__":
 
     cab = f"{'alpha':>6} | " + " ".join(f"{'D='+str(d):>10}" for d in DEVS) + \
           f" | {'div_sp':>7} {'sesgados':>9}"
-    print(cab)
-    print("-" * len(cab))
-    peor = {}
+    print("--- MAXIMO sobre la familia del atacante (la fila que cuenta) ---")
+    print(cab); print("-" * len(cab))
+    guarda = {}
     for alpha in ALPHAS:
         acc = {Dv: [0, 0] for Dv in DEVS}
         accmax = {Dv: 0.0 for Dv in DEVS}
-        dsp = [0, 0]
-        nses = 0
+        dsp = [0, 0]; nses = 0
         for pol in POLS:
             for sesgo in SESGOS:
                 for frac in FRACS:
@@ -116,23 +115,14 @@ if __name__ == "__main__":
                     for Dv in DEVS:
                         if sub[Dv][1]:
                             accmax[Dv] = max(accmax[Dv], sub[Dv][0] / sub[Dv][1])
-        peor[alpha] = accmax
+        guarda[alpha] = (accmax, acc, dsp, nses)
         fila = " ".join(f"{accmax[Dv]:>10.5f}" for Dv in DEVS)
         print(f"{alpha:>6.2f} | {fila} | {dsp[0]/max(dsp[1],1):>7.3f} {nses:>9}")
 
     print("\n--- media sobre toda la familia (no el maximo) ---")
     print(cab)
     for alpha in ALPHAS:
-        acc = {Dv: [0, 0] for Dv in DEVS}
-        dsp = [0, 0]
-        for pol in POLS:
-            for sesgo in SESGOS:
-                for frac in FRACS:
-                    for sem in SEMS:
-                        des, divsp, ns = una(alpha, sem, pol, sesgo, frac)
-                        for Dv, (x, y) in des.items():
-                            acc[Dv][0] += x; acc[Dv][1] += y
-                        dsp[0] += divsp[0]; dsp[1] += divsp[1]
+        accmax, acc, dsp, nses = guarda[alpha]
         fila = " ".join(f"{acc[Dv][0]/max(acc[Dv][1],1):>10.5f}" for Dv in DEVS)
         print(f"{alpha:>6.2f} | {fila} | {dsp[0]/max(dsp[1],1):>7.3f}")
     print(f"\n[{time.time()-t_ini:.0f} s]")

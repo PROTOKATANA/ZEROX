@@ -80,6 +80,8 @@ class MundoL9(Mundo):
         self.n_bloques_priv = 0
         self.n_bloques_perdidos = 0
         self.n_score_ok = 0
+        self.n_rechazados = 0
+        self.motivos = {}
         self.tam_rafagas = []
 
     def corre_l9(self, J=31, d_fork=1, giveup=None, modo="cadena", vista_sp="honesta"):
@@ -97,6 +99,8 @@ class MundoL9(Mundo):
         self.n_rafagas = self.n_abandonos = self.n_intentos = 0
         self.n_bloques_priv = self.n_bloques_perdidos = 0
         self.n_score_ok = 0
+        self.n_rechazados = 0
+        self.motivos = {}
         self.tam_rafagas = []
 
         for i, (t, quien, sd, sde, ident) in enumerate(self.ev):
@@ -140,8 +144,10 @@ class MundoL9(Mundo):
             else:
                 raise ValueError(modo)
             bid = f"a{i}"
-            ok, _ = d.add(bid, padres, t=t, creator="a", ident=ident, sd=sd, seed=sde)
+            ok, motivo = d.add(bid, padres, t=t, creator="a", ident=ident, sd=sd, seed=sde)
             if not ok:
+                self.n_rechazados += 1
+                self.motivos[motivo] = self.motivos.get(motivo, 0) + 1
                 continue
             priv.append(bid)
             self.n_bloques_priv += 1

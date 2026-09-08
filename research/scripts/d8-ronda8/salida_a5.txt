@@ -1,0 +1,9 @@
+=== A5 · soborno BDK+19 §2 portado a PoAS: que compra la ventana de prediccion ===
+k=30, mp=15, lambda=1, Delta=4, u3=dynamic, horizonte 400 s, 12 semillas, 21 umbrales, ancla por `slot`.
+Un granjero sobornado RETIENE su bloque (no equivoca): negabilidad de BDK intacta.
+Referencia: D9-f midio m_SLOT = 2,540 con el atacante produciendo SUS bloques (alpha=0,25, copias=14).
+
+ alpha |       b=0       b=1       b=2       b=3       b=5       b=8
+---------------------------------------------------------------------
+  0.00 |     1.000     2.000     3.000     4.000     6.000     9.000
+  0.10 |     1.000     2.000     3.000     4.000     6.000     9.000

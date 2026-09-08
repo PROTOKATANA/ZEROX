@@ -1,0 +1,9 @@
+=== A3 · S_max como arma: bloques honestos INVALIDOS sin particion real ===
+k=30, mp=15, lambda=1, Delta=4, u3=dynamic, horizonte 900 s, 12 semillas, copias=14.
+R-FIN-1a: slot(B)-slot(sp(B)) <= S_max. S_max=4 s es CONTROL de capacidad.
+
+--- (M1) sin eclipse: peor fraccion de bloques honestos con gap > S_max ---
+ alpha |          S=4         S=20         S=30        S=150 |  gap max   n_hon  estrat
+---------------------------------------------------------------------------------------
+  0.00 |      0.72216      0.00000      0.00000      0.00000 |       12     948      30
+  0.10 |      0.76788      0.00000      0.00000      0.00000 |       17     837      30
