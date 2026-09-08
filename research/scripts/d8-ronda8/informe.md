@@ -785,3 +785,30 @@ grueso de la captura es estructural.
 **Etiqueta: SIN VECTOR con esta familia.** El ancla por `slot` aguanta lo que se le pide en
 régimen; su punto débil no es el cruce, es **quién puede pagar por moverlo** (§A5).
 
+
+### A4.2 (continuación) · Retención hasta `S_max = 150 s` — **no rompe la cota**
+
+Segunda tabla de `d8_a4c_rachas.py`, con los 5 retrasos (0/4/12/40/**150** s = `S_max`) más
+retención total, 37 estrategias:
+
+| `α` | `m` medio | `m` máx | `nA` | capturas sin dirigir | racha | capturas dirigidas | racha | de |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **0,00** | **1,000** | 1 | **0** | 0 | 0 | 0 | 0 | 444 |
+| 0,10 | **2,282** | 7 | 343 | 75 | 2 | 99 | **4** | 444 |
+
+Retener y soltar justo antes de `S_max` sube `m` de **1,694 a 2,282** a `α = 0,10`
+(**+35 %**) y las capturas dirigidas de 82 a 99. **Sigue por debajo de la `m = 2,548` con la
+que el diseño dimensiona `I` y `F`**, así que la retención hasta `S_max` **no** las
+infradimensiona.
+
+> **DECLARACIÓN DE EJECUCIÓN INCOMPLETA (regla 10).** Las filas `α ∈ {0,25; 0,33; 0,40}` de
+> esta tabla y las celdas `HOR ∈ {900, 1500, 2400}` de A4.1 **no terminaron**. Motivo medido,
+> no supuesto: con `copias = 14` (R-FIN-11) y `α = 0,25` el DAG llega a ~4 000 bloques a
+> horizonte 900 s, y el `DAG` heredado de D9 (`r8c_gd.py`) calcula alcanzabilidad por **cierre
+> transitivo con conjuntos**, coste `O(n²)` en memoria y tiempo. **No es una laguna del
+> diseño: es un límite del instrumento**, y quien continúe esta línea debería sustituir el
+> cierre transitivo por índices de intervalo (lo que hace Kaspa de verdad,
+> `reachability/`) antes de subir el horizonte. Lo que **sí** está cerrado con datos:
+> `m` **baja** de 260 s a 500 s en las dos `α` medidas, y la retención sube `m` un 35 % sin
+> pasar de 2,548.
+
