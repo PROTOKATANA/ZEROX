@@ -1,0 +1,1440 @@
+
+=== PAGE 1 ===
+PHANTOM GHOSTDAG
+A Scalable Generalization of Nakamoto Consensus
+November 10, 2021
+Yonatan Sompolinsky
+yoni_sompo@cs.huji.ac.il
+School of Engineering and Computer
+Science, The Hebrew University of
+Jerusalem, Israel
+Shai Wyborski
+shaide@cs.huji.ac.il
+School of Engineering and Computer
+Science, The Hebrew University of
+Jerusalem, Israel
+Aviv Zohar
+avivz@cs.huji.ac.il
+School of Engineering and Computer
+Science, The Hebrew University of
+Jerusalem, Israel
+ABSTRACT
+In 2008 Satoshi Nakamoto invented the basis for blockchain-based
+distributed ledgers. The core concept of this system is an open
+and anonymous network of nodes, or miners, which together
+maintain a public ledger of transactions. The ledger takes the
+form of a chain of blocks, the blockchain , where each block is
+a batch of new transactions collected from users. One primary
+problem with Satoshi’s blockchain is its highly limited scalability.
+The security of Satoshi’s longest chain rule, more generally known
+as the Bitcoin protocol, requires that all honest nodes be aware of
+each other’s blocks very soon after the block’s creation. To this end,
+the throughput of the system is artificially suppressed so that each
+block fully propagates before the next one is created, and that very
+few “orphan blocks” that fork the chain be created spontaneously.
+In this paper we present PHANTOM, a proof-of-work based
+protocol for a permissionless ledger that generalizes Nakamoto’s
+blockchain to a direct acyclic graph of blocks (blockDAG).
+PHANTOM includes a parameter k that controls the level of
+tolerance of the protocol to blocks that were created concurrently,
+which can be set to accommodate higher throughput. It thus avoids
+the security-scalability tradeoff which Satoshi’s protocol suffers
+from.
+PHANTOM solves an optimization problem over the blockDAG
+to distinguish between blocks mined properly by honest nodes
+and those created by non-cooperating nodes who chose to deviate
+from the mining protocol. Using this distinction, PHANTOM
+provides a robust total order on the blockDAG in a way that
+is eventually agreed upon by all honest nodes. Implementing
+PHANTOM requires solving an NP-hard problem, and to avoid this
+prohibitive computation, we devised an efficient greedy algorithm
+GHOSTDAG that captures the essence of PHANTOM.
+The GHOSTDAG protocol has been implemented as the
+underlying technology of the Kaspa cryptocurrency. The Kaspa
+network allows us to produce statistics about the performance of
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full
+citation on the first page. Copyrights for components of this work owned by others
+than the author(s) must be honored. Abstracting with credit is permitted. To copy
+otherwise, or republish, to post on servers or to redistribute to lists, requires prior
+specific permission and/or a fee. Request permissions from permissions@acm.org.
+AFT ’21, September 26–28, 2021, Arlington, VA, USA © 2021 Copyright held by the
+owner/author(s). Publication rights licensed to the Association for Computing
+Machinery. ACM ISBN 978-1-4503-9082-8/21/09. . . $15.00
+https://doi.org/10.1145/3479722.3480990
+GHOSTDAG in real world scenarios. We provide an analysis of
+confirmation times obtained by observing the Kaspa network.
+We provide a formal proof of the security of GHOSTDAG, namely,
+that its ordering of blocks is irreversible up to an exponentially
+negligible factor. We discuss the properties of GHOSTDAG and
+how it compares to other DAG based protocols.
+1 INTRODUCTION
+The security of the Bitcoin protocol relies on blocks propagating
+quickly to all miners in the network [ 9, 14, 19]. Block creation
+itself is slowed down via the requirement that each block contain
+a proof-of-work. For the Bitcoin protocol to be secure, block
+propagation must be faster than the typical time it takes the network
+together to create the next block. In order to guarantee this property,
+the creation of blocks in Bitcoin is regulated by the protocol to occur
+only once every 10 minutes, and the block size itself is limited to
+allow for fast transmission. As a result, Bitcoin suffers from a highly
+restrictive throughput on the order of 3-7 transactions per second
+(tps)1.
+The PHANTOM protocol. In this paper we present PHANTOM,
+a protocol that generalizes Nakamoto’s longest chain protocol. In
+Bitcoin, blocks reference a single predecessor in the chain, hence
+form a tree; in contrast, PHANTOM blocks reference multiple
+predecessors, thus forming a Directed Acyclic Graph, a blockDAG.
+Each block can thus include several hash references to predecessors.
+PHANTOM then provides a total ordering over all blocks and
+transactions, and outputs a consistent set of accepted transactions.
+Unlike the Bitcoin protocol, where blocks that are not on the main
+chain are discarded, PHANTOM incorporates all blocks in the
+blockDAG into the ledger, but places blocks that were created by
+attackers later in the order.
+In rough terms, PHANTOM consists of a three-step procedure:
+(1) Using the structure of the blockDAG, we recognize a set
+of well-connected blocks (we later refer to these as blue
+blocks); this procedure is used to exclude blocks created by
+misbehaving nodes and is the heart of the protocol: Blocks
+that either reference only old blocks from the DAG, or are
+withheld by their creator for some time, will be excluded
+from the set of blue blocks with high probability.
+(2) We complete the DAG’s naturally induced partial order
+to a full topological one (i.e., an order which respects the
+1The exact figure varies according to the size of a typical transaction, and changes if
+one includes protocol changes such as SegWit, Schnorr signatures, etc.
+=== PAGE 2 ===
+, , Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar
+topology) in a way that favours blocks inside the selected
+cluster and penalizes those outside it.
+(3) The order over blocks induces an order over transactions;
+transactions in the same block are ordered according to
+the order of their appearance in the block. We iterate over
+all transactions in this order, and accept each one that is
+consistent (according to the underlying consistency notion)
+with all transactions approved so far.
+Propagation delay. The first step above involves assuming
+an upper bound on the network’s delay diameter D, and
+parameterizing the protocol accordingly; k denotes this parameter.
+Such an assumption is made in Nakamoto Consensus as well. In fact,
+if PHANTOM is set to process low throughput, we can set k = 0,
+in which case PHANTOM coincides with Nakamoto Consensus.
+However, while Nakamoto Consensus suppresses the throughput
+and sets the block creation rateλ such that D·λ≪ 1, PHANTOM
+does not impose an a priori constraint over λ. Instead, the
+throughput (in terms ofλ and the block size) can be set to approach
+the network’s capacity, and thenk can be set after the fact to ensure
+the safety of the protocol. This alleviates the security-scalability
+tradeoff that Nakamoto Consensus suffers. Still, increasing k does
+not come without cost, as we will discuss shortly.
+GHOSTDAG. In its vanilla form, PHANTOM requires solving
+an NP-hard problem, and is therefore unsuitable for practical
+applications. Instead, we use the intuition behind PHANTOM to
+devise a greedy algorithm, GHOSTDAG, which can be implemented
+efficiently. We prove formally that GHOSTDAG is secure, in the
+sense that its ordering of blocks becomes exponentially difficult to
+reverse as time develops.
+The main achievement of GHOSTDAG can be summarized as
+follows:
+Theorem (Informal). Given two transactions tx 1, tx 2 that were
+published and embedded in the blockDAG at some point in time,
+the probability that GHOSTDAG’s order between tx 1 and tx 2 changes
+over time decreases exponentially as time grows, even under a high
+block creation rate that is non-negligible relative to the network’s
+propagation delay, assuming that a majority of the computational
+power is held by honest nodes.
+We will reformalize this theorem in Section 3, and provide a
+formal proof in Appendix A.
+We now proceed to describe the PHANTOM and GHOSTDAG
+protocols more formally.
+2 THE PHANTOM PROTOCOL
+2.1 Preliminaries
+The following terminology is used extensively throughout this
+paper. A DAG of blocks is denoted G =(C, E), whereC represents
+blocks and E represents the hash references to previous blocks. We
+frequently write B∈ G instead of B∈C . past(B, G)⊂C denotes
+the subset of blocks reachable from B (excluding B), and similarly
+f uture(B, G)⊂C denotes the subset of blocks from which B is
+reachable (excluding B); these are blocks that were provably created
+before and after B, correspondingly. An edge in the DAG points
+back in time, from the new block to previously created blocks which
+it extends. We denote by anticone(B, G) the set of blocks outside
+Figure 1: An example of a block DAG G. Each block
+references all blocks that were known to its miner at the
+time it was created. The DAG terminology applies to H
+as follows:
+past(H) = {Genesis , C, D, E} – blocks which H
+references directly or indirectly, and which were
+provably created before H ;
+f utur e(H) = {J , K , M} – blocks which reference H
+directly or indirectly, and which were provably created
+after H ;
+ant icone(H) = {B, F , I , L} – the order between these
+blocks and H is ambiguous. Reaching consensus on the
+order between blocks and other blocks in their anticone
+is the main challenge that we face.
+t ips(G) = {J , L, M} – leaf-blocks, namely, blocks with
+in-degree 0; these will be referenced in the header of the
+next block.
+past(B, G) and f uture(B, G) (excluding B itself); this is the set of
+blocks in the DAG which did not reference B (directly or indirectly
+via their predecessors) and were not referenced by B (directly or
+indirectly via B’s predecessors).2 Finally, tips(G) is the set of blocks
+with in-degree 0 (usually, the most recent blocks). This terminology
+is demonstrated in Figure 1.
+2.2 The DAG mining protocol
+Rather than extending a single chain, a miner in PHANTOM
+references in its new block all blocks in tips(G), where G is the
+DAG that the miner observes locally at the time when the new
+block is created. Additionally, the miner should broadcast its new
+block as fast as possible. These two rules together constitute the
+DAG mining protocol in PHANTOM.
+2.3 The DAG ordering protocol
+The aforementioned DAG mining protocol implies in particular that
+even when two blocks contain conflicting transactions, both blocks
+are incorporated into the blockDAG and referenced by all (honest)
+miners. The core challenge is then how to recover the consistency of
+the blockDAG. This is done in our framework by ordering all blocks
+– and by extension, all transactions – and accepting transactions one
+by one, eliminating individual transactions that are inconsistent
+2We will frequently abbreviate the notation and write, e.g., ant icone(B), instead of
+ant icone(B, G).
+=== PAGE 3 ===
+PHANTOM GHOSTDAG
+A Scalable Generalization of Nakamoto ConsensusNovember 10, 2021 , ,
+with those approved before them. PHANTOM achieves consensus
+on the order of blocks, and this guarantees agreement on the set of
+accepted transactions as well.
+Essentially, Bitcoin can be seen as an ordering protocol as well,
+according to which transactions embedded in the longest chain of
+blocks precede those off the longest chain. Unfortunately, Bitcoin’s
+protocol is known to be secure only under slow block rates (see
+Section 4).
+The ordering rule of PHANTOM has two stages: First, we divide
+the blocks to Blues and Reds; the Blue set represents blocks that
+appear to have been mined by cooperating nodes, whereas blocks in
+the Red set are outliers that were most likely mined by malicious or
+strategic nodes. Then, we order the DAG in a way that favours blue
+blocks and penalizes red ones. The latter step is rather immediate,
+and the novelty of PHANTOM lies mainly in the first colouring
+procedure.
+2.3.1 The intuition behind PHANTOM. Just like Bitcoin,
+PHANTOM relies on the ability of honest nodes to communicate
+to their peers recent blocks in a timely manner, and on the
+assumption that honest nodes possess more than 50% of the
+hashrate. The block rate in Bitcoin is suppressed so as to ensure
+block creation is slower than the time it takes to communicate
+them. In PHANTOM, on the other hand, we notice that the set of
+honest blocks can be recognized even when the block rate is high
+and many forks appear spontaneously: Due to the communication
+and cooperation of honest miners, we should expect to see in the
+DAG a “well-connected” cluster of blocks.
+Indeed, let D be an upper bound on the network’s propagation
+delay. If block B was mined by an honest miner at time t, then any
+block published before time t− D necessarily arrived at its miner
+before time t, and is therefore included in past(B). Similarly, the
+honest miner will publish B immediately, and so B will be included
+in the past set of any block mined after timet +D. As a result, the set
+of honest blocks in B’s anticone is typically small, and consists only
+of blocks created in the interval[t− D, t + D]. The proof-of-work
+mechanism guarantees that the number of blocks created in an
+interval of length 2· D is typically below some k > 0.
+In short, the set of blocks created by honest nodes
+is well-connected. The following definition captures
+“well-connectedness”:
+Definition 1. Given a DAG G =(C, E), a subset S⊆C is called a
+k-cluster, if∀B∈ S :|anticone(B)∩ S|≤ k.
+Attacker nodes may deviate arbitrarily from the mining rules,
+have large anticones, and even artificially increase the anticone
+of honest blocks. Nonetheless, since honest miners possess more
+proof-of-work power, it is usually impossible for malicious miners
+to create a well-connected set of blocks that is larger than that
+created by honest nodes. PHANTOM utilizes this fact and selects the
+largest well-connected set within the DAG, by solving the following
+optimization problem:
+Maximum k-cluster SubDAG (MCS k )
+Input: DAG G =(C, E)
+Output: A subset S∗ ⊂ C of maximum size, s.t.
+|anticone(B)∩ S∗|≤ k for all B∈ S∗.
+In this formulation, the parameter k is predetermined; see
+Section 4 for more details. An example of a maximum k-cluster
+appears in Figure 2.
+2.3.2 The PHANTOM protocol. Following the above intuition, the
+ordering protocol of PHANTOM comprises the following two steps:
+(1) Given a block G, solve MCS k(G); let’s refer to its output as
+the Blue set and to its complement set as the Red one.
+(2) Determine the order between Blue blocks according to some
+topological sort. Then, for any Blue block B, add to the order
+just before B all of the Red blocks in past(B) that weren’t
+added to the order yet; these Red blocks too should be added
+in a topological manner.3
+An example of the output of the PHANTOM procedure on
+the small blockDAG from Figure 2 is:(A, D, C, G, B, F, I, E,J, H, K).
+Unfortunately, the Maximumk-cluster SubDAG problem is NP hard
+(see problem [GT26] in [10]), and PHANTOM is therefore of less
+practical use for an ever-growing blockDAG. We thus introduce a
+greedy algorithm that is more suitable for implementation. We call
+this greedy variant GHOSTDAG.4
+2.4 The GHOSTDAG protocol
+Similar to PHANTOM, the GHOSTDAG protocol selects ak-cluster,
+which induces a colouring of the blocks as Blues (blocks in the
+selected cluster) and Reds (blocks outside the cluster). However,
+instead of searching for the largest k-cluster, GHOSTDAG finds a
+k-cluster using a greedy algorithm. The algorithm constructs the
+Blue set of the DAG by first inheriting the Blue set of the best tip
+Bmax, i.e., the tip with the largest Blue set in its past, and then adds
+to the Blue set blocks outside Bmax’s past in a way that preserves
+the k-cluster property.
+Observe that this greedy inheritance rule induces a chain: The
+last block of the chain is the selected tip of G, Bmax; the next block
+in the chain is the selected tip of the DAG past(Bmax); and so on
+down to theдenesis . We denote this chain byChn(G) =(дenesis =
+Chn0(G),Chn1(G), . . . ,Chnh(G)).
+The final order over all blocks, in GHOSTDAG, follows a
+similar path as the colouring procedure: We order the blockDAG
+by first inheriting the order of Bmax on blocks in past(Bmax),
+then adding Bmax itself to the order, and finally adding blocks
+outside past(Bmax) according to some topological ordering. Thus,
+essentially, the order over blocks becomes robust as the colouring
+procedure.
+2.4.1 Formal algorithm. The procedures described above are
+formalized in Algorithm 1 below. The algorithm begins with
+the base case where the DAG consists of the дenesis block only
+(lines 2-3). Next, it performs a recursive call to compute the Blue
+sets and ordering of the past of each of the DAG’s tips (lines 4-5),
+and inherits those of the best tip (lines 6-8). Then, the selected
+3The topological sorts in this second step are additionally required to be agnostic to
+future blocks: For any Blue block B, the order on blocks in past(B) should remain
+the same if we remove from the DAG blocks inf utur e(B). This can be implemented,
+for instance, using a priority queue that pops out blocks according to the size of their
+past set.
+4In previous versions of this paper we referred to both versions as PHANTOM.
+Essentially, GHOSTDAG can be seen as a fix of the greedy algorithm introduced
+by the authors in [ 19], called the GHOST protocol. We thank Ethan Heilman for
+suggesting this name.
+=== PAGE 4 ===
+, , Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar
+Figure 2: An example of the largest 3-cluster of blocks
+within a given DAG: A, B, C, D, F , G, I ,J (coloured blue).
+It is easy to verify that each of these blue blocks has
+at most 3 blue blocks in its anticone, and (a bit less
+easy) that this is the largest set with this property.
+Setting PHANTOM’s inter-connectivity parameter with
+k = 3 means that at most 4 blocks are assumed to
+be created within each unit of delay, so that typical
+anticone sizes should not exceed 3. Blocks outside the
+largest 3-cluster, E, H , K (coloured red), belong to the
+attacker (w.h.p.). For instance, block E has 6 blue blocks
+in its anticone ( B, C, D, F , G, I ); these blocks didn’t
+reference E, presumably because E was withheld from
+their miners. Similarly, block K admits 6 blue blocks in
+its anticone ( B, C, G, F , I ,J ); presumably, its malicious
+miner received already some of these blocks but violated
+the mining protocol by not referencing them.
+tip is added to the Blue set BlueSet G and to the last position in
+the current ordered list OrderedList G (lines 9-10). Then we iterate
+over anticone(Bmax, G) in some topological way which guarantees
+that a block is visited only after its predecessors are (lines 11-14).5
+For every block we visit, we check if adding B to the Blue set will
+preserve the k-cluster property, and if this condition is satisfied,
+we add B to the Blue set (lines 9-13); either way, we add B to the
+current last position in the list (line 14). Finally, we return the Blue
+set and the ordered Note that the recursion in the algorithm (line 5)
+halts, because for any block B∈ G:|past(B)| <|G|.
+We demonstrate the operation of this algorithm in Figure 3.We
+have an efficient implementation of Algorithm 1, and we tested it
+under high block rates (λ = 10, 25 blocks per second, for blocks of
+size 0.1-1 MB). We will make the implementation available in the
+full version of this paper.
+2.5 Collapse to Bitcoin when k = 0
+If the block creation rate is kept low, as in Bitcoin, the parameter k
+can be safely set to 0, as honest blocks are likely to create a chain
+5This can be implemented in several ways, e.g., by inserting all blocks in
+ant icone(Bmax) into a deterministic priority queue which respects the topology.
+That is, the queue should pop out a block only after all of its parents have been popped
+out, and the order in which it pops blocks should be fully determined by the blockDAG.
+Algorithm 1 Ordering the DAG
+Input: G – a block DAG, k – the propagation parameter
+Output: BLU Ek(G) – the Blue set of G; ord – an ordered list
+containing all blocks in G
+1: function OrderDAG(G, k)
+2: if G =={дenesis} then
+3: return[{дenesis} ,{дenesis}]
+4: for B∈ tips(G) do
+5: [BlueSet B, OrderedList B]←OrderDAG(past(B) , k)
+6: Bmax ← arg max{|BlueSet B| : B∈ tips(G)}
+(break ties according to lowest hash)
+7: BlueSet G← BlueSet Bmax
+8: OrderedList G← OrderedList Bmax
+9: add Bmax to BlueSet G
+10: add Bmax to the end of OrderedList G
+11: for B∈ anticone(Bmax, G) do in some topological ordering
+12: if BlueSet G∪{B} is a k-cluster then
+13: add B to BlueSet G
+14: add B to the end of OrderedList G
+15: return[BlueSet G, OrderedList G]
+(see Section 4). In such a setup, both PHANTOM and GHOSTDAG
+converge to Bitcoin’s rule in the sense that, in case of a chain
+split, blocks on the longest chain precede those off the longest
+chain. These protocols would differ from Bitcoin’s rule in that, as
+of according to the DAG mining protocol, blocks in the longest
+chain would eventually reference those off the longest chain, in
+PHANTOM or GHOSTDAG, and will thereby insert them in the
+order.
+In fact, it is easy to see that the longest chain is, by definition,
+the largest 0-cluster of the DAG. Accordingly, our protocols can be
+seen as a generalization of Satoshi’s longest-chain rule to a setup
+where block rate is high and propagation delays are not negligible.
+In Appendix A we prove that GHOSTDAG remains secure under
+high block creation rates as well. We leave the formal analysis of
+PHANTOM for future work.
+3 FORMAL MODEL AND STATEMENT
+In this section we describe our formal framework. While we
+introduce new notation and terminology, the reader should keep
+in mind that we stick to Nakamoto Consensus’s model in almost
+every respect—transactions, blocks, Proof-of-work, computationally
+bounded attacker, P2P propagation of blocks, probabilistic security
+guarantees, etc. The “only” difference is that a block references
+(possibly) several predecessors rather than a single one. While this
+has far reaching consequences on how the ledger is to be interpreted,
+on the mining side things remain largely the same.
+3.1 Network
+We follow the model specified in [18]. The network of nodes (or
+miners) is denotedN, honest denotes the set of nodes that abide to
+the mining protocol (as defined below), and malicious denotes the
+rest of the nodes. Honest nodes form a connected component in
+N’s topology, and the communication delay diameter of the honest
+=== PAGE 5 ===
+PHANTOM GHOSTDAG
+A Scalable Generalization of Nakamoto ConsensusNovember 10, 2021 , ,
+Figure 3: An example of a blockDAG G and the operation of GHOSTDAG to construct its blue set BLU E k(G) set, under the parameter k = 3.
+The small circle near each block X represents its score, namely, the number of blue blocks in the DAGpast(X). The algorithm selects the chain
+greedily, starting from the highest scoring tip M , then selecting its predecessor K (the highest scoring tip in past(M)), then H , D (breaking
+the C, D, E tie arbitrarily), and finally Genesis . For methodological reasons, we add to this chain a hypothetical “virtual” block V – a block
+whose past equals the entire current DAG. Blocks in the chain (дenesis , D, H , K , M , V) are marked with a light-blue shade. Using this chain,
+we construct the DAG’s set of blue blocks, BLU E k(G). The set is constructed recursively, starting with an empty one, as follows: In step 1 we
+visit D and addдenesis to the blue set, as the only block in past(D). Next, in step 2, we visit H and add to BLU E k(G) blocks that are blue in
+past(H), namely, C, D, E. In step 3 we visit K and add H , I ; note that block B is in past(K) but was not added to the blue set, since it has 4
+blue blocks in its anticone. In step 4 we visit M and add K to the blue set; again, note that F∈ past(M) could not be added to the blue set due
+to its large blue anticone. Finally, in step 5, we visit the block vir tual(G) = V , and add M and to BLU E k(G), leaving L away due to its large
+blue anticone, and leaving J away because adding it would cause I to suffer too large a blue anticone (it already has C, D, and H in it).
+subnetwork is D: if an honest nodev∈N sends a message of size
+b MB at time t, it arrives at all honest nodes by time t + D the
+latest. The attacker is assumed to suffer no delays on its outgoing
+or incoming links.
+The real value ofD is a priori unknown. The PHANTOM protocol
+assumes that D is always smaller than some constant Dmax (both
+depend on the block sizeb). The parameter Dmax is not hard-coded
+explicitly in the protocol, rather it influences another parameter,
+k = k(Dmax), which is hard-coded and decided once and for all at
+the inception of the system. Roughly speaking,k(Dmax) represents
+an upper bound on the number of blocks that the network creates
+in one unit of delay and that may not be referenced by one another.
+Section 4 discusses this parameter in more detail.
+3.2 Mining framework
+Proof-of-work. Nodes create blocks of transactions by solving
+Proof-of-work puzzles. Block creation follows a Poisson process
+with parameterλ. For the sake of simplicity, we assume thatλ is
+constant.6 We denote by time(B) the absolute time of B’s creation.
+The computational power of nodev∈N is captured by 0 <αv < 1,
+which represents the probability that node v will be the creator
+of the next block in the system (at any point in time; this is a
+memoryless process).
+6In practice, λ must occasionally be readjusted to account for shifting network
+conditions. PHANTOM can support a retargeting mechanism similar to Bitcoin’s,
+e.g., readjust every time thatChn(G) grows by 2016 blocks.
+Block references. Every block specifies its direct predecessors
+by referencing their ID in its header (a block’s ID is obtained by
+applying a collision resistant hash to its header); the choice of
+predecessors will be described in the next subsection. This results
+in a structure of a directed acyclic graph of blocks (as blocks can only
+reference blocks created before them), denoted typicallyG =(C, E).
+Recall that the topology of the DAG induces a natural partial
+ordering over blocks (Subsection 2.1): if B∈ past(C) (equiv. C∈
+f uture(B)) then C was provably created after B and therefore B
+should precede C in the order.7
+DAG mining protocol. Gv
+t denotes the block DAG that nodev∈
+N observes at time t. This DAG represents the history of all (valid)
+block-messages received by the node. A node does not consider a
+block as valid until it receives its entire past set. The unique block
+дenesis is the block created at the inception of the system, and every
+valid block must have it in its past set.
+A tip of the DAG is a leaf-block, namely, a block with in-degree
+0. The instructions to a miner in the DAG paradigm are simple:
+(1) When creating or receiving a block, transmit it to all of one’s
+peers inN . Formally, this implies that∀v, u∈ honest : Gv
+t ⊆
+Gu
+t +D .
+(2) When creating a block, embed in its header a list containing
+the hash of all tips in the locally-observed DAG. Formally, this
+7Note that an edge in the DAG points back in time, from the new block to previously
+created blocks which it references.
+=== PAGE 6 ===
+, , Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar
+implies that if block B was created at time t, by honest node v,
+then past(B) = Gv
+t .8
+Since these are the only two mining rules in our system, a
+byzantine behaviour of the attacker (which controls up to α of
+the mining power) amounts to an arbitrary deviation from one or
+both of these instructions.
+For convenience, we additionally regard the virtual block of the
+DAG,virtual(G), which is a hypothetical (un-mined) block which
+points to the DAG’s tips as its parents. Thus,past(virtual(G)) = G.
+Essentially,virtual(G) represent the block template for the next
+block to be created by the miner, if it is honest.
+3.3 DAG client protocol
+The DAG as described so far possibly embeds conflicting
+transactions. In our work, these conflicts are resolved via an
+ordering protocol, namely, a protocol through which all nodes
+agree on the order of all transactions in the system. We refer to
+the ordering rule as the client protocol, as every participant in the
+network can run the ordering procedure on its client locally without
+any need to communicate additional messages with other clients.
+Once such an order is agreed, one can iterate over all transactions
+in the prescribed order and approve each transaction that is
+consistent with those approved so far. In the case where transactions
+represent payments in Bitcoin’s UTXO model, a transaction would
+be consistent with the set of previously approved transactions if its
+inputs belong to this set and none of these inputs are already spent
+by another transaction in the set (i.e., no “double spend”). However,
+our work is agnostic to the precise definitions of the transaction
+space and of the underlying consistency notion—for our purpose,
+suffice it to regard an abstract transaction spaceU and an abstract
+consistency function that determines whether a set of transactions
+T⊆U is consistent or not.
+Formally, an ordering rule ord takes as input a blockDAG G and
+outputs a linear order over G’s blocks, ord(G) =(B0, B1, . . . , B|G|).
+Transactions in the same block are ordered according to their
+appearance in it, and this convention allows us to talk henceforth
+on the order of blocks only. With respect to a given rule ord , we
+write B≺or d(G) C if the index of B precedes that of C in ord(G);
+we abbreviate and write B≺G C or even B≺ C when the context
+is understood. For convenience, we use the same notation B≺G C
+when B∈ G but C < G.
+3.4 Convergence of the order
+The following definition captures the desired security of the
+protocol, in terms of the probability that some order between two
+blocks will be reversed.
+Definition 2. Fix a rule ord , time t > 0, and node u∈N .
+• For B∈ Gu
+t , Risku(B, t, r) is defined by the probability that,
+from the point of view of u, a block that did not precede B in
+time t + r will later come to precede it:
+Risku(B, t, r) := Pr
+
+∃s > t + r,∃C∈ Gu
+s : B≺Gu
+t +r C∧ C≺Gus B
+
+• If B < Gu
+t we define Risku(B, t, r) = 1.
+8Technically it is more accurate to write past(B) = Gv
+t \{B}, as a block does not
+belongs to its own past set.
+• The function Risk is the maximal Risku over honest nodes:
+Risk(B, t, r) := max
+u∈honest
+Risku(B, t, r)
+Intuitively,t represents the time at which blockB was included in
+the DAG, andt + r the time at which transactions in B can be safely
+accepted as no conflicting ones would be able to bypass them. In the
+definition above, the probability is taken over all random events in
+the network, including block creation and propagation, as well as
+the attacker’s arbitrary behaviour. The convergence property below
+guarantees that the order between a block and those succeeding
+it (or those not published yet) will not be reversed, w.h.p. This
+captures the security of the protocol, as it provides honest nodes
+with (probabilistic) security guarantees regarding possible reorgs.
+Property 1. An ordering rule ord is said to (1-α)-converge if∀t > 0,
+∀u ∈ honest and∀B ∈ Gu
+t : limr→∞ Risk(B, t, r) = 0, even when a
+fractionα of the mining power is byzantine.
+Ideally, we would want Risk(B, t,·) to vanish exponentially fast
+so as to ensure speedy confirmation times.
+Remark. Property 1 essentially couples the Safety and Liveness
+properties required from consensus protocols. Indeed, once
+Risk(B, t, r) <ϵ, a decision to accept transactions in B can be made
+(Liveness), and is guaranteed to be irreversible (Safety) up to an error
+probability of ϵ—as in Nakamoto Consensus and similar protocols,
+decisions are only irreversible in the probabilistic sense. Nevertheless,
+we avoid phrasing our results in these terms, for the sake of clarity of
+presentation. The complication arises from the need to analyze the
+system from the perspective of every node Gv
+t ; this technicality is
+not unique to PHANTOM, and should be regarded in any work that
+formalizes blockchain based consensus (unless propagation delays
+are assumed to be negligible). We leave the task of bridging this gap
+to a later version.
+The security threshold is the minimal portion of the hashing
+power that an attacker must acquire in order to disrupt the
+protocol’s operation:
+Definition 3. The security threshold of an ordering rule ord is
+defined as the maximal α (attacker’s relative computational power)
+for which ord (1-α)-converges exponentially fast.
+3.5 Main result
+A protocol is scalable if it is safe to increase the block creation
+rateλ without compromising the security, that is, if the security
+threshold does not deteriorate asλ increases (this can be phrased
+also in terms of increasing the block size b rather thanλ).
+We claim that GHOSTDAG is indeed a scalable protocol, in this
+sense:
+Theorem 4 (GHOSTDAG scales). Given a block creation rateλ > 0,
+δ > 0, and Dmax > 0, if Dmax is equal to or greater than the
+network’s propagation delay diameter D, then the security threshold
+of GHOSTDAG, parameterized with k(Dmax ,λ,δ), is lower bounded
+by 1
+2·( 1−δ).
+The parameterization of GHOSTDAG via k(Dmax ,λ,δ) is
+defined in the subsequent section. Theorem 4 encapsulates the
+main achievement of our work. We prove the theorem formally in
+=== PAGE 7 ===
+PHANTOM GHOSTDAG
+A Scalable Generalization of Nakamoto ConsensusNovember 10, 2021 , ,
+Section A. Contrast this result to a theorem regarding Nakamoto
+Consensus, which appears in several forms in previous work
+(e.g., [15, 19]):
+Theorem 5 (Nakamoto Consensus does not scale) . The security
+threshold of Nakamoto Consensus goes to 0 as D·λ grows.
+Finally, we note that even if Dmax ̸≥ D, the system’s security
+does not immediately break apart. Rather, the minimal power
+needed to attack the system goes from 50% (times ( 1−δ)) to 0,
+deteriorating at a rate that depends on the error gap D− Dmax .
+4 SCALABILITY AND NETWORK DELAYS
+4.1 The propagation delay parameter Dmax
+The scalability of a distributed algorithm is closely tied to the
+assumptions it makes on the underlying network, and specifically
+on its propagation delay D = D(b) where b is the block-size in
+KB. The real value of D is both unknown and sensitive to shifting
+network conditions. For this reason, Bitcoin operates under the
+assumption that D is much smaller than 10 minutes, and sets the
+average block interval time to 10 minutes. While this seems like an
+overestimation of the network’s propagation delay under normal
+conditions (at least in 2018’s Internet terms), some safety margin
+must be taken, to account for peculiar network conditions as well.
+Similarly, in PHANTOM (and GHOSTDAG) we assume that the
+unknown D is upper bounded by some Dmax = Dmax(b) which
+is known to the protocol. The protocol does not explicitly encode
+Dmax , rather, it is used to parameterize k, as will be described in
+the next subsection.
+The use of an a priori known bound Dmax distinguishes
+GHOSTDAG’s (and PHANTOM’s) security model from that of
+SPECTRE [18]. While the security of both protocols depends on
+the assumption that the network’s propagation delay D is upper
+bounded by some constant, in SPECTRE the value of such a
+constant need not be known or assumed by the protocol, whereas
+GHOSTDAG makes explicit use of this parameter (via k) when
+ordering the DAG’s blocks. The fact that the order between any
+two blocks becomes robust in GHOSTDAG, but not in SPECTRE,
+should be ascribed to this added assumption; see further discussion
+in Section 5.
+4.2 The anticone size parameter k
+The parameter k is decided from the outset and hard-coded in the
+protocol. It is defined as follows:
+k(Dmax ,λ,δ) := min
+n
+ˆk∈ N : f( ˆk, Dmax ,λ) <δ
+o
+(1)
+f( ˆk, Dmax ,λ) := max
+ 
+
+∞Õ
+j= ˆk +1
+e−2·c·(2· c)j
+j! , 2· c
+ˆk + 2· c
+ 
+
+, (2)
+where c := Dmax · λ. The motivation behind this definition is
+twofold.
+Natural anticone size. First, we want to devise a bound over the
+number of blocks created in parallel. Since the block creation rate
+follows a Poisson process, for an arbitrary block B created at time
+t, k(Dmax ,λ,δ) bounds the number of additional blocks created in
+the time interval[t− Dmax , t + Dmax], with probability of at least
+1−δ; the term ˝∞
+j= ˆk+1 e−2·Dmax·λ·(2·Dmax·λ)j
+j! from (2) bounds
+the probability that more than k blocks were created in parallel to
+B in the time interval[t− Dmax , t + Dmax].
+Observe that blocks created in the intervals[0, t− Dmax) and
+(t + Dmax ,∞), by honest nodes, belong to B’s past and future sets,
+respectively. Consequently, in principle,|anticone(B)| ≤ k with
+probability of 1−δ at least. However, an attacker can artificially
+increase B’s anticone by creating blocks that do not reference it
+and by withholding his blocks so that B cannot reference them.
+Chain growth rate. The second motivation for (1) is potential
+manipulations by attackers on the increase rate of the blue set.
+GHOSTDAG does not guarantee that discovering new blocks
+necessarily increases the size of the blue set. Fortunately, by
+increasing k, we are able guarantee that the adverse effect is
+arbitrarily small. Indeed, a worst case analysis carried out in
+Lemma 9 shows that the overall decrease is at most by a factor of
+1− 2·C
+k +2·C
+
+. This is the role of the right-hand size term inside (2).
+We note one caveat here: the probability 2·C
+k +2·C does not vanish
+exponentially fast with k. To fix this, a tighter analysis of the effect
+of these attacks is needed; we leave this challenge to future work.
+4.3 Trade-offs
+Theorem 4, and the parameterization of GHOSTDAG in (1), tie
+together k, Dmax , λ, and δ. Striving for a better performance
+by modifying one parameter (e.g., increasing λ to obtain larger
+throughput and more frequent blocks) must be understood and
+considered against the effect on all other parameters.
+Increased block creation rate. Although the security threshold
+does not deteriorate as λ is increased, λ cannot be increased
+indefinitely, or otherwise the network becomes congested. The
+value of λ should be set such that nodes that are expected to
+participate in the system can support such a throughput. For
+instance, if nodes are required to maintain a bandwidth of at least
+1 MB per second, and blocks are of size b = 1 MB, then the block
+creation rate should be set toλ = 1 blocks per second (this is merely
+a back-of-the-envelope calculation, and in practice other messages
+consume the bandwidth as well).
+Higher security threshold. Theorem 4 states the security
+threshold in terms ofδ. Following (1) we notice that tightening the
+security threshold – by choosing a lowerδ – requires increasing
+k. A large k leads to slow confirmation times, as will be discussed
+shortly.9
+Larger safety margin. Similarly, if Dmax is to be increased, one
+needs to increase k as well in order to maintain the same security
+level (represented byδ).
+As discussed in Subsection 4.1, it is better to overestimate D and
+choose a large Dmax in order to remain on the safe side.10 Recall
+that the security of Bitcoin’s chain depends on the assumption that
+D·λ≪ 1, namely, that w.h.p. at least D seconds pass between
+consecutive blocks, so that forks are rare. Thus, Bitcoin’s large
+9The advanced reader should notice that although increasingλ has a similar negative
+effect on k, it has at the same time a positive effect on confirmation times, and so a
+certainλ will be optimal as far as confirmation times are concerned.
+10Several blockchain based projects do not do so, and consequently compromise the
+security threshold of their system.
+=== PAGE 8 ===
+, , Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar
+safety margin over D suppresses its throughput severely as it
+requires selecting a very low block rate λ = 1/600 (one block
+per 10 minutes). This is not the case with GHOSTDAG’s DAG, as
+the security of the DAG ordering does not rely on the assumption
+D·λ≪ 1. Therefore, even if we overestimate D, we can still allow
+for very high block creation rates while maintaining the same
+level of security. Consequently, GHOSTDAG supports a very large
+throughput, and does not suffer from a security-scalability tradeoff.
+That said, in GHOSTDAG there is still a tradeoff between a
+large safety margin and fast convergence of the protocol. A gross
+overestimation of Dmax – resulting an increase in k – would
+significantly increase the waiting time for transaction settlement.
+Thus, Dmax should be set to a reasonable level. In Section 5 we
+discuss how this tradeoff can be restricted to visible conflicts only,
+and how applications such as payments can enjoy much faster
+confirmation times.
+A note on the effective throughput. To increase the number of
+transactions included in the DAG per second, the protocol designer
+can increase the block rateλ or/and the block size b (which in turn
+affects Dmax = Dmax(b)). However, if honest miners include in
+their blocks the very same transactions, this would not contribute to
+the number of unique transactions included in the DAG, per second.
+There are two approaches to fix this. The first is to observe that
+honest and rational miners are actually incentivized to randomize
+over the transactions available to them in order to avoid “collision”
+and to thereby maximize their own profit; see more on this in [12].
+The second approach is to shard the transaction space and allow
+the block to contain transactions from one shard only, in a way
+that guarantees that parallel blocks will not collide on the same
+shard, with high probability. This technique was used in some of the
+works mentioned in Section 7, under “Parallel Nakamoto Chains”.
+Both techniques can be deployed in GHOSTDAG. Consequently,
+increasing the block rate or block size does indeed lead to a linear
+increase in the effective throughput.
+5 CONFIRMATION TIMES
+As in Nakamoto Consensus, the waiting time for transaction
+confirmation depends on the assumed attacker size α, and on
+the allowed error ϵ. The security analysis given in Appendix A
+shows that within constant expected time the chain of the honest
+network enters into a block race with any hypothetical or actual
+attacker chain. It is implied that the waiting time for the ordering
+between a given block B and other blocks becomes robust at a rate
+ofO
+
+log α
+1−α
+(1/ϵ)
+
+. This analysis was asymptotic, and we leave the
+task of tightening the analysis and improving the constants (hidden
+in theO) for future work.
+Still, we observe that in the case of payments, transactions of
+honest users can be confirmed much faster. Indeed, an honest user
+will not publish a conflicting transaction, and her transaction will
+therefore be commutative with all other published transactions.
+Of course, the payee does not know a priori who of the payers is
+honest, and will thus wait until the block containing the transaction
+is guaranteed (w.h.p.) to precede any new block that might be
+published by the attacker. Blocks that are published in the interim
+will not contain a conflicting transaction, in the case of an honest
+payer, and will therefore not delay acceptance.
+Formally, we argue that GHOSTDAG enjoys the following
+property: Given a published block b, the probability that a newly
+added block in anticone(b) will be accepted as a blue block decays
+exponentially:
+Proposition 6. If blocks b and c were published at times t and t + r ,
+respectively, and c∈ anticone(b), then the probability that c will ever
+be considered blue isO(e−C·r) for some positive constant C.
+Proof. Lemma 9 implies that the number of adversary blocks
+that are in the blue set of an honest node and not in past(B) grows
+linearly with r. LetBr = f uture(B)∩ past(Br) where Br is the
+honest tip of the node just before r. Then for any N and for any
+sufficiently large r it holds that|Br|≤ N + k. All blocks inBr are
+in anticone(C), for any C∈ anticone(B) that was discovered after
+t + r: indeed, if B′∈B r satisfies B′ < C then B′ < B, and if C < B′
+then it was discovered before t + r. Therefore, if Br remains the
+honest tip at time t + r, then C is not in the blue set of the honest
+node, as it has at least|Br| > k blue blocks in its anticone.
+Let B′ be a block such that C∈ BlueSet(B′), then |BlueSet(B′)∩
+Br|≤ k, or otherwise C cannot be inside BlueSet(B′). This proves
+that for the honest node to consider C blue, a block B′ has to win
+a block-race with Br – up to 3k blocks which it can freeload –
+which started a time t the latest and lasted up to t + r at least. The
+probability of winning such a block-race is inO(e−C·r). □
+In fact, following a similar analysis to that developed in [17, 18],
+the probability of C becoming blue is
+∞Õ
+m=0
+m + N + k− 1
+m
+
+·αm·( 1−α′)N +k·
+ α
+1−α′
+max(N−m,0)
+where 1−α′ =(1−α)·( 1−δ) as derived in Lemma 9. This implies,
+practically, that a merchant who received a payment in a block B,
+listens to the blockDAG and sees no conflicting payment in any
+block in B’s anticone, can accept the payment when the latter term
+becomes smaller than ϵ (- the error probability allowed by the
+merchant).
+For example, if the block creation rate is set toλ = 1 block per
+second, and the assumed upper bound on the network’s round trip
+time (2· D) is 7 seconds, then k can safely be set to 16. Assuming an
+attacker withα≤ 0.25, and an allowed error ofϵ = 0.1% (the values
+of these parameters must be assumed in Nakamoto Consensus as
+well), the waiting time for transaction confirmation would be in
+the order of 45 seconds. Note that if the actual network delay is
+smaller than the 7 seconds bound – say, below 4 seconds, as in
+Bitcoin’s Relay Network [1] – then the waiting time will remain the
+same. This demonstrates that GHOSTDAG is not responsive to the
+actual network delay. For comparison, under the same conditions,
+SPECTRE’s waiting time would be in the order of 21 seconds. This is
+due to SPECTRE not assuming any upper bound within the protocol,
+which enables it to be responsive.
+6 IMPLEMENTATION: THE KASPA
+NETWORK
+Kaspa is a cryptocurrency which operates over an open
+source implementation of the GHOSTDAG protocol [ 2]. This
+implementation includes an entire range of tools useful to monitor,
+=== PAGE 9 ===
+PHANTOM GHOSTDAG
+A Scalable Generalization of Nakamoto ConsensusNovember 10, 2021 , ,
+Figure 4: A histogram of the elapsed waiting time
+for a first confirmation of 458,557 transactions. The
+horizontal axis is confirmation time in seconds, the
+vertical axis is the number of transaction (note that the
+vertical axis is log scaled).
+test and analyze the network. Among these tools are a block
+explorer [4], a graph inspector [3] and a performance dashboard
+[5] which monitors quantities of interest such as the global hash
+rate, transaction throughput and combinatorial properties of the
+DAG such as width and tip count.
+The Kaspa implementation also includes features not discussed
+in the current work such as difficulty adjustment and algorithmic
+solution for efficient computation of all required quantities such as
+the blue anticone.
+Unlike simple proof of concept simulations, the Kaspa network
+provides evidence of the feasibility of GHOSTDAG in real world
+situations where the global hashrate fluctuates, the network miners
+are organically spread11, nodes are required to synchronize and
+verify blocks reasonably fast, and the network has been running
+for extended periods of time.
+At its current state, the fully operational network easily handles
+a throughput of 40 transactions per second, where the average
+waiting time for a single confirmation is of the order of seconds. We
+stress that a throughput of 40 transaction per second is larger than
+the highest throughput ever witnessed on both the Ethereum and
+Bitcoin networks, whose confirmation times are longer by orders
+of magnitude.
+We emphasize that the nodes running on the Kaspa network
+are fully operational, and furnish all services required for a real
+world cryptocurrency. The performance data of the network should
+not be compared against considerably simplified proof of concept
+simulations.
+We tested the confirmation times of the network by generating
+a total of 458,557 transactions and measuring how long before each
+transaction got a first confirmation. The results are summarized in
+fig. 4 and table 1.
+11at the time of writing, at least 30% of the Kaspa mining is carried out by parties other
+than the original developers
+Table 1: Percentage of transaction approved within given
+periods of time of the transactions described in fig. 4.
+All transactions were eventually confirmed. The largest
+observed first confirmation time is 746 second.
+Wait time 1s 2s 3s 4s 5s 10s
+Approval
+rate 5.3% 27.8% 43.6% 53.1% 59.3% 70,4%
+Wait time 30s 1m 2m 5m 10m
+Approval
+rate 80.7% 86.4% 92.2% 99.5% 99.9%
+7 RELATED WORK
+Many suggestions to improve the scalability of permissionless
+blockchains have been proposed in recent years. These proposals
+fall into two main categories, on-chain scaling and off-chain scaling.
+On-chain scaling. The protocols in this category may differ, e.g.,
+in how fast blocks are created, how blocks are organized in the
+ledger (a chain, a tree, a DAG, etc.), which transactions in the
+ledger are considered valid, and more. PHANTOM belongs to this
+line of works. Previous works in this family of protocols includes
+GHOST [19], where a main chain of blocks is chosen according
+to a greedy algorithm and not through the longest chain rule;
+Inclusive [12], where any chain-selection rule is extended to an
+ordered DAG and transactions off the main chain are added in a
+consistent manner; Bitcoin NG [ 7], where the ledger consists of
+slow key blocks (containing no transactions) and fast microblocks
+that contain transactions. The sole purpose of key blocks in Bitcoin
+NG is to define the miner that is eligible to create microblocks in
+that epoch and confirm thus transactions at a high rate.
+GHOST is still susceptible to some attacks, one of which was
+described in [11]. The DAG in Inclusive adds throughput but not
+security to the main chain, hence suffers from the same limitations
+as the underlying main chain selection rule. Key blocks in Bitcoin
+NG are still generated slowly, thus confirmation times remain high.
+Our work is most similar to the SPECTRE protocol [ 18].
+SPECTRE enjoys both high throughput and fast confirmation
+times. It uses the structure of the DAG as representing an abstract
+vote regarding the order between each pair of blocks. One caveat
+of SPECTRE is that the output of this pairwise ordering may
+not be extendable to a total order, due to possible Condorcet
+cycles. Another related caveat is that SPECTRE does not guarantee
+convergence of the ordering between two blocks that were
+published in time proximity to one another. This weak liveness
+property is showed to suffice for the use case of payments, where
+conflicts in two such blocks can only harm a malicious user
+that published a double spend. PHANTOM solves these issues
+and provides a linear ordering over the blocks of the DAG. As
+such, PHANTOM can support consensus regarding any general
+computation, including general Smart Contracts, which SPECTRE
+cannot handle. Indeed, in order for a computation or contract to
+be processed correctly and consistently, the full order of events
+in the ledger is usually required, and particularly the order of
+=== PAGE 10 ===
+, , Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar
+inputs to the contract. 12 PHANTOM’s linear ordering does not
+come without cost—confirmation times are mush slower than those
+in SPECTRE. In Section 5 we discuss the confirmation times in
+PHANTOM compared to those of SPECTRE, when the user does
+not publish a visible double spend.
+Parallel Nakamoto Chains. Another line of work attempts to
+avoid the scalability-security tradeoff imposed by the longest chain
+rule by dividing the ledger into k separate Nakamoto chains [6, 8,
+20]. The basic technique behind these protocols is to assign a block
+to one of the chains only after it was successfully mined, using the
+proof-of-work randomness represented in (the hash of) its header.
+This randomness ensures that an attacker cannot choose which
+chain to concentrate its attack on. One way to view these protocols
+and compare them against PHANTOM (and GHOSTDAG) is that
+Nakamoto Consensus operates under the assumption thatD·λ≪ 1,
+PHANTOM under the assumption that D·λ≪ k, and these parallel
+chain protocols under D·λ/k≪ 1; indeed, by dividing the protocol
+into k separate chains, each chain is mined at a rate ofλ/k, and this
+inequality ensures that each chain enjoys a negligible orphan rate
+similarly to Nakamoto Consensus.
+Protocols in this paradigm must specify the order over blocks in
+the ledger of parallel chains. The performance of these protocols
+depends on their respective ordering rules, and we differ the task
+of rigorously comparing them to GHOSTDAG to the full version of
+this paper.
+An attack on a previous variant. The work in [ 13]
+presents a DAG-based protocol Conflux, which is identical
+to Inclusive-GHOST [ 12, 19]. In the appendix section of [ 13]
+there appears an attack on a previous version of PHANTOM. In
+that version, the greedy algorithm inherited the blue set S of the
+maximal tip, and added blocks to S as long as their anticone in
+S was of size k or less. The fact that the greedy algorithm – in
+contrast to vanilla PHANTOM– did not attempt at enforcing the
+k-cluster property on the chosen set of blue blocks was shown
+in [13] to be exploitable. The greedy algorithm presented in this
+updated version of the paper, GHOSTDAG, does enforce the
+k-cluster property; we utilize this fact to prove its correctness. We
+thank the authors of [13] for highlighting this subtlety.
+Off-chain scaling. Our work is orthogonal and complementary
+to off-chain scaling solutions, and can enhance their operation
+by orders-of-magnitude. For instance, when the DAG is used
+to serve channel-settlement transactions of Bitcoin’s Lightning
+Network [16], it allows for a much cheaper access (due to larger
+supply of blocks and capacity) and much faster processing than if
+the LN were operating over a chain.
+8 DISCUSSION
+In this work we have introduced the PHANTOM paradigm, which
+generalizes over Nakamoto’s chain into a DAG, and which imposes
+no a priori constraint over the system’s throughput, thus avoiding
+the scalability-security tradeoff imposed by Nakamoto Consensus.
+We described a greedy algorithm, GHOSTDAG, which is more
+practical to implement, and proved its security rigorously. There
+are still several open research questions regarding GHOSTDAG: a
+12Contracts that do not require such a strict ordering can indeed be served under
+SPECTRE as well.
+tight analysis of its confirmation times, a comparison between it
+and other greedy algorithms that approximate PHANTOM, and a
+security analysis of the original PHANTOM protocol which wasn’t
+provided in this work.
+A GHOSTDAG SCALABILITY PROOF
+We present a proof that the GHOSTDAG order converges, and that
+an attacker (with less than 50% of the global hashrate) is unable to
+cause reorgs. We restate the theorem from Section 3:
+Theorem 4 (GHOSTDAG scales) Given a block creation rate λ > 0,
+δ > 0, and Dmax > 0, if Dmax is equal to or greater than the
+network’s propagation delay diameter D, then the security threshold of
+GHOSTDAG, parameterized withk(Dmax ,λ,δ), is at least 1
+2·(1−δ).
+Assumptions and notations. We first remind the reader that the
+topology of the DAG is regarded in our context in reverse to the
+usual convention, namely, if there is a path from a blockB to a block
+C we say thatC is a parent of B, whereas most literature concerning
+DAGs would say that B is a parent (or predecessor) of C. In our
+context blocks always point to older blocks, so this anti-convention
+is biologically justified whereas the conventional terminology is
+misleading.
+We assume a worst case byzantine attacker which suffers no
+internal delays or delays from or to honest nodes, and which
+deviates from the mining protocol arbitrarily (see definition). Still,
+regardless of any attacker intervention in the network, she cannot
+cause messages between honest nodes to take longer than Dmax to
+propagate. In the sequel, to avoid clutter, we useD instead of Dmax
+to denote the bound on the network delay (note that in previous
+sections D was used to denote the actual delay).
+When discussing the honest network, we fix an arbitrary honest
+node u∈ honest and assume its point of view, whereby terms such
+as the honest chain should be interpreted from u’s point of view.
+To that effect, by the honest (attacker) tips at time t we mean all
+immediate parents of the virtual block of the honest (attacker) node
+at time t, by the honest (attacker) chain we mean the selected chain
+of the virtual block, and by the honest (attacker) blue set we mean
+the blue set of the virtual block of the honest (attacker) node.
+The attacker does not follow the consensus rules and in particular
+may create a block which points at blocks which are not tips, and
+withhold any blocks they create. Hence, we separate between the
+time a block was created (by the attacker) and by the time it was
+discovered (by the arbitrary honest node u).
+The honest score wH(t) is defined as the score of the virtual block
+of the honest node at time t. The advantage of a block B is defined
+as adv(B) = score(B)− wH(t), where t is the time B was created.
+The attacker advantage adv(t) is the maximum of adv(B) over all
+attacker tips at time t. For a given block B, we define the relative
+advantage advB(t) to be the maximum of adv(B) over all attacker
+tips at time t such that B is not in their selected chain (or−∞ if
+there are none). We say that B convinced the honest node at time t
+if it was discovered before t− 2D and was in the selected chain at
+time t.
+We use B→ C to denote that C is an immediate parent of B
+and B ⇒ C to indicate that it is a selected parent. We use C < B
+to denote that C∈ past(B) and C <⋆ B to denote at C is in the
+=== PAGE 11 ===
+PHANTOM GHOSTDAG
+A Scalable Generalization of Nakamoto ConsensusNovember 10, 2021 , ,
+selected chain of B. We use C≤ B and C≤⋆ B to denote the same,
+with the possibility that B = C.
+We define many constants throughout the proof with the proviso
+that they only depend "on system parameters", by which we mean
+that they only depend onλ, D and k (and not on t, on the particular
+DAG structure of any node, etc.).
+Proof Structure. Due to the definition of security threshold in
+Definition 3, Theorem 4 reduces to the following proposition.
+Proposition 7 (GHOSTDAG security). For any t, r , the probability
+that the ordering of two blocks published before time t will change
+after time t + r isO(e−cr), where c depends only on the system
+parameters.
+In terms of Section 3, Proposition 7 states that Risku(B, t, r)
+decays exponentially fast, at a rate which does not depend on u
+or t. This implies that Risk(B, t, r) decays at the same rate, and in
+particular that the GHOSTDAG ordering rule(1−α)-converges.
+The correctness of this Proposition 7 follows from the following
+proposition:
+Proposition 8. Assume that B convinced the network at time t, then
+advB(t) is bound from above by a Markovian process on Z which goes
+to−∞ exponentially fast.13.
+The following two lemmas, which are of independent interest,
+are part of the proof of Proposition 8. The first lemma states that
+the growth rate of the blue score of the public chain is 1−α, up to
+a factor arbitrarily close to 1:
+Lemma 9. The expected value of wH(t + r)− wH(t) is at least
+(1−α)(1−δ) rλ.
+The next lemma states that the attacker’s advantage can be
+capped with high probability:
+Lemma 10. The advantage adv(t) is upper bounded by a stochastic
+process which admits a stationary distribution with an exponentially
+decaying tail.
+Blue set growth. In this section we discuss the non monotonicity
+of the chain weight and prove Lemma 9.
+In Nakamoto Consensus the longest chain is chosen, and it is
+therefore impossible for an adversary to reduce the length of the
+longest chain by publishing blocks. Stated otherwise, the score of
+a Bitcoin node increases monotonically. In GHOSTDAG this no
+longer holds. Indeed, there are cases where by learning of new
+blocks, the blue score of the virtual node actually decreases. This
+might have an adverse effect on the growth of the blue set, that is, of
+the score of the honest network. This adverse effect is bounded by a
+constant factor of
+
+1− 2Dλ
+k +2Dλ
+
+which is already built intoδ in the
+definition of the security threshold (1). That this is the appropriate
+factor is exactly the statement of Lemma 9, which we now prove.
+Lemma 9. The expected value of wH(t + r)− wH(t) is at least
+(1−α)(1−δ) rλ.
+13In the same sense that a random walk on Z which is biased to the left goes to−∞
+exponentially fast. That is, if T is the transition operator and p is a finitely supported
+distribution on Z, then for any N ∈ Z it holds that∥Π[N ,∞)T O(N)p∥1 = O(c N) for
+some constant c < 1 (which is α
+1−α for a random walk which transitions right with
+probabilityα < 1/2)
+Proof. Assume that a block B was published that caused wH
+to decrease. Let B′ be the honest selected tip right before B was
+published. We must have that B′ ≮ B and that score(B) ≥
+score(B′), then the reduction in score is at most the amount of
+blocks in anticone(B′) that the virtual node considered blue before
+B was discovered, and red after B was discovered. In particular,
+any such block must have an anticone larger than k. If all blocks
+are honest then the probability of this is at most δ; this follows
+from Dmax ≥ D and from k(D,λ,δ) monotonically increasing in D.
+This proves the theorem for the special case of an attacker which
+indefinitely withholds their blocks.
+To generalize to the adversarial setting, we need to argue the
+most damage an attacker can cause to the blue score by withholding
+blocks. Assume that at timet a block C was discovered that reduced
+the blue score, and let B be the honest selected tip right before C
+was published. If B <⋆ C then score(C) > score(B), contradicting
+the hypothesis. It follows thatC→ B can only increasescore(C), so
+we may assume without loss thatC̸→ B. It follows thatscore(C)≥
+score(B), for else B would have remained the honest selected tip
+and the score could not have decreased.
+Let nB be the number of blue blocks in the anticone of B that
+were in the honest blue when B was the selected tip, and let nC
+be defined similarly for C, then the decrease in score is at most
+nB− nC . However, note that if the selected chain ofC contains less
+than k blocks above max(SelectedChain(B)∩ SelectedChain(C))
+then nB≥ nC (as any block in anticone(B) could be a blue block,
+up to k blocks), and the score actually did not decrease.
+It follows that the adversary gains the most by publishing k + 1
+blocks in the anticone of the selected parent such that the most
+recent published block has score at least as large as that of the
+selected parent. This will cause the honest network to switch a
+chain, such that all the blocks in the anticone of the old selected
+parent, except the k + 1 blocks published by the adversary, will be
+considered red (as they are all in the anticone of the publishedk + 1
+blocks, which are blue). On average, there are at most 2Dλ such
+blocks, so that the adversary has managed to replace k + 2Dλ blue
+blocks with k + 1 blue blocks.
+This implies that the highest factor by which the adversary can
+reduce the growth of the honest blue set is k
+k +2Dλ = 1− 2Dλ
+k+2Dλ .
+Letδ0 be the probability that a particular honest block has an
+honest anticone larger than k. It follows that the expected value
+of wH(t)− wH(s) is at least(1−α)(1−δ0)
+
+1− 2Dλ
+k +2Dλ
+
+(t− s)λ >
+(1−α)(1−δ)(t− s)λ, where the last inequality holds by equation 2
+in the definition of k. □
+Freeloading and Bounded Advantage. In this section we prove
+Lemma 10, by a reduction to the analysis carried in [18]. The main
+challenge in this reduction is that the attacker may use the work
+done by the honest network to boost the score of their competing
+chain, by including honest blocks in the blue set of the chain tip.
+We call this phenomenon freeloading, more formally:
+Definition 11. We say that C ∈A is freeloading off B∈H if
+B∈ BlueSet(C), and C′ <⋆ C implies B < BlueSet(C′).
+It turns out that the advantage an attacker can gain by
+freeloading is bound by a constant depending only on system
+parameters.
+=== PAGE 12 ===
+, , Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar
+Lemma 12 (The Freeloader Bound). If C is freeloading off B then
+score(C)≤ score(B) + 4k.
+Proof. First note that if C ⇒ B then score(C)≤ score(B) + k,
+as GHOSTDAG does not add more than k blue blocks to C’s blue
+set over that of its selected parentB. We subsequently treat the case
+where C̸⇒ B. Let D <⋆ C be maximal such that D < B (this set
+is not empty as it contains the genesis block).Then score(B) >
+score(D). We show below that score(C)− score(D) ≤ 3k + 1
+and conclude that score(C)≤ score(B) + 3k. Note the following
+observations:
+• score(C)− score(D)≤| BlueSet(C)\ past(D)|,
+• BlueSet(C)\ past(D)⊂D 1∪D 2∪D 3∪D 4 where:D1 =
+past(C)∩ f uture(B),D2 = past(B)∩ f uture(D), andD3 =
+past(C)∩ anticone(B).
+• SelectedChain(C)∩ f uture(D) ,∅: the contrary implies
+that C→ D. However, that B < C implies that there is some
+C → B′ such that B ≤ B′. But score(B′) ≥ score(B) >
+score(D), which implies C̸⇒ D, contradicting D <⋆ C.
+Now, let E1, E2 be the maximal and minimal elements of
+SelectedChain(C)∩ f uture(D) respectively. If it does not hold that
+C ⇒ E1 then there must be a block between them, contradicting
+the maximality of E1. Similarly, E2 ⇒ D. IfD1 intersects past(E1)
+then B < E1, contradicting the minimality of C. Assume D1 ∈
+D1∩ f uture(E1), then score(E1) < score(D1) and since D1 < C
+we get that C ̸⇒ E1, which is a contradiction. Similarly, if D2
+intersects f uture(E2) then the maximality ofD is contradicted, and
+ifD2 intersects past(E2) then E2 ⇒ D is contradicted. HenceD1⊂
+anticone(E1),D2⊂ anticone(E2) andD3⊂ anticone(B) where it
+holds that E1, E2, B∈ BlueSet(c). Therefore|Di∩ BlueSet(C)|≤ k
+for i = 1, 2, 3, and since BlueSet(C)∩( past(B)∪{ B})⊂D 1∪D 2∪
+D3∪{ B} it follows that|BlueSet(C)\ past(D)|≤ 3k + 1. Hence
+score(C)− score(D)≤ 3k + 1, whereby score(C)≤ score(B) +
+3k. □
+Lemma 10 The advantage adv(t) is upper bounded by a stochastic
+process which admits a stationary distribution with an exponentially
+decaying tail.
+Proof. The work in [ 18] contains an analysis of the
+premining process, i.e., the maximal advantage of the
+attacker over an honest block, in a block race; formally:
+adv′(t) := maxC∈[0,t]{ f uture(C)∩A− f uture(C)∩H} (the
+notation adv′(t) does not appear therein). In contrast, we are
+interested in the processadv(t) = wA(t)− wH(t), which is similarly
+bounded: adv(t) = score(C)− score(V) where C is the selected tip
+of the attacker and V is the virtual block of the honest node. Let D
+satisfy that D≤⋆ C and D <⋆ V (such an element must exist, e.g.
+the genesis element). Then
+adv(t) =|BlueSet(C)|−| BlueSet(V)|
+=|BlueSet(C)\ past(D)|−| BlueSet(V)\ past(D)|
+≤ max
+C′
+
+|BlueSet(C)\ past C′|−| BlueSet(V)\ past C′|
+	
+The analysis of the last term is similar to the analysis of adv′(t)
+with two deviations: First, the growth rate of the honest network’s
+blue score is not(1−α) rather(1−α)(1−δ) as proven in Lemma 9.
+This has no qualitative effect on the analysis, it merely implies
+that the stationary distribution is governed by an exponent with
+base α
+(1−α)(1−δ) rather than α
+(1−α) . Secondly, the analysis therein
+assumes that no freeloading occurs. Fortunately, the Freeloader
+Bound guarantees that if the selected tip at time t was freeloading,
+adv(t) is bounded by a constant 3k. Therefore, by assuming the
+attacker always manages to saturate this constant, so that their
+advantage never goes below 3k, we can shift the process adv′(t)
+by 3k and analyze it as a block race, utilizing the result from [18].
+□
+The Markovian Process. In this section we prove the existence
+of the Markovian process described in Lemma 8. In order to do
+so, it is illuminating to first consider how one might prove the
+liveness property of GHOSTDAG in the non-adversarial setting. In
+this setting, it is easiest to demonstrate liveness by the emergence
+of so called hourglass blocks.
+Definition 13. A block B discovered in time t is called an hourglass
+block if it is the only block discovered between t− 2D and t + 2D.
+Lemma 14. In the non-adversarial setting where all miners are
+honest, if an honest hourglass block was created at time t, then the
+ordering of blocks created before t will remain unchanged after t.
+Proof. Let B be the hourglass block created at time t. If B′ was
+created before t, then by hypothesis it was created beforet− 2D, so
+by the definition of D it follows that B′∈ past(B) (as all miners are
+assumed to be honest). Similarly, if B′′ was created after t it was
+created after t + 2D and is therefore in f uture(B). It follows that
+B’s anticone is empty, or equivalently that B <⋆ B′′ for any B′′
+created after B. Hence, the ordering over all blocks in created before
+t is precisely the ordering induced by B, which is deterministic and
+does not change. □
+Corollary 15. In the non-adversarial setting where all miners are
+honest, the probability that the ordering between two blocks created
+before time t will change at time t + r decays exponentially with r .
+Proof. Let B, C be two blocks created before timet. At any point
+in time after t, the probability of the event Et where the next block
+will be an hourglass block is some positive constant C depending
+only on the system parameters; moreoever, the events Et and Es
+are independent as long as |s− t| > 2D. As r grows,|[t, t + r]|
+approaches r·λ exponentially fast. In particular, as r grows, with
+high probability (i.e., apart from a term inO(e−F·r)) there’s a set
+of blocks S of size at least r· f such that any two blocks in the set
+were created at least 2D seconds apart (F is some positive integer,
+0 < f < 1 is some positive constant). Since the events where blocks
+in S are hourglass blocks are mutually independent, we get that
+the probability that none of them is an hourglass block is at most
+(1− c)f·r . □
+In the adversarial setting, hourglass events are not enough to
+secure the ordering. If the honest network posts an hourglass block
+B, the adversary could "undo" it by posting a block in the anticone
+of B. Honest blocks created after B might include this block in
+their blue set, thus making the ordering of blocks in the past of B
+uncertain again. Overcoming this requires a more specific event: we
+require that the honest network created a chain of several blocks
+=== PAGE 13 ===
+PHANTOM GHOSTDAG
+A Scalable Generalization of Nakamoto ConsensusNovember 10, 2021 , ,
+while the adversary has produced none14. We call such an event a
+burst, and the blocks in the chain theburst blocks. We want to assure
+that the probability that the honest network is never convinced
+by a block whose selected chain does not include any of the burst
+blocks is bounded from below by some positive constant depending
+only on system parameters. In the following lemma, we prove that
+the amount of burst blocks required to achieve this depends only
+on system parameters and on adv(t) where t is the time the burst
+started.
+Lemma 16. For any Z , there exists a constant time length s
+depending only on Z and system parameters, such that for any t
+there exists an event Dt ,Z which, if adv(t)≤ Z , implies that there
+exists a block B created before t + s such that for the attacker to
+create a block C which satisfies that B ≮⋆ C and adv(C)≥− 2k they
+must win a block race starting with advantage −1. Furthermore, the
+probability of Dt ,Z is bounded from below by a constant depending
+only on Z and system parameters.
+Proof. The event Dt ,Z is the event that no blocks were created
+during the first 2D seconds, after which the honest network created
+Z′ + 3k + 2 blocks arranged in a chain, while the attacker created
+none, after which no blocks were created for 2D seconds, where
+Z′ = max Z, k + 1. Assume furthermore that the entire event lasted
+at most s =(2Z′ + 3k + 2)/αλ + 4D seconds (any s > 4D would
+work, but this choice of s is reasonable as the probability for such
+an event lasting longer decreases exponentially with Z). Finally, let
+B the 3k + 2 from last block created in the event. We immediately
+note that the independence of Dt ,Z and Dt +s ,Z is true by design.
+We call this event a burst and the blocks created during the event
+burst blocks.
+Let C0 be an attacker block created after t + s such that B ≮⋆ C0
+and the selected parent of C0 was created before t + s. Let C =
+max(SelectedChain(C0)∩A) , then adv(C)≤ Z and in particular
+score(B) > score(C). Let B′ be a burst block created after B and
+assume that C∈ SelectedChain(B′), this implies thatB <⋆ B′ since
+if C was discovered after B was created then any burst block would
+choose the previous burst block (which has score at least score(B))
+over C as a selected parent.
+This implies that all burst blocks created after B are in the
+anticone of C0. Let B′ be the latest burst block. It follows that
+score(C0) ≤ score(B) + k so score(B′) ≥ score(B) + 2k + 1 ≥
+score(C0) + k + 1. In particular, adv(C0)≤−( 2k− 1).
+Let E be a block created after t + s which freeloads off D ∈
+f uture(c0), but such that no block in SelectedChain(E) freeloaded
+off a block in f utureC 0.
+Let E′ be an element ofpast(D)∩A of maximal score (this set is
+not empty as it contains the genesis block). Ifscore(E)−score(E′) >
+k then there are more thank blocks in BlueSet(E)\ past(D), which
+contradicts that D∈ BlueSet(C). Hence score(E)− score(E′) < k.
+Note that score(E′) > score(E)− k > score(D)− k. So
+adv(E′)≥ score E′−( score(D) + k)
+≥ score E′− score(E)− k≥− 2k
+14Note that this is not a necessary condition for the network to converge, hence the
+constants which follow from the analysis are far from tight.
+Since adv(C)≤−( 2k− 1) and no block below E freeloaded, this
+implies that the attacker has won a block race with starting with
+advantage−1.
+□
+We now prove Proposition 8, thereby concluding the proof of
+Theorem 7.
+Proposition 8 Assume that B convinced the network at time t,
+then advB(t) is bound from above by a Markovian process on Z which
+goes to−∞ exponentially fast.
+Proof. Let Bt be the event that both Dt ,Z and adv(t)≤ Z hold.
+Lemma 10 implies that the probability of adv(t)≤ Z is bound by a
+constant depending only on system parameters, while Lemma 16
+states that the probability of Dt ,Z depends only on Z. It is evident
+from the construction ofDt ,Z that it depends only on blocks created
+after t while adv(t)≤ Z depends only on block created aftert, hence
+these events are independent, so the probability of their intersection
+is also bound by a constant.
+In order to construct M we construct another process M′ on
+Z×{ 0, 1} where the{0, 1} part keeps track on whether the attacker
+is in the condition described in Lemma 16. This means that as
+advb <−k, the attacker is in a block race. M is then defined as the
+projection of M′ on Z. From Lemma 9 it follows that the honest
+chain grows at a rate of(1−α)(1−δ) while the attacker chain grows
+at rateα. Letα′ = α
+1−δ . This renormalizes things such that if the
+attacker does not freeload the advantage is modeled as a walk on
+Z which transitions right with probabilityα′. We define transition
+probabilities of the state(n, i):
+• If n > Z then the process transitions to (n + 1, i) with
+probabilityα′ or to(n− 1, i) with probability 1−α′
+• If−2k ≤ n < 3k then the attacker may freeload, we
+assume that it always manages to do so and always gains
+the maximal advantage of 3k, so(n, i) transitions to(3k, 1)
+with probability 1
+• If 3k≤ n < Z then let p the probability of Bt , the process
+transitions to(n + 1, i) with probabilityα′p, to(n− 1, i) with
+probability(1−α′)p, or to(−k− 1, 0) with probability p
+• If n < −2k and i = 1 we also assume that the attacker
+manages to steal a block to gain the highest possible
+advantage, so the process always transitions to(3k, 1)
+• Finally, if n <−2k and i = 0 then the attacker is not able
+to freeload as long as n stays below−2k, so the process
+transitions to(n + 1, 0) with probabilityα′ or to(n− 1, 0)
+with probability 1−α′.
+Note that the state (−(2k + 1), 0) transitions to(−2k, 0) with
+probabilityα′ from which it transitions to(3k, 1) with probability 1.
+It is true by design that this process bounds the attacker advantage
+from above in the case where they insists not to include B in their
+selected chain (since all deviations from any actual process which
+is induced by any attacker strategy are positive), and that M goes
+to−∞ exponentially fast.
+□
+REFERENCES
+[1] Bitcoin’s relay network stats. http://bitcoinfibre.org/stats.html. Accessed:
+2020-01-20.
+[2] Kaspa github repository. https://github.com/kaspanet/kaspad/.
+=== PAGE 14 ===
+, , Yonatan Sompolinsky, Shai Wyborski, and Aviv Zohar
+[3] Kaspa graph inspector (testnet). http://kgi-testnet.daglabs-dev.com/.
+[4] Kaspa katnip block explorer (testnet). http://testnet.katnip.sh/.
+[5] Kaspa performance dashboard (testnet). http://kasboard-testnet.daglabs-dev.
+com/.
+[6] Vivek Bagaria, Sreeram Kannan, David Tse, Giulia Fanti, and Pramod Viswanath.
+Prism: Deconstructing the blockchain to approach physical limits. In Proceedings
+of the 2019 ACM SIGSAC Conference on Computer and Communications Security ,
+pages 585–602, 2019.
+[7] Ittay Eyal, Adem Efe Gencer, Emin Gün Sirer, and Robbert Van Renesse.
+Bitcoin-ng: A scalable blockchain protocol. In 13th USENIX Symposium on
+Networked Systems Design and Implementation (NSDI 16) , pages 45–59, 2016.
+[8] Matthias Fitzi, Peter Gazi, Aggelos Kiayias, and Alexander Russell. Parallel
+chains: Improving throughput and latency of blockchain protocols via parallel
+composition. IACR Cryptology ePrint Archive, 2018:1119, 2018.
+[9] Juan Garay, Aggelos Kiayias, and Nikos Leonardos. The bitcoin backbone
+protocol: Analysis and applications. In Annual International Conference on the
+Theory and Applications of Cryptographic Techniques , pages 281–310. Springer,
+2015.
+[10] Michael R Garey and David S Johnson. Computers and intractability, volume 29.
+wh freeman New York, 2002.
+[11] Aggelos Kiayias and Giorgos Panagiotakos. On trees, chains and fast transactions
+in the blockchain. Cryptology ePrint Archive, Report 2016/545, 2016.
+[12] Yoad Lewenberg, Yonatan Sompolinsky, and Aviv Zohar. Inclusive block chain
+protocols. In International Conference on Financial Cryptography and Data
+Security, pages 528–547. Springer, 2015.
+[13] Chenxing Li, Peilun Li, Dong Zhou, Wei Xu, Fan Long, and Andrew Yao. Scaling
+nakamoto consensus to thousands of transactions per second. arXiv preprint
+arXiv:1805.03870, 2018.
+[14] Rafael Pass, Lior Seeman, and Abhi Shelat. Analysis of the blockchain protocol
+in asynchronous networks. IACR Cryptology ePrint Archive, 2016:454, 2016.
+[15] Rafael Pass and Elaine Shi. Hybrid consensus: Efficient consensus in the
+permissionless model, 2016.
+[16] Joseph Poon and Thaddeus Dryja. The bitcoin lightning network: Scalable
+off-chain instant payments. Technical Report (draft), 2015.
+[17] Meni Rosenfeld. Analysis of hashrate-based double spending. arXiv preprint
+arXiv:1402.2009, 2014.
+[18] Yonatan Sompolinsky, Yoad Lewenberg, and Aviv Zohar. Spectre: A fast and
+scalable cryptocurrency protocol. IACR Cryptology ePrint Archive , 2016:1159,
+2016.
+[19] Yonatan Sompolinsky and Aviv Zohar. Secure high-rate transaction processing in
+bitcoin. In International Conference on Financial Cryptography and Data Security ,
+pages 507–527. Springer, 2015.
+[20] Haifeng Yu, Ivica Nikolic, Ruomu Hou, and Prateek Saxena. Ohie: Blockchain
+scaling made simple. arXiv preprint arXiv:1811.12628, 2018.

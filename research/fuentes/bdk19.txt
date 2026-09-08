@@ -1,0 +1,3137 @@
+
+=== PAGE 1 ===
+Proof-of-Stake Longest Chain Protocols:
+Security vs Predictability
+Vivek Bagaria⋆, Amir Dembo⋆, Sreeram Kannan‡, Sewoong Oh‡, David Tse⋆,
+Pramod Viswanath†, Xuechao Wang†, Ofer Zeitouni+
+†University of Illinois Urbana-Champaign,⋆Stanford University,
+‡University of Washington,+Weizmann Institute of Science
+Abstract. The Nakamoto longest chain protocol is remarkably simple
+and has been proven to provide security against any adversary with less
+than 50% of the total hashing power. Proof-of-stake (PoS) protocols
+are an energy eﬃcient alternative; however existing protocols adopting
+Nakamoto’s longest chain design achieve provable security only by al-
+lowing long-term predictability, subjecting the system to serious bribery
+attacks. In this paper, we prove that a natural longest chain PoS protocol
+with similar predictability as Nakamoto’s PoW protocol can achieve se-
+curity against any adversary with less than1/(1 +e) fraction of the total
+stake. Moreover we propose a new family of longest chain PoS protocols
+that achieve security against a50% adversary, while only requiring short-
+term predictability. Our proofs present a new approach to analyzing the
+formal security of blockchains, based on a notion ofadversary-proof con-
+vergence.
+1 Introduction
+Bitcoin is the original blockchain, invented by Nakamoto. At the core is the
+permissionless consensus problem, which Nakamoto solved with a remarkably
+simple but powerful scheme known as the longest chain protocol. It uses only
+basic cryptographic primitives (hash functions and digital signatures). In the
+seminal paper [23] that introduced the original Bitcoin protocol, Nakamoto also
+showed that the protocol is secure against one speciﬁc attack, a private double-
+spend attack, if the fraction of adversarial hashing power,β, is less than half the
+hashing power of the network. This attack is mounted by the adversary trying
+to grow a long chain over a long duration in private to replace the public chain.
+Subsequently, the security of Bitcoin againstall possible attacks is proven in [15],
+and further extended to a more realistic network delay model in [25].
+The authors are listed alphabetically. Email: vbagaria@stanford.edu,
+amir@math.stanford.edu, ksreeram@uw.edu, sewoong@cs.washington.edu,
+dntse@stanford.edu, pramodv@illinois.edu, xuechao2@illinois.edu,
+ofer.zeitouni@weizmann.ac.il. Amir Dembo and Ofer Zeitouni were partially
+supported by a US-Israel BSF grant.
+arXiv:1910.02218v3  [cs.CR]  23 Feb 2020
+=== PAGE 2 ===
+2 Bagaria et al.
+The permissionless design (robustness to Sybil attacks) of Bitcoin is achieved
+via a proof-of-work (PoW) mining process, but comes at the cost of large en-
+ergy consumption. Recently proof-of-stake (PoS) protocols have emerged as an
+energy-eﬃcient alternative. When running a lottery to win the right to propose
+the next valid block on the blockchain, each node wins with probability pro-
+portional its stake in the total pool. This replaces the resource intense mining
+process of PoW, while ensuring fair chances to contribute and claim rewards.
+There are broadly two families of PoS protocols: those derived from decades
+of research in Byzantine Fault Tolerant (BFT) protocols and those inspired by
+theNakamotolongestchainprotocol.AttemptsatblockchaindesignviatheBFT
+approach include Algorand [9,16] and Hotstuﬀ [32]. The adaptation of these new
+protocols into blockchains is an active area of research and engineering [4,16],
+with large scale permissionless deployment as yet untested.
+Motivated and inspired by the time-tested Nakamoto longest chain protocol
+are the PoS designs of Snow White [6] and the Ouroboros family of protocols
+[2,10,19]. The inherent energy eﬃciency of the PoS setting comes with the cost of
+enlarging the space of adversarial actions. In particular, the attacker can “grind”
+on the various sources of the randomness, i.e., attempt multiple samples from
+the sources of randomness to ﬁnd a favorable one. Since these multiple attempts
+are without any cost to the attacker this strategy is also known as anothing-at-
+stake (NaS) attack. One way to prevent an NaS attack is to rely on a source of
+randomness on which a consensus has been reached. In Snow White [6] and the
+Ouroboros family [2,10,19], this agreed upon randomness is derived from the
+stabilized segment of the blockchain from a few epochs before. Each epoch is a
+ﬁxed set of consecutive PoS lottery slots that use the same source of agreed upon
+randomness. However, this comes at a price of allowing each individual node to
+simulate and predict in advance whether it is going to win the PoS lottery at a
+given slot and add a new block to the chain. Further, as the size of each epoch
+is proportional to the security parameterκ (speciﬁcally, a block is conﬁrmed
+if and only if it is more thanκ blocks deep in the blockchain), higher security
+necessarily implies that the nodes can predict further ahead into the future.
+This is a serious security concern, as predictability makes a protocol vulnerable
+against other types of attacks driven by incentives, such as predictable selﬁsh
+mining or bribing attacks [7].
+Nakamoto-PoS. A straightforward PoS adoption of Nakamoto protocol,
+which in contrast to Ouroboros and Snow White can update randomness every
+block, runs as follows; we term the protocol as Nakamoto-PoS. The protocol pro-
+ceeds in discrete time units calledslots, during which each node runs the “PoS
+lottery”, a leader election with a winning probability proportional to the stake
+owned by the node – winners get topropose new blocks. Each node computes
+hash =H(time,secret key, parentBk.hash), where the hash functionH is aver-
+iﬁable random function(VRF) (formally deﬁned in §C), which enables the nodes
+to run leader elections with their secret keys (the outputhash is veriﬁed with
+the corresponding public key). The noden is elected a leader ifhash is smaller
+than a thresholdρ× staken, that is proportional to its stakestaken, then the
+=== PAGE 3 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 3
+node n proposes a new block consisting of time,parentBk.hash, public key and
+hash, and appends it to the parent block. A detailed algorithmic description of
+this protocol is in §G (withc = 1). Following Nakamoto’s protocol, each honest
+node runsonly oneelection, appending to the last block in the longest chain in
+its local view. Having the hash function depend on parentBk.hash ensures that
+every appended block provides a fresh source of randomness, for the following
+elections. However, there is no consensus on the randomness used and the ran-
+domness is block dependent, giving opportunities for the adversary to mount a
+NaS attack by trying its luck at many diﬀerent blocks.
+The analysis of the security of the Nakamoto-PoS protocol is ﬁrst attempted
+in [14]. Just like Nakamoto’s original analysis, their analysis is on the security
+against a speciﬁc attack: the private double-spend attack. Due to the NaS phe-
+nomenon, they showed the adversary can grow a private chain faster than just
+growing at the tip, as though its stake increases by a factor ofe. This shows
+that the PoS longest chain protocol is secure against the private double spend
+against if the adversarial fraction of stakeβ <1/(1+e). The question of whether
+the protocol is secure againstall attacks, or there are attacks more serious than
+the private double spend attack, remains open. This is not only an academic
+question, as well-known blockchain protocols like GHOST [29] had been shown
+to be secure against the private attack, only to be shown not secure later [20,24].
+Methodological Contribution. In this paper, we show that, under a for-
+mal security model (§3), the Nakamoto-PoS protocol is indeed secure againstall
+attacks, i.e., it has persistence and liveness wheneverβ < 1/(1 +e). One can
+view our result as analogous to what [15] proved for Nakamoto’s PoW protocol.
+However, how we prove the result is based on an entirely diﬀerent approach.
+Speciﬁcally, the security proofs of [15] are based oncounting the number of
+blocks that can be mined by the adversary over a long enough duration (see
+Fig. 1), and showing that the longest chain is secure because the number of such
+adversarial blocks is less than the number of honest blocks wheneverβ < 0.5.
+This proof approach does not give non-trivial security results for the PoS proto-
+col in question, because the number of adversarial blocks is exponentially larger
+than the number of honest blocks, due to the NaS phenomenon. Rather, our
+proof takes a dynamic view of the evolution of the blockchain, and shows that,
+whenever β <1/(1 +e), there are inﬁnite many time instances, which we call
+adversary-proof convergence times, in which no chains that the adversary can
+grow from the past can ever catch up to the longest chain any time in the fu-
+ture (see Fig. 1).1 Whenever such an event occurs, the current longest chain will
+remain as a preﬁx of any future longest chain.
+Although the adversary can propose an exponentially large number of blocks,
+perhaps surprisingly, the protocol can still tolerate apositive fraction β of ad-
+1 The notion of adversary-proof convergence is not to be confused with the notion
+of convergence opportunities in [25]. The latter refers to times in which the honest
+blocks are not mined at similar time so that honest nodes may have a split view of
+the blockchain. It says nothing about whether the adversary can launch an attack
+using the blocks it mined. That is what our notion focuses on.
+=== PAGE 4 ===
+4 Bagaria et al.
+Main chain grows
+at rate ≥𝜆#
+Tip of each of the adversarial NaStree
+grows at rate e𝜆$
+≥𝜆#T
+blocks
+≥𝜆#T
+blocks
+Since there are ≥ 2𝜆#Tblocks 
+and 𝜆#Tare honest, at least 
+𝜆#Tblocks are adversarial 
+=> 𝜆$≥ 𝜆#=> β ≥ ½.
+PoSProof IdeaPoWProof Idea
+Fig.1: Notations: λa,λ h are the rates at which the adversary and the honest nodes
+can mine a block on a given block, andT is the total duration. Left: In the PoW
+case, a counting argument shows that for the adversary to create a chain to match the
+longest chain,β > 1/2. This proof fails to work in the PoS case because there is no
+conservation of work and the total number of adversarial blocks that can be generated
+over a time durationT is exponentially larger thanλaT. Right: Our proof technique.
+Race between main chain and adversarial trees: adversary-proof convergence happens
+at a honest block ifnone of the previous NaS trees can ever catch up with the main
+chain downstream of the honest block. Security is proven by showing these events occur
+at a non-zero frequency.
+=== PAGE 5 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 5
+versarial stake. On the other hand, the fraction that can be tolerated ( 1
+1+e)
+is still less than the fraction for the longest chain PoW protocol (1
+2). In [14]
+and [13], modiﬁcations of the longest chain protocol (calledg-greedy and D-
+distance-greedy) are proposed, based on improvements to their security against
+the private double-spend attack. In §A, we showed that, unlike the longest chain
+protocol, these protocols are subject to worse public-private attacks, and they
+not only do not exhibit true improvements in security than the longest chain
+protocol, but in many cases, they do far worse.
+NewPoSProtocolContribution .Takingadiﬀerentdirection,wepropose
+a new family of simple longest chain PoS protocols that we callc-Nakamoto-
+PoS (§4); the fork choice rule remains the longest chain but the randomness
+update in the blockchain is controlled by a parameterc, the larger the value of
+the parameterc, the slower the randomness is updated. The common source of
+randomness used to elect a leader remains the same forc blocks starting from
+the genesis and is updated only when the current block to be generated is at
+a depth that is a multiple ofc. When updating the randomness, the hash of
+that newly appended block is used as the source of randomness. The basic PoS
+Nakamoto protocol corresponds toc = 1, where the NaS attack is most eﬀective.
+We can increasec to gracefully reduce the potency of NaS attacks and increase
+the security threshold. To analyze the formal security of this family of protocols,
+we combine our analysis forc = 1 with results from the theory of branching
+random walks [28]; this allows us to characterize the largest adversarial fraction
+β∗
+c of stake that can be securely tolerated. Asc→∞ , β∗
+c → 1/2. We should
+point out that the Ouroboros family of protocols [2,10] achieves security also
+by an infrequent update of the randomness; however, the update is much slower
+than what we are considering here, at the rate of once every constant multiple
+of κ, the security parameter. This is needed because the epoch must be long
+enough for the blockchain in the previous epoch to stabilize in order to generate
+the common randomness for the current epoch. Here, we are consideringc to be
+a ﬁxed parameter independent ofκ, and show that this is suﬃcient to thwart the
+NaS attack. Technically, we show that even ifc is small, there is no fundamental
+barrier to achieving any desired level of securityκ. Hence, achieving a high level
+of securityκ should not come at the cost of longer predictable window, and in
+this paper we introduce a natural adoption of Nakamoto protocol to achieve this.
+The practical implication of this result is shown in Fig. 2, where we can see that
+c-Nakamoto can achieve comparable security with a much smaller prediction
+window than a current implementation of Orouboros as part of the Cardano
+project [30].
+Organization. In §2 we formally deﬁne prediction windows for any PoS
+protocol and discuss a class of bribery attacks enabled by the predictive fea-
+ture of leader elections of many PoS protocols. The seriousness of these bribery
+attacks is underscored by the fatal nature of the attacks (double-spends and
+ledger rewrites) and that they can be implemented by bribing a fraction of users
+possessing an arbitrarily small total stake. This sets the stage for the protocols
+discussed in this paper, Nakamoto-PoS andc-Nakamoto-PoS, which have low
+=== PAGE 6 ===
+6 Bagaria et al.
+Fig.2: The security thresholdβ∗
+c of c-Nakamoto-PoS against the prediction window,
+equaling to c times the inter-block time, which we set to be20s, to match the im-
+plementation of Orouboros in Cardano. The Cardano project currently updates the
+common randomness every 5 days (21600 blocks, or10κ), while the security threshold
+ofc-Nakamoto-PoS can approach1/2 with much higher randomness update frequency.
+prediction windows and hence resistant to these bribery attacks. §3 discusses
+the formal security model we use to the analyze thec-Nakamoto-PoS protocols
+(deﬁned formally in §4). The formal security analyses of Nakamoto-PoS andc-
+Nakamoto-PoS protocols are conducted in §5. This analysis, conducted in the
+static stake setting, is generalized to dynamic stake settings in §6.
+2 Predictability in PoS Protocols
+Longest Chain BFT Our results
+[19] [10] [2] [6] [14] [13] Algorand [9]Nakamoto-PoSc-Nakamoto-PoS
+W 2κ 3κ 6κ 6κ 1 1 Θ(κ) 1 c
+β∗ 1
+2 unknown 1
+3
+1
+1+e β∗
+c
+Table 1: Our results decouple the prediction windowW and the security parameter
+κ, achieving any combination of(W,κ ). Prediction windowW for other PoS protocols
+are strongly coupled with the security parameterκ = log(1/Pfailure). The maximum
+threshold of adversarial stake that can be tolerated by the PoS protocols while being
+secure is β∗. Nakamoto-PoS is the most basic way of extending Nakamoto protocol
+to the PoS setting. This was originally introduced in [13,14] but with an incomplete
+security analysis; In §5 we showβ∗
+c ≈ 1/2−Θ(
+√
+(1/c)lnc) and numerically tabulate
+β∗
+c (example: β∗
+c = 39% for c = 10). [2,10,19] are the Ouroboros family, [6] is Snow
+White, [14] isg-Greedy, and [13] isD-Distance-Greedy.
+=== PAGE 7 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 7
+In PoW protocols such as Bitcoin, no miner knows when they will get to
+propose the block until they solve the puzzle, and once they solve the puzzle, the
+block is inviolable (because the puzzle solution will become invalid, otherwise).
+This causality is reversed in proof-of-stake (PoS) protocols: a node eligible to
+propose a block knowsa priori of its eligibility before proposing a block. This
+makes PoS protocols vulnerable to a new class of serious attacks not possible
+in the PoW setting. We brieﬂy discuss these attacks here, deferring a detailed
+discussion to §D.
+Deﬁnition 1 (W-predictable). Given a PoS protocolΠPoS, letC be a valid
+blockchain ending with blockB with a time stampt. We say a blockB enables
+w-length prediction, if there exists a timet1 > t and a blockB1 with a time
+stamp t1 such that (i) B1 can be mined by miner (using its private state and
+the common public state) at timet; and (ii) B1 can be appended toC′ to form a
+valid blockchain for any valid chainC′ that extendsC by appendingw− 1 valid
+blocks with time stamps within the interval(t,t 1). By taking the maximum over
+the prediction length over all blocks inΠPoS, we sayΠPoS is W-predictable.W
+is the size of the prediction window measured in units of number of blocks.
+Informally, a longest-chain PoS protocol hasW length prediction window if
+it is possible for a miner to know that it is allowed to propose a blockW blocks
+downstream of the present blockchain. We note that our deﬁnition is similar
+to the deﬁnition ofW-locally predictable protocols in [7], where it has been
+pointed out that PoS protocols trade oﬀ between predictability and nothing-
+at-stake incentive attacks. In Table 1, we compare the prediction windows of
+various protocols. The longest-chain family of protocols of Ouroboros update
+randomness every epoch have prediction window equal to the epoch length.
+Furthermore, they require the epoch length to be proportional to the security
+parameter κ, since one error event is that a majority of block producers in an
+epoch are not honest (and in that case, they can bias the randomness of all
+future slots).
+We note that in any PoS protocol with conﬁrmation-depthκ (the number of
+downstream blocks required to conﬁrm a given block), a simple bribing attack
+is possible, where a briber requests the previous block producers to sign an al-
+ternate block for each of their previous certiﬁcates. However, such attacks are
+overt and easily detectable, and can be penalized with slashing penalties. If the
+prediction windowW is greater than the conﬁrmation-depthκ, then the follow-
+ing covert (undetectable) attack becomes possible. An adversary who wants to
+issue a double-spend can create a website where nodes that have future proposer
+slots post their leadership certiﬁcates for a bribe. If the adversary gets more
+thanκ + 1miners to respond to this request, then the adversary can launch the
+following attack: (1) collect theκ + 1 leadership certiﬁcates (2) issue a transac-
+tion that gets included in the upcoming honest block, (3) let the honest chain
+grow forκ blocks to conﬁrm the transaction and receive any goods in return,
+then (4) create a double spend against the previous transaction and (5) create a
+longer chain downstream of a block including the double-spend using theκ + 1
+=== PAGE 8 ===
+8 Bagaria et al.
+certiﬁcates. We note that this attack does not require participation from miners
+having a majority of the stake. Far from it, it only requiresκ + 1 out of the
+next 2κ miners each holding a potentially inﬁnitesimal fraction of stake. Fur-
+thermore, this attack does not require miners to double-sign blocks, making it
+indistinguishable from unexpected network latency and providing plausible de-
+niability for the miners who take the bribe. Thus, it is a serious covert attack on
+security requiring only participants with a net inﬁnitesimal stake to participate
+in it. We note that this attack is not covered in the popular adaptive adversary
+model [10,16], since in that model, nodes are assumed not to have any agency
+and remain honest till the adversary corrupts them (based only on public state).
+We note that it isnot possibleto mitigate the prediction issue by increasing
+the conﬁrmation depth beyond the prediction window (which is equal to the
+epoch length). This is because the guarantees of existing protocols rely on the
+randomness of each epoch being unbiased and this guarantee fails to hold when a
+majority of nodes in an epoch are bribed through the aforementioned mechanism
+in order to bias the randomness.
+While our discussion so far focused on longest-chain PoS protocols, we note
+that the prediction issue is even more serious in BFT based PoS protocols. PoS-
+based BFT protocols that work with the same committee or same proposer for
+many time-slots give raise to similar prediction based attacks. Even in protocols
+such as Algorand [9,16], which require a new committee for each step of the
+BFT protocol, the entire set of committees for all steps of the BFT protocol
+for a given block is known once the previous block is ﬁnalized. This leads to a
+similartypeofbribingattackwhereoncea 2/3majorityofaBFT-stepcommittee
+coordinate through a centralized website, they can sign a diﬀerent block than
+the one the honest nodes agreed on. We note that since Algorand elects a small
+constant size committee (proportional toκ) for each round, a2/3 majority of
+the committee can comprise a negligible total stake. Thus, in Algorand, even
+though the prediction window appears negligible, the conﬁrmation delay is also
+small – thus leading to the same type of attack (detailed discussion deferred to
+§D). A formal deﬁnition of prediction window for BFT-based PoS protocols is
+in §D.4 where we evaluate the prediction windowW for a canonical BFT based
+PoS protocol: Algorand [9]. There is a strong coupling between the security
+parameter and prediction window for Algorand, and is tabulated in Table 1.
+Summary. We have demonstrated that both longest-chain and BFT based
+protocols are highly vulnerable to prediction-based security attacks when coor-
+dinating through an external bribing mechanism, thus compromising the per-
+sistence and liveness of the system. These attacks are covert, i.e., the deviant
+behavior is not detectable and punishable on the blockchain, and require only
+an inﬁnitesimal fraction of the stake to collude, thus signiﬁcantly weakening the
+security of the protocol. This motivates the study of Nakamoto-PoS (with a very
+small prediction window) and the design of a new PoS protocol that has a pre-
+diction window much shorter than the conﬁrmation depth and can be secure
+against adversaries with up to 50% of the stake. This state of aﬀairs, together
+with the security results we prove in this paper are summarized in Table 1.
+=== PAGE 9 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 9
+3 Security Model
+A blockchain protocolΠ is directed by anenvironmentZ(1κ), whereκ is the
+security parameter. This environment(i) initiates a set of participating nodes
+N; (ii) manages nodes through an adversaryA which corrupts a dynamically
+changing subset of nodes; (iii) manages all accesses of each node from/to the
+environment including broadcasting and receiving messages of blocks and trans-
+actions.
+The protocolΠ proceeds in discrete time units calledslots, each consisting
+of δ milliseconds (also called the slot duration), i.e. thetime argument in the
+input to the hash function should be in δ millisecond increments. Each slot
+slr is indexed by an integer r ∈ {1, 2,···} . A ledger associates at most one
+block to each slot among those generated (or proposed) by participating nodes,
+each running a distributed protocol. Collectively, at most one block per slot
+is selected to be included in the ledger according to a rule prescribed in the
+protocol Π. Similar to [19], we assume that the real time window for each slot
+satisﬁes that: (1)The time window of a slot is determined by a publicly-known
+and monotonically increasing function of current time; (2) every user has access
+to the current global time and any discrepancies between nodes’ local time are
+insigniﬁcant in comparison with the slot duration.
+We follow the security model of [10,15,25] with an ideal functionalityF. This
+includes diﬀusefunctionality andkey and transactionfunctionality as described
+below. With a protocolΠ, adversaryA, environmentZ, and security parameter
+κ, we denote byVIEWn,F
+Π,A,Z(κ) the view of a noden∈N who has access to an
+ideal functionalityF.
+We consider a semi-synchronousnetwork model with bounded network de-
+lay similar to that of [10,25] that accounts for adversarially controlled message
+delivery and immediate node corruption. All broadcast messages are delivered
+by the adversary, with a bounded network delay∆ millisecond. Letτ =∆/δ be
+an integer. We model this bounded network delay by allowing the adversary to
+selectively delay messages sent by honest nodes, with the following restrictions:
+(i) the messages broadcast in slotslr must be delivered by the beginning of slot
+slr+τ; and(ii) the adversary cannot forge or alter any message sent by an honest
+node. This is the so calleddelayed diﬀuse functionality(denoted by DDiﬀuseτ
+in [10]).
+The dynamically changing set of honest (or uncorrupted) nodesH ⊆ N
+strictly follows the blockchain protocol Π. The key registration functional-
+ity (from [19]) is initialized with the nodes N and their respective stakes
+(stake1,..., stake|N| ) such that the fraction of the initial stake owned by node
+n is staken/∑
+m∈N stakem. At the beginning of each round, the adversary can
+dynamically corrupt or uncorrupt any noden∈N , with a permission from the
+environmentZ in the form of a message(Corrupt,n ) or (Uncorrupt,n ). Even the
+corrupted nodes form a dynamically changing set, the total proportion of the
+adversarial stake is upper bounded byβ all the time. For the honest nodes, the
+functionality can sample a new public/secret key pair for each node and record
+them. For the corrupted nodes, if it is missing a public key, the adversary can
+=== PAGE 10 ===
+10 Bagaria et al.
+set the node’s public key, and the public keys of corrupt nodes will be marked
+as such. When the adversary releases the control of a corrupted node, the node
+retrieves the current view of the honest nodes at the beginning of the following
+round.
+Any of the following actions are allowed to take place.(i) A node can retrieve
+its public/secret key pair from the functionality.(ii) A node can retrieve the
+whole database of public keys from the functionality.(iii) The environment can
+send a message (Create) to spawn a new node, whose local view only contains
+the genesis block, and the functionality samples its public/secret key pair.(iv)
+The environment can request a transaction, specifying its payer and recipient.
+The functionality adjusts the stakes according to the transactions that make into
+the current ledger, as prescribed by the protocolΠ. The adversary has access
+to the state of a corrupt noden, and will be activated in place of noden with
+restrictions imposed byF.
+Veriﬁable Random Function (VRF).Veriﬁable Random Functions (VRF),
+ﬁrst introduced in [21], generates a pseudorandom number with a proof of its
+correctness. A node with a secret keysk can call VRFprove(·,sk ) to gener-
+ates a pseudorandomoutput Fsk(·) along with aproofπsk(·). Other nodes that
+have the proof and the corresponding public keypk can check that the output
+has been generated by VRF, by calling VRFverify(·, output,πsk(·),pk ). An
+eﬃcient implementation of VRF was introduced in [11], which formally satisfy
+Deﬁnition 5 in §C. This ensures that the output of a VRF is computationally in-
+distinguishable from a random number even if the public keypk and the function
+VRFprove is revealed.
+Key Evolving Signature schemes (KES).We propose using forward secure
+signature schemes [5] to sign the transactions to be included in a generated block.
+This prevents the adversary from altering the transactions in the blocks mined
+in the past. Eﬃcient Key Evolving Signature (KES) schemes have been proposed
+in [10,18] where keys are periodically erased and generated, while the new key is
+linked to the previous one. This is assumed to be available to the nodes via the
+ideal functionalityF. This ensures immutability of the contents of the blocks.
+4 Protocol description
+We explain our protocol following terminologies from [10] and emphasize the dif-
+ferences as appropriate. The ideal functionalityF captures the resources avail-
+able to the nodes in order to securely execute the protocol. When a PoS sys-
+tem is launched, a collectionN of nodes are initialized. Each noden∈N is
+initialized with a coin possessing stake staken, a veriﬁcation/signing key pair
+(KES.vkn, KES.skn), and a public/secret key pair(VRF.pkn, VRF.skn). The Key
+Evolving Signature key pair(KES) is used to sign and verify the content of a
+block, while the Veriﬁable Random Function key pair(VRF) is used to verify
+and elect leader nodes who generate new blocks. All the nodes and the adver-
+sary know all public keys{pkn = (KES.vkn, VRF.pkn)}n∈N. The genesis block
+contains all public keys and initial stakes of all nodes,{(pkn, staken)}n∈N, and
+=== PAGE 11 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 11
+also contains a nonce in genesis.content.RandSource. This nonce is used as a
+seed for the randomness. The depth of a block in a chain is counted from the
+genesis (which is at depth zero). We denote the time at the inception of the
+genesis block as zero (milliseconds), such that thei-th slot starts at the timeδ·i
+milliseconds (since the inception of the genesis block). Nakamoto-PoS protocol
+is executed by the nodes and is assumed to run indeﬁnitely. At each slot a node
+starts with a local chainC, which it tries to append new blocks on.
+Proposer selection.At each slot, a fresh subset of nodes are randomly elected
+to be the leaders, who have the right to generate new blocks. To be elected one
+of the leaders, each node ﬁrst decides on where to append the next block, in its
+local view of the blocktree. This choice of aparent blockis governed by the fork
+choice rule prescribed in the protocol. For example, inBitCoin, an honest node
+appends a new block to the deepest node in the local view of the blocktree. This
+is known as Nakamoto protocol. We proposes-truncated longest chain rulethat
+includes the Nakamoto protocol as a special case, which we deﬁne later in this
+section.
+A random number of leaders are elected in a single slot, and the collective
+average block generation rate is controlled by a global parameterρ that is adap-
+tively set by the ideal functionalityF. The individual block generation rate is
+proportional to the node’s stake. The stakes are updated continuously as the
+ledger is updated, but only a coins blocks deep in the ledger can be used in the
+election (the same parameters as used in the truncated longest chain rule), and
+is formally deﬁned later in this section.
+Concretely, at each slot, a noden∈N draws a number distributed uniformly
+at random in a predeﬁned range. If this is less than the product of its stake and
+a parameterρ (Algorithm 1 line 17), the node is elected one of the leaders of the
+slot and gains the right to generate a new block. Ideally, we want to simulate such
+a random trial while ensuring that the outcome(i) is veriﬁableby any node after
+the block generation;(ii) is unpredictableby any node other than noden before
+the generated block has been broadcast; and(iii) is independent of any other
+events.Veriﬁabilityin(i)iscriticalinensuringconsistencyamonguntrustedpool
+of nodes. Without unpredictability in(ii), the adversary can easily take over the
+blockchain by adaptively corrupting the future leaders. Without independence
+in (iii), a corrupted node might be able to grind on the events that the simulator
+(and hence the outcome of the election) depends on, until it ﬁnds one that favors
+its chances of generating future blocks. Properties(ii) and (iii) are challenges
+unique to PoS systems, aspredicting and grinding attacks are computationally
+costly in PoW systems.
+To implement such a simulator in a distributed manner among mutually
+untrusting nodes, [10,16] proposed using Veriﬁable Random Functions (VRFs),
+formally deﬁned in §C. In our proposed protocol, a noden uses its secret key
+VRF.sk to generate a pseudorandomhashand aproofof correctness (Algorithm 1
+line 16). If noden is elected a leader and broadcasts a new block, other nodes
+can verify the correctness with the corresponding public keyVRF.pk and the
+proof (which is included in the block content). This ensures unpredictability, as
+=== PAGE 12 ===
+12 Bagaria et al.
+only noden has access to its secret key, and veriﬁability, as any node can access
+all public keys and verify that the correctness of the random leader election.
+The pseudorandom hash generated byVRFprove(x, VRF.sk), depends on
+the external source of randomness, (x, VRF.sk), that is fed into the function.
+Along with the secret key VRF.sk, which we refer to as theprivate source of
+randomness, we prescribe constructing a headerx that contains the time (in
+a multiple of δ milliseconds) and a dynamically changing common source of
+randomness. Including the time ensures that the hash is drawn exactly once
+every slot. Including the common source of randomness ensures that the random
+elections cannot be predicted in advance, even by the owner of the secret key.
+Such private predictability by the owner of the secret key leads to other security
+concerns that we discuss in §D.
+A vanilla implementation of such a protocol might(a) update stakes imme-
+diately and (b) use the hash of the previous block (i.e. the parent of the newly
+generated block in the main chain as deﬁned by the fork chain rule) as the com-
+mon source of randomness. Each of these choices creates a distinct opportunity
+for an adversary to grind on, that could result in serious security breaches. We
+explain the potential threats in the following and propose how to update the
+randomness and the stake, respectively, to prevent each of the grinding attacks.
+A formal analysis of the resulting protocol is provided in §5.
+Updating the common source of randomness.One way to ensure unpre-
+dictability by even the owner of the secret key is to draw randomness from the
+dynamically evolving blocktree. For example, we could use the hash of the par-
+ent block (i.e. the block that a newly generated block will be appended to). This
+hash depends only on the parent block proposer’s secret key, the time, and the
+source of randomness included in the header of the parent block. In particular,
+this hash does not depend on the content of the parent block, to prevent an
+additional source of grinding attack. However, such a frequent update of the
+source creates an opportunity for the adversary to grind on. At every round, a
+corrupted node can run as many leader elections as the number of blocks in the
+blocktree, each appending to a diﬀerent block as its parent. To mitigate such
+grinding attacks, we propose a new update rule for the source of randomness
+which we callc-correlation.
+A parameter c ∈ Z determines how frequently we update. The common
+source of randomness remains the same forc blocks, and is updated only when
+thecurrentblocktobegeneratedisatadepththatisamultipleof c(Algorithm1
+line 19). When updating, the hash of that newly appended block is used as the
+source of randomness. Whenc = 1, this recovers the vanilla update rule, where
+a grinding attack is most eﬀective. We can increasec to gracefully increase the
+security threshold. A formal analysis is provided in §5. Whenc =∞, every block
+uses the nonce at the genesis block as the common source of randomness. This
+makes the entire future leader elections predictable in private, by the owners of
+the secret keys.
+Dynamic stake. The stake of a noden (or equivalently that of the coin the
+node possesses) is not only changing overtime as transactions are added to the
+=== PAGE 13 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 13
+blocktree, but also over whichchain we are referring to in the blocktree. Diﬀerent
+chains in the tree contain diﬀerent sequences of transactions, leading to diﬀerent
+stake allocations. One needs to specify which chain we are referring to, when we
+access the stake of a node. Such accesses are managed by the ideal functionality
+F (Algorithm 1 line 12).
+When running a random election to append a block to a parent blockb at
+depth𝓁−1in the blocktree, a coin can be used for this election of creating a block
+with depth𝓁 if and only if the coin is in the stake at the block with depth𝓁−s
+on the chain leading to blockb. Accordingly, a noden has a winning probability
+proportional to staken(b) when mining on blockb, where staken(b) denotes the
+stake belonging to noden as in the(s− 1)-th block beforeb. Starting from an
+initial stake distribution staken(bgenesis), we add to or subtract from the stake
+according to all transactions that(i) involve noden (or the coin that belongs to
+noden); (ii) are included in the chain of blocks from the genesis to the reference
+block b; and (iii) is included in the blockchain at leasts− 1 blocks before b.
+Here, s∈ Z is a global parameter.
+When s=1, the adversary can grind on (the secret keyVRF.sk of) the coin.
+For example, once a corrupted node is elected as a leader at some time slot and
+proposed a new block, it can include transactions in that block to transfer all
+stake to a coin that has a higher chance of winning the election at later time
+slots. To prevent such a grinding on the coin, a natural attempt is to use the
+stake in the block with depth𝓁−s when trying to create a block at depth𝓁 on
+the main chain. However, there remains a vulnerability, if we use the Nakamoto
+protocol from BitCoin as the fork choice rule.
+Consider a corrupted node growing its ownprivate chain from the genesis
+block (or any block in the blocktree). A private chain is a blockchain that the
+corrupted node grows privately without broadcasting it to the network until it is
+certain that it can take over the public blocktree. Under the Nakamoto protocol,
+this happens when the private chain is longer (in the number of blocks) than
+the longest chain in the public blocktree. Note that the public blocktree grows
+at a rate proportional toρ and the total stake of the nodes that append to the
+public blocktree. With a grinding attack, the private chain, which is entirely
+composed of the blocks generated by the corrupted node, can eventually take
+over the public blocktree.
+Initially, the private chain grows at a rate proportional toρ and the stake
+controlled by the corrupted node. However, afters blocks from the launch of the
+private chain, the corrupted node can start grinding on the private key of the
+coin; once a favorable coin is found, it can transfer the stake to the favored coin
+by including transactions in the ﬁrst ancestor block in the private chain. This
+is possible as all blocks in the private chain belong to the corrupted node. It
+can alter any content of the private chain and sign all blocks again. With such
+a grinding attack (which we refer to ascoin grinding), the corrupted node can
+potentially be elected a leader every slot in the private chain, eventually over-
+taking the public blocktree. To prevent this private grinding attack, we propose
+using ans-truncation as the fork choice rule.
+=== PAGE 14 ===
+14 Bagaria et al.
+Fork choice rule. An honest node follows a fork choice rule prescribed in
+the protocol. The purpose is to reach a consensus on which chain of blocks
+to maintain, in a distributed manner. Eventually, such chosen chain of blocks
+produces a ﬁnal ledger of transactions. Under the Nakamoto protocol, a node
+appends the next generated block to the longest chain in its local view of the
+blocktree. Unlike PoW systems, Nakamoto protocol can lead to serious security
+issues for PoS systems as discussed above. We propose using the followings-
+truncated longest chain rule, introduced in [2,14].
+At any given time slot, an honest node keeps track of one main chain that
+it appends its next generated block to. Upon receiving a new chain of blocks, it
+needs to decide which chain to keep. Instead of comparing the length of those
+two chains, as in Nakamoto protocol, we compare the creation time of the ﬁrst
+s blocks after the fork in truncated versions of those two chains (Algorithm 1
+line 34). Letbfork be the block where those two chains fork. The honest node
+counts how long it takes in each chain to create, up tos blocks after the fork.
+The chain with shorter time for thoses blocks is chosen, and the next generated
+block will be appended to the newest block in that selected chain. Whens =∞,
+the stake is ﬁxed since the genesis block, which leads to a system that is secure
+but not adaptive. This is undesirable, as even a coin with no current stake can
+participate in block generation. We propose using an appropriate global choice
+of s <∞, that scales linearly with the security parameterκ. This ensures that
+the protocol meets the desired level of security, while adapting to dynamic stake
+updates. One caveat is that we only apply thiss-truncation when comparing
+two chains that both have at leasts blocks after those two chains forked. If
+one of the chain has less thans blocks after forking, we use the longest chain
+rule to determine which chain to mine on. This is necessary in order to ensure
+that s-truncation is only applied to chains with enough blocks, such that our
+probabilistic analysis results hold.
+Content of the block.Once a node is elected a leader, all unconﬁrmed trans-
+actions in its buﬀer are added to the content (Algorithm 1 line 22). Along with
+the transactions, the content of the block also includes the identity of the coin
+that won the election, and thehash andproof from VRFprove(·). This allows
+other nodes to verify the accuracy of the leader election. A common source of
+randomnessRandSource is also included, to be used in the next leader election.
+The state variable in the content contains the hash of parent block, which en-
+sures that the content of the parent block cannot be altered. Finally, the header
+and the content is signed with the forward secure signatureKES.skn.
+Note that the content of the block is added after the leader election, in order
+to avoid any grinding on the content. However, this allows the adversary to
+create multiple blocks with the same header but diﬀerent content. In particular,
+after one leader election, the adversary can create multiple blocks appending to
+diﬀerent parent blocks, as long as those parent blocks share the same common
+source of randomness. Such copies of a block with the same header but diﬀerent
+contents are known as a “forkable string” in [19] or “non-core blocks” in [14]. We
+=== PAGE 15 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 15
+show in the next section that the Nakamoto-PoS protocol is secure against all
+such variations of attacks.
+β total proportion of the adversarial stake
+δ slot duration
+∆ network delay
+κ security parameter
+c correlation parameter
+s parameter in the fork choice rule
+φc maximum growth rate of a private tree
+Table 2: The parameters used in our analysis.
+5 Security analysis
+In this section, we provide formal security analysis for the longest chain PoS
+protocol. We focus on c = 1, and will discuss the generalc case in the last
+subsection and further in §F. To simplify the expressions, we will consider the
+regime when the time slot durationδ is very small, so that the block generation
+processes can be modeled as Poisson. We will also assume the stake distribution
+is static in this section; the case of dynamic stake is discussed in §6.
+We prove liveness and persistence of the protocol through understanding
+when the longest chainconverges as time passes, regardless of the adversarial
+strategy. We ﬁrst analyze this convergence in the setting when the network delay
+∆ = 0. This setting contains the core ideas of the proof, and allows us to explain
+it with the simplest notations. Then we extend it to the case of positive network
+delay. Finally, we use these results to prove high probability guarantees on the
+liveness and persistence of the protocol.
+5.1 Warmup: ∆ = 0
+Random processes In this setting, all the honest nodes have the same view of
+the blockchain, which can be modeled as a random process{(T (t),C(t)) :t≥ 0}.
+T (t) is a tree andC(t) is the public longest chain at time t. The treeT (t)
+is interpreted as consisting of all the blocks that are generated by both the
+adversary and the honest nodes up until timet, including blocks that are kept
+inprivatebytheadversary.Notethat T (t)consistsofthehonestblocks,minedat
+the tip of the longest chain, and all the blocks that the adversarycangenerate, by
+trying and winning the election lotteries at all possible locations of the blocktree.
+As suchT (t) captures all the resources the adversary has at its disposal to attack
+at timet.
+The longest chain protocol in §4 results in a process described as follows.
+1. T (0) =C(0) is a single root block (the genesis block).
+=== PAGE 16 ===
+16 Bagaria et al.
+2. T (t) evolves as follows: there are independent Poisson processes of rateλa at
+each block ofT (t) (we call them theadversary processes), plus an additional
+independentPoissonprocessofrate λh (wecallitthe honestprocess)arriving
+at the last block of the chainC(t), i.e. an aggregate Poisson process of rate
+λa +λh at that block (the tip of the longest chain), and rateλa at every
+other block ofT (t). A new block is added to the tree at a certain block when
+a block is generated. An arrival from the honest process is called an honest
+block. An arrival from the adversary process is called an adversarial block.
+3. The chainC(t) is updated in two possible ways : 1) an additional honest
+block is added toC(t) if an arrival from the honest process occurs; 2) an
+adversary can replaceC(t−) by another chainC(t) fromT (t) which is equal
+or longer in length thanC(t−).2 The adversary’s decision has to be based on
+the current state of the process.
+The longest chain protocol means that the honest nodes always propose on
+the tip of the current public longest chainC(t) (at rateλh, proportional to their
+stake). The adversary can propose on any block (at rateλa, again proportional to
+its stake). The adversary can change where the honest nodes act by broadcasting
+an equal or longer length chain using the blocks it has succeeded in proposing.
+Since the adversary can change where the honest nodes can propose even with an
+equal length new chain, that means the adversary is given the ability to choose
+where the honest nodes propose when there are more than one longest public
+chain.
+Proving the liveness and persistence of the protocol boil down to providing a
+guarantee that the chainC(t) converges ast→∞ regardless of the adversary’s
+strategy. We will show that this happens provided thatλa <λ h/e, i.e.
+β := λa
+λa +λh
+< 1
+1 +e
+Our key contribution here is deﬁning an appropriate notion ofadversary-proof
+convergenceand analyzing how frequently it occurs.
+Adversary-proof convergence We ﬁrst deﬁne several basic random variables
+andrandomprocesseswhichareconstituentsoftheprocesses T (·)andC(·).Then
+we will use them to deﬁne the notion of adversary-proof convergence event, and
+prove that indeed once the event occurs, convergence of the longest chain will
+occur regardless of what the adversarial strategy is.
+1. τi = generation time of thei-th honest block;τ0 = 0 is the generation time
+of the genesis block,τi+1−τi is exponentially distributed with mean1/λh,
+i.i.d. across alli’s.
+2. Ah(t) = number of honest blocks generated from time0 tot.Ah(t) increases
+by 1 at each timeτi. Ah(·) is a Poisson process of rateλh.
+2 All jump processes are assumed to be right-continuous with left limits, so that
+C(t),T (t), etc include the new arrival if there is a new arrival at timet.
+=== PAGE 17 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 17
+3. L(t) is the length ofC(t).L(0) = 0. Note that since the chainC(t) increments
+by 1 for every honest block generation, it follows that for alli and for all
+t>τ i,
+L(t)−L(τi)≥Ah(t)−Ah(τi). (1)
+4. Ti ={Ti(s) : s≥ 0} is the random tree process generated by the adversary
+startingfromthe i-thhonestblock. Ti(0)consistsofthe i-thhonestblockand
+Ti(s) consists of all adversarial blocks grown on thei-th honest block from
+time τi to τi +s. Note that theTi’s are i.i.d. copies of the pure adversarial
+treeTa (i.e. the treeT (t) when λh = 0).
+5. Di(s) is the depth of the adversarial treeTi(s).
+Note that the overall treeT (t) is the composition of the adversarial trees
+T0(t),T1(t−τ1),... Ti(t−τi) where thei-th honest block is the last honest block
+that was generated before timet. How these trees are composed to formT (t)
+depends on the adversarial action on when to release the private chains.
+Let us deﬁne the events:
+Eij = event thatDi(t−τi)<A h(t)−Ah(τi) for allt>τ j (2)
+and
+Fj =
+j−1⋂
+i=0
+Eij. (3)
+These events can be interpreted as about a ﬁctitious system where there is
+a growing chain consisting of only honest blocks. The eventEij is the event
+that the adversarial tree rooted at thei-th honest block does not catch up with
+the honest chain any time after the generation of thej-th honest block. Such a
+tree can be interpreted as providing resource for a possible attack at the honest
+chain. IfEij occurs, then there is not enough resource for thei-th tree to attack
+after the j-th block. IfFj occurs, there is not enough resource forany of the
+previous trees to attack the honest chain.
+Even though the events are about a ﬁctitious system with a purely honest
+chain and the longest chain in the actual system may consist of a mixture of
+adversarial and honest blocks, intuitively the actual chain can only grow faster
+than the ﬁctitious honest chain, and so we have the following key lemma. This
+lemma justiﬁes us giving the nameadversary-proof convergence eventto Fj.
+Lemma 1. If Fj occurs, then the chainC(τj) is a preﬁx of any future chain
+C(t), t>τ j. Equivalently, thej-th honest block will be inC(t) for allt>τ j.
+Proof. We will argue by contradiction. SupposeFj occurs and lett∗ >τ j be the
+smallestt such thatC(τj) is not a preﬁx ofC(t). Letbh be the last honest block
+onC(t∗) (which must exist, because the genesis block is by deﬁnition honest.)
+If bh is generated at some timet1 > τj, thenC(t−
+1 ) is the preﬁx ofC(t∗) before
+blockbh, and does not containC(τj) as a preﬁx, contradicting the minimality of
+t∗. Sobh must be generated beforeτj, and hencebh is thei-th honest block for
+=== PAGE 18 ===
+18 Bagaria et al.
+some i<j . The part ofC(t∗) after blockbh must lie entirely in the adversarial
+tree Ti(t∗−τi) rooted atbh. Hence,
+Di(t∗−τi)<A h(t∗)−Ah(τi)≤L(t∗)−L(τi), (4)
+where the ﬁrst inequality follows from the fact thatFj holds, and the second
+inequality follows from the longest chain policy (eqn. (1)). From this we obtain
+that
+L(τi) +Di(t∗−τi)<L (t∗) (5)
+which is a contradiction sinceL(t∗)≤L(τi) +Di(t∗−τi).
+We will show that the adversary-proof convergence event occurs inﬁnitely
+number of times ifβ <1/(1+e), and will also give an estimate on how frequently
+that happens. This will imply persistence and liveness of the protocol with high
+probability guarantees.
+Since the occurrence of the eventFj depends on whether the adversarial trees
+from the previous honest blocks can catch up with the (ﬁctitious) honest chain,
+we next turns to an analysis of the growth rate of an adversarial tree.3
+The adversarial tree via branching random walksThe adversarial tree
+Ta(t) is the treeT (t) when λh = 0, i.e. honest nodes not acting. Let the depth
+of the treeTa(t) be denoted byD(t) and deﬁned as the maximum depth of its
+blocks. The genesis block is always at depth0 and henceTa(0) has depth zero.
+We give a description of the (dual of the) adversarial tree in terms of a
+Branching Random Walk (BRW). Such a representation appears already in [12],
+but we use here the standard language from, e.g., [1,28].
+Consider the collection ofk tuples of positive integers,Ik ={(i1,...,i k)},
+and setI =∪k>0Ik. We consider elements ofI as labelling the vertices of a
+rooted inﬁnite tree, withIk labelling the vertices at generationk as follows:
+the vertex v = (i1,...,i k) ∈ Ik is the ik-th child of vertex (i1,...,i k−1) at
+level k− 1. An example of labelling is given in Fig. 3. For suchv we also let
+vj = (i1,...,i j), j = 1,...,k , denote the ancestor ofv at levelj, withvk = v.
+For notation convenience, we setv0 = 0 as the root of the tree.
+Next, let{Ev}v∈I be an i.i.d. family of exponential random variables of pa-
+rameter λa. For v = (i1,...,i k) ∈ Ik, letWv = ∑
+j≤ik
+E(i1,...,ik−1,j) and let
+Sv =∑
+j≤kWvj. This creates a labelled tree, with the following interpretation:
+forv = (i1,...,i j), theWvj are the waiting forvj to appear, measured from the
+appearance of vj−1, and Sv is the appearance time ofv. A moments thought
+ought to convince the reader that the treeSv is a description of the adversarial
+tree, sorted by depth.
+3 The mean growth rate of this tree was analysed in [14] using diﬀerence equations.
+Here, we are using the machinery of branching random walks, which not only gives
+us tail probabilities but also allow the extension to thec-correlated protocol,c> 1,
+easily.
+=== PAGE 19 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 19
+Fig.3: Labelling the vertices of a rooted inﬁnite tree.
+Let S∗
+k = minv∈IkSv. Note thatS∗
+k is the time of appearance of a block at
+levelk and therefore we have
+{D(t)≤k} ={S∗
+k≥t}. (6)
+S∗
+k is the minimum of a standard BRW. Introduce, forθ <0, the moment
+generating function
+Λ(θ) = log
+∑
+v∈I1
+E(eθSv) = log
+∞∑
+j=1
+E(e
+∑j
+i=1θEi) = log
+∞∑
+j=1
+(E(eθE1))j
+= log E(eθE1)
+1−E(eθE1).
+Due to the exponential law of E1, E(eθE1) = λa
+λa−θ and therefore Λ(θ) =
+log(−λa/θ).
+An important role is played byθ∗ =−eλa, for whichΛ(θ∗) =−1 and
+sup
+θ<0
+(Λ(θ)
+θ
+)
+= Λ(θ∗)
+θ∗ = 1
+λae = 1
+|θ∗|.
+Indeed, see e.g [28, Theorem 1.3], we have the following.
+Lemma 2.
+lim
+k→∞
+S∗
+k
+k = sup
+θ<0
+(Λ(θ)
+θ
+)
+= 1
+|θ∗|, a.s.
+In fact, much more is known, see e.g. [17].
+Lemma 3. There exist explicit constants c1 > c2 > 0 so that the sequence
+S∗
+k−k/λae−c1 logk is tight, and
+lim inf
+k→∞
+S∗
+k−k/λae−c2 logk =∞,a.s.
+=== PAGE 20 ===
+20 Bagaria et al.
+Note that Lemmas 2, 3 and (6) imply in particular thatD(t)≤eλat for all
+large t, a.s., and also that
+if eλa >λ h then D(t)>λ ht for all larget, a.s.. (7)
+We will need also tail estimates for the eventD(t) > eλat +x. While such
+estimates can be read from [28], we bring instead a quantitative statement suited
+for our needs.
+Lemma 4. Forx> 0 so thateλat +x is an integer,
+P (D(t)≥eλat +x)≤e−x. (8)
+Proof. We use a simple upper bound. Writem =eλat +x. Note that by (6),
+P (D(t)≥m) =P (S∗
+m≤t)≤
+∑
+v∈Im
+P (Sv≤t). (9)
+Forv = (i1,...,i k), set|v| =i1 +··· +ik. Then, we have thatSv has the same
+law as∑|v|
+j=1Ej. Thus, by Chebycheﬀ’s inequality, forv∈I m,
+P (Sv≤t)≤Eeθ∗Sve−θ∗t =
+( λa
+λa−θ∗
+)|v|
+e−θ∗t =
+( 1
+1 +e
+)|v|
+eeλat. (10)
+But
+∑
+v∈Im
+( 1
+1 +e
+)|v|
+=
+∑
+i1≥1,...,im≥1
+( 1
+1 +e
+)∑m
+j=1ij
+=
+
+∑
+i≥1
+( 1
+1 +e
+)i
+
+
+m
+=e−m.
+(11)
+Combining (10), (11) and (9) yields (8).
+Occurrence of adversary-proof convergence If the growth rate of the
+adversarial tree is greater thanλh, then the adversary can always attack the
+honest chain by growing a side chain at a rate faster than the honest chain’s
+growth rate and replace it at will. (7) immediately shows that ifλa >λ h/e, i.e.
+when the adversarial fractionβ >1/(1 +e), the growth rate of the adversarial
+tree is at least1, and hence the private attack is successful. This is what [14]
+showed. The question we want to answer is what happens whenβ <1/(1 +e)?
+Will another attack work? We show below that in this regime, the adversary-
+proof convergence eventFj has a non-zero probability of occurrence, and this
+implies that no attack works.
+Lemma 5. If λa <λ h/e, i.e.β <1/(1 +e), then there exists a strictly positive
+constantp> 0 such thatP (Fj)≥p for allj. Also, with probability1, the event
+Fj occurs for inﬁnitely manyj’s.
+The proof of this result can be found in §E.1.
+=== PAGE 21 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 21
+Waiting time for convergenceIn the previous section, we established the
+fact that the eventFj has P (Fj)> p >0 for allj. This implies that the event
+Fj occurs inﬁnitely often. But how long do we need to wait for such an event to
+occur? We answer this question in the present section.
+More speciﬁcally, we would like to get a bound on the probability that in
+a time interval[s,s +t], there are no adversary-proof convergence events, i.e. a
+bound on:
+q[s,s +t] :=P (
+⋂
+j:τj∈[s,s+t]
+Fc
+j ).
+Lemma 6. If λa <λ h/e, i.e.β <1/(1 +e) then there exist constantsa2,A 2 so
+that, for anys,t≥ 0,
+q[s,s +t] ≤ A2 exp(−a2
+√
+t). (12)
+The bound in (12) is not optimal, see Remark 1 below.
+Proof. DeﬁneRj =τj+1−τj, and let
+Bik = event thatDi(∑k−1
+m=iRm) ≥ (k−i− 1). (13)
+(Notation as in (43).) Note that from Lemma 4 we have
+P (Bik)≤P
+(
+Bik|
+k−1∑
+m=i
+Rm < (k−i− 1)λh +λae
+2λae
+1
+λh
+)
++P
+(k−1∑
+m=i
+Rm≥ (k−i− 1)λh +λae
+2λae
+1
+λh
+)
+≤e−
+λh−λae
+2λh
+(k−i−1) +A1e−α1(k−i−1) (14)
+for some positive constants A1,α 1 independent of k,i. The ﬁrst term in the
+last inequality follows from (8), and the second term follows from the fact that
+(λh +λae)/(2λae)> 1 and theRi’s are iid exponential random variables of mean
+1/λh. Then
+Fc
+j =
+⋃
+(i,k):i<j,k>j
+Bik. (15)
+Divide [s,s +t] into
+√
+t sub-intervals of length
+√
+t, so that ther th sub-interval
+is:
+Jr := [s + (r− 1)
+√
+t,s +r
+√
+t].
+Now look at the ﬁrst, fourth, seventh, etc sub-intervals, i.e. all ther = 1
+mod 3 sub-intervals.Introducetheeventthatinthe 𝓁-th 1 mod 3 thsub-interval,
+an adversarial tree that is rooted at a honest block arriving in that sub-interval
+or in the previous (0 mod 3 ) sub-interval catches up with a honest block in that
+sub-interval or in the next (2 mod 3 ) sub-interval. Formally,
+C𝓁 =
+⋂
+j:τj∈J3𝓁+1
+⋃
+(i,k):τj−
+√
+t<τi<τj,τj<τk<τj +
+√
+t
+Bik.
+=== PAGE 22 ===
+22 Bagaria et al.
+Note that for distinct𝓁, the eventsC𝓁’s are independent. Also, we have
+P (C𝓁)≤P (no arrival inJ3𝓁+1) + 1−p< 1 (16)
+for large enought.
+Introduce the atypical events:
+B =
+⋃
+(i,k):τi∈[s,s+t] or τk∈[s,s+t],i<k,τk−τi>
+√
+t
+Bik , and (17)
+˜B =
+⋃
+(i,k):τi<s,s+t<τk
+Bik . (18)
+The eventsB and ˜B are the events that an adversarial tree catches up with an
+honest block far ahead. Consider also the events
+D1 ={#{i :τi∈ (s−
+√
+t,s +t +
+√
+t)}> 2λht} (19)
+D2 ={∃i,k :τi∈ (s,s +t), (k−i)<
+√
+t/2λh,τk−τi >
+√
+t} (20)
+D3 ={∃i,k :τk∈ (s,s +t), (k−i)<
+√
+t/2λh,τk−τi >
+√
+t} (21)
+In words,D1 is the event of atypically many honest arrivals in(s−
+√
+t,s +t+
+√
+t)
+while D2 and D3 are the events that there exists an interval of length
+√
+t with
+at least one endpoint inside(s,s +t) with atypically small number of arrivals.
+Since the number of honest arrivals in(s,s +t) is Poisson with parameterλht, we
+have from the memoryless property of the Poisson process thatP (D1)≤ e−c0t
+for some constantc0 =c0(λa,λh)> 0. On the other hand, using the memoryless
+property and a union bound, and decreasingc0 if needed, we have thatP (D2)≤
+e−c0
+√
+t. Similarly, using time reversal,P (D3)≤ e−c0
+√
+t. Therefore, again using
+the memoryless property of the Poisson process,
+P (B)≤P (D1∪D2∪D3) +P (B∩Dc
+1∩Dc
+2∩Dc
+3)
+≤e−c0t + 2e−c0
+√
+t +
+2λht∑
+i=1
+∑
+k:k−i>
+√
+t/2λh
+P (Bik)≤c1e−c2
+√
+t, (22)
+wherec1,c 2 > 0 are constants that may depend onλa,λh and the last inequality
+is due to (14). We next claim that there exists a constantα> 0 so that, for all
+t large,
+P ( ˜B)≤e−αt. (23)
+Indeed, we have that
+P ( ˜B) =
+∑
+i<k
+∫ s
+0
+P (τi∈dθ)P (Bik,τk−τi >s +t−θ)
+≤
+∑
+i
+∫ s
+0
+P (τi∈dθ)
+∑
+k:k>i
+P (Bi,k)1/2P (τk−τi >s +t−θ)1/2. (24)
+=== PAGE 23 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 23
+By (14), there existsc3 > 0 so that
+P (Bi,k)≤e−c3(k−i−1), (25)
+while the tails of the Poisson distribution yield the existence of constantsc,c′ > 0
+so that
+P (τk−τi >s +t−θ) =P (τk−i >s +t−θ)≤
+{ 1, (k−i)>c (s +t−θ)
+e−c′(s+t−θ), (k−i)≤c(s +t−θ).
+(26)
+Combining (25) with (26) yields that there exists a constantα> 0 so that
+∑
+k:k>i
+P (Bi,k)1/2P (τk−τi >s +t−θ)1/2≤e−2α(t+s−θ). (27)
+Substituting this bound in (24) and using that∑
+iP (τi∈dθ) =dθ gives
+P ( ˜B)≤
+∑
+i
+∫ s
+0
+P (τi∈dθ)e−2α(t+s−θ)
+≤
+∫ s
+0
+e−2α(t+s−θ)dθ≤e−αt, (28)
+for t large, proving (23).
+Continuing with the proof of the lemma, we have:
+q[s,s +t]≤P (B) +P ( ˜B) +P (
+√
+t/3⋂
+𝓁=0
+C𝓁) =P (B) +P ( ˜B) + (P (C𝓁))
+√
+t/3
+≤c1e−c2
+√
+t +e−αt + (P (C𝓁))
+√
+t
+3 (29)
+where the equality is due to independence, and in the last inequality we used
+(22) and (23). The lemma follows from (16).
+Remark 1. Iterating the proof above (taking longer blocks and using the bound
+of Lemma 6 to improve onP (C𝓁) in (16) by replacingp with the bound from
+(12)) shows that (12) can be improved to the statement that for anyθ> 1 there
+exist constantsaθ,Aθ so that, for anys,t> 0,
+q[s,s +t] ≤ Aθ exp(−aθt1/θ). (30)
+5.2 Nonzero network delay: ∆> 0
+We will now extend the analysis in the above subsection to the case of non-zero
+delay.
+In the case of zero network delay, the power of the adversary is in the
+adversarial blocks that it can generate by winning lotteries. We show that if
+β < 1/(1 +e), regardless of the adversarial strategy, there will be adversary-
+proof convergence events happening in the system once in a while. When the
+=== PAGE 24 ===
+24 Bagaria et al.
+network delay is non-zero, the adversary has the additional power to delay deliv-
+ery of honest blocks to create split view among the honest nodes. In the context
+of the security analysis of Nakamoto’s PoW protocol, the limit of this power
+is quantiﬁed by the notion ofuniquely successfulround in [15] in the lock-step
+synchronous round-by-round model, and extended to the notion ofconvergence
+opportunity in [25] in the semi-synchronous model. (This notion is further used
+in [27] to provide a simpler security proof for Nakamoto’s protocol.) They show
+that during these convergence opportunities, the adversary cannot create split
+view between honest nodes, because only one honest block is generated during
+a suﬃciently long time interval. We combine our notion of adversary-proof con-
+vergence event with the notion of convergence opportunity to deﬁne a stronger
+notion of adversary-proof convergence event for the non-zero delay case.
+Random processes We consider the network model in §3 with bounded com-
+munication delay, where all broadcast blocks are delivered by the adversary with
+maximum delay∆. With this network model, the evolution of the blockchain can
+be modeled as a random process{(T (t),C(t),T (p)(t),C(p)(t) :t≥ 0, 1≤p≤n},
+where n is the number of honest nodes,T (t) is a tree,T (p)(t) is an induced
+sub-tree ofT (t) in the view of thep-th honest node at timet, andC(p)(t) is the
+longest chain in thep-th tree. Then letC(t) be the common preﬁx of all the local
+honest chainsC(p)(t) for 1≤ p≤ n. The treeT (t) is interpreted as consisting
+of all the blocks that are generated by both the adversary and the honest nodes
+up until timet, including blocks that are kept in private by the adversary. The
+chainC(p)(t) is interpreted as the longest chain in the local view of thep-th
+honest node at timet. The process is described as follows.
+1. T (0) = T (p)(0) = C(0) = C(p)(0), 1≤ p≤ n is a single root block (the
+genesis block).
+2. T (t) evolves as follows: there are independent Poisson processes of rateλa at
+each block ofT (t) (we call them theadversary processes), plus an additional
+independent Poisson process of rateλ(p)
+h (we call it thehonest process) ar-
+riving at the last block of the chainC(p)(t) (the tip of the local longest chain)
+for each 1≤p≤n, with∑n
+p=1λ(p)
+h =λh. A new block is added to the tree
+at a certain block when an arrival event occurs at that node. An arrival from
+the honest process is called an honest block. An arrival from the adversary
+process is called an adversarial block.
+3. The sub-treeT (p)(t) for each 1≤ p≤ n is updated in three possible ways
+: 1) an additional honest block can be added toT (p)(t) by the adversary
+if an arrival event of the honest process with thep-th honest node occurs;
+2) a block (whether is honest or adversarial) must be added toC(p)(t) if it
+appears inT (q) for someq⁄=p at timet−∆; 3) the adversary can replace
+T (p)(t−) by another sub-treeT (p)(t) fromT (t) as long asT (p)(t−) is an
+induced subgraph of the new treeT (p)(t). The adversary’s decision has to
+be based on the current state of the process.
+=== PAGE 25 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 25
+4. C(p)(t) is updated as follows for each1≤p≤n:C(p)(t) is the longest chain
+in the treeT (p)(t) starting from the root block at timet. If there are more
+than one longest chain, tie breaking is in favor of the adversary.
+5. C(t) is updated as follows:C(t) is the common preﬁx of all the local honest
+chainsC(p)(t) for 1≤p≤n at timet.
+The adversary can change where the honest nodes act by broadcasting an
+equal or longer length chain using the blocks it has succeeded in proposing. Since
+the adversary can change where the honest nodes can propose even with an equal
+length new chain, that means the adversary is given the ability to choose where
+the honest nodes propose when there are more than one longest public chain.
+Also the adversary has the ability to have one message delivered to honest nodes
+at diﬀerent time (but all within∆ time).
+Adversary-proof convergenceWe ﬁrst deﬁne several basic random variables
+and random processes which are constituents of the processesT (·) andC(·). We
+make use of the terminology in [27].
+1. τi = generation time of thei-th honest block;τ0 = 0 is the mining time
+of the genesis block,τi+1−τi is exponentially distributed with mean1/λh,
+i.i.d. across alli’s. Suppose an honest blockB is generated at timeτj. If
+τj−τj−1 >∆ , then we callB is anon-tailgater (otherwise,B is atailgater).
+If τj−τj−1 > ∆and τj+1−τj > ∆, then we callB is a loner. Note that
+non-tailgaters have diﬀerent depths and a loner is the only honest block at
+its depth.
+2. Hh(t) = number of non-tailgaters generated from time0 to t.
+3. L(p)(t) is the length ofC(p)(t) for each 1≤ p≤ n. L(p)(0) = 0. Note that
+since every non-tailgater appears at diﬀerent depth in the block tree, it
+follows that for allt>s +∆,
+L(p)(t)−L(p)(s)≥Hh(t−∆)−Hh(s). (31)
+4. Ti ={Ti(s) : s≥ 0} is the random tree process generated by the adversary
+starting from thei-th honest block.Ti(0) consists of thei-th honest block
+andTi(s) consists of all adversarial blocks grown on thei-th honest block
+from timeτi to τi +s. Note that theTi’s are i.i.d. copies of the adversarial
+treeTa.
+5. Di(s) is the depth of the adversarial treeTi(s).
+Let us deﬁne the events:
+ˆEij = event thatDi(t−τi)<H h(t−∆)−Hh(τi) for allt>τ j +∆, (32)
+ˆFj =
+⋂
+0≤i<j
+ˆEij, (33)
+=== PAGE 26 ===
+26 Bagaria et al.
+Uj = event thatj-th honest block is a loner={τj−τj−1 >∆,τ j+1−τj >∆},
+(34)
+and
+ˆUj = ˆFj∩Uj. (35)
+And we have the following lemma, which justiﬁes calling the event ˆUj
+adversary-proof convergence event for the non-zero delay case. .
+Lemma 7. If ˆUj occurs, then thej-th honest block is contained in any future
+chainC(t) (i.e. in all local chainsC(p)(t), 1≤p≤n), t>τ j +∆.
+Proof. We will argue by contradiction. SupposeˆUj occurs and lett∗ > τj +∆
+be the smallestt such that thej-th honest block is not contained inC(t). Letbh
+be the last honest block onC(p)(t∗) (which must exist, because the genesis block
+is by deﬁnition honest.) Ifbh is mined at some timet1 >τ j +∆, thenC(p)(t−
+1 ) is
+the preﬁx ofC(p)(t∗) before blockbh, and does not contain thej-th honest block,
+contradicting the minimality oft∗. Sobh must be mined before timeτj +∆. And
+since thej-th honest block is a loner, we further know thatbh must be mined
+before time τj, hence bh is the i-th honest block for somei < j. The part of
+C(p)(t∗) after blockbh must lie entirely in the adversarial treeTi(t∗−τi) rooted
+at bh. Hence, we have
+Di(t∗−τi)<H h(t∗−∆)−Hh(τi)≤L(p)(t∗)−L(p)(τi), (36)
+where the ﬁrst inequality follows from the fact thatˆFj holds, and the second
+inequality follows from the longest chain policy (eqn. (31)). From this we obtain
+that
+L(p)(τi) +Di(t∗−τi)<L (p)(t∗) (37)
+which is a contradiction sinceL(p)(t∗)≤L(p)(τi) +Di(t∗−τi).
+Note that, Lemma 7 implies that ifˆUj occurs, then the entire chain leading
+to thej-th honest block from the genesis is stabilized after thej-th honest block
+is seen by all the honest nodes.
+Occurrence of adversary-proof convergence
+Lemma 8. If λa <g/e ·λh, i.e.β <g/(g +e) with g =e−λh∆, then there is a
+p> 0 such thatP ( ˆUj)≥p for allj. Also, with probability1, the eventˆUj occurs
+for inﬁnitely manyj’s.
+The proof of this result can be found in §E.2.
+=== PAGE 27 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 27
+Waiting time for adversary-proof convergenceWe have established the
+fact that the eventˆUj has P ( ˆUj)>p> 0 for allj. In analogy to the zero-delay
+case, we would like to get a bound on the probability that in a time interval
+[s,s +t], there are no adversary-proof convergence events, i.e. a bound on:
+˜q[s,s +t] :=P (
+⋂
+j:τj∈[s,s+t]
+ˆUc
+j ).
+The following lemma is analogous to Lemma 6 in the zero-delay case. Its
+proof is almost verbatim identical, and will not be repeated here.
+Lemma 9. Ifλa <g/e·λh, i.e.β <g/(g +e), then there exist constants¯a2, ¯A2
+so that for alls,t≥ 0,
+˜q[s,s +t]≤ ¯A2 exp(−¯a2
+√
+t). (38)
+The improvement mentioned in Remark 1 applies here as well.
+5.3 Persistence and Liveness
+We will now use Lemma 9 to establish the liveness and persistence of the basic
+longest chain PoS protocol.
+In the absence of any adversary, each node will contribute to the ﬁnal ledger
+as many blocks as their proportion of the stake. In the presence of an adversary,
+the chain quality property ensures that the contribution of the adversary is
+bounded. When β < g/(g +e), we show that these properties hold with high
+probability, as stated in the following theorem.
+Our goal is to generate a transaction ledger that satisﬁespersistence and
+liveness as deﬁned in [15]. Together, persistence and liveness guarantees robust
+transaction ledger; honest transactions will be adopted to the ledger and be
+immutable.
+Deﬁnition 2 (from [15]).A protocolΠ maintains a robust public transaction
+ledger if it organizes the ledger as a blockchain of transactions and it satisﬁes
+the following two properties:
+–(Persistence) Parameterized byτ∈ R, if at a certain time a transactiontx
+appears in a block which is mined more thanτ time away from the mining
+time of the tip of the main chain of an honest node (such transaction will be
+called conﬁrmed), thentx will be conﬁrmed by all honest nodes in the same
+position in the ledger.
+–(Liveness) Parameterized byu∈ R, if a transaction tx is received by all
+honest nodes for more than timeu, then all honest nodes will containtx in
+the same place in the ledger forever.
+The main result is that common preﬁx, chain quality, and chain growth imply
+that the transaction ledger satisﬁes persistence and liveness.
+=== PAGE 28 ===
+28 Bagaria et al.
+Theorem 1. Distributed nodes running Nakamoto-PoS protocol generates a
+transaction ledger satisfyingpersistence (parameterized byτ = σ) and liveness
+(parameterized byu =σ) in Deﬁnition 2 with probability at least1−e−Ω(√σ).
+Proof. We ﬁrst prove persistence and then liveness.
+Lemma 10 (Persistence). The public transaction ledger maintained by
+Nakamoto-PoS satisﬁesPersistence parameterized byτ = σ with probability at
+least 1−e−Ω(√σ).
+Proof. For a chainCt with the last block generated at timet, letC⌈σ
+t be the chain
+resulting from pruning a chainCt up toσ, by removing the last blocks at the
+end of the chain that were generated after timet−σ. Note thatC⌈σ is a preﬁx
+ofC, which we denote byC⌈σ≼C .
+LetC1 be the main chain of an honest nodeP1 at timet1. Suppose a trans-
+action tx is contained inC⌈σ
+1 at roundt1, i.e., it is conﬁrmed byP1. Consider a
+main chainC2 of an honest nodeP2 at some timet2≥t1. Theσ-common preﬁx
+property ensures that after pruning a longest chain, it is a preﬁx of all future
+longest chains in the local view of any honest node. Formally, it follows that
+C⌈σ
+1 ≼C 2, which completes the proof.
+We are left to show that the σ-common preﬁx deﬁned below holds with
+a probability at least 1−e−Ω(√σ). This is a variation of a similar property
+ﬁrst introduced in [15] for PoW systems. Ours is closer to a local deﬁnition of
+k-common preﬁx introduced in [3], which works for a system running for an
+unbounded time.
+Deﬁnition 3 (σ-common preﬁx).We say a protocol and a corresponding
+conﬁrmation rule have aσ-common preﬁx propertyat time t, if in the view
+VIEWn,F
+Π,A,Z(κ) of a honest noden at time t, n adopts a longest chainC, then
+any longest chainC′ adopted by some honest noden′ at time t′ > t satisﬁes
+C⌈σ≼C′.
+LetCt denote the longest chain adopted by an honest node with the last
+node generated at timet. There are a number of honest nodes generated in the
+interval [t−σ,t ], each of which can be inCt,Ct′, or neither. We partition the set of
+honest blocks generated in that interval with three sets:Ht ≜{Hj∈C t :τj∈ [t−
+σ,t ]},Ht′ ≜{Hj∈C t′ :τj∈ [t−σ,t ]}, andHrest ≜{Hj /∈C t∪Ct′ :τj∈ [t−σ,t ]},
+depending on which chain they belong to.
+SupposeC⌈σ
+t ⁄≼C t′, and we will show that this event is unlikely. Under this
+assumption, we claim that none of the honest blocks generated in the interval
+[t−σ,t ] are stable, i.e. for each honest block, there exists a time in the future
+(since the generation of that block) in which the block does not belong to the
+longest chain.
+Precisely, we claim thatC⌈σ
+t ⁄≼C t′ implies thatFc
+j holds for allj such that
+τj∈ [t−σ,t ]. This in turn implies thatP (C⌈σ
+t ⁄≼C t′)≤ P (∩j:τj∈[t−σ,t]Fc
+j ). By
+Lemma 9, we know that the probability of this happening is low:e−Ω(√σ).
+=== PAGE 29 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 29
+This follows from the following facts.(i) the honest blocks inCt does not
+make it to the longest chain at timet′: Hj /∈C t′ for allHj∈H t. This follows
+fromC⌈σ
+t ⁄≼C t′. (ii) the honest blocks inCt′ does not make it to the longest chain
+Ct at timet:Hj /∈C t for allHj∈H t′. This also follows fromC⌈σ
+t ⁄≼C t′. (iii) the
+rest of the honest blocks did not make it to either of the above:Hj /∈C t∪Ct′ for
+all Hj∈H rest.
+We next prove liveness.
+Lemma 11 (Liveness). The public transaction ledger maintained by
+Nakamoto-PoS satisﬁesLivenesss parameterized byu = σ with probability at
+least 1−e−Ω(√σ).
+Proof. Assume a transactiontx is received by all honest nodes at timet, then
+by Lemma 9, we know that with probability at least1−e−Ω(√σ), there exists
+one honest blockBj mined at timeτj with τj∈ [t,t +u] and eventFj occurs,
+i.e., the blockBj and its ancestor blocks will be contained in any future longest
+chain. Therefore,tx must be contained in blockBj or one ancestor block ofBj
+sincetx is seen by all honest nodes at timet<τ j. In either way,tx is stabilized
+forever. Thus, the lemma follows.
+5.4 Extending the analysis to generalc
+We can repeat the analysis in the previous section for thec-Nakamoto-PoS for
+c> 1.Likefor c = 1,theanalysisbasicallyboilsdowntotheproblemofanalyzing
+the race between the adversarial tree and the ﬁctitious purely honest chain. In
+§F, we conﬁne our analysis to a study of that race. It turns out that underc-
+correlation randomness, the adversarial tree is developed by another branching
+random walking process, but with a slowing growth ampliﬁcation factorφc, such
+that φ1 =e and φ∞ = 1. So the security threshold is
+βc = e−λh∆
+e−λh∆ +φc
+and it goes from
+e−λh∆
+e−λh∆ +e
+for c = 1 to
+e−λh∆
+e−λh∆ + 1
+for c =∞. Under thec-correlation protocol, we have
+φc =− cθ∗
+c
+log(−θ∗c) + (c− 1) log(1−θ∗c),
+=== PAGE 30 ===
+30 Bagaria et al.
+where θ∗
+c is the unique negative solution of Eq. (39)
+− log(−θc)− (c− 1) log(1−θc) =−1 + (c− 1) θc
+1−θc
+. (39)
+We numerically compute the value ofφc and β∗
+c with ∆ = 0 in the table
+below.
+c 1 2 3 4 5 6 7 8 9 10
+φc e 2.22547 2.01030 1.88255 1.79545 1.73110 1.68103 1.64060 1.60705 1.57860
+β∗
+c
+1
+1+e 0.31003 0.33219 0.34691 0.35772 0.36615 0.37299 0.37870 0.38358 0.38780
+Table 3: Numerically computed growth rateφc and stake thresholdβ∗
+c with ∆ = 0.
+In the deployment of the Ouroboros protocol in the Cardano project4, each
+slot takes 20 seconds and each epoch is chosen to be 5 days [30], that is a
+common randomness will be shared by 21600 blocks. In Fig. 2, we plot the
+security thresholdβ∗
+c againstc up toc = 21600 for ourc-Nakamoto-PoS. It turns
+out the security threshold ofc-Nakamoto-PoS can approach 1/2 very closely
+even whenc is much less than21600, which is the current randomness update
+frequency in the Cardano project.
+6 Security analysis of the dynamic stake protocol
+One major advantage of the Nakamoto protocol in the proof of work setting is its
+permissionless setting: anyone can join (leave) the system by simply contributing
+(extricating) computing power for the mining process. Under the PoS setting the
+stakes are used in lieu of the computing power. To support a protocol that is
+close to a permissionless system, we need to handle the case when the stake is
+dynamically varying. Unlike the case of compute power, the entry/removal of
+stake has to be more carefully orchestrated: if a change in the stake takes eﬀect
+immediately after the transaction has been included in the blockchain, then this
+gives an opportunity for the adversary to grind on the secret key of the header
+(time, secret key, common source of randomness). Concretely, once an adversary
+has generated a block, it can add a transaction that moves all its stake to a new
+coin with a new pair of public and secret keys. The adversary can keep drawing
+a new coin and simulating the next leader election, until it ﬁnds one that wins.
+This is a serious concern as the adversary can potentially win all elections.
+To prevent such a grinding on the coin, we uses-truncation introduced in
+[2,14]. s-truncation has two components: using stakes from ancestor blocks and
+a fork choice rule. The winning probability of a leader election uses the stake
+computed at an ancestor block which iss blocks above the parent block that is
+currently being mined on. However, this allows an adversary to launch a long
+range attack, for any value ofs< ∞. To launch a long range attack, an adversary
+4 https://www.cardano.org
+=== PAGE 31 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 31
+grows a private block tree. Once it has grown for longer thans blocks, then it can
+grind on the coin to win the election for the next block, and add the favorable
+transaction to the ﬁrst ancestor block. As all blocks in this private tree are
+adversarial, the consistency of the transactions can be maintained by re-signing
+all intermediate blocks. This allows the adversary to win all elections afters
+private blocks, and eventually take over the honest block chain.
+The s-truncation longest chain rule works as follows. When presented with
+a chain that forks from current longest chain, a node compares the two chains
+according to the following rule. Both chains are truncated up tos blocks after
+the forking. Whichever truncated chain was created in a shorter time (and hence
+denser) is chosen to be mined on. This ensures that honest block chains will
+be chosen over privately grown adversarial chains with long range attacks. A
+detailed description of thec-correlation, s-truncation, Nakamoto-PoS protocol
+is in §4.
+We extend Theorem 1 to show that the aboves-truncation scheme is secure.
+Theorem 2. Under the dynamic stake setting, distributed nodes running
+Nakamoto-PoS protocol with a choice of s = Θ(σ) generates a transaction
+ledger satisfyingpersistence and liveness in Deﬁnition 2 with probability at least
+1−e−Ω(√σ).
+Proof sketch.We prove it in three steps. First, we show that with static stake
+setting, common preﬁx, chain growth, and chain quality properties still hold
+for s-truncation protocol withs = Θ(σ). Second, we show that with dynamic
+stake setting ands stake update rule, the adversary can mine a private chain
+with consecutives blocks that is denser than the public main chain only with a
+negligible probability.
+We show in §5 that the choice ofc only determines how many fraction of
+adversary the system can tolerate and not the security parameterκ. On the
+other hand, the choice ofs is critically related to the target security parameter
+κ as we show in §6. By decoupling these two parametersc ands in the protocol,
+we can achieve any level of predictability (with an appropriate choice ofc), while
+managing to satisfy any target security parameterκ (with an appropriate choice
+of s).
+7 Conclusion
+We proposed a new family of PoS protocols and proved that our proposed PoS
+protocols have low predictability while guaranteeing security against adversar-
+ial nothing-at-stake attacks. We did not discuss the design of incentive systems
+that encourage users to follow the honest protocol. We point out that there are
+existing ideas that could be naturally adapted for our problem. For example,
+one way to minimize NaS attacks is to require users to deposit stake that can
+be slashed if the node has a provable deviation (for example, double-signing
+blocks) [6,8]. Another important idea is that fruitchain-type incentive mecha-
+nisms [26] which protect against selﬁsh mining in PoW can be ported to PoS
+=== PAGE 32 ===
+32 Bagaria et al.
+protocols [19]. However, as pointed out in [7], the full problem of designing PoS
+protocols that strongly (instead of weakly) disincentivze NaS and selﬁsh-mining
+attacks remains an important direction of future research. Finally, a detailed
+mathematical modeling of bribing attacks that consider interaction between the
+blockchain and external coordination mechanisms also remains open.
+References
+1. Aïdékon, E. Convergence in law of the minimum of a branching random walk.
+The Annals of Probability 41 , 3A (2013), 1362–1426.
+2. Badertscher, C., Gaži, P., Kiayias, A., Russell, A., and Zikas, V.
+Ouroboros genesis: Composable proof-of-stake blockchains with dynamic availabil-
+ity. In Proceedings of the 2018 ACM SIGSAC Conference on Computer and Com-
+munications Security (2018), ACM, pp. 913–930.
+3. Bagaria, V., Kannan, S., Tse, D., F anti, G., and Visw anath, P. Prism: De-
+constructing the blockchain to approach physical limits. Conference on Computer
+and Communications Security (also available on arXiv), 2019.
+4. Baudet, M., Ching, A., Chursin, A., Danezis, G., Garillot, F., Li, Z.,
+Malkhi, D., Naor, O., Perelman, D., and Sonnino, A. State machine repli-
+cation in the libra blockchain, 2018.
+5. Bellare, M., and Miner, S. K. A forward-secure digital signature scheme. In
+Annual International Cryptology Conference (1999), Springer, pp. 431–448.
+6. Bentov, I., Pass, R., and Shi, E. Snow white: Provably secure proofs of stake.
+IACR Cryptology ePrint Archive 2016 (2016), 919.
+7. Brown-Cohen, J., Narayanan, A., Psomas, A., and Weinberg, S. M. For-
+mal barriers to longest-chain proof-of-stake protocols. InProceedings of the 2019
+ACM Conference on Economics and Computation (2019), ACM, pp. 459–473.
+8. Buterin, V., and Griffith, V. Casper the friendly ﬁnality gadget. arXiv
+preprint arXiv:1710.09437 (2017).
+9. Chen, J., and Micali, S. Algorand. arXiv preprint arXiv:1607.01341 (2016).
+10. Da vid, B., Gaži, P., Kiayias, A., and Russell, A. Ouroboros praos: An
+adaptively-secure, semi-synchronous proof-of-stake blockchain. In Annual Inter-
+national Conference on the Theory and Applications of Cryptographic Techniques
+(2018), Springer, pp. 66–98.
+11. Dodis, Y., and Yampolskiy, A. A veriﬁable random function with short proofs
+and keys. InInternational Workshop on Public Key Cryptography (2005), Springer,
+pp. 416–431.
+12. Drmota, M. The height of increasing trees.Annals of Combinatorics 12 , 4 (2009),
+373–402.
+13. F an, L., Katz, J., and Zhou, H.-S. A large-scale proof-
+of-stake blockchain in the open setting. Available online at
+http://www.fractalblock.com/assets/iching_consensus_protocol.pdf.
+14. F an, L., and Zhou, H.-S. A scalable proof-of-stake blockchain in the open setting
+(or, how to mimic nakamoto’s design via proof-of-stake), 2018. Cryptology ePrint
+Archive, Report 2017/656, Version 20180425:201821.
+15. Garay, J., Kiayias, A., and Leonardos, N. The bitcoin backbone protocol:
+Analysis and applications. InAnnual International Conference on the Theory and
+Applications of Cryptographic Techniques (2015), Springer, pp. 281–310.
+=== PAGE 33 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 33
+16. Gilad, Y., Hemo, R., Micali, S., Vlachos, G., and Zeldovich, N. Algo-
+rand: Scaling byzantine agreements for cryptocurrencies. InProceedings of the 26th
+Symposium on Operating Systems Principles (2017), ACM, pp. 51–68.
+17. Hu, Y., and Shi, Z. Minimal position and critical martingale convergence in
+branching random walks, and directed polymers on disordered trees.The Annals
+of Probability 37, 2 (2009), 742–789.
+18. Itkis, G., and Reyzin, L. Forward-secure signatures with optimal signing
+and verifying. In Annual International Cryptology Conference (2001), Springer,
+pp. 332–354.
+19. Kiayias, A., Russell, A., Da vid, B., and Oliynykov, R. Ouroboros: A prov-
+ably secure proof-of-stake blockchain protocol. InAnnual International Cryptology
+Conference (2017), Springer, pp. 357–388.
+20. Kiffer, L., Rajaraman, R., et al. A better method to analyze blockchain
+consistency. In Proceedings of the 2018 ACM SIGSAC Conference on Computer
+and Communications Security (2018), ACM, pp. 729–744.
+21. Micali, S., Rabin, M., and V adhan, S. Veriﬁable random functions. In40th
+Annual Symposium on Foundations of Computer Science (Cat. No. 99CB37039)
+(1999), IEEE, pp. 120–130.
+22. Micali, S., Rabin, M., and V adhan, S. Veriﬁable random functions. In40th an-
+nual symposium on foundations of computer science (cat. No. 99CB37039) (1999),
+IEEE, pp. 120–130.
+23. Nakamoto, S. Bitcoin: A peer-to-peer electronic cash system.
+24. Natoli, C., and Gramoli, V. The balance attack against proof-of-work
+blockchains: The r3 testbed as an example. arXiv preprint arXiv:1612.09426
+(2016).
+25. Pass, R., Seeman, L., and Shelat, A. Analysis of the blockchain protocol in
+asynchronous networks. In Annual International Conference on the Theory and
+Applications of Cryptographic Techniques (2017).
+26. Pass, R., and Shi, E. Fruitchains: A fair blockchain. InProceedings of the ACM
+Symposium on Principles of Distributed Computing (2017), ACM.
+27. Ren, L. Analysis of nakamoto consensus. Tech. rep., Cryptology ePrint Archive,
+Report 2019/943.(2019). https://eprint. iacr. org ..., 2019.
+28. Shi, Z. Branching Random Walks , vol. 2151 of Lecture Notes in Mathematics .
+Springer Verlag, New York NY, 2015.
+29. Sompolinsky, Y., and Zohar, A. Secure high-rate transaction processing in
+bitcoin. In International Conference on Financial Cryptography and Data Security
+(2015), Springer, pp. 507–527.
+30. Stütz, R., Gaži, P., Haslhofer, B., and Illum, J. Stake shift in major
+cryptocurrencies: An empirical study.arXiv preprint arXiv:2001.04187 (2020).
+31. W ang, X. e. a. Proof-of-stake longest chain protocol revisited. arXiv preprint
+arXiv:1910.02218v2 (2018).
+32. Yin, M., Malkhi, D., Reiter, M. K., Gueta, G. G., and Abraham, I.
+Hotstuﬀ: Bft consensus in the lens of blockchain.arXiv preprint arXiv:1803.05069
+(2018).
+=== PAGE 34 ===
+34 Bagaria et al.
+Appendix
+A Attacks on greedy protocols of [13,14]
+PoS protocols based directly on the Nakamoto protocol, have been proposed
+recently (g-greedy Protocol [14] andD-distance-greedy Protocol [13]), in a series
+ofattemptstoachieveashortpredictabilityandaprovablesecurity.However,the
+security analyses are subtle and we show more malignant attacks in this section
+on the protocols of [13,14]; thus more rigorous analysis is needed to study the
+security of those protocols. Both (g-greedy Protocols [14] andD-distance-greedy
+Protocols [13]) are extensions of Nakamoto-PoS discussed in 1, where honest
+nodes are encouraged to mine on multiple blocks in a single slot as well.
+A.1 g-greedy Protocol [14] (F-height-greedy Protocol [13])
+g-greedy Protocol. In an attempt to increase the amount of adversarial stake
+that can be tolerated by the basic protocol closer to1/2, [14] proposes a family
+of protocols calledg-greedy, parameterized by a non-negative integerg, which
+is called as F-height-greedy in [13]. Under theg-greedy protocol, the honest
+nodes are prescribed to run multiple leader elections in an attempt to outgrow
+the private NaS tree. In an honest node’s view, if the longest chain is at height
+𝓁 blocks, then the node mines on any block that is higher than𝓁−g blocks
+(illustrated by the blocks inside the dotted box in Fig. 4). Wheng =∞, each
+honest node works on every block, and wheng = 0, the node works on all blocks
+at the same height as the tip of the longest chain in the current view. Note that
+0-greedy diﬀers from the basic Nakamoto’s protocol above, which chooses one
+block to mine on when there are multiple longest chains. However, theg-greedy
+protocol also has prediction windowW = 1.
+Fig.4: g-greedy protocol withg = 0, 1, 2
+Private Attack on g-greedy Protocol. A notorious attack in longest chain
+blockchain protocols is theprivate attack: the adversary privately mines a chain
+=== PAGE 35 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 35
+that is longer than the longest chain in the honest view. Roughly speaking, by
+the law of large numbers, adversary will fail with the private attack eventually
+if thegrowth rateof the adversarial chain is strictly lower than the honest chain.
+The security guarantee forg-greedy protocol in [14] is based on this argument.
+Fig.5: Private attack ong-greedy protocol withg = 2
+g 0 1 2 3 4 5 6 7 8
+Rg [14] 1 1.7071 2.1072 2.3428 2.4905 2.5883 2.6562 2.7051 2.7414
+Rg this paper 1 1.6531 2.0447 2.2708 2.4084 2.4952 2.5472 2.5805 2.6048
+βg = Rg
+e+Rg
+[14] 0.2689 0.3858 0.4367 0.4629 0.4781 0.4876 0.4942 0.4988 0.5021
+βg = Rg
+e+Rg
+this paper0.2689 0.3782 0.4293 0.4552 0.4698 0.4786 0.4838 0.4870 0.4893
+Table 4: Expected growth rate of honest tree forg-greedy protocol under private adver-
+sarial behavior. The largest adversarial stake that can be tolerated under the private
+attack is denoted byβg. The claims of [14] are corrected and compared with our cal-
+culations.
+How about the expected growth rateRg(1−β) of the honest tree under the
+g-greedy protocol and private behavior by the adversary? It is clear thatRg
+is monotonically increasing ing. The limiting largest expected growth rate is
+achieved atg =∞, where the protocol is the same as the NaS attack. Thus the
+expected growth rateRg(1−β) = (1−β)e for g =∞. One suspects that the
+protocol forg = 0 is similar to simply growing only one of the longest chains. If
+the mining rate is slow enough (mining is considered to occur in discrete rounds
+which are spaced enough apart relative to the network broadcast propagation
+delay; detailed model in §3), then the expected growth rate of the honest tree
+(essentially a chain) is simply1−β. This is the expected growth rate of the
+honest tree withg = 0.
+=== PAGE 36 ===
+36 Bagaria et al.
+The expected growth rate for a generalg is signiﬁcantly involved. In Lemma
+4.6 of [14], a heuristic argument is conducted to estimate the expected growth
+rate for g = 2 to be R2(1−β) = 2.1(1−β). This heuristic argument can be
+extended to other values ofg (see §B.1) as summarized in Table 5. We note
+that R8 = 2.7414, which is at odds with the observation that Rg increases
+monotonically andR∞ =e. This shows that the heuristic argument in Lemma
+4.6 of [14] is ﬂawed. It is clear that the expected growth rate is related to the
+solution to the following set of recursive diﬀerential equations:dx𝓁(t)
+dt =x𝓁−1(t)
+form−g≤𝓁≤m and dx𝓁(t)
+dt = 0 for 0≤𝓁<m −g for some ﬁxedm. NowRg is
+the largest value ofm
+t such thatxm(t) decreases exponentially int. A closed form
+solution toRg is challenging; although a numerical solution is readily achieved
+and tabulated in Table 4.
+We can make the following conclusion from Table 4: theg-greedy protocol
+of [14] is robust to the purely private NaS attack as long as the adversarial stake
+is such thatRg(1−β) > RNaSβ = eβ. Asg grows large, this threshold on the
+adversarial stake approaches1
+2; for instance, forg = 5, robustness to private NaS
+attack is achieved as long as the adversarial stake is less than47.86%. The caveat
+is that this security statement is misleading since only one speciﬁc attack (the
+private NaS attack) has been studied. A diﬀerent attack strategy could prove
+more malignant, as we show next.
+Balance Attack ong-greedy Protocol. We describe an adversarial action
+that is a combination of private and public behaviors below; we term this as a
+balance attackfor reasons that will become obvious shortly; this attack has some
+commonalities with the balance attack on theGHOST protocol in [20]. The key
+idea of the balance attack is to reveal some privately mined blocks at an appro-
+priate time tobalance the length of two longest chainseach sharing a common
+ancestor in the distant past.
+The balance attack aims to have two longest chains of equally long length,
+forking all the way from the genesis block. Fig. 6 depicts the balance attack in
+action, as it progresses over time. At any time, the adversary will try to mine
+on every block including public blocks and private blocks, while honest nodes
+follow g-greedy protocol. Once the adversary succeeds in creating a new block,
+it will ﬁrst keep the block in private as shown in step 1 and step 3 of Fig. 6.
+Whenever the adversary owns a private chain that has the same length as the
+longest public chain, it will reveal the private chain so that there will be two
+public chain with the same length as shown in step 2 and step 4 of Fig. 6. If
+the adversary can keep up this kind of balance attack, then it has successfully
+prevented any block from irreversible no matter how deep the block is buried
+in the longest chain. To succeed with the balance attack, the adversary only
+needs to mine a few blocks as most blocks in the two main chain may be mined
+by honest nodes underg-greedy protocol. A formal pseudocode describing the
+balance attack algorithm is available in §B.2.
+The balance attack is hard to analyze theoretically, but its eﬃcacy can be
+evaluated via simulations. The simulation starts with a fork with length1 (i.e.,
+two independent public trees). The honest nodes followg-greedy protocol with
+=== PAGE 37 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 37
+Fig.6: Snapshot of balance attack in progress ong-greedy protocol withg = 2. The
+goal of the adversary is to balance the lengths of two chains each tracing the genesis
+block as their ancestor, consequently creating a deep fork.
+stake proportion 1−β while adversary will always mine on every block in his
+private view. Whenever the two public trees have diﬀerent heights, the adversary
+will immediately reveal the private blocks appending to the shorter public tree to
+re-balance their heights if he can. We setf∆ = 0.1 in each round and simulated
+various pairs of (g,β ) for 2000 rounds. Note that the simulation can be made
+more accurate with a ﬁner discretization and a longer run-time. The depth of
+the longest fork and its associated cumulative probability is plotted in Fig. 7
+for ﬁxed parametersg,β . We see that in each instance, the probability of a fork
+of any length is larger for the balance attack than the private NaS attack; this
+implies that the balance attackstochastically dominatesthe private attack. For
+example, wheng = 2,β = 0.38, the adversary is able to cause a fork from genesis,
+which is longer than 100 blocks, with a probability around 20%, while the private
+attack can only achieve it with probability less than 0.1%. In this instance, the
+balance attack is signiﬁcantly more powerful than the private attack.
+Fig.7: Comparison of CDF of the longest fork from genesis caused by private attack
+and balance attack for various pairs of(g,β ). The balance attack is a stochastically
+dominating strategy forg≥ 1.
+We see that virulence of the balance attack increases, dramatically, withg. In
+Fig. 8, the blue lines plot the largest value ofβ the balance attacking adversary
+can have while allowing a fork of a large ﬁxed length (50,100,200 blocks) with
+=== PAGE 38 ===
+38 Bagaria et al.
+signiﬁcantly high probability (25%, 25%, 10% respectively). The orange line
+plots the corresponding largest value ofβ using the private NaS attack. The
+experiments conclusively demonstrate the fatal nature of the balance attack as
+g increases: the private NaS attack gets weaker while the balance attack gets
+dramatically stronger. Forg = 6, the balance attack is successful in creating a
+very long fork (200 blocks deep) with a high probability (10%) using only 3% of
+the stake.
+Fig.8: The threshold ofβ to breakk-common-preﬁx property with a certain probability
+actually declines as greedy parameterg increases.
+A.2 D-distance-greedy Protocol [13]
+D-distance-greedy Protocol. In an attempt to make theg-greedy protocol of
+[14] robust against the balance attack, recent work [13] has updated the protocol
+to a new variant called theD-distance-greedy protocol described as below. The
+reason g-greedy protocol is so vulnerable against balance attack is that honest
+nodes are mining on both sides of two, for example, chains that forked many
+blocks deep. This makes it easy for the adversary to keep those chains balanced,
+especially wheng is large. The protocol in [13] is aimed to prevent honest nodes
+from mining on both chains as follows.
+We ﬁrst deﬁne the distance between two chains in a tree. For two chainsCa
+with length𝓁a andCb with length𝓁b, letC be the common preﬁx ofCa andCb with
+length 𝓁, then the distance betweenCa andCb is deﬁned asmax(𝓁a−𝓁,𝓁b−𝓁).
+D-distance-greedy protocol prescribes every honest node to ﬁrst select one of
+the longest chains (the tie breaking could be random) and attempt to extend a
+set of chains in which all chains have distance no more thanD from the longest
+chain (illustrated by the blocks with green diamonds in Fig. 9). If there are two
+chains that forked at more thanD blocks deep from the tip of the chain, then
+each honest node will mine on one side of those two chains. Again, the prediction
+window remains the same:W = 1.
+The intuition behind this protocol is the following:
+1. Although we are limiting the mining strategy of honest nodes to small dis-
+tance blocks, the growth of the longest chain is still high. Using a heuristic
+argument, [13] claims that the expected growth rateAD(1−β) of the longest
+chain following theD-distance greedy protocol, is (1−β)(D+1)
+D+1√
+(D+1)!
+. Note that as
+=== PAGE 39 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 39
+Fig.9: D-distance-greedy protocol withD = 0, 1, 2
+D increases, the expected growth rate of the honest tree, according to this
+calculation, approachese(1−β). Based on this calculation, the anticipated
+threshold of largest adversarial stake that can be tolerated under a private
+attack,βD = AD
+AD+e, approaches the ideal threshold ofβ = 0.5.
+2. Second, limiting the honest strategy to only grow on nodes that are near the
+tip of the longest chain might, at the outset, seems to render the balance
+attack of §A.1 ineﬀective. Indeed, an argument is made in [13] to imply the
+security of theD-distance-greedy protocol against all possible adversarial
+strategies as long as the adversarial stake is less thanβD.
+In this section, we show that both these results of [13] are inaccurate. We do
+this by focusing on the case ofD = 1 ﬁrst. Speciﬁcally:
+1. ForD = 1, we show that the precise expected growth of the longest chain of
+the honest block tree isA1(1−β) = 1−β
+e−2≈ 1.3922(1−β) and not
+√
+2(1−β).
+This implies that, even if the adversary is controlling a smaller fraction of
+stake, sayβ = 0.339, than the thresholdβD=1 = 0.3422 claimed in [13], the
+simple private attack can succeed with probability close to one. A formal
+statement and proof is in §B.3; a precise calculation of the growth rate for
+general D appears to be a challenging mathematical problem.
+2. More critically, we show that a balance attack similar to the one from §A.1
+can still be eﬀective on theD-distance-greedy protocol – and the eﬃcacy is
+primarily achieved byslowing downthe growth rate of the honest strategy.
+The D-distance-greedy protocol is not secure against balance attack, even
+if the adversary controls less thanβD = AD
+AD+e fraction of the stake, with
+the correctAD we compute in §B.3. The actual security threshold onβ is
+strictly smaller; the private attack considered in [13] isstrictly weaker than a
+standard adversary studied in the literature which can perform the balance
+attack. This is described in detail next.
+For generalD larger than one, a balance attack can successfully slow down
+the growth rate of honest nodes, but a precise computation of the slowed down
+growthrateisachallengingproblem.Wediscusssecurityimplicationsforlarge D
+=== PAGE 40 ===
+40 Bagaria et al.
+at the end of this section. [13] expects that the security of the protocol increases
+as D increases, eventually achieving the ideal threshold ofβ = 0.5. Contrarily,
+we ﬁnd that for a large enoughD, the D-distance-greedy protocol becomes
+insecure; none of the blocks can be conﬁrmed, regardless of how deep the block
+is in the current block chain. This is also true for theg-greedy protocol with
+a large enoughg. This follows from the fact that when every node is mining
+on every block, the entire block tree becomesunstable: the preﬁx of the longest
+chain keeps changing indeﬁnitely. Hence, even if the conjectured growth rate of
+AD = (D+1)
+D+1√
+(D+1)!
+were true for largeD, the desired threshold ofβ = 0.5 cannot
+be achieved.
+Balance Attack on D-distance-greedy Protocol. We consider the same
+balance attack, now on1-distance-greedy protocol. Here we assume that, when
+two chains with equal length are broadcast in the network, honest nodes will split
+into two groups with equal stake proportion, where each group picks one chain as
+the longest chain and mines on the corresponding tree under1-distance-greedy
+protocol. This balance attack is described formally in §B.5.
+Perhaps surprisingly, this balance attack canslow downthe growth rate of the
+honest block tree: we show the growth rate of the longest chain to be˜A1(1−β) =
+4(1−β)
+3e2−19≈ 1.26(1−β)< A1(1−β). A formal statement and proof of this result
+is in §B.4. We note that this result is against the grain of the Nakamoto longest
+chain protocol, where no adversary strategy can slow down the growth rate of the
+block tree, even though the honest nodes can be potentially split into working
+on two diﬀerent chains of equally long length. Thus when the proportion of
+adversarial stakeβ falls in the interval(
+˜A1
+˜A1+e, A1
+A1+e), the adversarial private tree
+will be ahead of the public longest chain, and the balance attack in conjunction
+with the private attack is fatal (i.e., any conﬁrmed block can be reversed no
+matter how deep the block is buried in the longest chain).
+We illustrate the high level idea of the slow-down eﬀect of1-distance-greedy
+protocol with Fig. 10. The scenario at the top of Fig. 10 is a pure honest tree
+with one block at height𝓁− 1 and two blocks at height𝓁, and honest nodes will
+mine on all these three blocks with rate1−β; while the scenario at the bottom
+is two trees balanced by the adversary, where child-blocks of every block are
+generated as a Poisson point process with rate0.5(1−β) since honest nodes are
+split. Note that the number of blocks at height𝓁 and 𝓁 + 1 increases with the
+same rates in these two scenarios (1−β) and 2(1−β) respectively). However,
+when the number of blocks at height𝓁 increases by one in both scenarios, the
+growth rate of blocks at height𝓁 + 1 becomes 3(1−β) in the top scenario but
+only 2.5(1−β) in the bottom. Since only half of honest nodes will beneﬁt from,
+or mine on the new block due to splitting, the growth rate of the public longest
+chain is slowed down. Formal analysis of this slow-down eﬀect will be provided
+in §B.4.
+We also use simulation to verify the analysis above. The simulation starts
+with a fork with length2 (i.e., two independent public trees). The honest nodes
+follow 1-distance-greedy protocol with stake proportion1−β while adversary
+will always mine on every block in his private view. Whenever the two public
+=== PAGE 41 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 41
+Fig.10: The slow-down eﬀect of1-distance-greedy protocol
+trees have diﬀerent heights, the adversary will immediately reveal a private chain
+appending to the shorter public tree to re-balance their heights if he can. For
+simplicity, when two chains with equal length are revealed in the public view,
+honest nodes will split into two groups with equal stake proportion. We set
+f∆ = 0.1 in each round and simulated the caseβ = 0.32 andβ = 0.33 for 10000
+rounds and 20000 rounds respectively. Note that the simulation can be made
+more accurate with a ﬁner discretization and a longer run-time. The depth of
+the longest fork and its associated cumulative probability is plotted in Fig. 11 for
+ﬁxed parametersβ = 0.32 andβ = 0.33. One can see that the success probability
+(1 minus the probability in the plots) of private attack will converge to0 as
+for longer fork, while the success probability of balance attack will saturate to
+some constant, which indicates that, using the balance attack, the adversary can
+succeedincreatingaforkofanylengthwithsomenon-negligibleprobability.This
+simulation results immediately verify the slow-down eﬀect of1-distance-greedy.
+When the growth rate of the public longest chain is slowed down due to splitting
+for some time, the adversarial private tree will be ahead of the public longest
+chain, and the balance attack can continue to succeed easily in the future and
+create forks with any length.
+Fig.11: Comparison of CDF of the longest fork from genesis caused by private attack
+and balance attack for variousβ. Due to the slow-down eﬀect, the success probability
+of balance attack saturates to some constant number.
+=== PAGE 42 ===
+42 Bagaria et al.
+Forgeneral D-distance-greedy,thegrowthrateofthehonestchaincanalsobe
+slowed down fromAD(1−β) by splitting the honest nodes. However, this balance
+attack of keepingtwo chains of balanced lengths is a sub-optimal strategy (for
+the adversary). The adversary can maintain multiple balanced chains, splitting
+honest nodes as much as possible. Under such an attack, we conjecture that the
+growth rate of the public longest chain can be slowed down all the way to1−β,
+eliminating ampliﬁcation entirely. However, how largeβ needs to be to make this
+attack successful remains an open question, and we defer it as a future research
+direction.
+In order to ﬁx the slow-down eﬀect for1-distance greedy protocol, we in-
+troduce the following reﬁned tie breaking rule. Recall that1-distance greedy
+protocol prescribes an honest node to mine on one of the longest chains (chosen
+randomly when there are multiple), and also simultaneously mine on its parent
+block and all its sibling blocks.
+Deﬁnition 4 (no-slow-down tie breaking rule for1-distance greedy
+protocol). When there are multiple longest chains with equal lengths, mine on
+one node that has the largest number of sibling blocks, and simultaneously mine
+on its parent block and all its sibling blocks. Further ties can be broken arbitrarily.
+For example, leth denote the height of the longest chain. If there are two
+nodes at height h− 1, one with two children blocks and another with three
+children blocks, then honest nodes will mine on the three sibling blocks at height
+h and its parent. If there are three nodes at heighth− 1, one with two children
+blocks and the rest with three children blocks each, then each honest node will
+mine on one set of three sibling blocks and its parent (chosen arbitrarily). If this
+ﬁner tie breaking rule is adopted, then we can prove the following “no-slow-down
+lemma” for1-distance greedy protocol.
+Lemma 12 (no-slow-down lemma for1-distance greedy).Under the syn-
+chronous network setting with bounded message delay from [13], an adversary
+cannot slow down the honest chain growth. That is, no matter what the adver-
+sary does, the honest nodes will grow a chain that is at least as long as if the
+adversary does not generate any blocks.
+Proof. By the analysis in §B.3, for1-distance greedy protocol, the growth rate of
+the longest chain in the honest tree depends only on the number of sibling blocks
+on the tip, then the adversary cannot slow down the honest chain under this tie
+breaking rule since honest nodes are always choosing the longest chain with
+the largest potential growth rate. To be more speciﬁc, whenever the adversary
+publishes a blockB and some honest nodes start to mine onB under this no
+slow-down tie breaking rule, which means that eitherB is on a deeper level or
+the number of sibling blocks ofB is no less than the number of sibling blocks of
+the main chain which is chosen beforeB is revealed, in both case the growth of
+the honest tree will not be slowed down.
+Thus the chain growth property for1-distance greedy protocol can be guar-
+anteed under the tie breaking rule with the no slow-down lemma proved above.
+=== PAGE 43 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 43
+This is not true for the random tie breaking rule, as we shows with balance
+attack in §B.4. Beyond the no-slow-down lemma, a rigorous analysis of common
+preﬁx property for1-distance greedy protocol still remains a challenging research
+problem.
+When there are multiple longest chains to be mined on, no-slow-down lemma
+holds as long as the honest nodes can choose the one that will ensure fastest
+expected growth. However, it is not straightforward how to selecting the fastest
+growing chain underD-distance-greedy, especially for largeD. For largeD, it
+becomes computationally intractable to break ties in order to eliminate the slow-
+down eﬀect completely.
+B Notes and Proofs for §A
+B.1 Rg calculation according to [14]
+We recall thatRg(1−β) is the expected growth rate of the longest chain of
+the tree grown by honest nodes (adversaries are acting purely privately) using
+the g-greedy protocol. We also recall thatRg is increasing monotonically ing
+and that R∞ = e, where e is the base of the natural logarithm. In [14], the
+authors claim thatR2 = 2.1 by assuming thatall chains grow with at thesame
+steady rate as the longest chain and then investigating the average case. One
+can generalize their methodology for arbitraryg as follows: suppose the length
+of the longest chain at roundr is𝓁, letxi with 0≤i≤g be the number of chains
+with length𝓁−i. For simplicity,x0 is set to be1. Then using the arguments in
+Lemma 4.6 in [14], we obtain the followingg + 1equations withg + 1unknowns
+{xi : 1≤i≤g} and Rg.
+
+
+
+x0+x1
+2 =Rgx0
+xi+xi+1
+2 =Rg(xi−xi−1) for i∈{ 1, 2,··· ,g− 1}
+xg =Rg(xg−xg−1)
+By solving these equations numerically, we obtain the value ofRg as shown
+in Table 5. It turns out thatRg > efor g≥ 8 which is in contradiction to the
+fact thatRg is monotonically increasing and the limiting value isR∞ =e. This
+shows that the method in [14] to estimate the growth rate of the longest chain
+is ﬂawed.
+g 0 1 2 3 4 5 6 7 8 9 10 ∞
+Rg 1 1.7071 2.1072 2.3428 2.4905 2.5883 2.6562 2.7051 2.7414 2.7690 2.7906 e = 2.7183
+Table 5: Chain growth rate forg-greedy protocol using the method of [14]. There is an
+inconsistency in the calculation forg≥ 8.
+=== PAGE 44 ===
+44 Bagaria et al.
+B.2 Pseudo Code for the Balance Attack on g-greedy Protocol
+In the main text we have described the balance attack informally along with
+accompanying examples depicted in Fig. 6. Here we provide a formal pseudocode
+describing the balance attack algorithm for completeness.
+Balance attack (g)
+1: procedure Initialize( )
+2: PrivateTree1← genesis
+3: PrivateTree2← genesis
+4: PublicTree1← genesis
+5: PublicTree2← genesis
+6: procedure Attack( )
+7: for r = 1 :rmax do
+8: HonestMining(g,PublicTree1,PublicTree2) ⊿ honest nodes work on
+blocks in the public view underg-greedy protocol
+9: AdversaryMining(PrivateTree1,PrivateTree2) ⊿ adversary works
+privately on all blocks in the private view
+10: if height(PublicTree1) == height(PublicTree2)then
+11: adversary reveals nothing
+12: else ifheight(PublicTree1)> height(PublicTree2)then
+13: PublicTree2(1:height(PublicTree1)) ← Private-
+Tree2(1:height(PublicTree1))
+14: else ifheight(PublicTree1)< height(PublicTree2)then
+15: PublicTree1(1:height(PublicTree2)) ← Private-
+Tree1(1:height(PublicTree2))
+16: height(r)← max{height(PublicTree1),height(PublicTree2)}
+17: diﬀ(r)← height(PublicTree1)− height(PublicTree2)
+18: return height(last(diﬀ== 0)) ⊿ return the length of the longest fork
+from genesis
+B.3 Growth rate of 1-distance-greedy Protocol
+In this section we calculate the expected growth rate of honest tree under1-
+distance-greedy protocol with a continuous time Markov chain.
+The honest nodes grow a tree starting with the genesis block as root at time
+t = 0. At any timet, the honest nodes independently mines on a set of blocks
+according to1-distance-greedy protocol. From the point of view of a ﬁxed block,
+its child-blocks are generated as a Poisson point process with rate1−β i.e., the
+time interval between the child-blocks is an exponential random variable with
+rate 1−β.
+LetW (t) be the number of blocks on the tip of the tree. For very small values
+of h, we have
+P
+(
+W (t +h) =k + 1|W (t) =k
+)
+= (1−β)h +o(h)
+P
+(
+W (t +h) = 1|W (t) =k
+)
+=k(1−β)h +o(h)
+=== PAGE 45 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 45
+It follows that the inﬁnitesimal generator ofW (t) is
+A = (1−β)
+
+
+−1 1 0 0 ···
+2 −3 1 0 ···
+3 0 − 4 1 ···
+... ... ... ... ...
+
+
+let π = (π1,π 2,··· ) be the stationary distribution, then it satisﬁesπA = 0. By
+solving the equations, we haveπ1 = 1
+2(e−2) andπn = 2π1
+(n+1)! forn≥ 1. Then the
+expected number of blocks on the tip of the honest tree can be computed as
+E[W (t)] =
+∞∑
+n=1
+nπn = 2π1
+∞∑
+n=1
+n
+(n + 1)! = 2π1
+∞∑
+n=1
+( 1
+n!− 1
+(n + 1)!
+)
+= 2π1 = 1
+e− 2.
+Let T be the time for the height of the honest tree to grow by one, then we
+have
+P(T∈ (t,t +dt)|W (t) =k,T ≥t) =k(1−β)dt
+=⇒P(T∈ (t,t +dt)|T≥t) =
+∞∑
+k=1
+k(1−β)dtP(W (t) =k) = E[W (t)](1−β)dt
+=⇒ P(T∈ (t,t +dt))
+P(T≥t) = E[W (t)](1−β)dt. (40)
+LetfT (t) be the probability density function of random variableT,FT (t) be
+the cumulative distribution function ofT, andFc
+T (t) = 1−FT (t), then we know
+fT (t) =− ˙Fc
+T (t). Equation (40) can be represented as
+˙Fc
+T (t)
+Fc
+T (t) =−E[W (t)](1−β)dt,
+with Fc
+T (0) = 1 , and the solution of this diﬀerential equation is Fc
+T (t) =
+eE[W (t)](1−β), then we have
+E[T ] =
+∫ ∞
+0
+Fc
+T (t)dt = 1
+E[W (t)](1−β).
+Therefore we can conclude that the growth rate of the honest treeA1(1−β) =
+1/E[T ] = E[W (t)](1−β) = 1−β
+e−2≈ 1.39(1−β).
+B.4 Growth rate of 1-distance-greedy Protocol under Balance
+Attack
+In this section we calculate the expected growth rate of honest tree in1-distance-
+greedy protocol under the balance attack in §A.2 (see pseudocode in §B.5).
+We start with two chains of equal length and the distance between them is
+greater than 1. In this situation, honest nodes will split into two groups with
+=== PAGE 46 ===
+46 Bagaria et al.
+equal stake proportion to mine on diﬀerent chains under1-distance-greedy pro-
+tocol. We ﬁrst consider thesteady statebehavior where the adversary has “suf-
+ﬁcient" number of private chains under each public chain, that is, whenever the
+length of one public chain grows by one, the adversary can immediately reveal
+one block for the other chain to re-balance these two chains and keep the honest
+nodes split. We analyze thetransient stage, i.e., getting to steady state from
+genesis after the steady state analysis.
+Let U(t) and V (t) be the number of blocks on the tip of the two trees. For
+very small values ofh, we have
+P
+(
+(U(t +h),V (t +h)) = (u + 1,v )| (U(t),V (t)) = (u,v )
+)
+= 0.5(1−β)h +o(h)
+P
+(
+(U(t +h),V (t +h)) = (u,v + 1)| (U(t),V (t)) = (u,v )
+)
+= 0.5(1−β)h +o(h)
+P
+(
+(U(t +h),V (t +h)) = (1, 1)| (U(t),V (t)) = (u,v )
+)
+= 0.5(u +v)(1−β)h +o(h)
+Let Z(t) =U(t) +V (t), then we have
+P
+(
+Z(t +h) =k + 1|Z(t) =k
+)
+= (1−β)h +o(h)
+P
+(
+Z(t +h) = 2|Z(t) =k
+)
+= 0.5k(1−β)h +o(h)
+It follows that the inﬁnitesimal generator ofZ(t) is
+A = (1−β)
+
+
+−1 1 0 0 ···
+1.5 −2.5 1 0 ···
+2 0 − 3 1 ···
+... ... ... ... ...
+
+
+let π = (π2,π 3,··· ) be the stationary distribution, then it satisﬁesπA = 0. By
+solving the equations, we haveπ2 = 2
+3e2−19 and πn = 3π12n+1
+(n+2)! for n≥ 1. Then
+the expected number of blocks on the tip of the honest tree can be computed as
+E[Z(t)] =
+∞∑
+n=2
+nπn = 3π2
+∞∑
+n=2
+2n+1n
+(n + 2)! = 3π2
+∞∑
+n=2
+2n+1(n + 2− 2)
+(n + 2)!
+= 3π2
+∞∑
+n=2
+( 2n+1
+(n + 1)!− 2n+2
+(n + 2)!
+)
+= 4π2.
+Let T be the time for the height of the honest tree to grow by one. Then,
+similar to the analysis in §B.3, we have thatE[T ] = 2/(E[Z(t)](1−β)) Thus
+the growth rate of the honest tree˜A1(1−β) = 1/E[T ] = E[Z(t)](1−β)/2 =
+4
+e2−19(1−β)≈ 1.26(1−β)<A 1(1−β).
+This implies that the growth rate of the public longest chain will be slowed
+down due to the balance attack. Therefore, when the adversary withβ smaller
+but close toA1/(A1 +e) succeeds in balancing the two chains for some time, the
+private chains will grow faster than the public chain, which gives the adversary
+a lot of future blocks in the “bank” to continue the balance attack.
+=== PAGE 47 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 47
+B.5 Pseudo Code for the Balance Attack on 1-distance-greedy
+Protocol
+Here we provide a formal pseudocode describing the balance attack algorithm
+on 1-distance-greedy protocol for completeness.
+Balance attack (D = 1,β )
+1: procedure Initialize( )
+2: PrivateTree1← genesis
+3: PrivateTree2← genesis
+4: PublicTree1← genesis
+5: PublicTree2← genesis
+6: procedure Attack( )
+7: for r = 1 :rmax do
+8: if height(PublicTree1) == height(PublicTree2)then
+9: HonestMining(Poisson_rate = 0.5(1−β),D = 1,PublicTree1)
+10: HonestMining(Poisson_rate = 0.5(1−β),D = 1,PublicTree2)
+11: else ifheight(PublicTree1)> height(PublicTree2)then
+12: HonestMining(Poisson_rate = 1−β, D = 1,PublicTree1)
+13: else ifheight(PublicTree1)< height(PublicTree2)then
+14: HonestMining(Poisson_rate = 1−β, D = 1,PublicTree2)
+⊿ honest nodes work on blocks in the public view under
+D-distance-greedy protocol
+15: AdversaryMining(Poisson_rate =β,PrivateTree1,PrivateTree2) ⊿
+adversary works privately on all blocks in the private view
+16: if height(PublicTree1) == height(PublicTree2)then
+17: adversary reveals nothing
+18: else ifheight(PublicTree1)> height(PublicTree2)then
+19: PublicTree2(height(PublicTree2)+1:min(height(PrivateTree2),height(PublicTree1))
+← 1 ⊿ adversary reveals a chain from PrivateTree2 to match the height of
+the public trees if he can
+20: else ifheight(PublicTree1)< height(PublicTree2)then
+21: PublicTree1(height(PublicTree1)+1:min(height(PrivateTree1),height(PublicTree2))
+← 1 ⊿ adversary reveals a chain from PrivateTree1 to match the height of
+the public trees if he can
+22: height(r)← max{height(PublicTree1),height(PublicTree2)}
+23: diﬀ(r)← height(PublicTree1)− height(PublicTree2)
+24: return height(last(diﬀ== 0)) ⊿ return the length of the longest fork
+from genesis
+F
+C Veriﬁable Random Functions
+Deﬁnition 5 (from [11]).A function familyF(·)(·) :{0, 1}a(κ)→{ 0, 1}b(κ) is
+a family of VRFs is there exists a probabilistic polynomial-time algorithmGen
+and deterministic algorithms VRFprove and VRFverify such that Gen(1κ)
+=== PAGE 48 ===
+48 Bagaria et al.
+outputs a pair of keys (pk,sk ); VRFprove(x,sk ) computes (Fsk(x),πsk(x)),
+where πsk(x) is the proof of correctness; andVRFverify(x,y,π,pk ) veriﬁes
+that y =Fsk(x) using the proofπ. Formally, we require
+1. Uniqueness: no values (pk,x,y 1,y 2,π 1,π 2) can satisfy
+VRFverify(x,y 1,π 1,pk ) =VRFverify(x,y 2,π 2,pk ) when y1⁄=y2.
+2. Provability:if (y,π ) =VRFprove(x,sk ), then VRFverify(x,y,π,sk ) =
+1.
+3. Pseudorandomness: for any probabilistic polynomial-time algorithmA =
+(A1,A 2), who does not query its oracle onx,
+Pr
+
+
+z =z′
+⏐⏐⏐⏐⏐⏐⏐⏐⏐⏐⏐⏐
+(pk,sk )← Gen(1κ);
+(x,st )←AVRFprove(·)
+1 (pk);
+y0 =Fsk(x);
+y1←{ 0, 1}b(k);
+z←{ 0, 1};
+z′←AVRFprove(·)
+2 (yz,st )
+
+
+≤ 1
+2 +negl(κ)
+This ensures that the output of a VRF is computationally indistinguishable
+from a random number even if the public keypk and the functionVRFprove
+is revealed.
+D Prediction inspired bribing attacks
+Proof-of-work (PoW) protocols such as Nakamoto’s protocol for Bitcoin achieve
+high security while maintaining a high unpredictability as to which miners can
+propose future blocks. A very attractive feature of this PoW protocol is that
+nodes that mine a valid block have no further ability to update the block after
+they have solved the mining puzzle, since the nonce seals the block making it
+tamper-proof. Thus no node knows whether they have the power to propose the
+block till they solve the puzzle, and once they solve the puzzle, they have no
+future rights to alter the content.
+This causality is reversed in proof-of-stake (PoS) protocols: usually, the node
+that is eligible to propose a block knowsa prioriof its eligibility before proposing
+a block. This makes PoS protocols vulnerable to a new class of serious attacks
+not found in the PoW setting. We will show that a set of miners controlling
+an inﬁnitesimal fraction of the stake can potentially completely undermine the
+security of the protocol. We demonstrate that the longer the prediction win-
+dow, the more serious the attack space is. This raises an important questions
+as to whether it is possible to design a secure proof-of-stake protocol which has
+minimal prediction window.
+We point out that an existing work [7] has already raised this issue that PoS
+protocols are forced make a tradeoﬀ between predictability and NaS attacks.
+While that work mainly concerned itself with incentive attacks, our concern
+here is adversarial attacks that compromise consensus. We point out that even in
+the adversarial setting, all provably secure PoS protocols have a long prediction
+=== PAGE 49 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 49
+window; the main contribution of this paper is to design such a protocol and
+show its security up to 50% of adversarial stake.
+D.1 Adaptive Adversaries and the VRF Attack
+Fig.12: Structure of bribing attack
+A popular model that has been proposed to capture the eﬀect of future
+prediction in the PoS setting is the so-called adaptive adversary model [10,16].
+In the adaptive adversary model, a node remains honest unless corrupted by an
+adversary (who can change who they are corrupting based on the public state).
+The adversary has a bound on how many nodes it can corrupt at any given time.
+To defend against an adaptive adversary model, many protocols have moved
+from global predictability of future block proposers (i.e., everyone knows who
+the future block leaders are) [19] to local predictability (i.e., each miner knows
+when in the future they will propose a block) [10,16]. The local predictability is
+achieved using a Veriﬁable Random Function (VRF) [22] based leader-election.
+However, the adaptive adversary model assumes that miners do not have
+any independent agency but rather only get corrupted based on an adversary’s
+instructions. An adversary can easily circumvent this assumption by establishing
+a website where it can oﬀer a bribe to anyone who posts their credentials for
+proposing blocks in an upcoming epoch of time. Thus even when the node’s
+future proposer status is not public knowledge, this bribing website can solicit
+such information and help launch serious attacks (see Fig. 12).
+=== PAGE 50 ===
+50 Bagaria et al.
+D.2 Longest Chain protocols
+We ﬁrst consider longest-chain PoS protocols, in order to demonstrate our pre-
+diction attacks. We begin with a deﬁnition of prediction window of a protocol.
+Deﬁnition 6 (W-predictable). Given a PoS protocolΠPoS, letC be a valid
+blockchain ending with blockB with a time stampt. We say a blockB is w(B)-
+predictable, if there exists a timet1 >t and a blockB1 with a time stampt1 such
+that (i)B1 can be mined by miner (using its private state and the common public
+state) at timet; and (ii) B1 can be appended toC′ to form a valid blockchain
+for any valid chainC′ that extendsC by appendingw− 1 valid blocks with time
+stamps within the interval (t,t 1). By taking the maximum over the prediction
+parameter over all blocks inΠPoS, i.e., letW = maxBw(B), we sayΠPoS isW-
+predictable.W is the size of the prediction window measured in units of number
+of blocks.
+We note that our deﬁnition is similar to the deﬁnition ofW-locally pre-
+dictable protocols in [7]. We note furthermore that longest chain protocols also
+have a κ-deep conﬁrmation policy, where a block embedded deep enough is
+deemed to be conﬁrmed.
+D.3 Prediction Attack on W-predictable protocols
+Let us consider aW-predictable protocol, where the prediction windowW is
+longer than the conﬁrmation windowκ. We note that the prediction window of
+many existing protocols are quite large, as demonstrated in Table 1 and therefore
+this is a reasonable assumption. We will consider the alternative case (W <<κ
+in the upcoming subsection).
+Consider block B that has been mined at time t (assume that B is W-
+predictable, since such a block exists by deﬁnition). The adversary launches
+a prediction attack by launching a website where it announces a reward for min-
+ers which possess a future block proposal slot. Some of the leaders respond to
+this call (these are shown with a red outer circle in Fig. 13). We note that while
+the adversary requiresκ + 1 leaders out of2κ + 1 slots to respond to the bribe,
+the total stake represented by these bribed leaders can be a very tiny fraction
+of the total stake. The adversary bribes these leaders to sign a forked version
+of the blockchain that it hoards till the blocks is conﬁrmed by aκ-deep honest
+chain. After that point, the adversary releases the hoarded blockchain to all the
+users thus switching the longest chain and conﬁrming a blocks′ (which contains
+a double spend) instead ofs. We note that this attack is indistinguishable from
+network delay since none of the bribed leaders sign multiple blocks with a single
+leadership certiﬁcate - thus nodes that participate in the bribing attack have
+plausible deniability.
+Bribing can enlarge prediction windowWe note that the previous attack
+applies whenever the prediction windowW is larger than the conﬁrmation depth
+=== PAGE 51 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 51
+Fig.13: Prediction attack on Ouroboros Praos.
+κ, this attack can be launched. However, here we will brieﬂy note that even
+whenW is smaller thanκ, the protocols still have a prediction problem. This is
+because in longest-chain PoS protocols such as Ouroboros, Praos, Snow White,
+the randomness is updated every epoch and a key assumption for the updated
+randomness to be unbiased is that a majority of the previous leaders were honest.
+However, by bribing the previous leaders, the adversary can bias the randomness
+(for example, by choosing a subset of proposers), thus leading itself to more
+favorable leadership slots in the upcoming epoch (and eﬀectively enlarging the
+prediction window). These protocols oﬀer no protection against these bribed
+randomness grinding attacks and hence their security parameter is limited to be
+of the same order as the epoch size. We note that while our proposed protocol has
+a similar structure as Ouroboros, our analysis proves security against adversarial
+randomness grinding (the so-called NaS attack).
+D.4 Prediction Attack on BFT-based PoS protocols
+While we have focused on longest chain PoS protocols in the previous section,
+here we consider the other large family of PoS protocols that are based on Byzan-
+tine Fault Tolerant consensus (BFT). Some PoS-based BFT protocols work with
+the same committee for many time-slots thus giving raise to prediction based
+attacks. Furthermore, in many BFT protocols, a single leader proposes blocks till
+evicted for wrong-doing [32], thus making the prediction problem worse. Among
+BFT-based PoS protocols, the one with the least prediction window is Algo-
+=== PAGE 52 ===
+52 Bagaria et al.
+Fig.14: Randomness grinding enlarges prediction ability.
+rand [9,16]. We will demonstrate a fatal prediction attack on Algorand (other
+BFT protocols which are even more predictable are naturally attacked as well).
+Fig.15: Algorand Bribing Attack
+In Algorand, at each round, a set of leaders and many sets of committees
+are elected using VRF from the previous ﬁnalized block. The leaders and com-
+mittee members can construct their membership certiﬁcates from the previous
+ﬁnalized block’s randomness, and others do not know their identities till they
+reveal themselves. The BFT consensus process proceeds in steps and each step
+is run by a diﬀerent committee - a block is considered ﬁnalized if it is voted on
+by a 2/3-majority of committee members at any step.
+This feature is used to prove that Algorand is secure against adaptive ad-
+versaries. However, we show that Algorand is not immune to the bribing-based
+prediction attack (similar to the one for longest-chain protocols). Since the pro-
+=== PAGE 53 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 53
+tocol does not use a sequence of blocks for conﬁrmation, the prediction window
+deﬁned for longest-chain protocols is not the appropriate measure for prediction-
+attacks in this protocol. Rather, the appropriate measure is what fraction of the
+committee participants are locally known when a block is proposed. For Algo-
+rand, all of the committee participants are known to themselves.
+Suppose in a given round, there are two leaders blocksB and B′ (the latter
+block may contain a double-spend relative toB). The adversary solicits using a
+website the committee members to post their certiﬁcates. If the adversary is able
+to obtain a2/3-quorum in any step, then the adversary can use that quorum to
+sign a diﬀerent certiﬁcate than the one the honest nodes signed. In particular,
+the adversary waits for a honest quorum to sign a certiﬁcate forB in order to
+conﬁrm the transaction and then signs a bribed quorum from a diﬀerent step to
+certify B′. This enables the adversary to reverse a conﬁrmation. We note that
+none of the bribed miners have to double sign a block since they would not have
+been elected in other steps of the quorum.
+We note that establishing a stalling-attack is even easier in this model - the
+adversary needs a1/3-fraction of committee members in a step to remain silent
+in order to stall the progress of Algorand. Given that miners are randomly sam-
+pled, this quorum may hold a very small fraction of stake (which the adversary
+may compensate for using its bribe). This stalling attack can be used to launch
+extortion attacks demanding a large amount of money to un-stall the network.
+D.5 Summary of Prediction Attacks
+We have demonstrated that both longest-chain and BFT based protocols are
+highly vulnerable to prediction-based security attacks (compromising the safety
+and liveness of the system). This motivates the design of a new PoS protocol
+that can only be predicted with a look ahead window, much shorter than the
+conﬁrmation window.
+E Proofs for §5
+E.1 Proof of Lemma 5
+In this proof, we renormalize time such thatλh = 1, and we setλa = λ to
+simplify notations.
+The random processes of interest start from time0. To look at the system
+in stationarity, let us extend them to−∞ < t <∞. More speciﬁcally, deﬁne
+τ−1,τ−2,... such that together withτ0,τ 1,... we have a double-sided inﬁnite
+Poisson process of rate1. Also, for eachi< 0, we deﬁne an independent copy of
+a random adversarial treeTi with the same distribution asT0.
+These extensions allow us to extend the deﬁnition ofEij to alli,j,−∞ <
+i<j < ∞, and deﬁneEj to be:
+Ej =
+⋂
+i<j
+Eij.
+=== PAGE 54 ===
+54 Bagaria et al.
+Note thatEj⊂Fj, so to prove thatFj occurs for inﬁnite manyj’s with prob-
+ability 1, it suﬃces to prove thatEj occurs for inﬁnite manyj’s with probability
+1. This is proved in the following.
+DeﬁneRj =τj+1−τj and
+Zj = (Rj,Tj). (41)
+Consider the i.i.d. process{Zj}−∞<j<∞. Now,
+Eij = event thatDi(t−τi)<A h(t)−Ah(τi) for allt>τ j
+= event thatDi(τk−τi)<A h(τk−)−Ah(τi) for allk>j
+= event thatDi(τk−τi)<A h(τk)−Ah(τi)− 1 for allk>j
+= event thatDi(τk−τi)<k −i− 1 for allk>j
+= event thatDi(∑k−1
+m=iRm)<k −i− 1 for allk>j
+HenceEj =∩i<jEij has a time-invariant dependence on{Zi}. This means that
+p =P (Ej) does not depend onj. Since{Zj} is i.i.d. and in particularly ergodic,
+with probability 1, the long term fraction ofj’s for whichEj occurs isp, which
+is nonzero ifp⁄= 0. This is the last step to prove.
+Let
+E0 = event thatDi(∑k−1
+m=iRm)<k −i− 1 for allk> 0 and i< 0 (42)
+and
+Bik = event thatDi(∑k−1
+m=iRm)≥k−i− 1 (43)
+then
+Ec
+0 =
+⋃
+k>0,i<0
+Bik. (44)
+Let us ﬁx a particularn> 0, and deﬁne:
+Gn = event thatRm < 1
+n for m =−n,−n + 1,..., −1, 0, +1,...,n − 1 (45)
+Then
+P (E0)≥P (E0|Gn)P (Gn) (46)
+= (1−P (∪k>0,i<0Bik|Gn))P (Gn) (47)
+≥
+
+1−
+∑
+k>0,i<0
+P (Bik|Gn)
+
+P (Gn) (48)
+≥ (1−an− 2bn−cn)P (Gn) (49)
+where
+an :=
+∑
+(i,k):−n≤i<0<k≤n
+P (Bik|Gn) (50)
+bn :=
+∑
+(i,k):−n≤i<0<n<k
+P (Bik|Gn) (51)
+cn :=
+∑
+(i,k):i<−n<n<k
+P (Bik|Gn). (52)
+=== PAGE 55 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 55
+The last inequality (49) comes from the factP (Bik|Gn) =P (B−k,−i|Gn).
+Using (8), we can boundP (Bik|Gn). Consider three cases:
+Case 1:−n≤i< 0<k ≤n:
+Fork−i< 4√n, we have that
+P (Bik|Gn) =P (Di(
+k−1∑
+m=i
+Rm)≥k−i− 1|Gn)≤P (Di( 1
+4√
+n3 )≥ 1)
+=P (Γλ≤ 1
+4√
+n3 ) = 1−e
+− λ
+4√
+n3 < λ
+4√
+n3, (53)
+where Γλ∼ Exp(λ).
+Fork−i≥ 4√n, we have that
+P (Bik|Gn) =P (Di(
+k−1∑
+m=i
+Rm)≥k−i− 1|Gn)
+≤P (Di(k−i
+n )≥ 4√n− 1)
+≤P (Di(2)≥ 4√n− 1)≤e− 4√n+1+2eλ, (54)
+where the last inequality follows from (8). Summing these terms, we have:
+an =
+∑
+(i,k):−n≤i<0<k≤n
+P (Bik|Gn)
+≤
+∑
+(i,k):−n≤i<0<k≤n,k−i< 4√n
+λ
+4√
+n3 +
+∑
+(i,k):−n≤i<0<k≤n,k−i≥ 4√n
+e− 4√n+1+2eλ
+≤ λ
+4√n +
+∑
+(i,k):−n≤i<0<k≤n,k−i≥ 4√n
+e− 4√n+1+2eλ := ¯an
+which is bounded and moreover¯an→ 0 as n→∞ .
+Case 2:−n≤i< 0<n<k :
+P (Bik|Gn)
+≤P
+(
+Bik|Gn, 2 +
+k−1∑
+m=n
+Rm < (k−i− 1)1 +λe
+2λe
+)
++P
+(
+2 +
+k−1∑
+m=n
+Rm > (k−i− 1)1 +λe
+2λe
+)
+≤e− 1−λe
+2 (k−i−1) +A1e−α(k−i−1)
+for some positive constantsA1,α independent of n,k,i . The ﬁrst term in the
+last inequality follows from (8), and the second term follows from the fact that
+=== PAGE 56 ===
+56 Bagaria et al.
+(1 +λe)/(2λe)> 1 and theRi’s have mean1. Summing these terms, we have:
+bn =
+∑
+(i,k):−n≤i<0<n<k
+P (Bik|Gn)
+≤
+∑
+(i,k):−n≤i<0<n<k
+[
+e− 1−λe
+2 (k−i−1) +A1e−α(k−i−1)
+]
+:= ¯bn
+which is bounded and moreover¯bn→ 0 as n→∞ .
+Case 3:i< −n<n<k :
+P (Bik|Gn)
+≤P
+(
+Bik|Gn, 2 +
+−n−1∑
+m=−i
+Rm +
+k−1∑
+m=n
+Rm < (k−i− 1)1 +λe
+2λe
+)
++P
+(
+2 +
+−n−1∑
+m=−i
+Rm +
+k−1∑
+m=n
+Rm > (k−i− 1)1 +λe
+2λe
+)
+≤e− 1−λe
+2 (k−i−1) +A2e−α(k−i−1)
+for some positive constantsA2,α independent of n,k,i . The ﬁrst term in the
+last inequality follows from (8), and the second term follows from the fact that
+(1 +λe)/(2λe)> 1 and theRi’s have mean1.
+Summing these terms, we have:
+cn =
+∑
+(i,k):i<−n<n<k
+P (Bik|Gn)
+≤
+∑
+(i,k):i<−n<n<k
+[
+e− 1−λe
+2 (k−i−1) +A2e−α(k−i−1)
+]
+:= ¯cn
+which is bounded and moreover¯cn→ 0 as n→∞ .
+Substituting these bounds in (49) we ﬁnally get:
+P (E0)> [1− (¯an + 2¯bn + ¯cn)]P (Gn) (55)
+By settingn suﬃciently large such that¯an,¯bn and ¯cn are suﬃciently small, we
+conclude thatP (E0)> 0.
+E.2 Proof of Lemma 8
+In this proof, we ﬁxg =e−λh∆ and renormalize time such thatλh = 1, and we
+set λa =λ to simplify notations.
+The random processes of interest start from time0. To look at the system
+in stationarity, let us extend them to−∞ < t <∞. More speciﬁcally, deﬁne
+τ−1,τ−2,... such that together withτ0,τ 1,... we have a double-sided inﬁnite
+=== PAGE 57 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 57
+Poisson process of rate1. Also, for eachi< 0, we deﬁne an independent copy of
+a random adversarial treeTi with the same distribution asT0.
+These extensions allow us to extend the deﬁnition ofˆEij to alli,j,−∞ <
+i<j < ∞, and deﬁneˆEj and ˆVj to be:
+ˆEj =
+⋂
+i<j
+ˆEij
+and
+ˆVj = ˆEj∩Uj.
+Note that ˆVj⊂ ˆUj, so to prove thatˆUj occurs for inﬁnite manyj’s with prob-
+ability 1, it suﬃces to prove thatˆVj occurs for inﬁnite manyj’s with probability
+1. This is proved in the following.
+DeﬁneRj =τj+1−τj and
+Zj = (Rj,Tj).
+Consider the i.i.d. process{Zj}−∞<j<∞. Now,
+Uj∩ ˆEij =Uj∩event thatDi(t−τi)<H h(t−∆)−Hh(τi) for allt>τ j +∆
+=Uj∩event thatDi(t +∆−τi)<H h(t)−Hh(τi) for allt>τ j
+=Uj∩event thatDi(τk− +∆−τi)<H h(τk−)−Hh(τi) for allk>j
+=Uj∩event thatDi(∑k−1
+m=iRm +∆)<H h(τk−1)−Hh(τi) for allk>j
+Hence ˆEj∩Uj =⋂
+i<j ˆEij∩Uj has a time-invariant dependence on{Zi}, which
+means that p = P ( ˆVj) does not depend onj. Since{Zj} is i.i.d. and in par-
+ticularly ergodic, with probability1, the long term fraction ofj’s for whichˆVj
+occurs isp, which is nonzero ifp⁄= 0. This is the last step to prove.
+P ( ˆV0) =P ( ˆE0|U0)P (U0) =P ( ˆE0|U0)P (R0 >∆ )P (R−1 >∆ ) =g2P ( ˆE0|U0).
+It remains to show thatP ( ˆE0|U0)> 0.
+ˆE0 = event thatDi(∑k−1
+m=iRm +∆)<H h(τk−1)−Hh(τi) for allk> 0 and i< 0
+(56)
+Let
+ˆBik = event thatDi(∑k−1
+m=iRm +∆)≥Hh(τk−1)−Hh(τi) (57)
+then
+ˆEc
+0 =
+⋃
+k>0,i<0
+ˆBik. (58)
+Let us ﬁx a particularn> 2∆> 0, and deﬁne:
+Gn = event thatDm(3n) = 0 for m =−n,−n + 1,..., −1, 0, +1,...,n − 1,n
+(59)
+=== PAGE 58 ===
+58 Bagaria et al.
+Then
+P ( ˆE0|U0)≥P ( ˆE0|U0,Gn)P (Gn|U0) (60)
+=
+(
+1−P (∪k>0,i<0 ˆBik|U0,Gn)
+)
+P (Gn|U0) (61)
+≥
+
+1−
+∑
+k>0,i<0
+P ( ˆBik|U0,Gn)
+
+P (Gn|U0) (62)
+≥ (1−an−bn)P (Gn|U0) (63)
+where
+an :=
+∑
+(i,k):−n≤i<0<k≤n
+P ( ˆBik|U0,Gn) (64)
+bn :=
+∑
+(i,k):i<−n or k>n
+P ( ˆBik|U0,Gn). (65)
+Using (8), we can boundP ( ˆBik|U0,Gn). Consider two cases:
+Case 1:−n≤i< 0<k ≤n:
+P ( ˆBik|U0,Gn) =P ( ˆBik|U0,Gn,
+k−1∑
+m=i
+Rm +∆≤ 3n) +P (
+k−1∑
+m=i
+Rm +∆> 3n|U0,Gn)
+≤P (
+k−1∑
+m=i
+Rm +∆> 3n|U0,Gn)
+≤P (
+k−1∑
+m=i
+Rm > 5n/2|U0)
+≤P (
+k−1∑
+m=i
+Rm > 5n/2)/P (U0)
+≤A1e−α1n
+for some positive constants A1,α 1 independent of n,k,i . The last inequality
+follows from the fact thatRi’s are iid exponential random variables of mean1.
+Summing these terms, we have:
+an =
+∑
+(i,k):−n≤i<0<k≤n
+P (Bik|U0,Gn)≤
+∑
+(i,k):−n≤i<0<k≤n
+A1e−α1n := ¯an,
+which is bounded and moreover¯an→ 0 as n→∞ .
+Case 2:k>n or i< −n:
+For 0<ε< 1, let us deﬁne eventWε
+ik to be:
+Wε
+ik = event thatHh(τk−1)−Hh(τi)≥ (1−ε)g(k−i− 1).
+=== PAGE 59 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 59
+Then we have
+P ( ˆBik|U0,Gn)≤P ( ˆBik|U0,Gn,W ε
+ik) +P (Wε
+ik
+c|U0,Gn).
+Let Xj be a Bernoulli random variable such that Xj = 1 if and only if
+Rj−1 > ∆, i.e., the j-th honest block is a non-tailgater. SinceRj’s are i.i.d
+exponential random variables with mean1, we have thatXj’s are also i.i.d and
+P (Xj = 1) = g. By the deﬁnition ofHh(·), we have Hh(τk−1)−Hh(τi) =∑k−1
+j=i+1Xj, then
+P (Wε
+ik
+c|U0,Gn) =P (
+k−1∑
+j=i+1
+Xj < (1−ε)g(k−i− 1)|X0 = 1,X 1 = 1)
+=P (
+−1∑
+j=i+1
+Xj +
+k−1∑
+j=2
+Xj < (1−ε)g(k−i− 1)− 2)
+≤P (
+−1∑
+j=i+1
+Xj +
+k−1∑
+j=2
+Xj < (1−ε)g(k−i− 3))
+≤A2e−α2(k−i−3) (66)
+for some positive constants A2,α 2 independent of n,k,i . The last inequality
+follows from the Chernoﬀ bound.
+Meanwhile, we have
+P ( ˆBik|U0,Gn,W ε
+ik)
+≤P (Di(
+k−1∑
+m=i
+Rm +∆)≥ (1−ε)g(k−i− 1))|U0,Gn,W ε
+ik)
+≤P (Di(
+k−1∑
+m=i
+Rm +∆)≥ (1−ε)g(k−i− 1))
+|U0,Gn,W ε
+ik,
+k−1∑
+m=i
+Rm +∆≤ (k−i− 1)g +λe
+2λe )
++P (
+k−1∑
+m=i
+Rm +∆> (k−i− 1)g +λe
+2λe |U0,Gn,W ε
+ik)
+≤e− (1−2ε)g−λe
+2 (k−i−1) +P (
+k−1∑
+m=i
+Rm +∆> (k−i− 1)g +λe
+2λe |U0,Gn,W ε
+ik)
+where the ﬁrst term in the last inequality follows from (8), and the second term
+can also be bounded:
+=== PAGE 60 ===
+60 Bagaria et al.
+P (
+k−1∑
+m=i
+Rm +∆> (k−i− 1)g +λe
+2λe |U0,Gn,W ε
+ik)
+=P (
+k−1∑
+m=i
+Rm +∆> (k−i− 1)g +λe
+2λe |U0,W ε
+ik)
+≤P (
+k−1∑
+m=i
+Rm +∆> (k−i− 1)g +λe
+2λe )/P (U0,W ε
+ik)
+≤A3e−α3(k−i−1)
+for some positive constants A3,α 3 independent of n,k,i . The last inequality
+follows from the fact that(g +λe)/(2λe) > 1 and theRi’s have mean1, while
+P (U0,W ε
+ik) is a event with high probability as we showed in (66).
+Then we have
+P ( ˆBik|U0,Gn)≤A2e−α2(k−i−3) +e− (1−2ε)g−λe
+2 (k−i−1) +A3e−α3(k−i−1).
+Summing these terms, we have:
+bn =
+∑
+(i,k):i<−n or k>n
+P ( ˆBik|U0,Gn)
+≤
+∑
+(i,k):i<−n or k>n
+[
+A2e−α2(k−i−3) +e− (1−2ε)g−λe
+2 (k−i−1) +A3e−α3(k−i−1)
+]
+:= ¯bn
+which is bounded and moreover¯bn→ 0 as n→∞ when we setε to be small
+enough such that(1− 2ε)g−λe> 0.
+Substituting these bounds in (63) we ﬁnally get:
+P ( ˆE0|U0)> [1− (¯an + ¯bn)]P (Gn|U0) (67)
+By setting n suﬃciently large such that ¯an and ¯bn are suﬃciently small, we
+conclude thatP ( ˆV0)> 0.
+F Growth rate of c-correlated adversary tree
+We setλa =λ in this section to simplify notations.
+The adversary is growing a private chain over the genesis block, under the
+c-correlation. As illustrated in Fig. 16, the common source of randomness at a
+block is only updated when the depth is a multiple ofc (Algorithm 1 line:19).
+We refer to such a blockb with depth(b)%c = 0 as agodfather-block.
+RandSource(b) :={
+VRFprove
+(
+RandSource(parent(b)), time, VRF.sk(b)
+)
+, if depth
+(
+b
+)
+%c = 0,
+RandSource(parent(b)), otherwise
+=== PAGE 61 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 61
+The randomness of a block changes only atgodfather-blocks. In other words, for
+n∈ Z, blocks along a chain at depths
+{
+nc,nc + 1,nc + 2,··· ,nc +c− 1
+}
+share
+a common random number. Two blocks are calledsiblings-blocks if they have
+the same parent block. Given this shared randomness, the adversary now has a
+freedom to choose where to place the newly generated blocks. The next theorem
+provides a dominant strategy, that creates the fastest growing private tree.
+Lemma 13. Under c-correlation, the optimal adversarial strategy to grow the
+tree fast is to only fork at the parents of godfather-blocks.
+Proof. Note that under the security model, several types of grinding attacks are
+plausible. First, at depth multiple ofc, the adversary can grind on the header
+of the parent of the godfather block, and run an independent election in every
+round. Secondly, for blocks sharing the same source of randomness, once an
+adversary is elected a leader, it can generate multiple blocks of the same header
+but appending on diﬀerent blocks. However, adding multiple blocks with the
+same header cannot make the tree any higher than the optimal scheme.
+Genesis
+depth=5
+depth=10
+depth=0
+Genesis
+(5)
+v0=0
+(6) (7)
+(5,5) (6,5) (6,6)
+Fig.16: An example ofT (a)(t)withc = 5 under the optimal strategy to grow the private
+NaS tree. Blocks forking from the same godfather-block share the same common source
+of randomness, as shown by the colors. To grow the tree fast, it is optimal to grow a
+single chain until the next godfather block. Circles with black outlines indicate blocks
+that are currently mined on.
+Sibling non-godfather blocks share a common source of randomness and thus
+“mining events” on these blocks are completely dependent. Speciﬁcally, for sib-
+ling non-godfather blocks, there is only one leader election in each round. As a
+result, for a particular non-godfather blockb, the child-block ofb’s any younger
+sibling (a sibling block mined after blockb) should share the same header and
+=== PAGE 62 ===
+62 Bagaria et al.
+identical source of randomness with one ofb’s child-block. Thus it is not neces-
+sary for a non-godfather block to have sibling blocks, that is, mining a sibling to
+a non-godfather block does not increase the growth rate of the longest chain in
+the adversarial block tree. However, sibling god-father blocks have independent
+sources of randomness and thus mining multiple such block increase the growth
+rate of the longest chain.
+Here we use the representation in Fig. 16, whose growth rate is the same as
+the full NaS adversarial tree as shown in Lemma 13. We can transform the tree
+T (a)(t) in Fig. 16 into a new random treeT 0(t). Everyc generations inT (a)(t)
+we can view as a single generation inT 0(t); in the example of Fig. 16, we have
+depth 0, 5, 10 etc (i.e., all the godfather depths) as the generations inT 0(t).
+T 0(t) corresponds to a branching random walk. For example, the genesis block
+B0 is the root ofT 0(t) at depth 0 with arrival time0. The children blocks of
+B0 inT 0(t) are the descendant blocks at depth5 inT (a)(t). We can order these
+children blocks in their arrival times. Consider blockB1 to be the ﬁrst such
+block, then the arrival time of blockB1 is
+S1 =X1 +X2 +... +Xc,
+where Xi is the inter-arrival time between block at depthi− 1 and block at
+depthi inT (a)(t). Note that all theXi’s are exponential with parameterλ, and
+they are all independent. Similarly, the arrival timeSi of thei-th child of root
+in T 0(t) is a sum ofi +c− 1 i.i.d exponential random variables with parameter
+λ.
+Let the depth of the treeTa(t) and T 0(t) be denoted byDa(t) and D(t)
+respectively deﬁned as the maximum depth of the blocks in the tree.
+Similar to §5, each vertices at generationk can be labelled as a k tuple
+of positive integers (i1,...,i k) with ij ≥ c for 1 ≤ j ≤ k: the vertex v =
+(i1,...,i k)∈I k is the(ik−c + 1)-th child of vertex(i1,...,i k−1) at levelk− 1.
+LetIk ={(i1,...,i k) :ij≥c for 1≤ j≤ k}, and setI =∪k>0Ik. For suchv we
+also letvj = (i1,...,i j), j = 1,...,k , denote the ancestor ofv at levelj, with
+vk =v. For notation convenience, we setv0 = 0 as the root of the tree.
+Next, let{Ev}v∈I be an i.i.d. family of exponential random variables of pa-
+rameter λ. For v = (i1,...,i k) ∈ Ik, letWv = ∑
+j≤ik
+E(i1,...,ik−1,j) and let
+Sv =∑
+j≤kWvj. This creates a labelled tree, with the following interpretation:
+forv = (i1,...,i j), theWvj are the waiting forvj to appear, measured from the
+appearance ofvj−1, andSv is the appearance time ofv.
+Let S∗
+k = minv∈IkSv. Note thatS∗
+k is the time of appearance of a block at
+levelk and therefore we have
+{Da(t)≥ck} ={D(t)≥k} ={S∗
+k≤t}. (68)
+=== PAGE 63 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 63
+S∗
+k is the minimum of a standard BRW. Introduce, forθc < 0, the moment
+generating function
+Λc(θc) = log
+∑
+v∈I1
+E(eθcSv) = log
+∞∑
+j=c
+E(e
+∑j
+i=1θcEi)
+= log
+∞∑
+j=c
+(E(eθcE1))j = log Ec(eθcE1)
+1−E(eθcE1).
+Due to the exponential law ofE1, E(eθcE1) = λ
+λ−θc
+and therefore Λc(θc) =
+log(−λc/θc(λ−θc)c−1).
+An important role is played byθ∗
+c, which is the negative solution to the
+equation Λc(θc) =θc ˙Λc(θc) and letηc satisfy that
+sup
+θc<0
+(Λc(θc)
+θc
+)
+= Λc(θ∗
+c)
+θ∗c
+= 1
+ληc
+.
+Indeed, see [28, Theorem 1.3], we have the following.
+Proposition 1.
+lim
+k→∞
+S∗
+k
+k = sup
+θc<0
+(Λc(θc)
+θc
+)
+= 1
+ληc
+, a.s.
+In fact, much more is known, see e.g. [17].
+Proposition 2. There exist explicit constantsc1 >c 2 > 0 so that the sequence
+S∗
+k−k/ληc−c1 logk is tight, and
+lim inf
+k→∞
+S∗
+k−k/ληc−c2 logk =∞,a.s.
+Note that Propositions 1,2 and (68) imply in particular thatDa(t)≤cηcλt
+for all larget, a.s., and also that
+if cηcλ> 1 then Da(t)>t for all larget, a.s.. (69)
+Let us deﬁneφc := cηc, thenφcλ is the growth rate of privatec-correlated
+NaS tree. One can check thatφc is the solution to the same equation as in [31],
+where the same problem is solved with a diﬀerential equation approach. [31]
+also proves the uniqueness of φc and provides an approximation for large c:
+φc = 1 +
+√
+lnc
+c +o
+(√
+lnc
+c
+)
+.
+We will need also tail estimates for the eventD(t) > ηcλt +x. While such
+estimates can be read from [28], we bring instead a quantitative statement suited
+for our needs.
+Theorem 3. Forx> 0 so thatηcλt +x is an integer,
+P (Da(t)≥φcλt +cx) =P (D(t)≥ηcλt +x)≤eΛc(θ∗
+c )x. (70)
+=== PAGE 64 ===
+64 Bagaria et al.
+Proof. We use a simple upper bound. Writem =ηcλt +x. Note that by (68),
+P (D(t)≥m) =P (S∗
+m≤t)≤
+∑
+v∈Im
+P (Sv≤t). (71)
+Forv = (i1,...,i k), set|v| =i1 +··· +ik. Then, we have thatSv has the same
+law as∑|v|
+j=1Ej. Thus, by Chebycheﬀ’s inequality, forv∈I m,
+P (Sv≤t)≤Eeθ∗
+cSve−θ∗
+ct =
+( λ
+λ−θ∗c
+)|v|
+e−θ∗
+ct. (72)
+And
+∑
+v∈Im
+( λ
+λ−θ∗c
+)|v|
+=
+∑
+i1≥c,...,im≥c
+( λ
+λ−θ∗c
+)∑m
+j=1ij
+=
+
+∑
+i≥c
+( λ
+λ−θ∗c
+)i
+
+
+m
+=eΛc(θ∗
+c )m. (73)
+Combining (72), (73) and (71) yields (70).
+G Nakamoto-PoS Protocol Pseudocode
+=== PAGE 65 ===
+Proof-of-Stake Longest Chain Protocols: Security vs Predictability 65
+Algorithm 1Nakamoto-PoS (c,s,δ )
+1: procedure Initialize( )
+2: BlkTree← genesis ⊿ Blocktree
+3: parentBk← genesis ⊿ Block to mine on
+4: unCnfTx←φ ⊿ Blk content: Pool of unconﬁrmedtxs
+5: procedure PosMining(coin)
+6: while Truedo
+7: SleepUntil(SystemTime %δ == 0) ⊿ System time is miner’s
+machine time
+8: time← SystemTime
+9: (KES.vk,KES.sk),(VRF.pk,VRF.sk)← coin.Keys()
+10: // Update the stake according to the stake distribution in thes-th
+last block in the main chain.
+11: stakeBk← SearchChainUp(parentBk,s)
+12: stake← coin.Stake(stakeBk)
+13: ρ←UpdateGrowthRate(parentBk)
+14: // Three sources of randomness: a common source (par-
+entBk.content.RandSource), a private source (coinSecretKey), and time.
+15: header←⟨ parentBk.content.RandSource , time⟩
+16: ⟨hash, proof⟩← VRFprove(header,VRF.sk) ⊿ Veriﬁable Random
+Function
+17: if hash <ρ × stake then ⊿ Block generated
+18: // Update common source of randomness everyc-th block in a
+chain as perc-correlation scheme
+19: if parentBk.Height() %c ==c− 1 then RandSource← hash
+20: else RandSource← parentBk.content.RandSource
+21: state← Hash(parentBk)
+22: content←⟨ unCnfTx, coin, RandSource, hash, proof, state⟩ and
+break// Return header along with signature on content
+23: return⟨header, content, Sign(content,KES.sk)⟩
+24: // Function to listen messages and update the blocktree
+25: procedure ReceiveMessage(X) ⊿ Receives messages from network
+26: if X is a validtx then
+27: undfTx← unCnfTx∪{ X}
+28: else if IsV alidBlock(X) then
+29: Xfork← the highest block shared by the main chain and the chain
+leading to X
+30: Lfork← min(parentBk.Height(), X.Height()) - Xfork.Height()
+31: if Lfork <s then ⊿ If the fork is less thans blocks
+32: if parentBk.Height() < X.Height() then
+33: ChangeMainChain(X) ⊿ If the new chain is longer
+34: else ⊿ checks-truncated longest chain rule
+35: MainChainBk← SearchChainDown(parentBk, Xfork,s) ⊿ ﬁnd
+the s-th block down the main chain from fork
+36: NewChainBk← SearchChainDown(X, Xfork,s) ⊿ ﬁnd thes-th
+block down the new chain from fork
+37: if NewChainBk.header.time < MainChainBk.header.time then
+38: ChangeMainChain(X) ⊿ If the new chain is denser
+39: procedure IsV alidBlock(X) ⊿ returns true if a block is valid
+40: if not IsUnspent(X.content.coin)then returnFalse
+41: if X.header.time > SystemTime then returnFalse
+42: if VRFverify(X.header, X.content.hash,X.content.proof,X.content.coin.VRF.pk)
+then
+43: return True
+44: else
+45: return False
+46: procedure Main( )
+47: Initialize()
+48: StartThread(ReceiveMessage)
+49: while Truedo
+50: block = PosMining(coin)
+51: SendMessage(block) ⊿ Broadcast to the whole network
