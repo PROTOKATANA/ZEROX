@@ -547,3 +547,111 @@ de BDK (`W/κ = 0,576 ≤ 1`) sin necesidad del segundo VDF de (h)**. Lo único 
 falta para subirlo a VERIFICADO:** medir `P(dos honestos leen anclas distintas)` con `L < F` en un
 simulador con dos vistas de verdad — el defecto `d8b_b3` que la propuesta ya señala (§7.4). No lo he
 hecho en esta ronda.
+
+<a name="reco"></a>
+## Recomendación (con etiqueta)
+
+1. **Retirar «`F` corta para el usuario» de la lista de razones.** — **REFUTADO** (§C). El riesgo del
+   comerciante **no depende de `F`**; espera 217-2 406 s según `α` y modelo, y por debajo de
+   ≈ 100-134 s no hay confirmación posible con ningún `F` (la ventaja `3k`). Lo que sí es cierto es
+   que la garantía **categórica** llega en `F`, y eso solo le importa a quien la necesite categórica.
+2. **La decisión de `ρ_max` es binaria, no un gradiente.** — **VERIFICADO** (§A.2). `ρ = 1` da 0 y
+   `ρ = 1,001` da el 99,7 % de lo que da `ρ = 10`. Lo único que compra `ρ` grande es acortar el
+   *bootstrap* (83 días → 13 min). Elegir entre **1,5 y 3 mueve el lookahead un ~5 % y el margen del
+   sembrador un ~4 %**, no lo que sugería la tabla P3 publicada (5,42× / 4,42× / 3,13×), cuyo abanico
+   venía enteramente de la pinza del *steering* que este informe corrige. **La pregunta real para
+   Katana es «¿admito `ρ > 1` o no?», y la respuesta honesta es que sí** (`pot-aes-asic-chacha.md`
+   estima el techo de un ASIC de latencia en 1,5-2,5×, y basta `ρ = 1,001` con paciencia).
+3. **Desatar `L` de `F`** (§E) y fijar **`L = F_carrera(α_obj, modelo pesimista)`**, `F` por
+   frontera / tolerancia a particiones / garantía. — **PLAUSIBLE**, con lo que falta dicho en §E.
+4. **Punto de diseño recomendado, sin (h):** `ρ_max = 3`, `I = 851 s`, **`L = 1 h`, `F = 2 h`**.
+   Da margen de sembrador **3,6×** (el de `F = 1 h`), la frontera y la garantía de `F = 2 h`, y
+   **`W/κ = 0,576`, dentro del umbral literal de BDK**, sin segundo VDF. Se paga: tolerancia a
+   particiones **1 h** en vez de 2 h.
+5. **Si se exige tolerancia a particiones de 2 h**, las opciones son `L = F = 2 h` (margen **1,9×**,
+   `W/κ = 1,08`, fuera de BDK) o **(h)** (margen **26×**, `W/κ = 0,079`), y (h) cuesta **81,3 % de un
+   núcleo** de verificación continua a `F = 2 h` / `I = 851 s` (**40,7 %** a `F = 1 h`) — §D.4,
+   PLAUSIBLE.
+6. **Retirar `W/κ ≤ 1,22` como criterio** y sustituirlo por el literal `W ≤ κ` calculado sobre el
+   lookahead real. Con `L` desatada **es alcanzable**; con `L = F` y `ρ > 1,024` **no lo es con
+   ninguna `F`**. — DEMOSTRADO sobre el modelo de `W` de §B.2.
+7. **No bajar `F` (ni `L`) por debajo de `F_carrera` del modelo pesimista para perseguir al
+   sembrador.** Bajar de 2 h a 1 h **atados** es gastar los dos puntos de colchón (35 % → 33 %) para
+   subir el margen de 1,9× a 3,6×; desatando `L` se consigue el margen **sin** gastar el colchón.
+
+<a name="auditoria"></a>
+## Auditoría de scripts (regla de método 10)
+
+```
+$ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d9-ronda10c/
+Scripts analizados: 8
+
+research/scripts/d9-ronda10c/r10c_lib.py
+   [T1] L41: hf_delta0() recibe 'alpha' y NO lo usa
+
+======================================================================
+Sospechas totales: 1
+```
+
+**La marca, leída.** `hf_delta0(alpha)` ignora `alpha` **a propósito y eso es la tesis de 9a**: el
+modelo corregido es `δ = 0` para todo `α` (atacante único, presupuestos disjuntos). La firma con
+`alpha` existe para que `hf_delta0` y `hf_d8` sean intercambiables donde el código pasa `hf(a)`. **No
+es un parámetro muerto: es el contraste.** Si se quitara el argumento habría que duplicar cada bucle,
+y el criterio `α` de las tablas se comprueba precisamente **comparando** las dos columnas: `hf_d8`
+**sí** depende de `α` (0,0000 / 0,0618 / 0,1544 / 0,2867), y las filas de C.1 se mueven con ella.
+**Falso positivo, declarado.** 0 marcas T2 / T3 / T3b / T4.
+
+> Dos marcas T3 (`bo != bo`, el test de NaN idiomático) aparecieron en la primera pasada y se
+> **eliminaron reescribiendo con `math.isnan`**, que es más claro y no dispara al detector.
+
+<a name="veredicto"></a>
+## Veredicto
+
+| Punto | Etiqueta | Número |
+|---|---|---|
+| **A** · lookahead honesto (`ρ = 1`) | **DEMOSTRADO** (R-FIN-14 a/b/e + código de Autonomys vía 9c §B.2) **+ VERIFICADO** | **0 slots.** `dag-poas-ancla-de-orden.md` §4.8 («todo granjero conoce sus victorias `L` por adelantado») queda **REFUTADO** bajo R-FIN-14 |
+| **A** · lookahead del atacante, núcleo | **VERIFICADO** (dos instrumentos, 0,274 % de discrepancia) | `(L − W_dec) + I(1 − 1/ρ)`; a `F = 2 h`, `I = 851`, `α = 0,33`: **7 462,7 s (`ρ=1,5`)**, **7 746,3 s (`ρ=3`)**; **0 si `ρ ≤ 1`** |
+| **A** · lookahead con (h) | **VERIFICADO** | `I(1 − 1/ρ)`, **independiente de `F`**: 283,3 s (`ρ=1,5`), 566,7 s (`ρ=3`), 765,0 s (`ρ=10`) |
+| **A** · ¿sobrevive el sembrador? | **VERIFICADO** | **Sí para todo `ρ > 1`** (margen 1,91× a `F=2 h`, 3,56× a `F=1 h`, con `ρ=3`); **no para `ρ ≤ 1`** (margen ∞); **casi no, con (h)** (26-52×) |
+| **A** · `δ_ancla` medido (12 semillas) | **VERIFICADO** | media 1,05-3,25 s, máx **10 s**; propaga **+0,13 %** al lookahead. Despreciable |
+| **B** · ¿es la pinza un artefacto? | **el mecanismo, PLAUSIBLE; el número, REFUTADO** | `W = F + I` es el rincón `ρ→∞`. Pinza real: **1 198 s (`ρ=1,5`) / 2 488 s (`ρ=3`)** con `I = 851`, frente a **3 868 s** publicados: **1,55-3,2× menos** |
+| **B** · `W/κ` con `ρ ≤ 1` | **VERIFICADO** | **0,0007 a `F = 2 h`** (`W = 1 + λD = 5` bloques). Tres órdenes **dentro** de BDK, no un 22 % fuera |
+| **B** · el 1,22 | **DEMOSTRADO que no es un umbral** | BDK marca **1,00**; `W/κ = 1 + I/F > 1` siempre ⇒ criterio insatisfacible bajo la `W` vieja. El 1,22 es el valor que salió a `F = 3,2 h` |
+| **B** · porte del ataque de BDK a PoAS | **LAGUNA** | Nadie lo ha modelado; con R-FIN-8′ el sobornado **pierde su coinbase**, lo que rompe el «arbitrarily small stake». Hace falta el modelo de soborno con coste de oportunidad |
+| **C** · tabla de reversión | **VERIFICADO** (analítico + MC de 12 semillas en 11 celdas, razones 0,983-1,003) | `α=0,33`, `δ=0`: 1,000 / 2,539e-1 / 1,516e-6 / 7,071e-36 / 4,264e-82 a 60/300/600/1 800/3 600 s. Pesimista: 1,000 / 9,986e-1 / 5,538e-1 / 2,375e-6 / 1,322e-16 |
+| **C** · ¿qué gana el usuario con 1 h vs 2 h? | **REFUTADO que gane algo** | **Nada** en riesgo (`prev` no depende de `F`); la garantía categórica llega 1 h antes, sobre un riesgo que a 3 600 s ya vale `4,3e-82` / `1,3e-16` |
+| **C** · suelo de espera | **VERIFICADO** | `≈ 3k/((1−α)λ) = 100-134 s`: **ninguna confirmación es posible antes**, con ningún `F` |
+| **D** · qué término manda | **VERIFICADO** | `α=0,33`, `δ=0`: **`F_carrera` 0,28-0,29 h**, salvo `ρ_max=3` donde manda la **pinza, 0,69 h**. `α=0,33` pesimista: **`F_carrera` 0,99-1,00 h** en todas. `α=0,35` pesimista: `F_carrera` **1,92-1,94 h**, y el núcleo con `ρ>1` **no cabe** con margen ≥ 3× |
+| **D** · el precio de (h) | **PLAUSIBLE** (derivado del coste medido por slot) | **40,7 %** de un núcleo a `F = 1 h`, **81,3 %** a `F = 2 h`, **215 %** a `F = 5,3 h` (con `I = 851 s`), además del 9,6 % de la cadena principal |
+| **E** · `L` desatada de `F` | **PLAUSIBLE** | `L = 1 h`, `F = 2 h`, `ρ=3`: lookahead **4 146 s**, margen **3,6×**, **`W/κ = 0,576` (dentro de BDK)**; coste: tolerancia a particiones 2 h → 1 h |
+
+<a name="errores"></a>
+## Errores propios (regla de método 9)
+
+1. **El esbozo interrumpido de esta misma ronda tenía mal la opción (h).** `tope_conocimiento(...,
+   retardada=True)` devolvía `I` con independencia de `ρ`. Es una cota superior válida (`ρ → ∞`) pero
+   **no es la cota**: bajo (h) la cadena se bloquea en cada inyección y el adelanto máximo es
+   `I(1 − 1/ρ)`. Con `ρ = 1,5` e `I = 851 s` la diferencia es **851 → 283 s, un factor 3**.
+   Corregido en `cinematica`/`cinematica_rapida`; el comentario queda en el fichero.
+2. **Primera pasada de la validación A0: horizonte más corto que el *bootstrap*.** Con `ρ = 1,05`,
+   `F = 19 080 s`, la simulación paso a paso se midió a 300 000 s cuando saturar exige 381 200 s, y
+   publiqué una «discrepancia» de **4 258 slots** que era del instrumento, no de la fórmula. Corregido
+   dimensionando el horizonte desde el *bootstrap* teórico (`2,5×`).
+3. **El mismo error, otra vez, en el integrador rápido.** `n_epocas = 4 000` fijas hacían que
+   `ρ = 1,001` marcara «CERRADA DISCREPA» en 10 filas. Corregido con auto-dimensionado
+   (`3·cap/((ρ−1)·I) + 400`). **Es la misma clase de error dos veces en una hora**; lo anoto como tal.
+4. **La media del integrador rápido no era una media temporal**, sino la media de los máximos por
+   época. Corregida a la media temporal exacta de la ventana (rampa + tope decayendo).
+5. **Primera pasada del Monte Carlo: celdas inútiles.** Elegí `α ∈ {0,40; 0,45; 0,48}` a
+   `t ∈ {60, 300}` y **7 de 8 celdas dieron 1,0000**: no validaban nada. Rehecho eligiendo celdas con
+   `0,005 < p < 0,95`.
+6. **Etiqueta imprecisa en A.5.** La columna «con retención» de `r10c_a2` usa `retraso = None`, que
+   en `r9c_lib` significa **retener para siempre**, no publicar con retraso; por eso `tips_pub = 0` y
+   `liberados = 0`. Lo que mide es «el atacante retiene todos sus bloques», que es el peor caso para
+   `δ_ancla`, pero **no es una retención temporal**. Declarado en el propio informe.
+7. **No he vuelto a medir `W_dec`**: uso la de 9c (`salida_c4.txt`), con su LAGUNA de resolución
+   declarada (rejilla `{0,10,20,45,…}`, tope de 10 candidatos). Todo el punto A y la pinza corregida
+   heredan esa resolución.
+8. **`L ≥ F_carrera` (§E) es un argumento, no una medición.** No he simulado la discrepancia de ancla
+   con dos vistas honestas distintas, que es el defecto `d8b_b3` que la propuesta ya señala. Por eso
+   §E es PLAUSIBLE y no VERIFICADO.
