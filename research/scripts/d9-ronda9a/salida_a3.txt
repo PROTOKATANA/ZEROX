@@ -15,3 +15,18 @@ prev() = d8_a1c_riesgo.py:29-40 (Skellam, ventaja 3k=90), F=19080 s, I=4200 s, 7
     r = alpha_f/(1-alpha_f-alpha_p);  en prev() se implementa con hf = (1-alpha_f-alpha_p)/(1-alpha_f)
  alpha_p | frontera para el atacante |  suma alpha_f+alpha_p |  r = 1 en
       0% |                 46.8784% |             46.8784% |     >0,50
+     10% |                 42.0270% |             52.0270% |    0.4500
+     20% |                 37.1840% |             57.1840% |    0.4000
+     33% |                 30.9036% |             63.9036% |    0.3350
+
+--- union a 10 anos en los alphas de operacion, con delta = 0 ---
+ alpha |   p_F por epoca   union 10 anos       r | union con delta_D8
+  0.00 |       0.000e+00       0.000e+00   0.000 |          0.000e+00
+ 0.100 |       0.000e+00       0.000e+00   0.111 |          0.000e+00
+ 0.250 |       0.000e+00       0.000e+00   0.333 |         7.502e-279
+ 0.330 |      5.098e-216      3.828e-211   0.493 |         2.059e-103
+ 0.350 |      6.431e-189      4.829e-184   0.538 |          4.048e-45
+ 0.370 |      1.595e-162      1.198e-157   0.587 |          1.799e-04
+ 0.400 |      5.447e-124      4.090e-119   0.667 |          1.471e-05
+ 0.450 |       1.028e-39       7.721e-35   0.818 |          0.000e+00
+ 0.469 |       2.155e-15       1.618e-10   0.883 |          0.000e+00
