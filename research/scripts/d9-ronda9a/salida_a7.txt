@@ -1,0 +1,43 @@
+=== A7 · frontera, version rapida CONTRASTADA contra el prev() de D8 ===
+
+--- control 0: prev_rapido == prev_lento? (el prev_lento es literal de D8) ---
+  alpha      hf |     prev lento    prev rapido     err rel
+  0.000   1.000 |   0.000000e+00   0.000000e+00    0.00e+00
+  0.100   1.000 |   0.000000e+00   0.000000e+00    0.00e+00
+  0.250   1.000 |   0.000000e+00   0.000000e+00    0.00e+00
+  0.330   1.000 |  5.097955e-216  5.097955e-216    1.26e-16
+  0.350   1.000 |  6.431043e-189  6.431043e-189    0.00e+00
+  0.400   1.000 |  5.446514e-124  5.446514e-124    1.54e-16
+  0.450   1.000 |   1.028306e-39   1.028306e-39    1.59e-16
+  0.469   1.000 |   2.154578e-15   2.154578e-15    0.00e+00
+  0.490   1.000 |   2.862133e-02   2.862133e-02    0.00e+00
+  peor error relativo sobre las 27 combinaciones: 1.000e+00  ->  NO VALE
+  (rejilla del barrido: 0,001 + brentq; la frontera la refina brentq, la
+   rejilla solo tiene que ACOTAR el primer cruce)
+
+--- control 1 (positivo): reproducir los numeros YA PUBLICADOS ---
+  modelo (a) delta de D8, mismo alpha en los dos sitios : 36.5431%  (auditoria 7 publica ~36,5 %)
+  modelo (b) Lema 9 como tasa, delta = 0,2105           : 40.8378%  (rondas 3-8 publican ~40,8 %)
+  Si estos dos salen, la cadena de calculo esta validada y lo de abajo es fiable.
+
+--- LA FRONTERA, los modelos que decide esta ronda ---
+                                              modelo |  frontera 1e-10 |    r = 1 |  vs 33 %
+      (a) delta de D8, mismo alpha en los dos sitios |       36.5431% |   0.3821 |  +3.54%
+                (b) Lema 9 como tasa, delta = 0,2105 |       40.8378% |   0.4412 |  +7.84%
+  (b') delta_real = 0,267 (el que el diseno publica) |       38.9783% |   0.4230 |  +5.98%
+          (c) ATACANTE UNICO, delta = 0  <- la tesis |       46.8784% |    >0,50 | +13.88%
+
+--- (e) delta que compra un atacante de RED subiendo Delta (delta_0 de L2b) ---
+ Delta (s)  delta_0 (alpha=0) |   frontera |      r=1 |  vs 33 %
+         4             0.0000 |  46.8784% |    >0,50 | +13.88%  <- DISENO
+         8             0.0020 |  46.8268% |   0.4995 | +13.83%  <- LAGUNA de D8
+        12             0.0828 |  44.6542% |   0.4784 | +11.65%
+        16             0.2858 |  38.3337% |   0.4166 |  +5.33%
+        20             0.4428 |  32.3789% |   0.3578 |  -0.62%
+
+--- (d) parasito racional AJENO de cuota alpha_p, con delta = 0 ---
+ alpha_p |  frontera del atacante |  suma af+ap |      r=1 |  vs 33 %
+      0% |              46.8784% |     46.88% |    >0,50 | +13.88%
+     10% |              42.0270% |     52.03% |   0.4500 |  +9.03%
+     20% |              37.1840% |     57.18% |   0.4000 |  +4.18%
+     33% |              30.9036% |     63.90% |   0.3350 |  -2.10%

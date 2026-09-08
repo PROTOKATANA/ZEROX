@@ -6,3 +6,12 @@ prev() = d8_a1c_riesgo.py:29-40 (Skellam, ventaja 3k=90), F=19080 s, I=4200 s, 7
 
                                           modelo | frontera 1e-10 |    r = 1
   (a) delta de D8, mismo alpha en los dos sitios |      36.5431% |   0.3821
+            (b) Lema 9 como tasa, delta = 0,2105 |      40.8378% |   0.4412
+         (b') delta_real = 0,267 (el del diseno) |      38.9783% |   0.4230
+                   (c) atacante unico, delta = 0 |      46.8784% |    >0,50
+                     (e) delta = delta_0 natural |      46.8784% |    >0,50
+
+--- (d) delta = 0 + PARASITO AJENO alpha_p: la tasa publica baja a 1-alpha_f-alpha_p ---
+    r = alpha_f/(1-alpha_f-alpha_p);  en prev() se implementa con hf = (1-alpha_f-alpha_p)/(1-alpha_f)
+ alpha_p | frontera para el atacante |  suma alpha_f+alpha_p |  r = 1 en
+      0% |                 46.8784% |             46.8784% |     >0,50

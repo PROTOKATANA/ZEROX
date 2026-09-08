@@ -517,7 +517,30 @@ llegar al 33 %. Con R-FIN-8 vigente (que **no** paga rojos) ese tercero sí gana
 escenario es real; **con R-FIN-8′ deja de serlo.** Eso convierte P1 de «palanca barata» en
 **precondición de la frontera de 46,9 %**, y hay que escribirlo así.
 
-### 5.4 · La palanca que SÍ existe, y que no es el espacio: `Δ` · **LAGUNA**
+### 5.4 · Contraste cruzado: tres implementaciones, y el control positivo cazándome a mí
+
+La frontera se calculó con **tres códigos independientes** que comparten solo el `prev()` de D8:
+
+| | `salida_a6.txt` (mío, `prev` literal) | `salida_a7.txt` (mío, soporte restringido) | `salida_a3.txt` (heredado, `prev` literal) |
+|---|---:|---:|---:|
+| (a) `δ` de D8, mismo `α` dos veces | — | **36,5431 %** | **36,5431 %** |
+| (b) Lema 9 como tasa, `δ = 0,2105` | — | **40,8378 %** | **40,8378 %** |
+| (b′) `δ_real = 0,267` | — | 38,9783 % | 38,9783 % |
+| **(c) `δ = 0`** | **46,8784 %** | **46,8784 %** | **46,8784 %** |
+| (e) `δ = δ₀` natural (`Δ=4`) | 46,8784 % | 46,8784 % | 46,8784 % |
+| (d) `α_p = 10/20/33 %` | 42,0270 / 37,1840 / 30,9036 % | idénticos | 46,8784 % en `α_p=0` ✓ |
+
+**El control positivo del encargo (regla 4) es el (a) y el (b): reproducen los 36,5 % de la auditoría 7
+y los 40,8 % de las rondas 3-8, números ya publicados antes de esta ronda.** La cadena de cálculo está
+validada contra dos resultados externos, y solo entonces se lee el (c).
+
+**El control 0 de A7 (`prev_rapido == prev_lento`) marca 4 combinaciones de 27.** Las cuatro —
+`(α=0,45; hf=0,70)`, `(0,469; 0,70)`, `(0,49; 0,70)`, `(0,49; 0,7895)` — tienen `r = α/((1−α)hf) > 1`,
+donde `prev()` **no es una probabilidad** sino el artefacto del recorte a `r^700` que D8 ya declaró.
+Ningún punto de frontera cae ahí: la más alta es `r → 0,5` y la más baja `r = 0,382`. En las 23
+combinaciones con `r < 1` las dos implementaciones coinciden a **1,6·10⁻¹⁶** (épsilon de máquina).
+
+### 5.5 · La palanca que SÍ existe, y que no es el espacio: `Δ` · **LAGUNA**
 
 Con el `δ₀` **medido** en L2b a `α = 0` (no con la cola de Poisson, que sobreestima: a `Δ = 16` da 0,59
 frente a 0,286 medido):
