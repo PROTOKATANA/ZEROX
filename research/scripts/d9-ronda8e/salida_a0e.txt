@@ -1,0 +1,23 @@
+=== A0e · el PUNTO DE DISEÑO con la ventana LLENA (horizonte 6 000 s) ===
+k=30, mp=15, W=3083 s, gamma=0,25, u3_mode=dynamic, 4 semillas.
+Prediccion de dag-poas-empalme-peso.md §2 sobre este horizonte: s_nota = 0.00638
+
+(1) COBERTURA y epsilon REALES en el punto de diseño, con adversario
+         pol  ret  cop  alpha |  n bloq  retarg  peso!=1     w!=   sp!=  sort!= |  sd(ln w)         rango ln w |  w at/w hon
+        tips    0    0   0.00 |    5977   11565    11565    9452      0       0 |   0.00464 [-0.0038, +0.0158] |         nan
+        tips    0    0   0.25 |    5977   11577    11577    3732      0       0 |   0.00462 [-0.0040, +0.0158] |     0.99983
+        tips    0    0   0.40 |    5977   11579    11579    3128      0       0 |   0.00461 [-0.0040, +0.0158] |     0.99985
+('retro', 8)    0    0   0.00 |    5977   11565    11565    9452      0       0 |   0.00464 [-0.0038, +0.0158] |         nan
+('retro', 8)    0    0   0.25 |    5977   11536    11536    9825    136     185 |   0.03364 [-0.0770, -0.0000] |     1.00110
+('retro', 8)    0    0   0.40 |    5977   11509    11509    9789    146      77 |   0.05426 [-0.1176, -0.0000] |     1.00199
+        tips   40    0   0.00 |    5977   11565    11565    9452      0       0 |   0.00464 [-0.0038, +0.0158] |         nan
+        tips   40    0   0.25 |    5977   11566    11566   10026    128     228 |   0.00696 [-0.0208, -0.0000] |     1.00065
+        tips   40    0   0.40 |    5977   11568    11568    9353      9      29 |   0.00235 [-0.0076, +0.0105] |     1.00066
+('retro', 1)    0    2   0.00 |    5977   11565    11565    9452      0       0 |   0.00464 [-0.0038, +0.0158] |         nan
+('retro', 1)    0    2   0.25 |    8939   17193    17193    9790    198     874 |   0.00461 [-0.0041, +0.0159] |     0.99985
+('retro', 1)    0    2   0.40 |   10752   20663    20663    9643    234     855 |   0.00449 [-0.0042, +0.0154] |     0.99987
+
+(2) [NO EJECUTADA AQUI] El menu profundo se corre en r8e_a0f_menu_prof.py (paralelo por alpha):
+    ver salida_a0f_0.0.txt, salida_a0f_0.25.txt, salida_a0f_0.40.txt. Este proceso se detuvo
+    a proposito tras la parte (1) para no duplicar cómputo.
+        configuracion  alpha |  m_BS medio  m_BS max |   sp!=   peso!=1  P (posicion)

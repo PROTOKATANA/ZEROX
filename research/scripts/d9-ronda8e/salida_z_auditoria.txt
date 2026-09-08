@@ -1,0 +1,23 @@
+=== Z · lectura de las marcas de AUDITA_SCRIPTS.py ===
+
+[T2] r8e_lib.py L164 — ¿se ejecuta el camino de MAS DE UNA frontera de golpe?
+  W (s)  alpha |  cruces de 1 frontera   cruces de >1 (camino T2)
+     20   0.00 |                   559                          0
+     20   0.25 |                   201                          0
+     20   0.40 |                   149                          0
+     80   0.00 |                   111                          0
+     80   0.25 |                    51                          0
+     80   0.40 |                    33                          0
+   3083   0.00 |                     0                          0
+   3083   0.25 |                     0                          0
+   3083   0.40 |                     0                          0
+
+  -> el camino marcado por T2 se ejecuta 0 veces en total.
+     Si es 0, la marca es doblemente inocua: ni es un payoff cableado ni corre.
+
+[T3] r8e_a3_lema9.py L118-119 — `x == x` es el descarte de NaN, no tautologia:
+     v=   1.0  ->  (v == v) = True   math.isnan(v) = False
+     v=   nan  ->  (v == v) = False   math.isnan(v) = True
+     v=   0.0  ->  (v == v) = True   math.isnan(v) = False
+     v=   inf  ->  (v == v) = True   math.isnan(v) = False
+     El filtro `[r for r in rs if r[2] == r[2]]` descarta EXACTAMENTE los NaN.

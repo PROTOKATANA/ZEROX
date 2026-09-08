@@ -1,0 +1,2 @@
+               peso 1   0.40 | m_BS medio    2.83  max   4 | sp!=     0  sort!=     0  peso!=1       0 | P medio    2362  bloques del atacante en la banda  22.7
+  desliz W=3083 g=.25   0.40 | m_BS medio    2.83  max   4 | sp!=     1  sort!=    21  peso!=1   43240 | P medio    2362  bloques del atacante en la banda  22.7
