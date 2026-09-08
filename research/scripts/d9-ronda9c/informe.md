@@ -391,3 +391,93 @@ nadie escribió, y que se viola si `I` baja a ~460 s.
 > retardada** —`entropía_j = VDF(chunk(I_j) ‖ salida(I_j), L·iteraciones)`, revelada en `t_j`—
 > reduce esa ventaja a `I` y hace `n_eval = 0` para cualquier `ρ`, al coste de un VDF adicional.
 > Queda como **opción**, no como núcleo.
+
+---
+
+## C · La ventana de decisión `W_dec` — MEDIDA
+
+### C.0 · Definición formal
+
+`I_j` es función de la cadena seleccionada final. Se define
+
+> `W_dec` = el mayor `d` tal que existe una **acción del atacante tomada en `T_j + d`** —con
+> **prefijo común**: todo lo anterior a `T_j + d` idéntico entre las ramas— que cambia `I_j`.
+> `W_dec = −1` si ninguna decisión posterior a `T_j` cambia el ancla.
+
+Vías medidas: **(i)** retener candidatos propios y **liberar uno** en `T_j+d`;
+**(ii)** construir una cadena privada desde `T_j − P` (`P ∈ {0,30,90}`) y **soltarla o no** en `T_j+d`.
+
+### C.1 · Tres instrumentos, y dos errores míos por el camino (regla 10)
+
+| Versión | Error | Resultado (inválido / válido) |
+|---|---|---|
+| `r9c_c1_wdec.py` | **`menu ∪ {base}`**: `base` no comparte prefijo (no retiene nada), así que el contraste mezclaba una decisión de `T_j` con una de `T_j+d` | `W_dec` **saturaba la rejilla** (300 s) para `α ≥ 0,25`. **INVÁLIDO** |
+| `r9c_c2_wdec.py` 1ª pasada | **el atacante «retenía» un bloque y publicaba un HIJO suyo.** En la red real publicar el hijo publica al padre (nadie valida sin él). Diagnosticado en `r9c_c3_diag.py`: el bloque que volteaba el ancla a `d = 600` era siempre el **primero** del lote, y estaba en la cadena final porque un hijo suyo, no retenido, lo arrastraba | `W_dec` = 600 s (saturada). **INVÁLIDO**. Corregido en `r9c_lib.py` con la **clausura de publicación** (`llega[ancestro] ← min(...)`, 994-1 021 disparos por corrida) |
+| `r9c_c2` 2ª pasada | consistente pero **sobre-corregida**: retiene la ventana entera (el atacante tira todos sus bloques) | `W_dec ≤ 20 s`. Válida como **cota inferior** |
+| **`r9c_c4_wdec.py`** | prefijo común barato: candidatos retenidos, **el resto del atacante en `tips_pub`** (cuelga solo de bloques ya publicados, así no delata a ninguno) | **VÁLIDA** |
+
+> **Aviso para las rondas anteriores.** La clausura de publicación **no está** en `r8c_sim.py`
+> (D9-c…D9-f) ni en `d8_lib.py`. Toda `m` medida allí «con retención» puede estar inflada por el
+> mismo artefacto — el atacante retiene un bloque y publica un descendiente. **No lo he
+> cuantificado**: queda como LAGUNA para quien revise D8 A4.2 (`m = 2,822`) y D9-f (`m = 3,64`).
+
+### C.2 · Resultado (`r9c_c4_wdec.py`, `salida_c4.txt`; 12 semillas, `TJ = 200`, horizonte 1 000 s)
+
+| `α` | `W_dec(i)` med / p90 / max | `W_dec(ii)` med / p90 / max | **unión** med / p90 / **max** | `T*` teórico `k/(1−2α)` |
+|---:|---:|---:|---:|---:|
+| **0,00** | −1 / −1 / **−1** | −1 / −1 / **−1** | −1 / −1 / **−1** | 30 |
+| 0,10 | −1 / −1 / 10 | 0 / 10 / 10 | 0 / 10 / **10** | 38 |
+| 0,25 | −1 / 10 / 20 | −1 / 0 / 10 | 0 / 10 / **20** | 60 |
+| 0,33 | −1 / 20 / 20 | −1 / 20 / 20 | 10 / 20 / **20** | 88 |
+| 0,40 | 10 / 20 / 20 | 10 / 45 / 45 | 10 / 45 / **45** | 150 |
+
+**Idéntica con `S_max = 20 s` y con `S_max = 150 s`** (las dos mitades de `salida_c4.txt` coinciden
+fila a fila). **`S_max` no es lo que cierra la ventana** — a `λ = 1` y `τ = 1 s` el salto natural de
+slot en la cadena es de 1-3 s, y un bloque retenido 20 s ya es inextensible con las dos.
+Lo que la cierra es **la carrera**: `W_dec ≈ 10-45 s`, por debajo de `T* = k/((1−2α)λ) = 38-150 s`
+(la cota es cota, no realidad — regla 6).
+
+**El menú por instante de decisión** (`m(d)` medio, vía i, `S_max=150`):
+
+| `α` | d=0 | **d=10** | d=20 | d=45 | d=80 | … | d=450 |
+|---:|---:|---:|---:|---:|---:|---|---:|
+| **0,00** | 1,00 | **1,00** | 1,00 | 1,00 | 1,00 | | 1,00 |
+| 0,10 | 1,00 | **1,17** | 1,00 | 1,00 | 1,00 | | 1,00 |
+| 0,25 | 1,00 | **1,42** | 1,08 | 1,00 | 1,00 | | 1,00 |
+| 0,33 | 1,00 | **1,58** | 1,17 | 1,00 | 1,00 | | 1,00 |
+| 0,40 | 1,00 | **1,83** | 1,25 | 1,00 | 1,00 | | 1,00 |
+
+El menú vive **en los primeros 10-20 s** tras `T_j` y está **cerrado a los 45 s**.
+
+**Cobertura de rama** (`r9c_c4`): `sp_filtrado_h = 90`, `sin_sp_h = 180`,
+`clausura_publicacion = 994`, `tips_pub = 3 394 962`, `menu_ge2 = 42`, `menu_ii_ge2 = 64`,
+`anc_atac = 3 186`, `anc_hon = 10 774`, `recortes = 610` (el tope de 10 candidatos mordió),
+`runs = 13 960`. **No ejercitadas: `sp_filtrado_a = 0`, `sin_sp_a = 0`** — se declaran.
+`rfin1a_ok = 0` aquí porque la comprobación de R-FIN-1a corre en `r9c_c0` (751 053 aristas, 0
+violaciones), no en este script.
+
+**Veredicto C: VERIFICADO — y a favor de P4, con más margen del que P4 pedía.**
+`W_dec ≤ 45 s` medida (≤ 20 s para `α ≤ 0,33`), no los 150 s de `S_max`.
+**LAGUNA declarada:** el tope de 10 candidatos y la rejilla `{0,10,20,45,…}` acotan la resolución;
+`W_dec` real está en `(20, 45]` a `α = 0,40`, no medida más fina.
+
+### C.3 · La tabla P3 con la `W_dec` medida (`r9c_d2_final.py`, `salida_d2.txt`)
+
+`m_dis = 2,955`, `α_cal = 0,10`, `α_ev = 0,33`, `W/κ = 1,22`, `A* = 4,1 h` (esc. B, plotter 10×):
+
+| lectura | `g` | `I` | `F` | `I+F` | `α_ef(m=2,955)` | `α_ef(m=151)` | margen |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **LIBRE (publicado hoy)** | 3,6 % | 5 362 s | **6,77 h** | 8,26 h | 33,44 % | 34,39 % | **0,50×** |
+| `n_eval = 20` (`W_dec=20`, `ρ=1`) | 3,6 % | 327 s | 0,41 h | 0,50 h | 33,44 % | 34,39 % | 8,13× |
+| **`n_eval = 45`** (`W_dec=45`, `ρ=1`) | **3,6 %** | **491 s** | **0,62 h** | **0,76 h** | 33,44 % | 34,39 % | **5,42×** |
+| `n_eval = 68` (`W_dec=45`, `ρ=1,5`) | 3,6 % | 602 s | 0,76 h | 0,93 h | 33,44 % | 34,39 % | 4,42× |
+| `n_eval = 135` (`W_dec=45`, `ρ=3`) | 3,6 % | 851 s | 1,07 h | 1,31 h | 33,44 % | 34,39 % | 3,13× |
+
+**`I+F` cae de 8,26 h a 0,76-1,31 h y el margen económico de 0,50× (insuficiente) a 3,1-5,4×.**
+
+> **AVISO IMPORTANTE, que P4 no dice.** Con la pinza del steering desactivada, **`F` deja de estar
+> fijada por el steering y pasa a estarlo por la carrera**: D8 midió `F_min(α=0,35) = 0,34 h` con
+> `δ = 0` y **1,85 h** con el `δ` pesimista (`dag-poas-tras-d8-palancas.md` §2 P3). `F = 0,62 h`
+> **estaría por debajo** de ese segundo valor. La constante que hay que fijar es
+> `F = max(F_carrera, I/(W/κ−1))`, y con P4 el primer término manda. **No es «F = 0,62 h»: es
+> «F ya no lo decide el steering».** Eso, y solo eso, es lo que P4 compra en `F`.

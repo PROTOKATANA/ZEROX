@@ -46,7 +46,8 @@ COB = {
     "retenidos": 0,
     "liberados": 0,
     "rfin1a_ok": 0,
-    "clausura_publicacion": 0,         # aristas de cadena comprobadas y validas
+    "clausura_publicacion": 0,
+    "tips_pub": 0,         # aristas de cadena comprobadas y validas
 }
 
 
@@ -125,7 +126,15 @@ class MundoR9(Mundo):
                 if retraso > 0:
                     COB["liberados"] += 1
                 todos = list(llega.keys()) if self.atacante_sin_retardo else visibles
-                if pol == "tips":
+                if pol == "tips_pub":
+                    # El atacante ve todo (paper L1024-1027) pero ELIGE no colgar de sus
+                    # bloques aun no publicados, para no delatarlos por clausura. Es lo que
+                    # hace consistente una estrategia de retencion de UN candidato.
+                    COB["tips_pub"] += 1
+                    padres = self._padres_r1a(d, visibles, t, "a")
+                    if padres is None:
+                        continue
+                elif pol == "tips":
                     padres = self._padres_r1a(d, todos, t, "a")
                     if padres is None:
                         continue
