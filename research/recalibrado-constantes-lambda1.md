@@ -225,9 +225,25 @@ simétrico**, y por eso el óptimo está cerca del extremo rápido. A 300 la cap
 22 800 años y la ráfaga más alta pedida se absorbe en siete minutos y medio con 127 000 transacciones en cola
 en el peor instante.
 
-**Recomendación del principal, corregida: `N_CORTO = 300`** (propuesto por Katana; la primera versión decía
-1 000, que compra seguridad que ya no hace falta a cambio de cuatro veces más cola). 200 es el suelo admisible.
-Es una constante de consenso (entra en C-WGT-06): cambiarla después es hard fork.
+**Contra atacantes mayores que el 33 %**, que el consenso tolera hasta la frontera del 46,9 %, la captura se
+desploma (binomial exacta; «extra» = episodios × cuota × N × 4,9 MB; «base» = lo que ya rellena gratis en la zona
+libre, cuota × 100 KB × 31,5 M bloques):
+
+| `N_CORTO` | Captura al 40 % | Captura al 45 % | Extra/año al 45 % | Base gratis al 45 % |
+|---:|---:|---:|---:|---:|
+| 200 | cada día | cada 48 min | ~5 TB | 1,42 TB |
+| 300 | cada 19 días | cada 2,3 h | 2,5 TB | 1,42 TB |
+| **1 000** | nunca | **cada 17 días** | **47 GB (+3 %)** | 1,42 TB |
+| 3 000 | nunca | cada 5 000 años | 0 | 1,42 TB |
+
+A partir del 47 % la captura es continua con cualquier `N_CORTO` razonable, pero ese atacante ya gana la carrera
+de bloques: la ventana se dimensiona para resistir hasta donde resiste el consenso, ni más ni menos. El ataque no
+da tokens (el subsidio no crece con el bloque): es *griefing*, coste de disco impuesto a los demás.
+
+**DECIDIDO (Katana, 2026-09-10): `N_CORTO = 1 000`.** 25 minutos de absorción en el peor escalón imaginable (que
+con el marketplace por canales no llega a la cadena base), a cambio de que la ventana corta resista al mismo
+adversario que el resto del diseño. La recomendación de 300 de la versión anterior valía solo contra el adversario
+del 33 %. Aplicado en SPEC, código y tests diferenciales.
 
 **BIFURCACIÓN DE KATANA (decisión 3).**
 
