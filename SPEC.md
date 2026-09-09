@@ -947,7 +947,12 @@ MAX_TX_WEIGHT = 100 000      // bytes — igual a ZONA_LIBRE, ver C-WGT-11
 > tiempo**: `N_LARGO` × 120; `ZONA_LIBRE` se mantiene por decisión de Katana (absorbe el objetivo de
 > 1 280 tx/s con 22× de margen y conserva la economía antispam; subirla abarata inflar la cadena como
 > `1/ZONA_LIBRE²`). `N_CORTO = 1 000` (Katana, 2026-09-10): la sobrecarga absorbe una ráfaga de 1 280 tx/s en
-> 25 min (cola máxima 423 000 tx), y la ventana resiste al mismo adversario que el consenso: un atacante la
+> **25:02 de media, con desviación típica de 39 s** —los bloques son un proceso de Poisson, no un reloj: el 68 % de
+> los episodios caen entre 24:23 y 25:41— y cola máxima de 423 000 tx. El tiempo es el de esa ráfaga concreta: con
+> 600 tx/s son 16:42 y con 2 500, 35:11. Los tres momentos: el límite se dobla a los 8:21, cubre la demanda a los
+> 16:41 y la cola se vacía a los 25:02 (`verif_n_corto_exacto.py`). Fijar la constante a 998 o 999 movería la media
+> un segundo dentro de una franja de ±39 s: no se hizo.
+> Además, cola máxima 423 000 tx, y la ventana resiste al mismo adversario que el consenso: un atacante la
 > captura por azar nunca al 33-40 % y cada 17 días al 45 % (+3 % sobre lo que ya rellena gratis en la zona
 > libre); a partir del 47 % la captura es continua, pero ahí ya gana la carrera de bloques (frontera 46,9 %).
 > Con 100 la capturaba cada 8 días al 33 %; con 300, cada 2,3 h al 45 %; con 12 000 (la lectura en tiempo) la
