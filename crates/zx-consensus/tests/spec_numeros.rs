@@ -34,9 +34,7 @@
 use zx_consensus::emision::COINBASE_MATURITY;
 use zx_consensus::fork_choice::MAX_REORG_LENGTH;
 use zx_consensus::peso::{N_LARGO, ZONA_LIBRE};
-use zx_core::preimage::block::{
-    OFFSET_NONCE_CABECERA, OFFSET_NONCE_PREIMAGEN, TAMANO_CABECERA, TAMANO_PREIMAGEN_POW,
-};
+use zx_core::preimage::block::TAMANO_CABECERA;
 
 /// El SPEC, incrustado en el binario de test.
 const SPEC: &str = include_str!("../../../SPEC.md");
@@ -175,10 +173,10 @@ fn el_spec_dice_las_cifras_reales_del_transporte() {
 #[test]
 fn el_spec_dice_la_profundidad_real_de_reorg() {
     assert_eq!(MAX_REORG_LENGTH, COINBASE_MATURITY - 1);
-    assert_eq!(MAX_REORG_LENGTH, 99);
+    assert_eq!(MAX_REORG_LENGTH, 11_999);
 
     afirma(
-        "MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 99 bloques",
+        "MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 11 999 bloques",
         "la relación entre las dos constantes, no solo el número: si cambia la madurez, cambia esto",
     );
 }
@@ -187,14 +185,20 @@ fn el_spec_dice_la_profundidad_real_de_reorg() {
 #[test]
 fn el_spec_dice_los_parametros_reales_de_peso() {
     assert_eq!(ZONA_LIBRE, 100_000);
-    assert_eq!(N_LARGO, 262_800, "un año a 120 s");
+    assert_eq!(N_LARGO, 31_536_000, "un año a λ = 1 bloque/s");
 
-    // 262 800 × 120 s = 31 536 000 s = 365 días exactos.
-    assert_eq!(N_LARGO as u64 * 120, 365 * 24 * 60 * 60);
+    // 31 536 000 × 1 s = 365 días exactos.
+    assert_eq!(N_LARGO as u64, 365 * 24 * 60 * 60);
 
-    afirma("262 800", "N_LARGO, la ventana de la mediana larga");
-    afirma("ZONA_LIBRE    = 100 000", "es constante de consenso: va en texto normativo, no en una nota");
-    afirma_ilustrativa("100 KB", "la forma legible de ZONA_LIBRE, para leer el SPEC sin calculadora");
+    afirma("31 536 000", "N_LARGO, la ventana de la mediana larga");
+    afirma(
+        "ZONA_LIBRE    = 100 000",
+        "es constante de consenso: va en texto normativo, no en una nota",
+    );
+    afirma_ilustrativa(
+        "100 KB",
+        "la forma legible de ZONA_LIBRE, para leer el SPEC sin calculadora",
+    );
 }
 
 /// El checkpoint firmado (SPEC §12.1, DECISIONES.md §25).
@@ -207,9 +211,13 @@ fn el_spec_dice_los_parametros_reales_de_peso() {
 /// Así que aquí no se comprueba solo que el número esté: se comprueba que **la etiqueta en petabytes
 /// no pueda volver a mentir**, rederivando el espacio desde el rango.
 #[test]
+#[expect(
+    clippy::integer_division,
+    reason = "rederiva pieces_to_solution_range con el truncamiento entero de solutions.rs:30-40"
+)]
 fn el_umbral_del_checkpoint_dice_el_espacio_que_dice() {
     const UMBRAL: u64 = 90_185_365;
-    const CADUCIDAD: u64 = 525_600;
+    const CADUCIDAD: u64 = 63_072_000;
 
     // pieces_to_solution_range invertida, con el orden EXACTO de solutions.rs:30-40.
     // Se rederiva aquí en vez de importarse: si alguien cambia la fórmula, este test debe romperse.
@@ -234,10 +242,17 @@ fn el_umbral_del_checkpoint_dice_el_espacio_que_dice() {
          donde forjar todavía cuesta menos que verificar, que es justo lo que §25 descartó."
     );
 
-    assert_eq!(CADUCIDAD * 120, 63_072_000, "525 600 bloques son dos años exactos a T = 120 s");
+    assert_eq!(
+        CADUCIDAD,
+        2 * 365 * 24 * 60 * 60,
+        "63 072 000 bloques son dos años exactos a λ = 1 bloque/s (eran 525 600 a T = 120 s)"
+    );
 
     afirma("90 185 365", "UMBRAL_CHECKPOINT, SPEC §12.1");
-    afirma("525 600", "ALTURA_CADUCIDAD, SPEC §12.1 — literal, NO 2·N_LARGO");
+    afirma(
+        "63 072 000",
+        "ALTURA_CADUCIDAD, SPEC §12.1 — literal, NO 2·N_LARGO",
+    );
     no_reaparece(
         &["90 185 375 997", "2 · N_LARGO"],
         "el umbral estuvo mil veces bajo y la caducidad colgaba de N_LARGO, que un network \

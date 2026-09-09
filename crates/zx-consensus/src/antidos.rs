@@ -33,10 +33,13 @@ use primitive_types::U256;
 /// de la punta**, que son sucesos normales cada vez que dos mineros aciertan casi a la vez. La
 /// holgura las admite.
 ///
-/// 144 es el valor de Bitcoin Core (`GetAntiDoSWorkThreshold`), donde equivale a un día. En ZEROX,
-/// con bloques de 120 s, son **4,8 horas** — más que suficiente para cualquier reorganización
-/// honesta, y muy por debajo de `MAX_REORG_LENGTH = 99`… que en realidad es **menor**: la holgura
-/// nunca será el factor limitante, porque el nodo se para antes por C-REORG-07.
+/// 144 es el valor de Bitcoin Core (`GetAntiDoSWorkThreshold`), donde equivale a un día. En ZEROX
+/// a `T = 120 s` eran **4,8 horas**, más que `MAX_REORG_LENGTH = 99`, así que la holgura nunca era
+/// el factor limitante.
+///
+/// ⚠️ **A `λ = 1 bloque/s` son 144 segundos**, y `MAX_REORG_LENGTH` pasó a 11 999 (P-041): la relación
+/// se invierte. Esta constante es del umbral de trabajo de PoW (C-NET-04), que el DAG sustituye por
+/// el coste de verificación del PoT por slot; su recalibrado va con C-NET-03/04 en P-041, no aquí.
 pub const HOLGURA_BLOQUES: u32 = 144;
 
 /// Trabajo mínimo absoluto que cualquier cadena candidata **MUST** demostrar.

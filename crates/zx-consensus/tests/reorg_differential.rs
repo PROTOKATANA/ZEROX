@@ -20,8 +20,8 @@
 
 use zx_consensus::fork_choice::ClaveVentana;
 use zx_consensus::peso::{
-    MedianaLarga, N_CORTO, ZONA_LIBRE, limite, mediana_corta, mediana_efectiva, mediana_larga,
-    peso_largo_plazo,
+    MedianaLarga, N_CORTO, ZONA_LIBRE, get_mid, limite, mediana_corta, mediana_efectiva,
+    mediana_larga, peso_largo_plazo,
 };
 use zx_core::digest::{BlockHash, Digest};
 
@@ -91,12 +91,27 @@ impl Cadena {
     ///
     /// Cada `lt_weight` depende de la `Mlt` vigente en su momento, así que la secuencia entera
     /// depende de la rama. No se puede reutilizar la de otra rama aunque las alturas coincidan.
+    ///
+    /// La mediana de cada paso se lee de una copia **ordenada** que se mantiene por inserción
+    /// binaria: con `MAX_REORG_LENGTH = 11 999` a `λ = 1`, reordenar el prefijo entero en cada paso
+    /// haría el test cuadrático-logarítmico. Es la misma mediana entera de C-WGT-03 (`get_mid`).
     fn ventana_larga(&self) -> Vec<u64> {
         let mut mlt = ZONA_LIBRE;
         let mut lt = Vec::with_capacity(self.0.len());
+        let mut ordenados: Vec<u64> = Vec::with_capacity(self.0.len());
         for e in &self.0 {
-            lt.push(peso_largo_plazo(e.peso, mlt));
-            mlt = mediana_larga(&lt).unwrap();
+            let w = peso_largo_plazo(e.peso, mlt);
+            lt.push(w);
+            let pos = ordenados.partition_point(|&v| v <= w);
+            ordenados.insert(pos, w);
+            let n = ordenados.len();
+            let en = |i: usize| ordenados.get(i).copied().unwrap();
+            let mediana = if n % 2 == 1 {
+                en(n / 2)
+            } else {
+                get_mid(en(n / 2 - 1), en(n / 2))
+            };
+            mlt = mediana.max(ZONA_LIBRE);
         }
         lt
     }
@@ -230,14 +245,15 @@ fn un_reorg_al_limite_de_profundidad_tampoco_desincroniza() {
     use zx_consensus::fork_choice::MAX_REORG_LENGTH;
 
     let profundidad = usize::try_from(MAX_REORG_LENGTH).unwrap();
-    let base = tronco(300, ZONA_LIBRE);
+    let alto = profundidad + 300;
+    let base = tronco(alto, ZONA_LIBRE);
 
-    let mut rama_b = base.truncar(300 - profundidad);
+    let mut rama_b = base.truncar(alto - profundidad);
     for _ in 0..profundidad {
         rama_b.empujar(ZONA_LIBRE / 4);
     }
 
-    let mut limpio = tronco(300 - profundidad, ZONA_LIBRE);
+    let mut limpio = tronco(alto - profundidad, ZONA_LIBRE);
     for _ in 0..profundidad {
         limpio.empujar(ZONA_LIBRE / 4);
     }

@@ -47,11 +47,16 @@ use zx_consensus::peso::MedianaLarga;
 
 /// Peso de la transacción de referencia que calibra el nivel absoluto de la tarifa.
 ///
-/// 🔶 **P-011b: valor de Monero adoptado como punto de partida.** Fijarlo para ZEROX requiere un
-/// modelo explícito de coste de atacante — encargo abierto para D2 y D8. Con este valor, una
-/// transparente típica de ~350 B paga ≈0,0032 ZZK y sostener 100 KB/bloque de spam cuesta
-/// ≈656 ZZK/día.
-pub const REF_WEIGHT: u128 = 3_000;
+/// 🔶 **P-011b: el valor de Monero (3 000) se adoptó como punto de partida.** Fijarlo para ZEROX
+/// requiere un modelo explícito de coste de atacante — encargo abierto para D2 y D8.
+///
+/// **Recalibrado 2026-09-09 (P-041) a `384 000 = 3 000 × 128`.** La tarifa escala con
+/// `recompensa_base`, y al dividir la recompensa por 128 para `λ = 1 bloque/s` el antispam se
+/// debilitaba en el mismo factor. Con 384 000 se conserva el coste del atacante del diseño original:
+/// inflar 1 GB de cadena cuesta 543 590 ZZK al lanzamiento. Una transparente típica de ~350 B paga
+/// ≈0,19 ZZK al lanzamiento y ≈0,0034 ZZK en régimen de cola; sostener 100 KB/bloque de spam cuesta
+/// ≈4,7 M ZZK/día al lanzamiento y ≈84 000 ZZK/día en la cola (86 400 bloques/día).
+pub const REF_WEIGHT: u128 = 384_000;
 
 /// Cuantización de la tarifa, en brek.
 ///
@@ -270,11 +275,12 @@ mod tests {
 
     /// **La tarifa varía ~60× a lo largo de la vida de la cadena, y conviene saberlo.**
     ///
-    /// La tarifa escala con la recompensa base, que cae de `1,9·10¹¹` brek en el lanzamiento a
-    /// `3,2·10⁹` en régimen de cola. Con la mediana en el suelo, una transparente típica de 350 B
-    /// paga **0,19 ZZK al lanzamiento** y **0,0032 ZZK en la cola**.
+    /// La tarifa escala con la recompensa base, que cae de `1,49·10⁹` brek en el lanzamiento a
+    /// `2,67·10⁷` en régimen de cola (recalibrado 2026-09-09 para `λ = 1`; a `T = 120 s` eran
+    /// `1,9·10¹¹` y `3,2·10⁹`, y la razón es la misma). Con la mediana en el suelo, una transparente
+    /// típica de 350 B paga **0,19 ZZK al lanzamiento** y **0,0034 ZZK en la cola**.
     ///
-    /// La cifra del SPEC (0,0032 ZZK) es la de **régimen de cola**. Este test empezó comprobándola
+    /// La cifra del SPEC (0,0034 ZZK) es la de **régimen de cola**. Este test empezó comprobándola
     /// contra la recompensa de lanzamiento y **falló**: los dos números eran correctos, pero de
     /// regímenes distintos. Ahora comprueba los dos, para que la diferencia quede visible.
     #[test]
@@ -291,7 +297,7 @@ mod tests {
         let en_la_cola = tarifa_minima(350, recompensa_base(u128::MAX / 2), m);
         assert!(
             (200_000..=500_000).contains(&en_la_cola),
-            "en la cola paga ~0,0032 ZZK; pagó {en_la_cola} brek"
+            "en la cola paga ~0,0034 ZZK; pagó {en_la_cola} brek"
         );
 
         assert!(

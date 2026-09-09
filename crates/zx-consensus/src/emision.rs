@@ -18,8 +18,8 @@
 //!
 //! # El suministro no tiene máximo
 //!
-//! A diferencia de Bitcoin, la emisión no se apaga. Tras el año ~10,15 se emiten
-//! `32 × 262 800 = 8 409 600` ZZK/año indefinidamente. Por eso ZEROX no puede tener un `MAX_MONEY`
+//! A diferencia de Bitcoin, la emisión no se apaga. Tras el año ~10,69 se emiten
+//! `26 666 666 brek × 31 536 000 ≈ 8 409 600` ZZK/año indefinidamente. Por eso ZEROX no puede tener un `MAX_MONEY`
 //! y usa `ZX_VALUE_SANITY_LIMIT` en su lugar.
 
 // C-ENC-04 prohíbe floats: toda la aritmética de aquí es entera a propósito.
@@ -35,13 +35,21 @@ use crate::peso::PesoValidado;
 pub const SOFT_CAP_BREK: u128 = 100_000_000_000_000_000;
 
 /// Desplazamiento de la curva de emisión. Constante de tiempo ≈ 2 años.
-pub const SHIFT: u32 = 19;
+///
+/// **Recalibrado 2026-09-09 (P-041) para `λ = 1 bloque/s`:** era 19 a `T = 120 s`. Sube en 7 porque
+/// `2⁷ = 128` es el entero más cercano al factor 120 de ritmo, y el calendario se estira un 5,3 %
+/// (los 1000 M se cruzan en el año 10,69 en vez del 10,15). Con 19 a `λ = 1` el techo se cruzaba en
+/// 30,9 días y la inflación perpetua era del 100,92 % anual.
+pub const SHIFT: u32 = 26;
 
-/// Cola perpetua: 32 ZZK/bloque, en brek. **Emisión nominal, no mínimo por bloque** (C-EMIT-07).
-pub const TAIL_EMISSION_BREK: u128 = 3_200_000_000;
+/// Cola perpetua: 0,26666666 ZZK/bloque (32 ZZK / 120), en brek. **Emisión nominal, no mínimo por
+/// bloque** (C-EMIT-07). A `λ = 1` son ≈ 8 409 600 ZZK/año, los mismos que 32 ZZK/bloque a `T = 120 s`.
+pub const TAIL_EMISSION_BREK: u128 = 26_666_666;
 
 /// Bloques que una salida de coinbase debe madurar antes de poder gastarse (C-EMIT-05).
-pub const COINBASE_MATURITY: u32 = 100;
+///
+/// 3,33 h a `λ = 1` (era 100 bloques a `T = 120 s`; P-041). Mayor que la finalidad del DAG, `F = 2 h`.
+pub const COINBASE_MATURITY: u32 = 12_000;
 
 /// Recompensa base del bloque de altura `H` (C-EMIT-01).
 ///
@@ -133,24 +141,33 @@ mod tests {
         COINBASE_MATURITY, SHIFT, SOFT_CAP_BREK, TAIL_EMISSION_BREK, acumular, recompensa_base,
         subsidio,
     };
-    use crate::peso::{PesoValidado, ZONA_LIBRE};
+    use crate::peso::{FACTOR_SURGE, PesoValidado, ZONA_LIBRE};
 
     const BREK_POR_ZZK: u128 = 100_000_000;
-    /// Bloques al año a 120 s.
-    const BLOQUES_ANIO: u128 = 262_800;
+    /// Bloques al año a `λ = 1 bloque/s`.
+    const BLOQUES_ANIO: u128 = 31_536_000;
 
     #[test]
     fn las_constantes_son_las_del_spec() {
         assert_eq!(SOFT_CAP_BREK / BREK_POR_ZZK, 1_000_000_000, "1000 M ZZK");
-        assert_eq!(TAIL_EMISSION_BREK / BREK_POR_ZZK, 32, "cola de 32 ZZK");
-        assert_eq!(SHIFT, 19);
-        assert_eq!(COINBASE_MATURITY, 100);
+        assert_eq!(
+            TAIL_EMISSION_BREK, 26_666_666,
+            "cola de 32/120 ZZK por bloque"
+        );
+        // La cola anual se conserva: ≈ 8 409 600 ZZK (a 1 ZZK de la cifra a 120 s).
+        let cola_anual_zzk = TAIL_EMISSION_BREK * BLOQUES_ANIO / BREK_POR_ZZK;
+        assert!(
+            (8_409_599..=8_409_600).contains(&cola_anual_zzk),
+            "{cola_anual_zzk}"
+        );
+        assert_eq!(SHIFT, 26);
+        assert_eq!(COINBASE_MATURITY, 12_000);
     }
 
     #[test]
     fn la_recompensa_inicial_es_la_documentada() {
-        // SOFT_CAP >> 19 = 190 734 863 281 brek ≈ 1907,35 ZZK
-        assert_eq!(recompensa_base(0), 190_734_863_281);
+        // SOFT_CAP >> 26 = 1 490 116 119 brek ≈ 14,90 ZZK (a T = 120 s era >> 19 = 1907,35 ZZK)
+        assert_eq!(recompensa_base(0), 1_490_116_119);
     }
 
     /// La curva decrece de forma monótona conforme se emite.
@@ -174,25 +191,28 @@ mod tests {
         assert_eq!(recompensa_base(SOFT_CAP_BREK * 10), TAIL_EMISSION_BREK);
     }
 
-    /// El cruce de la curva con la cola cae donde dice el SPEC: año ~8,16.
+    /// El cruce de la curva con la cola cae donde dice el SPEC: año ~8,56 a `λ = 1`.
     #[test]
     fn la_cola_arranca_hacia_el_anio_ocho() {
-        // La curva cae bajo la cola cuando restante >> 19 < TAIL, es decir
-        // restante < TAIL << 19.
+        // La curva cae bajo la cola cuando restante >> SHIFT < TAIL, es decir
+        // restante < TAIL << SHIFT.
         let umbral = TAIL_EMISSION_BREK << SHIFT;
         let emitido_en_el_cruce = SOFT_CAP_BREK - umbral;
 
-        // Simular hasta el cruce contando bloques.
+        // Simular hasta el cruce contando bloques. A 31,5 M bloques/año son ~270 M bloques; se
+        // avanza en tramos de 4 096 con la recompensa del primero. El error relativo del tramo es
+        // 4 096 · 2⁻²⁶ ≈ 6·10⁻⁵, muy por debajo de la tolerancia del test.
+        const TRAMO: u128 = 4_096;
         let mut emitido = 0u128;
         let mut bloques = 0u128;
-        while emitido < emitido_en_el_cruce && bloques < 5_000_000 {
-            emitido += recompensa_base(emitido);
-            bloques += 1;
+        while emitido < emitido_en_el_cruce && bloques < 400_000_000 {
+            emitido += recompensa_base(emitido) * TRAMO;
+            bloques += TRAMO;
         }
         let anios = bloques * 100 / BLOQUES_ANIO; // centésimas de año, sin floats
         assert!(
-            (790..=840).contains(&anios),
-            "cruce en el año {}, se esperaba ~8,16",
+            (840..=875).contains(&anios),
+            "cruce en el año {}, se esperaba ~8,56",
             anios
         );
     }
@@ -274,11 +294,16 @@ mod tests {
         assert_ne!(emitido, base, "MUST NOT acumular la recompensa base");
     }
 
-    /// El producto intermedio desborda `u64` con holgura: es el bug que Monero tuvo en producción.
+    /// El producto intermedio desborda `u64`: es el bug que Monero tuvo en producción.
+    ///
+    /// Con la recompensa recalibrada a `λ = 1` (14,90 ZZK, P-041) el producto **ya no desborda en el
+    /// suelo de la mediana** (`1,49·10⁹ × 10¹⁰ ≈ 1,5·10¹⁹ < u64::MAX`), pero sí en el régimen de
+    /// sobrecarga que C-WGT-08 permite, `M = FACTOR_SURGE · ZONA_LIBRE`: `1,49·10⁹ × 2,5·10¹³ ≈
+    /// 3,7·10²²`. El `u128` que C-EMIT-06 exige sigue siendo necesidad, no holgura.
     #[test]
     fn el_producto_intermedio_no_cabria_en_u64() {
         let base = recompensa_base(0);
-        let m = ZONA_LIBRE;
+        let m = FACTOR_SURGE * ZONA_LIBRE;
         let peso = validado(m + 1, m);
         let producto = base * peso.numerador_penalizacion();
         assert!(
@@ -289,11 +314,16 @@ mod tests {
         assert!(subsidio(base, peso, m).is_ok());
     }
 
-    /// Inflación perpetua: 32 ZZK × 262 800 bloques ≈ 0,84 % sobre 1000 M.
+    /// Inflación perpetua: 26 666 666 brek × 31 536 000 bloques ≈ 8 409 600 ZZK ≈ 0,84 % sobre 1000 M.
+    /// Es la misma cola anual que 32 ZZK × 262 800 bloques a `T = 120 s`, a 1 ZZK de redondeo.
     #[test]
     fn la_inflacion_perpetua_es_la_documentada() {
         let anual = TAIL_EMISSION_BREK * BLOQUES_ANIO;
-        assert_eq!(anual / BREK_POR_ZZK, 8_409_600, "8 409 600 ZZK/año");
+        let anual_zzk = anual / BREK_POR_ZZK;
+        assert!(
+            (8_409_599..=8_409_600).contains(&anual_zzk),
+            "≈ 8 409 600 ZZK/año; salió {anual_zzk}"
+        );
         // En diezmilésimas de punto porcentual, para no usar floats.
         let ppm = anual * 1_000_000 / SOFT_CAP_BREK;
         assert!(

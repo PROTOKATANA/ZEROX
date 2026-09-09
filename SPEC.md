@@ -733,7 +733,7 @@ tarifa_por_byte  = max(1, F − F/20)                                      // el
 tarifa_minima(tx)= redondear_arriba( weight(tx) · tarifa_por_byte, FEE_MASK )
 aceptar si         fee ≥ tarifa_minima − tarifa_minima/50                // colchón del 2 %
 
-REF_WEIGHT = 3000        // bytes de weight — transacción de referencia
+REF_WEIGHT = 384 000     // bytes de weight — transacción de referencia; recalibrado 2026-09-09 (P-041)
 FEE_MASK   = 10 000      // brek — cuantización de la tarifa
 ```
 
@@ -770,12 +770,12 @@ de prioridades sigue existiendo por encima del mínimo.
 
 #### Calibración pendiente
 
-Con `REF_WEIGHT = 3000` y `Mf = ZONA_LIBRE = 100 000`:
+Con `REF_WEIGHT = 384 000`, `Mf = ZONA_LIBRE = 100 000` y la emisión recalibrada a `λ = 1`:
 
 | Régimen | `recompensa_base` | tarifa/peso | tx típica de 350 B |
 |---|---|---|---|
-| Lanzamiento | 1,907·10¹¹ brek | 54 359 brek | **0,19 ZZK** |
-| Cola (año 8,16+) | 3,2·10⁹ brek | 912 brek | **0,0032 ZZK** |
+| Lanzamiento | 1,490·10⁹ brek | 54 359 brek | **0.19 ZZK** |
+| Cola (año 8 56+) | 2,67·10⁷ brek | 972 brek | **0.0034 ZZK** |
 
 > ⚠️ **La tarifa varía ~60× a lo largo de la vida de la cadena**, porque escala con la recompensa
 > base. Esta nota citaba solo la cifra de cola; un test que la comprobaba contra la recompensa de
@@ -790,8 +790,11 @@ Con `REF_WEIGHT = 3000` y `Mf = ZONA_LIBRE = 100 000`:
 > Y una consecuencia del suelo: con `Mlt` ya en `ZONA_LIBRE`, la tarifa mínima **está en su máximo**
 > y no puede subir más, porque `MedianaLarga` no admite valores por debajo del suelo.
 
-`REF_WEIGHT = 3000` es el valor de Monero, adoptado como punto de partida por ser el único
-precedente en producción. **Su calibración para ZEROX requiere un modelo de coste de atacante
+`REF_WEIGHT = 3 000` era el valor de Monero, adoptado como punto de partida por ser el único
+precedente en producción. **Recalibrado a 384 000 el 2026-09-09** (P-041): la tarifa escala con
+`recompensa_base`, y al dividir la recompensa por 128 para `λ = 1` el antispam se debilitaba en el
+mismo factor; 384 000 = 3 000 × 128 devuelve el coste del atacante (543 590 ZZK por GB de cadena) al
+valor del diseño original (`research/scripts/rendimiento/verif_zona_libre.py`). **Su calibración para ZEROX requiere un modelo de coste de atacante
 explícito** — encargo abierto para **D2** y **D8**, no una constante cerrada.
 
 ---
@@ -918,8 +921,8 @@ Reglas derivadas de `research/dynamic-blocksize.md`, que las obtuvo de
 #### Constantes
 
 ```
-N_CORTO       = 100          // bloques — 200 min
-N_LARGO       = 262 800      // bloques — 1 año exacto a 120 s
+N_CORTO       = 100          // bloques — 100 s a λ = 1 bloque/s ⚠️ lectura pendiente, P-041 decisión 3
+N_LARGO       = 31 536 000   // bloques — 1 año exacto a λ = 1 bloque/s (τ = 1 s)
 ZONA_LIBRE    = 100 000      // bytes de weight
 FACTOR_SURGE  = 50
 MAX_TX_WEIGHT = 100 000      // bytes — igual a ZONA_LIBRE, ver C-WGT-11
@@ -929,11 +932,22 @@ MAX_TX_WEIGHT = 100 000      // bytes — igual a ZONA_LIBRE, ver C-WGT-11
 > la cadena olvidaría el pico de Navidad antes de la siguiente Navidad y penalizaría cada año el
 > mismo tráfico estacional legítimo. Una ventana de un año absorbe el ciclo del marketplace, y
 > además es **más difícil de mover para un atacante** (hay que desplazar más muestras). Coste:
-> ~2 MB de estado.
+> ~252 MB de estado a `λ = 1` (8 B por muestra), y **la mediana MUST calcularse de forma incremental**
+> (estructura de orden con inserción y borrado logarítmicos): ordenar 31,5 millones de muestras por
+> bloque no es viable. Mover la mediana cuesta llenar media ventana, 182 días, y a la tarifa mínima
+> más que todo el suministro (`research/recalibrado-constantes-lambda1.md` §5).
 > `ZONA_LIBRE` de Monero (300 000) está dimensionada para transacciones CryptoNote, mucho mayores
-> que una transparente de ZEROX (~350 B para 2-in-2-out). 100 000 bytes dan ~285 tx/bloque
-> ≈ 205 000 tx/día **libres de penalización**, con un suelo de crecimiento adversarial de
-> 26,3 GB/año (262 800 bloques/año × 100 KB).
+> que una transparente de ZEROX (~350 B para 2-in-2-out). 100 000 bytes dan ~285 tx/bloque,
+> que a `λ = 1` son **~285 tx/s ≈ 24,7 M tx/día libres de penalización**, con un suelo de
+> crecimiento adversarial de 3 154 GB/año (31 536 000 bloques/año × 100 KB). El techo instantáneo
+> es `2 · FACTOR_SURGE · Mlt` = 10 MB/bloque = 28 571 tx/s.
+>
+> ⚠️ **Recalibrado 2026-09-09 (P-041).** Estas constantes estaban en unidades de bloque calibradas a
+> `T = 120 s` (262 800 bloques/año, 26,3 GB/año). Al pasar a `λ = 1` se conserva el **calendario en
+> tiempo**: `N_LARGO` × 120; `ZONA_LIBRE` se mantiene por decisión de Katana (absorbe el objetivo de
+> 1 280 tx/s con 22× de margen y conserva la economía antispam; subirla abarata inflar la cadena como
+> `1/ZONA_LIBRE²`). `N_CORTO` queda por decidir: en bloques la sobrecarga se abre en ~100 s; en tiempo
+> (12 000), en ~5 h (`research/scripts/rendimiento/verif_n_corto.py`).
 
 #### Peso
 
@@ -1450,9 +1464,9 @@ publicar hasta que `ts ≤ reloj_local + FTL`.
 
 ```
 SOFT_CAP           = 1 000 000 000 ZZK = 100 000 000 000 000 000 brek
-SHIFT              = 19
-TAIL_EMISSION      = 32 ZZK/bloque      =       3 200 000 000 brek
-COINBASE_MATURITY  = 100 bloques
+SHIFT              = 26                 // recalibrado 2026-09-09 (P-041): 19 + 7, 2^7 = 128 ≈ 120
+TAIL_EMISSION      = 0,26666666 ZZK/bloque =        26 666 666 brek   // 32 ZZK / 120
+COINBASE_MATURITY  = 12 000 bloques      // 3,33 h a λ = 1; era 100 a T = 120 s
 ```
 
 **C-EMIT-01 · Recompensa base.** La recompensa base del bloque de altura `H` es:
@@ -1463,13 +1477,17 @@ recompensa_base(H) = max( (SOFT_CAP_brek − emitido(H)) >> SHIFT , TAIL_EMISSIO
 
 donde `emitido(H)` es la suma de los **subsidios efectivos** (C-EMIT-06) de los bloques `0 .. H−1`.
 
-> Decaimiento exponencial suave, sin halvings. Recompensa inicial = `190 734 863 281` brek
-> ≈ **1 907,35 ZZK**. La fórmula cae por debajo del tail hacia el **año 8,16**; el suministro cruza
-> los 1000 M hacia el **año 10,15**. Inflación perpetua **0,84 %/año**, decreciente en porcentaje
-> para siempre. Números fijados 2026-09-04 (P-002).
+> Decaimiento exponencial suave, sin halvings. Recompensa inicial = `1 490 116 119` brek
+> ≈ **14,90 ZZK**. La fórmula cae por debajo del tail hacia el **año 8,56**; el suministro cruza
+> los 1000 M hacia el **año 10,69**. Inflación perpetua **0,84 %/año**, decreciente en porcentaje
+> para siempre. Calendario fijado 2026-09-04 (P-002) a `T = 120 s`; **recalibrado el 2026-09-09
+> (P-041) a `λ = 1 bloque/s` conservando el calendario en tiempo**: `SHIFT` sube en 7 (2⁷ = 128 es el
+> entero más cercano a 120, y el calendario se estira un 5,3 %: 10,15 → 10,69 años) y `TAIL_EMISSION`
+> se divide por 120. Con las constantes antiguas a `λ = 1` el techo se cruzaba en 30,9 días y la
+> inflación perpetua era del 100,92 % anual (`research/scripts/rendimiento/verif_emision_lambda.py`).
 >
 > **El suministro NO tiene máximo.** A diferencia de Bitcoin, la cola no se apaga: tras el año
-> ~10,15 se emiten `32 × 262 800 = 8 409 600` ZZK/año indefinidamente. Por eso ZEROX no puede tener
+> ~10,69 se emiten `26 666 666 brek × 31 536 000 ≈ 8 409 600` ZZK/año indefinidamente. Por eso ZEROX no puede tener
 > un `MAX_MONEY` y usa `ZX_VALUE_SANITY_LIMIT` (C-TX-12) en su lugar.
 >
 > **Por qué 1000 M y no 21 M.** El sistema es **homogéneo de grado 1**: escalar `SOFT_CAP` y
@@ -1554,7 +1572,7 @@ igual a la altura de su bloque.
 > Ver `research/zip244.md` §7.
 
 **C-EMIT-05 · Madurez.** Una salida de coinbase **MUST NOT** gastarse hasta que hayan pasado
-`COINBASE_MATURITY = 100` bloques desde su creación.
+`COINBASE_MATURITY = 12 000` bloques (3,33 h a `λ = 1`) desde su creación.
 
 ---
 
@@ -1734,7 +1752,7 @@ misma altura pueden contener un bloque de la otra rama.
 **C-REORG-07 · Profundidad máxima de reorg.**
 
 ```
-MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 99 bloques
+MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 11 999 bloques
 ```
 
 Un nodo que detecte una reorganización que retrocedería más de `MAX_REORG_LENGTH` bloques
@@ -1753,7 +1771,7 @@ rechazo **la cadena y la punta quedan intactas**.
 > (`src/main.cpp:4727-4746`).
 >
 > **Por qué el límite, para un marketplace.** Da a Cortex una garantía que se puede enunciar a un
-> vendedor: *"pasadas 100 confirmaciones (3,3 h) el cobro es final por protocolo, no solo
+> vendedor: *"pasadas 12 000 confirmaciones (3,3 h) el cobro es final por protocolo, no solo
 > probablemente"*. Es finalidad al estilo Zcash en lugar de la finalidad probabilística de Bitcoin:
 > *"In Zcash, chain state is final once it is beyond the reorg limit, unlike Bitcoin which only has
 > only probabilistic finality."* Además cierra por completo el vector "el minero cobra, gasta el
@@ -1855,7 +1873,7 @@ lo ha medido. Un umbral derivado de ese número sería provisional; `UMBRAL_CHEC
 
 ```
 UMBRAL_CHECKPOINT  = 90 185 365       // rango_solucion; equivale a 3,2 PiB
-ALTURA_CADUCIDAD   = 525 600          // bloques; dos años exactos a T = 120 s
+ALTURA_CADUCIDAD   = 63 072 000       // bloques; dos años exactos a λ = 1 (era 525 600 a T = 120 s; P-041)
 ```
 
 **C-CHK-01** · Existe **un único** checkpoint firmado en la vida de la cadena. Una vez emitido, la
@@ -1925,7 +1943,10 @@ cadena canónica, **no** quién puede producir bloques.
 |---|---|---|---|
 | Bajo valor (bien digital, importe pequeño) | **3** | 6 min | 1,71 % |
 | Estándar | **6** | 12 min | 0,059 % |
-| Alto valor / irreversible (envío físico caro) | **100** | 3,3 h | **cero por protocolo** (C-REORG-07) |
+| Alto valor / irreversible (envío físico caro) | **12 000** | 3,3 h | **cero por protocolo** (C-REORG-07) |
+
+> ⚠️ Las filas de 3 y 6 confirmaciones están calculadas a `T = 120 s` y no se han rederivado para
+> `λ = 1` ni para el DAG (donde la probabilidad de reversión a 600 s es 4,3·10⁻¹⁰, `research/dag-poas-ancla-de-orden.md` §3). Pendiente en P-041.
 
 A T=120 s, `z` confirmaciones cuestan **5× menos tiempo real** que las mismas `z` en Bitcoin. El
 tercer nivel no es una probabilidad: es la garantía dura de C-REORG-07.
@@ -2230,18 +2251,18 @@ formas de escribir un `Lock` serían dos sitios donde equivocarse, y la segunda 
 > importante: **el UTXO set no cabe en RAM**, y por eso hace falta una caché delante del disco.
 
 **C-STORE-06 · El disco guarda solo el estado FINALIZADO, y NUNCA revierte.** Un bloque se
-considera finalizado cuando su profundidad alcanza `MAX_REORG_LENGTH = 99`. Solo entonces su efecto
+considera finalizado cuando su profundidad alcanza `MAX_REORG_LENGTH = 11 999`. Solo entonces su efecto
 sobre el UTXO set se escribe. Los bloques más recientes viven en memoria, y una reorganización
 —que por C-REORG-07 **MUST NOT** superar esa profundidad— se resuelve sin tocar el disco.
 
 Al arrancar, el nodo **MUST** reconstruir el solapamiento no finalizado reproduciendo los cuerpos de
-los bloques posteriores a la punta finalizada. Son como mucho 99, así que el trabajo está **acotado
+los bloques posteriores a la punta finalizada. Son como mucho 11 999, así que el trabajo está **acotado
 por construcción**.
 
 > 🔶 **Implementada a medias, y conviene saber qué mitad.** El almacén ya cumple la suya: guarda el
 > UTXO set finalizado, lleva su altura, y `finalizar` **no tiene operación inversa** — el disco no
 > sabe revertir porque no hay código con el que hacerlo. Lo que falta es la mitad del nodo: decidir
-> *cuándo* finalizar (a profundidad 99), mantener el solapamiento de los bloques recientes y
+> *cuándo* finalizar (a profundidad 11 999), mantener el solapamiento de los bloques recientes y
 > reproducirlo al arrancar. Es el bloque **B2**, y hasta entonces nadie llama a `finalizar`.
 
 > **Por qué 99 y no un número elegido.** Más allá de `MAX_REORG_LENGTH` el nodo **se detiene**
@@ -2249,8 +2270,8 @@ por construcción**.
 > ventana no existe reversión que soportar. La ventana de la política y la ventana del
 > almacenamiento son la misma por necesidad, no por conveniencia.
 >
-> **Y toda salida gastable está siempre en disco**, porque `COINBASE_MATURITY = 100` es mayor que
-> `MAX_REORG_LENGTH = 99`. Tampoco es casualidad: las dos constantes salen del mismo límite, ya que
+> **Y toda salida gastable está siempre en disco**, porque `COINBASE_MATURITY = 12 000` es mayor que
+> `MAX_REORG_LENGTH = 11 999`. Tampoco es casualidad: las dos constantes salen del mismo límite, ya que
 > `MAX_REORG_LENGTH = COINBASE_MATURITY − 1`.
 >
 > **Lo que esta regla elimina** es una clase entera de fallo: la reversión **parcial** de estado ya
@@ -2259,9 +2280,11 @@ por construcción**.
 > (`#31499`); y la que llevó a sipa a escribir sobre el consumo de memoria en la recuperación de
 > Bitcoin que *"in general this problem is not solvable"* (`bitcoin#10693`).
 >
-> **El coste, medido y no estimado:** el solapamiento son 99 bloques × 2 439 salidas × 82 B = **18
-> MB** en el techo adversarial de C-WGT-02. Si `MAX_REORG_LENGTH` creciera, la factura crece
-> linealmente: a 1 000 serían 190 MB. Queda escrito para que nadie lo suba sin verla.
+> **El coste, medido y no estimado:** el solapamiento son 11 999 bloques × 2 439 salidas × 82 B =
+> **2,40 GB** en el techo adversarial de C-WGT-02 (a `T = 120 s` eran 99 bloques y 18 MB). Crece
+> linealmente con `MAX_REORG_LENGTH`. Queda escrito para que nadie lo suba sin verla. ⚠️ A `λ = 1` este
+> solapamiento en memoria es una factura real del nodo doméstico; bajo el DAG, R-FIN-7 (`F = 2 h` =
+> 7 200 bloques) lo dejaría en 1,44 GB. Pendiente en P-041.
 >
 > zebra hace esto mismo con una ventana de 1 000 y **sin datos de undo en absoluto**: al gastarse
 > una salida, su entrada se borra (`zebra_db/transparent.rs:695-699`, v6.3.0).

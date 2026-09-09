@@ -32,16 +32,28 @@
 
 use crate::error::ConsensusError;
 
-/// Ventana de la mediana corta, en bloques. A 120 s son 200 min.
+/// Ventana de la mediana corta, en bloques. A `λ = 1` son 100 s (a `T = 120 s` eran 200 min).
+///
+/// ⚠️ **P-041, decisión 3 pendiente:** en bloques (100) la sobrecarga se abre en ~100 s; en tiempo
+/// (12 000) tarda ~5 h (`research/scripts/rendimiento/verif_n_corto.py`).
 pub const N_CORTO: usize = 100;
 
-/// Ventana de la mediana larga, en bloques: **un año exacto** a 120 s.
-pub const N_LARGO: usize = 262_800;
+/// Ventana de la mediana larga, en bloques: **un año exacto** a `λ = 1 bloque/s`.
+///
+/// Recalibrada el 2026-09-09 (P-041): era 262 800 a `T = 120 s`. Se conserva el año porque la
+/// constante existe para recordar el ciclo estacional del marketplace, y porque mover una mediana
+/// de 31,5 M muestras cuesta llenar media ventana (182 días) y más que todo el suministro en
+/// tarifas. **Obligación de implementación:** la mediana sobre esta ventana MUST ser incremental
+/// (~252 MB de estado); ordenar la ventana por bloque no es viable. Hoy nadie la construye en
+/// producción (llega con B2).
+pub const N_LARGO: usize = 31_536_000;
 
 /// Zona libre de penalización, en bytes de weight.
 ///
-/// Da ~285 tx transparentes por bloque ≈ **205 000 tx/día libres de penalización**, con un suelo de
-/// crecimiento adversarial de 26,3 GB/año.
+/// Da ~285 tx transparentes por bloque, que a `λ = 1` son **~285 tx/s ≈ 24,7 M tx/día libres de
+/// penalización**, con un suelo de crecimiento adversarial de 3 154 GB/año y un techo instantáneo de
+/// `2 · FACTOR_SURGE · Mlt` = 28 571 tx/s. Mantenida sin cambios en el recalibrado de 2026-09-09
+/// (P-041, decisión de Katana): subirla abarata inflar la cadena como `1/ZONA_LIBRE²`.
 pub const ZONA_LIBRE: u64 = 100_000;
 
 /// Cuánto puede dispararse la mediana corta sobre la larga en una ráfaga.
@@ -277,8 +289,8 @@ mod tests {
     #[test]
     fn las_constantes_son_las_del_spec() {
         assert_eq!(N_CORTO, 100);
-        assert_eq!(N_LARGO, 262_800, "un año exacto a 120 s");
-        assert_eq!(N_LARGO, 720 * 365, "720 bloques/día × 365");
+        assert_eq!(N_LARGO, 31_536_000, "un año exacto a λ = 1 bloque/s");
+        assert_eq!(N_LARGO, 86_400 * 365, "86 400 bloques/día × 365");
         assert_eq!(ZONA_LIBRE, 100_000);
         assert_eq!(FACTOR_SURGE, 50);
         assert_eq!(MAX_TX_WEIGHT, ZONA_LIBRE, "C-WGT-11 lo ata a la zona libre");

@@ -30,7 +30,7 @@ use crate::error::ConsensusError;
 /// `COINBASE_MATURITY − 1`. Un reorg más profundo **MUST NOT** aplicarse: el nodo se detiene y
 /// alerta.
 ///
-/// Lo que compra, dicho para un vendedor: *pasadas 100 confirmaciones el cobro es final por
+/// Lo que compra, dicho para un vendedor: *pasadas 12 000 confirmaciones (3,3 h) el cobro es final por
 /// protocolo, no solo probablemente*. Es finalidad al estilo Zcash en vez de la probabilística de
 /// Bitcoin, y cierra el vector "el minero cobra, gasta el coinbase, y un reorg profundo se lo
 /// quita".
@@ -289,10 +289,10 @@ mod tests {
     #[test]
     fn el_limite_de_reorg_es_madurez_menos_uno() {
         assert_eq!(MAX_REORG_LENGTH, COINBASE_MATURITY - 1);
-        assert_eq!(MAX_REORG_LENGTH, 99);
+        assert_eq!(MAX_REORG_LENGTH, 11_999);
     }
 
-    /// El borde exacto: 99 se acepta, 100 detiene el nodo.
+    /// El borde exacto: `MAX_REORG_LENGTH` (11 999 a `λ = 1`) se acepta, uno más detiene el nodo.
     ///
     /// Que sea `COINBASE_MATURITY − 1` garantiza que **un coinbase maduro no puede deshacerse
     /// jamás**: cierra el vector "el minero cobra, gasta, y un reorg profundo se lo quita".
@@ -301,7 +301,7 @@ mod tests {
         assert!(comprobar_profundidad_reorg(0).is_ok());
         assert!(
             comprobar_profundidad_reorg(MAX_REORG_LENGTH).is_ok(),
-            "99 es válido"
+            "MAX_REORG_LENGTH es válido"
         );
 
         let e = comprobar_profundidad_reorg(MAX_REORG_LENGTH + 1).unwrap_err();
@@ -309,9 +309,9 @@ mod tests {
             matches!(
                 e,
                 ConsensusError::ReorgDemasiadoProfunda {
-                    profundidad: 100,
-                    maximo: 99
-                }
+                    profundidad,
+                    maximo
+                } if profundidad == MAX_REORG_LENGTH + 1 && maximo == MAX_REORG_LENGTH
             ),
             "{e:?}"
         );

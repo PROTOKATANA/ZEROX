@@ -530,7 +530,7 @@ mod tests {
     }
 
     /// Una transparente típica 2-in 2-out ronda los ~350 B que asume el dimensionado de
-    /// `ZONA_LIBRE`. Si esto se disparara, los 205 000 tx/día del SPEC dejarían de ser ciertos.
+    /// `ZONA_LIBRE`. Si esto se disparara, las ~285 tx/bloque del SPEC dejarían de ser ciertas.
     #[test]
     fn una_tx_tipica_pesa_lo_que_asume_el_spec() {
         let tx = Tx {
@@ -545,7 +545,7 @@ mod tests {
         assert!(
             (300..=400).contains(&p),
             "una 2-in 2-out debería rondar los 350 B; salió {p}. El dimensionado de ZONA_LIBRE \
-             (~285 tx/bloque, 205 000 tx/día) depende de esta cifra"
+             (~285 tx/bloque; 24,7 M tx/día a λ = 1) depende de esta cifra"
         );
     }
 
