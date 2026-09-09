@@ -42,15 +42,20 @@ use crate::error::ConsensusError;
 /// (`research/scripts/rendimiento/verif_n_corto_barrido.py`).
 pub const N_CORTO: usize = 1_000;
 
-/// Ventana de la mediana larga, en bloques: **un año exacto** a `λ = 1 bloque/s`.
+/// Ventana de la mediana larga, en bloques: **6 h** a `λ = 1 bloque/s`.
 ///
-/// Recalibrada el 2026-09-09 (P-041): era 262 800 a `T = 120 s`. Se conserva el año porque la
-/// constante existe para recordar el ciclo estacional del marketplace, y porque mover una mediana
-/// de 31,5 M muestras cuesta llenar media ventana (182 días) y más que todo el suministro en
-/// tarifas. **Obligación de implementación:** la mediana sobre esta ventana MUST ser incremental
-/// (~252 MB de estado); ordenar la ventana por bloque no es viable. Hoy nadie la construye en
-/// producción (llega con B2).
-pub const N_LARGO: usize = 31_536_000;
+/// Decidida el 2026-09-10 (P-041, decisión 4). Hasta entonces esta ventana hacía **dos trabajos**:
+/// el suelo de capacidad sin penalización y el ancla de la tarifa mínima (`∝ 1/Mlt²`). Los dos
+/// quieren cosas opuestas —la capacidad, adaptarse deprisa; la tarifa, ser lenta e incomprable— y
+/// pegados abrían un lazo: subir la mediana abarata la tarifa, y eso abarata seguir subiéndola.
+///
+/// El lazo se rompió por el otro lado, con `TARIFA_SUELO` en `zx-mempool` (SPEC §5.5): con la tarifa
+/// suelada, esta ventana queda libre para hacer **solo** capacidad y se elige por agilidad. Mueve su
+/// mediana en 3 h, cuesta 0,5 MB de estado —frente a los 757 MB de la ventana de un año que llegó a
+/// aplicarse— y se cura sola en 1,4 días. Coste del ataque con el suelo puesto: 487 M ZZK, el 49 %
+/// del suministro, **sin degradarse en régimen de cola**
+/// (`research/scripts/rendimiento/verif_bola_nieve.py`).
+pub const N_LARGO: usize = 21_600;
 
 /// Zona libre de penalización, en bytes de weight.
 ///
@@ -293,8 +298,10 @@ mod tests {
     #[test]
     fn las_constantes_son_las_del_spec() {
         assert_eq!(N_CORTO, 1_000, "16,7 min a λ = 1");
-        assert_eq!(N_LARGO, 31_536_000, "un año exacto a λ = 1 bloque/s");
-        assert_eq!(N_LARGO, 86_400 * 365, "86 400 bloques/día × 365");
+        assert_eq!(N_LARGO, 21_600, "6 h a λ = 1 bloque/s");
+        assert_eq!(N_LARGO, 6 * 3_600, "6 h × 3 600 bloques/h");
+        // La de capacidad MUST ser más larga que la de ráfaga: 21,6× a los valores vigentes.
+        const _: () = assert!(N_LARGO > N_CORTO);
         assert_eq!(ZONA_LIBRE, 100_000);
         assert_eq!(FACTOR_SURGE, 50);
         assert_eq!(MAX_TX_WEIGHT, ZONA_LIBRE, "C-WGT-11 lo ata a la zona libre");

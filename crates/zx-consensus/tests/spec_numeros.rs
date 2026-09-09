@@ -185,12 +185,12 @@ fn el_spec_dice_la_profundidad_real_de_reorg() {
 #[test]
 fn el_spec_dice_los_parametros_reales_de_peso() {
     assert_eq!(ZONA_LIBRE, 100_000);
-    assert_eq!(N_LARGO, 31_536_000, "un año a λ = 1 bloque/s");
+    assert_eq!(N_LARGO, 21_600, "6 h a λ = 1 bloque/s");
 
-    // 31 536 000 × 1 s = 365 días exactos.
-    assert_eq!(N_LARGO as u64, 365 * 24 * 60 * 60);
+    // 21 600 × 1 s = 6 h exactas.
+    assert_eq!(N_LARGO as u64, 6 * 60 * 60);
 
-    afirma("31 536 000", "N_LARGO, la ventana de la mediana larga");
+    afirma("21 600", "N_LARGO, la ventana de capacidad");
     afirma(
         "ZONA_LIBRE    = 100 000",
         "es constante de consenso: va en texto normativo, no en una nota",

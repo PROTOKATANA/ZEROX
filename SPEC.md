@@ -729,12 +729,13 @@ y el razonamiento.
 ```
 Mf(H)            = mediana de referencia para tarifas (ver más abajo)
 F(H)             = recompensa_base(H) · REF_WEIGHT / Mf(H) / Mf(H)      // dos divisiones enteras
-tarifa_por_byte  = max(1, F − F/20)                                      // el "0,95×", en entero
+tarifa_por_byte  = max(TARIFA_SUELO, max(1, F − F/20))                   // el "0,95×", en entero, con suelo
 tarifa_minima(tx)= redondear_arriba( weight(tx) · tarifa_por_byte, FEE_MASK )
 aceptar si         fee ≥ tarifa_minima − tarifa_minima/50                // colchón del 2 %
 
 REF_WEIGHT = 384 000     // bytes de weight — transacción de referencia; recalibrado 2026-09-09 (P-041)
 FEE_MASK   = 10 000      // brek — cuantización de la tarifa
+TARIFA_SUELO = 54 359    // brek/peso — suelo absoluto; = F(recompensa_base(0), ZONA_LIBRE)
 ```
 
 Requisitos de implementación, tomados del código de referencia:
@@ -772,23 +773,43 @@ de prioridades sigue existiendo por encima del mínimo.
 
 Con `REF_WEIGHT = 384 000`, `Mf = ZONA_LIBRE = 100 000` y la emisión recalibrada a `λ = 1`:
 
-| Régimen | `recompensa_base` | tarifa/peso | tx típica de 350 B |
-|---|---|---|---|
-| Lanzamiento | 1,490·10⁹ brek | 54 359 brek | **0.19 ZZK** |
-| Cola (año 8 56+) | 2,67·10⁷ brek | 972 brek | **0.0034 ZZK** |
+| Régimen | `recompensa_base` | tarifa/peso cruda | con `TARIFA_SUELO` | tx típica de 350 B |
+|---|---|---|---|---|
+| Lanzamiento, `Mf = ZONA_LIBRE` | 1,490·10⁹ brek | 54 359 brek | 54 359 | **0,19 ZZK** |
+| Cola (año 8,56+) | 2,67·10⁷ brek | 972 brek | **54 359** | **0,19 ZZK** |
+| Mediana a 4,91× la zona libre | 1,490·10⁹ brek | 2 255 brek | **54 359** | **0,19 ZZK** |
 
-> ⚠️ **La tarifa varía ~60× a lo largo de la vida de la cadena**, porque escala con la recompensa
-> base. Esta nota citaba solo la cifra de cola; un test que la comprobaba contra la recompensa de
-> lanzamiento **falló**, y así se descubrió que faltaba la mitad del cuadro. Ambos números son
-> correctos, cada uno en su régimen.
+> 🔶 **`TARIFA_SUELO` — suelo absoluto, decidido por Katana el 2026-09-10.** La tarifa mínima **MUST NOT**
+> bajar de `F(recompensa_base(0), ZONA_LIBRE) = 54 359` brek por unidad de peso. Cierra de un golpe los
+> **dos** caminos por los que el antispam se desmoronaba, que resultaron ser el mismo visto de dos lados:
 >
-> ⚠️ **La tarifa satura en 1 brek por unidad de peso cuando `Mlt > √(base·REF_WEIGHT) ≈ 23,9 MB`.**
-> Por encima de esa mediana el mínimo deja de escalar, y todo el antispam recae en la penalización
-> de C-EMIT-06. Es una propiedad real del diseño que conviene tener presente si la cadena creciera
-> hasta medianas de decenas de megabytes.
+> 1. **El lazo de realimentación con la capacidad.** `F ∝ 1/Mf²`: subir la mediana abarata la tarifa, y
+>    eso abarata seguir subiéndola. Sin suelo, la serie de costes **converge** y llevar la mediana hasta
+>    34 MB/bloque cuesta 2,42× la primera ronda. Con suelo, cada ronda cuesta 1,7× más que la anterior.
+> 2. **La degradación con la emisión.** `F ∝ recompensa_base`, que cae **56×** del lanzamiento al régimen
+>    de cola. Sin suelo, el mismo ataque que costaba 487 M ZZK al lanzamiento cuesta **8,7 M** a partir del
+>    año 8,56, el 0,9 % del suministro. Con suelo, se queda en 487 M **para siempre**.
 >
-> Y una consecuencia del suelo: con `Mlt` ya en `ZONA_LIBRE`, la tarifa mínima **está en su máximo**
-> y no puede subir más, porque `MedianaLarga` no admite valores por debajo del suelo.
+> **Lo que se paga, dicho sin adornos:** la tarifa mínima **nunca baja de 0,19 ZZK** por una transparente
+> de 350 B, aunque el tráfico real crezca y sobre capacidad. Es coherente con lo que esta misma sección
+> ya elegía —*«para un marketplace la predictibilidad vale más que la eficiencia del racionamiento»*—
+> pero el suelo está en unidades de moneda, no de poder adquisitivo: si el ZZK se revaloriza mucho,
+> habrá que bajarlo. **Se puede: §5.5 no es consenso**, así que es un cambio de política y no un hard fork.
+>
+> Verificado en `research/scripts/rendimiento/verif_bola_nieve.py` (el lazo y su ruptura) y
+> `verif_zona_libre.py` (el control que reproduce 54 359 y 972 brek/peso).
+>
+> ⚠️ **Sin auditar.** Nadie ha atacado el suelo. La pregunta para D8: al hacer la tarifa insensible a la
+> capacidad, ¿se abre alguna vía por el otro lado —por ejemplo, que llenar bloques por debajo de la
+> mediana deje de tener coste relativo cuando la mediana es enorme?
+>
+> ⚠️ **La tarifa cruda satura en 1 brek por unidad de peso cuando `Mf > √(base·REF_WEIGHT) ≈ 23,9 MB`.**
+> Con `TARIFA_SUELO` esa saturación deja de alcanzarse: el suelo muerde mucho antes.
+>
+> **Alternativa documentada y NO adoptada:** anclar la tarifa a una **ventana larga aparte** (`Mf ≠ Mlt`,
+> 180 días o un año, calculada como política y no como consenso). Rompe el lazo igual que el suelo, y
+> además dejaría que la tarifa **sí** bajara con el crecimiento real sostenido; pero **no** protege de la
+> degradación del punto 2, cuesta un segundo estado y su estimador no lo ha atacado nadie.
 
 `REF_WEIGHT = 3 000` era el valor de Monero, adoptado como punto de partida por ser el único
 precedente en producción. **Recalibrado a 384 000 el 2026-09-09** (P-041): la tarifa escala con
@@ -922,20 +943,34 @@ Reglas derivadas de `research/dynamic-blocksize.md`, que las obtuvo de
 
 ```
 N_CORTO       = 1 000        // bloques — 16,7 min a λ = 1 bloque/s; era 100 (200 min a T = 120 s), P-041 decisión 3
-N_LARGO       = 31 536 000   // bloques — 1 año exacto a λ = 1 bloque/s (τ = 1 s)
+N_LARGO       = 21 600       // bloques — 6 h a λ = 1 bloque/s; ventana de CAPACIDAD, no de tarifa
 ZONA_LIBRE    = 100 000      // bytes de weight
 FACTOR_SURGE  = 50
 MAX_TX_WEIGHT = 100 000      // bytes — igual a ZONA_LIBRE, ver C-WGT-11
 ```
 
-> **Por qué divergen de Monero.** `N_LARGO` de Monero son 100 000 bloques = 138,9 días a 120 s —
-> la cadena olvidaría el pico de Navidad antes de la siguiente Navidad y penalizaría cada año el
-> mismo tráfico estacional legítimo. Una ventana de un año absorbe el ciclo del marketplace, y
-> además es **más difícil de mover para un atacante** (hay que desplazar más muestras). Coste:
-> ~252 MB de estado a `λ = 1` (8 B por muestra), y **la mediana MUST calcularse de forma incremental**
-> (estructura de orden con inserción y borrado logarítmicos): ordenar 31,5 millones de muestras por
-> bloque no es viable. Mover la mediana cuesta llenar media ventana, 182 días, y a la tarifa mínima
-> más que todo el suministro (`research/recalibrado-constantes-lambda1.md` §5).
+> **Por qué divergen de Monero, y por qué `N_LARGO` dejó de ser una ventana larga.** En Monero, y en
+> el ZEROX de `T = 120 s`, esta ventana hacía **dos trabajos a la vez**: fijar el suelo de capacidad
+> sin penalización y anclar la tarifa mínima (`∝ 1/Mlt²`). Los dos quieren cosas opuestas: la
+> capacidad quiere adaptarse deprisa a la demanda real, y la tarifa quiere ser lenta para que nadie
+> pueda comprarla. Pegados, una ventana corta abre un **lazo de realimentación**: subir la mediana
+> abarata la tarifa, y una tarifa más barata abarata seguir subiéndola; la serie de costes converge y
+> llevar la mediana hasta 34 MB/bloque cuesta solo 2,42× la primera ronda
+> (`research/scripts/rendimiento/verif_bola_nieve.py`).
+>
+> **Se rompió el lazo por el otro lado** (2026-09-10, Katana): la tarifa mínima gana un **suelo
+> absoluto** (§5.5), con lo que deja de caer tanto cuando la mediana sube como cuando la recompensa
+> decae. Con el lazo roto, `N_LARGO` queda libre para hacer **solo** el trabajo de capacidad, y se
+> elige por agilidad: **6 h**, con la mediana moviéndose en 3 h. Coste del ataque con el suelo puesto:
+> **487 M ZZK, el 49 % del suministro, y no se degrada nunca** (antes caía a 8,7 M en régimen de cola).
+> Estado: 0,5 MB, frente a los 757 MB que costaba la ventana de un año. Y una propiedad que la ventana
+> larga no tenía: si la mediana llegara a subir, **vuelve sola a la zona libre en 1,4 días** en vez de
+> en 5,5 años (`verif_bola_nieve.py` §C).
+>
+> **Alternativa documentada y NO adoptada:** separar `Mf` de `Mlt` —capacidad en ventana corta de
+> consenso, tarifa en ventana larga de política— consigue lo mismo contra el lazo, pero **no** contra
+> la degradación en régimen de cola, y cuesta un segundo estado y un estimador que nadie ha atacado.
+> Queda escrita por si algún día se quiere que la tarifa **sí** baje con el crecimiento real sostenido.
 > `ZONA_LIBRE` de Monero (300 000) está dimensionada para transacciones CryptoNote, mucho mayores
 > que una transparente de ZEROX (~350 B para 2-in-2-out). 100 000 bytes dan ~285 tx/bloque,
 > que a `λ = 1` son **~285 tx/s ≈ 24,7 M tx/día libres de penalización**, con un suelo de
@@ -944,7 +979,8 @@ MAX_TX_WEIGHT = 100 000      // bytes — igual a ZONA_LIBRE, ver C-WGT-11
 >
 > ⚠️ **Recalibrado 2026-09-09 (P-041).** Estas constantes estaban en unidades de bloque calibradas a
 > `T = 120 s` (262 800 bloques/año, 26,3 GB/año). Al pasar a `λ = 1` se conserva el **calendario en
-> tiempo**: `N_LARGO` × 120; `ZONA_LIBRE` se mantiene por decisión de Katana (absorbe el objetivo de
+> tiempo**; `N_LARGO` se apartó de esa regla al romperse el lazo con la tarifa (ver arriba): pasó de
+> 262 800 a **21 600**, no a 31 536 000. `ZONA_LIBRE` se mantiene por decisión de Katana (absorbe el objetivo de
 > 1 280 tx/s con 22× de margen y conserva la economía antispam; subirla abarata inflar la cadena como
 > `1/ZONA_LIBRE²`). `N_CORTO = 1 000` (Katana, 2026-09-10): la sobrecarga absorbe una ráfaga de 1 280 tx/s en
 > **25:02 de media, con desviación típica de 39 s** —los bloques son un proceso de Poisson, no un reloj: el 68 % de

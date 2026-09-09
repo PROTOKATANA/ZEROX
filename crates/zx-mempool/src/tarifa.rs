@@ -54,9 +54,35 @@ use zx_consensus::peso::MedianaLarga;
 /// `recompensa_base`, y al dividir la recompensa por 128 para `λ = 1 bloque/s` el antispam se
 /// debilitaba en el mismo factor. Con 384 000 se conserva el coste del atacante del diseño original:
 /// inflar 1 GB de cadena cuesta 543 590 ZZK al lanzamiento. Una transparente típica de ~350 B paga
-/// ≈0,19 ZZK al lanzamiento y ≈0,0034 ZZK en régimen de cola; sostener 100 KB/bloque de spam cuesta
-/// ≈4,7 M ZZK/día al lanzamiento y ≈84 000 ZZK/día en la cola (86 400 bloques/día).
+/// ≈0,19 ZZK, y con [`TARIFA_SUELO`] esa cifra ya **no** baja en régimen de cola (antes caía a
+/// ≈0,0034 ZZK); sostener 100 KB/bloque de spam cuesta ≈4,7 M ZZK/día, también sin degradarse.
 pub const REF_WEIGHT: u128 = 384_000;
+
+/// Suelo absoluto de la tarifa mínima, en brek por unidad de peso (SPEC §5.5).
+///
+/// 🔶 **Decidido por Katana el 2026-09-10.** Es la tarifa cruda del **lanzamiento** con la mediana en
+/// [`ZONA_LIBRE`](zx_consensus::peso::ZONA_LIBRE), y no se deriva en tiempo de ejecución a propósito:
+/// es un ancla fija, no una función del estado de la cadena. Ese es justo su cometido.
+///
+/// # Los dos caminos que cierra, que son el mismo visto de dos lados
+///
+/// `F ∝ recompensa_base / Mf²`, así que la tarifa mínima cae por dos vías independientes:
+///
+/// 1. **El lazo con la capacidad.** Subir `Mf` abarata la tarifa, y eso abarata seguir subiéndola.
+///    Sin suelo la serie de costes **converge**: llevar la mediana hasta 34 MB/bloque cuesta 2,42× la
+///    primera ronda. Con suelo, cada ronda cuesta 1,7× **más** que la anterior.
+/// 2. **La degradación con la emisión.** `recompensa_base` cae 56× del lanzamiento al régimen de cola
+///    (año 8,56+), y la tarifa con ella. El ataque que costaba 487 M ZZK pasaba a costar 8,7 M, el
+///    0,9 % del suministro. Con suelo se queda en 487 M para siempre.
+///
+/// # Lo que cuesta
+///
+/// La tarifa mínima **nunca baja de 0,19 ZZK** por una transparente de 350 B, aunque sobre capacidad.
+/// El suelo está en unidades de moneda, no de poder adquisitivo: si el ZZK se revaloriza mucho habrá
+/// que bajarlo, y **se puede**, porque esta sección no es consenso.
+///
+/// **Sin auditar.** Nadie lo ha atacado; ver la pregunta abierta para D8 en SPEC §5.5.
+pub const TARIFA_SUELO: u128 = 54_359;
 
 /// Cuantización de la tarifa, en brek.
 ///
@@ -78,9 +104,13 @@ pub const COLCHON_DIVISOR: u128 = 50;
 /// tarifa_por_peso = max(1, F − F/20)
 /// ```
 ///
+/// ```text
+/// tarifa_por_peso = max(TARIFA_SUELO, max(1, F − F/20))
+/// ```
+///
 /// Requisitos que vienen del código de referencia y **MUST** respetarse: **dos divisiones enteras
 /// sucesivas** y no una por `Mlt²`, el `0,95×` como `F − F/20` en entero y nunca en coma flotante,
-/// y resultado nunca cero.
+/// y resultado nunca cero. El suelo se aplica **al final**, sobre el valor ya redondeado.
 ///
 /// # Sobre el `u128`
 ///
@@ -97,7 +127,7 @@ pub fn tarifa_por_peso(recompensa_base: u128, mlt: MedianaLarga) -> u128 {
     // `MedianaLarga` garantiza `≥ ZONA_LIBRE > 0`, así que no hay división por cero que comprobar:
     // esa es toda la gracia de exigir el tipo en la firma.
     let f = recompensa_base.saturating_mul(REF_WEIGHT) / m / m;
-    (f - f / 20).max(1)
+    (f - f / 20).max(1).max(TARIFA_SUELO)
 }
 
 /// Redondea hacia arriba al múltiplo de [`FEE_MASK`].
@@ -124,7 +154,8 @@ pub fn se_admite(fee: u128, peso: u64, recompensa_base: u128, mlt: MedianaLarga)
 #[cfg(test)]
 mod tests {
     use super::{
-        COLCHON_DIVISOR, FEE_MASK, REF_WEIGHT, cuantizar, se_admite, tarifa_minima, tarifa_por_peso,
+        COLCHON_DIVISOR, FEE_MASK, REF_WEIGHT, TARIFA_SUELO, cuantizar, se_admite, tarifa_minima,
+        tarifa_por_peso,
     };
     use zx_consensus::emision::recompensa_base;
     use zx_consensus::peso::{MedianaLarga, ZONA_LIBRE};
@@ -141,38 +172,43 @@ mod tests {
         assert!(tarifa_por_peso(0, mlt(ZONA_LIBRE)) >= 1);
     }
 
-    /// **La propiedad que motiva la divergencia frente a Monero.**
+    /// **La propiedad que motiva la divergencia frente a Monero, ahora reforzada por el suelo.**
     ///
-    /// La tarifa depende **solo** de `Mlt`, que está acotada a ±1,7× por bloque. Así que entre dos
-    /// bloques consecutivos no puede saltar: es suave en **ambas** direcciones, que es justo lo que
-    /// el *fee cliff* de Monero no garantiza.
+    /// La tarifa depende solo de `Mlt`, acotada a ±1,7× por bloque, así que entre dos bloques
+    /// consecutivos nunca podía saltar más de 2,89×: suave en **ambas** direcciones, que es lo que el
+    /// *fee cliff* de Monero no garantiza. Con [`TARIFA_SUELO`] (2026-09-10) la garantía se vuelve
+    /// trivial en el régimen normal —la tarifa es **constante**— y el test comprueba las dos cosas:
+    /// que sigue acotada donde el suelo no muerde, y que donde muerde no se mueve en absoluto.
     #[test]
     fn la_tarifa_no_puede_saltar_entre_bloques_consecutivos() {
         let base = recompensa_base(0);
-        // Cuatro veces el suelo: hay que estar **por encima** de `ZONA_LIBRE` para que el clamp
-        // inferior de C-WGT-04 sea observable. Partiendo del suelo, `MedianaLarga` lo devuelve al
-        // suelo y la tarifa no puede subir más — que es en sí una propiedad útil: **con la mediana
-        // en el suelo, la tarifa mínima ya está en su máximo**.
-        let m0 = ZONA_LIBRE * 4;
 
-        // Los dos extremos que C-WGT-04 permite en un bloque.
+        // Régimen donde el suelo NO muerde: por debajo de ZONA_LIBRE la mediana no puede bajar, así
+        // que se usa una recompensa alta artificial para levantar la tarifa cruda por encima del
+        // suelo y observar la cota de C-WGT-04.
+        let base_alta = base * 100;
+        let m0 = ZONA_LIBRE * 4;
         let m_arriba = m0 + (m0 * 7) / 10; // 1,7×
         let m_abajo = (m0 * 10) / 17; // 0,588×
 
-        let t0 = tarifa_por_peso(base, mlt(m0));
-        let t_arriba = tarifa_por_peso(base, mlt(m_arriba));
-        let t_abajo = tarifa_por_peso(base, mlt(m_abajo));
+        let t0 = tarifa_por_peso(base_alta, mlt(m0));
+        let t_arriba = tarifa_por_peso(base_alta, mlt(m_arriba));
+        let t_abajo = tarifa_por_peso(base_alta, mlt(m_abajo));
 
-        // tarifa ∝ 1/Mlt², así que 1,7× de mediana ⇒ ~1/2,89 de tarifa, y al revés.
         assert!(t_arriba < t0, "más espacio ⇒ tarifa menor");
         assert!(t_abajo > t0, "menos espacio ⇒ tarifa mayor");
-
-        // Y ninguno de los dos saltos supera el factor 2,89 = 1,7².
         assert!(
             t_abajo <= t0 * 3,
             "la subida máxima por bloque es ~2,89×, salió {t_abajo}/{t0}"
         );
         assert!(t0 <= t_arriba * 3, "y la bajada, lo mismo");
+
+        // Régimen real (recompensa de lanzamiento): el suelo muerde y no hay salto ninguno.
+        assert_eq!(
+            tarifa_por_peso(base, mlt(m0)),
+            tarifa_por_peso(base, mlt(m_arriba)),
+            "con el suelo puesto la tarifa es constante: no hay cliff que garantizar"
+        );
     }
 
     /// Más espacio en la cadena abarata; menos, encarece. Monótono.
@@ -187,13 +223,26 @@ mod tests {
         }
     }
 
-    /// Y baja con la recompensa: en régimen de cola, la tarifa mínima es mucho menor.
+    /// **Ya NO baja con la recompensa: [`TARIFA_SUELO`] corta esa vía (2026-09-10).**
+    ///
+    /// La tarifa cruda sí sigue al subsidio, y esa era la fuga: la recompensa cae 56× del lanzamiento
+    /// al régimen de cola, y el antispam caía con ella. El suelo la sostiene; el test comprueba las
+    /// dos mitades, que la cruda baja y que la efectiva no.
     #[test]
-    fn la_tarifa_baja_con_la_recompensa() {
+    fn la_tarifa_ya_no_baja_con_la_recompensa() {
         let m = mlt(ZONA_LIBRE);
         let al_principio = tarifa_por_peso(recompensa_base(0), m);
         let en_la_cola = tarifa_por_peso(recompensa_base(u128::MAX / 2), m);
-        assert!(en_la_cola < al_principio, "la tarifa sigue al subsidio");
+        assert_eq!(en_la_cola, al_principio, "el suelo MUST sostener la tarifa");
+
+        // Y la cruda, sin suelo, sí caía: 56× entre los dos regímenes.
+        let cruda =
+            |base: u128| base * REF_WEIGHT / u128::from(ZONA_LIBRE) / u128::from(ZONA_LIBRE);
+        let razon = cruda(recompensa_base(0)) / cruda(recompensa_base(u128::MAX / 2)).max(1);
+        assert!(
+            (50..=60).contains(&razon),
+            "la tarifa cruda cae ~56× con la recompensa; salió {razon}×"
+        );
     }
 
     #[test]
@@ -273,18 +322,14 @@ mod tests {
         );
     }
 
-    /// **La tarifa varía ~60× a lo largo de la vida de la cadena, y conviene saberlo.**
+    /// **La tarifa YA NO varía a lo largo de la vida de la cadena: `TARIFA_SUELO` la sostiene.**
     ///
-    /// La tarifa escala con la recompensa base, que cae de `1,49·10⁹` brek en el lanzamiento a
-    /// `2,67·10⁷` en régimen de cola (recalibrado 2026-09-09 para `λ = 1`; a `T = 120 s` eran
-    /// `1,9·10¹¹` y `3,2·10⁹`, y la razón es la misma). Con la mediana en el suelo, una transparente
-    /// típica de 350 B paga **0,19 ZZK al lanzamiento** y **0,0034 ZZK en la cola**.
-    ///
-    /// La cifra del SPEC (0,0034 ZZK) es la de **régimen de cola**. Este test empezó comprobándola
-    /// contra la recompensa de lanzamiento y **falló**: los dos números eran correctos, pero de
-    /// regímenes distintos. Ahora comprueba los dos, para que la diferencia quede visible.
+    /// La tarifa cruda escala con la recompensa base, que cae 56× del lanzamiento (`1,49·10⁹` brek)
+    /// al régimen de cola (`2,67·10⁷`). Hasta el 2026-09-10 la tarifa caía con ella, de 0,19 a
+    /// 0,0034 ZZK, y con ella el antispam: el ataque que llevaba la mediana a 34 MB/bloque pasaba de
+    /// costar 487 M ZZK a costar 8,7 M. Con el suelo, **las dos cifras son 0,19 ZZK**.
     #[test]
-    fn la_tarifa_tipica_varia_sesenta_veces_entre_lanzamiento_y_cola() {
+    fn la_tarifa_no_se_degrada_en_regimen_de_cola() {
         let m = mlt(ZONA_LIBRE);
 
         let al_lanzar = tarifa_minima(350, recompensa_base(0), m);
@@ -295,36 +340,47 @@ mod tests {
 
         // Régimen de cola: recompensa_base saturada en TAIL_EMISSION.
         let en_la_cola = tarifa_minima(350, recompensa_base(u128::MAX / 2), m);
-        assert!(
-            (200_000..=500_000).contains(&en_la_cola),
-            "en la cola paga ~0,0034 ZZK; pagó {en_la_cola} brek"
+        assert_eq!(
+            en_la_cola, al_lanzar,
+            "el suelo MUST sostener la tarifa en régimen de cola"
         );
 
-        assert!(
-            al_lanzar > en_la_cola * 40,
-            "la variación es de decenas de veces, no marginal"
+        // Y el suelo es exactamente la tarifa cruda del lanzamiento con la mediana en su suelo.
+        assert_eq!(
+            tarifa_por_peso(recompensa_base(0), m),
+            TARIFA_SUELO,
+            "TARIFA_SUELO MUST ser F(recompensa_base(0), ZONA_LIBRE)"
+        );
+
+        // Ni la mediana más alta imaginable la baja: es lo que rompe el lazo de realimentación.
+        assert_eq!(
+            tarifa_por_peso(recompensa_base(0), mlt(u64::MAX)),
+            TARIFA_SUELO,
+            "con Mlt enorme la tarifa cruda se hunde; el suelo MUST sostenerla"
         );
     }
 
-    /// **A medianas muy altas la tarifa satura en 1 brek por unidad de peso.**
+    /// **La saturación en 1 brek ya no se alcanza: [`TARIFA_SUELO`] muerde mucho antes.**
     ///
-    /// `F ≥ 1` exige `Mlt ≤ √(base·REF) ≈ 23,9 MB`. Por encima de eso, el mínimo deja de escalar y
-    /// la tarifa por peso se queda clavada en el suelo. Es una propiedad real del diseño que el
-    /// SPEC no mencionaba: si la cadena creciera hasta medianas de decenas de MB, el antispam por
-    /// tarifa dejaría de responder y todo el peso recaería en la penalización de C-EMIT-06.
+    /// La tarifa cruda satura en 1 brek/peso cuando `Mlt > √(base·REF) ≈ 23,9 MB`, y ahí el antispam
+    /// por tarifa dejaba de responder por completo. Con el suelo, la tarifa efectiva se clava en
+    /// `TARIFA_SUELO` en cuanto `Mlt` pasa de `ZONA_LIBRE`, que es 239× antes.
     #[test]
-    fn a_medianas_muy_altas_la_tarifa_satura_en_el_suelo() {
+    fn el_suelo_muerde_antes_que_la_saturacion_en_un_brek() {
         let base = recompensa_base(0);
-        let umbral = 23_920_798u64; // √(base·REF)
+        let umbral_saturacion = 23_920_798u64; // √(base·REF)
 
-        assert!(
-            tarifa_por_peso(base, mlt(umbral / 2)) > 1,
-            "por debajo del umbral aún escala"
-        );
+        // Donde la cruda saturaría en 1, la efectiva vale el suelo.
         assert_eq!(
-            tarifa_por_peso(base, mlt(umbral * 2)),
-            1,
-            "por encima del umbral la tarifa por peso se clava en 1 brek"
+            tarifa_por_peso(base, mlt(umbral_saturacion * 2)),
+            TARIFA_SUELO
+        );
+
+        // Y el suelo ya manda desde una mediana 239× menor que ese umbral.
+        assert_eq!(tarifa_por_peso(base, mlt(ZONA_LIBRE + 1)), TARIFA_SUELO);
+        assert!(
+            u128::from(umbral_saturacion) / u128::from(ZONA_LIBRE) > 200,
+            "el suelo se adelanta a la saturación por más de dos órdenes"
         );
     }
 }
