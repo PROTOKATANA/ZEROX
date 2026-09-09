@@ -147,4 +147,162 @@ Tres cosas, todas nuevas:
 **Lo decisivo:** las tres variantes son ciegas a un sensor y visibles al otro, y **ninguna es
 visible a los dos**. Hacen falta E1 **y** E2; ninguno sobra.
 
-*(secciones B a F, pendientes)*
+---
+
+## B · Sensor E1 (reloj de PoT contra reloj de pared)
+
+**Script:** `r11b_b_e1.py` · **salida:** `salida_b.txt`.
+
+### B.0 · El modelo, y por qué NO es «una muestra del retardo»
+
+La verificación del PoT es **secuencial**: «el seed del slot n+1 es la salida del slot n»
+(`DECISIONES.md` §19, bloque de la aceleración de los 128 B, línea 1851), y Autonomys descarta
+por gossip las pruebas de slots viejos y de slots demasiado futuros
+(`subspace/crates/sc-proof-of-time/src/source/gossip.rs:576-600`, `MAX_SLOTS_IN_THE_FUTURE = 10`
+en `:30`). Luego **la frontera verificada de un nodo avanza solo cuando llega el SIGUIENTE
+slot**: un solo slot retrasado la atasca aunque los posteriores ya estén en la red.
+
+Con `D_s` iid el retraso observado es `L_c = max(0, max_{j≥0}(D_{c−j} − j·σ))`, y su cola
+tiene forma cerrada exacta: `P(L ≤ x) = ∏_{j≥0} F_D(x + j·σ)`.
+
+**Control positivo** (forma cerrada contra Monte Carlo de 4·10⁶ slots):
+
+| cola | p99 | x | cerrada `P(L>x)` | Monte Carlo |
+|---|---:|---:|---:|---:|
+| lognormal | 8 | 8,0 | 0,014760 | 0,014831 |
+| lognormal | 8 | 12,0 | 0,000172 | 0,000170 |
+| lognormal | 16 | 20,0 | 0,016821 | 0,016810 |
+| Pareto | 8 | 20,0 | 0,000274 | 0,000231 |
+
+**VERIFICADO.** Y el control de capacidad: `P(D>8) = 0,0100` frente a `P(L>8) = 0,01476` —
+la cola de la frontera secuencial es **estrictamente más pesada** que la de una muestra suelta,
+que es exactamente lo que el modelo secuencial predice. **Un análisis que hubiera usado el
+cuantil de `Δ` a secas habría subestimado `B`.**
+
+**Hipótesis declaradas:** (a) mediana del retardo honesto de entrega del PoT = `Δ` nominal =
+4 s; (b) retardos iid entre slots; (c) dos familias de cola, lognormal (la que pide el
+encargo) y **Pareto ajustada a la misma mediana y p99**, como control de robustez —
+extrapolar seis órdenes de magnitud más allá del p99 es una hipótesis, no un dato.
+
+### B.1 · `B` para menos de 1 falsa alarma al año
+
+`ε` = error del reloj de pared (deriva). Dos contabilidades: **por excursión** (cada excursión
+la arranca un único slot con `D_s > B`, luego `excursiones/año = 3,15·10⁷·P(D>B)`; es la cuenta
+operativa) y **por slot** (conservadora, cuenta cada segundo en alarma).
+
+| cola | p99 (s) | ε (s) | **B (excursión)** | B (por slot) |
+|---|---:|---:|---:|---:|
+| lognormal | 8 | 0,1 | **20,14** | 20,70 |
+| lognormal | 8 | 1,0 | **21,04** | 21,60 |
+| lognormal | 8 | 10,0 | 30,04 | 30,60 |
+| lognormal | 16 | 1,0 | **101,43** | 133,20 |
+| Pareto | 8 | 1,0 | **76,40** | 138,92 |
+| Pareto | 16 | 1,0 | 1 422,41 | 50 691,69 |
+
+**El resultado incómodo, dicho pronto:** `B` es hipersensible a la forma de la cola. Con la
+misma mediana y el mismo p99 = 8 s, la lognormal pide `B = 21 s` y la Pareto `B = 76 s`. Con
+p99 = 16 s la Pareto pide **1 422 s**, es decir, E1 dejaría de servir para nada. **Fijar `B`
+por «1 falsa alarma al año» exige conocer la cola, y la cola no se conoce: LAGUNA.**
+
+### B.2 · La salida: el precio de una falsa alarma es despreciable
+
+Lo anterior deja de ser un problema en cuanto se mide **cuánto cuesta** una falsa alarma. Una
+excursión dura `D_s − B` segundos; si el nodo deja de autorizar durante ella, pierde
+`f_v·λ·duración` bloques. Medido con 12 semillas × 3·10⁵ slots (`salida_b.txt` B.8), para un
+granjero con `f_v = 0,05` (que produce 1,58·10⁶ bloques/año):
+
+| cola | p99 | B | alarmas/año | s/año en alarma | bloques perdidos/año | **% de su producción** |
+|---|---:|---:|---:|---:|---:|---:|
+| lognormal | 8 | 20 | 1,04 | 0 | 0 | 0 % |
+| lognormal | 16 | 30 | 1,14·10⁴ | 6,72·10⁴ | 3 360 | **0,21 %** |
+| Pareto | 8 | 20 | 1,79·10³ | 9 900 | 495 | **0,03 %** |
+| Pareto | 16 | 30 | 5,35·10⁴ | 8,71·10⁵ | 43 500 | **2,8 %** |
+| Pareto | 16 | 100 | 1,79·10³ | 8,98·10⁴ | 4 490 | **0,28 %** |
+
+**Con `B = 30 s`, incluso bajo la cola de potencia más agresiva que ajusta al p99 = 16 s, el
+granjero pierde el 2,8 % de sus bloques por falsas alarmas — y bajo la hipótesis nominal,
+el 0 %.** Es decir: **la elección de `B` no necesita resolver la LAGUNA de la cola**, porque
+el criterio «< 1 falsa alarma/año» era el criterio equivocado para el umbral de *paro*.
+DEMOSTRADO por la aritmética de arriba, con los números medidos.
+
+### B.3 · Tiempo de detección
+
+Variante (i), PoT retenido: `L` crece exactamente 1 s/s, luego la detección es casi
+determinista (200 corridas):
+
+| cola | p99 | ε | B | mediana | p99 | máx |
+|---|---:|---:|---:|---:|---:|---:|
+| lognormal | 8 | 1,0 | 21,04 | **16,0 s** | 18,0 s | 18,0 s |
+| lognormal | 16 | 1,0 | 101,43 | 94,0 s | 99,0 s | 99,0 s |
+| Pareto | 8 | 1,0 | 76,40 | 72,0 s | 72,0 s | 72,0 s |
+
+`t_det ≈ B − L(t_ataque)`, con `L` de mediana ≈ 4-5 s. **La dispersión es de 2 s: E1 no tiene
+cola de detección.**
+
+Variante (iii), retraso `E` (mediana / fracción de corridas que detectan, 200 corridas):
+
+| cola | p99 | B | E=20 | E=60 | E=200 |
+|---|---:|---:|---|---|---|
+| lognormal | 8 | 21,04 | **1,0 s / 100 %** | 1,0 s / 100 % | 1,0 s / 100 % |
+| lognormal | 16 | 101,43 | 17 129 s / **0,5 %** | 6 211 s / 68 % | 1,0 s / 100 % |
+| Pareto | 8 | 76,40 | **NUNCA** | 3 367 s / 100 % | 1,0 s / 100 % |
+
+**E1 detecta la variante (iii) en 1 segundo si `E > B`, y es ciego si `E < B`.** Con `B = 21 s`
+cubre `E ≥ 20 s`; con `B = 101 s` no ve el `E = 60 s` que la sección A.3 mostró que ya cuesta
+el 100 % de la recompensa. **Otro argumento para NO subir `B`.**
+
+Variante (ii), filtro de bloques con el PoT intacto: **0 disparos en 200 corridas de 20 000 s.
+E1 es ciego a (ii)**, como debía. Control negativo correcto.
+
+### B.4 · La persistencia no compra nada en E1
+
+Exigir que la alarma dure `m` slots equivale **exactamente** a exigir `D_s > B + (m−1)·σ`,
+porque `L` decae de forma determinista a 1 s/slot. Comprobado numéricamente (B.6): `B(m)+m−1`
+es constante (20,04 para lognormal p99=8; 1 421,41 para Pareto p99=16) y el tiempo de
+detección **no se mueve** (16,0 s para todo `m ∈ {1, 3, 10, 30}`). **DEMOSTRADO.** (En E2 sí
+comprará: allí el ruido es Poisson y no decae de forma determinista.)
+
+### B.5 · `B` del sensor y `B` de la atadura sello-slot son el MISMO número
+
+La atadura decidida (`DECISIONES.md` línea 1608) es
+`|timestamp − (TIEMPO_GENESIS + slot·σ)| ≤ B`. Un nodo honesto pone en `timestamp` su reloj de
+pared y en `slot` el último slot de PoT **que ha verificado**: la diferencia es exactamente
+`L + ε`. Luego:
+
+- si `B_consenso < B_sensor`, el nodo **emite bloques que la red rechaza sin que suene ninguna
+  alarma** — el peor de los mundos;
+- si `B_consenso > B_sensor`, la alarma llega antes de perder bloques (margen), pagando más
+  espacio de grinding al timestamp (el espacio es `2B`).
+
+**DEMOSTRADO: hay que derivarlos juntos, y `B_sensor ≤ B_consenso`.** Para «1 bloque honesto
+rechazado al año» el consenso pide `B = 20,04 s` (lognormal p99=8) y `B = 100,43 s`
+(lognormal p99=16). Este acoplamiento **no estaba escrito en ningún sitio** y es la primera
+consecuencia de esta ronda sobre una decisión ya tomada.
+
+### B.6 · Qué pasa si el timekeeper cae de verdad
+
+E1 **no distingue** eclipse de caída del timelord, y no puede: las dos se ven igual desde el
+nodo. La regla tiene que servir para las dos, y por suerte la respuesta correcta coincide:
+
+1. **MUST NOT autorizar** — sin PoT fresco el bloque es inválido por la atadura sello-slot
+   (B.5), así que no se pierde nada al no emitirlo.
+2. **MUST alertar** al operador con las dos causas nombradas.
+3. **MUST renovar pares** — es lo único que distingue las dos causas: si tras rotar a pares de
+   prefijos distintos el PoT sigue sin llegar, es caída de la red; si llega, era eclipse.
+   **Esa rotación es el discriminador, y por eso va en la regla.**
+4. **MUST NOT puntuar ni banear** a los pares por esto (C-NET-05: lento ≠ malicioso).
+
+### B.7 · Recomendación de `B`
+
+| | valor | por qué |
+|---|---|---|
+| **`B_paro` (dejar de autorizar, alertar, rotar pares)** | **30 s** | cubre `E ≥ 30 s` de la variante (iii); cuesta ≤ 2,8 % de la producción en el peor modelo de cola y 0 % en el nominal; detección de (i) en **≈ 25 s** |
+| **`B_aviso` (un comerciante no confirma)** | **10 s** | 3,3·10⁴ avisos/año bajo la hipótesis nominal, de 1,5 s de media: el comerciante espera dos segundos más, no pierde dinero |
+| **`B_consenso` (atadura sello-slot)** | **≥ `B_paro`; propuesta 30 s** | si es menor, se pierden bloques sin alarma (B.5) |
+
+**Etiqueta:** el `B = 30 s` es **PLAUSIBLE**, no VERIFICADO: descansa en la hipótesis
+«mediana del retardo del PoT = 4 s» y en una familia de colas elegida, no medida. Lo que sí
+está **VERIFICADO** es la forma cerrada, el tiempo de detección dado `B`, la insensibilidad a
+la persistencia y el coste de la falsa alarma.
+
+*(secciones C a F, pendientes)*
