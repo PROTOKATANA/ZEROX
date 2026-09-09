@@ -55,6 +55,24 @@ subsidio recalibrado son 0,0116 ZZK por transacción. El mercado de tarifas vuel
 
 **Estado: SIN BIFURCACIÓN. Es derivación, y el resultado es este.**
 
+### 2 bis · Efecto en cascada: la tarifa mínima escala con la recompensa, y hay que recalibrar `REF_WEIGHT`
+
+La tarifa mínima es `base · REF_WEIGHT / Mf²` (`SPEC.md:730`). Al bajar `base` de 1 907,35 a 14,90 ZZK, la
+tarifa mínima cae **128×** y con ella el coste de inflar la cadena: de 543 590 ZZK por GB en el diseño
+original a 4 250. **El recalibrado de la emisión, solo, debilita el antispam 128 veces.** Para conservar el
+coste del atacante hay que subir `REF_WEIGHT` en el mismo factor:
+
+| | Hoy | **Propuesto** |
+|---|---:|---:|
+| `REF_WEIGHT` | 3 000 | **384 000** |
+
+Con eso, la tarifa de lanzamiento vuelve a 54 359 brek por unidad de peso y 0,19 ZZK por transacción de 350
+bytes, exactamente lo que el SPEC publica. El SPEC ya avisaba (`SPEC.md:793-795`) de que `REF_WEIGHT` «requiere
+un modelo de coste de atacante explícito» y no es una constante cerrada: este es el momento de fijarla. La
+tarifa mínima **no es consenso** (`SPEC.md:721-725`), así que el cambio no rompe nada en cadena.
+
+**Estado: SIN BIFURCACIÓN, es derivación**, pero se descubrió al hacer el cálculo de §4 y no estaba en P-041.
+
 ---
 
 ## 3 · Ventanas en unidades de bloque
@@ -74,49 +92,46 @@ gastar antes de ser irreversible. Con el factor 120 quedan 3,33 horas contra las
 
 ---
 
-## 4 · `ZONA_LIBRE` — la decisión, y no es la que parecía
+## 4 · `ZONA_LIBRE` — la decisión, con la implicación que corrige mi primera recomendación
 
-`ZONA_LIBRE` **no limita el caudal**. Limita tres cosas: qué cabe sin penalización, cuál es el suelo de
-la mediana, y cuánto le cuesta a un atacante inflar la cadena (`SPEC.md:915`, *big bang attack*). El
-caudal instantáneo lo fija `2 · FACTOR_SURGE · Mlt`:
+> **Error mío, declarado.** En la primera versión de esta sección y en la pregunta que le hice a Katana
+> escribí que duplicar `ZONA_LIBRE` «duplica el coste del big bang attack». **Es al revés.** La tarifa
+> mínima del SPEC (§5.5) es `base · REF_WEIGHT / Mf²`, y con la mediana en su suelo `Mf = ZONA_LIBRE`:
+> el coste de llenar un bloque es `base · REF_WEIGHT / ZONA_LIBRE`, **inversamente proporcional** a la
+> constante, y como los bytes añadidos crecen con ella, **el coste de inflar un gigabyte va como
+> `1/ZONA_LIBRE²`**. Duplicarla hace el ataque **cuatro veces más barato por GB**, no más caro. Verificado
+> en `verif_zona_libre.py`, cuyo control reproduce exactamente la tabla del SPEC (54 359 y 912 brek/peso).
 
-| `ZONA_LIBRE` | Libres de penalización | Techo instantáneo | ¿Cabe el pico de 1 280? | Si fuera sostenido |
-|---:|---:|---:|:---:|---:|
-| **100 000 B** (actual) | 286 tx/s | **28 571 tx/s** | **sí** | 3 154 GB/año |
-| 200 000 B | 571 tx/s | 57 143 tx/s | sí | 6 307 GB/año |
-| 448 000 B (1 280 tx/s libres) | 1 280 tx/s | 128 000 tx/s | sí | 14 128 GB/año |
+`ZONA_LIBRE` **no limita el caudal**: el techo instantáneo es `2 · FACTOR_SURGE · Mlt`, que con la
+constante actual ya son **28 571 tx/s**, veintidós veces el objetivo de 1 280. Lo que la constante fija
+es **una sola tarifa que hace dos trabajos a la vez**: lo que paga un usuario por transacción y lo que
+le cuesta a un atacante inflar la cadena. No se puede abaratar una sin abaratar la otra.
 
-**Y lo que de verdad decide el tamaño de la cadena:**
+**Las implicaciones, con `REF_WEIGHT` ya corregido a 384 000 (ver §2 bis) y la emisión recalibrada:**
 
-| Escenario | En cadena | Crecimiento | SSD de 4 TB |
-|---|---:|---:|---:|
-| Todo el marketplace en cadena, 1 280 tx/s | 1 280 tx/s | 14,13 TB/año | **3,4 meses** |
-| Por canales, 200 000 pares liquidando a diario | 2,3 tx/s | 0,03 TB/año | 157 años |
-| Por canales, 1 M de pares liquidando a diario | 11,6 tx/s | 0,13 TB/año | 31 años |
-| Canales más 50 tx/s de tráfico directo | 50 tx/s | 0,55 TB/año | 7,2 años |
-| Canales más 285 tx/s de tráfico directo | 285 tx/s | 3,15 TB/año | 1,3 años |
+| `ZONA_LIBRE` | Libres de penalización | Techo instantáneo | Tarifa de una tx de 350 B | Coste de inflar 1 GB | Frente al diseño original |
+|---:|---:|---:|---:|---:|---:|
+| **100 000 B** (actual) | 286 tx/s | 28 571 tx/s | **0,190 ZZK** | **543 590 ZZK** | **1,00×, idéntico** |
+| 200 000 B | 571 tx/s | 57 143 tx/s | 0,048 ZZK | 135 900 ZZK | 0,25× |
+| 448 000 B | 1 280 tx/s | 128 000 tx/s | 0,009 ZZK | 27 080 ZZK | 0,05× |
 
-110 592 000 pagos al día repartidos entre 200 000 pares son **553 pagos por par y día**, que se liquidan
-en una sola transacción: **factor 553× de reducción**.
+Las tarifas son las del régimen de lanzamiento; en el régimen de cola caen unas 56× en las tres filas,
+como el SPEC ya documenta para la constante actual (`SPEC.md:779-783`).
 
-**Contra las paredes medidas del nodo doméstico** (8 núcleos, 50 Mbps de subida, SSD de 4 TB), con
-1 280 tx/s sostenidos en cadena:
+**Lo que significa cada fila para el marketplace.** Con canales de estado el usuario no paga una tarifa
+en cadena por cada pago, solo por cada liquidación, así que el argumento de «abaratar la tarifa al usuario»
+pesa poco. Lo que pesa es el otro trabajo de la constante: a 100 000 B inflar un terabyte de cadena cuesta
+más de la mitad del suministro total; a 448 000 B cuesta el 2,7 %. Y ese coste está denominado en ZZK, así
+que vale lo que valga la moneda: en los primeros meses, cuando el precio sea bajo, es cuando el antispam
+está más débil, y cuando más importa no haberlo debilitado por diseño.
 
-| Recurso | Techo | Uso | |
-|---|---:|---:|---|
-| CPU verificando firmas | 84 211 tx/s | 1,5 % | sobra |
-| Red con 8 pares | 2 232 tx/s | 57,3 % | cabe; **34 % con Erlay** |
-| Almacenamiento | 72 tx/s | **1 778 %** | **17,8× por encima** |
+**Recomendación corregida del principal: `ZONA_LIBRE = 100 000 B`, sin tocar.** Ya absorbe el pico de
+1 280 tx/s con veintidós veces de margen, conserva exactamente la economía antispam que se decidió, y con
+canales el precio por transacción no es el precio que ve el comprador. Subirla compra una tarifa más baja
+para el tráfico directo a cambio de un antispam cuatro veces más débil por cada duplicación, y ese es un
+intercambio que conviene hacer con datos de precio de la moneda, no antes del lanzamiento.
 
-**Recomendación del principal: `ZONA_LIBRE = 200 000 B`.** Duplica el margen libre de penalización sobre
-la constante actual (571 tx/s), deja el techo instantáneo en 57 143 tx/s —cuarenta y cuatro veces el
-objetivo—, y **no compromete al nodo doméstico**, porque el crecimiento real lo fija la carga sostenida y
-no esta constante. Subirla a 448 000 solo tendría sentido si el marketplace fuera a liquidar de verdad
-1 280 tx/s en cadena, y en ese caso el problema no es la constante: es que la cadena crece 14 TB al año.
-
-**BIFURCACIÓN DE KATANA.**
-
----
+**BIFURCACIÓN DE KATANA**, con la recomendación cambiada respecto a la primera versión.
 
 ## 5 · `N_LARGO` — un problema de ingeniería que aparece con el recalibrado
 
@@ -153,7 +168,8 @@ lo que la constante existía para conservar y no cuesta memoria; su riesgo es an
 | `N_CORTO` | 100 | **12 000** | derivación |
 | `COINBASE_MATURITY` | 100 | **12 000** | derivación |
 | `MAX_REORG_LENGTH` | 99 | **11 880** | derivación (superada por R-FIN-7) |
-| `ZONA_LIBRE` | 100 000 B | **200 000 B** (recomendado) | **decisión** |
+| `REF_WEIGHT` | 3 000 | **384 000** | derivación (cascada de la emisión; no es consenso) |
+| `ZONA_LIBRE` | 100 000 B | **100 000 B, sin tocar** (recomendado, corregido) | **decisión** |
 | `N_LARGO` | 262 800 | **muestreo de un año** (recomendado) | **decisión** |
 | `SOFT_CAP`, `FACTOR_SURGE`, unidad | — | **sin tocar** | — |
 
