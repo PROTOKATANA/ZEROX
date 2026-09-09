@@ -1,0 +1,4 @@
+=== C.1 · delta_0(Delta, k, lambda) medido, alpha = 0, 12 semillas ===
+instrumento: r9a_a1b_control.py (MundoL9, maniobra parasita J=31, u3=dynamic), ventana (60, T-60], horizonte 1800/lambda s.
+3216 corridas (18 Delta x 7 k x 2 lambda x 12 semillas, mas el control de alpha).
+

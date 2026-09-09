@@ -1,0 +1,3 @@
+=== C.2 · frontera, F_carrera y Delta_max con el delta_0 MEDIDO ===
+F = 7200 s (2 h, provisional), I = 4200 s, ventaja inicial 3k, objetivo union(10 anos) = 1e-10, umbral operativo 33 %, colchon 2%.
+

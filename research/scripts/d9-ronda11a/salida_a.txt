@@ -1,0 +1,31 @@
+=== A · control positivo ===
+
+--- A.1 · k* del punto fijo a D = 4 s, lambda = 1 ---
+   original verif_tau_vs_lambda.kopt(1,0) : k* = 29, delta_real = 0.2759, lambda_real = 1.3810, reversion 600 s = 4.307e-10
+   copia    r11a_lib.kopt(1,0, D=4, 80)   : k* = 29, delta_real = 0.2759, lambda_real = 1.3810, reversion 600 s = 4.307e-10
+   esperado k* = 29 (encargo)  ->  OK
+   (el diseno publica k = 30, no 29: la reversion a 600 s en k=29 y k=30 difiere
+    en un 0,3 % y `dag-poas-delta-real.md` L30-33 redondea al valor con k_Poisson
+    holgado. No es un error: es el mismo punto fijo con otro redondeo.)
+
+--- A.2 · delta_0(Delta) de 9a §5.5, con el instrumento parametrizado ---
+ Delta |  delta_0 medido  publicado 9a    |dif|       H  padres
+     4 |          0.0000        0.0000   0.0000    1665    4.92
+     8 |          0.0019        0.0020   0.0001    1665    8.82
+    12 |          0.0824        0.0828   0.0004    1665   12.18
+    16 |          0.2852        0.2858   0.0006    1665   14.11
+    20 |          0.4423        0.4428   0.0005    1665   14.75
+    24 |          0.5397        0.5401   0.0004    1665   14.75
+    32 |          0.6522        0.6526   0.0004    1665   14.68
+   -> HAY DIFERENCIAS
+
+--- A.3 · fronteras de 9a §5.5 (F = 19 080 s, I = 4 200 s, ventaja 3k = 90) ---
+ Delta   delta_0 |   frontera  publicada    |dif|
+     4    0.0000 |  46.8784%  46.8784% 4.48e-07
+     8    0.0020 |  46.8268%  46.8268% 1.08e-07
+    12    0.0828 |  44.6542%  44.6542% 1.49e-08
+    16    0.2858 |  38.3337%  38.3337% 8.89e-08
+    20    0.4428 |  32.3789%  32.3788% 6.57e-07
+   -> 5/5 OK
+
+CONTROL A: REVISAR  [658 s]
