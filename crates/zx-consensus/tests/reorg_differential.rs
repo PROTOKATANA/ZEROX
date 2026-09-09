@@ -141,18 +141,22 @@ fn tronco(bloques: usize, peso: u64) -> Cadena {
 #[test]
 fn tras_un_reorg_las_medianas_coinciden_con_las_de_un_nodo_limpio() {
     const FORK: usize = 150;
+    // Las ramas tienen que ser más largas que la ventana corta: si no, la mediana corta de las dos
+    // seguiría siendo la del tronco y la comprobación de sanidad de abajo no probaría nada.
+    const RAMA_A: usize = N_CORTO;
+    const RAMA_B: usize = N_CORTO + 10;
 
     // Rama A: bloques llenos. Rama B: bloques casi vacíos. Pesos deliberadamente muy distintos,
     // como pide C-REORG-06, para que un caché contaminado se note.
     let base = tronco(FORK, ZONA_LIBRE);
 
     let mut rama_a = base.clone();
-    for _ in 0..80 {
+    for _ in 0..RAMA_A {
         rama_a.empujar(ZONA_LIBRE * 2);
     }
 
     let mut rama_b = base.truncar(FORK);
-    for _ in 0..90 {
+    for _ in 0..RAMA_B {
         rama_b.empujar(1);
     }
 
@@ -161,7 +165,7 @@ fn tras_un_reorg_las_medianas_coinciden_con_las_de_un_nodo_limpio() {
 
     // El nodo limpio: reconstruye B desde el génesis sin haber visto A jamás.
     let mut limpio = tronco(FORK, ZONA_LIBRE);
-    for _ in 0..90 {
+    for _ in 0..RAMA_B {
         limpio.empujar(1);
     }
     let sin_reorg = limpio.mediana_efectiva_del_tip();
@@ -187,14 +191,16 @@ fn tras_un_reorg_las_medianas_coinciden_con_las_de_un_nodo_limpio() {
 #[test]
 fn un_cache_por_altura_daria_la_respuesta_equivocada() {
     const FORK: usize = 150;
+    // Más largas que la ventana corta, por la misma razón que en el test anterior.
+    const RAMA: usize = N_CORTO;
     let base = tronco(FORK, ZONA_LIBRE);
 
     let mut rama_a = base.clone();
-    for _ in 0..80 {
+    for _ in 0..RAMA {
         rama_a.empujar(ZONA_LIBRE * 2);
     }
     let mut rama_b = base.truncar(FORK);
-    for _ in 0..80 {
+    for _ in 0..RAMA {
         rama_b.empujar(1);
     }
 

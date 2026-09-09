@@ -32,11 +32,15 @@
 
 use crate::error::ConsensusError;
 
-/// Ventana de la mediana corta, en bloques. A `λ = 1` son 100 s (a `T = 120 s` eran 200 min).
+/// Ventana de la mediana corta, en bloques: 16,7 min a `λ = 1` (era 100, 200 min a `T = 120 s`).
 ///
-/// ⚠️ **P-041, decisión 3 pendiente:** en bloques (100) la sobrecarga se abre en ~100 s; en tiempo
-/// (12 000) tarda ~5 h (`research/scripts/rendimiento/verif_n_corto.py`).
-pub const N_CORTO: usize = 100;
+/// Decidida el 2026-09-10 (P-041, decisión 3). Es la ventana que abre la sobrecarga ante un pico, y a
+/// la vez la que un atacante puede capturar por azar si produce más de la mitad de sus bloques: con
+/// 1 000 no la captura nunca al 33-40 % y cada 17 días al 45 % (+3 % sobre lo que ya rellena gratis
+/// en la zona libre); a partir del 47 % es continua, pero ahí ya gana la carrera (frontera 46,9 %).
+/// Coste: una ráfaga de 1 280 tx/s tarda 25 min en absorberse del todo
+/// (`research/scripts/rendimiento/verif_n_corto_barrido.py`).
+pub const N_CORTO: usize = 1_000;
 
 /// Ventana de la mediana larga, en bloques: **un año exacto** a `λ = 1 bloque/s`.
 ///
@@ -288,7 +292,7 @@ mod tests {
 
     #[test]
     fn las_constantes_son_las_del_spec() {
-        assert_eq!(N_CORTO, 100);
+        assert_eq!(N_CORTO, 1_000, "16,7 min a λ = 1");
         assert_eq!(N_LARGO, 31_536_000, "un año exacto a λ = 1 bloque/s");
         assert_eq!(N_LARGO, 86_400 * 365, "86 400 bloques/día × 365");
         assert_eq!(ZONA_LIBRE, 100_000);

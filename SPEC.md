@@ -921,7 +921,7 @@ Reglas derivadas de `research/dynamic-blocksize.md`, que las obtuvo de
 #### Constantes
 
 ```
-N_CORTO       = 100          // bloques — 100 s a λ = 1 bloque/s ⚠️ lectura pendiente, P-041 decisión 3
+N_CORTO       = 1 000        // bloques — 16,7 min a λ = 1 bloque/s; era 100 (200 min a T = 120 s), P-041 decisión 3
 N_LARGO       = 31 536 000   // bloques — 1 año exacto a λ = 1 bloque/s (τ = 1 s)
 ZONA_LIBRE    = 100 000      // bytes de weight
 FACTOR_SURGE  = 50
@@ -946,8 +946,12 @@ MAX_TX_WEIGHT = 100 000      // bytes — igual a ZONA_LIBRE, ver C-WGT-11
 > `T = 120 s` (262 800 bloques/año, 26,3 GB/año). Al pasar a `λ = 1` se conserva el **calendario en
 > tiempo**: `N_LARGO` × 120; `ZONA_LIBRE` se mantiene por decisión de Katana (absorbe el objetivo de
 > 1 280 tx/s con 22× de margen y conserva la economía antispam; subirla abarata inflar la cadena como
-> `1/ZONA_LIBRE²`). `N_CORTO` queda por decidir: en bloques la sobrecarga se abre en ~100 s; en tiempo
-> (12 000), en ~5 h (`research/scripts/rendimiento/verif_n_corto.py`).
+> `1/ZONA_LIBRE²`). `N_CORTO = 1 000` (Katana, 2026-09-10): la sobrecarga absorbe una ráfaga de 1 280 tx/s en
+> 25 min (cola máxima 423 000 tx), y la ventana resiste al mismo adversario que el consenso: un atacante la
+> captura por azar nunca al 33-40 % y cada 17 días al 45 % (+3 % sobre lo que ya rellena gratis en la zona
+> libre); a partir del 47 % la captura es continua, pero ahí ya gana la carrera de bloques (frontera 46,9 %).
+> Con 100 la capturaba cada 8 días al 33 %; con 300, cada 2,3 h al 45 %; con 12 000 (la lectura en tiempo) la
+> ráfaga tardaba 5 h (`research/scripts/rendimiento/verif_n_corto_barrido.py`).
 
 #### Peso
 
