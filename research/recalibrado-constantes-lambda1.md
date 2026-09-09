@@ -206,21 +206,28 @@ mediana corta es la que abre la sobrecarga ante una ráfaga (C-WGT-08): hasta qu
 capados a `2 · Mlt` = 200 000 B con subsidio cero en el tope. Medido con las reglas exactas sobre cadena madura
 (`verif_n_corto.py`):
 
-| `N_CORTO` | Equivale a | Ráfaga de 600 tx/s absorbida en | Ráfaga de 1 280 tx/s absorbida en | Cola máxima a 1 280 |
-|---:|---:|---:|---:|---:|
-| **100** (actual) | 100 s | 102 s | **152 s** | 42 571 tx |
-| 1 000 | 16,7 min | 18 min | **27 min** | 457 577 tx |
-| 12 000 (× 120, en tiempo) | 3,3 h | 3,4 h | **5 h** | 5 109 006 tx |
+**Lo que se paga por la reacción rápida.** Un atacante que produzca más de la mitad de los últimos `N_CORTO`
+bloques mueve la mediana corta hasta `50 · Mlt` y, mientras dura la ventana, mete bloques de 5 MB con subsidio
+entero. Binomial exacta a `α = 0,33` y absorción medida (`verif_n_corto_barrido.py`; corrige la estimación
+anterior de «~1 GB por evento, ~73 GB/año», que era una cota inconsistente):
 
-**Lo que se paga por la reacción rápida.** Con 100 bloques, un atacante que produzca 51 de los últimos 100
-mueve la mediana corta hasta `50 · Mlt` y durante esa ventana puede meter bloques de 5 MB con subsidio entero.
-A `α = 0,33` eso ocurre por azar en ~2·10⁻⁴ de las ventanas (~0,2 veces al día): ~1 GB de cadena gratis por
-evento, ~73 GB/año (ESTIMACIÓN binomial). Con 1 000 bloques la probabilidad es ~10⁻³⁰: no ocurre. Con 12 000,
-tampoco, pero la red tarda cinco horas en absorber un pico de Navidad.
+| `N_CORTO` | Equivale a | Captura por azar al 33 % | Un evento cada | Inflado gratis (cota) | Ráfaga de 1 280 tx/s absorbida en | Cola máxima |
+|---:|---:|---:|---:|---:|---:|---:|
+| **100** (actual) | 100 s | 1,5·10⁻⁴ por ventana | **7,7 días** | 23,7 GB/año | **152 s** | 42 571 tx |
+| 200 | 3,3 min | 2,4·10⁻⁷ | 26 años | 0,0 | 302 s | 84 857 tx |
+| **300** | 5 min | 4,3·10⁻¹⁰ | **22 800 años** | 0,0 | **452 s** | 127 143 tx |
+| 500 | 8,3 min | 1,6·10⁻¹⁵ | nunca | 0,0 | 752 s | 211 714 tx |
+| 1 000 | 16,7 min | 5,1·10⁻²⁹ | nunca | 0,0 | 1 502 s | 423 143 tx |
+| 12 000 (× 120, en tiempo) | 3,3 h | 0 | nunca | 0,0 | ~5 h | 5 109 006 tx |
 
-**Recomendación del principal: `N_CORTO = 1 000` bloques.** Reacciona en 27 minutos al pico más alto que se
-ha pedido, y cierra la manipulación de la mediana corta por azar. Es una constante de consenso (entra en
-C-WGT-06): cambiarla después es hard fork.
+La captura cae de forma exponencial con `N_CORTO` y la absorción crece de forma lineal: **el intercambio no es
+simétrico**, y por eso el óptimo está cerca del extremo rápido. A 300 la captura por azar ocurre una vez cada
+22 800 años y la ráfaga más alta pedida se absorbe en siete minutos y medio con 127 000 transacciones en cola
+en el peor instante.
+
+**Recomendación del principal, corregida: `N_CORTO = 300`** (propuesto por Katana; la primera versión decía
+1 000, que compra seguridad que ya no hace falta a cambio de cuatro veces más cola). 200 es el suelo admisible.
+Es una constante de consenso (entra en C-WGT-06): cambiarla después es hard fork.
 
 **BIFURCACIÓN DE KATANA (decisión 3).**
 
