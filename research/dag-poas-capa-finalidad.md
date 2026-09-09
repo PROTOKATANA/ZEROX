@@ -114,6 +114,24 @@ durante `W_BAN = 30 días`.
 bloque (`C-HDR-04`) si se adopta la variante sin agregación, o la clave BLS que esa clave Ed25519
 declare en la coinbase de uno de sus bloques de la ventana, si se adopta la variante agregada (§5).
 
+**R-FIN-21 · El certificado compromete la tabla siguiente.** Todo certificado incluye el hash de la
+tabla de poder de R-FIN-15 que valida la **instancia siguiente**, tomando `LOOKBACK` en cuenta. Es
+el `SupplementalData.PowerTable` de F3, y es lo que hace la cadena de certificados **autosuficiente**:
+se verifica desde génesis sin tocar la cadena de bloques. Cita del FIP: *«Verifying the finality of a
+tipset from genesis does not require access to the EC chain.»*
+
+**R-FIN-22 · Certificado de época, para el cliente ligero. (HIPÓTESIS mía, no está en F3.)** Además
+del certificado por instancia, uno cada `W_EPOCA = 3 600 s` que compromete la tabla de poder de la
+**época** siguiente. Un cliente ligero sigue solo la cadena de épocas para llegar al presente y luego
+los certificados recientes que le interesen. Coste en §4.E.
+
+> **Por qué hace falta y F3 no la tiene:** Filecoin finaliza cada pocos segundos y sus clientes son
+> servidores. El nuestro es un móvil. Sin esta regla el cliente ligero baja de 21,5 GB/año a 795
+> MB/año, que sigue siendo inviable en un teléfono; con ella baja a **6,6 MB/año**.
+> **Sin verificar:** que se pueda saltar instancias sin romper la cadena de compromisos. Las dos
+> cadencias necesitan cada una su propia cadena de tablas, y que eso no abra un hueco entre ellas es
+> justo lo que hay que auditar.
+
 ## 4 · Los números
 
 Calculados hoy. Scripts en `research/scripts/finalidad-espacio/`, con criterio α declarado y
@@ -214,6 +232,31 @@ cabeceras. **`K = 4 000`.**
 la tabla de poder de R-FIN-15, no solo el ancla. Eso sigue siendo trabajo de D8 y es el punto 1 del
 encargo.
 
+### E · Lo que esta capa le hace al cliente ligero
+
+`verif_cliente_ligero.py`. **Es la ganancia mayor, y no es la finalidad.** El diseño vivo declara el
+cliente ligero estructuralmente perdido: *«SPV sin confianza no existe en GHOSTDAG y no lo arregla
+ningún parámetro»* (`dag-poas-ancla-de-orden.md:441`), con la comparación *«Bitcoin, SPV en un móvil:
+71 MB, sin confiar en nadie»* frente a *«ZEROX: nodo completo, > 21,5 GB/año»*.
+
+Con R-FIN-21 la cadena de certificados se verifica sola, sin la cadena de bloques:
+
+| Qué sigue el cliente | Por año | Ponerse al día tras 30 días |
+|---|---:|---:|
+| Cabeceras, hoy | 21,50 GB | 1 275,3 MB |
+| Certificados cada 30 s | 0,79 GB | 65,3 MB |
+| **Certificados de época, cada 1 h (R-FIN-22)** | **6,6 MB** | **0,54 MB** |
+
+En los 71 MB que le cuesta a Bitcoin toda su cadena caben **10,7 años** de certificados de época de
+ZEROX. Más la prueba de Merkle de la transacción propia, 448 bytes en un bloque de 10 000
+transacciones, que es el modelo SPV de Bitcoin recuperado.
+
+**Esto no es una mejora de la finalidad: es un crate que vuelve a existir.** `zx-lightwalletd` estaba
+condenado a servir a clientes que confían en él. Con certificados, el cliente verifica solo.
+
+**Aviso:** el certificado prueba que un bloque es final. No prueba qué hay dentro sin la prueba de
+Merkle, ni sustituye al nodo completo para validar el UTXO set. Y R-FIN-22 es hipótesis sin auditar.
+
 ## 5 · Lo que cuesta: BLS entra en la ruta de consenso
 
 Es el precio real y es una **bifurcación de Katana**, porque toca la regla de no meter dependencias
@@ -284,7 +327,9 @@ H-001, y esa lección costó cara. **Es de Katana.**
    `2/3(1−α)` sin reintroducir un registro? ¿Qué hace un atacante que apaga honestos?
 3. **D9 · permanencia (§6.1).** ¿Puede un certificado finalizar algo que R-FIN-7 no habría
    finalizado? Si sí, R-FIN-18 está mal escrita.
-4. **D8 · el certificado como vector de DoS.** Coste de verificar certificados inválidos;
+4. **D9 · las dos cadencias de R-FIN-22.** ¿Se puede saltar instancias sin romper la cadena de
+   compromisos de R-FIN-21? Si no, el cliente ligero se queda en 795 MB/año y hay que decirlo.
+5. **D8 · el certificado como vector de DoS.** Coste de verificar certificados inválidos;
    `C-NET-03/04` se calibraron para un SHA3 y ya deben rehacerse por el PoT.
 
 ## 9 · Orden recomendado
