@@ -133,31 +133,53 @@ intercambio que conviene hacer con datos de precio de la moneda, no antes del la
 
 **BIFURCACIÓN DE KATANA**, con la recomendación cambiada respecto a la primera versión.
 
-## 5 · `N_LARGO` — un problema de ingeniería que aparece con el recalibrado
+## 5 · `N_LARGO` — la ventana anual, con el ataque que el muestreo abre
 
-`N_LARGO = 262 800` bloques son un año a 120 s, y se eligió **expresamente** para absorber el ciclo
-estacional del marketplace sin penalizar el pico de Navidad (`SPEC.md:928-934`). A `λ = 1`, un año son
-**31 536 000 bloques**. El SPEC estima ~2 MB de estado con la ventana actual; con la nueva serían
-**~240 MB**, más una mediana sobre 31,5 millones de muestras en cada bloque.
+> **Segunda corrección mía, declarada.** La primera versión recomendaba «muestrear un año, un bloque de
+> cada 120». Al calcular el coste del atacante (`verif_n_largo.py`) resulta que **el muestreo determinista
+> abre una palanca de 120×**: el atacante sabe qué alturas se muestrean y solo llena esas. Mismo tiempo
+> que la ventana completa, pero el coste de mover la mediana cae de 1 457 M ZZK a 12 M. Retirada.
 
-Tres salidas:
+`N_LARGO = 262 800` bloques son un año a 120 s, elegido **expresamente** para que la mediana larga recuerde
+el ciclo estacional del marketplace y sea difícil de mover (`SPEC.md:928-934`). A `λ = 1`, un año son
+**31 536 000 bloques**: ~252 MB de estado (8 B por muestra, extrapolando los ~2 MB que el SPEC estima) y una
+mediana sobre 31,5 millones de muestras en cada bloque.
 
-1. **Mantener el año y pagar la memoria**, con mediana incremental (estructura ordenada con inserción y
-   borrado en tiempo logarítmico en vez de ordenar la ventana entera). Conserva la propiedad estacional;
-   cuesta 240 MB de estado permanente y trabajo de implementación.
-2. **Acortar la ventana** a, por ejemplo, 30 días (2 592 000 bloques, ~20 MB). Se pierde la propiedad
-   estacional que motivó el valor: la cadena olvidaría el pico de Navidad antes de la Navidad siguiente,
-   que es exactamente el defecto que el SPEC le achaca a Monero.
-3. **Muestrear la ventana**: mediana sobre una submuestra determinista de un año (por ejemplo, un bloque
-   de cada 120). Conserva la propiedad estacional con el mismo estado que hoy; hay que demostrar que la
-   mediana muestreada no abre una palanca de manipulación nueva.
+**Lo que `Mlt` protege.** Es el suelo de la mediana efectiva, del límite duro y de la tarifa mínima
+(`∝ 1/Mlt²`). Un atacante que la infle sube la capacidad sin penalización y abarata la tarifa: es la
+palanca del *big bang attack* a largo plazo. El freno estructural es C-WGT-04 (`lt_weight ≤ 1,7·Mlt`): la
+mediana sube como mucho 1,7× cada vez que el atacante consigue que **la mitad de las muestras** sean suyas.
 
-**Recomendación del principal: la opción 3, con la 1 como respaldo.** El muestreo determinista conserva
-lo que la constante existía para conservar y no cuesta memoria; su riesgo es analizable en una ronda.
+**Las cuatro salidas, con el coste del atacante a la tarifa mínima corregida:**
 
-**BIFURCACIÓN DE KATANA.**
+| Opción | Estado | Recuerda | Tiempo mínimo para mover `Mlt` 1,7× | Coste en tarifas | Frente al suministro |
+|---|---:|---:|---:|---:|---:|
+| **1 · Año completo, mediana incremental** | 252 MB | 365 días | 182,5 días | **1 457 M ZZK** | **146 %: imposible** |
+| 2 · Año muestreado, 1 de cada 120 | 2,1 MB | 365 días | 182,5 días | 12 M ZZK | 1,2 % |
+| 3 · Acortar a 30 días | 21 MB | 30 días | 15 días | 120 M ZZK | 12 % |
+| **4 · Año en cubos: mediana de cada 120** | 2,1 MB | 365 días | 182,5 días | **741 M ZZK** | **74 %** |
 
----
+**Lectura de cada fila.**
+
+- **Opción 1** conserva todo y es inatacable por tarifas: mover la mediana costaría más que todo el
+  suministro. Cuesta 252 MB de estado por nodo, una mediana incremental (dos montículos o un árbol de
+  orden, inserción y borrado logarítmicos: CPU despreciable) y reconstruir la ventana en la sincronización
+  inicial. 252 MB frente a los 26 GB anuales de cadena no es el cuello de botella.
+- **Opción 2** es la que retiro: el atacante conoce las alturas muestreadas y llena solo esas. Cien veces
+  más barata de atacar que la 1 con el mismo estado que la 4.
+- **Opción 3** pierde el ciclo estacional, que es el motivo por el que existe la constante, y además la
+  mediana se mueve doce veces más rápido.
+- **Opción 4** conserva el año y el estado pequeño, y solo abarata el ataque 2× respecto a la completa,
+  porque para mover la mediana de un cubo hay que llenar 61 de sus 120 bloques. **Pero es un estimador
+  distinto** (mediana de medianas, no mediana), y el SPEC especifica la mediana con aritmética entera exacta
+  (C-WGT-03); habría que reescribir C-WGT-05 y demostrar que el nuevo estimador no abre otra palanca.
+
+**Recomendación corregida del principal: opción 1, el año completo con mediana incremental.** No cambia
+ninguna regla del SPEC, solo cómo se implementa la mediana; es la única sin análisis adversarial nuevo; y su
+único coste, 252 MB, es el 1 % de un año de cadena. La opción 4 queda anotada como la alternativa si esos
+252 MB resultaran un problema real en el nodo doméstico, y exigiría una ronda D8 propia.
+
+**BIFURCACIÓN DE KATANA**, con la recomendación cambiada dos veces por el cálculo: primero 2, luego 1.
 
 ## 6 · Resumen de lo propuesto
 
@@ -170,7 +192,7 @@ lo que la constante existía para conservar y no cuesta memoria; su riesgo es an
 | `MAX_REORG_LENGTH` | 99 | **11 880** | derivación (superada por R-FIN-7) |
 | `REF_WEIGHT` | 3 000 | **384 000** | derivación (cascada de la emisión; no es consenso) |
 | `ZONA_LIBRE` | 100 000 B | **100 000 B, sin tocar** (recomendado, corregido) | **decisión** |
-| `N_LARGO` | 262 800 | **muestreo de un año** (recomendado) | **decisión** |
+| `N_LARGO` | 262 800 | **31 536 000, año completo con mediana incremental** (recomendado, corregido) | **decisión** |
 | `SOFT_CAP`, `FACTOR_SURGE`, unidad | — | **sin tocar** | — |
 
 ## 7 · Lo que este recalibrado NO resuelve
