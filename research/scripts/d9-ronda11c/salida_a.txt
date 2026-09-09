@@ -1,0 +1,26 @@
+=== A · CONTROL · `m` del ancla vigente (R-FIN-1, por slot) con la clausura de 9c ===
+k=30, mp=15, lambda=1, Delta=4, horizonte 260 s, u3=dynamic, P=30,
+21 umbrales S0+-10 slots, tau = 1 s, S_max = 150 s, semillas 1..12.
+Familia D9-f: {} + global(pols) + bloque a bloque(pols), pols = sp, retro 1/2/4/8/16.
+Familia +retencion: la anterior + retener TODO menos uno, liberado con
+   retraso in {0,4,12,30,60,100,149} s y politica in {tips_pub, pols}.
+REFERENCIA D9-f (salida_b1_gran1.txt, SIN clausura ni R-FIN-1a de validez):
+   m_SLOT = 1,000 / 2,079 / 2,452 / 2,917 (copias 0) y 1,000 / 2,238 / 2,540 /
+   3,024 (copias 14) para alpha = 0 / 0,10 / 0,25 / 0,40.
+
+ copias  alpha |  m sin retencion  max  estrat |  m +retencion  max  estrat |  |idx|
+      0   0.00 |            1.000    1     7.0 |         1.000    1     8.0 |    0.0
+      0   0.10 |            2.218    6    48.0 |         3.139    8   383.8 |    6.8
+      0   0.25 |            2.659    5   106.5 |         4.020    8   920.1 |   16.6
+      0   0.40 |            3.099    6   149.0 |         5.282   13  1309.7 |   23.7
+
+     14   0.00 |            1.000    1     7.0 |         1.000    1     8.0 |    0.0
+     14   0.10 |            2.258    5    48.0 |         3.222    7   383.8 |    6.8
+     14   0.25 |            2.484    5   106.5 |         3.996    8   920.1 |   16.6
+     14   0.40 |            2.901    5   149.0 |         5.365   13  1309.7 |   23.7
+
+[1547 s]  (semillas efectivas por fila: 12/12)
+
+NOTA de comparabilidad: los contadores COB/COB11 de este proceso principal solo
+cubren la corrida final; el trabajo va en subprocesos. La cobertura de rama se
+reporta en r11c_b_hipotesis.py, que la acumula dentro de cada worker.

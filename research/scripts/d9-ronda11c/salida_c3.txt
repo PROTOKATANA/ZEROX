@@ -1,0 +1,18 @@
+=== C.3 · Lema A4-slot bajo las seis reglas ===
+k=30, mp=15, horizonte 200 s, 40 vistas crecientes, 12 semillas,
+tau = 1 s, S_max = 150 s, S_ancla = 45 s, Delta = 4.0 s.
+(A4x) = «el ancla cambia => la cadena difiere en p <= idx(ancla)»: cumple/total.
+
+ alpha |            BASE              H1              H2            H1H2              H3            H1H3 |   H1H2 reparado
+  0.00 |    9914/9914       9914/9914      32247/52363      9914/9914       5087/5087       5087/5087    |    9914/9914   
+       | exceso p-idx max 0 exceso p-idx max 0 exceso p-idx max 34 exceso p-idx max 0 exceso p-idx max 0 exceso p-idx max 0
+  0.10 |    3348/3348       3348/3348      11734/24395      3360/3401       1147/1147       1147/1147    |    3401/3401   
+       | exceso p-idx max 0 exceso p-idx max 0 exceso p-idx max 62 exceso p-idx max 1 exceso p-idx max 0 exceso p-idx max 0
+  0.25 |     593/593         593/593        2284/7573        593/593           6/6             6/6       |     593/593    
+       | exceso p-idx max 0 exceso p-idx max 0 exceso p-idx max 72 exceso p-idx max 0 exceso p-idx max 0 exceso p-idx max 0
+  0.40 |     176/176         176/176         973/3116        176/176           0/0             0/0       |     176/176    
+       | exceso p-idx max 0 exceso p-idx max 0 exceso p-idx max 61 exceso p-idx max 0 exceso p-idx max 0 exceso p-idx max 0
+
+Lectura: una columna con cumple<total REFUTA el lema para esa regla, y el
+'exceso p-idx max' dice cuanto mas profundo hay que mirar. La columna reparada
+es la version del lema que SI se puede demostrar para H1H2.
