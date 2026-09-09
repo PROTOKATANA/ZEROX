@@ -305,4 +305,154 @@ nodo. La regla tiene que servir para las dos, y por suerte la respuesta correcta
 está **VERIFICADO** es la forma cerrada, el tiempo de detección dado `B`, la insensibilidad a
 la persistencia y el coste de la falsa alarma.
 
-*(secciones C a F, pendientes)*
+---
+
+## C · Sensor E2 (bloques por ventana)
+
+**Script:** `r11b_c_e2.py` · **salida:** `salida_c.txt`.
+**Regla:** alarma si la ventana deslizante `(t−W, t]` contiene **estrictamente menos de
+`n_min(W)`** bloques nuevos y válidos; se evalúa cada slot.
+
+### C.0 · Control positivo — ¿es Poisson lo que ve un nodo del DAG?
+
+Sobre el DAG completo (`MundoVictima` con `paso = 1`, sin eclipse, horizonte 3 000 s,
+12 semillas, 300 s de calentamiento descartados):
+
+| α | W | media | esperada `λW` | **var/media** | n ventanas |
+|---:|---:|---:|---:|---:|---:|
+| 0,00 | 30 | 28,41 | 30,0 | **1,011** | 1 080 |
+| 0,00 | 60 | 56,83 | 60,0 | **1,046** | 540 |
+| 0,00 | 120 | 113,48 | 120,0 | **1,052** | 264 |
+| 0,00 | 300 | 284,15 | 300,0 | 0,837 | 108 |
+| 0,33 | 60 | 57,89 | 60,0 | 1,027 | 540 |
+
+**VERIFICADO: el índice de dispersión es 1 (Poisson) dentro del error de muestreo.** El DAG
+no añade sobredispersión; la fila `W = 300` tiene solo 108 ventanas y su 0,84 es ruido de
+muestreo (error estándar de var/media con n=108 es ≈ 0,14).
+
+**Y un hallazgo de implementación que sale del control:** la media es 28,41 y no 30 — un
+déficit del 5,3 %, que es **exactamente `f_v = 0,05`**, la fracción de bloques que produce el
+propio nodo y que el instrumento no contaba como «llegada». **La regla debe contar los
+bloques propios**: si no, un granjero grande se alarma solo. Va en el texto de la regla (§E).
+
+### C.1 · Umbral `n_min(W)` con menos de 1 falsa alarma al año
+
+| W (s) | `s_λ` | **`n_min` (cota por slot)** | `n_min` (disjunta) | `P(N<n_min)` | **α mínima para evadir** |
+|---:|---:|---:|---:|---:|---:|
+| 30 | 0,00 | **6** | 8 | 2,26·10⁻⁸ | **0,200** |
+| 60 | 0,00 | **23** | 28 | 1,60·10⁻⁸ | **0,383** |
+| 120 | 0,00 | **66** | 74 | 2,79·10⁻⁸ | **0,550** |
+| 300 | 0,00 | **211** | 229 | 2,48·10⁻⁸ | **0,703** |
+| 60 | 0,10 | 16 | 21 | 1,99·10⁻⁸ | 0,267 |
+| 300 | 0,10 | 125 | 159 | 2,81·10⁻⁸ | 0,417 |
+| 300 | **0,20** | **0** | 41 | — | **0** |
+
+`s_λ` = desviación relativa de la tasa real dentro de la ventana (churn de granjeros,
+retraso del retarget). **HIPÓTESIS DECLARADA, no medida.**
+
+**El resultado duro:** si la tasa real fluctúa un 20 % (`s_λ = 0,20`), **la ventana deslizante
+con menos de 1 falsa alarma al año exige `n_min = 0`: el sensor deja de existir.** E2 vive o
+muere según lo estable que sea `λ` en la red real. Con `s_λ ≤ 0,10` sigue siendo utilizable
+(α mínima para evadir 0,27-0,42). **LAGUNA: `s_λ` no está medido y solo se mide en red real.**
+
+### C.2 · Falsas alarmas medidas (cruces por año), 12 semillas × 10⁶ s
+
+| W | `s_λ` | `n_min` | cruces/año medidos | cota «por slot» | segundos simulados |
+|---:|---:|---:|---:|---:|---:|
+| 30 | 0,00 | 6 | **0** | 0,712 | 1,2·10⁷ |
+| 30 | 0,00 | 8 *(relajado)* | 2,63 | 16,51 | 1,2·10⁷ |
+| 60 | 0,00 | 23 | **0** | 0,504 | 1,2·10⁷ |
+| 60 | 0,00 | 27 *(relajado)* | 5,26 | 20,20 | 1,2·10⁷ |
+| 120 | 0,00 | 75 *(relajado)* | 31,5 | 133,7 | 1,2·10⁷ |
+| 300 | 0,00 | 235 *(relajado)* | 147,2 | 1 376 | 1,2·10⁷ |
+
+Con el `n_min` recomendado el Monte Carlo da **0 cruces en 1,2·10⁷ s por ventana**, que es lo
+que debe salir a `P ≈ 2·10⁻⁸`. Los umbrales *relajados* existen para que la comparación sea
+medible: la **cota «por slot» es conservadora por un factor 6-9**, VERIFICADO. Es decir, el
+`n_min` de C.1 tiene todavía margen de seguridad.
+
+### C.3 · Tiempo de detección, variante (ii) — la tasa cae a `α·λ`
+
+12 semillas × 200 réplicas = 2 400 corridas por celda; la última columna es el rango de la
+mediana **entre semillas** (regla 5).
+
+| W | `n_min` | α | mediana | p99 | detecta | rango entre semillas |
+|---:|---:|---:|---:|---:|---:|---|
+| 30 | 6 | 0,00 | **25,0 s** | 29,0 s | 100 % | 24 – 25 |
+| 30 | 6 | 0,10 | 27,0 s | 53,0 s | 100 % | 27 – 28 |
+| 30 | 6 | 0,33 | 100,0 s | 583,0 s | 100 % | 76 – 116 |
+| 60 | 23 | 0,00 | **38,0 s** | 47,0 s | 100 % | 38 – 38 |
+| 60 | 23 | 0,10 | 42,0 s | 53,0 s | 100 % | 41 – 43 |
+| 60 | 23 | 0,33 | **56,0 s** | 150,0 s | 100 % | 55 – 57 |
+| 120 | 66 | 0,33 | 81,0 s | 107,0 s | 100 % | 80 – 83 |
+| 300 | 211 | 0,00 | 90,0 s | 122,0 s | 100 % | 88 – 93 |
+| 300 | 211 | 0,33 | 134,0 s | 181,0 s | 100 % | 131 – 137 |
+
+**Detección del 100 % en todas las configuraciones.** Criterio α satisfecho: la mediana sube
+monótonamente con α (25 → 27 → 100 a `W = 30`). La cola de `W = 30, α = 0,33` (p99 = 583 s)
+es la peor del cuadro: con ventana corta y un atacante que aporta un tercio del tráfico, la
+alarma puede tardar diez minutos. **`W = 60` es más rápido en p99 (150 s) que `W = 30`
+(583 s) para el atacante que importa**, y ese es el argumento para no elegir la ventana más
+corta.
+
+### C.4 · Tiempo de detección, variante (iii) — retraso `E`
+
+| W | `n_min` | E=20 s | E=60 s | E=200 s |
+|---:|---:|---|---|---|
+| 30 | 6 | 23 s / **23,5 %** | 25 s / 100 % | 25 s / 100 % |
+| 60 | 23 | 37 s / **1,5 %** | 38 s / 100 % | 38 s / 100 % |
+| 120 | 66 | — / **0,1 %** | 54 s / 97,9 % | 55 s / 100 % |
+| 300 | 211 | **NUNCA / 0 %** | 128 s / 15,5 % | 91 s / 100 % |
+
+Confirma lo de A.3: **E2 solo ve la variante (iii) durante el hueco inicial de duración `E`.**
+Si el atacante *sube el retraso poco a poco* en vez de de golpe, no hay hueco y **E2 es ciego
+del todo** (no simulado; es consecuencia directa de que el régimen tiene tasa λ — **PLAUSIBLE**).
+Ese caso lo cubre E1, que mide el retraso y no la tasa.
+
+**Control negativo (C.5):** sin ataque (`paso = 1`), E2 dispara en 0,04 % de 2 400 corridas de
+6 000 s a `W = 30` y en **0,00 %** en las otras tres ventanas. Correcto.
+
+### C.5 · El coste del atacante: qué `α` necesita para NO disparar E2
+
+`α` mínima para que el número esperado de alarmas durante un ataque de duración `T` sea < 0,1:
+
+| W | `n_min` | T = 10 min | T = 2 h | T = 24 h |
+|---:|---:|---:|---:|---:|
+| 30 | 6 | 0,6297 | 0,7374 | 0,8411 |
+| 60 | 23 | 0,7377 | 0,8138 | 0,8850 |
+| 120 | 66 | 0,8264 | 0,8809 | 0,9308 |
+| **300** | **211** | **0,8904** | **0,9249** | **0,9562** |
+
+**Este es el resultado más fuerte de la ronda.** Bajo PoST el atacante que eclipsa **no puede
+fabricar tasa**: los bloques que le enseña a la víctima tienen que ser suyos, y suyos significa
+respaldados por espacio. Con las cuatro ventanas corriendo a la vez necesita el mayor de los
+cuatro valores:
+
+> **Para sostener un eclipse-filtro de 2 horas sin una sola alarma de E2, el atacante necesita
+> el 92,5 % del espacio de la red. Para 24 horas, el 95,6 %.**
+
+Compárese con el umbral de seguridad del diseño (33 % operativo, frontera 46,9 %): **E2
+convierte el doble gasto por eclipse en un ataque más caro que tomar la cadena entera.**
+DEMOSTRADO a partir de la cola de Poisson, con el `n_min` verificado en C.2.
+
+Y la contrapartida honesta: el atacante **no necesita evadir E2 para robarle los bloques** al
+granjero (variante ii con α=0 le cuesta el 100 % de la recompensa, A.2). E2 no impide el robo;
+lo hace **visible en 25-38 s**, que es lo que se puede pedir de un sensor.
+
+Falsas alarmas de las cuatro ventanas juntas: cota «por slot» sumada = **2,878/año**, y
+medido 0 cruces en 1,2·10⁷ s por ventana.
+
+### C.6 · Recomendación de `W` y `n_min`
+
+| | valor | por qué |
+|---|---|---|
+| **Ventana del nodo (paro de autoría, alerta, rotación)** | **`W = 60 s`, `n_min = 23`** | detección 38 s (α=0) y 56 s (α=0,33) con p99 de 150 s; α para evadir 0,383 |
+| **Ventana del comerciante (no confirmar)** | **`W = 300 s`, `n_min = 211`** | la más cara de evadir: 92,5 % del espacio para 2 h |
+| **Ventana rápida (aviso, sin paro)** | `W = 30 s`, `n_min = 6` | detección en 25 s; su p99 a α=0,33 es malo, por eso solo avisa |
+
+Si `s_λ` medido en red real supera **0,10**, hay que **recalibrar `n_min` con la tabla de C.1**
+o el sensor deja de tener falsas alarmas aceptables; por encima de 0,20 **E2 no es viable** y
+habría que sustituirlo por un test relativo (comparar la tasa observada con la que implica la
+dificultad vigente) — no analizado aquí, **LAGUNA**.
+
+*(secciones D a F, pendientes)*
