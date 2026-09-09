@@ -198,3 +198,233 @@ operación** (un lado sin timekeeper ya está muerto sin (h)).
 **Verificar:** nada nuevo si se elige 4c; con 4a, el microbanco de 10a en una máquina de 4-8 núcleos con 3 líneas a 1 s/slot.
 
 ---
+
+# Parte II · Acotados con número
+
+## 5 · Carrera de bloques
+
+**Causa.** Un atacante con fracción `α` del espacio construye un flujo privado y lo publica dentro de `F`; gana si su
+`blue_work` supera al honesto (carrera de Skellam con ventaja inicial `3k`, Lema 10). Frontera de flujo único (unión a 10 años
+`< 10⁻¹⁰`): 46,9 % con `F = 5,3 h`, **44,6 % con `F = 2 h`**, 35,1 % en el modelo pesimista (`δ` de D8 ≡ `δ₀(16 s)`); el 33 %
+conserva 2,1 puntos en el peor modelo (`verif_frontera_vs_F.py`; 10b). Es el ataque de Nakamoto: ningún protocolo de cadena más
+larga lo cierra por debajo del 50 %; los 3-5 puntos que faltan hasta el 50 % son varianza y ventaja inicial.
+
+**Mejoras posibles y cuánto mueven (10b, VERIFICADO):**
+
+| Palanca | Efecto sobre `F_carrera` al 33 % | Efecto sobre la frontera a `F = 2 h` |
+|---|---|---|
+| `Δ` de 16 → 4 s | ×3,5 más corta | 35,1 → 44,6 % |
+| Ventaja `3k → 1,68k` (usar la medida, no la cota) | −3,2 min | ESTIMACIÓN +0,5 puntos |
+| Objetivo `10⁻¹⁰ → 10⁻⁶` | −4,1 min | ESTIMACIÓN +0,3 puntos |
+| `F` de 2 → 5,3 h | — | +2,3 puntos (44,6 → 46,9) |
+| `k` con `δ = 0` | `k`↑ alarga `F` | ESTIMACIÓN ±0,5 puntos |
+
+**Solución estructural que sí subiría el número: finalidad por comité (BFT) sobre el DAG.** Mecanismo: un conjunto de
+validadores con identidad (los granjeros con más espacio acreditado en la última ventana, o un conjunto abierto con
+staking) firma cada `T_fin` un bloque de la cadena seleccionada con `≥ 2/3`; un bloque firmado es irreversible aunque un
+flujo con más `blue_work` aparezca después. Precedente: Filecoin F3 (2025), tras un umbral real del ~20 %. **Cuánto arregla:**
+la reversión pasa de «probabilística con umbral 44,6 %» a «imposible por debajo de 1/3 de validadores corruptos», y `F`
+podría bajar al `T_fin` del comité (minutos). **Qué rompe:** introduce identidad, un conjunto de validadores con sus
+incentivos, y un segundo consenso; contradice P-036 (descentralización) y el modelo «sin permiso desde el bloque 1» (C-CHK-07).
+**No para v1.** HIPÓTESIS: si ZEROX lo adopta alguna vez, debería ser como Filecoin, capa opcional que los clientes pueden
+ignorar, nunca como sustituto de la regla de `blue_work`.
+
+**Solución barata que no toca consenso: el precio del ataque.** El atacante necesita **poseer** `α` del espacio durante `F`,
+no alquilar cómputo. Tres cosas mantienen ese precio alto: (i) parcelas no comprimibles ni regenerables al vuelo (laguna 39);
+(ii) el checkpoint de lanzamiento C-CHK-01..07 durante la ventana en que la red es pequeña; (iii) crecimiento del espacio
+honesto (marketing, recompensas de arranque). Ninguna cambia el 44,6 %; todas cambian cuánto cuesta llegar a él.
+
+**Cómo cambia el número.** Sin comité: 44,6 % es el techo práctico con `F = 2 h`; 46,9 % con `F = 5,3 h`; el 50 % es
+inalcanzable (varianza). Con comité: el número deja de ser una fracción de espacio y pasa a ser 1/3 de un conjunto de
+validadores.
+
+**Verificar:** `Δ` (todo depende de él); la ventaja real `3k` en régimen (D8 midió 0,56·3k; 10b: no diseñar con ella);
+si alguna vez se estudia el comité, el modelo de incentivos de F3 y su interacción con R-FIN-7.
+
+## 6 · Steering del ancla
+
+**Causa.** El ancla `I_j` es el bloque de la cadena seleccionada con menor `blue_work` entre `slot ≥ T_j`; un atacante con varios
+candidatos propios en `[T_j, T_j + S_max)` puede publicar o retener para elegir cuál queda, si sabe cuál le conviene. Saberlo
+exige evaluar la época que cada candidato produciría, y con R-FIN-14 (reto secuencial) eso exige calcular la cadena de PoT por
+delante: **0 con `ρ ≤ 1`**; con `ρ > 1`, `n_eval = ρ·W_dec` slots por candidato tras un bootstrap de días (9c E1). Con (h),
+÷279 en el rango físico y umbral `ρ* ≈ 1 + L/I` (10a).
+
+**Mejoras concretas.**
+
+**6a · Lo que ya hay, bien calibrado.** `I ≥ ρ_max·W_dec` y `I = c_m·√(n_eval/(αλ))/g` (R-FIN-14 (f)). El steering residual
+`g` con `ρ = 3` y `I = 851 s` es 3,6 % y crece como `√(ρ/ρ_max)`. Es un impuesto de desigualdad, no de seguridad: el atacante gana
+un `g` de bloques de más, no reversiones.
+
+**6b · Reducir `m` (número de candidatos) por construcción.** Hoy `m ≤ 1 + λ·S_max = 151` (cota) y 2,54 medido. Mecanismo:
+**ancla por slot exacto**: `I_j` := el bloque de la cadena seleccionada con `slot(B) = T_j` exactamente, y si no hay, el
+primero posterior. HIPÓTESIS: reduce el menú de candidatos a los bloques de un solo slot (en media `λ·τ = 1`), luego
+`m → 1 + P(dos bloques de cadena en el mismo slot) ≈ 1,2` (ESTIMACIÓN), y `g` baja como `√(m−1)`. **Qué rompe:** hay que
+comprobar que no reabre el ataque de la ronda 7 A1 (R-FIN-1a existe para eso) ni el contador de saltos de D9-c: el slot es
+índice de PoT, no cuenta, así que en principio no. **Verificar:** repetir D9-f B1 con la regla y medir `m`; 12 semillas.
+
+**6c · Desempate del ancla por `solution_distance` en vez de por `blue_work`.** HIPÓTESIS: entre candidatos del mismo slot,
+elegir el de menor `solution_distance` (la magnitud que el atacante no controla: R-FIN-6 ya desempata así) en vez del menor
+`blue_work` (que el atacante sí puede afectar reteniendo). Reduce el steering porque el atacante no elige cuál de sus
+candidatos «gana» el desempate. **Qué rompe:** el Lema A4-slot (Prop. 7 cubre el ancla) usa `blue_work`; habría que
+reescribirlo. **Verificar:** la prueba del lema con el desempate nuevo; simulación de `m`.
+
+**6d · (h)** ya analizada: divide por 279, cuesta `1 + L/I` en verificación.
+
+**Cómo cambia el número.** `g` con `ρ = 3`: 3,6 % hoy; con 6b (ESTIMACIÓN `m ≈ 1,2`) ~1,6 %; con (h) a `ρ ≤ 2,5`, 0,007 %
+por época (10a). Y con `ρ ≤ 1` (reloj honesto igual o más rápido), 0 en todos los casos.
+
+**Verificar:** 6b y 6c con el instrumento de D9-f (`r8f_*`) y la clausura de publicación de 9c (laguna 41).
+
+## 7 · Soborno del ancla
+
+**Causa.** D8 A5: `m = b + 1` comprando `b` retenciones ajenas, incluso con `α = 0`. Con R-FIN-14 y `ρ ≤ 1`, tener más
+candidatos no compra nada porque no se pueden evaluar (9c E1). Queda la variante de BDK (laguna 40): el sobornante regala su
+cadena de PoT adelantada al sobornado, y el sobornado renuncia a su coinbase honesta (R-FIN-8′) — «arbitrarily small stake»
+deja de ser cierto.
+
+**Mejoras concretas.** (a) **6b** (ancla por slot exacto) reduce lo que un soborno puede comprar: solo bloques del mismo slot.
+(b) **Coste de oportunidad explícito:** con R-FIN-8′ el bloque sobornado que acaba en la rama perdedora no cobra; el precio del
+soborno ≥ una coinbase por candidato retenido. ESTIMACIÓN: con `m` útil ≈ 2, el soborno cuesta ≥ 2 coinbases por época y
+compra `g ≈ 3,6 %` de una época de `I·λ = 851` bloques ≈ 31 bloques para el sobornante: rentable si `α_sobornante` grande,
+no rentable para `α < 6 %` (HIPÓTESIS aritmética: 31·α ≥ 2). (c) **Retención visible:** un bloque publicado más de `S_max`
+después de su slot es inválido (R-FIN-1a); un bloque publicado entre `W_dec` y `S_max` es sospechoso de retención y puede
+llevar una **penalización de coinbase** (HIPÓTESIS de regla: coinbase × `(1 − (t_pub − slot)/S_max)`, donde `t_pub` se
+aproxima por el slot del primer bloque que lo referencia). **Qué rompe:** castiga también al granjero lento honesto; con
+`Δ_p99 ≤ 16 s` y `W_dec = 45 s` el castigo honesto sería `< 30 %` en el peor caso y 0 en régimen. Es un intercambio entre
+desigualdad y censura de lentos (punto 10). **Verificar:** modelo de soborno con coste de oportunidad (laguna 40) y la
+penalización en simulación con retrasos reales.
+
+**Cómo cambia el número.** De «soborno gratis con `α = 0`» a «≥ 2 coinbases por época y solo rentable con `α` grande»;
+con (c), el bloque retenido pierde además parte de su propia coinbase.
+
+## 8 · Sembrador rápido (plotter con lookahead)
+
+**Causa.** Un atacante que conozca los retos futuros puede sembrar parcelas específicas para ganarlos y desecharlas.
+10c (VERIFICADO en D y F por el principal; A y B en verificación): lookahead honesto **0** bajo R-FIN-14; atacante con `ρ > 1`:
+`(F − W_dec) + I(1 − 1/ρ)` slots (el `F` viene de que la entropía del ancla se conoce `F` antes de aplicarse); es un
+acantilado en `ρ = 1`: `ρ = 1,001` ya da el 82-96 % de `ρ = 10`, y `ρ` grande solo acorta el bootstrap. Margen frente a un
+plotter 10× mejor que la extrapolación: 1,9× a `F = 2 h`, 3,6× a `F = 1 h`; con (h), 2,8-5,5×. El sembrador impone un
+**máximo** a `F` (o a `L`).
+
+**Mejoras concretas.**
+
+**8a · Desatar `L` de `F`** (10c E, PLAUSIBLE): el lookahead depende de `L` (rezago con que se aplica la entropía del ancla),
+no de `F` (finalidad). Hoy `L = F` sin necesidad. Con `L = 1 h`, `F = 2 h`, `ρ_max = 3`: lookahead 4 146 s, margen 3,6×,
+`W/κ = 0,58` dentro del tope literal de BDK, sin (h). **Qué cuesta:** la tolerancia a particiones baja a `L` (un lado
+partido más de `L` inyecta entropías distintas ⇒ flujos distintos). **Qué rompe:** hay que comprobar que `L < F` no reabre
+«conocer `entropía_j` antes de elegir `I_{j+1}`» (ronda 7 marcó `L ≥ I` como condición; con `L = 1 h > I = 851 s` se cumple).
+**Verificar:** repetir 9c C (`W_dec`) y D9-f B1 (`m`) con `L = 1 h`; y la regla de partición con `L`.
+
+**8b · Reto que no dependa de la entropía del ancla hasta el último momento: cadena de PoT «ciega».** HIPÓTESIS de
+mecanismo: en vez de inyectar `entropía_j` en `t_j` como semilla, **mezclarla en cada slot**: `semilla(f, s) = blake3(salida(f, s−1)
+‖ entropía_j)` para todo `s ≥ t_j`. No cambia nada para `ρ ≤ 1` (ya es 0) y **tampoco** para `ρ > 1` (la entropía sigue
+conocida `F` antes): descartado en el análisis; se deja escrito para no repetirlo.
+
+**8c · Reducir la ventaja del plotter por diseño de la parcela.** El sembrador solo sirve si sembrar un sector cuesta menos que
+`lookahead/N_sectores_útiles`. Autonomys pone un coste de sector fijo (`coste-ploteo-medido.md`: 69 s en GTX 1070, 4,3 s
+extrapolado a GPU 2026). Mecanismo: **subir el coste de sembrado por unidad de espacio probado**, p. ej. exigir que el
+`history_size` de la parcela tenga al menos `A` segmentos de antigüedad (C-EXP-04 con `altura_ploteo ≤ blue_work(punta) −
+F·λ·w̄`, R-FIN-10) — ya existe y es exactamente esta defensa: una parcela recién sembrada no puede ganar hasta que su
+`history_size` madure. **Cuánto arregla:** si la maduración `≥ lookahead`, el sembrador no llega. HIPÓTESIS: hoy la
+maduración es `F·λ·w̄` en `blue_work`, es decir ≈ `F` en tiempo; con `L < F` (8a), maduración `F` > lookahead `L`: **el sembrador
+queda fuera por construcción**. **Verificar:** que R-FIN-10 (C-EXP-04) se aplique a la parcela, no solo al mapeo, y que la
+maduración se cuente desde la publicación del segmento, no desde la siembra.
+
+**Cómo cambia el número.** Margen 1,9× (hoy) → 3,6× (8a) → «sin ventana» si la maduración de parcela supera `L` (8c,
+HIPÓTESIS).
+
+**Verificar:** a1/b de 10c (en curso), 8a con `m` y `W_dec` re-medidos, y la lectura de C-EXP-04/R-FIN-10 frente a la parcela.
+
+## 9 · Ráfagas planificadas con adelanto
+
+**Causa.** Con `ρ > 1` el atacante conoce sus victorias antes y planifica retenciones; 10a B.6: una carrera por segundo durante
+10 años cuesta 0,46 puntos en la cota, < 0,08 real. LAGUNA: retención selectiva con oráculo de victorias propias.
+
+**Mejora.** Ninguna necesaria: el número está por debajo del ruido de la medida de `δ` (±9 min de `F`). Si (h) se adopta, el
+adelanto baja 5,5× (10a). **Verificar:** el oráculo de victorias futuras en `r8c_sim.py` (laguna 41, misma herramienta).
+
+## 10 · Censura por `S_max`
+
+**Causa.** R-FIN-1a exige `slot(B) − slot(sp(B)) ≤ S_max`; un granjero cuya vista va retrasada produce bloques inválidos.
+Con `S_max = 150 s`, ~0; con 20 s, 71-77 %. `S_max` se co-determina con `m ≤ 1 + λ·S_max` (steering) y con la tolerancia a
+particiones (`f ≥ 9 %`).
+
+**Mejora concreta: `S_max` en dos escalas.** HIPÓTESIS de regla: `S_max_validez = 150 s` (como hoy, para validez) y
+`S_max_ancla = 45 s` (= `W_dec`) solo para **ser candidato a ancla**: un bloque publicado más de 45 s después de su slot es
+válido y cobra, pero no puede ser `I_j`. **Cuánto arregla:** la cota del steering pasa de `m ≤ 1 + λ·150 = 151` a
+`m ≤ 46` sin censurar a nadie (la validez sigue a 150 s). **Qué rompe:** hay que definir «publicado» de forma determinista
+(HIPÓTESIS: `slot` del primer bloque de la cadena seleccionada que lo referencia), y comprobar que no reabre D9-c (contador
+que el atacante fabrica): el slot del primer referenciador lo fija el PoT, no el atacante, salvo que el atacante sea el
+referenciador, y entonces solo puede **retrasar** su candidatura, no adelantarla. **Verificar:** D9-f B1 con la regla.
+
+**Cómo cambia el número.** Censura: 0 (igual). Cota de `m`: 151 → 46; `F ≤ 68,5 h` garantizado → ESTIMACIÓN ≤ 25 h.
+
+## 11 · DoS de verificación del PoT
+
+**Causa.** Verificar cuesta 96,1 ms/slot; un atacante que envíe cabeceras con slots adelantados podría forzar verificaciones.
+Asimetría 16,2× a favor del verificador (medida), y las cabeceras con slot por delante del PoT verificado se retienen.
+
+**Mejora concreta.** (a) Regla explícita (1a-ii): PoT por slot al llegar por gossip, una vez; cabeceras cuyo slot supere el PoT
+verificado + 10 slots (Autonomys `MAX_SLOTS_IN_THE_FUTURE = 10`, `gossip.rs:30`) se descartan con penalización de peer
+(C-NET-05). (b) Verificación en orden aleatorio de checkpoints (10a B.2.b): sube la asimetría a 32,4× contra prefijos largos
+correctos. (c) `EXPECTED_POT_VERIFICATION_SPEEDUP` de Autonomys (`gossip.rs:32`, valor 7): si hay más pruebas distintas que
+compensa verificar, el nodo calcula la suya. **Cómo cambia el número.** 16,2× → 32,4×; y el trabajo por slot queda acotado a
+una verificación por slot por nodo, independiente del número de cabeceras. **Verificar:** en `zx-p2p`, el coste por segundo
+bajo inundación de cabeceras con 10 pares maliciosos.
+
+## 12 · Particiones
+
+**Causa.** Dos lados producen flujos distintos tras `F` (o `L`); R-FIN-5 impide referenciar el flujo ajeno; al reunirse, el lado
+con menos `blue_work` se descarta. Hasta `F`, tolerada si el lado conserva ≥ 9 % del espacio (`S_max = 150 s`; D9-d A4).
+
+**Mejoras concretas.** (a) **Curación por fusión** (Kaspa): al reunirse antes de `F`, los bloques del lado minoritario se
+fusionan como rojos y **cobran** (R-FIN-8′ `rojo_k`): nadie pierde recompensa, solo orden. Ya está. (b) **Después de `F`:**
+el lado minoritario se pierde entero. Mecanismo para reducir la pérdida: **detección de partición** por los sensores del
+punto 2 (tasa de bloques cae a `f·λ`, PoT sigue) ⇒ el lado minoritario **sabe** que está partido en 1-2 min y puede
+**dejar de aceptar transacciones como confirmadas** (los comerciantes de ese lado no entregan mercancía). No evita la pérdida
+de bloques, evita el doble gasto. (c) **`L < F`** (8a) reduce la tolerancia a `L`: es el precio del margen frente al sembrador;
+con `L = 1 h`, las particiones de 1-2 h pasan de curables a no curables. HIPÓTESIS: particiones de más de 1 h en una red
+pública son raras (incidentes BGP típicos de minutos), pero un ataque de red dirigido puede sostenerlas: 12b lo hace visible.
+**Cómo cambia el número.** Tolerancia: `F = 2 h` (hoy) o `L = 1 h` (8a); pérdida del lado minoritario tras la ventana: igual;
+doble gasto en el lado minoritario: de posible a detectable en ~1-2 min. **Verificar:** 11b (sensores) y la regla de partición
+con `L`.
+
+## 13 · Recalibración de iteraciones a mitad de época
+
+**Causa.** R-FIN-9: `slot_iterations` cambia y se aplica en `t_j`; con (h), congelado en `slot(I_j)`. Acotado por regla.
+
+**Mejora.** Ninguna necesaria. HIPÓTESIS de refuerzo: limitar el cambio por época a ±10 % (Autonomys usa un retarget de
+iteraciones lento) para que un timekeeper que acelere no fuerce a los demás a quedarse fuera de golpe (#2141). **Verificar:**
+el retarget de iteraciones de Autonomys (`pot_parameters_change`, `verifier.rs:270-280`) y su cadencia.
+
+## 14 · Residuo de la cadena parásita
+
+**Causa.** Tras R-FIN-8′/13′ el ataque no renta y no revierte, pero sigue existiendo: bloques honestos en rojo (pagados), y
+transacciones que se aplican en el orden del mergeset en vez de en el de llegada. Parasitar sigue siendo gratis a `α` pequeño.
+
+**Mejoras concretas.** (a) **El sensor de `Δ`/parásita (1e)** como métrica: la fracción de rojos sostenida es la firma.
+(b) **Hacer que parasitar cueste:** HIPÓTESIS de regla, **coinbase de un bloque rojo escalada por su anticono**: un `rojo_k`
+cobra `coinbase × k/|anticone ∩ azules|` (≤ 1). Un bloque honesto que cae en rojo por `Δ` tiene anticono ≈ `k + 2Δλ` y cobra
+casi entero; un bloque parásito publicado en ráfaga de `J*` tiene anticono grande y cobra poco. **Qué rompe:** hay que
+comprobar que no reabre la inflación (no: solo reduce) ni castiga a los honestos a `Δ` alto (a `Δ = 16 s` un honesto rojo
+cobraría ≈ 30/38 = 79 %). Y que la parásita no lo esquive publicando en ráfagas más cortas (entonces `δ` baja: 9a L4). Es
+un intercambio con el punto 10. **Verificar:** en `verif_parasita.py` y `r9b_d_coste.py` con la regla, 12 semillas.
+**Cómo cambia el número.** Rentabilidad 0,99 → ESTIMACIÓN 0,7-0,8; `δ` igual; honestos a `Δ = 4 s` sin cambio.
+
+## 15 · Tolerancia a particiones = `F` (o `L`)
+
+**Causa y mejora.** Ver 12 y 8a. Es una elección, no un defecto: `L` corto compra margen frente al sembrador y vende
+tolerancia. **Cómo cambia el número.** `F = 2 h` / `L = 1 h`. **Decisión de Katana (F1).**
+
+## 16 · Umbral operativo 33 % frente al 46,9 % teórico
+
+**Causa.** El 33 % es lo que se publica con colchón frente a `Δ` no medido y al modelo pesimista. El 46,9 % es la frontera a
+`Δ = 4 s`, `F = 5,3 h`; a `F = 2 h`, 44,6 %.
+
+**Mejoras.** (a) Medir `Δ` y publicar el colchón real (si `Δ_p99 ≤ 8 s`, el 33 % tiene 11-14 puntos y se podría publicar
+**40 %**; ESTIMACIÓN con la tabla de 10b). (b) Subir el techo teórico: solo el comité (5) o reducir la varianza de la carrera
+(bloques más frecuentes: `λ = 2/s` reduce la varianza relativa de Skellam pero sube `2Δλ`; ESTIMACIÓN +0,5-1 punto, no
+compensa el coste en `Δ`). **Cómo cambia el número.** Publicado: 33 % → hasta 40 % con `Δ` medido bajo. Teórico: 44,6-46,9 %,
+techo 50 %. **Verificar:** `Δ`.
+
+---
