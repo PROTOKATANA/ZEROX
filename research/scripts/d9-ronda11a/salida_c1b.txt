@@ -1,0 +1,3 @@
+=== C.1b · criterio alpha con la rafaga del Lema 9 ESCALADA con k ===
+3840 corridas; J in {k+1, 2k, 3k, 96}, 12 semillas, se toma el J que MAXIMIZA delta (protocolo de r10b_b2b_delta_k.py).
+

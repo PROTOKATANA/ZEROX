@@ -27,6 +27,29 @@ en A.1.
 
 ---
 
+## A · Control positivo · **LOS TRES PASAN**
+
+**Script:** `r11a_a_control.py` → `salida_a.txt` (380 s).
+
+| Control | Exigido | Medido | |
+|---|---|---|---|
+| **A.1** `k*` a `D = 4 s`, `λ = 1` | `k* = 29` | `k* = 29`, `δ_real = 0,2759`, `λ_real = 1,3810`, reversión 600 s `4,307·10⁻¹⁰` — **con el original y con la copia parametrizada, bit a bit** | **OK** |
+| **A.2** `δ₀(Δ)` de 9a §5.5 | 0,0000 / 0,0020 / 0,0828 / 0,2858 / 0,4428 / 0,5401 / 0,6526 | **idénticos a la cuarta cifra, los siete** | **7/7 OK** |
+| **A.3** fronteras de 9a §5.5 | 46,8784 / 46,8268 / 44,6542 / 38,3337 / 32,3788 % | idénticas, `|dif| ≤ 6,6·10⁻⁷` | **5/5 OK** |
+
+**Un matiz sobre A.1 que conviene dejar escrito:** el punto fijo da `k* = 29` y el diseño publica
+`k = 30`. La reversión a 600 s alrededor del óptimo es `k=28: 4,60·10⁻¹⁰ · k=29: 4,31·10⁻¹⁰ ·
+**k=30: 4,34·10⁻¹⁰** · k=31: 4,66·10⁻¹⁰`: `k = 30` es un **0,74 % peor** que `k = 29` y las dos
+redondean a `4,3·10⁻¹⁰`, que es la cifra de dos dígitos que publica `dag-poas-delta-real.md` L30-33.
+**El óptimo es plano.** No hay error en el diseño; sí hay que saber que la elección entre 29 y 30 no
+la decide este criterio.
+
+**Un cuarto control, que salió gratis:** `F_carrera(33 %)` con `δ = 0` e `I = 851 s` da
+**875 / 948 / 1 019 / 1 157 s** para `k = 20/25/30/40` en D.3 — los cuatro valores de la tabla (i) de
+10b B.2, reproducidos exactamente.
+
+---
+
 ## B · `k*(Δ)` — el punto fijo del retarget · **VERIFICADO, y con un límite duro que nadie había visto**
 
 **Script:** `r11a_b_kestrella.py` → `salida_b.txt` (75 s). `τ = 1 s`, objetivo del punto fijo:
@@ -57,7 +80,7 @@ Con `λ = 1/2` (un bloque cada 2 s), `τ = 1 s`:
 **Lo que dice la tabla, en tres frases.**
 
 1. **`k*(Δ)` es casi lineal en `Δ`:** `k* ≈ 2Δλ/0,41` para `Δ ≥ 8 s`, es decir `k* ≈ 4,9·Δλ`. La comparación a `2Δλ` igual es instructiva y **no** da igualdad en todo el rango: `2Δλ = 24` → 61 y 61, `2Δλ = 32` → 78 y 78 (**iguales**); pero `2Δλ = 8` → 29 frente a 24 y `2Δλ = 16` → 45 frente a 43 (**distintos**). El motivo es que las dos restricciones (`λ_real ≤ 2λ` y el punto fijo de Poisson) sí dependen solo de `2Δλ`, mientras que el objetivo —la reversión en una ventana **de 600 s**— no es invariante de escala: con `λ = 1/2` caben la mitad de bloques en esa ventana. Donde el objetivo satura (`Δ` grande) manda `2Δλ` y las columnas coinciden; donde el objetivo discrimina (`Δ` pequeño), `λ = 1/2` pide **menos** `k` porque su `δ_real` es menor.
-2. **El punto fijo se rompe antes que el colchón.** A partir de `Δ ≈ 16 s` con `λ = 1` (y `Δ ≈ 12 s` con `λ = 1/2`) **la reversión a 600 s vale ≈ 1 para el `k*` que el propio criterio elige**, y a `Δ ≥ 20 s` vale exactamente 1 **para todo `k` admisible**. La razón es mecánica y está en el Lema 10 (`phantom-ghostdag.txt` L1200-1206): la ventaja de *freeloading* es **`3k`**, y con `k* = 96` son **288 bloques azules** que la red honesta tendría que remontar en 600 s, cuando su deriva neta en esa ventana es de ~193. **Subir `k` compra tolerancia a `Δ` y se la quita a la confirmación rápida.** La fila `Δ = 32 s`, `k* = 235` es un artefacto de ese empate: todos los `k` admisibles dan reversión 1,00 y `kopt` se queda con el primero que no la supera. **No es un `k` recomendable; es la marca de que ahí el criterio ya no discrimina.** Etiqueta: **REFUTADO** que el punto fijo de `verif_tau_vs_lambda.py` siga siendo un criterio de diseño útil por encima de `Δ ≈ 16 s`.
+2. **El punto fijo se rompe antes que el colchón.** A partir de `Δ ≈ 16 s` con `λ = 1` (y `Δ ≈ 12 s` con `λ = 1/2`) **la reversión a 600 s vale ≈ 1 para el `k*` que el propio criterio elige**, y a `Δ ≥ 20 s` vale exactamente 1 **para todo `k` admisible**. La razón es mecánica y está en la **cota del gorrón (Lema 12)**: `phantom-ghostdag.txt:1172` enuncia el *Freeloader Bound* y su demostración cierra en `:1203-1204` con `score(C) ≤ score(B) + 3k` (y `:804`: *«up to 3k blocks which it can freeload»*); esa `3k` es la **ventaja inicial** de la carrera de Skellam del Lema 10 (`:1205-1207`) que `prev()` implementa. La ventaja de *freeloading* es **`3k`**, y con `k* = 96` son **288 bloques azules** que la red honesta tendría que remontar en 600 s, cuando su deriva neta en esa ventana es de ~193. **Subir `k` compra tolerancia a `Δ` y se la quita a la confirmación rápida.** La fila `Δ = 32 s`, `k* = 235` es un artefacto de ese empate: todos los `k` admisibles dan reversión 1,00 y `kopt` se queda con el primero que no la supera. **No es un `k` recomendable; es la marca de que ahí el criterio ya no discrimina.** Etiqueta: **REFUTADO** que el punto fijo de `verif_tau_vs_lambda.py` siga siendo un criterio de diseño útil por encima de `Δ ≈ 16 s`.
 3. **`k*` de esta tabla NO es el `k` que hay que publicar.** `δ_real` es la **cota del Lema 9** (caso peor del paper, bajo sesgo sostenido del retarget), no una medida. Lo medido a `α = 0` es `δ₀`, y es **mucho menor** (regla 6: cota ≠ realidad). El `k` operativo sale de C, no de B.
 
 **El coste que B sí acota y conviene retener:** `mergeset_size_limit` solo se despega de su suelo de 180 cuando `k > 90` (`bps.rs:75-85`), y `max_block_parents` está **topado en 16** desde `k = 32` (`bps.rs:57-72`). Por eso la columna «cabeceras/año» **no se mueve con `k`**: son 21,5 GB/año a `λ = 1` y 10,8 GB/año a `λ = 1/2`, y lo que las cambia es `λ`, no `k`.

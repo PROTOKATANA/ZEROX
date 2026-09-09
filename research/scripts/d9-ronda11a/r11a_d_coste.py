@@ -51,15 +51,23 @@ def delta_real(k, D=D_DIS, lam=1.0):
     return 2 * D * lr / (k + 2 * D * lr), lr
 
 
+T_MAX = 5e4          # techo del instrumento, ver abajo
+
+
 def t_confirmacion(alpha, k, d0, lam=1.0, obj=1e-10):
     """Tiempo (s) tras el cual la reversion de UNA transaccion cae por debajo de `obj`,
-    con la ventaja inicial 3k del Lema 10. NO es la union por epocas: es una transaccion."""
+    con la ventaja inicial 3k del Lema 10. NO es la union por epocas: es una transaccion.
+
+    LIMITE DEL INSTRUMENTO, declarado: `prev()` evalua la Skellam sobre `ds in [-400, 60000)`
+    (`r9a_a3_frontera.py:36`). La deriva honesta en `t` es ~`(1-2a)*lam*t`, asi que por encima
+    de `t ~ 6e4 s` (a lam = 1) la masa se sale del array y el resultado seria un artefacto de
+    truncamiento. Se busca solo en [10, 5e4] s y fuera se devuelve nan."""
     g = lambda t: np.log10(max(A.prev(alpha, lam, t, 3 * k, 1 - d0), 1e-320)) - np.log10(obj)
-    if g(2e5) > 0:
+    if g(T_MAX) > 0:
         return float("nan")
     if g(10.0) < 0:
         return 10.0
-    return brentq(g, 10.0, 2e5, xtol=1.0)
+    return brentq(g, 10.0, T_MAX, xtol=1.0)
 
 
 if __name__ == "__main__":
