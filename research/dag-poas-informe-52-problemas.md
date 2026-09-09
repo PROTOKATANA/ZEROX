@@ -611,3 +611,205 @@ leer `rusty-kaspa/consensus/src/processes/pruning_proof/` y comprobar qué usa d
 pruning point» (ESTIMACIÓN 4-5 GB/año + UTXO).
 
 ---
+
+# Parte V · Lagunas de medida o de teoría — qué medir, calcular o demostrar, y una estimación acotada
+
+## 35 · `Δ` real
+
+**Qué es.** El retardo efectivo honesto↔honesto con cola (p99), con la verificación de PoT dentro y bajo carga. Todo el colchón
+depende de él. **Qué medir.** Red de pruebas con decenas de nodos (`zx-node` con el DAG), latencias inyectadas por región,
+bloques a tamaño máximo, un atacante de red que retrase, y el sensor 1e activo. Medir `Δ_p50`, `Δ_p99`, `Δ_max` por hora y la
+distribución de anticonos. **Estimación acotada (HIPÓTESIS, no dato):** Kaspa a 1 bps con bloques pequeños asume `D ≤ 10 s` con
+`k = 18`; Bitcoin propaga un bloque al 90 % de la red en ~2-4 s con compact blocks (datos públicos de propagación 2023-2025,
+no citados aquí: LAGUNA de fuente). Con bloques compactos y PoT por slot, **`Δ_p99` entre 4 y 10 s** es lo esperable en una
+red pequeña bien conectada; 16-20 s solo bajo ataque de red o con nodos mal provisionados. **Cómo cambia el número.** Si sale
+≤ 8 s, colchón 11-14 puntos y `F` de producción 1 h; si 12-16 s, `k = 40` (1b) y `F = 2 h`; si ≥ 20 s, rediseñar (`λ = 1/2` o KNIGHT).
+
+## 36 · Proposición 7 bajo las reglas añadidas
+
+**Qué es.** La convergencia del orden total de GHOSTDAG está probada sobre GHOSTDAG puro. La propuesta añade U3″ (coloreado
+con filtro de identidad), R-FIN-5 (flujos) y R-FIN-8′ (rojos que cobran). Los Lemas A4/A4b/A4-slot transfieren la cobertura
+del ancla (141 967/141 967 y 13 110/13 110 casos); la composición completa es PLAUSIBLE. **Qué demostrar.** (i) Que U3″ es un
+**posprocesado determinista del mergeset** que no cambia la cadena seleccionada (`blue_work` se calcula con U3″ aplicada, luego
+sí la cambia: hay que demostrar que la cambia de forma monótona, es decir, que el `blue_work` con U3″ sigue cumpliendo la
+Propiedad 1 del paper); (ii) que R-FIN-5 solo **restringe** el conjunto de DAG válidos (todo DAG con un solo flujo es un DAG de
+GHOSTDAG puro), luego Prop. 7 se aplica dentro de cada flujo tal cual — **DEMOSTRABLE en una página, HIPÓTESIS**; (iii) que
+R-FIN-8′ no toca el orden (solo qué se aplica), luego no toca Prop. 7 — trivial. El único punto real es (i). **Estimación
+acotada.** El riesgo de que (i) falle está acotado por lo medido: nueve rondas de simulación con U3″ y adversario del paper no
+han visto una no-convergencia; D9-d midió `δ_ef = 0,129` con U3″ frente a 0,379 con el filtro antiguo. **HIPÓTESIS:** (i) se
+demuestra viendo U3″ como una regla de coloreado que solo puede **quitar** azules del mergeset (nunca añadir), y GHOSTDAG con
+menos azules por mergeset sigue siendo un `k`-cluster; la monotonía de `blue_work` bajo ancestría (Lema A4b) ya está probada
+con peso real. **Cómo cambia el número.** Nada si se demuestra; todo si falla. **Verificar:** una ronda D9 dedicada solo a (i),
+con el paper y `r8c_gd.py`.
+
+## 37 · Ventaja inicial `3k` como cota
+
+**Qué es.** El atacante puede empezar la carrera con hasta `3k` bloques de ventaja (cota del paper); medido, 0,56·3k
+(D8, con parásita). **Qué medir.** La distribución de la ventaja inicial real en régimen, con y sin parásita, 12 semillas,
+`α ∈ {0,25; 0,33; 0,40}`. **Estimación acotada.** ESTIMACIÓN: 1,7k-2,1k a 10 años (10b: extrapolación 2,1k). **Cómo cambia el
+número.** `F_carrera` −3,2 min; frontera +0,5 puntos (ESTIMACIÓN). No merece diseñar con ella.
+
+## 38 · Velocidad máxima real de un ASIC de AES
+
+**Qué es.** `ρ_max`. Estimación del principal 1,5-2,5×; Autonomys cita un estudio de Supranational («no significant speedup»)
+no localizado; Chia 3,1-3,8× en otra primitiva. **Qué buscar/medir.** (i) El estudio de Supranational (pedirlo a Autonomys;
+buscar en su foro y en el repositorio de `subspace` la referencia). (ii) Literatura de AES de latencia mínima en ASIC: una
+ronda de AES sin pipeline en 7 nm ≈ 0,25-0,4 ns (HIPÓTESIS, sin fuente), frente a 0,48 ns del AESENC a 6,2 GHz ⇒ `ρ ≈ 1,2-1,9×`.
+(iii) Medir `prove` por slot en 3-4 CPU (Zen 5, Raptor Cove, Apple M4: AES en ARMv8 tiene latencia similar). **Cómo cambia el
+número.** Si `ρ_max ≤ 2,5`: (h) barato o innecesario; steering sin (h) `g ≤ 3,3 %` con `ρ_max = 3` diseñado. Si `ρ_max ≥ 5`:
+(h) necesario y `I` mayor.
+
+## 39 · Compresibilidad de las parcelas de Autonomys
+
+**Qué es.** Si una parcela se puede regenerar al vuelo con GPU más barata que el disco (lección de PoS 2.0 de Chia), el precio
+del ataque 5 baja. **Qué medir/leer.** El formato de sector de Autonomys (`subspace-farmer-components`, `sector.rs`): el
+sector se deriva de `history_size` + clave + índice con codificación de borrado y una PoS por pieza (`subspace-proof-of-space`,
+tabla de Chia k=20 por «chunk»); medir cuánto tarda regenerar un sector (coste-ploteo-medido: 69 s en GTX 1070, 4,3 s
+extrapolado) frente a la ventana en que sirve (un slot). **Estimación acotada.** HIPÓTESIS: como el reto exige el sector
+completo y la PoS por chunk, «sembrar al vuelo» cuesta ≥ 4 s por sector y sirve para 1 slot: `841 GiB/h` por GPU tope
+(10c A.4) frente a `~1 PiB` de red mínima ⇒ un plotter al vuelo cubre `< 0,1 %` del espacio por hora: **no rentable** salvo con
+lookahead grande (por eso importa `L`). **Cómo cambia el número.** Si la parcela fuera comprimible ×2 (como Chia), el coste
+del ataque 5 baja ×2: el 33 % costaría lo que hoy el 16,5 %. **Verificar:** leer `sector.rs` y `subspace-proof-of-space`;
+buscar en el foro de Autonomys «compressed plots».
+
+## 40 · Soborno de BDK portado a espacio
+
+**Qué es.** BDK19 muestra que en PoS un sobornante con poca participación compra bifurcaciones porque el sobornado no pierde
+nada al firmar dos ramas. En PoAS bajo R-FIN-8′ el sobornado **renuncia a su coinbase** en la rama perdedora, y no sabe que va a
+ganar hasta el slot. **Qué modelar.** Un modelo de soborno con coste de oportunidad: el sobornante paga `≥ coinbase` por
+bloque retenido; el beneficio es `g` de bloques en la época siguiente (punto 7). **Estimación acotada.** HIPÓTESIS aritmética
+del punto 7: no rentable para `α_sobornante < 6 %`; para `α = 0,33`, compra ~31 bloques por 2 coinbases: rentable ×15.
+**Cómo cambia el número.** Si el modelo confirma la rentabilidad a `α` grande, el punto 7 deja de ser «acotado» y necesita 7c
+(penalización por retención) o 6b. **Verificar:** el modelo, con `κ+1` de `2κ+1` slots en `F·λ` bloques (10c B.5).
+
+## 41 · `m` con retención posiblemente inflada
+
+**Qué es.** Los simuladores de D8/D9-c..f permitían publicar un hijo de un bloque retenido, imposible en la red real; 9c lo
+corrigió con la clausura de publicación. Las `m` «con retención» (2,82-2,96) pueden estar infladas. **Qué medir.** Repetir
+D8 A4.2 y D9-f B1 con la clausura de `r9c_lib.py` en `r8c_sim.py`/`d8_lib.py`, 12 semillas. **Estimación acotada.** HIPÓTESIS:
+`m` real con retención entre 2,54 (sin retención, medida) y 2,82: el diseño ya usa 2,548. **Cómo cambia el número.** `I`
+±10 %. **Verificar:** la re-medición.
+
+## 42 · Resolución de la ventana de decisión
+
+**Qué es.** `W_dec ≤ 45 s` medida con rejilla `{0, 10, 20, 45, …}` y tope de 10 candidatos. **Qué medir.** Rejilla de 5 s y
+sin tope, 12 semillas (33 min por corrida en 9c). **Estimación acotada.** `W_dec ∈ [20, 45]` s (el menú vive en los
+primeros 10-20 s). **Cómo cambia el número.** `I ≥ ρ_max·W_dec` baja hasta ×2; `ρ*` de (h) sube (10a: `(L+I)/(I+W_dec)`).
+
+## 43 · Unidades de `W` y `κ` en un DAG
+
+**Qué es.** Si `W` (ventana de retarget) se cuenta en bloques del DAG (`λ = 1/s`) y `κ` en bloques de cadena (`λ_chain =
+0,2/s`), la razón se multiplica ×5,2-5,8 (10c B.5). **Qué calcular.** Fijar las unidades en el texto de R-FIN-13: **todo en
+índices de PoT (slots)**, que es lo que dice la regla («ventana de `W` índices de PoT»); entonces `W/κ` es adimensional y la
+razón vieja no aplica. **Estimación acotada.** Con unidades en slots, `W/κ = 1 + I/F` y el criterio BDK (`≤ 1`) es
+insatisfacible como 10c demostró; el criterio correcto es el de 10c B (pinza real 1 198-2 488 s). **Verificar:** reescribir
+R-FIN-13 con la unidad explícita.
+
+## 44 · Composición de retraso alto y parásita a `Δ ≥ 16 s`
+
+**Qué es.** El teorema de la ráfaga vale mientras `2Δλ ≪ k`; a `Δ = 20 s` `W_pub/H = 0,936 < 1`. **Qué medir.** Repetir el A2
+de 9a con `Δ ∈ {12, 16, 20}` (7 200 corridas). **Estimación acotada.** HIPÓTESIS: a `Δ = 16 s` la composición resta 1-3
+puntos más sobre los 38,3 %; a 20 s el 33 % ya está perdido sin parásita. **Cómo cambia el número.** Solo a `Δ` alto; con
+1b (`k = 40`) se recupera `2Δλ ≪ k` hasta 20 s.
+
+## 45 · Régimen de más de 15 puntas
+
+**Qué es.** `max_block_parents = 15` (`k/2`); el `shuffle` reparte, pero nadie ha medido con > 15 puntas simultáneas (ocurre
+con `Δ` alto: `λΔ` puntas). **Qué medir.** Simulación de eventos con `Δ ∈ {16, 24}` (16-24 puntas), midiendo bloques que
+quedan fuera y durante cuánto. **Estimación acotada.** HIPÓTESIS: con `shuffle`, ningún bloque queda fuera más de
+`k/2/λΔ ≈ 1` ronda; sin `shuffle`, 14-21 fuera para siempre (D9-d). **Cómo cambia el número.** Nada si el shuffle funciona.
+
+## 46 · Economía con precios supuestos
+
+**Qué es.** `A*`, márgenes frente al plotter y almacenamiento de ganadores usan precios de GPU, disco y energía supuestos.
+**Qué medir.** Precios de mercado (disco €/TiB, GPU €/h, energía) en la fecha de lanzamiento; recomputar `A*` y el margen.
+**Estimación acotada.** El margen 3,6× (8a) es robusto a ±50 % en precios (HIPÓTESIS: el margen escala linealmente con el
+precio del ploteo). **Cómo cambia el número.** ±50 %.
+
+## 47 · Parásita y copias a la vez
+
+**Qué es.** 9b no midió la combinación. **Qué medir.** `r9b_d_coste.py` con copias U3 activas, 12 semillas. **Estimación
+acotada.** HIPÓTESIS: las copias son `rojo_U3` inertes, no cobran ni cuentan en el retarget: no añaden rentabilidad; ocupan
+`mergeset_size_limit` (griefing menor, acotado por `6k`). **Cómo cambia el número.** Rentabilidad 0,99 → 0,99 (HIPÓTESIS).
+
+## 48 · Incentivo a fusionar rojos
+
+**Qué es.** Con coinbase propia, nadie cobra por incluir un rojo; en Kaspa cobra el fusionador (y eso duplica la parásita).
+**Qué decidir/medir.** ¿Hace falta incentivo? `pick_virtual_parents` fusiona por defecto (R-FIN-12), sin coste para el
+fusionador; el riesgo es un fusionador que **excluya** rojos a propósito (censura de rojos): sus bloques valen igual. HIPÓTESIS:
+un incentivo pequeño (1-5 % de la coinbase del rojo al fusionador) no reabre la parásita (9b midió que el 100 % la duplica;
+el efecto es lineal ⇒ 5 % ⇒ +5 %). **Verificar:** `r9b_d_coste.py` con reparto 95/5.
+
+## 49 · Bloques fusionados fuera de la ventana del retarget (`mergeset_non_daa`)
+
+**Qué es.** Kaspa excluye del DAA los bloques del mergeset cuyo `daa_score` cae fuera de la ventana. R-FIN-13′ no lo escribe.
+**Qué escribir.** Regla: un bloque fusionado con `slot` fuera de la ventana vigente **no cuenta** en `N_obs` (igual que
+Kaspa, `daa/window`); sí cobra (R-FIN-8′). **Estimación acotada.** Afecta a bloques con retraso > `W_RETARGET` slots (≥ 3 083 s):
+solo particiones; efecto sobre el retarget < 0,1 % (HIPÓTESIS). **Verificar:** leer `rusty-kaspa/consensus/src/processes/window.rs`.
+
+## 50 · Empalme conteo-peso
+
+**Qué es.** `φ_c` está probado sobre conteo; `blue_work` es peso. Acotado por R-FIN-13 (`W ≥ 3 083`, `γ ≤ 0,25`): < 1 %,
+< 0,4 puntos; Lema E1 (la deriva se cancela). **Qué demostrar.** Que `Σ w(SR)` sobre azules con retarget acotado es
+`(1 ± ε)·conteo·w̄` sobre cualquier ventana `≥ W`: es una cota de variación del retarget, ya calculada
+(`dag-poas-empalme-peso.md`). **Estimación.** ε < 1 %. Cerrable con una página.
+
+## 51 · `c_a = c_h` en unidades de índice
+
+**Qué es.** BDK Lema 13 cuenta sobre la cadena seleccionada del propio pasado; el ancla por slot cuenta índices de PoT. Tres
+lecturas dan 40,7 / 41,2 / 41,9 %: mueve 1,2 puntos. **Qué demostrar.** Rehacer el Lema 13 con el ancla por slot: los índices
+de PoT son los mismos para todos (reloj infalsificable), luego `c_a = c_h` **por construcción** (HIPÓTESIS fuerte: con ancla
+por slot la laguna desaparece, porque ya no hay «unidades de índice de orden»). **Cómo cambia el número.** +1,2 puntos si se
+confirma. **Verificar:** una página de D9.
+
+## 52 · Coste del PoT por slot o por bloque en las reglas anti-DoS
+
+**Qué es.** `C-NET-03/04` se calibraron con «validar cuesta un SHA3». **Qué escribir.** Con 1a-ii: el coste por cabecera es
+O(1) (comparar contra el slot verificado) y el coste por slot es 96,1 ms una vez; el umbral anti-DoS de C-NET-04 pasa a
+contarse en slots pendientes de verificar (≤ 10, como Autonomys) y no en trabajo por cabecera. **Estimación.** Presupuesto:
+1 núcleo verifica 10 slots/s; con `MAX_SLOTS_IN_THE_FUTURE = 10`, el peor caso por segundo es acotado. **Verificar:**
+reescribir C-NET-03/04 y medir bajo inundación (11).
+
+---
+
+# Resumen · Qué tendría más impacto y en qué orden
+
+## Las soluciones con más impacto, ordenadas
+
+| # | Solución | Problemas que toca | Impacto | Coste | Estado |
+|---|---|---|---|---|---|
+| 1 | **Medir `Δ_p99` en red de pruebas** con el DAG en `zx-node` | 1, 5, 16, 35, 44, 45 | Decide el colchón entero; sin ella todo es condicional | Implementar el nodo (semanas) | Bloqueado por las decisiones de Katana |
+| 2 | **Desatar `L` de `F`** (`L = 1 h`, `F = 2 h`, `ρ_max = 3`) | 8, 15, 4 (lo evita), 6 | Margen frente al sembrador 1,9× → 3,6× sin segundo candado; `W/κ` dentro de BDK | Tolerancia a particiones 2 h → 1 h; re-medir `m` y `W_dec` | PLAUSIBLE (10c E); decisión F1 |
+| 3 | **PoT por slot, nunca por bloque** (regla en C-NET-03/04) | 1, 11, 52 | Quita 96 ms/slot de la ruta de propagación; acota el DoS | Una regla y su implementación | Redacción pendiente |
+| 4 | **Los dos sensores de eclipse + la tabla de Bitcoin Core** como C-NET | 2, 12 | Eclipse detectable en 30-120 s; comerciante protegido | Reglas de nodo, sin consenso | 11b en curso |
+| 5 | **`k` con etiqueta de `Δ` tolerado** (posible `k = 40`) | 1, 44, 23 | Colchón hasta 20 s en vez de 16 | +cabeceras, `F_carrera` algo mayor; hard fork si se cambia después | 11a en curso |
+| 6 | **Standby automático de timekeeper** (el TODO de Autonomys) | 3, 32 | Parón de «indefinido» a ~3 s | Implementación en `sc-proof-of-time` | Diseño escrito |
+| 7 | **Sensor de `Δ`/parásita desde el DAG** | 1, 14, 35 | Convierte la laguna en métrica | Módulo de métricas | Diseño escrito |
+| 8 | **Ancla por slot exacto y desempate por `solution_distance`** (6b/6c) | 6, 7, 10 | `m` 2,54 → ~1,2 (ESTIMACIÓN); soborno más caro | Reescribir Lema A4-slot; re-medir | HIPÓTESIS; una ronda D9 |
+| 9 | **Demostrar Prop. 7 con U3″** (36) y `c_a = c_h` por slot (51) | 36, 51 | Cierra la única deuda que podría invalidar el diseño; +1,2 puntos | Una ronda D9 de teoría | Pendiente |
+| 10 | **Maduración de parcela ≥ `L`** (R-FIN-10 aplicado a la parcela) | 8, 39 | El sembrador queda fuera por construcción | Verificar la lectura de C-EXP-04 | HIPÓTESIS |
+| 11 | **Poda por `blue_work` sin niveles de PoW** y PoT por época | 34, 29 | Estado de nodo acotado | Diseño nuevo sobre el pruning de Kaspa | Investigación |
+| 12 | **SPV sobre la cadena seleccionada** (28a) | 28 | 21,5 GB/año → 2-4 GB/año con confianza parcial | Compromisos en cabecera de cadena | Investigación |
+| 13 | **Segundo candado (h) calibrado a `ρ_max = 2,5`** | 6, 7, 8, 4 | Steering ÷279; margen sembrador 2,8-5,5× | 0,15 núcleos/nodo, 3 líneas, lookahead 3,3 h | Decisión F2; compite con la fila 2 |
+| 14 | **DAG KNIGHT bajo PoAS** | 1, 14, 30 | Única respuesta estructural a `Δ` | Meses; sin precedente en producción | Post-beta |
+| 15 | **Comité BFT sobre el DAG** | 5, 30, 31 | Único camino por encima del 50 % y a confirmaciones de minutos | Identidad, validadores, segundo consenso | Post-beta, si alguna vez |
+
+## El orden que recomiendo
+
+1. **Esta semana, decisiones de Katana:** F1 (`L` desatada: sí, con `L = 1 h`), F2 (sin candado a `ρ_max = 3`, con (h) como
+   opción escrita), F3 (`F = 2 h` hasta medir), F4 (`k` según 11a). Con eso se congelan constantes.
+2. **Redacción en el SPEC:** PoT por slot (fila 3), reglas anti-eclipse y sensores (fila 4), `mergeset_non_daa` (49), unidades
+   de R-FIN-13 (43), C-NET-03/04 (52).
+3. **Implementar el DAG en `zx-node`** con el orden como pieza sustituible, standby de timekeeper (fila 6) y el sensor de
+   `Δ` (fila 7).
+4. **Medir `Δ`** (fila 1) y, con el número, fijar `F` de producción, `k` definitivo y el umbral publicado.
+5. **Una ronda D9 de teoría** (fila 9) y **una D8 adversarial** sobre el diseño corregido entero, con las lagunas 40, 41, 44,
+   47, 48 dentro.
+6. **Después de la beta:** poda (fila 11), SPV parcial (fila 12), KNIGHT (fila 14).
+
+## Lo que este informe no ha podido cerrar
+
+Todo lo marcado HIPÓTESIS o ESTIMACIÓN. Las dos hipótesis más fuertes, que conviene atacar primero porque cambian más si
+fallan: que la maduración de parcela (R-FIN-10) deje al sembrador fuera por construcción (fila 10), y que el ancla por slot
+exacto no reabra los ataques de las rondas 7 y D9-c (fila 8). Y las dos medidas sin las que nada de esto tiene colchón
+conocido: `Δ_p99` y `ρ_max`.
