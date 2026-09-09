@@ -300,7 +300,7 @@ con (c), el bloque retenido pierde además parte de su propia coinbase.
 ## 8 · Sembrador rápido (plotter con lookahead)
 
 **Causa.** Un atacante que conozca los retos futuros puede sembrar parcelas específicas para ganarlos y desecharlas.
-10c (VERIFICADO en D y F por el principal; A y B en verificación): lookahead honesto **0** bajo R-FIN-14; atacante con `ρ > 1`:
+10c (VERIFICADO por el principal: A.1, B, C.2, D y F reproducidos idénticos): lookahead honesto **0** bajo R-FIN-14; atacante con `ρ > 1`:
 `(F − W_dec) + I(1 − 1/ρ)` slots (el `F` viene de que la entropía del ancla se conoce `F` antes de aplicarse); es un
 acantilado en `ρ = 1`: `ρ = 1,001` ya da el 82-96 % de `ρ = 10`, y `ρ` grande solo acorta el bootstrap. Margen frente a un
 plotter 10× mejor que la extrapolación: 1,9× a `F = 2 h`, 3,6× a `F = 1 h`; con (h), 2,8-5,5×. El sembrador impone un
@@ -333,7 +333,7 @@ maduración se cuente desde la publicación del segmento, no desde la siembra.
 **Cómo cambia el número.** Margen 1,9× (hoy) → 3,6× (8a) → «sin ventana» si la maduración de parcela supera `L` (8c,
 HIPÓTESIS).
 
-**Verificar:** a1/b de 10c (en curso), 8a con `m` y `W_dec` re-medidos, y la lectura de C-EXP-04/R-FIN-10 frente a la parcela.
+**Verificar:** 8a con `m` y `W_dec` re-medidos, y la lectura de C-EXP-04/R-FIN-10 frente a la parcela.
 
 ## 9 · Ráfagas planificadas con adelanto
 
@@ -485,7 +485,7 @@ descartada. Nada lo reabre.
 
 ## 26 · «Todo granjero conoce sus victorias con antelación» (refutado: lookahead honesto 0)
 
-Cierre: 10c A (en verificación). **Lo tocarían:** **8a** (`L < F`) no lo cambia para `ρ ≤ 1`; **1d** (KNIGHT) tampoco: el
+Cierre: 10c A (verificado). **Lo tocarían:** **8a** (`L < F`) no lo cambia para `ρ ≤ 1`; **1d** (KNIGHT) tampoco: el
 lookahead lo fija el PoT secuencial (R-FIN-14), no el orden. Nada lo reabre.
 
 ## 27 · Reloj AES 19× (no es físico)
@@ -555,13 +555,13 @@ publicarlo con colchón. **Cómo cambia el número.** 44,6-46,9 % teórico; 33-4
 ## 31 · Suelo de confirmación de 100-134 s
 
 **Causa.** La ventaja inicial `3k` del atacante en la carrera: hasta que los honestos acumulan `3k` bloques por encima, ninguna
-confirmación es posible (10c C, en verificación): `3k/((1−α)λ) ≈ 100-134 s`.
+confirmación es posible (10c C, verificado): `3k/((1−α)λ) ≈ 100-134 s`.
 
 **Cambios posibles.** (a) **Reducir `3k`**: es cota, la real medida es 0,56·3k (D8) ⇒ suelo real ~60-75 s; diseñar con la medida
 no es legítimo (10b) pero **publicar** el suelo real como orientación al comerciante sí. (b) **Confirmaciones probabilísticas
 antes del suelo:** un comerciante con transacción pequeña acepta riesgo `10⁻³` a los 300 s con `α = 0,25` (tabla de 10c:
 `2,2·10⁻⁴`). (c) **`λ` mayor** no ayuda (sube `3k` en bloques igual). (d) Comité (5). **Cómo cambia el número.** 100-134 s
-estructural; 60-75 s si se publica la ventaja medida como estimación; minutos con comité. **Verificar:** 10c C (a1/b en curso).
+estructural; 60-75 s si se publica la ventaja medida como estimación; minutos con comité. **Verificar:** nada más; 10c C verificado.
 
 ## 32 · Barrera de hardware y centralización del timekeeper
 

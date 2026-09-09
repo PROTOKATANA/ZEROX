@@ -3,7 +3,7 @@
 **2026-09-09, madrugada.** Lista completa de lo que la propuesta `research/dag-poas-ancla-de-orden.md` (§2, con R-FIN-8′,
 13′ y 14; umbral 33 %; `F = 2 h` provisional) presenta como problema, ataque, coste o laguna, con su estado. Compilada de
 las auditorías 3..8c, la bitácora del 2026-09-08 §2/§6, los informes de la ronda 10 (10a y 10b verificados por el
-principal en sus scripts decisivos; **10c en verificación**), `pot-aes-asic-chacha.md`, `dag-poas-mitigaciones-cuatro-riesgos.md`
+principal en sus scripts decisivos; **10c verificado**), `pot-aes-asic-chacha.md`, `dag-poas-mitigaciones-cuatro-riesgos.md`
 y `timelord-redundancia-informe.md`.
 
 **Estados.** CERRADO: regla escrita y verificada que lo neutraliza. ACOTADO: existe, tiene número y se acepta como
@@ -20,7 +20,7 @@ parámetro arregla. DECISIÓN: depende de una elección pendiente de Katana.
 | A2 | **Cadena parásita** | Ráfagas de `J* = kα/(1−2α)` bloques que tiñen de rojo `δ = α/(1−α)` de los honestos; legal e invisible para R-FIN-7 | Rentabilidad 1,16-1,55 → **0,99**; reversiones 64-142 s → 0; retarget ×1,45 → ×1,005. El `δ` no entra en la carrera (doble conteo) | **CERRADO** en lo económico (R-FIN-8′/13′); residuo ACOTADO | D8 A1; 9a; 9b |
 | A3 | **Steering del ancla** | Elegir entre sus candidatos a `I_j` el que le da más victorias en la época | 0 con `ρ ≤ 1` (R-FIN-14); con `ρ > 1`, `n_eval = ρ·W_dec` tras bootstrap; con (h), ÷279 hasta `ρ* ≈ 1 + L/I` | **ACOTADO**, condicionado a `ρ_max` (E6) | 9c; 10a B.1 |
 | A4 | **Soborno del ancla** | Compra retenciones ajenas: `m = b + 1` candidatos, incluso con `α = 0` | Con `ρ ≤ 1` tener más candidatos no compra nada (no puede evaluarlos) | **ACOTADO**; el porte del soborno de BDK a PoAS con coste de oportunidad de R-FIN-8′ es **LAGUNA** | D8 A5; 10c B.5 |
-| A5 | **Sembrador (plotter rápido)** | Conoce retos por adelantado y siembra discos solo para ganarlos | Lookahead honesto **0**; atacante `(F − W_dec) + I(1 − 1/ρ)` si `ρ > 1`, 0 si `ρ ≤ 1`. Margen frente a plotter 10×: 1,9× (`F = 2 h`), 3,6× (`F = 1 h`); con (h) 2,8-5,5× | **ACOTADO**, condicionado a `ρ_max`; palanca `L` desatada de `F` (F1) | 10c A (en verificación) |
+| A5 | **Sembrador (plotter rápido)** | Conoce retos por adelantado y siembra discos solo para ganarlos | Lookahead honesto **0**; atacante `(F − W_dec) + I(1 − 1/ρ)` si `ρ > 1`, 0 si `ρ ≤ 1`. Margen frente a plotter 10×: 1,9× (`F = 2 h`), 3,6× (`F = 1 h`); con (h) 2,8-5,5× | **ACOTADO**, condicionado a `ρ_max`; palanca `L` desatada de `F` (F1) | 10c A (verificado) |
 | A6 | **Copias de billete** (misma identidad, varios bloques) | Inflar recompensa o espacio con el mismo billete | Sin cláusula: ×15 (699 copias rojas por 51 billetes). Con U3″ + `rojo_U3` inerte: 1 azul por identidad | **CERRADO** (R-FIN-11, R-FIN-8′) | D9-c; D9-d; 9b |
 | A7 | **Timewarp / grinding del retarget** | Falsificar sellos para mover `solution_range` | `slot` = índice de PoT, no sello; deriva se cancela (Lema E1); un bloque por identidad en `N_obs` | **CERRADO** (R-FIN-13/13′) | D9-e; 9b |
 | A8 | **Ráfagas planificadas con adelanto** | Con `ρ > 1` conoce retos antes y planifica retenciones | Una carrera por segundo durante 10 años: −0,46 puntos; caso real < 0,08 | **ACOTADO**; retención selectiva con oráculo propio: **LAGUNA** | 10a B.6 |
@@ -60,10 +60,10 @@ parámetro arregla. DECISIÓN: depende de una elección pendiente de Katana.
 | D3 | **Poda** | Sin niveles de PoW; justificación de PoT 4 GB/año; podabilidad sin investigar (P-034) | **LAGUNA** | propuesta §4.9; DECISIONES §19 |
 | D4 | **Verificación de PoT no sucinta** | 96,1 ms/slot = 9,6 % de un núcleo continuo; con (h) +0,15 a +0,81 núcleos según calibración | ESTRUCTURAL (elegido frente a C++/GMP) | bench; 10a C |
 | D5 | **Umbral por debajo del 50 %** | 46,9 % teórico, 33 % publicado (Chia ~40 %, Bitcoin 50 %) | ESTRUCTURAL (familia PoST) | 9a |
-| D6 | **Suelo de confirmación** | Ninguna confirmación posible antes de `≈ 3k/((1−α)λ) = 100-134 s`, con ninguna `F` | ESTRUCTURAL | 10c C (en verificación) |
+| D6 | **Suelo de confirmación** | Ninguna confirmación posible antes de `≈ 3k/((1−α)λ) = 100-134 s`, con ninguna `F` | ESTRUCTURAL | 10c C (verificado) |
 | D7 | **Barrera de hardware del timekeeper** | Clase 14900KS; con (h) ×`(q+1)` líneas | ESTRUCTURAL / DECISIÓN | 10a B.3 |
 | D8 | **Tolerancia a particiones = `F`** (o `L` si se desata) | 2 h; 1 h si `L = 1 h` | ACOTADO / DECISIÓN | R-FIN-7; 10c E |
-| D9 | **Previsión propia** | «Todo granjero conoce sus victorias `L` por adelantado» (§4.8) | **REFUTADO** bajo R-FIN-14: lookahead honesto 0 | 10c A (en verificación) |
+| D9 | **Previsión propia** | «Todo granjero conoce sus victorias `L` por adelantado» (§4.8) | **REFUTADO** bajo R-FIN-14: lookahead honesto 0 | 10c A (verificado) |
 
 ## E · Lagunas de teoría y de medida (lo no demostrado)
 
@@ -92,7 +92,7 @@ parámetro arregla. DECISIÓN: depende de una elección pendiente de Katana.
 
 | # | Decisión | Opciones con número | Fuente |
 |---|---|---|---|
-| F1 | **`L` desatada de `F`** | `L = 1 h`, `F = 2 h`, `ρ_max = 3`: margen frente al sembrador 3,6×, `W/κ = 0,58` dentro de BDK, sin (h); coste: tolerancia a particiones 2 h → 1 h. PLAUSIBLE | 10c E (en verificación) |
+| F1 | **`L` desatada de `F`** | `L = 1 h`, `F = 2 h`, `ρ_max = 3`: margen frente al sembrador 3,6×, `W/κ = 0,58` dentro de BDK, sin (h); coste: tolerancia a particiones 2 h → 1 h. PLAUSIBLE | 10c E (verificado) |
 | F2 | **`ρ_max` y el segundo VDF (h)** | Sin (h): admitir 3× (`I = 851 s`, `F ≥ 0,69-1,07 h` por la pinza). Con (h): seis piezas de 10a; calibración barata (`I = 4 725 s`, 0,15 núcleos, `q+1 = 3`, lookahead 3,3 h) o cara (`I = 851 s`, 0,81 núcleos, `q+1 = 10`, 0,9 h) | 10a D; 10c D |
 | F3 | **`F` de producción** | 1 h condicionada a `Δ_p99 ≤ 14,9 s`; a 1 h el 33 % conserva 0,05 puntos en el pesimista, 9 en el verificado; el usuario no gana nada en riesgo (`prev` no lleva `F`) | 10b C; 10c C |
 | F4 | **`k` con margen** | 30 aguanta 16 s; 40-60 para 20-24 s a costa de cabeceras y `F_carrera`; es hard fork después | mitigaciones §1.2 M2 |

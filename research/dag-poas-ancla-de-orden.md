@@ -256,6 +256,13 @@ la velocidad de AES de un atacante frente al timekeeper. **(g)** Los `t_j` son d
 L·iter)`, revelada en `t_j`), que lleva la evaluación del atacante a 0 para cualquier `ρ` al coste de un VDF más.
 **Lo que compra (9c, verificado):** con `ρ ≤ 1` el steering por elección de ancla es **0** (evaluar un candidato
 exige conocer la cadena común `L` slots por delante); con `ρ > 1`, `n_eval = ρ·W_dec` tras un *bootstrap* de días.
+**Corrección a (h) (10a, verificado 2026-09-09):** la afirmación de 9c §E.5 «con (h) el steering es 0 para cualquier `ρ`» es
+**FALSA** (la ronda 7 tenía razón): las entradas del VDF son públicas y el atacante lo calcula él; (h) divide el steering por
+**279** en el rango físico (`ρ ≤ 2,5`) y lo anula solo hasta `ρ* = (L + I)/(I + W_dec)` (9,2 con `I = 851 s`, `L = 2 h`).
+**Protección y coste son el mismo número** (`ρ* ≈ 1 + L/I` = multiplicador de verificación por nodo): a `ρ_max = 2,5` basta
+`I = 4 725 s` (0,15 núcleos/nodo, `q + 1 = 3` líneas). Regla operativa completa en seis piezas (h.1)-(h.6), incluida (h.3′)
+«la entropía se calcula, no se publica», en `research/scripts/d8-ronda10a/informe.md` §A.6 y `auditoria-9a.md` §1. Vector nuevo
+si se adopta: un lado de partición sin `q + 1` líneas de AES no produce bloques válidos aunque conserve su espacio.
 `I` deja de escalar como `1/g²`: `I = c_m·√(n_eval/(αλ))/g`, y `F = max(F_carrera, I/(W/κ − 1))`.
 
 **R-FIN-6 · Color.** El k-cluster de GHOSTDAG con `k = 25`, sin condición de color por flujo
@@ -366,13 +373,18 @@ Y **no toca el PoT ni la prueba de espacio**: cambia de dónde se lee el inyecto
    número delgado del diseño.**
 3. **`W/κ = 1,22`:** sigue dentro del régimen que BDK marca, aunque un 22 % en vez de un 250 %. **Es
    una elección, no una derivación**, y hay que escribirla con esa etiqueta.
+   **Corrección (10c, verificado 2026-09-09):** `1,22` es el valor que salió a `F = 3,2 h`, no un umbral; BDK marca `≤ 1,00` y
+   `1 + I/F > 1` siempre bajo la `W` antigua. Con `W` recalculada bajo R-FIN-14 y `ρ ≤ 1`, `W/κ = 0,0007`; la pinza real a
+   `ρ > 1` es 1 198-2 488 s (`ρ` = 1,5-3, `I = 851 s`), no 3 868 s (`auditoria-9c.md` §2). Y **`L` no tiene por qué ser `F`**:
+   el lookahead del sembrador depende de `L`; `L = 1 h`, `F = 2 h`, `ρ_max = 3` da margen 3,6× y `W/κ = 0,576` (decisión F1).
 4. **Umbral ~40,7 %** (`Lema 9 ⊗ φ_c`, `δ = 0,242`). Menor que el 50 % de Nakamoto. Chia está en
    40,5 %. Es la factura de la familia PoST.
 5. **Tolerancia a particiones = `F` = 3,2 h.** Más allá, split permanente entre flujos.
 6. **Cabeceras y coinbases** a `q = 1`: 17,5 GB/año y 31,5 M salidas/año (~1,3 GB/año de UTXO).
 7. **Rojos sin aplicar:** una transacción que solo esté en un bloque rojo hay que reincluirla.
-8. **Previsión propia:** todo granjero conoce sus victorias `L` por adelantado. Sin efecto conocido
-   en consenso; sí en mempool.
+8. ~~**Previsión propia:** todo granjero conoce sus victorias `L` por adelantado.~~ **REFUTADO (10c, verificado 2026-09-09):**
+   bajo R-FIN-14 el reto sale de un PoT secuencial y el granjero honesto tiene lookahead **0**; solo un atacante con reloj
+   `ρ > 1` conoce `(F − W_dec) + I(1 − 1/ρ)` slots por delante (`auditoria-9c.md` §1).
 9. **Poda:** sin niveles de PoW. Sigue sin resolver.
 
 ---
