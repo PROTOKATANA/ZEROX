@@ -4,8 +4,8 @@ D · Lo que CUESTA cada `k`. Cinco costes, cada uno con su fuente:
 
  1. `max_block_parents` y `mergeset_size_limit` de R-FIN-12. FUENTE PRIMARIA, leida hoy:
     `/home/katana/zeo/fuentes/rusty-kaspa/consensus/core/src/config/bps.rs`
-      :56-72  max_block_parents  = k/2 (division entera), suelo 10, TECHO 16
-      :74-85  mergeset_size_limit = 2*k, SUELO 180, techo 512
+      :56-73  max_block_parents  = k/2 (division entera), suelo 10, TECHO 16
+      :75-86  mergeset_size_limit = 2*k, SUELO 180, techo 512
     CORRECCION AL ENCARGO: el encargo dice `mergeset_size_limit = 6k` y `max_block_parents = k/2`.
     `6k` solo es cierto EN k = 30 (6*30 = 180 = el SUELO); la formula del codigo es `2k` con suelo
     180, asi que el limite NO se mueve hasta k = 90. Y `k/2` esta TOPADO en 16 desde k = 32.
@@ -69,12 +69,16 @@ if __name__ == "__main__":
     KS = dat["ks"]
     print("=== D · lo que cuesta cada k ===\n")
 
-    print("--- D.1 · R-FIN-12 con la formula del codigo (bps.rs:56-85), no con `6k` ---")
+    print("--- D.1 · R-FIN-12 con la formula del codigo (bps.rs:56-86), no con `6k` ---")
+    print("    profundidad de poda: bps.rs:96-107, lower_bound = finality + 2*merge_depth")
+    print("    + 4*mergeset_size_limit*k + 2k + 2. El termino dominante 4*L*k crece con k.")
     print(f"{'k':>5} {'k/2':>5} {'max_block_parents':>18} {'2k':>5} {'mergeset_size_limit':>20} "
-          f"{'6k (el del encargo)':>20}")
+          f"{'6k (el del encargo)':>20} {'4*L*k (poda)':>13} {'vs k=30':>8}")
+    base_poda = 4 * R.mergeset_size_limit(30) * 30
     for k in KS + [90, 100, 256, 300]:
+        poda = 4 * R.mergeset_size_limit(k) * k
         print(f"{k:>5} {k//2:>5} {R.max_block_parents(k):>18} {2*k:>5} "
-              f"{R.mergeset_size_limit(k):>20} {6*k:>20}")
+              f"{R.mergeset_size_limit(k):>20} {6*k:>20} {poda:>13} {poda/base_poda:>7.2f}x")
     print("   -> desde k = 32 el tope de padres esta SATURADO en 16, y el de mergeset en su")
     print("      SUELO de 180 hasta k = 90. Subir k de 30 a 60 cuesta +1 padre y 0 de mergeset.\n")
 

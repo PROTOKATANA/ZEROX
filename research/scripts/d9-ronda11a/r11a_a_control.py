@@ -33,6 +33,11 @@ PUB_D0 = {4.0: 0.0000, 8.0: 0.0020, 12.0: 0.0828, 16.0: 0.2858,
 PUB_FR = {4.0: 0.468784, 8.0: 0.468268, 12.0: 0.446542,
           16.0: 0.383337, 20.0: 0.323788}                # 9a informe.md §5.5
 
+def _frontera_9a(D):
+    """La frontera de 9a §5.5 a `Delta = D`: F = 19 080 s, I = 4 200 s, ventaja 3k = 90."""
+    return R.frontera_con(PUB_D0[D], 30, F=19080.0, I=4200.0)
+
+
 if __name__ == "__main__":
     t0 = time.time()
     print("=== A · control positivo ===\n")
@@ -82,8 +87,10 @@ if __name__ == "__main__":
     print("--- A.3 · fronteras de 9a §5.5 (F = 19 080 s, I = 4 200 s, ventaja 3k = 90) ---")
     ok3 = True
     print(f"{'Delta':>6} {'delta_0':>9} | {'frontera':>10} {'publicada':>10} {'|dif|':>8}")
+    with Pool(len(PUB_FR)) as p:
+        frs = dict(zip(sorted(PUB_FR), p.map(_frontera_9a, sorted(PUB_FR))))
     for D in sorted(PUB_FR):
-        fr = R.frontera_con(PUB_D0[D], 30, F=19080.0, I=4200.0)
+        fr = frs[D]
         dif = abs(fr - PUB_FR[D])
         ok3 &= dif < 1e-5
         print(f"{D:>6.0f} {PUB_D0[D]:>9.4f} | {fr:>9.4%} {PUB_FR[D]:>9.4%} {dif:>8.2e}")
