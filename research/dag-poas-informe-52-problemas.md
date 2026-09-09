@@ -428,3 +428,186 @@ compensa el coste en `Δ`). **Cómo cambia el número.** Publicado: 33 % → has
 techo 50 %. **Verificar:** `Δ`.
 
 ---
+
+# Parte III · Cerrados por regla verificada, o refutados — qué propuesta de arriba podría reabrirlos
+
+No se rehace el análisis. Para cada cierre: la regla que lo sostiene y **qué solución de las partes I, II, IV o V lo tocaría**.
+
+## 17 · Cadena parásita, en lo económico (R-FIN-8′ + R-FIN-13′)
+
+Cierre: `rojo_k` cobra su propia coinbase y aplica sus transacciones; `rojo_U3` inerte; retarget cuenta un bloque por identidad.
+Rentabilidad 0,99, `S1_h = 1,0000`, retarget ×1,005 (9b, 12 semillas). **Lo tocarían:** **14b** (coinbase de rojos escalada por
+anticono) reduce lo que cobra un rojo: baja la rentabilidad de la parásita (bien) pero también lo que cobra un honesto rojo a
+`Δ` alto (hay que re-medir `S1_h`); **7c** (penalización por retención) igual. **1c** (`λ = 1/2`) cambia `k`, `J*` y `δ`: hay
+que repetir `verif_parasita.py`. **1d** (KNIGHT) cambia la regla del cluster: la parásita entera se reanaliza.
+
+## 18 · Copias de billete (U2 + U3″ + `rojo_U3` inerte)
+
+Cierre: una azul por identidad; copias rojas válidas pero inertes. **Lo tocarían:** **6b/6c** (ancla por slot exacto, desempate
+por `solution_distance`) no tocan el coloreado; **14b** no toca las copias (`rojo_U3` no cobra en ningún caso). **1d** (KNIGHT)
+cambia el coloreado: U3″ está definida sobre el mergeset ordenado de GHOSTDAG y habría que redefinirla.
+
+## 19 · Timewarp y grinding del retarget (`slot` = índice de PoT; Lema E1; 13′)
+
+Cierre: el retarget cuenta azules del flujo canónico en una ventana de índices de PoT; la deriva del retarget es factor común.
+**Lo tocarían:** **13** (límite ±10 % por época) lo refuerza; **1c** cambia `W_RETARGET` (en slots o en bloques: hay que fijarlo
+en slots). Nada de la parte I lo reabre.
+
+## 20 · Griefing del mergeset (`pick_virtual_parents` con presupuesto; `shuffle` obligatorio)
+
+Cierre: un honesto nunca emite `MergeSetTooBig`; el `shuffle` evita que 14-21 honestos queden fuera para siempre.
+**Lo tocarían:** **1b** (`k` mayor) escala `6k` y `k/2`: sigue cerrado pero con más padres por cabecera; **1d** (KNIGHT) no tiene
+`mergeset_size_limit` fijo: se reanaliza.
+
+## 21 · Grinding por hash en desempates (desempate por `solution_distance`)
+
+Cierre: la magnitud de desempate no la controla el atacante. **Lo tocarían:** **6c** lo **extiende** al ancla (bien). Nada lo reabre.
+
+## 22 · Parásito racional ajeno (deja de serlo con R-FIN-8′)
+
+Cierre: un tercero no gana parasitando. **Lo tocarían:** **14b** lo refuerza (cobra aún menos). **7c** también.
+
+## 23 · Publicación parcial y reparto parasitar-correr (no mejora al atacante)
+
+Cierre: teorema de la ráfaga (`R < A ⟺ gana`), `δ` cae al retener, `adv_max ≤ 43 < 3k`. **Lo tocarían:** vale mientras
+`2Δλ ≪ k` (9a); **1b** (subir `k`) lo **refuerza**; **1c** (`λ = 1/2`) lo refuerza; a `Δ ≥ 16 s` con `k = 30` hay que re-medir
+(laguna 44).
+
+## 24 · Inundación de revelaciones falsas del candado (asimetría 16-32×, (h.2c))
+
+Cierre: verificar una por época, en orden aleatorio; recomputar si hay demasiadas. Solo existe si se adopta (h). **Lo
+tocarían:** **4a** (calibración barata) lo hace aún más barato. Nada lo reabre.
+
+## 25 · Ventana predecible si la revelación llega tarde ((h.3′): se calcula, no se espera)
+
+Cierre: la entropía es función de `past(B)`. **Lo tocarían:** **4b** es exactamente esta regla; **8b** (mezcla por slot) fue
+descartada. Nada lo reabre.
+
+## 26 · «Todo granjero conoce sus victorias con antelación» (refutado: lookahead honesto 0)
+
+Cierre: 10c A (en verificación). **Lo tocarían:** **8a** (`L < F`) no lo cambia para `ρ ≤ 1`; **1d** (KNIGHT) tampoco: el
+lookahead lo fija el PoT secuencial (R-FIN-14), no el orden. Nada lo reabre.
+
+## 27 · Reloj AES 19× (no es físico)
+
+Cierre: `AESENC` a 3 ciclos y 6,2 GHz es ya hardware; 19× exigiría 25 ps por ronda. **Lo tocarían:** nada. La laguna que
+queda es el techo real (38).
+
+---
+
+# Parte IV · Estructurales — cambios de diseño o de arquitectura, no de parámetro
+
+## 28 · Sin cliente ligero: 21,5 GB/año de cabeceras, modelo con servidor
+
+**Causa.** GHOSTDAG no tiene SPV: `blue_work` en cabecera es una afirmación que solo se comprueba coloreando el DAG entero; a
+`q = 1` son 21,5 GB/año. Decidido `q = 1` con modelo Zcash (`zx-lightwalletd`).
+
+**Cambios de arquitectura posibles.**
+
+**28a · Pruebas de inclusión sobre la cadena seleccionada + compromiso al DAG.** Mecanismo: cada bloque de la cadena
+seleccionada lleva un **compromiso** (raíz de Merkle) al conjunto de bloques que fusiona y a su `blue_work` acumulado
+(Kaspa lo tiene en parte: `accepted_id_merkle_root`, `utxo_commitment` en la cabecera, `header.rs`). Un cliente ligero sigue
+**solo la cadena seleccionada** (una cadena lineal, ~0,2 bloques/s ⇒ ESTIMACIÓN 4,3 GB/año a 683 B, y con cabeceras de
+cadena sin padres extra, ~2 GB/año) y verifica que su transacción está en el `accepted_id_merkle_root` de algún bloque de
+cadena. **Qué compra:** SPV con confianza en que la cadena seleccionada que le sirven es la de mayor `blue_work`, que **no
+puede verificar** sin el DAG. **Qué no compra:** la comparación entre dos cadenas rivales; el cliente puede ser engañado con
+una cadena seleccionada falsa de menor peso. HIPÓTESIS: es el mismo compromiso que acepta Zcash con `lightwalletd`, pero con
+un cliente que baja 2-4 GB/año en vez de confiar ciegamente: **mejor que el modelo actual, no SPV sin confianza**.
+
+**28b · Muestreo del DAG (pruebas de peso probabilísticas).** Mecanismo: el cliente pide `n` bloques al azar de la ventana
+`F` y comprueba su coloreado local (anticono `≤ k`) y su `blue_work` contra el compromiso de la cadena; un servidor que
+mienta sobre `blue_work` en más de una fracción `ε` es detectado con probabilidad `1 − (1−ε)^n`. HIPÓTESIS: con `n = 200`
+y `ε = 5 %`, detección 99,997 %. **Qué cuesta:** el coloreado local de un bloque exige su pasado hasta `k` niveles: ~`k²`
+cabeceras por muestra (ESTIMACIÓN 900 × 683 B = 0,6 MB por muestra; 120 MB por comprobación). Cabe en un móvil de forma
+ocasional, no continua. LAGUNA: nadie lo ha diseñado para GHOSTDAG; es investigación.
+
+**28c · Compromisos sucintos (SNARK) del coloreado.** Mecanismo: el nodo que sirve genera una prueba sucinta de que el
+`blue_work` de la punta es el que dice, sobre el DAG de la ventana. HIPÓTESIS: viable en principio (el coloreado es un
+cómputo determinista), coste de prueba muy alto a 1 bloque/s y ninguna implementación; no para v1 ni v2.
+
+**Cómo cambia el número.** Cliente ligero: de 21,5 GB/año (imposible en móvil) a 2-4 GB/año (28a) con confianza parcial, o a
+~120 MB por comprobación (28b) con confianza probabilística. **Verificar:** que la cabecera de cadena lleve
+`accepted_id_merkle_root` y `blue_work` acumulado (leer `rusty-kaspa/consensus/core/src/header.rs`), y diseñar 28b.
+
+## 29 · Verificación de PoT no sucinta
+
+**Causa.** La cadena AES no tiene prueba corta; verificar recomputa en paralelo (1/16 del coste): 9,6 % de un núcleo
+continuo; con (h), +0,15 a +0,81 núcleos.
+
+**Cambios posibles.** (a) **Checkpoints firmados por el timekeeper + verificación diferida**: los nodos aceptan los
+checkpoints provisionalmente con la firma de un timekeeper conocido y los verifican en segundo plano; un checkpoint
+falso se detecta con retraso y se castiga. **Qué rompe:** introduce identidad del timekeeper (C-TIMELORD-02 lo prohíbe) y
+una ventana de confianza; no. (b) **VDF con prueba corta solo para la cadena de revelación (h)**: Wesolowski sobre grupos de
+clase, verificación en milisegundos; **qué cuesta:** C++/GMP, el problema de interoperabilidad H-001, y un reloj donde el ASIC
+de Chia demostró 3-4×; el candado pasaría a depender de un reloj que sí tiene carrera de hardware. No. (c) **Aceptar el
+coste y acotarlo**: 9,6 % es asumible; el de (h) se calibra (4a). **Cómo cambia el número.** Sin cambio realista: 0,1 núcleos.
+**Verificar:** nada; es una elección hecha (`CLAUDE.md`).
+
+## 30 · Umbral por debajo del 50 %
+
+**Causa.** Varianza de la carrera + ventaja `3k` + `δ₀(Δ)`; y la familia PoST paga además la posibilidad de *double dipping*
+(aquí evitada con R-FIN-5).
+
+**Cambios posibles.** (a) Comité BFT (5): el único que lo lleva por encima. (b) Reducir la varianza: bloques más frecuentes
+suben `2Δλ` (no compensa); `F` más larga sube el número (2,3 puntos de 2 h a 5,3 h) a costa de todo lo demás. (c) Aceptarlo y
+publicarlo con colchón. **Cómo cambia el número.** 44,6-46,9 % teórico; 33-40 % publicado. **Verificar:** `Δ`.
+
+## 31 · Suelo de confirmación de 100-134 s
+
+**Causa.** La ventaja inicial `3k` del atacante en la carrera: hasta que los honestos acumulan `3k` bloques por encima, ninguna
+confirmación es posible (10c C, en verificación): `3k/((1−α)λ) ≈ 100-134 s`.
+
+**Cambios posibles.** (a) **Reducir `3k`**: es cota, la real medida es 0,56·3k (D8) ⇒ suelo real ~60-75 s; diseñar con la medida
+no es legítimo (10b) pero **publicar** el suelo real como orientación al comerciante sí. (b) **Confirmaciones probabilísticas
+antes del suelo:** un comerciante con transacción pequeña acepta riesgo `10⁻³` a los 300 s con `α = 0,25` (tabla de 10c:
+`2,2·10⁻⁴`). (c) **`λ` mayor** no ayuda (sube `3k` en bloques igual). (d) Comité (5). **Cómo cambia el número.** 100-134 s
+estructural; 60-75 s si se publica la ventaja medida como estimación; minutos con comité. **Verificar:** 10c C (a1/b en curso).
+
+## 32 · Barrera de hardware y centralización del timekeeper
+
+**Causa.** El timekeeper necesita latencia de AES de clase 14900KS; con (h), ×`(q+1)`; el más rápido deja obsoletos a los
+demás (#2141).
+
+**Cambios posibles.** (a) **3b**: publicar hardware de referencia y operar ≥ 3; la dispersión entre CPU de gama alta es
+pequeña (HIPÓTESIS < 5 %). (b) **Bajar `pot_slot_iterations`** para que una CPU de gama media haga 1 slot/s: sube `ρ` de
+cualquier CPU de gama alta a ~1,3-1,5× ⇒ steering `√1,5` (punto 6): intercambio entre descentralización del reloj y steering.
+ESTIMACIÓN: con iteraciones para un 7950X (4 ciclos, 5,7 GHz), el 14900KS tendría `ρ = 1,45`. (c) **Aceptar** que el reloj
+lo opera ZEROX con redundancia, como Chia opera los suyos, y declararlo como propiedad de descentralización. **Cómo cambia el
+número.** Barrera: de «tope del mercado» a «gama media» con (b), a cambio de `ρ_max ≈ 1,5` para cualquiera de gama alta.
+**Verificar:** `prove` por slot en 3-4 CPU distintas.
+
+## 33 · Coinbases: 31,5 M salidas/año
+
+**Causa.** Un bloque por segundo, una coinbase por bloque: 31,5 M salidas/año, ~1,3 GB/año de UTXO.
+
+**Cambios posibles.** (a) **Coinbase agregada por época** (Kaspa: la coinbase de un bloque de cadena paga a todos los del
+mergeset, `coinbase.rs`): pagar por identidad y por ventana, no por bloque: una salida por granjero cada `I` (ESTIMACIÓN: con
+10 000 granjeros y `I = 851 s`, 370 M salidas/año — **peor**, porque hay más granjeros que bloques por época; con `I = 1 día`,
+3,6 M/año, mejor ×9). HIPÓTESIS: solo compensa con ventanas largas, y eso choca con la madurez (`COINBASE_MATURITY`). (b)
+**Salidas de coinbase consolidables sin firma** (tipo «sweep» automático): no reduce las salidas, reduce lo que el granjero
+tiene que gestionar. (c) Aceptar 1,3 GB/año: es menor que las cabeceras. **Cómo cambia el número.** 31,5 M/año → 3,6 M/año
+solo con pago diario; el UTXO 1,3 GB/año no es el cuello de botella. **Verificar:** nada urgente.
+
+## 34 · Poda sin resolver
+
+**Causa.** Sin niveles de PoW, no hay la estructura que Kaspa usa (`pruning_depth`, `pruning_point` con prueba de
+`ghostdag` a lo largo de niveles). La justificación de PoT pesa 128 B/slot = 4 GB/año y no se ha estudiado si es podable
+manteniendo verificabilidad desde el génesis (P-034).
+
+**Cambios posibles.** (a) **Poda de PoT por checkpoint C-CHK-05**: por debajo del checkpoint, un nodo MAY omitir la
+justificación; ya está escrito. Generalizarlo: **la propia cadena de PoT es su prueba** (determinista): un nodo que confía en
+el último output verificado no necesita los intermedios; guardar un checkpoint por época (`I`) reduce 4 GB/año a
+ESTIMACIÓN 37 000 × 16 B = 0,6 MB/año, y quien quiera verificar desde el génesis recomputa (`prove`, ×16). (b) **Poda del DAG
+al estilo Kaspa sin niveles**: el `pruning_point` de Kaspa es un bloque de cadena a profundidad `pruning_depth` (30 h) y su
+prueba de poda usa niveles de PoW para que un nodo nuevo pueda verificar la cadena de pruning points sin todo el DAG. Sin PoW,
+la alternativa es la **prueba de espacio acumulada de la cadena seleccionada**: cada bloque de cadena lleva `blue_work` y la
+cadena de anclas `I_j` es verificable con el PoT (R-FIN-1). HIPÓTESIS: un nodo nuevo puede verificar la cadena seleccionada
+desde el génesis con solo sus cabeceras y el PoT (4,3 GB/año + 0,6 MB/año con (a)) y aceptar el UTXO en el pruning point con
+su `utxo_commitment`, exactamente como Kaspa pero con `blue_work` en lugar de niveles. **Lo que se pierde:** el DAG completo
+(los bloques fuera de la cadena) más allá de 30 h; los `rojo_k` que cobraron quedan en el UTXO, no en el DAG. **Verificar:**
+leer `rusty-kaspa/consensus/src/processes/pruning_proof/` y comprobar qué usa de los niveles de PoW; diseñar el equivalente.
+
+**Cómo cambia el número.** Estado de un nodo: de «todo desde el génesis» a «cabeceras de cadena + PoT por época + UTXO en el
+pruning point» (ESTIMACIÓN 4-5 GB/año + UTXO).
+
+---
