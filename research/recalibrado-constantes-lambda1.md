@@ -3,7 +3,8 @@
 **2026-09-09** · Encargo de Katana: recalibrar primero, decidir el presupuesto con el marketplace
 delante, y dimensionar para **1 280 transacciones por segundo** (110 592 000 al día) para tener
 margen. · Responde a **P-041**. Scripts: `research/scripts/rendimiento/verif_recalibrado_1280.py` y
-`verif_600tps_maduro.py`. **Estado: PROPUESTA. El SPEC no se toca hasta que Katana decida §4 y §5.**
+`verif_600tps_maduro.py`. **Estado: APLICADO en SPEC y código el 2026-09-09** (commit «recalibrado a lambda = 1 bloque/s»), con `ZONA_LIBRE`
+sin tocar y `N_LARGO` = año completo por decisión de Katana; queda la decisión 3, `N_CORTO` (§5 bis).
 
 > **El hallazgo que cambia el encargo.** 1 280 tx/s **no exige** subir `ZONA_LIBRE` a 448 000 bytes.
 > La zona libre no es un techo: es el **suelo** de la mediana y el precio del atacante; el techo
@@ -81,14 +82,30 @@ tarifa mínima **no es consenso** (`SPEC.md:721-725`), así que el cambio no rom
 |---|---:|---:|---:|---|
 | `N_CORTO` | 100 | 3,33 h | **12 000** | — |
 | `COINBASE_MATURITY` | 100 | 3,33 h | **12 000** | 3,33 h **>** F = 2 h ✓ |
-| `MAX_REORG_LENGTH` | 99 | 3,30 h | **11 880** | sustituida por R-FIN-7 en el DAG |
+| `MAX_REORG_LENGTH` | 99 | 3,30 h | **11 999** | `= COINBASE_MATURITY − 1` por regla (la primera versión decía 11 880 = 99×120, que no respeta la forma de la regla); sustituida por R-FIN-7 en el DAG |
 | `N_LARGO` | 262 800 | 365 días | **ver §5** | problema de memoria |
 
 `COINBASE_MATURITY` tiene que ser mayor que la finalidad del DAG para que una recompensa no se pueda
 gastar antes de ser irreversible. Con el factor 120 quedan 3,33 horas contra las 2 de finalidad:
 **cumple con margen**.
 
-**Estado: SIN BIFURCACIÓN salvo `N_LARGO`.**
+**Estado: SIN BIFURCACIÓN salvo `N_LARGO` (§5) y `N_CORTO` (§5 bis).**
+
+### 3 bis · Más constantes en unidades de bloque, encontradas al aplicar
+
+| Constante | Hoy | A `λ = 1` significa | Qué se hizo |
+|---|---:|---:|---|
+| `ALTURA_CADUCIDAD` (C-CHK-03) | 525 600 «dos años exactos a T = 120 s» | 6,08 días | **Aplicado ×120 = 63 072 000**: la intención era dos años y no tiene otra dependencia |
+| `VIDA_MINIMA_BLOQUES` = 2¹⁶ (C-EXP-03) | 91 días a 120 s | **18,2 horas** | **NO tocada.** Es la vida mínima de un sector de granjero: a 1 b/s caducaría en horas. Potencia de dos obligatoria (C-EXP-02) y el DAG la reexpresa en `blue_work` (R-FIN-10): rederivar con la decisión de P-036/P-033, no aquí |
+| `DISPERSION_BLOQUES` = 2²⁰ (C-EXP-02) | 4 años | **12 días** | **NO tocada**, misma razón |
+| `HOLGURA_BLOQUES` = 144 (C-NET-04) | 4,8 h | 144 s, y ahora **menor** que `MAX_REORG_LENGTH` | **NO tocada**; comentario actualizado. Es el umbral de trabajo del PoW; el DAG lo sustituye por el coste del PoT por slot (C-NET-03/04, informe 52 §52) |
+| Tabla de confirmaciones para Cortex (§policy) | 3 conf = 6 min, 6 = 12 min | 3 s, 6 s | Solo la fila de 100 → 12 000; nota de que las otras filas no están rederivadas |
+
+**Consecuencia nueva, escrita en C-STORE-06:** el solapamiento de bloques no finalizados que el nodo
+mantiene en memoria pasa de 99 × 2 439 × 82 B = 18 MB a **11 999 × 2 439 × 82 B = 2,40 GB** en el techo
+adversarial. Bajo el DAG, R-FIN-7 (`F = 2 h` = 7 200 bloques) lo dejaría en 1,44 GB. Es una factura del nodo
+doméstico que conviene tener delante al decidir la poda (P-034).
+
 
 ---
 
@@ -179,7 +196,33 @@ ninguna regla del SPEC, solo cómo se implementa la mediana; es la única sin an
 único coste, 252 MB, es el 1 % de un año de cadena. La opción 4 queda anotada como la alternativa si esos
 252 MB resultaran un problema real en el nodo doméstico, y exigiría una ronda D8 propia.
 
-**BIFURCACIÓN DE KATANA**, con la recomendación cambiada dos veces por el cálculo: primero 2, luego 1.
+**DECIDIDO (Katana, 2026-09-09): opción 1, año completo.** Aplicado como `N_LARGO = 31 536 000` con la
+obligación de mediana incremental escrita en el SPEC.
+
+### 5 bis · `N_CORTO` — la ventana corta también está en bloques, y decide cuánto tarda la sobrecarga en abrirse
+
+`N_CORTO = 100` bloques se anota en el SPEC como «200 min», que es lo que 100 bloques daban a 120 s. La
+mediana corta es la que abre la sobrecarga ante una ráfaga (C-WGT-08): hasta que se entera, los bloques van
+capados a `2 · Mlt` = 200 000 B con subsidio cero en el tope. Medido con las reglas exactas sobre cadena madura
+(`verif_n_corto.py`):
+
+| `N_CORTO` | Equivale a | Ráfaga de 600 tx/s absorbida en | Ráfaga de 1 280 tx/s absorbida en | Cola máxima a 1 280 |
+|---:|---:|---:|---:|---:|
+| **100** (actual) | 100 s | 102 s | **152 s** | 42 571 tx |
+| 1 000 | 16,7 min | 18 min | **27 min** | 457 577 tx |
+| 12 000 (× 120, en tiempo) | 3,3 h | 3,4 h | **5 h** | 5 109 006 tx |
+
+**Lo que se paga por la reacción rápida.** Con 100 bloques, un atacante que produzca 51 de los últimos 100
+mueve la mediana corta hasta `50 · Mlt` y durante esa ventana puede meter bloques de 5 MB con subsidio entero.
+A `α = 0,33` eso ocurre por azar en ~2·10⁻⁴ de las ventanas (~0,2 veces al día): ~1 GB de cadena gratis por
+evento, ~73 GB/año (ESTIMACIÓN binomial). Con 1 000 bloques la probabilidad es ~10⁻³⁰: no ocurre. Con 12 000,
+tampoco, pero la red tarda cinco horas en absorber un pico de Navidad.
+
+**Recomendación del principal: `N_CORTO = 1 000` bloques.** Reacciona en 27 minutos al pico más alto que se
+ha pedido, y cierra la manipulación de la mediana corta por azar. Es una constante de consenso (entra en
+C-WGT-06): cambiarla después es hard fork.
+
+**BIFURCACIÓN DE KATANA (decisión 3).**
 
 ## 6 · Resumen de lo propuesto
 
@@ -189,7 +232,9 @@ ninguna regla del SPEC, solo cómo se implementa la mediana; es la única sin an
 | `TAIL_EMISSION` | 3 200 000 000 brek | **26 666 666 brek** | derivación |
 | `N_CORTO` | 100 | **12 000** | derivación |
 | `COINBASE_MATURITY` | 100 | **12 000** | derivación |
-| `MAX_REORG_LENGTH` | 99 | **11 880** | derivación (superada por R-FIN-7) |
+| `MAX_REORG_LENGTH` | 99 | **11 999** | derivación, `= COINBASE_MATURITY − 1` (superada por R-FIN-7) |
+| `ALTURA_CADUCIDAD` | 525 600 | **63 072 000** | derivación (dos años) |
+| `N_CORTO` | 100 | **100 provisional** | **decisión 3** (§5 bis) |
 | `REF_WEIGHT` | 3 000 | **384 000** | derivación (cascada de la emisión; no es consenso) |
 | `ZONA_LIBRE` | 100 000 B | **100 000 B, sin tocar** (recomendado, corregido) | **decisión** |
 | `N_LARGO` | 262 800 | **31 536 000, año completo con mediana incremental** (recomendado, corregido) | **decisión** |
