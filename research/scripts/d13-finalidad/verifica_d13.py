@@ -52,14 +52,21 @@ def p_falla(alpha):
     """P[Bin(K,alpha) >= ceil(K/3)]: el comité no alcanza 2/3 honesto."""
     return binom.sf(umbral - 1, K, alpha)
 
+def riesgo_anual(p, n=N):
+    """1 - (1-p)^n estable por cancelación (corrección de la auditoría D9)."""
+    if p <= 0:
+        return 0.0
+    return -math.expm1(n * math.log1p(-p))
+
 print(f"  N instancias/año = {N:,.0f}, umbral = {umbral}")
 for a, esp_p, esp_anual in ((0.33, 0.324, None), (0.30, 2.5e-06, None), (0.28, None, None)):
     p = p_falla(a)
-    print(f"  alpha={a}: P(parada por instancia)={p:.6e}  riesgo anual={1-(1-p)**N:.6e}")
+    print(f"  alpha={a}: P(parada por instancia)={p:.6e}  riesgo anual={riesgo_anual(p):.6e}")
 check("alpha=0.33 P(parada) vs 0.324", p_falla(0.33), 0.324, tol=0.005)
 check("alpha=0.30 P(parada) vs 2.5e-06", p_falla(0.30), 2.5e-06, tol=0.05)
-alfa_seguro = brentq(lambda a: 1 - (1 - p_falla(a))**N - 1e-6, 0.2, 0.33)
-check("alpha para riesgo anual 1e-6 vs 28,2 %", alfa_seguro, 0.282, tol=0.005)
+for objetivo, esp in ((1e-6, 0.282), (1e-12, 0.270)):
+    alfa_seguro = brentq(lambda a: riesgo_anual(p_falla(a)) - objetivo, 0.2, 0.33)
+    check(f"alpha para riesgo anual {objetivo:.0e} vs {esp:.3f}", alfa_seguro, esp, tol=0.005)
 check("paradas/año a alpha=0.33 vs 340 999", p_falla(0.33) * N, 340999, tol=0.01)
 
 print("=" * 72)
