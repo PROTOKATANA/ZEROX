@@ -1,0 +1,52 @@
+======================================================================================================================
+AUDITA-D8B · reps tips-only (S3) vs reps Def.4 completa, grupo del tip honesto
+======================================================================================================================
+    α    Δ seed estrategia | tips  k_tips  reps  k_reps |  k_view n_tips
+ 0.40   16   11    instant | sin tips honestos
+ 0.40   16   11  retraso20 | sin tips honestos
+ 0.40   20   11    instant | sin tips honestos
+ 0.40   20   11  retraso20 | sin tips honestos
+ 0.25   16   11    instant | sin tips honestos
+ 0.25   16   11  retraso20 | sin tips honestos
+ 0.25   20   11    instant | sin tips honestos
+ 0.25   20   11  retraso20 | sin tips honestos
+ 0.40   16   23    instant | sin tips honestos
+ 0.40   16   23  retraso20 | sin tips honestos
+ 0.40   20   23    instant | sin tips honestos
+ 0.40   20   23  retraso20 | sin tips honestos
+ 0.25   16   23    instant |    1       4     1       4 |       0      2
+ 0.25   16   23  retraso20 |    2       6    18       6 |       0      3
+ 0.25   20   23    instant |    1       4     1       4 |       0      2
+ 0.25   20   23  retraso20 |    2       6    19       6 |       0      3
+ 0.40   16   37    instant | sin tips honestos
+ 0.40   16   37  retraso20 | sin tips honestos
+ 0.40   20   37    instant | sin tips honestos
+ 0.40   20   37  retraso20 | sin tips honestos
+ 0.25   16   37    instant | sin tips honestos
+ 0.25   16   37  retraso20 | sin tips honestos
+ 0.25   20   37    instant | sin tips honestos
+ 0.25   20   37  retraso20 | sin tips honestos
+ 0.40   16   41    instant | sin tips honestos
+ 0.40   16   41  retraso20 | sin tips honestos
+ 0.40   20   41    instant | sin tips honestos
+ 0.40   20   41  retraso20 | sin tips honestos
+ 0.25   16   41    instant |    1       9     1       9 |       1      3
+ 0.25   16   41  retraso20 |    3       5    13       5 |       0      4
+ 0.25   20   41    instant |    1       9     1       9 |       1      3
+ 0.25   20   41  retraso20 |    3       4    14       4 |       0      4
+ 0.40   16   59    instant | sin tips honestos
+ 0.40   16   59  retraso20 | sin tips honestos
+ 0.40   20   59    instant | sin tips honestos
+ 0.40   20   59  retraso20 | sin tips honestos
+ 0.25   16   59    instant | sin tips honestos
+ 0.25   16   59  retraso20 | sin tips honestos
+ 0.25   20   59    instant | sin tips honestos
+ 0.25   20   59  retraso20 | sin tips honestos
+ 0.40   16   67    instant |    1       4     1       4 |       0      2
+ 0.40   16   67  retraso20 |    1    None     1    None |       0      3
+ 0.40   20   67    instant |    1       4     1       4 |       0      2
+ 0.40   20   67  retraso20 |    1    None     1    None |       0      3
+ 0.25   16   67    instant |    1    None     1    None |       2      6
+ 0.25   16   67  retraso20 |    2    None     2    None |       3      7
+ 0.25   20   67    instant |    1    None     1    None |       2      6
+ 0.25   20   67  retraso20 |    6       8    23       8 |       0      7
