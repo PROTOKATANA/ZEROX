@@ -1,0 +1,154 @@
+========================================================================================================
+F.1 · Tamano de un voto de PoAS, del codigo de Autonomys @ f8842d0
+========================================================================================================
+      public_key             32 B
+      reward_address         32 B
+      sector_index            2 B
+      history_size            8 B
+      piece_offset            2 B
+      record_commitment      48 B
+      record_witness         48 B
+      chunk                  32 B
+      chunk_witness          48 B
+      proof_of_space        160 B
+      TOTAL Solution        412 B     (sin reward_address: 380 B)
+
+      voto autoportante Ed25519 = solucion + ref(32) + slot(8) + firma(64) = 484 B
+      voto autoportante BLS agr. = solucion + ref(32) + slot(8) + clave BLS(48) = 468 B
+
+      CONTRASTE con HotPoW: alli un voto son 72 B (hotpow.txt:1049-1052: '256 bits para
+      la referencia y la clave publica, y 64 bits para la solucion'). Una solucion de
+      PoW son 8 B; una de ESPACIO son 380 B. Factor 48x en la parte que manda.
+
+========================================================================================================
+F.2 · Certificado y coste anual, a las cadencias razonables
+========================================================================================================
+
+                          variante     k   certificado       cada 30 s       cada 64 s      cada 300 s     cada 3600 s
+   1 · voto = bloque (k cabeceras)    16      10 928 B        11.488 GB         5.385 GB         1.149 GB         0.096 GB
+          2 · voto aparte  Ed25519    16       7 776 B         8.174 GB         3.832 GB         0.817 GB         0.068 GB
+     2 · voto aparte  BLS agregada    16       7 568 B         7.955 GB         3.729 GB         0.796 GB         0.066 GB
+   1 · voto = bloque (k cabeceras)    32      21 856 B        22.975 GB        10.770 GB         2.298 GB         0.191 GB
+          2 · voto aparte  Ed25519    32      15 520 B        16.315 GB         7.647 GB         1.631 GB         0.136 GB
+     2 · voto aparte  BLS agregada    32      15 056 B        15.827 GB         7.419 GB         1.583 GB         0.132 GB
+   1 · voto = bloque (k cabeceras)    64      43 712 B        45.950 GB        21.539 GB         4.595 GB         0.383 GB
+          2 · voto aparte  Ed25519    64      31 008 B        32.596 GB        15.279 GB         3.260 GB         0.272 GB
+     2 · voto aparte  BLS agregada    64      30 032 B        31.570 GB        14.798 GB         3.157 GB         0.263 GB
+   1 · voto = bloque (k cabeceras)   128      87 424 B        91.900 GB        43.078 GB         9.190 GB         0.766 GB
+          2 · voto aparte  Ed25519   128      61 984 B        65.158 GB        30.543 GB         6.516 GB         0.543 GB
+     2 · voto aparte  BLS agregada   128      59 984 B        63.055 GB        29.557 GB         6.306 GB         0.525 GB
+   1 · voto = bloque (k cabeceras)   256     174 848 B       183.800 GB        86.156 GB        18.380 GB         1.532 GB
+          2 · voto aparte  Ed25519   256     123 936 B       130.282 GB        61.069 GB        13.028 GB         1.086 GB
+     2 · voto aparte  BLS agregada   256     119 888 B       126.026 GB        59.075 GB        12.603 GB         1.050 GB
+
+      Referencias: cabeceras del diseno 21,50 GB/ano; PoT 4,0 GB/ano;
+      capa estilo Filecoin (dag-poas-capa-finalidad.md §4.B): 724 B cada 30 s = 0,76 GB/ano.
+
+========================================================================================================
+F.3 · Lo que compra la agregacion BLS aqui, frente a lo que compra en F3
+========================================================================================================
+
+     k       Ed25519    BLS agregada    ahorro   |  F3 (K=4000): 237 728 B -> 724 B = 99,70 %
+    16       7 776 B         7 568 B     2.67%
+    32      15 520 B        15 056 B     2.99%
+    64      31 008 B        30 032 B     3.15%
+   128      61 984 B        59 984 B     3.23%
+   256     123 936 B       119 888 B     3.27%
+  1000     484 032 B       468 080 B     3.30%
+  4000   1 936 032 B     1 872 080 B     3.30%
+
+      La agregacion solo comprime la FIRMA. En F3 el voto ES una firma, luego comprime
+      el 99,7 %. Aqui el voto esta dominado por la prueba de espacio, que no se agrega:
+      el ahorro es del orden del 3 %. **La ventaja criptografica del gadget se cae:**
+      ni evita BLS (ver F.5) ni lo aprovecha.
+
+========================================================================================================
+F.4 · Trafico de gossip de la variante 2 (lambda_voto = k * lambda_bloque)
+========================================================================================================
+
+     k   votos/s      kB/s    TB/ano   (lambda_bloque = 1/s)
+    16        16       7.7      0.24
+    32        32      15.5      0.49
+    64        64      31.0      0.98
+   128       128      62.0      1.95
+   256       256     123.9      3.91
+
+      Para comparar: la cadena entera son 21,5 GB/ano de cabeceras (0,0215 TB).
+
+========================================================================================================
+F.5 · ¿Obliga a BLS12-381? — LA RESPUESTA ESTA EN EL CODIGO QUE YA ADOPTAMOS
+========================================================================================================
+
+      `verify_solution` (subspace-verification/src/lib.rs:264-272) llama a `kzg.verify(...)`
+      para comprobar que el `chunk` pertenece al `record_commitment`. Ese KZG es
+      `rust-kzg-blst` (Cargo.toml:113,180 y shared/subspace-kzg/Cargo.toml:24-27), es decir
+      **`blst` de Supranational, C y ensamblador, sobre BLS12-381**, en la ruta de consenso de
+      TODOS los nodos y para TODOS los bloques.
+
+      R-FIN-14(c) del diseno vivo cita literalmente `subspace-verification/src/lib.rs:234-260`,
+      que es esa misma funcion.
+
+      Consecuencia para la comparacion: el 'coste' que `dag-poas-capa-finalidad.md` §5 presenta
+      como bifurcacion de Katana —meter BLS12-381 y `blst` en la ruta de consenso— **ya esta
+      pagado** si ZEROX adopta el PoAS de Autonomys con testigos KZG. No es una dependencia
+      nueva de la capa de finalidad: es una dependencia del propio consenso.
+      
+========================================================================================================
+F.6 · CPU de verificacion por nodo
+========================================================================================================
+
+      Verificar UN voto = verificar UNA solucion = 1 prueba de espacio (tabla k=20) +
+      1 apertura KZG (un emparejamiento sobre BLS12-381) + 1 firma. El coste lo domina el KZG.
+      Medido en esta maquina con el propio banco de Autonomys (`cargo bench -p subspace-kzg`,
+      funcion `verify`): ver `salida_bench_kzg.txt`.
+      
+      MEDIDO: kzg.verify = 1.0773 ms  (IC de Criterion: 1.0719 ms .. 1.0887 ms)
+
+           k    ms por certificado    % de un nucleo (cert/64 s)   % de un nucleo (variante 2)
+          16                 17.24                        0.0269                          1.72
+          32                 34.47                        0.0539                          3.45
+          64                 68.95                        0.1077                          6.89
+         128                137.89                        0.2155                         13.79
+         256                275.79                        0.4309                         27.58
+
+      (variante 2 = lambda_voto = k/s: hay que verificar k soluciones POR SEGUNDO,
+       encima del 9,6 % de nucleo que ya cuesta el PoT a tau = 1 s.)
+
+========================================================================================================
+F.7 · EQUIVOCACION GRATIS — lo que rompe la Definicion 1 del paper
+========================================================================================================
+
+      Definicion 1 de HotPoW (hotpow.txt:279-283): «cada evento asigna una capacidad de voto
+      (ATV) a un agente. Cada ATV puede usarla el agente al que se le asigno para votar UNA VEZ
+      por UN valor.» Toda la teoria de POA descansa en eso: dos quorums en conflicto exigen 2k
+      ATVs. En HotPoW se cumple por construccion, porque el voto ES la solucion y la solucion
+      contiene la referencia: `Hpow(r, p, s) <= tv` (hotpow.txt:437-441). Cambiar r obliga a
+      resolver otro puzzle.
+
+      En PoAS NO se cumple. `verify_solution` no ve r (lib.rs:228-272): el reto es
+      `derive_global_challenge(slot)`, funcion del PoT y del slot. La atadura al valor la pone
+      una firma aparte, y una clave firma cuantos mensajes quiera. Luego **una sola solucion
+      puede votar por todos los valores en conflicto a la vez, a coste cero.**
+
+      Consecuencia cuantitativa: dos quorums en conflicto ya no exigen 2k ATVs sino k, y
+      POA pasa de P[Poisson(k) >= 2k] a P[Poisson(k) >= k]:
+      
+           k      POA con Def.1 (2k)    POA con equivocacion (k)
+          16               2.762e-04                      0.5333
+          32               4.144e-07                      0.5235
+          64               1.272e-12                      0.5166
+         128               1.661e-23                      0.5118
+         256               3.959e-45                      0.5083
+
+      -> Sin regla anti-equivocacion el gadget NO tiene seguridad ninguna: la ambiguedad es
+         ~0,5 para cualquier k. Y una regla anti-equivocacion exige castigo, o sea R-FIN-19 de
+         la propuesta rival, o sea DINERO EN JUEGO. La ventaja anunciada 'sin dinero en juego'
+         desaparece. La alternativa —que el voto sea un BLOQUE, donde U2/U3'' (R-FIN-11) ya da
+         un voto por identidad de billete— es la variante 1, que es profundidad de confirmacion.
+      
+COBERTURA DE RAMA
+  cert_v1             5
+  cert_v2_bls         13
+  cert_v2_ed          13
+  voto_bls            14
+  voto_ed             19

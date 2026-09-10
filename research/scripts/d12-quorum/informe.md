@@ -95,3 +95,157 @@ inaplicable sin registro. El resto del script de partida es aritméticamente cor
 
 **Etiqueta del punto A: VERIFICADO** (control positivo reproducido con tres instrumentos; un error
 del cálculo de partida localizado y cuantificado).
+
+---
+
+## B · La composición con el DAG, que el paper NO hace
+
+**Script:** `d12_b_composicion.py` · **Salida:** `salida_b.txt`
+
+HotPoW **sustituye** el consenso; aquí se quiere **encima** de GHOSTDAG con el ancla por índice de
+PoT. Todo lo que sigue es lo que aparece al hacer la composición.
+
+### B.0 · Control positivo del segundo instrumento
+
+`prev()` (`research/scripts/d9-ronda9a/r9a_a3_frontera.py:36-49`, idéntica a
+`d8-ronda8/d8_a1c_riesgo.py:29-40`) reproduce los dos números publicados en el encargo para
+`α = 0,33`: **1,516e-06 a los 600 s** y **7,071e-36 a los 1 800 s**. VERIFICADO.
+
+### B.1 · ¿Sobre qué se vota?
+
+| Candidato | Lo que tiene en contra | Etiqueta |
+|---|---|---|
+| Un bloque de la **cadena seleccionada** | `blue_score` no es monótono (*«In GHOSTDAG this no longer holds … the blue score of the virtual node actually decreases»*, citado en `dag-poas-ancla-de-orden.md:31-34`), pero **`blue_work` sí lo es bajo ancestría** (Lema A4b, R-FIN-10). Votar por «`B` está en mi cadena seleccionada» es una afirmación bien definida y monótona si se ancla en `blue_work` | **es el único candidato viable** |
+| El ancla `I_j` | Ya es objeto de *steering* (rondas 3-10, A3 del catálogo). Un certificado sobre el ancla multiplicaría por `m ≤ 1 + λ·S_max = 151` los candidatos entre los que el atacante elige, exactamente el ataque que §4.D de la propuesta rival tuvo que pagar subiendo `K` de 1 000 a 4 000 | descartado |
+| Un punto de `blue_work` | `blue_work` es una **afirmación de la cabecera**, no algo verificable sin colorear el DAG (`dag-poas-ancla-de-orden.md:398-400`). Un certificado sobre `blue_work` no es autoverificable, que era la única gracia del certificado | descartado |
+
+**DEMOSTRADO** (por eliminación, con las citas de arriba): si se hace, se vota por un **bloque de la
+cadena seleccionada**, identificado por su hash.
+
+### B.2 · ¿De dónde sale el voto? — la pregunta que decide
+
+Las dos únicas variantes, y lo que cada una implica:
+
+**Variante 1 · el voto es el propio bloque.** `λ_voto = λ_bloque = 1/s`. Un `k`-quórum son `k`
+bloques y tarda `k` segundos.
+
+> **Es profundidad de confirmación con otro nombre. DEMOSTRADO.** Tres argumentos independientes:
+>
+> 1. **No hay información nueva.** El certificado «`k` bloques de la cadena seleccionada
+>    descienden de `B`» es exactamente el predicado «`B` tiene `k` confirmaciones». No se
+>    transmite ni un bit que el nodo no tuviera.
+> 2. **La unicidad del quórum no la da la teoría de quórums.** Un voto de HotPoW es `(r, p, s)`
+>    con `Hpow(r,p,s) ≤ tv` (`hotpow.txt:437-441`) y nada impide seguir buscando soluciones para
+>    una `r` vieja: el atacante produce votos para `r` a tasa `αλ` **para siempre**. Medido
+>    (`salida_b.txt`, B.b): a `α = 0,33` y `k = 64` le bastan **194 s** para tener un certificado
+>    propio y válido para un valor en conflicto. Lo que impide el conflicto en HotPoW es la regla
+>    de cabeza (Listing 4.6, línea 41, `hotpow.txt:597-601`: no cambiar de estado ya comprometido),
+>    que es **literalmente R-FIN-7** y es literalmente lo que hace Kaspa
+>    (`virtual_processor/processor.rs:1013` `is_chain_ancestor_of(finality_point, candidate)`;
+>    `:1033` *«Finality Violation Detected. Block … is ignored from Virtual chain»*).
+> 3. **Confirmación independiente en la literatura.** Sankagiri et al. clasifican HotStuff —el
+>    protocolo del que HotPoW toma el *commit* de tres fases— como **incumplidor de CP1, la
+>    condición de recencia**: *«PBFT and Hotstuff don't satisfy the CP1 (the recency condition).
+>    The adversary could potentially lock on a block B privately when it becomes the leader of one
+>    view, and then finalizes B as a checkpoint after a long time when B is no longer in the best
+>    chain»* (`cap-adaptividad-finalidad.txt:1575-1580`). Es el mismo ataque que mido en B.b,
+>    descrito por otros autores tres años antes.
+
+**Variante 2 · voto aparte, `λ_voto = k·λ_bloque`.** Es la de HotPoW (*«HotPoW asks for k easier
+puzzles each expected to take 10/k minutes»*, `hotpow.txt:200-208`). Aquí sí hay información nueva:
+`k` muestras de espacio por intervalo de bloque en vez de una. **Es la única variante que puede
+comprar algo.** Lo que cuesta está en C (retardo) y en F (bytes y CPU), y lo que rompe, en F.7.
+
+### B.3 · La regla de selección, escrita y demostrada
+
+**Texto propuesto (candidato, NO escrito en el SPEC — va aquí por el método):**
+
+> **R-QUO-1 · Prioridad de la finalidad más profunda.** Sea `cert(B)` un certificado válido para el
+> bloque de cadena `B`. Un nodo **MUST NOT** reorganizar por debajo de `B` mientras conozca
+> `cert(B)`. En ausencia de certificado rige **R-FIN-7 sin cambios**. Cuando haya las dos, manda la
+> **más profunda en `blue_work` de la cadena seleccionada**. Un certificado **MUST NOT** invalidar
+> ningún bloque ni apagar el proceso: una punta que exigiera reorganizar por debajo de `B` se
+> **ignora**, exactamente como en R-FIN-7.
+>
+> **R-QUO-2 · Recencia (CP1).** Un voto es válido para `B` solo si `slot(voto) ∈ [slot(B) + d,
+> slot(B) + d + W)`. Un certificado con un voto fuera de esa ventana es inválido. `d` es la
+> profundidad mínima de voto y `W` la ventana de quórum.
+
+**Demostración de que el certificado solo puede adelantar la finalidad, nunca retrasarla.**
+El conjunto de bloques finalizados por R-FIN-7 en el instante `t` es
+`Fin₇(t) = {B : slot(punta) − slot(B) ≥ F}`, que es **creciente en `t`** y función solo de la cadena.
+`R-QUO-1` define `Fin(t) = Fin₇(t) ∪ {B : conozco cert(B)}`. Como es una **unión**, `Fin(t) ⊇ Fin₇(t)`
+para todo `t`: ningún bloque deja de estar finalizado por la llegada de un certificado. Y como la
+regla de la punta es *ignorar* y no *invalidar* —igual que R-FIN-7 y que `processor.rs:1033`—, la
+llegada de un certificado no puede volver inválido ningún bloque ya válido (R-FIN-4 hace la validez
+función de `past(B)` y nada más, y un certificado no está en `past(B)`). **DEMOSTRADO.**
+
+**Lo que la demostración NO cubre, y es lo grave.** Que el certificado no *retrase* nada no
+significa que no pueda *adelantar una mentira*. `Fin` crece, sí, pero puede crecer con un `B`
+equivocado, y entonces **la mentira es permanente**: es el ataque 6.1 que la propuesta rival ya se
+declara a sí misma. Esa es la asimetría real de cualquier gadget de finalidad: convierte una
+reorganización temporal y visible en un **split permanente**. El número está en D.6.
+
+### B.4 · R-FIN-5, un flujo por PoT
+
+R-FIN-5 dice: *«Para todo `X ∈ past(B)`: `flujo(X, slot(X)) = flujo(B, slot(X))`. Un bloque MUST NOT
+referenciar un bloque de otro flujo»* — y el motivo es de coste: *«un nodo honesto jamás verifica el
+PoT de un flujo ajeno»* (`dag-poas-ancla-de-orden.md:196-200`).
+
+Un certificado **no es un bloque**, luego la letra no lo prohíbe. Pero un voto sí lleva `slot`, y por
+R-FIN-14(c) la validez de una solución se comprueba **bajo un flujo**: `f = flujo(B, s)`. Un voto de
+otro flujo obliga al verificador a evaluar el PoT ajeno, que es exactamente lo que R-FIN-5 existe
+para impedir. Y sin la comprobación, un atacante puede fabricar votos bajo un flujo privado barato.
+
+> **Regla necesaria (candidata):** **R-QUO-3.** Un voto para `B` es válido solo si
+> `flujo(voto, slot(voto)) = flujo(B, slot(voto))`. Un certificado con votos de otro flujo es
+> inválido y **se descarta antes de tocar ningún PoT**, igual que R-FIN-5.
+>
+> **Consecuencia que hay que decir:** con esa regla, un certificado **no cruza flujos**, luego **no
+> ayuda a resolver una partición** — que era una de las cosas para las que uno querría un gadget.
+> Y sin ella, el certificado es un vector de DoS de verificación de PoT (`C-NET-03/04`, B4 del
+> catálogo). **PLAUSIBLE** (argumento cerrado sobre el texto de las reglas; no medido).
+
+### B.5 · Y el número que ordena todo el punto
+
+`POA(k)` **no depende de `α`** — se evalúa con `α = 0,00 / 0,25 / 0,33 / 0,49` y da 1,272367e-12 las
+cuatro veces. **Falla el criterio α del método.** No es una cota de seguridad frente a un adversario:
+es `P[mala realización]` **condicionada** a excluir PoW-1 y PoW-2 *por hipótesis*
+(`hotpow.txt:265-272`). Y crece con el tiempo:
+
+| `t` (con `k = 64`, `λ_voto = 1/s`) | 64 s (`= t̄`) | 128 s | 256 s |
+|---|---:|---:|---:|
+| `POA(64, t)` | 1,272e-12 | **0,5118** | 1,000 |
+
+**Un `k`-quórum de 64 es «prácticamente único» exactamente en el instante `t̄`, y a los 128 s la
+ambigüedad ya es del 51 %.** El paper evalúa en `t̄` *«in order to isolate the effect of k»*
+(`hotpow.txt:374-377`), no como cota del protocolo desplegado — y el cálculo de partida (mío) leyó
+`1,3e-12` como si lo fuera. **Es el segundo error propio.**
+
+### B.6 · La tabla de poder implícita
+
+Para impedir la acumulación de B.2 hace falta la ventana `W` de R-QUO-2, y entonces `k` tiene que
+caber entre lo que produce el atacante y lo que producen los honestos:
+
+```
+α·λ_v·W   <   k   <   (1−α)(1−δ)·λ_v·W
+```
+
+Eso **es** una tabla de poder: hay que conocer `λ_v` (la sostiene el retarget) y acotar `α` (PoW-2).
+**La ventaja anunciada «sin tabla de poder, sin suponer quién está encendido» es falsa: la tabla
+sigue ahí, solo que implícita y menos informativa** — y por ser implícita no se puede indexar con un
+mapa de bits (A.2d, F.3). Ventana mínima medida para que **los dos** riesgos bajen del objetivo:
+
+| `α` | `λ_v` | `W` a 1e-6 | `W` a 1e-12 | `W` a 1e-30 |
+|---:|---:|---:|---:|---:|
+| 0,25 | 1/s | 170 s | 368 s | 976 s |
+| **0,33** | **1/s** | **382 s** | **830 s** | **2 201 s** |
+| 0,40 | 1/s | 1 122 s | 2 452 s | 6 499 s |
+| 0,45 | 1/s | 4 514 s | 9 880 s | 26 228 s |
+| 0,33 | 64/s | 6 s | 13 s | 34 s |
+
+Con pérdida honesta por retardo `δ = 0,267` (el `δ_real` del diseño) a `α = 0,33` y `λ_v = 1/s`:
+**1 420 s / 3 103 s / 8 226 s**; y a `α = 0,40`, **23 972 s** para un mísero 1e-6.
+
+**Etiqueta del punto B: la variante 1 es REFUTADA como aportación** (es profundidad de confirmación,
+DEMOSTRADO); **la variante 2 queda viva y pasa a C y F.**

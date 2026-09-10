@@ -1,0 +1,175 @@
+================================================================================================
+B.a · POA frente al riesgo REAL, a igualdad de espera. ¿Anade informacion el gadget?
+================================================================================================
+
+Variante 1 (voto = bloque): lambda_voto = lambda_bloque = 1/s, luego en t segundos hay
+t votos y el mayor quorum posible es k = t. Se compara con prev() del diseno vivo.
+
+  espera t   k = t     riesgo alpha=0.10     riesgo alpha=0.25     riesgo alpha=0.33     riesgo alpha=0.40      POA(k=t)
+        30      30             1.000e+00             1.000e+00             1.000e+00             1.000e+00     9.252e-07
+        60      60             1.000e+00             1.000e+00             1.000e+00             1.000e+00     6.155e-12
+       120     120             2.830e-01             9.964e-01             1.000e+00             1.000e+00     3.770e-22
+       300     300             6.376e-21             2.234e-04             2.539e-01             9.640e-01     1.520e-52
+       600     600             1.305e-68             7.413e-19             1.516e-06             1.234e-01    5.038e-103
+      1200    1200            1.238e-170             2.686e-52             9.208e-21             9.011e-06    7.814e-204
+      1800    1800            3.768e-316             9.476e-87             7.071e-36             1.148e-10    1.398e-304
+      3600    3600             0.000e+00            4.394e-191             4.264e-82             3.859e-26     0.000e+00
+
+[B.a.1] CRITERIO ALPHA sobre POA — el resultado NO debe ser el mismo para todo alpha.
+        POA(k) se evalua con alpha = 0,00 / 0,25 / 0,33 / 0,49 y k = 64:
+          alpha = 0.00 -> POA(64) = 1.272367e-12   (la funcion no recibe alpha)
+          alpha = 0.25 -> POA(64) = 1.272367e-12   (la funcion no recibe alpha)
+          alpha = 0.33 -> POA(64) = 1.272367e-12   (la funcion no recibe alpha)
+          alpha = 0.49 -> POA(64) = 1.272367e-12   (la funcion no recibe alpha)
+        -> POA FALLA el criterio alpha del metodo. No es una cota de seguridad frente a
+           un adversario: es P[mala realizacion] CONDICIONADA a excluir PoW-1 (lambda
+           conocida) y PoW-2 (alpha acotada) por hipotesis (hotpow.txt:265-272).
+
+[B.a.2] Y POA crece con el tiempo (Lema 1, Fig. 5 del paper): un certificado no es
+        unico 'para siempre'. POA(k=64, t) con lambda_voto = 1/s:
+             t (s)             POA
+                64       1.272e-12
+               128       5.118e-01
+               256       1.000e+00
+               512       1.000e+00
+              1024       1.000e+00
+              2048       1.000e+00
+              4096       1.000e+00
+        A t = 4*t_barra la ambiguedad ya es practicamente 1. El paper evalua en t_barra
+        'in order to isolate the effect of k' (hotpow.txt:374-377), NO como cota del
+        protocolo desplegado.
+
+================================================================================================
+B.b · El atacante que ACUMULA votos para una referencia vieja
+================================================================================================
+
+Un voto en HotPoW es (r, p, s) con H(r,p,s) <= t_v (hotpow.txt:437-441). Nada impide
+seguir buscando soluciones para una r vieja: el atacante con fraccion alpha del espacio
+produce votos para r a tasa alpha*lambda_v POR SIEMPRE. Tiempo hasta k votos propios:
+
+     k      alpha=0.10      alpha=0.25      alpha=0.33      alpha=0.40   (lambda_voto = 1/s)
+    16             160 s              64 s              48 s              40 s
+    32             320 s             128 s              97 s              80 s
+    64             640 s             256 s             194 s             160 s
+   128            1280 s             512 s             388 s             320 s
+   256            2560 s            1024 s             776 s             640 s
+
+-> A alpha = 0,33 y k = 64 le bastan 194 s para tener un certificado propio, valido,
+   para un valor en conflicto con el certificado honesto de la misma referencia.
+   La unicidad del quorum NO la da la teoria de quorums: la da la regla de cabeza de
+   HotPoW, que se niega a cambiar de estado ya comprometido (Listing 4.6, linea 41:
+   'if H.parent.parent.parent.block = R.parent.parent.parent.block then head <- r').
+   Es decir: HotPoW finaliza por PROFUNDIDAD + prohibicion de reorganizar, exactamente
+   como R-FIN-7 (y como Kaspa: processor.rs:1013 'is_chain_ancestor_of(finality_point,
+   candidate)' y :1033 'Finality Violation Detected ... is ignored from Virtual chain').
+   El quorum aporta VARIANZA BAJA del tiempo de bloque, no seguridad extra.
+
+================================================================================================
+B.c · El modelo correcto: ventana de voto W. (perdida honesta por retardo d = 0.00)
+================================================================================================
+
+Para que un certificado sea unico hay que impedir la acumulacion de B.b: el voto lleva
+slot y solo vale dentro de una ventana W (R-FIN-14 da el reto por slot). Entonces k tiene
+que caber entre lo que el atacante puede producir y lo que los honestos producen:
+
+     alpha*lam_v*W   <   k   <   (1-alpha)(1-d)*lam_v*W
+
+que es una TABLA DE PODER IMPLICITA: hay que conocer lam_v (la da el retarget) y acotar
+alpha (hipotesis PoW-2). La ventaja anunciada 'sin tabla de poder' NO existe.
+
+  alpha   lam_v   W (s)      k   P[atacante solo >= k]     P[honestos < k]
+   0.10       1      30     11               2.923e-04           1.645e-04
+   0.10       1      60     22               3.908e-07           2.669e-07
+   0.10       1     300    110               2.454e-29           6.643e-29
+   0.10       1    1800    656              4.221e-164          8.270e-164
+   0.10       1    3600   1287               0.000e+00           0.000e+00
+   0.10       8      30     88               7.999e-24           1.541e-23
+   0.10       8      60    175               2.871e-45           2.365e-45
+   0.10       8     300    874              1.085e-217          7.775e-218
+   0.10       8    1800   3095               0.000e+00           0.000e+00
+   0.10       8    3600   5133               0.000e+00           0.000e+00
+   0.10      64      30    699              1.750e-174          7.490e-175
+   0.10      64      60   1335               0.000e+00           0.000e+00
+   0.10      64     300   3799               0.000e+00           0.000e+00
+   0.10      64    1800  15888               0.000e+00           0.000e+00
+   0.10      64    3600  29120               0.000e+00           0.000e+00
+   0.25       1      30     14               2.156e-02           2.206e-02
+   0.25       1      60     28               1.716e-03           2.666e-03
+   0.25       1     300    137               8.863e-11           1.030e-10
+   0.25       1    1800    820               3.048e-55           5.031e-55
+   0.25       1    3600   1639              3.900e-108          5.073e-108
+   0.25       8      30    110               4.686e-09           7.717e-09
+   0.25       8      60    219               3.538e-16           4.484e-16
+   0.25       8     300   1093               6.933e-73           1.057e-72
+   0.25       8    1800   6094               0.000e+00           0.000e+00
+   0.25       8    3600  10702               0.000e+00           0.000e+00
+   0.25      64      30    874               1.290e-58           1.081e-58
+   0.25      64      60   1748              3.951e-115          3.996e-115
+   0.25      64     300   7702               0.000e+00           0.000e+00
+   0.25      64    1800  35570               0.000e+00           0.000e+00
+   0.25      64    3600  67074               0.000e+00           0.000e+00
+   0.33       1      30     15               7.835e-02           1.010e-01
+   0.33       1      60     29               3.085e-02           2.743e-02
+   0.33       1     300    144               1.313e-05           1.003e-05
+   0.33       1    1800    865               1.359e-25           1.924e-25
+   0.33       1    3600   1729               4.449e-49           5.531e-49
+   0.33       8      30    116               6.339e-05           8.853e-05
+   0.33       8      60    231               3.876e-08           4.552e-08
+   0.33       8     300   1153               1.963e-33           2.661e-33
+   0.33       8    1800   6914              1.462e-189          1.709e-189
+   0.33       8    3600  13493               0.000e+00           0.000e+00
+   0.33      64      30    922               4.594e-27           4.202e-27
+   0.33      64      60   1844               3.594e-52           3.809e-52
+   0.33      64     300   9218              7.430e-252          6.172e-252
+   0.33      64    1800  45758               0.000e+00           0.000e+00
+   0.33      64    3600  86881               0.000e+00           0.000e+00
+   0.40       1      30     15               2.280e-01           2.081e-01
+   0.40       1      60     30               1.321e-01           1.379e-01
+   0.40       1     300    148               7.398e-03           6.413e-03
+   0.40       1    1800    888               8.344e-10           7.671e-10
+   0.40       1    3600   1776               7.210e-18           7.002e-18
+   0.40       8      30    119               1.284e-02           1.468e-02
+   0.40       8      60    237               9.364e-04           8.967e-04
+   0.40       8     300   1184               1.668e-12           1.562e-12
+   0.40       8    1800   7103               1.394e-65           1.241e-65
+   0.40       8    3600  14206              5.517e-129          5.003e-129
+   0.40      64      30    947               2.505e-10           2.127e-10
+   0.40      64      60   1894               6.689e-19           5.552e-19
+   0.40      64     300   9471               9.280e-87           9.516e-87
+   0.40      64    1800  54580               0.000e+00           0.000e+00
+   0.40      64    3600 104080               0.000e+00           0.000e+00
+
+[B.c.2] Ventana minima W para que max(P[atacante solo], P[honestos no llegan]) <= objetivo
+        (lambda_voto = 1/s, es decir el voto es el bloque; y lambda_voto = 8/s y 64/s)
+          alpha   lam_v        obj=1e-6       obj=1e-12       obj=1e-30
+           0.10       1            56 s           122 s           320 s
+           0.10       8             7 s            15 s            40 s
+           0.10      64             1 s             2 s             5 s
+           0.25       1           170 s           368 s           976 s
+           0.25       8            21 s            46 s           122 s
+           0.25      64             3 s             6 s            15 s
+           0.33       1           382 s           830 s          2201 s
+           0.33       8            48 s           104 s           275 s
+           0.33      64             6 s            13 s            34 s
+           0.40       1          1122 s          2452 s          6499 s
+           0.40       8           140 s           306 s           813 s
+           0.40      64            18 s            38 s           102 s
+           0.45       1          4514 s          9880 s         26228 s
+           0.45       8           566 s          1235 s          3278 s
+           0.45      64            71 s           154 s           410 s
+
+[B.c.3] Lo mismo con perdida honesta por retardo d = 0,267 (delta_real del diseno, R-FIN-7)
+
+[B.c.2] Ventana minima W para que max(P[atacante solo], P[honestos no llegan]) <= objetivo
+        (lambda_voto = 1/s, es decir el voto es el bloque; y lambda_voto = 8/s y 64/s)
+          alpha   lam_v        obj=1e-6       obj=1e-12       obj=1e-30
+           0.10       1            92 s           199 s           524 s
+           0.10       8            11 s            25 s            65 s
+           0.10      64             1 s             3 s             8 s
+           0.25       1           390 s           846 s          2246 s
+           0.25       8            48 s           106 s           281 s
+           0.25      64             6 s            13 s            35 s
+           0.33       1          1420 s          3103 s          8226 s
+           0.33       8           177 s           388 s          1029 s
+           0.33      64            22 s            48 s           129 s
+           0.40       1         23972 s         52453 s        139295 s

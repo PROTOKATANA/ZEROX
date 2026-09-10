@@ -1,0 +1,68 @@
+warning: profile package spec `cranelift-wasm` in profile `dev` did not match any packages
+   Compiling typenum v1.19.0
+   Compiling version_check v0.9.5
+   Compiling crossbeam-utils v0.8.21
+   Compiling crossbeam-epoch v0.9.20
+   Compiling portable-atomic v1.13.1
+   Compiling rayon-core v1.13.0
+   Compiling critical-section v1.2.0
+   Compiling crunchy v0.2.4
+   Compiling scopeguard v1.2.0
+   Compiling bytes v1.12.0
+   Compiling byte-slice-cast v1.2.3
+   Compiling smallvec v1.15.1
+   Compiling cpufeatures v0.2.17
+   Compiling hex v0.4.3
+   Compiling parking_lot_core v0.9.12
+   Compiling blst v0.3.16
+   Compiling blake3 v1.8.5
+   Compiling siphasher v1.0.2
+   Compiling parity-scale-codec v3.7.5
+   Compiling getrandom v0.2.17
+   Compiling constant_time_eq v0.4.2
+   Compiling byteorder v1.5.0
+   Compiling zeroize_derive v1.5.0
+   Compiling threadpool v1.8.1
+   Compiling derive_more v2.1.1
+   Compiling pin-project-lite v0.2.17
+   Compiling ppv-lite86 v0.2.21
+   Compiling lock_api v0.4.14
+   Compiling rand_core v0.6.4
+   Compiling generic-array v0.14.7
+   Compiling spin v0.12.0
+   Compiling uint v0.10.0
+   Compiling rand_chacha v0.3.1
+   Compiling parking_lot v0.12.5
+   Compiling once_cell v1.21.4
+   Compiling zeroize v1.9.0
+   Compiling rand v0.8.6
+   Compiling tracing-core v0.1.36
+   Compiling crossbeam-deque v0.8.6
+   Compiling tracing v0.1.44
+   Compiling rayon v1.12.0
+   Compiling scale-info v2.11.6
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling subspace-core-primitives v0.1.0 (/home/katana/zeo/fuentes/subspace/crates/subspace-core-primitives)
+   Compiling kzg v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+   Compiling rust-kzg-blst v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+   Compiling subspace-kzg v0.1.0 (/home/katana/zeo/fuentes/subspace/shared/subspace-kzg)
+    Finished `bench` profile [optimized] target(s) in 6.77s
+     Running benches/kzg.rs (target/release/deps/kzg-93db399f399e2be0)
+Benchmarking verify
+Benchmarking verify: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.4s, enable flat sampling, or reduce sample count to 60.
+Benchmarking verify: Collecting 100 samples in estimated 5.4197 s (5050 iterations)
+Benchmarking verify: Analyzing
+verify                  time:   [1.0719 ms 1.0773 ms 1.0887 ms]
+                        change: [−98.885% −98.883% −98.879%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low severe
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+
