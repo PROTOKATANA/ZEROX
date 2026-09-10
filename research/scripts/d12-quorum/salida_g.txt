@@ -1,0 +1,12 @@
+================================================================================================
+G.1 · ¿Toca el gadget la frontera de flujo unico?
+================================================================================================
+
+      El gadget cambia el horizonte de finalidad efectivo: se deja de reorganizar en cuanto llega
+      el certificado, a t = d + W, en vez de a F. Y la frontera se calcula como la union sobre las
+      epocas de 10 anos de prev() EVALUADA EN ESE HORIZONTE (r9a_a3_frontera.py:81-84). Como prev
+      es decreciente en t, acortar el horizonte SUBE el riesgo por epoca y BAJA la frontera.
+
+      Control positivo del instrumento: modelo (c), atacante unico, delta = 0.
+      
+            horizonte de finalidad    frontera 1e-10   comentario

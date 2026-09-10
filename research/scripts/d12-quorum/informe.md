@@ -507,3 +507,88 @@ identidad de billete — y eso es la variante 1, que es profundidad de confirmac
 
 **Etiqueta del punto F: REFUTADO** (la equivocación gratis y el coste de agregación cierran la
 variante 2; F.5 quita a la propuesta rival su coste declarado principal).
+
+---
+
+## C · El umbral, con nuestro `Δ`, y el ataque de censura reproducido
+
+**Script:** `d12_c_censura.py` · **Salida:** `salida_c.txt`
+
+### C.0 · Control positivo (Figura 11 del paper), con un instrumento mejor que el suyo
+
+El modelo del Apéndice B (`hotpow.txt:1856-1927`) es una cadena de Markov absorbente. Como **todas**
+sus transiciones incrementan `a+d` en uno, se puede barrer por niveles `n = a+d` y **resolverla
+exacta** en vez de con las 10⁶ realizaciones del paper. Resultado (`salida_c.txt`, C.1):
+
+| `k` | `α = 0,020` | `α = 0,100` | `α = 0,200` | `α = 0,333` | `α = 0,500` |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0,0200 | 0,1000 | 0,2000 | 0,3333 | 0,5000 |
+| 64 | 0,0204 | 0,1091 | 0,2339 | **0,4153** | **0,6432** |
+| 256 | 0,0204 | 0,1094 | 0,2347 | 0,4170 | 0,6456 |
+
+El paper: *«an α = 1/3 attacker contributes roughly 42 % (α = 1/2: 64 %) of the blocks»*
+(`hotpow.txt:963-967`). **Reproducido. VERIFICADO.** Masa sin absorber ≤ 9,9e-16.
+
+**Control del control:** Monte Carlo vectorizado, 12 semillas × 30 000 rondas, contra la DP exacta:
+las seis configuraciones caen a **≤ 0,60 intervalos de confianza** del valor exacto. El simulador,
+que es el que después se usa con retardo, es correcto en el caso que el paper publica.
+
+### C.1 · Qué le hace el retardo a la unicidad del quórum
+
+Dos honestos con vistas distintas votan valores distintos **sin ser atacantes**. El paper lo
+reconoce y lo trata con la regla de preferencia (§5.2.1, `hotpow.txt:930-940`: *«as soon as the
+first vote is received from an honest node, all honest nodes converge to a single value»*), es
+decir: **resuelve el problema con un consenso**. Nosotros ya tenemos ese consenso —GHOSTDAG— y por
+tanto el gadget no puede aportarlo; lo que aporta es la exigencia de que los honestos coincidan en
+el valor votado, y eso obliga a votar a profundidad `d > 0` (D.6). Cuantitativamente, la pérdida
+honesta se comporta como un `δ` y entra en la condición de B.6: con `δ = 0,267` la ventana mínima a
+`α = 0,33` pasa de 830 s a **3 103 s** (objetivo 1e-12), y a `α = 0,45` **no existe ninguna `W`**.
+
+### C.2 · El umbral compuesto
+
+No es el mínimo de los dos, ni el del paper. Se compone así:
+
+1. **Techo propio del gadget.** La condición `α·λ_v·W < k < (1−α)(1−δ)·λ_v·W` sólo tiene solución si
+   `α < (1−δ)/(2−δ)`. Con `δ = 0` da el `α < 1/2` del paper; con el `δ_real = 0,267` del diseño da
+   **42,30 %**; con el `δ_ef = 0,129` medido bajo U3″ (D9-d A3), **46,55 %**. Es un techo asintótico
+   (`W → ∞`): **operativamente muere mucho antes** — a `α = 0,40` con `δ` hacen falta 23 972 s para
+   un objetivo de 1e-6 (B.6).
+2. **Frontera del DAG.** 44,6 % con `F = 2 h`, 38,3 % a `Δ = 16 s` (9a; catálogo A1/B1).
+3. **Y el término que no es de ninguno de los dos:** un certificado sobre el bloque equivocado es
+   **permanente**, no una reorganización temporal. Por eso el umbral compuesto es **la frontera
+   recalculada con el horizonte de finalidad que impone el gadget**, `d + W`, que es lo que mide
+   G.1 — y sale **por debajo** de la de hoy, no por encima.
+
+### C.3 · El ataque de censura por retención de votos, en nuestro régimen
+
+Cuota de certificados que controla el atacante (12 semillas × 20 000 rondas por configuración;
+adversario del paper: ve todo al instante y no paga `Δ`; los honestos sí):
+
+| `α` | `k` | `Δ = 0` | `Δ = 4 s` | `Δ = 8 s` | `Δ = 16 s` |
+|---:|---:|---:|---:|---:|---:|
+| **Variante 1 · el voto es el bloque (`λ_v = 1/s`)** | | | | | |
+| 0,25 | 64 | 0,3010 | 0,3062 | 0,3139 | 0,3291 |
+| **0,33** | **64** | **0,4105** | **0,4154** | **0,4242** | **0,4380** |
+| 0,40 | 64 | 0,5086 | 0,5148 | 0,5197 | 0,5338 |
+| **Variante 2 · voto aparte (`λ_v = k/s`), la de HotPoW** | | | | | |
+| 0,10 | 64 | 0,1093 | 0,2337 | 0,2779 | **0,3221** |
+| 0,25 | 64 | 0,3010 | 0,5055 | 0,5708 | **0,6316** |
+| **0,33** | **64** | **0,4105** | **0,6164** | **0,6801** | **0,7389** |
+| 0,40 | 64 | 0,5086 | 0,7002 | 0,7572 | **0,8088** |
+
+**La respuesta a la pregunta del encargo:** un atacante al 33 % controla **el 41,5 %** de los
+certificados en la variante 1 (que es la que no aporta nada) y **entre el 61,6 % y el 73,9 %** en la
+variante 2 (que es la que aportaría algo), según `Δ`.
+
+> **Y el hallazgo del punto:** *el retardo destruye precisamente la variante que compra algo.* En la
+> variante 1 la ronda dura `k` segundos y `Δ = 4 s` es un 6 % de ella: la cuota sube 1,2 puntos. En
+> la variante 2 la ronda dura ~1 s y `Δ = 4 s` es **cuatro veces** la ronda: la cuota sube **20,6
+> puntos**. Es la misma física que la Figura 8 del paper (*«latencies in the order of 10 % of the
+> expected block time delay the commit by about 20 %»*, `hotpow.txt:892-896`), llevada al régimen
+> donde la latencia es 400 % del tiempo de quórum. Y `Δ` es **E1 del catálogo: sin medir.**
+>
+> Con `Δ = 16 s` un atacante del **10 %** ya controla un tercio de los certificados en la variante 2.
+
+**Etiqueta del punto C: VERIFICADO** (control positivo del paper reproducido exacto; el ataque
+portado a nuestro régimen con 12 semillas y cobertura de rama completa: 9 845 129 éxitos del
+atacante y 13 194 871 de los honestos sobre 23 040 000 rondas, sin rondas truncadas).

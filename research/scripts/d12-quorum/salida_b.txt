@@ -173,3 +173,24 @@ alpha (hipotesis PoW-2). La ventaja anunciada 'sin tabla de poder' NO existe.
            0.33       8           177 s           388 s          1029 s
            0.33      64            22 s            48 s           129 s
            0.40       1         23972 s         52453 s        139295 s
+           0.40       8          2997 s          6559 s         17410 s
+           0.40      64           374 s           820 s          2176 s
+           0.45       1               —               —               —
+           0.45       8               —               —               —
+           0.45      64               —               —               —
+
+================================================================================================
+COBERTURA DE RAMA
+================================================================================================
+  W_alcanzable                 81
+  W_no_alcanzable              9
+  acumula_alpha_0.1            5
+  acumula_alpha_0.25           5
+  acumula_alpha_0.33           5
+  acumula_alpha_0.4            5
+  poa                          8
+  prev_alpha_0.1               8
+  prev_alpha_0.25              8
+  prev_alpha_0.33              8
+  prev_alpha_0.4               8
+  region_valida                60
