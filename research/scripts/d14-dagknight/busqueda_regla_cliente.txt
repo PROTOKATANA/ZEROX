@@ -1,0 +1,168 @@
+=== 1. rama y tip ===
+3353678ae69703b5fb603a335e7466a3c0604794 Mon Sep 7 20:22:20 2026 +0200 [DK][SSAV2] V2 all inner calls of ssav2 (#1123)
+
+=== 2. todos los commits que tocan la ruta dagknight (cualquier rama) ===
+940ddb57 [DK] Further lint fixes
+c6ef6686 [DK::CZM] Fix lint on correctness test
+9c00f54b [DK::CZM] Fix test_find_last_known_tips_uses_correct_ancestry_type
+0853887a [DK::CZM] Color by subgroup
+db2ef061 [DK::CZM] Loosen instrumentation check to match true requirements
+4ffb8e94 [DK::CZM] Replicate instrumentation strictness
+6a2df023 [DK::CZM] Fix find_last_known_tips to scope to NCA
+48e78399 [DK::CZM] Add test_czm_lkt_correctness
+059cc71f [DK::coloring] Use custom topology store for sorting coloring GD mergeset
+5cb5e8dd [DK::UMC] Extract cascade UMC voting into SegmentTreeUmcVoter
+2c30d9a7 [DK::UMC] Extract baseline UMC voting into BaselineUmcVoter
+4237cc6c [DK::UMC] Extract UmcVoter trait and voting context
+fd7429b8 [DK::UMC] Full incremental cascade voting implementation
+3ff0e45e [DK::UMC] Add persistence functions
+2210a5b1 [DK::UMC] Support segment tree leaves iteration
+e654fc9c [DK::UMC] Wire up persistence store to executor
+9e50824d [DK::UMC] Create UMC persistence store
+956c82fd Merge branch 'dk-umc-proposed' into dagknight
+bc83e8bd [DK::UMC] Promote proposed to actual umc implementation
+f3624fa8 [DK::UMC] Move baseline checks behind feature flag
+50079222 [DK::CZM] Atomic operations when filling zone data
+60c7cceb [DK] Remove unnecessary locks in protocol level
+3380ce56 [DK::CZM] Add KColouringLockKey (unused)
+3ea9954c Merge branch 'dagknight' into dk-umc-proposed
+6060b4e6 [DK::CZM] Stable mergeset ordering
+d093f58f DK: compare baseline and cascade virtual scores
+0c03a85f DK: process cascade blocks in topological order
+ba405e55 DK: derive vote direction from strict future
+7bccdd2f DK: return virtual score from cascade results
+b152b5db DK: extract cascade virtual score calculation
+7b771b6e [DK::UMC] Align baseline results to chain-based approach
+4708e16f [DK::UMC] Add UMC baseline to validate proposal impl
+54dbd983 [DK::UMC] Track stats for flips
+76334d66 [DK::UMC] Weight cascade voting by block work
+eed873ab [DK::UMC] Generalize segment tree scores
+5428bc9d [DK::UMC] Clarify cascade terminology
+5fdcbdf3 [DK::UMC] Simplify segment tree bucket handling
+21e303fe [DK::UMC] Migrate cascade to generic segment tree
+44c1caf4 [DK::UMC] Add generic appendable segment tree
+15677b22 [DK::tie] Rename and refactor for clarity
+0f246176 clippy-only fixes
+f0677d4a [DK::protocol] Deduplicate tips
+507bbd51 [DK::UMC] Add DagknightCounters and wire it up
+1ee6665e [DK::UMC] Handle gray blocks in proposed version
+df0ca4b7 [DK::UMC] Retain old basic impl to compare results
+5f8e03cc [DK::UMC] Proposed chain-based UMC (unreviewed)
+fd318a27 [DK::tie] Singular tie-break range check
+21798219 [DK::tie] cleaner logic and re-use GroupMetadata
+749aee35 [DK::tie] Implement anticone count and compare
+baf00578 [DK::tie] Add conditioned chain computation
+092b46bc [DK] Free-search minor fix
+02e2e451 [DK::tie] Calculate reference cluster
+3b5ada27 [DK::CZM] Implement free_search support
+f562706f [DK-protocol::rank] K in the outer loop
+6dcbba0d [DK-protocol][Test] Add ordering independence test
+2e2b72d9 [CZM] Move fill zone logic to ConflictZoneManager
+784fb91e [DK-protocol::umc] Move majority coverage logic
+b75ef94c [DK-protocol::tie] Implement placeholder for Tie Breaking
+110f949b [DK-protocol::rank] Optimize search even further when better data is available
+88ebeb0f [DK-protocol::rank] Refactor RankSearching into its own module
+
+=== 3. ficheros del arbol completo cuyo nombre menciona dagknight/umc/knight ===
+consensus/benches/dagknight_benches.rs
+consensus/src/model/stores/dagknight.rs
+consensus/src/processes/dagknight/appendable_segment_tree_api.rs
+consensus/src/processes/dagknight/appendable_segment_tree_impl.rs
+consensus/src/processes/dagknight/manager.rs
+consensus/src/processes/dagknight/mod.rs
+consensus/src/processes/dagknight/protocol.pseudo
+consensus/src/processes/dagknight/protocol.rs
+consensus/src/processes/dagknight/rank_search.rs
+consensus/src/processes/dagknight/tie_breaking.rs
+consensus/src/processes/dagknight/umc_baseline.rs
+consensus/src/processes/dagknight/umc_cascade.rs
+consensus/src/processes/dagknight/umc_cascade_persistence.rs
+consensus/src/processes/dagknight/umc_voting.rs
+consensus/umc_fixture.json
+
+=== 4. grep -i confirmation/finality/risk en TODO el arbol (rust/md/pseudo) ===
+origin/dagknight:bridge/src/prom.rs:144:            "Number of node-accepted blocks that were not confirmed blue within the confirmation window",
+origin/dagknight:bridge/src/rkstratum_cpu_miner.rs:10:// Mirror share_handler's block confirmation behavior so "Blocks" means confirmed BLUE.
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:73:        2. blue score (mainly for blue depth but also for client confirmation counting)
+origin/dagknight:docs/toccata-guide.md:92:- `confirmationCount`: populated once the block has known merge context.
+origin/dagknight:rpc/core/src/wasm/message.rs:953:        confirmationCount?: bigint;
+origin/dagknight:rpc/core/src/wasm/message.rs:1301:         * If passed, this request will only return blocks that have at least minConfirmationCount number of confirmations. Confirmation is counted through the distance from virtual chain tip.
+origin/dagknight:rpc/core/src/wasm/message.rs:1304:        minConfirmationCount?: number;
+origin/dagknight:rpc/core/src/wasm/message.rs:1345:         * If passed, this request will only return blocks that have at least minConfirmationCount number of confirmations. Confirmation is counted through the distance from virtual chain tip.
+origin/dagknight:rpc/core/src/wasm/message.rs:1348:        minConfirmationCount?: number;
+origin/dagknight:rpc/service/src/service.rs:1367:        // if min confirmation count is present, strip chain head if needed
+origin/dagknight:rpc/wrpc/examples/simple_client/src/main.rs:102:        "confirmation count: {:?}, reward: {:?}, color: {:?}",
+origin/dagknight:rpc/wrpc/wasm/src/client.rs:1016:        /// Returned information: block color, confirmation count, reward, merging chain block, and header.
+origin/dagknight:testing/integration/src/common/utils.rs:267:    let needed_confirmations = if !entry.is_coinbase { 10 } else { coinbase_maturity };
+origin/dagknight:testing/integration/src/common/utils.rs:268:    entry.block_daa_score + needed_confirmations <= virtual_daa_score
+origin/dagknight:testing/integration/src/daemon_integration_tests.rs:813:    // a small buffer for the confirmation and spend blocks.
+origin/dagknight:testing/integration/src/rpc_tests.rs:172:                    // VSPC min confirmation count test
+origin/dagknight:wallet/core/src/utxo/balance.rs:61:     * received and is pending confirmation.
+origin/dagknight:wallet/core/src/utxo/balance.rs:76:     * are pending confirmation.
+origin/dagknight:wallet/core/src/utxo/context.rs:86:    /// UTXOs that are pending confirmation
+origin/dagknight:wallet/core/src/utxo/context.rs:93:    /// Confirmation occurs when the transaction UTXOs are
+
+=== 5. cualquier 'client' dentro de consensus/src/processes/dagknight ===
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:73:        2. blue score (mainly for blue depth but also for client confirmation counting)
+
+=== 6. tests/benches de dagknight: nombres de test ===
+origin/dagknight:consensus/benches/dagknight_benches.rs:131:fn benchmark_tie_breaking(c: &mut Criterion) {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:506:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:507:    fn test_append_and_score() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:518:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:519:    fn test_prefix_add() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:536:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:537:    fn test_range_add() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:552:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:553:    fn test_crossing_detection_and_flip() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:571:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:572:    fn test_negative_flips_to_positive() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:596:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:597:    fn test_grow_capacity() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:615:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:616:    fn test_prefix_add_zero() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:623:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:625:    fn test_append_requires_crossingless_tree() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:633:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:634:    fn test_grow_preserves_lazy_state() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:658:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:659:    fn test_append_infers_bucket_from_score() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:670:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:671:    fn test_leaves_returns_in_position_order() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:683:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:684:    fn test_leaves_after_prefix_add() {
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:702:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/appendable_segment_tree_impl.rs:703:    fn test_leaves_empty_tree() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:610:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:611:    fn test_k_colouring_lock_key_constructors() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:627:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:628:    fn test_k_colouring_lock_key_equality() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:652:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:653:    fn test_get_k_colouring_locks_singleton() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:659:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:660:    fn test_cleanup_k_colouring_locks_removes_unused() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:673:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:674:    fn test_cleanup_k_colouring_locks_keeps_used() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:729:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:730:    fn test_find_last_known_tips_uses_correct_ancestry_type() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:865:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:866:    fn test_free_search_considers_non_agreeing_parents() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:968:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:969:    fn test_czm_lkt_correctness() {
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:1056:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/manager.rs:1057:    fn test_czm_lkt_correctness_2() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:674:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:675:    fn test_cascade() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:844:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:845:    fn test_dag_dk_sample() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:871:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:872:    fn test_dag_from_json() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:903:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:904:    fn test_complex_dag() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:926:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:927:    fn test_monitonicity_simple() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:1026:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:1027:    fn test_parent_ordering_stability() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:1130:    #[test]
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:1131:    fn test_duplicate_parents_two_same() {
+origin/dagknight:consensus/src/processes/dagknight/protocol.rs:1175:    #[test]

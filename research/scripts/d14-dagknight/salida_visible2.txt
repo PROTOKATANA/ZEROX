@@ -1,0 +1,49 @@
+==========================================================================================================================
+VISTA COMPLETA vs VISTA REAL DEL CLIENTE EN T — ataque retención + cadena privada
+vista completa = todo lo creado (modelo D8b); vista real = bloques con entrega <= T.
+cap0 = captura D8b; capb0 = captura_ref (ni pasado ni azul); 12 semillas.
+==========================================================================================================================
+
+α=0.25 Δ=16 — M0: captura D8b | captura_ref (12 semillas)
+   estrategia |   vista completa |       vista real
+      instant |           0|   0 |           0|   0
+    retraso20 |           8|   8 |          12|  12
+ retraso20_sp |           6|   5 |           7|   6
+ retraso60_sp |           8|   7 |           0|   0
+
+α=0.25 Δ=20 — M0: captura D8b | captura_ref (12 semillas)
+   estrategia |   vista completa |       vista real
+      instant |           0|   0 |           1|   1
+    retraso20 |           8|   8 |           8|   8
+ retraso20_sp |           6|   6 |           8|   8
+ retraso60_sp |           5|   5 |           0|   0
+
+α=0.40 Δ=16 — M0: captura D8b | captura_ref (12 semillas)
+   estrategia |   vista completa |       vista real
+      instant |           0|   0 |           0|   0
+    retraso20 |           5|   5 |          12|  12
+ retraso20_sp |           9|   9 |           3|   2
+ retraso60_sp |          12|  12 |           0|   0
+
+α=0.40 Δ=20 — M0: captura D8b | captura_ref (12 semillas)
+   estrategia |   vista completa |       vista real
+      instant |           0|   0 |           0|   0
+    retraso20 |           5|   5 |           7|   7
+ retraso20_sp |          11|   9 |           9|   8
+ retraso60_sp |           7|   5 |           0|   0
+
+==========================================================================================================================
+M2h SOBRE LA VISTA REAL — k_conf, congelación, cap_ref y latencia (α=0,33)
+==========================================================================================================================
+    α    Δ    estrategia |  k_conf med[min,max] |  cong cap_ref |  lat ε=1e-6 med[min,max] | lat ε=1e-12 med[min,max]
+ 0.33   16       instant |             1.8[0,8] |   0/12     0/12 |          30.5[15.2,40.9] |          55.7[36.2,68.4]
+ 0.33   16     retraso20 |            6.1[2,13] |   0/12     0/12 |          34.4[15.2,60.7] |          55.7[36.2,68.4]
+ 0.33   16  retraso20_sp |            9.2[1,16] |   0/12     0/12 |          41.7[17.1,69.5] |          56.7[36.2,69.5]
+ 0.33   16  retraso60_sp |            7.9[3,25] |   0/12     0/12 |          37.9[17.1,94.2] |          58.8[36.2,94.2]
+ 0.33   20       instant |            2.2[0,11] |   0/12     0/12 |          32.1[15.2,50.5] |          55.7[36.2,68.4]
+ 0.33   20     retraso20 |            3.9[0,13] |   0/12     0/12 |          33.5[15.2,60.7] |          55.7[36.2,68.4]
+ 0.33   20  retraso20_sp |           10.7[2,18] |   0/12     0/12 |          47.7[23.7,78.9] |          59.4[36.2,78.9]
+ 0.33   20  retraso60_sp |           11.9[2,21] |   0/12     0/12 |          51.7[19.8,93.7] |          61.7[36.2,93.7]
+
+baseline α=0,33: k=30 -> suelo 3·30/((1−α)λ) = 134.3 s; m(1e-6)=20, m(1e-12)=40
+(la latencia usa el mismo calendario y la misma fórmula que informe2/d14k_zerox2.py)

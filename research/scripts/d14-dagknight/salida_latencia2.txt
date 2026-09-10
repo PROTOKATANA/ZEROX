@@ -1,0 +1,42 @@
+==========================================================================================================================
+LATENCIA α=0,33 — mitigación M2h (el k-clúster confirmado cubre la cadena honesta)
+λ=1, T=400 s, 12 semillas. k_conf = k del ganador M2h; k_hon = k del subgrupo del
+tip honesto bajo M2h (None = congelación); k_fiel = rank fiel M0 de referencia.
+Latencia = tiempo hasta el M-ésimo honesto tras B*, M = max(3k, m(α,ε)).
+==========================================================================================================================
+
+A · baseline k=30 (M=90) y cota del paper (:1007) por Δ
+   Δ=16: baseline medido 130.41 s (suelo 3·30/((1−α)λ) = 134.3 s)
+      cota paper ε=1e-06: 343.7 s
+      cota paper ε=1e-12: 384.3 s
+   Δ=20: baseline medido 130.41 s (suelo 3·30/((1−α)λ) = 134.3 s)
+      cota paper ε=1e-06: 499.5 s
+      cota paper ε=1e-12: 540.1 s
+
+B · M2h por (Δ, estrategia): k_conf / k_hon / k_fiel (media[mín,máx]); congelación
+cong_conf = el ganador M2h no existe (cliente no confirma); cong_hon = el subgrupo
+del tip honesto no cubre su cadena. cap_ref = censura real residual (debe ser 0).
+   Δ    estrategia |       k_conf          k_hon       k_fiel | cong_c cong_h gan_att cap_ref
+  16       instant |     1.8[0,8]       2.6[0,8]     0.2[0,1] |    0/12    4/12     4/12     0/12
+  16  retraso20_sp |    9.2[1,16]      9.2[1,16]    4.4[0,14] |    0/12    0/12     1/12     0/12
+  16  retraso60_sp |    7.9[3,25]      7.9[3,25]    3.0[0,10] |    0/12    0/12     0/12     0/12
+  20       instant |    2.2[0,11]      6.5[0,11]     0.0[0,0] |    0/12    8/12     8/12     0/12
+  20  retraso20_sp |   10.7[2,18]     10.7[2,18]    3.3[0,16] |    0/12    0/12     7/12     0/12
+  20  retraso60_sp |   11.9[2,21]     11.9[2,21]    4.1[0,15] |    0/12    0/12     0/12     0/12
+
+C · latencia M2h (s) por (Δ, ε): con k_conf y con k_hon; media[mín,máx]
+   Δ    estrategia |           ε=1e-06 conf |           ε=1e-12 conf |            ε=1e-06 hon |            ε=1e-12 hon
+  16       instant |     30.49[ 15.19, 40.88] |     55.67[ 36.22, 68.41] |     32.89[ 23.75, 40.88] |     58.27[ 50.57, 68.41]
+  16  retraso20_sp |     41.69[ 17.09, 69.45] |     56.68[ 36.22, 69.45] |     41.69[ 17.09, 69.45] |     56.68[ 36.22, 69.45]
+  16  retraso60_sp |     37.92[ 17.09, 94.25] |     58.78[ 36.22, 94.25] |     37.92[ 17.09, 94.25] |     58.78[ 36.22, 94.25]
+  20       instant |     32.11[ 15.19, 50.50] |     55.67[ 36.22, 68.41] |     35.28[ 15.19, 50.50] |     56.62[ 36.22, 68.41]
+  20  retraso20_sp |     47.67[ 23.75, 78.86] |     59.36[ 36.22, 78.86] |     47.67[ 23.75, 78.86] |     59.36[ 36.22, 78.86]
+  20  retraso60_sp |     51.68[ 19.76, 93.67] |     61.72[ 36.22, 93.67] |     51.68[ 19.76, 93.67] |     61.72[ 36.22, 93.67]
+
+D · suelo teórico M2h max(3k,m)/((1−α)λ) (s) por (Δ, ε): media con k_conf / k_hon
+   Δ=  16       instant: c=  30.3 h=  30.6 | c=  59.7 h=  59.7
+   Δ=  16  retraso20_sp: c=  43.8 h=  43.8 | c=  61.2 h=  61.2
+   Δ=  16  retraso60_sp: c=  41.0 h=  41.0 | c=  64.1 h=  64.1
+   Δ=  20       instant: c=  32.1 h=  36.6 | c=  59.7 h=  59.7
+   Δ=  20  retraso20_sp: c=  50.9 h=  50.9 | c=  63.4 h=  63.4
+   Δ=  20  retraso60_sp: c=  56.5 h=  56.5 | c=  67.2 h=  67.2
