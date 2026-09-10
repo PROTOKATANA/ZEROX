@@ -249,3 +249,261 @@ Con pérdida honesta por retardo `δ = 0,267` (el `δ_real` del diseño) a `α =
 
 **Etiqueta del punto B: la variante 1 es REFUTADA como aportación** (es profundidad de confirmación,
 DEMOSTRADO); **la variante 2 queda viva y pasa a C y F.**
+
+---
+
+## D · Cuándo se para bajo ataque y cómo se recupera
+
+**Script:** `d12_d_parada.py` · **Salida:** `salida_d.txt`
+
+**El teorema, con su enunciado exacto y sus hipótesis.** Lewis-Pye y Roughgarden, Teorema 4.1
+(`research/fuentes/lewispye-roughgarden-cap.txt:759`): *«No protocol is both adaptive and has
+finality»*, donde **adaptativo** = vivo en el escenario **sin tamaño** (Def. 3.2, `:727-728`) y
+**finalidad** = seguro en el parcialmente síncrono (Def. 3.4, `:744-745`), bajo la hipótesis
+*«no balance, no voice»* (`:754-757`). La idea de la demostración, literal: *«in the unsized (and
+partially synchronous) setting … network partitions [are] indistinguishable from waning resource
+pools»* (`:774-777`).
+
+> **Cómo escapa HotPoW: no escapa, se sale del escenario.** Excluye PoW-1 *por axioma*
+> (`hotpow.txt:265-267` y `:1300-1303`: *«under axiomatic exclusion of the failure modes PoW-1 and
+> PoW-2»*), que es exactamente ponerse en el escenario **con tamaño**. Quien sostiene ese tamaño en
+> la práctica es el retarget, y el retarget tiene inercia: `W_RETARGET ≥ 3 083` índices de PoT
+> (R-FIN-13). **DEMOSTRADO** que la parada es inevitable; lo medible es cuánto dura.
+
+### D.1 · Fracción de instancias que no cierran quórum (atacante que retiene votos)
+
+Con `W` = tiempo esperado de quórum honesto, **la mitad no cierra** (es la mediana de una Poisson).
+Con holgura `W = c·k/((1−α)λ)`:
+
+| `α` | `k` | `c` | `W` | `P[no cierra]` | `P[el atacante forja el certificado solo]` |
+|---:|---:|---:|---:|---:|---:|
+| 0,33 | 32 | 1,5 | 71,6 s | 5,9e-03 | **5,8e-02** |
+| 0,33 | 64 | 1,5 | 143,3 s | 2,2e-04 | **1,2e-02** |
+| 0,33 | 64 | 2,0 | 191,0 s | 1,4e-10 | **0,469** |
+| 0,33 | 128 | 1,5 | 286,6 s | 3,8e-07 | 6,2e-04 |
+| 0,40 | 64 | 1,5 | 160,0 s | 2,2e-04 | **0,517** |
+
+**La pinza es la noticia.** Subir `W` mata la viveza del atacante… y le regala la seguridad: a
+`α = 0,33`, `k = 64`, `c = 2`, el gadget cierra siempre y **el atacante forja su propio certificado
+el 47 % de las veces**. Los dos riesgos no se pueden bajar a la vez sin subir `W` muchísimo (B.6).
+
+Con la pérdida honesta por retardo `δ = 0,267`, `P[no cierra]` a `W = t̄` pasa de 0,48 a **0,99**
+(`k = 64`). El retardo se come la viveza del gadget antes que ninguna otra cosa.
+
+**Control del instrumento (D.1c):** Monte Carlo con 12 semillas (11, 23, …, 127; 200 000
+realizaciones) frente al exacto: 0,006029 [0,005900, 0,006158] vs 0,005925. VERIFICADO.
+*Nota honesta:* la columna de viveza sale **idéntica** para `α` distintos porque `W` se define como
+`c·k/(1−α)`, que fija `μ_h = c·k`. La dependencia de `α` está toda en la columna de seguridad, que
+sí se mueve tres órdenes de magnitud.
+
+### D.2 · Tiempo hasta que vuelve a cerrarse
+
+Las instancias son independientes (votos nuevos, ventana nueva), luego el número de instancias
+hasta la primera que cierra es geométrico. Con `c = 1,5` la recuperación es de **una instancia**
+(`E[espera] ≈ W`, p99 `= W`): a `α = 0,33` y `k = 64`, **143 s**. La parada *por ataque de retención*
+es corta. La que no lo es está en D.4.
+
+### D.3 · ¿Sigue avanzando la cadena entretanto? **Sí. DEMOSTRADO por la regla.**
+
+R-FIN-7 ignora la punta, no apaga el proceso, y es literalmente lo que hace Kaspa
+(`virtual_processor/processor.rs:1013` y `:1033`, *«ignored from Virtual chain»*). La cadena sigue
+creciendo a `(1−α)λ` y `F = 2 h` sigue siendo el suelo. Es la misma propiedad que declara el FIP-0086
+citado por la propuesta rival: *«EC … continues operating "normally" if F3 assumptions are violated
+and F3 halts»*.
+
+### D.4 · La parada que ES el teorema: se apaga espacio y `λ_v` cae
+
+Si una fracción `(1−ρ)` del espacio se apaga de golpe, `λ_v` cae a `ρλ` hasta que el retarget
+reacciona. Con `W` dimensionada para `α = 0,33` y `c = 1,5`:
+
+| `ρ` | `k = 32` | `k = 64` | `k = 128` |
+|---:|---:|---:|---:|
+| 0,90 | 0,033 | 0,005 | 0,000 |
+| **0,70** | **0,368** | **0,332** | **0,279** |
+| 0,50 | 0,932 | 0,984 | 0,999 |
+| 0,30 | 1,000 | 1,000 | 1,000 |
+
+**Recuperación: una ventana de retarget, `W_RETARGET ≥ 3 083` s ≈ 51 min**, durante la cual el
+gadget está caído y la cadena corre. A `ρ = 0,5` se pierden entre 21 y 40 instancias seguidas. Esto
+**no es un ataque**: es un lunes por la mañana con el 30 % de los granjeros domésticos apagados. Es
+la misma laguna que la propuesta rival declara en su §4.C («la `p` real de un granjero doméstico»),
+solo que aquí aparece por otra puerta.
+
+### D.5 · Partición
+
+Fracción mínima de espacio de un lado para seguir certificando (misma `W`):
+
+| `k` | `f` para `P[no cierra] < 0,5` | `f` para `< 0,01` |
+|---:|---:|---:|
+| 32 | 0,442 | 0,651 |
+| 64 | 0,444 | 0,587 |
+| 128 | 0,446 | 0,544 |
+
+Frente al **9 %** que tolera R-FIN-7 (D9-d A4). **Matiz honesto:** el retarget del propio lado
+restauraría `λ_v` pasados `W_RETARGET` s, así que la exigencia de 44-65 % vale para los primeros
+~51 min de partición, no indefinidamente. Con `F = 2 h > W_RETARGET` la mayor parte de la ventana
+de tolerancia queda cubierta, pero el gadget está caído durante el primer cuarto de ella.
+
+### D.6 · La comparación que decide, y un error propio corregido
+
+**Error propio (declarado).** Mi primera versión comparaba `W` con la espera de hoy como si el
+certificado **sustituyera** a la profundidad. No la sustituye:
+
+> Un granjero honesto vota por un bloque que **cree** en su cadena seleccionada. Si se equivoca, se
+> equivocan **todos a la vez**, porque comparten la vista. Ese fallo es de **modo común** y el
+> quórum no lo divide por nada: `POA` acota que existan **dos** certificados en conflicto, no que el
+> **único** certificado esté sobre un bloque que la cadena va a abandonar.
+
+Luego la garantía de un certificado emitido en `t = d + W` es `max( prev(α, d), P_forja(k, W, α) )`,
+con `d` la profundidad a la que los honestos ya coinciden. Y sin gadget, esperando **el mismo tiempo**
+`d + W`, la garantía es `prev(α, d + W)`. Como `prev` es **decreciente** en `t`:
+
+```
+prev(α, d)  >  prev(α, d + W)      para todo α < 1/2, todo d, todo W > 0
+```
+
+**El gadget está estrictamente dominado, por exactamente los `W` segundos que tarda en juntar el
+quórum. DEMOSTRADO.**
+
+| `α` | objetivo | `d` necesaria | `W` del gadget | total con gadget | total sin gadget | penalización |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0,25 | 1e-12 | 482 s | 370 s | 852 s | **482 s** | +370 s |
+| **0,33** | **1e-12** | **871 s** | **832 s** | **1 702 s** | **871 s** | **+832 s** |
+| 0,33 | 1e-30 | 1 597 s | 2 201 s | 3 798 s | **1 597 s** | +2 201 s |
+| 0,40 | 1e-30 | 4 126 s | 6 502 s | 10 629 s | **4 126 s** | +6 502 s |
+
+La única salida sería que los honestos votaran a profundidad `d = 0`, como hace HotPoW (todos votan
+por la única cabeza que elige su regla de preferencia). En nuestro DAG a `λ = 1/s` con `Δ > 0` hay
+del orden de `λΔ` puntas simultáneas y los honestos **no** coinciden en la punta — es lo que mide C.
+Y el catálogo ya lo declara como coste estructural **D6**: *«Ninguna confirmación posible antes de
+≈ 3k/((1−α)λ) = 100-134 s, con ninguna F»*.
+
+**Etiqueta del punto D: DEMOSTRADO** (dominación estricta) **+ VERIFICADO** (las tres tablas).
+
+---
+
+## F · El coste real del certificado — el punto que decide la comparación
+
+**Script:** `d12_f_certificado.py` · **Salidas:** `salida_f.txt`, `salida_bench_kzg.txt`
+
+### F.1 · Un voto de PoAS no son 72 B: son 484 B
+
+Del código, campo a campo (`subspace @ f8842d0`,
+`crates/subspace-core-primitives/src/solutions.rs:254-274`):
+
+| campo | B | fuente |
+|---|---:|---|
+| `public_key` | 32 | `lib.rs:210` |
+| `reward_address` | 32 | `AccountId32` |
+| `sector_index` | 2 | `sectors.rs:25` (`u16`) |
+| `history_size` | 8 | `segments.rs:274` (`NonZeroU64`) |
+| `piece_offset` | 2 | `pieces.rs:229` (`u16`) |
+| `record_commitment` | 48 | `pieces.rs:801` |
+| `record_witness` | 48 | `pieces.rs:937` |
+| `chunk` | 32 | `lib.rs:258` (`FULL_BYTES`) |
+| `chunk_witness` | 48 | `solutions.rs:241` |
+| `proof_of_space` | 160 | `pos.rs:103-105` (`K=20`, `SIZE = K·8`) |
+| **`Solution`** | **412** | |
+
+Voto autoportante = solución sin `reward_address` (380) + referencia (32) + slot (8) + firma Ed25519
+(64) = **484 B**. En HotPoW un voto son **72 B**, porque una solución de PoW son 8 B y una de
+**espacio** son 380. **Factor 48× en la parte que manda.**
+
+### F.2 · Bytes por certificado y por año
+
+| variante | `k` | certificado | cada 30 s | cada 64 s | cada 300 s | cada 1 h |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 · voto = bloque (`k` cabeceras) | 64 | 43 712 B | 45,95 GB | 21,54 GB | 4,60 GB | 0,38 GB |
+| 2 · voto aparte, Ed25519 | 64 | 31 008 B | 32,60 GB | 15,28 GB | 3,26 GB | 0,27 GB |
+| 2 · voto aparte, BLS agregada | 64 | 30 032 B | 31,57 GB | 14,80 GB | 3,16 GB | 0,26 GB |
+| 2 · voto aparte, BLS agregada | 128 | 59 984 B | 63,06 GB | 29,56 GB | 6,31 GB | 0,53 GB |
+
+Referencias: cabeceras del diseño **21,50 GB/año**; PoT **4,0 GB/año**; capa estilo Filecoin
+**724 B cada 30 s = 0,76 GB/año** (`dag-poas-capa-finalidad.md` §4.B).
+
+### F.3 · La agregación BLS aquí **no sirve de nada**
+
+| `k` | Ed25519 | BLS agregada | ahorro |
+|---:|---:|---:|---:|
+| 64 | 31 008 B | 30 032 B | **3,15 %** |
+| 4 000 | 1 936 032 B | 1 872 080 B | **3,30 %** |
+
+Frente al **99,70 %** que compra en F3 (237 728 B → 724 B). La razón es estructural: la agregación
+comprime **firmas**, y en F3 el voto **es** una firma. Aquí el voto está dominado por la prueba de
+espacio, que no se agrega. **La ventaja criptográfica anunciada del gadget se cae por los dos lados:
+ni evita BLS (F.5) ni lo aprovecha.**
+
+### F.4 · Tráfico de gossip de la variante 2
+
+`λ_voto = k·λ` con `λ = 1/s`:
+
+| `k` | votos/s | kB/s | **TB/año** |
+|---:|---:|---:|---:|
+| 16 | 16 | 7,7 | 0,24 |
+| **64** | **64** | **31,0** | **0,98** |
+| 256 | 256 | 123,9 | 3,91 |
+
+La cadena entera son 0,0215 TB/año. **La variante que compra algo cuesta 45× la cadena en tráfico.**
+
+### F.5 · ¿Obliga a BLS12-381? — **ya está dentro, y no por la finalidad**
+
+`verify_solution` (`crates/subspace-verification/src/lib.rs:264-272`) llama a `kzg.verify(...)` para
+comprobar que el `chunk` pertenece al `record_commitment`. Ese KZG es **`rust-kzg-blst`**
+(`Cargo.toml:113,180`; `shared/subspace-kzg/Cargo.toml:24-27`), es decir **`blst` de Supranational,
+C y ensamblador, sobre BLS12-381**, en la ruta de consenso de **todos** los nodos y para **todos**
+los bloques. Y R-FIN-14(c) del diseño vivo cita literalmente `subspace-verification/src/lib.rs:234-260`,
+que es esa misma función.
+
+> **Consecuencia para la comparación, y es grande.** El coste que `dag-poas-capa-finalidad.md` §5
+> presenta como bifurcación de Katana —meter BLS12-381 y `blst` en la ruta de consenso— **ya está
+> pagado** si ZEROX adopta el PoAS de Autonomys con testigos KZG. No es una dependencia nueva de la
+> capa de finalidad: es una dependencia del consenso. **VERIFICADO** en el código; **PLAUSIBLE** que
+> ZEROX lo herede (el diseño cita la función, pero no hay una regla `C-XXX` que fije el esquema de
+> archivado).
+
+### F.6 · CPU de verificación, medida en esta máquina
+
+`cargo bench -p subspace-kzg --bench kzg -- verify` (Criterion, 100 muestras):
+**`kzg.verify` = 1,0773 ms** [1,0719 ; 1,0887].
+*(La línea «change: −98,88 %» del banco es una colisión de nombre de Criterion con el banco `verify`
+del PoT —96,1 ms/slot—, no una regresión: los identificadores comparten directorio.)*
+
+| `k` | ms por certificado | % de un núcleo (1 cert/64 s) | % de un núcleo (variante 2) |
+|---:|---:|---:|---:|
+| 64 | 68,95 | 0,11 % | **6,89 %** |
+| 128 | 137,89 | 0,22 % | **13,79 %** |
+| 256 | 275,79 | 0,43 % | **27,58 %** |
+
+La variante 2 suma **6,9 % de un núcleo** al **9,6 %** que ya cuesta el PoT (D4 del catálogo).
+
+### F.7 · **Equivocación gratis: lo que rompe la Definición 1**
+
+La Definición 1 de HotPoW (`hotpow.txt:279-283`): *«Each ATV can be used by the agent it is assigned
+to, to vote **once** for **one** value»*. Toda la teoría de POA descansa ahí: dos quórums en
+conflicto exigen `2k` ATVs. En HotPoW se cumple **por construcción**, porque el voto **es** la
+solución y la solución contiene la referencia: `Hpow(r, p, s) ≤ tv` (`hotpow.txt:437-441`). Cambiar
+`r` obliga a resolver otro puzzle.
+
+**En PoAS no se cumple.** `verify_solution` (`subspace-verification/src/lib.rs:228-272`) **no ve
+ninguna referencia al valor votado**: el reto es `global_randomness.derive_global_challenge(slot)`,
+función del PoT y del **slot**. La atadura al valor la pone una **firma aparte**
+(`check_reward_signature`, `lib.rs:107-117`; en ZEROX `C-HDR-03/04` con Ed25519), y una clave firma
+cuantos mensajes quiera. **Una sola solución puede votar por todos los valores en conflicto a la vez,
+a coste cero.**
+
+Entonces dos quórums en conflicto ya no exigen `2k` ATVs sino `k`:
+
+| `k` | POA con la Def. 1 (`2k`) | POA con equivocación (`k`) |
+|---:|---:|---:|
+| 16 | 2,762e-04 | **0,5333** |
+| 64 | 1,272e-12 | **0,5166** |
+| 256 | 3,959e-45 | **0,5083** |
+
+**Sin regla anti-equivocación el gadget no tiene seguridad ninguna: la ambigüedad es ~0,5 para
+cualquier `k`. REFUTADO.** Y una regla anti-equivocación exige castigo, o sea **R-FIN-19 de la
+propuesta rival**, o sea **dinero en juego**: la ventaja anunciada «sin dinero en juego» desaparece.
+La única alternativa es que el voto sea un **bloque**, donde U2/U3″ (R-FIN-11) ya da un voto por
+identidad de billete — y eso es la variante 1, que es profundidad de confirmación (B.2).
+
+**Etiqueta del punto F: REFUTADO** (la equivocación gratis y el coste de agregación cierran la
+variante 2; F.5 quita a la propuesta rival su coste declarado principal).
