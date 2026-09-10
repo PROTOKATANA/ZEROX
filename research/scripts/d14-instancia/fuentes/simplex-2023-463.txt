@@ -1,0 +1,1119 @@
+Simplex Consensus: A Simple and Fast Consensus Protocol
+Benjamin Y Chan ∗
+Cornell University
+byc@cs.cornell.edu
+Rafael Pass †
+Tel-Aviv University and Cornell Tech
+rafaelp@tau.ac.il
+June 1, 2023
+Abstract
+We present a theoretical framework for analyzing the efficiency of consensus protocols, and
+apply it to analyze the optimistic and pessimistic confirmation times of state-of-the-art partially-
+synchronous protocols in the so-called “rotating leader/random leader” model of consensus
+(recently popularized in the blockchain setting).
+We next present a new and simple consensus protocol in the partially synchronous setting,
+tolerating f < n/3 byzantine faults; in our eyes, this protocol is essentially as simple to de-
+scribe as the simplest known protocols, but it also enjoys an even simpler security proof, while
+matching and, even improving, the efficiency of the state-of-the-art (according to our theoretical
+framework).
+As with the state-of-the-art protocols, our protocol assumes a (bare) PKI, a digital signature
+scheme, collision-resistant hash functions, and a random leader election oracle, which may be
+instantiated with a random oracle (or a CRS).
+∗Supported in part by NSF CNS-2128519, NSF Award RI-1703846 and AFOSR Award FA9550-18-1-0267
+†Supported in part by NSF Award RI-1703846, AFOSR Award FA9550-18-1-0267, a JP Morgan Faculty Award
+and an award from the Algorand Foundation
+1
+1 Introduction
+Distributed consensus algorithms [LSP82] allow large numbers of machines to agree on a single
+ground truth, even when some machines malfunction. Born out of research towards fault-tolerant
+aircraft control [WLG+78] in the 1970s, consensus algorithms have since then touched every corner
+of the Internet, and are used by the Internet’s most important services to replicate data at scale
+(e.g. Google’s Chubby lock service [Bur06], Apache Zookeeper [Apa], and many more). Today,
+new varieties of consensus algorithms power blockchains such as Bitcoin [Nak08] and Ethereum
+[B+14], where users propose transactions which are then batched into agreed-upon blocks, and
+where—unlike in classical consensus algorithms—the set of servers is not known ahead of time, and
+instead miners can join the system at any time (in other words, the system is “permissionless”).
+Subsequently, blockchains have found new applications in cryptocurrency and also in bringing
+liquidity to otherwise illiquid markets (such as the market for art [AJK +22]).
+At their core, consensus algorithms allow people to work together and collaborate without
+needing to trust each other. In some sense, they (and their evolution as multi-party computation
+algorithms [Yao82]) are the epitome of enabling collaboration without needing trust. In a society
+that heavily depends on trust-mitigation protocols (such as markets, democracy, a justice system,
+etc) to keep people safe, boost productivity, and to provide a high standard of living, continued
+innovation on trustless algorithms is of fundamental importance.
+Relevance of the permissioned setting. In this paper, we return our focus to classical per-
+missioned consensus protocols, where the set of participants is known ahead of time. This setting
+has by now been studied for four decades [LSP82], but importantly, many modern techniques for
+realizing scalable, energy efficient permissionless blockchains (see e.g. Ethereum [BG17], Algorand
+[CGMV18]) rely on classical permissioned consensus as a building block. In particular, blockchain
+applications bring forth new desiderata for such consensus protocols, and require them to be faster
+and more robust than ever before, which we will soon make more precise.
+Our focus here is on the partially-synchronous model of computation [DLS88], which is specified
+by a worst-case bound on message delivery ∆, but where the actual message delivery time may
+be much smaller δ < ∆. The protocol is aware of ∆, but is not aware of δ; additionally, even
+the worst-case bound may not always hold, but is only required to hold after GST (the global
+stabilization time); liveness is only required to hold after GST, and consistency holds always 1. As
+we are in the partially-synchronous model, we assume the byzantine attacker can control at most
+1/3 of the players (which is optimal [DLS88]). The partial-synchronous model is well-suited for
+settings that require security even if the network is partitioned (e.g. due to a Denial-of-Service
+attack), or if message delivery is unreliable (e.g. on today’s Internet). Note that the partially-
+synchronous approach underlies many of the most successful consensus protocols deployed today,
+including Paxos [LAM98] and PBFT [CL +99].
+Additionally, we adopt the multicast model of communication. In the multicast model, players
+communicate by multicasting a message to the entire network, as opposed in the point-to-point
+model, where players send each message to a single recipient (whose identity must usually be
+known). The multicast model is the model of choice for protocols built for the large-scale peer-to-
+peer setting (see Bitcoin, Ethereum, and Algorand as examples).
+1As usual, the model can also be extended a more general model where liveness hold during “periods of synchrony”;
+for simplicity, we ignore this distinction.
+2
+Consensus with rotating/random leaders. In a blockchain protocol or a state-machine repli-
+cation system, clients send the system a series of transactions ( txs) over time and the protocol
+participants must collectively decide the order in which the transactions are executed, outputting a
+LOG of transactions. Suppose that there are two conflicting pending transactions txs and txs′ (for
+instance, comprising a double spend), and that the protocol must decide which of them to include
+in the final log of transactions. Typically, protocols (in the partially synchronous setting) decide
+which of the transactions to include by either flipping an imperfect global coin [CR93, CKS00] to
+directly choose one of the transactions, or by electing a leader process to decide on behalf of all of
+the participants. Nearly all modern protocols deployed in practice fall into the second category, in-
+cluding blockchains, where the leader is equivalent to the block proposer (see Paxos [Lam01], PBFT
+[CL+99], Bitcoin [Nak08], Ethereum [B+14], Algorand [GHM+17]). The reason is one of scalability:
+a block proposer can sequence many transactions in a row (as in PBFT), and more importantly also
+aggregate transactions together into blocks to improve throughput (as in blockchains). In contrast,
+flipping a global coin for each pair of transactions is expensive and is largely restricted to solving
+binary consensus, unless the coin is itself used to elect a leader.
+Consequently, block proposers (or leaders) have disproportionate power when deciding the order
+of transactions within blocks, or across blocks if it is proposing many blocks in a sequence. In a
+system such as Ethereum, where block proposers can profit from ordering transactions at will, such
+a disproportionate balance of power affects the security and fairness of the underlying protocol
+(e.g. via “miner extractable value” [DGK +20]). Mitigating the power of block proposers to reorder
+transactions within a block is an active area of research (e.g. see [HCPS19, KZGJ20]). Over
+multiple blocks, it is prudent to ensure that each new block is proposed by a different, “fresh”
+block proposer2, if only to ensure that no process is ‘in power’ for too long.
+A slow leader can additionally cause blocks to be confirmed slowly and drastically reduce
+throughput. In a ‘stable leader’ protocol such as PBFT, where the leader is never changed un-
+less it detectably misbehaves, this can be problematic. Even if there is only a single slow process, if
+that process is the leader, then every block proposal may take much longer than the true network
+speed δ. Thus one more reason to rotate leaders frequently is to ensure that a single slow leader
+cannot slow down the entire operation for too long (e.g. see [AAC +05]).
+In this paper, we focus on leader-based consensus protocols in the permissioned setting, specif-
+ically those protocols that rotate its leaders, or randomly choose their leaders for each block. This
+seems essential for both fairness and performance in the common case where proposers can be
+corrupt.
+Efficiency measures for consensus with rotating leaders. There has been a recent explosion
+in new leader-based consensus protocols. To compare these various approaches, and to understand
+whether they are “optimal” in some well-defined way, we need to specify some efficiency measures.
+In this paper, we consider the following notions of efficiency:
+• Optimistic confirmation time: Suppose that all block proposers are honest. When a transac-
+tion is provided to the protocol (after GST), how long does it take for the transaction to be
+finalized? The optimistic confirmation time is (informally) the sum of the “proposal confir-
+mation time” and the “optimistic block time” (both rather imprecise, but popular, notions):
+2See the related notion of chain quality [GKL15], which (informally) requires that any sufficiently long chain
+contain a large fraction of blocks that are mined by honest parties.
+3
+– Proposal confirmation time: Suppose an honest proposer is elected and proposes a block;
+how long does it take for that block to be finalized?
+– Optimistic block time: Suppose all block proposers are honest. How long does a pending
+transaction need to wait to be included in the next honest block proposal?
+If the optimistic confirmation time depends only on the true message delivery time δ and not
+on the known upper bound ∆, we say that the protocol is optimistically responsive [PS18].
+In practice, ∆ is usually set conservatively s.t. δ is much smaller than ∆, in which case a
+protocol that runs at the speed of δ (instead of the parameter ∆) is much preferable.
+• Pessimistic confirmation time: Suppose that some numberf of eligible proposers are corrupt.
+When a transaction is provided to the protocol (after GST), how long does it take for the
+transaction to be finalized? This is an important metric in practice, where there are almost
+certainly leaders who are offline, or even downright malicious. Uncooperative leaders may
+choose to exclude a transaction from its block proposals, whereas slow leaders may not propose
+it at all. There are two notions here:
+– Worst-case confirmation time. In the very worst-case, how long must we wait for a
+transaction to be finalized? The bound must hold for any transaction arrival time t.
+– (Expected) pessimistic confirmation time. In expectation, how long does it take for a
+transaction to be finalized?
+Essentially all protocols in the literature consider a “view-based liveness” notion that is
+tailored for rotating leader based protocols. 3 Following the literature, we will also con-
+sider this notion of expected “view-based” liveness: Suppose that the protocol proceeds
+in incrementing “views” or “iterations” v := 1, 2,... where each viewv is assigned a sin-
+gle leader Lv. Fix some view number v ahead of time, and suppose that a transaction is
+provided to every honest player at the time they enter viewv. How long (in expectation)
+does it take for the transaction to be finalized, once every honest process has entered
+view v?
+We focus mainly on the expected pessimistic confirmation time. For our protocol, as well as
+many other protocols in the literature, we can turn an expected liveness bound into a worst-
+case liveness bound by losing an additive term of ω(logλ)· Θ(∆). Note that, if a protocol
+requires multiple honest leaders in a row to confirm transactions, the worst-case bound will
+be worse.
+The State of the Art. Before describing our contributions, we summarize the current start of
+the art; we focus only on leader-based protocols that rotate their leaders or elect random leaders.
+(The interested reader will find further comparisons of related works in Section 4, building on the
+survey below.) Throughout, denote n the number of participants, and f the number of faults; we
+consider static corruptions only.
+3We may also consider an expected worst-case confirmation time , where, for any transaction arrival time t after
+GST, both fixed ahead of time, a transaction must be finalized soon after t in expectation over the coins of the
+execution. Such a bound may be useful to capture real-world liveness, but is typically difficult to analyze in a setting
+where the adversary can control the scheduling of messages.
+4
+Roughly speaking, the literature has focused on optimizing the optimistic confirmation times ,
+but this has come at the expense of sacrificing the pessimistic confirmation time. In more details,
+let’s first examine optimistic confirmation time:
+• Proposal confirmation-time favoring. The seminal paper of PBFT [CL+99] achieves a proposal
+confirmation time of 3δ for honest block proposals, but has stable leaders. Instead, consider
+an optimistically responsive “base version” of the Algorand agreement protocol [CGMV18],
+denote Algorand* 4, which is similar to PBFT but allows a different leader for each block.
+Algorand* achieves a proposal confirmation time of 3 δ, and an optimistic block time of 3 δ.
+[ANRX21] later showed that a 3δ proposal confirmation time is optimal when f≥ (n+2)/5.5
+• Block-time favoring. Following Hotstuff [YMR +19], a new class of pipe-lined protocols
+were subsequently designed to improve the optimistic block time of rotating-leader proto-
+cols from 3δ to 2δ. These protocols pipe-line proposals, similar to Nakamoto style consensus
+[Nak08], and achieve an optimistic block time of 2 δ. However, these protocols require a
+worse proposal confirmation time: proposals take 4δ time (Pala [CPS18]), or 5δ time (Jolteon
+[GKKS+22]/Pipelined Fast-Hotstuff [JNFG20]) or 7 δ time (Hotstuff [YMR +19]) to be con-
+firmed, and additionally require 2, 3, and 4 honest leaders in a row respectively to confirm
+each block. In essence, these protocols improve the blocktime to just 2 δ, but they sacrifice
+the proposal confirmation time. Moreover, the pessimistic confirmation time blows up sig-
+nificantly. Note that Hotstuff and its variants are generally designed for the point-to-point
+messaging model, where, to reduce communication, players often send their votes to a single
+recipient who aggregates them; if players instead multicast their votes, the confirmation time
+improves slightly (but only shaves off δ, or one less honest leader in a row).
+• Simultaneously proposal confirmation-time and block-time friendly: The recent ICC protocol
+[CDH+22] simultaneously achieves the state-of-the-art 3δ proposal confirmation time and 2δ
+optimistic block time. However, this protocol again requires (essentially) 2 honest leaders in
+a row to confirm a block if a faulty leader was previously elected. Requiring multiple honest
+leaders in a row to finalize a block severely impacts the pessimistic confirmation time, which
+we will explore next.
+Pessimistic liveness. Few protocols explicitly analyze their expected or worst-case confirmation time
+under pessimistic conditions, despite it being an important performance desiderata in practice—
+after all, it is natural to assume that a fraction of the participants will be offline if not outright
+malicious. To explicitly compare the different approaches, we focus on the setting where each
+“iteration” of the protocol is associated with a randomly selected leader (essentially all the protocols
+in the literature, for this setting, assume or instantiate such a sequence of leaders). Throughout,
+assume that f =⌊n/3⌋.
+The current state-of-the-art is achieved by Algorand* (as defined above), which achieves 4δ+2∆
+expected view-based liveness. Protocols that require multiple honest leaders in a row to confirm
+4While the version of Algorand agreement in [CGMV18] is not optimistically responsive, it can be easily made so
+if every period has a unique leader known ahead of time (provided by a leader election oracle in lieu of using a VRF).
+Then, players can simply ‘soft-vote’ immediately on seeing a proposal from the leader, and ‘cert-vote’ immediately
+on seeing 2n/3 soft-votes, much like in PBFT.
+5We do not consider optimizations of the variety made in Parametrized FaB Paxos [MA06] and SBFT [GAG +19],
+where if f < (n + 2)/5, a proposal confirmation time of 2 δ is possible without affecting worst-case fault tolerance.
+We are particularly interested in the case when leaders are honest, but 1 /3 of voters are not.
+5
+Proposal
+Conf. Time
+Optimistic
+Block Time
+Pessimistic
+Liveness (f =⌈n/3⌉− 1)
+Simplex 3 δ 2δ 3.5δ + 1.5∆
+Algorand*
+[CGMV18] 3δ 3δ 4δ + 2∆
+ICC
+[CDH+22] 3δ 2δ 5.5δ + 1.5∆
+PaLa
+[CPS18] 4δ 2δ 6.25δ + 9.25∆
+Pipeline Fast-Hotstuff
+[JNFG20]
+Jolteon
+[GKKS+22]
+5δ 2δ 10.87δ + 9.5∆
+Chained Hotstuff (v6)
+[YMR+19] 7δ 2δ 19.31δ + 12.18∆
+P-Sync Bullshark
+[SGSKK22b] 6δ 3δ 6δ + 9∆
+Streamlet
+[CS20a] 6∆ 2∆ 35 .56∆
+*Base protocol without sortition.
+Table 1: Latency of Popular Consensus Protocols (Random Leaders)
+transactions generally achieve degraded expected liveness: ICC [CDH+22], PaLa [CPS18], Pipelined
+Fast-Hotstuff/Jolteon [JNFG20, GKKS+22], and Chained Hotstuff (v6) [YMR +19] have expected
+liveness of 5.5δ + 1.5∆, 6.25δ + 9.25∆, 10.87δ + 9.5∆, and 19.31δ + 12.18∆ respectively.6 Generally
+speaking, the more honest leaders required in a row to finalize a block, the worse the expected
+pessimistic liveness.
+These protocols also get an even worse worst-case confirmation time: a protocol that requires k
+honest leaders in a row would need a longer sequence of random leaders to guarantee that k honest
+leaders in a row are elected, compared to if it only required 1 honest leader for confirmation. 7
+Protocols with random leaders generally require just a sequence of at least ω(logλ) leaders to
+guarantee one honest leader.
+So, summarizing the state of the art, there is a trade-off between achieving good optimistic
+liveness bounds, and and achieving pessimistic liveness bounds.
+6Here, Chained Hotstuff is analyzed using a timeout-based pacemaker from LibraBFT [BCC +19] and a timeout of
+3∆, since they don’t instantiate their own pacemaker. PaLa is analyzed with a less conservative timeout of 1min=5∆,
+and 1sec=2∆ than the ones presented in their paper.
+7An alternative is to have a single leader be in power for k iterations in a row, before switching to the next leader;
+this sacrifices fairness, since we would like to rotate leaders more frequently, and the latency is still not ideal, since a
+faulty leader can delay the execution for k iterations.
+6
+Our contributions. In this paper, we present a simple consensus protocol, named Simplex, that
+matches the best optimistic liveness bounds, while at the same time matching and even improving
+the best known pessimistic liveness bounds (both in expectation and in the worst-case). Most
+importantly, our protocol is simple to describe and has an, in our eyes, a very simple proof of
+correctness—including an easy liveness proof. In contrast, most protocols in the literature have
+somewhat informal or difficult liveness arguments or do not analyze their own theoretical latency
+at all. (In terms of simplicity, while the protocol itself is arguably more complicated to describe
+than Streamlet [CS20a], the proof of correctness is significantly easier, which may make it more
+understandable.)
+In more details, assuming a “bare” PKI, collision-resistant hash functions, and a random leader
+election oracle (which can be instantiated using a Random Oracle), Simplex implements partially-
+synchronous consensus (tolerating the standard f <n/3 static byzantine faults), while achieving
+– an optimal proposal confirmation time of 3 δ,
+– an optimistic block time of 2 δ,
+– an expected pessimistic confirmation time of 3 .5δ + 1.5∆,
+– a worst-case pessimistic confirmation time of 4 δ +ω(logλ)· (3∆ +δ),
+– and using O(n) multicast complexity.
+As observed by [PS17], the Random Oracle can be replaced with a PRF (which follows from
+collision-resistant hash functions [HILL99]) and a CRS chosen after the public keys.
+We also note that using now standard techniques, we can bring down the communication com-
+plexity to polylog(λ) (in the multi-cast model) and linear (in the point-to-point model) through
+subsampling the committee of voters [CM19, CPS18]. This gives a scalable protocol that may be
+suitable for deployment in practice on large-scale peer-to-peer networks. We do not innovate on
+this subsampling and therefore just focus on the “base protocol” (which determines the concrete
+efficiency also of the protocol with subsampling).
+Comparison of techniques. Our contributions build on the techniques of many prior works.
+In contrast with the pipelined protocols of [CS20a, YMR +19, CPS18, JNFG20, GKKS +22], which
+generally fall into a streamlined “propose/vote” paradigm where processes only send one vote type,
+our protocol follows [CL +99] and requires processes to multicast a second “finalize” message to
+finalize blocks (in parallel with the next block proposal). We posit that the resulting protocol is
+actually simpler despite the second voting step. 8 Moreover, having a second voting step makes for
+a faster protocol in the optimistic case, matching the proposal confirmation time of PBFT. Another
+technique that we use is that of a “dummy block”: if, during some iteration, a process detects no
+progress (i.e. due to a faulty leader or network), it will timeout and vote for the dummy block. On
+seeing 2n/3 votes for the dummy block, a player may move to the next iteration and try again with
+a new leader. It is similar to the notion of a timeout certificate in [CPS18, GKKS +22, YMR+19];
+the difference is that, in our protocol, a process must either vote for the dummy block of height
+h, or vote “finalize” for a block of height h (whereas no such stipulation was made in prior work).
+Then, if we see 2 n/3 finalize messages, we can be sure that no process saw 2 n/3 votes for the
+dummy block at that height, and it is safe to finalize the block. The result is a simpler consistency
+and liveness proof; moreover, a block proposer never needs to wait extra time before proposing
+(unlike in [CPS18, BKM18]) even after seeing a timeout block.
+8To recover a streamlined protocol, it is possible to “piggyback” the finalize message onto the first vote message
+of the next block; this would only make liveness a little slower, and consistency would still hold.
+7
+Comparison with asynchronous protocols. Consensus protocols have also been designed for
+the asynchronous setting [Rab83, CR93, CKS00, MXC +16, AMS19, etc], where protocols should
+make progress even before GST, as long as messages are eventually delivered. Asynchronous pro-
+tocols generally have worse latency than their partial-synchronous counterparts after GST. Here,
+we only mention the elegant DAGRider protocol [KKKNS21], which requires 4 rounds of reliable
+broadcast (≈ 12δ time) in the optimistic case, and Bullshark [SGSKK22a], which adds a syn-
+chronous fast-path but still requires 2 rounds of reliable broadcast (or 6 δ time) optimistically, as
+opposed to the optimal 3 δ. Moreover, essentially every asynchronous protocol requires a common
+coin, which is most practically implemented using threshold signatures, following [CKS00]. Thresh-
+old signatures require a private setup or trusted dealer, which aside from being hard to implement,
+makes it difficult to subsample the protocol for scalability.
+2 The Protocol
+We describe the Simplex consensus protocol in the framework of blockchains, which provides an
+elegant framework for reasoning about consensus on a sequence of values.
+To start, the protocol assumes a (bare) public-key infrastructure (PKI), and a digital signature
+scheme. Additionally, letH :{0, 1}∗→{ 0, 1}∗ be a publicly known collision-resistant hash function.
+• Bare PKI setup. Before the protocol execution, a trusted party generates a ( pki, ski)
+keypair for each process i∈ [n] using the key generation algorithm for the digital signature
+scheme, and for each i∈ [n] sends ( pki, ski) to process i. Each process replies with a pk′
+i,
+where honest processes reply with the same pk′
+i = pki. The trusted party then sends{pk′
+i}i∈[n]
+to all parties. 9
+• Notation for digital signatures. For any message m∈{ 0, 1}∗ and a process p∈ [n], we
+denote by⟨m⟩p a tuple of the form ( m,σ ), where σ is a valid signature for m under process
+p’s public key.
+The protocol uses the following data structures.
+• Blocks, block heights, and the genesis block. A block b is a tuple (h, parent, txs), where
+h∈ N is referred to as the height of the block, parent is a string that (typically) is meant to be
+the hash of a “parent” blockchain, and txs is an arbitrary sequence of strings, corresponding
+to transactions contained in the block.
+Define the genesis block to be the special tuple b0 := (0,∅,∅).
+• Dummy blocks. The special dummy block of height h is the tuple ⊥h := (h,⊥,⊥). This
+is an empty block that will be inserted into the blockchain at heights where no agreement is
+reached. A dummy block does not point to a specific parent.
+• Blockchains. A blockchain of height h is a sequence of blocks (b0,b 1,...,b h) such that b0 is
+the genesis block, and for each i∈ [h], either bi =⊥i or bi = (i,H (b0,...,b i−1), txs) for some
+txs.
+9Note that this is referred to as a Bare PKI [BCNP04] since malicious parties may pick their own, potentially
+malformed, public keys.
+8
+• Notarized blocks and blockchains. A notarization for a block b —which may be the
+dummy block— is a set of signed messages of the form ⟨vote,h,b⟩p from≥ 2n/3 unique
+processesp∈ [n], whereh is the height of the blockb. A notarized block is a block augmented
+with a notarization for that block.
+A notarized blockchain is a tuple (b0,...,b h,S ), where b0,...,b h is a blockchain, and S is a
+set of notarizations, one for each block b1,...,b h. We stress that a notarized blockchain may
+contain notarized dummy blocks.
+• Finalized blocks and blockchains. A finalization for a heighth is a set of signed messages
+of the form⟨finalize,h⟩p from≥ 2n/3 unique processes p∈ [n]. We say that a block of height
+h is finalized if it is notarized and accompanied by a finalization for h.
+A finalized blockchain is either just the genesis blockb0, or a notarized blockchain accompanied
+by a finalization for the last block.
+• Linearizing a blockchain. Given a blockchain b0,b 1,...,b h, denote linearize(b0,b 1,...,b h)
+to be the (most natural) operation that takes the sequences of transactions from each individ-
+ual block, in order, and outputs the concatenation, to form a total ordering of all transactions
+in the blockchain.
+2.1 The Protocol Description and Main Theorem
+We are now ready to describe the protocol. The protocol runs in sequential iterationsh = 1, 2, 3,...
+where each process starts in iterationh = 1. Note that each process may advance through iterations
+at a different speed, and at any given time, two processes may be in two different iterations, due
+to network delay (since we are in the partially synchronous setting). As local state, each process
+p∈ [n] keeps track of which iteration h it is currently in, and also stores all of the notarized blocks
+and messages that it has seen thus far.
+Additionally, we assume that each iteration h has a pre-determined block proposer or leader
+Lh∈ [n] that is randomly chosen ahead of time; this is referred to as a random leader election oracle
+and can be implemented using a random oracle: namely, Lh :=H∗(h) mod n, whereH∗(·) is some
+public hash function modeled as a random oracle.
+Playerp on entering iteration h does the following:
+1. Leader proposal: If p = Lh, p multicasts a single proposal of the form
+⟨propose,h,b 0,...,b h−1,bh,S⟩p.
+Here,b0,...,b h isp’s choice of a blockchain of height h, where (b0,...,b h−1,S ) is a notarized
+parent blockchain, and bh̸=⊥h. The new block bh should contain every pending transaction
+that p has seen that is not already in the parent chain.
+2. Dummy blocks: Each process p starts a new timer Th, set to fire locally after 3∆ time. 10
+If Th fires, vote for the dummy block by multicasting ⟨vote,h,⊥h⟩p.
+10In addition, we could optimistically fire the timer when the leader “equivocates”; we omit the rule for brevity.
+9
+3. Notarizing block proposals: On seeing the first proposal of the form
+⟨propose,h,b 0,...,b h,S⟩Lh
+check that bh ̸= ⊥h, that b0,...,b h is a valid blockchain, and that ( b0,...,b h−1,S ) is a
+notarized blockchain. If all checks pass, multicast ⟨vote,h,b h⟩p.
+4. Next iteration and finalize votes: On seeing a notarized blockchain of height h, enter
+iterationh+1. At the same time, p multicasts its view of the notarized blockchain to everyone
+else.
+At this point in time, if the timerTh did not fire yet: cancelTh (so it never fires) and multicast
+⟨finalize,h⟩p.
+5. Finalized Outputs: Wheneverp sees a finalized blockchain b0,...,b h′, output the contents
+LOG← linearize(b0,...,b h′).
+Let us informally describe the intuition behind the protocol. In each iteration, the processes
+collectively try to get the leader’s block (proposal) notarized; if this fails due to a faulty leader or
+a faulty network, then the timer will fire. The timer thus upper bounds the amount of time each
+leader has to get its block notarized; when it fires, processes now have the option of voting for the
+dummy block and (on seeing a notarization for this dummy block) moving to next height to try
+again with the next leader. Eventually, we will hit a good leader and have good network conditions
+and an iteration h will complete without the timer Th firing for any honest process. Consistency,
+on the other hand, will follow from a straight-forward use of the standard “quorum intersection
+lemma”.
+Summarizing, we get the following theorem.
+Theorem 2.1 (Partially-synchronous Consensus) . Assuming collision-resistant hash functions,
+digital signatures, a PRF, a bare PKI, and a CRS, there is a partially-synchronous blockchain
+protocol forf <n/3 static corruptions that has O(n) multicast complexity, optimistic confirmation
+time of 5δ, worst-case confirmation time of 4δ +ω(logλ)·(3∆+δ), and expected view-based liveness
+of 3.5δ + 1.5∆.
+Note that the existence of digital signatures and PRFs follows from the existence of collison-
+resistant hash functions (see [Rom90] and [HILL99] respectively), but we include it here to em-
+phasize what cryptographic building blocks we rely on. Also, as noted in [PS17], we can replace
+the random oracle with a common reference string (CRS) that is chosen after the adversary has
+registered its public keys, and instead use Lh = PRFcrs(h) mod n (and note that existence of PRFs
+follow from the existence of collision-resistant hash functions [HILL99]).
+2.2 Proof outline
+Let us provide a proof outline which conveys the essence of the whole proof:
+Consistency. The consistency proof is straightforward. Let Alice and Bob be two honest play-
+ers. We want to show that if Alice finalizes a chain b0,...,b h, and Bob finalizes a longer chain
+b0,...,b ′
+h,...,b ′
+h′, then Alice’s chain is a prefix of Bob’s, namely that b0...,b h = b0,...,b ′
+h. It
+10
+suffices to show that Bob’s block at height h is identical to Alice’s, namely that b′
+h = bh; by the
+collision resistant hash function, the parent chains must be the same.
+First, since Alice saw a finalization for height h, then the dummy block⊥h cannot be notarized
+in Bob’s view, by the standard “quorum intersection” lemma. This is because an honest player
+only votes for either⟨finalize,h⟩, or⟨vote,h,⊥h⟩, and never both. Likewise, since Alice saw that bh
+is notarized, then a competing non-dummy block b′
+h̸=bh also cannot be notarized in Bob’s view,
+again by the standard “quorum intersection” lemma. This follows because an honest player only
+votes for a single (non-dummy) block proposal per iteration. Immediately it must be that b′
+h =bh,
+as required.
+Liveness. Perhaps more interestingly, the liveness proof is also simple—this is in contrast to all
+previous protocols in the partially-synchronous setting that we are aware of, each of which require
+a subtle/complex analysis. We first claim that any honest leader can drive the protocol forward
+after GST. To see this, let us first observe that honest players need to be “synchronized” after GST:
+“Synchronization after GST” (Sync): If an honest player enters an iteration h by time
+t> GST, then every honest player enters iteration h by time t +δ.
+This follows because when an honest player enters iteration h, it forwards a notarized blockchain
+of height h− 1 to everyone else (and thus they will enter iteration h once they receive it, unless
+they had already entered iteration h before).
+Now, assume the honest leader for height h proposes a block at time t > GST. We shall
+argue that the block it proposes will be finalized by time t + 3δ. This follows from the following
+observations.
+1. Every honest player must enter iteration h + 1 by time t + 2δ. This is because either (a)
+every honest player votes for the leader’s block by time t +δ (thus they all see a notarized
+blockchain for h by time t + 2δ), or (b) some honest player i did not vote for the leader’s
+block. In the latter case, player i must have already been in iteration h + 1 (or higher) when
+it saw the block proposal by time t +δ (since otherwise it would have voted as by Sync, it
+must be in iteration at least h by time t +δ) and thus would have forwarded a notarized
+blockchain of height h by t +δ. So again, every honest player will enter iteration h + 1 by
+time t + 2δ.
+2. No timer of an honest player can fire until after time t + 2δ. This is because no honest player
+could have entered iteration h before time t−δ by Sync. Consequently, the earliest any
+(honest) timer can fire is after time t−δ + 3∆>t + 2δ.
+Combining Observation 1 and 2, we have that every honest player must vote ⟨finalize,h⟩ when it
+enters iteration h + 1 (because none of their timers have fired by the time they enter iteration
+h + 1). Consequently, by time t + 3δ, every honest player sees that h is finalized. Since no honest
+player voted for the dummy block (since by Observation 2, their timers did not fire), it must be
+the leader’s block that is finalized, which concludes the proof for the case that the leader is honest.
+Let us next consider the case that the leader for iteration h is malicious. We shall argue that
+in this case, the iteration will be “skipped” (and all honest processes move on to iteration h + 1)
+after at most 3∆ + δ time: Suppose that every honest player is in iteration h by time t >GST.
+Either every honest player fires its timer (by time t + 3∆), or some honest player does not fire its
+11
+timer. In the first case, they all vote for the dummy block and see a notarized dummy block by
+time t + 3∆ +δ, thus entering iteration h + 1. In the second case, that player must have entered
+iterationh + 1 before its timer could fire, i.e. before t + 3∆; but as before, then every honest player
+will follow it into iteration h + 1 by time t + 3∆ +δ.
+3 Formal Analysis
+3.1 Preliminaries
+We analyze the Simplex protocol in the framework of blockchains. Throughout, when we say that
+a message is “in honest view”, we mean that it is in the view of some honest process (but perhaps
+not all honest processes).
+The Permissioned Setting. We consider static byzantine corruptions. Denote n the number
+of players, f <n/3 of which are set to be “corrupted”. The corrupted players are chosen ahead of
+time, before the setup phase. The remaining players are “honest”.
+Protocol Execution. In our setting the adversary has power over the network and can choose
+when to deliver messages sent by honest players. However, in good network conditions, message
+delivery should occur “quickly”. This requires that we formalize a notion of time, in addition to
+specifying the execution of a distributed protocol. 11 In the spirit of the UC framework [Can01],
+considern player machines, an adversary machineA, and an environmentZ, where each is modeled
+as an instance of a non-uniform probabilistic polynomial time (nuPPT) interactive Turing Machine
+(ITM) that takes as input the security parameter 1 λ. The adversary A controls the f (statically
+corrupted) faulty players. Each player additionally has access to an authenticated multicast channel
+Fmult over whichA has scheduling power. We use the notationEXECΠ(1λ,Z,A) to denote a random
+execution of the protocol Π with A andZ, over the coins of the setup, the players, A, andZ.
+To model time, we consider environments Z that send special “tick” messages to the n player
+machines. Fix any execution of a protocol with Z andA on some 1λ. Recall that an execution
+is a sequence of activations of instances of machines. Given an execution, we say that it proceeds
+in timesteps t = 0, 1, 2,... where timestep t starts at the first point (in the execution) where
+the environment Z has sent any player machine exactly t “tick” messages. An event happens
+before/at/after time t if it occurs before/during/after timestep t in the execution. The execution
+ends whenZ halts.
+Network Model and Clocks. We consider adversaries that are partially synchronous [DLS88].
+An environment/attacker tuple (Z,A) is“δ-bounded partially synchronous” if, for every protocol
+Π, for every security parameter λ, there exists a time GST∈ N s.t. in every execution of Π with Z
+andA on 1λ:
+• Synchronized clocks. Denote t∗ the time at which Z halts. It must be that Z sends every
+honest player exactly one “tick” message at each time t∈ [t∗].
+11Doing this composably has been visited in-depth in works such as [KLP05, KMTZ13, BMM14, KZZ16, CHMV17,
+BDD+21]. However, here we ignore the question of composability and use an simple stand-alone model for conve-
+nience.
+12
+• Message delivery guarantee after GST. For every time t∈ N, if some honest player sends a
+message by time t, the message is delivered by time max( GST,t +δ). Note that GST is not
+publicly known.
+Definition of a blockchain protocol. Let T : N× N → N, and t ∈ N. A protocol Π,
+parametrized by ∆, is said to compute a blockchain with (expected) T (δ, ∆)-liveness if for ev-
+ery environmentZ and attackerA, in executions of Π in Z withA on 1λ, the following properties
+hold with all but negligible probability in λ:
+• Consistency. If two honest players ever output sequences of transactions LOG and LOG′
+respectively, either LOG⪯ LOG′ or LOG′⪯ LOG, where “⪯” means “is a prefix of or is equal
+to”.
+• T (δ, ∆)-Liveness. Fix any timet∈ N. Suppose that (A,Z) is additionallyδ-bounded partially
+synchronous for some δ < ∆ and GST < t. Suppose that Z never halts early and that it
+always delivers some input txs to every honest player by time t. Then txs is in the output of
+every honest player by time t +T (δ, ∆).
+We say that a protocol has T (δ, ∆) optimistic confirmation time if it is T (δ, ∆)-live when f = 0.
+Similarly, a protocol has T (δ, ∆) worst-case confirmation time if it is T (δ, ∆)-live for any f <
+n/3. Now, suppose that a protocol proceeds in incrementing views (or iterations) v = 1, 2,... ,
+implemented by a local counter on each process. We say that a protocol has expectedT (δ, ∆)
+view-based liveness (w.r.t. the counter v) if:
+• ExpectedT (δ, ∆) View-Based Liveness. Fix any viewv∈ N. Suppose that (A,Z) is addition-
+ally δ-bounded partially synchronous for some δ <∆ and some GST. Suppose that Z never
+halts early and that it always delivers some input txs to every honest player before they enter
+view v. Suppose that every honest player enters view v by time t. If t> GST, then txs is in
+the output of every honest player by time t +T (δ, ∆), in expectation (over the coins of the
+execution).
+Optimistic Responsiveness. (Variant of definition from [PS18].) We say that a blockchain
+protocol is optimistically responsive if it is has T (δ)-time liveness for some function T (·) that is not
+a function of ∆, conditioned on all processes being honest. In other words, when all processes are
+honest, the liveness depends only on δ, not ∆.
+3.2 Consistency of Simplex
+In this section, we present a consistency proof for the protocol. We start with a simple fact about
+digital signatures:
+Lemma 3.1. With overwhelming probability in λ, for any honest process i, no honest process will
+see a valid signature of the form ⟨m⟩i in honest view unless process i previously signed m.
+Proof. This is by a direct reduction to the unforgeability of the signature scheme.
+We next state the standard quorum-intersection lemma, and for completeness provide its proof.
+(This is a very standard technique.)
+13
+Lemma 3.2. Leth∈ N. Let bh and b′
+h be two distinct blocks s.t. neither are equal to the dummy
+block⊥h. It cannot be that both bh and b′
+h are both notarized in honest view (except with negligible
+probability in λ).
+Proof. Consider a random execution and letbh andb′
+h be any two blocks of heighth in the execution
+transcript, s.t. bh̸= b′
+h and moreover bh̸=⊥h and b′
+h̸=⊥h. We call a tuple ( i,m ) “good” if
+m∈{ (vote,h,b h), (vote,h,b′
+h)} and there exists a valid signature ⟨m⟩i in the view of some honest
+player. By the construction of the protocol, each honest process signs at most one of ( vote,h,b h)
+and ( vote,h,b′
+h). On the other hand, each corrupted player can sign both messages. Applying
+Lemma 3.1, then there are at most (n−f)+f·2 =n+f <4n/3 good tuples with all but negligible
+probability in the security parameter. Now assume for the sake of contradiction that there are both
+notarizations for bh and b′
+h in honest view. Then there are ≥ 2n/3 signatures for ⟨vote,h,b h⟩ and
+likewise≥ 2n/3 signatures for ⟨vote,h,b′
+h⟩ in honest view; thus there are ≥ 4n/3 good tuples in
+honest view, which is a contradiction.
+We can also apply the exact same quorum-intersection technique to finalize and⊥ messages; for
+completeness, we write out the proof (again).
+Lemma 3.3. If there is a finalization for height h in honest view,⊥h cannot be notarized in honest
+view (except with negligible probability in λ).
+Proof. We call a tuple ( i,m ) “good” if m∈{ (finalize,h ), (vote,h,⊥h)} and there exists a valid
+signature⟨m⟩i in the view of some honest player. By the construction of the protocol, each honest
+process signs at most one of ⟨finalize,h⟩ or⟨vote,h,⊥h⟩, whereas each corrupted player can sign
+either message. Applying Lemma 3.1, there are thus at most ( n−f) +f· 2 =n +f <4n/3 good
+tuples (with all but negligible probability in λ). But now assume for the sake of contradiction
+that bh is finalized and ⊥h is also notarized. Since bh is finalized, there are ≥ 2n/3 signatures
+for⟨finalize,h⟩ in honest view, and likewise since ⊥h is notarized, there are ≥ 2n/3 signatures for
+⟨vote,h,⊥h⟩ in honest view; thus there are ≥ 4n/3 good tuples, which is a contradiction.
+The main theorem immediately follows:
+Theorem 3.1 (Consistency). Suppose that two sequences of transactions, denote LOG and LOG′,
+are both output output in honest view. Then either LOG⪯ LOG′ or LOG′⪯ LOG (with overwhelming
+probability in λ).
+Proof. Immediately, there must be two blockchains denoted b0,b 1,...,b h and b0,b′
+1,...,b ′
+h′, such
+that both are finalized in honest view, whereLOG← linearize(b0,b 1,...,b h) and LOG′← linearize(b0,b′
+1,...,b ′
+h′).
+Without loss of generality, we assume that h≤h′.
+It suffices to show that bh = b′
+h and moreover that bh ̸= ⊥h. In plainer English, the two
+chains should contain the same block at height h, and moreover this block is not the dummy block.
+Then by collision-resistant property of the hash function H(·), the parent chains are the same
+b0,b 1,...,b h−1 =b0,b′
+1,...,b ′
+h−1, and thus LOG⪯ LOG′.
+To prove thatbh =b′
+h, first observe that both b′
+h′ and bh are finalized in honest view, and thus
+both b′
+h′ and bh are notarized in honest view. Because b′
+h′ is notarized in honest view, then some
+honest process must have voted for it in iterationh′ which implies thatb′
+h is also notarized in honest
+view. By Lemma 3.3, observing that bh is finalized in honest view, it must be that bh̸=⊥h, and
+likewise b′
+h̸=⊥h (except with negligible probability in λ). Finally, we apply Lemma 3.2, which
+says that since bh and b′
+h are both notarized and not the dummy block, it must be that bh = b′
+h
+(except with negligible probability), concluding the proof.
+14
+time t + 3Δ - 𝜹
+time t
+Leader enters 
+iteration h and 
+proposes a new block 
+bh extending a 
+notarized chain
+b1 … bh-1. 
+time t + 𝜹
+Every honest player 
+enters iteration h
+and sees the 
+proposal.
+time t + 2𝜹
+Earliest any honest timer can fire. (Δ > 𝜹) 
+Earliest any honest 
+player can enter 
+iteration h.
+time t - 𝜹
+Either everyone sends 
+“vote bh”, or
+someone already 
+entered iteration h+1.
+Every honest player 
+sees some notarized 
+blockchain of 
+height h.
+time t + 3𝜹
+Every honest player
+sees 2n/3 finalize 
+messages for h.
+They all send 
+“finalize h”.
+Figure 1: Timeline of events when the leader of iteration h is honest (t> GST).
+3.3 Liveness of Simplex
+In this section, we analyze the liveness of the protocol. Throughout, suppose that ( A,Z) is addi-
+tionallyδ-bounded partially synchronous, for someδ <∆. Recall that the protocol is parametrized
+by ∆ and not δ. When we say that “an honest process has entered iteration h by timet”, we mean
+that the process previously entered iteration h at some time t′≤t; when time t comes around, the
+process may well be in a larger iteration h′>h .
+Lemma 3.4 (Synchronized Iterations). If some honest process has entered iteration h by time t,
+then every honest process has entered iteration h by time max(GST,t +δ).
+Proof. By the assumption that some honest process p has entered iteration h by time t, we know
+that process p must have seen a notarized blockchain of height h− 1 at or before time t. By the
+protocol design,p will multicast their view of this notarized blockchain immediately before entering
+iterationh. Subsequently, every honest process will have seen a notarized blockchain of heighth−1,
+and thus also a notarized blockchain for every heighth′≤h−1, by time max(GST,t +δ). Thus, by
+time max(GST,t +δ), every honest process that is not yet in an iteration≥h will have incremented
+its iteration number until it is in iteration h.
+We show that the proposal confirmation time is 3 δ, and that the optimistic block time is 2 δ.
+Lemma 3.5 (The Effect of Honest Leaders) . Let h be any iteration with an honest leader Lh.
+Suppose that Lh entered iterationh by some time t> GST. Then, with all but negligible probability,
+every honest process will have entered iteration h+1 by time t+2δ. Moreover, every honest process
+will see a finalized block at height h, proposed by Lh, by time t + 3δ.
+We break the proof down into two subclaims.
+Subclaim 3.1. Every honest player will see a notarized blockchain of height h, and thus enter
+iterationh + 1, by time t + 2δ (except with negligible probability).
+15
+Proof. Recall that Lh enters iteration h by time t. Thus, Lh must multicast a proposal for a new
+non-dummy blockbh by timet. Thus, by time t+δ (observing thatt> GST), every honest process
+must have seen a valid proposal from the leader for bh. There are now two cases:
+• Case 1. Every honest process p casts a vote⟨vote,h,b h⟩p by time t +δ. Subsequently every
+honest process will see a notarization for bh and thus a notarized blockchain of height h by
+time t + 2δ, if not earlier, and enter iteration h + 1, as required.
+• Case 2. There is some honest process p that did not multicast a vote ⟨vote,h,b h⟩p by time
+t +δ. However, by Lemma 3.4, every honest process should have entered iteration h by time
+t+δ, so the only way this could happen is if p entered iterationh+ 1 before timet+δ. Then,
+every honest process will have entered iterationh+1 (and thus seen a notarized blockchain of
+heighth) by time t + 2δ, again by Lemma 3.4. (This case may have occured if, for instance,
+p saw a notarization for Lh’s proposed block without seeing the proposal itself.)
+Subclaim 3.2. Every honest player p will multicast ⟨finalize,h⟩p by time t + 2δ, and thus see a
+finalized block of height h by time t + 3δ (except with negligible probability).
+Proof. By Subclaim 3.1, every honest player sees a notarized blockchain of height h (thus finishing
+iteration h) by time t + 2δ. We will show below that no honest player’s timer for iteration h can
+fire before time≤t + 2δ. Then, when each honest player p finishes iterationh, they must multicast
+a⟨finalize,h⟩p message, as their timer cannot have fired yet, showing the claim.
+Let t′≤ t be the time at which the first honest process enters iteration h. By Lemma 3.4,
+all honest processes—including the leader Lh—will have entered iteration h by max(GST,t′ +δ),
+implying that t≤t′ +δ (sincet is strictly greater than GST). The earliest an honest timer can fire
+is at or after t′ + 3∆>t′ + 3δ≥t + 2δ time (noting that ∆ >δ ), as desired.
+Finishing the Proof of Lemma 3.5. It remains to show that this finalized block is proposed by the
+leader. Recall that by Subclaim 3.2, every honest player p will have seen a finalized block bh of
+heighth by time t + 3δ. Applying Lemma 3.3, we know that bh̸=⊥h. Thus, bh must be proposed
+by Lh, because for it to be notarized, some honest player must have voted for it. The lemma
+follows.
+Theorem 3.2 (Optimistic Confirmation Time) . Simplex has an optimistic confirmation time of
+5δ.
+Proof. Suppose that there is a set of transactions txs in the view of every honest player by time
+t, where t >GST, where txs is not yet in the output of any honest player. Let h be the highest
+iteration that any honest player is in at time t. There are two cases. If Lh has not entered iteration
+h yet by timet, then by Lemma 3.4, it will enter iterationh by timet+δ, at which point it proposes
+a blockchain that contains txs; applying Lemma 3.5 then completes the proof. In the second case,
+by time t, Lh has already started iteration h, and by Lemma 3.5 every honest process will be in
+iteration h + 1 by time t + 2δ, and see a finalized block from Lh+1 byt + 5δ.
+Now, we are ready to reason about worst-case confirmation time.
+Lemma 3.6 (The Effect of Faulty Leaders). Suppose every honest process has entered iteration h
+by time t, for some t >GST. Then every honest process will have entered iteration h + 1 by time
+t + 3∆ +δ.
+16
+time t
+Every honest player 
+has entered 
+iteration h.
+time t + 3Δ
+Either every honest 
+timer for iteration h 
+has fired, or some 
+honest process 
+entered iteration h+1 
+already.
+time t + 3Δ + 𝜹
+Every honest player 
+enters iteration h+1.
+If timer fires, multicast 
+“vote ⟂h”.
+Figure 2: Timeline of events when the leader of iteration h is faulty (t> GST).
+Proof. There are two cases. First, suppose that for every honest process, its timer in iterationh fires;
+then every honest process p will cast a vote⟨vote,h,⊥h⟩p at some time≤t + 3∆, and subsequently
+this vote will be in the view of every honest process by time max( GST,t + 3∆ +δ) = t + 3∆ +δ.
+These votes comprise a notarization for ⊥h and thus every honest process will see a notarized
+blockchain of height h by time t + 3∆ +δ (if not earlier) and subsequently enter iteration h + 1 as
+required. The second case is if an iteration h timer does not fire for some honest process p. Then it
+must be that p entered iteration h + 1 at a time before its timer could fire, i.e. before time t + 3∆,
+and applying Lemma 3.4 yields the claim.
+Theorem 3.3 (Worst-Case Confirmation Time) . Simplex has worst-case confirmation time of
+(4δ +ω(logλ)· (3∆ +δ)).
+Proof. Suppose that there is a set of transactions txs in the view of every honest player by time
+t, where t >GST, where txs is not yet in the output of any honest player. Let h be the highest
+iteration that any honest player is in at timet. By Lemma 3.4 every every honest process must have
+entered iterationh by timet+δ. Now, suppose that at least one iteration i∈{h+1,...,h +k} has
+an honest leader Li, for some choice of k∈ N. Then, applying Lemmas 3.5 and 3.6, every honest
+process will see a finalized block containing txs by time t + 4δ +k(3∆ +δ).
+It remains to analyze the probability that, in a random execution, there is a sequence of k
+iterations in a row h,h + 1,...,h +k− 1 s.t. for every i∈ [k], Lh+i−1 is corrupt. First, observe
+that the attacker (and the environment) is PPT, and so there is a polynomial function m(·) s.t.
+any execution of the protocol on a security parameter 1 λ must contain at most m(λ) number of
+iterations. Fix any λ∈ N. Recall that, for all i∈ [m(λ)], Li is selected using a random oracle, and
+is thus corrupt with independent probability f/n≤ 1/3. (Recall that we instantiated the leader
+election oracle to be either Li := H∗(i) mod n or Li := H∗(σi) mod n, where H∗ is a random
+oracle and σi is a unique threshold signature on i.)
+To help, we analyze the probability that in a sequence of m(λ) unbiased coin flips, there is
+a consecutive sequence of at least k tails. There are at most ( m(λ)−k + 1)· 2m(λ)−k possible
+sequences with at least k consecutive tails, out of 2 m(λ) total; thus the probability is less than
+(m(λ)−k+1)
+2k . Immediately, the probability there are k corrupt leaders in a row is < (m(λ)−k+1)
+2k , since
+17
+the probability a leader is corrupt is less than the probability an unbiased coin is tails. Observing
+that (m(λ)−k+1)
+2k is a negligible function in λ when k =ω(logλ), the theorem follows.
+For the sake of comparison, we also compute the expected view-based liveness. Recall that it
+says that, if every honest process sees some transaction txs before they enter iterationh, once every
+honest process enters iteration h, then txs will soon be confirmed:
+Theorem 3.4 (Expected View-Based Liveness). Simplex has expected 3.5δ + 1.5∆ view-based live-
+ness.
+Proof. Fix any iteration h∈ N. Suppose that there is a set of transactions txs in the view of every
+honest player before they enter iteration h, and moreover suppose that every honest player entered
+iterationh by some timet> GST. Recall that for each iteration i, we defined the leader to be Li :=
+H∗(i) mod n, where H∗ is a random oracle (chosen independently of GST and h). Immediately,
+for eachi∈ N, Li must be an honest player with independent probability (n−f)/n≥ 2/3. Denote
+X the number s.t. Lh+X is honest but, when X >0, Li is faulty∀i where h≤ i < h+X. Here
+X is a random variable, and immediately E[X]≤ 3/2− 1 = 1/2. Observe that, importantly, Lh+X
+will propose a blockchain that contains txs.
+It remains to upper bound the time at which some honest process enters iteration h +X. By
+Lemma 3.6, every honest process will have entered iterationh+X by timet+X·(3∆+δ). Applying
+Lemma 3.5, we conclude that every honest process will see a finalized block proposed by Lh+X by
+time t + 3δ + (X)· (3∆ +δ). Moreover, this block contains txs if not already in a previous block.
+Taking the expectation of the time elapsed since t, the theorem statement follows.
+3.4 Communication Complexity
+Each iteration of the Simplex protocol (without subsampling) requires O(n) multicasts. Note that
+we do not make any additional “relay rule assumptions”, unlike other protocols in the multicast
+model (e.g. Streamlet [CS20a], Algorand Agreement [CGMV18], PaLa [CPS18]).
+Lemma 3.7. In each iteration h, each honest process will multicast at most 4 messages.
+Proof. For each iterationh∈ N, an honest process p will multicast at most one propose message, at
+most one vote message for a non-⊥ block, at most one of ⟨vote,h,⊥h⟩p and⟨finalize,h⟩p, and will
+relay their view of a notarized blockchain of height h at most once.
+Each message is at most size O(λε·n) (since a notarization contains up to n signatures of
+O(λε) size each, where 0 <ε ≤ 1), so in each iteration, at most O(λε·n2) bits total are multicast
+(in the system as a whole, summing over all players). We note that this matches the multicast
+bit complexity of the base Algorand Agreement protocol [CGMV18]. By using now standard
+techniques, we can bring down the multicast bit complexity to O(λε· polylog(λ)) through sub-
+sampling the committee of voters [CM19]. Assuming the sub-exponential security of OWFs, then
+the length of a signature can be made to be O(polylog(λ)), yielding a total multicast bit complexity
+of O(polylog(λ)). We do not innovate on these methods, and focus on the base protocol.
+Multicast can be implemented in various different ways on an underlying communication net-
+work. In a point-to-point network, each multicast involves sending the message to every other
+player; thus, our protocol—without subsampling—has O(λε·n3) total bit complexity in a point-
+to-point setting (counting every bit that was sent in the whole system). However, in modern
+18
+peer-to-peer networks or gossip networks, peers do not need to directly communicate with every
+other peer. In the same vein as e.g. [BCP15, CCG +15] or the implementation of [GHM +17], it
+is possible to simulate all-to-all communication if each peer talks to O(polylog(n)) other peers (if
+chosen appropriately). Then, total communication can be reduced to O(λε·n2)· polylog(n) bits
+(assuming that players do not relay the same message twice when gossiping messages). This may
+be reduced further by subsampling (again, following the techniques in Algorand).
+We note that many nice works, starting with Hotstuff [YMR +19], propose base protocols that
+achieveO(λε·n) bit complexity in a point-to-point setting, when all players are honest. Pessimisti-
+cally, the bit complexity is O(λε·n2). Hotstuff and many follow-up works use threshold signatures
+to compress the size of notarizations, which requires a private setup, making it unclear how to
+do subsampling. Indeed, our protocol with subsampling (without gossip) matches the asymptotic
+communication complexity of their base protocols, achieving O(λε· polylog(λ)·n) total bit com-
+plexity, orO(polylog(λ)·n) assuming sub-exponentially secure OWFs. Moreover, this bound holds
+both pessimistically and optimistically for our protocol, as opposed to just the optimistic case in
+Hotstuff.
+4 Related Work
+The roots of consensus research in the permissioned and partially-synchronous setting dates back
+to the seminal paper of [DLS88]. Subsequently, the classical approaches in Paxos [LAM98] and
+PBFT [CL+99] became mainstream and were further studied in [KAD+07, GKQV10, MA06, OO14].
+These protocols typically adopt an expensive or complex “view-change” phase for switching out a
+faulty leader for a new leader, and are built mainly for the stable leader setting, where a single
+leader can propose many blocks in a row without ceding its leadership.
+More recently, the rise of blockchain applications (in particular, Proof-of-Stake systems) mo-
+tivated a new line of work towards building fairer and simpler consensus protocols, where each
+leader generally only gets to propose a single block. In particular, Casper FFG [BG17], Hotstuff
+(v1) [AGM18], Tendermint [BKM18], and PaLa [CPS18] introduced a new “streamlined” approach
+where consensus is reached on many pipelined blocks at once, largely avoiding the complexity of a
+dedicated view-change subroutine. All four protocols proceed in incrementing epochs e = 1, 2,...
+and have a similar voting rule, where voters vote only for proposals extending the “freshest block”
+they’ve seen, that is, the one with the highest epoch number. As a consequence of the voting rule,
+the protocols maintain some intricacy when arguing liveness (i.e. the proposer may have to wait
+an extra 2∆ before proposing a new block, if the previous proposer crashed). 12 (Note that Simplex
+does not have this intricacy.) Somewhat separately, but also building on the streamlined paradigm,
+Streamlet [CS20a] achieves a simple protocol description but has worse optimistic and pessimistic
+liveness.
+PBFT [CL+99] remains the fastest protocol when leaders are honest, requiring only 3δ timesteps
+to confirm transactions; [ANRX21] showed that this is optimal in the partially synchronous setting
+for f≤n/3. (We mention works such as Parametrized FaB Paxos [MA06] and SBFT [GAG +19],
+which achieve even faster optimistic confirmation whenf≤n/5, but this requires that the fraction
+of faulty voters also be small, in addition to honest leaders.) However, we are more interested
+in the setting with rotating/random leaders, due to issues of fairness. (Random leaders also give
+12Sometimes, this is referred to as the ‘hidden lock problem’.
+19
+Proposal
+Conf. Time
+Optimistic
+Block Time
+Expected View-Based
+Liveness (γ := n
+n−f )
+Expected Comm.
+Complexity
+Simplex 3 δ 2δ 3δ + (γ − 1) · (3∆ + δ) O(n) multicasts†
+Algorand*
+[CGMV18] 3δ 3δ 3δ + (γ− 1)· (4∆ + 2δ) O(n) multicasts
+ICC
+[CDH+22] 3δ 2δ 3δ + (γ− 1)· (γ· (2∆ + 2δ) + 2δ) O(n) multicasts
+PaLa
+[CPS18] 4δ 2δ 4δ + (γ2− 1)· (5∆ +δ) + (γ− 1)· 2δ +γ· 2∆ O(n) multicasts
+Pipelined
+Fast-Hotstuffˆ
+[JNFG20]
+Jolteonˆ
+[GKKS+22]
+5δ 2δ 5δ + (γ3− 1)· (4∆ +δ) + (γ2 +γ− 2)· 2δ O (n2) messages
+Chained
+Hotstuff (v6)ˆ
+[YMR+19]
+7δ 2δ 7δ +(γ4−1)·(3∆+δ)+(γ3 +γ2 +γ−3)·2δ O (n2) messages
+Streamlet
+[CS20a] 6∆ 2∆ 6∆ + ( γ5 +γ4 +γ3 +γ2 +γ− 5)· 2∆ O(n) multicasts
+P-Sync Bullshark‡
+[SGSKK22b] 6δ 3δ 6δ + (γ− 1)· 18∆ O(n2) messages
+Hotstuff (v1)ˆ
+[AGM18, Abr22]
+Casper FFGˆ
+[BG17]
+Chained Tendermintˆ
+[BKM18, Abr22]
+5δ 2δ 5δ + (γ3− 1)· (5∆ +δ) +γ2· 2∆ O(n2) messages
+ˆWith random leaders. *Base protocol without sortition, with optimistic responsiveness. †Following the techniques of Algorand [GHM +17], by using
+subsampling, many (if not all) of the protocols here built for the multicast model can be adapted to use only polylog(λ) multicasts per block. ‡Assuming
+that it takes 3δ to generate a vertex (optimistically), and where the timeout is set to 9∆ according to Section C.2 in [SGSKK22a].
+Table 2: Extended Comparison of Popular Consensus Protocols (Random Leaders)
+better worst-case confirmation time.) Consequently, many works have adapted PBFT to a set-
+ting with rotating leaders; we mention Algorand [CGMV18], Fast-Hotstuff [JNFG20], and Jolteon
+[GKKS+22]. In particular, Pipelined Fast-Hotstuff and Jolteon propose streamlined versions of
+PBFT-like protocols that also seek to reduce the complexity of the view-change, again by pipelin-
+ing proposals; both are slower than Algorand. Algorand and Fast-Hotstuff (without pipelining)
+achieve 3δ proposal confirmation time, but worse 3δ block time.
+A major concern when designing modern consensus protocols is that of communication com-
+plexity. A low communication complexity is essential for a scalable protocol. In the multicast
+model, Algorand [CM19] showed an elegant way to subsample the committee of voters to achieve
+20
+polylog(λ) multicasts (or O(n) messages in the point-to-point model). We remark that their tech-
+niques also apply to our protocol. (If we additionally trade off optimistic responsiveness, Algorand
+[CM19] can also achieve adaptive security.) In the point-to-point messaging model, a nice line of
+works, starting with Hotstuff [YMR+19], seeked to reduce communication complexity by funneling
+all messages through the leader (a technique from [Rei94]) and by using threshold signatures to re-
+duce the size of certificates (a technique from [CKS00]). Hotstuff, Pipelined Fast-Hotstuff [JNFG20]
+and Jolteon [GKKS +22] all achieve O(n) messages per block optimistically, and O(n2) messages
+in the case of a faulty leader (or better when amortized over many round-robin leaders, depending
+on the implementation of the ‘pacemaker’). It remains unclear how realistic it is to funnel com-
+munication through a single leader on a peer-to-peer network. We note that their optimizations
+to message size using threshold signatures or aggregate signatures also apply to other protocols; of
+course, threshold signatures require a much stronger private setup (e.g. see [CKS00]) that we wish
+to avoid. Apart from requiring additional complexity to instantiate the private setup, it is also not
+clear how to do subsampling for protocols that require threshold signatures, as an example.
+Our protocol has a similar ‘notarize/finalize’ voting procedure to that of [CDH +22] (Dfinity
+ICC) and an old variant of Streamlet ([CS20b], Appendix A), but uses different techniques for
+proposals and for switching leaders. The ICC protocol [CDH +22] is also quite nice but does not
+use timeout/dummy blocks, and incurs some complexity in how they rank leaders and allow multiple
+leaders in each round (they additionally assume threshold signatures and a trusted private setup,
+which we avoid). Consequently, if the first leader in a round is corrupt, they need essentially two
+honest leaders in a row to confirm a subsequent block. It is worth exploring whether their techniques
+for block dissemination can be used to improve Simplex. Independently, we also note structural
+similarities between Simplex and the Graded Binding Crusader Agreement protocol (using a weak
+common coin) in [ABDY22], albeit that protocol is for the asynchronous setting.
+In a somewhat distinct line of work, [SGSKK22a] propose a partially-synchronous version of
+Bullshark built on top of what they call a DAG. These protocols are well-suited for the asynchronous
+setting, but when adapted for partial-synchrony, much care is needed when integrating timeouts
+into the DAG construction, to ensure that a slow honest leader is not left behind before it can
+propose a block; moreover, it trades-off latency.
+We summarize the comparisons in Table 3.4 (for the random leader setting). When computing
+the expected view-based liveness, we define a parameter γ := n/(n−f) that corresponds to the
+inverse fraction of eligible leaders who are honest. 13 Table 1 presents concrete values for expected
+liveness when f =⌈n/3⌉− 1. Importantly, we remark that the landscape of consensus protocols
+is rich and ever-changing; this survey may not be comprehensive. In particular, while we compare
+only theoretical works here, much has been done to improve the performance of consensus protocols
+in practice by the systems community.
+5 Other Remarks
+In practice, one may in fact choose to run Simplex on three disjoint sets of players: a set of
+proposers, a set of validators (who validates blocks and votes for valid blocks only), and a set of
+“progress detectors” (who sends finalize votes or ⊥ votes). Members of the validating set do not
+13Another reason we use a different variable is to make clear that it is possible to elect leaders from an entirely
+different set of processes than the main set of protocol processes; indeed, our protocol supports a setting where most
+leaders are corrupt (i.e. γ >3/2) even when the number of faulty voters is required to be small ( f <n/3).
+21
+send⊥ votes. Importantly, no state needs to be shared across the three roles, making it easy to
+distribute the work necessary to run the protocol, and also to incentivize each role in a different
+way. For example, the block itself only needs to be delivered to the block validators (and clients).
+Bibliography
+[AAC+05] Amitanand S Aiyer, Lorenzo Alvisi, Allen Clement, Mike Dahlin, Jean-Philippe Mar-
+tin, and Carl Porth. Bar fault tolerance for cooperative services. In Proceedings of
+the twentieth ACM symposium on Operating systems principles , pages 45–58, 2005.
+[ABDY22] Ittai Abraham, Naama Ben-David, and Sravya Yandamuri. Efficient and adaptively
+secure asynchronous binary agreement via binding crusader agreement. Cryptology
+ePrint Archive, 2022.
+[Abr22] Ittai Abraham. Two round hotstuff. https://decentralizedthoughts.github.io/
+2022-11-24-two-round-HS/ , 2022. Accessed: 2022-12-30.
+[AGM18] Ittai Abraham, Guy Gueta, and Dahlia Malkhi. Hot-stuff the linear, optimal-
+resilience, one-message bft devil. CoRR, abs/1803.05069, 2018.
+[AJK+22] Sarah Allen, Ari Juels, Mukti Khaire, Tyler Kell, and Siddhant Shrivastava. Nfts for
+art and collectables: Primer and outlook. 2022.
+[AMS19] Ittai Abraham, Dahlia Malkhi, and Alexander Spiegelman. Asymptotically optimal
+validated asynchronous byzantine agreement. In Proceedings of the 2019 ACM Sym-
+posium on Principles of Distributed Computing , pages 337–346, 2019.
+[ANRX21] Ittai Abraham, Kartik Nayak, Ling Ren, and Zhuolun Xiang. Good-case latency of
+byzantine broadcast: A complete categorization. In Proceedings of the 2021 ACM
+Symposium on Principles of Distributed Computing , pages 331–341, 2021.
+[Apa] Apache Software Foundation. ZooKeeper internals. https://zookeeper.apache.
+org/doc/r3.4.13/zookeeperInternals.html. Accessed: 2023-02-24.
+[B+14] Vitalik Buterin et al. A next-generation smart contract and decentralized application
+platform. white paper, 3(37):2–1, 2014.
+[BCC+19] Mathieu Baudet, Avery Ching, Andrey Chursin, George Danezis, Fran¸ cois Garillot,
+Zekun Li, Dahlia Malkhi, Oded Naor, Dmitri Perelman, and Alberto Sonnino. State
+machine replication in the libra blockchain. The Libra Assn., Tech. Rep , 7, 2019.
+[BCNP04] Boaz Barak, Ran Canetti, Jesper Buus Nielsen, and Rafael Pass. Universally com-
+posable protocols with relaxed set-up assumptions. In 45th Annual IEEE Symposium
+on Foundations of Computer Science , pages 186–195. IEEE, 2004.
+[BCP15] Elette Boyle, Kai-Min Chung, and Rafael Pass. Large-scale secure computation:
+Multi-party computation for (parallel) ram programs. In Advances in Cryptology–
+CRYPTO 2015: 35th Annual Cryptology Conference, Santa Barbara, CA, USA, Au-
+gust 16-20, 2015, Proceedings, Part II , pages 742–762. Springer, 2015.
+22
+[BDD+21] Carsten Baum, Bernardo David, Rafael Dowsley, Jesper Buus Nielsen, and Sabine
+Oechsner. Tardis: a foundation of time-lock puzzles in uc. In Annual International
+Conference on the Theory and Applications of Cryptographic Techniques , pages 429–
+459. Springer, 2021.
+[BG17] Vitalik Buterin and Virgil Griffith. Casper the friendly finality gadget. arXiv preprint
+arXiv:1710.09437, 2017.
+[BKM18] Ethan Buchman, Jae Kwon, and Zarko Milosevic. The latest gossip on bft consensus.
+arXiv preprint arXiv:1807.04938 , 2018.
+[BMM14] Michael Backes, Praveen Manoharan, and Esfandiar Mohammadi. Tuc: Time-
+sensitive and modular analysis of anonymous communication. In 2014 IEEE 27th
+Computer Security Foundations Symposium , pages 383–397. IEEE, 2014.
+[Bur06] Mike Burrows. The chubby lock service for loosely-coupled distributed systems. In
+Proceedings of the 7th symposium on Operating systems design and implementation ,
+pages 335–350, 2006.
+[Can01] Ran Canetti. Universally composable security: A new paradigm for cryptographic
+protocols. In Proceedings 42nd IEEE Symposium on Foundations of Computer Sci-
+ence, pages 136–145. IEEE, 2001.
+[CCG+15] Nishanth Chandran, Wutichai Chongchitmate, Juan A Garay, Shafi Goldwasser,
+Rafail Ostrovsky, and Vassilis Zikas. The hidden graph model: Communication local-
+ity and optimal resiliency with adaptive faults. In Proceedings of the 2015 Conference
+on Innovations in Theoretical Computer Science , pages 153–162, 2015.
+[CDH+22] Jan Camenisch, Manu Drijvers, Timo Hanke, Yvonne-Anne Pignolet, Victor Shoup,
+and Dominic Williams. Internet computer consensus. In Proceedings of the 2022
+ACM Symposium on Principles of Distributed Computing , pages 81–91, 2022.
+[CGMV18] Jing Chen, Sergey Gorbunov, Silvio Micali, and Georgios Vlachos. Algorand agree-
+ment: Super fast and partition resilient byzantine agreement. Cryptology ePrint
+Archive, 2018.
+[CHMV17] Ran Canetti, Kyle Hogan, Aanchal Malhotra, and Mayank Varia. A universally
+composable treatment of network time. In 2017 IEEE 30th Computer Security Foun-
+dations Symposium (CSF) , pages 360–375. IEEE, 2017.
+[CKS00] Christian Cachin, Klaus Kursawe, and Victor Shoup. Random oracles in con-
+stantinopole: practical asynchronous byzantine agreement using cryptography. In
+Proceedings of the nineteenth annual ACM symposium on Principles of distributed
+computing, pages 123–132, 2000.
+[CL+99] Miguel Castro, Barbara Liskov, et al. Practical byzantine fault tolerance. In OsDI,
+volume 99, pages 173–186, 1999.
+[CM19] Jing Chen and Silvio Micali. Algorand: A secure and efficient distributed ledger.
+Theoretical Computer Science, 777:155–183, 2019.
+23
+[CPS18] TH Hubert Chan, Rafael Pass, and Elaine Shi. Pala: A simple partially synchronous
+blockchain. Cryptology ePrint Archive, 2018.
+[CR93] Ran Canetti and Tal Rabin. Fast asynchronous byzantine agreement with optimal
+resilience. In Proceedings of the twenty-fifth annual ACM symposium on Theory of
+computing, pages 42–51, 1993.
+[CS20a] Benjamin Y Chan and Elaine Shi. Streamlet: Textbook streamlined blockchains.
+In Proceedings of the 2nd ACM Conference on Advances in Financial Technologies ,
+pages 1–11, 2020.
+[CS20b] Benjamin Y Chan and Elaine Shi. Streamlet: Textbook streamlined blockchains (ear-
+lier version). Cryptology ePrint Archive, Paper 2020/088, 2020. https://eprint.
+iacr.org/archive/2020/088/20200204:124247.
+[DGK+20] Philip Daian, Steven Goldfeder, Tyler Kell, Yunqi Li, Xueyuan Zhao, Iddo Bentov,
+Lorenz Breidenbach, and Ari Juels. Flash boys 2.0: Frontrunning in decentralized ex-
+changes, miner extractable value, and consensus instability. In2020 IEEE Symposium
+on Security and Privacy (SP) , pages 910–927. IEEE, 2020.
+[DLS88] Cynthia Dwork, Nancy Lynch, and Larry Stockmeyer. Consensus in the presence of
+partial synchrony. Journal of the ACM (JACM) , 35(2):288–323, 1988.
+[GAG+19] Guy Golan Gueta, Ittai Abraham, Shelly Grossman, Dahlia Malkhi, Benny Pinkas,
+Michael Reiter, Dragos-Adrian Seredinschi, Orr Tamir, and Alin Tomescu. Sbft:
+a scalable and decentralized trust infrastructure. In 2019 49th Annual IEEE/IFIP
+international conference on dependable systems and networks (DSN) , pages 568–580.
+IEEE, 2019.
+[GHM+17] Yossi Gilad, Rotem Hemo, Silvio Micali, Georgios Vlachos, and Nickolai Zeldovich.
+Algorand: Scaling byzantine agreements for cryptocurrencies. In Proceedings of the
+26th symposium on operating systems principles , pages 51–68, 2017.
+[GKKS+22] Rati Gelashvili, Lefteris Kokoris-Kogias, Alberto Sonnino, Alexander Spiegelman,
+and Zhuolun Xiang. Jolteon and ditto: Network-adaptive efficient consensus with
+asynchronous fallback. In Financial Cryptography and Data Security: 26th Interna-
+tional Conference, FC 2022, Grenada, May 2–6, 2022, Revised Selected Papers, pages
+296–315. Springer, 2022.
+[GKL15] Juan Garay, Aggelos Kiayias, and Nikos Leonardos. The bitcoin backbone protocol:
+Analysis and applications. In Advances in Cryptology-EUROCRYPT 2015: 34th
+Annual International Conference on the Theory and Applications of Cryptographic
+Techniques, Sofia, Bulgaria, April 26-30, 2015, Proceedings, Part II , pages 281–310.
+Springer, 2015.
+[GKQV10] Rachid Guerraoui, Nikola Kneˇ zevi´ c, Vivien Qu´ ema, and Marko Vukoli´ c. The next 700
+bft protocols. In Proceedings of the 5th European Conference on Computer Systems ,
+EuroSys ’10, pages 363–376, New York, NY, USA, 2010. ACM.
+24
+[HCPS19] T-H Hubert Chan, Rafael Pass, and Elaine Shi. Consensus through herding. In
+Annual International Conference on the Theory and Applications of Cryptographic
+Techniques, pages 720–749. Springer, 2019.
+[HILL99] Johan H˚ astad, Russell Impagliazzo, Leonid A Levin, and Michael Luby. A pseudoran-
+dom generator from any one-way function. SIAM Journal on Computing, 28(4):1364–
+1396, 1999.
+[JNFG20] Mohammad M Jalalzai, Jianyu Niu, Chen Feng, and Fangyu Gai. Fast-hotstuff: A
+fast and resilient hotstuff protocol. arXiv preprint arXiv:2010.11454 , 2020.
+[KAD+07] Ramakrishna Kotla, Lorenzo Alvisi, Michael Dahlin, Allen Clement, and Edmund L.
+Wong. Zyzzyva: speculative byzantine fault tolerance. In Proceedings of the 21st
+ACM Symposium on Operating Systems Principles 2007, SOSP 2007, Stevenson,
+Washington, USA, October 14-17, 2007 , pages 45–58, 2007.
+[KKKNS21] Idit Keidar, Eleftherios Kokoris-Kogias, Oded Naor, and Alexander Spiegelman. All
+you need is dag. In Proceedings of the 2021 ACM Symposium on Principles of Dis-
+tributed Computing, pages 165–175, 2021.
+[KLP05] Yael Tauman Kalai, Yehuda Lindell, and Manoj Prabhakaran. Concurrent general
+composition of secure protocols in the timing model. In Proceedings of the thirty-
+seventh annual ACM Symposium on Theory of Computing , pages 644–653, 2005.
+[KMTZ13] Jonathan Katz, Ueli Maurer, Bj¨ orn Tackmann, and Vassilis Zikas. Universally com-
+posable synchronous computation. In Theory of Cryptography Conference , pages
+477–498. Springer, 2013.
+[KZGJ20] Mahimna Kelkar, Fan Zhang, Steven Goldfeder, and Ari Juels. Order-fairness for
+byzantine consensus. In Advances in Cryptology–CRYPTO 2020: 40th Annual Inter-
+national Cryptology Conference, CRYPTO 2020, Santa Barbara, CA, USA, August
+17–21, 2020, Proceedings, Part III 40 , pages 451–480. Springer, 2020.
+[KZZ16] Aggelos Kiayias, Hong-Sheng Zhou, and Vassilis Zikas. Fair and robust multi-party
+computation using a global transaction ledger. InAnnual International Conference on
+the Theory and Applications of Cryptographic Techniques , pages 705–734. Springer,
+2016.
+[LAM98] LESLIE LAMPORT. The part-time parliament. ACM Transactions on Computer
+Systems, 16(2):133–169, 1998.
+[Lam01] Leslie Lamport. Paxos made simple. ACM SIGACT News (Distributed Computing
+Column) 32, 4 (Whole Number 121, December 2001) , pages 51–58, 2001.
+[LSP82] LESLIE LAMPORT, ROBERT SHOSTAK, and MARSHALL PEASE. The byzan-
+tine generals problem. ACM Transactions on Programming Languages and Systems ,
+4(3):382–401, 1982.
+[MA06] Jean-Philippe Martin and Lorenzo Alvisi. Fast byzantine consensus. IEEE Trans.
+Dependable Secur. Comput., 3(3), 2006.
+25
+[MXC+16] Andrew Miller, Yu Xia, Kyle Croman, Elaine Shi, and Dawn Song. The honey badger
+of bft protocols. In Proceedings of the 2016 ACM SIGSAC conference on computer
+and communications security, pages 31–42, 2016.
+[Nak08] Satoshi Nakamoto. Bitcoin: A peer-to-peer electronic cash system. Decentralized
+business review, page 21260, 2008.
+[OO14] Diego Ongaro and John Ousterhout. In search of an understandable consensus algo-
+rithm. In Proceedings of the 2014 USENIX Conference on USENIX Annual Technical
+Conference, USENIX ATC’14, page 305–320, USA, 2014. USENIX Association.
+[PS17] Rafael Pass and Elaine Shi. The sleepy model of consensus. In International Confer-
+ence on the Theory and Application of Cryptology and Information Security , pages
+380–409. Springer, 2017.
+[PS18] Rafael Pass and Elaine Shi. Thunderella: Blockchains with optimistic instant con-
+firmation. In Annual International Conference on the Theory and Applications of
+Cryptographic Techniques, pages 3–33. Springer, 2018.
+[Rab83] Michael O Rabin. Randomized byzantine generals. In 24th annual symposium on
+foundations of computer science (sfcs 1983) , pages 403–409. IEEE, 1983.
+[Rei94] Michael K Reiter. Secure agreement protocols: Reliable and atomic group multicast
+in rampart. In Proceedings of the 2nd ACM Conference on Computer and Commu-
+nications Security, pages 68–80, 1994.
+[Rom90] John Rompel. One-way functions are necessary and sufficient for secure signatures.
+In Proceedings of the twenty-second annual ACM symposium on Theory of computing,
+pages 387–394, 1990.
+[SGSKK22a] Alexander Spiegelman, Neil Giridharan, Alberto Sonnino, and Lefteris Kokoris-
+Kogias. Bullshark: Dag bft protocols made practical. In Proceedings of the 2022
+ACM SIGSAC Conference on Computer and Communications Security , pages 2705–
+2718, 2022.
+[SGSKK22b] Alexander Spiegelman, Neil Giridharan, Alberto Sonnino, and Lefteris Kokoris-
+Kogias. Bullshark: The partially synchronous version. arXiv preprint
+arXiv:2209.05633, 2022.
+[WLG+78] John H Wensley, Leslie Lamport, Jack Goldberg, Milton W Green, Karl N Levitt,
+Po Mo Melliar-Smith, Robert E Shostak, and Charles B Weinstock. Sift: Design and
+analysis of a fault-tolerant computer for aircraft control. Proceedings of the IEEE ,
+66(10):1240–1255, 1978.
+[Yao82] Andrew C Yao. Protocols for secure computations. In 23rd annual symposium on
+foundations of computer science (sfcs 1982) , pages 160–164. IEEE, 1982.
+[YMR+19] Maofan Yin, Dahlia Malkhi, Michael K Reiter, Guy Golan Gueta, and Ittai Abraham.
+Hotstuff: Bft consensus with linearity and responsiveness. In Proceedings of the 2019
+ACM Symposium on Principles of Distributed Computing , pages 347–356, 2019.
+26

@@ -1,0 +1,40 @@
+====================================================================================================
+CONTROL POSITIVO — dagknight.txt:182-197
+lambda=3.75, alpha=0.2, eps=0.05, tasa honesta mu=(1-a)l=3.0
+====================================================================================================
+
+A · k* sobre el DAG SOLO-HONESTO (12 semillas)
+    D      T | bitset k* (semillas)                      media | replay k*                                 media
+  2.0   12.0 | [3, 3, 2, 2, 3, 3, 4, 4, 4, 3, 3, 5]       3.25 | [5, 4, 3, 5, 7, 6, 6, 9, 10, 4, 4, 9]      6.00
+  2.0   24.0 | [3, 3, 3, 3, 3, 3, 4, 4, 4, 3, 3, 4]       3.33 | [5, 5, 5, 6, 7, 6, 7, 7, 7, 5, 5, 7]       6.00
+  2.0   60.0 | [3, 3, 3, 3, 3, 3, 4, 3, 3, 3, 3, 3]       3.08 | [5, 5, 5, 5, 6, 6, 6, 5, 6, 5, 5, 6]       5.42
+      objetivo del paper para D=2.0: k=4  (y tiempo 12.0 s)
+
+  1.0    6.0 | [1, 2, 1, 1, 2, 2, 2, 2, 2, 1, 2, 2]       1.67 | [2, 3, 2, 2, 3, 3, 4, 4, 2, 1, 3, 4]       2.75
+  1.0   24.0 | [2, 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2]       1.75 | [2, 2, 2, 2, 3, 3, 3, 3, 3, 2, 3, 3]       2.58
+  1.0   60.0 | [1, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2]       1.75 | [2, 3, 2, 2, 2, 3, 3, 2, 3, 2, 3, 3]       2.50
+      objetivo del paper para D=1.0: k=1  (y tiempo 6.0 s)
+
+  0.1    1.2 | [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]       0.08 | [0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0]     -0.08
+  0.1   24.0 | [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]       0.00 | [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]       0.00
+  0.1   60.0 | [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]       0.00 | [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]       0.00
+      objetivo del paper para D=0.1: k=0  (y tiempo 1.2 s)
+
+B · cota asintotica del paper (:1007, :328-352) en segundos vs figura
+    D  cota paper   figura  figura/cota
+  2.0       19.66     12.0         0.61
+  1.0        6.75      6.0         0.89
+  0.1        1.54      1.2         0.78
+  (la cota es superior y el paper la declara holgada, :1026-1028; no puede reproducir
+   la tabla exacta: la tabla es de su simulacion, no de la formula)
+
+C · reglas de cliente probadas sobre el DAG solo-honesto (media de 12 semillas)
+    D | k target | 1er cruce cob>=50%   min_n=8 |  1er k*<=k_final | objetivo
+  2.0 |        4 |               0.56      3.52 |             0.27 | 12.0 s
+  1.0 |        1 |               0.56      4.10 |             0.27 | 6.0 s
+  0.1 |        0 |               0.56      2.57 |             0.27 | 1.2 s
+
+VEREDICTO DEL CONTROL: PARCIAL. k* escala como el paper (0 con Dl<<1, crece con Dl;
+valores 3-5 / 1-2 / 0 frente a 4 / 1 / 0, dentro de +-1-2), pero la tabla exacta
+1,2/6/12 s NO se reproduce: el paper no publica la regla de cliente ni el codigo de la
+simulacion. LAGUNA declarada; ver informe.md.

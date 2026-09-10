@@ -169,3 +169,26 @@ exige dar autoridad al timelord. No sirve para latencia; sí como red de segurid
 - `p` real del granjero doméstico y `m` real (2,955 vs 2,822): discrepan entre fuentes.
 - La estimación 12–20 s de DAGKNIGHT a `λ=1`, `α=0,33`: cuenta de orden, no simulación.
 - El tamaño real del mensaje GossiPBFT (el gossip de 3,5 TB depende de él).
+
+---
+
+## 7 · Decisión de Katana (2026-09-10): sin comités de decisión
+
+**Restricción nueva y vinculante: se descarta toda opción que implique un comité central que tome
+decisiones.** Se busca descentralización y seguridad. Consecuencias inmediatas sobre esta ronda:
+
+| Opción | Estado tras la restricción |
+|---|---|
+| **P-040 / capa estilo F3** (R-FIN-15..22) | **DESCARTADA**: es un comité derivado del espacio, aunque no haya dinero. Toda la ronda 14B (`d14-instancia/`) queda como documentación del coste, no como camino. |
+| Motores BFT (GossiPBFT, Simplex, BA\*, Cordial Miners) | **DESCARTADOS**: todos deciden en comité. |
+| **Quórum de soluciones** (P-043) | Ya muerto por d13 (equivocación + castigo de espacio evadible). Sin cambios. |
+| **Confirmación adaptativa tipo DAGKNIGHT** (ronda 14A) | **ÚNICA VÍA VIVA** para bajar la irreversibilidad sin comité, sin dinero y sin confianza nueva. Probabilista y por cliente. |
+| Baseline GHOSTDAG (R-FIN-7, 100–134 s) | Viva; es el suelo actual. |
+| Avalanche / submuestreo sobre peso de espacio | Sin comité fijo, pero sin estudiar con fuente primaria; queda como pregunta abierta. |
+| Prism (líderless, PoW) | Sin comité; adaptación a espacio sin estudiar. |
+| Finalidad anclada al VDF | **En cuestión**: el timelord es un operador (ZEROX), y el suelo es ≈112,5 s; choca con descentralización salvo redundancia. |
+
+**La consecuencia para la prioridad:** sin comité, el mínimo de irreversibilidad no lo da una capa
+de finalidad determinista, sino la **regla de confirmación del propio DAG**. El resultado de 14A
+(8–56 s a `α=0,33` para `ε=0,05…1e-12`, frente a 100–146 s del baseline) es, hoy, el mejor número
+disponible; su punto débil está declarado (manipulación del `k*` con retención si `Δ ≥ 16 s`).
