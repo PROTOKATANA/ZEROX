@@ -592,3 +592,299 @@ variante 2 (que es la que aportaría algo), según `Δ`.
 **Etiqueta del punto C: VERIFICADO** (control positivo del paper reproducido exacto; el ataque
 portado a nuestro régimen con 12 semillas y cobertura de rama completa: 9 845 129 éxitos del
 atacante y 13 194 871 de los honestos sobre 23 040 000 rondas, sin rondas truncadas).
+
+---
+
+## G · Lo que el gadget NO arregla, y lo que abre
+
+**Script:** `d12_g_frontera_cliente.py` · **Salida:** `salida_g.txt`
+
+### G.1 · Del catálogo, qué sigue exactamente igual
+
+| # | Problema | Con el gadget puesto |
+|---|---|---|
+| A1 | Carrera de bloques | **Igual, o peor.** El gadget no cambia quién gana la cadena seleccionada; sólo cambia cuándo se deja de reorganizar. Y acortar ese horizonte **baja** la frontera (G.2) |
+| A3/A4 | *Steering* y soborno del ancla | **Igual.** Y si se votara el ancla, peor (B.1) |
+| A5 | Sembrador (plotter rápido) | **Igual.** El lookahead depende de `L` y `ρ`, no del gadget |
+| B1 | Retardo adversarial `Δ_ef` | **Peor.** El gadget añade una segunda dependencia de `Δ`, y en la variante útil es catastrófica (C.3) |
+| B2 | Eclipse | **Mejora en detección**, no en consenso: el Apéndice C del paper (`hotpow.txt:1928-1941`) muestra que con quórums grandes un nodo detecta el eclipse en 0,11 tiempos de bloque en vez de 6,91. **Es la única ganancia real que encuentro, y no necesita el gadget: basta contar votos** |
+| C1 | Timekeeper único | **Igual** |
+| D1 | Sin cliente ligero | **Igual: no lo resucita** (G.3) |
+| D4 | Verificación de PoT no sucinta | **Peor:** +6,9 % de un núcleo en la variante 2 (F.6) |
+| D5 | Umbral por debajo del 50 % | **Igual o peor** (C.2) |
+| D6 | Suelo de confirmación 100-134 s | **Igual, y es lo que impide `d = 0`** (D.6) |
+| E1 | `Δ` sin medir | **Manda más que antes** |
+
+### G.2 · Sí toca la frontera de flujo único, y hacia abajo
+
+El instrumento es el `frontera()` de D9-9a **sin reescribirlo**, con `F_SEG` sustituida (el horizonte
+de finalidad efectivo). Control positivo: reproduce los dos números publicados.
+
+| horizonte de finalidad efectivo | frontera 1e-10 |
+|---|---:|
+| `F = 5,3 h` (medido, diseño vivo) | **46,88 %** (publicado 46,9 % ✓) |
+| `F = 2 h` (provisional, DECIDIDO) | **44,69 %** (publicado 44,6 % ✓) |
+| `F = 1 h` (candidata de producción) | 42,14 % |
+| `d+W = 3 798 s` (gadget, `α=0,33`, objetivo 1e-30) | 42,38 % |
+| `d+W = 1 702 s` (gadget, `α=0,33`, objetivo 1e-12) | 37,79 % |
+| `d+W = 988 s` (gadget, `α=0,33`, objetivo 1e-6) | **32,98 %** ← por debajo del umbral operativo publicado (33 %) |
+| sólo `W = 143 s` (`k=64`, `c=1,5`: el gadget «rápido») | **SIN FRONTERA: el riesgo es 1 para todo `α`** |
+
+> La última fila no es un artefacto del buscador: `union10(α) = 1` para todo `α ∈ [0,05 ; 0,499]` a
+> ese horizonte, porque en 143 s los honestos apenas construyen 96 bloques contra la ventaja inicial
+> de `3k = 90`. Un certificado a 143 s **no finaliza nada**: finaliza con probabilidad de reversión 1.
+
+**Lectura:** si el gadget se usa para **acortar** el horizonte —que es para lo que se quiere—, la
+frontera **baja**. Sólo es neutro si el certificado llega **después** de que `prev()` ya haya bajado
+por sí sola, que es exactamente la dominación de D.6.
+
+### G.3 · El cliente ligero: no lo resucita, y la razón es estructural
+
+| | Capa estilo Filecoin | Quórum de soluciones |
+|---|---|---|
+| Qué es un voto | una **firma** de una clave que está en la tabla de poder | una **prueba de espacio** contra el reto del slot |
+| Qué hace falta para verificarlo | la tabla, que va comprometida en el certificado anterior (R-FIN-21) | `derive_global_challenge(slot)` (`subspace-verification/src/lib.rs:234-236`), es decir **la salida del PoT de ese slot**, más el `record_commitment` de la historia archivada para el KZG |
+| ¿Autoverificable desde génesis? | **Sí** (*«Verifying the finality of a tipset from genesis does not require access to the EC chain»*) | **No** |
+| Coste del cliente | **6,6 MB/año** (R-FIN-22, sin auditar) | **4,0 GB/año de PoT + ~840 h de núcleo al año** de verificación secuencial (96,1 ms/slot, D4), más 263 MB/año de certificados |
+
+> **Y esto es lo que ordena la comparación entera.** La propiedad que resucita al cliente ligero
+> —que el certificado se verifique sin la cadena— se la da a F3 **exactamente la tabla de poder que
+> el quórum de soluciones presume no necesitar**. El registro no es el defecto de la otra propuesta:
+> es su producto. **DEMOSTRADO** sobre la definición de las dos reglas y el código de verificación.
+
+### G.4 · Lo que abre, que hoy no existe
+
+1. **Equivocación gratis (F.7).** Nuevo y letal. No existe hoy porque hoy el único objeto firmado es
+   un bloque, y U2/U3″ ya castiga la copia dentro del DAG.
+2. **La mentira permanente.** Igual que la otra propuesta (su §6.1), con la diferencia de que aquí la
+   probabilidad no es 6,5e-105 sino `prev(α, d)`, que es un número **grande** si `d` es pequeño.
+3. **DoS de verificación de votos.** Cada voto inválido cuesta 1,08 ms de KZG. A `λ_v = k/s` un
+   atacante que inunde con votos falsos fuerza `k` verificaciones por segundo por nodo. `C-NET-03/04`
+   se calibraron para un SHA3 y ya había que rehacerlos por el PoT (E18); esto lo agrava.
+4. **Certificados de otro flujo** (B.4): sin R-QUO-3 son un vector de verificación de PoT ajeno;
+   con ella, el certificado no cruza flujos y por tanto no ayuda en una partición.
+
+**Etiqueta del punto G: VERIFICADO** (frontera) **+ DEMOSTRADO** (cliente ligero).
+
+---
+
+## E · Cara a cara con la capa estilo Filecoin
+
+Mismas condiciones: `λ = 1 bloque/s`, `τ = 1 s`, `α = 0,33` (umbral operativo publicado), `Δ` sin
+medir, `F = 2 h` como suelo. Las columnas de la capa estilo Filecoin salen de
+`research/dag-poas-capa-finalidad.md` §4 (**sin auditar**, salvo donde digo lo contrario).
+
+| Dimensión | **Quórum de soluciones** (HotPoW portado) | **Capa estilo Filecoin** (R-FIN-15..22) |
+|---|---|---|
+| **Finalidad conseguida** | Ninguna que mejore lo que hay. `d + W = 1 702 s` a `α=0,33` y objetivo 1e-12, frente a **871 s** esperando sin nada (D.6). **Estrictamente dominada** | Decenas de segundos en el caso normal; una instancia cada 30 s. Es una mejora real **cuando funciona** |
+| **Umbral** | Techo asintótico **42,30 %** con `δ=0,267` (46,55 % con `δ_ef=0,129`); operativamente muere antes (a `α=0,40` hacen falta 23 972 s para un mísero 1e-6). Y **0 % sin regla anti-equivocación** (F.7) | Seguridad (finalizar una mentira) 6,5e-105 a `α=0,33` con `K=4 000`; **viveza rota a 33 %**: se para el 41 % de las instancias (§4.A) |
+| **Qué se para y cuándo** | Se para si se apaga espacio: a `ρ = 0,7` no cierra ~1/3 de las instancias; recuperación = **una ventana de retarget, ~51 min** (D.4). Partición: exige que el lado conserve **44-65 %** del espacio, frente al 9 % de R-FIN-7 (D.5) | Se para si la participación honesta `p < ⅔/(1−α)`: **88,9 % a `α=0,25`, 99,5 % a `α=0,33`** (§4.C). Recuperación: cuando vuelva la participación |
+| **Estado por nodo** | Ninguno nuevo: los votos son autoportantes | Tabla de poder derivada (bloques cobrados por clave en `W_POWER = 3 600 s`) + `W_VIVO` |
+| **Bytes por año** | `k=64`, un certificado cada 64 s: **14,80 GB**; cada hora: 0,26 GB. Y **0,98 TB/año de gossip** en la variante 2 (F.2, F.4) | **0,76 GB/año** (`K=4 000`, certificado cada 30 s, BLS agregada) |
+| **CPU por nodo** | **1,0773 ms medidos** por voto (KZG, `cargo bench -p subspace-kzg`). Variante 2: **+6,9 % de un núcleo** continuo sobre el 9,6 % del PoT | Una verificación de firma BLS agregada + mapa de bits por certificado: **despreciable** |
+| **Criptografía que obliga a adoptar** | BLS12-381 igualmente (para el KZG de la propia solución) **+** Ed25519 por voto. Y la agregación **sólo ahorra el 3 %** (F.3) | BLS12-381 con `blst`. **Corrección importante: ese coste ya está pagado.** `verify_solution` de Autonomys llama a `kzg.verify` con `rust-kzg-blst` (F.5): `blst` ya está en la ruta de consenso de todos los nodos |
+| **Supuestos sobre quién está encendido** | «Ninguno» es falso: excluye PoW-1 **por axioma** (`hotpow.txt:1300-1303`), o sea supone `λ` conocida y constante. Quien la sostiene es el retarget, con 51 min de inercia | Explícito y medible: `p ≥ ⅔/(1−α)`, con `W_VIVO = 1 800 s` como prueba de vida. **Laguna declarada por ellos mismos** |
+| **Superficie de ataque nueva** | Equivocación gratis (**letal**), mentira permanente, DoS de verificación de votos a 1,08 ms cada uno, certificados de otro flujo | Doble firma (mitigada con R-FIN-19, que toca dinero), sesgo del sorteo por ancla (`m ≤ 151`, evaluado: sube `K` a 4 000), censura del comité, amplificación de la partición |
+| **Cliente ligero** | **No lo resucita.** Verificar un voto exige el PoT del slot: 4,04 GB/año + **842 h de núcleo/año** (G.3) | **Lo resucita: 6,6 MB/año** (R-FIN-22, sin auditar). Es su mayor ganancia y no es la finalidad |
+| **Qué hay que demostrar antes de escribirla** | (1) una regla anti-equivocación **sin dinero** —y D9 ya tiene el teorema de que el Sybil de claves rompe toda exclusividad por espacio—; (2) que `Δ ≪ 1/λ_v`, o sea `Δ` ≤ ~0,1 s en la variante útil; (3) que el certificado no baje la frontera (G.2 dice que sí la baja) | (1) la `p` real del granjero doméstico (**medida de campo**, no simulación); (2) las plazas correlacionadas por clave (§7, error declarado por el autor); (3) GossiPBFT portado y leído entero; (4) las dos cadencias de R-FIN-22; (5) `Δ` para los temporizadores |
+
+### E.1 · Lo que esta ronda le cambia a la propuesta rival
+
+Dos cosas, y una es a su favor:
+
+1. **A su favor, y es grande.** Su §5 presenta la adopción de BLS12-381 y `blst` como *«el precio
+   real y una bifurcación de Katana»*. **No lo es**: `blst` ya está en la ruta de consenso de todos
+   los nodos, dentro de `verify_solution`, para verificar el testigo KZG de cada solución
+   (F.5, VERIFICADO en `Cargo.toml:113,180` y `shared/subspace-kzg/Cargo.toml:24-27`). Su coste
+   declarado principal **desaparece**, condicionado a que ZEROX herede el esquema de archivado de
+   Autonomys —que es lo que R-FIN-14(c) cita.
+2. **En su contra.** Su §4.C («el granjero doméstico se apaga») y mi D.4 («se apaga espacio y `λ_v`
+   cae») son **el mismo problema medido por dos caminos distintos**, y ninguna de las dos propuestas
+   lo resuelve. No es un defecto de la capa de finalidad: es que **una finalidad rápida exige saber
+   quién está encendido**, y eso es exactamente lo que el Teorema 4.1 dice que no se puede tener
+   gratis en el escenario sin tamaño.
+
+### E.2 · Recomendación
+
+**Ninguna de las dos ahora. PLAUSIBLE.** Y si hubiera que elegir una, **la capa estilo Filecoin, y
+no por la finalidad sino por el cliente ligero** — que es lo único de las dos que compra algo que hoy
+no existe y que ningún parámetro del diseño actual arregla (D1 del catálogo, ESTRUCTURAL).
+
+**La condición que cambiaría la recomendación:** que la medida de campo de `p` (§4.C de la propuesta
+rival) salga por encima del 90 % **y** que `Δ_p99` salga por debajo de 4 s. Con esas dos, la capa
+estilo Filecoin pasa de «no funciona en el umbral publicado» a «funciona en el caso normal», y el
+cliente ligero de 6,6 MB/año justifica por sí solo el resto. **Ninguna medida de `p` ni de `Δ`
+resucita al quórum de soluciones**, porque lo que lo mata (F.7, D.6, G.3) no depende de ellas.
+
+---
+
+## H · Veredicto
+
+### H.1 · ¿Merece la pena el quórum de soluciones? No, y no por poco
+
+Tres disparos independientes, cada uno suficiente por sí solo:
+
+1. **La premisa del paper no se cumple en PoAS.** La Definición 1 —*«cada ATV se usa para votar una
+   vez por un valor»*— la garantiza en HotPoW el propio puzzle, porque la referencia va dentro del
+   hash (`hotpow.txt:437-441`). En PoAS el reto sale del PoT y del slot y **no ve el valor votado**
+   (`subspace-verification/src/lib.rs:228-272`): una solución firma cuantos valores quiera, gratis.
+   `POA` pasa de 1,3e-12 a **0,52 para cualquier `k`**. Y arreglarlo exige un castigo, es decir
+   dinero en juego, es decir la R-FIN-19 de la otra propuesta: **la ventaja anunciada desaparece por
+   completo. REFUTADO.**
+2. **Aunque se arreglara, está estrictamente dominado.** El fallo que importa —que el único
+   certificado esté sobre un bloque que la cadena abandonará— es de **modo común** y el quórum no lo
+   divide por nada. La garantía de un certificado en `t = d + W` es `max(prev(α,d), P_forja)`, y
+   esperar `d + W` sin gadget da `prev(α, d+W) < prev(α, d)`. **El gadget cuesta `W` segundos y no
+   compra ni un orden de magnitud. DEMOSTRADO.** A `α=0,33` y objetivo 1e-12: 1 702 s con gadget
+   frente a **871 s** sin él.
+3. **Y no entrega lo único que justificaría el esfuerzo.** El certificado de quórum **no es
+   autoverificable**: comprobar un voto exige la salida del PoT de su slot, y el PoT no es sucinto
+   (4,04 GB/año + **842 h de núcleo/año**). El cliente ligero sigue muerto. **DEMOSTRADO.**
+
+A eso se añade: a `α = 0,33` el atacante controla entre el 41,5 % y el 73,9 % de los certificados
+según la variante y `Δ` (C.3); la variante que compra información cuesta **0,98 TB/año** de gossip y
+**+6,9 % de un núcleo** (F.4, F.6); y usar el certificado para acortar el horizonte **baja la
+frontera por debajo del 33 % publicado** (G.2).
+
+### H.2 · ¿Cuál de las dos? Ninguna — y el motivo es que la pregunta está mal puesta
+
+**El riesgo de reversión hoy, a `α = 0,33`, es 1,5e-06 a los 10 min y 7,1e-36 a los 30 min** —
+reproducido en B.0 con el instrumento del diseño. **La finalidad no es el problema de ZEROX.** Una
+espera de 15 minutos para un pago grande es una convención comercial, no un defecto de consenso;
+Bitcoin vive con 60 minutos y nadie ha construido un gadget para arreglarlo.
+
+Lo que sí es un problema de ZEROX, ESTRUCTURAL y sin arreglo por parámetros, es **D1: no hay cliente
+ligero.** *«Ninguna cartera de ZEROX podrá verificar sus propios pagos sin confiar en un servidor o
+correr un nodo completo»* (`dag-poas-ancla-de-orden.md:439-441`).
+
+> **Reformulación que propongo, y es lo más útil que sale de esta ronda.** La capa estilo Filecoin
+> no debería evaluarse como *capa de finalidad* —donde su propia §4.A dice que a `α = 0,33` se para
+> el 41 % de las instancias— sino como **capa de certificados para el cliente ligero**. En ese
+> encuadre:
+> - su viveza rota bajo ataque deja de ser fatal: si el gadget se para, el cliente ligero cae al
+>   modelo de confianza en un servidor, que es **exactamente donde está hoy**; no se pierde nada;
+> - su seguridad, que es lo que importa para un cliente ligero, es 6,5e-105 a `α = 0,33` con
+>   `K = 4 000`, y ni el *steering* con `m ≤ 151` la mueve (§4.D);
+> - su coste principal declarado (BLS12-381 y `blst`) **ya está pagado** por el KZG del propio PoAS
+>   (F.5, VERIFICADO en el código);
+> - y su ganancia es 6,6 MB/año frente a 21,5 GB/año, o sea **un móvil frente a una máquina
+>   permanente**.
+>
+> **PLAUSIBLE**, no demostrado: R-FIN-22 sigue sin auditar y las dos cadencias son la primera cosa
+> que habría que comprobar.
+
+### H.3 · Lo que decidiría
+
+| Si se mide… | …y sale | Entonces |
+|---|---|---|
+| `Δ_p99` (E1) | `> 8 s` | ninguna de las dos, sin discusión: la capa estilo Filecoin no calibra sus temporizadores y el quórum ya estaba muerto |
+| `p` del granjero doméstico (§4.C) | `< 88,9 %` | la capa estilo Filecoin no vale como finalidad; **sí** como capa de cliente ligero (H.2) |
+| `p` | `> 90 %` **y** `Δ_p99 < 4 s` | abrir la capa estilo Filecoin como P-040, con el cliente ligero como objetivo declarado y la finalidad como efecto secundario |
+| cualquier cosa | — | el quórum de soluciones **no revive**: lo que lo mata (equivocación, dominación, cliente ligero) no depende de ninguna medida |
+
+**Lo que NO recomiendo por ningún motivo:** escribir el gadget de quórum «porque es barato de
+probar». No es barato: exige una regla anti-equivocación nueva, una ventana de voto nueva, una regla
+de flujo nueva (R-QUO-3) y toca la regla de selección; y las cuatro son piezas de consenso.
+
+---
+
+## Veredicto
+
+| Punto | Qué se concluye | Etiqueta | Número |
+|---|---|---|---|
+| **A** · control positivo | Los números del paper se reproducen con tres instrumentos; el cálculo de partida es correcto salvo los bytes | **VERIFICADO** | 0,2642 · 1,2724e-12 · 3,959e-45; error rel. de `poisson_sf` 6,4e-14 |
+| **A** · bytes del certificado | El mapa de bits es inaplicable sin registro; el paper cobra 40 B por voto | **REFUTADO** (mi «< 60 B») | `32 + 40k` reproduce la Tabla A.1 exactamente |
+| **B.1** · sobre qué se vota | Sólo un bloque de la cadena seleccionada; ancla y `blue_work` descartados | **DEMOSTRADO** | — |
+| **B.2** · voto = bloque | Es profundidad de confirmación con otro nombre | **REFUTADO** como aportación | el atacante forja su certificado en **194 s** a `α=0,33`, `k=64` |
+| **B.3** · regla de selección | El certificado sólo puede adelantar la finalidad (R-QUO-1) | **DEMOSTRADO** | `Fin(t) ⊇ Fin₇(t)` por unión |
+| **B.4** · flujos | Hace falta R-QUO-3, y con ella el certificado no cruza flujos | **PLAUSIBLE** | — |
+| **B.5** · `POA` | No depende de `α` (falla el criterio del método) y crece con `t` | **REFUTADO** como cota de seguridad | `POA(64, 2·t̄) = 0,5118` |
+| **B.6** · tabla de poder | No desaparece: se vuelve implícita | **DEMOSTRADO** | `W ≥ 2 201 s` a `α=0,33` para 1e-30 |
+| **C.0** · Figura 11 | Reproducida exacta con DP en vez de 10⁶ realizaciones | **VERIFICADO** | 0,4153 (paper 42 %) · 0,6432 (paper 64 %) |
+| **C.2** · umbral compuesto | Techo asintótico propio del gadget con `δ` | **VERIFICADO** | **42,30 %** (`δ=0,267`); 46,55 % (`δ_ef=0,129`) |
+| **C.3** · censura con `Δ` | El retardo destruye justo la variante útil | **VERIFICADO** | `α=0,33`: **41,5 %** (voto=bloque) vs **61,6-73,9 %** (voto aparte, `Δ=4..16 s`) |
+| **D.1-D.2** · parada por retención | Pinza: bajar un riesgo sube el otro | **VERIFICADO** | `α=0,33`, `k=64`, `c=2`: no cierra 1,4e-10 **pero forja 0,469** |
+| **D.3** · la cadena sigue | Sí, por R-FIN-7, no por el gadget | **DEMOSTRADO** | `processor.rs:1013,1033` |
+| **D.4** · parada por el teorema | Se apaga espacio y el gadget cae hasta que reacciona el retarget | **VERIFICADO** | `ρ=0,7`: no cierra el 33 %; recuperación **~51 min** |
+| **D.5** · partición | Exige mucho más espacio que R-FIN-7 | **VERIFICADO** | **44-65 %** frente al **9 %** de R-FIN-7 |
+| **D.6** · dominación | El gadget está estrictamente dominado por esperar | **DEMOSTRADO** | `α=0,33`, 1e-12: **1 702 s vs 871 s** |
+| **F.1-F.4** · coste | Un voto son 484 B, no 72 | **VERIFICADO** | `k=64` cada 64 s: **14,80 GB/año**; gossip **0,98 TB/año** |
+| **F.3** · agregación | No sirve: comprime firmas y aquí el voto es una prueba | **VERIFICADO** | **3,15 %** de ahorro frente al **99,70 %** de F3 |
+| **F.5** · BLS | `blst` ya está en la ruta de consenso, vía KZG | **VERIFICADO** | `rust-kzg-blst` en `Cargo.toml:113,180` |
+| **F.6** · CPU | Medida en esta máquina | **VERIFICADO** | `kzg.verify` = **1,0773 ms** [1,0719 ; 1,0887] |
+| **F.7** · equivocación | Rompe la Definición 1 de HotPoW | **REFUTADO** (el gadget entero) | `POA` 1,3e-12 → **0,5166** a `k=64` |
+| **G.2** · frontera | El gadget sí la toca, y hacia abajo | **VERIFICADO** | 44,69 % → **32,98 %** a `d+W=988 s`; **sin frontera** a 143 s |
+| **G.3** · cliente ligero | No lo resucita; la tabla de poder es lo que se lo da a F3 | **DEMOSTRADO** | 4,04 GB/año + **842 h de núcleo/año** vs 6,6 MB/año |
+| **E** · cara a cara | Ninguna de las dos ahora; si una, la estilo Filecoin y por el cliente ligero | **PLAUSIBLE** | — |
+| **H** · veredicto | **Ninguna de las dos como capa de finalidad.** Reformular la estilo Filecoin como capa de cliente ligero | **PLAUSIBLE** | riesgo hoy **7,1e-36 a 30 min** con `α=0,33` |
+| — | Validación empírica del paper sobre datos de Bitcoin (`p̂ = 0,2606`) | **LAGUNA** | haría falta la serie de sellos de Bitcoin 2017-2018; no está en local y no afecta a ninguna conclusión |
+| — | Que ZEROX herede el KZG de Autonomys (base de F.5) | **LAGUNA** | R-FIN-14(c) cita la función que lo contiene, pero no hay regla `C-XXX` que fije el esquema de archivado |
+| — | GossiPBFT de F3, no leído | **LAGUNA** | la otra propuesta ya lo declara (§7); no se ha portado ni leído |
+
+## Errores propios
+
+1. **`bls = 48 + (k+7)//8` en `verif_quorum_soluciones.py` (mío, cálculo de partida).** Un mapa de
+   bits necesita un registro ordenado de firmantes, y el quórum de soluciones no lo tiene. El coste
+   real es **40 B por voto** en HotPoW (Tabla A.1 reproducida) y **484 B por voto** en PoAS.
+   *Qué cambió:* el certificado pasa de «< 60 B» a **31 kB** con `k=64`, y el punto F pasa de detalle
+   a argumento decisivo.
+2. **Leer `POA(64) = 1,3e-12` como probabilidad de fallo del gadget (mío).** Es la probabilidad de
+   ambigüedad **en el instante `t̄`**, condicionada a excluir PoW-1 y PoW-2 por hipótesis, y a los
+   `2·t̄` ya vale 0,51. *Qué cambió:* la comparación «1,3e-12 frente a 7,1e-36» no era una
+   comparación; hubo que rehacer el análisis con un modelo de ventana que sí depende de `α`.
+3. **D.6, primera versión (mío, en esta ronda).** Comparé la ventana `W` del gadget con la espera de
+   hoy **como si el certificado sustituyera a la profundidad**, y salió que el gadget ganaba en los
+   objetivos flojos (1e-6 y 1e-12). Está mal: el fallo de modo común no lo divide el quórum, así que
+   el certificado **hereda** `prev(α, d)` y hay que sumar `W` encima. *Qué cambió:* de «el gadget
+   gana en 7 de 12 filas» a «el gadget está estrictamente dominado en las 12». La versión errónea
+   quedó registrada en el propio script.
+4. **`frontera()` devolviendo 49,90 % a `F = 143 s` (mío, en esta ronda).** Es el valor de retorno
+   `hi` cuando no hay cruce, y lo leí como una frontera altísima. No lo es: a ese horizonte
+   `union10(α) = 1` para todo `α`, o sea **no hay frontera**. *Qué cambió:* la fila pasa de «49,9 %»
+   —que habría sido un argumento **a favor** del gadget— a «el certificado no finaliza nada».
+   Añadí la comprobación explícita al instrumento para que no vuelva a pasar.
+5. **Primera versión del simulador de C con bucle por voto.** Daba los mismos números (verificado
+   contra la DP exacta) pero ~50× más lento, y su dimensionado de la ventana `M0` provocaba
+   13,2 millones de rondas rechazadas y vueltas a sortear, lo que **condicionaba la muestra**.
+   *Qué cambió:* nada en los números (la versión final reproduce la DP a ≤ 0,60 IC en las seis
+   configuraciones de control), pero el contador `ronda_ampliada` pasó de 13 214 570 a **0**.
+
+---
+
+## Salida de `AUDITA_SCRIPTS.py`
+
+```
+$ python3 research/scripts/AUDITA_SCRIPTS.py research/scripts/d12-quorum/
+Scripts analizados: 6
+
+======================================================================
+Sospechas totales: 0
+```
+
+**Lectura de cada marca.** No queda ninguna. Hubo cinco en la primera pasada, todas del tipo **T3**
+(«compara consigo mismo»), y las cinco eran comprobaciones de `NaN` escritas como `x == x`
+(`th == th`, `tot_con == tot_con`, `fr == fr`) en `d12_d_parada.py` y `d12_g_frontera_cliente.py`.
+Son correctas en Python, pero el detector tiene razón en marcarlas: `x == x` es indistinguible de una
+tautología accidental. Se sustituyeron por `not np.isnan(...)`, que dice lo que quiere decir, y los
+dos scripts se **volvieron a ejecutar** — con resultados idénticos, que es lo que había que
+comprobar. No hay marcas **T1** (parámetro del atacante muerto): todas las funciones adversariales
+—`p_no_cierra`, `p_atacante_solo`, `censor_dp`, `_rondas_vectorizadas`, `poa` no, que precisamente
+por eso está señalado en B.5— usan `alpha`. No hay **T4**: las tres listas de semillas tienen 12
+elementos (`d12_a_control.py:139`, `d12_c_censura.py:29`, `d12_d_parada.py:32`).
+
+### Contadores de cobertura de rama (los seis scripts)
+
+| Script | Contadores |
+|---|---|
+| `d12_b_composicion.py` | `prev_alpha_{0,10/0,25/0,33/0,40}` = 8 cada uno · `poa` = 8 · `acumula_alpha_*` = 5 cada uno · `region_valida` = 60 · `W_alcanzable` = 81 · `W_no_alcanzable` = 9 |
+| `d12_c_censura.py` | `exito_atacante` = 9 845 129 · `exito_honesto` = 13 194 871 (suma exacta = 23 040 000 rondas) · `ronda_ampliada` = **0** · `dp_resuelta` = 45+ |
+| `d12_d_parada.py` | `no_cierra_a{0,1/0,25/0,33/0,4}` = 23/21/23/23 · `atacante_solo_a*` = 12 cada uno · `apagon_rho{1,0/0,9/0,7/0,5/0,3}` = 3 cada uno · `W_alcanzada` = 12 · `t_hoy_alcanzada` = 12 |
+| `d12_f_certificado.py` | `cert_v1` = 5 · `cert_v2_ed` = 13 · `cert_v2_bls` = 13 · `voto_ed` = 19 · `voto_bls` = 14 |
+| `d12_g_frontera_cliente.py` | siete `frontera_F*` = 1 cada una · `sin_frontera_riesgo_1` = 1 |
+| `d12_a_control.py` | control positivo puro: las ramas son las siete configuraciones de MC y los cinco `k` de la Tabla A.1, todas ejecutadas |
+
+**La rama que distingue A de B sí se ejecuta** en los dos sitios donde importa: en `d12_c_censura.py`
+las dos variantes (`λ_v = 1` y `λ_v = k`) y los cuatro `Δ` recorren las 96 configuraciones con las 12
+semillas; en `d12_b_composicion.py` la región factible se visita 60 veces y la infactible produce
+`W_no_alcanzable` = 9, que son exactamente las tres filas de `α = 0,45` con `δ = 0,267` por los tres
+objetivos.

@@ -9,4 +9,53 @@ G.1 · ¿Toca el gadget la frontera de flujo unico?
 
       Control positivo del instrumento: modelo (c), atacante unico, delta = 0.
       
-            horizonte de finalidad    frontera 1e-10   comentario
+                    horizonte de finalidad                            frontera 1e-10   comentario
+           F = 5,3 h (medido, diseno vivo)                                    46.88%   (19080 s)
+           F = 2 h (provisional, DECIDIDO)                                    44.69%   (7200 s)
+         F = 1 h (candidata de produccion)                                    42.14%   (3600 s)
+      d+W del gadget, alpha=0,33 obj 1e-30                                    42.38%   (3798 s)
+      d+W del gadget, alpha=0,33 obj 1e-12                                    37.79%   (1702 s)
+       d+W del gadget, alpha=0,33 obj 1e-6                                    32.98%   (988 s)
+  solo W (k=64, c=1,5): el gadget 'rapido' SIN FRONTERA (riesgo = 1 para todo alpha)   (143 s)
+
+      -> el control positivo sale: 46,9 % a 5,3 h y 44,6 % a 2 h, los dos numeros publicados.
+      -> y la lectura: si el gadget se usa para ACORTAR el horizonte, la frontera BAJA. Solo es
+         neutro si el certificado llega DESPUES de que prev() ya haya bajado por si sola, que es
+         justo la dominacion de D.6.
+      
+================================================================================================
+G.2 · El cliente ligero: que hace falta para VERIFICAR un certificado
+================================================================================================
+
+      Capa estilo Filecoin (R-FIN-17/21): un certificado son FIRMAS de claves que estan en la
+      TABLA DE PODER, y la tabla de la instancia siguiente va comprometida en el certificado
+      (R-FIN-21). Verificar = comprobar firmas contra una tabla que el propio certificado
+      encadena. NO hace falta la cadena de bloques. Cita del FIP en la propuesta:
+      «Verifying the finality of a tipset from genesis does not require access to the EC chain.»
+
+      Quorum de soluciones: un voto es una PRUEBA DE ESPACIO contra el reto del slot. Verificarlo
+      exige `global_randomness.derive_global_challenge(slot)`
+      (subspace-verification/src/lib.rs:234-236), es decir **la salida del PoT de ese slot**, y
+      el PoT es una cadena AES secuencial cuya verificacion NO ES SUCINTA (catalogo D4:
+      96,1 ms/slot). Ademas exige el `record_commitment` de la historia archivada para el KZG.
+      
+                   que tiene que seguir el cliente       por ano         CPU/ano
+               cabeceras (hoy, sin cliente ligero)      21,50 GB               —
+        certificados de epoca estilo F3 (R-FIN-22)        6,6 MB    despreciable
+                   PoT, obligatorio para el quorum       4.04 GB          842 h
+              + certificados de quorum (k=64, 1/h)      263.1 MB               —
+
+      -> el cliente ligero con quorum de soluciones NO existe: para comprobar un solo voto hay que
+         tener el PoT del slot, y eso son 4,0 GB/ano y ~840 horas de nucleo al ano de verificacion
+         secuencial. **La propiedad de autoverificacion desde genesis se la da a F3 exactamente la
+         TABLA DE PODER que el quorum presume no necesitar.**
+      
+COBERTURA DE RAMA
+  frontera_F143           1
+  frontera_F1702          1
+  frontera_F19080         1
+  frontera_F3600          1
+  frontera_F3798          1
+  frontera_F7200          1
+  frontera_F988           1
+  sin_frontera_riesgo_1   1

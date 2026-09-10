@@ -10,6 +10,8 @@ G.2  ¿Toca el cliente ligero? Se compara lo que hace falta para VERIFICAR un ce
      dos propuestas, y de ahi el coste anual del cliente.
 """
 import sys
+from concurrent.futures import ProcessPoolExecutor
+
 import numpy as np
 
 sys.path.insert(0, "research/scripts/d9-ronda9a")
@@ -23,6 +25,13 @@ def cuenta(r):
     COBERTURA[r] = COBERTURA.get(r, 0) + 1
 
 
+def frontera_con_F_cob(F_seg):
+    """Envoltorio para el pool: devuelve tambien los contadores de rama del subproceso."""
+    COBERTURA.clear()
+    fr = frontera_con_F(F_seg)
+    return fr, dict(COBERTURA)
+
+
 def frontera_con_F(F_seg, hf=lambda a: 1.0):
     """Frontera de flujo unico con otro horizonte de finalidad. NO reescribe el instrumento:
     sustituye la constante global que `union10()` lee."""
@@ -30,6 +39,11 @@ def frontera_con_F(F_seg, hf=lambda a: 1.0):
     R.F_SEG = float(F_seg)
     try:
         cuenta(f"frontera_F{int(F_seg)}")
+        # el `frontera()` de D9-9a devuelve `hi` (0,499) cuando NO hay cruce, que ocurre en dos
+        # casos opuestos. Se distinguen aqui para no leer un artefacto como una frontera alta.
+        if R.union10(0.05, hf(0.05)) >= 1e-10:
+            cuenta("sin_frontera_riesgo_1")
+            return float("nan")
         return R.frontera(hf)
     finally:
         R.F_SEG = viejo
@@ -47,7 +61,7 @@ if __name__ == "__main__":
 
       Control positivo del instrumento: modelo (c), atacante unico, delta = 0.
       """)
-    print(f"{'horizonte de finalidad':>34}{'frontera 1e-10':>18}   comentario")
+    print(f"{'horizonte de finalidad':>42}{'frontera 1e-10':>42}   comentario")
     casos = [
         (5.3 * 3600, "F = 5,3 h (medido, diseno vivo)"),
         (2.0 * 3600, "F = 2 h (provisional, DECIDIDO)"),
@@ -57,9 +71,15 @@ if __name__ == "__main__":
         (988.0, "d+W del gadget, alpha=0,33 obj 1e-6"),
         (143.3, "solo W (k=64, c=1,5): el gadget 'rapido'"),
     ]
-    for F, nombre in casos:
-        fr = frontera_con_F(F)
-        print(f"{nombre:>34}{fr:>17.2%}   ({F:.0f} s)")
+    with ProcessPoolExecutor(max_workers=min(len(casos), 16)) as ex:
+        res = list(ex.map(frontera_con_F_cob, [c[0] for c in casos]))
+    fronteras = [r[0] for r in res]
+    for r in res:
+        for kk, vv in r[1].items():
+            COBERTURA[kk] = COBERTURA.get(kk, 0) + vv
+    for (F, nombre), fr in zip(casos, fronteras):
+        txt = f"{fr:.2%}" if not np.isnan(fr) else "SIN FRONTERA (riesgo = 1 para todo alpha)"
+        print(f"{nombre:>42}{txt:>42}   ({F:.0f} s)")
     print("""
       -> el control positivo sale: 46,9 % a 5,3 h y 44,6 % a 2 h, los dos numeros publicados.
       -> y la lectura: si el gadget se usa para ACORTAR el horizonte, la frontera BAJA. Solo es

@@ -220,11 +220,11 @@ if __name__ == "__main__":
                         b_ = m_
                 Wg = b_
                 cuenta("W_alcanzada")
-            tot_con = th + Wg if (th == th and np.isfinite(Wg)) else float("nan")
-            print(f"{alpha:>7.2f}{obj:>12.0e}{(f'{th:.0f}' if th == th else '>40000'):>18}"
+            tot_con = th + Wg if (not np.isnan(th) and np.isfinite(Wg)) else float("nan")
+            print(f"{alpha:>7.2f}{obj:>12.0e}{(f'{th:.0f}' if not np.isnan(th) else '>40000'):>18}"
                   f"{(f'{Wg:.0f}' if np.isfinite(Wg) else '—'):>19}"
-                  f"{(f'{tot_con:.0f}' if tot_con == tot_con else '—'):>19}"
-                  f"{(f'{th:.0f}' if th == th else '>40000'):>19}"
+                  f"{(f'{tot_con:.0f}' if not np.isnan(tot_con) else '—'):>19}"
+                  f"{(f'{th:.0f}' if not np.isnan(th) else '>40000'):>19}"
                   f"{(f'+{Wg:.0f} s' if np.isfinite(Wg) else '—'):>14}")
 
     print("""
