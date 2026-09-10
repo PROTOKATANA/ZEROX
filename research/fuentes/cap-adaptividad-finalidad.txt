@@ -1,0 +1,1623 @@
+Blockchain CAP Theorem Allows
+User-Dependent Adaptivity and Finality
+Suryanarayana Sankagiri1⋆, Xuechao Wang1⋆, Sreeram Kannan 2, and Pramod
+Viswanath1
+1 University of Illinois, Urbana-Champaign IL 61801
+2 University of Washington at Seattle, WA
+Abstract. Longest-chain blockchain protocols, such as Bitcoin, guar-
+antee liveness even when the number of actively participating users is
+variable, i.e., they are adaptive. However, they are not safe under net-
+work partitions, i.e., they do not guarantee ﬁnality. On the other hand,
+classical blockchain protocols, like PBFT, achieve ﬁnality but not adap-
+tivity. Indeed, the CAP theorem in the context of blockchains asserts
+that no protocol can simultaneously oﬀer both adaptivity and ﬁnality.
+We propose a new blockchain protocol, called the checkpointed longest
+chain, that oﬀers individual users the choice between ﬁnality and adap-
+tivity instead of imposing it at a system-wide level. This protocol’s salient
+feature is that it supports two distinct conﬁrmation rules: one that guar-
+antees adaptivity and the other ﬁnality. The more optimistic adaptive
+rule always conﬁrms blocks that are marked as ﬁnalized by the more
+conservative rule, and may possibly conﬁrm more blocks during variable
+participation levels. Clients (users) make a local choice between the con-
+ﬁrmation rules as per their personal preference, while miners follow a
+ﬁxed block proposal rule that is consistent with both conﬁrmation rules.
+The proposed protocol has the additional beneﬁt of intrinsic validity: the
+ﬁnalized blocks always lie on a single blockchain, and therefore miners
+can attest to the validity of transactions while proposing blocks. Our
+protocol builds on the notion of a ﬁnality gadget, a popular technique
+for adding ﬁnality to longest-chain protocols.
+1 Introduction
+The longest-chain protocol, introduced by Nakamoto in Bitcoin [18], is the pro-
+totypical example of a blockchain protocol that operates in a permissionless
+setting. Put diﬀerently, the longest-chain protocol is adaptive: it remain safe and
+live irrespective of the number of active participants (nodes) in the system, as
+long as the fraction of adversarial nodes among the active ones is less than a
+half. Adaptivity (also known as dynamic availability) is a desirable property in
+a highly decentralized system such as a cryptocurrency. The downside of this
+protocol is that they are insecure during prolonged periods of network partition
+⋆ The ﬁrst two authors contributed equally to this work.
+arXiv:2010.13711v2  [cs.CR]  2 Apr 2021
+2 S. Sankagiri et al.
+(asynchrony). This is unavoidable; miners in disconnected portions of the net-
+work keep extending their blockchains separately, unaware of the other chains.
+When synchrony resumes, one of the chains wins, which implies that blocks on
+the other chains get unconﬁrmed. These features are present not just in the
+longest-chain protocol, but also in other protocols that are derived from it, e.g.,
+Prism [1].
+In stark contrast, committee-based consensus protocols like PBFT [4] and
+Hotstuﬀ [25] oﬀer strong ﬁnality guarantees. These protocols remain safe even
+during periods of asynchrony, and regain liveness when synchrony resumes. Fi-
+nality is also a desirable property for blockchains, as they may operate under
+conditions where synchrony cannot be guaranteed at all times. However, all
+ﬁnality-guaranteeing protocols come with a caveat: they are built for the per-
+missioned setting. These protocols make progress only when enough number of
+votes have been accrued for each block. If a signiﬁcant fraction of nodes become
+inactive (go oﬄine), the protocol stalls completely. This prevents them from
+being adaptive.
+We posit that the two disparate class of protocols is a consequence of the
+CAP theorem, a famous impossibility result in distributed systems. The theorem
+states that in the presence of a network partition, a distributed system cannot
+guarantee both consistency (safety) and availability (liveness) [13, 14]. The the-
+orem has led to a classiﬁcation of system designs, on the basis of whether they
+favor liveness or safety during network partitions. Blockchains, being distributed
+systems, inherit the trade-oﬀs implicated by the CAP theorem. In particular, we
+see that the longest-chain class of protocols favor liveness while the committee-
+based protocols favor safety.
+Recently, Lewis-Pye and Roughgarden [16] prove a CAP theorem for block-
+chains that highlights the adaptivity-ﬁnality trade-oﬀ explicitly. They show that
+“a fundamental dichotomy holds between protocols (such as Bitcoin) that are
+adaptive, in the sense that they can function given unpredictable levels of par-
+ticipation, and protocols (such as Algorand) that have certain ﬁnality proper-
+ties”. The essence of this impossibility result is the following: it is diﬃcult to
+distinguish network asynchrony from a reduced number of participants in the
+blockchain system. Therefore, a protocol is bound to behave similarly under
+both these conditions. In particular, adaptive protocols must continue to extend
+blockchains during asynchrony (thereby compromising ﬁnality), while ﬁnality-
+guaranteeing protocols must stall under reduced participation (which means they
+cannot have adaptivity).
+In this paper, we investigate whether the aforementioned trade-oﬀ between
+adaptivity and ﬁnality can be resolved at a user level, rather than at a system-
+wide level. In particular, we seek to build a blockchain system wherein all (hon-
+est) nodes follow a common block proposing mechanism, but diﬀerent nodes can
+choose between two diﬀerent conﬁrmation rules . Under appropriate bounds on
+adversarial participation, one rule must guarantee adaptivity, while the other
+must guarantee ﬁnality. When the system is operating under desirable condi-
+tions, i.e., a large enough fraction of nodes are active and the network is syn-
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 3
+chronous, the blocks conﬁrmed by both rules must coincide. Protocols with such
+a dual-conﬁrmation rule (aka dual-ledger) design are termed as “Ebb-and-ﬂow”
+protocols in [19]. Such a design would be of interest in blockchains for many rea-
+sons. For example, for low-value transactions such as buying a coﬀee, a node may
+prefer liveness over safety, whereas for high-value transactions, it is natural to
+choose safety over liveness. Moreover, such a trade-oﬀ allows each node to make
+their own assumptions about the state of the network and choose a conﬁrmation
+rule appropriately.
+At a high level, we are inspired in our formulation from analogous designs
+to adapt the CAP theorem in practical distributed system settings (Section 4
+of [14]). More concretely, dual-ledger designs do not fall under the purview of
+the CAP theorem of [16]; the formulation assumes a single conﬁrmation rule.
+A second motivation is that a variety of ﬁnality gadgets (in combination with
+a blockchain protocol) may also be viewed as providing a user-dependent dual
+ledger option. We elaborate on some recent proposals in [10,15,24] in §2.
+1.1 Our contributions
+Our main contribution is to propose a new protocol, called the checkpointed
+longest chain protocol, which oﬀers each node in the same blockchain system a
+choice between two diﬀerent conﬁrmation rules that have diﬀerent adaptivity-
+ﬁnality trade-oﬀs.
+– Block Proposal . Just as in the longest chain protocol, honest miners build
+new blocks by extending the chain that they currently hold. In addition, some
+honest users participate in a separate checkpointing protocol, that marks
+certain blocks as checkpoints at regular intervals. An honest user adopts the
+longest chain that contains the latest checkpoint .
+– Conﬁrmation rules . The protocol’s adaptivity-guaranteeing conﬁrmation
+rule is simply the k-deep rule. An honest user conﬁrms a block if it sees
+k blocks below it, for an appropriate choice of k. The protocol’s ﬁnality-
+guaranteeing rule is for honest users to treat all blocks in its chain up to the
+last checkpointed block as conﬁrmed.
+The protocol is designed such that new blocks continue to be mined at increasing
+heights even if the participation level is low, but new checkpoints appear only
+if there is suﬃcient participation. This illustrates the adaptivity-guaranteeing
+property of the k-deep rule. On the other hand, checkpoints are guaranteed to
+be on a single chain irrespective of network conditions, while the longest chain
+containing the latest checkpoint may keep alternating between divergent chains.
+This implies the ﬁnality property of the checkpointing rule.
+Below, we highlight the key design principles of our protocol, followed by the
+security guarantees.
+Validity of Blockchains Our protocol keeps intact the intrinsic validity of
+blockchains. Roughly, validity means that the set of blocks that are conﬁrmed all
+4 S. Sankagiri et al.
+lie on a single, monotonically increasing chain. Thus, the validity of a transaction
+can be inferred from just the blockchain leading up to the particular block. More
+precisely, an honest user that is constructing the block has the assurance that if
+the block is conﬁrmed, all transactions in the block are conﬁrmed, which means
+it accrues all the transaction rewards. Moreover, a user can infer that a certain
+transaction is conﬁrmed simply by knowing that the transaction was included in
+a particular block and that the block was conﬁrmed (as per either rule), without
+knowledge of the contents of other blocks. These properties are recognized to
+be important for the blockchain to be incentive-compatible and to enable light
+clients respectively. Further, validity of blockchains oﬀers spam-resistance and
+is compatible with existing sharding designs. Although validity of blockchains is
+a common feature of a majority of protocols, recent high performance designs
+crucially decouple validation from consensus [1, 11]. The Snap-and-Chat design
+of [19] for the same problem also does not have this feature.
+Fig. 1. The Checkpointed Longest Chain
+Interaction between Checkpointing and Longest Chain Protocol In our
+design, the longest chain rule (i.e., the block proposal rule) and the checkpointing
+rule satisfy some constraints with respect to each other. The interlocking struc-
+ture of constraints between the checkpointing protocol and the longest chain
+protocol is illustrated in Figure 1.1 and detailed below.
+– P1: Consistency with previous checkpoints. The sequence of check-
+points must be on a chain. This places a self-consistency condition on the
+checkpointing protocol.
+– P2: Checkpointed longest chain rule. The longest chain protocol respect
+the previous checkpoints. Honest users build adopt the longest chain that
+contains the latest checkpoint and mine new blocks at the tip of this chain.
+– P3: Checkpoints are deep enough. The checkpointing protocol should
+only checkpoint blocks that are suﬃciently deep in some honestly held chain.
+Furthermore, such a chain should be made available along with the check-
+point message.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 5
+All these three conditions are required to achieve our goals. Condition P1
+is a requisite for a validity preserving protocol (in particular, a validity preserv-
+ing, ﬁnality-guaranteeing conﬁrmation rule). The condition P2 says that honest
+nodes should adopt the longest checkpointed chain, rather than the longest chain.
+Given P1, the condition P2 is required to ensure new checkpoints are produced
+after a period of asynchrony. Without this condition P2, the block proposal rule
+is simply the longest chain rule. During asynchrony, the longest chain may be
+one that does not include some of the checkpoints, and there is no correction
+mechanism to ever bring the longest chain downstream of the last checkpoint.
+Condition P3 ensures that during synchrony, any block that is eventually check-
+pointed would be a part of all honestly held chains. Thus, the dynamics of the
+protocol would be as if nodes are simply following the longest chain rule, and
+the known security guarantees would apply. If no such condition is placed, the
+checkpointing protocol could checkpoint an arbitrary block that possibly forks
+from the main chain by a large margin. The rule P2 would force honest nodes
+to switch to this fork, thereby violating safety of the k-deep rule.
+The Checkpointing Protocol The checkpointing protocol in our design is
+a BFT consensus protocol. It is a slight modiﬁcation of Algorand BA, that
+is presented in [6]. The protocol is extended from a single-iteration byzantine
+agreement protocol to a multi-iteration checkpointing protocol. In each itera-
+tion, nodes run the checkpointing protocol to checkpoint a new block, and P1
+guarantees that the sequence of checkpoints lie on a single chain. Coupled with
+the chain adoption rule (longest checkpointed chain), these checkpoints oﬀer
+deterministic ﬁnality and safety against network partitions.
+We state the safety guarantee of the checkpointing protocol as a basic check-
+pointing property (CP) as below:
+– CP0: Safety. All honest users checkpoint the same block in one iteration of
+the checkpointing protocol, even during network partition. This checkpoint
+lies on the same chain as all previous checkpoints.
+While one might consider diﬀerent protocols for the checkpointing mecha-
+nism, the protocol must further satisfy some key properties during periods of
+synchrony.
+– CP1: Recency condition. If a new block is checkpointed at some time, it
+must have been in a chain held by an honest user at some point in the recent
+past.
+– CP2: Gap in checkpoints. The interval between successive checkpoints
+must be large enough to allow CP1 to hold.
+– CP3: Conditional liveness. If all honest nodes hold chains that have
+a common preﬁx (all but the last few blocks are common), then a new
+checkpoint will appear within a certain bounded time (i.e., there is an upper
+bound on the interval between two successive checkpoints).
+6 S. Sankagiri et al.
+CP1 helps in bounding the extent to which an honest user may have to
+drop honest blocks in its chain when it adopts a new checkpoint. Without this
+condition, (i.e., if arbitrarily old checkpoints can be issued), honest users may
+have to let go of many honestly mined blocks. This causes a loss in mining power,
+which we refer to asbleeding. Our choice of Algorand BA was made because it has
+this property. Other natural candidates such as PBFT [4] and HotStuﬀ [25], do
+not have this property. We discuss this in detail in Appendix D. CP2 ensures
+that the loss in honest mining power due to the above mechanism is limited.
+This condition can be incorporated by design. CP3 is a liveness property of the
+checkpointing protocol. It ensures new checkpoints appear at frequent intervals,
+leading to liveness of the ﬁnality-guaranteeing conﬁrmation rule.
+Security Guarantees (Informal) We show the following guarantees for proof-
+of-work longest chain along with Algorand BA (augmented with the appropriate
+validity condition).
+1. The k-deep rule is safe and live if the network is synchronous from the
+beginning and the fraction of adversaries among online users is less than a
+half.
+2. The checkpointing protocol, which is safe by design, is also live soon after
+the network partition is healed under the partially synchronous model.
+3. The ledger from the checkpoint rule is a preﬁx of the ledger from the k-deep
+rule from the point of view of any user.
+Proof Technique We prove these security guarantees using the following strat-
+egy. First, we show that if all honest users hold chains that obey the k-common
+preﬁx condition for an extended period of time, then new blocks get checkpointed
+at regular intervals, and these blocks are part of the common preﬁx of the hon-
+estly held chains. This tells us that under conditions in which the vanilla longest
+chain rule is secure, the checkpointed longest chain rule has exactly the same
+dynamics. It therefore inherits the same security properties of the longest chain
+rule. Secondly, we show that once suﬃcient time has passed after a network
+partition is healed, the chains held by the honest user under the checkpointed
+longest chain rule are guaranteed to have the common preﬁx property. Coupled
+with the ﬁrst result, we infer that new checkpoints will eventually be conﬁrmed
+thereby proving liveness of the checkpoint-based conﬁrmation rule under partial
+synchrony.
+Outline We review related works in §2 and place our results in the context
+of several recent works on the same topic as this paper. The similarities and
+diﬀerences in the techniques in our work with closely related works is pictorially
+illustrated in Figure 2. We state our network and security models formally in §3.
+In §4, we describe the checkpointed longest chain protocol, highlighting the roles
+of the miners and precisely stating the two conﬁrmation rules. For clarity, we
+describe the checkpointing protocol as a black box with certain properties here;
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 7
+we give the full protocol in Appendix A. We state our main theorem, concerning
+the security guarantees of our protocol, in §5. In the rest of the section, we give
+a proof sketch of the theorem. The formal proofs are given in Appendices B and
+C. We conclude the paper with a discussion and pointers for future work in §6.
+2 Related Work
+CAP Theorem The formal connection between the CAP theorem to block-
+chains is recently made in [16], by providing an abstract framework in which a
+wide class of blockchain protocols can be placed, including longest chain proto-
+cols (both Proof-of-Work based [12] and PoS based, e.g., [8]) as well as BFT-
+style protocols (e.g., [7]). The main result of [16] says that a protocol (containing
+a block “encoding” procedure and a block conﬁrmation rule) which is adaptive
+(i.e., which remains live in an unsized setting) cannot oﬀer ﬁnality (i.e., determin-
+istic safety, even under arbitrary network conditions) and vice-versa. However,
+the same paper is mute on the topic of whether diﬀerent block conﬁrmation rules
+could oﬀer diﬀerent guarantees, which is the entire focus of this work. We are
+inspired in our formulation from analogous designs to adapt the CAP theorem
+in practical distributed system settings (Section 4 of [14]).
+User-Dependent Conﬁrmation Rules The idea of giving users the option of
+choosing their own conﬁrmation rule, based on their beliefs about the network
+conditions and desired security level was pioneered by Nakamoto themself, via
+choosing the value ofk in thek-deep conﬁrmation rule. A recent work [17] allows
+users the option of choosing between partially synchronous conﬁrmation rule and
+a synchronous one. However, neither of the conﬁrmation rules are adaptive, as
+the block proposal rule itself is a committee-based one and cannot make progress
+once the participation is below a required level. Therefore, they do not “break”
+the CAP theorem as proposed in [16]. In contrast, our protocol oﬀers users the
+choice of an adaptive system.
+Hybrid Consensus Hybrid consensus [21] is a diﬀerent technique of incorpo-
+rating a BFT protocol into the longest-chain protocol. In a nutshell, the idea in
+this design is to use the longest-chain protocol to randomly select a committee,
+which then executes a BFT protocol to conﬁrm blocks. The committee consists
+of the miners of the blocks on the longest chain over a shifting interval of constant
+size, and is thus re-elected periodically. Hybrid consensus addresses the problem
+of building a responsive protocol (i.e., latency proportional to network delay) in
+a PoW setting. It does not, however, address the adaptivity-ﬁnality dilemma. In
+fact, as we illustrate here, the protocol oﬀers neither adaptivity nor ﬁnality. Once
+a miner is elected as a committee member, it is obliged to stay active until the
+period of its committee is over, which compromises on the adaptivity property.
+As for ﬁnality, although the blocks are conﬁrmed by a ﬁnality-based protocol,
+the committee election mechanism compromises the ﬁnality guarantee. During
+asynchrony, nodes cannot achieve consensus on who belongs to the committee,
+and thus the whole protocol loses safety.
+8 S. Sankagiri et al.
+Fig. 2. Four related works in our framework (counterclockwise): In Ebb-and-Flow [19],
+previous checkpoints are not respected by either the longest chain protocol or the
+checkpointing protocol. Hence checkpoints may not form a single chain and the ﬁnal
+ledger is constructed by sanitization, which makes it impossible to have validation be-
+fore block proposal. Afgjort [10] takes an oﬀ-the-shelf longest chain protocol and keeps
+checkpointing blocks on it. Due to lack of interaction between the longest chain pro-
+tocol and the checkpointing protocol, the protocol may fail in a partially synchronous
+setting when the security of the blockchain is broken. The Checkpointed Ledger [15]
+and GRANDPA [24] are very similar to our design; the diﬀerence is that the check-
+points don’t need to be buried deep enough in the longest chain. This minor change
+makes their protocols become insecure under the variable participation setting.
+Checkpointing is a protocol run on top of the longest chain protocol (run by
+largely honest parties) that deterministically marks certain blocks as ﬁnalized;
+a simple form of checkpointing was pioneered, and maintained until 2014, by
+Satoshi Nakamoto (presumably honest). In the context of our work, checkpoint-
+ing provides ﬁnality (essentially by ﬁat) while the longest chain rule ensures
+adaptivity. We can interpret our paper as an attempt to provide appropriate
+conditions on the interaction between the checkpointing and the longest chain
+protocol, and also to show how to realize such checkpointing in a distributed
+manner. We note that [15] is a recent work that studies the checkpointed ledger
+when the longest-chain protocol has super-majority adversaries; this regime is
+diﬀerent from that studied in the present paper, where we assume that the
+longest-chain protocol has majority honest and the checkpointing protocol has
+2/3 honest users. For completeness, we have included the architecture of check-
+pointed ledger in the comparison in Figure 2.
+Casper FFG and Gasper Casper FFG ( Casper: the Friendly Finality Gad-
+get), presented in [2], pioneered the study of ﬁnality gadgets. Casper FFG also
+introduced the notion of “economic security”. The ﬁnality gadget allows cryp-
+tographic proofs of malicious behavior which can be used to disincentivize such
+behavior. We do not explore this aspect of ﬁnality gadgets in our paper. Casper
+FFG, as presented in [2], is not a completely speciﬁed protocol. A recent follow-
+up paper called Gasper [3] provides a complete protocol. Gasper can be viewed
+as a checkpointed longest chain protocol, with the longest chain rule replaced by
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 9
+the Latest Message Driven Greediest Heaviest Observed Subtree (LMD GHOST)
+rule and the checkpointing protocol being Casper FFG. Gasper does not provide
+formal security guarantees; in fact, the work by Neu et al. [19] shows a liveness
+attack on Gasper.
+Afgjort Afgjort [10] is a recent ﬁnality gadget proposed by Dinsdale et al., which
+formally describes the desirable properties that a ﬁnality gadget must have, some
+of them are similar to the ones we require as well. Afgjort has a two-layer design:
+it takes an oﬀ-the-shelf longest chain protocol and adds a ﬁnality layer to it. Such
+a system can work as desired when the network is synchronous, including when
+the participation levels are variable. However, it is destined to fail in one of two
+ways in a partially synchronous setting: either the ﬁnality gadget stops ﬁnalizing
+new blocks (i.e., violates liveness), or it ﬁnalizes “conﬂicting” blocks, i.e., blocks
+in two diﬀerent chains (i.e., violates validity). Thus Afgjort does not provide the
+guarantees we seek in this work. More generally, any layer-two ﬁnality gadget on
+top of an adaptive protocol would not meet the desired objectives for the same
+reason; they would be missing rule P2 (see Figure 2).
+GRANDPA GRANDPA [24] is another recent ﬁnality gadget, proposed by
+Stewart et al. Just as in our protocol (and unlike Afgjort), GRANDPA alters
+the underlying block production mechanism to respect blocks that has been
+ﬁnalized by the ﬁnality gadget. GRANDPA’s security relies on the assumption
+that the block-production mechanism (longest-chain rule/GHOST) provides a
+type of “conditional eventual consensus”. I.e., If nodes keep building on the
+last ﬁnalized block and don’t ﬁnalize any new blocks, then eventually they have
+consensus on a longer chain. This argument, though presumably true, is not
+a rigorous security analysis; in our work, we prove security for a completely
+speciﬁed model and protocol.
+More importantly, comparing Figures 1.1 and 2, we see that GRANDPA does
+not have property P3. This leads to a security vulnerability in the variable par-
+ticipation setting. The issue arises due to the following subtlety: in the variable
+participation setting, a particular block could be ‘locked’ onto by the check-
+pointing protocol, but could be checkpointed much later (this does not happen
+under full participation). A block at the tip of the longest chain could soon be
+displaced from it by the adversary. If this block is locked while it is on the chain,
+but checkpointed only when it is out of the chain, the safety of the k-deep rule
+will be violated. A more detailed description of this attack is given in Appendix
+D.
+Snap-and-Chat protocols A concurrent work by Neu et al. [19] also solves
+the adaptivity vs ﬁnality dilemma posed by the CAP theorem. (Their work
+appeared online a few weeks prior to ours). They introduce a technique, called
+Snap-and-Chat, to combine a longest chain protocol with any BFT-style one
+to obtain a protocol that has the properties we desire. More speciﬁcally, their
+protocol produces two diﬀerent ledgers (ordered list of transactions), one that
+oﬀers adaptivity and the other that oﬀers ﬁnality. A user can choose to pick
+either one, depending on its belief about the network condition. These ledgers
+are proven to be consistent with each other (the ﬁnality guaranteeing ledger is a
+10 S. Sankagiri et al.
+preﬁx of the adaptive one). While the outcomes of the design of [19] are analogous
+to ours, the approach adopted and the resulting blockchain protocol are quite
+diﬀerent. A major advantage of the approach of [19] is its generality: unlike
+other existing approaches, it oﬀers a blackbox construction and proof which
+can be used to combine a variety of adaptive and ﬁnality preserving protocols.
+However, the design of [19] has an important caveat: the sequence of blocks that
+are conﬁrmed in their protocol do not necessarily form a single chain. Indeed,
+in the partially synchronous setting, the ﬁnality-guaranteeing conﬁrmation rule
+can ﬁnalize blocks on two diﬀerent forks one after the other. The design of [19]
+overcomes this apparent issue by constructing a ledger after the blocks have been
+ﬁnalized, and “sanitizing” it at a later step.
+The sanitization step implies that not all transactions in a conﬁrmed block
+may be part of the ledger: for example, if it is a double spend relative to a
+transaction occurring earlier in the ledger, such transaction will be removed.
+Put diﬀerently, the validity of a particular transaction in a particular block is
+decided only once the block is conﬁrmed, and not when the block is proposed.
+Most practical blockchain systems are designed with coupled validation, i.e., an
+honest block proposer can ensure that blocks contain only valid transactions.
+Our approach maintains coupled validity of blockchains and does not have this
+shortcoming, as highlighted in Section §1.
+3 Security Model
+Environment. A blockchain protocol Π is directed by an environmentZ(1κ),
+where κ is the security parameter, i.e., the length of the hash function output.
+This environment (i) initiates a set of participating nodes N ; (ii) manages a
+public-key infrastructure (PKI) and assigns each node with a unique crypto-
+graphic identity; (iii) manages nodes through an adversary A which corrupts a
+subset of nodes before the protocol execution starts; (iv) manages all accesses of
+each node from/to the environment including broadcasting and receiving mes-
+sages.
+Network model. The nodes’ individual timers do not need to be synchronized
+or almost synchronized. We only require they have the same speed. In our net-
+work, we have a variety of messages, including blocks, votes, etc. The following
+message delay bounds apply to all messages. Secondly, all messages sent by hon-
+est nodes are broadcast messages. Thirdly, all honest nodes re-broadcast any
+message they have heard. The adversary does not suﬀer any message delay. In
+general, we assume that the adversary controls the order of delivery of messages,
+but the end-to-end network delay between any two honest nodes is subject to
+some further constraints that are speciﬁed below. We operate under either one
+of the two settings speciﬁed below:
+– M1 (Partial synchrony model): A global stabilization time, GST, is cho-
+sen by the adversary, unknown to the honest nodes and also to the protocol
+designer. Before GST, the adversary can delay messages arbitrarily. After
+GST, all messages sent between honest nodes are delivered within ∆ time.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 11
+Moreover, messages sent by honest nodes before GST are also delivered by
+GST + ∆.
+– M2 (Synchrony model): All messages sent from one honest node to an-
+other are delivered within ∆ time.
+Participation model. We introduce the notion of sized/unsized number of
+nodes to capture the notion that node network activity (online or oﬄine) varies
+over time. It is important to note that we allow for adversarial nodes to go oﬄine
+as well. A node can come online and go oﬄine at any time during the protocol.
+An online honest node always executes the protocol faithfully. An oﬄine node, be
+it honest or adversarial, does not send any messages. Messages that are scheduled
+to be delivered during the time when the node is oﬄine are delivered immediately
+after the node comes online again. We consider two diﬀerent scenarios:
+– U1 (Sized setting): All nodes stay online at all times.
+– U2 (Unsized setting): Nodes can come online and oﬄine at arbitrary
+times, at the discretion of the adversary, provided a certain minimal number
+of nodes stay online.
+Abstract protocol model. We describe here our protocol in the abstract
+framework that was developed in [16]. In this framework, a blockchain protocol
+is speciﬁed as a tuple Π = (I,O,C ), where I denotes the instruction set , O is
+an oracle that abstracts out the leader election process, and C is a conﬁrmation
+rule (e.g., the k-deep conﬁrmation rule). The bounds on adversarial ratios are
+also speciﬁed through O. The rationale for adopting this framework is to point
+out precisely how we circumvent the CAP theorem for blockchains, which is the
+main result of [16].
+The theorem states that no protocol Π = (I,O,C ) can simultaneously of-
+fer both ﬁnality (safety in the partially synchronous setting) and adaptivity
+(liveness in the unsized setting). Our checkpointed longest chain protocol is a
+4-tuple ΠCLC = (I,O,C 1,C 2), with two conﬁrmation rules C1 and C2. This
+entire protocol can be split at a node level into two protocols: Πﬁn = (I,O,C 1)
+and Πada = (I,O,C 2). The protocol Πﬁn guarantees (deterministic) safety and
+(probabilistic) liveness under network assumption M1 and participation level
+U1, just as many BFT-type consensus protocols do. It therefore guarantees ﬁ-
+nality.Πada guarantees safety and liveness under network assumption M2 and
+participation level U2, just as longest chain protocols do. It thereby guarantees
+adaptivity. Finally, both Πﬁn and Πada are safe and live under conditions M2
+andU1; moreover, the set of blocks conﬁrmed by Πﬁn at any time is a subset of
+those conﬁrmed by Πada. A similar property is proven in [19].
+Each node can choose one of the two conﬁrmation rules according to their
+demands and assumptions. We specify the exact speciﬁcations of I,O,C 1 and
+C2 and the associated security properties in the next section.
+4 Protocol Description
+Nodes in the protocol.In our protocol, letN denote the set of all participating
+nodes. Among these, there are two subsets of participating nodesN1 andN2. We
+12 S. Sankagiri et al.
+call nodes inN1 miners, whose role is to propose new blocks. We call nodes inN2
+checkpointers, whose role is to vote for blocks on the blockchains they currently
+hold and mark them as checkpoints. Note that we allow for any relation among
+these sets, including the possibility that all nodes play both roles ( N1 =N2 =
+N ), or the two kinds of nodes are disjoint (N1∩N 2 =φ). The instruction set I
+and the oracleO is diﬀerent for miners and checkpointers, and is speciﬁed below.
+Note that in the sized/unsized setting, both N1 andN2 are sized/unsized.
+Before we specify the protocol, we introduce some terminology pertaining to
+checkpoints. A checkpoint certiﬁcate is a set of votes from at least 2 /3 of the
+checkpointers for a certain block, that certiﬁes that the block is a checkpoint.
+When an honest node receives both a checkpoint certiﬁcate and a chain that
+contains the block being checkpointed, we say that the honest node has heard
+of a checkpoint. We say that a checkpoint appears at time t if the t is the ﬁrst
+time that an honest node hears of it.
+I for all nodes. Every honest node holds a single blockchain at all times, which
+may be updated upon receiving new messages. They all follow the checkpointed
+longest chain rule, which states that a node selects the longest chain that extends
+the last checkpointed block it has heard of so far. Ties are broken by the adversary.
+To elaborate, a node keeps track of the last checkpoint it has heard of so far.
+If a node receives a longer chain that includes the last checkpoint, it adopts
+the received new chain. A node ignores all chains which do not contain the last
+checkpoint block as per their knowledge.
+I,O for miners. An honest miner adopts the tip of its checkpointed longest
+chain as the parent block. The miner forms a new block with a digest of the
+parent block and all transactions in its buﬀer, and broadcasts it when it is
+chosen as a leader by the oracle. The oracle O chooses miners as leaders at
+random intervals, that can be modeled as a Poisson process with rate λ. This
+joint leader election process can be further split into two independent Poisson
+processes. Let the fraction of online adversarial miners be β <1/2. The honest
+blocks arrive as a Poisson process of rate (1 −β)λ, while the adversarial blocks
+arrive as an independent Poisson process of rate βλ.
+I,O for checkpointers. The checkpointers run a multi-iteration Byzantine
+Agreement (BA) protocol ΠBA to checkpoint blocks, with each iteration check-
+pointing one block. Our protocol is a slight variant of the Algorand BA protocol
+from [6]. The complete protocol is described in Appendix A with a minor mod-
+iﬁcation from Algorand, which is highlighted in red. This modiﬁcation is made
+so as to enable a consistency check across iterations without losing liveness (i.e.,
+to get a multi-iteration BA from a single iteration one).
+Brieﬂy, the protocol works as follows. Each iteration is split into periods.
+Each period has a unique leader chosen by the oracle. Nominally, the values on
+which consensus is to be achieved amongst all checkpointers are the blockchains
+held by the checkpointers. In practice, the values may be the hashes of the
+last block of the blockchain. A key diﬀerence from the Algorand protocol is
+that we allow the checkpointers to change their values at the beginning of each
+period. The checkpointers aim to achieve consensus amongst these values. The
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 13
+ﬁnal chain that has been agreed upon is broadcast to all honest nodes (not
+just checkpointers) together with a certiﬁcate. The block that is exactly k-deep
+in this chain is chosen as the checkpoint block in current iteration. Here, k is
+a parameter of the protocol ΠCLC, and is chosen to be Θ(κ). We call it the
+checkpoint depth parameter.
+Conﬁrmation rules We propose the following two conﬁrmation rules forΠCLC,
+which have diﬀerent security guarantees under diﬀerent assumptions. Either rule
+can be adopted by any node in the protocol
+– C1: Conﬁrm the chain up to the last known checkpoint.
+– C2: Conﬁrm all but the last k′ blocks in the checkpointed longest chain, i.e.,
+in the chain that is currently held, where k′ =Θ(κ)
+Note that every honest node may choose any value of k′ that they wish.
+Intuition behind the checkpointing protocol The checkpointing protocol
+is designed such that under optimistic conditions, a checkpoint is achieved within
+one period. These optimistic conditions are that the leader of a period is honest,
+the network is synchronous, and all chains held by honest checkpointers satisfy
+the common preﬁx property. The sequence of leaders for this protocol is guaran-
+teed to be chosen in an i.i.d. fashion amongst online checkpointers by the oracle
+O. We assume that the fraction of adversarial checkpointers is β′ < 1/3. Thus,
+the probability of selecting an adversarial leader at any round is < 1/3.
+We now state some key properties of the checkpointing protocol. These prop-
+erties, CP0, CP1, CP2, CP3 were introduced in §1 and are elaborated upon
+below.
+– CP0: Safety. All honest nodes checkpoint the same block in one iteration of
+the checkpointing protocol, even during network partition. This checkpoint
+lies on the same chain as all previous checkpoints. This is a safety property
+of the checkpointing protocol, which will be essential in guaranteeing the
+safety of Πﬁn.
+– CP1: Recency condition. If a new block is checkpointed at some time t
+by an honest node for the ﬁrst time, it must have been in a chain held by
+an honest node at some time t′≥t−d. Here, d is the recency parameter of
+the protocol, and is of the order O(√κ∆).
+– CP2: Gap in checkpoints. If a new block is checkpointed at some timet by
+an honest node for the ﬁrst time, then the next iteration of the checkpointing
+protocol (to decide the next checkpoint) will begin at time t +e. Here, e is
+the inter-checkpoint interval and is chosen such that e≫d.
+– CP3: Conditional liveness. If all honest nodes hold chains that are self-
+consistent (they satisfy k-common preﬁx property), during an iteration of
+the checkpointing protocol, then the checkpointing protocol ﬁnishes within
+O(∆) time. Thus, in a period where all honest nodes hold chains that are
+self-consistent, checkpoints appear within e +O(∆) time of each other.
+14 S. Sankagiri et al.
+In Appendix B, we prove that the checkpointing protocol we use (modiﬁed
+Algorand BA) satisﬁes these properties. As such, any protocol that satisﬁesCP0
+- CP3 can be used in our design.
+5 Main Result
+To state the main security result of our protocol, recall the notations set in §3.
+The complete protocol is denoted by ΠCLC = (I,O,C 1,C 2) and its two user-
+dependent variations are Πﬁn = (I,O,C 1) and Πada = (I,O,C 2). We also recall
+the notation M1 , M2 for the partially synchronous and synchronous network
+model, and U1, U2 for the sized and unsized participation models. Clearly, M1
+is a more general setting than M2 and U2 is a more general setting than U1. In
+Theorem 1, a result stated for a general setting also applies to the more restricted
+setting, but not vice-versa. We ﬁrst deﬁne the notion of safety and liveness that
+we use for our protocols.
+Deﬁnition 1 (Safety). A blockchain protocol Π is safe if the set of blocks
+conﬁrmed during the execution is a non-decreasing set. Put diﬀerently, Π is safe
+if a block once conﬁrmed by the conﬁrmation rule remains conﬁrmed for all time
+thereafter.
+Deﬁnition 2 (Liveness). A blockchain protocol Π is live if there exists con-
+stants c,c′ > 0 s.t. the number of new honest blocks conﬁrmed in any interval
+[r,s ] is at least ⌊c(s−r)−c′⌋.
+We now state our main theorem, concerning the safety and liveness of Πﬁn
+and Πada.
+Theorem 1. Assume the fraction of adversarial mining power among total hon-
+est mining power is bounded by β < 1/2. Further, assume the fraction of ad-
+versarial checkpointers is always less than 1/3. Then, the protocol ΠCLC has
+the following security guarantees for an execution that runs for a duration of
+Tmax =O(poly(κ)) time, where κ is the security parameter, :
+– Security of Πﬁn: The protocol Πﬁn is safe, and is live after O(GST +κ)
+time in the setting ( M1, U1), except with probability negligible in κ.
+– Security of Πada: The protocolΠada is safe and live in the setting (M2, U2),
+except with probability negligible in κ.
+– Nested Protocols: At any time t, the set of blocks conﬁrmed by Πada is a
+superset of the set of blocks conﬁrmed by Πﬁn in all settings.
+We provide a proof sketch for Theorem 1 below. A detailed proof is relegated
+to Appendices B and C.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 15
+Fig. 3. Flowchart for proving the security property of Πﬁn under setting (M1, U1)
+Fig. 4. Flowchart for proving the security property of Πada under setting (M2, U2)
+Fig. 5. Flowchart for proving the nesting property of Πﬁn and Πada
+16 S. Sankagiri et al.
+Proof sketch Our proof for Theorem 1 can be split into two parts. First,
+Appendix B, we show that our checkpointing protocol ΠBA satisﬁes the four
+checkpointing properties given in §4, namely CP0, CP1, CP2, CP3 . Then,
+in Appendix C, we show that our complete protocol ΠCLC satisﬁes the desired
+security properties if it uses any sub-protocol for checkpointing that satisﬁes
+the above properties. We ﬁrst highlight some aspects of Theorem 1 that are
+straightforward to deduce, assuming that ΠBA does satisfy the aforementioned
+properties.
+Firstly, the safety of Πﬁn under setting (M1, U1) can be deduced from two
+facts: 1) ( CP0) safety of ΠBA holds under setting (M1 , U1), and 2) ( P1) the
+checkpointed longest chain rule respects all previous checkpoints (see Fig. 3).
+Specially, CP0 of ΠBA ensure that all checkpoints are uniquely decided by
+all honest nodes and they lie on a single chain by P1, while the checkpointed
+longest chain protocol instructs honest nodes to always adopt the longest chain
+with the last checkpoint block. Therefore, an honest node will always keep every
+checkpoint block it has seen forever.
+Secondly, the security of Πada under setting (M2, U2) are deduced by two
+facts: 1) security of pure longest chain rule; 2) ( P3) the checkpointing protocol
+respects the k-deep rule (see Fig. 4). P3 ensures that every checkpoint must be
+at least k-deep in the chain of some honest node when it is decided by ΠBA,
+while a block that is k-deep should remain in the longest chain of all honest
+nodes forever with high probability under synchrony [9,20,23]. Therefore, every
+checkpoint will already be present in all honest nodes’ chains when it appears.
+Thus, the chains held by the nodes of the protocol are indistinguishable from the
+case where they are following the pure longest chain protocol. Given that the
+conﬁrmation rule is also the same for both protocols (k-deep rule),Πada inherits
+the safety and liveness properties of the pure longest chain protocol.
+Thirdly, the nesting property of the conﬁrmed blocks also follow immediately
+by design, given that any checkpointed block must have been already k-deep in
+a node’s chain (P3) and the checkpointed longest chain is deﬁned as the longest
+chain that contains the latest checkpoint ( P2), (see Fig. 5).
+It remains to prove the liveness guarantee of Πﬁn under setting (M1, U1). In
+Appendix B, we evaluate the safety and liveness of our checkpointing protocol
+ΠBA – a modiﬁed version of Algorand BA. We show that it satisﬁes the desired
+checkpointing properties listed in §1. A distinguishing property of ΠBA is the
+recency condition ( CP1). This property states that ΠBA only outputs check-
+points that are recently contained in some honest node’s chain. Without this
+property, the adversary could make all honest nodes waste a long time mining
+on a chain that will never be checkpointed.
+In Appendix C, we prove an important result of Πada under partial syn-
+chronous model: the safety and liveness property will hold after O(GST) time.
+This is essential to guarantee the liveness of Πﬁn as a block can be only check-
+pointed when it lies in the k-common preﬁx of the checkpointed longest chains
+of all honest nodes. Finally, combining all these results (see Fig. 3), we show
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 17
+that Πﬁn is live after O(GST) time with high probability, Thereby completing
+the proof of the main theorem.
+6 Conclusion
+In this paper, we presented the design of a new ﬁnality gadget, to be used with
+Proof-of-Work blockchains. The proposed gadget provides each user a choice
+between an adaptivity guaranteeing conﬁrmation rule and a ﬁnality guarantee-
+ing one. This paper underscores the fact that it is possible to circumvent the
+impossibility result suggested by the CAP theorem by appropriately combining
+the longest-chain protocol with a committee-based BFT protocol. However, this
+paper is only a ﬁrst step towards designing a viable protocol. Several interesting
+directions of research remain open, which we highlight below.
+In our protocol, we used Algorand BA as our checkpointing protocol since
+it satisﬁes properties CP0-CP3. Other natural candidates, such as PBFT [4],
+Hotstuﬀ [25] and Streamlet [5] do not satisfy these properties. In particular, they
+do not satisfy the recency condition CP1 (we elaborate on this in Appendix D).
+It would be interesting to see whether these conditions are necessary, or merely
+required for the proof. In the latter case, many more BFT protocols could be
+used for checkpointing.
+We have shown that our protocol is essentially a ﬁnality gadget, just as
+Afgjort [10], GRANDPA [24] and Gasper [3]. Through Figure 2, it we have shown
+how some of these protocols could be tweaked to enhance their functionality to
+the level of the protocol we have designed. Formally analyzing the security of
+GRANDPA, and tweaking Gasper to make it secure (with a formal proof) are
+interesting open problems that could be tackled using the tools of this paper.
+Finality gadgets/checkpointing could potentially oﬀer many more proper-
+ties. For example, they could protect against a dishonest mining majority, as
+shown in [15]. They could potentially also be used to have lower latency, and
+even responsive conﬁrmation of blocks. Designing a protocol that achieves these
+properties in addition to the ones we show is an exciting design problem. De-
+signing an incentive-compatible ﬁnality gadget also remains an open problem.
+Finally, a system implementation of such protocols could lead to newer consid-
+erations, such as communication complexity, latency, which would pave the way
+for future research.
+7 Acknowledgements
+This research is supported in part by a gift from IOHK Inc., an Army Research
+Oﬃce grant W911NF1810332 and by the National Science Foundation under
+grants CCF 17-05007 and CCF 19-00636.
+References
+1. Bagaria, V., Kannan, S., Tse, D., F anti, G., and Viswanath, P. Prism: De-
+constructing the blockchain to approach physical limits. In Proceedings of the 2019
+18 S. Sankagiri et al.
+ACM SIGSAC Conference on Computer and Communications Security (2019),
+pp. 585–602.
+2. Buterin, V., and Griffith, V. Casper the friendly ﬁnality gadget.arXiv preprint
+arXiv:1710.09437 (2017).
+3. Buterin, V., Hernandez, D., Kamphefner, T., Pham, K., Qiao, Z., Ryan,
+D., Sin, J., W ang, Y., and Zhang, Y. X. Combining ghost and casper. arXiv
+preprint arXiv:2003.03052 (2020).
+4. Castro, M., and Liskov, B. Practical byzantine fault tolerance. In Proceedings
+of the Third Symposium on Operating Systems Design and Implementation (USA,
+1999), OSDI ’99, USENIX Association, p. 173–186.
+5. Chan, B. Y., and Shi, E. Streamlet: Textbook streamlined blockchains. IACR
+Cryptol. ePrint Arch. 2020 (2020), 88.
+6. Chen, J., Gorbunov, S., Micali, S., and Vlachos, G. Algorand agreement:
+Super fast and partition resilient byzantine agreement.IACR Cryptol. ePrint Arch.
+(2018).
+7. Chen, J., and Micali, S. Algorand. arXiv preprint arXiv:1607.01341 (2016).
+8. Daian, P., Pass, R., and Shi, E. Snow white: Robustly reconﬁgurable consensus
+and applications to provably secure proof of stake. In International Conference on
+Financial Cryptography and Data Security (2019), Springer, pp. 23–41.
+9. Dembo, A., Kannan, S., Tas, E. N., Tse, D., Viswanath, P., W ang, X., and
+Zeitouni, O. Everything is a race and nakamoto always wins. to appear in CCS
+2020, arXiv preprint arXiv:2005.10484 (2020).
+10. Dinsdale-Young, T., Magri, B., Matt, C., Nielsen, J. B., and Tschudi,
+D. Afgjort: A partially synchronous ﬁnality layer for blockchains. In Security and
+Cryptography for Networks (SCN) (2020).
+11. Fitzi, M., Gazi, P., Kiayias, A., and Russell, A. Parallel chains: Improving
+throughput and latency of blockchain protocols via parallel composition. IACR
+Cryptol. ePrint Arch. 2018 (2018), 1119.
+12. Garay, J., Kiayias, A., and Leonardos, N. The bitcoin backbone protocol:
+Analysis and applications. In Annual International Conference on the Theory and
+Applications of Cryptographic Techniques (2015), Springer, pp. 281–310.
+13. Gilbert, S., and Lynch, N. Brewer’s conjecture and the feasibility of consistent,
+available, partition-tolerant web services. Acm Sigact News 33 , 2 (2002), 51–59.
+14. Gilbert, S., and Lynch, N. Perspectives on the cap theorem. Computer 45 , 2
+(2012), 30–36.
+15. Karakostas, D., and Kiayias, A. Securing proof-of-work ledgers via checkpoint-
+ing. Cryptology ePrint Archive, Report 2020/173, 2020. https://eprint.iacr.
+org/2020/173.
+16. Lewis-Pye, A., and Roughgarden, T. Resource pools and the cap theorem.
+arXiv preprint arXiv:2006.10698 (2020).
+17. Malkhi, D., Nayak, K., and Ren, L. Flexible byzantine fault tolerance. In Pro-
+ceedings of the 2019 ACM SIGSAC Conference on Computer and Communications
+Security (2019), pp. 1041–1053.
+18. Nakamoto, S. Bitcoin: A peer-to-peer electronic cash system. Tech. rep.
+19. Neu, J., Tas, E. N., and Tse, D. Ebb-and-ﬂow protocols: A resolution of the
+availability-ﬁnality dilemma. arXiv preprint arXiv:2009.04987 (2020).
+20. Pass, R., Seeman, L., and Shelat, A. Analysis of the blockchain protocol in
+asynchronous networks. In Annual International Conference on the Theory and
+Applications of Cryptographic Techniques (2017), Springer, pp. 643–673.
+21. Pass, R., and Shi, E. Hybrid consensus: Eﬃcient consensus in the permissionless
+model. In 31st International Symposium on Distributed Computing (DISC) (2017).
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 19
+22. Pass, R., and Shi, E. The sleepy model of consensus. In International Conference
+on the Theory and Application of Cryptology and Information Security (2017),
+Springer, pp. 380–409.
+23. Ren, L. Analysis of nakamoto consensus. IACR Cryptol. ePrint Arch. (2019).
+24. Stewart, A., and Kokoris-Kogias, E. Grandpa: a byzantine ﬁnality gadget.
+arXiv preprint arXiv:2007.01560 (2020).
+25. Yin, M., Malkhi, D., Reiter, M. K., Gueta, G. G., and Abraham, I. Hotstuﬀ:
+Bft consensus with linearity and responsiveness. In Proceedings of the 2019 ACM
+Symposium on Principles of Distributed Computing (2019), pp. 347–356.
+Appendix
+A Algorand BA is a Checkpointing Protocol
+We outline the full Algorand Byzantine Agreement (BA) protocol below for
+completeness. A minor modiﬁcation (marked in red), adding validation, is the
+only addition to the original protocol. Honest checkpointers run a multi-iteration
+BA to commit checkpoints. The goal of the i-th iteration is to achieve consensus
+on the i-th checkpoint. Each iteration is divided into multiple periods and view
+changes will happen across periods.
+All checkpointers start period 1 of iteration 1 at the same time (time 0).
+Checkpointer i starts period 1 of iteration n after it receives 2 t + 1 cert-votes
+for some value v for the same period p of iteration n− 1 and waits for another
+ﬁxed time e, and only if it has not yet started an iteration n′ >n . Checkpointer
+i starts period p≥ 2 of iteration n after it receives 2t + 1 next-votes for some
+valuev for period p− 1 of iteration n, and only if it has not yet started a period
+p′ > p for the same iteration n, or some iteration n′ > n. For any iteration
+n, checkpointer i sets its starting value for period p≥ 2, stp
+i , to v (the value
+for which 2t + 1 next-votes were received and based on which the new period
+was started). For p = 1, st1
+i =⊥. The moment checkpointer i starts period p
+of iteration n, he ﬁnishes all previous periods and iterations and resets a local
+timer clocki to 0. At the beginning of every period, every honest checkpointer i
+sets vi to be the checkpointed longest chain in its view at that time.
+Each period has a unique leader known to all checkpointers. The leader is
+assigned in an i.i.d. fashion by the permitter oracle O. Each checkpointeri keeps
+a timer clocki which it resets to 0 every time it starts a new period. As long as
+i remains in the same period, clocki keeps counting. Recall that we assume the
+checkpointers’ individual timers have the same speed. In each period, an honest
+checkpointer executes the following instructions step by step.
+Step 1: [Value Proposal by leader] The leader of the period does the
+following when clocki = 0; the rest do nothing. If ( p = 1) OR (( p≥ 2) AND
+(the leader has received 2t + 1 next-votes for⊥ for period p− 1 of iteration n)),
+then it proposes its valuevi. Else if ((p≥ 2) AND (the leader has received 2t+ 1
+next-votes for some value v⁄=⊥ for period p− 1 of iteration n)), then the leader
+proposes v.
+20 S. Sankagiri et al.
+Step 2: [The Filtering Step] Checkpointer i does the following when
+clocki = 2∆. If(p = 1) OR ((p≥ 2) AND (i has received 2t + 1 next-votes for
+⊥ for period p− 1 of iteration n)), then i soft-votes the valuev proposed by the
+leader of current period if (it hears of it) AND (the value is VALID OR i has
+received 2t + 1 next-votes for v for period p− 1). Else if ((p≥ 2) AND (i has
+received 2t + 1 next-votes for some value v⁄=⊥ for period p− 1 of iteration n)),
+then i soft-votesv.
+Step 3: [The Certifying Step] Checkpointer i does the following when
+clocki∈ (2∆, 4∆). If i sees 2t + 1 soft-votes for some value v⁄=⊥, then i cert-
+votesv.
+Step 4: [The Period’s First Finishing Step] Checkpointer i does the
+following when clocki = 4∆. If i has certiﬁed some value v for period p, he
+next-votesv. Else if ( (p≥ 2) AND (i has seen 2t + 1 next-votes for⊥ for period
+p− 1 of iteration n)), he next-votes⊥. Else he next-votes his starting value stp
+i .
+Step 5: [The Period’s Second Finishing Step] Checkpointeri does the
+following whenclocki∈ (4∆,∞) until he is able to ﬁnish period p. Ifi sees 2t+1
+soft-votes for some value v⁄=⊥ for period p, then i next-votes v. If ((p≥ 2)
+AND (i sees 2t + 1 next-votes for⊥ for period p− 1) AND (i has not certiﬁed
+in period p)), then i next-votes⊥.
+Halting condition: Checkpointer i HALTS current iteration if he sees 2t + 1
+cert-votes for some value v for the same period p, and sets v to be his output.
+Those cert-votes form a certiﬁcate for v. The block that is exactly k-deep in v
+is chosen as the checkpoint in current iteration.
+A proposed value v (with block B being exactly k-deep in it) from period p
+of iteration n is VALID for checkpointer i (in the same period and iteration) if:
+– Valuev is proposed by the leader of that period;
+– Block B is a descendant of all previously checkpointed blocks with smaller
+iteration number;
+– BlockB is contained in the checkpointed longest chain that the checkpointer
+i holds when entering period p.
+The only modiﬁcation to the protocol is in Step 2, in the ﬁrst condition, where
+the notion of validity is introduced. This is the only place where new proposals
+are considered. The validity notion helps transform the Algorand BA protocol
+into the multi-iteration checkpointing protocol that we desire. In Appendix B,
+we show that this protocol indeed satisﬁes properties CP0-CP3, as mentioned
+in §4.
+B Checkpointing Properties
+In this section, we prove several important properties of our modiﬁed Algo-
+rand BA protocol. We assume throughout that the number of adversarial check-
+pointers is strictly less than one-third the total number of checkpointers; this is
+necessary to achieve any security results for a partially synchronous consensus
+protocol such as Algorand BA.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 21
+– It is safe even under asynchronous network conditions(CP0, proved in Lemma
+1). Moreover, it remains deadlock free, in the sense that it can always proceed
+as long as messages will be delivered eventually (Lemma 2).
+– It is live after GST if the local checkpointed longest chains of all honest nodes
+satisfy common preﬁx property ( CP3, proved in Lemma 3).
+– It only outputs recently inputted values after GST (CP1, proved in Lemma
+4).
+We ﬁrst deﬁne some useful notations according to the BA protocol described
+in Appendix A.
+Deﬁnition 3 (Potential starting value for period p). A value v that has
+been next-voted by t + 1 honest nodes for period p− 1.
+Deﬁnition 4 (Committed value for period p). A value v that has been
+cert-voted by 2t + 1 nodes for period p.
+Deﬁnition 5 (Potentially committed value for period p). A value v that
+has been cert-voted by t + 1 honest nodes for period p.
+Although we slightly altered Algorand BA protocol (which is highlighted in
+red in Appendix A), we note that our modiﬁcation does not break the safety
+of the protocol or cause any deadlock in Lemma 1 and Lemma 2. At a high
+level, the validity check only causes less soft-votes from honest nodes, which is
+indistinguishable with the case where the leader is malicious and no value receives
+at least 2t + 1 soft-votes in some period. Therefore, the safety and deadlock-free
+property remain.
+Lemma 1 (Asynchronous Safety, CP0). Even when the network is parti-
+tioned, the protocol ensures safety of the system so that no two honest nodes will
+ﬁnish one iteration of the protocol with diﬀerent outputs.
+Proof. The following properties hold even during a network partition.
+– By quorum intersection, as each honest node only soft-votes one value, then
+at most one value is committed or potentially committed for each period p
+in one iteration.
+– If a value v is potentially committed for period p, then only v can receive
+2t + 1 next-votes for period p. Thus, the unique potential starting value for
+period p + 1 is v.
+– If a period p has a unique potential starting value v⁄=⊥, then only v can
+be committed for period p. Moreover, honest nodes will only next-vote v
+for period p, so the unique potential starting value for period p + 1 is also
+v. Inductively, any future periods p′ > p can only have v as a potential
+starting value. Thus, once a value is potentially committed, it becomes the
+unique value that can be committed or potentially committed for any future
+period, and no two honest nodes will ﬁnish this iteration of the protocol with
+diﬀerent outputs.
+22 S. Sankagiri et al.
+Lemma 2 (Asynchronous Deadlock-freedom). As long as messages will be
+delivered eventually, an honest node can always leave period p, either by entering
+a higher period or meeting the halting condition for the current iteration.
+Proof. We ﬁrst prove that there can never exist 2t+1 next-votes for two diﬀerent
+non-⊥ values from the same period p by induction.
+Start with p = 1. Note that every honest node sets st1
+i =⊥ and at most one
+value (say v) could receive more than 2 t + 1 soft-votes. Therefore only value v
+and⊥ could potentially receive more than 2 t + 1 next-votes in period 1. Note
+that it is possible that both v and⊥ receive more than 2t + 1 next-votes: all the
+honest nodes could next-vote for⊥ in Step 4 and then next-vote for v in Step 5
+after seeing the 2t + 1 soft-votes for v.
+Assume that the claim holds for period p−1 (p≥ 2): there exist at most two
+values each of which has 2t + 1 next-votes for period p− 1, and one of them is
+necessarily⊥. Then there are three possible cases:
+– Case 1: Only ⊥ has 2t + 1 next-votes for period p− 1. This is the same as
+the induction basis p = 1.
+– Case 2: Only v has 2t + 1 next-votes for period p− 1. Then in period p,
+every honest node will have starting value stp
+i = v, so only v could receive
+soft-vote and next-vote.
+– Case 3: Both⊥ andv have 2t + 1 next-votes for periodp− 1. Suppose a new
+valuev′⁄=v receives 2t + 1 next-votes for period p, then v′ must have 2t + 1
+soft-votes for period p and at least t + 1 soft-votes are from honest nodes,
+which means that at least t + 1 honest nodes have received 2t + 1 next-votes
+for⊥ for period p− 1 when they enter Step 2. Hence when they enter Step
+4, they will next-vote v′ or⊥ instead of v. And they will not next-vote v in
+Step 5 either. Then v can have at most t next-votes from honest nodes and
+at most 2t next-votes from all nodes for period p.
+Therefore, we proved the claim for period p. Then we prove the lemma. Note
+that a node will stuck in period p if and only if no value receives at least 2 t + 1
+next-votes for period p. Then by the previous claim we proved, there are only
+two possible cases:
+– Case 1:⊥ has 2t+1 next-votes for period p−1. If no value has at least 2t+1
+soft-votes for period p, then every honest node will just next-vote ⊥ in Step
+4 or Step 5 (since 2t+1 next-votes on⊥ for periodp−1 will eventually reach
+every honest node). Otherwise if some value v has at least 2t + 1 soft-votes
+for period p, then every honest node will next-vote v.
+– Case 2: Only some value v has 2t + 1 next-votes for period p− 1. Then in
+period p, every honest node will have starting value stp
+i =v, so only v could
+receive soft-vote and next-vote. And every honest node will next-vote v in
+Step 4.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 23
+The original Algorand BA guarantees fast recovery from network partition:
+after GST, an agreement is reached in O(∆) time. However, our protocol does
+not have such a strong liveness property as honest nodes may disagree on what
+is the longest chain for some time right after GST. Here in Lemma 3, we prove
+that our protocol is live and each iteration takes O(∆) time to ﬁnish once the
+common preﬁx property of all honest nodes’ longest chains is recovered, which
+may take O(GST) time as we will see in §C.
+Lemma 3 (Conditional Liveness After GST, CP3). Suppose after time T ,
+all honest nodes always have the same values, i.e., their local checkpointed longest
+chains satisfy common preﬁx property, then after max{GST,T}, each iteration
+of Algorand BA will ﬁnish within O(∆) time. Moreover, all honest nodes ﬁnish
+the same iteration within time ∆ apart.
+Proof. Let N be the largest iteration number such that some honest node has
+committed some value v before GST. Then all honest nodes will receive the
+certiﬁcate for v within time ∆ after GST and they will all enter iteration N + 1
+after some time. If such N does not exist, i.e., no value has been committed by
+any honest node before GST, then we set N = 0.
+Further, let p be the highest period that some honest node is working on in
+iterationN +1 right before GST is. Then after time∆, all honest nodes will also
+start period p as they receive 2t+ 1 next-votes for periodp−1. Soon after, some
+valuev (which may be⊥) will receive at least 2t + 1 for period p by Lemma 2,
+and all honest node will all start period p + 1 within time ∆ apart.
+Once all honest nodes start the same period p within time ∆ apart, the
+network partition seems to have never happened. Without partition, if all honest
+nodes have the same value, i.e., after max{GST,T}, the following facts hold:
+– By Lemma 2, there exist at most two values each of which has 2 t + 1 next-
+votes for every period, and one of them is necessarily⊥ if there exist exactly
+two.
+– If a period p is reached and the leader is honest, then all honest nodes ﬁnish
+the current iteration in periodp by their own time 6∆, with the same output
+v⁄=⊥. Moreover, all honest nodes ﬁnish within time∆ apart. Indeed, if there
+exists a potentially committed value v for period p− 1, then v will be the
+unique potential starting value for period p. In period p, the honest leader
+proposes v in Step 1 and all honest nodes soft-vote v in Step 2. In Step 3,
+by their own time 4∆, all honest nodes have cert-voted v. Thus all of them
+ﬁnish the current iteration by their own time 6 ∆, with output v. Otherwise
+if there is no potentially committed value in period p− 1, then the leader of
+period p may propose its private input v′ or a value v⁄=⊥ for which it has
+seen 2t + 1 next-votes from period p− 1. In the ﬁrst case, all honest nodes
+will soft-vote v′ in Step 2 as they all see 2t + 1 next-votes for⊥ from period
+p− 1; in the second case, all honest nodes will soft-vote v in Step 2 either by
+condition 1 or condition 2. In both cases, all honest nodes will cert-vote the
+same value in Step 3 by their own time 4 ∆ and ﬁnish the current iteration
+with that value by their own time 6∆.
+24 S. Sankagiri et al.
+– If a period p is reached and there is no committed value for period p (which
+only happens if the leader is malicious), then all honest nodes move to period
+p + 1 by their own time 8∆, and they move within time ∆ apart. Note that
+the honest nodes may start period p not at the same time but within time
+∆ apart. Indeed, if no honest node has cert-voted in Step 3, then all honest
+nodes next-vote a common starting value v in Step 4 if no one has seen
+2t + 1 next-votes for ⊥ for period p− 1, or else all honest nodes next-vote
+⊥ in Step 4 or Step 5. In both cases, they all see these next-votes and move
+to period p + 1 by their own time 8∆. If at least one honest node has cert-
+voted a valuev in Step 3, then v must have received 2t + 1 soft-votes and no
+other value could have these many soft-votes by quorum intersection. Thus
+only v could have received cert-votes. Since those honest nodes have helped
+rebroadcasting the soft-votes for v by their own time 4 ∆, all honest nodes
+see 2t + 1 soft-votes forv by their own time 6∆. Thus all honest nodes next-
+vote v either in Step 4 or Step 5 by their own time 6 ∆, and all see 2 t + 1
+next-votes for the same value by their own time 8∆. Note that some honest
+nodes may have next-voted for⊥ in Step 4 as well, thus there may also exist
+2t + 1 next-votes for⊥.
+– Combining the above facts together, since the leader in each period is honest
+with probability> 2/3, one iteration takes in expectation at most 1.5 periods
+and at most 10∆ time. Moreover, all honest nodes ﬁnish within time∆ apart.
+The liveness property showed in Lemma 3 conditions on the assumption that
+all honest nodes will have the same values after some time T . However, this
+assumption may not hold right after GST as the adversary could have a bank
+of private blocks that can be used to break the common preﬁx property. During
+this stage, Algorand BA may still output some values in favor of the adversary
+(eg., the adversary sends its favorite chain to all honest nodes). But if the output
+value is too old in the sense that no honest node has that checkpointed block
+in its local longest chain for a long time, then all honest blocks mined during
+this time interval could be potentially wasted as they are not extending the last
+checkpoint. However, we show that Algorand BA with our cautious modiﬁcation
+won’t let this happen in the following lemma.
+Lemma 4 (Recency Condition After GST, CP1). After GST, if one honest
+node commits a value v in one iteration at time t, then v must have been the
+input value held by at least one honest node at time no earlier than t− 8D∆,
+whereD∼ Geo(p) with p> 2/3 being the fraction of honest nodes.
+Proof. For a ﬁxed iteration, We deﬁne Vp to be the set of potential starting
+values for period p. ThenV1 ={⊥} and also by Lemma 2, we have 1≤|Vp|≤ 2,
+and⊥∈Vp if|Vp| = 2 for all p. Note that Vp ={v,⊥} is an bad set as v may be
+an outdated value. Then we show that the state won’t remain in {v,⊥} for the
+same v for a long time.
+Suppose the leader of period p is honest and no honest node has value v for
+period p, then we have the following two cases.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 25
+– Case 1: if the leader of period p has received 2t + 1 next-votes for ⊥ for
+period p− 1 at the beginning of Step 1, then it will propose v′⁄=v. Further
+no honest node will soft-vote or next-vote v. Therefore, the state of period
+p + 1 will be{⊥},{v′}, or{v′,⊥}.
+– Case 2: if the leader of period p has received 2t + 1 next-votes only for v for
+period p− 1 at the beginning of Step 1, then it will propose v. Further every
+honest node will soft-vote v in Step 2 either by condition 1 or condition 2.
+Therefore, v will be committed in period p.
+Therefore, after GST, the state won’t remain in {v,⊥} for the same v from
+period p to period p + 1, if the leader of period p is honest and no honest node
+has valuev for periodp. By Lemma 3, we know that after GST each period (even
+with a malicious leader) will ﬁnish in 8 ∆ time. Combining these facts together,
+we can conclude the lemma.
+We say the i-th checkpoints committed at some time t by an honest node
+after GST is Di-recent if it has been held at depth exactly k in the chain of
+an honest node at some time t′≥ t−Di. Then by Lemma 4, we have Di is
+stochastically dominated by 8 D∆, where D ∼ Geo(p) with p > 2/3. Let us
+deﬁne event E to be the event that all checkpoints committed after GST and
+beforeTmax ared-recent, whered is called the recency parameter of the protocol.
+Then we have the following corollary directly from Lemma 4.
+Corollary 1. There exists d =O(√κ∆) such that P(E)≥ 1−e−Ω(√κ), where
+κ is the security parameter.
+Proof. Recall that there can be at most Tmax/e checkpoints by CP2. By the
+union bound, we have
+P(Ec)≤
+∑
+i
+P(Di >d )≤ Tmax
+e P(Geo(p)> d
+8∆) = Tmax
+e (1−p)
+d
+8∆ =e−Ω(√κ).
+Thus we conclude that the modiﬁed Algorand BA, given in Appendix A,
+provides the desired checkpointing properties CP0-CP3.
+C Checkpointed Longest Chain Properties
+C.1 Comparison With Longest Chain Protocol
+The security properties of the longest chain protocol has been intensely stud-
+ied in recent years. The strong security properties have been demonstrated in
+increasing sophistication (both network models as well as tightness of security
+threshold): the pioneering work of [12] on the round by round network model has
+been extended to discrete and ﬁnely partitioned network model in [20] and to a
+26 S. Sankagiri et al.
+continuous time network model in [23]. The tightness of the security threshold
+has been improved to the best possible in [9]. Despite this wealth of techni-
+cal background, the checkpointed longest chain protocol has seemingly subtle
+diﬀerences with the vanilla longest chain protocol, but impact the analysis sig-
+niﬁcantly. We discuss two of these issues next.
+Synchrony versus Partial Synchrony . The security analyses of the longest
+chain protocol require that synchronous network conditions hold from the be-
+ginning of the protocol [9, 12, 20]. In the partially synchronous model, where
+messages may be arbitrarily delayed until some unknown time GST, the proto-
+col’s security breaks down. More precisely, even after (a bounded time beyond)
+GST, safety and liveness may fail. We describe a possible attack scenario in Fig-
+ure 6. The aforementioned works do not provide any security guarantees in the
+.
+.
+.
+adversary’s private chain
+longest honestchain
+at GSTat GST + C1
+at C2*GST
+at GST at GST + C1 at C2*GST
+forked honestchainspriortoGST
+Fig. 6. An illustration of the private attack by an adversary in a partially synchronous
+system. The private chain is longer than the longest honest chain for a short while after
+GST, but not indeﬁnitely after.
+partially synchronous model. However, the method of analysis suggests that it is
+possible to provide some security guaranteesafterO(GST) time. This should hold
+for any adversarial power β in which the protocol is secure in the synchronous
+regime. Consider the feasibility of a private attack, in which the adversary must
+mine a longer chain than that mined by the honest nodes. The adversary has
+some initial advantage immediately after GST by means of some private blocks
+(see Figure 6), but it will eventually lose out to the honest chain as the latter’s
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 27
+growth rate is strictly larger. The analysis of [9] suggests that the private at-
+tack is the worst-case attack. To the best of our knowledge, only [19] analyzes
+a longest chain protocol (the sleepy consensus protocol of [22]) in the partially
+synchronous setting, and they show desirable properties hold afterO(GST) time,
+with the constant being approximately 1/(1− 2β).
+Non-Monotonic Chain Growth . The checkpointed longest chain protocol
+can behave very diﬀerently compared to the classical longest chain protocol when
+checkpoints appear. In the classical version, the chain length of each honest node
+grows monotonically. In contrast, in our protocol, the chain held by an honest
+node may reduce in length once it hears of a new checkpoint. This could happen
+if its current chain does not contain the new checkpoint. This has important
+ramiﬁcations for security. A key property used in analyzing the classical proto-
+col is that (after GST), two honest blocks that appear more than ∆ time apart
+must be at diﬀerent heights (see e.g., [23]). This property needn’t hold for the
+checkpointed longest chain protocol; in fact, it can be violated if the adversary
+chooses to do so. In eﬀect, this causes a bleeding (or wastage) of honest mining
+power. An instance of this is illustrated in Figure 7. The analysis of [19] uses
+many properties of longest chain protocols ‘oﬀ the shelf’ from [22]. However, for
+reasons highlighted above, we must establish new properties that hold determin-
+istically for our protocol, irrespective of the adversary’s actions. These properties
+are weaker analogs of those satisﬁed by the longest chain protocol. This is to be
+expected, since the checkpointed longest chain protocol may behave just as the
+longest chain protocol irrespective of GST, if the adversary so wishes.
+C.2 Deﬁnitions
+We ﬁrst deﬁne the notion of common preﬁx and chain quality, which are now
+standard in the literature (see, e.g., [12]).
+Deﬁnition 6 (k-Common Preﬁx). For a chain C, let C⌊k denote the new
+chai nobtained by dropping the last k blocks fromC. We say that the k-common
+preﬁx property holds if for any two chains C1,C2 held by honest nodes at times
+t1≤t2 respectively, it holds that C1⌊k≼C 2.
+Deﬁnition 7 ( (k,s )-Chain Quality). We say that the (k,s )-chain quality prop-
+erty holds if for all honestly held chains C, every portion of C with k consecutive
+blocks mined after time s contains at least one honest block.
+Comparing to [12], our deﬁnition of k-common preﬁx is identical to theirs.
+Our deﬁnition of (k,s )-Chain Quality with s = 0 is identical to their deﬁnition
+of chain quality with parameterµ = 1/k. We introduce the extra parameters to
+emphasize that the chain quality property holds only for the portion of the chain
+consisting of blocks mined after time s =O(GST). In the partially synchronous
+model, we cannot hope to do better. In [12], the authors show that common
+preﬁx is identical to safety (also called persistence) and chain quality is identical
+28 S. Sankagiri et al.
+honest blocks mined 
+between time (t-d, t) 
+honest 
+blocks 
+mined 
+after 
+time t
+checkpoint that 
+appears at time t
+longest chain containing 
+latest checkpoint
+Fig. 7. An illustration of a reduction in chain length due to the appearance of a check-
+point. Consequently, two honest blocks may be at the same height, even if they are
+mined more than ∆ time apart.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 29
+to liveness for thek-deep conﬁrmation rule. Thus, to prove security ofΠada after
+O(GST), it suﬃces to show that k-common preﬁx and (k,s )-chain quality hold
+after time O(GST), for s =O(GST).
+C.3 Proof Sketch
+In this section, we analyze the security of the protocol by discretizing time into
+slots. Note that this is purely a proof strategy; we do not change any assump-
+tions about the behavior of the nodes, nor of the message timings. Our proof
+is structured similar to that in [12]. It has three major parts that we describe
+below.
+– First, we deﬁne the notion of a typical execution (Deﬁnition 8). A typical
+execution is one in which the number of mined honest and adversarial blocks
+over a suﬃciently large period do not deviate from their mean by a large
+fraction. We introduce the notion of a convergence opportunity here, simi-
+lar to [20]. We show that a typical execution occurs with high probability
+(Corollary 2).
+– Next, we show necessary conditions for common-preﬁx violation and chain
+quality violation in terms of the mining process. These conditions are anal-
+ogous to the condition in the classical longest chain protocol, which are
+roughly as follows: the number of adversarial blocks over an interval is more
+than the number of honest blocks over the same interval.
+– Third, we show that these necessary conditions won’t happen afterO(GST+
+κ) time in a typical execution (Lemma 10). Hence, with high probability, the
+common preﬁx property and the chain quality property of the checkpointed
+longest chain will hold after O(GST +κ) time (Corollary 3).
+The ﬁrst part is similar to existing works. Our main novelty lies is the second
+and third parts. As hinted above, we can at best hope to obtain weaker necessary
+conditions for common preﬁx violation and chain quality violation than those for
+the classical protocol. At the same time, a condition that is too weak may not
+be rare in a typical execution. We show that the necessary conditions are very
+similar for both k-common preﬁx violation and ( k,s )-chain quality violation.
+Moreover, we show that these conditions are impossible in a typical execution
+after O(GST + κ) time. Our analysis relies heavily on the properties of the
+checkpointing protocol proved in §B. For clarity, we further split this part of the
+proof into four steps.
+– We reduce all common-preﬁx violation instances to a special case where two
+diverging chains are held by honest nodes at the same slot.
+– We establish a lower bound on the lengths of honestly held chains in terms
+of convergence opportunities in an interval, with some slack to account for
+the possibility of bleeding.
+– We establish the desired necessary condition for k-common preﬁx violation
+by analyzing the common portion and the forked portion of the two diverging
+honestly held chains.
+30 S. Sankagiri et al.
+– We establish the desired necessary condition for (k,s )-chain quality violation
+by comparing the chain growth for honest chains in an interval with the
+number of adversarial blocks in the same interval.
+In this section, whenever we refer to a block B being k-deep in a chain C, we
+mean there are k or more blocks that are descendants of B inC.
+C.4 Typical Execution
+From §4, we know that the block mining process is a Poisson process with rate
+λ. This can be further split into an adversarial block mining process of rate βλ
+and an independent honest block mining process of rate (1 −β)λ, with β <
+1/2. Therefore the number of honest/adversarial blocks mined in any interval
+is a Poisson random variable. By the Chernoﬀ bound, we know that a Poisson
+random variable is tightly concentrated around its mean. However, we would
+like to obtain such a result for all intervals of length bigger than O(κ). Hence,
+for the sake of applying the union bound, we discretize time into slots: the ith
+slot is the time interval (( i− 1)∆,i∆ ]. The total number of slots in the entire
+execution of the system is tmax =⌈Tmax/∆⌉ = O(poly(κ)). We abuse notation
+to let GST denote the ﬁrst slot that begins after the global synchronization time.
+All our analysis henceforth will be in the form of slots, but the protocol remains
+a continuous time one as described in §4.
+We deﬁne the following random variables for slot i.
+– Yi = 1 if there is exactly one block that is mined by honest nodes in slot i
+and there is no block that is mined by honest nodes in slot i− 1 and i + 1,
+otherwise 0. We follow the notation in [20] to call such slots as a convergence
+opportunity (such a block is also called loner in [23]).
+– Zi is the number of adversarial blocks plus the number of honest blocks that
+are not a convergence opportunity, in slot i.
+Let
+¯y ≜E[Yi] = (1−β)λ∆ e−3(1−β)λ∆.
+Further,E[Yi +Zi] =λ∆, and hence
+¯z ≜E[Zi] =λ∆− ¯y.
+For anyt1≤t2, we deﬁne Y [t1,t 2] = ∑t2
+i=t1+1Yi andZ[t1,t 2] = ∑t2
+i=t1+1Zi.
+With some abuse of notation, we let Y [S] denote ∑
+i∈SYi for any set of slots
+S⊂N. As we are now in discrete time, the notation [ t1,t 2] denotes the set of
+slots{t1,...,t 2}. We have that
+EY [t1,t 2] = ¯y(t2−t1), EZ[t1,t 2] = ¯z(t2−t1).
+We note that for any β <1/2 and any ∆, there exists ε> 0 and λ> 0 s.t.
+¯y(1− 3ε)> ¯z.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 31
+In particular, this implies ¯y >¯z, and (1−ε)¯y >¯z +ε¯y. We shall operate under
+this regime. We also assume that λ∆ <1. This condition implies ¯y = Ω(λ∆),
+where the constants hidden by Ω(λ∆) do not depend on β,λ,∆ .
+With these notations in place, we can now deﬁne the notion of a typical
+execution.
+Deﬁnition 8 (Typical execution). An execution is (ε,τ )-typical for a β-
+corrupt system, for ε∈ (0, 1) and τ ∈ N, if the following events hold for any
+t1,t 2 s.t. t2−t1≥τ:
+|Y [t1,t 2]−EY [t1,t 2]|≤ εEY [t1,t 2];
+|Z[t1,t 2]−EZ[t1,t 2]|≤ εEY [t1,t 2];
+|Y [t1,t 2] +Z[t1,t 2]− (EY [t1,t 2] +EZ[t1,t 2])|≤ ε(EY [t1,t 2] +EZ[t1,t 2]).
+Proposition 1. For any t1≤ t2, the following events hold with probability at
+least 1−e−Ω(ε2λ∆|t2−t1|):
+|Y [t1,t 2]−EY [t1,t 2]|≤ εEY [t1,t 2];
+|Z[t1,t 2]−EZ[t1,t 2]|≤ εEY [t1,t 2];
+|(Y [t1,t 2] +Z[t1,t 2])− (EY [t1,t 2] +EZ[t1,t 2])|≤ ε(EY [t1,t 2] +EZ[t1,t 2]).
+Proof. The Chernoﬀ bound for a binomial or a Poisson random variable X gives
+us
+P(|X−EX|≥ δEX)≤ 2e−δ2EX/3
+We ﬁrst prove the concentration bound onY [t1,t 2]. We cannot directly apply
+standard concentration inequalities on Y [t1,t 2] since Yi’s are not independent
+random variables. However, for any i, Yi and Yi+3 are independent. Each Yi is
+Bernoulli(¯y). Hence,Y [t1,t 2] can be written as the sum of three binomial random
+variables.
+Y [t1,t 2] =
+∑
+i
+Yt1+3i +
+∑
+i
+Yt1+3i+1 +
+∑
+i
+Yt1+3i+2.
+Using the Chernoﬀ bound and the union bound, we get that each of these three
+binomial random variables are within a factor ofε/3 from their mean, except with
+probability with probability e−Ω(ε2λ∆(t2−t1)). When this happens, the desired
+bound on Y [t1,t 2] follows.
+Next, we note that Y [t1,t 2] +Z[t1,t 2] is a Poisson random variable. Using
+the Chernoﬀ bound for Poisson random variables, and the fact thatE(Y [t1,t 2]+
+Z[t1,t 2]) = λ∆(t2−t1), we obtain that Y [t1,t 2] +Z[t1,t 2] is within a factor of
+ε from its mean except with probability e−Ω(ε2λ∆(t2−t1)).
+It remains to bound Z[t1,t 2]. For this, we need a slightly tighter bound on
+Y [t1,t 2] and Y [t1,t 2] +Z[t1,t 2] than the one in the statement of the proposi-
+tion; we replace ε by ε/3. Both these bounds also hold except with probability
+e−Ω(ε2λ∆(t2−t1)). From these bounds, and the relation ¯y >¯z, we can the desired
+bound on Z[t1,t 2].
+32 S. Sankagiri et al.
+There are at most t2
+max choices of t1,t 2. The following corollary follows from
+Proposition 1 and the union bound.
+Corollary 2. The protocol executes with (ε,τ )-typical execution with probability
+at least 1−e−Ω(ε2κ).
+Proof. From Proposition 1 and the union bound, we get that the probability of
+a typical execution is at least 1−t2
+maxe−Ω(ε2λ∆τ). We can chooseτ large enough
+such that λ∆τ = Θ(κ). We know that tmax = poly(κ). From this, the stated
+result follows.
+C.5 Necessary Conditions for Common Preﬁx/Chain Quality
+Violation
+We begin by noting some basic properties of the checkpointing protocol, and also
+introduce some new notation that is useful for this subsection. Our ﬁrst result is
+a chain growth lemma (Lemma 6). The chain growth lemma highlights the extent
+of bleeding that can take place in the checkpointing protocol. Next, we focus on
+the common preﬁx property. We show that without loss of generality, we can
+assume that common-preﬁx violation occurs between two chains at the same slot
+(Lemma 7). Following this, we show that in the forked portion, the number of
+adversarial blocks over the forked portion must be at least half the total number
+of blocks. This gives us the desired necessary condition comparing the number of
+convergence opportunities and adversarial blocks over a suﬃciently large period
+(Lemma 8). Finally, we analyze the chain quality property in Lemma 9.
+Basic properties of checkpoints Let us recall some properties of the check-
+pointing algorithm, re-stated in terms of slots instead of discrete time.
+1. We say that a checkpoint appears in slot t if the ﬁrst time an honest node
+marks the checkpoint is in slot t. If a checkpoint appears at slot t, all honest
+nodes mark the checkpoint by the beginning of slot t + 2.
+2. Let d′ ≜⌈d/∆⌉. Any checkpoint that appears at slot t >GST +d′ was at
+leastk-deep in a chain held by an honest node in some slott′∈{t−d′,...t }.
+3. Let e′ =⌊e/∆⌋. If two consecutive checkpoints appear at slots t,t′, then
+t′≥t +e′.
+Let GST +d′ < t∗
+1 ≤ t∗
+2 ≤ ... be the sequence of slots at which check-
+points appear after slot GST +d′. Let the corresponding checkpoint blocks be
+B∗
+1,B∗
+2,... . Let t∗
+0 ≜ GST. Deﬁne Sl ≜{t∗
+l + 2,...,t ∗
+l+1−d′− 2} for all l≥ 0
+and let S ≜∪l≥0Sl. We refer to each Sl as an inter-checkpoint interval.
+Chain growth results
+Lemma 5 (Chain Length Lower Bound). Let t1,t 2 be two slots such that
+t1∈ S and and t2≥ t1 + 2. LetC be a chain held by some honest node in slot
+t1. Then all honest nodes will hold a chain of length at least |C| in slot t2.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 33
+Proof. Let h be an honest node that holds chain C in slot t1, and let h′ be an
+arbitrary honest node (possibly h) that holds a chainC′ in slot t2. Since t1∈S,
+we know that t∈ Sl for some l. Therefore B∗
+l is the last checkpoint that is
+marked inC. Clearly, all honest nodes will hear of C by the beginning of slot t2,
+and would also have markedB∗
+l as a checkpoint. We aim to show that|C′|≥|C| .
+There are now two cases to consider.
+– Node h′ has not marked any new checkpoint at the time it holds C′. In this
+case, it will hold a chain at least as long as C, as it is a chain that it has
+heard of that contains all the checkpoints that it has marked.
+– Node h′ has marked at least one new checkpoint at the time it holds C′. In
+particular, it has marked B∗
+l+1. Note that B∗
+l+1 must be exactly k-deep in
+some honestly held chain C∗ at some slot in the interval [ t∗
+l+1−d′,t∗
+l+1] in
+which B∗
+l+1 was not marked as a checkpoint. By the ﬁrst case, C∗ must be
+at least as long asC, since t1≤t∗
+l+1−d′− 2. Further, all honest nodes must
+hold a chain at least as long as C∗ at the time of marking B∗
+l+1. Arguing
+inductively, we see that all honest nodes that have marked at least one new
+checkpoint compared toC also hold a chain at least as long as C.
+Lemma 6 (Chain Growth). Consider a chain C held by an honest node in a
+slott≥ GST + 1. SupposeC contains an honest block B mined in slot s at height
+𝓁. Then|C|≥ 𝓁 +Y [S∩ [s + 2,t− 2]].
+Proof. From Lemma 5, we can deduce three useful facts. Firstly, the ﬁrst con-
+verge opportunity block inS∩[s+2,t−2] will be built at a height≥𝓁+1, since
+all honest nodes by that slot would have adopted a chain at least as long as 𝓁.
+Secondly, we see that all convergence opportunities in S are mined at distinct
+heights. This is because all convergence opportunities are spaced at least 2 slots
+apart. Thirdly, all honest nodes will adopt a chain that is at least as long as the
+chain mined by the last converge opportunity inS∩[s+2,t−2]. Together, these
+two statements prove the desired statement when s∈S.
+To prove the same result when s⁄∈S, we consider the following two cases:
+– Suppose s /∈ S, and s≥ GST. This implies s∈{ t∗
+l−d′− 1,...t ∗
+l + 1} for
+some l≥ 1. then in slot t∗
+l + 2 all honest nodes will see both block B and
+checkpointBl. Moreover, block B and checkpoint Bl are on the same chain
+C∗, hence all honest nodes should hold a chain of length at least 𝓁 in slot
+t∗
+l + 2, simply because C∗ contains B. The rest of the proof is identical to
+the case s∈S.
+– Supposes /∈S ands< GST. LetB be the set of checkpoints with appearance
+time <= GST, i.e, for a block B∗∈B , at least one honest node marks B∗
+before GST. Then in slot GST + 1, all honest nodes will see a chain C∗ that
+contains block B and all checkpoints in B. Hence all honest nodes should
+hold a chain of length at least 𝓁 in slot GST + 1, simply becauseC∗ contains
+B. The rest of the proof is identical to the case s∈S.
+34 S. Sankagiri et al.
+Analysis of Common Preﬁx Property Let us ﬁrst note a simple fact about
+the checkpointed longest chain rule. In what follows, we say a chain C was held
+by an honest node in slot t if it was held by the node at any time in the interval
+((t− 1)∆,t∆ ].
+Proposition 2. If a block B is k-deep in a chain C held by an honest node h
+in slot t, then it either remains k-deep inC′ or is not present in C′, whereC′ is
+an chain held by h in slot t′.
+The above statement is trivially true for the longest chain rule, since the chain
+length held by an honest node is monotonically increasing. It is not so immediate
+for the checkpointed longest chain rule, since the length of the chain held by a
+particular honest node may reduce upon adopting a new checkpoint block. A
+crucial point in the proof of this statement is the property that a checkpoint is
+alwaysk-deep in all honest nodes’ chains. The statement is illustrated in Figure
+C.5, and is proven below.
+Proof. As remarked above, the property holds trivially as long as the honest
+node h adopts successive chains of increasing length. Consider the case when at
+some slot t′≥ t, h adopts a new checkpoint block and truncates its chain in
+the process. Suppose block B is present in both C andC′. Then it must be an
+ancestor of the new checkpoint block. Since the new checkpoint block is at least
+k-deep in the new chain, so is block B.
+blocks≥𝑘
+𝐵"
+𝐵)
+checkpoint block
+𝐶
+𝐶′
+Fig. 8. Illustration of Lemma 2. Both B1, B2 are k-deep in C. B1 gets ousted in C′,
+while B2 remains k-deep.
+Lemma 7 (Common Preﬁx Reduction). Suppose the common preﬁx prop-
+erty is violated after slot t0, i.e., there exist slots t1 and t2: t0≤t1≤t2, honest
+nodesh1,h 2 (possibly the same), and chains C1,C2, s.t.C1 is held by h1 at slot
+t1,C2 is held by h2 at slot t2, butC1⌊kC2. Then the following event happens
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 35
+at some slot t∈ [t1,t 2]: there exists chainC andC′ such thatC′⌊kC while both
+C′ andC are held by honest nodes in slot t.
+We refer to this events as common preﬁx violation at slot t, and the pair of
+chainsC′ andC as a certiﬁcate of the violation . Lemma 7, stated for the check-
+pointed longest chain rule, is also true for the longest chain rule. The proofs are
+identical as well, given that the statement of Lemma 2 holds for both protocols.
+We provide the proof for completeness.
+Proof. Lett≥t1 be the earliest slot at which there exists some chain C held by
+an honest node h (possibly h1) s.t.C1⌊kC. Let B be the block that is exactly
+k-deep inC1; clearly, it is not present in C. We now claim that there must be a
+chainC′ held by nodeh1 at some time in slot t that containsB. Note thatC and
+C′ satisfy the relation C′⌊kC, thus proving the desired statement. It remains
+to show the claim.
+Suppose h1 never holds a chain containing B in slot t. Then it must have
+adopted a chain that does not contain B in an earlier slot. However, we have
+deﬁned t to be the earliest slot such that some chain held by an honest node
+does not contains B. Thus, we have shown the claim to be true. A technical
+point to note is that if an honest node adopts a new chain Cnew at time s in slot
+t, it must have held the older chain Cold at some time (s−ϵ) in slot t itself.
+blocks≥𝑘
+𝐵
+𝐶
+𝐶′
+𝐶"
+𝐶)
+Fig. 9. Illustration of Lemma 7. BlockB isk-deep in C1. It remains so in C′. However, it
+is absent from C. In this case, C′ and C form a certiﬁcate of k-common preﬁx violation.
+Lemma 8 (Necessary condition for common preﬁx violation). Suppose
+k-common preﬁx violation occurs at slot t. Then there exist t∗ < t such that
+Z[t∗,t ] +Y [t∗,t ]≥k and Z[t∗,t ]≥Y [S∩ [t∗ + 2,t− 2]]− 1.
+Proof. The ﬁrst condition Z[t∗,t ] + Y [t∗,t ] ≥ k is trivial, as a certiﬁcate of
+k-common preﬁx violation contains at least k blocks. Then we focus on the
+36 S. Sankagiri et al.
+derivation of the second condition. From Lemma 7, we know that there exists
+two honestly held chains C,C′ such that C′⌊k C. Let 𝓁 be the height of the
+shorter of the two chains. Consider the last block on the common preﬁx of C,C′
+that is a convergence opportunity. Denote it by B, let its height be 𝓁 and let t
+be the slot at which it was created. If there is no convergence opportunity in the
+common preﬁx, let B be the genesis block and t = 0. From Lemma 6, we know
+that 𝓁≥𝓁∗ +Y [S∩ [t∗ + 2,t− 2]], which implies 𝓁−𝓁∗≥Y [S∩ [t∗ + 2,t− 2]].
+We now show that Z[t∗,t ]≥𝓁−𝓁∗− 1.
+Firstly, we note that any adversarial blocks inC,C′ that are descendants ofB
+must be mined in the interval [t∗,t ]. Let ˜B denote the last block on the common
+preﬁx ofC,C′, let its height be ˜𝓁. The portion of the common preﬁx from block
+B (excluded) to ˜B (included) is composed entirely of adversarial blocks. This
+accounts for ˜𝓁−𝓁 adversarial blocks.
+We now consider two possibilities regarding the number of checkpoints on the
+chainsC,C′. In the ﬁrst case, both chains have the same number of checkpoints
+marked. In this case, all checkpoints must be on the common preﬁx of C,C′. In
+the second case, one of the chains has one extra checkpoint. This checkpoint
+must have appeared in slot t or slot t− 1, for otherwise, it would be adopted by
+the other chain too. In both cases, let ˆB denote the last common checkpoint of
+the two chains. We now analyze the forked portion of the chains in both cases.
+For the ﬁrst case, we show that all convergence opportunity blocks that are
+descendants of ˆB must be at distinct heights. Note that every chain ending at
+each such convergence opportunity blocks contain all checkpoints that appear
+until slott. Thus, at the time when any honest node would have received such a
+chain (say ˜C), it would adopt ˜C or a chain of at least| ˜C|. This is because ˜C would
+contain all the checkpoints that this node would have marked until then. Since
+the miner of every convergence opportunity hears of broadcasts from all previous
+convergence opportunities before mining, the claimed result follows. For the
+second case, a slightly modiﬁed statement holds: all convergence opportunities
+that are descendants of ˆB mined in slots ≤ t− 2 must be at distinct heights.
+This can be proven by arguing in the same manner as above. Since the latter is
+a weaker claim than the former, we use the latter claim in the general case.
+Note that all blocks in the forked portion are descendants of ˜B, and are
+therefore descendants of ˆB. Therefore, all convergence opportunity blocks in the
+forked portion mined in slots≤t− 2 must be at distinct heights. Since they can
+be on at most one of the chains, they must be paired with either an adversarial
+block or a convergence opportunity from slot t− 1 or t. There can be at most
+one convergence opportunity from slots {t− 1,t}. From this, we conclude that
+the number of adversarial blocks in the forked portion is at least 𝓁− ˜𝓁− 1.
+In summary, we can say that the number of distinct adversarial blocks in
+chainsC,C′ combined that are descendants of blockB∗ is at least𝓁− ˜𝓁−1+ ˜𝓁−𝓁
+=𝓁−𝓁−1. All these blocks are mined in slots in the range [t∗,t ]. Thus,Z[t∗,t ]≥
+𝓁−𝓁∗− 1. Combined with the inequality 𝓁−𝓁∗≥Y [S∩ [t∗ + 2,t− 2]], we get
+the inequality: Z[t∗,t ]≥Y [S∩ [t∗ + 2,t− 2]]− 1.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 37
+Analysis of Chain Quality Property With some abuse of notation, we use
+the term (k,s )-chain quality to refer to a slot s instead of some time s.
+Proposition 3 (Chain Quality Reduction). Suppose at some slot t, (k,s )-
+chain quality is violated, i.e., there exists an honestly held chain C in slot t that
+contains k-consecutive blocks mined after slot s and there is no honest block
+amongst them. Then at some slot t′∈ (s,t ], there exists a chain C′ held by an
+honest node such that the last k blocks ofC′ are all adversarial blocks.
+Proof. Suppose, at some slot t, (k,s )-chain quality is violated. Clearly, t > s,
+else it is not possible for C to contain blocks mined at slots >s . There are two
+cases to consider. First, we consider the case where there are no more honest
+blocks inC after the string of k consecutive adversarial blocks. Then the claim
+trivially follows with t′ = t,C′ =C. Next, consider the case where there exists
+an honest block inC after the string of k consecutive adversarial blocks. Let the
+block be B and let its mining time be t′. Since these k blocks are all mined after
+slot t0, so is B (i.e., t′ > s). Then the portion of C up to B (but not including
+it) was held by the honest miner of block B. Call this sub-chain C′. From the
+condition onC, it is immediate that the last k blocks ofC′ are adversarial. Thus
+we have our claim.
+If there exists an honestly held chain C at slot t such that the last k blocks
+ofC are all adversarial blocks mined after slot s, we say that (k,s )-chain quality
+violation occurs at slot t. From Proposition 3, we assume without loss of gener-
+ality that all violations of ( k,s )-chain quality are such that ( k,s )-chain quality
+violation occurs at slot t, for some t>s .
+Lemma 9 (Necessary Condition for Chain Quality Violation). Suppose,
+for any slot t≥ GST + 1, (k,s )-chain quality is violated at slot t. Then there ∃
+t∗ <t s.t. Z[t∗,t ]≥k and Z[t∗,t ]≥Y [S∩ [t∗ + 2,t− 2]].
+Proof. LetC be the honestly held chain at slot t for which chain quality is
+violated. Let t∗ be the time of mining of the last honest block in C. Let this
+block be called B and let its height be 𝓁. By Lemma 6, we have|C|≥ 𝓁 +Y [S∩
+[t∗ + 2,t− 2]]. We know that the portion ofC from height𝓁 onward is composed
+only of adversarial blocks. These must be mined at or after slot t∗. Therefore,
+|C|− 𝓁≤ Z[t∗,t ]. This implies Z[t∗,t ]≥ Y [S∩ [t∗ + 2,t− 2]]. Furthermore, we
+know thatZ[t∗,t ]≥k by the condition that the lastk blocks do not contain any
+convergence opportunity.
+C.6 Probabilistic guarantee
+We begin with a proposition that transforms the necessary conditions from Lem-
+mas 8 and 9 to a more convenient form for analysis.
+Proposition 4. Supposek-common preﬁx violation or (k,s )-chain quality vio-
+lation occurs at slot t. Then there exist t∗ < t such that Z[t∗,t ] +Y [t∗,t ]≥ k
+and Z[t∗,t ]≥Y [max(GST,t∗) + 2,t− 2]− (1 + (t−t∗)/e′)(d′ + 3)− 1.
+38 S. Sankagiri et al.
+Proof. By comparing the necessary conditions in Lemma 8 and Lemma 9, it
+suﬃces to show that Z[t∗,t ] ≥ Y [S∩ [t∗ + 2,t − 2]]− 1 implies Z[t∗,t ] ≥
+Y [max(GST,t∗) + 2,t− 2]− (1 + (t−t∗)/e′)(d′ + 3)− 1. Indeed, Z[t∗,t ] ≥
+Y [S∩ [t∗ + 2,t− 2]]− 1 implies
+Z[t∗,t ]≥Y [max(GST,t∗) + 2,t− 2]−n(d′ + 3)− 1,
+wheren is the number of checkpoints that appear in the interval [t∗,t ]. We now
+show a upper bound on n: n≤ (t−t∗)/e′ + 1. Indeed, a block mined in slot t∗
+cannot be checkpointed at a slot earlier than t∗. Of course, at slot t, we only see
+checkpoints that appear until slot t. No more than⌈(t−t∗)/e′⌉≤ (t−t∗)/e′ + 1
+checkpoints can appear over such an interval, as consecutive checkpoints are
+separated at least e′ slots apart. Thus, n≤ (t−t∗)/e′ + 1. Therefore, Z[t∗,t ]≥
+Y [max(GST,t∗) + 2,t− 2]− (1 + (t−t∗)/e′)(d′ + 3)− 1.
+We conclude the proof in this section by showing that the in a typical exe-
+cution, the condition of Proposition 4 does not occur after slot t>C · GST for
+some appropriate C >0. Therefore k-common preﬁx property and ( k,s )-chain
+quality property hold after slot t>C · GST.
+Lemma 10. For τ large enough, under ( ε,τ )-typical execution, there exist a
+constant C > 0 such that k-common preﬁx property and (k,s )-chain quality
+property holds after slot t>s , where k = 2λ∆τ and s =C· GST.
+Proof. Suppose k-common preﬁx property or ( k,s )-chain quality property is
+violated at slot t > C· GST, then by Lemma 8 we have that there exists r < t
+such that
+Z[r,t ] +Y [r,t ]≥k, (1)
+and
+Z[r,t ]≥Y [¯r + 2,t− 2]− (1 + (t−r)/e′)(d′ + 3)− 1, (2)
+where ¯r ≜ max(r, GST). We only need to show that this event won’t happen
+under typical execution. If t−r < k
+2λ∆ = τ, then under typical execution we
+have
+Y [r,t ] +Z[r,t ]≤Y [r,r +τ] +Z[r,r +τ]≤ (1 +ε)λ∆τ <2λ∆τ =k,
+which contradicts Eqn. (1). Hence we have t−r≥ k
+2λ∆ =τ.
+Further we can rewrite Eqn. (2) as
+Z[r,t ]≥Y [¯r + 2,t− 2]− (t−r)d1/e′−d2, (3)
+whered1 =d′ + 3 andd2 =d′ + 4. Eqn. (3) describes a random walk with drift.
+Note that the extra terms on the right side of Eqn. (3) are small by the fact that
+d2 =O(√κ) =O(√τ) and e′ can be chosen arbitrarily large.
+As we have seen t−r≥τ, then under typical execution we have
+Z[r,t ]≤ (t−r)¯z +ε(t−r)¯y <(1− 3ε)(t−r)¯y +ε(t−r)¯y = (1− 2ε)(t−r)¯y.
+Blockchain CAP Theorem Allows User-Dependent Adaptivity and Finality 39
+Case 1: r> GST, i.e., ¯r =r. Then we have
+Y [r + 2,t− 2]≥ (1−ε)(t−r− 4)¯y.
+Therefore, we can always choose e′ to be large enough such that (1 − 2ε +
+d1/e′)(t−r)¯y +d2 < (1−ε)(t−r− 4)¯y, given that τ, as well as t−r, is large.
+Therefore,Z[r,t ]<Y [¯r + 2,t−2]−(t−r)d1/e′−d2, which contradicts Eqn. (3).
+Case 2: r≤ GST, i.e., ¯r = GST. Then we have
+Y [¯r + 2,t− 2]≥ (1−ε)(t− GST− 4)¯y >(1−ε)(C− 1
+C t− 4)¯y.
+Again we can always lete′ andC to be large enough such that (1−2ε+d1/e′)s¯y+
+d2 < (1−ε)(C−1
+C t− 4)¯y, given that τ, as well as t, is large. Then we have
+Y [¯r+2,t−2]>Z [0,t ]+d1t/e′ +d2≥Z[r,t ]+d1(t−r)/e′ +d2, which contradicts
+Eqn. (3).
+Then we have the following corollary, which states that the common preﬁx
+property and the chain quality property of the checkpointed longest chain will
+hold after O(GST) time with high probability.
+Corollary 3. If we choose k to be large enough such that k =Θ(κ), then there
+exist a constantC >0 such thatk-common preﬁx property and (k,C·GST)-chain
+quality property hold after slot C· GST with probability at least 1−e−Ω(√κ).
+Proof. All the analysis in this section conditions on that event E occurs (CP1
+holds), and we have P(E)≥ 1−e−Ω(√κ) by Corollary 1. Then combine it with
+Corollary 2 and Lemma 10, and apply the union bound, we can conclude the
+proof.
+D Discussion
+In this section, we elaborate on some of the ﬁner details pertaining to our work.
+Choice of Algorand as the Checkpointing BFT Protocol We chose Algo-
+rand BA as our checkpointing protocol because it satisﬁes the desired properties
+CP0-CP3 as listed in §4. However, some other well-known BFT protocols fail to
+meet all these properties, and therefore we don’t use them as a candidate check-
+pointing protocol. Generally, BFT protocols can be categorized into two classes:
+1) Classic BFT protocols, such as PBFT [4] and Hotstuﬀ [25]; 2) Chained BFT
+protocols, such as Streamlet [5] and Chained Hotstuﬀ [25].
+PBFT and Hotstuﬀ don’t satisfy the CP1 (the recency condition). The ad-
+versary could potentially lock on a blockB privately when it becomes the leader
+of one view, and then the adversary ﬁnalizes B as a checkpoint after a long time
+when B is no longer in the best chain ( B is a descendant of the last checkpoint
+but not in the longest chain). In this attack, all honest blocks mined during this
+time period could be potentially wasted as they are not extending B. Further,
+this resource-bleeding attack could be turned into a perpetual liveness attack in
+40 S. Sankagiri et al.
+the partial synchronous model. One simple way to ﬁx this bug is by introduc-
+ing randomness into the protocol: when a new honest leader does not hear any
+locked block from previous views, it will propose an empty block ⊥ to refresh
+the privately locked block, with a certain probability. However, this simple ﬁx
+introduces unnecessary latency in the normal path when there is no attack and
+the network is synchronous, as it may need more views with honest leaders to
+ensure progress.
+On the other hand, for Streamlet and Chained Hotstuﬀ, the ﬁnalization of
+one block is supported by its descendants, therefore it is hard to design a check-
+pointed longest chain protocol such that all ﬁnalized checkpoints lie on a single
+blockchain. Therefore, ﬁnding or designing a good checkpointing protocol is non-
+trivial, and it would be interesting to see whether there is any other BFT protocol
+that ﬁts our need and perhaps has better latency and lower communication cost.
+Checkpointing protocol properties The ﬁnality gadget in GRANDPA [24]
+and the ﬁnality layer of Afgjort [10] are also checkpointing protocols. The desired
+checkpointing properties in GRANDPA are very similar to ours: it has CP0,
+CP1 and CP3, but CP2 (gap in checkpoints) is missing. Without CP2, the
+mining bleeding could happen frequently, which leads to security vulnerabilities.
+(Note that GRANDPA also does not have property P3, as discussed in §2).
+Afgjort only requires CP0, but it has two other desired properties: The “∆-
+updated” property guarantees that the chains held by honest nodes are at most
+∆ blocks beyond the last ﬁnalized block; “k-support property” ensures that any
+ﬁnalized block must have been on the chain adopted by at least k honest nodes.
+The “∆-updated” property is in the opposite direction of our CP2; our protocol
+satisﬁes n/3-support. We defer a full comparison of all these properties and
+identifying the minimal set of desired properties to future work.
+Attack on GRANDPA In §2, we claimed that in the GRANDPA design, the
+k-deep rule is insecure in the synchronous but unsized setting. Here, we describe
+a possible “roll-back” attack, using some notations from GRANDPA paper [24].
+Let h be the number of online honest voters and we assume f + 1≤ h≤ 2f.
+Suppose at the beginning of round 1, the genesis block B0 has two children B1
+andB2 (they are siblings), whereB1 is an honest block andB2 is a private block.
+Then allh honest voters prevote forB1 in step 3 of round 1. However, all honest
+voters will get stuck in step 4 if the adversary doesn’t send any prevotes, because
+g(V1,v) = nil and E0,v = B0 hence g(V1,v)≥ E0,v is not satisﬁed. However, all
+honest miners will mine on B2 (assuming tie breaking in favor of the adversary).
+WhenB2 becomes k-deep, the adversary casts enough prevotes and precommits
+on B1 to make B1 ﬁnalized in round 1. Now B2 is deconﬁrmed, and all honest
+miners switch to mine onB1, creating a safety violation. Further if the adversary
+has mined some private blocks on B1, then he can continuous this attack in all
+rounds and all the ﬁnalized block will be adversarial block, leading to a liveness
+violation.
