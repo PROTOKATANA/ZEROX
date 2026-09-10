@@ -2,7 +2,7 @@
 
 > **ESTADO: DRAFT v0 — NO IMPLEMENTAR TODAVÍA.**
 > Cierra la Fase 0. Pendiente de revisión humana antes de escribir código de consenso.
-> Última revisión: 2026-09-04.
+> Última revisión: 2026-09-10.
 >
 > Alcance de este documento: **ZZK v1.0, capa transparente**. El pool blindado (v1.1, Fase 6)
 > tiene secciones reservadas con punteros a la investigación, no reglas normativas todavía.
@@ -769,7 +769,7 @@ de prioridades sigue existiendo por encima del mínimo.
 > adversarial de **D8** y **D2** antes de darse por buena: en concreto, si anclar solo a `Mlt`
 > abarata el spam durante el periodo en que `Mlt` es alta y la demanda real ha colapsado.
 
-#### Calibración pendiente
+#### Calibración
 
 Con `REF_WEIGHT = 384 000`, `Mf = ZONA_LIBRE = 100 000` y la emisión recalibrada a `λ = 1`:
 
@@ -815,8 +815,10 @@ Con `REF_WEIGHT = 384 000`, `Mf = ZONA_LIBRE = 100 000` y la emisión recalibrad
 precedente en producción. **Recalibrado a 384 000 el 2026-09-09** (P-041): la tarifa escala con
 `recompensa_base`, y al dividir la recompensa por 128 para `λ = 1` el antispam se debilitaba en el
 mismo factor; 384 000 = 3 000 × 128 devuelve el coste del atacante (543 590 ZZK por GB de cadena) al
-valor del diseño original (`research/scripts/rendimiento/verif_zona_libre.py`). **Su calibración para ZEROX requiere un modelo de coste de atacante
-explícito** — encargo abierto para **D2** y **D8**, no una constante cerrada.
+valor del diseño original (`research/scripts/rendimiento/verif_zona_libre.py`). **La constante quedó
+cerrada con ese modelo de coste explícito; lo que sigue abierto no es su valor, sino su ataque:**
+el suelo `TARIFA_SUELO` no ha pasado ronda adversarial —la pregunta es si, al hacer la tarifa
+insensible a la capacidad, se abre una vía por el otro lado.
 
 ---
 
@@ -1580,9 +1582,10 @@ mediana efectiva percibe **menos de `TAIL_EMISSION`**, tendiendo a 0 conforme `x
 El contador `emitido(H)` acumula el **subsidio efectivo ya penalizado**: la moneda no percibida
 **MUST NOT** emitirse nunca.
 
-> ⚠️ **`TAIL_EMISSION = 32 ZZK/bloque` es la emisión NOMINAL, no un mínimo garantizado por
-> bloque.** Decidido 2026-09-04 (P-009f, hallazgo H-004).
-> La alternativa —aplicar el suelo *después* de penalizar— garantizaría los 32 ZZK, pero anularía
+> ⚠️ **`TAIL_EMISSION = 0,26666666 ZZK/bloque` (26 666 666 brek) es la emisión NOMINAL, no un
+> mínimo garantizado por bloque.** Decidido 2026-09-04 (P-009f, hallazgo H-004); valor
+> recalibrado el 2026-09-09 (P-041).
+> La alternativa —aplicar el suelo *después* de penalizar— garantizaría el tail, pero anularía
 > la penalización en régimen de cola permanente, que en ZEROX es **para siempre**: llenar el bloque
 > hasta `2M` saldría gratis y se reintroduciría el problema que `monero-project/monero#1878` ya
 > señalaba en 2017. Ver `research/dynamic-blocksize.md` §6.
@@ -1991,7 +1994,19 @@ cadena canónica, **no** quién puede producir bloques.
 | Alto valor / irreversible (envío físico caro) | **12 000** | 3,3 h | **cero por protocolo** (C-REORG-07) |
 
 > ⚠️ Las filas de 3 y 6 confirmaciones están calculadas a `T = 120 s` y no se han rederivado para
-> `λ = 1` ni para el DAG (donde la probabilidad de reversión a 600 s es 4,3·10⁻¹⁰, `research/dag-poas-ancla-de-orden.md` §3). Pendiente en P-041.
+> `λ = 1` ni para el DAG (donde la probabilidad de reversión a 600 s es 4,3·10⁻¹⁰, `research/dag-poas-ancla-de-orden.md` §3). **Herencia de P-041, cerrada el 2026-09-10:** va con las reglas de red del DAG.
+>
+> **Decisión de rumbo (Katana, 2026-09-10): A + C.** El protocolo **no incorpora comité de finalidad**
+> (`DECISIONES.md` §27). La irreversibilidad es **probabilística** y la regla dura sin comité es
+> `C-REORG-07` (11 999 bloques, 3,33 h); el checkpoint `C-CHK` es una excepción del periodo frágil y
+> centraliza, por eso no es un mecanismo general. La confirmación adaptativa sobre el DAG
+> (`research/scripts/d16-gate/`) quedó **refutada como está diseñada**: su fórmula de espera es
+> inconsistente con el modelo de riesgo del proyecto (error 2,56·10⁵×), y la variante honesta no
+> pasa el criterio de muerte con el peor `k_ref` medido. **La irreversibilidad publicable es
+> probabilista por profundidad; `C-REORG-07` es la garantía dura.** Esta tabla es **la recomendación
+> por defecto, no una regla**: la
+> profundidad de confirmación es política del comerciante y cada usuario elige su espera por importe.
+> **Cortex es una aplicación: el consenso no depende de ella.**
 
 A T=120 s, `z` confirmaciones cuestan **5× menos tiempo real** que las mismas `z` en Bitcoin. El
 tercer nivel no es una probabilidad: es la garantía dura de C-REORG-07.
@@ -2329,7 +2344,8 @@ por construcción**.
 > **2,40 GB** en el techo adversarial de C-WGT-02 (a `T = 120 s` eran 99 bloques y 18 MB). Crece
 > linealmente con `MAX_REORG_LENGTH`. Queda escrito para que nadie lo suba sin verla. ⚠️ A `λ = 1` este
 > solapamiento en memoria es una factura real del nodo doméstico; bajo el DAG, R-FIN-7 (`F = 2 h` =
-> 7 200 bloques) lo dejaría en 1,44 GB. Pendiente en P-041.
+> 7 200 bloques) lo dejaría en 1,44 GB. **Herencia de P-041, cerrada el 2026-09-10:** pesa en la
+> decisión de poda (problema 34 del catálogo).
 >
 > zebra hace esto mismo con una ventana de 1 000 y **sin datos de undo en absoluto**: al gastarse
 > una salida, su entrada se borra (`zebra_db/transparent.rs:695-699`, v6.3.0).
@@ -3041,7 +3057,7 @@ cadena**. Los seis huecos están escritos:
 | ID | Sección | Resolución |
 |---|---|---|
 | **P-001** | §3.1 | **SHA3-256 (FIPS 202)** |
-| **P-002** | §8.1 | **1 000 000 000 ZZK** · **32 ZZK/bloque** · madurez 100 |
+| **P-002** | §8.1 | **1 000 000 000 ZZK** · **0,26666666 ZZK/bloque** (era 32) · madurez **12 000** (era 100) — recalibrado 2026-09-09 (P-041) |
 | **P-003** | §7.3 | `N = 90`, **con** suelo `T_FLOOR` |
 | **P-004** | §6.1, §7.2, §7.3 | `POW_LIMIT = 2^224 − 1` · `MIN_TARGET = 2^64` · `TARGET_INICIAL = POW_LIMIT` 🔶 · `timestamp: u64` |
 | **P-009a–f** | §6.5, §8.1 | Bloque dinámico parametrizado; **el tail no es suelo por bloque** (C-EMIT-07) |
@@ -3052,7 +3068,7 @@ cadena**. Los seis huecos están escritos:
 | — | §6.5, §5.4 | `MAX_TX_WEIGHT = ZONA_LIBRE = 100 000` (C-WGT-11, C-TX-18) |
 | **P-011** | §5.4, §5.5 | Tarifa mínima **NO es consenso** (C-TX-15 corregida); fórmula dinámica anclada a `Mlt` |
 | **P-012** | §11 | Desempate **determinista por menor hash de tip** (C-FORK-04), estilo Zebra, no orden de llegada |
-| **P-013** | §12 | `MAX_REORG_LENGTH = 99` con **fail-stop**. Finalidad por protocolo a las 100 confirmaciones |
+| **P-013** | §12 | `MAX_REORG_LENGTH = 11 999` (era 99) con **fail-stop**. Finalidad por protocolo a las **12 000** confirmaciones (era 100) — recalibrado 2026-09-09 (P-041) |
 | — | §14 | `CONSENSUS_BRANCH_ID` en la **cabecera** (C-UPG-05) — cierra el agujero de *wipe-out* que ZIP-200 dejó sin implementar |
 | — | §16.2 | **Relé compacto de bloques** (R-NET-01/02, estilo BIP 152). Transporte, **no consenso** ⇒ no puede partir la cadena; el peor caso es que no ayude. Huérfanos ~1,65 % → ~0,42 % |
 
