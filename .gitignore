@@ -1,6 +1,18 @@
 target/
 
-# Fuentes primarias de Chia. Los PDF y el clon de chia-blockchain (130 MB) son material de
-# consulta, no código nuestro: se leen, no se versionan. Quien reconstruya el repo los baja de
-# los enlaces de PDF/repositorio.txt.
+# Estado local del editor y cachés de instrumentos históricos; no son fuentes del proyecto.
+.obsidian/
+__pycache__/
+*.pyc
+*.pyo
+
+# Clones de fuentes primarias: consulta, no código del workspace. Commits y procedencia
+# documentados en PDF/README.md y PDF/repositorio.txt; no se versionan los clones completos.
 PDF/chia-blockchain/
+PDF/autonomys-subspace/
+
+# Zona de trabajo aislada para el ejecutor externo (DeepSeek). Nada de aquí es fuente del
+# proyecto: el ejecutor trabaja ahí aislado y sus cambios se migran a su ruta real sólo tras
+# validarse. El directorio se borra al cerrar cada encargo; la evidencia que deba sobrevivir se
+# deja en veritas/ antes del borrado.
+deepseek/

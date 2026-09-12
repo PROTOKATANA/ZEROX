@@ -1,4 +1,4 @@
-# ZEROX compila en NIGHTLY PINEADO desde 2026-09-05. Ver DECISIONES.md §18.
+# ZEROX compila en NIGHTLY PINEADO desde 2026-09-05. Ver MIGRACION.md para el estado del proyecto.
 #
 # El motivo es `ab-proof-of-space` (verificador de pruebas de espacio de Autonomys), que usa
 # `generic_const_exprs` y otras cuatro features inestables. Es la misma versión que Autonomys
