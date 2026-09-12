@@ -1,5 +1,12 @@
 # Ancla de orden — octava propuesta para un DAG sobre PoAS
 
+> **Consolidación documental — 2026-09-10.** Las tablas iniciales y los resultados de rondas son
+> históricos, no un perfil actual ni garantías revalidadas. Prevalecen [SPEC §7](../SPEC.md) y
+> [MODELO, revisión 2](../veritas/finalidad/baseline-30m/MODELO.md): A″, k30, slot no estricto,
+> U2/U3″, R-FIN-8′/13′; S_max150 nominal y F2h provisional. I/L/ρ no están cerrados. La tasa media
+> no acota determinísticamente el menú de anclas; tampoco se ha probado finalidad a 112,5 s.
+> Se corrigen abajo residuos textuales y se señalan lagunas sin reescribir mediciones históricas.
+
 **Fecha:** 2026-09-08 · **ESTADO (tras D9-f):** ancla **por `slot`** (índice de PoT) — la cuarta y la única con **`m` acotado por construcción**: `m ≤ 1 + λ·S_max[s]`. `F ∝ ln m`, así que las constantes **sí están dimensionadas, contra su cota**: **`I = 4 200 s`, `F = 5,3 h` medidos** (familia de D9-e), **`F ≤ 68,5 h` garantizado** (`S_max = 150 s`); **`c` desaparece**. Prop. 7 la cubre (Lema A4-slot). `τ ≈ 0,1 s`, R-FIN-1a **no estricta**, `S_max` **en segundos**. Ver `dag-poas-ancla-de-orden-auditoria-6.md`. **Pendiente: D8 sobre el diseño completo; la duración real del slot de PoT de Autonomys; `Δ`.** Es la **séptima propuesta**
 (`dag-poas-ancla-de-finalidad.md`) con **una regla reescrita y cuatro constantes derivadas**. Nueve
 de sus diez reglas se copian sin tocar. La meta-auditoría que motiva el cambio está en
@@ -155,19 +162,27 @@ convergen en `F ≈ 3,2 h`.** La ronda 7 ya lo había calculado en su §5.2.
 
 Constantes: `k = 30`, `q = 1`, `τ = 1 s` (A″), **`S_max = 150 s`** (DECIDIDO por Katana 2026-09-08: garantía `F ≤ 68,5 h` y tolerancia a particiones con `f ≥ 9 %`), `W_RETARGET ≥ 3 083`, **`F = 5,3 h` medido / `≤ 68,5 h` garantizado — se publican los dos con etiqueta y se diseña con el medido** (DECIDIDO), `I = 4 200 s`. **Umbral operativo publicado: 33 %** (DECIDIDO por Katana tras D8, 2026-09-08; confirmado por 9a: **frontera de flujo único 46,9 % contra un atacante de espacio**, condicionada a `2Δλ ≪ k` — a `Δ = 16 s` es 38,3 %, a `Δ = 20 s` 32,4 %; el 36,5 % de la auditoría 7 contaba dos veces el `α` del atacante). **D8 CERRADO** (`dag-poas-ancla-de-orden-auditoria-7.md`): `S_max = 150 s` **se mantiene**; la `m` medida con retención hasta `S_max` es **2,822** (A4.2) ⇒ `I = 4 890 s`, **`F = 6,17 h`** si se diseña con ella (pendiente de Katana); el «68,5 h garantizado» es garantía de consenso **sin respaldo económico** (0,49× frente a la GPU de hoy); el umbral de orden **es 37,1 %, no 40,0 %** (cadena parásita, `δ(0,35) = 0,318` con retarget); la frontera de flujo único es **36,25 %** y el 35 % sobrevive con 1,25 puntos; **desviarse es rentable desde 33 %** (R-FIN-8 no paga rojos). Pendientes de Katana: umbral (33 % recomendado), `F` con `m = 2,822`, etiqueta del 68,5 h, pagar rojos. **Rondas 9a/9b/9c cerradas** (`auditoria-8a/8b/8c.md`): R-FIN-8′, R-FIN-13′ y R-FIN-14 escritas; **`I` y `F` pendientes de recalibrar** con `W_dec ≤ 45 s` (candidatos en `auditoria-8c.md` §3: `I ≈ 490-850 s`, `F = max(F_carrera, I/(W/κ−1))`, lookahead 0,76-1,31 h, margen 3-5×; la elección de `ρ_max` y de `F` es de Katana). `Δ` sigue sin medir y es la primera medición que el diseño necesita. **DECIDIDO por Katana (2026-09-08, noche): `F = 2 h` PROVISIONAL** (cubre el `δ` pesimista de D8, 1,85 h, y la pinza `I/(W/κ−1) = 1,07 h` con `ρ_max = 3`); **se baja a 1 h cuando el diseño corregido sobreviva a su ronda adversarial, y es obligación bajarla en producción** (cuanto más corta, mejor para el usuario y contra el plotter rápido; ver `dag-poas-bitacora-2026-09-08.md` §11). **`ρ_max`: pendiente** (Katana entre 3× sin segundo VDF y revelación retardada; un 19× para AES no es físicamente alcanzable, `research/pot-aes-asic-chacha.md`). **P-038 sigue abierta.** Aviso: la frontera 46,9 % se calculó con `F = 19 080 s`; con `F = 2 h` hay que recalcularla (el 33 % aguanta: `F_carrera(35 %) = 0,34 h`).
 (§6). Estructura: GHOSTDAG (`rusty-kaspa @ c338d495`) con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules,
-desempate por menor `solution_distance` y nunca por hash, unicidad de billete **U3′-filtro** y **U2**
-(R-FIN-11; corregidas tras D9 ronda 8, que refutó la forma posproceso), retarget por controlador multiplicativo sobre azules, un solo flujo de PoT
-por gossip.
+desempate por menor `solution_distance` (el desempate completo sigue pendiente en SPEC §11),
+unicidad de billete **U3″ dinámica** y **U2** (R-FIN-11), retarget sobre el conjunto pagable de
+R-FIN-13′, no sólo azules, con unicidad de pago pendiente. Un solo flujo de PoT por gossip.
 
 **R-FIN-1 · Inyector por `slot` — CUARTA ANCLA (2026-09-08, tras D9-f).**
 `I_j(B) :=` el bloque de la cadena seleccionada de `B` con **menor `blue_work` entre los de `slot ≥ T_j`**, con
-`T_j = j·I` un **índice de PoT** fijo (R-FIN-13). Único por cadena, siempre existe (si ningún bloque de cadena
-tiene `slot ∈ [T_j, T_j + S_max)`, el primero posterior), sin campo de cabecera, función de `past(B)`.
+`T_j = j·I_slots` un **índice de PoT** fijo (R-FIN-13), sin campo de cabecera, función de `past(B)`.
+**Cierre pendiente:** no se presupone existencia si la cadena aún no alcanza T_j. Hay que cerrar
+bootstrap, selección inequívoca/primer cruce y disponibilidad tras poda; «siempre existe» no era
+una definición del caso vacío.
 
 > **Cota E, por construcción (D9-f, DEMOSTRADO el enunciado):** por R-FIN-1a, `slot(I_j) ∈ [T_j, T_j + S_max)` sin
 > ninguna hipótesis estadística; como `slot` lo fija el PoT y `λ` el retarget, **`m ≤ 1 + λ·S_max[s]`** (PLAUSIBLE
 > el conteo). Medido, mismas semillas y familia que D9-e: **`m = 2,54`** donde `blue_score` daba 6,05; con
 > retención 3,64 ↔ 8,54. **Prop. 7 la cubre** (Lema A4-slot, 13 110/13 110, sin necesitar monotonía).
+
+> **Corrección de alcance (2026-09-10):** el intervalo semiabierto se obtiene si el ancla es el
+> primer cruce, con padre p<T_j y salto ≤S_max_slots: entonces b<T_j+S_max_slots. No resuelve por
+> sí solo la selección/existencia anterior. Y `λ·S_max` usa una media, no un máximo de bloques:
+> la desigualdad histórica para m no es una cota determinista demostrada ni una esperanza sin
+> hipótesis adicionales. Las mediciones anteriores conservan únicamente su alcance experimental.
 
 > **Historial de anclas.** (1) Índice del orden total: **cuenta rojos** (D9-b). (2) Posición de cadena: **cuenta
 > saltos** (D9-c). (3) `blue_score`: cuenta azules, **no es un reloj** — el atacante fabrica bloques en la banda
@@ -181,15 +196,21 @@ límites (`max_block_parents = 15`, `mergeset_size_limit = 180` a `k=30`), sino 
 - **`merge_depth_bound`** y **`pruning_depth`** (`params.rs:189`). **Corrección D9-f:** `merge_depth_bound` acota lo que un bloque **fusiona** (`check_bounded_merge_depth` recorre solo `mergeset_reds`, `post_pow_validation.rs:85`), **no de dónde cuelga**; lo que acota de dónde cuelga es la **finalidad** (`processor.rs:1033`), y es la finalidad la que acota la retrolectura de U2.
 - **El `shuffle` de `pick_virtual_parents`** (`processor.rs:1069-1089`: mitad por `blue_work`, resto **al azar** «to ensure diversity between nodes»): **obligatorio**, no opcional. D9-d A3.1: el daño no viene del presupuesto de mergeset sino del tope de 15 padres frente a ~550 puntas; **sin el shuffle, 14-21 bloques honestos quedan fuera del DAG para siempre**.
 
+  Precisión de portado (2026-09-10): se baraja la cola de candidatos; el padre seleccionado se
+  incorpora aparte y los presupuestos pueden rechazar/reemplazar candidatos. No son cuotas
+  de padres finales ni azar en la validación de consenso.
+
 **R-FIN-1a · Monotonicidad de slot en la cadena seleccionada — NO ESTRICTA (D9-f B0).** `slot(sp(B)) ≤ slot(B)`.
-Un bloque cuyo padre seleccionado tenga slot mayor o igual es inválido. (D8 ronda 7, ataque A1;
-D9 demostró que `≤` reabre el ataque.) **Se conserva:** aunque el inyector ya no se lea de la cadena
-seleccionada, la monotonicidad sigue siendo necesaria para R-FIN-7.
-**Y cota superior en SEGUNDOS: `slot(B) − slot(sp(B)) ≤ S_max`, con `S_max ∈ [20 s, 150 s]`.** D9-f B4bis: `S_max` **se co-determina con el steering** (`m ≤ 1 + λ·S_max[s]`): `≥ 20 s` por el gap medido de cadena (15,9 s a `α=0,40`), `150 s` para tolerar particiones con `f ≥ 0,09` (D9-d) a costa de garantía `F ≤ 68,5 h`; `20-30 s` da `F ≤ 35-41 h`. **Elección con etiqueta.**
+Un bloque cuyo padre seleccionado tenga slot **mayor** es inválido; el empate está permitido
+por la decisión A″ citada bajo R-FIN-7. La frase anterior «mayor o igual» era un residuo superado.
+**Cota del perfil nominal:** `slot(B) − slot(sp(B)) ≤ S_max_slots = 150`, con `τ_nom=1 s/slot`.
+Es diferencia de índices, no cota física de red o retención. **Escenarios históricos, no nuevas
+garantías:** D9-f B4bis exploró 20–150 s, condicionado al steering; sus tiempos de finalidad y
+tolerancia a particiones no se revalidan con esta corrección de unidades.
 Con `τ = 1 s` la versión estricta invalidaría el 23,7-29,3 % de las aristas de cadena bajo ataque (D9-f B0); con `τ ≈ 0,1 s` y `≤` queda el 4,1 %, que la relajación absorbe. `S_max` cubre además la cola de operación normal a `10⁻¹²` y deja el DoS de verificación de PoT en ×60 (D9-d).
 
 **R-FIN-2 · Entropía e instante.** `entropía_j = blake3(chunk(I_j) ‖ pot_output(I_j))`;
-`t_j = slot(I_j) + L`. Antes de `t_j` la entropía no se mezcla, así que durante `[slot(I_j), t_j)`
+`t_j = slot(I_j) + L_slots`. Antes de `t_j` la entropía no se mezcla, así que durante `[slot(I_j), t_j)`
 todos los candidatos a `I_j` producen el mismo flujo: **una sola lotería**.
 
 **R-FIN-3 · Identificador de flujo.** `flujo(B, s) = H(flujo(B, t_{j−1}) ‖ entropía_j ‖ t_j)` para la
@@ -216,18 +237,19 @@ Identidad `(public_key, sector_index, history_size, chunk, slot)`.
 > determinista `r8c_a3_filtro.py`). U3″ deja 1 azul por identidad y 0 honestos rojos de más.
 > **VERIFICADA en simulación de eventos (D9-d A3):** peor `δ_ef = 0,129` con U3″ (cotas 0,2105 / 0,267), frente a **0,379** con U3′-filtro. Que no reabra otra cosa: PLAUSIBLE.
 
-**R-FIN-13 · Ventana del retarget. (NUEVA, 2026-09-08.)** `W_RETARGET ≥ 3 083 slots` con `γ ≤ 0,25`
-(o `W ≥ 12 331` con `γ ≤ 1`). Es lo que hace que `φ_c`, probado sobre **conteo**, valga sobre
-**peso** (`blue_work = Σ w(SR)`): la discrepancia sobre el horizonte `F` queda `< 1 %` y el umbral se
-mueve `< 0,4` puntos. Derivación y tabla en `dag-poas-empalme-peso.md`. Es una elección de diseño,
-con etiqueta.
+**R-FIN-13 · Ventana del retarget.** Referencias históricas: `W_RETARGET ≥ 3 083 slots` con
+`γ ≤ 0,25` (o `W ≥ 12 331` con `γ ≤ 1`). **Corrección 2026-09-10:** su derivación en
+`dag-poas-empalme-peso.md` usa tasa azul/F anteriores y desviación típica aproximada; no demuestra
+un error uniforme `<1 %`, ni transfiere por sí sola `φ_c` de conteo a peso en el DAG destino.
+Recalibración pendiente para R-FIN-13′, sin escoger otra ventana aquí.
 **`slot` es el ÍNDICE DE PoT, no el sello de tiempo de la cabecera** (D9-e LAGUNA 5, cerrada): con el sello el
 retarget es falsificable por *timewarp* y reaparece la palanca de heredar el `SR` de otra ventana (A1b). `N_obs`
-cuenta azules del flujo canónico en la ventana de `W` índices de PoT.
+contaba azules en la versión anterior; el conjunto de referencia vigente es el de R-FIN-13′.
 
 **R-FIN-13′ · Enmienda (ronda 9b).** `N_obs` cuenta, en la ventana de `W` índices de PoT del flujo canónico,
-**exactamente los bloques que cobran por R-FIN-8′** — azules y `rojo_k`, es decir **un bloque por identidad de
-billete**; los `rojo_U3` no cuentan. Invariante: *el conjunto que el retarget cuenta y el que la emisión paga son
+**exactamente los bloques que cobran por R-FIN-8′** — azules y `rojo_k`; los `rojo_U3` no cuentan.
+El objetivo **un bloque pagado por identidad** necesita el cierre descrito bajo R-FIN-8′, no se
+deduce sólo de la unicidad azul. Invariante: *el conjunto que el retarget cuenta y el que la emisión paga son
 el mismo* (si el pagado excede al contado, la emisión corre por delante y el exceso se lo lleva quien lo provoca;
 si el contado excede al pagado, `λ_real` se infla). **Medido (9b):** inflación del retarget bajo la parásita
 ×1,452 (contando azules) → **×1,005**; `dag-poas-delta-real.md` deja de aplicar; umbral de orden 40,0 → 41,7 %.
@@ -265,8 +287,16 @@ exige conocer la cadena común `L` slots por delante); con `ρ > 1`, `n_eval = �
 si se adopta: un lado de partición sin `q + 1` líneas de AES no produce bloques válidos aunque conserve su espacio.
 `I` deja de escalar como `1/g²`: `I = c_m·√(n_eval/(αλ))/g`, y `F = max(F_carrera, I/(W/κ − 1))`.
 
-**R-FIN-6 · Color.** El k-cluster de GHOSTDAG con `k = 25`, sin condición de color por flujo
-(R-FIN-5 la hace innecesaria). «Cadena seleccionada ⊆ azules» se conserva —U3′ lo respeta, U3 no.
+**Alcance actual de (f)/(g), 2026-09-10:** W_dec45 es máximo observado y ρ2,5 estimación, no
+cotas universales. I_slots separa umbrales, no necesariamente inyecciones. La conversión a
+segundos necesita velocidad de producción secuencial de referencia y calendario N(s); ver
+SPEC §7.3. La igualdad del presupuesto de (f) no excluye terminar justo en un deadline inclusivo.
+Se conserva S_max_slots<I_slots como condición suficiente del perfil, sin declararla necesaria
+para todo diseño. El candidato 112,5 s no satisface conjuntamente ese perfil con S_max150; no
+demuestra finalidad determinista ni obliga a descartar la familia de anclas/PoT.
+
+**R-FIN-6 · Color.** El k-cluster de GHOSTDAG con `k = 30` y U3″ dinámica, sin condición de color
+por flujo (R-FIN-5 la hace innecesaria). El k25 residual queda superado por el perfil de §2/SPEC.
 
 **R-FIN-7 · Finalidad en tiempo, sin `exit`.** Un nodo **MUST NOT** reorganizar su cadena
 seleccionada por debajo de `F` segundos de slot; una punta que lo exigiera se **ignora**, nunca
@@ -335,8 +365,20 @@ bajo la misma `public_key`, `C-HDR-03/04`). **Lo que cierra, medido (9b, 12 semi
 51 billetes). *Texto anterior (R-FIN-8):* «Ni la coinbase ni las transacciones de un bloque rojo se aplican al
 estado» — cerraba la inflación ×10 (ronda 1) y el espacio gratis (ronda 3); `P(honesto rojo) = 1,2·10⁻⁶` a `Δ = 4 s`.
 
-**R-FIN-9 · Recalibración del PoT.** Los cambios de `slot_iterations` se leen también del índice `c·j`
-y se aplican en `t_j`.
+**Laguna de R-FIN-8′/13′ (2026-09-10):** U2 no prohíbe dos copias paralelas, y U3″ consume
+identidad azul, no identidad pagada. Si ambas copias quedan rojas por k sin copia azul, la
+redacción no especifica cuál deja de cobrar/contar. «Cada bloque una vez» no resuelve «cada
+billete una vez». Falta fijar consumo, contexto persistente y selección entre copias, también
+en fusiones distintas. Es una laguna semántica, no un exploit completo demostrado. La ronda
+9b no combinó parásita y copias (`dag-poas-ancla-de-orden-auditoria-8b.md`, §4).
+Laguna cerrada en SPEC.md §7.2 el 2026-09-12 con P1 (azul primero); evidencia en
+`veritas/consenso/comprobacion-decisiva-v1/`.
+
+**R-FIN-9 · Recalibración del PoT.** La referencia al inyector es R-FIN-1, por umbral
+`T_j=j·I_slots`, no el contador obsoleto `c·j`. Los cambios de `N(s)=slot_iterations` se aplican
+en el mismo `t_j` que la entropía (R-FIN-14). **Pendiente:** origen de épocas, N inicial, regla
+que determina/autentica actualizaciones, límites y anuncio; esta corrección no los inventa.
+El actualizador upstream con `ensure_root` no es una autoridad adoptada por ZEROX.
 
 **R-FIN-10 · `C-EXP-04` sobre la cadena seleccionada. (Corregida tras D9-e A4b.)** `altura := blue_work` de la
 cadena seleccionada —**no** `idx` ni `blue_score`—, porque `blue_work` es monótono bajo ancestría con peso real

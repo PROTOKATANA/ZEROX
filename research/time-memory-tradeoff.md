@@ -168,8 +168,8 @@ extrapolación mía, no está en el paper.**
 
 ## 4 · ¿Es este el diseño que Chia implementó? Sí — y aquí no hay precursor abandonado
 
-A diferencia de `PDF/ChiaGreenPaper.pdf` (el precursor de 2019 nunca implementado, documentado en
-`research/proof-of-space-tiempo.md`), **este paper es la fuente primaria que Chia dice
+A diferencia del precursor de Chia de 2019 (nunca implementado y retirado de `PDF/` durante la
+limpieza; documentado en `research/proof-of-space-tiempo.md`), **este paper es la fuente primaria que Chia dice
 explícitamente haber usado**, verificado en la documentación oficial de construcción de pruebas de
 espacio (`chia.net/wp-content/uploads/2023/01/proof_of_space.pdf`, descargado y extraído con
 `pypdf` el 2026-09-05):

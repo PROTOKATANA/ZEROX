@@ -3,3 +3,9 @@ Documentación : https://docs.chia.net/chia-blockchain/introduction/
 Documentación : https://chiapower.org/chia-proofs-of-space/PoST
 
 Repositorio : https://github.com/Chia-Network/chia-blockchain
+Commit local Chia : f87270c0275904981366651a59a0618aea5144ce
+
+Repositorio Rust Autonomys : https://github.com/autonomys/subspace
+Commit de referencia Autonomys : f8842d019cdf0f7163421b9644db5a9ff82b2a73
+Directorio local : PDF/autonomys-subspace/
+Procedencia : clon independiente de /home/katana/zeo/fuentes/subspace, 2026-09-10; sin actualización remota.

@@ -1,5 +1,16 @@
 # El empalme `φ_c` (conteo) ⊗ `blue_work` (peso) — reducido a una restricción de diseño
 
+> **Rectificación de alcance — 2026-09-10.** Se conserva esta nota y su tabla como evidencia
+> histórica, no como certificación vigente. La desviación típica aproximada de §2 no prueba
+> un error uniforme `<1 %` en todo el horizonte ni su cola bajo ataque. Un peso constante,
+> común y estrictamente positivo preserva la comparación de conteos al convertirlos en pesos
+> para los mismos conjuntos; no demuestra por sí solo que
+> la carrera del árbol privado modele crecimiento azul, conflictos o pagos del DAG destino.
+> R-FIN-13′ cambió el conjunto contabilizado y F también cambió: los W de esta nota requieren
+> revisión. La corrección de §4 bis tampoco aporta una cota diferencial adversarial general.
+> Prevalecen [SPEC §§7/11](../SPEC.md) y [MODELO §6](../veritas/finalidad/baseline-30m/MODELO.md).
+> No se recalcularon cifras ni se ejecutó el instrumento histórico en esta rectificación.
+
 **Fecha:** 2026-09-08 (madrugada, modo autónomo) · **Origen:** deuda declarada desde la ronda 3
 (`dag-poas-candidatos-auditoria.md` L173: *«φ_c está probado contra la cadena honesta ficticia, no
 contra el crecimiento azul de un DAG… es exactamente el teorema que falta»*), repetida en las rondas

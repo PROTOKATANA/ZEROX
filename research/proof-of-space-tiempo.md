@@ -12,9 +12,10 @@ Es el hallazgo que reordena todo lo demás, y está verificado en la web oficial
 > *"the Green Paper's previous version that discusses a precursor consensus **which was never
 > implemented** is available here for viewing"* — docs.chia.net
 
-El archivo se publica allí como **`Precursor-ChiaGreenPaper.pdf`**. Es el que está en
-`PDF/ChiaGreenPaper.pdf`, fechado el 9 de julio de 2019. **El greenpaper vigente es del 12 de junio
-de 2026.**
+El archivo se publica allí como **`Precursor-ChiaGreenPaper.pdf`**, fechado el 9 de julio de
+2019. La copia local de ese precursor se retiró en la limpieza del 10 de septiembre de 2026.
+La versión consultada como vigente en esta investigación fue el
+[greenpaper del 12 de junio de 2026](scripts/d14-sin-comite/fuentes/chia-greenpaper-20260612.pdf).
 
 | | Atacante | Honesto |
 |---|---|---|
