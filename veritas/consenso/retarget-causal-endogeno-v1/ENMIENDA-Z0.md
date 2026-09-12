@@ -170,3 +170,24 @@ al SPEC original de la firma se da por perdido y se consigna aquí para que qued
 Un informe previo describió `70481a8e…` como «el hash de `git show HEAD:SPEC.md`». Esa
 afirmación era incorrecta y no se verificó antes de repetirla; los tres valores de arriba sí
 están medidos.
+
+## Efecto colateral detectado despues de migrar: la huella cruzada de DCM
+
+Al commitear el resto de `veritas/` se comprobaron las huellas de **todos** los instrumentos, no
+solo las de RCE, y apareció una consecuencia de esta enmienda que ni el ejecutor ni la validación
+habían visto:
+
+`veritas/consenso/disponibilidad-causal-multivista-v1/HUELLAS.sha256` **firma el CONTRATO de
+RCE-v0.1**, porque DCM lo declara entre sus insumos. Al pasar ese contrato a revisión 2, la huella
+cruzada quedó desalineada (`0cee6dc2…` → `34eeee87…`).
+
+Corregido al valor de la revisión 2, que es el contrato que DCM consume realmente hoy.
+
+**La lección, que vale más que el arreglo:** al enmendar un contrato hay que buscar quién más lo
+firma, no solo revisar las huellas del instrumento que se toca. El comando es
+
+```bash
+grep -l "<ruta del fichero enmendado>" veritas/consenso/*/HUELLAS.sha256
+```
+
+y debería ejecutarse en toda enmienda futura antes de dar el trabajo por cerrado.

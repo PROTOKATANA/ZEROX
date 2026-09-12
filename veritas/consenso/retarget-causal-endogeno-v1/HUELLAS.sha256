@@ -32,4 +32,4 @@ bf77626edf11136ad21f8e909105c6a83971e33e07c454105fdc5167d52345fe  veritas/consen
 581807ce9a2e868a95acf14303db8787011a0c388152608be3e5a2bd3d1320d1  veritas/consenso/retarget-causal-endogeno-v1/src/simulacion.jl
 cf10fe0ba251ee4b97775d5a7009e7acd731b699f8299be5bae1c7657d94797c  veritas/consenso/retarget-causal-endogeno-v1/src/validacion.jl
 a99a14e0c3d7e36d666a1bccf59f4ea5b0352a76d5019514aca20b5d7cd3def3  veritas/consenso/retarget-causal-endogeno-v1/test/runtests.jl
-0d74f357335f5dcd2d3677372bfec4e2056883bd53650266cbf376112a73d84b  veritas/consenso/retarget-causal-endogeno-v1/ENMIENDA-Z0.md
+27b361a1afecdc8c34e22ce865ea21b3355971e6784e48cf289013e4ffe585a5  veritas/consenso/retarget-causal-endogeno-v1/ENMIENDA-Z0.md
