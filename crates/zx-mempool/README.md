@@ -1,5 +1,7 @@
 # zx-mempool
 
-Validación de tx pendientes, orden por fee, constructor de plantilla de bloque
+Admisión de transacciones pendientes, cálculo de tarifas y selección para bloques.
 
-Esqueleto de Fase 0. Sin lógica todavía.
+Contiene implementación y tests. Su integración con el nodo y el contexto de estado del DAG
+siguen pendientes. No se ha implementado un productor de bloques PoSpace-Time.
+Estado y contratos pendientes: [MIGRACION.md](../../MIGRACION.md).

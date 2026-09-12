@@ -1,5 +1,7 @@
 # zx-core
 
-Tipos, criptografía, preimagen canónica de hashing, merkle, aritmética de target
+Tipos, firmas, hashes con dominio, codificación canónica, Merkle y transacciones.
 
-Esqueleto de Fase 0. Sin lógica todavía.
+Contiene implementación y tests reutilizables. La cabecera lineal y los tipos de target/trabajo
+son dependencias pendientes de migración; no definen el consenso PoSpace-Time + DAG.
+Estado y contratos pendientes: [MIGRACION.md](../../MIGRACION.md).

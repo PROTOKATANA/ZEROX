@@ -1,6 +1,7 @@
-//! Validación de tx pendientes, orden por fee, constructor de plantilla de bloque
+//! Admisión de transacciones, tarifas y selección para bloques.
 //!
-//! Implementa: SPEC.md §<pendiente> — Fase 0, esqueleto sin lógica.
+//! Contiene implementación y tests; la integración del nodo y del estado DAG sigue pendiente.
+//! Véanse README.md de este crate y MIGRACION.md en la raíz del proyecto.
 
 #![doc = include_str!("../README.md")]
 

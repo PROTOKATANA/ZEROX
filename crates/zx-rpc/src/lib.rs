@@ -1,5 +1,5 @@
-//! JSON-RPC del nodo: getblocktemplate, submitblock, gettip, getblock, sendrawtx
+//! Interfaz JSON-RPC prevista para consulta y envío de transacciones.
 //!
-//! Implementa: SPEC.md §<pendiente> — Fase 0, esqueleto sin lógica.
+//! Esqueleto sin lógica: métodos y contratos PoSpace-Time + DAG pendientes de definición.
 
 #![doc = include_str!("../README.md")]

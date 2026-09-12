@@ -1,5 +1,7 @@
 # zx-p2p
 
-libp2p: transporte, descubrimiento, gossip, sync headers-first
+Transporte libp2p, descubrimiento, gossip, codificación y límites de recursos.
 
-Esqueleto de Fase 0. Sin lógica todavía.
+Contiene implementación y tests. La red transporta datos; la validación y el estado se coordinan
+en `zx-node`. El relay y la sincronización necesitan adaptarse a la cabecera y dependencias DAG.
+Estado y contratos pendientes: [MIGRACION.md](../../MIGRACION.md).

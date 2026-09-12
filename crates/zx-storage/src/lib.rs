@@ -1,6 +1,7 @@
-//! RocksDB + flat files: bloques, cabeceras, UTXO set, árbol de commitments, nullifier set
+//! Almacenamiento de bloques, cabeceras y UTXO en memoria o disco (feature `rocksdb`).
 //!
-//! Implementa: SPEC.md §<pendiente> — Fase 0, esqueleto sin lógica.
+//! Contiene implementación y tests; el estado DAG y la capa blindada siguen pendientes.
+//! Véanse README.md de este crate y MIGRACION.md en la raíz del proyecto.
 
 #![doc = include_str!("../README.md")]
 
