@@ -38,6 +38,8 @@ rustup run stable cargo test --release      # rustc 1.93.1
 
 ## Por qué sigue sirviendo aunque ZEROX ya esté en nightly
 
-§18 decidió nightly pineado para todo el proyecto, así que **este port ya no es necesario** para
-compilar. Sigue mereciendo la pena por lo otro: no arrastra Substrate. Si se adopta, ZEROX depende
+`rust-toolchain.toml` fija nightly para el workspace principal, así que **este port ya no es
+necesario** para compilar. Sigue mereciendo la pena por lo otro: no arrastra Substrate. Si se adopta, ZEROX depende
 para el PoT solo de `aes`, `blake3`, `cpufeatures` y `thiserror`.
+
+Estado actual y contratos pendientes de integración: [MIGRACION.md](../../MIGRACION.md).

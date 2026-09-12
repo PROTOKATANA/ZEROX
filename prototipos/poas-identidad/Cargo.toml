@@ -1,0 +1,25 @@
+[package]
+name = "poas-identidad"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Workspace aislado. No se integra en el nodo ni modifica dependencias ZEROX.
+[workspace]
+
+[dependencies]
+ab-proof-of-space = { path = "../../PDF/autonomys-subspace/shared/ab-proof-of-space", default-features = false, features = ["alloc", "full-chiapos"] }
+subspace-core-primitives = { path = "../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
+subspace-proof-of-space = { path = "../../PDF/autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc"] }
+subspace-verification = { path = "../../PDF/autonomys-subspace/crates/subspace-verification" }
+subspace-kzg = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
+
+[profile.dev]
+opt-level = 2
+debug = 0
+incremental = false
+
+[profile.test]
+opt-level = 2
+debug = 0
+incremental = false

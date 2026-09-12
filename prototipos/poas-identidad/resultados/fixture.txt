@@ -1,0 +1,85 @@
+AUTONOMYS_COMMIT=f8842d019cdf0f7163421b9644db5a9ff82b2a73
+CONTEXTO=SINTETICO_NO_HISTORIA_ZEROX_NI_ARCHIVER_ACREDITADA
+K=20
+SEED_ED25519=42_repetido_32_bytes
+RECORD_SCALAR=17_repetido_31_bytes
+SLOT=4
+BUCKET=22412
+PARAMETROS=VerifySolutionParams {
+    proof_of_time: 35353535353535353535353535353535,
+    solution_range: 18446744073709551615,
+    piece_check_params: Some(
+        PieceCheckParams {
+            max_pieces_in_sector: 2,
+            segment_commitment: b14685d5136d6bc0026e3f644466b6f011fdff690eba31d74e2bf00cd35f9cf188b3aa39a384ccd05e6bc60b17c9a42a,
+            recent_segments: HistorySize(
+                5,
+            ),
+            recent_history_fraction: (
+                HistorySize(
+                    1,
+                ),
+                HistorySize(
+                    10,
+                ),
+            ),
+            min_sector_lifetime: HistorySize(
+                4,
+            ),
+            current_history_size: HistorySize(
+                3,
+            ),
+            sector_expiration_check_segment_commitment: None,
+        },
+    ),
+}
+SOLUCION_PRIMERA=Solution {
+    public_key: 2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12,
+    reward_address: (),
+    sector_index: 7,
+    history_size: HistorySize(
+        3,
+    ),
+    piece_offset: PieceOffset(
+        0,
+    ),
+    record_commitment: b1f458ff60dc196367e6361b2d560323ce34514b0dd97c1226d4fed820b2f7c208c4034d40a251e691d4c9cae9956837,
+    record_witness: c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+    chunk: 0017171717171717171717171717171717171717171717171717171717171717,
+    chunk_witness: c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+    proof_of_space: 21695d38192b159004860d40d50454f9c3e29288d10fda3d0da21b5a68c503d5a15f690249bf904a5fd923a32be249b8a3afa447b7cd8e49ce266a90c1680305af54d16333d721277b5142c17ceee886f2e99df605846915f840c0aa8ac005239c751af0d25cc88d8ede4cf42bf1de381f996512439f1c1360da0ec4d22c2e0167f56dda4805d564fd4e4d6694e8b37eb3e839e61666ebbfa1bf65e6f5e13327,
+}
+SOLUCION_ALTERNATIVA=Solution {
+    public_key: 2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12,
+    reward_address: (),
+    sector_index: 7,
+    history_size: HistorySize(
+        3,
+    ),
+    piece_offset: PieceOffset(
+        0,
+    ),
+    record_commitment: b1f458ff60dc196367e6361b2d560323ce34514b0dd97c1226d4fed820b2f7c208c4034d40a251e691d4c9cae9956837,
+    record_witness: c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+    chunk: 0017171717171717171717171717171717171717171717171717171717171717,
+    chunk_witness: c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+    proof_of_space: 7ebca794557456ed3b33319ac3d25f9c161db933c8578ddb7a5ad2c2b4c24597d12d3b898c3390003a65fbdf36d1bb619c9183e7eb82921ed012386c1859c1340a06010f9fa2a99d1d077317ea4880065da98a0f3c17bfc70b52055a43667e53ce12ee2ec57b999e06e7640b162c760028210cd20c269a808f7878d172af5ffa78f71c22d8101de17c6ae51eb809104064b59752b3cc249678e2c24dfdb18a19,
+}
+SOLUCION_OTRA_PIEZA=Solution {
+    public_key: 2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12,
+    reward_address: (),
+    sector_index: 7,
+    history_size: HistorySize(
+        3,
+    ),
+    piece_offset: PieceOffset(
+        1,
+    ),
+    record_commitment: b1f458ff60dc196367e6361b2d560323ce34514b0dd97c1226d4fed820b2f7c208c4034d40a251e691d4c9cae9956837,
+    record_witness: c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+    chunk: 0017171717171717171717171717171717171717171717171717171717171717,
+    chunk_witness: c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+    proof_of_space: 1c0971be3556fe7fc046eae852d2e22439b91375a18a8a4085935d424be711a5d1fab5d8c2b03de6209cf793ca9c192f983f43531ea6c92b3a161195639f7653e79d3284a71c82fe7e83aa611758ebba6470f66184be0b624b4ac3ce50fc814545cf7a7c6efeffe56bf49813e3f1ac7eb5b2d4c6e2496e2b0bc11661a414f48058d519d3f9f42d1c45c7a4f2f907e1380c2679cfdad2efb1e9aef0a6618829a0,
+}
+DISTANCIAS=4352823087875908110/8322768934019865430/3650123740992092631
+RANGO_DISCRIMINANTE=8705646175751816220

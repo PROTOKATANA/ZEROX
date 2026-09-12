@@ -3,6 +3,9 @@ name = "pot-estable"
 version = "0.1.0"
 edition = "2021"
 
+# Prototipo independiente: no incorpora PoT al consenso activo de ZEROX.
+[workspace]
+
 [dependencies]
 aes = "0.9.0-rc.1"
 blake3 = { version = "1.5", default-features = false }

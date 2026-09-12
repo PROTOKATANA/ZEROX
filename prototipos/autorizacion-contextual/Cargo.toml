@@ -1,0 +1,22 @@
+[package]
+name = "autorizacion-contextual"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+zx-core = { path = "../../crates/zx-core" }
+zx-consensus = { path = "../../crates/zx-consensus" }
+
+[dev-dependencies]
+ed25519-zebra = "=4.2.0"
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false
