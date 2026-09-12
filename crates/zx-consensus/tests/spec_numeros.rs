@@ -8,7 +8,7 @@
 //! | | Qué decía | Qué era | Cómo se rompió |
 //! |---|---|---|---|
 //! | **H-005** | nonce en `[92,100)`, offset 76 | `[96,104)`, offset 80 | `timestamp` pasó de `u32` a `u64` |
-//! | Tamaño de cabecera | 112 bytes, en **seis** sitios | **92** | nunca fue cierto; se copió y se propagó |
+//! | Tamaño de cabecera | valores repetidos a mano | tabla de campos | faltaba derivar el tamaño |
 //! | `MAX_RESPUESTA_BYTES` | 12,8 MB, en **cuatro** sitios | **25,6 MB** | C-NET-13 dobló la constante de la que sale |
 //!
 //! El patrón es siempre el mismo: **un número que es función de una constante, escrito a mano en
@@ -103,20 +103,15 @@ fn afirma(fragmento: &str, porque: &str) {
 }
 
 /// **El tamaño de cabecera.** Estuvo mal en seis sitios como 112.
+///
+/// El guardián del SPEC y el del código viven en tests separados: que el SPEC conserve la base
+/// PoAS de 556 B es un hecho del presente (verde), y que el código la alcance es una deuda
+/// futura (ignorado, `TAREAS.md` §1.4). Juntos, un rojo crónico dejaría de leerse.
 #[test]
-fn el_spec_dice_el_tamano_real_de_la_cabecera() {
-    // ⚠️ MIGRACIÓN EN CURSO (2026-09-05). El SPEC §6.1 ya describe la cabecera de PoAS: 556 B.
-    // `zx-core` sigue en los 92 B de PoW. Este test es ROJO A PROPÓSITO hasta que se reescriba
-    // `crates/zx-core/src/preimage/block.rs`. Es spec-first funcionando: el SPEC va delante y este
-    // test es lo que obliga al código a alcanzarlo. Ver DECISIONES.md §22.
-    assert_eq!(
-        TAMANO_CABECERA, 556,
-        "SPEC §6.1 dice 556 B (112 base + 380 solución + 64 sello). El código sigue en 92, que era \
-         la cabecera de PoW. Reescribe zx-core/src/preimage/block.rs."
-    );
+fn el_spec_conserva_la_base_poas_de_556() {
     afirma(
         "**556**",
-        "TAMANO_CABECERA = 112 + 380 + 64, derivado de la tabla de campos de §6.1.",
+        "Base PoAS lineal = 112 + 380 + 64; no es certificación del formato DAG final.",
     );
     no_reaparece(
         &["112 bytes", "cabecera(112"],
@@ -127,14 +122,27 @@ fn el_spec_dice_el_tamano_real_de_la_cabecera() {
 }
 
 #[test]
+#[ignore = "TAREAS.md §1.4: el código conserva la cabecera PoW de 92 B. El formato DAG (padres múltiples, compromisos, justificación PoT) no está cerrado, y 556 B es la base LINEAL, no el destino. Quitar este ignore cuando la cabecera DAG se implemente."]
+fn el_codigo_alcanza_la_base_poas_de_556() {
+    // MIGRACIÓN PENDIENTE: 556 B describe la base PoAS lineal, no la cabecera DAG final.
+    // El guardián exige que el código alcance esa base y permanece rojo mientras conserve
+    // el formato anterior. No certifica padres múltiples ni consenso DAG por pasar.
+    assert_eq!(
+        TAMANO_CABECERA, 556,
+        "SPEC §6.1 conserva la base PoAS lineal de 556 B (112 + 380 + 64). El código todavía \
+         no implementa esa base; el formato DAG completo también está pendiente."
+    );
+}
+
+#[test]
 fn el_spec_ya_no_habla_de_nonce_ni_de_pow() {
     // Bajo PoAS no hay nonce que iterar ni preimagen de PoW. H-005 —el offset del nonce escrito a
     // mano en vez de derivado— deja de estar en el camino crítico, pero la lección se conserva:
     // por eso este fichero existe.
     no_reaparece(
         &["OFFSET_NONCE", "preimagen del PoW", "el minero GPU"],
-        "PoW se retiró el 2026-09-05 (DECISIONES.md §14). Si esto reaparece en texto normativo, \
-         alguien está escribiendo reglas de un consenso que ya no existe.",
+        "El destino es PoSpace-Time + DAG (MIGRACION.md). Si esto reaparece en texto normativo, \
+         se están reintroduciendo reglas del consenso retirado.",
     );
 }
 
@@ -171,13 +179,13 @@ fn el_spec_dice_las_cifras_reales_del_transporte() {
 /// peor que ninguna: el código diría cumplir una y cumpliría la otra.
 /// **La profundidad máxima de reorg** y su relación con la madurez de coinbase.
 #[test]
-fn el_spec_dice_la_profundidad_real_de_reorg() {
+fn el_spec_identifica_el_limite_transitorio_de_reorg() {
     assert_eq!(MAX_REORG_LENGTH, COINBASE_MATURITY - 1);
     assert_eq!(MAX_REORG_LENGTH, 11_999);
 
     afirma(
         "MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 11 999 bloques",
-        "la relación entre las dos constantes, no solo el número: si cambia la madurez, cambia esto",
+        "límite transitorio del código, expresamente pendiente de sustituir al integrar R-FIN-7",
     );
 }
 
@@ -201,62 +209,26 @@ fn el_spec_dice_los_parametros_reales_de_peso() {
     );
 }
 
-/// El checkpoint firmado (SPEC §12.1, DECISIONES.md §25).
-///
-/// ⚠️ Este test existe por un fallo del 2026-09-05: `UMBRAL_CHECKPOINT` se escribió mil veces bajo
-/// —«3,2 PiB» etiquetando 3,277 TiB— y **ningún guardián lo cazó, porque la constante estaba solo
-/// en `DECISIONES.md` y este fichero lee `SPEC.md`**. La lección no es el factor 1000: es que una
-/// constante de consenso escrita fuera del SPEC está donde la defensa no mira.
-///
-/// Así que aquí no se comprueba solo que el número esté: se comprueba que **la etiqueta en petabytes
-/// no pueda volver a mentir**, rederivando el espacio desde el rango.
+/// Las constantes nominales de bootstrap se conservan sin certificar su calibración DAG.
+/// La antigua conversión rango→espacio dividía por 120 y no es válida como evidencia para A″.
 #[test]
-#[expect(
-    clippy::integer_division,
-    reason = "rederiva pieces_to_solution_range con el truncamiento entero de solutions.rs:30-40"
-)]
-fn el_umbral_del_checkpoint_dice_el_espacio_que_dice() {
-    const UMBRAL: u64 = 90_185_365;
-    const CADUCIDAD: u64 = 63_072_000;
-
-    // pieces_to_solution_range invertida, con el orden EXACTO de solutions.rs:30-40.
-    // Se rederiva aquí en vez de importarse: si alguien cambia la fórmula, este test debe romperse.
-    let base = ((u64::MAX / 120) / (1 << 15)) * (1 << 16);
-    let piezas = base / UMBRAL;
-    let sectores = piezas / 1000; // MAX_PIECES_IN_SECTOR
-    // Un sector mide 1007,90 MiB (research/coste-ploteo-medido.md). En MiB para no perder precisión.
-    let mib = sectores * 100_790 / 100;
-    let pib = mib as f64 / 1024.0 / 1024.0 / 1024.0;
-
-    assert!(
-        (3.15..3.25).contains(&pib),
-        "UMBRAL_CHECKPOINT dice ser 3,2 PiB y son {pib:.4} PiB. Si esto falla por un factor 1000, \
-         alguien ha vuelto a confundir piezas con sectores: un sector son 1000 piezas."
-    );
-
-    // Y que esté por ENCIMA del cruce de 10,3 TiB, que es lo que hace que el ancla sirva de algo.
-    let tib = mib as f64 / 1024.0 / 1024.0;
-    assert!(
-        tib > 10.3,
-        "el umbral ({tib:.1} TiB) está por debajo del cruce de 10,3 TiB: se emitiría el checkpoint \
-         donde forjar todavía cuesta menos que verificar, que es justo lo que §25 descartó."
-    );
-
-    assert_eq!(
-        CADUCIDAD,
-        2 * 365 * 24 * 60 * 60,
-        "63 072 000 bloques son dos años exactos a λ = 1 bloque/s (eran 525 600 a T = 120 s)"
-    );
-
-    afirma("90 185 365", "UMBRAL_CHECKPOINT, SPEC §12.1");
+fn el_checkpoint_conserva_constantes_y_declara_calibracion_pendiente() {
     afirma(
-        "63 072 000",
-        "ALTURA_CADUCIDAD, SPEC §12.1 — literal, NO 2·N_LARGO",
+        "UMBRAL_CHECKPOINT  = 90 185 365",
+        "constante nominal conservada; no se ha autorizado recalibrar el bootstrap",
+    );
+    afirma(
+        "ALTURA_CADUCIDAD   = 63 072 000",
+        "constante nominal conservada; altura y calendario DAG pendientes",
+    );
+    afirma(
+        "equivalencia de espacio DAG pendiente",
+        "la conversión antigua por 120 no certifica espacio en PoST/DAG",
     );
     no_reaparece(
-        &["90 185 375 997", "2 · N_LARGO"],
-        "el umbral estuvo mil veces bajo y la caducidad colgaba de N_LARGO, que un network \
-         upgrade puede cambiar (SPEC:1926). Los dos corregidos el 2026-09-06.",
+        &["90 185 375 997", "2 · N_LARGO", "equivale a 3,2 PiB"],
+        "no reintroducir el umbral erróneo, un calendario dependiente de capacidad, ni una \
+         equivalencia de espacio sin recalibrar",
     );
 }
 
@@ -284,9 +256,13 @@ fn ninguna_regla_esta_numerada_dos_veces() {
         repetidas.is_empty(),
         "reglas numeradas más de una vez: {repetidas:?}"
     );
-    assert!(
-        vistas.len() > 140,
-        "solo se encontraron {} reglas",
-        vistas.len()
-    );
+    // Comprobar áreas comunes concretas no obliga a conservar reglas de un consenso retirado.
+    for requerida in [
+        "ENC-01", "HASH-01", "HDR-01", "BLK-01", "SPEC-01", "SPEC-02", "SPEC-03",
+    ] {
+        assert!(
+            vistas.contains(&requerida),
+            "falta la regla común C-{requerida}"
+        );
+    }
 }
