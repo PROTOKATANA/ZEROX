@@ -1,0 +1,12 @@
+Julia 1.13.0; 1 hilo; --check-bounds=yes
+fixtures compartidos: 3/3
+contrato de ventanas: 10/10
+selección, identidad y journal: 6/6
+pending, sellado y undo: 13/13
+equivalencia referencia/kernel: 100/100
+Rust, fixture compartido VRC: 1/1
+Rust, regresión CBE: 14/14
+Clippy Rust VRC con -D warnings: código 0
+rustfmt VRC --check: código 0
+git diff --check: código 0
+Resultado: código 0

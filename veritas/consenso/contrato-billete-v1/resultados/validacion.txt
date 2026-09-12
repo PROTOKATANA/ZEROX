@@ -1,0 +1,62 @@
+seed=20260911 Julia=1.13.0 CPU=znver5 threads=1/0
+RAM_bytes=132497408000 BLAS=LBTConfig([ILP64] libopenblas64_.so) args=--seed 20260911
+git_head=7b783d469fbae5722a0ae014b5e212ed6999eb2b
+Status `~/zeo/ZEROX/veritas/consenso/contrato-billete-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [c3a54625] JET v0.12.1
+  [860ef19b] StableRNGs v1.0.4
+Test Summary:                  | Pass  Total  Time
+exact reference / typed kernel | 9024   9024  0.1s
+primera_roja Applied 1 10 1 5 2 7:101:1:9 31 T:41 101,102
+prioridad_azul Applied 1 10 1 8 3 7:102:1:9 32 S:51 101,102
+entrada_invertida Applied 1 10 1 5 2 7:101:1:9 31 T:41 101,102
+cuerpo_primero_retenido Pending 0 0 0 0 0 - - - -
+cuerpo_primero_retenido Applied 1 10 1 5 2 7:101:1:9 31 T:41 101,102
+cuerpo_perdedor_retenido Pending 0 0 0 0 0 - - - -
+cuerpo_perdedor_retenido Applied 1 10 1 5 2 7:101:1:9 31 T:41 101,102
+perdedor_invalido_no_se_salta Invalid 0 0 0 0 0 - - - -
+invalidez_precede_pendiente Invalid 0 0 0 0 0 - - - -
+copia_entre_fusiones Applied 1 10 1 5 2 7:101:1:9 31 T:41 101
+copia_entre_fusiones Applied 2 11 1 5 2 7:101:1:9 31 T:41 101,102
+azul_respeta_consumo_anterior Applied 1 10 1 5 0 7:101:1:9 - - 101
+azul_respeta_consumo_anterior Applied 2 11 1 5 0 7:101:1:9 - - 101,102
+conflicto_y_cero_no_liberan Applied 1 10 1 4 2 1:101:1:9 11 T:41 101
+conflicto_y_cero_no_liberan Applied 2 11 2 4 2 1:101:1:9,2:102:2:10 11 T:41 101,102,103
+conflicto_y_cero_no_liberan Applied 3 12 2 4 2 1:101:1:9,2:102:2:10 11 T:41 101,102,103,104
+ventana_bordes_y_cuerpo_vacio Applied 1 10 2 2 3 2:102:1:7,3:103:1:10 22 T:7 101,102,103
+ventana_sin_underflow Applied 1 2 1 1 0 1:101:1:0 - - 101
+ventana_cero Applied 1 10 1 2 0 2:102:1:10 - - 101,102
+tardio_retenido_tambien_pendiente Pending 0 0 0 0 0 - - - -
+rojo_u3_inerte Applied 1 10 1 2 3 2:102:1:9 12 S:41 101,102
+dominios_y_tx_repetida Applied 1 10 1 0 5 1:101:1:9 11,12 T:42,S:42 101
+azul_no_adelanta_ejecucion Applied 1 10 2 14 2 7:103:1:9,8:102:1:9 202 T:50 101,102,103
+primera_mismo_lote_conflicto Applied 1 10 2 10 1 7:101:1:9,8:102:1:9 201 T:50 101,102,103
+rollback_y_rama_alternativa Applied 1 10 1 5 2 7:101:1:9 31 T:41 101
+rollback_y_rama_alternativa Reverted 0 0 0 0 0 - - - -
+rollback_y_rama_alternativa Applied 2 10 1 8 3 7:102:2:9 32 S:51 102
+prefijo_no_caduca Applied 1 10 1 5 0 7:101:1:9 - - 101
+prefijo_no_caduca Applied 2 100 2 7 0 7:101:1:9,8:102:2:100 - - 101,102
+contexto_incorrecto Invalid 0 0 0 0 0 - - - -
+slot_futuro_fuera_dominio Invalid 0 0 0 0 0 - - - -
+rank_repetido Invalid 0 0 0 0 0 - - - -
+bloque_repetido Invalid 0 0 0 0 0 - - - -
+identidad_slot_inconsistente Invalid 0 0 0 0 0 - - - -
+overflow_subsidio_atomico Invalid 0 0 0 0 0 - - - -
+overflow_comisiones_atomico Invalid 0 0 0 0 0 - - - -
+pendiente_antes_de_sumar Pending 0 0 0 0 0 - - - -
+orden_numerico_ids Applied 1 10 2 2 2 2:2:1:9,10:10:1:9 2,10 T:2,S:10 2,10
+undo_vacio Invalid 0 0 0 0 0 - - - -
+replay_bloque_prefijo Applied 1 10 1 5 0 7:101:1:9 - - 101
+replay_bloque_prefijo Invalid 1 10 1 5 0 7:101:1:9 - - 101
+slot_contexto_retrocede Applied 1 10 1 5 0 7:101:1:9 - - 101
+slot_contexto_retrocede Invalid 1 10 1 5 0 7:101:1:9 - - 101
+error_no_publica_sobre_prefijo Applied 1 10 1 5 0 7:101:1:9 - - 101
+error_no_publica_sobre_prefijo Invalid 1 10 1 5 0 7:101:1:9 - - 101
+reutilizar_contexto_ancestral Applied 1 10 0 0 0 - - - -
+reutilizar_contexto_ancestral Applied 2 11 0 0 0 - - - -
+reutilizar_contexto_ancestral Invalid 2 11 0 0 0 - - - -
+txid_con_contenido_distinto Invalid 0 0 0 0 0 - - - -
+fixture_EXPECT_count=49
+Test Summary:              | Pass  Total  Time
+shared Rust/Julia fixtures |  163    163  0.2s
+validation_wall_seconds=0.306874303

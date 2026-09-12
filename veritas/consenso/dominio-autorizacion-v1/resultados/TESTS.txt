@@ -1,0 +1,106 @@
+# DAV-v0.1 — ejecución final 2026-09-11
+# /usr/bin/time -v timeout 120s cargo test --offline --locked -j 2 --manifest-path prototipos/autorizacion-contextual/Cargo.toml -- --test-threads=1
+# exit_code=0
+   Compiling autorizacion-contextual v0.1.0 (/home/katana/zeo/ZEROX/prototipos/autorizacion-contextual)
+    Finished `test` profile [unoptimized] target(s) in 0.32s
+     Running unittests src/lib.rs (prototipos/autorizacion-contextual/target/debug/deps/autorizacion_contextual-2396a0e1dbc0b73d)
+
+running 3 tests
+test almacen::tests::identificador_de_instancia_no_se_recicla_al_agotarse ... ok
+test almacen::tests::presupuesto_de_peso_tiene_fronteras_enteras_comprobadas ... ok
+test almacen::tests::revision_agotada_no_cambia_contexto_ni_vista ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/almacen.rs (prototipos/autorizacion-contextual/target/debug/deps/almacen-b40564596b711d4c)
+
+running 10 tests
+test aba_rechaza_solicitud_antigua_aunque_vuelva_el_mismo_contexto ... ok
+test cambiar_rama_no_traslada_evidencia_y_no_borra_su_contexto_original ... ok
+test capacidad_agotada_no_expulsa_la_evidencia_visible_ni_invalida_la_variante ... ok
+test dos_autorizaciones_validas_misma_cabecera_no_eligen_ganador_por_llegada ... ok
+test duplicado_exacto_no_duplica_almacenamiento_ni_cambia_la_vista ... ok
+test entrega_mala_no_bloquea_reparacion_ni_degrada_evidencia_buena ... ok
+test limite_local_de_peso_no_es_regla_de_invalidez ... ok
+test no_se_adjunta_certificado_a_bytes_mutados_despues_de_verificar ... ok
+test publicaciones_competidoras_no_comparten_una_version_consumida ... ok
+test una_vista_no_se_reutiliza_en_otra_instancia_o_cache_recreada ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/autorizar.rs (prototipos/autorizacion-contextual/target/debug/deps/autorizar-79a8541d5997f552)
+
+running 12 tests
+test clave_local_compromete_testigos_sobrantes_aunque_encoder_los_omite ... ok
+test contexto_con_todos_los_campos_vinculados_y_orden_independiente ... ok
+test doble_gasto_no_se_omite_como_conflicto_de_modelo_abstracto ... ok
+test dos_autorizaciones_multisig_validas_misma_cabecera ... ok
+test dos_inputs_usan_importes_locks_y_orden_del_sighash_correctos ... ok
+test evidencia_p2k_real_y_no_reutilizable_con_otra_autorizacion ... ok
+test fronteras_coinbase_y_multisig_no_bypassean_validacion ... ok
+test htlc_preimagen_y_timeout_se_componen_con_contexto_real ... ok
+test madurez_expiracion_y_balance_se_delegan_al_validador_nativo ... ok
+test no_confunde_ausencia_desconocida_gastada_e_inexistente ... ok
+test rechaza_perfiles_no_soportados_sin_fallback ... ok
+test snapshot_incoherente_y_locks_manuales_se_rechazan ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/compromiso.rs (prototipos/autorizacion-contextual/target/debug/deps/compromiso-3287fd7cf34f72f7)
+
+running 7 tests
+test autorizaciones_validas_distintas_comparten_header_actual_no_compromiso_candidato ... ok
+test compromiso_correcto_no_hace_valida_una_firma_mala ... ok
+test compromiso_esperado_rechaza_otra_variante_valida_sin_seleccionar_por_llegada ... ok
+test incluye_coinbase_y_auth_vacia_sin_omitirla ... ok
+test no_admite_merkle_contradictoria_ni_finge_comprometer_orchard ... ok
+test no_se_incluye_headerhash_y_se_preservan_orden_y_multiplicidad ... ok
+test no_se_rellenan_testigos_ausentes_ni_se_ignoran_sobrantes ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/dominio.rs (prototipos/autorizacion-contextual/target/debug/deps/dominio-937faf64e6c7a999)
+
+running 8 tests
+test anuncios_se_ordenan_pero_duplicados_no_se_aplican_dos_veces ... ok
+test cada_antecedente_se_compara_en_su_slot_no_en_la_punta_actual ... ok
+test clave_estable_no_depende_de_la_evidencia_ni_de_una_era_renacida ... ok
+test cobertura_y_convencion_de_origen_se_comprueban_sin_certificar_procedencia ... ok
+test divergencia_futura_no_rechaza_pasado_comun_y_el_borde_es_inclusivo ... ok
+test evidencia_de_incompatibilidad_conocida_no_depende_del_orden_de_lectura ... ok
+test omitir_n_confunde_relojes_con_las_mismas_entropias ... ok
+test otra_red_no_es_otro_ticket_admisible_en_la_historia_local ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests autorizacion_contextual
+
+running 2 tests
+test src/lib.rs - AutorizacionPerfil (line 196) - compile fail ... ok
+test src/lib.rs - AutorizacionPerfil (line 204) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+	Command being timed: "timeout 120s cargo test --offline --locked -j 2 --manifest-path prototipos/autorizacion-contextual/Cargo.toml -- --test-threads=1"
+	User time (seconds): 0.62
+	System time (seconds): 0.22
+	Percent of CPU this job got: 157%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.54
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 208744
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 5
+	Minor (reclaiming a frame) page faults: 98953
+	Voluntary context switches: 6908
+	Involuntary context switches: 98
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 25944
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

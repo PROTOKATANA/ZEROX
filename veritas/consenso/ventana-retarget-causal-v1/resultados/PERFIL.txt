@@ -1,0 +1,7 @@
+Julia 1.13.0; 1 hilo; BLAS 1; workload=180_blocks_70_ticket_cycle_fixture
+jet_diagnostics=0
+code_warntype_any=false
+return_type=ApplyResult
+allocated_bytes=96000
+profile_entries=7201
+Resultado: código 0

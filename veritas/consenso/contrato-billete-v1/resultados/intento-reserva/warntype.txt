@@ -1,0 +1,785 @@
+MethodInstance for Main.CBE.transition!(::Main.CBE.State, ::Main.CBE.Batch, ::Bool)
+  from transition!(s::Main.CBE.State, b::Main.CBE.Batch, blue::Bool) @ Main.CBE ~/zeo/ZEROX/veritas/consenso/contrato-billete-v1/src/rapido.jl:3
+Arguments
+  #self#::Core.Const(Main.CBE.transition!)
+  s::Main.CBE.State
+  b::Main.CBE.Batch
+  blue::Bool
+Locals
+  #19::Main.CBE.var"#transition!##8#transition!##9"
+  #18::Main.CBE.var"#transition!##6#transition!##7"{Main.CBE.Batch}
+  @_7::UNION{NOTHING, TUPLE{TUPLE{INT64, MAIN.CBE.BLOCK}, TUPLE{INT64, INT64}}}
+  #17::Main.CBE.var"#transition!##4#transition!##5"
+  @_9::UNION{NOTHING, TUPLE{MAIN.CBE.BLOCK, INT64}}
+  #16::Main.CBE.var"#transition!##2#transition!##3"
+  #15::Main.CBE.var"#transition!##0#transition!##1"
+  accepted::Set{UInt64}
+  spent::Set{Tuple{UInt8, UInt64}}
+  out::Main.CBE.State
+  selected::Vector{Int64}
+  lo::UInt64
+  choices::Dict{UInt64, Int64}
+  occupied::Set{UInt64}
+  ntx::Int64
+  n::Int64
+  txseen::Dict{UInt64, Tuple{UInt8, UInt64, UInt64}}
+  pending::Bool
+  slots::Dict{UInt64, UInt64}
+  seen::Set{UInt64}
+  ranks::Set{UInt64}
+  ids::Set{UInt64}
+  @_27::UNION{NOTHING, TUPLE{MAIN.CBE.TX, INT64}}
+  x@_28::Main.CBE.Block
+  tx@_29::Main.CBE.Tx
+  binding::Tuple{UInt8, UInt64, UInt64}
+  @_31::Int64
+  i@_32::Int64
+  better::Bool
+  y::Main.CBE.Block
+  j::Int64
+  x@_36::Main.CBE.Block
+  @_37::UNION{NOTHING, TUPLE{INT64, INT64}}
+  @_38::UNION{NOTHING, TUPLE{MAIN.CBE.TX, INT64}}
+  i@_39::Int64
+  x@_40::Main.CBE.Block
+  key::Tuple{UInt8, UInt64}
+  tx@_42::Main.CBE.Tx
+  err::ANY
+  @_44::Bool
+  @_45::UInt64
+  @_46::Bool
+Body::Symbol
+1 ───        Core.NewvarNode(:(#19))
+│            Core.NewvarNode(:(#18))
+│            Core.NewvarNode(:(@_7))
+│            Core.NewvarNode(:(#17))
+│            Core.NewvarNode(:(@_9))
+│            Core.NewvarNode(:(#16))
+│            Core.NewvarNode(:(#15))
+│            Core.NewvarNode(:(accepted))
+│            Core.NewvarNode(:(spent))
+│            Core.NewvarNode(:(out))
+│            Core.NewvarNode(:(selected))
+│            Core.NewvarNode(:(lo))
+│            Core.NewvarNode(:(choices))
+│            Core.NewvarNode(:(occupied))
+│            Core.NewvarNode(:(ntx))
+│            Core.NewvarNode(:(n))
+│            Core.NewvarNode(:(txseen))
+│            Core.NewvarNode(:(pending))
+│            Core.NewvarNode(:(slots))
+│            Core.NewvarNode(:(seen))
+│            Core.NewvarNode(:(ranks))
+│            Core.NewvarNode(:(ids))
+│     %23  = Main.CBE.:(==)::Core.Const(==)
+│     %24  = Base.getproperty(b, :ctx)::UInt64
+│     %25  = (%23)(%24, 0)::Bool
+└────        goto #3 if not %25
+2 ───        goto #8
+3 ─── %28  = Main.CBE.in::Core.Const(in)
+│     %29  = Base.getproperty(b, :ctx)::UInt64
+│     %30  = Base.getproperty(s, :active)::Vector{UInt64}
+│     %31  = (%28)(%29, %30)::Bool
+└────        goto #5 if not %31
+4 ───        goto #8
+5 ─── %34  = Main.CBE.:!=::Core.Const(!=)
+│     %35  = Base.getproperty(b, :parent)::UInt64
+│     %36  = Base.getproperty(s, :ctx)::UInt64
+│     %37  = (%34)(%35, %36)::Bool
+└────        goto #7 if not %37
+6 ───        goto #8
+7 ─── %40  = Main.CBE.:<::Core.Const(<)
+│     %41  = Base.getproperty(b, :slot)::UInt64
+│     %42  = Base.getproperty(s, :slot)::UInt64
+│     %43  = (%40)(%41, %42)::Bool
+└────        goto #10 if not %43
+8 ┄──        return :Invalid
+9 ───        Core.Const(:(goto %47))
+10 ┄─ %47  = Main.CBE.Set::Core.Const(Set)
+│     %48  = Main.CBE.UInt64::Core.Const(UInt64)
+│     %49  = Core.apply_type(%47, %48)::Core.Const(Set{UInt64})
+│            (ids = (%49)())
+│     %51  = Main.CBE.Set::Core.Const(Set)
+│     %52  = Main.CBE.UInt64::Core.Const(UInt64)
+│     %53  = Core.apply_type(%51, %52)::Core.Const(Set{UInt64})
+│            (ranks = (%53)())
+│     %55  = Main.CBE.Set::Core.Const(Set)
+│     %56  = Base.getproperty(s, :seen)::Vector{UInt64}
+│            (seen = (%55)(%56))
+│     %58  = Main.CBE.Dict::Core.Const(Dict)
+│     %59  = Main.CBE.UInt64::Core.Const(UInt64)
+│     %60  = Main.CBE.UInt64::Core.Const(UInt64)
+│     %61  = Core.apply_type(%58, %59, %60)::Core.Const(Dict{UInt64, UInt64})
+│     %62  = Main.CBE.:(var"#transition!##0#transition!##1")::Core.Const(Main.CBE.var"#transition!##0#transition!##1")
+│            (#15 = %new(%62))
+│     %64  = #15::Core.Const(Main.CBE.var"#transition!##0#transition!##1"())
+│     %65  = Base.getproperty(s, :ledger)::Vector{Main.CBE.Award}
+│     %66  = Base.Generator(%64, %65)::Base.Generator{Vector{Main.CBE.Award}, Main.CBE.var"#transition!##0#transition!##1"}
+│            (slots = (%61)(%66))
+│            (pending = false)
+│     %69  = Main.CBE.Dict::Core.Const(Dict)
+│     %70  = Main.CBE.UInt64::Core.Const(UInt64)
+│     %71  = Main.CBE.Tuple::Core.Const(Tuple)
+│     %72  = Main.CBE.UInt8::Core.Const(UInt8)
+│     %73  = Main.CBE.UInt64::Core.Const(UInt64)
+│     %74  = Main.CBE.UInt64::Core.Const(UInt64)
+│     %75  = Core.apply_type(%71, %72, %73, %74)::Core.Const(Tuple{UInt8, UInt64, UInt64})
+│     %76  = Core.apply_type(%69, %70, %75)::Core.Const(Dict{UInt64, Tuple{UInt8, UInt64, UInt64}})
+│            (txseen = (%76)())
+│     %78  = Main.CBE.length::Core.Const(length)
+│     %79  = Base.getproperty(b, :blocks)::Vector{Main.CBE.Block}
+│            (n = (%78)(%79))
+│     %81  = Main.CBE.:(var"#transition!##2#transition!##3")::Core.Const(Main.CBE.var"#transition!##2#transition!##3")
+│            (#16 = %new(%81))
+│     %83  = #16::Core.Const(Main.CBE.var"#transition!##2#transition!##3"())
+│     %84  = (:init,)::Core.Const((:init,))
+│     %85  = Core.apply_type(Core.NamedTuple, %84)::Core.Const(NamedTuple{(:init,)})
+│     %86  = Core.tuple(0)::Core.Const((0,))
+│     %87  = (%85)(%86)::Core.Const((init = 0,))
+│     %88  = Main.CBE.sum::Core.Const(sum)
+│     %89  = Base.getproperty(b, :blocks)::Vector{Main.CBE.Block}
+│            (ntx = Core.kwcall(%87, %88, %83, %89))
+│     %91  = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %92  = ids::Set{UInt64}
+│     %93  = n::Int64
+│            (%91)(%92, %93)
+│     %95  = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %96  = ranks::Set{UInt64}
+│     %97  = n::Int64
+│            (%95)(%96, %97)
+│     %99  = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %100 = slots::Dict{UInt64, UInt64}
+│     %101 = Main.CBE.:+::Core.Const(+)
+│     %102 = Main.CBE.length::Core.Const(length)
+│     %103 = Base.getproperty(s, :ledger)::Vector{Main.CBE.Award}
+│     %104 = (%102)(%103)::Int64
+│     %105 = n::Int64
+│     %106 = (%101)(%104, %105)::Int64
+│            (%99)(%100, %106)
+│     %108 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %109 = txseen::Dict{UInt64, Tuple{UInt8, UInt64, UInt64}}
+│     %110 = ntx::Int64
+│            (%108)(%109, %110)
+│     %112 = Base.getproperty(b, :blocks)::Vector{Main.CBE.Block}
+│            (@_9 = Base.iterate(%112))
+│     %114 = @_9::UNION{NOTHING, TUPLE{MAIN.CBE.BLOCK, INT64}}
+│     %115 = (%114 === nothing)::Bool
+│     %116 = Base.not_int(%115)::Bool
+└────        goto #61 if not %116
+11 ┄─        Core.NewvarNode(:(@_27))
+│     %119 = @_9::Tuple{Main.CBE.Block, Int64}
+│            (x@_28 = Core.getfield(%119, 1))
+│     %121 = Core.getfield(%119, 2)::Int64
+│     %122 = Main.CBE.:(==)::Core.Const(==)
+│     %123 = x@_28::Main.CBE.Block
+│     %124 = Base.getproperty(%123, :id)::UInt64
+│     %125 = (%122)(%124, 0)::Bool
+└────        goto #13 if not %125
+12 ──        goto #22
+13 ── %128 = Main.CBE.:(==)::Core.Const(==)
+│     %129 = x@_28::Main.CBE.Block
+│     %130 = Base.getproperty(%129, :ticket)::UInt64
+│     %131 = (%128)(%130, 0)::Bool
+└────        goto #15 if not %131
+14 ──        goto #22
+15 ── %134 = Main.CBE.in::Core.Const(in)
+│     %135 = x@_28::Main.CBE.Block
+│     %136 = Base.getproperty(%135, :id)::UInt64
+│     %137 = ids::Set{UInt64}
+│     %138 = (%134)(%136, %137)::Bool
+└────        goto #17 if not %138
+16 ──        goto #22
+17 ── %141 = Main.CBE.in::Core.Const(in)
+│     %142 = x@_28::Main.CBE.Block
+│     %143 = Base.getproperty(%142, :id)::UInt64
+│     %144 = seen::Set{UInt64}
+│     %145 = (%141)(%143, %144)::Bool
+└────        goto #19 if not %145
+18 ──        goto #22
+19 ── %148 = Main.CBE.in::Core.Const(in)
+│     %149 = x@_28::Main.CBE.Block
+│     %150 = Base.getproperty(%149, :rank)::UInt64
+│     %151 = ranks::Set{UInt64}
+│     %152 = (%148)(%150, %151)::Bool
+└────        goto #21 if not %152
+20 ──        goto #22
+21 ── %155 = Main.CBE.:>::Core.Const(>)
+│     %156 = x@_28::Main.CBE.Block
+│     %157 = Base.getproperty(%156, :slot)::UInt64
+│     %158 = Base.getproperty(b, :slot)::UInt64
+│     %159 = (%155)(%157, %158)::Bool
+└────        goto #24 if not %159
+22 ┄─        return :Invalid
+23 ──        Core.Const(:(goto %163))
+24 ┄─ %163 = Main.CBE.:!=::Core.Const(!=)
+│     %164 = x@_28::Main.CBE.Block
+│     %165 = Base.getproperty(%164, :color)::UInt8
+│     %166 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %167 = (%166)('B')::Core.Const(0x42)
+│     %168 = (%163)(%165, %167)::Bool
+└────        goto #31 if not %168
+25 ── %170 = Main.CBE.:!=::Core.Const(!=)
+│     %171 = x@_28::Main.CBE.Block
+│     %172 = Base.getproperty(%171, :color)::UInt8
+│     %173 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %174 = (%173)('R')::Core.Const(0x52)
+│     %175 = (%170)(%172, %174)::Bool
+└────        goto #30 if not %175
+26 ── %177 = Main.CBE.:!=::Core.Const(!=)
+│     %178 = x@_28::Main.CBE.Block
+│     %179 = Base.getproperty(%178, :color)::UInt8
+│     %180 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %181 = (%180)('U')::Core.Const(0x55)
+│     %182 = (%177)(%179, %181)::Bool
+└────        goto #29 if not %182
+27 ──        return :Invalid
+28 ──        Core.Const(:(goto %186))
+29 ┄─        goto #30
+30 ┄─        goto #31
+31 ┄─ %188 = Main.CBE.:!=::Core.Const(!=)
+│     %189 = x@_28::Main.CBE.Block
+│     %190 = Base.getproperty(%189, :body)::UInt8
+│     %191 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %192 = (%191)('V')::Core.Const(0x56)
+│     %193 = (%188)(%190, %192)::Bool
+└────        goto #36 if not %193
+32 ── %195 = Main.CBE.:!=::Core.Const(!=)
+│     %196 = x@_28::Main.CBE.Block
+│     %197 = Base.getproperty(%196, :body)::UInt8
+│     %198 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %199 = (%198)('P')::Core.Const(0x50)
+│     %200 = (%195)(%197, %199)::Bool
+└────        goto #35 if not %200
+33 ──        return :Invalid
+34 ──        Core.Const(:(goto %204))
+35 ┄─        goto #36
+36 ┄─ %205 = Main.CBE.haskey::Core.Const(haskey)
+│     %206 = slots::Dict{UInt64, UInt64}
+│     %207 = x@_28::Main.CBE.Block
+│     %208 = Base.getproperty(%207, :ticket)::UInt64
+│     %209 = (%205)(%206, %208)::Bool
+└────        goto #41 if not %209
+37 ── %211 = Main.CBE.:!=::Core.Const(!=)
+│     %212 = slots::Dict{UInt64, UInt64}
+│     %213 = x@_28::Main.CBE.Block
+│     %214 = Base.getproperty(%213, :ticket)::UInt64
+│     %215 = Base.getindex(%212, %214)::UInt64
+│     %216 = x@_28::Main.CBE.Block
+│     %217 = Base.getproperty(%216, :slot)::UInt64
+│     %218 = (%211)(%215, %217)::Bool
+└────        goto #40 if not %218
+38 ──        return :Invalid
+39 ──        Core.Const(:(goto %222))
+40 ┄─        goto #41
+41 ┄─ %223 = x@_28::Main.CBE.Block
+│     %224 = Base.getproperty(%223, :slot)::UInt64
+│     %225 = slots::Dict{UInt64, UInt64}
+│     %226 = x@_28::Main.CBE.Block
+│     %227 = Base.getproperty(%226, :ticket)::UInt64
+│            Base.setindex!(%225, %224, %227)
+│     %229 = Main.CBE.push!::Core.Const(push!)
+│     %230 = ids::Set{UInt64}
+│     %231 = x@_28::Main.CBE.Block
+│     %232 = Base.getproperty(%231, :id)::UInt64
+│            (%229)(%230, %232)
+│     %234 = Main.CBE.push!::Core.Const(push!)
+│     %235 = ranks::Set{UInt64}
+│     %236 = x@_28::Main.CBE.Block
+│     %237 = Base.getproperty(%236, :rank)::UInt64
+│            (%234)(%235, %237)
+│     %239 = Main.CBE.:|::Core.Const(|)
+│     %240 = pending::Bool
+│     %241 = Main.CBE.:(==)::Core.Const(==)
+│     %242 = x@_28::Main.CBE.Block
+│     %243 = Base.getproperty(%242, :body)::UInt8
+│     %244 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %245 = (%244)('P')::Core.Const(0x50)
+│     %246 = (%241)(%243, %245)::Bool
+│            (pending = (%239)(%240, %246))
+│     %248 = x@_28::Main.CBE.Block
+│     %249 = Base.getproperty(%248, :txs)::Vector{Main.CBE.Tx}
+│            (@_27 = Base.iterate(%249))
+│     %251 = @_27::UNION{NOTHING, TUPLE{MAIN.CBE.TX, INT64}}
+│     %252 = (%251 === nothing)::Bool
+│     %253 = Base.not_int(%252)::Bool
+└────        goto #59 if not %253
+42 ┄─        Core.NewvarNode(:(binding))
+│     %256 = @_27::Tuple{Main.CBE.Tx, Int64}
+│            (tx@_29 = Core.getfield(%256, 1))
+│     %258 = Core.getfield(%256, 2)::Int64
+│     %259 = Main.CBE.:(==)::Core.Const(==)
+│     %260 = tx@_29::Main.CBE.Tx
+│     %261 = Base.getproperty(%260, :id)::UInt64
+│     %262 = (%259)(%261, 0)::Bool
+└────        goto #44 if not %262
+43 ──        goto #50
+44 ── %265 = Main.CBE.:(==)::Core.Const(==)
+│     %266 = tx@_29::Main.CBE.Tx
+│     %267 = Base.getproperty(%266, :key)::UInt64
+│     %268 = (%265)(%267, 0)::Bool
+└────        goto #46 if not %268
+45 ──        goto #50
+46 ── %271 = Main.CBE.:!=::Core.Const(!=)
+│     %272 = tx@_29::Main.CBE.Tx
+│     %273 = Base.getproperty(%272, :domain)::UInt8
+│     %274 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %275 = (%274)('T')::Core.Const(0x54)
+│     %276 = (%271)(%273, %275)::Bool
+└────        goto #48 if not %276
+47 ── %278 = Main.CBE.:!=::Core.Const(!=)
+│     %279 = tx@_29::Main.CBE.Tx
+│     %280 = Base.getproperty(%279, :domain)::UInt8
+│     %281 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %282 = (%281)('S')::Core.Const(0x53)
+│            (@_44 = (%278)(%280, %282))
+└────        goto #49
+48 ──        (@_44 = false)
+49 ┄─ %286 = @_44::Bool
+└────        goto #52 if not %286
+50 ┄─        return :Invalid
+51 ──        Core.Const(:(goto %290))
+52 ┄─ %290 = tx@_29::Main.CBE.Tx
+│     %291 = Base.getproperty(%290, :domain)::UInt8
+│     %292 = tx@_29::Main.CBE.Tx
+│     %293 = Base.getproperty(%292, :key)::UInt64
+│     %294 = tx@_29::Main.CBE.Tx
+│     %295 = Base.getproperty(%294, :fee)::UInt64
+│            (binding = Core.tuple(%291, %293, %295))
+│     %297 = Main.CBE.haskey::Core.Const(haskey)
+│     %298 = txseen::Dict{UInt64, Tuple{UInt8, UInt64, UInt64}}
+│     %299 = tx@_29::Main.CBE.Tx
+│     %300 = Base.getproperty(%299, :id)::UInt64
+│     %301 = (%297)(%298, %300)::Bool
+└────        goto #57 if not %301
+53 ── %303 = Main.CBE.:!=::Core.Const(!=)
+│     %304 = txseen::Dict{UInt64, Tuple{UInt8, UInt64, UInt64}}
+│     %305 = tx@_29::Main.CBE.Tx
+│     %306 = Base.getproperty(%305, :id)::UInt64
+│     %307 = Base.getindex(%304, %306)::Tuple{UInt8, UInt64, UInt64}
+│     %308 = binding::Tuple{UInt8, UInt64, UInt64}
+│     %309 = (%303)(%307, %308)::Bool
+└────        goto #56 if not %309
+54 ──        return :Invalid
+55 ──        Core.Const(:(goto %313))
+56 ┄─        goto #57
+57 ┄─ %314 = txseen::Dict{UInt64, Tuple{UInt8, UInt64, UInt64}}
+│     %315 = binding::Tuple{UInt8, UInt64, UInt64}
+│     %316 = tx@_29::Main.CBE.Tx
+│     %317 = Base.getproperty(%316, :id)::UInt64
+│            Base.setindex!(%314, %315, %317)
+│            (@_27 = Base.iterate(%249, %258))
+│     %320 = @_27::UNION{NOTHING, TUPLE{MAIN.CBE.TX, INT64}}
+│     %321 = (%320 === nothing)::Bool
+│     %322 = Base.not_int(%321)::Bool
+└────        goto #59 if not %322
+58 ──        goto #42
+59 ┄─        (@_9 = Base.iterate(%112, %121))
+│     %326 = @_9::UNION{NOTHING, TUPLE{MAIN.CBE.BLOCK, INT64}}
+│     %327 = (%326 === nothing)::Bool
+│     %328 = Base.not_int(%327)::Bool
+└────        goto #61 if not %328
+60 ──        goto #11
+61 ┄─ %331 = pending::Bool
+└────        goto #64 if not %331
+62 ──        return :Pending
+63 ──        Core.Const(:(goto %335))
+64 ┄─ %335 = Main.CBE.Set::Core.Const(Set)
+│     %336 = Main.CBE.:(var"#transition!##4#transition!##5")::Core.Const(Main.CBE.var"#transition!##4#transition!##5")
+│            (#17 = %new(%336))
+│     %338 = #17::Core.Const(Main.CBE.var"#transition!##4#transition!##5"())
+│     %339 = Base.getproperty(s, :ledger)::Vector{Main.CBE.Award}
+│     %340 = Base.Generator(%338, %339)::Base.Generator{Vector{Main.CBE.Award}, Main.CBE.var"#transition!##4#transition!##5"}
+│            (occupied = (%335)(%340))
+│     %342 = Main.CBE.Dict::Core.Const(Dict)
+│     %343 = Main.CBE.UInt64::Core.Const(UInt64)
+│     %344 = Main.CBE.Int::Core.Const(Int64)
+│     %345 = Core.apply_type(%342, %343, %344)::Core.Const(Dict{UInt64, Int64})
+│            (choices = (%345)())
+│     %347 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %348 = choices::Dict{UInt64, Int64}
+│     %349 = n::Int64
+│            (%347)(%348, %349)
+│     %351 = Main.CBE.:>::Core.Const(>)
+│     %352 = Base.getproperty(b, :slot)::UInt64
+│     %353 = Base.getproperty(b, :window)::UInt64
+│     %354 = (%351)(%352, %353)::Bool
+└────        goto #66 if not %354
+65 ── %356 = Main.CBE.:-::Core.Const(-)
+│     %357 = Base.getproperty(b, :slot)::UInt64
+│     %358 = Base.getproperty(b, :window)::UInt64
+│            (@_45 = (%356)(%357, %358))
+└────        goto #67
+66 ── %361 = Main.CBE.UInt64::Core.Const(UInt64)
+└────        (@_45 = (%361)(0))
+67 ┄─ %363 = @_45::UInt64
+│            (lo = %363)
+│     %365 = Main.CBE.enumerate::Core.Const(enumerate)
+│     %366 = Base.getproperty(b, :blocks)::Vector{Main.CBE.Block}
+│     %367 = (%365)(%366)::Base.Iterators.Enumerate{Vector{Main.CBE.Block}}
+│            (@_7 = Base.iterate(%367))
+│     %369 = @_7::UNION{NOTHING, TUPLE{TUPLE{INT64, MAIN.CBE.BLOCK}, TUPLE{INT64, INT64}}}
+│     %370 = (%369 === nothing)::Bool
+│     %371 = Base.not_int(%370)::Bool
+└────        goto #85 if not %371
+68 ┄─        Core.NewvarNode(:(better))
+│            Core.NewvarNode(:(y))
+│            Core.NewvarNode(:(j))
+│     %376 = @_7::Tuple{Tuple{Int64, Main.CBE.Block}, Tuple{Int64, Int64}}
+│     %377 = Core.getfield(%376, 1)::Tuple{Int64, Main.CBE.Block}
+│     %378 = Base.indexed_iterate(%377, 1)::Core.PartialStruct(Tuple{Int64, Int64}, Union{Nothing, Bool}[0, 0], Any[Int64, Core.Const(2)])
+│            (i@_32 = Core.getfield(%378, 1))
+│            (@_31 = Core.getfield(%378, 2))
+│     %381 = @_31::Core.Const(2)
+│     %382 = Base.indexed_iterate(%377, 2, %381)::Core.PartialStruct(Tuple{Main.CBE.Block, Int64}, Union{Nothing, Bool}[0, 0], Any[Main.CBE.Block, Core.Const(3)])
+│            (x@_36 = Core.getfield(%382, 1))
+│     %384 = Core.getfield(%376, 2)::Tuple{Int64, Int64}
+│     %385 = Main.CBE.:<::Core.Const(<)
+│     %386 = x@_36::Main.CBE.Block
+│     %387 = Base.getproperty(%386, :slot)::UInt64
+│     %388 = lo::UInt64
+│     %389 = (%385)(%387, %388)::Bool
+└────        goto #70 if not %389
+69 ──        goto #73
+70 ── %392 = Main.CBE.:(==)::Core.Const(==)
+│     %393 = x@_36::Main.CBE.Block
+│     %394 = Base.getproperty(%393, :color)::UInt8
+│     %395 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %396 = (%395)('U')::Core.Const(0x55)
+│     %397 = (%392)(%394, %396)::Bool
+└────        goto #72 if not %397
+71 ──        goto #73
+72 ── %400 = Main.CBE.in::Core.Const(in)
+│     %401 = x@_36::Main.CBE.Block
+│     %402 = Base.getproperty(%401, :ticket)::UInt64
+│     %403 = occupied::Set{UInt64}
+│     %404 = (%400)(%402, %403)::Bool
+└────        goto #75 if not %404
+73 ┄─        goto #83
+74 ──        Core.Const(:(goto %408))
+75 ┄─ %408 = Main.CBE.get::Core.Const(get)
+│     %409 = choices::Dict{UInt64, Int64}
+│     %410 = x@_36::Main.CBE.Block
+│     %411 = Base.getproperty(%410, :ticket)::UInt64
+│            (j = (%408)(%409, %411, 0))
+│     %413 = Main.CBE.:(==)::Core.Const(==)
+│     %414 = j::Int64
+│     %415 = (%413)(%414, 0)::Bool
+└────        goto #77 if not %415
+76 ── %417 = choices::Dict{UInt64, Int64}
+│     %418 = i@_32::Int64
+│     %419 = x@_36::Main.CBE.Block
+│     %420 = Base.getproperty(%419, :ticket)::UInt64
+│            Base.setindex!(%417, %418, %420)
+└────        goto #83
+77 ── %423 = Base.getproperty(b, :blocks)::Vector{Main.CBE.Block}
+│     %424 = j::Int64
+│            (y = Base.getindex(%423, %424))
+└────        goto #80 if not blue
+78 ── %427 = Main.CBE.:!=::Core.Const(!=)
+│     %428 = Main.CBE.:(==)::Core.Const(==)
+│     %429 = x@_36::Main.CBE.Block
+│     %430 = Base.getproperty(%429, :color)::UInt8
+│     %431 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %432 = (%431)('B')::Core.Const(0x42)
+│     %433 = (%428)(%430, %432)::Bool
+│     %434 = Main.CBE.:(==)::Core.Const(==)
+│     %435 = y::Main.CBE.Block
+│     %436 = Base.getproperty(%435, :color)::UInt8
+│     %437 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %438 = (%437)('B')::Core.Const(0x42)
+│     %439 = (%434)(%436, %438)::Bool
+│     %440 = (%427)(%433, %439)::Bool
+└────        goto #80 if not %440
+79 ── %442 = Main.CBE.:(==)::Core.Const(==)
+│     %443 = x@_36::Main.CBE.Block
+│     %444 = Base.getproperty(%443, :color)::UInt8
+│     %445 = Main.CBE.UInt8::Core.Const(UInt8)
+│     %446 = (%445)('B')::Core.Const(0x42)
+│            (@_46 = (%442)(%444, %446))
+└────        goto #81
+80 ┄─ %449 = Main.CBE.:<::Core.Const(<)
+│     %450 = x@_36::Main.CBE.Block
+│     %451 = Base.getproperty(%450, :rank)::UInt64
+│     %452 = y::Main.CBE.Block
+│     %453 = Base.getproperty(%452, :rank)::UInt64
+└────        (@_46 = (%449)(%451, %453))
+81 ┄─ %455 = @_46::Bool
+│            (better = %455)
+│     %457 = better::Bool
+└────        goto #83 if not %457
+82 ── %459 = choices::Dict{UInt64, Int64}
+│     %460 = i@_32::Int64
+│     %461 = x@_36::Main.CBE.Block
+│     %462 = Base.getproperty(%461, :ticket)::UInt64
+│            Base.setindex!(%459, %460, %462)
+└────        goto #83
+83 ┄─        (@_7 = Base.iterate(%367, %384))
+│     %466 = @_7::UNION{NOTHING, TUPLE{TUPLE{INT64, MAIN.CBE.BLOCK}, TUPLE{INT64, INT64}}}
+│     %467 = (%466 === nothing)::Bool
+│     %468 = Base.not_int(%467)::Bool
+└────        goto #85 if not %468
+84 ──        goto #68
+85 ┄─ %471 = Main.CBE.collect::Core.Const(collect)
+│     %472 = Main.CBE.values::Core.Const(values)
+│     %473 = choices::Dict{UInt64, Int64}
+│     %474 = (%472)(%473)::Base.ValueIterator{Dict{UInt64, Int64}}
+│            (selected = (%471)(%474))
+│     %476 = (:by,)::Core.Const((:by,))
+│     %477 = Core.apply_type(Core.NamedTuple, %476)::Core.Const(NamedTuple{(:by,)})
+│     %478 = Main.CBE.:(var"#transition!##6#transition!##7")::Core.Const(Main.CBE.var"#transition!##6#transition!##7")
+│     %479 = Core._typeof_captured_variable(b)::Core.Const(Main.CBE.Batch)
+│     %480 = Core.apply_type(%478, %479)::Core.Const(Main.CBE.var"#transition!##6#transition!##7"{Main.CBE.Batch})
+│            (#18 = %new(%480, b))
+│     %482 = #18::Main.CBE.var"#transition!##6#transition!##7"{Main.CBE.Batch}
+│     %483 = Core.tuple(%482)::Tuple{Main.CBE.var"#transition!##6#transition!##7"{Main.CBE.Batch}}
+│     %484 = (%477)(%483)::@NamedTuple{by::Main.CBE.var"#transition!##6#transition!##7"{Main.CBE.Batch}}
+│     %485 = Main.CBE.sort!::Core.Const(sort!)
+│     %486 = selected::Vector{Int64}
+│            Core.kwcall(%484, %485, %486)
+│     %488 = Main.CBE.copy::Core.Const(copy)
+│            (out = (%488)(s))
+│     %490 = Main.CBE.Set::Core.Const(Set)
+│     %491 = Base.getproperty(s, :spent)::Vector{Tuple{UInt8, UInt64}}
+│            (spent = (%490)(%491))
+│     %493 = Main.CBE.Set::Core.Const(Set)
+│     %494 = Base.getproperty(s, :accepted)::Vector{UInt64}
+│            (accepted = (%493)(%494))
+│     %496 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %497 = out::Main.CBE.State
+│     %498 = Base.getproperty(%497, :ledger)::Vector{Main.CBE.Award}
+│     %499 = Main.CBE.:+::Core.Const(+)
+│     %500 = Main.CBE.length::Core.Const(length)
+│     %501 = Base.getproperty(s, :ledger)::Vector{Main.CBE.Award}
+│     %502 = (%500)(%501)::Int64
+│     %503 = Main.CBE.length::Core.Const(length)
+│     %504 = selected::Vector{Int64}
+│     %505 = (%503)(%504)::Int64
+│     %506 = (%499)(%502, %505)::Int64
+│            (%496)(%498, %506)
+│     %508 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %509 = spent::Set{Tuple{UInt8, UInt64}}
+│     %510 = Main.CBE.:+::Core.Const(+)
+│     %511 = Main.CBE.length::Core.Const(length)
+│     %512 = Base.getproperty(s, :spent)::Vector{Tuple{UInt8, UInt64}}
+│     %513 = (%511)(%512)::Int64
+│     %514 = ntx::Int64
+│     %515 = (%510)(%513, %514)::Int64
+│            (%508)(%509, %515)
+│     %517 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %518 = accepted::Set{UInt64}
+│     %519 = Main.CBE.:+::Core.Const(+)
+│     %520 = Main.CBE.length::Core.Const(length)
+│     %521 = Base.getproperty(s, :accepted)::Vector{UInt64}
+│     %522 = (%520)(%521)::Int64
+│     %523 = ntx::Int64
+│     %524 = (%519)(%522, %523)::Int64
+│            (%517)(%518, %524)
+│     %526 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %527 = out::Main.CBE.State
+│     %528 = Base.getproperty(%527, :accepted)::Vector{UInt64}
+│     %529 = Main.CBE.:+::Core.Const(+)
+│     %530 = Main.CBE.length::Core.Const(length)
+│     %531 = Base.getproperty(s, :accepted)::Vector{UInt64}
+│     %532 = (%530)(%531)::Int64
+│     %533 = ntx::Int64
+│     %534 = (%529)(%532, %533)::Int64
+│            (%526)(%528, %534)
+│     %536 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %537 = out::Main.CBE.State
+│     %538 = Base.getproperty(%537, :spent)::Vector{Tuple{UInt8, UInt64}}
+│     %539 = Main.CBE.:+::Core.Const(+)
+│     %540 = Main.CBE.length::Core.Const(length)
+│     %541 = Base.getproperty(s, :spent)::Vector{Tuple{UInt8, UInt64}}
+│     %542 = (%540)(%541)::Int64
+│     %543 = ntx::Int64
+│     %544 = (%539)(%542, %543)::Int64
+│            (%536)(%538, %544)
+│     %546 = Main.CBE.sizehint!::Core.Const(sizehint!)
+│     %547 = out::Main.CBE.State
+│     %548 = Base.getproperty(%547, :seen)::Vector{UInt64}
+│     %549 = Main.CBE.:+::Core.Const(+)
+│     %550 = Main.CBE.length::Core.Const(length)
+│     %551 = Base.getproperty(s, :seen)::Vector{UInt64}
+│     %552 = (%550)(%551)::Int64
+│     %553 = n::Int64
+│     %554 = (%549)(%552, %553)::Int64
+└────        (%546)(%548, %554)
+86 ── %556 = enter #98
+87 ── %557 = selected::Vector{Int64}
+│            (@_37 = Base.iterate(%557))
+│     %559 = @_37::UNION{NOTHING, TUPLE{INT64, INT64}}
+│     %560 = (%559 === nothing)::Bool
+│     %561 = Base.not_int(%560)::Bool
+└────        goto #96 if not %561
+88 ┄─ %563 = @_37::Tuple{Int64, Int64}
+│            (i@_39 = Core.getfield(%563, 1))
+│     %565 = Core.getfield(%563, 2)::Int64
+│     %566 = Base.getproperty(b, :blocks)::Vector{Main.CBE.Block}
+│     %567 = i@_39::Int64
+│            (x@_40 = Base.getindex(%566, %567))
+│     %569 = Main.CBE.push!::Core.Const(push!)
+│     %570 = out::Main.CBE.State
+│     %571 = Base.getproperty(%570, :ledger)::Vector{Main.CBE.Award}
+│     %572 = Main.CBE.Award::Core.Const(Main.CBE.Award)
+│     %573 = x@_40::Main.CBE.Block
+│     %574 = Base.getproperty(%573, :ticket)::UInt64
+│     %575 = x@_40::Main.CBE.Block
+│     %576 = Base.getproperty(%575, :id)::UInt64
+│     %577 = Base.getproperty(b, :ctx)::UInt64
+│     %578 = x@_40::Main.CBE.Block
+│     %579 = Base.getproperty(%578, :slot)::UInt64
+│     %580 = (%572)(%574, %576, %577, %579)::Main.CBE.Award
+│            (%569)(%571, %580)
+│     %582 = Main.CBE.checked_add::Core.Const(Base.Checked.checked_add)
+│     %583 = out::Main.CBE.State
+│     %584 = Base.getproperty(%583, :count)::UInt64
+│     %585 = Main.CBE.UInt64::Core.Const(UInt64)
+│     %586 = (%585)(1)::Core.Const(0x0000000000000001)
+│     %587 = (%582)(%584, %586)::UInt64
+│     %588 = out::Main.CBE.State
+│            Base.setproperty!(%588, :count, %587)
+│     %590 = Main.CBE.checked_add::Core.Const(Base.Checked.checked_add)
+│     %591 = out::Main.CBE.State
+│     %592 = Base.getproperty(%591, :subsidy)::UInt64
+│     %593 = x@_40::Main.CBE.Block
+│     %594 = Base.getproperty(%593, :subsidy)::UInt64
+│     %595 = (%590)(%592, %594)::UInt64
+│     %596 = out::Main.CBE.State
+│            Base.setproperty!(%596, :subsidy, %595)
+│     %598 = x@_40::Main.CBE.Block
+│     %599 = Base.getproperty(%598, :txs)::Vector{Main.CBE.Tx}
+│            (@_38 = Base.iterate(%599))
+│     %601 = @_38::UNION{NOTHING, TUPLE{MAIN.CBE.TX, INT64}}
+│     %602 = (%601 === nothing)::Bool
+│     %603 = Base.not_int(%602)::Bool
+└────        goto #94 if not %603
+89 ┄─ %605 = @_38::Tuple{Main.CBE.Tx, Int64}
+│            (tx@_42 = Core.getfield(%605, 1))
+│     %607 = Core.getfield(%605, 2)::Int64
+│     %608 = tx@_42::Main.CBE.Tx
+│     %609 = Base.getproperty(%608, :domain)::UInt8
+│     %610 = tx@_42::Main.CBE.Tx
+│     %611 = Base.getproperty(%610, :key)::UInt64
+│            (key = Core.tuple(%609, %611))
+│     %613 = Main.CBE.:!::Core.Const(!)
+│     %614 = Main.CBE.in::Core.Const(in)
+│     %615 = tx@_42::Main.CBE.Tx
+│     %616 = Base.getproperty(%615, :id)::UInt64
+│     %617 = accepted::Set{UInt64}
+│     %618 = (%614)(%616, %617)::Bool
+│     %619 = (%613)(%618)::Bool
+└────        goto #92 if not %619
+90 ── %621 = Main.CBE.:!::Core.Const(!)
+│     %622 = Main.CBE.in::Core.Const(in)
+│     %623 = key::Tuple{UInt8, UInt64}
+│     %624 = spent::Set{Tuple{UInt8, UInt64}}
+│     %625 = (%622)(%623, %624)::Bool
+│     %626 = (%621)(%625)::Bool
+└────        goto #92 if not %626
+91 ── %628 = Main.CBE.checked_add::Core.Const(Base.Checked.checked_add)
+│     %629 = out::Main.CBE.State
+│     %630 = Base.getproperty(%629, :fees)::UInt64
+│     %631 = tx@_42::Main.CBE.Tx
+│     %632 = Base.getproperty(%631, :fee)::UInt64
+│     %633 = (%628)(%630, %632)::UInt64
+│     %634 = out::Main.CBE.State
+│            Base.setproperty!(%634, :fees, %633)
+│     %636 = Main.CBE.push!::Core.Const(push!)
+│     %637 = accepted::Set{UInt64}
+│     %638 = tx@_42::Main.CBE.Tx
+│     %639 = Base.getproperty(%638, :id)::UInt64
+│            (%636)(%637, %639)
+│     %641 = Main.CBE.push!::Core.Const(push!)
+│     %642 = spent::Set{Tuple{UInt8, UInt64}}
+│     %643 = key::Tuple{UInt8, UInt64}
+│            (%641)(%642, %643)
+│     %645 = Main.CBE.push!::Core.Const(push!)
+│     %646 = out::Main.CBE.State
+│     %647 = Base.getproperty(%646, :accepted)::Vector{UInt64}
+│     %648 = tx@_42::Main.CBE.Tx
+│     %649 = Base.getproperty(%648, :id)::UInt64
+│            (%645)(%647, %649)
+│     %651 = Main.CBE.push!::Core.Const(push!)
+│     %652 = out::Main.CBE.State
+│     %653 = Base.getproperty(%652, :spent)::Vector{Tuple{UInt8, UInt64}}
+│     %654 = key::Tuple{UInt8, UInt64}
+└────        (%651)(%653, %654)
+92 ┄─        (@_38 = Base.iterate(%599, %607))
+│     %657 = @_38::UNION{NOTHING, TUPLE{MAIN.CBE.TX, INT64}}
+│     %658 = (%657 === nothing)::Bool
+│     %659 = Base.not_int(%658)::Bool
+└────        goto #94 if not %659
+93 ──        goto #89
+94 ┄─        (@_37 = Base.iterate(%557, %565))
+│     %663 = @_37::UNION{NOTHING, TUPLE{INT64, INT64}}
+│     %664 = (%663 === nothing)::Bool
+│     %665 = Base.not_int(%664)::Bool
+└────        goto #96 if not %665
+95 ──        goto #88
+96 ┄─        $(Expr(:leave, :(%556)))
+97 ──        goto #103
+98 ┄─        (err = $(Expr(:the_exception)))
+│     %671 = Main.CBE.isa::Core.Const(isa)
+│     %672 = err::ANY
+│     %673 = Main.CBE.OverflowError::Core.Const(OverflowError)
+│     %674 = (%671)(%672, %673)::Bool
+└────        goto #100 if not %674
+99 ──        goto #101
+100 ─ %677 = Main.CBE.rethrow::Core.Const(rethrow)
+└────        (%677)()
+101 ┄ %679 = :Invalid
+│            $(Expr(:pop_exception, :(%556)))
+└────        return %679
+102 ─        Core.Const(:($(Expr(:pop_exception, :(%556)))))
+103 ┄ %683 = Main.CBE.append!::Core.Const(append!)
+│     %684 = out::Main.CBE.State
+│     %685 = Base.getproperty(%684, :seen)::Vector{UInt64}
+│     %686 = Main.CBE.:(var"#transition!##8#transition!##9")::Core.Const(Main.CBE.var"#transition!##8#transition!##9")
+│            (#19 = %new(%686))
+│     %688 = #19::Core.Const(Main.CBE.var"#transition!##8#transition!##9"())
+│     %689 = Base.getproperty(b, :blocks)::Vector{Main.CBE.Block}
+│     %690 = Base.Generator(%688, %689)::Base.Generator{Vector{Main.CBE.Block}, Main.CBE.var"#transition!##8#transition!##9"}
+│            (%683)(%685, %690)
+│     %692 = Base.getproperty(b, :ctx)::UInt64
+│     %693 = out::Main.CBE.State
+│            Base.setproperty!(%693, :ctx, %692)
+│     %695 = Base.getproperty(b, :slot)::UInt64
+│     %696 = out::Main.CBE.State
+│            Base.setproperty!(%696, :slot, %695)
+│     %698 = Main.CBE.push!::Core.Const(push!)
+│     %699 = out::Main.CBE.State
+│     %700 = Base.getproperty(%699, :active)::Vector{UInt64}
+│     %701 = Base.getproperty(b, :ctx)::UInt64
+│            (%698)(%700, %701)
+│     %703 = out::Main.CBE.State
+│     %704 = Base.getproperty(%703, :ctx)::UInt64
+│            Base.setproperty!(s, :ctx, %704)
+│     %706 = out::Main.CBE.State
+│     %707 = Base.getproperty(%706, :slot)::UInt64
+│            Base.setproperty!(s, :slot, %707)
+│     %709 = out::Main.CBE.State
+│     %710 = Base.getproperty(%709, :count)::UInt64
+│            Base.setproperty!(s, :count, %710)
+│     %712 = out::Main.CBE.State
+│     %713 = Base.getproperty(%712, :subsidy)::UInt64
+│            Base.setproperty!(s, :subsidy, %713)
+│     %715 = out::Main.CBE.State
+│     %716 = Base.getproperty(%715, :fees)::UInt64
+│            Base.setproperty!(s, :fees, %716)
+│     %718 = out::Main.CBE.State
+│     %719 = Base.getproperty(%718, :ledger)::Vector{Main.CBE.Award}
+│            Base.setproperty!(s, :ledger, %719)
+│     %721 = out::Main.CBE.State
+│     %722 = Base.getproperty(%721, :accepted)::Vector{UInt64}
+│            Base.setproperty!(s, :accepted, %722)
+│     %724 = out::Main.CBE.State
+│     %725 = Base.getproperty(%724, :spent)::Vector{Tuple{UInt8, UInt64}}
+│            Base.setproperty!(s, :spent, %725)
+│     %727 = out::Main.CBE.State
+│     %728 = Base.getproperty(%727, :seen)::Vector{UInt64}
+│            Base.setproperty!(s, :seen, %728)
+│     %730 = out::Main.CBE.State
+│     %731 = Base.getproperty(%730, :active)::Vector{UInt64}
+│            Base.setproperty!(s, :active, %731)
+└────        return :Applied
+

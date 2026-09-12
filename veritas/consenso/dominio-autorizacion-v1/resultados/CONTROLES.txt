@@ -1,0 +1,81 @@
+# DAV-v0.1 — controles, 2026-09-11
+# Comandos exactos en INFORME.md; no prueba de consenso integrado.
+
+## dav-clippy-final; exit_code=0
+    Checking autorizacion-contextual v0.1.0 (/home/katana/zeo/ZEROX/prototipos/autorizacion-contextual)
+    Finished `dev` profile [unoptimized] target(s) in 0.19s
+
+## dav-fmt; exit_code=0
+
+## dav-cbe; exit_code=0
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contrato_billete_modelo.rs (target/debug/deps/contrato_billete_modelo-c52bbcaff6d21896)
+
+running 14 tests
+test cambio_de_rama_fallido_restaura_toda_la_rama_anterior ... ok
+test desbordamientos_y_undo_erroneo_son_atomicos ... ok
+test dominios_de_gasto_separados_y_ticket_vacio_consumido ... ok
+test overflow_de_fee_y_contador_no_publica_prefijos ... ok
+test pendiente_o_invalido_no_publica_ni_siquiera_perdedores ... ok
+test permutar_la_entrada_no_cambia_el_orden_ni_estado ... ok
+test preflight_rechaza_metadatos_inconsistentes_sin_mutacion ... ok
+test prioridad_azul_no_adelanta_la_ejecucion_del_ganador ... ok
+test prioridad_de_errores_es_independiente_de_llegada ... ok
+test roja_antes_azul_despues_no_sustituye_el_representante ... ok
+test todos_los_conflictos_o_cuerpo_vacio_consumen_sin_reintento ... ok
+test undo_restaura_seen_inertes_y_contextos ... ok
+test vectores_compartidos_cbe_v01 ... ok
+test ventana_inclusiva_y_late_l0_no_consumen ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+## dav-idv-huellas; exit_code=0
+Cargo.lock: OK
+Cargo.toml: OK
+SPEC.md: OK
+crates/zx-consensus/src/bloque.rs: OK
+crates/zx-consensus/src/testigo.rs: OK
+crates/zx-consensus/src/validacion.rs: OK
+crates/zx-core/src/preimage/tx.rs: OK
+crates/zx-core/tests/ed25519_no_unicidad.rs: OK
+crates/zx-node/src/cadena.rs: OK
+crates/zx-node/src/nodo.rs: OK
+crates/zx-node/tests/disponibilidad_real.rs: OK
+crates/zx-storage/src/disco.rs: OK
+crates/zx-storage/src/memoria.rs: OK
+prototipos/poas-identidad/Cargo.lock: OK
+prototipos/poas-identidad/Cargo.toml: OK
+prototipos/poas-identidad/README.md: OK
+prototipos/poas-identidad/resultados/README.md: OK
+prototipos/poas-identidad/resultados/fixture.txt: OK
+prototipos/poas-identidad/resultados/validacion.txt: OK
+prototipos/poas-identidad/src/lib.rs: OK
+prototipos/poas-identidad/tests/identidad_real.rs: OK
+prototipos/pot-estable/Cargo.lock: OK
+prototipos/pot-estable/Cargo.toml: OK
+prototipos/pot-estable/tests/contexto_verificado.rs: OK
+research/README.md: OK
+rust-toolchain.toml: OK
+veritas/consenso/identidad-disponibilidad-v1/CONTRATO-VALIDACION.md: OK
+veritas/consenso/identidad-disponibilidad-v1/DISPONIBILIDAD.md: OK
+veritas/consenso/identidad-disponibilidad-v1/IDENTIDAD.md: OK
+veritas/consenso/identidad-disponibilidad-v1/INFORME.md: OK
+veritas/consenso/identidad-disponibilidad-v1/resultados/ENTORNO.txt: OK
+veritas/consenso/identidad-disponibilidad-v1/resultados/VALIDACION.txt: OK
+
+## dav-cbe-huellas; exit_code=0
+veritas/consenso/contrato-billete-v1/CONTRATO.md: OK
+veritas/consenso/contrato-billete-v1/fixtures/CASOS.txt: OK
+veritas/consenso/contrato-billete-v1/src/modelo.jl: OK
+veritas/consenso/contrato-billete-v1/src/referencia.jl: OK
+veritas/consenso/contrato-billete-v1/src/rapido.jl: OK
+veritas/consenso/contrato-billete-v1/src/validacion.jl: OK
+veritas/consenso/contrato-billete-v1/Project.toml: OK
+veritas/consenso/contrato-billete-v1/Manifest.toml: OK
+crates/zx-consensus/tests/contrato_billete_modelo.rs: OK
+veritas/consenso/contrato-billete-v1/run.jl: OK
+veritas/consenso/contrato-billete-v1/bench/benchmarks.jl: OK
+veritas/consenso/contrato-billete-v1/julia-version.toml: OK
+
+## dav-meta-diff; exit_code=0

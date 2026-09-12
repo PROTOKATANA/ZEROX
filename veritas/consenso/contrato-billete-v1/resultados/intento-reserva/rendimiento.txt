@@ -1,0 +1,5 @@
+Julia=1.13.0 CPU=znver5 threads=1/0 n=180 seed=20260911
+first_timed_call_seconds=4.4159e-5 warmed_allocated_bytes=72088 (excludes_process_startup_and_prior_compilation)
+W_adm=10 initial_state=empty applied_awards=70 accepted_transactions=16 RAM_bytes=132497408000 BLAS=LBTConfig([ILP64] libopenblas64_.so)
+reference median_ns=138452.0 bytes=1096320 allocations=3204
+typed median_ns=21754.5 bytes=72088 allocations=81
