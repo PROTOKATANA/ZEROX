@@ -15,8 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2026-05-03
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
@@ -45,7 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-03
       - uses: Swatinem/rust-cache@v2
       # RocksDB necesita libclang para bindgen.
       - run: sudo apt-get update && sudo apt-get install -y libclang-dev
@@ -66,36 +69,16 @@ jobs:
       # Regla del proyecto: las dependencias van con versión EXACTA (`=`).
       # Un rango en workspace.dependencies deja que `cargo update` mueva consenso.
       - name: Rechazar rangos de versión en [workspace.dependencies]
-        run: |
-          python3 - <<'PY'
-          import re, sys, tomllib
-          with open("Cargo.toml","rb") as f: doc = tomllib.load(f)
-          deps = doc.get("workspace",{}).get("dependencies",{})
-          bad = []
-          for name, spec in deps.items():
-              v = spec if isinstance(spec,str) else spec.get("version","")
-              if not re.fullmatch(r"=\d+\.\d+\.\d+", v or ""):
-                  bad.append(f"{name} = {v!r}")
-          if bad:
-              print("Dependencias sin versión exacta:"); [print("  -",b) for b in bad]; sys.exit(1)
-          print(f"OK — {len(deps)} dependencias, todas con versión exacta")
-          PY
-
-  cpp:
-    name: C++/HIP — el minero compila
-    runs-on: ubuntu-latest
-    continue-on-error: true   # requiere toolchain ROCm/CUDA; informativo hasta la Fase 8
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y cmake g++ capnproto libcapnp-dev
-      - name: Placeholder — kernels HIP se integran en la Fase 8
-        run: echo "zx-miner: sin fuentes C++ todavía (Fase 8)"
+        run: bash ci/dependencias-exactas.sh
 
   frontera:
     name: Arquitectura — la frontera red/consenso
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-03
       # zx-p2p NO puede depender de consenso, estado ni mempool.
       #
       # Red y consenso se necesitan en las DOS direcciones: la red valida lo que recibe, y el
@@ -105,41 +88,4 @@ jobs:
       #
       # Esto ya se coló una vez, el primer día del crate. Un README no lo habría impedido.
       - name: zx-p2p solo puede ver zx-core
-        run: |
-          python3 - <<'PY'
-          import sys, tomllib
-
-          # crate -> dependencias internas permitidas en [dependencies] (produccion)
-          REGLAS = {
-              # zx-p2p solo ve tipos puros. El ciclo red<->consenso se rompe en zx-node.
-              "zx-p2p": {"zx-core"},
-              # zx-consensus no puede depender de la red ni del almacenamiento: es la capa de
-              # decision pura, y debe poder testearse sin ninguna de las dos.
-              "zx-consensus": {"zx-core"},
-              # zx-mempool decide admision, asi que ve consenso, pero NO red ni disco.
-              "zx-mempool": {"zx-core", "zx-consensus"},
-          }
-
-          fallos = []
-          for crate, permitidas in REGLAS.items():
-              with open(f"crates/{crate}/Cargo.toml", "rb") as f:
-                  doc = tomllib.load(f)
-              internas = {d for d in doc.get("dependencies", {}) if d.startswith("zx-")}
-              prohibidas = internas - permitidas
-              if prohibidas:
-                  fallos.append(
-                      f"{crate} depende de {sorted(prohibidas)} en [dependencies];\n"
-                      f"    solo puede depender de {sorted(permitidas)}.\n"
-                      f"    Si lo necesitas para un test, va en [dev-dependencies].\n"
-                      f"    Si lo necesitas en el codigo, la frontera esta mal: define un trait\n"
-                      f"    en {crate} y que zx-node lo implemente. Ver crates/{crate}/src/lib.rs."
-                  )
-              else:
-                  print(f"OK - {crate}: {sorted(internas) or 'sin dependencias internas'}")
-
-          if fallos:
-              print("\nFRONTERA ROTA:\n")
-              for f_ in fallos:
-                  print("  -", f_)
-              sys.exit(1)
-          PY
+        run: bash ci/frontera-crates.sh

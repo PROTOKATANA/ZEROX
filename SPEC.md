@@ -1,15 +1,14 @@
 # ZEROX — Especificación del protocolo
 
-> **ESTADO: DRAFT v0 — NO IMPLEMENTAR TODAVÍA.**
-> Cierra la Fase 0. Pendiente de revisión humana antes de escribir código de consenso.
+> **ESTADO: especificación en migración; consenso PoSpace-Time + DAG no congelado.**
 > Última revisión: 2026-09-10.
 >
-> Alcance de este documento: **ZZK v1.0, capa transparente**. El pool blindado (v1.1, Fase 6)
-> tiene secciones reservadas con punteros a la investigación, no reglas normativas todavía.
->
-> Decisiones de arquitectura y su justificación: `../DECISIONES.md`.
-> Preguntas abiertas: `../PREGUNTAS-PARA-KATANA.md`.
-> Evidencia de cada sección: `research/*.md`.
+> Alcance: Proof of Space and Time con GHOSTDAG, capa transparente y capa blindada Orchard.
+> La capa transparente conserva sus reglas comunes; §9 identifica el trabajo blindado pendiente.
+> Este documento distingue las reglas comunes, la base PoAS lineal y el diseño DAG pendiente de
+> integración. Ningún módulo heredado demuestra por sí solo que el consenso destino esté implementado.
+> Las decisiones y los pendientes activos viven en este repositorio; el vault externo es histórico.
+> Estado de la migración: `MIGRACION.md`. Evidencia: `research/`; cálculos nuevos: `veritas/`.
 
 ---
 
@@ -33,8 +32,6 @@ Cada regla de consenso lleva un identificador estable `C-<ÁREA>-<NN>`. El códi
 | `C-HDR` | Cabecera de bloque |
 | `C-TX` | Formato y validez de transacción |
 | `C-SIG` | Firmas |
-| `C-POW` | Prueba de trabajo |
-| `C-DIFF` | Ajuste de dificultad |
 | `C-TS` | Timestamps |
 | `C-EMIT` | Emisión y coinbase |
 | `C-BLK` | Validez de bloque |
@@ -42,14 +39,44 @@ Cada regla de consenso lleva un identificador estable `C-<ÁREA>-<NN>`. El códi
 ### 0.3 · Marcadores de pendiente
 
 `<<PENDIENTE: P-00N>>` señala un valor o regla que **todavía no está decidido** y remite a la
-entrada correspondiente de `../PREGUNTAS-PARA-KATANA.md`. **Ninguna implementación puede fijar
+entrada local de §17 y a la investigación indicada. **Ninguna implementación puede fijar
 esos valores por su cuenta.**
 
-### 0.4 · Qué NO es este documento
+### 0.4 · Codificación y estado de implementación
 
-No es la serialización de wire ni de almacenamiento — eso es Cap'n Proto y **no es
-consensus-critical** (§2.4). Este documento define **qué se hashea y qué se firma**, que es
-cosa distinta y sí lo es.
+Las preimágenes y los compromisos son de consenso. §2.4 define la codificación de intercambio;
+el almacenamiento interno puede usar otra representación si conserva el comportamiento.
+Las partes señaladas como pendientes no son autorización para completar reglas por intuición.
+
+### 0.5 · Auditorías y cálculos — obligatorio `veritas/` y `LINEO.md`
+
+> Esta sección **no es normativa para el consenso**. Ningún nodo valida nada de aquí. Es la regla
+> de proceso obligatoria para todo el trabajo de cálculo del proyecto: auditorías matemáticas,
+> simulaciones, búsquedas exhaustivas, benchmarks y tests de cálculo.
+
+**C-SPEC-02 · Toda auditoría, simulación, búsqueda exhaustiva, benchmark o test de cálculo DEBEN
+vivir en `veritas/<categoria>/<nombre-auditoria>/`**, con la estructura de `veritas/LINEO.md` §1
+(`Project.toml`, `Manifest.toml`, `src/`, `test/`, `bench/`, `run.jl`, `resultados/`, `INFORME.md`).
+**La categoría la determina el agente** según el tema dominante de la auditoría —por ejemplo
+`seguridad`, `rendimiento`, `consenso`, `economía`, `criptografía`, `red`, `almacenamiento` o
+`finalidad`; la lista **no es cerrada**— para que cada asunto tenga su directorio y no se mezcle
+todo. El agente puede crear tantas categorías temáticas como haga falta: si ninguna existente
+encaja, crea una nueva. La categoría elegida y su motivo quedan declarados en el `INFORME.md`, y una
+auditoría que toque varios temas se coloca por el dominante citando los secundarios. Se crea con
+`veritas/nueva-auditoria.sh <categoria> <nombre>`, que copia la plantilla compartida y ejecuta
+`Pkg.instantiate()`. Los scripts ya existentes en `research/scripts/` se conservan sin tocar como
+evidencia histórica; esta regla aplica a toda auditoría nueva o modificación sustancial de una
+existente.
+
+**C-SPEC-03 · `veritas/LINEO.md` es de lectura y cumplimiento obligatorios** para todo agente o
+persona que escriba o modifique código de cálculo. Resumen vinculante: Julia **solo CPU**; GPU en
+**C++/CUDA**; presupuestos como topes (64 GiB de RAM y 24 hilos en la máquina de referencia);
+ejecución con el envoltorio `veritas/julia.sh`; referencia estricta y validación contra oráculo;
+benchmark y reproducibilidad antes de publicar cualquier cifra.
+
+> **Alcance.** Quedan fuera los tests unitarios y de integración de los crates Rust (`cargo test`),
+> que viven junto a su código y no son cálculos de auditoría. Lo que cubre esta sección es el
+> cálculo de verificación: scripts, simulaciones, benchmarks y tests de cálculo.
 
 ---
 
@@ -127,7 +154,7 @@ elegir_unidad(cantidad_en_ZZK):
 **C-ENC-03** · Toda aritmética de consenso **MUST** usar operaciones con comprobación explícita
 de desbordamiento (`checked_*` o tipos de ancho suficiente). Está **prohibido** el desbordamiento
 silencioso. Rust hace *wrapping* en perfil `release` y *panic* en `debug`: dos nodos, dos
-resultados. Ver `research/lwma1.md` §No-determinismo.
+resultados. La equivalencia entre implementaciones debe comprobarse en los bordes numéricos.
 
 **C-ENC-04** · Está **prohibido** el uso de coma flotante (`f32`, `f64`) en cualquier ruta de
 consenso. La CI **MUST** fallar si aparece en `zx-core`, `zx-consensus` o `zx-storage`.
@@ -146,7 +173,7 @@ Codificación de longitud variable para contadores y longitudes.
 **C-ENC-05** · Un `CompactSize` **MUST** usar la codificación **mínima** posible para su valor.
 Las codificaciones no mínimas **MUST** rechazarse.
 
-> *Motivación (verificada):* FIPS/Zcash documentan el ataque concreto — sin esta regla un minero
+> *Motivación (verificada):* FIPS/Zcash documentan el ataque concreto — sin esta regla un productor
 > puede probar varias codificaciones distintas del mismo objeto contra el filtro de dificultad,
 > en vez de solo la codificación intencionada. Ver `research/zip244.md` §8.
 
@@ -235,24 +262,9 @@ unicidad de los *bytes* la tiene que dar el parser.
 > con separación de dominio. De una preimagen no se puede recuperar el objeto, porque no contiene
 > los datos sino sus hashes. Esto de aquí es lo otro: lo que viaja por la red y se guarda en disco.
 
-**C-WIRE-01 · La cabecera que viaja son los MISMOS bytes que se hashean.** La codificación de una
-`BlockHeader` es exactamente la preimagen del PoW (§7.1) **sin su etiqueta de dominio**: 92 bytes,
-mismo orden de campos.
-
-> No es una optimización, es una restricción: impide que exista una **segunda descripción** del
-> formato de cabecera capaz de divergir de la primera. Es la lección de **H-005**, donde un offset
-> transcrito a mano dejó de cuadrar al cambiar el tipo de `timestamp`.
->
-> ⚠️ **Y volvió a pasar con el tamaño, en la documentación.** Este SPEC decía "112 bytes" en tres
-> sitios, y los comentarios del código en tres más. El tamaño real es
-> `4 + 32 + 32 + 8 + 4 + 8 + 4 = `**92**, y ninguna de las seis menciones lo derivaba de
-> `TAMANO_CABECERA`: todas eran el número escrito a mano. No era explotable —los límites de wire
-> usan la constante, no el comentario— pero es exactamente la misma clase de fallo, en la capa de
-> la documentación. Corregido 2026-09-05 tras la revisión adversarial del sincronizador.
->
-> Corolario: **el decodificador MUST vivir junto al codificador** (`zx-core::wire`). Un
-> decodificador en el crate de red re-describe el orden de los campos, y eso es exactamente el
-> patrón que se quiere prohibir.
+**C-WIRE-01 · La cabecera que viaja son los mismos bytes que se hashean.** Su codificación es
+la de §6.1, sin la etiqueta de dominio del hash. Codificador y decodificador deben compartir una
+sola definición. La base de 556 bytes descrita allí todavía no es el formato definitivo del DAG.
 
 **C-WIRE-02 · Codificación de `Lock`.** La de C-TX-09b, sin cambios. Longitudes: 33 para `PubKey`,
 `3 + 32n` para `MultiSig` con `n ≤ 16`, 101 para `Htlc`.
@@ -281,22 +293,12 @@ los incluye, y eso es lo que la hace no maleable (C-TX-01).
 > los umbrales de `CompactSize` (252/253, 65 535/65 536) construidos a mano. Test diferencial
 > `wire_peso_differential`. Si un día divergen, falla un test — no el consenso, en producción.
 
-**C-WIRE-07 · Codificación de un bloque completo.**
+**C-WIRE-07 · Codificación de un bloque completo.** El bloque contiene su cabecera canónica,
+las transacciones con sus testigos (C-WIRE-03) y la justificación PoT obligatoria (C-HDR-07).
+Los testigos pertenecen a cada transacción. El códec no sustituye la validación.
 
-```
-cabecera(92) ‖ CompactSize(n_tx) ‖ n_tx × [ transacción con sus testigos (C-WIRE-03) ]
-```
-
-Los testigos van **dentro de cada transacción**, no en una lista paralela.
-
-> Que la correspondencia `tx ↔ testigo` sea **posicional por construcción** elimina una clase entera
-> de fallo: con dos listas separadas, una puede tener más elementos que la otra, y decidir qué hacer
-> entonces es una regla más que escribir y otra que dos implementaciones pueden interpretar
-> distinto.
->
-> **El códec no opina sobre validez.** Un bloque sin transacciones da la vuelta aunque C-BLK-07 exija
-> coinbase: mezclar codificación y reglas de consenso es lo que hace que un cambio de reglas rompa
-> el formato.
+**Pendiente de integración DAG:** fijar la codificación de padres y justificación PoT, sus límites
+y su compromiso antes de publicar un formato de bloque definitivo.
 
 **C-WIRE-04 · Todo contador declarado MUST acotarse ANTES de reservar memoria por él.** Un lector
 **MUST** rechazar un `CompactSize` que declare más de `MAX_ELEMENTOS_DECLARADOS = 1 000 000`
@@ -317,21 +319,12 @@ devolver `Result` ante cualquier entrada, incluida basura arbitraria.
 > un índice fuera de rango. Un parser de datos de red que entra en pánico es un DoS remoto de una
 > línea. Se comprueba con property tests que alimentan bytes aleatorios a los tres lectores.
 
-**C-WIRE-06 · Por qué a mano y no Cap'n Proto, para los mensajes de sincronización.**
-`DECISIONES.md` eligió Cap'n Proto para wire y disco, y **sigue siendo la elección** para el
-almacenamiento y para el intercambio de plantillas con el minero C++, donde el código generado para
-dos lenguajes paga su precio. Para los **mensajes de sincronización** se decidió distinto:
+**C-WIRE-06 · Una sola descripción del formato de intercambio.** Los mensajes de sincronización
+usan codificación explícita junto al codificador de los objetos. No se introduce otra descripción
+de cabeceras o transacciones en un esquema independiente. El formato interno de disco se rige por
+§15.1 y no altera las preimágenes.
 
-| | Razón |
-|---|---|
-| **Superficie de ataque** | Estos bytes vienen de un peer no autenticado. El parser de Cap'n Proto hace aritmética de punteros sobre datos hostiles; su crate de Rust tuvo `RUSTSEC-2025-0143` (UB en `get_root_unchecked`) y el bug de canonicalización de 2018 vivía en el manejo de *far pointers* |
-| **Una sola descripción** | Un `BlockHeader` ya tiene un orden de campos byte a byte fijado por el SPEC. Describirlo otra vez en un `.capnp` crea **dos** descripciones del mismo objeto — H-005 y H-006 otra vez |
-| **Sin paso de compilación** | Ni `capnpc`, ni esquema, ni código generado que auditar |
-
-> Coste asumido: se pierde el acceso *zero-copy*. No está en el camino caliente — procesar un bloque
-> cuesta verificar firmas, no copiar 200 KB. Ver `research/capnproto-canon.md`, cuya conclusión ya
-> era que ningún proyecto que necesite esto para consenso confía en el modo canónico de un
-> serializador de propósito general.
+---
 
 ## 3 · Función hash
 
@@ -364,12 +357,9 @@ es decir `KECCAK[512](M ‖ 01, 256)`:
 > **incompatibles**. Usar el fichero equivocado produce un kernel que pasa sus tests y rompe el
 > consenso. Ver `research/sha3-referencias.md`.
 
-**C-HASH-03** · La ruta de verificación (CPU) y la ruta de minado (GPU) **MUST** producir digests
-idénticos bit a bit para toda entrada. Un test de paridad cruzada **MUST** existir en CI.
-
-> El kernel actual de `caliza` **no cumple C-HASH-01**: no implementa padding ni separación de
-> dominio; es `KECCAK-p[1600,24]` crudo. 0 de 860 vectores CAVP. Ver `research/sha3-kernel-audit.md`.
-> Remedio: portar la esponja de `XKCP/Standalone/CompactFIPS202`. Fase 8.
+La función hash de identificadores y transacciones se conserva al cambiar el mecanismo de
+consenso. Cualquier aceleración nueva se valida contra la referencia y los vectores aplicables;
+las reglas de cálculo están en §0.5.
 
 ### 3.2 · Separación de dominio
 
@@ -588,7 +578,7 @@ exactamente 16 bytes.
 | `ZZKTxSigThisIn__` | §4.3 la entrada que se firma |
 | `ZZKTxAuthHash___` | §4.4 auth digest |
 | `ZZKBlkMerkle____` | §6.3 árbol de Merkle de transacciones |
-| `ZZKBlkHeader____` | §6.2 hash de cabecera (PoW) |
+| `ZZKBlkHeader____` | §6.2 hash de cabecera |
 
 ---
 
@@ -701,7 +691,7 @@ de mempool** (§5.5), nunca condición de validez de bloque.
 > deliberadamente fuera del crate `consensus/`. UkoeHB lo enuncia así en `research-lab#70`:
 > *"it is network consensus, not protocol consensus, to enforce the minimum fee"*.
 >
-> Convertirlo en consenso habría traído tres males: un minero no podría incluir transacciones
+> Convertirlo en consenso habría traído tres males: un productor no podría incluir transacciones
 > gratuitas ni propias; cambiar la política de tarifas exigiría un **hard fork**; y aparece una
 > circularidad, porque la tarifa depende de la mediana y la mediana de los bloques.
 >
@@ -826,9 +816,9 @@ insensible a la capacidad, se abre una vía por el otro lado.
 
 ### 6.1 · Cabecera
 
-> ⚠️ **Reescrita el 2026-09-05 por el cambio a Proof of Archival Storage** (`DECISIONES.md` §14).
-> Mueren `bits` y `nonce`. Entran el slot, la salida del PoT, el rango de solución, la solución y
-> el sello. `timestamp` **se queda**: bajo §19 recalibra la velocidad del PoT.
+**Base PoAS lineal, no formato DAG definitivo.** La tabla siguiente conserva los campos de
+solución, reloj y sello ya descritos. Los padres múltiples, la posición/altura derivada y sus
+compromisos todavía necesitan integración. El tamaño final del DAG y sus offsets no están fijados.
 
 | Campo | Tipo | Bytes | Offset |
 |---|---|---|---|
@@ -852,44 +842,41 @@ insensible a la capacidad, se abre una vía por el otro lado.
 | `sello` | `[u8;64]` | 64 | `[492, 556)` |
 | **Total** | | **556** | |
 
-**C-HDR-01** · La cabecera tiene tamaño **fijo**, `TAMANO_CABECERA = 556`. Su codificación es la
-concatenación de los campos en el orden de la tabla, cada uno en little-endian.
+**C-HDR-01** · La base PoAS lineal de la tabla ocupa `TAMANO_CABECERA = 556`. Se codifica
+concatenando los campos en ese orden, con enteros little-endian. Esta cifra no incluye una
+extensión de padres DAG y no afirma que el código ya implemente la base.
 
-**C-HDR-02** · `height` **MUST** ser `height(padre) + 1`. El génesis tiene `height = 0`.
+**C-HDR-02** · La posición de un bloque se deriva de sus ancestros, nunca se confía en la altura
+declarada. El génesis tiene `height = 0`. La definición de altura y su relación con cadena
+seleccionada, orden DAG y activaciones sigue pendiente; no se usa el índice de un lote como altura DAG.
 
 **C-HDR-02b** · `consensus_branch_id` **MUST** ser exactamente el identificador de rama activo a la
 altura del bloque, según la tabla de C-UPG-02. Cualquier otro valor **MUST** rechazarse. No existe
 un campo de "versión de bloque" separado: la rama de consenso *es* la versión.
 
-**C-HDR-05** · `slot` **MUST** ser estrictamente mayor que `slot(padre)`. El génesis tiene
-`slot = 0`.
-
-> Esta regla es la que hace que el reloj de slot sirva de reloj: con ella, la diferencia de slots
-> entre padre e hijo es `≥ 1` **por construcción**, y desaparece la normalización monótona defensiva
-> que LWMA-1 necesitaba sobre timestamps (`DECISIONES.md` §19). Autonomys la tiene en
-> `block_import.rs:368` (`SlotMustIncrease`).
+**C-HDR-05** · En el diseño DAG A″, la relación de slot con el padre seleccionado es **no estricta**:
+`slot(sp(B)) ≤ slot(B)` (R-FIN-1a). La igualdad no autoriza ciclos; la validación de ancestros,
+flujo y justificación secuencial del PoT se integra conjuntamente. El génesis tiene `slot = 0`.
 
 **C-HDR-06** · `rango_solucion` viaja en la cabecera y **MUST** ser exactamente
 `rango_esperado(padre)`, función pura de la cadena de cabeceras. Cualquier otro valor invalida el
 bloque. Es **redundancia comprobada** para clientes ligeros, nunca fuente de verdad.
 
-**C-HDR-07** · La **justificación del PoT no va en la cabecera**, pero **MUST** acompañar al bloque
-para que sea válido. Un bloque sin justificación verificable es **inválido**, no "pendiente".
-
-> Decidido en `DECISIONES.md` §22 con los números delante: meterla dentro no ahorra tráfico
-> —3,88 GiB/año en los dos casos— y multiplica por 32 la cadena de cabeceras, 77,64 GiB frente a
-> 2,45 a veinte años. Lo que se perdería es la capacidad de separar la fase barata de la cara, que
-> es para lo que existe *headers-first*.
+**C-HDR-07** · La justificación del PoT no está en la base de cabecera, pero debe acompañar al
+bloque para validar su prueba. Sin ella no se puede declarar válido ni adoptar el bloque.
+La sincronización debe distinguir datos pendientes de pruebas verificadas como inválidas.
 
 **C-HDR-08** · La cabecera **MUST NOT** contener la dirección de recompensa. La recompensa es la
 salida de la coinbase, ya comprometida en `merkle_root` (C-EMIT-04).
 
 > Autonomys lleva `reward_address` en la solución porque en Substrate la recompensa va a una cuenta.
-> ZEROX es UTXO: un solo sitio donde va el dinero. Ahorro medido: 160 MiB a veinte años.
+> ZEROX es UTXO: un solo sitio donde va el dinero. Se retira la extrapolación de ahorro a veinte
+> años del ritmo anterior; cualquier estimación nueva debe usar el formato y la tasa DAG.
 
 ### 6.2 · Hash de cabecera y sello
 
-**C-HDR-03** · `prefirma = header_encoding[0, 492)` — la cabecera entera **menos el sello**.
+**C-HDR-03** · En la base lineal, `prefirma = header_encoding[0, 492)`, excluyendo el sello.
+En el formato DAG la preimagen debe comprometer también los padres; su extensión está pendiente.
 `pre_hash = H_d("ZZKBlkPreHash___", prefirma)`.
 
 **C-HDR-04** · `sello` **MUST** ser una firma Ed25519 válida sobre `pre_hash` bajo
@@ -898,14 +885,18 @@ salida de la coinbase, ya comprometida en `merkle_root` (C-EMIT-04).
 > El sello liga la solución a **este** bloque. Sin él, cualquiera que vea una solución difundida la
 > reutiliza con su propia coinbase.
 >
-> **Ed25519 es determinista** (RFC 8032: el nonce es `SHA-512(prefijo ‖ mensaje)`). Misma clave y
-> mismo mensaje dan siempre la misma firma, así que **volver a firmar no genera un `block_hash`
-> nuevo**. Autonomys usa schnorrkel, que firma con nonce aleatorio, y por eso su desempate por menor
-> hash es gratis de moler. El nuestro no lo es por esta vía. ⚠️ **Sí lo es variando la coinbase**,
-> que cambia `merkle_root`: por eso C-FORK-04 desempata primero por `solution_distance`.
+> **Corrección de seguridad:** el algoritmo habitual de firma Ed25519 es determinista, pero
+> C-HDR-04 no obliga al propietario a usar ese algoritmo para elegir el nonce. Puede producir
+> firmas válidas distintas para la misma clave y mensaje; la regresión
+> `crates/zx-core/tests/ed25519_no_unicidad.rs` lo comprueba con el verificador real ZIP-215.
+> No es falsificación de claves ajenas ni un fallo de Ed25519. Puesto que C-HDR-09 incluye el
+> sello, su variación puede cambiar el hash sin cambiar la solución ni el cuerpo. Variar la
+> coinbase también cambia `merkle_root`. Ninguna de estas vías queda neutralizada sólo por
+> deduplicar pagos: el orden DAG necesita análisis propio de grinding y coste. Esta corrección
+> no cambia el algoritmo de firma ni activa una regla de consenso.
 
-**C-HDR-09** · `block_hash = H_d("ZZKBlkHeader____", header_encoding)` — sobre los **556** bytes,
-sello incluido.
+**C-HDR-09** · `block_hash = H_d("ZZKBlkHeader____", header_encoding)`, sello incluido.
+La base lineal ocupa **556** bytes; la codificación DAG definitiva queda pendiente.
 
 ### 6.3 · Árbol de Merkle
 
@@ -924,13 +915,21 @@ valor nulo `0x00 × 32`. **MUST NOT** duplicarse el último nodo.
 
 ### 6.4 · Validez de bloque
 
-**C-BLK-04** · `block_hash` **MUST** satisfacer el PoW (§7).
-**C-BLK-05** · `bits` **MUST** ser exactamente el valor que devuelve el retarget (§7.3, C-DIFF-09).
+**C-BLK-04** · La solución de espacio, el PoT y el sello deben verificarse conjuntamente según
+§6.2 y §7. La integración pendiente impide declarar un bloque DAG válido con el validador heredado.
+**C-BLK-05** · `rango_solucion` debe coincidir con el rango esperado contextual (C-HDR-06).
 **C-BLK-06** · El timestamp **MUST** cumplir §7.4.
 **C-BLK-07** · La primera transacción **MUST** ser una coinbase válida (§8); ninguna otra lo es.
 **C-BLK-08** · Todas las transacciones **MUST** ser válidas individualmente (§5.4).
 **C-BLK-09** · Ninguna transacción **MUST** gastar un outpoint gastado por otra del mismo bloque.
 **C-BLK-10** · El **weight** del bloque **MUST** ser `≤ LIMITE(H)`, según §6.5.
+
+> **Frontera de implementación comprobada:** `validar_tx` deja las firmas para
+> `testigo::satisface`; la ruta actual `validar_cuerpo` tampoco compone esa llamada. Su `Ok` no
+> demuestra autorización completa ni cumplimiento de C-BLK-08. La regresión
+> `crates/zx-node/tests/disponibilidad_real.rs` conserva el caso de una firma inválida que pasa
+> esas comprobaciones parciales y falla en el verificador real de condiciones de gasto.
+> La integración PoST/DAG no debe adoptar ese `Ok` como sustituto de validación completa.
 
 ### 6.5 · Peso de bloque y límite dinámico
 
@@ -1030,7 +1029,7 @@ calcula las dos cifras en vez de citarlas.
 >
 > C-ENC-08 declara que la serialización Cap'n Proto **no es consensus-critical**, y su propia
 > motivación dice que su modo canónico *"no garantiza bytes idénticos entre implementaciones"*. Pero
-> el peso alimenta C-WGT-09 (validez de bloque) y C-EMIT-06 (subsidio del minero): si el peso
+> el peso alimenta C-WGT-09 (validez de bloque) y C-EMIT-06 (subsidio del productor): si el peso
 > dependiera del serializador, **dos nodos calcularían límites y subsidios distintos para el mismo
 > bloque**. Split de cadena, y por una vía que ninguna suite de tests de hashing detectaría.
 >
@@ -1173,7 +1172,7 @@ toda transacción, coinbase incluida.
 >
 > Dos consecuencias que importan a un marketplace: (a) ninguna transacción puede quedar
 > permanentemente inminable porque la mediana esté baja — no hay fondos atrapados; (b) ningún
-> emisor puede obligar a un minero a asumir la penalización de C-EMIT-06 para incluirle. Con un
+> emisor puede obligar a un productor a asumir la penalización de C-EMIT-06 para incluirle. Con un
 > tope desacoplado de `ZONA_LIBRE` no se tiene ninguna de las dos garantías.
 >
 > ⚠️ **Revisar en la Fase 6.** A ~820 B por acción Orchard, 100 000 bytes dan ~121 acciones por
@@ -1189,319 +1188,195 @@ toda transacción, coinbase incluida.
 
 ---
 
-## 7 · Prueba de trabajo y dificultad
+## 7 · Prueba de espacio y tiempo — integración del consenso DAG
 
-### 7.1 · Regla de PoW
+El destino es PoSpace-Time: espacio archivado con pruebas de solución, un reloj PoT secuencial y
+orden GHOSTDAG. Las reglas de investigación se encuentran en
+`research/dag-poas-ancla-de-orden.md`, con las correcciones de rondas 9–11.
+Ese documento conserva versiones históricas: prevalecen sus enmiendas explícitas, no sus tablas
+anteriores. La integración de todas las piezas no está terminada.
 
-**C-POW-01** · Un bloque es válido solo si, interpretando `block_hash` como entero **big-endian**
-de 256 bits:
+### 7.1 · Prueba y desafío
 
-```
-block_hash < target
-```
+R-FIN-14 describe el reto por slot derivado de la salida PoT secuencial del flujo. No basta
+comprobar un hash de cabecera: hay que verificar solución de espacio, testigos KZG, identidad de
+billete, reto, distancia de solución, sello y justificación PoT.
 
-**C-POW-02** · Está **prohibido** el criterio de "contar bytes cero a la cabeza". Su granularidad
-es de 8 bits (saltos de dificultad de ×256), incompatible con un retarget por bloque como LWMA.
+**Pendiente:** fijar el formato y validación conjunta, retardo de autoría, puntos de control,
+inyección de entropía y dependencias por flujo. No se introduce una prueba de sustitución.
 
-> El kernel actual usa exactamente ese criterio prohibido. Ver `research/sha3-kernel-audit.md`.
+### 7.2 · Rango de solución
 
-### 7.2 · Codificación compacta del target (`bits`)
+El rango esperado es una función de los ancestros candidatos y del flujo. R-FIN-13′ exige que
+retarget y emisión contabilicen el mismo conjunto pagable: azules y `rojo_k`, excluyendo `rojo_U3`.
+Esto es distinto del conjunto azul que aporta `blue_work` (§11).
+La inflación `λ_real = 1,364` del retarget antiguo que solo contaba azules **deja de aplicar**
+(`research/dag-poas-ancla-de-orden.md`, R-FIN-13′).
 
-**C-POW-03** · `bits` es un `u32` que codifica un target de 256 bits como
-`mantisa (3 bytes) × 256^(exponente − 3)`, con el exponente en el byte más significativo.
+**Unicidad pagable — identidad pagable = el billete (P1).** La identidad pagable es el
+**billete**, no la identidad azul que registra U3″. Un billete paga y cuenta
+**exactamente una vez** en toda la historia seleccionada. La selección agrupa por
+billete y elige una única copia pagable por billete; las demás copias no cobran, no
+cuentan en el conjunto pagable y no aplican sus transacciones, tampoco en ventanas
+posteriores.
 
-**C-POW-04 · Canonicidad de `bits`, definida como punto fijo.** `bits` **MUST** ser exactamente el
-valor que produce el codificador canónico aplicado al target que decodifica:
+**Contexto persistente.** El conjunto de billetes ya consumidos se arrastra a lo largo
+de la cadena seleccionada: al aplicar una ventana, los billetes de sus ganadores entran
+en el conjunto, y las ventanas posteriores los excluyen. En reorg, el conjunto se
+reconstruye para la nueva cadena: un billete consumido en una historia abandonada
+vuelve a estar disponible en la rama que prevalece. Lo respalda el vector
+`fixture_reorg_libera_billete` de la comprobación decisiva v1, donde el mismo billete
+gana en dos ramas competidoras y, tras el reorg, lo consume el bloque de la rama
+prevalente. Consecuencia: un billete no puede cobrar dos veces **ni siquiera a través
+de un reorg**, porque la proyección económica se reconstruye desde génesis sobre la
+cadena que prevalece y los efectos de la rama abandonada se retiran íntegros. El
+contexto nunca sobrevive a un reorg a favor de la rama perdedora.
 
-```
-canónico(bits)  ⟺  codificar(decodificar(bits)) == bits
-```
+**Copia en mergeset posterior o con ventana de origen fuera de la historia: INERTE.**
+Ni cobra ni cuenta. Son **dos reglas independientes**: (a) el billete ya está en el
+conjunto consumido de la cadena seleccionada; (b) la ventana de origen de la copia no
+es la ventana de la historia que la fusiona. Cualquiera de las dos basta. En el
+instrumento no se pueden aislar en vectores distintos porque el catálogo rechaza
+declarar una copia con ventana de origen distinta a la de su billete; la inercia por
+fusión posterior queda respaldada por dos guardas simultáneas, no por una.
 
-Además, y como condición previa: el bit de signo **MUST** estar a cero, el exponente **MUST NOT**
-ser cero, la mantisa **MUST NOT** ser cero, y el resultado **MUST NOT** desbordar 256 bits.
+**Desempate entre copias del mismo billete — P1, DECIDIDO POR KATANA (2026-09-12).**
+Los candidatos al desempate son los bloques azules y los `rojo_k`; los `rojo_U3`
+quedan excluidos de la candidatura (es lo que implementa `eligible()` en DCM-v0.1 y lo
+que exige R-FIN-13′). Entre copias del mismo billete gana la **azul primero**; en
+igualdad de color, menor `rank`; en igualdad de `rank`, menor id de bloque. P0 (orden
+por `(rank, id)` sin preferir color) queda **retirado como política de consenso de
+ZEROX**; sigue existiendo y siendo válido en el instrumento como política de estudio,
+para comparar P0 y P1 en vistas separadas, y la suite de la comprobación decisiva
+sigue probando ambas: el vector `fixture_desempate_color` muestra que P0 y P1 eligen
+ganadores distintos, y P1 elige el azul.
 
-> ⚠️ **Reformulado 2026-09-04 al implementar.** La redacción anterior decía "mantisa normalizada", y
-> la lectura natural de eso —"el byte alto de la mantisa **MUST** ser distinto de cero"— **es
-> incorrecta**: rechazaría `0x1d00ffff`, que es canónico. Ese byte cero no es un descuido, es el
-> resultado del desplazamiento que evita invadir el bit de signo. Y `0x1d00ffff` es precisamente el
-> `TARGET_INICIAL` de **testnet** y el `powLimit` de Bitcoin.
->
-> Definir la canonicidad como punto fijo del codificador no puede desincronizarse de él, porque
-> **es** él. Enumerar reglas estructurales sí puede, y en el primer intento ya se equivocó.
->
-> **D9 verificó la propiedad de forma exhaustiva, no muestreada:** los 167 116 800 pares
-> (exponente, mantisa) válidos dentro de `[MIN_TARGET, POW_LIMIT]`. Cero fallos de identidad, cero
-> colisiones. Inyectividad y `decodificar ∘ codificar = id` quedan **demostradas** sobre el dominio
-> que ZEROX usa.
->
-> ⚠️ **Y refutadas fuera de él.** Para todo `target < 2¹⁶`, `codificar` produce un `bits` con
-> exponente `< 3` que `decodificar` **rechaza**: su propia salida no vuelve a decodificar a nada.
-> Ejemplo mínimo: `codificar(0) = 0x00000000`, que `decodificar` rechaza por exponente cero.
->
-> Hoy es inalcanzable —`MIN_TARGET = 2⁶⁴` está `2⁴⁸` veces por encima del umbral— pero **la
-> propiedad no vale sobre los 256 bits, solo sobre el subrango**. Si algún día se rebajara
-> `MIN_TARGET` por debajo de `2¹⁶`, `codificar` produciría `bits` indecodificables.
+**Relación con R-FIN-8′.** Esta regla **REFINA R-FIN-8′(1)**. Leído al pie de la letra,
+R-FIN-8′(1) —«Cobran los azules y los `rojo_k`; un `rojo_U3` no cobra nada»— pagaría a
+DOS copias `RedK` del mismo billete cuando ninguna de las dos es `rojo_U3`, porque
+`rojo_U3` se define como «copia: su identidad ya era azul»; sin esta regla, el SPEC se
+contradiría consigo mismo y un implementador pagaría dos veces por el mismo billete.
+Con esta regla:
+1. Entre copias del mismo billete cobra y cuenta SOLO la copia seleccionada por P1,
+   **AUNQUE NINGUNA SEA `rojo_U3`**: sean las dos rojas por k, las dos azules, o una
+   de cada color.
+2. La clasificación `rojo_k` / `rojo_U3` sigue siendo válida para lo que R-FIN-8′ ya
+   resolvía (la copia de una identidad ya azul no cobra); lo que esta regla cierra es
+   el caso que aquella clasificación NO cubría (dos copias del mismo billete sin copia
+   azul).
+3. La selección por billete se aplica **ANTES** de decidir cuál cobra: primero se
+   elige la copia pagable del billete, y después se aplica ese resultado. Orden de las
+   dos reglas: (i) selección por billete (P1); (ii) pago y aplicación de la única
+   copia elegida.
+4. R-FIN-13′ no cambia: retarget y emisión siguen contabilizando el mismo conjunto
+   pagable. Lo que cambia es que ese conjunto tiene ahora, como máximo, un bloque por
+   billete.
 
-**C-POW-05** · El target decodificado **MUST** estar en `[MIN_TARGET, POW_LIMIT]`, con
+**SEPARACIÓN OBLIGATORIA — selección ≠ aplicación.** P1 es el orden de **SELECCIÓN**
+entre copias del mismo billete. **NO** es el orden de **APLICACIÓN** del mergeset, que
+sigue siendo el de R-FIN-8′(4): por cada bloque de la cadena seleccionada,
+`[sp(B)] ++ mergeset(B)` con el mergeset en `blue_work` ascendente, desempate por
+menor `solution_distance` y luego hash, azules y `rojo_k` entrelazados, saltándose los
+`rojo_U3`. Implementar «azul primero» en la aplicación rompería R-FIN-8′(4); esta
+separación debe quedar escrita para que nadie la confunda. El acoplamiento R-FIN-13′
+—retarget y emisión contabilizan el mismo conjunto pagable— sigue vigente y no depende
+de esta regla.
 
-```
-POW_LIMIT  = 2^224 − 1     // target máximo  ⇒ dificultad MÍNIMA
-MIN_TARGET = 2^64          // target mínimo  ⇒ dificultad MÁXIMA
-```
+**PENDIENTE — prerrequisito de IMPLEMENTACIÓN.** `rank` es hoy una etiqueta abstracta
+suministrada, no recalculada (CONTRATO DCM-v0.1: «Rank y color son etiquetas globales
+suministradas, no recalculadas»). El SPEC debe atar `rank` al orden concreto del
+mergeset (`blue_work`, `solution_distance`, hash) y **demostrar que ese orden es
+total**: un empate de `rank` hace el desempate no determinista, y eso es un fork —
+con P1 igual que con P0. Hasta entonces, el desempate entre copias no es implementable
+con garantía.
 
-> `POW_LIMIT = 2^224 − 1` equivale a una dificultad de `2^32` ≈ 4,29·10⁹ hashes por bloque, es
-> decir **≈35,8 MH/s** sostenidos para mantener 120 s. `MIN_TARGET = 2^64` acota el error de
-> truncamiento del retarget (§7.3) manteniendo al menos 64 bits significativos en el target.
+**PENDIENTE — recompensa del bloque honesto tardío.** La regla (b) alcanza más de lo
+que sugiere: un bloque honesto con billete único que nadie disputa, fusionado después
+del cierre de su ventana, no cobra nunca. El destino de esa recompensa —pérdida
+definitiva, o reinclusión como la que modela la cola de RCE-v0.1— **NO está decidido**;
+la regla (b) no debe leerse como que ya lo está. Con Δ sin medir en DAG, no es un caso
+de borde raro.
 
-### 7.3 · Ajuste de dificultad — LWMA-1
+**Límites declarados de la evidencia.** La comprobación decisiva v1
+(`veritas/consenso/comprobacion-decisiva-v1/`) que respalda esta regla: no usa firmas
+ni criptografía (los billetes son IDs declarados en el fixture); no valida PoAS contra
+el rango del pasado causal; no modela red; la convergencia está probada para UN par de
+órdenes de entrega, no para un barrido de órdenes; y asume el vínculo
+billete→oportunidad, cuya propiedad real depende de
+`veritas/consenso/contrato-billete-v1/` y de C-HDR-03/04 (dos firmas Ed25519 bajo la
+misma `public_key`, R-FIN-8′).
 
-Reglas tomadas verbatim de `research/lwma1.md`, que las derivó de `zawy12/difficulty-algorithms`.
+**Pendiente:** separadamente, ventana, arranque por red, límites y
+redondeos, fusiones fuera de ventana y validación de ramas candidatas con pesos reales. Ningún
+rango declarado por el productor sustituye su cálculo contextual. Los valores históricos
+`W≥3 083, γ≤0,25` y `W≥12 331, γ≤1` no certifican este controlador: proceden de otra tasa/F y
+una aproximación de desviación típica, no de una cota uniforme adversarial de error menor al 1 %.
 
-> ⚠️ **Existen DOS fórmulas publicadas bajo el nombre "LWMA-1"**, con resultados numéricos
-> distintos. ZEROX usa la **variante de espacio-target en U512**, nunca la de dificultad en `u64`
-> (esta última tiene un bug de overflow confirmado que Wownero tuvo que parchear en producción).
+### 7.3 · Parámetros del diseño y límites de la evidencia
 
-#### Constantes
+El perfil de estudio A″ conserva `λ_obj = 1 bloque/s` nominal, `τ_nom = 1 s/slot`, `k = 30`
+y `S_max = 150 s` nominales. Prevalecen slot **no estricto** (`slot(sp)≤slot(B)`), U2/U3″
+dinámica, R-FIN-8′ y R-FIN-13′; el k25, el rechazo del empate y U3′-filtro residuales están
+superados. R-FIN-12 conserva los límites 15 padres / 180 bloques de mergeset a k30 y el shuffle
+de la **cola de candidatos**, no una cuota aleatoria de padres finales. El verificador no
+colorea al azar ni decide por orden de llegada.
 
-```
-T          = 120                    // segundos, objetivo de tiempo de bloque
-N          = 90                     // ventana, en bloques      [P-003 ✅ 2026-09-04]
-k          = N·(N+1)·T / 2          // = 491 400   — constante precomputada, NO evaluar la expresión
-NK         = N · k                  // = 44 226 000
-ST_CAP     = 6·T                    // = 720 segundos
-T_FLOOR    = N·(N+1)·T / 20         // = 49 140    — constante precomputada  [P-003 ✅]
-FTL        = N·T / 20               // = 540 segundos
-MTP_W      = 11                     // bloques
-```
+`F = 2 h` sigue provisional; no es la espera de Cortex ni se iguala por defecto a L. `L = 1 h`
+es candidato condicionado, no adopción inequívoca. `I`, `L`, `ρ_max`, la configuración final
+de `F` y la calibración frente a `Δ` siguen abiertos.
 
-**C-DIFF-01 · Pureza.** El retarget es la función pura `siguiente_target(H, cab[H−N−1 .. H−1])`.
-Sus **únicas** entradas son la altura `H`, los `N+1` timestamps y los `N` targets
-`decode(bits(h))`. **MUST NOT** leer reloj local, hora de red, mempool, configuración, ni ninguna
-cabecera fuera de esa ventana.
+`45 s` es el máximo observado de `W_dec` en las simulaciones citadas, no una cota
+universal. `I ≥ ρ_max·W_dec` es una restricción contra evaluar una época durante la elección
+del ancla; no demuestra finalidad a los 112,5 s. El retardo efectivo de red `Δ` necesita medición.
+Los escenarios que usan distintas tasas, pérdidas de red o presupuestos adversarios no se combinan.
 
-**C-DIFF-02 · Arranque.** Si `1 ≤ H ≤ N`, `siguiente_target(H) = TARGET_INICIAL(red)`. **Cada red
-lleva su propio valor:**
+#### Contrato de unidades del perfil de estudio
 
-```
-mainnet:  TARGET_INICIAL_BITS = 0x1c07fff8    TARGET_INICIAL = 0x07fff8 · 2^200
-testnet:  TARGET_INICIAL_BITS = 0x1d00ffff    TARGET_INICIAL = 0x00ffff · 2^208
-```
+Esta notación consolida magnitudes; no fija todavía su serialización ni completa el protocolo:
 
-Mainnet arranca **exactamente 32 veces más difícil** que testnet, sin resto.
+- `slot(B)`, `I_slots`, `L_slots`, `S_max_slots` y `D_aut_slots` son índices o cantidades enteras
+  de slots PoT. Con τ nominal de 1 s/slot, la referencia S_max se representa por 150 slots;
+  limita `slot(B)−slot(sp(B))`, no el tiempo de retención ni Δ de red.
+- `T_j=j·I_slots` es el umbral del inyector; `t_j=slot(I_j)+L_slots` es el índice de inyección.
+  R-FIN-9 remite a ese inyector, no al contador obsoleto `c·j`. Origen/bootstrap, existencia del
+  ancla, desempates y disponibilidad después de poda aún deben cerrarse. I separa umbrales,
+  no necesariamente los instantes realizados de inyección.
+- `N(s)` es trabajo secuencial por slot. Su eventual cambio coincide con la inyección, pero
+  su regla de actualización y su valor inicial no están definidos. El `ensure_root` del
+  actualizador de Autonomys **no se adopta** como autoridad de ZEROX.
+- `τ_nom·I_slots` es duración nominal. Para N fijo, si `v_ref` es la velocidad de producción
+  secuencial en slots/segundo físico y `ρ_max=v_A,max/v_ref`, la expresión dimensional del
+  presupuesto histórico es `I_slots≥ρ_max·v_ref·W_dec,físico`. Esto no prueba su suficiencia:
+  falta precisar trabajo disponible, comienzo y deadline; si N varía, también su calendario.
 
-El primer retarget calculado es el de `H = N+1`. La ventana es siempre exactamente `N`;
-**MUST NOT** encogerse dinámicamente.
+Se conserva `S_max_slots<I_slots` como **condición suficiente del perfil propuesto**, no como
+necesidad universal demostrada. El candidato de 112,5 s nominales no satisface esa condición
+manteniendo S_max; no se sustituye por otro I ni se reduce S_max para hacerlo encajar. Además,
+si se pretende impedir terminar una evaluación hasta un deadline inclusivo, la igualdad del
+presupuesto histórico requiere resolver el borde: no excluye por sí sola terminar justo a tiempo.
+Ninguna de estas restricciones constituye una regla demostrada de irreversibilidad de pagos.
 
-> ⚠️ **Corregido 2026-09-04 al implementar.** Esta regla decía `TARGET_INICIAL = POW_LIMIT =
-> 2^224 − 1`, y **eso es inalcanzable**: el formato compacto de C-POW-03 solo representa valores de
-> la forma `mantisa × 256^k` con la mantisa de 3 bytes, y `2^224 − 1` son 28 bytes de `0xFF`
-> seguidos. Ningún `bits` decodifica a él, así que **el bloque génesis no habría podido llevar el
-> target que la regla exigía**. `POW_LIMIT` sigue siendo la **cota** —C-POW-05 rechaza cualquier
-> target por encima— y `TARGET_INICIAL` es un valor representable por debajo.
+La procedencia y los cierres pendientes están en
+[la ficha de modelo, revisión 2](veritas/finalidad/baseline-30m/MODELO.md), §§3 y 6.
 
-> 🔶 **P-004c · decidido 2026-09-04 (Katana): que el primer bloque dure lo que dura cualquier otro.**
->
-> **Qué es esta constante, y qué no es.** Es **una estimación del hashrate del día 1 escrita como un
-> target**, y no debe hacer nada más que eso. `0x1c07fff8` está elegida para que el primer bloque
-> tarde **`T` = 120 s** si el día del lanzamiento hay **≈1,15 GH/s**.
->
-> | Hashrate real el día 1 | Primer bloque | LWMA entra en |
-> |---|---|---|
-> | 0,25 GH/s | 9,2 min | 13,7 h |
-> | 0,5 GH/s | 4,6 min | 6,9 h |
-> | **1,15 GH/s** | **2,0 min** ← nominal | **3,0 h** |
-> | 2 GH/s | 69 s | 1,7 h |
-> | 3 GH/s | 46 s | 1,1 h |
-> | 10 GH/s | 14 s | 21 min |
-> | 30 GH/s | 4,6 s | 6,9 min |
->
-> 1,15 GH/s es el extremo **conservador** de lo que rinde una GPU sola en SHA3-256. Se elige el
-> extremo conservador y no el central por la asimetría de esta misma regla: si la estimación se queda
-> **corta**, los bloques salen rápido y LWMA lo arregla en una hora; si se pasa de **larga**, los 90
-> bloques a dificultad fija van lentos y **nada puede acelerarlos**.
->
-> **Dos intentos anteriores, y por qué los dos estaban mal.**
->
-> `0x1d00ffff` — el target más fácil representable, justificado por la asimetría de arriba pero
-> **sin medir**: con una GPU los bloques salen en 1-4 segundos, no en 120.
->
-> `0x1c00ffff` (×256) — elegido para que el primer bloque tardase ~10 min y encarecer así la carrera
-> del día 1. **Descartado.** Le daba a esta constante **dos trabajos** —estimar el hashrate y frenar
-> el arranque— y cuando dos propósitos comparten una constante deja de poder saberse cuál se está
-> ajustando. Es la misma clase de acoplamiento oculto que produjo H-005 y H-006. Además volvía el
-> arranque 5× más lento que el régimen normal, un comportamiento artificial que el protocolo no pide
-> en ninguna parte.
->
-> Si algún día se quiere desincentivar la carrera del día 1, el instrumento correcto es un
-> **slow-start explícito sobre la emisión** —una regla propia, visible y discutible, como la de
-> Zcash— no un target torcido.
->
-> **El límite que no se puede quitar.** Ninguna cadena conoce su hashrate antes de existir, así que
-> este número **es un pronóstico**. La única defensa real es **medir en vez de estimar**: cuando
-> `zx-miner` funcione (Fase 8) se recalibra desde un benchmark. Revisable hasta el minuto antes de
-> crear el génesis, y solo hasta entonces.
->
-> **Por qué testnet se queda en el mínimo.** Una red local de tres nodos tiene que producir bloques
-> en segundos o los tests de integración no son utilizables. El aislamiento entre redes **no** depende
-> de la dificultad: lo garantizan el génesis distinto (C-GEN-04) y el prefijo mágico (C-NET-01).
+### 7.4 · Timestamps y timelocks
 
-**C-DIFF-03 · Reconstrucción monótona de solvetimes.** Todo en `i64`:
+**C-TS-01 · Contexto temporal.** La relación entre timestamp, slot y ancestros debe quedar fijada
+en la integración PoT/DAG; no se hereda una separación de un segundo por cada arista.
 
-```
-p := ts(H − N − 1)
-para j = 1..N:
-    h := H − N − 1 + j
-    c := si ts(h) > p entonces ts(h) sino p + 1
-    st[j] := min(ST_CAP, c − p)
-    p := c
-```
+**C-TS-02 · MTP para timelocks.** La política de mediana temporal para `lock_time` y HTLC debe
+usar ancestros de la historia candidata. La selección de esos ancestros en el DAG está pendiente;
+MTP no sustituye el índice PoT del retarget de rango.
 
-Invariante: `1 ≤ st[j] ≤ 720`. **MUST NOT** implementarse como `if st < 1 then st = 1`.
+**C-TS-03 · Future Time Limit.** Un rechazo por adelanto respecto al reloj local es temporal:
+se difiere y reintenta, no se cachea como invalidez permanente ni justifica banear al par.
+El valor de FTL para recalibración PoT queda pendiente.
 
-> ⚠️ **Precisado 2026-09-04 por D9.** Esta nota decía "por construcción, no por saturación", y solo
-> es cierto de una de las dos mitades:
-> - **`st ≥ 1` sí es por construcción**: cada timestamp se normaliza contra el anterior **ya
->   normalizado**, así que la resta nunca puede dar ≤ 0 y —lo que de verdad importa— `p` **nunca
->   queda contaminado** por un timestamp retrasado. Ahí está la diferencia con el patrón prohibido.
-> - **`st ≤ 720` es saturación**, literalmente `min(ST_CAP, ·)`. Es segura porque **no toca `p`**:
->   recorta el valor que entra en la suma sin desincronizar la reconstrucción.
+**C-TS-04 · Prohibida la hora de red.** Ninguna regla de consenso usa la mediana de relojes de
+pares ni hora ajustada por pares. La referencia temporal local no se convierte en voto de red.
 
-> *Motivación:* el patrón prohibido es exactamente el que produjo un ataque real — una moneda
-> perdió 4 800 bloques en 5 horas porque los timestamps retrasados se convertían en solvetimes
-> largos artificiales que hundían la dificultad.
-
-**C-DIFF-04 · Suma ponderada.** `t := Σ_{j=1..N} j · st[j]` en `i64`.
-
-**C-DIFF-05 · Suelo.** `si t < T_FLOOR entonces t := T_FLOOR`.
-
-> ✅ **P-003 RESUELTO (2026-09-04): el suelo se incluye.** Sin él, un atacante que controle la
-> ventana con timestamps a `padre+1` multiplica la dificultad por **120 en un solo bloque** y
-> congela la cadena al retirarse. Con el suelo, el techo es **×10**.
->
-> D9 verificó ambas cifras con aritmética de fracciones exactas: `K/4095 = 120` y `T_FLOOR/K = 1/10`,
-> las dos **exactas**. (Con la corrección de sesgo activa serían ×120,3 y ×10,02; como P-005 dejó
-> `BIAS = 1`, vuelven a ser exactas.) El mínimo absoluto de `t` es `N(N+1)/2 = 4095`, alcanzado con
-> todos los `st[j] = 1`, y `next(t)` es no decreciente en `t`, así que **ninguna secuencia de
-> timestamps puede superar el ×10** en un solo bloque.
-
-**C-DIFF-06 · Suma de targets.** `S := Σ_{j=1..N} decode(bits(H − N − 1 + j))` en **U512**, sin
-divisiones intermedias.
-
-**C-DIFF-07 · Target siguiente.** En U512, división entera truncada:
-
-```
-next := (S · t · BIAS_NUM) / (NK · BIAS_DEN)
-```
-
-con **`BIAS_NUM = BIAS_DEN = 1`**: **el sesgo del clamp NO se corrige.** Los dos factores se
-conservan en la fórmula, y no se colapsan a `next := S·t/NK`, para que la ausencia de corrección sea
-una decisión visible y no una omisión.
-
-> ✅ **P-005 CERRADO 2026-09-04 (Katana) → no se corrige. Sesgo documentado de +0,30 s.**
->
-> **Historia, porque el error importa más que el resultado.** Esta regla decía antes que el racional
-> sería `99752/100000 ≈ 1 − e⁻⁶`, es decir **menor que 1**. **D9 refutó la dirección**, y la
-> refutación se verificó de forma independiente:
->
-> - El clamp recorta por arriba, así que `E[min(X, 6T)] = T(1 − e⁻⁶) = 119,70 s < T`.
-> - Luego `t < k`, el target **baja**, y los bloques salen **más lentos**. El punto fijo está en
->   `ρ·(1 − e^(−6/ρ)) = 1` → `ρ = 1,00252` → **120,30 s**, que es exactamente la cifra que esta
->   misma nota citaba: el modelo se valida solo.
-> - Para llevar `ρ` a 1 haría falta `r = 1/(1 − e⁻⁶) = 1,002486`, es decir **`r > 1`: aflojar**.
->
-> Multiplicar por `0,9975` empujaba al revés: desplazaba el punto fijo a **120,61 s**, *más lejos* de
-> 120 que no corregir. Peor todavía, la implementación llevaba una aserción de compilación
-> `BIAS_NUM < BIAS_DEN` "para que la corrección apriete" — **protegiendo la dirección equivocada**.
-> Un candado mal orientado es peor que ningún candado: da confianza en la propiedad contraria a la
-> que hace falta.
->
-> **Por qué se cierra en "no corregir" y no en "invertirlo".** La **dirección** está demostrada; el
-> **valor** no. El campo medio de primer orden da `1,002486`; el Monte Carlo de D9 —float y
-> aritmética entera, varias semillas, hasta 300 000 bloques— sitúa el punto fijo empírico en
-> `≈1,0045`. **Discrepan**, luego hay efectos de segundo orden sin capturar y, por la regla de
-> independencia matemática, esa cifra **no puede presentarse como demostrada**. Fijar en el consenso,
-> para siempre, un número que no sabemos justificar, a cambio de un error del 0,25 %, es un mal
-> cambio.
->
-> **Y el 0,25 % es pequeño en su contexto.** Durante cualquier periodo de crecimiento de hashrate
-> LWMA va por detrás y los bloques salen *más rápido* que `T`; ese efecto es de un orden de magnitud
-> mayor que el sesgo del clamp. Corregir el clamp con precisión de cuarto decimal en un sistema cuyo
-> ruido normal es de varios puntos porcentuales es precisión falsa.
->
-> **Consecuencias declaradas, para que estén escritas y no se descubran después:**
->
-> | | Valor con `BIAS = 1` |
-> |---|---|
-> | Solvetime medio en régimen estacionario | **120,30 s**, no 120,00 |
-> | Desviación | **+0,25 %** (+0,30 s por bloque) |
-> | Bloques al año | 262 139 en vez de 262 800 — **661 menos** |
-> | Efecto sobre la emisión | la curva es **por bloque**, así que el calendario se estira un 0,25 %: el hito de los 1000 M llega ~18 días más tarde de lo nominal |
-> | Efecto sobre `N_LARGO` | la ventana "de un año" mide en realidad **366 días** |
->
-> Ninguna de esas cifras es un fallo: son la definición del sistema, y ahora están escritas.
->
-> **Precedente.** Flux, TENT y Tari usan LWMA-1 con clamp y **no corrigen** el sesgo.
->
-> **Efecto lateral bueno:** con `BIAS = 1` las cifras de C-DIFF-05 (×120 sin suelo, ×10 con él)
-> vuelven a ser **exactas**, verificado por D9 con aritmética de fracciones. Cualquier corrección las
-> volvería a ensuciar.
->
-> **Alternativa descartada explícitamente:** mover `T` a 119,70 s para que el punto fijo caiga en 120.
-> Es la misma constante no demostrada con otro disfraz, y además rompe las cuatro constantes que
-> cuelgan de `T` (`FTL`, `N_LARGO`, `T_FLOOR`, `ST_CAP`).
->
-> **Qué haría falta para reabrirlo:** un modelo que capture los efectos de segundo orden
-> —ponderación no uniforme de la ventana, Jensen sobre `S`— y **reconcilie** el campo medio con el
-> Monte Carlo. Mientras las dos estimaciones discrepen, la respuesta correcta es no tocar nada.
->
-> **Cota de overflow:** el peor caso real es `S·t·BIAS_NUM < 2²⁶⁹`, no 2²⁶⁵ como decía antes esta
-> nota — con `S ≤ N·POW_LIMIT < 2²³¹`, `t ≤ ST_CAP·N(N+1)/2 < 2²²` y `BIAS_NUM < 2¹⁷`. La cota se
-> mantiene calculada para `BIAS_NUM` arbitrario, no para 1, porque es la que valdría si P-005 se
-> reabriera. Verificado en `zx-consensus`, test `el_numerador_de_c_diff_07_cabe_en_u512`. Es la razón
-> de mandar U512 y no U256 en C-DIFF-06.
-
-**C-DIFF-08 · Acotado.** `next := clamp(next, MIN_TARGET, POW_LIMIT)`.
-
-> **`next(t)` es no decreciente en `t`, no estrictamente creciente** — precisado por D9. `⌊·⌋` y los
-> clamps preservan el orden **no estricto**, así que `t₁ ≤ t₂ ⟹ next(t₁) ≤ next(t₂)` **siempre**;
-> eso es lo que el consenso necesita y está demostrado algebraicamente. Pero la versión estricta
-> falla en dos sitios: por debajo de `T_FLOOR` todos los `t` dan el mismo `next` (es lo que el suelo
-> hace), y saturado en `MIN_TARGET` bloques mucho más lentos no ablandan nada.
->
-> Consecuencia práctica: **el retarget nunca puede invertirse** —endurecer cuando debería aflojar—,
-> que es la propiedad de seguridad. Pero no debe afirmarse "siempre estrictamente".
-
-**C-DIFF-09 · Ida y vuelta por `bits`.** `bits(H)` es válido **si y solo si**
-`bits(H) == compact(next)`. El valor que consume C-DIFF-06 para bloques anteriores es **siempre**
-`decode(bits(h))`, nunca un target de alta precisión persistido.
-
-> Persistir y realimentar el target sin cuantizar produce un **split entre nodos con estado
-> completo y nodos headers-first**.
-
-**C-DIFF-10 · Nada más.** **MUST NOT** aplicarse: jump rule de LWMA-2/4, tempering, clamps por
-bloque, límites de timespan, redondeo a dígitos significativos, ordenación de timestamps, lag,
-cut, ni MTP como bloque más reciente de la ventana.
-
-### 7.4 · Reglas de timestamp
-
-**C-TS-01 · Monotonía.** `ts(H) ≥ ts(H−1) + 1`. Rechazo **permanente**.
-
-**C-TS-02 · MTP solo para timelocks.** `MTP(H) = mediana(ts(H−1) .. ts(H−11))`. Se usa
-exclusivamente como reloj para `lock_time` y HTLC. **MUST NOT** entrar en el retarget.
-
-**C-TS-03 · Future Time Limit.** `ts(H) ≤ reloj_local + FTL`. Rechazo **NO permanente**: el bloque
-se difiere y se reintenta, **MUST NOT** cachearse como inválido ni banear al par.
-
-> Cachearlo como inválido permanente produce un **split garantizado con partición temporal**.
-
-**C-TS-04 · Prohibida la hora de red.** Ninguna regla de consenso **MUST** usar mediana de pares,
-NTP ni hora ajustada. Solo reloj local del nodo.
-
-> Con `FTL = 540 s`, la regla "revert to node time" de Bitcoin/Zcash abriría un Sybil del 33 %.
-> Al eliminar la hora de pares, la vulnerabilidad no existe.
-
-**C-TS-05 · Regla del minero (NO es consenso).** `ts = max(reloj_local, ts(padre) + 1)`; no
-publicar hasta que `ts ≤ reloj_local + FTL`.
+**C-TS-05 · Producción.** El productor respeta el slot y la política temporal que se congelen
+para PoT/DAG. No se publica una fórmula de producción antes de fijar esa relación.
 
 ---
 
@@ -1566,7 +1441,7 @@ truncadas hacia cero. El caso `x > 2M` no llega aquí: el bloque ya es inválido
 > **La función es NO CRECIENTE, no estrictamente decreciente.** D9 lo precisó: `⌊·⌋` de una función
 > estrictamente decreciente nunca sube, pero **puede tener mesetas**. Con los parámetros reales de
 > ZEROX no aparecen —la resolución de `base` frente a `M²` sobra—, pero eso depende de esa relación
-> y no es garantía general. Lo que el consenso necesita sí está demostrado: **un minero nunca cobra
+> y no es garantía general. Lo que el consenso necesita sí está demostrado: **un productor nunca cobra
 > más por hacer un bloque más grande**.
 >
 > ⚠️ **`u128` tiene un techo real, y no es infinito.** Con `base = recompensa_base(0)`, el numerador
@@ -1577,7 +1452,7 @@ truncadas hacia cero. El caso `x > 2M` no llega aquí: el bloque ya es inválido
 
 **C-EMIT-07 · Orden de aplicación — el tail NO es un suelo por bloque.** El suelo `TAIL_EMISSION`
 se aplica **dentro** de `recompensa_base` (C-EMIT-01), es decir **antes** de la penalización
-C-EMIT-06, y la penalización lo multiplica. En consecuencia, un minero cuyo bloque exceda la
+C-EMIT-06, y la penalización lo multiplica. En consecuencia, un productor cuyo bloque exceda la
 mediana efectiva percibe **menos de `TAIL_EMISSION`**, tendiendo a 0 conforme `x → 2M`.
 El contador `emitido(H)` acumula el **subsidio efectivo ya penalizado**: la moneda no percibida
 **MUST NOT** emitirse nunca.
@@ -1624,10 +1499,10 @@ igual a la altura de su bloque.
 
 ---
 
-## 9 · Reservado — v1.1, pool blindado (Fase 6)
+## 9 · Capa blindada Orchard — integración pendiente
 
-Esta sección **no contiene reglas normativas todavía**. La investigación está completa y
-verificada; se convertirá en reglas cuando se aborde la Fase 6.
+Esta sección **no contiene reglas normativas todavía**. La investigación identificada a continuación
+sirve de base; quedan por integrar las reglas y su validación.
 
 | Tema | Investigación |
 |---|---|
@@ -1665,74 +1540,25 @@ nueva activada por altura, no una reescritura.
 
 ---
 
-## 11 · Selección de cadena (fork choice)
+## 11 · Orden y selección en GHOSTDAG — pendiente de integración
 
-Derivado de `research/fork-choice-reorg.md`.
+El diseño destino usa GHOSTDAG con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules
+(`research/dag-poas-ancla-de-orden.md`, R-FIN-6 y estructura de §2).
+Es una modificación propia: el commit de Autonomys fijado en `PDF/README.md` usa `MAX_u64−SR`.
+El tipo de SR no fija el del peso ni del acumulador. Si se admite todo SR de tipo u64,
+`SR=0` produce `2^128` (no cabe en u128) y `SR=MAX_u64` requiere ensanchar antes de sumar uno.
+Dominio permitido, representación y política de desbordamiento siguen pendientes; no se
+heredan los tipos de Autonomys o Kaspa como demostración de que bastan aquí.
+Los billetes duplicados se tratan mediante U2/U3″; R-FIN-8′ distingue `rojo_k` pagable
+de `rojo_U3` inerte, con la laguna de unicidad pagable declarada en §7.2.
 
-**C-FORK-01 · Trabajo de un bloque.**
+No basta reemplazar un acumulador: faltan padres múltiples, coloración, cadena seleccionada,
+orden de ejecución, conflictos de transacciones, flujos, desempate y cálculo contextual del rango.
+El orden no puede depender de la llegada local de mensajes.
 
-```
-trabajo_bloque(h) := ((2^256 − 1 − target(h)) / (target(h) + 1)) + 1
-```
-
-con `target(h) = decode(bits(h))`. **MUST** calcularse en aritmética sin signo de al menos 256 bits,
-con operaciones comprobadas (C-ENC-03). **MUST NOT** truncarse a un ancho menor.
-
-> Es `2^256 / (target+1)`, la esperanza del número de hashes necesarios para resolver ese bloque.
-> Verbatim de `bitcoin/bitcoin:src/chain.cpp:120-133` (`GetBitsProof`).
-> **Riesgo si se trunca:** dos implementaciones con anchos distintos divergen en silencio en cuanto
-> el acumulado supere el ancho menor. Bitcoin usa 256 bits precisamente por esto.
-
-**C-FORK-02 · Trabajo acumulado.**
-
-```
-trabajo_acumulado(0) := trabajo_bloque(0)
-trabajo_acumulado(H) := trabajo_acumulado(H−1) + trabajo_bloque(H)
-```
-
-Es un valor **derivado y cacheable**, nunca fuente de verdad: **MUST** poder recalcularse
-íntegramente a partir de los `bits` almacenados.
-
-> Bitcoin lo marca así explícitamente en `src/chain.h`:
-> *"(memory only) Total amount of work (expected number of hashes) in the chain up to and including
-> this block"*.
-
-**C-FORK-03 · Regla de Nakamoto.** Entre dos cadenas válidas que comparten un ancestro común, la
-cadena activa **MUST** ser la de mayor `trabajo_acumulado(tip)`.
-
-"Válida" exige que **todos** los bloques desde el ancestro común hasta el tip candidato cumplan
-§5–§8, **evaluados sobre la cadena candidata** y nunca sobre la cadena activa vigente (C-REORG-06).
-
-> El trabajo acumulado es condición **necesaria, no suficiente**. Bitcoin lo implementa así en
-> `FindMostWorkChain()` (`validation.cpp:3126-3179`): toma el máximo, camina hacia atrás
-> verificando que ningún ancestro esté marcado inválido o le falten datos, y si lo está lo purga del
-> conjunto de candidatos y repite. No basta con ordenar por trabajo y quedarse con el primero.
-
-**C-FORK-04 · Desempate determinista.** Si dos cadenas tienen `trabajo_acumulado(tip)` **idéntico**,
-la cadena preferida es aquella cuyo `block_hash(tip)`, interpretado como entero **big-endian** (la
-misma convención de C-POW-01), sea **menor**.
-
-> 🔶 **Divergencia deliberada frente a Bitcoin.** Bitcoin desempata por `nSequenceId`, un contador
-> asignado **en el orden de llegada local** (`validation.cpp:3817`), con la dirección de puntero
-> como último recurso. Eso es **no determinista entre nodos**: dos nodos que reciben los mismos dos
-> bloques en distinto orden pueden sostener tips distintos.
->
-> Para ZEROX eso es inaceptable por dos razones. Primero, el proyecto se exige determinismo y lo
-> testea; una regla cuyo resultado depende de la topología de red no es testeable. Segundo, y más
-> concreto: **el nodo de Cortex y el del vendedor podrían discrepar sobre si un pago existe.**
->
-> No es terreno inexplorado. Zebra —software en producción en la mainnet de Zcash— hace exactamente
-> esto, y documenta que se aparta de la spec a propósito
-> (`zebra-state/src/service/non_finalized_state/chain.rs:2334-2347`):
-> *"Despite the consensus rules, Zebra uses the tip block hash as a tie-breaker... This departure
-> from the consensus rules may delay network convergence... But Zebra nodes should converge as soon
-> as the tied work is broken."*
->
-> ⚠️ **Contrapartida asignada a D8:** con "gana el hash menor", un minero que encuentra un bloque
-> tiene un incentivo marginal a **seguir buscando un hash más bajo** en vez de publicar de
-> inmediato. Se estima dominado —el empate solo importa durante una carrera de huérfanos, y retrasar
-> la publicación arriesga perder la carrera entera—, pero **debe cuantificarse**, no darse por
-> supuesto.
+Los identificadores C-FORK-01 a C-FORK-04 del acumulador anterior quedan retirados; no se reutilizan
+para afirmar que una regla DAG distinta ya está implementada. El desempate del diseño destino
+debe integrarse y comprobarse junto al orden GHOSTDAG.
 
 ---
 
@@ -1772,7 +1598,7 @@ resultante. Las que resulten inválidas —doble gasto por la cadena nueva, madu
 violada— **MUST** descartarse.
 
 **C-REORG-05 · Cachés de ventana: la clave es el HASH, no la altura.** Toda estructura que cachee
-una ventana de bloques —las medianas `Mst`/`Mlt` de §6.5, cualquier caché de solvetimes de LWMA—
+una ventana de bloques —las medianas `Mst`/`Mlt` de §6.5, las cachés de rango y de contexto PoT—
 **MUST** indexarse por el **hash del bloque tip que la originó**, nunca por altura ni por un
 contador incremental. Antes de reutilizar un valor cacheado **MUST** compararse ese hash contra el
 tip real de la cadena que se está evaluando; si no coincide, **MUST** recomputarse desde cero.
@@ -1797,75 +1623,42 @@ toda ventana de §6.5 y §7.3 **MUST** recorrerse hacia atrás siguiendo `prev_h
 candidato. **MUST NOT** leerse de estructuras indexadas por altura de la cadena activa, que a la
 misma altura pueden contener un bloque de la otra rama.
 
-**C-REORG-07 · Profundidad máxima de reorg.**
+**C-REORG-07 · Límite heredado de la implementación, pendiente de sustituir en el DAG.**
 
 ```
 MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 11 999 bloques
 ```
 
-Un nodo que detecte una reorganización que retrocedería más de `MAX_REORG_LENGTH` bloques
-**MUST NOT** aplicarla. **MUST** detenerse y alertar al operador de forma explícita y ruidosa.
+Este valor se conserva para identificar el estado transitorio del código; no fija la finalidad
+del consenso DAG. R-FIN-7 propone no reorganizar por debajo de `F` segundos del reloj de slot
+e ignorar la punta incompatible, sin detener el proceso. Su integración está pendiente.
 
-**La comprobación MUST hacerse ANTES de deshacer nada.** Comprobar a mitad de la reorganización
-dejaría el estado a medias precisamente en el caso que esta regla existe para tratar como
-excepcional. Implementado en `zx-node::cadena::adoptar`, con un test que verifica que tras el
-rechazo **la cadena y la punta quedan intactas**.
-
-> 🔶 **Decidido 2026-09-04, y es tanto decisión de producto como de consenso.**
->
-> Las tres posturas reales: Bitcoin no tiene límite; Monero tampoco en consenso (solo checkpoints
-> fuera de él); zcashd sí, exactamente `COINBASE_MATURITY − 1` (`src/main.h:64`), y **apaga el
-> nodo** — *"the node is shutting down for your safety... Please help, human!"*
-> (`src/main.cpp:4727-4746`).
->
-> **Por qué el límite, para un marketplace.** Da a Cortex una garantía que se puede enunciar a un
-> vendedor: *"pasadas 12 000 confirmaciones (3,3 h) el cobro es final por protocolo, no solo
-> probablemente"*. Es finalidad al estilo Zcash en lugar de la finalidad probabilística de Bitcoin:
-> *"In Zcash, chain state is final once it is beyond the reorg limit, unlike Bitcoin which only has
-> only probabilistic finality."* Además cierra por completo el vector "el minero cobra, gasta el
-> coinbase, y un reorg profundo se lo quita": ligado a `COINBASE_MATURITY`, un coinbase maduro no
-> puede deshacerse jamás.
->
-> **Por qué pesa más en una cadena pequeña.** No es teórico: Monero sufrió un reorg real de **18
-> bloques** el 14-15 de septiembre de 2025, invalidando 118 transacciones. ZEROX nacerá mucho más
-> pequeña que Monero, y por tanto más expuesta.
->
-> **Contrapartida asumida:** una partición de red honesta y prolongada (>3,3 h con hashrate
-> sustancial a ambos lados) se convierte en una parada de nodo que exige intervención humana. Es
-> *fail-stop*, no *fail-safe*, y es deliberado: para infraestructura de pagos, pararse y avisar es
-> preferible a seguir sirviendo un estado que quizá sea el de una minoría.
->
-> ⚠️ **Requisito derivado, para D3:** debe existir y documentarse un **camino de recuperación** para
-> el nodo detenido (resincronización, checkpoint). Sin él, la regla deja nodos congelados en una
-> minoría sin saberlo, que es justo lo que Bitcoin evita al no tener límite.
+Una restricción de reorg protege el estado local, pero no demuestra por sí sola acuerdo entre
+dos nodos aislados. Convertir 11 999 bloques a unas 3,33 h a tasa nominal no da un plazo
+determinista. No se publican ambas reglas como simultáneamente activas.
 
 ---
 
-## 7.5 · Ritmo de desafío y caducidad de sectores — `C-SLOT`, `C-EXP`
-
-> Derivación en `DECISIONES.md` §20 y §21. Aquí van las reglas y las constantes.
+## 7.5 · Ritmo de desafío y caducidad de sectores
 
 ```
-SIGMA                 = 1        // segundos por slot
-SLOT_PROBABILITY      = (1, 120) // q = T/SIGMA
-DELTA_SLOTS           = 4        // ventana explotable, en slots
-VIDA_MINIMA_BLOQUES   = 65 536   // 2^16
-DISPERSION_BLOQUES    = 1 048 576 // 2^20
+SIGMA                 = 1         // segundos por slot, variante A″
+VIDA_MINIMA_BLOQUES    = 65 536    // base existente, calendario DAG pendiente
+DISPERSION_BLOQUES     = 1 048 576 // base existente, calendario DAG pendiente
 ```
 
-**C-SLOT-01** · Un slot dura `SIGMA = 1` segundo. `q = T / SIGMA = 120`, y por tanto
-`SLOT_PROBABILITY = (1, 120)`.
+**C-SLOT-01** · La variante DAG A″ usa un slot de un segundo y tasa objetivo de un bloque por
+segundo. La tasa de producción y la duración del slot son magnitudes distintas.
 
-**C-SLOT-02** · `q` **MUST** ser `≥ 20`. Por debajo, LWMA-1 sobre slots no converge en el modelo
-determinista y la tasa de huérfanos por colisión de slot supera el 2,5 %. Con `q = 1` la propia
-función de calibración **desborda `u64`**.
+**C-SLOT-02** · El calibrador del rango debe admitir el régimen DAG con múltiples soluciones
+por slot. Su fórmula y límites están pendientes; no se conserva la restricción lineal `q ≥ 20`.
 
-**C-SLOT-03** · La ventana explotable —desde que el desafío es público hasta que una solución deja
-de aceptarse— es `DELTA_SLOTS = 4` slots.
+**C-SLOT-03** · La ventana durante la que un reto puede explotarse depende de publicación,
+autoría e inyección PoT. Su cota final no se identifica automáticamente con `SIGMA` ni con `Δ`
+de red. El retardo de autoría y esta ventana siguen pendientes de integración.
 
-> Es `Δ`, y **no `σ`, la magnitud de seguridad**: el greenpaper define el ataque sobre un desafío
-> **fijo**, así que lo que cuenta es cuánto tiempo tiene el atacante con ese desafío, no cada cuánto
-> llega el siguiente. Autonomys usa `Δ = 4 s`; Chia, 28,1–37,5 s.
+Las reglas de sectores siguientes conservan su base documental. La altura usada, su calendario
+y su relación con la finalidad temporal deben redefinirse conjuntamente para el DAG.
 
 **C-EXP-01** · Todo sector lleva `altura_ploteo`, válido solo si `altura_ploteo < altura_actual`.
 
@@ -1888,10 +1681,9 @@ nunca de «la cadena activa del nodo».
 > Es la fuente de no-determinismo más peligrosa de esta familia: leerlo de la cadena activa hace que
 > dos nodos discrepen al validar una rama lateral. **Split garantizado.**
 
-**C-EXP-05** · `VIDA_MINIMA_BLOQUES` **MUST** ser mayor que `MAX_REORG_LENGTH`.
-
-> Con `65 536 > 99`, cuando un sector puede caducar su bloque de ploteo lleva ≥ 65 437 bloques de
-> profundidad. **Ninguna caducidad depende jamás de un hash todavía mutable.**
+**C-EXP-05** · La caducidad debe depender de una referencia de historia ya estabilizada según
+la finalidad adoptada. La desigualdad de alturas de la base lineal no demuestra esta propiedad
+para `F` temporal; su condición concreta queda pendiente.
 
 **C-EXP-06** · Todo nodo **MUST** retener los hashes de bloque de al menos las últimas
 `VIDA_MINIMA_BLOQUES + DISPERSION_BLOQUES = 1 114 112` alturas (35,65 MB). Un sector cuyo
@@ -1899,15 +1691,17 @@ nunca de «la cadena activa del nodo».
 
 > ⚠️ **La dispersión no es exigible, y el SPEC no debe fingir que lo es.** Un granjero puede moler su
 > propia `altura_ploteo` —manteniendo huecos de disco vacíos hasta que salga un buen sorteo— y
-> quedarse con el 99,9 % de `DISPERSION_BLOQUES`. Los tres cierres posibles fallan (`DECISIONES.md`
-> §20). **La vida de diseño es `VIDA_MINIMA + DISPERSION − 1`; la dispersión es una red de seguridad
+> quedarse con el 99,9 % de `DISPERSION_BLOQUES`. **La vida de diseño es
+> `VIDA_MINIMA + DISPERSION − 1`; la dispersión es una red de seguridad
 > para el granjero ingenuo, no una garantía.** Las constantes están dimensionadas contra los dos
 > regímenes.
 
 ## 12.1 · Checkpoint firmado del periodo frágil — `C-CHK`
 
-> Origen y derivación completa en `DECISIONES.md` §25. Aquí van **las reglas y las constantes**,
-> que es donde el contrato vive y donde los guardianes de CI alcanzan.
+**Diseño de bootstrap pendiente de integrar.** Se conservan las constantes y restricciones
+identificadas, sin activar un firmante ni equiparar este mecanismo a finalidad general.
+La relación rango/espacio se debe recalibrar con el rango PoST/DAG; la conversión antigua
+con denominador 120 no certifica una equivalencia de espacio en el régimen A″.
 
 Una red joven de pruebas de espacio no se defiende sola: **con el PoT sin verificar, el atacante
 elige el desafío**, y entonces forjar peso de cadena cuesta lo mismo que auditar. Por debajo de
@@ -1917,11 +1711,12 @@ cierto tamaño de red eso sale más barato que defenderse.
 (atacante con lote SIMD) a 42,92 µs (granjero honesto con la implementación de referencia), y la
 cota inferior **no tiene techo conocido** —blake3 en GPU está órdenes de magnitud por encima y nadie
 lo ha medido. Un umbral derivado de ese número sería provisional; `UMBRAL_CHECKPOINT` se fija por
-**coste económico del espacio honesto**, no por core-horas. Ver `DECISIONES.md` §25.
+**coste económico del espacio honesto**, no por core-horas. Esta justificación histórica no
+sustituye la recalibración de rango y bootstrap indicada al comienzo de esta sección.
 
 ```
-UMBRAL_CHECKPOINT  = 90 185 365       // rango_solucion; equivale a 3,2 PiB
-ALTURA_CADUCIDAD   = 63 072 000       // bloques; dos años exactos a λ = 1 (era 525 600 a T = 120 s; P-041)
+UMBRAL_CHECKPOINT  = 90 185 365       // base conservada; equivalencia de espacio DAG pendiente
+ALTURA_CADUCIDAD   = 63 072 000       // base conservada; semántica de altura DAG pendiente
 ```
 
 **C-CHK-01** · Existe **un único** checkpoint firmado en la vida de la cadena. Una vez emitido, la
@@ -1945,8 +1740,8 @@ justificación del PoT. Por encima, **MUST** verificarla entera. **No hay muestr
 
 > ZEROX **no porta** el muestreo probabilístico de Autonomys (`verifier.rs:178-199`). Su constante
 > `3 162` no tiene derivación pública —la especificación está en un Notion privado— y sus bordes no
-> cierran: en `diff = 6 235` la tasa de muestreo **baja** al crecer la cadena. Ver `DECISIONES.md`
-> §24.
+> cierran: en `diff = 6 235` la tasa de muestreo **baja** al crecer la cadena. Esta observación
+> histórica no autoriza a omitir la validación de PoT fuera del bootstrap especificado.
 
 **C-CHK-06** · El checkpoint **MUST NOT** poder acuñar, cobrar recompensa, ni alterar la validez de
 ninguna transacción. Su único efecto es el de C-CHK-04.
@@ -1957,75 +1752,50 @@ cadena canónica, **no** quién puede producir bloques.
 > Es la diferencia con el lanzamiento de Autonomys, que arrancó con
 > `AllowAuthoringBy::RootFarmer` y las recompensas desactivadas a mano.
 
-## 13 · Profundidad de confirmación — política de producto, NO consenso
+## 13 · Confirmación de pagos — política del comercio
 
-> Esta sección **no es normativa**. Es la guía para Cortex y para el wallet. Se apoya en Nakamoto
-> §11, Rosenfeld (arXiv:1402.2009) y Grunspan & Pérez-Marco (arXiv:1702.02867), que **encontraron un
-> error real en la fórmula de Nakamoto** —usa `Q_z` donde corresponde `Q_{z+1}`, lo que
-> **subestima el riesgo**— y dan la forma cerrada `P(z) = I_{4pq}(z, 1/2)`.
+Esta sección no añade consenso. Cortex y cualquier otro comercio eligen la espera según importe
+y riesgo. El consenso no depende de Cortex. La seguridad de una política requiere declarar red,
+adversario, regla de aceptación y estado del consenso PoST/DAG.
 
-### Confirmaciones necesarias para `P(doble gasto) < 0,1 %`
+### Referencia nominal de investigación
 
-| `q` atacante | `z` correcto | `z` de Nakamoto (optimista) | Tiempo a T=120 s |
-|---|---|---|---|
-| 10 % | 6 | 5 | 12 min |
-| 15 % | 9 | 8 | 18 min |
-| 20 % | 13 | 11 | 26 min |
-| 25 % | 20 | 15 | 40 min |
-| 30 % | 32 | 24 | 1 h 04 |
-| 35 % | 58 | 41 | 1 h 56 |
-| 40 % | 133 | 81 | 4 h 26 ⚠ |
-| 45 % | 539 | 340 | ~18 h ⚠⚠ |
+La carrera histórica `prev(α,1,t,90,1)` usa tasa 1/s, `k = 30`, ventaja inicial `3k = 90`
+y pérdida de red aproximada por cero. Sus resultados publicados a 1 800 segundos son
+`7,071·10⁻³⁶` para `α = 0,33` y `1,148·10⁻¹⁰` para `α = 0,40`
+(`research/scripts/d12-quorum/salida_b.txt`).
+Son resultados de ese modelo, no probabilidades universales certificadas para la implementación.
 
-### Riesgo con pocas confirmaciones (Rosenfeld, Tabla 1)
+La pérdida `δ₀(Δ,k,λ)` requiere el escenario de red correspondiente. No se incorpora la inflación
+del retarget antiguo: R-FIN-13′ la sustituyó. La tabla final exige el modelo coherente de pesos,
+retarget, red y aceptación; queda pendiente.
 
-| `q` | n=1 | n=2 | n=3 | n=4 | n=6 |
-|---|---|---|---|---|---|
-| 0,10 | 20 % | 5,6 % | 1,71 % | 0,546 % | 0,059 % |
-| 0,20 | 40 % | 20,8 % | 11,58 % | 6,67 % | 2,33 % |
-| 0,30 | 60 % | 43,2 % | 32,6 % | 25,2 % | 15,6 % |
+### Confirmación adaptativa
 
-### Política recomendada para Cortex
+El gate de `research/scripts/d16-gate/` compara una adaptación propia bajo un modelo nominal.
+No refuta la familia DAGKNIGHT ni toda confirmación adaptativa. Sigue sin demostrarse que el
+rank visible `k_ref` sustituya al `k` de la cota de freeloading; las simulaciones de retención
+constituyen contraejemplos a la adaptación probada.
 
-| Nivel | Confirmaciones | Tiempo | Riesgo a `q=10 %` |
-|---|---|---|---|
-| Bajo valor (bien digital, importe pequeño) | **3** | 6 min | 1,71 % |
-| Estándar | **6** | 12 min | 0,059 % |
-| Alto valor / irreversible (envío físico caro) | **12 000** | 3,3 h | **cero por protocolo** (C-REORG-07) |
+Hay dos diferencias por resolver antes de publicar ratios o un descarte general: el peor
+`k_ref` proviene de red degradada mientras el gate mantiene pérdida cero; además, esperar
+M bloques y evaluar la carrera a su tiempo medio son criterios de parada distintos. El factor
+`2,56·10⁵` del gate no se presenta como riesgo exacto de la política original.
 
-> ⚠️ Las filas de 3 y 6 confirmaciones están calculadas a `T = 120 s` y no se han rederivado para
-> `λ = 1` ni para el DAG (donde la probabilidad de reversión a 600 s es 4,3·10⁻¹⁰, `research/dag-poas-ancla-de-orden.md` §3). **Herencia de P-041, cerrada el 2026-09-10:** va con las reglas de red del DAG.
->
-> **Decisión de rumbo (Katana, 2026-09-10): A + C.** El protocolo **no incorpora comité de finalidad**
-> (`DECISIONES.md` §27). La irreversibilidad es **probabilística** y la regla dura sin comité es
-> `C-REORG-07` (11 999 bloques, 3,33 h); el checkpoint `C-CHK` es una excepción del periodo frágil y
-> centraliza, por eso no es un mecanismo general. La confirmación adaptativa sobre el DAG
-> (`research/scripts/d16-gate/`) quedó **refutada como está diseñada**: su fórmula de espera es
-> inconsistente con el modelo de riesgo del proyecto (error 2,56·10⁵×), y la variante honesta no
-> pasa el criterio de muerte con el peor `k_ref` medido. **La irreversibilidad publicable es
-> probabilista por profundidad; `C-REORG-07` es la garantía dura.** Esta tabla es **la recomendación
-> por defecto, no una regla**: la
-> profundidad de confirmación es política del comerciante y cada usuario elige su espera por importe.
-> **Cortex es una aplicación: el consenso no depende de ella.**
+### Irreversibilidad y trabajo pendiente
 
-A T=120 s, `z` confirmaciones cuestan **5× menos tiempo real** que las mismas `z` en Bitcoin. El
-tercer nivel no es una probabilidad: es la garantía dura de C-REORG-07.
+La regla temporal R-FIN-7 del diseño DAG y el límite transitorio C-REORG-07 deben reconciliarse
+al integrar consenso. Una parada o rechazo local no prueba acuerdo global durante una partición.
+No se publica «cero riesgo de doble gasto a 3,33 h».
 
-> ⚠️ **Las filas de `q ≥ 40 %` pueden ser optimistas para ZEROX.** Ver §7.2 de
-> `research/fork-choice-reorg.md`: las tablas asumen dificultad constante e idéntica en ambas ramas,
-> pero C-DIFF-01 hace que **la rama privada del atacante tenga su propio LWMA** y se abarate sola
-> tras completar su ventana de `N=90`. Con `z=133` o `z=539` se cruzan varias ventanas completas.
-> Encargo abierto para **D9**.
->
-> ⚠️ **`q` en el lanzamiento puede ser mucho mayor que en Bitcoin.** Con un hashrate de red pequeño,
-> un pool de otra cadena SHA-3 puede apuntar hardware prestado a ZEROX de forma oportunista.
-> Modelado asignado a **D8**.
+Falta fijar una política de aceptación verificable, medir `Δ`, integrar y comprobar `blue_work`,
+y rederivar la tabla de riesgo. Los comités de decisión quedan fuera del alcance del proyecto.
 
 ---
 
 ## 14 · Activación de cambios de consenso
 
-Derivado de `research/upgrades-genesis.md`, que lo obtuvo de ZIP-200, del código de
+Las reglas comunes de actualización toman como referencia ZIP-200 y el código de
 `monero-project/monero` (`src/hardforks/hardforks.cpp`) y de BIP-9/BIP-8.
 
 ### 14.1 · Principio
@@ -2079,7 +1849,7 @@ firma válida en una rama es por construcción inválida en cualquier otra.
 > El escenario: si tras la altura de activación la rama no actualizada solo produce bloques que
 > *también* serían válidos bajo las reglas nuevas (por ejemplo, bloques vacíos), un atacante con
 > más trabajo acumulado en la rama vieja podría **barrer la rama nueva mediante un reorg
-> perfectamente legítimo** según la regla de mayor trabajo. Zcash se libró en Overwinter por
+> perfectamente legítimo** según la regla de selección. Zcash se libró en Overwinter por
 > casualidad estructural: su cambio de formato de transacción invalidaba trivialmente lo anterior.
 >
 > ZIP-200 nombra la solución genérica y la deja sin implementar: *"More generally, this issue could
@@ -2090,8 +1860,7 @@ firma válida en una rama es por construcción inválida en cualquier otra.
 > `N_LARGO`, `REF_WEIGHT`— son **cambios de parámetro puros**: no fuerzan ningún cambio de formato
 > que resulte trivialmente inválido bajo las reglas viejas. Son exactamente el caso vulnerable.
 > Al nacer sin cadena viva, podemos ponerlo en la cabecera desde el bloque 0 y sin coste: el
-> campo ya existía como `version`, la cabecera sigue midiendo **92 bytes** y la preimagen de PoW
-> sigue midiendo **108 bytes** (C-HDR-03, C-HDR-04 intactas).
+> compromiso de rama debe conservarse en la cabecera DAG definitiva, cuya codificación sigue pendiente.
 
 ### 14.3 · Comportamiento del nodo
 
@@ -2111,7 +1880,7 @@ continuar en silencio.
 >
 > La auditoría de trazabilidad las encontró como el único hueco **no declarado** del SPEC: no hay
 > lógica de altura de activación en `zx-mempool`, ni detección de "he seguido bloques inválidos" en
-> `zx-node`. Todos los demás huecos —el relé compacto, el kernel GPU, la validación de dificultad de
+> `zx-node`. Todos los demás huecos —el relé compacto, la integración PoT/DAG, la validación contextual de
 > cabeceras— sí venían marcados; estas dos parecían completas sin serlo, que es peor.
 >
 > Severidad baja y por una razón concreta: **son `SHOULD`, y ZEROX no tiene todavía ningún hard fork
@@ -2125,108 +1894,39 @@ ello los convierta en variables de ejecución: `N_CORTO`, `N_LARGO`, `ZONA_LIBRE
 
 ---
 
-## 15 · Bloque génesis
+## 15 · Bloque génesis — parámetros PoST/DAG pendientes
 
 ### 15.1 · Definición
 
-**C-GEN-01 · Definición constructiva, hash asertado.** El génesis **MUST** definirse por una
-función determinista de parámetros explícitos (mensaje de coinbase, timestamp, `bits`, `nonce`,
-recompensa cero), y la implementación **MUST** comparar el hash resultante contra una constante
-hardcodeada y **abortar el arranque** si no coincide.
+**C-GEN-01 · Definición constructiva, hash asertado.** El génesis se construye determinísticamente
+a partir de parámetros explícitos y su hash se compara con una constante congelada al arrancar.
+La cabecera, raíz inicial, reloj PoT, rango y bootstrap del DAG quedan pendientes de definición.
 
-> Es el patrón de Bitcoin (`src/kernel/chainparams.cpp`) y de Zcash: `CreateGenesisBlock(...)`
-> seguido de `assert(consensus.hashGenesisBlock == uint256{"000000000019d66..."})`. Monero, en
-> cambio, hardcodea la transacción coinbase en hexadecimal crudo.
->
-> Elegimos el patrón constructivo por dos razones: es **auditable** (se ve de qué parámetros sale)
-> y **falla duro y visible** si alguien toca un parámetro sin recalcular el hash, en lugar de
-> arrancar en silencio sobre un génesis no intencionado.
-
-**C-GEN-02 · El génesis está exento de la comprobación de PoW.** La validación de PoW (§7.1)
-**MUST NOT** aplicarse al bloque de altura 0. Su inserción en el índice es una ruta separada.
-
-> Verificado en el código de Bitcoin, `src/validation.cpp:4200-4218`: `AcceptBlockHeader` envuelve
-> la llamada a `CheckBlockHeader` en `if (hash != GetConsensus().hashGenesisBlock)`, y el génesis
-> entra por `LoadGenesisBlock`, que nunca pasa por ahí. Es una exención **estructural**,
-> independiente de si el génesis satisface o no su propio target.
->
-> **LAGUNA:** no se pudo verificar si zcashd valida el PoW/Equihash de su propio génesis en el
-> arranque real. Ver `research/upgrades-genesis.md` §B.5.
+**C-GEN-02 · Bootstrap.** La inserción del génesis es una ruta explícita. Las condiciones de
+prueba y estado inicial PoST que la distingan de bloques posteriores deben especificarse antes
+de habilitar una red; esta sección no inventa una exención de prueba.
 
 **C-GEN-03 · Coinbase de valor cero e inconectable.** La coinbase del génesis tiene
-`Σ value(salidas) = 0` y sus salidas **MUST NOT** insertarse en el UTXO set.
+`Σ value(salidas) = 0` y sus salidas no se insertan en el UTXO set.
 
-> Bitcoin lo resuelve con un caso especial en `ConnectBlock` (`validation.cpp:2336-2342`,
-> comentario: *"Special case for the genesis block, skipping connection of its transactions (its
-> coinbase is unspendable)"*). No es que gastarla esté prohibido por regla: es que nunca existe.
+**C-GEN-04 · Redes distintas, génesis distintos.** Mainnet y testnet deben tener hashes distintos.
 
-**C-GEN-04 · Redes distintas, génesis distintos.** El génesis de mainnet y el de testnet **MUST**
-producir hashes distintos. Ningún bloque de una red puede ser jamás el bloque 0 válido de otra.
+### 15.2 · Parámetros de lanzamiento
 
-> `DECISIONES.md` §7 solo describía el génesis de mainnet. El de testnet es una decisión pendiente
-> y **no es un detalle de redacción**.
+**C-GEN-05** · El mensaje de coinbase contiene una referencia pública verificable de la fecha de
+lanzamiento. Su contenido no interviene en las reglas posteriores de validez.
 
-### 15.2 · El mensaje simbólico
+**C-GEN-06 · Fecha plausible.** `ts(0) ≥ TIMESTAMP_MINIMO_GENESIS = 1 767 225 600`
+(2026-01-01 UTC). Los marcadores de posición no habilitan el arranque.
 
-**C-GEN-05** · El mensaje de la coinbase del génesis **no tiene función de consenso**: ningún nodo
-inspecciona su contenido. **MUST** contener, aun así, una referencia a un evento público
-verificable de la fecha de lanzamiento.
+**C-GEN-07 · Hash congelado por red.** El binario compara el hash construido con el de la red
+seleccionada y aborta si falta o no coincide. Los hashes del formato anterior no sirven para el
+génesis PoST/DAG.
 
-> El *"The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"* de Bitcoin es
-> indistinguible, en consenso, de cualquier otro relleno de la misma longitud: en
-> `src/kernel/chainparams.cpp` se copia al `scriptSig` y ninguna ruta de validación lo parsea.
->
-> Su valor es **una comprobación humana, manual y única**: cualquiera puede verificar que el titular
-> corresponde a esa fecha y concluir que el bloque no pudo minarse antes.
->
-> **Para ZEROX esto pesa más que en la mayoría de cadenas**, porque `DECISIONES.md` §7 declara
-> "premine / dev tax / founder reward: ninguno". El precedente es Bytecoin, del que Monero nació
-> como fork limpio: se concluyó públicamente que ~80 % del suministro ya existía antes del
-> lanzamiento anunciado, con timestamps de bloque fabricados para simular actividad desde 2012.
-> Un génesis con fecha verificable es la única defensa barata contra esa acusación.
-
-**`<<PENDIENTE: mensaje, timestamp y nonce del génesis — se fijan el día del lanzamiento>>`**
+**Pendiente:** mensaje, timestamp, estado inicial de espacio y PoT, rango inicial, parámetros DAG
+y hashes de mainnet/testnet. No hay un génesis de lanzamiento completo descrito aquí.
 
 ---
-
-**C-GEN-06 · El timestamp del génesis MUST ser plausible.** `ts(0) ≥ TIMESTAMP_MINIMO_GENESIS =
-1 767 225 600` (2026-01-01 00:00:00 UTC). Un génesis anterior **MUST** abortar el arranque.
-
-> **No es cosmética: el timestamp del génesis entra en la ventana del primer retarget.** Para
-> `H = N+1 = 91`, C-DIFF-01 consume `ts(H−N−1 .. H−1) = ts(0..90)`, y `ts(0)` es el del génesis.
->
-> Con `ts(0) = 0` el primer solvetime reconstruido satura en `ST_CAP = 720` en lugar de valer
-> `T = 120`, así que `t` sube exactamente `ST_CAP − T = 600` —con el peso más bajo, `j = 1`— y el
-> primer target calculado sale **un 0,122 % más fácil** de lo que debería. Medido en
-> `zx-consensus`, test `un_genesis_en_el_ano_cero_sesga_el_primer_retarget`.
->
-> **Su función real es que un marcador de posición no pueda lanzarse por descuido.** Los parámetros
-> de mainnet llevan `timestamp: 0` **a propósito** mientras P-017 siga abierto: así un nodo que
-> intente arrancar mainnet sin rellenarlos **aborta citando P-017**, en vez de levantar una cadena
-> sobre un génesis no intencionado. Test: `el_genesis_de_mainnet_todavia_no_arranca`.
-
-**C-GEN-07 · El hash del génesis está congelado en el binario.** Cada red cuyo génesis esté
-decidido **MUST** llevar su hash como constante, y el arranque **MUST** compararlo.
-
-```
-testnet:  fe56845a01bafa5a51ae43dd43d16584966f65a2acb41bc6fac281814062b6f1
-mainnet:  🔴 sin congelar — P-017
-```
-
-> Sin la aserción, dos nodos con builds distintas levantarían **cadenas distintas creyendo que son
-> la misma**, y el síntoma aparecería mucho más tarde y muy lejos de la causa. Mainnet **no debe**
-> tener su constante todavía: congelar el hash de un marcador de posición es congelar el error.
->
-> Y una red **sin** hash congelado **MUST NOT** arrancar. Son dos candados independientes con
-> C-GEN-06 —uno por el timestamp, otro por el hash ausente— y es deliberado: cerrar P-017 exige
-> tocar los dos, así que no basta con rellenar la fecha y olvidarse de congelar el hash.
->
-> ⚠️ **Corregido 2026-09-05 tras la primera auditoría de trazabilidad.** La comparación existía
-> **solo en un test**, y "el arranque" no es `cargo test`: un binario compilado con parámetros
-> tocados habría levantado una cadena distinta sin decir nada. Ahora vive en
-> `zx-consensus::genesis::comprobar_al_arrancar`, con un test que **toca cada parámetro** y
-> comprueba que impide arrancar.
-
 
 ## 15.1 · Almacenamiento — `C-STORE`
 
@@ -2305,50 +2005,19 @@ formas de escribir un `Lock` serían dos sitios donde equivocarse, y la segunda 
 > 1,2 % no compra el riesgo de que alguien lo decodifique mal.
 >
 > Lo que cuesta la decisión, medido con la fórmula real de C-WGT-02: una salida `PubKey` pesa 41
-> unidades, así que `ZONA_LIBRE` da un techo de **2 439 salidas por bloque**, y a 262 800 bloques al
-> año son **641 M entradas y ~52,6 GB anuales** en el peor caso adversarial. Ese peor caso no se
+> unidades, así que `ZONA_LIBRE` da un techo de **2 439 salidas por bloque**. El coste anual depende
+> de la tasa y de la ocupación real; no se conserva una estimación de la cadencia anterior. Ese peor caso no se
 > sostiene —una transacción 2-in/2-out tiene crecimiento neto **cero**— pero basta para fijar lo
 > importante: **el UTXO set no cabe en RAM**, y por eso hace falta una caché delante del disco.
 
-**C-STORE-06 · El disco guarda solo el estado FINALIZADO, y NUNCA revierte.** Un bloque se
-considera finalizado cuando su profundidad alcanza `MAX_REORG_LENGTH = 11 999`. Solo entonces su efecto
-sobre el UTXO set se escribe. Los bloques más recientes viven en memoria, y una reorganización
-—que por C-REORG-07 **MUST NOT** superar esa profundidad— se resuelve sin tocar el disco.
+**C-STORE-06 · Estado finalizado y recuperación.** El almacén persistente distingue el estado
+finalizado del solapamiento que todavía puede cambiar. Antes de finalizar debe existir una
+condición de finalidad integrada y verificable; al arrancar se reconstruye el estado reciente
+a partir de los datos persistidos.
 
-Al arrancar, el nodo **MUST** reconstruir el solapamiento no finalizado reproduciendo los cuerpos de
-los bloques posteriores a la punta finalizada. Son como mucho 11 999, así que el trabajo está **acotado
-por construcción**.
-
-> 🔶 **Implementada a medias, y conviene saber qué mitad.** El almacén ya cumple la suya: guarda el
-> UTXO set finalizado, lleva su altura, y `finalizar` **no tiene operación inversa** — el disco no
-> sabe revertir porque no hay código con el que hacerlo. Lo que falta es la mitad del nodo: decidir
-> *cuándo* finalizar (a profundidad 11 999), mantener el solapamiento de los bloques recientes y
-> reproducirlo al arrancar. Es el bloque **B2**, y hasta entonces nadie llama a `finalizar`.
-
-> **Por qué 99 y no un número elegido.** Más allá de `MAX_REORG_LENGTH` el nodo **se detiene**
-> (C-REORG-07): no está reorganizando, está parado esperando a un humano. Así que fuera de esa
-> ventana no existe reversión que soportar. La ventana de la política y la ventana del
-> almacenamiento son la misma por necesidad, no por conveniencia.
->
-> **Y toda salida gastable está siempre en disco**, porque `COINBASE_MATURITY = 12 000` es mayor que
-> `MAX_REORG_LENGTH = 11 999`. Tampoco es casualidad: las dos constantes salen del mismo límite, ya que
-> `MAX_REORG_LENGTH = COINBASE_MATURITY − 1`.
->
-> **Lo que esta regla elimina** es una clase entera de fallo: la reversión **parcial** de estado ya
-> persistido. Es la que produjo el hueco entre el freezer y LevelDB de Geth en 2019
-> (`go-ethereum#20238`), **y otra vez en 2025** al relajar la durabilidad por rendimiento
-> (`#31499`); y la que llevó a sipa a escribir sobre el consumo de memoria en la recuperación de
-> Bitcoin que *"in general this problem is not solvable"* (`bitcoin#10693`).
->
-> **El coste, medido y no estimado:** el solapamiento son 11 999 bloques × 2 439 salidas × 82 B =
-> **2,40 GB** en el techo adversarial de C-WGT-02 (a `T = 120 s` eran 99 bloques y 18 MB). Crece
-> linealmente con `MAX_REORG_LENGTH`. Queda escrito para que nadie lo suba sin verla. ⚠️ A `λ = 1` este
-> solapamiento en memoria es una factura real del nodo doméstico; bajo el DAG, R-FIN-7 (`F = 2 h` =
-> 7 200 bloques) lo dejaría en 1,44 GB. **Herencia de P-041, cerrada el 2026-09-10:** pesa en la
-> decisión de poda (problema 34 del catálogo).
->
-> zebra hace esto mismo con una ventana de 1 000 y **sin datos de undo en absoluto**: al gastarse
-> una salida, su entrada se borra (`zebra_db/transparent.rs:695-699`, v6.3.0).
+La implementación de almacenamiento no prueba que el nodo ya aplique R-FIN-7. Su integración,
+poda, undo y presupuesto de memoria están pendientes. Un límite temporal `F` no fija un número
+determinista de bloques: no se dimensiona el solapamiento sustituyendo dos horas por 7 200 bloques.
 
 **C-STORE-07 · Una operación lógica es UN SOLO `WriteBatch`.** Avanzar la punta toca la cabecera, el
 índice de alturas, el UTXO set y la propia punta. Los cuatro **MUST** entrar en el mismo lote y
@@ -2460,64 +2129,17 @@ identify agent:    zerox/<version>
 > `/ipfs/kad/1.0.0` —la DHT **pública de IPFS**— y no falla al compilar. Verificado en
 > `rust-libp2p@v0.56.0`, `protocols/kad/src/behaviour.rs:196-241`. Ver `research/libp2p-arquitectura.md` §0.
 
-### 16.1 · Sincronización de cadena — headers-first CON umbral de trabajo
+### 16.1 · Sincronización de cabeceras, pruebas y DAG
 
-**C-NET-03 · Headers-first: el cuerpo NO se pide hasta validar la cabecera.** Un nodo **MUST**
-descargar y validar la cadena de cabeceras —PoW (§7.1), continuidad de `prev_hash`, timestamps
-(§7.4)— **antes** de solicitar ningún cuerpo de bloque.
+**C-NET-03 · Validar antes de adoptar.** La sincronización comprueba codificación, compromisos,
+ancestros, sello, solución y contexto de rango/PoT antes de declarar válido un bloque.
+Los datos auxiliares necesarios para validar pueden solicitarse por fases acotadas; una
+cabecera pendiente de justificación no se cuenta como trabajo verificado.
 
-> **Aquí ZEROX diverge de Zebra a propósito, y conviene dejar escrito por qué.**
->
-> La hoja de ruta decía "headers-first, referencia Zebra". **Es falso que Zebra lo haga**: Zebra pide
-> *hashes* con `getblocks`/`FindBlocks`, nunca emite `getheaders` como cliente, y compensa acotando
-> altura y memoria en la descarga de cuerpos. Verificado en `zebra@b685fbe3`,
-> `zebra-network/src/protocol/internal/request.rs:100-138`. Y **no existe RFC de Zebra** que explique
-> la elección — la razón está dispersa en comentarios, así que "Zebra lo hace así" no vale como
-> argumento.
->
-> Para ZEROX la aritmética decide sola: **una cabecera mide 92 bytes y un cuerpo típico 100-200 KB**,
-> una relación de ~1:1000. Validar el PoW de una cabecera cuesta **un SHA3-256**. Descargar cuerpos
-> para descubrir después que la cadena no llevaba a ninguna parte cuesta mil veces más ancho de banda
-> por bloque. Ver `research/sync-cadena.md`.
-
-**C-NET-04 · Umbral anti-DoS de trabajo para cabeceras.** Un nodo **MUST NOT** retener en memoria una
-cadena de cabeceras que no demuestre trabajo acumulado suficiente. El umbral **MUST** ser **relativo
-al tip propio**, nunca una constante absoluta:
-
-```
-umbral = max( trabajo(tip) − 144·trabajo_de_un_bloque(tip),  TRABAJO_MINIMO_CADENA )
-```
-
-Por debajo del umbral, la cadena de cabeceras **MUST** mantenerse como resumen acotado, **MUST NOT**
-materializarse en un índice por cabecera, y el peer **MUST NOT** ser penalizado por ello.
-
-> **Esta regla existe porque headers-first tuvo su propio agujero: CVE-2019-25220**, divulgado el
-> 2024-09-18. Bitcoin Core guardaba un `CBlockIndex` por cada cabecera con PoW válido **sin exigir
-> trabajo acumulado**, y una cadena de cabeceras de baja dificultad tumbaba el nodo por OOM.
->
-> Lo instructivo no es el fallo sino su deriva: **el coste del ataque bajó solo, con el tiempo**,
-> porque el umbral era absoluto y la dificultad de red subía — de ~4,12 BTC (32 % de un bloque, enero
-> 2019) a **~0,14 BTC** (4,4 % de un bloque, septiembre 2024). De ahí que el umbral **MUST** ser
-> relativo al tip: un umbral fijo caduca sin que nadie lo note.
->
-> Fuente: `bitcoin/bitcoin@4519933391`, `src/net_processing.cpp:749-753` (`GetAntiDoSWorkThreshold`),
-> PR #25717 y #26355. El buffer de 144 bloques es suyo, y su razón es aceptar bifurcaciones cercanas
-> al tip. **zcashd nunca portó el arreglo** (no encontrado; confianza media, búsqueda dirigida).
->
-> ZEROX lo construye desde el día uno en vez de retrofitearlo, que es la única ventaja real de nacer
-> después.
->
-> ✅ **`TRABAJO_MINIMO_CADENA = 0`, y P-024 queda cerrada así.** Es el análogo de `nMinimumChainWork`
-> de Bitcoin: un suelo que se sube en cada release según la cadena real crece. Para una cadena **que
-> todavía no existe**, el único valor correcto es cero — cualquier otro rechazaría la cadena real en
-> el arranque. **No es una constante permanente de consenso**: dos nodos con valores distintos no se
-> bifurcan, solo difieren en cuánta basura retienen antes de descartarla.
->
-> ⚠️ **El trabajo se cuenta desde el ANCLA, no desde el tip.** Un test lo destapó: la primera
-> implementación sumaba el trabajo de la cadena candidata al del **tip**, y con esa cuenta una
-> bifurcación que colgara de hace cinco mil bloques sumaba trabajo que **no es de esa rama** y
-> superaba el umbral siempre. La defensa quedaba desactivada justo para el caso que existe para
-> cubrir. `zx-consensus::antidos`, `zx-node::sync`.
+**C-NET-04 · Recursos acotados antes de validar.** Los candidatos incompletos se mantienen bajo
+presupuestos de memoria, peticiones y coste de prueba. No se materializa un índice sin límites
+por recibir cabeceras aparentemente válidas. El umbral anti-DoS basado en `blue_work`, su ancla
+y el coste de verificar PoT requieren calibración; no se hereda un umbral de hashes ni 144 bloques.
 
 **C-NET-05 · Lento y malicioso son cosas distintas.** Un peer que **no responde a tiempo** o devuelve
 respuestas vacías **MUST** desconectarse sin puntuar. Solo una **violación de consenso positivamente
@@ -2539,7 +2161,7 @@ identificada** puntúa hacia el baneo.
 
 **C-NET-06 · Validar la cabecera antes de emitir un bloque compacto.** Un nodo **MUST NOT** emitir un
 anuncio compacto sin haber validado que la cabecera compromete cada transacción del bloque y que
-construye sobre la cadena válida con PoW correcto. **MAY** emitirlo antes de validar que cada
+construye sobre un estado cuya cabecera y pruebas de consenso estén verificadas. **MAY** emitirlo antes de validar que cada
 transacción gasta UTXO existentes.
 
 > Literal de BIP 152, y es la única de sus reglas que es **independiente del transporte**: habla del
@@ -2548,7 +2170,7 @@ transacción gasta UTXO existentes.
 **C-NET-07 · Derivación del ID corto.** Sobre `txid`:
 
 ```
-h  = SHA3-256( cabecera(92 B) ‖ nonce(8 B LE) )       ← divergencia deliberada, ver abajo
+h  = SHA3-256( cabecera_canónica ‖ nonce_transporte(8 B LE) )       ← divergencia deliberada, ver abajo
 k0 = h[0..8]  como u64 LE
 k1 = h[8..16] como u64 LE
 id = los 6 bytes bajos de SipHash-2-4(k0, k1, txid)
@@ -2561,7 +2183,7 @@ id = los 6 bytes bajos de SipHash-2-4(k0, k1, txid)
 >
 > **El nonce no es decorativo.** Cita del BIP: *"by using the block hash as a key to SipHash, an
 > attacker cannot predict what keys will be used […] so that even block creators cannot control where
-> collisions occur"*. Sin él, un minero podría fabricar transacciones que colisionen con las del
+> collisions occur"*. Sin él, un productor podría fabricar transacciones que colisionen con las del
 > mempool ajeno y degradar la propagación de la red entera.
 >
 > 🔶 `SipHash-2-4` **no está definido en BIP 152** — remite a Aumasson & Bernstein. Es una laguna
@@ -2700,8 +2322,8 @@ peer pueda provocar **MUST** ir por índice, y ninguna **MUST** recalcular hashe
 > génesis.
 >
 > Y un nodo que se cree al día sin estarlo es exactamente lo que un monedero consulta antes de dar
-> un pago por bueno. Contar lo aplicado sí es infalsificable: aplicar exige encadenar, `bits`
-> canónico y PoW.
+> un pago por bueno. Solo se cuenta progreso después de verificar contexto, pruebas y aplicación;
+> recibir cabeceras por sí solo no demuestra progreso de consenso.
 
 **C-NET-18 · Sin progreso, MUST cortarse; nunca reintentar con el mismo locator.** Si una respuesta
 válida no aporta ninguna cabecera aplicable, o si no cuelga de nada nuestro, el nodo **MUST** dejar
@@ -2728,7 +2350,7 @@ asíncrono** —encola un comando—, así que el sincronizador **MUST** olvidar
 **C-NET-20 · Los límites de conexión y el baneo MUST contarse por PREFIJO DE RED, no por `PeerId`.**
 IPv4 se agrupa por **/24** e IPv6 por **/64**.
 
-> **Un `PeerId` es gratis.** `Keypair::generate_ed25519()` es instantáneo: sin PoW, sin registro, sin
+> **Un `PeerId` es gratis.** `Keypair::generate_ed25519()` es instantáneo: sin recurso escaso, sin registro, sin
 > coste. Así que `MAX_CONEXIONES_POR_PEER = 1` no limita nada — basta con generar una identidad
 > nueva por conexión.
 >
@@ -2778,73 +2400,14 @@ IPv4 se agrupa por **/24** e IPv6 por **/64**.
 cupo de un contador **compartido** antes de leer, y **MUST** devolverlo al terminar. Techo:
 `PRESUPUESTO_BYTES = 256 MiB`.
 
-**C-NET-22 · La sincronización headers-first MUST hacer la validación CONTEXTUAL de cada cabecera.**
-Antes de adoptar un lote, el nodo **MUST** comprobar sobre cada cabecera todo lo que no se puede
-juzgar mirándola sola:
+**C-NET-22 · Validación contextual.** Antes de adoptar candidatos se comprueban sus ancestros,
+rango esperado, rama de consenso, solución y reloj PoT sobre la historia candidata.
+Faltar datos no demuestra mala fe; tampoco un rechazo temporal por el reloj local.
 
-| | Regla | ¿Mala fe? |
-|---|---|---|
-| **`height` es la posición real: `ancla + 1 + i`** | **C-NET-22a** | **sí** |
-| `bits` es exactamente `compact(siguiente_target(H))` | C-BLK-05, C-DIFF-09 | **sí** |
-| `consensus_branch_id` es el activo a esa altura | C-HDR-02b | **sí** |
-| el timestamp avanza respecto al del padre | C-TS-01 | **sí** |
-| el timestamp no pasa del FTL | C-TS-03 | **no** |
-| (faltan ancestros para calcular la ventana) | — | **no** |
-
-**C-NET-22a · La altura de una cabecera es su POSICIÓN, no su campo `height`.** Para la cabecera
-`i`-ésima de un lote anclado en la altura `A`, su altura es `A + 1 + i`. El campo `height`
-**MUST** coincidir con ese valor, y una cabecera que declare otro se rechaza como mala fe. Ninguna
-comprobación de este documento **MAY** tomar `height` como entrada: `height` lo escribe quien
-construye la cabecera.
-
-La ventana del retarget se arma sobre la **rama candidata**: las alturas por encima del ancla salen
-del lote, y las que están en el ancla o por debajo, de la cadena propia. El padre de la primera
-cabecera del lote es el ancla. Los índices dentro del lote se calculan **desde el ancla**, nunca
-desde el `height` de su primer elemento.
-
-Las tres primeras son mala fe porque son **deterministas**: dos nodos con los mismos ancestros
-obtienen el mismo valor, así que no hay forma inocente de discrepar. El FTL no lo es porque el reloj
-que puede estar mal es el propio, y su rechazo **MUST NOT** cachearse: la misma cabecera puede ser
-válida un minuto después. El reloj es **local**, nunca de red (C-TS-04).
-
-> **Esto no es una regla nueva, es un cable que faltaba.** Las cinco comprobaciones ya estaban
-> escritas y probadas en `zx-consensus`, y `validar_cabecera` las hace todas. Lo que no existía era
-> ninguna llamada desde el nodo: el camino de sincronización pasaba por
-> `validar_cadena_de_cabeceras`, que tenía su propia ruta más corta. **La diferencia entre las dos
-> rutas era exactamente lo que no se comprobaba** — otra vez dos fuentes para una sola verdad, esta
-> vez en el comportamiento y no en los números.
->
-> El agujero era que un peer podía servir cabeceras con **cualquier `bits` canónico** —uno más
-> barato del que LWMA exige— y el nodo las adoptaba. La defensa que quedaba era el umbral de
-> trabajo de C-NET-04, que solo atrapa lo grosero: un `bits` un poco más fácil produce una cadena
-> que **ese nodo acepta y el resto de la red rechaza**. Divergencia de consenso, que es el peor
-> sitio donde tener un hueco.
->
-> **Por qué la ventana sale de la rama candidata y no de la punta propia.** Es literalmente el
-> mismo error que ya se cazó una vez en `validar_cadena_de_cabeceras`, que sumaba el trabajo del
-> tip en lugar del ancla: juzgar una rama con datos de otra. La segunda vez se escribió bien desde
-> el principio, y hay un test que lo fija — `la_ventana_de_una_bifurcacion_usa_el_lote_no_nuestra_punta`.
->
-> **Va después del PoW a propósito.** Reconstruir una ventana de 91 ancestros cuesta bastante más
-> que un SHA3, y no merece gastarla en cabeceras que ni siquiera cumplen su propio `bits`.
->
-> ⚠️ **C-NET-22a existe porque la primera implementación no la tenía, y eso vació todo lo demás
-> — H-007.** El código usaba `cabecera.height` para saber qué target exigir. Una cabecera que
-> cuelga de la punta real de una cadena con meses de dificultad acumulada, pero que declara altura
-> 1, cae en la rama de arranque de C-DIFF-02 y solo se le exige `TARGET_INICIAL`: la dificultad del
-> día uno de la red, que se mina en segundos. Verificado con una sonda:
->
-> ```
-> altura declarada 1, bits del día 1, colgando de la altura 150: Ok(())
-> altura declarada 151 con esos mismos bits:            DificultadIncorrecta
-> ```
->
-> Era **peor que no comprobar la dificultad**, porque el módulo afirmaba haberla comprobado. Un
-> hueco conocido se cierra; uno que parece cerrado, no.
->
-> Es la lección de H-005 un piso más arriba. Allí fue transcribir a mano un número derivable; aquí,
-> **creerle** a un tercero un número derivable. Un valor que se puede derivar no se acepta de quien
-> tiene interés en mentir.
+**C-NET-22a · No confiar en la posición declarada.** Altura, orden y ancestros se derivan del DAG
+validado. El índice de llegada en un lote no define una altura de consenso. La representación y
+el recorrido contextual del DAG están pendientes de integración; el validador lineal no acredita
+esta propiedad.
 
 **C-NET-23 · Un cuerpo MUST demostrar que es el de su cabecera antes de guardarse.** Antes de
 escribir un cuerpo en el almacén, el nodo **MUST** recalcular la raíz de Merkle desde las
@@ -2867,6 +2430,15 @@ desconocida **MUST** descartarse sin penalizar — puede ser una carrera con una
 >
 > Cuesta un recorrido de Merkle y no necesita estado: es la barrera **anterior** a la validación
 > completa del cuerpo (§6.4), que necesita el conjunto UTXO y todavía no está cableada.
+
+> **Alcance del compromiso:** C-NET-23 vincula los datos de efecto, no todos los testigos.
+> C-TX-01 excluye las firmas del txid y la cabecera actual no compromete el `auth_digest`.
+> Una entrega con autorización incorrecta puede compartir cabecera/Merkle con otra correcta:
+> rechazar esa entrega no demuestra por sí solo que la cabecera sea inválida. El formato DAG
+> necesita resolver el compromiso de autorizaciones y el almacén distinguir datos recibidos
+> de evidencia validada. Se estudia en
+> [IDV-v0.1](veritas/consenso/identidad-disponibilidad-v1/CONTRATO-VALIDACION.md), sin activar una
+> extensión de cabecera ni cambiar el txid en esta etapa.
 
 **C-NET-24 · La descarga de cuerpos va de menor altura a mayor, en lotes acotados.** Cumplida
 C-NET-03, el nodo **MUST** pedir los cuerpos que le faltan **en orden ascendente de altura**, en
@@ -2932,167 +2504,56 @@ conoce— **MUST** descartarse **sin penalizar**, no rechazarse.
 > **Un bloque huérfano no es un bloque inválido: es un bloque que llegó antes de tiempo.** Castigarlo
 > penaliza a peers honestos con otro timing.
 
-### 16.2 · Propagación de bloques — requisito de Fase 3, NO consenso
+### 16.4 · Propagación de bloques — transporte
 
-> Esta subsección **no es normativa para el consenso**. Es transporte: cambia *cómo viaja* un
-> bloque, no *qué bloque es válido*. Un nodo que no lo implemente funciona igual, solo gasta más
-> ancho de banda. **No puede provocar un split de cadena**; el peor caso es que no ayude.
+**R-NET-01 · Relé compacto.** El relé compacto anuncia cabecera e identificadores cortos, negocia
+el soporte por conexión y permite recuperar transacciones faltantes o el bloque completo.
+No modifica las reglas que hacen válido al bloque.
 
-**R-NET-01 · Relé compacto de bloques.** El nodo **MUST** implementar relé compacto de bloques al
-estilo **BIP 152**: en lugar del bloque completo se anuncia un boceto —cabecera más identificadores
-cortos de las transacciones— y el par solicita únicamente las que le falten. **MUST** negociarse por
-conexión y **MUST** degradar a envío del bloque completo si el par no lo soporta o si faltan
-demasiadas transacciones.
+**R-NET-02 · Sal por bloque.** Los identificadores cortos usan una clave derivada de la cabecera
+y la sal de transporte (C-NET-07). Esa sal no es trabajo de consenso.
 
-**Por qué está aquí y no en la Fase 3 sin más.** La tasa de huérfanos es
-`≈ 1 − e^(−t_prop/T)` (§6.1, y `DECISIONES.md` §2). Reducir `t_prop` es la única forma de bajarla
-sin tocar consenso:
-
-```
-Bloque de 200 KB, ~571 transacciones
-Boceto ≈ 92 B (cabecera) + 571 × 6 B (IDs cortos) ≈ 3,6 KB   →  ~55× menos datos por el cable
-```
-
-| | `t_prop` estimado | Huérfanos a `T = 120 s` |
-|---|---|---|
-| Sin relé compacto | ~2 s | ~1,65 % |
-| **Con relé compacto** | ~0,5 s | **~0,42 %** |
-
-*Estimaciones de sobremesa. Deben medirse sobre gossipsub real antes de darlas por buenas.*
-
-**Qué mejora — y qué no.** **NO mejora el TPS**: no toca el tamaño de bloque ni `T`, que son los dos
-factores que lo fijan. Mejora la **robustez**, en tres frentes concretos:
-1. Menos hashrate honesto desperdiciado ⇒ la fracción **efectiva** de un atacante baja ⇒ la tabla de
-   confirmaciones de §13 mejora.
-2. Menos presión de centralización sobre el minero pequeño (un minero grande nunca compite consigo
-   mismo, y esa ventaja escala con la tasa de huérfanos).
-3. Menos reorganizaciones de un bloque ⇒ **menos veces que Cortex ve aparecer y desaparecer un
-   pago**. Beneficio directo de producto.
-
-**R-NET-02 · Los identificadores cortos MUST llevar sal por bloque.** La función que deriva los
-identificadores cortos **MUST** tomar una clave dependiente de la cabecera del bloque, de modo que
-un atacante no pueda precomputar transacciones cuyos identificadores colisionen y forzar viajes de
-ida y vuelta indefinidos.
-
-> ⚠️ **El mecanismo exacto MUST verificarse contra BIP 152 antes de implementarlo** — la función con
-> clave, la derivación de la sal, el saludo de negociación y los dos modos de operación
-> (alto/bajo ancho de banda). No se escribe de memoria. Encargo de investigación de Fase 3.
-
-**Limitación conocida.** El relé compacto rinde bien cuando los mempools están sincronizados.
-Durante un pico de demanda hay muchas transacciones frescas, los mempools divergen y hacen falta
-viajes extra — **precisamente cuando los huérfanos más importan**. Mitigación benigna: que Cortex
-retransmita transacciones de forma amplia y agresiva mantiene los mempools sincronizados, y
-**beneficia también a quien no usa Cortex**, porque las transacciones acaban en la red P2P igual. No
-crea dependencia ni poder de censura.
-
-**Techo que el relé compacto NO puede romper.** `t_prop` es *número de saltos × latencia por salto*,
-no solo ancho de banda. Con una malla de gossipsub de grado ~8 el diámetro son ~4-5 saltos; a 100 ms
-por salto eso ya son 0,4-0,5 s pese el bloque lo que pese. El relé compacto **lleva al suelo, no por
-debajo**.
+La latencia depende también de saltos de red, recuperación de datos y validación de PoT.
+Se medirá con el formato DAG y las pruebas reales; no se trasladan estimaciones de huérfanos de
+una cadena de bloques cada dos minutos.
 
 ---
 
-## 17 · Decisiones abiertas que bloquean este documento
+## 17 · Pendientes activos del consenso destino
 
-### Abiertas — decisiones
+Esta lista es local y no depende del estado de un vault externo. La limpieza documental no
+congela parámetros ni convierte prototipos en implementaciones.
 
-| ID | Bloquea | Resumen | Para quién |
-|---|---|---|---|
-| **P-006** | §11 | ¿Sirve `Σ 2^256/(target+1)` con dificultad muy variable? D2 argumenta que el sesgo `(N−1)/N` de zawy afecta a la *estimación* de hashrate, no al *acumulador* — falta relectura verbatim de #58/#82 | **D9** |
-| **P-014** | §13 | 🆕 La rama privada del atacante tiene su **propio LWMA** y se abarata sola tras `N=90`. Las tablas de confirmación asumen dificultad constante ⇒ las filas `q ≥ 40 %` podrían ser optimistas | **D9** |
-| **P-015** | §11 | ¿Puede un minero *grindear* el nonce buscando hash bajo para ganar desempates (C-FORK-04)? | **D8** |
-| **P-016** | §12 | Camino de recuperación de un nodo detenido por C-REORG-07 tras una partición larga | **D3** |
-| **P-017** | §15, §16 | Mensaje, timestamp y nonce del génesis (mainnet y testnet) · puerto por defecto | Katana, el día del lanzamiento |
-| **P-022** | §16.2 | 🆕 Rediseño del saludo de `sendcmpct` sobre request-response de libp2p: la negociación del BIP depende de orden total entre mensajes, que yamux no da | **D3**, Fase 5 |
-| **P-023** | §16.3 | 🆕 `PeerScoreParams`/`TopicScoreParams` de gossipsub. **No existe precedente**: ninguna cadena PoW con bloques de 100-200 KB cada 120 s usa gossipsub v1.1. Hay que derivarlo y medirlo | **D3** + **D8**, Fase 5 |
-| **P-019** | §16.2 | Medir `t_prop` real sobre gossipsub con bloques de 100-200 KB, **y de ahí derivar `D`/`D_low`/`D_high`/`heartbeat`**. Los de Ethereum son para slots de 12 s, no de 120 | **D3** |
-| **P-011b** | §5.5 | Calibración de `REF_WEIGHT` con un modelo de coste de atacante | **D2** + **D8** |
-| **P-011c** | §5.5 | ¿Anclar solo a `Mlt` abarata el spam si la demanda colapsa? | **D8** — revisión adversarial |
-| **P-009g** | §6.5 (v1.1) | ¿Necesita Orchard un *clawback* análogo al de bulletproofs? | **D1** |
-| **P-030** | §14 | 🆕 **C-UPG-06 y C-UPG-07 sin implementar.** No hay altura de activación en el mempool ni detección de "he seguido bloques inválidos". Son `SHOULD` y no hay hard fork que las ejercite todavía: se cierran con la segunda rama de consenso | **D2** |
-| **P-031** | §7.2 | 🔴 **Ningún test puede minar PoW real.** `POW_LIMIT = 2²²⁴−1` hace que la cabecera más barata cueste ~2³² hashes, así que el hito de tres nodos no se puede demostrar. Bitcoin y Zcash lo rodean con una red `regtest` de dificultad trivial; añadir una red es decisión de consenso, y queda **bloqueada** a la espera de autoridad | **Katana** |
-| **P-004d** | §7.3 | 🆕 ¿Puede LWMA adaptarse desde el bloque 1 **sembrando** la ventana con ancestros sintéticos, en vez de 90 bloques a dificultad fija? Encoger `N` está prohibido por varianza; sembrarla no. Regla de consenso nueva | Investigación + **D9** + **D8**, Fase 10 |
-
-### Cerradas en esta revisión
-
-| ID | Decisión | Dónde vive |
-|---|---|---|
-| **P-005** | **No se corrige** el sesgo del clamp. `BIAS = 1`, sesgo declarado de +0,30 s | C-DIFF-07 |
-| **P-026** | **`Excedido` puntúa 20**, cinco avisos hasta el baneo. Es atribuible al emisor, pero admite una explicación inocente que el score **por prefijo** distingue sola | C-NET-05, C-NET-20 |
-| **P-027** | **Presupuesto agregado de 256 MiB**, con reserva antes de leer y devolución por `Drop`. El peor caso baja de 14,7 GB a 256 MiB, sin importar peers ni streams | C-NET-21 |
-| **P-029** | Un `RwLock` envenenado **recupera su contenido** —que es válido— y registra el error. Ni degrada en silencio ni tira un nodo sano | `zx-node::cadena` |
-| **P-028** | **Reorganización de cabeceras**, con `fork_choice` conectado y la parada dura de C-REORG-07 comprobada **antes** de deshacer nada | C-NET-18, C-REORG-07 |
-| **P-025** | **Límites y baneo por prefijo de red** (/24 y /64), en un behaviour propio: `connection_limits` de libp2p no mira la IP y un `PeerId` es gratis | C-NET-20 |
-| **P-024** | **`TRABAJO_MINIMO_CADENA = 0`.** Es el análogo de `nMinimumChainWork`: para una cadena que no existe todavía, cero es el único valor correcto. Se sube por release, y **no es consenso** | C-NET-04 |
-| **P-018** | **BIP 152 extraído verbatim** → `research/bip152.md`. Lo portable y lo que no, delimitado | C-NET-06..10 |
-| **P-020** | **P2K**, no P2KH. La respuesta post-cuántica es un network upgrade con una variante nueva de `Lock`, no el formato de dirección | C-ENC-07, C-TX-06b, C-TX-09b |
-| **P-004c** | `TARGET_INICIAL` **por red**: mainnet `0x1c07fff8` (primer bloque en `T` = 120 s con ≈1,15 GH/s), testnet `0x1d00ffff`. La constante estima el hashrate del día 1 y nada más. Recalibrable con benchmark hasta el génesis | C-DIFF-02 |
-
-### Cubiertas desde la auditoría de cobertura
-
-Aquella auditoría concluyó que el SPEC sabía **validar un bloque aislado** pero no **llevar una
-cadena**. Los seis huecos están escritos:
-
-| Sección | Reglas |
+| Área | Trabajo pendiente |
 |---|---|
-| §11 · Selección de cadena | C-FORK-01..04 |
-| §12 · Reorganizaciones | C-REORG-01..07 |
-| §13 · Profundidad de confirmación | política de producto, no normativa |
-| §14 · Activación de cambios de consenso | C-UPG-01..08 |
-| §15 · Bloque génesis | C-GEN-01..07 |
-| §2.4 · Serialización de red | C-WIRE-01..07 |
-| §15.1 · Almacenamiento | C-STORE-01..04 |
-| §16 · Parámetros de red | C-NET-01..21 |
-
-### Aparcadas — evaluadas, con factura desglosada, NO adoptadas
-
-| Decisión | Qué compraría | Qué costaría | Estado |
-|---|---|---|---|
-| **Bajar `T` a 30 s** | 4× TPS y 4× menos latencia. Con relé compacto (R-NET-01) la tasa de huérfanos quedaría en ~1,65 %, la misma que hoy a 120 s | 🔴 **`FTL = N·T/20` bajaría a 135 s**: un nodo con 2 min de deriva de reloj produciría bloques rechazados por la red — deja fuera a mineros honestos por tener un reloj normal. Habría que **desacoplar `FTL` de `T`**, que es rediseñar una regla de timestamps. Además: rederivar `N_LARGO`, `k`, `T_FLOOR`, `ST_CAP` · ventana MTP de 22 → 5,5 min · IBD de cabeceras de 484 MB → **1,93 GB a 20 años, para siempre** · ×4 la sobrecarga fija por bloque | **No en v1.** Solo reconsiderable **antes del génesis** y con `t_prop` medido, no estimado |
-| **P2K en lugar de P2KH** (guardar la clave pública en la salida en vez de su hash) | **17 % menos bytes** por transacción (368 → 304 B) ⇒ 2,8 TPS en vez de 2,4, gratis. La dirección mide lo mismo: bech32 de 32 B en ambos casos, cero cambio de UX. En Bitcoin el hash ahorra espacio porque su hash son 20 B y su pubkey 33; en ZEROX el hash **son 32 B, exactamente lo que mide una clave Ed25519** — no ahorra nada | La clave pública queda expuesta antes de gastar. Contra un adversario cuántico con Shor, P2KH da una ventana de protección hasta el momento del gasto. Argumento real aunque especulativo, y la razón por la que casi todas las cadenas mantienen el hash | **Decisión de Katana, gratis hasta el génesis.** Después, hard fork |
-| **GHOST / recompensas de tío** | Desacopla la tasa de huérfanos de la pérdida de seguridad (el enfoque de Ethereum, que le permitió bloques de 13 s con 10-15 % de tíos) | Un subsistema de consenso entero: recompensas de tío, reglas de inclusión, su propio espacio de ataques | **Descartado.** Superficie de ataque desproporcionada |
-
-### Cerradas — 2026-09-04
-
-| ID | Sección | Resolución |
-|---|---|---|
-| **P-001** | §3.1 | **SHA3-256 (FIPS 202)** |
-| **P-002** | §8.1 | **1 000 000 000 ZZK** · **0,26666666 ZZK/bloque** (era 32) · madurez **12 000** (era 100) — recalibrado 2026-09-09 (P-041) |
-| **P-003** | §7.3 | `N = 90`, **con** suelo `T_FLOOR` |
-| **P-004** | §6.1, §7.2, §7.3 | `POW_LIMIT = 2^224 − 1` · `MIN_TARGET = 2^64` · `TARGET_INICIAL = POW_LIMIT` 🔶 · `timestamp: u64` |
-| **P-009a–f** | §6.5, §8.1 | Bloque dinámico parametrizado; **el tail no es suelo por bloque** (C-EMIT-07) |
-| **P-010** | §5.3 | `ZX_VALUE_SANITY_LIMIT = 2^62` brek |
-| — | §2.3 | Dirección de **32 bytes**, sin truncar |
-| — | §5.3 | `MAX_MULTISIG_KEYS = 16` |
-| — | §6.3 | Merkle: **relleno con nulo** (evita CVE-2012-2459) |
-| — | §6.5, §5.4 | `MAX_TX_WEIGHT = ZONA_LIBRE = 100 000` (C-WGT-11, C-TX-18) |
-| **P-011** | §5.4, §5.5 | Tarifa mínima **NO es consenso** (C-TX-15 corregida); fórmula dinámica anclada a `Mlt` |
-| **P-012** | §11 | Desempate **determinista por menor hash de tip** (C-FORK-04), estilo Zebra, no orden de llegada |
-| **P-013** | §12 | `MAX_REORG_LENGTH = 11 999` (era 99) con **fail-stop**. Finalidad por protocolo a las **12 000** confirmaciones (era 100) — recalibrado 2026-09-09 (P-041) |
-| — | §14 | `CONSENSUS_BRANCH_ID` en la **cabecera** (C-UPG-05) — cierra el agujero de *wipe-out* que ZIP-200 dejó sin implementar |
-| — | §16.2 | **Relé compacto de bloques** (R-NET-01/02, estilo BIP 152). Transporte, **no consenso** ⇒ no puede partir la cadena; el peor caso es que no ayude. Huérfanos ~1,65 % → ~0,42 % |
-
-🔶 `TARGET_INICIAL` es la única cerrada que sigue siendo **revisable hasta crear el génesis**.
-
----
+| Cabecera y wire | Padres múltiples, compromisos, formato y límites de la justificación PoT; tamaño final DAG. |
+| Prueba de espacio/tiempo | Verificación conjunta de solución, KZG, sello, reto secuencial, autoría y flujos. |
+| Rango | R-FIN-13′ completo: arranque, ventana, redondeos, fusiones tardías, ramas candidatas. |
+| DAG | GHOSTDAG, U2/U3″, peso, cadena seleccionada, orden de ejecución y conflictos. |
+| Alturas y calendario | Activaciones, expiración de tx/sectores, timelocks, coinbase y archivado derivados del orden DAG. |
+| Finalidad | Integración R-FIN-7, elección conjunta de I/F/L/ρ_max, particiones y recuperación. |
+| Red | Medir Δ y coste de pruebas; calibrar sincronización, scoring, recursos y propagación. |
+| Génesis | Parámetros y hashes PoST/DAG distintos por red; bootstrap explícito. |
+| Pagos | Recalibrar §13 con el mismo modelo y criterio de aceptación en todas las alternativas. |
+| Blindado | Convertir investigación Orchard de §9 en reglas, compromisos y validación integrados. |
+| Tarifas/capacidad | Revisar coste adversarial, suelo de tarifa y peso blindado conservando constantes adoptadas. |
 
 ## 18 · Trazabilidad
 
-Cada sección de este documento se apoya en investigación con fuente primaria verificada:
+Los documentos de investigación conservan evidencia y correcciones; no toda cifra histórica es
+un parámetro activo.
 
-| Sección | Investigación | Verificación empírica realizada |
-|---|---|---|
-| §3 Hash | `research/sha3-fips202.md`, `sha3-referencias.md` | 860 vectores CAVP del NIST |
-| §3 (kernel actual) | `research/sha3-kernel-audit.md` | Emulación línea a línea; 0/860 |
-| §4 Preimagen | `research/zip244.md` | Reimplementación validada, 10/10 txid, 46/46 sighash |
-| §7.3 Dificultad | `research/lwma1.md` | 6 implementaciones reales inspeccionadas |
-| §2.4 Serialización | `research/capnproto-canon.md` | Patrón contrastado con Cosmos, BCS, Zcash |
-| §9 Pool blindado | `research/orchard-bundle.md`, `orchard-math-verification.md` | 200 tx de mainnet; derivación numérica |
-| §6.5 Peso de bloque | `research/dynamic-blocksize.md` | 2 implementaciones (monero@3d3920d7, cuprate@4383f0d6); 6 suites de vectores localizadas |
-| §5.5 Tarifa | `research/dynamic-fee.md` | Código de 2 implementaciones; corrigió un error de capa en este SPEC |
-| §11–§13 Fork choice, reorgs | `research/fork-choice-reorg.md` | 4 implementaciones (bitcoin, zebra, zcashd, monero); 3 papers con tablas numéricas |
-| §14–§16 Upgrades, génesis, red | `research/upgrades-genesis.md` | ZIP-200, BIP-9/8, código de bitcoin/zcash/monero |
-| §18.1 Coherencia SPEC↔código | — (patrón interno, 3 reincidencias) | `spec_numeros.rs`: 6 tests; 2 mutaciones comprobadas |
+| Área | Referencias locales |
+|---|---|
+| PoST/DAG | `research/dag-poas-ancla-de-orden.md`; enmiendas R-FIN-8′, R-FIN-13′ y R-FIN-14; rondas 9–11. |
+| Reglas de red y pérdida honesta | `research/scripts/d9-ronda11a/informe.md`. |
+| Confirmación | `research/scripts/d9-ronda10c/informe.md`, `research/scripts/d16-gate/`; límites de interpretación en §13. |
+| Hash, codificación y firmas | `research/sha3-fips202.md`, `research/sha3-referencias.md`, `research/zip244.md`. |
+| Blindado | `research/orchard-bundle.md`, `research/orchard-math-verification.md`. |
+| Peso y tarifa | `research/dynamic-blocksize.md`, `research/dynamic-fee.md`. |
+| Reproducibilidad | `veritas/LINEO.md`; los cálculos nuevos viven en Veritas. |
+
+
 
 ## 18.1 · Este documento no puede contradecir al código
 

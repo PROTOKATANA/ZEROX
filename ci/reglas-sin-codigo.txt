@@ -10,10 +10,6 @@
 # y "aquí no hago X" es un comentario que envejece sin que nadie lo note. Lo que sí existe es un
 # test por cada una que comprueba que el criterio prohibido daría un resultado distinto.
 
-# Prohíbe la jump rule de LWMA-2/4, tempering, clamps por bloque, límites de timespan y redondeo.
-C-DIFF-10
-# Prohíbe el criterio de "contar bytes cero a la cabeza" para el PoW.
-C-POW-02
 # Prohíbe que un límite incidental del motor de almacenamiento decida si un bloque se acepta. Es la
 # lección de BIP-50: el límite de locks de BerkeleyDB se volvió consenso de facto y partió la red en
 # marzo de 2013. No hay línea que citar; lo que hay es la ausencia de esa línea.
@@ -36,7 +32,7 @@ R-NET-02
 # ── Bloque B1/B2: el estado del nodo ─────────────────────────────────────────────────────────
 #
 # El almacén ya sabe guardar el UTXO set (C-STORE-05) y aplicar un lote atómico (C-STORE-07). Lo
-# que falta es que la CADENA lo use: mantener el conjunto, finalizar a profundidad 99 y reconstruir
+# que falta es que la CADENA lo use: mantener el conjunto, integrar la finalidad temporal del DAG y reconstruir
 # el solapamiento al arrancar. Es el bloque B2 del plan.
 
 # (C-STORE-06 salió de esta lista: el almacén ya cumple su mitad —guarda el estado finalizado y no
@@ -45,9 +41,6 @@ R-NET-02
 
 # ── Fases que no han llegado ──────────────────────────────────────────────────────────────────
 
-# Paridad bit a bit CPU↔GPU. Necesita el kernel del minero, que es la Fase 8. Es la regla que
-# H-001 incumplió: el kernel heredado no pasa ninguno de los 237 vectores CAVP.
-C-HASH-03
 # Altura de activación en el mempool y detección de "he seguido bloques inválidos". Son SHOULD y
 # no hay hard fork que las ejercite: se cierran con la segunda rama de consenso. Es P-030.
 C-UPG-06
@@ -62,28 +55,27 @@ C-UPG-08
 # El código que resulta de esa decisión es todo crates/zx-core/src/wire.rs, que cita C-WIRE-01..05.
 C-WIRE-06
 
-# ── Cabecera de PoAS · SPEC §6.1-6.2 reescritas el 2026-09-05 (DECISIONES.md §22) ──
+# ── Cabecera de PoAS · SPEC §6.1-6.2 reescritas el 2026-09-05 ──
 #
 # Spec-first: el SPEC va delante y el código lo alcanza. Las cinco caen cuando se reescriba
 # crates/zx-core/src/preimage/block.rs. El test `el_spec_dice_el_tamano_real_de_la_cabecera`
 # está ROJO A PROPÓSITO hasta entonces, y es lo que fuerza el trabajo.
 #
-#   C-HDR-05  slot estrictamente creciente
+#   C-HDR-05  slot no decreciente respecto al padre seleccionado; integración DAG pendiente
 #   C-HDR-06  rango_solucion en cabecera, redundancia comprobada contra rango_esperado(padre)
 #   C-HDR-07  la justificación del PoT va fuera de la cabecera, pero es obligatoria
 #   C-HDR-08  la cabecera NO lleva dirección de recompensa: va en la coinbase
-#   C-HDR-09  block_hash sobre los 556 bytes, sello incluido
+#   C-HDR-09  block_hash canónico; 556 B es la base lineal, formato DAG pendiente
 C-HDR-05
 C-HDR-06
 C-HDR-07
 C-HDR-08
 C-HDR-09
 
-# ── Checkpoint firmado · SPEC §12.1, decidido el 2026-09-05 (DECISIONES.md §25) ──
+# ── Checkpoint firmado · SPEC §12.1, decidido el 2026-09-05 ──
 #
 # Spec-first. Caen cuando se implemente el checkpoint. Sus DOS constantes sí están cubiertas ya
-# por el test `el_umbral_del_checkpoint_dice_el_espacio_que_dice`, que rederiva el espacio desde
-# el rango para que la etiqueta en petabytes no pueda volver a mentir.
+# por un guardián de constantes nominales; su calibración rango→espacio DAG queda pendiente.
 #
 #   C-CHK-01  un único checkpoint en la vida de la cadena; la clave se destruye después
 #   C-CHK-02  solo válido si rango_solucion <= UMBRAL_CHECKPOINT
@@ -100,7 +92,7 @@ C-CHK-05
 C-CHK-06
 C-CHK-07
 
-# ── Ritmo de desafío y caducidad · SPEC §7.5 (DECISIONES.md §20 y §21) ──
+# ── Ritmo de desafío y caducidad · SPEC §7.5 ──
 # Spec-first. Caen al implementar el consenso nuevo.
 C-SLOT-01
 C-SLOT-02
@@ -111,3 +103,19 @@ C-EXP-03
 C-EXP-04
 C-EXP-05
 C-EXP-06
+
+# ── Reglas de proceso: no hay código que citar ────────────────────────────────────────────────
+#
+# C-SPEC-01 sí se cita: vive en crates/zx-consensus/tests/spec_numeros.rs. Las dos siguientes son
+# obligaciones de proceso —dónde viven las auditorías y qué guía deben cumplir—, no comportamiento
+# de un programa: no hay línea que citar ni punto de entrada que ejecutar.
+
+# C-SPEC-02 · Toda auditoría, simulación, benchmark o test de cálculo va en
+# veritas/<categoria>/<nombre>/ con la estructura de LINEO.md §1. La categoría la elige el agente
+# por tema dominante (seguridad, rendimiento, consenso, …); la lista es abierta y puede crear las
+# que haga falta. Se declara en el INFORME.md. Los scripts existentes en research/scripts/ quedan
+# como evidencia histórica.
+C-SPEC-02
+# C-SPEC-03 · veritas/LINEO.md es de lectura y cumplimiento obligatorios (Julia CPU, GPU C++/CUDA,
+# topes de 64 GiB / 24 hilos, envoltorio julia.sh, oráculo y reproducibilidad).
+C-SPEC-03

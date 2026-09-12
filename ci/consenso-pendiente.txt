@@ -15,7 +15,7 @@
 # barrera anterior y no necesita estado. Se cierra en la Fase 6.
 zx-consensus::bloque::validar_bloque
 
-# El timestamp que un minero debe poner en la cabecera que construye. Lo consume el minero, que
-# todavía no existe: zx-miner es la Fase 8. El nodo no lo necesita — el nodo COMPRUEBA timestamps
-# ajenos (C-TS-01, C-TS-03, ya cableado), no elige el suyo.
+# Auxiliar de producción del formato heredado, sin consumidor. El minero PoW fue retirado.
+# No conecta ni especifica un productor PoST: se sustituye al fijar la relación timestamp/slot
+# del DAG (SPEC §7.4 y MIGRACION.md). El nodo actual comprueba timestamps ajenos.
 zx-consensus::timestamps::timestamp_del_minero
