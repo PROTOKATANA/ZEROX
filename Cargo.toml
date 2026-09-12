@@ -11,7 +11,6 @@ members = [
     "crates/zx-node",
     "crates/zx-lightwalletd",
     "crates/zx-scanner",
-    "crates/zx-miner",
 ]
 
 [workspace.package]
@@ -58,10 +57,6 @@ rocksdb   = "=0.25.0"
 libp2p    = "=0.56.0"
 jsonrpsee = "=0.26.0"
 tokio     = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "time", "sync"] }
-
-# --- FFI (solo zx-miner) ---
-cxx       = "=1.0.199"
-cxx-build = "=1.0.199"
 
 # --- async, solo para la frontera de libp2p ---
 # El trait `Codec` de request-response usa `#[async_trait]`, así que no es opcional.

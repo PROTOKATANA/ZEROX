@@ -4438,14 +4438,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zx-miner"
-version = "0.0.0"
-dependencies = [
- "proptest",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "zx-node"
 version = "0.0.0"
 dependencies = [
