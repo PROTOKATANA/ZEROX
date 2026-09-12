@@ -1,0 +1,19 @@
+Test Summary:                                                    | Pass  Total  Time
+convergencia de dos nodos con distinto orden y cuerpos retenidos |  208    208  4.3s
+Test Summary:                                              | Pass  Total  Time
+peso azul deduplicado y control negativo de multiplicación |   18     18  0.2s
+Test Summary:                                                                  | Pass  Total  Time
+unicidad pagable: copias rojas, desempate de color y copia en fusión posterior |   93     93  0.4s
+Test Summary:                     | Pass  Total  Time
+doble gasto invalida sin publicar |   12     12  0.0s
+Test Summary:                                 | Pass  Total  Time
+reloj local: control negativo heredado de ARM |    4      4  0.1s
+Test Summary:                                                     | Pass  Total  Time
+ventana vacía con HeldZero (discrepancia legada Rust documentada) |   12     12  0.0s
+Test Summary:                                       | Pass  Total  Time
+referencia y kernel coinciden en todos los vectores |   12     12  0.0s
+Test Summary:                             | Pass  Total  Time
+descriptor, dominio y fallos sin publicar |    8      8  0.0s
+Test Summary:                         | Pass  Total  Time
+semilla obligatoria sin RNG implícito |    6      6  0.0s
+model=comprobacion-decisiva-v1 seed=20260912 rng=none acceptance=exact_economic_convergence

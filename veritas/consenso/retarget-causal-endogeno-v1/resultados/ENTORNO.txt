@@ -1,0 +1,17 @@
+fecha=2026-09-12 (enmienda Z0)
+git_head=7b783d469fbae5722a0ae014b5e212ed6999eb2b (origen del arbol; la copia no tiene .git)
+julia_version=1.13.0
+cpu_name=znver5
+cpu=AMD Ryzen 9 9950X3D; 16 nucleos fisicos; 32 hilos logicos; 1 nodo NUMA
+cpu_threads_visible=32
+ram_visible_kib=129392000
+word_size=64
+blas=LBTConfig([ILP64] libopenblas64_.so)
+julia_threads_default=1
+julia_threads_interactive=0
+openblas_threads=1
+paquetes_directos=BenchmarkTools 1.8.0; JET 0.12.1
+semilla=20260911
+presupuesto_referencia=1 hilo; 8 GiB RAM; 30 min por ejecucion
+presupuesto_piloto=maximo 8 hilos; 16 GiB RAM; 10 GiB disco temporal; 2 h totales
+uso_observado=muy por debajo del presupuesto; sin timeout

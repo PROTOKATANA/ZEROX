@@ -1,0 +1,8 @@
+# ARM-v0.1 — registro de ejecución 2026-09-12 (enmienda Z0)
+# command: env JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 JULIA_PKG_PRECOMPILE_AUTO=0 timeout 300s veritas/julia.sh --project=veritas/consenso/admision-retarget-multivista-v1 veritas/consenso/admision-retarget-multivista-v1/run.jl --seed 20260911
+# exit_code: 0
+model=ARM-v0.1 status=conditional_structural_composition seed=20260911 rng=none
+observed_event_ids=5 negative_control_detected=true
+naive_early_range=200 naive_late_range=100
+causal_convergence=true causal_range_at_slot21=200
+dag_inclusion=oracle range_validation=Pending network=Pending cortex_finality=Pending

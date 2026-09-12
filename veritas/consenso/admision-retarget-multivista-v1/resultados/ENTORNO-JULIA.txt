@@ -1,0 +1,14 @@
+# ARM-v0.1 — registro de ejecución 2026-09-12 (enmienda Z0)
+# command: env JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 JULIA_PKG_PRECOMPILE_AUTO=0 timeout 120s veritas/julia.sh --project=veritas/consenso/admision-retarget-multivista-v1 -e 'using LinearAlgebra, Pkg; println("julia_version=", VERSION); println("cpu_name=", Sys.CPU_NAME); println("cpu_threads=", Sys.CPU_THREADS); println("default_threads=", Threads.nthreads(:default)); println("interactive_threads=", Threads.nthreads(:interactive)); println("blas_threads=", BLAS.get_num_threads()); println("blas=", BLAS.get_config()); Pkg.status()'
+# exit_code: 0
+julia_version=1.13.0
+cpu_name=znver5
+cpu_threads=32
+default_threads=1
+interactive_threads=0
+blas_threads=1
+blas=LBTConfig([ILP64] libopenblas64_.so)
+Project AdmisionRetargetMultivista v0.1.0
+Status `~/zeo/ZEROX/deepseek/z0-no-op-v1/arbol/veritas/consenso/admision-retarget-multivista-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [c3a54625] JET v0.12.1

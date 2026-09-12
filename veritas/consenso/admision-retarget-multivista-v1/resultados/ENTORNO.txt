@@ -1,0 +1,7 @@
+ARM-v0.1; fecha de ejecución: 2026-09-12 (enmienda Z0)
+Raíz: /home/katana/zeo/ZEROX/deepseek/z0-no-op-v1/arbol (copia de trabajo sin .git)
+HEAD de origen: 7b783d469fbae5722a0ae014b5e212ed6999eb2b (según LINEA-BASE.md del encargo)
+Worktree: copia fiel verificada contra la línea base; cambios de la enmienda Z0 sin commitear.
+Fuentes: lscpu; /proc/meminfo; salida Julia/Pkg/BLAS en ENTORNO-JULIA.txt.
+CPU: AMD Ryzen 9 9950X3D 16-Core Processor, 16 núcleos físicos, 32 hilos lógicos, 1 NUMA.
+MemTotal del sistema: 129392000 kB según /proc/meminfo (unidad Linux equivalente a KiB).

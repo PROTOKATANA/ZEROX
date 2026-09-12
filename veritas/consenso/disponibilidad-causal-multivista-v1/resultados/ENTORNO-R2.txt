@@ -1,0 +1,22 @@
+fecha=2026-09-11
+model=DCM-v0.1
+revision=2
+git_head=7b783d469fbae5722a0ae014b5e212ed6999eb2b
+source_state=worktree_with_existing_changes; HUELLAS.sha256 identifies current inputs
+cpu=AMD Ryzen 9 9950X3D
+memory_total_kib=129392000
+rustc=1.97.0-nightly (20de910db 2026-05-02)
+randomness=none
+budget_reference=1 Julia thread; 8 GiB RAM; 2 GiB new disk; 30 min per suite
+budget_rust=2 cargo jobs; 4 GiB RAM; 512 MiB new disk; 20 min
+julia_version=1.13.0
+cpu_name=znver5
+cpu_threads=32
+default_threads=1
+interactive_threads=0
+blas_threads=1
+blas=LBTConfig([ILP64] libopenblas64_.so)
+Project DisponibilidadCausalMultivista v0.1.0
+Status `~/zeo/ZEROX/veritas/consenso/disponibilidad-causal-multivista-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [c3a54625] JET v0.12.1

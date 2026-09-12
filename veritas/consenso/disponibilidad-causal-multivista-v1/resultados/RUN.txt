@@ -1,0 +1,3 @@
+model=DCM-v0.1 status=structural_not_adopted
+fixture_cases=12 fixture_assertions=118
+retarget=Pending branch_weight_without_body=Pending network_resources=Pending

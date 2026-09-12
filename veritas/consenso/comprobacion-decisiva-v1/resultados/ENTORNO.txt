@@ -1,0 +1,19 @@
+# comprobacion-decisiva-v1 — entorno de ejecución 2026-09-12 (enmienda Z0)
+# fecha: 2026-09-12T21:25:15+02:00
+# git: origen 7b783d4 (7b783d469fbae5722a0ae014b5e212ed6999eb2b); arbol sin .git local
+# maquina:
+Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+# cpu: AMD Ryzen 9 9950X3D 16-Core Processor
+# cpus/hilos: 32
+# memoria visible: 123Gi
+
+VERSION=1.13.0
+threads=1
+CPU_NAME=znver5
+julia BLAS threads env=1
+--- Pkg.status ---
+Project ComprobacionDecisiva v0.1.0
+Status `~/zeo/ZEROX/deepseek/z0-no-op-v1/arbol/veritas/consenso/comprobacion-decisiva-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [c3a54625] JET v0.12.1
+exit_code=0

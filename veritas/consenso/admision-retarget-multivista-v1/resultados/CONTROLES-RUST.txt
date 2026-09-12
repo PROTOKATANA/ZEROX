@@ -1,0 +1,5 @@
+# ARM-v0.1 — registro de ejecución 2026-09-12 (enmienda Z0)
+# command: cargo clippy --offline --locked -j 2 -p zx-consensus --test retarget_causal_endogeno_modelo -- -D warnings
+# exit_code: 0
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/z0-no-op-v1/arbol/crates/zx-consensus)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s

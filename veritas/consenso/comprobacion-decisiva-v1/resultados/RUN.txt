@@ -1,0 +1,7 @@
+model=comprobacion-decisiva-v1 seed=20260912 rng=none acceptance=exact_economic_convergence
+node_convergence=true independent_progress_ana=true independent_progress_bruno=true pending_then_reproduced=true
+payments=6 consumptions=6 total_paid=3000 total_consumed=5500 retarget_equal=true
+blue_weight_dedup=5 naive_weight=6 naive_detected=true
+double_spend_invalid_unpublished=true same_window_double_spend=true
+local_clock_detected=true heldzero_convergencia=true
+range_validation=Pending network=Pending cortex_finality=Pending

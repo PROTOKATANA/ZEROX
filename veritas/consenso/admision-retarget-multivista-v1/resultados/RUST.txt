@@ -1,0 +1,24 @@
+# ARM-v0.1 — registro de ejecución 2026-09-12 (enmienda Z0)
+# command: cargo test --offline --locked -j 2 -p zx-consensus --test retarget_causal_endogeno_modelo -- --test-threads=1
+# exit_code: 0
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/z0-no-op-v1/arbol/crates/zx-consensus)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/retarget_causal_endogeno_modelo.rs (target/debug/deps/retarget_causal_endogeno_modelo-4ac39c8d527c43c2)
+
+running 13 tests
+test arm_frontera::errores_de_marco_y_overflow_no_publican ... ok
+test arm_frontera::held_zero_con_delay_dos_es_no_op_y_converge_con_julia ... ok
+test arm_frontera::missed_causal_y_ventana_vacia_no_se_confunden_con_pending ... ok
+test arm_frontera::reloj_local_diverge_con_los_mismos_ids_y_fronteras_19_20_21 ... ok
+test arm_frontera::reorg_reemplaza_agendas_y_prefijo_o_genesis_retiraran_el_sufijo ... ok
+test arm_frontera::replay_causal_tardio_converge_con_fuentes_y_activaciones_exactas ... ok
+test arm_frontera::undo_rce_restaura_rango_agenda_snapshot_y_eventos ... ok
+test cada_rama_realimenta_su_propio_rango_y_undo_no_contamina ... ok
+test dominio_u128_se_rechaza_antes_del_kernel ... ok
+test error_transaccional_no_publica_estado_parcial ... ok
+test fixtures_enteros_compartidos_con_julia ... ok
+test pending_no_elude_validacion_de_ventana ... ok
+test sello_y_pago_salen_del_mismo_journal_sin_retroactividad ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

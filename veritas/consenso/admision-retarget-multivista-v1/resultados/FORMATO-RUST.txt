@@ -1,0 +1,3 @@
+# ARM-v0.1 — registro de ejecución 2026-09-12 (enmienda Z0)
+# command: rustfmt --edition 2021 --check crates/zx-consensus/tests/retarget_causal_endogeno_modelo.rs crates/zx-consensus/tests/soporte/admision_retarget_multivista_frontera.rs
+# exit_code: 0

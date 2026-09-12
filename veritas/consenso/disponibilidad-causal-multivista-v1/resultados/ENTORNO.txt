@@ -1,0 +1,15 @@
+fecha=2026-09-11
+git_head=7b783d469fbae5722a0ae014b5e212ed6999eb2b
+julia_version=1.13.0
+cpu=AMD Ryzen 9 9950X3D
+cpu_name=znver5
+cpu_threads=32
+memory_total_kib=129392000
+julia_threads_default=1
+julia_threads_interactive=0
+openblas_threads=1
+blas=LBTConfig([ILP64] libopenblas64_.so)
+direct_packages=BenchmarkTools 1.8.0; JET 0.12.1
+budget_reference=1 CPU thread; 8 GiB RAM; 2 GiB new disk; 30 min per suite
+budget_pilot=max 8 CPU threads; 16 GiB RAM; 10 GiB temporary disk; 2 h total
+observed=no timeout; far below memory/disk budget
