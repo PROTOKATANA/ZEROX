@@ -1,0 +1,23 @@
+name = "DeltaMedido"
+uuid = "c50937d1-d69d-4a6c-b7d1-5e41fc29b157"
+version = "0.1.0"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
+
+[compat]
+BenchmarkTools = "1.8"
+DataStructures = "0.19"
+Distributions = "0.25"
+StableRNGs = "1"
+julia = "1.13"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

@@ -1,0 +1,23 @@
+fecha=2026-09-12T21:44:01Z
+git_head=f1a10a84e6d8057de2914d608b449c71ae25e959
+julia=1.13.0
+proyecto=/home/katana/zeo/ZEROX/deepseek/veritas/finalidad/delta-medido-v1/Project.toml
+hilos_julia=24
+cpu=znver5
+cpu_hilos=32
+ram_bytes=132497408000
+openblas_threads=1
+julia_num_threads_env=24
+semilla_maestra=23130
+pared_seg=6.3
+cpu_seg=134.11
+argv=--escalado
+--- Pkg.status ---
+Project DeltaMedido v0.1.0
+Status `~/zeo/ZEROX/deepseek/veritas/finalidad/delta-medido-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [864edb3b] DataStructures v0.19.6
+  [31c24e10] Distributions v0.25.131
+  [860ef19b] StableRNGs v1.0.4
+  [9a3f8284] Random v1.11.0
+

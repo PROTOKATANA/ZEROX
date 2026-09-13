@@ -1,0 +1,1 @@
+julia --project=. --caso --n 1000 --topologia regular --tam-bloque 1000000 --horizonte 300 --replicas 12 --semilla 0x5A5A

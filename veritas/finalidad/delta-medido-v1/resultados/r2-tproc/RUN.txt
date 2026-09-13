@@ -1,0 +1,1 @@
+julia --project=. --r2 --r2-subtarea tproc

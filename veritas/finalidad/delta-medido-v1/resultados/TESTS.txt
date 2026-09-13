@@ -1,0 +1,2 @@
+Test Summary: |  Pass  Total  Time
+DeltaMedido   | 25598  25598  2.7s
