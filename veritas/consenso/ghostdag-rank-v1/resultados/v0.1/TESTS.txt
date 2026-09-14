@@ -1,0 +1,4 @@
+== TESTS GDR-v0.1 — 2026-09-14 19:09:30 CEST ==
+comando: veritas/julia.sh --check-bounds=yes --project=deepseek/veritas/consenso/ghostdag-rank-v1 deepseek/veritas/consenso/ghostdag-rank-v1/test/runtests.jl (1 hilo)
+Test Summary: |   Pass   Total  Time
+GDR-v0.1      | 205968  205968  6.7s

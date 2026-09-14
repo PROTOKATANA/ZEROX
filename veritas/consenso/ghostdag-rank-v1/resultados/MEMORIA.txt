@@ -1,0 +1,21 @@
+== MEMORIA GDR-v0.2 ==
+git HEAD             = 9c2360d926ad8f4769fd5c7bcb8282ed7fd699d0
+fecha                = 2026-09-14 23:18:10
+julia VERSION        = 1.13.0
+hilos default        = 1
+CPU                  = znver5
+RAM total (GB)       = 123.4
+comando              = veritas/julia.sh --project=veritas/consenso/ghostdag-rank-v1 veritas/consenso/ghostdag-rank-v1/bench/memoria.jl
+seed                 = 0xb0e1
+(Base.summarysize del EstadoRapido tras n bloques y @allocated del último anadir!;
+ generador con ventana de padres 30, regla C por defecto. Memoria O(n²) en total:
+ est.anc guarda un BitSet de ancestros por bloque y blue_idents se copia por bloque.)
+
+n          summarysize (bytes)   bytes/bloque   @allocated último
+100                     151880           1519                3808
+200                     343752           1719                5232
+400                     797448           1994                2640
+800                    2102320           2628                4456
+1600                   5492472           3433                4680
+3200                  19056352           5955               12856
+6400                  57570520           8995               12824

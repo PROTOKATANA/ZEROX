@@ -1,0 +1,1 @@
+equivalencia oráculo/kernel: 600 DAGs aleatorios (n ∈ 4..114), todas exactas

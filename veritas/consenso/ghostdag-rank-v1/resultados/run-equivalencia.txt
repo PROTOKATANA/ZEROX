@@ -1,0 +1,11 @@
+git HEAD             = 00c14fa1386081375e1a44b8ac6a650bd24029ab
+fecha                = 2026-09-14 22:15:20
+julia VERSION        = 1.13.0
+hilos default        = 1
+hilos interactive    = 1
+CPU                  = znver5
+RAM total (GB)       = 123.4
+BLAS                 = /home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/../lib/julia/libopenblas64_.so
+comando              = run.jl --equivalencia 600
+seed                 = 0xacac10
+equivalencia oráculo/kernel: 600 DAGs aleatorios (n ∈ 4..114), todas exactas

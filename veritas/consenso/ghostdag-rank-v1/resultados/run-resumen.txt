@@ -1,0 +1,22 @@
+git HEAD             = 00c14fa1386081375e1a44b8ac6a650bd24029ab
+fecha                = 2026-09-14 22:15:25
+julia VERSION        = 1.13.0
+hilos default        = 1
+hilos interactive    = 1
+CPU                  = znver5
+RAM total (GB)       = 123.4
+BLAS                 = /home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/../lib/julia/libopenblas64_.so
+comando              = run.jl --resumen
+seed                 = 0xb0e1
+== resumen kernel: coste por bloque y bits de blue_work ==
+(generador con ventana de padres 30: mergesets ≤ 180, bloques válidos)
+n       µs/bloque   bits máx. bw   bits máx. w   cota 3.5 (bits)
+100            2.2       133            129              135
+200            2.5       133            129              136
+400            3.2       134            129              137
+800            3.2       135            129              138
+1600           3.8       136            129              139
+3200           6.2       137            129              140
+6400           6.7       138            129              141
+peor caso analítico corregido (todo SR=0, todo azul), n=100000: 145 bits (dominio BW256 = 256 bits; cota anterior errónea con factor (k+1): 150 bits)
+peor caso analítico corregido (todo SR=0, todo azul), n=1000000000: 158 bits (dominio BW256 = 256 bits; cota anterior errónea con factor (k+1): 163 bits)
