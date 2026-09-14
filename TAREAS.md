@@ -32,6 +32,33 @@ de §7.2 **no es computable** hasta que la coloración sea determinista y acorda
 nodos. La elegibilidad ya dependía del color por R-FIN-8′, así que P1 no añade una dependencia
 nueva, pero la vuelve crítica para el pago.
 
+**Dirección de los desempates — DECIDIDO POR KATANA (2026-09-14): opción C de GDR-v0.1 (D-1/D-2).**
+
+- **Orden del mergeset**, el mismo para colorear (U3″) y para aplicar (R-FIN-8′(4)):
+  `(blue_work, solution_distance, hash)` ascendente, con el hash comparado byte a byte.
+- **Padre seleccionado** (y punta virtual): el de mayor `blue_work`. Si hay empate, el que va
+  primero en ese orden: menor `solution_distance` y, después, menor hash.
+- **`rank` para P1:** la misma tupla, en orden ascendente; gana el menor.
+- **Motivo:** dos hermanos con los mismos padres tienen siempre el mismo `blue_work`, así que el
+  desempate del padre es el caso común. Con C, el orden de aplicación entre hermanos y la copia
+  superviviente de un billete son los mismos tanto si llegan como padres como si llegan dentro de
+  un mergeset. Con la lectura `:spec`, entre hermanos va primero el de mayor `solution_distance`;
+  la lectura `:python` reproduce el error de `r8c_gd.py`.
+- **Coste:** se aparta del patrón de Kaspa (padre = máximo del mismo orden) y obliga a redactar
+  dos reglas en vez de una.
+- **Comprobado por Claude** (regla sustituida en memoria sobre GDR-v0.1, sin tocar el
+  instrumento):
+  - hermanos y copias, coherentes;
+  - oráculo = kernel en 1 800 DAGs con k de 1 a 30;
+  - 1 000 órdenes de llegada idénticos en dos familias;
+  - todo padre tiene menor `rank` que su hijo.
+- **Pendiente derivado:**
+  - implementar el modo en GDR-v0.1 con sus tests (hoy solo existe la parte de
+    `solution_distance`, `SP_PYTHON` + `MERGE_SPEC`; falta el hash menor);
+  - corregir DERIVACIONES (horas inventadas) y las demostraciones de `rank`;
+  - redactar §7.2 y §11 del SPEC;
+  - el dominio y el desbordamiento de `blue_work` (D-5) siguen abiertos.
+
 ### 1.4 · La cabecera DAG no existe
 
 Padres múltiples, compromisos, formato y límites de la justificación PoT, y tamaño final: todo
