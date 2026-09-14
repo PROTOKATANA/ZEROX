@@ -1,0 +1,3071 @@
+operacion,detalle,lote,muestra,ns
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91412607
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91366388
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91744391
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91179872
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91115013
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91843670
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91148843
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91991416
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91242940
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91213091
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91463626
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91038194
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91285970
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91949088
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91682812
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91741631
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91904098
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91514286
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91848360
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91359179
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91369318
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91612464
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91446257
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91348418
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91760251
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91143233
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91519136
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91377708
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91109463
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,1,91779581
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101829349
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102119754
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101861599
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102785370
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101620813
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101845599
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102634963
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101680672
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102136683
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101946307
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102853770
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102127884
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101851779
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102428328
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101808789
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102079474
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102063164
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101949416
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102159113
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101909528
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102009506
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102193222
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102005436
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102112143
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102092534
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102087794
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102201501
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101885708
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,102056454
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,1,101617083
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191051138
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191426402
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191163736
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191357432
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191352753
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191642947
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191271684
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191378882
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192414302
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191455560
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191174626
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191379863
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191647087
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192987931
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192639878
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192036240
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192243435
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192375763
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,190889321
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192758506
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192790455
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192605059
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192479461
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192019570
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192808565
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191402452
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191059258
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,191658137
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192441092
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,1,192337534
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,959942553
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,969840704
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,1033088509
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,1015547293
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,972096231
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,965121944
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,965158213
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,967242143
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,960349995
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,961701659
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,1007310370
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,1055744607
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,990211966
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,961073911
+G-pot-generica,200032000 iteraciones, 8 checkpoints,1,963517824
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205267
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204577
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201817
+A,verify_solution ChiaTable K=20, piece_check_params,1,1211627
+A,verify_solution ChiaTable K=20, piece_check_params,1,1209637
+A,verify_solution ChiaTable K=20, piece_check_params,1,1198778
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203497
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204646
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202258
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202618
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202226
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202667
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203238
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201448
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203987
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201427
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204557
+A,verify_solution ChiaTable K=20, piece_check_params,1,1206447
+A,verify_solution ChiaTable K=20, piece_check_params,1,1211247
+A,verify_solution ChiaTable K=20, piece_check_params,1,1208257
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204367
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203857
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204078
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203628
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205617
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203636
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201217
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205107
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201937
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201007
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203557
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201658
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200537
+A,verify_solution ChiaTable K=20, piece_check_params,1,1206317
+A,verify_solution ChiaTable K=20, piece_check_params,1,1222697
+A,verify_solution ChiaTable K=20, piece_check_params,1,1207787
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202317
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202027
+A,verify_solution ChiaTable K=20, piece_check_params,1,1206717
+A,verify_solution ChiaTable K=20, piece_check_params,1,1208406
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202748
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204358
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204158
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203506
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203937
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201987
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205527
+A,verify_solution ChiaTable K=20, piece_check_params,1,1222727
+A,verify_solution ChiaTable K=20, piece_check_params,1,1211067
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205087
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202037
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200537
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203727
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205457
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204426
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202418
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202088
+A,verify_solution ChiaTable K=20, piece_check_params,1,1199487
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201718
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205088
+A,verify_solution ChiaTable K=20, piece_check_params,1,1208967
+A,verify_solution ChiaTable K=20, piece_check_params,1,1206847
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201417
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203927
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205957
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203087
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202847
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201217
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205977
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202437
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200107
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200437
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200437
+A,verify_solution ChiaTable K=20, piece_check_params,1,1204947
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201227
+A,verify_solution ChiaTable K=20, piece_check_params,1,1199867
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201777
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203517
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202167
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205207
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201807
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202657
+A,verify_solution ChiaTable K=20, piece_check_params,1,1206247
+A,verify_solution ChiaTable K=20, piece_check_params,1,1199317
+A,verify_solution ChiaTable K=20, piece_check_params,1,1203117
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200647
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200217
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205807
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205367
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201017
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201537
+A,verify_solution ChiaTable K=20, piece_check_params,1,1205677
+A,verify_solution ChiaTable K=20, piece_check_params,1,1207557
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202747
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202747
+A,verify_solution ChiaTable K=20, piece_check_params,1,1201178
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200168
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200187
+A,verify_solution ChiaTable K=20, piece_check_params,1,1200717
+A,verify_solution ChiaTable K=20, piece_check_params,1,1202407
+B-pos,PoS sola ChiaTable K=20,1,9140
+B-pos,PoS sola ChiaTable K=20,1,9100
+B-pos,PoS sola ChiaTable K=20,1,9100
+B-pos,PoS sola ChiaTable K=20,1,9110
+B-pos,PoS sola ChiaTable K=20,1,9120
+B-pos,PoS sola ChiaTable K=20,1,9110
+B-pos,PoS sola ChiaTable K=20,1,9110
+B-pos,PoS sola ChiaTable K=20,1,9120
+B-pos,PoS sola ChiaTable K=20,1,9139
+B-pos,PoS sola ChiaTable K=20,1,9160
+B-pos,PoS sola ChiaTable K=20,1,9180
+B-pos,PoS sola ChiaTable K=20,1,9180
+B-pos,PoS sola ChiaTable K=20,1,9169
+B-pos,PoS sola ChiaTable K=20,1,9190
+B-pos,PoS sola ChiaTable K=20,1,9170
+B-pos,PoS sola ChiaTable K=20,1,9170
+B-pos,PoS sola ChiaTable K=20,1,9170
+B-pos,PoS sola ChiaTable K=20,1,9130
+B-pos,PoS sola ChiaTable K=20,1,9120
+B-pos,PoS sola ChiaTable K=20,1,9120
+B-pos,PoS sola ChiaTable K=20,1,9150
+B-pos,PoS sola ChiaTable K=20,1,9100
+B-pos,PoS sola ChiaTable K=20,1,9130
+B-pos,PoS sola ChiaTable K=20,1,9129
+B-pos,PoS sola ChiaTable K=20,1,9140
+B-pos,PoS sola ChiaTable K=20,1,9120
+B-pos,PoS sola ChiaTable K=20,1,9140
+B-pos,PoS sola ChiaTable K=20,1,9139
+B-pos,PoS sola ChiaTable K=20,1,9140
+B-pos,PoS sola ChiaTable K=20,1,9130
+B-pos,PoS sola ChiaTable K=20,1,9120
+B-pos,PoS sola ChiaTable K=20,1,9120
+B-pos,PoS sola ChiaTable K=20,1,9110
+B-pos,PoS sola ChiaTable K=20,1,9160
+B-pos,PoS sola ChiaTable K=20,1,9180
+B-pos,PoS sola ChiaTable K=20,1,9170
+B-pos,PoS sola ChiaTable K=20,1,9170
+B-pos,PoS sola ChiaTable K=20,1,9400
+B-pos,PoS sola ChiaTable K=20,1,9169
+B-pos,PoS sola ChiaTable K=20,1,9180
+B-pos,PoS sola ChiaTable K=20,1,9190
+B-pos,PoS sola ChiaTable K=20,1,9180
+B-pos,PoS sola ChiaTable K=20,1,9199
+B-pos,PoS sola ChiaTable K=20,1,9180
+B-pos,PoS sola ChiaTable K=20,1,9200
+B-pos,PoS sola ChiaTable K=20,1,9200
+B-pos,PoS sola ChiaTable K=20,1,9190
+B-pos,PoS sola ChiaTable K=20,1,9170
+B-pos,PoS sola ChiaTable K=20,1,9170
+B-pos,PoS sola ChiaTable K=20,1,9200
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,587259
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589579
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589029
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,685316
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,692447
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,611018
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,595269
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,593199
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,590409
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,592779
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589238
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,592269
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,590249
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589368
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,592159
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,588559
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,594629
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,590529
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589359
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,592699
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,588479
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,590169
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,586379
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,587809
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,588019
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,585799
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589669
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,588589
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589989
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,599159
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,790915
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,694157
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,594319
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,594159
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,595859
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,594958
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,588829
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,591509
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,587958
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,590719
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589829
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,588729
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,591509
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,589139
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,591238
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,590539
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,588288
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,590799
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,585059
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,587999
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15480
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15420
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15449
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15450
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15470
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15440
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15410
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15439
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15450
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15410
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15420
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15459
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15450
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15439
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15449
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15460
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15469
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15450
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15419
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15470
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15449
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15440
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15450
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15449
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15420
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15450
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15460
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15439
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15460
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15440
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15429
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15810
+C,sello Ed25519 ZIP-215 sobre 492 B,1,17999
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15460
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15460
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15369
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15380
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15399
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15410
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15400
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15389
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15290
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15210
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15250
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15199
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15240
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15219
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15219
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15229
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15209
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15200
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15239
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15200
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15229
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15189
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15259
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15220
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15219
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15200
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15240
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15219
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15240
+C,sello Ed25519 ZIP-215 sobre 492 B,1,17719
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15200
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15229
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15210
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15230
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15270
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15159
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15150
+C,sello Ed25519 ZIP-215 sobre 492 B,1,15150
+D-92,block_hash cabecera 92 B (x100, dividido),1,297
+D-92,block_hash cabecera 92 B (x100, dividido),1,300
+D-92,block_hash cabecera 92 B (x100, dividido),1,297
+D-92,block_hash cabecera 92 B (x100, dividido),1,297
+D-92,block_hash cabecera 92 B (x100, dividido),1,298
+D-92,block_hash cabecera 92 B (x100, dividido),1,287
+D-92,block_hash cabecera 92 B (x100, dividido),1,280
+D-92,block_hash cabecera 92 B (x100, dividido),1,302
+D-92,block_hash cabecera 92 B (x100, dividido),1,305
+D-92,block_hash cabecera 92 B (x100, dividido),1,264
+D-92,block_hash cabecera 92 B (x100, dividido),1,330
+D-92,block_hash cabecera 92 B (x100, dividido),1,329
+D-92,block_hash cabecera 92 B (x100, dividido),1,335
+D-92,block_hash cabecera 92 B (x100, dividido),1,332
+D-92,block_hash cabecera 92 B (x100, dividido),1,297
+D-92,block_hash cabecera 92 B (x100, dividido),1,267
+D-92,block_hash cabecera 92 B (x100, dividido),1,278
+D-92,block_hash cabecera 92 B (x100, dividido),1,296
+D-92,block_hash cabecera 92 B (x100, dividido),1,234
+D-92,block_hash cabecera 92 B (x100, dividido),1,216
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,221
+D-92,block_hash cabecera 92 B (x100, dividido),1,223
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,221
+D-92,block_hash cabecera 92 B (x100, dividido),1,234
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,234
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,224
+D-92,block_hash cabecera 92 B (x100, dividido),1,233
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,221
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,221
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,245
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,221
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,234
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,263
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,277
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,218
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,218
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,254
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,236
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-92,block_hash cabecera 92 B (x100, dividido),1,220
+D-92,block_hash cabecera 92 B (x100, dividido),1,219
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1193
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1037
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1030
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1035
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1037
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1040
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1005
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1006
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1037
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1006
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1006
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1005
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1005
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1005
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1107
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1233
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1224
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1035
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1023
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1143
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1164
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1088
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1059
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1064
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1050
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1007
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1046
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1035
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1041
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1008
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1044
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1039
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1044
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1032
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1026
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1044
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1083
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1188
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1350
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1615
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1296
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1063
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1441
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1587
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1078
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1042
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1079
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1051
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1009
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1048
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1010
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1053
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1030
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1012
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1011
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1014
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1013
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),1,1068
+E-571,merkle_root 571 txids,1,124508
+E-571,merkle_root 571 txids,1,124888
+E-571,merkle_root 571 txids,1,124617
+E-571,merkle_root 571 txids,1,124608
+E-571,merkle_root 571 txids,1,124497
+E-571,merkle_root 571 txids,1,128258
+E-571,merkle_root 571 txids,1,124547
+E-571,merkle_root 571 txids,1,124248
+E-571,merkle_root 571 txids,1,124367
+E-571,merkle_root 571 txids,1,124508
+E-571,merkle_root 571 txids,1,131657
+E-571,merkle_root 571 txids,1,149707
+E-571,merkle_root 571 txids,1,186877
+E-571,merkle_root 571 txids,1,190066
+E-571,merkle_root 571 txids,1,181136
+E-571,merkle_root 571 txids,1,184607
+E-571,merkle_root 571 txids,1,194646
+E-571,merkle_root 571 txids,1,163467
+E-571,merkle_root 571 txids,1,124808
+E-571,merkle_root 571 txids,1,128427
+E-571,merkle_root 571 txids,1,124968
+E-571,merkle_root 571 txids,1,125227
+E-571,merkle_root 571 txids,1,125088
+E-571,merkle_root 571 txids,1,125217
+E-571,merkle_root 571 txids,1,124968
+E-571,merkle_root 571 txids,1,135377
+E-571,merkle_root 571 txids,1,126088
+E-571,merkle_root 571 txids,1,125907
+E-571,merkle_root 571 txids,1,126058
+E-571,merkle_root 571 txids,1,126217
+E-571,merkle_root 571 txids,1,126068
+E-571,merkle_root 571 txids,1,126177
+E-571,merkle_root 571 txids,1,128558
+E-571,merkle_root 571 txids,1,126287
+E-571,merkle_root 571 txids,1,125678
+E-571,merkle_root 571 txids,1,125267
+E-571,merkle_root 571 txids,1,125458
+E-571,merkle_root 571 txids,1,125357
+E-571,merkle_root 571 txids,1,125308
+E-571,merkle_root 571 txids,1,125357
+E-571,merkle_root 571 txids,1,128498
+E-571,merkle_root 571 txids,1,125217
+E-571,merkle_root 571 txids,1,125268
+E-571,merkle_root 571 txids,1,125337
+E-571,merkle_root 571 txids,1,125078
+E-571,merkle_root 571 txids,1,125258
+E-571,merkle_root 571 txids,1,125388
+E-571,merkle_root 571 txids,1,125168
+E-571,merkle_root 571 txids,1,128428
+E-571,merkle_root 571 txids,1,125367
+E-571,merkle_root 571 txids,1,125188
+E-571,merkle_root 571 txids,1,125087
+E-571,merkle_root 571 txids,1,124988
+E-571,merkle_root 571 txids,1,125257
+E-571,merkle_root 571 txids,1,125148
+E-571,merkle_root 571 txids,1,129507
+E-571,merkle_root 571 txids,1,125278
+E-571,merkle_root 571 txids,1,125047
+E-571,merkle_root 571 txids,1,124938
+E-571,merkle_root 571 txids,1,125008
+E-571,merkle_root 571 txids,1,125128
+E-571,merkle_root 571 txids,1,125078
+E-571,merkle_root 571 txids,1,124968
+E-571,merkle_root 571 txids,1,128328
+E-571,merkle_root 571 txids,1,124808
+E-571,merkle_root 571 txids,1,125108
+E-571,merkle_root 571 txids,1,124797
+E-571,merkle_root 571 txids,1,124978
+E-571,merkle_root 571 txids,1,124787
+E-571,merkle_root 571 txids,1,124858
+E-571,merkle_root 571 txids,1,124627
+E-571,merkle_root 571 txids,1,127768
+E-571,merkle_root 571 txids,1,125027
+E-571,merkle_root 571 txids,1,124808
+E-571,merkle_root 571 txids,1,124817
+E-571,merkle_root 571 txids,1,125068
+E-571,merkle_root 571 txids,1,124947
+E-571,merkle_root 571 txids,1,125218
+E-571,merkle_root 571 txids,1,128467
+E-571,merkle_root 571 txids,1,124938
+E-571,merkle_root 571 txids,1,124837
+E-571,merkle_root 571 txids,1,124658
+E-571,merkle_root 571 txids,1,124917
+E-571,merkle_root 571 txids,1,124678
+E-571,merkle_root 571 txids,1,124867
+E-571,merkle_root 571 txids,1,124738
+E-571,merkle_root 571 txids,1,127617
+E-571,merkle_root 571 txids,1,124948
+E-571,merkle_root 571 txids,1,124787
+E-571,merkle_root 571 txids,1,124968
+E-571,merkle_root 571 txids,1,124958
+E-571,merkle_root 571 txids,1,124928
+E-571,merkle_root 571 txids,1,125068
+E-571,merkle_root 571 txids,1,125108
+E-571,merkle_root 571 txids,1,128958
+E-571,merkle_root 571 txids,1,124878
+E-571,merkle_root 571 txids,1,124908
+E-571,merkle_root 571 txids,1,124987
+E-571,merkle_root 571 txids,1,124898
+E-571,merkle_root 571 txids,1,124797
+E-4464,merkle_root 4464 txids (techo Q1),1,968832
+E-4464,merkle_root 4464 txids (techo Q1),1,970782
+E-4464,merkle_root 4464 txids (techo Q1),1,970741
+E-4464,merkle_root 4464 txids (techo Q1),1,968191
+E-4464,merkle_root 4464 txids (techo Q1),1,967402
+E-4464,merkle_root 4464 txids (techo Q1),1,972251
+E-4464,merkle_root 4464 txids (techo Q1),1,970832
+E-4464,merkle_root 4464 txids (techo Q1),1,970431
+E-4464,merkle_root 4464 txids (techo Q1),1,968711
+E-4464,merkle_root 4464 txids (techo Q1),1,969262
+E-4464,merkle_root 4464 txids (techo Q1),1,968501
+E-4464,merkle_root 4464 txids (techo Q1),1,1009781
+E-4464,merkle_root 4464 txids (techo Q1),1,1091409
+E-4464,merkle_root 4464 txids (techo Q1),1,973541
+E-4464,merkle_root 4464 txids (techo Q1),1,977282
+E-4464,merkle_root 4464 txids (techo Q1),1,975091
+E-4464,merkle_root 4464 txids (techo Q1),1,971651
+E-4464,merkle_root 4464 txids (techo Q1),1,969852
+E-4464,merkle_root 4464 txids (techo Q1),1,971501
+E-4464,merkle_root 4464 txids (techo Q1),1,969252
+E-4464,merkle_root 4464 txids (techo Q1),1,970191
+E-4464,merkle_root 4464 txids (techo Q1),1,969541
+E-4464,merkle_root 4464 txids (techo Q1),1,968092
+E-4464,merkle_root 4464 txids (techo Q1),1,967961
+E-4464,merkle_root 4464 txids (techo Q1),1,969792
+E-4464,merkle_root 4464 txids (techo Q1),1,967211
+E-4464,merkle_root 4464 txids (techo Q1),1,964932
+E-4464,merkle_root 4464 txids (techo Q1),1,974191
+E-4464,merkle_root 4464 txids (techo Q1),1,1332555
+E-4464,merkle_root 4464 txids (techo Q1),1,1019691
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),1,1
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,232
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,264
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,232
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,239
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,237
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,260
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),1,234
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91369528
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91478166
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91195441
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91251130
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91216741
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91441567
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91312259
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91476796
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91917237
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91573974
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91444086
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91562414
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91960257
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92830550
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92814611
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92623415
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,93432369
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,91630034
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92246841
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92538646
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92831740
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92407778
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92429738
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,93109055
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92547985
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92213102
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92819100
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92495567
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92787451
+G-pot-avx512f_vaes,200032000 iteraciones, 8 checkpoints,2,92478507
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101739341
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101567344
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102016435
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101922876
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101801119
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101957926
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101946116
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101820629
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102244650
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101978606
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101918267
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102004146
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101801239
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101879938
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101938246
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101573183
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102150413
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101846259
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102106144
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102500096
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102364259
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102863008
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102837589
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102563745
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102060924
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101975776
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102220312
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102079754
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,101973916
+G-pot-avx2_vaes,200032000 iteraciones, 8 checkpoints,2,102015315
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,190714344
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,190858811
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,190670655
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191362832
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191257683
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191200435
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191379822
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191129207
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191018019
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191164986
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191202655
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,190882141
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191351392
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,193089139
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,197160352
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,192201156
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191711785
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191737394
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191265834
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191524089
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191719715
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,192531649
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191681726
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191777744
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,192098868
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191969211
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191674776
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191508689
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,191819543
+G-pot-aes_sse41,200032000 iteraciones, 8 checkpoints,2,192419582
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,952493882
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,956062943
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,975373005
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,987653441
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,969674825
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,957407928
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,992129046
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,999283999
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,965699790
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,968509356
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,961664157
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,991462109
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,1001766613
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,984900154
+G-pot-generica,200032000 iteraciones, 8 checkpoints,2,1002265733
+A,verify_solution ChiaTable K=20, piece_check_params,2,1207607
+A,verify_solution ChiaTable K=20, piece_check_params,2,1206347
+A,verify_solution ChiaTable K=20, piece_check_params,2,1204497
+A,verify_solution ChiaTable K=20, piece_check_params,2,1214036
+A,verify_solution ChiaTable K=20, piece_check_params,2,1675788
+A,verify_solution ChiaTable K=20, piece_check_params,2,1636399
+A,verify_solution ChiaTable K=20, piece_check_params,2,1797846
+A,verify_solution ChiaTable K=20, piece_check_params,2,1355724
+A,verify_solution ChiaTable K=20, piece_check_params,2,1225416
+A,verify_solution ChiaTable K=20, piece_check_params,2,1218327
+A,verify_solution ChiaTable K=20, piece_check_params,2,1215256
+A,verify_solution ChiaTable K=20, piece_check_params,2,1211987
+A,verify_solution ChiaTable K=20, piece_check_params,2,1211597
+A,verify_solution ChiaTable K=20, piece_check_params,2,1207307
+A,verify_solution ChiaTable K=20, piece_check_params,2,1211007
+A,verify_solution ChiaTable K=20, piece_check_params,2,1207387
+A,verify_solution ChiaTable K=20, piece_check_params,2,1421072
+A,verify_solution ChiaTable K=20, piece_check_params,2,1478082
+A,verify_solution ChiaTable K=20, piece_check_params,2,1789226
+A,verify_solution ChiaTable K=20, piece_check_params,2,1348754
+A,verify_solution ChiaTable K=20, piece_check_params,2,1226067
+A,verify_solution ChiaTable K=20, piece_check_params,2,1219107
+A,verify_solution ChiaTable K=20, piece_check_params,2,1216607
+A,verify_solution ChiaTable K=20, piece_check_params,2,1441752
+A,verify_solution ChiaTable K=20, piece_check_params,2,1287805
+A,verify_solution ChiaTable K=20, piece_check_params,2,1213267
+A,verify_solution ChiaTable K=20, piece_check_params,2,1208267
+A,verify_solution ChiaTable K=20, piece_check_params,2,1208197
+A,verify_solution ChiaTable K=20, piece_check_params,2,1493201
+A,verify_solution ChiaTable K=20, piece_check_params,2,1728637
+A,verify_solution ChiaTable K=20, piece_check_params,2,1774176
+A,verify_solution ChiaTable K=20, piece_check_params,2,1239196
+A,verify_solution ChiaTable K=20, piece_check_params,2,1226757
+A,verify_solution ChiaTable K=20, piece_check_params,2,1216987
+A,verify_solution ChiaTable K=20, piece_check_params,2,1214037
+A,verify_solution ChiaTable K=20, piece_check_params,2,1212957
+A,verify_solution ChiaTable K=20, piece_check_params,2,1212047
+A,verify_solution ChiaTable K=20, piece_check_params,2,1212257
+A,verify_solution ChiaTable K=20, piece_check_params,2,1209157
+A,verify_solution ChiaTable K=20, piece_check_params,2,1209067
+A,verify_solution ChiaTable K=20, piece_check_params,2,1443532
+A,verify_solution ChiaTable K=20, piece_check_params,2,1621029
+A,verify_solution ChiaTable K=20, piece_check_params,2,1768096
+A,verify_solution ChiaTable K=20, piece_check_params,2,1242536
+A,verify_solution ChiaTable K=20, piece_check_params,2,1223037
+A,verify_solution ChiaTable K=20, piece_check_params,2,1217407
+A,verify_solution ChiaTable K=20, piece_check_params,2,1214437
+A,verify_solution ChiaTable K=20, piece_check_params,2,1215497
+A,verify_solution ChiaTable K=20, piece_check_params,2,1210637
+A,verify_solution ChiaTable K=20, piece_check_params,2,1212346
+A,verify_solution ChiaTable K=20, piece_check_params,2,1214877
+A,verify_solution ChiaTable K=20, piece_check_params,2,1207647
+A,verify_solution ChiaTable K=20, piece_check_params,2,1247906
+A,verify_solution ChiaTable K=20, piece_check_params,2,1453832
+A,verify_solution ChiaTable K=20, piece_check_params,2,1771077
+A,verify_solution ChiaTable K=20, piece_check_params,2,1400534
+A,verify_solution ChiaTable K=20, piece_check_params,2,1529900
+A,verify_solution ChiaTable K=20, piece_check_params,2,1223187
+A,verify_solution ChiaTable K=20, piece_check_params,2,1216197
+A,verify_solution ChiaTable K=20, piece_check_params,2,1215696
+A,verify_solution ChiaTable K=20, piece_check_params,2,1216237
+A,verify_solution ChiaTable K=20, piece_check_params,2,1212147
+A,verify_solution ChiaTable K=20, piece_check_params,2,1214336
+A,verify_solution ChiaTable K=20, piece_check_params,2,1210897
+A,verify_solution ChiaTable K=20, piece_check_params,2,1209667
+A,verify_solution ChiaTable K=20, piece_check_params,2,1208827
+A,verify_solution ChiaTable K=20, piece_check_params,2,1209997
+A,verify_solution ChiaTable K=20, piece_check_params,2,1213707
+A,verify_solution ChiaTable K=20, piece_check_params,2,1212216
+A,verify_solution ChiaTable K=20, piece_check_params,2,1304035
+A,verify_solution ChiaTable K=20, piece_check_params,2,1603120
+A,verify_solution ChiaTable K=20, piece_check_params,2,1763526
+A,verify_solution ChiaTable K=20, piece_check_params,2,1786226
+A,verify_solution ChiaTable K=20, piece_check_params,2,1240776
+A,verify_solution ChiaTable K=20, piece_check_params,2,1227297
+A,verify_solution ChiaTable K=20, piece_check_params,2,1218417
+A,verify_solution ChiaTable K=20, piece_check_params,2,1214606
+A,verify_solution ChiaTable K=20, piece_check_params,2,1218017
+A,verify_solution ChiaTable K=20, piece_check_params,2,1210137
+A,verify_solution ChiaTable K=20, piece_check_params,2,1207527
+A,verify_solution ChiaTable K=20, piece_check_params,2,1208817
+A,verify_solution ChiaTable K=20, piece_check_params,2,1205547
+A,verify_solution ChiaTable K=20, piece_check_params,2,1593300
+A,verify_solution ChiaTable K=20, piece_check_params,2,1742777
+A,verify_solution ChiaTable K=20, piece_check_params,2,1657638
+A,verify_solution ChiaTable K=20, piece_check_params,2,1243106
+A,verify_solution ChiaTable K=20, piece_check_params,2,1223017
+A,verify_solution ChiaTable K=20, piece_check_params,2,1215456
+A,verify_solution ChiaTable K=20, piece_check_params,2,1214767
+A,verify_solution ChiaTable K=20, piece_check_params,2,1513821
+A,verify_solution ChiaTable K=20, piece_check_params,2,1210417
+A,verify_solution ChiaTable K=20, piece_check_params,2,1223187
+A,verify_solution ChiaTable K=20, piece_check_params,2,1213007
+A,verify_solution ChiaTable K=20, piece_check_params,2,1244736
+A,verify_solution ChiaTable K=20, piece_check_params,2,1472732
+A,verify_solution ChiaTable K=20, piece_check_params,2,1750607
+A,verify_solution ChiaTable K=20, piece_check_params,2,1605910
+A,verify_solution ChiaTable K=20, piece_check_params,2,1228566
+A,verify_solution ChiaTable K=20, piece_check_params,2,1218147
+A,verify_solution ChiaTable K=20, piece_check_params,2,1217017
+B-pos,PoS sola ChiaTable K=20,2,9200
+B-pos,PoS sola ChiaTable K=20,2,9220
+B-pos,PoS sola ChiaTable K=20,2,9220
+B-pos,PoS sola ChiaTable K=20,2,9189
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9240
+B-pos,PoS sola ChiaTable K=20,2,9230
+B-pos,PoS sola ChiaTable K=20,2,9239
+B-pos,PoS sola ChiaTable K=20,2,9240
+B-pos,PoS sola ChiaTable K=20,2,9200
+B-pos,PoS sola ChiaTable K=20,2,9200
+B-pos,PoS sola ChiaTable K=20,2,9200
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9210
+B-pos,PoS sola ChiaTable K=20,2,9209
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9240
+B-pos,PoS sola ChiaTable K=20,2,9249
+B-pos,PoS sola ChiaTable K=20,2,9260
+B-pos,PoS sola ChiaTable K=20,2,9240
+B-pos,PoS sola ChiaTable K=20,2,9280
+B-pos,PoS sola ChiaTable K=20,2,9230
+B-pos,PoS sola ChiaTable K=20,2,9250
+B-pos,PoS sola ChiaTable K=20,2,9250
+B-pos,PoS sola ChiaTable K=20,2,9230
+B-pos,PoS sola ChiaTable K=20,2,9270
+B-pos,PoS sola ChiaTable K=20,2,9260
+B-pos,PoS sola ChiaTable K=20,2,9250
+B-pos,PoS sola ChiaTable K=20,2,9229
+B-pos,PoS sola ChiaTable K=20,2,9260
+B-pos,PoS sola ChiaTable K=20,2,9230
+B-pos,PoS sola ChiaTable K=20,2,9220
+B-pos,PoS sola ChiaTable K=20,2,9189
+B-pos,PoS sola ChiaTable K=20,2,9180
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9170
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9200
+B-pos,PoS sola ChiaTable K=20,2,9189
+B-pos,PoS sola ChiaTable K=20,2,9180
+B-pos,PoS sola ChiaTable K=20,2,9180
+B-pos,PoS sola ChiaTable K=20,2,9180
+B-pos,PoS sola ChiaTable K=20,2,9189
+B-pos,PoS sola ChiaTable K=20,2,9200
+B-pos,PoS sola ChiaTable K=20,2,9590
+B-pos,PoS sola ChiaTable K=20,2,9180
+B-pos,PoS sola ChiaTable K=20,2,9190
+B-pos,PoS sola ChiaTable K=20,2,9170
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594059
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,595679
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,595718
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,591609
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594839
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,591849
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594149
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,592968
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,590449
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,593519
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,590898
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594009
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594569
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,590059
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594038
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,590859
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,593139
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,592489
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,592829
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,593338
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,776395
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,840304
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,879553
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,845154
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,896513
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,873494
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,631348
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,605739
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,604968
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,601309
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,596628
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,597109
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,593939
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,596539
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,595408
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,592519
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,593798
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,591629
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,595409
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,592819
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594329
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,594468
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,590239
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,593999
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,590658
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,791545
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,834344
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,852664
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,883614
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,881274
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15950
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15910
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15849
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15890
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15870
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15900
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15900
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15879
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15870
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15890
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15940
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15880
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15879
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15920
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15890
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15840
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15880
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15869
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15910
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15890
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15870
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15870
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15889
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15890
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15910
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15900
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15870
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15869
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15890
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15900
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15910
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15890
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15789
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15850
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15830
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15870
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15870
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15779
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15580
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15560
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15529
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15560
+C,sello Ed25519 ZIP-215 sobre 492 B,2,18459
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15550
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15530
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15509
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15500
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15519
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15520
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15520
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15519
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15540
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15530
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15530
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15509
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15560
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15520
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15569
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15490
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15509
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15550
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15510
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15529
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15540
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15520
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15540
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15530
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15539
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15530
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15520
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15509
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15550
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15529
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15510
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15520
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15519
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15520
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15489
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15530
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15540
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15509
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15490
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15550
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15540
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15540
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15499
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15470
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15460
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15449
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15440
+C,sello Ed25519 ZIP-215 sobre 492 B,2,17689
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15440
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15420
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15449
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15460
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15419
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15430
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15450
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15449
+C,sello Ed25519 ZIP-215 sobre 492 B,2,15440
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,216
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,241
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,264
+D-92,block_hash cabecera 92 B (x100, dividido),2,279
+D-92,block_hash cabecera 92 B (x100, dividido),2,283
+D-92,block_hash cabecera 92 B (x100, dividido),2,302
+D-92,block_hash cabecera 92 B (x100, dividido),2,273
+D-92,block_hash cabecera 92 B (x100, dividido),2,288
+D-92,block_hash cabecera 92 B (x100, dividido),2,293
+D-92,block_hash cabecera 92 B (x100, dividido),2,285
+D-92,block_hash cabecera 92 B (x100, dividido),2,285
+D-92,block_hash cabecera 92 B (x100, dividido),2,282
+D-92,block_hash cabecera 92 B (x100, dividido),2,289
+D-92,block_hash cabecera 92 B (x100, dividido),2,306
+D-92,block_hash cabecera 92 B (x100, dividido),2,294
+D-92,block_hash cabecera 92 B (x100, dividido),2,300
+D-92,block_hash cabecera 92 B (x100, dividido),2,284
+D-92,block_hash cabecera 92 B (x100, dividido),2,305
+D-92,block_hash cabecera 92 B (x100, dividido),2,308
+D-92,block_hash cabecera 92 B (x100, dividido),2,314
+D-92,block_hash cabecera 92 B (x100, dividido),2,320
+D-92,block_hash cabecera 92 B (x100, dividido),2,304
+D-92,block_hash cabecera 92 B (x100, dividido),2,309
+D-92,block_hash cabecera 92 B (x100, dividido),2,293
+D-92,block_hash cabecera 92 B (x100, dividido),2,307
+D-92,block_hash cabecera 92 B (x100, dividido),2,292
+D-92,block_hash cabecera 92 B (x100, dividido),2,313
+D-92,block_hash cabecera 92 B (x100, dividido),2,334
+D-92,block_hash cabecera 92 B (x100, dividido),2,330
+D-92,block_hash cabecera 92 B (x100, dividido),2,333
+D-92,block_hash cabecera 92 B (x100, dividido),2,312
+D-92,block_hash cabecera 92 B (x100, dividido),2,234
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,217
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,223
+D-92,block_hash cabecera 92 B (x100, dividido),2,244
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,220
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,220
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,220
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,243
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,243
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,261
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,219
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,222
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,218
+D-92,block_hash cabecera 92 B (x100, dividido),2,230
+D-92,block_hash cabecera 92 B (x100, dividido),2,355
+D-92,block_hash cabecera 92 B (x100, dividido),2,286
+D-92,block_hash cabecera 92 B (x100, dividido),2,329
+D-92,block_hash cabecera 92 B (x100, dividido),2,234
+D-92,block_hash cabecera 92 B (x100, dividido),2,270
+D-92,block_hash cabecera 92 B (x100, dividido),2,312
+D-92,block_hash cabecera 92 B (x100, dividido),2,335
+D-92,block_hash cabecera 92 B (x100, dividido),2,350
+D-92,block_hash cabecera 92 B (x100, dividido),2,343
+D-92,block_hash cabecera 92 B (x100, dividido),2,345
+D-92,block_hash cabecera 92 B (x100, dividido),2,345
+D-92,block_hash cabecera 92 B (x100, dividido),2,348
+D-92,block_hash cabecera 92 B (x100, dividido),2,350
+D-92,block_hash cabecera 92 B (x100, dividido),2,349
+D-92,block_hash cabecera 92 B (x100, dividido),2,348
+D-92,block_hash cabecera 92 B (x100, dividido),2,352
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1026
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1029
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1030
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1057
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1023
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1052
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1050
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1047
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1047
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1023
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1047
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1054
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1086
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1446
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1607
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1555
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1475
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1332
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1096
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1622
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1575
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1587
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1032
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1046
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1414
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1444
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1443
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1296
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1379
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1400
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1363
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1809
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1417
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1390
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1463
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1529
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1533
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1507
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1521
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1520
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1498
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1442
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1519
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1501
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1467
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1386
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1127
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1035
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1036
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1036
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1040
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1046
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1084
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1043
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1046
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1044
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1042
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1039
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1059
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1030
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1031
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1030
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1030
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1031
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1032
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1031
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1030
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1099
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1023
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1047
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1015
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1046
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1044
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1023
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1022
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1044
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1020
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1044
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1021
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1043
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1018
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1017
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1016
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1019
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1137
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1520
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1642
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1639
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1243
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1054
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1174
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1671
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1667
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1334
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1436
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1468
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1397
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1449
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1408
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1556
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1405
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1419
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1578
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1551
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1553
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1541
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1539
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1551
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1592
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1554
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1475
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1431
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1338
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1045
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1048
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1048
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1113
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1388
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1372
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1375
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1421
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1495
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1422
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1572
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1050
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1032
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1033
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1032
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1033
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1032
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1031
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1063
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1029
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1029
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1029
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1029
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1029
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1074
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1026
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1028
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1027
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1026
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1050
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1025
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+D-556,H_d replica sha3 0.12.0 sobre 556 B (x100, dividido),2,1024
+E-571,merkle_root 571 txids,2,124857
+E-571,merkle_root 571 txids,2,125238
+E-571,merkle_root 571 txids,2,124887
+E-571,merkle_root 571 txids,2,124868
+E-571,merkle_root 571 txids,2,124847
+E-571,merkle_root 571 txids,2,124798
+E-571,merkle_root 571 txids,2,124877
+E-571,merkle_root 571 txids,2,127948
+E-571,merkle_root 571 txids,2,124787
+E-571,merkle_root 571 txids,2,124968
+E-571,merkle_root 571 txids,2,124907
+E-571,merkle_root 571 txids,2,124768
+E-571,merkle_root 571 txids,2,124757
+E-571,merkle_root 571 txids,2,124838
+E-571,merkle_root 571 txids,2,124737
+E-571,merkle_root 571 txids,2,127358
+E-571,merkle_root 571 txids,2,124627
+E-571,merkle_root 571 txids,2,124768
+E-571,merkle_root 571 txids,2,124928
+E-571,merkle_root 571 txids,2,124668
+E-571,merkle_root 571 txids,2,124748
+E-571,merkle_root 571 txids,2,125008
+E-571,merkle_root 571 txids,2,125208
+E-571,merkle_root 571 txids,2,124998
+E-571,merkle_root 571 txids,2,124758
+E-571,merkle_root 571 txids,2,124717
+E-571,merkle_root 571 txids,2,124908
+E-571,merkle_root 571 txids,2,124857
+E-571,merkle_root 571 txids,2,124958
+E-571,merkle_root 571 txids,2,124827
+E-571,merkle_root 571 txids,2,129028
+E-571,merkle_root 571 txids,2,129447
+E-571,merkle_root 571 txids,2,125148
+E-571,merkle_root 571 txids,2,125367
+E-571,merkle_root 571 txids,2,124968
+E-571,merkle_root 571 txids,2,125077
+E-571,merkle_root 571 txids,2,124998
+E-571,merkle_root 571 txids,2,124757
+E-571,merkle_root 571 txids,2,130428
+E-571,merkle_root 571 txids,2,142217
+E-571,merkle_root 571 txids,2,161267
+E-571,merkle_root 571 txids,2,166617
+E-571,merkle_root 571 txids,2,170857
+E-571,merkle_root 571 txids,2,178876
+E-571,merkle_root 571 txids,2,166757
+E-571,merkle_root 571 txids,2,179686
+E-571,merkle_root 571 txids,2,199226
+E-571,merkle_root 571 txids,2,194407
+E-571,merkle_root 571 txids,2,126628
+E-571,merkle_root 571 txids,2,125208
+E-571,merkle_root 571 txids,2,144737
+E-571,merkle_root 571 txids,2,125427
+E-571,merkle_root 571 txids,2,127918
+E-571,merkle_root 571 txids,2,126697
+E-571,merkle_root 571 txids,2,163647
+E-571,merkle_root 571 txids,2,180516
+E-571,merkle_root 571 txids,2,177337
+E-571,merkle_root 571 txids,2,178556
+E-571,merkle_root 571 txids,2,168727
+E-571,merkle_root 571 txids,2,186296
+E-571,merkle_root 571 txids,2,170077
+E-571,merkle_root 571 txids,2,181086
+E-571,merkle_root 571 txids,2,187327
+E-571,merkle_root 571 txids,2,187897
+E-571,merkle_root 571 txids,2,188636
+E-571,merkle_root 571 txids,2,186706
+E-571,merkle_root 571 txids,2,188526
+E-571,merkle_root 571 txids,2,191887
+E-571,merkle_root 571 txids,2,181437
+E-571,merkle_root 571 txids,2,180026
+E-571,merkle_root 571 txids,2,132678
+E-571,merkle_root 571 txids,2,126927
+E-571,merkle_root 571 txids,2,127968
+E-571,merkle_root 571 txids,2,133457
+E-571,merkle_root 571 txids,2,127888
+E-571,merkle_root 571 txids,2,127938
+E-571,merkle_root 571 txids,2,127788
+E-571,merkle_root 571 txids,2,127768
+E-571,merkle_root 571 txids,2,127967
+E-571,merkle_root 571 txids,2,127788
+E-571,merkle_root 571 txids,2,128627
+E-571,merkle_root 571 txids,2,126218
+E-571,merkle_root 571 txids,2,126327
+E-571,merkle_root 571 txids,2,126148
+E-571,merkle_root 571 txids,2,126258
+E-571,merkle_root 571 txids,2,126128
+E-571,merkle_root 571 txids,2,125937
+E-571,merkle_root 571 txids,2,125618
+E-571,merkle_root 571 txids,2,127717
+E-571,merkle_root 571 txids,2,125518
+E-571,merkle_root 571 txids,2,125338
+E-571,merkle_root 571 txids,2,125208
+E-571,merkle_root 571 txids,2,125228
+E-571,merkle_root 571 txids,2,125238
+E-571,merkle_root 571 txids,2,125468
+E-571,merkle_root 571 txids,2,128297
+E-571,merkle_root 571 txids,2,125268
+E-571,merkle_root 571 txids,2,125368
+E-571,merkle_root 571 txids,2,125408
+E-571,merkle_root 571 txids,2,125238
+E-4464,merkle_root 4464 txids (techo Q1),2,976271
+E-4464,merkle_root 4464 txids (techo Q1),2,975171
+E-4464,merkle_root 4464 txids (techo Q1),2,974412
+E-4464,merkle_root 4464 txids (techo Q1),2,973701
+E-4464,merkle_root 4464 txids (techo Q1),2,973861
+E-4464,merkle_root 4464 txids (techo Q1),2,972062
+E-4464,merkle_root 4464 txids (techo Q1),2,972671
+E-4464,merkle_root 4464 txids (techo Q1),2,1007831
+E-4464,merkle_root 4464 txids (techo Q1),2,1005360
+E-4464,merkle_root 4464 txids (techo Q1),2,1308935
+E-4464,merkle_root 4464 txids (techo Q1),2,1453132
+E-4464,merkle_root 4464 txids (techo Q1),2,1077640
+E-4464,merkle_root 4464 txids (techo Q1),2,996681
+E-4464,merkle_root 4464 txids (techo Q1),2,983282
+E-4464,merkle_root 4464 txids (techo Q1),2,976802
+E-4464,merkle_root 4464 txids (techo Q1),2,973521
+E-4464,merkle_root 4464 txids (techo Q1),2,976981
+E-4464,merkle_root 4464 txids (techo Q1),2,972492
+E-4464,merkle_root 4464 txids (techo Q1),2,975881
+E-4464,merkle_root 4464 txids (techo Q1),2,973682
+E-4464,merkle_root 4464 txids (techo Q1),2,971732
+E-4464,merkle_root 4464 txids (techo Q1),2,971451
+E-4464,merkle_root 4464 txids (techo Q1),2,970332
+E-4464,merkle_root 4464 txids (techo Q1),2,1014530
+E-4464,merkle_root 4464 txids (techo Q1),2,1332095
+E-4464,merkle_root 4464 txids (techo Q1),2,1421393
+E-4464,merkle_root 4464 txids (techo Q1),2,1285446
+E-4464,merkle_root 4464 txids (techo Q1),2,1143058
+E-4464,merkle_root 4464 txids (techo Q1),2,1156678
+E-4464,merkle_root 4464 txids (techo Q1),2,981392
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-1,justificacion PoT vs cache, 1 slot x128 B (x10000, dividido),2,1
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,238
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,258
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,239
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,245
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,237
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,253
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,233
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,234
+F-150,justificacion PoT vs cache, 150 slots (S_max, x100, dividido),2,235

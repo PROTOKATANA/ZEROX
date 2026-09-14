@@ -1,0 +1,301 @@
+operacion,detalle,lote,muestra,ns
+B-pos,PoS sola ChiaTable K=20,1,0,9150
+B-pos,PoS sola ChiaTable K=20,1,1,9120
+B-pos,PoS sola ChiaTable K=20,1,2,9130
+B-pos,PoS sola ChiaTable K=20,1,3,9120
+B-pos,PoS sola ChiaTable K=20,1,4,9099
+B-pos,PoS sola ChiaTable K=20,1,5,9150
+B-pos,PoS sola ChiaTable K=20,1,6,9110
+B-pos,PoS sola ChiaTable K=20,1,7,9130
+B-pos,PoS sola ChiaTable K=20,1,8,9090
+B-pos,PoS sola ChiaTable K=20,1,9,9100
+B-pos,PoS sola ChiaTable K=20,1,10,9100
+B-pos,PoS sola ChiaTable K=20,1,11,9109
+B-pos,PoS sola ChiaTable K=20,1,12,9120
+B-pos,PoS sola ChiaTable K=20,1,13,9130
+B-pos,PoS sola ChiaTable K=20,1,14,9130
+B-pos,PoS sola ChiaTable K=20,1,15,9150
+B-pos,PoS sola ChiaTable K=20,1,16,9130
+B-pos,PoS sola ChiaTable K=20,1,17,9140
+B-pos,PoS sola ChiaTable K=20,1,18,9149
+B-pos,PoS sola ChiaTable K=20,1,19,9110
+B-pos,PoS sola ChiaTable K=20,1,20,9140
+B-pos,PoS sola ChiaTable K=20,1,21,9090
+B-pos,PoS sola ChiaTable K=20,1,22,9140
+B-pos,PoS sola ChiaTable K=20,1,23,9110
+B-pos,PoS sola ChiaTable K=20,1,24,9110
+B-pos,PoS sola ChiaTable K=20,1,25,9119
+B-pos,PoS sola ChiaTable K=20,1,26,9120
+B-pos,PoS sola ChiaTable K=20,1,27,9150
+B-pos,PoS sola ChiaTable K=20,1,28,9130
+B-pos,PoS sola ChiaTable K=20,1,29,9540
+B-pos,PoS sola ChiaTable K=20,1,30,9170
+B-pos,PoS sola ChiaTable K=20,1,31,9130
+B-pos,PoS sola ChiaTable K=20,1,32,9140
+B-pos,PoS sola ChiaTable K=20,1,33,9150
+B-pos,PoS sola ChiaTable K=20,1,34,9190
+B-pos,PoS sola ChiaTable K=20,1,35,9119
+B-pos,PoS sola ChiaTable K=20,1,36,9190
+B-pos,PoS sola ChiaTable K=20,1,37,9130
+B-pos,PoS sola ChiaTable K=20,1,38,9130
+B-pos,PoS sola ChiaTable K=20,1,39,9180
+B-pos,PoS sola ChiaTable K=20,1,40,9160
+B-pos,PoS sola ChiaTable K=20,1,41,9160
+B-pos,PoS sola ChiaTable K=20,1,42,9109
+B-pos,PoS sola ChiaTable K=20,1,43,9140
+B-pos,PoS sola ChiaTable K=20,1,44,9200
+B-pos,PoS sola ChiaTable K=20,1,45,9130
+B-pos,PoS sola ChiaTable K=20,1,46,9100
+B-pos,PoS sola ChiaTable K=20,1,47,9160
+B-pos,PoS sola ChiaTable K=20,1,48,9190
+B-pos,PoS sola ChiaTable K=20,1,49,9099
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,0,584959
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,1,587058
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,2,582319
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,3,584299
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,4,581549
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,5,584558
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,6,584169
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,7,580719
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,8,582359
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,9,581458
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,10,584249
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,11,585829
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,12,582699
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,13,584659
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,14,583279
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,15,584769
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,16,582369
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,17,584108
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,18,586169
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,19,582599
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,20,584299
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,21,582628
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,22,583689
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,23,583509
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,24,582229
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,25,583109
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,26,581299
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,27,584419
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,28,584969
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,29,581389
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,30,582619
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,31,581459
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,32,582619
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,33,581389
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,34,583838
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,35,584599
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,36,579839
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,37,582749
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,38,582068
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,39,586939
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,40,586229
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,41,582828
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,42,584929
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,43,583399
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,44,584659
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,45,586178
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,46,582299
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,47,583399
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,48,582329
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),1,49,584128
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,0,583869
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,1,580889
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,2,586269
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,3,584948
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,4,582619
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,5,584679
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,6,583269
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,7,584918
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,8,584809
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,9,583059
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,10,584238
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,11,583059
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,12,585859
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,13,582699
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,14,582609
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,15,582649
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,16,582349
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,17,583769
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,18,582609
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,19,583988
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,20,583859
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,21,581009
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,22,582539
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,23,581499
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,24,584219
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,25,584569
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,26,583069
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,27,584608
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,28,582359
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,29,586179
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,30,584349
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,31,582118
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,32,585249
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,33,583399
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,34,585769
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,35,583219
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,36,585569
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,37,585108
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,38,581939
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,39,583749
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,40,583649
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,41,585999
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,42,585429
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,43,582919
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,44,585298
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,45,582789
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,46,586859
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,47,585699
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,48,583519
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),1,49,585319
+B-pos,PoS sola ChiaTable K=20,2,0,9179
+B-pos,PoS sola ChiaTable K=20,2,1,9160
+B-pos,PoS sola ChiaTable K=20,2,2,9130
+B-pos,PoS sola ChiaTable K=20,2,3,9169
+B-pos,PoS sola ChiaTable K=20,2,4,9170
+B-pos,PoS sola ChiaTable K=20,2,5,9190
+B-pos,PoS sola ChiaTable K=20,2,6,9150
+B-pos,PoS sola ChiaTable K=20,2,7,9159
+B-pos,PoS sola ChiaTable K=20,2,8,9170
+B-pos,PoS sola ChiaTable K=20,2,9,9150
+B-pos,PoS sola ChiaTable K=20,2,10,9180
+B-pos,PoS sola ChiaTable K=20,2,11,9159
+B-pos,PoS sola ChiaTable K=20,2,12,9170
+B-pos,PoS sola ChiaTable K=20,2,13,9170
+B-pos,PoS sola ChiaTable K=20,2,14,9140
+B-pos,PoS sola ChiaTable K=20,2,15,9779
+B-pos,PoS sola ChiaTable K=20,2,16,9170
+B-pos,PoS sola ChiaTable K=20,2,17,9170
+B-pos,PoS sola ChiaTable K=20,2,18,9199
+B-pos,PoS sola ChiaTable K=20,2,19,9160
+B-pos,PoS sola ChiaTable K=20,2,20,9150
+B-pos,PoS sola ChiaTable K=20,2,21,9150
+B-pos,PoS sola ChiaTable K=20,2,22,9119
+B-pos,PoS sola ChiaTable K=20,2,23,9160
+B-pos,PoS sola ChiaTable K=20,2,24,9170
+B-pos,PoS sola ChiaTable K=20,2,25,9160
+B-pos,PoS sola ChiaTable K=20,2,26,9160
+B-pos,PoS sola ChiaTable K=20,2,27,9110
+B-pos,PoS sola ChiaTable K=20,2,28,9110
+B-pos,PoS sola ChiaTable K=20,2,29,9139
+B-pos,PoS sola ChiaTable K=20,2,30,9120
+B-pos,PoS sola ChiaTable K=20,2,31,9090
+B-pos,PoS sola ChiaTable K=20,2,32,9100
+B-pos,PoS sola ChiaTable K=20,2,33,9160
+B-pos,PoS sola ChiaTable K=20,2,34,9090
+B-pos,PoS sola ChiaTable K=20,2,35,9160
+B-pos,PoS sola ChiaTable K=20,2,36,9109
+B-pos,PoS sola ChiaTable K=20,2,37,9150
+B-pos,PoS sola ChiaTable K=20,2,38,9140
+B-pos,PoS sola ChiaTable K=20,2,39,9800
+B-pos,PoS sola ChiaTable K=20,2,40,9199
+B-pos,PoS sola ChiaTable K=20,2,41,9540
+B-pos,PoS sola ChiaTable K=20,2,42,9380
+B-pos,PoS sola ChiaTable K=20,2,43,9129
+B-pos,PoS sola ChiaTable K=20,2,44,9140
+B-pos,PoS sola ChiaTable K=20,2,45,9180
+B-pos,PoS sola ChiaTable K=20,2,46,9170
+B-pos,PoS sola ChiaTable K=20,2,47,9170
+B-pos,PoS sola ChiaTable K=20,2,48,9140
+B-pos,PoS sola ChiaTable K=20,2,49,9150
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,0,581889
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,1,583198
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,2,582879
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,3,616498
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,4,585169
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,5,589029
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,6,588428
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,7,582119
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,8,584749
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,9,582809
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,10,585099
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,11,584819
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,12,614878
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,13,586779
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,14,582408
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,15,583479
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,16,584839
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,17,585189
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,18,584578
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,19,582669
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,20,585399
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,21,618408
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,22,584759
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,23,585718
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,24,584139
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,25,585029
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,26,584019
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,27,582639
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,28,585099
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,29,583549
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,30,615098
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,31,586459
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,32,583449
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,33,586969
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,34,587479
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,35,589629
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,36,583049
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,37,579519
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,38,584529
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,39,613988
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,40,585629
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,41,584119
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,42,582079
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,43,583069
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,44,582179
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,45,584069
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,46,582998
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,47,585009
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,48,616008
+B-kzg,Kzg::verify chunk (NUM_S_BUCKETS),2,49,582819
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,0,584249
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,1,582469
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,2,583789
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,3,582339
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,4,583968
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,5,584379
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,6,581809
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,7,614698
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,8,581609
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,9,583009
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,10,583618
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,11,582899
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,12,590659
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,13,583919
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,14,582958
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,15,580989
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,16,614898
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,17,585289
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,18,583379
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,19,584799
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,20,583419
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,21,585409
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,22,584799
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,23,583589
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,24,583819
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,25,613368
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,26,584579
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,27,584099
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,28,583449
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,29,795435
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,30,858234
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,31,828645
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,32,987442
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,33,833214
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,34,667998
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,35,581869
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,36,586619
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,37,840974
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,38,783526
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,39,892233
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,40,826684
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,41,848234
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,42,677487
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,43,580809
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,44,586748
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,45,585249
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,46,588039
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,47,620008
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,48,586578
+B-kzg-hist,Kzg::verify parametros del banco historico (RawRecord::NUM_CHUNKS, indice 0),2,49,588049

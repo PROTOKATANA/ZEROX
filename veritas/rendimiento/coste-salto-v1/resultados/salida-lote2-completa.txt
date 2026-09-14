@@ -1,0 +1,202 @@
+=== BASE (A-H) ===
+=== CONTROLES (no cronometrados) ===
+CONTROL cfg!(aes_backend="soft") en este binario : false
+CONTROL A+  verify_solution(primera) -> Ok(distance) : Ok("Ok(4352823087875908110)")
+CONTROL A-1 proof_of_space=default -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL A-2 chunk mutado -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-3 chunk_witness=default -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-4 record_witness=default -> Err(InvalidPiece) : Err(InvalidPiece)
+CONTROL A-5 piece_offset=1 -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL B+  PoS sola K=20 valida : true
+CONTROL B-  PoS sola proof=default : false
+CONTROL B+  Kzg::verify chunk valido : true
+CONTROL B-  Kzg::verify chunk mutado : false
+CONTROL C+  sello sobre prefirma 492 B : Ok("Ok")
+CONTROL C-  prefirma mutada : Err(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })
+CONTROL D+  replica H_d == block_hash (92 B) : true == db0ac25182ef352467d5460312dfe4c1e651ade6ba09e27473336a47ce0ea1ea
+CONTROL D+  replica H_d(556) determinista : true
+CONTROL E+  merkle 571 determinista : true
+CONTROL E-  merkle 571 mutado difiere : true
+CONTROL F+  justificacion identica (1 slot) : true
+CONTROL F+  justificacion identica (150 slots) : true
+CONTROL F-  justificacion mutada (150 slots) : false
+CONTROL H    tamaño de una tx sintética : 348 B (composición: 2 in, 3 out P2K, 2 testigos de 64 B)
+CONTROL H+   bytes -> Tx -> bytes idéntico : true
+CONTROL H+   txid determinista : true
+CONTROL H-   cambiar el valor de una salida cambia el txid : true
+CONTROL H-   bytes truncados devuelven error : true
+CONTROL G+  verify auto : true
+CONTROL G+  verify_con_ruta Avx512fVaes : true
+CONTROL G+  verify_con_ruta Avx2Vaes : true
+CONTROL G+  verify_con_ruta AesSse41 : true
+CONTROL G+  verify_con_ruta Generica : true
+CONTROL G-  checkpoint mutado Avx512fVaes : false
+CONTROL G-  checkpoint mutado Avx2Vaes : false
+CONTROL G-  checkpoint mutado AesSse41 : false
+CONTROL G-  checkpoint mutado Generica : false
+=== MEDICIONES (lote 2) ===
+G semilla=3e00ef2f895f40d67f5bb8e81f09a5a1 checkpoints[0]=79ae8a3a68f5f73843fa1e29224618bd checkpoints[7]=889a66f7a3358ec832113973c2b57f7a
+G G-pot-avx512f_vaes     n=30 med=90.764 ms p10=90.509 p90=91.445 min=90.425 cv=0.0050
+G G-pot-avx2_vaes        n=30 med=101.319 ms p10=101.064 p90=101.646 min=100.996 cv=0.0021
+G G-pot-aes_sse41        n=30 med=190.411 ms p10=189.872 p90=190.618 min=189.782 cv=0.0015
+G G-pot-crate-aes        n=15 med=947.487 ms p10=944.373 p90=953.553 min=943.059 cv=0.0032
+A  n=100 med=1192.537 µs p10=1188.937 p90=1226.357 min=1181.778 cv=0.0578
+B-pos n=50 med=9.070 µs p10=9.040 p90=9.120 min=9.009 cv=0.4435
+B-kzg n=50 med=583.738 µs p10=581.379 p90=612.398 min=579.049 cv=0.0180
+CONTROL B+  kzg-hist verify valido : true
+CONTROL B-  kzg-hist verify mutado : false
+B-kzg-hist n=50 med=584.239 µs p10=582.409 p90=614.639 min=579.669 cv=0.0176
+C  n=100 med=15.209 µs p10=15.129 p90=15.339 min=15.100 cv=0.0086
+D-92 n=300 med=0.216 µs p10=0.214 p90=0.217 min=0.212 cv=0.0845
+D-556 n=300 med=0.998 µs p10=0.996 p90=1.012 min=0.992 cv=0.0424
+E-571 n=100 med=122.827 µs p10=122.598 p90=124.128 min=122.348 cv=0.0437
+E-4464 n=30 med=955.572 µs p10=953.742 p90=987.992 min=952.482 cv=0.0188
+F-1 n=300 med=0.001 µs p10=0.001 p90=0.001 min=0.001 cv=0.0000
+F-150 n=100 med=0.231 µs p10=0.231 p90=0.232 min=0.230 cv=0.1314
+H-571 n=30 med=987.711 µs p10=975.362 p90=1158.428 min=973.172 cv=0.1154
+H-4464 n=30 med=7673.304 µs p10=7641.815 p90=7705.693 min=7638.184 cv=0.0267
+H-txid-571 n=30 med=924.862 µs p10=917.983 p90=1118.919 min=916.063 cv=0.1087
+H-txid-4464 n=30 med=7240.522 µs p10=7203.593 p90=7304.521 min=7198.633 cv=0.0337
+LOTE 2 COMPLETO -> resultados/MEDICIONES.csv
+=== SOFT (G-pot-aes-soft) ===
+=== CONTROLES (no cronometrados) ===
+CONTROL cfg!(aes_backend="soft") en este binario : true
+CONTROL A+  verify_solution(primera) -> Ok(distance) : Ok("Ok(4352823087875908110)")
+CONTROL A-1 proof_of_space=default -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL A-2 chunk mutado -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-3 chunk_witness=default -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-4 record_witness=default -> Err(InvalidPiece) : Err(InvalidPiece)
+CONTROL A-5 piece_offset=1 -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL B+  PoS sola K=20 valida : true
+CONTROL B-  PoS sola proof=default : false
+CONTROL B+  Kzg::verify chunk valido : true
+CONTROL B-  Kzg::verify chunk mutado : false
+CONTROL C+  sello sobre prefirma 492 B : Ok("Ok")
+CONTROL C-  prefirma mutada : Err(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })
+CONTROL D+  replica H_d == block_hash (92 B) : true == db0ac25182ef352467d5460312dfe4c1e651ade6ba09e27473336a47ce0ea1ea
+CONTROL D+  replica H_d(556) determinista : true
+CONTROL E+  merkle 571 determinista : true
+CONTROL E-  merkle 571 mutado difiere : true
+CONTROL F+  justificacion identica (1 slot) : true
+CONTROL F+  justificacion identica (150 slots) : true
+CONTROL F-  justificacion mutada (150 slots) : false
+CONTROL H    tamaño de una tx sintética : 348 B (composición: 2 in, 3 out P2K, 2 testigos de 64 B)
+CONTROL H+   bytes -> Tx -> bytes idéntico : true
+CONTROL H+   txid determinista : true
+CONTROL H-   cambiar el valor de una salida cambia el txid : true
+CONTROL H-   bytes truncados devuelven error : true
+CONTROL G+  verify auto : true
+CONTROL G+  verify_con_ruta Avx512fVaes : true
+CONTROL G+  verify_con_ruta Avx2Vaes : true
+CONTROL G+  verify_con_ruta AesSse41 : true
+CONTROL G+  verify_con_ruta Generica : true
+CONTROL G-  checkpoint mutado Avx512fVaes : false
+CONTROL G-  checkpoint mutado Avx2Vaes : false
+CONTROL G-  checkpoint mutado AesSse41 : false
+CONTROL G-  checkpoint mutado Generica : false
+=== MEDICIONES (lote 2) ===
+G semilla=3e00ef2f895f40d67f5bb8e81f09a5a1 checkpoints[0]=79ae8a3a68f5f73843fa1e29224618bd checkpoints[7]=889a66f7a3358ec832113973c2b57f7a
+G G-pot-aes-soft         n=10 med=8340.045 ms p10=8303.364 p90=8353.834 min=8303.364 cv=0.0025
+LOTE 2 COMPLETO -> resultados/MEDICIONES.csv
+=== KZG parallel ===
+=== CONTROLES (no cronometrados) ===
+CONTROL cfg!(aes_backend="soft") en este binario : false
+CONTROL A+  verify_solution(primera) -> Ok(distance) : Ok("Ok(4352823087875908110)")
+CONTROL A-1 proof_of_space=default -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL A-2 chunk mutado -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-3 chunk_witness=default -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-4 record_witness=default -> Err(InvalidPiece) : Err(InvalidPiece)
+CONTROL A-5 piece_offset=1 -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL B+  PoS sola K=20 valida : true
+CONTROL B-  PoS sola proof=default : false
+CONTROL B+  Kzg::verify chunk valido : true
+CONTROL B-  Kzg::verify chunk mutado : false
+CONTROL C+  sello sobre prefirma 492 B : Ok("Ok")
+CONTROL C-  prefirma mutada : Err(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })
+CONTROL D+  replica H_d == block_hash (92 B) : true == db0ac25182ef352467d5460312dfe4c1e651ade6ba09e27473336a47ce0ea1ea
+CONTROL D+  replica H_d(556) determinista : true
+CONTROL E+  merkle 571 determinista : true
+CONTROL E-  merkle 571 mutado difiere : true
+CONTROL F+  justificacion identica (1 slot) : true
+CONTROL F+  justificacion identica (150 slots) : true
+CONTROL F-  justificacion mutada (150 slots) : false
+CONTROL H    tamaño de una tx sintética : 348 B (composición: 2 in, 3 out P2K, 2 testigos de 64 B)
+CONTROL H+   bytes -> Tx -> bytes idéntico : true
+CONTROL H+   txid determinista : true
+CONTROL H-   cambiar el valor de una salida cambia el txid : true
+CONTROL H-   bytes truncados devuelven error : true
+=== MEDICIONES (lote 2) ===
+B-pos n=50 med=9.160 µs p10=9.110 p90=9.199 min=9.090 cv=0.0152
+B-kzg n=50 med=584.749 µs p10=582.179 p90=613.988 min=579.519 cv=0.0177
+CONTROL B+  kzg-hist verify valido : true
+CONTROL B-  kzg-hist verify mutado : false
+B-kzg-hist n=50 med=584.799 µs p10=581.869 p90=833.214 min=580.809 cv=0.1672
+LOTE 2 COMPLETO -> resultados/kzg-parallel.csv
+=== KZG opt-s ===
+=== CONTROLES (no cronometrados) ===
+CONTROL cfg!(aes_backend="soft") en este binario : false
+CONTROL A+  verify_solution(primera) -> Ok(distance) : Ok("Ok(4352823087875908110)")
+CONTROL A-1 proof_of_space=default -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL A-2 chunk mutado -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-3 chunk_witness=default -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-4 record_witness=default -> Err(InvalidPiece) : Err(InvalidPiece)
+CONTROL A-5 piece_offset=1 -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL B+  PoS sola K=20 valida : true
+CONTROL B-  PoS sola proof=default : false
+CONTROL B+  Kzg::verify chunk valido : true
+CONTROL B-  Kzg::verify chunk mutado : false
+CONTROL C+  sello sobre prefirma 492 B : Ok("Ok")
+CONTROL C-  prefirma mutada : Err(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })
+CONTROL D+  replica H_d == block_hash (92 B) : true == db0ac25182ef352467d5460312dfe4c1e651ade6ba09e27473336a47ce0ea1ea
+CONTROL D+  replica H_d(556) determinista : true
+CONTROL E+  merkle 571 determinista : true
+CONTROL E-  merkle 571 mutado difiere : true
+CONTROL F+  justificacion identica (1 slot) : true
+CONTROL F+  justificacion identica (150 slots) : true
+CONTROL F-  justificacion mutada (150 slots) : false
+CONTROL H    tamaño de una tx sintética : 348 B (composición: 2 in, 3 out P2K, 2 testigos de 64 B)
+CONTROL H+   bytes -> Tx -> bytes idéntico : true
+CONTROL H+   txid determinista : true
+CONTROL H-   cambiar el valor de una salida cambia el txid : true
+CONTROL H-   bytes truncados devuelven error : true
+=== MEDICIONES (lote 2) ===
+B-pos n=50 med=9.070 µs p10=9.040 p90=9.110 min=9.030 cv=0.0030
+B-kzg n=50 med=584.688 µs p10=582.759 p90=614.338 min=580.089 cv=0.0184
+CONTROL B+  kzg-hist verify valido : true
+CONTROL B-  kzg-hist verify mutado : false
+B-kzg-hist n=50 med=584.689 µs p10=582.529 p90=613.368 min=581.669 cv=0.0211
+LOTE 2 COMPLETO -> resultados/kzg-opt-s.csv
+=== KZG ambas ===
+=== CONTROLES (no cronometrados) ===
+CONTROL cfg!(aes_backend="soft") en este binario : false
+CONTROL A+  verify_solution(primera) -> Ok(distance) : Ok("Ok(4352823087875908110)")
+CONTROL A-1 proof_of_space=default -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL A-2 chunk mutado -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-3 chunk_witness=default -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-4 record_witness=default -> Err(InvalidPiece) : Err(InvalidPiece)
+CONTROL A-5 piece_offset=1 -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL B+  PoS sola K=20 valida : true
+CONTROL B-  PoS sola proof=default : false
+CONTROL B+  Kzg::verify chunk valido : true
+CONTROL B-  Kzg::verify chunk mutado : false
+CONTROL C+  sello sobre prefirma 492 B : Ok("Ok")
+CONTROL C-  prefirma mutada : Err(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })
+CONTROL D+  replica H_d == block_hash (92 B) : true == db0ac25182ef352467d5460312dfe4c1e651ade6ba09e27473336a47ce0ea1ea
+CONTROL D+  replica H_d(556) determinista : true
+CONTROL E+  merkle 571 determinista : true
+CONTROL E-  merkle 571 mutado difiere : true
+CONTROL F+  justificacion identica (1 slot) : true
+CONTROL F+  justificacion identica (150 slots) : true
+CONTROL F-  justificacion mutada (150 slots) : false
+CONTROL H    tamaño de una tx sintética : 348 B (composición: 2 in, 3 out P2K, 2 testigos de 64 B)
+CONTROL H+   bytes -> Tx -> bytes idéntico : true
+CONTROL H+   txid determinista : true
+CONTROL H-   cambiar el valor de una salida cambia el txid : true
+CONTROL H-   bytes truncados devuelven error : true
+=== MEDICIONES (lote 2) ===
+B-pos n=50 med=9.059 µs p10=9.000 p90=9.099 min=8.960 cv=0.0041
+B-kzg n=50 med=586.308 µs p10=584.169 p90=625.008 min=582.929 cv=0.1217
+CONTROL B+  kzg-hist verify valido : true
+CONTROL B-  kzg-hist verify mutado : false
+B-kzg-hist n=50 med=584.979 µs p10=583.599 p90=586.949 min=582.639 cv=0.0162
+LOTE 2 COMPLETO -> resultados/kzg-ambas.csv

@@ -53,11 +53,12 @@ nueva, pero la vuelve crítica para el pago.
   - 1 000 órdenes de llegada idénticos en dos familias;
   - todo padre tiene menor `rank` que su hijo.
 - **Pendiente derivado:**
-  - implementar el modo en GDR-v0.1 con sus tests (hoy solo existe la parte de
-    `solution_distance`, `SP_PYTHON` + `MERGE_SPEC`; falta el hash menor);
-  - corregir DERIVACIONES (horas inventadas) y las demostraciones de `rank`;
-  - redactar §7.2 y §11 del SPEC;
-  - el dominio y el desbordamiento de `blue_work` (D-5) siguen abiertos.
+  - **hecho (2026-09-14):** GDR-v0.2 (`veritas/consenso/ghostdag-rank-v1/`) implementa C con un
+    oráculo de claves propias, derivaciones con hora verificable y demostraciones escritas de
+    `rank`;
+  - redactar §7.2 y §11 del SPEC (el borrador está en `PROPUESTA-SPEC.md` del instrumento);
+  - siguen abiertos el dominio y el desbordamiento de `blue_work` (D-5), y si P1 conserva su id
+    final, que con este `rank` es redundante.
 
 ### 1.4 · La cabecera DAG no existe
 
@@ -198,7 +199,7 @@ cota inferior):
   nodos no lo sube. No es el límite actual del protocolo (el límite de bloque de arranque da
   ≈571 tx/s) ni la única cota: sostenido, ese techo son 49,3 TB/año de disco sin poda (4 TB en
   unos 30 días), frente al presupuesto de 72 tx/s del Modelo B350 (`ZEROX-EN-NUMEROS.md:160`).
-  La CPU de validación no está medida.
+  La CPU de validación por salto ya está medida (Q4).
 - **Motivo:** política de marketplace. Se prioriza a quien produce bloques con conexión fija de
   calidad, aunque centralice algo y perjudique a los nodos mal conectados.
 - **Alcance:** es una referencia de planificación, no un requisito. Ninguna regla la comprueba ni
@@ -326,9 +327,15 @@ bajo demanda — DECIDIDO POR KATANA (2026-09-13).**
     (≈1,8 s para 150 slots en 8 núcleos; derivado, sin medir). Dentro de un slot no hay ganancia:
     la ruta AVX-512/VAES ya verifica los 8 tramos a la vez, con 16 carriles AES
     (`crates/subspace-proof-of-time/src/aes/x86_64.rs:248-269`).
-  - Nota de implementación: banco en hardware del coste por salto (prueba de espacio, 2 KZG, sello
-    y Merkle) y del PoT en las rutas sin AVX-512 (AVX2+VAES, AES-NI+SSE4.1). Los 96,1 ms son el
-    mejor caso.
+  - **Banco en hardware — MEDIDO (2026-09-14, `veritas/rendimiento/coste-salto-v1/`; MH, un
+    núcleo de un Ryzen 9 9950X3D).**
+    - Validar antes de reenviar cuesta 1,33 ms (571 tx) y 2,17 ms (4 464 tx) con relé compacto.
+    - Con cuerpo completo hay que calcular los txid, y sube a 2,32 y 9,86 ms.
+    - Incluso el peor caso deja 10× de margen sobre los 0,1 s por salto de la sensibilidad de
+      DMS-v0.1.
+    - El PoT por slot cuesta 92 ms con AVX-512/VAES, 101 ms con AVX2/VAES, 190 ms con AES-NI y
+      SSE4.1, y 8,3 s con AES por software.
+    - Las rutas sin AVX-512 se forzaron en la misma CPU: no equivalen a una CPU antigua.
 
 **Q5 · Adversario de red en un v2 partido en dos — DECIDIDO POR KATANA (2026-09-13).**
 
@@ -352,9 +359,9 @@ bajo demanda — DECIDIDO POR KATANA (2026-09-13).**
   hardware, GHOSTDAG en Julia). Partirlo evita que la parte de red espere a la de consenso.
 - **Orden:**
   1. enmienda del INFORME v1 y migración — **hecho, 2026-09-14**;
-  2. banco en hardware del coste por salto (Q4);
+  2. banco en hardware del coste por salto (Q4) — **hecho, 2026-09-14**;
   3. v2a;
-  4. GHOSTDAG en Julia (1.3 + 1.2);
+  4. GHOSTDAG en Julia (1.3 + 1.2) — **hecho, 2026-09-14**, adelantado en paralelo (GDR-v0.2);
   5. v2b.
 
 ---
@@ -402,12 +409,14 @@ citada en `crates/` o declarada. Es una decisión de convención del SPEC.
 ## Orden recomendado
 
 1. **`Δ` (3.1)** desde ya — es medición, no diseño, y desbloquea el nivel 3 entero. Δ natural
-   medida en simulación y migrada (2026-09-14). Siguiente paso: banco en hardware del coste por
-   salto y v2a (Q5), con las reglas de §2.7 redactadas antes, porque el v2a las modela.
+   medida en simulación y migrada (2026-09-14); el coste por salto, medido en hardware el mismo
+   día. Siguiente paso: v2a (Q5), con las reglas de §2.7 redactadas antes, porque el v2a las
+   modela.
 2. **GHOSTDAG + `rank` total (1.3 + 1.2)** juntos — son el mismo problema por dos lados, y
    desbloquean §7.2 completa. El GHOSTDAG en Julia también alimenta δ₀ con la distribución de Δ
    (Q3) y el v2b (Q5). **No depende de Δ:** puede arrancar en paralelo al banco y al v2a, y es el
-   camino crítico para escribir código, porque el nivel 1 es el único bloqueo duro.
+   camino crítico para escribir código, porque el nivel 1 es el único bloqueo duro. El
+   instrumento ya existe (GDR-v0.2, 2026-09-14); falta redactar §7.2 y §11 del SPEC.
 3. **Cabecera DAG (1.4)** — hasta que exista, ningún crate de serialización, red o almacenamiento
    puede cerrarse. Ya tiene presupuesto de diseño (Q2).
 4. El resto por área, siguiendo §17 del SPEC.
@@ -416,11 +425,24 @@ citada en `crates/` o declarada. Es una decisión de convención del SPEC.
 
 ## Cerrado recientemente (para no reabrirlo)
 
+- **GHOSTDAG + `rank` en Julia (1.2 + 1.3, instrumento)**, 2026-09-14. `GDR-v0.2` en
+  `veritas/consenso/ghostdag-rank-v1/`, con la regla C de Katana.
+  - Qué calcula: color, cadena, orden y `rank`, que antes venían puestos a mano en los fixtures.
+  - Qué queda probado: el resultado no depende del orden de llegada, y `rank` es total y
+    compatible con la causalidad, demostrado por escrito.
+  - Evidencia: 577 131 asserts; vectores de rusty-kaspa al 100 %; oráculo = kernel en 7 200 DAGs;
+    regla C comprobada aparte por Claude en 168 869 bloques; `HUELLAS.sha256`.
+  - Pendiente: redactar el SPEC.
+- **Coste por salto en hardware (Q4)**, 2026-09-14. `veritas/rendimiento/coste-salto-v1/`: de
+  1,33 a 9,86 ms según escenario (cifras en §3.1, Q4).
+  - Evidencia: dos lotes separados 30 min; lote de Claude dentro del 3 %; `HUELLAS.sha256`.
+  - Retira la cifra de 1,0773 ms por KZG, que no se reproducía: la medición vigente es 584 µs.
 - **Δ natural medida en simulación (3.1, primer tramo)**, 2026-09-14. Instrumento `DMS-v0.1` en
   `veritas/finalidad/delta-medido-v1/`, revisión 2. Con la base decidida por Katana (100 Mbit/s
   de subida y relé compacto), Δ_99 p99 queda entre 0,26 y 0,60 s, frente a los 4 s que `k=30`
   tolera sin bloques honestos rojos. El bloque completo en el techo satura el enlace. Sigue
-  siendo MS: sin validación medida, sin mempool y sin adversario (banco en hardware y v2).
+  siendo MS: sin mempool y sin adversario (v2); la validación por salto se midió después en
+  hardware y cabe en ≤ 10 ms.
   Evidencia: 25 598 asserts; resultados de r1 y r2 reproducidos byte a byte por Claude con 16
   hilos frente a 24; `ENMIENDA-R2.md`, `HUELLAS.sha256`, `TRAZAS.sha256`.
 

@@ -1,0 +1,44 @@
+[package]
+name = "coste-salto"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Banco de costes del salto (Q4). Workspace aislado: no se integra en el nodo
+# ni modifica dependencias de ZEROX. Todo offline y solo lectura de las rutas
+# ../../../PDF/autonomys-subspace/... y ../../../crates/zx-core (los target se
+# ponen SIEMPRE dentro de la zona de escritura con CARGO_TARGET_DIR).
+[workspace]
+exclude = ["pot-estable-rutas"]
+
+[dependencies]
+ab-proof-of-space = { path = "../../../PDF/autonomys-subspace/shared/ab-proof-of-space", default-features = false, features = ["alloc", "full-chiapos"] }
+subspace-core-primitives = { path = "../../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
+subspace-proof-of-space = { path = "../../../PDF/autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc"] }
+subspace-verification = { path = "../../../PDF/autonomys-subspace/crates/subspace-verification" }
+subspace-kzg = { path = "../../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
+zx-core = { path = "../../../crates/zx-core" }
+pot-estable = { path = "pot-estable-rutas" }
+ed25519-zebra = "=4.2.0"
+sha3 = "=0.12.0"
+hex = "=0.4.3"
+rand_chacha = "=0.3.1"
+rand_core = "=0.6.4"
+
+# Corrección 1, 3.3 b): compilación «parallel» de la matriz KZG. NO activada
+# por defecto (subspace-kzg ya está con default-features=false más arriba).
+[features]
+kzg-parallel = ["subspace-kzg/parallel"]
+
+[dev-dependencies]
+criterion = { version = "=0.8.2", default-features = false }
+
+# Perfil declarado: release por defecto del toolchain (opt-level 3, codegen-units
+# 16, sin LTO, panic unwind — el mismo que el workspace de Autonomys usa para
+# `cargo bench`). NO se usa RUSTFLAGS=-C target-cpu=native.
+[profile.release]
+debug = false
+
+[[bench]]
+name = "ancla"
+harness = false

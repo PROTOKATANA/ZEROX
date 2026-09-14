@@ -1,0 +1,46 @@
+=== CONTROLES (no cronometrados) ===
+CONTROL A+  verify_solution(primera) -> Ok(distance) : Ok("Ok(4352823087875908110)")
+CONTROL A-1 proof_of_space=default -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL A-2 chunk mutado -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-3 chunk_witness=default -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-4 record_witness=default -> Err(InvalidPiece) : Err(InvalidPiece)
+CONTROL A-5 piece_offset=1 -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL B+  PoS sola K=20 valida : true
+CONTROL B-  PoS sola proof=default : false
+CONTROL B+  Kzg::verify chunk valido : true
+CONTROL B-  Kzg::verify chunk mutado : false
+CONTROL C+  sello sobre prefirma 492 B : Ok("Ok")
+CONTROL C-  prefirma mutada : Err(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })
+CONTROL D+  replica H_d == block_hash (92 B) : true == db0ac25182ef352467d5460312dfe4c1e651ade6ba09e27473336a47ce0ea1ea
+CONTROL D+  replica H_d(556) determinista : true
+CONTROL E+  merkle 571 determinista : true
+CONTROL E-  merkle 571 mutado difiere : true
+CONTROL F+  justificacion identica (1 slot) : true
+CONTROL F+  justificacion identica (150 slots) : true
+CONTROL F-  justificacion mutada (150 slots) : false
+CONTROL G+  verify auto : true
+CONTROL G+  verify_con_ruta Avx512fVaes : true
+CONTROL G+  verify_con_ruta Avx2Vaes : true
+CONTROL G+  verify_con_ruta AesSse41 : true
+CONTROL G+  verify_con_ruta Generica : true
+CONTROL G-  checkpoint mutado Avx512fVaes : false
+CONTROL G-  checkpoint mutado Avx2Vaes : false
+CONTROL G-  checkpoint mutado AesSse41 : false
+CONTROL G-  checkpoint mutado Generica : false
+=== MEDICIONES (lote 1) ===
+G semilla=3e00ef2f895f40d67f5bb8e81f09a5a1 checkpoints[0]=79ae8a3a68f5f73843fa1e29224618bd checkpoints[7]=889a66f7a3358ec832113973c2b57f7a
+G G-pot-avx512f_vaes     n=30 med=89.674 ms p10=89.593 p90=90.004 min=89.553 cv=0.0017
+G G-pot-avx2_vaes        n=30 med=100.348 ms p10=100.064 p90=100.717 min=99.948 cv=0.0024
+G G-pot-aes_sse41        n=30 med=189.161 ms p10=188.281 p90=193.960 min=187.942 cv=0.0116
+G G-pot-generica         n=15 med=923.961 ms p10=923.551 p90=935.578 min=923.372 cv=0.0065
+A  n=100 med=1189.368 µs p10=1187.558 p90=1192.757 min=1187.027 cv=0.0020
+B-pos n=50 med=9.010 µs p10=8.990 p90=9.060 min=8.970 cv=0.0072
+B-kzg n=50 med=583.149 µs p10=581.689 p90=584.599 min=580.559 cv=0.0028
+C  n=100 med=15.230 µs p10=15.040 p90=15.259 min=15.019 cv=0.0135
+D-92 n=300 med=0.216 µs p10=0.214 p90=0.216 min=0.211 cv=0.0384
+D-556 n=300 med=1.005 µs p10=1.003 p90=1.018 min=0.999 cv=0.0360
+E-571 n=100 med=123.358 µs p10=123.147 p90=125.007 min=122.998 cv=0.0235
+E-4464 n=30 med=956.641 µs p10=955.502 p90=958.562 min=954.342 cv=0.0013
+F-1 n=300 med=0.001 µs p10=0.001 p90=0.001 min=0.001 cv=0.0000
+F-150 n=100 med=0.231 µs p10=0.231 p90=0.232 min=0.230 cv=0.0225
+LOTE 1 COMPLETO -> resultados/MEDICIONES.csv

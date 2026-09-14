@@ -214,7 +214,7 @@ No se mantiene la afirmación «un ASIC AES de **19×** es físicamente imposibl
 
 Fuentes: [SPEC, §§2–3, 6–7 y 9][spec], [Cargo.toml][cargo], [Cargo.lock][lock] y [migración][migracion]. `orchard`, `halo2_proofs` y `blake2b_simd` figuran en las dependencias declaradas del workspace, pero no en su grafo resuelto actual. Adoptar primitivas existentes no acredita la seguridad de su composición ni completa la capa blindada.
 
-Se retiran del panel de prestaciones **47,5 µs como cota de firma Ed25519** y **84 211 tx/s de CPU**: la investigación conserva la constante y su extrapolación, pero no un banco reproducible que respalde esa cota. Asimismo, **646 µs de KZG** no se confirma en el registro localizado: [el banco conservado][kzgbench] publica **1,0773 ms por `kzg.verify`** —intervalo de estimación **1,0719–1,0887 ms**, 100 muestras—, no coste completo de dos testigos y una cabecera ZEROX.
+Se retiran del panel de prestaciones **47,5 µs como cota de firma Ed25519** y **84 211 tx/s de CPU**: la investigación conserva la constante y su extrapolación, pero no un banco reproducible que respalde esa cota. Asimismo, **646 µs de KZG** no se confirma: [el banco del coste por salto][costesalto] mide **584 µs por `kzg.verify`** (mediana de dos lotes; 583–586 µs en cuatro configuraciones de compilación) y **1,19 ms** por la solución PoAS completa, con prueba de espacio y dos testigos, en un Ryzen 9 9950X3D.
 
 ---
 
@@ -526,7 +526,7 @@ Si cambian el SPEC, las constantes, el formato, las features o el modelo, revisa
 [timelord]: research/timelord-redundancia-informe.md
 [pot]: prototipos/pot-estable/LEEME.md
 [orchard]: research/orchard-bundle.md
-[kzgbench]: research/scripts/d12-quorum/salida_bench_kzg.txt
+[costesalto]: veritas/rendimiento/coste-salto-v1/resultados/RESUMEN.md
 [emision]: crates/zx-consensus/src/emision.rs
 [peso]: crates/zx-consensus/src/peso.rs
 [tarifas]: crates/zx-mempool/src/tarifa.rs

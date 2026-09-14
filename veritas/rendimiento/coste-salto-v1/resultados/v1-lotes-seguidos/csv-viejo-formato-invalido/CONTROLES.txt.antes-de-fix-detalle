@@ -1,0 +1,29 @@
+=== CONTROLES (no cronometrados) ===
+CONTROL A+  verify_solution(primera) -> Ok(distance) : Ok("Ok(4352823087875908110)")
+CONTROL A-1 proof_of_space=default -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL A-2 chunk mutado -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-3 chunk_witness=default -> Err(InvalidChunkWitness) : Err(InvalidChunkWitness)
+CONTROL A-4 record_witness=default -> Err(InvalidPiece) : Err(InvalidPiece)
+CONTROL A-5 piece_offset=1 -> Err(InvalidProofOfSpace) : Err(InvalidProofOfSpace)
+CONTROL B+  PoS sola K=20 valida : true
+CONTROL B-  PoS sola proof=default : false
+CONTROL B+  Kzg::verify chunk valido : true
+CONTROL B-  Kzg::verify chunk mutado : false
+CONTROL C+  sello sobre prefirma 492 B : Ok("Ok")
+CONTROL C-  prefirma mutada : Err(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })
+CONTROL D+  replica H_d == block_hash (92 B) : true == db0ac25182ef352467d5460312dfe4c1e651ade6ba09e27473336a47ce0ea1ea
+CONTROL D+  replica H_d(556) determinista : true
+CONTROL E+  merkle 571 determinista : true
+CONTROL E-  merkle 571 mutado difiere : true
+CONTROL F+  justificacion identica (1 slot) : true
+CONTROL F+  justificacion identica (150 slots) : true
+CONTROL F-  justificacion mutada (150 slots) : false
+CONTROL G+  verify auto : true
+CONTROL G+  verify_con_ruta Avx512fVaes : true
+CONTROL G+  verify_con_ruta Avx2Vaes : true
+CONTROL G+  verify_con_ruta AesSse41 : true
+CONTROL G+  verify_con_ruta Generica : true
+CONTROL G-  checkpoint mutado Avx512fVaes : false
+CONTROL G-  checkpoint mutado Avx2Vaes : false
+CONTROL G-  checkpoint mutado AesSse41 : false
+CONTROL G-  checkpoint mutado Generica : false
