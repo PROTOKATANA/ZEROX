@@ -1,9 +1,10 @@
 # TAREAS — lo que falta para que el SPEC PoST + DAG pase a fase de código
 
-Fecha: 2026-09-12. Derivado de §17 de [SPEC.md](SPEC.md), `ci/consenso-pendiente.txt`, los
-límites declarados de los instrumentos de `veritas/consenso/`, [MIGRACION.md](MIGRACION.md) y
-la auditoría externa de la comprobación decisiva v1
-([AUDITORIA-EXTERNA.md](veritas/consenso/comprobacion-decisiva-v1/AUDITORIA-EXTERNA.md)).
+Fecha: 2026-09-12; actualizado el 2026-09-14. Derivado de §17 de [SPEC.md](SPEC.md),
+`ci/consenso-pendiente.txt`, los límites declarados de los instrumentos de `veritas/`,
+[MIGRACION.md](MIGRACION.md), la auditoría externa de la comprobación decisiva v1
+([AUDITORIA-EXTERNA.md](veritas/consenso/comprobacion-decisiva-v1/AUDITORIA-EXTERNA.md)) y las
+decisiones de Katana sobre `Δ` del 2026-09-13 (§3.1).
 
 No congela parámetros ni convierte pendientes en decisiones. Los niveles 1 y 2 separan «el SPEC
 describe un protocolo» de «el SPEC especifica un protocolo». El nivel 3 separa «se puede
@@ -39,6 +40,16 @@ pendiente (§17). Persiste la discrepancia 92/556 con un test rojo conocido
 «función pura de la cadena de cabeceras»** — lineal — cuando el destino es un DAG: esa regla hay
 que reescribirla, no portarla.
 
+**Ya tiene presupuesto de diseño** (Q2 de §3.1, decidido por Katana el 2026-09-13; presupuesto,
+no formato):
+- cabecera ≤ ~1 kB en el caso típico y ≤ ~20 kB en el peor, que son 16 padres y 150 slots de
+  justificación PoT;
+- anuncio compacto ≤ ~28 kB en el techo;
+- relé compacto obligatorio en la ruta crítica.
+
+La r2 de `DMS-v0.1` midió 1,14–1,39 padres típicos, es decir, una cabecera típica de ≈716–748 B.
+El formato debe especificar además el caso degradado del relé compacto (§2.7).
+
 ---
 
 ## Nivel 2 — Reglas escritas que todavía no se pueden computar
@@ -47,6 +58,15 @@ que reescribirla, no portarla.
 Solución de espacio, testigos KZG, identidad de billete, reto, distancia de solución, sello y
 justificación PoT. Pendiente además: formato y validación conjunta, retardo de autoría, puntos de
 control, inyección de entropía y dependencias por flujo.
+
+**La parte de red ya está decidida** (Q4 de §3.1, 2026-09-13):
+- antes de reenviar se comprueban cabecera, prueba de espacio, 2 KZG, sello, justificación PoT
+  (desde la caché) y compromiso Merkle;
+- después, firmas, pruebas Halo2 y UTXO;
+- el PoT se verifica una vez por slot y se cachea.
+
+Eso fija el orden, no la verificación conjunta en sí, que sigue pendiente. Las reglas que faltan
+por escribir están en §2.7.
 
 ### 2.2 · La identidad del billete está supuesta, no demostrada
 Toda §7.2 —dedup, unicidad pagable, peso— se apoya en que el billete identifique de verdad la
@@ -72,6 +92,22 @@ trasladar esas cuentas a una garantía temporal». No escalar constantes por 120
 nadie porque la cadena no mantiene ese conjunto — hay un `TODO(sincronizador)` en
 `crates/zx-node/src/cadena.rs`. Sin eso no hay validación completa de bloque.
 
+### 2.7 · Reglas de transporte decididas y todavía sin escribir en el SPEC
+Salen de las decisiones de Katana del 2026-09-13 (§3.1). No son consenso, pero sin ellas la Δ
+medida es optimista, y el v2a las modela: conviene redactarlas antes. Cada ID nuevo debe citarse
+en `crates/` o declararse en `ci/reglas-sin-codigo.txt`.
+
+| Regla | De dónde sale | Estado actual del SPEC |
+|---|---|---|
+| Cola prioritaria para bloques y PoT sobre transacciones; presupuesto de reenvío de transacciones por debajo de la subida; reenvío de transacciones por anuncio y petición | Q1 | No existe en §16 ni en `crates/zx-p2p/src/behaviour.rs` |
+| Relé compacto obligatorio en la ruta crítica | Q2 | R-NET-01 lo negocia conexión a conexión (`SPEC.md:2509`) |
+| Caso degradado del relé compacto con presupuestos de recursos (C-NET-04), sin penalizar a quien reenvía (C-NET-05, C-NET-08) | Q2 | No especificado; se concreta en 1.4 |
+| Tema de gossip del PoT, verificación una vez por slot con caché, y verificación bajo demanda con tres salvaguardas | Q4 | Solo existen los temas `blocks` y `txs` (`SPEC.md:2122`) |
+| C-NET-06 reescrita: consenso antes de reenviar, transacciones después | Q4 | Hoy solo exime la comprobación de UTXO (`SPEC.md:2162-2165`) |
+
+**Pregunta abierta:** relajar C-NET-06 para anunciar antes de reconstruir el bloque. Se decide
+cuando el v2a mida con qué frecuencia faltan transacciones en las mempools.
+
 ---
 
 ## Nivel 3 — Parámetros sin cerrar (no impiden escribir, impiden lanzar)
@@ -84,7 +120,7 @@ nadie porque la cadena no mantiene ese conjunto — hay un `TODO(sincronizador)`
 | 3.4 | **P-038** | Abierta |
 | 3.5 | Génesis | Parámetros y hashes distintos por red; bootstrap explícito |
 
-### 3.1 · `Δ`: medición v1 y lo que falta para migrarla
+### 3.1 · `Δ`: medición, decisiones y lo que falta
 
 **Medición (MS, no MR).** `veritas/finalidad/delta-medido-v1/` (ID `DMS-v0.1`). Revisión 1
 reproducida por Claude el 2026-09-13; revisión 2 y su corrección, reproducidas fuera del repo
@@ -301,7 +337,10 @@ bajo demanda — DECIDIDO POR KATANA (2026-09-13).**
 ### 4.1 · Recompensa del bloque honesto tardío
 Abierta el 2026-09-12 y escrita en §7.2. Medido: un bloque honesto con billete único que nadie
 disputa, fusionado tras el cierre de su ventana, **no cobra nunca**. ¿Pérdida definitiva, o
-reinclusión como la que modela la cola de RCE-v0.1? Con `Δ` sin medir, no es un caso de borde raro.
+reinclusión como la que modela la cola de RCE-v0.1? La Δ natural ya está medida en simulación
+(0,26–0,60 s, §3.1). Que eso vuelva raro el caso depende de dos cosas que siguen abiertas: el
+margen `G` de cierre de la ventana, que en RCE-v0.1 es escenario pendiente, y las particiones y la
+retención adversaria, que el v2 todavía no mide.
 
 ### 4.2 · IDs de regla para §7.2
 Hoy es prosa, como el resto de §7.2. Darle IDs `C-XXX-NN` obliga a declararlos en
@@ -320,8 +359,16 @@ citada en `crates/` o declarada. Es una decisión de convención del SPEC.
   consumen 5500 y se pagan 3000 sin que nadie lo note.
 - **H6** — `catch ArgumentError → Invalid` enmascara roturas de invariante interno como veredicto
   de consenso.
-- El instrumento promovido no lleva `CONTRATO.md` ni `MODELO.md` como sus hermanos de
-  `veritas/consenso/`.
+- `comprobacion-decisiva-v1`, el instrumento promovido, no lleva `CONTRATO.md` ni `MODELO.md`
+  como sus hermanos de `veritas/consenso/`.
+- **Huellas de SPEC.md desalineadas:** `disponibilidad-causal-multivista-v1`,
+  `dominio-autorizacion-v1`, `identidad-disponibilidad-v1` y `ventana-retarget-causal-v1` firman un
+  `SPEC.md` que ya no existe con ese contenido. Cada uno firmó el SPEC del día en que se cerró, y
+  el SPEC se reescribió después. Declarado en el commit f1a10a8 y comprobado de nuevo el
+  2026-09-14; pendiente de decisión.
+- **`DMS-v0.1`:** el test del estimador ponderado por espacio (T1) comprueba las funciones, pero
+  `run.jl` aplica la regla en línea, sin llamarlas. Una regresión en esa ruta no la detectaría el
+  test (`veritas/finalidad/delta-medido-v1/ENMIENDA-R2.md` §7).
 
 ---
 
@@ -329,12 +376,13 @@ citada en `crates/` o declarada. Es una decisión de convención del SPEC.
 
 1. **`Δ` (3.1)** desde ya — es medición, no diseño, y desbloquea el nivel 3 entero. Δ natural
    medida en simulación y migrada (2026-09-14). Siguiente paso: banco en hardware del coste por
-   salto y v2a (Q5).
+   salto y v2a (Q5), con las reglas de §2.7 redactadas antes, porque el v2a las modela.
 2. **GHOSTDAG + `rank` total (1.3 + 1.2)** juntos — son el mismo problema por dos lados, y
    desbloquean §7.2 completa. El GHOSTDAG en Julia también alimenta δ₀ con la distribución de Δ
-   (Q3) y el v2b (Q5).
+   (Q3) y el v2b (Q5). **No depende de Δ:** puede arrancar en paralelo al banco y al v2a, y es el
+   camino crítico para escribir código, porque el nivel 1 es el único bloqueo duro.
 3. **Cabecera DAG (1.4)** — hasta que exista, ningún crate de serialización, red o almacenamiento
-   puede cerrarse.
+   puede cerrarse. Ya tiene presupuesto de diseño (Q2).
 4. El resto por área, siguiendo §17 del SPEC.
 
 ---
