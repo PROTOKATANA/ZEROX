@@ -1244,7 +1244,9 @@ fusión posterior queda respaldada por dos guardas simultáneas, no por una.
 Los candidatos al desempate son los bloques azules y los `rojo_k`; los `rojo_U3`
 quedan excluidos de la candidatura (es lo que implementa `eligible()` en DCM-v0.1 y lo
 que exige R-FIN-13′). Entre copias del mismo billete gana la **azul primero**; en
-igualdad de color, menor `rank`; en igualdad de `rank`, menor id de bloque. P0 (orden
+igualdad de color, menor `rank` (C-ORD-01 y C-ORD-02). No hay un tercer desempate: el
+id de bloque que la redacción anterior añadía al final es **redundante**, porque `rank`
+ya es total y ya termina en ese id. P0 (orden
 por `(rank, id)` sin preferir color) queda **retirado como política de consenso de
 ZEROX**; sigue existiendo y siendo válido en el instrumento como política de estudio,
 para comparar P0 y P1 en vistas separadas, y la suite de la comprobación decisiva
@@ -1277,18 +1279,49 @@ entre copias del mismo billete. **NO** es el orden de **APLICACIÓN** del merges
 sigue siendo el de R-FIN-8′(4): por cada bloque de la cadena seleccionada,
 `[sp(B)] ++ mergeset(B)` con el mergeset en `blue_work` ascendente, desempate por
 menor `solution_distance` y luego hash, azules y `rojo_k` entrelazados, saltándose los
-`rojo_U3`. Implementar «azul primero» en la aplicación rompería R-FIN-8′(4); esta
+`rojo_U3` — redactado como C-ORD-03, con el orden exacto en C-GD-05. Implementar
+«azul primero» en la aplicación rompería R-FIN-8′(4); esta
 separación debe quedar escrita para que nadie la confunda. El acoplamiento R-FIN-13′
 —retarget y emisión contabilizan el mismo conjunto pagable— sigue vigente y no depende
 de esta regla.
 
-**PENDIENTE — prerrequisito de IMPLEMENTACIÓN.** `rank` es hoy una etiqueta abstracta
-suministrada, no recalculada (CONTRATO DCM-v0.1: «Rank y color son etiquetas globales
-suministradas, no recalculadas»). El SPEC debe atar `rank` al orden concreto del
-mergeset (`blue_work`, `solution_distance`, hash) y **demostrar que ese orden es
-total**: un empate de `rank` hace el desempate no determinista, y eso es un fork —
-con P1 igual que con P0. Hasta entonces, el desempate entre copias no es implementable
-con garantía.
+**C-ORD-01** · **`rank`, definición operativa.** `rank(B) := (blue_work(B),
+solution_distance(B), id(B))`, comparado en orden lexicográfico ascendente: primero
+`blue_work`, luego `solution_distance`, luego el id por orden de bytes. Gana el
+**menor**. El último componente **MUST** ser el id de 32 bytes del bloque: es lo que
+hace total el orden, y ninguna redefinición futura de `rank` puede quitarlo sin volver
+a demostrar la totalidad.
+
+- **Totalidad — DEMOSTRADO.** Cada componente es un orden total (enteros para
+  `blue_work` y `solution_distance`; orden lexicográfico de bytes para el id), y el
+  producto lexicográfico de órdenes totales es total. Bajo el supuesto declarado de que
+  no hay colisión de id, dos bloques distintos tienen id distinto, así que sus tuplas
+  `rank` nunca empatan.
+- **Compatibilidad causal — DEMOSTRADO.** Si `A` es padre de `B`, entonces
+  `rank(A) < rank(B)`. `sp(B) ∈ blues(B)` y `w(x) ≥ 2^64 > 0` (C-GD-01, C-GD-08), luego
+  `blue_work(B) > blue_work(sp(B))`; y `sp(B)` maximiza `blue_work` entre los padres
+  (C-GD-03), luego `blue_work(B) > blue_work(A)`. Decide el primer componente: el orden
+  respeta siempre la ancestría, sin recurrir a `solution_distance` ni al id.
+- **Alcance.** `rank` es una función **global** del bloque: depende solo de `past(B)`.
+  El color, en cambio, es contextual (C-GD-09). P1 combina las dos cosas, que son de
+  naturaleza distinta.
+
+**C-ORD-02** · **Selección entre copias del mismo billete (P1).** Entre las copias
+candidatas —azules y `rojo_k`; las `rojo_U3` quedan excluidas— gana la azul; en
+igualdad de color, la de menor `rank`. **No hay tercer criterio**: por C-ORD-01 dos
+copias distintas nunca empatan en `rank`.
+
+**C-ORD-03** · **Orden de aplicación.** Por cada bloque `C` de la cadena seleccionada,
+desde el génesis: `[sp(C)] ++ mergeset(C)` con el mergeset en el orden de C-GD-05,
+azules y `rojo_k` entrelazados y saltando los `rojo_U3` (R-FIN-8′(4)). Cada bloque se
+aplica **exactamente una vez**, en el primer bloque de cadena que lo fusiona
+(R-FIN-8′(6)). La selección de C-ORD-02 **MUST NOT** alterar este orden.
+
+**Estado de la evidencia.** Las tres reglas están implementadas y comprobadas en
+`veritas/consenso/ghostdag-rank-v1/` (GDR-v0.2), con las demostraciones escritas en su
+`PROPUESTA-SPEC.md`. Lo que sigue pendiente es el **código del nodo**: los fixtures de
+DCM-v0.1 aún suministran `rank` y color como etiquetas, en vez de recalcularlos con
+estas reglas.
 
 **PENDIENTE — recompensa del bloque honesto tardío.** La regla (b) alcanza más de lo
 que sugiere: un bloque honesto con billete único que nadie disputa, fusionado después
@@ -1540,25 +1573,76 @@ nueva activada por altura, no una reescritura.
 
 ---
 
-## 11 · Orden y selección en GHOSTDAG — pendiente de integración
+## 11 · Orden y selección en GHOSTDAG
 
 El diseño destino usa GHOSTDAG con `blue_work = Σ⌊2^128/(SR+1)⌋` sobre azules
 (`research/dag-poas-ancla-de-orden.md`, R-FIN-6 y estructura de §2).
 Es una modificación propia: el commit de Autonomys fijado en `PDF/README.md` usa `MAX_u64−SR`.
-El tipo de SR no fija el del peso ni del acumulador. Si se admite todo SR de tipo u64,
-`SR=0` produce `2^128` (no cabe en u128) y `SR=MAX_u64` requiere ensanchar antes de sumar uno.
-Dominio permitido, representación y política de desbordamiento siguen pendientes; no se
-heredan los tipos de Autonomys o Kaspa como demostración de que bastan aquí.
-Los billetes duplicados se tratan mediante U2/U3″; R-FIN-8′ distingue `rojo_k` pagable
-de `rojo_U3` inerte, con la laguna de unicidad pagable declarada en §7.2.
 
-No basta reemplazar un acumulador: faltan padres múltiples, coloración, cadena seleccionada,
-orden de ejecución, conflictos de transacciones, flujos, desempate y cálculo contextual del rango.
-El orden no puede depender de la llegada local de mensajes.
+Las reglas de esta sección fijan la **dirección de cada desempate**, que es donde dos
+implementaciones podían divergir. Katana la decidió el 2026-09-14 (`TAREAS.md` §1.3, «regla C»),
+y el instrumento `veritas/consenso/ghostdag-rank-v1/` (GDR-v0.2) la implementa y la comprueba:
+los seis vectores oficiales de rusty-kaspa (168 bloques) coinciden al 100 %, un oráculo con claves
+propias coincide con el kernel en 7 200 DAGs, y 1 000 órdenes de llegada por familia dan el mismo
+resultado. Ninguna de estas reglas tiene todavía código en `crates/`; están declaradas como trabajo
+futuro en `ci/reglas-sin-codigo.txt`.
 
+**C-GD-01** · **Peso de un bloque.** `w(B) = ⌊2^128 / (SR(B)+1)⌋`, con `SR` de tipo `u64` y
+división entera exacta. El cálculo **MUST** hacerse en enteros; usar coma flotante está
+**prohibido**. `SR = 0` da `w = 2^128`, que no cabe en `u128`; `SR = 2^64−1` da el mínimo,
+`w = 2^64`. Por tanto `w(B) ≥ 2^64 > 0` para todo bloque.
+
+**C-GD-02** · **Dominio de `blue_work`.** `blue_work` se representa como `u256` (§2, tabla de
+tipos). Toda suma **MUST** usar aritmética comprobada (C-ENC-03): un desbordamiento es **fallo de
+consenso explícito**, nunca envoltura ni truncamiento. Cota demostrada: `blue_work(B) < n · 2^128`,
+donde `n = |past(B)| + 1`, porque cada bloque aporta su peso como mucho una vez al conjunto azul
+acumulado; en bits, `128 + ⌈log₂ n⌉`. Con `u256` la cota no se alcanza salvo con un DAG de `2^128`
+bloques. No se hereda el tipo de Autonomys ni el de Kaspa: `Uint192` desbordaría al acumular `2^64`
+contribuciones máximas, y ZEROX no declara ningún tope de bloques.
+
+**C-GD-03** · **Padre seleccionado.** `sp(B)` es el padre de **mayor** `blue_work`; si empatan,
+el de **menor** `solution_distance`; si vuelven a empatar, el de **menor** id por orden de bytes.
+Es decir: entre los padres de mayor `blue_work`, el que iría primero en el orden del mergeset
+(C-GD-05). El mismo criterio elige la punta virtual entre las puntas del DAG.
+
+**C-GD-04** · **Mergeset.** `mergeset(B) = past(B) \ (past(sp(B)) ∪ {sp(B)})`. El bloque **MUST**
+rechazarse si supera los límites de R-FIN-12: más de 15 padres, o `|mergeset(B)| + 1 > 180` con
+`k = 30`. Siguen vigentes `slot(sp(B)) ≤ slot(B)` (C-HDR-05) y `slot(B) − slot(sp(B)) ≤ S_max`.
+
+**C-GD-05** · **Orden del mergeset.** Ascendente por `(blue_work, solution_distance, id)`, con el
+id comparado por bytes. Es el **mismo** orden para colorear (C-GD-06, C-GD-07) y para aplicar
+(C-ORD-03). **MUST NOT** depender del orden de llegada de los bloques.
+
+**C-GD-06** · **Coloreo por k-cluster.** Se recorre el mergeset en el orden de C-GD-05. El
+contexto de partida es el conjunto azul heredado de `sp(B)`, y `blues(B)` empieza por `sp(B)`. Un
+candidato es **azul** si (i) su anticono dentro del contexto tiene como mucho `k` bloques, y
+(ii) ningún azul de ese anticono llega a `k` con él dentro. Si falla cualquiera de las dos, es
+`rojo_k`. Un candidato aceptado se añade al contexto antes de evaluar el siguiente.
+
+**C-GD-07** · **Unicidad de billete (U2 y U3″ dinámica).** Con identidad de billete
+`(public_key, sector_index, history_size, chunk, slot)` (R-FIN-11):
+- **U2:** si esa identidad aparece en `padres(B)` o en el pasado estricto de algún padre, `B` es
+  **inválido**. Es regla de consenso, no filtro de retransmisión.
+- **U3″ dinámica:** un candidato del mergeset cuya identidad ya sea azul en `past(sp(B))`, o ya
+  haya sido coloreada azul por un candidato anterior **en el orden de C-GD-05**, es `rojo_U3`, y
+  **MUST NOT** evaluarse contra el k-cluster.
+
+**C-GD-08** · **Acumuladores.** `blue_score(B) = blue_score(sp(B)) + |blues(B)|` y
+`blue_work(B) = blue_work(sp(B)) + Σ_{x ∈ blues(B)} w(x)`, donde `blues(B)` incluye a `sp(B)`. Un
+bloque **no** aporta su propio peso a su `blue_work`: lo hereda cuando otro lo incluye entre sus
+azules.
+
+**C-GD-09** · **Determinismo y color contextual.** Los datos GHOSTDAG de `B` —padre seleccionado,
+mergeset ordenado, colores, `blue_score` y `blue_work`— son función **exclusiva** de `past(B)`:
+**MUST NOT** depender del orden de llegada, de la punta observada ni del reloj local. El **color**,
+en cambio, es contextual: es el que el bloque recibe en el bloque de cadena que lo fusiona, y puede
+cambiar si un reorg cambia quién lo fusiona. El dato almacenado de un bloque no cambia; sí cambia
+el papel que juega al ser fusionado.
+
+**Lo que esta sección todavía no cierra.** Conflictos de transacciones y estado UTXO sobre el orden
+resultante, cálculo contextual del rango, flujos y la laguna de unicidad pagable declarada en §7.2.
 Los identificadores C-FORK-01 a C-FORK-04 del acumulador anterior quedan retirados; no se reutilizan
-para afirmar que una regla DAG distinta ya está implementada. El desempate del diseño destino
-debe integrarse y comprobarse junto al orden GHOSTDAG.
+ni se reciclan sus números.
 
 ---
 

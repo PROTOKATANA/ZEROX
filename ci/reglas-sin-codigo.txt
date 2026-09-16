@@ -119,3 +119,25 @@ C-SPEC-02
 # C-SPEC-03 · veritas/LINEO.md es de lectura y cumplimiento obligatorios (Julia CPU, GPU C++/CUDA,
 # topes de 64 GiB / 24 hilos, envoltorio julia.sh, oráculo y reproducibilidad).
 C-SPEC-03
+
+# ── GHOSTDAG y orden del DAG (SPEC §7.2 y §11): redactadas, sin código todavía ─────────────────
+#
+# Katana decidió la direccion de los desempates el 2026-09-14 (regla C, TAREAS.md §1.3) y el SPEC
+# las redacta en §11 (C-GD-*) y §7.2 (C-ORD-*). El consenso del nodo todavia no existe: zx-consensus
+# valida la cadena lineal transitoria, no un DAG. El instrumento veritas/consenso/ghostdag-rank-v1/
+# (GDR-v0.2) las implementa y las comprueba contra los vectores oficiales de rusty-kaspa, pero es
+# Julia y vive fuera de crates/, asi que no cuenta como cita.
+#
+# Se retiran de esta lista de una en una, conforme cada regla tenga codigo que la cite.
+C-GD-01
+C-GD-02
+C-GD-03
+C-GD-04
+C-GD-05
+C-GD-06
+C-GD-07
+C-GD-08
+C-GD-09
+C-ORD-01
+C-ORD-02
+C-ORD-03

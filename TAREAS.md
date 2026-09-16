@@ -14,17 +14,29 @@ implementar» de «se puede lanzar».
 
 ## Nivel 1 — Forks latentes: el SPEC no es determinista aquí
 
-Escribir código contra estos puntos produce nodos que discrepan. Son el único bloqueo duro.
+Escribir código contra estos puntos produce nodos que discrepan. Son el único bloqueo duro. Tras
+cerrar 1.2 y 1.3 en el SPEC el 2026-09-15, el único que sigue sin contenido es 1.4.
 
-### 1.2 · `rank` no define un orden total
+### 1.2 · `rank`: definido en el SPEC y demostrado total; falta el código
 
 §7.2 fija el desempate entre copias (P1: azul primero, luego `rank`, luego id de bloque), pero
 `rank` es hoy una etiqueta abstracta suministrada — CONTRATO de DCM-v0.1: «Rank y color son
 etiquetas globales suministradas, no recalculadas». Hay que atarlo al orden concreto del mergeset
 (`blue_work`, `solution_distance`, hash) y **demostrar que es total**. Un empate hace el desempate
-no determinista, y eso es un fork. Ya declarado como PENDIENTE en §7.2.
+no determinista, y eso es un fork. Fue el PENDIENTE de §7.2 hasta el 2026-09-15.
 
-### 1.3 · GHOSTDAG no está derivado, y P1 depende de él
+**Estado: CERRADO EN EL SPEC (2026-09-15).** `rank` ya está redactado como **C-ORD-01** y P1 como
+**C-ORD-02**, con el orden de aplicación en **C-ORD-03** (SPEC §7.2).
+- `rank = (blue_work, solution_distance, id)` ascendente, y el id final es obligatorio: es lo que
+  ancla la totalidad.
+- **Decidido por Katana (2026-09-15):** P1 **pierde** su desempate final por id, porque `rank` ya
+  es total y ya termina en ese id. Demostrado, no solo comprobado.
+- Las demostraciones de totalidad y de compatibilidad causal están resumidas en el SPEC y completas
+  en `veritas/consenso/ghostdag-rank-v1/PROPUESTA-SPEC.md`.
+- **Lo que queda es código**, no SPEC: los fixtures de DCM-v0.1 siguen suministrando `rank` y color
+  como etiquetas en vez de recalcularlos.
+
+### 1.3 · GHOSTDAG: derivado y redactado en el SPEC; falta el código del nodo
 
 El color (azul / `rojo_k` / `rojo_U3`) lo suministra hoy el oráculo del fixture; DCM-v0.1 declara
 que «no acredita la coloración ni el orden contextual de GHOSTDAG». Con P1 decidido, el desempate
@@ -56,9 +68,16 @@ nueva, pero la vuelve crítica para el pago.
   - **hecho (2026-09-14):** GDR-v0.2 (`veritas/consenso/ghostdag-rank-v1/`) implementa C con un
     oráculo de claves propias, derivaciones con hora verificable y demostraciones escritas de
     `rank`;
-  - redactar §7.2 y §11 del SPEC (el borrador está en `PROPUESTA-SPEC.md` del instrumento);
-  - siguen abiertos el dominio y el desbordamiento de `blue_work` (D-5), y si P1 conserva su id
-    final, que con este `rank` es redundante.
+  - **hecho (2026-09-15):** redactado en el SPEC. §11 pasa a nueve reglas, **C-GD-01** a
+    **C-GD-09** (peso, dominio de `blue_work`, padre seleccionado, mergeset, orden, coloreo,
+    U2/U3″, acumuladores y determinismo), y §7.2 a **C-ORD-01** a **C-ORD-03**;
+  - **D-5 decidido por Katana (2026-09-15):** `blue_work` se representa en **u256**, con
+    desbordamiento como fallo explícito de consenso por C-ENC-03. No se hereda `Uint192` de Kaspa:
+    desbordaría al acumular 2⁶⁴ contribuciones máximas y ZEROX no declara tope de bloques. El
+    repositorio ya usaba `u256` como tipo de codificación (SPEC §2) y `TrabajoAcumulado(U256)` con
+    suma comprobada (`crates/zx-core/src/target.rs:273-292`);
+  - **lo que queda es código del nodo**, no SPEC: las doce reglas están declaradas en
+    `ci/reglas-sin-codigo.txt` hasta que `crates/` las cite.
 
 ### 1.4 · La cabecera DAG no existe
 
@@ -107,8 +126,10 @@ Arranque por red, ventana, límites y redondeos, fusiones fuera de ventana y val
 candidatas con pesos reales. Conservado a propósito en el «Pendiente» de §7.2.
 
 ### 2.4 · Orden de ejecución del DAG y conflictos
-Cadena seleccionada, peso, `blue_work`, orden de aplicación del mergeset y resolución de
-conflictos de transacciones (§17, «DAG»).
+Cadena seleccionada, peso, `blue_work` y orden de aplicación del mergeset **ya están redactados**
+(C-GD-03, C-GD-05, C-GD-08 y C-ORD-03, desde el 2026-09-15). Queda la **resolución de conflictos
+de transacciones** sobre ese orden —qué gasto gana y qué pasa con el que se descarta— y su enlace
+con el estado UTXO de §2.6 (§17, «DAG»).
 
 ### 2.5 · Alturas y calendario derivados del orden DAG
 Activaciones, madurez de coinbase, timelocks, expiración de tx y sectores, archivado. MIGRACION:
@@ -142,7 +163,7 @@ cuando el v2a mida con qué frecuencia faltan transacciones en las mempools.
 
 | # | Punto | Estado |
 |---|---|---|
-| 3.1 | **`Δ` natural medida solo en simulación** | Instrumento `veritas/finalidad/delta-medido-v1/` (MS; revisión 2 validada y migrada el 2026-09-14); cinco decisiones tomadas; pendientes el banco en hardware y el v2, ver abajo |
+| 3.1 | **`Δ` natural medida solo en simulación** | Instrumento `veritas/finalidad/delta-medido-v1/` (MS; revisión 2 validada y migrada el 2026-09-14); cinco decisiones tomadas; coste por salto medido en hardware (`veritas/rendimiento/coste-salto-v1/`, 2026-09-14); pendiente el v2 (v2a y v2b), ver abajo |
 | 3.2 | `F` = 2 h **provisional** | Con obligación declarada de bajarla en producción |
 | 3.3 | `I`, `L`, `ρ_max` | Sin cerrar; `ρ_max` entre 3× sin segundo VDF y revelación retardada |
 | 3.4 | **P-038** | Abierta |
@@ -291,8 +312,8 @@ cota inferior):
 - **Motivo:** la pregunta del percentil existe solo porque las simulaciones antiguas usaban Δ
   constante. Hoy no cambia nada: todo estadístico del v1 queda por debajo de 4 s, donde `k=30` no
   deja bloques honestos rojos (ronda 11a). Importa para el método del v2.
-- **Dependencia:** portar el instrumento δ₀ (Python) a Julia exige un GHOSTDAG en Julia, que es
-  TAREAS 1.3. El trabajo sirve para las dos cosas. Ponderar por espacio requiere una hipótesis
+- **Dependencia:** portar el instrumento δ₀ (Python) a Julia exige un GHOSTDAG en Julia. Ya
+  existe: GDR-v0.2 (TAREAS 1.3, 2026-09-14). Ponderar por espacio requiere una hipótesis
   declarada sobre su reparto.
 
 **Q4 · Consenso antes de reenviar, transacciones después; PoT por slot con caché y verificación
@@ -376,10 +397,17 @@ reinclusión como la que modela la cola de RCE-v0.1? La Δ natural ya está medi
 margen `G` de cierre de la ventana, que en RCE-v0.1 es escenario pendiente, y las particiones y la
 retención adversaria, que el v2 todavía no mide.
 
-### 4.2 · IDs de regla para §7.2
-Hoy es prosa, como el resto de §7.2. Darle IDs `C-XXX-NN` obliga a declararlos en
-`ci/reglas-sin-codigo.txt` como trabajo futuro, porque `ci/citas-spec.sh` exige que toda regla esté
-citada en `crates/` o declarada. Es una decisión de convención del SPEC.
+### 4.2 · IDs de regla para §7.2 — DECIDIDO POR KATANA (2026-09-15)
+
+Las reglas de §7.2 y §11 llevan IDs `C-XXX-NN`. Se aplicó con dos familias nuevas: **C-ORD-NN**
+para el orden y el desempate de §7.2, y **C-GD-NN** para GHOSTDAG en §11.
+
+- Los IDs son **nuevos y estables**: no se reutiliza ninguno retirado, empezando por los
+  `C-FORK-01` a `C-FORK-04` del acumulador anterior.
+- Mientras no exista código, se declaran en `ci/reglas-sin-codigo.txt`, como exige
+  `ci/citas-spec.sh`; se retiran **uno a uno** conforme cada regla quede implementada y citada.
+- Motivo: es el criterio spec-first del proyecto. El código entra cuando tiene su regla normativa
+  que citar, y CI vigila que ninguna quede huérfana en los dos sentidos.
 
 ---
 
@@ -415,8 +443,9 @@ citada en `crates/` o declarada. Es una decisión de convención del SPEC.
 2. **GHOSTDAG + `rank` total (1.3 + 1.2)** juntos — son el mismo problema por dos lados, y
    desbloquean §7.2 completa. El GHOSTDAG en Julia también alimenta δ₀ con la distribución de Δ
    (Q3) y el v2b (Q5). **No depende de Δ:** puede arrancar en paralelo al banco y al v2a, y es el
-   camino crítico para escribir código, porque el nivel 1 es el único bloqueo duro. El
-   instrumento ya existe (GDR-v0.2, 2026-09-14); falta redactar §7.2 y §11 del SPEC.
+   camino crítico para escribir código, porque el nivel 1 es el único bloqueo duro. **Cerrado en
+   el SPEC el 2026-09-15**: instrumento GDR-v0.2 y reglas C-GD-01 a C-GD-09 y C-ORD-01 a C-ORD-03.
+   Lo que queda es el código del nodo, que es nivel 2.
 3. **Cabecera DAG (1.4)** — hasta que exista, ningún crate de serialización, red o almacenamiento
    puede cerrarse. Ya tiene presupuesto de diseño (Q2).
 4. El resto por área, siguiendo §17 del SPEC.
@@ -425,6 +454,12 @@ citada en `crates/` o declarada. Es una decisión de convención del SPEC.
 
 ## Cerrado recientemente (para no reabrirlo)
 
+- **GHOSTDAG y `rank` redactados en el SPEC (1.2 + 1.3)**, 2026-09-15. §11 pasa a nueve reglas
+  (`C-GD-01`…`C-GD-09`) y §7.2 a tres (`C-ORD-01`…`C-ORD-03`), con la regla C, `blue_work` en u256
+  y P1 sin su id final.
+  - Evidencia: `ci/citas-spec.sh` da 181 reglas, todas implementadas o declaradas; los doce IDs
+    nuevos están en `ci/reglas-sin-codigo.txt` hasta que haya código que los cite.
+  - Pendiente: el código del nodo (nivel 2) y la cabecera DAG (1.4), que ya puede apoyarse en §11.
 - **GHOSTDAG + `rank` en Julia (1.2 + 1.3, instrumento)**, 2026-09-14. `GDR-v0.2` en
   `veritas/consenso/ghostdag-rank-v1/`, con la regla C de Katana.
   - Qué calcula: color, cadena, orden y `rank`, que antes venían puestos a mano en los fixtures.
