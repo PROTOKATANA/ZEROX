@@ -2694,7 +2694,7 @@ congela parámetros ni convierte prototipos en implementaciones.
 | Cabecera y wire | Integrar en la ruta activa del nodo el formato ya fijado en §6.1–§6.2: layout (C-HDR-01), prefirma (C-HDR-03), justificación PoT (C-HDR-07) y codec único (C-HDR-09). El texto normativo no deja nada pendiente aquí. |
 | Prueba de espacio/tiempo | Verificación conjunta de solución, KZG, sello, reto secuencial, autoría y flujos. |
 | Rango | R-FIN-13′ completo: arranque, ventana, redondeos, fusiones tardías, ramas candidatas. |
-| DAG | Conflictos de transacciones sobre el orden ya definido (C-ORD-03) y su enlace con el estado UTXO (§2.6). GHOSTDAG, U2/U3″, peso, cadena seleccionada y orden quedan especificados en §11. |
+| DAG | Conflictos de transacciones sobre el orden ya definido (C-ORD-03) y su enlace con el estado UTXO (§2.6). Y tres reglas que esta especificación no tiene: `pick_virtual_parents` —qué puntas toma como padres un bloque que se produce, que es política de producción y no la verificación de C-GD-03—, el *merge depth bound* y el *pruning*. GHOSTDAG, U2/U3″, peso, cadena seleccionada y orden sí quedan especificados en §11. |
 | Alturas y calendario | Activaciones, expiración de tx/sectores, timelocks, coinbase y archivado derivados del orden DAG. |
 | Finalidad | Integración R-FIN-7, elección conjunta de I/F/L/ρ_max, particiones y recuperación. |
 | Red | Medir Δ y coste de pruebas; calibrar sincronización, scoring, recursos y propagación. |

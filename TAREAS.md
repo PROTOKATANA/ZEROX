@@ -135,6 +135,12 @@ control, inyección de entropía y dependencias por flujo.
 Eso fija el orden, no la verificación conjunta en sí, que sigue pendiente. Las reglas que faltan
 por escribir están en §2.7.
 
+**El verificador PoT no existe todavía.** `prototipos/pot-estable` tiene el PoT AES de Autonomys en
+Rust con vectores diferenciales, pero no está integrado, y
+`zx-core::wire_dag::verificar_justificacion_pot` devuelve `IntegracionPotPendiente` de forma
+explícita en vez de un booleano provisional. Hasta que exista, C-HDR-07 está en
+`ci/reglas-sin-cablear.txt` y nadie exige la justificación.
+
 ### 2.2 · La identidad del billete está supuesta, no demostrada
 Toda §7.2 —dedup, unicidad pagable, peso— se apoya en que el billete identifique de verdad la
 oportunidad. En los instrumentos eso es una declaración del fixture. La propiedad real depende de
@@ -150,6 +156,19 @@ Cadena seleccionada, peso, `blue_work` y orden de aplicación del mergeset **ya 
 (C-GD-03, C-GD-05, C-GD-08 y C-ORD-03, desde el 2026-09-15). Queda la **resolución de conflictos
 de transacciones** sobre ese orden —qué gasto gana y qué pasa con el que se descarta— y su enlace
 con el estado UTXO de §2.6 (§17, «DAG»).
+
+**Y tres reglas de Kaspa que ZEROX no tiene y que nadie estaba siguiendo.** El instrumento
+GDR-v0.2 las declara fuera de su alcance (`veritas/consenso/ghostdag-rank-v1/CONTRATO.md`), y al
+quedar §11 especificada es fácil darlas por resueltas. No lo están:
+
+- **`pick_virtual_parents`**: qué puntas incluye como padres un bloque que se **produce**. C-GD-03
+  fija cómo se **elige** el padre seleccionado entre unos padres dados, que es verificación; esto
+  es política de producción y no está escrita.
+- **Merge depth bound**: el límite de profundidad de fusión que impide que un bloque fusione un
+  pasado arbitrariamente viejo. Sin él, el coste de colorear no está acotado por nada más que
+  R-FIN-12.
+- **Pruning**: qué se puede podar del DAG y bajo qué garantía. Enlaza con la finalidad (§17) y con
+  el almacén.
 
 ### 2.5 · Alturas y calendario derivados del orden DAG
 Activaciones, madurez de coinbase, timelocks, expiración de tx y sectores, archivado. MIGRACION:
