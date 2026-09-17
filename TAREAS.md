@@ -15,7 +15,8 @@ implementar» de «se puede lanzar».
 ## Nivel 1 — Forks latentes: el SPEC no es determinista aquí
 
 Escribir código contra estos puntos produce nodos que discrepan. Son el único bloqueo duro. Tras
-cerrar 1.2 y 1.3 en el SPEC el 2026-09-15, el único que sigue sin contenido es 1.4.
+cerrar 1.2 y 1.3 en el SPEC el 2026-09-15 y 1.4 el 2026-09-17, el Nivel 1 **no tiene contenido
+pendiente**: lo que queda es integración en el nodo, que es Nivel 2.
 
 ### 1.2 · `rank`: definido en el SPEC y demostrado total; falta el código
 
@@ -79,23 +80,34 @@ nueva, pero la vuelve crítica para el pago.
   - **lo que queda es código del nodo**, no SPEC: las doce reglas están declaradas en
     `ci/reglas-sin-codigo.txt` hasta que `crates/` las cite.
 
-### 1.4 · La cabecera DAG no existe
+### 1.4 · La cabecera DAG: SPEC cerrado, falta cablear
 
-Padres múltiples, compromisos, formato y límites de la justificación PoT, y tamaño final: todo
-pendiente (§17). Persiste la discrepancia 92/556 con un test rojo conocido
-(`el_spec_dice_el_tamano_real_de_la_cabecera`). Y **C-HDR-06 define `rango_esperado(padre)` como
-«función pura de la cadena de cabeceras»** — lineal — cuando el destino es un DAG: esa regla hay
-que reescribirla, no portarla.
+**Estado: CERRADO EN EL SPEC (2026-09-17).** Igual que 1.2 y 1.3: lo que queda es código del nodo,
+no SPEC.
 
-**Ya tiene presupuesto de diseño** (Q2 de §3.1, decidido por Katana el 2026-09-13; presupuesto,
-no formato):
-- cabecera ≤ ~1 kB en el caso típico y ≤ ~20 kB en el peor, que son 16 padres y 150 slots de
-  justificación PoT;
-- anuncio compacto ≤ ~28 kB en el techo;
-- relé compacto obligatorio en la ruta crítica.
+- **Qué quedó fijado.** §6.1–§6.2 describen el formato completo: layout de la cabecera DAG con sus
+  offsets y tamaños (`589 + 32·(P−1)`, con `P` entre 1 y 15: 589/621/1 037 B), prefirma (C-HDR-03),
+  justificación PoT con `pot_bundle_count == slot(B) − slot(sp(B))` (C-HDR-07) y codec único para
+  wire, `pre_hash`, `block_hash` e IDs cortos (C-HDR-09). Los máximos de transporte se derivan de
+  esas fórmulas: 19 200 B de payload, 19 201 B codificados y 20 238 B de cabecera más
+  justificación (Q2). C-HDR-06 quedó reescrita para el contexto DAG y prohíbe la circularidad con
+  el `rango_solucion` declarado.
+- **Qué no se cierra aquí.**
+  - La **integración en `zx-node`**: la ruta activa sigue ligada a la cabecera lineal; hasta
+    cablearla, `el_codigo_alcanza_la_base_poas_de_556` sigue ignorado y la discrepancia 92/556
+    persiste. El test rojo es ahora ese, no `el_spec_dice_el_tamano_real_de_la_cabecera`, que
+    dejó de existir.
+  - El **controlador de rango** —ventana, bootstrap, redondeos y fusiones fuera de ventana—,
+    TAREAS §2.3.
+  - La **validación completa de cuerpo** y el estado UTXO, §2.6.
+  - El **caso degradado del relé compacto**, que es transporte (§2.7), no formato de bloque.
+
+**Presupuesto de diseño** (Q2 de §3.1, decidido por Katana el 2026-09-13): el formato de §6.1 lo
+respeta. Cabecera ≤ ~1 kB en el caso típico y ≤ ~20 kB en el peor, que son 15 padres y 150 slots
+de justificación PoT; anuncio compacto ≤ ~28 kB en el techo; relé compacto obligatorio en la ruta
+crítica.
 
 La r2 de `DMS-v0.1` midió 1,14–1,39 padres típicos, es decir, una cabecera típica de ≈716–748 B.
-El formato debe especificar además el caso degradado del relé compacto (§2.7).
 
 ---
 
@@ -150,7 +162,7 @@ en `crates/` o declararse en `ci/reglas-sin-codigo.txt`.
 |---|---|---|
 | Cola prioritaria para bloques y PoT sobre transacciones; presupuesto de reenvío de transacciones por debajo de la subida; reenvío de transacciones por anuncio y petición | Q1 | No existe en §16 ni en `crates/zx-p2p/src/behaviour.rs` |
 | Relé compacto obligatorio en la ruta crítica | Q2 | R-NET-01 lo negocia conexión a conexión (`SPEC.md:2509`) |
-| Caso degradado del relé compacto con presupuestos de recursos (C-NET-04), sin penalizar a quien reenvía (C-NET-05, C-NET-08) | Q2 | No especificado; se concreta en 1.4 |
+| Caso degradado del relé compacto con presupuestos de recursos (C-NET-04), sin penalizar a quien reenvía (C-NET-05, C-NET-08) | Q2 | No especificado; es transporte (§2.7), no formato de cabecera |
 | Tema de gossip del PoT, verificación una vez por slot con caché, y verificación bajo demanda con tres salvaguardas | Q4 | Solo existen los temas `blocks` y `txs` (`SPEC.md:2122`) |
 | C-NET-06 reescrita: consenso antes de reenviar, transacciones después | Q4 | Hoy solo exime la comprobación de UTXO (`SPEC.md:2162-2165`) |
 
@@ -204,7 +216,7 @@ cota inferior):
 | # | Pregunta abierta del v1 | Estado |
 |---|---|---|
 | Q1 | Ancho de banda de referencia | **Decidido por Katana, 2026-09-13** (abajo) |
-| Q2 | Presupuesto de tamaño de cabecera y bloque DAG (condiciona 1.4) | **Decidido por Katana, 2026-09-13** (abajo) |
+| Q2 | Presupuesto de tamaño de cabecera y bloque DAG (satisfecho por §6.1) | **Decidido por Katana, 2026-09-13** (abajo) |
 | Q3 | Qué estadístico de Δ gobierna cada parámetro | **Decidido por Katana, 2026-09-13** (abajo) |
 | Q4 | Cuánto cuesta la validación por salto (C-NET-12 ya obliga a validar) | **Decidido por Katana, 2026-09-13** (abajo) |
 | Q5 | Adversario de red: cuándo y cómo modelarlo | **Decidido por Katana, 2026-09-13** (abajo) |
@@ -244,16 +256,17 @@ cota inferior):
 
 **Q2 · Presupuesto compacto para la ruta crítica — DECIDIDO POR KATANA (2026-09-13).**
 
-- **Qué se fija:** un **presupuesto de diseño que 1.4 debe respetar, no un formato congelado**.
+- **Qué se fija:** un **presupuesto de diseño** que el formato cerrado en 1.4 respeta. El formato
+  se fijó después en §6.1–§6.2; el presupuesto no se movió al hacerlo.
   - Cabecera DAG (base PoAS + padres + justificación PoT): ≤ ~1 kB en el caso típico y ≤ ~20 kB
-    en el peor caso. El peor caso son 16 padres y 150 slots de justificación (S_max): 20 268 B, de
-    los que 19,2 kB son PoT.
+    en el peor caso. El peor caso son 15 padres y 150 slots de justificación (S_max): 20 238 B
+    (1 037 + 19 201), de los que 19 201 B son la justificación PoT codificada.
   - **Dos niveles.**
-    - **Lo que se reenvía y se valida en cada salto:** la cabecera sin justificación (base 556 B +
-      32 B por padre; 1 068 B con 16 padres) y los IDs cortos.
-    - **Lo que viaja pero no cuesta CPU por salto:** la justificación PoT (≤ 19,2 kB). Acompaña al
-      bloque (C-HDR-07) y se valida contra la caché de slots (Q4); su coste son bytes, 1,6 ms por
-      par a 100 Mbit/s con 20 kB.
+    - **Lo que se reenvía y se valida en cada salto:** la cabecera sin justificación
+      (`589 + 32·(P−1)`; 1 037 B con 15 padres) y los IDs cortos.
+    - **Lo que viaja pero no cuesta CPU por salto:** la justificación PoT (≤ 19 201 B). Acompaña
+      al bloque (C-HDR-07) y se valida contra la caché de slots (Q4); su coste son bytes, 1,6 ms
+      por par a 100 Mbit/s con 20 kB.
   - Anuncio compacto (cabecera + 6 B por transacción, C-NET-07): ≤ ~28 kB en el techo de Q1
     (≈4 464 transacciones de 350 B por bloque; 27 596 B).
   - Relé compacto **obligatorio en la ruta crítica**. Hoy R-NET-01 lo negocia conexión a
@@ -273,9 +286,10 @@ cota inferior):
   y el caso degradado sería el normal. Es una hipótesis derivada, no medida; se mide en el v2a (Q5).
 - **Pendiente derivado:**
   - Redactar la obligatoriedad del relé compacto en SPEC §16.
-  - Especificar en 1.4 el **caso degradado** (el receptor pide las transacciones que le faltan) como
+  - Especificar el **caso degradado** (el receptor pide las transacciones que le faltan) como
     mecanismo con presupuestos de recursos (C-NET-04), **sin penalizar a quien reenvía**: la falta
-    suele venir de mempools desincronizadas, no de mala fe (C-NET-05, C-NET-08).
+    suele venir de mempools desincronizadas, no de mala fe (C-NET-05, C-NET-08). Es transporte
+    (§2.7), no formato de cabecera.
   - **Pregunta abierta: relajar C-NET-06.** Hoy exige tener todas las transacciones antes de emitir
     el anuncio, así que la petición de las que faltan está en la ruta crítica. Anunciar antes de
     reconstruir la sacaría de ahí, a cambio de reenviar anuncios cuyo cuerpo podría no coincidir.
@@ -446,8 +460,9 @@ para el orden y el desempate de §7.2, y **C-GD-NN** para GHOSTDAG en §11.
    camino crítico para escribir código, porque el nivel 1 es el único bloqueo duro. **Cerrado en
    el SPEC el 2026-09-15**: instrumento GDR-v0.2 y reglas C-GD-01 a C-GD-09 y C-ORD-01 a C-ORD-03.
    Lo que queda es el código del nodo, que es nivel 2.
-3. **Cabecera DAG (1.4)** — hasta que exista, ningún crate de serialización, red o almacenamiento
-   puede cerrarse. Ya tiene presupuesto de diseño (Q2).
+3. **Cabecera DAG (1.4)** — **cerrada en el SPEC el 2026-09-17** (§6.1–§6.2). Lo que queda es
+   integrarla en `zx-node`; hasta entonces ningún crate de serialización, red o almacenamiento debe
+   darse por cerrado contra ella.
 4. El resto por área, siguiendo §17 del SPEC.
 
 ---
@@ -459,7 +474,8 @@ para el orden y el desempate de §7.2, y **C-GD-NN** para GHOSTDAG en §11.
   y P1 sin su id final.
   - Evidencia: `ci/citas-spec.sh` da 181 reglas, todas implementadas o declaradas; los doce IDs
     nuevos están en `ci/reglas-sin-codigo.txt` hasta que haya código que los cite.
-  - Pendiente: el código del nodo (nivel 2) y la cabecera DAG (1.4), que ya puede apoyarse en §11.
+  - Pendiente: el código del nodo (nivel 2). La cabecera DAG quedó cerrada en el SPEC el
+    2026-09-17 (§6.1–§6.2).
 - **GHOSTDAG + `rank` en Julia (1.2 + 1.3, instrumento)**, 2026-09-14. `GDR-v0.2` en
   `veritas/consenso/ghostdag-rank-v1/`, con la regla C de Katana.
   - Qué calcula: color, cadena, orden y `rank`, que antes venían puestos a mano en los fixtures.

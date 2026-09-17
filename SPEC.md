@@ -297,8 +297,9 @@ los incluye, y eso es lo que la hace no maleable (C-TX-01).
 las transacciones con sus testigos (C-WIRE-03) y la justificación PoT obligatoria (C-HDR-07).
 Los testigos pertenecen a cada transacción. El códec no sustituye la validación.
 
-**Pendiente de integración DAG:** fijar la codificación de padres y justificación PoT, sus límites
-y su compromiso antes de publicar un formato de bloque definitivo.
+**Pendiente de integración DAG:** el formato, los límites y el compromiso de los padres y de la
+justificación PoT ya están fijados en §6.1–§6.2 y existen tipos y códecs en `zx-core`.
+Falta integrarlos en la ruta activa del nodo, que sigue ligada a la cabecera lineal.
 
 **C-WIRE-04 · Todo contador declarado MUST acotarse ANTES de reservar memoria por él.** Un lector
 **MUST** rechazar un `CompactSize` que declare más de `MAX_ELEMENTOS_DECLARADOS = 1 000 000`
@@ -578,7 +579,9 @@ exactamente 16 bytes.
 | `ZZKTxSigThisIn__` | §4.3 la entrada que se firma |
 | `ZZKTxAuthHash___` | §4.4 auth digest |
 | `ZZKBlkMerkle____` | §6.3 árbol de Merkle de transacciones |
-| `ZZKBlkHeader____` | §6.2 hash de cabecera |
+| `ZZKBlkHeader____` | §6.2 hash de cabecera, sello incluido (C-HDR-09) |
+| `ZZKBlkPreHash___` | §6.2 `pre_hash`: mensaje que firma el sello (C-HDR-03) |
+| `ZZKBlkBodyHash__` | §6.1 compromiso completo del cuerpo, efectos y autorización |
 
 ---
 
@@ -846,6 +849,25 @@ compromisos todavía necesitan integración. El tamaño final del DAG y sus offs
 concatenando los campos en ese orden, con enteros little-endian. Esta cifra no incluye una
 extensión de padres DAG y no afirma que el código ya implemente la base.
 
+La **cabecera DAG** conserva los campos y offsets de la prefirma PoAS lineal `[0, 492)` y añade,
+antes del sello:
+
+```text
+prefijo_fijo_poas_sin_sello(492)
+‖ body_commitment(32)
+‖ parent_count(1)
+‖ extra_parents(32 · (parent_count − 1), o cero en génesis)
+‖ sello(64)
+```
+
+Offsets fijos: `body_commitment [492, 524)`, `parent_count [524, 525)`,
+`extra_parents [525, 525 + 32·(P−1))`, `sello` los últimos 64 bytes. Tamaños:
+`normal(P) = 589 + 32·(P−1)` con `1 ≤ P ≤ 15`, de modo que `P=1` mide **589 B**, `P=2` **621 B**
+y `P=15` **1 037 B**; el génesis mide **589 B**. Las constantes del tipo distinguen prefijo fijo,
+cabecera mínima y cabecera máxima. Los padres adicionales se codifican por sus 32 bytes en orden
+lexicográfico estrictamente ascendente, sin duplicados y sin repetir `prev_hash`; el parser
+**MUST** rechazar el orden no canónico y no ordenar una entrada hostil para aceptarla.
+
 **C-HDR-02** · La posición de un bloque se deriva de sus ancestros, nunca se confía en la altura
 declarada. El génesis tiene `height = 0`. La definición de altura y su relación con cadena
 seleccionada, orden DAG y activaciones sigue pendiente; no se usa el índice de un lote como altura DAG.
@@ -858,13 +880,52 @@ un campo de "versión de bloque" separado: la rama de consenso *es* la versión.
 `slot(sp(B)) ≤ slot(B)` (R-FIN-1a). La igualdad no autoriza ciclos; la validación de ancestros,
 flujo y justificación secuencial del PoT se integra conjuntamente. El génesis tiene `slot = 0`.
 
-**C-HDR-06** · `rango_solucion` viaja en la cabecera y **MUST** ser exactamente
-`rango_esperado(padre)`, función pura de la cadena de cabeceras. Cualquier otro valor invalida el
-bloque. Es **redundancia comprobada** para clientes ligeros, nunca fuente de verdad.
+**C-HDR-06** · `rango_solucion` viaja en la cabecera y **MUST** ser exactamente el rango
+esperado contextual:
+
+```text
+rango_esperado(B) = controlador(past(B), flow(B, slot(B)))
+B.rango_solucion == rango_esperado(B)
+```
+
+El rango esperado **MUST** aportarlo el contexto del pasado DAG validado y del flujo; debe ser
+función **exclusiva** de ese pasado. **MUST NOT** depender del orden de llegada, la punta local, el
+reloj local, `timestamp`, `height` declarado ni del propio `rango_solucion` que declara `B`. Es
+**redundancia comprobada** para clientes ligeros, nunca fuente de verdad.
+
+Ninguna implementación **MUST** ofrecer una vía que acepte el `rango_solucion` declarado por el
+propio candidato como si fuese el esperado: la circularidad **MUST** ser imposible, no solo
+desaconsejada. El algoritmo del controlador —ventana, bootstrap, redondeos y fusiones fuera de
+ventana— sigue en `TAREAS.md` §2.3; no se define aquí.
+
+> *Nota ilustrativa (no normativa).* La implementación Rust de referencia expone un contexto
+> (`zx-consensus::ContextoRangoDag`) que recibe una vista del candidato **sin** acceso a
+> `rango_solucion`; el intento de leerlo no compila. Es una forma de cumplir la exigencia doble de
+> arriba, no la exigencia misma: cualquier implementación, en cualquier lenguaje, **MUST** hacer
+> imposible la circularidad.
 
 **C-HDR-07** · La justificación del PoT no está en la base de cabecera, pero debe acompañar al
 bloque para validar su prueba. Sin ella no se puede declarar válido ni adoptar el bloque.
 La sincronización debe distinguir datos pendientes de pruebas verificadas como inválidas.
+
+En el formato DAG, el bloque completo es:
+
+```text
+dag_header
+‖ pot_bundle_count:u8
+‖ pot_bundle_count × PotCheckpoints      (128 B cada uno: 8 PotOutput de 16 B)
+‖ CompactSize(n_tx)
+‖ n_tx × tx_con_testigos
+```
+
+`0 ≤ pot_bundle_count ≤ 150` y la cota se comprueba **antes** de reservar. `d = 0` tiene lista
+vacía canónica; el génesis usa cero portadores. Para un bloque no génesis, la validación
+contextual **MUST** exigir `pot_bundle_count == slot(B) − slot(sp(B))` y rechazar underflow o
+diferencia mayor de 150. Los portadores se interpretan en orden cronológico y **MUST NOT**
+aceptarse otra codificación del mismo valor. La prueba es evidencia contextual reemplazable y
+**no** entra en `block_hash`; la cabecera sí firma/hashea `slot`, `pot_output` y los padres. Mientras
+el verificador PoT AES no esté integrado, la comprobación **MUST** devolver un estado explícito
+(`IntegracionPotPendiente`), nunca un booleano verdadero provisional.
 
 **C-HDR-08** · La cabecera **MUST NOT** contener la dirección de recompensa. La recompensa es la
 salida de la coinbase, ya comprometida en `merkle_root` (C-EMIT-04).
@@ -876,7 +937,8 @@ salida de la coinbase, ya comprometida en `merkle_root` (C-EMIT-04).
 ### 6.2 · Hash de cabecera y sello
 
 **C-HDR-03** · En la base lineal, `prefirma = header_encoding[0, 492)`, excluyendo el sello.
-En el formato DAG la preimagen debe comprometer también los padres; su extensión está pendiente.
+En el formato DAG, `prefirma` es todo lo anterior al sello: el prefijo fijo, el compromiso del
+cuerpo, `parent_count` y los padres adicionales. En ambos casos
 `pre_hash = H_d("ZZKBlkPreHash___", prefirma)`.
 
 **C-HDR-04** · `sello` **MUST** ser una firma Ed25519 válida sobre `pre_hash` bajo
@@ -896,7 +958,24 @@ En el formato DAG la preimagen debe comprometer también los padres; su extensi�
 > no cambia el algoritmo de firma ni activa una regla de consenso.
 
 **C-HDR-09** · `block_hash = H_d("ZZKBlkHeader____", header_encoding)`, sello incluido.
-La base lineal ocupa **556** bytes; la codificación DAG definitiva queda pendiente.
+La base lineal ocupa **556** bytes; la cabecera DAG mide entre **589** y **1 037** bytes según el
+número de padres. La misma codificación canónica alimenta wire, `pre_hash`, `block_hash` y la
+derivación de identificadores cortos; no hay un segundo serializador.
+
+De ese mismo formato se derivan los máximos que un par **MUST** usar para acotar lo que
+transporta; no se escriben a mano:
+
+```text
+justificación PoT, payload máximo    = 150 × 128           = 19 200 B
+justificación PoT, codificada        = 1 + 19 200          = 19 201 B
+cabecera DAG + justificación, máximo = 1 037 + 19 201      = 20 238 B
+```
+
+La justificación **codificada** son 1 byte de `pot_bundle_count` más `pot_bundle_count × 128`
+(C-HDR-07); el agregado usa la codificada, **no** el payload. La cabecera máxima son
+`589 + 32·(15−1) = 1 037 B` (C-HDR-01). Estas cifras acotan cabecera y justificación PoT; el cuerpo
+de transacciones se acota aparte por §6.5. Un límite de transporte que aplique otro máximo
+rechazaría un bloque legítimo.
 
 ### 6.3 · Árbol de Merkle
 
@@ -1944,7 +2023,8 @@ firma válida en una rama es por construcción inválida en cualquier otra.
 > `N_LARGO`, `REF_WEIGHT`— son **cambios de parámetro puros**: no fuerzan ningún cambio de formato
 > que resulte trivialmente inválido bajo las reglas viejas. Son exactamente el caso vulnerable.
 > Al nacer sin cadena viva, podemos ponerlo en la cabecera desde el bloque 0 y sin coste: el
-> compromiso de rama debe conservarse en la cabecera DAG definitiva, cuya codificación sigue pendiente.
+> compromiso de rama se conserva en la cabecera DAG, cuyo formato fija §6.1 (`consensus_branch_id`,
+> C-HDR-02b).
 
 ### 14.3 · Comportamiento del nodo
 
@@ -1984,7 +2064,8 @@ ello los convierta en variables de ejecución: `N_CORTO`, `N_LARGO`, `ZONA_LIBRE
 
 **C-GEN-01 · Definición constructiva, hash asertado.** El génesis se construye determinísticamente
 a partir de parámetros explícitos y su hash se compara con una constante congelada al arrancar.
-La cabecera, raíz inicial, reloj PoT, rango y bootstrap del DAG quedan pendientes de definición.
+El formato de la cabecera del génesis lo fija §6.1; los **valores** concretos de sus campos —raíz
+inicial, reloj PoT, rango y bootstrap— quedan pendientes de definición.
 
 **C-GEN-02 · Bootstrap.** La inserción del génesis es una ruta explícita. Las condiciones de
 prueba y estado inicial PoST que la distingan de bloques posteriores deben especificarse antes
@@ -2610,10 +2691,10 @@ congela parámetros ni convierte prototipos en implementaciones.
 
 | Área | Trabajo pendiente |
 |---|---|
-| Cabecera y wire | Padres múltiples, compromisos, formato y límites de la justificación PoT; tamaño final DAG. |
+| Cabecera y wire | Integrar en la ruta activa del nodo el formato ya fijado en §6.1–§6.2: layout (C-HDR-01), prefirma (C-HDR-03), justificación PoT (C-HDR-07) y codec único (C-HDR-09). El texto normativo no deja nada pendiente aquí. |
 | Prueba de espacio/tiempo | Verificación conjunta de solución, KZG, sello, reto secuencial, autoría y flujos. |
 | Rango | R-FIN-13′ completo: arranque, ventana, redondeos, fusiones tardías, ramas candidatas. |
-| DAG | GHOSTDAG, U2/U3″, peso, cadena seleccionada, orden de ejecución y conflictos. |
+| DAG | Conflictos de transacciones sobre el orden ya definido (C-ORD-03) y su enlace con el estado UTXO (§2.6). GHOSTDAG, U2/U3″, peso, cadena seleccionada y orden quedan especificados en §11. |
 | Alturas y calendario | Activaciones, expiración de tx/sectores, timelocks, coinbase y archivado derivados del orden DAG. |
 | Finalidad | Integración R-FIN-7, elección conjunta de I/F/L/ρ_max, particiones y recuperación. |
 | Red | Medir Δ y coste de pruebas; calibrar sincronización, scoring, recursos y propagación. |

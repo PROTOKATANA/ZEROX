@@ -35,6 +35,14 @@ use zx_consensus::emision::COINBASE_MATURITY;
 use zx_consensus::fork_choice::MAX_REORG_LENGTH;
 use zx_consensus::peso::{N_LARGO, ZONA_LIBRE};
 use zx_core::preimage::block::TAMANO_CABECERA;
+use zx_core::preimage::dag::{
+    MAX_PADRES, OFFSET_COMPROMISO_CUERPO, OFFSET_PADRES_EXTRA, OFFSET_PARENT_COUNT,
+    TAMANO_CABECERA_MAX, TAMANO_CABECERA_MIN, TAMANO_PREFIJO_FIJO, tamano_cabecera,
+};
+use zx_core::wire_dag::{
+    BUNDLE_BYTES, CHECKPOINTS_POR_BUNDLE, MAX_BLOQUE_DAG_AGREGADO, MAX_BUNDLES_POT,
+    MAX_JUSTIFICACION_POT_CODIFICADA, MAX_JUSTIFICACION_POT_PAYLOAD, POT_OUTPUT_BYTES,
+};
 
 /// El SPEC, incrustado en el binario de test.
 const SPEC: &str = include_str!("../../../SPEC.md");
@@ -51,6 +59,23 @@ fn normativo() -> String {
         .filter(|l| !l.trim_start().starts_with('>'))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Formatea un entero con espacio como separador de millares, igual que lo escribe el SPEC.
+///
+/// Existe para que las cadenas que se buscan en el SPEC se **construyan** desde la constante y
+/// no se transcriban a mano: `afirma(&format!("{} B", miles(MAX_...)))` falla si la constante
+/// cambia, aunque el literal escrito a mano siguiera diciendo el valor viejo.
+fn miles(n: usize) -> String {
+    let s = n.to_string();
+    let mut salida = String::with_capacity(s.len() + s.len() / 3);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i) % 3 == 0 {
+            salida.push(' ');
+        }
+        salida.push(c);
+    }
+    salida
 }
 
 /// Comprueba que una cifra ya corregida no ha vuelto al texto normativo.
@@ -122,7 +147,7 @@ fn el_spec_conserva_la_base_poas_de_556() {
 }
 
 #[test]
-#[ignore = "TAREAS.md §1.4: el código conserva la cabecera PoW de 92 B. El formato DAG (padres múltiples, compromisos, justificación PoT) no está cerrado, y 556 B es la base LINEAL, no el destino. Quitar este ignore cuando la cabecera DAG se implemente."]
+#[ignore = "TAREAS.md §1.4 (SPEC cerrado, falta cablear): el código conserva la cabecera lineal de 92 B; el formato DAG ya está especificado en SPEC §6.1–§6.2 (589/1 037 B, codec único) y 556 B es la base LINEAL, no el destino. Quitar este ignore cuando la cabecera DAG se cablee en la ruta activa."]
 fn el_codigo_alcanza_la_base_poas_de_556() {
     // MIGRACIÓN PENDIENTE: 556 B describe la base PoAS lineal, no la cabecera DAG final.
     // El guardián exige que el código alcance esa base y permanece rojo mientras conserve
@@ -130,7 +155,8 @@ fn el_codigo_alcanza_la_base_poas_de_556() {
     assert_eq!(
         TAMANO_CABECERA, 556,
         "SPEC §6.1 conserva la base PoAS lineal de 556 B (112 + 380 + 64). El código todavía \
-         no implementa esa base; el formato DAG completo también está pendiente."
+         no implementa esa base; el formato DAG está especificado (SPEC §6.1–§6.2) y falta \
+         cablearlo."
     );
 }
 
@@ -265,4 +291,194 @@ fn ninguna_regla_esta_numerada_dos_veces() {
             "falta la regla común C-{requerida}"
         );
     }
+}
+
+/// **Los offsets de la cabecera DAG** (S-03, §6.1). Cada cifra se deriva de la constante.
+///
+/// Grupo de mutación: el offset se mueve si cambia `TAMANO_COMPROMISO_CUERPO` (32, primitivo) o
+/// el prefijo; la cadena del SPEC deja de aparecer.
+#[test]
+fn el_spec_dice_los_offsets_de_la_cabecera_dag() {
+    // Relaciones entre constantes, no entre literales.
+    assert_eq!(
+        OFFSET_COMPROMISO_CUERPO, TAMANO_PREFIJO_FIJO,
+        "S-03: OFFSET_COMPROMISO_CUERPO debe ser TAMANO_PREFIJO_FIJO"
+    );
+    assert_eq!(
+        OFFSET_PARENT_COUNT,
+        OFFSET_COMPROMISO_CUERPO + 32,
+        "S-03: OFFSET_PARENT_COUNT = OFFSET_COMPROMISO_CUERPO + 32 (32 = ancho de hash)"
+    );
+    assert_eq!(
+        OFFSET_PADRES_EXTRA,
+        OFFSET_PARENT_COUNT + 1,
+        "S-03: OFFSET_PADRES_EXTRA = OFFSET_PARENT_COUNT + 1 (byte parent_count)"
+    );
+
+    afirma(
+        &format!("header_encoding[0, {})", miles(TAMANO_PREFIJO_FIJO)),
+        "C-HDR-03: la prefirma lineal son los bytes anteriores al sello",
+    );
+    afirma(
+        &format!(
+            "body_commitment [{}, {})",
+            miles(OFFSET_COMPROMISO_CUERPO),
+            miles(OFFSET_PARENT_COUNT)
+        ),
+        "S-03: el compromiso del cuerpo ocupa [492, 524)",
+    );
+    afirma(
+        &format!(
+            "parent_count [{}, {})",
+            miles(OFFSET_PARENT_COUNT),
+            miles(OFFSET_PADRES_EXTRA)
+        ),
+        "S-03: parent_count es el byte [524, 525)",
+    );
+    afirma(
+        &format!(
+            "extra_parents [{}, {}",
+            miles(OFFSET_PADRES_EXTRA),
+            miles(OFFSET_PADRES_EXTRA)
+        ),
+        "S-03: los padres adicionales empiezan en 525",
+    );
+}
+
+/// **Los tamaños de la cabecera DAG** (S-03 y C-HDR-09, §6.1–§6.2).
+///
+/// Grupo de mutación: `MAX_PADRES`.
+#[test]
+fn el_spec_dice_los_tamanos_de_la_cabecera_dag() {
+    // Relaciones, incluida la del SPEC: `MAX = MIN + 32·(MAX_PADRES − 1)`.
+    assert_eq!(
+        TAMANO_CABECERA_MIN,
+        OFFSET_PADRES_EXTRA + 64,
+        "S-03: TAMANO_CABECERA_MIN = OFFSET_PADRES_EXTRA + 64 (sello Ed25519)"
+    );
+    assert_eq!(
+        tamano_cabecera(1),
+        TAMANO_CABECERA_MIN,
+        "S-03: tamano_cabecera(1) es la cabecera mínima"
+    );
+    assert_eq!(
+        tamano_cabecera(2),
+        TAMANO_CABECERA_MIN + 32,
+        "S-03: dos padres añaden un prev_hash de 32 B"
+    );
+    assert_eq!(
+        tamano_cabecera(MAX_PADRES as u8),
+        TAMANO_CABECERA_MAX,
+        "S-03: tamano_cabecera(MAX_PADRES) es la cabecera máxima"
+    );
+    assert_eq!(
+        TAMANO_CABECERA_MAX,
+        TAMANO_CABECERA_MIN + 32 * (MAX_PADRES - 1),
+        "S-03: MAX = MIN + 32·(MAX_PADRES − 1)"
+    );
+
+    afirma(
+        &format!("normal(P) = {} + 32·(P−1)", miles(TAMANO_CABECERA_MIN)),
+        "S-03: fórmula del tamaño de cabecera con P padres",
+    );
+    afirma(
+        &format!("1 ≤ P ≤ {}", MAX_PADRES),
+        "R-FIN-12: máximo de padres de la cabecera",
+    );
+    afirma(
+        &format!("P=1` mide **{} B**", miles(TAMANO_CABECERA_MIN)),
+        "S-03: la cabecera mínima (P=1) mide 589 B",
+    );
+    afirma(
+        &format!("P=2` **{} B**", miles(tamano_cabecera(2))),
+        "S-03: la cabecera con dos padres mide 621 B",
+    );
+    afirma(
+        &format!("P=15` **{} B**", miles(TAMANO_CABECERA_MAX)),
+        "S-03: la cabecera máxima mide 1 037 B",
+    );
+    afirma(
+        &format!("**{}**", miles(TAMANO_CABECERA_MIN)),
+        "C-HDR-09: tamaño mínimo de la cabecera DAG",
+    );
+    afirma(
+        &format!("**{}**", miles(TAMANO_CABECERA_MAX)),
+        "C-HDR-09: tamaño máximo de la cabecera DAG",
+    );
+    afirma(
+        &format!("más de {} padres", MAX_PADRES),
+        "C-GD-04/R-FIN-12: tope de padres en §11",
+    );
+}
+
+/// **Los máximos de la justificación PoT y del agregado** (S-08, C-HDR-07, §6.1–§6.2).
+///
+/// Grupo de mutación: `MAX_BUNDLES_POT` (la del ejemplo del encargo, 150 → 149).
+#[test]
+fn el_spec_dice_los_maximos_de_la_justificacion_pot() {
+    // Relaciones: la que importa es `codificada == 1 + payload`, donde nació H-07.
+    assert_eq!(
+        BUNDLE_BYTES,
+        CHECKPOINTS_POR_BUNDLE * POT_OUTPUT_BYTES,
+        "C-HDR-07: BUNDLE_BYTES = CHECKPOINTS_POR_BUNDLE · POT_OUTPUT_BYTES"
+    );
+    assert_eq!(
+        MAX_JUSTIFICACION_POT_PAYLOAD,
+        MAX_BUNDLES_POT * BUNDLE_BYTES,
+        "S-08: payload = MAX_BUNDLES_POT · BUNDLE_BYTES (150 · 128)"
+    );
+    assert_eq!(
+        MAX_JUSTIFICACION_POT_CODIFICADA,
+        1 + MAX_JUSTIFICACION_POT_PAYLOAD,
+        "S-08: codificada = 1 + payload (el byte de pot_bundle_count; el error de H-07)"
+    );
+    assert_eq!(
+        MAX_BLOQUE_DAG_AGREGADO,
+        TAMANO_CABECERA_MAX + MAX_JUSTIFICACION_POT_CODIFICADA,
+        "S-08: agregado = TAMANO_CABECERA_MAX + justificación codificada"
+    );
+
+    afirma(
+        &format!(
+            "{} B cada uno: {} PotOutput de {} B",
+            miles(BUNDLE_BYTES),
+            CHECKPOINTS_POR_BUNDLE,
+            POT_OUTPUT_BYTES
+        ),
+        "C-HDR-07: tamaño de cada portador PoT",
+    );
+    afirma(
+        &format!("0 ≤ pot_bundle_count ≤ {}", MAX_BUNDLES_POT),
+        "C-HDR-07: cota del número de portadores",
+    );
+    afirma(
+        &format!("= {} B", miles(MAX_JUSTIFICACION_POT_PAYLOAD)),
+        "S-08: payload máximo de la justificación (150 × 128)",
+    );
+    afirma(
+        &format!("{} B", miles(MAX_JUSTIFICACION_POT_CODIFICADA)),
+        "S-08: justificación codificada; incluye el byte de pot_bundle_count",
+    );
+    afirma(
+        &format!("{} B", miles(MAX_BLOQUE_DAG_AGREGADO)),
+        "S-08: máximo agregado de cabecera más justificación",
+    );
+    // El `1 + payload` que se perdió una ronda entera: se deriva, no se escribe.
+    let byte_contador = MAX_JUSTIFICACION_POT_CODIFICADA - MAX_JUSTIFICACION_POT_PAYLOAD;
+    afirma(
+        &format!(
+            "{} + {}",
+            byte_contador,
+            miles(MAX_JUSTIFICACION_POT_PAYLOAD)
+        ),
+        "S-08: el byte del contador más el payload",
+    );
+    afirma(
+        &format!(
+            "{} + {}",
+            miles(TAMANO_CABECERA_MAX),
+            miles(MAX_JUSTIFICACION_POT_CODIFICADA)
+        ),
+        "S-08: cabecera máxima más justificación codificada",
+    );
 }
