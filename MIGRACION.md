@@ -104,6 +104,9 @@ Comprobaciones realizadas antes de retirar la caché de compilación:
 - Guardianes de alcance, citas del SPEC, versiones exactas y frontera de crates: correctos.
 - `cargo test --offline --locked -j 2 --workspace --no-fail-fast --quiet`: un único test falla,
   `el_spec_dice_el_tamano_real_de_la_cabecera`, por la discrepancia preexistente 92/556.
+  *(Ese test se partió en dos el 2026-09-12: `el_spec_conserva_la_base_poas_de_556`, en verde, y
+  `el_codigo_alcanza_la_base_poas_de_556`, ignorado. La discrepancia 92/556 sigue viva en el
+  segundo; el nombre de arriba ya no existe.)*
   Las cuatro pruebas ignoradas de `tres_nodos` siguen ignoradas; no se añadieron exclusiones.
 - Las pruebas de red necesitaron repetirse fuera del sandbox para abrir sockets/mDNS y pasaron.
 - Enlaces locales de los documentos de entrada y READMEs comprobados; `git diff --check` correcto.

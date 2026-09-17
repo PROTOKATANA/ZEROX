@@ -1,6 +1,6 @@
 # TAREAS — lo que falta para que el SPEC PoST + DAG pase a fase de código
 
-Fecha: 2026-09-12; actualizado el 2026-09-14. Derivado de §17 de [SPEC.md](SPEC.md),
+Fecha: 2026-09-12; actualizado el 2026-09-17. Derivado de §17 de [SPEC.md](SPEC.md),
 `ci/consenso-pendiente.txt`, los límites declarados de los instrumentos de `veritas/`,
 [MIGRACION.md](MIGRACION.md), la auditoría externa de la comprobación decisiva v1
 ([AUDITORIA-EXTERNA.md](veritas/consenso/comprobacion-decisiva-v1/AUDITORIA-EXTERNA.md)) y las
@@ -16,9 +16,10 @@ implementar» de «se puede lanzar».
 
 Escribir código contra estos puntos produce nodos que discrepan. Son el único bloqueo duro. Tras
 cerrar 1.2 y 1.3 en el SPEC el 2026-09-15 y 1.4 el 2026-09-17, el Nivel 1 **no tiene contenido
-pendiente**: lo que queda es integración en el nodo, que es Nivel 2.
+pendiente**: las tres están especificadas sin ambigüedad y las tres tienen código. Lo que queda es
+integrarlo en la ruta activa, y eso es **§2.8**, Nivel 2.
 
-### 1.2 · `rank`: definido en el SPEC y demostrado total; falta el código
+### 1.2 · `rank`: especificado, implementado y sin cablear
 
 §7.2 fija el desempate entre copias (P1: azul primero, luego `rank`, luego id de bloque), pero
 `rank` es hoy una etiqueta abstracta suministrada — CONTRATO de DCM-v0.1: «Rank y color son
@@ -34,10 +35,13 @@ no determinista, y eso es un fork. Fue el PENDIENTE de §7.2 hasta el 2026-09-15
   es total y ya termina en ese id. Demostrado, no solo comprobado.
 - Las demostraciones de totalidad y de compatibilidad causal están resumidas en el SPEC y completas
   en `veritas/consenso/ghostdag-rank-v1/PROPUESTA-SPEC.md`.
-- **Lo que queda es código**, no SPEC: los fixtures de DCM-v0.1 siguen suministrando `rank` y color
-  como etiquetas en vez de recalcularlos.
+- **El código ya existe** (2026-09-17): `crates/zx-consensus/src/ghostdag.rs` calcula `rank` como
+  `(blue_work, solution_distance, id)` y `seleccionar_copia` resuelve P1 sin tercer desempate. Un
+  test comprueba que `rank` es total sobre el corpus, que es lo que sostiene esa ausencia.
+- **Lo que queda es cablearlo** (§2.8): los fixtures de DCM-v0.1 siguen suministrando `rank` y color
+  como etiquetas en vez de recalcularlos, y C-ORD-01…03 están en `ci/reglas-sin-cablear.txt`.
 
-### 1.3 · GHOSTDAG: derivado y redactado en el SPEC; falta el código del nodo
+### 1.3 · GHOSTDAG: especificado, implementado y sin cablear
 
 El color (azul / `rojo_k` / `rojo_U3`) lo suministra hoy el oráculo del fixture; DCM-v0.1 declara
 que «no acredita la coloración ni el orden contextual de GHOSTDAG». Con P1 decidido, el desempate
@@ -77,8 +81,12 @@ nueva, pero la vuelve crítica para el pago.
     desbordaría al acumular 2⁶⁴ contribuciones máximas y ZEROX no declara tope de bloques. El
     repositorio ya usaba `u256` como tipo de codificación (SPEC §2) y `TrabajoAcumulado(U256)` con
     suma comprobada (`crates/zx-core/src/target.rs:273-292`);
-  - **lo que queda es código del nodo**, no SPEC: las doce reglas están declaradas en
-    `ci/reglas-sin-codigo.txt` hasta que `crates/` las cite.
+  - **hecho (2026-09-17):** `crates/zx-consensus/src/ghostdag.rs` implementa las doce reglas, con
+    una referencia transparente y un kernel comparados entre sí, contra el oráculo Julia GDR-v0.2 y
+    contra los vectores oficiales de rusty-kaspa. Determinismo comprobado con 3 000 órdenes de
+    llegada barajados;
+  - **lo que queda es cablearlo** (§2.8): el nodo sigue eligiendo cadena con `fork_choice.rs`, así
+    que las doce están en `ci/reglas-sin-cablear.txt`, no en `ci/reglas-sin-codigo.txt`.
 
 ### 1.4 · La cabecera DAG: SPEC cerrado, falta cablear
 
@@ -161,13 +169,98 @@ en `crates/` o declararse en `ci/reglas-sin-codigo.txt`.
 | Regla | De dónde sale | Estado actual del SPEC |
 |---|---|---|
 | Cola prioritaria para bloques y PoT sobre transacciones; presupuesto de reenvío de transacciones por debajo de la subida; reenvío de transacciones por anuncio y petición | Q1 | No existe en §16 ni en `crates/zx-p2p/src/behaviour.rs` |
-| Relé compacto obligatorio en la ruta crítica | Q2 | R-NET-01 lo negocia conexión a conexión (`SPEC.md:2509`) |
+| Relé compacto obligatorio en la ruta crítica | Q2 | R-NET-01 lo negocia conexión a conexión (`SPEC.md:2674`) |
 | Caso degradado del relé compacto con presupuestos de recursos (C-NET-04), sin penalizar a quien reenvía (C-NET-05, C-NET-08) | Q2 | No especificado; es transporte (§2.7), no formato de cabecera |
-| Tema de gossip del PoT, verificación una vez por slot con caché, y verificación bajo demanda con tres salvaguardas | Q4 | Solo existen los temas `blocks` y `txs` (`SPEC.md:2122`) |
-| C-NET-06 reescrita: consenso antes de reenviar, transacciones después | Q4 | Hoy solo exime la comprobación de UTXO (`SPEC.md:2162-2165`) |
+| Tema de gossip del PoT, verificación una vez por slot con caché, y verificación bajo demanda con tres salvaguardas | Q4 | Solo existen los temas `blocks` y `txs` (`SPEC.md:2287`) |
+| C-NET-06 reescrita: consenso antes de reenviar, transacciones después | Q4 | Hoy solo exime la comprobación de UTXO (`SPEC.md:2327`) |
 
 **Pregunta abierta:** relajar C-NET-06 para anunciar antes de reconstruir el bloque. Se decide
 cuando el v2a mida con qué frecuencia faltan transacciones en las mempools.
+
+#### Arquitectura «1+» del relé — DECIDIDO POR KATANA (2026-09-16)
+
+Cierra dos preguntas que eran una sola: **cómo viaja el anuncio determina si queda algo que
+negociar**. Si va por gossip a toda la malla, no hay negociación posible ni necesaria.
+
+**Canales.**
+
+| Protocolo | Lleva |
+|---|---|
+| `/zerox/blocks/2` | **solo** anuncios compactos. Versión nueva: hoy `/blocks/1` significa bloque completo |
+| `/zerox/block-relay/1` | transacciones que faltan, colisiones y bloque completo como último recurso |
+| `/zerox/sync/1` | IBD e histórico, **sin cambios** |
+
+- **El bloque completo nunca se difunde por gossip.** Desaparece así el problema de que el anuncio
+  y el bloque entero tengan `message_id` distinto y gossipsub no los deduplique.
+- Un anuncio que no se puede evaluar por faltarle padres DAG va a una **cola acotada** y se
+  reevalúa al llegar las dependencias; no depende de que gossipsub lo reentregue.
+- La recuperación prueba **proveedores alternativos**, no queda cautiva del primer emisor.
+- Pedir las transacciones que faltan es el **camino ordinario**. Bajarse el bloque entero al primer
+  fallo tira la ventaja que el relé venía a dar.
+
+**Identificadores cortos sobre `wtxid`.** C-NET-07 (`SPEC.md:2335`) pasa de derivar sobre `txid` a
+derivar sobre `txid ‖ auth_digest`, como BIP 152 v2.
+
+> El motivo **no es de consenso**. Un bloque mal reconstruido ya se rechaza: `merkle_root` va sobre
+> `txid`, pero `body_commitment` cubre `txid ‖ auth_digest` y el relé lo comprueba. El problema es
+> de **disponibilidad**: cuando ese compromiso falla, el nodo no sabe *qué* transacción estaba mal
+> y debe rebajarse el bloque entero. Quien firma una transacción puede publicar dos variantes con
+> el mismo `txid`, sembrarlas en mempools distintos y forzar fallbacks completos a coste casi cero.
+
+**Reglas afectadas.**
+
+| Regla | Qué pasa |
+|---|---|
+| **R-NET-01** | se conserva y se reescribe; se elimina **solo** la negociación `sendcmpct` por conexión |
+| **C-NET-07** | de `txid` a `wtxid` — cambia una regla ya cerrada e implementada en `id_corto.rs` |
+| **C-NET-10** | se **retira con tombstone** (`SPEC.md:2374`); su número no se reutiliza |
+| **C-NET-06** | sigue pendiente: la validación previa al anuncio no está implementada |
+
+**Por qué se descartaron las otras dos.** Dos temas conviviendo hace viajar el bloque dos veces,
+que es justo el ancho de banda que el relé ahorra. Y empujar a ≤3 pares (BIP 152 fiel) exige estado
+por conexión, que `research/bip152.md` §8 declara **no portable** a libp2p sin forzar un stream
+lógico único por par sobre yamux.
+
+**Aparcado:** el híbrido *eager/lazy* es portable —negociar al abrir cada substream no es
+`sendcmpct`— pero añade RTT, estado de proveedores y el riesgo de que los «más rápidos» sean pares
+adversarios. Queda como *fast lane* experimental; solo se activa si mejora p95/p99 frente a 1+ bajo
+mempool frío, ramas DAG, pérdida y eclipse.
+
+**Trampa al implementar.** Subir a `/zerox/blocks/2` no basta: `crates/zx-p2p/src/servicio.rs`
+despacha con `topico.contains("/blocks/")` hacia `respuesta_desde_bytes`, que espera una
+`Respuesta`. `/blocks/2` también cumple esa condición. Si se cambia la versión sin cambiar el
+despacho, los anuncios se rechazan como basura **y el par que los propaga se lleva la penalización**.
+
+### 2.8 · Cablear el DAG a la ruta activa del nodo
+Es lo único que queda del Nivel 1 entero: §1.2, §1.3 y §1.4 están especificadas **y tienen código**,
+y ninguna la ejecuta nadie. Las veintiuna reglas afectadas están declaradas en
+`ci/reglas-sin-cablear.txt`, y los puntos de entrada de GHOSTDAG en `ci/consenso-pendiente.txt`.
+Ese es el inventario exacto de lo que este trabajo cierra: cuando una regla se cablea, sale del
+archivo, y el guardián falla si no lo hace.
+
+Qué hay que conectar:
+
+- **`zx-node`/`zx-storage` adoptan `DagBlockHeader`** en vez de la cabecera lineal de 92 B. El
+  indicador de que está hecho es `el_codigo_alcanza_la_base_poas_de_556`, hoy ignorado a propósito
+  en `crates/zx-consensus/tests/spec_numeros.rs`: deja de estarlo cuando esto se cierra.
+- **GHOSTDAG sustituye a `fork_choice.rs`** en la selección de cadena, y el almacén se alimenta
+  desde el sincronizador. `zx-consensus::ghostdag` expone ya `ContextoDag` con génesis, padres
+  validados, anticadena y `prev_hash == sp(B)`.
+- **El relé compacto** según la arquitectura «1+» de §2.7, con su cambio de `txid` a `wtxid`.
+
+Dos deudas pequeñas que conviene saldar al cablear, no después:
+
+- `ghostdag::Parametros` expone `sp`, `merge`, `k`, `u2` y `u3_dinamica` como campos públicos. El
+  `default()` es la regla C, pero un llamante puede construir `ModoSp::Kaspa` y tener un nodo que
+  forkea. El modo histórico existe para leer los vectores oficiales de rusty-kaspa, que es un uso
+  legítimo; lo que no debe seguir es que la regla viva en la prosa y no en el tipo.
+- `mod ancho` de `crates/zx-core/src/preimage/dag.rs` es privado, así que las anchuras de campo de
+  §6.1 no se vigilan una a una. Quedan cubiertas de forma agregada —`TAMANO_PREFIJO_FIJO` es su
+  suma, y esa sí se comprueba—, de modo que solo escapa un cambio **compensado** entre dos campos.
+  Es estrecho, pero es la forma exacta del fallo H-005 que `spec_numeros.rs` documenta.
+
+**No lo cierra todo.** `validar_bloque` seguirá sin alcanzarse aunque esto termine: necesita el
+conjunto UTXO con datos de deshacer, que es §2.6.
 
 ---
 

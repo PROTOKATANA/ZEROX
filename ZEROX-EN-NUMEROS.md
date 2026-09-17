@@ -226,7 +226,7 @@ Se retiran del panel de prestaciones **47,5 µs como cota de firma Ed25519** y *
 | Comprobación / inventario | Resultado actual | Criterio y alcance |
 |---|---:|---|
 | Tests del workspace | **438 pasan · 1 falla · 4 ignorados** | **M** · 443 registrados, 439 ejecutados. Los ignorados no cuentan como aprobados. |
-| Fallo de `spec_numeros` | **92 B ≠ 556 B** | **M** · `el_spec_dice_el_tamano_real_de_la_cabecera`; discrepancia conservada, no escondida. |
+| Fallo de `spec_numeros` | **92 B ≠ 556 B** | **M** · `el_spec_dice_el_tamano_real_de_la_cabecera`; discrepancia conservada, no escondida. *(Partido en dos el 2026-09-12; hoy la discrepancia vive en `el_codigo_alcanza_la_base_poas_de_556`, ignorado en vez de rojo.)* |
 | `cargo check` / formato | **Correctos** | **M** · compilación y `cargo fmt --check`. |
 | Clippy | **0 avisos** | **M** · workspace, todos los targets, `-D warnings`. |
 | Guardianes locales | **4 correctos** | **M** · alcance, citas, versiones exactas y frontera de crates. Citas o excepciones declaradas no prueban implementación correcta. |
