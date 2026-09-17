@@ -137,6 +137,72 @@ pub enum EncodingError {
         /// Entradas que tiene la transacción.
         entradas: usize,
     },
+
+    /// Estrategia A de padres: `1 <= parent_count <= 15` para un bloque no génesis.
+    #[error("Estrategia A: {declarados} padres declarados, máximo {maximo}")]
+    DemasiadosPadres {
+        /// Cuántos padres se declararon (incluido el seleccionado).
+        declarados: u64,
+        /// `MAX_PADRES` = 15.
+        maximo: u64,
+    },
+
+    /// El constructor de padres rechaza duplicados; no los elimina en silencio.
+    #[error("Estrategia A: padre adicional duplicado")]
+    PadreDuplicado,
+
+    /// Un padre adicional repite el `prev_hash` (padre seleccionado).
+    #[error("Estrategia A: un padre adicional es igual al padre seleccionado (`prev_hash`)")]
+    PadreRepetidoConSeleccionado,
+
+    /// El parser del wire solo acepta el orden canónico estrictamente ascendente.
+    #[error(
+        "Estrategia A: los padres adicionales no están en orden canónico estrictamente ascendente"
+    )]
+    PadresNoCanonicos,
+
+    /// El número de listas de testigos no es exactamente el número de transacciones.
+    ///
+    /// No se sustituyen listas ausentes por listas vacías al calcular el compromiso del cuerpo.
+    #[error("cuerpo: {testigos} listas de testigos para {txs} transacciones")]
+    CuerpoTestigosDescuadrados {
+        /// Número de transacciones.
+        txs: usize,
+        /// Número de listas de testigos recibidas.
+        testigos: usize,
+    },
+
+    /// La justificación PoT declara más de `MAX_BUNDLES_POT = 150` portadores.
+    #[error("PoT: {declarados} portadores declarados, máximo {maximo}")]
+    DemasiadosBundlesPot {
+        /// Cuántos se declararon.
+        declarados: u64,
+        /// `MAX_BUNDLES_POT` = 150.
+        maximo: u64,
+    },
+
+    /// Una lista de índices de wire no está en orden estrictamente creciente.
+    #[error("índices no canónicos: MUST ser estrictamente crecientes y únicos")]
+    IndicesNoCanonicos,
+}
+
+/// Fallo al comprobar los compromisos del cuerpo de un bloque DAG.
+///
+/// Distingue **cuál** de los dos compromisos falla: Merkle cubre efectos, `BodyCommitment` cubre
+/// efectos y autorización. Igualarlos no es verificar firmas.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum CompromisosError {
+    /// `merkle_root` no coincide con la raíz recalculada sobre los `txid`.
+    #[error("C-BLK-01: la raíz de Merkle no coincide con las transacciones")]
+    MerkleNoCoincide,
+
+    /// `body_commitment` no coincide con el recalculado sobre `(txid, auth_digest)`.
+    #[error("compromiso del cuerpo no coincide con (txid, auth_digest)")]
+    CuerpoNoCoincide,
+
+    /// El número de listas de testigos no cuadra con el de transacciones.
+    #[error(transparent)]
+    TestigosDescuadrados(#[from] EncodingError),
 }
 
 /// Error agregado de `zx-core`.

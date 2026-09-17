@@ -16,5 +16,16 @@
 # Estado al escribirse: la cabecera DAG existe en zx-core, zx-consensus y zx-p2p; `zx-node` sigue
 # con la cabecera lineal. Ninguna de estas reglas está en la ruta activa.
 
-# Vacía a propósito: el guardián ya conoce el tercer estado, pero todavía no se ha promovido
-# ningún código que cite una regla declarada aquí. Las entradas llegan con su crate.
+# ── Cabecera DAG: código en zx-core, sin integrar en zx-node ──────────────────────────────────
+#
+# C-HDR-05  slot(B) >= slot(sp(B)). Comprobación estructural en crates/zx-core/src/wire_dag.rs
+#           (comprobar_diferencia_slots_del_bloque); el slot del padre seleccionado lo aporta el
+#           contexto DAG, que todavía no existe.
+# C-HDR-07  la justificación PoT va fuera de la cabecera y es obligatoria. Hay contenedor y
+#           códec, pero el verificador AES secuencial devuelve IntegracionPotPendiente: hoy
+#           nadie la exige.
+# C-HDR-09  block_hash canónico de la cabecera DAG. Calculado, con vectores congelados y con un
+#           oráculo Julia independiente; la ruta activa del nodo sigue hasheando la lineal.
+C-HDR-05
+C-HDR-07
+C-HDR-09

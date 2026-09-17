@@ -67,6 +67,30 @@ pub fn leer_32(bytes: &[u8]) -> Result<([u8; 32], &[u8]), EncodingError> {
     tomar::<32>(bytes)
 }
 
+/// Lee 16 bytes crudos (la salida PoT) y devuelve el resto.
+///
+/// # Errores
+/// [`EncodingError::Truncado`] si no quedan 16 bytes.
+pub fn leer_16(bytes: &[u8]) -> Result<([u8; 16], &[u8]), EncodingError> {
+    tomar::<16>(bytes)
+}
+
+/// Lee 48 bytes crudos (los testigos KZG de la solución PoAS) y devuelve el resto.
+///
+/// # Errores
+/// [`EncodingError::Truncado`] si no quedan 48 bytes.
+pub fn leer_48(bytes: &[u8]) -> Result<([u8; 48], &[u8]), EncodingError> {
+    tomar::<48>(bytes)
+}
+
+/// Lee 160 bytes crudos (la prueba de espacio) y devuelve el resto.
+///
+/// # Errores
+/// [`EncodingError::Truncado`] si no quedan 160 bytes.
+pub fn leer_160(bytes: &[u8]) -> Result<([u8; 160], &[u8]), EncodingError> {
+    tomar::<160>(bytes)
+}
+
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
 mod tests {

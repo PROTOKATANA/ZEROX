@@ -12,6 +12,7 @@
 //! la confusión wire↔preimagen deja de ser un riesgo de disciplina y pasa a ser un error de tipos.
 
 pub mod block;
+pub mod dag;
 pub mod tx;
 
 use crate::digest::Digest;

@@ -57,20 +57,20 @@ C-WIRE-06
 
 # ── Cabecera de PoAS · SPEC §6.1-6.2 reescritas el 2026-09-05 ──
 #
-# Spec-first: el SPEC va delante y el código lo alcanza. Las cinco caen cuando se reescriba
-# crates/zx-core/src/preimage/block.rs. El test `el_spec_dice_el_tamano_real_de_la_cabecera`
-# está ROJO A PROPÓSITO hasta entonces, y es lo que fuerza el trabajo.
+# Spec-first: el SPEC va delante y el código lo alcanza. El test que fuerza el trabajo es
+# `el_codigo_alcanza_la_base_poas_de_556`, ignorado a propósito en
+# crates/zx-consensus/tests/spec_numeros.rs hasta que la cabecera DAG se cablee.
 #
-#   C-HDR-05  slot no decreciente respecto al padre seleccionado; integración DAG pendiente
-#   C-HDR-06  rango_solucion en cabecera, redundancia comprobada contra rango_esperado(padre)
-#   C-HDR-07  la justificación del PoT va fuera de la cabecera, pero es obligatoria
-#   C-HDR-08  la cabecera NO lleva dirección de recompensa: va en la coinbase
-#   C-HDR-09  block_hash canónico; 556 B es la base lineal, formato DAG pendiente
-C-HDR-05
+# C-HDR-05, C-HDR-07 y C-HDR-09 ya no están aquí: zx-core tiene su código —layout, wire,
+# justificación PoT y block_hash— y pasan a ci/reglas-sin-cablear.txt, que es el estado de
+# "hay código y ninguna ruta lo ejecuta". Aquí solo queda lo que ningún código cita todavía:
+#
+#   C-HDR-06  rango_solucion en cabecera, redundancia comprobada contra rango_esperado(padre);
+#             su reescritura contextual llega con zx-consensus
+#   C-HDR-08  la cabecera NO lleva dirección de recompensa: va en la coinbase. Es una
+#             prohibición: no hay línea que citar y no la habrá
 C-HDR-06
-C-HDR-07
 C-HDR-08
-C-HDR-09
 
 # ── Checkpoint firmado · SPEC §12.1, decidido el 2026-09-05 ──
 #

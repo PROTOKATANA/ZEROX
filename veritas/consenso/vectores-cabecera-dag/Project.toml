@@ -1,0 +1,8 @@
+# Proyecto aislado del oráculo de vectores de la cabecera DAG (H-08a).
+#
+# Solo stdlib (`SHA`, `Test`): no hay dependencias externas que resolver, y el `Manifest.toml`
+# congela el árbol. `Manifest.toml` se versiona junto a este archivo.
+
+[deps]
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

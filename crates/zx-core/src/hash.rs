@@ -157,15 +157,20 @@ pub(crate) const TAG_TXSIG_THIS_IN: DomainTag = DomainTag::fija(*b"ZZKTxSigThisI
 pub(crate) const TAG_TX_AUTH: DomainTag = DomainTag::fija(*b"ZZKTxAuthHash___");
 /// §6.3 · nodos internos del árbol de Merkle.
 pub(crate) const TAG_BLK_MERKLE: DomainTag = DomainTag::fija(*b"ZZKBlkMerkle____");
-/// §6.2 · hash de cabecera. Es la preimagen del PoW.
+/// §6.2 · hash de cabecera. Desde el formato DAG identifica la cabecera completa (C-HDR-09); la
+/// preimagen del PoW de hash único pertenece a la base lineal retirada.
 pub(crate) const TAG_BLK_HEADER: DomainTag = DomainTag::fija(*b"ZZKBlkHeader____");
+/// §6.2 · `pre_hash`: el mensaje que firma el sello (C-HDR-03).
+pub(crate) const TAG_BLK_PRE_HASH: DomainTag = DomainTag::fija(*b"ZZKBlkPreHash___");
+/// §6.1 · compromiso completo del cuerpo, efectos **y** autorización.
+pub(crate) const TAG_BLK_BODY_HASH: DomainTag = DomainTag::fija(*b"ZZKBlkBodyHash__");
 
-/// Las once etiquetas ASCII fijas, para las comprobaciones de invariante.
+/// Las trece etiquetas ASCII fijas, para las comprobaciones de invariante.
 #[allow(
     dead_code,
     reason = "solo lo usan los tests de invariante de este módulo"
 )]
-pub(crate) const TAGS_FIJAS: [DomainTag; 11] = [
+pub(crate) const TAGS_FIJAS: [DomainTag; 13] = [
     TAG_TXID_HEADER,
     TAG_TXID_INPUTS,
     TAG_TXID_PREVOUT,
@@ -177,6 +182,8 @@ pub(crate) const TAGS_FIJAS: [DomainTag; 11] = [
     TAG_TX_AUTH,
     TAG_BLK_MERKLE,
     TAG_BLK_HEADER,
+    TAG_BLK_PRE_HASH,
+    TAG_BLK_BODY_HASH,
 ];
 
 #[cfg(test)]
@@ -210,7 +217,7 @@ mod tests {
             );
             vistas.push(b);
         }
-        assert_eq!(vistas.len(), 11);
+        assert_eq!(vistas.len(), 13);
     }
 
     /// La invariante que hace segura la etiqueta raíz con branch ID variable.

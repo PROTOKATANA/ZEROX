@@ -98,8 +98,31 @@ digest_newtype!(
 );
 
 digest_newtype!(
-    /// Hash de la cabecera de bloque. **Es la preimagen del PoW** (C-HDR-03).
+    /// Hash de la cabecera de bloque, sello incluido (C-HDR-09).
+    ///
+    /// En el formato DAG ya **no** es la preimagen del PoW: el PoW de hash único pertenece a la
+    /// base lineal heredada y no se hereda aquí. Es un identificador de cabecera, nada más.
     BlockHash
+);
+
+digest_newtype!(
+    /// `pre_hash = H_d("ZZKBlkPreHash___", prefirma)` (C-HDR-03).
+    ///
+    /// Es el mensaje que firma el sello Ed25519 de la cabecera DAG. Se distingue de [`BlockHash`]
+    /// a propósito: uno es lo que se firma (todo menos el sello) y el otro lo que identifica al
+    /// bloque (prefirma ‖ sello). Confundirlos produciría una firma sobre el valor equivocado, y
+    /// el compilador lo impide.
+    PreHash
+);
+
+digest_newtype!(
+    /// Compromiso completo del cuerpo: `H_d("ZZKBlkBodyHash__", CompactSize(n) ‖ txid ‖ auth_digest)`
+    /// (SPEC §6.1, nota de cuerpo).
+    ///
+    /// A diferencia de [`MerkleRoot`], que solo cubre los datos de efecto vía `txid`, este
+    /// compromiso liga **también** la autorización (`auth_digest`). Que la raíz de Merkle coincida
+    /// **no** sustituye comprobar las firmas: son dos controles distintos.
+    BodyCommitment
 );
 
 digest_newtype!(

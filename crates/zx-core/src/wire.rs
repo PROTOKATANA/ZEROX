@@ -368,7 +368,7 @@ pub fn cuerpo_desde_bytes(bytes: &[u8]) -> Result<(CuerpoBloque, &[u8]), Encodin
 /// Este es el punto exacto donde un peer hostil intentaría que reservásemos gigabytes declarando un
 /// `CompactSize` enorme con un cuerpo de veinte bytes. El límite no es de consenso: es lo que
 /// impide que la reserva ocurra antes de que el consenso llegue a opinar.
-fn leer_contador(bytes: &[u8]) -> Result<(usize, &[u8]), EncodingError> {
+pub(crate) fn leer_contador(bytes: &[u8]) -> Result<(usize, &[u8]), EncodingError> {
     let (n, r) = compact_size::leer(bytes)?;
     if n > MAX_ELEMENTOS_DECLARADOS {
         return Err(EncodingError::DemasiadosElementos {
