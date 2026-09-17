@@ -57,15 +57,14 @@ C-WIRE-06
 # `el_codigo_alcanza_la_base_poas_de_556`, ignorado a propósito en
 # crates/zx-consensus/tests/spec_numeros.rs hasta que la cabecera DAG se cablee.
 #
-# C-HDR-05, C-HDR-07 y C-HDR-09 ya no están aquí: zx-core tiene su código —layout, wire,
-# justificación PoT y block_hash— y pasan a ci/reglas-sin-cablear.txt, que es el estado de
-# "hay código y ninguna ruta lo ejecuta". Aquí solo queda lo que ningún código cita todavía:
+# C-HDR-05, C-HDR-06, C-HDR-07 y C-HDR-09 ya no están aquí: zx-core y zx-consensus tienen su
+# código —layout, wire, justificación PoT, block_hash y el rango contextual— y pasan a
+# ci/reglas-sin-cablear.txt, que es el estado de "hay código y ninguna ruta lo ejecuta".
 #
-#   C-HDR-06  rango_solucion en cabecera, redundancia comprobada contra rango_esperado(padre);
-#             su reescritura contextual llega con zx-consensus
+# Aquí solo queda la que ningún código cita ni citará:
+#
 #   C-HDR-08  la cabecera NO lleva dirección de recompensa: va en la coinbase. Es una
 #             prohibición: no hay línea que citar y no la habrá
-C-HDR-06
 C-HDR-08
 
 # ── Checkpoint firmado · SPEC §12.1, decidido el 2026-09-05 ──
@@ -116,24 +115,12 @@ C-SPEC-02
 # topes de 64 GiB / 24 hilos, envoltorio julia.sh, oráculo y reproducibilidad).
 C-SPEC-03
 
-# ── GHOSTDAG y orden del DAG (SPEC §7.2 y §11): redactadas, sin código todavía ─────────────────
+# ── GHOSTDAG y orden del DAG (SPEC §7.2 y §11): ya no están en este archivo ───────────────────
 #
-# Katana decidió la direccion de los desempates el 2026-09-14 (regla C, TAREAS.md §1.3) y el SPEC
-# las redacta en §11 (C-GD-*) y §7.2 (C-ORD-*). El consenso del nodo todavia no existe: zx-consensus
-# valida la cadena lineal transitoria, no un DAG. El instrumento veritas/consenso/ghostdag-rank-v1/
-# (GDR-v0.2) las implementa y las comprueba contra los vectores oficiales de rusty-kaspa, pero es
-# Julia y vive fuera de crates/, asi que no cuenta como cita.
+# Katana decidió la dirección de los desempates el 2026-09-14 (regla C, TAREAS.md §1.3) y el SPEC
+# las redacta en §11 (C-GD-*) y §7.2 (C-ORD-*).
 #
-# Se retiran de esta lista de una en una, conforme cada regla tenga codigo que la cite.
-C-GD-01
-C-GD-02
-C-GD-03
-C-GD-04
-C-GD-05
-C-GD-06
-C-GD-07
-C-GD-08
-C-GD-09
-C-ORD-01
-C-ORD-02
-C-ORD-03
+# Las doce pasan a ci/reglas-sin-cablear.txt: crates/zx-consensus/src/ghostdag.rs las implementa,
+# con referencia y kernel comparados entre sí y contra el oráculo Julia GDR-v0.2
+# (veritas/consenso/ghostdag-rank-v1/). Hay código, y ninguna ruta lo ejecuta: el nodo sigue
+# eligiendo cadena con fork_choice.rs.

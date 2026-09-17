@@ -21,14 +21,56 @@
 # C-HDR-05  slot(B) >= slot(sp(B)). Comprobación estructural en crates/zx-core/src/wire_dag.rs
 #           (comprobar_diferencia_slots_del_bloque); el slot del padre seleccionado lo aporta el
 #           contexto DAG, que todavía no existe.
+# C-HDR-06  rango_solucion contra el contexto, en crates/zx-consensus/src/bloque_dag.rs. La
+#           interfaz está y prohíbe la circularidad por tipo; el controlador (ventana,
+#           bootstrap, redondeos) sigue pendiente en TAREAS §2.3.
 # C-HDR-07  la justificación PoT va fuera de la cabecera y es obligatoria. Hay contenedor y
 #           códec, pero el verificador AES secuencial devuelve IntegracionPotPendiente: hoy
 #           nadie la exige.
 # C-HDR-09  block_hash canónico de la cabecera DAG. Calculado, con vectores congelados y con un
 #           oráculo Julia independiente; la ruta activa del nodo sigue hasheando la lineal.
 C-HDR-05
+C-HDR-06
 C-HDR-07
 C-HDR-09
+
+# ── GHOSTDAG y rank: código real en zx-consensus, sin integrar en zx-node ─────────────────────
+#
+# Las doce reglas del encargo 03 viven en crates/zx-consensus/src/ghostdag.rs, con referencia y
+# kernel comparados, y tests contra el oráculo GDR-v0.2 y los vectores de rusty-kaspa. Ninguna
+# ruta del nodo las ejecuta: la selección lineal de crates/zx-consensus/src/fork_choice.rs sigue
+# vigente y sustituirla es el encargo 04. Implementación real de ContextoDag: el almacén la aporta,
+# pero `comprobar_padres_contextual` solo la usa en tests.
+#
+# C-GD-01  w(B) = ⌊2^128/(SR+1)⌋ exacto. ghostdag.rs (peso); tests peso_fronteras.
+# C-GD-02  blue_work en u256 con suma comprobada. ghostdag.rs (sumar_blue_work, acumular) y
+#          ConsensusError::BlueWorkDesbordado; test desbordamiento_de_blue_work_es_error_explicito.
+# C-GD-03  sp(B) con dirección mixta. ghostdag.rs (comparar_sp, padre_seleccionado); tests de
+#          hermanos y de ContextoDag.
+# C-GD-04  mergeset y límites de R-FIN-12. ghostdag.rs (mergeset, anadir); tests de 15/16 padres
+#          y de los bordes 180/181.
+# C-GD-05  orden del mergeset. ghostdag.rs (comparar_merge, ordenar_mergeset); comparado con GDR.
+# C-GD-06  coloreo por k-cluster con las dos condiciones. ghostdag.rs (check_azul,
+#          revisar_con_bloque_cadena, colorear_kernel, colorear_referencia); oráculo y diferencial.
+# C-GD-07  U2 (invalidez) y U3″ dinámica. ghostdag.rs (anadir, filtrado); test u2_invalida_y_u3_colorea.
+# C-GD-08  blue_score y blue_work acumulados. ghostdag.rs (acumular); oráculo.
+# C-GD-09  determinismo. ghostdag.rs (función de past); test
+#          determinismo_con_mil_ordenes_de_llegada (1000 órdenes × 3 familias).
+# C-ORD-01 rank = (blue_work, solution_distance, id). ghostdag.rs (Rank, rank); test de totalidad.
+# C-ORD-02 selección entre copias. ghostdag.rs (seleccionar_copia); tests de hermanos y copias.
+# C-ORD-03 orden de aplicación. ghostdag.rs (cadena_seleccionada, orden_aplicacion); oráculo.
+C-GD-01
+C-GD-02
+C-GD-03
+C-GD-04
+C-GD-05
+C-GD-06
+C-GD-07
+C-GD-08
+C-GD-09
+C-ORD-01
+C-ORD-02
+C-ORD-03
 
 # ── Relé compacto: código puro en zx-p2p, servicio sin adoptar el candidato ───────────────────
 #

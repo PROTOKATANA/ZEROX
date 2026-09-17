@@ -237,6 +237,125 @@ pub enum ConsensusError {
         /// Límite admitido.
         limite: i64,
     },
+
+    /// C-BLK-01: la raíz de Merkle recalculada no coincide con la cabecera DAG.
+    #[error("C-BLK-01: la raíz de Merkle no coincide con la cabecera DAG")]
+    MerkleRaizNoCoincide,
+
+    /// El compromiso completo del cuerpo no coincide con la cabecera DAG.
+    #[error("compromiso del cuerpo (txid ‖ auth_digest) no coincide con la cabecera DAG")]
+    CuerpoCompromisoNoCoincide,
+
+    /// El número de listas de testigos no es el de transacciones.
+    #[error("cuerpo DAG: {testigos} listas de testigos para {txs} transacciones")]
+    CuerpoTestigosDescuadrados {
+        /// Transacciones.
+        txs: usize,
+        /// Listas de testigos.
+        testigos: usize,
+    },
+
+    /// C-HDR-06 (reescrita): `rango_solucion` no es el rango esperado contextual.
+    #[error("C-HDR-06: rango_solucion {encontrado}, esperado {esperado}")]
+    RangoIncorrecto {
+        /// Rango derivado del pasado DAG validado y del flujo.
+        esperado: u64,
+        /// Rango declarado en la cabecera.
+        encontrado: u64,
+    },
+
+    /// H-04 · Un bloque con `parent_count = 0` que no es el génesis de la red.
+    #[error("C-HDR-01: un bloque no génesis con parent_count = 0")]
+    GenesisConCeroPadresNoEsGenesis,
+
+    /// H-04 · El génesis declarado con padres.
+    #[error("C-HDR-01: el génesis MUST NOT tener padres")]
+    GenesisConPadres,
+
+    /// H-04 · Un padre no está entre los bloques validados del contexto.
+    #[error("contexto DAG: el padre {padre} no está validado")]
+    PadreNoValidado {
+        /// El hash del padre desconocido.
+        padre: zx_core::BlockHash,
+    },
+
+    /// H-04 · Dos padres en relación de ancestro: el conjunto no es una anticadena.
+    #[error("contexto DAG: {antepasado} está en el pasado de {descendiente}, no es anticadena")]
+    PadresNoAnticadena {
+        /// El padre que aparece antes.
+        antepasado: zx_core::BlockHash,
+        /// El padre que lo contiene en su pasado.
+        descendiente: zx_core::BlockHash,
+    },
+
+    /// H-04 · `prev_hash` no es el `sp(B)` de C-GD-03.
+    #[error("C-GD-03: padre seleccionado {encontrado}, esperado {esperado}")]
+    PadreSeleccionadoIncorrecto {
+        /// El que devuelve el contexto.
+        esperado: zx_core::BlockHash,
+        /// El declarado en `prev_hash`.
+        encontrado: zx_core::BlockHash,
+    },
+
+    /// C-GD-02 · C-ENC-03: un `blue_work` que desborda `u256` es **fallo de consenso
+    /// explícito**, nunca una envoltura ni un truncamiento.
+    #[error("C-GD-02: blue_work desborda u256 (C-ENC-03: nunca en silencio)")]
+    BlueWorkDesbordado,
+
+    /// C-GD-04 · R-FIN-12: más de 15 padres.
+    #[error("R-FIN-12: {declarados} padres, máximo {maximo}")]
+    DemasiadosPadresDag {
+        /// Padres declarados.
+        declarados: u64,
+        /// `MAX_PADRES`.
+        maximo: u64,
+    },
+
+    /// C-GD-04 · R-FIN-12: `|mergeset(B)| + 1 > 180` con `k = 30`.
+    #[error("R-FIN-12: |mergeset| + 1 = {tamano}, máximo {maximo}")]
+    MergesetExcedeLimite {
+        /// `|mergeset(B)| + 1`.
+        tamano: u64,
+        /// Límite de R-FIN-12.
+        maximo: u64,
+    },
+
+    /// C-GD-07 · U2: la identidad de billete ya aparece en un padre o su pasado estricto.
+    #[error("C-GD-07/U2: el billete {identidad} ya está en el pasado del bloque")]
+    BilleteDuplicadoU2 {
+        /// Identidad del billete repetida.
+        identidad: u64,
+    },
+
+    /// Un hash que el almacén GHOSTDAG no conoce.
+    #[error("GHOSTDAG: bloque desconocido {hash}")]
+    BloqueDesconocido {
+        /// El hash ausente.
+        hash: zx_core::BlockHash,
+    },
+
+    /// Estado GHOSTDAG incoherente: una consulta que por construcción no debería ocurrir.
+    #[error("GHOSTDAG: estado incoherente: {motivo}")]
+    GhostdagIncoherente {
+        /// Qué invariante interna se rompió.
+        motivo: &'static str,
+    },
+
+    /// C-HDR-05: `slot(B) < slot(sp(B))`.
+    #[error("C-HDR-05: slot(B) = {slot} anterior a slot(sp) = {slot_sp}")]
+    SlotNoMonotono {
+        /// Slot del bloque.
+        slot: u64,
+        /// Slot del padre seleccionado.
+        slot_sp: u64,
+    },
+
+    /// C-GD-04: `slot(B) − slot(sp(B)) > S_max`.
+    #[error("C-GD-04: salto de slot {salto} > S_max")]
+    SaltoMayorSmax {
+        /// Diferencia de slots.
+        salto: u64,
+    },
 }
 
 impl ConsensusError {

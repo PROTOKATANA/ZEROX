@@ -19,3 +19,20 @@ zx-consensus::bloque::validar_bloque
 # No conecta ni especifica un productor PoST: se sustituye al fijar la relación timestamp/slot
 # del DAG (SPEC §7.4 y MIGRACION.md). El nodo actual comprueba timestamps ajenos.
 zx-consensus::timestamps::timestamp_del_minero
+
+# ── GHOSTDAG y rank (encargo 03): código en zx-consensus, sin integrar en zx-node ─────────────
+#
+# crates/zx-consensus/src/ghostdag.rs implementa las doce reglas (C-GD-01…09, C-ORD-01…03) con
+# referencia y kernel comparados, oráculo GDR-v0.2 y vectores de rusty-kaspa. La ruta activa del
+# nodo sigue con la selección lineal de fork_choice.rs; sustituirla y alimentar este almacén
+# desde el sincronizador es el encargo 04. Son, por tanto, puntos de entrada reales que nadie
+# ejecuta todavía, no huecos: añadir un llamante sin la decisión de integración sería cablear
+# consenso a medias. Se cierran en el encargo 04.
+zx-consensus::ghostdag::algoritmo
+zx-consensus::ghostdag::anadir
+zx-consensus::ghostdag::hash_de_id_textual
+zx-consensus::ghostdag::orden_aplicacion
+zx-consensus::ghostdag::padres_de
+zx-consensus::ghostdag::parametros
+zx-consensus::ghostdag::punta_virtual
+zx-consensus::ghostdag::seleccionar_copia
