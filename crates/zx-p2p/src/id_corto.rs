@@ -41,9 +41,8 @@ use std::hash::Hasher as _;
 
 use siphasher::sip::SipHasher24;
 use zx_core::digest::TxId;
-use zx_core::preimage::block::{BlockHeader, TAMANO_CABECERA};
+use zx_core::preimage::dag::{DagBlockHeader, dag_header_a_bytes};
 use zx_core::sha3_256_publico;
-use zx_core::wire::cabecera_a_bytes;
 
 /// Cuántos bytes mide un identificador corto.
 ///
@@ -80,15 +79,18 @@ impl ClavesIdCorto {
         Self { k0, k1 }
     }
 
-    /// C-NET-07 · `h = SHA3-256(cabecera(92 B) ‖ nonce(8 B LE))`, y de ahí las dos claves.
+    /// C-NET-07 · `h = SHA3-256(cabecera_canónica ‖ nonce(8 B LE))`, y de ahí las dos claves.
+    ///
+    /// Acepta la cabecera como **bytes de longitud variable**: sirve igual para la base lineal
+    /// heredada que para la cabecera DAG, sin asumir un tamaño fijo ni construir un array
+    /// `[u8; TAMANO + 8]`. El `nonce` no es decorativo (ver el módulo).
     #[must_use]
-    pub fn derivar(cabecera: &BlockHeader, nonce: u64) -> Self {
-        let mut entrada = [0u8; TAMANO_CABECERA + 8];
+    pub fn derivar(cabecera_canonica: &[u8], nonce: u64) -> Self {
+        let mut entrada = Vec::with_capacity(cabecera_canonica.len() + 8);
         // La cabecera son los MISMOS bytes que viajan y que se hashean (C-WIRE-01), no una
         // segunda serialización escrita para esto. Si hubiera dos, podrían divergir.
-        let (cab, resto) = entrada.split_at_mut(TAMANO_CABECERA);
-        cab.copy_from_slice(&cabecera_a_bytes(cabecera));
-        resto.copy_from_slice(&nonce.to_le_bytes());
+        entrada.extend_from_slice(cabecera_canonica);
+        entrada.extend_from_slice(&nonce.to_le_bytes());
 
         let h = sha3_256_publico(&entrada);
         let b = h.as_bytes();
@@ -106,6 +108,13 @@ impl ClavesIdCorto {
             k0: leer(0),
             k1: leer(8),
         }
+    }
+
+    /// Igual que [`Self::derivar`], con la cabecera DAG ya codificada por su única descripción
+    /// canónica. Así el identificador corto usa **los mismos bytes** que el `block_hash`.
+    #[must_use]
+    pub fn derivar_dag(cabecera: &DagBlockHeader, nonce: u64) -> Self {
+        Self::derivar(&dag_header_a_bytes(cabecera), nonce)
     }
 
     /// El identificador corto de una transacción bajo estas claves.
@@ -133,6 +142,7 @@ mod tests {
     use std::hash::Hasher as _;
     use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
     use zx_core::preimage::block::{BlockHeader, TAMANO_CABECERA};
+    use zx_core::wire::cabecera_a_bytes;
 
     fn cabecera(nonce: u64) -> BlockHeader {
         BlockHeader {
@@ -152,6 +162,11 @@ mod tests {
 
     fn tx(n: u8) -> TxId {
         TxId::from_digest(Digest::from_bytes([n; 32]))
+    }
+
+    /// La cabecera canónica de longitud variable que consume `derivar`.
+    fn cbytes(nonce: u64) -> Vec<u8> {
+        cabecera_a_bytes(&cabecera(nonce)).to_vec()
     }
 
     /// **Vectores oficiales de SipHash-2-4** — `veorq/SipHash`, `vectors.h`, la implementación de
@@ -204,9 +219,9 @@ mod tests {
     /// Determinista: el mismo bloque y la misma transacción dan siempre el mismo identificador.
     #[test]
     fn es_determinista() {
-        let c = ClavesIdCorto::derivar(&cabecera(7), 42);
+        let c = ClavesIdCorto::derivar(&cbytes(7), 42);
         assert_eq!(c.id(&tx(1)), c.id(&tx(1)));
-        assert_eq!(ClavesIdCorto::derivar(&cabecera(7), 42), c);
+        assert_eq!(ClavesIdCorto::derivar(&cbytes(7), 42), c);
     }
 
     /// **El nonce no es decorativo** (C-NET-07).
@@ -216,8 +231,8 @@ mod tests {
     /// fabricar transacciones que degraden la propagación de la red entera.
     #[test]
     fn cambiar_el_nonce_cambia_todos_los_identificadores() {
-        let a = ClavesIdCorto::derivar(&cabecera(7), 1);
-        let b = ClavesIdCorto::derivar(&cabecera(7), 2);
+        let a = ClavesIdCorto::derivar(&cbytes(7), 1);
+        let b = ClavesIdCorto::derivar(&cbytes(7), 2);
         assert_ne!(a, b, "otro nonce, otras claves");
 
         let distintos = (0u8..32).filter(|n| a.id(&tx(*n)) != b.id(&tx(*n))).count();
@@ -234,8 +249,8 @@ mod tests {
         let mut otra = cabecera(7);
         otra.timestamp += 1;
         assert_ne!(
-            ClavesIdCorto::derivar(&cabecera(7), 1),
-            ClavesIdCorto::derivar(&otra, 1)
+            ClavesIdCorto::derivar(&cbytes(7), 1),
+            ClavesIdCorto::derivar(&cabecera_a_bytes(&otra), 1)
         );
     }
 
@@ -251,7 +266,6 @@ mod tests {
     #[test]
     fn una_pasada_de_sha3_no_dos() {
         use zx_core::sha3_256_publico;
-        use zx_core::wire::cabecera_a_bytes;
 
         let cab = cabecera(7);
         let nonce = 42u64;
@@ -273,7 +287,7 @@ mod tests {
         let dobles = ClavesIdCorto::desde_claves(leer(dos.as_bytes(), 0), leer(dos.as_bytes(), 8));
 
         assert_eq!(
-            ClavesIdCorto::derivar(&cab, nonce),
+            ClavesIdCorto::derivar(&cabecera_a_bytes(&cab), nonce),
             esperadas,
             "las claves salen de UNA pasada sobre cabecera ‖ nonce"
         );

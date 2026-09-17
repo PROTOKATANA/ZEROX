@@ -143,6 +143,24 @@ pub const MAX_PETICION_BYTES: u64 = 64 * 1024;
 /// parser tenga oportunidad de rechazar nada.
 pub const MAX_RESPUESTA_BYTES: u64 = MAX_GOSSIP_BYTES_GENESIS as u64 * 16;
 
+/// Tamaño máximo de un **anuncio compacto**, en bytes.
+///
+/// Cota superior **derivada**: el anuncio es cabecera DAG + nonce + `6 B` por transacción + una
+/// coinbase completa, todo lo cual es menor que el bloque entero, y un bloque entero **MUST** caber
+/// en el límite de gossip. No es una medición ni un formato cerrado.
+pub const MAX_ANUNCIO_COMPACTO_BYTES: u64 = MAX_GOSSIP_BYTES_GENESIS as u64;
+
+/// Tamaño máximo de una **respuesta de faltantes**, en bytes.
+///
+/// Cota superior derivada: `discriminante(1) + block_hash(32) + CompactSize(9)` más un subconjunto
+/// del cuerpo del bloque, que **MUST** caber en el límite de gossip.
+pub const MAX_RESPUESTA_FALTANTES_BYTES: u64 = 1 + 32 + 9 + MAX_GOSSIP_BYTES_GENESIS as u64;
+
+// El anuncio compacto no puede superar lo que el transporte de gossip admite.
+const _: () = assert!(MAX_ANUNCIO_COMPACTO_BYTES <= MAX_GOSSIP_BYTES_GENESIS as u64);
+// Y la respuesta de faltantes no puede superar el techo de respuesta.
+const _: () = assert!(MAX_RESPUESTA_FALTANTES_BYTES <= MAX_RESPUESTA_BYTES);
+
 /// Cabeceras por respuesta de `Headers`.
 ///
 /// A 92 bytes por cabecera son ~184 KB por respuesta llena. Bitcoin usa 2000 y zcashd 160 —este

@@ -25,6 +25,7 @@
 
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
+use zx_core::tx::Tx;
 
 use crate::mensaje::{BloqueRed, Estado};
 
@@ -63,4 +64,18 @@ pub trait ManejadorEntrante: Send + Sync + 'static {
 
     /// Un peer pide cuerpos de bloque. Los que no tengamos simplemente no van en la respuesta.
     fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed>;
+
+    /// **Relé compacto.** Las transacciones completas de un bloque anunciado, en el orden de los
+    /// índices pedidos.
+    ///
+    /// Implementación por defecto **vacía**: `zx-node` todavía no sirve el relé, y devolver vacío
+    /// equivale a `NoDisponible`, que no puntúa (C-NET-05). Cablear esto de verdad es trabajo del
+    /// nodo, no de este crate.
+    fn transacciones_compactas(
+        &self,
+        _bloque: &BlockHash,
+        _indices: &[u32],
+    ) -> Vec<(Tx, Vec<Vec<u8>>)> {
+        Vec::new()
+    }
 }

@@ -210,6 +210,13 @@ pub fn peticion_a_bytes(p: &Peticion) -> Vec<u8> {
                 b.extend_from_slice(h.as_bytes());
             }
         }
+        Peticion::FaltantesCompactas { bloque, indices } => {
+            b.extend_from_slice(bloque.as_bytes());
+            compact_size::escribir(&mut b, indices.len() as u64);
+            for i in indices {
+                int::escribir_u32(&mut b, *i);
+            }
+        }
     }
     b
 }
@@ -242,6 +249,31 @@ pub fn peticion_desde_bytes(bytes: &[u8]) -> Result<Peticion, EncodingError> {
         Peticion::DISC_BLOQUES => {
             let (hashes, r) = leer_hashes(r, limites::MAX_BLOQUES_POR_RESPUESTA)?;
             (Peticion::Bloques { hashes }, r)
+        }
+        Peticion::DISC_FALTANTES => {
+            let (bloque, r) = int::leer_32(r)?;
+            let (n, mut r) = compact_size::leer(r)?;
+            let n = acotar_rele(n)?;
+            let mut indices = Vec::with_capacity(n);
+            let mut anterior: Option<u32> = None;
+            for _ in 0..n {
+                let (i, resto) = int::leer_u32(r)?;
+                if let Some(a) = anterior
+                    && i <= a
+                {
+                    return Err(zx_core::error::EncodingError::IndicesNoCanonicos);
+                }
+                anterior = Some(i);
+                indices.push(i);
+                r = resto;
+            }
+            (
+                Peticion::FaltantesCompactas {
+                    bloque: BlockHash::from_digest(Digest::from_bytes(bloque)),
+                    indices,
+                },
+                r,
+            )
         }
         otro => {
             return Err(EncodingError::LockDesconocido {
@@ -294,6 +326,16 @@ pub fn respuesta_a_bytes(r: &Respuesta) -> Vec<u8> {
             }
         }
         Respuesta::NoDisponible => {}
+        Respuesta::FaltantesCompactas {
+            bloque,
+            transacciones,
+        } => {
+            b.extend_from_slice(bloque.as_bytes());
+            compact_size::escribir(&mut b, transacciones.len() as u64);
+            for (tx, t) in transacciones {
+                wire::tx_a_bytes(&mut b, tx, t);
+            }
+        }
     }
     b
 }
@@ -354,6 +396,24 @@ pub fn respuesta_desde_bytes(bytes: &[u8]) -> Result<Respuesta, EncodingError> {
             (Respuesta::Bloques(bs), r)
         }
         Respuesta::DISC_NO_DISPONIBLE => (Respuesta::NoDisponible, r),
+        Respuesta::DISC_FALTANTES => {
+            let (bloque, r) = int::leer_32(r)?;
+            let (n, mut r) = compact_size::leer(r)?;
+            let n = acotar_rele(n)?;
+            let mut transacciones = Vec::with_capacity(n);
+            for _ in 0..n {
+                let ((tx, t), resto) = wire::tx_desde_bytes(r)?;
+                transacciones.push((tx, t));
+                r = resto;
+            }
+            (
+                Respuesta::FaltantesCompactas {
+                    bloque: BlockHash::from_digest(Digest::from_bytes(bloque)),
+                    transacciones,
+                },
+                r,
+            )
+        }
         otro => {
             return Err(EncodingError::LockDesconocido {
                 discriminante: otro,
@@ -387,6 +447,18 @@ fn leer_contador(bytes: &[u8], max: usize) -> Result<(usize, &[u8]), EncodingErr
         maximo: tope,
     })?;
     Ok((n, r))
+}
+
+/// Acota un contador del relé por `reserva_acotada` (H-02 §2, punto 4).
+///
+/// La cota del relé vive en `rele_compacto`; aquí solo se traduce su error al de codificación. Así
+/// el camino real —el códec— pasa por la **misma** función que los tests, no por un límite
+/// paralelo que podría divergir.
+fn acotar_rele(n: u64) -> Result<usize, EncodingError> {
+    crate::rele_compacto::reserva_acotada(n).map_err(|_| EncodingError::DemasiadosElementos {
+        declarados: n,
+        maximo: crate::rele_compacto::MAX_TX_ANUNCIO,
+    })
 }
 
 fn leer_hashes(bytes: &[u8], max: usize) -> Result<(Vec<BlockHash>, &[u8]), EncodingError> {
@@ -483,7 +555,32 @@ mod tests {
             Peticion::Bloques {
                 hashes: vec![h(4), h(5)],
             },
+            Peticion::FaltantesCompactas {
+                bloque: h(6),
+                indices: vec![1, 3, 4],
+            },
         ]
+    }
+
+    fn tx_simple(n: u8) -> Tx {
+        Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(1_000).unwrap(),
+                lock: Lock::PubKey {
+                    pubkey: ClavePublica::desde_bytes([n; 32]),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: 0,
+        }
     }
 
     fn todas_las_respuestas() -> Vec<Respuesta> {
@@ -498,6 +595,10 @@ mod tests {
             Respuesta::Cabeceras((0..5).map(cabecera).collect()),
             Respuesta::Bloques(vec![]),
             Respuesta::Bloques((0..3).map(bloque).collect()),
+            Respuesta::FaltantesCompactas {
+                bloque: h(6),
+                transacciones: vec![(tx_simple(2), vec![vec![0x22; 64]])],
+            },
             Respuesta::NoDisponible,
         ]
     }
@@ -674,6 +775,28 @@ mod tests {
                 "disc {disc:#04x}"
             );
         }
+    }
+
+    /// **H-02.** Un contador del relé mentiroso se rechaza en el **códec real**, que pasa por
+    /// `reserva_acotada`.
+    #[test]
+    fn un_rele_con_contador_mentiroso_se_rechaza() {
+        use zx_core::encoding::compact_size;
+        let mut p = vec![Peticion::DISC_FALTANTES];
+        p.extend_from_slice(&[0u8; 32]);
+        compact_size::escribir(&mut p, u64::MAX);
+        assert!(matches!(
+            peticion_desde_bytes(&p),
+            Err(zx_core::error::EncodingError::DemasiadosElementos { .. })
+        ));
+
+        let mut r = vec![Respuesta::DISC_FALTANTES];
+        r.extend_from_slice(&[0u8; 32]);
+        compact_size::escribir(&mut r, u64::MAX);
+        assert!(matches!(
+            respuesta_desde_bytes(&r),
+            Err(zx_core::error::EncodingError::DemasiadosElementos { .. })
+        ));
     }
 
     /// Un lote lleno de cabeceras **sí** cabe: la cota no debe rechazar lo legítimo.

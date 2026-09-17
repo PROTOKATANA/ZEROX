@@ -74,6 +74,15 @@ pub enum Peticion {
         /// Los bloques que faltan.
         hashes: Vec<BlockHash>,
     },
+    /// **Relé compacto.** Las transacciones que faltan de un bloque anunciado, por índice.
+    ///
+    /// El `bloque` correlaciona la petición con el anuncio en curso (H-03 §2.2).
+    FaltantesCompactas {
+        /// Hash de la cabecera anunciada.
+        bloque: BlockHash,
+        /// Índices `u32` estrictamente crecientes y únicos, dentro del número anunciado.
+        indices: Vec<u32>,
+    },
 }
 
 /// Lo que un peer responde.
@@ -85,6 +94,13 @@ pub enum Respuesta {
     Cabeceras(Vec<BlockHeader>),
     /// Bloques completos, **en el orden en que se pidieron**.
     Bloques(Vec<BloqueRed>),
+    /// **Relé compacto.** Las transacciones pedidas, en el mismo orden que la petición.
+    FaltantesCompactas {
+        /// Hash de la cabecera a la que pertenecen.
+        bloque: BlockHash,
+        /// Pares `(transacción, testigos)`, en el orden de los índices pedidos.
+        transacciones: Vec<(Tx, Vec<Vec<u8>>)>,
+    },
     /// "No tengo eso." No es un error: un peer honesto puede no tener un bloque que ya podó, o que
     /// pertenece a una rama que él descartó.
     ///
@@ -99,6 +115,8 @@ impl Peticion {
     pub const DISC_CABECERAS: u8 = 0x01;
     /// Discriminante de [`Peticion::Bloques`].
     pub const DISC_BLOQUES: u8 = 0x02;
+    /// Discriminante de [`Peticion::FaltantesCompactas`]. **Nuevo; los anteriores no se mueven.**
+    pub const DISC_FALTANTES: u8 = 0x03;
 
     /// El byte que identifica esta variante.
     #[must_use]
@@ -107,6 +125,7 @@ impl Peticion {
             Self::Estado => Self::DISC_ESTADO,
             Self::Cabeceras { .. } => Self::DISC_CABECERAS,
             Self::Bloques { .. } => Self::DISC_BLOQUES,
+            Self::FaltantesCompactas { .. } => Self::DISC_FALTANTES,
         }
     }
 }
@@ -120,6 +139,9 @@ impl Respuesta {
     pub const DISC_BLOQUES: u8 = 0x02;
     /// Discriminante de [`Respuesta::NoDisponible`].
     pub const DISC_NO_DISPONIBLE: u8 = 0x03;
+    /// Discriminante de [`Respuesta::FaltantesCompactas`]. **Nuevo; empieza en 0x04 porque 0x03 ya
+    /// estaba tomado por `NoDisponible`, que no se mueve.**
+    pub const DISC_FALTANTES: u8 = 0x04;
 
     /// El byte que identifica esta variante.
     #[must_use]
@@ -128,6 +150,7 @@ impl Respuesta {
             Self::Estado(_) => Self::DISC_ESTADO,
             Self::Cabeceras(_) => Self::DISC_CABECERAS,
             Self::Bloques(_) => Self::DISC_BLOQUES,
+            Self::FaltantesCompactas { .. } => Self::DISC_FALTANTES,
             Self::NoDisponible => Self::DISC_NO_DISPONIBLE,
         }
     }
@@ -146,11 +169,17 @@ impl Respuesta {
             (Self::Estado(_), Peticion::Estado)
                 | (Self::Cabeceras(_), Peticion::Cabeceras { .. })
                 | (Self::Bloques(_), Peticion::Bloques { .. })
+                | (
+                    Self::FaltantesCompactas { .. },
+                    Peticion::FaltantesCompactas { .. }
+                )
                 // NoDisponible vale para cualquier petición de datos, pero NO para el saludo:
                 // un peer que no sabe decir quién es no sirve para nada.
                 | (
                     Self::NoDisponible,
-                    Peticion::Cabeceras { .. } | Peticion::Bloques { .. }
+                    Peticion::Cabeceras { .. }
+                        | Peticion::Bloques { .. }
+                        | Peticion::FaltantesCompactas { .. }
                 )
         )
     }
@@ -185,6 +214,10 @@ mod tests {
                 hasta: None,
             },
             Peticion::Bloques { hashes: vec![] },
+            Peticion::FaltantesCompactas {
+                bloque: h(0),
+                indices: vec![],
+            },
         ];
         let mut vistos = Vec::new();
         for p in &peticiones {
@@ -196,6 +229,10 @@ mod tests {
             Respuesta::Estado(estado()),
             Respuesta::Cabeceras(vec![]),
             Respuesta::Bloques(vec![]),
+            Respuesta::FaltantesCompactas {
+                bloque: h(0),
+                transacciones: vec![],
+            },
             Respuesta::NoDisponible,
         ];
         let mut vistos = Vec::new();
@@ -203,6 +240,17 @@ mod tests {
             assert!(!vistos.contains(&r.discriminante()), "{r:?} colisiona");
             vistos.push(r.discriminante());
         }
+
+        // Los viejos NO se han movido: son consenso de protocolo.
+        assert_eq!(Peticion::Estado.discriminante(), 0x00);
+        assert_eq!(Peticion::DISC_CABECERAS, 0x01);
+        assert_eq!(Peticion::DISC_BLOQUES, 0x02);
+        assert_eq!(Respuesta::DISC_ESTADO, 0x00);
+        assert_eq!(Respuesta::DISC_CABECERAS, 0x01);
+        assert_eq!(Respuesta::DISC_BLOQUES, 0x02);
+        assert_eq!(Respuesta::DISC_NO_DISPONIBLE, 0x03);
+        assert_eq!(Peticion::DISC_FALTANTES, 0x03);
+        assert_eq!(Respuesta::DISC_FALTANTES, 0x04);
     }
 
     /// Cada respuesta responde a su petición y **solo** a la suya.
@@ -213,16 +261,34 @@ mod tests {
             hasta: None,
         };
         let bloques = Peticion::Bloques { hashes: vec![h(1)] };
+        let faltantes = Peticion::FaltantesCompactas {
+            bloque: h(1),
+            indices: vec![1, 2],
+        };
 
         assert!(Respuesta::Estado(estado()).responde_a(&Peticion::Estado));
         assert!(Respuesta::Cabeceras(vec![]).responde_a(&cabeceras));
         assert!(Respuesta::Bloques(vec![]).responde_a(&bloques));
+        assert!(
+            Respuesta::FaltantesCompactas {
+                bloque: h(1),
+                transacciones: vec![]
+            }
+            .responde_a(&faltantes)
+        );
 
         // Los cruces, que son lo que de verdad se comprueba aquí.
         assert!(!Respuesta::Cabeceras(vec![]).responde_a(&bloques));
         assert!(!Respuesta::Bloques(vec![]).responde_a(&cabeceras));
         assert!(!Respuesta::Estado(estado()).responde_a(&cabeceras));
         assert!(!Respuesta::Cabeceras(vec![]).responde_a(&Peticion::Estado));
+        assert!(
+            !Respuesta::FaltantesCompactas {
+                bloque: h(1),
+                transacciones: vec![]
+            }
+            .responde_a(&bloques)
+        );
     }
 
     /// `NoDisponible` vale para datos, **nunca** para el saludo.

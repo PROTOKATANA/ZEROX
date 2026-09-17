@@ -217,6 +217,12 @@ impl Nodo {
                 self.pedir_cuerpos(peer).await;
                 Fin::Seguir
             }
+            Respuesta::FaltantesCompactas { bloque, .. } => {
+                // El relé compacto no está integrado en el nodo todavía: se registra y se ignora.
+                // Es una rama de compatibilidad, no una adopción.
+                tracing::debug!(peer = %peer, %bloque, "respuesta de faltantes compactas no integrada");
+                Fin::Seguir
+            }
             Respuesta::NoDisponible => {
                 // No es un error y no puntúa (C-NET-05). Pero tampoco se le sigue pidiendo lo
                 // mismo: si es él quien no lo tiene, insistir da la misma respuesta para siempre.

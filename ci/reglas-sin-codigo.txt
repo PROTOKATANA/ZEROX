@@ -15,19 +15,15 @@
 # marzo de 2013. No hay línea que citar; lo que hay es la ausencia de esa línea.
 C-STORE-09
 
-# ── Relé compacto de bloques (BIP 152): a medias ──────────────────────────────────────────────
+# ── Relé compacto de bloques (BIP 152) ────────────────────────────────────────────────────────
 #
-# research/bip152.md tiene el diseño con fuente primaria. Es lo que falta para cerrar la Fase 5
-# junto con el peer scoring. No sube el TPS: reduce huérfanos y reorgs de un bloque.
+# research/bip152.md tiene el diseño con fuente primaria. C-NET-07 (derivación del identificador
+# corto) está en crates/zx-p2p/src/id_corto.rs con los vectores oficiales de SipHash-2-4, y ahora
+# acepta cabeceras DAG de longitud variable.
 #
-# C-NET-07 (derivación del identificador corto) YA está: crates/zx-p2p/src/id_corto.rs, con los
-# vectores oficiales de SipHash-2-4. Lo que falta es todo lo demás — anuncio, reconstrucción y
-# recuperación de colisiones.
-C-NET-06
-C-NET-08
-C-NET-09
-R-NET-01
-R-NET-02
+# Las otras cinco tampoco están ya aquí: crates/zx-p2p/src/rele_compacto.rs las cita y las
+# implementa como tipos, códecs y máquina de estados. Pero el servicio no adopta el candidato,
+# así que su sitio es ci/reglas-sin-cablear.txt, no este archivo.
 
 # ── Bloque B1/B2: el estado del nodo ─────────────────────────────────────────────────────────
 #

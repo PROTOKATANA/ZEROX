@@ -55,4 +55,5 @@ pub mod limites;
 pub mod limites_ip;
 pub mod mensaje;
 pub mod presupuesto;
+pub mod rele_compacto;
 pub mod servicio;

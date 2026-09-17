@@ -29,3 +29,23 @@
 C-HDR-05
 C-HDR-07
 C-HDR-09
+
+# ── Relé compacto: código puro en zx-p2p, servicio sin adoptar el candidato ───────────────────
+#
+# C-NET-06  validar la cabecera antes de emitir un anuncio compacto. NO está implementada: la
+#           cita es la cabecera del módulo. Depende de la verificación conjunta PoAS/KZG/PoT y de
+#           la pregunta abierta de TAREAS §2.7. Es la más débil de la lista.
+# C-NET-08  las colisiones se recuperan y no puntúan. Implementada en reconstruir(): una
+#           coincidencia rellena, varias marcan ambiguo, y el fallback no puntúa al peer.
+# C-NET-09  el receptor verifica la raíz de Merkle reconstruida. Implementada en
+#           comprobar_completitud_y_compromisos().
+# R-NET-01  relé compacto negociado por conexión. NO está implementada, y además contradice la
+#           decisión Q2 de 2026-09-13, que lo hace obligatorio en la ruta crítica. La
+#           contradicción es del SPEC y sigue sin resolver.
+# R-NET-02  sal por bloque para los ID cortos. La derivación SHA3-256(cabecera ‖ nonce) está en
+#           id_corto.rs y acepta cabecera DAG de longitud variable; falta que el anuncio viaje.
+C-NET-06
+C-NET-08
+C-NET-09
+R-NET-01
+R-NET-02

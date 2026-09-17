@@ -348,6 +348,17 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                     Respuesta::Bloques(recortar(bs, crate::limites::MAX_BLOQUES_POR_RESPUESTA))
                 }
             }
+            Peticion::FaltantesCompactas { bloque, indices } => {
+                let ts = self.manejador.transacciones_compactas(bloque, indices);
+                if ts.is_empty() {
+                    Respuesta::NoDisponible
+                } else {
+                    Respuesta::FaltantesCompactas {
+                        bloque: *bloque,
+                        transacciones: ts,
+                    }
+                }
+            }
         }
     }
 
