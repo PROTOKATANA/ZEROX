@@ -1,0 +1,20 @@
+# Reglas del SPEC que SÍ cita el código, pero que ninguna ruta ejecutada aplica todavía.
+#
+# Las comprueba ci/citas-spec.sh. Es el tercer estado que faltaba: hasta la cabecera DAG este
+# proyecto solo distinguía "nadie la cita" (ci/reglas-sin-codigo.txt) de "hecha", y trataba un
+# grep como prueba de implementación. No lo es.
+#
+# Una regla vive aquí cuando existe código que la aplica —tipos, parser, comprobación, tests— y
+# nada lo llama desde la ruta activa del nodo. El guardián falla en los dos sentidos: si deja de
+# estar citada, su sitio es reglas-sin-codigo.txt; si sigue aquí después de cablearse, también
+# falla. Mover la regla al cablearla no es cortesía, es lo que impide que este archivo describa un
+# pasado que ya pasó.
+#
+# ⚠️ Esto NO es una sala de espera cómoda. Una regla aquí es una regla que el nodo incumple hoy.
+# Si la lista crece, es que se está escribiendo protocolo que nadie ejecuta.
+#
+# Estado al escribirse: la cabecera DAG existe en zx-core, zx-consensus y zx-p2p; `zx-node` sigue
+# con la cabecera lineal. Ninguna de estas reglas está en la ruta activa.
+
+# Vacía a propósito: el guardián ya conoce el tercer estado, pero todavía no se ha promovido
+# ningún código que cite una regla declarada aquí. Las entradas llegan con su crate.
