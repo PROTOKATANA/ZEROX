@@ -124,3 +124,181 @@ C-SPEC-03
 # con referencia y kernel comparados entre sí y contra el oráculo Julia GDR-v0.2
 # (veritas/consenso/ghostdag-rank-v1/). Hay código, y ninguna ruta lo ejecuta: el nodo sigue
 # eligiendo cadena con fork_choice.rs.
+
+# ── Transporte: el relé «1+», la prioridad de subida y el PoT en la red ───────────────────────
+#
+# Redactadas en el SPEC el 2026-09-17 (§16.2, §16.5 y §16.6) sobre decisiones de Katana ya
+# tomadas: Q1, Q2 y Q4 del 2026-09-13 y la arquitectura «1+» del 2026-09-16 (TAREAS §2.7).
+# Ninguna tiene una línea de código: el nodo difunde bloques completos por /zerox/blocks/1 y no
+# existe ni el tema de PoT ni el canal de recuperación.
+#
+# ⚠️ No son trabajo futuro cómodo: son reglas que el nodo incumple hoy, y tres de ellas
+# (C-NET-26, C-NET-29, C-NET-30) son la condición declarada para que la referencia de 100 Mbit/s
+# de Q1 se sostenga. Sin ellas, un nodo por debajo de la referencia se satura en vez de recortar.
+#
+# C-NET-25  los tres canales: /zerox/blocks/2 solo anuncios compactos, /zerox/block-relay/1 la
+#           recuperación, /zerox/sync/1 sin cambios. El bloque completo nunca por gossip.
+#           Trampa: servicio.rs despacha por topico.contains("/blocks/"), que /blocks/2 también
+#           cumple; cambiar la versión sin cambiar el despacho hace banear a pares correctos.
+# C-NET-26  relé compacto obligatorio en la ruta crítica, sin negociación por conexión.
+# C-NET-27  anuncio sin padres DAG a una cola acotada, reevaluado al llegar las dependencias.
+#           El tamaño de la cola es PENDIENTE: lo dimensiona el v2a (Q5).
+# C-NET-28  pedir las transacciones que faltan es el camino ordinario y admite proveedores
+#           alternativos; el bloque entero es el último recurso y no penaliza a quien reenvía.
+# C-NET-29  prioridad estricta del consenso (bloques y PoT) sobre el reenvío de transacciones.
+# C-NET-30  presupuesto de reenvío de transacciones por debajo de la subida, con recorte, y
+#           reenvío por anuncio y petición. El valor del presupuesto es PENDIENTE: v2a (Q5).
+# C-NET-31  tema /zerox/pot/1, una verificación por slot, cacheada. Sin esto el coste por salto
+#           no está acotado: hasta 150 × 96,1 ms ≈ 14,4 s por bloque.
+# C-NET-32  verificación PoT bajo demanda con las tres salvaguardas (caché primero, retener lo
+#           que va por delante del reloj, presupuesto de CPU). El presupuesto es PENDIENTE: v2b.
+C-NET-25
+C-NET-26
+C-NET-27
+C-NET-28
+C-NET-29
+C-NET-30
+C-NET-31
+C-NET-32
+
+# ── Producción de bloques y conflictos de transacciones (SPEC §11) ────────────────────────────
+#
+# Redactadas el 2026-09-17 sobre decisiones ya tomadas: el shuffle de pick_virtual_parents lo
+# decidió D9-d («R-FIN-12 nombra el shuffle», ya recogido en SPEC §7.3) y el conflicto de
+# transacciones es R-FIN-8′(5). Ninguna tiene código.
+#
+# C-GD-10   qué puntas toma como padres un bloque que se PRODUCE: hasta 15, de una cola de
+#           candidatos barajada, incluyendo siempre la punta virtual. Es política de producción,
+#           no verificación: ningún verificador rechaza un bloque por su elección de padres. Sin
+#           el barajado, 14-21 bloques honestos quedan fuera del DAG para siempre (D9-d §A3.1).
+#           El nodo no produce bloques todavía —el minero PoW fue retirado—, así que no hay
+#           productor que la cite.
+# C-ORD-04  conflicto de transacciones sobre el orden de C-ORD-03: gana el primero, el otro se
+#           descarta en silencio sin invalidar a nadie, y fees suma solo las aceptadas. Necesita
+#           el estado UTXO con datos de deshacer (TAREAS §2.6), que no existe: validar_bloque
+#           sigue sin alcanzarse (ci/consenso-pendiente.txt).
+C-GD-10
+C-ORD-04
+# C-GD-11  bounded merge depth con kosherización: un rojo fuera del merge_depth_root que no sea
+#          ancestro de un azul kosherizante invalida al fusionador. Decide validez de la FUSIÓN y
+#          nada más: no cambia quién cobra ni qué se aplica (rojo_k por P1/R-FIN-8′, rojo_U3
+#          inerte). Cinco pendientes declarados en el SPEC —métrica, valor, bootstrap, borde de
+#          igualdad y relación con finalidad y poda—: sin ellos no hay constante que implementar,
+#          y Katana prohibió expresamente copiar la de Kaspa o derivarla del F = 2 h provisional.
+C-GD-11
+
+# ── PoT como primitiva y contrato del verificador (SPEC §7.1.1-§7.1.2) ────────────────────────
+#
+# Redactadas el 2026-09-20 desde veritas/consenso/pot-primitiva-v1/, propuesta validada. Ninguna
+# tiene código. El verificador PoT AES no existe: prototipos/pot-estable tiene la primitiva con
+# 32 vectores diferenciales, pero no está integrada, y
+# zx-core::wire_dag::verificar_justificacion_pot devuelve IntegracionPotPendiente en vez de un
+# booleano provisional (TAREAS §2.1).
+#
+# C-POT-01  encadenado de semilla slot a slot, con la inyección aplicada exactamente en t_j.
+# C-POT-02  salida = AES128_chain^N(semilla) en 8 tramos; la verificación es determinista.
+# C-POT-03  aleatoriedad y reto por slot, y la PROHIBICIÓN de cualquier derivación que permita
+#           saltarse slots. Es una prohibición: no hay línea que citar, hay ausencia de línea.
+# C-POT-04  dominio de N(s) y proyección u64 -> NonZeroU32 sin panic; fuera de dominio = Pendiente.
+# C-POT-05  el pot_output de la cabecera es la salida FUTURA (D-2 = A) y el último checkpoint la
+#           ancla. Cambia la semántica de C-HDR-07, cuyo código queda por detrás: ver
+#           ci/reglas-sin-cablear.txt.
+# C-POT-06  contrato del verificador: tres estados y circularidad imposible.
+# C-POT-07  caché indexada por clave contextual (f, s, semilla, N); validez != recursos.
+# C-POT-08  orden de validación: estructural y caché antes que AES.
+C-POT-01
+C-POT-02
+C-POT-03
+C-POT-04
+C-POT-05
+C-POT-06
+C-POT-07
+C-POT-08
+
+# ── El flujo del PoT (SPEC §7.1.3-§7.1.7, y C-FLU-17 en §14.3) ────────────────────────────────
+#
+# Redactadas el 2026-09-20 desde veritas/consenso/regla-flujo-v1/, propuesta validada, sobre los
+# instrumentos veritas/consenso/ancla-inyeccion-v2/ y veritas/consenso/puerta-cobertura-v1/.
+# Ninguna tiene código, y dos de ellas ni siquiera tienen dónde engancharlo:
+#   · C-FLU-02 necesita un accesor del slot de un padre ARBITRARIO; zx-consensus::ContextoDag
+#     expone es_bloque_validado, esta_en_el_pasado_de, padre_seleccionado y es_genesis, y NINGUNO
+#     da el slot de un padre cualquiera. Sin ese accesor la regla no es comprobable en ese crate.
+#   · C-FLU-17 necesita puntos de enganche de estado/métrica en el nodo que no existen.
+#
+# C-FLU-19 NO EXISTE: fue el nombre de la regla de finalidad hasta D-F7, que la renombró C-FIN-01.
+# Su número no se reutiliza (TAREAS §4.2).
+#
+# C-FLU-01  unidades en slots; L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1). Definición,
+#           no parámetro. L_suelo_slots es <<PENDIENTE>>: exige una Delta medida en red real.
+# C-FLU-02  cota de slot para TODOS los padres. Es la misma que C-HDR-05 ampliada; su coste para
+#           el productor honesto está estimado ~0 y NO medido (TAREAS §2.9).
+# C-FLU-03  vista de época V_j(B), con corte en T_j + L_slots (no en t_j, que dependería del ancla).
+# C-FLU-04  el ancla: primer cruce de T_j por la cadena seleccionada de la VISTA, no la del nodo.
+# C-FLU-05  época sin ancla: se salta, sin recuperación retroactiva; el bloque sin ancla a
+#           T_j+L_slots es inválido.
+# C-FLU-06  flujo del génesis y semilla(f_0, 0). Usa DOS hashes distintos a propósito: H_flujo para
+#           el identificador, blake3 para la semilla. No uniformarlos.
+# C-FLU-07  t_j = slot(I_j) + L_slots; hasta t_j rige el flujo anterior. Una sola lotería.
+# C-FLU-08  S_max_slots < L_slots: condición de CORRECCIÓN de la definición del ancla.
+# C-FLU-09  S_max_slots < I_slots: los t_j distintos dos a dos, <= 1 inyección por slot.
+# C-FLU-10  derivación del identificador de flujo con H_flujo = H_d(ETIQUETA_FLUJO || m). Amplía
+#           C-HASH-06 con dos etiquetas nuevas (D-F2 = A).
+# C-FLU-11  el flujo NUNCA se declara. Prohibición: no hay línea que citar.
+# C-FLU-12  entropía de la inyección = blake3(chunk || pot_output) del ancla (D-F1 = A), con el
+#           invariante de no-equivocación del inyector como cláusula.
+# C-FLU-13  validez ABSOLUTA. Es la bifurcación de §2.1, decidida por Katana.
+# C-FLU-14  pasado consistente de flujo: paso 1b del orden de validación, estructural y sin AES.
+# C-FLU-15  una partición de flujo tiene el ESTATUTO de un fallo de finalidad ("se trata como", no
+#           "es"). Declaración: no hay línea que citar.
+# C-FLU-16  N(s) cambia exactamente en t_j y en ningún otro slot.
+# C-FLU-17  señal de flujo minoritario. NO es regla de consenso: vive en §14.3 y no cambia la
+#           validez de ningún bloque. Necesita enganches en el nodo que no existen.
+# C-FLU-18  el nodo sin cadena previa aplica la selección ordinaria de GHOSTDAG. Cierra un hueco de
+#           redacción; no añade mecanismo.
+# C-FLU-20  el productor descarta las puntas cuya fusión cambiaría un ancla ya activada. Política de
+#           producción, como C-GD-10; el bloque tardío queda infusionable para siempre.
+# C-FLU-21  la inyección ya activada se hereda, no se recalcula (D-F8 = C: la vista NO se congela).
+# C-FLU-22  adopción del flujo rival dentro de la ventana, con presupuesto (D-F9 = C). Sustituye a
+#           DF-2, que se había decidido sobre una premisa falsa.
+C-FLU-01
+C-FLU-02
+C-FLU-03
+C-FLU-04
+C-FLU-05
+C-FLU-06
+C-FLU-07
+C-FLU-08
+C-FLU-09
+C-FLU-10
+C-FLU-11
+C-FLU-12
+C-FLU-13
+C-FLU-14
+C-FLU-15
+C-FLU-16
+C-FLU-17
+C-FLU-18
+C-FLU-20
+C-FLU-21
+C-FLU-22
+
+# ── Finalidad (SPEC §12) ──────────────────────────────────────────────────────────────────────
+#
+# C-FIN-01  finalidad en índices de slot, sin exit: d >= F_slots prohibido, la punta se ignora y el
+#           proceso NO se detiene. Familia nueva por decisión de Katana (D-F7 = B): no es una regla
+#           de flujo, es una regla que el flujo usa.
+#
+#           ⚠ EL CÓDIGO DE HOY HACE LO CONTRARIO, y no por estar sin cablear: zx-node::cadena
+#           devuelve ReorgDemasiadoProfunda y obliga a "detener el nodo y avisar al operador, no
+#           reintentar". Eso implementa C-REORG-07, que sigue siendo TRANSITORIA y sigue vigente
+#           en el código. C-FIN-01 no la sustituye todavía: la reconciliación quedó fuera de
+#           alcance por decisión (D-F3 = C) y está declarada en TAREAS §2.9.
+C-FIN-01
+
+# ── Presupuesto de verificación de flujo ajeno (SPEC §16.6) ───────────────────────────────────
+#
+# C-NET-33  dos presupuestos (PRESUP_PAR, PRESUP_NODO), los dos <<PENDIENTE>>, y el modo de fallo
+#           escrito: agotar cualquiera da Pendiente y NUNCA Inválido, el nodo conserva su cadena,
+#           SIGUE REENVIANDO y reintenta. Es la enmienda a C-NET-32.3 que D-F10 = B decidió; se
+#           numera en C-NET y no en C-FLU por el mismo criterio de D-F7.
+C-NET-33

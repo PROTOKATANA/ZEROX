@@ -1,6 +1,6 @@
 # TAREAS — lo que falta para que el SPEC PoST + DAG pase a fase de código
 
-Fecha: 2026-09-12; actualizado el 2026-09-17. Derivado de §17 de [SPEC.md](SPEC.md),
+Fecha: 2026-09-12; actualizado el 2026-09-20. Derivado de §17 de [SPEC.md](SPEC.md),
 `ci/consenso-pendiente.txt`, los límites declarados de los instrumentos de `veritas/`,
 [MIGRACION.md](MIGRACION.md), la auditoría externa de la comprobación decisiva v1
 ([AUDITORIA-EXTERNA.md](veritas/consenso/comprobacion-decisiva-v1/AUDITORIA-EXTERNA.md)) y las
@@ -121,10 +121,93 @@ La r2 de `DMS-v0.1` midió 1,14–1,39 padres típicos, es decir, una cabecera t
 
 ## Nivel 2 — Reglas escritas que todavía no se pueden computar
 
-### 2.1 · Verificación conjunta PoAS/PoT (§7.1)
+### 2.1 · Dependencias por flujo del PoT (§7.1) — CERRADO EN EL SPEC (2026-09-20), FALTA CABLEAR
+
+> **CORRECCIÓN DEL TITULAR, y hay que leerla antes que el resto de la sección.** Este apartado se
+> tituló «🔴 AQUÍ ESTÁ EL PROBLEMA DE SEGURIDAD» porque `1/(S+1)` —el **4 %** con `S ≈ 24`— se leyó
+> como el umbral del diseño. **No lo es.** `1/(S+1)` es la **regla aditiva** —`S` flujos
+> independientes suman cuota— y **no aplica con pasado consistente de flujo**: bajo `C-FLU-14` un
+> bloque no puede referenciar un bloque de otro flujo, así que los flujos del atacante no se
+> agregan a una sola cadena. **El propio instrumento ya lo etiquetaba así**: CRP-v0.1 declaró su
+> resultado «condicionado al diseño del flujo, no demostrado»
+> (`veritas/seguridad/coste-rama-privada-v1/`). El umbral que CRP-v0.1 midió con **un solo flujo**
+> es `α_mínimo = 1/2`, el mismo que PoW — **pero esa cifra no está cerrada: CRP-v0.2 declara
+> «sustituye la evidencia protocolaria de CRP-v0.1» (baseline idealizado útil; veredicto
+> protocolario INCONCLUSO), y ni v0.2 ni v0.3 están validadas ni migradas** (§2.9 (e)). **Lo que
+> este cierre corrige es el titular del 4 %, y no lo sustituye por otro titular ancho.**
+>
+> **Lo que el multistream sí obligaba a decidir era la bifurcación**, y Katana la decidió: validez
+> **absoluta** (`C-FLU-13`) con perfil **1a**. Su precio no es el 4 %: es la **partición de flujo**,
+> que no se cierra con una regla y se previene con `L_slots` frente a `Δ`.
+
+**Estado: CERRADO EN EL SPEC, 2026-09-20.** Redactadas **31 reglas** en §7.1.1–§7.1.7, §12, §14.3
+y §16.6: `C-POT-01`…`C-POT-08`, `C-FLU-01`…`C-FLU-18`, `C-FLU-20`…`C-FLU-22`, `C-FIN-01` y
+`C-NET-33`. Familias nuevas: `C-POT`, `C-FLU`, `C-FIN`. `C-FLU-19` **no existe** y no se reutiliza.
+Reglas existentes modificadas: `C-HASH-06`, `C-HDR-05`, `C-HDR-06`, `C-HDR-07`, `C-GD-04`,
+`C-GD-10`, `C-REORG-07`, `C-NET-31`, `C-NET-32`.
+
+Procedencia: `veritas/consenso/pot-primitiva-v1/` y `veritas/consenso/regla-flujo-v1/` (propuestas
+validadas), sobre `veritas/consenso/ancla-inyeccion-v2/` y `veritas/consenso/puerta-cobertura-v1/`
+(instrumentos validados). El hilo completo de decisiones, en `P-ZRX/P-2.1/SINTESIS.md`.
+
+**Lo que queda, y es mucho:**
+
+- **El código: ninguna de las 31 reglas tiene una línea.** Las 31 están en
+  `ci/reglas-sin-codigo.txt`.
+- **Dos reglas existentes cambiaron de semántica y su código quedó por detrás del SPEC:**
+  `C-HDR-05` (la cota de slot alcanza ahora a todos los padres; el código solo mira `sp`) y
+  `C-HDR-07` (el `pot_output` es la salida futura y el último checkpoint la ancla; el verificador
+  devuelve `IntegracionPotPendiente`). Declaradas en `ci/reglas-sin-cablear.txt`, con el precedente
+  de C-NET-07.
+- **El verificador PoT sigue sin existir**, y ahora tiene contrato que cumplir (`C-POT-06`).
+- **Las mediciones que faltan: §2.9.**
+
+---
+
+**El registro de cómo se llegó aquí se conserva íntegro a partir de esta línea.**
+
 Solución de espacio, testigos KZG, identidad de billete, reto, distancia de solución, sello y
 justificación PoT. Pendiente además: formato y validación conjunta, retardo de autoría, puntos de
-control, inyección de entropía y dependencias por flujo.
+control, inyección de entropía y **dependencias por flujo**.
+
+**Esa última línea dejó de ser un pendiente más el 2026-09-18.** `veritas/seguridad/coste-rama-privada-v1/`
+(CRP-v0.1) midió el coste de construir una rama privada con más `blue_work` y encontró que:
+
+- **El diseño base aguanta.** `α_mínimo = 1/2`, **el mismo umbral que PoW y que GHOSTDAG sobre
+  PoW**, en los dos regímenes (reorg corta y *long-range*). El DAG aporta **menos varianza**, no
+  menos umbral.
+- **El rango endógeno NO es explotable en media.** La tasa de soluciones válidas es `∝ SR` y el peso
+  es `w(B) = ⌊2^128/(SR+1)⌋ ∝ 1/SR`: **el producto se cancela**. Era la sospecha principal con la
+  que se escribió el encargo y queda descartada por identidad, no por estadística. Lo que sí queda
+  es un riesgo de **varianza** (fijar `sr` bajo compra cola con el mismo trabajo medio), del que
+  sale una propiedad MUST para R-FIN-13′.
+- **El único vector medido que baja el umbral es el multistream de PoT** — **y `C-FLU-14` lo
+  cierra**, porque los flujos del atacante no se pueden agregar a una sola cadena. La tabla se
+  conserva como registro de qué se midió y bajo qué hipótesis, **no como el umbral del diseño**.
+  Cuota efectiva `S·α/(1−α+S·α)` ⟹ `α_mínimo = 1/(S+1)`:
+
+  | `S` | 2 | 4 | 8 | 16 | 24 |
+  |---|---:|---:|---:|---:|---:|
+  | `α_mínimo` | 0,333 | 0,200 | 0,111 | 0,059 | **0,040** |
+
+  `S ≈ 24` es el techo de IOPS de un SSD de 100 k. **Coste: `S` núcleos e IOPS, cero espacio
+  adicional.**
+
+**No es un hallazgo nuevo: es el ATAQUE 2** de `research/dag-poas-auditoria.md` (2026-09-06),
+calificado allí de **gravedad crítica** y con el estado «SOSPECHA fuerte — depende de una regla
+(validez del PoT en DAG) que la propuesta no escribe». Lo que CRP-v0.1 añade es el **número** y el
+haber comprobado que es el **único** vector medido que mueve el umbral.
+
+⚠️ **La auditoría avisaba de que las dos salidas obvias fallan:** si la validez del PoT es
+**relativa a la cadena seleccionada**, se abre el multistream; si es **absoluta**, se abre el split
+de cadena (ATAQUE 1). **DECIDIDO por Katana el 2026-09-19/20: validez absoluta, perfil 1a.** El
+split no se cierra con una regla: se **previene** con `L_slots` frente a `Δ` y, si nace, se cura
+**solo** en el caso espontáneo (`C-FLU-22`). Ver §2.9.
+
+**Lo que Claude acotó al validar** (`PROCEDENCIA.md` §3.2 del instrumento): el efecto de «rojos
+asimétricos» —que el adversario sufra menos rojos que la honesta— queda **no medido** por el
+instrumento, pero con la Δ medida (0,26–0,60 s, 25× por debajo del primer escalón de la ronda 11a)
+la fracción roja honesta es 0,0000 y **el umbral no se mueve**.
 
 **La parte de red ya está decidida** (Q4 de §3.1, 2026-09-13):
 - antes de reenviar se comprueban cabecera, prueba de espacio, 2 KZG, sello, justificación PoT
@@ -151,24 +234,94 @@ oportunidad. En los instrumentos eso es una declaración del fixture. La propied
 Arranque por red, ventana, límites y redondeos, fusiones fuera de ventana y validación de ramas
 candidatas con pesos reales. Conservado a propósito en el «Pendiente» de §7.2.
 
-### 2.4 · Orden de ejecución del DAG y conflictos
-Cadena seleccionada, peso, `blue_work` y orden de aplicación del mergeset **ya están redactados**
-(C-GD-03, C-GD-05, C-GD-08 y C-ORD-03, desde el 2026-09-15). Queda la **resolución de conflictos
-de transacciones** sobre ese orden —qué gasto gana y qué pasa con el que se descarta— y su enlace
-con el estado UTXO de §2.6 (§17, «DAG»).
+**Residuo de paridad del `SR`, anotado el 2026-09-20.** PCO-v0.1 demostró en `Rational{BigInt}` que
+el `SR` **se cancela en todo instante** —el peso de un flujo crece con el espacio que lo cubre—,
+con una excepción: **con `SR` impar queda un déficit de `1/(SR+1)`**. Es elegible y es pequeño
+—≤ 4,9·10⁻⁴ con `SR_MIN = 2^11`, despreciable con rangos realistas—, pero **existe**, y el
+controlador de rango puede evitarlo o no según cómo redondee. Fuente y alcance:
+`veritas/consenso/puerta-cobertura-v1/PROCEDENCIA.md` §3.
 
-**Y tres reglas de Kaspa que ZEROX no tiene y que nadie estaba siguiendo.** El instrumento
-GDR-v0.2 las declara fuera de su alcance (`veritas/consenso/ghostdag-rank-v1/CONTRATO.md`), y al
-quedar §11 especificada es fácil darlas por resueltas. No lo están:
+### 2.4 · Orden, conflictos y las tres reglas de Kaspa — TRES DE CUATRO REDACTADAS (2026-09-17)
 
-- **`pick_virtual_parents`**: qué puntas incluye como padres un bloque que se **produce**. C-GD-03
-  fija cómo se **elige** el padre seleccionado entre unos padres dados, que es verificación; esto
-  es política de producción y no está escrita.
-- **Merge depth bound**: el límite de profundidad de fusión que impide que un bloque fusione un
-  pasado arbitrariamente viejo. Sin él, el coste de colorear no está acotado por nada más que
-  R-FIN-12.
-- **Pruning**: qué se puede podar del DAG y bajo qué garantía. Enlaza con la finalidad (§17) y con
-  el almacén.
+Cadena seleccionada, peso, `blue_work` y orden de aplicación del mergeset ya estaban redactados
+(C-GD-03, C-GD-05, C-GD-08 y C-ORD-03, desde el 2026-09-15). El 2026-09-17 se cierran tres de los
+cuatro puntos que quedaban. **Dos de ellos no había que decidirlos: estaban decididos en
+investigación y nadie los había escrito como regla.**
+
+| Punto | Estado | De dónde salía |
+|---|---|---|
+| Conflictos de transacciones | **C-ORD-04**, redactada | R-FIN-8′(5), ya decidido |
+| `pick_virtual_parents` | **C-GD-10**, redactada | D9-d: «R-FIN-12 nombra el `shuffle`», ya en SPEC §7.3 |
+| Merge depth bound | **C-GD-11**, redactada con **5 pendientes** | Katana, 2026-09-17 |
+| Pruning | **NO redactable** — auditoría abierta | — |
+
+- **C-ORD-04** · gana el gasto que aparece primero en el orden de C-ORD-03; el otro se descarta en
+  silencio, sin invalidar ni al bloque ni al fusionador; `fees` suma solo las aceptadas.
+- **C-GD-10** · hasta 15 puntas de una cola de candidatos **barajada**, incluyendo siempre la punta
+  virtual, y descartando las que violarían C-GD-11. Es política de **producción**: ningún
+  verificador rechaza un bloque por la elección de padres de su autor. Sin el barajado, **14-21
+  bloques honestos quedan fuera del DAG para siempre** (D9-d §A3.1). Laguna conservada: el
+  argumento es de diversidad *entre nodos* y no aplica con un solo productor honesto.
+- **C-GD-11** · *bounded merge depth* con kosherización, **decidido por Katana el 2026-09-17**: un
+  rojo fuera del `merge_depth_root` que no sea ancestro de un azul kosherizante invalida al
+  fusionador. **Decide validez de la fusión y nada más** — no cambia quién cobra ni qué se aplica:
+  `rojo_k` por P1/R-FIN-8′, `rojo_U3` inerte. Cierra un hueco real: `mergeset_size_limit` acota el
+  **tamaño** y `S_max` la distancia al **padre seleccionado**, pero un bloque viejo cuyo pasado ya
+  está íntegro en `past(sp(B))` entra sumando **1** y ninguno de los dos lo toca.
+  **Cinco pendientes, por orden expreso de Katana:** métrica (slots / `blue_score` / posiciones),
+  valor, bootstrap, borde de igualdad, y relación con finalidad y poda. **No se copia la constante
+  de Kaspa ni se deriva de `F = 2 h`**, que es provisional.
+
+#### Pruning — AUDITADO (2026-09-17): no hay prueba de poda por niveles
+
+Instrumento **PPP-v0.1** en `veritas/consenso/poda-post-v1/`, ejecutado por DeepSeek según
+`ENCARGO-05-poda-post.md` y **validado por Claude reejecutando** (`PROCEDENCIA.md`).
+
+> ⚠️ **Revisión externa del 2026-09-18: varios veredictos estaban sobre-enunciados.** Los defectos
+> verificados están en `veritas/consenso/poda-post-v1/PROCEDENCIA.md` §3.3–§3.4, y la tabla de abajo
+> ya los incorpora. **Lo que falta no es el IBD sin confianza, es el IBD *sucinto*:** un nodo nuevo
+> siempre puede bajarse y validar toda la historia desde el génesis; lo que no puede es arrancar
+> desde estado podado sin un ancla externa. La diferencia importa: lo primero sería un fallo de
+> seguridad, lo segundo es coste y escalabilidad.
+
+| Problema | Veredicto | Etiqueta |
+|---|---|---|
+| (1) **poda local** — nodo que ya validó toda la historia | **viable en principio**, sin implementar; exige finalidad integrada, estado UTXO con deshacer (§2.6, no existe) y profundidad de retención cerrada | política, no demostración |
+| (2) **prueba de poda por certificados de niveles** | **descartada** para los mecanismos examinados | demostrado (D4, D5, D8), con el alcance acotado abajo |
+| (3) **disponibilidad histórica** — archivales | fuera del consenso; **no resuelve (2)** | estimado |
+
+**Lo que el teorema D5 NO demuestra**, y hay que decirlo: sus propiedades P1/P2/P3 no formalizan que
+el recurso deba **pagarse de nuevo por cada ancestría**, que es lo que hace funcionar a PoW. Un
+esquema que combine una condición cara pero **transferible** con otra barata ligada a los padres
+satisface las tres literalmente y sigue siendo inseguro. Y el modelo **excluye el PoT y sus flujos**.
+Vale para los mecanismos examinados; **no** para toda familia de pruebas.
+
+**La raíz, y es estructural.** En PoW el hash del bloque compromete a los padres **y** es el recurso
+escaso: las dos propiedades viven en el mismo objeto, y por eso los niveles funcionan. **En PoST se
+separan.** El billete ganador se calcula del PoT y del disco **antes** de elegir padres (D4, 0
+discrepancias), así que el mismo certificado se pega a cualquier historia; y un nivel sobre el hash
+de cabecera sí liga a los padres, pero se muele con CPU y espacio ≈ 0 —C-HDR-04 reconoce que el
+sello Ed25519 **no es único**, y el `merkle_root` varía con la coinbase—, así que no mide espacio.
+Medido: un certificado de 64 bloques de nivel 8 es **aceptado**, y dos DAG con certificado idéntico
+tienen distinto `blue_work` (comprobado con el oráculo GDR-v0.2).
+
+**Lo que esto desbloquea: §6.1 NO se reabre.** `parents_by_level` no rescata la prueba, porque el
+problema no es un campo que falte. **El cableado de la cabecera DAG (§2.8) no está bloqueado.** Era
+la pregunta de máxima prioridad del encargo.
+
+**Lo que queda abierto, y es un hueco del encargo, no de la ejecución.** El teorema cubre
+**predicados de nivel**. La vía que no es un nivel —una **prueba recursiva** de la función de
+transición del consenso (modelo Mina)— no cae en ninguno de sus cinco casos y no se examinó, porque
+`ENCARGO-05` preguntaba por el análogo a los **niveles** de PoW. Con esa precisión, lo demostrado es
+«no con certificados de niveles», no «no, en absoluto».
+
+**Encargo 06 — decidido por Katana (2026-09-17):** auditar la vía de prueba recursiva. Es la única
+candidata en pie; es cara (probar recursivamente GHOSTDAG, coloreo y `blue_work` es muy superior a
+probar una cadena lineal) y puede salir un «no» por coste. `PROPUESTA.md` P3.3 avisa de la
+dependencia: sin estado UTXO (§2.6) no hay qué comprometer.
+
+**La poda sigue siendo requisito para lanzar mainnet.** Una testnet puede operar provisionalmente
+sin poda y con nodos archivales declarados explícitamente, y **eso no cuenta como solución**.
 
 ### 2.5 · Alturas y calendario derivados del orden DAG
 Activaciones, madurez de coinbase, timelocks, expiración de tx y sectores, archivado. MIGRACION:
@@ -180,21 +333,45 @@ trasladar esas cuentas a una garantía temporal». No escalar constantes por 120
 nadie porque la cadena no mantiene ese conjunto — hay un `TODO(sincronizador)` en
 `crates/zx-node/src/cadena.rs`. Sin eso no hay validación completa de bloque.
 
-### 2.7 · Reglas de transporte decididas y todavía sin escribir en el SPEC
-Salen de las decisiones de Katana del 2026-09-13 (§3.1). No son consenso, pero sin ellas la Δ
-medida es optimista, y el v2a las modela: conviene redactarlas antes. Cada ID nuevo debe citarse
-en `crates/` o declararse en `ci/reglas-sin-codigo.txt`.
+### 2.7 · Reglas de transporte — REDACTADAS EN EL SPEC (2026-09-17)
 
-| Regla | De dónde sale | Estado actual del SPEC |
+**Estado: CERRADO EN EL SPEC.** Salían de las decisiones de Katana del 2026-09-13 (Q1, Q2 y Q4 de
+§3.1) y del 2026-09-16 (arquitectura «1+»). No son consenso, pero sin ellas la Δ medida es
+optimista y el v2a no tiene qué modelar. Lo que queda es **código: ninguna de las nueve tiene una
+línea**, y las nueve están en `ci/reglas-sin-codigo.txt`.
+
+| Regla nueva | Qué fija | De dónde sale |
 |---|---|---|
-| Cola prioritaria para bloques y PoT sobre transacciones; presupuesto de reenvío de transacciones por debajo de la subida; reenvío de transacciones por anuncio y petición | Q1 | No existe en §16 ni en `crates/zx-p2p/src/behaviour.rs` |
-| Relé compacto obligatorio en la ruta crítica | Q2 | R-NET-01 lo negocia conexión a conexión (`SPEC.md:2674`) |
-| Caso degradado del relé compacto con presupuestos de recursos (C-NET-04), sin penalizar a quien reenvía (C-NET-05, C-NET-08) | Q2 | No especificado; es transporte (§2.7), no formato de cabecera |
-| Tema de gossip del PoT, verificación una vez por slot con caché, y verificación bajo demanda con tres salvaguardas | Q4 | Solo existen los temas `blocks` y `txs` (`SPEC.md:2287`) |
-| C-NET-06 reescrita: consenso antes de reenviar, transacciones después | Q4 | Hoy solo exime la comprobación de UTXO (`SPEC.md:2327`) |
+| **C-NET-25** | los tres canales; el bloque completo **nunca** por gossip | «1+» |
+| **C-NET-26** | relé compacto **obligatorio**, sin negociación por conexión | Q2 |
+| **C-NET-27** | anuncio sin padres → cola acotada y reevaluación (tamaño PENDIENTE) | «1+» |
+| **C-NET-28** | pedir lo que falta es el camino ordinario; bloque entero, último recurso | Q2 + «1+» |
+| **C-NET-29** | prioridad estricta de bloques y PoT sobre transacciones | Q1 |
+| **C-NET-30** | presupuesto de subida con recorte, y anuncio-y-petición (valor PENDIENTE) | Q1 |
+| **C-NET-31** | tema `/zerox/pot/1`, una verificación por **clave de contexto**, cacheada — **corregida el 2026-09-20**: la clave es `(f, s, semilla, N)` de `C-POT-07`, no el slot a secas | Q4 + `C-POT-07` |
+| **C-NET-32** | verificación bajo demanda con tres salvaguardas — **corregida el 2026-09-20**: la salvaguarda 1 solo invalida **bajo la misma clave**, y la 3 remite a `C-NET-33` (cota global por nodo, D-F10) | Q4 + D-F10 |
+| **C-NET-33** | **nueva**: los dos presupuestos de verificación de flujo ajeno y su modo de fallo `Pendiente` (`PRESUP_PAR`, `PRESUP_NODO`, ambos PENDIENTE) | D-F10 = B |
 
-**Pregunta abierta:** relajar C-NET-06 para anunciar antes de reconstruir el bloque. Se decide
-cuando el v2a mida con qué frecuencia faltan transacciones en las mempools.
+Reescritas: **C-NET-06** (orden completo de verificación), **C-NET-07** (de `txid` a
+`wtxid = txid ‖ auth_digest`), **R-NET-01** (sin la negociación por conexión) y **C-NET-02** (los
+temas). **C-NET-10 retirada con tombstone**; su número no se reutiliza. El SPEC pasa de 181 a 188
+reglas.
+
+**Hallazgo al redactar: C-NET-07 estaba mal archivada.** Estaba citada en
+`crates/zx-p2p/src/id_corto.rs` y en **ninguna** de las dos listas, así que para `ci/citas-spec.sh`
+contaba como «ruta activa» — es el límite que el propio guardián declara. Sus hermanas del mismo
+módulo (C-NET-08, C-NET-09, R-NET-02) sí estaban declaradas. Corregido: pasa a
+`ci/reglas-sin-cablear.txt`, que sube de 21 a 22. Y arrastra un segundo desfase: su código deriva
+sobre `txid` y la regla ya dice `wtxid`, así que no es solo código sin cablear, es **código de la
+versión anterior de la regla**.
+
+**Los tres valores que el SPEC deja PENDIENTE a propósito** (§0.3: nadie los fija por su cuenta):
+tamaño de la cola de anuncios huérfanos, presupuesto de reenvío de transacciones y presupuesto de
+CPU del PoT bajo demanda. Los tres los calibra el v2 (Q5), y los tres son vectores que el v2b
+ataca.
+
+**Pregunta abierta, conservada:** relajar C-NET-06 para anunciar antes de reconstruir el bloque. Se
+decide cuando el v2a mida con qué frecuencia faltan transacciones en las mempools.
 
 #### Arquitectura «1+» del relé — DECIDIDO POR KATANA (2026-09-16)
 
@@ -281,6 +458,115 @@ Dos deudas pequeñas que conviene saldar al cablear, no después:
 **No lo cierra todo.** `validar_bloque` seguirá sin alcanzarse aunque esto termine: necesita el
 conjunto UTXO con datos de deshacer, que es §2.6.
 
+### 2.9 · La deuda que §2.1 deja al cerrarse — ESCRITA AQUÍ PORQUE NO ESTABA EN NINGUNA LISTA
+
+§2.1 quedó **cerrado en el SPEC** el 2026-09-20. Lo que sigue **no** es el trabajo de cablearlo:
+son **huecos de evidencia y de alcance** que el cierre deja vivos y que hasta hoy no figuraban en
+ningún inventario del repositorio. Están ordenados por lo que pasa si se ignoran.
+
+**(a) Lo que el diseño supone y nadie ha medido**
+
+1. **La vía A2 no está medida, y es un hueco nuevo.** `P(una rama privada desplaza el ancla dentro
+   de V_j antes de t_j)` es la cola de una carrera de `blue_work` de longitud `L_slots`. El
+   **umbral** está medido (`α_mínimo = 1/2`, CRP-v0.1); **la cola a `L = F_slots`, no**. Y lo que
+   `P-2.1` midió —`L_mín`— es **otra magnitud**: desacuerdo honesto por latencia. Ni el encargo de
+   `P-FLUJO` ni ninguna adenda contemplaban este vector. Instrumento que podría medirlo:
+   `veritas/consenso/ancla-inyeccion-v2/`.
+2. **El equilibrio adaptativo no está medido**, y es el ataque que va directamente contra (P2), que
+   es donde descansa toda la seguridad del perfil 1a: partir a los honestos en dos mitades y
+   sostener el empate. Lo medido es **A3 estática** —todos los bloques del atacante al mismo
+   observador toda la réplica— con tope de 8 candidatos y ventana `[T, T+45]`.
+3. **El coste de `C-FLU-02` para el productor honesto está `estimado ≈ 0`, no medido.** La
+   propuesta declara que confirmarlo con ANCLA-v0.2 —fracción de bloques honestos que
+   referenciarían un padre de slot mayor, con `Δ` = 0,5 / 4 / 16 s— es **«condición para pasar al
+   SPEC», no trabajo opcional**. **La regla se trasladó igualmente, por decisión de Katana
+   (D-F6 = A), y esa condición sigue SIN CUMPLIRSE.** En el régimen candidato `τ ≈ 0,1-0,17 s` los
+   empates y cruces de slot se multiplican por 6-10, así que la estimación **no se extrapola sola**.
+4. **La tercera rendija del presupuesto no está medida.** Dos nodos con **el mismo DAG** pueden
+   acabar en flujos distintos porque uno pudo pagar la verificación dentro de la ventana de
+   `C-FLU-22` y el otro no. A diferencia de las dos rendijas de PCO-v0.1, **ésta está parcialmente
+   bajo control del atacante**, que puede gastar presupuesto ajeno con tráfico barato del paso 1b.
+5. **El colateral honesto de `C-FLU-20` no está medido.** Un bloque tardío que cambiaría un ancla ya
+   activada queda **infusionable para siempre**. Lo normal es que sea del atacante; con qué
+   frecuencia atrapa bloques honestos, y cuánto empeora con `τ ≈ 0,1-0,17 s`, no se ha medido.
+6. **La `Δ` de TODO lo anterior es simulada** (DMS-v0.1), no medida en red. Sigue siendo «la primera
+   medición que el diseño necesita» (§3.1).
+
+**(b) Lo que está demostrado que NO funciona, o que falta por demostrar**
+
+7. **El sembrador (A5): las defensas escritas no sirven, y el margen no está medido.**
+   `P-ZRX/P-SEMBRADOR/investigacion/` (Codex, **validación parcial**: integridad, tests y dos citas clave
+   comprobadas; **el informe completo está sin leer**) establece que **ni `history_size` ni
+   `altura_ploteo` demuestran antigüedad física** —identifican el prefijo histórico, y un atacante
+   puede escoger hoy una referencia antigua que aún sea válida— y que **al atacante le basta una
+   pieza, no un sector**. Eliminarlo exigiría **A1+C1**: registrar antes del reto una
+   raíz/versionado/cardinalidad de la parcela exacta, **es decir un cambio de consenso**.
+   **Falta medir el coste de un intento dirigido** antes de elegir camino. Bajo el perfil **1a** la
+   salida histórica —«desatar `L` de `F`»— **queda cerrada**, y el suelo de `C-FLU-01` la cierra
+   más: el margen histórico de **1,91×** es **con precios supuestos** y **no está medido**.
+8. **La deuda principal: la convergencia del orden no está probada para este diseño.** Prop. 7 y
+   Def. 2 de GHOSTDAG están probadas sobre GHOSTDAG **puro**; con las tres reglas añadidas encima,
+   «que el orden total siga convergiendo bajo las tres **no está comprobado**. Es la deuda
+   principal» (`research/dag-poas-ancla-de-orden.md:436-439`). **Toca a §7.1 del SPEC de lleno:**
+   (F1) —`slot` no decreciente por la cadena seleccionada— y (F2) —`blue_work` estrictamente
+   creciente—, de las que cuelgan `C-FLU-04` y toda §7.1.3, son **propiedades medidas en simulador
+   y un lema**, no consecuencias del teorema.
+9. **La existencia del ancla en el caso patológico no está medida.** `C-FLU-04` la demuestra bajo
+   una condición suficiente y `C-FLU-05` cierra el caso contrario con un rechazo. **Con qué
+   probabilidad `Chn(V_j(B))` diverge de la cadena de `B` por debajo de `T_j` no se sabe:** no hay
+   ninguna proposición que ate `blue_work` con `slot`.
+10. **La disponibilidad del ancla tras la poda no se resuelve.** `C-FLU-04` necesita `V_j(B)` para
+    **todas** las épocas del pasado; qué pasa cuando esos bloques están podados sigue abierto, como
+    ya decía R-FIN-1 y repite `SPEC.md` §7.3.
+
+**(c) Aritmética y calibración sin rehacer**
+
+11. **La aritmética del adelanto está SIN REHACER tras D-2 = A.** El argumento de R-FIN-14(f)/(h)
+    —`I ≥ ρ_max·W_dec`, `lead_max`, `ρ* ≈ 1 + L/I`— está escrito sobre la salida **del propio
+    slot**; con `pot_output = salida(f, slot+D)` **no se ha rehecho**. **Ninguna cifra de adelanto,
+    de `ρ_max` ni de margen frente al sembrador debe darse por válida hasta que se rehaga.**
+12. **`PRESUP_NODO` se calibra en PINZA, y una de las dos mordazas no está derivada.** Por abajo:
+    integrado sobre la ventana de `C-FLU-22`, **MUST** bastar para verificar **una rama rival
+    completa** —peor caso `F_slots` slots, del orden de `F_slots × 92 ms` ≈ **11 min de CPU** con
+    los valores nominales—; **con menos, la adopción nunca se completa y D-F9 queda derogada de
+    hecho sin que nadie la revoque**. Por arriba: demasiado grande devuelve el DoS. **La cota
+    superior NO está derivada.** El valor de `PRESUP_PAR` sigue siendo un `<<PENDIENTE>>` declarado
+    que calibra el v2b (Q5).
+
+**(d) Alcance que se decidió dejar fuera, no olvido**
+
+13. **La reconciliación de `C-FIN-01`** con (i) el código que hoy **se detiene**
+    —`ReorgDemasiadoProfunda` obliga a «detener el nodo y avisar al operador, no reintentar»—, (ii)
+    **`COINBASE_MATURITY`**, de la que `MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 11 999` deriva, y
+    (iii) **el techo de archivado**, que nadie ha estudiado. Quedó fuera **por alcance decidido**
+    (D-F3 = C acotada al enunciado), no por falta de decisión. **Es trabajo, no bifurcación.**
+    `C-REORG-07` sigue transitoria.
+14. **La regla objetiva del recién llegado** —«el flujo canónico es el que lideraba en
+    `t_j + F_slots`»— queda como **encargo aparte**, con su resistencia a bloques con slots antiguos
+    por estudiar. `C-FLU-18` hace la conducta determinista y única; **no la hace acertada**: tras
+    `ALTURA_CADUCIDAD` del checkpoint y con una partición viva, un nodo nuevo va al flujo más pesado
+    **del momento**, que puede ser el minoritario.
+
+**(e) Evidencia sin validar que afecta a lo anterior**
+
+15. **CRP-v0.2 y CRP-v0.3 existen en `deepseek/` y NO están validadas ni migradas.** CRP-v0.2
+    declara en su propia cabecera que **«sustituye la evidencia protocolaria de CRP-v0.1»**
+    (baseline idealizado útil; **veredicto protocolario inconcluso**), y CRP-v0.3 se deriva de
+    CRP-v0.2, «que **no** se cierra». **§2.1 y `SPEC.md` §17 citan CRP-v0.1.** Hasta que alguien
+    valide v0.2/v0.3 o declare por qué no aplican, **hay una versión posterior de la evidencia
+    central de §2.1 sin revisar**, en una zona que `.gitignore` excluye y que se borra al cerrar
+    cada encargo.
+
+**(f) El código, que es lo único que cablea todo esto**
+
+16. **El verificador PoT no existe**, y ahora tiene contrato: `C-POT-06` (tres estados, sin
+    circularidad), `C-POT-07` (caché por clave contextual) y `C-POT-08` (orden de validación).
+    Integrar `prototipos/pot-estable` es el primer paso.
+17. **La derivación del flujo en el nodo no existe.** `C-FLU-10` necesita calcular `Chn(V_j)` sobre
+    la vista de época; `C-FLU-02` necesita un accesor de `slot` de un padre arbitrario que
+    `ContextoDag` **no expone** hoy; `C-FLU-17` necesita puntos de enganche en el nodo que tampoco
+    existen. Nada de esto se puede empezar sin §2.8.
+
 ---
 
 ## Nivel 3 — Parámetros sin cerrar (no impiden escribir, impiden lanzar)
@@ -289,7 +575,7 @@ conjunto UTXO con datos de deshacer, que es §2.6.
 |---|---|---|
 | 3.1 | **`Δ` natural medida solo en simulación** | Instrumento `veritas/finalidad/delta-medido-v1/` (MS; revisión 2 validada y migrada el 2026-09-14); cinco decisiones tomadas; coste por salto medido en hardware (`veritas/rendimiento/coste-salto-v1/`, 2026-09-14); pendiente el v2 (v2a y v2b), ver abajo |
 | 3.2 | `F` = 2 h **provisional** | Con obligación declarada de bajarla en producción |
-| 3.3 | `I`, `L`, `ρ_max` | Sin cerrar; `ρ_max` entre 3× sin segundo VDF y revelación retardada |
+| 3.3 | `I_slots`, `L_suelo_slots`, `ρ_max` | **`L` ya NO es un parámetro libre:** desde el 2026-09-20 es una definición, `L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1)` (`C-FLU-01`, perfil 1a). Lo que queda abierto es **`L_suelo_slots`**, que va como símbolo y **no se puede fijar hoy**: su criterio exige una cota de `Δ` **medida en red real** (§3.1), no simulada. `I_slots` sin cerrar; `ρ_max` entre 3× sin segundo VDF y revelación retardada, **y su aritmética está sin rehacer tras D-2** (§2.9) |
 | 3.4 | **P-038** | Abierta |
 | 3.5 | Génesis | Parámetros y hashes distintos por red; bootstrap explícito |
 
@@ -523,10 +809,21 @@ reinclusión como la que modela la cola de RCE-v0.1? La Δ natural ya está medi
 margen `G` de cierre de la ventana, que en RCE-v0.1 es escenario pendiente, y las particiones y la
 retención adversaria, que el v2 todavía no mide.
 
-### 4.2 · IDs de regla para §7.2 — DECIDIDO POR KATANA (2026-09-15)
+### 4.2 · IDs de regla — DECIDIDO POR KATANA (2026-09-15, ampliado el 2026-09-20)
 
 Las reglas de §7.2 y §11 llevan IDs `C-XXX-NN`. Se aplicó con dos familias nuevas: **C-ORD-NN**
 para el orden y el desempate de §7.2, y **C-GD-NN** para GHOSTDAG en §11.
+
+**Tres familias más el 2026-09-20**, con el mismo criterio: **C-POT-NN** (el PoT como primitiva y
+el contrato del verificador, §7.1.1–§7.1.2), **C-FLU-NN** (el flujo, §7.1.3–§7.1.7) y **C-FIN-NN**
+(finalidad, §12). La separación entre `C-FLU` y `C-FIN` **es una decisión**, no una comodidad:
+Katana la tomó en **D-F7 = B** porque la regla de finalidad **no es una regla de flujo**, es una
+regla que el flujo usa. Por ese mismo criterio, el presupuesto de verificación de flujo ajeno
+**no** es `C-FLU-23` sino **`C-NET-33`**: es una enmienda a C-NET-32.3, de la capa de red.
+
+> ⚠️ **`C-FLU-19` NO EXISTE y su número no se reutiliza.** Fue el nombre de la regla de finalidad
+> hasta que D-F7 la sacó de la familia y la renombró `C-FIN-01`. Es el mismo régimen que
+> `C-FORK-01`…`04` y que `C-NET-10`.
 
 - Los IDs son **nuevos y estables**: no se reutiliza ninguno retirado, empezando por los
   `C-FORK-01` a `C-FORK-04` del acumulador anterior.
@@ -557,6 +854,22 @@ para el orden y el desempate de §7.2, y **C-GD-NN** para GHOSTDAG en §11.
 - **`DMS-v0.1`:** el test del estimador ponderado por espacio (T1) comprueba las funciones, pero
   `run.jl` aplica la regla en línea, sin llamarlas. Una regresión en esa ruta no la detectaría el
   test (`veritas/finalidad/delta-medido-v1/ENMIENDA-R2.md` §7).
+- **`ANCLA-v0.2` escribe sus resultados en el directorio de trabajo, no en el suyo.** `run.jl` usa
+  `joinpath("resultados", ...)` relativo al CWD (`veritas/consenso/ancla-inyeccion-v2/run.jl:49`,
+  y lo mismo en `:81, :121, :150, :169`), mientras `METODO.md` manda ejecutar **desde la raíz del
+  repositorio**. Seguir el método al pie de la letra crea `resultados/` **en la raíz**, no dentro
+  de la carpeta del instrumento — que es donde el propio `METODO.md` dice que están las salidas.
+  Detectado el 2026-09-20 al reejecutar la celda `hon-4` como control de identidad de la
+  migración; **el control salió idéntico byte a byte**, así que no invalida ninguna cifra. Lo que
+  sí hace es que **una reproducción descuidada puede comparar la copia consigo misma y no darse
+  cuenta**. Avisado en el `METODO.md` del instrumento; **no corregido**, porque el único cambio de
+  código que `P-ZRX/P-CIERRE/ENCARGO.md` §1.1 autorizaba era el `include` de GDR.
+- **`puerta-cobertura-v1/HUELLAS.sha256` tiene 4 rutas de procedencia (de 82) que ya no resuelven.**
+  Citan `P-ZRX/P-2.1/ENCARGO.md`, `P-ZRX/P-2.1/ADENDA-2.md`, `P-ZRX/P-PUERTA/PROMPT.md` y `P-ZRX/P-PUERTA/ENTRADA.sha256`;
+  esos directorios se movieron a `P-ZRX/` el 2026-09-21, después de sellado el instrumento. El
+  contenido no cambió: los mismos archivos, con el mismo hash, viven ahora bajo
+  `P-ZRX/P-2.1/…` y `P-ZRX/P-PUERTA/…`. **No se edita el hash sellado**; se documenta aquí, igual
+  que la línea de `SPEC.md` que ya fallaba a propósito desde la fase 1 de `P-CIERRE`.
 
 ---
 
@@ -575,11 +888,49 @@ para el orden y el desempate de §7.2, y **C-GD-NN** para GHOSTDAG en §11.
 3. **Cabecera DAG (1.4)** — **cerrada en el SPEC el 2026-09-17** (§6.1–§6.2). Lo que queda es
    integrarla en `zx-node`; hasta entonces ningún crate de serialización, red o almacenamiento debe
    darse por cerrado contra ella.
-4. El resto por área, siguiendo §17 del SPEC.
+4. **Nivel 2, en dos mesas — decidido por Katana el 2026-09-17: SPEC primero, el ejecutor espera.**
+   El Nivel 2 no es homogéneo, y esa es la razón del reparto: §2.4, §2.5 y §2.7 son **reglas sin
+   redactar** y las escribe Claude; §2.1, §2.3, §2.6 y §2.8 son **código** y van a encargo. Mandar
+   el Nivel 2 entero al ejecutor le obligaría a inventar reglas, que es justo lo que AGENTS.md
+   prohíbe.
+   - **§2.7 · transporte — HECHO (2026-09-17).** Ocho reglas nuevas (C-NET-25…32), tres reescritas
+     (C-NET-06, C-NET-07, R-NET-01), C-NET-10 retirada.
+   - **§2.4 · orden y conflictos — HECHO en tres de cuatro (2026-09-17).** C-ORD-04, C-GD-10 y
+     C-GD-11. El pruning no era redactable: sale a auditoría.
+   - **Pruning — encargo 05 escrito**, pendiente de lanzar. Puede **reabrir §6.1** si la prueba de
+     poda exige `parents_by_level`: la cabecera DAG no tiene ese campo.
+   - **Siguiente en la mesa de Claude — REORDENADO el 2026-09-18: §2.1 antes que §2.5.** Las tres
+     auditorías de poda (05, 06, 07) acabaron localizando el problema de seguridad en otro sitio:
+     **la regla de dependencias por flujo del PoT**, que es el único punto medido que degrada el
+     umbral (`α = 0,040` con `S = 24`). La poda resultó ser un problema de **coste de arranque**,
+     no de seguridad. §2.5 sigue después.
+   - **Lección de método de la serie 05–07, anotada para no repetirla.** Las tres auditorías
+     produjeron **resultados correctos con alcance estrecho, presentados con etiqueta ancha**, y la
+     validación de Claude no lo detectó hasta que una revisión externa lo señaló. En el 06, los dos
+     defectos que invalidan su §1 estaban **escritos en los docstrings del código reejecutado**:
+     reproducir un experimento no comprueba que el experimento pruebe lo que dice. Los tres
+     `PROCEDENCIA.md` lo documentan instrumento a instrumento.
+5. El resto por área, siguiendo §17 del SPEC.
 
 ---
 
 ## Cerrado recientemente (para no reabrirlo)
+
+- **Dependencias por flujo del PoT (§2.1) redactadas en el SPEC**, 2026-09-20. **31 reglas
+  nuevas** —`C-POT-01`…`08`, `C-FLU-01`…`18`, `C-FLU-20`…`22`, `C-FIN-01`, `C-NET-33`— y nueve
+  existentes modificadas. Tres familias nuevas: `C-POT`, `C-FLU`, `C-FIN`. `C-FLU-19` no existe.
+  - **La decisión de fondo:** validez del PoT **absoluta** (`C-FLU-13`) con perfil **1a**
+    (`L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1)`, `C-FLU-01`). Su precio es la
+    **partición de flujo**, que **no se cierra con una regla**: se previene con `L` frente a `Δ` y,
+    si nace, `C-FLU-22` solo cura el nacimiento **espontáneo**.
+  - **Corrección del titular anterior:** `1/(S+1)` —el «4 %»— es la **regla aditiva** y **no
+    aplica con pasado consistente de flujo** (`C-FLU-14`). CRP-v0.1 ya etiquetaba su resultado
+    «condicionado al diseño del flujo, no demostrado».
+  - Evidencia: `veritas/consenso/pot-primitiva-v1/` y `veritas/consenso/regla-flujo-v1/`
+    (propuestas validadas), sobre `veritas/consenso/ancla-inyeccion-v2/` (ANCLA-v0.2) y
+    `veritas/consenso/puerta-cobertura-v1/` (PCO-v0.1). Decisiones: D-1, D-2, D-F1…D-F10, todas
+    cerradas; hilo completo en `P-ZRX/P-2.1/SINTESIS.md`.
+  - **Pendiente: el código —ninguna de las 31 tiene una línea— y la deuda de evidencia de §2.9.**
 
 - **GHOSTDAG y `rank` redactados en el SPEC (1.2 + 1.3)**, 2026-09-15. §11 pasa a nueve reglas
   (`C-GD-01`…`C-GD-09`) y §7.2 a tres (`C-ORD-01`…`C-ORD-03`), con la regla C, `blue_work` en u256

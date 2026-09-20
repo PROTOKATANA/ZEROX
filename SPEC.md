@@ -35,6 +35,9 @@ Cada regla de consenso lleva un identificador estable `C-<ÁREA>-<NN>`. El códi
 | `C-TS` | Timestamps |
 | `C-EMIT` | Emisión y coinbase |
 | `C-BLK` | Validez de bloque |
+| `C-POT` | Proof-of-Time como primitiva y contrato del verificador |
+| `C-FLU` | El flujo del PoT: ancla, época, identificador y partición |
+| `C-FIN` | Finalidad: profundidad máxima de reorganización |
 
 ### 0.3 · Marcadores de pendiente
 
@@ -582,6 +585,8 @@ exactamente 16 bytes.
 | `ZZKBlkHeader____` | §6.2 hash de cabecera, sello incluido (C-HDR-09) |
 | `ZZKBlkPreHash___` | §6.2 `pre_hash`: mensaje que firma el sello (C-HDR-03) |
 | `ZZKBlkBodyHash__` | §6.1 compromiso completo del cuerpo, efectos y autorización |
+| `ZZKFlowId_______` | §7.1.4 identificador de flujo del PoT (`C-FLU-10`) |
+| `ZZKFlowGenesis__` | §7.1.3 flujo del génesis (`C-FLU-06`) |
 
 ---
 
@@ -876,17 +881,35 @@ seleccionada, orden DAG y activaciones sigue pendiente; no se usa el índice de 
 altura del bloque, según la tabla de C-UPG-02. Cualquier otro valor **MUST** rechazarse. No existe
 un campo de "versión de bloque" separado: la rama de consenso *es* la versión.
 
-**C-HDR-05** · En el diseño DAG A″, la relación de slot con el padre seleccionado es **no estricta**:
-`slot(sp(B)) ≤ slot(B)` (R-FIN-1a). La igualdad no autoriza ciclos; la validación de ancestros,
-flujo y justificación secuencial del PoT se integra conjuntamente. El génesis tiene `slot = 0`.
+**C-HDR-05** · En el diseño DAG A″, la cota de slot es **no estricta** y alcanza a **TODOS los
+padres**, no solo al seleccionado: para todo bloque `B` y **todo** padre `p` de `B`,
+`slot(p) ≤ slot(B)`. En particular `slot(sp(B)) ≤ slot(B)` (R-FIN-1a). La igualdad no autoriza
+ciclos. El génesis tiene `slot = 0`.
+
+Es la misma cota que `C-FLU-02`, y es materia de **validez**: sin ella el corte por slot de
+`C-FLU-03` no es cerrado por ancestros y GHOSTDAG no está definido sobre él. Por eso `C-FLU-02`
+entra también en la enumeración de `C-GD-10`.
+
+> **Decidido por Katana el 2026-09-20 (D-F6 = A).** Hasta entonces el SPEC solo exigía la cota del
+> padre seleccionado y **no determinaba** el slot de los demás padres. **El coste para el productor
+> honesto está `estimado ≈ 0` y NO medido:** `TAREAS.md` §2.9.
+>
+> ⚠️ **El código va por detrás de esta regla.** `comprobar_diferencia_slots_del_bloque` recibe
+> **solo** `slot_sp`, y `ContextoDag` no expone forma de pedir el `slot` de un padre arbitrario. No
+> es solo código sin cablear: es **código de la versión anterior de la regla**, declarado en
+> `ci/reglas-sin-cablear.txt`.
 
 **C-HDR-06** · `rango_solucion` viaja en la cabecera y **MUST** ser exactamente el rango
 esperado contextual:
 
 ```text
-rango_esperado(B) = controlador(past(B), flow(B, slot(B)))
+rango_esperado(B) = controlador(past(B), flujo(B, slot(B)))
 B.rango_solucion == rango_esperado(B)
 ```
+
+`flujo(B, s)` es el identificador de flujo de `C-FLU-10`, que **MUST** derivarse del pasado y
+**MUST NOT** declararse (`C-FLU-11`). Como `C-FLU-10` es función exclusiva de `past(B)`, la
+exigencia de esta regla queda satisfecha **por composición, sin añadir ninguna dependencia nueva**.
 
 El rango esperado **MUST** aportarlo el contexto del pasado DAG validado y del flujo; debe ser
 función **exclusiva** de ese pasado. **MUST NOT** depender del orden de llegada, la punta local, el
@@ -926,6 +949,13 @@ aceptarse otra codificación del mismo valor. La prueba es evidencia contextual 
 **no** entra en `block_hash`; la cabecera sí firma/hashea `slot`, `pot_output` y los padres. Mientras
 el verificador PoT AES no esté integrado, la comprobación **MUST** devolver un estado explícito
 (`IntegracionPotPendiente`), nunca un booleano verdadero provisional.
+
+**Qué ancla la justificación, decidido por Katana el 2026-09-19 (D-2 = A).** El `pot_output` de la
+cabecera es la salida **futura**, `salida(f, slot(B) + D)` (`C-POT-05`). Los `d` portadores cubren
+el rango `(slot(sp(B)) + D, slot(B) + D]`, y el **último checkpoint del último portador MUST ser
+igual a `pot_output(B)`**. La semilla del primer slot del rango la aporta el **contexto** desde el
+pasado validado, **nunca el candidato** (`C-POT-06`). El orden interno de la verificación es el de
+`C-POT-08`.
 
 **C-HDR-08** · La cabecera **MUST NOT** contener la dirección de recompensa. La recompensa es la
 salida de la coinbase, ya comprometida en `merkle_root` (C-EMIT-04).
@@ -1277,12 +1307,578 @@ anteriores. La integración de todas las piezas no está terminada.
 
 ### 7.1 · Prueba y desafío
 
-R-FIN-14 describe el reto por slot derivado de la salida PoT secuencial del flujo. No basta
-comprobar un hash de cabecera: hay que verificar solución de espacio, testigos KZG, identidad de
-billete, reto, distancia de solución, sello y justificación PoT.
+No basta comprobar un hash de cabecera: hay que verificar solución de espacio, testigos KZG,
+identidad de billete, reto, distancia de solución, sello y justificación PoT.
 
-**Pendiente:** fijar el formato y validación conjunta, retardo de autoría, puntos de control,
-inyección de entropía y dependencias por flujo. No se introduce una prueba de sustitución.
+Las subsecciones §7.1.1 a §7.1.7 fijan la parte **PoT y flujo** de esa verificación: el PoT como
+primitiva (`C-POT-01`…`C-POT-05`), el contrato del verificador (`C-POT-06`…`C-POT-08`), y el
+**flujo** — unidades, ancla, época, identificador, entropía, validez y partición
+(`C-FLU-01`…`C-FLU-18`, `C-FLU-20`…`C-FLU-22`). La regla de finalidad de la que cuelgan es
+`C-FIN-01` (§12); el presupuesto de verificación de flujo ajeno es `C-NET-33` (§16.6); la señal de
+flujo minoritario, que **no es regla de consenso**, es `C-FLU-17` (§14.3).
+
+> **Procedencia.** `C-POT-01`…`C-POT-08` salen de
+> `veritas/consenso/pot-primitiva-v1/PROPUESTA-SPEC.md`, validada el 2026-09-20; las reglas de
+> flujo, de `veritas/consenso/regla-flujo-v1/PROPUESTA-SPEC.md`, validada el mismo día. **Las
+> demostraciones y las cifras de simulación se quedan allí y no se repiten aquí.** Los
+> instrumentos que las sostienen son `veritas/consenso/ancla-inyeccion-v2/` (ANCLA-v0.2) y
+> `veritas/consenso/puerta-cobertura-v1/` (PCO-v0.1), con el alcance declarado en sus
+> `PROCEDENCIA.md`. **Ninguno de sus números entra aquí como constante.**
+
+**Sigue pendiente**, y no lo cierran estas subsecciones: la **validación conjunta** de solución de
+espacio, testigos KZG, distancia de solución y sello contra el reto derivado (el paso 5 de
+`C-POT-08`), el **retardo de autoría** `D` como valor, y los puntos de control. No se introduce una
+prueba de sustitución.
+
+#### 7.1.1 · El PoT como primitiva
+
+Un **flujo** `f` es un identificador opaco de 32 bytes (`C-FLU-10`). `semilla(f, 0)` la aporta el
+contexto (`C-FLU-06`). `N(s)` es el trabajo secuencial del slot `s` (§7.3) y `D` el retardo de
+autoría; los dos van como **símbolos**.
+
+**C-POT-01** · **Encadenado de semilla slot a slot.**
+
+```text
+semilla(f, s) = salida(f, s−1)                                  (caso general)
+semilla(f, s) = blake3(entropía(f, s) ‖ salida(f, s−1))[0..16)  (si el contexto declara inyección en s)
+```
+
+La entropía y el slot de activación son **ENTRADAS que aporta el contexto**, nunca el candidato
+(`C-FLU-12`, `C-FLU-07`). **MUST** haber **a lo sumo una inyección por slot**; si el contexto
+declarara más de una, el estado es `Pendiente` por error de contexto (`C-POT-06`), **nunca** una
+decisión local. El bloque génesis no lleva justificación (`pot_bundle_count = 0`, C-HDR-07); la
+salida de su slot se evalúa desde `semilla(f_0, 0)` y su reto se deriva como el de cualquier slot.
+
+> El orden de la concatenación —**la entropía primero**, truncado a 16 bytes— y el aplicarla
+> exactamente en el slot de inyección son los de Autonomys, verificados en fuente en
+> `veritas/consenso/pot-primitiva-v1/PROPUESTA-SPEC.md:38-44`. `blake3` se conserva byte a byte
+> por decisión de Katana del 2026-09-19 (**D-1 = A**): es lo que mantiene vivos los 32 vectores
+> diferenciales de `prototipos/pot-estable` como validación externa.
+
+**C-POT-02** · **Salida, checkpoints y verificación de un slot.**
+
+```text
+salida(f, s) = AES128_chain^{N(s)}(semilla(f, s))
+```
+
+evaluada en **8 tramos uniformes**: un `PotCheckpoints` de `8 × 16 = 128 B`, siendo la salida el
+**último** de los ocho. La clave AES del tramo es `blake3(semilla)[0..16)`. `N(s)` **MUST** ser
+múltiplo de 16; en otro caso la primitiva rechaza (`C-POT-04`).
+
+La verificación de un slot **MUST** ser una función **determinista** de la terna
+`(semilla, N, PotCheckpoints)`: misma terna, mismo resultado, en cualquier nodo y en cualquier
+orden de llegada. Es la propiedad en la que se apoya `C-POT-07`.
+
+> Vectores de forma V1–V5 en `veritas/consenso/pot-primitiva-v1/vectores/`, reproducidos 4/4. **No
+> sustituyen** los 32 vectores diferenciales de `prototipos/pot-estable`, que son la validación
+> externa del AES.
+
+**C-POT-03** · **Aleatoriedad y reto por slot, sin atajos.**
+
+```text
+aleatoriedad(f, s) = blake3(salida(f, s))
+reto(f, s)         = blake3(aleatoriedad(f, s) ‖ LE64(s))
+```
+
+Ningún reto de un slot **MUST** derivarse de una función que permita **saltarse slots**. En
+particular **MUST NOT** existir `reto(f, s) = H(flujo(f) ‖ s)` ni ninguna PRF de `s` a partir de un
+valor fijo de época: el reto de `s` solo es derivable **después** de evaluar la cadena secuencial
+hasta `s`.
+
+> Es lo único que impide evaluar de antemano la época entera de un candidato a ancla. Sin esta
+> prohibición, el adelanto de `L_slots` con que se conoce la entropía (`C-FLU-07`) dejaría de
+> costar tiempo secuencial.
+
+**C-POT-04** · **Dominio de `N(s)` y proyección `u64 → NonZeroU32`.**
+
+El contexto expresa `N(s)` en `u64`. El **verificador MUST** proyectarlo con comprobaciones y
+**MUST NOT** hacer panic ni envolver en silencio. Si `N(s) == 0`, `N(s) > u32::MAX` o
+`N(s) % 16 ≠ 0`, el estado es **`Pendiente` con diagnóstico de contexto, nunca `Inválido`**: el
+fallo está en el pasado validado del nodo o en su implementación, no en el candidato.
+
+`N(s)` es función del pasado validado y lo aporta el contexto; el candidato **MUST NOT** poder
+declararlo. Su valor inicial, sus límites y **quién autoriza** un cambio siguen
+`<<PENDIENTE: §7.3>>`; su calendario lo fija `C-FLU-16`.
+
+**C-POT-05** · **Qué es el `pot_output` de la cabecera y qué cubre la justificación.**
+
+```text
+pot_output(B) = salida(f, slot(B) + D)      la salida «future», anclada en la cabecera
+```
+
+**Decidido por Katana el 2026-09-19 (D-2 = A):** de las dos salidas que Autonomys lleva en su
+pre-digest, el campo único de 16 B de ZEROX (`[88,104)`, C-HDR-01) es la **futura**.
+
+La justificación de `B` lleva `d = slot(B) − slot(sp(B))` portadores (C-HDR-07). El portador `i`
+cubre el slot `slot(sp(B)) + D + i`, y el **último checkpoint del último portador MUST ser igual a
+`pot_output(B)`**. Con esto `pot_bundle_count == slot(B) − slot(sp(B))` es exactamente el número
+de slots del rango `(slot(sp(B)) + D, slot(B) + D]`. La semilla del primer slot del rango la deriva
+el **contexto** del pasado validado —con D-2 = A es la salida del slot `slot(sp(B)) + D`, ya
+anclada en un bloque anterior—, **nunca el candidato** (`C-POT-06`).
+
+> **El coste de la opción A, dicho en voz alta y con su corrección.** El reto del slot `s`
+> (`C-POT-03`) usa la salida del slot `s`, que **no** está anclada en la cabecera de `B`. En el
+> camino normal la aporta la caché por slot (`C-NET-31`). En el camino **bajo demanda**
+> (`C-NET-32`) hay que obtenerla del pasado validado: **como los padres se validan antes que el
+> hijo, la salida del slot `s` sale siempre de ese pasado** —de la propia justificación de `B` si
+> `d > D`, o de la de un ancestro—. La redacción de la propuesta decía que «la justificación de
+> `B` no basta»; **es demasiado pesimista y queda corregida aquí**, según
+> `veritas/consenso/pot-primitiva-v1/PROCEDENCIA.md`.
+
+#### 7.1.2 · El contrato del verificador de PoT
+
+**C-POT-06** · **Entradas, salida de tres estados y prohibición de circularidad.**
+
+**Del candidato** —lo único que viaja en el wire— la cabecera DAG (con `slot` y `pot_output`) y la
+justificación `PotCheckpoints` (C-HDR-07). **Del contexto**, derivado exclusivamente del pasado DAG
+validado: el identificador de flujo `f`, la semilla del primer slot del rango, las inyecciones y
+`N(s)` de cada slot del rango, el retardo `D`, y la caché del propio nodo (`C-POT-07`).
+
+La salida **MUST** tener **tres** estados, no dos:
+
+```text
+PotValido        — cadena completa verificada y anclada
+PotInvalido(r)   — defecto del candidato, verificable y final
+PotPendiente(r)  — sin prueba de invalidez, pero tampoco de validez
+```
+
+`Inválido` **MUST** reservarse a: descuadre o desborde de portadores (C-HDR-05/C-HDR-07);
+verificación AES fallida para alguna terna con la semilla y el `N(s)` del contexto; último
+checkpoint ≠ `pot_output` (`C-POT-05`); discrepancia con la caché **bajo la misma clave**
+(`C-POT-07`). `Pendiente` cubre: `N(s)` fuera del dominio de `C-POT-04`; slot por delante del reloj
+PoT del nodo (C-NET-32.2); **presupuesto agotado** (`C-NET-33`); y fallo interno del contexto.
+**Nada `Pendiente` pasa a `Válido` por defecto:** la única transición es una verificación posterior
+**exitosa** con las mismas entradas de contexto.
+
+**Prohibición de circularidad.** El verificador **MUST NOT** aceptar del propio candidato lo que
+debe venir del pasado validado: el flujo, la semilla del rango, las inyecciones y `N(s)` **MUST**
+aportarlos el contexto. El candidato solo aporta los checkpoints —evidencia reemplazable— y el
+`pot_output` anclado —redundancia comprobada, **nunca fuente de verdad**—. Ninguna implementación
+**MUST** ofrecer una vía que acepte el valor declarado por el candidato como si fuese el esperado:
+**la circularidad MUST ser imposible, no desaconsejada**. Es el mismo principio de C-HDR-06.
+
+El identificador de flujo es **opaco** para este verificador: se usa para indexar el contexto y la
+caché, y **MUST NOT** interpretarse, derivarse de él ni validarse (`C-FLU-11`).
+
+**C-POT-07** · **La caché se indexa por contexto, no por slot; y validez ≠ política de recursos.**
+
+```text
+clave_caché = (f, s, semilla(f, s), N(s))     los cuatro del CONTEXTO, no del candidato
+valor       = salida(f, s)
+```
+
+La caché **MUST** indexarse por la clave contextual completa. Una entrada cacheada pertenece a un
+contexto: **discrepar con una entrada de OTRA clave no prueba nada** —son cadenas de PoT distintas,
+ambas legítimas—. Con la **misma** clave el PoT es determinista (`C-POT-02`), así que discrepancia
+⟹ `Inválido`, y se decide comparando 128 B, **sin gastar AES**.
+
+Agotar un presupuesto de CPU (`C-NET-33`) produce **`Pendiente`, nunca `Inválido`**: un nodo sin
+recursos **MUST NOT** declarar falsa una prueba que no ha verificado. Lo mismo para la retención
+por reloj (C-NET-32.2).
+
+> **Por qué la clave y no el slot.** Con más de un flujo candidato, `salida(f₁,s) ≠ salida(f₂,s)`, y
+> una caché por slot a secas haría depender la **validez** de qué llegó primero — contra el
+> principio de que la validez es función del pasado del bloque y de nada más. **Con un único flujo
+> la corrección es inocua**, y está demostrado en
+> `veritas/consenso/pot-primitiva-v1/PROPUESTA-SPEC.md:259-275`: la clave pasa a ser función de `s`
+> y el comportamiento observable es idéntico al del texto anterior.
+
+**C-POT-08** · **Orden de validación: estructural y barato antes que AES; cada paso con su estado.**
+
+| Paso | Comprobación | Estado si falla |
+|---|---|---|
+| 1 | **Estructural, sin AES.** Decode acotado (C-WIRE-04/C-WIRE-05); `slot(B) ≥ slot(p)` para **todo** padre (C-HDR-05); `pot_bundle_count == slot(B) − slot(sp(B)) ≤ 150` sin underflow (C-HDR-07) | `Inválido` |
+| 1b | **Flujo (`C-FLU-14`), sin AES.** Derivar `flujo(B, ·)` del pasado validado y comprobarlo contra el de cada `X ∈ past(B)` | `Inválido` si discrepa; `Pendiente` si falta pasado |
+| 2 | Cabecera y sello (C-HDR-03/C-HDR-04) | `Inválido` |
+| 3 | **Caché por clave** (`C-POT-07`): comparar la salida anclada con la entrada de la clave del contexto | `Inválido` / `Pendiente` |
+| 4 | **AES secuencial del rango**: por portador, verificar; encadenar semilla; último checkpoint == `pot_output` | `Inválido` si falla; `Pendiente` si se agota el presupuesto |
+| 5 | Solo con `Válido`: derivar `reto` del slot (`C-POT-03`) y verificar la solución PoAS contra él | según §7.1 |
+
+El paso 3 es lo que garantiza que **el camino normal no paga AES por bloque**: el coste por salto
+queda acotado por construcción, que es el criterio de C-NET-06. El paso 4 es el respaldo bajo
+demanda (C-NET-32), con el presupuesto de `C-NET-33`. Un `Pendiente` en el paso 4 **MUST NOT**
+invalidar el bloque: el nodo retiene y completa cuando pueda.
+
+> **El paso 1b va donde va, y no más tarde, por dos razones.** La clave de caché del paso 3
+> **empieza por `f`**: sin el flujo resuelto no hay clave que consultar. Y `C-POT-06` exige que el
+> flujo lo aporte el contexto: `C-FLU-10` y `C-FLU-11` son quien cumple esa exigencia.
+#### 7.1.3 · El flujo: unidades, el ancla y la vista de época
+
+**C-FLU-01** · **Todo lo del flujo se mide en índices de slot de PoT, y `L` va atada a `F`.**
+
+```text
+T_j      = j · I_slots                  umbral de época j (índice de slot), j ≥ 1
+I_j      = ancla de la época j          (C-FLU-04)
+t_j      = slot(I_j) + L_slots          instante de activación (índice de slot)
+profundidad(t, P) = t − slot(P)         en slots, con P el último ancestro común
+
+L_slots := máx( F_slots , L_suelo_slots , S_max_slots + 1 )
+```
+
+`L_slots` es una **definición**, no un parámetro libre: **MUST** derivarse y **MUST NOT**
+declararse aparte. `F_slots := ⌈F / τ_nom⌉`. `F_slots`, `L_suelo_slots` e `I_slots` son
+**símbolos**; esta regla no les da valor.
+
+Una comparación de consenso **MUST NOT** depender de `τ_nom` en tiempo de ejecución ni de ningún
+reloj físico. **La profundidad de una reorganización MUST medirse como
+`slot(punta) − slot(último ancestro común)`, en índices de slot; MUST NOT medirse en bloques**: a
+`λ = 1 bloque/s` y `τ_nom = 1 s/slot` coinciden nominalmente, pero C-GD-04 admite saltos de hasta
+`S_max_slots` en la cadena, así que las dos cuentas se separan y **solo el slot es infalsificable**.
+
+> **Los tres términos del máximo, y por qué hacen falta los tres.** El primero es la atadura que
+> Katana decidió (perfil **1a**): si `F` baja en producción, `L` baja con ella, como identidad y no
+> como nota de operación. El segundo es el **suelo**, y existe porque el primero no basta: `L`
+> responde a una magnitud distinta —la cola de desacuerdo honesto frente a `Δ`—, que no baja cuando
+> baja `F`. El tercero hace que `C-FLU-08` se cumpla por construcción para cualquier `F`.
+>
+> **`L_suelo_slots` MUST fijarse** a partir de (a) la cola medida de desacuerdo de cadena
+> seleccionada a una `ε` elegida explícitamente y (b) **una cota de `Δ` medida en red real**.
+> Mientras no exista (b), cualquier valor es provisional y **MUST** decirlo. La referencia de orden
+> de magnitud —y **solo** eso— está en `veritas/consenso/ancla-inyeccion-v2/`, con `Δ` **simulada**
+> (DMS-v0.1), no medida. `<<PENDIENTE: el valor de L_suelo_slots>>`.
+>
+> ⚠️ §7.3 advierte que `F` «no se iguala por defecto a `L`». Esa frase y `C-FLU-01` **no dicen lo
+> mismo**: aquella prohíbe copiar `L` desde `F`; ésta **deriva `L` de `F` con un suelo**. Se parecen
+> mucho y significan cosas distintas.
+
+**C-FLU-02** · **Cierre de ancestros por slot.** Para todo bloque `B` y **todo** padre `p` de `B`:
+`slot(p) ≤ slot(B)`, desigualdad **no estricta** (el empate está permitido, como en C-HDR-05).
+
+> **Por qué es materia de validez y no política.** La vista de época de `C-FLU-03` es un corte por
+> `slot`. Para que ese corte sea un sub-DAG bien formado tiene que ser **cerrado por ancestros**, y
+> eso exige que ningún padre tenga un `slot` mayor que su hijo. Sin esta regla un bloque dentro del
+> corte puede tener un padre fuera, el sub-DAG queda incompleto y GHOSTDAG **no está definido**
+> sobre él. Por eso C-FLU-02 entra también en la enumeración cerrada de C-GD-10 y en C-HDR-05.
+>
+> **Decidido por Katana el 2026-09-20 (D-F6 = A).** Su coste para el productor honesto está
+> **`estimado ≈ 0`, no medido**: `TAREAS.md` §2.9.
+
+**C-FLU-03** · **Vista de época.** `V_j(B) := ( past(B) ∪ {B} ) ∩ { X : slot(X) < T_j + L_slots }`.
+
+El corte **MUST** ser `T_j + L_slots` y **MUST NOT** ser `t_j`: `t_j` depende del ancla que se está
+definiendo, y `T_j + L_slots` es función de `j` y de las constantes y de nada más.
+
+> Consecuencia, dicha en voz alta: un bloque con `slot ∈ [T_j + L_slots, t_j)` **no participa** en
+> elegir el ancla. Es deliberado.
+
+**C-FLU-04** · **El ancla.** `I_j(B)` es el **primer** bloque de `Chn(V_j(B))` con `slot ≥ T_j`,
+donde `Chn(V_j(B))` es la cadena seleccionada del bloque virtual sobre `V_j(B)`, calculada con
+C-GD-01…C-GD-07 **restringidas a `V_j(B)`**.
+
+> **`Chn(V_j(B))` NO es la cadena seleccionada del nodo.** Es lo que hace la definición bien
+> fundada —la recursión termina, porque el flujo de todo `X ∈ V_j(B)` depende solo de épocas
+> `j' < j`— y es también lo que deja la puerta abierta antes de `t_j`: `V_j(B)` **crece sin
+> reorganización** en cuanto un bloque nuevo fusiona un bloque retenido del corte, y fusionar no es
+> reorganizar. Desde `t_j` la deriva se detiene (`C-FLU-14`, `C-FLU-21`) y el productor la evita
+> (`C-FLU-20`). **Antes de `t_j` no hay regla: hay carrera.**
+>
+> La existencia, la unicidad y la buena fundamentación están **demostradas** en
+> `veritas/consenso/regla-flujo-v1/PROPUESTA-SPEC.md:633-729`, con la condición suficiente escrita
+> y el caso en que falla nombrado. Ese caso lo cierra `C-FLU-05`.
+
+**C-FLU-05** · **Época sin ancla: se salta, y saltarla es definitivo.**
+
+```text
+Si Chn(V_j(B)) no cruza T_j, la época j NO produce inyección para B: el flujo de B
+sigue siendo el de la última inyección realizada.
+Un bloque B con slot(B) ≥ T_j + L_slots para el que I_j(B) no exista es INVÁLIDO.
+```
+
+Una época saltada **MUST NOT** recuperarse después. **No hay inyección retroactiva.**
+
+> Sin la segunda frase la regla no es monótona: un descendiente con vista mayor tendría un flujo
+> distinto del de `B` en slots donde `B` ya está fijado, `C-FLU-14` lo invalidaría, y la cadena se
+> atascaría. Declarar inválido al bloque convierte un bloqueo global en un rechazo local. Un bloque
+> honesto cuya cadena seleccionada coincide con la de su vista **nunca** cae aquí.
+
+**C-FLU-06** · **El flujo del génesis y el origen de `semilla(f, 0)`.**
+
+```text
+f_0             := H_flujo( ETIQUETA_GENESIS ‖ block_hash(génesis) )        32 B
+semilla(f_0, 0) := blake3( block_hash(génesis) ‖ entropía_externa )[0..16)  16 B
+```
+
+y `flujo(B, s) = f_0` para todo `s < t_1`. Las épocas se indexan desde `j = 1`: **no hay época 0 y
+el génesis no es ancla de nada**. `entropía_externa` es **parámetro de lanzamiento** (§15.2), no
+algo que derive el nodo: **MUST** ser pública, verificable e **imposible de elegir después** de
+conocer el génesis. `<<PENDIENTE: el valor de entropía_externa por red>>`.
+
+> **Las dos líneas usan hashes distintos a propósito, y el lector no debe «uniformarlas».**
+> `semilla(f_0, 0)` conserva `blake3` porque alimenta la primitiva PoT, que D-1 = A dejó entera en
+> `blake3`, y porque ahí sí hay oráculo: es la derivación de Autonomys. `f_0` usa `H_flujo`
+> (`C-FLU-10`), que es `H_d` con etiqueta propia, porque el identificador de flujo **no tiene
+> contraparte en Autonomys**: no hay oráculo que perder y gana la separación de dominio.
+
+**C-FLU-07** · **Activación retardada.** `t_j := slot(I_j) + L_slots`. Para todo slot `s`,
+`flujo(B, s)` lo fija la **última** inyección `j` con `t_j ≤ s`; si no hay ninguna, `f_0`. El borde
+es **inclusivo**: en `s = t_j` la entropía **ya** está mezclada.
+
+> **Una sola lotería, y está demostrado.** Para todo `s ∈ [slot(I_j), t_j)`, `flujo(B, s)` **no
+> depende de `I_j`**: lo fija la inyección `j−1` o anterior. Dos nodos que discrepen del ancla
+> producen y verifican **exactamente el mismo** `reto(f, s)` en todo ese intervalo. El intervalo es
+> donde la red tiene `L_slots` para converger **sin que la discrepancia tenga consecuencias**; lo
+> que ocurre en `t_j` es que la discrepancia, si sobrevive, se vuelve **irreversible**.
+
+**C-FLU-08** · **`S_max_slots < L_slots` — condición de corrección.** Con ella el ancla cae dentro
+de su propia vista de época, y en `t_j` está enterrada bajo al menos un bloque de cadena. Sin ella
+**la definición del ancla no está bien puesta**. `C-FLU-01` la hace automática.
+
+> **No es la condición que cierra el ataque del bloque retenido**, y decirlo al revés sería
+> repetir el patrón de etiqueta ancha sobre resultado estrecho. Lo que cierra ese ataque después de
+> `t_j` es `C-FIN-01` junto con `C-FLU-14` y `C-FLU-21`.
+
+**C-FLU-09** · **`S_max_slots < I_slots`.** Entonces `t_j < t_{j+1}` **estrictamente**, los `t_j`
+son distintos dos a dos y están ordenados como las épocas. Corolario: **a lo sumo una inyección por
+slot**, que es lo que `C-POT-01` exige del contexto.
+
+> §7.3 ya la conserva «como condición suficiente del perfil propuesto, no como necesidad universal
+> demostrada», y esta regla **no la eleva** a necesidad: demuestra que es suficiente para lo que se
+> usa. Con épocas saltadas (`C-FLU-05`) el número de inyecciones realizadas puede ser menor que el
+> de umbrales cruzados.
+
+#### 7.1.4 · El identificador de flujo y la entropía de la inyección
+
+**C-FLU-10** · **Derivación del identificador de flujo.**
+
+```text
+flujo(B, s) := f_0                                                      si no hay inyección con t_j ≤ s
+flujo(B, s) := H_flujo( flujo(B, t_j − 1) ‖ entropía_j(B) ‖ LE64(t_j) ) con j la última inyección con t_j ≤ s
+
+H_flujo(m)  := H_d( ETIQUETA_FLUJO ‖ m ) = SHA3-256( ETIQUETA_FLUJO ‖ m )
+```
+
+El resultado son **32 bytes**. El primer argumento es `flujo(B, t_j − 1)` —«el valor vigente justo
+antes de esta inyección»— y **MUST NOT** escribirse como `flujo(B, t_{j−1})`: con épocas saltadas
+(`C-FLU-05`) `t_{j−1}` puede no existir. `t_j` entra como `LE64(t_j)`, codificación fija: una
+concatenación de enteros sin longitud fija es ambigua por construcción.
+
+> **Es acumulativo y es función exclusiva de `past(B)`, las dos cosas demostradas** en
+> `veritas/consenso/regla-flujo-v1/PROPUESTA-SPEC.md:932-941`. Lo primero convierte la comparación
+> de flujos en una comparación de 32 bytes. Lo segundo es lo que satisface la exigencia de C-HDR-06
+> de que nada dependa del orden de llegada, del reloj local ni de la punta local.
+>
+> **Decidido por Katana el 2026-09-20 (D-F2 = A):** `H_d` con etiqueta nueva, no `blake3`. Las dos
+> etiquetas nuevas se añaden a C-HASH-06 (§4.5).
+
+**C-FLU-11** · **El flujo NUNCA se declara.** La cabecera y el cuerpo **MUST NOT** contener el
+identificador de flujo en ningún campo, ni ningún valor del que se derive. El flujo de un bloque lo
+calcula el verificador a partir de `past(B)`, y **MUST NOT** existir vía alguna que acepte un valor
+del candidato como si fuese el esperado: **la circularidad MUST ser imposible, no desaconsejada**.
+
+`C-FLU-10` **es** la definición de `flujo(B, slot(B))` que C-HDR-06 usa sin definir. Como el flujo
+es función exclusiva de `past(B)`, la exigencia de C-HDR-06 de que el rango esperado sea función
+**exclusiva** de ese pasado queda satisfecha por composición, **sin añadir ninguna dependencia
+nueva**.
+
+**C-FLU-12** · **Entropía de la inyección.**
+
+```text
+entropía_j(B) := blake3( chunk(I_j(B)) ‖ pot_output(I_j(B)) )
+```
+
+y se entrega a `C-POT-01` como la entrada `entropía(f, t_j)`. Los dos ingredientes son campos de
+**cabecera** de `I_j(B)`: `sol.chunk` en `[252,284)` y `pot_output` en `[88,104)` (C-HDR-01).
+
+**Invariante de no-equivocación del inyector.** **Dos copias del mismo billete MUST producir la
+misma entropía y el mismo `t_j`.** Cualquier cambio futuro que meta en la entropía un campo
+**moldeable por el constructor del bloque** —el hash del bloque, el `timestamp`, el conjunto de
+padres, la raíz de Merkle— **reabre el grinding de la entropía por contenido del bloque**, hoy
+cerrado, y **MUST NOT** hacerse sin rehacer ese análisis.
+
+> **Decidido por Katana el 2026-09-20 (D-F1 = A).** El motivo que más pesa no es criptográfico:
+> es **no atar §7.1 a la identidad del billete (§7.2), que además puede cambiar** si algún día se
+> adopta un registro de parcelas contra el sembrador.
+>
+> **El coste de A queda escrito:** dos billetes distintos con el mismo `chunk` en el mismo slot y
+> flujo dan la misma entropía. La entropía no distingue **quién** ancló, solo **qué chunk** ganó.
+> No se ha encontrado un ataque por esa vía, **y no encontrarlo no es cerrarlo**.
+>
+> **Aviso para quien valide:** con `pot_output` = salida **futura** (D-2 = A), la entropía se deriva
+> de `salida(f, slot(I_j) + D)`. El invariante se conserva —ambas son función de `(f, slot)` y de
+> nada más—, pero **la aritmética del adelanto no se ha rehecho con `+D`**: `TAREAS.md` §2.9.
+#### 7.1.5 · Validez absoluta y pasado consistente de flujo
+
+**C-FLU-13** · **Validez absoluta.** `B` es **válido** si y solo si: (1) su solución PoAS verifica
+bajo `reto(flujo(B, slot(B)), slot(B))`; (2) su justificación de PoT cubre el rango exigido por
+C-HDR-07 **bajo ese mismo flujo**; (3) todos los bloques de `past(B)` son válidos; (4) cumple
+`C-FLU-14`.
+
+La validez de `B` **MUST NOT** depender de la cadena seleccionada del observador, de su punta, de
+su reloj ni del orden de llegada. Es función de `past(B)` y de nada más.
+
+> **Ésta es la bifurcación de §2.1 de `TAREAS.md`, y su precio se paga aquí, explícito.** Si la
+> validez del PoT fuese **relativa a la cadena seleccionada**, se abriría el **multistream**
+> —`α_mínimo = 1/(S+1)`, medido en `veritas/seguridad/coste-rama-privada-v1/`—. Siendo
+> **absoluta**, el multistream queda cerrado (un flujo fabricado por el atacante no es el flujo de
+> ningún bloque honesto y sus bloques no se pueden referenciar, `C-FLU-14`) y lo que se abre es la
+> **partición de flujo** (§7.1.6). **Lo que la contiene no es una regla: es `L_slots` frente a
+> `Δ`**, con la probabilidad medida en simulación en `veritas/consenso/ancla-inyeccion-v2/` y la
+> `Δ` **simulada, no medida en red**.
+
+**C-FLU-14** · **Pasado consistente de flujo.**
+
+```text
+Para todo X ∈ past(B):   flujo(X, slot(X)) == flujo(B, slot(X))
+```
+
+Un bloque **MUST NOT** referenciar un bloque de otro flujo. La comprobación es **estructural** y va
+**antes** de tocar ningún PoT (paso 1b de `C-POT-08`). Si el nodo no tiene todo `past(B)` el estado
+es **`Pendiente` por contexto incompleto, nunca `Inválido`**.
+
+> **No necesita AES, y está demostrado:** los ingredientes de `flujo(·)` son una constante, dos
+> campos de cabecera por ancla, los `slot(I_j)` y el orden GHOSTDAG restringido a `V_j`. **Ninguno
+> exige evaluar la cadena AES.** Lo que **sí** cuesta es recomputar cadena y flujo del sub-DAG
+> ajeno, que es superficie de DoS: por eso el paso 1b va bajo el presupuesto de `C-NET-33`.
+
+**C-FLU-20** · **Qué hace el productor con un bloque tardío que cambiaría un ancla ya activada.**
+Al construir un bloque `B`, el productor **MUST** descartar de su cola de candidatos (C-GD-10) toda
+punta cuya inclusión cambiaría `entropía_j` o `t_j` de **alguna época `j` ya activada en el pasado
+de `B`** —es decir, con `t_j ≤ slot(X)` para algún `X ∈ past(B)`—. Un productor **MUST NOT** emitir
+un bloque inválido por una elección de padres que él mismo controla.
+
+Es **política de producción**, no verificación: un verificador no rechaza por el conjunto de
+padres, rechaza por `C-FLU-14`, que es validez objetiva.
+
+> **Consecuencia, y hay que decirla así: ese bloque queda INFUSIONABLE PARA SIEMPRE en ese flujo.**
+> Como el pasado solo crece, ningún descendiente futuro podrá fusionarlo si hacerlo cambiaría `I_j`.
+> **No hay caducidad ni ventana de rescate.** Normalmente paga el atacante, que es quien retiene;
+> **el colateral honesto no está medido** (`TAREAS.md` §2.9).
+>
+> ⚠️ **Esta política MUST NOT extenderse al intervalo anterior a `t_j`.** Antes de `t_j` fusionar es
+> legal, así que la política no se apoyaría en ninguna invalidez: sería un «lo primero que vi
+> manda» y **haría el flujo dependiente del orden de llegada de los mensajes**, que es exactamente
+> el defecto que la ronda 10a tuvo que retirar. **Solo actúa después de la activación.**
+
+**C-FLU-21** · **La inyección ya activada se hereda, no se recalcula.** Si `past(B)` contiene algún
+bloque `X` con `t_j ≤ slot(X)`, la inyección `j` de `B` —su `entropía_j` y su `t_j`— **MUST** ser la
+de `X` y **MUST NOT** recalcularse a partir de `V_j(B)`. `I_j` solo se calcula con `C-FLU-04`
+cuando ningún bloque del pasado la tiene activada.
+
+> **No cambia qué bloques son válidos: la vuelve constructiva.** El verificador deja de recalcular
+> `Chn(V_j(B))` por bloque y la hereda; el ancla se calcula **una vez por época y se transporta**.
+> Se escribe aunque sea redundante porque, sin ella, dos implementaciones pueden calcular lo mismo
+> por caminos distintos y discrepar en un borde que nadie ha enumerado.
+>
+> **Decidido por Katana el 2026-09-20 (D-F8 = C): la vista NO se congela.** Congelarla reabriría
+> la circularidad del ancla —el ancla dependiendo de la cadena, la cadena de la validez, la validez
+> del ancla— en una franja de anchura `≤ S_max_slots`, y compraba muy poco: adelantar la
+> congelación 150 slots nominales sobre una carrera que dura `L_slots ≥ F_slots`. **Esto no arregla
+> nada de la carrera anterior a `t_j`.**
+
+#### 7.1.6 · Partición de flujo: estatuto, adopción y nodo sin cadena
+
+> **Leer esto antes que las tres reglas.** **Ningún texto derivado de esta sección debe decir «las
+> particiones de flujo se curan», ni tampoco «no tienen cura». Las dos son falsas: depende de cómo
+> nació la partición.** `C-FLU-22` cura el nacimiento **espontáneo** —por latencia—, que es el
+> improbable. **No cura** el nacimiento realista, un corte de red más largo que `L_slots`, donde la
+> ventana es **vacía desde el propio `t_j`** y la partición es **permanente**. El diseño es, sobre
+> todo, **prevención** —`L_slots` frente a `Δ`, con el suelo de `C-FLU-01`—; la recuperación es un
+> añadido real pero acotado, **no una garantía de reconciliación**.
+
+**C-FLU-15** · **Una partición de flujo tiene el estatuto de un fallo de finalidad.** Una partición
+de flujo **se trata como** una violación de finalidad: es un fallo del modelo de seguridad, no un
+estado que el protocolo gestione.
+
+> **«Se trata como», no «es».** Escribirlo como equivalencia causal sería **falso**: existe una
+> partición de flujo que nace **sin** violar ninguna regla de finalidad
+> (`veritas/consenso/regla-flujo-v1/PROPUESTA-SPEC.md:248-294`, refutación demostrada). Lo que sí
+> es cierto y está demostrado: **si la partición nace, la finalidad es lo que impide curarla** fuera
+> de la ventana de `C-FLU-22`.
+>
+> **Producir en un flujo no seleccionado no se puede prohibir criptográficamente**, y el motivo es
+> más fuerte que una laguna: «cualquier mecanismo de exclusividad entre relojes en PoAS
+> permisionless es derrotable por partición de identidad, porque el coste de producir espacio es
+> lineal en bytes e independiente de cuántas identidades lo reclamen, y las identidades son gratis
+> por diseño» (`research/dag-poas-balizas-auditoria.md:68-75`). Lo que el diseño **sí** hace es
+> dejarlo **sin valor económico**, y no hace falta regla nueva: `C-FLU-14` impide referenciar esos
+> bloques desde el flujo ganador, luego su coinbase nunca entra en la historia seleccionada.
+
+**C-FLU-22** · **Adopción del flujo rival dentro de la ventana, con presupuesto.**
+
+```text
+Adoptar = seleccionar. Una rama de otro flujo es VÁLIDA en términos absolutos (C-FLU-13):
+NO se puede FUSIONAR (C-FLU-14) pero SÍ se puede SELECCIONAR.
+
+d(t) := slot(punta seleccionada actual) − slot(P),  con P el ÚLTIMO ANCESTRO COMÚN
+        de la cadena actual y la rama candidata.
+```
+
+Un nodo **MUST** elegir entre ramas válidas por la selección ordinaria de GHOSTDAG (mayor
+`blue_work`; desempates de C-GD-03), **sin excepción por flujo**, limitada por `C-FIN-01`: solo
+mientras `d < F_slots`.
+
+Orden y coste, que **MUST** respetarse:
+
+1. La comprobación estructural del flujo va **siempre primero** (paso 1b de `C-POT-08`). **Sin AES.**
+2. El PoT del flujo rival se verifica **solo si hace falta para adoptar**: solo si la rama rival va
+   **por delante** en `blue_work` y `d < F_slots`. Si no, **no se verifica nada**: la punta se
+   ignora (`C-FIN-01`).
+3. Todo ello **bajo los dos presupuestos de `C-NET-33`**. Agotarlos da **`Pendiente`, nunca
+   `Inválido`**.
+4. **Sin validez comprobada no se adopta.** `Pendiente` **MUST NOT** contar como válido ni como
+   inválido: el nodo se queda donde está y reintenta.
+
+> **La congelación es simultánea.** El instante de cierre es `slot(P) + F_slots`, **función
+> exclusiva de `P`**: no depende de cuándo cada nodo se enteró de la rama rival, ni de su reloj, ni
+> del orden de llegada. Todos los nodos **con cadena** cruzan el umbral en el mismo índice de slot.
+>
+> **La anchura de la ventana depende de cómo nació la partición**, y esto es lo que hay que leer:
+>
+> | Nacimiento | `slot(P)` | Ventana |
+> |---|---|---|
+> | **Espontáneo** (latencia) | `t_j − 1` | **máxima**, `F_slots − 1` |
+> | Corte de red que empezó en `s₀` | `s₀` | `[t_j, s₀ + F_slots)` |
+> | **Corte de red más largo que `L`** | `≤ t_j − L_slots` | **VACÍA** |
+>
+> **Riesgo residual, con su alcance declarado.** Aun con congelación simultánea quedan dos rendijas
+> medidas en `veritas/consenso/puerta-cobertura-v1/` (PCO-v0.1): el **desfase de vista** en el
+> instante de congelación, que va como `√(τ/F)` —**condicionado a que la partición haya nacido y a
+> reparto simétrico**—, y **el nodo que sincroniza después**, que toma el líder del momento. El
+> segundo **no lo cierra esta regla**: lo gobiernan `C-FLU-18` y `C-FLU-17`. `C-NET-33` añade una
+> **tercera, no medida** y parcialmente bajo control del atacante.
+>
+> **R-FIN-5 cambia de motivo, y la frase exacta importa.** Deja de ser cierto a la letra que «un
+> nodo honesto **jamás** verifica el PoT de un flujo ajeno». Lo cierto es: **nunca lo verifica para
+> FUSIONAR** —`C-FLU-14` es estructural y no toca AES—; **solo lo verifica para ADOPTAR**, dentro
+> de esta ventana y bajo presupuesto. La virtud que se conserva es la que importaba: **el camino
+> normal nunca paga AES ajeno**.
+>
+> **Forzar ese gasto no es barato, y está demostrado** en
+> `veritas/consenso/regla-flujo-v1/PROPUESTA-SPEC.md:1373-1425`: exige ganar una carrera de
+> `blue_work` de longitud `L_slots`. La demostración **usa `L_slots ≥ F_slots`**, así que es un
+> argumento a favor del perfil 1a, independiente de los demás. **La cola de esa carrera no está
+> medida** (`TAREAS.md` §2.9).
+
+**C-FLU-18** · **El nodo sin cadena previa aplica la selección ordinaria.** Un nodo sin cadena
+previa selecciona la rama de **mayor `blue_work`** por las reglas C-GD vigentes, **sin excepción por
+flujo**. `C-FIN-01` obliga **únicamente** a quien ya tiene una cadena seleccionada que reorganizar;
+**no impone nada a quien no tiene ninguna**.
+
+> **No es un mecanismo nuevo: es cerrar un hueco de redacción**, y sin escribirlo dos clientes
+> pueden implementarlo distinto, que es la clase de fork latente que el Nivel 1 de `TAREAS.md`
+> persigue.
+>
+> **Qué lo acota, y qué no.** En el arranque, C-CHK-01…C-CHK-07 fijan la rama canónica —pero son
+> **uno solo** en la vida de la cadena y **caducan** en `ALTURA_CADUCIDAD`—. A largo alcance, lo
+> acota la secuencialidad del PoT (`C-POT-03`). **Lo que NO acota:** después de `ALTURA_CADUCIDAD`
+> y con una partición viva, un nodo nuevo va al flujo más pesado **del momento**, que puede ser el
+> minoritario. **C-FLU-18 hace la conducta determinista y única; no la hace acertada.**
+
+#### 7.1.7 · El calendario de `N(s)`
+
+**C-FLU-16** · **`N(s)` cambia exactamente en `t_j`.** Cualquier cambio de `N(s)` **MUST**
+aplicarse en el mismo slot `t_j` en que se aplica la entropía de la inyección `j`, y **en ningún
+otro**. Entre dos activaciones, `N(s)` es constante.
+
+> **Por qué es regla y no coincidencia.** `N(s)` entra en la clave de caché de `C-POT-07`. Si
+> pudiera cambiar en un slot distinto de `t_j`, habría **dos** puntos de discontinuidad por época
+> en vez de uno, y la clave tendría que rastrear un calendario propio. Con esta regla el calendario
+> de `N` es **el mismo objeto** que el de las inyecciones, que `C-FLU-09` deja bien ordenado y con
+> a lo sumo un cambio por slot.
+>
+> **Quién autoriza un cambio de `N(s)`, su valor inicial, sus límites y su anuncio siguen
+> `<<PENDIENTE>>`** (§7.3). El `ensure_root` del actualizador de Autonomys **no se adopta** como
+> autoridad de ZEROX. Esta regla fija **cuándo** se aplica, no **quién** lo decide.
 
 ### 7.2 · Rango de solución
 
@@ -1433,9 +2029,18 @@ superados. R-FIN-12 conserva los límites 15 padres / 180 bloques de mergeset a 
 de la **cola de candidatos**, no una cuota aleatoria de padres finales. El verificador no
 colorea al azar ni decide por orden de llegada.
 
-`F = 2 h` sigue provisional; no es la espera de Cortex ni se iguala por defecto a L. `L = 1 h`
-es candidato condicionado, no adopción inequívoca. `I`, `L`, `ρ_max`, la configuración final
-de `F` y la calibración frente a `Δ` siguen abiertos.
+`F = 2 h` sigue provisional, con obligación declarada de bajarla en producción; no es la espera de
+Cortex. **`L` ha dejado de ser un parámetro libre:** desde el 2026-09-20 es una **definición**,
+`L_slots := máx(F_slots, L_suelo_slots, S_max_slots + 1)` (`C-FLU-01`), con el perfil **1a**
+decidido por Katana. El candidato `L = 1 h` queda **superado**: no se elige `L`, se deriva.
+
+**Cuidado con la frase heredada «no se iguala por defecto a `L`»:** prohibía copiar `L` desde `F`
+sin más, y `C-FLU-01` hace lo contrario en el sentido contrario —**deriva `L` de `F` con un
+suelo**—. Las dos frases se parecen mucho y significan cosas distintas.
+
+`I_slots`, `ρ_max`, `L_suelo_slots`, la configuración final de `F` y la calibración frente a `Δ`
+siguen abiertos. **`L_suelo_slots` no se puede fijar hoy**: su criterio exige una cota de `Δ`
+**medida en red real**, que no existe (`TAREAS.md` §3.1).
 
 `45 s` es el máximo observado de `W_dec` en las simulaciones citadas, no una cota
 universal. `I ≥ ρ_max·W_dec` es una restricción contra evaluar una época durante la elección
@@ -1446,13 +2051,21 @@ Los escenarios que usan distintas tasas, pérdidas de red o presupuestos adversa
 
 Esta notación consolida magnitudes; no fija todavía su serialización ni completa el protocolo:
 
-- `slot(B)`, `I_slots`, `L_slots`, `S_max_slots` y `D_aut_slots` son índices o cantidades enteras
-  de slots PoT. Con τ nominal de 1 s/slot, la referencia S_max se representa por 150 slots;
-  limita `slot(B)−slot(sp(B))`, no el tiempo de retención ni Δ de red.
-- `T_j=j·I_slots` es el umbral del inyector; `t_j=slot(I_j)+L_slots` es el índice de inyección.
-  R-FIN-9 remite a ese inyector, no al contador obsoleto `c·j`. Origen/bootstrap, existencia del
-  ancla, desempates y disponibilidad después de poda aún deben cerrarse. I separa umbrales,
-  no necesariamente los instantes realizados de inyección.
+- `slot(B)`, `I_slots`, `L_slots`, `S_max_slots`, `F_slots`, `L_suelo_slots` y `D_aut_slots` son
+  índices o cantidades enteras de slots PoT. Con τ nominal de 1 s/slot, la referencia S_max se
+  representa por 150 slots; limita `slot(B)−slot(sp(B))`, no el tiempo de retención ni Δ de red.
+  `F_slots := ⌈F / τ_nom⌉`, y **una comparación de consenso MUST NOT depender de `τ_nom` en tiempo
+  de ejecución** (`C-FLU-01`). **La profundidad de una reorganización se mide en slots**,
+  `slot(punta) − slot(último ancestro común)`, **nunca en bloques** (`C-FIN-01`).
+- `L_slots := máx(F_slots, L_suelo_slots, S_max_slots + 1)` es **definición, no parámetro**
+  (`C-FLU-01`). `L_suelo_slots` es parámetro de consenso y va como **símbolo**:
+  `<<PENDIENTE: el valor de L_suelo_slots; su criterio exige una cota de Δ medida en red real>>`.
+- `T_j=j·I_slots` es el umbral del inyector; `t_j=slot(I_j)+L_slots` es el índice de inyección
+  (`C-FLU-01`, `C-FLU-07`). R-FIN-9 remite a ese inyector, no al contador obsoleto `c·j`.
+  **El origen, la existencia y la unicidad del ancla quedan cerrados** en `C-FLU-04`, `C-FLU-05` y
+  `C-FLU-06`; **la disponibilidad después de poda NO**, y sigue abierta. I separa umbrales,
+  no necesariamente los instantes realizados de inyección (`C-FLU-05`: una época puede saltarse, y
+  saltarla es definitivo).
 - `N(s)` es trabajo secuencial por slot. Su eventual cambio coincide con la inyección, pero
   su regla de actualización y su valor inicial no están definidos. El `ensure_root` del
   actualizador de Autonomys **no se adopta** como autoridad de ZEROX.
@@ -1686,7 +2299,8 @@ Es decir: entre los padres de mayor `blue_work`, el que iría primero en el orde
 
 **C-GD-04** · **Mergeset.** `mergeset(B) = past(B) \ (past(sp(B)) ∪ {sp(B)})`. El bloque **MUST**
 rechazarse si supera los límites de R-FIN-12: más de 15 padres, o `|mergeset(B)| + 1 > 180` con
-`k = 30`. Siguen vigentes `slot(sp(B)) ≤ slot(B)` (C-HDR-05) y `slot(B) − slot(sp(B)) ≤ S_max`.
+`k = 30`. Siguen vigentes la cota de slot de **todos** los padres, `slot(p) ≤ slot(B)` (C-HDR-05,
+`C-FLU-02`), y `slot(B) − slot(sp(B)) ≤ S_max`.
 
 **C-GD-05** · **Orden del mergeset.** Ascendente por `(blue_work, solution_distance, id)`, con el
 id comparado por bytes. Es el **mismo** orden para colorear (C-GD-06, C-GD-07) y para aplicar
@@ -1718,8 +2332,118 @@ en cambio, es contextual: es el que el bloque recibe en el bloque de cadena que 
 cambiar si un reorg cambia quién lo fusiona. El dato almacenado de un bloque no cambia; sí cambia
 el papel que juega al ser fusionado.
 
-**Lo que esta sección todavía no cierra.** Conflictos de transacciones y estado UTXO sobre el orden
-resultante, cálculo contextual del rango, flujos y la laguna de unicidad pagable declarada en §7.2.
+**C-GD-10** · **Qué puntas toma como padres un bloque que se produce.** Al construir un bloque, el
+productor **MUST** tomar como padres hasta `max_block_parents = 15` puntas del DAG (R-FIN-12),
+elegidas recorriendo una **cola de candidatos barajada** al azar, y **MUST** incluir siempre la
+punta virtual (C-GD-03) entre ellas. El resto del conjunto **MAY** variar entre nodos y entre
+bloques: es la única regla de esta sección que **no** es determinista, y no lo es a propósito.
+
+Además, el productor **MUST** descartar de la cola de candidatos:
+
+1. toda punta cuya inclusión produciría un bloque que viola **C-GD-11**;
+2. toda punta con `slot` mayor que el del bloque que produce (**C-FLU-02**);
+3. toda punta cuya inclusión cambiaría `entropía_j` o `t_j` de alguna época ya activada en el
+   pasado del bloque (**C-FLU-20**).
+
+Un productor no puede emitir un bloque inválido por una elección de padres que él mismo controla.
+**El punto 3 MUST NOT extenderse al intervalo anterior a `t_j`**: allí fusionar es legal y la
+política se convertiría en un «lo primero que vi manda» que haría el flujo dependiente del orden de
+llegada (`C-FLU-20`).
+
+Esto es **política de producción**, no verificación: un verificador **MUST NOT** rechazar un bloque
+por el conjunto de padres que eligió su autor mientras cumpla C-GD-04, C-GD-11, C-HDR-05,
+`C-FLU-02` y `C-FLU-14`. C-GD-03 dice cómo se **elige el padre seleccionado entre unos padres
+dados**; esta dice **de dónde salen esos padres**.
+
+> **Sin el barajado se pierden bloques honestos para siempre, y está medido.** Con `k = 30` el tope
+> es de 15 padres, y una red cargada llega a tener del orden de **548 puntas** simultáneas. Si todos
+> los productores eligen las 15 «mejores» por el mismo criterio determinista, todos eligen **las
+> mismas**: las puntas que ningún nodo escoge no entran en el DAG por ninguna vía, y **14-21 bloques
+> honestos quedan fuera del DAG de forma permanente** (auditoría D9-d, §A3.1). El daño **no** venía
+> del `mergeset_size_limit` —cero cortes por esa causa— sino del tope de padres.
+>
+> Es `pick_virtual_parents` de rusty-kaspa (`virtual_processor/processor.rs:1069-1089`), y la
+> decisión de adoptarlo es de D9-d: **R-FIN-12 nombra el `shuffle`**. §7.3 ya lo recoge: se baraja
+> la **cola de candidatos**, no se reparte una cuota aleatoria de los padres finales.
+>
+> 🔶 **Laguna declarada, sin cerrar.** El argumento del barajado es de *diversidad entre nodos*: con
+> muchos productores honestos e independientes, el conjunto de puntas cubiertas es amplio. **Con un
+> solo productor honesto el argumento no aplica** y la garantía se pierde. Está anotado como abierto
+> en D9-d §6.4 y no se cierra aquí.
+>
+> **Aleatoriedad en un protocolo determinista, dicho en voz alta:** no rompe el consenso porque
+> ningún verificador la reproduce. El determinismo que C-GD-09 exige es el de los **datos GHOSTDAG**
+> —color, orden, `blue_work`—, que son función de `past(B)`. De dónde salió `past(B)` no entra en esa
+> función.
+
+**C-ORD-04** · **Conflictos de transacciones sobre el orden de aplicación.** Aplicando el orden de
+C-ORD-03, una transacción que no valide contra `UTXO(sp(C)) ⊕ diff(mergeset hasta ella)` **MUST**
+descartarse **en silencio**: **MUST NOT** invalidar ni al bloque que la contiene ni al bloque de
+cadena que lo fusiona. Entre dos gastos en conflicto **gana el que aparece primero** en ese orden, y
+el otro se descarta por esta misma regla. Las tarifas de un bloque suman **solo las transacciones
+aceptadas**.
+
+> Es R-FIN-8′(5), y el mecanismo es el de Kaspa (`utxo_validation.rs:311-313`). **La parte que hay
+> que entender es por qué el descarte es silencioso.** Quien produce un bloque no sabe qué van a
+> contener los bloques hermanos que se aplicarán antes que el suyo: exigirle que no colisione sería
+> exigirle predecir el futuro, y convertiría un conflicto inevitable en una invalidación. El DAG
+> ordena, y el orden decide; el bloque perdedor no hizo nada malo.
+>
+> **Dónde muerde la diferencia con Kaspa:** aquí solo entran al orden los azules y los `rojo_k`, y
+> los `rojo_U3` se saltan (R-FIN-8′(3)/(4), C-ORD-03). Kaspa aplica las transacciones de **todos**
+> los rojos (`utxo_validation.rs:122`), y portar eso bajo PoST daba inflación ×10 y espacio de bloque
+> gratis. R-FIN-8 se aparta a propósito: **rojo = peso cero, estado cero, recompensa cero.**
+>
+> Que `fees` sume solo las aceptadas se sigue de lo anterior, pero se escribe porque es justo el tipo
+> de detalle que una implementación resuelve «como salga»: cobrar la tarifa de una transacción
+> descartada paga dos veces por un gasto que ocurrió una.
+
+**C-GD-11** · **Límite de profundidad de fusión (*bounded merge depth*), con kosherización.** Un
+bloque **MUST** rechazarse si algún bloque **rojo** de su mergeset queda **fuera del
+`merge_depth_root`** y **no es ancestro de ningún azul kosherizante**. Un azul es kosherizante
+cuando él mismo tiene el `merge_depth_root` en su pasado.
+
+**Esta regla decide validez de la fusión, y nada más.** **MUST NOT** alterar quién cobra ni qué se
+aplica al estado: un `rojo_k` admitido sigue tratándose por P1 y R-FIN-8′, y un `rojo_U3` sigue
+siendo **inerte** (R-FIN-8′(3), C-ORD-03, C-ORD-04). Kosherizar **no** convierte un rojo en azul, no
+le da peso y no le da recompensa; solo dice que el bloque que lo fusiona es válido.
+
+**PENDIENTES declarados, que ninguna implementación puede fijar por su cuenta (§0.3):**
+
+| `<<PENDIENTE>>` | Qué falta decidir |
+|---|---|
+| **La métrica** | si `merge_depth` se cuenta en slots, en `blue_score` o en posiciones de cadena seleccionada. Kaspa cuenta en `blue_score`; ZEROX tiene un reloj de slots que Kaspa no tiene, y no está decidido cuál manda |
+| **El valor** | no se copia el de Kaspa ni se deriva de `F = 2 h`, que es **provisional** (MIGRACION §Parámetros). Una constante inventada aquí sería una regla de consenso fijada por intuición |
+| **El bootstrap** | qué es el `merge_depth_root` mientras el DAG es más corto que la profundidad |
+| **El borde de igualdad** | si la comparación es estricta o no en el bloque que cae exactamente en la profundidad |
+| **Su relación con finalidad y poda** | en Kaspa, `merge_depth`, `finality_depth` y `pruning_depth` son la misma familia de constantes. En ZEROX la finalidad es R-FIN-7 y la poda está abierta (§17): la relación entre las tres **no** se hereda por analogía |
+
+> **Qué acota, exactamente.** `mergeset_size_limit = 180` acota el **tamaño** de lo que se fusiona;
+> `S_max` acota la distancia al **padre seleccionado** (C-GD-04). Ninguno acota la **profundidad**:
+> un bloque viejo cuyo pasado ya está íntegro en `past(sp(B))` entra en el mergeset **sumando 1**, así
+> que ni el límite de 180 ni `S_max` lo tocan. Ese es el hueco que esta regla cierra, y es la razón
+> por la que Kaspa tiene `check_bounded_merge_depth` (`post_pow_validation.rs:79-101`,
+> `block_depth.rs:109-119`) además de los otros dos límites.
+>
+> Sin ella, el coste de colorear no está acotado por nada salvo R-FIN-12, y un bloque puede fusionar
+> un pasado arbitrariamente viejo — que es también por dónde entra la reorganización profunda que
+> R-FIN-7 pretende impedir.
+>
+> **Por qué la constante se queda pendiente y no se pone un número «razonable».** Las tres
+> profundidades de Kaspa están atadas a su finalidad, y la de ZEROX (`F = 2 h`) es **provisional en
+> investigación**, no un parámetro adoptado. Derivar de ella daría una regla de consenso con
+> apariencia de cerrada y un cimiento que se va a mover. Es exactamente el patrón que §0.3 prohíbe.
+>
+> **El productor no puede emitir un bloque que la viole:** C-GD-10 le obliga a descartar de su cola
+> de candidatos las puntas que lo provocarían. La regla es de verificación, pero su cumplimiento
+> empieza en la producción.
+
+**Lo que esta sección todavía no cierra.** El **estado UTXO** sobre el orden resultante —el conjunto
+con datos de deshacer que C-ORD-04 presupone y que hoy no existe (TAREAS §2.6)—, el cálculo
+contextual del rango, los flujos y la laguna de unicidad pagable declarada en §7.2. Los cinco
+pendientes de C-GD-11. Y una regla que esta especificación sigue sin tener y que **no es portable
+desde Kaspa**: el **pruning** (§17).
+
 Los identificadores C-FORK-01 a C-FORK-04 del acumulador anterior quedan retirados; no se reutilizan
 ni se reciclan sus números.
 
@@ -1792,13 +2516,58 @@ misma altura pueden contener un bloque de la otra rama.
 MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 11 999 bloques
 ```
 
-Este valor se conserva para identificar el estado transitorio del código; no fija la finalidad
-del consenso DAG. R-FIN-7 propone no reorganizar por debajo de `F` segundos del reloj de slot
-e ignorar la punta incompatible, sin detener el proceso. Su integración está pendiente.
+Este valor se conserva para identificar el estado transitorio del código; **no fija la finalidad
+del consenso DAG**. La regla de finalidad del diseño DAG es **`C-FIN-01`**, escrita más abajo en
+índices de slot y sin `exit`. **`C-REORG-07` sigue siendo transitoria y no se reconcilia aquí**:
+la reconciliación con el código que hoy se detiene, con `COINBASE_MATURITY` —de la que
+`MAX_REORG_LENGTH` deriva— y con el techo de archivado queda declarada pendiente (§13,
+`TAREAS.md` §2.9).
 
 Una restricción de reorg protege el estado local, pero no demuestra por sí sola acuerdo entre
 dos nodos aislados. Convertir 11 999 bloques a unas 3,33 h a tasa nominal no da un plazo
-determinista. No se publican ambas reglas como simultáneamente activas.
+determinista, y **convertir bloques en slots exigiría meter `λ` —una magnitud estimada por el
+retarget— dentro del consenso** (`C-FIN-01`). **Mientras las dos convivan, la que rige el destino
+es `C-FIN-01`; `C-REORG-07` describe lo que el código hace hoy, no lo que el protocolo manda.**
+
+**C-FIN-01 · Finalidad en índices de slot, sin `exit`.**
+
+```text
+Sea d = slot(punta actual) − slot(último ancestro común con la punta candidata),
+en índices de slot de PoT (C-FLU-01).
+
+Un nodo MUST NOT sustituir su cadena seleccionada por una candidata con d ≥ F_slots.
+Una punta que lo exigiera se IGNORA.
+El nodo MUST seguir operando: MUST NOT detenerse, MUST NOT abortar y MUST NOT exigir
+intervención del operador por este motivo.
+```
+
+`F_slots` es un **SÍMBOLO**. Esta regla no le da valor: `<<PENDIENTE: §7.3>>`.
+
+`C-FIN-01` obliga **únicamente** a quien ya tiene una cadena seleccionada que reorganizar
+(`C-FLU-18`). La adopción dentro de la ventana que esta desigualdad deja abierta es `C-FLU-22`.
+
+> **De dónde sale cada pieza.** El enunciado es el de R-FIN-7 (evidencia histórica,
+> `research/dag-poas-ancla-de-orden.md:301-303`), con tres precisiones que R-FIN-7 no tenía: la
+> magnitud es el **índice de slot** y no «segundos de slot»; **la desigualdad es explícita** —
+> profundidad **exactamente** `F_slots` cae **dentro** de lo prohibido, que es la lectura
+> conservadora (Katana, D-F4 = A)—; y el «nunca apaga el proceso» pasa de nota a **MUST NOT**
+> enumerado, porque es precisamente lo que la diferencia del comportamiento vigente del código.
+>
+> **Por qué en slots y no en bloques.** `C-REORG-07` cuenta **bloques**; toda la regla de flujo
+> cuenta **slots**. Convertir una en otra exige `λ`, que es una magnitud **estimada por el
+> retarget**, no una constante de consenso. **Una regla de finalidad medida en bloques no se puede
+> comparar con una profundidad medida en slots sin meter `λ` en el consenso.**
+>
+> **Relación con `C-REORG-07`: se declara, no se resuelve.** `C-REORG-07` sigue siendo
+> **transitoria** y esta regla **no la toca**. Por alcance decidido (D-F3 = C, acotada al
+> enunciado) **NO entran aquí**: la reconciliación con el código que hoy **se detiene**, la
+> relación con `COINBASE_MATURITY` —de la que `MAX_REORG_LENGTH = COINBASE_MATURITY − 1 = 11 999`
+> deriva— y el techo de archivado. Los tres están nombrados en `TAREAS.md` §2.9.
+>
+> ⚠️ **Dos reglas de profundidad conviven en este documento y dicen cosas distintas.** La que rige
+> el diseño destino es **ésta**; `C-REORG-07` es **transitoria** y describe lo que el código hace
+> hoy, no lo que el protocolo manda. **La reconciliación sigue pendiente** y está pedida en §13 y
+> nombrada en `TAREAS.md` §2.9.
 
 ---
 
@@ -2056,6 +2825,32 @@ continuar en silencio.
 ello los convierta en variables de ejecución: `N_CORTO`, `N_LARGO`, `ZONA_LIBRE`, `FACTOR_SURGE`,
 `MAX_TX_WEIGHT`, `REF_WEIGHT`, `FEE_MASK`. A cualquier altura concreta son constantes.
 
+**C-FLU-17 · El nodo detecta que ha quedado fuera del flujo mayoritario y lo señala.**
+
+> **Esto NO es una regla de consenso.** No cambia la validez de ningún bloque. Existe para que un
+> nodo no siga funcionando **en silencio** dentro de un flujo minoritario.
+
+Un nodo **MUST** señalar el estado «flujo posiblemente minoritario» cuando, **de forma sostenida**,
+exista una punta `P` conocida con `flujo(P, slot(P)) ≠ flujo(mi punta, slot(mi punta))`,
+`blue_work(P) > blue_work(mi punta seleccionada)`, y que `C-FIN-01` le obligue a ignorar.
+
+La señal **MUST** exigir persistencia durante una ventana y **MUST NOT** dispararse con una sola
+observación: una punta rival más pesada puede ser transitoria o fabricada.
+`<<PENDIENTE: la ventana de persistencia y el margen de blue_work>>` — es calibración, y ninguna
+implementación puede fijarla por su cuenta (§0.3).
+
+El trabajo de calcular `blue_work` de una punta ajena **MUST** caer dentro del presupuesto de
+`C-NET-33`, y agotarlo **MUST** dejar la señal como «no determinada», **nunca** como «estoy en el
+mayoritario».
+
+Qué hace el nodo con la señal: **nada automático**. La expone —registro, métrica, estado
+consultable— y **MAY** dejar de producir bloques si el operador lo ha configurado así.
+
+> **Es computable con lo que el nodo ya calcula y sin AES:** el flujo de `P` sale del paso 1b de
+> `C-POT-08`, y `blue_work` es lo que GHOSTDAG ya produce. **La señal existe precisamente porque el
+> protocolo no puede hacer nada más**: cambiar de flujo fuera de la ventana de `C-FLU-22` es lo que
+> `C-FIN-01` prohíbe.
+
 ---
 
 ## 15 · Bloque génesis — parámetros PoST/DAG pendientes
@@ -2284,11 +3079,16 @@ testnet:  bb 79 64 3f
 
 ```
 mainnet   TCP/QUIC 9833   ·  testnet   TCP/QUIC 19833
-gossipsub topics:  /zerox/blocks/1  ·  /zerox/txs/1
-request-response:  /zerox/sync/1
+gossipsub topics:  /zerox/blocks/2  ·  /zerox/txs/1  ·  /zerox/pot/1
+request-response:  /zerox/sync/1  ·  /zerox/block-relay/1
 kademlia:          /zerox/kad/1
 identify agent:    zerox/<version>
 ```
+
+> **`/zerox/blocks/2`, no `/1`** (C-NET-25, 2026-09-16): el tema de bloques pasa a llevar **solo**
+> anuncios compactos, y el `/1` significaba bloque completo. `/zerox/block-relay/1` recupera lo que
+> falte y `/zerox/pot/1` lleva el PoT (C-NET-31). El código sigue en `/blocks/1`
+> (`crates/zx-p2p/src/config.rs:91`): migrarlo es parte de cablear el relé.
 
 > **El nombre de protocolo de Kademlia NO es cosmético.** `kad::Config::default()` usa
 > `/ipfs/kad/1.0.0` —la DHT **pública de IPFS**— y no falla al compilar. Verificado en
@@ -2322,23 +3122,130 @@ identificada** puntúa hacia el baneo.
 > consenso duro. Separa por mecanismo: los lentos caen por `FindResponseStallTracker` (umbral 3,
 > desconecta y olvida), los maliciosos por score por IP.
 
-### 16.2 · Relé compacto (BIP 152 adaptado) — transporte, NO consenso
+### 16.2 · Relé compacto obligatorio — arquitectura «1+», transporte, NO consenso
 
-**C-NET-06 · Validar la cabecera antes de emitir un bloque compacto.** Un nodo **MUST NOT** emitir un
-anuncio compacto sin haber validado que la cabecera compromete cada transacción del bloque y que
-construye sobre un estado cuya cabecera y pruebas de consenso estén verificadas. **MAY** emitirlo antes de validar que cada
-transacción gasta UTXO existentes.
+> **Decidido por Katana el 2026-09-16**, sobre las decisiones de red del 2026-09-13 (Q1, Q2 y Q4 de
+> TAREAS §3.1). Esta subsección deja de describir BIP 152 adaptado y pasa a describir el transporte
+> de ZEROX: el relé compacto es **obligatorio**, no negociado, y el bloque completo **sale del
+> gossip**. Lo que se conserva de BIP 152 es la derivación del ID corto, las estructuras, el
+> algoritmo de reconstrucción y el orden causal de C-NET-06.
 
-> Literal de BIP 152, y es la única de sus reglas que es **independiente del transporte**: habla del
-> orden causal *interno* del nodo, no del canal. Ver `research/bip152.md` §7-§8.
+**C-NET-25 · Los tres canales, y qué lleva cada uno.** La propagación **MUST** repartirse así, y un
+mensaje que llegue por un canal que no le corresponde **MUST** descartarse:
 
-**C-NET-07 · Derivación del ID corto.** Sobre `txid`:
+| Protocolo | Lleva |
+|---|---|
+| `/zerox/blocks/2` (gossipsub) | **solo** anuncios compactos: cabecera DAG, nonce de transporte e IDs cortos |
+| `/zerox/block-relay/1` (request-response) | transacciones que faltan, resolución de colisiones y, como último recurso, el bloque completo |
+| `/zerox/sync/1` (request-response) | IBD e histórico, **sin cambios** |
+
+Un bloque completo **MUST NOT** difundirse por gossip en ningún caso.
+
+> **Por qué el bloque completo sale del gossip, y no es una cuestión de ahorro.** Si el anuncio y el
+> bloque entero viajan por el mismo mecanismo de difusión, tienen `message_id` distinto y gossipsub
+> **no los deduplica**: la red transporta el mismo bloque dos veces, que es exactamente el ancho de
+> banda que el relé compacto venía a ahorrar. Con dos temas conviviendo pasa lo mismo.
+>
+> **La versión del protocolo sube a `/2` y eso no es cosmético:** hoy `/zerox/blocks/1` significa
+> «bloque completo». Un nodo nuevo que anuncie compacto en el tema viejo le manda a un nodo antiguo
+> algo que no sabe parsear.
+>
+> ⚠️ **Trampa de implementación, verificada.** `crates/zx-p2p/src/servicio.rs` despacha por
+> `topico.contains("/blocks/")` hacia `respuesta_desde_bytes`, que espera una `Respuesta`.
+> `/blocks/2` **también** cumple esa condición. Cambiar la versión sin cambiar el despacho hace que
+> los anuncios se rechacen como basura **y que el par que los propaga se lleve la penalización** —
+> un nodo correcto baneando a otro nodo correcto, que es el peor fallo posible de esta familia.
+>
+> Se descartaron dos alternativas. **Dos temas conviviendo** hace viajar el bloque dos veces. **Empujar
+> a ≤3 pares** (BIP 152 fiel) exige estado por conexión, que `research/bip152.md` §8 declara **no
+> portable** a libp2p sin forzar un stream lógico único por par sobre yamux. El híbrido *eager/lazy*
+> queda **aparcado** como *fast lane* experimental: es portable —negociar al abrir cada substream no
+> es `sendcmpct`— pero añade RTT, estado de proveedores y el riesgo de que los «más rápidos» sean
+> pares adversarios. Solo se activa si mejora p95/p99 bajo mempool frío, ramas DAG, pérdida y eclipse.
+
+**C-NET-26 · El relé compacto es obligatorio en la ruta crítica.** Todo nodo **MUST** anunciar los
+bloques que produce o adopta como anuncio compacto por `/zerox/blocks/2`, y **MUST** aceptar
+anuncios compactos de cualquier par. No hay negociación por conexión ni modo de alto ancho de banda.
+
+> **Es una decisión de presupuesto, no de estilo** (Q2, 2026-09-13). Con el techo de Q1 y el modelo
+> pesimista del v1 —8 pares en serie, ≈5,6 saltos— el anuncio compacto ocupa el 1,8 % de la subida de
+> un nodo de 100 Mbit/s y añade ≈0,1 s de Δ. **El bloque completo satura el enlace**: utilización
+> ρ = 1,0 a 100 Mbit/s y 1,68 por líneas típicas de EE. UU. Con ρ ≥ 1 no existe una Δ estable,
+> porque la cola crece con el tiempo: no es que la propagación sea lenta, es que no converge.
+> Medido en `veritas/finalidad/delta-medido-v1/` (DMS-v0.1, revisión 2).
+>
+> Por eso «negociado por conexión» no sirve: si un par lo rechaza, el emisor cae al bloque completo
+> y ese enlace entra en saturación. Una opción que solo funciona cuando todos la eligen no es una
+> opción, es un requisito mal escrito.
+
+**C-NET-27 · Un anuncio sin padres va a una cola acotada, no se descarta.** Un anuncio compacto que
+no se pueda evaluar porque falten padres del DAG **MUST** retenerse en una cola de tamaño acotado y
+**MUST** reevaluarse cuando lleguen sus dependencias. El nodo **MUST NOT** depender de que gossipsub
+se lo vuelva a entregar, y **MUST NOT** penalizar al emisor (C-NET-12: huérfano no es inválido).
+
+`<<PENDIENTE: tamaño de la cola y política de desalojo>>` — se dimensiona con el v2a (Q5); hasta
+entonces ninguna implementación puede fijar el valor por su cuenta (§0.3). El presupuesto agregado
+de C-NET-21 sigue aplicando como techo.
+
+> Con el bloque completo fuera del gossip, **la reentrega deja de ser una red de seguridad**.
+> gossipsub deduplica por `message_id`: un anuncio ya visto no se vuelve a entregar aunque la
+> primera vez no se pudiera evaluar. En un DAG con varios padres esto no es un caso raro —es el caso
+> normal cuando dos bloques hermanos llegan en orden inverso—, así que sin cola el anuncio se pierde
+> y el bloque solo se recupera por IBD, con el retraso que eso implica.
+
+**C-NET-28 · Pedir lo que falta es el camino ordinario; el bloque entero, el último recurso.** Ante
+un anuncio cuyas transacciones no están todas en la mempool, el nodo **MUST** pedirlas por
+`/zerox/block-relay/1`. **MUST** poder probar **proveedores alternativos** y no quedar cautivo del
+primer emisor. Bajarse el bloque completo **MUST** ser el último recurso, no la reacción al primer
+fallo. Ni la falta de transacciones ni una colisión **MUST** penalizar a quien reenvía.
+
+> **Quien reenvía no eligió el contenido**, que es la razón de C-NET-05 y de C-NET-08 aplicada aquí:
+> la falta viene casi siempre de **mempools desincronizadas**, no de mala fe. Con un bloque por
+> segundo, lo que tardan las transacciones en llegar a todas las mempools es del orden del intervalo
+> entre bloques, así que el caso degradado puede ser el normal —hipótesis derivada, aún sin medir:
+> la mide el v2a (Q5).
+>
+> Y caer al bloque entero al primer fallo **tira la ventaja que el relé venía a dar**: devuelve el
+> enlace a la saturación que C-NET-26 evita, y lo hace justo bajo la condición que un adversario
+> puede provocar a coste casi nulo.
+
+**C-NET-06 · Qué se verifica antes de reenviar, y qué después.** Antes de reenviar un bloque o de
+emitir un anuncio compacto, el nodo **MUST** haber verificado, en este orden: **cabecera**, **prueba
+de espacio**, los **dos testigos KZG**, el **sello**, la **justificación PoT** (contra la caché de
+slots, C-NET-31) y el **compromiso del cuerpo**. **MUST NOT** reenviar sin eso.
+
+**MAY** dejar para después —antes de adoptar el estado, nunca antes de reenviar— las **firmas**, las
+**pruebas Halo2** y la comprobación de que cada entrada gasta un **UTXO existente**.
+
+> Reescrita el 2026-09-17 sobre la decisión Q4 del 2026-09-13. La versión anterior solo eximía la
+> comprobación de UTXO y dejaba el resto del orden sin decir, que es como no haberlo fijado.
+>
+> **El criterio es qué acota el coste por salto.** Lo que va antes está acotado por construcción: no
+> depende del salto de slots —si el PoT se verificara por bloque serían hasta 150 × 96,1 ms ≈ 14,4 s—
+> ni del número de transacciones, cuyo coste Halo2 no está medido. Medido en hardware
+> (`veritas/rendimiento/coste-salto-v1/`, 2026-09-14, un núcleo de un Ryzen 9 9950X3D): validar antes
+> de reenviar cuesta **1,33 ms** con 571 tx y **2,17 ms** con 4 464 tx usando relé compacto; con
+> cuerpo completo, 2,32 y 9,86 ms. El peor caso deja 10× de margen sobre los 0,1 s por salto de la
+> sensibilidad de DMS-v0.1.
+>
+> **Lo que se paga a cambio, dicho en voz alta:** un bloque con cabecera válida y transacciones
+> inválidas se propaga antes de detectarse. Es el mismo compromiso que acepta BIP 152, y aquí cuesta
+> más que en Bitcoin porque fabricar la cabecera exige un **billete ganador real** — no es gratis,
+> pero tampoco es imposible. El vector entra en el v2b (Q5).
+>
+> 🔶 **Pregunta abierta: relajar esta regla.** Tal y como está, el nodo necesita **todas** las
+> transacciones antes de anunciar, así que la petición de las que faltan (C-NET-28) está **dentro**
+> de la ruta crítica. Anunciar antes de reconstruir la sacaría de ahí, a cambio de propagar anuncios
+> cuyo cuerpo podría no coincidir. **Se decide cuando el v2a mida con qué frecuencia faltan
+> transacciones** (Q2, Q5). No se decide antes por intuición.
+
+**C-NET-07 · Derivación del ID corto.** Sobre `wtxid = txid ‖ auth_digest`:
 
 ```
 h  = SHA3-256( cabecera_canónica ‖ nonce_transporte(8 B LE) )       ← divergencia deliberada, ver abajo
 k0 = h[0..8]  como u64 LE
 k1 = h[8..16] como u64 LE
-id = los 6 bytes bajos de SipHash-2-4(k0, k1, txid)
+id = los 6 bytes bajos de SipHash-2-4(k0, k1, wtxid)
 ```
 
 > **BIP 152 usa SHA256 *simple*** —no doble, a diferencia del blockhash de Bitcoin— y esa asimetría
@@ -2353,6 +3260,22 @@ id = los 6 bytes bajos de SipHash-2-4(k0, k1, txid)
 >
 > 🔶 `SipHash-2-4` **no está definido en BIP 152** — remite a Aumasson & Bernstein. Es una laguna
 > declarada, no una omisión nuestra.
+>
+> **Por qué `wtxid` y no `txid` — decidido por Katana el 2026-09-16**, como BIP 152 v2. Y el motivo
+> **no es de consenso**: un bloque mal reconstruido ya se rechaza, porque `merkle_root` va sobre
+> `txid` pero `body_commitment` cubre `txid ‖ auth_digest` y el relé lo comprueba (C-NET-09).
+>
+> El problema es de **disponibilidad**. Cuando ese compromiso falla, el nodo no sabe **qué**
+> transacción estaba mal, y su única salida es bajarse el bloque entero — justo el fallback que
+> C-NET-28 declara último recurso. Quien firma una transacción puede publicar dos variantes con el
+> **mismo `txid`** y distinto `auth_digest`, sembrarlas en mempools distintas y forzar fallbacks
+> completos **a coste casi cero**. Derivar sobre `wtxid` convierte esas dos variantes en dos IDs
+> cortos distintos, y el fallo vuelve a ser una colisión ordinaria que C-NET-08 resuelve pidiendo la
+> transacción.
+>
+> ⚠️ **Esto cambia una regla ya cerrada e implementada.** `crates/zx-p2p/src/id_corto.rs` deriva hoy
+> sobre `txid`: su código es de la versión anterior de esta regla y **debe migrarse** al cablear el
+> relé. Declarado en `ci/reglas-sin-cablear.txt`.
 
 **C-NET-08 · Las colisiones se recuperan, NO se castigan.** Un ID corto colisionado **MUST** resolverse
 pidiendo la transacción completa, y el peer **MUST NOT** ser penalizado.
@@ -2371,15 +3294,22 @@ pidiendo la transacción completa, y el peer **MUST NOT** ser penalizado.
 > Se hace explícito aquí porque una regla que solo se cumple "por la vía de la validación ordinaria"
 > es una regla que alguien puede optimizar sin darse cuenta de lo que quita.
 
-**C-NET-10 · Máximo 3 peers en modo de alto ancho de banda.** Literal del BIP: *"Nodes MUST NOT send
-such sendcmpct messages to more than three peers, as it encourages wasting outbound bandwidth across
-the network."* Se eligen por **histórico de entrega rápida**, no al azar.
+🪦 **C-NET-10 — RETIRADA el 2026-09-16. Su número no se reutiliza ni se recicla.**
 
-> 🔶 **La negociación de `sendcmpct` NO se porta.** Depende de una conexión TCP persistente con
-> **orden total** entre `sendcmpct`, `getdata`, `cmpctblock`, `ping`/`pong`. libp2p multiplexa streams
-> independientes sobre yamux y no garantiza ese orden. Lo que se adopta de BIP 152 es la derivación
-> del ID corto, las estructuras, el algoritmo de reconstrucción y C-NET-06; el saludo se rediseña
-> sobre el protocolo de request-response propio. Ver `research/bip152.md` §8.
+Decía: «máximo 3 peers en modo de alto ancho de banda», literal de BIP 152 (*"Nodes MUST NOT send
+such sendcmpct messages to more than three peers…"*), elegidos por histórico de entrega rápida.
+
+**Por qué se retira.** Presuponía que existe un modo de alto ancho de banda que se negocia y que se
+concede a unos pares y no a otros. Con C-NET-26 el relé compacto es **obligatorio con todos**, así
+que no hay a quién elegir: la regla dejó de tener sujeto. Empujar a ≤3 pares, además, exige estado
+por conexión que `research/bip152.md` §8 declara **no portable** a libp2p sin forzar un stream
+lógico único por par sobre yamux.
+
+> 🔶 **La negociación de `sendcmpct` NO se porta**, y esa parte sigue siendo cierta: depende de una
+> conexión TCP persistente con **orden total** entre `sendcmpct`, `getdata`, `cmpctblock`,
+> `ping`/`pong`. libp2p multiplexa streams independientes sobre yamux y no garantiza ese orden. Lo
+> que se adopta de BIP 152 es la derivación del ID corto, las estructuras, el algoritmo de
+> reconstrucción y C-NET-06.
 
 ### 16.3 · Límites de la capa de red — todos explícitos
 
@@ -2671,9 +3601,17 @@ conoce— **MUST** descartarse **sin penalizar**, no rechazarse.
 
 ### 16.4 · Propagación de bloques — transporte
 
-**R-NET-01 · Relé compacto.** El relé compacto anuncia cabecera e identificadores cortos, negocia
-el soporte por conexión y permite recuperar transacciones faltantes o el bloque completo.
-No modifica las reglas que hacen válido al bloque.
+**R-NET-01 · Relé compacto.** El relé compacto anuncia cabecera e identificadores cortos y permite
+recuperar las transacciones que falten o, como último recurso, el bloque completo. No modifica las
+reglas que hacen válido al bloque.
+
+> **Reescrita el 2026-09-17: se elimina la negociación por conexión, y solo eso.** La redacción
+> anterior decía que el relé «negocia el soporte por conexión», que es la parte de BIP 152 que
+> C-NET-26 convierte en obligatoria y C-NET-10 retira. El resto de la regla se conserva.
+>
+> Esta regla contradecía a la decisión Q2 desde el 2026-09-13 y la contradicción estuvo viva cuatro
+> días. Se anota porque un SPEC que se contradice a sí mismo es peor que uno incompleto: el
+> incompleto se nota al implementar, y el contradictorio se implementa dos veces.
 
 **R-NET-02 · Sal por bloque.** Los identificadores cortos usan una clave derivada de la cabecera
 y la sal de transporte (C-NET-07). Esa sal no es trabajo de consenso.
@@ -2681,6 +3619,155 @@ y la sal de transporte (C-NET-07). Esa sal no es trabajo de consenso.
 La latencia depende también de saltos de red, recuperación de datos y validación de PoT.
 Se medirá con el formato DAG y las pruebas reales; no se trasladan estimaciones de huérfanos de
 una cadena de bloques cada dos minutos.
+
+### 16.5 · Prioridad de reenvío y presupuesto de subida
+
+> **Decidido por Katana el 2026-09-13** (Q1 de TAREAS §3.1), y es la condición sin la cual la
+> referencia de 100 Mbit/s de subida no se sostiene: **sin estas reglas, un nodo por debajo de la
+> referencia se satura en lugar de recortar.**
+
+**C-NET-29 · El consenso se reenvía antes que las transacciones.** Las colas de salida **MUST**
+servir los anuncios compactos de bloque (C-NET-25) y los mensajes de PoT (C-NET-31) **con prioridad
+estricta** sobre el reenvío de transacciones. Una cola de transacciones llena **MUST NOT** retrasar
+un anuncio de bloque.
+
+> **En el techo de Q1 el reenvío de transacciones ocupa toda la subida del nodo de referencia**
+> (ρ = 1,0 en la cuenta pesimista de 8 pares sin overhead). El anuncio compacto solo sale a tiempo
+> porque esta regla existe: sin ella, el bloque espera detrás de la cola de transacciones justo
+> cuando la red está cargada, que es cuando Δ importa.
+>
+> Y el orden importa en ambos sentidos: el PoT va con el bloque porque C-NET-31 lo pone en la ruta
+> de validación de todos los demás. Un PoT que llega tarde retrasa la verificación de cada bloque
+> que cite ese slot.
+
+**C-NET-30 · Presupuesto de reenvío de transacciones, y recorte antes que saturación.** El reenvío
+de transacciones **MUST** ir sujeto a un presupuesto de subida **estrictamente por debajo** de la
+capacidad de subida disponible del nodo. Alcanzado el presupuesto, el nodo **MUST** recortar lo que
+reenvía —y **MUST NOT** encolar sin límite ni dejar de reenviar bloques. Las transacciones **MUST**
+reenviarse por **anuncio y petición**, nunca empujando la transacción completa sin que se la pidan.
+
+`<<PENDIENTE: el valor del presupuesto y la política de recorte>>` — dependen del v2a (Q5), que mide
+la inundación de transacciones contra la subida honesta con y sin esta regla. Ninguna implementación
+puede fijarlos por su cuenta (§0.3).
+
+> **Anuncio y petición no es un detalle de eficiencia: es lo que hace que el recorte sea posible.**
+> Empujando la transacción completa, el emisor gasta su subida antes de saber si el receptor la
+> quería; el receptor no puede decir que no, y el coste se paga en la dirección equivocada. Con
+> anuncio y petición, un nodo saturado simplemente pide menos.
+>
+> **Consecuencia declarada de Q1, que esta regla no elimina:** con la carga sostenida del techo, las
+> líneas típicas de EE. UU., Canadá, México, Argentina, China, India y Alemania quedan por debajo de
+> la referencia. Esos nodos **siguen recibiendo y validando**; lo que se concentra en los nodos mejor
+> conectados es el **reenvío**. Es el coste aceptado de la política de marketplace de Q1, no un
+> efecto imprevisto.
+
+### 16.6 · Proof-of-Time en la red — una verificación por slot
+
+> **Decidido por Katana el 2026-09-13** (Q4). Es el patrón de Autonomys: `subspace` @ `f8842d0`,
+> `crates/sc-proof-of-time/src/source/gossip.rs` y `verifier.rs:25-29`.
+
+**C-NET-31 · El PoT viaja en su propio tema y se verifica una vez por clave de contexto.** Las
+salidas de PoT **MUST** propagarse por un tema de gossip propio, `/zerox/pot/1`, independiente de
+bloques y transacciones. Cada nodo **MUST** verificar cada slot **una sola vez por clave** y
+**MUST** cachear el resultado; toda validación de bloque que cite ese slot **MUST** resolverse
+contra esa caché (C-NET-06). Cada slot se verifica **entero**, lo que lo hace compatible con
+C-CHK-05.
+
+**La clave de la caché es la contextual de `C-POT-07`** —`(f, s, semilla(f, s), N(s))`, los cuatro
+del contexto—, **no el slot a secas**. Con un único flujo candidato la clave es función de `s` y el
+comportamiento es idéntico al de indexar por slot; con dos o más flujos, indexar por slot haría
+depender la **validez** de qué llegó primero a la caché del nodo, que es lo que `C-POT-07` corrige.
+
+> **Sin esto, el coste por salto depende del salto de slots y deja de estar acotado.** Verificar el
+> PoT por bloque, con `S_max = 150` slots de justificación, costaría hasta 150 × 96,1 ms ≈ **14,4 s**
+> por bloque. Con caché por slot, el coste es de un slot y se amortiza entre todos los bloques que lo
+> citen.
+>
+> Coste real de un slot, medido en hardware (`veritas/rendimiento/coste-salto-v1/`, 2026-09-14):
+> **92 ms** con AVX-512/VAES, **101 ms** con AVX2/VAES, **190 ms** con AES-NI y SSE4.1, y **8,3 s**
+> con AES por software. Las rutas sin AVX-512 se forzaron en la misma CPU, así que no equivalen a
+> una CPU antigua: son una cota superior optimista para hardware viejo, y el caso por software dice
+> que un nodo sin aceleración AES **no puede seguir el ritmo**.
+>
+> Nota de implementación, derivada y sin medir: ponerse al día admite verificar **varios slots en
+> paralelo** entre núcleos (≈1,8 s para 150 slots en 8 núcleos). **Dentro** de un slot no hay
+> ganancia — la ruta AVX-512/VAES ya verifica los 8 tramos a la vez con 16 carriles AES.
+
+**C-NET-32 · Verificación bajo demanda, con tres salvaguardas.** Si un bloque cita slots que el nodo
+todavía no ha verificado, **MAY** verificarlos en ese momento con la justificación que trae el propio
+bloque (C-HDR-07), **una sola vez por nodo y slot**. Esa verificación **MUST** aplicar las tres:
+
+1. **Comparar primero con la caché, bajo la MISMA clave.** Si la salida no coincide con la ya
+   verificada **para la misma clave contextual** (`C-POT-07`), el bloque es **inválido** y se
+   rechaza **sin gastar CPU** en la cadena AES. **Discrepar con una entrada de OTRA clave no prueba
+   nada** y **MUST NOT** invalidar: son cadenas de PoT distintas, ambas legítimas.
+2. **Retener, no verificar, lo que va por delante del reloj.** Los slots posteriores al reloj PoT del
+   nodo **MUST** retenerse, no verificarse (`research/dag-poas-ancla-de-orden.md:342`). El estado es
+   `Pendiente`.
+3. **Presupuesto de CPU acotado**, por par y por intervalo, en el espíritu de C-NET-04. **Para el
+   trabajo sobre ramas de otro flujo hay además una cota global por nodo, y el modo de fallo está
+   escrito: `C-NET-33`.** Agotar un presupuesto da **`Pendiente`, NUNCA `Inválido`** (`C-POT-07`).
+
+`<<PENDIENTE: el valor del presupuesto de CPU por par e intervalo>>` — se calibra con el v2b (Q5),
+que incluye agotar este presupuesto como vector de ataque. Ninguna implementación puede fijarlo por
+su cuenta (§0.3).
+
+> **Este es el respaldo, no el camino normal.** El camino normal es el tema de gossip de C-NET-31;
+> esto existe para nodos que se ponen al día y para el bloque que llega antes que su slot.
+>
+> Las tres salvaguardas no son cortesía: sin la primera, cualquiera hace gastar 92 ms por slot
+> inventado; sin la segunda, un bloque del futuro obliga a verificar una cadena que aún no debería
+> existir; sin la tercera, el coste agregado de peticiones simultáneas no tiene techo. El v2b (Q5)
+> las ataca a propósito.
+
+**C-NET-33 · Presupuesto de verificación de flujo ajeno: dos cotas, y qué pasa al agotarlas.**
+
+El trabajo que un nodo dedica a ramas de **otro flujo** —la comprobación estructural del paso 1b de
+`C-POT-08` y la verificación de PoT de `C-FLU-22`— **MUST** estar acotado por **dos** presupuestos
+a la vez:
+
+```text
+PRESUP_PAR    por par y por intervalo     (es el de C-NET-32.3)
+PRESUP_NODO   por NODO y por intervalo    (nuevo)
+```
+
+Agotar **cualquiera** de los dos produce **`Pendiente`, NUNCA `Inválido`**. Con `Pendiente` el nodo:
+
+- **MUST** conservar su cadena seleccionada actual — no adopta;
+- **MUST NOT** tratar la rama como inválida;
+- **MUST NOT** dejar de reenviarla por este motivo;
+- **MUST** reintentar cuando vuelva a tener presupuesto, mientras la ventana de `C-FLU-22` siga
+  abierta.
+
+`<<PENDIENTE: los valores de PRESUP_PAR y PRESUP_NODO>>`. Ninguna implementación puede fijarlos por
+su cuenta (§0.3).
+
+> **Por qué hacía falta la segunda cota.** C-NET-32.3 acota «por par y por intervalo», y **las
+> identidades son gratis por diseño** (`research/dag-poas-balizas-auditoria.md:68-75`): un atacante
+> con `N` conexiones obtiene `N` presupuestos, así que el techo de trabajo por nodo **lo fija él**.
+> Con `PRESUP_NODO` el techo **deja de depender de `N`**, que es el criterio declarado de C-NET-06.
+> Esto **no** abarata ni encarece el **disparo** del AES ajeno —que sigue exigiendo ganar la
+> carrera de `C-FLU-22`—; lo que acota es el **techo**.
+>
+> **Por qué el modo de fallo se escribe entero.** Bajo `C-FLU-22`, «no adoptar» **ya no es neutro**:
+> quedarse sin presupuesto durante la ventana significa quedarse en el flujo en el que se está, y
+> cuando la ventana se cierra, **quedarse ahí para siempre**. De ahí las cuatro obligaciones, y en
+> particular **seguir reenviando**: un nodo sin presupuesto no debe convertirse además en
+> amplificador de la partición cortando la propagación a sus pares.
+>
+> ⚠️ **Esto abre una rendija más, y no está medida.** Dos nodos **con el mismo DAG** pueden acabar
+> en flujos distintos porque uno pudo pagar la verificación dentro de la ventana y el otro no. Es
+> la **tercera** rendija, además de las dos de PCO-v0.1, y **a diferencia de aquellas está
+> parcialmente bajo control del atacante**, que puede gastar presupuesto ajeno con tráfico barato
+> del paso 1b. La **validez** no se mueve —sigue siendo función de `past(B)`—; lo que se mueve es la
+> **selección**, que bajo `C-FLU-22` decide el flujo. `TAREAS.md` §2.9.
+>
+> **La calibración es una pinza, no un número suelto.** Por abajo, integrado sobre la ventana,
+> `PRESUP_NODO` **MUST** bastar para verificar **una** rama rival completa —en el peor caso
+> `F_slots` slots, del orden de `F_slots × 92 ms` con los costes de esta sección—; con menos, la
+> adopción **nunca** se completa y **D-F9 quedaría derogada de hecho sin que nadie la revocara**.
+> Por arriba, demasiado grande devuelve el DoS que la segunda cota existe para acotar. **La cota
+> superior no está derivada.** `TAREAS.md` §2.9.
 
 ---
 
@@ -2692,12 +3779,13 @@ congela parámetros ni convierte prototipos en implementaciones.
 | Área | Trabajo pendiente |
 |---|---|
 | Cabecera y wire | Integrar en la ruta activa del nodo el formato ya fijado en §6.1–§6.2: layout (C-HDR-01), prefirma (C-HDR-03), justificación PoT (C-HDR-07) y codec único (C-HDR-09). El texto normativo no deja nada pendiente aquí. |
-| Prueba de espacio/tiempo | Verificación conjunta de solución, KZG, sello, reto secuencial, autoría y flujos. |
+| Prueba de espacio/tiempo | Verificación conjunta de solución, KZG, sello, reto secuencial, autoría y flujos. **🔴 PRIORIDAD: la regla de dependencias por flujo del PoT es el único punto medido que degrada el umbral de seguridad.** `veritas/seguridad/coste-rama-privada-v1/` (CRP-v0.1, 2026-09-18) mide `α_mínimo = 1/2` —el mismo que PoW y que GHOSTDAG sobre PoW— para el diseño con **un solo flujo**: la tasa de soluciones es `∝ SR` y el peso `∝ 1/SR`, así que el rango endógeno **se cancela** y no es explotable en media. Pero con `S` flujos de PoT simultáneos la cuota efectiva es `S·α/(1−α+S·α)` y el umbral cae a `α = 1/(S+1)`: **0,040 con `S = 24`**, que es el límite de IOPS de un SSD de 100 k, **sin espacio adicional**. Es el ATAQUE 2 de `research/dag-poas-auditoria.md` (2026-09-06, gravedad crítica), que ya declaraba depender de «una regla que la propuesta no escribe» y advertía que **las dos opciones obvias fallan**: validez del PoT relativa a la cadena seleccionada abre el multistream; validez absoluta abre el split. **DECIDIDO por Katana (2026-09-19/20) y REDACTADO en §7.1: validez ABSOLUTA (`C-FLU-13`), perfil 1a (`L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1)`, `C-FLU-01`).** El multistream queda cerrado porque un flujo fabricado no es el de ningún bloque honesto y sus bloques no se pueden referenciar (`C-FLU-14`). **El split NO se cierra con una regla: se previene con `L` frente a `Δ`**, y si nace se cura solo en el caso espontáneo (`C-FLU-22`), nunca en un corte de red más largo que `L`. **Lo que queda: el código** —ninguna de las 31 reglas nuevas tiene una línea— y las mediciones que faltan (`TAREAS.md` §2.9). |
 | Rango | R-FIN-13′ completo: arranque, ventana, redondeos, fusiones tardías, ramas candidatas. |
-| DAG | Conflictos de transacciones sobre el orden ya definido (C-ORD-03) y su enlace con el estado UTXO (§2.6). Y tres reglas que esta especificación no tiene: `pick_virtual_parents` —qué puntas toma como padres un bloque que se produce, que es política de producción y no la verificación de C-GD-03—, el *merge depth bound* y el *pruning*. GHOSTDAG, U2/U3″, peso, cadena seleccionada y orden sí quedan especificados en §11. |
+| DAG | Redactado el 2026-09-17: conflictos de transacciones (**C-ORD-04**), `pick_virtual_parents` (**C-GD-10**) y *bounded merge depth* con kosherización (**C-GD-11**). Quedan: el enlace de C-ORD-04 con el estado UTXO (§2.6) y los **cinco pendientes de C-GD-11** —métrica, valor, bootstrap, borde de igualdad y relación con finalidad y poda—, que no se fijan por analogía con Kaspa ni derivando de `F = 2 h` provisional. GHOSTDAG, U2/U3″, peso, cadena seleccionada y orden quedan especificados en §11. |
+| Poda (*pruning*) | **Auditado el 2026-09-17** (`veritas/consenso/poda-post-v1/`, PPP-v0.1), con **defectos anotados el 2026-09-18** en su `PROCEDENCIA.md` §3.3–§3.4. **Lo que falta no es el IBD sin confianza: es el IBD SUCINTO.** Un nodo nuevo siempre puede descargar y validar toda la historia desde el génesis sin confiar en nadie; lo que ZEROX no tiene es un arranque **sucinto desde estado podado** sin ancla externa. **(1) Poda local:** política de nodo **viable en principio**, no implementada, y condicionada a que existan finalidad integrada (R-FIN-7), estado UTXO con datos de deshacer (§2.6, hoy inexistente) y una profundidad de retención cerrada (C-GD-11). **(2) Prueba de poda por certificados de niveles: descartada.** El nivel de solución se calcula **antes** de elegir padres, así que se pega a cualquier historia; el nivel por hash de cabecera sí liga a los padres pero se muele con CPU (C-HDR-04: el sello Ed25519 no es único, y `merkle_root` varía con la coinbase), luego no mide espacio. En PoW ambas propiedades coinciden en el mismo objeto; en PoST se separan, y esa separación es la raíz. **El resultado vale para los mecanismos examinados, no para toda familia de pruebas**: su formalización no captura que el recurso deba pagarse de nuevo por cada ancestría, y no modela el PoT ni sus flujos. **(3) Disponibilidad histórica** — capa social/económica, no criptográfica: no resuelve (2). **Consecuencia: §6.1 NO se reabre por este mecanismo** — `parents_by_level` no rescata este certificado, luego el cableado de la cabecera DAG no está bloqueado; un reto futuro ligado a la ancestría sí la reabriría. **Abierto y sin cerrar:** la vía de prueba recursiva (coste **estimado**, no medido: no hay circuito ni banco de probador) y, sobre todo, **el coste real de construir una rama privada con más `blue_work`**, que ninguna auditoría ha medido y que decide si esto es un problema de ingeniería o de consenso. **La poda sigue siendo requisito para lanzar mainnet.** Una testnet **MAY** operar sin poda con nodos archivales declarados explícitamente, y eso **no cuenta como solución**. |
 | Alturas y calendario | Activaciones, expiración de tx/sectores, timelocks, coinbase y archivado derivados del orden DAG. |
-| Finalidad | Integración R-FIN-7, elección conjunta de I/F/L/ρ_max, particiones y recuperación. |
-| Red | Medir Δ y coste de pruebas; calibrar sincronización, scoring, recursos y propagación. |
+| Finalidad | **R-FIN-7 queda redactada como `C-FIN-01` (§12), en índices de slot y sin `exit`.** Lo que sigue abierto: la **reconciliación** con `C-REORG-07`, con el código que hoy se detiene, con `COINBASE_MATURITY` y con el techo de archivado (fuera de alcance por decisión, D-F3); la elección conjunta de `I`/`F`/`L_suelo`/`ρ_max`; y la **recuperación**, que `C-FLU-22` solo cubre para el nacimiento espontáneo de una partición de flujo. |
+| Red | Δ natural y coste por salto: **medidos** (`veritas/finalidad/delta-medido-v1/`, `veritas/rendimiento/coste-salto-v1/`, 2026-09-14). El transporte quedó especificado el 2026-09-17: relé «1+» obligatorio (C-NET-25…28), prioridad y presupuesto de subida (C-NET-29, C-NET-30) y PoT por slot (C-NET-31, C-NET-32). **Pendiente:** los tres valores que el v2a/v2b deben calibrar —tamaño de la cola de anuncios huérfanos, presupuesto de reenvío de transacciones y presupuesto de CPU del PoT bajo demanda—, la decisión de relajar o no C-NET-06, y el código: ninguna de las ocho reglas nuevas tiene implementación. |
 | Génesis | Parámetros y hashes PoST/DAG distintos por red; bootstrap explícito. |
 | Pagos | Recalibrar §13 con el mismo modelo y criterio de aceptación en todas las alternativas. |
 | Blindado | Convertir investigación Orchard de §9 en reglas, compromisos y validación integrados. |

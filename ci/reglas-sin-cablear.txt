@@ -18,15 +18,28 @@
 
 # ── Cabecera DAG: código en zx-core, sin integrar en zx-node ──────────────────────────────────
 #
-# C-HDR-05  slot(B) >= slot(sp(B)). Comprobación estructural en crates/zx-core/src/wire_dag.rs
-#           (comprobar_diferencia_slots_del_bloque); el slot del padre seleccionado lo aporta el
-#           contexto DAG, que todavía no existe.
+# C-HDR-05  ⚠️ CAMBIÓ DE SEMÁNTICA EL 2026-09-20, Y EL CÓDIGO ES DE LA VERSIÓN ANTERIOR. La regla
+#           exigía slot(sp(B)) <= slot(B) y no decía nada de los demás padres. Katana decidió
+#           D-F6 = A: la cota alcanza ahora a TODOS los padres, slot(p) <= slot(B), porque sin eso
+#           el corte por slot de C-FLU-03 no es cerrado por ancestros y GHOSTDAG no está definido
+#           sobre él. El código comprueba SOLO el padre seleccionado:
+#           comprobar_diferencia_slots_del_bloque recibe únicamente slot_sp
+#           (crates/zx-core/src/wire_dag.rs), y zx-consensus::ContextoDag no expone forma de pedir
+#           el slot de un padre arbitrario, así que la regla nueva NO es comprobable ahí sin un
+#           accesor nuevo. Es el mismo estado que C-NET-07: no solo código sin cablear, sino
+#           código de la versión anterior de la regla. Cablear C-HDR-05 significa ahora dos cosas,
+#           no una: llamar a la comprobación desde la ruta activa Y ampliarla a todos los padres.
+#           Mismo objeto que C-FLU-02, declarada en ci/reglas-sin-codigo.txt.
 # C-HDR-06  rango_solucion contra el contexto, en crates/zx-consensus/src/bloque_dag.rs. La
 #           interfaz está y prohíbe la circularidad por tipo; el controlador (ventana,
 #           bootstrap, redondeos) sigue pendiente en TAREAS §2.3.
-# C-HDR-07  la justificación PoT va fuera de la cabecera y es obligatoria. Hay contenedor y
-#           códec, pero el verificador AES secuencial devuelve IntegracionPotPendiente: hoy
-#           nadie la exige.
+# C-HDR-07  ⚠️ CAMBIÓ DE SEMÁNTICA EL 2026-09-20, Y EL CÓDIGO NO LA ALCANZA. La regla ya no solo
+#           dice que la justificación es obligatoria: dice QUÉ ancla (D-2 = A, C-POT-05). El
+#           pot_output de la cabecera es la salida FUTURA, salida(f, slot(B)+D), los d portadores
+#           cubren (slot(sp)+D, slot(B)+D], y el último checkpoint del último portador MUST ser
+#           igual a pot_output. Hay contenedor y códec, pero el verificador AES secuencial
+#           devuelve IntegracionPotPendiente: hoy nadie la exige y nadie comprueba el anclaje.
+#           Cablearla exige el verificador de C-POT-06/07/08, que no existe (TAREAS §2.9).
 # C-HDR-09  block_hash canónico de la cabecera DAG. Calculado, con vectores congelados y con un
 #           oráculo Julia independiente; la ruta activa del nodo sigue hasheando la lineal.
 C-HDR-05
@@ -74,9 +87,18 @@ C-ORD-03
 
 # ── Relé compacto: código puro en zx-p2p, servicio sin adoptar el candidato ───────────────────
 #
-# C-NET-06  validar la cabecera antes de emitir un anuncio compacto. NO está implementada: la
-#           cita es la cabecera del módulo. Depende de la verificación conjunta PoAS/KZG/PoT y de
-#           la pregunta abierta de TAREAS §2.7. Es la más débil de la lista.
+# C-NET-06  reescrita en el SPEC el 2026-09-17 con el orden completo de Q4 (cabecera, espacio, 2
+#           KZG, sello, PoT desde caché y compromiso del cuerpo antes de reenviar; firmas, Halo2 y
+#           UTXO después). NO está implementada: la cita es la cabecera del módulo. Sigue abierta
+#           la pregunta de si se relaja, que decide el v2a. Es la más débil de la lista.
+# C-NET-07  ⚠️ MAL ARCHIVADA HASTA EL 2026-09-17, y por eso se anota aquí el motivo. Estaba
+#           citada y en ninguna lista, así que para el guardián era "ruta activa" — su límite
+#           declarado. Su código vive en crates/zx-p2p/src/id_corto.rs, el mismo módulo del relé
+#           que nadie ejecuta, junto a C-NET-08, C-NET-09 y R-NET-02, que sí estaban declaradas.
+#           Y hay un segundo desfase: la regla pasó a derivar sobre wtxid = txid ‖ auth_digest
+#           (decisión de Katana del 2026-09-16) y el código sigue derivando sobre txid. No es solo
+#           código sin cablear: es código de la versión anterior de la regla. Migrar ambas cosas
+#           es parte de cablear el relé.
 # C-NET-08  las colisiones se recuperan y no puntúan. Implementada en reconstruir(): una
 #           coincidencia rellena, varias marcan ambiguo, y el fallback no puntúa al peer.
 # C-NET-09  el receptor verifica la raíz de Merkle reconstruida. Implementada en
@@ -87,6 +109,7 @@ C-ORD-03
 # R-NET-02  sal por bloque para los ID cortos. La derivación SHA3-256(cabecera ‖ nonce) está en
 #           id_corto.rs y acepta cabecera DAG de longitud variable; falta que el anuncio viaje.
 C-NET-06
+C-NET-07
 C-NET-08
 C-NET-09
 R-NET-01
