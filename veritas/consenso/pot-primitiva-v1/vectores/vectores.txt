@@ -1,0 +1,15 @@
+# Vectores P-POT — generados el 2026-09-19, N=16, blake3 (D-1 opcion A).
+# Regeneracion: ver LEEME.md de esta carpeta. Salida determinista.
+V1 semilla(f,0) = 10c9a9b2be91883dbbd81307655243d9
+V1 salida(f,0) = 81c5ab0e4ce122413b30e6ff45ca1673
+V1 salida(f,1) = 0eeb4bbd31aeb1e131bec475649b7063
+V1 salida(f,2) = 1b478f8dc23646fc6e7667ade3c09906
+V1 salida(f,3) = 01b5433c12027fdb51e8a0aceb53301c
+V2 entropia        = ef5acf99d01ad529a9a25e1558a28216aefcbc72d59d4acd27258b2088aa921a
+V2 salida(f,s-1)   = 81c5ab0e4ce122413b30e6ff45ca1673
+V2 semilla(f,s)    = 0c00b302341a3e3c3ba0fb1232e19ea0
+V2 salida(f,s)     = ef47c860bcdcd1a3754905ba9a19e7ce
+V3 aleatoriedad    = dbc39011a97deaa84376770553cfee918b16525e7797374dd394e50c8775f370
+V4 reto(f,42)      = 722ce84f18b69115eff93d38f42257e4649b7609f4312d25fcb268d47154c7f0
+V5 N=7 -> Iterations 7 are not multiple of number of checkpoints 8 times two
+V5 N=15 -> Iterations 15 are not multiple of number of checkpoints 8 times two

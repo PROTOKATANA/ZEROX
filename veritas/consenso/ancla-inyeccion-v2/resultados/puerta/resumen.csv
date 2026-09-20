@@ -1,0 +1,24 @@
+# 4.0 PUERTA — fecha 2026-09-18T22:34:01.458
+seccion,valor,unidad,etiqueta
+S_max_racional(1.0TiB),24,flujos,derivado
+S_max_racional(4.0TiB),24,flujos,derivado
+S_max_racional(10.0TiB),9,flujos,derivado
+S_max_racional(20.0TiB),4,flujos,derivado
+S_max_racional(50.0TiB),1,flujos,derivado
+S_max_racional(100.0TiB),0,flujos,derivado
+absorcion_sin_retarget(c=0.0),100.0,s,derivado
+absorcion_sin_retarget(c=0.1),111.11111111111111,s,derivado
+absorcion_sin_retarget(c=0.2),125.0,s,derivado
+absorcion_sin_retarget(c=0.3),142.85714285714286,s,derivado
+absorcion_sin_retarget(c=0.4),166.66666666666669,s,derivado
+absorcion_sin_retarget(c=0.5),200.0,s,derivado
+absorcion_sin_retarget(c=0.6),250.0,s,derivado
+absorcion_sin_retarget(c=0.7),333.33333333333326,s,derivado
+absorcion_sin_retarget(c=0.8),500.0000000000001,s,derivado
+absorcion_sin_retarget(c=0.9),1000.0000000000002,s,derivado
+absorcion_sin_retarget(c=1.0),Inf,s,derivado
+P(D(203.6)!=0),0.9802239449386946,prob,exacto
+P(cambio_lider_en_203.6),1.0,prob,exacto-dp
+P(D(600)!=0),0.9884823281556756,prob,exacto
+P(cambio_lider_en_600),1.0,prob,exacto-dp
+contraste_historico_redondeado,203.6s_epoca_205.7s_P0.82,texto,histórico-r3

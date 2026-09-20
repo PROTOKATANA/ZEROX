@@ -1,0 +1,10 @@
+[package]
+name = "ppot-vectores"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+pot-estable = { path = "../../../../prototipos/pot-estable" }
+blake3 = { version = "1.5", default-features = false }

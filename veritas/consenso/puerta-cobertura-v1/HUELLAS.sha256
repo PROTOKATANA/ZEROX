@@ -1,0 +1,82 @@
+# HUELLAS — puerta-cobertura-v1
+#
+# Regeneradas el 2026-09-20 por P-CIERRE al migrar, con RUTAS DESDE LA RAIZ DEL
+# REPOSITORIO y desde la ubicacion nueva. Se comprueban con:
+#     cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c veritas/consenso/puerta-cobertura-v1/HUELLAS.sha256
+#
+# Tres cambios de forma respecto a la original (60 lineas), los tres deliberados:
+#  · este archivo ya no se autoincluye;
+#  · las rutas propias cuelgan de veritas/ en vez de P-PUERTA/;
+#  · las lineas de ENTRADA se CONSERVAN VERBATIM con su hash de origen: son el registro
+#    de que documento firmo el instrumento el 2026-09-19, no una comprobacion de vigencia.
+#
+# ATENCION: la linea de SPEC.md de abajo FALLARA en cuanto P-CIERRE edite el SPEC, y eso
+# es correcto. El encargo lo prevé: 'se documenta, no se arregla'. Lo mismo vale para
+# cualquier fichero de research/ o PDF/ que cambie despues.
+
+# ── Entrada firmada el 2026-09-19 (conservada verbatim, NO recalculada) ──────────────
+1733e17d4d8acaf81d0516bd616a6e84ccd6fcba51a3c0f6b35285f4d5a13f30  P-PUERTA/PROMPT.md
+3c7b5e3420a7d07c9655fe5896b4f1b5b53cc74657d9c614ed8f39afc9102a94  P-PUERTA/ENTRADA.sha256
+0343b83290489fde1b3ba961eb8fdd1f7ccb1bdf1ea1ee7062db993fc48936e1  veritas/LINEO.md
+673d867970006036051c3eb9de0dbd6c07a8004bdc8419dd49ffd1ba78c6bc58  SPEC.md
+dcb1529f696189dc4dbe78ef6d4be8dff407681dbb1d16eb7133b9c0659fe90d  P-2.1/ENCARGO.md
+daa9cad056556142f7006f2053f00c894a6318bebaa1f59f5879cbc7e8445a17  P-2.1/ADENDA-2.md
+1fec301cfa2fcdf0876fae39bc83a5cb2cc186b821330a62bec828a9a982d5c8  research/README.md
+270e2dc24f74a2fc0c446c3dc94fed487b258322430397a16fc950a54acb7693  research/fork-choice-poas.md
+c0266a8961c5076b62020dca3677c2388029b42b2e38651dcf65a98a30a31341  research/dag-poas-candidatos-auditoria.md
+e192418247d1598b0080fd23e3861532f7ac005f90f961582989d4b95fbd1954  research/dag-poas-recursion-flujos.md
+1fec313768082f28c648aa14ff43370251ec1d10058e70f5b2b63c516d8f749a  research/dag-poas-ancla-de-finalidad-metaauditoria.md
+55e5c8158c9e495c9ba47f97bb834dd23d0b3fff44e46def98ea3d7f952b1a6a  research/dag-poas-ancla-de-orden.md
+058781f1314c791a1d16b4b57a6f1ab7c789066c214e3879aae77faf4cd071b1  research/dag-nativo-poas-propuesta.md
+e4b7cbf7b83fc6338b35687606a6b565872d40981552d12c30d58389fe468cb9  research/coste-ploteo-medido.md
+399c6973fd3b0ea88026132ede2bad7723a1547ac68048c70f7b165e25a07f08  research/dag-poas-auditoria.md
+66c814ca17ddda25e72659a82a8a658d6571124fa245936036a3a3e3f5505b48  research/dag-poas-relojes-efimeros.md
+c4ba3e32eeb550f38ba6335c36e5939162f859f95b1cef9100f74bf5f1f3c112  research/dag-poas-relojes-auditoria.md
+c5a8fc476988bf7c9b5827e292b4e96459943bba54d4b25f616c33e92aac788e  research/dag-poas-balizas-auditoria.md
+a2a682d20b793136b9dd12919527c06af657415e3e2de965baf1afcccda6d00e  PDF/autonomys-subspace/crates/subspace-verification/src/lib.rs
+77e655fb07883f22e380e4788bfe1e641f9a608406443abdef4cba0379d26f6e  PDF/autonomys-subspace/crates/subspace-core-primitives/src/solutions.rs
+7bc7f670748bacb6489c2f66bfc39be67df6189ee9a82bbeaa18d42792c16a94  PDF/autonomys-subspace/crates/subspace-core-primitives/src/pieces.rs
+1d19766cc947b57ff2dcc177d7ddc39b243604787428d660cc53bd459684f02e  PDF/autonomys-subspace/crates/subspace-core-primitives/src/sectors.rs
+
+# ── Ficheros propios, recalculados en la ubicacion nueva ─────────────────────────────
+4dfc8924baca18d8a80ba44675fe3a5c5079ca1edbd29d95e72f77021c05e207  veritas/consenso/puerta-cobertura-v1/CONTRATO.md
+cb07795d5ff9ea3a140c068e65b5b6e0b5fe5914cb913c3f48202329ad84f8c8  veritas/consenso/puerta-cobertura-v1/ENTRADA/ENTRADA.sha256
+1733e17d4d8acaf81d0516bd616a6e84ccd6fcba51a3c0f6b35285f4d5a13f30  veritas/consenso/puerta-cobertura-v1/ENTRADA/PROMPT.md
+0f403bb1e4ac54c16b71489bcf7979633c26ed47218ae2c9439397bbc20420c4  veritas/consenso/puerta-cobertura-v1/HIPOTESIS-QUE-CODIFICAN-LA-CONCLUSION.md
+dd05d3bac0a3297d7143167234e0c6733198014e6e4e621f6c7b225f2a70e003  veritas/consenso/puerta-cobertura-v1/INFORME.md
+0942cd0d5a3ac35da23037f74616844c95eeb34169e516d2362c8fbba973d411  veritas/consenso/puerta-cobertura-v1/METODO.md
+043c7ffd888d19c6e3bf53f7af6dd3c3c658c4f2b887b8b8b1a467ea0c88d465  veritas/consenso/puerta-cobertura-v1/MODELO.md
+f1295dc9aa74ba891c832cc45378ae424fd6c366858cd126954c53cc2827864a  veritas/consenso/puerta-cobertura-v1/Manifest.toml
+8912a934f5476750b57b18d8ff4a29c321425acdce0316d7e1e219d817de3105  veritas/consenso/puerta-cobertura-v1/PROCEDENCIA.md
+8a3e9d4749fe786c43ee7257140f98162f51304c670f4708f611adeddff66aeb  veritas/consenso/puerta-cobertura-v1/PROGRESO.md
+7c052fb7112111f5788d4b90a34e02256ef2349ea9e31ae081a50b48abb0183f  veritas/consenso/puerta-cobertura-v1/PROPUESTA.md
+82e934bcccb2d5920f28edc243316473707effda974d5a2090fed349621a83b5  veritas/consenso/puerta-cobertura-v1/Project.toml
+6debaf6323880ee5cd624a32650750faaea8dac0f0dc71c7af8c90cb9b73f6a5  veritas/consenso/puerta-cobertura-v1/bench/benchmarks.jl
+4e9d7d5380b6e7b5698077f00810a4c6e77828441739b3e9647f720a4692ebb2  veritas/consenso/puerta-cobertura-v1/julia-version.toml
+31da8b9b1ebb2308b570e400411dccc5cc8d8a1e070ed3e09162a0dfba51380b  veritas/consenso/puerta-cobertura-v1/resultados/absorcion.csv
+cbfa39be72dda49a8b3728d0bba56a6d96dab7dfbbe559f8e646d5a7a461864a  veritas/consenso/puerta-cobertura-v1/resultados/arcoseno-contraste.csv
+d12dacef34cf7a00750c583a8f30959fb9d8e686c65ff5acf5e3e6e3cd4402be  veritas/consenso/puerta-cobertura-v1/resultados/arcoseno-exacto.csv
+c89b1c05713c415685c9741965a289e61ae0ec9f4d9001781dae5802d7983f99  veritas/consenso/puerta-cobertura-v1/resultados/arcoseno-mc.csv
+c4bd246aeb78a3f989a417a1f6f0cc2392dcbe1b42e74245575732d8148fa1f3  veritas/consenso/puerta-cobertura-v1/resultados/bench.txt
+a15206a39de1722669b7550def64b05cd53c33896b013577060318cad11f4ae4  veritas/consenso/puerta-cobertura-v1/resultados/certificado.csv
+1c9f741e6198247870044d64c0d2e568a2f372cad5d0866e6ee557307fadebf5  veritas/consenso/puerta-cobertura-v1/resultados/cobertura.csv
+c5000ed123d1a10851e1692e1178935243e67d8fee26ce88a81af7d35c066749  veritas/consenso/puerta-cobertura-v1/resultados/congelamiento-realimentado.csv
+97ae084005a28452d6ebfb1345fb355cfb7851b1598517687dce4020bd420bf9  veritas/consenso/puerta-cobertura-v1/resultados/congelamiento.csv
+c3bb08597ca3277c80da6d65c625849ba0fbf5225e891f540c7fe37e1d074257  veritas/consenso/puerta-cobertura-v1/resultados/curva-L.csv
+6deebda558705beab9d88e76421d43a2a6e55dca200d5623cce35a3886e81ceb  veritas/consenso/puerta-cobertura-v1/resultados/dinamica.csv
+55c1342705dc941e8b26f280413784e87e6299df6a4619cce4794ab33ef1c6a8  veritas/consenso/puerta-cobertura-v1/resultados/peso-beta.csv
+4357bb2c51ef6f11a5bbe6beccec9cfbb244aafde9c6d48795519aebbe9e9bae  veritas/consenso/puerta-cobertura-v1/resultados/peso-sesgo.csv
+a2dc032f63ddcf1b6341a970f5db2a3c19c961a3742af6f84bd942c310a76b5f  veritas/consenso/puerta-cobertura-v1/resultados/peso.csv
+1760741689b55f7eab1d1b4fdd318716bd078ad63d738c445d0d3ae0130b4067  veritas/consenso/puerta-cobertura-v1/resultados/realimentacion.csv
+e0197e2fa5809f5df7557c2af2e20e091f614698c6971f355cae45129db74f34  veritas/consenso/puerta-cobertura-v1/resultados/smax.csv
+3332457241f923682e9a4810bd2bd241a8626151e02249c0a62ab618b390a4ac  veritas/consenso/puerta-cobertura-v1/run.jl
+a33a2377e9e61eec840ea3b746a85dc9a56a751b4110551cf1a32315f55eb356  veritas/consenso/puerta-cobertura-v1/src/PuertaCobertura.jl
+003506e2799b2aaf0ad372f61b4044c190c8d2a9ec417cb314accbf32e28e3a2  veritas/consenso/puerta-cobertura-v1/src/certificado.jl
+c680ddfd60de21ce271d92a55dcc97fcc04d76910f566c7518b6258ea57c5fe1  veritas/consenso/puerta-cobertura-v1/src/cobertura.jl
+d3ebd9b1fe42188dad172e5e6e03dcad80f74f445b3907dcc79069b87d736d85  veritas/consenso/puerta-cobertura-v1/src/peso.jl
+76b9520bfca5b0f058a83d481787cf10f3910780f93fbb95442259f9c8120375  veritas/consenso/puerta-cobertura-v1/src/proceso.jl
+8b5958aaec35aedd0d3b0f5b56e6a69e329ebbfa0c6b0320ab781d84d5e26e3e  veritas/consenso/puerta-cobertura-v1/src/rapido.jl
+8d1035d0c6c192063b5035099b15a96a59693d1e2d75fc466f4d67a3fe941b54  veritas/consenso/puerta-cobertura-v1/src/referencia.jl
+166643cea716cf2412831648102e8e44a1b6814c8bc578366c2f5aa95720500a  veritas/consenso/puerta-cobertura-v1/src/simulacion.jl
+c0043f3e5354f516a49d0dac2b1b44fea76b43a9e56a52c4300321974a8ba1d7  veritas/consenso/puerta-cobertura-v1/src/validacion.jl
+ab6bc55af1932a2d6bbd93503b1bd5185007c709ee7de96e675e35783d827d00  veritas/consenso/puerta-cobertura-v1/test/runtests.jl
