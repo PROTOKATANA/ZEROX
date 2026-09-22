@@ -1,0 +1,35 @@
+== ENTORNO PPP-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:26:27.721
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 default / 1 interactive
+comando: --sranclaje --out run-sranclaje.txt
+semilla: 23130
+pkg: Status `~/zeo/ZEROX/veritas/consenso/poda-post-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== Puntos 1-2 del §3: SR variable. Umbral de referencia SR0/2^L vs SR del bloque ==
+SR0 = 35184372088832   L = 4   C = 1   factor = F(SR0÷2^L)/F(SRb÷2)
+rho=SRb/SR0                  SRb    P(L|válida)    P/hipótesis
+      0.25        8796093022208      5.000e-01       4.000000
+      0.50       17592186044416      2.500e-01       2.000000
+      1.00       35184372088832      1.250e-01       1.000000
+      2.00       70368744177664      6.250e-02       0.500000
+      4.00      140737488355328      3.125e-02       0.250000
+     16.00      562949953421312      7.813e-03       0.062500
+
+Lectura: con umbral de referencia fijo, la tasa de nivel escala ≈ SR0/SRb.
+Con umbral = SR del bloque, la razón es escala-invariante (--niveles), pero el
+SR es endógeno (R-FIN-13′) y una rama privada controla su propio SR. Ninguna
+de las dos anclas es a la vez estable y no manipulable: el ancla estable
+(referencia) es manipulable por la razón, y el ancla no manipulada (SR del
+bloque) hereda el SR que la propia rama eligió.

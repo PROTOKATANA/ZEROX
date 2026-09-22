@@ -1,0 +1,57 @@
+== ENTORNO CRP-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-18T00:30:42.664
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 8 / 1
+comando: --corto --out run-corto.txt
+semilla: 201686535
+pkg: Status `~/zeo/ZEROX/deepseek/veritas/seguridad/coste-rama-privada-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== §3.3 · Régimen CORTO: alcanzar desde una ventaja inicial d ==
+Probabilidad de que el adversario alcance (lleve el déficit a ≤0):
+  exacta ±1: (α/(1−α))^d ; difusión: exp(−2(1−2α)d·g); DP Poisson-step.
+    d      α       exacta±1  difusion(g=1)     DP Poisson
+    6   0.20   2.441406e-04   7.465858e-04   1.853695e-04
+    6   0.30   6.196398e-03   8.229747e-03   5.156893e-03
+    6   0.40   8.779150e-02   9.071795e-02   8.008882e-02
+   12   0.20   5.960464e-08   5.573904e-07   4.525625e-08
+   12   0.30   3.839535e-05   6.772874e-05   3.195417e-05
+   12   0.40   7.707347e-03   8.229747e-03   7.031118e-03
+
+Granularidad g (bloques por unidad de trabajo): DP Poisson, α=0.4, d=6.
+  g=   1  p=8.009e-02
+  g=   4  p=6.553e-02
+  g=  16  p=4.214e-02
+  g=  64  p=1.259e-02
+  g= 256  p=3.193e-26
+  g mayor = más bloques más pequeños = menos varianza = menos cola para el
+  adversario, con la MISMA media. Ésa es la contribución del DAG (Kaspa/ZEROX)
+  frente a la cadena lineal; no mueve el umbral α*=0.5, mueve la varianza.
+
+α_mínimo(d, ε=0.10) para pasos ±1: invertir (α/(1−α))^d = ε.
+  d=  3  α_min=0.3170
+  d=  6  α_min=0.4052
+  d= 12  α_min=0.4522
+  d= 24  α_min=0.4760
+  d= 50  α_min=0.4885
+  → α_min → 0.5 por arriba al crecer d; para d→∞ es 0.5 exacto.
+
+VARIANZA ELEGIDA POR EL ADVERSARIO (PoST): fijar sr=sr0/K da el mismo trabajo
+medio αT con más varianza. ¿Baja α_min a horizonte finito? MC (α=0.45):
+     K     P(adv>hon) E[trabajo_adv]            α·T
+     1         0.0220         179.92         180.00
+     4         0.0968         179.68         180.00
+    16         0.2435         180.94         180.00
+    64         0.3078         177.97         180.00
+  Mismo medio; P(superar) sube con K: el adversario puede comprar cola con
+  varianza. Lo acota R-FIN-13′ (propiedad MUST en PROPUESTA.md), no el umbral.

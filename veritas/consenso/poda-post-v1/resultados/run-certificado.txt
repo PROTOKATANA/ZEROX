@@ -1,0 +1,40 @@
+== ENTORNO PPP-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:26:17.350
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 default / 1 interactive
+comando: --certificado --out run-certificado.txt
+semilla: 23130
+pkg: Status `~/zeo/ZEROX/veritas/consenso/poda-post-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== Punto 5 del §3: rama privada con certificado de niveles ==
+El adversario paga el espacio-tiempo (igual que un honesto); la pregunta no es
+si el gasto es real, sino si el certificado lo liga a UNA historia.
+
+Coste esperado de un bloque de nivel L (SR=1099511627776, C=1):
+P(L|válida) = 7.813e-03
+    L       sorteos/bloque sorteos para 100 bloques
+    2            3.355e+07            3.355e+09
+    4            1.342e+08            1.342e+10
+    6            5.369e+08            5.369e+10
+    8            2.147e+09            2.147e+11
+   10            8.590e+09            8.590e+11
+   12            3.436e+10            3.436e+12
+
+certificado de 64 bloques, Lreq=8, ventana=2: aceptado por el verificador de niveles = true
+
+El certificado se construye desde SOLO (slot, solución). Se puede pegar a
+cualquier ancestría con slot(padre) ≤ slot. El verificador lo acepta porque no
+hay nada más que mirar: no ve la ancestría y no puede distinguir la rama privada
+de la canónica. Con `--bluework` se comprueba que esa rama puede tener distinto
+blue_work, que es lo que el SPEC usa para decidir la cadena (§11).

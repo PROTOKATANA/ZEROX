@@ -1,0 +1,156 @@
+# IB-v0.1 · identidad-billete-v1 · comando=todo
+# VERSION=1.13.0  hilos=4/0
+# CPU=znver5  hilos_lógicos=32
+# semilla=23130  réplicas=400
+# fecha=2026-09-21T22:29:10.150
+
+# 1 · Fixtures canónicos
+
+| fixture | bloques | modo | válidos | U2 | herencia | azul | rojo_k | rojo_U3 | pagables | inertes | identidades | entropía violada | peso |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| desempate-color-p1 | 3 | MODO_A | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| desempate-color-p1 | 3 | MODO_B | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| desempate-color-p1 | 3 | MODO_C | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| dos-piezas-mismo-slot | 3 | MODO_A | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 0 | 3 | 0 | 2^129.6 |
+| dos-piezas-mismo-slot | 3 | MODO_B | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 0 | 3 | 0 | 2^129.6 |
+| dos-piezas-mismo-slot | 3 | MODO_C | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 0 | 3 | 0 | 2^129.6 |
+| flujo-divergente-misma-pieza | 3 | MODO_A | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 0 | 3 | 0 | 2^129.6 |
+| flujo-divergente-misma-pieza | 3 | MODO_B | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 1 | 2^129.0 |
+| flujo-divergente-misma-pieza | 3 | MODO_C | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 1 | 2^129.0 |
+| flujo-divergente-piezas-distintas | 3 | MODO_A | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 0 | 3 | 0 | 2^129.6 |
+| flujo-divergente-piezas-distintas | 3 | MODO_B | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 0 | 3 | 0 | 2^129.6 |
+| flujo-divergente-piezas-distintas | 3 | MODO_C | 4 | 0 | 0 | 4 | 0 | 0 | 4 | 0 | 3 | 0 | 2^129.6 |
+| misma-pieza-slots-distintos | 2 | MODO_A | 3 | 0 | 0 | 3 | 0 | 0 | 3 | 0 | 2 | 0 | 2^129.0 |
+| misma-pieza-slots-distintos | 2 | MODO_B | 3 | 0 | 0 | 3 | 0 | 0 | 3 | 0 | 2 | 0 | 2^129.0 |
+| misma-pieza-slots-distintos | 2 | MODO_C | 3 | 0 | 0 | 3 | 0 | 0 | 3 | 0 | 2 | 0 | 2^129.0 |
+| mismo-flujo-descendiente-u2 | 3 | MODO_A | 2 | 1 | 1 | 2 | 0 | 0 | 2 | 0 | 1 | 0 | 2^128.0 |
+| mismo-flujo-descendiente-u2 | 3 | MODO_B | 2 | 1 | 1 | 2 | 0 | 0 | 2 | 0 | 1 | 0 | 2^128.0 |
+| mismo-flujo-descendiente-u2 | 3 | MODO_C | 2 | 1 | 1 | 2 | 0 | 0 | 2 | 0 | 1 | 0 | 2^128.0 |
+| mismo-flujo-hermanas-u3 | 3 | MODO_A | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| mismo-flujo-hermanas-u3 | 3 | MODO_B | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| mismo-flujo-hermanas-u3 | 3 | MODO_C | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| ramas-disjuntas-mismo-flujo | 3 | MODO_A | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| ramas-disjuntas-mismo-flujo | 3 | MODO_B | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| ramas-disjuntas-mismo-flujo | 3 | MODO_C | 4 | 0 | 0 | 3 | 0 | 1 | 3 | 0 | 2 | 0 | 2^129.0 |
+| reorg-libera-billete | 4 | MODO_A | 5 | 0 | 0 | 3 | 0 | 0 | 3 | 0 | 3 | 0 | 2^129.0 |
+| reorg-libera-billete | 4 | MODO_B | 5 | 0 | 0 | 3 | 0 | 0 | 3 | 0 | 3 | 0 | 2^129.0 |
+| reorg-libera-billete | 4 | MODO_C | 5 | 0 | 0 | 3 | 0 | 0 | 3 | 0 | 3 | 0 | 2^129.0 |
+
+# 2 · Controles
+
+## C1 · ¿A refina a B? (subuniverso exhaustivo, escalares grandes)
+- pares evaluados sobre 256 soluciones (O(n²))
+- violaciones A-igual ⇒ B-distinto: **0**
+
+## C2 · ¿A y B se cruzan? (dominio de chunk reducido a 4 bits)
+- soluciones: 16
+- pares A-igual y B-distinto (cruce hacia B): 3
+- pares B-igual y A-distinto (cruce hacia A): 6
+  - ejemplo: chunk=5 pieza 0/3 flujo 0/1 slot 0/0
+  - ejemplo: pieza=0 chunk 2/8 flujo 0/1 slot 1/1
+
+## C3/C4 · oráculo↔kernel y capa pagable por conjuntos
+- 27 casos (fixture × modo); discrepancias: **0**
+
+## C4 · exhaustivo estructural sobre dos copias (rejilla declarada)
+- asignaciones enumeradas: 256 (8 piezas × 2 flujos, por copia)
+- misma identidad B (misma oportunidad): 32 (0.1250)
+  - de ellas, mismo `chunk`: 16 · `chunk` distinto: 16
+- misma identidad A (mismo `chunk`): 16 (0.0625)
+  - de ellas, con pieza distinta (cruce A→B): 0
+
+# 3 · Invariante de entropía (C-FLU-12)
+
+| fixture | modo | identidades | copias por identidad | entropías distintas | viola C-FLU-12 |
+|---|---|---:|---|---:|---|
+| desempate-color-p1 | MODO_A | 2 | 1,2 | 1,1 | no |
+| desempate-color-p1 | MODO_B | 2 | 2,1 | 1,1 | no |
+| desempate-color-p1 | MODO_C | 2 | 2,1 | 1,1 | no |
+| dos-piezas-mismo-slot | MODO_A | 3 | 1,1,1 | 1,1,1 | no |
+| dos-piezas-mismo-slot | MODO_B | 3 | 1,1,1 | 1,1,1 | no |
+| dos-piezas-mismo-slot | MODO_C | 3 | 1,1,1 | 1,1,1 | no |
+| flujo-divergente-misma-pieza | MODO_A | 3 | 1,1,1 | 1,1,1 | no |
+| flujo-divergente-misma-pieza | MODO_B | 2 | 2,1 | 2,1 | **SÍ** |
+| flujo-divergente-misma-pieza | MODO_C | 2 | 2,1 | 2,1 | **SÍ** |
+| flujo-divergente-piezas-distintas | MODO_A | 3 | 1,1,1 | 1,1,1 | no |
+| flujo-divergente-piezas-distintas | MODO_B | 3 | 1,1,1 | 1,1,1 | no |
+| flujo-divergente-piezas-distintas | MODO_C | 3 | 1,1,1 | 1,1,1 | no |
+| misma-pieza-slots-distintos | MODO_A | 2 | 1,1 | 1,1 | no |
+| misma-pieza-slots-distintos | MODO_B | 2 | 1,1 | 1,1 | no |
+| misma-pieza-slots-distintos | MODO_C | 2 | 1,1 | 1,1 | no |
+| mismo-flujo-descendiente-u2 | MODO_A | 1 | 2 | 1 | no |
+| mismo-flujo-descendiente-u2 | MODO_B | 1 | 2 | 1 | no |
+| mismo-flujo-descendiente-u2 | MODO_C | 1 | 2 | 1 | no |
+| mismo-flujo-hermanas-u3 | MODO_A | 2 | 1,2 | 1,1 | no |
+| mismo-flujo-hermanas-u3 | MODO_B | 2 | 2,1 | 1,1 | no |
+| mismo-flujo-hermanas-u3 | MODO_C | 2 | 2,1 | 1,1 | no |
+| ramas-disjuntas-mismo-flujo | MODO_A | 2 | 1,2 | 1,1 | no |
+| ramas-disjuntas-mismo-flujo | MODO_B | 2 | 2,1 | 1,1 | no |
+| ramas-disjuntas-mismo-flujo | MODO_C | 2 | 2,1 | 1,1 | no |
+| reorg-libera-billete | MODO_A | 3 | 1,1,2 | 1,1,1 | no |
+| reorg-libera-billete | MODO_B | 3 | 2,1,1 | 1,1,1 | no |
+| reorg-libera-billete | MODO_C | 3 | 2,1,1 | 1,1,1 | no |
+
+# 4 · Monte Carlo
+
+## MC-A · multiplicidad de ganadores por (sector, slot, flujo)
+| P | q | μ=P·q | media medida | P(W≥2) medida | IC95 | P(W≥2) Binomial |
+|---:|---:|---:|---:|---:|---|---:|
+| 8 | 0.125 | 1.0 | 0.9300 | 0.2425 | [0.2031, 0.2868] | 0.2637 |
+| 16 | 0.0625 | 1.0 | 0.9750 | 0.2550 | [0.2148, 0.2999] | 0.2641 |
+| 32 | 0.03125 | 1.0 | 0.9425 | 0.2275 | [0.1891, 0.2711] | 0.2642 |
+| 8 | 0.25 | 2.0 | 1.9750 | 0.6100 | [0.5614, 0.6565] | 0.6329 |
+
+## MC-B · misma pieza ganadora en dos flujos del mismo slot (lo que B captura y A no)
+La cota inferior supone flujos independientes; la coincidencia de bucket (1/16) correlaciona los ganadores y sube la medida.
+| P | q | μ | casos con ganador en ambos | P(intersección) | IC95 | cota inferior | P(forzado: única ganadora y la misma) | IC95 |
+|---:|---:|---:|---:|---:|---|---:|---:|---|
+| 1 | 0.5 | 0.5 | 104 | 1.0000 | [0.9644, 1.0000] | 0.2500 | 1.0000 | [0.9644, 1.0000] |
+| 4 | 0.25 | 1.0 | 198 | 0.4899 | [0.4211, 0.5591] | 0.2275 | 0.1010 | [0.0663, 0.1509] |
+| 16 | 0.0625 | 1.0 | 158 | 0.1709 | [0.1202, 0.2372] | 0.0607 | 0.0127 | [0.0035, 0.0450] |
+| 32 | 0.03125 | 1.0 | 154 | 0.0714 | [0.0403, 0.1234] | 0.0308 | 0.0000 | [0.0000, 0.0243] |
+| 1000 | 0.001 | 1.0 | 175 | 0.0057 | [0.0010, 0.0317] | 0.0010 | 0.0057 | [0.0010, 0.0317] |
+
+## MC-C · DAG honesto, un solo flujo por productor, un bloque por slot
+- λ=1.0 Δ=1 k=30 · MODO_A: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=1 k=30 · MODO_B: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=1 k=30 · MODO_C: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=4 k=30 · MODO_A: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=4 k=30 · MODO_B: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=4 k=30 · MODO_C: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=2.0 Δ=4 k=30 · MODO_A: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=2.0 Δ=4 k=30 · MODO_B: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=2.0 Δ=4 k=30 · MODO_C: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=4 k=10 · MODO_A: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=4 k=10 · MODO_B: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+- λ=1.0 Δ=4 k=10 · MODO_C: válidos=48400 U2=0 herencia=0 rojo_U3=0 pagables=48400 identidades=48000
+
+## MC-D · productor con dos nodos de vistas divergentes (equivocación honesta)
+- P=16 λ=1.0 Δ=1 k=30 equivoca=0.05 · MODO_A: válidos=48413 U2=0 herencia=0 rojo_U3=0 pagables=48413
+- P=16 λ=1.0 Δ=1 k=30 equivoca=0.05 · MODO_B: válidos=43680 U2=73 herencia=4660 rojo_U3=0 pagables=43680
+- P=16 λ=1.0 Δ=1 k=30 equivoca=0.05 · MODO_C: válidos=43680 U2=73 herencia=4660 rojo_U3=0 pagables=43680
+- P=16 λ=1.0 Δ=1 k=30 equivoca=0.25 · MODO_A: válidos=48302 U2=4 herencia=151 rojo_U3=0 pagables=48302
+- P=16 λ=1.0 Δ=1 k=30 equivoca=0.25 · MODO_B: válidos=31983 U2=239 herencia=16235 rojo_U3=0 pagables=31983
+- P=16 λ=1.0 Δ=1 k=30 equivoca=0.25 · MODO_C: válidos=31983 U2=239 herencia=16235 rojo_U3=0 pagables=31983
+- P=16 λ=1.0 Δ=1 k=30 equivoca=1.0 · MODO_A: válidos=48369 U2=18 herencia=174 rojo_U3=0 pagables=48369
+- P=16 λ=1.0 Δ=1 k=30 equivoca=1.0 · MODO_B: válidos=17183 U2=363 herencia=31015 rojo_U3=0 pagables=17183
+- P=16 λ=1.0 Δ=1 k=30 equivoca=1.0 · MODO_C: válidos=17183 U2=363 herencia=31015 rojo_U3=0 pagables=17183
+- P=16 λ=1.0 Δ=4 k=30 equivoca=0.05 · MODO_A: válidos=48413 U2=0 herencia=0 rojo_U3=0 pagables=48413
+- P=16 λ=1.0 Δ=4 k=30 equivoca=0.05 · MODO_B: válidos=43680 U2=73 herencia=4660 rojo_U3=0 pagables=43680
+- P=16 λ=1.0 Δ=4 k=30 equivoca=0.05 · MODO_C: válidos=43680 U2=73 herencia=4660 rojo_U3=0 pagables=43680
+- P=16 λ=1.0 Δ=4 k=30 equivoca=0.25 · MODO_A: válidos=48302 U2=4 herencia=151 rojo_U3=0 pagables=48302
+- P=16 λ=1.0 Δ=4 k=30 equivoca=0.25 · MODO_B: válidos=31983 U2=239 herencia=16235 rojo_U3=0 pagables=31983
+- P=16 λ=1.0 Δ=4 k=30 equivoca=0.25 · MODO_C: válidos=31983 U2=239 herencia=16235 rojo_U3=0 pagables=31983
+- P=16 λ=1.0 Δ=4 k=30 equivoca=1.0 · MODO_A: válidos=48369 U2=18 herencia=174 rojo_U3=0 pagables=48369
+- P=16 λ=1.0 Δ=4 k=30 equivoca=1.0 · MODO_B: válidos=17183 U2=363 herencia=31015 rojo_U3=0 pagables=17183
+- P=16 λ=1.0 Δ=4 k=30 equivoca=1.0 · MODO_C: válidos=17183 U2=363 herencia=31015 rojo_U3=0 pagables=17183
+- P=16 λ=1.0 Δ=4 k=10 equivoca=0.05 · MODO_A: válidos=48413 U2=0 herencia=0 rojo_U3=0 pagables=48413
+- P=16 λ=1.0 Δ=4 k=10 equivoca=0.05 · MODO_B: válidos=43680 U2=73 herencia=4660 rojo_U3=0 pagables=43680
+- P=16 λ=1.0 Δ=4 k=10 equivoca=0.05 · MODO_C: válidos=43680 U2=73 herencia=4660 rojo_U3=0 pagables=43680
+- P=16 λ=1.0 Δ=4 k=10 equivoca=0.25 · MODO_A: válidos=48302 U2=4 herencia=151 rojo_U3=0 pagables=48302
+- P=16 λ=1.0 Δ=4 k=10 equivoca=0.25 · MODO_B: válidos=31983 U2=239 herencia=16235 rojo_U3=0 pagables=31983
+- P=16 λ=1.0 Δ=4 k=10 equivoca=0.25 · MODO_C: válidos=31983 U2=239 herencia=16235 rojo_U3=0 pagables=31983
+- P=16 λ=1.0 Δ=4 k=10 equivoca=1.0 · MODO_A: válidos=48369 U2=18 herencia=174 rojo_U3=0 pagables=48369
+- P=16 λ=1.0 Δ=4 k=10 equivoca=1.0 · MODO_B: válidos=17183 U2=363 herencia=31015 rojo_U3=0 pagables=17183
+- P=16 λ=1.0 Δ=4 k=10 equivoca=1.0 · MODO_C: válidos=17183 U2=363 herencia=31015 rojo_U3=0 pagables=17183
+

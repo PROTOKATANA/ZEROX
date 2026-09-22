@@ -1,0 +1,2 @@
+Test Summary: | Pass  Total  Time
+RNG-v0.1      |   38     38  0.7s

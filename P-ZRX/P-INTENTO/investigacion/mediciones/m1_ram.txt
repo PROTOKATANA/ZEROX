@@ -1,0 +1,1 @@
+RAM	tablas=8	sizeof_Proofs=5251072	delta_kb=85372	byte_por_tabla=10927616

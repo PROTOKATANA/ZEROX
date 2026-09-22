@@ -1,0 +1,43 @@
+### semillas.jl
+== Parte A · autocorrelación lag-1 de la secuencia de uniforms (n=100000 por base) ==
+esquema                      salida      base1 media 3 bases
+StableRNG(base+i)            1         -0.4276    -0.4276
+StableRNG(base+i)            2          0.7066     0.7066
+Philox2x+set_counter!        1          0.0013     0.0004
+Philox2x+set_counter!        2         -0.0017    -0.0034
+(referencia iid: autocorrelación ≈ 0 ± 3/√n ≈ ±0.0095)
+
+== Parte B · recuentos por bloque de 24 réplicas, 120 bloques ==
+celda: S=4, α=0.2, T=200, Δ=2, k=30, modo=:derivada, d=0 bloques (suma aditiva)
+StableRNG(base+r)          p̂=0.5698  media=13.675  Var_obs=5.381  Var_binom=5.883  ratio=0.91
+Philox2x contracorriente   p̂=0.5802  media=13.925  Var_obs=6.994  Var_binom=5.846  ratio=1.20
+celda publicada (base=0x5a5a): exitos=13/24 con semillas consecutivas; 14/24 con contracorriente
+
+real	0m25,106s
+user	0m24,:00s
+sys	0m1,039s
+
+### diagnostico.jl
+== 1 · autocorrelación lag-1 de los uniforms por semilla consecutiva (n=100000) ==
+salida 1: StableRNG(base+i) = -0.4276   Philox (0,id) = +0.0013
+salida 2: StableRNG(base+i) = +0.7066   Philox (0,id) = -0.0017
+referencia iid: ±0.0095
+
+== 2 · control puro Bernoulli(0.5), 200 bloques x 24 réplicas ==
+StableRNG(base+r)  p̂=0.5002 Var_obs= 0.467 Var_binom= 6.000 ratio= 0.08  corr_media=-0.0401 max=+0.920
+Philox (0,id)      p̂=0.4900 Var_obs= 6.344 Var_binom= 5.998 ratio= 1.06  corr_media=+0.0025 max=+0.190
+Philox (id) MAL    p̂=0.4969 Var_obs= 6.271 Var_binom= 6.000 ratio= 1.05  corr_media=+0.0020 max=+0.159
+
+== 3 · estadístico del simulador (S=4, α=0.2, T=200, Δ=2, k=30, suma aditiva d=0) ==
+StableRNG(base+r)  p̂=0.5698 Var_obs= 5.105 Var_binom= 5.883 ratio= 0.87  corr_media=-0.0058 max=+0.199
+Philox (0,id)      p̂=0.5735 Var_obs= 6.924 Var_binom= 5.870 ratio= 1.18  corr_media=+0.0077 max=+0.193
+Philox (id) MAL    p̂=0.5625 Var_obs=118.754 Var_binom= 5.906 ratio=20.11  corr_media=+0.8266 max=+0.960
+
+== 4 · solapamiento con una sola palabra de contador ==
+flujo id=1: 0.797361 0.119669 0.066330 0.949363
+flujo id=2: 0.066330 0.949363 0.436354 0.389886
+obsérvese que el flujo id=2 es el id=1 desplazado: NO son réplicas independientes
+
+real	0m57,408s
+user	0m54,768s
+sys	0m3,570s

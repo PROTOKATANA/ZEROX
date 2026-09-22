@@ -1,0 +1,14 @@
+escrito ENTORNO.txt
+escrito EVENTOS.txt
+escrito SWEEP-TOY.txt
+escrito SWEEP-DAG.txt
+escrito VARIOS.txt
+escrito CORRELACION.txt
+escrito U2U3.txt
+escrito ETA.txt
+escrito VEREDICTO.txt
+CRP-v0.3 terminado.
+
+real	0m13,728s
+user	0m15,927s
+sys	0m0,263s

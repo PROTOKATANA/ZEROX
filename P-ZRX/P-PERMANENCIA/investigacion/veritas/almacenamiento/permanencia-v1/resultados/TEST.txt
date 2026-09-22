@@ -1,0 +1,22 @@
+Test Summary:           | Pass  Total  Time
+oráculo exacto Σ λ^j/j! |    6      6  0.0s
+Test Summary:   | Pass  Total  Time
+binomial exacta |    6      6  0.0s
+Test Summary:                           | Pass  Total  Time
+el intervalo contiene al oráculo exacto |    2      2  0.4s
+Test Summary:                                         | Pass  Total  Time
+Poisson frente a la binomial exacta en lotes pequeños |    2      2  0.1s
+Test Summary: | Pass  Total  Time
+bordes        |    5      5  0.1s
+Test Summary:                    | Pass  Total  Time
+umbral y potencia son coherentes |    6      6  0.0s
+Test Summary:                                       | Pass  Total  Time
+periodos_deteccion coincide con la búsqueda directa |    3      3  0.0s
+Test Summary:                 | Pass  Total  Time
+monotonía de la potencia en T |    1      1  0.1s
+Test Summary:                        | Pass  Total  Time
+kernel rápido frente a la referencia |    2      2  0.1s
+Test Summary:                | Pass  Total  Time
+modelo: costes e invariantes |    9      9  0.1s
+Test Summary:                            | Pass  Total  Time
+agregación: muestreo, grinding y ventana |    9      9  0.0s

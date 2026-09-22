@@ -1,0 +1,57 @@
+# HUELLAS — prueba-recursiva-v1
+#
+# Rutas relativas a /home/katana/zeo/ZEROX. Comprobar con:
+#     sha256sum -c veritas/consenso/prueba-recursiva-v1/HUELLAS.sha256
+# desde la RAÍZ del repositorio: la lista incluye fuentes leídas además de los artefactos propios.
+#
+# Regeneradas por Claude el 2026-09-18 al validar y migrar desde deepseek/.
+# ⚠️ Leer PROCEDENCIA.md antes de citar resultados de este instrumento.
+
+# --- instrumento ---
+1a697ad222f9ef622fd9448a331becabdcd5c11483cacf4530bb71d5f08ec433  veritas/consenso/prueba-recursiva-v1/bench/benchmarks.jl
+2852e1fdabf03dcb32f0bc5555be05ee58af10b20d84ba2d6d45d308933744fc  veritas/consenso/prueba-recursiva-v1/bench/escalado.jl
+c8ec56ff13e27483db8acd9bd06ae59f9af46bcf1fd5b77d46a395231e1c3ed6  veritas/consenso/prueba-recursiva-v1/BITACORA.md
+89594d32e5990501eb8b737db714860479a9fcc2a0bfc5310f8d8fc4085cdacd  veritas/consenso/prueba-recursiva-v1/CONTRATO.md
+eb8bb040cfc4849aca62aba8bc2bdab053c58eae7eda9d82bd67aa2f05a76f32  veritas/consenso/prueba-recursiva-v1/INFORME.md
+f9a5aab7b7db04495f32b7da1ac5581089f3706f154cd77347c00a463b6ee923  veritas/consenso/prueba-recursiva-v1/Manifest.toml
+62bbe82e40dfbacf1513e3f600d300cac6e0484b1eeb160075ff974a42949aa0  veritas/consenso/prueba-recursiva-v1/METODO.md
+3d937718b546c6a6673409172b18e8ec94540d5004ea88050a89b44a6764fed9  veritas/consenso/prueba-recursiva-v1/MODELO.md
+afbe77954ac48d83c0924e84f63e2363c1e1744fb587227b1956cc3f247f7e7b  veritas/consenso/prueba-recursiva-v1/PROCEDENCIA.md
+8ceee959d429b2b02418ff1a6a18583e0f1c05f5dbd4c60ce85c8401b54ce0a0  veritas/consenso/prueba-recursiva-v1/Project.toml
+481b47941960460e5dc448cde43bb44ca73199b6053f5b7e5f51af05473543a2  veritas/consenso/prueba-recursiva-v1/PROPUESTA.md
+9817ac1f4d4bd0ee41c72588b8defc5145519e739a81ae21dd3dc1a8473be659  veritas/consenso/prueba-recursiva-v1/resultados/BENCH.txt
+7456075d24a535347883231ba506cb9200606fce87ed1048234c14c9e0cd2d3f  veritas/consenso/prueba-recursiva-v1/resultados/run-barrido.txt
+269481e5e8cc28794b0dd8ffeab429fcb1073db0a25d2d2decac1c867a4185d1  veritas/consenso/prueba-recursiva-v1/resultados/run-coste.txt
+8a634fe0126ff7bb8f96446c58d0f1e1f7edb94807b31af32def104eeee0387e  veritas/consenso/prueba-recursiva-v1/resultados/run-entorno.txt
+05d758494dc9708f04e8bb807372fc109e7aac327e00bfac69f50048dded9e0b  veritas/consenso/prueba-recursiva-v1/resultados/run-fuentes.txt
+523f3222bca7bae57551144cc5747aa5387da5d168f38f5d0f08da818b2a7535  veritas/consenso/prueba-recursiva-v1/resultados/run-lineal.txt
+95a0bac46138d8aeba4e77c596ec45e72e47a1df706ba103af142ecbfcc4d7ba  veritas/consenso/prueba-recursiva-v1/resultados/run-orchard.txt
+35f832f990709634749eebe29fd448dc48a1dcb34d4dc737f41622a767b0e46a  veritas/consenso/prueba-recursiva-v1/resultados/run-resumen.txt
+2c2bcbf516bad62398a0628e98bc6f8bd731255e2fe9937c2b7dadd7276a0bac  veritas/consenso/prueba-recursiva-v1/resultados/run-seleccion.txt
+c16ef810d6b580658419874c9a311446647b34c2f0f7aa4b99c2e0dd4067ce69  veritas/consenso/prueba-recursiva-v1/resultados/TESTS.txt
+2babbfb0c74a0dc4b3d631c20d59eafa804a61fbf16ddd220c2f639f961077e9  veritas/consenso/prueba-recursiva-v1/run.jl
+e7cf120bcbe5fa9aafe2cf0f0ee1f1e33d030cfd99a25d1d7db8edab0b583fa3  veritas/consenso/prueba-recursiva-v1/src/modelo.jl
+ab6c2b22bf59ef427191d9d31df147f89260998f400e4a567b1768ec9c12a8f2  veritas/consenso/prueba-recursiva-v1/src/PruebaRecursiva.jl
+b7ff77b3aa9a5fcb6b2400bda56ebb6c388c644b7675ad6c00378924935c90cc  veritas/consenso/prueba-recursiva-v1/src/rapido.jl
+d5eb2cd0db6fd7f976e1c735a31f38f99a023168e4cab5b8387e490bb3df8d7b  veritas/consenso/prueba-recursiva-v1/src/referencia.jl
+679618c980f5c3ff34e21b2767ca75bd4995565330ffd7e872529e00033aa307  veritas/consenso/prueba-recursiva-v1/src/validacion.jl
+71961bd780a7ea76fe6b741b77798fef5e63408db4bf1d384fe93af82bedb003  veritas/consenso/prueba-recursiva-v1/test/runtests.jl
+
+# --- fuentes leídas (solo lectura) ---
+0343b83290489fde1b3ba961eb8fdd1f7ccb1bdf1ea1ee7062db993fc48936e1  veritas/LINEO.md
+e7a751176b1462382a00e8573375647e693c1cbec725300162180398221f8bd9  SPEC.md
+1e1b99bb942ac59fd718d038ee82f2ac1ad651409dae39cc0c2318d01e116ebc  TAREAS.md
+bd7669941d1e8be8b58ac497265bc9ccc7eaeb6b74f920c039cb622d9a4ad38e  research/orchard-bundle.md
+e347f6119078557bd09b12fa293320adb3d7b7ae49b4cffc55106f50aa580e24  research/orchard-math-verification.md
+399c6973fd3b0ea88026132ede2bad7723a1547ac68048c70f7b165e25a07f08  research/dag-poas-auditoria.md
+757ec7dd5accef23e5b16e105efc9b8ed61fddf42576a6642def97952ff81d29  veritas/consenso/poda-post-v1/DERIVACIONES.md
+d88af489ffec52758cf90f9557c2d609b59e425f437d4a6eb98e0e0dfd0b0cd4  veritas/consenso/poda-post-v1/INFORME.md
+67ff7398d84fc3df8535baae3cf46d7414c1a849f7f91f71118615f4ee20b8b3  veritas/consenso/poda-post-v1/PROPUESTA.md
+aaca1d190a80ad7382b61fe8f97a92dbc0720b8c635cde69d6d976a3ad1f2328  veritas/consenso/poda-post-v1/PROCEDENCIA.md
+9643647e6b1762e28da614a00d686cffe4c08d58ece8dbb5dbc88aea85033f1f  veritas/consenso/ghostdag-rank-v1/src/GhostdagRank.jl
+7769415b749f51133be454f525b12b2eb9f4549081f952e93e17dfa12d3a71b3  veritas/consenso/ghostdag-rank-v1/src/modelo.jl
+51e3961553bca60b0c3d3dda5d1d1e17a82bb4c8945cbfa417c9845117c7080c  veritas/consenso/ghostdag-rank-v1/src/referencia.jl
+dd9f200b419f7601ca49b8ccba1f18d3bb670012b4a4e52bae5e7091550c4579  veritas/consenso/ghostdag-rank-v1/src/rapido.jl
+05dd24d8dd35e349b0f2fb8827b2b564bcce23125c4c888e88901e3e756a879d  veritas/consenso/ghostdag-rank-v1/src/validacion.jl
+61ec61b694b0ffd60b842c2e7efef8f63d2dfa7ae90600c313a929b9733cd176  crates/zx-core/src/preimage/dag.rs
+0e2d1cf6e96c6019a40e0191fab58eaf04da45fa7927396080ea71cd6214724c  crates/zx-node/src/cadena.rs

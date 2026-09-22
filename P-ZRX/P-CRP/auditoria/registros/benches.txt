@@ -1,0 +1,45 @@
+### uptime antes v2-bench
+ 16:44:24  up 13 days 13:13,  0 users,  carga promedio: 3,47, 1,52, 0,63
+Benchmark CRP-v0.2 — kernel y simulación
+| DP d=6 T=2000                  |     6508.127 µs |        109 | referencia DP acotada |
+| exacta Rational d=6 T=200      |    33920.678 µs |     687992 | oráculo exacto |
+| DAG sim 4 nodos 400 slots      |        3.436 ms |      49036 | GDR-v0.2 oráculo |
+
+Escalado de réplicas independientes (barrido MC) 1..8 hilos
+hilos=1 (requiere JULIA_NUM_THREADS=1 en arranque)
+hilos=2 (requiere JULIA_NUM_THREADS=2 en arranque)
+hilos=4 (requiere JULIA_NUM_THREADS=4 en arranque)
+hilos=8 (requiere JULIA_NUM_THREADS=8 en arranque)
+Nota: el barrido de réplicas es determinista por semilla de réplica;
+la reducción es ordenada por ID, de modo que 1..N hilos dan el mismo resultado.
+EXIT=0
+### uptime antes v3-bench
+ 16:44:58  up 13 days 13:14,  0 users,  carga promedio: 2,71, 1,56, 0,67
+Benchmark CRP-v0.3
+| DP d=6 T=2000                |   6803.841 µs |       109 |
+| eventos terminal+paso T=200  |    173.257 µs |        72 |
+| DAG S=4 4 nodos 200 slots    |      1.633 ms |     60588 |
+Nota: el simulador es serial y determinista; no se barajan hilos en caliente.
+EXIT=0
+### uptime antes v2-io
+ 16:45:28  up 13 days 13:14,  0 users,  carga promedio: 2,17, 1,54, 0,70
+I/O solo lectura — destino=/tmp/opencode/crp-v02-io.bin bytes=67108864
+caché = PAGE CACHE CALIENTE (no se ejecutó drop_caches)
+no distingue page cache de almacenamiento; profundidad de cola = 1 (secuencial síncrona)
+p50=0.002 ms  p95=0.003 ms  p99=0.004 ms  max=0.099 ms
+rendimiento medio sostenido = 1923.8 MiB/s (bloque=4096 B)
+S_microbenchmark = NO acreditado como flujo completo (solo componente I/O de lectura).
+S_adversario = PENDIENTE: falta perfil de hardware compatible (CPU, PoAS/KZG, PoT por slot).
+EXIT=0
+### uptime antes v3-io
+ 16:45:29  up 13 days 13:14,  0 users,  carga promedio: 2,17, 1,54, 0,70
+I/O solo lectura — destino=/tmp/opencode/crp-v03-io.bin bytes=67108864
+caché = PAGE CACHE CALIENTE (no se ejecutó drop_caches)
+no distingue page cache de almacenamiento; profundidad de cola = 1 (secuencial síncrona)
+p50=0.002 ms  p95=0.003 ms  p99=0.005 ms  max=0.099 ms
+rendimiento medio sostenido = 1842.8 MiB/s (bloque=4096 B)
+S_microbenchmark = NO acreditado como flujo completo (solo componente I/O de lectura).
+S_adversario = PENDIENTE: falta perfil de hardware compatible (CPU, PoAS/KZG, PoT por slot).
+EXIT=?
+### uptime final
+ 16:45:30  up 13 days 13:14,  0 users,  carga promedio: 2,17, 1,54, 0,70

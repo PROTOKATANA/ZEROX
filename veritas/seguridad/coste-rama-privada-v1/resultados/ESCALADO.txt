@@ -1,0 +1,22 @@
+== Escalado CRP-v0.1 (barrido_alpha, 3 α, 8000 rep, 400 slots) ==
+comando: for n in 1 2 4 8 16 24; do veritas/julia.sh --project=. --threads=$n bench/escalado.jl; done
+fecha: 2026-09-18T00:31:38+02:00
+julia: 1.13.0  cpu: znver5
+hilos_julia=1  nrep=8000  nslots=400  α=3
+tiempo_s=0.2722  slots_procesados/s=3.52689258e7
+resultado=[(0.42, 0.000375, 8000), (0.48, 0.201375, 8000), (0.52, 0.78, 8000)]
+hilos_julia=2  nrep=8000  nslots=400  α=3
+tiempo_s=0.1669  slots_procesados/s=5.75339821e7
+resultado=[(0.42, 0.000375, 8000), (0.48, 0.201375, 8000), (0.52, 0.78, 8000)]
+hilos_julia=4  nrep=8000  nslots=400  α=3
+tiempo_s=0.1008  slots_procesados/s=9.52168113e7
+resultado=[(0.42, 0.000375, 8000), (0.48, 0.201375, 8000), (0.52, 0.78, 8000)]
+hilos_julia=8  nrep=8000  nslots=400  α=3
+tiempo_s=0.0694  slots_procesados/s=1.382948692e8
+resultado=[(0.42, 0.000375, 8000), (0.48, 0.201375, 8000), (0.52, 0.78, 8000)]
+hilos_julia=16  nrep=8000  nslots=400  α=3
+tiempo_s=0.0539  slots_procesados/s=1.780434516e8
+resultado=[(0.42, 0.000375, 8000), (0.48, 0.201375, 8000), (0.52, 0.78, 8000)]
+hilos_julia=24  nrep=8000  nslots=400  α=3
+tiempo_s=0.0513  slots_procesados/s=1.872346388e8
+resultado=[(0.42, 0.000375, 8000), (0.48, 0.201375, 8000), (0.52, 0.78, 8000)]

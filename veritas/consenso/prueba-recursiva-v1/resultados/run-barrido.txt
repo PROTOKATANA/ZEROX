@@ -1,0 +1,40 @@
+== ENTORNO PRV-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:59:16.671
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 / 1
+comando: --barrido --n 512 --out run-barrido.txt
+semilla: 6168263
+pkg: Status `~/zeo/ZEROX/deepseek/veritas/consenso/prueba-recursiva-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== §3.2/§6 · a qué tasa y con qué ventana cierra ==
+DAG medido n=512 (GDR-v0.2): mergerset medio=0.88, contexto medio=205.52
+Modelo por bloque: restr = M · W · ceil(log2(W+1)) · 80 · gs   (gs=2)
+M = mergeset medio medido, y M = 180 (tope de C-GD-04). Contexto = W.
+
+         W  restr(M med)  restr(M=180) | bloq/s Halo2(med) bloq/s Halo2(180)
+         1     0.000e+00     0.000e+00 |             Inf             Inf
+        10     5.638e+03     1.152e+06 |       1.774e+02       8.681e-01
+       100     9.866e+04     2.016e+07 |       1.014e+01       4.960e-02
+      1000     1.409e+06     2.880e+08 |       7.095e-01       3.472e-03
+     10000     1.973e+07     4.032e+09 |       5.068e-02       2.480e-04
+    100000     2.396e+08     4.896e+10 |       4.174e-03       2.042e-05
+
+Ventana crítica W* (mayor potencia de 2 que CIERRA a 1 bloque/s):
+  M medido  Halo2 realista=     512   1e9=  262144   2.4e10= 4194304
+  M=180     Halo2 realista=       8   1e9=    2048   2.4e10=   32768
+
+Para W mayor que el DAG medido la fila es una ESTIMACIÓN con el contexto lleno
+(W azules), no una medición. La ventana W es la profundidad de fusión
+(C-GD-11), constante PENDIENTE: el coste va como función de W, sin fijarla.
+Cota INFERIOR: firmas Ed25519, KZG, PoT y UTXO no están incluidos; sólo suman.

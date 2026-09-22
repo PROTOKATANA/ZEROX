@@ -1,0 +1,7 @@
+CRP-v0.3 — entorno
+fecha_utc = 2026-09-18T08:56:45.606
+julia = 1.13.0  cpu = znver5
+hilos = 1/1
+semilla = 23130  replicas = 24
+peso_unidad_blue_work = 170141183460469231731687303715884105728
+presupuesto = max 64 GiB RAM, 24 hilos

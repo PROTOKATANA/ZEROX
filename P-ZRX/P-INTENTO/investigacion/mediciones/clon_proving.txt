@@ -1,0 +1,31 @@
+warning: profile package spec `cranelift-wasm` in profile `dev` did not match any packages
+   Compiling subspace-farmer-components v0.1.0 (/home/katana/zeo/fuentes/subspace/crates/subspace-farmer-components)
+    Finished `bench` profile [optimized] target(s) in 1.79s
+     Running benches/proving.rs (/home/katana/zeo/ZEROX/P-ZRX/P-INTENTO/investigacion/target/release/deps/proving-03b6944a61c1b84a)
+Initializing...
+Plotting one sector...
+Searching for solutions
+Benchmarking proving/memory
+Benchmarking proving/memory: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 5.8s.
+Benchmarking proving/memory: Collecting 10 samples in estimated 5.8204 s (10 iterations)
+Benchmarking proving/memory: Analyzing
+proving/memory          time:   [580.48 ms 581.38 ms 582.42 ms]
+                        thrpt:  [1.7170  elem/s 1.7200  elem/s 1.7227  elem/s]
+Found 3 outliers among 10 measurements (30.00%)
+  1 (10.00%) low severe
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+Writing 10 sectors to disk...
+Benchmarking proving/disk
+Benchmarking proving/disk: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 58.3s.
+Benchmarking proving/disk: Collecting 10 samples in estimated 58.341 s (10 iterations)
+Benchmarking proving/disk: Analyzing
+proving/disk            time:   [5.8410 s 5.8672 s 5.9003 s]
+                        thrpt:  [1.6948  elem/s 1.7044  elem/s 1.7120  elem/s]
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+

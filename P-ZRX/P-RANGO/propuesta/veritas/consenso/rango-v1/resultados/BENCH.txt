@@ -1,0 +1,5 @@
+kernel=controlador_fast mediana_ns=8.618618618618619 allocs=0 bytes=0
+kernel=peso_fast (4096 sr) mediana_ns=22469.0 allocs=0 bytes=0 suma=72993224301183516997839163798213997242
+referencia=controlador_ref mediana_ns=540.7340425531914 allocs=58
+hilos_default=4
+BENCH_OK

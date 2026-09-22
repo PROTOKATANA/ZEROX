@@ -1,0 +1,7 @@
+Pendientes que impiden cerrar el umbral protocolario:
+ - controlador C-HDR-06 → ventana/arranque/redondeos
+ - R-FIN-5 → candidata; PoT AES no integrado
+ - C-GD-11 → 5 pendientes
+ - finalidad R-FIN-7/F → F provisional; Δ sin medir
+ - S_adversario → sin hardware compatible
+Umbral protocolario inconcluso; el baseline idealizado no sustituye las reglas pendientes.

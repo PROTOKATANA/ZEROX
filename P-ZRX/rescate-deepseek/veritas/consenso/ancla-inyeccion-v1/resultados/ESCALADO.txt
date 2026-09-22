@@ -1,0 +1,6 @@
+threads= 1  # tiempo_pared_s=72.74  procesado
+threads= 2  # tiempo_pared_s=42.73  procesado
+threads= 4  # tiempo_pared_s=29.16  procesado
+threads= 8  # tiempo_pared_s=23.82  procesado
+threads=16  # tiempo_pared_s=17.98  procesado
+threads=24  # tiempo_pared_s=18.22  procesado

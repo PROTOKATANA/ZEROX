@@ -1,0 +1,14 @@
+[cono] rep 0 hecha
+[cono] rep 1 hecha
+[cono] rep 2 hecha
+METRICA	segundos
+create_siete_tablas	0.756997
+create_proofs	0.833873
+create_proofs_parallel_24h	0.123055
+cota_superior_poda_extraccion	0.076876
+fraccion_podable_sobre_create_proofs	0.092191
+pruebas_por_tabla	32768
+sizeof_Proofs20_bytes	5251072
+# create=[0.741979006, 0.756997068, 0.835857074]
+# create_proofs=[0.825566091, 0.833872932, 0.858898562]
+# create_proofs_parallel=[0.122099366, 0.123055448, 0.124301093]

@@ -1,0 +1,38 @@
+== ENTORNO PPP-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:26:06.037
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 default / 1 interactive
+comando: --niveles --out run-niveles.txt
+semilla: 23130
+pkg: Status `~/zeo/ZEROX/veritas/consenso/poda-post-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== Niveles exactos: P(nivel L | válida) vs hipótesis 2^-(L-1) ==
+SR = 1099511627776   C (sorteos/bloque) = 1   M = 2^63
+aceptación por sorteo = (SR÷2+1)/2^63 = 5.960464e-08
+  L           umbral=SR>>L         exacta      hipótesis   exacta/hip
+  1           549755813888      1.000e+00      1.000e+00     1.000000
+  2           274877906944      5.000e-01      5.000e-01     1.000000
+  3           137438953472      2.500e-01      2.500e-01     1.000000
+  4            68719476736      1.250e-01      1.250e-01     1.000000
+  5            34359738368      6.250e-02      6.250e-02     1.000000
+  6            17179869184      3.125e-02      3.125e-02     1.000000
+  7             8589934592      1.563e-02      1.562e-02     1.000000
+  8             4294967296      7.813e-03      7.812e-03     1.000000
+  9             2147483648      3.906e-03      3.906e-03     1.000000
+ 10             1073741824      1.953e-03      1.953e-03     1.000000
+ 11              536870912      9.766e-04      9.766e-04     1.000000
+ 12              268435456      4.883e-04      4.883e-04     1.000000
+
+La hipótesis es el límite SR/2^63 → 0. El cociente es ≥ 1 (concavidad del
+mínimo de C uniformes) y crece con C y con SR/2^63; se cuantifica en --multiples.

@@ -1,0 +1,14 @@
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/ENTORNO.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/TEORIA.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/CORTO.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/RCE.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/RFIN5.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/DAG.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/CONTROL.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/MC.txt
+escrito /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados/VEREDICTO.txt
+CRP-v0.2 terminado. Artefactos en /home/katana/zeo/ZEROX/P-ZRX/P-CRP/auditoria/copia/coste-rama-privada-v2/resultados
+
+real	0m13,879s
+user	0m15,889s
+sys	0m0,296s

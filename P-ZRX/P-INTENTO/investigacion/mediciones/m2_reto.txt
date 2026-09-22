@@ -1,0 +1,222 @@
+    Finished `bench` profile [optimized] target(s) in 0.04s
+     Running benches/m2_reto.rs (/home/katana/zeo/ZEROX/P-ZRX/P-INTENTO/investigacion/target/release/deps/m2_reto-546e88a72230b104)
+[M2] buckets de sonda: bajo=SBucket(0) medio=SBucket(32769) alto=SBucket(54985)
+Benchmarking m2_aislado/rank_select_bucket_bajo
+Benchmarking m2_aislado/rank_select_bucket_bajo: Warming up for 1.0000 s
+Benchmarking m2_aislado/rank_select_bucket_bajo: Collecting 20 samples in estimated 5.0000 s (7.0B iterations)
+Benchmarking m2_aislado/rank_select_bucket_bajo: Analyzing
+m2_aislado/rank_select_bucket_bajo
+                        time:   [691.29 ps 704.28 ps 718.11 ps]
+                        thrpt:  [1.3925 Gelem/s 1.4199 Gelem/s 1.4466 Gelem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high mild
+Benchmarking m2_aislado/rank_select_bucket_medio
+Benchmarking m2_aislado/rank_select_bucket_medio: Warming up for 1.0000 s
+Benchmarking m2_aislado/rank_select_bucket_medio: Collecting 20 samples in estimated 5.0001 s (4.1M iterations)
+Benchmarking m2_aislado/rank_select_bucket_medio: Analyzing
+m2_aislado/rank_select_bucket_medio
+                        time:   [1.1995 µs 1.2034 µs 1.2077 µs]
+                        thrpt:  [828.01 Kelem/s 830.99 Kelem/s 833.67 Kelem/s]
+Found 2 outliers among 20 measurements (10.00%)
+  2 (10.00%) high mild
+Benchmarking m2_aislado/rank_select_bucket_alto
+Benchmarking m2_aislado/rank_select_bucket_alto: Warming up for 1.0000 s
+Benchmarking m2_aislado/rank_select_bucket_alto: Collecting 20 samples in estimated 5.0003 s (2.4M iterations)
+Benchmarking m2_aislado/rank_select_bucket_alto: Analyzing
+m2_aislado/rank_select_bucket_alto
+                        time:   [1.9873 µs 1.9996 µs 2.0184 µs]
+                        thrpt:  [495.45 Kelem/s 500.10 Kelem/s 503.20 Kelem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+Benchmarking m2_aislado/rank_select_bucket_sin_prueba
+Benchmarking m2_aislado/rank_select_bucket_sin_prueba: Warming up for 1.0000 s
+Benchmarking m2_aislado/rank_select_bucket_sin_prueba: Collecting 20 samples in estimated 5.0000 s (13B iterations)
+Benchmarking m2_aislado/rank_select_bucket_sin_prueba: Analyzing
+m2_aislado/rank_select_bucket_sin_prueba
+                        time:   [388.28 ps 392.41 ps 398.40 ps]
+                        thrpt:  [2.5101 Gelem/s 2.5483 Gelem/s 2.5755 Gelem/s]
+Found 3 outliers among 20 measurements (15.00%)
+  3 (15.00%) high mild
+Benchmarking m2_aislado/rank_select_bucket_maximo_sin_prueba
+Benchmarking m2_aislado/rank_select_bucket_maximo_sin_prueba: Warming up for 1.0000 s
+Benchmarking m2_aislado/rank_select_bucket_maximo_sin_prueba: Collecting 20 samples in estimated 5.0000 s (13B iterations)
+Benchmarking m2_aislado/rank_select_bucket_maximo_sin_prueba: Analyzing
+m2_aislado/rank_select_bucket_maximo_sin_prueba
+                        time:   [386.48 ps 387.98 ps 390.97 ps]
+                        thrpt:  [2.5577 Gelem/s 2.5774 Gelem/s 2.5875 Gelem/s]
+Found 3 outliers among 20 measurements (15.00%)
+  1 (5.00%) high mild
+  2 (10.00%) high severe
+Benchmarking m2_aislado/distancia_un_acierto
+Benchmarking m2_aislado/distancia_un_acierto: Warming up for 1.0000 s
+Benchmarking m2_aislado/distancia_un_acierto: Collecting 20 samples in estimated 5.0000 s (95M iterations)
+Benchmarking m2_aislado/distancia_un_acierto: Analyzing
+m2_aislado/distancia_un_acierto
+                        time:   [51.525 ns 51.587 ns 51.671 ns]
+                        thrpt:  [19.353 Melem/s 19.385 Melem/s 19.408 Melem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high mild
+
+Benchmarking m2_w1/por_bucket
+Benchmarking m2_w1/por_bucket: Warming up for 1.0000 s
+Benchmarking m2_w1/por_bucket: Collecting 20 samples in estimated 5.0000 s (1.4B iterations)
+Benchmarking m2_w1/por_bucket: Analyzing
+m2_w1/por_bucket        time:   [3.4521 ns 3.4618 ns 3.4708 ns]
+                        thrpt:  [288.12 Melem/s 288.87 Melem/s 289.68 Melem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) low mild
+Benchmarking m2_w1/lote_and_64k
+Benchmarking m2_w1/lote_and_64k: Warming up for 1.0000 s
+Benchmarking m2_w1/lote_and_64k: Collecting 20 samples in estimated 5.0001 s (12M iterations)
+Benchmarking m2_w1/lote_and_64k: Analyzing
+m2_w1/lote_and_64k      time:   [418.03 ns 421.09 ns 426.85 ns]
+                        thrpt:  [2.3428 Melem/s 2.3748 Melem/s 2.3922 Melem/s]
+Benchmarking m2_w1/construir_objetivo
+Benchmarking m2_w1/construir_objetivo: Warming up for 1.0000 s
+Benchmarking m2_w1/construir_objetivo: Collecting 20 samples in estimated 5.0000 s (126M iterations)
+Benchmarking m2_w1/construir_objetivo: Analyzing
+m2_w1/construir_objetivo
+                        time:   [40.972 ns 41.438 ns 41.822 ns]
+                        thrpt:  [23.911 Melem/s 24.132 Melem/s 24.407 Melem/s]
+Benchmarking m2_w1/derivar_buckets
+Benchmarking m2_w1/derivar_buckets: Warming up for 1.0000 s
+Benchmarking m2_w1/derivar_buckets: Collecting 20 samples in estimated 5.0000 s (304M iterations)
+Benchmarking m2_w1/derivar_buckets: Analyzing
+m2_w1/derivar_buckets   time:   [15.580 ns 15.718 ns 15.884 ns]
+                        thrpt:  [62.956 Melem/s 63.621 Melem/s 64.184 Melem/s]
+Found 2 outliers among 20 measurements (10.00%)
+  2 (10.00%) high severe
+
+Benchmarking m2_w10/por_bucket
+Benchmarking m2_w10/por_bucket: Warming up for 1.0000 s
+Benchmarking m2_w10/por_bucket: Collecting 20 samples in estimated 5.0008 s (1.2M iterations)
+Benchmarking m2_w10/por_bucket: Analyzing
+m2_w10/por_bucket       time:   [4.2293 µs 4.2479 µs 4.2745 µs]
+                        thrpt:  [2.3394 Melem/s 2.3541 Melem/s 2.3645 Melem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+Benchmarking m2_w10/lote_and_64k
+Benchmarking m2_w10/lote_and_64k: Warming up for 1.0000 s
+Benchmarking m2_w10/lote_and_64k: Collecting 20 samples in estimated 5.0000 s (11M iterations)
+Benchmarking m2_w10/lote_and_64k: Analyzing
+m2_w10/lote_and_64k     time:   [419.22 ns 421.23 ns 424.10 ns]
+                        thrpt:  [23.580 Melem/s 23.740 Melem/s 23.854 Melem/s]
+Found 2 outliers among 20 measurements (10.00%)
+  2 (10.00%) high mild
+Benchmarking m2_w10/construir_objetivo
+Benchmarking m2_w10/construir_objetivo: Warming up for 1.0000 s
+Benchmarking m2_w10/construir_objetivo: Collecting 20 samples in estimated 5.0000 s (117M iterations)
+Benchmarking m2_w10/construir_objetivo: Analyzing
+m2_w10/construir_objetivo
+                        time:   [41.054 ns 41.531 ns 42.103 ns]
+                        thrpt:  [237.51 Melem/s 240.78 Melem/s 243.58 Melem/s]
+Found 3 outliers among 20 measurements (15.00%)
+  3 (15.00%) high mild
+Benchmarking m2_w10/derivar_buckets
+Benchmarking m2_w10/derivar_buckets: Warming up for 1.0000 s
+Benchmarking m2_w10/derivar_buckets: Collecting 20 samples in estimated 5.0000 s (210M iterations)
+Benchmarking m2_w10/derivar_buckets: Analyzing
+m2_w10/derivar_buckets  time:   [23.210 ns 23.273 ns 23.356 ns]
+                        thrpt:  [428.16 Melem/s 429.68 Melem/s 430.85 Melem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+
+Benchmarking m2_w100/por_bucket
+Benchmarking m2_w100/por_bucket: Warming up for 1.0000 s
+Benchmarking m2_w100/por_bucket: Collecting 20 samples in estimated 5.0054 s (119k iterations)
+Benchmarking m2_w100/por_bucket: Analyzing
+m2_w100/por_bucket      time:   [41.864 µs 41.912 µs 41.983 µs]
+                        thrpt:  [2.3819 Melem/s 2.3860 Melem/s 2.3887 Melem/s]
+Benchmarking m2_w100/lote_and_64k
+Benchmarking m2_w100/lote_and_64k: Warming up for 1.0000 s
+Benchmarking m2_w100/lote_and_64k: Collecting 20 samples in estimated 5.0000 s (11M iterations)
+Benchmarking m2_w100/lote_and_64k: Analyzing
+m2_w100/lote_and_64k    time:   [415.56 ns 416.31 ns 417.73 ns]
+                        thrpt:  [239.39 Melem/s 240.20 Melem/s 240.64 Melem/s]
+Benchmarking m2_w100/construir_objetivo
+Benchmarking m2_w100/construir_objetivo: Warming up for 1.0000 s
+Benchmarking m2_w100/construir_objetivo: Collecting 20 samples in estimated 5.0000 s (81M iterations)
+Benchmarking m2_w100/construir_objetivo: Analyzing
+m2_w100/construir_objetivo
+                        time:   [61.597 ns 62.567 ns 63.716 ns]
+                        thrpt:  [1.5695 Gelem/s 1.5983 Gelem/s 1.6234 Gelem/s]
+Found 3 outliers among 20 measurements (15.00%)
+  3 (15.00%) high mild
+Benchmarking m2_w100/derivar_buckets
+Benchmarking m2_w100/derivar_buckets: Warming up for 1.0000 s
+Benchmarking m2_w100/derivar_buckets: Collecting 20 samples in estimated 5.0000 s (33M iterations)
+Benchmarking m2_w100/derivar_buckets: Analyzing
+m2_w100/derivar_buckets time:   [149.41 ns 151.25 ns 153.11 ns]
+                        thrpt:  [653.15 Melem/s 661.17 Melem/s 669.32 Melem/s]
+Found 2 outliers among 20 measurements (10.00%)
+  1 (5.00%) low mild
+  1 (5.00%) high mild
+
+Benchmarking m2_w1000/por_bucket
+Benchmarking m2_w1000/por_bucket: Warming up for 1.0000 s
+Benchmarking m2_w1000/por_bucket: Collecting 20 samples in estimated 5.0397 s (10k iterations)
+Benchmarking m2_w1000/por_bucket: Analyzing
+m2_w1000/por_bucket     time:   [487.56 µs 489.38 µs 491.57 µs]
+                        thrpt:  [2.0343 Melem/s 2.0434 Melem/s 2.0510 Melem/s]
+Found 3 outliers among 20 measurements (15.00%)
+  1 (5.00%) high mild
+  2 (10.00%) high severe
+Benchmarking m2_w1000/lote_and_64k
+Benchmarking m2_w1000/lote_and_64k: Warming up for 1.0000 s
+Benchmarking m2_w1000/lote_and_64k: Collecting 20 samples in estimated 5.0001 s (11M iterations)
+Benchmarking m2_w1000/lote_and_64k: Analyzing
+m2_w1000/lote_and_64k   time:   [418.20 ns 420.08 ns 423.17 ns]
+                        thrpt:  [2.3631 Gelem/s 2.3805 Gelem/s 2.3912 Gelem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+Benchmarking m2_w1000/construir_objetivo
+Benchmarking m2_w1000/construir_objetivo: Warming up for 1.0000 s
+Benchmarking m2_w1000/construir_objetivo: Collecting 20 samples in estimated 5.0000 s (20M iterations)
+Benchmarking m2_w1000/construir_objetivo: Analyzing
+m2_w1000/construir_objetivo
+                        time:   [252.21 ns 254.91 ns 257.03 ns]
+                        thrpt:  [3.8907 Gelem/s 3.9230 Gelem/s 3.9649 Gelem/s]
+Benchmarking m2_w1000/derivar_buckets
+Benchmarking m2_w1000/derivar_buckets: Warming up for 1.0000 s
+Benchmarking m2_w1000/derivar_buckets: Collecting 20 samples in estimated 5.0001 s (4.2M iterations)
+Benchmarking m2_w1000/derivar_buckets: Analyzing
+m2_w1000/derivar_buckets
+                        time:   [1.1855 µs 1.1869 µs 1.1884 µs]
+                        thrpt:  [841.47 Melem/s 842.55 Melem/s 843.54 Melem/s]
+
+Benchmarking m2_w10000/por_bucket
+Benchmarking m2_w10000/por_bucket: Warming up for 1.0000 s
+Benchmarking m2_w10000/por_bucket: Collecting 20 samples in estimated 5.1010 s (1050 iterations)
+Benchmarking m2_w10000/por_bucket: Analyzing
+m2_w10000/por_bucket    time:   [4.8358 ms 4.8821 ms 4.9628 ms]
+                        thrpt:  [2.0150 Melem/s 2.0483 Melem/s 2.0679 Melem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+Benchmarking m2_w10000/lote_and_64k
+Benchmarking m2_w10000/lote_and_64k: Warming up for 1.0000 s
+Benchmarking m2_w10000/lote_and_64k: Collecting 20 samples in estimated 5.0001 s (11M iterations)
+Benchmarking m2_w10000/lote_and_64k: Analyzing
+m2_w10000/lote_and_64k  time:   [416.59 ns 417.85 ns 419.72 ns]
+                        thrpt:  [23.825 Gelem/s 23.932 Gelem/s 24.004 Gelem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high mild
+Benchmarking m2_w10000/construir_objetivo
+Benchmarking m2_w10000/construir_objetivo: Warming up for 1.0000 s
+Benchmarking m2_w10000/construir_objetivo: Collecting 20 samples in estimated 5.0003 s (2.4M iterations)
+Benchmarking m2_w10000/construir_objetivo: Analyzing
+m2_w10000/construir_objetivo
+                        time:   [2.0434 µs 2.0519 µs 2.0678 µs]
+                        thrpt:  [4.8361 Gelem/s 4.8735 Gelem/s 4.8938 Gelem/s]
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+Benchmarking m2_w10000/derivar_buckets
+Benchmarking m2_w10000/derivar_buckets: Warming up for 1.0000 s
+Benchmarking m2_w10000/derivar_buckets: Collecting 20 samples in estimated 5.0018 s (437k iterations)
+Benchmarking m2_w10000/derivar_buckets: Analyzing
+m2_w10000/derivar_buckets
+                        time:   [11.472 µs 11.566 µs 11.635 µs]
+                        thrpt:  [859.50 Melem/s 864.59 Melem/s 871.69 Melem/s]
+Found 6 outliers among 20 measurements (30.00%)
+  2 (10.00%) low mild
+  4 (20.00%) high severe
+

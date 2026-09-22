@@ -1,0 +1,6 @@
+# escalado del kernel MC saldo_mc(2e6 replicas, K=32); uptime:  19:33:22  up 14 days 16:02,  0 users,  carga promedio: 5,02, 4,69, 4,55
+# hilos	tiempo_s	speedup	eficiencia
+1	0.2232	1.000	1.000
+2	0.1555	1.435	0.718
+4	0.1139	1.960	0.490
+8	0.1440	1.550	0.194

@@ -1,0 +1,92 @@
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+single	1	0	12	15	1.224393	816.731297	4396	no_leible
+single	1	1	12	15	1.217946	821.054220	6868	no_leible
+single	1	2	12	16	1.324264	755.136514	6868	no_leible
+# MEDIANA	single	1	tablas_por_s=1.224393	ms_por_tabla=816.731297
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+parallel	1	0	12	16	1.298440	770.154686	2948	no_leible
+parallel	1	1	12	16	1.321498	756.716819	6728	no_leible
+parallel	1	2	12	15	1.205700	829.393372	6728	no_leible
+# MEDIANA	parallel	1	tablas_por_s=1.298440	ms_por_tabla=770.154686
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+single	2	0	12	28	2.201339	454.268988	5852	no_leible
+single	2	1	12	29	2.277947	438.991794	10796	no_leible
+single	2	2	12	30	2.385467	419.205056	10796	no_leible
+# MEDIANA	single	2	tablas_por_s=2.277947	ms_por_tabla=438.991794
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+parallel	2	0	12	27	2.246589	445.119167	2988	no_leible
+parallel	2	1	12	29	2.363517	423.098289	6828	no_leible
+parallel	2	2	12	25	2.070295	483.022898	6828	no_leible
+# MEDIANA	parallel	2	tablas_por_s=2.246589	ms_por_tabla=445.119167
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+single	4	0	12	52	4.230099	236.401068	8776	no_leible
+single	4	1	12	56	4.437585	225.347786	18668	no_leible
+single	4	2	12	55	4.291152	233.037664	18668	no_leible
+# MEDIANA	single	4	tablas_por_s=4.291152	ms_por_tabla=233.037664
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+parallel	4	0	12	49	4.081442	245.011439	3124	no_leible
+parallel	4	1	12	46	3.781335	264.456879	6900	no_leible
+parallel	4	2	12	42	3.477313	287.578377	6900	no_leible
+# MEDIANA	parallel	4	tablas_por_s=3.781335	ms_por_tabla=264.456879
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+single	8	0	12	101	7.944709	125.869933	14656	no_leible
+single	8	1	12	103	8.025117	124.608769	34432	no_leible
+single	8	2	12	99	7.705300	129.780793	34432	no_leible
+# MEDIANA	single	8	tablas_por_s=7.944709	ms_por_tabla=125.869933
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+parallel	8	0	12	76	6.275663	159.345718	3268	no_leible
+parallel	8	1	12	71	5.848277	170.990532	7108	no_leible
+parallel	8	2	12	64	5.290261	189.026587	7108	no_leible
+# MEDIANA	parallel	8	tablas_por_s=5.848277	ms_por_tabla=170.990532
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+single	16	0	12	190	14.716635	67.950314	26356	no_leible
+single	16	1	12	195	15.193292	65.818520	69160	no_leible
+single	16	2	12	191	14.822082	67.466907	69160	no_leible
+# MEDIANA	single	16	tablas_por_s=14.822082	ms_por_tabla=67.466907
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+parallel	16	0	12	107	8.877696	112.641838	3876	no_leible
+parallel	16	1	12	106	8.791582	113.745173	7656	no_leible
+parallel	16	2	12	90	7.479639	133.696290	7656	no_leible
+# MEDIANA	parallel	16	tablas_por_s=8.791582	ms_por_tabla=113.745173
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+single	24	0	12	233	17.783889	56.230670	37876	no_leible
+single	24	1	12	222	17.062314	58.608697	113548	no_leible
+single	24	2	12	230	17.524526	57.062884	113548	no_leible
+# MEDIANA	single	24	tablas_por_s=17.524526	ms_por_tabla=57.062884
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+parallel	24	0	12	100	8.325112	120.118507	4280	no_leible
+parallel	24	1	12	96	7.967746	125.506012	8124	no_leible
+parallel	24	2	12	87	7.159149	139.681405	8124	no_leible
+# MEDIANA	parallel	24	tablas_por_s=7.967746	ms_por_tabla=125.506012
+=== FORMA ANIDADA (piscina 24, h llamadas concurrentes a generate_parallel) ===
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+anidado	1	0	12	120	9.997017	100.029835	4492	no_leible
+anidado	1	1	12	121	10.080590	99.200547	13744	no_leible
+anidado	1	2	12	122	10.123379	98.781249	13744	no_leible
+# MEDIANA	anidado	1	tablas_por_s=10.080590	ms_por_tabla=99.200547
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+anidado	2	0	12	171	14.229325	70.277404	4672	no_leible
+anidado	2	1	12	172	14.196230	70.441235	23052	no_leible
+anidado	2	2	12	173	14.303565	69.912639	23052	no_leible
+# MEDIANA	anidado	2	tablas_por_s=14.229325	ms_por_tabla=70.277404
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+anidado	4	0	12	254	20.963155	47.702742	5020	no_leible
+anidado	4	1	12	248	20.512446	48.750890	41776	no_leible
+anidado	4	2	12	253	20.879337	47.894240	41776	no_leible
+# MEDIANA	anidado	4	tablas_por_s=20.879337	ms_por_tabla=47.894240
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+anidado	8	0	12	305	25.047165	39.924677	5652	no_leible
+anidado	8	1	12	305	25.027041	39.956780	79156	no_leible
+anidado	8	2	12	303	24.893031	40.171885	79156	no_leible
+# MEDIANA	anidado	8	tablas_por_s=25.027041	ms_por_tabla=39.956780
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+anidado	16	0	12	310	25.007601	39.987842	6936	no_leible
+anidado	16	1	12	306	24.781500	40.352683	153948	no_leible
+anidado	16	2	12	306	24.771323	40.369261	153948	no_leible
+# MEDIANA	anidado	16	tablas_por_s=24.781500	ms_por_tabla=40.352683
+MODO	HILOS	REP	SEGUNDOS	TABLAS	tablas_por_s	ms_por_tabla	rss_pico_kb	uj
+anidado	24	0	12	313	24.877373	40.197170	64264	no_leible
+anidado	24	1	12	310	24.732272	40.433002	224872	no_leible
+anidado	24	2	12	309	24.713754	40.463298	224872	no_leible
+# MEDIANA	anidado	24	tablas_por_s=24.732272	ms_por_tabla=40.433002
+=== FIN ===

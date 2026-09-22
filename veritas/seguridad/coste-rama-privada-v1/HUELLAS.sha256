@@ -1,0 +1,62 @@
+# HUELLAS — coste-rama-privada-v1
+#
+# Rutas relativas a /home/katana/zeo/ZEROX. Comprobar con:
+#     sha256sum -c veritas/seguridad/coste-rama-privada-v1/HUELLAS.sha256
+# desde la RAÍZ del repositorio: la lista incluye fuentes leídas además de los artefactos propios.
+#
+# Regeneradas por Claude el 2026-09-18 al validar y migrar desde deepseek/.
+# ⚠️ Leer PROCEDENCIA.md antes de citar resultados de este instrumento.
+
+# --- instrumento ---
+5512120d908f16599bab7f598c69e5002aaa662db7da44a72ce9cbc757caeea5  veritas/seguridad/coste-rama-privada-v1/bench/benchmarks.jl
+f09e74834a5870a02e9d7c4db694be243efff8c19b537c9201de94404d4ca210  veritas/seguridad/coste-rama-privada-v1/bench/escalado.jl
+c92e64192d69163578dfadc843f710a284671b667332f02138e3a8fba07eb04a  veritas/seguridad/coste-rama-privada-v1/bench/perfil.jl
+37d7793b6f2abeaa30c61c09938c37737f3ed379a60d6ba4a8088aac026f111f  veritas/seguridad/coste-rama-privada-v1/bench/warntype.jl
+d5de25dd353a3100e0cf59ee62e3fbadc613bec2cfc4dc60cc04f28388c4fbf6  veritas/seguridad/coste-rama-privada-v1/BITACORA.md
+1d25f57ca5be37835481bcc86a646de423f54262205dd2b90fd2117aa2ac0815  veritas/seguridad/coste-rama-privada-v1/CONTRATO.md
+f9197e4912f9ce3fdf3c9ebef40817496e761fd6db382c27509a2ba0e072229e  veritas/seguridad/coste-rama-privada-v1/INFORME.md
+4e9d7d5380b6e7b5698077f00810a4c6e77828441739b3e9647f720a4692ebb2  veritas/seguridad/coste-rama-privada-v1/julia-version.toml
+f9a5aab7b7db04495f32b7da1ac5581089f3706f154cd77347c00a463b6ee923  veritas/seguridad/coste-rama-privada-v1/Manifest.toml
+f47eba12c4ee30b80233472f77ba9793e18198def202e571b61d0a3e2de8af5b  veritas/seguridad/coste-rama-privada-v1/METODO.md
+ad4aa112d472ae37302aa47dac39c53a8cd487b685f1ab5b06eac61818c94c6f  veritas/seguridad/coste-rama-privada-v1/MODELO.md
+6dfb2398117ea1fdc17b571d6662e9c1f0350a416243585383f82120faabf073  veritas/seguridad/coste-rama-privada-v1/PROCEDENCIA.md
+8ceee959d429b2b02418ff1a6a18583e0f1c05f5dbd4c60ce85c8401b54ce0a0  veritas/seguridad/coste-rama-privada-v1/Project.toml
+a9f88378f1167d4dfe8741e0925e77324d5ba02355775d9df287d86c5ee30e5b  veritas/seguridad/coste-rama-privada-v1/PROPUESTA.md
+b44bf8514b20d55d1d18ae42f8af704d2ba841d6a035144a101108c271ce4bb3  veritas/seguridad/coste-rama-privada-v1/resultados/BENCH.txt
+0d177ef5d864d8f33e778927387d082f8dc8253081d3e33c209c085a19dc3d0d  veritas/seguridad/coste-rama-privada-v1/resultados/ENTORNO.txt
+55cc32cc92223adffa4f2fab13a0f4a9a42650cdb8ff0118dcde71aa1cf6ee11  veritas/seguridad/coste-rama-privada-v1/resultados/ESCALADO.txt
+c8ad268a05cd509070b45267b05cae3b206726ee87239b857813b23cf46b7eeb  veritas/seguridad/coste-rama-privada-v1/resultados/PERFIL.txt
+f1015b32786453f13f709e78cc5560b23341cdba3ed7a8d462fa20a49e056baa  veritas/seguridad/coste-rama-privada-v1/resultados/run-controladores.txt
+915503debb17094fe1feb690d5afc13200ff7fa2d856b5fdfcdddb61438e5625  veritas/seguridad/coste-rama-privada-v1/resultados/run-corto.txt
+49f9581506f617b30942f6704a730bf8baf5d2e41b5af85684ffc015f62cceec  veritas/seguridad/coste-rama-privada-v1/resultados/run-gdr.txt
+518e50403bdd2d21839cc9a652da18aaa46c1c8b23d09b5aec8f3547bcbafa56  veritas/seguridad/coste-rama-privada-v1/resultados/run-referencias.txt
+a428645f6406bc4dcdb23df906ac72bfb6a306f23fccda75ae9d00c35caa8ed5  veritas/seguridad/coste-rama-privada-v1/resultados/run-resumen.txt
+2ebaaf497b4b992faea45989e9ff4521e3d3dc5f10bdad8afa8e8b1086aefa1d  veritas/seguridad/coste-rama-privada-v1/resultados/run-teoria.txt
+cc29995566d8e6c645b5450e2bb14e1c7aab933d6e8adab0dbf8c908b0ab8e61  veritas/seguridad/coste-rama-privada-v1/resultados/TESTS.txt
+d0330003c837a26de0506a09608dbe5e612a340deb2b54d4e22b2db0039b7ecb  veritas/seguridad/coste-rama-privada-v1/resultados/WARNTYPE.txt
+d86c91498e8d43d064f3ea4d3b9a9e7722f532ced9ac8f2d7b4c8bee0ff5018c  veritas/seguridad/coste-rama-privada-v1/run.jl
+57722ba764722f33d99426bd016835148ff724ebaf3a9cc1aa576a096c5198f4  veritas/seguridad/coste-rama-privada-v1/src/CosteRamaPrivada.jl
+0a55fe35f4749e33df4ca5ab2206cd974e8bc9bd51b19c6935f38f49a7aa9831  veritas/seguridad/coste-rama-privada-v1/src/modelo.jl
+a40f624109224aebc01797e9536d4f456d36df2021e363b4bd7f68474abc6ad0  veritas/seguridad/coste-rama-privada-v1/src/rapido.jl
+f2559b4eca91d3d26a90842e1814acd307b9bbb85704bae672caa63eb8b42933  veritas/seguridad/coste-rama-privada-v1/src/referencia.jl
+3a6a494d00f2736902a7fd050546323ab546e4698e6c6a664b6108ce2753007f  veritas/seguridad/coste-rama-privada-v1/src/validacion.jl
+cedf37b4d0fdc2a7a358562dc6e91555f5d906ed311bc36065267d2922435a46  veritas/seguridad/coste-rama-privada-v1/test/runtests.jl
+
+# --- fuentes leídas (solo lectura) ---
+66c43cdff4b6842490e150253076ac4b04be2b61415a79f75ddcddaf55a3b911  SPEC.md
+5d9243375e3f7da39ba492c9b66c3c774c875c2f0a64ffa8fe0a88c139051afe  TAREAS.md
+0343b83290489fde1b3ba961eb8fdd1f7ccb1bdf1ea1ee7062db993fc48936e1  veritas/LINEO.md
+7379c5e175e69c371587a5d83c71e110f9261790ea64bdaf6b02481cecd08a78  AGENTS.md
+399c6973fd3b0ea88026132ede2bad7723a1547ac68048c70f7b165e25a07f08  research/dag-poas-auditoria.md
+55e5c8158c9e495c9ba47f97bb834dd23d0b3fff44e46def98ea3d7f952b1a6a  research/dag-poas-ancla-de-orden.md
+d88af489ffec52758cf90f9557c2d609b59e425f437d4a6eb98e0e0dfd0b0cd4  veritas/consenso/poda-post-v1/INFORME.md
+16bc7843e593b902634a291c92f7400d9562bee10d06125fe13d7080b5c0559f  veritas/consenso/poda-post-v1/MODELO.md
+c16255ea9717bac95bd70644c140616cdab6acac0ceb8a105ca30c05fb402138  veritas/consenso/poda-post-v1/PROCEDENCIA.md
+67ff7398d84fc3df8535baae3cf46d7414c1a849f7f91f71118615f4ee20b8b3  veritas/consenso/poda-post-v1/PROPUESTA.md
+eb8bb040cfc4849aca62aba8bc2bdab053c58eae7eda9d82bd67aa2f05a76f32  deepseek/veritas/consenso/prueba-recursiva-v1/INFORME.md
+9643647e6b1762e28da614a00d686cffe4c08d58ece8dbb5dbc88aea85033f1f  veritas/consenso/ghostdag-rank-v1/src/GhostdagRank.jl
+51e3961553bca60b0c3d3dda5d1d1e17a82bb4c8945cbfa417c9845117c7080c  veritas/consenso/ghostdag-rank-v1/src/referencia.jl
+7769415b749f51133be454f525b12b2eb9f4549081f952e93e17dfa12d3a71b3  veritas/consenso/ghostdag-rank-v1/src/modelo.jl
+dd9f200b419f7601ca49b8ccba1f18d3bb670012b4a4e52bae5e7091550c4579  veritas/consenso/ghostdag-rank-v1/src/rapido.jl
+05dd24d8dd35e349b0f2fb8827b2b564bcce23125c4c888e88901e3e756a879d  veritas/consenso/ghostdag-rank-v1/src/validacion.jl
+5e4d8ef1e3f5dfdc9cfcab47adeaa8086e945595d14f52631a3e75e2e8624d86  veritas/finalidad/delta-medido-v1/INFORME.md

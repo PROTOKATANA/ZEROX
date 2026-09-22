@@ -1,0 +1,50 @@
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+     1         0 @SembradorV1/src/rapido.jl   66 barrer!
+     1         0 @Base/range.jl          928 iterate
+     1         1 @Base/promotion.jl      641 ==
+     1         0 @Base/special/log.jl    343 log1p(x::Float64)
+     1         0 @Base/special/log.jl    192 log_proc2
+     1         1 @Base/float.jl          492 +
+     1         1 @SembradorV1/src/rapido.jl    ? evaluar_margen(p::ParametrosMarge…
+     1         0 @Base/special/exp.jl    422 expm1_small
+     1         1 @Base/floatfuncs.jl     360 fma
+     1         0 @Base/math.jl           218 exthorner
+     1         0 @SembradorV1/src/rapido.jl   24 evaluar_margen(p::ParametrosMarge…
+     1         1 @Base/float.jl          251 Float64
+     1         1 @SembradorV1/src/rapido.jl   26 evaluar_margen(p::ParametrosMarge…
+     1         0 @SembradorV1/src/rapido.jl   15 evaluar_margen(p::ParametrosMarge…
+     1         1 @SembradorV1/src/modelo.jl  100 desafios_conocidos
+     2         2 @Base/special/exp.jl    433 expm1(x::Float64)
+     2         0 @Base/math.jl           217 exthorner
+     2         2 @Base/special/log.jl    335 log1p(x::Float64)
+     2         0 @SembradorV1/src/rapido.jl   14 evaluar_margen(p::ParametrosMarge…
+     2         2 @SembradorV1/src/modelo.jl   91 adelanto_nucleo
+     2         2 @Base/float.jl          493 -
+     3         0 @Base/special/exp.jl    421 expm1_small
+     3         0 @Base/math.jl           227 _exthorner
+     3         0 @SembradorV1/src/rapido.jl   44 evaluar_margen(p::ParametrosMarge…
+     4         4 @SembradorV1/src/rapido.jl   13 evaluar_margen(p::ParametrosMarge…
+     4         0 @Base/special/exp.jl    434 expm1(x::Float64)
+     4         3 @SembradorV1/src/rapido.jl   19 evaluar_margen(p::ParametrosMarge…
+     5         0 @SembradorV1/src/rapido.jl   41 evaluar_margen(p::ParametrosMarge…
+     5         0 @Base/number.jl         299 inv
+     5         0 @SembradorV1/src/rapido.jl   43 evaluar_margen(p::ParametrosMarge…
+     5         5 @Base/float.jl          494 *
+     9         0 @SembradorV1/src/rapido.jl   22 evaluar_margen(p::ParametrosMarge…
+     9         9 @Base/float.jl          495 /
+    11        11 @Base/float.jl          622 <
+    13         2 @SembradorV1/src/rapido.jl   45 evaluar_margen(p::ParametrosMarge…
+    24         0 @Base/array.jl         1020 setindex!
+    24        24 @Base/array.jl         1025 _setindex!
+    73         0 @SembradorV1/src/rapido.jl   65 barrer!
+    74         0 @Base/client.jl         577 _start()
+    74         0 @Base/client.jl         344 exec_options(opts::Base.JLOptions)
+    74         0 @Base/Base.jl           309 include(mod::Module, _path::Strin…
+    74         0 @Base/loading.jl       3076 _include(mapexpr::Function, mod::…
+    74         0 @Base/loading.jl       3016 include_string(mapexpr::typeof(id…
+    74         0 @Base/boot.jl           489 eval(m::Module, e::Any)
+    74         0 @SembradorV1/bench/benchmarks.jl   58 main()
+    74         0 @Profile/src/Profile.jl   60 macro expansion
+    74         0 @SembradorV1/bench/benchmarks.jl   59 macro expansion
+Total snapshots: 74. Utilization: 100% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

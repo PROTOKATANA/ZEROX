@@ -1,0 +1,7 @@
+== TESTS PPP-v0.1 ==
+2026-09-17T16:13:06+02:00
+git HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+comando: veritas/julia.sh --check-bounds=yes --project=deepseek/veritas/consenso/poda-post-v1 deepseek/veritas/consenso/poda-post-v1/test/runtests.jl
+
+Test Summary: | Pass  Total  Time
+PPP-v0.1      |   85     85  0.7s

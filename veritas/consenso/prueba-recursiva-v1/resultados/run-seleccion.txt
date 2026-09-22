@@ -1,0 +1,38 @@
+== ENTORNO PRV-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:57:38.038
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 / 1
+comando: --seleccion --out run-seleccion.txt
+semilla: 6168263
+pkg: Status `~/zeo/ZEROX/deepseek/veritas/consenso/prueba-recursiva-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== §2 · VALIDEZ ≠ SELECCIÓN ==
+Pregunta: ¿puede un nodo nuevo comprobar, SIN el DAG, que ninguna rama
+competidora tiene más blue_work? La prueba recursiva sólo acredita validez.
+
+H1: 40 bloques, canónica = 39, blue_work = 4083388403051261562353178591328542158483
+H2: 41 bloques, canónica = 41, blue_work = 4083388403051261562519717176475655434646
+verifica_prueba_validez(H1) = true   verifica_prueba_validez(H2) = true
+H1.canonica != H2.canonica : true
+blue_work(H2) > blue_work(H1) : true
+
+Puntas de H1 (por blue_work): NamedTuple[(tip = 39, blue_work = 4083388403051261562353178591328542158483, blue_score = 0x0000000000000020), (tip = 40, blue_work = 3913247219590792330639938031686367604372, blue_score = 0x0000000000000020), (tip = 24, blue_work = 3062541302288446171630433397249949569474, blue_score = 0x0000000000000013), (tip = 20, blue_work = 2722258935367507708078647627476809503522, blue_score = 0x0000000000000010)]
+Puntas de H2 (por blue_work): NamedTuple[(tip = 41, blue_work = 4083388403051261562519717176475655434646, blue_score = 0x0000000000000024)]
+
+H2 = H1 + un bloque válido Y que fusiona las puntas de H1. Ambas historias
+son válidas y sus pruebas de validez verifican. Un nodo que recibe sólo
+π(H1) no puede distinguir el mundo en que la red sigue H1 del mundo en que
+el adversario RETIENE H2: su vista es idéntica y la punta correcta difiere.
+Por tanto ninguna prueba que sólo acredite validez decide la canónica.
+Es exactamente la laguna de D5 de PPP-v0.1, con otro traje.

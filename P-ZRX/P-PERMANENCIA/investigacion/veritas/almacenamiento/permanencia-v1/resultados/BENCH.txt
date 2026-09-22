@@ -1,0 +1,7 @@
+# permanencia-v1 · benchmarks · julia 1.13.0 · hilos 4
+# CPU znver5
+poisson_cdf_intervalo(lambda=100, k=120)   min=0.112898 ms  allocs=8269  mem=282272
+umbral_rechazo(lambda=100, beta=1e-3)      min=0.080228 ms  allocs=5708  mem=194448
+periodos_deteccion(lambda=100, s=1/2)      min=0.304274 ms  allocs=21184  mem=722352
+barrer_e3!(1000 puntos)                    min=0.00018431824817518246 ms  allocs=0  mem=0
+barrer_paralelo(1000 puntos, 4 hilos)   min=0.001767 ms  allocs=31  mem=26360

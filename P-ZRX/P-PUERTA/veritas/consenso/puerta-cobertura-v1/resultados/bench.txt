@@ -1,0 +1,39 @@
+# bench PCO-v0.1
+VERSION            = 1.13.0
+CPU                = znver5
+hilos (:default)   = 2
+hilos (:interactive) = 1
+BLAS threads       = 1
+
+## L(t) en t = 60.0, transitorio c=1/2 s1=3/5 (r = 1, encierre exacto)
+| Variante | Tiempo mediano | Asignaciones | Bytes | Hilos | Resultado |
+|---|---:|---:|---:|---|---|
+| Oraculo BigFloat (`prob_cambio_posterior_ref`) | 4.025 ms | 140645 | 7879696 | 1 CPU | 5.27435649745760e-01 (fuente de verdad) |
+| Kernel Float64 (`prob_cambio_posterior`) | 21.139 us | 0 | 0 | 1 CPU | 5.27435649745758e-01 (igual, rtol 1e-9) |
+| Certificado Arb 160 bits | 0.296 ms | 11330 | 543936 | 1 CPU | [0.527435649745760167667735476069724784 +/- 2.29e-37] (contiene) |
+
+aceleracion kernel/oraculo = 190 x
+
+## Coste de `prob_cambio_posterior` frente a t (modelo O(sqrt(lambda t)))
+| t | tiempo mediano | asignaciones | t^(1/2) normalizado |
+|---:|---:|---:|---:|
+| 10 | 9.189 us | 0 | 1.00 |
+| 100 | 27.329 us | 0 | 0.94 |
+| 1000 | 73.159 us | 0 | 0.80 |
+| 10000 | 254.195 us | 0 | 0.87 |
+| 100000 | 1553.280 us | 0 | 1.69 |
+
+## Simulacion
+asignaciones de `recorrer` sobre 10 000 slots: 96 bytes
+tiempo mediano: 0.244 ms  (12.2 ns por evento, ~20000 eventos)
+
+## Escalado de hilos (tope declarado: 2; otro agente ocupa 24 en P-2.1)
+replicas(n=2000, T=5000) con 2 hilo(s): 0.134 s
+Nota: el escalado 1..24 de LINEO §7 NO aplica aqui. El encargo fija un tope de
+2 hilos porque otro agente usa 24 en `P-2.1/`; medir 4..24 habria contaminado su
+banco y habria violado el tope de la maquina. Se declara y no se hace.
+
+## Punto 1 (BigInt/Rational exactos)
+`desviacion_cancelacion(SR=6148914691)`: 0.726 us, 63 asignaciones, resultado -1.626303e-10
+Es precision arbitraria a proposito: el resultado se decide en el bit 2^-64 y
+Float64 no puede verlo. No hay nada que optimizar aqui, hay algo que no romper.

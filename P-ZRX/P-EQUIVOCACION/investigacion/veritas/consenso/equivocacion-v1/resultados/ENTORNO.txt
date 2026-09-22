@@ -1,0 +1,9 @@
+# ENTORNO — EQUIV-v0.1
+fecha: 2026-09-21T17:10:47.388
+julia: 1.13.0
+cpu: znver5
+hilos lógicos: 32  hilos Julia: 4
+hilos interactivos: 1
+ram GiB: 123.4
+so: Linux x86_64
+blas: LBTConfig([ILP64] libopenblas64_.so)

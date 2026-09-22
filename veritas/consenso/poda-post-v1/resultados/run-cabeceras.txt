@@ -1,0 +1,27 @@
+== ENTORNO PPP-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:26:31.166
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 default / 1 interactive
+comando: --cabeceras --out run-cabeceras.txt
+semilla: 23130
+pkg: Status `~/zeo/ZEROX/veritas/consenso/poda-post-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== Crecimiento sin poda (A″: 1 bloque/s, 1 s/slot, §7.5) ==
+cabecera 589 B:     31536000 cab/año     18.57 GB/año  reach<=5.676e+09 entradas/año
+cabecera 748 B:     31536000 cab/año     23.59 GB/año  reach<=5.676e+09 entradas/año
+cabecera 1037 B:     31536000 cab/año     32.70 GB/año  reach<=5.676e+09 entradas/año
+
+Reachability O(#cabeceras × mergeset_limit), mergeset_limit=180 (R-FIN-12).
+31,5 M cabeceras/año a 1 bloque/s; ~23,6 GB/año con la cabecera típica de 748 B
+(TAREAS §1.4). Es la laguna que motiva el encargo; sin poda no tiene cota.

@@ -1,0 +1,11 @@
+instrumento=rango-v1 (RNG-v0.1)
+fecha_unix=1790090851
+git_head=49c6ffa7a29a2237fb19c341d1d9fb79755f15a1
+julia_version=1.13.0
+cpu_name=znver5
+cpu_threads_visibles=32
+word_size=64
+julia_threads_default=4
+julia_threads_interactive=1
+semilla=592137
+presupuesto=maximo 4 hilos; 4 GiB RAM; 1 GiB disco temporal; 30 min de pared

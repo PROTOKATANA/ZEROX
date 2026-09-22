@@ -1,0 +1,3 @@
+=== report_call(simular_replica!) ===
+=== report_call(construir_trayectorias!) ===
+=== report_call(acumular!) ===

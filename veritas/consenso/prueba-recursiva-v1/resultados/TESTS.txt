@@ -1,0 +1,7 @@
+== TESTS PRV-v0.1 ==
+2026-09-17T23:59:51+02:00
+git HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+comando: veritas/julia.sh --check-bounds=yes --project=deepseek/veritas/consenso/prueba-recursiva-v1 deepseek/veritas/consenso/prueba-recursiva-v1/test/runtests.jl
+
+Test Summary: | Pass  Total  Time
+PRV-v0.1      |   20     20  2.6s

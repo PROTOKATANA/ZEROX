@@ -1,0 +1,9 @@
+# Contraste referencia ↔ kernel (EQUIV-v0.1)
+# fecha: 2026-09-21T17:10:40.541
+# Julia: 1.13.0  hilos: 4
+A n=10 I=4 L=8 jmax=3 k=3          casos=500  ok=true
+B n=14 I=6 L=12 jmax=4 k=2         casos=300  ok=true
+C n=20 I=5 L=10 jmax=5 k=5         casos=200  ok=true
+D n=16 I=4 L=9 jmax=4 k=1          casos=200  ok=true
+regresión contraejemplo A2: privada más pesada     ok=true
+regresión control: privada más ligera              ok=true

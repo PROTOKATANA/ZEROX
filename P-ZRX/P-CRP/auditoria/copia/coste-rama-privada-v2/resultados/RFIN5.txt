@@ -1,0 +1,13 @@
+R-FIN-5 estructural y escenarios de S
+compat en slot 7 (antes de la divergencia) = VALIDA
+compat en slot 20 (tras la divergencia)    = INVALIDA
+
+Toy escalar S: frontera de deriva α=1/(S+1)
+S= 1  α_drift=0.500000  g(α_drift)=+0.0e+00
+S= 2  α_drift=0.333333  g(α_drift)=-1.1e-16
+S= 4  α_drift=0.200000  g(α_drift)=+0.0e+00
+S= 8  α_drift=0.111111  g(α_drift)=+0.0e+00
+S=16  α_drift=0.058824  g(α_drift)=+0.0e+00
+S=24  α_drift=0.040000  g(α_drift)=+0.0e+00
+
+Cotas de unión para P_i = [0.1,0.2,0.05]: (0.2, 0.35000000000000003)

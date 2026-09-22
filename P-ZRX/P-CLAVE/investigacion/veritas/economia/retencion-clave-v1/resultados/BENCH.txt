@@ -1,0 +1,29 @@
+┌ Warning: Replacing docs for `Main.Modelo.beta_cruce :: Union{Tuple{Real}, Tuple{Real, Real}, Tuple{Real, Real, Real}}` in module `Main.Modelo`
+└ @ Base.Docs docs/Docs.jl:253
+# retencion-clave-v1 · BENCH — Julia 1.13.0, CPU znver5, hilos = 4
+# presupuesto declarado: 8 hilos, 8 GiB, 512 MiB de disco
+#20:22:00  up 14 days 16:51,  0 users,  carga promedio: 1,98, 2,14, 2,62
+# variante | tiempo mediano | asignaciones | hilos | frente a la referencia
+# (referencia: oráculo por espacios exponenciales, vía exacta)
+#20:22:00  up 14 days 16:51,  0 users,  carga promedio: 1,98, 2,14, 2,62
+oráculo espacios exponenciales θ=1                 0.0000 ms           42 B          1      1  fuente de verdad exacta
+#20:22:00  up 14 days 16:51,  0 users,  carga promedio: 1,98, 2,14, 2,61
+kernel MC, 1000 réplicas, 1 hilo                   0.0359 ms        32512 B       1004      1  = oráculo en distribución
+kernel MC, 1e6 réplicas, hilos                    27.3470 ms    552001992 B    5000027      4  idéntico al serial (test)
+#20:22:11  up 14 days 16:51,  0 users,  carga promedio: 2,07, 2,15, 2,61
+CDF exacta (DP por m), θ=36                       63.7429 ms    196886128 B       1394      1  exacta; validada contra el oráculo
+CDF exacta (DP por m), θ=0,36                     63.2934 ms    196886128 B       1394      1  exacta
+#20:22:28  up 14 days 16:51,  0 users,  carga promedio: 2,25, 2,19, 2,62
+greedy por ratio, n=1e5                            0.1156 ms      1600144 B          6      1  cota superior (no óptimo: O8)
+DP exacta, n=1e5, 2000 pasos                     179.6547 ms   3227232272 B     600006      1  óptimo (test vs fuerza bruta)
+#20:22:42  up 14 days 16:52,  0 users,  carga promedio: 2,20, 2,18, 2,61
+# @code_warntype de los kernels (se espera sin `Any`):
+#   muestra_saldo!(rng, Vector{Int32}, Vector{Float64}, Float64) -> Tuple{Float64,Int}
+#   cdf_m_bins(Int, Int, Vector{Int}, Float64, Float64, Float64) -> Float64
+#   reclutamiento_eligiendo(Vector{Float64}, Vector{Float64}, Float64) -> NamedTuple
+# asignaciones del kernel MC por réplica: 1.004
+#
+# ESCALADO (1e6 réplicas; el tope del encargo es 8 hilos):
+# hilos | tiempo mediano | speedup | eficiencia
+    4 |       5.1640 ms |   1.000 |  0.250
+# (para el barrido 1,2,4,8 ejecutar este fichero con JULIA_NUM_THREADS=h)

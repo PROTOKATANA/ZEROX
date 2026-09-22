@@ -1,0 +1,8 @@
+# ANCLA-v0.1 entorno znver5 | 123.3978271484375 GiB | julia 1.13.0
+# threads default=1
+# depots=["/home/katana/.julia", "/home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/local/share/julia", "/home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/share/julia"]
+Project AnclaInyeccion v0.1.0
+Status `~/zeo/ZEROX/deepseek/P-2.1/veritas/consenso/ancla-inyeccion-v1/Project.toml`
+  [860ef19b] StableRNGs v1.0.4
+  [de0858da] Printf v1.11.0
+  [9a3f8284] Random v1.11.0

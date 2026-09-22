@@ -1,0 +1,3 @@
+report_opt(controlador_fast, Tuple{UInt64,UInt64,ConfigControlador})
+diagnosticos=0
+report_opt(peso_fast, Tuple{UInt64}) diagnosticos=0

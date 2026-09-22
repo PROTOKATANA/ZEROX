@@ -1,0 +1,13 @@
+## EQUIV-v0.1 — benchmark del kernel  (2026-09-21T17:10:54.474)
+Julia 1.13.0 · hilos 4 · cpu znver5
+DAG: 46 bloques · I=20 L=20 F=20 S_max=15
+
+| variante | tiempo mediano | asignaciones | memoria | hilos |
+|---|---:|---:|---:|---:|
+| `seleccion_vista` (base) | 18250.0 | 1254 | 47.66 KiB | 1 |
+| `ancla_epoca` (base) | 17640.0 | 1261 | 48.23 KiB | 1 |
+| `seleccion_vista!` (preasignado) | 7913.333333333333 | 72 | 2.42 KiB | 1 |
+| `kappa` (20 slots, 128 candidatos) | 146947.0 | 2299 | 86.27 KiB | 4 |
+
+Detalle `seleccion_vista`: Trial(18.250 μs)
+Detalle `kappa`: Trial(146.947 μs)

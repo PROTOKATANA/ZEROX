@@ -1,0 +1,7 @@
+Fixtures U2/U3 y orden explícito (flujo → validez → U2 → color U3″)
+  mismo billete en ramas disjuntas, fusionador: colores=(A = :azul, B = :rojo_U3)  una_u3=true
+  mismo billete dentro de una rama: aceptado=false motivo=u2
+  prefijos compatibles en slot 5: VALIDA
+  prefijos incompatibles en slot 15: INVALIDA (R-FIN-5 rechaza ANTES de colorear)
+  el flujo se comprueba antes de U2/U3: una fusión con flujo divergente
+  se rechaza aunque los billetes fueran únicos.

@@ -1,0 +1,37 @@
+== ENTORNO PRV-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:59:25.518
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 / 1
+comando: --fuentes --out run-fuentes.txt
+semilla: 6168263
+pkg: Status `~/zeo/ZEROX/deepseek/veritas/consenso/prueba-recursiva-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== §6 · fuentes citadas (existencia comprobada desde la raíz) ==
+raíz: /home/katana/zeo/ZEROX
+  OK  SPEC.md  (188487 B)
+  OK  TAREAS.md  (49567 B)
+  OK  research/orchard-bundle.md  (12967 B)
+  OK  research/orchard-math-verification.md  (6519 B)
+  OK  veritas/consenso/poda-post-v1/DERIVACIONES.md  (9845 B)
+  OK  veritas/consenso/poda-post-v1/INFORME.md  (13156 B)
+  OK  veritas/consenso/poda-post-v1/PROPUESTA.md  (4149 B)
+  OK  veritas/consenso/poda-post-v1/PROCEDENCIA.md  (6328 B)
+  OK  veritas/consenso/ghostdag-rank-v1/src/GhostdagRank.jl  (939 B)
+  OK  veritas/consenso/ghostdag-rank-v1/src/referencia.jl  (10094 B)
+  OK  veritas/consenso/ghostdag-rank-v1/src/modelo.jl  (11150 B)
+  OK  crates/zx-core/src/preimage/dag.rs  (39471 B)
+
+Las huellas sha256 de estas fuentes y de los artefactos están en HUELLAS.sha256,
+verificable con `sha256sum -c` desde la raíz del repositorio.
+faltan: 0

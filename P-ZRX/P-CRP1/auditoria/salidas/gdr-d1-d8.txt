@@ -1,0 +1,55 @@
+##### D1 · ¿el supuesto DAG era una cadena? #####
+
+(a) `construir_rama_gdr` TAL CUAL (copia/src/rapido.jl:195-260): actualiza las puntas tras
+    CADA bloque, incluso dentro del mismo slot.
+     s   sr/sr0    n_total   n_azules   n_puntas    rojo_k   rojo_U3   ms_max
+  0.10     1.00         27         28          1         0         0        1
+  0.30     1.00         53         54          1         0         0        1
+  0.30     4.00        241        242          1         0         0        1
+  0.50     1.00         94         95          1         0         0        1
+
+    Identidad observada: n_azules = n_total + 1 en TODAS las filas (el +1 es el génesis,
+    que `blueset` incluye, GDR src/modelo.jl:249). Y n_puntas = 1 siempre: no hay anticonos.
+
+(b) CONTROL: la misma construcción con VISTA LOCAL — los k bloques de un slot se autorían
+    contra la vista del INICIO del slot, antes de propagar los del propio slot (la
+    corrección que pide D1). Se mide también el máximo de puntas alcanzado.
+     s    n_total   n_azules   n_puntas    rojo_k   rojo_U3   ms_max  azules/nt  max_puntas
+  0.30         55         56          1         0         0        3     1.0182           3
+  1.00        193        193          2         0         0        4     1.0000           4
+  3.00        612        612          2         0         0        8     1.0000           8
+
+    Con vista local aparecen PUNTAS MÚLTIPLES (max_puntas > 1) y mergesets > 1: la cadena
+    era un artefacto de `construir_rama_gdr`, no una propiedad del escenario. (Para rojo_k
+    harían falta mergesets mayores que k = 30, que este control no busca.)
+
+(c) ¿Algún test o resultado publicado ejercita anticonos o `rojo_k`?
+    * `rojo_k` (0x01) NO existe como identificador en GDR-v0.2: es la etiqueta documental
+      del valor 0x01 de `tipos` (GDR src/rapido.jl:11). No hay accesor `es_rojo_k`; los
+      tests lo ejercitan sólo de forma indirecta (GDR test/runtests.jl:239-240,281,317-318).
+    * CRP-v0.1 NUNCA cuenta 0x01: su fixture mide sólo `rojo_U3`
+      (copia/src/rapido.jl:348,350; copia/test/runtests.jl:87; resultados/run-gdr.txt:38,41).
+    * `copia/test/runtests.jl:78-91` sólo comprueba invariancia de trabajo y el fixture U2/U3″.
+
+##### D8 · ¿era suficiente el fixture U2/U3″? #####
+
+(a) La comprobación «azul en su propia rama» (copia/src/rapido.jl:368-369):
+    es_ancestro_rapido(est3, 2, 2) = true   (a == b => true por el `||`, GDR src/rapido.jl:43)
+    es_ancestro_rapido(est3, 3, 3) = true
+    Luego `azulX = es_ancestro_rapido(est3,2,2) && okX` se reduce a `okX`.
+    El color NO es una propiedad global del bloque: hay que registrar
+    `(punta/contexto, bloque) -> color` e inspeccionar blueset y blue_work REALES.
+
+(b) Los cuatro casos que D8 exige y su cobertura en CRP-v0.1:
+    dos copias del mismo billete en una rama compatible        SI (est, bloques A1/A2 + fusionador C)
+    dos ramas disjuntas con el mismo billete y flujo compatible SI (est3, X e Y)
+    dos ramas con prefijos PoT realmente divergentes           NO
+    intento de fusion de cada caso                             PARCIAL (solo intra-rama y ramas disjuntas)
+    orden explicito: flujo, validez, U2, color U3''            NO (no hay ninguna etapa de flujo PoT)
+
+(c) Efecto de la tautología en el resultado publicado `run-gdr.txt:39`:
+    «ambas azules en su rama=true» es exactamente `okX && okY` (que los bloques se
+    añadieron), NO una medición de color. La conclusión de U3″ («bloquea el doble uso
+    dentro de una rama y no entre ramas disjuntas») sigue siendo correcta para los casos
+    intra-rama y de fusión, que sí se miden; la columna «ambas azules en su rama» no
+    aporta evidencia.

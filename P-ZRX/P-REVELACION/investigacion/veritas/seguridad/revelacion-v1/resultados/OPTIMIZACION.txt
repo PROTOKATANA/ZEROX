@@ -1,0 +1,4 @@
+mismos escalares: true
+con histograma:    mediana    80.13 ms
+sin histograma:    mediana    31.09 ms
+ganancia: 2.58×

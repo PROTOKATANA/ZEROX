@@ -1,0 +1,66 @@
+# HUELLAS — PPP-v0.1 (poda-post-v1)
+#
+# Rutas relativas a /home/katana/zeo/ZEROX. Comprobar con:
+#     sha256sum -c veritas/consenso/poda-post-v1/HUELLAS.sha256
+# desde la RAÍZ del repositorio, no desde este directorio: la lista incluye fuentes leídas
+# (crates/, PDF/, SPEC.md…) además de los artefactos propios.
+#
+# Regeneradas por Claude el 2026-09-17 al validar y migrar el instrumento desde deepseek/.
+# Las de DeepSeek apuntaban a deepseek/veritas/consenso/poda-post-v1/ y quedan superadas.
+# El Project.toml/Manifest.toml y los resultados/ son los de la reejecución con dependencias
+# recortadas (PROCEDENCIA.md §2): contenido sustantivo idéntico al del ejecutor.
+
+# --- instrumento ---
+9978d213925fce634b1f0176592c260b8c7cf8a678c1c5c46dbe286afa226d4c  veritas/consenso/poda-post-v1/bench/benchmarks.jl
+77f2f2066faae76bc5e92638ebcb43b53f39f0df55ef0bd88a8b353f98479c5c  veritas/consenso/poda-post-v1/bench/escalado.jl
+86c62fc428372d44592cc35f862cfd37248c8f433bd4bf366ba465c50554f286  veritas/consenso/poda-post-v1/bench/memoria.jl
+672f1043655731d4aa87e14af63f9e2ccc876d4870a03a093d26f0029aff1bb5  veritas/consenso/poda-post-v1/bench/perfil.jl
+090874e9a73f9f32211b7919b43a20986ac4eb3b74e5d3f91f7438ba9e0142fc  veritas/consenso/poda-post-v1/bench/warntype.jl
+ad1addcaa252eae9c14cf4cf8503c5c9f316da27c7cdbb2a30ad4a937e0177e0  veritas/consenso/poda-post-v1/BITACORA.md
+d7b4141fb51d2352093912a360db279de36c4f8167e877dd307f8685546ea0bb  veritas/consenso/poda-post-v1/CONTRATO.md
+757ec7dd5accef23e5b16e105efc9b8ed61fddf42576a6642def97952ff81d29  veritas/consenso/poda-post-v1/DERIVACIONES.md
+d88af489ffec52758cf90f9557c2d609b59e425f437d4a6eb98e0e0dfd0b0cd4  veritas/consenso/poda-post-v1/INFORME.md
+f9a5aab7b7db04495f32b7da1ac5581089f3706f154cd77347c00a463b6ee923  veritas/consenso/poda-post-v1/Manifest.toml
+961d980cb45fa4ecb280a323d0bcb5144e689d4a07931f18aae5acd0678ae893  veritas/consenso/poda-post-v1/METODO.md
+16bc7843e593b902634a291c92f7400d9562bee10d06125fe13d7080b5c0559f  veritas/consenso/poda-post-v1/MODELO.md
+c16255ea9717bac95bd70644c140616cdab6acac0ceb8a105ca30c05fb402138  veritas/consenso/poda-post-v1/PROCEDENCIA.md
+8ceee959d429b2b02418ff1a6a18583e0f1c05f5dbd4c60ce85c8401b54ce0a0  veritas/consenso/poda-post-v1/Project.toml
+67ff7398d84fc3df8535baae3cf46d7414c1a849f7f91f71118615f4ee20b8b3  veritas/consenso/poda-post-v1/PROPUESTA.md
+ef53af1d5e2187a050d6eca0758b9b2a5e2beff560f0408ab06934b7c0b3db77  veritas/consenso/poda-post-v1/resultados/BENCH.txt
+e6b9b94d896456548a12704a30186d5cfba5da645b2ec7cafdce4fef3a393ed6  veritas/consenso/poda-post-v1/resultados/MEMORIA.txt
+306e282840d7056d7dac3e860eba223c97899a6a3c80c63d38ceb0d8c447c12e  veritas/consenso/poda-post-v1/resultados/PERFIL.txt
+fef728f87b80683125c757ce7b606081c3539419540b83a4d44d53d6ecff5c89  veritas/consenso/poda-post-v1/resultados/run-anclaje.txt
+be6571b3d679638359055ce649fb80a6aa2df6b9177b3cbc5d86d4ce572e6fbe  veritas/consenso/poda-post-v1/resultados/run-bluework.txt
+eb82fa2cb2e3226ef174c8264a64577f0ea4890c88943eb468c82ac7cd5cdcc0  veritas/consenso/poda-post-v1/resultados/run-cabeceras.txt
+1bfe8d2a3718a8e7f8f442f830ef26a60624cf3ad6a7c71c75c9482572ce8c63  veritas/consenso/poda-post-v1/resultados/run-certificado.txt
+53c87622ef4c8b6a07983574ce1fffde984945fffa062d08d7cd927656b3ac2b  veritas/consenso/poda-post-v1/resultados/run-entorno.txt
+92c74148bd99baf086995f3cfc84178a5210b93f37b2cbf77b52fc1b319cdda4  veritas/consenso/poda-post-v1/resultados/run-mc.txt
+416f21332e197b83bd3322f72ad3004378d240f5093840f343f7fcde16c1014e  veritas/consenso/poda-post-v1/resultados/run-multiples.txt
+fa01f89990bdc5219e701da018d44af70d6ea1a22f068fc32bcbeff6a6ebb335  veritas/consenso/poda-post-v1/resultados/run-niveles.txt
+6fa0ace67c5ec9b0cd0770e109e431567cdf5f4b40073ab73dc626aa938190eb  veritas/consenso/poda-post-v1/resultados/run-resumen.txt
+cb5818b84aae2e3306c399271ea9699266d3a958fc0426667b13b04694e9c574  veritas/consenso/poda-post-v1/resultados/run-retencion.txt
+1a328dcde8930c9812f15a1947c725c641e14a0488f66de8f1b67682f992ba4f  veritas/consenso/poda-post-v1/resultados/run-sranclaje.txt
+9a7a92b7631de6ed8bba03cf539f83267486762bc274f4a792113af38b787974  veritas/consenso/poda-post-v1/resultados/TESTS.txt
+ab839f5217103aecbfdc01ca28916eb79521ecbcd3e38543938c4686874fa4af  veritas/consenso/poda-post-v1/resultados/WARNTYPE.txt
+0154a6277e2abe7a53195a331e99a093b2427b4a2548bd2897296b880e264d9c  veritas/consenso/poda-post-v1/run.jl
+16a05c893e26984e089fdba9aac630a00a9570417a7eca2f7a66609c2f3211a0  veritas/consenso/poda-post-v1/src/modelo.jl
+557ab13ebf8945a3d04436c0a8428dcf818155c9dfeaa1ebe36b6b499cb754fd  veritas/consenso/poda-post-v1/src/PodaPost.jl
+1587d3d147994166de5f16abb8135188be26df24597602fa407023b8c6d3cd86  veritas/consenso/poda-post-v1/src/rapido.jl
+0b25e9fe226121b63e572a8cc35c09b4fe96cda166b831be4fd786b9172f7384  veritas/consenso/poda-post-v1/src/referencia.jl
+3e4e108fa1ae1b91d4ad83286935486976c3923afe2b152ff27119496d3bbb97  veritas/consenso/poda-post-v1/src/validacion.jl
+ca79b9c064d93e91f5d903bbb69fdac1e5472fd34c64304c088f56fab4b99e48  veritas/consenso/poda-post-v1/test/runtests.jl
+
+# --- fuentes leídas (solo lectura) ---
+0343b83290489fde1b3ba961eb8fdd1f7ccb1bdf1ea1ee7062db993fc48936e1  veritas/LINEO.md
+399c6973fd3b0ea88026132ede2bad7723a1547ac68048c70f7b165e25a07f08  research/dag-poas-auditoria.md
+ba362796ad1540c8533f67f1f8efff2f8d1c3b7533cd180c4b03db4b2a9dfd7d  SPEC.md
+0c8d5d2e2daae830036f10b4736bea96f4ebbed269b824cf0b0155950c8589d3  TAREAS.md
+2697cdd682e25069a2c454ff857d41922fbe814c006cc1153e51e6e36fcbeadc  MIGRACION.md
+7379c5e175e69c371587a5d83c71e110f9261790ea64bdaf6b02481cecd08a78  AGENTS.md
+41bcff2df0a426d33367a9781d74f500098308689079defb729e448aff799785  veritas/consenso/ghostdag-rank-v1/CONTRATO.md
+9643647e6b1762e28da614a00d686cffe4c08d58ece8dbb5dbc88aea85033f1f  veritas/consenso/ghostdag-rank-v1/src/GhostdagRank.jl
+a2a682d20b793136b9dd12919527c06af657415e3e2de965baf1afcccda6d00e  PDF/autonomys-subspace/crates/subspace-verification/src/lib.rs
+f56d95b23cb63105d25bdb4492b15873e099823686a569624e9ad13e2e76950e  PDF/autonomys-subspace/crates/subspace-farmer-components/src/auditing.rs
+77e655fb07883f22e380e4788bfe1e641f9a608406443abdef4cba0379d26f6e  PDF/autonomys-subspace/crates/subspace-core-primitives/src/solutions.rs
+7bc7f670748bacb6489c2f66bfc39be67df6189ee9a82bbeaa18d42792c16a94  PDF/autonomys-subspace/crates/subspace-core-primitives/src/pieces.rs
+61ec61b694b0ffd60b842c2e7efef8f63d2dfa7ae90600c313a929b9733cd176  crates/zx-core/src/preimage/dag.rs

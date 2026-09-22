@@ -1,0 +1,4 @@
+## simular_red (n=100, T=120s, λ=1)
+min=0.0031 s  allocs=1348  mem=0.4 MiB
+## medir_transitorio (obs=100, cortes=1s, Dmax=6)
+min=0.0272 s  allocs=504665  mem=46.6 MiB

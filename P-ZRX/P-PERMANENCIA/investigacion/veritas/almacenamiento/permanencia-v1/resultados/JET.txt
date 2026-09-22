@@ -1,0 +1,684 @@
+### poisson_cdf_intervalo
+═════ 36 possible errors found ═════
+┌ poisson_cdf_intervalo(λn::Integer, λd::Integer, k::Integer) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:61
+│┌ poisson_cdf_intervalo(λn::Integer, λd::Integer, k::Integer; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:62
+││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+│││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││└────────────────────
+││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+│││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:65
+│││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+│││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+│││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:76
+│││││┌ (::Colon)(a::Int64, b::Integer) @ Base ./range.jl:3
+││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:404
+│││││││┌ _promote(x::Int64, y::Integer) @ Base ./promotion.jl:378
+││││││││┌ promote_type(::Type{Int64}, ::Type{<:Integer}) @ Base ./promotion.jl:322
+│││││││││┌ promote_result(::Type{Int64}, ::Type{<:Integer}, ::Type{Int64}, ::Type{S}) where S @ Base ./promotion.jl:342
+││││││││││┌ promote_result(::Type{Int64}, ::Type, ::Type{Int64}, ::Type{S}) where S @ Base ./promotion.jl:342
+│││││││││││ runtime dispatch detected: promote_type(::Int64, %1::Type)::Any
+││││││││││└────────────────────
+││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:405
+│││││││┌ not_sametype(x::T, y::T) where T<:Tuple{Int64, Integer} @ Base ./promotion.jl:422
+││││││││┌ sametype_error(input::Tuple{Int64, Integer}) @ Base ./promotion.jl:428
+│││││││││┌ map(f::Base.var"#sametype_error##0#sametype_error##1", t::Tuple{Int64, Integer}) @ Base ./tuple.jl:355
+││││││││││┌ (::Base.var"#sametype_error##0#sametype_error##1")(x::Int64) @ Base ./promotion.jl:429
+│││││││││││┌ string(xs::Type{Int64}) @ Base ./strings/io.jl:186
+││││││││││││┌ print_to_string(xs::Type{Int64}) @ Base ./strings/io.jl:145
+│││││││││││││┌ print(io::IOBuffer, x::Type{Int64}) @ Base ./strings/io.jl:35
+││││││││││││││┌ show(io::IOBuffer, x::Type{Int64}) @ Base ./show.jl:978
+│││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:983
+││││││││││││││││┌ show_typealias(io::IOBuffer, x::Type) @ Base ./show.jl:821
+│││││││││││││││││┌ show_typealias(io::IOBuffer, name::GlobalRef, x::Type, env::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:768
+││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:732
+│││││││││││││││││││┌ show(io::IOContext{IOBuffer}, tv::TypeVar) @ Base ./show.jl:2724
+││││││││││││││││││││┌ (::Base.var"#show_bound#show##0")(io::IOContext{IOBuffer}, b::Any) @ Base ./show.jl:2716
+│││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, b::Any)::Any
+││││││││││││││││││││└────────────────────
+││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:727
+│││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %269::Any)::Any
+││││││││││││││││││└────────────────────
+││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:730
+│││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %338::Any)::Any
+││││││││││││││││││└────────────────────
+││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:735
+│││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %200::Any)::Any
+││││││││││││││││││└────────────────────
+│││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:986
+││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType) @ Base ./show.jl:1139
+│││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1142
+││││││││││││││││││┌ maybe_kws_nt(x::DataType) @ Base ./show.jl:1130
+│││││││││││││││││││ runtime dispatch detected: eltype(%60::DataType)::Any
+││││││││││││││││││└────────────────────
+│││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1231
+││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:732
+│││││││││││││││││││┌ show(io::IOBuffer, tv::TypeVar) @ Base ./show.jl:2724
+││││││││││││││││││││┌ (::Base.var"#show_bound#show##0")(io::IOBuffer, b::Any) @ Base ./show.jl:2716
+│││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, b::Any)::Any
+││││││││││││││││││││└────────────────────
+││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:727
+│││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %245::Any)::Any
+││││││││││││││││││└────────────────────
+││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:730
+│││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %302::Any)::Any
+││││││││││││││││││└────────────────────
+││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:735
+│││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %188::Any)::Any
+││││││││││││││││││└────────────────────
+│││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1202
+││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %223::Any)::Any
+│││││││││││││││││└────────────────────
+│││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1207
+││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %50::Any)::Any
+│││││││││││││││││└────────────────────
+│││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1193
+││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %53::Any)::Any
+│││││││││││││││││└────────────────────
+│││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1195
+││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %50::Any)::Any
+│││││││││││││││││└────────────────────
+│││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1217
+││││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOBuffer, %320::Tuple, %319::DataType)::Any
+│││││││││││││││││└────────────────────
+│││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:989
+││││││││││││││││┌ show_unionaliases(io::IOBuffer, x::Union) @ Base ./show.jl:922
+│││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %66::Any)::Any
+││││││││││││││││└────────────────────
+│││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:993
+││││││││││││││││┌ show_delim_array(io::IOBuffer, itr::Vector{Any}, op::Char, delim::Char, cl::Char, delim_one::Bool) @ Base ./show.jl:1423
+│││││││││││││││││┌ show_delim_array(io::IOBuffer, itr::Vector{Any}, op::Char, delim::Char, cl::Char, delim_one::Bool, i1::Int64, l::Int64) @ Base ./show.jl:1434
+││││││││││││││││││ runtime dispatch detected: show(%3::IOContext{IOBuffer}, %50::Any)::Any
+│││││││││││││││││└────────────────────
+│││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:1020
+││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1202
+│││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %260::Any)::Any
+││││││││││││││││└────────────────────
+││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1207
+│││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %62::Any)::Any
+││││││││││││││││└────────────────────
+││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1193
+│││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %65::Any)::Any
+││││││││││││││││└────────────────────
+││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1195
+│││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %62::Any)::Any
+││││││││││││││││└────────────────────
+││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1217
+│││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOContext{IOBuffer}, %431::Tuple, %430::DataType)::Any
+││││││││││││││││└────────────────────
+││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1225
+│││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOContext{IOBuffer}, %516::Tuple, %520::DataType)::Any
+││││││││││││││││└────────────────────
+│││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:1022
+││││││││││││││││ runtime dispatch detected: show(%77::IOContext{IOBuffer}, %78::Any)::Any
+│││││││││││││││└────────────────────
+││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:404
+│││││││ runtime dispatch detected: Base._promote(x::Int64, y::Integer)::Tuple{Any, Any}
+││││││└────────────────────
+││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:405
+│││││││ runtime dispatch detected: Base.not_sametype(%4::Tuple{Int64, Integer}, %5::Tuple{Any, Any})::Any
+││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:78
+│││││┌ setrounding(f::PermanenciaV1.var"#19#20"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+││││││ runtime dispatch detected: Base.MPFR.setrounding_raw(f::PermanenciaV1.var"#19#20"{BigFloat}, BigFloat, MPFRRoundDown)::Any
+│││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:81
+│││││┌ setrounding(f::PermanenciaV1.var"#21#22"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││ runtime dispatch detected: Base.MPFR.setrounding_raw(f::PermanenciaV1.var"#21#22"{BigFloat}, BigFloat, MPFRRoundUp)::Any
+│││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:84
+│││││┌ setrounding(f::PermanenciaV1.var"#23#24", ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#23#24", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#23#24")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:85
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:87
+│││││┌ setrounding(f::PermanenciaV1.var"#25#26", ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#25#26", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#25#26")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:88
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:91
+│││││┌ setrounding(f::PermanenciaV1.var"#27#28"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#27#28"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#27#28"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:92
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:94
+│││││┌ setrounding(f::PermanenciaV1.var"#29#30"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#29#30"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#29#30"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:95
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││└────────────────────
+││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││ runtime dispatch detected: Base.MPFR.:(var"#setprecision#29")(2, #self#::typeof(setprecision), f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, _3::Type{BigFloat}, prec::Int64)::Tuple{Any, Any}
+││└────────────────────
+
+### umbral_rechazo
+═════ 13 possible errors found ═════
+┌ umbral_rechazo(λn::Integer, λd::Integer, beta::Real) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:150
+│┌ umbral_rechazo(λn::Integer, λd::Integer, beta::Real; prec::Int64, kmax::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:152
+││┌ setprecision(f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││┌ setprecision(f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+│││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││└────────────────────
+││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+│││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:154
+│││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+│││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+│││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:165
+│││││┌ setrounding(f::PermanenciaV1.var"#49#50"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#49#50"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#49#50"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:166
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:173
+│││││┌ setrounding(f::PermanenciaV1.var"#51#52"{BigFloat, BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#51#52"{BigFloat, BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#51#52"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:174
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││└────────────────────
+│││││││┌ (::PermanenciaV1.var"#51#52"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:174
+││││││││ runtime dispatch detected: (%5::Any PermanenciaV1.:/ %6::BigFloat)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:176
+│││││┌ setrounding(f::PermanenciaV1.var"#53#54"{BigFloat, BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#53#54"{BigFloat, BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#53#54"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:177
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││└────────────────────
+│││││││┌ (::PermanenciaV1.var"#53#54"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:177
+││││││││ runtime dispatch detected: (%5::Any PermanenciaV1.:/ %6::BigFloat)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:179
+│││││┌ setrounding(f::PermanenciaV1.var"#55#56", ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#55#56", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#55#56")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:180
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:182
+│││││┌ setrounding(f::PermanenciaV1.var"#57#58", ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#57#58", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#57#58")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:183
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+│││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:185
+│││││┌ setrounding(f::PermanenciaV1.var"#59#60"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││┌ setrounding_raw(f::PermanenciaV1.var"#59#60"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││┌ (::PermanenciaV1.var"#59#60"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:186
+││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││└────────────────────
+││┌ setprecision(f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││ runtime dispatch detected: Base.MPFR.:(var"#setprecision#29")(2, #self#::typeof(setprecision), f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, _3::Type{BigFloat}, prec::Int64)::Tuple{Int64, Bool}
+││└────────────────────
+┌ umbral_rechazo(λn::Integer, λd::Integer, beta::Real) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:150
+│ runtime dispatch detected: PermanenciaV1.:(var"#umbral_rechazo#33")(256, 1000000, #self#::typeof(umbral_rechazo), λn::Integer, λd::Integer, beta::Real)::Tuple{Int64, Bool}
+└────────────────────
+
+### potencia_garantizada
+═════ 37 possible errors found ═════
+┌ potencia_garantizada(λn::Integer, λd::Integer, K::Integer) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:203
+│┌ potencia_garantizada(λn::Integer, λd::Integer, K::Integer; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:204
+││┌ setprecision(f::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││┌ setprecision(f::PermanenciaV1.var"#63#64"{…}, ::Type{…}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+│││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││└────────────────────
+││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+│││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││└────────────────────
+││││┌ (::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:205
+│││││┌ kwcall(::@NamedTuple{prec::Int64}, ::typeof(poisson_cdf_intervalo), λn::Integer, λd::Integer, k::Integer) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:61
+││││││┌ poisson_cdf_intervalo(λn::Integer, λd::Integer, k::Integer; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:62
+│││││││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││││││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:65
+││││││││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+│││││││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+││││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+│││││││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+││││││││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+│││││││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:76
+││││││││││┌ (::Colon)(a::Int64, b::Integer) @ Base ./range.jl:3
+│││││││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:404
+││││││││││││┌ _promote(x::Int64, y::Integer) @ Base ./promotion.jl:378
+│││││││││││││┌ promote_type(::Type{Int64}, ::Type{<:Integer}) @ Base ./promotion.jl:322
+││││││││││││││┌ promote_result(::Type{Int64}, ::Type{<:Integer}, ::Type{Int64}, ::Type{S}) where S @ Base ./promotion.jl:342
+│││││││││││││││┌ promote_result(::Type{Int64}, ::Type, ::Type{Int64}, ::Type{S}) where S @ Base ./promotion.jl:342
+││││││││││││││││ runtime dispatch detected: promote_type(::Int64, %1::Type)::Any
+│││││││││││││││└────────────────────
+│││││││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:405
+││││││││││││┌ not_sametype(x::T, y::T) where T<:Tuple{Int64, Integer} @ Base ./promotion.jl:422
+│││││││││││││┌ sametype_error(input::Tuple{Int64, Integer}) @ Base ./promotion.jl:428
+││││││││││││││┌ map(f::Base.var"#sametype_error##0#sametype_error##1", t::Tuple{Int64, Integer}) @ Base ./tuple.jl:355
+│││││││││││││││┌ (::Base.var"#sametype_error##0#sametype_error##1")(x::Int64) @ Base ./promotion.jl:429
+││││││││││││││││┌ string(xs::Type{Int64}) @ Base ./strings/io.jl:186
+│││││││││││││││││┌ print_to_string(xs::Type{Int64}) @ Base ./strings/io.jl:145
+││││││││││││││││││┌ print(io::IOBuffer, x::Type{Int64}) @ Base ./strings/io.jl:35
+│││││││││││││││││││┌ show(io::IOBuffer, x::Type{Int64}) @ Base ./show.jl:978
+││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:983
+│││││││││││││││││││││┌ show_typealias(io::IOBuffer, x::Type) @ Base ./show.jl:821
+││││││││││││││││││││││┌ show_typealias(io::IOBuffer, name::GlobalRef, x::Type, env::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:768
+│││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:732
+││││││││││││││││││││││││┌ show(io::IOContext{IOBuffer}, tv::TypeVar) @ Base ./show.jl:2724
+│││││││││││││││││││││││││┌ (::Base.var"#show_bound#show##0")(io::IOContext{IOBuffer}, b::Any) @ Base ./show.jl:2716
+││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, b::Any)::Any
+│││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:727
+││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %269::Any)::Any
+│││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:730
+││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %338::Any)::Any
+│││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:735
+││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %200::Any)::Any
+│││││││││││││││││││││││└────────────────────
+││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:986
+│││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType) @ Base ./show.jl:1139
+││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1142
+│││││││││││││││││││││││┌ maybe_kws_nt(x::DataType) @ Base ./show.jl:1130
+││││││││││││││││││││││││ runtime dispatch detected: eltype(%60::DataType)::Any
+│││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1231
+│││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:732
+││││││││││││││││││││││││┌ show(io::IOBuffer, tv::TypeVar) @ Base ./show.jl:2724
+│││││││││││││││││││││││││┌ (::Base.var"#show_bound#show##0")(io::IOBuffer, b::Any) @ Base ./show.jl:2716
+││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, b::Any)::Any
+│││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:727
+││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %245::Any)::Any
+│││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:730
+││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %302::Any)::Any
+│││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:735
+││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %188::Any)::Any
+│││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1202
+│││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %223::Any)::Any
+││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1207
+│││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %50::Any)::Any
+││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1193
+│││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %53::Any)::Any
+││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1195
+│││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %50::Any)::Any
+││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1217
+│││││││││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOBuffer, %320::Tuple, %319::DataType)::Any
+││││││││││││││││││││││└────────────────────
+││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:989
+│││││││││││││││││││││┌ show_unionaliases(io::IOBuffer, x::Union) @ Base ./show.jl:922
+││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %66::Any)::Any
+│││││││││││││││││││││└────────────────────
+││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:993
+│││││││││││││││││││││┌ show_delim_array(io::IOBuffer, itr::Vector{Any}, op::Char, delim::Char, cl::Char, delim_one::Bool) @ Base ./show.jl:1423
+││││││││││││││││││││││┌ show_delim_array(io::IOBuffer, itr::Vector{Any}, op::Char, delim::Char, cl::Char, delim_one::Bool, i1::Int64, l::Int64) @ Base ./show.jl:1434
+│││││││││││││││││││││││ runtime dispatch detected: show(%3::IOContext{IOBuffer}, %50::Any)::Any
+││││││││││││││││││││││└────────────────────
+││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:1020
+│││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1202
+││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %260::Any)::Any
+│││││││││││││││││││││└────────────────────
+│││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1207
+││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %62::Any)::Any
+│││││││││││││││││││││└────────────────────
+│││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1193
+││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %65::Any)::Any
+│││││││││││││││││││││└────────────────────
+│││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1195
+││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %62::Any)::Any
+│││││││││││││││││││││└────────────────────
+│││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1217
+││││││││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOContext{IOBuffer}, %431::Tuple, %430::DataType)::Any
+│││││││││││││││││││││└────────────────────
+│││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1225
+││││││││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOContext{IOBuffer}, %516::Tuple, %520::DataType)::Any
+│││││││││││││││││││││└────────────────────
+││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:1022
+│││││││││││││││││││││ runtime dispatch detected: show(%77::IOContext{IOBuffer}, %78::Any)::Any
+││││││││││││││││││││└────────────────────
+│││││││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:404
+││││││││││││ runtime dispatch detected: Base._promote(x::Int64, y::Integer)::Tuple{Any, Any}
+│││││││││││└────────────────────
+│││││││││││┌ promote(x::Int64, y::Integer) @ Base ./promotion.jl:405
+││││││││││││ runtime dispatch detected: Base.not_sametype(%4::Tuple{Int64, Integer}, %5::Tuple{Any, Any})::Any
+│││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:78
+││││││││││┌ setrounding(f::PermanenciaV1.var"#19#20"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││ runtime dispatch detected: Base.MPFR.setrounding_raw(f::PermanenciaV1.var"#19#20"{BigFloat}, BigFloat, MPFRRoundDown)::Any
+││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:81
+││││││││││┌ setrounding(f::PermanenciaV1.var"#21#22"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││ runtime dispatch detected: Base.MPFR.setrounding_raw(f::PermanenciaV1.var"#21#22"{BigFloat}, BigFloat, MPFRRoundUp)::Any
+││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:84
+││││││││││┌ setrounding(f::PermanenciaV1.var"#23#24", ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#23#24", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││┌ (::PermanenciaV1.var"#23#24")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:85
+│││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+││││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:87
+││││││││││┌ setrounding(f::PermanenciaV1.var"#25#26", ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#25#26", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││┌ (::PermanenciaV1.var"#25#26")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:88
+│││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+││││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:91
+││││││││││┌ setrounding(f::PermanenciaV1.var"#27#28"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#27#28"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││┌ (::PermanenciaV1.var"#27#28"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:92
+│││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+││││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:94
+││││││││││┌ setrounding(f::PermanenciaV1.var"#29#30"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#29#30"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││┌ (::PermanenciaV1.var"#29#30"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:95
+│││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+││││││││││││└────────────────────
+│││││││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││││││ runtime dispatch detected: Base.MPFR.:(var"#setprecision#29")(2, #self#::typeof(setprecision), f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, <:Integer}, _3::Type{BigFloat}, prec::Int64)::Tuple{Any, Any}
+│││││││└────────────────────
+││┌ setprecision(f::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││ runtime dispatch detected: Base.MPFR.:(var"#setprecision#29")(2, #self#::typeof(setprecision), f::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, <:Integer}, _3::Type{BigFloat}, prec::Int64)::Any
+││└────────────────────
+
+### periodos_deteccion
+═════ 49 possible errors found ═════
+┌ periodos_deteccion(λn::Integer, λd::Integer, s_num::Integer, s_den::Integer, beta::Real, gamma::Real) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:247
+│┌  @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:262
+││┌ kwcall(::@NamedTuple{…}, ::typeof(PermanenciaV1._potencia_y_umbral), λn::Integer, λd::Integer, T::Int64, s_num::Integer, s_den::Integer, beta::Real) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:226
+│││┌ _potencia_y_umbral(λn::Integer, λd::Integer, T::Int64, s_num::Integer, s_den::Integer, beta::Real; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:233
+││││┌ +(::Any, ::Any, ::Int64) @ Base ./operators.jl:653
+│││││ runtime dispatch detected: (a::Any + b::Any)::Any
+││││└────────────────────
+││││┌ +(::Any, ::Any, ::Int64) @ Base ./operators.jl:653
+│││││ runtime dispatch detected: (%1::Any + c::Int64)::Any
+││││└────────────────────
+│││┌ _potencia_y_umbral(λn::Integer, λd::Integer, T::Int64, s_num::Integer, s_den::Integer, beta::Real; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:234
+││││┌ kwcall(::NamedTuple{(:prec, :kmax), <:Tuple{…}}, ::typeof(umbral_rechazo), λn::Integer, λd::Integer, beta::Real) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:150
+│││││┌ umbral_rechazo(λn::Integer, λd::Integer, beta::Real; prec::Int64, kmax::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:152
+││││││┌ setprecision(f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││││││┌ setprecision(f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+│││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││││││└────────────────────
+││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+│││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││││││└────────────────────
+││││││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:154
+│││││││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+││││││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+││││││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+│││││││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+││││││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││││││││││└────────────────────
+││││││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:165
+│││││││││┌ setrounding(f::PermanenciaV1.var"#49#50"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#49#50"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││┌ (::PermanenciaV1.var"#49#50"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:166
+││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││││││└────────────────────
+││││││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:173
+│││││││││┌ setrounding(f::PermanenciaV1.var"#51#52"{BigFloat, BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#51#52"{BigFloat, BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││┌ (::PermanenciaV1.var"#51#52"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:174
+││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││││││└────────────────────
+│││││││││││┌ (::PermanenciaV1.var"#51#52"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:174
+││││││││││││ runtime dispatch detected: (%5::Any PermanenciaV1.:/ %6::BigFloat)::Any
+│││││││││││└────────────────────
+││││││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:176
+│││││││││┌ setrounding(f::PermanenciaV1.var"#53#54"{BigFloat, BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#53#54"{BigFloat, BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││┌ (::PermanenciaV1.var"#53#54"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:177
+││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││││││└────────────────────
+│││││││││││┌ (::PermanenciaV1.var"#53#54"{BigFloat, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:177
+││││││││││││ runtime dispatch detected: (%5::Any PermanenciaV1.:/ %6::BigFloat)::Any
+│││││││││││└────────────────────
+││││││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:179
+│││││││││┌ setrounding(f::PermanenciaV1.var"#55#56", ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#55#56", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││┌ (::PermanenciaV1.var"#55#56")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:180
+││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+│││││││││││└────────────────────
+││││││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:182
+│││││││││┌ setrounding(f::PermanenciaV1.var"#57#58", ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#57#58", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││┌ (::PermanenciaV1.var"#57#58")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:183
+││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+│││││││││││└────────────────────
+││││││││┌ (::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:185
+│││││││││┌ setrounding(f::PermanenciaV1.var"#59#60"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#59#60"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││┌ (::PermanenciaV1.var"#59#60"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:186
+││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+│││││││││││└────────────────────
+││││││┌ setprecision(f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││││││ runtime dispatch detected: Base.MPFR.:(var"#setprecision#29")(2, #self#::typeof(setprecision), f::PermanenciaV1.var"#43#44"{Int64, <:Integer, <:Integer}, _3::Type{BigFloat}, prec::Int64)::Tuple{Int64, Bool}
+││││││└────────────────────
+│││┌ _potencia_y_umbral(λn::Integer, λd::Integer, T::Int64, s_num::Integer, s_den::Integer, beta::Real; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:236
+││││┌ kwcall(::@NamedTuple{prec::Int64}, ::typeof(potencia_garantizada), λn::Integer, λd::Integer, K::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:203
+│││││┌ potencia_garantizada(λn::Integer, λd::Integer, K::Int64; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:204
+││││││┌ setprecision(f::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, Int64}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││││││┌ setprecision(f::PermanenciaV1.var"#63#64"{…}, ::Type{…}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+││││││││┌ (::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, Int64})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:205
+│││││││││┌ kwcall(::@NamedTuple{prec::Int64}, ::typeof(poisson_cdf_intervalo), λn::Integer, λd::Integer, k::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:61
+││││││││││┌ poisson_cdf_intervalo(λn::Integer, λd::Integer, k::Int64; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:62
+│││││││││││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, Int64}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││││││││││┌ setprecision(f::PermanenciaV1.var"#13#14", ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+│││││││││││││┌ (::PermanenciaV1.var"#13#14")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:76
+││││││││││││││┌ (::Colon)(a::Int64, b::Real) @ Base ./range.jl:3
+│││││││││││││││┌ promote(x::Int64, y::Real) @ Base ./promotion.jl:404
+││││││││││││││││┌ _promote(x::Int64, y::Real) @ Base ./promotion.jl:378
+│││││││││││││││││┌ promote_type(::Type{Int64}, ::Type{S} where S<:Real) @ Base ./promotion.jl:322
+││││││││││││││││││┌ promote_result(::Type{Int64}, ::Type{S} where S<:Real, ::Type{Int64}, ::Type{S}) where S @ Base ./promotion.jl:342
+│││││││││││││││││││ runtime dispatch detected: promote_type(::Int64, %1::Type)::Any
+││││││││││││││││││└────────────────────
+│││││││││││││││┌ promote(x::Int64, y::Real) @ Base ./promotion.jl:405
+││││││││││││││││┌ not_sametype(x::T, y::T) where T<:Tuple{Int64, Real} @ Base ./promotion.jl:422
+│││││││││││││││││┌ sametype_error(input::Tuple{Int64, Real}) @ Base ./promotion.jl:428
+││││││││││││││││││┌ map(f::Base.var"#sametype_error##0#sametype_error##1", t::Tuple{Int64, Real}) @ Base ./tuple.jl:355
+│││││││││││││││││││┌ (::Base.var"#sametype_error##0#sametype_error##1")(x::Int64) @ Base ./promotion.jl:429
+││││││││││││││││││││┌ string(xs::Type{Int64}) @ Base ./strings/io.jl:186
+│││││││││││││││││││││┌ print_to_string(xs::Type{Int64}) @ Base ./strings/io.jl:145
+││││││││││││││││││││││┌ print(io::IOBuffer, x::Type{Int64}) @ Base ./strings/io.jl:35
+│││││││││││││││││││││││┌ show(io::IOBuffer, x::Type{Int64}) @ Base ./show.jl:978
+││││││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:983
+│││││││││││││││││││││││││┌ show_typealias(io::IOBuffer, x::Type) @ Base ./show.jl:821
+││││││││││││││││││││││││││┌ show_typealias(io::IOBuffer, name::GlobalRef, x::Type, env::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:768
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:732
+││││││││││││││││││││││││││││┌ show(io::IOContext{IOBuffer}, tv::TypeVar) @ Base ./show.jl:2724
+│││││││││││││││││││││││││││││┌ (::Base.var"#show_bound#show##0")(io::IOContext{IOBuffer}, b::Any) @ Base ./show.jl:2716
+││││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, b::Any)::Any
+│││││││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:727
+││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %269::Any)::Any
+│││││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:730
+││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %338::Any)::Any
+│││││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOContext{IOBuffer}, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:735
+││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %200::Any)::Any
+│││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:986
+│││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType) @ Base ./show.jl:1139
+││││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1142
+│││││││││││││││││││││││││││┌ maybe_kws_nt(x::DataType) @ Base ./show.jl:1130
+││││││││││││││││││││││││││││ runtime dispatch detected: eltype(%60::DataType)::Any
+│││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1231
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:732
+││││││││││││││││││││││││││││┌ show(io::IOBuffer, tv::TypeVar) @ Base ./show.jl:2724
+│││││││││││││││││││││││││││││┌ (::Base.var"#show_bound#show##0")(io::IOBuffer, b::Any) @ Base ./show.jl:2716
+││││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, b::Any)::Any
+│││││││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:727
+││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %245::Any)::Any
+│││││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:730
+││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %302::Any)::Any
+│││││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││││┌ show_typeparams(io::IOBuffer, env::Core.SimpleVector, orig::Core.SimpleVector, wheres::Vector{TypeVar}) @ Base ./show.jl:735
+││││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %188::Any)::Any
+│││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1202
+│││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %223::Any)::Any
+││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1207
+│││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %50::Any)::Any
+││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1193
+│││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %53::Any)::Any
+││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1195
+│││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %50::Any)::Any
+││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││││┌ show_datatype(io::IOBuffer, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1217
+│││││││││││││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOBuffer, %320::Tuple, %319::DataType)::Any
+││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:989
+│││││││││││││││││││││││││┌ show_unionaliases(io::IOBuffer, x::Union) @ Base ./show.jl:922
+││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOBuffer, %66::Any)::Any
+│││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:993
+│││││││││││││││││││││││││┌ show_delim_array(io::IOBuffer, itr::Vector{Any}, op::Char, delim::Char, cl::Char, delim_one::Bool) @ Base ./show.jl:1423
+││││││││││││││││││││││││││┌ show_delim_array(io::IOBuffer, itr::Vector{Any}, op::Char, delim::Char, cl::Char, delim_one::Bool, i1::Int64, l::Int64) @ Base ./show.jl:1434
+│││││││││││││││││││││││││││ runtime dispatch detected: show(%3::IOContext{IOBuffer}, %50::Any)::Any
+││││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:1020
+│││││││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1202
+││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %260::Any)::Any
+│││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1207
+││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %62::Any)::Any
+│││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1193
+││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %65::Any)::Any
+│││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1195
+││││││││││││││││││││││││││ runtime dispatch detected: show(io::IOContext{IOBuffer}, %62::Any)::Any
+│││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1217
+││││││││││││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOContext{IOBuffer}, %431::Tuple, %430::DataType)::Any
+│││││││││││││││││││││││││└────────────────────
+│││││││││││││││││││││││││┌ show_datatype(io::IOContext{IOBuffer}, x::DataType, wheres::Vector{TypeVar}) @ Base ./show.jl:1225
+││││││││││││││││││││││││││ runtime dispatch detected: Base.show_at_namedtuple(io::IOContext{IOBuffer}, %516::Tuple, %520::DataType)::Any
+│││││││││││││││││││││││││└────────────────────
+││││││││││││││││││││││││┌ _show_type(io::IOBuffer, x::Type) @ Base ./show.jl:1022
+│││││││││││││││││││││││││ runtime dispatch detected: show(%77::IOContext{IOBuffer}, %78::Any)::Any
+││││││││││││││││││││││││└────────────────────
+│││││││││││││││┌ promote(x::Int64, y::Real) @ Base ./promotion.jl:404
+││││││││││││││││ runtime dispatch detected: Base._promote(x::Int64, y::Real)::Tuple{Any, Any}
+│││││││││││││││└────────────────────
+│││││││││││││││┌ promote(x::Int64, y::Real) @ Base ./promotion.jl:405
+││││││││││││││││ runtime dispatch detected: Base.not_sametype(%4::Tuple{Int64, Real}, %5::Tuple{Any, Any})::Any
+│││││││││││││││└────────────────────
+│││││││││││││┌ (::PermanenciaV1.var"#13#14")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:78
+││││││││││││││┌ setrounding(f::PermanenciaV1.var"#19#20"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││││││ runtime dispatch detected: Base.MPFR.setrounding_raw(f::PermanenciaV1.var"#19#20"{BigFloat}, BigFloat, MPFRRoundDown)::Any
+││││││││││││││└────────────────────
+│││││││││││││┌ (::PermanenciaV1.var"#13#14")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:81
+││││││││││││││┌ setrounding(f::PermanenciaV1.var"#21#22"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││││││ runtime dispatch detected: Base.MPFR.setrounding_raw(f::PermanenciaV1.var"#21#22"{BigFloat}, BigFloat, MPFRRoundUp)::Any
+││││││││││││││└────────────────────
+│││││││││││││┌ (::PermanenciaV1.var"#13#14")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:84
+││││││││││││││┌ setrounding(f::PermanenciaV1.var"#23#24", ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#23#24", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││││││┌ (::PermanenciaV1.var"#23#24")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:85
+│││││││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+││││││││││││││││└────────────────────
+│││││││││││││┌ (::PermanenciaV1.var"#13#14")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:87
+││││││││││││││┌ setrounding(f::PermanenciaV1.var"#25#26", ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#25#26", ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││││││┌ (::PermanenciaV1.var"#25#26")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:88
+│││││││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:+ %6::Any)::Any
+││││││││││││││││└────────────────────
+│││││││││││││┌ (::PermanenciaV1.var"#13#14")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:91
+││││││││││││││┌ setrounding(f::PermanenciaV1.var"#27#28"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Down}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#27#28"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││││││┌ (::PermanenciaV1.var"#27#28"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:92
+│││││││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+││││││││││││││││└────────────────────
+│││││││││││││┌ (::PermanenciaV1.var"#13#14")() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:94
+││││││││││││││┌ setrounding(f::PermanenciaV1.var"#29#30"{BigFloat}, ::Type{BigFloat}, r::RoundingMode{:Up}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#29#30"{BigFloat}, ::Type{BigFloat}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││││││┌ (::PermanenciaV1.var"#29#30"{BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:95
+│││││││││││││││││ runtime dispatch detected: (%3::Any PermanenciaV1.:* %4::BigFloat)::Any
+││││││││││││││││└────────────────────
+│││││││││││┌ setprecision(f::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, Int64}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││││││││││ failed to optimize due to recursion: setprecision(::PermanenciaV1.var"#13#14"{<:Integer, <:Integer, Int64}, ::Type{BigFloat}, ::Int64)
+│││││││││││└────────────────────
+││││││┌ setprecision(f::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, Int64}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││││││ runtime dispatch detected: Base.MPFR.:(var"#setprecision#29")(2, #self#::typeof(setprecision), f::PermanenciaV1.var"#63#64"{Int64, <:Integer, <:Integer, Int64}, _3::Type{BigFloat}, prec::Int64)::Any
+││││││└────────────────────
+┌ periodos_deteccion(λn::Integer, λd::Integer, s_num::Integer, s_den::Integer, beta::Real, gamma::Real) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:247
+│ runtime dispatch detected: PermanenciaV1.:(var"#periodos_deteccion#67")(256, 200000, #self#::typeof(periodos_deteccion), λn::Integer, λd::Integer, s_num::Integer, s_den::Integer, beta::Real, gamma::Real)::Tuple{Int64, Int64, Any}
+└────────────────────
+

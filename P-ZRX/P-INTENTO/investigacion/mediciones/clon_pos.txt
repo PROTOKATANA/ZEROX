@@ -1,0 +1,221 @@
+warning: profile package spec `cranelift-wasm` in profile `dev` did not match any packages
+    Finished `bench` profile [optimized] target(s) in 0.31s
+     Running benches/pos.rs (/home/katana/zeo/ZEROX/P-ZRX/P-INTENTO/investigacion/target/release/deps/pos-9bcb231c094e3103)
+Benchmarking chia/table/single/1x
+Benchmarking chia/table/single/1x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 7.3s.
+Benchmarking chia/table/single/1x: Collecting 10 samples in estimated 7.2928 s (10 iterations)
+Benchmarking chia/table/single/1x: Analyzing
+chia/table/single/1x    time:   [724.18 ms 727.77 ms 732.06 ms]
+                        thrpt:  [1.3660  elem/s 1.3741  elem/s 1.3809  elem/s]
+Benchmarking chia/table/single/2x
+Benchmarking chia/table/single/2x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 7.6s.
+Benchmarking chia/table/single/2x: Collecting 10 samples in estimated 7.6297 s (10 iterations)
+Benchmarking chia/table/single/2x: Analyzing
+chia/table/single/2x    time:   [760.05 ms 762.34 ms 765.16 ms]
+                        thrpt:  [2.6138  elem/s 2.6235  elem/s 2.6314  elem/s]
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high mild
+Benchmarking chia/table/single/4x
+Benchmarking chia/table/single/4x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 8.1s.
+Benchmarking chia/table/single/4x: Collecting 10 samples in estimated 8.1221 s (10 iterations)
+Benchmarking chia/table/single/4x: Analyzing
+chia/table/single/4x    time:   [812.26 ms 812.99 ms 813.71 ms]
+                        thrpt:  [4.9158  elem/s 4.9201  elem/s 4.9245  elem/s]
+Benchmarking chia/table/single/8x
+Benchmarking chia/table/single/8x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 8.6s.
+Benchmarking chia/table/single/8x: Collecting 10 samples in estimated 8.5621 s (10 iterations)
+Benchmarking chia/table/single/8x: Analyzing
+chia/table/single/8x    time:   [854.57 ms 855.52 ms 856.30 ms]
+                        thrpt:  [9.3425  elem/s 9.3511  elem/s 9.3614  elem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low severe
+Benchmarking chia/table/single/16x
+Benchmarking chia/table/single/16x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 9.0s.
+Benchmarking chia/table/single/16x: Collecting 10 samples in estimated 8.9571 s (10 iterations)
+Benchmarking chia/table/single/16x: Analyzing
+chia/table/single/16x   time:   [894.75 ms 897.22 ms 900.62 ms]
+                        thrpt:  [17.766  elem/s 17.833  elem/s 17.882  elem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking chia/table/parallel/1x
+Benchmarking chia/table/parallel/1x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 5.4s or enable flat sampling.
+Benchmarking chia/table/parallel/1x: Collecting 10 samples in estimated 5.3892 s (55 iterations)
+Benchmarking chia/table/parallel/1x: Analyzing
+chia/table/parallel/1x  time:   [96.798 ms 98.205 ms 98.931 ms]
+                        thrpt:  [10.108  elem/s 10.183  elem/s 10.331  elem/s]
+Benchmarking chia/table/parallel/2x
+Benchmarking chia/table/parallel/2x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 8.5s or enable flat sampling.
+Benchmarking chia/table/parallel/2x: Collecting 10 samples in estimated 8.5418 s (55 iterations)
+Benchmarking chia/table/parallel/2x: Analyzing
+chia/table/parallel/2x  time:   [153.92 ms 157.43 ms 160.37 ms]
+                        thrpt:  [12.472  elem/s 12.704  elem/s 12.994  elem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking chia/table/parallel/4x
+Benchmarking chia/table/parallel/4x: Warming up for 3.0000 s
+Benchmarking chia/table/parallel/4x: Collecting 10 samples in estimated 5.5423 s (20 iterations)
+Benchmarking chia/table/parallel/4x: Analyzing
+chia/table/parallel/4x  time:   [263.70 ms 268.47 ms 273.28 ms]
+                        thrpt:  [14.637  elem/s 14.899  elem/s 15.168  elem/s]
+Benchmarking chia/table/parallel/8x
+Benchmarking chia/table/parallel/8x: Warming up for 3.0000 s
+Benchmarking chia/table/parallel/8x: Collecting 10 samples in estimated 8.2934 s (20 iterations)
+Benchmarking chia/table/parallel/8x: Analyzing
+chia/table/parallel/8x  time:   [418.00 ms 424.69 ms 431.74 ms]
+                        thrpt:  [18.530  elem/s 18.837  elem/s 19.139  elem/s]
+Benchmarking chia/table/parallel/16x
+Benchmarking chia/table/parallel/16x: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 7.5s.
+Benchmarking chia/table/parallel/16x: Collecting 10 samples in estimated 7.5470 s (10 iterations)
+Benchmarking chia/table/parallel/16x: Analyzing
+chia/table/parallel/16x time:   [741.73 ms 751.71 ms 759.10 ms]
+                        thrpt:  [21.078  elem/s 21.285  elem/s 21.571  elem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low severe
+Benchmarking chia/proof/missing
+Benchmarking chia/proof/missing: Warming up for 3.0000 s
+Benchmarking chia/proof/missing: Collecting 10 samples in estimated 5.0000 s (5.1B iterations)
+Benchmarking chia/proof/missing: Analyzing
+chia/proof/missing      time:   [987.64 ps 987.87 ps 988.32 ps]
+                        thrpt:  [1.0118 Gelem/s 1.0123 Gelem/s 1.0125 Gelem/s]
+Benchmarking chia/proof/present
+Benchmarking chia/proof/present: Warming up for 3.0000 s
+Benchmarking chia/proof/present: Collecting 10 samples in estimated 5.0000 s (2.0B iterations)
+Benchmarking chia/proof/present: Analyzing
+chia/proof/present      time:   [2.5492 ns 2.5524 ns 2.5545 ns]
+                        thrpt:  [391.46 Melem/s 391.78 Melem/s 392.28 Melem/s]
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) low mild
+Benchmarking chia/proof/for-record
+Benchmarking chia/proof/for-record: Warming up for 3.0000 s
+Benchmarking chia/proof/for-record: Collecting 10 samples in estimated 5.5024 s (165 iterations)
+Benchmarking chia/proof/for-record: Analyzing
+chia/proof/for-record   time:   [33.312 ms 33.314 ms 33.319 ms]
+                        thrpt:  [30.013  elem/s 30.017  elem/s 30.020  elem/s]
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high mild
+Benchmarking chia/verification
+Benchmarking chia/verification: Warming up for 3.0000 s
+Benchmarking chia/verification: Collecting 10 samples in estimated 5.0001 s (573k iterations)
+Benchmarking chia/verification: Analyzing
+chia/verification       time:   [8.7166 µs 8.7218 µs 8.7327 µs]
+                        thrpt:  [114.51 Kelem/s 114.66 Kelem/s 114.72 Kelem/s]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low severe
+  1 (10.00%) high severe
+
+Benchmarking shim/table/single/1x
+Benchmarking shim/table/single/1x: Warming up for 3.0000 s
+Benchmarking shim/table/single/1x: Collecting 10 samples in estimated 5.0000 s (28B iterations)
+Benchmarking shim/table/single/1x: Analyzing
+shim/table/single/1x    time:   [178.68 ps 178.72 ps 178.76 ps]
+                        thrpt:  [5.5940 Gelem/s 5.5954 Gelem/s 5.5966 Gelem/s]
+Benchmarking shim/table/single/2x
+Benchmarking shim/table/single/2x: Warming up for 3.0000 s
+Benchmarking shim/table/single/2x: Collecting 10 samples in estimated 5.0002 s (1.1M iterations)
+Benchmarking shim/table/single/2x: Analyzing
+shim/table/single/2x    time:   [4.3135 µs 4.3581 µs 4.3993 µs]
+                        thrpt:  [454.62 Kelem/s 458.91 Kelem/s 463.66 Kelem/s]
+Found 3 outliers among 10 measurements (30.00%)
+  1 (10.00%) low severe
+  2 (20.00%) high severe
+Benchmarking shim/table/single/4x
+Benchmarking shim/table/single/4x: Warming up for 3.0000 s
+Benchmarking shim/table/single/4x: Collecting 10 samples in estimated 5.0003 s (1.0M iterations)
+Benchmarking shim/table/single/4x: Analyzing
+shim/table/single/4x    time:   [4.6998 µs 4.7363 µs 4.7919 µs]
+                        thrpt:  [834.74 Kelem/s 844.54 Kelem/s 851.10 Kelem/s]
+Benchmarking shim/table/single/8x
+Benchmarking shim/table/single/8x: Warming up for 3.0000 s
+Benchmarking shim/table/single/8x: Collecting 10 samples in estimated 5.0002 s (760k iterations)
+Benchmarking shim/table/single/8x: Analyzing
+shim/table/single/8x    time:   [6.5483 µs 6.5714 µs 6.6056 µs]
+                        thrpt:  [1.2111 Melem/s 1.2174 Melem/s 1.2217 Melem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking shim/table/single/16x
+Benchmarking shim/table/single/16x: Warming up for 3.0000 s
+Benchmarking shim/table/single/16x: Collecting 10 samples in estimated 5.0006 s (444k iterations)
+Benchmarking shim/table/single/16x: Analyzing
+shim/table/single/16x   time:   [11.216 µs 11.232 µs 11.241 µs]
+                        thrpt:  [1.4233 Melem/s 1.4245 Melem/s 1.4265 Melem/s]
+Benchmarking shim/table/parallel/1x
+Benchmarking shim/table/parallel/1x: Warming up for 3.0000 s
+Benchmarking shim/table/parallel/1x: Collecting 10 samples in estimated 5.0000 s (28B iterations)
+Benchmarking shim/table/parallel/1x: Analyzing
+shim/table/parallel/1x  time:   [179.29 ps 179.35 ps 179.43 ps]
+                        thrpt:  [5.5733 Gelem/s 5.5757 Gelem/s 5.5775 Gelem/s]
+Benchmarking shim/table/parallel/2x
+Benchmarking shim/table/parallel/2x: Warming up for 3.0000 s
+Benchmarking shim/table/parallel/2x: Collecting 10 samples in estimated 5.0001 s (1.1M iterations)
+Benchmarking shim/table/parallel/2x: Analyzing
+shim/table/parallel/2x  time:   [4.3724 µs 4.4428 µs 4.5173 µs]
+                        thrpt:  [442.74 Kelem/s 450.17 Kelem/s 457.41 Kelem/s]
+Benchmarking shim/table/parallel/4x
+Benchmarking shim/table/parallel/4x: Warming up for 3.0000 s
+Benchmarking shim/table/parallel/4x: Collecting 10 samples in estimated 5.0002 s (1.0M iterations)
+Benchmarking shim/table/parallel/4x: Analyzing
+shim/table/parallel/4x  time:   [4.8223 µs 4.8614 µs 4.9110 µs]
+                        thrpt:  [814.50 Kelem/s 822.80 Kelem/s 829.47 Kelem/s]
+Benchmarking shim/table/parallel/8x
+Benchmarking shim/table/parallel/8x: Warming up for 3.0000 s
+Benchmarking shim/table/parallel/8x: Collecting 10 samples in estimated 5.0001 s (760k iterations)
+Benchmarking shim/table/parallel/8x: Analyzing
+shim/table/parallel/8x  time:   [6.5301 µs 6.5354 µs 6.5437 µs]
+                        thrpt:  [1.2226 Melem/s 1.2241 Melem/s 1.2251 Melem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking shim/table/parallel/16x
+Benchmarking shim/table/parallel/16x: Warming up for 3.0000 s
+Benchmarking shim/table/parallel/16x: Collecting 10 samples in estimated 5.0002 s (445k iterations)
+Benchmarking shim/table/parallel/16x: Analyzing
+shim/table/parallel/16x time:   [11.145 µs 11.189 µs 11.258 µs]
+                        thrpt:  [1.4212 Melem/s 1.4300 Melem/s 1.4356 Melem/s]
+Benchmarking shim/proof/missing
+Benchmarking shim/proof/missing: Warming up for 3.0000 s
+Benchmarking shim/proof/missing: Collecting 10 samples in estimated 5.0000 s (52M iterations)
+Benchmarking shim/proof/missing: Analyzing
+shim/proof/missing      time:   [95.911 ns 95.929 ns 95.962 ns]
+                        thrpt:  [10.421 Melem/s 10.424 Melem/s 10.426 Melem/s]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low severe
+  1 (10.00%) high mild
+Benchmarking shim/proof/present
+Benchmarking shim/proof/present: Warming up for 3.0000 s
+Benchmarking shim/proof/present: Collecting 10 samples in estimated 5.0000 s (20M iterations)
+Benchmarking shim/proof/present: Analyzing
+shim/proof/present      time:   [258.47 ns 262.41 ns 264.54 ns]
+                        thrpt:  [3.7802 Melem/s 3.8108 Melem/s 3.8690 Melem/s]
+Benchmarking shim/proof/for-record
+Benchmarking shim/proof/for-record: Warming up for 3.0000 s
+Benchmarking shim/proof/for-record: Collecting 10 samples in estimated 5.1074 s (495 iterations)
+Benchmarking shim/proof/for-record: Analyzing
+shim/proof/for-record   time:   [10.059 ms 10.161 ms 10.291 ms]
+                        thrpt:  [97.173  elem/s 98.414  elem/s 99.417  elem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking shim/verification
+Benchmarking shim/verification: Warming up for 3.0000 s
+Benchmarking shim/verification: Collecting 10 samples in estimated 5.0000 s (19M iterations)
+Benchmarking shim/verification: Analyzing
+shim/verification       time:   [264.71 ns 264.86 ns 265.09 ns]
+                        thrpt:  [3.7724 Melem/s 3.7755 Melem/s 3.7777 Melem/s]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+

@@ -1,0 +1,2675 @@
+
+===== PDF_PAGE 1 =====
+SpaceMint: A Cryptocurrency Based on Proofs of Space ∗
+Sunoo Park1, Albert Kwon 1, Georg Fuchsbauer2,
+Peter Gaˇ zi3, Jo¨ el Alwen4, and Krzysztof Pietrzak 4
+1MIT
+2Inria, ENS, CNRS, and PSL
+3IOHK
+4IST Austria
+Abstract
+Bitcoin has become the most successful cryptocur-
+rency ever deployed, and its most distinctive feature
+is that it is decentralized. Its underlying protocol
+(Nakamoto consensus) achieves this by using proof
+of work , which has the drawback that it causes the
+consumption of vast amounts of energy to maintain
+the ledger. Moreover, Bitcoin mining dynamics have
+become less distributed over time.
+Towards addressing these issues, we propose
+SpaceMint, a cryptocurrency based on proofs of space
+instead of proofs of work. Miners in SpaceMint ded-
+icate disk space rather than computation. We argue
+that SpaceMint’s design solves or alleviates several of
+Bitcoin’s issues: most notably, its large energy con-
+sumption. SpaceMint also rewards smaller miners
+fairly according to their contribution to the network,
+thus incentivizing more distributed participation.
+This paper adapts proof of space to enable its use
+in cryptocurrency, studies the attacks that can arise
+against a Bitcoin-like blockchain that uses proof of
+space, and proposes a new blockchain format and
+transaction types to address these attacks. Our pro-
+totype shows that initializing 1 TB for mining takes
+about a day (a one-oﬀ setup cost), and miners spend
+on average just a fraction of a second per block mined.
+Finally, we provide a game-theoretic analysis mod-
+∗In an early version, our proposal was called “Spacecoin.”
+We changed it to “SpaceMint” due to name conﬂicts.
+eling SpaceMint as an extensive game (the canoni-
+cal game-theoretic notion for games that take place
+over time) and show that this stylized game satis-
+ﬁes a strong equilibrium notion, thereby arguing for
+SpaceMint’s stability and consensus.
+1 Introduction
+E-cash was ﬁrst proposed by Chaum [8] in 1983, but
+did not see mainstream interest and deployment until
+the advent of Bitcoin [28] in 2009. With a market
+cap of over 300 trillion US dollars by December 2017,
+Bitcoin has given an unprecedented demonstration
+that the time was ripe for digital currencies.
+On the ﬂip side, Bitcoin’s dramatic expansion has
+provoked serious questions about the currency’s long-
+term sustainability. Bitcoin miners produce proofs of
+work (PoW) to add blocks to theblockchain, the pub-
+lic ledger of all transactions. For each block added,
+there is a reward of newly minted coins. One con-
+cern is that proofs of work deplete large amounts
+of natural resources: by some estimates from De-
+cember 2017, the Bitcoin network consumed over 30
+terawatt-hours per year, which exceeds Denmark’s
+energy consumption. Moreover, most mining is cur-
+rently done by specialized ASICs, which have no use
+beyond Bitcoin mining.
+A related concern is the emergence of a “mining oli-
+garchy” controlled by a handful of powerful entities.
+1
+===== PDF_PAGE 2 =====
+One of the original ideas behind basing Bitcoin min-
+ing on computing power was that anyone could par-
+ticipate in the network by dedicating their spare CPU
+cycles, incurring little cost as they would be repur-
+posing idle time of already-existing personal comput-
+ers. However, modern Bitcoin mining dynamics have
+become starkly diﬀerent [37]: the network’s mining
+clout is overwhelmingly concentrated in large-scale
+mining farms using special-purpose hardware for Bit-
+coin mining, often in collaboration with electricity
+producers. As a result, mining with one’s spare CPU
+cycles today would result in net loss due to electric-
+ity costs. This phenomenon undermines the stability
+and security intended by the original decentralized
+design.
+In light of these issues, there has been increas-
+ing interest in cryptocurrencies based on alterna-
+tives to proofs of work. The most explored alterna-
+tive is proofs of stake (PoStake), in which a miner’s
+probability of successfully creating a block increases
+with the amount of currency he holds, rather than
+the amount of computation he performs. This con-
+cept has several incarnations, from ad-hoc implemen-
+tations in existing cryptocurrencies [22, 36] to de-
+signs with rigorous security proofs in various mod-
+els [23, 21, 9, 10]. While these are innovative propos-
+als, the early constructions have variously suﬀered
+from attacks that arise due to the inexpensive na-
+ture of mining. On the other hand, the more re-
+cent proposals are fairly complex, usually running
+some kind of Byzantine agreement protocol among
+a suﬃciently large subset of stakeholders, and thus
+diverge substantially from the simplicity of the orig-
+inal Nakamoto design. Such schemes also typically
+fail in case of low participation (i.e., if stakeholders
+are not mostly online).
+In this paper, we propose SpaceMint, a cryptocur-
+rency that uses proofs of space (PoSpace) [14, 34, 4]
+to address the aforementioned issues that occur in
+Bitcoin and alternatives such as PoSpace-based cur-
+rencies. To mine blocks in SpaceMint, miners invest
+disk space instead of computing power, and dedicat-
+ing more disk space yields a proportionally higher ex-
+pectation of successfully mining a block. SpaceMint
+has several advantages compared to a PoW-based
+blockchain like Bitcoin, summarized below.
+• Ecological: Once the dedicated space for mining
+is initialized, the cost of mining is marginal: a
+few disk accesses with minimal computation.
+• Economical: Unused disk space is readily avail-
+able on many personal computers today, and the
+marginal cost of dedicating it to SpaceMint min-
+ing would be small (by the previous point).1 We
+thus expect that space will be dedicated towards
+mining even if the reward is much smaller than
+the cost of buying disk space for mining. In con-
+trast, in PoW-based blockchains rational miners
+will stop mining if the reward does not cover the
+energy cost.
+• Egalitarian: Bitcoin mining is done almost en-
+tirely on application-speciﬁc integrated circuits
+(ASIC) and by large “mining farms,” to the
+point that small-scale participation (e.g., based
+on general-purpose hardware) is impossible. We
+believe SpaceMint to be less susceptible to spe-
+cialized hardware than Bitcoin, as discussed in
+§6.
+Another cause of centralization of mining power
+in Bitcoin is mining pools. This paper does
+not address that problem directly, but an ele-
+gant and simple idea [26] to discourage mining
+pools in PoW-based blockchains — namely, hav-
+ing the mining process require the secret key to
+redeem the block reward – can be straightfor-
+wardly adapted for SpaceMint. 2
+1.1 Challenges and Our Contributions
+In order to “replace” PoW by PoSpace to achieve
+consensus on the blockchain, the following problems
+must be addressed.
+• Interactivity: PoSpace, as originally deﬁned [14],
+is an interactive protocol. Although the same
+is true for the original deﬁnition of PoW [13],
+there the interaction was very simple (i.e., a
+two-message, public-coin protocol). PoSpace re-
+1By marginal cost we mean the cost of using disk space that
+otherwise would just sit around unused.
+2In a PoW this can be achieved by, e.g., not applying the
+hash function to a nonce directly, but to its signature. In the
+PoS [14] used for SpaceMint, this can be achieved by augment-
+ing each “label” that is stored with its signature.
+2
+===== PDF_PAGE 3 =====
+quires more interaction, thus it is more challeng-
+ing to adapt PoSpace to the blockchain setting.
+• Determine the winner: In a PoW-based
+blockchain like Bitcoin, the probability of a
+miner being the ﬁrst to ﬁnd an eligible next
+block increases with its hashing power. The
+Bitcoin protocol prescribes that once an eligible
+next block is announced, all miners should ap-
+pend that block to the blockchain and continue
+mining on the new longest chain. Generating a
+PoSpace, on the other hand, is deliberately com-
+putationally cheap. We thus need some way to
+determine which of many diﬀerent proofs “wins”.
+Moreover, the probability of any miner winning
+should be proportional to the space it dedicates,
+and we want a miner to learn if he is a likely
+winner without any interaction.
+• “Nothing-at-stake” problems: When replacing
+PoW by proofs that are computationally easy
+to generate (such as PoStake or PoSpace), a se-
+ries of problems arise known as nothing-at-stake
+problems [16].3 The computation-intensive na-
+ture of Bitcoin mining is a key property that, in-
+formally, ensures that all miners are incentivized
+to concentrate their mining eﬀorts on a single
+chain, which leads to consensus. When mining
+is computationally cheap however, miners can
+intuitively (1) mine on multiple chains simulta-
+neously, not just the one the protocol speciﬁes,
+and (2) try creating many diﬀerent blocks with
+a single proof (of space or of stake) by altering
+the block contents slightly (e.g., by using diﬀer-
+ent transaction sets) before choosing the most
+favorable one to announce. The latter behavior
+is known as “(block) grinding”. Those issues are
+undesirable as
+1. they slow down consensus;
+2. they potentially allocate a greater reward
+to cheating miners
+3. they potentially enable double-spending at-
+tacks by an adversary controlling much less
+than 50% of the space.
+3Although PoSpace-based currencies share some of the is-
+sues PoStake-based currencies have, they are robust to others,
+in particular, PoSpace does not share the tricky participation
+problem of PoStake.
+• Challenge grinding: Yet another issue arises
+when the content of past blocks can inﬂuence
+which blocks are added to the blockchain in fu-
+ture. Then it may be possible for a miner to
+generate a long sequence of blocks whose ear-
+lier blocks might have proofs of low quality, but
+are generated in a biased way (by “grinding”
+through all the possible proofs) so that the miner
+can create high quality proofs later in the se-
+quence. The problem arises when the overall se-
+quence is of higher quality than would be ex-
+pected from the miner’s disk space size, due
+to the disproportionately high quality of later
+blocks. Challenge grinding may be considered a
+nothing-at-stake problem, but we state it sepa-
+rately as, unlike the other nothing-at-stake prob-
+lems, we have not encountered it in other con-
+texts.
+To tackle the interactivity problem, SpaceMint uses
+the Fiat-Shamir paradigm (a standard technique to
+replace a public-coin challenge with a hash of the
+previous message, already used to adapt PoW for
+Bitcoin); additionally, we leverage the blockchain it-
+self to record messages of the PoSpace protocol (con-
+cretely, we use a special type of transaction to record
+the commitment to its space a prover needs to send to
+the veriﬁer in the initialization phase of the PoSpace).
+To determine the winner , we deﬁne a quality func-
+tion, which assigns a quality value to a PoSpace proof.
+This function can be computed by the miner locally,
+and is designed such that the probability of a miner
+having the highest-quality proof in the network is
+proportional to the space it dedicates.
+The nothing-at-stake problems are more challeng-
+ing to solve. To tackle these, we introduce several
+new ideas and leverage existing approaches. To dis-
+incentivize miners from extending multiple chains we
+ensure such behavior is detected and penalize it. To
+prevent block grinding , SpaceMint ensures that the
+PoSpace is “unique”, i.e., a miner can generate ex-
+actly one valid proof for every given challenge, and
+this challenge itself is uniquely determined by the
+proofs that were used to mine a previous block. This
+is done by basically running two chains in parallel, a
+“proof chain” that contains the proofs, and a “signa-
+ture chain” that contains the transactions.
+3
+===== PDF_PAGE 4 =====
+Finally, to address challenge grinding , SpaceMint
+prescribes that past blocks inﬂuence the quality of
+short sequences of future blocks, thus exponentially
+driving down the probability that a miner could gen-
+erate a sequence of blocks of disproportionately high
+quality by exploiting the relationship between past
+and future blocks.
+The idea of making the challenge for a block a de-
+terministic function of a unique credential of the re-
+source that “won” a previous block – in combination
+with having a quality function by which miners can
+locally decide if they are likely winners – has been
+used in subsequent blockchain proposals like Algo-
+rand [23] or the Chia Network [3].
+We also implement and evaluate the modiﬁed
+PoSpace to demonstrate the eﬀectiveness of our
+scheme. Even for space larger than 1 TB, we show
+that (1) miners need less than a second to check if
+they are likely to “win” and therefore should gener-
+ate a candidate next block, (2) block generation takes
+less than 30 seconds, and (3) verifying the validity of
+a block takes a fraction of a second. Moreover, these
+numbers grow logarithmically with larger space.
+Finally, we provide a game-theoretic analysis of
+SpaceMint modeled as an extensive game. To do this,
+we formally specify a stylized model of SpaceMint
+mining and show that adhering to the protocol is
+a sequential equilibrium for rational miners in this
+game (i.e., deviating from the protocol does not pay
+oﬀ). Our analysis works in a simpliﬁed model that
+serves to rule out certain classes of attacks (i.e., prof-
+itable deviations based on a simplistic set of possible
+actions), but does not capture all possible attack vec-
+tors by real miners. 4 To our knowledge, this is the
+ﬁrst analysis of a cryptocurrency mining as an ex-
+tensive game with the corresponding game-theoretic
+equilibrium concepts; though the model is simplistic,
+we hope that this framework for rigorously ruling out
+certain classes of attacks will serve as a useful base
+upon which to build more nuanced game-theoretic
+models to rule out larger classes of attacks, in this
+and other similar cryptocurrencies.
+4For example, “selﬁsh mining” [17] or block withholding is
+not captured by our simpliﬁed model, and SpaceMint is in fact
+susceptible to block withholding attacks to a similar extent to
+Bitcoin.
+1.2 Related Work
+We have already discussed proofs of stake above.
+Here, we brieﬂy mention other related proposals. A
+more detailed discussion can be found in the full ver-
+sion [31].
+Proof of storage/retrievability [18, 7, 6, 19, 12, and
+many more] are proof systems where a veriﬁer sends
+a ﬁle to a prover and later requests a proof that the
+prover really stored the ﬁle. Proving storage of a
+(random) ﬁle does show that one dedicated space,
+but the veriﬁer must send the entire ﬁle ﬁrst. In
+contrast, PoSpace requires veriﬁer computation and
+communication to be polylogarithmic in the prover’s
+storage size.
+Proof of secure erasure (PoSE), one-time com-
+putable functions [33, 15, 20, 5] are proof systems
+where a prover convinces the veriﬁer that is has access
+to some space. Additionally one can require that the
+proof implies that the space also was erased [33, 20],
+or some function can only be computed in forward
+direction [15]. Those protocols have only one phase,
+and thus cannot be used as a PoSpace, i.e., to eﬃ-
+ciently prove space usage over time.
+Permacoin [25] is a cryptocurrency proposal that
+uses proofs of retrievability with a novel variant of
+PoW. While solutions to Bitcoin’s PoW puzzles carry
+no intrinsic value, Permacoin makes proof-of-work
+mining serve a useful purpose: miners are incen-
+tivized to store useful data and thus the network
+serves as a data archive. Permacoin is however still
+fundamentally a PoW-based scheme. In contrast, in
+SpaceMint the dedicated storage does not store any-
+thing useful, but we completely avoid PoW and the
+associated perpetual computation.
+Burstcoin [1] is the only cryptocurrency we are
+aware of in which disk space is the primary min-
+ing resource. However, Burstcoin’s design allows
+time/memory trade-oﬀs : i.e., a miner doing a little
+extra computation can mine at the same rate as an
+honest miner, while using just a small fraction (e.g.,
+10%) of the space. Moreover, Burstcoin requires a
+constant (albeit small) fraction (0.024%) of dedicated
+disk space to be read every time a block is mined,
+while SpaceMint requires only a logarithmic fraction.
+Finally, veriﬁcation in Burstcoin is problematic: min-
+4
+===== PDF_PAGE 5 =====
+ers must hash over 8 million blocks to verify another
+miner’s claim. The details on this attacks can be
+found in Appendix B of the full version [31].
+Chia Network [3] is a very recent proposal of a
+blockchain based on PoSpace in combination with
+proofs of sequential work. In a nutshell, the better
+the quality of the PoSpace, the faster the block can
+be “ﬁnalized” by a proof of sequential work, and this
+proof tuple then can be used to create a block. By us-
+ing proofs of sequential work on top of PoSpace, Chia
+is even more similar to Bitcoin than SpaceMint in
+several respects: for example, it requires no synchro-
+nization/clocks (except, as in Bitcoin, time-stamped
+blocks for the occasional re-calculation of the min-
+ing diﬃculty), while retaining the eﬃciency of a pure
+PoSpace-based currency. The PoSpace that was de-
+veloped for Chia [4] is based on ideas completely dif-
+ferent from the PoSpace [14] we use. It has worse
+asymptotic security guarantees, but unlike [14], it has
+a non-interactive initialization phase and extremely
+short and eﬃcient proofs.
+Outline.
+• Cryptocurrency from proofs of space: In (§§2–3)
+we modify PoSpace [14] for the blockchain set-
+ting and present SpaceMint, a cryptocurrency
+based purely on proofs of space.
+• Addressing the “nothing-at-stake” problems: Af-
+ter describing attacks that arise from nothing-
+at-stake problems and challenge grinding, we
+describe how our design uses novel approaches
+to overcome them ( §4). Our solutions extend
+to other blockchain designs based on easy-to-
+generate proofs.
+• Evaluation of proof of space: We evaluate our
+modiﬁed PoSpace in terms of time to initialize
+the space, to generate and verify blocks, and
+block size (§6).
+• Game theory of SpaceMint: We model
+SpaceMint as an extensive game, and show that
+adhering to the protocol is an ε-sequential Nash
+equilibrium (§7).
+2 Proof of Space in SpaceMint
+A PoSpace [14] is a two-phase protocol between a
+proverP and a veriﬁer V. After an initialization
+phase,P stores some data Sγ of size N, andV stores
+a short commitment γ to Sγ. Then, in the execution
+phase,V sends a challengec toP, who returns a short
+answera after reading a small fraction of Sγ.
+The PoSpace from [14, 34] are speciﬁed a family of
+“hard-to-pebble” directed acyclic graphs of increas-
+ing size. The prover picks a graph G = (V,E ) from
+this family depending on the amount of space it wants
+to dedicate. P then stores a label li for each node
+i∈V , which is computed as
+li := hash(µ,i,l p1,...,l pt) , (1)
+where p1,...,p t are the parents of node i and hash
+is a hash function (sampled by V). In [14] two graph
+families are suggested, one for which any success-
+ful cheating prover must either use Ω( |V|/ log(|V|))
+space between the initialization and execution phase,
+or use Ω(|V|/ log(|V|)) space during execution. The
+other graph family enforces either Θ( |V|) space be-
+tween the phases (i.e., the same as the honest prover,
+up to a constant), or Θ(|V|) time during execution.
+Formally, [14] speciﬁes a PoSpace by a tuple of al-
+gorithms{Init, Chal, Ans, Vrfy}, which specify a two-
+phase protocol between a veriﬁer V and a proverP.
+Init is used to initialize the space, Chal generates
+a challenge, Ans computes the response to a chal-
+lenge and Vrfy veriﬁes the response. The initializa-
+tion phase consists of running Algorithm 1, where
+P commits to its space, followed by Algorithm 2,
+whereP proves that the commitment is computed
+“mostly correct”. In the execution phase, given by
+Algorithm 3,V simply opens some of the committed
+labels to prove it has stored them.
+The algorithms we give here are already made par-
+tially non-interactive for our blockchain application –
+in the actual PoSpace the challenges in Algorithm 2
+and 3, as well as µ in Algorithm 1 are sampled by V
+and sent toP.
+5The nonce just ensures that the same space cannot be used
+for two diﬀerent proofs [14]; thus in a single-veriﬁer setting, P
+can generate the nonce.
+5
+===== PDF_PAGE 6 =====
+Algorithm 1 Space commit
+Common input: A hard-to-pebble graph G with n
+nodes and a function hash:{0, 1}∗→{ 0, 1}L.
+1. P generates a unique nonce µ and then com-
+putes and stores (γ,Sγ) := Init(µ,n ), and sends
+the nonce 5 µ and the commitment γ toV. Sγ
+contains the labels of all the nodes of G com-
+puted using Eq. (1) and γ is a Merkle-tree com-
+mitment to these n labels. The total size of Sγ
+is N = 2·n·L (graph + Merkle tree).
+Algorithm 2 Prove commit
+Initial state: V holds commitment γ and nonce µ;
+P stores Sγ and µ. Both are given the challenges
+c = (c1,...,c kv) to be used.
+1. P computes openings b := (b1,b 2,... ) of all the
+labels of the nodes{ci}i∈[kv] and of all their par-
+ents and sends them toV. This is done using Ans
+where Ans(µ,Sγ,c ) returns the Merkle inclusion
+proof of label lc w.r.t. γ.
+2. V veriﬁes these openings using Vrfy, where
+Vrfy(µ,γ,c,a ) = 1 iﬀ a is a correct opening for
+c. It then checks for all i = 1,...,k v if the label
+lci is correctly computed as in Eq. (1).
+3 SpaceMint Protocol
+3.1 Mining
+The mining process consists of two phases: initializa-
+tion and mining.
+Initialization. When a miner ﬁrst joins the
+SpaceMint network and wants to contribute N bits
+of space to the mining eﬀort, it ﬁrst generates a pub-
+lic/secret key pair (pk,sk ) and runs Algorithm 1 as
+P, with nonce µ set to pk, to generate
+(γ,Sγ) := Init(pk,N ) .
+The miner stores ( Sγ,sk ) and announces its space
+commitment (pk,γ ) via a special transaction. We
+require miners to commit ( pk,γ ) to prevent a type
+of grinding attack: the problem is that the PoSpace
+we use [14] have the property that by making minor
+changes one can turn ( pk,γ ) into many other space
+commitments that re-use most of the space.
+Algorithm 3 Prove space
+Initial state: V holds commitment γ and nonce µ;
+P stores Sγ and µ. Both are given the challenges
+c = (c1,...,c kp) to be used.
+1. P computes openings{ai := Ans(µ,Sγ,ci)}i∈[kp]
+and sends them to V.
+2. V veriﬁes these openings by executing
+Vrfy(µ,γ,c i,ai).
+Once this transaction is in the blockchain, the
+miner can start mining.
+Mining. Similar to Bitcoin, SpaceMint incentivizes
+mining (adding new blocks) through block rewards
+(freshly minted coins per block) and transaction fees.
+Once initialized, each miner attempts to add a block
+to the blockchain every time period. For time period
+i, a miner proceeds as follows:
+1. Retrieve the hash value of the last block in the
+best chain so far, and a challenge c (we dis-
+cuss how c is derived in §3.4), which serves as
+a short seed from which we derive two long ran-
+dom strings $p, $v.
+2. Compute challenges ( c1,...,c kp) :=
+Chal(n,kp, $p) for use in Algorithm 3.
+3. Compute the proof of space a ={a1,...,a kp}
+using Algorithm 3.
+4. Compute the quality Quality(pk,γ,c,a ) of the
+proof (details of the quality function are given
+in§3.5).
+5. If the quality is high enough, so that there is
+a realistic chance of being the best answer in
+period i, compute the proof of correct commit-
+ment b ={b1,...,b kv} using Algorithm 2; then
+create a block and send it to the network in an
+attempt to add it to the chain. This block con-
+tains the proofs a and b computed above and a
+set of transactions; the exact speciﬁcation is in
+given§3.2 below.
+Remark (Postponing Algorithm 2) . Note that un-
+like in the interactive PoSpace where one runs Al-
+gorithms 1 and 2 during initialization, we only re-
+quire miners to execute Algorithm 2 if they want
+to add a block. This is done for eﬃciency reasons.
+For one thing, this way, the proof b (which is sig-
+6
+===== PDF_PAGE 7 =====
+niﬁcantly larger than a or γ) must only be recorded
+in the blockchain once the corresponding space has
+actually been used to mine a block. Another more
+subtle advantage is that now the challenge for Algo-
+rithm 2 changes with every block; thus a cheating
+miner (who computed some of the labels incorrectly)
+will only know if he was caught cheating at the same
+time when he generates a potentially winning proofa
+(and if b does not pass, he cannot use a). This allow
+us to tolerate a much larger soundness error in Al-
+gorithm 2, which means we can choose a smaller kv
+(concretely, it’s ok if he passes the proof with large
+probabilityp, as long as this requires using at least a
+p times the space an honest miner would use).
+3.2 Blockchain Format
+A blockchain in SpaceMint is a sequence of blocks
+β0,β 1,... which serve as a public ledger of all trans-
+actions. Each block βi = ( ϕi,σi,τi) consists of
+three parts, called “sub-blocks”, which contain the
+index i that speciﬁes the position of the block in the
+blockchain. The structures of sub-blocks are as fol-
+lows:
+• The hash sub-block ϕi contains
+– the current block index i,
+– the miner’s signature ζϕ on ϕi−1, the (i− 1)th
+hash sub-block, and
+– a “space proof” containing the miner’s pk.
+• The transaction sub-block τi contains
+– the current block index i and
+– a list of transactions (§3.3).
+• The signature sub-block σi contains
+– the current block index i,
+– the miner’s signature ζτ onτi, theith transac-
+tion sub-block, and
+– the miner’s signature ζσ on σi−1, the (i− 1)th
+signature sub-block.
+The links between blocks in a blockchain are illus-
+trated in Fig. 1. We will refer to the hash sub-blocks
+as the proof chain, and the signature sub-blocks with
+the transactions as the signature chain . While the
+signature and transaction sub-blocks are all linked,
+...
+...
+Block i βi
+hash ϕi
+signature σi
+transactionτi
+Block i+1
+hash
+signature
+transaction
+PC
+SC
+Figure 1: Our blockchain consists of a proof chain
+PC that does not allow for grinding, and a signature
+chain SC that binds transactions to the proof chain.
+the hash sub-blocks are only linked to each other and
+not to any signature or transaction sub-blocks.
+This design may seem to prevent any kind of con-
+sensus, as now we can have arbitrary many signa-
+ture chains containing diﬀerent transactions consis-
+tent with the same proof chain. The key observa-
+tion is that once an honest miner adds the ith block
+(honest in the sense that he will only sign one block
+and keep its secret key secret), the transactions cor-
+responding to this proof chain up to block i cannot
+be changed any more even by an adversary who con-
+trols all secret keys from miners that added the ﬁrst
+i− 1 blocks.
+3.3 Transactions in SpaceMint
+There are three types of transactions in SpaceMint:
+(1) payments, (2) space commitments, and (3) penal-
+ties. Every transaction is signed by the user gener-
+ating the transaction, and sent to the miners to be
+added to the blockchain. Here, we specify the three
+types of transactions.
+Payments. Coins in SpaceMint are held and trans-
+ferred by parties identiﬁed by public keys. A payment
+transaction transfers coins from m benefactors to n
+beneﬁciaries and has the form
+ctx = (payment, txId,⃗in, ⃗out) .
+• txId: A unique, arbitrary transaction identiﬁer.
+That is, no two transactions in a blockchain can
+have the same identiﬁer.
+• ⃗in: A list of input coins to the transaction.
+Speciﬁcally, ⃗in = ( in1,...,in n), a list of n
+benefactors, each comprised of a triple: inj =
+(txIdj,kj,sigj), where:
+– txIdj is the identiﬁer of a past transaction,
+7
+===== PDF_PAGE 8 =====
+– kj is an index that speciﬁes a beneﬁciary
+pkkj of the transaction txIdj,
+– sigj is a signature of ( txId, txIdj,kj, ⃗out),
+which veriﬁes under key pkkj proving own-
+ership of the thekjth beneﬁciary of transac-
+tion txIdj and binding the coin to the ben-
+eﬁciaries.
+• ⃗out: A list of beneﬁciaries and the amount they
+receive. Speciﬁcally, ⃗out = (out1,...,out m) with
+outi = (pki,vi), where:
+– pki speciﬁes a beneﬁciary, and
+– vi is the number of coins that pki is to be
+paid.
+For a transaction to be valid, we require that (1) all
+signatures in ⃗in verify correctly; (2) no benefactor is
+referenced by more than one subsequent transaction
+in the blockchain (to prevent double-spending); (3)
+the sum of the input values to the transaction is at
+least the sum of the amounts paid to beneﬁciaries.
+Space commitments. A space-commitment
+transaction
+ctx = (commit, txId, (pk,γ ))
+consists of pk, a public key, and γ which was com-
+puted as (γ,Sγ) := Init(pk,N ). Thus, ctx is a space
+commitment to a space of size N.
+Penalties. A penalty transaction
+ctx = (penalty, txId,pk, prf )
+consists of pk, the public key of the transaction cre-
+ator, and prf, a proof of penalty-worthy behavior by
+another miner. These transactions serve to penal-
+ize miners that engage in malicious behavior. The
+primary usage of penalties in SpaceMint is to disin-
+centivize mining on multiple chains (e.g., the proof
+would contain two blocks of the same index signed
+by the same miner), but penalty transactions can be
+used to discourage other types of (detectable) behav-
+ior in blockchain-based currencies.
+3.4 Where the Challenge Comes From
+In Bitcoin, the PoW challenge for block i is sim-
+ply the hash of block i− 1. For SpaceMint, using
+block i− 1 for the challenge can slow down consen-
+sus: If there are many diﬀerent chains, miners can
+get diﬀerent challenges for diﬀerent chains. A ra-
+tional miner would thus compute answers for many
+diﬀerent chains (since it is easy to do), and if one of
+them is very good, try to add a block to the corre-
+sponding chain, even if this chain is not the best chain
+seen so far. If all miners behave rationally, this will
+considerably slow down consensus, as bad chains get
+extended with blocks of quality similar to the current
+best chain, and it will take longer for lower-quality
+chains to die oﬀ.
+Instead, we derive the challenge for block i from
+the hash of block i− ∆, for a reasonably large ∆:
+the probability of multiple chains surviving for more
+than ∆ blocks decreases exponentially as ∆ increases.
+Moreover, in contrast to Bitcoin, we only hash the
+block from the proof chain , but not the signature
+chain (Fig. 1): this serves to prevent block-grinding
+attacks, since there is nothing to grind on (the proof
+chain is ﬁxed regardless of the set of transactions in
+the block). Finally, we will use the same challenge
+not just for one, but for δ consecutive blocks. This
+is done to prevent challenge-grinding attacks, as we
+explain in§4.
+3.5 Quality of Proofs and Chains
+Quality of a proof. The block to be added to
+the chain at each time step is decided by a qual-
+ity measure on the PoSpace proof included in each
+proposed block. For a set of valid proofs π1 =
+(pk1,γ 1,c 1,a 1), ..., πm = (pkm,γm,cm,am), we re-
+quire Quality(πi) to be such that the probability that
+πi has the best quality amongπ1,...,π m corresponds
+to the ith miner’s fraction of the total space in the
+network. The probability is over the choice of the
+random oracle hash, which we use to hash answer a.
+We require:
+Pr
+hash
+[
+∀j⁄=i : Quality(πi)> Quality(πj)
+]
+= Nγi∑m
+j=1Nγj
+,
+where Nγi is the space committed to by γi.
+LetDN be a distribution that samples N values in
+[0, 1] at random and outputs the largest of them:
+DN∼ max
+{
+r1,...,r N :ri← [0, 1],i∈ [N]
+}
+. (2)
+Let DN(τ) denote a sample from DN with sampling
+8
+===== PDF_PAGE 9 =====
+randomness τ. For valid proofs we now deﬁne
+Quality(pk,γ,c,a ) :=DNγ(hash(a)) . (3)
+The Quality of an invalid proof is set to 0.
+It remains to show how to eﬃciently sample from
+the distribution DN for a given N. Recall that
+if FX denotes the cumulative distribution function
+(CDF) of some random variable X over [0, 1]. If
+the inverse F−1
+X exists, then F−1
+X (U) for U uniform
+over [0, 1] is distributed as X. The random variable
+X sampled according to distribution DN has CDF
+FX(z) = Pr[X≤z] = zN, since this is the probabil-
+ity that all N values ri considered in (2) are below
+z. Therefore, if we want to sample from DN, we
+can simply sample F−1
+X (U) for U uniform over [0, 1],
+which is U1/N. In (3) we want to sample DNγi
+us-
+ing randomness hash(ai). To do so, we normalize the
+hash outputs in{0, 1}L to a value in [0, 1], and get
+DNγi
+(hash(ai)) :=
+(
+hash(ai)/2L)1/N
+.
+Quality of a chain. In order to decide which
+of two given proof-chain branches is the “bet-
+ter” one, we also need to deﬁne the quality of
+a proof chain ( ϕ0,...,ϕ i), which we denote by
+QualityPC(ϕ0,...,ϕ i). Each hash sub-block ϕj con-
+tains a proof ( pkj,γj,cj,aj), and the quality of the
+block is vj = DNj(hash(aj)). For any quality v ∈
+[0, 1], we deﬁne
+N(v) = min
+{
+N∈ N : Prw←DN [v <w]≥ 1/2
+}
+,
+the space required to obtain a proof with quality bet-
+ter thanv on a random challenge with probability 1/2.
+This quantity captures the amount of space required
+to generate a proof of this quality.
+In order to prevent challenge-grinding attacks, it
+is desirable for the chain quality to depend multi-
+plicatively on constituent block qualities (described
+in more detail in §4), and moreover it is useful to
+weight the contribution of the jth block for a chain
+of length i by a discount factor Λi−j. From these
+motivations we derive the following quality function.
+Note that we have used a sum of logarithms, rather
+than a product, to achieve the multiplicativity.
+QualityPC(ϕ0,...,ϕ i) =∑i
+j=1 log(N(vj))· Λi−j .
+(4)
+4 Nothing-at-Stake Problems
+and Solutions
+In this section we discuss the “nothing-at-stake” is-
+sues, which were already mentioned in the introduc-
+tion. We describe them here in more detail, and out-
+line how SpaceMint defends against them.
+Recall that the diﬃculty arises due to the ease of
+computing multiple candidate blocks: in a PoSpace
+(or PoStake) based currency, a miner can compute
+many proofs (either extending diﬀerent chains, or
+computing diﬀerent proofs for the same chain) at lit-
+tle extra cost. Deviating from the protocol like this
+can be rational for a miner as it might lead to higher
+expected rewards. PoW-based blockchains also suﬀer
+from such “selﬁsh mining” attacks [17], and basing
+the blockchain on eﬃciently computable proofs like
+PoSpace or PoStake can further aggravate this prob-
+lem. Such behavior can signiﬁcantly slow down con-
+sensus as well as push the scheme to follow energy
+expenditure trends similar to PoW-based schemes,
+which arise whenever there is an advantage to be
+gained by doing extra computation.
+An even more serious issue is double-spending at-
+tacks, which become possible if a miner can create
+a suﬃciently long chain in private which has better
+quality than the honestly mined chain. In all known
+blockchain proposals, a miner controlling more than
+half of the mining resources (hashing power, stake
+or space) can do this. But it is considered problem-
+atic if a blockchain is susceptible to double spending
+by adversaries with signiﬁcantly less than half of the
+network resources.
+I. Grinding blocks. The problem: In Nakamoto-
+style blockchains, the challenge for the proof com-
+puted by the miners (like PoW in Bitcoin or PoSpace
+in SpaceMint) is somehow derived from previous
+blocks. If it is computationally easy to generate
+proofs, a miner can try out many diﬀerent blocks (for
+example by including diﬀerent transactions) until it
+ﬁnds an advantageous one that will allow him to gen-
+erate good proofs for future blocks. This is an issue
+for selﬁsh-mining and double-spending attacks.
+The solution: We decouple proofs from transactions
+as shown in Fig. 1. This eliminates the problem of
+9
+===== PDF_PAGE 10 =====
+block grinding, as now challenges depend only on the
+proof chain. Moreover, our PoSpace are “unique” in
+that a prover can generate at most one valid proof per
+challenge. Hence, the only degree of freedom that a
+miner has in inﬂuencing future challenges is to either
+publish its proof (so it might end up in the chain), or
+to withhold it.
+II. Mining on multiple chains. The problem:
+In Bitcoin, rational miners will always work towards
+extending the longest known chain. However, when
+mining is computationally easy, it can be rational to
+mine on all (or at least many) known chains in paral-
+lel, to “hedge one’s bets” across all chains that might
+eventually become part of the public ledger. Again,
+this is an issue for selﬁsh-mining and double-spending
+attacks.
+The solution: To address this problem in the context
+of selﬁsh-mining attacks (we discuss double-spending
+later), we derive the challenge for block i from block
+i−∆ for some parameter ∆ (§3.4). Note that for any
+given challenge, there is a single proof (i.e., the proof
+is deterministic given the challenge). Then, we im-
+pose a penalty, via the penalty transactions of §3.3,
+for any pair of identical proofs published in two can-
+didate blocks: half of the block reward for such a
+“misbehaving” block is allocated to the creator of
+the penalty transaction, and the other half simply
+disappears.6 Let us consider two cases, depending on
+whether mining is done on two or more chains that
+forked more or less than ∆ blocks in the past.
+Case 1: chains forked less than ∆ ago. In this
+case, the miner will get the same challenge for both
+chains. SpaceMint uses penalties ( §3.3) to disincen-
+tivize miners from extending multiple chains in this
+case; without the penalties, a rational miner with a
+good-quality PoSpace proof could announce blocks on
+multiple chains to maximize his chances of winning.
+Concretely, suppose a miner pk′ attempts to mine
+concurrently on two chains whose most recent blocks
+are βj and β′
+j, by announcing βj+1 and β′
+j+1 (which
+have the same quality and were mined using the same
+space). Then anyone who observes this can generate
+a transaction ( penalty,txId,pk, {pk′,βj+1,β′
+j+1}) to
+6This is to disincentivize penalizing oneself.
+penalize pk′. This transaction can be added to a
+chain extending βj+1 (or β′
+j+1), and its meaning is
+that half of the reward (block reward and transac-
+tion fees) that should go to the miner who announced
+βj+1, is now going to pk (the “accuser”) instead, and
+the other half of the reward is destroyed, i.e., cannot
+be redeemed by any party. We destroy half of the re-
+ward so the penalty hurts even if the cheating miner
+can be reasonably sure to be able to accuse itself. For
+this to work, mining rewards can only be transferred
+by a miner some time after the block was added, so
+that there is enough time for other miners to claim
+the penalty.7
+Case 2: chains forked more than ∆ ago. In this
+case the miner receives diﬀerent challenges for diﬀer-
+ent chains, leading to proofs of diﬀerent quality for
+the two chains. In this case, even with our penalty
+scheme in place, a rational miner can still get an ad-
+vantage by deviating: instead of only trying to ex-
+tending the highest-quality chain, it also generates
+proofs for the lesser chain. As the challenges diﬀer,
+so will the two proofs, and if the proof on the lesser
+chain has very high quality, the rational miner would
+publish it, hoping that this chain will become the best
+chain and survive.
+We address this problem by arguing that it is
+extremely unlikely (the probability is exponentially
+small in ∆) that this case occurs, as a weaker branch
+of the chain would have to “survive” for ∆ blocks de-
+spite a strong incentive (via our punishment scheme)
+for miners to only extend the chain of highest quality.
+III. Grinding challenges. The problem: Chal-
+lenge grinding is a type of attack that can be used for
+double-spending, by generating a long chain in pri-
+vate that is of higher quality than what would result
+when using one’s resources honestly. It arises from
+the fact that an adversary can split its space into m
+smaller chunks. As discussed in§3.5, the quality of a
+block is purposely designed such that splitting a ﬁxed
+amount of space into smaller chunks and choosing the
+7The idea of penalizing miners for extending multiple chains
+goes back at least to slasherhttps://blog.ethereum.org/2014/
+01/15/slasher-a-punitive-proof-of-stake-algorithm .
+Unlike previous penalty-based proposals, we do not need the
+miners to make a deposit up-front; instead, they will simply
+lose their mining reward if they cheat.
+10
+===== PDF_PAGE 11 =====
+highest-quality block among them does not aﬀect the
+expected quality of the block generated. However, a
+miner can examine all possible chains of some given
+length, and then pick the chain that gives it the most
+favorable challenges for future blocks.
+Concretely, consider our setting, where the chal-
+lenge for block i is determined by block i− ∆. An
+adversary can generate a sequence of length 2∆ where
+the ﬁrst half of the blocks is chosen to provide the
+most favorable challenges for the later half of the se-
+quence.8 Note that the ﬁrst half of this sequence
+would be of even poorer quality than the expected
+quality from honest mining given the adversary’s to-
+tal amount of space; however, the beneﬁt gained in
+the second half of the sequence can outweigh this loss
+in quality in the ﬁrst half. The adversary can then
+release this high-quality chain (all at once) in an at-
+tempt to overtake the current best chain.
+Note that in this attack the adversary explores
+multiple chains in parallel, which we have addressed
+already using a penalizing scheme. But penalizing
+does not protect against double-spending attacks in
+which the adversary never actually published two
+proofs for the same slot. And even he would, a
+double-spending attack can be proﬁtable even if one
+loses some mining rewards due to the penalizing
+scheme.
+The solution: As mentioned in§3.5, the problem with
+this attack is exacerbated if the metric for determin-
+ing the quality of a chain is a sum or any other linear
+function. Thus, to prevent this attack, (1) we deﬁne
+the quality of a chain as the product of the amounts
+of space needed for the proofs in it, rather than their
+sum; and (2) we use the same block to derive chal-
+lenges forδ future blocks (i.e., use hash(βi,nonce ) for
+nonce∈ [1,δ ] as challenges for time i + ∆ through
+i + ∆ +δ).
+Intuitively, (1) makes it harder for the adversary to
+ﬁnd a good chain of length 2∆, as worse blocks are
+weighted more; and (2) is helpful because it means
+that a challenge-grinding adversary would have to
+8As for each of the ∆ blocks there arem distinct challenges,
+the search space here is of huge size m∆. Consequently, this
+attack might seem artiﬁcial, but by pruning and just consid-
+ering the most promising sub-chains at every level, one will
+probably not miss the best one.
+choose “early” blocks to optimize their chances over
+sequences of δ future challenges rather than just a
+single future challenge, thus making it exponentially
+harder (in δ) to ﬁnd a “good” challenge that will
+yield δ high-quality blocks at once. Another way to
+see this is that by the Chernoﬀ bound, the average of
+δ independent random variables deviates less from its
+expectation as δ grows. So for large δ, even the abil-
+ity to select between multiple challenges (each giving
+a sample of the average of δ i.i.d. variables) is not
+very useful to ﬁnd one where this value deviates by
+a lot from its expectation. A more detailed discus-
+sion of this attack and our defense is given in the full
+version [31].
+5 Parametrization
+We now discuss and justify some suggested param-
+eter choices for SpaceMint. A more detailed discus-
+sion on parameters, their interplay, and their impact
+on various attacks is given in §D due to space con-
+straints.
+Determining challenges. To minimize the prob-
+ability of forks surviving for more than ∆ blocks
+(which is necessary to prevent the “mining on multi-
+ple chains” issue described in §4), we should choose
+a large ∆. On the other hand, a smaller ∆ increases
+other security features of SpaceMint (detailed in§D).
+We suggest ∆ = 50, which makes it highly unlikely
+that a fork survives for ∆ steps (since the probability
+of a fork surviving is exponentially small in ∆), and
+yet the value is not large enough to introduce signif-
+icant negative impacts to other aspects (see §D for
+further discussion).
+Frequency of block generation. The challenge
+for block i is available at least ∆ blocks (which cor-
+responds to ∆· time minutes) before block i is added.
+In terms of computation, since it takes less than 30
+seconds to generate a block (§6) and we set ∆ = 50,
+we could generate blocks every few seconds given that
+one miner is unlikely to mine more than a few good
+blocks within the ∆ blocks. However, we only want
+to generate the blocks as fast as they can propagate
+through the network, since the miners need to gener-
+11
+===== PDF_PAGE 12 =====
+ate the signature chains using the previous block. In
+Bitcoin, blocks propagate to over 95% of the miners
+within 40 seconds [11], so we believe that time = 1
+minute would be a reasonable frequency of block gen-
+eration for SpaceMint.
+Quality discount factor. As discussed in §3.5,
+we use a discount factor Λ to deﬁne each block’s con-
+tribution to overall chain quality. The value of Λ is
+determined by the pace at which the total storage
+in the network increases. For instance, if we assume
+that storage stays roughly in the same order of mag-
+nitude for two-month periods, we can set Λ as large
+as 0.99999.9 Such a high Λ is helpful when we argue
+about the hardness of generating long forks. Detailed
+analysis is given in§D.
+Conﬁrmation time. To conﬁrm a transaction, we
+must be sure that there is consensus regarding the
+transaction being on the chain, in order to prevent
+double spending. Bitcoin, to this end, only conﬁrms
+transactions after 6 blocks are added, at which point
+users are reasonably conﬁdent of consensus. Their
+analysis [35] assumes the adversary has less than 10%
+of total hashing power and gives an upper-bound of
+0.001 on the probability of double-spending. Assum-
+ing a 10% adversary as in the Bitcoin analysis (with
+Λ = 0.99999 as discussed above), in SpaceMint after
+6 blocks we have on upper-bound of 2−16≈ 0.000015
+on the probability that a block will remain in the
+chain. This also takes only 6 minutes compared
+to the 1 hour of Bitcoin. This analysis only applies
+to the proof chain, but to avoid double spending we
+must be sure that the transaction also remains in the
+signature chain, for this reason one should wait for a
+few extra blocks, so one can be reasonably sure that
+at least one of those blocks was added by an honest
+miner (who will not sign another list of transactions
+for this block).
+Even assuming a stronger adversary who controls
+33% of the total space (and Λ = 0 .99999 as before),
+after 93 blocks a block in the proof chain will be safe
+with failure probability bounded by 2−32. For further
+details see§D.
+9In this case, the contribution of a block decreases by a
+factor 1/e≈ 0.37 every 1/(1− Λ) = 100.000 blocks, which for
+time = 1 minute is roughly 69 days.
+6 Evaluation
+To evaluate SpaceMint, we have implemented a
+prototype in Go, using SHA3 in 256-bit mode as
+the hash function. The prototype uses the graphs
+from [32], and forces a cheating prover to store at
+least Ω(N/ log(N)) bits in order to eﬃciently gener-
+ate proofs. Given that the network infrastructure is
+very similar to Bitcoin, we are mainly interested in
+three quantities: time to initialize the space (graph),
+size of the proof, and time to generate and verify the
+proof. The experiments were conducted on a desk-
+top equipped with an Intel i5-4690K Haswell CPU
+and 8 GB of memory. We used an oﬀ-the-shelf hard
+disk drive with 2 TB of capacity and 64 MB of cache.
+Time to initialize. To start mining SpaceMint,
+the clients must ﬁrst initialize their space, as de-
+scribed in §3.1. Concretely, this involves computing
+all the hashes of the nodes, and computing the Merkle
+tree over the hashes. In Figure 2a, we show the ini-
+tialization time for spaces of size 8 KB to 1.3 TB. As
+expected, the time to initialize grows linearly with the
+size of the space; at 1.3 TB, it takes approximately
+41 hours to generate and commit the space. While
+expensive, this procedure is done only once when a
+miner ﬁrst joins the SpaceMint network, and the ini-
+tialized space will be used over and over again. In
+fact, space initialization should take non-trivial time
+because an extremely fast space initialization would
+make re-using the same space for diﬀerent commit-
+ments a viable strategy.
+Size of the proof. A proof in SpaceMint consists
+of the Merkle inclusion proof for a set of node labels.
+For the PoSpace that we implemented, the number
+of nodes we have to open is λ· log(n) + 1 (as kv =
+λ·log(n) in Algorithm 2 andkp≪kv in Algorithm 3),
+where λ is a statistical security parameter. Every
+node in this graph has at most two parents, and each
+opening of a node is log(n)·32 bytes. Thus, the over-
+all proof size is upper-bounded 3·λ·log2(n)·32 bytes.
+Though opening fewer than λ log(n) nodes is not
+shown to be secure, we are unaware of any concrete
+attacks even for opening λ nodes. We believe that
+the size of a suﬃciently secure proof will lie some-
+where in between, closer to opening λ nodes. Fig-
+12
+===== PDF_PAGE 13 =====
+0 200 400 600 800 1000 1200 1400
+File Size (GB)
+0
+500
+1000
+1500
+2000
+2500
+3000Time (min)
+Graph Setup
+Generate Merkle Tree
+(a) Time to initialize space.
+0 200 400 600 800 1000 1200 1400
+File Size (GB)
+0
+500
+1000
+1500
+2000
+2500
+3000Size (KB) λlog(n) nodes
+0
+20
+40
+60
+80
+100
+120
+λ nodes (b) Proof size for varying space sizes with
+λ = 30. The left and right vertical axes rep-
+resent proof size when opening λ log(n) and
+λ nodes (respectively).
+0 200 400 600 800 1000 1200 1400
+File Size (GB)
+0
+5
+10
+15
+20
+25Time to Prove (s)
+Prove
+0.00
+0.02
+0.04
+0.06
+0.08
+0.10
+Time to Verify (s)
+Verify
+(c) Time for a miner to prove and verify
+when λ log(n) nodes are opened for λ = 30.
+Figure 2: Results of evaluation
+ure 2b demonstrates the size of the proof when we
+open λ log(n) nodes vs. just λ nodes for λ = 30.
+Time to generate/verify the proof. In
+SpaceMint, assuming a miner is storing the space cor-
+rectly, the miner needs to only open a small kp num-
+ber of nodes in the Merkle tree to check the quality
+of its solution (§3.1), which takes just a fraction of a
+second; it takes< 1 ms to read a single hash from the
+disk. Only in the rare case where the miner believes
+its answer is of very good quality will it generate the
+full proof, which still takes less than 30 seconds. As
+for every space-commitment, a miner must open kp
+nodes for every time-slot, we want this value to be
+as small as possible, in practice kp = 1 seems secure,
+though one might set it to some small constant to be
+on the safe side.
+Our proofs are substantially bigger than Bitcoin’s
+and require more than just one hash evaluation to
+verify. However, for an active currency, we still ex-
+pect the size and veriﬁcation time for the proofs
+added with every block to be marginal compared to
+the size of the transactions added with every block or
+the time required to verify that the transactions are
+consistent. Figure 2c indeed shows that even though
+it takes seconds to generate the proof, veriﬁcation
+takes only a fraction of a second.
+Energy estimates. Though our prototype was
+evaluated using a full CPU which wastes a lot of en-
+ergy, a cost-conscious miner could mine on a much
+more energy-eﬃcient device (e.g., Raspberry Pi [2]).
+An eﬃcient microcontroller consumes less than 10 W
+of power, and most miners will only open a few nodes
+per time step since the quality of their answers will
+usually be bad. To get an upper bound on the power
+requirement, suppose there are 100 000 miners, each
+with 1 TB of space, and about 1% of the miners mine
+“good” answers for which they will generate a full an-
+swer. Then we have
+10W· 100 000· 0.01s + 10W· 1000· 20s
+= 210 000J/block
+which translates to 210 kJ/min if we add one block
+every minute. In contrast, Bitcoin on average uses
+100 MW, so it consumes 6 GJ/min, which is several
+orders of magnitude larger. We note that the 1%
+ﬁgure is a very conservative bound, so the diﬀerence
+could be even larger in practice.
+Impact of storage medium. Almost all mod-
+ern Bitcoin mining is done by clusters of application-
+speciﬁc integrated circuits (ASICs), which can com-
+pute hashes for a tiny fraction of the hardware and
+energy cost of a general-purpose processor. We be-
+lieve that SpaceMint mining would not be as suscep-
+tible to advantages from specialized hardware as Bit-
+coin, and that regular hard disk drives are well-suited
+to serve as SpaceMint mining equipment. Let us con-
+sider existing categories of storage devices. Although
+hard disks are expensive compared to other storage
+devices, most notably tapes, devices like tapes are
+not adequate for mining as we require frequent ran-
+dom accesses to answer the PoSpace challenges. Solid
+state drives do allow for (fast) random accesses, but
+are more expensive than hard disks and do not pro-
+vide any beneﬁt since the rate of lookups required
+for mining is very low. Notably, SpaceMint mining
+hinges on doing a few random lookups every minute.
+13
+===== PDF_PAGE 14 =====
+The required frequency is so low that speed is a non-
+issue: cheap, slow random access is what SpaceMint
+miners are after.
+7 Game Theory of SpaceMint
+Intuitively, SpaceMint mining is modeled by the fol-
+lowing n-player strategic game. Game-play occurs
+over a series of discrete time steps, in each of which a
+block is added to the blockchain. At each time step,
+each player (miner) must choose a strategy, speciﬁed
+by: (1) which blocks to extend (if any), and (2) which
+extended blocks to publish (if any).
+Showing that adhering to the protocol is anequilib-
+rium of such a game means that rational miners are
+not incentivized to deviate from the protocol when
+playing the game. From this, it follows that rational
+miners will reach consensus on a single chain, and will
+not be able to get an advantage by using a “cheating”
+strategy.
+We remark that game-theoretic analyses inherently
+start by deﬁning a game which models reality, and
+prove properties of the game in this model. It is al-
+most never possible for a model to capture all aspects
+of a real-world situation, and it is moreover desirable
+to have a model which is simple enough to allow for a
+rigorous analysis of incentives, while still being close
+to reality.
+Let us stress that our analysis herein is intended as
+a basic framework to model blockchain-based cryp-
+tocurrencies using the standard game-theoretic no-
+tion of an extended game, and does not claim to com-
+prise an exhaustive modeling of all possible attack
+vectors. In particular, our stylized model does not
+capture some important aspects, most notably block
+withholding, which is used in “selﬁsh mining.” Nev-
+ertheless, we believe that our simple modeling frame-
+work for cryptocurrency as an extended game may be
+of value as a base upon which to build more nuanced
+game-theoretic models, and thus we have chosen to
+include it in this exposition.
+7.1 Informal overview of results
+The standard game-theoretic notion for a strategic
+game which occurs over multiple time steps (rather
+than in “one shot”) is the extensive game . An ex-
+tensive game takes place over discrete time steps. In
+each time step, one or more players take an action
+from a well-deﬁned set of possible “moves”. At any
+point, the sequence of all moves made by all play-
+ers so far is called a history. In some games, players
+do not necessarily know all the moves made by other
+players. For any history, an extensive game deﬁnes
+a set of possible actions that each player can take at
+that history. If all of these sets are empty, then the
+game is considered to have ended, and such a history
+is called a terminal history.
+Each player has a utility function that assigns real-
+valued utilities to each terminal history. For example,
+in a simple two-player game like rock-paper-scissors,
+each player’s utility function might assign utility 1 to
+histories in which they won, and utility −1 to histo-
+ries in which they lost. When modeling SpaceMint,
+the utility that a player (i.e., a miner) assigns to a
+history depends on the amount of currency he has
+earned by successfully adding blocks to the chain.
+In order to model the probabilistic aspects of
+the SpaceMint protocol (e.g. the unpredictable bea-
+con), we consider extensive games with chance moves,
+which is the standard game-theoretic notion to cap-
+ture extensive games which involve exogenous uncer-
+tainty. Essentially, we model the beacon as an ad-
+ditional player, called Chance, which makes random
+moves.
+Equilibrium concepts. The most widely known
+equilibrium concept for a strategic game is the Nash
+equilibrium [29]. Intuitively, in a Nash equilibrium,
+each player’s strategy is a best response to the strate-
+gies of the other players.
+The Nash equilibrium concept was originally for-
+mulated for one-shot games (in which all players
+make a move simultaneously, then the game is over),
+and it is known to have some shortcomings in the set-
+ting of extensive games. Informally, the Nash equi-
+librium does not account for the possibility of play-
+ers adaptively changing strategy partway through a
+game: in particular, there exist Nash equilibria that
+14
+===== PDF_PAGE 15 =====
+are not “stable” in the sense that given the ability
+to adaptively switch strategies during the game, no
+rational player would stick with his Nash-equilibrium
+strategy all the way to the end of the game.
+Thus, for extensive games, the alternative
+(stronger) notion of sequential equilibrium is the
+standard equilibrium notion in game theory. This
+stronger concept ensures players are making the best
+decision possible at each history during game-play.
+We remark that while informal analyses have been
+presented that argue that Bitcoin mining constitutes
+a Nash equilibrium, we are not aware of any prior
+analyses that model a cryptocurrency as an exten-
+sive game or consider sequential equilibria. Since
+protocols inherently occur over time, we strongly be-
+lieve that extensive games are the appropriate game-
+theoretic formalism for analyzing stability of cryp-
+tocurrencies, and accordingly that sequential equilib-
+rium is the right equilibrium concept for cryptocur-
+rencies.
+7.1.1 SpaceMint as an extensive game
+In the “SpaceMint Game”, every player (including
+Chance) makes an action at every time step. A
+player’s action consists of choosing whether and how
+to extend the blockchain, and the action of Chance
+determines the value of the unpredictable beacon for
+the next time step. Players do not necessarily know
+all actions taken by other players: the information
+known to each player at any point comprises all the
+moves that he himself has taken, together with the
+information in the blockchain. Based on this infor-
+mation, each player decides his action in each time
+step, aiming to maximize his utility, i.e., his expected
+reward from adding blocks to the chain.
+Due to the rather extensive deﬁnitional preliminar-
+ies required to state our results formally, we now give
+an informal theorem statement together with a proof
+sketch. Rigorous theorems and proofs are given in
+§7.2.
+Theorem 7.1. It is a sequential equilibrium of the
+SpaceMint game (Deﬁnition 7.2, §7.2) for all com-
+putationally bounded players to adhere to the mining
+protocol, provided that no player holds more than50%
+of all space.
+Proof sketch. Our proof proceeds in two main steps,
+showing the following.
+1. Adhering to the protocol is a Nash equilibrium
+of the SpaceMint game.
+2. Adhering to the protocol is moreover sequentially
+rational at each history during game-play.
+To prove item 1, we consider the information avail-
+able to an arbitrary player at any given time step. At
+the start of his turn, the player has an expected util-
+ity based on all the information he knows (e.g., if
+he has mined some blocks that have been added to
+the blockchain, his utility is high). Since a miner’s
+utility function is simply his expectation of reward
+from adding blocks to the chain, a utility-maximizing
+miner can choose an action to take in each time step
+as a function just of the blockchain (i.e., he need
+not separately take into account the full sequence
+of moves he has made in the past, as these only af-
+fect his expected utility if they have impacted the
+blockchain). In a given turn, the player will choose
+the action that yields the highest expectation of fu-
+ture reward: his action consists of mining a set of
+blocks (locally), and then announcing a set of blocks
+to the network. Based on SpaceMint’s penalty trans-
+actions and the fact that any given miner’s block
+quality is ﬁxed in each time step, we are able to argue
+that mining and announcing exactly one block is an
+optimal strategy. Moreover, this strategy adheres to
+the protocol.
+To prove item 2, it is necessary to show that there
+exist a system of consistent beliefs of the players over
+the entire duration of the game, under which each
+player is not incentivized to deviate from the protocol
+at any point during game-play. We show that such a
+belief system can be derived by applying Bayes’ rule
+to the Nash equilibrium strategy which consists of
+adhering to the protocol. This concludes the proof
+sketch; for the full proof see §7.2.
+7.2 Formally modeling SpaceMint
+mining as an extensive game
+For standard game-theoretic terminology and prelim-
+inaries (such as deﬁnitions of extensive games, Nash
+equilibria, and sequential equilibria), we refer the
+reader to a standard textbook such as [30].
+15
+===== PDF_PAGE 16 =====
+In order to analyze the game-theoretic properties
+of SpaceMint mining, we deﬁne an extensive game,
+SpaceMint, which models the actions that miners can
+take, and the associated payoﬀs.
+The SpaceMint mining game. Let Π =
+{Init, Chal, Ans, Vrfy} be a proof of space. Let B de-
+note set of all blocks as deﬁned in §3.2, and for any
+𝓁∈ N, letB𝓁 denote the set of all blocks with index
+𝓁.10 LetB𝓁 denote the set of blocks with index at
+most 𝓁, i.e. B𝓁 =⋃𝓁
+𝓁′=0B𝓁′. Let Bgen be the genesis
+block; note thatB0 ={Bgen}.
+For a block B∈B and a challenge c← Chal, we
+deﬁne Exti(B,c ) to be the block generated by player
+i when mining the next block after B using PoSpace
+challenge c (see§3.2 for exact block format). For
+𝓁∈ N and challenge c, deﬁne:
+˜B𝓁,i,c =
+{
+(B,B′)∈B 𝓁−1×B𝓁 :B′ = Exti(B,c )
+}
+and let ˜B𝓁,i,c =⋃
+𝓁′∈{0,...,𝓁} ˜B𝓁′,i,c.
+Remark. To simplify exposition, we do not explic-
+itly model the amount of the space that each player
+has in the game deﬁned below. A standard way to
+model this would be to assign each player a type ti,
+representing player i’s amount of space. Our expo-
+sition keeps the types implicit; our theorems require
+that no player has more than 50% of the space com-
+mitted by active miners.
+Deﬁnition 7.2 (The SpaceMint Game) . Let Π =
+{Init, Chal, Ans, Vrfy} be a proof of space. For any
+number of players N∈ N, any number of time steps
+K∈ N, any consensus-delay Ψ∈ N, and any reward
+function ρ: N→ N, we deﬁne the extensive game
+SpaceMintΠ,K,ρ =⟨N,H,f C,⃗I,⃗ u⟩
+as follows:
+• The set H of histories is deﬁned inductively.
+◦ The action set of the Chance player AC(h) =
+{0, 1}m is the same for every history h.
+◦ The empty sequence () is in H, and Ai(()) =
+{(∅, ∅)} for each i∈ [N].
+10The index denotes the block’s position in the blockchain.
+In§3.2,i is used to refer to the block index, but in this section
+we use 𝓁 to avoid confusion with the player indices.
+◦ For any non-terminal history h and any i∈ [N],
+the action set Ai(h) of player i at h is:
+Ai(h) =P
+(
+B|h|×B|h|+1
+)
+×P
+(
+B|h|×B|h|+1
+)
+.
+An action ai ∈ Ai(h) is a pair of sets ai =
+(T, A). T is the set of blocks that player i tries
+extending in this time step, and A⊆ T is the
+set of blocks that player i announces in this time
+step. An element in T (or A) is a pair of blocks
+(B′,B )∈B|h|×B|h|+1 where B′ is the existing
+block which player i wishes to extend, and B∈B
+is the extended block.
+The probability measuref(·,h ) is uniform on{0, 1}m.
+• For each i∈ [N], we deﬁne the partition Ii by
+an equivalence relation ∼i. The equivalence relation
+∼i is deﬁned inductively as follows (we write [h]i to
+denote the equivalence class of h under∼i):
+◦ [()]i ={()}, that is, the empty sequence is equiv-
+alent only to itself.
+◦ [(h, ((T1, A1),..., (TN, AN),aC))]i =
+{(h′, ((T′
+1, A′
+1),..., (T′
+N, A′
+N),a′
+C))∈H :
+h∼i h′∧ Ti = T′
+i∧ Ai = A′
+i∧aC =a′
+C
+∧∀i′⁄=i, Ai′ = A′
+i′},
+whereh and h′ are histories of equal length, and
+the pairs (Ti′, Ai′) and (T′
+i′, A′
+i′) are actions of
+player i′. That is, two histories are equivalent
+under∼i if they are identical except in the “ﬁrst
+components” Ti′ of the actions (Ti′, Ai′) taken by
+players other than i.
+• ⃗ u= (u1,...,u N), where eachui : Z→ R is deﬁned
+as described below. For a history h, let C(h) denote
+the sequence of actions taken by the Chance player
+in h. Let B.chal denote the challenge c within the
+proof of space of a block B. Recall that the functions
+Quality(B) and QualityPC(⃗B) were deﬁned in §3.5.
+We deﬁne a new function
+Quality(B,c ) =
+{
+Quality(B) if B.chal =c
+0 otherwise .
+Also, let QualityPC((B1,...,B L), (c1,...,c L)) be
+equal to
+16
+===== PDF_PAGE 17 =====
+QualityPC((B1,...,B L)) whenever
+∀𝓁∈ [L], B𝓁.chal =c𝓁 and B𝓁∈B 𝓁 and
+∀𝓁∈ [L], ∃i∈ [N] s.t. (B𝓁−1,B𝓁)∈ ˜B𝓁,i,c𝓁
+and equal to 0 otherwise. For any history h, let A(h)
+be the set of all blocks announced by any player in
+history h:
+A(h) =
+{
+B :∃i∈ [N], A′ s.t. (·,B )∈ A′ and
+player i took action (·, A′) in h
+}
+.
+Let blocks(h) be the “winning block sequence” at any
+h∈H:
+blocks(h) = arg max
+⃗B∈(A(h))|h|
+(
+QualityPC(⃗B, C(h))
+)
+.
+Let blocks𝓁(h) denote the 𝓁th block in the chain. Let
+win𝓁(h) be the player who announced the winning
+block blocks𝓁(h) for index 𝓁.11 Recall that a history
+h = (⃗ a1,...,⃗ aJ) is a sequence of J≤ K action pro-
+ﬁles. For j ∈ [J], let (Ti,j, Ai,j) be the action of
+player i in⃗ aj. Let one𝓁(i,h ) be an indicator variable
+for the event that player i announces at most one
+block with index 𝓁, i.e.⏐⏐⏐
+{
+B :B∈B 𝓁 and (·,B )∈⋃
+j∈[J] Ai,j
+}⏐⏐⏐≤ 1 .
+Finally, the players’ utility functions are deﬁned as
+follows: for a terminal history h of length K,
+ui(h) =
+∑
+𝓁∈[K−Ψ]
+δi,win𝓁(h)· one𝓁(i,h )·ρ
+(
+blocks𝓁(h)
+)
+,
+where δi,j is the Kronecker delta function.That is, a
+player’s utility is the sum of the rewards he has re-
+ceived for announcing a winning block, up to index
+K− Ψ.
+By Deﬁnition 7.2, for any i∈ [N], for any histories
+h,h′ in the same information set I ∈ Ii, it holds
+that blocks(h) = blocks(h′). Thus, we can associate
+a unique blockchain with each information set: we
+deﬁne blocks(I) to be equal toblocks(h) for anyh∈I.
+Similarly, C(h) = C(h′) for any h,h′∈I in the same
+information set I, so we deﬁne C(I) to be equal to
+C(h) for any h∈I.
+For a block B ∈ Band a challenge c ← Chal,
+we deﬁne Exti(B,c ) to be the block generated by
+player i when mining the next block after B using
+11We can assume that the winning block is unique at each
+time step, and Quality imposes a total order on blocks.
+the PoSpace challengec (see§3.2 for exact block for-
+mat).
+Theorem 7.3. Let
+Π ={Init, Chal, Ans, Vrfy}
+be a proof of space. For any number of players N,
+any number of time steps K ∈ N, and any reward
+function ρ: N→ N, let ⃗ α= (α1,...,α n) be a pure
+strategy proﬁle of SpaceMintΠ,K,ρ, deﬁned as follows:
+for each i∈ [N], for any information set I∈I i such
+that I⁄={()},
+αi(I)
+(
+({blocksj(I)},{Exti(blocksj(I), Cj(I))})
+)
+= 1,
+where j ≥ 1 is the length of the histories in infor-
+mation set I12. That is, player i’s next action at
+information set I is
+ˆαi =
+(
+{blocksj(I)},{Exti(blocksj(I), Cj(I))}
+)
+.
+Then ⃗ αis a Nash equilibrium of SpaceMintΠ,K,ρ.
+Proof. Take any playeri∈ [N]. By the deﬁnition of
+Ext, for any information set I∈I i withI⁄={()}, the
+qualityv of the extended blockchain
+v = QualityPC
+(
+(blocks(I), Exti(B, Cj(I))), C(I)
+)
+is the same for any block B which was announced
+at time step j. Therefore, no utility can be gained
+by choosing any block B over any other block B′ to
+extend: that is, ui(⃗ α)≥ui(α′
+i,⃗ α−i) for any strategy
+α′
+i which distributes probability over actions of the
+form (S,T ) where|S| = 1.
+Moreover, not extending any block or extending
+multiple blocks precludes a player from being the
+“winner” and receiving the reward in this time step,
+so extending a block is preferable to not extending
+any block. That is, ui(⃗ α)≥ui(α′
+i,⃗ α−i) for any strat-
+egy α′
+i which assigns non-zero probability to any ac-
+tion of the form (S,T ) where|S|⁄ = 1.
+We have shown that ui(⃗ α) ≥ ui(α′
+i,⃗ α−i) for all
+strategies α′
+i of player i. The theorem follows.
+7.3 Analyzing the SpaceMint game
+In this section, we prove that honest mining is an ε-
+sequential Nash equilibrium of the SpaceMint game.
+12All histories in an information set are the same length.
+17
+===== PDF_PAGE 18 =====
+By Deﬁnition 7.2, for any i∈ [N], for any histories
+h,h′ in the same information set I ∈ Ii, it holds
+that blocks(h) = blocks(h′). Thus, we can associate
+a unique blockchain with each information set: we
+deﬁne blocks(I) to be equal toblocks(h) for anyh∈I.
+Similarly, C(h) = C(h′) for any h,h′∈I in the same
+information set I, so we deﬁne C(I) to be equal to
+C(h) for any h∈I.
+First, Theorem 7.4 deﬁnes an ε-Nash equilib-
+rium of the SpaceMint game, and then Theorem 7.5
+shows that this Nash equilibrium is, moreover, an ε-
+sequential equilibrium.
+Theorem 7.4. Let Π = {Init, Chal, Ans, Vrfy} be a
+proof of space. For any number of players N, any
+number of time stepsK∈ N, and any reward function
+ρ: N→ N, let ⃗ α= (α1,...,α n) be a pure strategy
+proﬁle of SpaceMintΠ,K,ρ, deﬁned as follows: for each
+i∈ [N], for any information set I ∈ Ii such that
+I⁄={()},
+αi(I)
+(
+({blocks𝓁(I)},{Exti(blocks𝓁(I), C𝓁(I))})
+)
+= 1,
+where𝓁≥ 1 is the length of the histories in informa-
+tion set I. That is, player i’s next action at informa-
+tion set I is
+ˆαi =
+(
+{blocks𝓁(I)},{Exti(blocks𝓁(I), C𝓁(I))}
+)
+.
+Let
+ξ = maxi∈[N]ti∑
+i∈[N]ti
+be the maximum fraction of space possessed by a sin-
+gle player, 13 and suppose ξ < 0.5. Then ⃗ αis an
+ε-Nash equilibrium of SpaceMintΠ,K,ρ, where
+ε = exp
+(
+− 1
+2K· E [diﬀ1]2·
+(K−1∑
+j=0
+Λ2j
+)2)
+,
+Λ is the discount factor deﬁned in §3.5 and diﬀ1 is
+deﬁned as in §D.
+Proof. Fix any player i∈ [N]. By the deﬁnition of
+Ext, for any information set I∈I i withI⁄={()}, the
+qualityv of the extended blockchain
+v = QualityPC
+(
+(blocks(I), Exti(B, C𝓁(I))), C(I)
+)
+is the same for any block B which was announced
+for block index 𝓁. Therefore, no utility is gained
+13Recall that ti is the amount of space that player i has
+(deﬁned in the remark just before Deﬁnition 7.2).
+by choosing any block B over any other block B′
+to extend: i.e., ui(⃗ α)≥ ui(α′
+i,⃗ α−i) for any strategy
+α′
+i which distributes probability only over action se-
+quences ((Ti,1, Ai,1),..., (Ti,K, Ai,K)) such that
+∀𝓁∈ [K− Ψ], |Ai∩B𝓁| = 1 ,
+where Ai =⋃
+j∈[K] Ai,j.
+Moreover, for any given block index 𝓁, not an-
+nouncing any block or announcing multiple blocks
+precludes a player from being the “winner” and
+receiving the reward at index 𝓁, so announcing
+exactly one block per index is preferable to an-
+nouncing any other number of blocks. Hence, for
+any strategies α′′
+i,α′
+i such that α′′
+i announces ex-
+actly one block per index with probability 1, and
+α′
+i assigns non-zero probability to action sequences
+((Ti,1, Ai,1),..., (Ti,K, Ai,K)) such that
+∀𝓁∈ [K− Ψ], |Ai∩B𝓁|⁄ = 1 ,
+(where Ai =⋃
+j∈[K] Ai,j as above), it holds that
+ui(ui(α′′
+i,⃗ α−i))≥ui(α′
+i,⃗ α−i) .
+We can now restrict our attention to strategies
+which announce exactly one block per index. Fix any
+time stepj∈ [K]. Let α′
+i be any strategy in which the
+probability that player i announces a block Bj∈B j
+at time step j is less than 1.
+Suppose playeri does not announce a blockB∈B j
+at time step j. Since we are assuming that i an-
+nounces exactly one block per index, we know i
+announces a block Bi,j ∈ Bj at some time step
+j′ > j. If the other players use strategies ⃗ α−i
+(i.e. they announce exactly one block with index
+j at each time step j), then no player (other than
+i) will extend player i’s block Bi,j. Let ⃗B′ =
+(Bgen,B′
+1,...,B ′
+j−1,Bi,j) be the unique (length- j)
+blockchain induced by Bi,j. If player i does not ex-
+tend his own block Bi,j, then he will gain no utility
+after time step j. Thus, the only way player i can
+gain any utility in time steps after j is if he extends
+his own blocks all the way up to time step K:
+Bi,j+1 = Exti(Bi,j, Cj(Ii,j))
+...
+Bi,K = Exti(Bi,K−1, Cj(Ii,K−1))
+where Ii,j denotes player i’s information set at time
+step j, and moreover his self-extended chain has
+18
+===== PDF_PAGE 19 =====
+higher quality than any chain produced by others:
+i.e., at the terminal history h,
+QualityPC
+(
+(⃗B′,Bi,j+1,...,B i,K), C(Ii,K)
+)
+= arg max
+⃗B∈(A(h))|h|
+(
+QualityPC(⃗B, C(h))
+)
+. (5)
+By Theorem D.2, the probability that (5) holds is at
+most
+exp
+(
+− 1
+2K· E [diﬀ1]2·
+(K−1∑
+j=0
+Λ2j
+)2)
+.
+We conclude that ui(⃗ α) ≥ ui(α′
+i,⃗ α−i)− ε for all
+strategies α′
+i of player i. The theorem follows.
+We now show that honestly following the
+SpaceMint protocol is an ε-sequential equilibrium of
+the SpaceMint game.
+Theorem 7.5 (formal version of Theorem 7.1,§7.1).
+Let Π ={Init, Chal, Ans, Vrfy} be a proof of space. For
+any number of players N, any number of time steps
+K∈ N, and any reward function ρ: N→ N, let (⃗ α,⃗ µ)
+be an assessment of SpaceMintΠ,K,ρ where:
+• ⃗ αand ˆαi are deﬁned as in Theorem 7.4, and for
+each n∈ N, we deﬁne ⃗ αn to be the completely
+mixed strategy proﬁle which (at history h) as-
+signs probability 1/|Ai(h)|n to every action ex-
+cept ˆαi, and assigns all remaining probability to
+ˆαi.
+• ⃗ µis derived from ⃗ αusing Bayes’ rule in the fol-
+lowing way: ⃗ µ= lim n→∞⃗ µn, where for each
+n∈ N, ⃗ µn is derived from ⃗ αn using Bayes’ rule.
+Let
+ξ = maxi∈[N]ti∑
+i∈[N]ti
+be the maximum fraction of space possessed by a sin-
+gle player, and suppose ξ <0.5. Then (⃗ α,⃗ µ) is an ε-
+sequential Nash equilibrium of SpaceMintΠ,K,ρ where
+ε = exp
+(
+− 1
+2K· E [diﬀ1]2·
+(K−1∑
+j=0
+Λ2j
+)2)
+,
+Λ is the discount factor (§3.5) and diﬀ1 is deﬁned as
+in§D.
+Proof. Fix any player i∈ [N]. Let I ∈I i be any
+information set of playeri in SpaceMintΠ,K,ρ, and let
+L be the length of histories in I. It follows from
+Deﬁnition 7.2 that the expected utility of player i at
+I is ui((⃗ α,⃗ µ)|I) =∑
+j∈[L]
+δi,winj(h)· onej(i,h )·ρ
+(
+blocksj(h)
+)
++u′
+i
+(
+(⃗ α,⃗ µ)
+)
+,
+where u′
+i is the utility function of player i in the
+game SpaceMintΠ,K−L,ρ. Since win, one, and blocks
+are invariant over histories within any given infor-
+mation set, the summation term can be computed
+explicitly by player i at I. Hence, in order to maxi-
+mize his expected utility at I, the player needs sim-
+ply to maximize u′
+i((⃗ α,⃗ µ)). Let ( ⃗ α|K−L,⃗ µ|K−L) de-
+note the assessment ( ⃗ α,⃗ µ) for the ﬁrst K−L time
+steps of the game. By Theorem 7.4, ⃗ α|K−L is an
+ε-Nash equilibrium of SpaceMintΠ,K−L,ρ. Since ⃗ µ
+is derived from ⃗ αby Bayes’ rule, it follows that
+ui((⃗ α,⃗ µ)|I) ≥ ui(((α′
+i,⃗ α−i),⃗ µ)|I) for any strategy
+α′
+i of player i. Applying this argument for every I,
+we conclude that ( ⃗ α,⃗ µ) is ε-sequentially rational in
+SpaceMintΠ,K,ρ.
+By construction, lim n→∞⃗ αn = ⃗ αand ⃗ µ=
+limn→∞⃗ µn. Hence, ( ⃗ α,⃗ µ) is consistent. The theo-
+rem follows.
+Acknowledgements. We would like to thank
+Andrew Miller and Bram Cohen for bringing the
+challenge-grinding attack to our attention. We thank
+Srini Devadas for useful feedback on draft versions of
+this paper, and Ethan Heilman for an interesting dis-
+cussion about costs of modern Bitcoin mining.
+Sunoo’s research is supported by the follow-
+ing grants: NSF MACS (CNS-1413920), DARPA
+IBM (W911NF-15-C-0236), and SIMONS Investiga-
+tor Award Agreement Dated June 5th, 2012. Georg
+is supported by the French ANR EfTrEC project
+(ANR-16-CE39-0002). Jo¨ el and Krzysztof are sup-
+ported by the European Research Council (ERC)
+consolidator grant 682815 - TOCNeT.
+References
+[1] Burstcoin. http://burstcoin.info.
+[2] Raspberry Pi. www.raspberrypi.org.
+19
+===== PDF_PAGE 20 =====
+[3] Chia Network. https://chia.network/, 2017.
+[4] H. Abusalah, J. Alwen, B. Cohen, D. Khilko,
+K. Pietrzak, and L. Reyzin. Beyond Hell-
+man’s time-memory trade-oﬀs with applications
+to proofs of space. In ASIACRYPT (2), volume
+10625 of LNCS, pages 357–379. Springer, 2017.
+[5] G. Ateniese, I. Bonacina, A. Faonio, and
+N. Galesi. Proofs of space: When space is of
+the essence. In M. Abdalla and R. D. Prisco,
+editors, SCN 14 , volume 8642 of LNCS, pages
+538–557. Springer, Heidelberg, Sept. 2014.
+[6] G. Ateniese, R. C. Burns, R. Curtmola, J. Her-
+ring, L. Kissner, Z. N. J. Peterson, and D. Song.
+Provable data possession at untrusted stores. In
+P. Ning, S. D. C. di Vimercati, and P. F. Syver-
+son, editors, ACM CCS 07, pages 598–609. ACM
+Press, Oct. 2007.
+[7] K. D. Bowers, A. Juels, and A. Oprea. Proofs
+of retrievability: theory and implementation. In
+CCSW, pages 43–54, 2009.
+[8] D. Chaum. Blind signatures for untraceable pay-
+ments. In D. Chaum, R. L. Rivest, and A. T.
+Sherman, editors, CRYPTO 82, pages 199–203.
+Springer US, 1983.
+[9] P. Daian, R. Pass, and E. Shi. Snow white:
+Provably secure proofs of stake. Cryptology
+ePrint Archive, Report 2016/919, 2016. http:
+//eprint.iacr.org/2016/919.
+[10] B. David, P. Gaˇ zi, A. Kiayias, and A. Russell.
+Ouroboros Praos: An adaptively-secure, semi-
+synchronous proof-of-stake protocol. Cryptology
+ePrint Archive, Report 2017/573, 2017. http:
+//eprint.iacr.org/2017/573.
+[11] C. Decker and R. Wattenhofer. Information
+propagation in the bitcoin network. In Peer-to-
+Peer Computing (P2P) 2013 IEEE , pages 1–10,
+Sept 2013.
+[12] R. Di Pietro, L. Mancini, Y. W. Law, S. Etalle,
+and P. Havinga. LKHW: a directed diﬀusion-
+based secure multicast scheme for wireless sen-
+sor networks. In Parallel Processing Workshops,
+2003. Proceedings, pages 397–406, 2003.
+[13] C. Dwork and M. Naor. Pricing via processing or
+combatting junk mail. In E. F. Brickell, editor,
+CRYPTO’92, volume 740 of LNCS, pages 139–
+147. Springer, Heidelberg, Aug. 1993.
+[14] S. Dziembowski, S. Faust, V. Kolmogorov, and
+K. Pietrzak. Proofs of space. In R. Gennaro and
+M. Robshaw, editors, CRYPTO 2015 , volume
+9216 of LNCS, pages 585–605. Springer, 2015.
+[15] S. Dziembowski, T. Kazana, and D. Wichs.
+One-time computable self-erasing functions. In
+Y. Ishai, editor, TCC 2011 , volume 6597 of
+LNCS, pages 125–143. Springer, Heidelberg,
+Mar. 2011.
+[16] Ethereum. Problems. https://github.com/
+ethereum/wiki/wiki/Problems.
+[17] I. Eyal and E. G. Sirer. Majority is not enough:
+Bitcoin mining is vulnerable. In N. Christin and
+R. Safavi-Naini, editors, FC 2014, volume 8437
+of LNCS, pages 436–454. Springer, Heidelberg,
+Mar. 2014.
+[18] P. Golle, S. Jarecki, and I. Mironov. Crypto-
+graphic primitives enforcing communication and
+storage complexity. In M. Blaze, editor, FC
+2002, volume 2357 of LNCS, pages 120–135.
+Springer, Heidelberg, Mar. 2003.
+[19] A. Juels and B. S. Kaliski Jr. Pors: proofs of
+retrievability for large ﬁles. In P. Ning, S. D. C.
+di Vimercati, and P. F. Syverson, editors, ACM
+CCS 07, pages 584–597. ACM Press, Oct. 2007.
+[20] N. P. Karvelas and A. Kiayias. Eﬃcient proofs of
+secure erasure. In M. Abdalla and R. D. Prisco,
+editors, Security and Cryptography for Networks
+- SCN 2014 , volume 8642 of LNCS, pages 520–
+537. Springer, 2014.
+[21] A. Kiayias, A. Russell, B. David, and
+R. Oliynykov. Ouroboros: A provably secure
+proof-of-stake blockchain protocol. In J. Katz
+and H. Shacham, editors, CRYPTO 2017,
+20
+===== PDF_PAGE 21 =====
+Part I , volume 10401 of LNCS, pages 357–388.
+Springer, Heidelberg, Aug. 2017.
+[22] S. King and S. Nadal. Ppcoin: Peer-to-peer
+crypto-currency with proof-of-stake.
+[23] S. Micali. ALGORAND: the eﬃcient and demo-
+cratic ledger. CoRR, abs/1607.01341, 2016.
+[24] A. Miller, December 2015. Personal communi-
+cation.
+[25] A. Miller, A. Juels, E. Shi, B. Parno, and
+J. Katz. Permacoin: Repurposing bitcoin work
+for data preservation. In 2014 IEEE Symposium
+on Security and Privacy , pages 475–490. IEEE
+Computer Society Press, May 2014.
+[26] A. Miller, A. E. Kosba, J. Katz, and E. Shi.
+Nonoutsourceable scratch-oﬀ puzzles to discour-
+age bitcoin mining coalitions. In I. Ray, N. Li,
+and C. Kruegel:, editors, ACM CCS 15 , pages
+680–691. ACM Press, Oct. 2015.
+[27] T. Moran and I. Orlov. Proofs of space-time
+and rational proofs of storage. Cryptology
+ePrint Archive, Report 2016/035, 2016. http:
+//eprint.iacr.org/2016/035.
+[28] S. Nakamoto. Bitcoin: A peer-to-peer elec-
+tronic cash system, 2009. http://bitcoin.org/
+bitcoin.pdf.
+[29] J. F. Nash. Equilibrium points in n-person
+games. Proceedings of the National Academy of
+Sciences, 36(1):48–49, 1950.
+[30] M. J. Osborne and A. Rubinstein. A Course in
+Game Theory. MIT Press, 1994.
+[31] S. Park, A. Kwon, G. Fuchsbauer, P. Gaˇ zi, J. Al-
+wen, and K. Pietrzak. Spacemint: A cryp-
+tocurrency based on proofs of space. Cryp-
+tology ePrint Archive, Report 2015/528, 2015.
+https://eprint.iacr.org/2015/528.
+[32] W. J. Paul, R. E. Tarjan, and J. R. Celoni. Space
+bounds for a game on graphs. Mathematical sys-
+tems theory, 10(1):239–251, 1976–1977.
+[33] D. Perito and G. Tsudik. Secure code update for
+embedded devices via proofs of secure erasure. In
+D. Gritzalis, B. Preneel, and M. Theoharidou,
+editors, ESORICS 2010, volume 6345 of LNCS,
+pages 643–662. Springer, Heidelberg, Sept. 2010.
+[34] L. Ren and S. Devadas. Proof of space from
+stacked expanders. In M. Hirt and A. D.
+Smith, editors, TCC 2016-B, Part I , volume
+9985 of LNCS, pages 262–285. Springer, Heidel-
+berg, Oct. / Nov. 2016.
+[35] M. Rosenfeld. Analysis of hashrate-based double
+spending. CoRR, abs/1402.2009, 2014.
+[36] The NXT Community. Nxt whitepa-
+per. https://bravenewcoin.com/assets/
+Whitepapers/NxtWhitepaper-v122-rev4.pdf,
+July 2014.
+[37] S. Valfells and J. H. Egilsson. Mint-
+ing money with Megawatts: How to
+mine Bitcoin proﬁtably, September 2015.
+http://www.researchgate.net/publication/
+278027487 Minting Money With Megawatts -
+How to Mine Bitcoin Profitably.
+A Proof-of-Space Parameters
+The two PoSpace constructed in [14] have the fol-
+lowing eﬃciency/security properties. Below, thash de-
+notes the time required to evaluate the underlying
+hash function hash:{0, 1}∗ →{ 0, 1}L on inputs of
+length 2L (to hash an input of length m·L takes
+timem·thash by using Merkle-Damg˚ ard), For a given
+numbern of nodes of the underlying graph, an honest
+proverP must dedicate
+N = 2·n·L
+bits of storage ( n·L for the labels, and almost the
+same for the values required to eﬃciently open the
+Merkle tree commitment). A typical value for L is
+256, then N = 512·n.
+Proposition A.1 ([14] ﬁrst construction). There ex-
+ists a PoSpace in the random oracle model with the
+following properties:
+21
+===== PDF_PAGE 22 =====
+• Eﬃciency: The veriﬁer runs in time O(L) dur-
+ing initialization (it just has to send a nonce
+and store a commitment) and O(k· log(n)·
+log log(n)·thash) during execution (it must check
+O(k·log log(n)) openings of the Merkle tree com-
+mitment; the parameter k is discussed below).
+The (honest) prover runs in timeO(n·log log(n)·
+thash) during initialization and in O(k· log(n)·
+log log(n)·thash) during execution.
+• Security: Let kv,kp denote the parameter k
+we set for the commitment veriﬁcation and the
+proof execution phase. If a (potentially cheat-
+ing) prover P passes the commitment veriﬁca-
+tion phase, then with probability 1− 2Θ(kv) the
+following holds: If P can make V accept in the
+proof execution phase with probability≥ 2−Θ(kp),
+then P either stores Θ(N) bits (i.e., almost
+as much as an honest prover) or runs in time
+Θ(n· log log(n)·thash) (i.e., the time required for
+initialization).
+To use the above PoSpace in our construction, we
+must set kv = λ, where λ is a statistical security
+parameter, and kp = Θ(1) can be a constant.
+Proposition A.2 ([14] second construction). There
+exists a PoSpace in the random oracle model with the
+following properties:
+• Eﬃciency: The veriﬁer runs in time O(L) dur-
+ing initialization and in O(k· log(n)·thash) dur-
+ing execution. The (honest) prover runs in time
+O(n· thash) during initialization and in O(k·
+log(n)·thash) during execution.
+• Security: Let kv,kp be as above. If a (po-
+tentially cheating) prover passes the commit-
+ment veriﬁcation phase, then with probability
+1− 2Θ(−kv/ log(n)) the following holds: If P can
+makeV accept in in the proof execution phase
+with probability≥ 2−Θ(kp), then P either stores
+Ω(nL/ log(n)) = Ω( N/ log(n)) bits or requires
+Ω(N/ log(n)) space and Ω(thash·n/ log(n)) time
+during execution.
+To use the above PoSpace in our construction, we
+must set kv = λ· log(n), where λ is a statistical se-
+curity parameter, and kp = Θ(1) can be a constant.
+B Burstcoin
+Here we give some more details on the eﬃciency and
+security issues of Burstcoin as outlined in §1.2.
+The only speciﬁcation of the Burstcoin mining pro-
+cess that we were able to ﬁnd is the webpage ( http:
+//burstcoin.info/intro), which unfortunately is
+rather informal. The description below is thus only
+our best guess on how exactly the mining process
+in Burstcoin works, mostly based on the follow-
+ing ﬁgure: http://burstcoin.info/assets/img/
+flow.png.
+Burstcoin uses the Shabal256 hash function, which
+below we will denote with H(·). To mine Burstcoin,
+a miner ﬁrst initializes his disk space as follows: he
+picks a nonce µ and an account identiﬁer (which is
+a hash of a public key) Id, and then computes 4097
+valuesx0,x 1,... ∈{ 0, 1}256 as
+x0 =H(Id,µ ) and (6)
+xi+1 =H(xi‖xi−1‖... ‖x0) for i = 0,..., 4095.
+The miner then stores s0,...,s 4095 where si = xi⊕
+x4096. Each block si is called a “scoop”, and the
+4096 scoops together are called a “plot”. The miner
+is supposed to store as many plots as he can (using
+diﬀerent nonces) until all the dedicated space is ﬁlled.
+To compute a plot, one must hash 4096 · 1+4096
+2 ≈ 8
+million 256-bit blocks 14. In the following we assume
+for simplicity that there is just one plot s0,...,s 4095.
+Eﬃciency. Once every few minutes, a new block
+gets added to the hash chain. (How this is done is
+irrelevant for this discussion, so we omit it.) At this
+point the miner can compute a designated (public)
+index i∈{ 0,..., 4095} and must look up the value
+si. This si then determines if the miner “wins” and
+thus can add the next block to the blockchain. Note
+that this requires accessing a constant fraction of the
+entire dedicated disk space (i.e. one block per plot,
+or 0.024%) every time a new block gets mined. More-
+14Note that in equation (6), a freshly computed block xi is
+prepended to the previous input. This is because Shabal256
+is an iterated hash function: appending instead of prepending
+would bring the number of hashes required to compute a plot
+down to linear (instead of quadratic) in the length of the plot,
+but at the same time would allow for much more dramatic
+time/memory trade-oﬀs than the ones outlined below.
+22
+===== PDF_PAGE 23 =====
+over, in order to verify that a miner “won” and can
+add a block, it is necessary to recompute the entire
+plot from the initial inputs ( Id,µ ), which, as men-
+tioned above, involves hashing over 8· 106 blocks. In
+comparison, in SpaceMint, the number of bits read
+from the disk is only logarithmic in the size of the
+dedicated space, and veriﬁcation also just requires a
+logarithmic number of hashes. (In Bitcoin, veriﬁca-
+tion requires just a single hash.)
+Time/memory trade-oﬀs. We observe that
+Burstcoin allows for a simple time/memory trade-
+oﬀ: instead of storing an entire plot s0,...,s 4095,
+a miner can initially compute and store only the
+value x4096. The miner then re-computes the re-
+quired scoop si at a given time step, but only if i
+is suﬃciently small (say, i ≤ 10). This would re-
+quire hashing only at most 50 blocks (as the miner
+computes x0,...,x i and sets si =xi⊕x4096). Thus,
+the miner will get a shot at adding a block only at
+10/4095≈ 0.25% of the time slots, but now also only
+requires a 1/4095≈ 0.025% fraction of the space that
+would be needed to store an entire plot. Using this
+strategy, given some ﬁxed amount of disk space, it is
+possible to mine 0 .25/0.025 = 10 times faster than
+the honest mining algorithm, at the price of having
+to compute a modest number of extra hashes. More
+generally, using this type of mining strategy, it is pos-
+sible to mine t times faster at the price of having to
+hash t2/2 blocks with every block read from disk.
+Given that application-speciﬁc integrated circuits
+(ASICs) can compute in the order of millions
+of hashes per second per dollar invested 15, such
+time/memory trade-oﬀs seem practical16. We remark
+that the creators of Burstcoin discuss the possibility
+of mining their currency in a pure proof-of-work style,
+though they come to a diﬀerent conclusion from ours:
+Technically, this mining process can be mined
+POW-style, however mining it as intended will
+yield thousands of times the hashrate, and your
+hardware will sit idle most of the time. Contin-
+15https://en.bitcoin.it/wiki/
+Mining hardware comparison
+16However, we remark that currently, ASICs exist primarily
+for the SHA256 hash function used in Bitcoin (and not for the
+more unconventional Shabal256 used in Burstcoin).
+uously hashing until a block is found is unnec-
+essary, as waiting long enough will cause any
+nonce to eventually become valid.
+—http://burstcoin.info/intro
+Block grinding and extending multiple chains.
+The two main challenges we had to overcome when
+designing SpaceMint were attacks based on grind-
+ing and mining multiple chains. (The problem with
+time/memory trade-oﬀs was solved in the Proofs of
+Space paper [14] upon which this work builds.)
+Due to lack of documentation of the Burstcoin min-
+ing process, we do not know to what extent Burst-
+coin can be attacked using grinding or by extend-
+ing multiple chains. From our understanding of the
+Burstcoin mining process, it seems especially cru-
+cial to avoid grinding of the index of the scoop to
+be used in a given round: otherwise, a malicious
+miner could “hijack” the chain forever (i.e. mine
+all future blocks) using only a very small fraction
+of the total dedicated space, as follows. The ﬁg-
+ure http://burstcoin.info/assets/img/flow.png
+indicates that this scoop index is computed from
+two values PrevGenSig and PrevBlkGenerator. The
+naming indicates that PrevGenSig corresponds to the
+value NewGenSig used in the previous block. This
+value is computed deterministically and is thus “un-
+grindable”. We were not able to ﬁnd details on the
+functionality of PrevBlkGenerator, so we do not know
+whether it can be grinded; however, it seems possible
+that this value serves to bind transactions to proofs
+within a given block, and thus can be grinded (by
+trying diﬀerent sets of transactions to be included in
+a block).
+C Challenge-grinding attacks
+In this section we describe the challenge-grinding at-
+tack (which was communicated to us by Andrew
+Miller [24]), and our solution. Recall (from§3.5) that
+the quality of a blockchain in SpaceMint is deﬁned by:
+QualityPC(ϕ0,...,ϕ i) =
+i∑
+j=1
+log(N(vj))· Λi−j , (7)
+23
+===== PDF_PAGE 24 =====
+wherevj is the quality of the proof inϕj and N(vj) is
+the space required for a proof of quality vj. The dis-
+count factor Λ ensures that more-recent blocks weigh
+slightly more. For the purpose of this section, the fac-
+tor Λ is not important, so we omit it. Then, notice
+that an equivalent measure is the product of block
+qualities:
+QualityPC×(ϕ0,...,ϕ i) =∏i
+j=1 N(vj) . (8)
+A natural question is: why take the product, rather
+than the sum? It turns out that there is a possible
+attack in the case that QualityPC takes a sum, i.e.
+QualityPC+(ϕ0,...,ϕ i) =∑i
+j=1 N(vj) , (9)
+which is mitigated by instead taking a product. The
+basic intuition for this is that the geometric mean
+is more robust against outliers than the arithmetic
+mean. We now describe the attack against the sum-
+based quality function.
+Challenge-grinding attack. When using a space
+commitment (pk,γ ) to compute a proof for block i,
+we must use the challenge computed as a hash of
+block i− ∆ as c := hash(pk,ϕi−∆). It is important
+that ∆ is at least the number of time steps required
+to reach consensus with overwhelming probability, so
+that each miner (i.e., each public key) gets exactly
+one chance at mining a block at time step i. Thus, it
+is not possible to get an unfair advantage by spend-
+ing computational power to “try many diﬀerent chal-
+lenges and pick the best one”. In a challenge-grinding
+attack, the adversary does exactly this, by producing
+long enough ( > ∆) sequences of blocks so that he
+controls his own future challenges.
+LetA be a challenge-grinding adversary who con-
+trols space of size N. A splits up his space into as
+many separate space commitments as possible (sub-
+ject to the minimum size allowed for space com-
+mitments): let ( pk1,γ 1),..., (pkm,γm) be his space
+commitments, which together comprise space N =∑m
+j=1Nγj. If this adversary “honestly” mined t con-
+secutive blocks (by taking the highest-quality proof
+ϕi among all his m space commitments, at each time
+step i), then the expected quality of the resulting
+chain is
+E[QualityPC+(ϕ0,...,ϕ t)] =
+t∑
+i=1
+E[N(vi)] =t·N
+according to the sum-based quality function (9). (Re-
+call that by construction, the expectation of N(vi) is
+N, where vi is the quality of proof ϕi.)
+In fact, for a sum-based quality function, A can
+do signiﬁcantly better than this for all suﬃciently
+long chains. First, he partitions the block indices
+{1,...,t } into disjoint pairs (i,i + ∆). For simplicity,
+suppose t = 2∆ and let the pairs be
+(1, 1 + ∆), ..., (∆, 2∆) .
+Then, for each pair ( i,i + ∆) and every space com-
+mitment (pkj,γj), A computes a challenge ci,j :=
+hash(pkj,ϕ′
+i,j), where ϕ′
+i,j is the proof corresponding
+to commitment (pkj,γj) at time stepi. At this point,
+A has computed m possible challenges ci,1,...,c i,m
+for each time step i + ∆. He can choose the best,
+c∗
+i∈{ci,1,...,c i,m}, such that the quality of his block
+at positioni+∆ is maximized. Informally, this is like
+having just one challenge, but m times more space.
+Now, for a pair ( i,i + ∆), the expected quality of
+A’s proof in time step i + ∆ is increased to N·m.
+This strategy actually decreases the expected qual-
+ity in the earlier time step i compared to the honest
+strategy, since instead of optimizing for quality at po-
+sitioni,A optimizes for position i + ∆: the expected
+quality ofA’s proof in time step i is only N/m.
+With this approach,A generates a chain where half
+the blocks have quality around N·m and the other
+half N/m, so the expected chain quality is
+E[QualityPC+(ϕ′
+0,...,ϕ ′
+t)] =
+t∑
+i=1
+E[N(vi)]
+≈ t· (N/m) +N·m
+2
+> tmN/ 2 .
+Summing up, A, using space N that was initialized
+once, generated a chain of quality that would require
+total space over mN/2 if generated by honest min-
+ing. This m/2 factor can be even further improved
+by optimizing over blocks separated not just by ∆
+positions, but by k· ∆ positions: e.g. blocks i and
+i + ∆ can be used to generate t2 challenges and pick
+the best proof for blocki+2∆, yielding a factorm2/3
+improvement. (More generally, we can getmk/(k+1)
+for any k∈ N; the computational cost of the attack
+grows as tk.)
+24
+===== PDF_PAGE 25 =====
+If the QualityPC function is product-based (or
+equivalently, based on the sum of logarithms), as in
+(7), the attack outlined above no longer works. The
+reason is that the (expected) quality of our two blocks
+j and j + ∆ is N/t and N·t, respectively, and thus
+the product is N2 (which is the same as obtained by
+honest mining, where each block has expected quality
+N).
+Although we have eliminated the speciﬁc space-
+grinding attack described above, we remark that it
+is still possible to get some minor advantage by chal-
+lenge grinding even with a product-based measure
+of quality. Recall that the attack generated m chal-
+lenges at block i (using the m space commitments),
+and then picked the challenge which gave the best
+quality for block i + ∆. Instead of only doing this,
+an adversary could check which challenge (among the
+m candidates) gives the highest value for the prod-
+uct of block qualities at position j and j + ∆. Using
+this strategy, the expected quality of these blocks is
+N2· log(m), which is a factor log(m) higher than the
+N2 we get by honest mining (but still much smaller
+than the m/2 factor in the original attack).
+Before we explain how to counter this attack, let us
+observe that what makes challenge grinding possible
+in the ﬁrst place is the variance in the quality of a
+proof: for a space commitment ( pk,γ ), the expected
+quality of a proof is Nγ, but for any α> 1, the qual-
+ity will be higher thanα·Nγ with probability roughly
+1/α. This variance is necessary as we need the ex-
+pected quality of the best proof found amongst many
+commitments (pk1,γ 1),..., (pkm,γm) to be the sum∑m
+i=1Nγi of all the spaces.
+We can decrease the advantage of challenge grind-
+ing over honestly mining by lowering the variance of
+the quality of proofs. As mentioned above, this vari-
+ance is an important feature that we cannot simply
+remove; however, we can cluster proofs together so
+that the advantage from challenge grinding “amor-
+tizes” over many proofs. One way is to use the same
+challenge for several consecutive blocks. Concretely,
+we introduce a new parameter δ which speciﬁes how
+many blocks are generated using the same challenge.
+The challenge for block i is no longer computed as
+c := hash(pk,ϕi−∆)
+but as
+c := hash(pk,ϕi−∆−(i modδ)) .
+Now a challenge-grinding adversary must try to “op-
+timize”δ proofs at once, which will give a much lower
+advantage than when able to “grind” the proof for
+every block individually. We suggest to set δ = 10,
+which seems more than suﬃcient to prevent challenge
+grinding (we do not recommend using much larger δ,
+since that can make generating long forks easier, as
+we discuss in§D).
+D Parameter setting and inter-
+play
+We have deﬁned several parameters which control the
+eﬃciency and security of SpaceMint. Some of those
+parameters cannot simply be seen as security param-
+eters (where increasing the parameter leads to more
+security but less eﬃciency) as there is a delicate inter-
+play between them, where changing some parameter
+increases one security property at the price of de-
+creasing another. We discuss the importance of the
+most important parameters on the most relevant at-
+tacks below; a summarized view is given in Table 1.
+The parameters are the following, where the number
+in [·] brackets indicates the parameter value in our
+suggested instantiation.
+time [1] which speciﬁes the time (in minutes) between
+blocks.
+δ [10] which speciﬁes for how many blocks the same
+challenge is used.
+∆ [50] which speciﬁes that the challenge for a block
+is computed as the hash of the block at least ∆
+blocks in the past (and at most ∆ + δ).
+Λ [0.99999] speciﬁes how the weight of blocks – when
+computing the quality of a chain – degrades for
+older blocks.17
+minspace [100] speciﬁes (in GB) the minimal size of
+space one must dedicate to start mining.
+17With this Λ the weight drops by 50% every 69314 blocks,
+or 48 days (as Λ 69314≈ 0.5).
+25
+===== PDF_PAGE 26 =====
+Table 1: A summary on how diﬀerent parameters inﬂuence diﬀerent security properties of SpaceMint as
+discussed in Appendix D. An arrow ↑ (↓) means increasing (decreasing) this parameter will increase the
+security against the corresponding attack, ⇑ means that increasing this parameter has a major inﬂuence
+on the security against this attack. The ↑’ arrows do not refer directly to minspace, but rather the time
+required to initialize the minimal allowed space, which scales linear in minspace as shown in Figure 2a.
+Decreasing time makes the scheme only more secure, but setting it very low will force miners to dedicate
+more computation. Also setting minspace high will make the scheme more secure, but a high minspace will
+lower its usability, as parties with small space will not be able to participate.
+Parameters time ∆ δ Λ minspace
+Range/unit N+/min N+ N+ [0, 1] N+/GB
+Suggested 1 50 10 0.99999 100
+Attacks
+Challenge Grinding - - ⇑ - ↑
+Extending Multiple Chains - ⇑ - - -
+Short Forks by Space Reuse ↓ ↓ ↓ - ↑’
+Long Forks by Space Reuse ↓ ↓ ↓ ⇑ ↑’
+Long Forks by Space Decrease - - - ⇓ -
+Challenge grinding. We discussed challenge
+grinding in detail in §C and how setting the param-
+eter δ suﬃciently high prevents this attack. We also
+discussed how challenge grinding becomes more suc-
+cessful the more space commitments one can generate
+given some ﬁxed space, thus increasing minspace also
+makes the attack harder.
+Extending multiple chains. We must ensure
+that for a miner it is rational to only announce blocks
+extending one chain, and this chain should be the
+chain of highest quality known to the miner. Ensur-
+ing that a miner only announces one block is done by
+penalizing miners otherwise (§4). If there is a fork,
+we assume that with high probability this penaliz-
+ing is suﬃcient to ensure that one branch will “die”
+within at most ∆ blocks. Otherwise, miners will get
+diﬀerent challenges for the two chains, which (assum-
+ing the miners are rational) will slow down consensus.
+Clearly, increasing ∆ makes this event less likely (at
+an exponential rate).
+Short forks by space reuse. The security of
+SpaceMint relies on the assumption that it is not pos-
+sible to reuse space for mining. As we can compute
+the challenges for up to ∆ + δ blocks in advance, for
+reusing space even just twice, one would have to ini-
+tialize the space in less than
+time(∆ +δ) = 1(50 + 10)/2 = 30 minutes .
+This is far from the ≈ 200 minutes required to in-
+stantiate 100 GB of space, which is the minimum we
+suggest (Figure 2c on p. 13).
+A promising approach to further harden Spacemint
+against space reuse is to use “proofs of space-time” as
+suggested in [27], which will make the initialisation of
+the space more expensive, but as a consequence also
+reusing the space comes at a much higher cost.
+Long forks by space reuse. The situation is dif-
+ferent if we consider an adversary who tries to create
+a long-range fork (and not extend the current chain)
+because (as speciﬁed in Eq. (4), p. 9) more recent
+blocks contribute more to the quality of a chain. We
+shortly sketch how this attacks works: Let cur denote
+the index of the current block. An adversary ﬁrst ex-
+tends the current chain up to some block cur + low
+by simply using the space he has available (so, the
+low new blocks will be of low quality compared to
+the actual chain). Then the adversary extends this
+26
+===== PDF_PAGE 27 =====
+chain to block cur + low + high with high quality
+blocks, i.e., somewhat better than the blocks of the
+actual chain. As the adversary has less space than
+the total space contributed by all miners, he must
+re-instantiate the space many times while generating
+these blocks. This will take a lot of time, but the
+adversary has time(low + high) minutes to generate
+these high blocks, so it will be possible by setting low
+high enough.
+How large high must be depends on how fast the in-
+ﬂuence of blocks degrades as speciﬁed by the param-
+eter Λ: concretely, it will be in the order of 1/(1− Λ)
+(as the contribution of blocks from far in the past
+is just a small fraction ( ≈ 1/e) of the most recent
+blocks.)
+Every time the adversary re-initalizes its space, it
+can generate challenges for the next ∆ + δ blocks.
+Let Tinit denote the time in minutes required for re-
+initialization. Consider an adversary that generates
+a chain while re-sampling even only once for every
+block, which will allow to generate blocks that look
+as if they had been mined with twice the space that
+is available to the adversary. (This will only be suf-
+ﬁcient if the adversary has more than half the space
+of the honest miners available.) Then the adversary
+is by a factor
+β = Tinit
+(∆ +δ)time
+slower than the speed at which the actual chain
+grows. This means it must set
+low≈ high/β≈ 1
+(1− Λ)· Tinit
+(∆ +δ)time
+to ﬁnish the fork on time.
+For minspace = 100(GB) we have Tinit≈ 200 so
+low ≈ 100 000· 200/60 minutes. Thus, even with
+our rough analysis, this implies that a fork would
+have to go back at the very least half a year. Of
+course even such a long fork constitutes an attack,
+and thus some mechanisms to handle very long forks
+must be in place. This could either be some type of
+checkpoints, but we believe that for such long forks
+relying on weak subjectivity18 should be suﬃcient.
+18https://blog.ethereum.org/2014/11/25/proof-stake-
+learned-love-weak-subjectivity/
+Long forks by space decrease. The above attack
+assumes Λ< 1. If Λ = 1 then there is no degradation
+of the contribution to chain quality of blocks further
+in the past. This is problematic as it allows to gen-
+erate a chain, stating from the genesis block, using
+space that is only as large as the average amount of
+space that has been available by the miners over the
+entire lifetime of the currency, which can be much
+lower than the currently used space. But then, also
+in this case we could rely on weak subjectivity.
+Overtaking the chain. Another attack involves
+the adversary extending only his own blocks, and at-
+tempting to overtake the main chain. In this case, the
+adversary will only get rewarded for those blocks if
+the quality of his chain eventually exceeds that of the
+chain mined by the rest of the network. We say that
+the attack is successful if the blocks thus mined by
+the adversary eventually become part of the highest-
+quality chain.
+A successful overtake would enable an adversary
+to do a double-spending attack by putting a transac-
+tion transferring money to someone in the “main”
+blockchain, and later overwriting the transaction
+when his self-mined blockchain overtakes the main
+one.
+Recall the quality of a block (from §3.5):
+Quality(pk,γ,c,a ) =DNγ(hash(a)) ,
+where DN(hash(a)) is deﬁned as
+DN(hash(a)) :=
+(
+hash(a)/2L)1/N
+.
+We model the hash function as a random ora-
+cle, so hash(a)/2L is distributed as r′/2L for random
+r′←{ 0, 1}L. This distribution is statistically close
+to randomly sampling r← [0, 1], that is,
+∆
+(
+{r′/2L}r′←{0,1}L, {r}r←[0,1]
+)
+= 2−L ,
+where ∆ denotes statistical distance. Henceforth, our
+analysis considers only the latter distribution, which
+we denote by D∗
+N:
+D∗
+N∼
+{
+r1/N}
+r←[0,1] .
+Let (ϕ0,...,ϕ M) be a proof chain, where each
+proof sub-block ϕj contains a proof ( pkj,γj,cj,aj)
+and the quality of the jth block is vj← D∗
+Nj. The
+27
+===== PDF_PAGE 28 =====
+Table 2: Bounding the probability of a successful overtake of the chain:
+p is the probability of a successful overtake, ξ is the adversary’s proportion of the network disk space, and
+the tabulated values are fork length (in blocks).
+Λ = 0.99999 Λ = 0.99998 Λ = 0.99997
+ξ\ p 2−8 2−16 2−32 2−64 2−128 2−8 2−16 2−32 2−64 2−128 2−8 2−16 2−32 2−64 2−128
+0.1 3 5 10 19 37 3 5 10 19 37 3 5 10 19 37
+0.25 10 19 37 74 148 10 19 37 74 148 10 19 37 74 148
+0.33 24 47 93 186 371 24 47 93 186 373 24 47 93 186 374
+0.4 68 136 271 543 1092 68 136 272 546 1104 68 136 273 549 1116
+0.45 277 554 1114 2254 4614 277 557 1127 2307 4852 278 561 1140 2365 5130
+quality of a blockchain (cf.§3.5) is given by
+QualityPC(ϕ0,...,ϕ M) =
+M∑
+j=1
+log(N∗(vj))· ΛM−j
+where Λ∈ [0, 1] and N∗ is deﬁned as
+N∗(v) = min{N∈ N : Pr
+w←D∗
+N
+[v <w]≥ 1/2}. (10)
+Lemma D.1. N∗(v) =−1/ log(v).
+Proof. By deﬁnition of D∗
+N, increasing N means
+Prw←D∗
+N [v <w] increases. Therefore, (10) implies
+N∗(v) =N s.t. Pr
+w←D∗
+N
+[v <w] = 1/2.
+Also by deﬁnition of D∗
+N, it holds that
+Pr
+w←D∗
+N
+[v <w] = Pr
+r←[0,1]
+[v <r1/N]
+= Pr
+r←[0,1]
+[vN <r ]
+Setting the above probability to 1/2 and solving for
+N givesN =−1/ log(v). The claim follows.
+Suppose, without loss of generality, that the adver-
+sary begins his long-fork attack at time 0. Let Nadv
+be the amount of space the adversary has, and let
+Nhonest be that of the rest of the network. For any
+M∈ N, let EM denote the event that after M blocks,
+the adversary’s blockchain is of higher quality than
+the honest miners’ blockchain. Then, by deﬁnition of
+QualityPC, Pr[EM] equals
+Pr
+[ M∑
+j=1
+(
+log
+(
+N∗(ˆvj)
+)
+− log
+(
+N∗(vj)
+))
+· ΛM−j > 0
+]
+,
+(11)
+where ˆvj,vj are random variables representing the
+quality of thejth block of the adversary and the net-
+work respectively, and the probability is taken over
+ˆvj and vj. Using Claim D.1 to substitute for N∗(·)
+and rearranging, we ﬁnd that Pr[ EM] =
+Pr
+[ M∑
+j=1
+(log(− log(vj))− log(− log(ˆvj)))·ΛM−j > 0
+]
+.
+(12)
+Forj∈ [M], we deﬁne new random variables diﬀj
+and diﬀΛ,M
+j as follows:
+diﬀj := log(− log(vj))− log(− log ˆvj)) ,
+diﬀΛ,M
+j := diﬀj· ΛM−j .
+Both diﬀj and diﬀΛ,M
+j have support [−1, 1]. We can
+now write
+Pr[EM] = Pr
+[∑M
+j=1 diﬀΛ,M
+j > 0
+]
+. (13)
+Theorem D.2.
+Pr[EM]≤ exp
+(
+− 1
+2M· E [diﬀ1]2·
+(M−1∑
+j=0
+Λ2j
+)2)
+.
+Proof. Applying a Hoeﬀding bound to the right-hand
+side of (13), we obtain:
+Pr[EM]≤ exp
+(
+− 1
+2M·
+( M∑
+j=1
+E
+[
+diﬀΛ,M
+j
+])2)
+. (14)
+By deﬁnition of diﬀj and diﬀΛ,M
+j ,
+E
+[
+diﬀΛ,M
+j
+]
+= ΛM−j· E [diﬀj]
+= ΛM−j· E [diﬀ1] ,
+where the second equality follows from the fact that
+the diﬀj are identically distributed for all j. Substi-
+tuting this expression in Eq. (14) and using linearity
+of expectation, we obtain the inequality given in the
+theorem statement.
+28
+===== PDF_PAGE 29 =====
+The values in Table 2 were calculated by using
+Mathematica to solve (for M) the expression given
+in Theorem D.2.
+Remark. The dynamics of long-fork attacks change
+slightly if there is more than one (independent) ad-
+versarial party. In this case, the probabilities shown
+in Table 2 are still accurate as long as no adversar-
+ial party owns more space than all the honest parties
+combined, even if the sum of the space owned by ad-
+versarial parties is more than 50% of total space .
+29

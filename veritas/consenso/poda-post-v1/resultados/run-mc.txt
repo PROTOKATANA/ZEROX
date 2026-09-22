@@ -1,0 +1,49 @@
+== ENTORNO PPP-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T16:09:43.740
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 24 default / 0 interactive
+comando: --mc --seed 0xC0FFEE --out run-mc.txt
+semilla: 12648430
+pkg: Status `~/zeo/ZEROX/deepseek/veritas/consenso/poda-post-v1/Project.toml`
+  [4c88cf16] Aqua v0.8.16
+  [fb37089c] Arblib v1.8.1
+  [69666777] Arrow v2.8.1
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [861a8166] Combinatorics v1.1.0
+  [f68482b8] Cthulhu v3.0.2
+  [864edb3b] DataStructures v0.19.6
+  [31c24e10] Distributions v0.25.131
+  [cc61a311] FLoops v0.2.2
+  [41a02a25] Folds v0.2.10
+  [86223c79] Graphs v1.15.0
+  [d1acc4aa] IntervalArithmetic v1.0.12
+  [c3a54625] JET v0.12.1
+  [033835bb] JLD2 v0.6.6
+  [bdcacae8] LoopVectorization v0.12.174
+  [2edaba10] Nemo v0.56.1
+  [9b87118b] PackageCompiler v2.4.1
+  [aea7be01] PrecompileTools v1.3.4
+  [74087812] Random123 v1.7.1
+  [47aef6b3] SimpleWeightedGraphs v1.5.1
+  [276daf66] SpecialFunctions v2.9.0
+  [860ef19b] StableRNGs v1.0.4
+  [90137ffa] StaticArrays v1.9.20
+  [2913bbd2] StatsBase v0.34.13
+  [09ab397b] StructArrays v0.7.3
+  [a759f4b9] TimerOutputs v1.2.1
+  [bc48ee85] Tullio v0.3.9
+
+== Monte Carlo vs fórmula exacta (validación del kernel) ==
+SR=4611686018427387904 C=1 N=100000 réplicas=24 hilos=24 semilla=12648430
+válidos observados = 601356 (esperado ≈ 600000.0)
+  L         exacta             MC          sigma    cubre
+  1      1.000e+00      1.000e+00      0.000e+00       sí
+  2      5.000e-01      5.006e-01      6.448e-04       sí
+  3      2.500e-01      2.502e-01      5.584e-04       sí
+  4      1.250e-01      1.250e-01      4.265e-04       sí
+  5      6.250e-02      6.222e-02      3.121e-04       sí
+  6      3.125e-02      3.090e-02      2.244e-04       sí
+  7      1.562e-02      1.529e-02      1.599e-04       sí
+  8      7.812e-03      7.711e-03      1.135e-04       sí

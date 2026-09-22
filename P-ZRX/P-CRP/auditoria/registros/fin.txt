@@ -1,0 +1,141 @@
+### date
+lun 21 sep 2026 16:54:27 CEST
+### uptime
+ 16:54:27  up 13 days 13:23,  0 users,  carga promedio: 2,32, 2,14, 1,40
+### sha256sum -c P-ZRX/P-CRP/ENTRADA.sha256
+P-ZRX/P-CRP/PROMPT.md: OK
+P-ZRX/rescate-deepseek/encargos/ENCARGO-07v2-coste-rama-privada.md: OK
+P-ZRX/rescate-deepseek/encargos/ENCARGO-07v2-coste-rama-privada.sha256: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/CONTRATO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/ENCARGO.sha256: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/ENTRADA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/HIPOTESIS-QUE-CODIFICAN-LA-CONCLUSION.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/HUELLAS.sha256: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/INFORME.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/MATRIZ-AUTORIDAD.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/MATRIZ-VALIDEZ.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/METODO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/MODELO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/Manifest.toml: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/PROCEDENCIA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/PROGRESO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/PROPUESTA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/Project.toml: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/REVISION-JULIA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/REVISION-MATEMATICA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/REVISION-RESPUESTA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/REVISION-RUST.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/bench/benchmarks.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/bench/io_lectura.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/julia-version.toml: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/BENCH.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/CONTROL.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/CORTO.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/DAG.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/ENTORNO.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/IO.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/MC.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/RCE.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/RFIN5.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/TEORIA.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/TESTS.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/resultados/VEREDICTO.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/run.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/CosteRamaPrivadaV2.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/controlador_rce.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/dag_sim.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/dp.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/gdr_wrapper.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/modelo.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/referencia.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/rfin5.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/src/validacion.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v2/test/runtests.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/CONTRATO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/ENCARGO.sha256: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/ENTRADA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/HIPOTESIS-QUE-CODIFICAN-LA-CONCLUSION.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/HUELLAS.sha256: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/INFORME.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/MATRIZ-AUTORIDAD.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/MATRIZ-VALIDEZ.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/METODO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/MODELO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/Manifest.toml: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/PROCEDENCIA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/PROGRESO.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/PROPUESTA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/Project.toml: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/REVISION-JULIA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/REVISION-MATEMATICA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/REVISION-RESPUESTA.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/REVISION-RUST.md: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/bench/benchmarks.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/bench/io_lectura.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/julia-version.toml: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/BENCH.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/CORRELACION.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/ENTORNO.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/ETA.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/EVENTOS.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/IO.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/SWEEP-DAG.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/SWEEP-TOY.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/TESTS.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/U2U3.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/VARIOS.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/resultados/VEREDICTO.txt: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/run.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/CosteRamaPrivadaV3.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/controlador_rce.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/dag_sim.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/dp.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/eventos.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/flujo.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/gdr_wrapper.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/modelo.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/referencia.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/src/validacion.jl: OK
+P-ZRX/rescate-deepseek/veritas/seguridad/coste-rama-privada-v3/test/runtests.jl: OK
+exit=0
+### git status --short
+ D ZEROX-EN-NUMEROS.md
+?? .trash/
+?? P-ZRX/
+?? veritas/consenso/poda-post-v1/
+?? veritas/consenso/prueba-recursiva-v1/
+?? veritas/seguridad/
+### ficheros del repositorio (fuera de P-ZRX/P-CRP) modificados desde 16:35
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/src/rapido.jl
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/src/validacion.jl
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/src/modelo.jl
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/src/Equivocacion.jl
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/src/espectro.jl
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/src/referencia.jl
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/Project.toml
+./P-ZRX/P-EQUIVOCACION/investigacion/veritas/consenso/equivocacion-v1/Manifest.toml
+./P-ZRX/P-EQUIVOCACION/investigacion/PROGRESO.md
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/modelo.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/validacion.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/rapido.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/PermanenciaV1.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/test/runtests.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/bench/benchmarks.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/mediciones/hardware.tsv
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/Project.toml
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/Manifest.toml
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/run.jl
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/correr-modelo.sh
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/Pkg/tUTdb_ReH04.so
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/Pkg/tUTdb_ReH04.ji
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/TOML/mjrwE_ReH04.so
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/TOML/mjrwE_ReH04.ji
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/Dates/p8See_ReH04.so
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/Dates/p8See_ReH04.ji
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/Printf/3FQLY_ReH04.so
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/Printf/3FQLY_ReH04.ji
+./P-ZRX/P-PERMANENCIA/investigacion/veritas/.julia-depot/compiled/v1.13/LibGit2/xrYJZ_ReH04.so
+grep: error de escritura: Tubería rota
+grep: error de escritura: Tubería rota
+(fin)

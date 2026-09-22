@@ -1,0 +1,25 @@
+Herramienta: Segunda línea VDF (revelación retardada, R-FIN-14 (h))
+Problema que ataca: Sembrador y manipulación del ancla por un atacante con reloj más rápido
+Qué consigue: Oculta la entropía hasta cerca de usarla y recorta los retos que el atacante conoce por adelantado. Cubre hasta una ventaja de reloj
+de ≈ 1 + L/I. Según research/pot-aes-asic-chacha.md, también es la palanca más fuerte para acortar F
+Precio: 0,15–0,81 núcleos por nodo y de 3 a 10 líneas AES. Abre un vector nuevo (C4): en una partición, el lado sin esas líneas deja de producir
+aunque tenga espacio
+Estado: Estudiada en las auditorías 9a/10a. Sus cifras son anteriores al perfil 1a y a pot_output futuro, así que no son heredables
+────────────────────────────────────────
+Herramienta: Compromiso previo de parcela + edad (patrón ATX de Spacemesh)
+Problema que ataca: Sembrador y alquiler por horas
+Qué consigue: El atacante ya no puede elegir parcelas después de ver el reto
+Precio: Registro en cadena, más una prueba de que el compromiso cubre todos los bytes, que no existe para el formato Autonomys
+Estado: Nº 1 en P-SEMBRADOR. Necesita prototipo
+────────────────────────────────────────
+Herramienta: Sellado secuencial por sector (estilo PoRep de Filecoin)
+Problema que ataca: Sembrador
+Qué consigue: Fabricar un candidato tarda más que la ventana de adelanto, con cualquier paralelismo
+Precio: Parcela nueva, prueba sucinta nueva y riesgo de ventaja ASIC
+Estado: Nº 2 en P-SEMBRADOR, solo como línea de investigación
+────────────────────────────────────────
+Herramienta: Auditoría periódica de permanencia (estilo PoSt) + vesting
+Problema que ataca: Cobrar y borrar
+Qué consigue: Abandonar el almacenamiento cuesta la recompensa pendiente
+Precio: Riesgo de pérdida para el granjero doméstico con apagones
+Estado: Sin medir

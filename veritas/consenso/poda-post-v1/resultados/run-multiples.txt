@@ -1,0 +1,37 @@
+== ENTORNO PPP-v0.1 ==
+git_HEAD: 8dffd1c1a2487ca571cab9a7358c4b7ffb0a21af
+fecha: 2026-09-17T23:26:20.785
+julia: 1.13.0
+cpu: znver5
+hilos_julia: 1 default / 1 interactive
+comando: --multiples --out run-multiples.txt
+semilla: 23130
+pkg: Status `~/zeo/ZEROX/veritas/consenso/poda-post-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [860ef19b] StableRNGs v1.0.4
+  [ade2ca70] Dates v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [44cfe95a] Pkg v1.13.0
+  [de0858da] Printf v1.11.0
+  [9abbd945] Profile v1.11.0
+  [9a3f8284] Random v1.11.0
+  [8dfed614] Test v1.11.0
+
+== Punto 3 del §3: múltiples sorteos por s-bucket. Razón exacta/hipótesis ==
+razón = F(SR÷2^L)/F(SR÷2) / 2^-(L-1), F(x)=1-((M-1-x)/M)^C, M=2^63
+SR=          1073741824  L=2  acept/dibujo=5.821e-11 |  C=1: 1.000000  C=2: 1.000000  C=4: 1.000000  C=8: 1.000000  C=16: 1.000000  C=32: 1.000000  C=64: 1.000000
+SR=          1073741824  L=4  acept/dibujo=5.821e-11 |  C=1: 1.000000  C=2: 1.000000  C=4: 1.000000  C=8: 1.000000  C=16: 1.000000  C=32: 1.000000  C=64: 1.000000
+SR=          1073741824  L=8  acept/dibujo=5.821e-11 |  C=1: 1.000000  C=2: 1.000000  C=4: 1.000000  C=8: 1.000000  C=16: 1.000000  C=32: 1.000000  C=64: 1.000000
+SR=      35184372088832  L=2  acept/dibujo=1.907e-06 |  C=1: 1.000000  C=2: 1.000000  C=4: 1.000001  C=8: 1.000003  C=16: 1.000007  C=32: 1.000015  C=64: 1.000030
+SR=      35184372088832  L=4  acept/dibujo=1.907e-06 |  C=1: 1.000000  C=2: 1.000001  C=4: 1.000003  C=8: 1.000006  C=16: 1.000013  C=32: 1.000026  C=64: 1.000053
+SR=      35184372088832  L=8  acept/dibujo=1.907e-06 |  C=1: 1.000000  C=2: 1.000001  C=4: 1.000003  C=8: 1.000007  C=16: 1.000014  C=32: 1.000029  C=64: 1.000060
+SR= 1152921504606846976  L=2  acept/dibujo=6.250e-02 |  C=1: 1.000000  C=2: 1.016129  C=4: 1.048345  C=8: 1.112378  C=16: 1.237067  C=32: 1.461146  C=64: 1.766225
+SR= 1152921504606846976  L=4  acept/dibujo=6.250e-02 |  C=1: 1.000000  C=2: 1.028226  C=4: 1.085977  C=8: 1.206455  C=16: 1.465214  C=32: 2.033537  C=64: 3.208856
+SR= 1152921504606846976  L=8  acept/dibujo=6.250e-02 |  C=1: 1.000000  C=2: 1.032006  C=4: 1.097982  C=8: 1.237715  C=16: 1.547300  C=32: 2.273146  C=64: 4.003450
+SR= 9223372036854775807  L=2  acept/dibujo=5.000e-01 |  C=1: 1.000000  C=2: 1.166667  C=4: 1.458333  C=8: 1.806832  C=16: 1.979985  C=32: 1.999799  C=64: 2.000000
+SR= 9223372036854775807  L=4  acept/dibujo=5.000e-01 |  C=1: 1.000000  C=2: 1.291667  C=4: 1.941536  C=8: 3.238896  C=16: 5.151486  C=32: 6.985690  C=64: 7.871397
+SR= 9223372036854775807  L=8  acept/dibujo=5.000e-01 |  C=1: 1.000000  C=2: 1.330729  C=4: 2.120866  C=8: 3.961211  C=16: 7.769962  C=32: 15.068043  C=64: 28.362290
+
+Lectura: la multiplicidad de chunks NO da ventaja injusta —la razón es la
+misma para todos—, pero infla la probabilidad de nivel alto respecto de la
+hipótesis. La desviación es despreciable si SR ≪ 2^63 y apreciable si no.

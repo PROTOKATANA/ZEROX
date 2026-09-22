@@ -1,0 +1,15 @@
+# ADL-v1 · benchmark del barrido — 2026-09-21T10:46:50.061
+julia  = 1.13.0
+cpu    = znver5
+hilos  = 4
+filas  = 100000
+
+@allocated barrer! (serial, 100000 filas) = 0 bytes
+serial       : mediana 0.914512 ms  mínimo 0.914512 ms  allocs 0  mem 0
+hilos reales = 4  (el escalado se mide reejecutando con JULIA_NUM_THREADS=1,2,4,8)
+con hilos    : mediana 0.266925 ms  allocs 22  mem 1632
+una fila     : mediana 4.729 ns  allocs 0  mem 0
+BigFloat 256 : mediana 2.319888888888889 µs  allocs 91  mem 4960
+Sim-v1 400ep : mediana 0.31529328621908126 µs  allocs 3  mem 9672
+
+barrido con hilos == serial : true

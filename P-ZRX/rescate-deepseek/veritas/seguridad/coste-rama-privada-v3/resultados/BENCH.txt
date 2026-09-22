@@ -1,0 +1,5 @@
+Benchmark CRP-v0.3
+| DP d=6 T=2000                |   6490.280 µs |       109 |
+| eventos terminal+paso T=200  |    180.697 µs |        72 |
+| DAG S=4 4 nodos 200 slots    |      1.666 ms |     60588 |
+Nota: el simulador es serial y determinista; no se barajan hilos en caliente.

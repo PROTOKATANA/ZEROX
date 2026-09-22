@@ -1,0 +1,9 @@
+Perfil candidato RCE-v0.1 rev2 (Z0). Instrumento, NO consenso.
+cohorte0 N=5 sello=10 -> Scheduled R=200 activación=20
+rango(19)=100 rango(20)=200
+cohorte1 N=0 sello=20 -> HeldZero (Z0: sin propuesta)
+rango(39)=200 rango(40)=200
+
+Primer dato ausente del controlador del SPEC (C-HDR-06): la VENTANA
+(TAREAS §2.3: arranque, ventana, límites, redondeos, fusiones fuera de ventana).
+Resultado del controlador del SPEC: Pendiente.

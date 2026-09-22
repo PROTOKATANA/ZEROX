@@ -1,0 +1,15 @@
+F1 -> resultados/F1-distribucion.tsv
+F1b -> resultados/F1b-arranque.tsv
+F2 -> resultados/F2-reclutamiento.tsv
+F2b -> resultados/F2b-coste-analitico.tsv
+F2c -> resultados/F2c-curva-coste.tsv
+F3 -> resultados/F3-grieta.tsv
+F4 -> resultados/F4-claves-nuevas.tsv
+F5 -> resultados/F5-honesto-region.tsv
+F6 -> resultados/F6-coste-absoluto.tsv
+v1 -> resultados/V1-discretizacion.tsv
+v2 -> resultados/V2-greedy.tsv
+v3 -> resultados/V3-cola-pequena.tsv
+v4 -> resultados/V4-cotas.tsv
+┌ Warning: Replacing docs for `Main.Modelo.beta_cruce :: Union{Tuple{Real}, Tuple{Real, Real}, Tuple{Real, Real, Real}}` in module `Main.Modelo`
+└ @ Base.Docs docs/Docs.jl:253

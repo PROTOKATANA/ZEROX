@@ -1,0 +1,16 @@
+# ADL-v1 · JET sobre el kernel — 2026-09-21T10:47:45.888
+julia  = 1.13.0
+jet    = 0.12.1
+
+## report_call(evaluar_fila)
+No errors detected
+
+n_errores_call = 0
+
+## report_opt(evaluar_fila)
+No errors detected
+
+n_errores_opt = 0
+
+## report_call(barrer!)
+n_errores_barrer = 0

@@ -1,0 +1,6 @@
+# semilla = 5787764695322676559 (UInt64); Julia 1.13.0; hilos = 6
+# F = [1019]  α = [0.2, 0.33, 0.4]  η_h = 1.0  η_a = 1.0
+F2 -> resultados/F2-ventana.tsv, F2b-betad-minimo.tsv
+# semilla = 5787764695322676559 (UInt64); Julia 1.13.0; hilos = 6
+# F = [3600]  α = [0.2, 0.33, 0.4]  η_h = 1.0  η_a = 1.0
+F2 -> resultados/F2-ventana-F3600.tsv, F2b-betad-minimo-F3600.tsv

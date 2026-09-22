@@ -1,0 +1,10 @@
+CRP-v0.2 — entorno de ejecución
+fecha_utc = 2026-09-21T14:50:20.399
+julia_version = 1.13.0
+cpu = znver5
+hilos_default = 8
+hilos_interactive = 1
+sistema = Linux
+semilla = 23130 (5a5a)
+replicas = 64
+presupuesto_declarado = max 64 GiB RAM, 24 hilos, disco temporal acotado

@@ -1,0 +1,8 @@
+Toy escalar aditivo: frontera media α_drift = 1/(S+1)
+S  1/(S+1)   g en la frontera   P_sup(d=4,T=200) en 1/(S+1)±0.03
+ 1  0.500000  +0.0e+00        bajo=4.9291e-01  alto=8.9879e-01
+ 2  0.333333  -1.1e-16        bajo=5.7330e-01  alto=9.3239e-01
+ 4  0.200000  +0.0e+00        bajo=5.9685e-01  alto=9.5882e-01
+ 8  0.111111  +0.0e+00        bajo=5.7969e-01  alto=9.7817e-01
+16  0.058824  +0.0e+00        bajo=4.0866e-01  alto=9.8841e-01
+24  0.040000  +0.0e+00        bajo=2.1131e-01  alto=9.9195e-01

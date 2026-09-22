@@ -1,0 +1,76 @@
+# El repositorio ZEROX tiene su propio workspace en la raiz. Este crate vive dentro de el, pero
+# NO debe ser miembro suyo (el encargo prohibe tocar ficheros fuera de `P-ZRX/P-INTENTO/investigacion/`,
+# y meterlo en la raiz obligaria a editar `ZEROX/Cargo.toml`). Un `[workspace]` vacio lo declara
+# raiz de su propio workspace.
+[workspace]
+
+[package]
+name = "intento-banco"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Banco de medida P-INTENTO: coste del intento dirigido del sembrador sobre Autonomys @ f8842d0"
+
+# Dependencias POR RUTA al clon fijado. El clon es de solo lectura: aqui solo se le llama.
+# Los `[patch]` del workspace de Autonomys (polkadot-sdk, libp2p-identity) NO afectan a este
+# subconjunto de dependencias, asi que no se replican.
+[dependencies]
+ab-proof-of-space = { path = "../../../../../fuentes/subspace/shared/ab-proof-of-space", features = [
+    "alloc",
+    "parallel",
+    "full-chiapos",
+] }
+subspace-core-primitives = { path = "../../../../../fuentes/subspace/crates/subspace-core-primitives" }
+subspace-proof-of-space = { path = "../../../../../fuentes/subspace/crates/subspace-proof-of-space", features = [
+    "alloc",
+    "parallel",
+] }
+subspace-verification = { path = "../../../../../fuentes/subspace/crates/subspace-verification" }
+subspace-erasure-coding = { path = "../../../../../fuentes/subspace/crates/subspace-erasure-coding" }
+subspace-kzg = { path = "../../../../../fuentes/subspace/shared/subspace-kzg" }
+blake3 = "1.8.5"
+criterion = { version = "0.8.2", default-features = false }
+rayon = "1.12"
+
+[[bench]]
+name = "m1_tabla"
+harness = false
+
+[[bench]]
+name = "m2_reto"
+harness = false
+
+[[bench]]
+name = "m3_ganador"
+harness = false
+
+[[bench]]
+name = "m4_cono"
+harness = false
+
+[[bin]]
+name = "escalado"
+path = "src/bin/escalado.rs"
+
+[[bin]]
+name = "entorno"
+path = "src/bin/entorno.rs"
+
+[profile.bench]
+# Perfil de compilacion del banco: identico al del clon (`bench` hereda de `release`).
+# `panic = unwind` como en el clon; sin LTO para que el tiempo de compilacion no se dispare
+# y para no alterar el codigo generado respecto del banco oficial.
+inherits = "release"
+lto = false
+
+[[bin]]
+name = "distribucion"
+path = "src/bin/distribucion.rs"
+
+[[bin]]
+name = "exportar_modelo"
+path = "src/bin/exportar_modelo.rs"
+
+[[bin]]
+name = "estres"
+path = "src/bin/estres.rs"

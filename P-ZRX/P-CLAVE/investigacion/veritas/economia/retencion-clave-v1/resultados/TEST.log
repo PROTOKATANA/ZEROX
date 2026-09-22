@@ -1,0 +1,4 @@
+┌ Warning: Replacing docs for `Main.Modelo.beta_cruce :: Union{Tuple{Real}, Tuple{Real, Real}, Tuple{Real, Real, Real}}` in module `Main.Modelo`
+└ @ Base.Docs docs/Docs.jl:253
+Test Summary:      | Pass  Total     Time
+retencion-clave-v1 | 1096   1096  1m14.7s

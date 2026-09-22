@@ -1,0 +1,76 @@
+warning: address range table at offset 0x3900 has a premature terminator entry at offset 0x4260
+warning: address range table at offset 0x3900 has a premature terminator entry at offset 0x42c0
+== Perfil CRP-v0.1 (barrido_alpha, hilos=1) ==
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+     5         0 @Base/int.jl            580 >>
+     5         5 @Base/int.jl            574 >>
+     5         0 @Base/promotion.jl      404 promote
+     5         0 @Base/promotion.jl      379 _promote
+     5         5 @Base/float.jl          245 Float64
+     5         5 @Base/float.jl          698 abs
+     5         0 @Compiler/src/typeinfer.jl 1610 typeinf_ext_toplevel(mi::Core.Met…
+     5         0 @Compiler/src/typeinfer.jl 1601 typeinf_ext_toplevel
+     5         0 @Compiler/src/typeinfer.jl 1404 typeinf_ext(interp::Compiler.Nati…
+     5         0 @Compiler/…ractinterpretation.jl  189 (::Compiler.var"#handle1#abstract…
+     5         0 @Compiler/…ractinterpretation.jl  879 abstract_call_method_with_const_a…
+     6         0 @Base/number.jl           7 convert
+     6         6 @Base/mpfr.jl           623 /(x::BigFloat, y::BigFloat)
+     6         0 @Base/gmp.jl            316 BigInt
+     6         0 @Base/gmp.jl            218 set_ui(a::UInt64)
+     8         0 @Base/special/exp.jl    218 exp_impl
+     8         0 @Base/rational.jl       164 Float64(x::Rational{BigInt})
+     9         0 @Base/special/exp.jl     78 expm1b_kernel
+     9         0 @Base/math.jl            94 evalpoly
+     9         0 @Base/math.jl            95 macro expansion
+     9         9 @Base/float.jl          623 <=
+    11         0 …vada-v1/src/modelo.jl   30 peso_exacto
+    12         0 @Base/special/exp.jl    182 table_unpack
+    12         0 @Base/special/exp.jl    230 exp_impl
+    12        12 @Base/essentials.jl     783 reinterpret
+    13        13 @Base/gmp.jl            207 set!
+    14        14 @Base/int.jl            418 |
+    15         0 @Base/special/exp.jl    216 exp_impl
+    15         0 @Base/promotion.jl      434 *
+    16        16 @Base/gmp.jl            157 init2!
+    16         0 …vada-v1/src/rapido.jl   39 simular_rama_rapido(rng::StableRN…
+    17         0 @Base/special/exp.jl    215 exp_impl
+    17        17 @Base/float.jl          497 muladd
+    18         0 @Base/gmp.jl             69 BigInt
+    18         2 @Base/gmp.jl             70 _
+    18        18 @Base/float.jl          494 *
+    19         0 @Base/client.jl         577 _start()
+    19         0 @Base/client.jl         344 exec_options(opts::Base.JLOptions)
+    19         0 @Base/Base.jl           309 include(mod::Module, _path::Strin…
+    19         0 @Base/loading.jl       3076 _include(mapexpr::Function, mod::…
+    19         0 @Base/loading.jl       3016 include_string(mapexpr::typeof(id…
+    19        12 @Base/boot.jl           489 eval(m::Module, e::Any)
+    21         0 @Base/gmp.jl            994 Rational{BigInt}(num::BigInt, den…
+    21         0 @Base/gmp.jl            208 set(a::BigInt)
+    22        16 …vada-v1/src/rapido.jl   15 poisson_knuth
+    22         0 @Base/rational.jl        91 //
+    22         0 @Base/rational.jl        48 Rational
+    31        31 @Base/int.jl           1043 *
+    32         0 @Random/src/generation.jl  125 rand
+    32         0 @Random/src/generation.jl  114 rand
+    32         0 @Random/src/generation.jl  118 _rand52
+    32         1 @StableRNGs/src/StableRNGs.jl   74 rand
+    33         0 …vada-v1/src/modelo.jl   35 peso_relativo(sr::UInt64, sr0::UI…
+    41         0 @Random/src/Random.jl   265 rand
+    41         0 @Random/src/generation.jl   35 rand
+    41         0 @Random/src/Random.jl   262 rand
+    41         0 @Random/src/generation.jl   32 rand
+    42         1 …vada-v1/src/rapido.jl   34 simular_rama_rapido(rng::StableRN…
+    49         0 …vada-v1/src/rapido.jl   14 poisson_knuth
+    61         3 @Base/special/exp.jl    329 exp(x::Float64)
+    64         3 …vada-v1/src/rapido.jl   10 poisson_knuth
+    97         0 …vada-v1/src/rapido.jl   68 #simular_raza#18
+    99         0 …vada-v1/src/rapido.jl   67 #simular_raza#18
+   136         0 …vada-v1/src/rapido.jl   37 simular_rama_rapido(rng::StableRN…
+   196         0 @Base/threadingconstructs.jl  178 (::Base.Threads.var"#threading_ru…
+   196         0 @Base/threadingconstructs.jl  246 #27
+   196         0 @Base/threadingconstructs.jl  279 (::Main.CosteRamaPrivada.var"#27#…
+   196         0 …vada-v1/src/rapido.jl  110 macro expansion
+   196         0 …vada-v1/src/rapido.jl   60 simular_raza
+   196         1 …vada-v1/src/rapido.jl   25 simular_rama_rapido
+Total snapshots: 215. Utilization: 100% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

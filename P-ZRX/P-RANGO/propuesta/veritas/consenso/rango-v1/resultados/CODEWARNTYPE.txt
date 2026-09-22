@@ -1,0 +1,154 @@
+MethodInstance for controlador_fast(::UInt64, ::UInt64, ::ConfigControlador)
+  from controlador_fast(r::UInt64, n::UInt64, c::ConfigControlador) @ Main.RangoV1 ~/zeo/ZEROX/P-ZRX/P-RANGO/propuesta/veritas/consenso/rango-v1/src/rapido.jl:51
+Arguments
+  #self#::Core.Const(Main.RangoV1.controlador_fast)
+  r::UInt64
+  n::UInt64
+  c::ConfigControlador
+Locals
+  out::UInt128
+  step::UInt128
+  hi::UInt128
+  lo::UInt128
+  r_par::UInt128
+  r_raw::UInt128
+  den::UInt128
+  num::UInt128
+  blend::UInt128
+  rr::UInt128
+  nn::UInt128
+  q::UInt128
+  a::UInt128
+  d::UInt128
+Body::Tuple{UInt64, Bool}
+1 ─        Core.NewvarNode(:(out))
+│          Core.NewvarNode(:(step))
+│          Core.NewvarNode(:(hi))
+│          Core.NewvarNode(:(lo))
+│          Core.NewvarNode(:(r_par))
+│          Core.NewvarNode(:(r_raw))
+│          Core.NewvarNode(:(den))
+│          Core.NewvarNode(:(num))
+│          Core.NewvarNode(:(blend))
+│          Core.NewvarNode(:(rr))
+│          Core.NewvarNode(:(nn))
+│          Core.NewvarNode(:(q))
+│          Core.NewvarNode(:(a))
+│          Core.NewvarNode(:(d))
+│   %15  = Main.RangoV1.:(==)::Core.Const(==)
+│   %16  = Main.RangoV1.UInt64::Core.Const(UInt64)
+│   %17  = (%16)(0)::Core.Const(0x0000000000000000)
+│   %18  = (%15)(n, %17)::Bool
+└──        goto #4 if not %18
+2 ─ %20  = Core.tuple(r, false)::Core.PartialStruct(Tuple{UInt64, Bool}, Union{Nothing, Bool}[0, 0], Any[UInt64, Core.Const(false)])
+└──        return %20
+3 ─        Core.Const(:(goto %23))
+4 ┄ %23  = Main.RangoV1.precondicion_u128::Core.Const(Main.RangoV1.precondicion_u128)
+│   %24  = (%23)(c)::Bool
+└──        goto #6 if not %24
+5 ─        goto #7
+6 ─ %27  = Main.RangoV1.throw::Core.Const(throw)
+│   %28  = Main.RangoV1.ArgumentError::Core.Const(ArgumentError)
+│   %29  = (%28)("configuración fuera del dominio de u128")::Core.Const(ArgumentError("configuración fuera del dominio de u128"))
+└──        (%27)(%29)
+7 ┄ %31  = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %32  = Base.getproperty(c, :ganancia_den)::UInt64
+│          (d = (%31)(%32))
+│   %34  = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %35  = Base.getproperty(c, :ganancia_num)::UInt64
+│          (a = (%34)(%35))
+│   %37  = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %38  = Base.getproperty(c, :q)::UInt64
+│          (q = (%37)(%38))
+│   %40  = Main.RangoV1.UInt128::Core.Const(UInt128)
+│          (nn = (%40)(n))
+│   %42  = Main.RangoV1.UInt128::Core.Const(UInt128)
+│          (rr = (%42)(r))
+│   %44  = Main.RangoV1.Base::Core.Const(Base)
+│   %45  = Base.getproperty(%44, :Checked)::Core.Const(Base.Checked)
+│   %46  = Base.getproperty(%45, :checked_add)::Core.Const(Base.Checked.checked_add)
+│   %47  = Main.RangoV1.Base::Core.Const(Base)
+│   %48  = Base.getproperty(%47, :Checked)::Core.Const(Base.Checked)
+│   %49  = Base.getproperty(%48, :checked_mul)::Core.Const(Base.Checked.checked_mul)
+│   %50  = Main.RangoV1.:-::Core.Const(-)
+│   %51  = d::UInt128
+│   %52  = a::UInt128
+│   %53  = (%50)(%51, %52)::UInt128
+│   %54  = nn::UInt128
+│   %55  = (%49)(%53, %54)::UInt128
+│   %56  = Main.RangoV1.Base::Core.Const(Base)
+│   %57  = Base.getproperty(%56, :Checked)::Core.Const(Base.Checked)
+│   %58  = Base.getproperty(%57, :checked_mul)::Core.Const(Base.Checked.checked_mul)
+│   %59  = a::UInt128
+│   %60  = q::UInt128
+│   %61  = (%58)(%59, %60)::UInt128
+│          (blend = (%46)(%55, %61))
+│   %63  = Main.RangoV1.Base::Core.Const(Base)
+│   %64  = Base.getproperty(%63, :Checked)::Core.Const(Base.Checked)
+│   %65  = Base.getproperty(%64, :checked_mul)::Core.Const(Base.Checked.checked_mul)
+│   %66  = rr::UInt128
+│   %67  = blend::UInt128
+│          (num = (%65)(%66, %67))
+│   %69  = Main.RangoV1.Base::Core.Const(Base)
+│   %70  = Base.getproperty(%69, :Checked)::Core.Const(Base.Checked)
+│   %71  = Base.getproperty(%70, :checked_mul)::Core.Const(Base.Checked.checked_mul)
+│   %72  = d::UInt128
+│   %73  = nn::UInt128
+│          (den = (%71)(%72, %73))
+│   %75  = Main.RangoV1.divide_round_half_even::Core.Const(Main.RangoV1.divide_round_half_even)
+│   %76  = num::UInt128
+│   %77  = den::UInt128
+│          (r_raw = (%75)(%76, %77))
+│   %79  = Main.RangoV1.rejilla_par::Core.Const(Main.RangoV1.rejilla_par)
+│   %80  = r_raw::UInt128
+│          (r_par = (%79)(%80))
+│   %82  = Main.RangoV1.cota_par_inferior::Core.Const(Main.RangoV1.cota_par_inferior)
+│   %83  = Main.RangoV1.Base::Core.Const(Base)
+│   %84  = Base.getproperty(%83, :Checked)::Core.Const(Base.Checked)
+│   %85  = Base.getproperty(%84, :checked_mul)::Core.Const(Base.Checked.checked_mul)
+│   %86  = rr::UInt128
+│   %87  = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %88  = Base.getproperty(c, :paso_lo_num)::UInt64
+│   %89  = (%87)(%88)::UInt128
+│   %90  = (%85)(%86, %89)::UInt128
+│   %91  = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %92  = Base.getproperty(c, :paso_lo_den)::UInt64
+│   %93  = (%91)(%92)::UInt128
+│          (lo = (%82)(%90, %93))
+│   %95  = Main.RangoV1.cota_par_superior::Core.Const(Main.RangoV1.cota_par_superior)
+│   %96  = Main.RangoV1.Base::Core.Const(Base)
+│   %97  = Base.getproperty(%96, :Checked)::Core.Const(Base.Checked)
+│   %98  = Base.getproperty(%97, :checked_mul)::Core.Const(Base.Checked.checked_mul)
+│   %99  = rr::UInt128
+│   %100 = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %101 = Base.getproperty(c, :paso_hi_num)::UInt64
+│   %102 = (%100)(%101)::UInt128
+│   %103 = (%98)(%99, %102)::UInt128
+│   %104 = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %105 = Base.getproperty(c, :paso_hi_den)::UInt64
+│   %106 = (%104)(%105)::UInt128
+│          (hi = (%95)(%103, %106))
+│   %108 = Main.RangoV1.clamp::Core.Const(clamp)
+│   %109 = r_par::UInt128
+│   %110 = lo::UInt128
+│   %111 = hi::UInt128
+│          (step = (%108)(%109, %110, %111))
+│   %113 = Main.RangoV1.clamp::Core.Const(clamp)
+│   %114 = step::UInt128
+│   %115 = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %116 = Base.getproperty(c, :sr_min)::UInt64
+│   %117 = (%115)(%116)::UInt128
+│   %118 = Main.RangoV1.UInt128::Core.Const(UInt128)
+│   %119 = Base.getproperty(c, :sr_max)::UInt64
+│   %120 = (%118)(%119)::UInt128
+│          (out = (%113)(%114, %117, %120))
+│   %122 = Main.RangoV1.UInt64::Core.Const(UInt64)
+│   %123 = out::UInt128
+│   %124 = (%122)(%123)::UInt64
+│   %125 = Main.RangoV1.:!=::Core.Const(!=)
+│   %126 = out::UInt128
+│   %127 = r_raw::UInt128
+│   %128 = (%125)(%126, %127)::Bool
+│   %129 = Core.tuple(%124, %128)::Tuple{UInt64, Bool}
+└──        return %129
+

@@ -1,0 +1,5 @@
+REV-v1.0 · bench · Julia 1.13.0 · znver5 · nthreads=1
+caso representativo: J=1500 épocas, 12 valores de ρ, 64 réplicas; 1152000 iteraciones de época
+kernel por réplica (J=1500, ρ=2): mediana 0.127 ms · asignaciones 0 · memoria 0 B · @allocated 0 B
+barrido completo: mediana 119.58 ms · mínimo 117.08 ms · asignaciones 1634
+checksum determinista: hash(vmax)=7757797510507331078 hash(vmin)=8953092054662536871 hash(hist)=5088611890431642458 hash(n_pro)=11051106634689393802

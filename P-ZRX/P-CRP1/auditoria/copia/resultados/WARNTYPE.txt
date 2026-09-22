@@ -1,0 +1,79 @@
+== @code_warntype simular_rama_rapido (kernel) ==
+MethodInstance for Core.kwcall(::@NamedTuple{n_slots::Int64}, ::typeof(simular_rama_rapido), ::StableRNGs.LehmerRNG, ::Float64, ::Parametros)
+  from kwcall(::NamedTuple, ::typeof(simular_rama_rapido), rng, s::Real, p::Parametros) @ Main.CosteRamaPrivada ~/zeo/ZEROX/deepseek/veritas/seguridad/coste-rama-privada-v1/src/rapido.jl:25
+Arguments
+  _::Core.Const(Core.kwcall)
+  @_2::@NamedTuple{n_slots::Int64}
+  @_3::Core.Const(Main.CosteRamaPrivada.simular_rama_rapido)
+  rng::StableRNGs.LehmerRNG
+  s::Float64
+  p::Parametros
+Locals
+  n_slots::Union{}
+  sr::Union{}
+  ctrl::Union{}
+  @_10::UNION{NOTHING, INT64, UINT64}
+Body::@NamedTuple{trabajo::Float64, bloques::Int64}
+1 ──       Core.NewvarNode(:(n_slots))
+│          Core.NewvarNode(:(sr))
+│          Core.NewvarNode(:(ctrl))
+│          Core.NewvarNode(:(@_10))
+│    %5  = Core.isdefined(@_2, :n_slots)::Core.Const(true)
+└───       goto #6 if not %5
+2 ── %7  = Core.getfield(@_2, :n_slots)::Int64
+│    %8  = Main.CosteRamaPrivada.Int::Core.Const(Int64)
+│    %9  = (%7 isa %8)::Core.Const(true)
+└───       goto #4 if not %9
+3 ──       goto #5
+4 ──       Core.Const(:(Main.CosteRamaPrivada.Int))
+│          Core.Const(:(%new(Core.TypeError, Symbol("keyword argument"), :n_slots, %12, %7)))
+└───       Core.Const(:(Core.throw(%13)))
+5 ┄─       (@_10 = %7)
+└───       goto #7
+6 ──       Core.Const(:(@_10 = 100))
+7 ┄─ %18 = @_10::Int64
+│    %19 = Core.isdefined(@_2, :sr)::Core.Const(false)
+└───       goto #9 if not %19
+8 ──       Core.Const(:(Core.getfield(@_2, :sr)))
+│          Core.Const(:(Main.CosteRamaPrivada.Integer))
+│          Core.Const(:(%21 isa %22))
+│          Core.Const(:(goto %26 if not %23))
+│          Core.Const(:(goto %29))
+│          Core.Const(:(Main.CosteRamaPrivada.Integer))
+│          Core.Const(:(%new(Core.TypeError, Symbol("keyword argument"), :sr, %26, %21)))
+│          Core.Const(:(Core.throw(%27)))
+│          Core.Const(:(@_10 = %21))
+└───       Core.Const(:(goto %32))
+9 ┄─       (@_10 = Base.getproperty(p, :sr0))
+│    %32 = @_10::UInt64
+│    %33 = Core.isdefined(@_2, :ctrl)::Core.Const(false)
+└───       goto #11 if not %33
+10 ─       Core.Const(:(Core.getfield(@_2, :ctrl)))
+│          Core.Const(:(Main.CosteRamaPrivada.Union))
+│          Core.Const(:(Main.CosteRamaPrivada.Nothing))
+│          Core.Const(:(Main.CosteRamaPrivada.Controlador))
+│          Core.Const(:(Core.apply_type(%36, %37, %38)))
+│          Core.Const(:(%35 isa %39))
+│          Core.Const(:(goto %43 if not %40))
+│          Core.Const(:(goto %49))
+│          Core.Const(:(Main.CosteRamaPrivada.Union))
+│          Core.Const(:(Main.CosteRamaPrivada.Nothing))
+│          Core.Const(:(Main.CosteRamaPrivada.Controlador))
+│          Core.Const(:(Core.apply_type(%43, %44, %45)))
+│          Core.Const(:(%new(Core.TypeError, Symbol("keyword argument"), :ctrl, %46, %35)))
+│          Core.Const(:(Core.throw(%47)))
+│          Core.Const(:(@_10 = %35))
+└───       Core.Const(:(goto %52))
+11 ┄       (@_10 = Main.CosteRamaPrivada.nothing)
+│    %52 = @_10::Core.Const(nothing)
+│    %53 = Base.keys(@_2)::Core.Const((:n_slots,))
+│    %54 = (:n_slots, :sr, :ctrl)::Core.Const((:n_slots, :sr, :ctrl))
+│    %55 = Base.diff_names(%53, %54)::Core.Const(())
+│    %56 = Base.isempty(%55)::Core.Const(true)
+└───       goto #13 if not %56
+12 ─       goto #14
+13 ─       Core.Const(:(Base.kwerr(@_2, @_3, rng, s, p)))
+14 ┄ %60 = Main.CosteRamaPrivada.:(var"#simular_rama_rapido#17")::Core.Const(Main.CosteRamaPrivada.var"#simular_rama_rapido#17")
+│    %61 = (%60)(%18, %32, %52, @_3, rng, s, p)::@NamedTuple{trabajo::Float64, bloques::Int64}
+└───       return %61
+

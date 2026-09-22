@@ -1,0 +1,22 @@
+# semilla = 289042159173 (UInt64)
+# Julia 1.13.0; hilos = 8/1
+# CPU = znver5; git = 49c6ffa
+# aviso: TODA cifra de distribución de tamaños depende de H3 (Pareto, exponente
+# declarado); TODA cifra de ventana depende de H-PUENTE. Ver
+# HIPOTESIS-QUE-CODIFICAN-LA-CONCLUSION.md
+# v1 · error de discretización del kernel de K bins frente a la CDF EXACTA
+# (la vía exacta es la DP por mezcla sobre m; su equivalencia con el oráculo de
+#  espacios exponenciales y con la enumeración multinomial se prueba en test/runtests.jl)
+theta	x	K	cdf_exacta	cdf_kernel	diferencia	n
+0.05	0	8	0.95122942	0.95280000	+0.00157058	20000
+0.05	0	32	0.95122942	0.95280000	+0.00157058	20000
+0.05	0.1	8	0.96091302	0.96320000	+0.00228698	20000
+0.05	0.1	32	0.96091302	0.96120000	+0.00028698	20000
+1	0	8	0.36787944	0.37240000	+0.00452056	20000
+1	0	32	0.36787944	0.37240000	+0.00452056	20000
+1	0.1	8	0.44619377	0.46800000	+0.02180623	20000
+1	0.1	32	0.44619377	0.44325000	-0.00294377	20000
+5	0	8	0.00673795	0.00605000	-0.00068795	20000
+5	0	32	0.00673795	0.00605000	-0.00068795	20000
+5	0.1	8	0.01539094	0.01610000	+0.00070906	20000
+5	0.1	32	0.01539094	0.01485000	-0.00054094	20000

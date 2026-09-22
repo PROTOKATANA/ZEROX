@@ -1,0 +1,141 @@
+### cdf
+═════ 3 possible errors found ═════
+┌ f1(λn::BigInt, k::Int64) @ Main ./none:4
+│┌ poisson_cdf_intervalo(λn::BigInt, λd::BigInt, k::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:90
+││┌ poisson_cdf_intervalo(λn::BigInt, λd::BigInt, k::Int64; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:91
+│││┌ setprecision(f::PermanenciaV1.var"#13#14"{BigInt, BigInt, Int64}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││┌ setprecision(f::PermanenciaV1.var"#13#14"{BigInt, BigInt, Int64}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+│││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+│││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+│││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││└────────────────────
+│││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││└────────────────────
+│││││┌ (::PermanenciaV1.var"#13#14"{BigInt, BigInt, Int64})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:94
+││││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+│││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+││││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+│││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+││││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+│││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││││││└────────────────────
+
+### umbral
+═════ 3 possible errors found ═════
+┌ f2(λn::BigInt, beta::Float64) @ Main ./none:5
+│┌ umbral_rechazo(λn::BigInt, λd::BigInt, beta::Float64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:163
+││┌ umbral_rechazo(λn::BigInt, λd::BigInt, beta::Float64; prec::Int64, kmax::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:165
+│││┌ setprecision(f::PermanenciaV1.var"#19#20"{Int64, BigInt, BigInt, BigFloat}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││┌ setprecision(f::PermanenciaV1.var"#19#20"{Int64, BigInt, BigInt, BigFloat}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+│││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+│││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+│││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││└────────────────────
+│││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││└────────────────────
+│││││┌ (::PermanenciaV1.var"#19#20"{Int64, BigInt, BigInt, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:167
+││││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+│││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+││││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+│││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+││││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+│││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││││││└────────────────────
+
+### potencia
+═════ 3 possible errors found ═════
+┌ f3(λn::BigInt, K::Int64) @ Main ./none:6
+│┌ potencia_garantizada(λn::BigInt, λd::BigInt, K::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:199
+││┌ potencia_garantizada(λn::BigInt, λd::BigInt, K::Int64; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:200
+│││┌ setprecision(f::PermanenciaV1.var"#23#24"{Int64, BigInt, BigInt, Int64}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││┌ setprecision(f::PermanenciaV1.var"#23#24"{Int64, BigInt, BigInt, Int64}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+│││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+│││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+│││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││└────────────────────
+│││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││└────────────────────
+│││││┌ (::PermanenciaV1.var"#23#24"{Int64, BigInt, BigInt, Int64})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:201
+││││││┌ kwcall(::@NamedTuple{prec::Int64}, ::typeof(poisson_cdf_intervalo), λn::BigInt, λd::BigInt, k::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:90
+│││││││┌ poisson_cdf_intervalo(λn::BigInt, λd::BigInt, k::Int64; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:91
+││││││││┌ setprecision(f::PermanenciaV1.var"#13#14"{BigInt, BigInt, Int64}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+│││││││││┌ setprecision(f::PermanenciaV1.var"#13#14"{BigInt, BigInt, Int64}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+││││││││││┌ (::PermanenciaV1.var"#13#14"{BigInt, BigInt, Int64})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:94
+│││││││││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+││││││││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+│││││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+││││││││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+│││││││││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+││││││││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+│││││││││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+││││││││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+│││││││││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+││││││││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+│││││││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+││││││││││││││││││││└────────────────────
+
+### periodos
+═════ 3 possible errors found ═════
+┌ f4(λn::BigInt) @ Main ./none:7
+│┌ kwcall(::@NamedTuple{…}, ::typeof(periodos_deteccion), λn::BigInt, λd::BigInt, s_num::BigInt, s_den::BigInt, beta::Float64, gamma::Float64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:243
+││┌  @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:258
+│││┌ kwcall(::@NamedTuple{…}, ::typeof(PermanenciaV1._potencia_y_umbral), λn::BigInt, λd::BigInt, T::Int64, s_num::BigInt, s_den::BigInt, beta::Float64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:222
+││││┌ _potencia_y_umbral(λn::BigInt, λd::BigInt, T::Int64, s_num::BigInt, s_den::BigInt, beta::Float64; prec::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:230
+│││││┌ kwcall(::@NamedTuple{prec::Int64, kmax::Int64}, ::typeof(umbral_rechazo), λn::BigInt, λd::BigInt, beta::Float64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:163
+││││││┌ umbral_rechazo(λn::BigInt, λd::BigInt, beta::Float64; prec::Int64, kmax::Int64) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:165
+│││││││┌ setprecision(f::PermanenciaV1.var"#19#20"{Int64, BigInt, BigInt, BigFloat}, ::Type{BigFloat}, prec::Int64) @ Base.MPFR ./mpfr.jl:1213
+││││││││┌ setprecision(f::PermanenciaV1.var"#19#20"{Int64, BigInt, BigInt, BigFloat}, ::Type{BigFloat}, prec::Int64; base::Int64) @ Base.MPFR ./mpfr.jl:1214
+│││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{Base.ScopedValues.ScopedValue{Int64}, Int64}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{Int64}, value::Int64) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:953
+│││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:876
+││││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Int64) @ Base ./dict.jl:881
+│││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Int64}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││││││└────────────────────
+│││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Int64) @ Base.HashArrayMappedTries ./hamt.jl:220
+││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.next(%84::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││││││└────────────────────
+│││││││││┌ (::PermanenciaV1.var"#19#20"{Int64, BigInt, BigInt, BigFloat})() @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:167
+││││││││││┌ _limites_lambda(λn::BigInt, λd::BigInt) @ PermanenciaV1 /home/katana/zeo/ZEROX/P-ZRX/P-PERMANENCIA/investigacion/veritas/almacenamiento/permanencia-v1/src/referencia.jl:47
+│││││││││││┌ setrounding(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::RoundingMode{…}) @ Base.MPFR ./mpfr.jl:255
+││││││││││││┌ setrounding_raw(f::PermanenciaV1.var"#_limites_lambda##0#_limites_lambda##1"{…}, ::Type{…}, r::Base.MPFR.MPFRRoundingMode) @ Base.MPFR ./mpfr.jl:250
+│││││││││││││┌ Base.ScopedValues.Scope(scope::Base.ScopedValues.Scope, pair::Pair{…}) @ Base.ScopedValues ./scopedvalues.jl:153
+││││││││││││││┌ Base.ScopedValues.Scope(parent::Base.ScopedValues.Scope, key::Base.ScopedValues.ScopedValue{…}, value::Base.MPFR.MPFRRoundingMode) @ Base.ScopedValues ./scopedvalues.jl:149
+│││││││││││││││┌ Base.PersistentDict{…}(dict::Base.PersistentDict{…}, pair::Pair{…}) @ Base ./dict.jl:947
+││││││││││││││││┌ Base.PersistentDict(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:953
+│││││││││││││││││┌ set(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:876
+││││││││││││││││││┌ _keyvalueset(dict::Base.PersistentDict{…}, key::Base.ScopedValues.ScopedValue{…}, val::Base.MPFR.MPFRRoundingMode) @ Base ./dict.jl:881
+│││││││││││││││││││┌ insert!(found::Bool, present::Bool, trie::Base.HashArrayMappedTries.HAMT{…}, i::Int64, bi::Base.HashArrayMappedTries.BitmapIndex, h::Base.HashArrayMappedTries.HashState{…}, val::Base.MPFR.MPFRRoundingMode) @ Base.HashArrayMappedTries ./hamt.jl:205
+││││││││││││││││││││ runtime dispatch detected: Base.HashArrayMappedTries.HashState(h::Base.HashArrayMappedTries.HashState{Base.ScopedValues.ScopedValue{Base.MPFR.MPFRRoundingMode}}, %76::Base.ScopedValues.AbstractScopedValue)::Base.HashArrayMappedTries.HashState{K} where K<:Base.ScopedValues.AbstractScopedValue
+│││││││││││││││││││└────────────────────
+

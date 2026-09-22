@@ -1,0 +1,151 @@
+# ADL-v1 · @code_warntype del kernel — 2026-09-21T10:47:44.817
+MethodInstance for evaluar_fila(::ParametrosAdelanto{Float64})
+  from evaluar_fila(p::ParametrosAdelanto{T}) where T<:AbstractFloat @ AdelantoV1 ~/zeo/ZEROX/P-ZRX/P-ADELANTO/investigacion/veritas/seguridad/adelanto-v1/src/modelo.jl:416
+Static Parameters
+  T = Float64
+Arguments
+  #self#::Core.Const(AdelantoV1.evaluar_fila)
+  p::ParametrosAdelanto{Float64}
+Locals
+  manda_f::Bool
+  v::Bool
+  w::UInt64
+  nn::Float64
+  li::Float64
+  cr::Float64
+  re::Float64
+  rt::Float64
+  A_sub::Float64
+  A_add::Float64
+  A_h_d::Float64
+  A_h::Float64
+  A_fr_inf::Float64
+  A_fr::Float64
+  A_d::Float64
+  A_nuc::Float64
+  L::Float64
+Body::ResultadoAdelanto{Float64}
+1 ─        nothing
+│   %2   = AdelantoV1.L_derivada::Core.Const(AdelantoV1.L_derivada)
+│   %3   = Base.getproperty(p, :F_slots)::Float64
+│   %4   = Base.getproperty(p, :L_suelo)::Float64
+│   %5   = Base.getproperty(p, :S_max)::Float64
+│          (L = (%2)(%3, %4, %5))
+│   %7   = AdelantoV1.adelanto_nucleo::Core.Const(AdelantoV1.adelanto_nucleo)
+│   %8   = Base.getproperty(p, :rho)::Float64
+│   %9   = L::Float64
+│   %10  = Base.getproperty(p, :I_slots)::Float64
+│   %11  = Base.getproperty(p, :W_dec)::Float64
+│          (A_nuc = (%7)(%8, %9, %10, %11))
+│   %13  = AdelantoV1.adelanto_D::Core.Const(AdelantoV1.adelanto_D)
+│   %14  = Base.getproperty(p, :rho)::Float64
+│   %15  = L::Float64
+│   %16  = Base.getproperty(p, :I_slots)::Float64
+│   %17  = Base.getproperty(p, :W_dec)::Float64
+│   %18  = Base.getproperty(p, :D)::Float64
+│          (A_d = (%13)(%14, %15, %16, %17, %18))
+│   %20  = AdelantoV1.adelanto_frontera::Core.Const(AdelantoV1.adelanto_frontera)
+│   %21  = Base.getproperty(p, :rho)::Float64
+│   %22  = L::Float64
+│   %23  = Base.getproperty(p, :I_slots)::Float64
+│   %24  = Base.getproperty(p, :W_dec)::Float64
+│   %25  = Base.getproperty(p, :D)::Float64
+│   %26  = Base.getproperty(p, :t_obs)::Float64
+│          (A_fr = (%20)(%21, %22, %23, %24, %25, %26))
+│   %28  = AdelantoV1.adelanto_frontera_inf::Core.Const(AdelantoV1.adelanto_frontera_inf)
+│   %29  = L::Float64
+│   %30  = Base.getproperty(p, :I_slots)::Float64
+│   %31  = Base.getproperty(p, :W_dec)::Float64
+│   %32  = Base.getproperty(p, :D)::Float64
+│          (A_fr_inf = (%28)(%29, %30, %31, %32))
+│   %34  = AdelantoV1.adelanto_con_h::Core.Const(AdelantoV1.adelanto_con_h)
+│   %35  = Base.getproperty(p, :rho)::Float64
+│   %36  = L::Float64
+│   %37  = Base.getproperty(p, :I_slots)::Float64
+│   %38  = Base.getproperty(p, :W_dec)::Float64
+│          (A_h = (%34)(%35, %36, %37, %38))
+│   %40  = AdelantoV1.adelanto_con_h_D::Core.Const(AdelantoV1.adelanto_con_h_D)
+│   %41  = Base.getproperty(p, :rho)::Float64
+│   %42  = L::Float64
+│   %43  = Base.getproperty(p, :I_slots)::Float64
+│   %44  = Base.getproperty(p, :W_dec)::Float64
+│   %45  = Base.getproperty(p, :D)::Float64
+│          (A_h_d = (%40)(%41, %42, %43, %44, %45))
+│   %47  = AdelantoV1.adelanto_add::Core.Const(AdelantoV1.adelanto_add)
+│   %48  = Base.getproperty(p, :rho)::Float64
+│   %49  = L::Float64
+│   %50  = Base.getproperty(p, :I_slots)::Float64
+│   %51  = Base.getproperty(p, :W_dec)::Float64
+│   %52  = Base.getproperty(p, :D)::Float64
+│          (A_add = (%47)(%48, %49, %50, %51, %52))
+│   %54  = AdelantoV1.adelanto_sub::Core.Const(AdelantoV1.adelanto_sub)
+│   %55  = Base.getproperty(p, :rho)::Float64
+│   %56  = L::Float64
+│   %57  = Base.getproperty(p, :I_slots)::Float64
+│   %58  = Base.getproperty(p, :W_dec)::Float64
+│   %59  = Base.getproperty(p, :D)::Float64
+│          (A_sub = (%54)(%55, %56, %57, %58, %59))
+│   %61  = AdelantoV1.rho_transitorio::Core.Const(AdelantoV1.rho_transitorio)
+│   %62  = L::Float64
+│   %63  = Base.getproperty(p, :I_slots)::Float64
+│   %64  = Base.getproperty(p, :W_dec)::Float64
+│   %65  = Base.getproperty(p, :D)::Float64
+│   %66  = Base.getproperty(p, :t_obs)::Float64
+│          (rt = (%61)(%62, %63, %64, %65, %66))
+│   %68  = AdelantoV1.rho_estrella::Core.Const(AdelantoV1.rho_estrella)
+│   %69  = L::Float64
+│   %70  = Base.getproperty(p, :I_slots)::Float64
+│   %71  = Base.getproperty(p, :W_dec)::Float64
+│          (re = (%68)(%69, %70, %71))
+│   %73  = AdelantoV1.coste_relativo::Core.Const(AdelantoV1.coste_relativo)
+│   %74  = L::Float64
+│   %75  = Base.getproperty(p, :I_slots)::Float64
+│          (cr = (%73)(%74, %75))
+│   %77  = AdelantoV1.lineas_timekeeper::Core.Const(AdelantoV1.lineas_timekeeper)
+│   %78  = L::Float64
+│   %79  = Base.getproperty(p, :I_slots)::Float64
+│          (li = (%77)(%78, %79))
+│   %81  = AdelantoV1.nucleos_nodo::Core.Const(AdelantoV1.nucleos_nodo)
+│   %82  = L::Float64
+│   %83  = Base.getproperty(p, :I_slots)::Float64
+│   %84  = Base.getproperty(p, :c_v)::Float64
+│          (nn = (%81)(%82, %83, %84))
+│   %86  = AdelantoV1.desafios_nucleo::Core.Const(AdelantoV1.desafios_nucleo)
+│   %87  = Base.getproperty(p, :rho)::Float64
+│   %88  = L::Float64
+│   %89  = Base.getproperty(p, :I_slots)::Float64
+│   %90  = Base.getproperty(p, :W_dec)::Float64
+│          (w = (%86)(%87, %88, %89, %90))
+│   %92  = AdelantoV1.vivo::Core.Const(AdelantoV1.vivo)
+│   %93  = L::Float64
+│   %94  = Base.getproperty(p, :W_dec)::Float64
+│   %95  = Base.getproperty(p, :D)::Float64
+│          (v = (%92)(%93, %94, %95))
+│   %97  = AdelantoV1.:(==)::Core.Const(==)
+│   %98  = L::Float64
+│   %99  = Base.getproperty(p, :F_slots)::Float64
+│          (manda_f = (%97)(%98, %99))
+│   %101 = AdelantoV1.ResultadoAdelanto::Core.Const(ResultadoAdelanto)
+│   %102 = $(Expr(:static_parameter, 1))::Core.Const(Float64)
+│   %103 = Core.apply_type(%101, %102)::Core.Const(ResultadoAdelanto{Float64})
+│   %104 = L::Float64
+│   %105 = manda_f::Bool
+│   %106 = v::Bool
+│   %107 = A_nuc::Float64
+│   %108 = A_d::Float64
+│   %109 = A_fr::Float64
+│   %110 = A_fr_inf::Float64
+│   %111 = A_h::Float64
+│   %112 = A_h_d::Float64
+│   %113 = A_add::Float64
+│   %114 = A_sub::Float64
+│   %115 = rt::Float64
+│   %116 = re::Float64
+│   %117 = cr::Float64
+│   %118 = li::Float64
+│   %119 = nn::Float64
+│   %120 = w::UInt64
+│   %121 = (%103)(%104, %105, %106, %107, %108, %109, %110, %111, %112, %113, %114, %115, %116, %117, %118, %119, %120)::ResultadoAdelanto{Float64}
+└──        return %121
+
+

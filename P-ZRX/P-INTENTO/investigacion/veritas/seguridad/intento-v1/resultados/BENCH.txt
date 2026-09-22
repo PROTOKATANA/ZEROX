@@ -1,0 +1,6 @@
+modelo=intento-v1 carga=sintetica_solo_rendimiento n=100000
+julia=1.13.0 cpu=znver5 threads=1/0
+kernel_allocated_bytes=0
+kernel median_ns=581588.5 median_bytes=0 median_allocs=0 min_ns=574669.0
+referencia median_ns=4790.0 median_bytes=6624 median_allocs=150 min_ns=3980.0
+validacion_ok=true max_error_relativo=2.737268200374118e-16 comparaciones=200
