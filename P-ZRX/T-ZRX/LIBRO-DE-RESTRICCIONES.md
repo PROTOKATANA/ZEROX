@@ -224,8 +224,10 @@ bucket se le audita**, y puede caer en buckets densos pagando reploteo. **Sin me
    reduce el ataque, y depende de `Δ` **medida en red real**.
 3. **La cobertura del objeto caro** sí es construible (R-2, alcance).
 4. **La composición multiplicativa** con un recurso rival donde la **mayoría honesta sea
-   estructural** (no comprable): `P-ZRX/P-RIVAL/investigacion/INFORME.md` §3.4 deja esa rendija abierta, y su
-   propio fichero de hipótesis marca cuál es la que decide.
+   estructural** (no comprable): `P-ZRX/P-RIVAL/investigacion/INFORME.md` §3.4 deja esa rendija
+   abierta, y su propio fichero de hipótesis marca cuál es la que decide. **Ver el Apéndice al final
+   de este documento: la vía de la rivalidad está APARCADA, no refutada — nueve de doce recursos
+   nunca se examinaron.**
 5. **La magnitud del daño.** Sigue **sin poder medirse** hasta que el nodo esté cableado
    (`P-ZRX/P-PUENTE-ESPACIO-TASA/veritas/seguridad/espacio-tasa-v1/INFORME.md` §9, cinco dependencias de código inexistente). **No decidas un
    rediseño «porque el agujero es grande o pequeño»: hoy no se sabe.**
@@ -242,3 +244,81 @@ bucket se le audita**, y puede caer en buckets densos pagando reploteo. **Sin me
    pasó, para que el ejecutor no las rehaga.
 5. Si una restricción te parece mal, **atácala**: son resultados, no dogmas, y tres de ellas
    corrigieron creencias previas del propio repositorio.
+
+---
+
+## Apéndice · La vía de la rivalidad: **aparcada, no refutada**
+
+> ⚠️ **Todo este apéndice es conjetura de Claude, de conversación, SIN VALIDAR por ningún encargo.**
+> Está aquí para que no se pierda y para que **nadie lo trate como resultado**. Si algún día se
+> encarga, se encarga con la premisa atacable, como se hizo con `P-ZRX/P-TASA/`.
+
+**Por qué está aquí.** El 2026-09-23 se recorrió el catálogo de recursos buscando uno que fuera
+**rival entre ramas**. Se propuso encargarlo; Katana redirigió a `κ = 0` (`P-ZRX/P-SECRETO/`), que era
+la decisión correcta entonces. **Consecuencia: la vía de la rivalidad quedó examinada solo en dos
+filas de doce.**
+
+### El criterio propuesto (conjetura)
+
+Para que un recurso sea rival entre ramas harían falta **dos** cosas:
+
+1. **Indexación por rama** — consumirlo para la rama `A` tiene que ser una **acción distinta** de
+   consumirlo para `B`. Si el consumo es el mismo acto, sirve a las dos.
+2. **No duplicable comprando hardware** — si con el doble de máquinas tienes el doble del recurso, el
+   atacante paga y listo.
+
+**Y el nudo, que es la parte más conjetural:** (1) exige que algo de la rama entre en el consumo del
+recurso, y en cuanto eso pasa, **o el atacante lo muele** —el 26,8941 % de R-7— **o el coste se
+duplica con hardware** —R-8—. Las dos condiciones tirarían en direcciones opuestas.
+
+**Nota de contraste:** `P-ZRX/P-RIVAL/` formalizó «rival» como **superaditividad (P4) más
+proporcionalidad al peso**, que **no es el mismo criterio**. El de arriba sigue sin prueba.
+
+### Estado real de cada recurso
+
+| Recurso | Estado |
+|---|---|
+| Tiempo / VDF | **REFUTADO** (R-8) |
+| Cómputo / PoW | **REFUTADO** para composición aditiva (`P-RIVAL`): no hay `θ` útil |
+| Capital | Descartado **por política** (`AGENTS.md`), no refutado técnicamente |
+| **IOPS / ancho de banda de disco** | **Sin examinar.** El `S ≈ 24` del multistream era el techo de IOPS de un SSD de 100 k: las lecturas son un flujo rival de verdad. Su talón: indexarlas por rama exige que el reto dependa de la rama, y ahí vuelve R-7 |
+| **RAM simultánea** (memory-hard) | **Sin examinar.** Más cara de alquilar que CPU |
+| **Ancho de banda de red** | **Sin examinar, y es el candidato con mejor pinta** — ver abajo |
+| **Desgaste de SSD** | **Sin examinar.** Cumple las dos condiciones limpiamente (una escritura gastada no se recupera ni se alquila) pero **probarlo exige confiar en el firmware**, y eso es confiar en el fabricante: el mismo talón que mata a los TEE bajo el modelo de amenaza |
+| **Espectro radioeléctrico** | **Sin examinar.** Rival localmente; necesita hardware y testigos (DePIN) |
+| **Identidad verificada** | **Sin examinar.** No es físico; *proof of personhood* |
+| Posición física | Descartado en conversación: presencia global del adversario |
+| Calor, energía | Derivados del cómputo |
+| Disco (stock) | Es el problema actual (R-1) |
+
+**Nueve de doce sin examinar.**
+
+### El candidato que conecta con la rendija ya anotada
+
+**Ancho de banda de red.** Es rival por física —un byte enviado a una rama no se envía a otra—, no se
+acumula y no exige capital previo. Y encaja **justo** en el punto 4 de «Lo que NO está cerrado»: en
+composición **multiplicativa** la ventaja del doble farmeo **sí decrece** con `θ` cuando el honesto
+tiene mayoría del recurso, y con PoW eso falla porque el hashrate **se compra** — pero **el ancho de
+banda agregado de miles de nodos honestos no se compra**: la mayoría honesta sería **estructural**.
+
+**Su talón conocido, y no es pequeño:** medirlo sin confiar en testigos es un problema abierto. Todo
+lo que se conoce en esa dirección acaba dependiendo de verificadores que pueden ser del atacante — lo
+mismo que hundió a la prueba de latencia.
+
+### Una corrección de redacción, para que no se herede mal
+
+Se escribió: *«la rivalidad encarece el ataque; solo la observabilidad lo impide»*. Es literalmente
+cierto **y se lee mal**: puede entenderse como «la rivalidad no sirve», y eso es falso.
+
+**Si el recurso es rival, el atacante que farmea dos ramas paga dos veces**: con el mismo recurso
+tiene la mitad de peso en cada una. Eso no cierra el ataque, **pero encarecerlo proporcionalmente es
+exactamente lo que mueve el umbral** —es la superficie `α*` de `P-ZRX/P-PRESTAMO/`—. Encarecer no es
+cerrar, pero tampoco es nada.
+
+### Qué haría falta para cerrar esto
+
+Un encargo que **(a)** formalice el criterio y decida si el nudo es teorema o se rompe en algún caso,
+**(b)** pase los nueve recursos sin examinar por él, y **(c)** evalúe el ancho de banda en composición
+multiplicativa contra la hipótesis que decide: si la mayoría honesta agregada es realmente no
+comprable. **Si el nudo resulta ser teorema, se cierra la familia entera de una vez** — como hizo
+`P-TASA` con las cuotas.

@@ -199,6 +199,13 @@ secreto»*. De ahí salió **`P-ZRX/P-SECRETO/`**, que se ejecutó y **cerró la
 **Lo que sigue vivo, y este encargo lo confirma:** el frente de la **oferta de `β`** (H-7). El
 secreto no se rompe por el lado de la validez.
 
+**Y una segunda vía que quedó APARCADA, no refutada:** la de la **rivalidad del recurso**. Al
+redirigir el trabajo hacia `κ = 0` se dejó de examinar, y solo dos de doce recursos llegaron a
+evaluarse (tiempo y cómputo, ambos cerrados). Los otros nueve —IOPS, RAM, **ancho de banda de red**,
+desgaste de SSD, espectro, identidad verificada…— **nunca se miraron**. El detalle, el criterio
+propuesto y el candidato que conecta con la rendija de `P-RIVAL` están en el **Apéndice de
+`P-ZRX/T-ZRX/LIBRO-DE-RESTRICCIONES.md`**, marcado como conjetura sin validar.
+
 **Contexto de por qué se intentó:**
 
 **El razonamiento que lo abre** (de Claude, **sin validar**): las siete defensas de castigo no
