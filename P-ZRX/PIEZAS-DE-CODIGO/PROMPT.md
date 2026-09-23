@@ -23,6 +23,18 @@ partes, y las cuatro son tuyas:
 elige entre opciones y no inventa números.** Si tus instrucciones son vagas, el código será vago: la
 calidad de su salida es responsabilidad de la precisión de tu orden.
 
+> **El modelo es `deepseek-v4.1-flash`, y no otro.** Decidido por Katana el 2026-09-24.
+>
+> **Conoce su perfil, porque decide qué tienes que vigilar.** En las evaluaciones públicas V4.1 Flash
+> **gana en código y en tareas agénticas** —DeepSWE v1.1 74,2 % frente al 62,7 % de V4 Pro,
+> Automation-Bench 54,8 % frente a 43,2 %— pero **pierde en cumplimiento estricto de instrucciones**:
+> la evaluación de trayectorias `AgentLens` le atribuye **relajar el *step gating*, el formato y el
+> control de límites de ficheros con más frecuencia** que Pro, a cambio de completar más trabajo.
+>
+> **Traducción para ti:** su código será bueno; **lo que tienes que vigilar es que no se salga de los
+> límites**. Por eso existe el procedimiento de cierre de pieza de §8.1 — no es desconfianza, es
+> cubrir con procedimiento una debilidad documentada.
+
 **Katana decide.** Las decisiones de §4 son suyas — ni tuyas ni de DeepSeek.
 
 > **Una orden a DeepSeek NO es «implementa el verificador PoAS».** Es el desglose: qué crate, qué
@@ -347,7 +359,7 @@ serie**.
 
 ## 6 · Criterio de «hecho» por pieza
 
-Una casilla se marca **solo** si cumple las cinco:
+Una casilla se marca **solo** si cumple las seis:
 
 1. **Compila** y `cargo clippy -D warnings` y `cargo fmt --check` pasan.
 2. **Tiene test** que falla si se rompe la pieza. No vale un test que compruebe una definición
@@ -359,6 +371,8 @@ Una casilla se marca **solo** si cumple las cinco:
 5. **No hay verificador sustituido por aceptación.** `AGENTS.md` lo prohíbe expresamente: si algo no
    se puede verificar todavía, **devuelve un error explícito** —como hace hoy
    `IntegracionPotPendiente`— y **nunca un `Ok` fabricado**.
+6. **El cierre de pieza de §8.1 ha pasado**: `git status` solo muestra los ficheros que declaraste
+   para esa pieza, y hay commit.
 
 ## 7 · Cuándo se da por válida la 0.0.1
 
@@ -404,6 +418,30 @@ retorno. **No hagas `git checkout`, `reset`, `clean` ni `--force` de nada.** Com
 avance con frecuencia para que, si algo sale mal, se pueda volver a un punto intermedio y no al
 principio.
 
+### 8.1 · Cierre de pieza — OBLIGATORIO, y es lo que cubre la debilidad del modelo
+
+V4.1 Flash **relaja el control de límites de ficheros** más que Pro (ver REPARTO DE PAPELES). Eso no
+se arregla confiando: se arregla **comprobando**. Al terminar **cada** pieza, en este orden:
+
+```bash
+git -C /home/katana/zeo/ZEROX status --short
+```
+
+1. **Contrasta la salida con los ficheros que TÚ declaraste** en la orden de esa pieza. Si aparece
+   algo que no declaraste, **para**: anótalo en `PROGRESO-0.0.1.md` con el fichero y qué cambió, y
+   decide si se conserva —porque hacía falta y tu orden se quedó corta— o se revierte.
+2. **Revertir solo lo que DeepSeek escribió de más**, nunca en bloque y nunca con `git checkout .`,
+   `reset` o `clean`. Fichero a fichero y mirando el diff.
+3. **Commit de la pieza**, con mensaje que diga **qué pieza cierra y qué reglas del SPEC cita por
+   ID**. Un commit por pieza: así el daño máximo de cualquier desvío es **una pieza**, no la noche.
+4. Solo entonces marcas la casilla.
+
+**Y si `git status` muestra ficheros tocados fuera de `crates/` y `P-ZRX/PIEZAS-DE-CODIGO/`** —en
+`SPEC.md`, `research/`, `veritas/` fuera de una auditoría de §5, o cualquier otro `P-ZRX/`— **es una
+violación de la zona: revierte esos ficheros y déjalo escrito en la bitácora.** No lo silencies: si
+pasa una vez, hay que saberlo para la siguiente orden.
+
+
 ## 9 · Disciplina de implementación (de `AGENTS.md`, que debes leer entero)
 
 - **Preservar** código y vectores reutilizables de criptografía, transacciones, red y almacenamiento.
@@ -432,7 +470,7 @@ principio.
 ## 11 · Reglas de validez
 
 - **No inventes un número que el SPEC deja pendiente.** Plantea la decisión (§4).
-- **No marques una casilla que no cumpla las cinco condiciones de §6.**
+- **No marques una casilla que no cumpla las seis condiciones de §6.**
 - **Di siempre cuántas piezas van de 17.**
 - Si una pieza resulta **más grande de lo que la lista sugiere**, dilo en cuanto lo sepas: es
   información, no un fallo.
