@@ -69,7 +69,8 @@ valida y los ordena**, de forma que se puedan **medir cifras reales** que hoy no
   flujo queda fuera.
 - El controlador de rango completo. Arranca con rango fijo declarado.
 
-**Si te encuentras ordenando algo de esa lista, has salido del alcance. Para y pregunta.**
+**Si te encuentras ordenando algo de esa lista, has salido del alcance: para esa linea de trabajo,
+anótalo en `PROGRESO-0.0.1.md` y sigue con otra pieza.** No te bloquees esperando confirmación.
 
 ## 1 · El estado real del código, para que no lo descubras tú
 
@@ -93,17 +94,18 @@ Verificado el 2026-09-23 leyendo el código, no los documentos:
 
 **Inventario completo y ordenado por dependencias:** `P-ZRX/T-ZRX/PIEZAS-DE-CODIGO.md`. **Ábrelo.**
 
-## 2 · La decisión de arquitectura, que es la PRIMERA que hay que tomar
+## 2 · La decisión de arquitectura — YA TOMADA por Katana (2026-09-24)
 
-La ruta activa es PoW lineal heredado; el destino es PoST + DAG. **Antes de dar la primera orden a DeepSeek,
-plantea esta decisión a Katana con el formato de §4** y espera respuesta:
+La ruta activa es PoW lineal heredado; el destino es PoST + DAG. **Katana ha decidido: (b) escribir
+la ruta DAG al lado y conmutar.** No se refactoriza `Cadena` en marcha.
 
-- **(a) Refactorizar `Cadena` en marcha.**
-- **(b) Escribir la ruta DAG al lado y conmutar.**
+**Motivo declarado:** es lo que el repositorio ya viene haciendo —`zx-consensus` tiene el DAG
+completo junto al lineal— y con la otra opción los tests existentes protegen el comportamiento
+**viejo**: te avisan cuando rompes lo que quieres romper y callan cuando rompes lo que no.
 
-**Mi lectura, que no te vincula** (de Claude): (b), porque es lo que el repositorio ya viene haciendo
-—`zx-consensus` tiene el DAG completo junto al lineal— y porque con (a) los tests existentes
-protegen el comportamiento **viejo**. Pero decide Katana.
+**Consecuencia práctica:** la ruta lineal **se deja en pie y funcionando** hasta el punto de
+conmutación. No la desmontes por el camino. El indicador de haber llegado es objetivo y ya existe:
+el test `el_codigo_alcanza_la_base_poas_de_556` dejando de estar ignorado.
 
 ## 3 · LA LISTA — las piezas de la 0.0.1, con su check
 
@@ -202,6 +204,62 @@ anótala. Acumula las decisiones planteadas en `P-ZRX/PIEZAS-DE-CODIGO/DECISIONE
 
 **Mientras esperas una decisión, trabaja en otra pieza que no dependa de ella.**
 
+### 4.1 · Régimen desatendido — Katana NO está delante
+
+**Vas a trabajar de noche, sin supervisión.** Katana ha decidido cómo proceder:
+
+> **Ante una decisión que bloquea: decide tú, sigue trabajando, y déjalo marcado.**
+
+Cómo:
+
+1. **Determina cuál es la mejor opción según el criterio de Katana** (§4.2). No la más cómoda de
+   implementar: la que encaja con lo que este proyecto quiere ser.
+2. **Si te falta información para decidir, búscala.** Estás autorizado a investigar en la **web** y
+   en los **documentos y directorios del repositorio** —`research/`, `veritas/`, `P-ZRX/`, los clones
+   de `PDF/`— para fundamentar la decisión. Una decisión fundamentada vale; una decisión a ojo, no.
+3. **Anótala en `DECISIONES-0.0.1.md` con la etiqueta `PROVISIONAL`**, el formato completo de §4, y
+   **qué la haría revertible**: qué ficheros la encarnan y qué habría que tocar si Katana dice que no.
+4. **Aíslala.** Construye de forma que revertirla sea barato: una decisión provisional no debe quedar
+   repartida por diez ficheros.
+5. **Sigue trabajando.**
+
+**Lo que NO puedes hacer sin Katana, ni siquiera provisionalmente:**
+
+- **Fijar un valor de consenso** que el SPEC deja `<<PENDIENTE>>`. Si una pieza lo necesita, usa un
+  valor de desarrollo **declarado como tal en el código y en la bitácora**, que no pueda colarse a
+  producción, y dilo.
+- **Tocar `SPEC.md`**, `research/`, `veritas/` (salvo auditorías, §5) ni el resto de `P-ZRX/`.
+- **Revocar nada de `AGENTS.md`.**
+- **Borrar, revertir o reescribir trabajo que no hayas escrito tú.** Nada de `git reset`,
+  `git checkout` de ficheros ajenos, `git clean` ni forzar nada. El árbol está limpio y commiteado a
+  fecha 2026-09-24: **déjalo recuperable**.
+
+### 4.2 · El criterio de Katana, para que decidas alineado
+
+Destilado de `AGENTS.md`, del SPEC y de las decisiones que ha ido tomando. **Úsalo como filtro
+cuando tengas que elegir:**
+
+1. **Se asume que un ente con mucha capacidad atacará** —dinero, CPU, GPU, discos; un Estado, una
+   agencia—. **«No compensa económicamente» NO es un argumento de seguridad**: descarta al atacante
+   que busca lucro y a nadie más. Separa lo **imposible** de lo **caro** y da el coste **absoluto**.
+2. **Verificar antes de afirmar.** Si dices que algo funciona, es porque lo ejecutaste. Si citas un
+   número, es porque lo mediste o lo leíste en la fuente — no porque lo recuerdes.
+3. **Las malas noticias, completas y pronto.** Si algo no se puede hacer, o cuesta el triple de lo
+   dicho, se dice al saberlo. **Y si te equivocas, lo dices tú primero.**
+4. **Una regla pendiente no se implementa inventando un número.**
+5. **Ningún verificador sustituido por aceptación.** Error explícito antes que un `Ok` fabricado.
+6. **Accesibilidad: cualquiera con un disco debe poder producir.** Es la razón de ser de PoST. Una
+   opción que exija hardware especializado, capital previo o registro va **contra el proyecto**.
+7. **Sin staking ni comités de decisión.**
+8. **Seguridad antes que secreto.** Dicho por Katana el 2026-09-23: el anonimato del productor no es
+   una propiedad elegida, es un efecto secundario.
+9. **Preservar lo auditado.** Adoptar primitivas auditadas; **no reimplementarlas**.
+10. **Entregar lo pedido.** El alcance es el alcance: el trabajo adyacente se **ofrece en una línea**,
+    no se ejecuta por iniciativa propia.
+
+**Cuando dudes entre dos opciones, gana la que:** deja el fallo visible antes que oculto; conserva la
+accesibilidad; no fija un número que nadie ha decidido; y es más fácil de revertir.
+
 ## 5 · Puedes lanzar una auditoría por tu cuenta si la necesitas
 
 **Autorizado por Katana.** Si para escribir una pieza necesitas **medir algo que no está medido**,
@@ -286,9 +344,10 @@ responsabilidad de lo que entre es tuya, no suya.
 
 > ⚠️ **HAY OTRO ENCARGO TRABAJANDO EN `crates/` AL MISMO TIEMPO** (el del verificador PoT y el
 > cableado; ha creado `crates/zx-pot/`, `crates/zx-consensus/src/pot.rs`, `pot_rango.rs` y sus
-> tests). **Antes de empezar, comprueba `git status` y pregunta a Katana si ese encargo sigue vivo.**
-> Si lo está, **coordinaos o repartid bloques**: dos agentes editando los mismos ficheros se pisan y
-> se pierde trabajo.
+> tests). **Estado a 2026-09-24, 00:30: ese encargo lleva sin tocar `crates/` desde las 21:35 del día
+> anterior y su trabajo está commiteado** (`166f97a`). Se da por terminado. Aun así, **comprueba
+> `git status` al empezar**: si aparece actividad ajena en `crates/`, para y repórtalo antes de
+> seguir — dos agentes editando los mismos ficheros se pisan y se pierde trabajo.
 
 **No toques** `SPEC.md`, `research/`, `veritas/`, `PDF/` ni el resto de `P-ZRX/`. Si crees que el SPEC
 está mal, **no lo edites**: plantéalo como decisión (§4).
@@ -300,8 +359,10 @@ git -C /home/katana/zeo/ZEROX status --short
 date
 ```
 
-con las salidas en `PROGRESO-0.0.1.md`. **Hay 38 ficheros modificados sin commitear**: no los
-revuelvas y **no hagas `git checkout`, `reset` ni `clean` de nada que no hayas escrito tú.**
+con las salidas en `PROGRESO-0.0.1.md`. **El árbol está limpio y commiteado** (`561b2cc` y `166f97a`, 2026-09-24): ése es tu punto de
+retorno. **No hagas `git checkout`, `reset`, `clean` ni `--force` de nada.** Commitea tu propio
+avance con frecuencia para que, si algo sale mal, se pueda volver a un punto intermedio y no al
+principio.
 
 ## 9 · Disciplina de implementación (de `AGENTS.md`, que debes leer entero)
 
