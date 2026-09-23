@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use primitive_types::U256;
 use proptest::prelude::*;
 use proptest::test_runner::RngSeed;
+use zx_consensus::RangoSolucionValidado;
 use zx_consensus::ghostdag::{
     Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, Idx, ModoMerge, ModoSp, Parametros,
     hash_de_id_textual,
@@ -36,7 +37,14 @@ fn construir(
     idents: &[u8],
     algoritmo: Algoritmo,
 ) -> Result<Vec<(Option<usize>, u64, U256)>, zx_consensus::ConsensusError> {
-    let mut almacen = AlmacenGhostdag::nuevo(params(), algoritmo, hash_de_id_textual("G"), 0, 0, 0);
+    let mut almacen = AlmacenGhostdag::nuevo(
+        params(),
+        algoritmo,
+        hash_de_id_textual("G"),
+        0,
+        RangoSolucionValidado::para_oraculos(0),
+        0,
+    );
     let mut ids: Vec<BlockHash> = vec![hash_de_id_textual("G")];
     for i in 1..NODOS {
         let id = hash_de_id_textual(&format!("B{i}"));
@@ -46,12 +54,12 @@ fn construir(
                 padres.push(*id_j);
             }
         }
-        let idx = almacen.anadir(BloqueGhostdag {
+        let idx = almacen.anadir_sintetico(BloqueGhostdag {
             id,
             padres,
             slot: i as u64,
             solution_distance: u64::from(sds[i % sds.len()]),
-            rango_espacio: u64::from(srs[i % srs.len()]),
+            rango_espacio: RangoSolucionValidado::para_oraculos(u64::from(srs[i % srs.len()])),
             identidad: u64::from(idents[i % idents.len()]),
         })?;
         debug_assert_eq!(idx as usize, i);
@@ -101,7 +109,7 @@ proptest! {
         let idents = vec![0u8; 8];
         if construir(&mascaras, &sds, &srs, &idents, Algoritmo::Kernel).is_ok() {
             let mut almacen = AlmacenGhostdag::nuevo(
-                params(), Algoritmo::Kernel, hash_de_id_textual("G"), 0, 0, 0);
+                params(), Algoritmo::Kernel, hash_de_id_textual("G"), 0, RangoSolucionValidado::para_oraculos(0), 0);
             let mut ids: Vec<BlockHash> = vec![hash_de_id_textual("G")];
             for i in 1..NODOS {
                 let id = hash_de_id_textual(&format!("B{i}"));
@@ -109,10 +117,10 @@ proptest! {
                 for (j, id_j) in ids.iter().enumerate().take(i) {
                     if mascaras[i] & (1u16 << j) != 0 { padres.push(*id_j); }
                 }
-                if almacen.anadir(BloqueGhostdag {
+                if almacen.anadir_sintetico(BloqueGhostdag {
                     id, padres, slot: i as u64,
                     solution_distance: u64::from(sds[i % sds.len()]),
-                    rango_espacio: u64::from(srs[i % srs.len()]),
+                    rango_espacio: RangoSolucionValidado::para_oraculos(u64::from(srs[i % srs.len()])),
                     identidad: 0,
                 }).is_err() { return Ok(()); }
                 ids.push(id);

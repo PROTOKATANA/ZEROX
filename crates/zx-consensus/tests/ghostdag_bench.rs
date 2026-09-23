@@ -20,6 +20,7 @@
 
 use std::time::Instant;
 
+use zx_consensus::RangoSolucionValidado;
 use zx_consensus::ghostdag::{
     Algoritmo, AlmacenGhostdag, BloqueGhostdag, ModoMerge, ModoSp, Parametros, hash_de_id_textual,
 };
@@ -34,17 +35,24 @@ fn params() -> Parametros {
 
 /// Dos cadenas desde el génesis; la unión tiene un mergeset del tamaño de la cadena corta.
 fn construir_brazo(algoritmo: Algoritmo, largo_p: usize, largo_q: usize) -> AlmacenGhostdag {
-    let mut almacen = AlmacenGhostdag::nuevo(params(), algoritmo, hash_de_id_textual("G"), 0, 0, 0);
+    let mut almacen = AlmacenGhostdag::nuevo(
+        params(),
+        algoritmo,
+        hash_de_id_textual("G"),
+        0,
+        RangoSolucionValidado::para_oraculos(0),
+        0,
+    );
     let mut anterior = hash_de_id_textual("G");
     for i in 1..=largo_p {
         let id = hash_de_id_textual(&format!("P{i}"));
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id,
                 padres: vec![anterior],
                 slot: i as u64,
                 solution_distance: 0,
-                rango_espacio: 100,
+                rango_espacio: RangoSolucionValidado::para_oraculos(100),
                 identidad: 0,
             })
             .unwrap();
@@ -54,12 +62,12 @@ fn construir_brazo(algoritmo: Algoritmo, largo_p: usize, largo_q: usize) -> Alma
     for i in 1..=largo_q {
         let id = hash_de_id_textual(&format!("Q{i}"));
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id,
                 padres: vec![anterior],
                 slot: i as u64,
                 solution_distance: 0,
-                rango_espacio: 100,
+                rango_espacio: RangoSolucionValidado::para_oraculos(100),
                 identidad: 0,
             })
             .unwrap();
@@ -77,12 +85,12 @@ fn medir(algoritmo: Algoritmo, repeticiones: usize) -> Vec<f64> {
     // Calentamiento.
     for _ in 0..2 {
         let mut a = construir_brazo(algoritmo, 180, 179);
-        a.anadir(BloqueGhostdag {
+        a.anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("U"),
             padres: vec![hash_de_id_textual("P180"), hash_de_id_textual("Q179")],
             slot: 180,
             solution_distance: 0,
-            rango_espacio: 100,
+            rango_espacio: RangoSolucionValidado::para_oraculos(100),
             identidad: 0,
         })
         .unwrap();
@@ -91,12 +99,12 @@ fn medir(algoritmo: Algoritmo, repeticiones: usize) -> Vec<f64> {
     for _ in 0..repeticiones {
         let mut a = construir_brazo(algoritmo, 180, 179);
         let t0 = Instant::now();
-        a.anadir(BloqueGhostdag {
+        a.anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("U"),
             padres: vec![hash_de_id_textual("P180"), hash_de_id_textual("Q179")],
             slot: 180,
             solution_distance: 0,
-            rango_espacio: 100,
+            rango_espacio: RangoSolucionValidado::para_oraculos(100),
             identidad: 0,
         })
         .unwrap();
@@ -137,7 +145,7 @@ fn generar(n: usize, ventana: usize, semilla: u64) -> Vec<BloqueGhostdag> {
         padres: Vec::new(),
         slot: 0,
         solution_distance: 0,
-        rango_espacio: 0,
+        rango_espacio: RangoSolucionValidado::para_oraculos(0),
         identidad: 0,
     }];
     for i in 1..n {
@@ -173,7 +181,7 @@ fn generar(n: usize, ventana: usize, semilla: u64) -> Vec<BloqueGhostdag> {
             padres,
             slot: max_slot + rng.rango(0, 2),
             solution_distance: rng.rango(0, 1 << 20),
-            rango_espacio: sr,
+            rango_espacio: RangoSolucionValidado::para_oraculos(sr),
             identidad: 0,
         });
     }
@@ -196,7 +204,7 @@ fn bench_throughput(algoritmo: Algoritmo) {
                 0,
             );
             for b in nodos.iter().skip(1) {
-                a.anadir(b.clone()).unwrap();
+                a.anadir_sintetico(b.clone()).unwrap();
             }
             a
         };
@@ -210,7 +218,7 @@ fn bench_throughput(algoritmo: Algoritmo) {
             0,
         );
         for b in nodos.iter().skip(1) {
-            a.anadir(b.clone()).unwrap();
+            a.anadir_sintetico(b.clone()).unwrap();
         }
         let dt = t0.elapsed().as_secs_f64() * 1e3;
         println!("{:<8} {:>12.3} {:>12.3}", n, dt, dt * 1e3 / n as f64);

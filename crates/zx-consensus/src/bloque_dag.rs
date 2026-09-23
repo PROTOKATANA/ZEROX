@@ -82,8 +82,10 @@ impl core::fmt::Debug for CandidatoSinRango<'_> {
 /// validado y del flujo. **No** puede depender del orden de llegada, la punta local, el reloj, el
 /// `timestamp`, el `height` declarado ni del propio `rango_solucion` que trae el candidato.
 ///
-/// El método recibe [`CandidatoSinRango`], no la cabecera: la circularidad prohibida tampoco
-/// compila.
+/// El método recibe [`CandidatoSinRango`], no la cabecera. Eso **solo** bloquea el acceso directo a
+/// `rango_solucion` a través de esa vista; **no** demuestra que un contexto no conserve la cabecera
+/// (o el valor por otra vía) y lo devuelva como «esperado». La garantía real es que el controlador
+/// derive el esperado del pasado validado y del flujo, y eso sigue pendiente.
 ///
 /// # Intento de circularidad que NO compila
 ///
@@ -94,7 +96,7 @@ impl core::fmt::Debug for CandidatoSinRango<'_> {
 /// struct Circular;
 /// impl ContextoRangoDag for Circular {
 ///     fn rango_esperado(&self, c: &CandidatoSinRango<'_>) -> Result<u64, ConsensusError> {
-///         // H-06: `rango_solucion` no es alcanzable desde la vista opaca.
+///         // Acceso DIRECTO por la vista: no existe. Otra vía (una copia de la cabecera) sí.
 ///         Ok(c.rango_solucion())
 ///     }
 /// }
@@ -110,9 +112,102 @@ pub trait ContextoRangoDag {
     fn rango_esperado(&self, candidato: &CandidatoSinRango<'_>) -> Result<u64, ConsensusError>;
 }
 
+/// `SR` y la cabecera para la que se validó, en la frontera C-HDR-06 → C-GD-01/C-GD-08.
+///
+/// # Qué mejora y qué no
+///
+/// C-GD-01 pondera `w(B) = ⌊2^128/(SR(B)+1)⌋` y C-GD-08 lo acumula en `blue_work`. Este tipo
+/// guarda el valor y, cuando sale de [`Self::validar`], **el `block_hash` de la cabecera que lo
+/// superó**. La inserción comprueba esa atadura: un rango validado para `A` no se puede colocar en
+/// un bloque con el id de `B` (ver [`ConsensusError::RangoDeOtroBloque`]).
+///
+/// La puerta que valida el `SR` es
+/// [`AlmacenGhostdag::admitir`](crate::ghostdag::AlmacenGhostdag::admitir): recibe la cabecera,
+/// deriva su id, pide el rango esperado al contexto, valida e inserta. No acepta ni el `SR` ni el
+/// id del llamante. Es una validación **parcial** —solo el `SR`, no la prueba PoST ni el resto del
+/// bloque— y ninguna ruta de `zx-node` la ejecuta todavía.
+///
+/// # Límites, dichos sin adorno
+///
+/// - [`Self::para_oraculos`] construye un rango **sin validar** (sin cabecera asociada) y sigue
+///   siendo API pública para los oráculos. Un llamante que la use con
+///   [`AlmacenGhostdag::anadir_sintetico`](crate::ghostdag::AlmacenGhostdag::anadir_sintetico)
+///   **se salta C-HDR-06**. Es la parte que este encargo **no** cierra: separar de verdad esa
+///   entrada exige que los oráculos construyan cabeceras y pasen por `admitir`, y que exista el
+///   contexto real.
+/// - Aun pasando por [`Self::validar`], la garantía vale lo que valga el [`ContextoRangoDag`]. La
+///   vista opaca impide que el contexto lea el `rango_solucion` declarado, pero **no** prueba que
+///   lo derive del pasado validado y del flujo: es una precondición pendiente (`TAREAS.md` §2.3).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RangoSolucionValidado {
+    /// Cabecera para la que se validó; `None` en el constructor sintético.
+    bloque: Option<BlockHash>,
+    rango: u64,
+}
+
+impl RangoSolucionValidado {
+    /// El `SR`.
+    #[must_use]
+    pub const fn valor(self) -> u64 {
+        self.rango
+    }
+
+    /// El bloque para el que se validó, si salió de [`Self::validar`].
+    #[must_use]
+    pub const fn bloque(self) -> Option<BlockHash> {
+        self.bloque
+    }
+
+    /// Comprueba C-HDR-06 y ata el resultado a la cabecera.
+    ///
+    /// El valor esperado sale **exclusivamente** del contexto; el candidato entra como
+    /// [`CandidatoSinRango`], que no expone `rango_solucion`. Eso impide la circularidad por
+    /// lectura, **no** demuestra que el contexto esté bien fundado.
+    ///
+    /// # Errores
+    /// [`ConsensusError::RangoIncorrecto`] si el declarado no coincide con el esperado; o el error
+    /// que devuelva el contexto al calcularlo.
+    pub fn validar<C: ContextoRangoDag>(
+        candidato: &DagBlockHeader,
+        ctx: &C,
+    ) -> Result<Self, ConsensusError> {
+        let vista = CandidatoSinRango {
+            cabecera: candidato,
+        };
+        let esperado = ctx.rango_esperado(&vista)?;
+        if candidato.rango_solucion != esperado {
+            return Err(ConsensusError::RangoIncorrecto {
+                esperado,
+                encontrado: candidato.rango_solucion,
+            });
+        }
+        Ok(Self {
+            bloque: Some(candidato.block_hash()),
+            rango: candidato.rango_solucion,
+        })
+    }
+
+    /// Constructor **sintético** para oráculos y tests. **NO valida C-HDR-06** y no ata el rango a
+    /// ninguna cabecera.
+    ///
+    /// No es la API de producción: existe para que los vectores de GDR-v0.2, los DAGs generados y
+    /// los benchmarks puedan sembrar un `SR` sin un `ContextoRangoDag` (el controlador no existe,
+    /// `TAREAS.md` §2.3). Un llamante puede invocarlo; por eso la frontera es **parcial** y se
+    /// documenta como tal.
+    #[must_use]
+    pub const fn para_oraculos(rango_solucion: u64) -> Self {
+        Self {
+            bloque: None,
+            rango: rango_solucion,
+        }
+    }
+}
+
 /// Comprueba `rango_solucion` contra el rango que aporta el contexto (C-HDR-06 reescrita).
 ///
-/// Construye la vista opaca, se la pasa al contexto y compara el resultado con el campo recibido.
+/// Es la puerta que fabrica [`RangoSolucionValidado`]: construye la vista opaca, se la pasa al
+/// contexto y compara el resultado con el campo recibido. Delega en
+/// [`RangoSolucionValidado::validar`] para que la comparación viva en un solo sitio.
 ///
 /// # Errores
 /// [`ConsensusError::RangoIncorrecto`] si el valor declarado no coincide; o el error que devuelva
@@ -121,24 +216,15 @@ pub fn comprobar_rango_contextual<C: ContextoRangoDag>(
     candidato: &DagBlockHeader,
     ctx: &C,
 ) -> Result<(), ConsensusError> {
-    let vista = CandidatoSinRango {
-        cabecera: candidato,
-    };
-    let esperado = ctx.rango_esperado(&vista)?;
-    if candidato.rango_solucion != esperado {
-        return Err(ConsensusError::RangoIncorrecto {
-            esperado,
-            encontrado: candidato.rango_solucion,
-        });
-    }
-    Ok(())
+    RangoSolucionValidado::validar(candidato, ctx).map(|_| ())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // H-04 · Validación contextual de padres
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Contexto **obligatorio** para comprobar los padres de un bloque DAG (C-HDR-05, C-GD-03).
+/// Contexto **obligatorio** para comprobar los padres de un bloque DAG (C-HDR-05, C-FLU-02,
+/// C-GD-03).
 ///
 /// La anticadena y que `prev_hash` sea el `sp(B)` de GHOSTDAG dependen del DAG validado, que este
 /// crate no posee. Igual que con el rango, el llamante aporta la información; aquí **no** se
@@ -156,6 +242,19 @@ pub trait ContextoDag {
         antepasado: &BlockHash,
         descendiente: &BlockHash,
     ) -> Result<bool, ConsensusError>;
+
+    /// `slot` de un padre, tomado del contexto almacenado (C-HDR-05, C-FLU-02).
+    ///
+    /// Es la **única** vía admitida para conocer el `slot` de un padre arbitrario: el candidato
+    /// declara su propio `slot`, no el de sus padres, así que la cota de C-HDR-05/C-FLU-02 no
+    /// puede leerse del bloque que se valida. La ausencia **MUST NOT** sustituirse por cero: sin
+    /// el slot contextual la cota no es comprobable y el bloque no puede aceptarse.
+    ///
+    /// # Errores
+    /// [`ConsensusError::PadreNoValidado`] si el hash no pertenece al contexto;
+    /// [`ConsensusError::SlotDePadreAusente`] si el padre existe pero su `slot` no está
+    /// almacenado.
+    fn slot_de_padre(&self, h: &BlockHash) -> Result<u64, ConsensusError>;
 
     /// El padre que GHOSTDAG elige para estos padres (C-GD-03).
     ///
@@ -176,12 +275,18 @@ pub trait ContextoDag {
 ///
 /// 1. `parent_count == 0` ⟺ es el génesis;
 /// 2. cada padre —seleccionado y adicionales— está validado;
-/// 3. anticadena: ningún padre está en el pasado de otro;
-/// 4. `prev_hash` es el `sp(B)` que devuelve el contexto.
+/// 3. `slot(p) ≤ slot(B)` para **todos** los padres, cota no estricta (C-HDR-05 · C-FLU-02);
+/// 4. anticadena: ningún padre está en el pasado de otro;
+/// 5. `prev_hash` es el `sp(B)` que devuelve el contexto.
+///
+/// El `slot` de cada padre lo aporta [`ContextoDag::slot_de_padre`]; nunca se lee del candidato. El
+/// génesis, que no tiene padres, conserva su tratamiento propio: pasa por el paso 1 y no llega a
+/// la cota.
 ///
 /// # Errores
 /// [`ConsensusError::GenesisConCeroPadresNoEsGenesis`], [`ConsensusError::GenesisConPadres`],
-/// [`ConsensusError::PadreNoValidado`], [`ConsensusError::PadresNoAnticadena`] o
+/// [`ConsensusError::PadreNoValidado`], [`ConsensusError::SlotDePadreAusente`],
+/// [`ConsensusError::SlotDePadrePosterior`], [`ConsensusError::PadresNoAnticadena`] o
 /// [`ConsensusError::PadreSeleccionadoIncorrecto`].
 pub fn comprobar_padres_contextual<C: ContextoDag>(
     cabecera: &DagBlockHeader,
@@ -216,10 +321,25 @@ pub fn comprobar_padres_contextual<C: ContextoDag>(
         }
     }
 
-    // 3 · Anticadena: ningún padre en el pasado de otro.
     let todos: Vec<BlockHash> = core::iter::once(seleccionado)
         .chain(cabecera.padres.extras().iter().copied())
         .collect();
+
+    // 3 · Cota de slot para TODOS los padres (C-HDR-05 · C-FLU-02): `slot(p) ≤ slot(B)`, no
+    //     estricta. Se hace justo después de comprobar que cada padre pertenece al contexto y
+    //     antes de la anticadena: es una comprobación estructural de validez.
+    for p in &todos {
+        let slot_p = ctx.slot_de_padre(p)?;
+        if slot_p > cabecera.slot {
+            return Err(ConsensusError::SlotDePadrePosterior {
+                padre: *p,
+                slot_padre: slot_p,
+                slot_b: cabecera.slot,
+            });
+        }
+    }
+
+    // 4 · Anticadena: ningún padre en el pasado de otro.
     for (i, a) in todos.iter().enumerate() {
         for (j, b) in todos.iter().enumerate() {
             if i == j {
@@ -234,7 +354,7 @@ pub fn comprobar_padres_contextual<C: ContextoDag>(
         }
     }
 
-    // 4 · prev_hash == sp(B) de C-GD-03.
+    // 5 · prev_hash == sp(B) de C-GD-03.
     let esperado = ctx.padre_seleccionado(&cabecera.padres)?;
     if esperado != seleccionado {
         return Err(ConsensusError::PadreSeleccionadoIncorrecto {
@@ -302,8 +422,8 @@ pub fn comprobar_compromisos_cuerpo_dag(
 )]
 mod tests {
     use super::{
-        CandidatoSinRango, ContextoDag, ContextoRangoDag, comprobar_compromisos_cuerpo_dag,
-        comprobar_padres_contextual, comprobar_rango_contextual,
+        CandidatoSinRango, ContextoDag, ContextoRangoDag, RangoSolucionValidado,
+        comprobar_compromisos_cuerpo_dag, comprobar_padres_contextual, comprobar_rango_contextual,
     };
     use crate::error::ConsensusError;
     use crate::testigo::{ContextoGasto, satisface};
@@ -480,6 +600,45 @@ mod tests {
         );
     }
 
+    /// **C-HDR-06 → C-GD-01/C-GD-08.** El `SR` validado sale del contexto, no del candidato.
+    #[test]
+    fn el_rango_validado_sale_del_contexto_y_no_del_candidato() {
+        let lock = Lock::PubKey {
+            pubkey: ClavePublica::desde_bytes([1; 32]),
+        };
+        let txs = vec![tx_con(1, lock)];
+        let testigos = vec![vec![vec![0; 64]]];
+        let mut c = cabecera_para(&txs, &testigos);
+        c.rango_solucion = 42;
+
+        // El contexto que coincide: valida y conserva exactamente su valor.
+        let v = RangoSolucionValidado::validar(&c, &CtxFijo(42)).unwrap();
+        assert_eq!(v.valor(), 42);
+
+        // El mismo candidato contra otro contexto no valida: el esperado es el del contexto.
+        assert_eq!(
+            RangoSolucionValidado::validar(&c, &CtxFijo(7)),
+            Err(ConsensusError::RangoIncorrecto {
+                esperado: 7,
+                encontrado: 42
+            })
+        );
+
+        // `comprobar_rango_contextual` y `validar` son la misma puerta.
+        assert!(comprobar_rango_contextual(&c, &CtxFijo(42)).is_ok());
+        assert!(comprobar_rango_contextual(&c, &CtxFijo(7)).is_err());
+    }
+
+    /// El constructor sintético es explícito: no valida nada, solo envuelve el valor.
+    #[test]
+    fn el_constructor_de_oraculos_no_valida_y_lo_declara() {
+        assert_eq!(RangoSolucionValidado::para_oraculos(0).valor(), 0);
+        assert_eq!(
+            RangoSolucionValidado::para_oraculos(u64::MAX).valor(),
+            u64::MAX
+        );
+    }
+
     /// **H-06** · La vista opaca no filtra `rango_solucion` ni por `Debug`.
     #[test]
     fn la_vista_de_rango_no_imprime_rango_solucion() {
@@ -519,6 +678,8 @@ mod tests {
         validados: Vec<BlockHash>,
         genesis: BlockHash,
         pasados: Vec<(BlockHash, BlockHash)>,
+        /// `slot` contextual de cada padre: la única fuente admitida por C-HDR-05/C-FLU-02.
+        slots: Vec<(BlockHash, u64)>,
         sp_forzado: Option<BlockHash>,
     }
 
@@ -528,6 +689,7 @@ mod tests {
                 validados: Vec::new(),
                 genesis,
                 pasados: Vec::new(),
+                slots: Vec::new(),
                 sp_forzado: None,
             }
         }
@@ -544,6 +706,18 @@ mod tests {
             descendiente: &BlockHash,
         ) -> Result<bool, ConsensusError> {
             Ok(self.pasados.contains(&(*antepasado, *descendiente)))
+        }
+
+        fn slot_de_padre(&self, h: &BlockHash) -> Result<u64, ConsensusError> {
+            // Igual que el almacén real: padre desconocido y slot ausente son errores distintos,
+            // y el slot **no** se toma del candidato ni se sustituye por cero.
+            if !self.validados.contains(h) {
+                return Err(ConsensusError::PadreNoValidado { padre: *h });
+            }
+            self.slots
+                .iter()
+                .find_map(|(id, slot)| (id == h).then_some(*slot))
+                .ok_or(ConsensusError::SlotDePadreAusente { padre: *h })
         }
 
         fn padre_seleccionado(&self, padres: &PadresDag) -> Result<BlockHash, ConsensusError> {
@@ -598,6 +772,7 @@ mod tests {
         let c = cabecera_con(padres, &txs, &testigos);
         let mut ctx = CtxDag::nuevo(h(0));
         ctx.validados = vec![h(1), h(2)];
+        ctx.slots = vec![(h(1), 0), (h(2), 0)];
         // h(1) está en el pasado de h(2): no es anticadena.
         ctx.pasados = vec![(h(1), h(2))];
         assert_eq!(
@@ -616,6 +791,7 @@ mod tests {
         let c = cabecera_con(padres, &txs, &testigos);
         let mut ctx = CtxDag::nuevo(h(0));
         ctx.validados = vec![h(1), h(2)];
+        ctx.slots = vec![(h(1), 0), (h(2), 0)];
         ctx.sp_forzado = Some(h(2));
         assert_eq!(
             comprobar_padres_contextual(&c, &ctx),
@@ -633,6 +809,104 @@ mod tests {
         let c = cabecera_con(padres, &txs, &testigos);
         let mut ctx = CtxDag::nuevo(h(0));
         ctx.validados = vec![h(1), h(2), h(3)];
+        ctx.slots = vec![(h(1), 0), (h(2), 0), (h(3), 0)];
         assert!(comprobar_padres_contextual(&c, &ctx).is_ok());
+    }
+
+    // ── C-HDR-05 · C-FLU-02 · cota de slot para TODOS los padres ─────────────
+
+    #[test]
+    fn el_padre_seleccionado_con_slot_posterior_se_rechaza() {
+        let (txs, testigos) = bloque_minimo();
+        let padres = PadresDag::nuevo(h(1), &[]).unwrap();
+        let mut c = cabecera_con(padres, &txs, &testigos);
+        c.slot = 5;
+        let mut ctx = CtxDag::nuevo(h(0));
+        ctx.validados = vec![h(1)];
+        ctx.slots = vec![(h(1), 6)];
+        assert_eq!(
+            comprobar_padres_contextual(&c, &ctx),
+            Err(ConsensusError::SlotDePadrePosterior {
+                padre: h(1),
+                slot_padre: 6,
+                slot_b: 5
+            })
+        );
+    }
+
+    #[test]
+    fn el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpla() {
+        let (txs, testigos) = bloque_minimo();
+        let padres = PadresDag::nuevo(h(1), &[h(2)]).unwrap();
+        let mut c = cabecera_con(padres, &txs, &testigos);
+        c.slot = 5;
+        let mut ctx = CtxDag::nuevo(h(0));
+        ctx.validados = vec![h(1), h(2)];
+        // El seleccionado cumple; el adicional no.
+        ctx.slots = vec![(h(1), 4), (h(2), 9)];
+        assert_eq!(
+            comprobar_padres_contextual(&c, &ctx),
+            Err(ConsensusError::SlotDePadrePosterior {
+                padre: h(2),
+                slot_padre: 9,
+                slot_b: 5
+            })
+        );
+    }
+
+    #[test]
+    fn todos_los_padres_con_el_mismo_slot_que_b_pasan() {
+        let (txs, testigos) = bloque_minimo();
+        let padres = PadresDag::nuevo(h(1), &[h(2), h(3)]).unwrap();
+        let mut c = cabecera_con(padres, &txs, &testigos);
+        c.slot = 7;
+        let mut ctx = CtxDag::nuevo(h(0));
+        ctx.validados = vec![h(1), h(2), h(3)];
+        ctx.slots = vec![(h(1), 7), (h(2), 7), (h(3), 7)];
+        assert!(comprobar_padres_contextual(&c, &ctx).is_ok());
+    }
+
+    #[test]
+    fn padres_con_slots_anteriores_pasan() {
+        let (txs, testigos) = bloque_minimo();
+        let padres = PadresDag::nuevo(h(1), &[h(2)]).unwrap();
+        let mut c = cabecera_con(padres, &txs, &testigos);
+        c.slot = 10;
+        let mut ctx = CtxDag::nuevo(h(0));
+        ctx.validados = vec![h(1), h(2)];
+        ctx.slots = vec![(h(1), 0), (h(2), 9)];
+        assert!(comprobar_padres_contextual(&c, &ctx).is_ok());
+    }
+
+    #[test]
+    fn un_padre_validado_sin_slot_contextual_es_error_explicito() {
+        let (txs, testigos) = bloque_minimo();
+        let padres = PadresDag::nuevo(h(1), &[h(2)]).unwrap();
+        let mut c = cabecera_con(padres, &txs, &testigos);
+        c.slot = 5;
+        let mut ctx = CtxDag::nuevo(h(0));
+        ctx.validados = vec![h(1), h(2)];
+        // El adicional está validado pero el contexto no le da slot: no se acepta por defecto.
+        ctx.slots = vec![(h(1), 4)];
+        assert_eq!(
+            comprobar_padres_contextual(&c, &ctx),
+            Err(ConsensusError::SlotDePadreAusente { padre: h(2) })
+        );
+    }
+
+    #[test]
+    fn un_padre_desconocido_no_tiene_slot_y_se_rechaza() {
+        // Sin pasar por `comprobar_padres_contextual`: la consulta misma falla explícitamente.
+        let ctx = CtxDag::nuevo(h(0));
+        assert_eq!(
+            ContextoDag::slot_de_padre(&ctx, &h(1)),
+            Err(ConsensusError::PadreNoValidado { padre: h(1) })
+        );
+        let mut ctx = CtxDag::nuevo(h(0));
+        ctx.validados = vec![h(1)];
+        assert_eq!(
+            ContextoDag::slot_de_padre(&ctx, &h(1)),
+            Err(ConsensusError::SlotDePadreAusente { padre: h(1) })
+        );
     }
 }

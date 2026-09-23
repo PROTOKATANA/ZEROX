@@ -17,10 +17,12 @@ use std::collections::HashMap;
 
 use primitive_types::U256;
 use zx_consensus::ConsensusError;
-use zx_consensus::bloque_dag::comprobar_padres_contextual;
+use zx_consensus::ContextoDag;
+use zx_consensus::RangoSolucionValidado;
+use zx_consensus::bloque_dag::{CandidatoSinRango, ContextoRangoDag, comprobar_padres_contextual};
 use zx_consensus::ghostdag::{
-    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, Idx, ModoMerge, ModoSp, Parametros, Rank,
-    hash_de_id_textual, peso, sumar_blue_work,
+    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, DatosGhostdag, Idx, ModoMerge, ModoSp,
+    Parametros, Rank, hash_de_id_textual, peso, sumar_blue_work,
 };
 use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
 use zx_core::{DagBlockHeader, PadresDag, SolucionPoas};
@@ -154,7 +156,7 @@ fn entregar(
         algoritmo,
         nodos[0].id,
         nodos[0].slot,
-        nodos[0].sr,
+        RangoSolucionValidado::para_oraculos(nodos[0].sr),
         nodos[0].ident,
     );
     let mut mapa: HashMap<usize, Idx> = HashMap::new();
@@ -163,12 +165,12 @@ fn entregar(
         let nodo = &nodos[*spec_idx];
         let padres = nodo.padres.iter().map(|p| nodos[*p].id).collect();
         let idx = almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id: nodo.id,
                 padres,
                 slot: nodo.slot,
                 solution_distance: nodo.sd,
-                rango_espacio: nodo.sr,
+                rango_espacio: RangoSolucionValidado::para_oraculos(nodo.sr),
                 identidad: nodo.ident,
             })
             .unwrap_or_else(|e| panic!("DAG válido rechazado: {e}"));
@@ -329,17 +331,17 @@ fn quince_padres_se_aceptan_y_dieciseis_se_rechazan() {
         Algoritmo::Kernel,
         hash_de_id_textual("G"),
         0,
-        0,
+        RangoSolucionValidado::para_oraculos(0),
         0,
     );
     for i in 1..=16 {
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id: hash_de_id_textual(&format!("P{i}")),
                 padres: vec![hash_de_id_textual("G")],
                 slot: 1,
                 solution_distance: 1,
-                rango_espacio: i,
+                rango_espacio: RangoSolucionValidado::para_oraculos(i),
                 identidad: 0,
             })
             .unwrap();
@@ -352,23 +354,23 @@ fn quince_padres_se_aceptan_y_dieciseis_se_rechazan() {
         .collect();
     assert!(
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id: hash_de_id_textual("A"),
                 padres: quince,
                 slot: 1,
                 solution_distance: 0,
-                rango_espacio: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(0),
                 identidad: 0,
             })
             .is_ok()
     );
     assert_eq!(
-        almacen.anadir(BloqueGhostdag {
+        almacen.anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("B"),
             padres: dieciseis,
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 0,
+            rango_espacio: RangoSolucionValidado::para_oraculos(0),
             identidad: 0,
         }),
         Err(ConsensusError::DemasiadosPadresDag {
@@ -385,19 +387,19 @@ fn construir_brazo(largo_p: usize, largo_q: usize) -> AlmacenGhostdag {
         Algoritmo::Kernel,
         hash_de_id_textual("G"),
         0,
-        0,
+        RangoSolucionValidado::para_oraculos(0),
         0,
     );
     let mut anterior_p = hash_de_id_textual("G");
     for i in 1..=largo_p {
         let id = hash_de_id_textual(&format!("P{i}"));
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id,
                 padres: vec![anterior_p],
                 slot: i as u64,
                 solution_distance: 0,
-                rango_espacio: 100,
+                rango_espacio: RangoSolucionValidado::para_oraculos(100),
                 identidad: 0,
             })
             .unwrap();
@@ -407,12 +409,12 @@ fn construir_brazo(largo_p: usize, largo_q: usize) -> AlmacenGhostdag {
     for i in 1..=largo_q {
         let id = hash_de_id_textual(&format!("Q{i}"));
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id,
                 padres: vec![anterior_q],
                 slot: i as u64,
                 solution_distance: 0,
-                rango_espacio: 100,
+                rango_espacio: RangoSolucionValidado::para_oraculos(100),
                 identidad: 0,
             })
             .unwrap();
@@ -425,12 +427,12 @@ fn construir_brazo(largo_p: usize, largo_q: usize) -> AlmacenGhostdag {
 fn bordes_exactos_de_mergeset_180_y_181() {
     // 179 bloques en la cadena Q ⇒ |mergeset| = 179 ⇒ +1 = 180: se acepta.
     let mut acepta = construir_brazo(180, 179);
-    let ok = acepta.anadir(BloqueGhostdag {
+    let ok = acepta.anadir_sintetico(BloqueGhostdag {
         id: hash_de_id_textual("U"),
         padres: vec![hash_de_id_textual("P180"), hash_de_id_textual("Q179")],
         slot: 180,
         solution_distance: 0,
-        rango_espacio: 100,
+        rango_espacio: RangoSolucionValidado::para_oraculos(100),
         identidad: 0,
     });
     assert!(ok.is_ok(), "180 debe aceptarse: {ok:?}");
@@ -438,12 +440,12 @@ fn bordes_exactos_de_mergeset_180_y_181() {
     // 180 bloques en Q ⇒ |mergeset| = 180 ⇒ +1 = 181: se rechaza.
     let mut rechaza = construir_brazo(180, 180);
     assert_eq!(
-        rechaza.anadir(BloqueGhostdag {
+        rechaza.anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("V"),
             padres: vec![hash_de_id_textual("P180"), hash_de_id_textual("Q180")],
             slot: 180,
             solution_distance: 0,
-            rango_espacio: 100,
+            rango_espacio: RangoSolucionValidado::para_oraculos(100),
             identidad: 0,
         }),
         Err(ConsensusError::MergesetExcedeLimite {
@@ -511,28 +513,28 @@ fn almacen_hermanos() -> (AlmacenGhostdag, BlockHash) {
         Algoritmo::Kernel,
         hash_de_id_textual("G"),
         0,
-        0,
+        RangoSolucionValidado::para_oraculos(0),
         0,
     );
     // Hermana 1: menor id, mismo bw y sd.
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("A1"),
             padres: vec![hash_de_id_textual("G")],
             slot: 1,
             solution_distance: 7,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
     // Hermana 2: mismo bw y sd, id mayor.
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("A2"),
             padres: vec![hash_de_id_textual("G")],
             slot: 1,
             solution_distance: 7,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
@@ -543,12 +545,12 @@ fn almacen_hermanos() -> (AlmacenGhostdag, BlockHash) {
 fn sp_empatado_en_bw_y_sd_elige_el_menor_id() {
     let (mut almacen, g) = almacen_hermanos();
     let c = almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("C"),
             padres: vec![hash_de_id_textual("A2"), hash_de_id_textual("A1")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
@@ -564,28 +566,28 @@ fn sp_empatado_en_bw_elige_el_menor_sd() {
         Algoritmo::Kernel,
         hash_de_id_textual("G"),
         0,
-        0,
+        RangoSolucionValidado::para_oraculos(0),
         0,
     );
     for (id, sd) in [("A1", 9u64), ("A2", 3u64)] {
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id: hash_de_id_textual(id),
                 padres: vec![hash_de_id_textual("G")],
                 slot: 1,
                 solution_distance: sd,
-                rango_espacio: 5,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
                 identidad: 0,
             })
             .unwrap();
     }
     let c = almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("C"),
             padres: vec![hash_de_id_textual("A1"), hash_de_id_textual("A2")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
@@ -600,36 +602,36 @@ fn sp_elige_el_mayor_blue_work() {
         Algoritmo::Kernel,
         hash_de_id_textual("G"),
         0,
-        0,
+        RangoSolucionValidado::para_oraculos(0),
         0,
     );
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("A"),
             padres: vec![hash_de_id_textual("G")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("B"),
             padres: vec![hash_de_id_textual("A")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
     let c = almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("C"),
             padres: vec![hash_de_id_textual("A"), hash_de_id_textual("B")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
@@ -643,34 +645,40 @@ fn copia_de_billete_direccion_coherente_entre_padres_y_mergeset() {
         k: 30,
         ..params_regla_c()
     };
-    let mut almacen =
-        AlmacenGhostdag::nuevo(params, Algoritmo::Kernel, hash_de_id_textual("G"), 0, 0, 0);
+    let mut almacen = AlmacenGhostdag::nuevo(
+        params,
+        Algoritmo::Kernel,
+        hash_de_id_textual("G"),
+        0,
+        RangoSolucionValidado::para_oraculos(0),
+        0,
+    );
     // A (sin billete) y dos copias s1,s2 del billete 7. A es el sp por tener menor sd.
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("A"),
             padres: vec![hash_de_id_textual("G")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
     for id in ["S1", "S2"] {
         almacen
-            .anadir(BloqueGhostdag {
+            .anadir_sintetico(BloqueGhostdag {
                 id: hash_de_id_textual(id),
                 padres: vec![hash_de_id_textual("G")],
                 slot: 1,
                 solution_distance: 5,
-                rango_espacio: 5,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
                 identidad: 7,
             })
             .unwrap();
     }
     // C con A como sp (menor sd) y S1,S2 en el mergeset.
     let c = almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("C"),
             padres: vec![
                 hash_de_id_textual("A"),
@@ -679,7 +687,7 @@ fn copia_de_billete_direccion_coherente_entre_padres_y_mergeset() {
             ],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
@@ -725,28 +733,28 @@ fn u2_invalida_y_u3_colorea() {
         Algoritmo::Kernel,
         hash_de_id_textual("G"),
         0,
-        0,
+        RangoSolucionValidado::para_oraculos(0),
         0,
     );
     // A lleva el billete 7.
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("A"),
             padres: vec![hash_de_id_textual("G")],
             slot: 1,
             solution_distance: 5,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 7,
         })
         .unwrap();
     // S es copia (mismo billete) pero hermana, no descendiente de A: U2 NO la invalida.
     let s = almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("S"),
             padres: vec![hash_de_id_textual("G")],
             slot: 1,
             solution_distance: 5,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 7,
         })
         .unwrap();
@@ -755,12 +763,12 @@ fn u2_invalida_y_u3_colorea() {
 
     // D es descendiente de A: el billete 7 ya está en el pasado estricto de su padre ⇒ U2.
     assert_eq!(
-        almacen.anadir(BloqueGhostdag {
+        almacen.anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("D"),
             padres: vec![hash_de_id_textual("A")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 7,
         }),
         Err(ConsensusError::BilleteDuplicadoU2 { identidad: 7 })
@@ -768,12 +776,12 @@ fn u2_invalida_y_u3_colorea() {
 
     // C fusiona A (sp) y S: S no se evalúa contra el k-cluster, queda rojo_U3.
     let c = almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: hash_de_id_textual("C"),
             padres: vec![hash_de_id_textual("A"), hash_de_id_textual("S")],
             slot: 1,
             solution_distance: 0,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
@@ -812,47 +820,51 @@ struct Escenario {
 }
 
 fn escenario_dag() -> Escenario {
+    escenario_dag_con(Algoritmo::Kernel)
+}
+
+fn escenario_dag_con(algoritmo: Algoritmo) -> Escenario {
     let h_genesis = cabecera(PadresDag::genesis(), 0);
     let mut almacen = AlmacenGhostdag::nuevo(
         params_regla_c(),
-        Algoritmo::Kernel,
+        algoritmo,
         h_genesis.block_hash(),
         0,
-        0,
+        RangoSolucionValidado::para_oraculos(0),
         0,
     );
     // Génesis → A → B (B desciende de A).
     let h_a = cabecera(PadresDag::nuevo(h_genesis.block_hash(), &[]).unwrap(), 1);
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: h_a.block_hash(),
             padres: vec![h_genesis.block_hash()],
             slot: 1,
             solution_distance: 1,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
     let h_b = cabecera(PadresDag::nuevo(h_a.block_hash(), &[]).unwrap(), 2);
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: h_b.block_hash(),
             padres: vec![h_a.block_hash()],
             slot: 2,
             solution_distance: 1,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
     // C es hermana de A (anticadena con A).
     let h_c = cabecera(PadresDag::nuevo(h_genesis.block_hash(), &[]).unwrap(), 3);
     almacen
-        .anadir(BloqueGhostdag {
+        .anadir_sintetico(BloqueGhostdag {
             id: h_c.block_hash(),
             padres: vec![h_genesis.block_hash()],
             slot: 1,
             solution_distance: 2,
-            rango_espacio: 5,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
             identidad: 0,
         })
         .unwrap();
@@ -929,4 +941,663 @@ fn padres_validados_y_anticadena_pasan_contra_el_almacen_real() {
         9,
     );
     assert!(comprobar_padres_contextual(&h, &esc.almacen).is_ok());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9 · C-HDR-05 · C-FLU-02 — cota de slot para TODOS los padres, en el almacén
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estado observable completo del almacén: lo que un rechazo **MUST NOT** haber tocado.
+type EstadoObservable = (BlockHash, Vec<Idx>, Option<Rank>, Option<DatosGhostdag>);
+
+fn huella(a: &AlmacenGhostdag) -> Vec<EstadoObservable> {
+    (0..a.len() as Idx)
+        .map(|i| {
+            (
+                a.id(i).unwrap(),
+                a.padres_de(i).map(|p| p.to_vec()).unwrap_or_default(),
+                a.rank(i),
+                a.datos(i).cloned(),
+            )
+        })
+        .collect()
+}
+
+/// Dos hermanas con el mismo `blue_work` y distinto `sd`: `A` es el `sp` (menor `sd`) y `C` es el
+/// padre adicional. `slot_c` fija el slot **contextual** de `C`, que es el único que cuenta.
+fn escenario_hermanas(
+    algoritmo: Algoritmo,
+    slot_c: u64,
+) -> (AlmacenGhostdag, BlockHash, BlockHash) {
+    let g = cabecera(PadresDag::genesis(), 0);
+    let mut almacen = AlmacenGhostdag::nuevo(
+        params_regla_c(),
+        algoritmo,
+        g.block_hash(),
+        0,
+        RangoSolucionValidado::para_oraculos(0),
+        0,
+    );
+    let a = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1);
+    almacen
+        .anadir_sintetico(BloqueGhostdag {
+            id: a.block_hash(),
+            padres: vec![g.block_hash()],
+            slot: 1,
+            solution_distance: 1,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
+            identidad: 0,
+        })
+        .unwrap();
+    // La cabecera de `C` declara el MISMO slot que se almacena: `slot_c` se fija antes de calcular
+    // `block_hash`, para que el fixture sea coherente y no un slot declarado distinto del contextual.
+    let mut c = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 9);
+    c.slot = slot_c;
+    let id_c = c.block_hash();
+    almacen
+        .anadir_sintetico(BloqueGhostdag {
+            id: id_c,
+            padres: vec![g.block_hash()],
+            slot: slot_c,
+            solution_distance: 2,
+            rango_espacio: RangoSolucionValidado::para_oraculos(5),
+            identidad: 0,
+        })
+        .unwrap();
+    (almacen, a.block_hash(), id_c)
+}
+
+#[test]
+fn el_padre_seleccionado_con_slot_posterior_se_rechaza_en_los_dos_algoritmos() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let mut esc = escenario_dag_con(algoritmo);
+        let h_b = esc.h_b.block_hash(); // slot 2 en el almacén, slot 2 en la cabecera
+        let err = esc
+            .almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("FUT-SEL"),
+                padres: vec![h_b],
+                slot: 1,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: 0,
+            })
+            .unwrap_err();
+        assert_eq!(
+            err,
+            ConsensusError::SlotDePadrePosterior {
+                padre: h_b,
+                slot_padre: 2,
+                slot_b: 1,
+            },
+            "{algoritmo:?}"
+        );
+    }
+}
+
+/// **Caso de aceptación focalizado.** El seleccionado cumple la cota y el adicional no: el rechazo
+/// debe nombrar al adicional. Sin la comprobación de todos los padres, este bloque se aceptaría.
+#[test]
+fn el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpla() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let (mut almacen, a, c) = escenario_hermanas(algoritmo, 5);
+        let err = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("FUT-EXTRA"),
+                // `sp` = A (menor sd) con slot 1; C es el adicional con slot 5.
+                padres: vec![a, c],
+                slot: 3,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: 0,
+            })
+            .unwrap_err();
+        assert_eq!(
+            err,
+            ConsensusError::SlotDePadrePosterior {
+                padre: c,
+                slot_padre: 5,
+                slot_b: 3,
+            },
+            "{algoritmo:?}"
+        );
+    }
+}
+
+#[test]
+fn todos_los_padres_con_el_mismo_slot_que_b_se_aceptan() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let (mut almacen, a, c) = escenario_hermanas(algoritmo, 1);
+        let idx = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("MISMO"),
+                padres: vec![a, c],
+                slot: 1,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: 0,
+            })
+            .unwrap_or_else(|e| panic!("{algoritmo:?}: la igualdad está permitida: {e}"));
+        assert_eq!(almacen.padres_de(idx).unwrap(), &[1, 2]);
+    }
+}
+
+#[test]
+fn padres_con_slots_anteriores_se_aceptan() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let (mut almacen, a, c) = escenario_hermanas(algoritmo, 1);
+        let idx = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("TARDE"),
+                padres: vec![a, c],
+                slot: 40,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: 0,
+            })
+            .unwrap_or_else(|e| panic!("{algoritmo:?}: los slots anteriores son válidos: {e}"));
+        assert_eq!(almacen.padres_de(idx).unwrap(), &[1, 2]);
+    }
+}
+
+#[test]
+fn un_padre_desconocido_se_rechaza_sin_tocar_el_almacen() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let mut esc = escenario_dag_con(algoritmo);
+        let antes = huella(&esc.almacen);
+        let impostor = cabecera(PadresDag::genesis(), 0xEE).block_hash();
+        let err = esc
+            .almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("HUERFANO"),
+                padres: vec![impostor],
+                slot: 9,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: 0,
+            })
+            .unwrap_err();
+        assert_eq!(
+            err,
+            ConsensusError::BloqueDesconocido { hash: impostor },
+            "{algoritmo:?}"
+        );
+        assert_eq!(huella(&esc.almacen), antes, "{algoritmo:?}");
+    }
+}
+
+/// Un rechazo por la cota de slot deja el almacén **exactamente** como estaba: índices, padres,
+/// slots, colores y acumuladores.
+#[test]
+fn el_rechazo_por_slot_deja_el_almacen_intacto() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        // Caso 1: padre seleccionado con slot posterior.
+        let mut esc = escenario_dag_con(algoritmo);
+        let antes = (
+            esc.almacen.len(),
+            esc.almacen.puntas(),
+            huella(&esc.almacen),
+        );
+        assert!(
+            esc.almacen
+                .anadir_sintetico(BloqueGhostdag {
+                    id: hash_de_id_textual("R-SEL"),
+                    padres: vec![esc.h_b.block_hash()],
+                    slot: 1,
+                    solution_distance: 0,
+                    rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                    identidad: 0,
+                })
+                .is_err(),
+            "{algoritmo:?}"
+        );
+        assert_eq!(
+            (
+                esc.almacen.len(),
+                esc.almacen.puntas(),
+                huella(&esc.almacen)
+            ),
+            antes,
+            "{algoritmo:?}: un rechazo no puede modificar el almacén"
+        );
+
+        // Caso 2: padre adicional con slot posterior y seleccionado válido.
+        let (mut almacen, a, c) = escenario_hermanas(algoritmo, 5);
+        let antes = (almacen.len(), almacen.puntas(), huella(&almacen));
+        assert!(
+            almacen
+                .anadir_sintetico(BloqueGhostdag {
+                    id: hash_de_id_textual("R-EXTRA"),
+                    padres: vec![a, c],
+                    slot: 3,
+                    solution_distance: 0,
+                    rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                    identidad: 0,
+                })
+                .is_err(),
+            "{algoritmo:?}"
+        );
+        assert_eq!(
+            (almacen.len(), almacen.puntas(), huella(&almacen)),
+            antes,
+            "{algoritmo:?}: un rechazo no puede modificar el almacén"
+        );
+    }
+}
+
+/// La consulta `slot_de_padre` del almacén real devuelve el slot **contextual** del padre y falla
+/// explícitamente ante un hash que no conoce; nunca devuelve cero por defecto.
+#[test]
+fn el_slot_contextual_del_almacen_real_es_explicito() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let esc = escenario_dag_con(algoritmo);
+        assert_eq!(
+            esc.almacen.slot_de_padre(&esc.h_b.block_hash()).unwrap(),
+            2,
+            "{algoritmo:?}: el slot sale del contexto, no del candidato"
+        );
+
+        let impostor = cabecera(PadresDag::genesis(), 0xEE).block_hash();
+        assert_eq!(
+            esc.almacen.slot_de_padre(&impostor),
+            Err(ConsensusError::PadreNoValidado { padre: impostor }),
+            "{algoritmo:?}"
+        );
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10 · C-HDR-06 → C-GD-01/C-GD-08 — frontera del SR contextual validado
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Contexto de rango de los tests: un valor fijo. No hay controlador (`TAREAS.md` §2.3).
+struct CtxRangoFijo(u64);
+
+impl ContextoRangoDag for CtxRangoFijo {
+    fn rango_esperado(&self, _c: &CandidatoSinRango<'_>) -> Result<u64, ConsensusError> {
+        Ok(self.0)
+    }
+}
+
+#[test]
+fn el_rango_contextual_correcto_e_incorrecto() {
+    // El helper `cabecera` declara `rango_solucion = 42`.
+    let h = cabecera(PadresDag::genesis(), 3);
+
+    let validado = RangoSolucionValidado::validar(&h, &CtxRangoFijo(42)).unwrap();
+    assert_eq!(validado.valor(), 42);
+
+    // El esperado es el del contexto; el declarado no puede usarse como tal.
+    assert_eq!(
+        RangoSolucionValidado::validar(&h, &CtxRangoFijo(7)),
+        Err(ConsensusError::RangoIncorrecto {
+            esperado: 7,
+            encontrado: 42,
+        })
+    );
+}
+
+/// El SR que pesa sale de `validar` (C-HDR-06), no de un `u64` libre del candidato.
+#[test]
+fn el_peso_usa_el_sr_validado_en_los_dos_algoritmos() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let g = cabecera(PadresDag::genesis(), 0);
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            g.block_hash(),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+
+        let h_a = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1);
+        let sr_a = RangoSolucionValidado::validar(&h_a, &CtxRangoFijo(42)).unwrap();
+        let idx_a = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h_a.block_hash(),
+                padres: vec![g.block_hash()],
+                slot: 1,
+                solution_distance: 1,
+                rango_espacio: sr_a,
+                identidad: 0,
+            })
+            .unwrap();
+
+        // B desciende de A: hereda `blue_work(A)` y suma `w(A)` con el SR validado.
+        let h_b = cabecera(PadresDag::nuevo(h_a.block_hash(), &[]).unwrap(), 2);
+        let idx_b = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h_b.block_hash(),
+                padres: vec![h_a.block_hash()],
+                slot: 2,
+                solution_distance: 2,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: 0,
+            })
+            .unwrap();
+
+        let esperado_a = peso(0); // el génesis es azul de A y su SR es 0
+        let esperado_b = sumar_blue_work(esperado_a, peso(sr_a.valor())).unwrap();
+        assert_eq!(
+            almacen.rank(idx_a).unwrap().blue_work,
+            esperado_a,
+            "{algoritmo:?}"
+        );
+        assert_eq!(
+            almacen.rank(idx_b).unwrap().blue_work,
+            esperado_b,
+            "{algoritmo:?}"
+        );
+        assert_eq!(sr_a.valor(), 42);
+    }
+}
+
+/// `SR = 0` (peso máximo) y `SR = u64::MAX` (peso mínimo) se acumulan sin desbordar ni
+/// confundirse con una ausencia. Referencia y Kernel coinciden.
+#[test]
+fn los_extremos_del_sr_se_acumulan_en_blue_work() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let g = cabecera(PadresDag::genesis(), 0);
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            g.block_hash(),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        let h_a = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1);
+        let idx_a = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h_a.block_hash(),
+                padres: vec![g.block_hash()],
+                slot: 1,
+                solution_distance: 1,
+                rango_espacio: RangoSolucionValidado::para_oraculos(0),
+                identidad: 0,
+            })
+            .unwrap();
+        // B usa el extremo máximo; su peso cuenta al incluirse en C, no en sí mismo (C-GD-08).
+        let h_b = cabecera(PadresDag::nuevo(h_a.block_hash(), &[]).unwrap(), 2);
+        let idx_b = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h_b.block_hash(),
+                padres: vec![h_a.block_hash()],
+                slot: 2,
+                solution_distance: 2,
+                rango_espacio: RangoSolucionValidado::para_oraculos(u64::MAX),
+                identidad: 0,
+            })
+            .unwrap();
+        let h_c = cabecera(PadresDag::nuevo(h_b.block_hash(), &[]).unwrap(), 3);
+        let idx_c = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h_c.block_hash(),
+                padres: vec![h_b.block_hash()],
+                slot: 3,
+                solution_distance: 3,
+                rango_espacio: RangoSolucionValidado::para_oraculos(1),
+                identidad: 0,
+            })
+            .unwrap();
+
+        // A hereda el peso del génesis (SR=0) = 2^128.
+        assert_eq!(
+            almacen.rank(idx_a).unwrap().blue_work,
+            U256::one() << 128usize,
+            "{algoritmo:?}"
+        );
+        // B añade el peso de A (SR=0): 2^129.
+        assert_eq!(
+            almacen.rank(idx_b).unwrap().blue_work,
+            U256::one() << 129usize,
+            "{algoritmo:?}"
+        );
+        // C añade el peso de B (SR=u64::MAX) = 2^64, sin desbordar.
+        let esperado_c = sumar_blue_work(U256::one() << 129usize, U256::one() << 64usize).unwrap();
+        assert_eq!(
+            almacen.rank(idx_c).unwrap().blue_work,
+            esperado_c,
+            "{algoritmo:?}"
+        );
+    }
+}
+
+/// **Adversarial (hueco conocido, no cerrado).**
+///
+/// Un cliente normal puede construir `RangoSolucionValidado::para_oraculos(cabecera.rango_solucion)`
+/// y llamar a `anadir_sintetico` sin pasar por ningún contexto: se acepta. La frontera de
+/// producción no impide esta llamada; solo la separa por nombre y por API. Este test existe para
+/// que la limitación quede exhibida y no se presente como resuelta.
+#[test]
+fn el_sr_sintetico_libre_sigue_siendo_una_puerta_trasera() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let g = cabecera(PadresDag::genesis(), 0);
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            g.block_hash(),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        // La cabecera declara `rango_solucion = 42`; el llamante lo copia sin contexto.
+        let h = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 7);
+        let idx = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h.block_hash(),
+                padres: vec![g.block_hash()],
+                slot: h.slot,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(h.rango_solucion),
+                identidad: 0,
+            })
+            .expect("se conserva como hueco: la entrada sintética no valida C-HDR-06");
+        assert_eq!(almacen.id(idx), Some(h.block_hash()));
+    }
+}
+
+/// La entrada **de producción** rechaza lo que la sintética acepta.
+#[test]
+fn admitir_rechaza_el_rango_declarado_que_no_es_el_esperado() {
+    let g = cabecera(PadresDag::genesis(), 0);
+    let h = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 7); // declara 42
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            g.block_hash(),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        let antes = (almacen.len(), huella(&almacen));
+        assert_eq!(
+            almacen.admitir(&h, 0, 0, &CtxRangoFijo(7)),
+            Err(ConsensusError::RangoIncorrecto {
+                esperado: 7,
+                encontrado: 42,
+            }),
+            "{algoritmo:?}"
+        );
+        assert_eq!(
+            (almacen.len(), huella(&almacen)),
+            antes,
+            "{algoritmo:?}: el rechazo no muta el almacén"
+        );
+
+        // Con el contexto correcto inserta el id de la MISMA cabecera que valida.
+        let idx = almacen
+            .admitir(&h, 0, 0, &CtxRangoFijo(42))
+            .unwrap_or_else(|e| panic!("{algoritmo:?}: {e}"));
+        assert_eq!(almacen.id(idx), Some(h.block_hash()), "{algoritmo:?}");
+    }
+}
+
+/// **Adversarial.** Un `SR` validado para `A` no se puede colocar en un bloque con el id de `B`:
+/// la atadura `(bloque, rango)` lo rechaza.
+#[test]
+fn un_sr_validado_no_se_puede_colocar_en_otro_bloque() {
+    let g = cabecera(PadresDag::genesis(), 0);
+    let h_a = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1);
+    let h_b = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 2);
+    assert_ne!(h_a.block_hash(), h_b.block_hash());
+
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let sr_a = RangoSolucionValidado::validar(&h_a, &CtxRangoFijo(42)).unwrap();
+        assert_eq!(sr_a.bloque(), Some(h_a.block_hash()));
+
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            g.block_hash(),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        let err = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h_b.block_hash(),
+                padres: vec![g.block_hash()],
+                slot: h_b.slot,
+                solution_distance: 0,
+                rango_espacio: sr_a,
+                identidad: 0,
+            })
+            .unwrap_err();
+        assert_eq!(
+            err,
+            ConsensusError::RangoDeOtroBloque {
+                bloque: h_b.block_hash(),
+                validado_para: h_a.block_hash(),
+            },
+            "{algoritmo:?}"
+        );
+        assert_eq!(
+            almacen.len(),
+            1,
+            "{algoritmo:?}: el rechazo no muta el almacén"
+        );
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11 · Unicidad del almacén y alcance real de `ContextoRangoDag`
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// **Antes**, insertar dos veces el mismo `block_hash` hacía que `indice.insert` sustituyera la
+/// entrada (el mapa pasaba a apuntar al índice nuevo) mientras `ids` crecía: `len()` llegaba a 3 y
+/// `id(1) == id(2) == duplicado`. **Ahora** se rechaza como duplicado de almacenamiento antes de
+/// mutar, y la huella completa no cambia.
+#[test]
+fn el_duplicado_por_anadir_sintetico_se_rechaza_sin_mutar() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let g = cabecera(PadresDag::genesis(), 0);
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            g.block_hash(),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        let h = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1);
+        almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h.block_hash(),
+                padres: vec![g.block_hash()],
+                slot: h.slot,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: 0,
+            })
+            .unwrap();
+
+        let antes = (almacen.len(), almacen.puntas(), huella(&almacen));
+        // Mismo id con otros metadatos: un duplicado de almacenamiento, no una prueba PoST nueva.
+        let h_dup = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 2);
+        let err = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: h.block_hash(),
+                padres: vec![g.block_hash()],
+                slot: h_dup.slot,
+                solution_distance: 1,
+                rango_espacio: RangoSolucionValidado::para_oraculos(9),
+                identidad: 0,
+            })
+            .unwrap_err();
+        assert_eq!(
+            err,
+            ConsensusError::BloqueDuplicado {
+                hash: h.block_hash()
+            },
+            "{algoritmo:?}"
+        );
+        assert_eq!(
+            (almacen.len(), almacen.puntas(), huella(&almacen)),
+            antes,
+            "{algoritmo:?}: el duplicado no puede mutar el almacén"
+        );
+    }
+}
+
+/// El duplicado se rechaza **antes** de consultar el contexto: no se revalida un bloque que ya
+/// está, y no depende de que el controlador responda.
+#[test]
+fn el_duplicado_por_admitir_se_rechaza_sin_consultar_el_contexto() {
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let g = cabecera(PadresDag::genesis(), 0);
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            g.block_hash(),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        let h = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1); // declara 42
+        almacen.admitir(&h, 0, 0, &CtxRangoFijo(42)).unwrap();
+
+        let antes = (almacen.len(), almacen.puntas(), huella(&almacen));
+        // Este contexto haría fallar la validación si se consultara; el duplicado va primero.
+        let err = almacen.admitir(&h, 0, 0, &CtxRangoFijo(999)).unwrap_err();
+        assert_eq!(
+            err,
+            ConsensusError::BloqueDuplicado {
+                hash: h.block_hash()
+            },
+            "{algoritmo:?}"
+        );
+        assert_eq!(
+            (almacen.len(), almacen.puntas(), huella(&almacen)),
+            antes,
+            "{algoritmo:?}: el duplicado no puede mutar el almacén"
+        );
+    }
+}
+
+/// Contexto **adversarial**: conserva la cabecera y devuelve su `rango_solucion` declarado como
+/// «esperado». `CandidatoSinRango` solo bloquea el acceso directo *dentro de la vista*; no impide
+/// esta vía, así que la vista **no** es una garantía de ausencia de circularidad.
+struct CtxQueReenviaElDeclarado(DagBlockHeader);
+
+impl ContextoRangoDag for CtxQueReenviaElDeclarado {
+    fn rango_esperado(&self, _c: &CandidatoSinRango<'_>) -> Result<u64, ConsensusError> {
+        Ok(self.0.rango_solucion)
+    }
+}
+
+#[test]
+fn un_contexto_puede_devolver_el_sr_declarado_como_esperado() {
+    // No hace falta un DAG: `validar` solo compara el declarado con lo que dé el contexto.
+    let h = cabecera(PadresDag::genesis(), 7); // declara 42
+    let v = RangoSolucionValidado::validar(&h, &CtxQueReenviaElDeclarado(h)).unwrap();
+    assert_eq!(v.valor(), 42);
+
+    // Y con cualquier otro valor declarado también pasa: el contexto lo copia, no lo deriva.
+    let mut otro = cabecera(PadresDag::genesis(), 8);
+    otro.rango_solucion = 999;
+    let v2 = RangoSolucionValidado::validar(&otro, &CtxQueReenviaElDeclarado(otro)).unwrap();
+    assert_eq!(v2.valor(), 999);
 }

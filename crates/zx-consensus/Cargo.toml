@@ -13,7 +13,13 @@ workspace = true
 [dependencies]
 thiserror       = { workspace = true }
 primitive-types = { workspace = true }
+# Hash de las derivaciones puras de semilla, aleatoriedad y reto (C-POT-01/C-POT-03). Versión
+# exacta ya fijada en el workspace (`=1.8.7`, la misma que usa `zx-pot`): aquí no se elige.
+blake3          = { workspace = true }
 zx-core         = { path = "../zx-core" }
+# Primitiva PoT AES (C-POT-02) para el adaptador puro del wire a los checkpoints. Es una
+# dependencia real, no de test: el adaptador vive en `src/pot.rs`.
+zx-pot          = { path = "../zx-pot" }
 
 [dev-dependencies]
 proptest      = { workspace = true }

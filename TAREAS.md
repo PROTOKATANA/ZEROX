@@ -1,6 +1,6 @@
 # TAREAS — lo que falta para que el SPEC PoST + DAG pase a fase de código
 
-Fecha: 2026-09-12; actualizado el 2026-09-20. Derivado de §17 de [SPEC.md](SPEC.md),
+Fecha: 2026-09-12; actualizado el 2026-09-23. Derivado de §17 de [SPEC.md](SPEC.md),
 `ci/consenso-pendiente.txt`, los límites declarados de los instrumentos de `veritas/`,
 [MIGRACION.md](MIGRACION.md), la auditoría externa de la comprobación decisiva v1
 ([AUDITORIA-EXTERNA.md](veritas/consenso/comprobacion-decisiva-v1/AUDITORIA-EXTERNA.md)) y las
@@ -130,10 +130,9 @@ La r2 de `DMS-v0.1` midió 1,14–1,39 padres típicos, es decir, una cabecera t
 > bloque no puede referenciar un bloque de otro flujo, así que los flujos del atacante no se
 > agregan a una sola cadena. **El propio instrumento ya lo etiquetaba así**: CRP-v0.1 declaró su
 > resultado «condicionado al diseño del flujo, no demostrado»
-> (`veritas/seguridad/coste-rama-privada-v1/`). El umbral que CRP-v0.1 midió con **un solo flujo**
-> es `α_mínimo = 1/2`, el mismo que PoW — **pero esa cifra no está cerrada: CRP-v0.2 declara
-> «sustituye la evidencia protocolaria de CRP-v0.1» (baseline idealizado útil; veredicto
-> protocolario INCONCLUSO), y ni v0.2 ni v0.3 están validadas ni migradas** (§2.9 (e)). **Lo que
+> (`veritas/seguridad/coste-rama-privada-v1/`). En su baseline idealizado de un flujo,
+> `α_drift = 1/2`; **no es un umbral global acreditado para ZEROX**. P-CRP auditó v0.2/v0.3
+> sin validarlas ni migrarlas y declaró el veredicto protocolario **INCONCLUSO** (§2.9(e)). **Lo que
 > este cierre corrige es el titular del 4 %, y no lo sustituye por otro titular ancho.**
 >
 > **Lo que el multistream sí obligaba a decidir era la bifurcación**, y Katana la decidió: validez
@@ -152,14 +151,21 @@ validadas), sobre `veritas/consenso/ancla-inyeccion-v2/` y `veritas/consenso/pue
 
 **Lo que queda, y es mucho:**
 
-- **El código: ninguna de las 31 reglas tiene una línea.** Las 31 están en
-  `ci/reglas-sin-codigo.txt`.
-- **Dos reglas existentes cambiaron de semántica y su código quedó por detrás del SPEC:**
-  `C-HDR-05` (la cota de slot alcanza ahora a todos los padres; el código solo mira `sp`) y
-  `C-HDR-07` (el `pot_output` es la salida futura y el último checkpoint la ancla; el verificador
-  devuelve `IntegracionPotPendiente`). Declaradas en `ci/reglas-sin-cablear.txt`, con el precedente
-  de C-NET-07.
-- **El verificador PoT sigue sin existir**, y ahora tiene contrato que cumplir (`C-POT-06`).
+- **El código: sigue faltando casi todo, pero ya hay piezas PoT aisladas.** `C-FLU-02` tiene
+  comprobación de todos los padres en los componentes DAG. Los encargos 03a–03c añadieron la
+  primitiva AES, el adaptador de un slot, las derivaciones puras de semilla y reto, y un núcleo de
+  rango con tres estados, caché contextual y anclaje en `pot_output`. Las reglas con código
+  parcial están en `ci/reglas-sin-cablear.txt`; las que aún carecen de código siguen en
+  `ci/reglas-sin-codigo.txt`. Ninguna de estas piezas PoT se ejecuta en la ruta lineal de `zx-node`.
+- **Dos reglas existentes cambiaron de semántica y su código no está en la ruta activa:**
+  `C-HDR-05` (la cota de slot alcanza ahora a **todos** los padres; los componentes DAG ya la
+  comprueban para el seleccionado y los adicionales, pero `zx-node` continúa con la cabecera lineal
+  y `fork_choice.rs`) y `C-HDR-07` (el `pot_output` es la salida futura y el último checkpoint la
+  ancla; el verificador devuelve `IntegracionPotPendiente`). Declaradas en
+  `ci/reglas-sin-cablear.txt`, con el precedente de C-NET-07.
+- **Falta acreditar la procedencia contextual del PoT.** El núcleo de 03c comprueba el rango
+  suponiendo que su instantánea procede de `past(B)` validado; no existe todavía el derivador de
+  flujo, vista de época, ancla y salida base que pueda satisfacer esa precondición en producción.
 - **Las mediciones que faltan: §2.9.**
 
 ---
@@ -170,33 +176,33 @@ Solución de espacio, testigos KZG, identidad de billete, reto, distancia de sol
 justificación PoT. Pendiente además: formato y validación conjunta, retardo de autoría, puntos de
 control, inyección de entropía y **dependencias por flujo**.
 
-**Esa última línea dejó de ser un pendiente más el 2026-09-18.** `veritas/seguridad/coste-rama-privada-v1/`
-(CRP-v0.1) midió el coste de construir una rama privada con más `blue_work` y encontró que:
+**Esa última línea motivó CRP-v0.1 el 2026-09-18.** La auditoría posterior
+`P-ZRX/P-CRP/auditoria/INFORME.md` limita sus conclusiones: CRP-v0.1 es un **baseline
+idealizado**, no una medición del umbral del protocolo completo.
 
-- **El diseño base aguanta.** `α_mínimo = 1/2`, **el mismo umbral que PoW y que GHOSTDAG sobre
-  PoW**, en los dos regímenes (reorg corta y *long-range*). El DAG aporta **menos varianza**, no
-  menos umbral.
-- **El rango endógeno NO es explotable en media.** La tasa de soluciones válidas es `∝ SR` y el peso
-  es `w(B) = ⌊2^128/(SR+1)⌋ ∝ 1/SR`: **el producto se cancela**. Era la sospecha principal con la
-  que se escribió el encargo y queda descartada por identidad, no por estadística. Lo que sí queda
-  es un riesgo de **varianza** (fijar `sr` bajo compra cola con el mismo trabajo medio), del que
-  sale una propiedad MUST para R-FIN-13′.
-- **El único vector medido que baja el umbral es el multistream de PoT** — **y `C-FLU-14` lo
-  cierra**, porque los flujos del atacante no se pueden agregar a una sola cadena. La tabla se
-  conserva como registro de qué se midió y bajo qué hipótesis, **no como el umbral del diseño**.
-  Cuota efectiva `S·α/(1−α+S·α)` ⟹ `α_mínimo = 1/(S+1)`:
+- **Deriva en el baseline:** `α_drift = 1/2` es una identidad de ese modelo de un solo flujo;
+  **no** acredita el umbral global de ZEROX, ni las colas corta/larga con controlador, red y
+  finalidad del protocolo destino.
+- **Rango en ese modelo:** la cancelación de tasa por peso vale bajo las hipótesis de tasa y
+  rango comunes allí declaradas. P-PUERTA encontró un residuo de paridad (§2.3) y P-RANGO
+  redactó una forma candidata de controlador; ni eso ni una media preservada acreditan su
+  comportamiento en ramas privadas completas con `blue_work` real.
+- **Multistream aditivo contrafactual:** la fórmula siguiente suma flujos independientes. Bajo
+  `C-FLU-14` esos flujos no pueden agregarse a una sola ancestría válida; la tabla **no** es
+  un umbral del diseño ni prueba que el doble farmeo en ramas separadas esté resuelto.
+  Cuota efectiva del contrafactual `S·α/(1−α+S·α)` ⟹ `α_drift = 1/(S+1)`:
 
   | `S` | 2 | 4 | 8 | 16 | 24 |
   |---|---:|---:|---:|---:|---:|
-  | `α_mínimo` | 0,333 | 0,200 | 0,111 | 0,059 | **0,040** |
+  | `α_drift` contrafactual | 0,333 | 0,200 | 0,111 | 0,059 | **0,040** |
 
-  `S ≈ 24` es el techo de IOPS de un SSD de 100 k. **Coste: `S` núcleos e IOPS, cero espacio
-  adicional.**
+  `S = 24` fue un escenario de SSD/IOPS, **no** un límite adversario universal: CPU, tamaño
+  de granja y paralelismo cambian el cuello de botella (P-PUERTA §2–3).
 
 **No es un hallazgo nuevo: es el ATAQUE 2** de `research/dag-poas-auditoria.md` (2026-09-06),
 calificado allí de **gravedad crítica** y con el estado «SOSPECHA fuerte — depende de una regla
-(validez del PoT en DAG) que la propuesta no escribe». Lo que CRP-v0.1 añade es el **número** y el
-haber comprobado que es el **único** vector medido que mueve el umbral.
+(validez del PoT en DAG) que la propuesta no escribe». CRP-v0.1 cuantificó **ese contrafactual**;
+la auditoría P-CRP deja inconcluso el umbral protocolario, no identifica un «único» vector global.
 
 ⚠️ **La auditoría avisaba de que las dos salidas obvias fallan:** si la validez del PoT es
 **relativa a la cadena seleccionada**, se abre el multistream; si es **absoluta**, se abre el split
@@ -204,10 +210,10 @@ de cadena (ATAQUE 1). **DECIDIDO por Katana el 2026-09-19/20: validez absoluta, 
 split no se cierra con una regla: se **previene** con `L_slots` frente a `Δ` y, si nace, se cura
 **solo** en el caso espontáneo (`C-FLU-22`). Ver §2.9.
 
-**Lo que Claude acotó al validar** (`PROCEDENCIA.md` §3.2 del instrumento): el efecto de «rojos
-asimétricos» —que el adversario sufra menos rojos que la honesta— queda **no medido** por el
-instrumento, pero con la Δ medida (0,26–0,60 s, 25× por debajo del primer escalón de la ronda 11a)
-la fracción roja honesta es 0,0000 y **el umbral no se mueve**.
+**Rojos asimétricos:** CRP-v0.1 no midió una frontera con rojos contextuales y red adversaria.
+La Δ de 0,26–0,60 s procede de una **red sintética**, no de una red ZEROX desplegada; un resultado
+de fracción roja en ese escenario no demuestra que el umbral global sea invariante
+(`P-ZRX/P-CRP/auditoria/INFORME.md` §7–8).
 
 **La parte de red ya está decidida** (Q4 de §3.1, 2026-09-13):
 - antes de reenviar se comprueban cabecera, prueba de espacio, 2 KZG, sello, justificación PoT
@@ -218,10 +224,15 @@ la fracción roja honesta es 0,0000 y **el umbral no se mueve**.
 Eso fija el orden, no la verificación conjunta en sí, que sigue pendiente. Las reglas que faltan
 por escribir están en §2.7.
 
-**El verificador PoT no existe todavía.** `prototipos/pot-estable` tiene el PoT AES de Autonomys en
-Rust con vectores diferenciales, pero no está integrado, y
-`zx-core::wire_dag::verificar_justificacion_pot` devuelve `IntegracionPotPendiente` de forma
-explícita en vez de un booleano provisional. Hasta que exista, C-HDR-07 está en
+**La primitiva PoT está integrada y el núcleo de rango sigue aislado.** `crates/zx-pot` incorpora
+`prototipos/pot-estable` —el AES de Autonomys con sus 32 vectores diferenciales— y
+`zx-consensus::pot::verificar_slot_aes` verifica un slot: la semilla y `N(s)` no viajan en los
+checkpoints del wire, pero llegan como **argumentos libres** y el adaptador **no acredita su origen
+causal** (encargo 03a). El encargo 03c añadió `zx-consensus::pot_rango`, que verifica un rango
+contra una instantánea contextual; falta el derivador que acredite esa instantánea desde el pasado
+DAG validado. Ninguna ruta de `zx-node` llama al núcleo, y
+`zx-core::wire_dag::verificar_justificacion_pot` sigue devolviendo `IntegracionPotPendiente` de
+forma explícita en vez de un booleano provisional. Mientras siga así, C-HDR-07 está en
 `ci/reglas-sin-cablear.txt` y nadie exige la justificación.
 
 ### 2.2 · La identidad del billete está supuesta, no demostrada
@@ -234,12 +245,38 @@ oportunidad. En los instrumentos eso es una declaración del fixture. La propied
 Arranque por red, ventana, límites y redondeos, fusiones fuera de ventana y validación de ramas
 candidatas con pesos reales. Conservado a propósito en el «Pendiente» de §7.2.
 
-**Residuo de paridad del `SR`, anotado el 2026-09-20.** PCO-v0.1 demostró en `Rational{BigInt}` que
-el `SR` **se cancela en todo instante** —el peso de un flujo crece con el espacio que lo cubre—,
-con una excepción: **con `SR` impar queda un déficit de `1/(SR+1)`**. Es elegible y es pequeño
-—≤ 4,9·10⁻⁴ con `SR_MIN = 2^11`, despreciable con rangos realistas—, pero **existe**, y el
-controlador de rango puede evitarlo o no según cómo redondee. Fuente y alcance:
-`veritas/consenso/puerta-cobertura-v1/PROCEDENCIA.md` §3.
+**Residuo de paridad del `SR`, anotado el 2026-09-20.** Bajo el predicado PoAS de Autonomys
+examinado por PCO-v0.1, un `SR` par acepta `SR+1` valores y uno impar acepta `SR`; el peso
+vigente divide por `SR+1`. Por eso, en el modelo de tasas de PCO, la cancelación media tiene
+un déficit exacto de `1/(SR+1)` para `SR` impar. El ejemplo ≤ 4,9·10⁻⁴ presupone
+`SR_MIN = 2^11`, **valor no adoptado**. El efecto del controlador completo y de ramas privadas
+con pesos reales sigue pendiente. Fuente y condición:
+`P-ZRX/P-PUERTA/veritas/consenso/puerta-cobertura-v1/INFORME.md` §1.1.
+
+**P-RANGO (2026-09-22): propuesta, no cierre.** `P-ZRX/P-RANGO/propuesta/` redacta
+`C-RET-01`…`C-RET-11` y comprueba aritmética local. El acoplamiento del rango validado con
+el rango que pesa es una precisión de las reglas vigentes, pero P2/P3 **no tienen veredicto**
+sobre una rama privada completa con controlador en el bucle y pesos reales. Siguen pendientes
+`δ`, los valores del controlador, la relación de `G_slots` con C-GD-11 y la viveza de `Pending`
+(`INFORME.md` §2). Las once reglas no están listas para traslado íntegro al SPEC.
+
+**Encargo 02 (2026-09-22) y 02c: puerta parcial de SR, unicidad e intercambio cerrados.** Hay dos
+entradas separadas por nombre y por firma. `AlmacenGhostdag::admitir(cabecera, sd, identidad, ctx)`
+es la **puerta parcial de validación del `SR`**: valida C-HDR-06 con la **misma** cabecera cuyo
+`block_hash` inserta y no acepta ni el `SR` ni el id, así que no se puede usar para colar un rango
+libre ni para mover un resultado validado a otro bloque (un rango validado para `A` en un bloque con
+id de `B` es `RangoDeOtroBloque`). **No** es una admisión PoST de producción: no verifica prueba de
+espacio/tiempo, firma, cuerpo ni el resto de reglas. `AlmacenGhostdag::anadir_sintetico(BloqueGhostdag)`
+es la entrada de oráculos/tests: **no valida** y sigue siendo API pública, de modo que un llamante
+puede saltarse C-HDR-06 con `RangoSolucionValidado::para_oraculos`; se conserva como hueco declarado
+con tests adversariales en `tests/ghostdag_rust.rs`. Ambas rechazan un `block_hash` ya almacenado con
+`BloqueDuplicado` antes de mutar nada: es duplicado de almacenamiento, no invalidez PoST ni motivo
+para penalizar al par. `acumular` usa el peso del rango y un azul sin `SR` almacenado es
+`GhostdagIncoherente` explícito. Sigue **sin ruta activa en `zx-node`**, el controlador (ventana,
+bootstrap, redondeos) continúa pendiente, y la precondición de fondo es que `ContextoRangoDag` derive
+el esperado del pasado y del flujo: la vista opaca solo bloquea el acceso directo, así que **no**
+prueba esa derivación. Esto no cierra C-HDR-06, ni P2/P3, ni los valores del controlador, ni el
+acoplamiento con el retarget.
 
 ### 2.4 · Orden, conflictos y las tres reglas de Kaspa — TRES DE CUATRO REDACTADAS (2026-09-17)
 
@@ -468,7 +505,8 @@ ningún inventario del repositorio. Están ordenados por lo que pasa si se ignor
 
 1. **La vía A2 no está medida, y es un hueco nuevo.** `P(una rama privada desplaza el ancla dentro
    de V_j antes de t_j)` es la cola de una carrera de `blue_work` de longitud `L_slots`. El
-   **umbral** está medido (`α_mínimo = 1/2`, CRP-v0.1); **la cola a `L = F_slots`, no**. Y lo que
+   baseline de deriva **idealizado** da `α_drift = 1/2` (CRP-v0.1), pero el umbral del protocolo
+   sigue **inconcluso** (P-CRP); **la cola a `L = F_slots` tampoco está medida**. Y lo que
    `P-2.1` midió —`L_mín`— es **otra magnitud**: desacuerdo honesto por latencia. Ni el encargo de
    `P-FLUJO` ni ninguna adenda contemplaban este vector. Instrumento que podría medirlo:
    `veritas/consenso/ancla-inyeccion-v2/`.
@@ -494,15 +532,17 @@ ningún inventario del repositorio. Están ordenados por lo que pasa si se ignor
 
 **(b) Lo que está demostrado que NO funciona, o que falta por demostrar**
 
-7. **El sembrador (A5): las defensas escritas no sirven, y el margen no está medido.**
-   `P-ZRX/P-SEMBRADOR/investigacion/` (Codex, **validación parcial**: integridad, tests y dos citas clave
-   comprobadas; **el informe completo está sin leer**) establece que **ni `history_size` ni
-   `altura_ploteo` demuestran antigüedad física** —identifican el prefijo histórico, y un atacante
-   puede escoger hoy una referencia antigua que aún sea válida— y que **al atacante le basta una
-   pieza, no un sector**. Eliminarlo exigiría **A1+C1**: registrar antes del reto una
-   raíz/versionado/cardinalidad de la parcela exacta, **es decir un cambio de consenso**.
-   **Falta medir el coste de un intento dirigido** antes de elegir camino. Bajo el perfil **1a** la
-   salida histórica —«desatar `L` de `F`»— **queda cerrada**, y el suelo de `C-FLU-01` la cierra
+7. **El sembrador (A5): las reglas actuales no prueban preexistencia y el margen adversarial
+   real no está cerrado.** `P-ZRX/P-SEMBRADOR/investigacion/INFORME.md` establece que ni
+   `history_size` ni `altura_ploteo` demuestran antigüedad física: identifican el prefijo
+   histórico, y un atacante puede escoger hoy una referencia antigua todavía válida. Basta
+   **una pieza, no un sector**. `P-ZRX/P-INTENTO/investigacion/INFORME.md` midió una ruta de
+   intento dirigido en una CPU y revisión concretas; no es el coste mínimo de un adversario
+   con GPU/SIMD/ASIC ni una garantía económica. El cierre exigiría acreditar cobertura y
+   preexistencia de la parcela completa antes del reto: **A1+C1 sigue siendo propuesta**, pues
+   esa prueba no existe para el formato fijado
+   (`P-ZRX/P-PERMANENCIA/investigacion/INFORME.md` F3). Bajo el perfil **1a** la salida
+   histórica —«desatar `L` de `F`»— **queda cerrada**, y el suelo de `C-FLU-01` la cierra
    más: el margen histórico de **1,91×** es **con precios supuestos** y **no está medido**.
 8. **La deuda principal: la convergencia del orden no está probada para este diseño.** Prop. 7 y
    Def. 2 de GHOSTDAG están probadas sobre GHOSTDAG **puro**; con las tres reglas añadidas encima,
@@ -519,12 +559,11 @@ ningún inventario del repositorio. Están ordenados por lo que pasa si se ignor
     **todas** las épocas del pasado; qué pasa cuando esos bloques están podados sigue abierto, como
     ya decía R-FIN-1 y repite `SPEC.md` §7.3.
 
-**(c) Aritmética y calibración sin rehacer**
+**(c) Aritmética revisada y calibración pendiente**
 
-11. **La aritmética del adelanto está SIN REHACER tras D-2 = A.** El argumento de R-FIN-14(f)/(h)
-    —`I ≥ ρ_max·W_dec`, `lead_max`, `ρ* ≈ 1 + L/I`— está escrito sobre la salida **del propio
-    slot**; con `pot_output = salida(f, slot+D)` **no se ha rehecho**. **Ninguna cifra de adelanto,
-    de `ρ_max` ni de margen frente al sembrador debe darse por válida hasta que se rehaga.**
+11. **La calibración de la ventana sigue pendiente.** `ρ_max` por plataforma adversaria y la
+    cola de anclas no están medidas; `I`, edad y margen de seguridad no están fijados. Los
+    análisis de alternativas permanecen en `P-ZRX/`, fuera de este inventario de trabajo.
 12. **`PRESUP_NODO` se calibra en PINZA, y una de las dos mordazas no está derivada.** Por abajo:
     integrado sobre la ventana de `C-FLU-22`, **MUST** bastar para verificar **una rama rival
     completa** —peor caso `F_slots` slots, del orden de `F_slots × 92 ms` ≈ **11 min de CPU** con
@@ -549,23 +588,117 @@ ningún inventario del repositorio. Están ordenados por lo que pasa si se ignor
 
 **(e) Evidencia sin validar que afecta a lo anterior**
 
-15. **CRP-v0.2 y CRP-v0.3 existen en `deepseek/` y NO están validadas ni migradas.** CRP-v0.2
-    declara en su propia cabecera que **«sustituye la evidencia protocolaria de CRP-v0.1»**
-    (baseline idealizado útil; **veredicto protocolario inconcluso**), y CRP-v0.3 se deriva de
-    CRP-v0.2, «que **no** se cierra». **§2.1 y `SPEC.md` §17 citan CRP-v0.1.** Hasta que alguien
-    valide v0.2/v0.3 o declare por qué no aplican, **hay una versión posterior de la evidencia
-    central de §2.1 sin revisar**, en una zona que `.gitignore` excluye y que se borra al cerrar
-    cada encargo.
+15. **CRP-v0.2 y CRP-v0.3 fueron auditadas, no validadas como instrumentos ni migradas.**
+    `P-ZRX/P-CRP/auditoria/INFORME.md` da veredicto **protocolario inconcluso**; su
+    `RECOMENDACION-MIGRACION.md` deja v0.2 como anexo histórico y permite considerar v0.3
+    **solo tras corregir bloqueantes y rebajar su conclusión**. CRP-v0.1 sigue siendo baseline
+    idealizado, no una prueba de umbral global. Los titulares residuales de §2.1 y `SPEC.md`
+    §17 requieren la misma corrección; reproducir un barrido no valida sus hipótesis.
 
 **(f) El código, que es lo único que cablea todo esto**
 
-16. **El verificador PoT no existe**, y ahora tiene contrato: `C-POT-06` (tres estados, sin
-    circularidad), `C-POT-07` (caché por clave contextual) y `C-POT-08` (orden de validación).
-    Integrar `prototipos/pot-estable` es el primer paso.
+16. **El verificador PoT contextual no está integrado en el nodo**, y ahora tiene contrato:
+    `C-POT-06` (tres estados y prohibición de circularidad), `C-POT-07` (caché por clave contextual)
+    y `C-POT-08` (orden de validación). Desde 03a–03c existen `crates/zx-pot`, el adaptador de un
+    slot y el núcleo `zx-consensus::pot_rango`. Este último reproduce la cadena AES y comprueba
+    `pot_output`, pero su trait `InstantaneaPot` no acredita por sí mismo `past(B)` validado; falta
+    derivar flujo, vista de época, ancla y salida base. Las piezas siguen fuera de la ruta activa,
+    declaradas como parciales en `ci/reglas-sin-cablear.txt` y `ci/consenso-pendiente.txt`.
+    `wire_dag::verificar_justificacion_pot` sigue devolviendo siempre `IntegracionPotPendiente`.
+    Integrarlo con contexto, flujo y caché sigue pendiente.
 17. **La derivación del flujo en el nodo no existe.** `C-FLU-10` necesita calcular `Chn(V_j)` sobre
-    la vista de época; `C-FLU-02` necesita un accesor de `slot` de un padre arbitrario que
-    `ContextoDag` **no expone** hoy; `C-FLU-17` necesita puntos de enganche en el nodo que tampoco
-    existen. Nada de esto se puede empezar sin §2.8.
+    la vista de época; `C-FLU-17` necesita puntos de enganche en el nodo que tampoco existen. Nada
+    de esto se puede empezar sin §2.8. **`C-FLU-02` es la excepción parcial:** su comprobación —y el
+    accesor `ContextoDag::slot_de_padre` que le faltaba— **ya está implementada** en los
+    componentes DAG (`comprobar_padres_contextual` y `AlmacenGhostdag (inserción)`, Referencia y
+    Kernel), con tests; lo que sigue pendiente es **integrarla en el nodo**, que continúa con la
+    cabecera lineal y `fork_choice.rs`. Por eso C-FLU-02 está en `ci/reglas-sin-cablear.txt`, no
+    entre las reglas sin código.
+
+### 2.10 · P-ZRX: frentes nuevos y alcance de los hallazgos (2026-09-22)
+
+Solo se anotan **hechos y trabajos pendientes**, no defensas adoptadas. «Bloque válido» en las
+auditorías del diseño no implica que el nodo lineal actual pueda producirlo o aceptarlo.
+
+1. **Pool de farming y firma ciega — riesgo condicional, no explotación de un pool existente.**
+   ZEROX aún no tiene protocolo de pool de farming ni productor DAG integrado. Si un futuro
+   cliente firma un `pre_hash` construido por el operador, este puede elegir rama y coinbase sin
+   tener la clave privada (`P-ZRX/P-POOLS/investigacion/INFORME.md` §1). **Pendiente:** decidir la
+   arquitectura antes de implementarla y comprobar, en el futuro productor, que el granjero
+   honesto construye y valida el candidato antes de firmarlo y que una **parcial de pool tiene
+   dominio separado del sello de bloque**, de modo que no pueda autorizar un bloque. Es una
+   condición arquitectónica para un cliente honesto, **no** una garantía frente a un cliente
+   malicioso ni una solución general al doble farmeo. Atar la
+   coinbase a `sol.public_key` quitaría el premio directo, **no** la capacidad de usar el espacio
+   o sabotear la rama; es propuesta, no regla vigente (`DECISIONES-PENDIENTES.md` D1–D2).
+2. **Doble farmeo/espacio prestado — sin defensa general validada.** El modelo
+   `P-ZRX/P-PRESTAMO/investigacion/INFORME.md` muestra erosión de la deriva bajo sus supuestos;
+   la traducción de fracción física de espacio a tasa/peso y el canal de pool no están cubiertos.
+   P-IDENTIDAD descarta que cambiar el billete por identidad de pieza elimine el peso simultáneo
+   de ramas separadas. P-PERMANENCIA descarta E2 como prueba de almacenamiento y limita E3 a
+   observabilidad/coste económico; no existe una prueba de cobertura/preexistencia de la parcela
+   completa para este formato. P-EQUIVOCACION caracteriza evidencia **cuando ambas firmas se
+   publican**, no una rama oculta, censura o sanción segura ante firma ciega. **P-CLAVE midió el
+   único candidato de castigo vivo (retención ligada a la clave) y el resultado es que NO
+   disuade al atacante que importa:** con la distribución de tamaños de clave declarada (H3), el
+   67,5 % del espacio vive en claves de saldo casi nulo — más que el `β_d = 0,34` (con
+   `α = 0,33`) que basta para cruzar la deriva —, así que ese `β_d` se compra con soborno **cero**;
+   y las claves nuevas no se pueden encarecer sin registro ni moneda previa, porque el ploteo es
+   lineal en bytes e independiente del número de identidades (identidades gratis por diseño).
+   Queda como **mitigación parcial**, no como defensa del umbral. **Pendiente:**
+   modelar juntos esos casos, C-GD-11 y el puente espacio→tasa, sin adoptar por inferencia
+   registro, castigo ni compromiso de rama (`P-ZRX/P-IDENTIDAD/investigacion/INFORME.md` §6;
+   `P-ZRX/P-PERMANENCIA/investigacion/INFORME.md` F1–F3;
+   `P-ZRX/P-EQUIVOCACION/investigacion/INFORME.md` §8;
+   `P-ZRX/P-CLAVE/investigacion/INFORME.md` F3–F6).
+3. **Red adversaria/eclipses — falta transferencia al destino.** Q5 de §3.1 ya encarga v2a
+   (aislamiento, no reenvío y saturación) y v2b (efecto de seguridad). Falta contrastar la
+   investigación histórica de `research/dag-poas-informe-52-problemas.md` §2 y §12 con C-NET/C-FLU
+   vigentes y medir red bajo ataque. Δ natural de DMS es **sintética**, no medición en una red
+   ZEROX desplegada. Una partición mayor que `L_slots` no queda curada por C-FLU-22 (§2.1).
+4. **Elección de padres/U2 — omisión textual, no pérdida observada «hoy».** C-GD-10 no enumera
+   puntas cuya inclusión haría violar U2. El **0,40 %** procede únicamente del estrés MC-D de
+   P-IDENTIDAD con identidad vigente, `equivoca = 1`, `P = 16`, 400 réplicas de unas 120
+   emisiones; incluye bloques inválidos y herederos. La red honesta de un solo flujo del mismo
+   instrumento dio **0**; no existe productor DAG activo y no se conoce una tasa real. El
+   propio informe considera la omisión inocua bajo la identidad vigente y bloqueante si se
+   adoptara la identidad por pieza (`P-ZRX/P-IDENTIDAD/investigacion/INFORME.md` F2 y resultado 7).
+5. **`ab-proof-of-space`: la ruta serial no paralela tiene un SIGSEGV reproducible — bloqueo de
+   adopción de esa ruta.** `P-ZRX/P-INTENTO/investigacion/mediciones/fallo-semilla.md` documenta,
+   con entrada mínima de 32 bytes, que `Tables::<20>::create_proofs` y `Tables::<20>::create`
+   (ruta **no paralela**, la que usa `ChiaV2TableGenerator::generate`) terminan el proceso con
+   SIGSEGV con un solo hilo y una sola llamada; la ruta paralela (`create_proofs_parallel`, la del
+   plotter honesto) **no falla con esa semilla**. **[medido]** en el clon fijado `f8842d0`; la
+   causa raíz está **no determinada** (sin `gdb` ni sanitizer) y la tasa solo **estimada**, no
+   medida. **Bloqueo de adopción de esa ruta:** antes de usarla hay que determinar la causa,
+   verificar si existe en la revisión aplicable y contar con corrección y regresión. **No** se
+   elige por ello la ruta paralela «que no falló con una semilla», ni se extrapola frecuencia o
+   causa no medidas.
+6. **P-FIRMANTE — prototipo local de *persist-before-sign*, no integración ni defensa.**
+   `P-ZRX/P-FIRMANTE/informe/INFORME.md` e `INTEGRACION.md`: prototipo Rust fuera de `crates/`,
+   con registro durable y orden decidir→persistir→sellar; su coste medido (~0,81 ms por bloque)
+   es de esta máquina. Es un **filtro de accidentes honestos**, no una defensa contra claves
+   compartidas, clientes que firman órdenes hostiles ni atacantes deliberados, y dos registros
+   distintos no se coordinan. El **productor DAG al que se engancharía no existe** hoy
+   (`INTEGRACION.md` §1). No se copia a `crates/` ni se fija su ubicación futura.
+
+**Magnitudes todavía sin calibrar:** Δ en una red ZEROX real (§3.1); ventaja máxima del reloj
+`ρ_max` por plataforma/adversario (P-REVELACION §6); probabilidad de que el atacante controle
+un ancla seleccionada, **no identificada** con su cuota física de disco (P-REVELACION §§1.4, 6);
+distribución observada de capacidad por granja y de espacio por clave (P-PUERTA H-TAMANOS,
+P-CLAVE H3); y el puente entre bytes PoAS, oportunidades elegibles y tasa/peso
+(`P-ZRX/P-CRP/auditoria/INFORME.md` C1). Los barridos existentes usan entradas o redes
+sintéticas; ninguna de esas magnitudes puede copiarse de una celda de escenario.
+
+**Construcción y reglas ya inventariadas:** falta un productor que ensamble, seleccione padres,
+firme y publique bloques DAG (`P-ZRX/P-FIRMANTE/informe/INTEGRACION.md` §1), aunque existen tipos,
+códec y GHOSTDAG sin cablear. `wire_dag::verificar_justificacion_pot` devuelve
+`IntegracionPotPendiente` (§2.9(16)); el núcleo de rango PoT existe en `zx-consensus`, pero no
+tiene derivador causal ni ruta en el nodo. Las 31 reglas nuevas,
+`PRESUP_NODO`, C-GD-11 con cinco pendientes y `L_suelo_slots` ya están en §2.1, §2.4, §2.9 y
+§3.3. Las once C-RET de P-RANGO son **propuesta** (§2.3), no reglas decididas. No se crea una
+tarea llamada «trece pendientes»: el recuento textual de marcadores no equivale a trece
+decisiones independientes.
 
 ---
 
@@ -575,7 +708,7 @@ ningún inventario del repositorio. Están ordenados por lo que pasa si se ignor
 |---|---|---|
 | 3.1 | **`Δ` natural medida solo en simulación** | Instrumento `veritas/finalidad/delta-medido-v1/` (MS; revisión 2 validada y migrada el 2026-09-14); cinco decisiones tomadas; coste por salto medido en hardware (`veritas/rendimiento/coste-salto-v1/`, 2026-09-14); pendiente el v2 (v2a y v2b), ver abajo |
 | 3.2 | `F` = 2 h **provisional** | Con obligación declarada de bajarla en producción |
-| 3.3 | `I_slots`, `L_suelo_slots`, `ρ_max` | **`L` ya NO es un parámetro libre:** desde el 2026-09-20 es una definición, `L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1)` (`C-FLU-01`, perfil 1a). Lo que queda abierto es **`L_suelo_slots`**, que va como símbolo y **no se puede fijar hoy**: su criterio exige una cota de `Δ` **medida en red real** (§3.1), no simulada. `I_slots` sin cerrar; `ρ_max` entre 3× sin segundo VDF y revelación retardada, **y su aritmética está sin rehacer tras D-2** (§2.9) |
+| 3.3 | `I_slots`, `L_suelo_slots`, `ρ_max` | **`L` ya NO es un parámetro libre:** desde el 2026-09-20 es una definición, `L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1)` (`C-FLU-01`, perfil 1a). Lo que queda abierto es **`L_suelo_slots`**, que va como símbolo y **no se puede fijar hoy**: su criterio exige una cota de `Δ` **medida en red real** (§3.1), no simulada. `I_slots` sin cerrar; `ρ_max` carece de cota medida por plataforma adversaria. Los análisis de alternativas no calibran estos valores (§2.9). |
 | 3.4 | **P-038** | Abierta |
 | 3.5 | Génesis | Parámetros y hashes distintos por red; bootstrap explícito |
 
@@ -899,11 +1032,12 @@ regla que el flujo usa. Por ese mismo criterio, el presupuesto de verificación 
      C-GD-11. El pruning no era redactable: sale a auditoría.
    - **Pruning — encargo 05 escrito**, pendiente de lanzar. Puede **reabrir §6.1** si la prueba de
      poda exige `parents_by_level`: la cabecera DAG no tiene ese campo.
-   - **Siguiente en la mesa de Claude — REORDENADO el 2026-09-18: §2.1 antes que §2.5.** Las tres
-     auditorías de poda (05, 06, 07) acabaron localizando el problema de seguridad en otro sitio:
-     **la regla de dependencias por flujo del PoT**, que es el único punto medido que degrada el
-     umbral (`α = 0,040` con `S = 24`). La poda resultó ser un problema de **coste de arranque**,
-     no de seguridad. §2.5 sigue después.
+   - **Secuencia histórica del 2026-09-18, corregida por P-CRP.** Las auditorías de poda (05,
+     06, 07) trasladaron la prioridad a las dependencias por flujo del PoT. La frase de entonces
+     —«único punto medido que degrada el umbral, `α = 0,040` con `S = 24`»— **no describe el
+     protocolo vigente**: era el contrafactual aditivo de CRP-v0.1 (§2.1), y el umbral global
+     sigue inconcluso. La poda dejó además una deuda de arranque sucinto (§2.5), no una garantía
+     de seguridad sobre ramas privadas.
    - **Lección de método de la serie 05–07, anotada para no repetirla.** Las tres auditorías
      produjeron **resultados correctos con alcance estrecho, presentados con etiqueta ancha**, y la
      validación de Claude no lo detectó hasta que una revisión externa lo señaló. En el 06, los dos

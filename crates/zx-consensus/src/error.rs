@@ -264,6 +264,18 @@ pub enum ConsensusError {
         encontrado: u64,
     },
 
+    /// C-HDR-06 · C-GD-01: un `SR` validado para un bloque se intenta insertar en otro.
+    ///
+    /// El rango validado queda atado al `block_hash` de la cabecera que lo superó; colocarlo en
+    /// un bloque distinto es un error explícito, no una aceptación.
+    #[error("C-HDR-06: el SR validado para {validado_para} se intenta usar en {bloque}")]
+    RangoDeOtroBloque {
+        /// El bloque en el que se intenta insertar.
+        bloque: zx_core::BlockHash,
+        /// El bloque para el que se validó el `SR`.
+        validado_para: zx_core::BlockHash,
+    },
+
     /// H-04 · Un bloque con `parent_count = 0` que no es el génesis de la red.
     #[error("C-HDR-01: un bloque no génesis con parent_count = 0")]
     GenesisConCeroPadresNoEsGenesis,
@@ -334,6 +346,18 @@ pub enum ConsensusError {
         hash: zx_core::BlockHash,
     },
 
+    /// El almacén GHOSTDAG ya tiene ese `block_hash`.
+    ///
+    /// Es un **duplicado de almacenamiento**, no un veredicto sobre la prueba PoST del bloque ni
+    /// motivo automático para penalizar al par: el mismo bloque puede llegar dos veces por
+    /// retransmisión. Rechazarlo es lo que impide que `indice.insert` sustituya el índice mientras
+    /// `ids` crece y deje dos entradas para un solo id.
+    #[error("GHOSTDAG: el bloque {hash} ya está almacenado (duplicado de almacenamiento)")]
+    BloqueDuplicado {
+        /// El hash repetido.
+        hash: zx_core::BlockHash,
+    },
+
     /// Estado GHOSTDAG incoherente: una consulta que por construcción no debería ocurrir.
     #[error("GHOSTDAG: estado incoherente: {motivo}")]
     GhostdagIncoherente {
@@ -341,13 +365,32 @@ pub enum ConsensusError {
         motivo: &'static str,
     },
 
-    /// C-HDR-05: `slot(B) < slot(sp(B))`.
-    #[error("C-HDR-05: slot(B) = {slot} anterior a slot(sp) = {slot_sp}")]
-    SlotNoMonotono {
-        /// Slot del bloque.
-        slot: u64,
-        /// Slot del padre seleccionado.
-        slot_sp: u64,
+    /// C-HDR-05 · C-FLU-02: **algún** padre tiene un `slot` posterior al del bloque.
+    ///
+    /// La cota es **no estricta** y alcanza a **todos** los padres, no solo al seleccionado
+    /// (`sp(B)`, que es el caso particular de `C-GD-03`). Se informa del padre infractor y de los
+    /// dos `slot` para poder localizar la violación; el slot se toma del contexto validado, nunca
+    /// del candidato.
+    #[error(
+        "C-HDR-05/C-FLU-02: el padre {padre} tiene slot {slot_padre} posterior a slot(B) = {slot_b}"
+    )]
+    SlotDePadrePosterior {
+        /// Hash del padre infractor.
+        padre: zx_core::BlockHash,
+        /// `slot` del padre, tomado del contexto.
+        slot_padre: u64,
+        /// `slot` del bloque candidato.
+        slot_b: u64,
+    },
+
+    /// C-HDR-05 · C-FLU-02: el contexto no puede dar el `slot` de un padre que dice conocer.
+    ///
+    /// Sin ese slot la cota no es comprobable. La ausencia **MUST NOT** sustituirse por cero ni
+    /// por ningún valor por defecto.
+    #[error("contexto DAG: no hay slot contextual para el padre {padre}")]
+    SlotDePadreAusente {
+        /// Hash del padre cuyo slot falta.
+        padre: zx_core::BlockHash,
     },
 
     /// C-GD-04: `slot(B) − slot(sp(B)) > S_max`.

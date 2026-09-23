@@ -894,10 +894,17 @@ entra también en la enumeración de `C-GD-10`.
 > padre seleccionado y **no determinaba** el slot de los demás padres. **El coste para el productor
 > honesto está `estimado ≈ 0` y NO medido:** `TAREAS.md` §2.9.
 >
-> ⚠️ **El código va por detrás de esta regla.** `comprobar_diferencia_slots_del_bloque` recibe
-> **solo** `slot_sp`, y `ContextoDag` no expone forma de pedir el `slot` de un padre arbitrario. No
-> es solo código sin cablear: es **código de la versión anterior de la regla**, declarado en
-> `ci/reglas-sin-cablear.txt`.
+> **Estado del código (actualizado el 2026-09-22).** La comprobación **sí está implementada en los
+> componentes DAG**: `ContextoDag::slot_de_padre` obtiene el slot del contexto validado —falla de
+> forma explícita si falta el padre o su slot, y nunca lo sustituye por cero ni lo lee del
+> candidato—, `comprobar_padres_contextual` comprueba `slot(p) ≤ slot(B)` para el seleccionado y
+> para cada padre adicional, y la inserción de `AlmacenGhostdag` aplica la misma cota a todos los
+> padres —`Referencia` y `Kernel`— antes de modificar índices, padres, slots, colores o
+> acumuladores. Eso
+> **no** significa que la regla esté integrada: la ruta activa de `zx-node` sigue con la cabecera
+> lineal y la selección de `fork_choice.rs`, así que nadie la ejecuta en producción y C-HDR-05
+> permanece en `ci/reglas-sin-cablear.txt`. La regla **normativa** de arriba no cambia, y el número
+> de portadores PoT sigue siendo `slot(B) − slot(sp(B))`, una regla distinta.
 
 **C-HDR-06** · `rango_solucion` viaja en la cabecera y **MUST** ser exactamente el rango
 esperado contextual:
@@ -921,11 +928,19 @@ propio candidato como si fuese el esperado: la circularidad **MUST** ser imposib
 desaconsejada. El algoritmo del controlador —ventana, bootstrap, redondeos y fusiones fuera de
 ventana— sigue en `TAREAS.md` §2.3; no se define aquí.
 
+El `rango_solucion` que ha superado esta comprobación es **el único `SR`** con el que `C-GD-01`
+calcula `w(B)` y `C-GD-08` acumula `blue_work`. Un segundo `SR` con semántica distinta **MUST
+NOT** existir: ni una re-derivación, ni otro redondeo, ni un `clamp` o una caché con semántica
+propia, ni el valor declarado por el candidato.
+
 > *Nota ilustrativa (no normativa).* La implementación Rust de referencia expone un contexto
 > (`zx-consensus::ContextoRangoDag`) que recibe una vista del candidato **sin** acceso a
-> `rango_solucion`; el intento de leerlo no compila. Es una forma de cumplir la exigencia doble de
-> arriba, no la exigencia misma: cualquier implementación, en cualquier lenguaje, **MUST** hacer
-> imposible la circularidad.
+> `rango_solucion`; leerlo por esa vista no compila. Eso **solo** bloquea el acceso directo: un
+> contexto que conserve la cabecera —o el valor por otra vía— puede devolver el declarado como
+> «esperado», así que la vista **no** cumple por sí sola la exigencia de arriba. La única forma de
+> cumplirla es que el contexto derive el esperado del pasado y del flujo, y ese controlador no
+> existe todavía (`TAREAS.md` §2.3). La entrada Rust asociada (`AlmacenGhostdag::admitir`) es una
+> puerta **parcial** de validación del `SR`: no es una admisión PoST de producción.
 
 **C-HDR-07** · La justificación del PoT no está en la base de cabecera, pero debe acompañar al
 bloque para validar su prueba. Sin ella no se puede declarar válido ni adoptar el bloque.
@@ -1694,8 +1709,8 @@ cerrado, y **MUST NOT** hacerse sin rehacer ese análisis.
 > No se ha encontrado un ataque por esa vía, **y no encontrarlo no es cerrarlo**.
 >
 > **Aviso para quien valide:** con `pot_output` = salida **futura** (D-2 = A), la entropía se deriva
-> de `salida(f, slot(I_j) + D)`. El invariante se conserva —ambas son función de `(f, slot)` y de
-> nada más—, pero **la aritmética del adelanto no se ha rehecho con `+D`**: `TAREAS.md` §2.9.
+> de `salida(f, slot(I_j) + D)`. Ambos valores son función de `(f, slot)`, sin contenido del
+> candidato.
 #### 7.1.5 · Validez absoluta y pasado consistente de flujo
 
 **C-FLU-13** · **Validez absoluta.** `B` es **válido** si y solo si: (1) su solución PoAS verifica
@@ -1707,13 +1722,16 @@ La validez de `B` **MUST NOT** depender de la cadena seleccionada del observador
 su reloj ni del orden de llegada. Es función de `past(B)` y de nada más.
 
 > **Ésta es la bifurcación de §2.1 de `TAREAS.md`, y su precio se paga aquí, explícito.** Si la
-> validez del PoT fuese **relativa a la cadena seleccionada**, se abriría el **multistream**
-> —`α_mínimo = 1/(S+1)`, medido en `veritas/seguridad/coste-rama-privada-v1/`—. Siendo
-> **absoluta**, el multistream queda cerrado (un flujo fabricado por el atacante no es el flujo de
-> ningún bloque honesto y sus bloques no se pueden referenciar, `C-FLU-14`) y lo que se abre es la
-> **partición de flujo** (§7.1.6). **Lo que la contiene no es una regla: es `L_slots` frente a
-> `Δ`**, con la probabilidad medida en simulación en `veritas/consenso/ancla-inyeccion-v2/` y la
-> `Δ` **simulada, no medida en red**.
+> validez del PoT fuese **relativa a la cadena seleccionada**, se abriría el **multistream**. La
+> frontera `α = 1/(S+1)` de `veritas/seguridad/coste-rama-privada-v1/` pertenece al
+> **contrafactual aditivo** de flujos independientes —identidad del modelo escalar, no umbral
+> medido de una cadena válida— y `C-FLU-14` lo excluye; el **umbral protocolario global sigue
+> inconcluso** (`P-ZRX/P-CRP/auditoria/INFORME.md`). Siendo **absoluta**, el multistream queda
+> cerrado **por decisión del protocolo, no por medición** (un flujo fabricado por el atacante no
+> es el flujo de ningún bloque honesto y sus bloques no se pueden referenciar, `C-FLU-14`) y lo
+> que se abre es la **partición de flujo** (§7.1.6). **Lo que la contiene no es una regla: es
+> `L_slots` frente a `Δ`**, con la probabilidad medida en simulación en
+> `veritas/consenso/ancla-inyeccion-v2/` y la `Δ` **simulada, no medida en red**.
 
 **C-FLU-14** · **Pasado consistente de flujo.**
 
@@ -2276,13 +2294,25 @@ implementaciones podían divergir. Katana la decidió el 2026-09-14 (`TAREAS.md`
 y el instrumento `veritas/consenso/ghostdag-rank-v1/` (GDR-v0.2) la implementa y la comprueba:
 los seis vectores oficiales de rusty-kaspa (168 bloques) coinciden al 100 %, un oráculo con claves
 propias coincide con el kernel en 7 200 DAGs, y 1 000 órdenes de llegada por familia dan el mismo
-resultado. Ninguna de estas reglas tiene todavía código en `crates/`; están declaradas como trabajo
-futuro en `ci/reglas-sin-codigo.txt`.
+resultado. Estas reglas **sí tienen código** en `crates/zx-consensus/src/ghostdag.rs` (referencia y
+kernel, oráculo y vectores), pero **ninguna ruta del nodo las ejecuta**: `zx-node` sigue con la
+selección lineal de `fork_choice.rs`. Por eso están declaradas en `ci/reglas-sin-cablear.txt`, no
+en `ci/reglas-sin-codigo.txt`.
 
 **C-GD-01** · **Peso de un bloque.** `w(B) = ⌊2^128 / (SR(B)+1)⌋`, con `SR` de tipo `u64` y
 división entera exacta. El cálculo **MUST** hacerse en enteros; usar coma flotante está
 **prohibido**. `SR = 0` da `w = 2^128`, que no cabe en `u128`; `SR = 2^64−1` da el mínimo,
 `w = 2^64`. Por tanto `w(B) ≥ 2^64 > 0` para todo bloque.
+
+**De dónde sale el `SR` que pesa.** El `SR(B)` de esta fórmula **MUST** ser el mismo
+`rango_solucion(B)` que `C-HDR-06` exige igual al rango esperado contextual. `w(B)` **MUST NOT**
+calcularse ni entrar en `blue_work` (`C-GD-08`) antes de que ese rango haya superado la
+comprobación contextual, y **MUST NOT** existir una segunda fuente de `SR` con semántica propia
+—otra derivación, otro redondeo, un `clamp` o una caché distintos del valor validado—. Es una
+precisión del acoplamiento ya implícito entre `C-HDR-06`, `C-GD-01` y `C-GD-08`; no añade una
+regla de retarget, no cambia la fórmula del peso ni el orden de validación de §6.4. Procedencia:
+P1/`C-RET-08` de `P-ZRX/P-RANGO/propuesta/PROPUESTA-SPEC.md`; es lo único que se toma de esa
+propuesta, y las demás reglas `C-RET-01`…`C-RET-11` **no** se trasladan.
 
 **C-GD-02** · **Dominio de `blue_work`.** `blue_work` se representa como `u256` (§2, tabla de
 tipos). Toda suma **MUST** usar aritmética comprobada (C-ENC-03): un desbordamiento es **fallo de
@@ -2593,6 +2623,15 @@ Las reglas de sectores siguientes conservan su base documental. La altura usada,
 y su relación con la finalidad temporal deben redefinirse conjuntamente para el DAG.
 
 **C-EXP-01** · Todo sector lleva `altura_ploteo`, válido solo si `altura_ploteo < altura_actual`.
+
+> **Alcance de `altura_ploteo` y `history_size`, dicho para no leer de más.** Los dos son
+> referencias **lógicas** de historia y validez: identifican el prefijo histórico que determina la
+> parcela y su caducidad. **No acreditan** cuándo se computaron físicamente los bytes, la posesión
+> de un sector completo ni su permanencia, y un atacante puede escoger hoy una referencia antigua
+> que aún sea válida. La interfaz examinada en `P-ZRX/P-SEMBRADOR/investigacion/INFORME.md`
+> (resultado y «unidad mínima de intento») verifica **una pieza y su prueba**, no la preexistencia
+> del sector entero. Esta nota no cambia campos, wire, predicados de aceptación ni edad de
+> sectores, y no aprueba A1+C1, registro, maduración ni PoRep.
 
 **C-EXP-02** · `desplazamiento = blake3(sector_id ‖ hash_bloque[altura_ploteo]) mod DISPERSION_BLOQUES`.
 Como `DISPERSION_BLOQUES = 2^20`, el módulo es **exactamente una máscara de 20 bits** sobre la salida
@@ -3779,7 +3818,7 @@ congela parámetros ni convierte prototipos en implementaciones.
 | Área | Trabajo pendiente |
 |---|---|
 | Cabecera y wire | Integrar en la ruta activa del nodo el formato ya fijado en §6.1–§6.2: layout (C-HDR-01), prefirma (C-HDR-03), justificación PoT (C-HDR-07) y codec único (C-HDR-09). El texto normativo no deja nada pendiente aquí. |
-| Prueba de espacio/tiempo | Verificación conjunta de solución, KZG, sello, reto secuencial, autoría y flujos. **🔴 PRIORIDAD: la regla de dependencias por flujo del PoT es el único punto medido que degrada el umbral de seguridad.** `veritas/seguridad/coste-rama-privada-v1/` (CRP-v0.1, 2026-09-18) mide `α_mínimo = 1/2` —el mismo que PoW y que GHOSTDAG sobre PoW— para el diseño con **un solo flujo**: la tasa de soluciones es `∝ SR` y el peso `∝ 1/SR`, así que el rango endógeno **se cancela** y no es explotable en media. Pero con `S` flujos de PoT simultáneos la cuota efectiva es `S·α/(1−α+S·α)` y el umbral cae a `α = 1/(S+1)`: **0,040 con `S = 24`**, que es el límite de IOPS de un SSD de 100 k, **sin espacio adicional**. Es el ATAQUE 2 de `research/dag-poas-auditoria.md` (2026-09-06, gravedad crítica), que ya declaraba depender de «una regla que la propuesta no escribe» y advertía que **las dos opciones obvias fallan**: validez del PoT relativa a la cadena seleccionada abre el multistream; validez absoluta abre el split. **DECIDIDO por Katana (2026-09-19/20) y REDACTADO en §7.1: validez ABSOLUTA (`C-FLU-13`), perfil 1a (`L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1)`, `C-FLU-01`).** El multistream queda cerrado porque un flujo fabricado no es el de ningún bloque honesto y sus bloques no se pueden referenciar (`C-FLU-14`). **El split NO se cierra con una regla: se previene con `L` frente a `Δ`**, y si nace se cura solo en el caso espontáneo (`C-FLU-22`), nunca en un corte de red más largo que `L`. **Lo que queda: el código** —ninguna de las 31 reglas nuevas tiene una línea— y las mediciones que faltan (`TAREAS.md` §2.9). |
+| Prueba de espacio/tiempo | Verificación conjunta de solución, KZG, sello, reto secuencial, autoría y flujos. El **umbral protocolario sigue inconcluso** (`P-ZRX/P-CRP/auditoria/INFORME.md`): `α_drift = 1/2` es una **identidad aritmética del baseline analítico idealizado** (un evento por paso, tasas simétricas), no un umbral demostrado de ZEROX; y `α = 1/(S+1)` —el «4 %» con `S = 24`— pertenece al **contrafactual aditivo** de flujos independientes, que `C-FLU-14` excluye: **no es umbral de una cadena válida** bajo las reglas vigentes. `S = 24` es un escenario de IOPS de una configuración de hardware (`P-ZRX/P-PUERTA/veritas/consenso/puerta-cobertura-v1/INFORME.md`), no una capacidad adversaria universal; `S_adversario` sigue pendiente (`P-ZRX/P-CRP/auditoria/RECOMENDACION-MIGRACION.md`). CRP-v0.2 y CRP-v0.3 fueron **auditadas**, no validadas como instrumentos ni migradas; v0.3 exige correcciones bloqueantes y veredicto rebajado, y v0.2 no sustituye esas correcciones. Es el ATAQUE 2 de `research/dag-poas-auditoria.md` (2026-09-06, gravedad crítica), que ya declaraba depender de «una regla que la propuesta no escribe» y advertía que **las dos opciones obvias fallan**: validez del PoT relativa a la cadena seleccionada abre el multistream; validez absoluta abre el split. **DECIDIDO por Katana (2026-09-19/20) y REDACTADO en §7.1: validez ABSOLUTA (`C-FLU-13`), perfil 1a (`L_slots := máx(F_slots, L_suelo_slots, S_max_slots+1)`, `C-FLU-01`).** El multistream queda cerrado **por decisión, no por medición**: un flujo fabricado no es el de ningún bloque honesto y sus bloques no se pueden referenciar (`C-FLU-14`); `C-FLU-13`/`C-FLU-14` siguen vigentes. **El split NO se cierra con una regla: se previene con `L` frente a `Δ`**, y si nace se cura solo en el caso espontáneo (`C-FLU-22`), nunca en un corte de red más largo que `L`. **No se declara resuelto el doble farmeo ni existe un umbral global demostrado.** Lo que queda: el código —casi ninguna de las 31 reglas nuevas tiene una línea; la excepción es `C-FLU-02`, cuya comprobación `slot(p) ≤ slot(B)` ya existe en los componentes DAG, pero sigue sin ejecutarse en la ruta activa de `zx-node`, que continúa lineal— y las mediciones que faltan (`TAREAS.md` §2.9). |
 | Rango | R-FIN-13′ completo: arranque, ventana, redondeos, fusiones tardías, ramas candidatas. |
 | DAG | Redactado el 2026-09-17: conflictos de transacciones (**C-ORD-04**), `pick_virtual_parents` (**C-GD-10**) y *bounded merge depth* con kosherización (**C-GD-11**). Quedan: el enlace de C-ORD-04 con el estado UTXO (§2.6) y los **cinco pendientes de C-GD-11** —métrica, valor, bootstrap, borde de igualdad y relación con finalidad y poda—, que no se fijan por analogía con Kaspa ni derivando de `F = 2 h` provisional. GHOSTDAG, U2/U3″, peso, cadena seleccionada y orden quedan especificados en §11. |
 | Poda (*pruning*) | **Auditado el 2026-09-17** (`veritas/consenso/poda-post-v1/`, PPP-v0.1), con **defectos anotados el 2026-09-18** en su `PROCEDENCIA.md` §3.3–§3.4. **Lo que falta no es el IBD sin confianza: es el IBD SUCINTO.** Un nodo nuevo siempre puede descargar y validar toda la historia desde el génesis sin confiar en nadie; lo que ZEROX no tiene es un arranque **sucinto desde estado podado** sin ancla externa. **(1) Poda local:** política de nodo **viable en principio**, no implementada, y condicionada a que existan finalidad integrada (R-FIN-7), estado UTXO con datos de deshacer (§2.6, hoy inexistente) y una profundidad de retención cerrada (C-GD-11). **(2) Prueba de poda por certificados de niveles: descartada.** El nivel de solución se calcula **antes** de elegir padres, así que se pega a cualquier historia; el nivel por hash de cabecera sí liga a los padres pero se muele con CPU (C-HDR-04: el sello Ed25519 no es único, y `merkle_root` varía con la coinbase), luego no mide espacio. En PoW ambas propiedades coinciden en el mismo objeto; en PoST se separan, y esa separación es la raíz. **El resultado vale para los mecanismos examinados, no para toda familia de pruebas**: su formalización no captura que el recurso deba pagarse de nuevo por cada ancestría, y no modela el PoT ni sus flujos. **(3) Disponibilidad histórica** — capa social/económica, no criptográfica: no resuelve (2). **Consecuencia: §6.1 NO se reabre por este mecanismo** — `parents_by_level` no rescata este certificado, luego el cableado de la cabecera DAG no está bloqueado; un reto futuro ligado a la ancestría sí la reabriría. **Abierto y sin cerrar:** la vía de prueba recursiva (coste **estimado**, no medido: no hay circuito ni banco de probador) y, sobre todo, **el coste real de construir una rama privada con más `blue_work`**, que ninguna auditoría ha medido y que decide si esto es un problema de ingeniería o de consenso. **La poda sigue siendo requisito para lanzar mainnet.** Una testnet **MAY** operar sin poda con nodos archivales declarados explícitamente, y eso **no cuenta como solución**. |

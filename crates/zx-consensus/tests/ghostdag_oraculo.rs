@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use primitive_types::U256;
+use zx_consensus::RangoSolucionValidado;
 use zx_consensus::ghostdag::{
     Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, Idx, ModoMerge, ModoSp, Parametros,
     hash_de_id_textual,
@@ -191,18 +192,25 @@ fn parsear_corpus(texto: &str) -> Vec<Dag> {
 fn construir_dag(dag: &Dag, params: Parametros, algoritmo: Algoritmo) -> AlmacenGhostdag {
     let g = dag.specs.first().expect("toda DAG tiene génesis");
     let genesis = hash_de_id_textual(&g.id);
-    let mut almacen = AlmacenGhostdag::nuevo(params, algoritmo, genesis, g.slot, g.sr, g.ident);
+    let mut almacen = AlmacenGhostdag::nuevo(
+        params,
+        algoritmo,
+        genesis,
+        g.slot,
+        RangoSolucionValidado::para_oraculos(g.sr),
+        g.ident,
+    );
     for spec in dag.specs.iter().skip(1) {
         let bloque = BloqueGhostdag {
             id: hash_de_id_textual(&spec.id),
             padres: spec.padres.iter().map(|p| hash_de_id_textual(p)).collect(),
             slot: spec.slot,
             solution_distance: spec.sd,
-            rango_espacio: spec.sr,
+            rango_espacio: RangoSolucionValidado::para_oraculos(spec.sr),
             identidad: spec.ident,
         };
         almacen
-            .anadir(bloque)
+            .anadir_sintetico(bloque)
             .unwrap_or_else(|e| panic!("DAG {} rechaza {}: {e}", dag.etiqueta, spec.id));
     }
     almacen

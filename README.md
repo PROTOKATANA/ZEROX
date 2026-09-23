@@ -28,17 +28,25 @@ este repositorio y no fija las decisiones ni los parámetros actuales.
 |---|---|
 | `crates/zx-core` | Tipos, codificación, hashes, firmas y transacciones; cabecera pendiente de migrar. |
 | `crates/zx-consensus` | Validación transparente, emisión y capacidad; selección y prueba de bloque pendientes del DAG. |
+| `crates/zx-pot` | Primitiva PoT AES de Autonomys (`subspace-proof-of-time` @ `f8842d0`, 0BSD) con 32 vectores diferenciales; verifica **un slot**, no un bloque. |
 | `crates/zx-storage` | Estado UTXO y persistencia; integración del estado y orden DAG pendiente. |
 | `crates/zx-p2p`, `crates/zx-node` | Transporte, límites y sincronización reutilizables; nodo aún ligado al formato lineal. |
 | `crates/zx-mempool` | Admisión y tarifas; integración con el nodo pendiente. |
 | `crates/zx-rpc`, `crates/zx-wallet` | Interfaces previstas; todavía esqueletos. |
 | `crates/zx-lightwalletd`, `crates/zx-scanner` | Servicios previstos de consulta y scanning. |
-| `prototipos/pot-estable` | PoT AES de Autonomys en Rust, con vectores diferenciales; aún no integrado. |
+| `prototipos/pot-estable` | Prototipo original del PoT AES, conservado **sin cambios**; su incorporación al workspace es `crates/zx-pot`. |
 | `research`, `PDF`, `testdata` | Investigación, fuentes de PoSpace y vectores criptográficos que siguen siendo útiles. |
 | `veritas` | Julia CPU y C++/CUDA para las auditorías que lo justifiquen. |
 
 La capa blindada es parte del destino del proyecto; su ausencia actual no autoriza sustituirla
 por una solución distinta. No se incorporan staking ni comités de decisión.
+
+La primitiva PoT está incorporada y probada, pero **no cableada**: `zx-consensus` expone el
+adaptador de un slot AES y un núcleo de rango con tres estados. Ese núcleo exige una instantánea
+del pasado DAG validado que todavía no tiene derivador de producción.
+`zx-core::wire_dag::verificar_justificacion_pot` sigue devolviendo `IntegracionPotPendiente` y
+`zx-node` continúa con la cabecera lineal. Esto **no** resuelve el doble farmeo ni convierte a
+ZEROX en un nodo que valide bloques PoST.
 
 ## Comprobación del código
 

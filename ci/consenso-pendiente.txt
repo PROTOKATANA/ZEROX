@@ -28,11 +28,53 @@ zx-consensus::timestamps::timestamp_del_minero
 # desde el sincronizador es el encargo 04. Son, por tanto, puntos de entrada reales que nadie
 # ejecuta todavía, no huecos: añadir un llamante sin la decisión de integración sería cablear
 # consenso a medias. Se cierran en el encargo 04.
+#
+# ⚠️ `zx-consensus::ghostdag::admitir` —la entrada de producción de C-HDR-06 del encargo 02— está
+# en la misma situación y NO se puede listar como línea suelta: el heurístico de nombre lo da por
+# alcanzado porque `zx-mempool::pool::admitir` se llama dentro de su propio crate. Queda anotado
+# aquí para que el hueco no desaparezca del inventario.
 zx-consensus::ghostdag::algoritmo
-zx-consensus::ghostdag::anadir
 zx-consensus::ghostdag::hash_de_id_textual
 zx-consensus::ghostdag::orden_aplicacion
 zx-consensus::ghostdag::padres_de
 zx-consensus::ghostdag::parametros
 zx-consensus::ghostdag::punta_virtual
 zx-consensus::ghostdag::seleccionar_copia
+
+# ── Primitiva PoT: adaptador puro, sin verificar bloques (encargo 03a) ─────────────────────────
+#
+# crates/zx-consensus/src/pot.rs convierte el wire de 128 B a la primitiva `zx-pot` y expone
+# «verificar un slot AES» (C-POT-02, C-POT-04). NO es `validar_bloque`: no conoce flujo,
+# inyección, reto, sello, caché, anclaje de `pot_output` ni el orden de §7.1.2, y `zx-node` no lo
+# llama. El núcleo contextual 03c existe, pero carece de derivador causal de `past(B)`;
+# `wire_dag::verificar_justificacion_pot` sigue devolviendo IntegracionPotPendiente
+# (C-HDR-07 en reglas-sin-cablear.txt). Cablearlo exige contexto y flujo acreditados.
+#
+# ⚠️ `proyectar_iteraciones`, `checkpoints_a_primitiva` y `verificar_slot_aes` NO se listan como
+# línea suelta: el heurístico los da por alcanzados porque las llama código del propio crate
+# —`verificar_slot_aes` entre ellos, y desde el encargo 03c también `pot_rango`—. Siguen igual de
+# lejos de la ruta activa. Quedan anotados aquí para que no desaparezcan.
+zx-consensus::pot::checkpoints_a_wire
+
+# ── PoT: fórmulas puras de semilla, aleatoriedad y reto (encargo 03b) ─────────────────────────
+#
+# Mismo estado que el adaptador de 03a: código puro probado contra V1–V4 y una microtraza, sin
+# ninguna ruta que lo ejecute. Calculan solo la FORMA de C-POT-01/C-POT-03 y aceptan entradas
+# libres: no acreditan procedencia contextual ni impiden por sí solas saltarse slots.
+#
+# ⚠️ `aleatoriedad_de_salida` NO se lista como línea suelta: el heurístico la da por alcanzada
+# porque `reto_desde_salida` la llama dentro del mismo módulo. `semilla_siguiente` tampoco se
+# lista desde el encargo 03c: la llama `pot_rango` dentro del crate. Las dos siguen igual de
+# lejos de la ruta activa y quedan anotadas aquí para que no desaparezcan.
+zx-consensus::pot::reto_desde_salida
+
+# ── Núcleo de verificación de un rango PoT (encargo 03c) ──────────────────────────────────────
+#
+# `crates/zx-consensus/src/pot_rango.rs` implementa el núcleo de C-POT-06 sobre una instantánea
+# contextual (`InstantaneaPot`) que HOY no tiene fuente causal: ningún objeto del código acredita
+# un `past(B)` validado para el PoT (no hay derivador del flujo de §7.1.4, ni vista de época, ni
+# ancla). `verificar_rango_pot` no lo llama ninguna ruta del nodo y
+# `wire_dag::verificar_justificacion_pot` sigue devolviendo IntegracionPotPendiente. Los métodos
+# de los tres traits se dan por alcanzados dentro del crate porque el propio núcleo los llama; la
+# función libre es el punto de entrada huérfano.
+zx-consensus::pot_rango::verificar_rango_pot

@@ -39,10 +39,11 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use primitive_types::U256;
+use zx_core::DagBlockHeader;
 use zx_core::digest::{BlockHash, Digest};
 use zx_core::preimage::dag::{MAX_PADRES, PadresDag};
 
-use crate::bloque_dag::ContextoDag;
+use crate::bloque_dag::{ContextoDag, ContextoRangoDag, RangoSolucionValidado};
 use crate::error::ConsensusError;
 
 /// `k` por defecto de R-FIN-12 (elegido, `SPEC.md:1609`).
@@ -144,8 +145,13 @@ pub struct BloqueGhostdag {
     pub slot: u64,
     /// `solution_distance` de la prueba PoAS/PoT.
     pub solution_distance: u64,
-    /// Rango de espacio `SR`; determina el peso `⌊2^128/(SR+1)⌋`.
-    pub rango_espacio: u64,
+    /// `rango_solucion` que **superó C-HDR-06** si la inserción es de producción.
+    ///
+    /// La entrada de producción es [`AlmacenGhostdag::admitir`], que la construye con
+    /// [`RangoSolucionValidado::validar`] y deriva el id de la misma cabecera. La entrada sintética
+    /// de oráculos ([`AlmacenGhostdag::anadir_sintetico`]) acepta un rango sin validar; esa parte
+    /// **no** es una frontera de seguridad (ver [`RangoSolucionValidado`]).
+    pub rango_espacio: RangoSolucionValidado,
     /// Identidad de billete comprimida; `0` = sin billete.
     pub identidad: u64,
 }
@@ -270,9 +276,23 @@ pub struct DatosGhostdag {
 ///
 /// `SR` es `u64`, así que el divisor es `≥ 1`. `SR = 0` da `2^128`; `SR = 2^64−1` da el mínimo
 /// `2^64 > 0`.
+///
+/// Es la fórmula pura. La ruta de consenso **no** la llama con un `u64` suelto: `acumular` la
+/// aplica al `SR` almacenado como [`RangoSolucionValidado`], que solo se construye validando
+/// C-HDR-06 (o con el constructor sintético de oráculos).
 #[must_use]
 pub fn peso(rango_espacio: u64) -> U256 {
     (U256::one() << 128usize) / (U256::from(rango_espacio) + U256::one())
+}
+
+impl RangoSolucionValidado {
+    /// `w(B)` de C-GD-01 sobre el `SR` **validado**.
+    ///
+    /// Es la vía de `acumular` (C-GD-08): el valor viene del tipo, no de un `u64` libre.
+    #[must_use]
+    pub fn peso(self) -> U256 {
+        peso(self.valor())
+    }
 }
 
 /// Suma comprobada de `blue_work` (`C-GD-02`, C-ENC-03).
@@ -302,7 +322,10 @@ pub fn hash_de_id_textual(s: &str) -> BlockHash {
 
 /// Almacén GHOSTDAG en memoria.
 ///
-/// Construido con [`AlmacenGhostdag::nuevo`] y alimentado con [`AlmacenGhostdag::anadir`].
+/// Construido con [`AlmacenGhostdag::nuevo`]. [`AlmacenGhostdag::admitir`] es la puerta que valida
+/// el `SR` contra el contexto y deriva el id de la cabecera (validación **parcial**: no es una
+/// admisión PoST de producción); [`AlmacenGhostdag::anadir_sintetico`] es la entrada de
+/// oráculos/tests y **no** valida el rango.
 pub struct AlmacenGhostdag {
     params: Parametros,
     algoritmo: Algoritmo,
@@ -312,7 +335,8 @@ pub struct AlmacenGhostdag {
     padres: Vec<Vec<Idx>>,
     slots: Vec<u64>,
     sds: Vec<u64>,
-    srs: Vec<u64>,
+    /// `SR` **validado** por bloque, en paralelo a `ids` (C-HDR-06 → C-GD-01/C-GD-08).
+    srs: Vec<RangoSolucionValidado>,
     idents: Vec<u64>,
     anc: Vec<ConjuntoBits>,
     gd: Vec<DatosGhostdag>,
@@ -320,13 +344,18 @@ pub struct AlmacenGhostdag {
 
 impl AlmacenGhostdag {
     /// Crea el almacén con un génesis.
+    ///
+    /// El `SR` del génesis entra ya como [`RangoSolucionValidado`]. Sembrarlo es un camino
+    /// **sintético** —el *bootstrap* del controlador de C-HDR-06 sigue sin definir (`TAREAS.md`
+    /// §2.3)— y no forma parte de la admisión de bloques: los oráculos y los tests pasan
+    /// [`RangoSolucionValidado::para_oraculos`].
     #[must_use]
     pub fn nuevo(
         params: Parametros,
         algoritmo: Algoritmo,
         id_genesis: BlockHash,
         slot_genesis: u64,
-        sr_genesis: u64,
+        sr_genesis: RangoSolucionValidado,
         ident_genesis: u64,
     ) -> Self {
         let mut anc = ConjuntoBits::nuevos();
@@ -534,11 +563,80 @@ impl AlmacenGhostdag {
         orden
     }
 
-    /// Añade un bloque. Devuelve su índice o el motivo de rechazo.
+    /// Puerta **parcial** de validación del `SR` (C-HDR-06 → C-GD-01/C-GD-08).
+    ///
+    /// **No** es una admisión PoST de producción: no verifica la prueba de espacio/tiempo, la
+    /// firma, el cuerpo ni el resto de reglas de bloque, y ninguna ruta de `zx-node` la llama. Lo
+    /// que sí cierra es la vía por la que un llamante podía elegir el `SR` o el id: recibe la
+    /// **misma cabecera cuyo `block_hash` se insertará**, obtiene el rango esperado del contexto,
+    /// valida y solo entonces inserta. No acepta ni el `SR` ni el id.
+    ///
+    /// # Precondición pendiente
+    /// La garantía vale lo que valga `ctx`: **debe** derivar `rango_esperado` del pasado validado y
+    /// del flujo. La vista opaca solo impide el acceso directo al `rango_solucion` declarado dentro
+    /// de esa vista; un contexto que conserve la cabecera o el valor por otra vía puede devolverlo
+    /// como «esperado». Falta un controlador concreto derivado del pasado y del flujo
+    /// (`TAREAS.md` §2.3).
     ///
     /// # Errores
-    /// [`ConsensusError`] con el motivo (`C-GD-04`, `C-GD-07/U2`, `C-HDR-05`, desbordamiento).
-    pub fn anadir(&mut self, bloque: BloqueGhostdag) -> Result<Idx, ConsensusError> {
+    /// [`ConsensusError::BloqueDuplicado`], [`ConsensusError::RangoIncorrecto`] y los de
+    /// [`Self::anadir_sintetico`].
+    pub fn admitir<C: ContextoRangoDag>(
+        &mut self,
+        cabecera: &DagBlockHeader,
+        solution_distance: u64,
+        identidad: u64,
+        ctx: &C,
+    ) -> Result<Idx, ConsensusError> {
+        // Duplicado de almacenamiento antes de consultar el contexto: no se revalida un bloque que
+        // ya está, y no se depende de que el contexto responda para rechazarlo.
+        let id = cabecera.block_hash();
+        if self.indice.contains_key(&id) {
+            return Err(ConsensusError::BloqueDuplicado { hash: id });
+        }
+        let rango_espacio = RangoSolucionValidado::validar(cabecera, ctx)?;
+        let mut padres = Vec::with_capacity(usize::from(cabecera.padres.count()));
+        if !cabecera.padres.es_genesis() {
+            padres.push(cabecera.padres.seleccionado());
+        }
+        padres.extend(cabecera.padres.extras().iter().copied());
+        self.anadir_sintetico(BloqueGhostdag {
+            id,
+            padres,
+            slot: cabecera.slot,
+            solution_distance,
+            rango_espacio,
+            identidad,
+        })
+    }
+
+    /// Entrada **sintética** para oráculos y tests: inserta un bloque ya construido, con el `SR`
+    /// que traiga `bloque.rango_espacio`, **sin validar C-HDR-06**.
+    ///
+    /// No es la puerta de validación; para esa, [`Self::admitir`]. Sigue siendo **API pública sin
+    /// validación**: un llamante puede saltarse C-HDR-06 con
+    /// [`RangoSolucionValidado::para_oraculos`]. Si el rango trae cabecera asociada (salió de
+    /// `validar`) y no es la de este bloque, se rechaza: un resultado validado no se puede
+    /// intercambiar entre bloques.
+    ///
+    /// # Errores
+    /// [`ConsensusError`] con el motivo (`C-GD-04`, `C-GD-07/U2`, `C-HDR-05`,
+    /// [`ConsensusError::BloqueDuplicado`], [`ConsensusError::RangoDeOtroBloque`], desbordamiento).
+    pub fn anadir_sintetico(&mut self, bloque: BloqueGhostdag) -> Result<Idx, ConsensusError> {
+        // Duplicado de almacenamiento: se rechaza ANTES de tocar índices, padres, slots, colores o
+        // acumuladores. No es un veredicto sobre la prueba PoST ni una razón para penalizar al par.
+        if self.indice.contains_key(&bloque.id) {
+            return Err(ConsensusError::BloqueDuplicado { hash: bloque.id });
+        }
+        if let Some(validado_para) = bloque.rango_espacio.bloque()
+            && validado_para != bloque.id
+        {
+            return Err(ConsensusError::RangoDeOtroBloque {
+                bloque: bloque.id,
+                validado_para,
+            });
+        }
+
         let mut padres: Vec<Idx> = Vec::with_capacity(bloque.padres.len());
         for p in &bloque.padres {
             let idx = *self
@@ -583,18 +681,24 @@ impl AlmacenGhostdag {
             },
         )?;
 
-        let slot_sp = *self
-            .slots
-            .get(sp as usize)
-            .ok_or(ConsensusError::GhostdagIncoherente {
-                motivo: "el sp del bloque no tiene slot almacenado",
-            })?;
-        if slot_sp > bloque.slot {
-            return Err(ConsensusError::SlotNoMonotono {
-                slot: bloque.slot,
-                slot_sp,
-            });
+        // C-HDR-05 · C-FLU-02: **todo** padre cumple `slot(p) ≤ slot(B)`, cota no estricta. Se
+        // comprueba aquí, con los índices ya resueltos y **antes** de tocar índices, padres,
+        // slots, colores o acumuladores: un rechazo deja el almacén exactamente como estaba.
+        for p in &padres {
+            let (slot_p, id_p) = self.slot_e_id_de(*p)?;
+            if slot_p > bloque.slot {
+                return Err(ConsensusError::SlotDePadrePosterior {
+                    padre: id_p,
+                    slot_padre: slot_p,
+                    slot_b: bloque.slot,
+                });
+            }
         }
+
+        // C-GD-04: el salto respecto del padre SELECCIONADO sigue acotado por `S_max`. Es una
+        // regla distinta de la cota anterior —el número de portadores PoT cuenta
+        // `slot(B) − slot(sp(B))`, no la diferencia con otro padre—, y se conserva tal cual.
+        let slot_sp = self.slot_de_indice(sp)?;
         if bloque.slot - slot_sp > self.params.s_max {
             return Err(ConsensusError::SaltoMayorSmax {
                 salto: bloque.slot - slot_sp,
@@ -637,6 +741,32 @@ impl AlmacenGhostdag {
             a.iter()
                 .any(|x| self.idents.get(x as usize).copied() == Some(identidad))
         })
+    }
+
+    /// `slot` almacenado de un índice ya resuelto (C-HDR-05 · C-FLU-02).
+    ///
+    /// Un índice sin slot es una incoherencia interna: se falla explícitamente, nunca se
+    /// sustituye por cero.
+    fn slot_de_indice(&self, i: Idx) -> Result<u64, ConsensusError> {
+        self.slots
+            .get(i as usize)
+            .copied()
+            .ok_or(ConsensusError::GhostdagIncoherente {
+                motivo: "el índice de bloque no tiene slot almacenado",
+            })
+    }
+
+    /// `(slot, id)` de un índice ya resuelto, para informar del padre infractor.
+    fn slot_e_id_de(&self, i: Idx) -> Result<(u64, BlockHash), ConsensusError> {
+        let slot = self.slot_de_indice(i)?;
+        let id = self
+            .ids
+            .get(i as usize)
+            .copied()
+            .ok_or(ConsensusError::GhostdagIncoherente {
+                motivo: "el índice de bloque no tiene id almacenado",
+            })?;
+        Ok((slot, id))
     }
 
     // ── Comparadores ────────────────────────────────────────────────────────
@@ -1058,8 +1188,16 @@ impl AlmacenGhostdag {
             })?;
         let mut bw = sp_datos.blue_work;
         for x in blues {
-            let sr = self.srs.get(*x as usize).copied().unwrap_or(0);
-            bw = sumar_blue_work(bw, peso(sr))?;
+            // C-GD-08 sobre el `SR` validado. La ausencia **no** se sustituye por 0: cero es un
+            // `SR` legítimo con peso máximo (`2^128`), no un centinela.
+            let sr =
+                self.srs
+                    .get(*x as usize)
+                    .copied()
+                    .ok_or(ConsensusError::GhostdagIncoherente {
+                        motivo: "un bloque azul del mergeset no tiene SR almacenado",
+                    })?;
+            bw = sumar_blue_work(bw, sr.peso())?;
         }
         let score = sp_datos
             .blue_score
@@ -1147,6 +1285,19 @@ impl ContextoDag for AlmacenGhostdag {
         Ok(a != b && self.es_ancestro(a, b))
     }
 
+    fn slot_de_padre(&self, h: &BlockHash) -> Result<u64, ConsensusError> {
+        // El slot sale del almacén validado, nunca del candidato. Un padre desconocido y un slot
+        // ausente son dos fallos explícitos distintos; ninguno se sustituye por cero.
+        let idx = *self
+            .indice
+            .get(h)
+            .ok_or(ConsensusError::PadreNoValidado { padre: *h })?;
+        self.slots
+            .get(idx as usize)
+            .copied()
+            .ok_or(ConsensusError::SlotDePadreAusente { padre: *h })
+    }
+
     fn padre_seleccionado(&self, padres: &PadresDag) -> Result<BlockHash, ConsensusError> {
         // Se ignoran las posiciones declaradas: el `sp` se recalcula con C-GD-03.
         let mut indices: Vec<Idx> = Vec::with_capacity(usize::from(padres.count()));
@@ -1180,5 +1331,133 @@ impl ContextoDag for AlmacenGhostdag {
 
     fn es_genesis(&self, h: &BlockHash) -> bool {
         *h == self.genesis
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
+mod tests {
+    use super::*;
+
+    fn params() -> Parametros {
+        Parametros::default()
+    }
+
+    fn id(n: u8) -> BlockHash {
+        BlockHash::from_digest(Digest::from_bytes([n; 32]))
+    }
+
+    /// Bloque **sintético** de este test: el `SR` no se valida (no hay contexto de controlador).
+    fn bloque(bloque_id: BlockHash, padres: Vec<BlockHash>, slot: u64, sr: u64) -> BloqueGhostdag {
+        BloqueGhostdag {
+            id: bloque_id,
+            padres,
+            slot,
+            solution_distance: 0,
+            rango_espacio: RangoSolucionValidado::para_oraculos(sr),
+            identidad: 0,
+        }
+    }
+
+    /// C-GD-08: un azul sin `SR` almacenado es una incoherencia explícita, **no** un cero.
+    ///
+    /// La ausencia se provoca desde dentro del módulo; la API pública no puede crear el estado.
+    #[test]
+    fn acumular_sin_sr_almacenado_es_incoherencia() {
+        let g = id(0x60);
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params(),
+            Algoritmo::Kernel,
+            g,
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        let id_a = id(0xA1);
+        almacen
+            .anadir_sintetico(bloque(id_a, vec![g], 1, 5))
+            .unwrap();
+
+        // Se rompe el invariante interno a propósito: `A` se queda sin `SR`.
+        let quitado = almacen.srs.pop();
+        assert_eq!(quitado.map(RangoSolucionValidado::valor), Some(5));
+
+        // El hijo incluye a `A` entre sus azules y `acumular` lo detecta.
+        let err = almacen
+            .anadir_sintetico(bloque(id(0xB2), vec![id_a], 2, 7))
+            .unwrap_err();
+        assert!(
+            matches!(err, ConsensusError::GhostdagIncoherente { .. }),
+            "{err:?}"
+        );
+        assert_eq!(almacen.len(), 2, "el rechazo no muta el almacén");
+    }
+
+    /// Un `block_hash` ya almacenado se rechaza como **duplicado de almacenamiento** antes de
+    /// mutar nada: índice, vectores paralelos y datos GHOSTDAG quedan idénticos.
+    ///
+    /// Antes de la corrección, `indice.insert` sustituía la entrada (pasaba a apuntar al índice
+    /// nuevo) mientras `ids` crecía: un solo id con dos índices y el bloque viejo inalcanzable.
+    #[test]
+    fn el_duplicado_se_rechaza_antes_de_mutar_el_almacen() {
+        let g = id(0x60);
+        for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+            let mut almacen = AlmacenGhostdag::nuevo(
+                params(),
+                algoritmo,
+                g,
+                0,
+                RangoSolucionValidado::para_oraculos(0),
+                0,
+            );
+            let id_a = id(0xA1);
+            almacen
+                .anadir_sintetico(bloque(id_a, vec![g], 1, 5))
+                .unwrap();
+
+            let huella = |a: &AlmacenGhostdag| {
+                (
+                    a.indice.clone(),
+                    a.ids.clone(),
+                    a.padres.clone(),
+                    a.slots.clone(),
+                    a.sds.clone(),
+                    a.srs.clone(),
+                    a.idents.clone(),
+                    a.anc.clone(),
+                    a.gd.clone(),
+                )
+            };
+            let antes = huella(&almacen);
+
+            // Mismo id con otros metadatos: antes sustituía el índice y hacía crecer `ids`.
+            let err = almacen
+                .anadir_sintetico(bloque(id_a, vec![g], 2, 7))
+                .unwrap_err();
+            assert_eq!(
+                err,
+                ConsensusError::BloqueDuplicado { hash: id_a },
+                "{algoritmo:?}"
+            );
+            assert_eq!(huella(&almacen), antes, "{algoritmo:?}");
+            assert_eq!(almacen.len(), 2, "{algoritmo:?}");
+        }
+    }
+
+    /// C-GD-01: los extremos del `SR` dan `2^128` y `2^64`, y el peso del tipo validado coincide
+    /// con la fórmula pura en todo el dominio probado.
+    #[test]
+    fn los_extremos_del_sr_validado_dan_los_pesos_de_c_gd_01() {
+        assert_eq!(
+            RangoSolucionValidado::para_oraculos(0).peso(),
+            U256::one() << 128usize
+        );
+        assert_eq!(
+            RangoSolucionValidado::para_oraculos(u64::MAX).peso(),
+            U256::one() << 64usize
+        );
+        for sr in [0u64, 1, 2, 1 << 32, u64::MAX - 1, u64::MAX] {
+            assert_eq!(RangoSolucionValidado::para_oraculos(sr).peso(), peso(sr));
+        }
     }
 }

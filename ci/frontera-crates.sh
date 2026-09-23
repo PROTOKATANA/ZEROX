@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Cargo interpreta TOML: incluye aliases y dependencias condicionales, excluye las de desarrollo.
 # jq está disponible en la máquina del proyecto y en los runners ubuntu de CI.
+#
+# `zx-consensus` puede ver `zx-core` y `zx-pot`. `zx-pot` es una primitiva pura (PoT AES, encargo
+# 03a): no depende de nada del workspace, así que no reintroduce ninguna frontera que este guardián
+# proteja. Lo que sigue prohibido es que consenso vea red, estado o mempool.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 cargo metadata --locked --no-deps --format-version 1 | jq -e '
     {"zx-p2p": ["zx-core"],
-     "zx-consensus": ["zx-core"],
+     "zx-consensus": ["zx-core", "zx-pot"],
      "zx-mempool": ["zx-core", "zx-consensus"]} as $reglas |
     [.packages[] | select(.name as $n | $reglas | has($n))] as $paquetes |
     if ($paquetes | length) != ($reglas | length) then

@@ -17,6 +17,8 @@ pub mod fork_choice;
 pub mod genesis;
 pub mod ghostdag;
 pub mod peso;
+pub mod pot;
+pub mod pot_rango;
 pub mod testigo;
 pub mod timestamps;
 pub mod validacion;
@@ -24,8 +26,8 @@ pub mod validacion;
 pub use activacion::{Rama, Red, comprobar_branch_id, rama_activa};
 pub use bloque::{Bloque, BloqueValidado, ContextoBloque, validar_bloque};
 pub use bloque_dag::{
-    CandidatoSinRango, ContextoDag, ContextoRangoDag, comprobar_compromisos_cuerpo_dag,
-    comprobar_padres_contextual, comprobar_rango_contextual,
+    CandidatoSinRango, ContextoDag, ContextoRangoDag, RangoSolucionValidado,
+    comprobar_compromisos_cuerpo_dag, comprobar_padres_contextual, comprobar_rango_contextual,
 };
 pub use dificultad::{VentanaRetarget, siguiente_target};
 pub use emision::{recompensa_base, subsidio};
@@ -37,5 +39,15 @@ pub use ghostdag::{
     sumar_blue_work,
 };
 pub use peso::{PesoValidado, limite, mediana_efectiva};
+pub use pot::{
+    ALEATORIEDAD_BYTES, ENTROPIA_BYTES, ErrorContextoPot, aleatoriedad_de_salida,
+    checkpoints_a_primitiva, checkpoints_a_wire, proyectar_iteraciones, reto_desde_salida,
+    semilla_siguiente, verificar_slot_aes,
+};
+pub use pot_rango::{
+    BloqueDelPasado, CachePot, ClaveCachePot, EntradaCachePot, EstadoPot, FLUJO_BYTES,
+    InstantaneaPot, InyeccionPot, InyeccionesPot, MotivoPotInvalido, MotivoPotPendiente,
+    PresupuestoPot, verificar_rango_pot,
+};
 pub use testigo::{ContextoGasto, satisface};
 pub use validacion::{ConjuntoUtxo, EntradaUtxo, peso_tx, validar_tx};

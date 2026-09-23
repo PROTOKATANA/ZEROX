@@ -1,8 +1,78 @@
 # Estado de la migración PoSpace-Time + DAG
 
-Actualizado el 10 de septiembre de 2026 durante la limpieza autorizada del repositorio.
+Actualizado el 10 de septiembre de 2026 durante la limpieza autorizada del repositorio, con una
+actualización acotada del 2026-09-22 (véase «Actualización del 2026-09-22»).
 Este documento distingue el destino, las piezas implementadas y la evidencia; no añade reglas
 de consenso ni convierte propuestas en decisiones. El vault externo no es fuente de vigencia.
+
+## Actualización del 2026-09-22 — cabecera DAG redactada, integración pendiente
+
+Sección acotada a la fecha. No reescribe el relato de la limpieza de septiembre ni convierte
+propuestas en decisiones.
+
+- **Redactado en el SPEC.** `SPEC.md` §6.1–§6.2 fijan el layout de la cabecera DAG (C-HDR-01),
+  la prefirma (C-HDR-03), el codec único (C-HDR-09) y la justificación PoT (C-HDR-07): prefijo
+  PoAS `[0, 492)`, `body_commitment` `[492, 524)`, `parent_count` `[524, 525)`,
+  `extra_parents` `[525, 525 + 32·(P−1))` y `sello` al final, con `589 + 32·(P−1)` bytes y
+  `1 ≤ P ≤ 15`. El texto normativo del formato no deja nada pendiente; lo que sigue abierto son
+  los valores del controlador de rango y de la finalidad, no la cabecera.
+- **No integrado en la ruta activa.** La ruta del nodo sigue usando la cabecera lineal de 92 B;
+  la discrepancia 92/556 persiste y `el_codigo_alcanza_la_base_poas_de_556` sigue ignorado a
+  propósito. La cabecera redactada **no demuestra** que exista un nodo PoST + DAG completo.
+- **Resultados históricos frente a comprobaciones de esta actualización.** La verificación de la
+  limpieza (`cargo fmt/check/clippy/test`, 10 de septiembre) es **histórica** y pertenece a aquel
+  árbol. En la actualización del 2026-09-22 **no se ha reejecutado `cargo test`**: las
+  comprobaciones hechas aquí son documentales (`git diff --check`, `ci/citas-spec.sh`) y ningún
+  recuento de tests se presenta como «actual». Cualquier cifra de tests debe citarse con su fecha
+  y su árbol.
+
+### Ampliación del 2026-09-22 — primitiva PoT incorporada, sin cablear (encargo 03a)
+
+Sección acotada. Corrige, **solo para este incremento**, la nota anterior sobre `cargo test`: aquí
+sí se ejecutaron tests y se citan con su comando exacto. El aserto sigue siendo válido para la
+cabecera DAG del incremento anterior, que no reejecutó la suite.
+
+- **La primitiva entra al workspace.** `crates/zx-pot` incorpora `prototipos/pot-estable`
+  —`subspace-proof-of-time` @ `f8842d0`, 0BSD— sin reescribir el AES. Los ficheros `src/aes.rs`,
+  `src/aes/x86_64.rs`, `src/aes/aarch64.rs` y `src/tipos.rs` son **byte a byte idénticos** al
+  prototipo; `crates/zx-pot/rustfmt.toml` usa `skip_children` para no reformatearlos. El prototipo
+  **no se modifica** y sigue en su sitio como fuente de contraste.
+- **Dependencias fijadas, no sustituidas.** `aes = "=0.9.3"` y `blake3 = "=1.8.7"` (más
+  `cpufeatures = "=0.2.17"`), exactamente las del lock del prototipo. **No** se intercambió AES por
+  el `0.8.4` que ya estaba en el lock raíz por `aes-gcm`: habría cambiado la primitiva. El
+  `Cargo.lock` se actualizó con `cargo check -p zx-pot --offline`; las seis bajadas ajenas que la
+  re-resolución MSRV-aware hizo (`hermit-abi`, `js-sys`, `wasm-bindgen` ×4) se restauraron para que
+  el diff **no baje ninguna versión ajena** —solo añade paquetes y desambigua las referencias
+  duplicadas—, y `cargo check -p zx-pot --locked --offline` lo acepta.
+- **Los 32 vectores siguen siendo la validación externa.** `cargo test -p zx-pot --locked
+  --offline`: 5/5 en verde (1 del AES interno, 3 de la primitiva, 1 del diferencial de 32 vectores).
+- **Adaptador puro en `zx-consensus`, no en `zx-core`.** `crates/zx-consensus/src/pot.rs` convierte
+  los ocho valores de 16 B del wire a los checkpoints de `zx-pot` **valor a valor, sin `transmute`**,
+  y expone `verificar_slot_aes(semilla, N, checkpoints)`. Nunca se llama «validar bloque». La
+  proyección `N(s): u64 → NonZeroU32` (`proyectar_iteraciones`) da **error de contexto** —cero,
+  `> u32::MAX` o no múltiplo de 16—, no «prueba inválida»; el futuro verificador de bloque lo
+  traducirá a `Pendiente`. Los tests de límites no ejecutan AES con valores enormes.
+- **Origen causal: pendiente, no acreditado.** La semilla y `N(s)` **no viajan** en los
+  checkpoints del wire, pero el adaptador acepta **argumentos libres** y **no acredita su origen
+  causal**; esa garantía corresponde al futuro verificador contextual, que no existe.
+  `zx-core::wire_dag::verificar_justificacion_pot` **no se ha tocado** y sigue devolviendo
+  `IntegracionPotPendiente`; `zx-node` sigue con la cabecera lineal. No se han conectado caché,
+  flujo, PoAS ni el controlador de rango, y no se ha fijado `D` ni `N(s)`.
+- **Inventario actualizado.** `C-POT-02` (contrato de verificación de un slot, probado) y
+  `C-POT-04` (solo la proyección) pasan de `ci/reglas-sin-codigo.txt` a
+  `ci/reglas-sin-cablear.txt`; `C-POT-01`, `C-POT-03` y `C-POT-05`…`C-POT-08` siguen sin código.
+  Las funciones del adaptador están declaradas en `ci/consenso-pendiente.txt` y
+  `ci/frontera-crates.sh` admite `zx-consensus → zx-pot`. Guardianes en verde.
+- **Comprobaciones de este incremento, con su árbol.** `cargo fmt --all -- --check`;
+  `cargo check --workspace --locked --offline`; `cargo test -p zx-consensus --test pot_slot
+  --locked --offline` (7/7); `cargo clippy` con `-D warnings` sobre `zx-pot` (todos los targets) y
+  sobre `zx-consensus --lib --test pot_slot`;
+  `ci/citas-spec.sh`, `ci/alcance-consenso.sh`, `ci/frontera-crates.sh`,
+  `ci/dependencias-exactas.sh` y `git diff --check`. No se ejecutó la suite completa del workspace.
+- **Lo que esto NO es.** No resuelve el doble farmeo, no convierte a ZEROX en un nodo que valide
+  bloques PoST y no cierra `C-FLU-*`, `C-HDR-07` ni la finalidad. La ruta ARM (`aarch64.rs`) se
+  conserva intacta pero **no se ha compilado ni verificado** en esta máquina `x86_64`: sigue usando
+  `core::simd` y no se presenta como probada.
 
 ## Destino y límites
 
@@ -90,9 +160,13 @@ consenso vigente ni evidencia de que el objetivo tenga el ritmo de bloques del c
 Eliminar toda esa dependencia requiere una migración funcional con contratos de cabecera, pruebas,
 rango, orden UTXO y finalidad; no se ha simulado esa migración durante la limpieza.
 
-La base PoAS de 556 bytes no especifica aún la cabecera final con padres DAG. Los tests que
-detectan discrepancias de formato deben conservar su significado: pasar tests del formato
-existente no puede presentarse como implementar el nuevo.
+La base PoAS de 556 bytes describe el prefijo y el sello, y la **cabecera DAG ya está redactada**
+en `SPEC.md` §6.1–§6.2 (prefijo fijo `[0, 492)`, `body_commitment`, `parent_count` y
+`extra_parents` antes del sello, `589 + 32·(P−1)` bytes con `1 ≤ P ≤ 15`). Que esté redactada
+**no significa que el código la implemente**: la ruta activa del nodo sigue ligada a la cabecera
+lineal de 92 B y la integración completa sigue pendiente. Los tests que detectan discrepancias
+de formato deben conservar su significado: pasar tests del formato existente no puede presentarse
+como implementar el nuevo.
 
 ## Verificación de la limpieza
 
