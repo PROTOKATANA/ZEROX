@@ -94,6 +94,44 @@ Verificado el 2026-09-23 leyendo el código, no los documentos:
 
 **Inventario completo y ordenado por dependencias:** `P-ZRX/T-ZRX/PIEZAS-DE-CODIGO.md`. **Ábrelo.**
 
+### 1.1 · Antes de medir, decidir o proponer nada: LEE LO QUE YA ESTÁ HECHO
+
+**El desperdicio más caro de este repositorio es repetir trabajo ya hecho.** Ha pasado: en un
+encargo de esta misma serie se citó una vía como viva sin haber mirado que otro encargo la había
+**refutado con números** semanas antes. No la buscó — y la conclusión salió contaminada.
+
+**Regla: antes de montar una auditoría, tomar una decisión o dar por abierto un problema, comprueba
+si ya está resuelto.** Un `grep` del concepto en `P-ZRX/`, `veritas/` y `research/` cuesta segundos.
+
+**Dónde mirar, y qué te da cada sitio:**
+
+| Dónde | Qué encuentras | Cuándo mirarlo |
+|---|---|---|
+| **`P-ZRX/T-ZRX/ESTADO-DOBLE-FARMEO.md`** | Las nueve vías cerradas del doble farmeo, con la ruta de la prueba de cada una | **Siempre, antes que nada** |
+| **`P-ZRX/T-ZRX/LIBRO-DE-RESTRICCIONES.md`** | Las **doce restricciones duras** que toda pieza nueva debe pasar, con su alcance exacto — y el apéndice de lo que quedó aparcado | Antes de proponer cualquier mecanismo |
+| **`P-ZRX/T-ZRX/INVENTARIO-ABIERTO.md`** | Todo lo que sigue abierto, por tipo, con el grafo de bloqueos | Para saber si algo es problema conocido |
+| **`P-ZRX/PROPUESTAS-VIABLES.md`** | El tablero: qué propuesta está en qué fase, con **bitácora fechada** de cada movimiento | Para ver si tu idea ya subió o cayó |
+| **`P-ZRX/P-*/investigacion/INFORME.md`** | Los encargos entregados. **Cada uno cierra con «Lo que esta investigación NO resuelve»: ahí está exactamente lo que falta** | Antes de medir algo de su tema |
+| **`veritas/<categoria>/<instrumento>/`** | Instrumentos migrados y validados, con `INFORME.md`, `CONTRATO.md`, `METODO.md`, `PROCEDENCIA.md` y `HUELLAS.sha256` | Para reutilizar una medición en vez de rehacerla |
+| **`research/README.md`** | Índice de la investigación histórica | Para el porqué de decisiones antiguas |
+| **`ci/reglas-sin-codigo.txt`, `ci/reglas-sin-cablear.txt`, `ci/consenso-pendiente.txt`** | Los inventarios que el **propio CI** mantiene sobre qué falta | Antes de decir que algo no está implementado |
+| **`crates/*/src/`** | El código **y sus doc comments**, que en este repositorio llevan escrita la razón de la decisión y a menudo el hueco conocido | Antes de reescribir algo que quizá ya existe |
+| **`PDF/autonomys-subspace/`** (clon fijado `f8842d0`) | **La fuente de verdad del formato de parcela.** Enlaza contra su API pública; no la reimplementes | Para cualquier duda sobre PoAS, sectores, s-buckets o KZG |
+| **`SPEC.md`** | Las reglas normativas. **Cítalas por ID, nunca por línea** | Siempre que implementes una regla |
+| **`AGENTS.md`, `MIGRACION.md`, `README.md`** | Alcance autorizado, estado de la migración y qué no es fuente de vigencia | Al empezar |
+
+**Dos trampas al leer, las dos vistas en esta serie:**
+
+1. **«No se ha encontrado» no es «no puede existir».** Varios informes se niegan expresamente a dar
+   ese salto, y con razón. No conviertas un límite de búsqueda en un teorema.
+2. **Lee el ALCANCE, no solo la conclusión.** Un resultado correcto con alcance estrecho presentado
+   con etiqueta ancha es el error que más veces ha aparecido aquí. Si un informe dice `derivado` o
+   `condicionado a H3`, eso forma parte del resultado.
+
+**Y si encuentras que algo ya está medido: úsalo como entrada, no lo repitas.** Si crees que la cifra
+está mal, dilo con el argumento — pero no gastes la noche rehaciéndola.
+
+
 ## 2 · La decisión de arquitectura — YA TOMADA por Katana (2026-09-24)
 
 La ruta activa es PoW lineal heredado; el destino es PoST + DAG. **Katana ha decidido: (b) escribir
@@ -277,9 +315,11 @@ trabajo legítimo de este encargo.
 0.0.1 es código; las mediciones son medios, no el fin.** Si una auditoría se te alarga más de lo que
 tardarías en la pieza que bloquea, dilo y decidimos.
 
-**Antes de montar nada, comprueba si ya está medido.** Hay nueve encargos entregados en `P-ZRX/` e
-instrumentos migrados en `veritas/`. Reinventar una medición existente es el desperdicio más caro de
-este repositorio.
+**Antes de montar nada, aplica §1.1: comprueba si ya está medido.** Hay nueve encargos entregados en
+`P-ZRX/` e instrumentos migrados en `veritas/`, y **cada informe cierra con «Lo que esta
+investigación NO resuelve»** — ahí está, literalmente, lo que falta y lo que no. Reinventar una
+medición existente es el desperdicio más caro de este repositorio, y **ya ha ocurrido en esta
+serie**.
 
 **Cómo hacerla — no es negociable** (`AGENTS.md` y `veritas/LINEO.md`):
 
