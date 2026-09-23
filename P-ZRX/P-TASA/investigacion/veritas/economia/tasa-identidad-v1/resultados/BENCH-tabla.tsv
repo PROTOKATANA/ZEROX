@@ -1,0 +1,12 @@
+variante	tiempo_mediano_ms	asignaciones_bytes	allocs	hilos	frente_a_la_referencia
+Φ Pareto cerrada (1 punto)	3.0994969818913485e-5	0	0	4	—
+Φ Pareto cerrada (rejilla 10^4)	0.153127	0	0	4	= Phi_espacio en la rejilla
+Φ Riemann K=20.000 (oráculo)	1.185397	0	0	4	acota la cerrada
+MC 1 réplica M=10^4	0.166507	0	0	4	—
+MC 4 réplicas M=10^4 (1 hilo)	0.658407	1744	32	4	—
+MC 4 réplicas M=10^4 (4 hilos)	0.175647	3504	54	4	idéntico al serial
+f_detenida (kernel)	1.709e-6	0	0	4	—
+τ_min (kernel)	1.3089999999999999e-6	0	0	4	—
+barrido de tasa (200 puntos)	0.0062378	3328	4	4	—
+reclutamiento avaricioso n=10^3	0.00119	16144	6	4	cota superior, no óptimo
+reclutamiento exacto 2 niveles K=10^6	0.686236	0	0	4	= fuerza bruta en K pequeño

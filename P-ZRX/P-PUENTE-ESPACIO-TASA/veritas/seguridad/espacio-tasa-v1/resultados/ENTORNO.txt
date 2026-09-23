@@ -1,0 +1,10 @@
+# ENTORNO — espacio-tasa-v1
+fecha	2026-09-23T20:06:54.766
+julia	1.13.0
+cpu	znver5
+nucleos	32 logicos
+ram_gib	123.4
+hilos_default	1
+hilos_interactive	0
+blas	LBTConfig([ILP64] libopenblas64_.so)
+git	98abede40b1534756385ce64db5335fb4480ff99

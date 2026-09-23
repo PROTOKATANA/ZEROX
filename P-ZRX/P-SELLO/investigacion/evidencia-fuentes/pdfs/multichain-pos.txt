@@ -1,0 +1,936 @@
+arXiv:1907.07896v1  [cs.CR]  18 Jul 2019
+Towards a Multi-Chain Future of Proof-of-Space
+Shuyang Tang1, Jilai Zheng 1, Yao Deng 1, Ziyu Wang 2, Zhiqiang Liu 1⋆(/A0 ), and
+Dawu Gu 1( /A0 )
+1Department of Computer Science and Engineering, Shanghai J iao Tong University,
+Shanghai, China
+{htftsy, zhengjilai, deng19930115 }@sjtu.edu.cn
+{liu-zq,gu-dw} @cs.sjtu.edu.cn
+2 School of Cyber Science and Technology, Beihang University , Beijing, China
+wangziyu@buaa.edu.cn
+Abstract. Proof-of-Space provides an intriguing alternative for con sen-
+sus protocol of permissionless blockchains due to its recyc lable nature
+and the potential to support multiple chains simultaneousl y. However, a
+direct shared proof of the same storage, which was adopted in the ex-
+isting multi-chain schemes based on Proof-of-Space, could give rise to
+newborn attack on new chain launching. To ﬁx this gap, we prop ose an
+innovative framework of single-chain Proof-of-Space and f urther present
+a novel multi-chain scheme which can resist newborn attack e ﬀectively
+by elaborately combining shared proof and chain-speciﬁc pr oof of stor-
+age. Moreover, we analyze the security of the multi-chain sc heme and
+prove that it is incentive-compatible. This means that part icipants in
+such multi-chain system can achieve their greatest utility with our pro-
+posed strategy of storage resource partition.
+Keywords: Blockchain· Mechanism Design · Consensus· Cryptocur-
+rency· Proof-of-Space
+1 Introduction
+Since the proposal of Bitcoin in 2008 [ 1], blockchain has been successfully pro-
+viding a decentralized consensus on a distributive ledger in a permissio nless en-
+vironment through a peer-to-peer network. In a high level, blockc hain is a chain
+of blocks, each containing certain linearly ordered transactions. T he consensus of
+blockchain performs a “leader election” process and a “ledger exte nsion” process
+for each round. The “leader election” process elects one or few leaders from all
+consensus participants (known as miners) according to their computing power,
+and then these leaders perform a “ledger extension” process via a ppending their
+proposed blocks to the rear of the blockchain. Since the speciﬁc co mputing power
+is evaluated by having miners work on ﬁnding certain hash functions p reimages,
+⋆ Zhiqiang Liu ( liu-zq@cs.sjtu.edu.cn) and Dawu Gu ( gu-dw@cs.sjtu.edu.cn) are
+the corresponding authors. The research is supported by the National Natural Sci-
+ence Foundation of China (Grant No. 61672347).
+2 Shuyang Tang et. al.
+such a way of leader election is called Proof-of-Work (PoW) [2]. The computing
+power of conducting PoW is referred to as hash power.
+PoW consensus scheme suﬀers from notorious consumption of has h power
+which turns out to be a waste of natural resource. This circumsta nces has acti-
+vated the investigation of alternative consensus schemes which ar e more energy-
+eﬃcient. An alternative consensus scheme is Proof-of-Stake (PoS) [ 3–9]. In the
+“leader election” process of PoS consensus scheme, the leader is r andomly se-
+lected proportionally to the stake that each miner holds, rather than the hash
+power. Another alternative to PoW is Proof-of-Space (aka. Proof-of-Capacity,
+PoC). In PoC consensus, the one-time consumption of hash power is replaced by
+the holding of the storage resource, namely, recyclable hardware disks. Also, PoC
+is inherited with a nature of concurrency by providing resource pro of for multiple
+chains simultaneously. With a shared nonce for the pebbling graph [10–12] (PG,
+the building block of most existing PoC-based consensus schemes), the claim on
+the same storage can be applied to the consensus of more than one PG-based
+blockchain. With such a shared proof of storage, the same storag e contributes
+to the security of multiple chains – less total resource is required fo r the same
+security guarantee globally.
+However, a direct shared proof of the same storage brings about newborn
+attack, which makes new chains hard to launch since holders of large storag e
+pools may attack a newly started chain with almost zero-cost (it nee ds only
+to duplicate the proof one more time). In this paper, we aim to addre ss this
+issue by proposing an innovative multi-chain scheme of proof-of-sp ace based on
+the SpaceMint [ 13] protocol. This scheme is built on a combination of a shared
+proof and a chain-speciﬁc proof of storage, which makes the same storage source
+contributes simultaneously to multiple blockchains, and the cost for an adversary
+to launch a newborn attack is enormous. Moreover, we prove that our scheme is
+incentive-compatible, which means participants can achieve their gr eatest utility
+with our desired strategy of storage resource partition.
+1.1 Related Works
+Two recent works [ 14, 15]both proposed their “Proof-of-Space” protocol. Their
+main diﬀerence is whether the proofs are for transient storage or persistent stor-
+age. Proof of transient space(PoTS) by Ateniese et al. [ 14] enables eﬃcient ver-
+iﬁcation of memory-hard function [ 16], which is a function that needs a lot of
+space to compute. In this work, a veriﬁer only needs O(poly logS) time and
+space to verify the claimed space usage of the prover, where S is the amount
+of storage the prover P wants to dedicate. Proof of persistent space(PoPS) by
+Dziembowski et. al. [ 15] allows the veriﬁer to repeatedly audit the prover. Only
+prover who stores the data persistently can pass the repeatedly audit.
+Proof of retrievability(PoR) [ 17] allows a user who outsources some useful
+data to an untrusted server to repeatedly verify if the data is still existing in
+the server. The diﬀerence between PoPS and PoR is whether a large amount of
+initial data is transferred from veriﬁer V to prover P.
+Towards a Multi-Chain Future of Proof-of-Space 3
+Previous PoC constructions only diﬀer in the pebbling graphs G . Dziem-
+bowski et. al. [ 15] proposed two constructions of PoC schemes in the random
+oracle model, using Merkle tree and graphs with high “pebbling complex ity”.
+One is based on a graph with high pebbling complexity by Paul et. al. [ 18], which
+is (Θ(S/ logS),S/ logS,∞)-secure (see deﬁnition in Sec. 2.2). Another one com-
+bines superconcentrators [ 19–21], random bipartite expander graphs [ 22,23] and
+depth robust graphs [ 24, 25] and is
+(Θ(S),∞,Θ (S))-secure
+The construction of Ren and Devadas [ 26] uses stacked bipartite expander
+graphs, which is
+(α·S, (1−α)·S,∞)-secure
+for anyα∈ [0, 0.5]. The labels of the graph are computed just as in [ 15], however
+the prover only stores the labels on top of this stack.
+The construction of Krzysztof Pietrzak [ 27] uses depth-robust graphs from
+[16] to realize PoC, which is
+(S· (1−ǫ),∞,S )-secure
+This construction has a tight bound, which means it can get security against
+adversary storing (1−ǫ) fraction of the space. Moreover, this construction gets
+security against parallelism, which implies massive parallelism of oracle qu eries
+doesn’t beneﬁt the adversary. Besides, this work also introduces and constructs
+a new type of PoC, which allows the prover to store useful data at t he same
+time.
+1.2 Paper Organization
+The remainder of this paper is organized as follows. Sec. 2 introduces notations,
+building blocks and the background of PoC. Sec. 3 presents a single-chain PoC
+scheme built on SpaceMint – one of the most well-known PoC scheme to day.
+Based on this, in Sec. 4, we describe our framework for the multi-chain PoC
+scheme both by a general functionality and a speciﬁc protocol rea lizing one case
+of the functionality. Finally, we analyze the incentive compatibility and security
+of our framework in Sec. 5.
+2 Backgrounds
+2.1 Notations
+For a set S,|S| denotes the number of elements in S. With “||” we denote con-
+catenation of strings. More generally, for any two tuples m1, m2, m1◦ m2 is
+the concatenation of them and for unary tuple m1 = (m), m1◦ m2 is written
+as m◦ m2 (same to the case of m2 = ( m)). We ideally assume N partici-
+pants and refer to them by either identities ( P1,P 2,...,P N ) or their public keys
+4 Shuyang Tang et. al.
+(pk1, pk2,..., pkN ) interchangeably. The secret key corresponding to a public
+key pk is denoted as pk−1 for simplicity. To further facilitate our description of
+a high-level framework. We assume a public-key infrastructure (P KI) among all
+participants, which is described by a functionality Fcert. Moreover, to any tuple
+of messages ( m0,m 1,...,m ℓ), we use ( m0,m 1,...,m ℓ)pk−1 to signify the tuple
+along with the valid signature on the tuple hash from the participant o f public
+key pk. In later descriptions, we may take the necessity of signing and ver ify-
+ing as granted and avoid redundant descriptions. We assume a hash function
+H :{0, 1}∗→{ 0, 1}λ simulating the random oracle [ 28]. Note that based on H,
+we can build Hz for any message z as Hz(·) := H(z||·) [ 29].
+2.2 Proof-of-Space
+Proof-of-space is an interactive protocol between a prover P and a veriﬁer V
+that demonstrates the prover P is storing some data of a certain size. The PoC
+protocol in [ 15] involves two phases: initialization phase and execution phase.
+Initialization is an interactive process between the prover P and the veriﬁer
+V. It runs on shared inputs ( id,S ). id is an identiﬁer to assure that the prover
+P cannot reuse the same disk space to run PoC for diﬀerent stateme nt.S is the
+amount of storage the prover P wants to dedicate. After the initialization phase,
+P stores some data F , whereas V only stores a commitment γ to F.
+Execution is an interactive process between the prover P and the veriﬁer V.
+The prover P runs on data F and the veriﬁer V runs on input γ. Then the veriﬁer
+V sends challenges to the prover P, obtains back the corresponding openings. At
+the end V veriﬁes these openings and outputs accept or reject.
+The security of a PoC protocol was formally deﬁned in [ 15]. Speciﬁcally, a
+(S0,S 1,T )-adversarial prover ˆP was deﬁned, which means ˆP’s storage after the
+initialization phase is bounded by S0, while during the execution phase it runs
+in storage at most S1 and time at most T . Secure PoC protocols are required to
+have three properties, which are completeness, soundness and e ﬃciency.
+1. Completeness: We say a PoC protocol has completeness if the ve riﬁer always
+outputs accept for any honest prover P with probability 1.
+2. Soundness: We say a PoC protocol has soundness if the veriﬁer V outputs
+accept with a negligible probability for any ( S0,S 1,T )-adversarial prover ˆP .
+3. Eﬃciency: We say a PoC protocol has eﬃciency if the veriﬁer V can run in
+time O(poly logS).
+We say that a PoC protocol is ( S0,S 1,T )-secure if the above three properties
+are satisﬁed.
+3 Single-Chain Proof-of-Space
+In this section, we use SpaceMint protocol as the building block of ou r multi-
+chain protocol to be described in the latter section.
+Towards a Multi-Chain Future of Proof-of-Space 5
+3.1 Graph Labeling Game
+At ﬁrst, we introduce the graph labeling game [ 30, 31].
+Deﬁnition 1 (Graph Labelling). We consider a directed acyclic graph (DAG)
+G = (V,E ) ,which has a vertex set V ={0, 1,...,S − 1} and a hash function
+H :{0, 1}∗→{ 0, 1}λ, the label li∈{ 0, 1}λ for each vertex i∈ V is recursively
+computed as li = H(nc,i,l p1,...,l pt ) where lp1,...,l pt are the parents of vertex i
+and nc is a unique nonce.
+Graph labeling game is the building block of most PoC protocols. Let G = (V,E )
+be a directed acyclic graph (DAG) which has S nodes . H :{0, 1}∗→{ 0, 1}λ
+is a collision-resistant hash function. For every id, a fresh hash function can be
+sampled:Hid =H(id||·). The PoC protocol based on the graph labeling game is
+as follows:
+1. Initialization: First, P computes the labels on all nodes of G using graph
+labelling, and commits to them in γ using Merkle-tree Commitment. Then
+P gets q challenges from V. For each of the challenges C = (C1,...,C q),
+P opens the label on the Cth
+i node of G, as same as the labels of all its
+parent nodes. Finally, V checks the openings of all challenge nodes and their
+parents. V also checks if the challenge nodes are computed correctly from
+their parents.
+2. Execution: V choosest challenge nodes randomly. Then P sends the opening
+of these challenge nodes to V. This execution phase can be done repeatedly.
+3.2 PoC Deﬁnition
+Before introducing how to apply any PoC schemes to blockchains, we introduce
+the formal description of a PoC at ﬁrst designed to apply between t wo parties.
+A PoC scheme built on a hash oracle H is described as Π PoC = (init, open, vrf).
+Speciﬁcally,
+Space Commitment. ΠPoC.initH (S)→ (γ,~γ) inputs the size of the pebbling
+graph and returns a pair ( γ,~γ) after building up the graph where γ is the
+commitment released to the publicity and ~γ is a secret to be locally stored.
+Commitment Opening. ΠPoC.openH (S,~γ,C )→ τ takes as input the graph
+size, the threshold ~γ, the challenge C and returns a proof τ .
+V eriﬁcation. ΠPoC.vrfH (S,γ,C,τ )→{accept,reject} veriﬁes a proof τ for the
+challengeC to the graph of size S and public commitment γ.
+3.3 SpaceMint
+In SpaceMint [13], the structure of blocks is identical to Bitcoin blockchain except
+for containing a space proof instead of a hash solution. Furthermo re, the detailed
+protocol of SpaceMint is similar to any blockchain, in spite that the min ing
+and chain-competition diﬀer from that of PoW-based blockchains. T hereby, it is
+too redundant to cover every details to introduce the full scheme . To describe
+SpaceMint, we only need to enumerate all the diﬀerence between Sp aceMint and
+the ordinary blockchain.
+6 Shuyang Tang et. al.
+s0
+s1
+s2
+. . .
+sM
+Fig. 1. Capacity Resource Partition
+Initial Step. For a miner to dedicate λN bits of storage to the blockchain
+network, it computes and stores the labels of their pebbling graph t o get
+(γ,~γ)← ΠPoC.initH (S) at the initial stage. Afterwards sctx = (pk,γ )pk−1 is
+broadcast to the network.
+The Mining. Each miner maintains a main chain (the chain branch with the
+greatest total weight) in its view. We denote the chain as ( A1,A 2,...,A i−1)
+and their corresponding proofs as τ 1,τ 2,...,τ i−1 (i≥∆). To mine the next
+block Ai, the miner at ﬁrst derives the challenge for block i from the proof
+of block i−∆, i.e., Ci =H(τi−∆) mod S. Thereby, the miner obtains τ←
+ΠPoC.openH (S,~γ,C i) and assembles Ai with τ . This diﬀers from PoW.
+Block V eriﬁcation. Diﬀerent from the nonce veriﬁcation in the existing blockchain,
+we in SpaceMint should check the open-upτ of each block by ΠPoC.vrfH (S,γ,C,τ ).
+Chain Weight. Assuming a block is followed bym sequential blocks (A1,A 2,...,A m),
+which have valid proofs τ 1,τ 2,...,τ m respectively, and that the correspond-
+ing space contributed by these miners are S1,S 2,...,S m. The weight of Ai is
+deﬁned as follows:
+weight(Ai) = (H(τ i)
+2λ )1/Si
+It can be proved that the probability that Ai has the largest weight among
+these m blocks equals to his fraction of the total space, which is Si
+∑m
+k=1 Sk .
+In this way, in a chain competition, the chain branch with the greates t total
+weight outruns the others. This diﬀers from the existing blockchain where
+the block weight is atomic (either one or zero).
+4 A Multi-Chain scheme
+In this section, we introduce our framework for the multi-chain sch eme of proof-
+of-space. To this end, we ﬁrst describe our high-level functionalit y and then
+propose one possible realization of the functionality based on the af orementioned
+SpaceMint-based single-chain protocol.
+4.1 F unctionalities
+In a high level, as Fig. 1, we expect to have all participants pay half of the
+total storage for purchasing the upper bound of their admissible s torage (the
+shared proof part, denoted as s0), and allocate the rest half of storage on each
+supportive chains respectively according to their market weight ( si for chain i).
+Towards a Multi-Chain Future of Proof-of-Space 7
+FunctionalityGmain
+Shared functionalityGmain interacts with all participants P1, P2, . . . , PN , the environ-
+mentZ, as well as a public-key infrastructure Fcert and a publicly shared global clock
+functionalityGCLOCK.
+This functionality is parameterized by the number of candid ates N (this is a variant
+in the permissionless setting, but we take this notation for the simplicity of descrip-
+tions), the number of adversary controlled parties t. A predetermined parameter lsize
+describes the number of leaders to be elected for a round whic h varies among diﬀerent
+emulations of the functionality. The ledger ledgerk := ǫ of each chain k∈ [M ] is a
+linearly ordered list of transactions initially set as empt y.
+Each round (round R) proceeds as follows.
+– Leader Election.
+• Querying each participant Pi for its resource partition si = (si
+0, si
+1, . . . , si
+M ).
+• For each i∈ [N ] and k∈ [M ], calculate weightk
+i := w(si, B, k).
+• For each j∈ [lsize] and k∈ [M ], pick leaderk
+j from{Pi}i∈[N] randomly such that
+leaderk
+j = Pi for each participant Pi with the probability proportional to weightk
+i .
+– Ledger Extension.
+• For each chain k ∈ [M ], fetch from the environment Z a tuple of transactions
+{txi
+R,k}i∈[ℓ], sort them into a linear list txR,k.
+• For each chain k∈ [M ], extend the ledger by appending txR,k into its rear ledgerk :=
+ledgerk⊕ txR,k.
+– Reward Issuing.
+• For each chain k∈ [M ], let txreward
+R,k := ( txk
+leader1 , txk
+leader2 , . . . , txk
+leaderlsize ) where each
+txk
+leaderj is a specially formed transaction that allocates
+rewardk
+R+ℓ×fee
+lsize to leaderk,j .
+• For each chain k∈ [M ], issue rewards and transaction fees to leaders by appendin g
+txreward
+R,k to the ledger ledgerk := ledgerk⊕ txreward
+R,k .
+• Pend till the global time clock GCLOCK issuing the end of the round R := R + 1.
+Fig. 2. The Main Functionality
+Speciﬁcally, to a chain i with βi = Bi
+||B|| (Bi is the sum of si for all participants)
+fraction of total storage proof, we stimulate the participant to a llocate si = βis0
+storage on it. To allow for the start-up of new chains, we in actual a sk that
+si≤ (1 +δ)βis0. Clearly, as an equilibrium of economics, the total storage proof
+behind a blockchain is proportional to the total market weight of th e chain.
+Therefore, the market weight of each chain is described by the tot al storage
+proof behind the chain. Also, we assume that the amount of release d coins and
+transaction fees is the same to all chains for each round and hence the per-coin
+value is proportional to our deﬁned market weight.
+In all, our system supports M diﬀerent PoC-based blockchains. Each (jth) of
+them elects leaders according to si
+j. Speciﬁcally, each miner ( ith) has the chance
+of being the leader of each round by
+w(s, B,k ) :=
+{ sk
+Bk+sk
+, sk≤ (1 +δ)β′
+ks0
+~sk
+Bk+~sk
+, otherwise
+8 Shuyang Tang et. al.
+where B′
+k := Bk + sk, β′ := B′
+||B′|| , and ~sk := max sk{sk≤ (1 +δ)β′
+ks0}. The
+exact formula of sk is easy to uncover by solving a quadratic equation (hence
+can be described in codes when implemented). However, we remain th e current
+formulation for readability. To facilitate proofs in later sections, we observe that
+ψB,k(s) := w(s, B,k ) is continuous on ( R+)M+1 and is smooth almost every-
+where (a.e.) on ( R+)M+1 except for{s∈ (R+)M+1|sk = (1 +δ)β′
+ks0} with zero
+Lebesgue-measure for each k∈ [M ].
+The detailed description of the functionality is shown in Fig. 2, where we aim
+to provide a framework more general than our speciﬁc way of realiz ation so the
+size of leaders to be elected for each round is parameterized by lsize. In fact, lsize
+of most existing blockchains and our realization based on SpaceMint is simply
+1.
+4.2 A Protocol for lsize = 1
+To build our realization of the above functionality with lsize = 1 based on our
+SpaceMint-based single-chain PoC protocol in the previous section , most steps
+are natural implementations of our building block. However, few issu es should be
+carefully considered alongside. To establish a commonly veriﬁable com putation
+on the market weight B in a decentralized environment, we assume that the
+market weight of each chain is proportional to the summed weight of latest ∆
+consequent blocks by a constant factor µ. To make sure that each space proof
+is used for only one identity, there should be a pool Γ of space commits locally
+store in each node. We have put the speciﬁc protocol in Fig. 3 since details are
+not crucial to the roadmap of our paper.
+5 Framework Analysis
+The realization of our functionality in Fig. 2 should satisfy both safety and live-
+ness. The analysis of basic safety and liveness is speciﬁc to the way o f realization.
+In our protocol to realize the functionality with lsize = 1, the basic safety and
+liveness properties of the realization are inherited from SpaceMint. In this sec-
+tion, we focus on two higher-leveled properties of our general fra mework for a
+PoC multi-chain future, namely, incentive compatibility and the syste m security
+that a considerable fraction of global storage resource has to be held by an ad-
+versary to devastate any chain under the framework, even for n ewly launched
+chains or chains with the least market weight.
+5.1 Incentive Compatibility
+In this part, we prove that our framework is incentive-compatible. Namely, par-
+ticipants achieve their greatest utility (the most expected revenu e) with our
+desired strategy of storage resource partition. Without loss of g enerality, we
+considerδ = 0 to simplify our proofs. Also, we assume β′ = β from time to time
+to simplify proofs. To begin with, we formally describe the partition st rategy.
+Towards a Multi-Chain Future of Proof-of-Space 9
+Deﬁnition 2 (Capacity Resource Partition). For each participant with to-
+tal capacity c, all its admissible resource partitions form the space D M+1
+c ⊂
+(R+)M+1 that∑ M
+i=0si =c for each s = (s0,s 1,...,s M )∈ D M+1
+c . Furthermore,
+we introduce D M+1 :=∪c∈R+ D M+1
+c .
+Likewise, we denote D M
+1 as the set of vectors ( β1,β 2,...,β M )⊂ (R+)M of
+length M that∑ M
+i=0βi = 1.
+The utility function is a mapping from a partition strategy to the expe cted
+revenue for each round. To deﬁne the global utility function, we ﬁr stly introduce
+the chain-speciﬁc utility function.
+Deﬁnition 3 (Chain-Speciﬁc Utility F unction). The chain-speciﬁc utility
+function for chain k is
+val(s, B,k ) := r×w(s, B,k )×ωBk.
+Intuitively, r is a positive constant, w(s, B,k ) (proportionally) describes the
+probability of becoming the leader of each round, and the per -coin value of chain
+k is proportional to the market weight of the chain (hence is ωBk for a positive
+constant ω). Note that we have assume that the minted coins and transact ion
+fees are the same for each chain and for each round, hence it is not a necessity
+to add in another factor for it in the multiplication.
+At a ﬁrst glance, the formula above seems ﬁt only into the scenario o f lsize = 1.
+Actually, in the multi-leader case, each participant has lsize times the chance to
+become an leader while each leader has only 1
+lsize fraction of total revenue. By
+lsize·sk
+B′[k] · r
+lsize·ωB′
+k = sk
+B′
+k
+·r·ωB′
+k, the expected revenue remains identical to the
+one-leader case.
+Deﬁnition 4 (The Utility F unction). Thereby the ﬁnal utility function is
+the sum of all chain-speciﬁc utility functions
+U (s, B) :=
+M∑
+k=1
+val(s, B,k ).
+The optimal resource partition strategy is clearly depicted as below .
+Deﬁnition 5 (Optimal Resource Partition). To a participant with total
+storage resource c, its optimal resource partition strategy in the environmen t
+where each chain i has market weight Bi is
+~opt(c, B) := argmax s∈D M +1
+c
+U (s, B)
+We aim to show that our desired resource partition strategy optimiz es the
+utility function. That is to have the optimal resource partition equa ls our desired
+one.
+10 Shuyang Tang et. al.
+Theorem 1. For any c∈ R+ and any B∈ D M
+c ,
+~opt(c, B) = c
+2◦ c
+2 β
+where β = B
+||B|| .
+To prove this theorem, we at ﬁrst introduce two lemmas.
+Lemma 1. For any positive integer n, positive values k, (β1, β2,..., βn) with∑ n
+i=1 βi = 1, functionF (x) :=−∑ n
+i=1 βi· xi
+kβi+xi
+(x = (x0,x 1,...,x n)) achieves
+its minimum in ˆx = ( c
+2, β1c
+2 ,..., βnc
+2 ) subject to
+– gi(x) := xi− βix0≤ 0 for each i∈ [n],
+– gn+i+1(x) :=−xi≤ 0 for each i∈ [n]∪{ 0},
+– h(x) :=∑ n
+i=0xi−c = 0.
+Proof. To begin with, we show that F is convex on ( R+)n+1. It is easy to observe
+that the Hessian matrix of F is diagonal since ∂2F
+∂xi∂xj
+= 0 for each i⁄= j. Each
+element in the diagonal
+∂2F
+∂x2
+i
+= 2βi
+(kβi +xi)2
+(
+1− xi
+kβi +xi
+)
+is positive so the Hessian matrix is semi-deﬁnite and F is convex on ( R+)n+1.
+Since F and each gi are convex and h is an aﬃne function, this turns out to be
+a convex optimization and any minimal value of F is its minimum. According
+to Karush-Kuhn-Tucker (KKT) conditions, we only need to show th at
+– ▽L( ˆx) = 0,
+– µigi( ˆx) = 0 for all i∈ [2n + 1],
+where
+L(x) = F (x) +
+2n+1∑
+i=1
+µigi(x) +νh(x) (1)
+=−
+n∑
+i=1
+βi· xi
+kβi +xi
++
+n∑
+i=1
+µi (xi− βix0) +ν
+( n∑
+i=0
+xi−c
+)
+, (2)
+µi = ν = k
+c(k+c/2) for each i∈ [n]. For each natural number i≤ n, µn+i+1 are
+set to be zero so ∑ 2n+1
+i=n+1µigi(x) = 0. In fact,
+1. From simple derivations,
+∂L(x)
+∂x0
+=
+n∑
+i=1
+−µiβi +ν = k
+c(k + c
+2 ) (1−
+n∑
+i=1
+βi) = 0
+Towards a Multi-Chain Future of Proof-of-Space 11
+and for each i∈ [n],
+∂L(x)
+∂xi
+=−βi· kβi
+xi(kβi +xi) +µi +ν.
+Thereby,
+∂L( ˆx)
+∂xi
+=−βi· kβi
+βic
+2 (kβi + βic
+2 )
++ 2k
+c(k + c
+2 )
+=− 2k
+c(k + c
+2 ) + 2k
+c(k + c
+2 ) = 0.
+As a result, we conclude that ▽L( ˆx) = 0.
+2. The second condition is easy to hold since gi( ˆx) = 0 for each i≤ n and
+µi = 0 for each i>n .
+Therefore, f achieves its minimum in ˆx.
+Intuitively, Lemma. 1 alone has proved Theorem. 1 since by having k =||B||,
+U (s, B) =−F (s)×rω||B||
+within the boundary in the lemma. Since the Hessian matrix is semi-deﬁn ite
+either inside the boundary (shown in the lemma proof) or outside the bound-
+ary (easy to verify) and U is obviously continuous everywhere and smooth a.e.
+except for a subset with zero Lebesgue measure, U is almost convex and the lo-
+cal maximization is actually the global optimization. However, to more strictly
+prove the theorem, we still require the following lemma.
+Lemma 2. For any space division strategy onn chains, suppose sA = (sA
+0, sA
+1,..., sA
+n ),
+if∃i∈ [n] : sA
+i > βisA
+0 , then there always exists another strategy whose utility
+is better than sA.
+Proof. If there exists i∈ [n] : sA
+i > βisA
+0 , then there must exist a set of index
+I A ={a1,a 2,...,a exc}⊂ [n] where∀i∈I A, sA
+i > βisA
+0 and∀i /∈I A, sA
+i ≤ βisA
+0
+both satisfy. Without loss of generality, we assume
+sA
+a1
+βa1
+≥ sA
+a2
+βa2
+≥... ≥ sA
+aexc
+βaexc
+> sA
+0.
+Consider another strategy sA+ = ( sA+
+0 , sA+
+1 ,..., sA+
+n ). When comparing
+sA+ with sA, the new strategy just subtracts some space division from sa1
+and adds it to s0. In detail, sA+ can be formally expressed as
+sA+
+i =
+
+
+
+βa1
+βa1 +1 (sA
+0 + sA
+a1 ) i =a1
+1
+βa1 +1 (sA
+0 + sA
+a1 ) i = 0
+sA
+i o.w.
+12 Shuyang Tang et. al.
+Notice that if sA is a valid space division strategy, then sA+ is also a valid
+strategy, as∑ n
+i=0 sA+
+i =∑ n
+i=0 sA
+i =c.
+Now we compare the utility of sA
+i with that of sA+
+i . Consider the utility
+function U for a space division strategy. If we denote the truly eﬀective spac e
+division for chain i as seﬀi, where
+seﬀi = min{βis0, si}.
+Then, it is obvious that the utility function is monotonic for every seﬀi where
+i∈ [n]. As a result, if ∀i∈ [n], seﬀA+
+i ≥ seﬀA
+i and∃i∈ [n], seﬀA+
+i > seﬀA
+i , then
+the utility of strategy sA+ is better than that of sA.
+In fact, when i = a1, we have seﬀA
+i = βa1sA
+0 , while seﬀA+
+i = sA+
+i =
+βa1
+βa1 +1 (sA
+0 + sA
+a1 ). Since
+sA
+a1
+βa1
+> sA
+0 , it comes out that seﬀA+
+a1 > seﬀA
+a1 . When
+i∈I A and i⁄=a1, given that we have assumed sA
+i > βisA
+0 , then seﬀA
+i = βisA
+0 .
+Since
+sA+
+0 = 1
+βa1 + 1 (sA
+0 + sA
+a1 )> 1
+βa1 + 1 (sA
+0 + βa1sA
+0 ) = sA
+0,
+we have
+seﬀA+
+i = min{βisA+
+0 , sA+
+i }> βisA
+0 = seﬀA
+i .
+When i∈ [n] and i /∈I A, it is obvious that seﬀA+
+i = sA+
+i = sA
+i = seﬀA
+i . And it
+concludes that the utility of sA+ is better than that of sA.
+Now we are allowed to prove Theorem. 1.
+Proof. We partite D M+1
+c =D⊎D′ into two domains where
+D =
+{
+s∈ D M+1
+c |∀i∈ [M ]. si≤ βis0
+}
+.
+Lemma. 2 tells that each strategy in D′ can be emulated by a strategy in D.
+Therefore, D includes the optimal partition strategy within D M+1
+c . By having
+k =||B||, U (s, B) =−F (s)×rω||B|| in Lemma. 1 within D and so forth the
+optimal strategy among D is our desired partition.
+Based on Theorem. 1, we ﬁnd that the optimization of strategy is indeed in-
+dependent from the total resource c. Hence we conclude that for any participant,
+the optimal strategy is to divide half resource for the shared proo f and divide
+the rest part according to the market weight of each chain
+opt(β) := 1
+c
+~opt(c, B) = 1
+2◦ 1
+2 β.
+5.2 System Security
+In this part, we show the diﬃculty of devastating a chain (say, ith chain of market
+weight Bi = b) with b
+||B|| = β fraction of total market weight. To devastate
+chaini, the adversary should occupy the total market weight with total storage
+Towards a Multi-Chain Future of Proof-of-Space 13
+resource over αb1. That is to have si = α(b + si) and at the same time (1 +
+δ)β′
+is0≥ si where β′
+i = b+si
+||B||+si
+. Thereby,
+si = α
+1−αb,
+and hence
+s0≥ si
+(1 +δ)β′
+i
+= si(||B|| + si)
+(1 +δ)(b + si)
+≥
+α
+1−αb||B||
+(1 +δ)(b + 1−α
+α b) = α2
+(1 +δ)(1−α)||B||.
+Forα> 1
+3 andδ = 1
+10 , s0≥ 5
+33||B||> 15%||B||. This tells that regardless of the
+market weight of the chain, the adversary has to devote more tha n 15% global
+storage resource (45% to α >1/2) to devastate a chain with even the slightest
+market weight.
+6 Conclusion
+In this paper, we have proposed a novel multi-chain scheme from th e inherited
+merit of proof-of-space. With our framework, the same storage source contributes
+simultaneously to multiple blockchains and newly set up blockchains are hard to
+be devastated. In the future, we look forward to the ﬂourishing d evelopment of
+PoC-based blockchains and having our framework implemented on th em. Also,
+although we have shown to realize this framework via pebbling graph- styled
+proof-of-space schemes, we also expect its application on PoC sch emes of other
+styles.
+References
+1. Satoshi Nakamoto. Bitcoin: A peer-to-peer electronic ca sh system, 2008.
+2. Cynthia Dwork and Moni Naor. Pricing via processing or com batting junk mail.
+In Advances in Cryptology - CRYPTO ’92, 12th Annual Internatio nal Cryptology
+Conference, Santa Barbara, California, USA, August 16-20, 1992, Proceedings,
+pages 139–147, 1992.
+3. QuantumMechanic et al. Proof of stake instead of proof of w ork. Bitcoin forum,
+2011. https://bitcointalk.org/index.php?topic=27787.0.
+4. Iddo Bentov, Charles Lee, Alex Mizrahi, and Meni Rosenfel d. Proof of activity:
+Extending bitcoin’s proof of work via proof of stake [extend ed abstract]y. SIG-
+METRICS Performance Evaluation Review , 42(3):34–37, 2014.
+5. Iddo Bentov, Rafael Pass, and Elaine Shi. Snow white: Prov ably secure proofs of
+stake. IACR Cryptology ePrint Archive , 2016:919, 2016.
+1 Most existing systems ask for α > 1/3, but we treat α as a tunable parameter to
+allow ﬂexibility.
+14 Shuyang Tang et. al.
+6. Rafael Pass and Elaine Shi. The sleepy model of consensus. In Advances in
+Cryptology - ASIACRYPT 2017 - 23rd International Conferenc e on the Theory and
+Applications of Cryptology and Information Security, Hong Kong, China, December
+3-7, 2017, Proceedings, Part II , pages 380–409, 2017.
+7. Aggelos Kiayias, Alexander Russell, Bernardo David, and Roman Oliynykov.
+Ouroboros: A provably secure proof-of-stake blockchain pr otocol. In Advances in
+Cryptology - CRYPTO 2017 - 37th Annual International Crypto logy Conference,
+Santa Barbara, CA, USA, August 20-24, 2017, Proceedings, Pa rt I , pages 357–388,
+2017.
+8. Bernardo David, Peter Gazi, Aggelos Kiayias, and Alexand er Russell. Ouroboros
+praos: An adaptively-secure, semi-synchronous proof-of- stake blockchain. In Ad-
+vances in Cryptology - EUROCRYPT 2018 - 37th Annual Internat ional Conference
+on the Theory and Applications of Cryptographic Techniques , Tel Aviv, Israel, April
+29 - May 3, 2018 Proceedings, Part II , pages 66–98, 2018.
+9. Christian Badertscher, Peter Gazi, Aggelos Kiayias, Ale xander Russell, and Vassilis
+Zikas. Ouroboros genesis: Composable proof-of-stake bloc kchains with dynamic
+availability. In Proceedings of the 2018 ACM SIGSAC Conference on Computer
+and Communications Security, CCS 2018, Toronto, ON, Canada , October 15-19,
+2018, pages 913–930, 2018.
+10. Cynthia Dwork, Moni Naor, and Hoeteck Wee. Pebbling and p roofs of work. In
+Advances in Cryptology - CRYPTO 2005: 25th Annual Internati onal Cryptology
+Conference, Santa Barbara, California, USA, August 14-18, 2005, Proceedings,
+pages 37–54, 2005.
+11. Stefan Dziembowski, Tomasz Kazana, and Daniel Wichs. Ke y-evolution schemes
+resilient to space-bounded leakage. In Advances in Cryptology - CRYPTO 2011
+- 31st Annual Cryptology Conference, Santa Barbara, CA, USA , August 14-18,
+2011. Proceedings, pages 335–353, 2011.
+12. Stefan Dziembowski, Tomasz Kazana, and Daniel Wichs. On e-time computable
+self-erasing functions. In Theory of Cryptography - 8th Theory of Cryptography
+Conference, TCC 2011, Providence, RI, USA, March 28-30, 201 1. Proceedings,
+pages 125–143, 2011.
+13. Georg Fuchsbauer. Spacemint: A cryptocurrency based on proofs of space. ERCIM
+News, 2017(110), 2017.
+14. Giuseppe Ateniese, Ilario Bonacina, Antonio Faonio, an d Nicola Galesi. Proofs of
+space: When space is of the essence. In Security and Cryptography for Networks
+- 9th International Conference, SCN 2014, Amalﬁ, Italy, Sep tember 3-5, 2014.
+Proceedings, pages 538–557, 2014.
+15. Stefan Dziembowski, Sebastian Faust, Vladimir Kolmogo rov, and Krzysztof
+Pietrzak. Proofs of space. In Advances in Cryptology - CRYPTO 2015 - 35th
+Annual Cryptology Conference, Santa Barbara, CA, USA, Augu st 16-20, 2015,
+Proceedings, Part II, pages 585–605, 2015.
+16. COLIN PERCIV AL. Stronger key derivation via sequential memory-hard func-
+tions. 01 2009.
+17. Ari Juels and Burton S. Kaliski Jr. Pors: proofs of retrie vability for large ﬁles.
+In Proceedings of the 2007 ACM Conference on Computer and Commu nications
+Security, CCS 2007, Alexandria, Virginia, USA, October 28- 31, 2007 , pages 584–
+597, 2007.
+18. Wolfgang J. Paul, Robert Endre Tarjan, and James R. Celon i. Space bounds for
+a game on graphs. Mathematical Systems Theory , 10:239–251, 1977.
+19. Noga Alon and Michael R. Capalbo. Smaller explicit super concentrators. Internet
+Mathematics, 1(2):151–163, 2003.
+Towards a Multi-Chain Future of Proof-of-Space 15
+20. Uwe Sch¨ oning. Better expanders and superconcentrator s by kolmogorov complex-
+ity. In SIROCCO’97, 4th International Colloquium on Structural In formation &
+Communication Complexity, Monte Verita, Ascona, Switzerl and, July 24-26, 1997 ,
+pages 138–150, 1997.
+21. Vladimir Kolmogorov and Michal Rolinek. Superconcentr ators of density 25.3. Ars
+Comb., 141:269–304, 2018.
+22. David J. Haglin. Bipartite expander matching is in NC. Parallel Processing Letters,
+5:413–420, 1995.
+23. Andrew Thomason. Dense expanders and pseudo-random bip artite graphs. Dis-
+crete Mathematics, 75(1-3):381–386, 1989.
+24. Paul Erdoes, Ronald L. Graham, , and Endre Szemeredi. On s parse graphs with
+dense long paths. Technical report, Stanford, CA, USA,, 197 5.
+25. Jo¨ el Alwen, Jeremiah Blocki, and Krzysztof Pietrzak. D epth-robust graphs and
+their cumulative memory complexity. In Advances in Cryptology - EUROCRYPT
+2017 - 36th Annual International Conference on the Theory an d Applications of
+Cryptographic Techniques, Paris, France, April 30 - May 4, 2 017, Proceedings,
+Part III , pages 3–32, 2017.
+26. Ling Ren and Srinivas Devadas. Proof of space from stacke d expanders. In Theory
+of Cryptography - 14th International Conference, TCC 2016- B, Beijing, China,
+October 31 - November 3, 2016, Proceedings, Part I , pages 262–285, 2016.
+27. Krzysztof Pietrzak. Proofs of catalytic space. In 10th Innovations in Theoreti-
+cal Computer Science Conference, ITCS 2019, January 10-12, 2019, San Diego,
+California, USA , pages 59:1–59:25, 2019.
+28. Mihir Bellare and Phillip Rogaway. Random oracles are pr actical: A paradigm for
+designing eﬃcient protocols. In CCS ’93, Proceedings of the 1st ACM Conference
+on Computer and Communications Security, Fairfax, Virgini a, USA, November
+3-5, 1993. , pages 62–73, 1993.
+29. Yevgeniy Dodis, Siyao Guo, and Jonathan Katz. Fixing cra cks in the concrete:
+Random oracles with auxiliary input, revisited. In Advances in Cryptology - EU-
+ROCRYPT 2017 - 36th Annual International Conference on the T heory and Ap-
+plications of Cryptographic Techniques, Paris, France, Ap ril 30 - May 4, 2017,
+Proceedings, Part II, pages 473–495, 2017.
+30. Bram Cohen and Krzysztof Pietrzak. Simple proofs of sequ ential work. In Advances
+in Cryptology - EUROCRYPT 2018 - 37th Annual International C onference on the
+Theory and Applications of Cryptographic Techniques, Tel A viv, Israel, April 29 -
+May 3, 2018 Proceedings, Part II , pages 451–467, 2018.
+31. John E. Savage. Models of computation - exploring the power of computing .
+Addison-Wesley, 1998.
+16 Shuyang Tang et. al.
+Protocol Πmain
+Shared protocol Π main is executed by all participants P1, P2, . . . , PN . We assume a public-key
+infrastructureFcert.
+This functionality is parameterized by the number of candid ates N (this is a variant in
+the permissionless setting, but we take this notation for th e simplicity of descriptions), the
+number of adversary controlled parties t. A predetermined parameter lsize describes the
+number of leaders to be elected for a round which varies among diﬀerent emulations of the
+functionality. H(·) :{0, 1}∗→{ 0, 1}λ is a hash function.
+– System Setup.
+• Each participant from Fcert fetch their key pairs ( pkj, skj ). To facilitate descriptions, we
+denote pk−1
+j := skj.
+• Each initially launched chain contains ∆ start-up blocks, speciﬁcally, Ai
+k for chain i and
+block k.
+• Each participant j divides its total resource into sj.
+• Each participant j for each chain i generates ( γj
+i , ˜γj
+i )← ΠPoC.initH (sj
+i ).
+• Each participant j issues the resource commitment
+comj := (pkj, sj , γj = (γj
+1, γj
+2, . . . , γj
+M ))pk−1
+j
+.
+• Prepare a set Γ of γ’s, initially set as empty. Prepare a map J from public key pk to
+commitment com.
+Each round (round R) proceeds as follows.
+– Block Proposal.
+• Find the current chain branch in view with the greatest total weight (Ai
+1, Ai
+2, . . . , Ai
+R+∆−1).
+• Calculate the expected market weight of each chain, namely, Bi := µ ∑ R+∆−1
+k=R weight(Ai
+k)
+for chain i, let β := B
+||B|| .
+• Each participant j for each chain i assembles its own block for the round.
+ˆAi
+R+∆ :=
+
+pkj, rec, H(Ai
+R+∆−1), τ j
+i , τ j
+i′, weight =
+( H(τ j
+i )
+2λ
+) 1/~sj
+i
+, comj
+
+
+pk−1
+j
+,
+where ~sj
+i := min{sj
+i , (1 + δ)βisj
+0}, τ j
+i , τ j
+i′ are two opens τ j
+i ← ΠPoC.openH
+(
+sj
+i , ˜γj
+i , H(τAi
+R
+)
+)
+,
+τ j
+i′← ΠPoC.openH
+(
+sj
+0, ˜γj
+0, H(τAi
+R
+)
+)
+and rec has already included all newly appended trans-
+actions and the block reward.
+Here, for a block A = (pk, rec, hash, τ, w, com), weight(A) := w and τA := τ .
+• After the assembly,
+( ˆAi
+R+∆
+)
+pk−1
+j
+is proposed.
+– Chain Growth.
+• Parse every received block into ˆAi
+R+∆→
+(
+pk, rec, H(Ai
+R+∆−1
+)
+, τi, τi′, weight, com), ﬁrstly
+verify the calculation of weight, integrity of rec, the hash, and the signature. For a block
+passing the above veriﬁcation, add it into the current view o f block branches if passing
+through the following veriﬁcations:
+1. Parse com→
+(
+pk′, s, γ ={γi}i∈[M ]
+)
+, check pk′ ?
+= pk.
+2. Check Π PoC.vrfH
+(
+si, γi, H(τAi
+R
+), τi
+)
+and Π PoC.vrfH
+(
+s0, γ0, H(τAi
+R
+), τi′
+)
+.
+3. Check whether each two elements in Γ are diﬀerent.
+4. Check whether ( pk, com) /∈ J and for each γi, it holds γi /∈ Γ . Reject if the above
+condition is not satisﬁed.
+5. Update J := J⊎{ (pk, com)} and Γ := Γ⊎ γ.
+Fig. 3. The Main Protocol

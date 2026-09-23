@@ -1,0 +1,7 @@
+τ	T_plot_slots	tasa_amortizada_por_slot	disuasion_residual	recurrente_anual	nota
+1e-06	31536000	3.170979198e-14	decae como 1/T_plot	0.0876	la única amortiza; la recurrente es impuesto permanente al honesto
+1e-06	157680000	6.341958397e-15	decae como 1/T_plot	0.0876	la única amortiza; la recurrente es impuesto permanente al honesto
+0.001	31536000	3.170979198e-11	decae como 1/T_plot	87.6	la única amortiza; la recurrente es impuesto permanente al honesto
+0.001	157680000	6.341958397e-12	decae como 1/T_plot	87.6	la única amortiza; la recurrente es impuesto permanente al honesto
+0.1	31536000	3.170979198e-09	decae como 1/T_plot	8760	la única amortiza; la recurrente es impuesto permanente al honesto
+0.1	157680000	6.341958397e-10	decae como 1/T_plot	8760	la única amortiza; la recurrente es impuesto permanente al honesto

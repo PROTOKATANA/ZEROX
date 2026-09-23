@@ -1,0 +1,19 @@
+Auditoría: veritas/seguridad/segundo-vdf-v1 (SegundoVdfV1)
+Julia: 1.13.0
+CPU: znver5  hilos lógicos: 32
+RAM total (GiB): 123.4
+Hilos Julia (default, interactive): 4, 0
+Semilla maestra: 0x0000000000005a5a
+git HEAD: 98abede40b1534756385ce64db5335fb4480ff99
+Fecha: 2026-09-23T23:06:39.336
+Presupuesto declarado: 24 hilos, 64 GiB RAM, 8 GiB disco temporal
+Pkg.status() del proyecto aislado:
+Project SegundoVdfV1 v0.1.0
+Status `~/zeo/ZEROX/veritas/seguridad/segundo-vdf-v1/Project.toml`
+  [6e4b80f9] BenchmarkTools v1.8.0
+  [c3a54625] JET v0.12.1
+  [860ef19b] StableRNGs v1.0.4
+  [10745b16] Statistics v1.11.5
+  [ade2ca70] Dates v1.11.0
+  [de0858da] Printf v1.11.0
+  [9a3f8284] Random v1.11.0

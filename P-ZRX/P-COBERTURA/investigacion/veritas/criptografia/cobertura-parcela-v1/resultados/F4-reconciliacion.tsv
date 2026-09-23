@@ -1,0 +1,18 @@
+# cobertura-parcela-v1 · F4 · reconciliación de las dos cifras de coste publicadas
+# fecha	2026-09-22T23:49:47.838
+# julia	1.13.0	hilos	4
+# cpu	znver5	uptime	23:49:47  up 14 days 20:19,  0 users,  carga promedio: 1,62, 1,85, 1,67
+# hardware	mediciones/hardware.tsv
+# t_unidad_s	0.809	r_maquina_s	25.03	bytes_pieza_B	1.048672e6	tau_s	1.0
+# w_slots	7175.0	D_a_s	60.0	k	1000	maquinas	1.0	gamma	0.01	beta	0.001
+magnitud	valor	unidad	definicion
+trabajo_nucleo_s_por_TiB	848220.327110	s·nucleo/TiB	N_TiB · t_unidad
+trabajo_nucleo_h_por_TiB	235.6167575	h·nucleo/TiB	trabajo total, una pasada
+maquinas_por_TiB_w_only	5.838178903	maquinas/TiB	N/(r·w): regenerar 1 vez por ventana
+maquinas_por_TiB_ventana_completa	5.789762769	maquinas/TiB	N/(r·(w+D_a))
+nucleos_por_TiB	117.238469538	nucleos/TiB	N·t/(w+D_a)
+nucleos_equivalentes_por_maquina	20.249270000	nucleos/maquina	r·t: FACTOR EXACTO de la reconciliación
+factor_ingenuo_235.6/5.84	40.357920069	adimensional	cociente con unidades mezcladas
+eficiencia_paralela	0.843720	adimensional	r / (24 · 1/t): 24 hilos del banco
+E3_medido_sobre_E1_ideal	1.185228	adimensional	24 / (r·t)
+tiempo_pared_1_maquina_por_TiB	11.635815	h	independiente de w

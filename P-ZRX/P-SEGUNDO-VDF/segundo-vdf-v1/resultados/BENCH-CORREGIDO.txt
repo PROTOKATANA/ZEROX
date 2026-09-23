@@ -1,0 +1,72 @@
+Julia=1.13.0 CPU=znver5 hilos_default=1 semilla=0x5a5a
+== kernel: una réplica, J=1500, hilo único ==
+mediana = 0.145 ms   mínimo = 0.141 ms   asignaciones = 2   memoria = 64 B
+@allocated una llamada = 64 B
+
+== barrido réplicas × ρ ==
+hilos reales del proceso = 1 (para medir 2/4/8/16, iniciar procesos Julia separados con --threads=N,0)
+R= 64 ρ=12 hilos_reales= 1    101.71 ms   speedup vs serie =  0.91×
+R=256 ρ=12 hilos_reales= 1    360.85 ms   speedup vs serie =  0.95×
+
+== determinismo entre hilos (checksum) ==
+hilos= 1  checksum idéntico = true
+Julia=1.13.0 CPU=znver5 hilos_default=2 semilla=0x5a5a
+== kernel: una réplica, J=1500, hilo único ==
+mediana = 0.144 ms   mínimo = 0.143 ms   asignaciones = 2   memoria = 64 B
+@allocated una llamada = 64 B
+
+== barrido réplicas × ρ ==
+hilos reales del proceso = 2 (para medir 2/4/8/16, iniciar procesos Julia separados con --threads=N,0)
+R= 64 ρ=12 hilos_reales= 1     84.40 ms   speedup vs serie =  1.02×
+R= 64 ρ=12 hilos_reales= 2     64.87 ms   speedup vs serie =  1.36×
+R=256 ρ=12 hilos_reales= 1    339.26 ms   speedup vs serie =  1.00×
+R=256 ρ=12 hilos_reales= 2    190.91 ms   speedup vs serie =  1.77×
+
+== determinismo entre hilos (checksum) ==
+hilos= 1  checksum idéntico = true
+hilos= 2  checksum idéntico = true
+Julia=1.13.0 CPU=znver5 hilos_default=4 semilla=0x5a5a
+== kernel: una réplica, J=1500, hilo único ==
+mediana = 0.144 ms   mínimo = 0.142 ms   asignaciones = 2   memoria = 64 B
+@allocated una llamada = 64 B
+
+== barrido réplicas × ρ ==
+hilos reales del proceso = 4 (para medir 2/4/8/16, iniciar procesos Julia separados con --threads=N,0)
+R= 64 ρ=12 hilos_reales= 1     86.31 ms   speedup vs serie =  0.98×
+R= 64 ρ=12 hilos_reales= 4     42.50 ms   speedup vs serie =  2.08×
+R=256 ρ=12 hilos_reales= 1    338.67 ms   speedup vs serie =  0.97×
+R=256 ρ=12 hilos_reales= 4    119.23 ms   speedup vs serie =  2.83×
+
+== determinismo entre hilos (checksum) ==
+hilos= 1  checksum idéntico = true
+hilos= 4  checksum idéntico = true
+Julia=1.13.0 CPU=znver5 hilos_default=8 semilla=0x5a5a
+== kernel: una réplica, J=1500, hilo único ==
+mediana = 0.144 ms   mínimo = 0.143 ms   asignaciones = 2   memoria = 64 B
+@allocated una llamada = 64 B
+
+== barrido réplicas × ρ ==
+hilos reales del proceso = 8 (para medir 2/4/8/16, iniciar procesos Julia separados con --threads=N,0)
+R= 64 ρ=12 hilos_reales= 1     90.32 ms   speedup vs serie =  0.87×
+R= 64 ρ=12 hilos_reales= 8     42.76 ms   speedup vs serie =  2.11×
+R=256 ρ=12 hilos_reales= 1    340.66 ms   speedup vs serie =  0.98×
+R=256 ρ=12 hilos_reales= 8     73.61 ms   speedup vs serie =  4.49×
+
+== determinismo entre hilos (checksum) ==
+hilos= 1  checksum idéntico = true
+hilos= 8  checksum idéntico = true
+Julia=1.13.0 CPU=znver5 hilos_default=16 semilla=0x5a5a
+== kernel: una réplica, J=1500, hilo único ==
+mediana = 0.146 ms   mínimo = 0.144 ms   asignaciones = 2   memoria = 64 B
+@allocated una llamada = 64 B
+
+== barrido réplicas × ρ ==
+hilos reales del proceso = 16 (para medir 2/4/8/16, iniciar procesos Julia separados con --threads=N,0)
+R= 64 ρ=12 hilos_reales= 1     91.13 ms   speedup vs serie =  0.96×
+R= 64 ρ=12 hilos_reales=16     43.93 ms   speedup vs serie =  2.05×
+R=256 ρ=12 hilos_reales= 1    338.55 ms   speedup vs serie =  0.99×
+R=256 ρ=12 hilos_reales=16     61.35 ms   speedup vs serie =  5.39×
+
+== determinismo entre hilos (checksum) ==
+hilos= 1  checksum idéntico = true
+hilos=16  checksum idéntico = true

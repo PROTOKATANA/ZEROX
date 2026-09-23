@@ -1,0 +1,18 @@
+# P-SEGUNDO-VDF · escenarios · 2026-09-23T22:03:42.228
+== CONTROL: filas viejas tal como se publicaron (I mezclado) ==
+                                            fila          valor          I fuente
+                           ventana V_max (ρ=2,5)      7685.6000      851.0 ADL.txt/F1.txt
+             ventana V_max con (h), Lrev=L−S_max      4865.6000      851.0 F2.txt
+                              ΔV/V_sin publicado         0.3669      851.0 informe §1.1/D2
+                                edad q99 sin (h)      8800.0000      851.0 F4.txt (F=7200, α=0,33, ρ_max=2,5)
+                                edad q99 con (h)      5712.0000      851.0 F4.txt
+                          núcleos/nodo publicado         0.2384     4766.7 F3.txt/D2
+                               líneas publicadas         3.0000     4766.7 F3.txt/D2
+                             I usado en el coste      4766.6700     4766.7 F3.txt (I*=4766,7)
+  ⇒ la ventana y la edad usan I=851; el coste, I≈4766,7. No es una comparación.
+
+== RECÁLCULO CONSISTENTE: mismo I, L, Lrev, D, W_dec, α, ρ y riesgo ==
+L=7200  Lrev=7050  W_dec=20  D=4  S_max=150  ρ=2,5  α=0,33  J=1500  R=64
+       I       rho*     cumple      V_sin          V_con   dV/V_sin    q99_sin  q99_con   factor   lineas  nucleos      iny/h
+     851     9.0712         sí    7685.60        4865.60     0.3669       9280     6464    1.436       10   0.8927     4.2303
+    4666     2.5002         sí    9974.60        7154.60     0.2827      19008    16192    1.174        3   0.2414     0.7715

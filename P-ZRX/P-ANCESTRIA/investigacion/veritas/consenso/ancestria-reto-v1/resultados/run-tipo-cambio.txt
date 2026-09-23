@@ -1,0 +1,18 @@
+# ANR-v0.1 — anclaje del reto a profundidad d
+# comando : run.jl --tipo-cambio
+# fecha   : 2026-09-22T23:09:38.158
+# julia   : 1.13.0
+# hilos   : 1 default, 1 interactive
+# CPU     : znver5
+# semilla : 0x5a5a5a5a
+# git     : 98abede40b1534756385ce64db5335fb4480ff99
+# estado  : OK
+
+umbral objetivo   c = d+1 minimo   d minimo   ventana de reutilizacion (bloques)   phi_c
+0.3000            2                 1          2                                    2.225473
+0.3500            5                 4          5                                    1.795447
+0.4000            14                13         14                                   1.496813
+0.4500            86                85         86                                   1.221622
+0.4800            798               797        798                                  1.083320
+0.4900            4019              4018       4019                                 1.040815
+0.4950            19457             19456      19457                                1.020202

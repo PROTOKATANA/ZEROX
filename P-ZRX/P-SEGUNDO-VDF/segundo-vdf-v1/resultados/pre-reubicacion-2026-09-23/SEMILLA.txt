@@ -1,0 +1,25 @@
+# P-SEGUNDO-VDF · semilla · 2026-09-23T23:06:43.259
+== DEFECTO 3: dos variantes; ajenas/propias V_max determinista, mixto media de V_max por réplica ==
+       I    patron        V_sin      V_con[+D] V_con[presente]      dV[+D] dV[presente] dif_semillas
+     851    ajenas      7685.60        4865.60         4865.60      0.3669      0.3669       0.0000
+     851   propias    770217.60      770217.60       770217.60      0.0000      0.0000       0.0000
+     851     mixto     10862.28        8042.28         8042.28      0.2596      0.2596       0.0000
+    4666    ajenas      9974.60        7154.60         7154.60      0.2827      0.2827       0.0000
+    4666   propias   4203717.60     4203717.60      4203717.60      0.0000      0.0000       0.0000
+    4666     mixto     27386.00       24566.00        24566.00      0.1030      0.1030       0.0000
+
+== fecha en que cada entrada se conoce / grinding / unicidad / circularidad ==
+· C-FLU-12 (vigente, D-F1=A)
+    ingrediente:        chunk(I_j) ‖ pot_output(I_j) = salida(f, s_j+D)
+    ancla ajena:        al recibir el bloque I_j (≥ s_j): su cabecera ancla pot_output [C-POT-05]
+    ancla propia:       cuando la frontera propia alcanza s_j+D (lead_h = D) [HIPOTESIS premisa 3]
+    grinding:           cerrado: ni hash de bloque, ni timestamp, ni padres, ni raíz entran en la entropía [C-FLU-12]
+    unicidad de billete:NO distingue billete: dos copias del mismo chunk dan la misma entropía (coste declarado en C-FLU-12)
+    circularidad:       pot_output es salida FUTURA pero D < L ⇒ bien fundada; el contexto aporta la semilla, nunca el candidato [C-POT-06]
+· h.1 (candidata)
+    ingrediente:        chunk(I_j) ‖ salida(f, slot(I_j))
+    ancla ajena:        al recibir el bloque I_j (≥ s_j)
+    ancla propia:       cuando la frontera propia alcanza s_j (D/ρ antes que la variante vigente)
+    grinding:           mismo cierre mientras el ingrediente sea función de (f, slot) y del chunk
+    unicidad de billete:igual: tampoco distingue billete
+    circularidad:       sin salida futura; el lookahead de R-FIN-14(f) está escrito sobre esta variante y no se rehízo con +D

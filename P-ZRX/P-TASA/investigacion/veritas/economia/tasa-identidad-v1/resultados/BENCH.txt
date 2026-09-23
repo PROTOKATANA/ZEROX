@@ -1,0 +1,84 @@
+== P-TASA · benchmarks ==
+julia 1.13.0 · hilos 4 · hilos interactivos 1
+CPU: znver5 · núcleos lógicos: 32 · RAM GiB: 123
+uptime: 17:58:19  up 15 days 14:27,  0 users,  carga promedio: 2,30, 1,92, 1,56
+
+
+Φ Pareto cerrada (1 punto)                        0.0000 ms              0 B        0 allocs  hilos=4  frente=—
+Φ Pareto cerrada (rejilla 10^4)                   0.1531 ms              0 B        0 allocs  hilos=4  frente== Phi_espacio en la rejilla
+Φ Riemann K=20.000 (oráculo)                      1.1854 ms              0 B        0 allocs  hilos=4  frente=acota la cerrada
+MC 1 réplica M=10^4                               0.1665 ms              0 B        0 allocs  hilos=4  frente=—
+MC 4 réplicas M=10^4 (1 hilo)                     0.6584 ms           1744 B       32 allocs  hilos=4  frente=—
+MC 4 réplicas M=10^4 (4 hilos)                    0.1756 ms           3504 B       54 allocs  hilos=4  frente=idéntico al serial
+f_detenida (kernel)                               0.0000 ms              0 B        0 allocs  hilos=4  frente=—
+τ_min (kernel)                                    0.0000 ms              0 B        0 allocs  hilos=4  frente=—
+barrido de tasa (200 puntos)                      0.0062 ms           3328 B        4 allocs  hilos=4  frente=—
+reclutamiento avaricioso n=10^3                   0.0012 ms          16144 B        6 allocs  hilos=4  frente=cota superior, no óptimo
+reclutamiento exacto 2 niveles K=10^6             0.6862 ms              0 B        0 allocs  hilos=4  frente== fuerza bruta en K pequeño
+
+== @allocated ==
+phi_pareto!(10^4)       : 0 B
+f_detenida              : 0 B
+mc_phi_replica M=10^4   : 0 B
+barrido_tasa 200 puntos : 3328 B
+
+== @code_warntype de los dos kernels calientes ==
+-- f_detenida --
+MethodInstance for f_detenida(::Float64, ::Float64, ::Float64, ::Float64, ::Float64, ::Float64, ::Float64, ::Float64)
+  from f_detenida(τ::T, κq::T, Lp::T, λ::T, I::T, Pwin::T, Th::T, c_b::T; n_extra) where T<:Real @ Main ~/zeo/ZEROX/P-ZRX/P-TASA/investigacion/veritas/economia/tasa-identidad-v1/src/modelo.jl:154
+Static Parameters
+  T = Float64
+Arguments
+  #self#::Core.Const(Main.f_detenida)
+  τ::Float64
+  κq::Float64
+  Lp::Float64
+  λ::Float64
+  I::Float64
+  Pwin::Float64
+  Th::Float64
+  c_b::Float64
+Body::Float64
+1 ─      nothing
+│   %2 = Main.:(var"#f_detenida#3")::Core.Const(Main.var"#f_detenida#3")
+│   %3 = (%2)(1, #self#, τ, κq, Lp, λ, I, Pwin, Th, c_b)::Float64
+└──      return %3
+
+-- tau_minimo_fee --
+MethodInstance for tau_minimo_fee(::Float64, ::Float64, ::Float64, ::Float64, ::Float64, ::Float64)
+  from tau_minimo_fee(f_estrella::T, λ::T, I::T, Pwin::T, Th::T, c_b::T; n_extra) where T<:Real @ Main ~/zeo/ZEROX/P-ZRX/P-TASA/investigacion/veritas/economia/tasa-identidad-v1/src/modelo.jl:174
+Static Parameters
+  T = Float64
+Arguments
+  #self#::Core.Const(Main.tau_minimo_fee)
+  f_estrella::Float64
+  λ::Float64
+  I::Float64
+  Pwin::Float64
+  Th::Float64
+  c_b::Float64
+Body::Float64
+1 ─      nothing
+│   %2 = Main.:(var"#tau_minimo_fee#4")::Core.Const(Main.var"#tau_minimo_fee#4")
+│   %3 = (%2)(1, #self#, f_estrella, λ, I, Pwin, Th, c_b)::Float64
+└──      return %3
+
+
+== validación de las variantes contra la referencia ==
+Riemann K=2e4: [1.582461387881e-05, 1.587278457345e-05] ancho=4.817e-08
+Riemann K=8e4: [1.584266056074e-05, 1.585470322993e-05] ancho=1.204e-08
+cerrada dentro de ambos: true
+phi_pareto! == Phi_espacio en la rejilla: true
+MC serial == MC 4 hilos: true
+barrido de tasa monótono en f_det: true
+f_det(0.3)=3.000000e-01  f_det(0.6)=6.000000e-01
+
+== JET (análisis estático de los kernels) ==
+f_detenida                                 0 diagnósticos
+tau_minimo_fee                             0 diagnósticos
+ganancia_cofarmacion                       0 diagnósticos
+Phi_espacio (Pareto)                       0 diagnósticos
+mc_phi_replica                             0 diagnósticos
+
+tabla escrita: /home/katana/zeo/ZEROX/P-ZRX/P-TASA/investigacion/veritas/economia/tasa-identidad-v1/bench/../resultados/BENCH-tabla.tsv
+== fin benchmarks ==

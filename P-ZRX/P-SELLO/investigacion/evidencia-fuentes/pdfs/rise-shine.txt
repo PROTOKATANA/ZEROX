@@ -1,0 +1,4140 @@
+† © IACR 2020: An extended abstract of this paper appears in the proceedings of IACR CRYPTO 2020, with DOI:
+10.1007/978-3-030-56784-2_16. This is the full version.
+An earlier version of this document was titled ‘RISE and SHINE: Fast and Secure Updatable Encryption’. This version
+subsumes that work and includes new results; we summarize the changes in Section 1.4.
+Fast and Secure Updatable Encryption†
+Colin Boyd1 Gareth T. Davies2 ID Kristian Gjøsteen1 and Yao Jiang1
+1Norwegian University of Science and Technology, NTNU, Norway.
+{colin.boyd,kristian.gjosteen,yao.jiang}@ntnu.no
+2Bergische Universität Wuppertal, Wuppertal, Germany.
+davies@uni-wuppertal.de
+February 25, 2022
+Abstract
+Updatable encryption allows a client to outsource ciphertexts to some untrusted server and periodically
+rotate the encryption key. The server can update ciphertexts from an old key to a new key with the help of
+an update token, received from the client, which should not reveal anything about plaintexts to an adversary.
+We provide a new and highly efﬁcient suite of updatable encryption schemes that we collectively call
+SHINE. In the variant designed for short messages, ciphertext generation consists of applying one per-
+mutation and one exponentiation (per message block), while updating ciphertexts requires just one expo-
+nentiation. Variants for longer messages provide much stronger security guarantees than prior work that
+has comparable efﬁciency. We present a new conﬁdentiality notion for updatable encryption schemes that
+implies prior notions. We prove that SHINE is secure under our new conﬁdentiality deﬁnition while also
+providing ciphertext integrity.
+1
+Contents
+1 Introduction 3
+1.1 Related Work . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+1.1.1 Security Models for UE. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+1.1.2 Constructions of Ciphertext-Independent UE . . . . . . . . . . . . . . . . . . . . . . 5
+1.1.3 Related Primitives . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+1.2 Contributions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+1.3 Further Discussion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+1.4 Document History . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+1.5 Organization . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+2 Preliminaries 8
+2.1 Hardness Assumptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+2.2 Updatable Encryption . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+3 Security Models for Updatable Encryption 10
+3.1 Existing Deﬁnitions of Conﬁdentiality . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+3.2 Trivial Win Conditions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+3.2.1 Trivial Win Conditions in Conﬁdentiality Games . . . . . . . . . . . . . . . . . . . . 14
+3.2.2 Trivial Win Conditions in Ciphertext Integrity Games . . . . . . . . . . . . . . . . . . 16
+3.3 Firewall Technique . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+3.3.1 Example of Epoch Corruption and Trivial Wins . . . . . . . . . . . . . . . . . . . . . 17
+4 On the Security of Updates 18
+4.1 A New Deﬁnition of Conﬁdentiality . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+4.2 Relations among Security Notions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+4.2.1 Relations between IND-UE and IND-UE∗ . . . . . . . . . . . . . . . . . . . . . . . . 19
+4.2.2 Relations among IND-ENC, IND-UPD, and IND-UE . . . . . . . . . . . . . . . . . . 22
+4.2.3 Relation among CPA, CTXT and CCA Security . . . . . . . . . . . . . . . . . . . . . 29
+5 The SHINE Schemes 31
+5.1 Construction of SHINE Schemes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+5.1.1 SHINE via Zero Block: SHINE0. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+5.1.2 SHINE via Double Encryption: MirrorSHINE . . . . . . . . . . . . . . . . . . . . . . 32
+5.1.3 SHINE for Long Messages via Checksum: OCBSHINE. . . . . . . . . . . . . . . . . 32
+5.2 Security - SHINE is detIND-UE-CPA, INT-CTXT, detIND-UE-CCA Secure . . . . . . . . . . 34
+5.3 Proof Challenges in Schemes with Deterministic Updates . . . . . . . . . . . . . . . . . . . . 34
+5.4 SHINE is detIND-UE-CPA . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+5.5 SHINE is INT-CTXTs . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39
+5.6 Implementing the SHINE Schemes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44
+6 Conclusions 45
+A SHINE0 is IND-ENC -CPA Secure 48
+B The BLMR Scheme of Boneh, Lewi, Montgomery, and Raghunathan 50
+B.1 BLMR+ is weakIND-UE-CPA Secure. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51
+C The RISE Scheme of Lehmann and Tackmann 56
+C.1 RISE is randIND-UE-CPA Secure . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 56
+2
+1 Introduction
+The past decades have demonstrated clearly that key compromise is a real threat for deployed systems. The
+standard technique for mitigating key compromise is to regularly rotate the encryption keys – generate new
+ones and switch the ciphertexts to encryption under the new keys. Key rotation is a well-established technique
+in applications such as payment cards [Cou18] and cloud storage [KRS+03].
+For a local drive or server, key rotation is feasible by decrypting and re-encrypting with a new key, since
+symmetric encryption operations are fast and parallelizable and bandwidth is often plentiful. When ciphertext
+storage has been outsourced to some (untrusted) cloud storage provider, bandwidth is often considerably more
+expensive than computation, and even for small volumes of data it may be prohibitively expensive to download,
+re-encrypt and upload the entire database even once. This means that key rotation by downloading, decrypting,
+re-encrypting and reuploading is practically infeasible.
+An alternative approach to solving this problem is to useupdatable encryption (UE), ﬁrst deﬁned by Boneh
+et al. [BLMR13] (henceforth BLMR). The user computes a token and sends it to the storage server. The token
+allows the server to update the ciphertexts so that they become encryptions under some new key. Although the
+token clearly depends on both the old and new encryption keys, knowledge of the token alone should not allow
+the server to obtain either key. In a typical usage of UE, the cloud storage provider will receive a new token on
+a periodic basis, and the provider then updates every stored ciphertext. The time period for which a given key
+is valid for is called an epoch.
+In the past few years there has been considerable interest in extending the understanding of UE. A series of
+prominent papers [BLMR13, EPRS17a, LT18a, KLR19a] have provided both new (typically stronger) security
+deﬁnitions and concrete or generic constructions to meet their deﬁnitions. (We make a detailed comparison
+of related work in Section 1.1.1 next.) An important distinction between earlier schemes is whether or not
+the token (and in particular its size) depends on the ciphertexts to be updated (and in particular the number
+of ciphertexts). Schemes for which a token is assigned to each ciphertext are ciphertext-dependent and were
+studied by Everspaugh et al. [EPRS17a] (henceforth EPRS). If the token is independent of the ciphertexts to be
+updated, such as in BLMR [BLMR15], we have a ciphertext-independent1 scheme. A clear and important goal
+is to limit the bandwidth required and so, in general, one should prefer ciphertext-independent schemes. Thus,
+as with the most recent work [LT18a, KLR19a], we focus on such schemes in this paper. The ciphertext update
+procedure, performed by the server, may bedeterministic or randomized – note that in the latter case the server
+is burdened with producing (good) randomness and using it correctly.
+Despite the considerable advances of the past few years, there remain some important open questions re-
+garding basic properties of UE. In terms of security, various features have been added to protect against stronger
+adversaries. Yet it is not obvious what are the realistic and optimal security goals of UE and whether they have
+been achieved. In terms of efﬁciency, we only have a few concrete schemes to compare. As may be expected,
+schemes with stronger security are generally more expensive but it remains unclear whether this cost is neces-
+sary. In this paper we make contributions to both of these fundamental questions by deﬁningnew and stronger
+security properties and showing that these can be achieved with more efﬁcient concrete UE schemes.
+Security. The main security properties that one would expect from updatable encryption are by now well
+studied; however the breadth of information that is possible to protect in this context is more subtle than at ﬁrst
+glance. Consider, for example, a journalist who stores a contact list with a cloud storage provider. At some
+point, the storage is compromised and an adversary recovers the ciphertexts. At this point, it may be important
+that the cryptography does not reveal which of the contacts are recent, and which are old. That is, it must be
+hard to decide if some ciphertext was recently created, or if it has been updated from a ciphertext stored in an
+earlier epoch.
+So how do we deﬁne realistic adversaries in this environment? A natural ﬁrst step for security in updatable
+encryption is conﬁdentiality of ciphertexts – given a single ciphertext, the adversarial server should not be able
+to determine anything about the underlying plaintext. The security model here must take into account that this
+adversary could be in possession of a number of prior keys or update tokens, and snapshot access to the storage
+1Note that Boneh et al. [[BLMR15], § Deﬁnition 7.6] use ciphertext-independence to mean that the updated ciphertext should have
+the same distribution as a fresh ciphertext (i.e. independent of the ciphertext in the previous epoch) – we follow the nomenclature of
+Lehmann and Tackmann [LT18a].
+3
+database in different epochs. The next step is to consider unlinkability between different epochs arising from
+the ciphertext update procedure: given a ciphertext for the current epoch, the adversary should not be able to
+tell which ciphertext (that existed in the previous epoch) a current ciphertext was updated from. Both of these
+properties can be naturally extended to chosen-ciphertext (CCA) security via provision of a decryption oracle.
+These steps have been taken by prior work, but unfortunately even a combination of these properties is
+not enough to defend against our motivating example. Previous security deﬁnitions cannot guarantee that the
+adversary is unable to distinguish between a ciphertext new in the current epoch and an updated ciphertext
+from an earlier epoch. We give a single new security property that captures this requirement and implies the
+notions given in prior work. Therefore we believe that this deﬁnition isthe natural conﬁdentiality property that
+is required for updatable encryption.
+An additional factor to consider is integrity: the user should be conﬁdent that their ciphertexts have not
+been modiﬁed by the adversarial server. While prior work has shown how to deﬁne and achieve integrity
+in the context of updatable encryption, a composition result of the style given by Bellare and Namprempre
+for symmetric encryption [BN08] – the combination of CPA security and integrity of ciphertexts gives CCA
+security – has been missing. We close this gap.
+Efﬁciency and Functionality. Although UE is by deﬁnition a form of symmetric key cryptography, tech-
+niques from asymmetric cryptography appear to be needed to achieve the required functionality in a sensible
+fashion. All of the previous known schemes with security proofs use exponentiation in both the encryption
+and update functions, even for those with limited security properties. Since a modern database may contain
+large numbers of ﬁles, efﬁciency is critical both for clients who will have to encrypt plaintexts initially and for
+servers who will have to update ciphertexts for all of their users.
+To bridge the gap between the academic literature and deployments of encrypted outsourced storage, it is
+crucial to design fast schemes . We present three novel UE schemes that not only satisfy our strong security
+deﬁnitions (CCA and ciphertext integrity), but in the vast majority of application scenarios are also at least
+twice as fast (in terms of computation each message block) as any previous scheme with comparable security
+level.
+The ciphertext expansion of a scheme says how much the size of a ciphertext grows compared to the size
+of the message. For a cloud server that stores vast numbers of ﬁles, it is naturally crucial to minimize the
+ciphertext expansion rate. It is also desirable to construct UE schemes that can encrypt arbitrarily large ﬁles,
+since a client might want to upload media ﬁles such as images or videos. Prior schemes that have achieved
+these two properties have only been secure in comparatively weak models. Our construction suitable for long
+messages – enabling encryption of arbitrarily large ﬁles with almost no ciphertext expansion – is secure in our
+strong sense and is thus the ﬁrst to bridge this gap.
+1.1 Related Work
+1.1.1 Security Models for UE.
+We regard the sequential, epoch-based corruption model of Lehmann and Tackmann [LT18a] (LT18) as the
+most suitable execution environment to capture the threats in updatable encryption. In this model, the adversary
+advances to the next epoch via an oracle query. It can choose to submit its (single) challenge when it pleases,
+and it can later update the challenge ciphertext to the ‘current’ epoch. Further, the adversary is allowed to
+adaptively corrupt epoch (i.e. ﬁle encryption) keys and update tokens at any point in the game: only at the end
+of the adversary’s execution does the challenger determine whether a trivial win has been made possible by
+some combination of the corruption queries and the challenge.
+LT18 introduced two notions: IND-ENC asks the adversary to submit two plaintexts and distinguish the
+resulting ciphertext, while possibly having corrupted tokens (but of course not keys) linking this challenge
+ciphertext to prior or later epochs. Further, they introduced IND-UPD: the adversary provides two ciphertexts
+that it received via regular encryption-oracle queries in the previous epoch, and has to work out which one
+has been updated. They observed 2 that plaintext information can be leaked not only through the encryption
+2The proceedings and full versions of LT18 stated that “IND-ENC security cannot guarantee anything about the security of updates.
+In fact, a scheme where the update algorithm UE.Upd includes all the old ciphertexts C0, ... , Ce in the updated ciphertext Ce+1 could
+be considered IND-ENC secure, but clearly lose all security if a single old key gets compromised. ” This line of argument is ﬂawed,
+4
+procedure, but also via updates. For schemes with deterministic updates, the adversary would trivially win if it
+could acquire the update token that takes the adversarially-provided ciphertexts into the challenge epoch, hence
+the deﬁnition for this setting, named detIND-UPD, is different from that for the randomized setting, named
+randIND-UPD.
+LT18’sIND-UPD deﬁnition was not the ﬁrst approach to formalizing the desirable property of unlinkabil-
+ity of ciphertexts, which attempts to specify that given two already-updated ciphertexts, the adversary cannot
+tell if the plaintext is the same. Indeed EPRS ( UP-REENC) and later KLR19 ( UP-REENC-CCA) also con-
+sidered this problem, in the ciphertext-dependent update and CCA-secure setting respectively. The work of
+KLR19 [[KLR19a], § Appendix A] stated that “an even stronger notion [than IND-UPD] might be desirable:
+namely that fresh and re-encrypted ciphertexts are indistinguishable... which is not guaranteed byUP-REENC”
+– we will answer this open question later on in our paper.
+In the full version of their work [BLMR15], BLMR introduced a security deﬁnition for UE denotedupdate
+– an extension of a model of symmetric proxy re-encryption. This non-sequential deﬁnition is considerably less
+adaptive than the later work of LT18, since the adversary’s key/token corruption queries and ciphertext update
+queries are very limited. Further, they only considered schemes with deterministic update algorithms.
+EPRS [EPRS17a] provided (non-sequential) deﬁnitions for updatable authenticated encryption, in the ciphertext-
+dependent setting. Their work (inherently) covered CCA security and ciphertext integrity (CTXT). These deﬁ-
+nitions were ambiguous regarding adaptivity: these issues have since been ﬁxed in the full version [EPRS17b].
+KLR19 attempted to provide stronger security guarantees for ciphertext-independent UE than LT18, con-
+centrating on chosen-ciphertext security (and the weaker replayable CCA) in addition to integrity of plaintexts
+and ciphertexts. We revisit these deﬁnitions later on, and show how a small modiﬁcation to their INT-CTXT
+game gives rise to natural composition results.
+In practice, LT18’srandIND-UPD deﬁnition insists that the ciphertext update procedure Upd requires the
+server to generate randomness for updating each ciphertext. Further, a scheme meeting both IND-ENC and
+IND-UPD can still leak the epoch in which the ﬁle was uploaded (the ‘age’ of the ciphertext). While it is
+arguable that metadata is inherent in outsourced storage, the use of updatable encryption is for high-security
+applications, and it would not be infeasible to design a system that does not reveal meta-data, which is clearly
+impossible if the underlying cryptosystem reveals the meta-data.
+Recent work by Jarecki et al. [JKR19] considers the key wrapping entity as a separate entity from the data
+owner or the storage server. While this approach seems promising, their security model is considerably weaker
+than those considered in our work or the papers already mentioned in this section: the adversary must choose
+whether to corrupt the key management server (and get the epoch key) or the storage server (and get the update
+token) for each epoch, and thus it cannot dynamically corrupt earlier keys or tokens at a later stage.
+1.1.2 Constructions of Ciphertext-Independent UE
+The initial description of updatable encryption by Boneh et al. [BLMR13] was motivated by providing a
+symmetric-key version of proxy re-encryption (see below). BLMR imagined doing this in a symmetric manner,
+where each epoch is simply one period in which re-encryption (rotation) has occurred. Their resulting scheme,
+denoted BLMR, deploys a key-homomorphic PRF, yet the nonce attached to a ciphertext ensures thatIND-UPD
+cannot be met (the scheme pre-dates the IND-UPD notion).
+The symmetric-Elgamal-based scheme of LT18, named RISE, uses a randomized update algorithm and is
+proven to meet IND-ENC and randIND-UPD under DDH. These proofs entail a seemingly unavoidable loss –
+a cubic term in the total number of epochs – our results also have this factor. LT18 also presented an extended
+version of the scheme by BLMR, denotedBLMR+, where the nonce is encrypted: they showed that this scheme
+meets a weak version ofIND-UPD called weakIND-UPD, in which if the adversary corrupts the token that links
+the challenge epoch to the epoch immediately after then a trivial win condition is triggered.
+The aim of KLR19 was to achieve stronger security than BLMR, EPRS and LT18 in the ciphertext-
+independent setting: in particular CCA security and integrity protection. They observed that the structure
+of RISE ensures that ciphertext integrity cannot be achieved: access to just one update token allows the storage
+and in fact IND-ENC rules out schemes of this form: encryptions were always fresh at some point. This claim was corrected and
+clariﬁed in a June 2019 presentation by the ﬁrst author [Leh19], and further elaborated on in an update to the full version in December
+2019 [LT18b].
+5
+provider to construct ciphertexts of messages of its choice. Their generic constructions, based on encrypt-and-
+MAC and the Naor-Yung paradigm, are strictly less efﬁcient thanRISE. We show how to achieve CCA security
+and integrity protections with novel schemes that are comparably efﬁcient with RISE.
+1.1.3 Related Primitives
+Proxy re-encryption (PRE) allows a ciphertext that is decryptable by some secret key to be re-encrypted such
+that it can be decrypted by some other key. Security models for PRE are closer to those for encryption than
+the strictly sequential outsourced-storage-centric models for UE, and as observed by Lehmann and Tack-
+mann [LT18a] the concepts of allowable corruptions and trivial wins for UE need considerable care when
+translating to the (more general) PRE setting. Unlinkability is not necessarily desired in PRE – updating the
+entire ciphertext may not be essential for a PRE scheme to be deemed secure – thus even after conversion to the
+symmetric setting, prior schemes [AFGH05, CH07] cannot meet the indistinguishability requirements that we
+ask of UE schemes. Recent works by Lee [Lee17] and Davidson et al. [DDLM19] have highlighted the links
+between the work of BLMR and EPRS and PRE, and in particular the second work gives a public-key variant
+of the (sequential) IND-UPD deﬁnition of LT18. Myers and Shull [MS18] presented security models for hybrid
+proxy re-encryption, and gave a single-challenge version of theUP-IND notion of EPRS. While the models are
+subtly different, the techniques for achieving secure UE and PRE are often similar: in particular rotating keys
+via exponentiation to some simple function of old and new key ( RISE is essentially a combination of Blaze et
+al.’s symmetric version of ElGamal [BBS98] and ciphertext randomization). Further, the symmetric-key PRE
+scheme of Sakurai et al. [SNS17] is at a high level similar to SHINE (their all-or-nothing-transform as an inner
+layer essentially serves the same purpose as the ideal cipher in SHINE), but in a security model that does not
+allow dynamic corruptions. Their approach includes – this natural approach is somewhat similar to the schemes
+that we introduce later in the paper.
+Tokenization schemes aim to protect short secrets, such as credit card numbers, using deterministic encryp-
+tion and deterministic updates: this line of work reﬂects the PCI DSS standard [Cou18] for the payment card
+industry. Provable security of such schemes was initially explored by Diaz-Santiago et al. [DRC14] and ex-
+tended to the updatable setting by Cachin et al. [CCFL17]. While much of the formalism in the model of Cachin
+et al. has been used in recent works on UE (in particular the epoch-based corruption model), the requirements
+on ciphertext indistinguishability are stronger in the UE setting, where we expect probabilistic encryption of
+(potentially large) ﬁles.
+1.2 Contributions
+Our ﬁrst major contribution is deﬁning thexxIND-UE-atk security notion for updatable encryption, for(xx, atk)∈
+{(det, CPA), (rand, CPA), (det, CCA)}, and comprehensively analyzing its relation to other, existing3 security
+notions (xxIND-ENC-atk, xxIND-UPD-atk). Our single deﬁnition requires that ciphertexts output by the en-
+cryption algorithm are indistinguishable from ciphertexts output by the update algorithm. We show that our new
+notion is strictly stronger even than combinations of prior notions, both in the randomized- and deterministic-
+update settings under chosen-plaintext attack and chosen-ciphertext attack. This not only gives us the unlinka-
+bility desired by prior works, but also answers the open question posed by KLR19 mentioned on page 5. Fig. 18
+describes the relationship between our new notion xxIND-UE-atk and prior notions.
+After a slight tweak to KLR19’s deﬁnitions for CTXT and CCA, we show the following generic composi-
+tion result: detIND-yy-CPA + INT-CTXT ⇒ detIND-yy-CCA for yy∈{ UE, ENC, UPD}. Combining this
+result with the relations from detIND-UE-atk above, we thus show that the combination of detIND-UE-CPA
+and INT-CTXT yields detIND-yy-CCA for all yy∈{ UE, ENC, UPD}.
+Our second major contribution is in designing a new, fast updatable encryption schemeSHINE. Our scheme
+is based on a random-looking permutation combined with the exponentiation map in a cyclic group, and comes
+in a number of variants: SHINE0, MirrorSHINE and OCBSHINE, for small messages, medium-sized messages
+and arbitrarily large messages respectively. In Fig. 1, we provide a comparison of security, ciphertext expansion
+and efﬁciency between our new schemes and those from prior literature. We also further the understanding of
+3The notions IND-ENC, randIND-UPD and detIND-UPD (which we denote as IND-ENC-CPA, randIND-UPD-CPA and
+detIND-UPD-CPA, resp.) are from LT18. The notions UP-IND-CCA and UP-REENC-CCA (detIND-ENC-CCA and
+detIND-UPD-CCA, resp.) are from KLR19. LT18 and KLR19 both build upon the deﬁnitions given by EPRS.
+6
+IND INT |M| | C| Enc (Upd)
+BLMR [BLMR13] (det, ENC, CPA)  l|G| (l+1)|G| lE
+BLMR+ [BLMR13, LT18a] (weak, UE, CPA)  l|G| (l+1)|G| lE
+RISE [LT18a] (rand, UE, CPA)  1|G| 2|G| 2E
+SHINE0[CPA] § 5.1.1 (det, UE, CPA)  (1-γ)|G| 1|G| 1E
+NYUE [KLR19a] (rand, ENC, RCCA)
+(rand, UPD, RCCA)  1|G1| (34|G1|, 34|G2|) (60E,70E)
+NYUAE [KLR19a] (rand, ENC, RCCA)
+(rand, UPD, RCCA) PTXT 1|G1| (58|G1|, 44|G2|) (110E,90E)
+E&M [KLR19a] (det, ENC, CCA)
+(det, UPD, CCA) CTXT 1|G| 3|G| 3E
+SHINE0 § 5.1.1 (det, UE, CCA) CTXT (1-2γ)|G| 1|G| 1E
+MirrorSHINE § 5.1.2 (det, UE, CCA) CTXT (1-γ)|G| 2|G| 2E
+OCBSHINE § 5.1.3 (det, UE, CCA) CTXT l|G| (l+2)|G| (l+2)E
+Figure 1: Comparison of security, ciphertext expansion and efﬁciency for updatable encryption schemes.
+(xx, yy, atk) represents the best possible xxIND-yy-atk notion that each scheme can achieve. E represents
+the cost of an exponentiation, for encryption Enc and ciphertext update Upd. γ represents the bit-size of the
+used nonce as a proportion of the group element bit-size. ForNYUE and NYUAE, size/cost is in pairing groups
+G1, G2. SHINE0[CPA] is SHINE0 with a zero-length integrity tag. BLMR, BLMR+ and OCBSHINE support
+encryption of arbitrary size messages (ofl blocks), with|M|≈ l|G|.
+schemes with deterministic update mechanisms. In particular, we identify the properties that are necessary of
+such schemes to meet a generalized version of our detIND-UE-atk notion. Another important contribution is
+that we further improve on the existing epoch insulation techniques that have been used to create proofs of
+security in the strong corruption environment we pursue. These have been shown to be very useful for studying
+updatable encryption schemes, and we expect our new techniques to be useful in the future.
+1.3 Further Discussion
+We have had to make a number of practical design decisions for our new UE scheme SHINE. The main idea
+is to permute the (combination of nonce and) message and then exponentiate the resulting value, with different
+mechanisms for enforcing ciphertext integrity depending on the ﬂavor that is being used (which is in turn
+deﬁned by the desired message length). In this subsection we give some motivation for why we believe that
+these choices are reasonable.
+Deterministic updates. Since we will require indistinguishability of ciphertexts, we know that the UE en-
+cryption algorithm should be randomized. The update algorithm may or may not be randomized, however. All
+known schemes indicate that randomized updates are more expensive than deterministic updates, but there is a
+small, well-understood security loss in moving to deterministic updates: an adversary with an update token in
+an appropriate epoch can trivially distinguish between an update of a known ciphertext and other ciphertexts
+in the next epoch. As a result, in the detIND-UE-CPA case the adversary is only forbidden from obtaining
+one token compared to randIND-UE-CPA. Furthermore, UE schemes with randomized updates cannot achieve
+CTXT and CCA security, which is possible for the deterministic-update setting. We believe that the minor CPA
+security loss is a small price to pay for stronger security (CTXT and CCA) and efﬁciency gain, in particular to
+reduce computations in the UE encryption and update algorithms and also improve ciphertext expansion.
+Bi-directional key updates. In principle, the token used to update ciphertexts need not be sufﬁcient to derive
+the new key from the old key. But for every known practical scheme, this derivation is indeed easy. Moreover,
+for every known practical scheme including ours, the old key can be derived from the new key (and token).
+While uni-directional update algorithms are desirable, constructing efﬁcient protocols has so far been elusive:
+this has technical implications for how security notions are deﬁned.
+7
+Limited number of epochs. In many applications that we would like to consider, the user of the storage
+service will control when updates occur (perhaps when an employee with access to key material leaves the
+organisation, or if an employee loses a key-holding device): this indicates that the total number of key rotations
+in the lifetime of a storage system might be numbered in the thousands, and in particular could be considerably
+smaller than the number of outsourced ﬁles.
+1.4 Document History
+This is the fourth version of this document. The ﬁrst version 4 contained two versions of SHINE that were
+only detIND-UE-CPA secure, with one ﬂavor for long messages and the other for short messages. The second
+version5 introduced a number of technical changes, including: three new schemes that all meet the stronger no-
+tion of detIND-UE-CCA security via differing integrity mechanisms; the composition result in Theorem 3; the
+formulation of INT-CTXT (a tweak of that given by KLR19), plus the description of the relationship between
+possible integrity notions (Lemma 1 and Remark 1). The third 6 and fourth versions are more incremental.
+Version 3 incorporated a discussion of implementation of SHINE in Section 5.6, and this version ﬁxes the
+counterexample used in Theorem 2.7 and adds an explicit length check to queries in the IND-UE game.
+1.5 Organization
+After introducing syntax and preliminaries in Section 2, we detail the necessary formalism for security modeling
+in updatable encryption in Section 3. In Section 4 we deﬁne our new conﬁdentiality property IND-UE and
+show how it implies prior notions; in Section 5 we give our new scheme, SHINE, including intuition behind
+its security analysis and implementation options. We show the security properties that can be met, in our new
+framework, by prior work schemes BLMR and RISE (LT18) in Section B and C respectively.
+2 Preliminaries
+Pseudocode returnb′ ?=b is used as shorthand forif b′ =b then return 1 // else return 0, with an output
+of 1 indicating adversarial success. We use the concrete security framework, deﬁning adversarial advantage as
+probability of success in the security game, and avoid statements of security with respect to security notions. In
+the cases where we wish to indicate that notion A implies notion B (for some ﬁxed primitive), i.e. an adversary’s
+advantage against B carries over to an advantage against A, we show this by bounding these probabilities.
+2.1 Hardness Assumptions
+For the deﬁnition of DDH, CDH and later on, we assume the existence of a group-generation algorithm that is
+parameterized byλ and outputs a cyclic group G of orderq (whereq is of lengthλ bits) and a generatorg. We
+adapt the deﬁnition of pseudorandom functions from Boneh et al. [BLMR13].
+Deﬁnition 1 (DDH). Fix a cyclic group G of prime orderq with generatorg. The advantage of an algorithmA
+solving the Decision Difﬁe-Hellman (DDH) problem for G andg is
+AdvDDH
+G,A(λ) =
+⏐⏐⏐Pr[ExpDDH-1
+G,A (λ) = 1]− Pr[ExpDDH-0
+G,A (λ) = 1]
+⏐⏐⏐
+where the experiment ExpDDH-b
+G,A is given in Fig. 2.
+Deﬁnition 2 (CDH). Fix a cyclic group G of prime orderq with generatorg. The advantage of an algorithmA
+solving the Computational Difﬁe-Hellman (CDH) problem for G andg is
+AdvCDH
+G,A (λ) = Pr[ExpCDH
+G,A(λ) = 1]
+where the experiment ExpCDH
+G,A is given in Fig. 3.
+4https://eprint.iacr.org/2019/1457/20191218:195141, 17th December 2019
+5https://eprint.iacr.org/2019/1457/20200221:133540, 21st February 2020
+6https://eprint.iacr.org/2019/1457/20200729:120307, 29th July 2020
+8
+ExpDDH-b
+G,A (λ)
+1 : x,y,r
+$
+← −Zq
+2 : X←gx;Y ←gy
+3 : if b = 0
+4 : Z←gxy
+5 : else
+6 : Z←gr
+7 : b ′←A (g,X,Y,Z )
+8 : return b′
+Figure 2: DDH experiment ExpDDH-b
+G,A
+ExpCDH
+G,A(λ)
+1 : x,y
+$
+← −Zq
+2 : X←gx
+3 : Y ←gy
+4 : Z←A (g,X,Y )
+5 : if Z =gxy
+6 : return 1
+7 : else
+8 : return 0
+Figure 3: CDH experiment ExpCDH
+G,A
+Deﬁnition 3 (PRF). LetF :K×X − →Ybe an efﬁciently computable function, where K is called the key
+space,X is the domain, andY is the range. The PRF advantage forA againstF is given by
+AdvPRF
+F,A(λ) =
+⏐⏐⏐Pr[ExpPRF-1
+F,A (λ) = 1]− Pr[ExpPRF-0
+F,A (λ) = 1]
+⏐⏐⏐
+where the experiment ExpPRF-b
+F,A is given in Fig. 4.
+ExpPRF-b
+F,A (λ)
+1 : if b = 0
+2 : k
+$
+← −K
+3 : f(·)←F (k,·)
+4 : else
+5 : f(·)
+$
+← −{f :X− →Y}
+6 : b ′←AO.f()
+7 : return b′
+O.f(x)
+8 : if x⁄∈X
+9 : return⊥
+10 : else
+11 : returnf(x)
+Figure 4: PRF experiment ExpPRF-b
+F,A
+2.2 Updatable Encryption
+We follow the syntax of prior work [KLR19a], deﬁning an Updatable Encryption ( UE) scheme as a tuple of
+algorithms{UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} that operate in epochs, these algorithms are described
+in Fig. 5. A scheme is deﬁned over some plaintext space MS, ciphertext spaceCS , key spaceKS and token
+spaceTS . We specify integer n + 1 as the (total) number of epochs over which a UE scheme can operate,
+though this is only for proof purposes. Correctness [KLR19a] is deﬁned as expected: fresh encryptions and
+updated ciphertexts should decrypt to the correct message under the appropriate epoch key. In contrast to prior
+work, we only consider deterministic token generation algorithms – all schemes in prior literature and our
+schemes allow the token to be produced deterministically from epoch keys alone.
+In addition to enabling ciphertext updates, in many schemes the token allows ciphertexts to be ‘down-
+graded’: performing some analog of the UE.Upd operation on a ciphertext C created in (or updated to) epoch
+e yields a valid ciphertext in epoch e-1. Such a scheme is said to have bi-directional ciphertext updates7. Fur-
+thermore, for many constructions, the token additionally enables key derivation, given one adjacent key. If
+this can be done in both directions – i.e. knowledge of ke and ∆e+1 allows derivation of ke+1 AND knowl-
+edge of ke+1 and ∆e+1 allows derivation of ke – then such schemes are referred to by LT18 as having bi-
+directional key updates. If such derivation is only possible in one ‘direction’ then the scheme is said to haveuni-
+directional key updates. Much of the prior literature on updatable encryption has distinguished these notions:
+7For example if the Upd procedure exponentiates all ciphertext components using the token, as done in SHINE, then Upd itself is
+sufﬁcient to demonstrate this property.
+9
+Algorithm Rand/Det Input Output Syntax
+UE.KG Key Gen Rand λ ke ke
+$← −UE.KG(λ)
+UE.TG Token Gen Det ke, ke+1 ∆e+1 ∆e+1← UE.TG(ke, ke+1)
+UE.Enc Encryption Rand M, ke Ce Ce
+$← −UE.Enc(ke, M)
+UE.Dec Decryption Det Ce, ke M′ or⊥ {M′/⊥}← UE.Dec(ke, Ce)
+UE.Upd Update Ctxt Rand/det Ce, ∆e+1 Ce+1 Ce+1
+$← −UE.Upd(∆e+1, Ce)
+Figure 5: Syntax of algorithms deﬁning an Updatable Encryption scheme UE.
+we stress that all schemes and deﬁnitions of security considered in this paper have bi-directional key updates
+and bi-directional ciphertext updates.
+3 Security Models for Updatable Encryption
+We consider a number of indistinguishability-based conﬁdentiality games and integrity games for assessing
+security of updatable encryption schemes. The environment provided by the challenger attempts to give as
+much power as possible to adversary A. The adversary may call for a number of oracles, and after A has
+ﬁnished running the challenger computes whether or not any of the actions enabled a trivial win. The available
+oracles are described in Fig. 6. An overview of the oraclesA has access to in each security game is provided in
+Fig. 7.
+Setup(λ)
+1 : k 0← UE.KG(λ)
+2 : ∆ 0←⊥
+3 : e, c← 0
+4 : phase, twf← 0
+5 : L, ˜L,C,K,T ←∅
+O.Enc(M)
+6 : C ← UE.Enc(ke, M)
+7 : c← c + 1
+8 : L←L∪{ (c, C, e)}
+9 : return C
+O.Dec(C)
+10 : twf← 1 if
+11 : phase = 1 and C∈ ˜L
+12 : M ′ or⊥← UE.Dec(ke, C)
+13 : return M′ or⊥
+O.Next()
+14 : e← e + 1
+15 : k e
+$
+← −UE.KG(λ)
+16 : ∆ e
+$
+← −UE.TG(ke-1, ke)
+17 : if phase = 1
+18 : ˜Ce← UE.Upd(∆e, ˜Ce-1)
+O.Upd(Ce−1)
+19 : if (j, Ce−1, e− 1) /∈L
+20 : return ⊥
+21 : C e← UE.Upd(∆e, Ce−1)
+22 : L←L∪{ (j, Ce, e)}
+23 : return Ce
+O.Corr(inp, ˆe)
+24 : if ˆe> e
+25 : return ⊥
+26 : if inp = key
+27 : K←K∪{ ˆe}
+28 : return kˆe
+29 : if inp = token
+30 : T ←T ∪{ˆe}
+31 : return ∆ˆe
+O.Upd ˜C
+32 : C←C∪{ e}
+33 : ˜L← ˜L∪{ (˜Ce, e)}
+34 : return ˜Ce
+O.Try(˜C)
+35 : if phase = 1
+36 : return⊥
+37 : phase← 1
+38 : twf← 1 if
+39 : e∈K∗ or ˜C∈L∗
+40 : M ′ or⊥← UE.Dec(ke, ˜C)
+41 : if M′⁄=⊥
+42 : win← 1
+Figure 6: Oracles in security games for updatable encryption. The boxed lines in O.Try only apply to
+INT-CTXTs: in this game the adversary is allowed to query the O.Try oracle only once. Computing ˜L∗ is
+discussed in Section 3.2.
+10
+Notion O.Enc O.Dec O.Next O.Upd O.Corr O.Upd ˜C O.Try
+detIND-yy-CPA ✓ × ✓ ✓ ✓ ✓ ×
+randIND-yy-CPA ✓ × ✓ ✓ ✓ ✓ ×
+detIND-yy-CCA ✓ ✓ ✓ ✓ ✓ ✓ ×
+INT-CTXT ✓ × ✓ ✓ ✓ × ✓
+Figure 7: Oracles the adversary is allowed to query in different security games, where yy∈{ ENC, UPD, UE}.
+× indicates the adversary does not have access to the corresponding oracle,✓ indicates the adversary has access
+to the corresponding oracle.
+Conﬁdentiality. A generic representation of all conﬁdentiality games described in this paper is detailed in
+Fig. 8. The current epoch is advanced by an adversarial call toO.Next – simulating UE.KG and UE.TG – and
+keys and tokens (for the current or any prior epoch) can be corrupted via O.Corr. The adversary can encrypt
+arbitrary messages viaO.Enc, and update these ‘non-challenge’ ciphertexts viaO.Upd. In CCA games, the
+adversary can additionally call decryption oracleO.Dec (with some natural restrictions to prevent trivial wins).
+At some point A makes its challenge by providing two inputs, and receives the challenge ciphertext – and
+in later epochs can receive an updated version by calling O.Upd ˜C (computing this value is actually done by
+O.Next, a call toO.Upd ˜C returns it).A can then interact with its other oracles again, and eventually outputs
+its guess bit. The ﬂag phase tracks whether or not A has made its challenge, and we always give the epoch
+in which the challenge happens a special identiﬁer ˜e. If A makes any action that would lead to a trivial win,
+the ﬂag twf is set as 1 andA’s output is discarded and replaced by a random bit. We follow the bookkeeping
+techniques of LT18 and KLR19, using the following sets to track ciphertexts and their updates that can be
+known to the adversary.
+•L: List of non-challenge ciphertexts (fromO.Enc orO.Upd) with entries of form (c, C, e), where query
+identiﬁer c is a counter incremented with each newO.Enc query.
+• ˜L: List of updated versions of challenge ciphertext (created via O.Next, received by adversary via
+O.Upd ˜C), with entries of form (˜C, e).
+Further, we use the following lists that track epochs only.
+•C: List of epochs in which adversary learned updated version of challenge ciphertext (via CHALL or
+O.Upd ˜C).
+•K: List of epochs in which the adversary corrupted the encryption key.
+•T : List of epochs in which the adversary corrupted the update token.
+All experiments necessarily maintain some state, but we omit this for readability reasons. The challenger’s
+state is S←{L, ˜L,C,K,T} , and the system state in the current epoch is given by st← (ke, ∆e, S, e).
+An at-a-glance overview of CHALL for various security deﬁnitions is given in Fig. 9. For security games
+such as LT18’s IND-UPD notion, where the adversary must submit as its challenge two ciphertexts (that it
+received fromO.Enc) and one is updated, the game must also track in which epochs the adversary has updates
+of these ciphertexts. We will later specify a version of our new xxIND-UE-atk notion that allows the adversary
+to submit a ciphertext that existed in any epoch prior to the challenge epoch, not just the one immediately
+before: this introduces some additional bookkeeping (discussed further in Section 3.2).
+CHALL Output of “ Create ˜C with CHALL” (in ˜e)
+xxIND-ENC-atk ¯M0, ¯M1 UE.Enc(k˜e, ¯M0) or UE.Enc(k˜e, ¯M1)
+xxIND-UPD-atk ¯C0, ¯C1 UE.Upd(∆˜e, ¯C0) or UE.Upd(∆˜e, ¯C1)
+xxIND-UE-atk ¯M, ¯C UE.Enc(k˜e, ¯M) or UE.Upd(∆˜e, ¯C)
+Figure 9: Intuitive description of challenge inputs and outputs in conﬁdentiality games for updatable encryption
+schemes, for (xx, atk)∈{ (det, CPA), (rand, CPA), (det, CCA)}. Full deﬁnitions are given in Section 3.1 and
+4.1.
+11
+ExpxxIND-yy-atk-b
+UE,A (λ)
+1 : do Setup
+2 : CHALL←AO.Enc,(O.Dec),O.Next,O.Upd,O.Corr(λ)
+3 : phase← 1; ˜e← e
+4 : Create ˜C with CHALL; ˜L← ˜L∪{ (˜Ce, e)}
+5 : b ′←AO.Enc,(O.Dec),O.Next,O.Upd,O.Corr,O.Upd˜C(˜C)
+6 : twf← 1 if
+7 : K∗∩C∗⁄=∅ or
+8 : xx = det and I∗∩C∗⁄=∅
+9 : if twf = 1
+10 : b ′ $
+← −{0, 1}
+11 : return b′
+Figure 8: Generic description of conﬁdentiality experiment ExpxxIND-yy-atk-b
+UE,A for scheme UE and adversary
+A, for xx∈{ det, rand}, yy∈{ ENC, UPD, UE} and atk∈{ CPA, CCA}. We do not consider (and thus do
+not formally deﬁne) randIND-yy-CCA; only in detIND-yy-CCA games doesA have access toO.Dec. CHALL
+is the challenge input provided byA: how to perform Create ˜C with CHALL is shown in Fig. 11, Fig. 12 and
+Fig. 17. Trivial win conditions, i.e. deciding the value of twf and computingK∗,C∗,I∗, are discussed in
+Section 3.2.
+A note on nomenclature: the adversary can make its challenge query to receive the challenge ciphertext,
+and then acquire updates of the challenge ciphertext via calls to O.Upd ˜C, and additionally it can calculate
+challenge-equal ciphertexts via applying tokens it gets viaO.Corr queries.
+When appropriate, we will restrict our experiments to provide deﬁnitions of security that are more suitable
+for assessing schemes with deterministic update mechanisms. For such schemes, access to the update token
+for the challenge epoch ( ∆˜e) allows the adversary to trivially win detIND-UPD-atk and detIND-UE-atk for
+atk∈{ CPA, CCA}. Note however that the deﬁnitions are not restricted to schemes with deterministic updates:
+such schemes are simply insecure in terms of randIND-UPD-CPA and randIND-UE-CPA.
+Ciphertext Integrity. In ciphertext integrity (CTXT) game, the adversary is allowed to make calls to oracles
+O.Enc,O.Next,O.Upd andO.Corr. At some pointA attempts to provide a forgery viaO.Try; as part of this
+query the challenger will assess if it is valid. We distinguish between the single-O.Try case (INT-CTXTs) and
+the multi-O.Try case (INT-CTXT). Here, “valid” means decryption outputs a message (i.e. not ⊥). In the
+single-O.Try case,A can continue making oracle queries after its O.Try query, however this is of no beneﬁt
+since it has already won or lost. In the multi- O.Try case,A can make any number ofO.Try queries: as long
+as it wins once, it wins the ciphertext integrity game. Formally, the deﬁnition of ciphertext integrity is given in
+Deﬁnition 4.
+Deﬁnition 4. Let UE = {UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme.
+Then the INT-CTXT advantage of an adversaryA against UE is deﬁned as
+AdvINT-CTXT
+UE,A (λ) = Pr[ExpINT-CTXT
+UE,A = 1]
+where the experiment ExpINT-CTXT
+UE,A is given in Fig. 6 and Fig. 10. Particularly, ifA is allowed to ask only one
+O.Try query, denote such notion as INT-CTXTs.
+12
+ExpINT-CTXT
+UE,A (λ)
+1 : do Setup
+2 : win← 0
+3 : AO.Enc,O.Next,O.Upd,O.Corr,O.Try(λ)
+4 : if twf = 1
+5 : win← 0
+6 : return win
+Figure 10: INT-CTXT security notion for updatable encryption scheme UE and adversaryA. Deciding twf
+and computingL∗ are discussed in Section 3.2.
+Note that INT-CTXT trivially implies INT-CTXTs. We can prove that INT-CTXTs implies INT-CTXT
+too, with loss upper-bounded by the number of O.Try queries. We prove this result in Lemma 1. KLR19
+deﬁned ciphertext integrity with one O.Try query plus access to O.Dec, and the game ends when the O.Try
+query happens. It is hard to prove the generic relation among CPA, CTXT and CCA using this formulation.
+Notice that decryption oracles give the adversary power to win the CTXT game even it only has one O.Try
+query. The adversary can send its forgery to the decryption oracle to test if it is valid (if O.Dec outputs a
+message and not⊥) – thusA can continue to send forgeries toO.Dec until a valid one is found, and then send
+this as aO.Try query (and win the game). So intuitively, a decryption oracle is equivalent to multiple O.Try
+queries. Proving that all these variants of CTXT deﬁnitions are equivalent to each other is straightforward, with
+the loss upper-bounded by the sum ofO.Try queries and decryption queries.
+Remark 1. The deﬁnition of INT-CTXT is more natural for deﬁning ciphertext integrity, however, it is eas-
+ier to use INT-CTXTs notion to prove ciphertext integrity for speciﬁc UE schemes. As INT-CTXT ⇐⇒
+INT-CTXTs, we use both deﬁnitions in this paper.
+Lemma 1. Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme. For
+any INT-CTXT adversaryA against UE that queries as most QTO.Try queries, there exists an INT-CTXTs
+adversaryB1 against UE such that
+AdvINT-CTXT
+UE,A (λ)≤QT· AdvINT-CTXTs
+UE,B1 (λ).
+Proof. As deﬁnition 4, we have
+AdvINT-CTXT
+UE,A (λ) = Pr[ExpINT-CTXT
+UE,A = 1].
+We deﬁneQT games, for the i-th gameGi, it is identical to INT-CTXT game except for the challenger only
+responses the i-thO.Try query and returns⊥ to the rest ofO.Try queries. Then we have
+Pr[ExpINT-CTXT
+UE,A = 1]≤
+QT∑
+i=1
+Pr[Gi = 1].
+Then we claim that for anyi∈{ 1, ...,Q T} there exists an adversary
+Pr[Gi = 1] = AdvINT-CTXTs
+UE,B1,i (λ).
+We can construct the reduction B1,i playing INT-CTXTs game and simulating the responses of Gi by
+submitting thei-thO.Try query to its INT-CTXTs challenger and returns⊥ for the restO.Try queries. Other
+queries and the ﬁnal result can be passed from INT-CTXTs game toGi. Then we have the desired result.
+3.1 Existing Deﬁnitions of Conﬁdentiality
+Here we describe existing conﬁdentiality notions given by LT18 and KLR19, including formal deﬁnitions for
+their IND-yy-CPA and IND-yy-CCA notions, respectively. (Note that KLR19 used UP-REENC to refer to the
+the unlinkability notion that we and LT18 callIND-UPD). We will deﬁne our new security notion in Section 4.1
+and compare the relationship between all notions in Section 4.2.
+13
+Deﬁnition 5. Let UE = {UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme.
+Then the xxIND-ENC-atk advantage, for (xx, atk)∈{ (det, CPA), (rand, CPA), (det, CCA)}, of an adversary
+A against UE is deﬁned as
+AdvxxIND-ENC-atk
+UE,A (λ) =
+⏐⏐⏐⏐Pr[ExpxxIND-ENC-atk-1
+UE,A = 1]− Pr[ExpxxIND-ENC-atk-0
+UE,A = 1]
+⏐⏐⏐⏐,
+where the experiment ExpxxIND-ENC-atk-b
+UE,A is given in Fig. 6, Fig. 8 and Fig. 11.
+Deﬁnition 6. Let UE = {UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme.
+Then the xxIND-UPD-atk advantage, for (xx, atk)∈{ (det, CPA), (rand, CPA), (det, CCA)}, of an adversary
+A against UE is deﬁned as
+AdvxxIND-UPD-atk
+UE,A (λ) =
+⏐⏐⏐Pr[ExpxxIND-UPD-atk-1
+UE,A = 1]− Pr[ExpxxIND-UPD-atk-0
+UE,A = 1]
+⏐⏐⏐,
+where the experiments ExpxxIND-UPD-atk-b
+UE,A are given in Fig. 6, Fig. 8 and Fig. 12.
+ExpxxIND-ENC-atk-b
+UE,A (λ)
+1 : ( ¯M0, ¯M1)←A
+2 : Create ˜C with ( ¯M0, ¯M1)
+3 : if| ¯M0|⁄ =| ¯M1|
+4 : return ⊥
+5 : ˜C
+$
+← −UE.Enc(k˜e, ¯Mb)
+6 : return ˜C
+Figure 11: Challenge call deﬁnition for
+xxIND-ENC-atk security experiment; the full
+experiment is given in combination with Fig. 6 and
+Fig. 8.
+ExpxxIND-UPD-atk-b
+UE,A (λ)
+1 : ( ¯C0, ¯C1)←A
+2 : Create ˜C with (¯C0, ¯C1)
+3 : if|¯C0|⁄ =|¯C1|
+4 : return ⊥
+5 : if (¯C0, ˜e-1) /∈L or (¯C1, ˜e-1) /∈L
+6 : return ⊥
+7 : ˜C
+$
+← −UE.Upd(∆˜e, ¯Cb)
+8 : return ˜C
+Figure 12: Challenge call deﬁnition for
+xxIND-UPD-atk security experiment; the full
+experiment is given in combination with Fig. 6 and
+Fig. 8.
+We do not deﬁne randIND-ENC-CCA or randIND-UPD-CCA – these notions were formalized by KLR19.
+Note that trivial win via direct update (see Section 3.2) is never triggered in the detIND-ENC-CPA game.
+Thus, randIND-ENC-CPA is equivalent to detIND-ENC-CPA. For simplicity, we will often denote the notion
+xxIND-ENC-CPA as IND-ENC-CPA.
+Remark 2. LT18 deﬁned weakIND-ENC-CPA and weakIND-UPD-CPA for analyzing BLMR+, a modiﬁcation
+of BLMR’s scheme where the nonce is encrypted using symmetric encryption. In this notion, the adversary
+trivially loses if it obtains an update token linking the challenge epoch to the epoch before or after. In Section B
+we show that BLMR+ is weakIND-UE-CPA secure.
+3.2 Trivial Win Conditions
+3.2.1 Trivial Win Conditions in Conﬁdentiality Games
+Trivial wins via keys and ciphertexts. The following is for analyzing all conﬁdentiality games. We again
+follow LT18 in deﬁning the epoch identiﬁcation sets C∗,K∗ andT∗ as the extended sets of C,K andT in
+which the adversary has learned or inferred information via its acquired tokens. These extended sets are used
+to exclude cases in which the adversary trivially wins, i.e. ifC∗∩K∗⁄=∅, then there exists an epoch in which
+the adversary knows the epoch key and a valid update of the challenge ciphertext. Note that the challenger
+computes these sets once the adversary has ﬁnished running. We employ the following algorithms of LT18 (for
+bi-directional updates):
+14
+K∗←{ e∈{ 0, ...,n}|CorrK(e) = true}
+true← CorrK(e) ⇐⇒ (e∈K )∨ (CorrK(e-1)∧ e∈T )∨ (CorrK(e+1)∧ e+1∈T )
+T∗←{ e∈{ 0, ...,n}|(e∈T )∨ (e∈K∗∧ e-1∈K∗)}
+C∗←{ e∈{ 0, ...,n}|ChallEq(e) = true}
+true← ChallEq(e) ⇐⇒
+(e = ˜e)∨ (e∈C )∨ (ChallEq(e-1)∧ e∈T ∗)∨ (ChallEq(e+1)∧ e+1∈T ∗)
+Trivial wins via direct updates. The following is for analyzing detIND-yy-atk security notions, for yy∈
+{UE, UPD} and atk∈{ CPA, CCA}, where the adversary provides as its challenge one or two ciphertexts that
+it received fromO.Enc. The challenger needs to use L to track the information the adversary has about these
+challenge input values.
+Deﬁne a new listI as the list of epochs in which the adversary learned an updated version of the cipher-
+text(s) given as a challenge input. Furthermore, deﬁne I∗ to be the extended set in which the adversary has
+learned or inferred information via token corruption. We will use this set to exclude cases which the adversary
+trivially wins, i.e. ifI∗∩C∗⁄=∅, then there exists an epoch in which the adversary knows the updated cipher-
+text of ¯C and a valid challenge-equal ciphertext. For deterministic updates, the adversary can simply compare
+these ciphertexts to win the game. In particular, if ¯C is restricted to come from˜e−1 (recall the challenge epoch
+is ˜e), then the conditionI∗∩C∗⁄=∅ is equivalent to the win condition that LT18 used forIND-UPD: ∆˜e∈T ∗
+orA didO.Upd(¯C) in ˜e. Our generalization is necessary for a variant of xxIND-UE-atk that we deﬁne later in
+which the challenge ciphertext input can come from any prior epoch, and not just the epoch immediately before
+the one in which the challenge is made.
+To computeI, ﬁnd an entry in L that contains challenge input ¯C. Then for that entry, note the query
+identiﬁer c, scanL for other entries with this identiﬁer, and add into listI all found indices:
+I←{ e∈{ 0, ...,n}|(c,·, e)∈L}.
+Then computeI∗ as follows:
+I∗←{ e∈{ 0, ...,n}|ChallinputEq(e) = true}
+true← ChallinputEq(e) ⇐⇒
+(e∈I )∨ (ChallinputEq(e-1)∧ e∈T ∗)∨ (ChallinputEq(e+1)∧ e+1∈T ∗)
+Additionally, if the adversary submits two ciphertexts ¯C0, ¯C1 as challenge (as in xxIND-UPD-atk), we
+computeIi,I∗
+i,i ∈{ 0, 1} ﬁrst and then useI∗ =I∗
+0∪I∗
+1 to check the trivial win condition. An example of
+trivial win conditionsK∗∩C∗⁄=∅ andI∗∩C∗⁄=∅ is shown in Fig. 16.
+We do not consider this trivial win condition for the ENC notion, as there is no ciphertext in the challenge
+input value, i.e.I∗ =∅. Thus, the assessmentI∗∩C∗⁄=∅ in experiment ExpdetIND-ENC-atk-b
+UE,A (see Fig. 8) will
+never be true.
+Trivial wins via decryptions. The following is for analyzing detIND-yy-CCA for yy∈{ UE, ENC, UPD},
+where the adversary has access toO.Dec. We follow the trivial win analysis in KLR19: suppose the adversary
+knows a challenge ciphertext (˜C, e0)∈ ˜L and tokens from epoch e0 + 1 to epoch e, then the adversary can
+update the challenge ciphertext from epoch e0 to epoch e. IfA sends the updated ciphertext toO.Dec this will
+reveal the underlying message, andA trivially wins the game: we shall exclude this type of attack.
+Deﬁne ˜L∗ to be the extended set of ˜L in which the adversary has learned or inferred information via token
+corruption. Whenever O.Dec receives a ciphertext located in ˜L∗, the challenger will set the trivial win ﬂag
+twf to be 1. The list ˜L∗ is updated while the security game is running. After the challenge query happens, the
+challenger updates ˜L∗ whenever an element is added to list ˜L or a token is corrupted. In Fig. 13 we show how
+list ˜L∗ is updated.
+15
+Update ˜L∗
+1 : if challenge query orO.Upd ˜C happens
+2 : ˜L∗← ˜L∗∪{ (˜C,·)}
+3 : if phase = 1 andO.Corr(token,·) happens
+4 : fori∈T ∗ and (˜Ci−1,i− 1)∈ ˜L∗ do
+5 : ˜L∗← ˜L∗∪{ (˜Ci,i )}
+Figure 13: Update procedure for list ˜L∗
+UpdateL∗
+1 : ifO.Enc orO.Upd happens
+2 : L∗←L∗∪{ (·, C,·)}
+3 : ifO.Corr(token,·) happens
+4 : fori∈T ∗ do
+5 : for (j, Ci−1,i− 1)∈L∗ do
+6 : C i← UE.Upd(∆i, Ci−1)
+7 : L∗←L∗∪{ (j, Ci,i )}
+Figure 14: Update procedure for listL∗.
+3.2.2 Trivial Win Conditions in Ciphertext Integrity Games
+We again follow the trivial win analysis in KLR19. In ciphertext integrity games for updatable encryption, we
+do not consider the randomized update setting as the adversary can update an old ciphertext via a corrupted
+token to provide any number of new valid forgeries to the Try query to trivially win this game.
+Trivial wins via keys. If an epoch key is corrupted, then the adversary can use this key to forge ciphertexts in
+this epoch. We exclude this trivial win: if the adversary provides a forgery in an epoch in listK∗, the challenger
+sets twf to 1.
+Trivial wins via ciphertexts. Suppose the adversary knows a ciphertext (C, e0)∈L and tokens from epoch
+e0 + 1 to epoch e, then the adversary can provide a forgery by updating C to epoch e. We shall exclude this
+type of forgeries.
+DeﬁneL∗ to be the extended set ofL in which the adversary has learned or inferred information via token
+corruption. IfO.Try receives a ciphertext located inL∗, the challenger will set twf to 1. The listL∗ is updated
+while the security game is running. Ciphertexts output by O.Enc andO.Upd are known to the adversary.
+Furthermore, whenever a token is corrupted, the challenger may update listL∗ as well. In Fig. 14 we show how
+listL∗ is updated.
+3.3 Firewall Technique
+In order to prove security for updatable encryption in the epoch-based model with strong corruption capabilities,
+cryptographic separation is required between the epochs in which the adversary knows key material, and those
+in which it knows challenge-equal ciphertexts (acquired/calculated via queries to O.Upd ˜C andO.Corr(∆)).
+To ensure this, we follow prior work in explicitly deﬁning the ‘safe’ orinsulated regions, as we explain below.
+These regions insulate epoch keys, tokens and ciphertexts: outside of an insulated region a reduction in a
+security proof can generate keys and tokens itself, but within these regions it must embed its challenge while
+still providing the underlying adversary with access to the appropriate oracles. A thorough discussion of how
+we leverage these insulated regions in proofs is given in Section 5.3.
+To understand the idea of ﬁrewalls, consider any security game (for bi-directional schemes) in which the
+trivial win conditions are not triggered. If the adversaryA corrupts all tokens then either it never corrupts any
+keys or it never asks for a challenge ciphertext. Suppose that A does ask for a challenge ciphertext in epoch
+˜e 8. Then there exists an (unique) epoch continuum around ˜e such that no keys in this epoch continuum, and
+no tokens in the boundaries of this epoch continuum are corrupted. Moreover, we can assume that all tokens
+within this epoch continuum are corrupted, because once the adversary has ﬁnished corrupting keys, it can
+corrupt any remaining tokens that do not ‘touch’ those corrupted keys. This observation is ﬁrst used in the
+IND-UPD proof of RISE provided by Lehmann and Tackmann [LT18a], and Klooß et al. [KLR19a] provided
+an extended description of this ‘key insulation’ technique. We name these epoch ranges insulated regions and
+their boundaries to be ﬁrewalls.
+8In the situation that the adversary does not corrupt any keys to the left or the right (or both) of the challenge epoch, the insulated
+region thus extends to the boundary (or boundaries) of the epoch continuum.
+16
+Deﬁnition 7. An insulated region with ﬁrewalls fwl and fwr is a consecutive sequence of epochs(fwl,..., fwr)
+for which:
+• no key in the sequence of epochs (fwl,..., fwr) is corrupted;
+• the tokens ∆fwl and ∆fwr+1 are not corrupted (if they exist);
+• all tokens (∆fwl+1,..., ∆fwr) are corrupted (if any exist).
+We denote the ﬁrewalls bordering the special insulated region that contains ˜e as ˆfwl and ˆfwr – though note
+that there could be (many, distinct) insulated regions elsewhere in the epoch continuum. Speciﬁcally, when
+the adversary asks for updated versions of the challenge ciphertext, the epoch in which this query occurs must
+also fall within (what the challenger later calculates as) an insulated region. In Fig. 15 we give an algorithm
+FW-Find for computing ﬁrewall locations. The list FW tracks, and appends a label to, each insulated region
+and its ﬁrewalls. Observe that if an epoch is a left ﬁrewall, then neither the key nor the token for that epoch are
+corrupted. From the left ﬁrewall, since we assume that all tokens are corrupted, track to the right until either a
+token is not corrupted or a key is.
+FW-Find
+1 : FW←∅
+2 : j = 0
+3 : for e∈{ 0, ...,n} do
+4 : if e∈¬ (T∗∪K∗)
+5 : j←j + 1
+6 : fwlj← e
+7 : if (e + 1 /∈T ∗) and (e /∈K∗)
+8 : fwrj← e
+9 : FW←{ (j, fwlj, fwrj)}
+Figure 15: Algorithm FW-Find for computing all ﬁrewalls.
+3.3.1 Example of Epoch Corruption and Trivial Wins
+In Fig. 16 we indicate the trivial win conditions and insulated regions for a particular adversarial corruption
+strategy, in the experiment for detIND-UE∗-CPA (this notion chosen here to demonstrate how the challenger
+populates its lists). Suppose challenge epoch ˜e = 8, and further assumeK∗ ={1, 6, 9}, andT∗ ={3, 4, 8},
+meaning thatC∗ ={7, 8}. Suppose ¯C is in epoch 1 and the adversary has asked O.Upd(¯C) in epoch 2, so
+¯C2, ¯C3, ¯C4 are updated ciphertexts of ¯C, thereforeI∗ ={1, 2, 3, 4}. SoC∗∩K∗ =∅ andI∗∩C∗ =∅, the trivial
+win conditions have not occurred. Then we see insulated regions: {0} is the ﬁrst insulated region,{2, 3, 4} is
+the second insulated region, etc. We computeT∗∪K∗ ={1, 3, 4, 6, 8, 9}, so¬(T∗∪K∗) ={0, 2, 5, 7}: using
+FW-Find we know this is the set of left ﬁrewalls, and the right ﬁrewalls are{0, 4, 5, 8}.
+Epoch {0} 1 {2 3 4} { 5} 6 {7 ˜e} 9
+Key × k1 × × × × k6 × × k9
+Token × × ∆3 ∆4 × × × ∆8 ×
+Challenge ciphertexts × × × × × × × ˜C7 ˜C8 ×
+Challenge input × ¯C ¯C2 ¯C3 ¯C4 × × × × ×
+Figure 16: An example of trivial win conditions and insulated regions incurred by an adversary playing
+detIND-UE∗-CPA, where× indicates the keys/tokens/ciphertexts not revealed to the adversary, and {} indi-
+cates insulated regions.
+17
+4 On the Security of Updates
+In this section we present a new notion of security for updatable encryption schemes, which we denotexxIND-UE-atk.
+This notion captures both security of fresh encryptions (i.e. impliesxxIND-ENC-atk) and unlinkability (i.e. im-
+plies xxIND-UPD-atk). We ﬁrst explain the new notion and then describe its relation to previous notions. Then,
+we prove a generic relationship among CPA, CTXT and CCA to complete the picture for security notions for
+UE schemes.
+4.1 A New Deﬁnition of Conﬁdentiality
+In the security game for xxIND-UE-atk, the adversary submits one message and a ciphertext from an earlier
+epoch that the adversary received via a call toO.Enc. The challenger responds with either an encryption of that
+message or an update of that earlier ciphertext, in the challenge (current) epoch ˜e.
+Deﬁnition 8 (xxIND-UE-atk). Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable en-
+cryption scheme. Then the xxIND-UE-atk advantage, for (xx, atk)∈{ (det, CPA), (rand, CPA), (det, CCA)},
+of an adversaryA against UE is deﬁned as
+AdvxxIND-UE-atk
+UE,A (λ) =
+⏐⏐⏐Pr[ExpxxIND-UE-atk-1
+UE,A = 1]− Pr[ExpxxIND-UE-atk-0
+UE,A = 1]
+⏐⏐⏐
+where the experiment ExpxxIND-UE-atk-b
+UE,A is given in Fig. 6, Fig. 8 and Fig. 17.
+Note that randIND-UE-CPA is strictly stronger than detIND-UE-CPA, since the adversary has strictly more
+capabilities. A generalized version of xxIND-UE-atk, denoted xxIND-UE∗-atk, is also given in Fig. 17. In
+this game the input challenge ciphertext can come from (i.e. be known to A in) any prior epoch, not just the
+epoch immediately before ˜e. Note that xxIND-UE-atk is a special case of xxIND-UE∗-atk. Under some fairly
+weak requirements (that all schemes discussed in this paper satisfy) we can prove that xxIND-UE-atk implies
+xxIND-UE∗-atk – we prove this result in Section. 4.2.1.
+ExpxxIND-UE-atk-b
+UE,A (λ)
+1 : ( ¯M, ¯C)←A
+2 : Create ˜C with ( ¯M, ¯C)
+3 : if (¯C, ˜e− 1) /∈L
+4 : return ⊥
+5 : ˜C˜e,0← UE.Enc(k˜e, ¯M)
+6 : ˜C˜e,1← UE.Upd(∆˜e, ¯C)
+7 : if|˜C˜e,0|⁄ =|˜C˜e,1|
+8 : return ⊥
+9 : return ˜C˜e,b
+ExpxxIND-UE∗-atk-b
+UE,A (λ)
+1 : ( ¯M, (¯C, e′))←A
+2 : Create ˜C with ( ¯M, (¯C, e′))
+3 : if (¯C, e′) /∈L
+4 : return ⊥
+5 : ˜C˜e,0← UE.Enc(k˜e, ¯M)
+6 : ˜Ce′,1← ¯C
+7 : forj∈{ e′+1, ..., ˜e} do
+8 : ˜Cj,1← UE.Upd(∆j, ˜Cj−1,1)
+9 : if|˜C˜e,0|⁄ =|˜C˜e,1|
+10 : return ⊥
+11 : return ˜C˜e,b
+Figure 17: Challenge call deﬁnition for xxIND-UE-atk and xxIND-UE∗-atk security experiments; the full
+experiment is deﬁned in Fig. 6 and Fig. 8.
+Remark 3. The deﬁnition of xxIND-UE-atk is more concise and intuitively easier to understand than that of
+xxIND-UE∗-atk, however in Theorem 2.1 and Theorem 2.2 in Section 4.2.1 we show thatxxIND-UE-atk ⇐⇒
+xxIND-UE∗-atk. This result and our generic proof techniques mean that all results in this paper that hold for
+xxIND-UE-atk, also hold for xxIND-UE∗-atk, and vice versa.
+Remark 4. In Section C.1 we show that the RISE scheme presented by LT18 is randIND-UE-CPA secure
+under DDH. While this result is perhaps unsurprising 9, the proof techniques we use are novel and may be of
+9LT18 had already shown that RISE is IND-ENC-CPA and randIND-UPD-CPA, so our result shows that it is stronger than was
+previously known.
+18
+independent interest. We give an Oracle-DDH-like game that inherits the epoch-based nature of the updatable
+encryption security model, and then use this as a bridge to prove security.
+4.2 Relations among Security Notions
+In Fig. 18 we show the relationship between the new and existing UE security notions. Note that our new
+notion is strictly stronger than the xxIND-ENC-atk and xxIND-UPD-atk notions presented in prior work, and
+is in fact stronger than the combination of the prior notions. Further, we show that the generic relation among
+CPA, CTXT and CCA, that CPA security coupled with ciphertext integrity implies CCA security, also holds
+for updatable encryption schemes. The relationships are proven via Theorem 2.2 to 2.8, and Theorem 3, which
+follow next.
+Theorem 2 (Informal Theorem). The relationship among the security notions xxIND-UE-atk, xxIND-ENC-atk
+and xxIND-UPD-atk are as in Fig. 18. This is proven via Theorem 2.2 to 2.8, and Theorem 3.
+randIND-UE-CPA
+IND-ENC-CPA
+randIND-UPD-CPA
+IND-ENC-CPA
++randIND-UPD-CPA
+Thm. 2.3
+2.5
+\ 2.7
+detIND-UE-CPA
+detIND-UPD-CPA
+IND-ENC-CPA
+IND-ENC-CPA
++detIND-UPD-CPA
+2.6
+2.4+2.2
+\ 2.7
+Def. 8
+\
+2.8
+detIND-UE-CCA
+detIND-UPD-CCA
+detIND-ENC-CCA
+IND-ENC-CCA
++detIND-UPD-CCA
++CTXT
+Thm. 3
++CTXT
+Thm. 3
++CTXT
+Thm. 3
+2.4+2.2
+2.6
+\ 2.7
+Figure 18: Relations among conﬁdentiality notions xxIND-yy-atk for xx ∈ { det, rand}, yy ∈
+{UE, ENC, UPD}, atk∈{ CPA, CCA}, and ciphertext integrity (INT-CTXT). Arrow labelling refers to Theo-
+rem numbering except where otherwise speciﬁed.
+4.2.1 Relations between IND-UE and IND-UE∗
+Properties of Deterministic Updates Here we will use an an alternative representation of UE.Enc that spec-
+iﬁes a deterministic algorithm with randomness as input, i.e. Ce← UE.Enc(ke, M;r).
+One of our main contributions is a scheme with a deterministic update mechanism – we now discuss some
+of the properties of such schemes. The ﬁrst two properties, simulatable token generation and randomness-
+preserving updates, were introduced by Klooß et al. [KLR19a]. Simulatable token generation states that the
+real token looks like a token generated from a token simulation algorithm, as we consider bi-directional updates
+we omit the generation of the reverse token. Randomness-preserving states that the update of a ciphertext looks
+like an encryption of the same message, with the same randomness, under the new key.
+Deﬁnition 9 (Simulatable token [KLR19a]) . Let UE be an updatable encryption scheme. We say that UE
+has simulatable token generation if it has the following property: There is a PPT algorithm SimTG(λ) which
+samples a token ∆. Furthermore, for arbitrary (ﬁxed) kold
+$← −UE.KG(λ) following distributions of ∆ are
+identical:
+•{∆| ∆ $← −SimTG(λ)}
+•{∆| knew
+$← −UE.KG(λ), ∆← UE.TG(kold, knew)}
+19
+Notice that BLMR, BLMR+, RISE, SHINE all have simulatable token generation. Furthermore, the simu-
+latable token generation algorithms of these UE schemes generates a token by randomly picking a token from
+the token space, i.e. SimTG : ∆ $← −TS.
+Deﬁnition 10 (Randomness-preserving [KLR19a]) . Let UE be an updatable encryption scheme. We say
+that UE.Upd (for UE) is randomness-preserving if the following holds: First, as usually assumed, UE en-
+crypts with uniformly chosen randomness. Second, all keys (kold, knew) $← −UE.KG(λ), tokens ∆new $← −
+UE.TG(kold, knew), plaintextm and randomnessr, we have
+UE.Upd(∆new, Cold) = UE.Enc(knew,m ;r),
+where Cold = UE.Enc(kold,m ;r).
+Suppose Ci = UE.Enc(ki,m ;r), and Cj is an update of Ci from epoch i to epoch j. Randomness-
+preserving property makes sure that Cj = UE.Enc(kj,m ;r), which means a (updated) ciphertext under some
+epoch key is uniquely decided by the message and randomness.
+We deﬁne an even weaker property which we call update-preserving: any update sequence starting and
+ending at the same key that starts with the same ciphertext will result in the same ciphertext.
+Deﬁnition 11 (Update-preserving). Let UE be an updatable encryption scheme with deterministic update algo-
+rithm. We say that UE.Upd (for UE) is update-preserving if the following holds: for any two sequence of key
+pairs with the same start key and end key(ki, ki+1, ..., kj) and (k′
+i, k′
+i+1, ..., k′
+j), where ki(= k′
+i), ki+1, k′
+i+1, ...,
+kj−1, k′
+j−1, kj(= k′
+j) $← −UE.KG(λ), and tokens ∆l
+$← −UE.TG(kl−1, kl), ∆′
+l
+$← −UE.TG(k′
+l−1, k′
+l), for any ci-
+phertext Ci in epochi, we have Cj = C′
+j where C′
+i = Ci, Cl = UE.Upd(∆l, Cl−1), C′
+l = UE.Upd(∆′
+l, C′
+l−1)
+forl =i + 1, ...,j .
+The diagrams in Fig. 19 show how the property works, with the left-hand side indicating keys and tokens
+and the right-hand side showing ciphertexts.
+ki
+k′
+i+1
+ki+1
+k′
+j−1
+kj−1
+kj
+∆′
+i+1 ∆′
+i+2, ..., ∆′
+j−1 ∆′
+j
+∆i+1 ∆i+2, ..., ∆j−1 ∆j Ci
+C′
+i+1
+Ci+1
+C′
+j−1
+Cj−1
+Cj
+∆′
+i+1 ∆′
+i+2, ..., ∆′
+j−1 ∆′
+j
+∆i+1 ∆i+2, ..., ∆j−1 ∆j
+Figure 19: Keys and updated ciphertexts in Deﬁnition 11
+Update-preserving property implies that the updated ciphertext is uniquely determined by (Ci,k j,j -i),
+where Ci is the beginning ciphertext for updating,j-i decides how many updates have occurred, andkj decides
+the value of the ending epoch’s epoch key.
+We now deﬁne another property which states that ciphertexts encrypted under one key can be simulated by
+ciphertexts encrypted under another key. All schemes in this paper meet this property.
+Deﬁnition 12 (Simulatable Encryption). Let UE be an updatable encryption scheme. For all keys kold, knew $← −
+UE.KG(λ), tokens ∆new $← −UE.TG(kold, knew), plaintext m, deﬁne X old,X new to be the statistical distribu-
+tion of the ciphertexts output by UE.Enc(kold,m ), UE.Enc(knew,m ), resp.. We say that UE has simulatable
+encryption if update algorithm keeps the ciphertext distribution, i.e. UE.Upd(∆new,X old) dist= X new.
+Note that we do not restrict that the update algorithm is probabilistic. This means when the update algorithm
+is deterministic, it will not add randomness to the updated ciphertext, and it maintains the ciphertext distribution.
+For example, suppose U(Z) is a uniform distribution over Z, and for any integer ∆, let UE.Upd(∆,x ) =
+x+∆, then UE.Upd(∆,U (Z)) =U(Z). This deﬁnition looks similar to the deﬁnition of perfect re-encryption
+provided by Klooß et al. [KLR19a], which mandates that update has the same distribution as decrypt-then-
+encrypt. Perfect re-encryption requires the update algorithm is probabilistic, which makes it possible for any
+updated ciphertext looks like a fresh encryption. The simulatable encryption property is to make sure that the
+update algorithm can keep the distribution of encryption – however it is not necessary to require that the update
+algorithm is probabilistic.
+20
+All schemes discussed in this paper satisfy all of the above properties. Note that randomness-preserving
+property is strictly stronger than the update-preserving property and simulatable encryption. Obviously, if
+a scheme is randomness-preserving then it is also update-preserving and has simulatable encryption. How-
+ever, the update-preserving property does not imply randomness-preserving property, even with simulatable
+encryption. To see this, construct a deterministic update variant of the RISE scheme (Section C) such that the
+randomnessr updates tor + 2: this scheme has the update-preserving property and simulatable encryption, but
+not the randomness-preserving property.
+xxIND-UE-atk implies xxIND-UE∗-atk. We provexxIND-UE-atk implies xxIND-UE∗-atk in this section, and
+consequently xxIND-UE-atk and xxIND-UE∗-atk are equivalent.
+randIND-UE-CPA implies randIND-UE∗-CPA.
+Theorem 2.1. Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme.
+For any randIND-UE∗-CPA adversaryA against UE, there exists an randIND-UE-CPA adversaryB2.1 against
+UE such that
+AdvrandIND-UE∗-CPA
+UE,A (λ)≤ AdvrandIND-UE-CPA
+UE,B2.1 (λ).
+Proof. We construct a reduction B2.1: before the epoch counter is incremented, every ciphertext is updated
+using the available update oracles. This needs to happen when the adversary moves to the next epoch, so that
+it is always possible to provide a valid challenge input to the reducton’s ownrandIND-UE-CPA challenger and
+respond with a valid challenge output to the adversary.
+More precisely, when the adversary makes the randIND-UE∗-CPA challenge query, the reduction make its
+own randIND-UE-CPA query, submitting the ciphertext provided by the adversary but updated to the epoch one
+before the challenge epoch that both algorithms are in. This should give the exact same result as updating the
+older ciphertext. Consequently, and since all other oracle queries can just be forwarded, the reduction perfectly
+simulates the randIND-UE∗-CPA game. We have the required result.
+detIND-UE-atk implies detIND-UE∗-atk.
+Proof technique of Theorem 2.2. The proof uses the ﬁrewall technique, where the reduction will ‘pause’ its
+own epoch continuum while responding to the adversary’s queries. The main left ﬁrewall in thedetIND-UE∗-atk
+game is an epoch in which the detIND-UE-atk reduction can possibly ask for a valid challenge query. Before
+the left ﬁrewall, the reduction sends the queries received from the adversaryA to its own detIND-UE-atk chal-
+lenger, and forwards responses to A. Within the ﬁrewalls, the reduction stops asking any O.Next queries,
+and instead simulates the responses of each query to provide answers to A. Because of this action, the
+detIND-UE-atk challenger will stay in epoch ˆfwl. When A makes the detIND-UE∗-atk challenge queries
+(if the trivial win conditions of the detIND-UE∗-atk game are not satisﬁed then the trivial win conditions of the
+detIND-UE-atk game will be not satisﬁed as well), the reduction makes its detIND-UE-atk query using the old
+ciphertext (in ˆfwl− 1) instead. After receiving the response, the reduction updates its challenge ciphertext to
+the challenge epoch to reply toA. After the right ﬁrewall, the query responses are calculated and forwarded, in
+the same manner as before the left ﬁrewall.
+Theorem 2.2. Let UE = {UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme
+has simulatable token generation, update-preserving property and simulatable encryption property. For any
+detIND-UE∗-atk adversaryA against UE, where atk∈{ CPA, CCA}, there exists an detIND-UE-atk adversary
+B2.2 against UE such that
+AdvdetIND-UE∗-atk
+UE,A (λ)≤ (n + 1)2· AdvdetIND-UE-atk
+UE,B2.2 (λ),
+Proof. We use three steps to prove this result.
+(Step 1.) Consider a modiﬁed version of detIND-UE∗-atk. For b∈{ 0, 1}, deﬁne experiments ExpINT1-b
+to be the same as ExpdetIND-UE∗-atk-b except that the experiments randomly pick ˆfwl, ˆfwr, and if ˆfwl, ˆfwr are
+not the ﬁrewalls around challenge epoch ˜e, then the experiment returns a random bit b′. More formally, the
+21
+values ˆfwl, ˆfwr are the desired ﬁrewalls if the challenge is made inside – i.e. ˜e∈ [ ˆfwl, ˆfwr] – and they actually
+consitute an insulate region, i.e. (, ˆfwl, ˆfwr)∈FW )).
+These ﬁrewalls ˆfwl, ˆfwr could take any value in{0, ...,n}, so this loss is upper bounded by (n + 1)2. We
+have
+AdvdetIND-UE∗atk
+UE,A (λ)≤ (n + 1)2AdvINT1
+UE,A.
+(Step 2.) Then we consider experiments ExpINT2-b, which is the same as ExpINT1-b except for: in the
+insulated region all encryptions are updated ciphertexts of ciphertexts encrypted in left ﬁrewall ˆfwl By this we
+mean that if the adversary asks for anyO.Enc,O.Dec and challenge query, the responses work as follows:
+•O.Enc(M): if called in an epoch ˆfwl< e≤ ˆfwr, encrypt the message in left ﬁrewall ˆfwl, then update the
+ciphertext to epoch e, and return the updated ciphertext.
+•O.Dec(C): if called in an epoch ˆfwl < e≤ ˆfwr, reverse update the ciphertext from e back to ˆfwl, then
+decrypt the updated ciphertext, and return the decrypted value.
+• challenge query, on input ( ¯M, (¯C, e′)): if b = 0, encrypt the message ¯M in left ﬁrewall ˆfwl, then update
+the ciphertext to the challenge epoch ˜e; if b = 1, update ciphertext ¯C from epoch e′ to epoch ˜e. Return
+the challenge ciphertext.
+Since we assume that UE has the simulatable encryption property, both operations are possible so we have
+AdvINT1
+UE,A(λ) = AdvINT2
+UE,A(λ).
+(Step 3.) We construct a reductionB2.2, detailed in Fig. 20 and Fig. 21, that is playing the detIND-UE-atk
+game and runsA. We claim that
+AdvINT2
+UE,A(λ)≤ AdvdetIND-UE-atk
+UE,B2.2 (λ).
+If ˆfwl, ˆfwr are the desired ﬁrewalls, then [ ˆfwl, ˆfwr]⊆C∗. If the trivial win conditions in ExpINT2-b are not
+set (the same result as the trivial win conditions inExpdetIND-UE∗-atk-b), i.e.I∗∩C∗ =∅, thenI∗∩[ ˆfwl, ˆfwr] =
+∅. That meansA never asksO.Upd(¯C) andO.Corr(token) in ˆfwl. So the reduction uses the relevant challenge
+input to ask a challenge query to its own detIND-UE-atk challenger in epoch ˆfwl, and it will not trivially lose.
+Before the epoch counter is incremented, every ciphertext is updated using the available update oracles.
+This needs to happen when the adversary moves to the next epoch, so that it is always possible to provide
+a valid challenge input to the reducton’s own detIND-UE-atk challenger and respond with a valid challenge
+output to the adversary.
+Within the ﬁrewalls, the reduction simulates all ciphertexts and uses the list FL and the list ˜FL to track
+non-challenge ciphertexts and challenge-equal ciphertexts, respectively. When the challenge query happens
+with input ( ¯M, (¯C, e′)), the reduction can ﬁnd all updated versions of ¯C by checking the ﬁrst entry of the list
+L. The reduction uses the ciphertext in epoch ˆfwl-1 with the same query identiﬁer c as a challenge input,
+sending to its own detIND-UE-atk challenger. (Note that e′ < ˆfwl, otherwise, [ ˆfwl, ˆfwr]⊆I ∗ and the trivial
+win condition is triggered.) After receiving the response from the detIND-UE-atk challenger,B2.2 updates the
+received ciphertext to the challenge epoch to replyA.
+EventuallyB2.2 receives b′ fromA, and simply outputs b′ to its detIND-UE-atk challenger. When B2.2
+interacts with ExpdetIND-UE-atk-b
+UE,B2.2 ,B2.2 can perfectly simulate ExpINT2-b
+UE,A toA. Then we have the required
+result.
+4.2.2 Relations among IND-ENC, IND-UPD, and IND-UE
+In this section, we analyze the relations among notions with different challenge input. Since similar proof
+techniques are used in Theorems 2.3, 2.4, 2.5 and 2.6, of these we give full proof details only for Theorem 2.3.
+Theorem 2.3. Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme.
+For any IND-ENC-CPA adversaryA against UE, there exists an randIND-UE-CPA adversaryB2.3 against UE
+such that
+AdvIND-ENC-CPA
+UE,A (λ)≤ 2· AdvrandIND-UE-CPA
+UE,B2.3 (λ).
+22
+ReductionB2.2 playing ExpdetIND-UE-atk-b
+UE,B2.2
+1 : do Setup;FL, ˜FL,L, ˜L←∅
+2 : ˆfwl, ˆfwr
+$
+← −{0, ...,n}
+3 : ¯M, (¯C, e′)←AO.Enc,(O.Dec),O.Next,O.Upd,O.Corr(λ)
+4 : phase← 1
+5 : Create ˜C with ( ¯M, (¯C, e′)), get ˜C˜e
+6 : b ′←AO.Enc,(O.Dec),O.Next,O.Upd,O.Corr,O.Upd˜C(˜C˜e)
+7 : twf← 1 if
+8 : C∗∩K∗⁄=∅ or I∗∩C∗⁄=∅
+9 : if ABORT occurred or (·, ˆfwl, ˆfwr)⁄∈FW or twf = 1
+10 : b ′ $
+← −{0, 1}
+11 : return b′
+Figure 20: Reduction B2.2 for proof of Theorem 2.2. The adversary may call forO.Dec in the CCA game. The
+oracles in Fig. 21 show howB2.2 responds toA, including calls to oracles in its own detIND-UE-atk game.
+Proof. We construct a reduction B2.3 running the randIND-UE-CPA experiment which will simulate the re-
+sponses of queries made by the IND-ENC-CPA adversaryA. To provide a valid non-challenge ciphertext to its
+own challenger,B2.3 must runA out of step with its own game, so epoch 0 as far asA is concerned is actually
+epoch 1 forB2.3, and so on.
+1. B2.3 chooses b $← −{0, 1}.
+2. B2.3 receives the setup parameters from its randIND-UE-CPA challenger, chooses M $← −MSand calls
+O.Enc(M) which returns some C0. ThenB2.3 callsO.Next once and sends the setup parameters toA.
+3. (a) Whenever B2.3 receives the queriesO.Enc,O.Upd,O.Corr fromA,B2.3 sends these queries to its
+randIND-UE-CPA challenger, and forwards the responses toA.
+(b) WheneverO.Next is called byA,B2.3 randomly chooses a messageM $← −MSand callsO.Enc(M)
+to receive some Ce, and then callsO.Next.
+4. At some point, in epoch ˜e (for its game),B2.3 receives the challenge query ( ¯M0, ¯M1) fromA. ThenB2.3
+sends ( ¯Mb, C˜e−1) as challenge to its own randIND-UE-CPA challenger. After receiving the challenge
+ciphertext, ˜C˜e, from its challenger,B2.3 sends ˜C˜e toA.
+5. B2.3 continues to answerA’s queries using its own oracles, now includingO.Upd ˜C.
+6. FinallyB2.3 receives the output bit b′ fromA. If b = b′ thenB2.3 returns 0. OtherwiseB2.3 returns 1.
+We now bound the advantage ofB2.3. The point is that whenever B2.3 returns a random encryption toA,
+B2.3’s probability of winning is exactly 1/2 because the bit b′ fromA is independent of its choice of b. This
+happens with probability 1/2. However, whenB2.3 returns a “correct” value toA (an encryption of ¯M0 or ¯M1),
+thenB2.3’s probability of winning is the same as the probability thatA wins.
+First note that, as usual,
+AdvrandIND-UE-CPA
+UE,B2.3 =|Pr[ExprandIND-UE-CPA-1
+UE,B2.3 = 1]− Pr[ExprandIND-UE-CPA-0
+UE,B2.3 = 1]|.
+We claim thatPr[ExprandIND-UE-CPA-1
+UE,B2.3 = 1] = 1/2 because in this case ˜C˜e is independent of b and so b′ must
+23
+O.Enc(M)
+1 : c← c + 1
+2 : if e⁄∈{ ˆfwl+1, ..., ˆfwr}
+3 : callO.Enc(M), get Ce
+4 : L←L∪{ (c, Ce, e)}
+5 : if e∈{ ˆfwl+1, ..., ˆfwr}
+6 : callO.Enc(M), get C ˆfwl
+7 : L←L∪{ (c, C ˆfwl, ˆfwl)}
+8 : forj∈{ ˆfwl+1, ..., e} do
+9 : C j← UE.Upd(∆j, Cj−1)
+10 : FL←FL∪{ (c, Ce, e)}
+11 : return Ce
+O.Next
+12 : if e∈{ 1, ..., ˆfwl-1} then
+13 : for (c, Ce−1, e− 1)∈L do
+14 : callO.Upd(Ce-1), get Ce
+15 : L←L∪{ (c, Ce, e)}
+16 : callO.Next
+17 : if e∈{ ˆfwr+1, ...,n} then
+18 : callO.Next
+19 : if e∈{ ˆfwl, ..., ˆfwr-1} then
+20 : e← e+1
+21 : ∆ e
+$
+← −SimTG(λ)
+22 : if e = ˆfwr then
+23 : forj∈{ ˆfwl+1, ..., ˆfwr+1} do
+24 : callO.Next
+25 : for (c, Cj-1,j -1)∈L do
+26 : callO.Upd(Cj-1)
+27 : get Cj
+28 : L←L∪{ (c, Cj,j )}
+29 : for (˜Cj-1,j -1)∈ ˜L do
+30 : callO.Upd ˜C(˜Cj-1))
+31 : get ˜Cj
+32 : ˜L← ˜L∪{ (˜Cj,j )}
+O.Upd(Ce−1)
+33 : if (c, Ce−1, e− 1) /∈L∪FL
+34 : return ⊥
+35 : if e∈{ 1, ..., ˆfwl}
+36 : callO.Upd(Ce−1), get Ce
+37 : L←L∪{ (c, Ce, e)}
+38 : if e∈{ ˆfwr+2, ...,n}
+39 : callO.Upd(Ce−1), get Ce
+40 : L←L∪{ (c, Ce, e)}
+41 : if e∈{ ˆfwl+1, ..., ˆfwr}
+42 : C e← UE.Upd(∆e, Ce−1)
+43 : FL←FL∪{ (c, Ce, e)}
+44 : if e = ˆfwr+1
+45 : ﬁnd (c, Ce, e)∈L
+46 : return Ce
+O.Corr(inp, ˆe)
+47 : do Check(inp, ˆe; e; ˆfwl, ˆfwr)
+48 : if inp = key
+49 : K←K∪{ ˆe}
+50 : return kˆe
+51 : if inp = token
+52 : T ←T ∪{ˆe}
+53 : if ˆe∈{ 1, ..., ˆfwl-1}
+54 : callO.Corr(inp, ˆe)
+55 : get ∆ˆe
+56 : if{ ˆfwr+2, ...,n}
+57 : callO.Corr(inp, ˆe)
+58 : get ∆ˆe
+59 : if ˆe∈{ ˆfwl+1, ..., ˆfwr}
+60 : ﬁnd ∆ˆe
+61 : return ∆ˆe
+Create ˜C with ( ¯M, (¯C, e′))
+62 : if ˜e⁄∈{ ˆfwl, ..., ˆfwr}
+63 : ABORT
+64 : if (c, ¯C, e′)⁄∈L
+65 : ABORT
+66 : ﬁnd (c, C ˆfwl−1, ˆfwl− 1)∈L
+67 : call cq ( ¯M, C ˆfwl−1)
+68 : get ˜C ˆfwl
+69 : ˜L← ˜L∪{ (˜C ˆfwl, ˆfwl)}
+70 : forj∈{ ˆfwl+1, ..., ˆfwr} do
+71 : ˜Cj← UE.Upd(∆j, ˜Cj−1)
+72 : ˜FL← ˜FL∪{ (˜Cj,j )}
+73 : return ˜C˜e
+O.Upd ˜C
+74 : if e∈{ 1, ..., ˆfwl-1}
+75 : return ⊥
+76 : C←C∪{ e}
+77 : if e∈{ ˆfwl}
+78 : ﬁnd (˜Ce, e)∈ ˜L
+79 : if e∈{ ˆfwl+1, ..., ˆfwr}
+80 : ﬁnd (˜Ce, e)∈ ˜FL
+81 : if e∈{ ˆfwr+1, ...,n}
+82 : callO.Upd ˜C, get ˜Ce
+83 : return ˜Ce
+O.Dec(C)
+84 : if phase← 1 and C∈ ˜L∗
+85 : twf← 1
+86 : return⊥
+87 : if e⁄∈{ ˆfwl+1, ..., ˆfwr}
+88 : callO.Dec(C), get M′/⊥
+89 : if e∈{ ˆfwl+1, ..., ˆfwr}
+90 : forj∈{ e, ..., ˆfwl+1} do
+91 : C j−1← UE.Upd−1(∆j, Cj)
+92 : callO.Dec(C ˆfwl), get M′/⊥
+93 : return M′ or⊥
+Figure 21: Oracles used in the proof of Theorem 2.2. In line 67 of the Create ˜C description, call cq means that
+the reduction makes its own challenge query with these values.
+24
+also be independent of b. Then we have:
+AdvrandIND-UE-CPA
+UE,B2.3 =
+⏐⏐⏐⏐
+1
+2− Pr[ExprandIND-UE-CPA-0
+UE,B2.3 = 1]
+⏐⏐⏐⏐
+=
+⏐⏐⏐⏐
+1
+2−
+(1
+2· Pr[ExpIND-ENC-CPA-0
+UE,A = 1] + 1
+2· Pr[ExpIND-ENC-CPA-1
+UE,A = 0]
+)⏐⏐⏐⏐
+=
+⏐⏐⏐⏐
+1
+2− 1
+2· Pr[ExpIND-ENC-CPA-0
+UE,A = 1]− 1
+2
+(
+1− Pr[ExpIND-ENC-CPA-1
+UE,A = 1]
+)⏐⏐⏐⏐
+=
+⏐⏐⏐⏐
+1
+2·
+(
+Pr[ExpIND-ENC-CPA-0
+UE,A = 1]− Pr[ExpIND-ENC-CPA-1
+UE,A = 1]
+)⏐⏐⏐⏐
+= 1
+2· AdvIND-ENC-CPA
+UE,A .
+A remark on Theorem 2.4. Directly proving that detIND-UE-atk implies detIND-ENC-atk is very challeng-
+ing, and in fact the difﬁculty is the same as proving that detIND-UE-atk implies detIND-UE∗-atk. Since we
+have proved detIND-UE-atk implies detIND-UE∗-atk in Theorem 2.2 in Section 4.2.1, we do not repeat the
+similar proof approach here. We can just prove detIND-UE∗-atk implies detIND-ENC-atk, which is easy. We
+follow a very similar approach to the proof of Theorem 2.3. ThedetIND-UE∗-atk (reduction) adversary can ask
+for tokens almost as freely as the detIND-ENC-atk adversary without incurring the trivial win conditions. But
+since there should at least one token, in an epoch before (include) challenge epoch ˜e, is unknown to the adver-
+sary, we again have to run our reduction out of step with the detIND-ENC-atk adversary (essentially creating
+an artiﬁcial epoch).
+Theorem 2.4. Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme.
+For any detIND-ENC-atk adversaryA against UE, where atk∈{ CPA, CCA}, there exists a detIND-UE∗-atk
+adversaryB2.4 against UE such that
+AdvdetIND-ENC-atk
+UE,A (λ)≤ 2· AdvdetIND-UE∗-atk
+UE,B2.4 (λ).
+Proof. Similar to the proof strategy in Theorem 2.3, we construct a detIND-UE∗-atk adversaryB2.4 against
+UE to simulate the responses to queries made by detIND-ENC-atk adversaryA. B2.4 chooses b $← −{0, 1}.
+SinceB2.4 is allowed to takes its challenge ciphertext from any epoch in its detIND-UE∗-atk experiment, it
+can in particular uses the random ciphertext created in epoch 0, C0. Note that, in contrast to Step 3 (b) of the
+simulation in the proof of Theorem 2.3, there is now no need forB2.4 to generate a random ciphertext for each
+epoch. AlsoB2.4 will never ask forO.Upd(C0) to its own detIND-UE∗-atk challenger.
+When receiving the challenge query ( ¯M0, ¯M1) fromA, the reductionB2.4 sends ( ¯Mb, C0) as challenge to
+its own detIND-UE∗-atk challenger. SinceA has no view of epoch 0,A cannot ask for ∆1. In addition,A will
+never ask forO.Upd(C0).
+Thus the trivial win conditionI∗∩C∗⁄=∅ will not be satisﬁed in the detIND-UE∗-atk game. The other
+trivial win(s), i.e. trivial win via keys and ciphertexts (and trivial wins via decryptions), will also pass from
+detIND-ENC-atk game to detIND-UE∗-atk game. The result follows using the same calculation as in the proof
+of Theorem 2.3.
+Theorem 2.5. Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme.
+For any randIND-UPD-CPA adversaryA against UE, there exists an randIND-UE-CPA adversaryB2.5 against
+UE such that
+AdvrandIND-UPD-CPA
+UE,A (λ)≤ 2· AdvrandIND-UE-CPA
+UE,B2.5 (λ).
+Proof. Similarly to the proof of Theorem 2.3, we construct a randIND-UE-CPA reductionB2.5 against UE to
+simulate the responses of queries made by randIND-UPD-CPA adversaryA. However in this case it is not
+necessary for the reduction to be out-of-step with the adversary. B2.5 ﬁrst chooses b $← −{0, 1}.B2.5 forwards
+all queries fromA to its own oracles, and when it receives challenge query (¯C0, ¯C1) fromA,B2.5 samples a
+25
+random message M, and sends (M, ¯Cb) to the randIND-UE-CPA challenger. The result follows using a similar
+calculation to that in the proof of Theorem 2.3.
+Theorem 2.6. Let UE = {UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme
+For any detIND-UPD-atk adversaryA against UE, where atk∈{ CPA, CCA}, there exists an detIND-UE-atk
+adversaryB2.6 against UE such that
+AdvdetIND-UPD-atk
+UE,A (λ)≤ 2· AdvdetIND-UE-atk
+UE,B2.6 (λ).
+Proof. The proof follows exactly the same steps as that of Theorem 2.5, in addition to the observation that in
+the det versions and CCA versions of the games, the trivial win ﬂag twf is either triggered for both adversary
+and reduction or for neither whenO.Corr queries are made by the underlying adversary.
+Theorem 2.7. Each of the following hold for (xx, atk)∈{ (det, CPA), (rand, CPA), (det, CCA)}.
+(i). Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme and let αENC
+be the xxIND-ENC-atk advantage of an adversaryA against UE. Then there exists a modiﬁed scheme UE′ such
+thatA’sxxIND-ENC-atk advantage against UE′ is (still)αENC, and there exists an xxIND-UE-atk adversaryB
+against UE′ with advantage 1.
+(ii). Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme and let αUPD
+be the xxIND-UPD-atk advantage of an adversaryA against UE. Then there exists a modiﬁed scheme UE′ such
+thatA’sxxIND-UPD-atk advantage against UE′ is (still)αUPD, and there exists an xxIND-UE-atk adversaryB
+against UE′ with advantage 1.
+(iii). Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme and letαENC
+be the xxIND-ENC-atk advantage of an adversaryAENC against UE andαUPD be the xxIND-UPD-atk advan-
+tage of an adversary . Then there exists a modiﬁed scheme UE′ such thatAENC’sxxIND-ENC-atk advantage
+against UE′ is (still)αENC,AUPD’sxxIND-UPD-atk advantage against UE′ is (still)αUPD, and there exists an
+xxIND-UE-atk adversaryB against UE′ with advantage 1.
+Proof. All three are demonstrated using the same counterexample. All algorithms for UE′ are the same as
+for UE, except UE′.Enc is deﬁned by modifying UE.Enc to append 0, and UE′.Upd is deﬁned by modifying
+UE.Upd to append 1. Hence, freshly encrypted ciphertexts and updated ciphertexts are distinguishable. This
+does not affect an adversary’s ability to win thexxIND-ENC-atk or xxIND-UPD-atk games but trivially breaks
+xxIND-UE-atk security.
+A remark on Theorem 2.8. We construct an updatable encryption scheme which is detIND-UE-CPA secure
+but not randIND-UE-CPA secure to prove thatdetIND-UE-CPA does not imply randIND-UE-CPA. Note that in
+Section 5 we will prove thatSHINE is detIND-UE-CPA secure (yet it is trivially notrandIND-UE-CPA secure),
+which provides an example to support this result. However the proof that SHINE is detIND-UE-CPA in the
+ideal cipher model (if DDH holds). Here we demonstrate the theorem based on a weaker assumption, namely
+the existence of pseudorandom functions.
+Proof technique of Theorem 2.8. We use axxIND-UE-CPAsecure UE scheme to construct a new UE scheme
+UEnew, where we use a PRF to make a part of the new update algorithm deterministic. Because of this UEnew
+will not be randIND-UE-CPA secure. In order to bound the detIND-UE-CPA security of UEnew, we need to
+make sure the newly added deterministic part of the updates will not makeEnc(m) and Upd(C) distinguishable
+– this is where we need the PRF.
+Theorem 2.8. Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme,
+and deﬁne a new updatable encryption scheme UEnew in Fig. 22, built using pseudorandom function F :
+K×X − →X. Then, for any detIND-UE-CPA adversaryA against UEnew that asks at most QE queries to
+O.Enc before it makes its challenge, there exists a PRF adversaryBPRF against F and a detIND-UE-CPA
+adversaryB2.8 against UE such that
+AdvdetIND-UE-CPA
+UEnew,A (λ)≤ (n + 1)· (AdvdetIND-UE-CPA
+UE,B2.8 (λ) + 2· AdvPRF
+F,BPRF + 2QE2
+|X| ),
+and there exists a randIND-UE-CPA adversaryC against UEnew that wins with probability 1.
+26
+UEnew.KG(λ)
+1 : k
+$
+← −UE.KG(λ)
+2 : return k
+UEnew.TG(ke, ke+1)
+3 : ∆ ′
+e+1← UE.TG(ke, ke+1)
+4 : fk e+1
+$
+← −K
+5 : return (∆′
+e+1, fke+1)
+UEnew.Enc(ke, M)
+6 : re
+$
+← −X
+7 : C ′
+e
+$
+← −UE.Enc(ke, M)
+8 : return (re, C′
+e)
+UEnew.Dec(ke, Ce)
+9 : parse Ce = (re, C′
+e)
+10 : M ′/⊥← UE.Dec(ke, C′
+e)
+11 : return M′
+UEnew.Upd(∆e+1, Ce)
+12 : parse ∆e+1 = (∆′
+e+1, fke+1)
+13 : parse Ce = (re, C′
+e)
+14 : re+1←F (fke+1,r e)
+15 : C ′
+e+1← UE.Upd(∆′
+e+1, C′
+e)
+16 : return (re+1, C′
+e+1)
+Figure 22: Updatable encryption scheme UEnew for proof of Theorem 2.8, built from PRF F and updatable
+encryption scheme UE.
+Proof. UEnew is not randIND-UE-CPA secure. If the token in the challenge epoch is corrupted then the adver-
+sary can compare r in the value it receives with the value it provided and therefore trivially win. So UEnew is
+not randIND-UE-CPA secure.
+UEnew is detIND-UE-CPA secure. We proceed in three steps.
+(Step 1.) Consider a modiﬁed version of detIND-UE-CPA. For b∈{ 0, 1}, deﬁne experiments ExpINT1-b
+to be the same as ExprandIND-UE-CPA-b except that the experiments randomly pick e∗←{ 0, ...,n}, and if
+e∗⁄= ˜e the experiments return a random bit for b′. The loss is upper bounded byn + 1. Then:
+AdvdetIND-UE-CPA
+UEnew,A (λ)≤ (n + 1)· AdvINT1
+UEnew,A(λ).
+(Step 2.) Then we consider modiﬁed experiments ExpINT2-b, which are the same as ExpINT1-b except
+that the ﬁrst element of ciphertexts in the guessed epoch e∗ is a uniformly random element. We show that
+the ability to notice this change is upper bounded by PRF advantage. More precisely, experiment ExpINT2-b
+tracks randomness in the setX (initialized as empty), and when adversary asks anO.Upd or challenge query:
+• ForO.Upd(Ce∗-1): parse ∆e∗ = (∆′
+e∗, ), parse Ce∗-1 = (re∗-1, C′
+e∗-1), ifre∗-1∈X, then the experiment
+aborts; otherwise, setX←X∪{re∗-1}, randomly choosere∗
+$← −X. Return (re∗, UE.Upd(∆′
+e∗, C′
+e∗-1)).
+• For challenge input ( ¯M, (r, ¯C)): parse ∆e∗ = (∆′
+e∗, ), if e∗⁄= ˜e orr∈ X, then the experiment aborts;
+otherwise, setX←X∪{r}. If b = 0, return UEnew.Enc(ke∗, ¯M). If b = 1, randomly choosere∗
+$← −X,
+return (re∗, UE.Upd(∆′
+e∗, ¯C)).
+Note that
+AdvINT1
+UEnew,A(λ) =
+⏐⏐⏐Pr[ExpINT1-1
+UEnew,A = 1]− Pr[ExpINT1-0
+UEnew,A = 1]
+⏐⏐⏐
+≤ AdvINT2
+UEnew,A(λ) +
+⏐⏐⏐Pr[ExpINT2-1
+UEnew,A = 1]− Pr[ExpINT1-1
+UEnew,A = 1]
+⏐⏐⏐
++
+⏐⏐⏐Pr[ExpINT2-0
+UEnew,A = 1]− Pr[ExpINT1-0
+UEnew,A = 1]
+⏐⏐⏐
+For b∈{ 0, 1}, we wish to prove that
+⏐⏐⏐Pr[ExpINT2-b
+UEnew,A = 1]− Pr[ExpINT1-b
+UEnew,A = 1]
+⏐⏐⏐≤ AdvPRF
+F + QE2
+|X| .
+SupposeA is an adversary trying to distinguishExpINT2-b
+UEnew,A from ExpINT1-b
+UEnew,A. We construct a PRF reduction
+BPRF, detailed in Fig. 23, against F to simulate the responses of queries made byA.BPRF ﬁrst guesses when
+A is going to ask a challenge query (assume e∗) and in that epochBPRF does bookkeeping for the randomness
+inX (initialized as empty set). Note that the reduction generates all keys and tokens except for fke∗. Update
+randomness in epoch e∗ is simulated by sending the randomness to the PRF challenger and forwarding the
+response toA.
+27
+ReductionBPRF playing ExpPRF-b
+F,BPRF
+1 : do Setup
+2 : ¯M, (r, ¯C)←AO.Enc,O.Next,O.Upd,O.Corr(λ)
+3 : phase← 1
+4 : Create ˜C with ( ¯M, (r, ¯C)), get ˜Ce∗
+5 : b ′←AO.Enc,O.Next,O.Upd,O.Corr,O.Upd˜C(˜Ce∗)
+6 : twf← 1 if
+7 : C∗∩K∗⁄=∅ or I∗∩C∗⁄=∅
+8 : if ABORT occurred or twf = 1
+9 : b ′ $
+← −{0, 1}
+10 : return b′
+11 : if b′ = b
+12 : return 0
+13 : else
+14 : return 1
+Setup(λ)
+15 : k 0← UE.KG(λ)
+16 : ∆ 0←⊥; e← 0; phase, twf← 0
+17 : e∗ $
+← −{0, ...,n}
+18 : L, ˜L,C,K,T,X ←∅
+O.Next†
+O.Upd(re−1, C′
+e−1)
+19 : if (·, (re−1, C′
+e−1), e− 1)⁄∈L
+20 : return ⊥
+21 : if e⁄= e∗
+22 : C e← UEnew.Upd((∆′
+e, fke), (re−1, C′
+e−1))
+23 : if e = e∗
+24 : if re−1∈X
+25 : return ABORT
+26 : X←X∪{re−1}
+27 : re←O.f(re−1) / /embed
+28 : C ′
+e← UE.Upd(∆′
+e, C′
+e−1)
+29 : C e← (re, C′
+e)
+30 : L←L∪{ (·, Ce, e)}
+31 : return Ce
+Create ˜C with ( ¯M, (r, ¯C))
+32 : if (·, (r, ¯C), ˜e− 1)⁄∈L or e∗⁄= ˜e orr∈X
+33 : return ⊥
+34 : X←X∪{r}
+35 : if b = 0
+36 : ˜C˜e← UEnew.Enc(k˜e, ¯M)
+37 : else
+38 : r˜e←O.f(r) / /embed
+39 : ˜C′
+˜e← UE.Upd(∆′
+˜e, ¯C)
+40 : ˜C˜e← (r˜e, ˜C′
+˜e)
+41 : return ˜C˜e
+Figure 23: Reduction BPRF for proof of Theorem 2.8,BPRF simulatesO.Enc,O.Next,O.Corr andO.Upd ˜C
+queries as described in Fig. 6. Recall that the PRF advantage in Deﬁnition 3, O.f replies with F(k,r ) or a
+random value.† indicates fke∗ are skipped in the generation.
+EventuallyBPRF receives the guess fromA, and outputs 0 ifA guesses that it is in ExpINT1-b, and 1 ifA
+guesses that it is in ExpINT2-b.
+WhenBPRF interacts with ExpPRF-0, it can simulate ExpINT1-b perfectly except with a negligible prob-
+ability. The negligible term is due to BPRF aborts the game. Since the number of existed randomnesses is
+small compared to the number of possible random elements, the probability thatBPRF aborts the game is upper
+bounded by QE2
+|X| . WhenBPRF interacts with ExpPRF-1, it can perfectly simulate ExpINT2-b, thus we have the
+required result.
+(Step 3.) Now we conclude that the advantage of winning INT2 is upper bounded by detIND-UE-CPA ad-
+vantage (against UE). Suppose an INT2 adversaryA is trying to attack UEnew. We construct a detIND-UE-CPA
+reductionB2.8, detailed in Fig. 24, attacking UE and runsA.B2.8 ﬁrst guesses whenA is going to ask a chal-
+lenge query (assume e∗) and in that epochB2.8 does bookkeeping for the randomness inX (initialized as empty
+set).
+EventuallyB2.8 receives b′ fromA, and simply outputs b′. ThenB2.8 perfectly simulates ExpINT2-b toA.
+We have the required result
+AdvINT2
+UEnew,A(λ)≤ AdvdetIND-UE-CPA
+UE,B2.8 (λ).
+28
+ReductionB2.8 playing ExpdetIND-UE-CPA
+UE,B2.8
+1 : do Setup
+2 : ¯M, (r, ¯C)←AO.Enc,O.Next,O.Upd,O.Corr(λ)
+3 : phase← 1
+4 : Create ˜C with ( ¯M, (r, ¯C)), get ˜Ce∗
+5 : b ′←AO.Enc,O.Next,O.Upd,O.Corr,O.Upd˜C(˜Ce∗)
+6 : twf← 1 if
+7 : C∗∩K∗⁄=∅ or I∗∩C∗⁄=∅
+8 : if ABORT occurred or twf = 1
+9 : b ′ $
+← −{0, 1}
+10 : return b′
+Setup(λ)
+11 : k 0← UE.KG(λ)
+12 : ∆ 0←⊥; e← 0; phase, twf← 0
+13 : e∗ $
+← −{0, ...,n}
+14 : L, ˜L,C,K,T,X ←∅
+O.Enc(M)
+15 : callO.Enc(M), get C′
+16 : r
+$
+← −X
+17 : return (r, C′)
+O.Next
+18 : callO.Next
+19 : fk e+1
+$
+← −K
+20 : if phase = 1
+21 : ˜ re+1 =F (fke+1, ˜re)
+22 : ˜L← ˜L∪{ ((˜re+1,·), e + 1)}
+O.Upd((re−1, C′
+e−1))
+23 : if (·, (re−1, C′
+e−1), e− 1)⁄∈L
+24 : return ⊥
+25 : callO.Upd(C′
+e−1), get C′
+e
+26 : if e⁄= e∗
+27 : re =F (fke,r )
+28 : if e = e∗
+29 : if re−1∈X
+30 : return ABORT
+31 : X←X∪{re−1}
+32 : re
+$
+← −X
+33 : L←L∪{ (·, (re, C′
+e), e)}
+34 : return (re, C′
+e)
+O.Corr(inp, ˆe)
+35 : callO.Corr(inp, ˆe), get⊥ or kˆe or ∆′
+ˆe
+36 : return ⊥ or kˆe or (∆′
+ˆe, fkˆe)
+Create ˜C with ( ¯M, (r, ¯C))
+37 : if (·, (r, ¯C), ˜e− 1)⁄∈L or e∗⁄= ˜e orr∈X
+38 : return ⊥
+39 : X←X∪{r}
+40 : call cq with ( ¯M, ¯C), get ˜C′ / /embed
+41 : ˜r˜e
+$
+← −X
+42 : ˜L← ˜L∪{ ((˜r˜e, ˜C′), ˜e)}
+43 : return (˜r˜e, ˜C′)
+O.Upd ˜C
+44 : callO.Upd ˜C, get ˜C′
+e / /embed
+45 : ˜L← ˜L∪{ ((˜re, ˜C′
+e), e)}
+46 : return (˜re, ˜C′
+e)
+Figure 24: ReductionB2.8 for proof of Theorem 2.8. In line 40 of the Create ˜C description, call cq means that
+the reduction makes its own challenge query with these values.
+4.2.3 Relation among CPA, CTXT and CCA Security
+Theorem 3. Let UE ={UE.KG, UE.TG, UE.Enc, UE.Dec, UE.Upd} be an updatable encryption scheme. For
+any detIND-yy-CCA adversaryA against UE, there exists anINT-CTXT adversaryB3a and an detIND-yy-CPA
+adversaryB3b against UE such that
+AdvdetIND-yy-CCA
+UE,A (λ)≤ 2AdvINT-CTXT
+UE,B3a (λ) + AdvdetIND-yy-CPA
+UE,B3b
+(λ)
+where yy∈{ UE, ENC, UPD}.
+We now prove Theorem 3, which states that the combination of detIND-yy-CPA security and INT-CTXT
+security yields detIND-yy-CCA, for yy∈{ UE, ENC, UPD}. The proof proceeds via a single game hop.
+29
+Proof. Game 0
+The ﬁrst game is the experiment ExpdetIND-yy-CCA
+UE,A , given in Fig. 11 (or Fig. 12 or Fig. 17). From Def. 5 (or
+Def. 6 or Def. 8) we have
+AdvdetIND-yy-CCA
+UE,A (λ) = 2
+⏐⏐⏐Pr[G0 = 1]− 1/2
+⏐⏐⏐.
+Game 1
+In this game we introduce an event bad that is triggered if the adversary asks its decryption oracle for some-
+thing that would count as a forgery, and then show that the success probability of a distinguisher between the
+two games is bounded by INT-CTXT. Then, we bound the success probability in this modiﬁed game by an
+adversary against detIND-yy-CCA. We modifyO.Dec, such that the boxed statements only run in Game 1:
+O.Dec(C)
+1 : if phase← 1 and C∈ ˜L∗
+2 : return ⊥
+3 : M /⊥← UE.Dec(ke, C)
+4 : if C /∈L∗ and M′⁄=⊥
+5 : bad← true
+6 : return⊥
+We have
+⏐⏐⏐Pr[G0 = 1]− 1/2
+⏐⏐⏐≤
+⏐⏐⏐Pr[G0 = 1]− Pr[G1 = 1]
+⏐⏐⏐ +
+⏐⏐⏐Pr[G1 = 1]− 1/2
+⏐⏐⏐
+We claim that there exists an INT-CTXT adversaryB3a against UE such that
+⏐⏐⏐Pr[G0 = 1]− Pr[G1 = 1]
+⏐⏐⏐≤ AdvINT-CTXT
+UE,B3a (λ),
+and there exists an detIND-yy-CPA adversaryB3b such that
+2
+⏐⏐⏐Pr[G1 = 1]− 1/2
+⏐⏐⏐≤ AdvdetIND-yy-CPA
+UE,B3b
+(λ).
+Claim 1. ⏐⏐⏐Pr[G0 = 1]− Pr[G1 = 1]
+⏐⏐⏐ = Pr[bad = true inG1] = AdvINT-CTXT
+UE,B3a (λ).
+We construct a reductionB3a playing INT-CTXT that simulates the environment of G1 toA. B3a starts
+by picking a random bit b, then runs A answering its queries as follows. For a challenge query with input
+(˜C0 or ¯M0, ˜C1 or ¯M1). If b =0,B3a sends ˜C0 (or ¯M0) to itsO.Upd (orO.Enc); b =1,B3a sends ˜C1 (or ¯M1) to
+itsO.Upd (orO.Enc); eventually, returns the response toA. Furthermore,B3a simulatesO.Upd ˜C by sending
+the challenge ciphertext toO.Upd, and forwards the response toA.
+For a decryption queryO.Dec with input C: If C∈L∗,B3a checks the corresponding message in listL∗
+(adversaryB3a does bookkeeping for this list and additionally stores message in this list, list is updated by
+O.Enc,O.Upd,O.Corr. Hence this simulation is feasible by an INT-CTXT adversary.), and returns it toA. If
+C /∈L∗,B3a returns⊥ toA, and sends C to itsO.Try oracle.
+B3a perfectly simulatesG1. Notice that G0 andG1 are identical until UE.Dec(ke, C)⁄=⊥ and C /∈L ∗
+happens (which causes bad = true inG1): denote this event to be E. Thus, we have
+⏐⏐⏐Pr[G0 = 1]− Pr[G1 =
+1]
+⏐⏐⏐ = Pr[bad = true inG1] = Pr[E]. If event E happens, which results in win = 1 in the INT-CTXT game,
+that means C is a valid forgery in INT-CTXT game. So Pr[E] = AdvINT-CTXT
+UE,B3a (λ).
+Claim 2.
+2
+⏐⏐⏐Pr[G1 = 1]− 1/2
+⏐⏐⏐≤ AdvdetIND-yy-CPA
+UE,B3b
+(λ).
+We only need to consider how the detIND-yy-CPA adversaryB3b simulates theO.Dec oracle. Since B3b
+knows ˜L∗ andL∗, wheneverA asksO.Dec with C,B3b checks if C∈ ˜L∗ or C /∈L∗, and if so, responds⊥.
+30
+Otherwise,B3b checks the corresponding message in listL∗ (adversaryB3b does bookkeeping for this list and
+additionally stores message in this list as well, list is updated byO.Enc,O.Upd,O.Corr. Hence this simulation
+is feasible by an detIND-yy-CPA adversary), and returns it toA.
+5 The SHINE Schemes
+We now describe our new UE scheme SHINE (Secure Homomorphic Ideal-cipher Nonce-based Encryption).
+The encryption algorithm uses a permutation to obfuscate the input to the exponentiation function. Updating a
+ciphertext simply requires exponentiation once by the update token, which itself is the quotient of the current
+epoch key and the previous epoch key. The scheme comes in three ﬂavors: SHINE0 is presented in Fig. 25
+and takes in short messages and only uses a single permutation. The second ﬂavor, MirrorSHINE, is provided
+in Fig. 26 and runs two different permutations with the same input. The third ﬂavor OCBSHINE is given in
+Fig. 28 and is for applications with arbitrarily long messages, using a family of permutations.
+We discuss implementation details of the SHINE schemes in Section 5.6. In particular, for each scheme
+in the SHINE suite, it is necessary to embed the output of the permutation (a regular block cipher) into an
+appropriate DDH-hard group.
+Our proofs of security, given as Theorem 4 for conﬁdentiality and Theorem 5 for integrity, bound an adver-
+sary’sdetIND-UE-CPA (INT-CTXTs) advantage by DDH (CDH), and are provided in the ideal cipher model.
+Furthermore, combining the results of Theorem 3, Theorem 4 and Theorem 5, we have that the suite of SHINE
+schemes (i.e. SHINE0, MirrorSHINE and OCBSHINE) are detIND-UE-CCA secure.
+5.1 Construction of SHINE Schemes
+5.1.1 SHINE via Zero Block: SHINE0.
+Suppose a message space ofMS ={0, 1}m and random nonce spaceN ={0, 1}v. The encryption algorithm
+feeds as input to the permutation a nonce, the message, and a zero string. The decryption algorithm will return
+⊥ if the decrypted value does not end with0t. The SHINE0 scheme is deﬁned in Fig. 25. If ciphertext integrity
+is not required (or ﬁle/ciphertext integrity is performed in some other manner), then SHINE0 without the zero
+block results in a scheme (denoted SHINE0[CPA]) that is still detIND-UE-CPA secure.
+SHINE0.KG(λ)
+1 : k
+$
+← −Z∗
+q
+2 : return k
+SHINE0.TG(ke, ke+1)
+3 : ∆ e+1← ke+1
+ke
+4 : return ∆e+1
+SHINE0.Enc(ke, M)
+5 : N
+$
+← −N
+6 : C e← (π(N‖M‖0t))ke
+7 : return Ce
+SHINE0.Dec(ke, Ce)
+8 : a←π−1(C1/ke
+e )
+9 : parse†a as N′‖M′‖Z
+10 : if Z = 0t
+11 : return M′
+12 : else
+13 : return ⊥
+SHINE0.Upd(∆e+1, Ce)
+14 : C e+1← (Ce)∆e+1
+15 : return Ce+1
+Figure 25: Updatable encryption scheme SHINE0. Note that there may be an additional embedding step after
+the permutationπ, as discussed in Section 5.6.†:‖N′‖ = v,‖M′‖ = m,‖Z‖ = t.
+31
+5.1.2 SHINE via Double Encryption: MirrorSHINE
+The construction of MirrorSHINE is similar to SHINE0, except that instead of padding a zero block after
+the message, the encryption algorithm processes each message and nonce twice using two different random
+permutations. For authentication, we compare if two ciphertext blocks have the same underlying message and
+nonce. The idea of the authentication is similar toSHINE0, however here we use the difference of the underlying
+message and nonce as the “zero block”. Compared to SHINE0, MirrorSHINE does one more exponentiation in
+both encryption and update and requires two ciphertext elements per message, but larger messages are supported
+(when using the same – for example standardized – group).
+MirrorSHINE.KG(λ)
+1 : k
+$
+← −Z∗
+q
+2 : return k
+MirrorSHINE.TG(ke, ke+1)
+3 : ∆ e+1← ke+1
+ke
+4 : return ∆e+1
+MirrorSHINE.Enc(ke, M)
+5 : N
+$
+← −N
+6 : C 1
+e← (π1(N||M))ke
+7 : C 2
+e← (π2(N||M))ke
+8 : C e← (C1
+e, C2
+e)
+9 : return Ce
+MirrorSHINE.Dec(ke, Ce)
+10 : parse Ce = (C1
+e, C2
+e)
+11 : a1←π−1
+1 ((C1
+e)1/ke)
+12 : a2←π−1
+2 ((C2
+e)1/ke)
+13 : parse‡a1 as N′||M′
+14 : if a1 =a2
+15 : return M′
+16 : else
+17 : return ⊥
+MirrorSHINE.Upd(∆e+1, Ce)
+18 : parse Ce = (C1
+e, C2
+e)
+19 : C 1
+e+1← (C1
+e)∆e+1
+20 : C 2
+e+1← (C2
+e)∆e+1
+21 : return C1
+e+1, C2
+e+1
+Figure 26: Updatable encryption scheme MirrorSHINE, whereπ1,π 2 are two different random permutations.
+Note that there may be an additional embedding step after the permutations π1 andπ2, as discussed in Sec-
+tion 5.6.‡:‖N′‖ = v,‖M′‖ = m.
+5.1.3 SHINE for Long Messages via Checksum: OCBSHINE.
+The schemes SHINE0 and MirrorSHINE both require that the message space be smaller than the size of an
+element of the exponentiation group. This ciphertext expansion is undesirable in many practical scenarios, and
+so we wish to construct a SHINE scheme which gives us (almost) no ciphertext expansion and can be applied
+to arbitrarily long messages. We build a new SHINE scheme, OCBSHINE, with these properties.
+The construction of OCBSHINE is inspired by the authenticated encryption scheme OCB [RBBK01]. Dif-
+ferent from OCB mode, the nonce is encrypted inside the ciphertext instead of sending it along with the ci-
+phertext. In order to determine the length of the last message block, the encryption algorithm of OCB mode
+removes some bits of the last ciphertext block to reveal this information. However in our setting, the output of
+the permutations are (mapped to) the input of the exponentiation function: thus all bits of permutation outputs
+must be included. Therefore, OCBSHINE includes the length of the last message block in the ﬁrst ciphertext
+component. If ciphertext integrity is not required, then OCBSHINE can be improved by removing the last
+ciphertext block.
+OCBSHINE is formally deﬁned in Fig. 28 and the encryption process is pictorially represented in Fig. 27;
+we give an intuitive description here. Suppose the blocksize is m, and assume the encryption algorithm
+OCBSHINE.Enc has input messageM. By “partitionM into M1, ..., Ml” we mean settingl← max{⌈|M|/m⌉, 1}
+and dividing M intol blocks, i.e. M1, ..., Ml, where|M1| = ... =|Ml−1| =m. The last message block Ml is
+padded with zeros to make it length m before computing the permutation output and the checksum, i.e Ml‖0∗
+with|Ml‖0∗| =m. Leta =⌈log(m)⌉, so the length ofMl (|Ml|≤ m) can be written as ana-bit representation.
+32
+N‖|M3| M1 M2 M3‖0∗ Σ
+π0 πN‖1‖0 πN‖2‖0 πN‖3‖0 πN‖3‖1
+Expke Expke Expke Expke Expke
+C0 C1 C2 C3 C4
+Figure 27: Diagram describing how the OCBSHINE encryption algorithm works on message M =
+(M1, M2, M3). Σ = M1⊕ M2⊕ M3‖0∗. There may be an additional embedding step after the permutations,
+as discussed in Section 5.6.
+Let Perm(m) be the set of all permutations on {0, 1}m. Randomly choose π0
+$← −Perm(m), and use this
+permutation to randomize the concatenation of the nonce N and an a-bit representation of the last message
+block length. Then, index the (random) permutations used to encrypt message blocks by the nonce and a
+counter. Let Perm (S,m ) be the set of all mappings from S to permutations on{0, 1}m. Suppose the nonce
+space isN ={0, 1}m−a,S =N× N∗×{0, 1}, for each(N∈N ,i∈ N∗,b∈{ 0, 1}), setπN‖i‖b
+$← −Perm(N×
+N∗×{ 0, 1},m ), which form a random permutation family: we use these permutations to randomize message
+blocks and the checksum.
+OCBSHINE.KG(λ)
+1 : k
+$
+← −Z∗
+q
+2 : return k
+OCBSHINE.TG(ke, ke+1)
+3 : ∆ e+1← ke+1
+ke
+4 : return ∆e+1
+OCBSHINE.Enc(ke, M)
+5 : partition M into M 1, ..., Ml
+6 : Σ ←⊕ l-1
+i=1Mi⊕ Ml‖0∗
+7 : N
+$
+← −N
+8 : C 0←
+(
+π0(N‖|Ml|)
+)ke
+9 : C l+1←
+(
+πN‖l‖1(Σ)
+)ke
+10 : fori = 1, ...,l -1 do
+11 : C i←
+(
+πN‖i‖0(Mi)
+)ke
+12 : C l←
+(
+πN‖l‖0(Ml‖0∗)
+)ke
+13 : C e← (C0, ..., Cl, Cl+1)
+14 : return Ce
+OCBSHINE.Dec(ke, Ce)
+15 : parse Ce = (C0, ..., Cl, Cl+1)
+16 : N ′‖A′←π−1
+0 (
+(
+C0)1/ke
+)
+17 : Σ ′←π−1
+N′‖l‖1(
+(
+Cl+1)1/ke
+)
+18 : fori = 1, ...,l do
+19 : M ′
+i←π−1
+N′‖i‖0(
+(
+Ci)1/ke
+)
+20 : if Σ′ =⊕l
+i=1M′
+i
+21 : M ′← (M′
+1, ..., M′
+l[x])
+22 : return M′
+23 : else
+24 : return ⊥
+OCBSHINE.Upd(∆e+1, Ce)
+25 : parse Ce = (C0, ..., Cl, Cl+1)
+26 : fori = 0, ...,l + 1 do
+27 : C i
+e+1← (Ci
+e)∆e+1
+28 : return Ce+1
+Figure 28: Updatable encryption scheme OCBSHINE. Note that there may be an additional embedding step
+after the permutations, as discussed in Section 5.6. In line 21, Ml[x] represents the ﬁrstA′ bits of Ml.
+33
+5.2 Security - SHINE is detIND-UE-CPA, INT-CTXT, detIND-UE-CCA Secure
+All three SHINE schemes, i.e. SHINE0, MirrorSHINE and OCBSHINE, have the same security properties, and
+the proofs are very similar for each ﬂavor. We refer to SHINE to mean the family containing all these three
+schemes. In Theorem 4, we show that SHINE is detIND-UE-CPA in the ideal cipher model, if DDH holds.
+In Theorem 5, we show that SHINE is INT-CTXTs, and therefore INT-CTXT (INT-CTXT and INT-CTXTs
+are equivalent, recall Section 3), in the ideal cipher model, if CDH holds. The loss incurred by this proof is
+the normal (n + 1)3 (or (n + 1)2 for INT-CTXT) and also the number of encryption queries the adversary
+makes before it makes its challenge: to avoid the issues described in Section 5.3 we not only need to guess the
+locations of the challenge ﬁrewalls but also the ciphertext that the adversary will submit as its challenge.
+The ideal cipher model, a version of which was initially given by Shannon [Sha49] and shown to be equiv-
+alent to the random oracle model by Coron et al. [CPS08], gives all parties access to a permutation chosen ran-
+domly from all possible key-permutation possibilities of appropriate length. The SHINE schemes exponentiate
+the output of the permutation by the epoch key to encrypt, so our reduction can ‘program’ the transformation
+from permutation outputs to group elements.
+In the following two Theorems we detail the security properties met by SHINE, i.e. detIND-UE-CPA,
+INT-CTXT and thus detIND-UE-CCA. Note that this is the strongest known security property for updatable
+encryption schemes with deterministic updates. In Section 5.3 we discuss the challenges that arise in the proofs
+of these two theorems, and in Section 5.4 and Section 5.5 we describe the novel techniques and methods used
+in the proofs.
+Theorem 4 (SHINE is detIND-UE-CPA). Let SHINE ∈ {SHINE0, MirrorSHINE, OCBSHINE} be the UE
+scheme described in Fig. 25 (or Fig. 26 or Fig. 28). For any ideal cipher model adversary A (that makes max
+QE encryption queries before its challenge), there exists an adversaryB4 such that
+AdvdetIND-UE-CPA
+SHINE,A (λ)≤O(1)(n + 1)3· QE· AdvDDH
+G,B4(λ).
+This is proven via Theorem 4.1, and Theorem 4.3 and Theorem 4.4 in Section 5.4.
+Theorem 5 (SHINE is INT-CTXTs). Let SHINE∈{ SHINE0, MirrorSHINE, OCBSHINE} be the UE scheme
+described in Fig. 25 (or Fig. 26 or Fig. 28).For any ideal cipher model adversary A (that makes max QE
+encryption queries before callingO.Try), there exists an adversaryB5 such that
+AdvINT-CTXTs
+SHINE,A (λ)≤O(1)(n + 1)2· QE· AdvCDH
+B5 + negligible terms
+This is proven via Theorem 5.1, and Theorem 5.3 and Theorem 5.4 in Section 5.5.
+Remark 5. Combining the results of Theorem 3, Theorem 4 and Theorem 5, we have thatSHINE is detIND-UE-CCA.
+Remark 6. Proofs for SHINE0 are extendable to MirrorSHINE and OCBSHINE, so we only show full proof
+details of Theorem 4.1 and Theorem 5.1 in Section 5.4 and Section 5.5, respectively.
+5.3 Proof Challenges in Schemes with Deterministic Updates
+In each variant of SHINE all ciphertext components are raised to the epoch key, so the update mechanism
+transforms a ciphertext for epoche to one fore+1 by raising this value toke+1
+ke . We now highlight the difﬁculties
+in creating security proofs for such ‘single-component’ updatable encryption schemes. Randomness is used in
+creation of the initial ciphertext (via N) but updates are completely deterministic, and thus in any reduction
+it is necessary to provide consistent ciphertexts to the adversary (i.e. the N value must be consistent). The
+(cryptographic) separation gained by using the ﬁrewall technique (see Section 3.3 for discussion and deﬁnition)
+assists with producing (updates of) non-challenge ciphertexts, but embedding any challenge value while also
+providing answers to theO.Corr queries of the underlying adversary is very challenging.
+The regular key insulation technique as introduced by LT18 – where the reduction constructs one hybrid
+for each epoch – does not work. Speciﬁcally, in any reduction to a DDH-like assumption, it is not possible to
+provide a challenge ciphertext in a left or right sense (to the left of this challenge ciphertext are of some form,
+and to the right of this challenge ciphertext are of some other form) if the underlying adversary asks for tokens
+34
+around the challenge epoch: deterministic updates mean that tokens will make these ciphertexts of the same
+form and this gap will be easily distinguishable.
+We counteract this problem by constructing ahybrid argument across insulated regions. This means that in
+each hybrid, we can embed at one ﬁrewall of the insulated region, and simulate all tokens within that insulated
+region to enable answering queries to both O.Upd andO.Upd ˜C. The reduction’s distinguishing task is thus
+ensured to be at the boundaries of the insulated regions, the ﬁrewalls, so any (non-trivial) win for the underlying
+adversary is ensured to carry through directly to the reduction.
+5.4 SHINE is detIND-UE-CPA
+We now explain how we bound the advantage of any adversary playing the detIND-UE-CPA game for SHINE
+by the advantage of a reduction playing DDH.
+Proof Method for Conﬁdentiality: Constructing a Hybrid Argument across Insulated Regions. No-
+tice that the non-corrupted key space is the union set of all insulated regions, i.e. {0, 1, ...,n}\K ∗ =
+∪(j,fwlj ,fwrj)∈FW{fwlj, ..., fwrj}. If the trivial win conditions are not triggered and the adversary knows a
+challenge-equal ciphertext in some epoch within an insulated region, then since the adversary knows all to-
+kens in that insulated region, the adversary will know all challenge-equal ciphertexts in that insulated region.
+Then we have
+C∗ =∪(j,fwlj ,fwrj)∈S⊆FW{fwlj, ..., fwrj},
+whereS is a subset of ﬁrewall listFW .
+We apply the ﬁrewall technique to set up hybrid games such that in hybrid i, we embed within the i-th
+insulated region: this means that to the left of the i-th insulated region the game responds with the b = 1
+case of the detIND-UE-CPA experiment, and to the right of the i-th insulated region it gives an encryption of
+the challenge input message as output, i.e. b = 0 . This means we have one hybrid for each insulated region,
+moving left-to-right across the epoch space.
+We construct a reductionB playing the DDH experiment in hybrid i. Initially, B guesses the location of
+thei-th insulated region. If the underlying adversary has performed a corrupt query within this insulated region
+that would lead to the reduction failing, the reduction aborts the game. We use the algorithm Check described
+in Fig. 29 to check if this event happens.
+Check(inp, ˆe; e; fwl, fwr)
+1 : if ˆe> e
+2 : return ⊥
+3 : if inp = key and ˆe∈{ fwl, ..., fwr}
+4 : return ABORT
+5 : if inp = token and ˆe∈{ fwl, fwr+1}
+6 : return ABORT
+Figure 29: Algorithm Check, used in proofs in this section. In Check, ˆe is the epoch in the adversary’s request,
+and e is the current epoch.
+In particular, within the insulated region, the reduction can simulate challenge ciphertexts and non-challenge
+ciphertexts using its DDH tuple. Furthermore, ciphertexts can be moved around within the insulated region by
+tokens.
+Remark 7. We note that the problem of challenge insulation in schemes with deterministic updates was also
+observed independently by Klooß et al. [[KLR19b], § B.2]. Their solution (though in the different context of
+CCA security of UE with certain properties) is to form a hybrid argument with a hybrid for each epoch, and
+essentially guess an epochr which is the ﬁrst token ‘after’ the hybrid index that the adversary has not corrupted,
+and use the inherent ‘gap’ in the adversary’s knowledge continuum to replace challenge updates across this gap
+with encryptions of just one of the challenge messages. It is not clear if this approach would work for showing
+detIND-UE-CPA (or IND-ENC-CPA) of SHINE. We conjecture that even if it were possible to construct a
+35
+reduction in this vein, our approach enables a more direct proof: in particular we do not need to assume speciﬁc
+additional properties of the UE scheme in question for it to work.
+SHINE0 is detIND-UE-CPA.
+Theorem 4.1 (SHINE0 is detIND-UE-CPA). Let G be a group of orderq (aλ-bit prime) with generatorg, and
+let SHINE0 be the updatable encryption scheme described in Fig. 25. For any detIND-UE-CPA adversaryA
+against SHINE0 that asks at most QE queries toO.Enc before it makes its challenge, there exists an adversary
+B4.1 against DDH such that
+AdvdetIND-UE-CPA
+SHINE0,A (λ)≤ 2(n + 1)3· QE· AdvDDH
+G,B4.1(λ).
+Proof. Play hybrid games. We begin by partitioning non-corrupted key space as follows:{0, 1, ...,n}\K ∗ =
+∪(j,fwlj ,fwrj)∈FW{fwlj, ..., fwrj}, where fwri and fwri are ﬁrewalls of the i-th insulated region. Recall the
+deﬁnition from Section 3.3 and ﬁrewall computing algorithm FW-Find in Fig. 15: fwli, fwri are ﬁrewalls of the
+i-th insulated region if (i, fwli, fwri)∈FW .
+For b∈{ 0, 1}, deﬁne gameGb
+i as ExpdetIND-UE-CPA-b
+SHINE0,A except for:
+• The game randomly picks an integer h, and if the challenge input ¯C is not an updated ciphertext of the
+h-thO.Enc query, it (aborts and) returns a random bit for b′. This loss is upper-bounded by QE.
+• The game randomly picks fwli, fwri
+$← −{0, ...,n} and if fwli, fwri are not the i-th ﬁrewalls, returns a
+random bit for b′. This loss is upper-bounded by (n + 1)2.
+• For the challenge (made in epoch ˜e, input ( ¯M, ¯C)): If ˜e < fwli then return a ciphertext with respect to
+¯C, if ˜e > fwri return a ciphertext with ¯M, and if fwli≤ ˜e≤ fwri then return a ciphertext with ¯M when
+b = 0, return a ciphertext with respect to ¯C when b = 1.
+• AfterA outputs b′, returns b′ if twf⁄= 1 or some additional trivial win condition triggers.
+If h, fwli, fwri are the desired values, then G0
+1 is ExpdetIND-UE-CPA-0
+SHINE0,A , i.e. all challenges are encryptions
+of ¯M. And there exists some l (the total number of insulated regions, bounded by n + 1), game G1
+l is
+ExpdetIND-UE-CPA-1
+SHINE0,A , i.e. all challenges are updates of ¯C. Let E to be the event that h, fwli, fwri are the desired
+values, notice that Pr[Gb
+i = 1|¬E] = 1
+2 for any 1≤i≤n + 1 and b∈{ 0, 1}. Then
+Pr[G1
+l = 1] = Pr[G1
+l = 1|E]· Pr[E] + Pr[G1
+l = 1|¬E]· Pr[¬E]
+= Pr[ExpdetIND-UE-CPA-1
+SHINE0,A = 1]· 1
+(n + 1)2QE
++ 1
+2· (1− 1
+(n + 1)2QE
+), and
+Pr[G0
+1 = 1] = Pr[ExpdetIND-UE-CPA-0
+SHINE0,A = 1]· 1
+(n + 1)2QE
++ 1
+2· (1− 1
+(n + 1)2QE
+)
+Thus we have that
+⏐⏐Pr[G1
+l = 1]− Pr[G0
+1 = 1]
+⏐⏐ = 1
+(n + 1)2QE
+·
+⏐⏐⏐Pr[ExpdetIND-UE-CPA-1
+SHINE0,A = 1]− Pr[ExpdetIND-UE-CPA-0
+SHINE0,A = 1]
+⏐⏐⏐
+= 1
+(n + 1)2QE
+· AdvdetIND-UE-CPA
+SHINE0,A (λ)
+Notice that all queries in G1
+i−1 andG0
+i have the equal responses: for the challenge query and O.Upd ˜C, if
+called in epoch in ﬁrst i− 1 insulated regions, the reduction returns a ciphertext with respect to ¯C, otherwise
+returns an encryption of ¯M. Therefore, for any l(≤ n + 1),|Pr[G1
+l = 1]− Pr[G0
+1 = 1]|≤ ∑l
+i=1|Pr[G1
+i =
+1]− Pr[G0
+i = 1]|. We prove that for any 1≤ i≤ l,|Pr[G1
+i = 1]− Pr[G0
+i = 1]|≤ 2AdvDDH
+G, (λ). We only
+prove one of thesel hybrids, the rest can be similarly proven.
+In hybridi. Suppose thatAi is an adversary attempting to distinguishG0
+i fromG1
+i . For all queries concerning
+epochs outside of the i-th insulated region the responses will be equal in either game, so we assume that Ai
+asks for at least one challenge ciphertext in an epoch within the i-th insulated region (then [fwli, fwri]⊆C ∗)
+and this is where we will embed DDH tuples in our reduction.
+36
+We construct a reductionB4.1, detailed in Fig. 30, that is playing the standard DDH game and will simulate
+the responses of queries made by adversaryAi.
+ReductionB4.1 playing ExpDDH
+G,B4.1
+1 : receive (g,X,Y,Z )
+2 : do Setup
+3 : ¯M, ¯C←A ors(λ)
+4 : phase← 1
+5 : Create ˜C with ( ¯M, ¯C), get ˜C˜e
+6 : b ′←A ors,O.Upd˜C(˜C˜e)
+7 : twf← 1 if
+8 : C∗∩K∗⁄=∅ or
+9 : I∗∩C∗⁄=∅
+10 : if ABORT occurred or twf = 1
+11 : b ′ $
+← −{0, 1}
+12 : return b′
+13 : if (i, fwli, fwri)⁄∈FW
+14 : b ′ $
+← −{0, 1}
+15 : return b′
+16 : if b′ = b
+17 : return 0
+18 : else
+19 : return 1
+Setup(λ)
+20 : b
+$
+← −{0, 1}
+21 : k 0← SHINE0.KG(λ)
+22 : ∆ 0←⊥
+23 : e, c, phase, twf← 0
+24 : L, ˜L,C,K,T ←∅
+25 : fwli, fwri
+$
+← −{0, ...,n}
+26 : h
+$
+← −{1, ..., QE}
+27 : forj∈{0, ..., fwli-1} do
+28 : k j
+$
+← −Z∗
+q; ∆j← kj
+kj−1
+⊿ ◁
+29 : PKj←gkj
+Setup(λ) cont.
+33 : forj∈{ fwri+1, ...,n} do
+34 : k j
+$
+← −Z∗
+q; ∆j← kj
+kj−1
+⊿ ◁
+35 : PKj←gkj
+36 : if b = 0
+37 : PKfwli←Y ; C
+$
+← −G
+38 : else
+39 : PKfwli←Y kfwli−1; C←X
+40 : forj∈{ fwli+1, ..., fwri} do
+41 : ∆ j
+$
+← −Z∗
+q; PKj← PK∆j
+j−1
+O.Enc(M)
+39 : c← c + 1
+40 : if c = h
+41 : C e← C; inf← e
+42 : else
+43 : inf
+$
+← −Z∗
+q
+44 : π(N||M)←ginf
+45 : C e← PKinf
+e
+46 : L←L∪{ (c, Ce, e; inf)}
+47 : return Ce
+O.Next
+48 : e← e + 1
+O.Upd(Ce−1)
+49 : if (c, Ce−1, e− 1; inf)⁄∈L
+50 : return ⊥
+51 : if c = h
+52 : C e← C∆e
+e−1
+53 : else
+54 : C e← PKinf
+e
+55 : L←L∪{ (c, Ce, e; inf)}
+56 : return Ce
+O.Corr(inp, ˆe)
+57 : do Check(inp, ˆe; e; fwli, fwri)
+58 : if inp = key
+59 : K←K∪{ ˆe}
+60 : return kˆe
+61 : if inp = token
+62 : T ←T ∪{ˆe}
+63 : return ∆ˆe
+Create ˜C with ( ¯M, ¯C)
+64 : if (h, ¯C, ˜e− 1; inf) /∈L
+65 : return ABORT
+66 : if b = 0
+67 : π(N|| ¯M)←X; ˜Cfwli←Z
+68 : else
+69 : π(N|| ¯M)
+$
+← −G
+70 : ˜Cfwli←Z
+∏fwli−1
+j=inf+1 ∆j
+71 : forj∈{ 0, ..., fwli− 1} do
+72 : ˜Cj← ¯C(∏j
+k=0 ∆k)/(∏˜e−1
+k=0 ∆k) / /left
+73 : forj∈{ fwli + 1, ..., fwri} do
+74 : ˜Cj← ˜C∆j
+j−1 / /embed
+75 : forj∈{ fwri + 1, ...,n} do
+76 : ˜Cj← (π(N|| ¯M))kj / /right
+77 : ˜L←∪ n
+j=0{(˜Cj,j )}
+78 : return ˜C˜e
+O.Upd ˜C
+79 : C←C∪{ e}
+80 : ﬁnd(˜Ce, e)∈ ˜L
+81 : return ˜Ce
+Figure 30: Reduction B4.1 for proof of Theorem 4.1, in hybrid i. Moving left-to-right through embedding
+DDH tuples in the i-th insulated region: when b = 1 , embedding DDH tuples to token values to move left
+to random; when b = 0 , embedding DDH tuples to key values to move right to random. inf encodes ﬁxed
+programming information: it marks an epoch if c = h , otherwise it is the random encryption exponent. On
+lines 3 and 6, ors refers to the set{O.Enc,O.Next,O.Upd,O.Corr}. On lines 28 and 34,⊿◁indicates ∆0 and
+∆fwri+1 are skipped in the computation.
+The reductionB4.1 receives DDH tuples (X,Y,Z ), ﬂips a coin b and simulates gameGb
+i . Whenever the
+37
+reduction needs to provide an output of π(·) toA, it chooses (‘programs’) some random value r such that
+π(·) = gr. Then, we use the fact that (gr)ke = (gke)r and use the gke values as ‘public keys’ to allow
+simulation. In this setting, decryption (i.e. π−1) is simply a lookup to this mapping of the ideal cipher π. A
+summary of the technical simulations follows:
+Initially,
+1. B4.1 guesses the values of h, fwli, fwri.
+2. B4.1 generates all keys and tokens except for kfwli, ..., kfwri, ∆fwli, ∆fwri+1. If Ai ever corrupts these
+keys and tokens – which indicates the ﬁrewall guess is wrong – the reduction aborts the game.
+3. B4.1 computes the public values of keys in an epoch:
+• e⁄∈{ fwli, ..., fwri}:B4.1 computes PKe =gke;
+• e∈{ fwli, ..., fwri}:B4.1 embeds DDH valueY as PKfwli. More precisely, if b = 0, PKfwli =Y ,
+otherwise PKfwli = Y kfwli−1 (since g∆fwli = Y ). Then B4.1 uses tokens ∆fwli+1, ..., ∆fwri to
+compute the remaining public key values PKe in the insulated region.
+To simulate a non-challenge ciphertext that is:
+• not the h-th query toO.Enc:B4.1 generates a random valuer for each encryption (so that the randomness
+will be consistent for calls thatAi makes toO.Upd) and programs the ideal cipher with Ce = PKr
+e. To
+respond toO.Upd queries, the reduction computes Ce′ = PKr
+e′ to update a non-challenge ciphertext to
+epoch e′.
+• the h-th query toO.Enc:B4.1 embeds either a random ciphertext ( b = 0 ) or a DDH value ( b = 1 ) to
+the encryption (Ceh). Furthermore, the reduction uses tokens ∆0, ..., ∆fwli−1 to update the h-th encryp-
+tion. Note that ¯C is an update of the h-th encryption. The adversary can not ask for update of the h-th
+encryption in an epoch e≥ fwli, as this would trigger the trivial win condition[fwli, fwri]⊆I∗∩C∗⁄=∅.
+To simulate challenge-equal ciphertext in an epoch that is:
+• to the left of the i-th insulated region: B4.1 simulates SHINE0.Upd(¯C) using the tokens that it created
+itself.
+• within thei-th insulated region:B4.1 simulates SHINE0.Upd(¯C) if b = 1, and simulatesSHINE0.Enc( ¯M)
+if b = 0. More precisely,B4.1 embeds DDH valueX to ciphertext information of challenge input, em-
+beds DDH valueZ to the challenge ciphertext. Which means if b = 1, the reduction will give the value
+X to Ceh,Z
+∏fwli−1
+j=eh+1 ∆j
+to ˜Cfwli (recallg∆fwli =Y ) since
+˜Cfwli = SHINE0.Upd(¯C) = ¯C
+∆fwli
+fwli−1 = (C
+∆fwli
+eh )
+∏fwli−1
+j=eh+1 ∆j
+.
+If b = 0 , the reduction will give X to π(N|| ¯M), and Z to ˜Cfwli (recall PKfwli = Y ) since ˜Cfwli =
+SHINE0.Enc( ¯M) = π(N|| ¯M)kfwli . Furthermore, the reduction uses tokens ∆fwli+1, ..., ∆fwri to update
+˜Cfwli to simulate all challenge ciphertext in epochs within the insulated region.
+• to the right of the i-th insulated region: B4.1 simulates SHINE0.Enc( ¯M) using the keys that it created
+itself.
+Eventually,B4.1 receives the output bitb′ fromAi. If b′ = b, thenB4.1 guesses that it has seen real DDH tuples
+(returns 0 to its DDH challenger), otherwise,B4.1 guesses that it has seen random DDH tuples (returns 1).
+IfB4.1 receives a real DDH tuple, thenB4.1 perfectly simulates the environment ofAi inGb
+i . IfB4.1 receives
+a random DDH tuple, thenB4.1 wins with probability 1/2. After some computation similar to that in the proof
+of Theorem 2.3 we have AdvDDH
+G,B4.1(λ) = 1
+2|Pr[G1
+i = 1]− Pr[G0
+i = 1]|.
+38
+SHINE0 is IND-ENC-CPASecure. As a corollary of Theorem 2.4 and Theorem 4.1,SHINE0 is IND-ENC-CPA
+– however in Appendix A we give a tighter proof – eliminating theQE term – by directly proving theIND-ENC-CPA
+security of SHINE0. The proof follows a similar strategy to that of Theorem 4.1, with one hybrid for each in-
+sulated region.
+MirrorSHINE is detIND-UE-CPA.
+Theorem 4.3 (MirrorSHINE is detIND-UE-CPA). Let G be a group of order q (aλ-bit prime) with generator
+g, and let MirrorSHINE be the updatable encryption scheme described in Fig. 26. For any detIND-UE-CPA
+adversaryA against MirrorSHINE that asks at most QE queries toO.Enc before it makes its challenge, there
+exists an adversaryB4.3 against DDH such that
+AdvdetIND-UE-CPA
+MirrorSHINE,A (λ)≤ 2(n + 1)3· QE· AdvDDH
+G,B4.3(λ).
+Proof. The proof is similar to the security proof of Theorem 4.1, except that the reduction will embed two
+random group elements to the image of π1,π 2 while it simulates the output of the O.Enc oracle, instead of
+embedding one random group element to the image of π. We will not give a detailed construction of the
+reduction in this proof, since we will give a more general construction in the proof of Theorem 4.4.
+OCBSHINE is detIND-UE-CPA. For convenience, we denote a vector with l + 2 elements to be ⃗C =
+(C0, ...,C l+1). We also use the shorthand ⃗A← ⃗Bc (component-wise exponentiation) and ⃗A←B⃗ c(common-
+base exponentiation) to mean the following:
+⃗A← ⃗Bc
+1 : forj = 0, ...,l + 1 do
+2 : Aj← (Bj)c
+⃗A←B⃗ c
+1 : forj = 0, ...,l + 1 do
+2 : Aj←Bcj
+Theorem 4.4 (OCBSHINE is detIND-UE-CPA). Let G be a group of orderq (aλ-bit prime,λ =m) with gen-
+eratorg, and let OCBSHINE be the updatable encryption scheme described in Fig. 28. For anydetIND-UE-CPA
+adversaryA against OCBSHINE that asks at most QE queries toO.Enc before it makes its challenge, there
+exists an adversaryB4.4 against DDH such that
+AdvdetIND-UE-CPA
+OCBSHINE,A (λ)≤ 2(n + 1)3· QE· AdvDDH
+G,B4.4(λ).
+Proof. The proof is similar to the security proof of Theorem 4.1, except that here we are dealing with vector of
+ciphertexts. To simulate the output ofO.Enc, the reduction will embed a vector of random group elements to
+the image of the random permutation family. The reduction is detailed in Fig. 31.
+5.5 SHINE is INT-CTXTs
+We then explain how we bound the advantage of any adversary playing the INT-CTXTs game for SHINE by
+the advantage of a reduction playing CDH.
+Proof Method for ciphertext integrity. In the INT-CTXTs game, the challenger will keep a list of consistent
+values for ciphertexts (i.e. the underlying permutation output). Suppose˜C is a forgery attempt sent to theO.Try
+query in epoch ˜e. Let ˜c = (˜C)1/k˜e be the underlying permutation output.
+If ˜c is a new value, since we have that π (or (π1,π 2) or (π0,{πN‖i‖b})) is a random permutation then the
+INT-CTXTs challenger simulates the preimage of ˜c under the corresponding random permutation(s) to be a
+random string(s). So the probability that this (these) random string(s) matches the integrity tag is negligible,
+and this carries over to the probability that the adversary wins the INT-CTXTs game.
+If ˜c is an already-existing value, and suppose this event happens with probabilityp. We construct a reduction
+playing the CDH game such that it wins CDH game with probabilityp· 1
+QE(n+1)2 . Similar to the proof method
+of Theorem 4.1, we construct a reduction playing the CDH experiment by guessing the location of the ﬁrewalls
+around the challenge epoch. The reduction embeds the CDH value and simulates the INT-CTXTs game, using
+any successfully-forged ciphertext to compute the CDH output to its CDH challenger.
+39
+ReductionB4.4 playing ExpDDH
+G,B4.4
+1 : receive (g,X,Y,Z )
+2 : do Setup
+3 : ⃗¯M,⃗¯C←A ors(λ)
+4 : phase← 1
+5 : Create ˜C with (⃗¯M,⃗¯C), get ˜C˜e
+6 : b ′←A ors,O.Upd˜C(˜C˜e)
+7 : twf← 1 if
+8 : C∗∩K∗⁄=∅ or
+9 : I∗∩C∗⁄=∅
+10 : if ABORT occurred or twf = 1
+11 : b ′ $
+← −{0, 1}
+12 : return b′
+13 : if (i, fwli, fwri)⁄∈FW
+14 : b ′ $
+← −{0, 1}
+15 : return b′
+16 : if b′ = b
+17 : return 0
+18 : else
+19 : return 1
+Setup(λ)
+20 : b
+$
+← −{0, 1}
+21 : k 0← SHINE0.KG(λ)
+22 : ∆ 0←⊥
+23 : e, c, phase, twf← 0
+24 : L, ˜L,C,K,T ←∅
+25 : fwli, fwri
+$
+← −{0, ...,n}
+26 : h
+$
+← −{1, ..., QE}
+27 : forj∈{0, ..., fwli-1} do
+28 : k j
+$
+← −Z∗
+q; ∆j← kj
+kj−1
+⊿ ◁
+29 : PKj←gkj
+30 : forj∈{ fwri+1, ...,n} do
+31 : k j
+$
+← −Z∗
+q; ∆j← kj
+kj−1
+⊿ ◁
+32 : PKj←gkj
+Setup(λ) cont.
+33 : if b = 0
+34 : PKfwli←Y
+35 : ⃗C
+$
+← −Gl+2
+36 : else
+37 : PKfwli←Y kfwli−1
+38 : ⃗ r
+$
+← −(Z∗
+q)l+2
+39 : ⃗C
+$
+← −X⃗ r
+40 : forj∈{ fwli+1, ..., fwri} do
+41 : ∆ j
+$
+← −Z∗
+q
+42 : PKj← PK∆j
+j−1
+O.Enc(⃗M)
+43 : c← c + 1
+44 : if c = h
+45 : ⃗Ce←⃗C; inf← e
+46 : else
+47 : ⃗inf
+$
+← −(Z∗
+q)l+2
+48 : Π( ⃗M)
+$
+← −g
+⃗inf / /see caption
+49 : ⃗Ce← PK
+⃗inf
+e
+50 : L←L∪{ (c,⃗Ce, e; inf or ⃗inf)}
+51 : return⃗Ce
+O.Next
+52 : e← e + 1
+O.Upd(⃗Ce−1)
+53 : if (j,⃗Ce−1, e− 1; inf or ⃗inf)⁄∈L
+54 : return ⊥
+55 : if j = h
+56 : ⃗Ce←⃗C∆e
+e−1
+57 : else
+58 : ⃗Ce← PK
+⃗inf
+e
+59 : L←L∪{ (j,⃗Ce, e; inf or ⃗inf)}
+60 : return⃗Ce
+O.Corr(inp, ˆe)
+61 : do Check(inp, ˆe; e; fwli, fwri)
+62 : if inp = key
+63 : K←K∪{ ˆe}
+64 : return kˆe
+65 : if inp = token
+66 : T ←T ∪{ˆe}
+67 : return ∆ˆe
+Create ˜C with (⃗¯M,⃗¯C)
+68 : if (h,⃗¯C, ˜e− 1; inf) /∈L
+69 : return ABORT
+70 : if b = 0
+71 : ⃗ s
+$
+← −(Z∗
+q)l+2
+72 : Π( ⃗¯M)
+$
+← −X⃗ s
+73 : ⃗˜Cfwli←Z⃗ s
+74 : else
+75 : Π( ⃗¯M)
+$
+← −Gl+2
+76 : ⃗˜Cfwli← (Z
+∏fwli−1
+j=inf+1 ∆j)
+⃗ r
+77 : forj∈{ 0, ..., fwli− 1} do
+78 : ⃗˜Cj←⃗¯C(∏j
+k=0 ∆k)/(∏˜e−1
+k=0 ∆k) / /left
+79 : forj∈{ fwli + 1, ..., fwri} do
+80 : ⃗˜Cj←⃗˜C∆j
+j−1 / /embed
+81 : forj∈{ fwri + 1, ...,n} do
+82 : ⃗˜Cj←{ Π(⃗¯M)}kj / /right
+83 : ˜L←∪ n
+j=0{(⃗˜Cj,j )}
+84 : return⃗˜C˜e
+O.Upd ˜C
+85 : C←C∪{ e}
+86 : ﬁnd(⃗˜Ce, e)∈ ˜L
+87 : return⃗˜Ce
+Figure 31: Reduction B4.4 for proof of Theorem 4.4, in hybrid i. On lines 3 and 6, ors refers to the set
+{O.Enc,O.Next,O.Upd,O.Corr}. On lines 28 and 31,⊿◁indicates ∆0 and ∆fwri+1 are skipped in the compu-
+tation. On line 48 ofO.Enc, vector Π(⃗M) = (π0(N),π N‖1‖0(M1), ...,π N‖l‖0(Ml),π N‖l‖1(Σ)).
+SHINE0 is INT-CTXTs.
+Theorem 5.1 (SHINE0 is INT-CTXTs). Let G be a group of orderq (aλ-bit prime, whereλ =v +m+l) with
+generatorg, and let SHINE0 be the updatable encryption scheme described in Fig. 25. For any INT-CTXTs
+40
+adversaryA against SHINE0 that asks at most QE queries toO.Enc before it asks itsO.Try query, there exists
+an adversaryB5.1 against CDH such that
+AdvINT-CTXTs
+SHINE0,A (λ)≤ 1/2l + QE(n + 1)2AdvCDH
+B5.1.
+Proof. Note that the probability of a random string ends by 0l is 1/2l.
+In the INT-CTXTs game, whenever, the adversary sends a forgery, suppose C∗, to theO.Try oracle. If the
+trivial win conditions does not trigger, thenC∗ is a new ciphertext to the challenger and there exists an insulated
+region around the challenge epoch. We split the proof into two parts based on if C∗1/ke is a new value to the
+challenger:
+1. If C∗1/ke is a new value, the random permutation π−1 will pick a random string a as the output of
+π−1(C∗1/ke). So the probability ofa is valid (a (v +m +l)-bit string with al-bit zero string in the end)
+is upper bounded by 1/2l.
+2. If C∗1/ke is an existed value, denote this event asE3, we claim that the probability ofE3 happens is very
+low. Which means it is hard to provide a valid forgery with a known permutation value. In other words,
+without the knowledge of the encryption key, it is difﬁcult to provide a correct exponentiation. Formally,
+we prove the following inequality in Lemma 5.2.
+Pr[E3] = Pr[C∗1/ke exists, C∗ is new]≤ QE(n + 1)2AdvCDH.
+In order to analyze the security, we deﬁne some events:
+• E1 ={C∗ is new},
+• E2 ={C∗1/ke is new, C∗ is new},
+• Recall E3 ={C∗1/ke exists, C∗ is new}.
+Denote the experiment ExpINT-CTXTs
+SHINE0,A to be Exp. Then we have the following results:
+• Pr[Exp = 1|¬E1] = 0.
+• We have proved Pr[Exp = 1|E2]≤ 1/2l in part 1.
+• Events¬E1,E 2,E 3 are disjoint from each other, so Pr[¬E1] + Pr[E2] + Pr[E3] = 1.
+• We have proved Pr[E3]≤ QE(n + 1)2AdvCDH in Lemma 5.2.
+Applying the above properties, we can compute the INT-CTXTs advantage
+AdvINT-CTXTs
+SHINE0,A (λ) = Pr[Exp = 1]
+= Pr[Exp = 1|¬E1]· Pr[¬E1] + Pr[Exp = 1|E2]· Pr[E2] + Pr[Exp = 1|E3]· Pr[E3]
+= Pr[Exp = 1|E2]· Pr[E2] + Pr[Exp = 1|E3]· Pr[E3]
+≤ Pr[Exp = 1|E2] + Pr[E3]
+≤ 1/2l + QE(n + 1)2AdvCDH.
+Lemma 5.2. LetA be an INT-CTXTs adversary against SHINE0 that asks at most QE queries toO.Enc before
+it asks itsO.Try query. Suppose ˜C is a forgery attempt provided byA and the corresponding permutation value
+is ˜c. Deﬁne E to be the event that ˜c is an existed value but ˜C is a new value. Then there exists an adversary
+B5.2 against CDH such that
+Pr[E]≤ QE(n + 1)2AdvCDH
+B5.2
+41
+Proof. SupposeA is an adversary against INT-CTXTs game, and it can provide a forgery such that ˜C is a new
+ciphertext but the underlying permutation value is an existed one with probability Pr[E]. We claim that there
+exists a reductionB5.2, detailed in Figure 32, such that it wins CDH game with probability Pr[E]· 1
+QE(n+1)2 .
+ReductionB5.2 playing ExpCDH
+G,B5.2
+1 : receive (g,X,Y )
+2 : do Setup
+3 : AO.Enc,O.Next,O.Upd,O.Corr,O.Try(λ)
+4 : if twf = 1 or ABORT occurred
+5 : win← 0
+6 : else
+7 : return win
+Setup(λ)
+8 : k 0← SHINE0.KG(λ)
+9 : ∆ 0←⊥; e, c← 0; win← 0
+10 : L∗,C,K,T ←∅
+11 : ˆfwl, ˆfwr
+$
+← −{0, ...,n}
+12 : h
+$
+← −{1, ..., QE}
+13 : forj∈{ 0, ..., ˆfwl-1} do
+14 : k j
+$
+← −Z∗
+q
+15 : ∆ j← kj
+kj−1
+/ /except ∆0
+16 : PKj←gkj
+17 : for{ ˆfwr+1, ...,n} do
+18 : k j
+$
+← −Z∗
+q
+19 : ∆ j← kj
+kj−1
+/ /except ∆ ˆfwr+1
+20 : PKj←gkj
+21 : PK ˆfwl←Y
+22 : forj∈{ ˆfwl+1, ..., ˆfwr} do
+23 : ∆ j
+$
+← −Z∗
+q; PKj← PK∆j
+j−1
+O.Enc(M)
+24 : c← c + 1
+25 : if c = h
+26 : if e< ˆfwl
+27 : π(N‖M‖0l)←X
+28 : C e←Xke
+29 : else
+30 : return ABORT
+31 : else
+32 : r
+$
+← −Z∗
+q;
+33 : π(N‖M‖0l)←gr
+34 : C e← PKr
+e
+35 : L∗←L∗∪{ (c, Ce, e;r)}⋗
+36 : return Ce
+O.Next()
+37 : e← e + 1
+O.Upd(Ce−1)
+38 : if (j, Ce−1, e− 1;r) /∈L∗
+39 : return ⊥
+40 : if j = h
+41 : if e< ˆfwl
+42 : C e← C∆e
+e−1
+43 : else
+44 : return ABORT
+45 : else
+46 : C e← PKr
+e
+47 : L∗←L∗∪{ (j, Ce, e;r)}
+48 : return Ce
+O.Corr(inp, ˆe)
+49 : do Check(inp, ˆe; e; ˆfwl, ˆfwr)
+50 : if inp = key
+51 : K←K∪{ ˆe}
+52 : return kˆe
+53 : if inp = token
+54 : T ←T ∪{ˆe}
+55 : fori∈T ∗ do
+56 : for (j, Ci−1,i− 1;r)∈L∗ do
+57 : C i←O.Upd(Ci−1)
+58 : L∗←L∗∪{ (j, Ci,i ;r)}
+59 : return ∆ˆe
+O.Try(˜C)
+60 : if phase = 1
+61 : return ⊥
+62 : phase← 1
+63 : if ˜e∈K∗ or ˜C∈L∗
+64 : twf← 1
+65 : if ˜e⁄∈{ ˆfwl, ..., ˆfwr}
+66 : twf← 1
+67 : y← ˜C1/ ∏e=˜e
+e= ˆfwl+1 ∆e
+68 : call Chall withy; get b
+69 : win← b
+Figure 32: ReductionB5.2 for proof of Lemma 5.2. On line 35, ⋗ indicatesr is empty when c = h.
+The reduction will guess the location of ﬁrewalls around the epoch whenO.Try query happens, furthermore,
+it guess which message (suppose the h-th encryption) might be the underlying message of the forgery. After
+it receives the CDH valuesga,g b, it embeds ga to the h-th encryption as π(N‖M‖0l)← ga, embeds gb to
+the public key value on the left ﬁrewall as PK ˆfwl = gk ˆfwl ← gb. Then ˜C = gab ∏e=˜e
+e= ˆfwl+1 ∆e with probability
+Pr[E]· 1
+QE(n+1)2 , which is the advantage of winning the CDH game.
+MirrorSHINE is INT-CTXTs.
+Theorem 5.3 (MirrorSHINE is INT-CTXTs). Let G be a group of order q (aλ-bit prime) with generator g,
+and let MirrorSHINE be the updatable encryption scheme described in Fig. 26. For any INT-CTXTs adversary
+42
+A against MirrorSHINE that asks at most queries at most QE queries toO.Enc before it asks itsO.Try query,
+there exists an adversaryB5.3 against CDH such that
+AdvINT-CTXTs
+MirrorSHINE,A(λ)≤ 1/2|N| + 2QE(n + 1)2AdvCDH
+B5.3
+Proof. Similar to the proof in Theorem 5.1. Suppose ˜C = (˜C1, ˜C2) is a new ciphertext sent as theO.Try query.
+Then at least one block of the ciphertext, suppose ˜Ci, is new. We split the proof in two parts:
+• If (˜Ci)1/ke is new. The random permutationπ−1
+i will pick a random stringai as the output ofπ−1
+i ((˜Ci)1/ke).
+So the probability ofai is valid (satisfya1 =a2) is upper bounded by 1/2|N| .
+• If (˜Ci)1/ke is an existed value outputted by permutationπi. Similar to the proof in Theorem 5.1, we can
+prove that Pr[(˜Ci)1/ke exists, ˜Ci is new ]≤ 2QE(n + 1)2AdvCDH
+B5.3.
+OCBSHINE is INT-CTXTs.
+Theorem 5.4 (OCBSHINE is INT-CTXTs). Let G be a group of orderq (aλ-bit prime,λ =m) with generator
+g, and let OCBSHINE be the updatable encryption scheme described in Fig. 28. For anyINT-CTXTs adversary
+A against OCBSHINE that asks at most QE queries, on messages with at most L message blocks, toO.Enc
+before it asks itsO.Try query, there exists an adversaryB5.4 against CDH such that
+AdvINT-CTXTs
+OCBSHINE,A(λ)≤ QE2 + QE
+2m−a + (L + 1)QE(n + 1)2AdvCDH
+B5.4.
+Proof. Game 0
+The ﬁrst game is the experiment ExpINT-CTXTs
+OCBSHINE,A, given in Fig. 6 and Fig. 10. As deﬁnition 4 we have
+AdvINT-CTXTs
+OCBSHINE,A(λ) = Pr[G0 = 1]
+Game 1
+Modify the response of the encryption oracle such that the game randomly picks a nonce and if the nonce
+repeats, it aborts the game and returns win = 0. This loss is upper-bounded by QE2
+2m−a , then we have
+|Pr[G0 = 1]− Pr[G1 = 1]|≤ QE2
+2m−a
+Finally, we claimPr[G1 = 1]≤ QE
+2m−a + (l + 1)QE(n + 1)2AdvCDH. Similar to the proof in Theorem 5.1.
+Suppose ˜C = ( ˜C0, ..., ˜C˜l+1) is a forgery attempt sent as theO.Try query in epoch ˜e. Suppose ˜ci = ( ˜Ci)1/k˜e,
+the corresponding message is ˜Mi. Let ˜N be the underlying nonce and ˜Σ be the underlying checksum. We
+consider the following two situations.
+1. If (˜c0, ..., ˜c˜l+1) is new, we claim that the probability of the adversary correctly guessing ˜Σ is upper-
+bounded by QE
+2m−a .
+(a) If ˜c0 is new, then either ˜N is new or| ˜M˜l| is new.
+i. If ˜N is equal to some already existing nonce N, we claim that the probability that this event
+happens is very low. Sinceπ0 is a random permutation, the ﬁrst (m-a) bits of the preimage of
+˜c0 underπ0, which is ˜N, is as likely as any (m-a)-bit string. So the probability that ˜N collides
+with one of the existed nonces is upper bounded by QE/2m−a.
+ii. If ˜N is new, therefore π˜N‖˜l‖1 is a new random permutation. The adversary sees no image
+and preimage of π˜N‖˜l‖1. The preimage of ˜c˜l+1 underπ˜N‖˜l‖1, which is ˜Σ, is as likely as any
+other m-bit string. So the probability that the adversary correctly guesses ˜Σ (which means
+˜Σ =⊕l
+i=1 ˜Mi) is 2−m.
+43
+(b) If ˜c0 =c0 for some already existing (c0, ...,c l+1) but ˜l⁄=l, similar to the above situationπ˜N‖˜l‖1 is
+a new random permutation. So the probability that the adversary correctly guesses ˜Σ is 2−m.
+(c) If ˜c0 = c0 for some already existing (c0, ...,c l+1) and ˜l = l but ˜cj⁄= cj for some j∈{ 1, ..., ˜l}.
+The adversary sees one image ofπ˜N‖j‖0, that is,cj. The preimage of ˜cj underπ˜N‖j‖0, which is ˜Mj,
+is as likely as any m-bit string except for Mj (or Ml‖0∗ whenj = l). So the probability that the
+adversary correctly guesses ˜Σ is 1
+2m−1.
+(d) If ˜c0 = c0 for some already existing (c0, ...,c l+1) and ˜l = l and ˜cj = cj for all j∈{ 1, ..., ˜l}
+but ˜c˜l+1 ⁄= cl+1. This event is impossible to happen, as ˜N = N ,|M˜l| = |Ml| and ˜l = l so
+π˜N‖˜l‖1 =πN‖l‖1, furthermore ˜Mj = Mj for allj∈{ 1, ..., ˜l}, so ˜Σ = Σ and then ˜c˜l+1 =cl+1.
+2. If (˜c0, ..., ˜c˜l+1) is an already existing value output by the permutations but ˜C = ( ˜C0, ..., ˜C˜l+1) is a
+new ciphertext, then this is equivalent to (˜c0, ..., ˜c˜l) exists but (˜C0, ..., ˜C˜l) is new, as in the analysis of
+1.(d). Similar to the proof in Theorem 5.1, we can prove that the probability of this event happening is
+upper-bounded by CDH advantage:
+Pr[ (˜c0, ..., ˜c˜l) exists but (˜C0, ..., ˜C
+˜l) is new ]≤ (L + 1)QE(n + 1)2AdvCDH.
+5.6 Implementing the SHINE Schemes
+In the proofs of Theorem 4 and Theorem 5, we require that π is a random (unkeyed) permutation which must
+be followed by a mapping to an appropriate group for exponentiation by the epoch key. For the permutation we
+do not need any speciﬁc and strong properties that are provided by modern constructions of block ciphers and
+sponges. As far as the proof goes, and in practice, the property that we want from this permutation is that given
+a ciphertext and the inverse of the epoch key ke, the only way to extract useful information about the message
+is to apply the inverse permutationπ−1. The random permutation model (or ideal cipher model) is thus the tool
+we need here to create a simple interface for this aspect of our proof.
+The different members of the SHINE family are suited to different application scenarios. The variants
+SHINE0 and MirrorSHINE are best suited to cases where messages are of small, ﬁxed size, such as customer
+credentials (or phone contact details, to return to the motivating example in the Introduction). For applications
+with longer messages (i.e. larger than the size of the exponentiation group), OCBSHINE is considerably faster
+and we will assume that these choices are made in our implementation suggestions. This removes any need
+for larger groups in order to encrypt longer messages. Using larger groups would not only carry a signiﬁcant
+performance penalty, but also force us to construct custom large blocklength block ciphers. Although this can
+be done (and has been for RSA groups [GOR18], where our approach would not work), the analysis is tricky.
+Instantiating the ideal permutation. The message block in SHINE0, MirrorSHINE and the ﬁnal message
+block in OCBSHINE must be appropriately padded to allow application of the permutation. The permutation
+could be deployed using a variable-output-length sponge construction, a block cipher or an authenticated en-
+cryption scheme with a ﬁxed key and suitably large nonce space. In practice, we suggest to instantiate the
+random permutation with a block cipher of a suitable block length. AES has only 128-bit blocks which does
+not match the minimum required size of the group, so we instead suggest block ciphers such as Threeﬁsh, or
+original Rijndael, allowing block lengths of 256 or 512 bits.
+Mapping to elliptic curve group. We would like to instantiate our groups using elliptic curves. Using mod-
+ern techniques it is always possible to ﬁnd a suitable curve over a ﬁeld with a size matching the block length
+of the ideal permutation, but using standard curves like NIST P-256 or P-521 seems desirable. A standard
+approach [Kob87] is to embed bit strings in the X-coordinate of a point as follows. Note that close to half the
+ﬁeld elements are X-coordinates of points. Given a ﬁeld of size q, we consider a t-bit block as an integer x0
+and ﬁnd a small integeru such thatu2t +x0 is theX-coordinate of a curve point. If logq−t is between 8 and
+9, this will fail to terminate with probability around 2−256 under reasonable assumptions.
+With this approach we could use Threeﬁsh with 512-bit blocks together with NIST P-521 curve. If we
+want to use 256-bit blocks from Threeﬁsh, or original Rijndael, together with NIST P-256 curve, we can use
+44
+a standard block cipher iteration trick [RSA78] to reduce the block length from 256 bits, so that embedding in
+theX-coordinate still works, as follows. With block lengtht+τ, concatenate at-bit block withτ leading zeros
+and apply the block cipher until the τ leading bits of the result are all zeros. Discard these zeros to get a t-bit
+block. This is fairly cheap as for our purposes 8 or 9 bits will do.
+Note that we have constructed an injective embedding of a block into an elliptic curve, not a bijection as
+assumed in our proofs. When we sample group elements in our proof, we must take care to sample points in
+the image of our embedding, but this can be done cheaply.
+6 Conclusions
+In this work we provided a suite of new updatable encryption schemes, collectively called SHINE, and a new
+deﬁnition of security xxIND-UE-atk (that implies prior notions) in which we prove our schemes secure. In the
+process, we provided a greater understanding of the proof techniques that are inherent in the strong corruption
+model that is desirable for updatable encryption – in particular in the context of deterministic updates that is
+desirable in practice.
+Acknowledgements. This research was funded by the Research Council of Norway under Project No. 248166.
+Gareth T. Davies is supported by the European Research Council (ERC) under the European Union’s Hori-
+zon 2020 research and innovation programme, grant agreement 802823. We would like to thank Frederik
+Armknecht, Håvard Raddum and Mohsen Toorani for fruitful discussions in the initial stages of this project,
+and anonymous reviewers for a number of useful suggestions for improvement. We would also like to thank
+Adam O’Neill for a number of useful suggestions for improvement. Parts of this work were conducted while
+Gareth T. Davies was employed by NTNU Trondheim and the University of Paderborn.
+References
+[AFGH05] Giuseppe Ateniese, Kevin Fu, Matthew Green, and Susan Hohenberger. Improved proxy re-
+encryption schemes with applications to secure distributed storage. In Proceedings of the Net-
+work and Distributed System Security Symposium, NDSS 2005, San Diego, California, USA . The
+Internet Society, 2005. Cited on page 6.
+[BBS98] Matt Blaze, Gerrit Bleumer, and Martin Strauss. Divertible protocols and atomic proxy cryptogra-
+phy. In Kaisa Nyberg, editor, Proceedings of EUROCRYPT 1998, volume 1403 of Lecture Notes
+in Computer Science, pages 127–144. Springer, 1998. Cited on page 6.
+[BLMR13] Dan Boneh, Kevin Lewi, Hart William Montgomery, and Ananth Raghunathan. Key homomorphic
+prfs and their applications. In Ran Canetti and Juan A. Garay, editors, Advances in Cryptology -
+CRYPTO 2013 - 33rd Annual Cryptology Conference, Santa Barbara, CA, USA, August 18-22,
+2013. Proceedings, Part I, volume 8042 of Lecture Notes in Computer Science , pages 410–428.
+Springer, 2013. Cited on pages 3, 5, 7, 8, 50, and 51.
+[BLMR15] Dan Boneh, Kevin Lewi, Hart William Montgomery, and Ananth Raghunathan. Key homomorphic
+prfs and their applications. IACR Cryptology ePrint Archive, Report 2015/220 , 2015. Cited on
+pages 3 and 5.
+[BN08] Mihir Bellare and Chanathip Namprempre. Authenticated encryption: Relations among notions
+and analysis of the generic composition paradigm. J. Cryptology, 21(4):469–491, 2008. Cited on
+page 4.
+[CCFL17] Christian Cachin, Jan Camenisch, Eduarda Freire-Stögbuchner, and Anja Lehmann. Updatable
+tokenization: Formal deﬁnitions and provably secure constructions. In Aggelos Kiayias, editor,
+Financial Cryptography and Data Security - 21st International Conference, FC 2017, Sliema,
+Malta, April 3-7, 2017, Revised Selected Papers , volume 10322 of Lecture Notes in Computer
+Science, pages 59–75. Springer, 2017. Cited on page 6.
+45
+[CH07] Ran Canetti and Susan Hohenberger. Chosen-ciphertext secure proxy re-encryption. In Peng
+Ning, Sabrina De Capitani di Vimercati, and Paul F. Syverson, editors, Proceedings of the 2007
+ACM Conference on Computer and Communications Security, CCS 2007, Alexandria, Virginia,
+USA, October 28-31, 2007, pages 185–194. ACM, 2007. Cited on page 6.
+[Cou18] PCI Security Standards Council. Data security standard (PCI DSS v3.2.1), 2018.
+https://www.pcisecuritystandards.org/. Cited on pages 3 and 6.
+[CPS08] Jean-Sébastien Coron, Jacques Patarin, and Yannick Seurin. The random oracle model and the
+ideal cipher model are equivalent. In David A. Wagner, editor,Advances in Cryptology - CRYPTO
+2008, 28th Annual International Cryptology Conference, Santa Barbara, CA, USA, August 17-21,
+2008. Proceedings, volume 5157 of Lecture Notes in Computer Science , pages 1–20. Springer,
+2008. Cited on page 34.
+[DDLM19] Alex Davidson, Amit Deo, Ela Lee, and Keith Martin. Strong post-compromise secure proxy re-
+encryption. In Julian Jang-Jaccard and Fuchun Guo, editors, Information Security and Privacy -
+24th Australasian Conference, ACISP 2019, Christchurch, New Zealand, July 3-5, 2019, Proceed-
+ings, volume 11547 of Lecture Notes in Computer Science , pages 58–77. Springer, 2019. Cited
+on page 6.
+[DRC14] Sandra Diaz-Santiago, Lil María Rodríguez-Henríquez, and Debrup Chakraborty. A cryptographic
+study of tokenization systems. In Mohammad S. Obaidat, Andreas Holzinger, and Pierangela
+Samarati, editors, SECRYPT 2014 - Proceedings of the 11th International Conference on Security
+and Cryptography, Vienna, Austria, 28-30 August, 2014, pages 393–398. SciTePress, 2014. Cited
+on page 6.
+[EPRS17a] Adam Everspaugh, Kenneth G. Paterson, Thomas Ristenpart, and Samuel Scott. Key rotation for
+authenticated encryption. In Jonathan Katz and Hovav Shacham, editors, Advances in Cryptology
+- CRYPTO 2017 - 37th Annual International Cryptology Conference, Santa Barbara, CA, USA,
+August 20-24, 2017, Proceedings, Part III, volume 10403 of Lecture Notes in Computer Science,
+pages 98–129. Springer, 2017. Cited on pages 3 and 5.
+[EPRS17b] Adam Everspaugh, Kenneth G. Paterson, Thomas Ristenpart, and Samuel Scott. Key rotation for
+authenticated encryption. IACR Cryptology ePrint Archive, Report 2017/527, 2017. Cited on page
+5.
+[GOR18] Craig Gentry, Adam O’Neill, and Leonid Reyzin. A uniﬁed framework for trapdoor-permutation-
+based sequential aggregate signatures. In Michel Abdalla and Ricardo Dahab, editors, Public-Key
+Cryptography – PKC 2018, pages 34–57, Cham, 2018. Springer International Publishing. Cited
+on page 44.
+[JKR19] Stanislaw Jarecki, Hugo Krawczyk, and Jason K. Resch. Updatable oblivious key management
+for storage systems. In Lorenzo Cavallaro, Johannes Kinder, XiaoFeng Wang, and Jonathan Katz,
+editors, Proceedings of the 2019 ACM SIGSAC Conference on Computer and Communications
+Security, CCS 2019, London, UK, November 11-15, 2019, pages 379–393. ACM, 2019. Cited on
+page 5.
+[KLR19a] Michael Klooß, Anja Lehmann, and Andy Rupp. (R)CCA secure updatable encryption with in-
+tegrity protection. In Yuval Ishai and Vincent Rijmen, editors, Advances in Cryptology - EURO-
+CRYPT 2019 - 38th Annual International Conference on the Theory and Applications of Crypto-
+graphic Techniques, Darmstadt, Germany, May 19-23, 2019, Proceedings, Part I , volume 11476
+of Lecture Notes in Computer Science, pages 68–99. Springer, 2019. Cited on pages 3, 5, 7, 9, 16,
+19, and 20.
+[KLR19b] Michael Klooß, Anja Lehmann, and Andy Rupp. (R)CCA secure updatable encryption with in-
+tegrity protection. IACR Cryptology ePrint Archive, Report 2019/222, 2019. Cited on page 35.
+46
+[Kob87] Neil Koblitz. Elliptic curve cryptosystems. Mathematics of Computation, 48(177):203–209, 1987.
+Cited on page 44.
+[KRS+03] Mahesh Kallahalla, Erik Riedel, Ram Swaminathan, Qian Wang, and Kevin Fu. Plutus: Scalable
+secure ﬁle sharing on untrusted storage. In Jeff Chase, editor, Proceedings of the FAST ’03 Con-
+ference on File and Storage Technologies, March 31 - April 2, 2003, Cathedral Hill Hotel, San
+Francisco, California, USA. USENIX, 2003. Cited on page 3.
+[Lee17] Ela Lee. Improved security notions for proxy re-encryption to enforce access control. In Tanja
+Lange and Orr Dunkelman, editors, Progress in Cryptology - LATINCRYPT 2017 - 5th Inter-
+national Conference on Cryptology and Information Security in Latin America, Havana, Cuba,
+September 20-22, 2017, Revised Selected Papers , volume 11368 of Lecture Notes in Computer
+Science, pages 66–85. Springer, 2017. Cited on page 6.
+[Leh19] Anja Lehmann. Updatable encryption & key rotation (presentation slides), 2019.
+https://summerschool-croatia.cs.ru.nl/2019/slides/lehmann1.pdf. Cited on page 5.
+[LT18a] Anja Lehmann and Björn Tackmann. Updatable encryption with post-compromise security. In
+Jesper Buus Nielsen and Vincent Rijmen, editors, Advances in Cryptology - EUROCRYPT 2018
+- 37th Annual International Conference on the Theory and Applications of Cryptographic Tech-
+niques, Tel Aviv, Israel, April 29 - May 3, 2018 Proceedings, Part III , volume 10822 of Lecture
+Notes in Computer Science , pages 685–716. Springer, 2018. Cited on pages 3, 4, 6, 7, 16, 51,
+and 56.
+[LT18b] Anja Lehmann and Björn Tackmann. Updatable encryption with post-compromise security. IACR
+Cryptology ePrint Archive, Report 2018/118, 2018. Cited on pages 5 and 56.
+[MS18] Steven Myers and Adam Shull. Practical revocation and key rotation. In Nigel P. Smart, editor,
+Topics in Cryptology - CT-RSA 2018 - The Cryptographers’ Track at the RSA Conference 2018, San
+Francisco, CA, USA, April 16-20, 2018, Proceedings, volume 10808 ofLecture Notes in Computer
+Science, pages 157–178. Springer, 2018. Cited on page 6.
+[NPR99] Moni Naor, Benny Pinkas, and Omer Reingold. Distributed pseudo-random functions and kdcs.
+In Jacques Stern, editor, Advances in Cryptology - EUROCRYPT ’99, International Conference
+on the Theory and Application of Cryptographic Techniques, Prague, Czech Republic, May 2-6,
+1999, Proceeding, volume 1592 of Lecture Notes in Computer Science, pages 327–346. Springer,
+1999. Cited on page 50.
+[RBBK01] Phillip Rogaway, Mihir Bellare, John Black, and Ted Krovetz. OCB: a block-cipher mode of
+operation for efﬁcient authenticated encryption. In Michael K. Reiter and Pierangela Samarati,
+editors, CCS 2001, Proceedings of the 8th ACM Conference on Computer and Communications
+Security, Philadelphia, Pennsylvania, USA, November 6-8, 2001 , pages 196–205. ACM, 2001.
+Cited on page 32.
+[RSA78] R. L. Rivest, A. Shamir, and L. M. Adleman. A method for obtaining digital signatures and public-
+key cryptosystems. Communications of the ACM, 21:120–126, 1978. Cited on page 45.
+[Sha49] Claude E Shannon. Communication theory of secrecy systems. Bell system technical journal ,
+28(4):656–715, 1949. Cited on page 34.
+[SNS17] Kouichi Sakurai, Takashi Nishide, and Amril Syalim. Improved proxy re-encryption scheme for
+symmetric key cryptography. In International Workshop on Big Data and Information Security,
+IWBIS 2017, Jakarta, Indonesia, September 23-24, 2017 , pages 105–111. IEEE, 2017. Cited on
+page 6.
+47
+A SHINE0 is IND-ENC -CPA Secure
+Theorem 4.2. Let G be a group of order q (aλ-bit prime) with generator g, and let SHINE0 be the updatable
+encryption scheme described in Fig. 25. For any IND-ENC -CPA adversaryA against SHINE0, there exists an
+adversaryB4.2 against DDH such that
+AdvIND-ENC-CPA
+SHINE0,A (λ)≤ 2(n + 1)3· AdvDDH
+G,B4.2(λ).
+Proof. Similarly to the proof of Theorem 4.1, we use the ﬁrewall technique and construct hybrid games. For
+b∈{ 0, 1}, deﬁne gameGb
+i as ExpIND-ENC-CPA-b
+SHINE0,A except for:
+• The game randomly picks two numbers fwli, fwri and if fwli, fwri are not thei-th ﬁrewalls, a random bit
+is returned for b′. This loss is upper bounded by (n + 1)2;
+• For challenge made in epoch ˜e with input ( ¯M0, ¯M1): If ˜e < fwli then return a ciphertext of ¯M1, if
+˜e> fwri return a ciphertext of ¯M0, and if fwli≤ ˜e≤ fwri return a ciphertext of ¯Mb;
+• AfterA outputs b′: returns b′ if twf⁄= 1 or some additional trivial win condition is triggered.
+Similarly to the computation in Theorem 4.1, we have
+AdvIND-ENC-CPA
+SHINE0,A (λ) = (n + 1)2·
+( l∑
+i=1
+|Pr[G1
+i = 1]− Pr[G0
+i = 1]|
+)
+,
+for somel. Again we need to prove that|Pr[G1
+i = 1]− Pr[G0
+i = 1]|≤ 2AdvDDH
+G, (λ).
+We construct a reductionB4.2, detailed in Fig. 33, that is playing the standard DDH game and runsAi. The
+reductionB4.2 ﬂips a coin b, and simulatesGb
+i by using DDH tuples (X,Y,Z ) to output SHINE0.Enc( ¯Mb) in
+thei-th insulated region. IfAi guess b correctly, thenB4.2 guesses its real DDH tuples, otherwise,B4.2 guess
+its random DDH tuples. IfB4.2 receives a real DDH tuple, thenB4.2 perfectly simulates the input ofAi inGb
+i .
+IfB4.2 receives a random DDH tuple, thenB4.2 wins with probability 1/2. After some computation similar to
+that in the proof of Theorem 2.3 we have that AdvDDH
+G,B4.2(λ) = 1
+2|Pr[G1
+i = 1]− Pr[G0
+i = 1]|.
+48
+ReductionB4.2 playing ExpDDH
+G,B4.2 in hybridi
+1 : receive (g,X,Y,Z )
+2 : do Setup
+3 : ¯M0, ¯M1←AO.Enc,O.Next,O.Upd,O.Corr(λ)
+4 : phase← 1
+5 : Create ˜C with ( ¯M0, ¯M1), get ˜C˜e
+6 : b ′←AO.Enc,O.Next,O.Upd,O.Corr,O.Upd˜C(˜C˜e)
+7 : twf← 1 if
+8 : C∗∩K∗⁄=∅
+9 : if ABORT occurred or twf = 1
+10 : b ′ $
+← −{0, 1}
+11 : return b′
+12 : if (i, fwli, fwri)⁄∈FW
+13 : b ′ $
+← −{0, 1}
+14 : return b′
+15 : if b′ = b
+16 : return 0
+17 : else
+18 : return 1
+Setup(λ)
+19 : b
+$
+← −{0, 1}; k0← SHINE0.KG(λ)
+20 : ∆ 0←⊥; e← 0; phase, twf← 0
+21 : L, ˜L,C,K,T ←∅
+22 : fwli, fwri
+$
+← −{0, ...,n}
+23 : PKfwli←Y
+24 : forj∈{ fwli+1, ..., fwri} do
+25 : ∆ j
+$
+← −Z∗
+q; PKj← PK∆j
+j−1
+26 : forj∈{0, ..., fwli-1}∪{ fwri+1, ...,n} do
+27 : k j
+$
+← −Z∗
+q; ∆j← kj
+kj−1
+⊿ ◁
+; PKj←gkj
+O.Enc(M)
+28 : r
+$
+← −Z∗
+q;π(N||M)←gr; Ce← PKr
+e
+29 : L←L∪{ (·, Ce, e;r)}
+30 : return Ce
+O.Next
+31 : e← e + 1
+O.Upd(Ce−1)
+32 : if (·, Ce−1, e− 1;r)⁄∈L
+33 : return ⊥
+34 : C e← PKr
+e
+35 : L←L∪{ (·, Ce, e;r)}
+36 : return Ce
+O.Corr(inp, ˆe)
+37 : do Check(inp, ˆe; e; fwli, fwri)
+38 : if inp = key
+39 : K←K∪{ ˆe}
+40 : return kˆe
+41 : if inp = token
+42 : T ←T ∪{ˆe}
+43 : return ∆ˆe
+Create ˜C with ( ¯M0, ¯M1)
+44 : π(N|| ¯Mb)←X
+45 : π(N|| ¯Mb⊕1)
+$
+← −G
+46 : ˜Cfwli←Z
+47 : forj∈{ 0, ..., fwli− 1} do
+48 : ˜Cj← (π(N|| ¯M1))kj / /left
+49 : forj∈{ fwli + 1, ..., fwri} do
+50 : ˜Cj← ˜C∆j
+j−1 / /embed
+51 : forj∈{ fwri + 1, ...,n} do
+52 : ˜Cj← (π(N|| ¯M0))kj / /right
+53 : ˜L←∪ n
+j=0{(˜Cj,j )}
+54 : return ˜C˜e
+O.Upd ˜C
+55 : C←C∪{ e}
+56 : ﬁnd(˜Ce, e)∈ ˜L
+57 : return ˜Ce
+Figure 33: Reduction B4.2 for proof of Theorem 4.2. Embedding DDH tuples to challenge ciphertexts requires
+faithful responses to queries within the i-th insulated region. On line 27, ⊿◁ indicates ∆0 and ∆fwri+1 are
+skipped in the computation.
+49
+B The BLMR Scheme of Boneh, Lewi, Montgomery, and Raghunathan
+We present the original scheme given by Boneh et al. [BLMR13], which we denote byBLMR. The scheme is a
+direct application of the key-homomorphic PRFs deﬁned in the same paper: the authors observed that the Naor-
+Reingold-Pinkas PRF [NPR99] is key homomorphic, and presented a number of other constructions based on
+DLIN and LWE. The updatable encryption scheme BLMR [BLMR13], which is ciphertext-independent and
+deﬁned in Fig. 34, represented the ﬁrst UE construction.
+BLMR.KG(λ)
+1 : k e
+$
+← −F.KG(λ)
+2 : return ke
+BLMR.TG(ke, ke+1)
+3 : ∆ e+1← ke⊕ ke+1
+4 : return ∆e+1
+BLMR.Enc(ke, M)
+5 : N
+$
+← −χ
+6 : C 1
+e← F(ke, N)⊗ M
+7 : C e← (C1
+e, N)
+8 : return Ce
+BLMR.Dec(ke, Ce)
+9 : parse Ce = (C1
+e, N)
+10 : M ′← C1
+e⊗ F(ke, N)
+11 : return M′
+BLMR.Upd(∆e+1, Ce)
+12 : parse Ce = (C1
+e, N)
+13 : C e+1← (C1
+e⊗ F(∆e+1, N), N)
+14 : return Ce+1
+Figure 34: Updatable encryption scheme BLMR [BLMR13] for key-homomorphic PRF F.
+To present the schemes and the results in this section, we ﬁrst need to introduce a deﬁnition of a key-
+homomorphic PRF, and also the regular (left-or-right) IND-CPA security deﬁnition for symmetric encryption.
+Deﬁnition 13 (Key-homomorphic PRF [BLMR13]). LetF :KS×X →Y be some efﬁciently-computable
+function, where (KS,⊕) and (Y,⊗) are groups. Then, (F,⊕,⊗) is a key-homomorphic PRF if F is a PRF,
+and for every k1, k2∈KS and everyx∈X ,F (k1,x )⊗F (k2,x ) =F (k1⊕ k2).
+Deﬁnition 14. Let SKE ={KG, E, D} be an symmetric encryption scheme. Then the IND-CPA advantage of
+an adversaryA against SKE is deﬁned as
+AdvIND-CPA
+SKE,A (λ) =
+⏐⏐⏐⏐Pr[ExpIND-CPA-1
+SKE,A = 1]− Pr[ExpIND-CPA-0
+SKE,A = 1]
+⏐⏐⏐⏐,
+where the experiment ExpIND-CPA-b
+SKE,A is given in Fig. 35.
+ExpIND-CPA-b
+SKE,A (λ)
+1 : k
+$
+← −KG
+2 : (M 0, M1, st)←AO.E(λ)
+3 : if|M0|⁄ =|M1|
+4 : return ⊥
+5 : ˜C
+$
+← −SKE.Enc(k, Mb)
+6 : b ′←AO.E(˜C)
+7 : return b′
+O.E(M)
+8 : C ← SKE.Enc(k, M)
+9 : return C
+Figure 35: The experiments deﬁning IND-CPA security for symmetric encryption schemes.
+Note that BLMR is trivially insecure in terms of xxIND-UPD-atk (in any of its three ﬂavors) since the
+adversary can gain the epoch key for the epoch preceding the challenge epoch, allowing decryption of the chal-
+lenge input ciphertexts and consequently a direct comparison of nonce values between these input ciphertexts
+and the challenge ciphertext.
+50
+BLMR+.KG(λ)
+1 : k 1 $
+← −F.KG(λ)
+2 : k 2 $
+← −SKE.KG(λ)
+3 : k e← (k1, k2)
+4 : return ke
+BLMR+.TG(ke, ke+1)
+5 : parse ke = (k1
+e, k2
+e)
+6 : parse ke+1 = (k1
+e+1, k2
+e+1)
+7 : ∆ e+1← (k1
+e⊕ k1
+e+1, (k2
+e, k2
+e+1))
+8 : return ∆e+1
+BLMR+.Enc(ke, M)
+9 : parse ke = (k1
+e, k2
+e)
+10 : N
+$
+← −χ
+11 : C 1
+e← F(k1
+e, N)⊗ M
+12 : C 2
+e← SKE.E(k2
+e, N)
+13 : C e← (C1
+e, C2
+e)
+14 : return Ce
+BLMR+.Dec(ke, Ce
+15 : parse ke = (k1
+e, k2
+e)
+16 : parse Ce = (C1
+e, C2
+e)
+17 : N ← SKE.D(k2
+e, C2
+e)
+18 : M ′← C1
+e⊗ F(k1
+e, N)
+19 : return M′
+BLMR+.Upd(∆e+1, Ce)
+20 : parse ∆e+1 = (∆′
+e+1, (k2
+e, k2
+e+1))
+21 : parse Ce = (C1
+e, C2
+e)
+22 : N ← SKE.D(k2
+e, C2
+e)
+23 : C 1
+e+1← C1
+e⊗ F(∆′
+e+1, N)
+24 : C 2
+e+1← SKE.E(k2
+e+1, N)
+25 : C e+1← (C1
+e+1, C2
+e+1)
+26 : return Ce+1
+Figure 36: Updatable encryption scheme BLMR+ [BLMR13, LT18a] for key-homomorphic PRF F and sym-
+metric key encryption scheme SKE.
+LT18 detailed an extension of BLMR, denoted BLMR+, where the nonce is encrypted: this scheme is
+described in Fig. 36. LT18 showed thatBLMR+ is IND-ENC-CPA and weakIND-UPD-CPA secure, however it
+is not detIND-UE-CPA secure, since the token contains the encryption key for the nonce value. More precisely,
+the adversary runs as follows:
+• Choose some M0, callO.Enc(M0) and receive some C.
+• CallO.Next, choose M1 (that is distinct from M0), doO.Chall(C, M1) and receive ˜C.
+• CallO.Next, callO.Upd ˜C, callO.Corr(token, 2) andO.Corr(key, 0).
+• Do BLMR+.Deck0(C) to see its nonce, do Dk2
+2
+(˜C) to see nonce of challenge ciphertext and compare.
+This is a very similar attack to the one LT18 used to demonstrate thatBLMR+ is not detIND-UPD-CPA secure.
+Although BLMR+ is not detIND-UE-CPA secure, we can prove that it is weakIND-UE-CPA secure.
+B.1 BLMR+ is weakIND-UE-CPA Secure.
+Trivial wins for a weak model. An additional notion weakIND-UPD-CPA was used by LT18 for proving
+their BLMR+ scheme secure: if the adversary has access to any token or key which could leak the nonce of a
+challenge input ciphertext, the trivial win ﬂag is triggered if the adversary gains access to any token which could
+reveal the nonce of a known (version of the) challenge ciphertext (i.e. ifI∗∩ (K∗∪T ∗)⁄=∅, then twf← 1 if
+∃e∈C ∗ such that e or e + 1∈T ∗). This is necessary because the token in BLMR+ contains the symmetric
+keys that enable decryption and re-encryption of the nonce.
+Proof technique of Proposition 6. The proof technique is very similar to the proof of weakIND-UPD-CPA
+security of BLMR+ in LT18 [LT18a]. We consider two situations of the additional requirements ofweakIND-UE-CPA
+security and provide two proofs based on these situations. We only describe the ﬁrst proof technique as both
+proofs use the same strategy. We construct hybrid games across each epoch, such that distinguishing the end-
+points represents success in the weakIND-UE-CPA game. Suppose Ai is an adversary trying to distinguish
+games in hybridi. We consider a modiﬁed hybrid game in which the ﬁrst element of ciphertexts is a uniformly
+random element. We can prove that the ability to notice this change is upper bounded byPRF advantage. Then,
+we conclude the proof by switching out the nonce inside the encryption in the second component: noticing this
+change is upper bounded by IND-CPA advantage of an adversary against SKE.
+51
+Proposition 6. Let BLMR+ be the updatable encryption scheme described in Fig. 36. For anyweakIND-UE-CPA
+adversaryA against UE that asks at most QE queries toO.Enc before it makes its challenge, there exists an
+IND-CPA adversaryBIND-CPA
+6b against SKE and an PRF adversaryBPRF
+6a against F such that
+AdvweakIND-UE-CPA
+BLMR+,A (λ)≤ (n + 1)3·
+(
+AdvIND-CPA
+SKE,BIND-CPA
+6b
+(λ) + 2AdvPRF
+F,BPRF
+6a
+(λ) + 2QE2
+|X|
+)
+.
+Proof. The additional requirement of weakIND-UE-CPA security states: If the adversary knows a secret key or
+a token in epoch e∗∈I∗, then for any e∈C∗, if the adversary corrupts ∆e or ∆e+1 then the adversary trivially
+loses, i.e. twf← 1. We consider two situations (whether or notI∗∩ (K∗∪T ∗) =∅) that might happen. The
+reduction can ﬂip a coin at the beginning of the simulation to guess which situation the adversary will produce
+and set up the simulation appropriately.
+Situation 1. Suppose the adversary knows a secret key or a token in epoch e∗∈I∗.
+(Step 1.) We construct a sequence of hybrid games. Deﬁne gameGi as ExpweakIND-UE-CPA-b
+BLMR+,A except for:
+• The challenge input ( ¯M, ¯C), called in epochj. If j≤i then return a ciphertext that is an update of ¯C, if
+j >i then return a ciphertext that is an encryption of ¯M.
+• AfterA outputs b′, returns b′ if twf⁄= 1.
+Similarly the advantage AdvweakIND-UE-CPA
+BLMR+,A (λ) is upper bounded by|Pr[G−1 = 1]− Pr[Gn = 1]|. For
+anyi, we prove that
+|Pr[Gi = 1]− Pr[Gi−1 = 1]|≤ AdvIND-CPA
+SKE,BIND-CPA
+6b
+(λ) + 2AdvPRF
+F,BPRF
+6a
+(λ) + 2QE2
+|X| .
+SupposeAi is an adversary trying to distinguish Gi fromGi−1. For all queries concerning epochs other
+thani the responses will be equal in either game, so we assume Ai asks for a challenge ciphertext in epoch i.
+That means if the adversary corrupts tokens in epoch i or epochi + 1, the trivial win condition is met and the
+adversary loses.
+(Step 2.) We consider a modiﬁed game GPRF which is the same as Gi except for: the ﬁrst element of
+ciphertexts given to the adversary in epoch i is a uniformly random element inY. More precisely, in epoch i,
+whenAi asks forO.Enc,O.Upd or a challenge-equal ciphertext to gameGb
+PRF:
+• AnO.Enc(M) query: randomly choose a nonce N $← −X\X, set X ← X∪{ N}, randomly choose
+C1
+i
+$← −Y, compute C2
+i← SKE.E(k2
+i, N), setL←L∪{ (·, Ci,i ; N, M)}. Output Ci.
+• AnO.Upd(Ci−1) query: proceed if (·, Ci−1,i− 1; N, M)∈L . If N∈ X, then abort the game; oth-
+erwise, set X ← X∪{ N}, randomly choose C1
+i
+$← − Y, compute C2
+i ← SKE.E(k2
+i, N), set L ←
+L∪{ (·, Ci,i ; N, M)}. Output Ci.
+• A challenge-equal ciphertext (with the underlying challenge input( ¯M0, ¯C)): proceed if (·, ¯C, ˜e−1; N1, ¯M1)∈
+L. If N1 ∈ X, then abort the game; otherwise, set X ← X∪{ N1}. Randomly choose a nonce
+N0
+$← − X\X, set X ← X∪{ N0}, randomly choose C1
+i
+$← − Y, compute ˜C2
+i ← SKE.E(k2
+i, Nb),
+(˜Ci,i ; Nb, ¯Mb)∈ ˜L. Output ˜Ci.
+We wish to prove that
+|Pr[Gi = 1]− Pr[Gi−1 = 1]|≤ AdvGPRF(λ) + 2AdvPRF
+F,BPRF
+6a
+(λ) + 2QE2
+|X| .
+If the following results are true, then we have the above result.
+|Pr[Gi = 1]− Pr[G1
+PRF = 1]|≤ AdvPRF
+F,BPRF
+6a
+(λ) + QE2
+|X|
+52
+and
+|Pr[Gi−1 = 1]− Pr[G0
+PRF = 1]|≤ AdvPRF
+F,BPRF
+6a
+(λ) + QE2
+|X| .
+We construct an PRF adversaryBPRF
+6a , detailed in Fig. 37, against F to simulate the responses of queries made
+byAi.
+The reduction does appropriate bookkeeping for the nonce, message, and ciphertexts in listL. Speciﬁcally,
+in epoch i,BPRF
+6a collects used nonces in list X (initiated as empty set). Initially, the reduction ﬂips a coin
+b $← −{0, 1}, simulates the challenge response with ¯M0 if b = 0 ; otherwise, simulates the challenge response
+with ¯C. The reduction BPRF
+6a generates all keys and tokens except for k1
+i . In epoch i,BPRF
+6a calls its PRF
+challenger for help computing F(k1
+i, N).
+EventuallyBPRF
+6a receives b′ fromAi, and if b′ = b, thenBPRF
+6a guesses that it is interacting with the ‘real’
+PRF, i.e. outputs 0 to the PRF challenger, otherwiseBPRF
+6a outputs 1.
+WhenBPRF
+6a interacts with ExpPRF-0
+F,BPRF
+6a
+, the simulation ofGi−1 (if b = 0) orGi (if b = 1) is perfect except
+if a nonce collision during the game has caused an abort, this term is bounded by QE2
+|X| . WhenBPRF
+6a interacts
+with ExpPRF-1
+F,BPRF
+6a
+, the simulation ofGb
+PRF toAi is perfect. We have the desired result.
+(Step 3.) SupposeAi is an adversary trying to distinguish gameG0
+PRF from gameG1
+PRF. Then we construct
+a reductionBIND-CPA
+6b , detailed in Fig. 38, playing the IND-CPA game that runsAi. We claim that
+AdvGPRF
+Ai (λ)≤ AdvIND-CPA
+BIND-CPA
+6b
+(λ).
+ReductionBIND-CPA
+6b generates all keys and tokens except for ki. In epoch i,BIND-CPA
+6b uses the IND-CPA
+challenger for assistance in computing SKE.E(k2
+i, N). In epoch i, the reduction forwards all nonces ofO.Enc
+andO.Upd to the IND-CPA challenger, and sets the reply in the second part of ciphertext, i.e.C2
+i . For challenge
+input ( ¯M, ¯C), suppose ¯C has the underlying nonce N1,BIND-CPA
+6b chooses nonce N0 while encrypting M, sends
+(N0, N1) to the IND-CPA challenger as challenge input, and sets the reply in the second part of the challenge
+ciphertext. The following shows howBIND-CPA
+6b simulates the responses of queries made byAi:
+Eventually,BIND-CPA
+6b sends the guess bit ofA to the IND-CPA challenger. We have the required result.
+Situation 2. Suppose the adversary knows none of the secret keys and tokens in epoch e∗∈I∗.
+Since the adversary never knows the nonce in the challenge ¯C, we do not need to worry if the adversary
+knows a token in the challenge epoch or the next epoch will make the adversary trivially win the game.
+We use the ﬁrewall technique to construct hybrid games: in hybrid i, we embed within the i-th insulated
+region. This means that to the left of thei-th insulated region the game responds with an update of the challenge
+input ciphertext and to the right of thei-th insulated region it gives an encryption of the challenge input message.
+Similarly the advantage AdvweakIND-UE-CPA
+BLMR+,A (λ) is upper bounded by (n + 1)2·| Pr[G1
+l = 1]− Pr[G0
+1 = 1]|.
+For any 1≤i≤l, we prove that
+|Pr[G1
+i = 1]− Pr[G0
+i = 1]|≤ AdvIND-CPA
+SKE,BIND-CPA
+6b
+(λ) + 2AdvPRF
+F,BPRF
+6a
+(λ) + 2QE2
+|X| .
+SupposeAi is an adversary trying to distinguish gameG0
+i from gameG1
+i in hybridi.
+As the above step 2 proof, we consider a modiﬁed hybrid game in which the ﬁrst element of ciphertexts in
+epoch fwli is a uniformly random element in Y. The difference here is that if Ai asks for encryption queries
+or challenge queries in an epoch within the i-th insulated region, the reduction will simulate these queries in
+epoch fwli and then output the updated version (updated from epoch fwli to the queried epoch). Since the
+update algorithm of BLMR+ is deterministic, this simulation is valid.
+Similarly we can prove the modiﬁed hybrid game is indistinguishable from the original hybrid game, and
+that the distinguishing advantage is upper bounded by the PRF advantage. Finally, similarly to the above step
+3 proof (the difference is the same as the difference mentioned in the former paragraph), the advantage is upper
+bounded by IND-CPA advantage of SKE. We have the following result:
+AdvweakIND-UE-CPA
+BLMR+,A (λ)≤ (n + 1)3·
+(
+AdvIND-CPA
+SKE,BIND-CPA
+6b
+(λ) + 2AdvPRF
+F,BIND-CPA
+6b
+(λ) + 2QE2
+|X|
+)
+.
+53
+ReductionBPRF
+6a playing ExpPRF-b
+F,B6a in hybrid i
+1 : do Setup
+2 : ¯M0, ¯C←AO.Enc,O.Next,O.Upd,O.Corr(λ)
+3 : phase← 1
+4 : Create ˜C with ( ¯M0, ¯C), get ˜C˜e
+5 : b ′←AO.Enc,O.Next,O.Upd,O.Corr,O.Upd˜C(˜C˜e)
+6 : ifI∗∩ (K∗∪T ∗) =∅
+7 : return ABORT
+8 : twf← 1 if
+9 : C∗∩K∗⁄=∅ or I∗∩C∗⁄=∅ or
+10 : ( ∃e∈C∗ : e∈T ∗ or e + 1∈T ∗)
+11 : if ABORT occurred or twf = 1
+12 : b ′ $
+← −{0, 1}
+13 : return b′
+14 : if b′ = b
+15 : return 0
+16 : else
+17 : return 1
+Setup(λ)
+18 : b
+$
+← −{0, 1}
+19 : ∆ 0←⊥; e← 0; phase, twf← 0
+20 : L, ˜L,C,K,T,X ←∅
+21 : forj∈{ 0, ...,n} do
+22 : k ¶
+j
+$
+← −BLMR+.KG(λ)
+23 : ∆ ⋄
+j+1
+$
+← −BLMR+.TG(kj, kj+1)
+O.Enc(M)
+24 : if e⁄=i
+25 : C e← BLMR+.Enc(ke, M)
+26 : if e =i
+27 : N
+$
+← −X\X;X←X∪{ N}
+28 : cally←O.f(N)
+29 : C 1
+i←y⊗ M / /embed
+30 : C 2
+i← SKE.E(k2
+i, N)
+31 : C i← (C1
+i, C2
+i )
+32 : L←L∪{ (·, Ce, e; N, M)}
+33 : return Ce
+O.Next
+34 : e← e + 1
+O.Upd(Ce-1)
+35 : if (·, Ce-1, e-1; N, M)⁄∈L or (e =i and N∈X)
+36 : return ⊥
+37 : if e⁄=i,i + 1
+38 : C e← BLMR+.Upd(∆e, Ce-1)
+39 : if e =i + 1
+40 : C e← (F(k1
+e, N)⊗ M, SKE.E(k2
+e, N))
+41 : if e =i
+42 : X←X∪{ N}
+43 : cally←O.f(N); C 1
+i←y⊗ M / /embed
+44 : C 2
+i← SKE.E(k2
+i, N)
+45 : C i← (C1
+i, C2
+i )
+46 : L←L∪{ (·, Ce, e; N, M)}
+47 : return Ce
+O.Corr(inp, ˆe)
+48 : if ˆe> e or e =i or (e =i+1 and inp = token)
+49 : return ⊥
+50 : if inp = key
+51 : K←K∪{ ˆe}
+52 : return kˆe
+53 : if inp = token
+54 : T ←T ∪{ˆe}
+55 : return ∆ˆe
+Create ˜C with ( ¯M0, ¯C)
+56 : if (·, ¯C, ˜e− 1; N1, ¯M1)⁄∈L or N1∈X
+57 : return ⊥
+58 : N 0
+$
+← −X\(X∪{ N1}); X←X∪{ N0, N1}
+59 : callyb←O.f(Nb); ˜C1
+i←yb⊗ ¯Mb / /embed
+60 : ˜C2
+i← SKE.E(k2
+i, Nb)
+61 : ˜Ci← (˜C1
+i, ˜C2
+i )
+62 : forj∈{ 0, ...,i− 1} do
+63 : ˜Cj← (F(k1
+j, N1)⊗ ¯M1, SKE.E(k2
+j, N1)) / /left
+64 : forj∈{i + 1, ...,n} do
+65 : ˜Cj← (F(k1
+j, N0)⊗ ¯M0, SKE.E(k2
+j, N0)) / /right
+66 : ˜L←∪ n
+j=0{(˜Cj,j )}
+67 : return ˜C˜e
+O.Upd ˜C
+69 : C←C∪{ e}
+70 : ﬁnd (˜Ce, e)∈ ˜L
+71 : return ˜Ce
+Figure 37: ReductionBPRF
+6a for proof of Proposition 6. Recall that in the PRF game in Deﬁnition 3, the oracle
+O.f responds to query input N with either F(k, N) or a random value. On line 22, ¶ indicates k1
+i are skipped
+in the generation; on line 23,⋄ indicates ∆i and ∆i+1 are skipped in the generation.
+54
+ReductionBIND-CPA
+6b playing ExpIND-CPA
+SKE,B6b in hybrid i
+1 : do Setup
+2 : ¯M0, ¯C←AO.Enc,O.Next,O.Upd,O.Corr(λ)
+3 : phase← 1
+4 : Create ˜C with ( ¯M0, ¯C), get ˜C˜e
+5 : b ′←AO.Enc,O.Next,O.Upd,O.Corr,O.Upd˜C(˜C˜e)
+6 : if ifI∗∩ (K∗∪T ∗)⁄=∅
+7 : return ABORT
+8 : twf← 1if
+9 : C∗∩K∗⁄=∅ or I∗∩C∗⁄=∅ or
+10 : ( ∃e∈C∗ : e∈T ∗ or e + 1∈T ∗)
+11 : if ABORT occurred or twf = 1
+12 : b ′ $
+← −{0, 1}
+13 : return b′
+14 : if b′ = b
+15 : return 0
+16 : else
+17 : return 1
+Setup(λ)
+18 : b
+$
+← −{0, 1}
+19 : ∆ 0←⊥; e← 0; phase, twf← 0
+20 : L, ˜L,C,K,T,X ←∅
+21 : forj∈{ 0, ...,n} do
+22 : k ⊛
+j
+$
+← −BLMR+.KG(λ)
+23 : ∆ ⋄
+j+1
+$
+← −BLMR+.TG(kj, kj+1)
+O.Enc(M)
+24 : if e⁄=i
+25 : C e← BLMR+.Enc(ke, M)
+26 : if e =i
+27 : N
+$
+← −X\X;X←X∪{ N}
+28 : C 1
+i
+$
+← −Y
+29 : cally←O.E(N)
+30 : C 2
+i←y / /embed
+31 : C i← (C1
+i, C2
+i )
+32 : L←L∪{ (·, Ce, e; N, M)}
+33 : return Ce
+O.Next
+34 : e← e + 1
+O.Upd(Ce-1)
+35 : if (·, Ce-1, e-1; N, M)⁄∈L or (e =i and N∈X)
+36 : return ⊥
+37 : if e⁄=i,i + 1
+38 : C e← BLMR+.Upd(∆e, Ce-1)
+39 : if e =i + 1
+40 : C e← (F(k1
+e, N)⊗ M, SKE.E(k2
+e, N))
+41 : if e =i
+42 : X←X∪{ N}; C 1
+i
+$
+← −Y
+43 : cally←O.E(N); C 2
+i←y / /embed
+44 : C i← (C1
+i, C2
+i )
+45 : L←L∪{ (·, Ce, e; N, M)}
+46 : return Ce
+O.Corr(inp, ˆe)
+47 : if ˆe> e or e =i or (e =i+1 and inp = token)
+48 : return ⊥
+49 : if inp = key
+50 : K←K∪{ ˆe}
+51 : return kˆe
+52 : if inp = token
+53 : T ←T ∪{ˆe}
+54 : return ∆ˆe
+Create ˜C with ( ¯M0, ¯C)
+55 : if (·, ¯C, ˜e− 1; N1, ¯M1)⁄∈L or N1∈X
+56 : return ⊥
+57 : N 0
+$
+← −X\(X∪{ N1}); X←X∪{ N0, N1}
+58 : ˜C1
+i
+$
+← −Y
+59 : call CHALL with (N0, N1), get ˜C2
+i / /embed
+60 : ˜Ci← (˜C1
+i, ˜C2
+i )
+61 : forj∈{ 0, ...,i− 1} do
+62 : ˜Cj← (F(k1
+j, N1)⊗ ¯M1, SKE.E(k2
+j, N1)) / /left
+63 : forj∈{i + 1, ...,n} do
+64 : ˜Cj← (F(k1
+j, N0)⊗ ¯M0, SKE.E(k2
+j, N0)) / /right
+65 : ˜L←∪ n
+j=0{(˜Cj,j )}
+66 : return ˜C˜e
+O.Upd ˜C
+67 : C←C∪{ e}
+68 : ﬁnd(˜Ce, e)∈ ˜L
+69 : return ˜Ce
+Figure 38: Reduction BIND-CPA
+6b for proof of Proposition 6; the simulation is almost the same as BPRF
+6a except
+for the underlined simulations. Recall that in the IND-CPA game in Deﬁnition 14, the encryption oracle O.E
+replies to input N with SKE.Enc(k, N). On line 22, ⊛ indicates ki is skipped in the generation; on line 23, ⋄
+indicates ∆i and ∆i+1 are skipped in the generation.
+55
+C The RISE Scheme of Lehmann and Tackmann
+In this section we discuss the Elgamal-based updatable encryption scheme RISE, developed by Lehmann and
+Tackmann [LT18a] and given in Fig. 39. LT18 showed10 that RISE is randIND-ENC and randIND-UPD-CPA,
+under DDH. KLR19 observed that for RISE, knowledge of an update token allows the storage host to create
+arbitrary ciphertexts for messages of its choice: this is a very undesirable feature for an UE scheme, and is not
+possible for SHINE. This emphasizes the importance of ciphertext integrity for UE schemes.
+RISE.KG(λ)
+1 : x
+$
+← −Z∗
+q
+2 : k e← (x,g x)
+3 : return ke
+RISE.TG(ke, ke+1)
+4 : parse ke = (x,y )
+5 : parse ke+1 = (x′,y′)
+6 : ∆ e+1← (x′
+x,y′)
+7 : return ∆e+1
+RISE.Enc(ke, M)
+8 : parse ke = (x,y )
+9 : r
+$
+← −Zq
+10 : C e← (yr,g r· M)
+11 : return Ce
+RISE.Dec(ke, Ce)
+12 : parse ke = (x,y )
+13 : parse Ce = (C1, C2)
+14 : M ′← C2· C−1/x
+1
+15 : return M′
+RISE.Upd(∆e+1, Ce)
+16 : parse ∆e+1 = (∆,y′)
+17 : parse Ce = (C1, C2)
+18 : r′ $
+← −Zq
+19 : C ′
+1← C∆
+1 ·y′r′
+20 : C ′
+2← C2·gr′
+21 : C e+1← (C′
+1, C′
+2)
+22 : return Ce+1
+Figure 39: Updatable encryption scheme RISE [LT18a] forλ-bit primeq.
+C.1 RISE is randIND-UE-CPA Secure
+We show thatRISE is randIND-UE-CPA under DDH. First, we adapt (an extended version of) the Oracle-DDH
+experiment to the epoch-based corruption model found in updatable encryption, in a way that ensures that it
+still reduces to DDH. In this way, we lift a lot of the bookkeeping and complexity. Then, the reduction from
+randIND-UE-CPA to this oracle-based game is straightforward. We believe that this two-step proof strategy
+may be useful for proving security of other UE schemes, under any of the security notions discussed so far.
+Oracle-Decision-Difﬁe Hellman for RISE. We give an experimentO-DDHRISE, where each exponent repre-
+sents an epoch key, and corruption of keys and tokens is represented: the game allows the adversary to acquire
+the difference of two exponents in the form ti = ei
+ei−1
+. In each ‘epoch’ the adversary can possibly ask for a
+challenge viaO.Chall, which returns either a ‘real’ DDH tuple, with the epoch key deﬁned as one of the expo-
+nents, or a random tuple. The game is given in Fig. 40. Just as in the games for UE, the challenger keeps track
+of the epochs in which the adversary has access to ‘updates’ of the ‘challenge’ (viaCL∗), and access to the keys
+(exponents, via EL∗). If these overlap then the adversary can trivially extract from the challenge value whether
+it is ‘real’ or ‘random’ and win, so this is of course ruled out. The syntax also follows the UE games in the sense
+that once the adversary asks for a challenge, it can only ask for ‘later’ challenges (i.e. with a higher index) from
+this oracle – it can of course move this challenge ‘backwards’ into earlier epochs/indices by applying ‘token’t.
+Deﬁnition 15. Fix a cyclic group G of prime order q with generator g. The advantage of an algorithm A
+solving the Oracle-Decision Difﬁe-Hellman for RISE (O-DDHRISE) problem for G andg is
+AdvO-DDHRISE
+G,A =
+⏐⏐⏐Pr[ExpO-DDHRISE-1
+G,A (λ) = 1]− Pr[ExpO-DDHRISE-0
+G,A (λ) = 1]
+⏐⏐⏐
+where the experiment ExpO-DDHRISE-b
+G,A is given in Fig. 40.
+10On 19th December 2019, the authors updated the full version of their paper [LT18b] to include a new proof of randIND-ENC
+security, ﬁxing a ﬂaw in the prior proof methodology.
+56
+ExpO-DDHRISE-b
+G,A (λ)
+1 : phase,i∗← 0
+2 : EL∗, CL∗←∅
+3 : if b = 1
+4 : w1, ...,w n
+$
+← −Z∗
+q
+5 : else
+6 : w1, ...,w n← 0
+7 : e1, ..., en
+$
+← −Z∗
+q
+8 : x1, ...,x n
+$
+← −Z∗
+q
+9 : fori∈{ 0, ...n} do
+10 : si←gei
+11 : Xi←gxi
+12 : b ′←AO.Open,O.Difr,O.Chall(g,{s1, ..., sn})
+13 : if EL∗∩ CL∗⁄=∅
+14 : b ′ $
+← −{0, 1}
+15 : return b′
+O.Open(i)
+16 : update EL∗
+17 : return ei
+O.Difr(i)
+18 : ti← ei
+ei−1
+19 : update EL∗, CL∗
+O.Chall(i)
+20 : if phase = 1 andi<i ∗
+21 : return ⊥
+22 : CL∗← CL∗∪{i}
+23 : Zi← sxi
+i ·gwi
+24 : if phase = 0
+25 : i∗←i
+26 : phase← 1
+27 : return (Xi,Z i)
+Figure 40: O-DDHRISE experiment for G of orderq (λ-bit prime) and generatorg.
+Proposition 7. Let G be a group of order q (aλ-bit prime) with generator g, and let RISE be the updatable
+encryption scheme described in Fig. 39. For any randIND-UE-CPA adversaryA against RISE, there exists an
+adversaryB7 against DDH such that
+AdvrandIND-UE-CPA
+RISE,A (λ) = 2(n + 1)3· AdvDDH
+G,B7(λ).
+This theorem is proven by Lemmas 7.1 and 7.2.
+Lemma 7.1. Let G be a group of order q (a λ-bit prime) with generator g. For any adversary A against
+O-DDHRISE, there exists an adversaryB7.1 against DDH such that
+AdvO-DDHRISE
+G,A (λ) = (n + 1)3· AdvDDH
+G,B7.1(λ),
+wheren + 1 is the number of exponents in theO-DDHRISE game.
+Proof. We use a sequence of game hops and a hybrid argument. Deﬁne gameGb
+i as ExpO-DDHRISE-b
+G,A except for
+O.Chall: if called in index j, ifj <i then return a ‘real’ sample (withwj = 0), and ifj >i return a ‘random
+sample’ (wj
+$← −Z∗
+q). ThusG1
+0 is ExpO-DDHRISE-1
+G , i.e. all challenges result in ‘random’ DDH tuples, andG0
+n is
+ExpO-DDHRISE-0
+G , i.e. all challenges result in ‘real’ DDH tuples. Thus distinguishingG1
+0 fromG0
+n is the task of
+distinguishing ExpO-DDHRISE-1
+G,A from ExpO-DDHRISE-0
+G,A for adversaryA.
+Notice that all queries inG0
+i−1 andG1
+i have the equal responses (For j≤ i− 1, returns a real sample. For
+j >i− 1, returns a random sample). We have AdvO-DDHRISE
+G,A (λ) =∑n
+i=0|Pr[G1
+i = 1]− Pr[G0
+i = 1]|. Then
+we prove that|Pr[G1
+i = 1]− Pr[G0
+i = 1]|≤ (n + 1)2· AdvDDH
+G, (λ) for anyi.
+LetAi be an adversary trying to distinguish G1
+i fromG0
+i . For all queries concerning epochs other than i
+the responses will be equal in either game, so we assume thatAi asks for a challenge ciphertext in epochi and
+this is where we will embed in our reduction. We construct a reductionB7.1, detailed in Fig. 41, that is playing
+the standard DDH game (Fig. 2) and runsAi. This reduction guesses the locations of the ﬁrewalls around the
+challenge query: ifAi adds any of the epochs within this insulated region to itsEL∗ list then the reduction fails.
+fwl and fwr could take any value in{0, ...,n}, so this loss is upper bounded by (n + 1)2.
+57
+ReductionB7.1 playing ExpDDH-b
+G,B7.1(λ) in hybridi
+1 : receive (g,X,Y,Z )
+2 : fwl, fwr
+$
+← −{0, ...,n}
+3 : wi+1, ...,w n
+$
+← −Z∗
+q
+4 : w0, ...,w i−1← 0
+5 : si←Y
+6 : forj∈{ 0, ...,i -1}∪{ i+1, ...,n} do
+7 : xj
+$
+← −Z∗
+q;Xj←gxj
+8 : forj∈{ 0, ..., fwl-1}∪{ fwr+1, ...,n} do
+9 : ej
+$
+← −Z∗
+q; tj← ej
+ej-1
+†
+; sj←gej
+10 : forj∈{ fwl+1, ..., fwr} do
+11 : tj
+$
+← −Z∗
+q
+12 : forj∈{ fwl, ...,i -1} do
+13 : sj←Y− ∏i
+k=j+1 tk
+14 : forj∈{i+1, ..., fwr} do
+15 : sj←Y
+∏j
+k=i+1 tk
+16 : b ′←AO.Open,O.Difr,O.Chall
+i (g,{s1, ..., sn})
+17 : if ABORT occurred then
+18 : return b′ $
+← −{0, 1}
+19 : return b′
+O.Open(j)
+20 : if j∈{ fwl, ..., fwr}
+21 : return ABORT
+22 : return ei
+O.Difr(j)
+23 : if j∈{ fwl, fwr+1}
+24 : return ABORT
+25 : return tj
+O.Chall(j)
+26 : if j =i
+27 : Xj←X
+28 : Zj←Z
+29 : else
+30 : Zj← sj
+xjgwj
+31 : return (Xj,Z j)
+Figure 41: Reduction B7.1 for proof of Lemma 7.1. On line 9, † indicates t0 and tfwr+1 are skipped in the
+computation.
+For all challenge queries smaller than i the reduction needs to faithfully respond with a ‘real’ tuple, that is
+the exponent of Zj is the product of the exponent used in sj and the exponent in Xj. These queries must still
+be consistent with each other, which is why even though the reduction is free to choosexj it must compute the
+correct value of sj. For challenge queries larger thani the reduction produces a random value.
+Note that Ai will have its own CL∗ and EL∗ lists and B7.1 will simulate these, however we omit this
+calculation for readability.
+IfB7.1 is playing ExpDDH-1
+G,B7.1 then it receives a random tuple from its challenger and thus provides a random
+response toO.Chall(i), creating a perfect simulation ofG1
+i toAi. IfB7.1 is playing ExpDDH-0
+G,B7.1 then its tuple is
+real, providing a perfect simulation ofG0
+i . We have the required result.
+Lemma 7.2. Let G be a group of order q (a λ-bit prime) with generator g, and let RISE be the updatable
+encryption scheme described in Fig. 39. For any randIND-UE-CPA adversaryA against RISE, there exists an
+adversaryB7.2 againstO-DDHRISE such that
+AdvrandIND-UE-CPA
+RISE,A (λ) = 2· AdvO-DDHRISE
+G,B7.2 (λ).
+Proof. The reductionB7.2 is given in Fig. 42. The reduction B7.2 is playingO-DDHRISE game and runsA.
+B7.2 ﬂips a coin b, and simulates ExprandIND-UE-CPA-b
+RISE,A by interacting with its ownO-DDHRISE challenger.
+To simulate updated non-challenge ciphertexts (i.e. respond toO.Upd queries),B7.2 must track the under-
+lying messages for these encryptions so that it can generate valid ‘fresh’ encryptions using the ‘public key’
+values{s1, ..., sn} received from itsO-DDHRISE challenger. Since updated non-challenge ciphertexts are of
+the form Ce = (sr
+e,g r· M), wherer is a fresh random value, the si values allowB7.2 to successfully simulate
+updated non-challenge ciphertexts.
+58
+ReductionB7.2 playing ExpO-DDHRISE
+G,B7.2
+1 : receiveg,{s1, ..., sn}
+2 : e← 0; phase← 0;L←∅
+3 : ¯M0, C←AO.Enc,O.Next,O.Upd,O.Corr(λ)
+4 : phase← 1
+5 : if (·, C = (C1, C2), ˜e− 1; ¯M1)⁄∈L
+6 : return ⊥
+7 : call (X˜e,Z ˜e)←O.Chall(˜e)
+8 : b
+$
+← −{0, 1}
+9 : ˜C← (Z˜e,X ˜e· ¯Mb) / /embed
+10 : b ′←AO.Enc,O.Next,O.Upd,O.Corr,O.Upd˜C(˜C)
+11 : if b′ = b
+12 : return 0
+13 : else
+14 : return 1
+O.Enc(M)
+15 : r
+$
+← −Z∗
+q
+16 : C e← (sr
+e,g r· M)
+17 : L←L∪{ (·, Ce,·; M)}
+18 : return Ce
+O.Next
+19 : e← e + 1
+O.Upd(Ce−1)
+20 : if (·, Ce−1,·; M)⁄∈L
+21 : return ⊥
+22 : r
+$
+← −Z∗
+q
+23 : C e← (sr
+e,g r· M)
+24 : L←L∪{ (·, Ce,·; M)}
+25 : return Ce
+O.Corr(inp, ˆe)
+26 : if ˆe> e
+27 : return ⊥
+28 : if inp = key
+29 : call eˆe←O.Open(ˆe)
+30 : k ˆe← (eˆe,g eˆe)
+31 : return kˆe
+32 : if inp = token
+33 : call tˆe←O.Difr(ˆe)
+34 : ∆ ˆe← (tˆe, sˆe)
+35 : return ∆ˆe
+O.Upd ˜C
+36 : call (Xe,Z e)←O.Chall(e)
+37 : ˜C← (Ze,X e· ¯Mb)
+38 : return ˜Ce
+Figure 42: ReductionB7.2 for proof of Lemma 7.2.
+To simulate challenge ciphertext (i.e. respond to challenge query or O.Upd ˜C),B7.2 must embed using
+its own challenge. Recall that in the O-DDHRISE experiment in Fig. 40, a call to O.Chall(i) will result in
+a response Zi = gk˜exi or gk˜exi+wi, and Xi = gxi. When B7.2 receives a challenge query ( ¯M0, C) (where
+C = ( gr2k˜e−1,g r2 ¯M1) for some ¯M1) fromA,B7.2 tries to simulate RISE.Enc(k˜e, ¯M0) = ( gr1k˜e,g r1 ¯M0) or
+RISE.Upd(∆˜e−1, C) = (C ∆˜e−1
+1 gk˜er3, C2gr3) = (gk˜e(r2+r3),g r2+r3 ¯M1), wherer1,r 3 are fresh random values.
+B7.2 will embedZ˜e to the ﬁrst part of the challenge ciphertext and embedX˜e to the second part of the challenge
+ciphertext, i.e. ˜C˜e = (Z˜e,X ˜e· ¯Mb). Similarly, B7.2 can simulate the response of O.Upd ˜C using the same
+approach.
+Eventually,B7.2 receives the output bit b′ fromAi. If b′ = b , then B7.2 returns 0 to its O-DDHRISE
+challenger, otherwise,B7.2 returns 1.
+IfB7.2 interacting with ExpO-DDHRISE-0
+G,B7.2 , then it perfectly simulates ExprandIND-UE-CPA-b
+RISE,A toA. If B7.2
+interacting with ExpO-DDHRISE-1
+G,B7.2 , then it wins with probability 1/2. After some computation similar to that in
+the proof of Theorem 2.3 we have the desired result.
+59

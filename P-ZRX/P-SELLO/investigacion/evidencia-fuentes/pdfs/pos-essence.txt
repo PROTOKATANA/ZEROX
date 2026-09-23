@@ -1,0 +1,1039 @@
+Proofs of Space: When Space is of the Essence
+Giuseppe Ateniese1,2, Ilario Bonacina 1, Antonio Faonio1, and Nicola Galesi 1
+1 Sapienza - University of Rome, Italy
+{ateniese,bonacina,faonio,galesi}@di.uniroma1.it
+2 Johns Hopkins University, USA
+Abstract. Proofs of computational eﬀort were devised to control denial of service attacks. Dwork and
+Naor (CRYPTO ’92), for example, proposed to use such proofs to discourage spam. The idea is to couple
+each email message with a proof of work that demonstrates the sender performed some computational
+task. A proof of work can be either CPU-bound or memory-bound. In a CPU-bound proof, the prover
+must compute a CPU-intensive function that is easy to check by the veriﬁer. A memory-bound proof,
+instead, forces the prover to access the main memory several times, eﬀectively replacing CPU cycles
+with memory accesses.
+In this paper we put forward a new concept dubbed proof of space . To compute such a proof, the
+prover must use a speciﬁed amount of space, i.e., we are not interested in the number of accesses to
+the main memory (as in memory-bound proof of work) but rather on the amount of actual memory
+the prover must employ to compute the proof. We give a complete and detailed algorithmic description
+of our model. We develop a comprehensive theoretical analysis which uses combinatorial tools from
+Complexity Theory (such as pebbling games) which are essential in studying space lower bounds.
+Keywords: Space Complexity, Proof of Work, Pebbling Game, Random Oracle Model.
+1 Introduction
+Space has a special meaning in Computer Science. It refers to the number of cells of the working tape used
+by a Turing Machine (TM). While a TM computes a function, it will make several steps (relevant to time
+complexity) and use a certain number of tape cells (relevant to space complexity).
+In [14], Dwork and Naor proposed to employ proof of work (PoW) to discourage spam and, in general,
+to hinder denial of service attacks. Before any action (such as sending an email), the prover must perform
+some work and generate a proof of it that can be eﬃciently veriﬁed. Proofs of work are currently being
+used to implement a publicly veriﬁable ledger for Bitcoin, where transactions are registered and veriﬁed by
+a community of users to avoid the double-spending problem [28]. The work performed by the prover can be
+CPU-bound, in which the work represents the number of steps made by a TM, or memory-bound, in which
+the work represents the times a TM access the working tape. The motivation behind memory-bound PoW
+is that, while CPU speed may diﬀer signiﬁcantly among distinct platforms, memory latencies vary much less
+across machines and may prove to be more equitable and egalitarian. We stress that memory-bound function
+complexity measures the number of memory accesses and does not take into account the actual amount of
+memory employed. That is, a TM may read and mark a single cell several times to reach a certain complexity
+level but it will still end up using only one cell.
+In this work we deﬁne the notion of Proof of Space (PoSpace). PoSpace forces the prover to use at least a
+speciﬁed amount of memory. This means, for instance, that a TM must now use a predetermined number of
+distinct tape cells to be able to respond to a challenge. We will show that our PoSpace construction is also a
+memory-bound PoW under the deﬁnition provided in [13, 15], while in general a PoW cannot be a PoSpace
+under our deﬁnition. The state of the art memory-bound PoW was described in [15] by Dwork, Goldberg,
+and Naor. Their scheme requires both the prover and the veriﬁer to store a large table T but they devised
+ways to mitigate this problem via either hash trees or public-key signatures. We view PoSpace as a valid
+alternative to various ﬂavors of PoWs. In PoSpace the spotlight is turned on the amount of space rather than
+on CPU cycles or memory accesses as in PoWs. In addition, PoSpace solves certain problems where PoW is
+not applicable. For instance, we believe PoSpace can be employed in forensic analysis or device attestation
+to conﬁrm remotely that an embedded device has been successfully wiped. That is, a remote device could
+be instructed to respond to a wipe command with PoSpace as evidence that its functional memory is now
+overwritten (cf. [30]).
+Straw Man Solutions. Memory-bound functions were ﬁrst introduced by Abadi et al. [1]. In the main con-
+struction of memory-bound PoW given in [13], both the prover and the veriﬁer share a large random table
+T . The prover must compute a function by making several memory accesses to uniformly random positions
+in T . Through a proper tuning of the parameters, it is also possible to force the prover to reserve a speciﬁc
+amount of memory. In another construction, the authors of [13] show that the veriﬁer does not have to store
+T . The idea is to sign all pairs ( i,T [i]) and then challenge the prover on 𝓁 positions of T . The prover will
+return the 𝓁 valuesT [i] along with an aggregate signature that can be checked by the veriﬁer to ensure the
+prover is holding the table T .
+We ﬁrst remark that it is possible to harness recent advances in proof of storage schemes, such as
+Provable Data Possession (PDP) [4] and (compact) Proof of Retrievability (POR) [33], to reduce the message
+complexity fromO(𝓁) to essentially constant. This solution improves upon the one in [13] and, as long as the
+initialization phase is performed only once, would meet our eﬃciency requirements for PoSpace. However,
+proof of storage does not satisfy our deﬁnition of PoSpace since the running time of the veriﬁer depends on
+the size ofT . The only way to avoid linear dependency is to run a PDP-based scheme with spot checking [4],
+but then the prover either must use more space than required or will not access all the memory locations.
+Intuitively, the reason why a solution based on proof of storage will not work rests upon the interpretation
+of what proof of space really means. Proof of storage applied to our context satisﬁes the notion that “the
+prover can access space”. PoSpace instead captures the stronger notion that “the prover can handle space”,
+i.e., the prover possesses, controls, and manipulates space directly. In particular, we distinguish between a
+prover that can only read memory and a prover that can read and write memory. This is important because,
+among other things, write operations cannot be parallelized within classical computer architectures. We will
+provide a formal deﬁnition later and make this intuition rigorous.
+We also remark that the adversarial model considered in [1,13] contemplates the existence of a small but
+fast cache memory that must be saturated to force the prover to dispense with the cache and use traditional
+RAM memory. Thus, the constructions in [1, 13, 15] do provide a form of proof of space where the space
+coincides with the cache memory. But, as for proof-of-storage schemes, these schemes satisfy the weaker
+notion of PoSpace where the prover can only read memory.
+Other Related Work. A proof of work is also known as a cryptographic puzzle in the computer security
+literature. Puzzles were devised to improve on the proposal by Back [6] and employed to thwart denial of
+service attacks. In particular, it is important to make them hard to precompute (see [23] and references
+therein). Waters et al. [36] suggest to outsource the creation of puzzles to an external secure entity. Abliz
+and Tznati [2] introduce the concept of network-bound puzzles where clients collect tokens from remote
+servers before querying the service provider. They argue that network latency provides a good solution to
+the resource disparity problem.
+All solutions above deal with proof of eﬀort and cannot be adapted to prove possession of space in the
+way it is meant and deﬁned in this paper.
+Litecoin (litecoin.org) is a variant of Bitcoin that employs scrypt [29] to certify a public ledger. scrypt
+is deﬁned as a sequential memory-hard function and originally designed as a key derivation function, but it
+is used as a proof of eﬀort in litecoin to hinder the use of specialized hardware. Technically, scrypt is not
+a memory-bound function as deﬁned in [1] since no lower bound on the memory used by the function can
+be guaranteed. Thus, it is not even a PoSpace. We also note it requires both the prover and the veriﬁer to
+dedicate a possibly large amount of memory, while ideally only the prover should reserve and use actual
+memory (as in our construction to be presented later).
+Dziembowski et al. [19] have independently suggested a notion of proof of space. Their original construc-
+tion generalizes the hash-based PoW of Cash [6] and does not employ the pebbling framework of [15] (cf.
+Appendix A of [16]). A major overhaul version of their paper later appeared on the IACR Crypto Eprint
+2
+repository [16], along with ours [3]. Their new version does use pebbling and adopts techniques similar to
+ours.
+However, there are two main diﬀerences between our work and [16] that make their work quite compelling:
+1. The deﬁnition of proof of space in [16] is stronger in that it allows a two-stage protocol. The ﬁrst stage
+can be executed once while the second stage can potentially be executed many times after the ﬁrst.
+There are several applications that would beneﬁt from this two-stage notion (see for example the Gmail
+scenario described in [16]). At the same time, however, this stronger notion is achieved in a more idealized
+model than the Random Oracle Model. To emphasize the diﬀerences between these two notions, we will
+often refer to ours as a one-stage PoSpace.
+2. In [16] the authors provide two main constructions. The one that can be compared with our work achieves
+better pebbling complexity (N/(log(N) vs. N/(log(N)·k)). Namely, they are able to remove the extra
+k (a security parameter) through a clever technique.
+The pebbling framework introduced in [15] has been used successfully in many other contexts (see for
+example [16–18, 24, 34]). Dziembowski et al. [17] built a leakage resilient key evolution scheme based on the
+pebbling framework. Their model allows an internal memory-bounded adversary that can control the update
+operation and leak bounded amounts of information. Smith and Zhang obtain a more eﬃcient scheme [34],
+speciﬁcally, their update operation runs in time quasilinear in the key length, rather than quadratic. The
+key-evolution scheme can be adapted to obtain a proof of space with eﬃcient communication complexity but
+the space complexity of the veriﬁer would not satisfy the eﬃciency constraint of PoSpace.
+In a recent paper [24], Karvelas and Kiayias provide two eﬃcient constructions for Proof of Secure Erasure
+(PoSE) as introduced by Perito and Tsudik [30]. Informally, in PoSE the prover must convince a veriﬁer
+that a certain amount of memory has been erased. Both schemes in [24] are ingenious and one of them uses
+the pebbling framework. PoSE and PoSpace are closely related notions but have diﬀerent requirements as
+stated in [24]. In addition, in PoSpace the prover must show that he can access (read/write) memory while
+in PoSE, intuitively, there should be the extra and necessary requirement that the memory contents before
+and after the protocol execution are uncorrelated.
+General ideas behind our protocol. We cast PoSpace in the context of delegation of computation, where
+a delegator outsources to a worker the computation of a function on a certain input. Securely delegating
+computation is a very active area [10, 11, 20, 22] thanks also to the popularity of cloud computing where
+weak devices use the cloud to compute heavy functions. In the case of PoSpace, a function f is ﬁrst selected
+satisfying the property that there exists a space lower bound for any TM computing it. Then, the veriﬁer
+chooses a random input x and delegates to the prover the computation of f(x).
+Speciﬁcally, we will turn to the class of functions derived from the“graph labeling problem” already used in
+cryptography (see for example [15,17,18]). Important tools in delegation of computation are interactive proof
+(and argument) systems. The delegation problem, as described in [27], can be solved as follows: The worker
+computes y := f(x) and proves using an interactive proof system that indeed y = f(x). While interactive
+proofs with statistical soundness and non-trivial savings in veriﬁcation time are unlikely to exist [8, 9, 21],
+Kilian showed [25] that proof systems for NP languages with only computational soundness (i.e., argument
+systems [7]) and succinctness 3 do exist. The construction in [25] relies on Merkle Trees and PCP proofs.
+However, in the context of PoSpace, the PCP machinery is an overkill. In fact, the prover does not have to
+prove the statement f(x) = y, but only that a space-consuming computation was carried out. Therefore,
+we replace the PCP veriﬁcation with an ad-hoc scheme that results in a very eﬃcient overall construction
+(while PCP-based constructions are notoriously impractical).
+Our Contributions. We introduce a formal deﬁnition of Proof of Space ( PoSpace Deﬁnition 2) capturing
+the intuitive idea of proving to be able to handle (read / write) at least a speciﬁed amount of space. We
+provide two PoSpace protocols in the ROM. In addition, we provide a weaker form of PoSpace (wPoSpace)
+3 I.e., the total amount of communication and the veriﬁcation time are both less than their respective values required
+to transmit and check the NP-witness.
+3
+and prove that it is indeed a separate notion. Most of previous work on proof of storage [4, 5, 33] and on
+memory-bound PoW, as deﬁned in [1, 13, 15], can somehow be adapted to meet this weaker deﬁnition but
+we will not elaborate on this any further in this paper.
+Structure of the paper. Section 2 contains some preliminary deﬁnitions. Section 3 contains the formal deﬁ-
+nition of PoSpace and provide two PoSpace protocols. Section 5 contains the deﬁnition of a weak variant of
+PoSpace that captures read-only provers and a separation result between PoSpace and this weaker variant.
+Open Problems. It is not clear whether in general PoSpace implies the standard deﬁnition of PoW in the
+sense of [14] (i.e., whether PoSpace is also a PoW). The main obstacle to proving a positive result consists in
+showing non-amortizability. Roughly speaking, non-amortizability means that the “price” of computing the
+function for l diﬀerent inputs is comparable to l times the “price” of computing the same function once. In
+the context of PoWs, the “price” is measured in terms of computational time. A PoSpace prover for space
+S requires a computational time proportional to S, thus we would like to reduce an adversary for l diﬀerent
+protocol executions to an adversary for a single execution which spends less than S computational time.
+The point is that in order to carry out l executions, the prover needs S space and we need to ensure that
+he spends l×S computational time. But space is reusable and it may well happen that something already
+computed for one instance is reused to compute the proof for another instance. Nevertheless, our second
+construction does satisfy the deﬁnition of PoW. This is simply because we resort to the Random Oracle to
+ensure that two instances of the protocol are uncorrelated.
+2 Notations and Preliminary Deﬁnitions
+Graph Notation. Given a directed acyclic graph (DAG) G, the set of successors and predecessors of v in G
+are respectively Γ +(v) and Γ−(v). We will implicitly assume a topological ordering on its vertex set and a
+boolean encoding of the vertices respecting that ordering. If Γ +(v) =∅ then v is an output-node and T(G)
+is the set of all output-nodes of G. Analogously if Γ−(v) =∅ then v is an input-node and S(G) is the set of
+all input-nodes of G.
+Sampling, Interactive Execution, and Space. LetA be a probabilistic TM. We write y←A (x) to denote y
+sampled from the output of A on input x. Moreover, given σ∈{ 0, 1}∗, we write y :=A(x;σ) to denote the
+output ofA on inputx ﬁxing the random coins to beσ. We write ppt for the class of probabilistic polynomial
+time algorithms. LetA,B be two probabilistic interactive TMs. An interactive joint execution betweenA,B
+on common input x is speciﬁed via the next message function notation: let b1←B (x),ai←A (x,b 1,...,b i),
+andbi+1←B (x,a 1,...,a i), then⟨A,B⟩ (x) denotes a joint execution ofA andB on common input x. If the
+sequence of messages exchanged is ( b1,a 1,...,b k,ak,bk+1) we say that k is the number of rounds of that
+joint execution and we denote with ⟨A,B⟩ (x) = bk+1 the last output of B in that joint execution of A and
+B on common input x.
+With Space(A,x ), we denote the maximal amount of space used by the deterministic TM A on input x
+without taking into account the length of the input and output. More formally, we say that A(x) has space
+s (or Space(A,x ) = s) if and only if at most s locations on A’s work tapes (excluding the input and the
+output tapes) are ever written by A’s head during its computation on x. In the case of probabilistic TM A,
+the function Space(A,x ) is a random variable that depends on A’s randomness.
+Similarly, given two interactive TMs A andB, we can deﬁne the space occupied by A during a joint
+execution on common input x as follows. Let ( b1,a 1,...,b k,ak,bk+1) the sequence of messages exchanged
+during⟨A,B⟩ (x), then:
+SpaceA(⟨A,B⟩,x ) := max
+i=1,...,n
+{Space (A,x,b 1,...,b i))}
+As before, if A andB are probabilistic interactive TM then the function Space A(⟨A,B⟩,x ) is a random
+variable that depends on the randomness of both A andB. For simplicity, when the inputs ofA (or⟨A,B⟩)
+are clear from the context, we write Space(A) (or SpaceA (⟨A,B⟩)).
+4
+Merkle Trees. Merkle Trees ( MT) are classical tools in cryptography. A MT enables a party to succinctly
+commit itself to a string l = (l1,...,l n) with li∈{ 0, 1}k.
+The term “succinctly” here means that the MT-commitment has sizek which is independent with respect
+to the size ofl. In a later stage, when a party opens the MT-commitment, it is guaranteed that the “opening”
+can yield only the string l committed before (the binding property). Moreover l can be succinctly opened
+location-by-location: the party can open li for any i giving the certiﬁcate attesting the value of li. Here we
+use the term succinctly to mean that the “ opening”, i.e., the certiﬁcate, has size log n×k (sub-linear in n)
+with respect to the size of l.
+Abstractly, we deﬁne a Merkle Tree as a tuple of three algorithms ( GenCRH , MT, Open) where the ﬁrst
+algorithm is a key generation algorithm for a collision resistance hash (CRH) function. Suppose that GenCRH
+outputs a key s. Then MT takes as input s and a sequence of strings l and outputs the commitment C for
+l, i.e., C = MTs(l). The algorithm Open takes as input the key s, a sequence of strings l, and an index i (it
+is denoted as Opens(l,i )), and outputs the string li inl.
+Usually, the term “commitment” refers to a scheme that is both hiding (i.e., the receiver cannot infer
+any knowledge on l from the commitment) and binding. The MT scheme that we use does not provide the
+hiding property but we still refer to it as a commitment.
+A full description of the Merkle Tree is deferred to Appendix B.
+Pebbling Games with wildcards. The following deﬁnition of pebbling game with wildcards is a modiﬁcation of
+the standard deﬁnition of pebbling game that can be found, for instance, in [26]. Given a DAG G = (V,E ),
+we say that a sequenceP = (P0,...,P T ) of subsets of V is a pebbling sequence on G with m wildcards if and
+only if P0 =∅ and there exists a set W⊆V of size m such that, for each i∈{ 1,...,T }, exactly one of the
+following holds:
+– Pi =Pi−1∪{v} if Γ−(v)⊆Pi−1∪W (pebbling) or
+– Pi⊆Pi−1 (unpebbling).
+If a set of vertexes Γ is such that Γ ⊆⋃T
+i=0Pi, we say that P pebbles Γ. IfP pebbles T(G) then we
+say that P is a pebbling game on G with m wildcards. Moreover we say that the pebbling time ofP is T
+and the pebbling space ofP is maxi|Pi|. Intuitively, a pebbled node is a node for which we have made some
+computations. Instead, W represents complementary nodes, for which we have made no computations.
+One of the main ingredients for the correctness of our constructions is the Pebbling Theorem [26] that
+proves that stacks of superconcentrators graphs (Pippenger [31]) have an exponential pebbling space-time
+trade oﬀ.
+Theorem 1 (Pebbling Theorem). There exists a family of eﬃciently sampleable directed acyclic graphs
+{GN,k}k,N∈N with constant fan-in d,N input nodes, N output nodes and kN logN nodes in total, such that:
+1. Any pebbling sequence that pebbles ∆ output nodes has pebbling space at most S pebbles and m wildcards,
+where|∆|> 4S + 2m + 1, and pebbling time T such that
+T>|∆|
+(N− 2S−m
+2S +m + 1
+)k
+.
+2. There exists a pebbling sequence that pebbles the graph GN,k which has pebbling space N + 2 and needs
+time O(kN logN).
+3. For any node v∈V (GN,k), the incoming nodes ofv and the position ofv in ﬁrst lexicographic topologically
+order of GN,k are computable in O(k logN).
+More details about the construction and the proof of this theorem are given in Appendix A.
+5
+Graph Labeling Problem with faults. We adopt the paradigm where the action of pebbling a node in a DAG
+G is made equivalent to the action of having calculated some labeling on it. This paradigm was introduced
+in [15] and also recently used in [17,18]. We make use of a Random Oracle (RO) H to build a labeling on G
+according to the pebbling rules.
+Deﬁnition 1 (H-labeling with faults). Given a DAG G with a ﬁxed ordering of the nodes and a Random
+Oracle functionH :{0, 1}∗→{ 0, 1}k, we say that 𝓁 :V (G)→{ 0, 1}k is a (partial)H-labeling of G with m
+faults if and only if there exists a set M⊆V (G) of size m such that for each v∈V (G)\M
+𝓁(v) :=H(v‖𝓁(v1)‖... ‖𝓁(vd)) where{v1,...,v d} =Γ−(v). (1)
+Given a label 𝓁 and a node v, we say that 𝓁 well-label v if only if the equation (1) holds for 𝓁 and v.
+Our framework generalize the paradigm of [15] by introducing the concept of “faults”. As it is shown in
+Section 3.1, dealing with “faults” is necessary because an adversary challenged on a labeling function could
+cheat by providing an inconsistent label on some nodes (which, indeed, are then referred to as “faults”).
+The use of a Random OracleH provides two important beneﬁts to our construction: First, the incompress-
+ibility of any output given the input and the evaluation of the function in many diﬀerent points. Speciﬁcally,
+for any x and x1,...,x m, the value of H(x) is uniformly random and independent of H(x1),..., H(xm).
+Therefore, to storeH(x), an adversary needs space equal to the minimum between the shortest description
+of the input and the length of the output. In particular, notice that we do not require that theentire function
+be incompressible (this holds for a Random Oracle but it is trivially false for any real-world instantiation of
+it). Second, in order to H-label the graph, any TM must follow a pebble strategy. In particular, to label a
+node v, a TM must necessarily calculate and store the label values of all the predecessors 𝓁(v1),...,𝓁 (vd) of
+the node v. If the graph G needs at least S pebbles to be pebbled eﬃciently in a pebbling game, then a TM
+needs to store at least S labels (i.e., RO outputs) to compute an H-labeling of G. This general strategy is
+proven sound in [15] and referred to as the Labeling Lemma. In our context, however, we provide m degrees
+of freedom and, given a partialH-labeling 𝓁 ofG withm faults and aH-labeling 𝓁′ ofG, it will likely be the
+case that 𝓁(v)⁄= 𝓁′(v) for each node v that is a descendant of a not well-labeled node. For this reason, we
+must state a more general version of the Labeling Lemma in [15].
+Lemma 1 (Labeling with Faults Lemma). Consider a DAG G with degree d, a TM A with advice
+h, and a Random Oracle H :{0, 1}∗→{ 0, 1}k that computes an H-labeling 𝓁 with m faults of G. If h is
+independent ofH, with overwhelming probability, there exists a pebbling sequence P = (P1,...,P T ) for the
+DAGG with m wildcards having pebbling space S such that:
+– S⩽ 1
+k Space(A) +d,
+– T⩽ (d + 2)σ, where σ is the number of queries of A toH.
+In particular T is a lower bound for the execution time of A.
+Before proceeding with the proof of the Lemma, we recall the deﬁnitions of min-entropy and conditional
+average min-entropy as stated in [12]. For any random variable X we deﬁne the min-entropy of X as
+H∞(X) :=− log
+(
+max
+B TM
+Pr [B() =X]
+)
+and we deﬁne the conditional average min-entropy of X given another random variable Y as
+~H∞ (Y|X) :=− log
+(
+max
+B TM
+Pr [B(X) =Y ]
+)
+.
+The following chaining rule for conditional average min-entropy holds [12]:
+~H∞ (Y|X)> H∞ (Y )−|X|.
+6
+Proof. Let W be the set of not well-labeled nodes by the partial labeling 𝓁, in particular|W| =m. We look
+at the ordered set of queries Q ={Q1,...,Q τ} ofA toH of the form Qi :=
+(
+wi‖𝓁(w1
+i )‖... ‖𝓁(wd
+i )
+)
+, where
+∀i wi∈V (G) and∀j wj
+i∈Γ−(wi). Notice that by costruction τ⩽σ.
+LetSi =Si−1∪{wi}∪Γ−(wi). As𝓁 is a partialH-labeling andH a RO, we have that with overwhelming
+probabilityΓ−(wi)⊆Si−1∪W∪ S(G). Hence, the sequence (S1,...,S σ) can be interpolated to a pebbling
+sequence adding source vertexes when needed. This would make a pebbling sequence ˜P of length at most
+(d + 1)τ. By interpolating ˜P with suitable unpebbling moves after each Si (i.e., removing all unnecessary
+pebbles following the informal rule “unpebble as soon as possible”), we can obtain a pebbling sequence P
+using minimal space. This is the desired pebbling sequenceP = (P1,...,P T ) withW as the set of wildcards.
+Notice that by construction T = (d + 2)τ⩽ (d + 2)σ, hence we have only to focus on bounding the pebbling
+space ofP.
+Let ˜S = Space(A). Suppose for simplicity that k divides ˜S and, by contradiction, suppose that there
+are ˜S/k +d + 1 pebbles at some time t∗ inP. This time t∗ should correspond to the time a query to
+H is made. After the unpebble operation, by the rule “unpebble as soon as possible”, there are left at
+least ˜S/k + 1 pebbles at time t∗ + 1. We look now at the labels of the nodes of G having at time t∗ + 1
+one of the ˜S/k + 1 pebbles: by the use of a RO H, their labels correspond to a uniformly random string
+L :=𝓁1‖... ‖𝓁 ˜S/k+1∈{ 0, 1} ˜S+k.
+LetM be the content of the memory ofA at time t∗ + 1. Note thatM is a random variable in{0, 1} ˜S−1.
+By the chaining rule of the conditional average min-entropy, we have that
+~H∞ (L|M,h ) = ~H∞ (L|M)> H∞ (L)−S =k, (2)
+where the ﬁrst equality comes from the independence of H from h.
+We want to upperbound ~H∞ (L|M,h ). To do this we deﬁneB a TM that on input M and h executesA
+from the state where she was at time t∗ + 1.B writes the string M inA’s working tape and the hint h inA’s
+input tape. In addition, B simulates the random oracle H. Notice that, as we unpebble as soon as possible
+then, for any 1⩽i⩽S/k + 1, the following cases occur:
+1. A is going to query (as substring of queries to H) the value 𝓁i with overwhelming probability. In fact, if
+this is not the case then it would be already deleted in P 4. The overwhelming probability comes from
+the fact thatA could simply guess 𝓁i. HenceB can collect all of those labels 𝓁1,...,𝓁 ˜S/k+1 by looking at
+the queries made byA toH. Moreover,B can reply to all the queries toH by uniformly choosing strings
+in{0, 1}k and storing those values to reply accordingly in the future. This simulation is possible as h is
+independent fromH.
+2. A will not query H with a string which corresponds to a successor of 𝓁i before having queried 𝓁i toH
+with overwhelming probability. Otherwise it would have already been deleted in P. The overwhelming
+probability comes from the fact that there could be a collision in the RO H. Hence the simulation
+ofH stores the labels 𝓁1,...,𝓁 ˜S/k+1 before using them as replies to A. Therefore the simulation is
+indistinguishable fromA’s point of view. Eventually B outputs all the labels collected.
+The existence ofB implies that− log(1−ν(k))> ~H∞ (L|M,h ), whereν(k) is a negligible function. This
+gives an immediate contradiction with equation (2). Hence the pebbling space of P is at most ˜S/k +d. ⊓ ⊔
+3 Proof-of-Space Protocols
+In this section we deﬁne the notion of PoSpace, then we provide two constructions that meet the deﬁnition.
+We later deﬁne a second notion of a weak form of PoSpace and show a separation result between the two
+notions. In our deﬁnition below, we allow the adversary to access extra information to model the case in
+which the adversary may outsource storage and computation to an external provider.
+4 This is the reason why we apply this information-theoretical argument to time t∗ + 1 and not to time t∗. In fact
+it would be the case that at time t∗ we are pebbling a vertex w but none of the vertexes in Γ−(w) would be used
+again.
+7
+We model the write permission on the storage by providing a precomputation phase to the adversary.
+That is, the adversary can use as much space as needed to produce an hint. The hint, that may depend
+on the public parameters of PoSpace, can be read during the interactive phase (i.e., when the protocol is
+started). In contrast, wPoSpace does not provide the adversary with a precomputation phase.
+Deﬁnition 2 ( PoSpace). Consider Σ = (Gen, P, V), where Gen is a ppt TM, and P,V are interactive ppt
+TMs. Let k∈ N be a security parameter. Suppose that the following points hold :
+(Completeness) For all pk∈ Gen(1k) and for all S∈ N,S >k it holds⟨P, V⟩ (pk, 1S) = 1, time complexity
+of P is O(poly(k,S ));
+(Succinctness) For all S∈ N, S > kthe time and space complexity of V and the message complexity of
+⟨P, V⟩, as functions of k and S, are O(poly(k)· poly logS);
+(Soundness) For any ppt adversaryA and for any ppt TM with advice A′ such that pk← Gen(1k) and
+h←A′(pk, 1S), the following event:
+SndA,A′
+Σ,S (k) :=⟨A(h), V⟩ (pk, 1S) = 1 ∧ SpaceA(⟨A(h), V⟩, pk, 1S)<S
+has negligible probability (as a function of k) for all S∈ N, S >k.
+Then, we say that Σ = (Gen, P, V) is a (one-stage) Proof of Space ( PoSpace). To be concise, we could say
+informally that A wins when the event ∃S∈ N : SndA,A′
+Σ,S (k) occurs.
+Notice that in the completeness part we set just a very mild upper bound on the space complexity of
+P. This is done on purpose to allow comparison among diﬀerent PoSpace protocols. In particular a useful
+measure on a PoSpace protocol (Gen, P, V) is the following space gap: the ratio Space( P(pk, 1S))/S.
+Notice that A′ is a space-unbounded ppt TM that models the fact that there might be information
+that can be eﬃciently computed that the space-bounded adversary A can exploit somehow to compromise
+PoSpace.
+It is easy to see that the PoSpace deﬁnition implicitly provides sequential composability. In fact, the
+adversaryA′ gives toA a hint which is a function of the public key, therefore the adversaryA′ can compute
+all the previous executions of the protocol “in his head”.
+We provide next a 4-messages PoSpace protocol in the Random Oracle Model (ROM) without any
+computational assumption. By applying the Fiat-Shamir paradigm to the scheme, we obtain a 2-message
+non-interactive PoSpace.
+3.1 A 4-message PoSpace protocol
+The protocol Σ4 = (Gen, V, P) is described in Figure 3.1 and it is a 4-message protocol.
+The protocol follows in some way Kilian’s construction of argument systems [25]. For any string α∈
+{0, 1}∗, let Hα(·) be deﬁned as H(α‖·). The veriﬁer chooses a random α and asks the prover to build a
+Hα-labeling of graph GN,k, whereN depends on S. The purpose of α is to “reset” the Random Oracle. That
+is, any previous information about H is now useless with overwhelming probability. The labeling provides
+evidence that the prover has handled at least S memory cells. The prover then commits the labeling and
+sends the commitment to the veriﬁer. At this point, the veriﬁer asks the prover to open several random
+locations in the commitment and then it checks locally the integrity of the labeling. For a commitment C
+and for any node that the veriﬁer has challenged, the prover sends what we call a C-proof for the node
+(deﬁned next).
+Deﬁnition 3 (C-proof). Given a DAG G, a commitment C, and a Random OracleH, we say that a string
+π = (π0,...,π d) is a C-proof for a vertex v∈ V (G) w.r.t. H if only if given Γ−
+G (v) = {w1,...,w d} the
+following points hold:
+1. π0 is a C-opening for v, let x be the value π0 is opening to;
+2. for each i = 1,...,d , πi is a C-opening for wi, let xi be the value πi is opening to;
+8
+Generator Gen takes as input 1k and outputs pk := ({GN,k}N∈N,H,s ),
+where{GN,k}N∈N is a family of graphs satisfying the Pebbling Theorem (Theorem 1), equipped with the natural
+lexicographic topological ordering on its vertex set,
+H is a RO and s is a key for CRH H.
+Common input: k,S, pk
+N :=⌈4γ(d +S/k) +γ⌉, where d is the degree of GN,k and γ∈ R, γ >1.
+Veriﬁer V Prover P
+1. Pick α←{ 0, 1}k α
+C
+Let 𝓁 be aHα-labeling of GN,k,
+whereHα(·) :=H(α‖·).
+Commit C := MTs(𝓁).
+2. Pick (v1,...,v l) ← Vl
+uniformly at random, where
+l =⌊k ln2k logN⌋ and
+V =V (GN,k)
+3. Check for any i⩽ l if
+Πi is a C-proof for vi wrt
+theHα-labeling 𝓁
+(v1,...,v l)
+(Π1,...,Π l)
+For anyvi, πi := Opens (𝓁,vi):
+For anyvj
+i∈Γ−(vi):
+πj
+i := Opens
+(
+𝓁,vj
+i
+)
+Πi :=
+(
+πi,π 1
+i,...,π d
+i
+)
+Send (Π1,...,Π l)
+Fig. 3.1. The 4-message PoSpace protocol Σ4.
+3. x =H(v‖x1‖... ‖xd).
+We omit C, G, andH, when they are clear from the context, by saying that π is simply a proof.
+In the deﬁnition of C-proof, the points 1 and 2 refer to the commitment C while point 3 ensures the
+integrity of the labeling. Note that the size of π is O(kd logN).
+We remark that when TMB takes as input a ROH, it is intended thatB has oracle access toH and the
+length of the input of B does not take into account the (exponentially long) length of H.
+Theorem 2. The protocolΣ4 in Figure 3.1 is a (one-stage) PoSpace.
+We start by giving the intuition behind the proof of the Theorem. Completeness is trivial. Succinctness
+follows easily from point (3) of the Pebbling Theorem (Theorem 1). For Soundness, we ﬁrst prove that the
+protocol Σ4 is a Proof-of-Knowledge (PoK) of a partial labeling with “few” faults. By the PoK property, we
+can extract from a winning adversary a partial labeling with few faults. Thus, with overwhelming probability,
+the adversaryA computes a partial labeling. We then exploit the binding property of the Merkle-Tree and
+show that the adversary has computed the labeling during the round (1) of the protocol. By appropriately
+ﬁxing the randomness of the protocol, we ensure that the hint h is independent of H, thus meeting all the
+hypotheses of the Labeling Lemma (Lemma 1). We obtain then a pebbling strategy that has pebbling space
+and pebbling time roughly upper-bounded by the respective space and time complexity of the adversary A.
+Since the adversary uses strictly less space than S andA is ppt then, by our choice of the parameters, there
+is a contradiction with the point (1) of the Pebbling Theorem (Theorem 1).
+9
+Proof. We focus on the Soundness. We divide the proof in two parts. First, in the PoK Lemma, we prove
+that the Protocol Σ4 is a PoK for a partial labeling with “few” faults, and that the partial labeling has been
+computed during the round (1), i.e., after the veriﬁer V sent the message α and before the adversary sent
+the commitment message C. Then we combine the PoK Lemma with the Labeling Lemma and the Pebbling
+Theorem to reach a contradiction assuming that there exists a winning ppt adversary.
+We stress that the knowledge extractor doesn’t need to be eﬃcient since we do not rely on any compu-
+tational assumption.
+Lemma 2 (PoK Lemma). Consider the protocol Σ4 = ( Gen, V, P), a ppt adversaryA, a ppt Turing
+Machine with advice A′, a space parameter S, and a security parameter k. Sample a random pk← Gen(1k)
+and let h←A′(pk, 1S). If Pr
+[
+SndA,A′
+Σ4,S(k)
+]
+is noticeable (where the probability is taken over the randomness
+of pk,h and all the randomness used during the protocol execution between A and the veriﬁer) then, for
+a noticeable probability over the choice of pk, there exist a ﬁrst veriﬁer message ˜α and an adversary’s
+randomness ˜ρ such thatA(h) calculates anH ˜α-labeling𝓁 ofGN,k withm faults such that the following holds:
+– the hint h is independent of H ˜α,
+– m =O
+( N
+lnk
+)
+and
+– for any well-labeled node u in 𝓁 we have (˜α‖u‖𝓁(u1)‖... ‖𝓁(ud))∈Q ,
+whereQ is the set of queries to H made byA when fed with randomness ˜ρ during round (1) of the protocol
+Σ4, and{u1,...,u d} =Γ−(u).
+Proof. Consider the event
+Q′ :={α∈{ 0, 1}k|A′(pk, 1S) made at least a query to H with preﬁx α}.
+We say that a ﬁrst message α is good iﬀ
+Pr
+[
+⟨A(h), V⟩ (pk, 1S) = 1| V sends α as ﬁrst message
+]
+is noticeable. By Markov’s inequality, the probability that “a uniformly random ﬁrst message α is good” is
+noticeable. On the other hand, the probability that a uniformly random ﬁrst message α is inQ′ is bounded
+by poly(k,S )/2k. Thus, there exists ˜α that is both good and not in Q′. Since ˜α⁄∈Q′ then h←A′(pk, 1S) is
+independent ofH ˜α. Let V =V (GN,k) be the vertex set of GN,k and let WC(v) be the following event:
+“A(h, pk, ˜α) sends the commitment C at the end of round (1)
+and makes the veriﬁer V accept
+when challenged with the vector v∈Vl during round (2)”.
+The event WC(v) depends on the public key pk,A’s randomness, and the challenge v←Vl, where l is the
+length of the message as deﬁned in the protocol Σ4.
+A commitment string sent byA(h, pk, ˜α) to the veriﬁer V at the end of round (1) is a good commitment
+iﬀ Pr[WC(v)] is noticeable. We have that with noticeable probability A(h, pk, ˜α) sends a good commitment
+at the end of round (1).
+It might be the case that A(h, pk, ˜α), instead of computing the labeling through the RO queries, simply
+guesses the correct one. However, A’s guess is correct with probability at most 2 −k. Hence, with noticeable
+probability during round (1):
+–A(h) is not making any guesses and
+–A(h) sends a good commitment.
+Thus, there exists a randomness ˜ρ such thatA(h, pk, ˜α) satisﬁes the two properties above when fed with
+˜ρ. To simplify the notation, we call such an adversary ˜A.
+10
+Thus, there exists a deterministic adversary ˜A that, with noticeable probability over pk and over the
+challengev, makes the veriﬁer accept. Let C be the good commitment sent by ˜A. Now we focus on round
+(2). Let
+E :=
+{
+u∈V | Pr
+pk,v
+[ ˜A challenged onv∈Vl
+sends a C-proof for u ∧ u∈v
+]
+<r (k)
+}
+,
+where r(k)∈ poly(k).
+There exists a procedure to compute the set E (recall that the extraction process doesn’t need to be
+eﬃcient). Notice that by construction the nodes of V \E can be C-opened with noticeable probability,
+hence they C-open to ﬁxed labels with noticeable probability (otherwise an eﬃcient sampling procedure can
+invalidate the binding property of the underlying Merkle-Tree).
+For eachu∈V\E, there exists a randomness ρu such that ˜A sends to the veriﬁer V aC-proof for u that
+C-opens u to the most probable label. Here, it is assumed that A(h) is using ρu as source of randomness
+during round (2).
+If we collect all those values, we obtain an H ˜α-labeling with at most |E| faults.
+We now prove the second item of the lemma, i.e., the upper-bound for m =|E|. Notice that m is a
+random variable that depends on pk. For any ˜pk let ˜m :=m( ˜pk), the following chain of inequalities hold:
+Pr
+v
+[
+WC(v)| pk = ˜pk
+]
+= Pr
+v
+[
+WC(v)∧∀vi∈v vi⁄∈E| pk = ˜pk
+]
++
++ Pr
+v
+[
+WC(v)∧∃vi∈v vi∈E| pk = ˜pk
+]
+⩽ Pr
+v
+[
+∀vi∈v vi⁄∈E| pk = ˜pk
+]
++
+∑
+u∈E
+Pr
+v
+[
+WC(v)∧u∈v| pk = ˜pk
+]
+⩽
+(
+1− ˜m
+|V|
+)l
++
+∑
+u∈E
+Pr
+v
+[ ˜A challenged onv∈Vl
+sends a C-proof for u ∧ u∈v
+⏐⏐⏐⏐ pk = ˜pk
+]
+⩽ e− ˜m
+|V |·l +
+∑
+u∈E
+Pr
+v
+[ ˜A challenged onv∈Vl
+sends a C-proof for u ∧ u∈v
+⏐⏐⏐⏐ pk = ˜pk
+]
+Taking the expected value over pk, we obtain:
+Pr
+pk,v
+[WC(v)]⩽ E
+pk
+[
+e− m
+|V |·l
+]
++
+∑
+u∈E
+Pr
+pk,v
+[ ˜A challenged onv∈Vl
+sends a C-proof for u ∧ u∈v
+]
+< E
+pk
+[
+e− m
+|V |·l
+]
++|V|r(k).
+There exists a constant c∈ N such that, for k > >1, Pr [WC(v)]> k−c. Hence, if we select r(k) =
+(|V|2kc)−1, we obtain that
+E
+pk
+[
+e− m
+|V |·l
+]
+> 1
+2kc.
+Via the Paley-Zygmund inequality [32], we have:
+Pr
+pk
+[
+e− m
+|V |·l > 1
+4kc
+]
+> 1
+8k2c.
+Thus, with noticeable probability over pk:
+m
+|V|·l< ln 4 +c lnk.
+11
+Notice that, in the graph family {GN,k},|V| = kN logN. Thus, since l = k ln2k logN, we achieve the
+required upper-bound for m.
+We now prove the third item of the Lemma, i.e., for any assignment ρ of the randomness of A for the
+round (1) such that (a) the commitment C is a good commitment and (b) A has not made any guess, we
+have that for any u∈V\E,Qu := (˜α‖u‖𝓁(u1)‖... ‖𝓁(ud))∈Q , whereQ is the set of queries made by A to
+H until the end of round (1) and {u1,...,u d} =Γ−(u).
+If that would not be the case, we can deﬁne a reduction that violate the binding property of the Merkle
+Tree. The probability that a uniformly random assignment of the randomness of A has the properties (a)
+and (b) and a uniformly random ﬁrst message of V is good and not in Q′ is noticeable. Let p(k)∈ poly(k)
+be a lower-bound for that probability.
+By contradiction suppose there exists a u such that the query Qu⁄∈Q . By the choice of ˜α, Qu⁄∈Q ′
+hence it must have be made in the round (2) of the protocol.
+Suppose for now that the reduction knows the values 𝓁(u1),...,𝓁 (ud), then:
+(a) it can choose an assignment of the randomness ρ ofA for the round (1) and a ﬁrst message α∈{ 0, 1}k
+both uniformly at random. Then, it executes A(h, pk, 1S,α ;ρ) to obtain a commitment C;
+(b) V challengesA in round (2) with a uniformly random vector v∈Vl containingu.A will make the query
+Qu toH and the reduction responds to it with a uniformly random string in {0, 1}k;
+(c) it rewinds A to the point corresponding to the end of round (1) of the protocol, then runs again point
+(b).
+A willC-open the nodeu in points (b) and (c) of the reduction with two diﬀerent values with a probability
+at least p(k)· (r(k)2− 2−k).
+In general the reduction doesn’t know the values 𝓁(u1),...,𝓁 (ud) and it can’t ﬁgure out which of the queries
+made by A in the round (2) of the protocol is Qu. But A is ppt so we can ﬁnd a q(k)∈ poly(k,S ) that
+upper-bounds the number of queries made by A toH during round (2).
+A will C-open the node u, by guessing the exact point in time Qu is queried, with two diﬀerent values
+with a probability at least q(k)−1·p(k)· (r(k)2− 2−k). Hence, this reduction violates the binding property
+of the Merkle Tree. ⊓ ⊔
+We are ready now to prove the Theorem.
+By contradiction, suppose there exists an adversary A for the protocol Σ4. By applying Lemma 2, we
+extract with noticeable probability a partial H ˜α-labeling, ensure that A(h) computed that labeling during
+round (1) and that the hint h is independent ofH ˜α. Hence, satisfying the hypotheses of Lemma 1.
+This gives us, with overwhelming probability, a pebbling sequence P of GN,k with m wildcards having
+pebbling space S′ = S
+k +d, m = O( N
+lnk). In addition, the pebbling time of P is a lower bound for the
+execution time ofA during round (1). To apply Theorem 1, we ﬁx N such that
+N−l> 4S′ + 2m + 1, (3)
+where l denotes the number of wildcards that are in T(GN,k).
+Givenc∈ (0, 1) and ϵ> 0, we have that (2 +ϵ)m +l⩽cN. If we ﬁnd N such that
+N> 4S′ +cN + 1,
+(hence N> 4γS′ +γ, where γ = 1/(1−c)) then the inequality (3) will follow. (This is main reason why we
+have set N :=⌈4γS′ +γ⌉ in the Protocol Σ4.)
+By applying Theorem 1, the execution time T ofA is such that
+T> (N−l)
+(N− 2S′−m
+2S′ +m + 1
+)k
+>c′(1 +ϵ)k, (4)
+wherec′ is a constant that is a lower bound forN−l. The value (1+ϵ)k derives from the fact that, eventually,
+N− 2S′−m> (1 +ϵ)(2S′ +m + 1).
+Equation (4) shows that the execution time of A is exponential in k. This is not possible as, by hypothesis,
+A is ppt. ■
+12
+On the Space Gap of the Protocol. The prover algorithm can be implemented basically in two ways. The most
+natural implementation is to ﬁrst build the labeling for all the nodes in the graph and then apply the Merkle
+Tree, while keeping in memory the labeling which is reused during the second phase of the prover algorithm.
+Through this algorithm, the space gap of the prover is O(logS) while the time complexity is essentially
+dominated by the one labeling phase. Another way to implement the prover algorithm is by computing the
+labeling and the Merkle Tree simultaneously. In this way the algorithm can reuse space resulting in a strategy
+with space gap O(1). Note however that, in this implementation, the prover must build the labeling twice
+(once for the commitment and then during the challenge phase).
+4 A 2-messages PoSpace protocol
+We apply the standard Fiat-Shamir paradigm to the PoSpace scheme given in Section 3.1 by using two
+independent Random OraclesH,L:
+– H :{0, 1}∗→{ 0, 1}k is used by the prover for the labeling of the graph;
+– L :{0, 1}k→Vl given the commitmentC as input, it yields the second veriﬁer’s message (of the protocol
+Σ4).
+Let (Σ4.Gen,Σ 4.P,Σ 4.V) the PoSpace deﬁned in Figure 3.1. We deﬁne in Figure 4.1 a 2-messages PoSpace:
+we call Σ2 = (Gen, P, V) this protocol. Furthermore, let H′ :{0, 1}∗→{ 0, 1}k be a RO then the function
+f(x) :=Σ2.P(pk, 1S,H′(x)) is a non-interactivePoSpace that satisﬁes the syntactic deﬁnition of PoWs in [14].
+Generator Gen on input 1k returns pk′ := (pk,L),
+where pk←Σ4.Gen(1k) andL is a RO
+Common input: k,S, pk
+Veriﬁer V Prover P
+1. Pick α←{ 0, 1}k
+2. Let v =L(C)
+Check Σ4.V(pk, 1S,α,C, v,Π ) = 1
+α
+(C,Π )
+C :=Σ4.P(pk, 1S,α )
+v :=L(C)
+Π :=Σ4.P(pk, 1S,α, v)
+Fig. 4.1. The 2-messages (one-stage) PoSpace protocol Σ2 = (Gen, P, V).
+Theorem 3. The ProtocolΣ2 in Figure 4.1 is a PoSpace.
+Proof. Completeness and Succinctness follow from the fact that Σ4 is a PoSpace as proved in Theorem 2.
+To prove Soundness, we reduce an adversary A for the scheme Σ2 to an adversaryB for the scheme Σ4 (of
+Figure 4.1). Suppose, by contradiction, there exists an adversary A, a hint h←A (pk′) and a value S such
+that for k large enough:
+Pr
+[
+SndA,A′
+Σ2,S(k)
+]
+>k−c.
+Let q(k) be a polynomial that upper-bounds the number of queries made by A to the RO L. For each
+0⩽ i < q(k), let Qi be the i-th query made by A to the oracle L. Without loss of generality, we can
+assume that all the Qi’s are diﬀerent and A veriﬁes her output certiﬁcate before sending it: if A hasn’t
+found a valid certiﬁcate, she outputs the empty string. Thus, either there exists an index m such that
+13
+(C,Π )←A (h, pk′,α ;ρ), with Qm = C and Σ4.V
+(
+pk, 1S,α,C, L(C),Π
+)
+= 1, or A(h, pk′,α ;ρ) outputs the
+empty string. Moreover:
+Pr[(C,Π )←A (h, pk′,α )∧Qm =C]>k−c·q(x)−1.
+Notice that the probability above states that the outputs ofA will be the same value asked byA toL at the
+m-th call. However, the value Qm is a random variable that may depend on all the randomness used until
+them-th call. We divide the randomness used byA into two parts,ρ1 andρ2:ρ1 is the randomness used by
+A before she has made the m-th query to the oracle L, ρ2 is the remaining randomness.
+By an averaging argument, there exists a setting of ρ1 such that the following equation holds
+Pr
+ρ2,H,L
+[
+(C,Π ) :=A(h, pk′,α ;ρ1‖ρ2)∧Qm =C
+]
+>k−c·q(x)−1 (5)
+Now the valueQm is a random variable that depends only on the randomness of the challengeα, the ROs
+H andL, and ρ1. Therefore, by repeating many times the TM A(h, pk′,α ;ρ1‖ρ2) for a uniformly random ρ2
+using the same oracles H,L, we’ll get the same value Qm as the m-th query to L. We deﬁne the ppt TM
+with adviceB′ that on input pk and advice ρ1,m outputs the hint ˜h := (A′(pk,L),Q′,m,ρ 1), whereQ′ is
+the set of RO queries made by A′ toH andL.
+DeﬁneB(˜h, pk, 1S) :
+– Wait for the message α;
+– ComputeA(˜h, pk,α ;ρ1) and reply to RO queries from A viaH orL respectively;
+until she makes the m-th RO query toL. Let Qm be such a query;
+– Pause the machineA;
+– if Qm∈Q′ abort.
+– Send Qm to Σ4.V;
+– Wait for the message v from Σ4.V;
+– choose ρ2 uniformly at random;
+– Resume A and reply to the query Qm with v and use as randomness ρ2;
+– If A outputs the empty string, send the empty string to Σ4.V;
+else let (C,Π ) be the output of A;
+– if C =Qm then send Π to Σ4.V
+else send the empty string to Σ4.V.
+First, we show that the value Qm has high min-entropy. Since|Q′|∈ poly(k,S ), this implies that B will
+abort with negligible probability.
+By the equation (5), there exists an Hα-labeling 𝓁 with m =O(N/ lnk) faults such that Qm = MTs(𝓁).
+LetR′ be the set of RO replies made by H andL to the RO queries of A′. As α is uniformly random in
+{0, 1}k then
+~H∞( 𝓁|R′,α )> (|V (GN,k)|− m− 1)·k.
+In fact only with negligible probability in k the setQ′ contains queries toH with preﬁx α. The min-entropy
+of Qm is ω(logk) because MT is collision resistant. The probability that Qm is inQ′ is then negligible.
+WhenB doesn’t abort the simulation of the protocol, Σ2 is perfect. Also notice that B needs space
+S′ =S +O(log(poly(k))) whereS is from the simulations ofA andO(log poly(k)) from the auxiliary indexes.
+Moreover, if the event in equation (5) holds, thenB will not send the empty string to Σ4.V. Hence, it follows
+that the adversaryB, with access to the hint function ˜h and using space S′ fork large enough, is such that:
+Pr
+[
+SndB,B′
+Σ4,S′(k)
+]
+>k−c·q(k)−1− negl(k).
+Therefore, we reach the contradiction that B is a winning adversary against protocol Σ4 which was proved
+to be a PoSpace (Theorem 2).■
+14
+5 Weak Proof of Space
+The concept of proof of space can lead to multiple interpretations. The main interpretation formalized in
+the PoSpace deﬁnition requires that the prover can handle (i.e., read/write) space. In this section we provide
+a deﬁnition for a weaker alternative of PoSpace we call weak Proof of Space ( wPoSpace). This captures the
+property that the prover can just access space and formalizes what could eﬀectively be achieved by properly
+adapting previous work on proof of storage [4,5, 33] and on memory-bound PoW as deﬁned in [1,13](where
+the adversary model contemplates the existence of cache memory). The deﬁnition of wPoSpace is similar
+to the Deﬁnition of PoSpace (Deﬁnition 2) (the only change is in the Soundness part). We will provide a
+protocol which is a wPoSpace but not a PoSpace, hence wPoSpace is a strictly weaker notion than PoSpace.
+Deﬁnition 4 ( wPoSpace). Consider Σ = (Gen, P, V) where Gen is a ppt TM, and P, V are interactive ppt
+TMs. Let k∈ N be a security parameter and pk← Gen(1k). Suppose that the following points hold for all
+S∈ N, S >k:
+(Completeness) and (Succinctness) the same as in the PoSpace deﬁnition.
+(weak-Soundness) For any ppt adversaryA, the following event:
+wSndA
+Σ,S(k) :=⟨A, V⟩ (pk, 1S) = 1∧ SpaceA(⟨A, V⟩, pk, 1S)<S,
+has negligible probability (as a function of k).
+Then we say that Σ is a (one-stage) Weak Proof of Space ( wPoSpace).
+In the Soundness of PoSpace, the adversary can take advantage of an unbounded space machine which
+is then unavailable during the protocol execution. In the Soundness of wPoSpace, instead, this is disallowed.
+Notice that a wPoSpace’s adversary can perform some precomputation before the execution of the protocol
+(i.e., before sending/receiving the ﬁrst message), however, such a precomputation cannot exceed the space
+bound given.
+Theorem 4. There exists a protocol which is a wPoSpace but not a PoSpace.
+Proof. We start by providing a protocol which is not a PoSpace. Consider the protocol Σ4 in Figure 3.1
+where the ﬁrst message α sent by V is always the same, say 0k. We callΣ3 this modiﬁed version of Σ4. The
+protocol Σ3 is not a PoSpace. For any k and S∈ N, consider the hint h which is the H0k-labeling of GN,k
+plus the complete Merkle-Tree of that labeling. We deﬁne an adversary that sends the commitmentC that is
+inh and, for any veriﬁer’s second message v, reads the right answer from h. That adversary needs to access
+h in read-only mode, hence without using any additional working space.
+The protocol Σ3 is a wPoSpace. The structure of the proof is the same as the one of Theorem 2. We
+provide a particular case of the PoK Lemma (Lemma 2) where the hint h is the empty string and ˜α is 0k.
+For the sake of clarity, we restate the PoK Lemma for this particular setting.
+Lemma 3. Consider the protocol Σ3 = (Gen, V, P), a ppt adversaryA, a space parameter S and a security
+parameterk such that pk← Gen(1k).
+If Pr
+[
+wSndA
+Σ3,S(k)
+]
+is noticeable, then there exists a randomness ˜ρ such thatA fed with the randomness
+˜ρ during the round (1) of the protocol Σ3 calculates anH0k-labeling 𝓁 of GN,k with m faults such that the
+following holds:
+– m =O
+( N
+lnk
+)
+and
+– for any well-labeled node u in 𝓁 we have (˜α‖u‖𝓁(u1)‖... ‖𝓁(ud))∈Q ,
+whereQ is the set of queries to H made by A when fed with randomness ˜ρ until the end of round (1) and
+{u1,...,u d} =Γ−(u).
+15
+By contradiction, suppose there exists an adversary A for the protocol Σ3. By applying Lemma 3, we
+extract a partial H0k-labeling, ensuring that A computed that labeling during round (1) (hence satisfying
+the hypotheses of Lemma 1).
+This gives us, with overwhelming probability, a pebbling sequenceP ofGN,k withm wildcards and with
+pebbling space S′ = S
+k +d, m =O( N
+lnk). The pebbling time of P is a lower bound for the execution time of
+A before round (2). The rest of the proof follows exactly the same structure of the proof of Theorem 2 and
+it is therefore omitted. ⊓ ⊔
+Acknowledgements. We are grateful to Krzysztof Pietrzak for his insightful comments and suggestions.
+References
+1. Martin Abadi, Mike Burrows, Mark Manasse, and Ted Wobber. Moderately hard, memory-bound functions.
+ACM Trans. Internet Technol. , 5(2):299–327, May 2005.
+2. Mehmud Abliz and Taieb Znati. A guided tour puzzle for denial of service prevention. In ACSAC, pages 279–288.
+IEEE Computer Society, 2009.
+3. Giuseppe Ateniese, Ilario Bonacina, Antonio Faonio, and Nicola Galesi. Proofs of space: When space is of the
+essence. Cryptology ePrint Archive, Report 2013/805, 2013. http://eprint.iacr.org/.
+4. Giuseppe Ateniese, Randal Burns, Reza Curtmola, Joseph Herring, Lea Kissner, Zachary Peterson, and Dawn
+Song. Provable data possession at untrusted stores. In Proceedings of the 14th ACM conference on Computer
+and communications security , CCS ’07, pages 598–609, New York, NY, USA, 2007. ACM.
+5. Giuseppe Ateniese, Seny Kamara, and Jonathan Katz. Proofs of storage from homomorphic identiﬁcation pro-
+tocols. In ASIACRYPT, pages 319–333, 2009.
+6. Adam Back. Hashcash - a denial of service counter-measure. Technical report, 2002.
+7. Boaz Barak and Oded Goldreich. Universal arguments and their applications. In IEEE Conference on Compu-
+tational Complexity , pages 194–203. IEEE Computer Society, 2002.
+8. R. B. Boppana, J. Hastad, and S. Zachos. Does co-np have short interactive proofs? Inf. Process. Lett., 25(2):127–
+132, May 1987.
+9. Lu´ ıs Caires, Giuseppe F. Italiano, Lu´ ıs Monteiro, Catuscia Palamidessi, and Moti Yung, editors. Automata,
+Languages and Programming, 32nd International Colloquium, ICALP 2005, Lisbon, Portugal, July 11-15, 2005,
+Proceedings, volume 3580 of Lecture Notes in Computer Science . Springer, 2005.
+10. Ran Canetti, Ben Riva, and Guy N. Rothblum. Refereed delegation of computation. Information and Compu-
+tation, 226(0):16 – 36, 2013.
+11. Kai-min Chung, Yael Kalai, and Salil Vadhan. Improved Delegation of Computation Using Fully Homomorphic
+Encryption. pages 483–501, 2010.
+12. Yevgeniy Dodis, Leonid Reyzin, and Adam Smith. Fuzzy extractors: How to generate strong keys from biometrics
+and other noisy data. In Christian Cachin and JanL. Camenisch, editors,Advances in Cryptology - EUROCRYPT
+2004, volume 3027 of Lecture Notes in Computer Science , pages 523–540. Springer Berlin Heidelberg, 2004.
+13. Cynthia Dwork, Andrew Goldberg, and Moni Naor. On memory-bound functions for ﬁghting spam. Advances in
+Cryptology-Crypto 2003, 2003.
+14. Cynthia Dwork and Moni Naor. Pricing via processing or combatting junk mail. Advances in Cryptology-
+CRYPTO’92, pages 139–147, 1993.
+15. Cynthia Dwork, Moni Naor, and Hoeteck Wee. Pebbling and proofs of work. Advances in CryptologyCRYPTO
+2005, pages 37–54, 2005.
+16. Stefan Dziembowski, Sebastian Faust, Vladimir Kolmogorov, and Krzysztof Pietrzak. Proofs of space. Cryptology
+ePrint Archive, Report 2013/796, 2013. http://eprint.iacr.org/.
+17. Stefan Dziembowski, Tomasz Kazana, and Daniel Wichs. Key-evolution schemes resilient to space-bounded
+leakage. In CRYPTO, pages 335–353, 2011.
+18. Stefan Dziembowski, Tomasz Kazana, and Daniel Wichs. One-time computable self-erasing functions. In Pro-
+ceedings of the 8th conference on Theory of cryptography , TCC’11, pages 125–143, Berlin, Heidelberg, 2011.
+Springer-Verlag.
+19. Stefan Dziembowski, Krzysztof Pietrzak, and Sebastian Faust. Proofs of space and a greener bitcoin. talk
+presented at Workshop on Leakage, Tampering and Viruses , Warsaw 2013, 2013.
+20. Dario Fiore and Rosario Gennaro. Publicly veriﬁable delegation of large polynomials and matrix computations,
+with applications. Proceedings of the 2012 ACM conference on Computer and communications security - CCS
+’12, page 501, 2012.
+16
+21. Oded Goldreich and Johan Hastad. On the complexity of interactive proofs with bounded communication.
+Information Processing Letters, 1998.
+22. Shaﬁ Goldwasser, Yael Tauman Kalai, and Guy N. Rothblum. Delegating computation: interactive proofs for
+muggles. In Proceedings of the 40th annual ACM symposium on Theory of computing , STOC ’08, pages 113–122,
+New York, NY, USA, 2008. ACM.
+23. Ari Juels and John G. Brainard. Client puzzles: A cryptographic countermeasure against connection depletion
+attacks. In NDSS. The Internet Society, 1999.
+24. Nikolaos P. Karvelas and Aggelos Kiayias. Eﬃcient proofs of secure erasure. SCN, 2014.
+25. Joe Kilian. A note on eﬃcient zero-knowledge proofs and arguments (extended abstract). In Proceedings of the
+twenty-fourth annual ACM symposium on Theory of computing , STOC ’92, pages 723–732, New York, NY, USA,
+1992. ACM.
+26. Thomas Lengauer and Robert E. Tarjan. Asymptotically tight bounds on time-space trade-oﬀs in a pebble game.
+Journal of the ACM (JACM) , 29(4):1087–1130, 1982.
+27. Silvio Micali. Computationally sound proofs. SIAM Journal on Computing , 30(4):1253–1298, 2000.
+28. Satoshi Nakamoto. Bitcoin: A peer-to-peer electronic cash system. May 2009.
+29. Colin Percival. Stronger key derivation via sequential memory-hard functions. presented at BSDCan ’09, 2009.
+30. Daniele Perito and Gene Tsudik. Secure code update for embedded devices via proofs of secure erasure. In
+ESORICS, pages 643–662, 2010.
+31. Nicholas Pippenger. Superconcentrators. SIAM J. Comput. , 6(2):298–304, 1977.
+32. R.E.A.C.Paley and A.Zygmund. A note on analytic functions in the unit circle. page 266272, 1932.
+33. Hovav Shacham and Brent Waters. Compact proofs of retrievability. In Proceedings of the 14th International
+Conference on the Theory and Application of Cryptology and Information Security: Advances in Cryptology ,
+ASIACRYPT ’08, pages 90–107, Berlin, Heidelberg, 2008. Springer-Verlag.
+34. Adam Smith and Ye Zhang. Near-linear time, leakage-resilient key evolution schemes from expander graphs.
+IACR Cryptology ePrint Archive , 2013:864, 2013.
+35. Martin Tompa. Time-space tradeoﬀs for computing functions, using connectivity properties of their circuits. In
+Proceedings of the tenth annual ACM symposium on Theory of computing , STOC ’78, pages 196–204, New York,
+NY, USA, 1978. ACM.
+36. Brent Waters, Ari Juels, J. Alex Halderman, and Edward W. Felten. New client puzzle outsourcing techniques
+for dos resistance. In Proceedings of the 11th ACM conference on Computer and communications security , CCS
+’04, pages 246–256, New York, NY, USA, 2004. ACM.
+A Proof of the Pebbling Theorem (Theorem 1)
+For the sake of convenience we re-write the statement of that theorem here. For the deﬁnitions of pebbling
+games, pebbling space and pebbling time we refer the reader to Section 2.
+Pebbling Theorem (Theorem 1). There exists a family of eﬃciently sampleable directed acyclic graphs
+{GN,k}k,N∈N with constant fan-in d,N input nodes, N output nodes and kN logN nodes in total, such that:
+1. Any pebbling sequence that pebbles ∆ output nodes has pebbling space at most S pebbles and m wildcards,
+where|∆|> 4S + 2m + 1, and pebbling time T such that
+T>|∆|
+(N− 2S−m
+2S +m + 1
+)k
+.
+2. There exists a pebbling sequence that pebbles the graph GN,k which has pebbling space N + 2 and needs
+time O(kN logN).
+3. For any node v∈V (GN,k), the incoming nodes ofv and the position ofv in ﬁrst lexicographic topologically
+order of GN,k are computable in O(k logN).
+The family of graphsGN,k we build is made from DAGs that arek layered stack of superconcentrators [31]
+with N inputs and N outputs.
+17
+Deﬁnition 5 (superconcentrator). We say that a directed acyclic graphG = (V,E ) is an N-superconcentrator
+if and only if
+1. |S(G)| =|T(G)| =N,
+2. for each S⊆ S(G) and for each T ⊆ T(G) such that |S| =|T| = 𝓁 there exist 𝓁 vertex-disjoint paths
+fromS to T , i.e. paths such that no vertex in V is in two of them.
+Fig. A.1. An example of 16-superconcentrator: the Butterﬂy Graph
+Deﬁnition 6 (stack of superconcentrators). Given an N-superconcentratorG we deﬁne the graph G×k,
+the stack ofk copies ofG, inductively as follows: G×1 =G andG×k is obtained from G×(k−1) andG by ﬁrst
+renaming the vertexes of G so that they do not appear in the vertexes of G×(k−1), obtaining a graph G′, and
+then by identifying T(G×(k−1)) with S(G′).
+Not any k layered stack of superconcentrators satisﬁes points 2 and 3 of the Pebbling Theorem. To obtain
+those properties we use the following well-known superconcentrator: theButterﬂy Graph BN built by putting
+together two FFT graphs with N inputs and outputs [35]. An example of such construction (for N = 16) is
+given in Figure A.1.
+It is easy to see that the family of graphs GN,k :=B×k
+N satisﬁes points 2 and 3 of the Pebbling Theorem
+and it is a k layered stack of N-superconcentrators. It remains to prove only point 1.
+For superconcentrator graphs we can prove a tradeoﬀ between pebbling space and pebbling time, even
+for pebbling games with wildcards. This result is based on a generalization of the “Basic Lower Bound
+Argument” (BLBA) by Tompa [35].
+Lemma 4 (BLBA with wildcards). Consider anN-superconcentratorG, a setM⊆ T(G), and a pebbling
+sequenceP = (P0,...,P 𝓁) with m wildcards that pebbles M. Let A be the set of all elements of S(G) pebbled
+and unpebbled at some point in P. If|M|>|P0| +|P𝓁| +m + 1 then|A|>N−|P0|−| P𝓁|− m.
+Proof. By contradiction suppose that|A|<N −|P0|−| P𝓁|− m, this means that|Ac|>|P0| +|P𝓁| +m + 1
+and every element inAc, by deﬁnition, is not pebbled and unpebbled. Take any B⊆Ac such that|B| =|M|
+then, as G is an N-superconcentrator, we have π1,...,π |M| vertex disjoint paths from B to M. Let W be a
+set of m faults forP. By construction|M|>|P0∪P𝓁∪W| thus we have some path π from some element v
+ofB to some element w ofM such that π∩ (P0∪P𝓁∪W ) =∅. By deﬁnition of Ac, and hence of B,v is not
+pebbled and unpebbled and v⁄∈ P0∪P𝓁∪W , thus v⁄∈ Pi for each i∈ [𝓁]. As π∩ (P0∩W ) =∅, we must
+have that π∩Pi =∅ for each i∈ [𝓁]. But then the vertex w is not in ⋃
+i∈[𝓁]Pi contradicting the fact thatP
+pebbles M. ⊓ ⊔
+18
+Theorem 5 (Pebbling Theorem (point 1)). LetG×k be a stack of k copies of an N-superconcentrator
+G, ∆⊆ T(G×k) andP a pebbling sequence for G×k with m wildcards that pebbles ∆. Let S be the pebbling
+space ofP and T the pebbling time of P. If|∆|> 4S + 2m + 1 then
+T>|∆|
+(N− 2S−m
+2S +m + 1
+)k
+.
+Proof. Let G1,...,G k be the k copies of G that form G×k. Suppose we want to pebble a set M⊆ T(Gi)
+such that|M|> 2S +m+1 and let A1,...,A n be disjoint subsetes ofM such thatA1 are the ﬁrst 2S +m+1
+elements of M to be pebbled in P, A2 are the second 2S +m + 1 elements of M to be pebbled in P and so
+on. Clearly we have that the number of these sets is n =
+⌊
+|M|
+2S+m+1
+⌋
+. By Lemma 4 we have that for each Aj
+there exists a set β(Aj) in S(Gi), whose elements are pebbled and unpebbled, of size at least N− 2S−m.
+Thus we have that the total number of elements in S(Gi) that have been pebbled and unpebbled is at least
+(N− 2S−m)
+⌊
+|M|
+2S+m+1
+⌋
+. Notice now that each β(Aj)∈ T(Gi−1) hence we can reapply the argument above
+to it provided that for each j,|β(Aj)|> N− 2S−m> 2S +m + 1 (and this is implied by the fact that
+N>|∆|> 4S + 2m + 1). Thus starting from T(Gk) = T(G×k) we can prove by induction, going back to
+G1, that at least
+|∆|
+(N− 2S−m
+2S +m + 1
+)k
+actions of pebbling and unpebbling take place on S(G1) = S(G×k). As each action is an elementary step in
+the pebbling gameP we have that the result follows. ⊓ ⊔
+B Merkle Tree
+Consider the complete binary tree T over n leaves. Without loss of generality we can assume that n is a
+power of 2 by using padding if necessary. Label the i-th leaf with li, then, use a collision resistant hash
+(CRH) function Hs :{0, 1}2k→{ 0, 1}k with random seed s to propagate the labeling l of the leaves to a
+labeling φ along the tree T up to the root according to the following rules:
+1. φ(v) :=li if v is the i-th leaf of T ,
+2. φ(v) := Hs(φ(v1)‖φ(v2)) where v1,v 2 are the two children of v.
+Then the commitment for a string l is the label φ(r) of the root of the tree: we denote it with MTs(l). The
+commitment is succinct in fact it has size k which is independent of n.
+An opening for the i-th element in the sequence l is an ordered sequence formed by elements of {0, 1}k
+that are intended to be the label li of the i-th leaf of T together with the labels φ(vj) for each vj that is a
+sibling of vertices in the path from the root of the tree to the i-th leaf. An example of opening is shown in
+Figure B.1.
+e
+c
+b a
+d
+Fig. B.1. An example of opening: c = (a,b,c,d,e )
+We denote with Open s(l,i ) the opening formed by li together with all the φ(vj). Notice that from
+Opens(l,i ) it is possible to compute φ(w) for each vertex w in the path from the root to the leaf at the i-th
+19
+position. In particular it is eﬃcient to compute MTs(l). The opening is succinct in fact it has size k· logn
+which is (almost) independent of n. In general, given an opening c = (c1,...,c logn) for some position i we
+can think of it as equivalent to Open s(l,i ) and compute the label of the root according to the given c and
+positioni. If this value is equal to MTs(l), we say thatc opens thei-th position toc1. As H is a CRH function,
+then for any i, it is guaranteed that MTs(l) can open the i-th position only to li.
+20

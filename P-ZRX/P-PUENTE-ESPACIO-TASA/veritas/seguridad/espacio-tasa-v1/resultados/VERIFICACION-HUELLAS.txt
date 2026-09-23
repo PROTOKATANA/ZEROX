@@ -1,0 +1,33 @@
+== 1. Huellas de las ENTRADAS (desde la raíz de ZEROX) ==
+   AGENTS.md: La suma coincide
+   README.md: La suma coincide
+   MIGRACION.md: La suma coincide
+   SPEC.md: La suma coincide
+   veritas/LINEO.md: La suma coincide
+   research/README.md: La suma coincide
+   P-ZRX/P-CRP/auditoria/DEFECTOS.md: La suma coincide
+   P-ZRX/P-PRESTAMO/investigacion/INFORME.md: La suma coincide
+   P-ZRX/P-PUERTA/veritas/consenso/puerta-cobertura-v1/MODELO.md: La suma coincide
+   P-ZRX/P-PUERTA/veritas/consenso/puerta-cobertura-v1/src/peso.jl: La suma coincide
+   P-ZRX/P-INTENTO/investigacion/INFORME.md: La suma coincide
+   P-ZRX/P-COBERTURA/investigacion/INFORME.md: La suma coincide
+   P-ZRX/P-PUENTE-ESPACIO-TASA/PROMPT.md: La suma coincide
+
+== 2. Huellas del INSTRUMENTO (desde el propio directorio) ==
+   (sin autorreferencia a HUELLAS\.sha256)
+   (sin autorreferencia a VERIFICACION-HUELLAS\.txt)
+   64 huellas verificadas
+
+== 3. Fuente fijada de Autonomys ==
+   commit OK: f8842d019cdf0f7163421b9644db5a9ff82b2a73
+   árbol limpio
+   huellas de las fuentes usadas OK
+
+== 4. Árbol de ZEROX fuera del instrumento ==
+   ningún fichero VERSIONADO cambió (20 entradas M/D/R/A idénticas)
+   entradas ?? nuevas durante la sesión (trabajo AJENO, preservado):
+      ?? P-ZRX/P-RIVAL/
+      ?? P-ZRX/P-SELLO/
+   el instrumento sigue siendo el único añadido propio
+
+RESULTADO: TODO VERIFICADO

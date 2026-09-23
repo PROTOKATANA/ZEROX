@@ -1,0 +1,14 @@
+N_identidades	bytes_por_identidad	suma_bytes_igual_T	hipotesis_piezas_por_sector	bytes_por_pieza_plot	sectores_esc1_hip_1000	sectores_agregado_desde_T	perdidos	perdidos_le_N	identidades_sin_sector_hip_1000	piezas_max_que_caben	cabe_algun_sector_si_se_ajustan_piezas
+1	1099511627776	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1040	1040	0	true	0	1000	true
+2	549755813888	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1040	1040	0	true	0	1000	true
+3	366503875926	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1038	1040	2	true	0	1000	true
+7	157073089683	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1036	1040	4	true	0	1000	true
+10	109951162778	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1040	1040	0	true	0	1000	true
+100	10995116278	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1000	1040	40	true	0	1000	true
+520	2114445439	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1040	1040	0	true	0	1000	true
+1039	1058240258	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1039	1040	1	true	0	1000	true
+1040	1057222720	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	1040	1040	0	true	0	1000	true
+1041	1056207136	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	0	1040	1040	true	1041	999	true
+1042	1055193501	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	0	1040	1040	true	1042	998	true
+2000	549755814	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	0	1040	1040	true	2000	520	true
+10000	109951163	true	1000 (MAX_PIECES_IN_SECTOR, hipotesis)	1056896	0	1040	1040	true	10000	104	true

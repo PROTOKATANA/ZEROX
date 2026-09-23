@@ -1,0 +1,11 @@
+[deps]
+Arblib = "fb37089c-8514-4489-9461-98f9c8763369"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+Random123 = "74087812-796a-5b5d-8853-05524746bad3"
+StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
+[compat]
+julia = "1.13"

@@ -1,0 +1,8 @@
+escrito en /home/katana/zeo/ZEROX/P-ZRX/P-COBERTURA/investigacion/veritas/criptografia/cobertura-parcela-v1/resultados
+  F3-deteccion.tsv
+  F3-exacto-racional.tsv
+  F4-coste.tsv
+  F4-frontera.tsv
+  F4-reconciliacion.tsv
+  F5-registro.tsv
+  certificado.tsv

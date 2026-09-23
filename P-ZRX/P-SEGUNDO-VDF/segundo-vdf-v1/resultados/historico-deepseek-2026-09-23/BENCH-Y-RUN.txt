@@ -1,0 +1,31 @@
+=== RUN COMPLETO ===
+modo controles   → resultados/CONTROLES.txt               2.11 s
+modo calibracion → resultados/CALIBRACION.txt             0.10 s
+modo escenarios  → resultados/ESCENARIOS.txt              0.61 s
+modo semilla     → resultados/SEMILLA.txt                 0.13 s
+modo regimenes   → resultados/REGIMENES.txt               0.10 s
+modo coste       → resultados/COSTE.txt                   0.00 s
+TOTAL 3.32 s (16 hilos)
+=== BENCH ===
+== kernel: una réplica, J=1500, hilo único ==
+mediana = 0.143 ms   mínimo = 0.138 ms   asignaciones = 0   memoria = 0 B
+@allocated una llamada = 0 B
+
+== barrido réplicas × ρ ==
+R= 64 ρ=12 hilos= 1     85.16 ms   speedup vs 1 hilo =  0.96×
+R= 64 ρ=12 hilos= 2     55.21 ms   speedup vs 1 hilo =  1.53×
+R= 64 ρ=12 hilos= 4     27.32 ms   speedup vs 1 hilo =  2.89×
+R= 64 ρ=12 hilos= 8     22.41 ms   speedup vs 1 hilo =  3.73×
+R= 64 ρ=12 hilos=16     23.03 ms   speedup vs 1 hilo =  3.76×
+R=256 ρ=12 hilos= 1    314.26 ms   speedup vs 1 hilo =  0.98×
+R=256 ρ=12 hilos= 2     62.26 ms   speedup vs 1 hilo =  5.08×
+R=256 ρ=12 hilos= 4     61.60 ms   speedup vs 1 hilo =  5.06×
+R=256 ρ=12 hilos= 8     53.88 ms   speedup vs 1 hilo =  5.76×
+R=256 ρ=12 hilos=16     58.41 ms   speedup vs 1 hilo =  5.35×
+
+== determinismo entre hilos (checksum) ==
+hilos= 1  checksum idéntico = true
+hilos= 2  checksum idéntico = true
+hilos= 4  checksum idéntico = true
+hilos= 8  checksum idéntico = true
+hilos=16  checksum idéntico = true

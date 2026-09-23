@@ -1,0 +1,8 @@
+[deps]
+Arblib = "fb37089c-8514-4489-9461-98f9c8763369"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Random123 = "74087812-796a-5b5d-8853-05524746bad3"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+
+[compat]
+julia = "1.13"

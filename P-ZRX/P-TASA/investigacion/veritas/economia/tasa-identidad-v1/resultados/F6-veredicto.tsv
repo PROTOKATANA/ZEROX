@@ -1,0 +1,6 @@
+rama	cae_dentro_de_la_linea	que_cierra	coste	quien_paga	etiqueta
+(a) stake proporcional al espacio	si	nada nuevo: el teorema ya dice que el coste por byte es neutral	convierte el consenso en una subasta de capital	el granjero sin capital	verificado en fuente (AGENTS.md)
+(b) depósito fijo confiscable	no	nada sin κq > 0; con κq > 0 hereda la pared de P-CLAVE	depende de la economía de castigo ya refutada contra claves pobres/nuevas	el honesto con dos nodos (falsos positivos)	derivado
+(c) tasa fija no recuperable, pagada en moneda	no	habilita exclusividad; no toca el doble farmeo	regresiva (carga = f*/f) y exige moneda previa: barrera de entrada	la granja pequeña	derivado
+(c') tasa fija pagada en cómputo	no	cumple la letra del teorema y evita el arranque monetario	reintroduce minería PoW y es ASIC-able; regresiva igual	el granjero doméstico frente al que compra cómputo a escala	derivado
+rechazar (11) entera	si	nada: deja el hueco que la motivaba	ninguno; conserva el tablero honesto	—	propuesto

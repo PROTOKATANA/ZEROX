@@ -1,0 +1,22 @@
+sellado-rama-v1 · VALIDACION
+fecha: 2026-09-23T19:30:05+02:00
+julia: julia version 1.13.0
+hilos de cálculo: 4 (tope del encargo) · tests a 1 hilo
+uptime:  19:30:05  up 15 days 15:59,  0 users,  carga promedio: 2,68, 3,92, 3,29
+
+Test Summary:   | Pass  Total  Time
+sellado-rama-v1 |   76     76  1.2s
+
+artefactos: resultados/certificado.tsv resultados/F2-mc-puntas.tsv resultados/F2-religadura.tsv resultados/F4-honesto.tsv resultados/F5-alfa-sustitucion.tsv 
+
+--- cabeceras de los TSV publicados ---
+### resultados/certificado.tsv
+filas_datos=7
+### resultados/F2-mc-puntas.tsv
+filas_datos=5
+### resultados/F2-religadura.tsv
+filas_datos=30
+### resultados/F4-honesto.tsv
+filas_datos=10
+### resultados/F5-alfa-sustitucion.tsv
+filas_datos=50

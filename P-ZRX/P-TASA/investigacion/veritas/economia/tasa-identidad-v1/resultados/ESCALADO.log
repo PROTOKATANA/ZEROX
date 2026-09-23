@@ -1,0 +1,12 @@
+hilos=1  tiempo=0.216457 s  media=1.617187500000e-05  desv=8.392e-06  identico_a_serial=true
+uptime: 17:56:18  up 15 days 14:25,  0 users,  carga promedio: 2,09, 1,71, 1,44
+hilos=2  tiempo=0.113855 s  media=1.617187500000e-05  desv=8.392e-06  identico_a_serial=true
+uptime: 17:56:19  up 15 days 14:25,  0 users,  carga promedio: 2,09, 1,71, 1,45
+hilos=4  tiempo=0.057352 s  media=1.617187500000e-05  desv=8.392e-06  identico_a_serial=true
+uptime: 17:56:20  up 15 days 14:25,  0 users,  carga promedio: 2,09, 1,71, 1,45
+hilos=1  tiempo=0.215664 s  media=1.617187500000e-05  desv=8.392e-06  identico_a_serial=true
+uptime: 17:59:04  up 15 days 14:28,  0 users,  carga promedio: 2,34, 1,98, 1,59
+hilos=2  tiempo=0.112394 s  media=1.617187500000e-05  desv=8.392e-06  identico_a_serial=true
+uptime: 17:59:05  up 15 days 14:28,  0 users,  carga promedio: 2,55, 2,03, 1,61
+hilos=4  tiempo=0.061314 s  media=1.617187500000e-05  desv=8.392e-06  identico_a_serial=true
+uptime: 17:59:06  up 15 days 14:28,  0 users,  carga promedio: 2,55, 2,03, 1,61

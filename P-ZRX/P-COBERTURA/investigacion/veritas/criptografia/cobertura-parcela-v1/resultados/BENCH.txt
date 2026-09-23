@@ -1,0 +1,48 @@
+== cobertura-parcela-v1 · benchmarks ==
+Julia 1.13.0 · hilos=4 · CPU=znver5
+uptime:  23:51:03  up 14 days 20:20,  0 users,  carga promedio: 2,10, 1,95, 1,72
+
+validación kernel vs Rational{BigInt}: 1620 casos, error máx 4.785e-14
+BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
+ Range (min … max):  181.996 μs … 274.825 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     186.276 μs               ┊ GC (median):    0.00%
+ Time  (mean ± σ):   186.768 μs ±   1.755 μs  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+                          ▂▆█▅▄                                  
+  ▂▂▂▂▁▁▁▁▁▁▁▂▂▁▁▁▁▁▂▂▂▃▅▇██████▅▄▃▂▂▂▂▃▃▃▄▄▄▄▄▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂ ▃
+  182 μs           Histogram: frequency by time          192 μs <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+mediana      : 0.182 ms
+memoria      : 0 B
+asignaciones : 0
+celdas       : 64 por llamada
+
+-- escalado del barrido por hilos (tope del encargo: 4) --
+hilos=1 (no usado por el kernel): 0.1863 ms/barrido
+hilos=2 (no usado por el kernel): 0.1864 ms/barrido
+hilos=4 (no usado por el kernel): 0.1870 ms/barrido
+
+-- perfil --
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+     7         0 @Base/Base.jl           355 (::Base.var"#start_profile_listen…
+     7         0 @Base/Base.jl           335 profile_printing_listener(cond::B…
+     7         0 @Base/asyncevent.jl     186 _trywait(t::Base.AsyncCondition)
+     7         0 @Base/condition.jl      136 wait
+     7         0 @Base/condition.jl      141 wait(c::Base.GenericCondition{Bas…
+     7         0 @Base/client.jl         577 _start()
+     7         0 @Base/client.jl         344 exec_options(opts::Base.JLOptions)
+     7         0 @Base/Base.jl           309 include(mod::Module, _path::Strin…
+     7         0 @Base/loading.jl       3076 _include(mapexpr::Function, mod::…
+     7         0 @Base/loading.jl       3016 include_string(mapexpr::typeof(id…
+     7         0 @Base/boot.jl           489 eval(m::Module, e::Any)
+     7         0 @CoberturaParcela/bench/benchmarks.jl   66 main()
+     7         0 @Profile/src/Profile.jl   60 macro expansion
+     7         0 @CoberturaParcela/bench/benchmarks.jl   67 macro expansion
+     7         0 @CoberturaParcela/src/rapido.jl   72 cola_hiper_barrido!(dest::Vector{…
+     7         0 @Base/special/exp.jl    329 exp(x::Float64)
+    21         0 @Base/task.jl          1196 wait_forever()
+    28        27 @Base/task.jl          1296 wait()
+Total snapshots: 56. Utilization: 50% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

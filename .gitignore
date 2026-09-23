@@ -16,3 +16,6 @@ PDF/autonomys-subspace/
 # validarse. El directorio se borra al cerrar cada encargo; la evidencia que deba sobrevivir se
 # deja en veritas/ antes del borrado.
 deepseek/
+
+# Depósitos de Julia por instrumento: artefactos regenerables (añadido 2026-09-24)
+.julia-depot/

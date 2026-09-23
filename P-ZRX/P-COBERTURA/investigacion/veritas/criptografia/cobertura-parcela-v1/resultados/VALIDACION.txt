@@ -1,0 +1,10 @@
+cobertura-parcela-v1 · VALIDACION
+fecha: 2026-09-22T23:51:13+02:00
+julia: julia version 1.13.0
+hilos: 4 (tope del encargo)
+uptime:  23:51:13  up 14 days 20:20,  0 users,  carga promedio: 2,08, 1,95, 1,73
+
+Test Summary:        |  Pass  Total  Time
+cobertura-parcela-v1 | 11833  11833  2.6s
+
+artefactos: resultados/certificado.tsv resultados/F3-deteccion.tsv resultados/F3-exacto-racional.tsv resultados/F4-coste.tsv resultados/F4-frontera.tsv resultados/F4-reconciliacion.tsv resultados/F5-registro.tsv 

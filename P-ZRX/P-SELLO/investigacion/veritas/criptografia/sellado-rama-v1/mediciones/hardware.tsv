@@ -1,0 +1,11 @@
+# hardware.tsv — entradas de coste, NO re-medidas en este encargo.
+# clave	valor	unidad	etiqueta	fuente
+t_tabla_s	0.80913	s/tabla/nucleo	medido	P-ZRX/P-INTENTO/investigacion/INFORME.md §5 (M1, semilla distinta por iteración)
+r_tablas_s	25.027	tablas/s	medido	P-ZRX/P-INTENTO/investigacion/INFORME.md §5 (forma C, 8 concurrentes, 24 hilos)
+hilos	24	hilos	tope	veritas/LINEO.md §7
+piece_bytes	1048672	B/pieza	verificado en fuente	PDF/autonomys-subspace/crates/subspace-core-primitives/src/pieces.rs:1226 (Piece::SIZE)
+slot_s	1.0	s/slot	verificado en fuente	PDF/autonomys-subspace/crates/subspace-runtime/src/lib.rs:145 (SLOT_DURATION=1000)
+lambda_bps	1.0	bloques/s	entrada	SPEC.md §7.3 (λ=1 nominal A'')
+delta_medio_s	0.138	-	0.387	s	derivado	veritas/finalidad/delta-medido-v1/INFORME.md §11.4 (Δ̄ uniforme, extremos)
+delta_p99_s	0.26	-	0.60	s	medido	veritas/finalidad/delta-medido-v1/INFORME.md §11.2 (Δ_99 p99, rejilla r2)
+s_max_s	150	s	nominal	SPEC.md:2052

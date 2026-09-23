@@ -1,0 +1,51 @@
+TR-v0.1 · BENCH · 2026-09-23T19:27:49.417
+Julia 1.13.0 · hilos=4/1
+CPU=znver5 · RAM=123 GiB
+uptime: 19:27:49  up 15 days 15:57,  0 users,  carga promedio: 5,67, 4,98, 3,48
+
+| Variante | Tiempo mediano | Asignaciones | Hilos | Resultado |
+|---|---:|---:|---:|---|
+| α* exacto (Rational{BigInt}) | 0.752 µs | 78 | 1 | fuente de verdad |
+| α* por bisección (512 it., oráculo) | 966.5 µs | 70027 | 1 | = forma cerrada |
+| ventaja marginal (diferencia finita exacta) | 2.854 µs | 285 | 1 | = derivada |
+| α* multiplicativo (bisección exacta) | 1214.1 µs | 76351 | 1 | = control |
+| rejilla Float64, 10⁴ puntos | 0.6 µs | 0 | 1 | sin fronteras |
+
+asignaciones de rejilla_alpha! (10⁴): 0 B
+code_warntype(alpha_aditivo_f64): MethodInstance for alpha_aditivo_f64(::Float64, ::Float64, ::Float64, ::Float64)
+  from alpha_aditivo_f64(β_d::Float64, β_x::Float64, θ::Float64, ρ::Float64) @ Main ~/zeo/ZEROX/P-ZRX/P-RIVAL/investigacion/veritas/consenso/trabajo-rival-v1/src/rapido.jl:7
+Arguments
+  #self#::Core.Const(Main.alpha_aditivo_f64)
+  β_d::Float64
+  β_x::Float64
+  θ::Float64
+  ρ::Float64
+Body::Float64
+1 ─       nothing
+│   %2  = Main.:(==)::Core.Const(==)
+│   %3  = (%2)(θ, 1.0)::Bool
+└──       goto #4 if not %3
+2 ─ %5  = Main.NaN::Core.Const(NaN)
+└──       return %5
+3 ─       Core.Const(:(goto %8))
+4 ┄ %8  = Main.:/::Core.Const(/)
+│   %9  = Main.:-::Core.Const(-)
+│   %10 = Main.:-::Core.Const(-)
+│   %11 = Main.:-::Core.Const(-)
+│   %12 = (%11)(1.0, β_d)::Float64
+│   %13 = Main.:*::Core.Const(*)
+│   %14 = (%13)(2.0, β_x)::Float64
+│   %15 = (%10)(%12, %14)::Float64
+│   %16 = Main.:/::Core.Const(/)
+│   %17 = Main.:*::Core.Const(*)
+│   %18 = Main.:-::Core.Const(-)
+│   %19 = (%18)(ρ, 1.0)::Float64
+│   %20 = (%17)(θ, %19)::Float64
+│   %21 = Main.:-::Core.Const(-)
+│   %22 = (%21)(1.0, θ)::Float64
+│   %23 = (%16)(%20, %22)::Float64
+│   %24 = (%9)(%15, %23)::Float64
+│   %25 = (%8)(%24, 2.0)::Float64
+└──       return %25
+
+

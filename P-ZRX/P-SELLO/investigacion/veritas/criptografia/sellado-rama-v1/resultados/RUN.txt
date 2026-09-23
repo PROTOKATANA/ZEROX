@@ -1,0 +1,17 @@
+=== sellado-rama-v1 · SELLO-v0.1 ===
+hardware: t_tabla=0.80913 s r=25.027 tablas/s hilos=24 piece=1048672 B
+N_TiB=1.048480008788258e6 · horas/TiB 1 núcleo=235.65461930856756 · máquina=11.63720968896101
+λ=1.0 τ=1.0 Δ=[0.26, 0.35, 0.45, 0.6] Δmedio=[0.138, 0.2, 0.3, 0.387] ramas=[1.0, 1.14, 1.26, 1.39, 2.0]
+hilos Julia=4, interactivo=1
+escrito F2-religadura.tsv
+escrito F4-honesto.tsv
+escrito F5-alfa-sustitucion.tsv
+escrito certificado.tsv
+=== fin ===
+=== sellado-rama-v1 · SELLO-v0.1 ===
+hardware: t_tabla=0.80913 s r=25.027 tablas/s hilos=24 piece=1048672 B
+N_TiB=1.048480008788258e6 · horas/TiB 1 núcleo=235.65461930856756 · máquina=11.63720968896101
+λ=1.0 τ=1.0 Δ=[0.26, 0.35, 0.45, 0.6] Δmedio=[0.138, 0.2, 0.3, 0.387] ramas=[1.0, 1.14, 1.26, 1.39, 2.0]
+hilos Julia=4, interactivo=1
+escrito F2-mc-puntas.tsv
+=== fin ===

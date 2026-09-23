@@ -1,0 +1,8 @@
+c / composición	θ* (seguridad)	ventaja en θ=1/2	razón	consecuencia
+0/1	no existe en [0,1)	1/2	aditiva: la pata no anula la ventaja: 1 + θ(c−1) ≥ 0	degenerado: hace falta θ = 1 y el espacio deja de pesar
+1/2	no existe en [0,1)	3/4	aditiva: la pata no anula la ventaja: 1 + θ(c−1) ≥ 0	la compuerta amplifica o deja igual la ventaja
+1/1	no existe en [0,1)	1/1	aditiva: la pata no anula la ventaja: 1 + θ(c−1) ≥ 0	la compuerta amplifica o deja igual la ventaja
+2/1	no existe en [0,1)	3/2	aditiva: la pata no anula la ventaja: 1 + θ(c−1) ≥ 0	la compuerta amplifica o deja igual la ventaja
+multiplicativa (ρ_pub>ρ_priv)	V decrece pero V>0	0.133333	k = (ρ_pub/ρ_priv)^(θ/(1−θ)); V = [β_d+β_x(1+k)]/(1+k) → β_x	θ<1/2 diluye la ventaja, pero exige mayoría de trabajo del honesto (ρ_pub>ρ_priv) y el atacante puede comprarla: carrera de hash
+multiplicativa (ρ_pub<ρ_priv)	no existe en [0,1)	0.166667	el atacante con más trabajo ve CRECER la ventaja con θ	la pata ayuda al atacante
+umbral (trabajo fuera del peso)	no existe en [0,1)	1/1	V = β_d/2 + β_x, sin factor de compuerta	el grifo no cambia la frontera; solo añade coste

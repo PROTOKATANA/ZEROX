@@ -1,0 +1,1128 @@
+Proofs of Replicated Storage
+Without Timing Assumptions ⋆
+Ivan Damg˚ ard, Chaya Ganesh, and Claudio Orlandi
+Computer Science Department, DIGIT, Aarhus University, Denmark
+{ivan,ganesh,orlandi}@cs.au.dk
+Abstract. In this paper we provide a formal treatment of proof of repli-
+cated storage, a novel cryptographic primitive recently proposed in the
+context of a novel cryptocurrency, namely Filecoin.
+In a nutshell, proofs of replicated storage is a solution to the following
+problem: A user stores a ﬁle m on n diﬀerent servers to ensure that
+the ﬁle will be available even if some of the servers fail. Using proof of
+retrievability, the user could check that every server is indeed storing
+the ﬁle. However, what if the servers collude and, in order to save on
+resources, decide to only store one copy of the ﬁle? A proof of replicated
+storage guarantees that, unless the (potentially colluding) servers are
+indeed reserving the space necessary to storen copies of the ﬁle, the user
+will not accept the proofs. While some candidate proofs of replicated
+storage have already been proposed, their soundness relies on timing
+assumptions i.e., the user must reject the proof if the prover does not
+reply within a certain time-bound.
+In this paper we provide the ﬁrst construction of a proof of replication
+which does not rely on any timing assumptions.
+1 Introduction
+Consider a scenario where a user A wants to use the cloud or some other decen-
+tralized network of servers to store and distribute some ﬁle m to other users. To
+make sure she and other users will be able to access the ﬁle later on, A stores
+several replicas of m in diﬀerent locations. However, A suspects that the servers
+she is using are adversarial and may collude, for instance to save on costs by
+using less space than they are supposed to. So she will be interested in checking
+that indeed unique space has been dedicated to each replica, and it is natural to
+require that this can be veriﬁed, even if all servers are controlled by an adversary.
+We will call this proof of replication.
+A ﬁrst issue to note is that the well-known notions of proof of retrievability or
+proof of space (which we discuss in more detail below) do not solve the problem if
+⋆ This work was supported by the: Protocol Labs RFP Program; Danish Indepen-
+dent Research Council under Grant-ID DFF-6108-00169 (FoCC); European Research
+Council (ERC) under the European Unions’s Horizon 2020 research and innovation
+program under grant agreement No 669255 (MPCPRO) and No 803096 (SPEC);
+Concordium Blockchain Research Center, Aarhus University, Denmark.
+each replica is simply a copy ofm. Such proofs allow a user to check that a given
+ﬁle is retrievable from a server, much more eﬃciently than by simply retrieving
+the ﬁle. However, even if A asks for a proof of retrievability of m from each of
+the servers and all these proofs are successful, this may simply be because the
+user is actually talking to the adversary who stores only a single copy of m.
+Another idea that comes to mind is that A could let each replica be an
+encryption of m under some key K, but with fresh randomness for each replica.
+If the encryption is IND-CPA secure, the adversary cannot distinguish this from
+encryptions of random independent messages, and hence it seems they are forced
+to store all replicas in order for them to be retrievable later. While this intuition
+can in fact be proved, this would not be a satisfactory solution: recall that we
+want that anyone, not just A, can retrieve the original ﬁle, so A would have
+to share K with other users. However, if any of these users collude with the
+adversary, the security breaks down. Besides, a solution that does not require A
+to store secret information for later is clearly more practical.
+The idea of proof of replication was introduced in Filecoin [Lab17a, Lab17b],
+a decentralized storage network 1. They articulate a list of properties that they
+desire from such a notion. They deﬁne a Sybil attack which is exactly what
+we discussed above: if an honest client wishes to store the same ﬁle m on n
+diﬀerent servers, an adversary can store these using sybil identities (all servers
+are controlled by one adversary) and successfully pass the storage audit, while
+essentially storing only one copy of the ﬁle.
+While the Filecoin paper does not give a formal treatment of proof of repli-
+cation, they propose a construction for what they call a time-bounded proof of
+replication. In such a notion, the ﬁle to be stored is encoded so that the en-
+coding process is slow: slow enough for a client to distinguish between honest
+proving time, and potentially adversarial proving time which includes the time
+to re-encode. Thus, the encoding process is, by design, distinguishably more ex-
+pensive than honest proving time. This notion is realized by using a block-cipher
+and slowing it down by block chaining, and a time-bounded proof of replication
+is a proof of storage of a replica that is encoded in this way.
+The basic problem with all time-bounded schemes is the handling of recom-
+puting attack: the encoding has to be made so slow that even a powerful server
+cannot encode faster than the time a proof takes. This is harder than it may
+seem at ﬁrst: even if we know for sure how many operations are needed to encode
+for a given value of security parameter, the actual time it takes depends on the
+hardware held by the adversarial parties, and so is beyond the control of hon-
+est users. This makes a concrete choice of parameters very diﬃcult: should we
+compensate for the adversary being more powerful than we expect and choose
+a very slow encoding thus making life harder also for honest clients when they
+encode? Or should we choose parameters more aggressively and run a bigger risk
+1 Other related notions in the context of data replication have been studied earlier in
+the cryptographic literature; we discuss the connection and diﬀerences in the related
+work section.
+2
+of being cheated? It would clearly be better if we did not have to make such a
+choice.
+We ask if we can do better in all the above aspects: can we have a proof
+of replication scheme that provably resists sybil attacks, and is not
+time-bounded?
+Our Results. We give a formal treatment of proofs of replication, by giving a
+deﬁnition that captures the desired properties as well as a construction which we
+prove secure according to the deﬁnition. The construction works in the random
+oracle model and can be instantiated from any one-way permutation. We con-
+centrate on the case where the client doing the encoding is honest, as this seems
+to be the most important case in practice, and is in line with the deﬁnitions of
+proof of retrievability and storage.
+Each replica of the ﬁlem to be stored in our construction has sizeO(|m|+κ),
+where|m| is the length ofm andκ is the security parameter. To verify replication,
+the user conducts a proof of retrievability with each server. Any such proof can
+be used, so we inherit whatever communication complexity that proof has.
+Very roughly speaking, the idea in our solution is that the adversary ﬁrst
+receives each of the replicas to store, where each replica is a special encoding of
+m. The adversary may now store a state for later use, which in the honest case
+would contain all replicas. What we show is that, no matter how the adversary
+computes the state, if it is signiﬁcantly smaller than the combined size of all
+replicas, then some of the proofs of retrievability will fail, unless the adversary
+breaks a computational assumption.
+Let us consider what this exactly guarantees us. Since the proofs of retriev-
+ability are extractable, the above guarantees that the replicas cannot be com-
+pressed i.e., the adversary must reserve enough space to store all replicas, and
+this space must contain some data which is equivalent (up to polynomial time
+computation) to the replicas of the ﬁle. But is this the best we can do? Why
+don’t we ask that the adversary in fact stores a concatenation of all the replicas?
+Unfortunately, this is impossible to achieve: even honest servers will most likely
+store the same information in diﬀerent formats (think of little- vs. big-endian
+representation). So we certainly cannot expect that the adversary will store ex-
+actly the same data that was received from the client. However, this should
+not matter from a security point of view, as long as the original data can be
+eﬃciently recovered.
+In conclusion: it is impossible to force the corrupted servers to store exactly
+the n replicas or n copies of the ﬁle. Therefore, the best we can hope for is
+what we do in this paper: no matter how the corrupted servers behave, it is
+possible to recovern distinct, incompressible encodings of the same ﬁle, thus the
+servers cannot pass the veriﬁcation unless they reserve the necessary space for
+all replicas. Note, however, that in such a scenario, the corrupted servers have
+no incentive to do anything else than simply store the replicas.
+The main diﬀerence between our work and previously proposed solutions to
+the problem, is that our solution does not require the use of time: while the
+3
+original, informal deﬁnition of proof of replication states that it should be hard
+for the server to recompute the encodings of the ﬁle in the time it takes to verify
+the proof, our deﬁnition is much stronger as it rules out that any polynomially
+bounded attacker who uses less storage than claimed can pass the veriﬁcation.
+As discussed above, this makes implementing proof of replications much easier,
+since one does not need to worry about ﬁnding an appropriate value for the
+veriﬁer timeout.
+To avoid misunderstandings, we emphasize that even if our deﬁnitions and
+proof work with a single adversary that handles all replicas, the actual use case
+includes several servers that each store one replica (if they are honest). Since it
+is clearly impossible to check if a server stores something without talking to that
+server, the communication complexity of our protocol must be proportional to
+the number of servers 2.
+Finally, our main construction achieves public veriﬁability in the sense that
+if the encoder is honest, then anyone can interact with the servers and verify the
+proofs. At the end of the paper we discuss extensions which allow to cope with
+malicious encoders.
+1.1 Related Work
+Proofs of retrievability. A lot of user data today is outsourced for storage on
+the cloud both because of large volumes of data, and for reliability in case of
+failure of local storage. The problem with cloud storage is that of maintaining
+integrity of data and enforcing accountability of the storage provider. Proofs of
+retrievability, ﬁrst formalized by Juels and Kaliski in [JK07] address this problem
+by allowing for audits. In a proof of retrievability, a client can store a ﬁle on the
+server, while storing (a short) veriﬁcation string locally. In an audit protocol,
+the client acts as the veriﬁer and the server proves that it possesses the client’s
+ﬁle. The property that the server “possesses” a ﬁle is formalized by the existence
+of an extractor that retrieves the client’s ﬁle from a server that makes a client
+accept in the audit protocol. Since their introduction, there have been several
+works [SW08, DVW09] constructing proof of retrievability schemes with a proof
+of security and eﬃcient audit procedures. One property we prioritize in this
+work is public veriﬁability where any party can take the role of the veriﬁer in the
+audit protocol, not just the client who originally stored the ﬁle. This means the
+client’s state storing any veriﬁcation information for the ﬁle should not contain
+any secrets. The construction of [SW08] gives a proof of retrievability scheme
+secure in the random oracle model that allows public veriﬁability.
+Proofs of space. A proof of space is a protocol where a prover convinces a veriﬁer
+that it has dedicated a signiﬁcant amount of disk-space. Proofs of space were
+introduced in [DFKP15] as an alternative to proof of work (PoW), and further
+2 Of course, if a single server would store all replicas, we can optimize the communi-
+cation needed, this is also easy to see for our protocol, but this hardly seems like an
+interesting use case.
+4
+studied in [RD16, AAC+17]. There have been proposals based on proof of space
+like chia network [chi17] and Spacemint [PPK +15]. Very roughly, a proof of
+space gives the guarantee that it is more “expensive” for a malicious server that
+dedicates less space than an honest server to successfully pass an audit.
+Data replication. Curtmola et al. [CKBA08] and Barsoum et al. [BH11] propose
+protocols that enable proofs of data replication in the private veriﬁer model,
+where the client stores a secret key that is used for veriﬁcation. The work of Hao
+and Yu [HY10] allows public veriﬁability but nevertheless requires the client
+to store a secret. The work of Etemad and K¨ up¸ c¨ u [EK13] studies replicated
+provable data possession, but does not formalize replicated storage, and the
+client need not be aware of any replication. Finally, the protocol of Armknecht
+et al. [ABBK16] is also in the private veriﬁcation model, and in addition, uses
+RSA time-lock puzzles which results in a protocol with a time-bounded property
+that we elaborate on below.
+Filecoin. Filecoin is a decentralized storage network [Lab17a]. Essentially this
+can be seen as a network of independent storage providers that oﬀer veriﬁable
+ﬁle storage and retrieval services. In the Filecoin protocol, miners earn protocol
+tokens by providing data storage services.
+To be used in the Filecoin context, a proof of replicated storage should sat-
+isfy several properties. First, the scheme should protect against Sybil attacks as
+described above e.g., a corrupt server should not be able to impersonate n dif-
+ferent servers while storing a single copy of the ﬁle. Then, the scheme should be
+publicly veriﬁable, meaning that any user (not only the original encoder) should
+be able to verify the proof. It is also crucial that the security deﬁnition allows
+the adversary to choose the ﬁle m. This is because an adversary could request
+form to be stored, and then prove thatm was stored to collect network rewards.
+Finally, the scheme should be resilient against generation attacks, meaning that
+the adversary should not be able to reconstruct an encoding “on the ﬂy” when
+a proof of storage is requested.
+Our main construction cannot be directly used in the Filecoin context since
+the soundness of the proof relies on the encoder being honest. Thus, a malicious
+encoder colluding with malicious servers could perform a generation attack i.e.,
+persuade other users that some servers are storing several copies of a ﬁle without
+reserving any space. At the end of the paper, we discuss how to extend our
+solution to handle malicious clients too.
+Time-bounded Proofs of Replication. In a recent work by Pietrzak [Pie18], a
+construction for proof of replication based on proof of space is given. A proof
+of replication is not formally deﬁned, and therefore it is not clear what is the
+replication property that the construction satisﬁes. In addition, since a proof of
+space is the starting point of the construction, it has the same “time-bounded”
+property as the Filecoin construction, since a malicious server can pass the au-
+dit by recomputing data. More recently, [FBBG18, BBBF18, CFMJ18, Fis18]
+construct proofs of replication based on slow encodings. They have the same
+5
+time-bounded ﬂavour of other recent works and is thus signiﬁcantly diﬀerent
+from ours.
+Comparison with Hourglass scheme [VDJO +12]. We note that our construction
+and the construction of [VDJO+12] are reminiscent of each other; at a high level
+both involve repeated applications of inversion of a trapdoor permutation and
+a random permutation. However, there are diﬀerences in both the goals and the
+details of the constructions.
+The diﬀerence between the goal of the present work and the Hourglass
+schemes can be summarized as follows: Hourglass only tries to guarantee incom-
+pressibility of a single encoding (such that the original ﬁle can be receoverd),
+whereas the goal of our proof of replicated storage is to get diﬀerent incompress-
+ible encodings to be stored on independent servers, such that the original ﬁle
+can be recovered interacting with a single server. Regarding the constructions,
+our work applies the random permutation over all blocks of the ﬁle and produces
+randomized and independent encodings to be stored on each server, which makes
+a notable diﬀerence in the our analysis 3.
+1.2 Technical Overview
+The existing time-bounded proofs use a public deterministic encoding function.
+The problem is that this always allow a malicious server to recompute encoded
+data and this may lead to a successful recomputation attack if the server has
+suﬃcient computational resources. Our observation is that one can instead make
+the encoding be probabilistic. Now the adversary will only see the encoded data
+but not the randomness that the client used to encode. One may therefore hope
+that recomputing an encoding is not only slow, but completely unfeasible. On
+the other hand, decoding must still be easy for anyone.
+To illustrate the idea of our solution, we start with a toy example: we assume
+that we are given oracle access to a random permutationT , and its inverse4, act-
+ing on strings {0, 1}n. As is well known (and discussed in detail later) we can
+instantiate such an oracle in the standard random oracle model. In order to
+create replicas of a ﬁle, A will generate an instance of a one-way trapdoor per-
+mutationf :{0, 1}n↦→{ 0, 1}n, with trapdoor tf. For simplicity, we assume that
+the ﬁle m to store is an (n− logn)-bit string. Then the i’th replica is deﬁned to
+be (f,f−1(T (m||i))), where|| denotes concatenation and f is a speciﬁcation of
+the 1-way permutation. Clearly, anyone can easily compute m from a replica by
+computingf in the forward direction and callingT−1. It turns out that this con-
+struction is secure if the adversary computes the state to store for later in a very
+restricted way, namely he forgets all information about at least one replica, say
+thei’th one. Namely, the adversary forgets both the encoding (f,f−1(T (m||i)))
+and the intermediate value T (m||i).
+3 It is hard to compare our analysis with that of Hourglass since in [VDJO +12] only
+an informal security argument of incompressibility is given.
+4 One can think of the random permutationT as a random oracle which can be invoked
+in both directions.
+6
+We can now argue that if the adversary is nevertheless able to produce thei’th
+replica, he will have to invert the one-way permutation: from the output of the
+adversary (f,f−1(T (m||i))) we can (as the encoding can be decoded eﬃciently),
+extractT (m||i). But, we assumed that the state did not contain any information
+about this value (except for a negligible amount following from the fact that it
+must be diﬀerent from other outputs). Hence he must call the oracle to get
+T (m||i). Therefore, in a security reduction, we can take a challenge value y and
+reprogramT such that T (m||i) =y. Now, the i’th replica (that we assumed the
+adversary could produce) is exactly the preimage of y under f.
+Of course, we cannot reasonably assume that the adversary behaves in this
+simple-minded way. As mentioned, we only want to assume that the state stored
+is smaller than the combined size of the replicas, say by a constant factor. To
+overcome this problem, we iterate the above construction several times, so that
+T is called several times while preparing a replica. Now there are many more
+outputs from T than the adversary can remember, and we show that by the
+setting the parameters right, at least one of these is almost uniform in the view
+of the adversary. Now we can place a challenge value for the one-way permutation
+in this position by an argument similar to the above.
+2 Preliminaries
+Notation. We denote the concatenation of two bit strings x and y by x||y.
+Throughout, we useκ to denote the security parameter. We denote a probabilis-
+tic polynomial time algorithm by PPT. A function is negligible if for all large
+enough values of the input, it is smaller than the inverse of any polynomial. We
+use negl to denote a negligible function. We use [1 ,n ] to represent the set of
+numbers{1, 2,...,n }. For a randomized algorithm Alg, we use y← Alg(x) to
+denote that y is the output of Alg on x. We write y
+R
+←Y to mean sampling a
+valuey uniformly from the set Y.
+2.1 Trapdoor permutations
+A collection of trapdoor permutations is a family F ={fpk :Dpk→D pk} such
+that:
+– There exists a PPT algorithm KeyGen such that (pk,sk )← KeyGen(1κ),fpk
+is a permutation.
+– There exists a PPT algorithm that given pk samples uniformly fromDpk.
+– There exists a PPT algorithm that on input pk and x∈ Dpk, computes
+fpk(x).
+– There exists a PPT algorithm that on inputsk andfpk(x), computesx, that
+is, f−1
+sk (fpk(x)) =x.
+Deﬁnition 1. A trapdoor permutation family F ={fpk :Dpk→D pk} is said
+to be hard to invert if the following holds: for all PPT algorithms A, there exists
+7
+a negligible function negl such that
+Pr[fpk(z) =y : (pk,sk )← KeyGen(1κ),x←D pk,y←fpk(x),
+z←A(pk,y )]≤ negl(κ)
+When the domain and range is clear from context, we omit the subscript pk
+and only writeD.
+Deﬁnition 2. We call a trapdoor permutation family a B-leakage trapdoor per-
+mutation if the following holds: For all PPT algorithms (A1,A 2), there exists a
+negligible function negl such that
+Pr[fpk(z) =y : (pk,sk )← KeyGen(1κ),x←D pk,
+L←A1(x,pk ),y←fpk(x),z←A2(y,L (x))]≤ negl(κ)
+where the output length of L is bounded by B bits.
+Note that every trapdoor function family is also a B-leakage trapdoor per-
+mutation family for B = logκ.
+RSA trapdoor permutation. The RSA trapdoor permutation is given by:
+– KeyGen(1κ): Choose κ-bit primes p,q , let N = pq. Choose e such that
+gcd(e, (p− 1)(q− 1)) = 1, let d be such that ed = 1 mod (p− 1)(q− 1).
+Return (pk = (e,N ),sk =d)
+– Forx∈ Z∗
+N, given pk = (e,N ), compute fpk(x) =y =xe modN.
+– Fory∈ Z∗
+N, and sk =d, compute f−1
+sk (y) =yd modN
+The RSA inversion problem is assumed to be hard for anyA running in time
+polynomial in κ.
+Invertible Random Oracle. We assume the algorithms of the construction and
+the adversary have access to an invertible random oracle (IRO): that is oracle
+access to Π :D→D and Π−1 :D→D .
+We discuss here how to plausibly implement such an oracle: The indiﬀeren-
+tiablity framework, ﬁrst proposed by Maurer et al. [MRH04], informally says
+that given ideal primitives G and F , a construction CG is indiﬀerentiable from
+F , if there exists a simulatorS with oracle access toF such that (CG,G ) is indis-
+tinguishable from (F,SF ). Coron et al. [CHK+16] showed that a 14-round Feistel
+network where the round functions are independent random oracles is indiﬀeren-
+tiable from a random permutation. A series of subsequent works [DKT16, DS16]
+show that 8 rounds is suﬃcient. Thus, using a Feistel network appears like a
+plausible way of instantiating the oracle we need.
+Unfortunately, the indiﬀerentiability composition theorem is not known to
+apply to security notions that are captured by games that have multiple stages [RSS11].
+Our security notion of proof of replication is captured using a multi-stage game,
+and therefore the result of [RSS11] applies.
+Therefore, the construction described below should only be seen as a plausible
+instantiation of an invertible random oracle.
+8
+A plausible oracle instantiation. In our constructions, we make use of an invert-
+ible random oracle H that acts on strings of arbitrary length, and an invertible
+random oracle T that has the same domain as a trapdoor permutation. H is in-
+stantiated using a regular Feistel network. In the following we discuss an heuristic
+instantiation of T on pairs of outputs of RSA and obtain trapdoor permutation
+f and IRO T with the same domain.
+We deﬁne a trapdoor permutationf : (ZN)2→ (ZN)2 as follows:f(x1,x 2) =
+(f′(x1),f′(x2)) where f′ is the RSA permutation f′ : ZN→ ZN. Note that N is
+part of the public key of the RSA permutation. The input and output of T are
+elements in ( ZN)2. We note that we can instantiate the Feistel construction in
+this domain as well by replacing XOR with multiplication modulo N i.e., given
+a random oracle G that maps inputs in Z∗
+N to strings that are twice the length,
+we can deﬁneF : (ZN)2→ (ZN)2 on pairs of values modulo N as follows:
+FH(L||R) =s||t, where s =L·G(R) modN,t =R·G(s) modN
+where· is product modulo N. Note that G(x) modN is close to uniform in
+Z∗
+N, therefore,F is invertible except with negligible probability i.e., if F is not
+invertible then a non-trivial factor of N is found.
+2.2 Proof of retrievability
+Proofs of retrievability, introduced by Juels and Kaliski [JK07] allow a client to
+store data on a server that is untrusted, and admit an audit protocol in which
+the server proves to the client that it is still storing all of the data. A scheme
+without random oracle was given in [DVW09], whereas [SW08] allows public
+veriﬁability. A proof of retrievability (PoR) scheme consists of three algorithms,
+Gen,P,V. We recall the deﬁnition from [SW08, DVW09] below.
+– The generation algorithm takes as input a ﬁle F∈{ 0, 1}∗ and outputs a ﬁle
+to be stored on the server and a tag (veriﬁcation information) for the client.
+(F∗,τ )← Gen(F )
+– TheP,V algorithms deﬁne an audit protocol to prove retrievability of the
+ﬁle. TheP algorithm takes as input the processed ﬁleF∗ and theV algorithm
+takes the tag τ. At the end of the audit protocol, the veriﬁer outputs a bit
+indicating whether the proof succeeds or not.
+{0, 1}←⟨P (F∗),V(τ)⟩
+A PoR scheme needs to satisfy correctness and soundness. Correctness requires
+that for all ﬁle F ∈{ 0, 1}∗, and for all ( F∗,τ ) output by Gen(F ), an honest
+prover will make the veriﬁer accept in the audit protocol.
+⟨P(F∗),V(τ)⟩ = 1
+9
+Informally, a PoR scheme is sound if for any prover that convinces the veriﬁer
+that it is storing the ﬁle, there exists an algorithm called the extractor that
+interacts with the prover and extracts the ﬁle. We give the formal deﬁnition
+below.
+Experiment ExptPoR-sound
+A (κ)
+– The adversaryA picks a ﬁle F∈{ 0, 1}n.
+– The challenger creates (F∗,τ )← Gen(F ) and returns F∗ toA.
+– A can interact withV(τ) by running many proofs and seeing whether V out-
+puts 0 or 1.
+– A outputs a prover algorithm (ITM) P∗ and returns this to the challenger.
+– The challenger runsb←⟨P∗,V(τ)⟩, and runs the extractor, ˜F = extP∗
+(τ,n,κ )
+– Output 1 if b = 1∧ ˜F⁄=F , or 0 otherwise.
+Fig. 1: Soundness for Proofs of Retrievability.
+Deﬁnition 3 (Soundness for Proof of Retrievability). A proof of retriev-
+ability (PoR) Gen,P,V satisﬁes soundness if for any PPT adversary A, there
+exists an extractor ext such that the advantage of A
+AdvPoR-Sound
+A (κ) = Pr[ExptPoR-Sound
+A (κ) = 1]
+in the experiment described in Figure 1 is negligible in κ.
+The deﬁnition in [DVW09] discusses the notion of knowledge soundness versus
+information soundness. If the deﬁnition holds for the class of eﬃcient extractors,
+the scheme satisﬁes knowledge soundness. A somewhat weaker notion is that of
+information soundness where the running time of the extractor is not restricted.
+2.3 Min entropy
+Recall that the predictability of a random variable X is maxx Pr[X =x] and its
+min-entropy H∞(X) is− log (maxx Pr[X =x]). The average case min-entropy is
+deﬁned as follows. Let X and Y be random variables.
+˜H∞(X|Y ) =− log
+(
+Ey←Y
+(
+2−H∞(X|Y =y)
+))
+We make use of the following lemma which states that the average min-
+entropy of a variable (from the point of view of an adversary) does not go down
+by more than the number of bits (correlated with the variable) observed by the
+adversary. We recall the entropy weak chain rule for average case min entropy
+below in Lemma 1.
+10
+Lemma 1. ([DORS08]) Let X andY be random variables. If Y has at most 2λ
+values, then
+˜H∞(X|Y )≥ H∞(X)− H0(Y ) = H∞(X)−λ
+where H0(Y ) = log|support(Y )|
+3 Deﬁning Proof of Replication
+While several candidates of proof of replication have already been proposed, they
+all use timing assumptions, and we are not aware of any formal deﬁnition of the
+security properties that such a proof should satisfy without timing assumption.
+It is indeed non-trivial to come up with the “right” deﬁnition, due to the fact
+that we ask the adversary to store many copies of the same ﬁle . Thus simply
+requiring the existence of an extractor algorithm (as in proof of knowledge or
+proof of storage) is not suﬃcient: it is not enough that the adversary knows the
+ﬁle, the adversary should know multiple replicas of the same ﬁle. But what does
+it mean for an extractor to extract replicas of the same ﬁle? Before providing our
+deﬁnition, we introduce some notions of encodings which will be used to build
+up our solution.
+3.1 Replica Encodings
+We now deﬁne ReplicaEncoding as a tuple of algorithms ( rEnc, rDec) where rEnc
+takes a message m∈{ 0, 1}∗ and outputs a replica encoding of m∈{ 0, 1}∗,
+y← rEnc(κ,m )
+The rDec algorithm takes a replica encoding and returns a message i.e., m←
+rDec(y).
+Deﬁnition 4 (Replica encoding). A pair (rEnc, rDec) is a secure replica en-
+coding if the following holds:
+– Completeness: The probability of incorrect decoding is negligible i.e.,
+Pr[rDec(rEnc(κ,m ))⁄=m]< negl(κ)
+– Soundness: Consider the game soundA1,A2 between an adversary and a chal-
+lenger deﬁned in Figure 2. A replica encoding scheme is c-sound (for a con-
+stant c, 0<c< 1) if for any (A1,A2), there exists a negligible function negl
+such that the following holds.
+Pr [|state|<cvβ|v← soundA1,A2]≤ negl(κ)
+whereβ is the bit-length of an encoding y.
+– Eﬃciency:|y| =|m| +O(κ).
+11
+Experiment soundA1,A2
+– The adversaryA1 chooses a ﬁle m∈{ 0, 1}k
+– The challenger outputs n encodings of m
+y(i)← rEnc(κ,m )
+for i∈ [1,n ] and returns (y(1),...,y (n)) toA1.
+– A1 outputs a state state←A 1(y(1),...,y (n))
+– The challenger runsA2 on state.
+(˜y(1),..., ˜y(n))←A 2(κ, state)
+– Let vi = 1 if ˜y(i) =y(i), and 0 otherwise. Output v = ∑n
+i=1vi.
+Fig. 2: Soundness of a Replica Encoding scheme
+Discussion. The main measure of eﬃciency for a replica encoding is its expansion
+factor, in other words the ratio|y|/|m|. Clearly, the smaller the expansion factor
+the more interesting the scheme is. Looking ahead, all our constructions will
+have|y| =|m| +O(κ).
+We motivate here some of the choices in our deﬁnition. First note that the
+completeness requirement allows the ﬁle to be reconstructed from a single replica
+encoding. This captures the functional requirement in the honest usage of proofs
+of replication, where a client would store diﬀerent encodings of the ﬁle on diﬀer-
+ent servers and should be able to recover the ﬁle as long as one server is storing
+their encoding.
+When deﬁning soundness, we consider a monolithic adversary A which con-
+trols all colluding servers. To be able to meaningfully talk about the space that
+the adversary uses for storing the ﬁle, we split the adversaryA into two partsA1
+andA2, whereA1 receives the replica encoding from the challenger (represent-
+ing the honest client) and A2 is the part of the adversary returning (some of)
+the encodings to the client at a later stage, using the state thatA1 transferred
+toA2. We do not require that A2 outputs all of the received encoding, instead,
+we use the variable v to count how many of the replica encodings A2 is able to
+return. The deﬁnition of soundness then intuitively states that the adversary can
+at most return the number of replicas that “ﬁt” into the state (where we allow
+for a constant “slack” c, to avoid trivial attacks where the adversary forgets few
+bits and then “guesses” them right before returning the encodings – in practice
+one should think of c as any constant close to 1).
+As a sanity check of our deﬁnition, let’s consider a construction of replica
+encoding that is “too trivial”: deﬁne y(i) = (m,ri) i.e., every replica is simply
+the message concatenated with some random string ri. Due to incompressibility
+12
+of random data the adversary needs to store all the ri’s, but clearly only needs
+to store one copy of m and can still recompute all encodings. This is of course
+not desirable, so our deﬁnition had better not accept this construction. Indeed it
+does not: the adversary can break the soundness property because he can choose
+to returnv≥ 2 encodings using storage only|m|+v|r|<cv|y| - which is trivially
+true for any interesting case (remember in eﬃcient encodings |y|≈| m| and c is
+close to 1).
+3.2 Proof of Replication
+We now use the notion of encodings to meaningfully capture the replication prop-
+erty. A proof of replication scheme consists of a tuple of algorithmscreate, retrieve
+and an audit protocol deﬁned by two algorithms, P,V for the prover and ver-
+iﬁer respectively. create is a randomized algorithm that takes as input a ﬁle
+m∈{ 0, 1}∗, that is to be replicated and stored, a replication factor n; and pro-
+duces n replicas y(1),...,y (n) together with veriﬁcation information ver. Each
+replica y(i) is sent the server i to be stored, and ver with the client to be used
+for veriﬁcation in the audit protocol. retrieve is a deterministic algorithm run by
+anyone that takes as input a replica y(i) and outputs a ﬁle m∗.
+In the audit protocol, each server (prover) has a replica y(i), and the client
+(veriﬁer) has ver. At the end of the audit, the veriﬁer outputs a bit b indicating
+whether the audit was successful or not. We denote the protocol executing the
+prover and veriﬁer algorithms by⟨Pi(˜y(i)),V(ver,i )⟩.
+We require the scheme to satisfy completeness and soundness properties as
+deﬁned below. Note that when considering the honest usage of the our protocol
+(e.g., completeness), each server is able to prove to the client that they are
+storing the ﬁle independently5. On the other hand, when considering adversarial
+behaviour (e.g., soundness), we assume that all servers are under the control of
+a monolithic adversary.
+All our algorithms below are parametrized by a security parameter, even
+when omitted as in the description below.
+Deﬁnition 5 (Proof of Replication). A scheme PoRep = (create, retrieve,P,V)
+where,
+(y(1),...,y (n), ver)← create(m,n ), for m∈{ 0, 1}∗,n∈ Z
+m∗
+i = retrieve(y(i)),i∈ [1,n ]
+{0, 1}←⟨P i(˜y(i)),V(ver,i )⟩
+is a proof of replication scheme if the following properties are satisﬁed.
+– Completeness. For an honest client and honest server,
+5 For instance, an honest server does not need to communicate with the other servers,
+nor know that they exist.
+13
+• for (y(1),...,y (n), ver)← create(m,n ),m∗
+i = retrieve(y(i)),m∗
+i =m∀i∈
+[1,n ]
+• The audit protocol interaction between honest client and honest server
+succeeds, that is, the client accepts and outputs b = 1.
+⟨Pi(˜y(i)),V(ver,i )⟩ = 1
+– Soundness. We deﬁne the soundness game soundE
+A1,A2 between an adversary
+and a challenger in Figure 3. The scheme PoRep is c-sound (for a constant
+c, 0<c< 1) if for any (A1,A2), there exists an extractor E and a negligible
+function negl such that the following holds.
+Pr
+[
+u<v ∨| state|<cvβ|(u,v )← soundE
+A1,A2
+]
+≤ negl(κ)
+whereβ is the bitlength of an encoding y.
+Experiment soundE
+A1,A2
+• The adversaryA1 chooses a ﬁle m∈{ 0, 1}k
+• The challenger runs ( y(1),...,y (n), ver) ← create(m,n ) and returns
+(y(1),...,y (n)) toA1.
+• A1 outputs a state state←A 1(y(1),...,y (n))
+• The challenger runs ⟨A2(state),V(ver,i )⟩, let vi be the output of V for all
+i∈ [1,n ] and v = ∑n
+i=1vi.
+• The challenger runs the extractor.
+(˜y(1),..., ˜y(n)) =EA2(κ, ver,k )
+• For alli∈ [1,n ], deﬁne ui = 1 if ˜y(i) =y(i), and u = ∑n
+i=1ui
+The output of the game soundE
+A1,A2 is (u,v ).
+Fig. 3: Soundness of a proof of replication scheme
+The deﬁnition above guarantees that the malicious servers, even colluding,
+cannot make the veriﬁer accept more proofs than the storage they have used.
+4 Constructing Proof of Replication
+We begin by giving a high-level overview of our construction. Following the idea
+behind our deﬁnition, we create many independent encodings, and use a proof of
+14
+retrievability on the encodings. Even though each encoding can independently
+be decoded to the same ﬁle without any secret information, the proof of re-
+trievability on the encodings enforces that the server stores each encoding and
+therefore dedicates space for each replica. Recall that in Section 1.2 we have
+already described a simple solution which works in a restricted model in which
+the adversary is restricted to either store or delete entire replicas. Of course this
+is not a realistic threat model and a malicious server could choose to forget ar-
+bitrary parts of each encoding (say, a constant fraction). Now, to pass the audit,
+the server would have to compute a preimage of the underlying trapdoor permu-
+tation, but given a constant fraction of bits of the preimage. Unfortunately, the
+deﬁnition of security for trapdoor permutation does not allow us to say that this
+is not possible; in other words, we cannot construct a reduction for this kind of
+adversaries.
+To address this problem, we use the following approach: we start by applying
+an (invertible) random oracle (IRO) on the message concatenated with a short
+seed (which is diﬀerent for each replica), and then we use the trapdoor permu-
+tation on the result. We then iterate the IRO and the trapdoor permutation as
+a round function suﬃciently many times. Intuitively the trapdoor permutation
+of the round function ensures that the adversary has to do something “hard” in
+every round, while the IRO of the round function is used to make sure that the
+“hard tasks” are all independent.
+Again, in any given round, we cannot rule out that the adversary might
+have stored some (small) information that allows to easily invert the trapdoor
+permutation. However, since we repeat this for many rounds and the adversary
+must store some pre-image information at every round to potentially break the
+trapdoor permutation, eventually the total information that the adversary would
+have to store will exceed the bound necessary for replicated storage.
+When dealing with large ﬁles (e.g., larger than the size of the input/output of
+T ), we split the ﬁle in blocks. To make sure that all blocks depend on the entire
+ﬁle (for instance, to prevent the server from “de-duplicating” individual blocks
+which might appear in multiple ﬁles), we ﬁrst apply a “large” IRO on the entire
+ﬁle. Then, in the round function, we apply a “small” IRO on each individual
+block. Thanks to this, the number of rounds in the encoding only needs to be
+proportional to the block size, instead of the entire ﬁle size (as it was the case
+in an earlier version of this paper).
+Note that our combination of the RSA trapdoor permutation with a random
+oracle is reminiscent of full domain hash-signatures and, to a greater extent, CCA
+secure encryption via RSA and OAEP. Note however that, in our construction,
+we apply the oracle and the trapdoor permutation for multiple rounds, and the
+domain of the random oracle is a pair of blocks for the RSA permutation. The
+idea of iterating a combination of RSA with a random oracle was used before
+in [VDJO+12], however (apart from their work having a less in-depth treatment)
+there are two major diﬀerences, namely that they did not consider replication
+as an application, and that they use a strictly weaker notion of security, namely
+“near-incompressibility”.
+15
+Eﬃciency of decoding. We note that, when instantiating the construction with
+the RSA trapdoor permutation, it is possible to use a small exponent (i.e.,e = 3).
+Now decoding would be much faster then encoding, which is a desirable property
+in applications where a single user uploads a ﬁle which is then retrieved by a
+large number of users.
+4.1 Replica Encodings
+We now proceed to describe our construction in detail, and ﬁrst construct a
+replica encoding scheme ReplicaEncoding = (rEnc, rDec) in Figures 4 and 5.
+Let m∈{ 0, 1}k′
+be a message to be encoded.
+– Choose a string γ uniformly at random from {0, 1}κ, and let y0 = H(m||γ),
+where H :{0, 1}λ→{ 0, 1}λ is a invertible random oracle (IRO), and λ =
+k′ +κ.
+– Let ( KeyGen,f−1,f ) be trapdoor permutation over domain D. (sk,pk ) ←
+KeyGen(1κ). Divide y0 into s blocks such that each block is in D. That is,
+y0 = Y10||···|| Ys0. Let T :D→D be an IRO over D. We then iterate the
+following round function: For each round j from 1 to r, and for each block
+t∈ [1,s ] deﬁne
+• Apply the IRO T ,
+Ztj =T (Ytj−1)
+• Invert the trapdoor permutation block-wise,
+Ytj =f−1
+sk (Ztj)
+Let yj =Y1j||···|| Ysj
+– Let R = (yr,pk )
+– Return R
+Fig. 4: The Replica Encoding Algorithm rEnc(κ,m )
+Soundness of the scheme. Before formally proving the soundness of the scheme,
+we give an overview of the proof idea. If the state state that is passed from A1
+toA2 is small, then the adversary A2 cannot “remember” all the answers to
+the queries that A1 made in the ﬁrst part of the game since the outputs of a
+random oracle are incompressible. However, we can extract the outputs of the
+random oracle used during the encoding from the adversary since the replica
+encodings can be eﬃciently decoded. This implies that the adversary must make
+some queries to the random oracle in phase 2 of the game. Now, for each of the
+16
+For a replicaR = (yr,pk ), Parseyr asY1r||···|| Ysr. For each roundj fromr down
+to 1, and each block t∈ [1,s ], compute
+– Round j:
+• Apply the trapdoor permutation block-wise,
+Ztj =fpk(Ytj)
+• Invert the IRO,
+Ytj−1 =T−1(Ztj)
+– Lety0 =Y10||···|| Ys0. ComputeH−1(y0) and parse the output asm||γ where
+m is the ﬁrst k′ bits. Return m.
+Fig. 5: The replica decoding algorithm rDec(R)
+queries the adversary makes, there are two options: either the response to the
+query has full entropy in the view of the adversary, or it doesn’t. If it has full
+entropy, i.e., if the state contained no (or very little) information about what the
+oracle would answer, then we are done, as we will elaborate next. But ﬁrst let us
+consider if not; that is, the response to the query made did not have full entropy
+inA2’s view. This means that the state must have contained some information
+about the answer to the query. Now, since the encoding uses the random oracle
+in each round, and since the state that the adversary is allowed to remember
+is small, by carefully accounting for the entropy budget for each query made,
+we argue that after a certain round, the entropy in the state is exhausted and
+therefore there is at least one query that the adversary had to make to the
+oracle whose response has full entropy in order to win the game. Finally, once
+we have found such a query for which we know that the output of the oracle
+has full entropy that A2 had to make to win the game, we can reprogram the
+random oracle with a challenge for the trapdoor permutation. Thus since A2 is
+nevertheless able to produce the replicas, we use it to break the assumption and
+reach a contradiction.
+Theorem 1. Assuming T,H are invertible random oracles, the construction
+ReplicaEncoding = (rEnc, rDec) using trapdoor permutation f is a secure replica
+encoding scheme, replication parameter n as per Deﬁnition 4. For number of
+roundsr> (cn+1)k
+B , it is complete and c-sound with soundness error
+ϵ≤
+(
+ϵ′ + 2−k(1−c) +qs22−k
+)
+nrs
+wherek = log|D|,D is the domain of f and T , s is the number of blocks, q
+the number of queries to the RO and the advantage of any adversary in B-leakage
+inversion of the permutation f is at most ϵ′.
+17
+Proof. We use the notation R(i) to identify the encoding stored on server i.
+Completeness. For n encodings that are created honestly, R(i)← rEnc(m,κ ),
+m∗ = rDec(R(i)). Then, due to the invertibility of T,H and the trapdoor per-
+mutationf, m∗ =m,∀i.
+Soundness. Assume there exists an adversary (A1,A2) such that
+Pr [|state|<cvβ|v← soundA1,A2]>ϵ .
+Therefore, the adversaryAT
+2 outputs R(i1),··· ,R (iv), where each ij∈ [1,n ].
+LetI⊂ [1,n ],|I| =v be the set of indices indicating the replicas thatA2 outputs
+correctly. We argue that if the state is too small, then the adversary does not
+have enough entropy to store information aboutR(i),∀i∈I and therefore one of
+the R(i) must have been recomputed, (by making relevant queries to T ), which
+we use to invert the B-leakage trapdoor permutation. The proof idea is that
+since the state is small, in round r,A2 must have learned some of the Z values
+of roundr from responses of T . If the response of T to these queries do not have
+full entropy in A2’s view given the state, then this deﬁcit must be accounted
+for in the size of the state. We continue this argument for every round going
+backwards from the last round, by reasoning about the set of relevant queries
+made in each round, and accounting for every query made that did not have
+entropy inA2’s view with B bits in the state. We then hit a round where the
+response of T for one ofA2’s queries must have high enough entropy from A2’s
+point of view. Such a query is guaranteed to exist since the state size is used
+up after enough queries of the former kind. We use the response to this query
+to embed a challenge and invert the trapdoor permutation. We now proceed to
+give the reduction.
+LetB be an adversary whose task is to invert the trapdoor permutation. B
+receives a challenge ( ˆpk, ˆx), and wins if it outputs ˆy such that f ˆpk(ˆy) = ˆx.B in-
+teracts with (A1,A2) in the soundness game.B receives a ﬁle m∈{ 0, 1}k′
+from
+A1.B creates encoded replicas honestly, except for one of the replicas chosen at
+random (call its index i∗∈ [1,n ]), in which the challenge will be embedded. For
+now we only use the public key ˆpk. Since B does not know the corresponding
+secret key,B cannot compute this encoding honestly. Thus,B deﬁnes the encod-
+ingR(i∗) as ( ˆpk,yr) for a uniformly random yr. Then it “decodes” yr down toy0
+(by following the decoding procedure) and ﬁnally programs the random oracle
+H such that H−1(y0) = (m||γ(i∗)) for some random string γ(i∗). More in detail:
+– Choose random y(i∗)
+r ∈{ 0, 1}λ.
+– For each roundj fromr down to 1, parse y(i∗)
+j =Y1j||···|| Ysj and, for each
+block t∈ [1,s ], compute:
+• Apply the trapdoor permutation block-wise,
+Ztj =f ˆpk(Ytj)
+18
+• Invert the IRO,
+Ytj−1 =T−1(Ztj)
+– Let y0 =Y10||···|| Ys0.
+– Pick a random value γ∈{ 0, 1}κ and program the IRO H to output y0 on
+input (m,γ ).
+– Return R(i∗) = (y(i∗), ˆpk)
+B responds to any other oracle queries of A1 honestly, and ﬁnally gives
+(R(1),··· ,R (n)) to A1, where R(i) for i⁄= i∗ is created honestly. A1 outputs
+a state state. Now,B interacts withA2. It runs A2 on state, and receives and
+responds toA2’s oracle queries in the following way.B chooses a random round
+j∗∈ [1,r ], and a random block t∗∈ [1,s ] to embed the challenge ˆx in. If A2
+queriesT onY (i∗)
+t∗j∗−1,B sets the response to embed its challenge ˆx in the following
+way. SetZt∗j∗ = ˆx and,
+T (Y (i∗)
+t∗j∗−1) =Zt∗j∗
+The rest of the queries are answered honestly. IfA2 makes a query Y (i∗)
+t∗j∗ = ˆy
+such that, f ˆpk(ˆy) = ˆx,B outputs ˆy. If there is no such query, B outputs⊥. We
+now compute the probability thatB wins in the trapdoor permutation inversion
+game. Consider the case when ( m||γ) ﬁts into D, and therefore there is only
+one block in the encoding. We later show how the argument extends to multiple
+blocks. Let k be the block length, that is, the bit length of elements in D. We
+therefore have |state| < cvk,c < 1. Consider the min-entropy of the random
+variable state, which is at most the bit length, H∞(state)≤ cvk.A2 on state
+returns,
+{R(i)}i∈I←A 2(state)
+forR(i) = (y(i)
+r ,pki). Since there is only one block in the encoding, y(i)
+r ∈D and
+can be decoded to obtain z(i)
+r =fpki(y(i)
+r ).
+LetYr =y(i1)
+r ||···|| y(iv)
+r andZr =z(i1)
+r ||···|| z(iv)
+r ,ij∈I.
+Since each replica is computed by using independent randomness γi, the
+queries to the oracle are diﬀerent for each replica, and therefore each z(i)
+r is
+unpredictable. We have,
+H∞(z(i)
+r |z(1)
+r ,··· ,z (i−1)
+r ,z (i+1)
+r ,··· ,z (n)
+r ) =k
+and therefore, H∞(Zr) =vk. SinceZr can be extracted fromAT
+2 (state) by decod-
+ing, either the state contains information about each z(i) inz(1)||···|| z(v), orA2
+must make relevant RO queries, that is, query the RO on the inputs correspond-
+ing to z(i). By the conditional rule for average case min-entropy (Lemma 1),
+˜H∞(Zr|state)≥ H∞(Zr)− H0(state)
+˜H∞(Zr|state)≥ H∞(Zr)−cvk =vk−cvk
+19
+Zr is extracted by making no RO queries only with probability less than
+2−vk(1−c) < 2−k(1−c) which is negligible for constant c (even in the worse case
+where the adversary replies with a single replica). Therefore, there is at least one
+RO query. LetQr be the indices inI that indicates the queries which arey-values
+of round r. That is, ∀u∈Q r,A2 queried T on y(u)
+r−1, and T (y(u)
+r−1) = z(u)
+r . Let
+qr =|Q| denote the number of “relevant”r-round queries. For each query, either
+the state contains information about the response or not; we consider the two
+cases where the state stores <B bits of information or ≥B of information of a
+query response. If the state contains <B bits of information about responses in
+round r, thenB wins if the challenge is embedded in that response and we are
+done. Otherwise, the state contains information about each z(u)
+r which means
+the state stores at least B bits of information for each query.
+H∞(state)≥qrB
+Now, let us consider the set of queries made with indices in Qr. For each
+y(u)
+r−1,u∈Q r, we can extract z(u)
+r−1 by computing the decoding. That is, z(u)
+r−1 =
+fpku(y(u)
+r−1), for y(u)
+r−1 ∈ D. These qr elements are outputs of RO on diﬀerent
+inputs, and therefore have full entropy. LetZr−1 =z(u1)
+r−1||···|| z(uqr )
+r−1 where each
+ui∈Q r. We have H∞(Zr−1) = qrk. IfZr−1 can be extracted from AT
+2 (state),
+either the state contains information aboutz(i)
+r−1,∀i∈Q r, orA2 must make more
+RO queries. If there are no more queries, then H∞(state)≥vk. Therefore, there
+must be more queries on inputs corresponding to the indices in Qr.
+Letqr−1 be the number of relevant round (r−1) queries. Deﬁne a set of query
+indicesQr−1, from which we can extract Zr−2 = z(u1)
+r−2||···|| z
+(uqr−1 )
+r−2 , for ui∈
+Qr−1. Again, for each query, either the state dedicates <B bits of information,
+in which case B wins if the challenge is embedded in that response and we are
+done. Otherwise, the state stores at least B bits of information about each y(u)
+r−1,
+and therefore we have,
+H∞(state)≥qrB +qr−1B
+Making a similar argument as before, there must be more RO queries corre-
+sponding to the indices in set Qr−1. Thus, we have, after r rounds,Zr,..., Z1
+are extracted fromA2(state), and we have
+H∞(state)≥
+r∑
+i=1
+qiB
+LetA2 make RO queries in each roundj for the replicas given by the indices
+inQj such that the reduction could not successfully embed a challenge in any
+of the responses. Then after r rounds, setting,
+r∑
+i=1
+qiB−cvk =k
+20
+We get ˜H∞(Z1|state)≥k, when r>k (cv + 1)/B.
+Therefore, at some round 𝓁≤ r, the entropy of the response is full when
+making an RO query at round 𝓁. That is,∃𝓁∈ [1,r ],w∈ [1,n ] such that,
+˜H∞(z(w)
+𝓁 |state) =k
+When there are multiple blocks, we have|state|<cvβ . Since the permutation
+H is applied to the entire ﬁle concatenated with a random string γ, before r
+rounds ofT andf, the adversary can ﬁnd ﬁles such that the output of H results
+in the same blocks only with probability (( qs)2 + 1)/2k where q is the number
+of queries and s the number of blocks. Then the above argument holds for each
+block independently.
+The probability that the challenge is programmed into the RO response of one
+of the blocks ofz(w)
+𝓁 is the probability thati∗ =w,j∗ =𝓁 which is 1/vrs> 1/nrs
+(in the worse case where n = v). Thus the probability that B wins is at least
+ϵ
+nrs− 2−k(1−c)−qs22−k.
+⊓ ⊔
+As any trapdoor function is also trivially B-leakage secure for B = log(k),
+we obtain the following corollary.
+Corollary 1. Assuming T,H are invertible random oracles, the construction
+ReplicaEncoding = (rEnc, rDec) using trapdoor permutation f is a secure replica
+encoding scheme for replication parameter n as per Deﬁnition 4. For number of
+roundsr> (cn+1)k
+logk , it is complete and c-sound with soundness error
+ϵ≤
+(
+ϵ′ + 2−k(1−c) +qs22−k
+)
+nrs
+wherek = log|D|,D is the domain of f and T , s is the number of blocks, q the
+number of queries to the RO and the advantage of any adversary in inverting
+the permutation f is at most ϵ′.
+Of course, for speciﬁc trapdoor permutations, it might be possible to assume
+B-leakage security for larger values ofB thus achieving better round complexity.
+4.2 From Replica Encodings to Proofs of Replication
+We now construct a proof of replication scheme create, retrieve,P,V. The idea
+is very simple: to construct a proof of replication we use the replica encoding
+scheme from the previous section to create replicas, and then apply a proof of
+retrievability on the encoded replicas. The proof of security is also simple, as an
+adversary that breaks soundness for the proof of replication can be used to break
+the soundness property of the proof of retrievability scheme or the soundness of
+the replica encoding scheme.
+The create procedure is formally described in Figure 6. The prover, and
+veriﬁer algorithmsP,V are the same as the prover and veriﬁer in the proof of
+retrievability. Finally, the retrieve algorithm simply runs the replica decoding
+algorithm rDec if the proof of retrievability accepts.
+21
+Let PoR = (Gen,P,V) be a proof of retrievability scheme. Given a ﬁlem∈{ 0, 1}k′
+,
+and a replication factor n:
+– For eachi∈ [1,n ]
+• Run R(i)← rEnc(m,κ )
+• ({ ˜R(i)}i,τi) = PoR.Gen(R(i))
+– Set ver ={τi}i
+– ˜R(i) is sent to the server i for storage and ver is returned to the client.
+Fig. 6: create(m,n ): Create replicated storage
+Theorem 2. PoRep = (create, retrieve,P,V) is a proof of replication scheme for
+replication parameter n secure as per Deﬁnition 5. It is complete and c-sound
+with soundness error γ≤δ +ϵ where the underlying PoR scheme has soundness
+errorδ, and the replica encoding scheme has soundness error ϵ.
+Proof. We ﬁrst argue completeness: Given R(i) and pk, for encodings that are
+created honestly, an honest server can recoverm∗ = retrieve(R(i)). By complete-
+ness of the replica encoding schemerEnc, we haverDec(R(i)) = rDec(y(i),pk (i)) =
+m,∀i.
+We now argue the soundness of the construction. Let (A1,A2) be an adver-
+sary, that wins the soundness game soundE
+A1,A2 with advantage γ. Let (u,v )←
+soundE
+A1,A2.We consider the two cases:
+Case 1. u < v. Let ext be the extractor of the PoR scheme, and let the ﬁle
+output by ext be{ ˜R(i)}n
+i=1. By assumption that u < vthere must be an
+index i∈ [1,n ] such that the adversary A2 succeeds in the audit protocol
+(i.e., vi = 1), but ˜R(i)⁄=R(i) (i.e., ui = 0). By the soundness of the proof of
+retrievability scheme PoR, this happens only with probability δ.
+Case 2. |state|≤ cvβ. In this case the adversary AT
+2 succeeds in v audit pro-
+tocols, and since u≥ v, the extractor E outputs ˜R(i) = R(i) for i∈ I ⊂
+[1,n ],|I| =v. Let (B1,B2) be an adversary whose task is to break the sound-
+ness of the replica encoding scheme rEnc.B1 interacts with (A1,A2) in the
+soundness game. B1 receives a ﬁle m∈{ 0, 1}k′
+fromA1, and outputs m
+to its challenger. B1 receives n replica encodings (R(1),··· ,R (n)) from the
+challenger, where the bit length of each encoding is β.B1 runs the PoR on
+the replicas. ({ ˜R(i)}i, ver)← PoR.Gen{R(i)}i and returns{ ˜R(i)}i toA1.B1
+outputs as state whateverA1 outputs with|state|≤ cvβ. For every success-
+ful audit proof given byA2,B2 runs the extractorE(ver,n,κ ) of the scheme.
+ThusB2 outputs ˜R(i) =R(i) for each i∈I with probability at least γ.
+22
+5 Dealing with Malicious Clients
+We discuss here some limitations and possible extensions of our approach.
+Our deﬁnition and construction so far has concentrated on the case where the
+client is honest. This is not a problem for our base use-case where a user wants to
+make sure they will be able to retrieve their ﬁles in the future, but it is a problem
+in the Filecoin use case where servers are rewarded for the ﬁles they store. In
+this case, we need to prevent against the so called generation attack and it is
+therefore important to have some security guarantees when the client is corrupt
+and might work with a set of corrupt servers to convince honest users that they
+store many replicas whereas in fact the replicas are generated “on-the-ﬂy” for
+each proof.
+Our solution from the previous section does not work in this case, as a corrupt
+user could share the trapdoor function secret key with the servers and now they
+can indeed encode a replica on the ﬂy. If the client who owns the ﬁle is corrupt
+and is the only user involved in the encoding process, then the adversary knows
+everything about the encoding process, and a diﬀerent solution is needed. One
+way to go is to involve several users in the encoding process and work under the
+assumption that at least one of them is honest.
+In a Filecoin-like scenario one could implement such a solution by rewarding
+users for helping others to encode. We now describe two diﬀerent approaches to
+such multi-user encoding.
+Parallel Encoding. Given one-way trapdoor functions f1,...,f n that act on k-
+bit strings, we deﬁne a new function F on kn bit strings by F (x1,...,x n) =
+(f1(x1),...,f n(xn)), where each xi is a k-bit string. It is clear that F is a one-
+way trapdoor function even with respect to an adversary who knows all but
+one of the trapdoors for f1,...,f n. Namely, if the j’th trapdoor is unknown, we
+can take a challenge yj, choose yi = fi(xi) for i⁄= j and random xi and give
+(y1,...,y n) to the adversary. If he computes a preimage, then thej’th component
+is the answer to challenge yj.
+Note that our main result gives a construction that is secure based on any
+one-way trapdoor function and so it also works for F .
+Now, in the practical use-case, we will assume thatn users are involved, such
+that useri hasfi as part of his public key and knows the corresponding trapdoor.
+A public-key infrastructure is one of several ways to realize this. Then then users
+can collaborate to encode: whenever we need to compute F , we can assume the
+input to the current round is known (initially it will be the ﬁle to encode), so
+each user i can apply the permutation oracle and compute and broadcast f−1
+i
+on his part of the result.
+It follows immediately from the above that if at least one user is honest,
+then this construction results in a secure replica encoding. Note also that the
+contributions of each user can be veriﬁed by computing his function in the for-
+ward direction. Moreover, the overhead in encoding size and the cost per bit of
+encoding and decoding is the same as for the single honest user case. On the
+23
+other hand, we need a number of rounds for the encoding protocol that equals
+the number of rounds in the encoding process.
+Sequential Encoding. An obvious alternative is to do the encoding sequentially.
+Namely, the ﬁrst user does an encoding of the input ﬁle using his (set of) trapdoor
+functions and broadcasts the result. The second user encodes the output of the
+ﬁrst, etc. In the end, we have an encoding that is essentially done just like our
+original construction, only with more rounds. Note that one can decode the
+output of each user and check the result is correct.
+The intuition behind the security of this approach is the following: under
+the assumption that at least one user is honest, we have the same security as
+in the original construction assuming that at least one of the users is honest.
+This is simply because the adversary does not know the trapdoors for the honest
+member, and his encoding process involves the same number of random oracle
+responses that we considered in the original proof. This approach increases the
+size of the encodings but not signiﬁcantly (the complexity would grow from
+O(|m| +κ) to O(|m| +n·κ) with n users). The cost of encoding and decoding
+in this solution is a factor n larger than for the single honest user case. On the
+other hand, the number of rounds in the encoding protocol is n, which may be
+better than parallel encoding, depending on the concrete scenario.
+6 Conclusions and Future Work
+We gave two possible solutions to multi-user encoding above. However, there is
+also a solution of a diﬀerent nature that comes to mind: namely we can share
+a trapdoor (say, an RSA key) between a set of users and have them collaborate
+to compute the encoding using that trapdoor function securely. This has the
+advantage that an encoding looks just like what an honest client would produce,
+we are not forced to have larger block size when many users are involved. Also,
+decoding is as fast as in the honest client case, and one can set up the proto-
+col such that just one participating client needs to be honest in order for the
+secret key to not leak. On the other hand, encoding requires more work. For
+the encoding protocol, one can take advantage of the huge body of literature
+on distributed RSA key generation and distributed signing. Finding the optimal
+solution for this approach is left for future work.
+We also leave as an open question the problem of ﬁnding a secure replica
+encoding where the number of rounds in the encoding process does not depend
+on the number of replicas.
+References
+AAC+17. Hamza Abusalah, Jo¨ el Alwen, Bram Cohen, Danylo Khilko, Krzysztof
+Pietrzak, and Leonid Reyzin. Beyond hellman’s time-memory trade-oﬀs
+with applications to proofs of space. In Tsuyoshi Takagi and Thomas
+Peyrin, editors, ASIACRYPT 2017, Part II , volume 10625 of LNCS, pages
+357–379. Springer, Heidelberg, December 2017.
+24
+ABBK16. Frederik Armknecht, Ludovic Barman, Jens-Matthias Bohli, and Ghas-
+san O Karame. Mirror: Enabling proofs of data replication and retriev-
+ability in the cloud. In USENIX Security Symposium , pages 1051–1068,
+2016.
+BBBF18. Dan Boneh, Joseph Bonneau, Benedikt B¨ unz, and Ben Fisch. Veriﬁable
+delay functions. In Hovav Shacham and Alexandra Boldyreva, editors,
+CRYPTO 2018, Part I , volume 10991 of LNCS, pages 757–788. Springer,
+Heidelberg, August 2018.
+BH11. Ayad F Barsoum and M Anwar Hasan. On verifying dynamic multiple
+data copies over cloud servers. IACR Cryptology ePrint Archive , 2011:447,
+2011.
+CFMJ18. Ethan Cecchetti, Ben Fisch, Ian Miers, and Ari Juels. Pies: Public incom-
+pressible encodings for decentralized storage. Cryptology ePrint Archive,
+Report 2018/684, 2018. https://eprint.iacr.org/2018/684.
+chi17. Chia network. https://chia.network/, 2017.
+CHK+16. Jean-S´ ebastien Coron, Thomas Holenstein, Robin K¨ unzler, Jacques
+Patarin, Yannick Seurin, and Stefano Tessaro. How to build an ideal cipher:
+The indiﬀerentiability of the Feistel construction. Journal of Cryptology ,
+29(1):61–114, January 2016.
+CKBA08. Reza Curtmola, Osama Khan, Randal Burns, and Giuseppe Ateniese. Mr-
+pdp: Multiple-replica provable data possession. In Distributed Computing
+Systems, 2008. ICDCS’08. The 28th International Conference on , pages
+411–420. IEEE, 2008.
+DFKP15. Stefan Dziembowski, Sebastian Faust, Vladimir Kolmogorov, and
+Krzysztof Pietrzak. Proofs of space. In Rosario Gennaro and Matthew
+J. B. Robshaw, editors, CRYPTO 2015, Part II , volume 9216 of LNCS,
+pages 585–605. Springer, Heidelberg, August 2015.
+DKT16. Dana Dachman-Soled, Jonathan Katz, and Aishwarya Thiruvengadam. 10-
+round Feistel is indiﬀerentiable from an ideal cipher. In Marc Fischlin and
+Jean-S´ ebastien Coron, editors,EUROCRYPT 2016, Part II , volume 9666
+of LNCS, pages 649–678. Springer, Heidelberg, May 2016.
+DORS08. Yevgeniy Dodis, Rafail Ostrovsky, Leonid Reyzin, and Adam Smith. Fuzzy
+extractors: How to generate strong keys from biometrics and other noisy
+data. SIAM journal on computing , 38(1):97–139, 2008.
+DS16. Yuanxi Dai and John P. Steinberger. Indiﬀerentiability of 8-round
+Feistel networks. In Matthew Robshaw and Jonathan Katz, editors,
+CRYPTO 2016, Part I , volume 9814 of LNCS, pages 95–120. Springer,
+Heidelberg, August 2016.
+DVW09. Yevgeniy Dodis, Salil P. Vadhan, and Daniel Wichs. Proofs of retrievability
+via hardness ampliﬁcation. In Omer Reingold, editor, TCC 2009 , volume
+5444 of LNCS, pages 109–127. Springer, Heidelberg, March 2009.
+EK13. Mohammad Etemad and Alptekin K¨ up¸ c¨ u. Transparent, distributed, and
+replicated dynamic provable data possession. In Michael J. Jacobson Jr.,
+Michael E. Locasto, Payman Mohassel, and Reihaneh Safavi-Naini, editors,
+ACNS 13 , volume 7954 of LNCS, pages 1–18. Springer, Heidelberg, June
+2013.
+FBBG18. Ben Fisch, Joseph Bonneau, Juan Benet, and Nicola Greco. Proofs of
+replication using depth robust graphs, 2018. https://cyber.stanford.
+edu/bpase18.
+Fis18. Ben Fisch. Tight proofs of space and replication. Cryptology ePrint
+Archive, Report 2018/702, 2018. https://eprint.iacr.org/2018/702.
+25
+HY10. Zhuo Hao and Nenghai Yu. A multiple-replica remote data possession
+checking protocol with public veriﬁability. In Data, Privacy and E-
+Commerce (ISDPE), 2010 Second International Symposium on , pages 84–
+89. IEEE, 2010.
+JK07. Ari Juels and Burton S. Kaliski Jr. Pors: proofs of retrievability for large
+ﬁles. In Peng Ning, Sabrina De Capitani di Vimercati, and Paul F. Syver-
+son, editors, ACM CCS 2007 , pages 584–597. ACM Press, October 2007.
+Lab17a. Protocol Labs. Filecoin: A decentralized storage network. https://
+filecoin.io/filecoin.pdf, 2017.
+Lab17b. Protocol Labs. Proof of replication. https://filecoin.io/
+proof-of-replication.pdf, 2017.
+MRH04. Ueli M. Maurer, Renato Renner, and Clemens Holenstein. Indiﬀerentia-
+bility, impossibility results on reductions, and applications to the random
+oracle methodology. In Moni Naor, editor, TCC 2004 , volume 2951 of
+LNCS, pages 21–39. Springer, Heidelberg, February 2004.
+Pie18. Krzysztof Pietrzak. Proofs of catalytic space. Cryptology ePrint Archive,
+Report 2018/194, 2018. https://eprint.iacr.org/2018/194.
+PPK+15. Sunoo Park, Krzysztof Pietrzak, Albert Kwon, Jo¨ el Alwen, Georg Fuchs-
+bauer, and Peter Gaˇ zi. Spacemint: A cryptocurrency based on proofs
+of space. Cryptology ePrint Archive, Report 2015/528, 2015. http:
+//eprint.iacr.org/2015/528.
+RD16. Ling Ren and Srinivas Devadas. Proof of space from stacked expanders.
+In Martin Hirt and Adam D. Smith, editors, TCC 2016-B, Part I , volume
+9985 of LNCS, pages 262–285. Springer, Heidelberg, October / November
+2016.
+RSS11. Thomas Ristenpart, Hovav Shacham, and Thomas Shrimpton. Careful
+with composition: Limitations of the indiﬀerentiability framework. In Ken-
+neth G. Paterson, editor,EUROCRYPT 2011, volume 6632 ofLNCS, pages
+487–506. Springer, Heidelberg, May 2011.
+SW08. Hovav Shacham and Brent Waters. Compact proofs of retrievability. In
+Josef Pieprzyk, editor, ASIACRYPT 2008, volume 5350 of LNCS, pages
+90–107. Springer, Heidelberg, December 2008.
+VDJO+12. Marten Van Dijk, Ari Juels, Alina Oprea, Ronald L Rivest, Emil Stefanov,
+and Nikos Triandopoulos. Hourglass schemes: how to prove that cloud ﬁles
+are encrypted. In Proceedings of the 2012 ACM conference on Computer
+and communications security , pages 265–280. ACM, 2012.
+26
