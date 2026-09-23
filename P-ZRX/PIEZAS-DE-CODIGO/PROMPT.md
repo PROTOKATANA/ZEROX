@@ -23,7 +23,23 @@ partes, y las cuatro son tuyas:
 elige entre opciones y no inventa números.** Si tus instrucciones son vagas, el código será vago: la
 calidad de su salida es responsabilidad de la precisión de tu orden.
 
-> **El modelo es `deepseek-v4.1-flash`, y no otro.** Decidido por Katana el 2026-09-24.
+> **Cómo lanzas a DeepSeek — decidido por Katana el 2026-09-24, y no se cambia:**
+>
+> | | |
+> |---|---|
+> | **Harness** | **DeepSeek Harness (`dsh`)**, instalado en `/home/katana/torio/deepseek-harness` |
+> | **Modelo** | **`deepseek-v4.1-flash`**, y no otro |
+> | **Esfuerzo** | **`high`** |
+>
+> **Por qué el harness y no opencode:** auto-compactación por defecto —lo que evita que un run de
+> ocho horas muera por desbordamiento de contexto—, del orden de **8× menos tokens por tarea**, y
+> runs largos ya probados. Para 17 piezas en una noche, eso pesa más que cualquier otra cosa.
+>
+> **Y una advertencia que su propio `SAFETY.md` declara, porque cambia cómo debes trabajar:** es
+> software en *developer preview*, **sin auditoría de seguridad**, que «puede ejecutar código y
+> comandos generados por el modelo» y «modificar o borrar ficheros», y cuyos controles de permisos
+> **«reducen el riesgo pero no garantizan aislamiento»**. No es motivo para no usarlo — es motivo
+> para que el cierre de pieza de §8.1 se cumpla **siempre**, sin saltárselo ni una vez.
 >
 > **Conoce su perfil, porque decide qué tienes que vigilar.** En las evaluaciones públicas V4.1 Flash
 > **gana en código y en tareas agénticas** —DeepSWE v1.1 74,2 % frente al 62,7 % de V4 Pro,
@@ -345,9 +361,9 @@ serie**.
   cuatro: declara en una tabla qué rutas son independientes y cuáles no.
 - **Etiqueta cada cifra**: `medido`, `derivado`, `estimado`, `demostrado`, `no determinado`. Y declara
   las hipótesis que gobiernan la conclusión en un fichero aparte.
-- **Declara el presupuesto antes de ejecutar** (hilos, RAM, disco, tiempo) y **anota `uptime`**: la
-  máquina tiene otro trabajo corriendo y compartirla contamina cualquier medición de tiempos. Si una
-  cifra se midió con carga ajena, **etiquétala así**.
+- **Declara el presupuesto antes de ejecutar** (hilos, RAM, disco, tiempo) y **anota `uptime`**:
+  compartir la máquina contamina cualquier medición de tiempos, y tú mismo estarás compilando Rust
+  en paralelo. Si una cifra se midió con carga ajena, **etiquétala así**.
 
 **Qué hacer con el resultado:**
 
@@ -371,8 +387,9 @@ Una casilla se marca **solo** si cumple las seis:
 5. **No hay verificador sustituido por aceptación.** `AGENTS.md` lo prohíbe expresamente: si algo no
    se puede verificar todavía, **devuelve un error explícito** —como hace hoy
    `IntegracionPotPendiente`— y **nunca un `Ok` fabricado**.
-6. **El cierre de pieza de §8.1 ha pasado**: `git status` solo muestra los ficheros que declaraste
-   para esa pieza, y hay commit.
+6. **El cierre de pieza de §8.1 ha pasado entero**: `git status` solo muestra los ficheros que
+   declaraste para esa pieza, hay commit, y `PROGRESO-0.0.1.md` queda continuable desde contexto
+   vacío.
 
 ## 7 · Cuándo se da por válida la 0.0.1
 
@@ -434,7 +451,18 @@ git -C /home/katana/zeo/ZEROX status --short
    `reset` o `clean`. Fichero a fichero y mirando el diff.
 3. **Commit de la pieza**, con mensaje que diga **qué pieza cierra y qué reglas del SPEC cita por
    ID**. Un commit por pieza: así el daño máximo de cualquier desvío es **una pieza**, no la noche.
-4. Solo entonces marcas la casilla.
+4. **Actualiza `PROGRESO-0.0.1.md` de forma que otro agente con el contexto VACÍO pueda continuar
+   desde ahí.** No es un diario: es el **estado persistente del trabajo**. Con auto-compactación el
+   riesgo de perder contexto baja, pero si el run se corta a las 04:00 esto es lo único que evita
+   rehacerlo todo. Debe contener, siempre: qué piezas están hechas y cuáles no, en qué ficheros vive
+   cada una, qué decisiones provisionales se tomaron, qué queda inmediatamente después, y cualquier
+   trampa que hayas encontrado. **Si para retomar hace falta algo que solo está en tu cabeza, no lo
+   has escrito.**
+5. Solo entonces marcas la casilla.
+
+> ⛔ **NUNCA hagas `git push`.** Commitea localmente todo lo que quieras —es tu red de seguridad—
+> pero **nada sale a GitHub**: Katana revisa antes de publicar. La rama `rediseno/v1-spec-first` no
+> tiene upstream y así debe seguir al amanecer.
 
 **Y si `git status` muestra ficheros tocados fuera de `crates/` y `P-ZRX/PIEZAS-DE-CODIGO/`** —en
 `SPEC.md`, `research/`, `veritas/` fuera de una auditoría de §5, o cualquier otro `P-ZRX/`— **es una
@@ -469,6 +497,8 @@ pasa una vez, hay que saberlo para la siguiente orden.
 
 ## 11 · Reglas de validez
 
+- **No hagas `git push`.** Nunca, por ningún motivo.
+- **Deja `PROGRESO-0.0.1.md` continuable desde contexto vacío** después de cada pieza (§8.1).
 - **No inventes un número que el SPEC deja pendiente.** Plantea la decisión (§4).
 - **No marques una casilla que no cumpla las seis condiciones de §6.**
 - **Di siempre cuántas piezas van de 17.**
