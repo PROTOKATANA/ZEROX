@@ -5050,6 +5050,7 @@ dependencies = [
  "subspace-farmer-components",
  "subspace-kzg",
  "subspace-proof-of-space",
+ "subspace-verification",
  "thiserror 2.0.20",
  "tokio",
  "tracing",

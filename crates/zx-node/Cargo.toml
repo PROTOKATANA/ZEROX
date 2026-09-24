@@ -27,6 +27,7 @@ farmer = [
     "dep:subspace-farmer-components",
     "dep:subspace-kzg",
     "dep:subspace-proof-of-space",
+    "dep:subspace-verification",
 ]
 
 [lib]
@@ -79,6 +80,10 @@ subspace-data-retrieval = { path = "../../PDF/autonomys-subspace/shared/subspace
 subspace-erasure-coding = { path = "../../PDF/autonomys-subspace/crates/subspace-erasure-coding", optional = true }
 subspace-kzg = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"], optional = true }
 subspace-proof-of-space = { path = "../../PDF/autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc", "parallel"], optional = true }
+# Verificador PoAS (A1, `C-POT-08` paso 5). Ya lo usa `zx-consensus` y su paquete está en el
+# `Cargo.lock`; D2 lo necesita directamente para pasar el mismo `PieceCheckParams` que A1. Se
+# enlaza por `path` al clon fijado con las features por defecto (`std`, `kzg`), las mismas de A1.
+subspace-verification = { path = "../../PDF/autonomys-subspace/crates/subspace-verification", optional = true }
 subspace-archiving = { path = "../../PDF/autonomys-subspace/crates/subspace-archiving", optional = true }
 
 [dev-dependencies]

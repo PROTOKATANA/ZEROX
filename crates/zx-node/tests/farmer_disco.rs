@@ -34,7 +34,7 @@ use subspace_archiving::archiver::{Archiver, NewArchivedSegment};
 use subspace_core_primitives::hashes::{Blake3Hash, blake3_hash, blake3_hash_with_key};
 use subspace_core_primitives::pieces::Record;
 use subspace_core_primitives::sectors::{SectorId, SectorIndex};
-use subspace_core_primitives::segments::{HistorySize, RecordedHistorySegment};
+use subspace_core_primitives::segments::{HistorySize, RecordedHistorySegment, SegmentCommitment};
 use subspace_core_primitives::solutions::bidirectional_distance;
 use subspace_core_primitives::{PublicKey, ScalarBytes};
 use subspace_erasure_coding::ErasureCoding;
@@ -42,8 +42,13 @@ use subspace_farmer_components::FarmerProtocolInfo;
 use subspace_farmer_components::plotting::PlottedSector;
 use subspace_farmer_components::sector::{SectorContentsMap, sector_size};
 use subspace_kzg::Kzg;
+use subspace_verification::PieceCheckParams;
+use zx_consensus::poas::{ErrorPoas, verificar_solucion_poas};
 use zx_consensus::reto_desde_salida;
 use zx_node::farmer::{ErrorFarmer, ParcelaDisco, plotear_sector_en_disco};
+use zx_node::productor_poas::{
+    ErrorProductorPoas, ResultadoConversionLocal, convertir_candidatos_locales,
+};
 
 /// Piezas del sector de fixture (valor de desarrollo).
 const PIEZAS: u16 = 2;
@@ -194,6 +199,24 @@ fn instalar_par(dir: &DirTemporal, fondo: &Fondo) -> PathBuf {
     fs::write(&ruta, &fondo.bytes_sector).expect("escribir sector");
     fs::write(ruta_metadata(&ruta), &fondo.bytes_metadata).expect("escribir metadata");
     ruta
+}
+
+/// `PieceCheckParams` del fixture de **desarrollo** de D2, no de red.
+///
+/// El compromiso de segmento sale del propio segmento archivado por el fixture
+/// (`historial.segment_header.segment_commitment()`) y el resto de `FarmerProtocolInfo`, la misma
+/// fuente de desarrollo que usa el ploteo de D1 (`plot_read_roundtrip.rs`). No son parámetros de
+/// red ni sustituyen al contexto de pieza que debe inyectar el snapshot causal.
+fn params_pieza_fixture(fondo: &Fondo) -> PieceCheckParams {
+    PieceCheckParams {
+        max_pieces_in_sector: fondo.protocolo.max_pieces_in_sector,
+        segment_commitment: fondo.historial.segment_header.segment_commitment(),
+        recent_segments: fondo.protocolo.recent_segments,
+        recent_history_fraction: fondo.protocolo.recent_history_fraction,
+        min_sector_lifetime: fondo.protocolo.min_sector_lifetime,
+        current_history_size: fondo.protocolo.history_size,
+        sector_expiration_check_segment_commitment: None,
+    }
 }
 
 /// Espejo local del `CuerpoParcela` privado de `farmer.rs`, con el mismo orden y tipos, para
@@ -738,6 +761,182 @@ fn auditar_candidatos_coincide_con_oraculo_y_resumen() {
     eprintln!(
         "[medición local, no consenso] primer slot determinista con candidatos: {encontrado:?} \
          (salida {salida:?})"
+    );
+}
+
+/// Salida de PoT de fixture para D2. Valor de test, no de red.
+const SALIDA_D2: [u8; 16] = [13u8; 16];
+
+/// Límite de test del barrido de slots de D2. Si no aparece solución, el test falla con mensaje.
+const LIMITE_BUSQUEDA_SOLUCION: u64 = 64;
+
+/// D2 (tramo local): convierte candidatos de D1 en soluciones, verifica con A1 y no acepta lo que
+/// A1 rechaza. No elige padres, no firma y no publica.
+#[test]
+fn convierte_candidatos_y_verifica_a1() {
+    let fondo = fondo();
+    let dir = DirTemporal::nuevo("conversion-a1");
+    let ruta = instalar_par(&dir, fondo);
+    let parcela = ParcelaDisco::abrir(&ruta, &fondo.public_key).expect("abrir parcela válida");
+    let params = params_pieza_fixture(fondo);
+
+    // Barrido con límite de test explícito hasta la primera solución verificada por A1.
+    let mut hallado: Option<(u64, ResultadoConversionLocal)> = None;
+    let mut barridos = 0u64;
+    for slot in 0..LIMITE_BUSQUEDA_SOLUCION {
+        let resultado = convertir_candidatos_locales(
+            &parcela,
+            SALIDA_D2,
+            slot,
+            RANGO_PRUEBA,
+            &params,
+            &fondo.kzg,
+            &fondo.erasure_coding,
+        )
+        .expect("la conversión no debe fallar con el contexto del fixture");
+        barridos += 1;
+        if !resultado.soluciones().is_empty() {
+            hallado = Some((slot, resultado));
+            break;
+        }
+    }
+    let mensaje = format!(
+        "el fixture no produjo ninguna solución verificada por A1 en {barridos} slots con la salida \
+         {SALIDA_D2:?} y rango {RANGO_PRUEBA}; no se fabrica una solución: revisa el fixture o el \
+         límite de test"
+    );
+    let (slot, resultado) = hallado.expect(&mensaje);
+
+    // Cada solución devuelta vuelve a verificar de forma independiente y su distancia es la de A1.
+    for comprobada in resultado.soluciones() {
+        let distancia = verificar_solucion_poas(
+            comprobada.solucion(),
+            slot,
+            SALIDA_D2,
+            RANGO_PRUEBA,
+            &params,
+            &fondo.kzg,
+        )
+        .expect("la solución devuelta debe verificar de forma independiente");
+        assert_eq!(
+            distancia,
+            comprobada.distancia(),
+            "la distancia devuelta debe ser la que calcula A1"
+        );
+    }
+    assert_eq!(
+        resultado.diagnostico().soluciones_verificadas,
+        resultado.soluciones().len(),
+        "el contador de verificadas debe coincidir con las devueltas"
+    );
+    assert!(
+        resultado.diagnostico().soluciones_generadas >= resultado.soluciones().len(),
+        "no puede haber más verificadas que generadas"
+    );
+
+    // Mutación de prueba: A1 la rechaza y la API no la devuelve como válida.
+    let mut mutada = *resultado.soluciones()[0].solucion();
+    mutada.proof_of_space = [0u8; 160];
+    let rechazo =
+        verificar_solucion_poas(&mutada, slot, SALIDA_D2, RANGO_PRUEBA, &params, &fondo.kzg)
+            .expect_err("A1 debe rechazar la mutación de prueba");
+    assert!(
+        matches!(rechazo, ErrorPoas::Prueba(_)),
+        "la mutación debe rechazarse como prueba inválida, fue {rechazo:?}"
+    );
+    assert!(
+        resultado
+            .soluciones()
+            .iter()
+            .all(|comprobada| comprobada.solucion() != &mutada),
+        "la API no debe devolver la mutación como válida"
+    );
+
+    // Contexto de pieza incompatible (compromiso de segmento ajeno): A1 rechaza las generadas y la
+    // API no acepta ninguna. El rechazo se cuenta en `rechazos_a1` **sin atribuir causa**: no
+    // prueba un falso positivo del auditor y, con contexto ajeno, puede ocultar un fallo de
+    // integración causal; la función no acredita la procedencia del contexto. Sin A1, aquí
+    // aparecerían soluciones.
+    let mut contexto_ajeno = params.clone();
+    contexto_ajeno.segment_commitment = SegmentCommitment::default();
+    let con_ajeno = convertir_candidatos_locales(
+        &parcela,
+        SALIDA_D2,
+        slot,
+        RANGO_PRUEBA,
+        &contexto_ajeno,
+        &fondo.kzg,
+        &fondo.erasure_coding,
+    )
+    .expect("un contexto aritméticamente válido no debe ser error");
+    assert!(
+        con_ajeno.soluciones().is_empty(),
+        "un contexto de pieza incompatible no puede producir soluciones válidas"
+    );
+    assert!(
+        con_ajeno.diagnostico().rechazos_a1 > 0,
+        "el rechazo debe contarse como rechazo de A1 (sin atribución de causa), no como ausencia \
+         de candidato"
+    );
+
+    // Contexto aritméticamente inválido: error explícito, nunca aceptación.
+    let mut contexto_invalido = params.clone();
+    contexto_invalido.current_history_size =
+        HistorySize::from(NonZeroU64::new(u64::MAX).expect("no es cero"));
+    let error = convertir_candidatos_locales(
+        &parcela,
+        SALIDA_D2,
+        slot,
+        RANGO_PRUEBA,
+        &contexto_invalido,
+        &fondo.kzg,
+        &fondo.erasure_coding,
+    )
+    .expect_err("un contexto aritméticamente inválido debe propagarse como error");
+    assert!(
+        matches!(
+            error,
+            ErrorProductorPoas::Contexto(ErrorPoas::ContextoInvalido(_))
+        ),
+        "se esperaba contexto inválido explícito, fue {error:?}"
+    );
+
+    // `InvalidHistorySize` de upstream (rama `derive_expiration_history_size`) es un fallo del
+    // contexto de pieza/expiración, no un rechazo ordinario: se propaga por
+    // `ErrorProductorPoas::Contexto` conservando el motivo upstream, sin contarlo como
+    // `rechazos_a1` ni convertirlo en conjunto vacío. Se induce con el mismo fixture de A1
+    // (`min_sector_lifetime` desbordado + compromiso de expiración del segmento) y el slot ya
+    // hallado, sin volver a plotear.
+    let mut contexto_expiracion = params.clone();
+    contexto_expiracion.min_sector_lifetime =
+        HistorySize::from(NonZeroU64::new(u64::MAX).expect("no es cero"));
+    contexto_expiracion.sector_expiration_check_segment_commitment =
+        Some(params.segment_commitment);
+    let error = convertir_candidatos_locales(
+        &parcela,
+        SALIDA_D2,
+        slot,
+        RANGO_PRUEBA,
+        &contexto_expiracion,
+        &fondo.kzg,
+        &fondo.erasure_coding,
+    )
+    .expect_err("la expiración de sector no representable debe propagarse como error");
+    assert!(
+        matches!(
+            error,
+            ErrorProductorPoas::Contexto(ErrorPoas::Prueba(
+                subspace_verification::Error::InvalidHistorySize
+            ))
+        ),
+        "se esperaba propagar InvalidHistorySize conservando el motivo upstream, fue {error:?}"
+    );
+
+    eprintln!(
+        "[medición local, no consenso] D2: primera solución verificada en slot {slot}; diagnóstico \
+         {:?}; hilos visibles {}",
+        resultado.diagnostico(),
+        std::thread::available_parallelism().map_or(1, |n| n.get()),
     );
 }
 

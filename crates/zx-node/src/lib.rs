@@ -20,4 +20,6 @@ pub mod contextual;
 #[cfg(feature = "farmer")]
 pub mod farmer;
 pub mod nodo;
+#[cfg(feature = "farmer")]
+pub mod productor_poas;
 pub mod sync;
