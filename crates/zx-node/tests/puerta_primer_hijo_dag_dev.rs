@@ -1,6 +1,7 @@
 //! Test de integración de la costura A3/D2 del primer hijo DAG dev
-//! (`zx_node::puerta_primer_hijo_dag_dev`; `C-POT-03`/`C-POT-05`/`C-POT-06`/`C-POT-08` y
-//! `C-HDR-03`/`C-HDR-04`/`C-HDR-06`/`C-HDR-07`).
+//! (`zx_node::puerta_primer_hijo_dag_dev` y `zx_node::cuerpo_coinbase_dag_dev`; `C-POT-03`/
+//! `C-POT-05`/`C-POT-06`/`C-POT-08`, `C-HDR-03`/`C-HDR-04`/`C-HDR-06`/`C-HDR-07` y
+//! `C-BLK-01`/`C-BLK-02`/`C-BLK-03`/`C-BLK-07`, `C-EMIT-03`/`C-EMIT-04`).
 //!
 //! # Qué ejercita de verdad
 //!
@@ -21,20 +22,35 @@
 //! - La función pública `verificar_primer_hijo_dag_dev` con reloj PoT explícito y un presupuesto de
 //!   prueba que concede **exactamente** los slots generados; se exige `Comprobada` con el hash de la
 //!   cabecera, el slot/salida auditados, la distancia A1 y el rango validado atados al mismo hash.
-//! - Dos negativos: sello alterado ⇒ `Invalida(Sello)` sin consumir presupuesto AES, y `pot_output`
-//!   alterado **y resellado** bajo la misma clave ⇒ `Invalida(Pot(PotOutputNoCoincide))`. El segundo
-//!   no usa un sello roto para fingir un rechazo PoT.
+//! - La **coinbase cero real** de `CuerpoCoinbaseCeroDagDev`: una sola transacción sin entradas,
+//!   salida cero a la clave del plot, `lock_time = 0` y `expiry_height = altura`; sus
+//!   `merkle_root` y `body_commitment` se calculan antes de firmar `pre_hash` y alimentan la
+//!   cabecera. `comprobar_cuerpo_coinbase_cero_dev` exige esa forma y recalcula ambos compromisos.
+//! - Los negativos de sello y PoT: sello alterado ⇒ `Invalida(Sello)` sin consumir presupuesto AES,
+//!   y `pot_output` alterado **y resellado** bajo la misma clave ⇒
+//!   `Invalida(Pot(PotOutputNoCoincide))`. El segundo no usa un sello roto para fingir un rechazo
+//!   PoT.
+//! - Los negativos acotados del cuerpo: Merkle alterado ⇒ `MerkleRaizNoCoincide`; `body_commitment`
+//!   alterado ⇒ `CuerpoCompromisoNoCoincide`; `expiry_height` distinto con compromisos
+//!   recalculados ⇒ `CoinbaseSinAltura` (`C-EMIT-04`) y no Merkle; bloque vacío ⇒ `BloqueSinCoinbase`
+//!   (`C-BLK-07`); y una segunda coinbase ⇒ error explícito, nunca `Ok`.
 //!
 //! # Qué NO cubre, y por qué
 //!
-//! - **No es admisión.** No se comprueba cuerpo, UTXO, coinbase, orden GHOSTDAG ni red de tres
-//!   nodos. `Comprobada` solo dice que las pruebas locales se satisficieron contra este contexto dev.
+//! - **Solo el positivo combina A3 y cuerpo básico, y no es admisión.** El positivo pasa la costura
+//!   A3 (`Comprobada`) **y** el comprobador limitado del cuerpo coinbase cero; los negativos del
+//!   cuerpo mutan cabecera o cuerpo sin exigir sello, porque `comprobar_cuerpo_coinbase_cero_dev`
+//!   no verifica sello. No se comprueba UTXO, subsidio, peso dinámico, firmas de gasto, timelocks,
+//!   orden GHOSTDAG ni red de tres nodos: `Comprobada` solo dice que las pruebas locales se
+//!   satisficieron contra este contexto dev.
 //! - **A3 no deriva altura ni rama ni comprueba el reloj de pared.** La `rama` y la `altura` del
 //!   fixture son coherentes con `G` por construcción (misma rama dev, altura `G + 1`) y el
 //!   `timestamp` avanza con el slot, pero **nadie las verifica** aquí; `reloj_pot` es el reloj PoT,
 //!   no un reloj de pared.
-//! - **`body_commitment` y `merkle_root` no acreditan cuerpo.** El bloque del test tiene cuerpo
-//!   vacío y esos dos campos son marcadores: no se calculan sobre transacciones ni se comprueban.
+//! - **`body_commitment` y `merkle_root` sí acreditan este cuerpo, y nada más.** Ahora se calculan
+//!   sobre la coinbase cero real y el comprobador los recalcula; eso **no** convierte el cuerpo en
+//!   válido: no cubre la ruta económica completa (`C-EMIT-03` admite el cobro cero como cobro
+//!   inferior, no como subsidio).
 //! - La historia dev **no es historia de red** ni un contexto causal general; `params_pieza` solo es
 //!   el contexto de pieza coherente con este archivo determinista.
 //!
@@ -60,18 +76,22 @@ use subspace_core_primitives::PublicKey;
 use subspace_core_primitives::sectors::SectorIndex;
 
 use zx_consensus::{
-    CachePotVerificada, EstadoCabeceraConjunta, InstantaneaPot, MotivoCabeceraInvalida,
-    MotivoPotInvalido, PresupuestoPot, RangoSolucionValidado, checkpoints_a_wire,
-    proyectar_iteraciones, semilla_siguiente,
+    CachePotVerificada, ConsensusError, EstadoCabeceraConjunta, InstantaneaPot,
+    MotivoCabeceraInvalida, MotivoPotInvalido, PresupuestoPot, RangoSolucionValidado,
+    checkpoints_a_wire, proyectar_iteraciones, semilla_siguiente,
 };
+use zx_core::preimage::block::merkle_root;
 use zx_core::wire_dag::{
     CHECKPOINTS_POR_BUNDLE, JustificacionPot, PotCheckpoints as PotCheckpointsWire,
 };
 use zx_core::{
-    BloqueDag, BodyCommitment, DagBlockHeader, Digest, MerkleRoot, POT_OUTPUT_BYTES, PadresDag,
-    SolucionPoas,
+    BloqueDag, BodyCommitment, ClavePublica, DagBlockHeader, Digest, MerkleRoot, POT_OUTPUT_BYTES,
+    PadresDag, SolucionPoas, Tx, body_commitment, txid,
 };
 use zx_node::bootstrap_dag_dev::{EstadoBootstrapDagDev, iniciar_bootstrap_dag_dev};
+use zx_node::cuerpo_coinbase_dag_dev::{
+    CuerpoCoinbaseCeroDagDev, ErrorCuerpoCoinbaseDev, comprobar_cuerpo_coinbase_cero_dev,
+};
 use zx_node::farmer::{ParcelaDisco, plotear_sector_en_disco};
 use zx_node::historia_dag_dev::HistoriaDagDev;
 use zx_node::perfil_primer_hijo_dag_dev::ContextoPrimerHijoPotDagDev;
@@ -120,8 +140,19 @@ fn construir_escenario() -> Escenario {
     let vk_bytes: [u8; 32] = vk.into();
     let public_key = PublicKey::from(vk_bytes);
 
+    // Cuerpo coinbase cero real: la misma identidad que plotta es la que cobra. Sus compromisos
+    // entran en la cabecera antes de firmar `pre_hash`.
+    let cuerpo =
+        CuerpoCoinbaseCeroDagDev::construir(&bootstrap, ClavePublica::desde_bytes(vk_bytes))
+            .expect("la coinbase cero del primer hijo MUST construirse");
+
     // `N(s)` y `SR` se leen del contexto dev, no de literales del test.
-    let cabecera_perfil = cabecera_dev(&bootstrap, MAX_SLOTS_BUSQUEDA, SR_DECLARADO_PARA_DERIVAR);
+    let cabecera_perfil = cabecera_dev(
+        &bootstrap,
+        MAX_SLOTS_BUSQUEDA,
+        SR_DECLARADO_PARA_DERIVAR,
+        &cuerpo,
+    );
     let contexto_perfil =
         ContextoPrimerHijoPotDagDev::desde_bootstrap_y_cabecera(&bootstrap, &cabecera_perfil)
             .expect("el contexto del perfil dev MUST construirse");
@@ -212,8 +243,8 @@ fn construir_escenario() -> Escenario {
     );
 
     // Cabecera `{G}`: rama y altura coherentes con G por construcción (A3 no las deriva ni las
-    // comprueba); `body_commitment` y `merkle_root` son marcadores que NO acreditan cuerpo.
-    let mut cabecera = cabecera_dev(&bootstrap, slot, sr);
+    // comprueba); `body_commitment` y `merkle_root` salen del cuerpo coinbase cero real.
+    let mut cabecera = cabecera_dev(&bootstrap, slot, sr, &cuerpo);
     cabecera.pot_output = salida;
     cabecera.sol = sol;
     cabecera.sello = sk.sign(cabecera.pre_hash().as_bytes()).into();
@@ -224,8 +255,13 @@ fn construir_escenario() -> Escenario {
 
     let justificacion =
         JustificacionPot::nueva(portadores).expect("la lista de portadores del rango es canónica");
-    let bloque = BloqueDag::nuevo(cabecera, justificacion, Vec::new(), Vec::new())
-        .expect("bloque sin cuerpo");
+    let bloque = BloqueDag::nuevo(
+        cabecera,
+        justificacion,
+        cuerpo.txs().to_vec(),
+        cuerpo.testigos().to_vec(),
+    )
+    .expect("bloque con la coinbase cero del primer hijo");
 
     eprintln!(
         "[medición local, no consenso] A3/primer hijo: primera solución A1 en el slot {slot} tras \
@@ -244,18 +280,19 @@ fn construir_escenario() -> Escenario {
     }
 }
 
-/// Cabecera dev con padres `{G}`. Los compromisos de cuerpo son marcadores **elegidos para test**.
+/// Cabecera dev con padres `{G}`. Los compromisos de cuerpo salen del cuerpo coinbase cero real.
 fn cabecera_dev(
     bootstrap: &EstadoBootstrapDagDev,
     slot: u64,
     rango_solucion: u64,
+    cuerpo: &CuerpoCoinbaseCeroDagDev,
 ) -> DagBlockHeader {
     let genesis = &bootstrap.bloque_dev().cabecera;
     DagBlockHeader {
         // Coherente con G; este test **no** comprueba C-HDR-02b.
         consensus_branch_id: genesis.consensus_branch_id,
-        // Marcador: no acredita cuerpo (el bloque del test tiene cuerpo vacío).
-        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0xA1; 32])),
+        // Compromisos reales del cuerpo coinbase cero (`C-BLK-01`/`C-BLK-02`/`C-BLK-03`).
+        merkle_root: cuerpo.merkle_root(),
         // Posterior al timestamp de G; A3 no comprueba reloj de pared ni §7.4.
         timestamp: genesis.timestamp.saturating_add(slot),
         // Altura coherente con G por construcción; A3 no la deriva (C-HDR-02).
@@ -265,8 +302,8 @@ fn cabecera_dev(
         pot_output: [0u8; POT_OUTPUT_BYTES],
         rango_solucion,
         sol: SolucionPoas::default(),
-        // Marcador: no acredita cuerpo.
-        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0xB2; 32])),
+        // Compromiso real del cuerpo (efectos y autorización) de la coinbase cero.
+        body_commitment: cuerpo.body_commitment(),
         padres: PadresDag::nuevo(bootstrap.hash_congelado_dev(), &[])
             .expect("los padres {G} son canónicos"),
         sello: [0u8; 64],
@@ -327,11 +364,20 @@ impl Drop for DirTemporal {
     }
 }
 
-/// Positivo: PoT real encadenado, PoAS real, sello real y contexto dev ⇒ `Comprobada`.
+/// Positivo: cuerpo coinbase cero real, PoT real encadenado, PoAS real, sello real y contexto dev
+/// ⇒ `Comprobada` y comprobador de cuerpo `Ok`. Solo este positivo combina A3 y cuerpo básico; no es
+/// admisión.
 #[test]
 fn primer_hijo_dev_comprobado_con_pot_poas_y_sello_reales() {
     let e = escenario();
     let hash = e.bloque.cabecera.block_hash();
+    assert!(
+        !e.bloque.txs().is_empty(),
+        "el cuerpo del fixture MUST llevar la coinbase cero"
+    );
+    comprobar_cuerpo_coinbase_cero_dev(&e.bootstrap, &e.bloque).expect(
+        "el comprobador limitado del cuerpo coinbase cero MUST aceptar el cuerpo real del fixture",
+    );
     assert!(
         e.bloque.cabecera.verificar_sello().is_ok(),
         "el bloque del fixture MUST llegar con sello válido"
@@ -459,4 +505,111 @@ fn pot_output_alterado_y_resellado_es_invalida_pot_output_no_coincide() {
         )) => {}
         otro => panic!("se esperaba Invalida(Pot(PotOutputNoCoincide)); llegó {otro:?}"),
     }
+}
+
+/// Reensambla un bloque dev `{G}` con los `txs`/`testigos` dados y los compromisos recalculados.
+///
+/// **No** rehace el sello: `comprobar_cuerpo_coinbase_cero_dev` no verifica sello, así que estos
+/// negativos aíslan la comprobación del cuerpo. El llamante MUST partir de una cabecera base
+/// coherente con `{G}`.
+fn bloque_con_cuerpo(e: &Escenario, txs: Vec<Tx>, testigos: Vec<Vec<Vec<u8>>>) -> BloqueDag {
+    let rama = e.bootstrap.bloque_dev().cabecera.consensus_branch_id;
+    let txids: Vec<_> = txs.iter().map(|t| txid(t, rama)).collect();
+    let mut cabecera = e.bloque.cabecera;
+    cabecera.merkle_root = merkle_root(&txids);
+    cabecera.body_commitment =
+        body_commitment(&txs, &testigos, rama).expect("el cuerpo emparejado MUST comprometerse");
+    BloqueDag::nuevo(cabecera, e.bloque.justificacion.clone(), txs, testigos)
+        .expect("txs y testigos emparejados")
+}
+
+/// Negativo: `merkle_root` alterado con el cuerpo intacto ⇒ `MerkleRaizNoCoincide`.
+#[test]
+fn merkle_alterado_con_cuerpo_intacto_es_merkle_raiz_no_coincide() {
+    let e = escenario();
+    let mut bloque = e.bloque.clone();
+    bloque.cabecera.merkle_root = MerkleRoot::from_digest(Digest::from_bytes([0x5A; 32]));
+    // No se rehace el sello: el comprobador de cuerpo no verifica sello.
+    assert!(matches!(
+        comprobar_cuerpo_coinbase_cero_dev(&e.bootstrap, &bloque),
+        Err(ErrorCuerpoCoinbaseDev::Compromisos(
+            ConsensusError::MerkleRaizNoCoincide
+        ))
+    ));
+}
+
+/// Negativo: `body_commitment` alterado con el Merkle intacto ⇒ `CuerpoCompromisoNoCoincide`.
+#[test]
+fn body_commitment_alterado_con_merkle_intacto_es_cuerpo_compromiso_no_coincide() {
+    let e = escenario();
+    let mut bloque = e.bloque.clone();
+    bloque.cabecera.body_commitment = BodyCommitment::from_digest(Digest::from_bytes([0x6B; 32]));
+    assert!(matches!(
+        comprobar_cuerpo_coinbase_cero_dev(&e.bootstrap, &bloque),
+        Err(ErrorCuerpoCoinbaseDev::Compromisos(
+            ConsensusError::CuerpoCompromisoNoCoincide
+        ))
+    ));
+}
+
+/// Negativo: coinbase con `expiry_height` distinto y compromisos **recalculados** ⇒ rechazo por
+/// `C-EMIT-04`, no por Merkle.
+#[test]
+fn coinbase_con_expiry_distinto_con_compromisos_recalculados_es_c_emit_04() {
+    let e = escenario();
+    let mut coinbase = e
+        .bloque
+        .txs()
+        .first()
+        .expect("la coinbase del fixture MUST existir")
+        .clone();
+    coinbase.expiry_height = coinbase.expiry_height.saturating_add(1);
+    let testigos: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
+    let bloque = bloque_con_cuerpo(e, vec![coinbase], testigos);
+
+    match comprobar_cuerpo_coinbase_cero_dev(&e.bootstrap, &bloque) {
+        Err(ErrorCuerpoCoinbaseDev::CoinbaseSinAltura { altura, expiry }) => {
+            assert_eq!(altura, 1, "el perfil dev deriva altura 1 de G con height 0");
+            assert_ne!(expiry, altura, "el expiry mutado no coincide con la altura");
+        }
+        otro => panic!("se esperaba CoinbaseSinAltura (C-EMIT-04); llegó {otro:?}"),
+    }
+}
+
+/// Negativo: bloque sin ninguna transacción ⇒ `BloqueSinCoinbase` (`C-BLK-07`).
+#[test]
+fn bloque_vacio_es_bloque_sin_coinbase_c_blk_07() {
+    let e = escenario();
+    let bloque = BloqueDag::nuevo(
+        e.bloque.cabecera,
+        JustificacionPot::vacia(),
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("el bloque vacío empareja cero transacciones con cero testigos");
+    assert!(matches!(
+        comprobar_cuerpo_coinbase_cero_dev(&e.bootstrap, &bloque),
+        Err(ErrorCuerpoCoinbaseDev::BloqueSinCoinbase)
+    ));
+}
+
+/// Negativo: una segunda coinbase no se acepta mediante `Ok`: queda fuera del perfil.
+///
+/// Los compromisos se recalculan para que el rechazo sea del número de transacciones y no de un
+/// Merkle desactualizado.
+#[test]
+fn una_segunda_coinbase_no_se_acepta_como_ok() {
+    let e = escenario();
+    let coinbase = e
+        .bloque
+        .txs()
+        .first()
+        .expect("la coinbase del fixture MUST existir")
+        .clone();
+    let testigos: Vec<Vec<Vec<u8>>> = vec![Vec::new(), Vec::new()];
+    let bloque = bloque_con_cuerpo(e, vec![coinbase.clone(), coinbase], testigos);
+    assert!(matches!(
+        comprobar_cuerpo_coinbase_cero_dev(&e.bootstrap, &bloque),
+        Err(ErrorCuerpoCoinbaseDev::TransaccionesFueraDePerfil { encontradas: 2 })
+    ));
 }

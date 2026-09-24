@@ -1,0 +1,25 @@
+# ORDEN D2/B3 · cuerpo coinbase cero y compromisos reales del primer hijo dev
+
+**Ejecutor:** DeepSeek Harness `deepseek-v4.1-flash`, esfuerzo `high`. Incremento parcial D2/B3/C3; no cierra casillas ni admite bloques. Lee `DECISIONES-0.0.1.md` COINBASE-CERO-PRIMER-HIJO-DEV, `PROMPT.md` §8, `SPEC.md` C-BLK-01/02/03/07 y C-EMIT-03/04, `crates/zx-core/src/preimage/{block,dag}.rs`, `crates/zx-consensus/src/{bloque_dag,bloque,validacion}.rs`, `crates/zx-node/src/bootstrap_dag_dev.rs` y el test `puerta_primer_hijo_dag_dev.rs` antes de editar.
+
+## Archivos exactos
+
+- Crear `crates/zx-node/src/cuerpo_coinbase_dag_dev.rs` (módulo dev, sin feature farmer porque solo usa core/consensus).
+- Añadir solo `pub mod cuerpo_coinbase_dag_dev;` en orden a `crates/zx-node/src/lib.rs`.
+- Modificar `crates/zx-node/tests/puerta_primer_hijo_dag_dev.rs` para sustituir cuerpo vacío y compromisos marcadores por coinbase y compromisos reales, y añadir negativos acotados.
+
+No tocar otros módulos, manifests/lock, `SPEC.md`, PDF, CI, binario ni archivos concurrentes. No commit ni push. `git status --short` antes/después. Si una API obliga a otros ficheros, detente y explica la necesidad.
+
+## Contrato del módulo
+
+Encapsular un `CuerpoCoinbaseCeroDagDev` con campos privados `txs`, `testigos`, `merkle_root`, `body_commitment` y getters de solo lectura. Constructor público `construir(bootstrap: &EstadoBootstrapDagDev, productor: ClavePublica) -> Result<Self, ErrorCuerpoCoinbaseDev>`. Derivar altura por `bootstrap.bloque_dev().cabecera.height.checked_add(1)`; exigir que G del bootstrap tenga altura 0 si el perfil solo cubre primer hijo. Derivar `consensus_branch_id` de G **solo como supuesto dev para esta construcción**, sin afirmar la rama activa normativa de C-HDR-02b. Construir exactamente una `Tx` versión `zx_consensus::validacion::VERSION_TX`, sin entradas, una salida `Amount::CERO` con `Lock::PubKey { pubkey: productor }`, `lock_time=0`, `expiry_height=altura_derivada`. Testigos: un vector vacío para esa coinbase. Calcular `txid` con el branch dev, `merkle_root` con `zx_core::preimage::block::merkle_root` y `body_commitment` con `zx_core::body_commitment`; propagar error tipado, sin `unwrap/expect` en producto. No reimplementar hashes ni derivación de IDs.
+
+Añadir `pub fn comprobar_cuerpo_coinbase_cero_dev(bootstrap: &EstadoBootstrapDagDev, bloque: &BloqueDag) -> Result<(), ErrorCuerpoCoinbaseDev>`. Es comprobación **limitada** al primer hijo `{G}` y a la decisión provisional dev: exigir padres `{G}`, altura derivada `1`, branch igual al G dev, exactamente una tx y una lista de testigos vacía; comprobar versión, ninguna entrada, una salida de valor cero a `bloque.cabecera.sol.public_key`, `lock_time=0`, `expiry_height=1`. Después llamar a `zx_consensus::bloque_dag::comprobar_compromisos_cuerpo_dag(&bloque.cabecera, bloque.txs(), bloque.testigos())` y conservar sus errores de Merkle/BodyCommitment distinguibles. No aceptar una segunda coinbase ni transacciones de usuario mediante `Ok`; quedan **fuera del perfil** como error explícito. No usar el validador lineal `validar_cuerpo` sobre `DagBlockHeader` ni afirmar que este comprobador cubre subsidio, peso dinámico, firmas de gastos, timelocks, reloj o UTXO. El cobro cero es inferior al máximo permitido por C-EMIT-03; **no** es subsidio de consenso ni regla de mainnet/testnet.
+
+## Pruebas obligatorias
+
+En el fixture compartido de `tests/puerta_primer_hijo_dag_dev.rs`, construir `CuerpoCoinbaseCeroDagDev` con la clave del plot/firmador y usar sus `merkle_root` y `body_commitment` **antes** de firmar `pre_hash`; pasar `cuerpo.txs().to_vec()` y `cuerpo.testigos().to_vec()` a `BloqueDag::nuevo`. Comprobar en el positivo que el cuerpo no está vacío y `comprobar_cuerpo_coinbase_cero_dev` pasa; la puerta A3 debe continuar devolviendo `Comprobada` con el mismo PoT/PoAS/sello reales. Mantener los negativos de sello y PoT. Añadir al menos estos negativos sin replotear ni rearchivar: (1) Merkle alterado con cuerpo intacto ⇒ error tipado `MerkleRaizNoCoincide`; (2) `body_commitment` alterado con Merkle intacto ⇒ `CuerpoCompromisoNoCoincide`; (3) coinbase con `expiry_height` diferente pero compromisos recalculados ⇒ rechazo por C-EMIT-04, no por merkle; (4) bloque vacío ⇒ rechazo de `C-BLK-07`. Usar el `OnceLock` existente; no exigir firma válida en tests aislados del comprobador de cuerpo si se muta cabecera, porque esta función no verifica sello. Documentar que solo el **positivo** combina A3 y cuerpo básico y aún no es admisión.
+
+## Entrega
+
+Ejecutar `cargo test -p zx-node --features farmer --locked --test puerta_primer_hijo_dag_dev -- --nocapture`, `cargo fmt --all -- --check`, `cargo clippy -p zx-node --all-targets --features farmer --locked -- -D warnings`, `cargo check --workspace --locked`, `ci/citas-spec.sh`, `ci/alcance-consenso.sh`, `git diff --check`. No repetir D1 ni ejecutar release/suites ajenas. Informar cada negativo, tiempo observado y archivos exactos; detenerse para revisión. No marcar D2/B3/A3.

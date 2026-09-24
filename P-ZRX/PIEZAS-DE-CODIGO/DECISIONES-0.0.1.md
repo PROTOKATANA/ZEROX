@@ -159,3 +159,23 @@ La discrepancia aritmética de 17 frente a 18 piezas no es una decisión de prot
 - Descripción: mantener `Fondo` privado y pasar manualmente `PieceCheckParams` en cada llamada de productor/verificador, sin identidad congelada común.
 
 **Elección PROVISIONAL del líder: A, solo para desarrollo local.** El compromiso congelado y la receta del archivo serán datos de fixture, no compromiso de génesis ni norma de mainnet/testnet. La decisión es reversible en un módulo dev, la extracción del test `farmer_disco.rs` y sus pruebas; no toca el clon Autonomys ni el SPEC. Antes de conectar tres nodos hay que comprobar que cada proceso obtiene el mismo compromiso y que claves de parcela distintas producen soluciones válidas bajo el mismo contexto. Ningún bloque se admite por tener este objeto: A3, cuerpo, reloj y publicación siguen pendientes.
+
+## DECISIÓN PROVISIONAL · COINBASE-CERO-PRIMER-HIJO-DEV
+
+**Piezas bloqueadas:** D2, B1/B3 y primer cuerpo DAG dev coherente con su cabecera.
+
+**Descripción:** la prueba de la puerta A3 ya combina PoT de carga completa, PoAS y sello reales, pero usa cuerpo vacío y compromisos marcadores. La 0.0.1 quiere medir DAG/PoST con bloques reales. `C-BLK-07` exige coinbase, `C-EMIT-04` exige `expiry_height=height`, y `C-EMIT-03` permite que la coinbase cobre menos que el subsidio más fees. El controlador de emisión/mediana de bloque aún no está conectado al DAG; fabricar un subsidio esperado o validar el cuerpo lineal como si fuera DAG daría falsa validez.
+
+**Opción A · Coinbase dev de valor cero y compromisos reales**
+
+- Ventajas: es un subcaso permitido por `Σ salidas ≤ subsidio + fees`, siempre que el subsidio sea no negativo; ejercita txid, Merkle, `body_commitment`, ubicación y unicidad de coinbase, y aplicación UTXO sin elegir mediana de lanzamiento. Reutiliza primitivas ya escritas.
+- Desventajas: no mide emisión ni incentivos, no paga a productores y no cierra la validación económica completa. Requiere impedir que el verificador parcial se presente como admisión.
+- Descripción: un módulo exclusivo del primer hijo `zx-dag-dev` construye una única coinbase sin entradas, con una salida cero a la clave del productor, `expiry_height=1`, testigos vacíos y compromisos calculados por `zx-core`; un comprobador limitado a ese perfil exige la misma forma y llama a `comprobar_compromisos_cuerpo_dag`. No acepta transacciones de usuario ni recompensa positiva.
+
+**Opción B · Subsidio completo desde el primer bloque dev**
+
+- Ventajas: prueba antes la ruta económica que se necesitará al cerrar B3/D2.
+- Desventajas: depende de mediana efectiva, `emitido(H)`, penalización y límite de peso DAG aún sin fuente causal; elegirlos ahora como si fueran consenso de lanzamiento inventaría parámetros o conectaría un validador lineal fuera de su contrato.
+- Descripción: retrasar el primer cuerpo verificable hasta integrar las entradas económicas en el pasado DAG validado y calcular el subsidio exacto.
+
+**Elección PROVISIONAL del líder: A para `zx-dag-dev` y el primer hijo `{G}` exclusivamente.** El valor cero es un **cobro voluntariamente inferior**, no un subsidio de consenso ni una exención de `C-EMIT-03`; el cierre de D2/B3 exigirá la ruta económica completa antes de llamar válido a un bloque. Se revierte modificando solo el módulo dev de coinbase/cuerpo y sus tests, y pasando al constructor económico cuando el contexto causal exista; no cambia `SPEC.md`, génesis ni redes de lanzamiento. El resultado de cuerpo básico tampoco cubre timestamps, autorizaciones, peso dinámico, orden DAG, firma D3 ni admisión atómica.

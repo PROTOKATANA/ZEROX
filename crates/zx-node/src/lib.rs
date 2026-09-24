@@ -19,6 +19,7 @@ pub mod bootstrap_dag_dev;
 pub mod cadena;
 pub mod contexto_genesis_dag_dev;
 pub mod contextual;
+pub mod cuerpo_coinbase_dag_dev;
 pub mod dag_causal;
 #[cfg(feature = "farmer")]
 pub mod farmer;
