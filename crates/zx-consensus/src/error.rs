@@ -278,6 +278,19 @@ pub enum ConsensusError {
         validado_para: zx_core::BlockHash,
     },
 
+    /// C-HDR-06: el contexto de rango no puede resolver el rango esperado para esta vista.
+    ///
+    /// Es **falta de contexto**, no un veredicto sobre el candidato: el contexto no dispone de la
+    /// derivación que C-HDR-06 exige (pasado validado y flujo) para la vista opaca recibida. Por eso
+    /// **MUST NOT** confundirse con [`Self::RangoIncorrecto`] ni reutilizar
+    /// [`Self::PadreNoValidado`], [`Self::SaltoMayorSmax`] o [`Self::BloqueDesconocido`] para
+    /// encubrirlo. La causa concreta viaja como literal tipado, no como rechazo permanente.
+    #[error("C-HDR-06: contexto de rango no disponible: {motivo}")]
+    ContextoRangoNoDisponible {
+        /// Qué premisa contextual falta o no encaja.
+        motivo: &'static str,
+    },
+
     /// H-04 · Un bloque con `parent_count = 0` que no es el génesis de la red.
     #[error("C-HDR-01: un bloque no génesis con parent_count = 0")]
     GenesisConCeroPadresNoEsGenesis,
@@ -410,8 +423,16 @@ impl ConsensusError {
     /// inválido: si un nodo marca permanentemente un bloque que solo llegó pronto, y luego su reloj
     /// se pone al día, se queda fuera de la cadena buena para siempre. C-TS-03 lo dice
     /// explícitamente.
+    ///
+    /// [`Self::ContextoRangoNoDisponible`] tampoco es permanente: es **falta de contexto** (el
+    /// llamante aún no puede resolver el rango esperado de esa vista), no un veredicto sobre el
+    /// candidato. Cachearlo como rechazo dejaría fuera un bloque válido que solo necesitaba más
+    /// contexto. El resto de variantes conserva su clasificación.
     #[must_use]
     pub const fn es_permanente(&self) -> bool {
-        !matches!(self, Self::TimestampDemasiadoFuturo { .. })
+        !matches!(
+            self,
+            Self::TimestampDemasiadoFuturo { .. } | Self::ContextoRangoNoDisponible { .. }
+        )
     }
 }
