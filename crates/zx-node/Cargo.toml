@@ -88,3 +88,7 @@ subspace-archiving = { path = "../../PDF/autonomys-subspace/crates/subspace-arch
 
 [dev-dependencies]
 proptest = { workspace = true }
+# Solo el test de integración del puente D2/PoT (`farmer_disco`) necesita crear portadores con la
+# primitiva AES real (`zx_pot::prove`). `zx-pot` ya está en el grafo (lo usa `zx-consensus`) y es
+# miembro del workspace; esta línea solo declara la arista directa de test.
+zx-pot = { path = "../zx-pot" }

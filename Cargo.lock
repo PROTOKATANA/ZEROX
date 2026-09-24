@@ -5059,6 +5059,7 @@ dependencies = [
  "zx-core",
  "zx-mempool",
  "zx-p2p",
+ "zx-pot",
  "zx-storage",
 ]
 

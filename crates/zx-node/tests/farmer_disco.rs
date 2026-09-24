@@ -24,7 +24,7 @@
 use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::num::{NonZeroU64, NonZeroUsize};
+use std::num::{NonZeroU32, NonZeroU64, NonZeroUsize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Barrier, OnceLock};
@@ -44,11 +44,15 @@ use subspace_farmer_components::sector::{SectorContentsMap, sector_size};
 use subspace_kzg::Kzg;
 use subspace_verification::PieceCheckParams;
 use zx_consensus::poas::{ErrorPoas, verificar_solucion_poas};
+use zx_consensus::pot::{checkpoints_a_wire, semilla_siguiente, verificar_slot_aes};
 use zx_consensus::reto_desde_salida;
+use zx_core::wire_dag::{CHECKPOINTS_POR_BUNDLE, PotCheckpoints as PotCheckpointsWire};
+use zx_node::bootstrap_dag_dev::iniciar_bootstrap_dag_dev;
 use zx_node::farmer::{ErrorFarmer, ParcelaDisco, plotear_sector_en_disco};
 use zx_node::productor_poas::{
     ErrorProductorPoas, ResultadoConversionLocal, convertir_candidatos_locales,
 };
+use zx_pot::tipos::PotSeed;
 
 /// Piezas del sector de fixture (valor de desarrollo).
 const PIEZAS: u16 = 2;
@@ -937,6 +941,162 @@ fn convierte_candidatos_y_verifica_a1() {
          {:?}; hilos visibles {}",
         resultado.diagnostico(),
         std::thread::available_parallelism().map_or(1, |n| n.get()),
+    );
+}
+
+/// `N` del smoke test: el mínimo válido para los ocho checkpoints de `C-POT-02` (`C-POT-04`).
+///
+/// Es un **tiempo de prueba**, no una cadencia ni un parámetro de consenso: no se declara `N_dev`,
+/// no se mide la red y no se usa este valor fuera del fixture local.
+const N_SMOKE: u32 = 16;
+
+/// D2/A2/F4 (tramo local): encadena PoT AES desde el ancla **confiada** del génesis dev, audita la
+/// parcela real de D1 con cada salida de slot y convierte candidatos con la API D2 hasta que A1
+/// valide al menos una solución.
+///
+/// Ejerce `C-POT-01` (encadenado sin inyecciones), `C-POT-02` (producir por la primitiva y verificar
+/// por el adaptador), `C-POT-03` de forma indirecta (la auditoría de D1 deriva el reto de la salida
+/// del slot) y `C-POT-04` (proyección de `N_SMOKE`), más el paso 5 de `C-POT-08` mediante la
+/// verificación PoAS. **No acredita procedencia causal ni admisión**: el ancla del slot 0 es el dato
+/// confiado de C3-ARRANQUE, no una salida AES derivada de `semilla(f_0, 0)`; no hay flujo, contexto,
+/// retardo `D` de red, cabecera ni bloque. `C-POT-05` **no** se ejerce: aquí `D = 0` solo en el
+/// bootstrap dev y no se construye cabecera ni se ancla `pot_output`. No elige padres, no firma y no
+/// publica.
+#[test]
+fn convierte_pot_dev_y_solucion_disco() {
+    let fondo = fondo();
+    let dir = DirTemporal::nuevo("pot-disco");
+    let ruta = instalar_par(&dir, fondo);
+    let parcela = ParcelaDisco::abrir(&ruta, &fondo.public_key).expect("abrir parcela válida");
+    let params = params_pieza_fixture(fondo);
+
+    // Ancla **confiada** del slot 0 según C3-ARRANQUE: `pot_output(G)` del génesis dev. No la
+    // acredita el AES de este test; el encadenado parte de ella como haría el contexto futuro.
+    let bootstrap = iniciar_bootstrap_dag_dev().expect("el bootstrap dev debe arrancar");
+    let ancla_slot_0 = bootstrap.ancla_pot_slot_0_dev();
+    assert_eq!(
+        bootstrap.retardo_pot_dev(),
+        0,
+        "D = 0 es la hipótesis del bootstrap dev, no un valor de red"
+    );
+
+    let n_smoke = NonZeroU32::new(N_SMOKE).expect("N_SMOKE = 16 es positivo");
+
+    let mut salida_anterior = ancla_slot_0;
+    let mut semilla_slot_1: Option<[u8; 16]> = None;
+    let mut portador_slot_1: Option<PotCheckpointsWire> = None;
+    let mut hallado: Option<(u64, [u8; 16], ResultadoConversionLocal)> = None;
+    let mut slots_atravesados = 0u64;
+
+    for slot in 1..=LIMITE_BUSQUEDA_SOLUCION {
+        // C-POT-01: el fixture no declara inyecciones, así que la semilla es la salida anterior.
+        let semilla = semilla_siguiente(salida_anterior, None);
+        let checkpoints =
+            zx_pot::prove(PotSeed::from(semilla), n_smoke).expect("N_SMOKE = 16 es múltiplo de 16");
+        let wire = checkpoints_a_wire(&checkpoints);
+
+        // C-POT-02: verifica la **API distinta** del adaptador, no la primitiva que produjo.
+        assert!(
+            verificar_slot_aes(semilla, u64::from(N_SMOKE), &wire)
+                .expect("N_SMOKE está en el dominio de C-POT-04"),
+            "el slot {slot} no verifica por AES desde la salida anterior"
+        );
+
+        let salida_slot = wire.outputs()[CHECKPOINTS_POR_BUNDLE - 1];
+        if slot == 1 {
+            assert_ne!(
+                salida_slot, ancla_slot_0,
+                "la salida del slot 1 debe diferir del ancla confiada del slot 0"
+            );
+            semilla_slot_1 = Some(semilla);
+            portador_slot_1 = Some(wire);
+        }
+
+        // La semilla del slot siguiente sale **solo** del último checkpoint verificado de este slot.
+        salida_anterior = salida_slot;
+        slots_atravesados += 1;
+
+        // D2: convierte candidatos de disco con la salida auditada del slot y vuelve a verificar cada
+        // solución con A1 (paso 5 de C-POT-08). Se detiene en la primera solución hallada.
+        let resultado = convertir_candidatos_locales(
+            &parcela,
+            salida_slot,
+            slot,
+            RANGO_PRUEBA,
+            &params,
+            &fondo.kzg,
+            &fondo.erasure_coding,
+        )
+        .expect("la conversión no debe fallar con el contexto del fixture");
+
+        for comprobada in resultado.soluciones() {
+            let distancia = verificar_solucion_poas(
+                comprobada.solucion(),
+                slot,
+                salida_slot,
+                RANGO_PRUEBA,
+                &params,
+                &fondo.kzg,
+            )
+            .expect("la solución devuelta debe verificar de forma independiente");
+            assert_eq!(
+                distancia,
+                comprobada.distancia(),
+                "la distancia devuelta debe ser la que calcula A1"
+            );
+        }
+
+        if !resultado.soluciones().is_empty() {
+            hallado = Some((slot, salida_slot, resultado));
+            break;
+        }
+    }
+
+    let mensaje = format!(
+        "el fixture no produjo ninguna solución verificada por A1 en {slots_atravesados} slots PoT \
+         encadenados desde el ancla dev con rango {RANGO_PRUEBA}; no se fabrica una solución ni se \
+         amplía el rango: revisa el fixture o el límite de test"
+    );
+    let (slot_hallado, salida_hallada, resultado) = hallado.expect(&mensaje);
+    assert!(
+        slots_atravesados > 0,
+        "debe haberse ejecutado una cadena PoT no vacía"
+    );
+
+    // Negativo PoT no tautológico: el portador del slot 1 alterado en un byte no verifica con la
+    // semilla original. No se acepta una colección vacía como sustituto de esta comprobación.
+    let semilla_slot_1 = semilla_slot_1.expect("el slot 1 siempre se recorre");
+    let portador_slot_1 = portador_slot_1.expect("el slot 1 siempre se recorre");
+    let mut crudos = portador_slot_1.outputs();
+    crudos[0][0] ^= 0x01;
+    let alterado = PotCheckpointsWire::desde_outputs(crudos);
+    assert!(
+        !verificar_slot_aes(semilla_slot_1, u64::from(N_SMOKE), &alterado)
+            .expect("el N del slot 1 sigue en el dominio"),
+        "un checkpoint alterado del wire no debe verificar"
+    );
+
+    // Negativo PoAS: alterar `proof_of_space` de una solución hallada y exigir error de A1.
+    let mut mutada = *resultado.soluciones()[0].solucion();
+    mutada.proof_of_space = [0u8; 160];
+    let rechazo = verificar_solucion_poas(
+        &mutada,
+        slot_hallado,
+        salida_hallada,
+        RANGO_PRUEBA,
+        &params,
+        &fondo.kzg,
+    )
+    .expect_err("A1 debe rechazar la mutación de prueba");
+    assert!(
+        matches!(rechazo, ErrorPoas::Prueba(_)),
+        "la mutación debe rechazarse como prueba inválida, fue {rechazo:?}"
+    );
+
+    eprintln!(
+        "[medición local de fixture, no consenso] D2/PoT: solución en slot {slot_hallado} con \
+         {slots_atravesados} slots PoT atravesados; N de prueba {N_SMOKE}; rango de prueba \
+         {RANGO_PRUEBA}"
     );
 }
 
