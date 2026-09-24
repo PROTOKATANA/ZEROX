@@ -72,6 +72,16 @@ pub enum StorageError {
         causa: String,
     },
 
+    /// Ya existe una entrada en el índice de bloques DAG admitidos bajo ese `block_hash`.
+    ///
+    /// A diferencia de la cola de candidatos —donde reintentar con otra justificación PoT
+    /// reemplaza la entrada—, el **requisito del futuro escritor** es que una entrada admitida no
+    /// se sobrescriba: una segunda versión bajo el mismo hash sería una sustitución silenciosa.
+    /// Hoy solo puede dispararlo la inyección de fixture de los tests, porque no existe un escritor
+    /// de producción ni, por tanto, bytes verificados que este error pudiera proteger.
+    #[error("entrada admitida duplicada: el índice ya contenía ese block_hash")]
+    AdmitidoDuplicado,
+
     /// Fallo del backend de disco.
     #[error("fallo del almacén: {0}")]
     Backend(String),

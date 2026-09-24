@@ -3,7 +3,7 @@
 //! Tras la feature `rocksdb`. Ver [`crate::memoria`] para por qué es opcional y por qué existe una
 //! implementación de referencia contra la que compararlo.
 //!
-//! # Seis familias de columnas, no una
+//! # Siete familias de columnas, no una
 //!
 //! | Familia | Clave → valor | Por qué separada |
 //! |---|---|---|
@@ -13,11 +13,14 @@
 //! | `meta` | clave corta → valor | La punta, la altura finalizada, y lo que venga |
 //! | `utxo` | outpoint(36 B) → entrada | El UTXO set **finalizado**. Enorme y de acceso aleatorio: separarlo es lo que evita que se coma la caché de las cabeceras |
 //! | `candidatos_dag` | `block_hash`(32) → bloque DAG completo | La cola **no confiable** de candidatos DAG, separada de la cadena lineal para no reinterpretar ni mezclar sus familias |
+//! | `admitidos_dag` | `block_hash`(32) → sobre versionado | El índice de bloques DAG **plenamente admitidos** —destino, hoy **vacío en la ruta activa**—, de **solo lectura** hoy. Separado de la cola reemplazable: el futuro escritor no sobrescribirá la evidencia |
 //!
-//! La familia `candidatos_dag` la añade la preparación C1 (ver [`crate::almacen_dag`]): guarda
-//! bloques DAG **sin validar** en una entrada por `block_hash`, y **no** participa de la punta, las
-//! alturas ni el UTXO. Se crea con `create_missing_column_families`, así que un almacén lineal
-//! anterior se abre sin migración y gana la familia vacía.
+//! Las familias `candidatos_dag` y `admitidos_dag` las añade la preparación C1 (ver
+//! [`crate::almacen_dag`] y [`crate::almacen_admitidos_dag`]): guardan bloques DAG **sin validar**
+//! y **admitidos** respectivamente —la segunda es hoy un destino vacío en la ruta activa, que solo
+//! los tests llenan con bytes no verificados—, y **no** participan de la punta, las alturas ni el
+//! UTXO. Se crean con `create_missing_column_families`, así que un almacén lineal anterior se abre
+//! sin migración y gana las familias vacías.
 //!
 //! La altura se codifica en **big-endian a propósito**: RocksDB ordena las claves por bytes, así
 //! que big-endian hace que el orden lexicográfico coincida con el numérico. Con little-endian, la
@@ -40,6 +43,7 @@ use zx_core::wire;
 use zx_core::wire_dag::{BloqueDag, bloque_dag_a_bytes, bloque_dag_desde_bytes};
 
 use crate::almacen::{AlmacenCadena, Punta};
+use crate::almacen_admitidos_dag::{AlmacenAdmitidosDag, bloque_admitido_con_clave};
 use crate::almacen_dag::AlmacenCandidatosDag;
 use crate::error::StorageError;
 use crate::formato;
@@ -56,6 +60,13 @@ const CF_UTXO: &str = "utxo";
 /// Familia nueva de la preparación C1. No es el estado validado del DAG ni su punta: ver
 /// [`crate::almacen_dag`].
 const CF_CANDIDATOS_DAG: &str = "candidatos_dag";
+/// El índice de bloques DAG **plenamente admitidos**: `block_hash`(32) → sobre versionado.
+///
+/// Familia nueva de la preparación C1, de **solo lectura** hoy y **vacía en la ruta activa**: solo
+/// las inyecciones de fixture de los tests la llenan, con bytes no verificados. Separada de
+/// `candidatos_dag`: el futuro escritor no sobrescribirá la evidencia. Ver
+/// [`crate::almacen_admitidos_dag`].
+const CF_ADMITIDOS_DAG: &str = "admitidos_dag";
 
 /// Clave de la punta dentro de `meta`.
 const CLAVE_PUNTA: &[u8] = b"punta";
@@ -110,6 +121,7 @@ impl AlmacenEnDisco {
             CF_META,
             CF_UTXO,
             CF_CANDIDATOS_DAG,
+            CF_ADMITIDOS_DAG,
         ]
         .into_iter()
         .map(|n| ColumnFamilyDescriptor::new(n, Options::default()))
@@ -409,6 +421,64 @@ impl AlmacenCandidatosDag for AlmacenEnDisco {
     }
 }
 
+impl AlmacenAdmitidosDag for AlmacenEnDisco {
+    fn bloque_admitido(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
+        let Some(bytes) = self
+            .db
+            .get_cf(self.cf(CF_ADMITIDOS_DAG)?, hash.as_bytes())
+            .map_err(backend)?
+        else {
+            // `None` es "no está en el índice", no un veredicto de validez (C-HDR-07).
+            return Ok(None);
+        };
+        bloque_admitido_con_clave(hash, &bytes).map(Some)
+    }
+}
+
+impl AlmacenEnDisco {
+    /// **Inyección de fixture, sin autoridad.** Escribe una entrada en la familia de admitidos para
+    /// que los tests puedan ejercitar la lectura.
+    ///
+    /// No existe en el binario de producción: está tras `#[cfg(test)]`. No valida nada y rechaza
+    /// reemplazar en el propio helper una clave ya presente; eso **no** demuestra la inmutabilidad
+    /// de la futura escritura de admisión, ni su atomicidad con estado, undo y GHOSTDAG, ni que los
+    /// bytes inyectados sean evidencia PoST verificada.
+    ///
+    /// # Errores
+    /// [`StorageError::AdmitidoDuplicado`] si la clave ya está; [`StorageError`] si el backend falla.
+    #[cfg(test)]
+    pub(crate) fn inyectar_fixture_admitido(&self, bloque: &BloqueDag) -> Result<(), StorageError> {
+        let clave = bloque.cabecera.block_hash();
+        let cf = self.cf(CF_ADMITIDOS_DAG)?;
+        if self
+            .db
+            .get_pinned_cf(cf, clave.as_bytes())
+            .map_err(backend)?
+            .is_some()
+        {
+            return Err(StorageError::AdmitidoDuplicado);
+        }
+        let bytes = crate::almacen_admitidos_dag::bloque_admitido_a_bytes(bloque);
+        self.db.put_cf(cf, clave.as_bytes(), bytes).map_err(backend)
+    }
+
+    /// **Inyección de fixture cruda, sin autoridad.** Inserta bytes arbitrarios bajo una clave para
+    /// probar la defensa contra corrupción. No existe en producción.
+    ///
+    /// # Errores
+    /// [`StorageError`] si el backend falla.
+    #[cfg(test)]
+    pub(crate) fn inyectar_fixture_admitido_crudo(
+        &self,
+        clave: &BlockHash,
+        bytes: &[u8],
+    ) -> Result<(), StorageError> {
+        self.db
+            .put_cf(self.cf(CF_ADMITIDOS_DAG)?, clave.as_bytes(), bytes)
+            .map_err(backend)
+    }
+}
+
 #[cfg(test)]
 #[expect(clippy::panic, reason = "los tests fallan con panic por diseño")]
 mod tests_estructura {
@@ -548,6 +618,171 @@ mod tests_candidatos_dag {
                 Err(StorageError::Corrupto { .. })
             ),
             "un bloque bajo una clave que no es su block_hash MUST rechazarse"
+        );
+    }
+}
+
+/// **El índice de admitidos en disco.** Corrupción, ausencia y reapertura. La inyección de fixture
+/// es de test y no existe en producción; los bloques son bytes, **no** evidencia PoST verificada.
+#[cfg(test)]
+#[expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
+mod tests_admitidos_dag {
+    use super::AlmacenEnDisco;
+    use crate::almacen::AlmacenCadena;
+    use crate::almacen_admitidos_dag::{
+        AlmacenAdmitidosDag, VERSION_ADMITIDOS_DAG, bloque_admitido_a_bytes,
+    };
+    use crate::almacen_dag::AlmacenCandidatosDag;
+    use crate::error::StorageError;
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
+    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::wire_dag::{BUNDLE_BYTES, BloqueDag, JustificacionPot, PotCheckpoints};
+
+    /// Cabecera de **fixture**: bytes para probar el índice, **no** una cabecera admitida.
+    fn cabecera_de_fixture(slot: u64, marca: u8) -> DagBlockHeader {
+        DagBlockHeader {
+            consensus_branch_id: 0xc478_80ea,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([marca; 32])),
+            timestamp: 1_788_480_000 + slot,
+            height: 1,
+            slot,
+            pot_output: [marca; 16],
+            rango_solucion: u64::from(marca),
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([marca; 32])),
+            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([marca; 32])), &[])
+                .expect("un padre seleccionado es canónico"),
+            sello: [marca; 64],
+        }
+    }
+
+    fn justificacion(marca: u8, bundles: usize) -> JustificacionPot {
+        let lista: Vec<PotCheckpoints> = (0..bundles)
+            .map(|i| PotCheckpoints::desde_bytes([marca.wrapping_add(i as u8); BUNDLE_BYTES]))
+            .collect();
+        JustificacionPot::nueva(lista).expect("dentro del máximo de portadores")
+    }
+
+    fn bloque(cabecera: DagBlockHeader, justificacion: JustificacionPot) -> BloqueDag {
+        BloqueDag::nuevo(cabecera, justificacion, vec![], vec![]).expect("sin txs no hay descuadre")
+    }
+
+    #[test]
+    fn rechaza_bytes_que_no_decodifican() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let h = cabecera_de_fixture(3, 0x01).block_hash();
+        a.inyectar_fixture_admitido_crudo(&h, b"esto no es un bloque DAG")
+            .expect("inyecta bytes crudos");
+
+        assert!(
+            matches!(a.bloque_admitido(&h), Err(StorageError::Corrupto { .. })),
+            "una entrada ilegible MUST ser corrupción, nunca `None`"
+        );
+    }
+
+    #[test]
+    fn rechaza_bytes_finales_sobrantes() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let b = bloque(cabecera_de_fixture(4, 0x02), justificacion(0x02, 1));
+        let mut bytes = bloque_admitido_a_bytes(&b);
+        bytes.extend_from_slice(b"cola");
+        a.inyectar_fixture_admitido_crudo(&b.cabecera.block_hash(), &bytes)
+            .expect("inyecta bytes crudos");
+
+        assert!(
+            matches!(
+                a.bloque_admitido(&b.cabecera.block_hash()),
+                Err(StorageError::Corrupto { .. })
+            ),
+            "bytes finales sobrantes MUST rechazarse: decodificar no es aceptar"
+        );
+    }
+
+    #[test]
+    fn rechaza_una_clave_que_no_es_el_block_hash() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let b = bloque(cabecera_de_fixture(5, 0x03), justificacion(0x03, 1));
+        let clave_ajena = cabecera_de_fixture(5, 0x04).block_hash();
+        a.inyectar_fixture_admitido_crudo(&clave_ajena, &bloque_admitido_a_bytes(&b))
+            .expect("inyecta bytes crudos");
+
+        assert!(
+            matches!(
+                a.bloque_admitido(&clave_ajena),
+                Err(StorageError::Corrupto { .. })
+            ),
+            "un bloque bajo una clave que no es su block_hash MUST rechazarse"
+        );
+    }
+
+    #[test]
+    fn rechaza_version_desconocida() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let h = cabecera_de_fixture(6, 0x05).block_hash();
+        let mut bytes = vec![VERSION_ADMITIDOS_DAG.wrapping_add(1)];
+        bytes.extend_from_slice(b"cuerpo de una version futura");
+        a.inyectar_fixture_admitido_crudo(&h, &bytes)
+            .expect("inyecta bytes crudos");
+
+        assert!(matches!(
+            a.bloque_admitido(&h),
+            Err(StorageError::Corrupto { .. })
+        ));
+    }
+
+    /// Cerrar y reabrir RocksDB conserva la lectura del fixture de admitidos.
+    #[test]
+    fn reabrir_conserva_la_lectura_de_fixture() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let b = bloque(cabecera_de_fixture(7, 0x06), justificacion(0x06, 3));
+        let hash = b.cabecera.block_hash();
+
+        {
+            let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+            a.inyectar_fixture_admitido(&b).expect("fixture");
+            a.sincronizar().expect("sincroniza");
+        }
+
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("reabre");
+        assert_eq!(a.bloque_admitido(&hash).expect("lee"), Some(b));
+    }
+
+    /// **La cola no es el índice, tampoco en disco.**
+    #[test]
+    fn un_candidato_presente_sin_entrada_admitida_devuelve_none() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let b = bloque(cabecera_de_fixture(8, 0x07), justificacion(0x07, 1));
+        let hash = b.cabecera.block_hash();
+        a.guardar_candidato_dag(&b).expect("la cola guarda");
+        assert_eq!(a.candidato_dag(&hash).expect("lee candidato"), Some(b));
+        assert_eq!(a.bloque_admitido(&hash).expect("consulta el índice"), None);
+    }
+
+    #[test]
+    fn dos_cabeceras_mismo_slot_coexisten_en_disco() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let c1 = cabecera_de_fixture(9, 0x08);
+        let c2 = cabecera_de_fixture(9, 0x09);
+        assert_eq!(c1.slot, c2.slot);
+        assert_ne!(c1.block_hash(), c2.block_hash());
+        let b1 = bloque(c1, justificacion(0x08, 1));
+        let b2 = bloque(c2, justificacion(0x09, 2));
+        a.inyectar_fixture_admitido(&b1).expect("fixture 1");
+        a.inyectar_fixture_admitido(&b2).expect("fixture 2");
+
+        assert_eq!(
+            a.bloque_admitido(&c1.block_hash()).expect("lee 1"),
+            Some(b1)
+        );
+        assert_eq!(
+            a.bloque_admitido(&c2.block_hash()).expect("lee 2"),
+            Some(b2)
         );
     }
 }

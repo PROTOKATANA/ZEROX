@@ -20,6 +20,7 @@ use zx_core::tx::OutPoint;
 use zx_core::wire_dag::BloqueDag;
 
 use crate::almacen::{AlmacenCadena, Punta};
+use crate::almacen_admitidos_dag::{AlmacenAdmitidosDag, bloque_admitido_con_clave};
 use crate::almacen_dag::AlmacenCandidatosDag;
 use crate::error::StorageError;
 use crate::utxo::{ConjuntoEnMemoria, DeltaUtxo};
@@ -39,6 +40,13 @@ struct Interior {
     /// La cola **no confiable** de candidatos DAG, por `block_hash` (C-HDR-09). No es estado de
     /// consenso: ver [`crate::almacen_dag`].
     candidatos_dag: HashMap<BlockHash, BloqueDag>,
+    /// El índice de bloques DAG **plenamente admitidos**, por `block_hash`, en su sobre versionado.
+    ///
+    /// Está separado de [`Self::candidatos_dag`] y **no** es estado lineal: ver
+    /// [`crate::almacen_admitidos_dag`]. Hoy no tiene escritor de producción y está **vacío en la
+    /// ruta activa**: solo las inyecciones de fixture `#[cfg(test)]` lo llenan, con bytes que no
+    /// son evidencia PoST verificada.
+    admitidos_dag: HashMap<BlockHash, Vec<u8>>,
     /// El UTXO set **finalizado**. Solo avanza (C-STORE-06).
     utxo: ConjuntoEnMemoria,
     /// Hasta dónde llega ese conjunto. Va por detrás de `punta` hasta `MAX_REORG_LENGTH` bloques.
@@ -206,6 +214,59 @@ impl AlmacenCandidatosDag for AlmacenEnMemoria {
             });
         }
         Ok(Some(bloque.clone()))
+    }
+}
+
+impl AlmacenAdmitidosDag for AlmacenEnMemoria {
+    fn bloque_admitido(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
+        let i = self.interior.read().map_err(|_| envenenado())?;
+        let Some(bytes) = i.admitidos_dag.get(hash) else {
+            // `None` es "no está en el índice", no un veredicto de validez (C-HDR-07).
+            return Ok(None);
+        };
+        bloque_admitido_con_clave(hash, bytes).map(Some)
+    }
+}
+
+impl AlmacenEnMemoria {
+    /// **Inyección de fixture, sin autoridad.** Escribe una entrada en el índice de admitidos para
+    /// que los tests puedan ejercitar la lectura.
+    ///
+    /// No existe en el binario de producción: está tras `#[cfg(test)]`. No valida nada y rechaza
+    /// reemplazar en el propio helper una clave ya presente; eso **no** demuestra la inmutabilidad
+    /// de la futura escritura de admisión, ni su atomicidad con estado, undo y GHOSTDAG, ni que los
+    /// bytes inyectados sean evidencia PoST verificada.
+    ///
+    /// # Errores
+    /// [`StorageError::AdmitidoDuplicado`] si la clave ya está; [`StorageError`] si el lock falla.
+    #[cfg(test)]
+    pub(crate) fn inyectar_fixture_admitido(&self, bloque: &BloqueDag) -> Result<(), StorageError> {
+        let mut i = self.interior.write().map_err(|_| envenenado())?;
+        let clave = bloque.cabecera.block_hash();
+        if i.admitidos_dag.contains_key(&clave) {
+            return Err(StorageError::AdmitidoDuplicado);
+        }
+        i.admitidos_dag.insert(
+            clave,
+            crate::almacen_admitidos_dag::bloque_admitido_a_bytes(bloque),
+        );
+        Ok(())
+    }
+
+    /// **Inyección de fixture cruda, sin autoridad.** Inserta bytes arbitrarios bajo una clave para
+    /// probar la defensa contra corrupción. No existe en producción.
+    ///
+    /// # Errores
+    /// [`StorageError`] si el lock falla.
+    #[cfg(test)]
+    pub(crate) fn inyectar_fixture_admitido_crudo(
+        &self,
+        clave: &BlockHash,
+        bytes: &[u8],
+    ) -> Result<(), StorageError> {
+        let mut i = self.interior.write().map_err(|_| envenenado())?;
+        i.admitidos_dag.insert(*clave, bytes.to_vec());
+        Ok(())
     }
 }
 

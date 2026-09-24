@@ -19,7 +19,9 @@
 //! Los datos los aporta una [`FuenteRegistrosDag`] inyectada. Su contrato de producción es
 //! estricto: **MUST** leer exclusivamente un índice separado de bloques PoST **plenamente
 //! admitidos** —los que ya superaron el orden completo de `C-POT-08` y la validez de
-//! `C-FLU-14`—. **MUST NOT** leer la cola reemplazable `AlmacenCandidatosDag`, ni entradas
+//! `C-FLU-14`—. Ese índice es hoy un **destino vacío en la ruta activa**: solo los tests lo llenan
+//! con bytes no verificados, así que este adaptador todavía no lee evidencia de producción.
+//! **MUST NOT** leer la cola reemplazable `AlmacenCandidatosDag`, ni entradas
 //! sintéticas de `AlmacenGhostdag::anadir_sintetico`, ni campos del propio candidato. Una
 //! implementación de test cumple la firma pero **no acredita** procedencia: sirve para probar esta
 //! vista, no para admitir un bloque.
@@ -62,6 +64,7 @@
 use std::collections::BTreeMap;
 
 use zx_core::{BlockHash, PadresDag};
+use zx_storage::{AlmacenAdmitidosDag, StorageError};
 
 /// Registro estructural mínimo de un bloque: `hash`, padres y `slot`.
 ///
@@ -123,6 +126,63 @@ pub trait FuenteRegistrosDag {
     /// El error propio de la fuente. Devolver `None` no es un error de la fuente: es contexto
     /// incompleto.
     fn leer(&self, hash: &BlockHash) -> Result<Option<RegistroEstructural>, Self::Error>;
+}
+
+/// Adaptador de [`FuenteRegistrosDag`] sobre el índice de bloques DAG plenamente admitidos.
+///
+/// Lee **exclusivamente** [`AlmacenAdmitidosDag::bloque_admitido`]. No consulta la cola
+/// reemplazable de candidatos, ni entradas sintéticas, ni campos del candidato bajo análisis.
+///
+/// # Qué acredita y qué no
+///
+/// El adaptador no añade confianza: confía en que el índice contiene bloques ya admitidos por la
+/// ruta completa, que todavía no existe. Construye el [`RegistroEstructural`] con el `block_hash`
+/// canónico, los `PadresDag` y el `slot` de la cabecera; **no** deriva `InstantaneaPot` ni presenta
+/// `pot_output` o `sol.chunk` como salidas verificadas. Hoy el índice está **vacío en la ruta
+/// activa**, de modo que en producción el adaptador devuelve `Ok(None)` para toda clave; solo los
+/// tests lo pueblan con fakes o fixtures que **no** acreditan admisión.
+///
+/// Un `Ok(None)` del índice se traduce en `Ok(None)` de la fuente: contexto incompleto, **nunca**
+/// invalidez del candidato. Un error del índice —corrupción incluida— se propaga como
+/// [`ErrorVistaCausal::Fuente`] sin convertirse en ausencia.
+///
+/// # Coherencia de instantánea
+///
+/// Lleva `&self` y **no** promete por sí mismo una instantánea estable: si el índice cambiara
+/// durante el recorrido, dos lecturas de la misma clave podrían divergir. Para producción la
+/// fuente **MUST** ser inmutable durante todo el recorrido. Hoy, al estar el índice **vacío en la
+/// ruta activa**, no hay nada que pueda cambiar durante el recorrido, pero eso **no** es una
+/// garantía del almacenamiento ni del adaptador: la publicación del futuro escritor tendrá que
+/// serializarse con el recorrido o exponer una vista congelada, y esa garantía no se implementa en
+/// este incremento.
+pub struct FuenteIndiceAdmitidos<'a, A> {
+    indice: &'a A,
+}
+
+impl<'a, A> FuenteIndiceAdmitidos<'a, A> {
+    /// Envuelve una referencia al índice de admitidos.
+    ///
+    /// No acredita que el índice contenga bloques válidos: solo expone su lectura.
+    #[must_use]
+    pub const fn nueva(indice: &'a A) -> Self {
+        Self { indice }
+    }
+}
+
+impl<A: AlmacenAdmitidosDag> FuenteRegistrosDag for FuenteIndiceAdmitidos<'_, A> {
+    type Error = StorageError;
+
+    fn leer(&self, hash: &BlockHash) -> Result<Option<RegistroEstructural>, StorageError> {
+        let Some(bloque) = self.indice.bloque_admitido(hash)? else {
+            // Ausencia de contexto, no invalidez del candidato.
+            return Ok(None);
+        };
+        Ok(Some(RegistroEstructural::nuevo(
+            bloque.cabecera.block_hash(),
+            bloque.cabecera.padres,
+            bloque.cabecera.slot,
+        )))
+    }
 }
 
 /// Presupuesto **local** de registros a materializar.
@@ -424,5 +484,228 @@ impl VistaPasadoEstructural {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ancestros.is_empty()
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::{
+        ErrorVistaCausal, FuenteIndiceAdmitidos, FuenteRegistrosDag, PresupuestoVista,
+        RegistroEstructural, VistaPasadoEstructural,
+    };
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
+    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::wire_dag::{BloqueDag, JustificacionPot};
+    use zx_storage::{AlmacenAdmitidosDag, AlmacenCandidatosDag, StorageError};
+
+    fn h(marca: u8) -> BlockHash {
+        BlockHash::from_digest(Digest::from_bytes([marca; 32]))
+    }
+
+    fn cabecera_con(slot: u64, marca: u8, padres: PadresDag) -> DagBlockHeader {
+        DagBlockHeader {
+            consensus_branch_id: 0xc478_80ea,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([marca; 32])),
+            timestamp: 1_788_480_000 + slot,
+            height: 1,
+            slot,
+            pot_output: [marca; 16],
+            rango_solucion: u64::from(marca),
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([marca; 32])),
+            padres,
+            sello: [marca; 64],
+        }
+    }
+
+    fn bloque_con(
+        slot: u64,
+        marca: u8,
+        seleccionado: BlockHash,
+        extras: &[BlockHash],
+    ) -> BloqueDag {
+        let padres = PadresDag::nuevo(seleccionado, extras).expect("padres canónicos");
+        BloqueDag::nuevo(
+            cabecera_con(slot, marca, padres),
+            JustificacionPot::vacia(),
+            vec![],
+            vec![],
+        )
+        .expect("bloque sin cuerpo")
+    }
+
+    fn bloque(slot: u64, marca: u8, seleccionado: u8, extras: &[u8]) -> BloqueDag {
+        let extras: Vec<BlockHash> = extras.iter().copied().map(h).collect();
+        bloque_con(slot, marca, h(seleccionado), &extras)
+    }
+
+    fn bloque_genesis(slot: u64, marca: u8) -> BloqueDag {
+        BloqueDag::nuevo(
+            cabecera_con(slot, marca, PadresDag::genesis()),
+            JustificacionPot::vacia(),
+            vec![],
+            vec![],
+        )
+        .expect("bloque génesis sin cuerpo")
+    }
+
+    /// Fake de **lectura** del nuevo trait. No acredita admisión: solo rellena la interfaz para
+    /// probar el adaptador. Implementa **además** la cola de candidatos para demostrar que el
+    /// adaptador no la consulta como respaldo.
+    #[derive(Default)]
+    struct IndiceFake {
+        admitidos: BTreeMap<BlockHash, BloqueDag>,
+        candidatos: BTreeMap<BlockHash, BloqueDag>,
+        falla: bool,
+    }
+
+    impl IndiceFake {
+        fn con_admitido(mut self, bloque: BloqueDag) -> Self {
+            self.admitidos.insert(bloque.cabecera.block_hash(), bloque);
+            self
+        }
+
+        fn con_candidato(mut self, bloque: BloqueDag) -> Self {
+            self.candidatos.insert(bloque.cabecera.block_hash(), bloque);
+            self
+        }
+
+        fn que_falla(mut self) -> Self {
+            self.falla = true;
+            self
+        }
+    }
+
+    impl AlmacenAdmitidosDag for IndiceFake {
+        fn bloque_admitido(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
+            if self.falla {
+                return Err(StorageError::Corrupto {
+                    que: "un fake que falla a propósito",
+                });
+            }
+            Ok(self.admitidos.get(hash).cloned())
+        }
+    }
+
+    impl AlmacenCandidatosDag for IndiceFake {
+        fn guardar_candidato_dag(&self, _bloque: &BloqueDag) -> Result<(), StorageError> {
+            Ok(())
+        }
+
+        fn candidato_dag(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
+            Ok(self.candidatos.get(hash).cloned())
+        }
+    }
+
+    /// El adaptador lee el índice con hash/padres/slot canónicos y **no** cae a la cola.
+    #[test]
+    fn el_adaptador_lee_el_indice_y_no_la_cola_de_candidatos() {
+        let candidato = bloque(30, 0x0A, 0x01, &[]);
+        let hash = candidato.cabecera.block_hash();
+
+        // Solo en la cola: la fuente debe decir `None`, no leer el candidato.
+        let solo_cola = IndiceFake::default().con_candidato(candidato.clone());
+        let fuente = FuenteIndiceAdmitidos::nueva(&solo_cola);
+        assert_eq!(
+            fuente.leer(&hash).expect("sin error"),
+            None,
+            "la cola no es una fuente de bloques admitidos"
+        );
+
+        // En el índice: se lee con los campos canónicos de la cabecera.
+        let admitido = IndiceFake::default().con_admitido(candidato.clone());
+        let fuente = FuenteIndiceAdmitidos::nueva(&admitido);
+        let registro = fuente.leer(&hash).expect("sin error").expect("está");
+        assert_eq!(registro.hash(), hash);
+        assert_eq!(registro.hash(), candidato.cabecera.block_hash());
+        assert_eq!(registro.padres(), candidato.cabecera.padres);
+        assert_eq!(registro.slot(), 30);
+    }
+
+    /// El diamante del índice se une y comparte ancestro una sola vez, como el resto de la vista.
+    #[test]
+    fn el_diamante_del_indice_coincide_con_la_vista_estructural() {
+        let c = bloque_genesis(10, 0x0C);
+        let c_hash = c.cabecera.block_hash();
+        let a = bloque_con(20, 0x0A, c_hash, &[]);
+        let b = bloque_con(20, 0x0B, c_hash, &[]);
+        let indice = IndiceFake::default()
+            .con_admitido(a.clone())
+            .con_admitido(b.clone())
+            .con_admitido(c.clone());
+        let fuente = FuenteIndiceAdmitidos::nueva(&indice);
+        let padres = PadresDag::nuevo(a.cabecera.block_hash(), &[b.cabecera.block_hash()])
+            .expect("padres canónicos");
+
+        let vista = VistaPasadoEstructural::desde_padres(
+            &fuente,
+            &padres,
+            h(0x50),
+            PresupuestoVista::nuevo(8),
+        )
+        .expect("vista completa");
+
+        let mut esperado = vec![
+            a.cabecera.block_hash(),
+            b.cabecera.block_hash(),
+            c.cabecera.block_hash(),
+        ];
+        esperado.sort_unstable();
+        let obtenido: Vec<BlockHash> = vista
+            .ancestros()
+            .iter()
+            .map(RegistroEstructural::hash)
+            .collect();
+        assert_eq!(obtenido, esperado);
+    }
+
+    /// La ausencia en el índice es contexto incompleto, no invalidez.
+    #[test]
+    fn la_ausencia_en_el_indice_es_contexto_incompleto() {
+        // A está admitido y apunta a B, que no está: falta contexto.
+        let a = bloque(20, 0x0A, 0x0B, &[]);
+        let indice = IndiceFake::default().con_admitido(a.clone());
+        let fuente = FuenteIndiceAdmitidos::nueva(&indice);
+        let padres = PadresDag::nuevo(a.cabecera.block_hash(), &[]).expect("padres canónicos");
+
+        let resultado = VistaPasadoEstructural::desde_padres(
+            &fuente,
+            &padres,
+            h(0x50),
+            PresupuestoVista::nuevo(8),
+        );
+        assert_eq!(
+            resultado,
+            Err(ErrorVistaCausal::ContextoIncompleto {
+                faltante: h(0x0B),
+                referido_por: Some(a.cabecera.block_hash()),
+            })
+        );
+    }
+
+    /// La corrupción del índice **no** se convierte en ausencia: se propaga como error de fuente.
+    #[test]
+    fn la_corrupcion_del_indice_llega_como_error_de_fuente() {
+        let indice = IndiceFake::default().que_falla();
+        let fuente = FuenteIndiceAdmitidos::nueva(&indice);
+        assert!(matches!(
+            fuente.leer(&h(0x01)),
+            Err(StorageError::Corrupto { .. })
+        ));
+
+        let padres = PadresDag::nuevo(h(0x0A), &[]).expect("padres canónicos");
+        let resultado = VistaPasadoEstructural::desde_padres(
+            &fuente,
+            &padres,
+            h(0x50),
+            PresupuestoVista::nuevo(8),
+        );
+        assert!(matches!(
+            resultado,
+            Err(ErrorVistaCausal::Fuente(StorageError::Corrupto { .. }))
+        ));
     }
 }
