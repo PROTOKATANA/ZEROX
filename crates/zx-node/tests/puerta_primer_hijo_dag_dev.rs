@@ -7,18 +7,24 @@
 //!
 //! - El **bootstrap congelado** `G` y **una sola** [`HistoriaDagDev`]: el archivo determinista que
 //!   comparten productor y verificador.
-//! - Un **ploteo real** de dos piezas bajo una clave que el firmador controla:
-//!   `SigningKey::from([7u8; 32])` es la única fuente de la `VerificationKey`/`PublicKey` con la
-//!   que se plotta y con la que se firma. No se plotta bajo una clave ajena al firmador.
+//! - Un **ploteo real** de dos piezas bajo la clave de una identidad durable D3
+//!   ([`IdentidadProductorLocal`], creada en un directorio temporal de test): la `PublicKey` con la
+//!   que se plotta y la `ClavePublica` que cobra la coinbase son la **misma** identidad generada
+//!   por el alta. No se plotta bajo una clave ajena al firmador.
 //! - La **cadena PoT real** desde `bootstrap.ancla_pot_slot_0_dev()`, sin inyecciones, con
 //!   `N(s)` leído del contexto dev ([`InstantaneaPot::iteraciones`]) y `SR` leído del contexto
 //!   ([`RangoSolucionValidado::validar`]). Los portadores generados se retienen enteros: la
 //!   justificación mide `slot` (`C-HDR-07`).
 //! - La **auditoría de la parcela** con `convertir_candidatos_locales` y la verificación PoAS real
 //!   del paso 5 de `C-POT-08`, con la misma historia y el mismo KZG.
-//! - El **sello ZIP-215 real** sobre `pre_hash` (`C-HDR-04`) firmado por la clave del plot. La
-//!   firma es **solo del test**: el registro firmante D3 no queda integrado, no se publica ni se
-//!   registra nada y este test **no** afirma seguridad de producción.
+//! - El **sello ZIP-215 real** sobre `pre_hash` (`C-HDR-04`) emitido para el positivo por la ruta
+//!   durable D3 ([`IdentidadProductorLocal::firmar`]): persistir la oportunidad y **después** sellar.
+//!   La firma directa con `SigningKey` **solo** fabrica los negativos que simulan un bloque remoto
+//!   adversarial (resellado), para aislar el motivo PoT/hash del sello. Este test **no** afirma
+//!   seguridad de producción y D3 no queda cerrado.
+//! - La **abstención por conflicto** del registro D3: antes de cerrar la identidad, un candidato
+//!   mutado con la misma identidad de billete y el mismo slot ⇒ [`Resultado::AbstenidoPorConflicto`]
+//!   y el candidato nuevo, que llega sin sello, permanece sin sello.
 //! - La función pública `verificar_primer_hijo_dag_dev` con reloj PoT explícito y un presupuesto de
 //!   prueba que concede **exactamente** los slots generados; se exige `Comprobada` con el hash de la
 //!   cabecera, el slot/salida auditados, la distancia A1 y el rango validado atados al mismo hash.
@@ -75,27 +81,32 @@
     clippy::panic,
     reason = "los tests fallan con panic por diseño; los negativos discriminan por match"
 )]
+#![expect(
+    clippy::indexing_slicing,
+    reason = "el helper de test parte los 96 B de productor.key en offsets constantes tras comprobar la longitud"
+)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use ed25519_zebra::{SigningKey, VerificationKey};
+use ed25519_zebra::SigningKey;
 use subspace_core_primitives::PublicKey;
 use subspace_core_primitives::sectors::SectorIndex;
 
+use zx_consensus::firmante::alta::{IdentidadProductorLocal, NOMBRE_CLAVE};
 use zx_consensus::{
     CachePotVerificada, ComprobacionCabecera, ConjuntoUtxo, ConsensusError, EstadoCabeceraConjunta,
     InstantaneaPot, MotivoCabeceraInvalida, MotivoPotInvalido, PresupuestoPot,
-    RangoSolucionValidado, checkpoints_a_wire, proyectar_iteraciones, semilla_siguiente,
+    RangoSolucionValidado, Resultado, checkpoints_a_wire, proyectar_iteraciones, semilla_siguiente,
 };
 use zx_core::preimage::block::merkle_root;
 use zx_core::wire_dag::{
     CHECKPOINTS_POR_BUNDLE, JustificacionPot, PotCheckpoints as PotCheckpointsWire,
 };
 use zx_core::{
-    Amount, BloqueDag, BodyCommitment, ClavePublica, DagBlockHeader, Digest, Lock, MerkleRoot,
-    OutPoint, POT_OUTPUT_BYTES, PadresDag, SolucionPoas, Tx, body_commitment, txid,
+    Amount, BloqueDag, BodyCommitment, DagBlockHeader, Digest, Lock, MerkleRoot, OutPoint,
+    POT_OUTPUT_BYTES, PadresDag, SolucionPoas, Tx, body_commitment, txid,
 };
 use zx_node::bootstrap_dag_dev::{EstadoBootstrapDagDev, iniciar_bootstrap_dag_dev};
 use zx_node::cuerpo_coinbase_dag_dev::{
@@ -115,6 +126,11 @@ const PIEZAS: u16 = 2;
 const INDICE_SECTOR: SectorIndex = 2;
 /// Máximo de slots a recorrer buscando la primera solución A1. No es un parámetro de red.
 const MAX_SLOTS_BUSQUEDA: u64 = 8;
+/// `S_max` del perfil dev para abrir la identidad D3: la ventana `1..=150` de `C-HDR-07`.
+///
+/// Es un valor de test, explícito y no una constante inventada por el fixture. El alta lo usa como
+/// parámetro del perfil; no se fija dentro de [`IdentidadProductorLocal`].
+const S_MAX_SLOTS_ALTA: u64 = 150;
 /// `SR` **declarado** solo para que el contexto dev lo valide y devuelva el suyo.
 ///
 /// No es el valor usado por el test por el hecho de declararlo: `RangoSolucionValidado::validar`
@@ -130,6 +146,13 @@ struct Escenario {
     salida: [u8; POT_OUTPUT_BYTES],
     distancia: u64,
     sr: u64,
+    /// Clave **de test** derivada de la semilla de `productor.key` del alta.
+    ///
+    /// Solo fabrica los negativos que simulan un bloque remoto adversarial con un sello válido bajo
+    /// la misma clave de oportunidad. No emite el positivo: ese pasa por
+    /// [`IdentidadProductorLocal::firmar`]. El directorio de alta se borra al construir el
+    /// `Escenario`, así que el `OnceLock` no conserva ni el registro ni ningún fichero privado.
+    clave_remota_de_prueba: SigningKey,
 }
 
 static ESCENARIO: OnceLock<Escenario> = OnceLock::new();
@@ -144,17 +167,21 @@ fn construir_escenario() -> Escenario {
     let historia = HistoriaDagDev::construir().expect("la historia archivada dev MUST construirse");
     let bootstrap = iniciar_bootstrap_dag_dev().expect("el bootstrap dev MUST arrancar");
 
-    // La clave del plot sale del firmador: VerificationKey y PublicKey son la misma identidad.
-    let sk = SigningKey::from([7u8; 32]);
-    let vk = VerificationKey::from(&sk);
-    let vk_bytes: [u8; 32] = vk.into();
-    let public_key = PublicKey::from(vk_bytes);
+    // La identidad durable D3 genera la clave local en un directorio temporal de test. La `PublicKey`
+    // del ploteo y la `ClavePublica` que cobra la coinbase son la **misma** identidad. El `0` de
+    // `slot_actual` sale del bootstrap dev (G es ancla confiada PoT del slot 0); solo en este fixture
+    // y no como fuente operativa del reloj D2.
+    let dir_identidad = DirTemporal::nuevo("a3-identidad");
+    let identidad =
+        IdentidadProductorLocal::abrir_o_crear(dir_identidad.ruta(), 0, S_MAX_SLOTS_ALTA)
+            .expect("el alta durable D3 de la identidad del fixture MUST funcionar");
+    let clave_publica = identidad.public_key();
+    let public_key = PublicKey::from(*clave_publica.bytes());
 
     // Cuerpo coinbase cero real: la misma identidad que plotta es la que cobra. Sus compromisos
-    // entran en la cabecera antes de firmar `pre_hash`.
-    let cuerpo =
-        CuerpoCoinbaseCeroDagDev::construir(&bootstrap, ClavePublica::desde_bytes(vk_bytes))
-            .expect("la coinbase cero del primer hijo MUST construirse");
+    // entran en la cabecera antes de que la identidad D3 selle.
+    let cuerpo = CuerpoCoinbaseCeroDagDev::construir(&bootstrap, clave_publica)
+        .expect("la coinbase cero del primer hijo MUST construirse");
 
     // `N(s)` y `SR` se leen del contexto dev, no de literales del test.
     let cabecera_perfil = cabecera_dev(
@@ -248,8 +275,8 @@ fn construir_escenario() -> Escenario {
     );
     assert_eq!(
         sol.public_key.bytes(),
-        &vk_bytes,
-        "la solución MUST provenir de la clave del plot que el firmador controla"
+        clave_publica.bytes(),
+        "la solución MUST provenir de la clave de la identidad D3 que plotta y firma"
     );
 
     // Cabecera `{G}`: rama y altura coherentes con G por construcción (A3 no las deriva ni las
@@ -257,11 +284,56 @@ fn construir_escenario() -> Escenario {
     let mut cabecera = cabecera_dev(&bootstrap, slot, sr, &cuerpo);
     cabecera.pot_output = salida;
     cabecera.sol = sol;
-    cabecera.sello = sk.sign(cabecera.pre_hash().as_bytes()).into();
+    // El positivo pasa por la ruta durable D3: persistir la oportunidad y **después** sellar.
+    let resultado = identidad
+        .firmar(&mut cabecera)
+        .expect("la identidad D3 MUST firmar el candidato positivo");
+    assert_eq!(
+        resultado,
+        Resultado::Sellado,
+        "el primer candidato de la identidad MUST persistir la oportunidad y sellar"
+    );
+    assert_eq!(
+        identidad.entradas(),
+        1,
+        "tras sellar el positivo el registro MUST tener exactamente una entrada"
+    );
     assert!(
         cabecera.verificar_sello().is_ok(),
         "el sello Ed25519 real del fixture MUST verificar"
     );
+
+    // Abstención por conflicto, antes de cerrar la identidad: misma identidad de billete y mismo
+    // slot, otro `pre_hash`. El candidato nuevo llega **sin sello**, como lo construiría un
+    // productor; el registro MUST abstenerse y no sellarlo.
+    let mut candidato_en_conflicto = cabecera;
+    candidato_en_conflicto.timestamp = candidato_en_conflicto.timestamp.saturating_add(1);
+    candidato_en_conflicto.sello = [0u8; 64];
+    match identidad.firmar(&mut candidato_en_conflicto) {
+        Ok(Resultado::AbstenidoPorConflicto { .. }) => {}
+        otro => panic!(
+            "el candidato con la misma identidad y slot y otro pre_hash MUST abstenerse; llegó {otro:?}"
+        ),
+    }
+    assert_eq!(
+        candidato_en_conflicto.sello, [0u8; 64],
+        "la abstención por conflicto MUST dejar sin sello al candidato nuevo"
+    );
+    assert!(
+        cabecera.verificar_sello().is_ok(),
+        "el positivo original MUST conservar su sello verificable tras la abstención"
+    );
+    assert_eq!(
+        identidad.entradas(),
+        1,
+        "la abstención por conflicto MUST NOT añadir entradas al registro"
+    );
+
+    // Clave **de test** para los negativos que simulan un bloque remoto adversarial, leída mientras
+    // el directorio de alta sigue vivo. No firma el positivo ni entra en producto.
+    let clave_remota_de_prueba = leer_semilla_de_prueba(&dir_identidad.unir(NOMBRE_CLAVE));
+    drop(identidad);
+    drop(dir_identidad);
 
     let justificacion =
         JustificacionPot::nueva(portadores).expect("la lista de portadores del rango es canónica");
@@ -287,7 +359,43 @@ fn construir_escenario() -> Escenario {
         salida,
         distancia,
         sr,
+        clave_remota_de_prueba,
     }
+}
+
+/// Lee y valida `productor.key` del alta y devuelve una clave **de test** con esa semilla.
+///
+/// Solo la usan los negativos que necesitan resellar bajo la misma identidad de oportunidad. La
+/// semilla no se imprime ni se expone: se copia a un [`SigningKey`] cuyo `Debug` no la muestra. El
+/// formato esperado es el de `firmante::alta` (96 B, magia, versión y comprobación de integridad).
+fn leer_semilla_de_prueba(ruta: &Path) -> SigningKey {
+    let bytes = std::fs::read(ruta).expect("productor.key del alta MUST leerse");
+    assert_eq!(
+        bytes.len(),
+        96,
+        "productor.key MUST medir exactamente 96 bytes"
+    );
+    assert_eq!(
+        &bytes[0..8],
+        b"ZXRGPKEY",
+        "magia de productor.key inesperada"
+    );
+    let mut version = [0u8; 8];
+    version.copy_from_slice(&bytes[8..16]);
+    assert_eq!(
+        u64::from_le_bytes(version),
+        1,
+        "versión de productor.key inesperada"
+    );
+    let comprobacion = zx_core::sha3_256_publico(&bytes[..80]);
+    assert_eq!(
+        &bytes[80..96],
+        &comprobacion.as_bytes()[..16],
+        "comprobación de integridad de productor.key inválida"
+    );
+    let mut semilla = [0u8; 32];
+    semilla.copy_from_slice(&bytes[16..48]);
+    SigningKey::from(semilla)
 }
 
 /// Cabecera dev con padres `{G}`. Los compromisos de cuerpo salen del cuerpo coinbase cero real.
@@ -361,6 +469,10 @@ impl DirTemporal {
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(&base).expect("crear directorio temporal del fixture A3");
         Self { ruta: base }
+    }
+
+    fn ruta(&self) -> &Path {
+        &self.ruta
     }
 
     fn unir(&self, hijo: &str) -> PathBuf {
@@ -487,7 +599,7 @@ fn sello_alterado_es_invalida_sin_gastar_presupuesto() {
 #[test]
 fn pot_output_alterado_y_resellado_es_invalida_pot_output_no_coincide() {
     let e = escenario();
-    let sk = SigningKey::from([7u8; 32]);
+    let sk = &e.clave_remota_de_prueba;
     let mut bloque = e.bloque.clone();
     bloque.cabecera.pot_output[0] ^= 0x01;
     bloque.cabecera.sello = sk.sign(bloque.cabecera.pre_hash().as_bytes()).into();
@@ -693,15 +805,12 @@ fn utxo_simulado_del_primer_hijo_registra_la_coinbase_cero_y_revierte() {
     assert_eq!(entrada.altura_creacion, 1, "altura del primer hijo de G");
     assert!(entrada.es_coinbase, "la salida creada es de coinbase");
 
-    let sk = SigningKey::from([7u8; 32]);
-    let vk = VerificationKey::from(&sk);
-    let vk_bytes: [u8; 32] = vk.into();
     assert_eq!(
         entrada.salida.lock,
         Lock::PubKey {
-            pubkey: ClavePublica::desde_bytes(vk_bytes)
+            pubkey: e.bloque.cabecera.sol.public_key
         },
-        "el bloqueo es la clave del productor que plotta y firma"
+        "el bloqueo es la clave del productor que plotta y firma, atada al alta D3"
     );
 
     assert!(
@@ -727,7 +836,7 @@ fn utxo_simulado_del_primer_hijo_registra_la_coinbase_cero_y_revierte() {
 fn cabecera_mutada_y_resellada_con_evidencia_original_es_error_de_hash() {
     let e = escenario();
     let comprobacion = comprobacion_real(e);
-    let sk = SigningKey::from([7u8; 32]);
+    let sk = &e.clave_remota_de_prueba;
 
     let mut bloque = e.bloque.clone();
     bloque.cabecera.timestamp = bloque.cabecera.timestamp.saturating_add(1);
@@ -763,7 +872,7 @@ fn cabecera_mutada_y_resellada_con_evidencia_original_es_error_de_hash() {
 fn cuerpo_mutado_con_compromisos_recalculados_y_evidencia_original_es_error_de_hash() {
     let e = escenario();
     let comprobacion = comprobacion_real(e);
-    let sk = SigningKey::from([7u8; 32]);
+    let sk = &e.clave_remota_de_prueba;
 
     let mut coinbase = e
         .bloque
