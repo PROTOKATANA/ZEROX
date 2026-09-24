@@ -500,6 +500,69 @@ impl Registro {
         })
     }
 
+    /// Crea un registro **inicialmente limpio** para una identidad nueva: cabecera v3 con
+    /// `slot_perdida = 0`, `abstener_hasta = 0` y `abstencion_activa = false`, sin abstención.
+    ///
+    /// # Uso restringido al alta local
+    ///
+    /// Esta función **no** es la ruta pública del productor y no debe serlo: un registro sin
+    /// historia solo es legítimo si la clave que va a firmar se generó en la misma operación de
+    /// aprovisionamiento y no ha firmado nunca. Su único llamante es
+    /// [`crate::firmante::alta::IdentidadProductorLocal`], que garantiza las dos condiciones.
+    /// Tras una pérdida de registro, la única entrada sigue siendo [`Registro::abrir`], que se
+    /// abstiene `s_max_slots`.
+    ///
+    /// A diferencia de [`Registro::abrir`], aquí el fichero se abre con `create_new(true)`: si ya
+    /// existe un fichero —aunque esté vacío— la llamada falla y **no** se sobrescribe ni se
+    /// interpreta como un alta nueva. Toma el mismo bloqueo exclusivo y escribe la misma cabecera
+    /// v3, con `sync_all` del fichero y del directorio padre antes de devolver.
+    ///
+    /// `s_max_slots` es el del perfil y queda como parámetro de la instancia, igual que en
+    /// [`Registro::abrir`]; esta ruta no lo usa para abstenerse, porque la clave es nueva.
+    ///
+    /// # Errores
+    /// [`RegistroError::Io`] si el fichero ya existe, si falla la apertura, la escritura o
+    /// cualquiera de las dos sincronizaciones; [`RegistroError::Bloqueado`] si otro proceso lo
+    /// tiene abierto.
+    pub(in crate::firmante) fn crear_inicial_sin_historia(
+        ruta: impl AsRef<Path>,
+        s_max_slots: u64,
+    ) -> Result<Self, RegistroError> {
+        let ruta = ruta.as_ref().to_path_buf();
+        let mut fichero = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&ruta)
+            .map_err(|origen| io_err(&ruta, origen))?;
+
+        // El mismo bloqueo exclusivo que `abrir`, antes de escribir nada.
+        bloquear(&fichero, &ruta)?;
+
+        // La misma cabecera v3, pero sin historia: no hay firma previa que perder.
+        let cabecera = cabecera_bytes(0, 0, false);
+        fichero
+            .write_all(&cabecera)
+            .and_then(|()| fichero.sync_all())
+            .map_err(|origen| io_err(&ruta, origen))?;
+        sincronizar_directorio(&ruta)?;
+
+        Ok(Self {
+            estado: Mutex::new(Estado {
+                fichero,
+                ruta,
+                indice: HashMap::new(),
+                max_slot: 0,
+                abstener_hasta: 0,
+                abstencion_activa: false,
+                entradas: 0,
+                s_max_slots,
+                envenenado: false,
+                inyeccion: InyeccionSync::default(),
+            }),
+        })
+    }
+
     /// Consulta y, si procede, **persiste antes de devolver**.
     ///
     /// Es la única operación de escritura que el firmante usa, y es atómica respecto de la clave:

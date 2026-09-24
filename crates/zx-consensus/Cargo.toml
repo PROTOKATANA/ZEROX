@@ -28,6 +28,10 @@ zx-pot          = { path = "../zx-pot" }
 # era `[dev-dependencies]` y pasa a dependencia normal porque el firmante de biblioteca necesita
 # `SigningKey`. No hay otra dependencia añadida.
 ed25519-zebra   = { workspace = true }
+# Entropía del sistema para la semilla del alta dev (alcance D3, `src/firmante/alta.rs`). Versión
+# exacta ya presente en `Cargo.lock` —la usan `rand_core` y `tempfile`—: aquí solo se añade la
+# arista al paquete `zx-consensus`. La semilla nunca se acepta desde el llamante.
+getrandom       = "=0.3.4"
 
 # ── Verificador PoAS (A1, C-POT-08 paso 5) ────────────────────────────────────────────────────
 # Adaptamos la API pública de Autonomys enlazando por `path` al clon fijado

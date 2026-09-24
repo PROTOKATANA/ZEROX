@@ -45,6 +45,7 @@
 //! registros distintos, ni a un atacante que borre el registro, ni un `sync_all` que mienta. Ver
 //! `P-ZRX/P-FIRMANTE/ESPECIFICACION.md` §3.4.
 
+pub mod alta;
 pub mod identidad;
 pub mod registro;
 

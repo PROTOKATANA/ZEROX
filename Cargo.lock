@@ -4989,6 +4989,7 @@ dependencies = [
  "ab-proof-of-space",
  "blake3",
  "ed25519-zebra",
+ "getrandom 0.3.4",
  "primitive-types",
  "proptest",
  "subspace-core-primitives",
