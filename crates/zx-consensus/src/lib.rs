@@ -50,9 +50,10 @@ pub use pot::{
     semilla_siguiente, verificar_slot_aes,
 };
 pub use pot_rango::{
-    BloqueDelPasado, CachePot, ClaveCachePot, EntradaCachePot, EstadoPot, FLUJO_BYTES,
-    InstantaneaPot, InyeccionPot, InyeccionesPot, MotivoPotInvalido, MotivoPotPendiente,
-    PresupuestoPot, verificar_rango_pot,
+    BloqueDelPasado, CachePotVerificada, ClaveCachePot, EstadoPot, FLUJO_BYTES, InstantaneaPot,
+    InyeccionPot, InyeccionesPot, MotivoPotInvalido, MotivoPotPendiente, PresupuestoPot,
+    TokenRangoPot, verificar_rango_pot, verificar_rango_pot_fase_aes,
+    verificar_rango_pot_fase_previa,
 };
 pub use testigo::{ContextoGasto, satisface};
 pub use validacion::{ConjuntoUtxo, EntradaUtxo, peso_tx, validar_tx};

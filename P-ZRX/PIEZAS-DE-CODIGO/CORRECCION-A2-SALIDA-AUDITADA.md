@@ -1,0 +1,17 @@
+# Corrección a DeepSeek · A2, salida auditada
+
+Modelo DeepSeek V4.1 Flash, esfuerzo `high`. No commit ni push. Solo `crates/zx-consensus/src/pot_rango.rs` y `crates/zx-consensus/tests/pot_rango.rs`. Preserva todo el resto del trabajo concurrente.
+
+La revisión independiente matemática y Rust encontró un **error factual en el comentario** de `pot_rango.rs` (sección «Ancla del rango y salida auditada»): dice que salida auditada y `pot_output` pueden coincidir «solo en el caso `d = 0`». Es falso. Son salidas de los slots `slot(B)` y `slot(B)+D`; coinciden por posición cuando **`D=0`**, cualquiera que sea `d`. Con `d=0,D>0` son slots distintos. Corrige la frase y evita afirmar que las salidas byte a byte son siempre distintas si los slots son distintos: podrían coincidir accidentalmente sin ser la misma variable. Mantén las definiciones exactas de C-POT-05.
+
+La misma revisión precisa el límite de la prueba opaca: sus campos privados impiden **construcción directa** fuera del módulo, pero un llamante puede inducir `PotValido` con un `InstantaneaPot` inventado. Ejemplo `d=0,D>0`: el mock devuelve `pot_output` como ancla y una salida auditada arbitraria; no hay AES. El comentario «ningún código seguro fuera del módulo puede fabricar una prueba con campos arbitrarios» es demasiado fuerte. Sustitúyelo por una afirmación estricta sobre construcción directa y deja explícito este contraejemplo de procedencia; la puerta A3 no debe aceptar `PotValido` de `verificar_rango_pot` público como validez de bloque, y debe interponer el sello. **No** intentes eliminar el caso `d=0` ni cambiar el resultado correcto del núcleo: falta la fuente causal de producción, no una comprobación matemática adicional dentro de este incremento.
+
+Añade pruebas unitarias del **comportamiento real**, con getter de `PruebaPotValidada`, sin fijar `D=0` como valor de consenso:
+
+1. `D=0,d>0`: genera portadores AES reales con el helper existente para un retardo **inyectado cero**; la salida auditada debe salir del **último portador** y ser igual a `pot_output`, sin consultar `contexto.salida_validada(slot(B))`. La prueba debe seguir ligada al hash del candidato. El mock de contexto debe contener solo las salidas del pasado que el verificador puede conocer: la ancla del rango, no los portadores propios precargados.
+2. `D=0,d=0`: justificación vacía, ancla del contexto en `slot(B)`; la salida auditada y `pot_output` son esa misma ancla. Si falta el ancla, `PotPendiente`, no `PotValido`.
+3. Refuerza el test existente `d>D`: separa el mapa de salidas **generadas para el valor esperado** del mapa que entrega `ContextoUnit`. Éste debe contener solo la ancla y cualquier salida ancestral anterior; elimina **todos** los outputs de portadores de B, no solo el del slot auditado. Así el test no deja una vía accidental desde datos del candidato hacia la instantánea.
+
+Si el helper `contexto_con` fija `RETARDO=2`, parametrízalo con `retardo` de prueba en el mismo archivo, sin introducir un valor global de producción. Actualiza las llamadas existentes. No modifiques la lógica que ambos revisores consideraron correcta salvo necesidad demostrada por los tests.
+
+Ejecuta `cargo test -p zx-consensus --locked`, Clippy all targets `-D warnings`, formato, `ci/citas-spec.sh`, `ci/alcance-consenso.sh` y `git diff --check`. **No hagas pasar el guardián mediante usos añadidos solo para CI ni edites CI.** Reporta archivos y resultados; A2 no se cierra.
