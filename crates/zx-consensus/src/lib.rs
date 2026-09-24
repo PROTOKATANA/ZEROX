@@ -16,6 +16,7 @@ pub mod error;
 pub mod firmante;
 pub mod fork_choice;
 pub mod genesis;
+pub mod genesis_dag;
 pub mod ghostdag;
 pub mod peso;
 pub mod poas;
