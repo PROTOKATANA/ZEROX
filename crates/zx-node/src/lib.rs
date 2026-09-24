@@ -29,4 +29,6 @@ pub mod nodo_dag_dev;
 pub mod perfil_primer_hijo_dag_dev;
 #[cfg(feature = "farmer")]
 pub mod productor_poas;
+#[cfg(feature = "farmer")]
+pub mod puerta_primer_hijo_dag_dev;
 pub mod sync;

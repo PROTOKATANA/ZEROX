@@ -5038,6 +5038,7 @@ dependencies = [
  "async-lock",
  "blake3",
  "clap",
+ "ed25519-zebra",
  "futures",
  "libp2p",
  "parity-scale-codec",

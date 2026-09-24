@@ -92,3 +92,8 @@ proptest = { workspace = true }
 # primitiva AES real (`zx_pot::prove`). `zx-pot` ya está en el grafo (lo usa `zx-consensus`) y es
 # miembro del workspace; esta línea solo declara la arista directa de test.
 zx-pot = { path = "../zx-pot" }
+# Solo el test de la puerta A3/D2 (`puerta_primer_hijo_dag_dev`) firma el `pre_hash` con la clave
+# del plot para que el sello ZIP-215 real (`C-HDR-04`) pase. `ed25519-zebra` ya está en el grafo
+# (lo usan `zx-core` y `zx-consensus`) y es la misma versión del workspace: esta línea solo declara
+# la arista directa de test, sin paquetes ni versiones nuevos.
+ed25519-zebra = { workspace = true }
