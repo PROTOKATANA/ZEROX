@@ -15,6 +15,7 @@
 //! red↔consenso: `zx-p2p` declara `ManejadorEntrante` y aquí se implementa. Ver
 //! `crates/zx-p2p/src/lib.rs` para el diagrama y el job de CI que lo vigila.
 
+pub mod bootstrap_dag_dev;
 pub mod cadena;
 pub mod contextual;
 pub mod dag_causal;
