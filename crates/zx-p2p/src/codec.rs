@@ -45,23 +45,76 @@ use zx_core::wire;
 /// que no está construyendo un locator, sino gastándonos tiempo.
 pub const MAX_LOCATOR: usize = 64;
 
+/// Tamaño exacto en el wire de una petición `Estado`, en bytes.
+///
+/// `Peticion::Estado` **no lleva cuerpo**: solo el discriminante. Es el máximo que el perfil
+/// `dag-dev` admite leer, derivado del formato y no del límite lineal general.
+const PETICION_ESTADO_BYTES: u64 = 1; // discriminante
+
+/// Tamaño exacto en el wire de una respuesta `Estado`, en bytes.
+///
+/// Desglose por campo, para que no sea un número mágico:
+/// - discriminante de respuesta: `1`
+/// - `genesis`: `32`
+/// - `tip`: `32`
+/// - `altura` LE32: `4`
+/// - `trabajo`: `32`
+const RESPUESTA_ESTADO_BYTES: u64 = 1 + 32 + 32 + 4 + 32; // = 101
+
+/// Alcance de variantes que admite un [`ZxCodec`].
+///
+/// Es un **modo privado del códec**, no una bandera pública: solo lo elige
+/// [`ZxBehaviour::con_presupuesto`](crate::behaviour::ZxBehaviour::con_presupuesto) a partir del
+/// perfil de red, y no se puede activar arbitrariamente desde fuera del crate.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+enum ModoCodec {
+    /// Todas las variantes de sync, como en mainnet/testnet.
+    #[default]
+    Completo,
+    /// **Solo** `Peticion::Estado` y `Respuesta::Estado(_)`. Perfil `dag-dev`.
+    SoloEstado,
+}
+
 /// El códec de ZEROX para `request-response`.
 ///
 /// Lleva el [`Presupuesto`] porque **es aquí donde se reserva la memoria**. Ponerlo más arriba
 /// significaría contabilizar después de haber leído, que es contabilizar tarde.
-#[derive(Clone, Default, Debug)]
+///
+/// Lleva también un [`ModoCodec`] privado: en `dag-dev` el request-response solo sirve el saludo
+/// `Estado`, y **rechaza en lectura y escritura** las variantes lineales (`Cabeceras`, `Bloques`,
+/// `FaltantesCompactas`, `NoDisponible`). El modo se elige al construir el behaviour desde el
+/// perfil de red; el `Default` es el códec completo para no debilitar mainnet/testnet.
+#[derive(Clone, Debug, Default)]
 pub struct ZxCodec {
     presupuesto: Presupuesto,
+    modo: ModoCodec,
 }
 
 impl ZxCodec {
-    /// Uno que comparte presupuesto con los demás.
+    /// Uno que comparte presupuesto con los demás y admite **todas** las variantes.
     ///
     /// **Comparten el contador a propósito**: el recurso que se agota es global, así que repartirlo
     /// por conexión no acotaría la suma. Ver [`crate::presupuesto`].
     #[must_use]
     pub fn con_presupuesto(presupuesto: Presupuesto) -> Self {
-        Self { presupuesto }
+        Self {
+            presupuesto,
+            modo: ModoCodec::Completo,
+        }
+    }
+
+    /// Códec restringido al saludo `Estado`, para el perfil `dag-dev`.
+    ///
+    /// `pub(crate)` a propósito: **no** es una bandera pública. El único consumidor es el
+    /// constructor de [`ZxBehaviour`](crate::behaviour::ZxBehaviour), que la elige según
+    /// [`ParametrosRed`](crate::config::ParametrosRed). Así un llamante externo no puede degradar el
+    /// códec de mainnet/testnet ni abrir una ruta lineal por accidente.
+    #[must_use]
+    pub(crate) fn solo_estado(presupuesto: Presupuesto) -> Self {
+        Self {
+            presupuesto,
+            modo: ModoCodec::SoloEstado,
+        }
     }
 
     /// El presupuesto que usa.
@@ -81,16 +134,35 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let bytes = leer_acotado(io, limites::MAX_PETICION_BYTES, &self.presupuesto).await?;
-        peticion_desde_bytes(&bytes).map_err(a_io)
+        // El límite se elige **antes** de `leer_acotado` porque es ahí donde se reserva (C-NET-21).
+        // En dev el saludo tiene forma fija; reservar por el máximo lineal dejaría que cada saludo
+        // retuviera temporalmente la cuota de una petición enorme y que un peer lento la conservara.
+        let max = match self.modo {
+            ModoCodec::Completo => limites::MAX_PETICION_BYTES,
+            ModoCodec::SoloEstado => PETICION_ESTADO_BYTES,
+        };
+        let bytes = leer_acotado(io, max, &self.presupuesto).await?;
+        match self.modo {
+            ModoCodec::Completo => peticion_desde_bytes(&bytes).map_err(a_io),
+            ModoCodec::SoloEstado => peticion_solo_estado(&bytes),
+        }
     }
 
     async fn read_response<T>(&mut self, _: &StreamProtocol, io: &mut T) -> io::Result<Respuesta>
     where
         T: AsyncRead + Unpin + Send,
     {
-        let bytes = leer_acotado(io, limites::MAX_RESPUESTA_BYTES, &self.presupuesto).await?;
-        respuesta_desde_bytes(&bytes).map_err(a_io)
+        // Igual que en la petición: el límite exacto del formato dev (`101` B) se fija antes de la
+        // reserva, no el máximo lineal de `MAX_RESPUESTA_BYTES`.
+        let max = match self.modo {
+            ModoCodec::Completo => limites::MAX_RESPUESTA_BYTES,
+            ModoCodec::SoloEstado => RESPUESTA_ESTADO_BYTES,
+        };
+        let bytes = leer_acotado(io, max, &self.presupuesto).await?;
+        match self.modo {
+            ModoCodec::Completo => respuesta_desde_bytes(&bytes).map_err(a_io),
+            ModoCodec::SoloEstado => respuesta_solo_estado(&bytes),
+        }
     }
 
     async fn write_request<T>(
@@ -102,6 +174,12 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
+        if self.modo == ModoCodec::SoloEstado && !matches!(req, Peticion::Estado) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "dag-dev: este perfil solo admite Peticion::Estado",
+            ));
+        }
         let bytes = peticion_a_bytes(&req);
         // Un emisor que se pasa de su propio límite es un bug nuestro, no de nadie más. Fallar aquí
         // es mejor que mandar algo que el otro extremo va a tirar.
@@ -124,6 +202,12 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
+        if self.modo == ModoCodec::SoloEstado && !matches!(res, Respuesta::Estado(_)) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "dag-dev: este perfil solo admite Respuesta::Estado",
+            ));
+        }
         let bytes = respuesta_a_bytes(&res);
         if bytes.len() as u64 > limites::MAX_RESPUESTA_BYTES {
             return Err(io::Error::new(
@@ -133,6 +217,38 @@ impl request_response::Codec for ZxCodec {
         }
         io.write_all(&bytes).await?;
         io.close().await
+    }
+}
+
+/// Deserializa una petición exigiendo que sea **solo** el saludo `Estado` (perfil `dag-dev`).
+///
+/// Comprueba el discriminante **antes** de parsear el cuerpo, de modo que una variante lineal se
+/// rechaza sin reservar por su locator ni por sus listas. Un `Estado` con bytes de más tampoco
+/// cuela: el parser canónico rechaza el relleno (C-TX-06c).
+fn peticion_solo_estado(bytes: &[u8]) -> io::Result<Peticion> {
+    match bytes.first() {
+        Some(&Peticion::DISC_ESTADO) => peticion_desde_bytes(bytes).map_err(a_io),
+        Some(&disc) => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("dag-dev: petición lineal 0x{disc:02x} prohibida en este perfil"),
+        )),
+        None => Err(a_io(truncado("petición vacía"))),
+    }
+}
+
+/// Deserializa una respuesta exigiendo que sea **solo** `Estado` (perfil `dag-dev`).
+///
+/// Igual que [`peticion_solo_estado`]: el discriminante se comprueba antes de parsear, así que
+/// `Cabeceras`, `Bloques`, `FaltantesCompactas` y `NoDisponible` se rechazan como datos inválidos
+/// **sin** materializar nada de la ruta lineal.
+fn respuesta_solo_estado(bytes: &[u8]) -> io::Result<Respuesta> {
+    match bytes.first() {
+        Some(&Respuesta::DISC_ESTADO) => respuesta_desde_bytes(bytes).map_err(a_io),
+        Some(&disc) => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("dag-dev: respuesta lineal 0x{disc:02x} prohibida en este perfil"),
+        )),
+        None => Err(a_io(truncado("respuesta vacía"))),
     }
 }
 
@@ -480,11 +596,12 @@ fn leer_hashes(bytes: &[u8], max: usize) -> Result<(Vec<BlockHash>, &[u8]), Enco
 )]
 mod tests {
     use super::{
-        MAX_LOCATOR, ZxCodec, peticion_a_bytes, peticion_desde_bytes, respuesta_a_bytes,
+        MAX_LOCATOR, ModoCodec, ZxCodec, peticion_a_bytes, peticion_desde_bytes, respuesta_a_bytes,
         respuesta_desde_bytes,
     };
     use crate::limites;
     use crate::mensaje::{BloqueRed, Estado, Peticion, Respuesta};
+    use crate::presupuesto::Presupuesto;
     use futures::AsyncWriteExt;
     use futures_ringbuf::Endpoint;
     use libp2p::StreamProtocol;
@@ -654,6 +771,284 @@ mod tests {
         }
     }
 
+    // ── Perfil dev: solo el saludo `Estado` ──────────────────────────────────
+
+    /// Peticiones que el perfil `dag-dev` **MUST** rechazar.
+    fn peticiones_lineales() -> Vec<Peticion> {
+        vec![
+            Peticion::Cabeceras {
+                locator: vec![h(1), h(2)],
+                hasta: Some(h(3)),
+            },
+            Peticion::Bloques { hashes: vec![h(4)] },
+            Peticion::FaltantesCompactas {
+                bloque: h(5),
+                indices: vec![1, 2],
+            },
+        ]
+    }
+
+    /// Respuestas que el perfil `dag-dev` **MUST** rechazar.
+    fn respuestas_lineales() -> Vec<Respuesta> {
+        vec![
+            Respuesta::Cabeceras((0..3).map(cabecera).collect()),
+            Respuesta::Bloques(vec![bloque(1)]),
+            Respuesta::FaltantesCompactas {
+                bloque: h(6),
+                transacciones: vec![(tx_simple(2), vec![vec![0x22; 64]])],
+            },
+            Respuesta::NoDisponible,
+        ]
+    }
+
+    /// **`dag-dev`: `Estado` ida y vuelta por un stream real.**
+    #[tokio::test]
+    async fn en_dev_el_saludo_estado_da_la_vuelta() {
+        assert!(matches!(
+            ZxCodec::solo_estado(Presupuesto::default()).modo,
+            ModoCodec::SoloEstado
+        ));
+
+        let (mut a, mut b) = Endpoint::pair(4096, 4096);
+        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
+        codec
+            .write_request(&proto(), &mut a, Peticion::Estado)
+            .await
+            .expect("el saludo MUST poder escribirse");
+        a.close().await.unwrap();
+        assert_eq!(
+            codec.read_request(&proto(), &mut b).await.unwrap(),
+            Peticion::Estado
+        );
+
+        let estado = Respuesta::Estado(Estado {
+            genesis: h(0),
+            tip: h(1),
+            altura: 7,
+            trabajo: [0xcd; 32],
+        });
+        let (mut a, mut b) = Endpoint::pair(4096, 4096);
+        codec
+            .write_response(&proto(), &mut a, estado.clone())
+            .await
+            .expect("el saludo MUST poder escribirse");
+        a.close().await.unwrap();
+        assert_eq!(codec.read_response(&proto(), &mut b).await.unwrap(), estado);
+    }
+
+    /// **El saludo dev reserva su tamaño exacto, no el máximo lineal.**
+    ///
+    /// La reserva de C-NET-21 ocurre **antes** de leer, así que usar `MAX_RESPUESTA_BYTES` en dev
+    /// dejaba que cada saludo retuviera temporalmente la cuota de una respuesta lineal de ~25,6 MB y
+    /// que un peer lento la conservara. Con el límite exacto (`1` en la petición, `101` en la
+    /// respuesta) un presupuesto de `102` basta: `101` del cuerpo máximo + `1` del `max + 1` que
+    /// pide `leer_acotado` para distinguir exceso de tamaño.
+    #[tokio::test]
+    async fn en_dev_el_saludo_reserva_su_tamano_exacto() {
+        let estado = Respuesta::Estado(Estado {
+            genesis: h(0),
+            tip: h(1),
+            altura: 7,
+            trabajo: [0xcd; 32],
+        });
+
+        // `Estado` = `101` bytes; `leer_acotado` reserva `max + 1` = `102`.
+        let p = Presupuesto::nuevo(102);
+        let mut codec = ZxCodec::solo_estado(p.clone());
+        let (mut a, mut b) = Endpoint::pair(4096, 4096);
+        codec
+            .write_response(&proto(), &mut a, estado.clone())
+            .await
+            .unwrap();
+        a.close().await.unwrap();
+        assert_eq!(codec.read_response(&proto(), &mut b).await.unwrap(), estado);
+        assert_eq!(p.en_vuelo(), 0, "la reserva del saludo se libera");
+
+        // El mismo presupuesto NO alcanza para el códec completo: su reserva normal es
+        // `MAX_RESPUESTA_BYTES + 1`, muy por encima de `102`.
+        let p = Presupuesto::nuevo(102);
+        let mut completo = ZxCodec::con_presupuesto(p.clone());
+        let (mut a, mut b) = Endpoint::pair(4096, 4096);
+        completo
+            .write_response(&proto(), &mut a, estado)
+            .await
+            .unwrap();
+        a.close().await.unwrap();
+        let e = completo
+            .read_response(&proto(), &mut b)
+            .await
+            .expect_err("el códec completo MUST rechazarse con un presupuesto de saludo");
+        assert_eq!(e.kind(), std::io::ErrorKind::OutOfMemory);
+        assert!(e.to_string().contains("C-NET-21"), "{e}");
+        assert_eq!(p.en_vuelo(), 0, "el rechazo no deja reserva");
+    }
+
+    /// **Un `Estado` dev con un byte de más no se acepta.**
+    ///
+    /// El límite del formato (`101` B en la respuesta, `1` B en la petición) se comprueba antes de
+    /// parsear, así que un byte añadido se rechaza como tamaño excesivo —o como relleno— y **nunca**
+    /// se devuelve un mensaje.
+    #[tokio::test]
+    async fn en_dev_un_estado_con_un_byte_de_mas_se_rechaza() {
+        let estado = Respuesta::Estado(Estado {
+            genesis: h(0),
+            tip: h(1),
+            altura: 7,
+            trabajo: [0xcd; 32],
+        });
+        let mut bytes = respuesta_a_bytes(&estado);
+        bytes.push(0x00);
+        let (mut a, mut b) = Endpoint::pair(4096, 4096);
+        a.write_all(&bytes).await.unwrap();
+        a.close().await.unwrap();
+        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
+        let e = codec
+            .read_response(&proto(), &mut b)
+            .await
+            .expect_err("un `Estado` con relleno MUST rechazarse");
+        assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{e}");
+
+        // Lo mismo en la petición: `Estado` ocupa `1` byte, así que `2` ya exceden.
+        let mut bytes = peticion_a_bytes(&Peticion::Estado);
+        bytes.push(0x00);
+        let (mut a, mut b) = Endpoint::pair(4096, 4096);
+        a.write_all(&bytes).await.unwrap();
+        a.close().await.unwrap();
+        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
+        let e = codec
+            .read_request(&proto(), &mut b)
+            .await
+            .expect_err("una petición `Estado` con relleno MUST rechazarse");
+        assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{e}");
+    }
+
+    /// **`dag-dev` · al escribir se rechaza antes de serializar.** Cada variante lineal devuelve
+    /// `InvalidInput` y **nunca** un `Ok` con datos omitidos.
+    #[tokio::test]
+    async fn en_dev_las_peticiones_lineales_se_rechazan_al_escribir() {
+        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
+        for p in peticiones_lineales() {
+            let (mut a, _b) = Endpoint::pair(4096, 4096);
+            let e = codec
+                .write_request(&proto(), &mut a, p.clone())
+                .await
+                .expect_err("una petición lineal MUST rechazarse");
+            assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput, "{p:?}");
+        }
+    }
+
+    /// **`dag-dev` · al escribir se rechaza antes de serializar.** También las respuestas, incluido
+    /// `NoDisponible`, que no aporta nada en un perfil que solo habla el saludo.
+    #[tokio::test]
+    async fn en_dev_las_respuestas_lineales_se_rechazan_al_escribir() {
+        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
+        for r in respuestas_lineales() {
+            let (mut a, _b) = Endpoint::pair(65_536, 65_536);
+            let e = codec
+                .write_response(&proto(), &mut a, r.clone())
+                .await
+                .expect_err("una respuesta lineal MUST rechazarse");
+            assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput, "{r:?}");
+        }
+    }
+
+    /// **`dag-dev` · al leer se rechaza por tamaño o por discriminante, sin parsear el cuerpo
+    /// lineal.** Con el límite exacto (`1` B) una variante lineal excede el máximo y la corta
+    /// `leer_acotado` como `InvalidData` antes del parser; un único byte con discriminante lineal lo
+    /// rechaza `peticion_solo_estado`. En ningún caso se acepta.
+    #[tokio::test]
+    async fn en_dev_los_bytes_de_peticiones_lineales_se_rechazan_al_leer() {
+        for p in peticiones_lineales() {
+            let (mut a, mut b) = Endpoint::pair(4096, 4096);
+            let bytes = peticion_a_bytes(&p);
+            futures::AsyncWriteExt::write_all(&mut a, &bytes)
+                .await
+                .unwrap();
+            a.close().await.unwrap();
+
+            let mut codec = ZxCodec::solo_estado(Presupuesto::default());
+            let e = codec
+                .read_request(&proto(), &mut b)
+                .await
+                .expect_err("bytes lineales MUST rechazarse en lectura");
+            assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{p:?}");
+            assert!(
+                !matches!(e.kind(), std::io::ErrorKind::OutOfMemory),
+                "no es un fallo de presupuesto"
+            );
+        }
+    }
+
+    /// **`dag-dev` · respuestas lineales rechazadas al leer.** `Cabeceras`, `Bloques` y
+    /// `FaltantesCompactas` exceden los `101` B del saludo y se cortan por tamaño; `NoDisponible`,
+    /// que ocupa un único byte, se rechaza por discriminante. Ninguna se acepta.
+    #[tokio::test]
+    async fn en_dev_los_bytes_de_respuestas_lineales_se_rechazan_al_leer() {
+        for r in respuestas_lineales() {
+            let (mut a, mut b) = Endpoint::pair(65_536, 65_536);
+            let bytes = respuesta_a_bytes(&r);
+            futures::AsyncWriteExt::write_all(&mut a, &bytes)
+                .await
+                .unwrap();
+            a.close().await.unwrap();
+
+            let mut codec = ZxCodec::solo_estado(Presupuesto::default());
+            let e = codec
+                .read_response(&proto(), &mut b)
+                .await
+                .expect_err("bytes lineales MUST rechazarse en lectura");
+            assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{r:?}");
+        }
+    }
+
+    /// **`dag-dev` no debilita mainnet/testnet.** El códec público sigue admitiendo todas las
+    /// variantes lineales, tanto los helpers libres como el camino real del stream.
+    #[tokio::test]
+    async fn el_codec_publico_sigue_admitiendo_las_variantes_lineales() {
+        for p in peticiones_lineales() {
+            let (mut a, mut b) = Endpoint::pair(4096, 4096);
+            let mut codec = ZxCodec::con_presupuesto(Presupuesto::default());
+            assert!(matches!(codec.modo, ModoCodec::Completo));
+            codec
+                .write_request(&proto(), &mut a, p.clone())
+                .await
+                .unwrap();
+            a.close().await.unwrap();
+            assert_eq!(codec.read_request(&proto(), &mut b).await.unwrap(), p);
+        }
+        for r in respuestas_lineales() {
+            let (mut a, mut b) = Endpoint::pair(65_536, 65_536);
+            let mut codec = ZxCodec::default();
+            codec
+                .write_response(&proto(), &mut a, r.clone())
+                .await
+                .unwrap();
+            a.close().await.unwrap();
+            assert_eq!(codec.read_response(&proto(), &mut b).await.unwrap(), r);
+        }
+    }
+
+    /// **El `magic` no está en el wire.** El saludo `Estado` serializado es idéntico con cualquier
+    /// perfil y no empieza por el prefijo mágico. Es la constatación que gobierna E1: un `magic`
+    /// distinto **no** aísla el tráfico; separar exige otra barrera (protocolos y temas propios, y
+    /// en el futuro el cotejo del saludo de génesis).
+    #[test]
+    fn el_magic_no_es_una_barrera_del_wire() {
+        let dev = crate::config::ParametrosRed::dag_dev().magic();
+        let peticion = peticion_a_bytes(&Peticion::Estado);
+        assert_eq!(peticion, vec![Peticion::DISC_ESTADO]);
+        assert_ne!(peticion.get(..4), Some(dev.as_slice()));
+
+        let respuesta = respuesta_a_bytes(&Respuesta::Estado(Estado {
+            genesis: h(0),
+            tip: h(1),
+            altura: 1,
+            trabajo: [0; 32],
+        }));
+        assert_eq!(respuesta.first().copied(), Some(Respuesta::DISC_ESTADO));
+        assert_ne!(respuesta.get(..4), Some(dev.as_slice()));
+    }
+
     // ── Límites de tamaño ────────────────────────────────────────────────────
 
     /// **El matiz que casi se cuela: `.take(N)` trunca en silencio.**
@@ -692,8 +1087,6 @@ mod tests {
     /// peticiones que un atacante emite gratis.
     #[tokio::test]
     async fn sin_presupuesto_la_lectura_se_rechaza() {
-        use crate::presupuesto::Presupuesto;
-
         // Un presupuesto ridículo: no cabe ni una petición.
         let p = Presupuesto::nuevo(10);
         let mut codec = ZxCodec::con_presupuesto(p.clone());
@@ -722,8 +1115,6 @@ mod tests {
     /// dispara sin que esté pasando nada.
     #[tokio::test]
     async fn una_lectura_correcta_devuelve_su_reserva() {
-        use crate::presupuesto::Presupuesto;
-
         let p = Presupuesto::nuevo(crate::presupuesto::PRESUPUESTO_BYTES);
         let mut codec = ZxCodec::con_presupuesto(p.clone());
 

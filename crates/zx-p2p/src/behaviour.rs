@@ -34,15 +34,9 @@ use crate::codec::ZxCodec;
 use crate::limites_ip::LimitesPorIp;
 use crate::presupuesto::Presupuesto;
 
-use crate::config::ParametrosRed;
+use crate::config::{IdentidadP2p, ParametrosRed};
 use crate::error::P2pError;
 use crate::limites;
-
-/// Versión del protocolo que anuncia `identify`.
-///
-/// No se comparte entre redes: forma parte de [`ParametrosRed::protocolo_sync`] la identidad real,
-/// pero esta cadena es lo que ve un operador al inspeccionar un peer.
-const PROTOCOLO_IDENTIFY: &str = "/zerox/id/1";
 
 /// Cada cuánto late gossipsub.
 ///
@@ -295,7 +289,7 @@ impl ZxBehaviour {
         let limites_ip = LimitesPorIp::nuevo();
 
         let identify = identify::Behaviour::new(
-            identify::Config::new(PROTOCOLO_IDENTIFY.to_owned(), clave.public())
+            identify::Config::new(p.protocolo_identify().to_owned(), clave.public())
                 .with_agent_version(p.agent_version()),
         );
 
@@ -316,12 +310,15 @@ impl ZxBehaviour {
         // punto de partida barato para un eclipse: descubrir nodos sin pasar por Kademlia ni por
         // los bootstrap. En testnet es justo lo que se quiere: el arnés multinodo local depende de
         // que tres nodos se encuentren sin configurar nada.
-        let mdns = match p.red() {
-            Red::Testnet => Toggle::from(Some(
+        //
+        // `dag-dev` tampoco lo activa: su descubrimiento lo fija el runner local, y anunciarse por
+        // multicast en una máquina de desarrollo es ruido que no aporta nada.
+        let mdns = match p.identidad() {
+            IdentidadP2p::Publica(Red::Testnet) => Toggle::from(Some(
                 mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
                     .map_err(|_| P2pError::Configuracion("no se pudo iniciar mDNS"))?,
             )),
-            Red::Mainnet => Toggle::from(None),
+            IdentidadP2p::Publica(Red::Mainnet) | IdentidadP2p::DagDev => Toggle::from(None),
         };
 
         let mut gossipsub = Self::gossipsub(clave, limite_bloque)?;
@@ -356,8 +353,16 @@ impl ZxBehaviour {
 
         let proto_sync = StreamProtocol::try_from_owned(p.protocolo_sync().to_owned())
             .map_err(|_| P2pError::Configuracion("nombre de protocolo de sync inválido"))?;
+        // El modo del códec sale del perfil, no de una bandera pública: `dag-dev` solo habla el
+        // saludo `Estado` y rechaza en lectura y escritura las variantes lineales; mainnet/testnet
+        // conservan el códec completo. `solo_estado` es `pub(crate)`, así que nadie externo puede
+        // degradar el códec de una red pública.
+        let codec = match p.identidad() {
+            IdentidadP2p::DagDev => ZxCodec::solo_estado(presupuesto),
+            IdentidadP2p::Publica(_) => ZxCodec::con_presupuesto(presupuesto),
+        };
         let sync = request_response::Behaviour::with_codec(
-            ZxCodec::con_presupuesto(presupuesto),
+            codec,
             [(proto_sync, request_response::ProtocolSupport::Full)],
             request_response::Config::default()
                 // El default son 10 s. Un lote de bloques por un enlace lento no cabe en 10 s, y un
@@ -469,8 +474,7 @@ fn id_por_contenido(m: &gossipsub::Message) -> gossipsub::MessageId {
 #[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
 mod tests {
     use super::{
-        MESH_N, MESH_N_ALTO, MESH_N_BAJO, PROTOCOLO_IDENTIFY, ParametrosDelNodo, ZxBehaviour,
-        id_por_contenido,
+        MESH_N, MESH_N_ALTO, MESH_N_BAJO, ParametrosDelNodo, ZxBehaviour, id_por_contenido,
     };
     use crate::config::ParametrosRed;
     use crate::error::P2pError;
@@ -495,6 +499,47 @@ mod tests {
                 )
                 .is_ok(),
                 "{red:?}"
+            );
+        }
+    }
+
+    /// **`dag-dev` construye un behaviour con sync, temas, identify y mDNS propios.**
+    ///
+    /// Esto comprueba **configuración, no entrega**: que los dos temas suscritos son exactamente los
+    /// dev y que no se suscribe ninguno de mainnet/testnet, que el protocolo de sync es el dev, que
+    /// el `identify` es dev y que mDNS está apagado. Que la suscripción exista no acredita que un
+    /// mensaje llegue al callback (C-NET-12): hoy sigue siendo `Ignorar` mientras `zx-node` no
+    /// valide el DAG causal.
+    #[tokio::test]
+    async fn dag_dev_construye_con_sync_temas_propios_y_sin_mdns() {
+        let p = ParametrosRed::dag_dev();
+        let b = ZxBehaviour::nueva(&clave(), p, limites::LIMITE_BLOQUE_GENESIS).unwrap();
+
+        assert_eq!(
+            b.parametros_de_red().protocolo_sync(),
+            "/zerox-dag-dev/sync/1"
+        );
+        assert_eq!(
+            b.parametros_de_red().protocolo_identify(),
+            "/zerox-dag-dev/id/1"
+        );
+        assert!(!b.mdns.is_enabled(), "dag-dev MUST NOT usar mDNS");
+
+        let temas: Vec<String> = b.gossipsub.topics().map(ToString::to_string).collect();
+        assert_eq!(temas.len(), 2, "se suscriben exactamente dos temas");
+        assert!(temas.contains(&p.topic_bloques().to_owned()));
+        assert!(temas.contains(&p.topic_txs().to_owned()));
+        for ajeno in [
+            "/zerox/blocks/2",
+            "/zerox/txs/1",
+            "/zerox-testnet/blocks/2",
+            "/zerox-testnet/txs/1",
+            "/zerox/blocks/1",
+            "/zerox-testnet/blocks/1",
+        ] {
+            assert!(
+                !temas.iter().any(|t| t == ajeno),
+                "tema ajeno suscrito en dag-dev: {ajeno}"
             );
         }
     }
@@ -697,9 +742,13 @@ mod tests {
     /// La identidad de `identify` es de ZEROX y nombra la red.
     #[test]
     fn identify_anuncia_zerox_y_no_la_libreria() {
-        assert!(PROTOCOLO_IDENTIFY.starts_with("/zerox/"));
-        for red in [Red::Mainnet, Red::Testnet] {
-            let v = ParametrosRed::de(red).agent_version();
+        for p in [
+            ParametrosRed::de(Red::Mainnet),
+            ParametrosRed::de(Red::Testnet),
+            ParametrosRed::dag_dev(),
+        ] {
+            assert!(p.protocolo_identify().starts_with("/zerox"), "{p:?}");
+            let v = p.agent_version();
             assert!(v.starts_with("zerox/"), "{v}");
             assert!(
                 !v.contains("rust-libp2p"),
