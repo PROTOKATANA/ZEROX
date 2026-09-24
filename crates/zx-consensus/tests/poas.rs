@@ -468,3 +468,24 @@ fn resta_reciente_negativa_es_contexto_invalido_sin_panic() {
         ))
     );
 }
+
+/// **Fallo 1** · `min_sector_lifetime` desbordado es contexto, no candidato.
+///
+/// `min_sector_lifetime` lo aporta `PieceCheckParams` y la puerta no lo acredita. Con
+/// `history_size = 3` y `min_sector_lifetime = u64::MAX`, `SectorId::sector_expiration_check`
+/// devuelve `None`, `derive_expiration_history_size` propaga `None` y la primitiva real responde
+/// `Error::InvalidHistorySize`. El adaptador debe conservar ese error tipado —no `panic`, no `Ok`—
+/// para que la puerta pueda clasificarlo como `Pendiente`. Se reutiliza la fixture positiva y su
+/// compromiso de segmento; no se duplica el ploteo ni se genera una solución nueva.
+#[test]
+fn min_sector_lifetime_desbordado_devuelve_invalid_history_size_sin_panic() {
+    let f = fixture();
+    let mut contexto = f.params.clone();
+    contexto.min_sector_lifetime = history(u64::MAX);
+    contexto.sector_expiration_check_segment_commitment = Some(f.params.segment_commitment);
+
+    assert_eq!(
+        verificar_solucion_poas(&f.primera, f.slot, f.pot, u64::MAX, &contexto, &Kzg::new()),
+        Err(ErrorPoas::Prueba(Error::InvalidHistorySize))
+    );
+}

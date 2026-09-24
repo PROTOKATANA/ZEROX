@@ -161,8 +161,11 @@ impl RangoSolucionValidado {
     /// Comprueba C-HDR-06 y ata el resultado a la cabecera.
     ///
     /// El valor esperado sale **exclusivamente** del contexto; el candidato entra como
-    /// [`CandidatoSinRango`], que no expone `rango_solucion`. Eso impide la circularidad por
-    /// lectura, **no** demuestra que el contexto esté bien fundado.
+    /// [`CandidatoSinRango`]. Esa vista **solo** impide leer `rango_solucion` de forma directa: un
+    /// contexto puede conservar la cabecera —o el valor por otra vía— y devolverlo como «esperado»,
+    /// o derivarlo de `height`, `timestamp` o `pot_output`, que C-HDR-06 prohíbe como fuente. La
+    /// garantía causal —derivar el esperado de `past(B)` y del flujo— **no** la aporta este
+    /// método y sigue pendiente (`TAREAS.md` §2.3).
     ///
     /// # Errores
     /// [`ConsensusError::RangoIncorrecto`] si el declarado no coincide con el esperado; o el error

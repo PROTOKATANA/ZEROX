@@ -10,6 +10,7 @@ pub mod activacion;
 pub mod antidos;
 pub mod bloque;
 pub mod bloque_dag;
+pub mod cabecera_conjunta;
 pub mod dificultad;
 pub mod emision;
 pub mod error;
@@ -31,6 +32,10 @@ pub use bloque::{Bloque, BloqueValidado, ContextoBloque, validar_bloque};
 pub use bloque_dag::{
     CandidatoSinRango, ContextoDag, ContextoRangoDag, RangoSolucionValidado,
     comprobar_compromisos_cuerpo_dag, comprobar_padres_contextual, comprobar_rango_contextual,
+};
+pub use cabecera_conjunta::{
+    ComprobacionCabecera, EstadoCabeceraConjunta, MotivoCabeceraInvalida, MotivoCabeceraPendiente,
+    verificar_cabecera_conjunta,
 };
 pub use dificultad::{VentanaRetarget, siguiente_target};
 pub use emision::{recompensa_base, subsidio};
