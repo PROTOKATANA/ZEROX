@@ -17,6 +17,7 @@
 
 pub mod cadena;
 pub mod contextual;
+pub mod dag_causal;
 #[cfg(feature = "farmer")]
 pub mod farmer;
 pub mod nodo;
