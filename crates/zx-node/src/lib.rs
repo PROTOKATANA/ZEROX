@@ -17,6 +17,7 @@
 
 pub mod bootstrap_dag_dev;
 pub mod cadena;
+pub mod contexto_genesis_dag_dev;
 pub mod contextual;
 pub mod dag_causal;
 #[cfg(feature = "farmer")]
