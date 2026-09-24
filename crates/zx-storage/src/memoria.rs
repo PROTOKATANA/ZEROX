@@ -17,8 +17,10 @@ use zx_consensus::validacion::{ConjuntoUtxo, EntradaUtxo};
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
 use zx_core::tx::OutPoint;
+use zx_core::wire_dag::BloqueDag;
 
 use crate::almacen::{AlmacenCadena, Punta};
+use crate::almacen_dag::AlmacenCandidatosDag;
 use crate::error::StorageError;
 use crate::utxo::{ConjuntoEnMemoria, DeltaUtxo};
 
@@ -34,6 +36,9 @@ struct Interior {
     por_altura: HashMap<u32, BlockHash>,
     cuerpos: HashMap<BlockHash, Vec<u8>>,
     punta: Option<Punta>,
+    /// La cola **no confiable** de candidatos DAG, por `block_hash` (C-HDR-09). No es estado de
+    /// consenso: ver [`crate::almacen_dag`].
+    candidatos_dag: HashMap<BlockHash, BloqueDag>,
     /// El UTXO set **finalizado**. Solo avanza (C-STORE-06).
     utxo: ConjuntoEnMemoria,
     /// Hasta dónde llega ese conjunto. Va por detrás de `punta` hasta `MAX_REORG_LENGTH` bloques.
@@ -172,6 +177,35 @@ impl AlmacenCadena for AlmacenEnMemoria {
         // En RAM no hay nada que sincronizar. No es un no-op vacío: documenta que el contrato se
         // cumple trivialmente, en vez de dejar a quien lea preguntándose si falta algo.
         Ok(())
+    }
+}
+
+impl AlmacenCandidatosDag for AlmacenEnMemoria {
+    fn guardar_candidato_dag(&self, bloque: &BloqueDag) -> Result<(), StorageError> {
+        // La clave es el `block_hash` canónico (C-HDR-09). El `insert` bajo el mismo lock de
+        // escritura reemplaza la entrada completa de una vez: no hay ventana en la que convivan la
+        // justificación vieja y el cuerpo nuevo.
+        let mut i = self.interior.write().map_err(|_| envenenado())?;
+        i.candidatos_dag
+            .insert(bloque.cabecera.block_hash(), bloque.clone());
+        Ok(())
+    }
+
+    fn candidato_dag(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
+        let i = self.interior.read().map_err(|_| envenenado())?;
+        let Some(bloque) = i.candidatos_dag.get(hash) else {
+            // `None` es "no lo tengo", no un veredicto de validez (C-HDR-07).
+            return Ok(None);
+        };
+        // La clave es el hash: una entrada cuya cabecera no lo reproduzca es corrupción, no un
+        // candidato casi bueno. En memoria no debería ocurrir —se inserta por ese hash—, pero el
+        // contrato del trait no depende de que el backend sea el que lo garantiza.
+        if bloque.cabecera.block_hash() != *hash {
+            return Err(StorageError::Corrupto {
+                que: "un candidato DAG en memoria bajo una clave que no es su block_hash",
+            });
+        }
+        Ok(Some(bloque.clone()))
     }
 }
 

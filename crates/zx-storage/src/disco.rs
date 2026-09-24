@@ -3,7 +3,7 @@
 //! Tras la feature `rocksdb`. Ver [`crate::memoria`] para por qué es opcional y por qué existe una
 //! implementación de referencia contra la que compararlo.
 //!
-//! # Cuatro familias de columnas, no una
+//! # Seis familias de columnas, no una
 //!
 //! | Familia | Clave → valor | Por qué separada |
 //! |---|---|---|
@@ -12,6 +12,12 @@
 //! | `cuerpos` | hash(32) → bytes | Grandes y de acceso raro. Mezclarlos con las cabeceras arruinaría la caché |
 //! | `meta` | clave corta → valor | La punta, la altura finalizada, y lo que venga |
 //! | `utxo` | outpoint(36 B) → entrada | El UTXO set **finalizado**. Enorme y de acceso aleatorio: separarlo es lo que evita que se coma la caché de las cabeceras |
+//! | `candidatos_dag` | `block_hash`(32) → bloque DAG completo | La cola **no confiable** de candidatos DAG, separada de la cadena lineal para no reinterpretar ni mezclar sus familias |
+//!
+//! La familia `candidatos_dag` la añade la preparación C1 (ver [`crate::almacen_dag`]): guarda
+//! bloques DAG **sin validar** en una entrada por `block_hash`, y **no** participa de la punta, las
+//! alturas ni el UTXO. Se crea con `create_missing_column_families`, así que un almacén lineal
+//! anterior se abre sin migración y gana la familia vacía.
 //!
 //! La altura se codifica en **big-endian a propósito**: RocksDB ordena las claves por bytes, así
 //! que big-endian hace que el orden lexicográfico coincida con el numérico. Con little-endian, la
@@ -31,8 +37,10 @@ use zx_core::digest::{BlockHash, Digest};
 use zx_core::preimage::block::{BlockHeader, TAMANO_CABECERA};
 use zx_core::tx::OutPoint;
 use zx_core::wire;
+use zx_core::wire_dag::{BloqueDag, bloque_dag_a_bytes, bloque_dag_desde_bytes};
 
 use crate::almacen::{AlmacenCadena, Punta};
+use crate::almacen_dag::AlmacenCandidatosDag;
 use crate::error::StorageError;
 use crate::formato;
 use crate::utxo::DeltaUtxo;
@@ -43,6 +51,11 @@ const CF_CUERPOS: &str = "cuerpos";
 const CF_META: &str = "meta";
 /// El UTXO set finalizado: clave de 36 B → entrada serializada (C-STORE-05).
 const CF_UTXO: &str = "utxo";
+/// La cola **no confiable** de candidatos DAG: `block_hash`(32) → bloque DAG completo.
+///
+/// Familia nueva de la preparación C1. No es el estado validado del DAG ni su punta: ver
+/// [`crate::almacen_dag`].
+const CF_CANDIDATOS_DAG: &str = "candidatos_dag";
 
 /// Clave de la punta dentro de `meta`.
 const CLAVE_PUNTA: &[u8] = b"punta";
@@ -90,10 +103,17 @@ impl AlmacenEnDisco {
         // atomic_flush to true if WAL is always enabled […] This option is useful when there are
         // column families with writes NOT protected by WAL". Aquí no hay ninguna así.
 
-        let familias = [CF_CABECERAS, CF_ALTURAS, CF_CUERPOS, CF_META, CF_UTXO]
-            .into_iter()
-            .map(|n| ColumnFamilyDescriptor::new(n, Options::default()))
-            .collect::<Vec<_>>();
+        let familias = [
+            CF_CABECERAS,
+            CF_ALTURAS,
+            CF_CUERPOS,
+            CF_META,
+            CF_UTXO,
+            CF_CANDIDATOS_DAG,
+        ]
+        .into_iter()
+        .map(|n| ColumnFamilyDescriptor::new(n, Options::default()))
+        .collect::<Vec<_>>();
 
         let db = DB::open_cf_descriptors(&opts, ruta, familias).map_err(backend)?;
         Ok(Self { db })
@@ -346,6 +366,49 @@ impl AlmacenCadena for AlmacenEnDisco {
     }
 }
 
+impl AlmacenCandidatosDag for AlmacenEnDisco {
+    fn guardar_candidato_dag(&self, bloque: &BloqueDag) -> Result<(), StorageError> {
+        let clave = bloque.cabecera.block_hash();
+        let mut bytes = Vec::new();
+        // Único códec de C-WIRE-07: cabecera, justificación PoT y cuerpo, tal cual. Guardarlo no
+        // valida nada; una `put_cf` del bloque completo es atómica por sí sola.
+        bloque_dag_a_bytes(&mut bytes, bloque);
+        self.db
+            .put_cf(self.cf(CF_CANDIDATOS_DAG)?, clave.as_bytes(), bytes)
+            .map_err(backend)
+    }
+
+    fn candidato_dag(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
+        let Some(bytes) = self
+            .db
+            .get_cf(self.cf(CF_CANDIDATOS_DAG)?, hash.as_bytes())
+            .map_err(backend)?
+        else {
+            // `None` es "no lo tengo", no un veredicto de validez (C-HDR-07).
+            return Ok(None);
+        };
+        let (bloque, resto) =
+            bloque_dag_desde_bytes(&bytes).map_err(|_| StorageError::Corrupto {
+                que: "un candidato DAG guardado",
+            })?;
+        // Sobrar bytes significa que lo guardado no es el bloque que decimos: corrupción, no
+        // "casi bien". Deserializar no es aceptar.
+        if !resto.is_empty() {
+            return Err(StorageError::Corrupto {
+                que: "un candidato DAG guardado, con bytes finales",
+            });
+        }
+        // La clave es el `block_hash` (C-HDR-09). Que decodifique no basta: tiene que ser el
+        // bloque de esa clave, o el almacén estaría sirviendo un candidato por otro.
+        if bloque.cabecera.block_hash() != *hash {
+            return Err(StorageError::Corrupto {
+                que: "un candidato DAG guardado bajo una clave que no es su block_hash",
+            });
+        }
+        Ok(Some(bloque))
+    }
+}
+
 #[cfg(test)]
 #[expect(clippy::panic, reason = "los tests fallan con panic por diseño")]
 mod tests_estructura {
@@ -383,5 +446,108 @@ mod tests_estructura {
                  ignorando lo que sobra."
             );
         }
+    }
+}
+
+/// **La corrupción no se convierte en `None`.** El backend de disco es el único que puede recibir
+/// bytes que no decodifiquen —una escritura ajena a esta API, un sector dañado—, así que aquí se
+/// inyectan **directamente en la familia** para probar la defensa. Es una prueba de test: no se
+/// expone ninguna mutación peligrosa en la API de producción.
+#[cfg(test)]
+#[expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
+mod tests_candidatos_dag {
+    use super::{AlmacenEnDisco, CF_CANDIDATOS_DAG};
+    use crate::almacen_dag::AlmacenCandidatosDag;
+    use crate::error::StorageError;
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
+    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::wire_dag::{
+        BUNDLE_BYTES, BloqueDag, JustificacionPot, PotCheckpoints, bloque_dag_a_bytes,
+    };
+
+    /// Cabecera de fixture, etiquetada **candidata**: sin PoAS válida.
+    fn cabecera_candidata(slot: u64, marca: u8) -> DagBlockHeader {
+        DagBlockHeader {
+            consensus_branch_id: 0xc478_80ea,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([marca; 32])),
+            timestamp: 1_788_480_000 + slot,
+            height: 1,
+            slot,
+            pot_output: [marca; 16],
+            rango_solucion: u64::from(marca),
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([marca; 32])),
+            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x07; 32])), &[])
+                .expect("un padre seleccionado es canónico"),
+            sello: [marca; 64],
+        }
+    }
+
+    fn bloque(cabecera: DagBlockHeader, marca: u8) -> BloqueDag {
+        let just =
+            JustificacionPot::nueva(vec![PotCheckpoints::desde_bytes([marca; BUNDLE_BYTES])])
+                .expect("un portador está dentro del máximo");
+        BloqueDag::nuevo(cabecera, just, vec![], vec![]).expect("sin txs no hay descuadre")
+    }
+
+    /// Inyecta bytes crudos bajo una clave de la familia de candidatos.
+    fn inyectar(a: &AlmacenEnDisco, clave: &BlockHash, bytes: &[u8]) {
+        a.db.put_cf(
+            a.cf(CF_CANDIDATOS_DAG).expect("la familia existe"),
+            clave.as_bytes(),
+            bytes,
+        )
+        .expect("inyecta bytes crudos");
+    }
+
+    #[test]
+    fn rechaza_bytes_que_no_decodifican() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let h = cabecera_candidata(3, 0x01).block_hash();
+        inyectar(&a, &h, b"esto no es un bloque DAG");
+
+        assert!(
+            matches!(a.candidato_dag(&h), Err(StorageError::Corrupto { .. })),
+            "una entrada ilegible MUST ser corrupción, nunca `None`"
+        );
+    }
+
+    #[test]
+    fn rechaza_bytes_finales_sobrantes() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let b = bloque(cabecera_candidata(4, 0x02), 0x02);
+        let mut bytes = Vec::new();
+        bloque_dag_a_bytes(&mut bytes, &b);
+        bytes.extend_from_slice(b"cola");
+        inyectar(&a, &b.cabecera.block_hash(), &bytes);
+
+        assert!(
+            matches!(
+                a.candidato_dag(&b.cabecera.block_hash()),
+                Err(StorageError::Corrupto { .. })
+            ),
+            "bytes finales sobrantes MUST rechazarse: decodificar no es aceptar"
+        );
+    }
+
+    #[test]
+    fn rechaza_una_clave_que_no_es_el_block_hash() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
+        let b = bloque(cabecera_candidata(5, 0x03), 0x03);
+        let clave_ajena = cabecera_candidata(5, 0x04).block_hash();
+        let mut bytes = Vec::new();
+        bloque_dag_a_bytes(&mut bytes, &b);
+        inyectar(&a, &clave_ajena, &bytes);
+
+        assert!(
+            matches!(
+                a.candidato_dag(&clave_ajena),
+                Err(StorageError::Corrupto { .. })
+            ),
+            "un bloque bajo una clave que no es su block_hash MUST rechazarse"
+        );
     }
 }
