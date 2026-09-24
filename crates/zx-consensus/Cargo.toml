@@ -21,6 +21,21 @@ zx-core         = { path = "../zx-core" }
 # dependencia real, no de test: el adaptador vive en `src/pot.rs`.
 zx-pot          = { path = "../zx-pot" }
 
+# ── Verificador PoAS (A1, C-POT-08 paso 5) ────────────────────────────────────────────────────
+# Adaptamos la API pública de Autonomys enlazando por `path` al clon fijado
+# `PDF/autonomys-subspace` @ f8842d0. No se copia ni se reimplementa KZG, PoS, la máscara del
+# chunk ni la distancia; estas dependencias son las mismas que usaron los instrumentos
+# `prototipos/poas-identidad` y `veritas/rendimiento/coste-salto-v1`. Las versiones transitivas
+# las fija el `Cargo.lock` del workspace. No se activa la feature `testing` de upstream.
+subspace-core-primitives = { path = "../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
+subspace-proof-of-space  = { path = "../../PDF/autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc"] }
+subspace-verification    = { path = "../../PDF/autonomys-subspace/crates/subspace-verification" }
+subspace-kzg             = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
+
 [dev-dependencies]
 proptest      = { workspace = true }
 ed25519-zebra = { workspace = true }
+# Solo para generar el fixture PoS positivo del test con la ruta **paralela** de ploteo
+# (`Tables::create_parallel`). La ruta no paralela tiene un SIGSEGV reproducible documentado en
+# `P-ZRX/P-INTENTO/investigacion/mediciones/fallo-semilla.md`; no se usa aquí.
+ab-proof-of-space = { path = "../../PDF/autonomys-subspace/shared/ab-proof-of-space", default-features = false, features = ["alloc", "full-chiapos", "parallel"] }

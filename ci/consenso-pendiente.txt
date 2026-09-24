@@ -78,3 +78,8 @@ zx-consensus::pot::reto_desde_salida
 # de los tres traits se dan por alcanzados dentro del crate porque el propio núcleo los llama; la
 # función libre es el punto de entrada huérfano.
 zx-consensus::pot_rango::verificar_rango_pot
+
+# ── PoAS A1: verificador de solución aún sin llamada desde el nodo ─────────────────────────
+# C-POT-08 paso 5: exige salida PoT, rango y contexto de pieza ya acreditados.
+# Se cablea en C1/B3 con la validación DAG; hasta entonces no acredita un bloque completo.
+zx-consensus::poas::verificar_solucion_poas

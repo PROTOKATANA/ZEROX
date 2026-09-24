@@ -17,6 +17,7 @@ pub mod fork_choice;
 pub mod genesis;
 pub mod ghostdag;
 pub mod peso;
+pub mod poas;
 pub mod pot;
 pub mod pot_rango;
 pub mod testigo;
@@ -39,6 +40,7 @@ pub use ghostdag::{
     sumar_blue_work,
 };
 pub use peso::{PesoValidado, limite, mediana_efectiva};
+pub use poas::{ErrorPoas, verificar_solucion_poas};
 pub use pot::{
     ALEATORIEDAD_BYTES, ENTROPIA_BYTES, ErrorContextoPot, aleatoriedad_de_salida,
     checkpoints_a_primitiva, checkpoints_a_wire, proyectar_iteraciones, reto_desde_salida,

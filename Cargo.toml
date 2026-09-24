@@ -13,6 +13,19 @@ members = [
     "crates/zx-lightwalletd",
     "crates/zx-scanner",
 ]
+# El clon fijado `PDF/autonomys-subspace` vive dentro de este directorio, así que Cargo lo
+# incluiría como miembro automático de este workspace al enlazarlo por `path` (A1) y resolvería
+# su herencia `workspace = true` contra ESTE manifiesto, que no tiene sus cientos de
+# `[workspace.dependencies]`. Se excluyen las cinco piezas que A1 enlaza para que cada una use su
+# propio workspace raíz (`PDF/autonomys-subspace/Cargo.toml`), como ya hacen los instrumentos
+# `prototipos/poas-identidad` y `veritas/rendimiento/coste-salto-v1`. No se toca el clon.
+exclude = [
+    "PDF/autonomys-subspace/crates/subspace-core-primitives",
+    "PDF/autonomys-subspace/crates/subspace-proof-of-space",
+    "PDF/autonomys-subspace/crates/subspace-verification",
+    "PDF/autonomys-subspace/shared/subspace-kzg",
+    "PDF/autonomys-subspace/shared/ab-proof-of-space",
+]
 
 [workspace.package]
 version    = "0.0.0"

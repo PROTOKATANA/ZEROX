@@ -68,9 +68,9 @@ fn normativo() -> String {
 /// cambia, aunque el literal escrito a mano siguiera diciendo el valor viejo.
 fn miles(n: usize) -> String {
     let s = n.to_string();
-    let mut salida = String::with_capacity(s.len() + s.len() / 3);
+    let mut salida = String::with_capacity(s.len() + s.len().div_ceil(3));
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             salida.push(' ');
         }
         salida.push(c);
