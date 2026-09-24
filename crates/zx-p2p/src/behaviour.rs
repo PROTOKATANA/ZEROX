@@ -25,8 +25,8 @@
 use std::time::Duration;
 
 use libp2p::{
-    StreamProtocol, connection_limits, gossipsub, identify, identity, kad, mdns, ping,
-    request_response, swarm::NetworkBehaviour, swarm::behaviour::toggle::Toggle,
+    Multiaddr, PeerId, StreamProtocol, connection_limits, gossipsub, identify, identity, kad, mdns,
+    ping, request_response, swarm::NetworkBehaviour, swarm::behaviour::toggle::Toggle,
 };
 use zx_core::red::Red;
 
@@ -116,7 +116,14 @@ pub struct ZxBehaviour {
     /// redes en vez de dos composiciones que se desincronizarían.
     pub mdns: Toggle<mdns::tokio::Behaviour>,
     /// Difusión de bloques y transacciones.
-    pub gossipsub: gossipsub::Behaviour,
+    ///
+    /// `pub(crate)` y no `pub`: es el behaviour **suscrito** a los temas, y [`crate::servicio::ManejoRed`]
+    /// conserva su propia copia de esos temas para fijar el canal de difusión. Con el campo público,
+    /// código externo podía suscribir o desuscribir temas por detrás del handle y dejar las dos
+    /// vistas desincronizadas. La garantía —handle y suscripción leen la misma instancia— vale para
+    /// la ruta construida por el nodo (el `Swarm` que este crate envuelve), no para un `ZxBehaviour`
+    /// mutado por fuera.
+    pub(crate) gossipsub: gossipsub::Behaviour,
     /// Sincronización punto a punto: `GetHeaders`/`Headers`, `GetBlocks`/`Blocks`.
     ///
     /// **Separado de gossipsub a propósito.** Gossipsub difunde hacia la malla actual y no es un
@@ -127,9 +134,120 @@ pub struct ZxBehaviour {
     /// Es la misma separación que hace Ethereum entre el dominio *gossip* —solo bloques nuevos— y
     /// el dominio *Req/Resp* —historial— (`consensus-specs`, `p2p-interface.md`).
     pub sync: request_response::Behaviour<ZxCodec>,
+    /// Los parámetros de red con los que se construyó esta composición.
+    ///
+    /// Es un behaviour **sin tráfico propio** (ver [`ParametrosDelNodo`]) para poder viajar dentro
+    /// del `#[derive(NetworkBehaviour)]` y ser la única fuente de los temas que usa el handle de
+    /// difusión. Así `ManejoRed` no acepta un tema libre y no puede desincronizarse de la
+    /// suscripción.
+    ///
+    /// `pub(crate)` por la misma razón que [`Self::gossipsub`]: este es el origen de los temas y
+    /// [`crate::servicio::ManejoRed`] copia los suyos de aquí. La garantía de que ambos ven lo mismo
+    /// se limita a la ruta construida por el nodo, no a un `ZxBehaviour` alterado desde fuera.
+    pub(crate) parametros: ParametrosDelNodo,
+}
+
+/// Un behaviour de libp2p que **no hace nada**: solo transporta [`ParametrosRed`].
+///
+/// # Por qué existe
+///
+/// `#[derive(NetworkBehaviour)]` exige que **todos** los campos implementen `NetworkBehaviour`; no
+/// admite un campo de datos al margen. Y «deducir» la red en el momento de construir el handle
+/// sería adivinar: `Swarm` no expone los parámetros, y el `Red` elegido no basta porque
+/// `ParametrosRed::de` es la única fuente de los temas y de los protocolos.
+///
+/// La alternativa —pasar un `ParametrosRed` aparte a [`crate::servicio::arrancar`]— rompe a todos
+/// los llamantes de test, que hoy no lo tienen. Este envoltorio mantiene la firma y garantiza que
+/// el handle y la suscripción leen **la misma** instancia.
+///
+/// `poll` devuelve `Pending` siempre —no genera eventos— y su `ConnectionHandler` es el
+/// `dummy::ConnectionHandler` de libp2p, que no negocia ningún protocolo. Es deliberadamente
+/// inerte: su único trabajo es hacer visible una invariante en el tipo.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ParametrosDelNodo(ParametrosRed);
+
+impl ParametrosDelNodo {
+    /// Envuelve los parámetros de una red.
+    #[must_use]
+    pub const fn nuevos(p: ParametrosRed) -> Self {
+        Self(p)
+    }
+
+    /// Los parámetros envueltos.
+    #[must_use]
+    pub const fn de_red(self) -> ParametrosRed {
+        self.0
+    }
+}
+
+impl NetworkBehaviour for ParametrosDelNodo {
+    type ConnectionHandler = libp2p::swarm::dummy::ConnectionHandler;
+    type ToSwarm = std::convert::Infallible;
+
+    fn handle_pending_inbound_connection(
+        &mut self,
+        _: libp2p::swarm::ConnectionId,
+        _: &Multiaddr,
+        _: &Multiaddr,
+    ) -> Result<(), libp2p::swarm::ConnectionDenied> {
+        Ok(())
+    }
+
+    fn handle_established_inbound_connection(
+        &mut self,
+        _: libp2p::swarm::ConnectionId,
+        _: PeerId,
+        _: &Multiaddr,
+        _: &Multiaddr,
+    ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
+        Ok(libp2p::swarm::dummy::ConnectionHandler)
+    }
+
+    fn handle_established_outbound_connection(
+        &mut self,
+        _: libp2p::swarm::ConnectionId,
+        _: PeerId,
+        _: &Multiaddr,
+        _: libp2p::core::Endpoint,
+        _: libp2p::core::transport::PortUse,
+    ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
+        Ok(libp2p::swarm::dummy::ConnectionHandler)
+    }
+
+    fn on_swarm_event(&mut self, _: libp2p::swarm::FromSwarm) {}
+
+    fn on_connection_handler_event(
+        &mut self,
+        _: PeerId,
+        _: libp2p::swarm::ConnectionId,
+        evento: libp2p::swarm::THandlerOutEvent<Self>,
+    ) {
+        libp2p::core::util::unreachable(evento);
+    }
+
+    fn poll(
+        &mut self,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
+    {
+        std::task::Poll::Pending
+    }
 }
 
 impl ZxBehaviour {
+    /// Los parámetros de red de esta composición (C-NET-02, C-NET-25).
+    ///
+    /// El nombre **no** es simplemente `parametros` a propósito: ese identificador ya lo usa un
+    /// punto de entrada público de `zx-consensus` (`ghostdag::parametros`), y
+    /// `ci/alcance-consenso.sh` es un guardián de grep que cuenta una mención en el código como una
+    /// llamada. Una coincidencia de nombre aquí haría que el guardián diera por alcanzada una
+    /// función que nadie llama —un falso positivo que esconde el hueco que ese guardián existe para
+    /// ver—.
+    #[must_use]
+    pub const fn parametros_de_red(&self) -> ParametrosRed {
+        self.parametros.de_red()
+    }
+
     /// Construye la composición con **todos** los límites de C-NET-11 fijados explícitamente.
     ///
     /// `limite_bloque` es `LIMITE(H)` de la cadena **en el momento de arrancar** (C-WGT-09). No es
@@ -206,7 +324,35 @@ impl ZxBehaviour {
             Red::Mainnet => Toggle::from(None),
         };
 
-        let gossipsub = Self::gossipsub(clave, limite_bloque)?;
+        let mut gossipsub = Self::gossipsub(clave, limite_bloque)?;
+
+        // ── C-NET-25 / C-NET-26 · la suscripción es exacta y es obligatoria ──
+        //
+        // Un `ConfigBuilder` sin `subscribe` deja el behaviour **suscrito a nada**: los mensajes
+        // entrantes de `/blocks/2` y `/txs/1` no llegan al bucle, y publicar falla con
+        // `NoPeersSubscribedToTopic`. Eso no falla al compilar y se manifiesta como una red que no
+        // propaga nada.
+        //
+        // Se suscriben **exactamente dos temas**, los de esta red, ni uno más. **No** se suscribe
+        // `/blocks/1`: C-NET-25 reserva `/blocks/2` a los anuncios compactos y prohíbe difundir el
+        // bloque completo por gossip; tener los dos temas a la vez haría viajar dos veces lo mismo.
+        //
+        // Suscribirse **no admite mensajes**: el callback compacto sigue `Ignorar` —el default de
+        // `ManejadorEntrante`— mientras `zx-node` no valide el DAG causal. El tema es transporte, no
+        // validez (C-NET-12).
+        for tema in [p.topic_bloques(), p.topic_txs()] {
+            let t = gossipsub::IdentTopic::new(tema);
+            // `Ok(true)` es "suscripción nueva", `Ok(false)` es "ya estaba". Un `Err` sí es un
+            // fallo: el `subscription_filter` por defecto rechaza cualquier tema que no empiece por
+            // `/`, así que un nombre mal escrito debe impedir arrancar en vez de dejar el nodo mudo.
+            //
+            // Se hace **antes** de construir el `Swarm`, de modo que el error sale por el tipo de
+            // `ZxBehaviour::con_presupuesto` —[`P2pError::Configuracion`]— y no envuelto por el
+            // builder de `SwarmBuilder`.
+            gossipsub.subscribe(&t).map_err(|_| {
+                P2pError::Configuracion("no se pudo suscribir a un tema de gossipsub")
+            })?;
+        }
 
         let proto_sync = StreamProtocol::try_from_owned(p.protocolo_sync().to_owned())
             .map_err(|_| P2pError::Configuracion("nombre de protocolo de sync inválido"))?;
@@ -234,6 +380,7 @@ impl ZxBehaviour {
             mdns,
             gossipsub,
             sync,
+            parametros: ParametrosDelNodo::nuevos(p),
         })
     }
 
@@ -284,25 +431,52 @@ impl ZxBehaviour {
     }
 }
 
-/// Identifica un mensaje por el **hash de su contenido**, no por quién lo mandó.
+/// Identifica un mensaje por el **tema exacto y su contenido**, no por quién lo mandó.
+///
+/// # Por qué el tema entra en el ID
 ///
 /// El default de libp2p usa `(source_peer_id, sequence_number)`. Con él, el mismo bloque recibido
 /// por dos rutas son dos mensajes distintos: se valida dos veces y se reenvía dos veces. Para una
 /// cadena, donde el mismo bloque llega por muchos caminos, eso es desperdicio puro.
+///
+/// Pero hashear **solo** `SHA3(datos)` tiene un agujero: gossipsub deduplica por `message_id`, y dos
+/// temas distintos pueden llevar los mismos bytes. Un tercero podía emitir primero en `/txs/1` unos
+/// bytes arbitrarios —válidos como transacción para el codec— y consumir el `message_id` que después
+/// tendría un anuncio legítimo en `/blocks/2`: el anuncio real se descartaría por «ya visto». Con el
+/// tema dentro del hash, mismo tema + mismos bytes = mismo ID; mismos bytes + otro tema = ID
+/// distinto.
+///
+/// # Coste y naturaleza
+///
+/// `SHA3(SHA3(tema) ‖ SHA3(datos))`: dos digests intermedios de 32 B (64 B fijos) y ningún buffer
+/// proporcional al mensaje —los bytes del anuncio ya están en memoria, no se copian—. Se usa
+/// [`zx_core::sha3_256_publico`], la primitiva ya adoptada por el crate.
+///
+/// ⚠️ **Esto es un identificador de transporte, no un hash de consenso.** No entra en un `txid`, ni
+/// en un `sighash`, ni en un hash de bloque: sirve solo para que gossipsub deduplique y no tiene
+/// reglas de dominio. Por eso puede usar SHA3 desnudo (C-HASH-04 sería obligatorio si fuera
+/// preimagen de consenso).
 fn id_por_contenido(m: &gossipsub::Message) -> gossipsub::MessageId {
-    gossipsub::MessageId::from(*zx_core::sha3_256_publico(&m.data).as_bytes())
+    let tema = zx_core::sha3_256_publico(m.topic.as_str().as_bytes());
+    let datos = zx_core::sha3_256_publico(&m.data);
+    let mut intermedio = [0u8; 64];
+    intermedio[..32].copy_from_slice(tema.as_bytes());
+    intermedio[32..].copy_from_slice(datos.as_bytes());
+    gossipsub::MessageId::from(*zx_core::sha3_256_publico(&intermedio).as_bytes())
 }
 
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
 mod tests {
     use super::{
-        MESH_N, MESH_N_ALTO, MESH_N_BAJO, PROTOCOLO_IDENTIFY, ZxBehaviour, id_por_contenido,
+        MESH_N, MESH_N_ALTO, MESH_N_BAJO, PROTOCOLO_IDENTIFY, ParametrosDelNodo, ZxBehaviour,
+        id_por_contenido,
     };
     use crate::config::ParametrosRed;
     use crate::error::P2pError;
     use crate::limites;
-    use libp2p::{gossipsub, identity};
+    use libp2p::swarm::NetworkBehaviour;
+    use libp2p::{PeerId, gossipsub, identity};
     use zx_core::red::Red;
 
     fn clave() -> identity::Keypair {
@@ -325,25 +499,75 @@ mod tests {
         }
     }
 
-    /// **C-NET-11.** El mismo contenido da el mismo id; contenido distinto, id distinto.
+    /// **C-NET-11 + C-NET-25.** El mismo tema y los mismos bytes dan el mismo id; cambia el tema o
+    /// cambian los datos y cambia el id.
     ///
     /// Con el default de libp2p —`(emisor, secuencia)`— la primera afirmación sería **falsa**: el
-    /// mismo bloque llegado de dos peers tendría dos ids y se procesaría dos veces.
+    /// mismo bloque llegado de dos peers tendría dos ids y se procesaría dos veces. Por eso aquí los
+    /// dos mensajes iguales llevan **emisores distintos**: es la única forma de que la prueba
+    /// ejercite la independencia del emisor. Y hashear solo los datos permitiría que unos bytes en
+    /// `/txs/1` consumieran el id de un anuncio en `/blocks/2`.
     #[test]
-    fn el_id_de_mensaje_depende_del_contenido_y_no_del_emisor() {
-        let mensaje = |datos: &[u8]| gossipsub::Message {
-            source: None,
+    fn el_id_de_mensaje_depende_del_tema_y_del_contenido() {
+        let emisor_a = clave().public().to_peer_id();
+        let emisor_b = clave().public().to_peer_id();
+        assert_ne!(
+            emisor_a, emisor_b,
+            "hacen falta dos emisores distintos para probar la independencia"
+        );
+
+        let mensaje = |tema: &str, datos: &[u8], source: PeerId| gossipsub::Message {
+            source: Some(source),
             data: datos.to_vec(),
             sequence_number: None,
-            topic: gossipsub::IdentTopic::new("/zerox/blocks/1").hash(),
+            topic: gossipsub::IdentTopic::new(tema).hash(),
         };
 
-        let a = id_por_contenido(&mensaje(b"bloque"));
-        let b = id_por_contenido(&mensaje(b"bloque"));
-        let c = id_por_contenido(&mensaje(b"otro bloque"));
+        // Mismo tema + mismos bytes = un solo id, **aunque cambie el emisor**.
+        let a = id_por_contenido(&mensaje("/zerox/blocks/2", b"bloque", emisor_a));
+        let b = id_por_contenido(&mensaje("/zerox/blocks/2", b"bloque", emisor_b));
+        assert_eq!(
+            a, b,
+            "mismo tema y bytes desde emisores distintos: es UN mensaje"
+        );
 
-        assert_eq!(a, b, "el mismo bloque por dos rutas es UN mensaje");
-        assert_ne!(a, c);
+        // Mismo tema, otros datos.
+        let c = id_por_contenido(&mensaje("/zerox/blocks/2", b"otro bloque", emisor_a));
+        assert_ne!(a, c, "datos distintos, id distinto");
+
+        // **Los mismos bytes en otro tema no colisionan.**
+        let t = id_por_contenido(&mensaje("/zerox/txs/1", b"bloque", emisor_a));
+        assert_ne!(
+            a, t,
+            "mismos bytes en /txs/1 MUST NOT consumir el id del anuncio"
+        );
+        let t2 = id_por_contenido(&mensaje("/zerox-testnet/blocks/2", b"bloque", emisor_b));
+        assert_ne!(a, t2, "mismos bytes en otra red, id distinto");
+    }
+
+    /// **`ParametrosDelNodo` es inerte: no emite tráfico ni eventos.**
+    ///
+    /// Existe solo para llevar [`ParametrosRed`] dentro del `#[derive(NetworkBehaviour)]`. Su
+    /// `ToSwarm` es [`std::convert::Infallible`] —el tipo de evento no tiene valores— y su
+    /// `ConnectionHandler` es el `dummy` de libp2p, que no negocia ningún protocolo; `poll` devuelve
+    /// `Pending` siempre. Sin esta comprobación, un cambio futuro podría darle tráfico propio sin que
+    /// ningún test lo notara.
+    #[test]
+    fn parametros_del_nodo_no_emite_trafico_ni_eventos() {
+        use libp2p::swarm::dummy;
+        use std::task::{Context, Poll};
+
+        // Si el handler dejara de ser el `dummy`, esta asignación no compilaría.
+        let _: <ParametrosDelNodo as NetworkBehaviour>::ConnectionHandler =
+            dummy::ConnectionHandler;
+
+        let mut p = ParametrosDelNodo::nuevos(ParametrosRed::de(Red::Testnet));
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        assert!(
+            matches!(p.poll(&mut cx), Poll::Pending),
+            "un behaviour sin tráfico no puede producir eventos"
+        );
     }
 
     /// El id es un SHA3-256 completo: 32 bytes, no un truncado.
@@ -353,9 +577,59 @@ mod tests {
             source: None,
             data: b"x".to_vec(),
             sequence_number: None,
-            topic: gossipsub::IdentTopic::new("/zerox/blocks/1").hash(),
+            topic: gossipsub::IdentTopic::new("/zerox/blocks/2").hash(),
         };
         assert_eq!(id_por_contenido(&m).0.len(), 32);
+    }
+
+    /// **C-NET-25 · la suscripción es exacta: los dos temas de la red, ni uno más.**
+    ///
+    /// Sin `subscribe`, el behaviour queda mudo y publicar falla. Con un tema de más —`/blocks/1`—
+    /// se duplica tráfico y se reabre el canal que C-NET-25 prohíbe. Este test es el único que ve
+    /// ese error antes de producción.
+    #[tokio::test]
+    async fn la_suscripcion_son_los_dos_temas_exactos_de_la_red() {
+        for red in [Red::Mainnet, Red::Testnet] {
+            let p = ParametrosRed::de(red);
+            let b = ZxBehaviour::nueva(&clave(), p, limites::LIMITE_BLOQUE_GENESIS).unwrap();
+            let temas: Vec<String> = b.gossipsub.topics().map(ToString::to_string).collect();
+
+            assert_eq!(
+                temas.len(),
+                2,
+                "{red:?}: se suscriben exactamente dos temas"
+            );
+            assert!(
+                temas.contains(&p.topic_bloques().to_owned()),
+                "{red:?}: falta {}",
+                p.topic_bloques()
+            );
+            assert!(
+                temas.contains(&p.topic_txs().to_owned()),
+                "{red:?}: falta {}",
+                p.topic_txs()
+            );
+            assert!(
+                !temas.iter().any(|t| t.contains("/blocks/1")),
+                "{red:?}: C-NET-25 prohíbe suscribir /blocks/1"
+            );
+        }
+    }
+
+    /// **Los dos temas suscritos son de la red pedida, no de la otra.**
+    #[tokio::test]
+    async fn ningun_tema_suscrito_viene_de_la_otra_red() {
+        let m = ParametrosRed::de(Red::Mainnet);
+        let bm = ZxBehaviour::nueva(&clave(), m, limites::LIMITE_BLOQUE_GENESIS).unwrap();
+        for t in bm.gossipsub.topics() {
+            assert!(!t.to_string().contains("testnet"), "mainnet: {t}");
+        }
+
+        let t = ParametrosRed::de(Red::Testnet);
+        let bt = ZxBehaviour::nueva(&clave(), t, limites::LIMITE_BLOQUE_GENESIS).unwrap();
+        for tema in bt.gossipsub.topics() {
+            assert!(tema.to_string().contains("testnet"), "testnet: {tema}");
+        }
     }
 
     /// **C-NET-11.** La malla es 8/6/12, no el 6/5/12 de fábrica, y es coherente.

@@ -130,6 +130,18 @@ impl Nodo {
                 self.sinc.peer_perdido(peer);
                 Fin::Seguir
             }
+            EventoRed::Suscripcion {
+                peer,
+                topico,
+                suscrito,
+            } => {
+                // Cambio de malla de gossipsub (transporte, no consenso). Hoy solo se registra:
+                // quien necesita esperar a que un peer esté suscrito —el arnés de `zx-p2p`— lo hace
+                // sobre el evento. El nodo todavía no publica anuncios, así que no hay nada que
+                // esperar aquí; cuando lo haga, este es el punto donde decidir la malla.
+                tracing::debug!(%peer, %topico, suscrito, "cambio de suscripción de gossipsub");
+                Fin::Seguir
+            }
             EventoRed::Respuesta {
                 peer, respuesta, ..
             } => self.atender_respuesta(peer, *respuesta).await,

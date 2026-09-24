@@ -37,6 +37,7 @@ use tokio::sync::{mpsc, oneshot};
 use libp2p::{gossipsub, request_response};
 
 use crate::behaviour::{ZxBehaviour, ZxBehaviourEvent};
+use crate::config::ParametrosRed;
 use crate::entrante::{ManejadorEntrante, Veredicto};
 use crate::error::{MotivoDesconexion, P2pError};
 use crate::mensaje::{Peticion, Respuesta};
@@ -55,8 +56,13 @@ pub const CAPACIDAD_COMANDOS: usize = 256;
 pub const CAPACIDAD_EVENTOS: usize = 1024;
 
 /// Lo que se le pide al bucle desde fuera.
+///
+/// Es `pub(crate)` y no `pub`: el único `Sender<Comando>` vive dentro de [`ManejoRed`], que no lo
+/// expone, así que fuera del crate no hay forma de emitir un comando —ni, por tanto, de elegir un
+/// tema de difusión—. La visibilidad de crate la necesitan los métodos de `ManejoRed`, pero ningún
+/// llamante externo puede nombrar el enum.
 #[derive(Debug)]
-pub enum Comando {
+pub(crate) enum Comando {
     /// Empezar a escuchar en una dirección.
     Escuchar {
         /// Dónde.
@@ -78,12 +84,24 @@ pub enum Comando {
         /// Qué.
         peticion: Peticion,
     },
-    /// Difundir bytes ya serializados por un tópico.
+    /// Publicar bytes ya serializados por un tópico de la red.
+    ///
+    /// **Solo lo emiten los métodos de [`ManejoRed`]** —[`ManejoRed::difundir_anuncio`] y
+    /// [`ManejoRed::difundir_tx`]—, y `BucleRed` vuelve a comprobarlo contra los dos temas
+    /// configurados antes de publicar (C-NET-25). El `Sender` de comandos no se expone fuera de
+    /// `ManejoRed`, así que no hay una vía pública para fabricar esta variante.
     Difundir {
-        /// Tópico.
+        /// Tópico, que debe ser uno de los dos de [`ParametrosRed`].
         topico: String,
-        /// Contenido.
+        /// Contenido ya serializado.
         datos: Vec<u8>,
+        /// Por dónde vuelve el resultado **local** del intento de publicación.
+        ///
+        /// `Ok(())` acredita solo que `gossipsub.publish` aceptó el mensaje **en este nodo**: ni
+        /// entrega, ni retransmisión, ni validez DAG. `Err` es que el tema no es uno de los dos
+        /// configurados o que gossipsub rechazó la publicación local. Nunca se deja sin responder:
+        /// un tema rechazado por defensa en profundidad responde `Err`, no cuelga al llamante.
+        respuesta: oneshot::Sender<Result<(), P2pError>>,
     },
     /// Cortar con un peer, y por qué (C-NET-05).
     Desconectar {
@@ -120,14 +138,39 @@ pub enum EventoRed {
         /// A quién se le había pedido.
         peer: PeerId,
     },
+    /// Un peer se suscribió (`true`) o desuscribió (`false`) de un tema de gossipsub.
+    ///
+    /// # Por qué el nodo lo ve
+    ///
+    /// La malla no se forma en el instante de la conexión: hasta que el `SUBSCRIBE` de un peer no
+    /// llega, `gossipsub.publish` devuelve `NoPeersSubscribedToTopic` **y mete el mensaje en su
+    /// caché de deduplicación**, así que reintentarlo después da `Duplicate` en vez de entregarlo.
+    /// Es decir, publicar «a ciegas» pierde el anuncio. Este evento es la señal de que el otro lado
+    /// ya está en la malla, y quien publica puede esperarla en vez de dormir a ciegas.
+    ///
+    /// No es un evento de consenso: es transporte, y por eso viaja por [`EventoRed`] sin tocar
+    /// [`Veredicto`].
+    Suscripcion {
+        /// Quién cambió de suscripción.
+        peer: PeerId,
+        /// A qué tema.
+        topico: String,
+        /// `true` si se suscribió, `false` si se desuscribió.
+        suscrito: bool,
+    },
 }
 
 /// El handle con el que el resto del nodo habla con la red.
 ///
-/// `Clone`, `Send` y `Sync` porque solo lleva un `Sender`. El `Swarm` se queda en su tarea.
+/// `Clone`, `Send` y `Sync` porque solo lleva un `Sender` y los parámetros de red (que son `Copy`).
+/// El `Swarm` se queda en su tarea.
+///
+/// Lleva [`ParametrosRed`] para que las APIs de difusión **no acepten un tema libre**: el canal de
+/// cada mensaje es una decisión del tipo, no de quien llama (C-NET-25).
 #[derive(Clone, Debug)]
 pub struct ManejoRed {
     comandos: mpsc::Sender<Comando>,
+    parametros: ParametrosRed,
 }
 
 impl ManejoRed {
@@ -169,12 +212,66 @@ impl ManejoRed {
         self.enviar(Comando::Pedir { peer, peticion }).await
     }
 
-    /// Difunde bytes por un tópico.
+    /// Difundir **un anuncio compacto** por el canal que le corresponde (C-NET-25/C-NET-26).
+    ///
+    /// # Qué fija esta API, y qué NO
+    ///
+    /// La versión anterior exponía `difundir(topico, datos)` con un `String` libre. Eso permitía
+    /// publicar un bloque completo por `/blocks/1` —lo que C-NET-25 prohíbe— o meter bytes en el
+    /// canal equivocado, y el compilador no decía nada. Aquí el tema **no es un parámetro**: sale de
+    /// [`ParametrosRed::topic_bloques`], que es la misma fuente que usa la suscripción.
+    ///
+    /// Pero fijar **formato y tema no certifica validez**. Un [`AnuncioCompacto`] se puede construir
+    /// sin validación —este mismo módulo lo hace en sus tests con sello cero y PoAS por defecto—, así
+    /// que la API **no** impide publicar un anuncio que nunca fue admitido en el DAG. El productor
+    /// futuro (`zx-node`) MUST llamar a este método **solo después** de la admisión del DAG; la
+    /// recepción mantiene `Ignorar` mientras esa validación no exista (C-NET-12).
+    ///
+    /// Serializa con [`AnuncioCompacto::a_bytes`], el codec del relé.
     ///
     /// # Errores
-    /// [`P2pError::Transporte`] si el bucle ya no está.
-    pub async fn difundir(&self, topico: String, datos: Vec<u8>) -> Result<(), P2pError> {
-        self.enviar(Comando::Difundir { topico, datos }).await
+    /// - [`P2pError::Transporte`] si el canal de comandos está cerrado —el bucle de red ya no
+    ///   existe— o si `gossipsub.publish` **rechaza el envío local** (por ejemplo,
+    ///   `NoPeersSubscribedToTopic` porque nadie está en la malla todavía, o `Duplicate` porque
+    ///   esos mismos bytes ya se publicaron o recibieron).
+    ///
+    /// `Ok(())` acredita **solo aceptación local por gossipsub**: no es entrega, no es
+    /// retransmisión y no es validez DAG. Quien necesite saber que el otro extremo está suscrito
+    /// espera al evento [`EventoRed::Suscripcion`].
+    pub async fn difundir_anuncio(&self, anuncio: &AnuncioCompacto) -> Result<(), P2pError> {
+        let (tx, rx) = oneshot::channel();
+        self.enviar(Comando::Difundir {
+            topico: self.parametros.topic_bloques().to_owned(),
+            datos: anuncio.a_bytes(),
+            respuesta: tx,
+        })
+        .await?;
+        rx.await
+            .map_err(|_| P2pError::Transporte("el bucle de red murió antes de responder"))?
+    }
+
+    /// Difundir una **transacción** por `/txs/1` (C-NET-25).
+    ///
+    /// API separada de [`Self::difundir_anuncio`] a propósito: cada canal lleva su contenido, y el
+    /// tema de cada uno sale de los parámetros de red, no del llamante. Igual que aquella, fija
+    /// **formato y tema**, no validez: quien produzca una transacción MUST difundirla solo tras la
+    /// admisión que corresponda.
+    ///
+    /// # Errores
+    /// - [`P2pError::Transporte`] si el canal de comandos está cerrado —el bucle ya no existe— o si
+    ///   `gossipsub.publish` **rechaza el envío local**.
+    ///
+    /// `Ok(())` acredita **solo aceptación local por gossipsub**, nunca entrega.
+    pub async fn difundir_tx(&self, tx_serializada: Vec<u8>) -> Result<(), P2pError> {
+        let (tx, rx) = oneshot::channel();
+        self.enviar(Comando::Difundir {
+            topico: self.parametros.topic_txs().to_owned(),
+            datos: tx_serializada,
+            respuesta: tx,
+        })
+        .await?;
+        rx.await
+            .map_err(|_| P2pError::Transporte("el bucle de red murió antes de responder"))?
     }
 
     /// Corta con un peer.
@@ -203,6 +300,19 @@ pub struct BucleRed<M: ManejadorEntrante> {
     comandos: mpsc::Receiver<Comando>,
     eventos: mpsc::Sender<EventoRed>,
     manejador: Arc<M>,
+    /// Contador **compartido** de memoria en vuelo (C-NET-21).
+    ///
+    /// Es el mismo que lleva el códec de `sync`: la reserva del parseo de una respuesta y la del
+    /// parseo de un anuncio compacto salen del mismo techo. Se guarda aquí para **no** estrenar un
+    /// contador por mensaje —que es lo que hacía `Presupuesto::default()` dentro de `juzgar` y no
+    /// acreditaba ningún techo agregado—.
+    ///
+    /// ⚠️ Compartir el contador **no** cierra C-NET-21: la reserva del parseo se libera antes de
+    /// retener el anuncio o llamar al callback, así que la memoria que el nodo **retiene** después
+    /// del parseo sigue fuera de este techo. Tampoco existe aquí la cola acotada de anuncios sin
+    /// padres que la regla hermana exige: retener un huérfano y reevaluarlo cuando lleguen sus
+    /// dependencias es trabajo de `zx-node`, todavía pendiente.
+    presupuesto: Presupuesto,
 }
 
 /// Lo que devuelve [`arrancar`]: el handle, el flujo de eventos y el bucle listo para correr.
@@ -215,26 +325,59 @@ pub struct Piezas<M: ManejadorEntrante> {
     pub bucle: BucleRed<M>,
 }
 
-/// Prepara las tres piezas. **No arranca nada**: quien decide dónde corre el bucle es `zx-node`.
+/// Prepara las tres piezas con un presupuesto agregado **concreto**. No arranca nada.
 ///
-/// Devolver el bucle sin ejecutarlo, en vez de hacer el `tokio::spawn` aquí dentro, es deliberado:
-/// quien lo lanza se queda con el `JoinHandle`, y **soltar un `JoinHandle` en tokio no cancela la
-/// tarea** — solo pierdes la forma de pararla. Un crate que spawnea por su cuenta deja tareas
-/// huérfanas que sobreviven al nodo.
-pub fn arrancar<M: ManejadorEntrante>(swarm: Swarm<ZxBehaviour>, manejador: Arc<M>) -> Piezas<M> {
+/// `presupuesto` es el contador de C-NET-21. `zx-node` debe crear **una sola instancia** y pasar
+/// clones de la misma tanto a [`ZxBehaviour::con_presupuesto`] —el códec de `sync`— como aquí:
+/// compartir el contador es lo que hace que el techo sea agregado y no por mensaje.
+///
+/// # Por qué hay dos constructores
+///
+/// [`arrancar`] conserva la firma histórica de dos argumentos para no romper a los llamantes que
+/// no necesitan controlar el presupuesto —varios arneses de `zx-node`—. Este es el que usa la ruta
+/// de producción: la única forma de que el bucle de gossip y el códec compartan contador es que
+/// quien monta el `Swarm` entregue el mismo clon a los dos.
+pub fn arrancar_con<M: ManejadorEntrante>(
+    swarm: Swarm<ZxBehaviour>,
+    manejador: Arc<M>,
+    presupuesto: Presupuesto,
+) -> Piezas<M> {
     let (tx_cmd, rx_cmd) = mpsc::channel(CAPACIDAD_COMANDOS);
     let (tx_ev, rx_ev) = mpsc::channel(CAPACIDAD_EVENTOS);
 
+    // El handle necesita los parámetros de red para no aceptar un tema libre en la difusión. Salen
+    // del behaviour, que es la misma fuente que usó la suscripción: no se pueden desincronizar.
+    let parametros = swarm.behaviour().parametros_de_red();
+
     Piezas {
-        manejo: ManejoRed { comandos: tx_cmd },
+        manejo: ManejoRed {
+            comandos: tx_cmd,
+            parametros,
+        },
         eventos: rx_ev,
         bucle: BucleRed {
             swarm,
             comandos: rx_cmd,
             eventos: tx_ev,
             manejador,
+            presupuesto,
         },
     }
+}
+
+/// Prepara las tres piezas con un `Presupuesto` propio. **No arranca nada.**
+///
+/// Devolver el bucle sin ejecutarlo, en vez de hacer el `tokio::spawn` aquí dentro, es deliberado:
+/// quien lo lanza se queda con el `JoinHandle`, y **soltar un `JoinHandle` en tokio no cancela la
+/// tarea** — solo pierdes la forma de pararla. Un crate que spawnea por su cuenta deja tareas
+/// huérfanas que sobreviven al nodo.
+///
+/// ⚠️ El presupuesto que crea aquí es **solo para este bucle**: no lo comparte con el códec. La ruta
+/// de producción debe usar [`arrancar_con`] con la misma instancia que
+/// [`ZxBehaviour::con_presupuesto`]; este constructor sobrevive para los arneses que no controlan el
+/// contador y **no** acredita el techo agregado de C-NET-21.
+pub fn arrancar<M: ManejadorEntrante>(swarm: Swarm<ZxBehaviour>, manejador: Arc<M>) -> Piezas<M> {
+    arrancar_con(swarm, manejador, Presupuesto::default())
 }
 
 impl<M: ManejadorEntrante> BucleRed<M> {
@@ -366,16 +509,53 @@ impl<M: ManejadorEntrante> BucleRed<M> {
 
     /// Atiende la difusión. **C-NET-12: validar antes de retransmitir.**
     fn atender_gossip(&mut self, e: gossipsub::Event) {
-        let gossipsub::Event::Message {
-            propagation_source,
-            message_id,
-            message,
-        } = e
-        else {
-            return;
-        };
+        match e {
+            gossipsub::Event::Message {
+                propagation_source,
+                message_id,
+                message,
+            } => self.juzgar_y_reportar(&propagation_source, &message_id, &message),
+            // La malla de gossipsub cambia: se cuenta hacia fuera para que quien publique pueda
+            // esperar a que el otro extremo esté suscrito. Publicar antes no entrega el mensaje y
+            // además lo envenena en la caché de deduplicación.
+            gossipsub::Event::Subscribed { peer_id, topic } => {
+                self.avisar(EventoRed::Suscripcion {
+                    peer: peer_id,
+                    topico: topic.to_string(),
+                    suscrito: true,
+                });
+            }
+            gossipsub::Event::Unsubscribed { peer_id, topic } => {
+                self.avisar(EventoRed::Suscripcion {
+                    peer: peer_id,
+                    topico: topic.to_string(),
+                    suscrito: false,
+                });
+            }
+            gossipsub::Event::GossipsubNotSupported { peer_id } => {
+                tracing::debug!(%peer_id, "el peer no soporta gossipsub");
+            }
+            gossipsub::Event::SlowPeer {
+                peer_id,
+                failed_messages,
+            } => {
+                // C-NET-05 · lentitud no es violación de consenso: se registra, no se puntúa.
+                tracing::debug!(%peer_id, ?failed_messages, "peer lento en gossipsub");
+            }
+        }
+    }
 
-        let veredicto = self.juzgar(&message);
+    /// Evalúa un mensaje de gossip y reporta el resultado a gossipsub.
+    ///
+    /// **C-NET-12.** Separado de [`Self::atender_gossip`] para que el `match` de eventos no mezcle
+    /// la clasificación con las variantes de malla.
+    fn juzgar_y_reportar(
+        &mut self,
+        propagation_source: &PeerId,
+        message_id: &gossipsub::MessageId,
+        message: &gossipsub::Message,
+    ) {
+        let veredicto = self.juzgar(message);
 
         let acceptance = match veredicto {
             Veredicto::Aceptar => gossipsub::MessageAcceptance::Accept,
@@ -393,7 +573,7 @@ impl<M: ManejadorEntrante> BucleRed<M> {
             .swarm
             .behaviour_mut()
             .gossipsub
-            .report_message_validation_result(&message_id, &propagation_source, acceptance)
+            .report_message_validation_result(message_id, propagation_source, acceptance)
         {
             tracing::debug!(
                 ?veredicto,
@@ -415,18 +595,20 @@ impl<M: ManejadorEntrante> BucleRed<M> {
     /// se reserva para lo indiscutiblemente inválido. El éxito del parseo **no** es validación: por
     /// C-NET-12 el veredicto de un anuncio compacto lo decide el manejador, no el codec.
     fn juzgar(&self, m: &gossipsub::Message) -> Veredicto {
-        // C-NET-21 exige reservar de un contador **compartido** para que el techo sea agregado.
-        // Mientras E1 no tenga ruta activa, aquí se crea un `Presupuesto::default()` por mensaje:
-        // reutiliza la misma estructura, pero **no acredita el techo agregado** —cada mensaje
-        // estrena su propio contador de cero—. El `Presupuesto` se inyecta en `despachar` para que
-        // los tests puedan forzar una reserva fallida; cablear el contador compartido de verdad y
-        // la ruta de `/blocks/2` es trabajo de otra entrega. Esto **no** cierra C-NET-21.
-        let presupuesto = Presupuesto::default();
+        // C-NET-21 · se reserva del contador **compartido** del bucle, el mismo que usa el códec de
+        // `sync`. Antes se estrenaba un `Presupuesto::default()` por mensaje: misma estructura, pero
+        // el techo dejaba de ser agregado —cada mensaje empezaba de cero—. Con la instancia única de
+        // `BucleRed`, ambos caminos compiten por el mismo techo.
+        //
+        // ⚠️ Esto **no** cierra C-NET-21: `AnuncioCompacto::desde_bytes` libera su reserva antes de
+        // devolver el anuncio, así que la memoria que se **retiene** después —el anuncio parseado, la
+        // cola acotada de anuncios sin padres que la regla hermana exige, el callback— no está
+        // contabilizada. Tampoco existe esa cola.
         despachar(
             self.manejador.as_ref(),
             m.topic.as_str(),
             &m.data,
-            &presupuesto,
+            &self.presupuesto,
         )
     }
 
@@ -455,13 +637,47 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                     .sync
                     .send_request(&peer, peticion);
             }
-            Comando::Difundir { topico, datos } => {
-                let t = libp2p::gossipsub::IdentTopic::new(topico);
-                // Que una publicación falle —sin peers en la malla todavía, por ejemplo— es normal
-                // y no es motivo de nada. Se registra y se sigue.
-                if let Err(e) = self.swarm.behaviour_mut().gossipsub.publish(t, datos) {
-                    tracing::debug!(%e, "no se pudo difundir");
+            Comando::Difundir {
+                topico,
+                datos,
+                respuesta,
+            } => {
+                // C-NET-25 · defensa en profundidad. `Comando` es `pub(crate)` y su único emisor es
+                // `ManejoRed`, cuyo `Sender` no se expone; aun así esta comprobación impide publicar
+                // por `/blocks/1` o por un tema de la otra red si alguna vez se añade un camino
+                // interno. Los dos temas permitidos salen del behaviour, que es la misma fuente que
+                // la suscripción.
+                let permitidos = [
+                    self.swarm.behaviour().parametros_de_red().topic_bloques(),
+                    self.swarm.behaviour().parametros_de_red().topic_txs(),
+                ];
+                if !permitidos.contains(&topico.as_str()) {
+                    tracing::warn!(
+                        %topico,
+                        "difusión rechazada: el tema no es uno de los dos configurados (C-NET-25)"
+                    );
+                    // Nunca se deja colgado al llamante: un tema rechazado responde `Err`.
+                    let _ = respuesta.send(Err(P2pError::Transporte(
+                        "tema de difusión fuera de los dos configurados (C-NET-25)",
+                    )));
+                    return;
                 }
+
+                let t = libp2p::gossipsub::IdentTopic::new(topico);
+                // El resultado **local** de `publish` vuelve a quien encoló el comando. `Ok` solo
+                // acredita aceptación local por gossipsub; no es entrega ni validez DAG. Antes este
+                // fallo se silenciaba y una prueba negativa podía pasar con el anuncio sin salir.
+                let r = self
+                    .swarm
+                    .behaviour_mut()
+                    .gossipsub
+                    .publish(t, datos)
+                    .map_err(|e| {
+                        tracing::debug!(%e, "no se pudo difundir");
+                        P2pError::Transporte("gossipsub rechazó la publicación local")
+                    })
+                    .map(|_| ());
+                let _ = respuesta.send(r);
             }
             Comando::Desconectar { peer, motivo } => {
                 tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");

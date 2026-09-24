@@ -38,7 +38,8 @@ use zx_core::red::Red;
 use zx_p2p::behaviour::ZxBehaviour;
 use zx_p2p::config::ParametrosRed;
 use zx_p2p::limites;
-use zx_p2p::servicio::arrancar;
+use zx_p2p::presupuesto::Presupuesto;
+use zx_p2p::servicio::arrancar_con;
 
 use zx_node::cadena::Cadena;
 use zx_node::nodo::{Fin, Nodo};
@@ -100,7 +101,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // El límite de bloque vigente decide el límite de transporte (C-NET-13). Con la cadena en el
     // génesis es el de arranque; cuando exista el sincronizador saldrá de la mediana larga real.
-    let behaviour = ZxBehaviour::nueva(&clave, params, limites::LIMITE_BLOQUE_GENESIS)?;
+    //
+    // **Una sola instancia de `Presupuesto` para los dos consumidores** (C-NET-21): el códec de
+    // `sync`, que reserva al leer cada respuesta, y el bucle de gossip, que reserva al parsear cada
+    // anuncio compacto. Si cada uno tuviera la suya, el techo se contaría dos veces y no sería
+    // agregado. Compartir el contador **no** hace que el techo cubra la memoria retenida después del
+    // parseo —la cola acotada de huérfanos incluida—: eso sigue pendiente.
+    let presupuesto = Presupuesto::default();
+    let behaviour = ZxBehaviour::con_presupuesto(
+        &clave,
+        params,
+        limites::LIMITE_BLOQUE_GENESIS,
+        presupuesto.clone(),
+    )?;
 
     let swarm = libp2p::SwarmBuilder::with_existing_identity(clave)
         .with_tokio()
@@ -119,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
-    let piezas = arrancar(swarm, Arc::clone(&cadena));
+    let piezas = arrancar_con(swarm, Arc::clone(&cadena), presupuesto);
     let manejo = piezas.manejo.clone();
     let mut eventos = piezas.eventos;
     let bucle = tokio::spawn(piezas.bucle.correr());

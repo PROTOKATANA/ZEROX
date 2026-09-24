@@ -60,6 +60,12 @@ impl ParametrosRed {
         self.puerto
     }
     /// Tópico de gossipsub para bloques.
+    ///
+    /// **`/blocks/2`, no `/blocks/1`** (C-NET-25, C-NET-26): el tema de bloques pasa a llevar
+    /// **solo anuncios compactos** —cabecera DAG, nonce de transporte e identificadores cortos—, y
+    /// el `/1` significaba bloque completo. Un bloque completo **MUST NOT** viajar por gossip. La
+    /// versión sube porque un nodo nuevo que anunciara compacto en `/blocks/1` le mandaría a un nodo
+    /// antiguo bytes que no sabe interpretar.
     #[must_use]
     pub const fn topic_bloques(&self) -> &'static str {
         self.topic_bloques
@@ -88,7 +94,7 @@ impl ParametrosRed {
                 red,
                 magic: red.magic(),
                 puerto: PUERTO_MAINNET,
-                topic_bloques: "/zerox/blocks/1",
+                topic_bloques: "/zerox/blocks/2",
                 topic_txs: "/zerox/txs/1",
                 protocolo_sync: "/zerox/sync/1",
                 protocolo_kad: "/zerox/kad/1",
@@ -97,7 +103,7 @@ impl ParametrosRed {
                 red,
                 magic: red.magic(),
                 puerto: PUERTO_TESTNET,
-                topic_bloques: "/zerox-testnet/blocks/1",
+                topic_bloques: "/zerox-testnet/blocks/2",
                 topic_txs: "/zerox-testnet/txs/1",
                 protocolo_sync: "/zerox-testnet/sync/1",
                 protocolo_kad: "/zerox-testnet/kad/1",
@@ -163,6 +169,67 @@ mod tests {
             );
             assert!(!p.protocolo_kad().contains("ipfs"));
         }
+    }
+
+    /// **C-NET-25 · el tema de bloques es `/2` y nunca `/1`.**
+    ///
+    /// El `/1` significaba «bloque completo» y un bloque completo **MUST NOT** difundirse por
+    /// gossip. Este test es el que impide que una vuelta atrás silenciosa reintroduzca el tema
+    /// viejo: `/blocks/2` también contiene la subcadena `/blocks/`, así que el error no se vería en
+    /// ninguna clasificación por prefijo.
+    #[test]
+    fn el_tema_de_bloques_es_el_dos_y_no_el_uno() {
+        for (red, esperado) in [
+            (Red::Mainnet, "/zerox/blocks/2"),
+            (Red::Testnet, "/zerox-testnet/blocks/2"),
+        ] {
+            let p = ParametrosRed::de(red);
+            assert_eq!(p.topic_bloques(), esperado, "{red:?}");
+            assert!(
+                !p.topic_bloques().contains("/blocks/1"),
+                "{red:?}: C-NET-25 prohíbe difundir el bloque completo por gossip"
+            );
+        }
+    }
+
+    /// **C-NET-25 · las txs conservan `/txs/1`.** El relé compacto cambia el canal de bloques, no
+    /// el de transacciones.
+    #[test]
+    fn las_transacciones_conservan_el_tema_uno() {
+        assert_eq!(ParametrosRed::de(Red::Mainnet).topic_txs(), "/zerox/txs/1");
+        assert_eq!(
+            ParametrosRed::de(Red::Testnet).topic_txs(),
+            "/zerox-testnet/txs/1"
+        );
+    }
+
+    /// **Cada red tiene sus dos temas, y ninguna comparte el conjunto entero con la otra.**
+    ///
+    /// No es cosmético: los dos temas que `ZxBehaviour` suscribe son **exactamente** los de esa red.
+    /// Si mainnet y testnet compartieran un tema, un nodo de una red podría recibir anuncios de la
+    /// otra —lo que el prefijo mágico impide en la conexión, y esto en la difusión—.
+    #[test]
+    fn cada_red_tiene_sus_dos_temas_y_no_hay_suscripcion_cruzada() {
+        for red in [Red::Mainnet, Red::Testnet] {
+            let p = ParametrosRed::de(red);
+            assert_ne!(p.topic_bloques(), p.topic_txs(), "{red:?}");
+        }
+
+        let m = ParametrosRed::de(Red::Mainnet);
+        let t = ParametrosRed::de(Red::Testnet);
+        assert_ne!(m.topic_bloques(), t.topic_bloques());
+        assert_ne!(m.topic_txs(), t.topic_txs());
+        // Los cuatro son distintos entre sí: no hay un tema que sirva a las dos redes.
+        let mut todos = vec![
+            m.topic_bloques(),
+            m.topic_txs(),
+            t.topic_bloques(),
+            t.topic_txs(),
+        ];
+        todos.sort_unstable();
+        let antes = todos.len();
+        todos.dedup();
+        assert_eq!(antes, todos.len(), "hay un tema compartido entre redes");
     }
 
     /// Todos los protocolos empiezan por `/`: libp2p lo exige en `StreamProtocol::new`.
