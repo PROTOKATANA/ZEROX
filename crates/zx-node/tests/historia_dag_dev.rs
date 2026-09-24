@@ -10,14 +10,18 @@
 //!   función consigo misma;
 //! - el segmento archivado es el primero y contiene todas sus piezas reales;
 //! - un **segundo productor** con otra clave e índice plotea, reabre y audita contra la misma
-//!   historia sin duplicarla.
+//!   historia sin duplicarla;
+//! - **tres identidades** de parcela, con tres claves e índices distintos, producen soluciones PoAS
+//!   verificadas por A1 (paso 5 de `C-POT-08`) contra **el mismo compromiso archivado**, sin
+//!   reconstruir la historia ni pasar un compromiso calculado por la parcela.
 //!
 //! **No** cierra D2: no hay cabecera, ni snapshot causal, ni selección de padres, ni firma, ni
 //! publicación, y no se afirma una red de tres nodos. La prueba del segundo productor solo demuestra
-//! que la API sirve a otro productor; la verificación PoAS con este contexto corresponde al paso 5
-//! de `C-POT-08`, ya cubierto por D1/D2.
+//! que la API sirve a otro productor; la prueba de tres identidades solo demuestra que varias
+//! parcelas responden al mismo contexto común y no mide una tasa de red. La verificación PoAS con
+//! este contexto corresponde al paso 5 de `C-POT-08`, ya cubierto por D1/D2.
 //!
-//! La historia se construye **una sola vez por proceso** con `OnceLock`: las dos pruebas comparten
+//! La historia se construye **una sola vez por proceso** con `OnceLock`: las pruebas comparten
 //! el mismo archivo archivado y no se duplica el archivo de ~130 MB.
 
 #![cfg(feature = "farmer")]
@@ -41,8 +45,13 @@ use subspace_core_primitives::segments::{
     ArchivedHistorySegment, HistorySize, SegmentCommitment, SegmentIndex,
 };
 use subspace_farmer_components::FarmerProtocolInfo;
-use zx_node::farmer::{ParcelaDisco, plotear_sector_en_disco};
+use zx_consensus::poas::{ErrorPoas, verificar_solucion_poas};
+use zx_core::ClavePublica;
+use zx_node::farmer::{ErrorFarmer, ParcelaDisco, plotear_sector_en_disco};
 use zx_node::historia_dag_dev::HistoriaDagDev;
+use zx_node::productor_poas::{
+    DiagnosticoLocal, SolucionComprobadaLocal, convertir_candidatos_locales,
+};
 
 /// Piezas del sector del segundo productor; mismo valor de desarrollo que D1.
 const PIEZAS: u16 = 2;
@@ -238,4 +247,202 @@ fn un_segundo_productor_plotea_y_audita_contra_la_misma_historia() {
          {public_key:?}, slots 0..16 con candidatos {con_candidatos}; historia compartida sin \
          duplicarla"
     );
+}
+
+/// Salida de PoT **sintética de test** del barrido de tres identidades.
+///
+/// No es una salida de `N_dev` ni de red: solo un dato fijo que hace determinista el barrido.
+const SALIDA_TRES_PARCELAS: [u8; 16] = [13u8; 16];
+
+/// Límite de **test** del barrido de slots por identidad. No es cadencia ni parámetro de red.
+const LIMITE_SLOTS_TRES_PARCELAS: u64 = 64;
+
+/// Tres identidades de parcela contra la **misma** historia dev común: clave y sector distintos.
+///
+/// `PublicKey::default()` conserva el sector `2` del fixture D1; las claves `0xB7` y `0x5A` usan
+/// los sectores `9` y `17` para que el `sector_id` no colisione entre identidades.
+fn identidades_de_parcela() -> [(PublicKey, SectorIndex); 3] {
+    [
+        (PublicKey::default(), 2),
+        (PublicKey::from([0xB7u8; 32]), 9),
+        (PublicKey::from([0x5Au8; 32]), 17),
+    ]
+}
+
+/// Tres identidades de parcela producen soluciones PoAS verificadas contra un compromiso común.
+///
+/// # Qué demuestra y qué no
+///
+/// Plotea tres parcelas reales con `plotear_sector_en_disco` usando **la misma** [`HistoriaDagDev`]
+/// (mismo `NewArchivedSegment`, `FarmerProtocolInfo`, KZG, erasure coding y `PieceCheckParams`) y
+/// tres claves/índices distintos, sin reconstruir la historia ni pasar a una parcela un compromiso
+/// calculado por ella. Barre `slot` de forma determinista y acotada hasta la primera
+/// [`SolucionComprobadaLocal`] de cada identidad, la vuelve a verificar de forma **independiente**
+/// con el paso 5 de `C-POT-08` y exige rechazo de A1 ante una mutación de `proof_of_space`.
+///
+/// **No** afirma PoT de `N_dev`, ni red de tres procesos, ni cadencia, ni `Δ`, ni tasa de red: la
+/// salida `[13; 16]` y el rango `u64::MAX` son datos de test. Tampoco cierra D2: no hay cabecera,
+/// snapshot causal, selección de padres, firma ni publicación.
+#[test]
+fn tres_parcelas_distintas_verifican_poas_contra_una_historia_comun() {
+    let historia = historia();
+    let params = historia.params_pieza();
+    let identidades = identidades_de_parcela();
+    let dir = DirTemporal::nuevo("tres-parcelas");
+
+    // 1. Plotea y reabre las tres contra la misma historia; confirma metadata y clave ajena.
+    let mut parcelas = Vec::with_capacity(identidades.len());
+    for (indice, (public_key, sector_index)) in identidades.iter().enumerate() {
+        let ruta = dir.unir(&format!("sector-{indice}.plot"));
+        plotear_sector_en_disco(
+            &ruta,
+            public_key,
+            *sector_index,
+            PIEZAS,
+            historia.historial(),
+            historia.protocolo(),
+            historia.kzg(),
+            historia.erasure_coding(),
+        )
+        .unwrap_or_else(|error| {
+            panic!("la parcela {indice} debe plotear contra la historia común: {error}")
+        });
+
+        let parcela = ParcelaDisco::abrir(&ruta, public_key).unwrap_or_else(|error| {
+            panic!("la parcela {indice} debe reabrir con su propia clave: {error}")
+        });
+        assert_eq!(
+            parcela.sector_index(),
+            *sector_index,
+            "el índice de la parcela {indice} debe ser el de su identidad"
+        );
+        assert_eq!(
+            parcela.pieces_in_sector(),
+            PIEZAS,
+            "las piezas de la parcela {indice} deben ser las del fixture"
+        );
+        assert_eq!(
+            parcela.metadata().history_size,
+            historia.protocolo().history_size,
+            "la historia de la parcela {indice} debe ser la fuente compartida"
+        );
+
+        // La API actual rechaza una clave ajena con error explícito; no abre un sector ajeno.
+        let clave_ajena = if *public_key == PublicKey::default() {
+            PublicKey::from([0x5Au8; 32])
+        } else {
+            PublicKey::default()
+        };
+        let error = ParcelaDisco::abrir(&ruta, &clave_ajena)
+            .expect_err("una clave ajena no debe abrir la parcela");
+        assert!(
+            matches!(error, ErrorFarmer::ClaveDiscordante),
+            "se esperaba ClaveDiscordante en la parcela {indice}, fue {error:?}"
+        );
+
+        parcelas.push(parcela);
+    }
+
+    // 2. Barrido acotado por identidad: se detiene en su primera solución verificada.
+    for (indice, ((public_key, sector_index), parcela)) in
+        identidades.iter().zip(parcelas.iter()).enumerate()
+    {
+        let mut acumulado = DiagnosticoLocal::default();
+        let mut hallado: Option<(u64, SolucionComprobadaLocal)> = None;
+        let mut slots_recorridos = 0u64;
+
+        for slot in 0..LIMITE_SLOTS_TRES_PARCELAS {
+            let resultado = convertir_candidatos_locales(
+                parcela,
+                SALIDA_TRES_PARCELAS,
+                slot,
+                RANGO_PRUEBA,
+                &params,
+                historia.kzg(),
+                historia.erasure_coding(),
+            )
+            .unwrap_or_else(|error| {
+                panic!(
+                    "la conversión de la parcela {indice} en el slot {slot} no debe fallar: {error}"
+                )
+            });
+
+            slots_recorridos += 1;
+            let diagnostico = resultado.diagnostico();
+            acumulado.candidatos += diagnostico.candidatos;
+            acumulado.soluciones_generadas += diagnostico.soluciones_generadas;
+            acumulado.rechazos_a1 += diagnostico.rechazos_a1;
+            acumulado.soluciones_verificadas += diagnostico.soluciones_verificadas;
+
+            if let Some(primera) = resultado.soluciones().first() {
+                hallado = Some((slot, *primera));
+                break;
+            }
+        }
+
+        let (slot, comprobada) = hallado.unwrap_or_else(|| {
+            panic!(
+                "la parcela {indice} (clave {public_key:?}, sector {sector_index}) no halló ninguna \
+                 solución PoAS verificada por A1 en {slots_recorridos} slots con la salida \
+                 {SALIDA_TRES_PARCELAS:?} y rango {RANGO_PRUEBA}; diagnóstico acumulado \
+                 {acumulado:?}; no se fabrica solución ni se amplía el límite de test"
+            )
+        });
+
+        // 3. Verificación independiente con el mismo lote y el contexto de pieza común.
+        let distancia = verificar_solucion_poas(
+            comprobada.solucion(),
+            slot,
+            SALIDA_TRES_PARCELAS,
+            RANGO_PRUEBA,
+            &params,
+            historia.kzg(),
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "la solución de la parcela {indice} debe verificar de forma independiente: {error}"
+            )
+        });
+        assert_eq!(
+            distancia,
+            comprobada.distancia(),
+            "la distancia de la parcela {indice} debe ser la que calcula A1"
+        );
+
+        // La solución pertenece a la identidad de su parcela, no a otra.
+        assert_eq!(
+            comprobada.solucion().public_key,
+            ClavePublica::desde_bytes(**public_key),
+            "la clave de la solución de la parcela {indice} debe ser la de su parcela"
+        );
+        assert_eq!(
+            comprobada.solucion().sector_index,
+            parcela.sector_index(),
+            "el sector de la solución de la parcela {indice} debe ser el de su parcela"
+        );
+
+        // 4. Mutación de `proof_of_space`: A1 debe rechazarla, no basta con descartarla al convertir.
+        let mut mutada = *comprobada.solucion();
+        mutada.proof_of_space = [0u8; 160];
+        let rechazo = verificar_solucion_poas(
+            &mutada,
+            slot,
+            SALIDA_TRES_PARCELAS,
+            RANGO_PRUEBA,
+            &params,
+            historia.kzg(),
+        )
+        .expect_err("A1 debe rechazar la mutación de prueba");
+        assert!(
+            matches!(rechazo, ErrorPoas::Prueba(_)),
+            "la mutación de la parcela {indice} debe rechazarse como prueba inválida, fue {rechazo:?}"
+        );
+
+        eprintln!(
+            "[medición local, no consenso] parcela {indice}: clave {public_key:?}, sector \
+             {sector_index}, primer slot {slot}, slots de test recorridos {slots_recorridos}, \
+             diagnóstico de test {acumulado:?}; salida sintética {SALIDA_TRES_PARCELAS:?}, rango de \
+             test {RANGO_PRUEBA}"
+        );
+    }
 }
