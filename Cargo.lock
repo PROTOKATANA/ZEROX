@@ -243,6 +243,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-lock"
+version = "3.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290f7f2596bd5b78a9fec8088ccd89180d7f9f55b94b0576823bbbdc72ee8311"
+dependencies = [
+ "event-listener",
+ "event-listener-strategy",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -289,6 +300,20 @@ name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
+
+[[package]]
+name = "backoff"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b62ddb9cb1ec0a098ad4bbf9344d0713fa193ae1a80af55febcff2627b6a00c1"
+dependencies = [
+ "futures-core",
+ "getrandom 0.2.17",
+ "instant",
+ "pin-project-lite",
+ "rand 0.8.8",
+ "tokio",
+]
 
 [[package]]
 name = "base-x"
@@ -401,6 +426,7 @@ dependencies = [
  "cfg-if",
  "constant_time_eq",
  "cpufeatures 0.3.1",
+ "rayon-core",
 ]
 
 [[package]]
@@ -474,6 +500,9 @@ name = "bytes"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bzip2-sys"
@@ -1143,6 +1172,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "funty"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1449,6 +1488,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "hex_fmt"
@@ -1817,6 +1859,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "instant"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "ipconfig"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1926,8 +1977,11 @@ version = "0.1.0"
 source = "git+https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac"
 dependencies = [
  "blst",
+ "num_cpus",
+ "rayon",
  "sha2 0.10.9",
  "siphasher",
+ "threadpool",
 ]
 
 [[package]]
@@ -3371,6 +3425,7 @@ dependencies = [
  "kzg",
  "libc",
  "once_cell",
+ "rayon",
  "smallvec",
 ]
 
@@ -3770,6 +3825,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
+name = "subspace-archiving"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "rand 0.8.8",
+ "rayon",
+ "serde",
+ "subspace-core-primitives",
+ "subspace-erasure-coding",
+ "subspace-kzg",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "subspace-core-primitives"
 version = "0.1.0"
 dependencies = [
@@ -3779,11 +3848,71 @@ dependencies = [
  "hex",
  "num-traits",
  "parity-scale-codec",
+ "rayon",
  "scale-info",
  "serde",
  "serde-big-array",
  "static_assertions",
  "uint",
+]
+
+[[package]]
+name = "subspace-data-retrieval"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "hex",
+ "parity-scale-codec",
+ "subspace-archiving",
+ "subspace-core-primitives",
+ "subspace-erasure-coding",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "subspace-erasure-coding"
+version = "0.1.0"
+dependencies = [
+ "kzg",
+ "rust-kzg-blst",
+ "subspace-core-primitives",
+ "subspace-kzg",
+]
+
+[[package]]
+name = "subspace-farmer-components"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-lock",
+ "backoff",
+ "bitvec",
+ "fs2",
+ "futures",
+ "hex",
+ "libc",
+ "parity-scale-codec",
+ "parking_lot",
+ "rand 0.8.8",
+ "rayon",
+ "schnorrkel",
+ "serde",
+ "static_assertions",
+ "subspace-archiving",
+ "subspace-core-primitives",
+ "subspace-data-retrieval",
+ "subspace-erasure-coding",
+ "subspace-kzg",
+ "subspace-proof-of-space",
+ "subspace-verification",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "winapi",
 ]
 
 [[package]]
@@ -3809,6 +3938,7 @@ dependencies = [
  "blake3",
  "chacha20 0.10.2",
  "derive_more 2.1.1",
+ "rayon",
  "seq-macro",
  "subspace-core-primitives",
 ]
@@ -4032,6 +4162,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2 0.6.5",
@@ -4384,6 +4515,28 @@ name = "widestring"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72069c3113ab32ab29e5584db3c6ec55d416895e60715417b5b883a357c3e471"
+
+[[package]]
+name = "winapi"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c839a674fcd7a98952e593242ea400abe93992746761e38641405d28b00f419"
+dependencies = [
+ "winapi-i686-pc-windows-gnu",
+ "winapi-x86_64-pc-windows-gnu",
+]
+
+[[package]]
+name = "winapi-i686-pc-windows-gnu"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
+
+[[package]]
+name = "winapi-x86_64-pc-windows-gnu"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
@@ -4882,10 +5035,21 @@ dependencies = [
 name = "zx-node"
 version = "0.0.0"
 dependencies = [
+ "async-lock",
+ "blake3",
  "clap",
+ "futures",
  "libp2p",
+ "parity-scale-codec",
  "primitive-types",
  "proptest",
+ "subspace-archiving",
+ "subspace-core-primitives",
+ "subspace-data-retrieval",
+ "subspace-erasure-coding",
+ "subspace-farmer-components",
+ "subspace-kzg",
+ "subspace-proof-of-space",
  "thiserror 2.0.20",
  "tokio",
  "tracing",

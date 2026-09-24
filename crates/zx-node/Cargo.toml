@@ -12,6 +12,22 @@ repository.workspace   = true
 # mantiene en RAM y la pierde al cerrar. Útil para tests y para arrancar rápido.
 default = []
 disco = ["zx-storage/rocksdb"]
+# D1: parcela persistente y auditoría por slot con la API pública del farmer auditado
+# (`ChiaTable` + `CpuRecordsEncoder` + `plot_sector` + `audit_plot_sync`). Es optativa: el build
+# normal de `zx-node` no la activa y no arrastra el árbol de dependencias del farmer ni GPU.
+farmer = [
+    "dep:async-lock",
+    "dep:blake3",
+    "dep:futures",
+    "dep:parity-scale-codec",
+    "dep:subspace-archiving",
+    "dep:subspace-core-primitives",
+    "dep:subspace-data-retrieval",
+    "dep:subspace-erasure-coding",
+    "dep:subspace-farmer-components",
+    "dep:subspace-kzg",
+    "dep:subspace-proof-of-space",
+]
 
 [lib]
 name = "zx_node"
@@ -40,6 +56,30 @@ thiserror = { workspace = true }
 tracing   = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 clap      = { workspace = true }
+
+# ── D1: plotter/auditor de parcela (feature `farmer`, optativa) ───────────────────────────────
+# Se enlaza por `path` la API pública del clon fijado `PDF/autonomys-subspace` @ f8842d0, igual
+# que A1 en `zx-consensus`. No se copia ni se reimplementa PoS, KZG ni erasure coding. Las rutas
+# se excluyen del workspace de ZEROX en el `Cargo.toml` raíz para que cada paquete resuelva su
+# herencia `workspace = true` contra el workspace del clon. `async-lock`, `futures` y
+# `parity-scale-codec` se declaran aquí porque `farmer.rs` los usa directamente; se fijan a la
+# versión exacta que el clon resolvió (`Cargo.lock` del clon) para no mover el árbol transitivo.
+# `subspace-archiving` solo lo usa el fixture de test, pero va tras la misma feature para no
+# arrastrarlo cuando `farmer` está apagada. No se activa GPU ni `ab-proof-of-space` por ruta no
+# paralela: el ploteo siempre usa `generate_parallel`.
+async-lock = { version = "=3.4.2", optional = true }
+futures = { workspace = true, optional = true }
+parity-scale-codec = { version = "=3.7.5", default-features = false, features = ["derive"], optional = true }
+# Huella incremental del sector en `huella_de_region`: mismo `blake3` exacto que fija el workspace
+# (`=1.8.7`), sin features extra. `blake3_hash` del clon sigue produciendo la huella del cuerpo.
+blake3 = { workspace = true, optional = true }
+subspace-farmer-components = { path = "../../PDF/autonomys-subspace/crates/subspace-farmer-components", optional = true }
+subspace-core-primitives = { path = "../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"], optional = true }
+subspace-data-retrieval = { path = "../../PDF/autonomys-subspace/shared/subspace-data-retrieval", optional = true }
+subspace-erasure-coding = { path = "../../PDF/autonomys-subspace/crates/subspace-erasure-coding", optional = true }
+subspace-kzg = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"], optional = true }
+subspace-proof-of-space = { path = "../../PDF/autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc", "parallel"], optional = true }
+subspace-archiving = { path = "../../PDF/autonomys-subspace/crates/subspace-archiving", optional = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

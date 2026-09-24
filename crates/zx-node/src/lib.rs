@@ -17,5 +17,7 @@
 
 pub mod cadena;
 pub mod contextual;
+#[cfg(feature = "farmer")]
+pub mod farmer;
 pub mod nodo;
 pub mod sync;
