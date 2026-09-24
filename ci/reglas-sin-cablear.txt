@@ -143,12 +143,26 @@ C-ORD-03
 #           contradicción es del SPEC y sigue sin resolver.
 # R-NET-02  sal por bloque para los ID cortos. La derivación SHA3-256(cabecera ‖ nonce) está en
 #           id_corto.rs y acepta cabecera DAG de longitud variable; falta que el anuncio viaje.
+# C-NET-25  los tres canales: /zerox/blocks/2 solo anuncios compactos, /zerox/block-relay/1 la
+#           recuperación, /zerox/sync/1 sin cambios; el bloque completo nunca por gossip. PARCIAL:
+#           servicio.rs ya clasifica /blocks/1 y /blocks/2 por IGUALDAD EXACTA (el antiguo
+#           `topico.contains("/blocks/")` quedó eliminado) y decodifica `AnuncioCompacto`; pero
+#           config.rs sigue suscrito a /blocks/1, el canal /block-relay/1 no está conectado como
+#           tal y zx-node no valida ni reconstruye el DAG. La ruta activa NO cumple la regla.
+# C-NET-26  relé compacto obligatorio en la ruta crítica, sin negociación por conexión. PARCIAL:
+#           el despacho ya entiende /blocks/2 y `ManejadorEntrante` tiene el callback
+#           `anuncio_compacto`, pero su default `Ignorar` no admite ni retransmite; config.rs sigue
+#           en /blocks/1 y zx-node no valida ni reconstruye el DAG. La ruta activa NO cumple esta
+#           regla. La cola acotada de anuncios sin padres y los proveedores alternativos siguen
+#           pendientes (C-NET-27/28, todavía en reglas-sin-codigo.txt).
 C-NET-06
 C-NET-07
 C-NET-08
 C-NET-09
 R-NET-01
 R-NET-02
+C-NET-25
+C-NET-26
 
 # ── PoT AES: primitiva real, adaptador real, sin verificar bloques (encargo 03a) ──────────────
 #
@@ -194,14 +208,26 @@ C-POT-04
 C-POT-01
 C-POT-03
 
+# ── Flujo: hashes puros, sin snapshot causal ni arranque DAG (A2 parcial) ───────────────────
+# C-FLU-06  `zx-core::preimage::flow::flujo_genesis` calcula H_flujo con las dos etiquetas
+#           distintas de C-HASH-06; `zx-consensus::pot::semilla_genesis` calcula blake3 del hash
+#           y la entropía externa explícita. Ninguna fuente acredita aún el hash de génesis
+#           congelado ni el compromiso previo de esa entropía; C-GEN-02 sigue pendiente.
+# C-FLU-10  `flujo_siguiente` calcula H_flujo(f_anterior ‖ entropía_j ‖ LE64(t_j)) con vectores
+#           OpenSSL. No elige I_j, ni deriva t_j ni obtiene past(B). No cablear el trait
+#           `InstantaneaPot` desde estos argumentos libres como si fueran pasado validado.
+C-FLU-06
+C-FLU-10
+
 # ── Núcleo de rango PoT: código real, sin fuente causal de past(B) (encargo 03c) ──────────────
 #
 # `crates/zx-consensus/src/pot_rango.rs` implementa el núcleo de `C-POT-06`: tres estados
 # (`PotValido`/`PotInvalido`/`PotPendiente`), estructura y flujo sin AES antes de la cadena, caché
 # por clave contextual y anclaje en `pot_output`. NINGUNA ruta lo ejecuta y NO tiene fuente
 # causal: el trait `InstantaneaPot` es la costura, y ningún objeto del código acredita hoy un
-# `past(B)` validado para el PoT (no hay derivador del flujo de §7.1.4, ni vista de época, ni
-# ancla). Sus implementaciones en los tests son mocks. `wire_dag::verificar_justificacion_pot`
+# `past(B)` validado para el PoT (hay hashes puros C-FLU-06/10, pero no derivador causal del
+# flujo, ni vista de época, ni ancla). Sus implementaciones en los tests son mocks.
+# `wire_dag::verificar_justificacion_pot`
 # sigue devolviendo IntegracionPotPendiente.
 #
 # C-POT-05  el pot_output es la salida FUTURA (D-2 = A) y el último checkpoint el ancla. El núcleo

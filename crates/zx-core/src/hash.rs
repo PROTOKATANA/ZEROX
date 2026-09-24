@@ -63,8 +63,8 @@ impl DomainTag {
     /// válida en una rama de consenso sea inválida en cualquier otra — la protección de repetición
     /// de C-UPG-04, copiada de ZIP-244.
     ///
-    /// El argumento de inyectividad sigue en pie, y se verificó byte a byte: las otras once
-    /// etiquetas **divergen de `ZZKTxIdHash_` dentro de los primeros 12 bytes**, antes de que
+    /// El argumento de inyectividad sigue en pie, y se verificó byte a byte: **las demás
+    /// etiquetas fijas divergen de `ZZKTxIdHash_` dentro de los primeros 12 bytes**, antes de que
     /// empiece la región del branch ID. Ninguno de los 2³² valores posibles puede provocar una
     /// colisión.
     ///
@@ -164,13 +164,18 @@ pub(crate) const TAG_BLK_HEADER: DomainTag = DomainTag::fija(*b"ZZKBlkHeader____
 pub(crate) const TAG_BLK_PRE_HASH: DomainTag = DomainTag::fija(*b"ZZKBlkPreHash___");
 /// §6.1 · compromiso completo del cuerpo, efectos **y** autorización.
 pub(crate) const TAG_BLK_BODY_HASH: DomainTag = DomainTag::fija(*b"ZZKBlkBodyHash__");
+/// §7.1.4 · identificador de flujo del PoT (`C-FLU-10`). Es la etiqueta de `H_flujo`.
+pub(crate) const TAG_FLOW_ID: DomainTag = DomainTag::fija(*b"ZZKFlowId_______");
+/// §7.1.3 · etiqueta del génesis del flujo (`C-FLU-06`). Va **dentro del mensaje** de `H_flujo`
+/// junto al `block_hash` del génesis; no es la etiqueta de dominio del hash.
+pub(crate) const TAG_FLOW_GENESIS: DomainTag = DomainTag::fija(*b"ZZKFlowGenesis__");
 
-/// Las trece etiquetas ASCII fijas, para las comprobaciones de invariante.
+/// Las quince etiquetas ASCII fijas, para las comprobaciones de invariante.
 #[allow(
     dead_code,
     reason = "solo lo usan los tests de invariante de este módulo"
 )]
-pub(crate) const TAGS_FIJAS: [DomainTag; 13] = [
+pub(crate) const TAGS_FIJAS: [DomainTag; 15] = [
     TAG_TXID_HEADER,
     TAG_TXID_INPUTS,
     TAG_TXID_PREVOUT,
@@ -184,11 +189,13 @@ pub(crate) const TAGS_FIJAS: [DomainTag; 13] = [
     TAG_BLK_HEADER,
     TAG_BLK_PRE_HASH,
     TAG_BLK_BODY_HASH,
+    TAG_FLOW_ID,
+    TAG_FLOW_GENESIS,
 ];
 
 #[cfg(test)]
 mod tests {
-    use super::{DomainTag, TAGS_FIJAS, h_d, sha3_256};
+    use super::{DomainTag, TAG_FLOW_GENESIS, TAG_FLOW_ID, TAGS_FIJAS, h_d, sha3_256};
 
     /// Ancla de cordura: si esto falla, se ha implementado Keccak-256 y no SHA3-256 (H-001).
     #[test]
@@ -217,7 +224,22 @@ mod tests {
             );
             vistas.push(b);
         }
-        assert_eq!(vistas.len(), 13);
+        assert_eq!(vistas.len(), 15);
+    }
+
+    /// Las dos etiquetas del flujo son exactamente las de la tabla C-HASH-06.
+    ///
+    /// Son **distintas** a propósito: `ZZKFlowId_______` es la etiqueta de dominio de `H_flujo`
+    /// (C-FLU-10) y `ZZKFlowGenesis__` va dentro de su mensaje para el génesis (C-FLU-06). Un
+    /// cambio aquí es un cambio de consenso (C-HASH-05).
+    #[test]
+    fn las_etiquetas_de_flujo_son_las_de_la_tabla() {
+        assert_eq!(TAG_FLOW_ID.as_bytes(), b"ZZKFlowId_______");
+        assert_eq!(TAG_FLOW_GENESIS.as_bytes(), b"ZZKFlowGenesis__");
+        assert_ne!(
+            TAG_FLOW_ID, TAG_FLOW_GENESIS,
+            "no se uniforman: son dos etiquetas distintas"
+        );
     }
 
     /// La invariante que hace segura la etiqueta raíz con branch ID variable.

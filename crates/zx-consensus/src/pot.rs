@@ -1,6 +1,7 @@
 //! Operaciones **puras** del PoT de ZEROX: el adaptador entre el wire y la primitiva AES de
 //! `zx-pot` (`C-POT-02`, `C-POT-04`; encargo 03a) y las derivaciones de semilla, aleatoriedad y
-//! reto (`C-POT-01`, `C-POT-03`; encargo 03b). Todo vive en SPEC §7.1.1.
+//! reto (`C-POT-01`, `C-POT-03`; encargo 03b). Todo vive en SPEC §7.1.1, salvo [`semilla_genesis`],
+//! que es la semilla del génesis de `C-FLU-06` (§7.1.3).
 //!
 //! # Qué hay aquí
 //!
@@ -11,6 +12,8 @@
 //! 2. **Semilla, aleatoriedad y reto** (`C-POT-01`, `C-POT-03`): [`semilla_siguiente`] encadena la
 //!    salida anterior con cero o una inyección, [`aleatoriedad_de_salida`] hashea la salida, y
 //!    [`reto_desde_salida`] concatena aleatoriedad y `LE64(slot)`.
+//! 3. **Semilla del génesis** (`C-FLU-06`): [`semilla_genesis`] deriva `semilla(f_0, 0)` con
+//!    `blake3`, recibiendo la `entropía_externa` como argumento **explícito** del llamante.
 //!
 //! # Qué NO es
 //!
@@ -37,6 +40,7 @@
 use core::num::NonZeroU32;
 
 use thiserror::Error;
+use zx_core::BlockHash;
 use zx_core::wire_dag::{
     CHECKPOINTS_POR_BUNDLE, POT_OUTPUT_BYTES, PotCheckpoints as PotCheckpointsWire,
 };
@@ -238,4 +242,53 @@ pub fn reto_desde_salida(salida: [u8; POT_OUTPUT_BYTES], slot: u64) -> [u8; ALEA
     segunda.copy_from_slice(&slot.to_le_bytes());
 
     blake3::hash(&buffer).into()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Semilla del génesis (C-FLU-06)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `semilla(f_0, 0) = blake3( block_hash(génesis) ‖ entropía_externa )[0..16)` (`C-FLU-06`).
+///
+/// Es el punto de arranque del PoT en el génesis, **distinto** de `f_0`: `f_0` usa `H_flujo`
+/// (`C-FLU-10`) y esta semilla usa `blake3`, y las dos rutas **no se uniforman**. El SPEC lo dice
+/// expresamente: `blake3` alimenta la primitiva PoT y conserva el oráculo de Autonomys; el
+/// identificador de flujo no tiene contraparte y gana la separación de dominio (`H_flujo`). El
+/// resultado son 16 B, el tamaño de semilla de [`semilla_siguiente`].
+///
+/// # `entropía_externa` la aporta el llamante, y es un parámetro de lanzamiento
+///
+/// `C-FLU-06` la declara parámetro de lanzamiento (§15.2): **MUST** ser pública, verificable e
+/// **imposible de elegir después** de conocer el génesis. Esta función es **pura**: no escoge bytes
+/// de entropía, no ofrece un valor por defecto implícito y **no** acredita que la entropía se
+/// hubiera comprometido antes del hash. Tampoco valida el génesis ni acredita que
+/// `block_hash_genesis` sea el correcto.
+///
+/// El SPEC deja `<<PENDIENTE: el valor de entropía_externa por red>>` y **no** fija su longitud.
+/// Por eso se recibe como `&[u8]` y **no** se impone una longitud normativa inventada: el perfil de
+/// red fija la codificación. La concatenación es inequívoca porque `block_hash` mide siempre 32 B y
+/// va primero. Los valores de los tests no son parámetros de red.
+///
+/// # Lo que NO acredita
+///
+/// No sustituye a `InstantaneaPot` ni declara cerrada A2: `past(B)`, el calendario de inyecciones,
+/// el ancla del primer cruce, `N(s)`, `D`, el controlador de rango y el bootstrap del génesis
+/// siguen sin derivador de producción. No deriva `InstantaneaPot` ni la simula.
+#[must_use]
+pub fn semilla_genesis(
+    block_hash_genesis: &BlockHash,
+    entropia_externa: &[u8],
+) -> [u8; POT_OUTPUT_BYTES] {
+    // `blake3` incremental: `update(block_hash)` y después `update(entropía)` reproducen bit a bit
+    // la preimagen `block_hash(génesis) ‖ entropía_externa`, sin reservar un buffer proporcional a
+    // la entrada ni sumar longitudes. Sin `unsafe` ni reinterpretación de memoria.
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(block_hash_genesis.as_bytes());
+    hasher.update(entropia_externa);
+
+    let digest = hasher.finalize();
+    let (cabeza, _) = digest.as_bytes().split_at(POT_OUTPUT_BYTES);
+    let mut semilla = [0u8; POT_OUTPUT_BYTES];
+    semilla.copy_from_slice(cabeza);
+    semilla
 }

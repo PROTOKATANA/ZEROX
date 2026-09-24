@@ -13,6 +13,7 @@
 
 pub mod block;
 pub mod dag;
+pub mod flow;
 pub mod tx;
 
 use crate::digest::Digest;

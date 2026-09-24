@@ -59,14 +59,19 @@ zx-consensus::pot::checkpoints_a_wire
 # ── PoT: fórmulas puras de semilla, aleatoriedad y reto (encargo 03b) ─────────────────────────
 #
 # Mismo estado que el adaptador de 03a: código puro probado contra V1–V4 y una microtraza, sin
-# ninguna ruta que lo ejecute. Calculan solo la FORMA de C-POT-01/C-POT-03 y aceptan entradas
-# libres: no acreditan procedencia contextual ni impiden por sí solas saltarse slots.
+# admisión activa de DAG. Calculan solo la FORMA de C-POT-01/C-POT-03 y aceptan entradas libres:
+# no acreditan procedencia contextual ni impiden por sí solas saltarse slots.
 #
 # ⚠️ `aleatoriedad_de_salida` NO se lista como línea suelta: el heurístico la da por alcanzada
 # porque `reto_desde_salida` la llama dentro del mismo módulo. `semilla_siguiente` tampoco se
 # lista desde el encargo 03c: la llama `pot_rango` dentro del crate. Las dos siguen igual de
-# lejos de la ruta activa y quedan anotadas aquí para que no desaparezcan.
-zx-consensus::pot::reto_desde_salida
+# lejos de la ruta activa y quedan anotadas aquí para que no desaparezcan. `reto_desde_salida`
+# se retiró de la lista porque D1 optativo lo llama: eso es alcance textual, NO admisión de red.
+
+# C-FLU-06: la semilla del génesis está implementada como fórmula pura con entropía explícita;
+# ningún arranque DAG ni derivador causal la llama aún. Sus tests viven en `tests/flow.rs`, por
+# lo que el guardián no los cuenta como consumidor de producción.
+zx-consensus::pot::semilla_genesis
 
 # ── Núcleo de verificación de un rango PoT (encargo 03c) ──────────────────────────────────────
 #
@@ -79,7 +84,8 @@ zx-consensus::pot::reto_desde_salida
 # función libre es el punto de entrada huérfano.
 zx-consensus::pot_rango::verificar_rango_pot
 
-# ── PoAS A1: verificador de solución aún sin llamada desde el nodo ─────────────────────────
-# C-POT-08 paso 5: exige salida PoT, rango y contexto de pieza ya acreditados.
-# Se cablea en C1/B3 con la validación DAG; hasta entonces no acredita un bloque completo.
-zx-consensus::poas::verificar_solucion_poas
+# ── PoAS A1: alcanzado por A3 y D2 parcial, todavía sin admisión de red ──────────────────────
+# `verificar_solucion_poas` se retiró de esta lista porque `cabecera_conjunta.rs` y el adaptador
+# local `zx-node::productor_poas` ya lo llaman. Sus contextos todavía no provienen de un
+# snapshot causal acreditado y el nodo activo sigue lineal: ninguna llamada valida bloques de
+# red. C-POT-08 permanece declarado en `ci/reglas-sin-cablear.txt`.

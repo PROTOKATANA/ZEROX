@@ -130,20 +130,19 @@ C-SPEC-03
 # Redactadas en el SPEC el 2026-09-17 (§16.2, §16.5 y §16.6) sobre decisiones de Katana ya
 # tomadas: Q1, Q2 y Q4 del 2026-09-13 y la arquitectura «1+» del 2026-09-16 (TAREAS §2.7).
 # Casi ninguna tiene una línea de código: el nodo difunde bloques completos por /zerox/blocks/1 y
-# no existe ni el tema de PoT ni el canal de recuperación. La excepción parcial es C-NET-32: el
-# núcleo `zx-consensus::pot_rango` (encargo 03c) aplica su salvaguarda 2 —retener lo que va por
-# delante del reloj PoT— y consume un presupuesto inyectado; por eso vive en
-# ci/reglas-sin-cablear.txt, no aquí. Sigue sin existir el tema de gossip ni la caché de red.
+# no existe ni el tema de PoT ni el canal de recuperación. Las excepciones parciales viven en
+# ci/reglas-sin-cablear.txt: C-NET-25 y C-NET-26, porque servicio.rs ya clasifica /blocks/1 y
+# /blocks/2 por igualdad exacta y ManejadorEntrante tiene el callback `anuncio_compacto` —aunque su
+# default `Ignorar` no admite ni retransmite y config.rs sigue suscrito a /blocks/1—; y C-NET-32,
+# porque el núcleo `zx-consensus::pot_rango` (encargo 03c) aplica su salvaguarda 2 —retener lo que
+# va por delante del reloj PoT— y consume un presupuesto inyectado. Sigue sin existir el tema de
+# gossip ni la caché de red.
 #
-# ⚠️ No son trabajo futuro cómodo: son reglas que el nodo incumple hoy, y tres de ellas
-# (C-NET-26, C-NET-29, C-NET-30) son la condición declarada para que la referencia de 100 Mbit/s
-# de Q1 se sostenga. Sin ellas, un nodo por debajo de la referencia se satura en vez de recortar.
+# ⚠️ No son trabajo futuro cómodo: son reglas que el nodo incumple hoy, y C-NET-26 —ya en
+# sin-cablear— junto con C-NET-29 y C-NET-30 son la condición declarada para que la referencia de
+# 100 Mbit/s de Q1 se sostenga. Sin ellas, un nodo por debajo de la referencia se satura en vez de
+# recortar.
 #
-# C-NET-25  los tres canales: /zerox/blocks/2 solo anuncios compactos, /zerox/block-relay/1 la
-#           recuperación, /zerox/sync/1 sin cambios. El bloque completo nunca por gossip.
-#           Trampa: servicio.rs despacha por topico.contains("/blocks/"), que /blocks/2 también
-#           cumple; cambiar la versión sin cambiar el despacho hace banear a pares correctos.
-# C-NET-26  relé compacto obligatorio en la ruta crítica, sin negociación por conexión.
 # C-NET-27  anuncio sin padres DAG a una cola acotada, reevaluado al llegar las dependencias.
 #           El tamaño de la cola es PENDIENTE: lo dimensiona el v2a (Q5).
 # C-NET-28  pedir las transacciones que faltan es el camino ordinario y admite proveedores
@@ -153,8 +152,6 @@ C-SPEC-03
 #           reenvío por anuncio y petición. El valor del presupuesto es PENDIENTE: v2a (Q5).
 # C-NET-31  tema /zerox/pot/1, una verificación por slot, cacheada. Sin esto el coste por salto
 #           no está acotado: hasta 150 × 96,1 ms ≈ 14,4 s por bloque.
-C-NET-25
-C-NET-26
 C-NET-27
 C-NET-28
 C-NET-29
@@ -209,8 +206,9 @@ C-GD-11
 #     la cabecera lineal y fork_choice.rs—, su sitio es ci/reglas-sin-cablear.txt.
 #   · C-FLU-14 tiene comprobación parcial desde 2026-09-23 (encargo 03c): el núcleo
 #     `zx-consensus::pot_rango` compara `flujo(B, slot(X))` con el de cada `X ∈ past(B)` y devuelve
-#     `Inválido` si discrepa o `Pendiente` si falta pasado. NO deriva el flujo —eso es C-FLU-10,
-#     que sigue aquí—, así que su sitio es ci/reglas-sin-cablear.txt.
+#     `Inválido` si discrepa o `Pendiente` si falta pasado. Los hashes puros de C-FLU-10 ya
+#     existen, pero no hay derivador causal de inyecciones desde past(B); C-FLU-10 está en
+#     ci/reglas-sin-cablear.txt. C-FLU-14 también permanece allí.
 #   · C-FLU-12 tiene detección parcial desde 2026-09-23 (encargo 03c): el núcleo reconoce que el
 #     ancla de una inyección del rango es el propio candidato y devuelve `Pendiente` por contexto
 #     circular, sin presuponer D < L_slots. NO deriva la entropía. Va a
@@ -229,13 +227,9 @@ C-GD-11
 # C-FLU-04  el ancla: primer cruce de T_j por la cadena seleccionada de la VISTA, no la del nodo.
 # C-FLU-05  época sin ancla: se salta, sin recuperación retroactiva; el bloque sin ancla a
 #           T_j+L_slots es inválido.
-# C-FLU-06  flujo del génesis y semilla(f_0, 0). Usa DOS hashes distintos a propósito: H_flujo para
-#           el identificador, blake3 para la semilla. No uniformarlos.
 # C-FLU-07  t_j = slot(I_j) + L_slots; hasta t_j rige el flujo anterior. Una sola lotería.
 # C-FLU-08  S_max_slots < L_slots: condición de CORRECCIÓN de la definición del ancla.
 # C-FLU-09  S_max_slots < I_slots: los t_j distintos dos a dos, <= 1 inyección por slot.
-# C-FLU-10  derivación del identificador de flujo con H_flujo = H_d(ETIQUETA_FLUJO || m). Amplía
-#           C-HASH-06 con dos etiquetas nuevas (D-F2 = A).
 # C-FLU-11  el flujo NUNCA se declara. Prohibición: no hay línea que citar.
 # C-FLU-13  validez ABSOLUTA. Es la bifurcación de §2.1, decidida por Katana.
 # C-FLU-15  una partición de flujo tiene el ESTATUTO de un fallo de finalidad ("se trata como", no
@@ -254,11 +248,9 @@ C-FLU-01
 C-FLU-03
 C-FLU-04
 C-FLU-05
-C-FLU-06
 C-FLU-07
 C-FLU-08
 C-FLU-09
-C-FLU-10
 C-FLU-11
 C-FLU-13
 C-FLU-15
