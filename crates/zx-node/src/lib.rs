@@ -33,3 +33,4 @@ pub mod productor_poas;
 #[cfg(feature = "farmer")]
 pub mod puerta_primer_hijo_dag_dev;
 pub mod sync;
+pub mod utxo_primer_hijo_dag_dev;
