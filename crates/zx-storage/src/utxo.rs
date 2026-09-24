@@ -38,8 +38,13 @@ pub struct UndoData {
     /// `consumidos[i]` son los UTXO que gastó la transacción `i+1` del bloque (la 0 es la coinbase,
     /// que no gasta nada), en el orden de sus entradas.
     pub consumidos: Vec<Vec<(OutPoint, EntradaUtxo)>>,
-    /// Outpoints que el bloque **creó**, para poder retirarlos al deshacer.
-    pub creados: Vec<OutPoint>,
+    /// Salidas que el bloque **creó**, con su clave y **el contenido esperado**, para poder
+    /// retirarlas al deshacer comprobando que el conjunto tiene exactamente eso (C-REORG-02).
+    ///
+    /// No basta con guardar el outpoint: si el conjunto tuviera otra entrada bajo la misma clave,
+    /// el rollback la borraría sin detectar la corrupción. El orden es el que entrega
+    /// [`DeltaUtxo::de_bloque`].
+    pub creados: Vec<(OutPoint, EntradaUtxo)>,
 }
 
 /// **Lo que un bloque cambia en el UTXO set**, calculado una sola vez.
@@ -217,7 +222,9 @@ pub fn aplicar_bloque(
 
     for (o, e) in &delta.creados {
         trabajo.insertar(*o, e.clone())?;
-        undo.creados.push(*o);
+        // El par entra en el undo **solo tras** insertar con éxito: si la inserción falla, el
+        // bloque no se aplica y no hay nada que deshacer de esa salida.
+        undo.creados.push((*o, e.clone()));
     }
 
     *conjunto = trabajo;
@@ -226,24 +233,31 @@ pub fn aplicar_bloque(
 
 /// Deshace un bloque (C-REORG-02).
 ///
-/// El orden **MUST** ser: primero retirar las salidas que el bloque creó —comprobando que están, que
-/// es la detección de corrupción—, y después reinsertar los UTXO consumidos en orden **inverso de
-/// transacción** e **inverso de entrada** dentro de cada una.
+/// El orden **MUST** ser: primero retirar las salidas que el bloque creó —comprobando que están
+/// **y que su contenido es el esperado**, que es la detección de corrupción—, y después reinsertar
+/// los UTXO consumidos en orden **inverso de transacción** e **inverso de entrada** dentro de cada
+/// una.
 ///
 /// Como [`aplicar_bloque`], trabaja sobre una copia y la publica solo al final.
 ///
 /// # Errores
-/// [`StorageError`] si el estado no es el que el undo data describe — señal de que el conjunto ya
-/// estaba corrupto.
+/// [`StorageError::OutpointAusente`] si una salida creada no está;
+/// [`StorageError::UtxoIncoherente`] si está pero con otro contenido. Ambos son señal de que el
+/// conjunto ya estaba corrupto.
 pub fn revertir_bloque(
     conjunto: &mut ConjuntoEnMemoria,
     undo: &UndoData,
 ) -> Result<(), StorageError> {
     let mut trabajo = conjunto.clone();
 
-    // 1 · Retirar lo creado. `retirar` falla si no está: esa es la comprobación de corrupción que
-    //     C-REORG-02 exige hacer **antes** de borrar.
-    for o in &undo.creados {
+    // 1 · Retirar lo creado, comprobando **existencia y contenido completo** antes de borrar
+    //     (C-REORG-02). Comparar solo la clave dejaba pasar una entrada distinta con el mismo
+    //     outpoint: el rollback la borraba y la corrupción se propagaba en silencio.
+    for (o, esperado) in &undo.creados {
+        let actual = trabajo.buscar(o).ok_or(StorageError::OutpointAusente)?;
+        if actual != *esperado {
+            return Err(StorageError::UtxoIncoherente);
+        }
         trabajo.retirar(o)?;
     }
 
@@ -461,14 +475,29 @@ mod tests {
     fn un_undo_incoherente_no_deja_el_conjunto_a_medias() {
         let mut c = ConjuntoEnMemoria::nuevo();
         let cb = coinbase(1, vec![salida(1000, 1)]);
-        aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
+        let undo = aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
         let antes = c.len();
 
+        // El primer par es el bueno; el segundo apunta a un outpoint que no existe. Así el fallo
+        // que se prueba sigue siendo la **ausencia**, no el contenido.
+        let mut creados = undo.creados.clone();
+        let fantasma = creados
+            .first()
+            .expect("el undo tiene la salida creada")
+            .1
+            .clone();
+        creados.push((punto(&cb, 42), fantasma));
         let falso = UndoData {
             consumidos: vec![],
-            creados: vec![punto(&cb, 0), punto(&cb, 42)], // el segundo no existe
+            creados,
         };
-        assert!(revertir_bloque(&mut c, &falso).is_err());
+        assert!(
+            matches!(
+                revertir_bloque(&mut c, &falso),
+                Err(StorageError::OutpointAusente)
+            ),
+            "un outpoint ausente en el undo MUST detectarse"
+        );
         assert_eq!(c.len(), antes, "el conjunto MUST quedar intacto");
     }
 
@@ -488,6 +517,135 @@ mod tests {
                 Err(StorageError::OutpointAusente)
             ),
             "deshacer dos veces MUST detectarse, no pasar en silencio"
+        );
+    }
+
+    /// El undo data guarda el **contenido esperado** de lo creado, no solo la clave (C-REORG-02).
+    ///
+    /// Es el fallo que esta corrección cierra: con un `Vec<OutPoint>` el rollback no tenía con qué
+    /// comparar y aceptaba cualquier entrada bajo la misma clave.
+    #[test]
+    fn el_undo_data_guarda_lo_creado_completo() {
+        let mut c = ConjuntoEnMemoria::nuevo();
+        let cb = coinbase(1, vec![salida(1000, 1), salida(500, 2)]);
+        let undo = aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
+
+        assert_eq!(undo.creados.len(), 2, "una pareja por salida, en su orden");
+
+        let (o0, e0) = undo
+            .creados
+            .first()
+            .expect("la primera salida está en el undo");
+        assert_eq!(*o0, punto(&cb, 0));
+        assert_eq!(e0.salida.value.brek(), 1000, "importe de la primera");
+        assert_eq!(e0.altura_creacion, 1, "altura de creación");
+        assert!(e0.es_coinbase, "la coinbase se marca como tal");
+
+        let (o1, e1) = undo
+            .creados
+            .get(1)
+            .expect("la segunda salida está en el undo");
+        assert_eq!(*o1, punto(&cb, 1));
+        assert_eq!(e1.salida.value.brek(), 500, "importe de la segunda");
+        assert_eq!(
+            e1.salida.lock,
+            Lock::PubKey {
+                pubkey: ClavePublica::desde_bytes([2; 32])
+            },
+            "condición de bloqueo de la segunda"
+        );
+    }
+
+    /// Sustituye en el conjunto una salida creada por otra del mismo outpoint y comprueba que el
+    /// rollback detecta el contenido distinto y **no publica** ningún borrado (C-REORG-02/03).
+    fn alterar_salida_y_revertir(alterar: impl FnOnce(&mut EntradaUtxo)) {
+        let mut c = ConjuntoEnMemoria::nuevo();
+        let cb = coinbase(1, vec![salida(1000, 1)]);
+        let undo = aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
+
+        let (o, esperado) = undo
+            .creados
+            .first()
+            .cloned()
+            .expect("el undo tiene la salida creada");
+        let mut corrupta = esperado.clone();
+        alterar(&mut corrupta);
+        assert_ne!(corrupta, esperado, "la alteración debe cambiar la entrada");
+
+        c.retirar(&o).unwrap();
+        c.insertar(o, corrupta.clone()).unwrap();
+        let antes = c.len();
+
+        let r = revertir_bloque(&mut c, &undo);
+        assert!(
+            matches!(r, Err(StorageError::UtxoIncoherente)),
+            "la igualdad completa MUST detectar el contenido distinto: {r:?}"
+        );
+        assert_eq!(c.len(), antes, "el conjunto MUST quedar intacto");
+        assert_eq!(
+            c.buscar(&o),
+            Some(corrupta),
+            "la entrada distinta sigue donde estaba, sin retirarla"
+        );
+    }
+
+    /// La comparación de C-REORG-02 cubre los cuatro campos de `EntradaUtxo`, no solo la clave.
+    #[test]
+    fn el_contenido_distinto_es_corrupcion_en_cada_campo() {
+        // `value`
+        alterar_salida_y_revertir(|e| {
+            e.salida.value = Amount::nuevo(999).unwrap();
+        });
+        // `Lock`
+        alterar_salida_y_revertir(|e| {
+            e.salida.lock = Lock::PubKey {
+                pubkey: ClavePublica::desde_bytes([42; 32]),
+            };
+        });
+        // altura de creación
+        alterar_salida_y_revertir(|e| {
+            e.altura_creacion += 1;
+        });
+        // marca de coinbase
+        alterar_salida_y_revertir(|e| {
+            e.es_coinbase = !e.es_coinbase;
+        });
+    }
+
+    /// Si la comparación falla en una salida **posterior**, los borrados anteriores no se publican:
+    /// el rollback es todo-o-nada (C-REORG-03).
+    #[test]
+    fn el_fallo_en_una_salida_posterior_no_publica_los_borrados_anteriores() {
+        let mut c = ConjuntoEnMemoria::nuevo();
+        let cb = coinbase(1, vec![salida(1000, 1), salida(500, 2)]);
+        let undo = aplicar_bloque(&mut c, core::slice::from_ref(&cb), 1, RAMA).unwrap();
+
+        // La segunda salida se sustituye por otra del mismo outpoint con otro importe.
+        let (o1, e1) = undo
+            .creados
+            .get(1)
+            .cloned()
+            .expect("el bloque creó dos salidas");
+        let mut corrupta = e1;
+        corrupta.salida.value = Amount::nuevo(499).unwrap();
+        c.retirar(&o1).unwrap();
+        c.insertar(o1, corrupta).unwrap();
+
+        let antes_len = c.len();
+        let (o0, _) = undo
+            .creados
+            .first()
+            .cloned()
+            .expect("hay una primera salida");
+        let primero = c.buscar(&o0);
+
+        let r = revertir_bloque(&mut c, &undo);
+        assert!(matches!(r, Err(StorageError::UtxoIncoherente)), "{r:?}");
+        assert_eq!(c.len(), antes_len, "el conjunto MUST quedar intacto");
+        assert_eq!(
+            c.buscar(&o0),
+            primero,
+            "el borrado de la primera salida no MUST publicarse"
         );
     }
 

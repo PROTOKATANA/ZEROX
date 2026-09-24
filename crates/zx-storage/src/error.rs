@@ -22,6 +22,17 @@ pub enum StorageError {
     #[error("outpoint ausente: el conjunto no contiene esa salida")]
     OutpointAusente,
 
+    /// La clave del outpoint está, pero la entrada **no es la que el bloque creó** (C-REORG-02).
+    ///
+    /// La comparación obligatoria de C-REORG-02 no es solo de existencia: hay que cotejar
+    /// `value`, `Lock`, altura de creación y marca de coinbase. Un contenido distinto bajo la
+    /// misma clave es corrupción, y retirarlo sin mirar la habría propagado en silencio. Va
+    /// separado de [`Self::OutpointAusente`] porque el diagnóstico es distinto.
+    #[error(
+        "entrada de UTXO incoherente: el conjunto no contiene la salida que el undo data espera"
+    )]
+    UtxoIncoherente,
+
     /// Un bloque sin transacciones. Ni siquiera el génesis lo está (C-BLK-07).
     #[error("bloque sin transacciones")]
     BloqueSinTransacciones,
