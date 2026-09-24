@@ -21,11 +21,12 @@ use zx_consensus::ContextoDag;
 use zx_consensus::RangoSolucionValidado;
 use zx_consensus::bloque_dag::{CandidatoSinRango, ContextoRangoDag, comprobar_padres_contextual};
 use zx_consensus::ghostdag::{
-    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, DatosGhostdag, Idx, ModoMerge, ModoSp,
-    Parametros, Rank, hash_de_id_textual, peso, sumar_blue_work,
+    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, DatosGhostdag, IdentidadGhostdag, Idx,
+    ModoMerge, ModoSp, Parametros, Rank, hash_de_id_textual, peso, sumar_blue_work,
 };
+use zx_consensus::{Firmante, IdentidadTicket};
 use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
-use zx_core::{DagBlockHeader, PadresDag, SolucionPoas};
+use zx_core::{ClavePublica, DagBlockHeader, PadresDag, SolucionPoas};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Generador determinista de DAGs (semilla fija en el código).
@@ -171,7 +172,7 @@ fn entregar(
                 slot: nodo.slot,
                 solution_distance: nodo.sd,
                 rango_espacio: RangoSolucionValidado::para_oraculos(nodo.sr),
-                identidad: nodo.ident,
+                identidad: IdentidadGhostdag::de_fixture(nodo.ident),
             })
             .unwrap_or_else(|e| panic!("DAG válido rechazado: {e}"));
         mapa.insert(*spec_idx, idx);
@@ -342,7 +343,7 @@ fn quince_padres_se_aceptan_y_dieciseis_se_rechazan() {
                 slot: 1,
                 solution_distance: 1,
                 rango_espacio: RangoSolucionValidado::para_oraculos(i),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
     }
@@ -360,7 +361,7 @@ fn quince_padres_se_aceptan_y_dieciseis_se_rechazan() {
                 slot: 1,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(0),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .is_ok()
     );
@@ -371,7 +372,7 @@ fn quince_padres_se_aceptan_y_dieciseis_se_rechazan() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(0),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         }),
         Err(ConsensusError::DemasiadosPadresDag {
             declarados: 16,
@@ -400,7 +401,7 @@ fn construir_brazo(largo_p: usize, largo_q: usize) -> AlmacenGhostdag {
                 slot: i as u64,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(100),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
         anterior_p = id;
@@ -415,7 +416,7 @@ fn construir_brazo(largo_p: usize, largo_q: usize) -> AlmacenGhostdag {
                 slot: i as u64,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(100),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
         anterior_q = id;
@@ -433,7 +434,7 @@ fn bordes_exactos_de_mergeset_180_y_181() {
         slot: 180,
         solution_distance: 0,
         rango_espacio: RangoSolucionValidado::para_oraculos(100),
-        identidad: 0,
+        identidad: IdentidadGhostdag::SinBillete,
     });
     assert!(ok.is_ok(), "180 debe aceptarse: {ok:?}");
 
@@ -446,7 +447,7 @@ fn bordes_exactos_de_mergeset_180_y_181() {
             slot: 180,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(100),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         }),
         Err(ConsensusError::MergesetExcedeLimite {
             tamano: 181,
@@ -524,7 +525,7 @@ fn almacen_hermanos() -> (AlmacenGhostdag, BlockHash) {
             slot: 1,
             solution_distance: 7,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     // Hermana 2: mismo bw y sd, id mayor.
@@ -535,7 +536,7 @@ fn almacen_hermanos() -> (AlmacenGhostdag, BlockHash) {
             slot: 1,
             solution_distance: 7,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     (almacen, hash_de_id_textual("G"))
@@ -551,7 +552,7 @@ fn sp_empatado_en_bw_y_sd_elige_el_menor_id() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     let sp = almacen.datos(c).unwrap().sp.unwrap();
@@ -577,7 +578,7 @@ fn sp_empatado_en_bw_elige_el_menor_sd() {
                 slot: 1,
                 solution_distance: sd,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
     }
@@ -588,7 +589,7 @@ fn sp_empatado_en_bw_elige_el_menor_sd() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     let sp = almacen.datos(c).unwrap().sp.unwrap();
@@ -612,7 +613,7 @@ fn sp_elige_el_mayor_blue_work() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     almacen
@@ -622,7 +623,7 @@ fn sp_elige_el_mayor_blue_work() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     let c = almacen
@@ -632,7 +633,7 @@ fn sp_elige_el_mayor_blue_work() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     let sp = almacen.datos(c).unwrap().sp.unwrap();
@@ -661,7 +662,7 @@ fn copia_de_billete_direccion_coherente_entre_padres_y_mergeset() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     for id in ["S1", "S2"] {
@@ -672,7 +673,7 @@ fn copia_de_billete_direccion_coherente_entre_padres_y_mergeset() {
                 slot: 1,
                 solution_distance: 5,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 7,
+                identidad: IdentidadGhostdag::Sintetica(7),
             })
             .unwrap();
     }
@@ -688,7 +689,7 @@ fn copia_de_billete_direccion_coherente_entre_padres_y_mergeset() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     // Los dos hermanos van en orden de rank (S1 antes que S2) y el primero queda azul, el
@@ -744,7 +745,7 @@ fn u2_invalida_y_u3_colorea() {
             slot: 1,
             solution_distance: 5,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 7,
+            identidad: IdentidadGhostdag::Sintetica(7),
         })
         .unwrap();
     // S es copia (mismo billete) pero hermana, no descendiente de A: U2 NO la invalida.
@@ -755,7 +756,7 @@ fn u2_invalida_y_u3_colorea() {
             slot: 1,
             solution_distance: 5,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 7,
+            identidad: IdentidadGhostdag::Sintetica(7),
         })
         .unwrap();
     // U2 NO la rechaza: es hermana de A, no descendiente. El bloque existe.
@@ -769,9 +770,11 @@ fn u2_invalida_y_u3_colorea() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 7,
+            identidad: IdentidadGhostdag::Sintetica(7),
         }),
-        Err(ConsensusError::BilleteDuplicadoU2 { identidad: 7 })
+        Err(ConsensusError::BilleteDuplicadoU2 {
+            identidad: IdentidadGhostdag::Sintetica(7),
+        })
     );
 
     // C fusiona A (sp) y S: S no se evalúa contra el k-cluster, queda rojo_U3.
@@ -782,7 +785,7 @@ fn u2_invalida_y_u3_colorea() {
             slot: 1,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     let idx_s = almacen.datos(c).unwrap().rojos.first().copied().unwrap();
@@ -842,7 +845,7 @@ fn escenario_dag_con(algoritmo: Algoritmo) -> Escenario {
             slot: 1,
             solution_distance: 1,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     let h_b = cabecera(PadresDag::nuevo(h_a.block_hash(), &[]).unwrap(), 2);
@@ -853,7 +856,7 @@ fn escenario_dag_con(algoritmo: Algoritmo) -> Escenario {
             slot: 2,
             solution_distance: 1,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     // C es hermana de A (anticadena con A).
@@ -865,7 +868,7 @@ fn escenario_dag_con(algoritmo: Algoritmo) -> Escenario {
             slot: 1,
             solution_distance: 2,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     Escenario {
@@ -986,7 +989,7 @@ fn escenario_hermanas(
             slot: 1,
             solution_distance: 1,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     // La cabecera de `C` declara el MISMO slot que se almacena: `slot_c` se fija antes de calcular
@@ -1001,7 +1004,7 @@ fn escenario_hermanas(
             slot: slot_c,
             solution_distance: 2,
             rango_espacio: RangoSolucionValidado::para_oraculos(5),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     (almacen, a.block_hash(), id_c)
@@ -1020,7 +1023,7 @@ fn el_padre_seleccionado_con_slot_posterior_se_rechaza_en_los_dos_algoritmos() {
                 slot: 1,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap_err();
         assert_eq!(
@@ -1049,7 +1052,7 @@ fn el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpl
                 slot: 3,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap_err();
         assert_eq!(
@@ -1075,7 +1078,7 @@ fn todos_los_padres_con_el_mismo_slot_que_b_se_aceptan() {
                 slot: 1,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap_or_else(|e| panic!("{algoritmo:?}: la igualdad está permitida: {e}"));
         assert_eq!(almacen.padres_de(idx).unwrap(), &[1, 2]);
@@ -1093,7 +1096,7 @@ fn padres_con_slots_anteriores_se_aceptan() {
                 slot: 40,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap_or_else(|e| panic!("{algoritmo:?}: los slots anteriores son válidos: {e}"));
         assert_eq!(almacen.padres_de(idx).unwrap(), &[1, 2]);
@@ -1114,7 +1117,7 @@ fn un_padre_desconocido_se_rechaza_sin_tocar_el_almacen() {
                 slot: 9,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap_err();
         assert_eq!(
@@ -1146,7 +1149,7 @@ fn el_rechazo_por_slot_deja_el_almacen_intacto() {
                     slot: 1,
                     solution_distance: 0,
                     rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                    identidad: 0,
+                    identidad: IdentidadGhostdag::SinBillete,
                 })
                 .is_err(),
             "{algoritmo:?}"
@@ -1172,7 +1175,7 @@ fn el_rechazo_por_slot_deja_el_almacen_intacto() {
                     slot: 3,
                     solution_distance: 0,
                     rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                    identidad: 0,
+                    identidad: IdentidadGhostdag::SinBillete,
                 })
                 .is_err(),
             "{algoritmo:?}"
@@ -1260,7 +1263,7 @@ fn el_peso_usa_el_sr_validado_en_los_dos_algoritmos() {
                 slot: 1,
                 solution_distance: 1,
                 rango_espacio: sr_a,
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
 
@@ -1273,7 +1276,7 @@ fn el_peso_usa_el_sr_validado_en_los_dos_algoritmos() {
                 slot: 2,
                 solution_distance: 2,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
 
@@ -1315,7 +1318,7 @@ fn los_extremos_del_sr_se_acumulan_en_blue_work() {
                 slot: 1,
                 solution_distance: 1,
                 rango_espacio: RangoSolucionValidado::para_oraculos(0),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
         // B usa el extremo máximo; su peso cuenta al incluirse en C, no en sí mismo (C-GD-08).
@@ -1327,7 +1330,7 @@ fn los_extremos_del_sr_se_acumulan_en_blue_work() {
                 slot: 2,
                 solution_distance: 2,
                 rango_espacio: RangoSolucionValidado::para_oraculos(u64::MAX),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
         let h_c = cabecera(PadresDag::nuevo(h_b.block_hash(), &[]).unwrap(), 3);
@@ -1338,7 +1341,7 @@ fn los_extremos_del_sr_se_acumulan_en_blue_work() {
                 slot: 3,
                 solution_distance: 3,
                 rango_espacio: RangoSolucionValidado::para_oraculos(1),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
 
@@ -1391,7 +1394,7 @@ fn el_sr_sintetico_libre_sigue_siendo_una_puerta_trasera() {
                 slot: h.slot,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(h.rango_solucion),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .expect("se conserva como hueco: la entrada sintética no valida C-HDR-06");
         assert_eq!(almacen.id(idx), Some(h.block_hash()));
@@ -1414,7 +1417,7 @@ fn admitir_rechaza_el_rango_declarado_que_no_es_el_esperado() {
         );
         let antes = (almacen.len(), huella(&almacen));
         assert_eq!(
-            almacen.admitir(&h, 0, 0, &CtxRangoFijo(7)),
+            almacen.admitir(&h, 0, &CtxRangoFijo(7)),
             Err(ConsensusError::RangoIncorrecto {
                 esperado: 7,
                 encontrado: 42,
@@ -1429,7 +1432,7 @@ fn admitir_rechaza_el_rango_declarado_que_no_es_el_esperado() {
 
         // Con el contexto correcto inserta el id de la MISMA cabecera que valida.
         let idx = almacen
-            .admitir(&h, 0, 0, &CtxRangoFijo(42))
+            .admitir(&h, 0, &CtxRangoFijo(42))
             .unwrap_or_else(|e| panic!("{algoritmo:?}: {e}"));
         assert_eq!(almacen.id(idx), Some(h.block_hash()), "{algoritmo:?}");
     }
@@ -1463,7 +1466,7 @@ fn un_sr_validado_no_se_puede_colocar_en_otro_bloque() {
                 slot: h_b.slot,
                 solution_distance: 0,
                 rango_espacio: sr_a,
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap_err();
         assert_eq!(
@@ -1510,7 +1513,7 @@ fn el_duplicado_por_anadir_sintetico_se_rechaza_sin_mutar() {
                 slot: h.slot,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(5),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
 
@@ -1524,7 +1527,7 @@ fn el_duplicado_por_anadir_sintetico_se_rechaza_sin_mutar() {
                 slot: h_dup.slot,
                 solution_distance: 1,
                 rango_espacio: RangoSolucionValidado::para_oraculos(9),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap_err();
         assert_eq!(
@@ -1557,11 +1560,11 @@ fn el_duplicado_por_admitir_se_rechaza_sin_consultar_el_contexto() {
             0,
         );
         let h = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1); // declara 42
-        almacen.admitir(&h, 0, 0, &CtxRangoFijo(42)).unwrap();
+        almacen.admitir(&h, 0, &CtxRangoFijo(42)).unwrap();
 
         let antes = (almacen.len(), almacen.puntas(), huella(&almacen));
         // Este contexto haría fallar la validación si se consultara; el duplicado va primero.
-        let err = almacen.admitir(&h, 0, 0, &CtxRangoFijo(999)).unwrap_err();
+        let err = almacen.admitir(&h, 0, &CtxRangoFijo(999)).unwrap_err();
         assert_eq!(
             err,
             ConsensusError::BloqueDuplicado {
@@ -1600,4 +1603,299 @@ fn un_contexto_puede_devolver_el_sr_declarado_como_esperado() {
     otro.rango_solucion = 999;
     let v2 = RangoSolucionValidado::validar(&otro, &CtxQueReenviaElDeclarado(otro)).unwrap();
     assert_eq!(v2.valor(), 999);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 12 · Identidad exacta de C-GD-07: U2/U3 con la tupla literal, no con una proyección
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Contraejemplo de **cualquier** proyección artificial de ocho bytes elegida para el test: dos
+/// billetes que solo difieren en un byte del `chunk` comparten los primeros ocho bytes de la
+/// codificación canónica (que son la clave pública), así que una proyección de `[..8]` los
+/// confundiría. La tupla literal los distingue: **ni U2 ni U3** deben dispararse.
+///
+/// No se atribuye esa proyección a la implementación histórica: la API previa recibía un `u64`
+/// libre, sin proyección definida. El test solo demuestra que la representación nueva no admite
+/// una proyección de ocho bytes elegida a conveniencia.
+#[test]
+fn identidades_distintas_con_misma_proyeccion_no_disparan_u2_ni_u3() {
+    let t1 = IdentidadTicket::vigente(
+        ClavePublica::desde_bytes([9u8; 32]),
+        3,
+        1 << 20,
+        [1u8; 32],
+        1,
+    );
+    let t2 = IdentidadTicket::vigente(
+        ClavePublica::desde_bytes([9u8; 32]),
+        3,
+        1 << 20,
+        [2u8; 32],
+        1,
+    );
+    assert_ne!(t1, t2, "la tupla literal los distingue");
+    assert_eq!(
+        t1.bytes_canonicos()[..8],
+        t2.bytes_canonicos()[..8],
+        "una proyección artificial de los primeros ocho bytes los confundiría"
+    );
+
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            hash_de_id_textual("G"),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("A"),
+                padres: vec![hash_de_id_textual("G")],
+                slot: 1,
+                solution_distance: 5,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(t1),
+            })
+            .unwrap();
+        // Descendiente de A con t2: identidades distintas ⇒ U2 NO lo invalida.
+        let a2 = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("A2"),
+                padres: vec![hash_de_id_textual("A")],
+                slot: 2,
+                solution_distance: 6,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(t2),
+            })
+            .unwrap_or_else(|e| panic!("{algoritmo:?}: A2 no debe ser U2: {e}"));
+        assert!(almacen.datos(a2).is_some(), "{algoritmo:?}");
+
+        // Hermana S con t2; C fusiona A (sp) y S. Como t2 ≠ t1, S no puede ser U3: se comprueba
+        // su color de forma directa, no solo que una lista de colores no contenga `RojoU3`.
+        let s = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("S"),
+                padres: vec![hash_de_id_textual("G")],
+                slot: 1,
+                solution_distance: 7,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(t2),
+            })
+            .unwrap();
+        let c = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("C"),
+                padres: vec![hash_de_id_textual("A"), hash_de_id_textual("S")],
+                slot: 2,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::SinBillete,
+            })
+            .unwrap();
+        assert_eq!(
+            almacen.color_en(c, s),
+            Some(Color::Azul),
+            "{algoritmo:?}: dos identidades literales distintas no pueden hacer U3 a S"
+        );
+    }
+}
+
+/// La **misma** identidad literal: U2 en un descendiente y U3 en un mergeset, en Referencia y
+/// Kernel. El billete es real (`Billete`), no un `u64` de fixture.
+#[test]
+fn la_misma_identidad_literal_dispara_u2_y_u3() {
+    let t = IdentidadTicket::vigente(
+        ClavePublica::desde_bytes([4u8; 32]),
+        7,
+        1 << 20,
+        [3u8; 32],
+        1,
+    );
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            hash_de_id_textual("G"),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("A"),
+                padres: vec![hash_de_id_textual("G")],
+                slot: 1,
+                solution_distance: 5,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(t),
+            })
+            .unwrap();
+        // Misma tupla en un descendiente ⇒ U2, sin mutar el almacén.
+        let antes = (almacen.len(), huella(&almacen));
+        assert_eq!(
+            almacen.anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("D"),
+                padres: vec![hash_de_id_textual("A")],
+                slot: 1,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(t),
+            }),
+            Err(ConsensusError::BilleteDuplicadoU2 {
+                identidad: IdentidadGhostdag::Billete(t),
+            }),
+            "{algoritmo:?}"
+        );
+        assert_eq!((almacen.len(), huella(&almacen)), antes, "{algoritmo:?}");
+
+        // Misma tupla en una hermana ⇒ el candidato del mergeset es rojo_U3.
+        almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("S"),
+                padres: vec![hash_de_id_textual("G")],
+                slot: 1,
+                solution_distance: 5,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(t),
+            })
+            .unwrap();
+        let c = almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("C"),
+                padres: vec![hash_de_id_textual("A"), hash_de_id_textual("S")],
+                slot: 2,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::SinBillete,
+            })
+            .unwrap();
+        let s_idx = almacen
+            .datos(c)
+            .unwrap()
+            .rojos
+            .first()
+            .copied()
+            .unwrap_or_else(|| panic!("{algoritmo:?}: S debe quedar fuera del blue set"));
+        assert_eq!(
+            almacen.color_en(c, s_idx),
+            Some(Color::RojoU3),
+            "{algoritmo:?}: la repetición de la misma tupla es U3"
+        );
+    }
+}
+
+/// Un billete real cuyos bytes canónicos son **todos cero** no es ausencia: se registra y su
+/// repetición se detecta como U2. El `SinBillete` del génesis/fixture no produce U2 falso.
+#[test]
+fn un_billete_real_de_bytes_cero_no_es_ausencia() {
+    let cero = IdentidadTicket::vigente(ClavePublica::desde_bytes([0u8; 32]), 0, 0, [0u8; 32], 0);
+    assert!(cero.bytes_canonicos().iter().all(|b| *b == 0));
+    assert_ne!(
+        IdentidadGhostdag::Billete(cero),
+        IdentidadGhostdag::SinBillete,
+        "un billete de bytes cero no es ausencia"
+    );
+
+    for algoritmo in [Algoritmo::Referencia, Algoritmo::Kernel] {
+        let mut almacen = AlmacenGhostdag::nuevo(
+            params_regla_c(),
+            algoritmo,
+            hash_de_id_textual("G"),
+            0,
+            RangoSolucionValidado::para_oraculos(0),
+            0,
+        );
+        // Sin billete sobre el génesis: aceptado, sin U2 falso por la ausencia.
+        almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("N"),
+                padres: vec![hash_de_id_textual("G")],
+                slot: 1,
+                solution_distance: 1,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::SinBillete,
+            })
+            .unwrap();
+        // Billete real de bytes cero: aceptado una vez…
+        almacen
+            .anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("Z1"),
+                padres: vec![hash_de_id_textual("G")],
+                slot: 1,
+                solution_distance: 2,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(cero),
+            })
+            .unwrap();
+        // …y detectado cuando reaparece en su descendiente.
+        assert_eq!(
+            almacen.anadir_sintetico(BloqueGhostdag {
+                id: hash_de_id_textual("Z2"),
+                padres: vec![hash_de_id_textual("Z1")],
+                slot: 2,
+                solution_distance: 0,
+                rango_espacio: RangoSolucionValidado::para_oraculos(5),
+                identidad: IdentidadGhostdag::Billete(cero),
+            }),
+            Err(ConsensusError::BilleteDuplicadoU2 {
+                identidad: IdentidadGhostdag::Billete(cero),
+            }),
+            "{algoritmo:?}"
+        );
+    }
+}
+
+/// `admitir` no acepta identidad: la deriva de la misma cabecera que aporta hash y slot. Un error
+/// de SR deja el almacén intacto y el mismo header se reintenta correctamente; un hijo con la
+/// misma tupla dispara U2, que es la prueba de que la identidad salió de la cabecera.
+#[test]
+fn admitir_deriva_la_identidad_de_la_cabecera() {
+    let g = cabecera(PadresDag::genesis(), 0);
+    let mut almacen = AlmacenGhostdag::nuevo(
+        params_regla_c(),
+        Algoritmo::Kernel,
+        g.block_hash(),
+        0,
+        RangoSolucionValidado::para_oraculos(0),
+        0,
+    );
+    let h = cabecera(PadresDag::nuevo(g.block_hash(), &[]).unwrap(), 1); // declara 42
+    let antes = (almacen.len(), huella(&almacen));
+    assert_eq!(
+        almacen.admitir(&h, 0, &CtxRangoFijo(7)),
+        Err(ConsensusError::RangoIncorrecto {
+            esperado: 7,
+            encontrado: 42,
+        })
+    );
+    assert_eq!(
+        (almacen.len(), huella(&almacen)),
+        antes,
+        "un rechazo de SR no muta índices ni identidades"
+    );
+
+    // El MISMO header se reintenta con el contexto correcto.
+    let idx = almacen
+        .admitir(&h, 0, &CtxRangoFijo(42))
+        .unwrap_or_else(|e| panic!("el reintento correcto debe aceptar: {e}"));
+    assert_eq!(almacen.id(idx), Some(h.block_hash()));
+
+    // Un hijo con la MISMA tupla de identidad (misma cabecera salvo padres) dispara U2.
+    let h2 = cabecera(PadresDag::nuevo(h.block_hash(), &[]).unwrap(), 1);
+    assert_ne!(h.block_hash(), h2.block_hash());
+    assert_eq!(Firmante::identidad(&h), Firmante::identidad(&h2));
+    let antes = (almacen.len(), huella(&almacen));
+    assert_eq!(
+        almacen.admitir(&h2, 0, &CtxRangoFijo(42)),
+        Err(ConsensusError::BilleteDuplicadoU2 {
+            identidad: IdentidadGhostdag::Billete(Firmante::identidad(&h)),
+        })
+    );
+    assert_eq!(
+        (almacen.len(), huella(&almacen)),
+        antes,
+        "U2 no muta el almacén"
+    );
 }

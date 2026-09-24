@@ -34,9 +34,26 @@
 //!
 //! El almacén es **en memoria** y de estudio. Su persistencia y su cableado a `zx-node`/`zx-storage`
 //! son el encargo 04; aquí no se toca `fork_choice.rs`, que sigue siendo la selección lineal vigente.
+//!
+//! # Límites pendientes de C2 (no cerrar con esta corrección)
+//!
+//! La identidad de `C-GD-07` ya es la tupla literal (sin proyección a `u64`, sin `Vec` en `Hash`/`Ord`)
+//! y U2/U3 comparan el enum tipado, pero quedan dos límites que **no** se resuelven aquí:
+//!
+//! - **Coste.** `DatosGhostdag::blue_idents` copia la colección acumulada de identidades azules en
+//!   cada bloque, y U2 (`pasado_contiene_ident`) recorre los ancestros de cada padre. Sin un índice
+//!   compartido/acotado, el coste por bloque crece con el DAG. No se inventa una cota.
+//! - **Fuente causal.** `admitir` deriva la identidad de la misma cabecera que aporta hash, slot y
+//!   `SR`, pero **no** acredita la procedencia causal del `SR`, de la prueba PoT, de la PoAS, del
+//!   cuerpo ni la profundidad de fusión con kosherización (regla aún sin código).
+//!
+//! Por eso este almacén **no** se activa en la ruta de red ni se marca C2 cerrada: falta diseñar el
+//! índice compartido/acotado con fuente causal.
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
+use std::hash::{Hash, Hasher};
 
 use primitive_types::U256;
 use zx_core::DagBlockHeader;
@@ -45,6 +62,7 @@ use zx_core::preimage::dag::{MAX_PADRES, PadresDag};
 
 use crate::bloque_dag::{ContextoDag, ContextoRangoDag, RangoSolucionValidado};
 use crate::error::ConsensusError;
+use crate::firmante::{Firmante, IdentidadTicket};
 
 /// `k` por defecto de R-FIN-12 (elegido, `SPEC.md:1609`).
 pub const K_POR_DEFECTO: u32 = 30;
@@ -134,6 +152,116 @@ pub enum Color {
     RojoU3,
 }
 
+/// Identidad de billete de GHOSTDAG (`C-GD-07`/R-FIN-11).
+///
+/// # Por qué un enum y no un `u64`
+///
+/// `C-GD-07` define la identidad como la tupla literal
+/// `(public_key, sector_index, history_size, chunk, slot)`, que [`IdentidadTicket`] representa.
+/// Comprimirla a un `u64` **no es inyectivo**: dos billetes distintos podían pasar por iguales y
+/// un billete real con bytes a cero podía pasar por ausencia. Este enum mantiene **separados** el
+/// dominio real y el de fixture:
+///
+/// - [`IdentidadGhostdag::Billete`] compara la tupla literal mediante el `Eq` de
+///   [`IdentidadTicket`]. **Nunca** `huella()[..8]`, un `u64`, un hash corto, la clave pública
+///   sola ni el sello.
+/// - [`IdentidadGhostdag::Sintetica`] es el `u64` de los vectores/oráculos históricos. Existe
+///   **solo** para la vía sintética y **no** es una entrada de producción.
+/// - [`IdentidadGhostdag::SinBillete`] es la ausencia; sustituye al antiguo centinela de fixture
+///   `0`. Un `Billete` real con todos sus bytes a cero **no** es ausencia.
+///
+/// El enum es público porque [`DatosGhostdag::blue_idents`] y
+/// [`ConsensusError::BilleteDuplicadoU2`] lo exponen. Construir
+/// [`IdentidadGhostdag::Billete`] a mano y meterlo por [`AlmacenGhostdag::anadir_sintetico`]
+/// **no** acredita PoST, PoAS, cuerpo ni procedencia: es una afirmación del llamante, igual que el
+/// `SR` de esa misma vía sintética. La vía de producción ([`AlmacenGhostdag::admitir`]) no acepta
+/// identidad del llamante: la deriva de la cabecera.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IdentidadGhostdag {
+    /// Sin billete: el bloque no reclama una oportunidad.
+    SinBillete,
+    /// Identidad real de `C-GD-07`; la igualdad es la de [`IdentidadTicket`].
+    Billete(IdentidadTicket),
+    /// Identidad de fixture de los vectores históricos (`u64`). Nunca producción.
+    Sintetica(u64),
+}
+
+impl IdentidadGhostdag {
+    /// Convierte el `u64` de fixture de los vectores/oráculos al dominio sintético.
+    ///
+    /// El centinela `0` se traduce a [`IdentidadGhostdag::SinBillete`]: en los vectores históricos
+    /// cero significaba «sin billete», no un billete. Es la única conversión admitida del `u64`
+    /// de fixture y **no** es una identidad de producción.
+    #[must_use]
+    pub const fn de_fixture(valor: u64) -> Self {
+        if valor == 0 {
+            Self::SinBillete
+        } else {
+            Self::Sintetica(valor)
+        }
+    }
+}
+
+impl Hash for IdentidadGhostdag {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // El hash solo elige cubeta; la igualdad la decide `Eq` (tupla literal en `Billete`). Se
+        // separan los dominios con un discriminante para que `Sintetica` y `Billete` nunca se
+        // mezclen.
+        match self {
+            Self::SinBillete => state.write_u8(0),
+            Self::Sintetica(n) => {
+                state.write_u8(1);
+                n.hash(state);
+            }
+            Self::Billete(t) => {
+                state.write_u8(2);
+                // Hash campo a campo en `firmante/identidad.rs`: **sin** `bytes_canonicos()` ni
+                // `Vec` por consulta de `HashSet`.
+                t.hash(state);
+            }
+        }
+    }
+}
+
+impl Ord for IdentidadGhostdag {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Orden total determinista para `DatosGhostdag::blue_idents`. Es un detalle de forma del
+        // acumulador, no una igualdad: la de `Billete` sigue siendo la tupla literal.
+        match (self, other) {
+            (Self::SinBillete, Self::SinBillete) => Ordering::Equal,
+            (Self::Sintetica(a), Self::Sintetica(b)) => a.cmp(b),
+            (Self::Billete(a), Self::Billete(b)) => a.cmp(b),
+            (Self::SinBillete, _) => Ordering::Less,
+            (_, Self::SinBillete) => Ordering::Greater,
+            (Self::Sintetica(_), Self::Billete(_)) => Ordering::Less,
+            (Self::Billete(_), Self::Sintetica(_)) => Ordering::Greater,
+        }
+    }
+}
+
+impl PartialOrd for IdentidadGhostdag {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl fmt::Display for IdentidadGhostdag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SinBillete => f.write_str("sin billete"),
+            Self::Sintetica(n) => write!(f, "sintetica({n})"),
+            Self::Billete(t) => {
+                // La huella es **solo** para diagnóstico; jamás decide igualdad.
+                f.write_str("billete(")?;
+                for b in t.huella() {
+                    write!(f, "{b:02x}")?;
+                }
+                f.write_str(")")
+            }
+        }
+    }
+}
+
 /// Bloque de entrada al almacén GHOSTDAG.
 #[derive(Clone, Debug)]
 pub struct BloqueGhostdag {
@@ -152,8 +280,10 @@ pub struct BloqueGhostdag {
     /// de oráculos ([`AlmacenGhostdag::anadir_sintetico`]) acepta un rango sin validar; esa parte
     /// **no** es una frontera de seguridad (ver [`RangoSolucionValidado`]).
     pub rango_espacio: RangoSolucionValidado,
-    /// Identidad de billete comprimida; `0` = sin billete.
-    pub identidad: u64,
+    /// Identidad de billete exacta ([`IdentidadGhostdag`]). La ausencia es
+    /// [`IdentidadGhostdag::SinBillete`], **no** un cero: un billete real con bytes a cero sigue
+    /// siendo un billete.
+    pub identidad: IdentidadGhostdag,
 }
 
 /// `rank(B) = (blue_work, solution_distance, id)` (`C-ORD-01`), ascendente.
@@ -263,8 +393,11 @@ pub struct DatosGhostdag {
     pub rojos: Vec<Idx>,
     /// Color de cada bloque rojo del mergeset (los azules están en `blues`).
     pub colores: Vec<(Idx, Color)>,
-    /// Identidades azules acumuladas, ordenadas (comparación determinista).
-    pub blue_idents: Vec<u64>,
+    /// Identidades azules acumuladas, ordenadas (comparación determinista). Son la fuente de U3″.
+    ///
+    /// **Límite pendiente:** esta colección se **copia** entera por bloque y no tiene índice
+    /// compartido ni cota; no es apta para la ruta de red hasta diseñar ese índice.
+    pub blue_idents: Vec<IdentidadGhostdag>,
     /// `blue_score(B)` (conteo, `C-GD-08`).
     pub blue_score: u64,
     /// `blue_work(B)` (peso acumulado en `u256`, `C-GD-02`).
@@ -337,7 +470,8 @@ pub struct AlmacenGhostdag {
     sds: Vec<u64>,
     /// `SR` **validado** por bloque, en paralelo a `ids` (C-HDR-06 → C-GD-01/C-GD-08).
     srs: Vec<RangoSolucionValidado>,
-    idents: Vec<u64>,
+    /// Identidad exacta de billete por bloque, en paralelo a `ids` (C-GD-07).
+    idents: Vec<IdentidadGhostdag>,
     anc: Vec<ConjuntoBits>,
     gd: Vec<DatosGhostdag>,
 }
@@ -349,6 +483,10 @@ impl AlmacenGhostdag {
     /// **sintético** —el *bootstrap* del controlador de C-HDR-06 sigue sin definir (`TAREAS.md`
     /// §2.3)— y no forma parte de la admisión de bloques: los oráculos y los tests pasan
     /// [`RangoSolucionValidado::para_oraculos`].
+    ///
+    /// `ident_genesis` es el `u64` de fixture: se traduce con [`IdentidadGhostdag::de_fixture`],
+    /// así que el centinela `0` queda como [`IdentidadGhostdag::SinBillete`]. Esta vía **no**
+    /// acredita PoST ni procedencia de la identidad.
     #[must_use]
     pub fn nuevo(
         params: Parametros,
@@ -358,6 +496,7 @@ impl AlmacenGhostdag {
         sr_genesis: RangoSolucionValidado,
         ident_genesis: u64,
     ) -> Self {
+        let ident_genesis = IdentidadGhostdag::de_fixture(ident_genesis);
         let mut anc = ConjuntoBits::nuevos();
         let genesis_idx: Idx = 0;
         anc.insertar(genesis_idx);
@@ -374,7 +513,7 @@ impl AlmacenGhostdag {
                 EstadoInterno::Kernel { bas }
             }
         };
-        let blue_idents = if ident_genesis == 0 {
+        let blue_idents = if ident_genesis == IdentidadGhostdag::SinBillete {
             Vec::new()
         } else {
             vec![ident_genesis]
@@ -567,9 +706,18 @@ impl AlmacenGhostdag {
     ///
     /// **No** es una admisión PoST de producción: no verifica la prueba de espacio/tiempo, la
     /// firma, el cuerpo ni el resto de reglas de bloque, y ninguna ruta de `zx-node` la llama. Lo
-    /// que sí cierra es la vía por la que un llamante podía elegir el `SR` o el id: recibe la
-    /// **misma cabecera cuyo `block_hash` se insertará**, obtiene el rango esperado del contexto,
-    /// valida y solo entonces inserta. No acepta ni el `SR` ni el id.
+    /// que sí cierra es la vía por la que un llamante podía elegir el `SR`, el id **o la
+    /// identidad**: recibe la **misma cabecera cuyo `block_hash` se insertará**, obtiene el rango
+    /// esperado del contexto, valida, deriva la identidad de esa cabecera con
+    /// [`Firmante::identidad`] y solo entonces inserta. No acepta ni el `SR`, ni el id, ni la
+    /// identidad.
+    ///
+    /// # Alcance exacto
+    /// Lo que cierra es **solo la igualdad de `C-GD-07`**: la identidad que se almacena y con la
+    /// que se comparan U2/U3 es la tupla literal derivada de la cabecera, no una proyección ni un
+    /// valor del llamante. **No** cierra la procedencia causal del `SR`, de la prueba PoT, de la
+    /// PoAS, del cuerpo ni la profundidad de fusión con kosherización que el SPEC deja pendiente:
+    /// aquí no se comprueba ninguna de esas cosas.
     ///
     /// # Precondición pendiente
     /// La garantía vale lo que valga `ctx`: **debe** derivar `rango_esperado` del pasado validado y
@@ -585,7 +733,6 @@ impl AlmacenGhostdag {
         &mut self,
         cabecera: &DagBlockHeader,
         solution_distance: u64,
-        identidad: u64,
         ctx: &C,
     ) -> Result<Idx, ConsensusError> {
         // Duplicado de almacenamiento antes de consultar el contexto: no se revalida un bloque que
@@ -595,6 +742,9 @@ impl AlmacenGhostdag {
             return Err(ConsensusError::BloqueDuplicado { hash: id });
         }
         let rango_espacio = RangoSolucionValidado::validar(cabecera, ctx)?;
+        // C-GD-07: la identidad sale de la MISMA cabecera que aporta hash, slot y SR. No hay
+        // parámetro libre; `Billete` no admite proyección.
+        let identidad = IdentidadGhostdag::Billete(Firmante::identidad(cabecera));
         let mut padres = Vec::with_capacity(usize::from(cabecera.padres.count()));
         if !cabecera.padres.es_genesis() {
             padres.push(cabecera.padres.seleccionado());
@@ -618,6 +768,10 @@ impl AlmacenGhostdag {
     /// [`RangoSolucionValidado::para_oraculos`]. Si el rango trae cabecera asociada (salió de
     /// `validar`) y no es la de este bloque, se rechaza: un resultado validado no se puede
     /// intercambiar entre bloques.
+    ///
+    /// Por la misma razón, una identidad [`IdentidadGhostdag::Billete`] que llegue por aquí es una
+    /// **afirmación del llamante**: esta vía **nunca** acredita PoST, PoAS ni procedencia, y no es
+    /// la admisión de producción. U2/U3 sí usan la igualdad exacta de esa identidad.
     ///
     /// # Errores
     /// [`ConsensusError`] con el motivo (`C-GD-04`, `C-GD-07/U2`, `C-HDR-05`,
@@ -655,9 +809,11 @@ impl AlmacenGhostdag {
         }
 
         // C-GD-07 / U2: la identidad no puede estar en un padre ni en su pasado estricto.
-        if self.params.u2 && bloque.identidad != 0 {
+        // `SinBillete` no es un billete; un `Billete` con bytes a cero sí lo es. Una incoherencia
+        // interna (identidad o pasado ausente) es error explícito antes de mutar.
+        if self.params.u2 && bloque.identidad != IdentidadGhostdag::SinBillete {
             for p in &padres {
-                if self.pasado_contiene_ident(*p, bloque.identidad) {
+                if self.pasado_contiene_ident(*p, bloque.identidad)? {
                     return Err(ConsensusError::BilleteDuplicadoU2 {
                         identidad: bloque.identidad,
                     });
@@ -731,16 +887,52 @@ impl AlmacenGhostdag {
         Ok(nuevo)
     }
 
-    fn pasado_contiene_ident(&self, raiz: Idx, identidad: u64) -> bool {
+    /// ¿La identidad aparece en `raiz` o en su pasado estricto? (`C-GD-07`/U2).
+    ///
+    /// La comparación es la del tipo: `Billete` usa la tupla literal de [`IdentidadTicket`] y
+    /// `Sintetica(n)` solo casa con `Sintetica(n)`.
+    ///
+    /// # Errores
+    /// [`ConsensusError::GhostdagIncoherente`] si falta la identidad de `raiz`, el pasado de
+    /// `raiz` o la identidad de cualquier ancestro. Un índice incoherente **nunca** se interpreta
+    /// como «no hay duplicado»: se falla antes de mutar nada.
+    fn pasado_contiene_ident(
+        &self,
+        raiz: Idx,
+        identidad: IdentidadGhostdag,
+    ) -> Result<bool, ConsensusError> {
         // El pasado estricto de `raiz` es `anc[raiz]`; se incluye `raiz` mismo para el caso de
-        // identidad en el propio padre.
-        if self.idents.get(raiz as usize).copied() == Some(identidad) {
-            return true;
+        // identidad en el propio padre. La ausencia de la identidad de la raíz es incoherencia,
+        // no un padre «sin billete».
+        if self.identidad_de(raiz)? == identidad {
+            return Ok(true);
         }
-        self.anc.get(raiz as usize).is_some_and(|a| {
-            a.iter()
-                .any(|x| self.idents.get(x as usize).copied() == Some(identidad))
-        })
+        let anc = self
+            .anc
+            .get(raiz as usize)
+            .ok_or(ConsensusError::GhostdagIncoherente {
+                motivo: "el índice de bloque no tiene pasado almacenado",
+            })?;
+        for x in anc.iter() {
+            // Si falta `idents[x]`, es incoherencia interna y se falla explícitamente.
+            if self.identidad_de(x)? == identidad {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Identidad almacenada de un índice ya resuelto.
+    ///
+    /// Un índice sin identidad es una incoherencia interna: se falla explícitamente, nunca se
+    /// sustituye por «sin billete».
+    fn identidad_de(&self, i: Idx) -> Result<IdentidadGhostdag, ConsensusError> {
+        self.idents
+            .get(i as usize)
+            .copied()
+            .ok_or(ConsensusError::GhostdagIncoherente {
+                motivo: "el índice de bloque no tiene identidad almacenada",
+            })
     }
 
     /// `slot` almacenado de un índice ya resuelto (C-HDR-05 · C-FLU-02).
@@ -991,7 +1183,7 @@ impl AlmacenGhostdag {
         &self,
         sp: Idx,
         ms: &[Idx],
-        identidad: u64,
+        identidad: IdentidadGhostdag,
         nuevo: Idx,
     ) -> Result<DatosGhostdag, ConsensusError> {
         let mut ordenado = ms.to_vec();
@@ -1003,19 +1195,19 @@ impl AlmacenGhostdag {
             .ok_or(ConsensusError::GhostdagIncoherente {
                 motivo: "índice interno del almacén fuera de rango",
             })?;
-        let sp_bi: HashSet<u64> = sp_datos.blue_idents.iter().copied().collect();
+        let sp_bi: HashSet<IdentidadGhostdag> = sp_datos.blue_idents.iter().copied().collect();
 
         let mut bas: Vec<u32> = vec![SIN_ENTRADA; nuevo as usize + 1];
         fijar_tabla(&mut bas, sp, 0);
         let mut blues: Vec<Idx> = vec![sp];
         let mut rojos: Vec<Idx> = Vec::new();
         let mut colores: Vec<(Idx, Color)> = Vec::new();
-        let mut vistos: HashSet<u64> = HashSet::new();
+        let mut vistos: HashSet<IdentidadGhostdag> = HashSet::new();
 
         for cand in &ordenado {
-            let cid = self.idents.get(*cand as usize).copied().unwrap_or(0);
+            let cid = self.identidad_de(*cand)?;
             let filtrado = self.params.u3_dinamica
-                && cid != 0
+                && cid != IdentidadGhostdag::SinBillete
                 && (sp_bi.contains(&cid) || vistos.contains(&cid));
             if filtrado {
                 rojos.push(*cand);
@@ -1030,7 +1222,7 @@ impl AlmacenGhostdag {
                 for (h, s) in cand_sizes {
                     fijar_tabla(&mut bas, h, s + 1);
                 }
-                if cid != 0 {
+                if cid != IdentidadGhostdag::SinBillete {
                     vistos.insert(cid);
                 }
             } else {
@@ -1057,7 +1249,7 @@ impl AlmacenGhostdag {
         &self,
         sp: Idx,
         ms: &[Idx],
-        identidad: u64,
+        identidad: IdentidadGhostdag,
         nuevo: Idx,
     ) -> Result<DatosGhostdag, ConsensusError> {
         // Claves INDEPENDIENTES del kernel (Corrección 1 de GDR-v0.2): la referencia ordena por
@@ -1085,17 +1277,17 @@ impl AlmacenGhostdag {
         };
         // `tam` cubre hasta el bloque nuevo; los índices intermedios no vistos valen 0.
         tam.resize(nuevo as usize + 1, 0);
-        let sp_bi: HashSet<u64> = sp_datos.blue_idents.iter().copied().collect();
+        let sp_bi: HashSet<IdentidadGhostdag> = sp_datos.blue_idents.iter().copied().collect();
 
         let mut blues: Vec<Idx> = vec![sp];
         let mut rojos: Vec<Idx> = Vec::new();
         let mut colores: Vec<(Idx, Color)> = Vec::new();
-        let mut vistos: HashSet<u64> = HashSet::new();
+        let mut vistos: HashSet<IdentidadGhostdag> = HashSet::new();
 
         for cand in &ordenado {
-            let cid = self.idents.get(*cand as usize).copied().unwrap_or(0);
+            let cid = self.identidad_de(*cand)?;
             let filtrado = self.params.u3_dinamica
-                && cid != 0
+                && cid != IdentidadGhostdag::SinBillete
                 && (sp_bi.contains(&cid) || vistos.contains(&cid));
             if filtrado {
                 rojos.push(*cand);
@@ -1121,7 +1313,7 @@ impl AlmacenGhostdag {
                 fijar_tabla(&mut tam, *cand, anticono.len() as u32);
                 contexto.insertar(*cand);
                 blues.push(*cand);
-                if cid != 0 {
+                if cid != IdentidadGhostdag::SinBillete {
                     vistos.insert(cid);
                 }
             } else {
@@ -1177,9 +1369,9 @@ impl AlmacenGhostdag {
     fn acumular(
         &self,
         sp: Idx,
-        identidad: u64,
+        identidad: IdentidadGhostdag,
         blues: &[Idx],
-    ) -> Result<(U256, u64, Vec<u64>), ConsensusError> {
+    ) -> Result<(U256, u64, Vec<IdentidadGhostdag>), ConsensusError> {
         let sp_datos = self
             .gd
             .get(sp as usize)
@@ -1203,14 +1395,14 @@ impl AlmacenGhostdag {
             .blue_score
             .checked_add(blues.len() as u64)
             .ok_or(ConsensusError::BlueWorkDesbordado)?;
-        let mut idents: Vec<u64> = sp_datos.blue_idents.clone();
+        let mut idents: Vec<IdentidadGhostdag> = sp_datos.blue_idents.clone();
         for x in blues {
-            let cid = self.idents.get(*x as usize).copied().unwrap_or(0);
-            if cid != 0 {
+            let cid = self.identidad_de(*x)?;
+            if cid != IdentidadGhostdag::SinBillete {
                 idents.push(cid);
             }
         }
-        if identidad != 0 {
+        if identidad != IdentidadGhostdag::SinBillete {
             idents.push(identidad);
         }
         Ok((bw, score, idents))
@@ -1355,7 +1547,7 @@ mod tests {
             slot,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(sr),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         }
     }
 
@@ -1458,6 +1650,179 @@ mod tests {
         );
         for sr in [0u64, 1, 2, 1 << 32, u64::MAX - 1, u64::MAX] {
             assert_eq!(RangoSolucionValidado::para_oraculos(sr).peso(), peso(sr));
+        }
+    }
+
+    /// Billete real para los tests de U2 y de coherencia de la identidad.
+    fn ticket(chunk: u8) -> IdentidadTicket {
+        IdentidadTicket::vigente(
+            zx_core::ClavePublica::desde_bytes([5u8; 32]),
+            3,
+            1 << 20,
+            [chunk; 32],
+            1,
+        )
+    }
+
+    /// Bloque sintético con identidad explícita (el helper `bloque` de arriba siempre es
+    /// `SinBillete`).
+    fn bloque_con_ident(
+        bloque_id: BlockHash,
+        padres: Vec<BlockHash>,
+        slot: u64,
+        sr: u64,
+        identidad: IdentidadGhostdag,
+    ) -> BloqueGhostdag {
+        BloqueGhostdag {
+            id: bloque_id,
+            padres,
+            slot,
+            solution_distance: 0,
+            rango_espacio: RangoSolucionValidado::para_oraculos(sr),
+            identidad,
+        }
+    }
+
+    /// `Eq`, `Hash` y `Ord` de `IdentidadGhostdag` son consistentes: `Hash` igual cuando `Eq`
+    /// igual y `cmp == Equal` si y solo si `Eq` igual. Dos tickets distintos que comparten prefijo
+    /// canónico no son iguales ni comparan `Equal`. Una colisión de hash ordinaria sería aceptable
+    /// porque `HashSet` comprueba `Eq`, pero la igualdad no puede confundirlos.
+    #[test]
+    fn eq_hash_y_ord_de_la_identidad_son_consistentes() {
+        use std::collections::hash_map::DefaultHasher;
+
+        fn hash_de(v: &IdentidadGhostdag) -> u64 {
+            let mut h = DefaultHasher::new();
+            v.hash(&mut h);
+            h.finish()
+        }
+
+        // Mismo prefijo canónico (clave pública, sector e historia) y `chunk` distinto.
+        let t_a = ticket(1);
+        let t_b = ticket(2);
+        assert_eq!(
+            t_a.bytes_canonicos().get(..42),
+            t_b.bytes_canonicos().get(..42),
+            "los dos tickets comparten prefijo canónico"
+        );
+
+        let a = IdentidadGhostdag::Billete(t_a);
+        let a_igual = IdentidadGhostdag::Billete(ticket(1));
+        let b = IdentidadGhostdag::Billete(t_b);
+        assert_eq!(a, a_igual);
+        assert_eq!(hash_de(&a), hash_de(&a_igual));
+        assert_eq!(a.cmp(&a_igual), Ordering::Equal);
+        assert_ne!(a, b);
+        assert_ne!(a.cmp(&b), Ordering::Equal);
+        assert_eq!(a.cmp(&b), b.cmp(&a).reverse());
+
+        let s7 = IdentidadGhostdag::Sintetica(7);
+        let s7_igual = IdentidadGhostdag::Sintetica(7);
+        let s8 = IdentidadGhostdag::Sintetica(8);
+        assert_eq!(s7, s7_igual);
+        assert_eq!(hash_de(&s7), hash_de(&s7_igual));
+        assert_eq!(s7.cmp(&s7_igual), Ordering::Equal);
+        assert_ne!(s7, s8);
+        assert_ne!(s7.cmp(&s8), Ordering::Equal);
+
+        let sin = IdentidadGhostdag::SinBillete;
+        assert_ne!(sin, a);
+        assert_ne!(sin.cmp(&a), Ordering::Equal);
+        assert_ne!(a, s7);
+        assert_ne!(a.cmp(&s7), Ordering::Equal);
+
+        // En un `HashSet`, `Eq`/`Hash` consistentes agrupan iguales y separan el resto.
+        let mut conjunto = HashSet::new();
+        conjunto.insert(a);
+        conjunto.insert(a_igual);
+        assert_eq!(conjunto.len(), 1, "dos iguales ocupan una sola entrada");
+        conjunto.insert(b);
+        conjunto.insert(s7);
+        conjunto.insert(sin);
+        assert_eq!(conjunto.len(), 4, "los distintos ocupan entradas distintas");
+
+        // `cmp == Equal` si y solo si `Eq` igual, para los pares representativos.
+        for (x, y) in [(&a, &a_igual), (&s7, &s7_igual)] {
+            assert_eq!(x.cmp(y) == Ordering::Equal, x == y);
+        }
+        for (x, y) in [(&a, &b), (&s7, &s8), (&sin, &a), (&a, &s7)] {
+            assert_eq!(x.cmp(y) == Ordering::Equal, x == y);
+        }
+    }
+
+    /// U2 con estado interno fabricado solo desde este módulo: si falta la identidad de un padre,
+    /// su pasado o la identidad de un ancestro, se devuelve `GhostdagIncoherente` **antes** de
+    /// mutar, nunca se interpreta como «no hay duplicado».
+    #[test]
+    fn u2_con_estado_incoherente_falla_sin_mutar() {
+        let g = id(0x60);
+        let a = id(0xA1);
+        let padre = IdentidadGhostdag::Billete(ticket(9));
+        // Identidad distinta de la del padre: la comprobación no puede cortocircuitar en `raiz`.
+        let hijo = IdentidadGhostdag::Billete(ticket(10));
+
+        for caso in [
+            "falta la identidad del padre",
+            "falta el pasado del padre",
+            "falta la identidad de un ancestro",
+        ] {
+            let mut almacen = AlmacenGhostdag::nuevo(
+                params(),
+                Algoritmo::Kernel,
+                g,
+                0,
+                RangoSolucionValidado::para_oraculos(0),
+                0,
+            );
+            almacen
+                .anadir_sintetico(bloque_con_ident(a, vec![g], 1, 5, padre))
+                .unwrap();
+
+            match caso {
+                "falta la identidad del padre" => {
+                    assert_eq!(almacen.idents.pop(), Some(padre));
+                }
+                "falta el pasado del padre" => {
+                    assert!(almacen.anc.pop().is_some());
+                }
+                _ => {
+                    // Ancestro sin identidad: un bit del pasado que no tiene entrada en `idents`.
+                    let anc = almacen.anc.get_mut(1).unwrap();
+                    anc.insertar(99);
+                }
+            }
+
+            let antes = (
+                almacen.indice.clone(),
+                almacen.ids.clone(),
+                almacen.padres.clone(),
+                almacen.slots.clone(),
+                almacen.sds.clone(),
+                almacen.srs.clone(),
+                almacen.idents.clone(),
+                almacen.anc.clone(),
+                almacen.gd.clone(),
+            );
+            let err = almacen
+                .anadir_sintetico(bloque_con_ident(id(0xB2), vec![a], 2, 7, hijo))
+                .unwrap_err();
+            assert!(
+                matches!(err, ConsensusError::GhostdagIncoherente { .. }),
+                "{caso}: {err:?}"
+            );
+            let despues = (
+                almacen.indice.clone(),
+                almacen.ids.clone(),
+                almacen.padres.clone(),
+                almacen.slots.clone(),
+                almacen.sds.clone(),
+                almacen.srs.clone(),
+                almacen.idents.clone(),
+                almacen.anc.clone(),
+                almacen.gd.clone(),
+            );
+            assert_eq!(antes, despues, "{caso}: el rechazo no muta el almacén");
+            assert_eq!(almacen.len(), 2, "{caso}");
         }
     }
 }

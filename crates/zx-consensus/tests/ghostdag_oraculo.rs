@@ -26,8 +26,8 @@ use std::path::PathBuf;
 use primitive_types::U256;
 use zx_consensus::RangoSolucionValidado;
 use zx_consensus::ghostdag::{
-    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, Idx, ModoMerge, ModoSp, Parametros,
-    hash_de_id_textual,
+    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, IdentidadGhostdag, Idx, ModoMerge, ModoSp,
+    Parametros, hash_de_id_textual,
 };
 
 #[derive(Debug)]
@@ -207,7 +207,7 @@ fn construir_dag(dag: &Dag, params: Parametros, algoritmo: Algoritmo) -> Almacen
             slot: spec.slot,
             solution_distance: spec.sd,
             rango_espacio: RangoSolucionValidado::para_oraculos(spec.sr),
-            identidad: spec.ident,
+            identidad: IdentidadGhostdag::de_fixture(spec.ident),
         };
         almacen
             .anadir_sintetico(bloque)

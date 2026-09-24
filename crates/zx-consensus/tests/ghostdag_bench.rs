@@ -22,7 +22,8 @@ use std::time::Instant;
 
 use zx_consensus::RangoSolucionValidado;
 use zx_consensus::ghostdag::{
-    Algoritmo, AlmacenGhostdag, BloqueGhostdag, ModoMerge, ModoSp, Parametros, hash_de_id_textual,
+    Algoritmo, AlmacenGhostdag, BloqueGhostdag, IdentidadGhostdag, ModoMerge, ModoSp, Parametros,
+    hash_de_id_textual,
 };
 
 fn params() -> Parametros {
@@ -53,7 +54,7 @@ fn construir_brazo(algoritmo: Algoritmo, largo_p: usize, largo_q: usize) -> Alma
                 slot: i as u64,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(100),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
         anterior = id;
@@ -68,7 +69,7 @@ fn construir_brazo(algoritmo: Algoritmo, largo_p: usize, largo_q: usize) -> Alma
                 slot: i as u64,
                 solution_distance: 0,
                 rango_espacio: RangoSolucionValidado::para_oraculos(100),
-                identidad: 0,
+                identidad: IdentidadGhostdag::SinBillete,
             })
             .unwrap();
         anterior = id;
@@ -91,7 +92,7 @@ fn medir(algoritmo: Algoritmo, repeticiones: usize) -> Vec<f64> {
             slot: 180,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(100),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
     }
@@ -105,7 +106,7 @@ fn medir(algoritmo: Algoritmo, repeticiones: usize) -> Vec<f64> {
             slot: 180,
             solution_distance: 0,
             rango_espacio: RangoSolucionValidado::para_oraculos(100),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         })
         .unwrap();
         tiempos.push(t0.elapsed().as_secs_f64() * 1e6);
@@ -146,7 +147,7 @@ fn generar(n: usize, ventana: usize, semilla: u64) -> Vec<BloqueGhostdag> {
         slot: 0,
         solution_distance: 0,
         rango_espacio: RangoSolucionValidado::para_oraculos(0),
-        identidad: 0,
+        identidad: IdentidadGhostdag::SinBillete,
     }];
     for i in 1..n {
         let lo = i.saturating_sub(ventana);
@@ -182,7 +183,7 @@ fn generar(n: usize, ventana: usize, semilla: u64) -> Vec<BloqueGhostdag> {
             slot: max_slot + rng.rango(0, 2),
             solution_distance: rng.rango(0, 1 << 20),
             rango_espacio: RangoSolucionValidado::para_oraculos(sr),
-            identidad: 0,
+            identidad: IdentidadGhostdag::SinBillete,
         });
     }
     nodos

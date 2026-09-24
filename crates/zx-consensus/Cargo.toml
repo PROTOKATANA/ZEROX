@@ -21,6 +21,14 @@ zx-core         = { path = "../zx-core" }
 # dependencia real, no de test: el adaptador vive en `src/pot.rs`.
 zx-pot          = { path = "../zx-pot" }
 
+# ── Firmante local (D3) ──────────────────────────────────────────────────────────────────────
+# El módulo `src/firmante/` firma el sello con la clave privada del productor antes de publicarlo
+# y usa el MISMO verificador del repositorio: `zx-core` verifica con `ed25519-zebra` (ZIP-215) y
+# aquí se firma con `ed25519-zebra`. No se introduce ningún otro firmador ni una versión nueva:
+# era `[dev-dependencies]` y pasa a dependencia normal porque el firmante de biblioteca necesita
+# `SigningKey`. No hay otra dependencia añadida.
+ed25519-zebra   = { workspace = true }
+
 # ── Verificador PoAS (A1, C-POT-08 paso 5) ────────────────────────────────────────────────────
 # Adaptamos la API pública de Autonomys enlazando por `path` al clon fijado
 # `PDF/autonomys-subspace` @ f8842d0. No se copia ni se reimplementa KZG, PoS, la máscara del
@@ -34,7 +42,6 @@ subspace-kzg             = { path = "../../PDF/autonomys-subspace/shared/subspac
 
 [dev-dependencies]
 proptest      = { workspace = true }
-ed25519-zebra = { workspace = true }
 # Solo para generar el fixture PoS positivo del test con la ruta **paralela** de ploteo
 # (`Tables::create_parallel`). La ruta no paralela tiene un SIGSEGV reproducible documentado en
 # `P-ZRX/P-INTENTO/investigacion/mediciones/fallo-semilla.md`; no se usa aquí.

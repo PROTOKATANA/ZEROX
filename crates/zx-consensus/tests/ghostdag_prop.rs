@@ -15,8 +15,8 @@ use proptest::prelude::*;
 use proptest::test_runner::RngSeed;
 use zx_consensus::RangoSolucionValidado;
 use zx_consensus::ghostdag::{
-    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, Idx, ModoMerge, ModoSp, Parametros,
-    hash_de_id_textual,
+    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, IdentidadGhostdag, Idx, ModoMerge, ModoSp,
+    Parametros, hash_de_id_textual,
 };
 use zx_core::digest::BlockHash;
 
@@ -60,7 +60,7 @@ fn construir(
             slot: i as u64,
             solution_distance: u64::from(sds[i % sds.len()]),
             rango_espacio: RangoSolucionValidado::para_oraculos(u64::from(srs[i % srs.len()])),
-            identidad: u64::from(idents[i % idents.len()]),
+            identidad: IdentidadGhostdag::de_fixture(u64::from(idents[i % idents.len()])),
         })?;
         debug_assert_eq!(idx as usize, i);
         ids.push(id);
@@ -121,7 +121,7 @@ proptest! {
                     id, padres, slot: i as u64,
                     solution_distance: u64::from(sds[i % sds.len()]),
                     rango_espacio: RangoSolucionValidado::para_oraculos(u64::from(srs[i % srs.len()])),
-                    identidad: 0,
+                    identidad: IdentidadGhostdag::SinBillete,
                 }).is_err() { return Ok(()); }
                 ids.push(id);
             }

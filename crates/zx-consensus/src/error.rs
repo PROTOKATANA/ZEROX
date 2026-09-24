@@ -2,6 +2,8 @@
 
 use thiserror::Error;
 
+use crate::ghostdag::IdentidadGhostdag;
+
 /// Fallo al aplicar una regla de consenso.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ConsensusError {
@@ -335,8 +337,8 @@ pub enum ConsensusError {
     /// C-GD-07 · U2: la identidad de billete ya aparece en un padre o su pasado estricto.
     #[error("C-GD-07/U2: el billete {identidad} ya está en el pasado del bloque")]
     BilleteDuplicadoU2 {
-        /// Identidad del billete repetida.
-        identidad: u64,
+        /// Identidad del billete repetida (tupla exacta de `C-GD-07` o fixture sintética).
+        identidad: IdentidadGhostdag,
     },
 
     /// Un hash que el almacén GHOSTDAG no conoce.

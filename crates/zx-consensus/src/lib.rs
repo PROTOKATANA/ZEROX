@@ -13,6 +13,7 @@ pub mod bloque_dag;
 pub mod dificultad;
 pub mod emision;
 pub mod error;
+pub mod firmante;
 pub mod fork_choice;
 pub mod genesis;
 pub mod ghostdag;
@@ -33,11 +34,12 @@ pub use bloque_dag::{
 pub use dificultad::{VentanaRetarget, siguiente_target};
 pub use emision::{recompensa_base, subsidio};
 pub use error::ConsensusError;
+pub use firmante::{Firmante, FirmanteError, IdentidadTicket, Registro, RegistroError, Resultado};
 pub use fork_choice::{ClaveVentana, MAX_REORG_LENGTH, Preferencia, Tip, preferir};
 pub use genesis::{GENESIS_MAINNET, GENESIS_TESTNET, ParametrosGenesis, construir};
 pub use ghostdag::{
-    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, Idx, ModoMerge, ModoSp, Parametros, Rank,
-    sumar_blue_work,
+    Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, IdentidadGhostdag, Idx, ModoMerge, ModoSp,
+    Parametros, Rank, sumar_blue_work,
 };
 pub use peso::{PesoValidado, limite, mediana_efectiva};
 pub use poas::{ErrorPoas, verificar_solucion_poas};
