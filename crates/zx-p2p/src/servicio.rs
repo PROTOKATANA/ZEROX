@@ -40,6 +40,8 @@ use crate::behaviour::{ZxBehaviour, ZxBehaviourEvent};
 use crate::entrante::{ManejadorEntrante, Veredicto};
 use crate::error::{MotivoDesconexion, P2pError};
 use crate::mensaje::{Peticion, Respuesta};
+use crate::presupuesto::Presupuesto;
+use crate::rele_compacto::{AnuncioCompacto, ReleError};
 
 /// Capacidad del canal de comandos.
 ///
@@ -402,25 +404,30 @@ impl<M: ManejadorEntrante> BucleRed<M> {
 
     /// Decide qué es el mensaje y se lo pasa al manejador.
     ///
+    /// **C-NET-25 · la clasificación es por igualdad exacta.** Cada canal lleva un contenido
+    /// distinto y un mensaje que llegue por el que no le corresponde MUST descartarse; nada de
+    /// prefijos ni subcadenas. La versión anterior usaba `topico.contains("/blocks/")`, que daba por
+    /// buenos `/zerox/blocks/2/extra` y `/zerox/blocks/20`. Un tema desconocido se ignora **sin
+    /// decodificar y sin llamar al manejador**.
+    ///
     /// Un mensaje que no decodifica es `Rechazar`: no es ambigüedad de *timing* como un huérfano,
     /// es basura. Pero ojo — `Rechazar` penaliza al que **lo propagó**, no al que lo creó, así que
-    /// se reserva para lo indiscutiblemente inválido.
+    /// se reserva para lo indiscutiblemente inválido. El éxito del parseo **no** es validación: por
+    /// C-NET-12 el veredicto de un anuncio compacto lo decide el manejador, no el codec.
     fn juzgar(&self, m: &gossipsub::Message) -> Veredicto {
-        let topico = m.topic.as_str();
-        if topico.contains("/blocks/") {
-            match crate::codec::respuesta_desde_bytes(&m.data) {
-                Ok(Respuesta::Bloques(bs)) => bs
-                    .first()
-                    .map_or(Veredicto::Rechazar, |b| self.manejador.bloque_difundido(b)),
-                _ => Veredicto::Rechazar,
-            }
-        } else if topico.contains("/txs/") {
-            self.manejador.tx_difundida(&m.data)
-        } else {
-            // Un tópico al que no estamos suscritos no debería llegar. Ignorar sin penalizar:
-            // puede ser una versión nueva del protocolo, no un ataque.
-            Veredicto::Ignorar
-        }
+        // C-NET-21 exige reservar de un contador **compartido** para que el techo sea agregado.
+        // Mientras E1 no tenga ruta activa, aquí se crea un `Presupuesto::default()` por mensaje:
+        // reutiliza la misma estructura, pero **no acredita el techo agregado** —cada mensaje
+        // estrena su propio contador de cero—. El `Presupuesto` se inyecta en `despachar` para que
+        // los tests puedan forzar una reserva fallida; cablear el contador compartido de verdad y
+        // la ruta de `/blocks/2` es trabajo de otra entrega. Esto **no** cierra C-NET-21.
+        let presupuesto = Presupuesto::default();
+        despachar(
+            self.manejador.as_ref(),
+            m.topic.as_str(),
+            &m.data,
+            &presupuesto,
+        )
     }
 
     /// Atiende un comando. No es `async`: nada de lo que hace debe esperar.
@@ -502,6 +509,94 @@ impl<M: ManejadorEntrante> BucleRed<M> {
     }
 }
 
+/// A qué canal de difusión pertenece un tema, por **igualdad exacta**.
+///
+/// C-NET-25 asigna a cada canal un contenido distinto y exige descartar un mensaje que llegue por
+/// el canal que no le corresponde. `contains("/blocks/")` —lo que había— clasificaba como bloques
+/// `/zerox/blocks/2/extra`, `/otra/zerox/blocks/2` y `/zerox/blocks/20`, y el primero habría ido a
+/// un decodificador que no entiende sus bytes.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum TemaDifusion {
+    /// `/zerox[/testnet]/blocks/1`: bloque completo de la ruta lineal **todavía activa**.
+    BloqueLineal,
+    /// `/zerox[/testnet]/blocks/2`: **solo** anuncio compacto (C-NET-25, C-NET-26).
+    AnuncioCompacto,
+    /// `/zerox[/testnet]/txs/1`: transacción difundida.
+    Transaccion,
+    /// Cualquier otro tema.
+    Desconocido,
+}
+
+/// Clasifica un tema de difusión por igualdad exacta, nunca por prefijo ni subcadena.
+fn clasificar_tema(topico: &str) -> TemaDifusion {
+    match topico {
+        "/zerox/blocks/1" | "/zerox-testnet/blocks/1" => TemaDifusion::BloqueLineal,
+        "/zerox/blocks/2" | "/zerox-testnet/blocks/2" => TemaDifusion::AnuncioCompacto,
+        "/zerox/txs/1" | "/zerox-testnet/txs/1" => TemaDifusion::Transaccion,
+        _ => TemaDifusion::Desconocido,
+    }
+}
+
+/// Decide el veredicto de un mensaje de difusión a partir de su tema y sus bytes.
+///
+/// Es una función libre —no un método de [`BucleRed`]— para poder probar el despacho **sin**
+/// construir un `Swarm`: montar un `Swarm` entero solo para ejercitar un `match` probaría libp2p,
+/// no este crate. [`BucleRed::juzgar`] es su único llamante de producción.
+///
+/// El `presupuesto` se **inyecta** en vez de crearse dentro: es lo que permite a un test forzar una
+/// reserva fallida con `Presupuesto::nuevo(0)` y comprobar que el agotamiento local no penaliza. El
+/// techo de C-NET-21 es **agregado**, de modo que en producción la instancia compartida es la que
+/// debe llegar aquí; un `default` recién creado por mensaje no lo acredita.
+///
+/// # El tema desconocido no se decodifica
+///
+/// Un tema que no sea uno de los seis exactos devuelve [`Veredicto::Ignorar`] **sin** tocar los
+/// bytes ni llamar al manejador: puede ser una versión más nueva del protocolo, no un ataque.
+fn despachar<M: ManejadorEntrante>(
+    manejador: &M,
+    topico: &str,
+    datos: &[u8],
+    presupuesto: &Presupuesto,
+) -> Veredicto {
+    match clasificar_tema(topico) {
+        // El bloque completo de la ruta lineal sigue por su camino de siempre.
+        TemaDifusion::BloqueLineal => match crate::codec::respuesta_desde_bytes(datos) {
+            Ok(Respuesta::Bloques(bs)) => bs
+                .first()
+                .map_or(Veredicto::Rechazar, |b| manejador.bloque_difundido(b)),
+            _ => Veredicto::Rechazar,
+        },
+        // La transacción se pasa cruda: su validación es del manejador.
+        TemaDifusion::Transaccion => manejador.tx_difundida(datos),
+        TemaDifusion::AnuncioCompacto => {
+            // C-NET-26 · el relé compacto es obligatorio, así que el transporte sabe leer el
+            // anuncio. Lo que `desde_bytes` **no** certifica es contenido ni padres: solo
+            // comprueba formato, presupuesto y que no sobre ni falte un byte.
+            //
+            // C-NET-12 · validar antes de retransmitir. El veredicto no puede salir del parseo: lo
+            // decide `anuncio_compacto`, cuyo default es `Ignorar` mientras `zx-node` no valide el
+            // DAG causal.
+            //
+            // Pero no todo fallo del codec es culpa del par que propagó el mensaje. Agotar el
+            // presupuesto es un recurso **local** de este nodo (C-NET-21): el mismo anuncio, con
+            // presupuesto, se juzgaría con normalidad. Penalizarlo castigaría a un par honesto por
+            // nuestra falta de memoria, así que es `Ignorar` (C-NET-05) y **no** `Rechazar`. Un
+            // fallo de formato o un byte residual sí es basura indiscutible y sí penaliza.
+            //
+            // Nótese que esto **no** es el presupuesto de CPU de C-NET-33, que gobierna la
+            // verificación PoT de flujo ajeno: aquí se habla solo del techo de bytes en vuelo.
+            // `ReleError::Presupuesto` **no** llega al callback: sin anuncio parseado no hay nada
+            // que pasarle al manejador.
+            match AnuncioCompacto::desde_bytes(datos, presupuesto) {
+                Ok((anuncio, [])) => manejador.anuncio_compacto(&anuncio),
+                Err(ReleError::Presupuesto) => Veredicto::Ignorar,
+                _ => Veredicto::Rechazar,
+            }
+        }
+        TemaDifusion::Desconocido => Veredicto::Ignorar,
+    }
+}
+
 /// Recorta una lista al límite del protocolo.
 ///
 /// Se aplica **aquí** y no se confía en que el manejador lo respete: el límite es de transporte, y
@@ -527,4 +622,353 @@ fn request_id_a_u64(id: request_response::OutboundRequestId) -> u64 {
     // `OutboundRequestId` no expone su valor; su `Display` sí. Es feo, y la alternativa —filtrar el
     // tipo de libp2p hacia `zx-node`— sería peor.
     id.to_string().parse().unwrap_or(0)
+}
+
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
+mod tests {
+    use super::{TemaDifusion, clasificar_tema, despachar};
+    use crate::codec::respuesta_a_bytes;
+    use crate::entrante::{ManejadorEntrante, Veredicto};
+    use crate::mensaje::{BloqueRed, Estado, Respuesta};
+    use crate::presupuesto::Presupuesto;
+    use crate::rele_compacto::AnuncioCompacto;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use zx_core::Amount;
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot, TxId};
+    use zx_core::firma::ClavePublica;
+    use zx_core::preimage::block::BlockHeader;
+    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+
+    /// Manejador espía: cuenta cada callback y **no valida nada**.
+    ///
+    /// Devuelve `Ignorar` a los anuncios, que es lo que `zx-node` puede devolver hoy —sin validación
+    /// DAG causal—, y lo que el test comprueba que nunca se convierte en `Aceptar` por el mero
+    /// parseo. El `Aceptar` de bloque y tx es solo para verificar que su callback se alcanza.
+    #[derive(Default)]
+    struct Espia {
+        bloques: AtomicUsize,
+        txs: AtomicUsize,
+        anuncios: AtomicUsize,
+    }
+
+    impl ManejadorEntrante for Espia {
+        fn estado(&self) -> Estado {
+            Estado {
+                genesis: BlockHash::from_digest(Digest::from_bytes([0; 32])),
+                tip: BlockHash::from_digest(Digest::from_bytes([1; 32])),
+                altura: 0,
+                trabajo: [0; 32],
+            }
+        }
+
+        fn bloque_difundido(&self, _: &BloqueRed) -> Veredicto {
+            self.bloques.fetch_add(1, Ordering::Relaxed);
+            Veredicto::Aceptar
+        }
+
+        fn tx_difundida(&self, _: &[u8]) -> Veredicto {
+            self.txs.fetch_add(1, Ordering::Relaxed);
+            Veredicto::Aceptar
+        }
+
+        fn anuncio_compacto(&self, _: &AnuncioCompacto) -> Veredicto {
+            self.anuncios.fetch_add(1, Ordering::Relaxed);
+            // Sin validación DAG causal no se acepta ni se rechaza: se ignora.
+            Veredicto::Ignorar
+        }
+
+        fn cabeceras_desde(&self, _: &[BlockHash], _: Option<BlockHash>) -> Vec<BlockHeader> {
+            Vec::new()
+        }
+
+        fn bloques_por_hash(&self, _: &[BlockHash]) -> Vec<BloqueRed> {
+            Vec::new()
+        }
+    }
+
+    /// Implementa solo lo obligatorio para ejercitar el **default** de `anuncio_compacto`.
+    struct Minimo;
+
+    impl ManejadorEntrante for Minimo {
+        fn estado(&self) -> Estado {
+            Espia::default().estado()
+        }
+
+        fn bloque_difundido(&self, _: &BloqueRed) -> Veredicto {
+            Veredicto::Rechazar
+        }
+
+        fn tx_difundida(&self, _: &[u8]) -> Veredicto {
+            Veredicto::Rechazar
+        }
+
+        fn cabeceras_desde(&self, _: &[BlockHash], _: Option<BlockHash>) -> Vec<BlockHeader> {
+            Vec::new()
+        }
+
+        fn bloques_por_hash(&self, _: &[BlockHash]) -> Vec<BloqueRed> {
+            Vec::new()
+        }
+    }
+
+    fn tx_llave(n: u8) -> Tx {
+        Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(1_000).unwrap(),
+                lock: Lock::PubKey {
+                    pubkey: ClavePublica::desde_bytes([n; 32]),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: 0,
+        }
+    }
+
+    /// Un anuncio compacto real, serializable con `a_bytes`.
+    fn anuncio() -> AnuncioCompacto {
+        let cabecera = DagBlockHeader {
+            consensus_branch_id: 0xc478_80ea,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
+            timestamp: 1_788_480_000,
+            height: 1,
+            slot: 1,
+            pot_output: [0; 16],
+            rango_solucion: 1,
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x44; 32])),
+            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x55; 32])), &[])
+                .unwrap(),
+            sello: [0; 64],
+        };
+        AnuncioCompacto::nuevo(
+            cabecera,
+            7,
+            tx_llave(0x11),
+            vec![vec![0x66; 64]],
+            vec![[0x77; 6]],
+        )
+        .unwrap()
+    }
+
+    /// Bytes de una `Respuesta::Bloques` lineal, para comprobar que no se confunde con un anuncio.
+    fn respuesta_lineal() -> Vec<u8> {
+        let cabecera = BlockHeader {
+            consensus_branch_id: 0xc478_80ea,
+            prev_hash: BlockHash::from_digest(Digest::from_bytes([0x01; 32])),
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x02; 32])),
+            timestamp: 1_788_480_000,
+            bits: 0x1c07_fff8,
+            nonce: 1,
+            height: 1,
+        };
+        let bloque = BloqueRed {
+            cabecera,
+            txs: vec![tx_llave(0x03)],
+            testigos: vec![vec![vec![0xAA; 64]]],
+        };
+        respuesta_a_bytes(&Respuesta::Bloques(vec![bloque]))
+    }
+
+    /// **La tabla de los seis temas exactos y sus falsos positivos.**
+    ///
+    /// El `contains("/blocks/")` anterior habría clasificado los cuatro falsos como bloques.
+    #[test]
+    fn la_clasificacion_es_exacta() {
+        for (tema, esperado) in [
+            ("/zerox/blocks/1", TemaDifusion::BloqueLineal),
+            ("/zerox-testnet/blocks/1", TemaDifusion::BloqueLineal),
+            ("/zerox/blocks/2", TemaDifusion::AnuncioCompacto),
+            ("/zerox-testnet/blocks/2", TemaDifusion::AnuncioCompacto),
+            ("/zerox/txs/1", TemaDifusion::Transaccion),
+            ("/zerox-testnet/txs/1", TemaDifusion::Transaccion),
+        ] {
+            assert_eq!(clasificar_tema(tema), esperado, "{tema}");
+        }
+
+        for falso in [
+            "/zerox/blocks/2/extra",
+            "/otra/zerox/blocks/2",
+            "/zerox/blocks/20",
+            "/zerox/txs/2",
+        ] {
+            assert_eq!(
+                clasificar_tema(falso),
+                TemaDifusion::Desconocido,
+                "{falso} no es ninguno de los seis temas"
+            );
+        }
+    }
+
+    /// Un anuncio de fixture llega **una sola vez** al callback compacto y no se acepta.
+    #[test]
+    fn el_anuncio_bien_formado_llega_una_vez_y_no_se_acepta() {
+        let bytes = anuncio().a_bytes();
+        for tema in ["/zerox/blocks/2", "/zerox-testnet/blocks/2"] {
+            let espia = Espia::default();
+            let v = despachar(&espia, tema, &bytes, &Presupuesto::default());
+
+            assert_eq!(espia.anuncios.load(Ordering::Relaxed), 1, "{tema}");
+            assert_eq!(
+                v,
+                Veredicto::Ignorar,
+                "{tema}: sin validación, no se acepta"
+            );
+            assert_ne!(v, Veredicto::Aceptar, "{tema}: el parseo no es validación");
+            assert_ne!(
+                v,
+                Veredicto::Rechazar,
+                "{tema}: un anuncio bien formado no penaliza"
+            );
+        }
+    }
+
+    /// **El presupuesto agotado es un recurso local, no un defecto del par.**
+    ///
+    /// Con `Presupuesto::nuevo(0)` la reserva del códec falla antes de leer. El mismo anuncio, bien
+    /// formado, se juzgaría con normalidad si hubiera memoria, así que penalizar al propagador sería
+    /// castigar a un par honesto por nuestra falta de recursos (C-NET-21 + C-NET-05). El veredicto
+    /// es `Ignorar`, el callback compacto **no** se invoca y no hay ningún `Rechazar`.
+    #[test]
+    fn el_presupuesto_agotado_ignora_y_no_penaliza() {
+        let bytes = anuncio().a_bytes();
+
+        let espia = Espia::default();
+        assert_eq!(
+            despachar(&espia, "/zerox/blocks/2", &bytes, &Presupuesto::nuevo(0)),
+            Veredicto::Ignorar,
+            "sin presupuesto no se puede juzgar: no se penaliza al propagador"
+        );
+        assert_ne!(
+            despachar(&espia, "/zerox/blocks/2", &bytes, &Presupuesto::nuevo(0)),
+            Veredicto::Rechazar,
+            "agotar el presupuesto no es basura del par"
+        );
+        assert_eq!(
+            espia.anuncios.load(Ordering::Relaxed),
+            0,
+            "sin anuncio parseado no se llama al callback"
+        );
+
+        // El mismo anuncio, con presupuesto suficiente, sí llega al callback.
+        let espia = Espia::default();
+        assert_eq!(
+            despachar(&espia, "/zerox/blocks/2", &bytes, &Presupuesto::default()),
+            Veredicto::Ignorar,
+            "el manejador espía sigue devolviendo Ignorar"
+        );
+        assert_eq!(
+            espia.anuncios.load(Ordering::Relaxed),
+            1,
+            "con presupuesto, el anuncio bien formado llega al callback"
+        );
+    }
+
+    /// El **default** del trait ignora; no acepta ni reenvía, ni rechaza.
+    #[test]
+    fn el_default_ignora_sin_aceptar_ni_rechazar() {
+        let a = anuncio();
+        assert_eq!(Minimo.anuncio_compacto(&a), Veredicto::Ignorar);
+    }
+
+    /// Residuo, truncamiento y un bloque lineal no pasan por anuncio; el tema desconocido ni mira.
+    #[test]
+    fn residuo_truncado_y_lineal_no_son_anuncios() {
+        let base = anuncio().a_bytes();
+
+        let mut con_residuo = base.clone();
+        con_residuo.push(0x00);
+        let mut truncado = base;
+        truncado.pop();
+
+        let espia = Espia::default();
+        assert_eq!(
+            despachar(
+                &espia,
+                "/zerox/blocks/2",
+                &con_residuo,
+                &Presupuesto::default()
+            ),
+            Veredicto::Rechazar,
+            "un byte residual invalida el anuncio"
+        );
+        assert_eq!(
+            despachar(
+                &espia,
+                "/zerox/blocks/2",
+                &truncado,
+                &Presupuesto::default()
+            ),
+            Veredicto::Rechazar,
+            "un anuncio truncado invalida"
+        );
+        assert_eq!(
+            despachar(
+                &espia,
+                "/zerox/blocks/2",
+                &respuesta_lineal(),
+                &Presupuesto::default()
+            ),
+            Veredicto::Rechazar,
+            "una Respuesta::Bloques no se interpreta como anuncio"
+        );
+        assert_eq!(
+            espia.anuncios.load(Ordering::Relaxed),
+            0,
+            "ninguno de los tres llegó al callback compacto"
+        );
+
+        // El mismo contenido por un tema desconocido no decodifica ni penaliza.
+        let espia2 = Espia::default();
+        for falso in [
+            "/zerox/blocks/2/extra",
+            "/otra/zerox/blocks/2",
+            "/zerox/blocks/20",
+        ] {
+            assert_eq!(
+                despachar(&espia2, falso, &con_residuo, &Presupuesto::default()),
+                Veredicto::Ignorar,
+                "{falso}"
+            );
+        }
+        assert_eq!(espia2.anuncios.load(Ordering::Relaxed), 0);
+        assert_eq!(espia2.bloques.load(Ordering::Relaxed), 0);
+        assert_eq!(espia2.txs.load(Ordering::Relaxed), 0);
+    }
+
+    /// `/blocks/1` sigue invocando el callback lineal y `/txs/1` conserva el suyo.
+    #[test]
+    fn el_bloque_lineal_y_la_transaccion_conservan_su_callback() {
+        for tema in ["/zerox/blocks/1", "/zerox-testnet/blocks/1"] {
+            let espia = Espia::default();
+            assert_eq!(
+                despachar(&espia, tema, &respuesta_lineal(), &Presupuesto::default()),
+                Veredicto::Aceptar
+            );
+            assert_eq!(espia.bloques.load(Ordering::Relaxed), 1, "{tema}");
+            assert_eq!(espia.anuncios.load(Ordering::Relaxed), 0, "{tema}");
+        }
+
+        let espia = Espia::default();
+        assert_eq!(
+            despachar(
+                &espia,
+                "/zerox/txs/1",
+                b"bytes de transaccion",
+                &Presupuesto::default()
+            ),
+            Veredicto::Aceptar
+        );
+        assert_eq!(espia.txs.load(Ordering::Relaxed), 1);
+        assert_eq!(espia.bloques.load(Ordering::Relaxed), 0);
+    }
 }

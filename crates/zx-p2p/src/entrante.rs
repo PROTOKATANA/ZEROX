@@ -28,6 +28,7 @@ use zx_core::preimage::block::BlockHeader;
 use zx_core::tx::Tx;
 
 use crate::mensaje::{BloqueRed, Estado};
+use crate::rele_compacto::AnuncioCompacto;
 
 /// Qué hacer con algo que llegó por difusión.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -55,6 +56,31 @@ pub trait ManejadorEntrante: Send + Sync + 'static {
 
     /// Una transacción llegó por difusión.
     fn tx_difundida(&self, tx_serializada: &[u8]) -> Veredicto;
+
+    /// Un **anuncio compacto** llegó por `/zerox/blocks/2` (o por su variante de testnet).
+    ///
+    /// # Qué ha certificado el transporte, y qué no
+    ///
+    /// El codec que lo entregó aquí comprueba **formato, presupuesto y ausencia de bytes
+    /// residuales**, y nada más: **no certifica el contenido de la cabecera ni que sus padres
+    /// existan**. Validar eso es consenso, y `zx-p2p` no ve el consenso —por eso el trait vive aquí
+    /// y lo implementa `zx-node`—.
+    ///
+    /// # Por qué el default es `Ignorar` y no `Aceptar` ni `Rechazar`
+    ///
+    /// C-NET-26 hace **obligatorio** el relé compacto con cualquier par y C-NET-25 reserva
+    /// `/zerox/blocks/2` a los anuncios compactos, pero ambas fijan el **transporte**, no la
+    /// validez. C-NET-12 exige validar antes de retransmitir, y un bloque huérfano —cuyo padre aún
+    /// no se conoce— MUST descartarse **sin penalizar**.
+    ///
+    /// Así que mientras `zx-node` no disponga de la validación DAG causal, esta implementación por
+    /// defecto **no acepta y no reenvía** (`Aceptar` propagaría algo no validado) ni rechaza
+    /// (`Rechazar` penalizaría a quien solo propagó, C-NET-05). Se limita a `Ignorar`. Cablear la
+    /// validación real, la cola acotada de anuncios sin padres y los proveedores alternativos de
+    /// faltantes es trabajo de `zx-node`, todavía pendiente.
+    fn anuncio_compacto(&self, _anuncio: &AnuncioCompacto) -> Veredicto {
+        Veredicto::Ignorar
+    }
 
     /// Un peer pide cabeceras desde el primer hash de su locator que reconozcamos.
     ///

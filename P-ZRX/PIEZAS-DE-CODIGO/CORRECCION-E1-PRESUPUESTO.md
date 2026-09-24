@@ -1,0 +1,12 @@
+# Corrección E1 · Agotamiento local no penaliza
+
+Ejecuta con DeepSeek Harness `deepseek-v4.1-flash`, esfuerzo `high`. La revisión independiente Rust encontró un defecto de la entrega E1: `servicio.rs::despachar` convierte `ReleError::Presupuesto` en `Rechazar`. La reserva puede fallar por recurso **local**, y `Rechazar` penaliza al par propagador. Además `Presupuesto::default()` recién creado por mensaje no es un presupuesto agregado, aunque la misma estructura lo pueda ser si se comparte.
+
+**Archivos permitidos:** solo `crates/zx-p2p/src/servicio.rs` y, si resulta imprescindible para precisión documental, `crates/zx-p2p/src/entrante.rs`. No toques `ci/`, config, behaviour, node, manifests, lock ni otros archivos. No hagas commit ni push.
+
+1. Cambia el despacho de `/blocks/2` para distinguir `Err(ReleError::Presupuesto)` → `Veredicto::Ignorar` de errores de formato/bytes residuales → `Rechazar`. Mantén `Ok((anuncio, []))` → callback. Un error de presupuesto **no** llega al callback. Cita la semántica de recurso local de `C-NET-21` y no presentes `C-NET-33` (presupuesto CPU PoT) como si fuera este presupuesto de bytes.
+2. Haz que la función libre `despachar` acepte `&Presupuesto` inyectado, de modo que el test pueda forzar reserva fallida con `Presupuesto::nuevo(0)`. `juzgar` puede usar el presupuesto actual de forma explícita mientras E1 sigue sin ruta activa, pero documenta con exactitud que el `default` nuevo no acredita el techo **agregado** de C-NET-21. No afirmes que se ha cerrado C-NET-21. No amplíes a una remodelación de `BucleRed` ni a trabajo asíncrono en esta corrección.
+3. Añade un test con un anuncio serializado válido y presupuesto cero: resultado `Ignorar`, callback compacto cero, ningún rechazo. Con presupuesto suficiente, el mismo anuncio llega al callback. Conserva los tests de residuo/truncado y los seis temas.
+4. Revisa los comentarios que actualmente dicen que *todo* fallo de presupuesto da `Rechazar` y corrígelos. La revisión también confirmó que no aparece ninguna llamada `gossipsub.subscribe` en la ruta actual: no confundas `config.rs::topic_bloques` con suscripción activa. Informa este límite sin editar otros archivos.
+
+Ejecuta `cargo test -p zx-p2p --locked`, `cargo clippy -p zx-p2p --all-targets --locked -- -D warnings`, `cargo fmt --all -- --check`, `ci/citas-spec.sh` y `git diff --check`. Entrega el diff relevante y resultado de gates.
