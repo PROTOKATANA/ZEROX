@@ -22,6 +22,7 @@ pub mod dag_causal;
 #[cfg(feature = "farmer")]
 pub mod farmer;
 pub mod nodo;
+pub mod nodo_dag_dev;
 #[cfg(feature = "farmer")]
 pub mod productor_poas;
 pub mod sync;
