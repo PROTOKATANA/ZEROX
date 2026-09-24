@@ -38,8 +38,11 @@
 //!   dev** y están congelados aquí; no son medidos, no son valores de red y no pueden confundirse
 //!   con mainnet ni testnet. El perfil fija `D_dev = 0`, un solo flujo y el `SR` fijo del fixture
 //!   **solo para preparación**; **no** fija `N_dev` ni la tasa de slots.
-//! - **No toca la red.** El binario `zx-dag-dev` no acepta `--red`, `--peer` ni `--datos`, no abre
-//!   sockets y no abre RocksDB.
+//! - **No opera la red.** Este módulo no abre sockets y el bootstrap no monta red. El binario
+//!   `zx-dag-dev` que lo ejecuta comprueba el bootstrap y sale **sin sockets** si no se pasa
+//!   `--listen` ni `--peer`; con `--listen`/`--peer` abre, **después** del bootstrap y **separado**
+//!   de él, un saludo P2P loopback. El binario no acepta `--red` ni `--datos` y no abre RocksDB; no
+//!   hay admisión PoST, ni producción, ni persistencia, ni propagación de bloques.
 //! - **No usa `AlmacenAdmitidosDag`** ni `AlmacenGhostdag::anadir_sintetico`: atribuirían admisión
 //!   PoST a un fixture.
 //!
