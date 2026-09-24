@@ -1,10 +1,12 @@
 //! Tests de contrato de D1: parcela persistente y auditoría por slot.
 //!
-//! El fixture se construye una sola vez por proceso: archiva un `RecordedHistorySegment` con datos
-//! reproducibles y el `Archiver` real (no un `PieceGetter` de bytes arbitrarios), plotea un sector
+//! El fixture se construye una sola vez por proceso: toma la historia archivada común dev de
+//! [`zx_node::historia_dag_dev::HistoriaDagDev`] (que archiva un `RecordedHistorySegment` con datos
+//! reproducibles y el `Archiver` real, no un `PieceGetter` de bytes arbitrarios), plotea un sector
 //! con `ChiaTable` y guarda el par de archivos. Los tests reutilizan esos bytes para no repetir el
-//! ploteo. Los valores de `FarmerProtocolInfo` son de **desarrollo** y su fuente es el test upstream
-//! `subspace-farmer-components/tests/plot_read_roundtrip.rs`; no son parámetros de red.
+//! ploteo ni la archivación. Los valores de `FarmerProtocolInfo` son de **desarrollo** y su fuente
+//! es el test upstream `subspace-farmer-components/tests/plot_read_roundtrip.rs`; no son parámetros
+//! de red.
 //!
 //! La auditoría se comprueba contra un oráculo independiente que lee el sector desde disco y
 //! recalcula los ganadores con `blake3_hash_with_key` + `bidirectional_distance`; así un
@@ -30,25 +32,21 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Barrier, OnceLock};
 
 use parity_scale_codec::{Decode, DecodeAll, Encode};
-use subspace_archiving::archiver::{Archiver, NewArchivedSegment};
 use subspace_core_primitives::hashes::{Blake3Hash, blake3_hash, blake3_hash_with_key};
-use subspace_core_primitives::pieces::Record;
 use subspace_core_primitives::sectors::{SectorId, SectorIndex};
-use subspace_core_primitives::segments::{HistorySize, RecordedHistorySegment, SegmentCommitment};
+use subspace_core_primitives::segments::{HistorySize, SegmentCommitment};
 use subspace_core_primitives::solutions::bidirectional_distance;
 use subspace_core_primitives::{PublicKey, ScalarBytes};
 use subspace_erasure_coding::ErasureCoding;
-use subspace_farmer_components::FarmerProtocolInfo;
 use subspace_farmer_components::plotting::PlottedSector;
 use subspace_farmer_components::sector::{SectorContentsMap, sector_size};
-use subspace_kzg::Kzg;
-use subspace_verification::PieceCheckParams;
 use zx_consensus::poas::{ErrorPoas, verificar_solucion_poas};
 use zx_consensus::pot::{checkpoints_a_wire, semilla_siguiente, verificar_slot_aes};
 use zx_consensus::reto_desde_salida;
 use zx_core::wire_dag::{CHECKPOINTS_POR_BUNDLE, PotCheckpoints as PotCheckpointsWire};
 use zx_node::bootstrap_dag_dev::iniciar_bootstrap_dag_dev;
 use zx_node::farmer::{ErrorFarmer, ParcelaDisco, plotear_sector_en_disco};
+use zx_node::historia_dag_dev::HistoriaDagDev;
 use zx_node::productor_poas::{
     ErrorProductorPoas, ResultadoConversionLocal, convertir_candidatos_locales,
 };
@@ -63,10 +61,9 @@ const RANGO_PRUEBA: u64 = u64::MAX;
 
 struct Fondo {
     public_key: PublicKey,
-    kzg: Kzg,
-    erasure_coding: ErasureCoding,
-    historial: NewArchivedSegment,
-    protocolo: FarmerProtocolInfo,
+    /// Historia archivada común dev: única fuente de historial, protocolo, KZG, erasure coding y
+    /// contexto de pieza. Sustituye a los campos que este test reconstruía por su cuenta.
+    historia: HistoriaDagDev,
     bytes_sector: Vec<u8>,
     bytes_metadata: Vec<u8>,
 }
@@ -79,37 +76,7 @@ fn fondo() -> &'static Fondo {
 
 fn construir_fondo() -> Fondo {
     let public_key = PublicKey::default();
-    let kzg = Kzg::new();
-    let erasure_coding = ErasureCoding::new(
-        NonZeroUsize::new(Record::NUM_S_BUCKETS.next_power_of_two().ilog2() as usize)
-            .expect("el log2 de los s-buckets no es cero"),
-    )
-    .expect("16 shards es una instancia válida");
-
-    let mut archiver = Archiver::new(kzg.clone(), erasure_coding.clone());
-    let mut input = RecordedHistorySegment::new_boxed();
-    llenar_determinista(AsMut::<[u8]>::as_mut(input.as_mut()));
-    let archived = archiver.add_block(
-        AsRef::<[u8]>::as_ref(input.as_ref()).to_vec(),
-        Default::default(),
-        true,
-    );
-    let historial = archived
-        .archived_segments
-        .into_iter()
-        .next()
-        .expect("un RecordedHistorySegment produce al menos un segmento archivado");
-
-    let protocolo = FarmerProtocolInfo {
-        history_size: HistorySize::from(NonZeroU64::new(1).expect("no es cero")),
-        max_pieces_in_sector: PIEZAS,
-        recent_segments: HistorySize::from(NonZeroU64::new(5).expect("no es cero")),
-        recent_history_fraction: (
-            HistorySize::from(NonZeroU64::new(1).expect("no es cero")),
-            HistorySize::from(NonZeroU64::new(10).expect("no es cero")),
-        ),
-        min_sector_lifetime: HistorySize::from(NonZeroU64::new(4).expect("no es cero")),
-    };
+    let historia = HistoriaDagDev::construir().expect("la historia archivada dev debe construirse");
 
     let dir = DirTemporal::nuevo("fondo");
     let ruta = dir.unir("sector.plot");
@@ -119,10 +86,10 @@ fn construir_fondo() -> Fondo {
         &public_key,
         INDICE_SECTOR,
         PIEZAS,
-        &historial,
-        protocolo,
-        &kzg,
-        &erasure_coding,
+        historia.historial(),
+        historia.protocolo(),
+        historia.kzg(),
+        historia.erasure_coding(),
     )
     .expect("el fixture de ploteo debe funcionar");
     eprintln!(
@@ -137,28 +104,9 @@ fn construir_fondo() -> Fondo {
 
     Fondo {
         public_key,
-        kzg,
-        erasure_coding,
-        historial,
-        protocolo,
+        historia,
         bytes_sector,
         bytes_metadata,
-    }
-}
-
-/// Genera 130 MB reproducibles sin depender de `rand`: splitmix64 sobre el buffer.
-fn llenar_determinista(bytes: &mut [u8]) {
-    let mut estado: u64 = 0x9E37_79B9_7F4A_7C15;
-    for trozo in bytes.chunks_mut(8) {
-        estado = estado.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = estado;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^= z >> 31;
-        let palabra = z.to_le_bytes();
-        for (destino, origen) in trozo.iter_mut().zip(palabra.iter()) {
-            *destino = *origen;
-        }
     }
 }
 
@@ -203,24 +151,6 @@ fn instalar_par(dir: &DirTemporal, fondo: &Fondo) -> PathBuf {
     fs::write(&ruta, &fondo.bytes_sector).expect("escribir sector");
     fs::write(ruta_metadata(&ruta), &fondo.bytes_metadata).expect("escribir metadata");
     ruta
-}
-
-/// `PieceCheckParams` del fixture de **desarrollo** de D2, no de red.
-///
-/// El compromiso de segmento sale del propio segmento archivado por el fixture
-/// (`historial.segment_header.segment_commitment()`) y el resto de `FarmerProtocolInfo`, la misma
-/// fuente de desarrollo que usa el ploteo de D1 (`plot_read_roundtrip.rs`). No son parámetros de
-/// red ni sustituyen al contexto de pieza que debe inyectar el snapshot causal.
-fn params_pieza_fixture(fondo: &Fondo) -> PieceCheckParams {
-    PieceCheckParams {
-        max_pieces_in_sector: fondo.protocolo.max_pieces_in_sector,
-        segment_commitment: fondo.historial.segment_header.segment_commitment(),
-        recent_segments: fondo.protocolo.recent_segments,
-        recent_history_fraction: fondo.protocolo.recent_history_fraction,
-        min_sector_lifetime: fondo.protocolo.min_sector_lifetime,
-        current_history_size: fondo.protocolo.history_size,
-        sector_expiration_check_segment_commitment: None,
-    }
 }
 
 /// Espejo local del `CuerpoParcela` privado de `farmer.rs`, con el mismo orden y tipos, para
@@ -463,10 +393,10 @@ fn ploteo_sobre_par_existente_rechaza_y_conserva_el_previo() {
         &fondo.public_key,
         INDICE_SECTOR,
         PIEZAS,
-        &fondo.historial,
-        fondo.protocolo,
-        &fondo.kzg,
-        &fondo.erasure_coding,
+        fondo.historia.historial(),
+        fondo.historia.protocolo(),
+        fondo.historia.kzg(),
+        fondo.historia.erasure_coding(),
     )
     .expect_err("no debe sobreescribir sin una operación segura");
     assert!(
@@ -514,9 +444,9 @@ fn plotter_fallido_no_deja_par_ni_lock() {
         &fondo.public_key,
         INDICE_SECTOR,
         PIEZAS,
-        &fondo.historial,
-        fondo.protocolo,
-        &fondo.kzg,
+        fondo.historia.historial(),
+        fondo.historia.protocolo(),
+        fondo.historia.kzg(),
         &poca,
     )
     .expect_err("el plotter debe fallar");
@@ -560,10 +490,10 @@ fn lock_preexistente_falla_cerrado_sin_tocar_al_primero() {
         &fondo.public_key,
         INDICE_SECTOR,
         PIEZAS,
-        &fondo.historial,
-        fondo.protocolo,
-        &fondo.kzg,
-        &fondo.erasure_coding,
+        fondo.historia.historial(),
+        fondo.historia.protocolo(),
+        fondo.historia.kzg(),
+        fondo.historia.erasure_coding(),
     )
     .expect_err("el lock ajeno debe detener el ploteo");
     assert!(
@@ -602,10 +532,10 @@ fn dos_escritores_concurrentes_publican_uno_solo() {
             &fondo.public_key,
             INDICE_SECTOR,
             PIEZAS,
-            &fondo.historial,
-            fondo.protocolo,
-            &fondo.kzg,
-            &fondo.erasure_coding,
+            fondo.historia.historial(),
+            fondo.historia.protocolo(),
+            fondo.historia.kzg(),
+            fondo.historia.erasure_coding(),
         )
     };
 
@@ -782,7 +712,7 @@ fn convierte_candidatos_y_verifica_a1() {
     let dir = DirTemporal::nuevo("conversion-a1");
     let ruta = instalar_par(&dir, fondo);
     let parcela = ParcelaDisco::abrir(&ruta, &fondo.public_key).expect("abrir parcela válida");
-    let params = params_pieza_fixture(fondo);
+    let params = fondo.historia.params_pieza();
 
     // Barrido con límite de test explícito hasta la primera solución verificada por A1.
     let mut hallado: Option<(u64, ResultadoConversionLocal)> = None;
@@ -794,8 +724,8 @@ fn convierte_candidatos_y_verifica_a1() {
             slot,
             RANGO_PRUEBA,
             &params,
-            &fondo.kzg,
-            &fondo.erasure_coding,
+            fondo.historia.kzg(),
+            fondo.historia.erasure_coding(),
         )
         .expect("la conversión no debe fallar con el contexto del fixture");
         barridos += 1;
@@ -819,7 +749,7 @@ fn convierte_candidatos_y_verifica_a1() {
             SALIDA_D2,
             RANGO_PRUEBA,
             &params,
-            &fondo.kzg,
+            fondo.historia.kzg(),
         )
         .expect("la solución devuelta debe verificar de forma independiente");
         assert_eq!(
@@ -841,9 +771,15 @@ fn convierte_candidatos_y_verifica_a1() {
     // Mutación de prueba: A1 la rechaza y la API no la devuelve como válida.
     let mut mutada = *resultado.soluciones()[0].solucion();
     mutada.proof_of_space = [0u8; 160];
-    let rechazo =
-        verificar_solucion_poas(&mutada, slot, SALIDA_D2, RANGO_PRUEBA, &params, &fondo.kzg)
-            .expect_err("A1 debe rechazar la mutación de prueba");
+    let rechazo = verificar_solucion_poas(
+        &mutada,
+        slot,
+        SALIDA_D2,
+        RANGO_PRUEBA,
+        &params,
+        fondo.historia.kzg(),
+    )
+    .expect_err("A1 debe rechazar la mutación de prueba");
     assert!(
         matches!(rechazo, ErrorPoas::Prueba(_)),
         "la mutación debe rechazarse como prueba inválida, fue {rechazo:?}"
@@ -869,8 +805,8 @@ fn convierte_candidatos_y_verifica_a1() {
         slot,
         RANGO_PRUEBA,
         &contexto_ajeno,
-        &fondo.kzg,
-        &fondo.erasure_coding,
+        fondo.historia.kzg(),
+        fondo.historia.erasure_coding(),
     )
     .expect("un contexto aritméticamente válido no debe ser error");
     assert!(
@@ -893,8 +829,8 @@ fn convierte_candidatos_y_verifica_a1() {
         slot,
         RANGO_PRUEBA,
         &contexto_invalido,
-        &fondo.kzg,
-        &fondo.erasure_coding,
+        fondo.historia.kzg(),
+        fondo.historia.erasure_coding(),
     )
     .expect_err("un contexto aritméticamente inválido debe propagarse como error");
     assert!(
@@ -922,8 +858,8 @@ fn convierte_candidatos_y_verifica_a1() {
         slot,
         RANGO_PRUEBA,
         &contexto_expiracion,
-        &fondo.kzg,
-        &fondo.erasure_coding,
+        fondo.historia.kzg(),
+        fondo.historia.erasure_coding(),
     )
     .expect_err("la expiración de sector no representable debe propagarse como error");
     assert!(
@@ -968,7 +904,7 @@ fn convierte_pot_dev_y_solucion_disco() {
     let dir = DirTemporal::nuevo("pot-disco");
     let ruta = instalar_par(&dir, fondo);
     let parcela = ParcelaDisco::abrir(&ruta, &fondo.public_key).expect("abrir parcela válida");
-    let params = params_pieza_fixture(fondo);
+    let params = fondo.historia.params_pieza();
 
     // Ancla **confiada** del slot 0 según C3-ARRANQUE: `pot_output(G)` del génesis dev. No la
     // acredita el AES de este test; el encadenado parte de ella como haría el contexto futuro.
@@ -1024,8 +960,8 @@ fn convierte_pot_dev_y_solucion_disco() {
             slot,
             RANGO_PRUEBA,
             &params,
-            &fondo.kzg,
-            &fondo.erasure_coding,
+            fondo.historia.kzg(),
+            fondo.historia.erasure_coding(),
         )
         .expect("la conversión no debe fallar con el contexto del fixture");
 
@@ -1036,7 +972,7 @@ fn convierte_pot_dev_y_solucion_disco() {
                 salida_slot,
                 RANGO_PRUEBA,
                 &params,
-                &fondo.kzg,
+                fondo.historia.kzg(),
             )
             .expect("la solución devuelta debe verificar de forma independiente");
             assert_eq!(
@@ -1085,7 +1021,7 @@ fn convierte_pot_dev_y_solucion_disco() {
         salida_hallada,
         RANGO_PRUEBA,
         &params,
-        &fondo.kzg,
+        fondo.historia.kzg(),
     )
     .expect_err("A1 debe rechazar la mutación de prueba");
     assert!(

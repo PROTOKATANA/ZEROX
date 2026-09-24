@@ -22,6 +22,8 @@ pub mod contextual;
 pub mod dag_causal;
 #[cfg(feature = "farmer")]
 pub mod farmer;
+#[cfg(feature = "farmer")]
+pub mod historia_dag_dev;
 pub mod nodo;
 pub mod nodo_dag_dev;
 pub mod perfil_primer_hijo_dag_dev;

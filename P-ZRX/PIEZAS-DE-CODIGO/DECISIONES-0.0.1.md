@@ -139,3 +139,23 @@ La discrepancia aritmética de 17 frente a 18 piezas no es una decisión de prot
 - Descripción: retrasar el primer hijo hasta crear parcelas distintas y medir una distribución de distancias y tiempos de producción bajo carga, luego fijar un perfil de red dev con esos datos.
 
 **Elección PROVISIONAL del líder: A solo para la preparación del primer hijo dev.** Los valores no se exportan a mainnet/testnet ni se convierten en norma de consenso; la red de tres nodos tendrá que medir y, si procede, cambiar el perfil antes de afirmar tasas representativas. La elección es reversible en un módulo de perfil/contexto dev y sus tests; no toca `SPEC.md`, el génesis congelado ni reglas de lanzamiento. Ninguna cabecera se admitirá por esta decisión aislada: faltan contexto de pieza común, reloj y presupuesto operativos, sello, cuerpo, UTXO y publicación atómica.
+
+## DECISIÓN PROVISIONAL · HISTORIA-DAG-DEV
+
+**Piezas bloqueadas:** A3/D2 y el primer bloque dev verificable por PoAS.
+
+**Descripción:** el test D1 `farmer_disco.rs` ya usa `Archiver` y `plot_sector` reales con un `RecordedHistorySegment` determinista, pero su `Fondo` privado no puede alimentar ni al productor ni al verificador del nodo. A1 exige siempre `PieceCheckParams` con compromiso de segmento procedente de historia coherente; un compromiso arbitrario o tomado del candidato produciría una falsa aceptación o rechazos ambiguos. La historia inicial de mainnet/testnet y su disponibilidad siguen sin fijarse, así que este paso solo puede crear una fuente dev explícita.
+
+**Opción A · Extraer el historial determinista de D1 a un módulo dev compartido**
+
+- Ventajas: productor, verificador y pruebas usan el mismo segmento archivado por upstream, el mismo `FarmerProtocolInfo` y los mismos parámetros de pieza; permite congelar y cotejar un compromiso para detectar divergencias entre procesos. Reutiliza el fixture ya probado.
+- Desventajas: genera ~130 MB de entrada determinista para archivar el segmento y plotea sectores pequeños; es caro para el arranque local y no representa un archivo de red. Congelar un compromiso no demuestra disponibilidad de historia en red ni constituye una regla de lanzamiento.
+- Descripción: mover la construcción determinista y los valores de desarrollo del fixture D1 a un módulo `zx-node` disponible solo con `feature=farmer`, exponer un objeto inmutable con el `NewArchivedSegment`, parámetros de ploteo y `PieceCheckParams`, y comparar el compromiso contra un literal congelado obtenido de una ejecución reproducible. El nodo dev podrá plotear claves distintas contra ese mismo archivo; este incremento no activa aún el binario.
+
+**Opción B · Cada productor aporta su propio contexto de pieza**
+
+- Ventajas: menor refactor inicial del test.
+- Desventajas: dos nodos podrían aceptar soluciones contra historias/compromisos distintos y la red local mediría una configuración incoherente; el candidato podría influir en el contexto si se tomara de su parcela sin una fuente común.
+- Descripción: mantener `Fondo` privado y pasar manualmente `PieceCheckParams` en cada llamada de productor/verificador, sin identidad congelada común.
+
+**Elección PROVISIONAL del líder: A, solo para desarrollo local.** El compromiso congelado y la receta del archivo serán datos de fixture, no compromiso de génesis ni norma de mainnet/testnet. La decisión es reversible en un módulo dev, la extracción del test `farmer_disco.rs` y sus pruebas; no toca el clon Autonomys ni el SPEC. Antes de conectar tres nodos hay que comprobar que cada proceso obtiene el mismo compromiso y que claves de parcela distintas producen soluciones válidas bajo el mismo contexto. Ningún bloque se admite por tener este objeto: A3, cuerpo, reloj y publicación siguen pendientes.
