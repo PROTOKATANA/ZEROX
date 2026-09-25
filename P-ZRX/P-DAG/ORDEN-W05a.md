@@ -27,7 +27,7 @@ solo lectura, con `git -C /home/katana/zeo/ZEROX show 9681061:<ruta>`:
 esos módulos y los de `dag_causal.rs`; vectores
 `veritas/consenso/ghostdag-rank-v1/resultados/{corpus-rust.txt,kaspa-rust.txt}`.
 Base de trabajo: el workspace de la raíz (con W02 y W04 migradas).
-Entrada congelada: `P-ZRX/P-DAG/ENTRADA-W05a.sha256`, al empezar y como último paso.
+Entrada congelada: `P-ZRX/P-DAG/ENTRADA-W05a.sha256` (no incluye el contrato, que se está actualizando; úsalo solo como contexto), al empezar y como último paso.
 
 ## 3. Decisiones ya tomadas por el director
 
