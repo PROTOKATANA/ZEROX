@@ -52,11 +52,14 @@ preimagen.
 
 Cualquier otra versión se rechaza (`C-TX-07`).
 
-**F-06 · Sub-digest de las versiones 2 y 3.** El `txid` de v1 no cambia. Para `version ∈ {2, 3}`
-se añade, **después** de los sub-digest antiguos y en el mismo orden de composición que ellos, un
-sub-digest `H_d("ZZKTxIdGarantia_", campos)` con los campos extra en el orden de la tabla,
-little-endian. La etiqueta mide 16 B, como las demás de `C-HASH`, y se añade a la tabla cerrada de
-etiquetas. El `auth_digest` compromete los testigos como antes (F-08).
+**F-06 · Sub-digest de las versiones 2 y 3.** El `txid` antiguo es
+`H_d(raíz(CBID), header_digest ‖ inputs_digest ‖ outputs_digest)` (`crates/zx-core/src/preimage/tx.rs`,
+`fn txid`), con `version` dentro de `header_digest`. Para `version ∈ {2, 3}` el `txid` es
+`H_d(raíz(CBID), header_digest ‖ inputs_digest ‖ outputs_digest ‖ extension_digest)` con
+`extension_digest = H_d("ZZKTxIdGarantia_", campos extra en el orden de la tabla, little-endian)`.
+Para `version = 1` **no** se añade nada: su `txid` es byte a byte el de `9681061` (vectores
+antiguos intactos). La etiqueta mide 16 B y entra en la tabla cerrada `TAGS_FIJAS`. El
+`auth_digest` compromete los testigos como antes.
 
 **F-07 · Tipos de la versión 2:**
 
@@ -69,10 +72,13 @@ etiquetas. El `auth_digest` compromete los testigos como antes (F-08).
 Otros valores de `tipo` se rechazan. `importe > 0` y `≤ ZX_VALUE_SANITY_LIMIT` (`C-TX-12`). En v0
 el depósito **no** paga tarifa: la igualdad es exacta (coincide con la orden T01, AMBIGÜEDAD-3).
 
-**F-08 · Testigos de la versión 2.** `testigos.len() = entradas.len() + 1`. El último testigo es la
-**firma de aceptación** de `clave`: Ed25519 bajo `clave` sobre el mismo sighash `SIGHASH_ALL` que
-`C-SIG` define para la transacción (ZIP-215, `C-SIG-01`). Para retiro y liberación, que no tienen
-entradas, hay exactamente un testigo. La versión 3 no lleva testigos (la autoriza el sello de la
+**F-08 · Testigos de la versión 2.** `testigos.len() = entradas.len() + 1`: los de las entradas,
+en su orden y con el sighash por entrada de `C-SIG`, y **al final** la **firma de aceptación** de
+`clave`, de 64 B: Ed25519 bajo `clave` (verificación ZIP-215, `C-SIG-01`) sobre el mensaje
+`H_d("ZZKTxSigGarant__", txid(tx, CBID))` (32 B). El sighash antiguo es por entrada y retiro/liberación
+no tienen entradas: por eso la aceptación firma el `txid`, que ya compromete todos los datos de
+efecto y el `CBID`. La etiqueta entra en `TAGS_FIJAS`. Retiro y liberación llevan exactamente un
+testigo. La versión 3 no lleva testigos (la autoriza el sello de la
 cabecera, `C-HDR-04`).
 
 **F-09 · Coinbase PoST (v3).** `clave` **MUST** ser igual a `sol.public_key` de la cabecera que la
@@ -83,6 +89,15 @@ comprueba W03, no el parser).
 `expiry_height = 0`, si no `ErrCampoInactivo`. La coinbase PoW **no** aplica `C-EMIT-04`
 (`expiry_height = altura`) en v0. **No** se admiten salidas `Lock::Htlc` nuevas (su `timeout` es una
 altura): `ErrCampoInactivo`. Las tres restricciones se levantarán cuando exista semántica de altura.
+
+**F-14 · Formato de red y disco (`C-WIRE-03`).** El orden antiguo es
+`version ‖ lock_time ‖ expiry_height ‖ CompactSize(n_in) ‖ entradas ‖ CompactSize(n_out) ‖ salidas ‖
+CompactSize(n_wit) ‖ testigos` (`crates/zx-core/src/wire.rs`, `tx_a_bytes`). Para `version ∈ {2, 3}`
+los campos extra se escriben **entre las salidas y los testigos**, sin prefijo de longitud, en el
+orden y anchura de F-05 (`u8 ‖ 32 B ‖ u64 LE` para v2, `32 B ‖ u64 LE` para v3). La versión 1 no
+cambia. El parser lee `version` y, según ella, exige o prohíbe esos bytes; tras el último testigo no
+puede sobrar nada dentro del cuerpo. La fórmula de peso `C-WGT-02` deberá sumar esos bytes cuando se
+porte `peso.rs` (orden posterior); la propiedad «longitud serializada = peso» se mantiene.
 
 ## 3. Cuerpo, red y génesis
 

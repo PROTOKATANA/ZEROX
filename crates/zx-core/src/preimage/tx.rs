@@ -8,13 +8,15 @@
 //! cuyo hash dio cero" eran indistinguibles y **todos los ausentes colisionaban entre sí**.
 
 use crate::digest::{AuthDigest, Digest, SigHash, TxId};
-use crate::error::EncodingError;
+use crate::error::{EncodingError, ErrorFormaTx};
+use crate::firma::{Firma, LONGITUD_FIRMA};
 use crate::hash::{
-    DomainTag, TAG_TX_AUTH, TAG_TXID_HEADER, TAG_TXID_INPUTS, TAG_TXID_OUTPUTS, TAG_TXID_PREVOUT,
-    TAG_TXID_SEQUENCE, TAG_TXSIG_AMOUNTS, TAG_TXSIG_LOCKS, TAG_TXSIG_THIS_IN,
+    DomainTag, TAG_TX_AUTH, TAG_TXID_GARANTIA, TAG_TXID_HEADER, TAG_TXID_INPUTS, TAG_TXID_OUTPUTS,
+    TAG_TXID_PREVOUT, TAG_TXID_SEQUENCE, TAG_TXSIG_AMOUNTS, TAG_TXSIG_GARANT, TAG_TXSIG_LOCKS,
+    TAG_TXSIG_THIS_IN, h_d,
 };
 use crate::preimage::PreimageWriter;
-use crate::tx::{SpentOutput, Tx, TxOut};
+use crate::tx::{ExtensionTx, SpentOutput, Tx, TxOut};
 
 /// Modo de firma (C-SIG-03). Conjunto **cerrado**: cualquier otro byte es inválido.
 ///
@@ -135,6 +137,35 @@ fn inputs_digest(tx: &Tx) -> Digest {
     w.finish(TAG_TXID_INPUTS)
 }
 
+/// `extension_digest` de las versiones 2 y 3 (F-06, F-07):
+/// `H_d("ZZKTxIdGarantia_", campos extra de F-05)`.
+///
+/// - v2: `tipo u8 ‖ clave 32 B ‖ importe u64` LE.
+/// - v3: `clave 32 B ‖ importe u64` LE.
+/// - v1 (`Ninguna`): `None`; su `txid` queda byte a byte igual al de `9681061`.
+///
+/// Los campos se escriben aunque el `importe` sea `u64` (F-05); el `importe` de las salidas sigue
+/// siendo `i64` (el árbol de `9681061`). Como `importe > 0`, los bytes no difieren.
+fn extension_digest(tx: &Tx) -> Option<Digest> {
+    match &tx.extension {
+        ExtensionTx::Ninguna => None,
+        ExtensionTx::Garantia {
+            tipo,
+            clave,
+            importe,
+        } => {
+            let mut w = PreimageWriter::con_capacidad(1 + 32 + 8);
+            w.u8(tipo.byte()).clave(clave).u64(importe.brek() as u64);
+            Some(w.finish(TAG_TXID_GARANTIA))
+        }
+        ExtensionTx::CoinbasePost { clave, importe } => {
+            let mut w = PreimageWriter::con_capacidad(32 + 8);
+            w.clave(clave).u64(importe.brek() as u64);
+            Some(w.finish(TAG_TXID_GARANTIA))
+        }
+    }
+}
+
 /// El **txid** (C-TX-01): solo datos de efecto, **sin firmas**.
 ///
 /// Que excluya las firmas es lo que lo hace no maleable, y por tanto lo que permite construir una
@@ -143,13 +174,61 @@ fn inputs_digest(tx: &Tx) -> Digest {
 ///
 /// `consensus_branch_id` entra en la etiqueta raíz (C-UPG-04): una transacción de una rama de
 /// consenso no puede repetirse en otra.
+///
+/// Para v2/v3 se añade `extension_digest` al final (F-06). Para v1 no se añade nada.
 #[must_use]
 pub fn txid(tx: &Tx, consensus_branch_id: u32) -> TxId {
-    let mut w = PreimageWriter::con_capacidad(96);
+    let mut w = PreimageWriter::con_capacidad(128);
     w.digest(&header_digest(tx))
         .digest(&inputs_digest(tx))
         .digest(&outputs_digest_de(&tx.outputs));
+    if let Some(ext) = extension_digest(tx) {
+        w.digest(&ext);
+    }
     TxId::from_digest(w.finish(DomainTag::raiz(consensus_branch_id)))
+}
+
+/// Mensaje de la **firma de aceptación** de v2 (F-08): `H_d("ZZKTxSigGarant__", txid(tx, CBID))`.
+///
+/// Es el mensaje Ed25519 que firma `clave` (la de la extensión de garantía). El `txid` ya
+/// compromete todos los datos de efecto y el `CBID`; para retiro y liberación, que no tienen
+/// entradas, es la única atadura disponible.
+#[must_use]
+pub fn mensaje_aceptacion(tx: &Tx, consensus_branch_id: u32) -> [u8; 32] {
+    *h_d(TAG_TXSIG_GARANT, txid(tx, consensus_branch_id).as_bytes()).as_bytes()
+}
+
+/// Verifica la firma de aceptación de v2 (F-08) con las reglas ZIP-215 de [`crate::firma`].
+///
+/// `testigo_aceptacion` es el último testigo y **MUST** medir [`LONGITUD_FIRMA`] = 64 B.
+///
+/// # Errores
+/// - [`ErrorFormaTx::ExtensionIncoherente`] si `tx` no es una v2 con extensión `Garantia`.
+/// - [`ErrorFormaTx::TestigoAceptacionLongitud`] si el testigo no mide 64 B.
+/// - [`ErrorFormaTx::Codificacion`] con [`EncodingError::FirmaInvalida`] si la firma no verifica.
+pub fn verificar_aceptacion(
+    tx: &Tx,
+    testigo_aceptacion: &[u8],
+    consensus_branch_id: u32,
+) -> Result<(), ErrorFormaTx> {
+    let ExtensionTx::Garantia { clave, .. } = &tx.extension else {
+        return Err(ErrorFormaTx::ExtensionIncoherente {
+            version: tx.version,
+            esperada: "Garantia",
+        });
+    };
+
+    let bytes: [u8; LONGITUD_FIRMA] =
+        testigo_aceptacion
+            .try_into()
+            .map_err(|_| ErrorFormaTx::TestigoAceptacionLongitud {
+                obtenidos: testigo_aceptacion.len(),
+            })?;
+
+    let firma = Firma::desde_bytes(bytes);
+    let mensaje = mensaje_aceptacion(tx, consensus_branch_id);
+    crate::firma::verificar(clave, &firma, &mensaje)?;
+    Ok(())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -322,7 +401,7 @@ mod tests {
     use crate::error::EncodingError;
     use crate::firma::ClavePublica;
     use crate::preimage::PreimageWriter;
-    use crate::tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
+    use crate::tx::{ExtensionTx, Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
 
     const CBID: u32 = 0xc478_80ea;
 
@@ -361,6 +440,7 @@ mod tests {
             outputs: vec![salida(50_000, 10), salida(25_000, 11)],
             lock_time: 0,
             expiry_height: 0,
+            extension: ExtensionTx::Ninguna,
         };
         let gastadas = vec![gastada(40_000, 20), gastada(40_000, 21)];
         (tx, gastadas)
@@ -479,6 +559,7 @@ mod tests {
             outputs: vec![salida(10, 5)], // solo una salida, dos entradas
             lock_time: 0,
             expiry_height: 0,
+            extension: ExtensionTx::Ninguna,
         };
         let g = vec![gastada(10, 6), gastada(10, 7)];
 

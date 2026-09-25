@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use zx_core::digest::{BodyCommitment, Digest, TxId};
 use zx_core::firma::ClavePublica;
 use zx_core::preimage::block::merkle_root;
-use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
 use zx_core::{Amount, BlockHash, DagBlockHeader, PadresDag, SolucionPoas, auth_digest, txid};
 
 const CBID: u32 = 0xc478_80ea;
@@ -49,6 +49,7 @@ fn tx(n: u8, valor: i64) -> Tx {
         }],
         lock_time: 0,
         expiry_height: 0,
+        extension: ExtensionTx::Ninguna,
     }
 }
 

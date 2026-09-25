@@ -18,6 +18,16 @@ pub const MAGIC_MAINNET: [u8; 4] = [0x9e, 0x0f, 0x10, 0x44];
 /// Prefijo mágico de testnet (C-NET-01). Primeros 4 bytes de `SHA3-256("ZEROX/testnet/magic")`.
 pub const MAGIC_TESTNET: [u8; 4] = [0xbb, 0x79, 0x64, 0x3f];
 
+/// Prefijo mágico de la red dev (C-NET-01). Primeros 4 bytes de `SHA3-256("ZEROX/dev/magic")`.
+pub const MAGIC_DEV: [u8; 4] = [0xdb, 0x34, 0x78, 0x47];
+
+/// `CONSENSUS_BRANCH_ID` de la red dev (F-12).
+///
+/// Los **4 primeros bytes, en little-endian**, de `SHA3-256("ZEROX hibrido red dev v0")`; si salen
+/// `0`, se usa `1`. Vale `0xa8b466a7` y el test lo **recalcula** de su fórmula. Solo la red dev
+/// puede usarlo (D-P05).
+pub const CBID_RED_DEV: u32 = 0xa8b4_66a7;
+
 /// La cadena a la que pertenece algo.
 ///
 /// Aparece en direcciones (el HRP entra en el checksum, así que una dirección de testnet **no
@@ -29,6 +39,8 @@ pub enum Red {
     Mainnet,
     /// Cadena de pruebas.
     Testnet,
+    /// Red de desarrollo de 0.0.1 (F-12, D-P05).
+    Dev,
 }
 
 impl Red {
@@ -38,6 +50,7 @@ impl Red {
         match self {
             Self::Mainnet => "mainnet",
             Self::Testnet => "testnet",
+            Self::Dev => "dev",
         }
     }
 
@@ -51,6 +64,7 @@ impl Red {
         match self {
             Self::Mainnet => MAGIC_MAINNET,
             Self::Testnet => MAGIC_TESTNET,
+            Self::Dev => MAGIC_DEV,
         }
     }
 }
@@ -58,13 +72,15 @@ impl Red {
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
 mod tests {
-    use super::{MAGIC_MAINNET, MAGIC_TESTNET, Red};
+    use super::{CBID_RED_DEV, MAGIC_DEV, MAGIC_MAINNET, MAGIC_TESTNET, Red};
     use crate::sha3_256_publico;
 
     #[test]
     fn las_dos_redes_tienen_nombres_distintos() {
         assert_ne!(Red::Mainnet.nombre(), Red::Testnet.nombre());
         assert_eq!(Red::Mainnet.nombre(), "mainnet");
+        assert_eq!(Red::Dev.nombre(), "dev");
+        assert_ne!(Red::Dev.nombre(), Red::Mainnet.nombre());
     }
 
     /// **C-NET-01.** Los prefijos son **derivados, no inventados**, y esto lo demuestra.
@@ -74,7 +90,7 @@ mod tests {
     /// fórmula o los que alguien tecleó una vez.
     #[test]
     fn los_prefijos_magicos_se_derivan_de_su_formula() {
-        for red in [Red::Mainnet, Red::Testnet] {
+        for red in [Red::Mainnet, Red::Testnet, Red::Dev] {
             let etiqueta = format!("ZEROX/{}/magic", red.nombre());
             let h = sha3_256_publico(etiqueta.as_bytes());
             let cuatro: [u8; 4] = h.as_bytes().get(..4).unwrap().try_into().unwrap();
@@ -89,7 +105,7 @@ mod tests {
     /// Bitcoin documenta que sus prefijos *"not valid as UTF-8"*. Comprobado, no citado.
     #[test]
     fn los_prefijos_magicos_no_son_utf8_valido() {
-        for magic in [MAGIC_MAINNET, MAGIC_TESTNET] {
+        for magic in [MAGIC_MAINNET, MAGIC_TESTNET, MAGIC_DEV] {
             assert!(core::str::from_utf8(&magic).is_err(), "{magic:02x?}");
         }
     }
@@ -97,5 +113,22 @@ mod tests {
     #[test]
     fn cada_red_tiene_su_propio_prefijo() {
         assert_ne!(Red::Mainnet.magic(), Red::Testnet.magic());
+        assert_ne!(Red::Mainnet.magic(), Red::Dev.magic());
+        assert_ne!(Red::Testnet.magic(), Red::Dev.magic());
+    }
+
+    /// **F-12.** El `CONSENSUS_BRANCH_ID` de dev es **derivado**, no tecleado: se recalcula aquí
+    /// de su fórmula exacta (primeros 4 bytes LE de `SHA3-256("ZEROX hibrido red dev v0")`; `0` se
+    /// sustituye por `1`).
+    #[test]
+    fn el_cbid_de_dev_se_deriva_de_su_formula() {
+        let h = sha3_256_publico(b"ZEROX hibrido red dev v0");
+        let bytes: [u8; 4] = h.as_bytes().get(..4).unwrap().try_into().unwrap();
+        let mut cbid = u32::from_le_bytes(bytes);
+        if cbid == 0 {
+            cbid = 1;
+        }
+        assert_eq!(cbid, CBID_RED_DEV, "F-12");
+        assert_ne!(CBID_RED_DEV, 0, "F-12: 0 se sustituye por 1");
     }
 }

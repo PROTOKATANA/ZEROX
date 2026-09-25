@@ -43,6 +43,8 @@ pub const HRP_MAINNET: &str = "zzk";
 pub const HRP_MAINNET_BLINDADA: &str = "zzs";
 /// HRP de testnet, pool transparente.
 pub const HRP_TESTNET: &str = "tzzk";
+/// HRP de la red dev, pool transparente (F-12, D-P05).
+pub const HRP_DEV: &str = "dzzk";
 
 pub use crate::red::Red;
 
@@ -58,6 +60,7 @@ impl HrpDeRed for Red {
         match self {
             Self::Mainnet => HRP_MAINNET,
             Self::Testnet => HRP_TESTNET,
+            Self::Dev => HRP_DEV,
         }
     }
 
@@ -65,6 +68,7 @@ impl HrpDeRed for Red {
         match h {
             HRP_MAINNET => Some(Self::Mainnet),
             HRP_TESTNET => Some(Self::Testnet),
+            HRP_DEV => Some(Self::Dev),
             _ => None,
         }
     }
@@ -149,7 +153,7 @@ impl Address {
     reason = "los tests fallan con panic por diseño"
 )]
 mod tests {
-    use super::{Address, HRP_MAINNET, HRP_TESTNET, Red};
+    use super::{Address, HRP_DEV, HRP_MAINNET, HRP_TESTNET, Red};
     use crate::firma::{ClavePublica, LONGITUD_CLAVE};
     use bech32::{Bech32, Bech32m, Hrp};
 
@@ -159,7 +163,7 @@ mod tests {
 
     #[test]
     fn ida_y_vuelta() {
-        for red in [Red::Mainnet, Red::Testnet] {
+        for red in [Red::Mainnet, Red::Testnet, Red::Dev] {
             let a = dir(red, 0x42);
             let s = a.codificar().unwrap();
             assert_eq!(Address::decodificar(&s).unwrap(), a, "{s}");
@@ -173,6 +177,10 @@ mod tests {
                 .codificar()
                 .unwrap()
                 .starts_with(HRP_MAINNET)
+        );
+        assert!(
+            dir(Red::Dev, 1).codificar().unwrap().starts_with(HRP_DEV),
+            "F-12: el HRP de dev es dzzk"
         );
         assert!(
             dir(Red::Testnet, 1)

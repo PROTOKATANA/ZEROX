@@ -135,12 +135,73 @@ pub struct TxOut {
     pub lock: Lock,
 }
 
+/// Tipo de operación de garantía (F-07, `C-BON-02/05/06`).
+///
+/// Los valores son consenso: no se reordenan. El `u8` del wire es el discriminante.
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum TipoGarantia {
+    /// Depósito: entradas ≥ 1, salidas ≥ 0 (cambio). `Σ entradas = Σ salidas + importe`.
+    Deposito = 1,
+    /// Retiro: sin entradas ni salidas; mueve `importe` de activo a en retirada.
+    Retiro = 2,
+    /// Liberación: sin entradas ni salidas; crea la salida implícita por `importe`.
+    Liberacion = 3,
+}
+
+impl TipoGarantia {
+    /// El byte de wire (F-07).
+    #[must_use]
+    pub const fn byte(self) -> u8 {
+        self as u8
+    }
+
+    /// Decodifica el byte de wire (F-07). Conjunto **cerrado**: otro valor se rechaza.
+    #[must_use]
+    pub const fn desde_byte(v: u8) -> Option<Self> {
+        match v {
+            1 => Some(Self::Deposito),
+            2 => Some(Self::Retiro),
+            3 => Some(Self::Liberacion),
+            _ => None,
+        }
+    }
+}
+
+/// Campos de efecto extra por versión (F-05, F-06, F-07).
+///
+/// Es el «gancho de extensión» de `C-TX-07`. La coherencia con `version` es obligatoria:
+/// `1 ⇔ Ninguna`, `2 ⇔ Garantia`, `3 ⇔ CoinbasePost`; `validar_forma_tx` la exige.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum ExtensionTx {
+    /// Versión 1: sin campos extra (idéntica a `9681061`).
+    Ninguna,
+    /// Versión 2: operación de garantía (F-07).
+    Garantia {
+        /// Operación.
+        tipo: TipoGarantia,
+        /// Clave a la que se acredita / de la que se retira / a la que se libera.
+        clave: ClavePublica,
+        /// Importe de la operación. `> 0` y `≤ ZX_VALUE_SANITY_LIMIT`.
+        importe: Amount,
+    },
+    /// Versión 3: coinbase PoST (F-09). `clave` MUST ser `sol.public_key` de su cabecera
+    /// (lo comprueba la máquina de estados, no el parser).
+    CoinbasePost {
+        /// Clave pagada.
+        clave: ClavePublica,
+        /// Importe de la coinbase.
+        importe: Amount,
+    },
+}
+
 /// Una transacción, solo con sus **datos de efecto** (§5.1).
 ///
 /// Los datos de autorización —las firmas— viajan aparte, en el testigo. Ver [`crate::preimage`].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Tx {
-    /// Versión. **MUST** ser `1` en v1.0 (C-TX-07). Es el gancho de extensión del protocolo.
+    /// Versión. En v0: `1` transferencia/coinbase PoW, `2` garantía, `3` coinbase PoST. Es el
+    /// gancho de extensión del protocolo (C-TX-07).
     pub version: u32,
     /// Entradas consumidas.
     pub inputs: Vec<TxIn>,
@@ -150,6 +211,23 @@ pub struct Tx {
     pub lock_time: u32,
     /// Altura tras la cual deja de ser válida; `0` = sin expiración (C-TX-08).
     pub expiry_height: u32,
+    /// Campos de efecto extra de la versión (F-05). Coherencia obligatoria con `version`.
+    pub extension: ExtensionTx,
+}
+
+impl Tx {
+    /// ¿Esta transacción es candidata a **coinbase PoW**?
+    ///
+    /// F-05: una v1 con `n_in = 0` solo es válida como coinbase PoW (o como la coinbase sin salidas
+    /// de valor del génesis, F-13). `validar_forma_tx` no puede saber si la transacción es la
+    /// primera de un bloque PoW, así que no la rechaza: la acepta y expone esta marca para que el
+    /// contexto decida. No sustituye a la comprobación contextual.
+    #[must_use]
+    pub fn es_candidata_coinbase_pow(&self) -> bool {
+        self.version == 1
+            && self.inputs.is_empty()
+            && matches!(self.extension, ExtensionTx::Ninguna)
+    }
 }
 
 /// La salida que una entrada consume, tal y como existía en el UTXO set.

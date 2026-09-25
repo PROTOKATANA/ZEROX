@@ -1,0 +1,7 @@
+# Versión de Julia fijada para este oráculo (LINEO §1: pinchar la versión o documentarla).
+#
+# Es la misma versión con la que se ejecutaron las órdenes T01/T02 y L01. El binario se invoca
+# siempre con `env -u LD_LIBRARY_PATH` y `--project=.` según LINEO §1.
+
+version = "1.13.0"
+binary  = "/home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/julia"

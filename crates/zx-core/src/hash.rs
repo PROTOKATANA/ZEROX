@@ -169,21 +169,29 @@ pub(crate) const TAG_FLOW_ID: DomainTag = DomainTag::fija(*b"ZZKFlowId_______");
 /// §7.1.3 · etiqueta del génesis del flujo (`C-FLU-06`). Va **dentro del mensaje** de `H_flujo`
 /// junto al `block_hash` del génesis; no es la etiqueta de dominio del hash.
 pub(crate) const TAG_FLOW_GENESIS: DomainTag = DomainTag::fija(*b"ZZKFlowGenesis__");
+/// F-06 · sub-digest de la extensión de v2/v3 (`extension_digest`).
+///
+/// Añadida en W02 a la tabla cerrada: cambiarla es un cambio de consenso (C-HASH-05).
+pub(crate) const TAG_TXID_GARANTIA: DomainTag = DomainTag::fija(*b"ZZKTxIdGarantia_");
+/// F-08 · mensaje de la firma de aceptación de v2: `H_d("ZZKTxSigGarant__", txid)`.
+pub(crate) const TAG_TXSIG_GARANT: DomainTag = DomainTag::fija(*b"ZZKTxSigGarant__");
 
-/// Las quince etiquetas ASCII fijas, para las comprobaciones de invariante.
+/// Las diecisiete etiquetas ASCII fijas, para las comprobaciones de invariante.
 #[allow(
     dead_code,
     reason = "solo lo usan los tests de invariante de este módulo"
 )]
-pub(crate) const TAGS_FIJAS: [DomainTag; 15] = [
+pub(crate) const TAGS_FIJAS: [DomainTag; 17] = [
     TAG_TXID_HEADER,
     TAG_TXID_INPUTS,
     TAG_TXID_PREVOUT,
     TAG_TXID_SEQUENCE,
     TAG_TXID_OUTPUTS,
+    TAG_TXID_GARANTIA,
     TAG_TXSIG_AMOUNTS,
     TAG_TXSIG_LOCKS,
     TAG_TXSIG_THIS_IN,
+    TAG_TXSIG_GARANT,
     TAG_TX_AUTH,
     TAG_BLK_MERKLE,
     TAG_BLK_HEADER,
@@ -195,7 +203,10 @@ pub(crate) const TAGS_FIJAS: [DomainTag; 15] = [
 
 #[cfg(test)]
 mod tests {
-    use super::{DomainTag, TAG_FLOW_GENESIS, TAG_FLOW_ID, TAGS_FIJAS, h_d, sha3_256};
+    use super::{
+        DomainTag, TAG_FLOW_GENESIS, TAG_FLOW_ID, TAG_TXID_GARANTIA, TAG_TXSIG_GARANT, TAGS_FIJAS,
+        h_d, sha3_256,
+    };
 
     /// Ancla de cordura: si esto falla, se ha implementado Keccak-256 y no SHA3-256 (H-001).
     #[test]
@@ -224,7 +235,7 @@ mod tests {
             );
             vistas.push(b);
         }
-        assert_eq!(vistas.len(), 15);
+        assert_eq!(vistas.len(), 17);
     }
 
     /// Las dos etiquetas del flujo son exactamente las de la tabla C-HASH-06.
@@ -238,6 +249,20 @@ mod tests {
         assert_eq!(TAG_FLOW_GENESIS.as_bytes(), b"ZZKFlowGenesis__");
         assert_ne!(
             TAG_FLOW_ID, TAG_FLOW_GENESIS,
+            "no se uniforman: son dos etiquetas distintas"
+        );
+    }
+
+    /// Las dos etiquetas de W02 son exactamente las de F-06 y F-08.
+    ///
+    /// `ZZKTxIdGarantia_` es el sub-digest de la extensión de v2/v3 y `ZZKTxSigGarant__` es el
+    /// mensaje de la firma de aceptación. Un cambio aquí es un cambio de consenso (C-HASH-05).
+    #[test]
+    fn las_etiquetas_de_garantia_son_las_de_la_tabla() {
+        assert_eq!(TAG_TXID_GARANTIA.as_bytes(), b"ZZKTxIdGarantia_");
+        assert_eq!(TAG_TXSIG_GARANT.as_bytes(), b"ZZKTxSigGarant__");
+        assert_ne!(
+            TAG_TXID_GARANTIA, TAG_TXSIG_GARANT,
             "no se uniforman: son dos etiquetas distintas"
         );
     }

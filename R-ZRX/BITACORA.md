@@ -108,3 +108,18 @@ Nunca push.
 
 Modelo adversarial FC-1/FC-2/FC-3 (DeepSeek, 4 hilos). Entrada congelada sin `RFT-ZRX.md` ni la
 nota A-07 para poder actualizarlas durante la ejecución.
+
+### 01:12–01:23
+
+- Revisados los informes Sonnet de fuentes (Filecoin; coste PoW) con citas comprobadas por el
+  director; una corrección al de Filecoin (motivo del bloque finalizado). `REVISION.md` en cada uno.
+- **L01-C1**: `zx-consensus` 421/0/4 y `zx-storage`+`rocksdb` 60/0/0 → **línea base REPRODUCIDA**
+  (`P-ZRX/P-LINEA-BASE/REVISION.md`).
+- **T02** se detuvo con cuatro ambigüedades reales (la más seria: sin retarget, FC-1 ≡ FC-3 en E3);
+  corrección **T02-A** lanzada 01:16.
+- **W01** superada y **migrada a la raíz** (workspace con `zx-core` y `zx-pot`); commit local
+  `29b6bd6` (solo archivos propios y revisados, sin borrados ni documentos de Katana).
+- Diseño **FORMATO-v0** (`P-ZRX/P-FORMATO/`): v1 intacta; v2 garantía, v3 coinbase PoST, v4
+  evidencia inactiva; campos de altura inactivos; `Red::Dev`. **W02** lanzada 01:23.
+- Nota de proceso: por dos veces lancé `python3 -c 1`/`--version` como sonda inútil; no ejecuta
+  código de auditoría, pero sobra: no se repetirá.

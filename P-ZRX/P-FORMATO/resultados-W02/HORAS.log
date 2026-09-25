@@ -1,0 +1,20 @@
+# HORAS.log — ORDEN-W02
+# Marcas `date -Is`; donde no hubo captura directa, hora de modificación del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W02/
+2026-09-26T01:24:00+02:00  inicio de sesion; lectura integra de ORDEN-W02.md, FORMATO-v0.md, V-ZRX/LINEO.md y PLAN-0.0.1.md §3
+2026-09-26T01:24:30+02:00  ENTRADA INICIO: sha256sum de los 4 ficheros de ENTRADA-W02.sha256 -> coinciden los 4
+2026-09-26T01:24:50+02:00  hallazgos de definicion imperfecta (§9(b) tres anclas, V6 vs §3.2, bytes sobrantes, importe>limite, ruta de vectores) informados antes de editar
+2026-09-26T01:25:10+02:00  copia de Cargo.toml/Cargo.lock/rust-toolchain.toml/crates/testdata/ci/.github a ws.orig y ws; copia de .cargo-home de W01 (697 MiB)
+2026-09-26T01:26:02+02:00  ancla v1 temporal sobre ws pristino (logs/ancla-tmp.log): ANCLA_TX_EJEMPLO=c722c4f8a2edc1c092b4d494e6e287df2bc88ab79b9d4568f609f8eef9ce3bc6; test temporal borrado
+2026-09-26T01:27:28+02:00  oraculo Julia: Pkg.instantiate, Pkg.test (80/80) y run.jl --seed 0x5a5a -> 14 casos; vectores copiados a ws/testdata/formato-v0
+2026-09-26T01:30:00+02:00  implementacion Rust: ExtensionTx/TipoGarantia, ErrorFormaTx, etiquetas, extension_digest/txid/mensaje_aceptacion/verificar_aceptacion, codec F-14, forma.rs, Red::Dev
+2026-09-26T01:30:52+02:00  cargo check --workspace --all-targets --locked -> exit 0
+2026-09-26T01:32:22+02:00  formato_v0.rs: 19 tests, 0 fallan; Rust y Julia coinciden byte a byte
+2026-09-26T01:32:44+02:00  V1-V3/V7 primera pasada: V1=0 V2=101 (2 avisos clippy) V3=0 V7=0
+2026-09-26T01:33:22+02:00  V1-V3/V7 segunda pasada: V1=0 V2=0 V3=0 (182 pasan, 0 fallan) V7=0
+2026-09-26T01:33:25+02:00  V5: 161 nombres antiguos, 0 desaparecen; V6: 12 ficheros, 10 identicos, 2 con solo `extension: ExtensionTx::Ninguna`
+2026-09-26T01:33:49+02:00  V4 final: Pkg.test (80/80) y run.jl --seed 0x5a5a; vectores identicos a los usados por V3
+2026-09-26T01:34:30+02:00  cambios.patch (2164 lineas) y MIGRACION.sha256 (54 huellas, sha256sum -c OK)
+2026-09-26T01:35:30+02:00  INFORME.md, PROGRESO.md, oraculo-formato-v0/INFORME.md
+2026-09-26T01:36:00+02:00  ENTREGA FINAL: sha256sum -c ENTRADA-W02.sha256 -> 4/4 La suma coincide, exit=0
+2026-09-26T01:36:00+02:00  fin; presupuesto (2 h / 8 hilos / 16 GiB / 20 GiB) no agotado (≈13 min de reloj)

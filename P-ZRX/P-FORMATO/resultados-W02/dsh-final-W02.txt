@@ -1,0 +1,18 @@
+**ORDEN-W02 — veredicto: SUPERADO.** Pregunta falsable no refutada: Rust y el oráculo Julia independiente coinciden byte a byte en `wire`, `txid` y mensaje de aceptación; ningún `txid`/vector v1 de `9681061` cambió.
+
+**Falta de definición detectada antes de editar (y resuelta, §5 del INFORME):**
+1. §9(b) pide **tres** `txid` v1 antiguos, pero solo hay **dos** literales congelados (`txid1`/`txid2`). Se ancló un tercero del escenario `tx_ejemplo()` de `preimage/tx.rs`, congelado con el código antiguo (`29b6bd6`) y reproducido por Julia.
+2. **V6 byte a byte choca con §3.2** (añadir `extension` obliga a tocar literales de test). Se cumple el criterio: el diff de `vectores_dag.rs`/`oraculo_julia.rs` es solo `extension: ExtensionTx::Ninguna`; ningún vector cambia.
+3. «Bytes sobrantes»: el parser devuelve el resto por diseño (lo exige `cuerpo_desde_bytes`); no los consume y `validar_forma_tx` rechaza v1+extensión en memoria.
+4. `importe > ZX_VALUE_SANITY_LIMIT` es irrepresentable en `Tx` (`Amount` lo impide); se cubre en `Amount` y en el códec.
+5. La ruta de los vectores (`oraculo → ws/testdata/formato-v0`) no estaba fijada.
+
+**V1–V7:** V1 fmt **0**; V2 clippy `-D warnings` **0**; V3 **182 pasan / 0 fallan** (161 antiguos con su nombre + 19 nuevos); V4 oráculo Julia **80/80** y `run.jl --seed 0x5a5a`; V5 161 antiguos, **0** desaparecen; V6 12 ficheros, 10 idénticos y 2 con solo la inserción mecánica; V7 **10** deps exactas. Entrada `ENTRADA-W02.sha256` verificada al inicio y al final (4/4).
+
+**Implementado (F-05…F-14 en alcance):** `ExtensionTx`/`TipoGarantia` y `Tx.extension`; coherencia versión⇔extensión; `txid` v1 intacto y v2/v3 con `H_d("ZZKTxIdGarantia_", …)`; firma de aceptación `H_d("ZZKTxSigGarant__", txid)` con ZIP-215; códec F-14; `validar_forma_tx`/`validar_forma_cabecera_post`; `Red::Dev` con `magic=db347847`, `CBID=a8b466a7` (recalculados en test) y HRP `dzzk`; `TAGS_FIJAS` 15→17.
+
+**Oráculo:** `oraculo-formato-v0/` (solo stdlib `SHA`/`Test`, `Manifest.toml` y `julia-version.toml`), con 14 casos ≥12 y `testdata/formato-v0/vectores.txt` copiado sin editar a `ws/`. Ninguna dependencia Rust nueva; `Cargo.toml`/`Cargo.lock` intactos.
+
+**Entregables en `/home/katana/zeo/ZEROX/deepseek/W02/`:** `ws/`, `ws.orig/`, `cambios.patch` (2188 líneas), `MIGRACION.sha256` (54 huellas, `-c` OK), `oraculo-formato-v0/` (con `INFORME.md`), `logs/`, `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Todo dentro de la zona; ≈13 min de reloj de los 2 h.
+
+**Lo que NO demuestra:** reglas contextuales (posición de coinbase, saldos, `clave == sol.public_key`), peso `C-WGT-02`, génesis F-13 ni semántica de estado; quedan para W03/W05.

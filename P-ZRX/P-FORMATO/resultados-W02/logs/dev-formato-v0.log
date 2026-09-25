@@ -1,0 +1,28 @@
+   Compiling zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02/ws/crates/zx-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+     Running tests/formato_v0.rs (/home/katana/zeo/ZEROX/deepseek/W02/target/debug/deps/formato_v0-071b96b81cb022a8)
+
+running 19 tests
+test el_codec_rechaza_un_importe_de_extension_fuera_de_rango ... ok
+test el_codec_rechaza_versiones_y_tipos_fuera_de_rango ... ok
+test el_deposito_sin_entradas_se_rechaza ... ok
+test el_importe_de_la_extension_debe_ser_positivo ... ok
+test el_codec_rechaza_una_extension_truncada_y_no_consume_sobrantes ... ok
+test el_recuento_de_testigos_de_v2_es_n_in_mas_uno ... ok
+test el_testigo_de_aceptacion_mide_64_bytes ... ok
+test la_altura_de_una_cabecera_post_debe_ser_cero ... ok
+test la_version_y_la_extension_deben_ser_coherentes ... ok
+test las_salidas_htlc_estan_inactivas ... ok
+test las_versiones_fuera_de_rango_se_rechazan ... ok
+test los_campos_de_altura_estan_inactivos ... ok
+test la_coinbase_post_no_lleva_entradas_salidas_ni_testigos ... ok
+test los_casos_validos_de_forma_pasan ... ok
+test retiro_y_liberacion_no_admiten_entradas_ni_salidas ... ok
+test los_tres_txid_v1_antiguos_se_reproducen ... ok
+test cada_campo_de_la_extension_y_la_version_cambia_el_txid ... ok
+test los_vectores_del_oraculo_julia_coinciden ... ok
+test la_firma_de_aceptacion_verifica_y_rechaza ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+EXIT=0

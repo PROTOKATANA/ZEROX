@@ -659,7 +659,7 @@ mod tests {
     use crate::error::{CompromisosError, EncodingError};
     use crate::firma::ClavePublica;
     use crate::preimage::block::merkle_root;
-    use crate::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use crate::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
     use ed25519_zebra::{SigningKey, VerificationKey};
 
     fn h(n: u8) -> BlockHash {
@@ -704,6 +704,7 @@ mod tests {
             }],
             lock_time: 0,
             expiry_height: 0,
+            extension: ExtensionTx::Ninguna,
         }
     }
 

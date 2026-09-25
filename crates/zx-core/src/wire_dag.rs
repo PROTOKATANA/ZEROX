@@ -400,7 +400,7 @@ mod tests {
         DagBlockHeader, MAX_PADRES_EXTRA, PadresDag, SolucionPoas, TAMANO_CABECERA_MAX,
         TAMANO_CABECERA_MIN,
     };
-    use crate::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use crate::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
     use crate::wire::tx_a_bytes;
 
     fn cabecera_con_padres(n: usize) -> DagBlockHeader {
@@ -445,6 +445,7 @@ mod tests {
             }],
             lock_time: 0,
             expiry_height: 0,
+            extension: ExtensionTx::Ninguna,
         }
     }
 

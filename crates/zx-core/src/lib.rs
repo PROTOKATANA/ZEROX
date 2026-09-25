@@ -26,6 +26,7 @@ pub mod digest;
 pub mod encoding;
 pub mod error;
 pub mod firma;
+pub mod forma;
 mod hash;
 pub mod preimage;
 pub mod red;
@@ -34,13 +35,14 @@ pub mod tx;
 pub mod wire;
 pub mod wire_dag;
 
-pub use address::{Address, Red};
+pub use address::Address;
 pub use amount::{Amount, ZX_VALUE_SANITY_LIMIT};
 pub use digest::{
     AuthDigest, BlockHash, BodyCommitment, Digest, MerkleRoot, PreHash, SigHash, TxId,
 };
-pub use error::{CompromisosError, CoreError, EncodingError};
+pub use error::{CompromisosError, CoreError, EncodingError, ErrorFormaTx};
 pub use firma::{ClavePublica, Firma, verificar};
+pub use forma::{validar_forma_cabecera_post, validar_forma_tx};
 // El módulo `hash` sigue privado: `h_d` MUST ser inalcanzable desde fuera. Se reexporta únicamente
 // `sha3_256_publico`, que no acepta etiqueta de dominio y por tanto no puede producir un digest de
 // consenso. Ver la nota de diseño de `crate::hash`.
@@ -52,9 +54,12 @@ pub use preimage::dag::{
     comprobar_compromisos, dag_header_a_bytes, dag_header_desde_bytes, tamano_cabecera,
     tamano_prefirma,
 };
-pub use preimage::tx::{HashType, auth_digest, sighash, txid};
+pub use preimage::tx::{
+    HashType, auth_digest, mensaje_aceptacion, sighash, txid, verificar_aceptacion,
+};
+pub use red::{CBID_RED_DEV, MAGIC_DEV, Red};
 pub use target::{CompactBits, TrabajoAcumulado, cumple_pow, trabajo_bloque};
-pub use tx::{Lock, OutPoint, SpentOutput, Tx, TxIn, TxOut};
+pub use tx::{ExtensionTx, Lock, OutPoint, SpentOutput, TipoGarantia, Tx, TxIn, TxOut};
 pub use wire_dag::{
     BUNDLE_BYTES, BloqueDag, CHECKPOINTS_POR_BUNDLE, ContextoVerificacionPot, ErrorDiferenciaSlots,
     IntegracionPotPendiente, JustificacionPot, MAX_BLOQUE_DAG_AGREGADO, MAX_BUNDLES_POT,

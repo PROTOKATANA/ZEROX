@@ -1,0 +1,50 @@
+IDENTICO crates/zx-core/tests/cavp_sha3_256.rs
+IDENTICO crates/zx-core/tests/ed25519_no_unicidad.rs
+DIFIERE  crates/zx-core/tests/oraculo_julia.rs
+--- /home/katana/zeo/ZEROX/deepseek/W02/logs/.v6-tmp	2026-09-26 01:34:59.056844503 +0200
++++ crates/zx-core/tests/oraculo_julia.rs	2026-09-26 01:30:46.168558753 +0200
+@@ -26,7 +26,7 @@
+ use zx_core::digest::{BodyCommitment, Digest, TxId};
+ use zx_core::firma::ClavePublica;
+ use zx_core::preimage::block::merkle_root;
+-use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
++use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
+ use zx_core::{Amount, BlockHash, DagBlockHeader, PadresDag, SolucionPoas, auth_digest, txid};
+ 
+ const CBID: u32 = 0xc478_80ea;
+@@ -49,6 +49,7 @@
+         }],
+         lock_time: 0,
+         expiry_height: 0,
++        extension: ExtensionTx::Ninguna,
+     }
+ }
+ 
+IDENTICO crates/zx-core/tests/parsers_dag_prop.rs
+DIFIERE  crates/zx-core/tests/vectores_dag.rs
+--- /home/katana/zeo/ZEROX/deepseek/W02/logs/.v6-tmp	2026-09-26 01:34:59.059844566 +0200
++++ crates/zx-core/tests/vectores_dag.rs	2026-09-26 01:30:46.163558649 +0200
+@@ -20,7 +20,7 @@
+ use zx_core::digest::{BodyCommitment, Digest, TxId};
+ use zx_core::firma::ClavePublica;
+ use zx_core::preimage::block::merkle_root;
+-use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
++use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
+ use zx_core::{Amount, BlockHash, DagBlockHeader, PadresDag, SolucionPoas, body_commitment, txid};
+ 
+ const CBID: u32 = 0xc478_80ea;
+@@ -43,6 +43,7 @@
+         }],
+         lock_time: 0,
+         expiry_height: 0,
++        extension: ExtensionTx::Ninguna,
+     }
+ }
+ 
+IDENTICO testdata/nist-cavp/README.md
+IDENTICO testdata/nist-cavp/SHA3_256LongMsg.rsp
+IDENTICO testdata/nist-cavp/SHA3_256Monte.rsp
+IDENTICO testdata/nist-cavp/SHA3_256ShortMsg.rsp
+IDENTICO testdata/nist-cavp/SHA3_256ShortMsg_bitoriented.rsp
+IDENTICO testdata/vectores-cabecera-dag/PROCEDENCIA.md
+IDENTICO testdata/vectores-cabecera-dag/vectores.txt

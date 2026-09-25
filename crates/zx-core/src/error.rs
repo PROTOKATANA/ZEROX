@@ -184,6 +184,168 @@ pub enum EncodingError {
     /// Una lista de índices de wire no está en orden estrictamente creciente.
     #[error("índices no canónicos: MUST ser estrictamente crecientes y únicos")]
     IndicesNoCanonicos,
+
+    /// F-05: la versión `4` (evidencia) está diseñada pero **inactiva** en v0.
+    #[error("F-05: versión inactiva en v0: {version}")]
+    VersionInactiva {
+        /// Versión leída.
+        version: u32,
+    },
+
+    /// F-05: versión que no está en la tabla de versiones activas ni es la 4.
+    #[error("F-05: versión desconocida: {version}")]
+    VersionDesconocida {
+        /// Versión leída.
+        version: u32,
+    },
+
+    /// F-07: discriminante del `tipo` de garantía fuera de `{1, 2, 3}`.
+    #[error("F-07: tipo de garantía inválido: {tipo}")]
+    TipoGarantiaInvalido {
+        /// Byte leído.
+        tipo: u8,
+    },
+}
+
+/// Fallos de **forma** de una transacción, sin contexto (F-03, F-05, F-07, F-08, F-10).
+///
+/// Es lo que [`crate::forma::validar_forma_tx`] y
+/// [`crate::forma::validar_forma_cabecera_post`] pueden decidir **sin** UTXO, sin la cabecera que
+/// contiene la transacción y sin estado. Las reglas contextuales —posición de la coinbase,
+/// `clave == sol.public_key` de F-09, saldos, peso— son de órdenes posteriores y **no** se
+/// comprueban aquí.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum ErrorFormaTx {
+    /// F-05: versión definida pero inactiva en v0 (la `4`).
+    #[error("F-05: versión inactiva en v0: {version}")]
+    VersionInactiva {
+        /// Versión rechazada.
+        version: u32,
+    },
+
+    /// F-05: versión fuera de la tabla de versiones activas.
+    #[error("F-05: versión desconocida: {version}")]
+    VersionDesconocida {
+        /// Versión rechazada.
+        version: u32,
+    },
+
+    /// F-05/F-06: `version` y `extension` no son coherentes.
+    ///
+    /// `1 ⇔ Ninguna`, `2 ⇔ Garantia`, `3 ⇔ CoinbasePost`.
+    #[error("F-05: la versión {version} debe llevar extensión {esperada}")]
+    ExtensionIncoherente {
+        /// Versión de la transacción.
+        version: u32,
+        /// Extensión esperada para esa versión.
+        esperada: &'static str,
+    },
+
+    /// F-07: `tipo` de garantía fuera de `{1, 2, 3}`.
+    #[error("F-07: tipo de garantía inválido: {tipo}")]
+    TipoGarantiaInvalido {
+        /// Byte leído.
+        tipo: u8,
+    },
+
+    /// F-07: un depósito (`tipo = 1`) MUST tener al menos una entrada.
+    #[error("F-07: depósito sin entradas")]
+    DepositoSinEntradas,
+
+    /// F-07: un retiro (`tipo = 2`) MUST NOT tener entradas.
+    #[error("F-07: retiro con {entradas} entradas (MUST ser 0)")]
+    RetiroConEntradas {
+        /// Entradas presentes.
+        entradas: usize,
+    },
+
+    /// F-07: un retiro (`tipo = 2`) MUST NOT tener salidas.
+    #[error("F-07: retiro con {salidas} salidas (MUST ser 0)")]
+    RetiroConSalidas {
+        /// Salidas presentes.
+        salidas: usize,
+    },
+
+    /// F-07: una liberación (`tipo = 3`) MUST NOT tener entradas.
+    #[error("F-07: liberación con {entradas} entradas (MUST ser 0)")]
+    LiberacionConEntradas {
+        /// Entradas presentes.
+        entradas: usize,
+    },
+
+    /// F-07: una liberación (`tipo = 3`) MUST NOT tener salidas.
+    #[error("F-07: liberación con {salidas} salidas (MUST ser 0)")]
+    LiberacionConSalidas {
+        /// Salidas presentes.
+        salidas: usize,
+    },
+
+    /// F-05: una v1 con entradas es una transferencia y MUST tener al menos una salida.
+    #[error("F-05: transferencia v1 sin salidas")]
+    TransferenciaSinSalidas,
+
+    /// F-08: `testigos.len()` MUST ser `entradas.len() + 1` en v2.
+    #[error("F-08: se esperaban {esperados} testigos y llegaron {obtenidos}")]
+    NumeroDeTestigosInvalido {
+        /// Número exigido.
+        esperados: usize,
+        /// Número presente.
+        obtenidos: usize,
+    },
+
+    /// F-08: el testigo de aceptación (el último de v2) MUST medir 64 B.
+    #[error("F-08: testigo de aceptación de {obtenidos} bytes (MUST ser 64)")]
+    TestigoAceptacionLongitud {
+        /// Longitud presente.
+        obtenidos: usize,
+    },
+
+    /// F-07: `importe` de la extensión MUST ser `> 0`.
+    #[error("F-07: importe de la extensión debe ser > 0")]
+    ImporteCero,
+
+    /// F-10: campo dependiente de altura, inactivo en v0.
+    #[error("F-10: campo inactivo en v0: {campo}")]
+    CampoInactivo {
+        /// Campo rechazado.
+        campo: &'static str,
+    },
+
+    /// F-10: las salidas `Lock::Htlc` nuevas no se admiten en v0.
+    #[error("F-10: salida Lock::Htlc inactiva en v0")]
+    SalidaHtlc,
+
+    /// F-05: la coinbase PoST (v3) MUST NOT tener entradas.
+    #[error("F-05: coinbase PoST con {entradas} entradas (MUST ser 0)")]
+    EntradasEnCoinbasePost {
+        /// Entradas presentes.
+        entradas: usize,
+    },
+
+    /// F-05: la coinbase PoST (v3) MUST NOT tener salidas.
+    #[error("F-05: coinbase PoST con {salidas} salidas (MUST ser 0)")]
+    SalidasEnCoinbasePost {
+        /// Salidas presentes.
+        salidas: usize,
+    },
+
+    /// F-08: la coinbase PoST (v3) MUST NOT llevar testigos.
+    #[error("F-08: coinbase PoST con {testigos} testigos (MUST ser 0)")]
+    TestigosEnCoinbasePost {
+        /// Testigos presentes.
+        testigos: usize,
+    },
+
+    /// F-03: el campo `height` de una cabecera PoST es reservado y MUST ser 0 en v0.
+    #[error("F-03: cabecera PoST con height = {height} (MUST ser 0)")]
+    AlturaPostNoCero {
+        /// Altura declarada.
+        height: u32,
+    },
+
+    /// Error de codificación al verificar una firma de aceptación.
+    #[error(transparent)]
+    Codificacion(#[from] EncodingError),
 }
 
 /// Fallo al comprobar los compromisos del cuerpo de un bloque DAG.

@@ -50,7 +50,7 @@ use crate::encoding::{compact_size, int};
 use crate::error::EncodingError;
 use crate::firma::{ClavePublica, LONGITUD_CLAVE};
 use crate::preimage::block::{BlockHeader, TAMANO_CABECERA};
-use crate::tx::{Lock, MAX_MULTISIG_KEYS, OutPoint, Tx, TxIn, TxOut};
+use crate::tx::{ExtensionTx, Lock, MAX_MULTISIG_KEYS, OutPoint, TipoGarantia, Tx, TxIn, TxOut};
 
 /// Máximo de entradas, salidas o testigos que un lector acepta declarados.
 ///
@@ -212,11 +212,15 @@ fn leer_clave(bytes: &[u8]) -> Result<(ClavePublica, &[u8]), EncodingError> {
 // Transacción
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Escribe una transacción **con sus testigos** (C-WIRE-03).
+/// Escribe una transacción **con sus testigos** (C-WIRE-03, F-14).
 ///
 /// El orden de campos es exactamente el que cuenta la fórmula de peso de C-WGT-02, y hay un test de
 /// propiedad que comprueba que `serializar_tx(...).len() == peso_tx(...)` sobre transacciones
 /// generadas al azar.
+///
+/// F-14: para v2 y v3, los campos extra se escriben **entre las salidas y los testigos**, sin
+/// prefijo de longitud (`tipo u8 ‖ clave 32 B ‖ importe u64` en v2; `clave 32 B ‖ importe u64` en
+/// v3). La v1 no cambia.
 pub fn tx_a_bytes(salida: &mut Vec<u8>, tx: &Tx, testigos: &[Vec<u8>]) {
     int::escribir_u32(salida, tx.version);
     int::escribir_u32(salida, tx.lock_time);
@@ -235,6 +239,24 @@ pub fn tx_a_bytes(salida: &mut Vec<u8>, tx: &Tx, testigos: &[Vec<u8>]) {
         lock_a_bytes(salida, &s.lock);
     }
 
+    // F-14 · campos extra de v2/v3, en el orden y anchura de F-05, sin prefijo de longitud.
+    match &tx.extension {
+        ExtensionTx::Ninguna => {}
+        ExtensionTx::Garantia {
+            tipo,
+            clave,
+            importe,
+        } => {
+            int::escribir_u8(salida, tipo.byte());
+            salida.extend_from_slice(clave.bytes());
+            int::escribir_u64(salida, importe.brek() as u64);
+        }
+        ExtensionTx::CoinbasePost { clave, importe } => {
+            salida.extend_from_slice(clave.bytes());
+            int::escribir_u64(salida, importe.brek() as u64);
+        }
+    }
+
     compact_size::escribir(salida, testigos.len() as u64);
     for t in testigos {
         compact_size::escribir(salida, t.len() as u64);
@@ -249,13 +271,27 @@ pub fn tx_a_bytes(salida: &mut Vec<u8>, tx: &Tx, testigos: &[Vec<u8>]) {
 /// misma estructura invitaría a que alguien los metiera en la preimagen sin darse cuenta.
 pub type TxConTestigos = (Tx, Vec<Vec<u8>>);
 
-/// Lee una transacción y sus testigos (C-WIRE-03).
+/// Lee una transacción y sus testigos (C-WIRE-03, F-14).
+///
+/// F-14: el parser lee `version` y, según ella, **exige** los campos extra de v2/v3 o los prohíbe
+/// (v1). Tras el último testigo no se consume nada más: el resto se devuelve al llamante, que es
+/// quien decide (el bloque lo usa para encadenar transacciones; una transacción suelta **MUST**
+/// exigir que el resto venga vacío).
 ///
 /// # Errores
-/// [`EncodingError::Truncado`] si faltan bytes, [`EncodingError::DemasiadosElementos`] si un contador
-/// declarado supera [`MAX_ELEMENTOS_DECLARADOS`], o el error del campo que no decodifique.
+/// [`EncodingError::VersionInactiva`] para la 4, [`EncodingError::VersionDesconocida`] para el
+/// resto, [`EncodingError::TipoGarantiaInvalido`] para un `tipo` de v2 fuera de `{1,2,3}`,
+/// [`EncodingError::Truncado`] si faltan bytes, [`EncodingError::DemasiadosElementos`] si un
+/// contador declarado supera [`MAX_ELEMENTOS_DECLARADOS`], o el error del campo que no decodifique.
 pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingError> {
     let (version, r) = int::leer_u32(bytes)?;
+    // F-05: solo 1, 2 y 3 están activas en v0; la 4 está diseñada pero inactiva; el resto se
+    // rechaza. El parser no acepta una versión fuera de rango.
+    match version {
+        1..=3 => {}
+        4 => return Err(EncodingError::VersionInactiva { version }),
+        v => return Err(EncodingError::VersionDesconocida { version: v }),
+    }
     let (lock_time, r) = int::leer_u32(r)?;
     let (expiry_height, r) = int::leer_u32(r)?;
 
@@ -287,6 +323,34 @@ pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingEr
         r = resto;
     }
 
+    // F-14 · campos extra de v2/v3, leídos según la versión. La v1 no lleva ninguno.
+    let extension = match version {
+        2 => {
+            let (tipo_byte, resto) = int::leer_u8(r)?;
+            let tipo = TipoGarantia::desde_byte(tipo_byte)
+                .ok_or(EncodingError::TipoGarantiaInvalido { tipo: tipo_byte })?;
+            let (clave, resto) = leer_clave(resto)?;
+            let (brek, resto) = int::leer_i64(resto)?;
+            r = resto;
+            ExtensionTx::Garantia {
+                tipo,
+                clave,
+                importe: Amount::nuevo(brek)?,
+            }
+        }
+        3 => {
+            let (clave, resto) = leer_clave(r)?;
+            let (brek, resto) = int::leer_i64(resto)?;
+            r = resto;
+            ExtensionTx::CoinbasePost {
+                clave,
+                importe: Amount::nuevo(brek)?,
+            }
+        }
+        // Ya se validó arriba: solo queda la 1.
+        _ => ExtensionTx::Ninguna,
+    };
+
     let (n_wit, mut r) = leer_contador(r)?;
     let mut testigos = Vec::with_capacity(n_wit);
     for _ in 0..n_wit {
@@ -311,6 +375,7 @@ pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingEr
                 outputs,
                 lock_time,
                 expiry_height,
+                extension,
             },
             testigos,
         ),
@@ -396,7 +461,7 @@ mod tests {
     use crate::error::EncodingError;
     use crate::firma::ClavePublica;
     use crate::preimage::block::{BlockHeader, TAMANO_CABECERA};
-    use crate::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use crate::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
 
     fn clave(n: u8) -> ClavePublica {
         ClavePublica::desde_bytes([n; 32])
@@ -454,6 +519,7 @@ mod tests {
             ],
             lock_time: 12,
             expiry_height: 34,
+            extension: ExtensionTx::Ninguna,
         };
         let testigos = vec![vec![0x11; 64], vec![0x22; 65]];
         (tx, testigos)
@@ -776,7 +842,7 @@ mod tests_cuerpo {
     use crate::error::EncodingError;
     use crate::firma::ClavePublica;
     use crate::preimage::block::BlockHeader;
-    use crate::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use crate::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
 
     fn cabecera() -> BlockHeader {
         BlockHeader {
@@ -808,6 +874,7 @@ mod tests_cuerpo {
             }],
             lock_time: 0,
             expiry_height: 0,
+            extension: ExtensionTx::Ninguna,
         }
     }
 
