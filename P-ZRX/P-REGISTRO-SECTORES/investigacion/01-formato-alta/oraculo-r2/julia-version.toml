@@ -1,0 +1,4 @@
+# Versión de Julia con la que se produjo el resultado de S01 (LINEO §1: pinear la versión).
+version = "1.13.0"
+canal = "release"
+nota = "juliaup en /home/katana/torio/.juliaup; ejecutar con `env -u LD_LIBRARY_PATH` (LINEO §1)."

@@ -93,7 +93,7 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 
 | ID | Problema | Estado | Prio | Depende de | Límite ya conocido | Siguiente encargo | Puerta |
 |---|---|---|---|---|---|---|---|
-| D-01 | Compromiso y alta de un sector real (encargo 01, G1) | abierto | P1 | B-01 | RFT-03: R1/R2 no fechan | Encargo 01 en plantilla §6 | G1 |
+| D-01 | Compromiso y alta de un sector real (encargo 01, G1) | **G1 superada** en su alcance (S01: pertenencia de la pieza al objeto comprometido; R2 32 B, apertura ~630 B, ~4,6 µs; `investigacion/01-formato-alta/REVISION.md`) | P1 | B-01 | RFT-03: R1/R2 no fechan | Encargo 01 en plantilla §6 | G1 |
 | D-02 | Auditorías, regeneración y fallos honestos (encargo 02, G2) | abierto | P1 | D-01 | RFT-04: sobre el formato actual solo encarecen | Encargo 02 en plantilla §6 | G2 |
 | D-03 | Ciclo de vida del sector en el DAG y vínculo con garantía (encargo 03, G3) | abierto | P1 | D-01, D-02, C-01 | No solapar con `C-EVP`/`C-SLA` sin prioridad | Encargo 03 | G3 |
 | D-04 | Formato alternativo / PoRep (encargo 04, G4) | abierto; revisión de fuentes puede empezar ya | P2 | — (fuentes); D-01/D-02 (decisión) | RFT-06: ningún sellado separa ramas | Revisión de fuentes primarias Filecoin | G4 |

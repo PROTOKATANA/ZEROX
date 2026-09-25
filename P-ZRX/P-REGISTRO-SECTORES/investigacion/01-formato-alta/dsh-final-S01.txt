@@ -1,0 +1,23 @@
+He leído íntegras la orden y `LINEO.md` (y el resto de entradas obligatorias) y he ejecutado S01. Resumen y, sobre todo, **las faltas de definición detectadas**, como pedías.
+
+## Faltas de definición / incidencias (informadas antes de editar código)
+
+1. **`zx_core::hash` no es reutilizable.** En `crates/zx-core/src/hash.rs`, `h_d` y `DomainTag` son `pub(crate)` a propósito. La orden permitía «reimplementa `H_d` en 3 líneas»: lo hice (`prototipo/src/h_d.rs`, `sha3 = "=0.12.0"`, la misma versión que pinea `zx-core`).
+2. **`CBID_RED_DEV` no existe** en `zx-core` (solo un `CONSENSUS_BRANCH_ID` de parámetro y el valor de test `0xc478_80ea`). Declaré `CBID_PRUEBA = 0xc478_80ea`, explícitamente no de red.
+3. **La entrada congelada se rompió durante la sesión:** `D-ZRX/RFT-ZRX.md` cambió por un commit concurrente externo (`49e4434`, «T02 … RFT-13», 01:38:36) después de congelarse `ENTRADA-S01.sha256` (01:35:00). El hash esperado corresponde a `HEAD~1`; el diff **solo añade RFT-13** y **no toca RFT-03/04/06**. Las otras cinco entradas verifican. No toqué el archivo; queda reportado por si el director regenera la entrada.
+4. **Regiones exactas de mapa y metadatos:** la orden no fijaba los cortes; los definí byte a byte en `ESPECIFICACION-BYTES.md` (mapa `8192·p+32` incluyendo su BLAKE3; meta `p·(48+48+32)`), y enumeré lo que queda fuera de R2.
+5. **`max_pieces_in_sector`:** el fixture usa 2; para medir 3 tamaños lo fijé = `pieces_in_sector` (2/3/4), declarado como parámetro de test.
+
+## Resultado
+
+**G1: SUPERADA** en el alcance exacto de §7.
+
+- Una solución PoAS real, verificada con `verify_solution::<ChiaTable,_>` del clon `f8842d0`, abre el mismo objeto comprometido por R2. Positivos: 3 soluciones en 3 slots distintos por cada tamaño.
+- **15/15 negativos rechazados** con su error (clave, índice, historia, versión, CBID, `piece_offset`, `s_bucket`, `codificado=0`, camino de otra posición/hoja, R2 de un segundo sector real, raíz ajena, `digest_mapa` ajeno, alta duplicada y caducada).
+- **Oráculo Julia independiente**: `digest_mapa`, `digest_meta`, `raiz_chunks` y R2 coinciden **byte a byte en los tres tamaños** (12/12).
+- Costes medidos: R2 = **32 B**, **32–60 ms** por sector de 2–4 MiB; apertura **617–649 B**; verificación de apertura **4,5–4,7 µs** (mediana de 1000) frente a **~1,25 ms** del verificador PoAS real (0,4 % de sobrecoste). R0 = 0 B / 0 s.
+- Separación de §7 explícita: R2 demuestra **pertenencia de la pieza al objeto comprometido**, no corrección del ploteo, ni preexistencia (RFT-03), ni permanencia (RFT-04), ni doble uso entre ramas (RFT-06).
+- **R3 no implementada con razón técnica** (RFT-04 + `P-COBERTURA` §3, Cor. 1–4): el objeto es determinista, público y paralelizable por registro; la única salida es cambiar el objeto/circuito (semilla secreta o sellado secuencial tipo PoRep), que pertenece a los encargos 04/05.
+
+## Entregables en `deepseek/S01/`
+`prototipo/` (crate independiente, `nightly-2026-05-03`, `Cargo.lock` propio), `oraculo-r2/` (Julia, `Manifest.toml`, tests 5/5), `resultados/` (crudos + `RESULTADOS.tsv` + `ORACULO-CHECK.tsv`), `INFORME.md`, `ESPECIFICACION-BYTES.md`, `METODO.md`, `PROGRESO.md`, `HORAS.log`, `ENTORNO.txt`. Rust `cargo test` 6/6. Sin Python, sin escrituras fuera de S01, sin commit/push, clon de Autonomys intacto. La comprobación final de `ENTRADA-S01.sha256` vuelve a dar 5/6 OK por la incidencia 3 (externa).

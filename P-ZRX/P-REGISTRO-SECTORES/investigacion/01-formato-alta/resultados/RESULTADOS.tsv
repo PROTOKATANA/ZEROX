@@ -1,0 +1,4 @@
+piezas	sector_bytes	n_hojas	t_plot_mediana_s	t_r2_mediana_s	ram_vmhwm_MiB	r1_bytes	r2_bytes	apertura_bytes	camino_len	verif_apertura_mediana_ns	verif_poas_mediana_ns	slots_barridos	soluciones_verificadas	slots_con_solucion	negativos_total	negativos_ok	oraculo_raiz_chunks	oraculo_r2
+2	2113856	65536	0.446761	0.031556	519	32	32	617	16	4470	1248756	3	5	3	15	15	COINCIDE	COINCIDE
+3	3170752	98304	0.668517	0.052961	518	32	32	649	17	4659	1246126	3	5	3	15	15	COINCIDE	COINCIDE
+4	4227648	131072	0.865971	0.059940	518	32	32	649	17	4580	1224507	3	8	3	15	15	COINCIDE	COINCIDE

@@ -1,0 +1,7 @@
+# Toolchain exigida por ORDEN-S01 §4, la misma que pinea el clon de Autonomys
+# (`autonomys-subspace/rust-toolchain.toml`) y el workspace histórico de ZEROX. No subirla sin
+# reejecutar la suite: `subspace-farmer-components` usa `generic_const_exprs`, `portable_simd`,
+# `never_type` y `try_blocks`.
+[toolchain]
+channel = "nightly-2026-05-03"
+profile = "default"

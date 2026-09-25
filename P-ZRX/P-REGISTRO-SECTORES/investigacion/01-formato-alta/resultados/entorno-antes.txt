@@ -1,0 +1,16 @@
+=== uptime antes ===
+ 01:42:25  arriba  8:44,  0 users,  carga promedio: 2,67, 1,71, 1,36
+=== nproc ===
+32
+=== free -g ===
+               total       usado       libre  compartido   búf/caché  disponible
+Mem:             123          10          88           0          26         113
+Inter:             0           0           0
+=== uname ===
+Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+=== lscpu model ===
+Nombre del modelo:                        AMD Ryzen 9 9950X3D 16-Core Processor
+«Socket(s)»:                              1
+CPU(s) factor de escala MHz:              40%
+CPU MHz máx.:                             5756,4521
+CPU MHz mín.:                             624,1940

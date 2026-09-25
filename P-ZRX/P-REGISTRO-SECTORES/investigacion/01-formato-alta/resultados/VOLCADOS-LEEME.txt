@@ -1,0 +1,1 @@
+Los volcados binarios sector-P{2,3,4}.dump (9,5 MB) no se versionan: se regeneran con prototipo/ (ploteo determinista) y deben coincidir con resultados/VOLCADOS.sha256. Copia de trabajo: deepseek/S01/resultados/ (zona borrable).

@@ -1,0 +1,8 @@
+name = "OraculoS01"
+uuid = "b7c1e2a4-5f3d-4a1b-9c2e-0d6f7a8b9c01"
+authors = ["S01 DeepSeek Harness"]
+version = "0.0.0"
+
+[deps]
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
