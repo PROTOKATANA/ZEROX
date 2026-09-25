@@ -1,0 +1,9 @@
+T02 run: seed=0x5a5a replicas=100000 escenario=todos hilos=4
+E1: error máximo vs tabla publicada = 4.828e-08 (< 1e-6: sí)
+E2: 35 puntos escritos
+E3: 6912 puntos escritos
+E3 validación MC: 128 chequeos, 0 fuera del IC
+E4: 24 puntos escritos
+resumen.csv escrito
+run.jl terminado
+WALL 10.95 s MAXRSS 478372 KB

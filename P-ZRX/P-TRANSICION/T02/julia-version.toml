@@ -1,0 +1,2 @@
+# Versión de Julia fijada para esta auditoría (ORDEN-T02 §4/LINEO §1).
+julia = "1.13.0"

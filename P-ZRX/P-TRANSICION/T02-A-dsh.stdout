@@ -1,0 +1,18 @@
+Orden T02-A cumplida. Leí íntegros `CORRECCION-T02-A.md`, `ORDEN-T02.md`, `PROGRESO.md` y `V-ZRX/LINEO.md` antes de escribir código. Las cuatro ambigüedades que bloqueaban (2, 3, 4, 5) están cerradas por la corrección; 1 y 6 ratificadas.
+
+**Falta de definición restante que informo (declarada en `PROGRESO.md` §2, no bloqueó porque la corrección fija el proceso y se reporta con sensibilidad):**
+1. **E4, línea base de «retraso»**: no fijada; reporto el corte desde `t=0` **y** el exceso sobre `1+M_dep`.
+2. **E4, empate al publicar**: implemento «estrictamente más larga» (favorable al honesto); por eso la censura difiere de la expectativa de la corrección (ver abajo).
+3. **E3, `FC-1` sin sufijo PoST vs AMBIGUEDAD-6**: prima la definición explícita de E3 de la corrección; tensión declarada (H-5).
+4. **E2, «slots hasta el éxito»**: medidos desde `t_H`, 0 si el éxito precede a `t_H`.
+5. **E2, rejilla**: producto cartesiano completo (3456 puntos) inviable en 2 h → sensibilidad de 35 puntos; el resto, inconcluso por presupuesto.
+
+**Resultado principal:** la pregunta falsable **se refuta dentro del modelo**. Con `FC-3`, `h=0,9`, `a=0,4` (<1/2), `k=6`, `r=0,1`, `p=0,9`, `F_slots=1000`: éxito del nodo nuevo y del en línea **0,99982** (IC 99,9 % [0,99962; 0,99992]). Mecanismo: el terminal adversario existe antes (`t_A≤t_H`), el empate `W_A=W_H=0` favorece al adversario y `d=0`, luego `C-FIN-01` no protege; `a` no es el recurso que decide. 32/35 puntos de E2 con `a<1/2` superan `10⁻³`.
+
+**Controles:** E1 vs tabla publicada de Nakamoto §11, error máximo `4,83·10⁻⁸`, simulador 24/24 dentro del IC; E3 exacto del producto completo (`FC-1` gana siempre para nodo nuevo; `FC-3` máx. 0,8647, y 0,8394 con `a=0,45<1/2`; `FC-3` peor que `FC-1` en línea en 6832/6912); E4 retraso finito salvo `h=0,9` con `M_dep=6` (81 % censurado) y `M_dep=12` (99,98 %). Puse `(1−h)^{−(M_dep+1)}` como cota para `h→1`.
+
+**Discrepancia declarada:** para `h>1/2` la corrección esperaba censura ~1 en E4; con la estrategia literal el retraso es finito y solo censura a `h=0,9, M_dep≥6` (a `h=0,99, M_dep=6` sí 1,0). Se reporta como propiedad que no se cumple en la letra del modelo.
+
+**Verificación:** `ENTRADA-T02.sha256` y `ENTRADA-T02-A.sha256` → `OK` en los 4 ficheros al empezar y al terminar. `Pkg.test()` **69/69**; `run.jl --escenario todos --replicas 100000` en **10,95 s** y 467 MiB (tope 2 h/4 hilos/16 GiB).
+
+**Entregables** en `T02/`: `Project.toml`, `Manifest.toml`, `julia-version.toml`, `src/{modelo,referencia,rapido,validacion,T02}.jl`, `test/runtests.jl`, `run.jl`, `resultados/` (`E1..E4.csv`, `E1_tabla_nakamoto.csv`, `E3_validacion_mc.csv`, `resumen.csv`, `test.log`, `run.log`), `INFORME.md`, `METODO.md`, `MODELO.md`, `HIPOTESIS-QUE-CODIFICAN-LA-CONCLUSION.md`, `PROGRESO.md`, `HORAS.log`, `RESUMEN-FINAL.md`. Sin commit, sin push, nada fuera de la zona, sin Python y sin leer `T01/`.

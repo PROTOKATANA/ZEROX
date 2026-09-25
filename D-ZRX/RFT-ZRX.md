@@ -256,8 +256,29 @@ más rápido conoce antes los retos, incluidos los primeros tras `s_0`.
 
 ---
 
+## RFT-13 · Ninguna regla de selección protege con PoST los últimos bloques PoW antes del primer bloque PoST
+
+**Enunciado.** Mientras ningún sufijo tiene peso PoST, la selección a través del corte (FC-3)
+decide por trabajo PoW: reescribir los últimos `k` bloques antes del corte es la carrera de Nakamoto
+(depende de `h` y `k`, no del espacio). Con `h ≥ 1/2` el adversario controla el terminal.
+
+**Alcance.** Modelo T02 sin latencia ni retarget, `k = 0` para GHOSTDAG; `h = 0,25`, `k = 6`:
+éxito ≈ 0,039 con cualquier `a < 1/2`.
+
+**Aplicación al híbrido.** **Aplica:** no se puede afirmar que el corte «hereda» seguridad PoST
+para los bloques inmediatamente anteriores. Lo que se juega en esa ventana (depósitos, pagos,
+emisión de los últimos bloques) tiene seguridad PoW.
+
+**Fuente.** `P-ZRX/P-TRANSICION/T02/INFORME.md` §§1, 3; revisión `P-ZRX/P-TRANSICION/REVISION-T02.md`.
+
+**Lo reabriría.** Una regla que dé peso PoST honesto antes del corte o que cierre lo que está en juego
+antes de la ventana (IPA A-05b), demostrada con latencia real.
+
+---
+
 ## Registro de altas
 
 | Fecha | Filas | Motivo |
 |---|---|---|
 | 2026-09-26 | RFT-01 … RFT-12 | Alta inicial tras releer el archivo antiguo para el rediseño híbrido |
+| 2026-09-26 01:40 | RFT-13 | T02-A (ventana previa al primer bloque PoST) |

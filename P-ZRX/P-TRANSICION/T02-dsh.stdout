@@ -1,0 +1,18 @@
+He leído íntegros `ORDEN-T02.md`, `V-ZRX/LINEO.md` y `CONTRATO-v0.md` (más `RFT-ZRX.md`, `NOTA-A07-SEMILLA.md` y, como documento del director, `ORDEN-T01.md`; **no** he leído código ni ficheros de `T01/`). **No he escrito ni ejecutado código**: la orden manda detenerse si una falta de definición cambia un resultado, y hay varias que lo hacen. Lo dejé registrado en `T02/PROGRESO.md` (**único archivo creado**).
+
+**Entrada congelada (inicio), 2026-09-26T01:14:18+02:00**
+```
+cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T02.sha256
+ORDEN-T02.md: OK   CONTRATO-v0.md: OK   LINEO.md: OK
+```
+
+**Ambigüedades que cambian resultados y bloquean la implementación**
+
+1. **E1 · déficit inicial (`k` vs `z`).** §3.5 E1 dice «bifurca `k` bloques antes de un pago que espera `z` confirmaciones». ¿Déficit `= z` (Nakamoto; `k` solo coste, E1 independiente de `k`) o `= k+z` (revierte también los `k` previos; control en `k=0`)? Cambia `P_éxito` en todo `k>0`.
+2. **E2 · reloj PoST y comparación.** No se fija (i) si las dos fases PoST arrancan a la vez en el corte o cada una al alcanzar su terminal `H*` (acopla la carrera PoW privada con la PoST); (ii) si el terminal adversario está exactamente a `H*` o es el primero que cumple TRN-04; (iii) si el éxito exige peso PoST estrictamente mayor (empate al honesto) o `≥`, dado que TRN-09 desempata por hash y aquí no hay hash.
+3. **E3 · «más trabajo PoW» es imposible como está escrito.** Con `trabajo = 1`/bloque y sin retarget (§3.1), dos ramas con terminal a `H*` tienen idéntico trabajo `H*`: FC-1 empata y cae al peso PoST, luego **FC-1 ≡ FC-3**, contradiciendo «con FC-1 puede ganar». Las salidas (Φ falsa en la rama adversaria, trabajo variable, admitir descendientes PoW de un terminal, o FC-1 ignorando la validez del sufijo) o están prohibidas por la orden o la contradicen.
+4. **E4 · censura de depósitos.** Faltan el proceso de llegada de depósitos, su madurez, `S_min/K_min/q/C_min`, `H_corte_min`/`W_min` (para definir el corte sin adversario), la estrategia exacta con `h>1/2` (con censura total el retraso es infinito: ¿se reporta contra un horizonte?) y la de «reorganizaciones parciales» con `h≤1/2`. Sin esto no son medibles «retraso» ni «emisión capturada».
+
+Resuelta sin bloquear: **AMBIGÜEDAD-1** (`d` de `C-FIN-01` con ancestro PoW): `ORDEN-T01.md` §3.3 y el `SPEC.md` antiguo fijan `slot(PoW)=0`, luego `d = slot(punta honesta)`. Y **AMBIGÜEDAD-6**: FC-1 sobre candidatas sin sufijo PoST queda subordinada a la 3.
+
+**Qué necesito del director** para seguir: fijar la lectura de (1) E1, (2) E2, (3) E3 y (4) E4. Con eso implemento el proyecto de §4 y lanzo los comandos de §6 dentro de las 2 h/4 hilos. ¿Resuelvo con una lectura propuesta (p. ej. E1 déficit `k+z`, E3 con terminal adversario a `H**>H*` por Φ falsa, E4 con llegada de depósitos Poisson por bloque y horizonte acotado) o prefieres re-emitir la orden con las definiciones?
