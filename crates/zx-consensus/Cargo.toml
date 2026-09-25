@@ -1,6 +1,6 @@
 [package]
 name         = "zx-consensus"
-description  = "Validez de tx transparente y blindada, turnstile, LWMA, selección de cadena, reorgs"
+description  = "Motor PoW de la fase de arranque: retarget LWMA-1, selección por trabajo, timestamps, génesis dev y minero CPU, parametrizados por red"
 version.workspace      = true
 edition.workspace      = true
 rust-version.workspace = true
@@ -13,40 +13,9 @@ workspace = true
 [dependencies]
 thiserror       = { workspace = true }
 primitive-types = { workspace = true }
-# Hash de las derivaciones puras de semilla, aleatoriedad y reto (C-POT-01/C-POT-03). Versión
-# exacta ya fijada en el workspace (`=1.8.7`, la misma que usa `zx-pot`): aquí no se elige.
-blake3          = { workspace = true }
 zx-core         = { path = "../zx-core" }
-# Primitiva PoT AES (C-POT-02) para el adaptador puro del wire a los checkpoints. Es una
-# dependencia real, no de test: el adaptador vive en `src/pot.rs`.
-zx-pot          = { path = "../zx-pot" }
 
-# ── Firmante local (D3) ──────────────────────────────────────────────────────────────────────
-# El módulo `src/firmante/` firma el sello con la clave privada del productor antes de publicarlo
-# y usa el MISMO verificador del repositorio: `zx-core` verifica con `ed25519-zebra` (ZIP-215) y
-# aquí se firma con `ed25519-zebra`. No se introduce ningún otro firmador ni una versión nueva:
-# era `[dev-dependencies]` y pasa a dependencia normal porque el firmante de biblioteca necesita
-# `SigningKey`. No hay otra dependencia añadida.
-ed25519-zebra   = { workspace = true }
-# Entropía del sistema para la semilla del alta dev (alcance D3, `src/firmante/alta.rs`). Versión
-# exacta ya presente en `Cargo.lock` —la usan `rand_core` y `tempfile`—: aquí solo se añade la
-# arista al paquete `zx-consensus`. La semilla nunca se acepta desde el llamante.
-getrandom       = "=0.3.4"
-
-# ── Verificador PoAS (A1, C-POT-08 paso 5) ────────────────────────────────────────────────────
-# Adaptamos la API pública de Autonomys enlazando por `path` al clon fijado
-# `PDF/autonomys-subspace` @ f8842d0. No se copia ni se reimplementa KZG, PoS, la máscara del
-# chunk ni la distancia; estas dependencias son las mismas que usaron los instrumentos
-# `prototipos/poas-identidad` y `veritas/rendimiento/coste-salto-v1`. Las versiones transitivas
-# las fija el `Cargo.lock` del workspace. No se activa la feature `testing` de upstream.
-subspace-core-primitives = { path = "../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
-subspace-proof-of-space  = { path = "../../PDF/autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc"] }
-subspace-verification    = { path = "../../PDF/autonomys-subspace/crates/subspace-verification" }
-subspace-kzg             = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
-
+# Test: `proptest` ya lo usa el workspace (`zx-core`) y sus versiones ya están resueltas en
+# `Cargo.lock`. No se añade ninguna dependencia externa nueva.
 [dev-dependencies]
-proptest      = { workspace = true }
-# Solo para generar el fixture PoS positivo del test con la ruta **paralela** de ploteo
-# (`Tables::create_parallel`). La ruta no paralela tiene un SIGSEGV reproducible documentado en
-# `P-ZRX/P-INTENTO/investigacion/mediciones/fallo-semilla.md`; no se usa aquí.
-ab-proof-of-space = { path = "../../PDF/autonomys-subspace/shared/ab-proof-of-space", default-features = false, features = ["alloc", "full-chiapos", "parallel"] }
+proptest = { workspace = true }

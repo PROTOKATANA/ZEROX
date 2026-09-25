@@ -1,4 +1,4 @@
-//! Bloque génesis (SPEC §15).
+//! Bloque génesis (SPEC §15, `C-GEN-01…07`).
 //!
 //! # Definición constructiva, no bytes hardcodeados
 //!
@@ -8,54 +8,52 @@
 //! qué parámetros sale, y **falla duro y visible** si alguien toca un parámetro sin recalcular el
 //! hash, en lugar de arrancar en silencio sobre un génesis no intencionado.
 //!
-//! # 🔴 Los parámetros de mainnet están BLOQUEADOS — P-017
+//! # Redes
 //!
-//! El mensaje, el timestamp y el nonce se fijan **el día del lanzamiento**, porque C-GEN-05 exige
-//! que el mensaje referencie un evento público verificable de esa fecha. Lo que hay aquí es la
-//! **maquinaria**, ya probada, con parámetros de marcador de posición explícitos.
+//! Mainnet sigue **bloqueado** por P-017 (sin hash congelado). Testnet conserva sus parámetros y su
+//! hash congelado de `9681061`. La **red dev** de 0.0.1 (F-12, F-13) añade sus propios parámetros y
+//! congela `HASH_GENESIS_DEV`.
 
+use zx_core::Red;
 use zx_core::amount::Amount;
 use zx_core::digest::{BlockHash, Digest, TxId};
 use zx_core::firma::ClavePublica;
 use zx_core::preimage::block::{BlockHeader, merkle_root};
 use zx_core::preimage::tx::txid;
-use zx_core::target::{CompactBits, TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET};
-use zx_core::tx::{Lock, Tx, TxOut};
+use zx_core::target::{TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET, decodificar_con};
+use zx_core::tx::{ExtensionTx, Lock, Tx, TxOut};
 
-use crate::activacion::{Red, rama_activa};
-use crate::error::ConsensusError;
-use crate::validacion::VERSION_TX;
+use crate::activacion::rama_activa;
+use crate::error::ErrorPow;
+use crate::parametros::{PARAMETROS_POW_DEV, limites_de};
 
-/// Parámetros de los que se construye un génesis (C-GEN-01).
+/// Versión de la transacción coinbase PoW en v0 (`F-05`): transferencia/coinbase, idéntica a
+/// `9681061`.
+pub const VERSION_TX: u32 = 1;
+
+/// Parámetros de los que se construye un génesis (`C-GEN-01`).
 ///
 /// Que sean explícitos es el punto: cualquiera puede reconstruir el bloque y comprobar el hash.
 #[derive(Clone, Copy, Debug)]
 pub struct ParametrosGenesis {
     /// Red a la que pertenece.
     pub red: Red,
-    /// Mensaje simbólico de la coinbase (C-GEN-05).
+    /// Mensaje simbólico de la coinbase (`C-GEN-05`).
     ///
     /// **No tiene función de consenso** — ningún nodo inspecciona su contenido. Su valor es una
-    /// comprobación humana, manual y única: que referencie un evento público de la fecha permite a
-    /// cualquiera concluir que el bloque no pudo minarse antes.
-    ///
-    /// Para ZEROX pesa más que en la mayoría de cadenas, porque el proyecto declara "sin premine".
-    /// El precedente es Bytecoin, del que Monero nació como fork limpio tras concluirse que ~80 %
-    /// del suministro existía antes del lanzamiento anunciado, con timestamps fabricados.
+    /// comprobación humana, manual y única.
     pub mensaje: &'static [u8],
     /// Segundos Unix del lanzamiento.
     pub timestamp: u64,
-    /// Nonce. No hay PoW que resolver (C-GEN-02), así que su única función es separar redes.
+    /// Nonce. No hay PoW que resolver (`C-GEN-02`), así que su única función es separar redes.
     pub nonce: u64,
 }
 
 /// 🔴 **P-017.** Parámetros de mainnet — marcador de posición hasta el día del lanzamiento.
 ///
-/// **Están diseñados para NO pasar [`comprobar`].** El `timestamp: 0` incumple C-GEN-06 a
+/// **Están diseñados para NO pasar [`comprobar`].** El `timestamp: 0` incumple `C-GEN-06` a
 /// propósito, así que un nodo que intente arrancar en mainnet con estos parámetros **aborta con un
-/// mensaje que nombra a P-017** en vez de levantar una cadena sobre un génesis no intencionado.
-///
-/// Es deliberado y hay un test que lo fija: `el_genesis_de_mainnet_todavia_no_arranca`.
+/// mensaje que nombra a P-017**.
 pub const GENESIS_MAINNET: ParametrosGenesis = ParametrosGenesis {
     red: Red::Mainnet,
     mensaje: b"PENDIENTE P-017: titular verificable de la fecha de lanzamiento",
@@ -63,17 +61,8 @@ pub const GENESIS_MAINNET: ParametrosGenesis = ParametrosGenesis {
     nonce: 0,
 };
 
-/// ✅ Parámetros de **testnet** — reales, no marcador de posición.
-///
-/// P-017 bloquea los de **mainnet**, no estos: C-GEN-05 pide un mensaje verificable de la fecha de
-/// lanzamiento, y testnet no se lanza, se enciende. Lo que testnet necesita es existir, para que
-/// `zx-p2p` y `zx-node` tengan una cadena real contra la que sincronizar.
-///
-/// **MUST** producir un hash distinto al de mainnet (C-GEN-04). Lo garantizan a la vez el mensaje,
-/// el nonce, el `bits` y el `CONSENSUS_BRANCH_ID`; el prefijo mágico de C-NET-01 hace el resto del
-/// aislamiento a nivel de transporte.
-///
-/// El timestamp es **2026-09-04 00:00:00 UTC**. No es decorativo — ver C-GEN-06.
+/// ✅ Parámetros de **testnet** — reales, no marcador de posición. El timestamp es
+/// **2026-09-04 00:00:00 UTC**.
 pub const GENESIS_TESTNET: ParametrosGenesis = ParametrosGenesis {
     red: Red::Testnet,
     mensaje: b"ZEROX testnet 2026-09-04 - sin valor, se reinicia sin aviso",
@@ -81,42 +70,42 @@ pub const GENESIS_TESTNET: ParametrosGenesis = ParametrosGenesis {
     nonce: 1,
 };
 
-/// Hash del génesis de **testnet**, la aserción que C-GEN-01 pide hardcodear.
+/// ✅ Parámetros de la **red dev** (`F-13`).
 ///
-/// No es decorativo: si alguien toca un parámetro de [`GENESIS_TESTNET`] sin recalcular esto, el
-/// test `el_hash_del_genesis_de_testnet_esta_congelado` falla y el nodo **no arranca sobre una
-/// cadena que no era la que creía**. Es la diferencia entre un error ruidoso y una partición
-/// silenciosa de red.
-///
-/// Mainnet **no tiene** su constante todavía, y no debe tenerla: sus parámetros están bloqueados
-/// por P-017 y congelar el hash de un marcador de posición sería congelar el error.
+/// Mensaje `b"ZEROX hibrido red dev v0 - sin valor"`, timestamp **2026-09-26 00:00:00 UTC**
+/// (`1_790_380_800 ≥ TIMESTAMP_MINIMO_GENESIS`), `nonce 0` y `bits` del perfil dev
+/// (`PARAMETROS_POW_DEV.bits_iniciales`), que aplica [`target_inicial_bits`].
+pub const GENESIS_DEV: ParametrosGenesis = ParametrosGenesis {
+    red: Red::Dev,
+    mensaje: b"ZEROX hibrido red dev v0 - sin valor",
+    timestamp: 1_790_380_800,
+    nonce: 0,
+};
+
+/// Hash del génesis de **testnet**, la aserción que `C-GEN-01` pide hardcodear.
 pub const HASH_GENESIS_TESTNET: [u8; 32] = [
     0xfe, 0x56, 0x84, 0x5a, 0x01, 0xba, 0xfa, 0x5a, 0x51, 0xae, 0x43, 0xdd, 0x43, 0xd1, 0x65, 0x84,
     0x96, 0x6f, 0x65, 0xa2, 0xac, 0xb4, 0x1b, 0xc6, 0xfa, 0xc2, 0x81, 0x81, 0x40, 0x62, 0xb6, 0xf1,
 ];
 
-/// Suelo de plausibilidad del timestamp del génesis: **2026-01-01 00:00:00 UTC** (C-GEN-06).
+/// Hash del génesis de **dev**, congelado igual que el de testnet (`C-GEN-07`, F-13).
 ///
-/// ZEROX no existía antes de 2026, así que ningún génesis legítimo puede declarar una fecha
-/// anterior. Su función real es que un **marcador de posición no pueda lanzarse por descuido**.
+/// Cambiar cualquier parámetro de [`GENESIS_DEV`] sin recalcular esta constante hace fallar el test
+/// `el_hash_del_genesis_dev_esta_congelado` y el arranque del nodo.
+pub const HASH_GENESIS_DEV: [u8; 32] = [
+    0xc7, 0x2f, 0xdb, 0x3b, 0x37, 0xe7, 0x57, 0x1a, 0x82, 0xec, 0x1e, 0x0e, 0x97, 0x3e, 0x90, 0xd5,
+    0xe9, 0x5e, 0x7a, 0xd9, 0xfc, 0x87, 0x17, 0x72, 0x26, 0x5b, 0x19, 0x94, 0x05, 0x0c, 0x2d, 0x59,
+];
+
+/// Suelo de plausibilidad del timestamp del génesis: **2026-01-01 00:00:00 UTC** (`C-GEN-06`).
 pub const TIMESTAMP_MINIMO_GENESIS: u64 = 1_767_225_600;
 
-/// Coinbase del génesis: **valor cero** (C-GEN-03, C-EMIT-02).
+/// Coinbase del génesis: **valor cero** (`C-GEN-03`, `C-EMIT-02`).
 ///
-/// Sus salidas **MUST NOT** insertarse en el UTXO set. No es que gastarlas esté prohibido por una
-/// regla: es que nunca existen. Bitcoin hace lo mismo con un caso especial en `ConnectBlock`.
-///
-/// El mensaje viaja en el `lock` de una salida de valor cero. Es inconectable por C-GEN-03, así que
-/// no crea un UTXO no gastable — simplemente no llega al conjunto.
+/// Sus salidas **MUST NOT** insertarse en el UTXO set. El mensaje viaja en el `lock` de una salida de
+/// valor cero; es inconectable, así que no crea un UTXO no gastable.
 #[must_use]
 pub fn coinbase_genesis(mensaje: &[u8]) -> Tx {
-    // El mensaje se compacta a 32 bytes con XOR por posición. No es criptográfico ni pretende
-    // serlo: el mensaje íntegro vive en los parámetros, que son públicos y reproducibles.
-    //
-    // Los 32 bytes ocupan el hueco de una clave pública, y casi con certeza NO son una clave válida
-    // — que es justo lo que se quiere: la salida es inconectable por C-GEN-03 y además nadie tiene
-    // la privada. Con P2K (P-020) esto es más honesto que antes: ya no finge ser el hash de una
-    // clave que existe en alguna parte.
     let mut marca = [0u8; 32];
     for (i, b) in mensaje.iter().enumerate() {
         if let Some(d) = marca.get_mut(i % 32) {
@@ -135,32 +124,25 @@ pub fn coinbase_genesis(mensaje: &[u8]) -> Tx {
         lock_time: 0,
         // C-EMIT-04: la coinbase declara su altura. El génesis está en la 0.
         expiry_height: 0,
+        extension: ExtensionTx::Ninguna,
     }
 }
 
-/// `bits` de arranque de cada red (C-DIFF-02, P-004c).
-///
-/// **Las dos redes llevan valores distintos a propósito.** Mainnet arranca 32 veces más difícil que
-/// el mínimo representable, que es la estimación de hashrate con la que el primer bloque dura `T`
-/// = 120 s — **lo mismo que cualquier bloque después**, sin arranque artificialmente lento. Testnet
-/// se queda en el mínimo, porque una red local de tres nodos tiene que producir bloques deprisa o
-/// los tests de integración no sirven.
-///
-/// El aislamiento entre redes **no** depende de esto: lo garantizan el génesis distinto (C-GEN-04)
-/// y el prefijo mágico (C-NET-01). Aquí solo se decide la dificultad de arranque.
+/// `bits` de arranque de cada red (`C-DIFF-02`, P-004c; dev en `ORDEN-W04 §3.5`).
 #[must_use]
 pub const fn target_inicial_bits(red: Red) -> u32 {
     match red {
         Red::Mainnet => TARGET_INICIAL_BITS_MAINNET,
         Red::Testnet => TARGET_INICIAL_BITS_TESTNET,
+        Red::Dev => PARAMETROS_POW_DEV.bits_iniciales,
     }
 }
 
-/// Construye el bloque génesis a partir de sus parámetros (C-GEN-01).
+/// Construye el bloque génesis a partir de sus parámetros (`C-GEN-01`).
 ///
 /// # Errores
-/// [`ConsensusError::SinRamaActiva`] si la tabla de ramas de la red está mal formada.
-pub fn construir(p: ParametrosGenesis) -> Result<(BlockHeader, Tx), ConsensusError> {
+/// [`ErrorPow::SinRamaActiva`] si la tabla de ramas de la red está mal formada.
+pub fn construir(p: ParametrosGenesis) -> Result<(BlockHeader, Tx), ErrorPow> {
     let cb = coinbase_genesis(p.mensaje);
     let branch_id = rama_activa(p.red, 0)?;
     let raiz = merkle_root(&[txid(&cb, branch_id)]);
@@ -182,17 +164,12 @@ pub fn construir(p: ParametrosGenesis) -> Result<(BlockHeader, Tx), ConsensusErr
 
 /// Comprueba que un génesis construido cumple todas las invariantes de §15.
 ///
-/// Es lo que C-GEN-01 pide que aborte el arranque: se llama al inicializar el nodo, antes de tocar
-/// nada más.
-///
-/// **No comprueba el PoW**: C-GEN-02 lo exime explícitamente. Es una exención estructural, igual
-/// que la de Bitcoin en `AcceptBlockHeader`, y no depende de que el génesis satisfaga o no su
-/// propio target.
+/// **No comprueba el PoW**: `C-GEN-02` lo exime explícitamente.
 ///
 /// # Errores
-/// [`ConsensusError::GenesisInvalido`] con el motivo concreto.
-pub fn comprobar(cabecera: &BlockHeader, coinbase: &Tx) -> Result<(), ConsensusError> {
-    let malo = |motivo| ConsensusError::GenesisInvalido { motivo };
+/// [`ErrorPow::GenesisInvalido`] con el motivo concreto.
+pub fn comprobar(cabecera: &BlockHeader, coinbase: &Tx, red: Red) -> Result<(), ErrorPow> {
+    let malo = |motivo| ErrorPow::GenesisInvalido { motivo };
 
     if cabecera.height != 0 {
         return Err(malo("C-HDR-02: el génesis MUST estar en la altura 0"));
@@ -221,11 +198,12 @@ pub fn comprobar(cabecera: &BlockHeader, coinbase: &Tx) -> Result<(), ConsensusE
             "C-BLK-01: la raíz de Merkle no compromete esta coinbase",
         ));
     }
-    // `bits` MUST ser canónico y estar en rango, aunque el PoW no se compruebe.
-    CompactBits::from_u32(cabecera.bits)
-        .decodificar()
-        .map_err(|_| malo("C-POW-04: los bits del génesis no son canónicos"))?;
-    // C-GEN-06 · el timestamp MUST ser plausible. Ver la constante para el porqué.
+    // `bits` MUST ser canónico y estar dentro de los límites de la red, aunque el PoW no se
+    // compruebe. La red dev admite un máximo más fácil que `POW_LIMIT`, y por eso los límites se
+    // eligen por red y no se leen de las constantes antiguas.
+    decodificar_con(cabecera.bits, &limites_de(red))
+        .map_err(|_| malo("C-POW-04/C-POW-05: los bits del génesis no son válidos en su red"))?;
+    // C-GEN-06 · el timestamp MUST ser plausible.
     if cabecera.timestamp < TIMESTAMP_MINIMO_GENESIS {
         return Err(malo(
             "C-GEN-06: el timestamp del génesis es anterior a 2026 — ¿parámetros de marcador de \
@@ -235,69 +213,56 @@ pub fn comprobar(cabecera: &BlockHeader, coinbase: &Tx) -> Result<(), ConsensusE
     Ok(())
 }
 
-/// Hash congelado de una red, o `None` si esa red todavía no lo tiene (C-GEN-07).
+/// Hash congelado de una red, o `None` si esa red todavía no lo tiene (`C-GEN-07`).
 ///
-/// Mainnet devuelve `None` **a propósito** mientras P-017 siga abierto: congelar el hash de un
-/// marcador de posición sería congelar el error.
+/// Mainnet devuelve `None` **a propósito** mientras P-017 siga abierto.
 #[must_use]
 pub const fn hash_congelado(red: Red) -> Option<[u8; 32]> {
     match red {
         Red::Testnet => Some(HASH_GENESIS_TESTNET),
+        Red::Dev => Some(HASH_GENESIS_DEV),
         Red::Mainnet => None,
     }
 }
 
-/// **La comprobación de arranque completa (C-GEN-01, C-GEN-07).** Es lo que un nodo llama antes de
-/// tocar nada más, y lo que aborta el arranque si algo no cuadra.
+/// **La comprobación de arranque completa (`C-GEN-01`, `C-GEN-07`).**
 ///
-/// Hace tres cosas, en este orden:
-/// 1. construye el génesis a partir de sus parámetros,
-/// 2. comprueba todas las invariantes de §15 con [`comprobar`],
-/// 3. **compara su hash contra la constante congelada** del binario.
-///
-/// # Por qué el paso 3 no puede vivir solo en un test
-///
-/// Lo hacía, y una auditoría de trazabilidad lo cazó: C-GEN-07 dice *"el arranque MUST
-/// compararlo"*, y una comparación que solo ocurre en `cargo test` **no es el arranque**. Un
-/// binario compilado con parámetros tocados habría levantado una cadena distinta sin decir nada,
-/// y el síntoma —nodos que no se sincronizan entre sí— aparecería lejísimos de la causa.
+/// Hace tres cosas, en este orden: construye el génesis, comprueba las invariantes de §15 y compara
+/// su hash contra la constante congelada del binario.
 ///
 /// # Errores
-/// [`ConsensusError::GenesisInvalido`] con el motivo concreto, o el error de [`construir`].
-pub fn comprobar_al_arrancar(p: ParametrosGenesis) -> Result<BlockHash, ConsensusError> {
+/// [`ErrorPow::GenesisInvalido`] con el motivo concreto, o el error de [`construir`].
+pub fn comprobar_al_arrancar(p: ParametrosGenesis) -> Result<BlockHash, ErrorPow> {
     let (cabecera, coinbase) = construir(p)?;
-    comprobar(&cabecera, &coinbase)?;
+    comprobar(&cabecera, &coinbase, p.red)?;
 
     let obtenido = cabecera.block_hash();
     match hash_congelado(p.red) {
         Some(esperado) if obtenido.as_bytes() == &esperado => Ok(obtenido),
-        Some(_) => Err(ConsensusError::GenesisInvalido {
+        Some(_) => Err(ErrorPow::GenesisInvalido {
             motivo: "C-GEN-07: el génesis construido NO coincide con el hash congelado del \
                      binario — o alguien tocó los parámetros, o este binario no es de esta red",
         }),
         // Una red sin hash congelado no puede arrancar. Hoy es mainnet, por P-017.
-        None => Err(ConsensusError::GenesisInvalido {
+        None => Err(ErrorPow::GenesisInvalido {
             motivo: "C-GEN-07: esta red no tiene hash de génesis congelado todavía — ver P-017",
         }),
     }
 }
 
-/// Hash del génesis de una red, tal y como se hardcodearía para la aserción de C-GEN-01.
+/// Hash del génesis de una red, tal y como se hardcodearía para la aserción de `C-GEN-01`.
 ///
 /// # Errores
 /// La de [`construir`].
-pub fn hash(p: ParametrosGenesis) -> Result<BlockHash, ConsensusError> {
+pub fn hash(p: ParametrosGenesis) -> Result<BlockHash, ErrorPow> {
     Ok(construir(p)?.0.block_hash())
 }
 
-/// El txid de la coinbase del génesis, que **MUST NOT** entrar en el UTXO set (C-GEN-03).
-///
-/// Se expone para que la capa de estado pueda comprobar explícitamente que no está, en vez de
-/// confiar en que nadie la insertó.
+/// El txid de la coinbase del génesis, que **MUST NOT** entrar en el UTXO set (`C-GEN-03`).
 ///
 /// # Errores
 /// La de [`construir`].
-pub fn txid_coinbase(p: ParametrosGenesis) -> Result<TxId, ConsensusError> {
+pub fn txid_coinbase(p: ParametrosGenesis) -> Result<TxId, ErrorPow> {
     let (cab, cb) = construir(p)?;
     Ok(txid(&cb, cab.consensus_branch_id))
 }
@@ -307,18 +272,19 @@ pub fn txid_coinbase(p: ParametrosGenesis) -> Result<TxId, ConsensusError> {
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
-    reason = "los tests fallan con panic por diseño"
+    clippy::integer_division,
+    reason = "los tests fallan con panic por diseño; la división de la derivación es exacta"
 )]
 mod tests {
     use super::target_inicial_bits;
     use super::{
-        GENESIS_MAINNET, GENESIS_TESTNET, HASH_GENESIS_TESTNET, ParametrosGenesis,
-        TIMESTAMP_MINIMO_GENESIS, coinbase_genesis, comprobar, comprobar_al_arrancar, construir,
-        hash, hash_congelado, txid_coinbase,
+        GENESIS_DEV, GENESIS_MAINNET, GENESIS_TESTNET, HASH_GENESIS_DEV, HASH_GENESIS_TESTNET,
+        ParametrosGenesis, TIMESTAMP_MINIMO_GENESIS, coinbase_genesis, comprobar,
+        comprobar_al_arrancar, construir, hash, hash_congelado, txid_coinbase,
     };
     use crate::activacion::Red;
-    use crate::dificultad::{N, ST_CAP, T};
-    use crate::error::ConsensusError;
+    use crate::error::ErrorPow;
+    use crate::parametros::{PARAMETROS_POW_ANTIGUOS, PARAMETROS_POW_DEV};
     use zx_core::amount::Amount;
     use zx_core::digest::{BlockHash, Digest};
     use zx_core::target::{TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET};
@@ -326,21 +292,20 @@ mod tests {
     #[test]
     fn el_genesis_de_testnet_es_valido() {
         let (cab, cb) = construir(GENESIS_TESTNET).unwrap();
-        comprobar(&cab, &cb).unwrap_or_else(|e| panic!("testnet: {e}"));
+        comprobar(&cab, &cb, Red::Testnet).unwrap_or_else(|e| panic!("testnet: {e}"));
+    }
+
+    #[test]
+    fn el_genesis_dev_es_valido() {
+        let (cab, cb) = construir(GENESIS_DEV).unwrap();
+        comprobar(&cab, &cb, Red::Dev).unwrap_or_else(|e| panic!("dev: {e}"));
     }
 
     /// **C-GEN-06 · P-017.** Mainnet **MUST NOT** arrancar todavía, y esto lo demuestra.
-    ///
-    /// El marcador de posición lleva `timestamp: 0`, que incumple C-GEN-06. Así, olvidarse de P-017
-    /// no produce una mainnet sobre un génesis inventado: produce un nodo que **se niega a
-    /// arrancar** citando la pregunta abierta.
-    ///
-    /// Cuando P-017 se cierre, este test fallará — y esa es exactamente la señal de que hay que
-    /// convertirlo en el test de que mainnet **sí** arranca.
     #[test]
     fn el_genesis_de_mainnet_todavia_no_arranca() {
         let (cab, cb) = construir(GENESIS_MAINNET).unwrap();
-        let Err(e) = comprobar(&cab, &cb) else {
+        let Err(e) = comprobar(&cab, &cb, Red::Mainnet) else {
             panic!("P-017 sigue abierto: el génesis de mainnet NO debe validar todavía");
         };
         let texto = format!("{e}");
@@ -350,18 +315,20 @@ mod tests {
         );
     }
 
-    /// **C-GEN-07.** El arranque de testnet valida y compara el hash. Ruta real, no un test aparte.
     #[test]
     fn el_arranque_de_testnet_valida_y_compara_el_hash() {
         let h = comprobar_al_arrancar(GENESIS_TESTNET).expect("testnet arranca");
         assert_eq!(h.as_bytes(), &HASH_GENESIS_TESTNET);
     }
 
-    /// **C-GEN-07.** Tocar un parámetro sin recalcular el hash **impide arrancar**.
-    ///
-    /// Este es el test que da valor a la regla. Sin la comparación en el arranque, un binario con
-    /// parámetros tocados levantaría una cadena distinta en silencio, y el síntoma —nodos que no
-    /// se sincronizan— aparecería lejísimos de la causa.
+    /// **C-GEN-07.** El arranque de dev valida y compara el hash congelado.
+    #[test]
+    fn el_arranque_dev_valida_y_compara_el_hash() {
+        let h = comprobar_al_arrancar(GENESIS_DEV).expect("dev arranca");
+        assert_eq!(h.as_bytes(), &HASH_GENESIS_DEV);
+    }
+
+    /// Tocar un parámetro sin recalcular el hash **impide arrancar**.
     #[test]
     fn un_parametro_tocado_impide_arrancar() {
         for tocar in [
@@ -386,11 +353,6 @@ mod tests {
         }
     }
 
-    /// **C-GEN-07 · P-017.** Mainnet no puede arrancar: no tiene hash congelado.
-    ///
-    /// Son dos candados independientes —C-GEN-06 por el timestamp y C-GEN-07 por el hash ausente—
-    /// y eso es deliberado: cerrar P-017 exige tocar los dos, así que no basta con rellenar la
-    /// fecha y olvidar congelar el hash.
     #[test]
     fn mainnet_no_arranca_porque_no_tiene_hash_congelado() {
         assert!(
@@ -400,32 +362,45 @@ mod tests {
         assert!(comprobar_al_arrancar(GENESIS_MAINNET).is_err());
     }
 
-    /// **C-GEN-01.** El hash del génesis de testnet está congelado.
-    ///
-    /// Cambiar cualquier parámetro sin actualizar la constante hace fallar esto. Sin la aserción,
-    /// dos nodos con builds distintas levantarían **cadenas distintas creyendo que son la misma**,
-    /// y el síntoma aparecería mucho más tarde y muy lejos de la causa.
     #[test]
     fn el_hash_del_genesis_de_testnet_esta_congelado() {
         let h = hash(GENESIS_TESTNET).unwrap();
         assert_eq!(
             h.as_bytes(),
             &HASH_GENESIS_TESTNET,
-            "el génesis de testnet cambió — si es a propósito, actualiza HASH_GENESIS_TESTNET; \
-             si no, has roto la red de pruebas"
+            "el génesis de testnet cambió — si es a propósito, actualiza HASH_GENESIS_TESTNET"
         );
     }
 
-    /// **C-GEN-04.** Las dos redes producen génesis distintos.
-    ///
-    /// Se comprueba aunque mainnet no valide todavía: `construir` sí funciona, y lo que interesa es
-    /// que los hashes difieran, no que el bloque sea lanzable.
+    /// **C-GEN-07 · F-13.** El hash del génesis dev está congelado.
+    #[test]
+    fn el_hash_del_genesis_dev_esta_congelado() {
+        let h = hash(GENESIS_DEV).unwrap();
+        assert_eq!(
+            h.as_bytes(),
+            &HASH_GENESIS_DEV,
+            "el génesis dev cambió — si es a propósito, actualiza HASH_GENESIS_DEV"
+        );
+    }
+
     #[test]
     fn mainnet_y_testnet_no_comparten_genesis() {
         assert_ne!(
             hash(GENESIS_MAINNET).unwrap().as_bytes(),
             hash(GENESIS_TESTNET).unwrap().as_bytes(),
             "C-GEN-04: un génesis compartido dejaría a las dos redes confundirse"
+        );
+    }
+
+    /// **C-GEN-04.** Ninguna red comparte génesis con la dev.
+    #[test]
+    fn la_red_dev_tiene_genesis_propio() {
+        let dev = hash(GENESIS_DEV).unwrap();
+        assert_ne!(dev, hash(GENESIS_MAINNET).unwrap());
+        assert_ne!(dev, hash(GENESIS_TESTNET).unwrap());
+        assert_ne!(
+            txid_coinbase(GENESIS_DEV).unwrap(),
+            txid_coinbase(GENESIS_TESTNET).unwrap()
         );
     }
 
@@ -437,51 +412,41 @@ mod tests {
         p.timestamp = TIMESTAMP_MINIMO_GENESIS - 1;
         let (cab, cb) = construir(p).unwrap();
         assert!(
-            comprobar(&cab, &cb).is_err(),
+            comprobar(&cab, &cb, Red::Testnet).is_err(),
             "un segundo antes MUST fallar"
         );
 
         p.timestamp = TIMESTAMP_MINIMO_GENESIS;
         let (cab, cb) = construir(p).unwrap();
-        assert!(comprobar(&cab, &cb).is_ok(), "el suelo justo MUST valer");
+        assert!(
+            comprobar(&cab, &cb, Red::Testnet).is_ok(),
+            "el suelo justo MUST valer"
+        );
     }
 
     /// **Por qué C-GEN-06 existe, medido.**
-    ///
-    /// El timestamp del génesis **entra en la ventana del primer retarget**: para `H = N+1 = 91`,
-    /// C-DIFF-01 usa `ts(H−N−1 .. H−1) = ts(0..90)`, y `ts(0)` es el del génesis.
-    ///
-    /// Con `ts(0) = 0` el primer solvetime reconstruido satura en `ST_CAP = 720` en vez de valer
-    /// `T = 120`, así que `t` sube 600 y el primer target calculado sale **un 0,122 % más fácil** de
-    /// lo que debería. Es pequeño, pero es un error silencioso nacido de un marcador de posición —
-    /// justo la clase de cosa que conviene volver imposible en vez de documentar.
     #[test]
     fn un_genesis_en_el_ano_cero_sesga_el_primer_retarget() {
-        let n = N as i64;
-        // n(n+1) siempre es par, así que la división entera aquí es exacta, no truncada.
-        #[expect(
-            clippy::integer_division,
-            reason = "n(n+1) es par: la división es exacta"
-        )]
-        let k = n * (n + 1) / 2 * T;
+        let pp = PARAMETROS_POW_ANTIGUOS;
+        let n = i64::try_from(pp.n).unwrap();
+        let k = n * (n + 1) / 2 * pp.t;
+        assert_eq!(k, pp.k().unwrap(), "K = N(N+1)T/2");
 
-        // Cadena sana: todos los solvetimes valen exactamente T.
-        let t_sano: i64 = (1..=n).map(|j| j * T).sum();
+        let t_sano: i64 = (1..=n).map(|j| j * pp.t).sum();
         assert_eq!(
             t_sano, k,
             "con st = T en todos, t = k y el target no se mueve"
         );
 
-        // Con el génesis en 0, st[1] satura en ST_CAP en vez de valer T.
-        let t_sesgado: i64 = ST_CAP + (2..=n).map(|j| j * T).sum::<i64>();
+        let st_cap = pp.st_cap().unwrap();
+        let t_sesgado: i64 = st_cap + (2..=n).map(|j| j * pp.t).sum::<i64>();
         assert!(t_sesgado > k, "el target se afloja");
         assert_eq!(
             t_sesgado - k,
-            ST_CAP - T,
+            st_cap - pp.t,
             "exactamente ST_CAP − T, con peso j=1"
         );
 
-        // +0,122 %. Comprobado con enteros: 1,001 < t/k < 1,002.
         assert!(t_sesgado * 1000 > k * 1001 && t_sesgado * 1000 < k * 1002);
     }
 
@@ -492,13 +457,10 @@ mod tests {
         assert_eq!(cab.prev_hash.as_bytes(), &[0u8; 32]);
     }
 
-    /// **P-004c.** Cada red arranca con SU dificultad, y mainnet es la difícil.
-    ///
-    /// Sin este test, cambiar una de las dos constantes y olvidar la otra pasaría desapercibido:
-    /// los demás tests del génesis no miran `bits`.
+    /// **P-004c.** Cada red arranca con SU dificultad; la dev con la del perfil dev.
     #[test]
     fn cada_red_arranca_con_su_propia_dificultad() {
-        for p in [GENESIS_MAINNET, GENESIS_TESTNET] {
+        for p in [GENESIS_MAINNET, GENESIS_TESTNET, GENESIS_DEV] {
             let (cab, _) = construir(p).unwrap();
             assert_eq!(
                 cab.bits,
@@ -515,10 +477,18 @@ mod tests {
             target_inicial_bits(Red::Testnet),
             TARGET_INICIAL_BITS_TESTNET
         );
-        assert_ne!(
-            TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET,
-            "si se igualan, o testnet va lenta o mainnet se regala"
+        assert_eq!(
+            target_inicial_bits(Red::Dev),
+            PARAMETROS_POW_DEV.bits_iniciales
         );
+        assert_eq!(GENESIS_DEV.timestamp, 1_790_380_800);
+        const {
+            assert!(
+                GENESIS_DEV.timestamp >= TIMESTAMP_MINIMO_GENESIS,
+                "el timestamp del génesis dev MUST ser posterior al suelo de C-GEN-06"
+            )
+        };
+        assert_eq!(GENESIS_DEV.nonce, 0);
     }
 
     /// **C-GEN-03 / C-EMIT-02.** Sin premine, sin dev tax, sin founder reward.
@@ -530,24 +500,20 @@ mod tests {
         assert!(cb.inputs.is_empty(), "es coinbase");
     }
 
-    /// Y se rechaza si alguien intenta colar valor.
     #[test]
     fn se_rechaza_un_genesis_con_premine() {
         let (cab, mut cb) = construir(GENESIS_MAINNET).unwrap();
         if let Some(s) = cb.outputs.first_mut() {
             s.value = Amount::nuevo(1).unwrap();
         }
-        let e = comprobar(&cab, &cb).unwrap_err();
-        assert!(matches!(e, ConsensusError::GenesisInvalido { .. }), "{e:?}");
+        let e = comprobar(&cab, &cb, Red::Mainnet).unwrap_err();
+        assert!(matches!(e, ErrorPow::GenesisInvalido { .. }), "{e:?}");
         assert!(
             format!("{e}").contains("cero"),
             "el error debe nombrar la regla"
         );
     }
 
-    /// **C-GEN-04.** Mainnet y testnet MUST producir hashes distintos.
-    ///
-    /// Sin esto, un bloque de una red podría ser el bloque 0 válido de la otra.
     #[test]
     fn mainnet_y_testnet_tienen_genesis_distintos() {
         let m = hash(GENESIS_MAINNET).unwrap();
@@ -560,8 +526,6 @@ mod tests {
         );
     }
 
-    /// El génesis es **determinista**: los mismos parámetros dan siempre el mismo hash. Es lo que
-    /// permite la aserción de C-GEN-01.
     #[test]
     fn el_genesis_es_determinista() {
         let a = hash(GENESIS_MAINNET).unwrap();
@@ -570,8 +534,6 @@ mod tests {
         }
     }
 
-    /// Cambiar **cualquier** parámetro cambia el hash. Es lo que hace útil la aserción: tocar algo
-    /// sin recalcular el hash rompe el arranque en vez de pasar desapercibido.
     #[test]
     fn cada_parametro_cambia_el_hash_del_genesis() {
         let base = hash(GENESIS_MAINNET).unwrap();
@@ -589,14 +551,13 @@ mod tests {
         assert_ne!(hash(p).unwrap(), base, "nonce");
     }
 
-    /// C-BLK-01: la raíz de Merkle compromete esa coinbase y no otra.
     #[test]
     fn una_coinbase_cambiada_invalida_el_genesis() {
         let (cab, _) = construir(GENESIS_MAINNET).unwrap();
         let otra = coinbase_genesis(b"una coinbase que no es la del genesis");
         assert!(matches!(
-            comprobar(&cab, &otra),
-            Err(ConsensusError::GenesisInvalido { .. })
+            comprobar(&cab, &otra, Red::Mainnet),
+            Err(ErrorPow::GenesisInvalido { .. })
         ));
     }
 
@@ -604,44 +565,33 @@ mod tests {
     fn se_rechaza_un_genesis_con_padre() {
         let (mut cab, cb) = construir(GENESIS_MAINNET).unwrap();
         cab.prev_hash = BlockHash::from_digest(Digest::from_bytes([1u8; 32]));
-        assert!(comprobar(&cab, &cb).is_err());
+        assert!(comprobar(&cab, &cb, Red::Mainnet).is_err());
     }
 
     #[test]
     fn se_rechaza_un_genesis_fuera_de_la_altura_cero() {
         let (mut cab, cb) = construir(GENESIS_MAINNET).unwrap();
         cab.height = 1;
-        assert!(comprobar(&cab, &cb).is_err());
+        assert!(comprobar(&cab, &cb, Red::Mainnet).is_err());
     }
 
     /// **C-GEN-02: el génesis NO pasa por la comprobación de PoW.**
-    ///
-    /// Su nonce es 0 y no resuelve nada, y aun así `comprobar` lo acepta. La exención es
-    /// estructural —igual que en Bitcoin—, no depende de que el génesis satisfaga su propio target.
     #[test]
     fn el_genesis_no_necesita_resolver_el_pow() {
-        // Testnet, porque mainnet está bloqueado por C-GEN-06 mientras P-017 siga abierto.
         let (cab, cb) = construir(GENESIS_TESTNET).unwrap();
-        assert_eq!(
-            cab.nonce, 1,
-            "el nonce del génesis separa redes (C-GEN-04), no resuelve un PoW"
+        assert_eq!(cab.nonce, 1);
+        assert!(
+            comprobar(&cab, &cb, Red::Testnet).is_ok(),
+            "C-GEN-02: exento del PoW"
         );
-
-        let target = zx_core::target::CompactBits::from_u32(cab.bits)
-            .decodificar()
-            .unwrap();
-        let cumple = zx_core::target::cumple_pow(&cab.block_hash(), target);
-        // No se afirma que NO lo cumpla —podría cumplirlo por azar—, sino que `comprobar` no lo mira.
-        let _ = cumple;
-        assert!(comprobar(&cab, &cb).is_ok(), "C-GEN-02: exento del PoW");
     }
 
-    /// Las dos redes usan la rama de consenso activa a la altura 0.
     #[test]
     fn el_genesis_declara_la_rama_activa() {
         for (p, red) in [
             (GENESIS_MAINNET, Red::Mainnet),
             (GENESIS_TESTNET, Red::Testnet),
+            (GENESIS_DEV, Red::Dev),
         ] {
             let (cab, _) = construir(p).unwrap();
             assert_eq!(

@@ -1,0 +1,13 @@
+   Compiling zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W04/ws/crates/zx-core)
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W04/ws/crates/zx-consensus)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running tests/pow_dev.rs (/home/katana/zeo/ZEROX/deepseek/W04/target/debug/deps/pow_dev-7b3b61a1c8d9f099)
+
+running 1 test
+test v5_cadena_dev_minada_y_validada has been running for over 60 seconds
+V5: 40/40 válidos; intentos/bloque media=136733 max=448988 total=5469356; tiempo de pared=124.844148186s
+test v5_cadena_dev_minada_y_validada ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 124.84s
+
+V5_EXIT=0

@@ -104,6 +104,120 @@ pub fn target_inicial_testnet() -> U256 {
     U256::from(0x0000_ffff_u32) << (8usize * (0x1d - 3))
 }
 
+/// Límites de target de una red (C-POW-05).
+///
+/// El mismo `bits` puede decodificar a un target válido en una red y fuera de rango en otra: la red
+/// dev elige un máximo más fácil (`PARAMETROS_POW_DEV`) para que una red local mine en segundos.
+/// `min`/`max` son **consenso de esa red**, no constantes universales.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LimitesTarget {
+    /// Target mínimo admitido — la **dificultad máxima** de la red.
+    pub min: U256,
+    /// Target máximo admitido — la **dificultad mínima** de la red.
+    pub max: U256,
+}
+
+/// Límites de las redes antiguas (mainnet y testnet): `MIN_TARGET` y `POW_LIMIT` **sin cambiar**.
+///
+/// Se escribe en limbos —y no evaluando `min_target()`/`pow_limit()`— porque debe ser `const`; un
+/// test comprueba que coincide exactamente con esas dos funciones.
+pub const LIMITES_ANTIGUOS: LimitesTarget = LimitesTarget {
+    min: U256([0, 1, 0, 0]),
+    max: U256([u64::MAX, u64::MAX, u64::MAX, 0x0000_0000_ffff_ffff]),
+};
+
+/// Límites **abiertos**: todo target estructuralmente válido. Sirve para expandir un `bits` sin
+/// aplicar la cota de una red concreta (por ejemplo, al derivar el máximo de la red dev).
+pub const LIMITES_AMPLIOS: LimitesTarget = LimitesTarget {
+    min: U256::zero(),
+    max: U256::max_value(),
+};
+
+/// Expande un `bits` a su target exigiendo forma canónica, **sin** mirar límites de red.
+fn expandir_compacto(v: u32) -> Result<U256, EncodingError> {
+    let exponente = (v >> 24) as u8;
+    let mantisa = v & 0x007f_ffff;
+    let signo = v & 0x0080_0000 != 0;
+
+    let malo = |motivo| EncodingError::BitsNoCanonico { bits: v, motivo };
+
+    if signo {
+        return Err(malo("el bit de signo MUST estar a cero"));
+    }
+    if exponente == 0 {
+        return Err(malo("exponente cero"));
+    }
+    if mantisa == 0 {
+        return Err(malo("mantisa cero"));
+    }
+    // El exponente cuenta bytes: mantisa × 256^(exp−3).
+    if exponente < 3 {
+        return Err(malo("exponente < 3 no es representable de forma canónica"));
+    }
+    let desplazamiento = 8usize * (exponente as usize - 3);
+    // 24 bits de mantisa + desplazamiento MUST caber en 256.
+    if desplazamiento + 24 > 256 {
+        return Err(malo("mantisa × 256^(exp−3) desborda 256 bits"));
+    }
+    let target = U256::from(mantisa) << desplazamiento;
+
+    // C-POW-04 · canonicidad, definida como punto fijo: `bits` MUST ser exactamente lo que produce
+    // el codificador para ese target. La canonicidad **no depende de los límites de la red**: un
+    // `bits` no canónico lo es en cualquier red.
+    if codificar_con(target, &LIMITES_ANTIGUOS) != v {
+        return Err(malo("no es la codificación canónica de su propio target"));
+    }
+    Ok(target)
+}
+
+/// Decodifica `bits` exigiendo forma **canónica** y rango **de la red** (C-POW-04, C-POW-05).
+///
+/// A diferencia de [`CompactBits::decodificar`] —que usa los límites antiguos— aquí el rango lo fija
+/// el llamante. Es lo que permite que la red dev admita un target más fácil sin aflojar mainnet.
+///
+/// # Errores
+/// [`EncodingError::BitsNoCanonico`] o [`EncodingError::TargetFueraDeRango`].
+pub fn decodificar_con(bits: u32, limites: &LimitesTarget) -> Result<U256, EncodingError> {
+    let target = expandir_compacto(bits)?;
+    if target > limites.max {
+        return Err(EncodingError::TargetFueraDeRango {
+            motivo: "target > límite máximo de la red",
+        });
+    }
+    if target < limites.min {
+        return Err(EncodingError::TargetFueraDeRango {
+            motivo: "target < límite mínimo de la red",
+        });
+    }
+    Ok(target)
+}
+
+/// Codifica un target en su forma compacta **canónica** (C-POW-04).
+///
+/// La codificación **no depende de los límites**: es total sobre cualquier `U256` y la cota de red
+/// se aplica al **decodificar**. `limites` se recibe por simetría con [`decodificar_con`] y para que
+/// las dos mitades de la pareja tengan la misma forma.
+#[must_use]
+pub fn codificar_con(target: U256, _limites: &LimitesTarget) -> u32 {
+    if target.is_zero() {
+        return 0;
+    }
+    // Bytes significativos: cuántos hacen falta para representarlo.
+    let bits_significativos = 256 - target.leading_zeros() as usize;
+    let mut exponente = bits_significativos.div_ceil(8);
+    let mut mantisa = if exponente <= 3 {
+        (target << (8 * (3 - exponente))).low_u32() & 0x00ff_ffff
+    } else {
+        (target >> (8 * (exponente - 3))).low_u32() & 0x00ff_ffff
+    };
+    // Si el bit alto de la mantisa invadiría el bit de signo, se corre un byte.
+    if mantisa & 0x0080_0000 != 0 {
+        mantisa >>= 8;
+        exponente += 1;
+    }
+    (u32::try_from(exponente).unwrap_or(0xFF) << 24) | mantisa
+}
+
 /// Target compacto de 32 bits (C-POW-03).
 ///
 /// Codifica un entero de 256 bits como `mantisa (3 bytes) × 256^(exponente − 3)`, con el exponente
@@ -141,57 +255,7 @@ impl CompactBits {
     /// # Errores
     /// [`EncodingError::BitsNoCanonico`] o [`EncodingError::TargetFueraDeRango`].
     pub fn decodificar(self) -> Result<U256, EncodingError> {
-        let v = self.0;
-        let exponente = (v >> 24) as u8;
-        let mantisa = v & 0x007f_ffff;
-        let signo = v & 0x0080_0000 != 0;
-
-        let malo = |motivo| EncodingError::BitsNoCanonico { bits: v, motivo };
-
-        if signo {
-            return Err(malo("el bit de signo MUST estar a cero"));
-        }
-        if exponente == 0 {
-            return Err(malo("exponente cero"));
-        }
-        if mantisa == 0 {
-            return Err(malo("mantisa cero"));
-        }
-        // El exponente cuenta bytes: mantisa × 256^(exp−3).
-        if exponente < 3 {
-            return Err(malo("exponente < 3 no es representable de forma canónica"));
-        }
-        let desplazamiento = 8usize * (exponente as usize - 3);
-        // 24 bits de mantisa + desplazamiento MUST caber en 256.
-        if desplazamiento + 24 > 256 {
-            return Err(malo("mantisa × 256^(exp−3) desborda 256 bits"));
-        }
-        let target = U256::from(mantisa) << desplazamiento;
-
-        // C-POW-04 · canonicidad, definida como punto fijo: `bits` MUST ser exactamente lo que
-        // produce el codificador para ese target.
-        //
-        // Se define así, y no enumerando reglas estructurales, porque enumerar se equivoca. El
-        // intento obvio —"el byte alto de la mantisa MUST ser distinto de cero"— rechaza
-        // `0x1d00ffff`, que es canónico: ese byte cero **es** el resultado del desplazamiento que
-        // evita invadir el bit de signo. Es el propio `powLimit` de Bitcoin.
-        //
-        // Recodificar y comparar no puede desincronizarse del codificador, porque es el codificador.
-        if Self::codificar(target).0 != v {
-            return Err(malo("no es la codificación canónica de su propio target"));
-        }
-
-        if target > pow_limit() {
-            return Err(EncodingError::TargetFueraDeRango {
-                motivo: "target > POW_LIMIT",
-            });
-        }
-        if target < min_target() {
-            return Err(EncodingError::TargetFueraDeRango {
-                motivo: "target < MIN_TARGET",
-            });
-        }
-        Ok(target)
+        decodificar_con(self.0, &LIMITES_ANTIGUOS)
     }
 
     /// Codifica un target en su forma compacta **canónica** (C-POW-04).
@@ -206,23 +270,7 @@ impl CompactBits {
     /// subrango, no sobre los 256 bits**, y dejaría de valer si `MIN_TARGET` bajara de `2¹⁶`.
     #[must_use]
     pub fn codificar(target: U256) -> Self {
-        if target.is_zero() {
-            return Self(0);
-        }
-        // Bytes significativos: cuántos hacen falta para representarlo.
-        let bits_significativos = 256 - target.leading_zeros() as usize;
-        let mut exponente = bits_significativos.div_ceil(8);
-        let mut mantisa = if exponente <= 3 {
-            (target << (8 * (3 - exponente))).low_u32() & 0x00ff_ffff
-        } else {
-            (target >> (8 * (exponente - 3))).low_u32() & 0x00ff_ffff
-        };
-        // Si el bit alto de la mantisa invadiría el bit de signo, se corre un byte.
-        if mantisa & 0x0080_0000 != 0 {
-            mantisa >>= 8;
-            exponente += 1;
-        }
-        Self((u32::try_from(exponente).unwrap_or(0xFF) << 24) | mantisa)
+        Self(codificar_con(target, &LIMITES_ANTIGUOS))
     }
 }
 
@@ -535,6 +583,45 @@ mod tests {
         assert!(
             total.is_some(),
             "mil años a dificultad máxima deben caber en U256"
+        );
+    }
+
+    // ── Límites de target por red ────────────────────────────────────────────
+
+    /// `LIMITES_ANTIGUOS` es un `const` escrito en limbos: **MUST** coincidir con las funciones.
+    ///
+    /// Es la lección de H-005: una constante derivada escrita a mano se comprueba, no se confía.
+    #[test]
+    fn los_limites_antiguos_coinciden_con_sus_funciones() {
+        assert_eq!(
+            super::LIMITES_ANTIGUOS.min,
+            min_target(),
+            "el mínimo de la red antigua es MIN_TARGET = 2^64"
+        );
+        assert_eq!(
+            super::LIMITES_ANTIGUOS.max,
+            pow_limit(),
+            "el máximo de la red antigua es POW_LIMIT = 2^224 − 1"
+        );
+    }
+
+    /// El rango lo fija la red: `0x1e7fffff` es canónico y válido con límites amplios, pero excede
+    /// `POW_LIMIT`; la red dev lo usa como dificultad de arranque.
+    #[test]
+    fn decodificar_con_aplica_los_limites_de_la_red() {
+        let dev = super::decodificar_con(0x1e7f_ffff, &super::LIMITES_AMPLIOS).unwrap();
+        assert!(
+            dev > pow_limit(),
+            "el máximo dev es más fácil que POW_LIMIT"
+        );
+        assert_eq!(
+            super::codificar_con(dev, &super::LIMITES_AMPLIOS),
+            0x1e7f_ffff,
+            "y sigue siendo canónico"
+        );
+        assert!(
+            super::decodificar_con(0x1e7f_ffff, &super::LIMITES_ANTIGUOS).is_err(),
+            "mainnet/testnet MUST rechazarlo: supera POW_LIMIT"
         );
     }
 }

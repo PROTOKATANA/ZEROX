@@ -86,6 +86,9 @@ Entrada congelada: `P-ZRX/P-TRANSICION/ENTRADA-W03.sha256`, al empezar y como ú
 | `Evidencia` en PoW (`ErrOperacionFase`) o en PoST (`ErrFueraDeAlcanceV0`) | la v4 no se puede construir: el arnés espera `ErrForma(VersionInactiva)` y lo cuenta como coincidencia |
 | `firmante ≠ dueño` o `firmante ≠ clave` (`ErrAutorizacion`) | `ErrFirma` o `ErrAutorizacion` |
 | Salida o entrada inexistente (`ErrSaldo`/`ErrDobleGasto` según T01) | el mismo nombre; si Rust da otro, es **discrepancia** |
+| R-8 importe 0 (`ErrSaldo`) | `ErrForma(ImporteCero)` |
+| R-9 transferencia con entradas y sin salidas (`ErrSaldo`) | `ErrForma(TransferenciaSinSalidas)` |
+| R-6/R-7/R-9 coinbase fuera de lugar, sin salidas o transferencia sin entradas (`ErrEmision`) | `ErrEmision` |
 | Cualquier otro | nombre idéntico |
 
 Cualquier otra diferencia es discrepancia: no añadas correspondencias por tu cuenta; si crees que

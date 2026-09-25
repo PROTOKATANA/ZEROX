@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/zx-core",
     "crates/zx-pot",
+    "crates/zx-consensus",
 ]
 
 [workspace.package]

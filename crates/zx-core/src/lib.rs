@@ -58,7 +58,10 @@ pub use preimage::tx::{
     HashType, auth_digest, mensaje_aceptacion, sighash, txid, verificar_aceptacion,
 };
 pub use red::{CBID_RED_DEV, MAGIC_DEV, Red};
-pub use target::{CompactBits, TrabajoAcumulado, cumple_pow, trabajo_bloque};
+pub use target::{
+    CompactBits, LIMITES_AMPLIOS, LIMITES_ANTIGUOS, LimitesTarget, TrabajoAcumulado, codificar_con,
+    cumple_pow, decodificar_con, trabajo_bloque,
+};
 pub use tx::{ExtensionTx, Lock, OutPoint, SpentOutput, TipoGarantia, Tx, TxIn, TxOut};
 pub use wire_dag::{
     BUNDLE_BYTES, BloqueDag, CHECKPOINTS_POR_BUNDLE, ContextoVerificacionPot, ErrorDiferenciaSlots,

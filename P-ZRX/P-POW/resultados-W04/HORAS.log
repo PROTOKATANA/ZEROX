@@ -1,0 +1,22 @@
+# HORAS.log — ORDEN-W04
+# Marcas `date -Is`; donde no hubo captura directa, hora de modificación del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W04/
+2026-09-26T01:38:00+02:00  inicio de sesion; lectura integra de ORDEN-W04.md, V-ZRX/LINEO.md, CONTRATO-v0.md §0/§5, FORMATO-v0.md y PLAN-0.0.1.md
+2026-09-26T01:38:20+02:00  ENTRADA INICIO: sha256sum -c de ENTRADA-W04.sha256 -> 4/4 coinciden, exit=0 (logs/entrada-inicio.log)
+2026-09-26T01:38:40+02:00  falta de definicion detectada e informada antes de editar: 0x1e7fffff es canonico pero supera POW_LIMIT; se resuelve con LimitesTarget por red, sin elegir otro valor
+2026-09-26T01:39:00+02:00  copia de Cargo.toml/Cargo.lock/rust-toolchain.toml/crates/testdata/ci/.github a ws.orig y ws; copia de .cargo-home de W02 (697 MiB)
+2026-09-26T01:39:30+02:00  zx-core/target.rs: LimitesTarget, LIMITES_ANTIGUOS, LIMITES_AMPLIOS, decodificar_con, codificar_con; CompactBits delega; 14 tests de target pasan (12 antiguos + 2 nuevos)
+2026-09-26T01:41:00+02:00  crate zx-consensus: parametros.rs (derivadas k/nk/st_cap/t_floor/ftl), algoritmo.rs (AlgoritmoPow/Sha3Dev), activacion.rs (RAMA_DEV), error.rs (ErrorPow)
+2026-09-26T01:43:00+02:00  portados: dificultad.rs (LWMA-1), timestamps.rs (con ftl), fork_choice.rs (sin MAX_REORG_LENGTH), genesis.rs (mainnet/testnet/dev)
+2026-09-26T01:44:30+02:00  verificador.rs (validar_cabecera_pow + ContextoPow) y minero_dev.rs (nonce desde 0, un hilo, sin unsafe)
+2026-09-26T01:45:20+02:00  HASH_GENESIS_DEV calculado con ejemplo temporal (borrado): c72fdb3b37e7571a82ec1e0e973e90d5e95e7ad9fc871772265b1994050c2d59
+2026-09-26T01:45:50+02:00  tests/pow_dev.rs (V5 40 bloques, V6 retarget) y tests/verificador_pow.rs (14 tests de §5/§6)
+2026-09-26T01:46:40+02:00  primer clippy: 4 expectativas incumplidas + 2 expect() + 2 integer_division; corregido
+2026-09-26T01:47:10+02:00  V1 fmt=0; V2 clippy=0 (0 avisos); logs/V1-fmt.log, logs/V2-clippy.log
+2026-09-26T01:48:00+02:00  ci/frontera-crates.sh portado y ajustado a zx-consensus -> {zx-core} (jq disponible); workflow CI actualizado
+2026-09-26T01:50:30+02:00  V3: cargo test --workspace --all-features --locked -> 265 pasan, 0 fallan; 182 nombres previos de W02, 0 desaparecen (logs/V3-test.log)
+2026-09-26T01:50:40+02:00  V7: dependencias-exactas (10 exactas) y frontera zx-consensus->{zx-core} -> OK
+2026-09-26T01:51:00+02:00  cambios.patch (3290 lineas), MIGRACION.sha256 (70 huellas, sha256sum -c OK), logs/lock-subconjunto.txt (unica adicion zx-consensus 0.0.0)
+2026-09-26T01:51:50+02:00  V5 medicion dedicada con --nocapture (logs/V5-medicion.log)
+2026-09-26T01:55:00+02:00  INFORME.md y PROGRESO.md; ENTREGA FINAL: sha256sum -c ENTRADA-W04.sha256 -> 4/4 coinciden
+2026-09-26T01:55:00+02:00  fin; presupuesto (2 h / 8 hilos / 16 GiB / 20 GiB) no agotado

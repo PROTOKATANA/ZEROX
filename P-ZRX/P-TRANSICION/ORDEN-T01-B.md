@@ -29,8 +29,14 @@ Entrada congelada: `P-ZRX/P-TRANSICION/ENTRADA-T01-B.sha256`, al empezar y como 
    de T01, repartidas uniformemente sobre los puntos de la rejilla reducida con interfaces por
    defecto, semilla maestra `0x5a5a`, réplica `r` con `StableRNG(0x5a5a + r)` como en T01. Cada caso
    lleva su punto de rejilla y su semilla.
-3. **No cambies** la semántica del oráculo: el exportador solo lee resultados de `aplicar`,
-   `seleccionar` y el estado.
+3. **Alineación previa con «Ratificaciones v0.1» del contrato** (única modificación permitida de la
+   semántica de T01, marcada en el código con `# RATIFICACION-v0.1-Rn`): R-6 coinbase que no es la
+   primera transacción ⇒ `ErrEmision`; R-7 coinbase PoW sin salidas ⇒ `ErrEmision`; R-8 importe 0
+   en `CoinbasePost`, `Deposito`, `Retiro` o `Liberacion` ⇒ `ErrSaldo`; R-9 transferencia sin
+   entradas ⇒ `ErrEmision` (se trata como coinbase fuera de lugar) y transferencia con entradas y
+   sin salidas ⇒ `ErrSaldo`. Tras aplicarlas, vuelve a pasar `test/runtests.jl` y ejecuta
+   `run.jl --seed 0x5a5a --replicas 50 --rejilla reducida`; guarda ambas salidas. Aparte de eso, el
+   exportador solo lee resultados de `aplicar`, `seleccionar` y el estado.
 4. **Formato** (UTF-8, una línea por registro, campos `clave=valor` separados por un espacio, sin
    espacios dentro de los valores, listas entre corchetes separadas por comas, enteros en decimal):
 
@@ -62,7 +68,7 @@ Entrada congelada: `P-ZRX/P-TRANSICION/ENTRADA-T01-B.sha256`, al empezar y como 
   **no** reutiliza funciones del exportador, reconstruye cada caso, lo vuelve a ejecutar con el
   oráculo y compara `RES`, `SEL`, `UTXO`, `GAR` y `EST`. 0 discrepancias.
 - Determinismo: dos ejecuciones del exportador producen el mismo `sha256`.
-- Presupuesto: 45 min, 1 hilo, 4 GiB. **Prohibido Python.**
+- Presupuesto: 1 h 30 min, 1 hilo, 8 GiB. **Prohibido Python.**
 
 ## 5. Entregables y límites
 

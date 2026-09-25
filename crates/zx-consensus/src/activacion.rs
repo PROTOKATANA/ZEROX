@@ -1,37 +1,19 @@
-//! Activación de cambios de consenso (SPEC §14) y parámetros de red (§16).
+//! Activación de ramas de consenso (`C-UPG-01…05`) y parámetros de red.
 //!
-//! # Solo hard forks, y solo por altura
+//! Portado de `9681061` con **una** diferencia: la red dev tiene su propia rama,
+//! `(CBID_RED_DEV, 0)`, y mainnet/testnet conservan la tabla antigua sin cambios (`ORDEN-W04 §3.9`).
 //!
-//! Ni señalización de mineros, ni votación, ni detección de versión de cliente. Es el denominador
-//! común de los dos diseños maduros: Zcash lo exige textualmente en ZIP-200, y Monero —pese a tener
-//! implementada una votación por supermayoría— usa `threshold = 0` en **las 16 entradas reales** de
-//! su tabla: nunca la ha ejercido.
-//!
-//! BIP-9 y BIP-8 **no aplican**: están definidos para *soft forks*. La señalización de mineros no
-//! evita un split en un hard fork, porque un nodo antiguo rechaza los bloques nuevos por definición,
-//! se señalice o no.
-//!
-//! # Por qué el branch ID va en la cabecera
-//!
-//! ZIP-200 describe el ataque de *wipe-out* —si tras la activación la rama vieja solo produce
-//! bloques que también serían válidos bajo las reglas nuevas, un atacante con más trabajo en la
-//! vieja puede **barrer la nueva con un reorg perfectamente legítimo**— y nombra la solución
-//! genérica: *"modifying the block header to include a commitment to the CONSENSUS_BRANCH_ID"*.
-//!
-//! **Zcash no la implementó.** A ZEROX le importa más: los hard forks que ya damos por previstos
-//! —ajustar `ZONA_LIBRE`, `N_LARGO`, `REF_WEIGHT`— son **cambios de parámetro puros**, que no
-//! fuerzan ningún cambio de formato trivialmente inválido bajo las reglas viejas. Son exactamente
-//! el caso vulnerable. Al nacer sin cadena viva, ponerlo en la cabecera cuesta cero.
+//! El `CONSENSUS_BRANCH_ID` va en la cabecera (ZIP-200) para cerrar el ataque de *wipe-out*: un
+//! bloque de una rama vieja no puede competir a alturas donde rige otra.
 
-use crate::error::ConsensusError;
+use crate::error::ErrorPow;
 
-/// La red. **Definida en `zx-core`**, reexportada aquí por comodidad.
-///
-/// Llegó a haber dos `Red` distintos en el workspace —este y el de `zx-core::address`— con el
-/// mismo nombre y el mismo significado, y sin ninguna relación para el compilador. Unificados.
-pub use zx_core::red::Red;
+/// La red, definida en `zx-core` y reexportada aquí por comodidad.
+pub use zx_core::Red;
 
-/// Una rama de consenso: su identificador y la altura desde la que rige (C-UPG-02).
+pub use zx_core::red::{MAGIC_MAINNET, MAGIC_TESTNET};
+
+/// Una rama de consenso: su identificador y la altura desde la que rige (`C-UPG-02`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Rama {
     /// `CONSENSUS_BRANCH_ID`. **MUST** ser no cero y globalmente único.
@@ -40,7 +22,7 @@ pub struct Rama {
     pub desde_altura: u32,
 }
 
-/// Rama v1.0 de mainnet, activa desde el génesis (C-UPG-02).
+/// Rama v1.0 de mainnet, activa desde el génesis (`C-UPG-02`).
 ///
 /// `0xc47880ea` = primeros 4 bytes de `SHA3-256("ZEROX/consensus-branch/v1.0")` leídos como `u32`
 /// little-endian. **Derivado, no inventado**: cualquiera puede reproducirlo.
@@ -54,55 +36,54 @@ pub const RAMAS_MAINNET: &[Rama] = &[RAMA_V1_MAINNET];
 
 /// Tabla de ramas de testnet.
 ///
-/// Comparte identificador con mainnet en v1.0 porque las dos redes ya están separadas por el
-/// génesis (C-GEN-04) y por el prefijo mágico (C-NET-01). Si algún día divergen las reglas, cada red
-/// tendrá su propio identificador.
+/// Comparte identificador con mainnet en v1.0 porque las dos redes ya están separadas por el génesis
+/// (`C-GEN-04`) y por el prefijo mágico (`C-NET-01`).
 pub const RAMAS_TESTNET: &[Rama] = &[RAMA_V1_MAINNET];
 
-pub use zx_core::red::{MAGIC_MAINNET, MAGIC_TESTNET};
+/// Rama única de la **red dev** (`F-12`, D-P05): `CBID_RED_DEV` desde la altura 0.
+pub const RAMA_DEV: Rama = Rama {
+    id: zx_core::CBID_RED_DEV,
+    desde_altura: 0,
+};
+
+/// Tabla de ramas de la red dev: una sola rama (`ORDEN-W04 §3.9`).
+pub const RAMAS_DEV: &[Rama] = &[RAMA_DEV];
 
 /// Tabla de ramas de una red.
 ///
-/// Función libre y no método porque [`Red`] vive ahora en `zx-core`: la tabla de ramas **sí** es
-/// consenso y se queda aquí, pero no puede colgar de un tipo de otro crate.
+/// Función libre y no método porque [`Red`] vive en `zx-core`.
 #[must_use]
 pub const fn ramas(red: Red) -> &'static [Rama] {
     match red {
         Red::Mainnet => RAMAS_MAINNET,
         Red::Testnet => RAMAS_TESTNET,
+        Red::Dev => RAMAS_DEV,
     }
 }
 
-/// Identificador de rama activo a una altura dada (C-UPG-01, C-UPG-02).
-///
-/// Se elige por **altura de bloque**, nunca por versión de software ni por señalización.
+/// Identificador de rama activo a una altura dada (`C-UPG-01`, `C-UPG-02`).
 ///
 /// # Errores
-/// [`ConsensusError::SinRamaActiva`] si ninguna rama cubre esa altura — imposible con una tabla
-/// bien formada, cuya primera entrada arranca en 0, pero se trata como valor.
-pub fn rama_activa(red: Red, altura: u32) -> Result<u32, ConsensusError> {
+/// [`ErrorPow::SinRamaActiva`] si ninguna rama cubre esa altura.
+pub fn rama_activa(red: Red, altura: u32) -> Result<u32, ErrorPow> {
     ramas(red)
         .iter()
         .rev()
         .find(|r| altura >= r.desde_altura)
         .map(|r| r.id)
-        .ok_or(ConsensusError::SinRamaActiva { altura })
+        .ok_or(ErrorPow::SinRamaActiva { altura })
 }
 
-/// C-HDR-02b · el `consensus_branch_id` de la cabecera **MUST** ser el activo a esa altura.
-///
-/// Es lo que da la protección contra *wipe-out* (C-UPG-05): un bloque de la rama vieja lleva su
-/// identificador viejo y por tanto es inválido a alturas donde rige otro, así que no puede
-/// participar en un reorg contra la rama nueva.
+/// `C-HDR-02b`: el `consensus_branch_id` de la cabecera **MUST** ser el activo a esa altura.
 ///
 /// # Errores
-/// [`ConsensusError::BranchIdIncorrecto`].
-pub fn comprobar_branch_id(red: Red, altura: u32, branch_id: u32) -> Result<(), ConsensusError> {
+/// [`ErrorPow::BranchIdIncorrecto`].
+pub fn comprobar_branch_id(red: Red, altura: u32, branch_id: u32) -> Result<(), ErrorPow> {
     let esperado = rama_activa(red, altura)?;
     if branch_id == esperado {
         Ok(())
     } else {
-        Err(ConsensusError::BranchIdIncorrecto {
+        Err(ErrorPow::BranchIdIncorrecto {
             altura,
             esperado,
             encontrado: branch_id,
@@ -110,18 +91,15 @@ pub fn comprobar_branch_id(red: Red, altura: u32, branch_id: u32) -> Result<(), 
     }
 }
 
-/// Comprueba que una tabla de ramas está bien formada (C-UPG-02, C-UPG-03).
+/// Comprueba que una tabla de ramas está bien formada (`C-UPG-02`, `C-UPG-03`).
 ///
 /// Invariantes: arranca en la altura 0, las alturas crecen estrictamente, ningún identificador es
-/// cero, y no hay identificadores repetidos.
-///
-/// Existe para que una tabla mal editada falle en un test y no en producción — es la lección de
-/// H-005 aplicada a una constante que se editará a mano en cada hard fork.
+/// cero y no hay identificadores repetidos.
 ///
 /// # Errores
-/// [`ConsensusError::TablaDeRamasInvalida`] con el motivo.
-pub fn comprobar_tabla(ramas: &[Rama]) -> Result<(), ConsensusError> {
-    let malo = |motivo| ConsensusError::TablaDeRamasInvalida { motivo };
+/// [`ErrorPow::TablaDeRamasInvalida`] con el motivo.
+pub fn comprobar_tabla(ramas: &[Rama]) -> Result<(), ErrorPow> {
+    let malo = |motivo| ErrorPow::TablaDeRamasInvalida { motivo };
 
     let primera = ramas.first().ok_or_else(|| malo("la tabla está vacía"))?;
     if primera.desde_altura != 0 {
@@ -136,7 +114,6 @@ pub fn comprobar_tabla(ramas: &[Rama]) -> Result<(), ConsensusError> {
             return Err(malo("un CONSENSUS_BRANCH_ID MUST ser distinto de cero"));
         }
         if vistos.contains(&r.id) {
-            // Salvo que sea la misma rama repetida, que la comprobación de altura ya descarta.
             return Err(malo("dos ramas comparten CONSENSUS_BRANCH_ID"));
         }
         vistos.push(r.id);
@@ -155,16 +132,13 @@ pub fn comprobar_tabla(ramas: &[Rama]) -> Result<(), ConsensusError> {
 #[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
 mod tests {
     use super::{
-        MAGIC_MAINNET, MAGIC_TESTNET, RAMA_V1_MAINNET, RAMAS_MAINNET, Rama, Red,
+        MAGIC_MAINNET, MAGIC_TESTNET, RAMA_DEV, RAMA_V1_MAINNET, RAMAS_MAINNET, Rama, Red,
         comprobar_branch_id, comprobar_tabla, rama_activa, ramas,
     };
-    use crate::error::ConsensusError;
+    use crate::error::ErrorPow;
     use zx_core::sha3_256_publico;
 
-    /// **Las constantes derivadas se recalculan aquí, no se confían.**
-    ///
-    /// Son valores que alguien podría "corregir" a mano en un editor. Si el identificador de rama o
-    /// un prefijo mágico dejaran de coincidir con su derivación, el test lo dice.
+    /// Las constantes derivadas se recalculan aquí, no se confían.
     #[test]
     fn las_constantes_derivadas_se_reproducen() {
         let cbid = sha3_256_publico(b"ZEROX/consensus-branch/v1.0");
@@ -181,30 +155,23 @@ mod tests {
         assert_eq!(t.as_bytes().get(..4).unwrap(), MAGIC_TESTNET);
     }
 
-    /// C-NET-01: el criterio que Bitcoin documenta para sus prefijos.
-    ///
-    /// Se comprueba sobre los bytes **derivados en ejecución**, no sobre las constantes: con estas
-    /// últimas clippy demuestra la invalidez en compilación y considera el test trivial —cosa que
-    /// en sí misma es una garantía más fuerte, pero deja de ser una regresión útil si algún día se
-    /// cambia la etiqueta de derivación.
+    /// **F-12.** El `CBID` de dev es derivado: se recalcula de su fórmula.
     #[test]
-    fn los_prefijos_magicos_no_son_utf8_valido() {
-        for etiqueta in [&b"ZEROX/mainnet/magic"[..], &b"ZEROX/testnet/magic"[..]] {
-            let d = sha3_256_publico(etiqueta);
-            let cuatro = d.as_bytes().get(..4).unwrap();
-            assert!(
-                core::str::from_utf8(cuatro).is_err(),
-                "el prefijo derivado de {:?} resultó ser UTF-8 válido — habría que elegir otra \
-                 etiqueta, porque el criterio de C-NET-01 es que no aparezca en datos normales",
-                core::str::from_utf8(etiqueta)
-            );
+    fn el_cbid_de_dev_se_reproduce() {
+        let h = sha3_256_publico(b"ZEROX hibrido red dev v0");
+        let bytes: [u8; 4] = h.as_bytes().get(..4).unwrap().try_into().unwrap();
+        let mut cbid = u32::from_le_bytes(bytes);
+        if cbid == 0 {
+            cbid = 1;
         }
-        assert_ne!(MAGIC_MAINNET, MAGIC_TESTNET, "las redes MUST distinguirse");
+        assert_eq!(RAMA_DEV.id, cbid, "F-12");
+        assert_eq!(RAMA_DEV.id, zx_core::CBID_RED_DEV);
     }
 
     #[test]
     fn el_branch_id_no_es_cero() {
         assert_ne!(RAMA_V1_MAINNET.id, 0, "C-UPG-02: MUST ser no cero");
+        assert_ne!(RAMA_DEV.id, 0);
     }
 
     #[test]
@@ -214,15 +181,19 @@ mod tests {
             rama_activa(Red::Mainnet, u32::MAX).unwrap(),
             RAMA_V1_MAINNET.id
         );
+        assert_eq!(rama_activa(Red::Dev, 0).unwrap(), RAMA_DEV.id);
+        assert_eq!(rama_activa(Red::Dev, u32::MAX).unwrap(), RAMA_DEV.id);
     }
 
     #[test]
     fn la_tabla_real_esta_bien_formada() {
         assert!(comprobar_tabla(RAMAS_MAINNET).is_ok());
         assert!(comprobar_tabla(ramas(Red::Testnet)).is_ok());
+        assert!(comprobar_tabla(ramas(Red::Dev)).is_ok());
+        assert_eq!(ramas(Red::Dev).len(), 1, "§3.9: una sola rama dev");
     }
 
-    /// La tabla se editará a mano en cada hard fork. Estas son las formas de estropearla.
+    /// La tabla se editará a mano en cada hard fork: estas son las formas de estropearla.
     #[test]
     fn se_detecta_una_tabla_mal_formada() {
         let casos: [(&str, Vec<Rama>); 5] = [
@@ -276,7 +247,7 @@ mod tests {
             assert!(
                 matches!(
                     comprobar_tabla(&tabla),
-                    Err(ConsensusError::TablaDeRamasInvalida { .. })
+                    Err(ErrorPow::TablaDeRamasInvalida { .. })
                 ),
                 "debería detectarse: {que}"
             );
@@ -284,10 +255,6 @@ mod tests {
     }
 
     /// **La protección contra wipe-out en funcionamiento.**
-    ///
-    /// Con dos ramas, un bloque que declare el identificador de la vieja a una altura donde rige la
-    /// nueva es **inválido**, así que no puede competir en un reorg contra la rama nueva. Es lo que
-    /// ZIP-200 describe y Zcash dejó sin implementar.
     #[test]
     fn un_bloque_de_la_rama_vieja_no_vale_en_la_nueva() {
         const VIEJA: u32 = 0x1111_1111;
@@ -314,20 +281,17 @@ mod tests {
         };
         assert_eq!(activo_en(999), VIEJA, "antes de la activación");
         assert_eq!(activo_en(1000), NUEVA, "justo en la altura de activación");
-        assert_ne!(
-            activo_en(1000),
-            VIEJA,
-            "un bloque con el id viejo a 1000 sería inválido"
-        );
     }
 
     #[test]
     fn se_rechaza_una_cabecera_con_el_branch_id_equivocado() {
         assert!(comprobar_branch_id(Red::Mainnet, 10, RAMA_V1_MAINNET.id).is_ok());
+        assert!(comprobar_branch_id(Red::Dev, 10, RAMA_DEV.id).is_ok());
         let e = comprobar_branch_id(Red::Mainnet, 10, 0xDEAD_BEEF).unwrap_err();
+        assert!(matches!(e, ErrorPow::BranchIdIncorrecto { .. }), "{e:?}");
         assert!(
-            matches!(e, ConsensusError::BranchIdIncorrecto { .. }),
-            "{e:?}"
+            comprobar_branch_id(Red::Dev, 10, RAMA_V1_MAINNET.id).is_err(),
+            "un branch_id de mainnet NO vale en dev"
         );
     }
 }

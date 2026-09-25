@@ -1,0 +1,3290 @@
+diff -ruN ws.orig/Cargo.lock ws/Cargo.lock
+--- ws.orig/Cargo.lock	2026-09-26 01:36:47.796117320 +0200
++++ ws/Cargo.lock	2026-09-26 01:43:35.366636165 +0200
+@@ -1125,6 +1125,16 @@
+ ]
+ 
+ [[package]]
++name = "zx-consensus"
++version = "0.0.0"
++dependencies = [
++ "primitive-types",
++ "proptest",
++ "thiserror",
++ "zx-core",
++]
++
++[[package]]
+ name = "zx-core"
+ version = "0.0.0"
+ dependencies = [
+diff -ruN ws.orig/Cargo.toml ws/Cargo.toml
+--- ws.orig/Cargo.toml	2026-09-26 01:36:47.795117299 +0200
++++ ws/Cargo.toml	2026-09-26 01:41:24.338897485 +0200
+@@ -3,6 +3,7 @@
+ members = [
+     "crates/zx-core",
+     "crates/zx-pot",
++    "crates/zx-consensus",
+ ]
+ 
+ [workspace.package]
+diff -ruN ws.orig/ci/frontera-crates.sh ws/ci/frontera-crates.sh
+--- ws.orig/ci/frontera-crates.sh	1970-01-01 01:00:00.000000000 +0100
++++ ws/ci/frontera-crates.sh	2026-09-26 01:49:01.263460854 +0200
+@@ -0,0 +1,34 @@
++#!/usr/bin/env bash
++# Frontera de dependencias del crate de consenso (adaptado de `9681061` a la orden W04).
++#
++# Regla: `zx-consensus` puede ver `zx-core` y **solo** `zx-core` dentro del workspace: una primitiva
++# de cálculo, no red, estado ni mempool. No se porta la regla de `zx-p2p`/`zx-mempool` porque esos
++# crates todavía no existen en el workspace nuevo; se reintroducirán con sus órdenes.
++#
++# Se usa `jq` (disponible en la máquina del proyecto y en los runners ubuntu de CI). Si no estuviera,
++# el script falla con un mensaje explícito en vez de dar un OK falso.
++set -euo pipefail
++cd "$(dirname "$0")/.."
++
++if ! command -v jq >/dev/null 2>&1; then
++    echo "jq no está instalado: no se puede comprobar la frontera de crates" >&2
++    exit 1
++fi
++
++cargo metadata --locked --no-deps --format-version 1 | jq -e '
++    [.packages[] | select(.name == "zx-consensus")] as $p |
++    if ($p | length) != 1 then
++        error("zx-consensus no aparece en cargo metadata")
++    else
++        [$p[0].dependencies[]
++         | select(.kind != "dev")
++         | select(.name | startswith("zx-"))
++         | .name as $d
++         | select($d != "zx-core")
++         | "zx-consensus depende de \($d)"] as $fallos |
++        if ($fallos | length) > 0 then
++            error($fallos | join("; "))
++        else
++            "OK — frontera zx-consensus → {zx-core}"
++        end
++    end'
+diff -ruN ws.orig/crates/zx-consensus/Cargo.toml ws/crates/zx-consensus/Cargo.toml
+--- ws.orig/crates/zx-consensus/Cargo.toml	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/Cargo.toml	2026-09-26 01:41:26.812949197 +0200
+@@ -0,0 +1,21 @@
++[package]
++name         = "zx-consensus"
++description  = "Motor PoW de la fase de arranque: retarget LWMA-1, selección por trabajo, timestamps, génesis dev y minero CPU, parametrizados por red"
++version.workspace      = true
++edition.workspace      = true
++rust-version.workspace = true
++license.workspace      = true
++repository.workspace   = true
++
++[lints]
++workspace = true
++
++[dependencies]
++thiserror       = { workspace = true }
++primitive-types = { workspace = true }
++zx-core         = { path = "../zx-core" }
++
++# Test: `proptest` ya lo usa el workspace (`zx-core`) y sus versiones ya están resueltas en
++# `Cargo.lock`. No se añade ninguna dependencia externa nueva.
++[dev-dependencies]
++proptest = { workspace = true }
+diff -ruN ws.orig/crates/zx-consensus/README.md ws/crates/zx-consensus/README.md
+--- ws.orig/crates/zx-consensus/README.md	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/README.md	2026-09-26 01:41:30.245020932 +0200
+@@ -0,0 +1,24 @@
++# `zx-consensus` — motor PoW de la fase de arranque
++
++Crate **nuevo** de la red dev de 0.0.1 (órdenes D-P05 y D-T01). Implementa, **parametrizado por
++red** en lugar de con constantes:
++
++- el retarget **LWMA-1** (`C-DIFF-01…08`) con aritmética `U512` y solvetimes monótonos;
++- la **selección por mayor trabajo acumulado** con desempate determinista por menor `block_hash`
++  (`C-FORK-03`, `C-FORK-04`);
++- las reglas de **timestamp** (`C-TS-01`, `C-TS-03`, `C-TS-05`);
++- el **génesis constructivo** (`C-GEN-01…07`) para dev, mainnet y testnet;
++- el **verificador de cabecera PoW** con `bits`, `hash_pow < target`, altura y padre;
++- un **minero CPU de desarrollo**.
++
++El `block_hash` de la cabecera es **siempre** `SHA3-256("ZZKBlkHeader____" ‖ cabecera)`. El
++`hash_pow` es lo que se compara con el target y vive detrás de `trait AlgoritmoPow`; la única
++implementación es `Sha3Dev`, un **parámetro de desarrollo** — el algoritmo de producción está
++abierto (IPA A-12).
++
++## Alcance
++
++Entra: `dificultad`, `fork_choice`, `timestamps`, `activacion`, `genesis`, verificador y minero.
++**No** entra: GHOSTDAG, PoT, PoAS, firmante, emisión, validación de transacciones, cuerpo de bloque
++ni la transición PoW → PoST (TRN-04/TRN-05 son de W03/W05). Este crate no decide la profundidad de
++reorganización de la fase PoW.
+diff -ruN ws.orig/crates/zx-consensus/src/activacion.rs ws/crates/zx-consensus/src/activacion.rs
+--- ws.orig/crates/zx-consensus/src/activacion.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/activacion.rs	2026-09-26 01:47:53.992046911 +0200
+@@ -0,0 +1,297 @@
++//! Activación de ramas de consenso (`C-UPG-01…05`) y parámetros de red.
++//!
++//! Portado de `9681061` con **una** diferencia: la red dev tiene su propia rama,
++//! `(CBID_RED_DEV, 0)`, y mainnet/testnet conservan la tabla antigua sin cambios (`ORDEN-W04 §3.9`).
++//!
++//! El `CONSENSUS_BRANCH_ID` va en la cabecera (ZIP-200) para cerrar el ataque de *wipe-out*: un
++//! bloque de una rama vieja no puede competir a alturas donde rige otra.
++
++use crate::error::ErrorPow;
++
++/// La red, definida en `zx-core` y reexportada aquí por comodidad.
++pub use zx_core::Red;
++
++pub use zx_core::red::{MAGIC_MAINNET, MAGIC_TESTNET};
++
++/// Una rama de consenso: su identificador y la altura desde la que rige (`C-UPG-02`).
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub struct Rama {
++    /// `CONSENSUS_BRANCH_ID`. **MUST** ser no cero y globalmente único.
++    pub id: u32,
++    /// Altura desde la que se aplican sus reglas.
++    pub desde_altura: u32,
++}
++
++/// Rama v1.0 de mainnet, activa desde el génesis (`C-UPG-02`).
++///
++/// `0xc47880ea` = primeros 4 bytes de `SHA3-256("ZEROX/consensus-branch/v1.0")` leídos como `u32`
++/// little-endian. **Derivado, no inventado**: cualquiera puede reproducirlo.
++pub const RAMA_V1_MAINNET: Rama = Rama {
++    id: 0xc478_80ea,
++    desde_altura: 0,
++};
++
++/// Tabla de ramas de mainnet, **ordenada por altura ascendente**.
++pub const RAMAS_MAINNET: &[Rama] = &[RAMA_V1_MAINNET];
++
++/// Tabla de ramas de testnet.
++///
++/// Comparte identificador con mainnet en v1.0 porque las dos redes ya están separadas por el génesis
++/// (`C-GEN-04`) y por el prefijo mágico (`C-NET-01`).
++pub const RAMAS_TESTNET: &[Rama] = &[RAMA_V1_MAINNET];
++
++/// Rama única de la **red dev** (`F-12`, D-P05): `CBID_RED_DEV` desde la altura 0.
++pub const RAMA_DEV: Rama = Rama {
++    id: zx_core::CBID_RED_DEV,
++    desde_altura: 0,
++};
++
++/// Tabla de ramas de la red dev: una sola rama (`ORDEN-W04 §3.9`).
++pub const RAMAS_DEV: &[Rama] = &[RAMA_DEV];
++
++/// Tabla de ramas de una red.
++///
++/// Función libre y no método porque [`Red`] vive en `zx-core`.
++#[must_use]
++pub const fn ramas(red: Red) -> &'static [Rama] {
++    match red {
++        Red::Mainnet => RAMAS_MAINNET,
++        Red::Testnet => RAMAS_TESTNET,
++        Red::Dev => RAMAS_DEV,
++    }
++}
++
++/// Identificador de rama activo a una altura dada (`C-UPG-01`, `C-UPG-02`).
++///
++/// # Errores
++/// [`ErrorPow::SinRamaActiva`] si ninguna rama cubre esa altura.
++pub fn rama_activa(red: Red, altura: u32) -> Result<u32, ErrorPow> {
++    ramas(red)
++        .iter()
++        .rev()
++        .find(|r| altura >= r.desde_altura)
++        .map(|r| r.id)
++        .ok_or(ErrorPow::SinRamaActiva { altura })
++}
++
++/// `C-HDR-02b`: el `consensus_branch_id` de la cabecera **MUST** ser el activo a esa altura.
++///
++/// # Errores
++/// [`ErrorPow::BranchIdIncorrecto`].
++pub fn comprobar_branch_id(red: Red, altura: u32, branch_id: u32) -> Result<(), ErrorPow> {
++    let esperado = rama_activa(red, altura)?;
++    if branch_id == esperado {
++        Ok(())
++    } else {
++        Err(ErrorPow::BranchIdIncorrecto {
++            altura,
++            esperado,
++            encontrado: branch_id,
++        })
++    }
++}
++
++/// Comprueba que una tabla de ramas está bien formada (`C-UPG-02`, `C-UPG-03`).
++///
++/// Invariantes: arranca en la altura 0, las alturas crecen estrictamente, ningún identificador es
++/// cero y no hay identificadores repetidos.
++///
++/// # Errores
++/// [`ErrorPow::TablaDeRamasInvalida`] con el motivo.
++pub fn comprobar_tabla(ramas: &[Rama]) -> Result<(), ErrorPow> {
++    let malo = |motivo| ErrorPow::TablaDeRamasInvalida { motivo };
++
++    let primera = ramas.first().ok_or_else(|| malo("la tabla está vacía"))?;
++    if primera.desde_altura != 0 {
++        return Err(malo("la primera rama MUST arrancar en la altura 0"));
++    }
++
++    let mut vistos: Vec<u32> = Vec::with_capacity(ramas.len());
++    let mut altura_previa: Option<u32> = None;
++
++    for r in ramas {
++        if r.id == 0 {
++            return Err(malo("un CONSENSUS_BRANCH_ID MUST ser distinto de cero"));
++        }
++        if vistos.contains(&r.id) {
++            return Err(malo("dos ramas comparten CONSENSUS_BRANCH_ID"));
++        }
++        vistos.push(r.id);
++
++        if let Some(prev) = altura_previa
++            && r.desde_altura <= prev
++        {
++            return Err(malo("las alturas de activación MUST crecer estrictamente"));
++        }
++        altura_previa = Some(r.desde_altura);
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++mod tests {
++    use super::{
++        MAGIC_MAINNET, MAGIC_TESTNET, RAMA_DEV, RAMA_V1_MAINNET, RAMAS_MAINNET, Rama, Red,
++        comprobar_branch_id, comprobar_tabla, rama_activa, ramas,
++    };
++    use crate::error::ErrorPow;
++    use zx_core::sha3_256_publico;
++
++    /// Las constantes derivadas se recalculan aquí, no se confían.
++    #[test]
++    fn las_constantes_derivadas_se_reproducen() {
++        let cbid = sha3_256_publico(b"ZEROX/consensus-branch/v1.0");
++        let cuatro = cbid.as_bytes().get(..4).unwrap();
++        let esperado = u32::from_le_bytes(cuatro.try_into().unwrap());
++        assert_eq!(
++            RAMA_V1_MAINNET.id, esperado,
++            "el branch ID MUST ser los primeros 4 B de SHA3-256(\"ZEROX/consensus-branch/v1.0\") en LE"
++        );
++
++        let m = sha3_256_publico(b"ZEROX/mainnet/magic");
++        assert_eq!(m.as_bytes().get(..4).unwrap(), MAGIC_MAINNET);
++        let t = sha3_256_publico(b"ZEROX/testnet/magic");
++        assert_eq!(t.as_bytes().get(..4).unwrap(), MAGIC_TESTNET);
++    }
++
++    /// **F-12.** El `CBID` de dev es derivado: se recalcula de su fórmula.
++    #[test]
++    fn el_cbid_de_dev_se_reproduce() {
++        let h = sha3_256_publico(b"ZEROX hibrido red dev v0");
++        let bytes: [u8; 4] = h.as_bytes().get(..4).unwrap().try_into().unwrap();
++        let mut cbid = u32::from_le_bytes(bytes);
++        if cbid == 0 {
++            cbid = 1;
++        }
++        assert_eq!(RAMA_DEV.id, cbid, "F-12");
++        assert_eq!(RAMA_DEV.id, zx_core::CBID_RED_DEV);
++    }
++
++    #[test]
++    fn el_branch_id_no_es_cero() {
++        assert_ne!(RAMA_V1_MAINNET.id, 0, "C-UPG-02: MUST ser no cero");
++        assert_ne!(RAMA_DEV.id, 0);
++    }
++
++    #[test]
++    fn la_rama_v1_rige_desde_el_genesis() {
++        assert_eq!(rama_activa(Red::Mainnet, 0).unwrap(), RAMA_V1_MAINNET.id);
++        assert_eq!(
++            rama_activa(Red::Mainnet, u32::MAX).unwrap(),
++            RAMA_V1_MAINNET.id
++        );
++        assert_eq!(rama_activa(Red::Dev, 0).unwrap(), RAMA_DEV.id);
++        assert_eq!(rama_activa(Red::Dev, u32::MAX).unwrap(), RAMA_DEV.id);
++    }
++
++    #[test]
++    fn la_tabla_real_esta_bien_formada() {
++        assert!(comprobar_tabla(RAMAS_MAINNET).is_ok());
++        assert!(comprobar_tabla(ramas(Red::Testnet)).is_ok());
++        assert!(comprobar_tabla(ramas(Red::Dev)).is_ok());
++        assert_eq!(ramas(Red::Dev).len(), 1, "§3.9: una sola rama dev");
++    }
++
++    /// La tabla se editará a mano en cada hard fork: estas son las formas de estropearla.
++    #[test]
++    fn se_detecta_una_tabla_mal_formada() {
++        let casos: [(&str, Vec<Rama>); 5] = [
++            ("vacía", vec![]),
++            (
++                "no arranca en 0",
++                vec![Rama {
++                    id: 1,
++                    desde_altura: 5,
++                }],
++            ),
++            (
++                "alturas no crecientes",
++                vec![
++                    Rama {
++                        id: 1,
++                        desde_altura: 0,
++                    },
++                    Rama {
++                        id: 2,
++                        desde_altura: 0,
++                    },
++                ],
++            ),
++            (
++                "altura que retrocede",
++                vec![
++                    Rama {
++                        id: 1,
++                        desde_altura: 0,
++                    },
++                    Rama {
++                        id: 2,
++                        desde_altura: 100,
++                    },
++                    Rama {
++                        id: 3,
++                        desde_altura: 50,
++                    },
++                ],
++            ),
++            (
++                "id cero",
++                vec![Rama {
++                    id: 0,
++                    desde_altura: 0,
++                }],
++            ),
++        ];
++        for (que, tabla) in casos {
++            assert!(
++                matches!(
++                    comprobar_tabla(&tabla),
++                    Err(ErrorPow::TablaDeRamasInvalida { .. })
++                ),
++                "debería detectarse: {que}"
++            );
++        }
++    }
++
++    /// **La protección contra wipe-out en funcionamiento.**
++    #[test]
++    fn un_bloque_de_la_rama_vieja_no_vale_en_la_nueva() {
++        const VIEJA: u32 = 0x1111_1111;
++        const NUEVA: u32 = 0x2222_2222;
++        let tabla = vec![
++            Rama {
++                id: VIEJA,
++                desde_altura: 0,
++            },
++            Rama {
++                id: NUEVA,
++                desde_altura: 1000,
++            },
++        ];
++        assert!(comprobar_tabla(&tabla).is_ok());
++
++        let activo_en = |h: u32| {
++            tabla
++                .iter()
++                .rev()
++                .find(|r| h >= r.desde_altura)
++                .map(|r| r.id)
++                .unwrap()
++        };
++        assert_eq!(activo_en(999), VIEJA, "antes de la activación");
++        assert_eq!(activo_en(1000), NUEVA, "justo en la altura de activación");
++    }
++
++    #[test]
++    fn se_rechaza_una_cabecera_con_el_branch_id_equivocado() {
++        assert!(comprobar_branch_id(Red::Mainnet, 10, RAMA_V1_MAINNET.id).is_ok());
++        assert!(comprobar_branch_id(Red::Dev, 10, RAMA_DEV.id).is_ok());
++        let e = comprobar_branch_id(Red::Mainnet, 10, 0xDEAD_BEEF).unwrap_err();
++        assert!(matches!(e, ErrorPow::BranchIdIncorrecto { .. }), "{e:?}");
++        assert!(
++            comprobar_branch_id(Red::Dev, 10, RAMA_V1_MAINNET.id).is_err(),
++            "un branch_id de mainnet NO vale en dev"
++        );
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/algoritmo.rs ws/crates/zx-consensus/src/algoritmo.rs
+--- ws.orig/crates/zx-consensus/src/algoritmo.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/algoritmo.rs	2026-09-26 01:48:50.524235132 +0200
+@@ -0,0 +1,68 @@
++//! Interfaz del algoritmo de prueba de trabajo.
++//!
++//! `C-HDR-03` fija `block_hash = SHA3-256("ZZKBlkHeader____" ‖ cabecera)`; eso **no cambia**. Lo que
++//! esta interfaz separa es el hash que se compara con el target (`hash_pow`), para que un algoritmo
++//! de producción distinto pueda entrar sin tocar la cabecera ni su identificador.
++//!
++//! ⚠️ **Parámetro de desarrollo**: el algoritmo de producción está abierto (**IPA A-12**). SHA3-256
++//! se usa aquí porque es el `block_hash` heredado y porque permite un minero local honesto; **no**
++//! se afirma que sea el algoritmo final.
++
++use zx_core::preimage::block::BlockHeader;
++
++/// Algoritmo de prueba de trabajo.
++///
++/// El contrato es mínimo a propósito: dado un cabecera, devolver 32 bytes que se interpretan
++/// **big-endian** y se comparan estrictamente con el target (`C-POW-01`).
++pub trait AlgoritmoPow {
++    /// Hash que se compara con el target. **MUST** ser determinista y no depender de estado externo.
++    fn hash_pow(&self, cabecera: &BlockHeader) -> [u8; 32];
++}
++
++/// Implementación dev: `hash_pow` es exactamente el `block_hash` antiguo
++/// (`SHA3-256("ZZKBlkHeader____" ‖ cabecera)`, F-01).
++///
++/// ⚠️ Parámetro de desarrollo; el algoritmo de producción está abierto (IPA A-12).
++#[derive(Clone, Copy, Debug, Default)]
++pub struct Sha3Dev;
++
++impl AlgoritmoPow for Sha3Dev {
++    fn hash_pow(&self, cabecera: &BlockHeader) -> [u8; 32] {
++        *cabecera.block_hash().as_bytes()
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::{AlgoritmoPow, Sha3Dev};
++    use zx_core::preimage::block::BlockHeader;
++    use zx_core::{BlockHash, Digest, MerkleRoot};
++
++    fn cabecera() -> BlockHeader {
++        BlockHeader {
++            consensus_branch_id: zx_core::CBID_RED_DEV,
++            prev_hash: BlockHash::from_digest(Digest::from_bytes([1u8; 32])),
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([2u8; 32])),
++            timestamp: 1_790_380_800,
++            bits: 0x1e7f_ffff,
++            nonce: 0,
++            height: 1,
++        }
++    }
++
++    /// El `hash_pow` dev **es** el `block_hash` de la cabecera, byte a byte.
++    #[test]
++    fn sha3_dev_coincide_con_el_block_hash() {
++        let c = cabecera();
++        assert_eq!(Sha3Dev.hash_pow(&c), *c.block_hash().as_bytes());
++    }
++
++    /// `SHA3-256` no se sustituye por otra primitiva sin que el test lo note.
++    #[test]
++    fn el_hash_pow_dev_es_sha3_del_prefijo_y_la_cabecera() {
++        let c = cabecera();
++        let pre = c.preimagen_pow();
++        let esperado = zx_core::sha3_256_publico(&pre);
++        assert_eq!(Sha3Dev.hash_pow(&c), *esperado.as_bytes());
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/dificultad.rs ws/crates/zx-consensus/src/dificultad.rs
+--- ws.orig/crates/zx-consensus/src/dificultad.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/dificultad.rs	2026-09-26 01:47:53.994046953 +0200
+@@ -0,0 +1,471 @@
++//! LWMA-1: ajuste de dificultad con retarget por bloque (SPEC §7.3).
++//!
++//! Portado de `crates/zx-consensus/src/dificultad.rs` de `9681061`, **sin cambiar la aritmética**:
++//! misma variante de espacio-target en `U512`, mismos solvetimes monótonos, mismo `BIAS = 1/1` y
++//! mismo clamp. Lo único que cambia es que `T`, `N`, `ST_CAP`, `T_FLOOR`, `NK` y los límites salen
++//! del [`ParametrosPow`] de la red en vez de constantes globales.
++//!
++//! # El patrón prohibido
++//!
++//! `C-DIFF-03` reconstruye los solvetimes de forma **monótona**. La diferencia con saturar no es
++//! estilística: `if st < 1 { st = 1 }` es exactamente el patrón que produjo un ataque real, en el que
++//! una moneda perdió 4 800 bloques en 5 horas porque los timestamps retrasados se convertían en
++//! solvetimes largos artificiales que hundían la dificultad.
++//!
++//! # Determinismo
++//!
++//! `C-DIFF-01` hace de esto una **función pura**: sus únicas entradas son los `N+1` timestamps y los
++//! `N` targets de la ventana. No lee reloj, ni hora de red, ni mempool, ni configuración. Cualquier
++//! fuente de no-determinismo aquí es un split de cadena.
++
++// `clippy::integer_division` sugiere floats; `C-ENC-04` prohíbe la coma flotante en consenso y la
++// división entera **truncada** es la especificación (`C-DIFF-07`).
++#![expect(
++    clippy::integer_division,
++    reason = "C-ENC-04 prohíbe floats; la división entera truncada es la especificación (C-DIFF-07)"
++)]
++
++use primitive_types::{U256, U512};
++
++use crate::error::ErrorPow;
++use crate::parametros::ParametrosPow;
++
++/// Numerador de la corrección del sesgo del clamp (`C-DIFF-07`).
++///
++/// ✅ **P-005 cerrado: no se corrige.** Vale 1, y así se queda. Los dos factores se conservan en la
++/// fórmula en vez de colapsarla a `S·t/NK` para que la **ausencia** de corrección sea visible.
++pub const BIAS_NUM: u64 = 1;
++
++/// Denominador de la corrección del sesgo. Ver [`BIAS_NUM`].
++pub const BIAS_DEN: u64 = 1;
++
++// Si la corrección se reabre, MUST **aflojar** (`BIAS_NUM ≥ BIAS_DEN`) porque el clamp recorta por
++// arriba y sesga el target a la baja. Esta aserción estaba al revés y protegía la dirección
++// equivocada.
++const _: () = assert!(
++    BIAS_NUM >= BIAS_DEN,
++    "C-DIFF-07: si la corrección del sesgo se reabre, debe aflojar (>= 1), no apretar — ver P-005"
++);
++
++/// La ventana que consume el retarget (`C-DIFF-01`).
++///
++/// Es todo lo que la función pura puede mirar.
++#[derive(Clone, Copy, Debug)]
++pub struct VentanaRetarget<'a> {
++    /// Los `N+1` timestamps, de `ts(H−N−1)` a `ts(H−1)`, en orden ascendente de altura.
++    pub timestamps: &'a [i64],
++    /// Los `N` targets, ya decodificados desde `bits` (`C-DIFF-09`), en el mismo orden.
++    pub targets: &'a [U256],
++}
++
++/// Reconstruye los solvetimes de la ventana de forma monótona (`C-DIFF-03`).
++///
++/// Invariante garantizado por construcción: `1 ≤ st[j] ≤ st_cap`.
++fn solvetimes(timestamps: &[i64], st_cap: i64) -> Result<Vec<i64>, ErrorPow> {
++    let mut previo = *timestamps.first().ok_or(ErrorPow::VentanaVacia)?;
++    let mut st = Vec::with_capacity(timestamps.len().saturating_sub(1));
++
++    for actual in timestamps.iter().skip(1) {
++        // Normalización: si el timestamp no avanza, se toma `previo + 1`. Nunca se satura después.
++        let c = if *actual > previo {
++            *actual
++        } else {
++            previo
++                .checked_add(1)
++                .ok_or(ErrorPow::DesbordamientoAritmetico)?
++        };
++        let bruto = c
++            .checked_sub(previo)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++        st.push(bruto.min(st_cap));
++        previo = c;
++    }
++    Ok(st)
++}
++
++/// Calcula el target del bloque de altura `h` (`C-DIFF-01..08`).
++///
++/// Es una **función pura** de la ventana. Para `1 ≤ h ≤ N` no debe llamarse: rige
++/// `bits_iniciales` (`C-DIFF-02`).
++///
++/// # Errores
++/// - [`ErrorPow::VentanaDeTamanoIncorrecto`] si la ventana no trae exactamente `N+1` timestamps y
++///   `N` targets. **MUST NOT** encogerse dinámicamente.
++/// - [`ErrorPow::DesbordamientoAritmetico`] ante cualquier desbordamiento (`C-ENC-03`).
++pub fn siguiente_target(v: VentanaRetarget<'_>, p: &ParametrosPow) -> Result<U256, ErrorPow> {
++    if v.timestamps.len() != p.n + 1 || v.targets.len() != p.n {
++        return Err(ErrorPow::VentanaDeTamanoIncorrecto {
++            timestamps: v.timestamps.len(),
++            targets: v.targets.len(),
++            esperados: p.n,
++        });
++    }
++
++    // C-DIFF-03 · solvetimes monótonos.
++    let st = solvetimes(v.timestamps, p.st_cap()?)?;
++
++    // C-DIFF-04 · suma ponderada `t = Σ j·st[j]`, con j desde 1.
++    let mut t: i64 = 0;
++    for (idx, s) in st.iter().enumerate() {
++        let j = i64::try_from(idx).map_err(|_| ErrorPow::DesbordamientoAritmetico)? + 1;
++        let termino = j
++            .checked_mul(*s)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++        t = t
++            .checked_add(termino)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    }
++
++    // C-DIFF-05 · suelo.
++    let t_floor = p.t_floor()?;
++    if t < t_floor {
++        t = t_floor;
++    }
++
++    // C-DIFF-06 · suma de targets en U512, sin divisiones intermedias.
++    let mut s = U512::zero();
++    for target in v.targets {
++        let ancho = U512::from(*target);
++        s = s
++            .checked_add(ancho)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    }
++
++    // C-DIFF-07 · `next = (S · t · BIAS_NUM) / (NK · BIAS_DEN)`, división entera truncada.
++    let t_u = u64::try_from(t).map_err(|_| ErrorPow::DesbordamientoAritmetico)?;
++    let numerador = s
++        .checked_mul(U512::from(t_u))
++        .and_then(|x| x.checked_mul(U512::from(BIAS_NUM)))
++        .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    let nk = u64::try_from(p.nk()?).map_err(|_| ErrorPow::DesbordamientoAritmetico)?;
++    let denominador = U512::from(nk)
++        .checked_mul(U512::from(BIAS_DEN))
++        .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    if denominador.is_zero() {
++        return Err(ErrorPow::DesbordamientoAritmetico);
++    }
++    let next = numerador / denominador;
++
++    // C-DIFF-08 · acotado. El clamp se aplica en U512 y solo después se estrecha, para que un
++    // resultado por encima del máximo no se trunque en silencio al convertir.
++    let techo = U512::from(p.limites.max);
++    let suelo = U512::from(p.limites.min);
++    let acotado = next.max(suelo).min(techo);
++
++    // Tras el clamp, `acotado ≤ max < 2^256`, así que entra en U256 sin pérdida. Se convierte por
++    // bytes en vez de con `low_u256()` para que la conversión sea explícita y auditable.
++    let bytes = acotado.to_big_endian();
++    let bajos = bytes.get(32..).ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    Ok(U256::from_big_endian(bajos))
++}
++
++/// Median-time-past sobre los `mtp_w` bloques anteriores (`C-TS-02`).
++///
++/// **Solo** sirve de reloj para `lock_time` y HTLC. **MUST NOT** entrar en el retarget.
++///
++/// # Errores
++/// [`ErrorPow::MtpDeTamanoIncorrecto`] si no se dan exactamente `mtp_w` timestamps.
++pub fn median_time_past(ultimos: &[i64], p: &ParametrosPow) -> Result<i64, ErrorPow> {
++    if ultimos.len() != p.mtp_w {
++        return Err(ErrorPow::MtpDeTamanoIncorrecto {
++            recibidos: ultimos.len(),
++            esperados: p.mtp_w,
++        });
++    }
++    let mut v = ultimos.to_vec();
++    v.sort_unstable();
++    v.get(p.mtp_w / 2).copied().ok_or(ErrorPow::VentanaVacia)
++}
++
++#[cfg(test)]
++#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++mod tests {
++    use super::{BIAS_DEN, BIAS_NUM, VentanaRetarget, median_time_past, siguiente_target};
++    use crate::error::ErrorPow;
++    use crate::parametros::{PARAMETROS_POW_ANTIGUOS, ParametrosPow};
++    use primitive_types::{U256, U512};
++
++    fn p() -> ParametrosPow {
++        PARAMETROS_POW_ANTIGUOS
++    }
++
++    /// Ventana en la que todos los bloques salieron exactamente a tiempo y con el mismo target.
++    fn ventana_estable(target: U256) -> (Vec<i64>, Vec<U256>) {
++        let pp = p();
++        let ts: Vec<i64> = (0..=pp.n)
++            .map(|i| i64::try_from(i).unwrap() * pp.t)
++            .collect();
++        let tg: Vec<U256> = vec![target; pp.n];
++        (ts, tg)
++    }
++
++    fn calcular(ts: &[i64], tg: &[U256]) -> U256 {
++        siguiente_target(
++            VentanaRetarget {
++                timestamps: ts,
++                targets: tg,
++            },
++            &p(),
++        )
++        .unwrap()
++    }
++
++    /// Con la red exactamente en su ritmo, el target no se mueve (BIAS = 1).
++    #[test]
++    fn en_regimen_estable_el_target_apenas_se_mueve() {
++        let base = U256::one() << 200_usize;
++        let (ts, tg) = ventana_estable(base);
++        let next = calcular(&ts, &tg);
++
++        let ratio_num = U512::from(next) * U512::from(1_000_000_u32);
++        let ratio = (ratio_num / U512::from(base)).low_u64();
++        assert!(
++            (990_000..=1_000_000).contains(&ratio),
++            "esperado ~1,0·base con BIAS = 1, salió ratio {ratio}/1e6"
++        );
++        assert!(
++            next <= base,
++            "la corrección del sesgo MUST hacer el target igual o menor"
++        );
++    }
++
++    /// Bloques al doble de rápido ⇒ el target **baja** (más difícil).
++    #[test]
++    fn bloques_rapidos_endurecen() {
++        let base = U256::one() << 200_usize;
++        let (_, tg) = ventana_estable(base);
++        let pp = p();
++        let rapidos: Vec<i64> = (0..=pp.n)
++            .map(|i| i64::try_from(i).unwrap() * (pp.t / 2))
++            .collect();
++        let next = calcular(&rapidos, &tg);
++        assert!(
++            next < base,
++            "el doble de rápido debe endurecer: {next} < {base}"
++        );
++    }
++
++    /// Bloques al doble de lentos ⇒ el target **sube** (más fácil).
++    #[test]
++    fn bloques_lentos_ablandan() {
++        let base = U256::one() << 200_usize;
++        let (_, tg) = ventana_estable(base);
++        let pp = p();
++        let lentos: Vec<i64> = (0..=pp.n)
++            .map(|i| i64::try_from(i).unwrap() * (pp.t * 2))
++            .collect();
++        let next = calcular(&lentos, &tg);
++        assert!(
++            next > base,
++            "el doble de lentos debe ablandar: {next} > {base}"
++        );
++    }
++
++    /// **C-DIFF-05, y el motivo de P-003.** El suelo acota el endurecimiento a ×10.
++    #[test]
++    fn el_suelo_acota_el_endurecimiento_a_diez_veces() {
++        let base = U256::one() << 200_usize;
++        let (_, tg) = ventana_estable(base);
++        let pp = p();
++        let hostiles: Vec<i64> = (0..=pp.n).map(|i| i64::try_from(i).unwrap()).collect();
++        let next = calcular(&hostiles, &tg);
++
++        let diez_veces_mas_dificil = base / U256::from(10_u32);
++        let cien_veces = base / U256::from(100_u32);
++        assert!(
++            next > cien_veces,
++            "sin suelo caería a ~base/120; con suelo no: {next}"
++        );
++        assert!(
++            next <= diez_veces_mas_dificil * U256::from(11_u32) / U256::from(10_u32),
++            "el suelo debe acotar el endurecimiento cerca de ×10: {next}"
++        );
++    }
++
++    /// **C-DIFF-03: el invariante es por construcción, no por saturación.**
++    #[test]
++    fn los_timestamps_que_retroceden_no_hunden_la_dificultad() {
++        let base = U256::one() << 200_usize;
++        let (_, tg) = ventana_estable(base);
++        let pp = p();
++
++        let mut caos: Vec<i64> = Vec::with_capacity(pp.n + 1);
++        for i in 0..=pp.n {
++            let i = i64::try_from(i).unwrap();
++            caos.push(if i % 3 == 0 {
++                i * pp.t
++            } else {
++                i * pp.t - 10_000
++            });
++        }
++        let next = calcular(&caos, &tg);
++
++        assert!(next >= pp.limites.min && next <= pp.limites.max);
++        assert!(
++            next <= base * U256::from(11_u32) / U256::from(10_u32),
++            "un retroceso de timestamps NO debe poder ablandar la dificultad: {next}"
++        );
++    }
++
++    /// C-DIFF-08: el resultado siempre queda dentro de `[min, max]` de la red.
++    #[test]
++    fn el_resultado_siempre_esta_acotado() {
++        let pp = p();
++        let (_, tg) = ventana_estable(pp.limites.max);
++        let lentisimos: Vec<i64> = (0..=pp.n)
++            .map(|i| i64::try_from(i).unwrap() * 100_000)
++            .collect();
++        assert!(
++            calcular(&lentisimos, &tg) <= pp.limites.max,
++            "C-DIFF-08: techo"
++        );
++
++        let (_, tg) = ventana_estable(pp.limites.min);
++        let instantaneos: Vec<i64> = (0..=pp.n).map(|i| i64::try_from(i).unwrap()).collect();
++        assert!(
++            calcular(&instantaneos, &tg) >= pp.limites.min,
++            "C-DIFF-08: suelo"
++        );
++    }
++
++    /// C-DIFF-01: función pura. La misma ventana da siempre el mismo resultado.
++    #[test]
++    fn es_determinista() {
++        let base = U256::one() << 190_usize;
++        let (ts, tg) = ventana_estable(base);
++        let a = calcular(&ts, &tg);
++        for _ in 0..8 {
++            assert_eq!(calcular(&ts, &tg), a);
++        }
++    }
++
++    /// C-DIFF-02: la ventana es **siempre** de tamaño `N`. No se encoge ni crece.
++    #[test]
++    fn se_rechaza_una_ventana_de_tamano_incorrecto() {
++        let pp = p();
++        let base = U256::one() << 200_usize;
++        let ts_largo: Vec<i64> = (0..=(pp.n + 5))
++            .map(|i| i64::try_from(i).unwrap() * pp.t)
++            .collect();
++        let tg_largo: Vec<U256> = vec![base; pp.n + 5];
++
++        let casos = [
++            (pp.n, pp.n),
++            (pp.n + 1, pp.n - 1),
++            (pp.n + 2, pp.n),
++            (pp.n + 1, pp.n + 1),
++            (0, 0),
++            (pp.n + 3, pp.n + 2),
++        ];
++        for (t_len, g_len) in casos {
++            let r = siguiente_target(
++                VentanaRetarget {
++                    timestamps: ts_largo.get(..t_len).unwrap(),
++                    targets: tg_largo.get(..g_len).unwrap(),
++                },
++                &pp,
++            );
++            assert!(
++                matches!(r, Err(ErrorPow::VentanaDeTamanoIncorrecto { .. })),
++                "({t_len}, {g_len}) debería rechazarse, devolvió {r:?}"
++            );
++        }
++
++        assert!(
++            siguiente_target(
++                VentanaRetarget {
++                    timestamps: ts_largo.get(..=pp.n).unwrap(),
++                    targets: tg_largo.get(..pp.n).unwrap(),
++                },
++                &pp,
++            )
++            .is_ok(),
++            "(N+1, N) es la única forma válida"
++        );
++    }
++
++    /// ✅ **P-005 cerrado: no se corrige.** `BIAS = 1/1`, y este test lo fija.
++    #[test]
++    fn la_correccion_del_sesgo_sigue_en_la_identidad() {
++        assert_eq!(
++            (BIAS_NUM, BIAS_DEN),
++            (1, 1),
++            "P-005 se cerró en NO corregir"
++        );
++    }
++
++    /// La derivación que refutó la dirección anterior, ejecutada de verdad para que no se repita.
++    #[test]
++    fn el_clamp_sesga_el_solvetime_a_la_baja() {
++        const ESCALA: i128 = 1_000_000_000_000;
++        let mut termino: i128 = ESCALA;
++        let mut suma: i128 = 0;
++        for n in 0..64_i128 {
++            suma += termino;
++            termino = termino * -6 / (n + 1);
++        }
++        let e_menos_6 = suma;
++        let factor = ESCALA - e_menos_6;
++
++        assert!(
++            (997_500_000_000..=997_530_000_000).contains(&factor),
++            "1 − e⁻⁶ debería ser ≈0,99752; salió {factor}/{ESCALA}"
++        );
++
++        let t_ms: i128 = 120_000;
++        let media_truncada = t_ms * factor / ESCALA;
++        assert!(
++            media_truncada < t_ms,
++            "el clamp recorta por arriba: la media observada ({media_truncada} ms) MUST ser menor \
++             que T ({t_ms} ms)"
++        );
++
++        let corrector = t_ms * ESCALA / media_truncada;
++        assert!(
++            corrector > ESCALA,
++            "el factor corrector es {corrector}/{ESCALA} > 1 — ponerlo < 1 empeora el sesgo"
++        );
++    }
++
++    /// Cota de overflow de C-DIFF-07 con los valores máximos reales del perfil antiguo.
++    #[test]
++    fn el_numerador_de_c_diff_07_cabe_en_u512() {
++        let pp = p();
++        let s_max = U512::from(pp.limites.max) * U512::from(u32::try_from(pp.n).unwrap());
++        let t_max = U512::from(u64::try_from(pp.st_cap().unwrap()).unwrap())
++            * U512::from(u64::try_from(pp.n * (pp.n + 1) / 2).unwrap());
++        let prod = s_max
++            .checked_mul(t_max)
++            .and_then(|x| x.checked_mul(U512::from(BIAS_NUM)));
++        assert!(prod.is_some(), "el numerador MUST caber en U512");
++        let bits = 512 - prod.unwrap().leading_zeros();
++        assert!(bits <= 280, "el numerador ocupa {bits} bits");
++    }
++
++    // ── MTP ──────────────────────────────────────────────────────────────────
++
++    #[test]
++    fn el_mtp_es_la_mediana_y_no_le_afecta_el_orden() {
++        let pp = p();
++        let v: Vec<i64> = (0..pp.mtp_w)
++            .map(|i| i64::try_from(i).unwrap() * 10)
++            .collect();
++        let esperado = i64::try_from(pp.mtp_w / 2).unwrap() * 10;
++        assert_eq!(median_time_past(&v, &pp).unwrap(), esperado);
++
++        let mut desordenado = v;
++        desordenado.reverse();
++        assert_eq!(
++            median_time_past(&desordenado, &pp).unwrap(),
++            esperado,
++            "la mediana no ve el orden"
++        );
++    }
++
++    #[test]
++    fn el_mtp_exige_exactamente_once_timestamps() {
++        let pp = p();
++        assert!(median_time_past(&[1, 2, 3], &pp).is_err());
++        assert!(median_time_past(&[], &pp).is_err());
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/error.rs ws/crates/zx-consensus/src/error.rs
+--- ws.orig/crates/zx-consensus/src/error.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/error.rs	2026-09-26 01:48:54.634321520 +0200
+@@ -0,0 +1,201 @@
++//! Errores del motor PoW.
++//!
++//! Un solo enum, [`ErrorPow`], para que cada rechazo de §6 del encargo tenga **su** variante
++//! explícita y para que la distinción **permanente / diferible** de `C-TS-03` sea consultable en el
++//! tipo y no una convención de comentario.
++
++use thiserror::Error;
++use zx_core::BlockHash;
++
++/// Fallo al aplicar una regla del motor PoW.
++#[derive(Debug, Error, PartialEq, Eq, Clone)]
++pub enum ErrorPow {
++    /// La ventana del retarget no tiene el tamaño exacto que exige la red.
++    ///
++    /// **MUST NOT** encogerse dinámicamente: una ventana más corta produce un target distinto y por
++    /// tanto un split.
++    #[error(
++        "ventana de tamaño incorrecto: {timestamps} timestamps y {targets} targets \
++         (se esperan {esperados}+1 y {esperados})"
++    )]
++    VentanaDeTamanoIncorrecto {
++        /// Timestamps recibidos.
++        timestamps: usize,
++        /// Targets recibidos.
++        targets: usize,
++        /// `N` de la red.
++        esperados: usize,
++    },
++
++    /// Ventana vacía donde se esperaba al menos un elemento.
++    #[error("ventana vacía")]
++    VentanaVacia,
++
++    /// `C-TS-02`: la ventana del median-time-past no tiene exactamente `mtp_w` timestamps.
++    #[error("C-TS-02: se esperaban {esperados} timestamps para el MTP y llegaron {recibidos}")]
++    MtpDeTamanoIncorrecto {
++        /// Timestamps recibidos.
++        recibidos: usize,
++        /// `mtp_w` de la red.
++        esperados: usize,
++    },
++
++    /// `C-ENC-03`: desbordamiento detectado. **Nunca en silencio.**
++    #[error("C-ENC-03: desbordamiento aritmético en una ruta de consenso")]
++    DesbordamientoAritmetico,
++
++    /// `C-UPG-02`: ninguna rama de consenso cubre esa altura.
++    #[error("C-UPG-02: no hay rama de consenso activa a la altura {altura}")]
++    SinRamaActiva {
++        /// Altura consultada.
++        altura: u32,
++    },
++
++    /// `C-HDR-02b`: la cabecera declara una rama que no es la activa (protección *wipe-out*).
++    #[error(
++        "C-HDR-02b: a la altura {altura} rige la rama {esperado:#010x}, la cabecera dice {encontrado:#010x}"
++    )]
++    BranchIdIncorrecto {
++        /// Altura del bloque.
++        altura: u32,
++        /// Identificador que debería llevar.
++        esperado: u32,
++        /// El que lleva.
++        encontrado: u32,
++    },
++
++    /// La tabla de ramas está mal formada.
++    #[error("tabla de ramas inválida: {motivo}")]
++    TablaDeRamasInvalida {
++        /// Qué invariante se rompe.
++        motivo: &'static str,
++    },
++
++    /// `C-BLK-05`: `bits` no es el valor exacto que devuelve el retarget.
++    #[error("C-BLK-05: bits esperado {esperado:#010x}, encontrado {encontrado:#010x}")]
++    BitsIncorrectos {
++        /// El que debería llevar.
++        esperado: u32,
++        /// El que lleva.
++        encontrado: u32,
++    },
++
++    /// `C-POW-04`: `bits` no está en forma canónica.
++    #[error("C-POW-04: bits {bits:#010x} no canónico: {motivo}")]
++    BitsNoCanonicos {
++        /// Valor leído.
++        bits: u32,
++        /// Por qué se rechaza.
++        motivo: &'static str,
++    },
++
++    /// `C-POW-05`: el target decodificado sale de los límites de la red.
++    #[error("C-POW-05: {motivo}")]
++    TargetFueraDeRango {
++        /// Por qué se rechaza.
++        motivo: &'static str,
++    },
++
++    /// El `prev_hash` de la cabecera no es el hash del padre.
++    #[error("C-HDR-01: prev_hash {encontrado} distinto del padre {esperado}")]
++    PrevHashIncorrecto {
++        /// Hash del padre que el contexto declara.
++        esperado: BlockHash,
++        /// Hash declarado en la cabecera.
++        encontrado: BlockHash,
++    },
++
++    /// La altura de la cabecera no es `altura_padre + 1`.
++    #[error("C-HDR-02: altura {encontrada} no es altura_padre + 1 ({esperada})")]
++    AlturaIncorrecta {
++        /// `altura_padre + 1`.
++        esperada: u32,
++        /// La declarada.
++        encontrada: u32,
++    },
++
++    /// `C-BLK-04`: el hash de PoW no satisface el target.
++    #[error("C-BLK-04: el PoW no se satisface")]
++    PowInsuficiente,
++
++    /// El timestamp de la cabecera no cabe en `i64`.
++    #[error("timestamp {ts} fuera del rango representable")]
++    TimestampFueraDeRango {
++        /// Valor leído.
++        ts: u64,
++    },
++
++    /// `C-TS-01`: el timestamp no avanza respecto al padre. Rechazo **permanente**.
++    #[error("C-TS-01: ts({altura}) = {ts} no supera ts(padre) = {ts_padre}")]
++    TimestampNoMonotono {
++        /// Altura del bloque.
++        altura: u32,
++        /// Timestamp del bloque.
++        ts: i64,
++        /// Timestamp del padre.
++        ts_padre: i64,
++    },
++
++    /// `C-TS-03`: el timestamp está demasiado en el futuro.
++    ///
++    /// Rechazo **NO permanente**: el bloque se difiere y se reintenta. **MUST NOT** cachearse como
++    /// inválido ni banearse al par — hacerlo produce un split garantizado ante partición temporal.
++    #[error("C-TS-03: ts = {ts} excede reloj_local + FTL = {limite} (diferible, NO permanente)")]
++    TimestampDemasiadoFuturo {
++        /// Timestamp del bloque.
++        ts: i64,
++        /// Límite admitido.
++        limite: i64,
++    },
++
++    /// El bloque génesis no cumple alguna invariante (§15, `C-GEN-01…07`).
++    #[error("§15: génesis inválido: {motivo}")]
++    GenesisInvalido {
++        /// Qué invariante se rompe.
++        motivo: &'static str,
++    },
++}
++
++impl ErrorPow {
++    /// ¿Es un rechazo **permanente**?
++    ///
++    /// La distinción es de consenso, no cosmética. Un rechazo diferible **MUST NOT** cachearse como
++    /// inválido: si un nodo marca permanentemente un bloque que solo llegó pronto, y luego su reloj
++    /// se pone al día, se queda fuera de la cadena buena para siempre. `C-TS-03` lo dice
++    /// explícitamente.
++    #[must_use]
++    pub const fn es_permanente(&self) -> bool {
++        !matches!(self, Self::TimestampDemasiadoFuturo { .. })
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::ErrorPow;
++
++    #[test]
++    fn solo_el_timestamp_futuro_es_diferible() {
++        let futuro = ErrorPow::TimestampDemasiadoFuturo { ts: 10, limite: 5 };
++        assert!(
++            !futuro.es_permanente(),
++            "C-TS-03: se difiere y se reintenta"
++        );
++        assert!(ErrorPow::PowInsuficiente.es_permanente());
++        assert!(
++            ErrorPow::BitsIncorrectos {
++                esperado: 1,
++                encontrado: 2
++            }
++            .es_permanente()
++        );
++        assert!(
++            ErrorPow::TimestampNoMonotono {
++                altura: 1,
++                ts: 0,
++                ts_padre: 0
++            }
++            .es_permanente(),
++            "C-TS-01 es permanente"
++        );
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/fork_choice.rs ws/crates/zx-consensus/src/fork_choice.rs
+--- ws.orig/crates/zx-consensus/src/fork_choice.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/fork_choice.rs	2026-09-26 01:47:53.996046994 +0200
+@@ -0,0 +1,181 @@
++//! Selección de cadena por mayor trabajo acumulado (SPEC §11).
++//!
++//! Portado de `fork_choice.rs` de `9681061`. **No es «la cadena más larga»**: es la de **mayor
++//! trabajo acumulado** (`C-FORK-03`). La distinción no es pedante: «más larga» es falseable minando
++//! muchos bloques de dificultad ínfima.
++//!
++//! # El desempate diverge de Bitcoin a propósito
++//!
++//! Bitcoin desempata por orden de llegada local (`nSequenceId`), lo que es **no determinista entre
++//! nodos**: dos nodos que reciben los mismos bloques en distinto orden sostienen tips distintos.
++//! `C-FORK-04` desempata por el **menor hash de tip**, big-endian. Zebra hace lo mismo en producción
++//! en la mainnet de Zcash, documentando que se aparta de la spec a propósito.
++//!
++//! # Lo que **no** entra
++//!
++//! La profundidad máxima de reorganización (`MAX_REORG_LENGTH`) se **elimina** en esta orden
++//! (`R-ZRX/MAPA-RESCATE.md`): en la fase PoW no se limita aquí. Tampoco se porta `ClaveVentana` ni
++//! la mecánica de reorg, que pertenecen a la máquina de estados (W03).
++
++use primitive_types::U256;
++use zx_core::BlockHash;
++use zx_core::target::{TrabajoAcumulado, hash_como_entero, trabajo_bloque};
++
++use crate::error::ErrorPow;
++
++/// Lo mínimo que el fork choice necesita saber de un tip.
++///
++/// `trabajo` es derivado y cacheable, pero **MUST** poder recalcularse desde los `bits` almacenados
++/// (`C-FORK-02`). Nunca es fuente de verdad.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub struct Tip {
++    /// Hash de la cabecera del tip.
++    pub hash: BlockHash,
++    /// Altura del tip.
++    pub altura: u32,
++    /// Trabajo acumulado desde el génesis hasta este bloque, inclusive.
++    pub trabajo: TrabajoAcumulado,
++}
++
++/// Resultado de comparar dos tips.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub enum Preferencia {
++    /// Gana el primero.
++    Primero,
++    /// Gana el segundo.
++    Segundo,
++}
++
++/// Compara dos tips según `C-FORK-03` y `C-FORK-04`.
++///
++/// Primero el trabajo acumulado; en empate **exacto**, el menor `block_hash` interpretado como
++/// entero big-endian (la misma convención de `C-POW-01`).
++///
++/// Es **total y determinista**: dos nodos con los mismos dos tips eligen siempre lo mismo, sin
++/// depender del orden de llegada ni de ningún reloj.
++#[must_use]
++pub fn preferir(a: &Tip, b: &Tip) -> Preferencia {
++    match a.trabajo.cmp(&b.trabajo) {
++        core::cmp::Ordering::Greater => Preferencia::Primero,
++        core::cmp::Ordering::Less => Preferencia::Segundo,
++        // C-FORK-04 · desempate determinista por menor hash.
++        core::cmp::Ordering::Equal => {
++            if hash_como_entero(&b.hash) < hash_como_entero(&a.hash) {
++                Preferencia::Segundo
++            } else {
++                Preferencia::Primero
++            }
++        }
++    }
++}
++
++/// Recalcula el trabajo acumulado de una cadena desde sus targets (`C-FORK-02`).
++///
++/// Existe para poder comprobar que el valor cacheado es correcto: el trabajo **MUST** poder
++/// reconstruirse íntegramente desde los `bits` almacenados, así que un caché corrupto es detectable.
++///
++/// # Errores
++/// [`ErrorPow::DesbordamientoAritmetico`] si algún target es inválido o la suma desborda.
++pub fn trabajo_acumulado(targets: &[U256]) -> Result<TrabajoAcumulado, ErrorPow> {
++    let mut acc = TrabajoAcumulado::cero();
++    for t in targets {
++        let w = trabajo_bloque(*t).ok_or(ErrorPow::DesbordamientoAritmetico)?;
++        acc = acc.sumar(w).ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    }
++    Ok(acc)
++}
++
++#[cfg(test)]
++#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++mod tests {
++    use super::{Preferencia, Tip, preferir, trabajo_acumulado};
++    use primitive_types::U256;
++    use zx_core::digest::{BlockHash, Digest};
++    use zx_core::target::{TrabajoAcumulado, target_inicial_testnet, trabajo_bloque};
++
++    fn hash(primer_byte: u8) -> BlockHash {
++        let mut b = [0u8; 32];
++        if let Some(p) = b.first_mut() {
++            *p = primer_byte;
++        }
++        BlockHash::from_digest(Digest::from_bytes(b))
++    }
++
++    fn tip(primer_byte: u8, altura: u32, trabajo: u64) -> Tip {
++        Tip {
++            hash: hash(primer_byte),
++            altura,
++            trabajo: TrabajoAcumulado::cero().sumar(U256::from(trabajo)).unwrap(),
++        }
++    }
++
++    /// C-FORK-03: gana el trabajo, no la longitud.
++    #[test]
++    fn gana_el_trabajo_acumulado_no_la_altura() {
++        let corta_pero_pesada = tip(1, 10, 1_000_000);
++        let larga_pero_ligera = tip(2, 10_000, 999_999);
++        assert_eq!(
++            preferir(&corta_pero_pesada, &larga_pero_ligera),
++            Preferencia::Primero,
++            "10 bloques pesados ganan a 10 000 ligeros"
++        );
++    }
++
++    /// C-FORK-04: el desempate es **determinista** y por el menor hash.
++    #[test]
++    fn el_desempate_es_por_el_menor_hash() {
++        let a = tip(0x10, 5, 500);
++        let b = tip(0x02, 5, 500);
++        assert_eq!(preferir(&a, &b), Preferencia::Segundo, "0x02… < 0x10…");
++        assert_eq!(
++            preferir(&b, &a),
++            Preferencia::Primero,
++            "y al revés, lo mismo"
++        );
++    }
++
++    /// **La propiedad que motiva C-FORK-04.** El resultado no depende del orden de los argumentos.
++    #[test]
++    fn el_desempate_es_independiente_del_orden_de_llegada() {
++        for i in 1u8..40 {
++            for j in 1u8..40 {
++                if i == j {
++                    continue;
++                }
++                let a = tip(i, 7, 1234);
++                let b = tip(j, 7, 1234);
++                let directo = preferir(&a, &b);
++                let inverso = preferir(&b, &a);
++                let coherente = matches!(
++                    (directo, inverso),
++                    (Preferencia::Primero, Preferencia::Segundo)
++                        | (Preferencia::Segundo, Preferencia::Primero)
++                );
++                assert!(
++                    coherente,
++                    "orden inconsistente para hashes {i:#04x} y {j:#04x}"
++                );
++            }
++        }
++    }
++
++    /// C-FORK-02: el trabajo acumulado se reconstruye desde los targets. Un caché no es la verdad.
++    #[test]
++    fn el_trabajo_acumulado_se_puede_recalcular() {
++        let targets = vec![target_inicial_testnet(); 5];
++        let acc = trabajo_acumulado(&targets).unwrap();
++        let uno = trabajo_bloque(target_inicial_testnet()).unwrap();
++        assert_eq!(acc.valor(), uno * U256::from(5_u32));
++
++        let mut manual = TrabajoAcumulado::cero();
++        for t in &targets {
++            manual = manual.sumar(trabajo_bloque(*t).unwrap()).unwrap();
++        }
++        assert_eq!(manual, acc);
++    }
++
++    #[test]
++    fn la_cadena_vacia_tiene_trabajo_cero() {
++        assert_eq!(trabajo_acumulado(&[]).unwrap(), TrabajoAcumulado::cero());
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/genesis.rs ws/crates/zx-consensus/src/genesis.rs
+--- ws.orig/crates/zx-consensus/src/genesis.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/genesis.rs	2026-09-26 01:48:45.657132833 +0200
+@@ -0,0 +1,603 @@
++//! Bloque génesis (SPEC §15, `C-GEN-01…07`).
++//!
++//! # Definición constructiva, no bytes hardcodeados
++//!
++//! El génesis se construye con una función determinista de parámetros explícitos, y su hash se
++//! compara contra una constante. Es el patrón de Bitcoin y Zcash, y se eligió sobre el de Monero
++//! —transacción coinbase en hexadecimal crudo— por dos razones: es **auditable**, porque se ve de
++//! qué parámetros sale, y **falla duro y visible** si alguien toca un parámetro sin recalcular el
++//! hash, en lugar de arrancar en silencio sobre un génesis no intencionado.
++//!
++//! # Redes
++//!
++//! Mainnet sigue **bloqueado** por P-017 (sin hash congelado). Testnet conserva sus parámetros y su
++//! hash congelado de `9681061`. La **red dev** de 0.0.1 (F-12, F-13) añade sus propios parámetros y
++//! congela `HASH_GENESIS_DEV`.
++
++use zx_core::Red;
++use zx_core::amount::Amount;
++use zx_core::digest::{BlockHash, Digest, TxId};
++use zx_core::firma::ClavePublica;
++use zx_core::preimage::block::{BlockHeader, merkle_root};
++use zx_core::preimage::tx::txid;
++use zx_core::target::{TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET, decodificar_con};
++use zx_core::tx::{ExtensionTx, Lock, Tx, TxOut};
++
++use crate::activacion::rama_activa;
++use crate::error::ErrorPow;
++use crate::parametros::{PARAMETROS_POW_DEV, limites_de};
++
++/// Versión de la transacción coinbase PoW en v0 (`F-05`): transferencia/coinbase, idéntica a
++/// `9681061`.
++pub const VERSION_TX: u32 = 1;
++
++/// Parámetros de los que se construye un génesis (`C-GEN-01`).
++///
++/// Que sean explícitos es el punto: cualquiera puede reconstruir el bloque y comprobar el hash.
++#[derive(Clone, Copy, Debug)]
++pub struct ParametrosGenesis {
++    /// Red a la que pertenece.
++    pub red: Red,
++    /// Mensaje simbólico de la coinbase (`C-GEN-05`).
++    ///
++    /// **No tiene función de consenso** — ningún nodo inspecciona su contenido. Su valor es una
++    /// comprobación humana, manual y única.
++    pub mensaje: &'static [u8],
++    /// Segundos Unix del lanzamiento.
++    pub timestamp: u64,
++    /// Nonce. No hay PoW que resolver (`C-GEN-02`), así que su única función es separar redes.
++    pub nonce: u64,
++}
++
++/// 🔴 **P-017.** Parámetros de mainnet — marcador de posición hasta el día del lanzamiento.
++///
++/// **Están diseñados para NO pasar [`comprobar`].** El `timestamp: 0` incumple `C-GEN-06` a
++/// propósito, así que un nodo que intente arrancar en mainnet con estos parámetros **aborta con un
++/// mensaje que nombra a P-017**.
++pub const GENESIS_MAINNET: ParametrosGenesis = ParametrosGenesis {
++    red: Red::Mainnet,
++    mensaje: b"PENDIENTE P-017: titular verificable de la fecha de lanzamiento",
++    timestamp: 0,
++    nonce: 0,
++};
++
++/// ✅ Parámetros de **testnet** — reales, no marcador de posición. El timestamp es
++/// **2026-09-04 00:00:00 UTC**.
++pub const GENESIS_TESTNET: ParametrosGenesis = ParametrosGenesis {
++    red: Red::Testnet,
++    mensaje: b"ZEROX testnet 2026-09-04 - sin valor, se reinicia sin aviso",
++    timestamp: 1_788_480_000,
++    nonce: 1,
++};
++
++/// ✅ Parámetros de la **red dev** (`F-13`).
++///
++/// Mensaje `b"ZEROX hibrido red dev v0 - sin valor"`, timestamp **2026-09-26 00:00:00 UTC**
++/// (`1_790_380_800 ≥ TIMESTAMP_MINIMO_GENESIS`), `nonce 0` y `bits` del perfil dev
++/// (`PARAMETROS_POW_DEV.bits_iniciales`), que aplica [`target_inicial_bits`].
++pub const GENESIS_DEV: ParametrosGenesis = ParametrosGenesis {
++    red: Red::Dev,
++    mensaje: b"ZEROX hibrido red dev v0 - sin valor",
++    timestamp: 1_790_380_800,
++    nonce: 0,
++};
++
++/// Hash del génesis de **testnet**, la aserción que `C-GEN-01` pide hardcodear.
++pub const HASH_GENESIS_TESTNET: [u8; 32] = [
++    0xfe, 0x56, 0x84, 0x5a, 0x01, 0xba, 0xfa, 0x5a, 0x51, 0xae, 0x43, 0xdd, 0x43, 0xd1, 0x65, 0x84,
++    0x96, 0x6f, 0x65, 0xa2, 0xac, 0xb4, 0x1b, 0xc6, 0xfa, 0xc2, 0x81, 0x81, 0x40, 0x62, 0xb6, 0xf1,
++];
++
++/// Hash del génesis de **dev**, congelado igual que el de testnet (`C-GEN-07`, F-13).
++///
++/// Cambiar cualquier parámetro de [`GENESIS_DEV`] sin recalcular esta constante hace fallar el test
++/// `el_hash_del_genesis_dev_esta_congelado` y el arranque del nodo.
++pub const HASH_GENESIS_DEV: [u8; 32] = [
++    0xc7, 0x2f, 0xdb, 0x3b, 0x37, 0xe7, 0x57, 0x1a, 0x82, 0xec, 0x1e, 0x0e, 0x97, 0x3e, 0x90, 0xd5,
++    0xe9, 0x5e, 0x7a, 0xd9, 0xfc, 0x87, 0x17, 0x72, 0x26, 0x5b, 0x19, 0x94, 0x05, 0x0c, 0x2d, 0x59,
++];
++
++/// Suelo de plausibilidad del timestamp del génesis: **2026-01-01 00:00:00 UTC** (`C-GEN-06`).
++pub const TIMESTAMP_MINIMO_GENESIS: u64 = 1_767_225_600;
++
++/// Coinbase del génesis: **valor cero** (`C-GEN-03`, `C-EMIT-02`).
++///
++/// Sus salidas **MUST NOT** insertarse en el UTXO set. El mensaje viaja en el `lock` de una salida de
++/// valor cero; es inconectable, así que no crea un UTXO no gastable.
++#[must_use]
++pub fn coinbase_genesis(mensaje: &[u8]) -> Tx {
++    let mut marca = [0u8; 32];
++    for (i, b) in mensaje.iter().enumerate() {
++        if let Some(d) = marca.get_mut(i % 32) {
++            *d ^= *b;
++        }
++    }
++    Tx {
++        version: VERSION_TX,
++        inputs: vec![],
++        outputs: vec![TxOut {
++            value: Amount::CERO,
++            lock: Lock::PubKey {
++                pubkey: ClavePublica::desde_bytes(marca),
++            },
++        }],
++        lock_time: 0,
++        // C-EMIT-04: la coinbase declara su altura. El génesis está en la 0.
++        expiry_height: 0,
++        extension: ExtensionTx::Ninguna,
++    }
++}
++
++/// `bits` de arranque de cada red (`C-DIFF-02`, P-004c; dev en `ORDEN-W04 §3.5`).
++#[must_use]
++pub const fn target_inicial_bits(red: Red) -> u32 {
++    match red {
++        Red::Mainnet => TARGET_INICIAL_BITS_MAINNET,
++        Red::Testnet => TARGET_INICIAL_BITS_TESTNET,
++        Red::Dev => PARAMETROS_POW_DEV.bits_iniciales,
++    }
++}
++
++/// Construye el bloque génesis a partir de sus parámetros (`C-GEN-01`).
++///
++/// # Errores
++/// [`ErrorPow::SinRamaActiva`] si la tabla de ramas de la red está mal formada.
++pub fn construir(p: ParametrosGenesis) -> Result<(BlockHeader, Tx), ErrorPow> {
++    let cb = coinbase_genesis(p.mensaje);
++    let branch_id = rama_activa(p.red, 0)?;
++    let raiz = merkle_root(&[txid(&cb, branch_id)]);
++
++    Ok((
++        BlockHeader {
++            consensus_branch_id: branch_id,
++            // El génesis no tiene padre. Cero es el único valor con significado aquí.
++            prev_hash: BlockHash::from_digest(Digest::from_bytes([0u8; 32])),
++            merkle_root: raiz,
++            timestamp: p.timestamp,
++            bits: target_inicial_bits(p.red),
++            nonce: p.nonce,
++            height: 0,
++        },
++        cb,
++    ))
++}
++
++/// Comprueba que un génesis construido cumple todas las invariantes de §15.
++///
++/// **No comprueba el PoW**: `C-GEN-02` lo exime explícitamente.
++///
++/// # Errores
++/// [`ErrorPow::GenesisInvalido`] con el motivo concreto.
++pub fn comprobar(cabecera: &BlockHeader, coinbase: &Tx, red: Red) -> Result<(), ErrorPow> {
++    let malo = |motivo| ErrorPow::GenesisInvalido { motivo };
++
++    if cabecera.height != 0 {
++        return Err(malo("C-HDR-02: el génesis MUST estar en la altura 0"));
++    }
++    if *cabecera.prev_hash.as_bytes() != [0u8; 32] {
++        return Err(malo("el génesis no tiene padre: prev_hash MUST ser cero"));
++    }
++    if !coinbase.inputs.is_empty() {
++        return Err(malo("C-BLK-07: la coinbase no tiene entradas"));
++    }
++    if coinbase.expiry_height != 0 {
++        return Err(malo(
++            "C-EMIT-04: la coinbase del génesis declara la altura 0",
++        ));
++    }
++    // C-GEN-03 · valor cero. Sin premine, sin dev tax, sin founder reward.
++    let total: i64 = coinbase.outputs.iter().map(|s| s.value.brek()).sum();
++    if total != 0 {
++        return Err(malo(
++            "C-GEN-03/C-EMIT-02: la coinbase del génesis MUST valer cero",
++        ));
++    }
++    // La raíz de Merkle compromete esa coinbase y no otra.
++    if merkle_root(&[txid(coinbase, cabecera.consensus_branch_id)]) != cabecera.merkle_root {
++        return Err(malo(
++            "C-BLK-01: la raíz de Merkle no compromete esta coinbase",
++        ));
++    }
++    // `bits` MUST ser canónico y estar dentro de los límites de la red, aunque el PoW no se
++    // compruebe. La red dev admite un máximo más fácil que `POW_LIMIT`, y por eso los límites se
++    // eligen por red y no se leen de las constantes antiguas.
++    decodificar_con(cabecera.bits, &limites_de(red))
++        .map_err(|_| malo("C-POW-04/C-POW-05: los bits del génesis no son válidos en su red"))?;
++    // C-GEN-06 · el timestamp MUST ser plausible.
++    if cabecera.timestamp < TIMESTAMP_MINIMO_GENESIS {
++        return Err(malo(
++            "C-GEN-06: el timestamp del génesis es anterior a 2026 — ¿parámetros de marcador de \
++             posición sin rellenar? Ver P-017",
++        ));
++    }
++    Ok(())
++}
++
++/// Hash congelado de una red, o `None` si esa red todavía no lo tiene (`C-GEN-07`).
++///
++/// Mainnet devuelve `None` **a propósito** mientras P-017 siga abierto.
++#[must_use]
++pub const fn hash_congelado(red: Red) -> Option<[u8; 32]> {
++    match red {
++        Red::Testnet => Some(HASH_GENESIS_TESTNET),
++        Red::Dev => Some(HASH_GENESIS_DEV),
++        Red::Mainnet => None,
++    }
++}
++
++/// **La comprobación de arranque completa (`C-GEN-01`, `C-GEN-07`).**
++///
++/// Hace tres cosas, en este orden: construye el génesis, comprueba las invariantes de §15 y compara
++/// su hash contra la constante congelada del binario.
++///
++/// # Errores
++/// [`ErrorPow::GenesisInvalido`] con el motivo concreto, o el error de [`construir`].
++pub fn comprobar_al_arrancar(p: ParametrosGenesis) -> Result<BlockHash, ErrorPow> {
++    let (cabecera, coinbase) = construir(p)?;
++    comprobar(&cabecera, &coinbase, p.red)?;
++
++    let obtenido = cabecera.block_hash();
++    match hash_congelado(p.red) {
++        Some(esperado) if obtenido.as_bytes() == &esperado => Ok(obtenido),
++        Some(_) => Err(ErrorPow::GenesisInvalido {
++            motivo: "C-GEN-07: el génesis construido NO coincide con el hash congelado del \
++                     binario — o alguien tocó los parámetros, o este binario no es de esta red",
++        }),
++        // Una red sin hash congelado no puede arrancar. Hoy es mainnet, por P-017.
++        None => Err(ErrorPow::GenesisInvalido {
++            motivo: "C-GEN-07: esta red no tiene hash de génesis congelado todavía — ver P-017",
++        }),
++    }
++}
++
++/// Hash del génesis de una red, tal y como se hardcodearía para la aserción de `C-GEN-01`.
++///
++/// # Errores
++/// La de [`construir`].
++pub fn hash(p: ParametrosGenesis) -> Result<BlockHash, ErrorPow> {
++    Ok(construir(p)?.0.block_hash())
++}
++
++/// El txid de la coinbase del génesis, que **MUST NOT** entrar en el UTXO set (`C-GEN-03`).
++///
++/// # Errores
++/// La de [`construir`].
++pub fn txid_coinbase(p: ParametrosGenesis) -> Result<TxId, ErrorPow> {
++    let (cab, cb) = construir(p)?;
++    Ok(txid(&cb, cab.consensus_branch_id))
++}
++
++#[cfg(test)]
++#[expect(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    clippy::integer_division,
++    reason = "los tests fallan con panic por diseño; la división de la derivación es exacta"
++)]
++mod tests {
++    use super::target_inicial_bits;
++    use super::{
++        GENESIS_DEV, GENESIS_MAINNET, GENESIS_TESTNET, HASH_GENESIS_DEV, HASH_GENESIS_TESTNET,
++        ParametrosGenesis, TIMESTAMP_MINIMO_GENESIS, coinbase_genesis, comprobar,
++        comprobar_al_arrancar, construir, hash, hash_congelado, txid_coinbase,
++    };
++    use crate::activacion::Red;
++    use crate::error::ErrorPow;
++    use crate::parametros::{PARAMETROS_POW_ANTIGUOS, PARAMETROS_POW_DEV};
++    use zx_core::amount::Amount;
++    use zx_core::digest::{BlockHash, Digest};
++    use zx_core::target::{TARGET_INICIAL_BITS_MAINNET, TARGET_INICIAL_BITS_TESTNET};
++
++    #[test]
++    fn el_genesis_de_testnet_es_valido() {
++        let (cab, cb) = construir(GENESIS_TESTNET).unwrap();
++        comprobar(&cab, &cb, Red::Testnet).unwrap_or_else(|e| panic!("testnet: {e}"));
++    }
++
++    #[test]
++    fn el_genesis_dev_es_valido() {
++        let (cab, cb) = construir(GENESIS_DEV).unwrap();
++        comprobar(&cab, &cb, Red::Dev).unwrap_or_else(|e| panic!("dev: {e}"));
++    }
++
++    /// **C-GEN-06 · P-017.** Mainnet **MUST NOT** arrancar todavía, y esto lo demuestra.
++    #[test]
++    fn el_genesis_de_mainnet_todavia_no_arranca() {
++        let (cab, cb) = construir(GENESIS_MAINNET).unwrap();
++        let Err(e) = comprobar(&cab, &cb, Red::Mainnet) else {
++            panic!("P-017 sigue abierto: el génesis de mainnet NO debe validar todavía");
++        };
++        let texto = format!("{e}");
++        assert!(
++            texto.contains("C-GEN-06") && texto.contains("P-017"),
++            "el error debe decir qué falta y dónde está anotado: {texto}"
++        );
++    }
++
++    #[test]
++    fn el_arranque_de_testnet_valida_y_compara_el_hash() {
++        let h = comprobar_al_arrancar(GENESIS_TESTNET).expect("testnet arranca");
++        assert_eq!(h.as_bytes(), &HASH_GENESIS_TESTNET);
++    }
++
++    /// **C-GEN-07.** El arranque de dev valida y compara el hash congelado.
++    #[test]
++    fn el_arranque_dev_valida_y_compara_el_hash() {
++        let h = comprobar_al_arrancar(GENESIS_DEV).expect("dev arranca");
++        assert_eq!(h.as_bytes(), &HASH_GENESIS_DEV);
++    }
++
++    /// Tocar un parámetro sin recalcular el hash **impide arrancar**.
++    #[test]
++    fn un_parametro_tocado_impide_arrancar() {
++        for tocar in [
++            |mut p: ParametrosGenesis| {
++                p.timestamp += 1;
++                p
++            },
++            |mut p: ParametrosGenesis| {
++                p.nonce += 1;
++                p
++            },
++            |mut p: ParametrosGenesis| {
++                p.mensaje = b"otro mensaje cualquiera";
++                p
++            },
++        ] {
++            let p = tocar(GENESIS_TESTNET);
++            let Err(e) = comprobar_al_arrancar(p) else {
++                panic!("un parámetro tocado MUST impedir el arranque");
++            };
++            assert!(format!("{e}").contains("C-GEN-07"), "{e}");
++        }
++    }
++
++    #[test]
++    fn mainnet_no_arranca_porque_no_tiene_hash_congelado() {
++        assert!(
++            hash_congelado(Red::Mainnet).is_none(),
++            "P-017 sigue abierto"
++        );
++        assert!(comprobar_al_arrancar(GENESIS_MAINNET).is_err());
++    }
++
++    #[test]
++    fn el_hash_del_genesis_de_testnet_esta_congelado() {
++        let h = hash(GENESIS_TESTNET).unwrap();
++        assert_eq!(
++            h.as_bytes(),
++            &HASH_GENESIS_TESTNET,
++            "el génesis de testnet cambió — si es a propósito, actualiza HASH_GENESIS_TESTNET"
++        );
++    }
++
++    /// **C-GEN-07 · F-13.** El hash del génesis dev está congelado.
++    #[test]
++    fn el_hash_del_genesis_dev_esta_congelado() {
++        let h = hash(GENESIS_DEV).unwrap();
++        assert_eq!(
++            h.as_bytes(),
++            &HASH_GENESIS_DEV,
++            "el génesis dev cambió — si es a propósito, actualiza HASH_GENESIS_DEV"
++        );
++    }
++
++    #[test]
++    fn mainnet_y_testnet_no_comparten_genesis() {
++        assert_ne!(
++            hash(GENESIS_MAINNET).unwrap().as_bytes(),
++            hash(GENESIS_TESTNET).unwrap().as_bytes(),
++            "C-GEN-04: un génesis compartido dejaría a las dos redes confundirse"
++        );
++    }
++
++    /// **C-GEN-04.** Ninguna red comparte génesis con la dev.
++    #[test]
++    fn la_red_dev_tiene_genesis_propio() {
++        let dev = hash(GENESIS_DEV).unwrap();
++        assert_ne!(dev, hash(GENESIS_MAINNET).unwrap());
++        assert_ne!(dev, hash(GENESIS_TESTNET).unwrap());
++        assert_ne!(
++            txid_coinbase(GENESIS_DEV).unwrap(),
++            txid_coinbase(GENESIS_TESTNET).unwrap()
++        );
++    }
++
++    /// **C-GEN-06.** El suelo es un suelo: un segundo antes falla, el suelo justo pasa.
++    #[test]
++    fn el_borde_exacto_del_suelo_de_timestamp() {
++        let mut p = GENESIS_TESTNET;
++
++        p.timestamp = TIMESTAMP_MINIMO_GENESIS - 1;
++        let (cab, cb) = construir(p).unwrap();
++        assert!(
++            comprobar(&cab, &cb, Red::Testnet).is_err(),
++            "un segundo antes MUST fallar"
++        );
++
++        p.timestamp = TIMESTAMP_MINIMO_GENESIS;
++        let (cab, cb) = construir(p).unwrap();
++        assert!(
++            comprobar(&cab, &cb, Red::Testnet).is_ok(),
++            "el suelo justo MUST valer"
++        );
++    }
++
++    /// **Por qué C-GEN-06 existe, medido.**
++    #[test]
++    fn un_genesis_en_el_ano_cero_sesga_el_primer_retarget() {
++        let pp = PARAMETROS_POW_ANTIGUOS;
++        let n = i64::try_from(pp.n).unwrap();
++        let k = n * (n + 1) / 2 * pp.t;
++        assert_eq!(k, pp.k().unwrap(), "K = N(N+1)T/2");
++
++        let t_sano: i64 = (1..=n).map(|j| j * pp.t).sum();
++        assert_eq!(
++            t_sano, k,
++            "con st = T en todos, t = k y el target no se mueve"
++        );
++
++        let st_cap = pp.st_cap().unwrap();
++        let t_sesgado: i64 = st_cap + (2..=n).map(|j| j * pp.t).sum::<i64>();
++        assert!(t_sesgado > k, "el target se afloja");
++        assert_eq!(
++            t_sesgado - k,
++            st_cap - pp.t,
++            "exactamente ST_CAP − T, con peso j=1"
++        );
++
++        assert!(t_sesgado * 1000 > k * 1001 && t_sesgado * 1000 < k * 1002);
++    }
++
++    #[test]
++    fn el_genesis_esta_en_la_altura_cero_y_no_tiene_padre() {
++        let (cab, _) = construir(GENESIS_MAINNET).unwrap();
++        assert_eq!(cab.height, 0);
++        assert_eq!(cab.prev_hash.as_bytes(), &[0u8; 32]);
++    }
++
++    /// **P-004c.** Cada red arranca con SU dificultad; la dev con la del perfil dev.
++    #[test]
++    fn cada_red_arranca_con_su_propia_dificultad() {
++        for p in [GENESIS_MAINNET, GENESIS_TESTNET, GENESIS_DEV] {
++            let (cab, _) = construir(p).unwrap();
++            assert_eq!(
++                cab.bits,
++                target_inicial_bits(p.red),
++                "C-DIFF-02, {:?}",
++                p.red
++            );
++        }
++        assert_eq!(
++            target_inicial_bits(Red::Mainnet),
++            TARGET_INICIAL_BITS_MAINNET
++        );
++        assert_eq!(
++            target_inicial_bits(Red::Testnet),
++            TARGET_INICIAL_BITS_TESTNET
++        );
++        assert_eq!(
++            target_inicial_bits(Red::Dev),
++            PARAMETROS_POW_DEV.bits_iniciales
++        );
++        assert_eq!(GENESIS_DEV.timestamp, 1_790_380_800);
++        const {
++            assert!(
++                GENESIS_DEV.timestamp >= TIMESTAMP_MINIMO_GENESIS,
++                "el timestamp del génesis dev MUST ser posterior al suelo de C-GEN-06"
++            )
++        };
++        assert_eq!(GENESIS_DEV.nonce, 0);
++    }
++
++    /// **C-GEN-03 / C-EMIT-02.** Sin premine, sin dev tax, sin founder reward.
++    #[test]
++    fn la_coinbase_del_genesis_vale_cero() {
++        let (_, cb) = construir(GENESIS_MAINNET).unwrap();
++        let total: i64 = cb.outputs.iter().map(|s| s.value.brek()).sum();
++        assert_eq!(total, 0, "el génesis MUST NOT crear valor");
++        assert!(cb.inputs.is_empty(), "es coinbase");
++    }
++
++    #[test]
++    fn se_rechaza_un_genesis_con_premine() {
++        let (cab, mut cb) = construir(GENESIS_MAINNET).unwrap();
++        if let Some(s) = cb.outputs.first_mut() {
++            s.value = Amount::nuevo(1).unwrap();
++        }
++        let e = comprobar(&cab, &cb, Red::Mainnet).unwrap_err();
++        assert!(matches!(e, ErrorPow::GenesisInvalido { .. }), "{e:?}");
++        assert!(
++            format!("{e}").contains("cero"),
++            "el error debe nombrar la regla"
++        );
++    }
++
++    #[test]
++    fn mainnet_y_testnet_tienen_genesis_distintos() {
++        let m = hash(GENESIS_MAINNET).unwrap();
++        let t = hash(GENESIS_TESTNET).unwrap();
++        assert_ne!(m, t, "C-GEN-04: los génesis de las dos redes MUST diferir");
++        assert_ne!(
++            txid_coinbase(GENESIS_MAINNET).unwrap(),
++            txid_coinbase(GENESIS_TESTNET).unwrap(),
++            "y sus coinbases también"
++        );
++    }
++
++    #[test]
++    fn el_genesis_es_determinista() {
++        let a = hash(GENESIS_MAINNET).unwrap();
++        for _ in 0..5 {
++            assert_eq!(hash(GENESIS_MAINNET).unwrap(), a);
++        }
++    }
++
++    #[test]
++    fn cada_parametro_cambia_el_hash_del_genesis() {
++        let base = hash(GENESIS_MAINNET).unwrap();
++
++        let mut p = GENESIS_MAINNET;
++        p.mensaje = b"otro mensaje completamente distinto";
++        assert_ne!(hash(p).unwrap(), base, "mensaje");
++
++        let mut p = GENESIS_MAINNET;
++        p.timestamp = 1;
++        assert_ne!(hash(p).unwrap(), base, "timestamp");
++
++        let mut p = GENESIS_MAINNET;
++        p.nonce = 1;
++        assert_ne!(hash(p).unwrap(), base, "nonce");
++    }
++
++    #[test]
++    fn una_coinbase_cambiada_invalida_el_genesis() {
++        let (cab, _) = construir(GENESIS_MAINNET).unwrap();
++        let otra = coinbase_genesis(b"una coinbase que no es la del genesis");
++        assert!(matches!(
++            comprobar(&cab, &otra, Red::Mainnet),
++            Err(ErrorPow::GenesisInvalido { .. })
++        ));
++    }
++
++    #[test]
++    fn se_rechaza_un_genesis_con_padre() {
++        let (mut cab, cb) = construir(GENESIS_MAINNET).unwrap();
++        cab.prev_hash = BlockHash::from_digest(Digest::from_bytes([1u8; 32]));
++        assert!(comprobar(&cab, &cb, Red::Mainnet).is_err());
++    }
++
++    #[test]
++    fn se_rechaza_un_genesis_fuera_de_la_altura_cero() {
++        let (mut cab, cb) = construir(GENESIS_MAINNET).unwrap();
++        cab.height = 1;
++        assert!(comprobar(&cab, &cb, Red::Mainnet).is_err());
++    }
++
++    /// **C-GEN-02: el génesis NO pasa por la comprobación de PoW.**
++    #[test]
++    fn el_genesis_no_necesita_resolver_el_pow() {
++        let (cab, cb) = construir(GENESIS_TESTNET).unwrap();
++        assert_eq!(cab.nonce, 1);
++        assert!(
++            comprobar(&cab, &cb, Red::Testnet).is_ok(),
++            "C-GEN-02: exento del PoW"
++        );
++    }
++
++    #[test]
++    fn el_genesis_declara_la_rama_activa() {
++        for (p, red) in [
++            (GENESIS_MAINNET, Red::Mainnet),
++            (GENESIS_TESTNET, Red::Testnet),
++            (GENESIS_DEV, Red::Dev),
++        ] {
++            let (cab, _) = construir(p).unwrap();
++            assert_eq!(
++                cab.consensus_branch_id,
++                crate::activacion::rama_activa(red, 0).unwrap()
++            );
++        }
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/lib.rs ws/crates/zx-consensus/src/lib.rs
+--- ws.orig/crates/zx-consensus/src/lib.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/lib.rs	2026-09-26 01:47:53.998047036 +0200
+@@ -0,0 +1,39 @@
++//! Motor PoW de la fase de arranque para la red dev (D-P05, D-T01).
++//!
++//! Todo lo de aquí es **consensus-critical**: una divergencia de un bit entre dos nodos es un split
++//! de cadena. Cada elemento cita la regla `C-XXX` del SPEC que implementa.
++//!
++//! El retarget, la selección por trabajo, los timestamps, el génesis y el verificador están
++//! **parametrizados por red** ([`ParametrosPow`]) en vez de con constantes globales. El `hash_pow`
++//! vive detrás de [`AlgoritmoPow`]; su implementación dev es [`Sha3Dev`].
++
++#![doc = include_str!("../README.md")]
++
++pub mod activacion;
++pub mod algoritmo;
++pub mod dificultad;
++pub mod error;
++pub mod fork_choice;
++pub mod genesis;
++pub mod minero_dev;
++pub mod parametros;
++pub mod timestamps;
++pub mod verificador;
++
++pub use activacion::{
++    RAMA_DEV, RAMA_V1_MAINNET, RAMAS_DEV, RAMAS_MAINNET, RAMAS_TESTNET, Rama, Red,
++    comprobar_branch_id, comprobar_tabla, rama_activa, ramas,
++};
++pub use algoritmo::{AlgoritmoPow, Sha3Dev};
++pub use dificultad::{BIAS_DEN, BIAS_NUM, VentanaRetarget, median_time_past, siguiente_target};
++pub use error::ErrorPow;
++pub use fork_choice::{Preferencia, Tip, preferir, trabajo_acumulado};
++pub use genesis::{
++    GENESIS_DEV, GENESIS_MAINNET, GENESIS_TESTNET, HASH_GENESIS_DEV, HASH_GENESIS_TESTNET,
++    ParametrosGenesis, TIMESTAMP_MINIMO_GENESIS, VERSION_TX, coinbase_genesis, comprobar,
++    comprobar_al_arrancar, construir, hash, hash_congelado, target_inicial_bits, txid_coinbase,
++};
++pub use minero_dev::minar;
++pub use parametros::{PARAMETROS_POW_ANTIGUOS, PARAMETROS_POW_DEV, ParametrosPow, limites_de};
++pub use timestamps::{comprobar_ftl, comprobar_monotonia, timestamp_del_minero};
++pub use verificador::{ContextoPow, validar_cabecera_pow};
+diff -ruN ws.orig/crates/zx-consensus/src/minero_dev.rs ws/crates/zx-consensus/src/minero_dev.rs
+--- ws.orig/crates/zx-consensus/src/minero_dev.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/minero_dev.rs	2026-09-26 01:47:53.999047057 +0200
+@@ -0,0 +1,131 @@
++//! Minero CPU de desarrollo.
++//!
++//! Recorre el `nonce` de forma **determinista desde 0** y en **un solo hilo**. El `nonce` ocupa los
++//! bytes `[OFFSET_NONCE_PREIMAGEN, +8)` = `[96, 104)` de la preimagen del PoW (`C-HDR-04`); iterar
++//! el campo `nonce` de la cabecera mueve exactamente ese rango y nada más.
++//!
++//! No hay `unsafe`. La cancelación es un [`AtomicBool`] que el llamante puede activar desde otro
++//! hilo; el minero la consulta en cada intento y devuelve `None`.
++
++use core::sync::atomic::{AtomicBool, Ordering};
++
++use primitive_types::U256;
++use zx_core::preimage::block::BlockHeader;
++
++use crate::algoritmo::AlgoritmoPow;
++
++/// Busca un `nonce` que satisfaga `hash_pow < target`.
++///
++/// Itera `nonce = 0, 1, …` hasta `max_intentos` intentos (o hasta que `cancelar` sea `true`) y
++/// devuelve la cabecera con el `nonce` encontrado. Es **determinista**: los mismos argumentos dan el
++/// mismo resultado en cualquier máquina.
++///
++/// La comparación es la de `C-POW-01`: `hash_pow` interpretado **big-endian** y estrictamente menor
++/// que el target.
++#[must_use]
++pub fn minar(
++    plantilla: &BlockHeader,
++    target: U256,
++    algo: &impl AlgoritmoPow,
++    max_intentos: u64,
++    cancelar: &AtomicBool,
++) -> Option<BlockHeader> {
++    let mut cabecera = *plantilla;
++    let mut intento: u64 = 0;
++    while intento < max_intentos {
++        if cancelar.load(Ordering::Relaxed) {
++            return None;
++        }
++        cabecera.nonce = intento;
++        let hash = algo.hash_pow(&cabecera);
++        if U256::from_big_endian(&hash) < target {
++            return Some(cabecera);
++        }
++        intento += 1;
++    }
++    None
++}
++
++#[cfg(test)]
++#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++mod tests {
++    use super::minar;
++    use crate::algoritmo::{AlgoritmoPow, Sha3Dev};
++    use core::sync::atomic::AtomicBool;
++    use primitive_types::U256;
++    use zx_core::preimage::block::{BlockHeader, OFFSET_NONCE_PREIMAGEN, TAMANO_PREIMAGEN_POW};
++    use zx_core::{BlockHash, Digest, MerkleRoot};
++
++    struct HashFijo([u8; 32]);
++    impl AlgoritmoPow for HashFijo {
++        fn hash_pow(&self, _: &BlockHeader) -> [u8; 32] {
++            self.0
++        }
++    }
++
++    fn plantilla() -> BlockHeader {
++        BlockHeader {
++            consensus_branch_id: zx_core::CBID_RED_DEV,
++            prev_hash: BlockHash::from_digest(Digest::from_bytes([1u8; 32])),
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([2u8; 32])),
++            timestamp: 1_790_380_800,
++            bits: 0x1e7f_ffff,
++            nonce: 0,
++            height: 1,
++        }
++    }
++
++    /// El `nonce` que itera el minero es exactamente el rango documentado por `C-HDR-04`.
++    #[test]
++    fn el_nonce_iterado_es_el_rango_c_hdr_04() {
++        let a = plantilla().preimagen_pow();
++        let mut b = plantilla();
++        b.nonce = u64::MAX;
++        let b = b.preimagen_pow();
++
++        let distintos: Vec<usize> = (0..TAMANO_PREIMAGEN_POW)
++            .filter(|i| a.get(*i) != b.get(*i))
++            .collect();
++        let esperados: Vec<usize> = (OFFSET_NONCE_PREIMAGEN..OFFSET_NONCE_PREIMAGEN + 8).collect();
++        assert_eq!(distintos, esperados, "C-HDR-04: el nonce vive en [96, 104)");
++    }
++
++    /// El minero es determinista: mismo problema, mismo `nonce`.
++    #[test]
++    fn es_determinista() {
++        let p = plantilla();
++        let cancelar = AtomicBool::new(false);
++        // Un target imposible: agota max_intentos y devuelve None sin depender del hash.
++        let dificil = U256::from(1u32);
++        assert!(minar(&p, dificil, &Sha3Dev, 256, &cancelar).is_none());
++    }
++
++    /// Con un algoritmo que siempre acierta, el primer intento (nonce 0) sale.
++    #[test]
++    fn encuentra_en_el_primer_intento() {
++        let p = plantilla();
++        let cancelar = AtomicBool::new(false);
++        let algo = HashFijo([0u8; 32]);
++        let m = minar(&p, U256::from(1u32), &algo, 16, &cancelar).unwrap();
++        assert_eq!(m.nonce, 0, "iteración determinista desde 0");
++        assert_eq!(m.height, p.height);
++    }
++
++    /// El minero respeta la cancelación.
++    #[test]
++    fn la_cancelacion_detiene_el_minado() {
++        let p = plantilla();
++        let cancelar = AtomicBool::new(true);
++        let algo = HashFijo([0xFFu8; 32]);
++        assert!(minar(&p, U256::MAX, &algo, 1_000, &cancelar).is_none());
++    }
++
++    /// Deja de buscar al agotar `max_intentos`.
++    #[test]
++    fn agota_los_intentos() {
++        let p = plantilla();
++        let cancelar = AtomicBool::new(false);
++        let algo = HashFijo([0xFFu8; 32]); // siempre > target 1
++        assert!(minar(&p, U256::from(1u32), &algo, 10, &cancelar).is_none());
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/parametros.rs ws/crates/zx-consensus/src/parametros.rs
+--- ws.orig/crates/zx-consensus/src/parametros.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/parametros.rs	2026-09-26 01:47:53.999047057 +0200
+@@ -0,0 +1,193 @@
++//! Parámetros PoW por red (D-P05).
++//!
++//! Las constantes del retarget de `9681061` (`T`, `N`, `K`, `NK`, `ST_CAP`, `T_FLOOR`, `FTL`,
++//! `MTP_W`) eran globales. Aquí son campos de [`ParametrosPow`] y las **funciones derivadas**
++//! reproducen las fórmulas de los comentarios antiguos con aritmética comprobada:
++//!
++//! ```text
++//! k       = N(N+1)T/2
++//! nk      = N·k
++//! st_cap  = 6T
++//! t_floor = N(N+1)T/20
++//! ftl     = N·T/20
++//! ```
++//!
++//! Un test obligatorio comprueba que, con `T = 120`, `N = 90`, `LIMITES_ANTIGUOS`,
++//! `bits_iniciales = 0x1c07fff8` y `mtp_w = 11`, los derivados valen **exactamente** las constantes
++//! de `9681061`: `K = 491_400`, `NK = 44_226_000`, `ST_CAP = 720`, `T_FLOOR = 49_140`, `FTL = 540`.
++
++// Igual que en el `dificultad.rs` antiguo: `clippy::integer_division` sugiere floats, y
++// `C-ENC-04` prohíbe la coma flotante en toda ruta de consenso. La división entera **truncada** es
++// la especificación.
++#![expect(
++    clippy::integer_division,
++    reason = "C-ENC-04 prohíbe floats; la división entera truncada es la especificación"
++)]
++
++use primitive_types::U256;
++use zx_core::Red;
++use zx_core::target::{LIMITES_ANTIGUOS, LimitesTarget};
++
++use crate::error::ErrorPow;
++
++/// Parámetros PoW de una red.
++///
++/// Todos los campos son consenso de esa red. `limites` sustituye a las constantes globales
++/// `MIN_TARGET`/`POW_LIMIT`; `bits_iniciales` sustituye a `TARGET_INICIAL_BITS_*`; `mtp_w` sustituye
++/// a `MTP_W`.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub struct ParametrosPow {
++    /// Tiempo objetivo entre bloques, en segundos (`T`).
++    pub t: i64,
++    /// Tamaño de la ventana del retarget, en bloques (`N`).
++    pub n: usize,
++    /// Límites de target de la red (`C-POW-05`).
++    pub limites: LimitesTarget,
++    /// `bits` de arranque (`C-DIFF-02`).
++    pub bits_iniciales: u32,
++    /// Ventana del median-time-past (`C-TS-02`).
++    pub mtp_w: usize,
++}
++
++impl ParametrosPow {
++    /// `n` como `i64`, o error de desbordamiento.
++    fn n_i64(&self) -> Result<i64, ErrorPow> {
++        i64::try_from(self.n).map_err(|_| ErrorPow::DesbordamientoAritmetico)
++    }
++
++    /// `k = N(N+1)T/2`.
++    ///
++    /// `N(N+1)` es par, así que la división intermedia es **exacta**.
++    pub fn k(&self) -> Result<i64, ErrorPow> {
++        let n = self.n_i64()?;
++        let np1 = n.checked_add(1).ok_or(ErrorPow::DesbordamientoAritmetico)?;
++        let par = n
++            .checked_mul(np1)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++        let mitad = par / 2;
++        mitad
++            .checked_mul(self.t)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)
++    }
++
++    /// `NK = N·k`, el denominador del retarget.
++    pub fn nk(&self) -> Result<i64, ErrorPow> {
++        let n = self.n_i64()?;
++        n.checked_mul(self.k()?)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)
++    }
++
++    /// `ST_CAP = 6T`. Techo del solvetime de un bloque.
++    pub fn st_cap(&self) -> Result<i64, ErrorPow> {
++        self.t
++            .checked_mul(6)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)
++    }
++
++    /// `T_FLOOR = N(N+1)T/20`. Suelo de la suma ponderada (P-003).
++    pub fn t_floor(&self) -> Result<i64, ErrorPow> {
++        let n = self.n_i64()?;
++        let np1 = n.checked_add(1).ok_or(ErrorPow::DesbordamientoAritmetico)?;
++        n.checked_mul(np1)
++            .and_then(|x| x.checked_mul(self.t))
++            .map(|x| x / 20)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)
++    }
++
++    /// `FTL = N·T/20`. Margen de futuro admitido en un timestamp (`C-TS-03`).
++    pub fn ftl(&self) -> Result<i64, ErrorPow> {
++        let n = self.n_i64()?;
++        n.checked_mul(self.t)
++            .map(|x| x / 20)
++            .ok_or(ErrorPow::DesbordamientoAritmetico)
++    }
++}
++
++/// Parámetros **antiguos** de `9681061`: las constantes del commit, ahora como perfil.
++///
++/// `MIN_TARGET`/`POW_LIMIT` no cambian; van en `LIMITES_ANTIGUOS`.
++pub const PARAMETROS_POW_ANTIGUOS: ParametrosPow = ParametrosPow {
++    t: 120,
++    n: 90,
++    limites: LIMITES_ANTIGUOS,
++    bits_iniciales: 0x1c07_fff8,
++    mtp_w: 11,
++};
++
++/// Perfil **dev** de la red de pruebas local de 0.0.1.
++///
++/// ⚠️ **No son parámetros de producción**: se eligieron para que una red local de pruebas mine en
++/// segundos. En particular, `limites.max` y `bits_iniciales` son `0x1e7fffff`, un target **más
++/// fácil que `POW_LIMIT`**, que solo existe porque `LimitesTarget` está parametrizado por red. El
++/// algoritmo PoW de producción sigue abierto (IPA A-12).
++///
++/// `limites.max` es la expansión exacta de `0x1e7fffff`: `0x7fffff · 2^216` = `2^239 − 2^216`. Un
++/// test lo recalcula con `decodificar_con` y comprueba que no se tecleó mal.
++pub const PARAMETROS_POW_DEV: ParametrosPow = ParametrosPow {
++    t: 2,
++    n: 20,
++    limites: LimitesTarget {
++        min: U256([0, 1, 0, 0]),
++        max: U256([0, 0, 0, 0x0000_7fff_ff00_0000]),
++    },
++    bits_iniciales: 0x1e7f_ffff,
++    mtp_w: 11,
++};
++
++/// Límites de target de una red.
++#[must_use]
++pub const fn limites_de(red: Red) -> LimitesTarget {
++    match red {
++        Red::Mainnet | Red::Testnet => LIMITES_ANTIGUOS,
++        Red::Dev => PARAMETROS_POW_DEV.limites,
++    }
++}
++
++#[cfg(test)]
++#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++mod tests {
++    use super::{PARAMETROS_POW_ANTIGUOS, PARAMETROS_POW_DEV, limites_de};
++    use zx_core::Red;
++    use zx_core::target::{LIMITES_AMPLIOS, LIMITES_ANTIGUOS, decodificar_con};
++
++    /// **Test obligatorio de ORDEN-W04 §3.4.** Con los parámetros antiguos, los derivados son
++    /// exactamente las constantes de `9681061`.
++    #[test]
++    fn las_constantes_precomputadas_cuadran() {
++        let p = PARAMETROS_POW_ANTIGUOS;
++        assert_eq!(p.k().unwrap(), 491_400, "K = N(N+1)T/2");
++        assert_eq!(p.nk().unwrap(), 44_226_000, "NK = N·k");
++        assert_eq!(p.st_cap().unwrap(), 720, "ST_CAP = 6T");
++        assert_eq!(p.t_floor().unwrap(), 49_140, "T_FLOOR = N(N+1)T/20");
++        assert_eq!(p.ftl().unwrap(), 540, "FTL = N·T/20");
++    }
++
++    /// El perfil dev es dev: arranca más fácil que el mínimo antiguo y su máximo es exacto.
++    #[test]
++    fn el_maximo_dev_es_la_expansion_de_su_bits_iniciales() {
++        let objetivo =
++            decodificar_con(PARAMETROS_POW_DEV.bits_iniciales, &LIMITES_AMPLIOS).unwrap();
++        assert_eq!(PARAMETROS_POW_DEV.limites.max, objetivo);
++        assert_eq!(PARAMETROS_POW_DEV.limites.min, LIMITES_ANTIGUOS.min);
++        assert_eq!(PARAMETROS_POW_DEV.bits_iniciales, 0x1e7f_ffff);
++        assert!(
++            decodificar_con(
++                PARAMETROS_POW_DEV.bits_iniciales,
++                &PARAMETROS_POW_DEV.limites
++            )
++            .is_ok(),
++            "el propio perfil dev admite su bits de arranque"
++        );
++        assert!(
++            decodificar_con(PARAMETROS_POW_DEV.bits_iniciales, &LIMITES_ANTIGUOS).is_err(),
++            "mainnet/testnet MUST NOT admitirlo: es más fácil que POW_LIMIT"
++        );
++    }
++
++    #[test]
++    fn los_limites_por_red_son_los_esperados() {
++        assert_eq!(limites_de(Red::Mainnet), LIMITES_ANTIGUOS);
++        assert_eq!(limites_de(Red::Testnet), LIMITES_ANTIGUOS);
++        assert_eq!(limites_de(Red::Dev), PARAMETROS_POW_DEV.limites);
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/timestamps.rs ws/crates/zx-consensus/src/timestamps.rs
+--- ws.orig/crates/zx-consensus/src/timestamps.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/timestamps.rs	2026-09-26 01:47:54.000047078 +0200
+@@ -0,0 +1,97 @@
++//! Reglas de timestamp (`C-TS-01`, `C-TS-03`, `C-TS-05`).
++//!
++//! # Aquí no existe la hora de red
++//!
++//! `C-TS-04` prohíbe usar mediana de pares, NTP o cualquier hora ajustada. Solo el reloj local.
++//!
++//! No es purismo: con un `FTL` de minutos, la regla «revert to node time» de Bitcoin y Zcash abriría
++//! un ataque Sybil al 33 %. Al eliminar la hora de pares del consenso, la vulnerabilidad deja de
++//! existir en lugar de mitigarse.
++
++use crate::error::ErrorPow;
++
++/// `C-TS-01` · Monotonía: `ts(H) > ts(H−1)`. Rechazo **permanente**.
++///
++/// # Errores
++/// [`ErrorPow::TimestampNoMonotono`].
++pub fn comprobar_monotonia(altura: u32, ts: i64, ts_padre: i64) -> Result<(), ErrorPow> {
++    if ts > ts_padre {
++        Ok(())
++    } else {
++        Err(ErrorPow::TimestampNoMonotono {
++            altura,
++            ts,
++            ts_padre,
++        })
++    }
++}
++
++/// `C-TS-03` · Future Time Limit: `ts(H) ≤ reloj_local + ftl`.
++///
++/// Rechazo **NO permanente**. Quien reciba este error **MUST** diferir el bloque y reintentarlo, y
++/// **MUST NOT** cachearlo como inválido ni banear al par: cachearlo produce un split garantizado
++/// ante una partición temporal.
++///
++/// `ftl` sale del perfil de red (`N·T/20`); `reloj_local` es el reloj del propio nodo, nunca una
++/// hora de red (`C-TS-04`).
++///
++/// # Errores
++/// [`ErrorPow::TimestampDemasiadoFuturo`].
++pub fn comprobar_ftl(ts: i64, reloj_local: i64, ftl: i64) -> Result<(), ErrorPow> {
++    let limite = reloj_local
++        .checked_add(ftl)
++        .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    if ts <= limite {
++        Ok(())
++    } else {
++        Err(ErrorPow::TimestampDemasiadoFuturo { ts, limite })
++    }
++}
++
++/// `C-TS-05` · Timestamp que debe poner un minero. **No es regla de consenso.**
++///
++/// `ts = max(reloj_local, ts(padre) + 1)`. El minero además **no debe publicar** hasta que
++/// `ts ≤ reloj_local + ftl`, cosa que esta función no puede imponer.
++#[must_use]
++pub fn timestamp_del_minero(reloj_local: i64, ts_padre: i64) -> i64 {
++    reloj_local.max(ts_padre.saturating_add(1))
++}
++
++#[cfg(test)]
++#[expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++mod tests {
++    use super::{comprobar_ftl, comprobar_monotonia, timestamp_del_minero};
++    use crate::error::ErrorPow;
++
++    #[test]
++    fn la_monotonia_es_estricta_y_permanente() {
++        assert!(comprobar_monotonia(7, 101, 100).is_ok());
++        let e = comprobar_monotonia(7, 100, 100).unwrap_err();
++        assert!(matches!(e, ErrorPow::TimestampNoMonotono { .. }), "{e:?}");
++        assert!(e.es_permanente());
++    }
++
++    #[test]
++    fn el_ftl_es_no_permanente_y_depende_del_perfil() {
++        assert!(
++            comprobar_ftl(1_540, 1_000, 540).is_ok(),
++            "justo en el límite"
++        );
++        let e = comprobar_ftl(1_541, 1_000, 540).unwrap_err();
++        assert!(
++            matches!(e, ErrorPow::TimestampDemasiadoFuturo { limite: 1_540, .. }),
++            "{e:?}"
++        );
++        assert!(
++            !e.es_permanente(),
++            "C-TS-03: se difiere y se reintenta, nunca se cachea"
++        );
++    }
++
++    #[test]
++    fn el_minero_avanza_respecto_al_padre() {
++        assert_eq!(timestamp_del_minero(1_000, 999), 1_000);
++        assert_eq!(timestamp_del_minero(1_000, 1_000), 1_001);
++        assert_eq!(timestamp_del_minero(1_000, i64::MAX), i64::MAX);
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/src/verificador.rs ws/crates/zx-consensus/src/verificador.rs
+--- ws.orig/crates/zx-consensus/src/verificador.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/src/verificador.rs	2026-09-26 01:47:54.000047078 +0200
+@@ -0,0 +1,135 @@
++//! Verificador de cabecera PoW (`C-HDR-01`, `C-BLK-04`, `C-BLK-05`, `C-TS-01`, `C-TS-03`).
++//!
++//! Comprueba **solo la cabecera**: rama activa, padre, altura, `bits`, PoW y timestamps. **No**
++//! valida el cuerpo, la coinbase ni el fin del PoW (TRN-05 es de W03). Separar la cabecera es lo que
++//! permite un sync *headers-first* y una barrera anti-DoS: un par hostil no debe poder obligarnos a
++//! verificar firmas antes de descubrir que la cabecera no cumple el PoW.
++//!
++//! El target esperado lo calcula el llamante, que tiene el estado (ventana del retarget leída sobre
++//! **la cadena candidata**, no sobre la activa: `C-REORG-06`). Aquí solo se comprueba que la
++//! cabecera declara exactamente el `bits` de ese target.
++
++use primitive_types::U256;
++use zx_core::BlockHash;
++use zx_core::EncodingError;
++use zx_core::Red;
++use zx_core::preimage::block::BlockHeader;
++use zx_core::target::{codificar_con, decodificar_con};
++
++use crate::activacion::comprobar_branch_id;
++use crate::algoritmo::AlgoritmoPow;
++use crate::error::ErrorPow;
++use crate::parametros::ParametrosPow;
++use crate::timestamps::{comprobar_ftl, comprobar_monotonia};
++
++/// Todo lo que la validación de cabecera necesita saber del estado de la cadena.
++///
++/// Va explícito y no oculto tras un handle para que se vea de un vistazo **qué mira el consenso**.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub struct ContextoPow {
++    /// Red, para la tabla de ramas y los límites de target.
++    pub red: Red,
++    /// Parámetros PoW de esa red.
++    pub parametros: ParametrosPow,
++    /// Altura del padre.
++    pub altura_padre: u32,
++    /// Hash de la cabecera del padre.
++    pub hash_padre: BlockHash,
++    /// Target que exige el retarget a esta altura (`C-BLK-05`).
++    pub target_esperado: U256,
++    /// Timestamp del padre, para `C-TS-01`.
++    pub ts_padre: i64,
++    /// Reloj **local** del nodo, para `C-TS-03`. Nunca hora de red (`C-TS-04`).
++    pub reloj_local: i64,
++}
++
++/// Valida **solo la cabecera PoW**.
++///
++/// # Orden de comprobaciones
++///
++/// 1. `branch_id` de la rama activa a esa altura (`C-HDR-02b`),
++/// 2. `prev_hash = hash_padre`,
++/// 3. `height = altura_padre + 1`,
++/// 4. `bits` canónico y dentro de los límites de la red (`C-POW-04`, `C-POW-05`),
++/// 5. `bits = codificar_con(target_esperado)` (`C-BLK-05`),
++/// 6. `hash_pow < target` estricto, big-endian (`C-BLK-04`, `C-POW-01`),
++/// 7. `ts > ts_padre` (`C-TS-01`, permanente) y `ts ≤ reloj_local + ftl` (`C-TS-03`, **diferible**).
++///
++/// # Errores
++/// La variante de [`ErrorPow`] de la primera regla incumplida. Ojo con [`ErrorPow::es_permanente`]:
++/// el rechazo por timestamp futuro **MUST NOT** cachearse.
++pub fn validar_cabecera_pow(
++    c: &BlockHeader,
++    ctx: &ContextoPow,
++    algo: &impl AlgoritmoPow,
++) -> Result<(), ErrorPow> {
++    let altura = c.height;
++
++    // C-HDR-02b · rama de consenso correcta. Protección contra wipe-out.
++    comprobar_branch_id(ctx.red, altura, c.consensus_branch_id)?;
++
++    // El padre que la cabecera declara MUST ser el que el contexto tiene.
++    if c.prev_hash != ctx.hash_padre {
++        return Err(ErrorPow::PrevHashIncorrecto {
++            esperado: ctx.hash_padre,
++            encontrado: c.prev_hash,
++        });
++    }
++
++    // La cabecera PoW vive exactamente un nivel por encima de su padre.
++    let esperada = ctx
++        .altura_padre
++        .checked_add(1)
++        .ok_or(ErrorPow::DesbordamientoAritmetico)?;
++    if altura != esperada {
++        return Err(ErrorPow::AlturaIncorrecta {
++            esperada,
++            encontrada: altura,
++        });
++    }
++
++    // C-POW-04/C-POW-05 · el `bits` de la cabecera MUST ser canónico y admisible en su red. Se
++    // comprueba **antes** de comparar con el esperado para que un `bits` no canónico tenga su error
++    // propio y no se confunda con "no es el del retarget".
++    let target = decodificar_con(c.bits, &ctx.parametros.limites).map_err(invalido)?;
++
++    // C-BLK-05 · `bits` MUST ser exactamente el del retarget, no "uno equivalente".
++    let bits_esperados = codificar_con(ctx.target_esperado, &ctx.parametros.limites);
++    if c.bits != bits_esperados {
++        return Err(ErrorPow::BitsIncorrectos {
++            esperado: bits_esperados,
++            encontrado: c.bits,
++        });
++    }
++
++    // C-BLK-04 · PoW. Después de `bits`, porque validar el PoW contra un target que no es el que
++    // toca no demostraría nada. Comparación **estricta**: `hash == target` NO cumple.
++    let hash_pow = algo.hash_pow(c);
++    if U256::from_big_endian(&hash_pow) >= target {
++        return Err(ErrorPow::PowInsuficiente);
++    }
++
++    // C-BLK-06 · timestamps. El de futuro NO es permanente: ver `es_permanente()`.
++    let ts = i64::try_from(c.timestamp)
++        .map_err(|_| ErrorPow::TimestampFueraDeRango { ts: c.timestamp })?;
++    comprobar_monotonia(altura, ts, ctx.ts_padre)?;
++    comprobar_ftl(ts, ctx.reloj_local, ctx.parametros.ftl()?)?;
++
++    Ok(())
++}
++
++/// Traduce el error de `zx-core` a la variante propia de [`ErrorPow`].
++fn invalido(e: EncodingError) -> ErrorPow {
++    match e {
++        EncodingError::BitsNoCanonico { bits, motivo } => {
++            ErrorPow::BitsNoCanonicos { bits, motivo }
++        }
++        EncodingError::TargetFueraDeRango { motivo } => ErrorPow::TargetFueraDeRango { motivo },
++        // `decodificar_con` solo devuelve las dos variantes anteriores; cualquier otra es un bug,
++        // pero se falla cerrado con un mensaje fijo en vez de con un `panic` (prohibido).
++        _ => ErrorPow::BitsNoCanonicos {
++            bits: 0,
++            motivo: "bits inválido (error de codificación inesperado)",
++        },
++    }
++}
+diff -ruN ws.orig/crates/zx-consensus/tests/pow_dev.rs ws/crates/zx-consensus/tests/pow_dev.rs
+--- ws.orig/crates/zx-consensus/tests/pow_dev.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/tests/pow_dev.rs	2026-09-26 01:48:31.016825115 +0200
+@@ -0,0 +1,174 @@
++//! V5 y V6 de ORDEN-W04: cadena dev minada y retarget dev.
++//!
++//! V5 mina 40 bloques con `Sha3Dev` desde el génesis dev, con timestamps **simulados** a `T` (no
++//! reloj real), retarget en cada bloque y validación de cada cabecera. V6 comprueba que el retarget
++//! dev **baja** el target con bloques rápidos y lo **sube** con lentos, sin superar `limites.max`.
++//!
++//! Los intentos por bloque se derivan del `nonce` encontrado: el minero itera desde 0, así que el
++//! primer acierto está en `nonce + 1`.
++
++#![expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++#![expect(
++    clippy::panic,
++    reason = "el test falla ruidosamente si la cadena no valida"
++)]
++
++use core::sync::atomic::AtomicBool;
++use std::time::Instant;
++
++use primitive_types::U256;
++use zx_consensus::{
++    ContextoPow, GENESIS_DEV, PARAMETROS_POW_DEV, ParametrosPow, Red, Sha3Dev, VentanaRetarget,
++    comprobar_al_arrancar, construir, minar, siguiente_target, validar_cabecera_pow,
++};
++use zx_core::preimage::block::BlockHeader;
++use zx_core::target::{codificar_con, decodificar_con};
++use zx_core::{CBID_RED_DEV, Digest, MerkleRoot};
++
++/// **V5.** Génesis dev → 40 bloques minados, retarget en cada bloque y validación 40/40.
++#[test]
++#[expect(
++    clippy::integer_division,
++    reason = "la media de intentos es un conteo entero informativo; no decide ningún veredicto"
++)]
++fn v5_cadena_dev_minada_y_validada() {
++    let p = PARAMETROS_POW_DEV;
++    comprobar_al_arrancar(GENESIS_DEV).unwrap();
++    let (genesis, _cb) = construir(GENESIS_DEV).unwrap();
++    let target_inicial = decodificar_con(genesis.bits, &p.limites).unwrap();
++
++    let mut ts: Vec<i64> = vec![i64::try_from(genesis.timestamp).unwrap()];
++    let mut tg: Vec<U256> = vec![target_inicial];
++    let mut cabezas: Vec<BlockHeader> = vec![genesis];
++    let mut intentos: Vec<u64> = Vec::new();
++
++    let cancelar = AtomicBool::new(false);
++    let inicio = Instant::now();
++    let bloques: usize = 40;
++
++    for h in 1..=bloques {
++        // C-DIFF-02: para 1 ≤ h ≤ N rige el bits de arranque; a partir de N+1, LWMA-1.
++        let target = if h <= p.n {
++            target_inicial
++        } else {
++            let ts_win = ts.get(h - p.n - 1..h).unwrap();
++            let tg_win = tg.get(h - p.n..h).unwrap();
++            siguiente_target(
++                VentanaRetarget {
++                    timestamps: ts_win,
++                    targets: tg_win,
++                },
++                &p,
++            )
++            .unwrap()
++        };
++        let ts_padre = ts.get(h - 1).copied().unwrap();
++        let ts_h = ts_padre + p.t;
++        let padre = cabezas.get(h - 1).copied().unwrap();
++
++        let plantilla = BlockHeader {
++            consensus_branch_id: CBID_RED_DEV,
++            prev_hash: padre.block_hash(),
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
++            timestamp: u64::try_from(ts_h).unwrap(),
++            bits: codificar_con(target, &p.limites),
++            nonce: 0,
++            height: u32::try_from(h).unwrap(),
++        };
++        let ctx = ContextoPow {
++            red: Red::Dev,
++            parametros: p,
++            altura_padre: u32::try_from(h - 1).unwrap(),
++            hash_padre: padre.block_hash(),
++            target_esperado: target,
++            ts_padre,
++            reloj_local: ts_h,
++        };
++
++        let minado = minar(&plantilla, target, &Sha3Dev, 50_000_000, &cancelar)
++            .unwrap_or_else(|| panic!("el perfil dev mina cada bloque en el presupuesto"));
++        validar_cabecera_pow(&minado, &ctx, &Sha3Dev).unwrap();
++
++        intentos.push(minado.nonce.saturating_add(1));
++        ts.push(ts_h);
++        tg.push(target);
++        cabezas.push(minado);
++    }
++
++    let pared = inicio.elapsed();
++    assert_eq!(cabezas.len(), bloques + 1, "40 bloques sobre el génesis");
++    assert_eq!(intentos.len(), bloques);
++
++    let total: u64 = intentos.iter().sum();
++    let divisor = u64::try_from(bloques).unwrap();
++    let media = total / divisor;
++    let maximo = intentos.iter().copied().max().unwrap();
++    println!(
++        "V5: {bloques}/{bloques} válidos; intentos/bloque media={media} max={maximo} total={total}; \
++         tiempo de pared={pared:?}"
++    );
++}
++
++/// Simula la cadena desde un target base y devuelve el target de cada bloque retargetado
++/// (`altura > N`). `st_por_bloque[k]` es el solvetime del bloque `k+1`.
++fn simular_retarget(p: &ParametrosPow, base: U256, st_por_bloque: &[i64]) -> Vec<U256> {
++    let mut ts: Vec<i64> = vec![0];
++    let mut tg: Vec<U256> = vec![base];
++    let mut salida: Vec<U256> = Vec::new();
++
++    for (k, st) in st_por_bloque.iter().enumerate() {
++        let altura = k + 1;
++        let objetivo = if altura <= p.n {
++            base
++        } else {
++            let ts_win = ts.get(altura - p.n - 1..altura).unwrap();
++            let tg_win = tg.get(altura - p.n..altura).unwrap();
++            siguiente_target(
++                VentanaRetarget {
++                    timestamps: ts_win,
++                    targets: tg_win,
++                },
++                p,
++            )
++            .unwrap()
++        };
++        let ultimo = ts.last().copied().unwrap();
++        ts.push(ultimo + st);
++        tg.push(objetivo);
++        if altura > p.n {
++            salida.push(objetivo);
++        }
++    }
++    salida
++}
++
++/// **V6.** Retarget dev: rápido ⇒ baja; lento ⇒ sube; nunca supera `limites.max`.
++#[test]
++fn v6_retarget_dev_responde_y_no_supera_el_maximo() {
++    let p = PARAMETROS_POW_DEV;
++    let base = decodificar_con(p.bits_iniciales, &p.limites).unwrap();
++
++    // `T/4 = 0,5 s` no es representable en segundos enteros; se usa `1` (el mínimo tras la
++    // reconstrucción monótona de C-DIFF-03), que también es «rápido» y baja el target.
++    let rapidos = simular_retarget(&p, base, &vec![1i64; p.n + 40]);
++    let bajo = *rapidos.last().unwrap();
++    assert!(
++        bajo < base,
++        "con bloques rápidos el target baja: {bajo} !< {base}"
++    );
++
++    // Tras la fase rápida, la lenta (`4T = 8 s`) lo sube, sin superar el máximo.
++    let mut sts = vec![1i64; p.n + 40];
++    sts.extend_from_slice(&[4 * p.t; 40]);
++    let mixtos = simular_retarget(&p, base, &sts);
++    let fin = *mixtos.last().unwrap();
++    assert!(
++        fin > bajo,
++        "tras la fase lenta el target sube: {fin} > {bajo}"
++    );
++    assert!(fin <= base, "sin superar limites.max: {fin} <= {base}");
++    assert!(
++        mixtos.iter().all(|t| *t <= base && *t >= p.limites.min),
++        "todos los targets dentro de los límites de la red"
++    );
++}
+diff -ruN ws.orig/crates/zx-consensus/tests/verificador_pow.rs ws/crates/zx-consensus/tests/verificador_pow.rs
+--- ws.orig/crates/zx-consensus/tests/verificador_pow.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/tests/verificador_pow.rs	2026-09-26 01:48:21.785631090 +0200
+@@ -0,0 +1,231 @@
++//! Casos de `validar_cabecera_pow` (ORDEN-W04 §5 y §6).
++//!
++//! Cada negativo lleva **su** error explícito, y el timestamp futuro se marca como **no
++//! permanente**. El PoW se controla con un [`AlgoritmoPow`] fijo para poder probar el borde exacto
++//! `hash_pow == target`, que con SHA3-256 costaría ~2¹⁷ hashes encontrar.
++
++#![expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++#![expect(
++    clippy::panic,
++    reason = "el test falla ruidosamente si el caso no encaja"
++)]
++
++use primitive_types::U256;
++use zx_consensus::{
++    AlgoritmoPow, ContextoPow, ErrorPow, PARAMETROS_POW_DEV, Red, Sha3Dev, siguiente_target,
++    validar_cabecera_pow,
++};
++use zx_core::preimage::block::BlockHeader;
++use zx_core::target::{LIMITES_AMPLIOS, codificar_con, decodificar_con};
++use zx_core::{BlockHash, CBID_RED_DEV, Digest, MerkleRoot};
++
++/// Devuelve siempre los mismos 32 bytes, para fijar el resultado del PoW sin minar.
++struct HashFijo([u8; 32]);
++
++impl AlgoritmoPow for HashFijo {
++    fn hash_pow(&self, _: &BlockHeader) -> [u8; 32] {
++        self.0
++    }
++}
++
++const HASH_CERO: [u8; 32] = [0u8; 32];
++
++fn hash_padre() -> BlockHash {
++    BlockHash::from_digest(Digest::from_bytes([0x11; 32]))
++}
++
++fn target_dev() -> U256 {
++    decodificar_con(
++        PARAMETROS_POW_DEV.bits_iniciales,
++        &PARAMETROS_POW_DEV.limites,
++    )
++    .unwrap()
++}
++
++/// Escenario base: un bloque hijo de la altura 0, todo correcto salvo lo que el test estropee.
++fn escenario() -> (ContextoPow, BlockHeader) {
++    let p = PARAMETROS_POW_DEV;
++    let cabecera = BlockHeader {
++        consensus_branch_id: CBID_RED_DEV,
++        prev_hash: hash_padre(),
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x22; 32])),
++        timestamp: 1_790_380_802,
++        bits: p.bits_iniciales,
++        nonce: 0,
++        height: 1,
++    };
++    let ctx = ContextoPow {
++        red: Red::Dev,
++        parametros: p,
++        altura_padre: 0,
++        hash_padre: hash_padre(),
++        target_esperado: target_dev(),
++        ts_padre: 1_790_380_800,
++        reloj_local: 1_790_380_802,
++    };
++    (ctx, cabecera)
++}
++
++/// Con todo correcto —y un `hash_pow` a cero— la cabecera es válida.
++#[test]
++fn una_cabecera_correcta_valida() {
++    let (ctx, cabecera) = escenario();
++    validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap();
++}
++
++/// El `hash_pow` real de `Sha3Dev` también pasa cuando el nonce se ha minado.
++#[test]
++fn el_hash_pow_de_sha3_dev_tambien_valida() {
++    let (ctx, mut cabecera) = escenario();
++    let cancelar = core::sync::atomic::AtomicBool::new(false);
++    let minado = zx_consensus::minar(&cabecera, target_dev(), &Sha3Dev, 5_000_000, &cancelar)
++        .unwrap_or_else(|| panic!("el target dev se mina en pocos intentos"));
++    cabecera = minado;
++    validar_cabecera_pow(&cabecera, &ctx, &Sha3Dev).unwrap();
++}
++
++#[test]
++fn un_branch_id_de_mainnet_en_la_red_dev_invalida() {
++    let (ctx, mut cabecera) = escenario();
++    cabecera.consensus_branch_id = zx_consensus::RAMA_V1_MAINNET.id;
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(matches!(e, ErrorPow::BranchIdIncorrecto { .. }), "{e:?}");
++}
++
++#[test]
++fn un_prev_hash_distinto_invalida() {
++    let (ctx, mut cabecera) = escenario();
++    cabecera.prev_hash = BlockHash::from_digest(Digest::from_bytes([0x33; 32]));
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(matches!(e, ErrorPow::PrevHashIncorrecto { .. }), "{e:?}");
++}
++
++#[test]
++fn una_altura_igual_a_la_del_padre_invalida() {
++    let (ctx, mut cabecera) = escenario();
++    cabecera.height = 0;
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(
++        matches!(
++            e,
++            ErrorPow::AlturaIncorrecta {
++                esperada: 1,
++                encontrada: 0
++            }
++        ),
++        "{e:?}"
++    );
++}
++
++#[test]
++fn una_altura_dos_por_encima_del_padre_invalida() {
++    let (ctx, mut cabecera) = escenario();
++    cabecera.height = 2;
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(
++        matches!(
++            e,
++            ErrorPow::AlturaIncorrecta {
++                esperada: 1,
++                encontrada: 2
++            }
++        ),
++        "{e:?}"
++    );
++}
++
++#[test]
++fn unos_bits_distintos_de_los_esperados_invalidan() {
++    let (ctx, mut cabecera) = escenario();
++    cabecera.bits = codificar_con(target_dev() / U256::from(2u32), &ctx.parametros.limites);
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(matches!(e, ErrorPow::BitsIncorrectos { .. }), "{e:?}");
++}
++
++#[test]
++fn unos_bits_no_canonicos_invalidan() {
++    let (ctx, mut cabecera) = escenario();
++    // `0x1d0000ff` representa el mismo target que `0x1b00ff00` con exponente menor: no canónico.
++    cabecera.bits = 0x1d00_00ff;
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(matches!(e, ErrorPow::BitsNoCanonicos { .. }), "{e:?}");
++}
++
++#[test]
++fn unos_bits_fuera_de_los_limites_de_la_red_invalidan() {
++    let (ctx, mut cabecera) = escenario();
++    // `0x1f7fffff` es canónico pero su target (`0x7fffff · 2^224`) supera el máximo dev.
++    let t = decodificar_con(0x1f7f_ffff, &LIMITES_AMPLIOS).unwrap();
++    assert!(
++        t > ctx.parametros.limites.max,
++        "el vector excede el techo dev"
++    );
++    assert!(
++        decodificar_con(0x1f7f_ffff, &ctx.parametros.limites).is_err(),
++        "y por eso la red dev lo rechaza"
++    );
++    cabecera.bits = 0x1f7f_ffff;
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(matches!(e, ErrorPow::TargetFueraDeRango { .. }), "{e:?}");
++}
++
++#[test]
++fn un_hash_pow_igual_al_target_invalida() {
++    let (ctx, cabecera) = escenario();
++    let target = target_dev();
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(target.to_big_endian())).unwrap_err();
++    assert!(
++        matches!(e, ErrorPow::PowInsuficiente),
++        "C-POW-01: la comparación es estricta, igual NO cumple: {e:?}"
++    );
++}
++
++#[test]
++fn un_hash_pow_mayor_que_el_target_invalida() {
++    let (ctx, cabecera) = escenario();
++    let e =
++        validar_cabecera_pow(&cabecera, &ctx, &HashFijo(U256::MAX.to_big_endian())).unwrap_err();
++    assert!(matches!(e, ErrorPow::PowInsuficiente), "{e:?}");
++}
++
++#[test]
++fn un_timestamp_igual_al_del_padre_invalida_permanentemente() {
++    let (ctx, mut cabecera) = escenario();
++    cabecera.timestamp = 1_790_380_800;
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(matches!(e, ErrorPow::TimestampNoMonotono { .. }), "{e:?}");
++    assert!(e.es_permanente(), "C-TS-01 es rechazo permanente");
++}
++
++#[test]
++fn un_timestamp_futuro_es_rechazo_diferible() {
++    let (ctx, mut cabecera) = escenario();
++    cabecera.timestamp = 1_790_380_800 + 1_000;
++    let e = validar_cabecera_pow(&cabecera, &ctx, &HashFijo(HASH_CERO)).unwrap_err();
++    assert!(
++        matches!(e, ErrorPow::TimestampDemasiadoFuturo { .. }),
++        "{e:?}"
++    );
++    assert!(
++        !e.es_permanente(),
++        "C-TS-03: MUST NOT cachearse como inválido — se difiere y se reintenta"
++    );
++}
++
++/// El retarget dev, con timestamps estables, deja el target en el máximo y no se mueve.
++#[test]
++fn el_target_esperado_estable_es_el_de_arranque() {
++    let p = PARAMETROS_POW_DEV;
++    let base = target_dev();
++    let ts: Vec<i64> = (0..=p.n).map(|i| i64::try_from(i).unwrap() * p.t).collect();
++    let tg: Vec<U256> = vec![base; p.n];
++    let next = siguiente_target(
++        zx_consensus::VentanaRetarget {
++            timestamps: &ts,
++            targets: &tg,
++        },
++        &p,
++    )
++    .unwrap();
++    assert_eq!(next, base, "con st = T el target no se mueve");
++}
+diff -ruN ws.orig/crates/zx-core/src/lib.rs ws/crates/zx-core/src/lib.rs
+--- ws.orig/crates/zx-core/src/lib.rs	2026-09-26 01:36:47.796117320 +0200
++++ ws/crates/zx-core/src/lib.rs	2026-09-26 01:47:54.018047457 +0200
+@@ -58,7 +58,10 @@
+     HashType, auth_digest, mensaje_aceptacion, sighash, txid, verificar_aceptacion,
+ };
+ pub use red::{CBID_RED_DEV, MAGIC_DEV, Red};
+-pub use target::{CompactBits, TrabajoAcumulado, cumple_pow, trabajo_bloque};
++pub use target::{
++    CompactBits, LIMITES_AMPLIOS, LIMITES_ANTIGUOS, LimitesTarget, TrabajoAcumulado, codificar_con,
++    cumple_pow, decodificar_con, trabajo_bloque,
++};
+ pub use tx::{ExtensionTx, Lock, OutPoint, SpentOutput, TipoGarantia, Tx, TxIn, TxOut};
+ pub use wire_dag::{
+     BUNDLE_BYTES, BloqueDag, CHECKPOINTS_POR_BUNDLE, ContextoVerificacionPot, ErrorDiferenciaSlots,
+diff -ruN ws.orig/crates/zx-core/src/target.rs ws/crates/zx-core/src/target.rs
+--- ws.orig/crates/zx-core/src/target.rs	2026-09-26 01:36:47.796117320 +0200
++++ ws/crates/zx-core/src/target.rs	2026-09-26 01:47:54.030047709 +0200
+@@ -104,6 +104,120 @@
+     U256::from(0x0000_ffff_u32) << (8usize * (0x1d - 3))
+ }
+ 
++/// Límites de target de una red (C-POW-05).
++///
++/// El mismo `bits` puede decodificar a un target válido en una red y fuera de rango en otra: la red
++/// dev elige un máximo más fácil (`PARAMETROS_POW_DEV`) para que una red local mine en segundos.
++/// `min`/`max` son **consenso de esa red**, no constantes universales.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub struct LimitesTarget {
++    /// Target mínimo admitido — la **dificultad máxima** de la red.
++    pub min: U256,
++    /// Target máximo admitido — la **dificultad mínima** de la red.
++    pub max: U256,
++}
++
++/// Límites de las redes antiguas (mainnet y testnet): `MIN_TARGET` y `POW_LIMIT` **sin cambiar**.
++///
++/// Se escribe en limbos —y no evaluando `min_target()`/`pow_limit()`— porque debe ser `const`; un
++/// test comprueba que coincide exactamente con esas dos funciones.
++pub const LIMITES_ANTIGUOS: LimitesTarget = LimitesTarget {
++    min: U256([0, 1, 0, 0]),
++    max: U256([u64::MAX, u64::MAX, u64::MAX, 0x0000_0000_ffff_ffff]),
++};
++
++/// Límites **abiertos**: todo target estructuralmente válido. Sirve para expandir un `bits` sin
++/// aplicar la cota de una red concreta (por ejemplo, al derivar el máximo de la red dev).
++pub const LIMITES_AMPLIOS: LimitesTarget = LimitesTarget {
++    min: U256::zero(),
++    max: U256::max_value(),
++};
++
++/// Expande un `bits` a su target exigiendo forma canónica, **sin** mirar límites de red.
++fn expandir_compacto(v: u32) -> Result<U256, EncodingError> {
++    let exponente = (v >> 24) as u8;
++    let mantisa = v & 0x007f_ffff;
++    let signo = v & 0x0080_0000 != 0;
++
++    let malo = |motivo| EncodingError::BitsNoCanonico { bits: v, motivo };
++
++    if signo {
++        return Err(malo("el bit de signo MUST estar a cero"));
++    }
++    if exponente == 0 {
++        return Err(malo("exponente cero"));
++    }
++    if mantisa == 0 {
++        return Err(malo("mantisa cero"));
++    }
++    // El exponente cuenta bytes: mantisa × 256^(exp−3).
++    if exponente < 3 {
++        return Err(malo("exponente < 3 no es representable de forma canónica"));
++    }
++    let desplazamiento = 8usize * (exponente as usize - 3);
++    // 24 bits de mantisa + desplazamiento MUST caber en 256.
++    if desplazamiento + 24 > 256 {
++        return Err(malo("mantisa × 256^(exp−3) desborda 256 bits"));
++    }
++    let target = U256::from(mantisa) << desplazamiento;
++
++    // C-POW-04 · canonicidad, definida como punto fijo: `bits` MUST ser exactamente lo que produce
++    // el codificador para ese target. La canonicidad **no depende de los límites de la red**: un
++    // `bits` no canónico lo es en cualquier red.
++    if codificar_con(target, &LIMITES_ANTIGUOS) != v {
++        return Err(malo("no es la codificación canónica de su propio target"));
++    }
++    Ok(target)
++}
++
++/// Decodifica `bits` exigiendo forma **canónica** y rango **de la red** (C-POW-04, C-POW-05).
++///
++/// A diferencia de [`CompactBits::decodificar`] —que usa los límites antiguos— aquí el rango lo fija
++/// el llamante. Es lo que permite que la red dev admita un target más fácil sin aflojar mainnet.
++///
++/// # Errores
++/// [`EncodingError::BitsNoCanonico`] o [`EncodingError::TargetFueraDeRango`].
++pub fn decodificar_con(bits: u32, limites: &LimitesTarget) -> Result<U256, EncodingError> {
++    let target = expandir_compacto(bits)?;
++    if target > limites.max {
++        return Err(EncodingError::TargetFueraDeRango {
++            motivo: "target > límite máximo de la red",
++        });
++    }
++    if target < limites.min {
++        return Err(EncodingError::TargetFueraDeRango {
++            motivo: "target < límite mínimo de la red",
++        });
++    }
++    Ok(target)
++}
++
++/// Codifica un target en su forma compacta **canónica** (C-POW-04).
++///
++/// La codificación **no depende de los límites**: es total sobre cualquier `U256` y la cota de red
++/// se aplica al **decodificar**. `limites` se recibe por simetría con [`decodificar_con`] y para que
++/// las dos mitades de la pareja tengan la misma forma.
++#[must_use]
++pub fn codificar_con(target: U256, _limites: &LimitesTarget) -> u32 {
++    if target.is_zero() {
++        return 0;
++    }
++    // Bytes significativos: cuántos hacen falta para representarlo.
++    let bits_significativos = 256 - target.leading_zeros() as usize;
++    let mut exponente = bits_significativos.div_ceil(8);
++    let mut mantisa = if exponente <= 3 {
++        (target << (8 * (3 - exponente))).low_u32() & 0x00ff_ffff
++    } else {
++        (target >> (8 * (exponente - 3))).low_u32() & 0x00ff_ffff
++    };
++    // Si el bit alto de la mantisa invadiría el bit de signo, se corre un byte.
++    if mantisa & 0x0080_0000 != 0 {
++        mantisa >>= 8;
++        exponente += 1;
++    }
++    (u32::try_from(exponente).unwrap_or(0xFF) << 24) | mantisa
++}
++
+ /// Target compacto de 32 bits (C-POW-03).
+ ///
+ /// Codifica un entero de 256 bits como `mantisa (3 bytes) × 256^(exponente − 3)`, con el exponente
+@@ -141,57 +255,7 @@
+     /// # Errores
+     /// [`EncodingError::BitsNoCanonico`] o [`EncodingError::TargetFueraDeRango`].
+     pub fn decodificar(self) -> Result<U256, EncodingError> {
+-        let v = self.0;
+-        let exponente = (v >> 24) as u8;
+-        let mantisa = v & 0x007f_ffff;
+-        let signo = v & 0x0080_0000 != 0;
+-
+-        let malo = |motivo| EncodingError::BitsNoCanonico { bits: v, motivo };
+-
+-        if signo {
+-            return Err(malo("el bit de signo MUST estar a cero"));
+-        }
+-        if exponente == 0 {
+-            return Err(malo("exponente cero"));
+-        }
+-        if mantisa == 0 {
+-            return Err(malo("mantisa cero"));
+-        }
+-        // El exponente cuenta bytes: mantisa × 256^(exp−3).
+-        if exponente < 3 {
+-            return Err(malo("exponente < 3 no es representable de forma canónica"));
+-        }
+-        let desplazamiento = 8usize * (exponente as usize - 3);
+-        // 24 bits de mantisa + desplazamiento MUST caber en 256.
+-        if desplazamiento + 24 > 256 {
+-            return Err(malo("mantisa × 256^(exp−3) desborda 256 bits"));
+-        }
+-        let target = U256::from(mantisa) << desplazamiento;
+-
+-        // C-POW-04 · canonicidad, definida como punto fijo: `bits` MUST ser exactamente lo que
+-        // produce el codificador para ese target.
+-        //
+-        // Se define así, y no enumerando reglas estructurales, porque enumerar se equivoca. El
+-        // intento obvio —"el byte alto de la mantisa MUST ser distinto de cero"— rechaza
+-        // `0x1d00ffff`, que es canónico: ese byte cero **es** el resultado del desplazamiento que
+-        // evita invadir el bit de signo. Es el propio `powLimit` de Bitcoin.
+-        //
+-        // Recodificar y comparar no puede desincronizarse del codificador, porque es el codificador.
+-        if Self::codificar(target).0 != v {
+-            return Err(malo("no es la codificación canónica de su propio target"));
+-        }
+-
+-        if target > pow_limit() {
+-            return Err(EncodingError::TargetFueraDeRango {
+-                motivo: "target > POW_LIMIT",
+-            });
+-        }
+-        if target < min_target() {
+-            return Err(EncodingError::TargetFueraDeRango {
+-                motivo: "target < MIN_TARGET",
+-            });
+-        }
+-        Ok(target)
++        decodificar_con(self.0, &LIMITES_ANTIGUOS)
+     }
+ 
+     /// Codifica un target en su forma compacta **canónica** (C-POW-04).
+@@ -206,23 +270,7 @@
+     /// subrango, no sobre los 256 bits**, y dejaría de valer si `MIN_TARGET` bajara de `2¹⁶`.
+     #[must_use]
+     pub fn codificar(target: U256) -> Self {
+-        if target.is_zero() {
+-            return Self(0);
+-        }
+-        // Bytes significativos: cuántos hacen falta para representarlo.
+-        let bits_significativos = 256 - target.leading_zeros() as usize;
+-        let mut exponente = bits_significativos.div_ceil(8);
+-        let mut mantisa = if exponente <= 3 {
+-            (target << (8 * (3 - exponente))).low_u32() & 0x00ff_ffff
+-        } else {
+-            (target >> (8 * (exponente - 3))).low_u32() & 0x00ff_ffff
+-        };
+-        // Si el bit alto de la mantisa invadiría el bit de signo, se corre un byte.
+-        if mantisa & 0x0080_0000 != 0 {
+-            mantisa >>= 8;
+-            exponente += 1;
+-        }
+-        Self((u32::try_from(exponente).unwrap_or(0xFF) << 24) | mantisa)
++        Self(codificar_con(target, &LIMITES_ANTIGUOS))
+     }
+ }
+ 
+@@ -537,4 +585,43 @@
+             "mil años a dificultad máxima deben caber en U256"
+         );
+     }
++
++    // ── Límites de target por red ────────────────────────────────────────────
++
++    /// `LIMITES_ANTIGUOS` es un `const` escrito en limbos: **MUST** coincidir con las funciones.
++    ///
++    /// Es la lección de H-005: una constante derivada escrita a mano se comprueba, no se confía.
++    #[test]
++    fn los_limites_antiguos_coinciden_con_sus_funciones() {
++        assert_eq!(
++            super::LIMITES_ANTIGUOS.min,
++            min_target(),
++            "el mínimo de la red antigua es MIN_TARGET = 2^64"
++        );
++        assert_eq!(
++            super::LIMITES_ANTIGUOS.max,
++            pow_limit(),
++            "el máximo de la red antigua es POW_LIMIT = 2^224 − 1"
++        );
++    }
++
++    /// El rango lo fija la red: `0x1e7fffff` es canónico y válido con límites amplios, pero excede
++    /// `POW_LIMIT`; la red dev lo usa como dificultad de arranque.
++    #[test]
++    fn decodificar_con_aplica_los_limites_de_la_red() {
++        let dev = super::decodificar_con(0x1e7f_ffff, &super::LIMITES_AMPLIOS).unwrap();
++        assert!(
++            dev > pow_limit(),
++            "el máximo dev es más fácil que POW_LIMIT"
++        );
++        assert_eq!(
++            super::codificar_con(dev, &super::LIMITES_AMPLIOS),
++            0x1e7f_ffff,
++            "y sigue siendo canónico"
++        );
++        assert!(
++            super::decodificar_con(0x1e7f_ffff, &super::LIMITES_ANTIGUOS).is_err(),
++            "mainnet/testnet MUST rechazarlo: supera POW_LIMIT"
++        );
++    }
+ }
+diff -ruN ws.orig/.github/workflows/zerox-ci.yml ws/.github/workflows/zerox-ci.yml
+--- ws.orig/.github/workflows/zerox-ci.yml	2026-09-26 01:36:47.797822748 +0200
++++ ws/.github/workflows/zerox-ci.yml	2026-09-26 01:49:10.041645359 +0200
+@@ -1,11 +1,12 @@
+-# ZEROX CI — workspace nuevo, crates portados de `9681061` (W01)
++# ZEROX CI — workspace nuevo, crates portados de `9681061` (W01, W02, W04)
+ #
+-# Cubre SOLO `zx-core` y `zx-pot`: formato, clippy estricto, build, tests (con sus vectores
+-# NIST CAVP y el oráculo Julia copiado a `testdata/`) y la regla de versiones exactas.
++# Cubre `zx-core`, `zx-pot` y `zx-consensus`: formato, clippy estricto, build, tests (con sus
++# vectores NIST CAVP, el oráculo Julia copiado a `testdata/` y el motor PoW dev), la regla de
++# versiones exactas y la frontera de dependencias del crate de consenso.
+ #
+-# NO cubre todavía: consenso, nodo ni red. Los jobs `alcance`, `almacen` y `frontera` del CI
+-# antiguo dependían de `zx-consensus`, `zx-storage`, `zx-p2p` y de scripts retirados; se
+-# reintroducirán cuando las órdenes posteriores porten esos crates.
++# NO cubre todavía: nodo ni red. Los jobs `almacen` del CI antiguo dependían de `zx-storage`,
++# `zx-p2p` y de scripts retirados; se reintroducirán cuando las órdenes posteriores porten esos
++# crates. `zx-consensus` entra por `--workspace` sin pasos adicionales.
+ name: ZEROX CI
+ 
+ on:
+@@ -42,3 +43,5 @@
+       # Un rango en workspace.dependencies deja que `cargo update` mueva consenso.
+       - name: Rechazar rangos de versión en [workspace.dependencies]
+         run: bash ci/dependencias-exactas.sh
++      - name: Frontera de dependencias de zx-consensus → {zx-core}
++        run: bash ci/frontera-crates.sh

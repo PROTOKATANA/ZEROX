@@ -1,11 +1,12 @@
-# ZEROX CI — workspace nuevo, crates portados de `9681061` (W01)
+# ZEROX CI — workspace nuevo, crates portados de `9681061` (W01, W02, W04)
 #
-# Cubre SOLO `zx-core` y `zx-pot`: formato, clippy estricto, build, tests (con sus vectores
-# NIST CAVP y el oráculo Julia copiado a `testdata/`) y la regla de versiones exactas.
+# Cubre `zx-core`, `zx-pot` y `zx-consensus`: formato, clippy estricto, build, tests (con sus
+# vectores NIST CAVP, el oráculo Julia copiado a `testdata/` y el motor PoW dev), la regla de
+# versiones exactas y la frontera de dependencias del crate de consenso.
 #
-# NO cubre todavía: consenso, nodo ni red. Los jobs `alcance`, `almacen` y `frontera` del CI
-# antiguo dependían de `zx-consensus`, `zx-storage`, `zx-p2p` y de scripts retirados; se
-# reintroducirán cuando las órdenes posteriores porten esos crates.
+# NO cubre todavía: nodo ni red. Los jobs `almacen` del CI antiguo dependían de `zx-storage`,
+# `zx-p2p` y de scripts retirados; se reintroducirán cuando las órdenes posteriores porten esos
+# crates. `zx-consensus` entra por `--workspace` sin pasos adicionales.
 name: ZEROX CI
 
 on:
@@ -42,3 +43,5 @@ jobs:
       # Un rango en workspace.dependencies deja que `cargo update` mueva consenso.
       - name: Rechazar rangos de versión en [workspace.dependencies]
         run: bash ci/dependencias-exactas.sh
+      - name: Frontera de dependencias de zx-consensus → {zx-core}
+        run: bash ci/frontera-crates.sh

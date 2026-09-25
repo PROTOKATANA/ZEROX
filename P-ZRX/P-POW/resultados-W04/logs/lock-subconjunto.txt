@@ -1,0 +1,18 @@
+# Comparación de subconjunto entre el Cargo.lock de la raíz y el de ws/ (ORDEN-W04 §4).
+# Regla: añadir `zx-consensus` no debe CAMBIAR la versión de ningún paquete existente.
+# Se comparan los conjuntos de pares (name, version) de ambos locks.
+
+raiz: 130 paquetes
+ws:   131 paquetes
+
+## Paquetes del ws AUSENTES en la raíz (adiciones):
+zx-consensus 0.0.0
+
+## Paquetes de la raíz AUSENTES en el ws (desaparecidos):
+(vacio)
+
+## Paquetes con el MISMO nombre y versión distinta:
+(vacio: la inclusión de conjuntos name+version lo garantiza; no se compara por nombre solo)
+
+RESULTADO: OK - todo (name,version) de la raiz existe con la MISMA version en ws;
+la unica adicion es zx-consensus 0.0.0.

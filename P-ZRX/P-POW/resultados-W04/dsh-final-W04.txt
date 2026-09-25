@@ -1,0 +1,25 @@
+## ORDEN-W04 — ejecutada. Veredicto: **SUPERADO** (pregunta falsable no refutada)
+
+### Falta de definición informada (antes de editar)
+`ORDEN-W04 §3.5` fija `0x1e7fffff`. Lo comprobé con el código existente: **es canónico** (`0x7fffff·2^216 = 2^239−2^216`), pero su target **supera el `POW_LIMIT` antiguo** (`2^224−1`). No es un error: es justo lo que `LimitesTarget` permite parametrizar. **No elegí otro valor**: el perfil dev lo admite con sus límites y `decodificar_con` los aplica (3 tests lo fijan). No hubo más faltas de definición.
+
+### Qué se entregó (`/home/katana/zeo/ZEROX/deepseek/W04/`)
+- `crates/zx-consensus` **nuevo**: `ParametrosPow { t, n, limites, bits_iniciales, mtp_w }` con derivadas comprobadas; `AlgoritmoPow`/`Sha3Dev`; LWMA-1 en `U512`; selección por trabajo (**sin** `MAX_REORG_LENGTH`); timestamps; rama dev `(CBID_RED_DEV,0)`; génesis dev/mainnet/testnet; `validar_cabecera_pow`; minero CPU.
+- `zx-core/target.rs`: `LimitesTarget`, `LIMITES_ANTIGUOS`/`LIMITES_AMPLIOS`, `decodificar_con`/`codificar_con`; los 12 tests antiguos pasan sin cambios.
+- `HASH_GENESIS_DEV = c72fdb3b37e7571a82ec1e0e973e90d5e95e7ad9fc871772265b1994050c2d59`.
+- `ws/`, `ws.orig/`, `cambios.patch` (3290 líneas), `MIGRACION.sha256` (70 huellas, `-c` OK), `logs/`, `INFORME.md`, `PROGRESO.md`, `HORAS.log`.
+
+### Verificación (V1–V7)
+| | Resultado |
+|---|---|
+| V1 fmt | OK |
+| V2 clippy `-D warnings` | 0 avisos |
+| V3 tests | **265 pasan, 0 fallan**; los **182** nombres previos de W02 siguen presentes |
+| V4 portados | mismos valores (`K=491400`, `NK=44226000`, `ST_CAP=720`, `T_FLOOR=49140`, `FTL=540`); omitidos documentados (`MAX_REORG_LENGTH`/`ClaveVentana`) |
+| V5 dev | **40/40 válidos**; intentos/bloque media 136733, máx 448988; pared 124,8 s (perfil `test`) |
+| V6 retarget dev | rápido baja, lento sube, sin superar `limites.max` |
+| V7 | 10 dependencias exactas + frontera `zx-consensus → {zx-core}` (`jq` sí está) |
+
+`Cargo.lock`: única adición `zx-consensus 0.0.0`; ninguna versión existente cambia (`logs/lock-subconjunto.txt`). Entrada congelada verificada al inicio y como último paso (4/4, exit 0). Sin Python, sin `unsafe`, sin commit/push, sin secretos; nada escrito fuera de `deepseek/W04/`.
+
+Lo que **no** demuestra: seguridad del PoW, idoneidad de los parámetros dev, algoritmo de producción (IPA A-12), validación de cuerpo/fin del PoW (W03) ni la transición PoW→PoST.

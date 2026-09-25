@@ -1,0 +1,6 @@
+# Derivados del perfil dev (T=2, N=20) calculados con aritmetica de shell
+k       = N(N+1)T/2   = 420
+nk      = N*k         = 8400
+st_cap  = 6T          = 12
+t_floor = N(N+1)T/20  = 42
+ftl     = N*T/20      = 2
