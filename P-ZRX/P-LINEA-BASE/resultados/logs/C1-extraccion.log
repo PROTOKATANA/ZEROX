@@ -1,0 +1,8 @@
+=== C1 extraccion SPEC.md 2026-09-26T01:12:01+02:00 ===
+--- comando: git -C /home/katana/zeo/ZEROX archive 9681061 SPEC.md | tar -x -C checkout
+exit_pipe=0 0
+--- sha256sum checkout/SPEC.md
+b59905c5f1900076e699f762f3f6604f282790fa5a7ed97527d22d21f9d4e0ae  checkout/SPEC.md
+esperado: b59905c5f1900076e699f762f3f6604f282790fa5a7ed97527d22d21f9d4e0ae
+--- ls -l checkout/SPEC.md
+-rw-r--r--. 1 katana katana 243515 sep 24 20:50 checkout/SPEC.md

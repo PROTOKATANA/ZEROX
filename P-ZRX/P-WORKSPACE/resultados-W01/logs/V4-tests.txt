@@ -1,0 +1,6 @@
+# V4 - Comparacion de nombres de test: salida de V3 frente a la linea base L01
+# Referencia (L01/logs/S1-zx-core.log + S2-zx-pot.log): 161 tests
+# Nuevo (logs/V3-test.log):                            161 tests
+# diff (referencia vs nuevo) exit=0
+
+RESULTADO: identicas (mismos nombres, misma cantidad).

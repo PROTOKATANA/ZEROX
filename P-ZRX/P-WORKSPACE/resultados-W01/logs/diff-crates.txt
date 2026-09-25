@@ -1,0 +1,16 @@
+diff -r /home/katana/zeo/ZEROX/deepseek/W01/extract/crates/zx-core/tests/oraculo_julia.rs /home/katana/zeo/ZEROX/deepseek/W01/ws/crates/zx-core/tests/oraculo_julia.rs
+92,94c92,94
+<     // La auditoría vive donde LINEO §1 manda: `veritas/<categoría>/<nombre>/`. Durante el staging
+<     // estuvo fuera del árbol del repositorio, y por eso esta ruta subía tres niveles; al promover
+<     // se corrigió. `CARGO_MANIFEST_DIR` es `crates/zx-core`, así que la raíz está dos arriba.
+---
+>     // Los vectores viven en `testdata/vectores-cabecera-dag/`, copiados sin cambios del oráculo
+>     // Julia del commit 9681061 (ver `PROCEDENCIA.md`). `CARGO_MANIFEST_DIR` es `crates/zx-core`,
+>     // así que la raíz del workspace está dos niveles arriba.
+99,100c99
+<         "veritas",
+<         "consenso",
+---
+>         "testdata",
+102d100
+<         "resultados",

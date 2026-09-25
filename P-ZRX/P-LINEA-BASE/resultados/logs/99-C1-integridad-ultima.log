@@ -1,0 +1,10 @@
+=== C1 verificacion final (ultima, tras docs) 2026-09-26T01:14:38+02:00 ===
+--- 1. checkout vs MANIFIESTO-CHECKOUT.sha256
+exit_diff=0
+--- 2. git -C checkout/PDF/autonomys-subspace status --porcelain
+exit_status=0
+--- 3. ENTRADA-C1.sha256 (ULTIMA comprobacion, desde /home/katana/zeo/ZEROX)
+P-ZRX/P-LINEA-BASE/CORRECCION-L01-S4.md: OK
+P-ZRX/P-LINEA-BASE/ORDEN-L01.md: OK
+V-ZRX/LINEO.md: OK
+exit_entrada_c1=0

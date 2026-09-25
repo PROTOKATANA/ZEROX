@@ -1,0 +1,99 @@
+--- /home/katana/zeo/ZEROX/deepseek/W01/extract/Cargo.toml	2026-09-24 20:50:41.000000000 +0200
++++ /home/katana/zeo/ZEROX/deepseek/W01/ws/Cargo.toml	2026-09-26 01:16:48.712864598 +0200
+@@ -2,35 +2,7 @@
+ resolver = "3"
+ members = [
+     "crates/zx-core",
+-    "crates/zx-consensus",
+     "crates/zx-pot",
+-    "crates/zx-storage",
+-    "crates/zx-p2p",
+-    "crates/zx-mempool",
+-    "crates/zx-rpc",
+-    "crates/zx-wallet",
+-    "crates/zx-node",
+-    "crates/zx-lightwalletd",
+-    "crates/zx-scanner",
+-]
+-# El clon fijado `PDF/autonomys-subspace` vive dentro de este directorio, así que Cargo lo
+-# incluiría como miembro automático de este workspace al enlazarlo por `path` y resolvería su
+-# herencia `workspace = true` contra ESTE manifiesto, que no tiene sus cientos de
+-# `[workspace.dependencies]`. A1 enlaza cinco paquetes y D1 (farmer auditado) añade cuatro; se
+-# excluyen los nueve para que cada paquete resuelva su herencia `workspace = true` contra el
+-# workspace del clon (`PDF/autonomys-subspace/Cargo.toml`), no el de ZEROX, como ya hacen los
+-# instrumentos `prototipos/poas-identidad` y `veritas/rendimiento/coste-salto-v1`. No se toca el
+-# clon. `subspace-data-retrieval` vive en `shared/`, no en `crates/`.
+-exclude = [
+-    "PDF/autonomys-subspace/crates/subspace-core-primitives",
+-    "PDF/autonomys-subspace/crates/subspace-proof-of-space",
+-    "PDF/autonomys-subspace/crates/subspace-verification",
+-    "PDF/autonomys-subspace/shared/subspace-kzg",
+-    "PDF/autonomys-subspace/shared/ab-proof-of-space",
+-    "PDF/autonomys-subspace/crates/subspace-farmer-components",
+-    "PDF/autonomys-subspace/crates/subspace-archiving",
+-    "PDF/autonomys-subspace/shared/subspace-data-retrieval",
+-    "PDF/autonomys-subspace/crates/subspace-erasure-coding",
+ ]
+ 
+ [workspace.package]
+@@ -51,14 +23,10 @@
+ # permutación — `sha3` delega en `keccak` y `sponge-cursor` como RANGOS. Por eso el
+ # Cargo.lock se committea (fuera de .gitignore) y la CI corre con `--locked`: el lock es
+ # la única fuente de verdad del árbol transitivo consensus-critical. Ver research/sha3-referencias.md.
+-orchard               = "=0.15.5"
+-halo2_proofs          = "=0.3.5"
+-incrementalmerkletree = "=0.8.2"
+ ed25519-zebra         = "=4.2.0"
+ sha3                  = "=0.12.0"
+ bech32                = "=0.12.0"
+ primitive-types       = "=0.14.0"
+-blake2b_simd          = "=1.0.5"
+ 
+ # --- PoT AES (SPEC §7.1.1, C-POT-02) ---
+ # `zx-pot` porta `subspace-proof-of-time` @ f8842d0. AES y BLAKE3 no se eligen aquí: son las
+@@ -70,45 +38,12 @@
+ blake3      = { version = "=1.8.7", default-features = false }
+ cpufeatures = "=0.2.17"
+ 
+-# --- relé compacto (BIP 152) ---
+-# SipHash-2-4 para los identificadores cortos (C-NET-07). Se adopta en vez de escribirla: es una
+-# primitiva con vectores oficiales, y el propio SPEC anota que BIP 152 no la define y remite a
+-# Aumasson & Bernstein. No es consensus-critical —un ID mal derivado provoca una re-petición, no un
+-# fork— pero eso no es motivo para reimplementarla.
+-siphasher = "=1.0.3"
+-
+-# --- serialización ---
+-capnp   = "=0.27.0"
+-capnpc  = "=0.27.0"
+-serde   = { version = "=1.0.229", features = ["derive"] }
+-
+-# --- infraestructura ---
+-rocksdb   = "=0.25.0"
+-libp2p    = "=0.56.0"
+-jsonrpsee = "=0.26.0"
+-tokio     = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+-
+-# --- async, solo para la frontera de libp2p ---
+-# El trait `Codec` de request-response usa `#[async_trait]`, así que no es opcional.
+-async-trait = "=0.1.92"
+-futures     = "=0.3.34"
+-
+ # --- errores, logging, CLI ---
+ thiserror          = "=2.0.20"
+-anyhow             = "=1.0.104"
+-tracing            = "=0.1.44"
+-tracing-subscriber = "=0.3.23"
+-clap               = { version = "=4.6.6", features = ["derive"] }
+ hex                = "=0.4.3"
+ 
+ # --- test ---
+ proptest        = "=1.11.0"
+-# Par de extremos AsyncRead/AsyncWrite en memoria: testear un Codec sin levantar un Swarm.
+-# Es el patrón que usa el propio rust-libp2p en `request-response/src/cbor.rs`.
+-futures_ringbuf = "=0.4.0"
+-criterion = "=0.8.2"
+-# Directorios temporales para los tests del almacén en disco.
+-tempfile  = "=3.24.0"
+ 
+ # ─────────────────────────────────────────────────────────────────────────
+ # Lints: en código de consenso un panic es un vector de DoS.

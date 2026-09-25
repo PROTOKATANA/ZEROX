@@ -1,0 +1,43 @@
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.12
+   Compiling cpufeatures v0.3.1
+   Compiling constant_time_eq v0.4.2
+   Compiling arrayvec v0.7.8
+   Compiling cpubits v0.1.1
+   Compiling inout v0.2.2
+   Compiling cipher v0.5.2
+   Compiling cc v1.4.5
+   Compiling aes v0.9.3
+   Compiling blake3 v1.8.7
+   Compiling zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/crates/zx-pot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.87s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/zx_pot-6aad51213a2de53f)
+
+running 1 test
+test aes::tests::test_create_verify ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contexto_verificado.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/contexto_verificado-bc883b5b0c19d80b)
+
+running 3 tests
+test trabajo_mal_formado_es_error_no_un_checkpoint_pendiente ... ok
+test una_prueba_no_se_reutiliza_con_otra_semilla_o_cantidad_de_trabajo ... ok
+test cada_checkpoint_es_necesario_aunque_la_salida_final_coincida ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/diferencial.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/diferencial-352e2974aee3bb50)
+
+running 1 test
+test el_port_a_estable_es_byte_a_byte_identico_al_original ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zx_pot
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=== STEP S2-zx-pot pkg=zx-pot exit=0 elapsed=1 ===

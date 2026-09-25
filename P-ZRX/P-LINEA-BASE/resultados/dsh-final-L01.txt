@@ -1,0 +1,22 @@
+**ORDEN-L01 ejecutada.** Leí íntegros `ORDEN-L01.md`, `V-ZRX/LINEO.md` y `MAPA-RESCATE.md` §1. No hubo falta de definición previa a ejecutar; apareció una durante S4 (abajo).
+
+**Veredicto por paso**
+- **S0** `cargo metadata --locked`: **REPRODUCIDO** (exit 0; grafo del lock original, 496 paquetes).
+- **S1** `zx-core`: **REPRODUCIDO** — 156/156, 0 fallidas, 0 ignoradas.
+- **S2** `zx-pot`: **REPRODUCIDO** — 5/5.
+- **S3** `zx-storage`: **REPRODUCIDO** — 36/36. Diferencia: 24 de los 60 `#[test]` están tras `#![cfg(feature = "rocksdb")]` (11 en `src/disco.rs` + 13 de integración) y «sin la feature compilan a nada»; por eso no cubren «almacén diferencial» ni `matar_a_mitad`.
+- **S4** `zx-consensus`: **FALLA** (exit 101). Literal: `error: couldn't read 'crates/zx-consensus/tests/../../../SPEC.md': No such file or directory`, en `spec_numeros.rs:48` (`include_str!`).
+- **S5** `zx-node --features farmer --test farmer_disco` (opcional): **REPRODUCIDO** — 13/13.
+
+**Fallo / falta de definición.** S4 es imposible con la preparación fija de §4, que **no extrae `SPEC.md`**, y no es un fallo del código. No lo he añadido ni he reintentado con otra extracción: §3 lo prohíbe («no elijas tú»). El veredicto sobre `zx-consensus` queda **indeterminado** hasta que el director decida si `SPEC.md` entra en la entrada. No hubo bloqueo de entorno (red, sandbox, toolchain y permisos funcionaron).
+
+**Diferencias de conteo.** `zx-core` 156 y `zx-pot` 5 coinciden exactas. `zx-consensus`: 422 `#[test]`, 4 `#[ignore]` reales (el grep da 5 por un comentario en `firmante_local.rs:7`) y **0 ejecutados** por el fallo de compilación. `zx-storage`: 60 de inventario, 36 ejecutados, 24 gateados.
+
+**Integridad.**
+- Checkout: `diff` contra `MANIFIESTO-CHECKOUT.sha256` **vacío** antes y después de compilar (exit 0); `Cargo.lock` sin cambios; `git status --porcelain` del clon Autonomys vacío.
+- Hashes fijos correctos: `e75b1ded`, `741b75d0`, `0b387d75`, `023a9fc8`.
+- `ENTRADA.sha256`: **OK al inicio y al final** (`ORDEN-L01.md`, `V-ZRX/LINEO.md`).
+
+**Presupuesto/trazas.** ~3 min de reloj, 16 jobs, ~5,3 GiB de disco; tope no agotado. Carga ajena no controlada (`uptime` 0,33→3,51). Sin Python; solo shell. Entregables en `/home/katana/zeo/ZEROX/deepseek/L01/`: `INFORME.md`, `PROGRESO.md`, `RESULTADOS.tsv`, `ENTORNO.txt`, `HORAS.log`, `MANIFIESTO-CHECKOUT.sha256`, `logs/` y `checkout/`.
+
+Lo que esta orden **NO** demuestra: que un test antiguo que pasa pruebe el contrato híbrido (prueba el antiguo); que se haya validado ninguna constante antigua; y que la carga de la máquina estuviera controlada.

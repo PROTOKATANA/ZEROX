@@ -1,0 +1,4 @@
+# Procedencia: copia selectiva desde /home/katana/zeo/.trash/zerox/ (no existe en git 9681061). Copiado 2026-09-26T00:44:58+02:00 por Claude. Origen -> copia
+0261f56c55ad81dbd2f10997d5f2b8933374f78222cdabc6bba1077e6fb0d9ae  P-ZRX/P-STAKE/MAPA.md -> R-ZRX/LEGADO/stake/MAPA.md  (mtime origen: 2026-09-24 20:43:03.149163429 +0200)
+88f436498971ba84ff3a17a1ff908e438021766c13d776cc2f95a0369a1cda4a  P-ZRX/T-ZRX/ESTADO-RELOJ.md -> R-ZRX/LEGADO/reloj/ESTADO-RELOJ.md  (mtime origen: 2026-09-24 17:38:08.748995206 +0200)
+afd8481f3c686636c8b34fada67fd25dc0b6534a743ef4e3fecc5a887b8873c5  P-ZRX/P-ECLIPSE/investigacion/INFORME.md -> R-ZRX/LEGADO/eclipse/INFORME.md  (mtime origen: 2026-09-24 10:56:10.354345237 +0200)

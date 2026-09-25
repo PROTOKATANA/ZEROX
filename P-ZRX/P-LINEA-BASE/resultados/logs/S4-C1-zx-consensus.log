@@ -1,0 +1,561 @@
+=== STEP S4-C1-zx-consensus 2026-09-26T01:12:08+02:00 ===
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/crates/zx-consensus)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.50s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/zx_consensus-39cb2d0787042a07)
+
+running 207 tests
+test activacion::tests::el_branch_id_no_es_cero ... ok
+test activacion::tests::la_rama_v1_rige_desde_el_genesis ... ok
+test activacion::tests::la_tabla_real_esta_bien_formada ... ok
+test activacion::tests::se_detecta_una_tabla_mal_formada ... ok
+test activacion::tests::se_rechaza_una_cabecera_con_el_branch_id_equivocado ... ok
+test activacion::tests::un_bloque_de_la_rama_vieja_no_vale_en_la_nueva ... ok
+test activacion::tests::los_prefijos_magicos_no_son_utf8_valido ... ok
+test antidos::tests::el_umbral_crece_con_la_cadena ... ok
+test antidos::tests::no_desborda_en_ningun_extremo ... ok
+test activacion::tests::las_constantes_derivadas_se_reproducen ... ok
+test antidos::tests::una_bifurcacion_cercana_a_la_punta_pasa ... ok
+test antidos::tests::una_cadena_sin_historia_no_rechaza_nada ... ok
+test antidos::tests::una_cadena_de_bajo_trabajo_se_rechaza ... ok
+test bloque::tests::es_coinbase_es_no_tener_entradas ... ok
+test bloque::tests::el_bloque_debe_empezar_por_la_coinbase ... ok
+test bloque::tests::la_coinbase_debe_declarar_su_altura ... ok
+test bloque::tests::dos_coinbases_de_alturas_distintas_no_colisionan ... ok
+test bloque::tests::los_bits_deben_ser_los_del_retarget ... ok
+test bloque::tests::cambiar_una_tx_sin_tocar_la_raiz_invalida ... ok
+test bloque_dag::tests::el_constructor_de_oraculos_no_valida_y_lo_declara ... ok
+test bloque::tests::los_bits_se_comprueban_antes_que_el_pow ... ok
+test bloque::tests::un_timestamp_que_no_avanza_invalida_permanentemente ... ok
+test bloque::tests::un_timestamp_futuro_es_rechazo_diferible ... ok
+test bloque::tests::un_branch_id_equivocado_invalida ... ok
+test bloque_dag::tests::la_ruta_lineal_y_la_dag_son_tipos_distintos ... ok
+test bloque::tests::la_coinbase_puede_cobrar_de_menos ... ok
+test bloque::tests::la_coinbase_no_puede_cobrar_de_mas ... ok
+test bloque::tests::un_pow_insuficiente_invalida ... ok
+test bloque_dag::tests::un_padre_desconocido_no_tiene_slot_y_se_rechaza ... ok
+test bloque::tests::no_puede_haber_dos_coinbases ... ok
+test bloque::tests::un_bloque_solo_con_coinbase_valida ... ok
+test bloque::tests::una_raiz_de_merkle_que_no_cuadra_invalida ... ok
+test bloque_dag::tests::dos_padres_en_relacion_de_ancestro_se_rechazan ... ok
+test bloque_dag::tests::el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpla ... ok
+test bloque_dag::tests::el_padre_seleccionado_con_slot_posterior_se_rechaza ... ok
+test bloque_dag::tests::el_rango_se_exige_exacto_y_nunca_sale_del_campo ... ok
+test bloque_dag::tests::la_vista_de_rango_no_imprime_rango_solucion ... ok
+test bloque_dag::tests::padres_validados_y_anticadena_pasan ... ok
+test bloque_dag::tests::padres_con_slots_anteriores_pasan ... ok
+test bloque_dag::tests::todos_los_padres_con_el_mismo_slot_que_b_pasan ... ok
+test bloque_dag::tests::el_rango_validado_sale_del_contexto_y_no_del_candidato ... ok
+test bloque_dag::tests::un_padre_no_validado_se_rechaza ... ok
+test bloque_dag::tests::el_genesis_sin_padres_pasa_y_el_impostor_no ... ok
+test bloque_dag::tests::un_padre_validado_sin_slot_contextual_es_error_explicito ... ok
+test bloque_dag::tests::un_prev_hash_que_no_es_sp_se_rechaza ... ok
+test dificultad::tests::el_clamp_sesga_el_solvetime_a_la_baja ... ok
+test dificultad::tests::bloques_lentos_ablandan ... ok
+test dificultad::tests::bloques_rapidos_endurecen ... ok
+test dificultad::tests::el_mtp_es_la_mediana_y_no_le_afecta_el_orden ... ok
+test dificultad::tests::el_mtp_exige_exactamente_once_timestamps ... ok
+test bloque_dag::tests::distingue_cual_de_los_dos_falla ... ok
+test dificultad::tests::el_numerador_de_c_diff_07_cabe_en_u512 ... ok
+test dificultad::tests::el_suelo_acota_el_endurecimiento_a_diez_veces ... ok
+test dificultad::tests::el_resultado_siempre_esta_acotado ... ok
+test dificultad::tests::en_regimen_estable_el_target_apenas_se_mueve ... ok
+test dificultad::tests::la_correccion_del_sesgo_sigue_en_la_identidad ... ok
+test dificultad::tests::las_constantes_precomputadas_cuadran ... ok
+test dificultad::tests::los_timestamps_que_retroceden_no_hunden_la_dificultad ... ok
+test dificultad::tests::se_rechaza_una_ventana_de_tamano_incorrecto ... ok
+test emision::tests::el_producto_intermedio_no_cabria_en_u64 ... ok
+test emision::tests::el_suministro_acumula_lo_penalizado_no_lo_base ... ok
+test dificultad::tests::es_determinista ... ok
+test emision::tests::en_regimen_de_cola_un_bloque_grande_cobra_menos_que_la_cola ... ok
+test emision::tests::la_cola_no_se_apaga_nunca ... ok
+test emision::tests::la_curva_decrece ... ok
+test emision::tests::la_inflacion_perpetua_es_la_documentada ... ok
+test emision::tests::la_penalizacion_llega_a_cero_en_el_doble_de_la_mediana ... ok
+test emision::tests::la_recompensa_inicial_es_la_documentada ... ok
+test emision::tests::las_constantes_son_las_del_spec ... ok
+test emision::tests::sin_penalizacion_hasta_la_mediana ... ok
+test firmante::identidad::tests::el_slot_se_lee_de_la_identidad ... ok
+test firmante::identidad::tests::el_dominio_y_la_version_forman_parte_de_la_preimagen ... ok
+test firmante::identidad::tests::la_huella_mide_32_bytes_y_es_determinista ... ok
+test bloque_dag::tests::acepta_ambos_compromisos_correctos ... ok
+test emision::tests::la_cola_arranca_hacia_el_anio_ocho ... ok
+test firmante::identidad::tests::cambiar_cualquier_campo_cambia_la_huella ... ok
+test firmante::registro::tests::bytes_alterados_en_medio_fallan_cerrado ... ok
+test firmante::registro::tests::el_fallo_de_persistencia_envenena_la_instancia ... ok
+test firmante::registro::tests::el_formato_declara_version_tres_y_cabecera_de_cincuenta_y_seis ... ok
+test firmante::registro::tests::la_creacion_sincroniza_el_directorio_padre ... ok
+test firmante::registro::tests::entrada_nueva_conocida_y_conflicto ... ok
+test firmante::registro::tests::la_abstencion_de_un_alta_nueva_persiste_tras_dos_reinicios ... ok
+test firmante::registro::tests::un_bit_en_la_cabecera_rompe_el_checksum ... ok
+test firmante::registro::tests::un_formato_dos_no_se_migra_en_silencio ... ok
+test firmante::registro::tests::la_recuperacion_sincroniza_antes_de_autorizar_firma ... ok
+test firmante::registro::tests::un_horizonte_que_desborda_u64_sigue_absteniendose ... ok
+test firmante::registro::tests::sobrevive_a_reabrir_y_conserva_entradas ... ok
+test firmante::registro::tests::una_magia_ajena_se_rechaza ... ok
+test firmante::registro::tests::un_duplicado_conflictivo_falla_cerrado ... ok
+test firmante::registro::tests::un_duplicado_identico_no_falla ... ok
+test firmante::registro::tests::una_version_desconocida_falla_cerrado ... ok
+test firmante::registro::tests::una_cola_parcial_falla_cerrado ... ok
+test firmante::registro::tests::una_entrada_completa_a_ceros_tras_una_valida_falla_cerrado ... ok
+test firmante::tests::hijo_persiste_y_aborta ... ignored, punto de entrada para el proceso hijo; aborta a propósito
+test bloque_dag::tests::un_testigo_invalido_puede_coincidir_con_el_compromiso ... ok
+test firmante::tests::la_abstencion_usa_el_perfil_de_registro_abrir ... ok
+test fork_choice::tests::el_borde_de_la_profundidad_maxima ... ok
+test fork_choice::tests::el_cache_se_invalida_por_hash_no_por_altura ... ok
+test firmante::tests::caso_5_con_entrada_previa_y_otro_pre_hash_no_firma ... ok
+test fork_choice::tests::el_desempate_es_por_el_menor_hash ... ok
+test fork_choice::tests::el_limite_de_reorg_es_madurez_menos_uno ... ok
+test fork_choice::tests::el_trabajo_acumulado_se_puede_recalcular ... ok
+test fork_choice::tests::gana_el_trabajo_acumulado_no_la_altura ... ok
+test fork_choice::tests::la_cadena_vacia_tiene_trabajo_cero ... ok
+test fork_choice::tests::la_igualdad_de_la_clave_solo_mira_el_hash ... ok
+test fork_choice::tests::la_profundidad_es_la_distancia_al_ancestro_comun ... ok
+test fork_choice::tests::un_coinbase_maduro_no_puede_deshacerse ... ok
+test fork_choice::tests::el_desempate_es_independiente_del_orden_de_llegada ... ok
+test genesis::tests::cada_parametro_cambia_el_hash_del_genesis ... ok
+test genesis::tests::cada_red_arranca_con_su_propia_dificultad ... ok
+test genesis::tests::el_arranque_de_testnet_valida_y_compara_el_hash ... ok
+test genesis::tests::el_borde_exacto_del_suelo_de_timestamp ... ok
+test genesis::tests::el_genesis_de_mainnet_todavia_no_arranca ... ok
+test firmante::tests::la_clave_ajena_no_ocupa_la_oportunidad_ni_muta_el_sello ... ok
+test genesis::tests::el_genesis_de_testnet_es_valido ... ok
+test genesis::tests::el_genesis_declara_la_rama_activa ... ok
+test genesis::tests::el_genesis_esta_en_la_altura_cero_y_no_tiene_padre ... ok
+test firmante::tests::el_sello_verifica_bajo_la_clave_publica ... ok
+test genesis::tests::el_genesis_no_necesita_resolver_el_pow ... ok
+test genesis::tests::la_coinbase_del_genesis_vale_cero ... ok
+test genesis::tests::el_hash_del_genesis_de_testnet_esta_congelado ... ok
+test genesis::tests::mainnet_no_arranca_porque_no_tiene_hash_congelado ... ok
+test genesis::tests::mainnet_y_testnet_no_comparten_genesis ... ok
+test genesis::tests::el_genesis_es_determinista ... ok
+test genesis::tests::se_rechaza_un_genesis_con_padre ... ok
+test genesis::tests::un_genesis_en_el_ano_cero_sesga_el_primer_retarget ... ok
+test genesis::tests::se_rechaza_un_genesis_fuera_de_la_altura_cero ... ok
+test genesis::tests::se_rechaza_un_genesis_con_premine ... ok
+test genesis::tests::una_coinbase_cambiada_invalida_el_genesis ... ok
+test genesis_dag::tests::el_timestamp_marcador_se_rechaza ... ok
+test ghostdag::tests::acumular_sin_sr_almacenado_es_incoherencia ... ok
+test ghostdag::tests::eq_hash_y_ord_de_la_identidad_son_consistentes ... ok
+test ghostdag::tests::el_duplicado_se_rechaza_antes_de_mutar_el_almacen ... ok
+test ghostdag::tests::los_extremos_del_sr_validado_dan_los_pesos_de_c_gd_01 ... ok
+test genesis::tests::mainnet_y_testnet_tienen_genesis_distintos ... ok
+test peso::tests::bajo_el_invariante_reordenar_no_cambia_nada ... ok
+test ghostdag::tests::u2_con_estado_incoherente_falla_sin_mutar ... ok
+test peso::tests::dividir_antes_de_multiplicar_sesga_el_clamp_inferior ... ok
+test peso::tests::el_limite_es_el_doble_de_la_mediana ... ok
+test peso::tests::el_clamp_inferior_no_admite_la_forma_por_resta ... ok
+test peso::tests::el_peso_de_largo_plazo_acota_por_arriba_y_por_abajo ... ok
+test peso::tests::el_peso_validado_rechaza_por_encima_del_limite ... ok
+test peso::tests::get_mid_no_desborda ... ok
+test peso::tests::la_holgura_se_calcula_una_vez_y_es_correcta ... ok
+test peso::tests::la_mediana_corta_es_la_mediana_cruda ... ok
+test peso::tests::la_mediana_efectiva_respeta_suelo_y_techo ... ok
+test peso::tests::la_mediana_impar_y_par ... ok
+test peso::tests::la_mediana_larga_nunca_baja_de_la_zona_libre ... ok
+test peso::tests::la_mediana_no_depende_del_orden_de_entrada ... ok
+test peso::tests::las_constantes_son_las_del_spec ... ok
+test peso::tests::mediana_larga_impide_el_caso_patologico_de_d9 ... ok
+test peso::tests::toda_tx_valida_cabe_en_el_bloque_mas_pequeno ... ok
+test peso::tests::las_dos_formas_del_clamp_superior_coinciden ... ok
+test pot_rango::pruebas_salida_auditada::con_d_cero_y_d_positivo_la_prueba_lleva_el_ultimo_portador_sin_tocar_el_contexto ... ok
+test pot_rango::pruebas_salida_auditada::con_d_mayor_que_d_la_prueba_lleva_la_salida_del_portador_auditado ... ok
+test genesis::tests::un_parametro_tocado_impide_arrancar ... ok
+test pot_rango::pruebas_salida_auditada::con_d_cero_y_d_cero_la_salida_auditada_es_el_ancla_de_slot_b ... ok
+test pot_rango::pruebas_salida_auditada::con_d_menor_o_igual_que_d_la_prueba_lleva_la_salida_del_contexto ... ok
+test pot_rango::pruebas_salida_auditada::dos_verificaciones_del_mismo_candidato_dan_la_misma_prueba ... ok
+test pot_rango::pruebas_salida_auditada::sin_la_salida_auditada_del_contexto_no_hay_prueba ... ok
+test firmante::tests::caso_4_reemitir_el_mismo_bloque_funciona ... ok
+test testigo::tests::htlc_admite_una_preimagen_vacia ... ok
+test testigo::tests::htlc_la_via_de_preimagen_exige_al_receptor ... ok
+test testigo::tests::htlc_rechaza_una_preimagen_incorrecta ... ok
+test testigo::tests::htlc_rechaza_una_via_desconocida ... ok
+test testigo::tests::htlc_la_via_de_timeout_exige_al_emisor ... ok
+test testigo::tests::multisig_rechaza_indice_fuera_de_rango ... ok
+test testigo::tests::htlc_el_borde_exacto_del_timeout ... ok
+test testigo::tests::htlc_via_preimagen ... ok
+test testigo::tests::multisig_rechaza_indices_desordenados ... ok
+test testigo::tests::el_relleno_sobrante_se_rechaza ... ok
+test testigo::tests::multisig_rechaza_la_misma_clave_dos_veces ... ok
+test testigo::tests::multisig_2_de_3_valido ... ok
+test testigo::tests::multisig_rechaza_menos_firmas_de_las_exigidas ... ok
+test testigo::tests::un_testigo_truncado_se_rechaza ... ok
+test validacion::tests::el_borde_exacto_de_la_expiracion ... ok
+test validacion::tests::el_borde_exacto_de_la_madurez_de_coinbase ... ok
+test validacion::tests::el_peso_crece_con_todo_lo_que_ocupa_sitio ... ok
+test validacion::tests::el_tamano_de_lock_es_el_de_su_codificacion_canonica ... ok
+test validacion::tests::las_salidas_no_pueden_exceder_las_entradas ... ok
+test validacion::tests::p2k_ahorra_32_bytes_por_entrada ... ok
+test validacion::tests::se_exige_un_testigo_por_entrada ... ok
+test validacion::tests::se_rechaza_el_doble_gasto_entre_txs_del_bloque ... ok
+test validacion::tests::se_rechaza_el_doble_gasto_interno ... ok
+test validacion::tests::se_rechaza_una_entrada_inexistente ... ok
+test validacion::tests::se_rechaza_una_tx_por_encima_del_maximo ... ok
+test validacion::tests::se_rechaza_una_tx_sin_entradas_o_sin_salidas ... ok
+test validacion::tests::se_rechaza_una_version_desconocida ... ok
+test validacion::tests::una_salida_normal_no_tiene_madurez ... ok
+test validacion::tests::una_tx_con_fee_cero_es_valida ... ok
+test validacion::tests::una_tx_correcta_valida_y_devuelve_su_fee ... ok
+test validacion::tests::una_tx_tipica_pesa_lo_que_asume_el_spec ... ok
+test testigo::tests::multisig_rechaza_una_firma_de_mas ... ok
+test testigo::tests::pubkey_con_la_clave_equivocada ... ok
+test testigo::tests::pubkey_valida ... ok
+test testigo::tests::una_firma_no_sirve_para_otro_sighash ... ok
+test firmante::tests::durabilidad_el_proceso_muere_entre_la_persistencia_y_la_firma ... ok
+test cabecera_conjunta::pruebas::pot_invalido_no_invoca_poas ... ok
+test cabecera_conjunta::pruebas::padres_invalidos_no_llaman_sello_ni_tocan_presupuesto ... ok
+test cabecera_conjunta::pruebas::invalid_history_size_de_upstream_es_pendiente_y_conserva_la_causa ... ok
+test cabecera_conjunta::pruebas::la_espia_de_poas_ok_registra_los_datos_solo_al_final ... ok
+test cabecera_conjunta::pruebas::flujo_discrepante_no_llama_sello_ni_toca_presupuesto ... ok
+test cabecera_conjunta::pruebas::contexto_de_pieza_ausente_es_pendiente_y_no_invoca_poas ... ok
+test cabecera_conjunta::pruebas::pot_pendiente_no_invoca_poas ... ok
+test cabecera_conjunta::pruebas::la_funcion_publica_usa_el_sello_real_y_termina_pendiente_sin_pieza ... ok
+test cabecera_conjunta::pruebas::sello_invalido_tras_la_fase_previa_no_toca_cache_ni_presupuesto ... ok
+test firmante::registro::tests::el_bloqueo_entre_dos_descriptores_se_detecta ... ok
+
+test result: ok. 206 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.00s
+
+     Running tests/alta_firmante_local.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/alta_firmante_local-fa1aa3147e8f18bc)
+
+running 11 tests
+test bloqueo_como_enlace_simbolico_falla_sin_crear_el_destino ... ok
+test directorio_de_alta_como_enlace_simbolico_se_rechaza ... ok
+test clave_con_permisos_para_grupo_u_otros_falla_antes_de_recrear_el_registro ... ok
+test registro_preexistente_y_clave_ausente_falla_sin_sobrescribir ... ok
+test clave_como_enlace_simbolico_falla_sin_abrir_el_registro ... ok
+test segundo_alta_simultanea_sobre_el_mismo_directorio_falla_por_bloqueo ... ok
+test registro_como_enlace_simbolico_falla_sin_crear_el_destino ... ok
+test alta_nueva_firma_el_slot_uno_y_deja_clave_de_96_bytes ... ok
+test clave_parcial_checksum_alterado_y_bytes_extra_fallan_cerrado ... ok
+test reabrir_conserva_clave_y_registro_y_reemite_o_se_abstiene ... ok
+test perder_el_registro_se_abstiene_hasta_151_y_vuelve_a_firmar_en_152 ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/cabecera_conjunta.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/cabecera_conjunta-1cf5670287b92386)
+
+running 11 tests
+test un_padre_desconocido_es_pendiente ... ok
+test padres_invalidos_no_gastan_presupuesto ... ok
+test reloj_futuro_es_pendiente_y_no_invoca_poas ... ok
+test sin_contexto_de_pieza_es_pendiente_tras_sello_y_aes ... ok
+test el_poas_real_rechaza_entrada_no_canonica ... ok
+test sello_invalido_no_gasta_presupuesto ... ok
+test la_reexportacion_es_la_misma_funcion ... ok
+test un_contexto_de_pieza_aritmeticamente_invalido_es_pendiente ... ok
+test rango_declarado_incorrecto_es_invalida ... ok
+test el_motivo_invalido_conserva_el_tipo_del_nucleo_pot ... ok
+test un_pot_valido_de_mock_no_admite_la_cabecera ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/contrato_billete_modelo.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/contrato_billete_modelo-ef02feedc0c02fd4)
+
+running 14 tests
+test overflow_de_fee_y_contador_no_publica_prefijos ... ok
+test desbordamientos_y_undo_erroneo_son_atomicos ... ok
+test dominios_de_gasto_separados_y_ticket_vacio_consumido ... ok
+test cambio_de_rama_fallido_restaura_toda_la_rama_anterior ... ok
+test preflight_rechaza_metadatos_inconsistentes_sin_mutacion ... ok
+test pendiente_o_invalido_no_publica_ni_siquiera_perdedores ... ok
+test prioridad_de_errores_es_independiente_de_llegada ... ok
+test prioridad_azul_no_adelanta_la_ejecucion_del_ganador ... ok
+test roja_antes_azul_despues_no_sustituye_el_representante ... ok
+test todos_los_conflictos_o_cuerpo_vacio_consumen_sin_reintento ... ok
+test undo_restaura_seen_inertes_y_contextos ... ok
+test ventana_inclusiva_y_late_l0_no_consumen ... ok
+test permutar_la_entrada_no_cambia_el_orden_ni_estado ... ok
+test vectores_compartidos_cbe_v01 ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/disponibilidad_causal_multivista_modelo.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/disponibilidad_causal_multivista_modelo-12a29aa9e7c52e90)
+
+running 9 tests
+test evidencias_monotonas_y_contextuales_no_se_reetiquetan ... ok
+test dominio_de_ids_y_contexto_ausente_no_se_aceptan_por_defecto ... ok
+test rechazo_de_descarga_no_revive_cuerpo_invalido ... ok
+test expectativas_rechazan_subcampos_y_duplicados ... ok
+test replay_pending_es_atomico_y_reintentable ... ok
+test politica_fijada_sobrevive_pending_ramas_replay_y_undo_a_genesis ... ok
+test fixtures_compartidos_con_julia ... ok
+test parser_rechaza_estructura_y_definiciones_fuera_de_contrato ... ok
+test estructura_profunda_y_ciclo_con_ids_inversos_sin_recursion ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/firmante_local.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/firmante_local-d41164483278f715)
+
+running 12 tests
+test hijo_intenta_abrir_y_reporta ... ignored, punto de entrada para el proceso hijo
+test la_abstencion_depende_del_perfil_de_abrir ... ok
+test un_formato_dos_no_se_migra_en_silencio ... ok
+test una_cabecera_manipulada_falla_cerrado_y_no_firma ... ok
+test la_identidad_se_deriva_de_la_cabecera ... ok
+test la_clave_que_no_corresponde_no_ocupa_la_oportunidad ... ok
+test dos_hilos_no_firman_dos_hashes ... ok
+test la_abstencion_tras_perder_el_registro_persiste_tras_reinicio ... ok
+test distinto_padre_mismo_billete_y_slot_se_abstiene ... ok
+test mismo_pre_hash_se_reemite_tras_reinicio ... ok
+test billete_o_slot_diferente_puede_firmarse ... ok
+test dos_procesos_sobre_el_mismo_fichero_no_firman_dos_hashes ... ok
+
+test result: ok. 11 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.01s
+
+     Running tests/flow.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/flow-4202530efa00d3b7)
+
+running 6 tests
+test cambiar_el_genesis_cambia_la_semilla ... ok
+test cambiar_la_entropia_cambia_la_semilla ... ok
+test coincide_con_la_concatenacion_y_el_orden_importa ... ok
+test es_determinista ... ok
+test mide_16_bytes ... ok
+test entropias_con_prefijo_comun_dan_semillas_distintas ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/genesis_dag.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/genesis_dag-65fe1513cc0edc0f)
+
+running 6 tests
+test el_genesis_lineal_de_testnet_conserva_sus_pruebas ... ok
+test una_coinbase_con_muchas_salidas_positivas_no_desborda_en_panico ... ok
+test cabecera_minima_de_589_bytes_y_roundtrip ... ok
+test un_timestamp_marcador_de_posicion_se_rechaza ... ok
+test la_construccion_es_determinista_y_el_hash_congelado_cuadra ... ok
+test las_mutaciones_fallan_con_motivo_y_sin_panico ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ghostdag_bench.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/ghostdag_bench-518464720e06ccdf)
+
+running 1 test
+test bench_coloreo_mergeset_maximo ... ignored, banco; ejecutar con --ignored --nocapture
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ghostdag_oraculo.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/ghostdag_oraculo-784477910d56b652)
+
+running 3 tests
+test los_vectores_de_rusty_kaspa_pasan ... ok
+test el_kernel_rust_coincide_con_gdr_v0_2 ... ok
+test la_referencia_rust_coincide_con_gdr_v0_2 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/ghostdag_prop.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/ghostdag_prop-976304965fe555a4)
+
+running 3 tests
+test la_semilla_fija_es_reproducible ... ok
+test referencia_y_kernel_coinciden ... ok
+test ancestria_estricta ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/ghostdag_rust.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/ghostdag_rust-32b6223d3ba94b95)
+
+running 38 tests
+test desbordamiento_de_blue_work_es_error_explicito ... ok
+test copia_de_billete_direccion_coherente_entre_padres_y_mergeset ... ok
+test identidades_distintas_con_misma_proyeccion_no_disparan_u2_ni_u3 ... ok
+test el_rango_contextual_correcto_e_incorrecto ... ok
+test la_misma_identidad_literal_dispara_u2_y_u3 ... ok
+test admitir_rechaza_el_rango_declarado_que_no_es_el_esperado ... ok
+test admitir_deriva_la_identidad_de_la_cabecera ... ok
+test el_peso_usa_el_sr_validado_en_los_dos_algoritmos ... ok
+test peso_fronteras ... ok
+test el_sr_sintetico_libre_sigue_siendo_una_puerta_trasera ... ok
+test el_genesis_sin_padres_pasa_contra_el_almacen_real ... ok
+test quince_padres_se_aceptan_y_dieciseis_se_rechazan ... ok
+test sp_elige_el_mayor_blue_work ... ok
+test el_duplicado_por_admitir_se_rechaza_sin_consultar_el_contexto ... ok
+test sp_empatado_en_bw_elige_el_menor_sd ... ok
+test sp_empatado_en_bw_y_sd_elige_el_menor_id ... ok
+test la_anticadena_se_comprueba_contra_el_almacen_real ... ok
+test u2_invalida_y_u3_colorea ... ok
+test un_billete_real_de_bytes_cero_no_es_ausencia ... ok
+test el_duplicado_por_anadir_sintetico_se_rechaza_sin_mutar ... ok
+test el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpla ... ok
+test el_prev_hash_que_no_es_sp_se_rechaza_contra_el_almacen_real ... ok
+test un_contexto_puede_devolver_el_sr_declarado_como_esperado ... ok
+test padres_validados_y_anticadena_pasan_contra_el_almacen_real ... ok
+test padres_con_slots_anteriores_se_aceptan ... ok
+test el_padre_seleccionado_con_slot_posterior_se_rechaza_en_los_dos_algoritmos ... ok
+test los_extremos_del_sr_se_acumulan_en_blue_work ... ok
+test el_slot_contextual_del_almacen_real_es_explicito ... ok
+test un_padre_no_validado_se_rechaza_contra_el_almacen_real ... ok
+test todos_los_padres_con_el_mismo_slot_que_b_se_aceptan ... ok
+test bordes_exactos_de_mergeset_180_y_181 ... ok
+test un_sr_validado_no_se_puede_colocar_en_otro_bloque ... ok
+test un_padre_desconocido_se_rechaza_sin_tocar_el_almacen ... ok
+test el_rechazo_por_slot_deja_el_almacen_intacto ... ok
+test todo_padre_tiene_menor_rank_que_su_hijo ... ok
+test rank_es_total_sobre_el_corpus ... ok
+test referencia_y_kernel_coinciden_en_dags_generados ... ok
+test determinismo_con_mil_ordenes_de_llegada ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.77s
+
+     Running tests/poas.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/poas-995d1318f4aa90ac)
+
+running 15 tests
+test record_commitment_mutada_falla ... ok
+test chunk_witness_mutada_falla ... ok
+test slot_equivocado_falla ... ok
+test proof_of_space_mutada_falla ... ok
+test resta_reciente_negativa_es_contexto_invalido_sin_panic ... ok
+test history_size_cero_es_error_sin_panic ... ok
+test producto_del_umbral_reciente_es_contexto_invalido_sin_panic ... ok
+test history_size_del_candidato_que_no_cabe_es_entrada_no_canonica ... ok
+test current_history_size_maximo_es_contexto_invalido_sin_panic ... ok
+test recent_segments_saturado_es_contexto_invalido_sin_panic ... ok
+test salida_pot_equivocada_falla ... ok
+test record_witness_mutada_falla ... ok
+test min_sector_lifetime_desbordado_devuelve_invalid_history_size_sin_panic ... ok
+test rango_por_debajo_de_la_distancia_falla ... ok
+test positivo_devuelve_la_distancia_de_la_fixture ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.81s
+
+     Running tests/pot_derivaciones.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/pot_derivaciones-920beed62bb94f47)
+
+running 9 tests
+test control_detecta_big_endian_en_el_reto ... ok
+test control_detecta_cambiar_el_slot_o_cambiar_la_salida ... ok
+test v1_encadenado_sin_inyeccion_devuelve_la_salida_anterior ... ok
+test la_formula_no_acredita_quien_inyecta_ni_en_que_slot ... ok
+test control_detecta_invertir_entropia_y_salida ... ok
+test v2_inyeccion_usa_la_entropia_primero_y_trunca_a_16 ... ok
+test v3_aleatoriedad_es_blake3_de_la_salida ... ok
+test v4_reto_codifica_slot_42_en_little_endian_sobre_una_salida_fija ... ok
+test microtraza_de_ocho_slots_con_inyeccion_en_el_slot_tres ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pot_rango.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/pot_rango-3a130fc911f61e82)
+
+running 33 tests
+test cambiar_solo_pot_output_no_fabrica_prueba_ni_toca_la_salida_del_contexto ... ok
+test dos_inyecciones_en_el_mismo_slot_son_pendiente ... ok
+test el_genesis_no_lleva_portadores_ni_se_inventa_entropia_externa ... ok
+test un_descuadre_del_numero_de_portadores_invalida ... ok
+test con_d_mayor_que_d_la_salida_auditada_no_la_aporta_el_contexto ... ok
+test el_cambio_de_n_en_el_slot_de_inyeccion_se_respeta ... ok
+test un_flujo_de_pasado_discrepante_invalida ... ok
+test un_padre_ausente_del_pasado_es_pendiente ... ok
+test slot_mas_d_desbordado_es_pendiente ... ok
+test mutar_un_portador_posterior_al_auditado_no_deja_prueba ... ok
+test con_d_menor_o_igual_que_d_la_salida_auditada_la_aporta_el_contexto ... ok
+test un_pot_output_incorrecto_invalida ... ok
+test el_presupuesto_agotado_es_pendiente_y_nunca_invalido ... ok
+test un_slot_de_padre_posterior_invalida ... ok
+test la_fase_previa_invalida_o_pendiente_no_toca_cache_ni_presupuesto ... ok
+test con_d_cero_la_salida_auditada_la_aporta_el_contexto ... ok
+test el_acierto_de_cache_usa_el_flujo_del_slot_al_cruzar_una_inyeccion ... ok
+test un_rango_vacio_sin_ancla_en_el_contexto_es_pendiente ... ok
+test mutar_un_checkpoint_intermedio_con_el_ultimo_intacto_invalida ... ok
+test un_portador_alterado_bajo_la_misma_clave_invalida_sin_gastar_aes ... ok
+test un_rango_de_varios_slots_consecutivos_verifica ... ok
+test la_inyeccion_se_aplica_exactamente_en_su_slot ... ok
+test un_ancla_que_es_el_propio_candidato_es_contexto_circular ... ok
+test un_rango_vacio_exige_que_el_ancla_acreditada_sea_pot_output ... ok
+test un_slot_por_delante_del_reloj_es_pendiente ... ok
+test un_token_no_sirve_para_otro_contexto ... ok
+test ciento_cincuenta_portadores_verifican ... ok
+test un_acierto_de_cache_completo_no_gasta_aes ... ok
+test n_cero_no_multiplo_o_mayor_que_u32_max_es_pendiente ... ok
+test una_salida_distinta_bajo_la_misma_clave_invalida_sin_gastar_aes ... ok
+test una_entrada_de_cache_de_otra_clave_no_invalida ... ok
+test una_diferencia_de_151_es_exceso_estructural ... ok
+test un_token_no_sirve_para_otro_candidato ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pot_slot.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/pot_slot-a5f1e10dec4b4101)
+
+running 7 tests
+test la_conversion_no_reordena_los_ocho_bloques_crudos ... ok
+test el_dominio_del_contexto_se_rechaza_sin_ejecutar_aes ... ok
+test la_proyeccion_de_ns_comprueba_cero_rango_y_multiplo_de_16 ... ok
+test la_conversion_wire_a_primitiva_y_vuelta_conserva_los_ocho_valores_en_orden ... ok
+test la_salida_es_el_ultimo_de_los_ocho_checkpoints ... ok
+test semilla_o_trabajo_distintos_del_contexto_no_verifican_la_misma_prueba ... ok
+test corromper_cualquiera_de_los_ocho_checkpoints_del_wire_rompe_la_verificacion ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/reorg_differential.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/reorg_differential-8d6dda858322fa48)
+
+running 4 tests
+test el_peso_de_largo_plazo_depende_de_la_rama_entera ... ok
+test un_cache_por_altura_daria_la_respuesta_equivocada ... ok
+test tras_un_reorg_las_medianas_coinciden_con_las_de_un_nodo_limpio ... ok
+test un_reorg_al_limite_de_profundidad_tampoco_desincroniza ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/retarget_causal_endogeno_modelo.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/retarget_causal_endogeno_modelo-1f45987d2aaf0c9d)
+
+running 13 tests
+test arm_frontera::missed_causal_y_ventana_vacia_no_se_confunden_con_pending ... ok
+test arm_frontera::held_zero_con_delay_dos_es_no_op_y_converge_con_julia ... ok
+test arm_frontera::reloj_local_diverge_con_los_mismos_ids_y_fronteras_19_20_21 ... ok
+test arm_frontera::errores_de_marco_y_overflow_no_publican ... ok
+test arm_frontera::reorg_reemplaza_agendas_y_prefijo_o_genesis_retiraran_el_sufijo ... ok
+test arm_frontera::undo_rce_restaura_rango_agenda_snapshot_y_eventos ... ok
+test dominio_u128_se_rechaza_antes_del_kernel ... ok
+test arm_frontera::replay_causal_tardio_converge_con_fuentes_y_activaciones_exactas ... ok
+test cada_rama_realimenta_su_propio_rango_y_undo_no_contamina ... ok
+test error_transaccional_no_publica_estado_parcial ... ok
+test pending_no_elude_validacion_de_ventana ... ok
+test sello_y_pago_salen_del_mismo_journal_sin_retroactividad ... ok
+test fixtures_enteros_compartidos_con_julia ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/spec_numeros.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/spec_numeros-2b09f522f9792dc8)
+
+running 11 tests
+test el_codigo_alcanza_la_base_poas_de_556 ... ignored, TAREAS.md §1.4 (SPEC cerrado, falta cablear): el código conserva la cabecera lineal de 92 B; el formato DAG ya está especificado en SPEC §6.1–§6.2 (589/1 037 B, codec único) y 556 B es la base LINEAL, no el destino. Quitar este ignore cuando la cabecera DAG se cablee en la ruta activa.
+test ninguna_regla_esta_numerada_dos_veces ... ok
+test el_spec_identifica_el_limite_transitorio_de_reorg ... ok
+test el_spec_dice_los_parametros_reales_de_peso ... ok
+test el_spec_ya_no_habla_de_nonce_ni_de_pow ... ok
+test el_spec_dice_las_cifras_reales_del_transporte ... ok
+test el_spec_conserva_la_base_poas_de_556 ... ok
+test el_spec_dice_los_offsets_de_la_cabecera_dag ... ok
+test el_checkpoint_conserva_constantes_y_declara_calibracion_pendiente ... ok
+test el_spec_dice_los_maximos_de_la_justificacion_pot ... ok
+test el_spec_dice_los_tamanos_de_la_cabecera_dag ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ventana_retarget_causal_modelo.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/ventana_retarget_causal_modelo-90062305c6bae1c8)
+
+running 1 test
+test fixtures_compartidos_con_julia ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire_peso_differential.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/wire_peso_differential-bec7b8d0050a883f)
+
+running 8 tests
+test el_umbral_de_compact_size_en_la_longitud_de_un_testigo ... ok
+test el_umbral_de_compact_size_no_descuadra_el_peso ... ok
+test el_tamano_declarado_de_lock_es_su_longitud_real ... ok
+test ningun_byte_arbitrario_hace_entrar_en_panico_al_leer_cabeceras ... ok
+test ningun_byte_arbitrario_hace_entrar_en_panico_al_lector ... ok
+test ningun_byte_arbitrario_hace_entrar_en_panico_al_leer_locks ... ok
+test la_longitud_serializada_es_el_peso_del_protocolo ... ok
+test la_transaccion_da_la_vuelta ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests zx_consensus
+
+running 3 tests
+test crates/zx-consensus/src/pot_rango.rs - pot_rango::PruebaPotValidada (line 200) - compile fail ... ok
+test crates/zx-consensus/src/pot_rango.rs - pot_rango::verificar_rango_pot_fase_aes (line 672) - compile fail ... ok
+test crates/zx-consensus/src/bloque_dag.rs - bloque_dag::ContextoRangoDag (line 92) - compile fail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+=== STEP S4-C1-zx-consensus exit=0 elapsed=13 ===

@@ -1,0 +1,21 @@
+**Corrección L01-C1 — completada.** No detecté ninguna falta de definición; ejecuté la corrección tal cual.
+
+**Veredicto por paso**
+- **Extracción/manifiesto:** `SPEC.md` extraído del commit `9681061`; sha256 `b59905c5…` = exigido. `MANIFIESTO-CHECKOUT.sha256` regenerado (**841** archivos; antes 840); copia previa `MANIFIESTO-CHECKOUT.antes-C1.sha256`. `diff` entre ambos = **solo la línea `./SPEC.md`** (`206a207`), guardado en `logs/C1-diff-manifiesto.log`.
+- **S4** `cargo test --locked -p zx-consensus`: **REPRODUCIDO** (exit 0, 13 s). 22 binarios, **421 pasadas, 0 fallidas, 4 ignoradas, 0 filtradas**. `spec_numeros` compila y pasa.
+- **S3b** `cargo test --locked -p zx-storage --features rocksdb`: **REPRODUCIDO** (exit 0, 62 s). 5 binarios, **60/60, 0 fallidas, 0 ignoradas**; `matar_a_mitad_de_escritura_no_deja_el_almacen_incoherente` pasó.
+
+**Fallos / bloqueos:** ninguno. No hubo error de compilación ni prueba fallida. S3b no fue BLOQUEADO: `/usr/lib64/libclang.so.21.1.8` bastó a `bindgen` (descargó `bindgen 0.72.1`, `clang-sys 1.9.1`, `rocksdb 0.25.0`, `librocksdb-sys 0.19.0+11.8.1`). No instalé nada.
+
+**Diferencias de conteo:** ninguna. S4: 422 `#[test]` (207 `src/` + 215 `tests/`) con **4 `#[ignore]` reales** (`firmante/mod.rs:389`, `firmante_local.rs:398`, `ghostdag_bench.rs:230`, `spec_numeros.rs:150`); el 5.º texto `#[ignore` es un comentario en `firmante_local.rs:7`. Ejecutado = 422 − 4 + 3 doc-tests = **421**; coincide con la referencia. S3b: 60 `#[test]`, 0 ignoradas; 24 estaban tras `rocksdb` (11 de `src/disco.rs` + 13 de integración), ahora sí cubiertas.
+
+**Integridad final (tras el último paso, `ENTRADA-C1` la última):**
+- `diff` checkout vs nuevo manifiesto → **vacío** (`exit_diff=0`); `Cargo.lock` intacto (`9021465d…`).
+- `git -C checkout/PDF/autonomys-subspace status --porcelain` → **vacío**.
+- Hashes fijos OK (`e75b1ded…`, `741b75d0…`, `0b387d75…`, `023a9fc8…`).
+- `sha256sum -c ENTRADA-C1.sha256` desde `ZEROX` → **OK** (los 3 archivos), como última comprobación. `ENTRADA.sha256` también OK.
+- Logs: `99-C1-integridad-final.log` y `99-C1-integridad-ultima.log`.
+
+**Artefactos:** `RESULTADOS.tsv` (fila S4 antigua marcada «(sustituida por C1)» + 27 filas nuevas: 22 `S4-C1` + 5 `S3b`), secciones «Corrección C1» al final de `INFORME.md` (§10) y `PROGRESO.md` (§5), logs crudos `S4-C1-zx-consensus.log` y `S3b-zx-storage-rocksdb.log`, backups `logs/RESULTADOS.antes-C1.tsv` y del manifiesto.
+
+**Alcance:** sin parches, `cargo update`, `--offline`, `--ignored`, Python ni escritura fuera de `deepseek/L01/`; sin commit/push. Presupuesto C1 (1 h) no agotado (≈ 2 min de reloj). Los tests prueban el contrato antiguo, no el híbrido.

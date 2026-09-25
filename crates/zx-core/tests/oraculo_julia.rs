@@ -89,17 +89,15 @@ fn escenario() -> (DagBlockHeader, Vec<Tx>, Vec<Vec<Vec<u8>>>) {
 }
 
 fn leer_oraculo() -> HashMap<String, String> {
-    // La auditoría vive donde LINEO §1 manda: `veritas/<categoría>/<nombre>/`. Durante el staging
-    // estuvo fuera del árbol del repositorio, y por eso esta ruta subía tres niveles; al promover
-    // se corrigió. `CARGO_MANIFEST_DIR` es `crates/zx-core`, así que la raíz está dos arriba.
+    // Los vectores viven en `testdata/vectores-cabecera-dag/`, copiados sin cambios del oráculo
+    // Julia del commit 9681061 (ver `PROCEDENCIA.md`). `CARGO_MANIFEST_DIR` es `crates/zx-core`,
+    // así que la raíz del workspace está dos niveles arriba.
     let ruta: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "..",
         "..",
-        "veritas",
-        "consenso",
+        "testdata",
         "vectores-cabecera-dag",
-        "resultados",
         "vectores.txt",
     ]
     .iter()

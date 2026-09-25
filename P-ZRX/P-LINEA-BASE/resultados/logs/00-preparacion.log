@@ -1,0 +1,13 @@
+=== 2026-09-26T01:05:17+02:00 extraction ===
+exit_extract=0
+=== 2026-09-26T01:05:17+02:00 clone ===
+Clonando en 'checkout/PDF/autonomys-subspace'...
+exit_clone=0
+=== 2026-09-26T01:05:18+02:00 checkout detach ===
+HEAD está ahora en f8842d0 Bump client versions to 0.1.12 and h2 to 0.4.16 (#3906)
+exit_checkout=0
+=== rev-parse HEAD ===
+f8842d019cdf0f7163421b9644db5a9ff82b2a73
+=== 2026-09-26T01:05:18+02:00 manifest ===
+exit_manifest=0
+manifest_files=840

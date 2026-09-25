@@ -1,0 +1,159 @@
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling winnow v1.0.4
+   Compiling hashbrown v0.17.1
+   Compiling rustversion v1.0.23
+   Compiling portable-atomic v1.15.0
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling unicode-xid v0.2.6
+   Compiling syn v2.0.119
+   Compiling blake3 v1.8.7
+   Compiling crypto-common v0.1.7
+   Compiling hex v0.4.3
+   Compiling critical-section v1.2.0
+   Compiling konst_macro_rules v0.2.19
+   Compiling unicode-segmentation v1.13.3
+   Compiling constant_time_eq v0.4.2
+   Compiling digest v0.10.7
+   Compiling const_format_proc_macros v0.2.34
+   Compiling block-buffer v0.12.1
+   Compiling konst v0.2.20
+   Compiling byte-slice-cast v1.2.3
+   Compiling bytes v1.12.1
+   Compiling sha2 v0.10.9
+   Compiling cipher v0.5.2
+   Compiling rand v0.8.8
+   Compiling uint v0.10.1
+   Compiling num_cpus v1.17.0
+   Compiling blst v0.3.17
+   Compiling branches v0.4.6
+   Compiling curve25519-dalek v4.1.3
+   Compiling convert_case v0.10.0
+   Compiling threadpool v1.8.1
+   Compiling scopeguard v1.2.0
+   Compiling indexmap v2.14.1
+   Compiling smallvec v1.16.0
+   Compiling parking_lot_core v0.9.12
+   Compiling parity-scale-codec v3.7.5
+   Compiling once_cell v1.21.4
+   Compiling const_format v0.2.36
+   Compiling lock_api v0.4.14
+   Compiling siphasher v1.0.3
+   Compiling chacha20 v0.10.2
+   Compiling rclite v0.4.1
+   Compiling seq-macro v0.3.6
+   Compiling ab-chacha8 v0.1.1
+   Compiling tracing-core v0.1.36
+   Compiling ab-blake3 v0.1.0
+   Compiling pin-project-lite v0.2.17
+   Compiling keccak v0.1.6
+   Compiling parking_lot v0.12.5
+   Compiling spin v0.12.3
+   Compiling fixed-hash v0.8.0
+   Compiling getrandom_or_panic v0.0.3
+   Compiling arrayref v0.3.9
+   Compiling aes v0.9.3
+   Compiling primitive-types v0.14.0
+   Compiling tempfile v3.24.0
+   Compiling rusty-fork v0.3.1
+   Compiling tracing v0.1.44
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/crates/zx-pot)
+   Compiling proptest v1.11.0
+   Compiling toml_edit v0.25.13+spec-1.1.0
+   Compiling proc-macro-crate v3.5.0
+   Compiling serde_bytes v0.11.19
+   Compiling serde-big-array v0.5.1
+   Compiling ed25519 v2.2.3
+   Compiling zeroize_derive v1.5.0
+   Compiling derive_more-impl v1.0.0
+   Compiling impl-trait-for-tuples v0.2.3
+   Compiling parity-scale-codec-derive v3.7.5
+   Compiling derive_more-impl v2.1.1
+   Compiling scale-info-derive v2.11.6
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling zeroize v1.9.0
+   Compiling merlin v3.0.0
+   Compiling derive_more v1.0.0
+   Compiling kzg v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+   Compiling rust-kzg-blst v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+   Compiling schnorrkel v0.11.5
+   Compiling ed25519-zebra v4.2.0
+   Compiling scale-info v2.11.6
+   Compiling zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/crates/zx-core)
+   Compiling derive_more v2.1.1
+   Compiling subspace-core-primitives v0.1.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/PDF/autonomys-subspace/crates/subspace-core-primitives)
+   Compiling ab-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/PDF/autonomys-subspace/shared/ab-proof-of-space)
+   Compiling subspace-kzg v0.1.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/PDF/autonomys-subspace/shared/subspace-kzg)
+   Compiling subspace-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/PDF/autonomys-subspace/crates/subspace-proof-of-space)
+   Compiling subspace-verification v0.1.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/PDF/autonomys-subspace/crates/subspace-verification)
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/crates/zx-consensus)
+   Compiling zx-storage v0.0.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/crates/zx-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.86s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/zx_storage-a19153be6b9abf2c)
+
+running 36 tests
+test almacen_dag::tests::un_hash_desconocido_devuelve_none ... ok
+test almacen_admitidos_dag::tests::una_version_desconocida_es_corrupcion ... ok
+test formato::tests::el_orden_de_las_claves_es_el_orden_numerico ... ok
+test formato::tests::la_clave_mide_36_y_da_la_vuelta ... ok
+test formato::tests::las_salidas_de_una_tx_comparten_prefijo ... ok
+test formato::tests::la_entrada_da_la_vuelta ... ok
+test almacen_admitidos_dag::tests::la_corrupcion_en_memoria_no_se_convierte_en_none ... ok
+test formato::tests::los_bytes_corruptos_se_rechazan ... ok
+test memoria::tests::no_encontrar_algo_no_es_un_error ... ok
+test memoria::tests::un_cuerpo_guardado_se_recupera_byte_a_byte ... ok
+test memoria::tests::la_punta_no_puede_apuntar_a_una_cabecera_que_no_existe ... ok
+test almacen_admitidos_dag::tests::un_candidato_presente_sin_entrada_admitida_devuelve_none ... ok
+test memoria::tests::una_cabecera_guardada_se_recupera_igual ... ok
+test almacen_admitidos_dag::tests::una_clave_que_no_es_el_block_hash_es_corrupcion ... ok
+test memoria::tests::una_altura_puede_cambiar_de_hash_tras_un_reorg ... ok
+test utxo::tests::deshacer_lo_que_no_esta_es_un_error ... ok
+test utxo::tests::el_fallo_en_una_salida_posterior_no_publica_los_borrados_anteriores ... ok
+test almacen_dag::tests::la_segunda_justificacion_reemplaza_la_primera ... ok
+test utxo::tests::un_outpoint_duplicado_es_un_error ... ok
+test almacen_admitidos_dag::tests::dos_cabeceras_con_el_mismo_slot_coexisten_en_el_indice ... ok
+test utxo::tests::el_undo_data_guarda_el_utxo_completo ... ok
+test utxo::tests::el_contenido_distinto_es_corrupcion_en_cada_campo ... ok
+test utxo::tests::el_undo_data_guarda_lo_creado_completo ... ok
+test utxo::tests::ramas_distintas_dan_claves_distintas ... ok
+test almacen_dag::tests::dos_cabeceras_con_el_mismo_slot_coexisten ... ok
+test utxo::tests::la_clave_sale_de_la_rama_del_bloque_no_de_cero ... ok
+test utxo::tests::un_undo_incoherente_no_deja_el_conjunto_a_medias ... ok
+test utxo::tests::las_salidas_de_coinbase_quedan_marcadas ... ok
+test utxo::tests::aplicar_y_deshacer_es_la_identidad ... ok
+test utxo::tests::un_bloque_que_falla_no_deja_el_conjunto_a_medias ... ok
+test formato::tests::cambiar_un_solo_campo_cambia_los_bytes ... ok
+test formato::tests::ida_y_vuelta_siempre ... ok
+test formato::tests::claves_distintas_para_outpoints_distintos ... ok
+test utxo::tests::un_reorg_devuelve_el_estado_al_punto_de_fork ... ok
+test formato::tests::entradas_iguales_dan_bytes_iguales ... ok
+test memoria::tests::se_puede_usar_desde_varios_hilos ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/almacen_dag.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/almacen_dag-a9ae078578b58807)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/almacen_differential.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/almacen_differential-8f2b32f3b13cedcb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/matar_a_mitad.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/matar_a_mitad-c8fd519020483143)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zx_storage
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=== STEP S3-zx-storage pkg=zx-storage exit=0 elapsed=5 ===

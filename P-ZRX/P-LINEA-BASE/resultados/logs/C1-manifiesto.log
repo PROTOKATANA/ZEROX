@@ -1,0 +1,14 @@
+=== C1 regenerar manifiesto 2026-09-26T01:12:04+02:00 ===
+--- comando: (cd checkout && find . -path ./PDF -prune -o -type f -print0 | sort -z | xargs -0 sha256sum) > MANIFIESTO-CHECKOUT.sha256
+exit_manifest=0
+--- wc -l antes / despues
+   840 MANIFIESTO-CHECKOUT.antes-C1.sha256
+   841 MANIFIESTO-CHECKOUT.sha256
+  1681 total
+--- diff antes-C1 vs nuevo (unica linea permitida: ./SPEC.md)
+206a207
+> b59905c5f1900076e699f762f3f6604f282790fa5a7ed97527d22d21f9d4e0ae  ./SPEC.md
+diff_exit=1
+--- sha256sum de los dos manifiestos
+7649ceb9e5dfcd1a8e01074de3b25a99317dfd47c020d328f76d9e971eb10d88  MANIFIESTO-CHECKOUT.antes-C1.sha256
+a6f0880a9169fe24b05a638c1a291f9f81269d1c53c521fd4e719a6208fdac2c  MANIFIESTO-CHECKOUT.sha256

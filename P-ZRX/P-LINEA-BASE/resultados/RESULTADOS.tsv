@@ -1,0 +1,47 @@
+paso	crate	binario	pasadas	fallidas	ignoradas	filtradas	segundos	codigo_salida
+S0	(workspace)	cargo metadata (sin binario de prueba)	0	0	0	0	10	0
+S1-zx-core	zx-core	unittests src/lib.rs	144	0	0	0	0.01	0
+S1-zx-core	zx-core	tests/cavp_sha3_256.rs	4	0	0	0	2.03	0
+S1-zx-core	zx-core	tests/ed25519_no_unicidad.rs	1	0	0	0	0.02	0
+S1-zx-core	zx-core	tests/oraculo_julia.rs	1	0	0	0	0.00	0
+S1-zx-core	zx-core	tests/parsers_dag_prop.rs	2	0	0	0	0.05	0
+S1-zx-core	zx-core	tests/vectores_dag.rs	4	0	0	0	0.00	0
+S1-zx-core	zx-core	doc-tests:zx_core	0	0	0	0	0.00	0
+S2-zx-pot	zx-pot	unittests src/lib.rs	1	0	0	0	0.00	0
+S2-zx-pot	zx-pot	tests/contexto_verificado.rs	3	0	0	0	0.00	0
+S2-zx-pot	zx-pot	tests/diferencial.rs	1	0	0	0	0.00	0
+S2-zx-pot	zx-pot	doc-tests:zx_pot	0	0	0	0	0.00	0
+S3-zx-storage	zx-storage	unittests src/lib.rs	36	0	0	0	0.01	0
+S3-zx-storage	zx-storage	tests/almacen_dag.rs	0	0	0	0	0.00	0
+S3-zx-storage	zx-storage	tests/almacen_differential.rs	0	0	0	0	0.00	0
+S3-zx-storage	zx-storage	tests/matar_a_mitad.rs	0	0	0	0	0.00	0
+S3-zx-storage	zx-storage	doc-tests:zx_storage	0	0	0	0	0.00	0
+S4 (sustituida por C1)	zx-consensus	spec_numeros (fallo de compilacion; no ejecutado)	0	0	0	0	3	101
+S5-zx-node-farmer_disco	zx-node	tests/farmer_disco.rs	13	0	0	0	35.09	0
+S4-C1	zx-consensus	unittests src/lib.rs	206	0	1	0	2.00	0
+S4-C1	zx-consensus	tests/alta_firmante_local.rs	11	0	0	0	0.03	0
+S4-C1	zx-consensus	tests/cabecera_conjunta.rs	11	0	0	0	0.27	0
+S4-C1	zx-consensus	tests/contrato_billete_modelo.rs	14	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/disponibilidad_causal_multivista_modelo.rs	9	0	0	0	0.33	0
+S4-C1	zx-consensus	tests/firmante_local.rs	11	0	1	0	2.01	0
+S4-C1	zx-consensus	tests/flow.rs	6	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/genesis_dag.rs	6	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/ghostdag_bench.rs	0	0	1	0	0.00	0
+S4-C1	zx-consensus	tests/ghostdag_oraculo.rs	3	0	0	0	0.24	0
+S4-C1	zx-consensus	tests/ghostdag_prop.rs	3	0	0	0	0.03	0
+S4-C1	zx-consensus	tests/ghostdag_rust.rs	38	0	0	0	4.77	0
+S4-C1	zx-consensus	tests/poas.rs	15	0	0	0	2.81	0
+S4-C1	zx-consensus	tests/pot_derivaciones.rs	9	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/pot_rango.rs	33	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/pot_slot.rs	7	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/reorg_differential.rs	4	0	0	0	0.01	0
+S4-C1	zx-consensus	tests/retarget_causal_endogeno_modelo.rs	13	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/spec_numeros.rs	10	0	1	0	0.01	0
+S4-C1	zx-consensus	tests/ventana_retarget_causal_modelo.rs	1	0	0	0	0.00	0
+S4-C1	zx-consensus	tests/wire_peso_differential.rs	8	0	0	0	0.03	0
+S4-C1	zx-consensus	doc-tests:zx_consensus	3	0	0	0	0.03	0
+S3b	zx-storage	unittests src/lib.rs	47	0	0	0	0.07	0
+S3b	zx-storage	tests/almacen_dag.rs	3	0	0	0	0.03	0
+S3b	zx-storage	tests/almacen_differential.rs	9	0	0	0	0.05	0
+S3b	zx-storage	tests/matar_a_mitad.rs	1	0	0	0	0.28	0
+S3b	zx-storage	doc-tests:zx_storage	0	0	0	0	0.00	0

@@ -1,3 +1,11 @@
+# ZEROX CI — workspace nuevo, crates portados de `9681061` (W01)
+#
+# Cubre SOLO `zx-core` y `zx-pot`: formato, clippy estricto, build, tests (con sus vectores
+# NIST CAVP y el oráculo Julia copiado a `testdata/`) y la regla de versiones exactas.
+#
+# NO cubre todavía: consenso, nodo ni red. Los jobs `alcance`, `almacen` y `frontera` del CI
+# antiguo dependían de `zx-consensus`, `zx-storage`, `zx-p2p` y de scripts retirados; se
+# reintroducirán cuando las órdenes posteriores porten esos crates.
 name: ZEROX CI
 
 on:
@@ -21,45 +29,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets --all-features --locked
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo build --workspace --all-features --locked
       - run: cargo test --workspace --all-features --locked
-
-  alcance:
-    name: Alcance — consenso que nadie ejecuta, reglas que nadie cita
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # Cuatro veces la respuesta ha sido que sí, y las cuatro el hueco era grave: la dificultad
-      # esperada no se comprobaba, ni la rama, ni los timestamps, y el nodo no pedía un cuerpo
-      # jamás. Las cuatro reglas estaban escritas y probadas; faltaba la llamada. Un `cargo test`
-      # verde no dice nada de esto, porque los tests de zx-consensus prueban las funciones
-      # directamente — que es justo por lo que el hueco sobrevivió tanto.
-      - run: ./ci/alcance-consenso.sh
-      # Y la otra mitad: reglas del SPEC que ningún código cita. Encontró tres citas ausentes
-      # sobre código que sí existía, una de ellas porque estaba escrita en rango —`C-BLK-01..03`—
-      # y ninguna búsqueda por número la ve.
-      - run: ./ci/citas-spec.sh
-
-  almacen:
-    name: Almacén — el backend de disco y su test diferencial
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-05-03
-      - uses: Swatinem/rust-cache@v2
-      # RocksDB necesita libclang para bindgen.
-      - run: sudo apt-get update && sudo apt-get install -y libclang-dev
-      # El backend de disco está tras una feature para no ralentizar el ciclo normal, pero eso
-      # significa que `cargo test --workspace` NO lo prueba. Si no se corre aquí, no se corre nunca.
-      # Incluye el test de `kill -9`: lanza subprocesos de verdad y los mata a mitad de escribir.
-      # Comprueba que el almacén reabre coherente, no que RocksDB sea atómico —eso ya lo prueba
-      # RocksDB—. Lo que C-STORE-07 pide de verdad lo comprueba `tests_estructura`, leyendo el
-      # código: el test de matar NO caza una escritura partida, y está escrito en su cabecera.
-      - run: cargo test -p zx-storage --features rocksdb --locked
-      - run: cargo clippy -p zx-storage --features rocksdb --all-targets --locked -- -D warnings
 
   deps:
     name: Dependencias — versiones pineadas
@@ -70,22 +42,3 @@ jobs:
       # Un rango en workspace.dependencies deja que `cargo update` mueva consenso.
       - name: Rechazar rangos de versión en [workspace.dependencies]
         run: bash ci/dependencias-exactas.sh
-
-  frontera:
-    name: Arquitectura — la frontera red/consenso
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-05-03
-      # zx-p2p NO puede depender de consenso, estado ni mempool.
-      #
-      # Red y consenso se necesitan en las DOS direcciones: la red valida lo que recibe, y el
-      # sincronizador pide bloques por la red. Si zx-p2p puede ver zx-consensus, ese ciclo se
-      # cierra poco a poco y sin que nadie lo decida. El ciclo se rompe en zx-node, que es el
-      # único que ve las cuatro cosas a la vez.
-      #
-      # Esto ya se coló una vez, el primer día del crate. Un README no lo habría impedido.
-      - name: zx-p2p solo puede ver zx-core
-        run: bash ci/frontera-crates.sh

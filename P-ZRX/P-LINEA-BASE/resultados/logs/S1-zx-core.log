@@ -1,0 +1,279 @@
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling typenum v1.20.1
+   Compiling zerocopy v0.8.56
+   Compiling version_check v0.9.5
+   Compiling getrandom v0.3.4
+   Compiling semver v1.0.28
+   Compiling serde_core v1.0.229
+   Compiling crunchy v0.2.4
+   Compiling serde v1.0.229
+   Compiling rustix v1.1.4
+   Compiling cpufeatures v0.2.17
+   Compiling byteorder v1.5.0
+   Compiling bitflags v2.13.1
+   Compiling autocfg v1.5.1
+   Compiling static_assertions v1.1.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling fastrand v2.5.0
+   Compiling signature v2.2.0
+   Compiling thiserror v2.0.20
+   Compiling equivalent v1.0.2
+   Compiling rustc_version v0.4.1
+   Compiling const-oid v0.10.2
+   Compiling allocator-api2 v0.2.21
+   Compiling hex v0.4.3
+   Compiling once_cell v1.21.4
+   Compiling generic-array v0.14.7
+   Compiling num-traits v0.2.19
+   Compiling rustc-hex v2.1.0
+   Compiling subtle v2.6.1
+   Compiling foldhash v0.2.0
+   Compiling keccak v0.2.2
+   Compiling fnv v1.0.7
+   Compiling curve25519-dalek v4.1.3
+   Compiling bit-vec v0.8.0
+   Compiling quick-error v1.2.3
+   Compiling sponge-cursor v0.1.0
+   Compiling uint v0.10.1
+   Compiling unarray v0.1.4
+   Compiling regex-syntax v0.8.11
+   Compiling bech32 v0.12.0
+   Compiling hashbrown v0.16.1
+   Compiling bit-set v0.8.0
+   Compiling hybrid-array v0.4.14
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling crypto-common v0.2.2
+   Compiling getrandom v0.2.17
+   Compiling wait-timeout v0.2.1
+   Compiling rand_core v0.6.4
+   Compiling rand_core v0.9.5
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling rand_xorshift v0.4.0
+   Compiling rand v0.9.5
+   Compiling sha2 v0.10.9
+   Compiling digest v0.11.3
+   Compiling sha3 v0.12.0
+   Compiling tempfile v3.24.0
+   Compiling rusty-fork v0.3.1
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.3.1
+   Compiling rand_chacha v0.9.0
+   Compiling proptest v1.11.0
+   Compiling rand v0.8.8
+   Compiling zeroize_derive v1.5.0
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling ed25519 v2.2.3
+   Compiling zeroize v1.9.0
+   Compiling fixed-hash v0.8.0
+   Compiling primitive-types v0.14.0
+   Compiling ed25519-zebra v4.2.0
+   Compiling zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/L01/checkout/crates/zx-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.54s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/zx_core-6e78f03a67dca316)
+
+running 144 tests
+test address::tests::no_se_puede_cambiar_de_red_editando_el_hrp ... ok
+test address::tests::el_hrp_identifica_la_red ... ok
+test address::tests::ida_y_vuelta ... ok
+test amount::tests::la_suma_no_desborda_en_silencio ... ok
+test address::tests::se_rechaza_el_checksum_bech32_antiguo ... ok
+test amount::tests::las_fronteras_exactas_son_validas ... ok
+test address::tests::un_caracter_cambiado_invalida ... ok
+test amount::tests::se_rechazan_los_importes_fuera_de_rango ... ok
+test digest::tests::digest_se_muestra_en_hex_big_endian ... ok
+test amount::tests::una_zzk_son_cien_millones_de_brek ... ok
+test digest::tests::los_newtypes_no_son_intercambiables ... ok
+test encoding::compact_size::tests::cada_forma_ocupa_lo_que_debe ... ok
+test address::tests::se_rechaza_una_longitud_distinta_de_32 ... ok
+test encoding::compact_size::tests::el_valor_minimo_de_cada_forma_es_valido ... ok
+test encoding::compact_size::tests::se_devuelve_el_resto_sin_tocar ... ok
+test encoding::compact_size::tests::fronteras_exactas_de_cada_forma ... ok
+test encoding::compact_size::tests::se_rechazan_las_codificaciones_no_minimas ... ok
+test encoding::compact_size::tests::un_buffer_truncado_no_se_lee_a_medias ... ok
+test encoding::int::tests::i64_negativo_en_complemento_a_dos ... ok
+test encoding::int::tests::leer_deja_el_resto_intacto ... ok
+test encoding::int::tests::u32_ida_y_vuelta_en_little_endian ... ok
+test encoding::int::tests::un_buffer_corto_no_se_lee_a_medias ... ok
+test hash::tests::las_etiquetas_de_flujo_son_las_de_la_tabla ... ok
+test hash::tests::las_etiquetas_fijas_son_unicas ... ok
+test hash::tests::ninguna_etiqueta_fija_empieza_por_el_prefijo_de_la_raiz ... ok
+test hash::tests::la_raiz_depende_del_branch_id ... ok
+test hash::tests::sha3_256_del_mensaje_vacio ... ok
+test firma::tests::una_firma_manipulada_no_verifica ... ok
+test hash::tests::el_dominio_separa ... ok
+test firma::tests::la_firma_es_determinista ... ok
+test preimage::block::tests::bits_esta_justo_antes_del_nonce ... ok
+test firma::tests::la_clave_enlaza_con_la_salida_por_igualdad ... ok
+test preimage::block::tests::el_nonce_esta_donde_dice_c_hdr_04 ... ok
+test preimage::block::tests::cambiar_el_nonce_solo_toca_su_rango ... ok
+test preimage::block::tests::la_cabecera_mide_92_bytes_y_la_preimagen_108 ... ok
+test address::tests::bech32_tiene_el_defecto_de_insercion_y_bech32m_no ... ok
+test preimage::block::tests::la_lista_vacia_tiene_raiz_propia ... ok
+test preimage::block::tests::una_sola_hoja_no_es_su_propia_raiz ... ok
+test preimage::block::tests::la_raiz_depende_del_orden ... ok
+test preimage::dag::tests::el_constructor_rechaza_duplicados_y_repeticion_del_seleccionado ... ok
+test preimage::block::tests::duplicar_la_ultima_hoja_no_da_la_misma_raiz ... ok
+test firma::tests::firmas_de_mensajes_distintos_difieren ... ok
+test preimage::dag::tests::el_parser_devuelve_el_resto ... ok
+test preimage::dag::tests::el_sello_esta_al_final ... ok
+test preimage::dag::tests::los_offsets_y_tamanos_son_los_fijados ... ok
+test preimage::block::tests::cada_campo_de_la_cabecera_entra_en_el_hash ... ok
+test preimage::dag::tests::los_tamanos_por_numero_de_padres ... ok
+test hash::tests::el_hash_del_vacio_no_es_cero ... ok
+test preimage::dag::tests::rechaza_padres_desordenados ... ok
+test preimage::dag::tests::rechaza_parent_count_mayor_que_15 ... ok
+test preimage::dag::tests::rechaza_padres_repetidos_y_repetir_el_seleccionado ... ok
+test preimage::dag::tests::roundtrip_para_genesis_uno_dos_y_quince_padres ... ok
+test preimage::flow::tests::cambiar_el_hash_del_genesis_cambia_f0 ... ok
+test preimage::block::tests::la_raiz_es_determinista ... ok
+test preimage::flow::tests::cambiar_la_entropia_cambia_el_flujo ... ok
+test preimage::flow::tests::cambiar_la_etiqueta_de_flujo_cambia_la_salida ... ok
+test preimage::flow::tests::cambiar_t_j_cambia_el_flujo ... ok
+test preimage::flow::tests::control_detecta_big_endian_en_t_j ... ok
+test preimage::flow::tests::control_detecta_invertir_flujo_y_entropia ... ok
+test preimage::flow::tests::f0_vector_fijo_openssl ... ok
+test preimage::flow::tests::flujo_siguiente_vector_fijo_openssl ... ok
+test preimage::flow::tests::flujo_y_entropia_no_son_intercambiables ... ok
+test preimage::dag::tests::rechaza_truncados_en_cada_frontera ... ok
+test preimage::flow::tests::omitir_la_etiqueta_del_genesis_cambia_f0 ... ok
+test preimage::dag::tests::los_bytes_de_wire_son_los_que_se_hashean ... ok
+test preimage::flow::tests::las_salidas_miden_32_bytes_y_son_deterministas ... ok
+test preimage::tx::tests::el_hash_type_es_un_conjunto_cerrado ... ok
+test preimage::dag::tests::mutar_el_sello_cambia_block_hash_pero_no_pre_hash ... ok
+test preimage::tx::tests::el_auth_digest_delimita_los_testigos ... ok
+test preimage::block::tests::la_raiz_depende_del_numero_de_hojas ... ok
+test preimage::tx::tests::el_txid_depende_del_branch_id ... ok
+test preimage::tx::tests::la_codificacion_de_lock_es_autodelimitada ... ok
+test preimage::tx::tests::las_variantes_de_lock_no_colisionan ... ok
+test preimage::tx::tests::el_sighash_cambia_por_entrada ... ok
+test preimage::tx::tests::el_txid_es_determinista ... ok
+test preimage::tx::tests::un_indice_de_entrada_invalido_falla ... ok
+test preimage::tx::tests::single_sin_salida_correspondiente_falla ... ok
+test red::tests::cada_red_tiene_su_propio_prefijo ... ok
+test red::tests::las_dos_redes_tienen_nombres_distintos ... ok
+test preimage::tx::tests::el_importe_gastado_entra_en_el_sighash_pero_no_en_el_txid ... ok
+test red::tests::los_prefijos_magicos_no_son_utf8_valido ... ok
+test target::tests::el_hash_se_interpreta_big_endian ... ok
+test target::tests::el_acumulado_aguanta_siglos ... ok
+test preimage::tx::tests::anyonecanpay_aisla_la_entrada_firmada ... ok
+test target::tests::el_pow_compara_estrictamente_menor ... ok
+test target::tests::el_target_inicial_apunta_a_un_bloque_de_t_segundos ... ok
+test red::tests::los_prefijos_magicos_se_derivan_de_su_formula ... ok
+test target::tests::el_target_inicial_es_representable_y_cabe_bajo_pow_limit ... ok
+test target::tests::el_trabajo_acumulado_no_desborda_en_silencio ... ok
+test target::tests::el_trabajo_es_2_elevado_256_entre_target_mas_uno ... ok
+test target::tests::ida_y_vuelta_de_bits_canonico ... ok
+test target::tests::mainnet_arranca_32_veces_mas_dificil_que_testnet ... ok
+test target::tests::menos_target_es_mas_trabajo ... ok
+test target::tests::se_rechaza_el_target_fuera_de_rango ... ok
+test target::tests::se_rechazan_los_bits_no_canonicos ... ok
+test tx::tests::dieciseis_claves_es_el_limite_exacto ... ok
+test preimage::dag::tests::merkle_ignora_testigos_y_el_compromiso_no ... ok
+test tx::tests::los_discriminantes_son_los_del_spec ... ok
+test tx::tests::multisig_rechaza_claves_repetidas ... ok
+test tx::tests::multisig_rechaza_k_fuera_de_rango ... ok
+test tx::tests::multisig_rechaza_n_fuera_de_rango ... ok
+test tx::tests::multisig_valido ... ok
+test wire::tests::cada_campo_de_la_cabecera_llega_a_los_bytes ... ok
+test wire::tests::la_cabecera_da_la_vuelta_completa ... ok
+test wire::tests::la_transaccion_da_la_vuelta_completa ... ok
+test wire::tests::los_bytes_de_la_cabecera_son_los_que_se_hashean ... ok
+test wire::tests::las_longitudes_de_lock_son_las_del_spec ... ok
+test wire::tests::los_tres_locks_dan_la_vuelta ... ok
+test wire::tests::un_compact_size_no_minimo_se_rechaza ... ok
+test wire::tests::un_contador_mentiroso_de_testigos_tambien_se_rechaza ... ok
+test wire::tests::un_contador_mentiroso_se_rechaza_sin_reservar ... ok
+test wire::tests::un_discriminante_desconocido_se_rechaza ... ok
+test wire::tests::un_importe_fuera_de_rango_se_rechaza_al_leer ... ok
+test wire::tests::un_multisig_con_claves_repetidas_se_rechaza_al_leer ... ok
+test wire::tests::un_multisig_con_n_absurdo_no_reserva_memoria ... ok
+test wire::tests::un_testigo_que_miente_su_longitud_se_rechaza ... ok
+test preimage::dag::tests::el_compromiso_del_cuerpo_es_sensible ... ok
+test wire::tests::una_cabecera_truncada_se_rechaza_en_todo_punto ... ok
+test wire::tests_cuerpo::un_bloque_da_la_vuelta_completa ... ok
+test preimage::tx::tests::cada_campo_de_efecto_entra_en_el_txid ... ok
+test wire::tests_cuerpo::un_contador_de_transacciones_mentiroso_se_rechaza ... ok
+test wire::tests_cuerpo::un_bloque_vacio_da_la_vuelta ... ok
+test preimage::dag::tests::cada_campo_de_la_cabecera_y_de_solucion_entra_en_pre_hash ... ok
+test wire_dag::tests::el_verificador_pot_no_finge_exito ... ok
+test wire_dag::tests::la_cabecera_minima_y_la_maxima ... ok
+test wire_dag::tests::el_bloque_maximo_mide_exactamente_el_agregado ... ok
+test wire_dag::tests::la_diferencia_de_slots_se_comprueba_sobre_el_bloque ... ok
+test wire_dag::tests::la_codificacion_del_bloque_es_inyectiva ... ok
+test wire_dag::tests::justificacion_de_cero_uno_y_150_bundles ... ok
+test wire_dag::tests::los_tamanos_son_los_presupuestados ... ok
+test wire_dag::tests::nuevo_rechaza_el_descuadre_en_las_dos_direcciones ... ok
+test wire_dag::tests::rechaza_151_bundles_antes_de_reservar ... ok
+test wire_dag::tests::un_bundle_conserva_ocho_outputs ... ok
+test preimage::tx::tests::el_sighash_cambia_por_modo ... ok
+test wire::tests::una_transaccion_truncada_se_rechaza_en_todo_punto ... ok
+test firma::tests::una_clave_que_no_es_un_punto_se_rechaza ... ok
+test wire::tests_cuerpo::un_bloque_truncado_nunca_se_acepta_a_medias ... ok
+test firma::tests::cambiar_el_mensaje_invalida ... ok
+test firma::tests::otra_clave_no_verifica ... ok
+test firma::tests::una_firma_valida_verifica ... ok
+test wire::tests_cuerpo::ningun_byte_arbitrario_hace_entrar_en_panico ... ok
+test wire_dag::tests::truncados_y_basura_no_hacen_panico ... ok
+test preimage::dag::tests::bytes_arbitrarios_no_hacen_entrar_en_panico ... ok
+test preimage::dag::tests::el_sello_zip215_se_verifica ... ok
+
+test result: ok. 144 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cavp_sha3_256.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/cavp_sha3_256-2a874c3ced86f589)
+
+running 4 tests
+test ancla_mensaje_vacio ... ok
+test cavp_short_msg ... ok
+test cavp_long_msg ... ok
+test cavp_monte_carlo ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.03s
+
+     Running tests/ed25519_no_unicidad.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/ed25519_no_unicidad-71418269e229423c)
+
+running 1 test
+test dos_firmas_distintas_del_propietario_verifican_el_mismo_mensaje ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/oraculo_julia.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/oraculo_julia-f332aa995f8524f5)
+
+running 1 test
+test el_oraculo_julia_coincide_con_la_implementacion ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/parsers_dag_prop.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/parsers_dag_prop-fe5a42252cc84966)
+
+running 2 tests
+test bloque_dag_desde_bytes_no_entra_en_panico ... ok
+test dag_header_desde_bytes_no_entra_en_panico ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/vectores_dag.rs (/home/katana/zeo/ZEROX/deepseek/L01/target/debug/deps/vectores_dag-2e59d7c530a6ff6d)
+
+running 4 tests
+test el_wire_congelado_se_recalcula ... ok
+test los_offsets_congelados_del_wire ... ok
+test los_hashes_congelados_se_recalculan ... ok
+test un_byte_del_wire_cambia_el_hash ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zx_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=== STEP S1-zx-core pkg=zx-core exit=0 elapsed=6 ===

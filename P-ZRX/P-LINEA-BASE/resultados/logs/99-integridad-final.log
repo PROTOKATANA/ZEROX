@@ -1,0 +1,17 @@
+=== 2026-09-26T01:07:13+02:00 integridad checkout (diff manifiesto) ===
+exit_diff=0
+=== git status clon Autonomys ===
+exit_status=0
+=== hashes fijos (repeticion) ===
+e75b1ded16e9862eaaef9ad9b89402b9832f86fe818292634b2e54dc6b3540ff  testdata/nist-cavp/SHA3_256ShortMsg.rsp
+741b75d093aeb1de3536681b5e7e65090a5eca8015eb75c5f9be0feda47660d5  testdata/nist-cavp/SHA3_256LongMsg.rsp
+0b387d75eb7bb96070007ae570601675d4527f50295f41c9d0fbc6c03ec48ca4  testdata/nist-cavp/SHA3_256Monte.rsp
+023a9fc85b145f4f49e70f49246f6ae6ad35fd3e5f4d7f2d3a466e9b6b53fc15  crates/zx-pot/tests/vectores-nightly.txt
+=== sha256 unidad (repeticion) ===
+619d4950b3bef5e5fa771d3f1a3e6e635f0a18f4d88962a950a2c12261bc2495  Cargo.toml
+9021465df73c82c1e5c97d1ad00305e3c85494fc68d4d54bf4fb28ca49612b59  Cargo.lock
+604b0c1bfdae30f1a0075734760c954072de325b6bf319b8b73790364ebb874e  rust-toolchain.toml
+
+=== 2026-09-26T01:08:30+02:00 integridad FINAL tras S5 ===
+exit_diff_final=0
+exit_status_final=0

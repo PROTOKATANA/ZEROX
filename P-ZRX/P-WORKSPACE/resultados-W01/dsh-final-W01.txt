@@ -1,0 +1,24 @@
+## Orden W01 — resumen (SUPERADO)
+
+**Veredicto:** la pregunta falsable **no se refuta**. `ws/` queda listo para migrar a la raíz.
+
+**Faltas de definición detectadas (informadas antes de actuar):**
+1. §3.1 manda actualizar «el comentario que explica la ruta» pero §5/V6 exigen «solo la línea autorizada». Hay dos comentarios con rutas; actualicé **solo el inline del `PathBuf`** y dejé intacto el doc-comentario de módulo (que ya citaba una ruta vieja `lineo/...`).
+2. §3.3 no menciona `[profile.release]`; lo conservé por D-P03 (mínimo cambio).
+
+**Verificación (desde `ws/`, entorno §4, sin Python):**
+- **V1** `fmt --all -- --check` → OK, sin diferencias.
+- **V2** `clippy --workspace --all-targets --all-features --locked -- -D warnings` → OK, **0 avisos**.
+- **V3** `test --workspace --all-features --locked` → OK; **zx-core 156**, **zx-pot 5**, 0 fallidas.
+- **V4** nombres de test vs L01 → **161/161 idénticos** (`diff` exit 0).
+- **V5** `ci/dependencias-exactas.sh` → OK, 10 dependencias exactas.
+- **V6** `diff -r` crates vs `9681061` → solo la región autorizada de `oraculo_julia.rs`.
+- **Lock** 496 → 130 paquetes; **0** `name`+`version` del nuevo ausentes en el antiguo (recorte sin cambiar ninguna versión).
+- **Entrada** `ENTRADA-W01.sha256` → OK al inicio y al final.
+- `MIGRACION.sha256`: 50 archivos, `sha256sum -c` exit 0.
+
+**Diferencias con `9681061`:** `ws/Cargo.toml` (members 11→2, sin `exclude`, deps 31→10), `Cargo.lock` recortado, `oraculo_julia.rs` (ruta + comentario), y nuevos `testdata/vectores-cabecera-dag/{vectores.txt,PROCEDENCIA.md}` y CI nueva de 2 jobs. `rust-toolchain.toml` idéntico.
+
+**Entregables:** `ws/`, `MIGRACION.sha256`, `logs/`, `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Presupuesto ≈3 min / 8 jobs / ~1,3 GiB, no agotado.
+
+**NO demuestra:** ninguna regla de consenso híbrido; que la CI haya corrido en GitHub; que el oráculo Julia se haya re-ejecutado; nada sobre consenso, nodo, red ni adaptación.
