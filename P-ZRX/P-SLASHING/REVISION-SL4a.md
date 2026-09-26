@@ -29,3 +29,13 @@ tras reorganización.
   llevar el firmante seguro al voto cuando exista la capa (FV-1, D4).
 - La combinación con W06d4 (en curso, toca `zx-node` y `zx-post`) no se ha probado junta: la primera suite
   conjunta será la de la migración de W06d4.
+
+## Corrección de la migración (22:15)
+
+**Error del director:** la migración por parche no trajo los dos directorios de vectores que usan los
+diferenciales de SL-4a (`testdata/transicion-v0.4/` y `testdata/estado-dag-v0.5/`): el parche de 22 rutas
+solo contenía código. La raíz quedó con `diferencial_t01` y `diferencial_t04` sin sus datos. Lo detectó
+W06d5 en su paso 0. Copiados desde `deepseek/SL4a/ws/testdata/`; los vectores son idénticos byte a byte a
+las salidas de los oráculos (`T01/resultados/vectores-transicion-v0.4.txt`,
+`T04/resultados/vectores-estado-dag-v0.5.txt`). Lección: al migrar por parche, comparar también
+`testdata/` de la zona con la raíz.
