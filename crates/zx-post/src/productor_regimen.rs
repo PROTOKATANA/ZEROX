@@ -27,6 +27,13 @@
 //! No decide si la clave tiene garantía: eso es del motor de estado (`zx-cadena`). No elige `SR`
 //! (constante dev, D-P11), no admite el bloque, no comprueba el cuerpo y no publica.
 //!
+//! # Firmante seguro (SL-4b1)
+//!
+//! [`producir_en_regimen`] sella directamente y **no** protege contra la doble firma: es la ruta
+//! antigua, conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La
+//! variante [`producir_en_regimen_con_firmante`] construye **exactamente** el mismo bloque y lo
+//! sella **solo** a través de [`Firmante`] (`C-EVP-06`, FIR-01…FIR-15).
+//!
 //! # Frontera de confianza
 //!
 //! [`FuenteSoluciones`] afirma que la solución verificó contra las entradas proporcionadas; el
@@ -42,7 +49,11 @@ use zx_core::{
     ClavePublica, DagBlockHeader, EncodingError, ExtensionTx, PadresDag, Tx, body_commitment, txid,
 };
 
-use crate::productor::{FuenteSoluciones, ParametrosProductor, clave_publica_de};
+use crate::firmante::{Firmante, FirmanteError};
+use crate::productor::{
+    CandidatoPoST, ErrorSellado, FuenteSoluciones, ParametrosProductor, ProductoFirmado,
+    clave_publica_de, finalizar_con_firmante, finalizar_directo,
+};
 use crate::servicio_pot::{ErrorServicioPot, ServicioPot};
 
 /// Cuerpo que aporta el llamante: transacciones **sin** la coinbase y sus testigos, en paralelo.
@@ -176,6 +187,9 @@ where
         /// Clave del firmante.
         firma: ClavePublica,
     },
+    /// Fallo del firmante (clave ajena, sello inválido o E/S del registro).
+    #[error("firmante: {0}")]
+    Firmante(#[from] FirmanteError),
     /// Fallo de la fuente de soluciones.
     #[error("fuente de soluciones: {0}")]
     Fuente(#[source] E),
@@ -190,7 +204,22 @@ where
     Formato(#[from] EncodingError),
 }
 
+impl<E> From<ErrorSellado> for ErrorRegimen<E>
+where
+    E: std::error::Error + 'static,
+{
+    fn from(fallo: ErrorSellado) -> Self {
+        match fallo {
+            ErrorSellado::Firmante(e) => Self::Firmante(e),
+            ErrorSellado::Formato(e) => Self::Formato(e),
+        }
+    }
+}
+
 /// Produce un bloque PoST en régimen para los padres y el slot dados.
+///
+/// **No protege contra la doble firma:** sella directamente con `clave`. La variante segura es
+/// [`producir_en_regimen_con_firmante`]; SL-4b2 retirará esta del nodo.
 ///
 /// # Argumentos
 /// - `padres`: padres ya elegidos por el llamante (seleccionado primero, `≤ 15`). El productor no
@@ -215,6 +244,75 @@ pub fn producir_en_regimen<F>(
     parametros: &ParametrosProductor,
     cuerpo: CuerpoProductor,
 ) -> Result<BloqueDag, ErrorRegimen<F::Error>>
+where
+    F: FuenteSoluciones,
+    F::Error: std::error::Error + 'static,
+{
+    let candidato = ensamblar_regimen(
+        padres,
+        slot_objetivo,
+        servicio,
+        fuente,
+        clave,
+        parametros,
+        cuerpo,
+    )?;
+    finalizar_directo(candidato, clave).map_err(ErrorRegimen::from)
+}
+
+/// Produce un bloque PoST en régimen sellándolo **solo** con `firmante` (SL-4b1).
+///
+/// Construye exactamente el mismo bloque que [`producir_en_regimen`] y lo sella por
+/// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
+/// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
+///
+/// # Errores
+/// Los mismos que [`producir_en_regimen`], más [`ErrorRegimen::Firmante`] para un fallo real del
+/// registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "firma pública del productor seguro; agrupar rompería la simetría con producir_en_regimen"
+)]
+pub fn producir_en_regimen_con_firmante<F>(
+    padres: PadresDag,
+    slot_objetivo: u64,
+    servicio: &mut ServicioPot,
+    fuente: &F,
+    clave: &SigningKey,
+    parametros: &ParametrosProductor,
+    cuerpo: CuerpoProductor,
+    firmante: &mut Firmante<'_>,
+) -> Result<ProductoFirmado, ErrorRegimen<F::Error>>
+where
+    F: FuenteSoluciones,
+    F::Error: std::error::Error + 'static,
+{
+    let candidato = ensamblar_regimen(
+        padres,
+        slot_objetivo,
+        servicio,
+        fuente,
+        clave,
+        parametros,
+        cuerpo,
+    )?;
+    finalizar_con_firmante(candidato, clave, firmante).map_err(ErrorRegimen::from)
+}
+
+/// Valida el rango, avanza el servicio y ensambla cabecera (sin sello) y cuerpo (coinbase v3).
+#[allow(
+    clippy::too_many_arguments,
+    reason = "mismos argumentos públicos del productor"
+)]
+fn ensamblar_regimen<F>(
+    padres: PadresDag,
+    slot_objetivo: u64,
+    servicio: &mut ServicioPot,
+    fuente: &F,
+    clave: &SigningKey,
+    parametros: &ParametrosProductor,
+    cuerpo: CuerpoProductor,
+) -> Result<CandidatoPoST, ErrorRegimen<F::Error>>
 where
     F: FuenteSoluciones,
     F::Error: std::error::Error + 'static,
@@ -308,7 +406,7 @@ where
     let merkle_root = merkle_root(&txids);
     let body_commitment = body_commitment(&txs, &testigos, parametros.consensus_branch_id)?;
 
-    let mut cabecera = DagBlockHeader {
+    let cabecera = DagBlockHeader {
         consensus_branch_id: parametros.consensus_branch_id,
         merkle_root,
         timestamp: parametros.timestamp,
@@ -322,11 +420,14 @@ where
         padres,
         sello: [0u8; LONGITUD_FIRMA],
     };
-    let pre_hash = cabecera.pre_hash();
-    cabecera.sello = clave.sign(pre_hash.as_bytes()).into();
 
     let justificacion = JustificacionPot::nueva(portadores)?;
-    Ok(BloqueDag::nuevo(cabecera, justificacion, txs, testigos)?)
+    Ok(CandidatoPoST {
+        cabecera,
+        justificacion,
+        txs,
+        testigos,
+    })
 }
 
 #[cfg(test)]

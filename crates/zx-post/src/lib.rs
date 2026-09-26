@@ -1,6 +1,6 @@
 //! Crate `zx-post`: PoT puro, rango PoT, puerta conjunta, contexto de transición dev,
 //! justificación PoT del wire, productor del bloque de transición (W05b2), servicio PoT local y
-//! productor en régimen (W05b3) (D-P14).
+//! productor en régimen (W05b3) y firmante seguro local (SL-4b1) (D-P14).
 //!
 //! Depende solo de `zx-core`, `zx-pot`, `zx-dag` y `zx-poas` (frontera §V8). No depende de
 //! `zx-consensus` salvo como `dev-dependency` para minar la cadena PoW de los tests de extremo a
@@ -16,6 +16,7 @@
 
 pub mod cabecera_conjunta;
 pub mod contexto_transicion;
+pub mod firmante;
 pub mod justificacion;
 pub mod pot;
 pub mod pot_rango;
@@ -46,8 +47,11 @@ pub use pot_rango::{
     verificar_rango_pot_fase_previa,
 };
 pub use productor::{
-    ErrorProductor, FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de,
-    producir,
+    ErrorProductor, FuenteSoluciones, MotivoAbstencion, ParametrosProductor, ProductoFirmado,
+    SolucionCandidata, clave_publica_de, producir, producir_con_firmante,
 };
-pub use productor_regimen::{CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen};
+pub use productor_regimen::{
+    CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen,
+    producir_en_regimen_con_firmante,
+};
 pub use servicio_pot::{ErrorServicioPot, ServicioPot};

@@ -40,3 +40,10 @@ de 1,66 s: no cambia la decisión de no usar `fdatasync`. Se repetirá sin carga
 
 `tests/firmante_identidad_evidencia.rs` llama a `validar_forma_tx_v4` con la firma actual y espera
 `ErrCbidAjeno`; SL-4c cambia las dos cosas. Se adaptará al migrar SL-4c (orden de rebase).
+
+## Migración (2026-09-27 ≈ 00:42, tras `e2eee98` de W06d5)
+
+Por parche (`git apply -p1`, 10 rutas, todas en `crates/zx-post/`); base de la raíz idéntica a `ws.orig` en los
+tres archivos modificados; `MIGRACION.sha256` 10/10 en la raíz; `crates/zx-post` idéntico a `ws/crates/zx-post`.
+Sin cambios en `Cargo.*` ni `testdata/`. La suite conjunta con W06d5 la ejecuta el paso 0 de la siguiente orden
+de código.

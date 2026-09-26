@@ -24,6 +24,14 @@
 //! no elige padres con GHOSTDAG (el de transición es hijo único de `T`), no firma con una clave de
 //! red, no publica y no admite. No arranca desde génesis: el terminal lo aporta el llamante.
 //!
+//! # Firmante seguro (SL-4b1)
+//!
+//! [`producir`] sella directamente y **no** protege contra la doble firma: es la ruta antigua,
+//! conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La variante
+//! [`producir_con_firmante`] construye **exactamente** la misma cabecera y el mismo cuerpo y los
+//! sella **solo** a través de [`Firmante`], que persiste `(identidad, slot) -> pre_hash` con `fsync`
+//! antes de emitir el sello (`C-EVP-06`, FIR-01…FIR-15).
+//!
 //! # Por qué la parcela es un rasgo
 //!
 //! La frontera §V8 `zx-post → {zx-core, zx-pot, zx-dag, zx-poas}` **no** incluye `zx-farmer`, pero
@@ -46,10 +54,11 @@ use zx_core::preimage::block::merkle_root;
 use zx_core::wire_dag::{BloqueDag, JustificacionPot, MAX_BUNDLES_POT, PotCheckpoints};
 use zx_core::{
     Amount, BlockHash, ClavePublica, DagBlockHeader, EncodingError, ExtensionTx, PadresDag,
-    SolucionPoas, Tx, body_commitment, txid,
+    PreHash, SolucionPoas, Tx, body_commitment, txid,
 };
 use zx_pot::tipos::PotSeed;
 
+use crate::firmante::{Firmante, FirmanteError, Resultado as ResultadoFirmante};
 use crate::pot::{
     ErrorContextoPot, checkpoints_a_wire, proyectar_iteraciones, semilla_genesis, semilla_siguiente,
 };
@@ -101,6 +110,56 @@ pub struct ParametrosProductor {
     pub importe_coinbase: Amount,
 }
 
+/// Motivo por el que un productor con firmante **no** emite bloque.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MotivoAbstencion {
+    /// El firmante ya registró otro `pre_hash` para esta identidad y slot: el candidato se
+    /// descarta y no se sella.
+    Conflicto {
+        /// El `pre_hash` que ya estaba registrado.
+        pre_hash_registrado: PreHash,
+    },
+    /// El registro se perdió y el firmante sigue en su ventana de abstención (FIR-10).
+    PerdidaRegistro {
+        /// Último slot en el que todavía se abstiene.
+        hasta: u64,
+        /// `s_max_slots` del perfil con el que se abrió el registro.
+        s_max_slots: u64,
+    },
+}
+
+/// Lo que devuelve un productor que sella a través de [`Firmante`].
+#[derive(Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "el bloque es el producto normal; boxearlo obligaría a desempaquetar en cada llamante sin ganancia medible"
+)]
+pub enum ProductoFirmado {
+    /// Se ensambló y selló el bloque. El segundo campo es el veredicto del firmante: `Sellado`
+    /// (entrada nueva) o `Reemitido` (mismo `pre_hash`).
+    Bloque(BloqueDag, ResultadoFirmante),
+    /// El firmante se abstuvo: no se emitió bloque y el candidato se descarta.
+    Abstenido {
+        /// Causa de la abstención.
+        motivo: MotivoAbstencion,
+    },
+}
+
+/// Traduce el veredicto del firmante a un motivo de abstención, si lo hay.
+fn motivo_de(resultado: ResultadoFirmante) -> Option<MotivoAbstencion> {
+    match resultado {
+        ResultadoFirmante::Sellado | ResultadoFirmante::Reemitido => None,
+        ResultadoFirmante::AbstenidoPorConflicto {
+            pre_hash_registrado,
+        } => Some(MotivoAbstencion::Conflicto {
+            pre_hash_registrado,
+        }),
+        ResultadoFirmante::AbstenidoPorPerdida { hasta, s_max_slots } => {
+            Some(MotivoAbstencion::PerdidaRegistro { hasta, s_max_slots })
+        }
+    }
+}
+
 /// Fallo al producir el bloque de transición.
 #[derive(Debug, thiserror::Error)]
 pub enum ErrorProductor<E>
@@ -132,6 +191,9 @@ where
     /// `zx-core` rechazó el formato (padres o compromiso del cuerpo).
     #[error("formato del bloque: {0}")]
     Formato(#[from] EncodingError),
+    /// Fallo del firmante (clave ajena, sello inválido o E/S del registro).
+    #[error("firmante: {0}")]
+    Firmante(#[from] FirmanteError),
     /// Fallo de la fuente de soluciones.
     #[error("fuente de soluciones: {0}")]
     Fuente(#[source] E),
@@ -143,7 +205,88 @@ where
     },
 }
 
+/// Fallo interno del sellado, común a las dos rutas del productor.
+#[derive(Debug)]
+pub(crate) enum ErrorSellado {
+    /// El firmante rechazó el candidato.
+    Firmante(FirmanteError),
+    /// `zx-core` rechazó el bloque ensamblado.
+    Formato(EncodingError),
+}
+
+impl<E> From<ErrorSellado> for ErrorProductor<E>
+where
+    E: std::error::Error + 'static,
+{
+    fn from(fallo: ErrorSellado) -> Self {
+        match fallo {
+            ErrorSellado::Firmante(e) => Self::Firmante(e),
+            ErrorSellado::Formato(e) => Self::Formato(e),
+        }
+    }
+}
+
+/// Candidato PoST ensamblado **sin sello**: cabecera con `sello = 0`, justificación y cuerpo.
+///
+/// La construcción vive aquí una sola vez; las dos rutas de sellado ([`finalizar_directo`] y
+/// [`finalizar_con_firmante`]) la comparten para que el bloque sea idéntico byte a byte.
+pub(crate) struct CandidatoPoST {
+    /// Cabecera con `sello = [0; 64]`.
+    pub(crate) cabecera: DagBlockHeader,
+    /// Justificación del rango de slots.
+    pub(crate) justificacion: JustificacionPot,
+    /// Transacciones (la primera es la coinbase).
+    pub(crate) txs: Vec<Tx>,
+    /// Testigos paralelos a `txs`.
+    pub(crate) testigos: Vec<Vec<Vec<u8>>>,
+}
+
+/// Sella directamente el candidato con la clave (ruta antigua, sin firmante seguro).
+pub(crate) fn finalizar_directo(
+    candidato: CandidatoPoST,
+    clave: &SigningKey,
+) -> Result<BloqueDag, ErrorSellado> {
+    let CandidatoPoST {
+        mut cabecera,
+        justificacion,
+        txs,
+        testigos,
+    } = candidato;
+    let pre_hash = cabecera.pre_hash();
+    cabecera.sello = clave.sign(pre_hash.as_bytes()).into();
+    BloqueDag::nuevo(cabecera, justificacion, txs, testigos).map_err(ErrorSellado::Formato)
+}
+
+/// Sella el candidato **solo** a través del firmante seguro y traduce su veredicto.
+pub(crate) fn finalizar_con_firmante(
+    candidato: CandidatoPoST,
+    clave: &SigningKey,
+    firmante: &mut Firmante<'_>,
+) -> Result<ProductoFirmado, ErrorSellado> {
+    let CandidatoPoST {
+        mut cabecera,
+        justificacion,
+        txs,
+        testigos,
+    } = candidato;
+    let resultado = firmante
+        .firmar(&mut cabecera, clave)
+        .map_err(ErrorSellado::Firmante)?;
+    match motivo_de(resultado) {
+        Some(motivo) => Ok(ProductoFirmado::Abstenido { motivo }),
+        None => {
+            let bloque = BloqueDag::nuevo(cabecera, justificacion, txs, testigos)
+                .map_err(ErrorSellado::Formato)?;
+            Ok(ProductoFirmado::Bloque(bloque, resultado))
+        }
+    }
+}
+
 /// Produce el primer bloque PoST hijo de `terminal` (D-P09…D-P11, F-03, F-09).
+///
+/// **No protege contra la doble firma.** Es la ruta antigua: sella directamente con `clave` sin
+/// consultar registro alguno. La variante segura es [`producir_con_firmante`]; SL-4b2 retirará esta
+/// del nodo.
 ///
 /// # Procedimiento
 /// Arranca de S1, avanza el PoT slot a slot con `N_dev` y, en cada slot, pide a `fuente` las
@@ -159,6 +302,45 @@ pub fn producir<F>(
     clave: &SigningKey,
     parametros: &ParametrosProductor,
 ) -> Result<BloqueDag, ErrorProductor<F::Error>>
+where
+    F: FuenteSoluciones,
+    F::Error: std::error::Error + 'static,
+{
+    let candidato = ensamblar(terminal, fuente, clave, parametros)?;
+    finalizar_directo(candidato, clave).map_err(ErrorProductor::from)
+}
+
+/// Produce el primer bloque PoST hijo de `terminal` sellándolo **solo** con `firmante` (SL-4b1).
+///
+/// Construye exactamente el mismo candidato que [`producir`] y lo sella por
+/// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
+/// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
+///
+/// # Errores
+/// Los mismos que [`producir`], más [`ErrorProductor::Firmante`] para un fallo real del registro
+/// (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
+pub fn producir_con_firmante<F>(
+    terminal: BlockHash,
+    fuente: &F,
+    clave: &SigningKey,
+    parametros: &ParametrosProductor,
+    firmante: &mut Firmante<'_>,
+) -> Result<ProductoFirmado, ErrorProductor<F::Error>>
+where
+    F: FuenteSoluciones,
+    F::Error: std::error::Error + 'static,
+{
+    let candidato = ensamblar(terminal, fuente, clave, parametros)?;
+    finalizar_con_firmante(candidato, clave, firmante).map_err(ErrorProductor::from)
+}
+
+/// Barre los slots desde S1 y ensambla el primer candidato con solución.
+fn ensamblar<F>(
+    terminal: BlockHash,
+    fuente: &F,
+    clave: &SigningKey,
+    parametros: &ParametrosProductor,
+) -> Result<CandidatoPoST, ErrorProductor<F::Error>>
 where
     F: FuenteSoluciones,
     F::Error: std::error::Error + 'static,
@@ -199,10 +381,9 @@ where
             });
         }
 
-        return construir_bloque(
+        return construir_sin_sello(
             terminal,
             parametros,
-            clave,
             slot,
             salida,
             portadores,
@@ -215,22 +396,21 @@ where
     })
 }
 
-/// Ensambla cabecera y cuerpo (coinbase v3) y sella la prefirma.
-fn construir_bloque<E>(
+/// Ensambla cabecera (sin sello) y cuerpo (coinbase v3) del candidato.
+fn construir_sin_sello<E>(
     terminal: BlockHash,
     parametros: &ParametrosProductor,
-    clave: &SigningKey,
     slot: u64,
     pot_output: [u8; 16],
     portadores: Vec<PotCheckpoints>,
     solucion: SolucionPoas,
-) -> Result<BloqueDag, ErrorProductor<E>>
+) -> Result<CandidatoPoST, ErrorProductor<E>>
 where
     E: std::error::Error + 'static,
 {
     let productor = solucion.public_key;
     // Coinbase v3 (F-05, F-09, F-17): sin entradas ni salidas, campos extra `clave ‖ importe ‖
-    // slot`, con el slot de **esta** cabecera (el que se le pasa a `construir_bloque`).
+    // slot`, con el slot de **esta** cabecera (el que se le pasa a `construir_sin_sello`).
     let coinbase = Tx {
         version: 3,
         inputs: Vec::new(),
@@ -251,7 +431,7 @@ where
     let merkle_root = merkle_root(&txids);
     let body_commitment = body_commitment(&txs, &testigos, parametros.consensus_branch_id)?;
 
-    let mut cabecera = DagBlockHeader {
+    let cabecera = DagBlockHeader {
         consensus_branch_id: parametros.consensus_branch_id,
         merkle_root,
         timestamp: parametros.timestamp,
@@ -266,12 +446,13 @@ where
         sello: [0u8; LONGITUD_FIRMA],
     };
 
-    // El sello cubre la prefirma canónica (C-HDR-03, C-HDR-04).
-    let pre_hash = cabecera.pre_hash();
-    cabecera.sello = clave.sign(pre_hash.as_bytes()).into();
-
     let justificacion = JustificacionPot::nueva(portadores)?;
-    Ok(BloqueDag::nuevo(cabecera, justificacion, txs, testigos)?)
+    Ok(CandidatoPoST {
+        cabecera,
+        justificacion,
+        txs,
+        testigos,
+    })
 }
 
 /// La clave pública Ed25519 que firmará el bloque de una `SigningKey` dada.
