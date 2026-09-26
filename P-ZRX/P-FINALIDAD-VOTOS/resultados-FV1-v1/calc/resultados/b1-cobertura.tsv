@@ -1,0 +1,8 @@
+caso	n	minimo
+a=0 (sin atacante)	60	1
+pi=1.0 (todos encendidos)	72	1
+cola=Inf (homogéneo, control)	90	1
+cola=2.2 (H3 de P-CLAVE, más pesimista)	90	1
+n=100 (pocas claves)	120	1
+n=10000 (muchas claves)	120	1
+total de celdas	360	360

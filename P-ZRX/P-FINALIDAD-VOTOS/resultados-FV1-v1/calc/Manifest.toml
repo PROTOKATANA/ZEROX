@@ -1,0 +1,10 @@
+# This file is machine-generated - editing it directly is not advised
+
+julia_version = "1.13.0"
+manifest_format = "2.1"
+project_hash = "429fc41f257650e9ee1c7a2ad363c4f85ca7073e"
+
+[[deps.FV1Calc]]
+path = "."
+uuid = "2aac2b28-13b3-4d3b-b856-bf581c260288"
+version = "0.1.0"

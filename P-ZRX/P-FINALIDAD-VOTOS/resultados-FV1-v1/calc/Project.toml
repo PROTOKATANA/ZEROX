@@ -1,0 +1,7 @@
+name = "FV1Calc"
+uuid = "2aac2b28-13b3-4d3b-b856-bf581c260288"
+authors = ["Sonnet (ejecutor FV-1)"]
+version = "0.1.0"
+
+[compat]
+julia = "1.13"

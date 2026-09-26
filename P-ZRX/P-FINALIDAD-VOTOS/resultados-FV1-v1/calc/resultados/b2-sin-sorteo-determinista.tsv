@@ -1,0 +1,7 @@
+a	pausa_posible_sin_control_red	sella_mentira_con_control_red	sella_mentira_sin_control_red
+0.1	false	false	false
+0.2	false	false	false
+0.25	false	false	false
+0.3	false	false	false
+0.33	false	false	false
+0.4	true	true	false

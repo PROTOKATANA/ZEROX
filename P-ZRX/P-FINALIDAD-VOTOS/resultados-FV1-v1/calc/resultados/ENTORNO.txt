@@ -1,0 +1,8 @@
+Fecha: 2026-09-26T19:15:40.855
+VERSION Julia: 1.13.0
+Threads(:default): 4
+Threads(:interactive): 0
+Tiempo total run.jl: 321.08 s
+Semillas: (quorum = 0x0000001f3a9c7b5e, quorum_cov = 0x0000007e2d0b5911, sorteo_cruz = 0x0000004c81f033a7, sesgo_ancla = 0x0000009b60e4127d)
+Sys.CPU_NAME: znver5
+Sys.total_memory (GiB): 123.4
