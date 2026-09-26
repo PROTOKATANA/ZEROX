@@ -1,0 +1,24 @@
+     Testing OraculoFormatoV0
+      Status `/tmp/jl_gMQuEd/Project.toml`
+  [2836fb15] OraculoFormatoV0 v0.0.0 `~/zeo/ZEROX/deepseek/W02b/oraculo-formato-v0.1`
+  [ea8e919c] SHA v1.0.0
+  [8dfed614] Test v1.11.0
+      Status `/tmp/jl_gMQuEd/Manifest.toml`
+  [2836fb15] OraculoFormatoV0 v0.0.0 `~/zeo/ZEROX/deepseek/W02b/oraculo-formato-v0.1`
+  [2a0f44e3] Base64 v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [ac6e5ff7] JuliaSyntaxHighlighting v1.12.0
+  [56ddb016] Logging v1.11.0
+  [d6f4376e] Markdown v1.11.0
+  [9a3f8284] Random v1.11.0
+  [ea8e919c] SHA v1.0.0
+  [9e88b42a] Serialization v1.11.0
+  [f489334b] StyledStrings v1.11.0
+  [8dfed614] Test v1.11.0
+Precompiling for configuration --code-coverage=none --color=no --warn-overwrite=yes --depwarn=yes --inline=yes --startup-file=no --track-allocation=none
+   0.1 s  ✓ OraculoFormatoV0
+  1 dependency successfully precompiled in 0 seconds. 8 already precompiled.
+     Testing Running tests...
+Test Summary:      | Pass  Total  Time
+oráculo formato v0 |   85     85  0.6s
+     Testing OraculoFormatoV0 tests passed 

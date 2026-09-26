@@ -1,0 +1,14 @@
+# Proyecto aislado del oráculo de formatos v0 del ZEROX híbrido (ORDEN-W02).
+#
+# Solo stdlib (`SHA`, `Test`): no hay dependencias externas que resolver, y el `Manifest.toml`
+# congela el árbol. `Manifest.toml` se versiona junto a este archivo (LINEO §1).
+#
+# Se declara `name`/`uuid` para que `Pkg.test()` (paso V4) funcione como paquete; la referencia
+# pedida vive en `src/referencia.jl` y `src/OraculoFormatoV0.jl` solo la envuelve.
+
+name = "OraculoFormatoV0"
+uuid = "2836fb15-873c-49c7-85a0-2efab44c065e"
+
+[deps]
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

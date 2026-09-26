@@ -137,11 +137,11 @@ fn inputs_digest(tx: &Tx) -> Digest {
     w.finish(TAG_TXID_INPUTS)
 }
 
-/// `extension_digest` de las versiones 2 y 3 (F-06, F-07):
-/// `H_d("ZZKTxIdGarantia_", campos extra de F-05)`.
+/// `extension_digest` de las versiones 2 y 3 (F-06, F-07, F-15, F-17):
+/// `H_d("ZZKTxIdGarantia_", campos extra de F-15/F-17)`.
 ///
-/// - v2: `tipo u8 ‖ clave 32 B ‖ importe u64` LE.
-/// - v3: `clave 32 B ‖ importe u64` LE.
+/// - v2: `tipo u8 ‖ clave 32 B ‖ importe u64 ‖ nonce u64` LE (F-15).
+/// - v3: `clave 32 B ‖ importe u64 ‖ slot u64` LE (F-17).
 /// - v1 (`Ninguna`): `None`; su `txid` queda byte a byte igual al de `9681061`.
 ///
 /// Los campos se escriben aunque el `importe` sea `u64` (F-05); el `importe` de las salidas sigue
@@ -153,14 +153,22 @@ fn extension_digest(tx: &Tx) -> Option<Digest> {
             tipo,
             clave,
             importe,
+            nonce,
         } => {
-            let mut w = PreimageWriter::con_capacidad(1 + 32 + 8);
-            w.u8(tipo.byte()).clave(clave).u64(importe.brek() as u64);
+            let mut w = PreimageWriter::con_capacidad(1 + 32 + 8 + 8);
+            w.u8(tipo.byte())
+                .clave(clave)
+                .u64(importe.brek() as u64)
+                .u64(*nonce);
             Some(w.finish(TAG_TXID_GARANTIA))
         }
-        ExtensionTx::CoinbasePost { clave, importe } => {
-            let mut w = PreimageWriter::con_capacidad(32 + 8);
-            w.clave(clave).u64(importe.brek() as u64);
+        ExtensionTx::CoinbasePost {
+            clave,
+            importe,
+            slot,
+        } => {
+            let mut w = PreimageWriter::con_capacidad(32 + 8 + 8);
+            w.clave(clave).u64(importe.brek() as u64).u64(*slot);
             Some(w.finish(TAG_TXID_GARANTIA))
         }
     }

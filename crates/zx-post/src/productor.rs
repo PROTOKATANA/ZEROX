@@ -229,7 +229,8 @@ where
     E: std::error::Error + 'static,
 {
     let productor = solucion.public_key;
-    // Coinbase v3 (F-05, F-09): sin entradas ni salidas, campos extra `clave ‖ importe`.
+    // Coinbase v3 (F-05, F-09, F-17): sin entradas ni salidas, campos extra `clave ‖ importe ‖
+    // slot`, con el slot de **esta** cabecera (el que se le pasa a `construir_bloque`).
     let coinbase = Tx {
         version: 3,
         inputs: Vec::new(),
@@ -239,6 +240,7 @@ where
         extension: ExtensionTx::CoinbasePost {
             clave: productor,
             importe: parametros.importe_coinbase,
+            slot,
         },
     };
     // El `txid` de la coinbase se calcula antes de moverla al vector del cuerpo.

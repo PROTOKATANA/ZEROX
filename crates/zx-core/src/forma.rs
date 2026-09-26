@@ -33,7 +33,10 @@ use crate::tx::{ExtensionTx, Lock, TipoGarantia, Tx};
 ///    `n_in = n_out = 0`; v1 con entradas exige `n_out ≥ 1`; v3 exige `n_in = n_out = n_wit = 0`;
 /// 5. testigos de v2 (F-08): `n_wit = n_in + 1` y el **último** (aceptación) de 64 B;
 /// 6. campos inactivos (F-10): `lock_time = 0`, `expiry_height = 0` y ninguna salida
-///    [`Lock::Htlc`], en toda versión.
+///    [`Lock::Htlc`]. **Excepción F-16:** las candidatas a coinbase PoW (`version == 1`,
+///    `inputs.is_empty()`) pueden llevar `expiry_height ≠ 0`; el motor exige allí
+///    `expiry_height == altura`. La **anchura** de la extensión (con `nonce` y `slot`) la fijan el
+///    códec y el `txid` (F-15/F-17), no esta función.
 ///
 /// # Errores
 /// [`ErrorFormaTx`], con una variante específica por caso. El orden de comprobación está fijado
@@ -157,10 +160,16 @@ pub fn validar_forma_tx(tx: &Tx, testigos: &[Vec<u8>]) -> Result<(), ErrorFormaT
     }
 
     // 6 · campos dependientes de altura, inactivos en v0 (F-10), válido para toda versión.
+    //
+    // Excepción F-16: la coinbase PoW **MUST** llevar `expiry_height = altura` (lo comprueba el
+    // motor, que sí conoce el bloque). Como la forma no puede saber la altura, exime a las
+    // candidatas a coinbase PoW —igual que ya difiere al contexto su **posición**— y deja la
+    // igualdad `expiry_height == altura` para `aplicar_coinbase_pow`. En el resto de transacciones
+    // (v1 con entradas, v2 y v3) `expiry_height ≠ 0` sigue siendo `ErrCampoInactivo`.
     if tx.lock_time != 0 {
         return Err(ErrorFormaTx::CampoInactivo { campo: "lock_time" });
     }
-    if tx.expiry_height != 0 {
+    if tx.expiry_height != 0 && !tx.es_candidata_coinbase_pow() {
         return Err(ErrorFormaTx::CampoInactivo {
             campo: "expiry_height",
         });

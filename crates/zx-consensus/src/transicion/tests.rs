@@ -20,7 +20,8 @@ use zx_core::{
 use crate::transicion::estado::{invariante_i1, invariante_i1b};
 use crate::transicion::{
     BloqueTransicion, EnRetirada, EntradaUtxo, ErrorTransicion, Estado, Fase, Garantia,
-    HechosCabecera, Origen, ParametrosTransicion, Punto, aplicar, aplicar_fusion,
+    HechosCabecera, Origen, ParametrosTransicion, Punto, aplicar, aplicar_con_undo, aplicar_fusion,
+    deshacer,
 };
 
 fn subsidio_pow_test(_h: u32) -> Amount {
@@ -102,7 +103,19 @@ fn tx_coinbase_pow(salidas: Vec<TxOut>) -> Tx {
     }
 }
 
-fn tx_coinbase_post(clave: ClavePublica, importe: i64) -> Tx {
+/// Coinbase PoW con `expiry_height` explícito (F-16).
+fn tx_coinbase_pow_exp(salidas: Vec<TxOut>, expiry_height: u32) -> Tx {
+    Tx {
+        version: 1,
+        inputs: Vec::new(),
+        outputs: salidas,
+        lock_time: 0,
+        expiry_height,
+        extension: ExtensionTx::Ninguna,
+    }
+}
+
+fn tx_coinbase_post(clave: ClavePublica, importe: i64, slot: u64) -> Tx {
     Tx {
         version: 3,
         inputs: Vec::new(),
@@ -112,6 +125,7 @@ fn tx_coinbase_post(clave: ClavePublica, importe: i64) -> Tx {
         extension: ExtensionTx::CoinbasePost {
             clave,
             importe: Amount::nuevo(importe).unwrap(),
+            slot,
         },
     }
 }
@@ -127,7 +141,7 @@ fn tx_transferencia(inputs: Vec<TxIn>, outputs: Vec<TxOut>) -> Tx {
     }
 }
 
-fn tx_garantia(tipo: TipoGarantia, clave: ClavePublica, importe: i64) -> Tx {
+fn tx_garantia(tipo: TipoGarantia, clave: ClavePublica, importe: i64, nonce: u64) -> Tx {
     Tx {
         version: 2,
         inputs: Vec::new(),
@@ -138,6 +152,7 @@ fn tx_garantia(tipo: TipoGarantia, clave: ClavePublica, importe: i64) -> Tx {
             tipo,
             clave,
             importe: Amount::nuevo(importe).unwrap(),
+            nonce,
         },
     }
 }
@@ -153,6 +168,7 @@ fn tx_deposito(inputs: Vec<TxIn>, outputs: Vec<TxOut>, clave: ClavePublica, impo
             tipo: TipoGarantia::Deposito,
             clave,
             importe: Amount::nuevo(importe).unwrap(),
+            nonce: 0,
         },
     }
 }
@@ -190,6 +206,7 @@ fn con_garantia(estado: &mut Estado, pk: ClavePublica, activo: i64) {
             en_retirada: Vec::new(),
             congelado: Amount::CERO,
             creditos: Vec::new(),
+            nonce_siguiente: 0,
         },
     );
 }
@@ -390,9 +407,9 @@ fn coinbase_post_en_posicion_dos_se_rechaza() {
         con_garantia(&mut e, pk, 10);
         e
     };
-    let retiro = tx_garantia(TipoGarantia::Retiro, pk, 1);
+    let retiro = tx_garantia(TipoGarantia::Retiro, pk, 1, 0);
     let testigo = aceptacion(&sk, &retiro);
-    let cb = tx_coinbase_post(pk, 3);
+    let cb = tx_coinbase_post(pk, 3, 1);
     let bloque = bloque_post(1, pk, vec![(retiro, vec![testigo]), (cb, Vec::new())]);
     assert_eq!(
         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
@@ -409,7 +426,7 @@ fn coinbase_post_a_otra_clave_se_rechaza() {
         con_garantia(&mut e, pk, 10);
         e
     };
-    let cb = tx_coinbase_post(otra, 3);
+    let cb = tx_coinbase_post(otra, 3, 1);
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
     assert_eq!(
         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
@@ -431,7 +448,7 @@ fn fusion_descarta_doble_gasto() {
     }];
     let w1 = vec![firma_entrada(&sk, &t1, &gastadas, 0)];
     let w2 = vec![firma_entrada(&sk, &t2, &gastadas, 0)];
-    let cb = tx_coinbase_post(pk, 3);
+    let cb = tx_coinbase_post(pk, 3, 1);
 
     let mut estado = estado_post();
     con_garantia(&mut estado, pk, 10);
@@ -458,11 +475,11 @@ fn fusion_descarta_doble_gasto() {
 #[test]
 fn fusion_descarta_retiro_duplicado() {
     let (sk, pk) = par(21);
-    let t1 = tx_garantia(TipoGarantia::Retiro, pk, 3);
-    let t2 = tx_garantia(TipoGarantia::Retiro, pk, 2);
+    let t1 = tx_garantia(TipoGarantia::Retiro, pk, 3, 0);
+    let t2 = tx_garantia(TipoGarantia::Retiro, pk, 2, 1);
     let w1 = vec![aceptacion(&sk, &t1)];
     let w2 = vec![aceptacion(&sk, &t2)];
-    let cb = tx_coinbase_post(pk, 3);
+    let cb = tx_coinbase_post(pk, 3, 1);
 
     let mut estado = estado_post();
     con_garantia(&mut estado, pk, 10);
@@ -481,9 +498,9 @@ fn fusion_descarta_retiro_duplicado() {
 #[test]
 fn fusion_descarta_liberacion_prematura() {
     let (sk, pk) = par(22);
-    let t1 = tx_garantia(TipoGarantia::Liberacion, pk, 5);
+    let t1 = tx_garantia(TipoGarantia::Liberacion, pk, 5, 0);
     let w1 = vec![aceptacion(&sk, &t1)];
-    let cb = tx_coinbase_post(pk, 3);
+    let cb = tx_coinbase_post(pk, 3, 1);
 
     let mut estado = estado_post();
     con_garantia(&mut estado, pk, 1);
@@ -506,7 +523,7 @@ fn fusion_descarta_liberacion_prematura() {
 #[test]
 fn fusion_recorta_la_coinbase_post() {
     let (_, pk) = par(23);
-    let cb = tx_coinbase_post(pk, 100);
+    let cb = tx_coinbase_post(pk, 100, 1);
     let mut estado = estado_post();
     con_garantia(&mut estado, pk, 10);
     estado.emitido = 10;
@@ -526,4 +543,298 @@ fn fusion_recorta_la_coinbase_post() {
     assert_eq!(g.creditos[0].madura_en_slot, Some(2));
     assert!(invariante_i1(&nuevo));
     assert!(invariante_i1b(&nuevo));
+}
+
+// ── V5 · F-15 (nonce por clave) ────────────────────────────────────────────
+
+fn tx_deposito_nonce(
+    inputs: Vec<TxIn>,
+    outputs: Vec<TxOut>,
+    clave: ClavePublica,
+    importe: i64,
+    nonce: u64,
+) -> Tx {
+    Tx {
+        version: 2,
+        inputs,
+        outputs,
+        lock_time: 0,
+        expiry_height: 0,
+        extension: ExtensionTx::Garantia {
+            tipo: TipoGarantia::Deposito,
+            clave,
+            importe: Amount::nuevo(importe).unwrap(),
+            nonce,
+        },
+    }
+}
+
+/// F-15 · dos operaciones de la misma clave con nonces `n, n+1` son válidas y dejan
+/// `nonce_siguiente = n+2`; con el mismo nonce `n, n` la segunda invalida el bloque estricto.
+#[test]
+fn dos_depositos_con_nonces_consecutivos_valen_y_la_repeticion_no() {
+    let (sk, pk) = par(40);
+    let op1 = outpoint(11, 0);
+    let op2 = outpoint(12, 0);
+    let d1 = tx_deposito_nonce(vec![txin(op1)], Vec::new(), pk, 10, 0);
+    let d2 = tx_deposito_nonce(vec![txin(op2)], Vec::new(), pk, 10, 1);
+    let g1 = vec![SpentOutput {
+        value: Amount::nuevo(10).unwrap(),
+        lock: Lock::PubKey { pubkey: pk },
+    }];
+    let g2 = g1.clone();
+    let w1 = vec![firma_entrada(&sk, &d1, &g1, 0), aceptacion(&sk, &d1)];
+    let w2 = vec![firma_entrada(&sk, &d2, &g2, 0), aceptacion(&sk, &d2)];
+
+    let mut estado = estado_pow();
+    for op in [op1, op2] {
+        estado.utxo.insert(
+            op,
+            entrada(
+                10,
+                Lock::PubKey { pubkey: pk },
+                Origen::Tx,
+                Punto::Altura(0),
+            ),
+        );
+    }
+    estado.emitido = 20;
+    estado.subsidio_acum = 20;
+
+    let bloque_ok = bloque_pow(1, vec![(d1.clone(), w1.clone()), (d2.clone(), w2.clone())]);
+    let nuevo = aplicar(&estado, &bloque_ok, &params(), CBID_RED_DEV).unwrap();
+    let g = nuevo.garantias.get(&pk).unwrap();
+    assert_eq!(g.activo, Amount::nuevo(20).unwrap());
+    assert_eq!(g.nonce_siguiente, 2, "cada operación incrementa el nonce");
+
+    let d2_repetido = tx_deposito_nonce(vec![txin(op2)], Vec::new(), pk, 10, 0);
+    let g2r = vec![SpentOutput {
+        value: Amount::nuevo(10).unwrap(),
+        lock: Lock::PubKey { pubkey: pk },
+    }];
+    let w2r = vec![
+        firma_entrada(&sk, &d2_repetido, &g2r, 0),
+        aceptacion(&sk, &d2_repetido),
+    ];
+    let bloque_mal = bloque_pow(1, vec![(d1.clone(), w1), (d2_repetido, w2r)]);
+    assert_eq!(
+        aplicar(&estado, &bloque_mal, &params(), CBID_RED_DEV),
+        Err(ErrorTransicion::ErrNonce)
+    );
+    let _ = d2;
+}
+
+/// F-15 · repetición exacta de un retiro ya aplicado: el bloque estricto es inválido.
+#[test]
+fn repeticion_de_retiro_invalida_el_bloque_estricto() {
+    let (sk, pk) = par(41);
+    let retiro = tx_garantia(TipoGarantia::Retiro, pk, 3, 0);
+    let w = vec![aceptacion(&sk, &retiro)];
+    let cb = tx_coinbase_post(pk, 3, 1);
+
+    let mut estado = estado_post();
+    con_garantia(&mut estado, pk, 10);
+    estado.emitido = 10;
+    estado.subsidio_acum = 10;
+
+    let bloque = bloque_post(
+        1,
+        pk,
+        vec![(cb, Vec::new()), (retiro.clone(), w.clone()), (retiro, w)],
+    );
+    assert_eq!(
+        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        Err(ErrorTransicion::ErrNonce)
+    );
+}
+
+/// F-15 · repetición exacta de una liberación ya aplicada: el bloque estricto es inválido.
+#[test]
+fn repeticion_de_liberacion_invalida_el_bloque_estricto() {
+    let (sk, pk) = par(42);
+    let lib = tx_garantia(TipoGarantia::Liberacion, pk, 5, 0);
+    let w = vec![aceptacion(&sk, &lib)];
+    let cb = tx_coinbase_post(pk, 3, 3);
+
+    let mut estado = estado_post();
+    estado.garantias.insert(
+        pk,
+        Garantia {
+            activo: Amount::nuevo(6).unwrap(),
+            pendientes: Vec::new(),
+            en_retirada: vec![EnRetirada {
+                importe: Amount::nuevo(5).unwrap(),
+                inicio_slot: 0,
+            }],
+            congelado: Amount::CERO,
+            creditos: Vec::new(),
+            nonce_siguiente: 0,
+        },
+    );
+    estado.emitido = 11;
+    estado.subsidio_acum = 11;
+
+    let bloque = bloque_post(
+        3,
+        pk,
+        vec![(cb, Vec::new()), (lib.clone(), w.clone()), (lib, w)],
+    );
+    assert_eq!(
+        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        Err(ErrorTransicion::ErrNonce)
+    );
+}
+
+/// F-15 · en modo fusión la repetición se **descarta** con motivo `ErrNonce`, no invalida el bloque.
+#[test]
+fn fusion_descarta_repeticion_con_err_nonce() {
+    let (sk, pk) = par(43);
+    let retiro = tx_garantia(TipoGarantia::Retiro, pk, 3, 0);
+    let w = vec![aceptacion(&sk, &retiro)];
+    let cb = tx_coinbase_post(pk, 3, 1);
+
+    let mut estado = estado_post();
+    con_garantia(&mut estado, pk, 10);
+    estado.emitido = 10;
+    estado.subsidio_acum = 10;
+
+    let bloque = bloque_post(
+        1,
+        pk,
+        vec![(cb, Vec::new()), (retiro.clone(), w.clone()), (retiro, w)],
+    );
+    let (nuevo, _undo, descartadas) =
+        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    assert_eq!(descartadas.len(), 1);
+    assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrNonce);
+    let g = nuevo.garantias.get(&pk).unwrap();
+    assert_eq!(g.nonce_siguiente, 1, "solo la primera operación se aplica");
+}
+
+/// F-15 · el nonce se comprueba **antes** que el resto de reglas: un retiro con nonce equivocado
+/// y saldo insuficiente da `ErrNonce`, no `ErrSaldo`.
+#[test]
+fn el_nonce_se_comprueba_antes_que_el_saldo() {
+    let (sk, pk) = par(44);
+    let retiro = tx_garantia(TipoGarantia::Retiro, pk, 9_999, 7);
+    let w = vec![aceptacion(&sk, &retiro)];
+    let cb = tx_coinbase_post(pk, 3, 1);
+
+    let mut estado = estado_post();
+    con_garantia(&mut estado, pk, 10);
+    estado.emitido = 10;
+    estado.subsidio_acum = 10;
+
+    let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (retiro, w)]);
+    assert_eq!(
+        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        Err(ErrorTransicion::ErrNonce)
+    );
+}
+
+/// F-15 · el undo por delta restituye `nonce_siguiente`.
+#[test]
+fn el_undo_restituye_el_nonce() {
+    let (sk, pk) = par(45);
+    let retiro = tx_garantia(TipoGarantia::Retiro, pk, 3, 0);
+    let w = vec![aceptacion(&sk, &retiro)];
+    let cb = tx_coinbase_post(pk, 3, 1);
+
+    let mut estado = estado_post();
+    con_garantia(&mut estado, pk, 10);
+    estado.emitido = 10;
+    estado.subsidio_acum = 10;
+
+    let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (retiro, w)]);
+    let (nuevo, undo) = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
+    assert_eq!(nuevo.garantias.get(&pk).unwrap().nonce_siguiente, 1);
+    assert_eq!(deshacer(&nuevo, &undo), estado);
+    assert_eq!(
+        deshacer(&nuevo, &undo)
+            .garantias
+            .get(&pk)
+            .unwrap()
+            .nonce_siguiente,
+        0
+    );
+}
+
+// ── V5 · F-16 (coinbase PoW única por altura) ──────────────────────────────
+
+/// F-16 · la coinbase PoW exige `expiry_height == altura`; cualquier otro valor ⇒ `ErrEmision`.
+#[test]
+fn la_coinbase_pow_exige_expiry_igual_a_la_altura() {
+    let (_, pk) = par(46);
+    let estado = estado_pow();
+
+    for expiry in [0u32, 2, 99] {
+        let cb = tx_coinbase_pow_exp(vec![tx_out(1, pk)], expiry);
+        let bloque = bloque_pow(1, vec![(cb, Vec::new())]);
+        assert_eq!(
+            aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+            Err(ErrorTransicion::ErrEmision),
+            "expiry {expiry} ≠ altura 1"
+        );
+    }
+
+    let cb = tx_coinbase_pow_exp(vec![tx_out(1, pk)], 1);
+    let bloque = bloque_pow(1, vec![(cb, Vec::new())]);
+    assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
+}
+
+/// F-16 · dos coinbases PoW idénticas salvo la altura (y por tanto el `expiry_height`) tienen
+/// `txid` distintos y no colisionan en el UTXO.
+#[test]
+fn dos_coinbases_pow_iguales_salvo_altura_no_colisionan() {
+    let (_, pk) = par(47);
+    let cb1 = tx_coinbase_pow_exp(vec![tx_out(5, pk)], 1);
+    let cb2 = tx_coinbase_pow_exp(vec![tx_out(5, pk)], 2);
+    assert_ne!(
+        zx_core::txid(&cb1, CBID_RED_DEV),
+        zx_core::txid(&cb2, CBID_RED_DEV),
+        "el expiry (altura) entra en el txid"
+    );
+
+    let estado = estado_pow();
+    let s1 = aplicar(
+        &estado,
+        &bloque_pow(1, vec![(cb1, Vec::new())]),
+        &params(),
+        CBID_RED_DEV,
+    )
+    .unwrap();
+    let s2 = aplicar(
+        &s1,
+        &bloque_pow(2, vec![(cb2, Vec::new())]),
+        &params(),
+        CBID_RED_DEV,
+    )
+    .unwrap();
+    assert_eq!(s2.utxo.len(), 2, "las dos coinbases coexisten");
+}
+
+// ── V5 · F-17 (coinbase PoST única por bloque y slot) ──────────────────────
+
+/// F-17 · el `slot` de la v3 MUST ser el del bloque; otro valor ⇒ `ErrEmision`.
+#[test]
+fn la_coinbase_post_exige_el_slot_del_bloque() {
+    let (_, pk) = par(48);
+    let mut estado = estado_post();
+    con_garantia(&mut estado, pk, 10);
+    estado.emitido = 10;
+    estado.subsidio_acum = 10;
+
+    for slot in [0u64, 2, 99] {
+        let cb = tx_coinbase_post(pk, 3, slot);
+        let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
+        assert_eq!(
+            aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+            Err(ErrorTransicion::ErrEmision),
+            "slot {slot} ≠ slot del bloque 1"
+        );
+    }
+
+    let cb = tx_coinbase_post(pk, 3, 1);
+    let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
+    assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
 }

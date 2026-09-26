@@ -176,7 +176,7 @@ impl TipoGarantia {
 pub enum ExtensionTx {
     /// Versión 1: sin campos extra (idéntica a `9681061`).
     Ninguna,
-    /// Versión 2: operación de garantía (F-07).
+    /// Versión 2: operación de garantía (F-07), con el nonce por clave de F-15.
     Garantia {
         /// Operación.
         tipo: TipoGarantia,
@@ -184,14 +184,18 @@ pub enum ExtensionTx {
         clave: ClavePublica,
         /// Importe de la operación. `> 0` y `≤ ZX_VALUE_SANITY_LIMIT`.
         importe: Amount,
+        /// Nonce por clave de garantía (F-15): debe ser `nonce_siguiente[clave]` al aplicarse.
+        nonce: u64,
     },
-    /// Versión 3: coinbase PoST (F-09). `clave` MUST ser `sol.public_key` de su cabecera
-    /// (lo comprueba la máquina de estados, no el parser).
+    /// Versión 3: coinbase PoST (F-09). `clave` MUST ser `sol.public_key` de su cabecera y `slot`
+    /// MUST ser el slot del bloque (F-17); ambas cosas las comprueba la máquina de estados.
     CoinbasePost {
         /// Clave pagada.
         clave: ClavePublica,
         /// Importe de la coinbase.
         importe: Amount,
+        /// Slot del bloque que la contiene (F-17).
+        slot: u64,
     },
 }
 

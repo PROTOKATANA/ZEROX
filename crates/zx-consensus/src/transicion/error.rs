@@ -71,6 +71,9 @@ pub enum ErrorTransicion {
     /// Segundo retiro de una clave con una retirada viva (`R-2`).
     #[error("ErrRetiroPendiente")]
     ErrRetiroPendiente,
+    /// Nonce de una operación de garantía distinto del `nonce_siguiente` de la clave (F-15).
+    #[error("ErrNonce")]
+    ErrNonce,
     /// La firma de una entrada o de aceptación no verifica (equivale a `ErrAutorizacion` de T01).
     #[error("ErrFirma")]
     ErrFirma,
@@ -94,6 +97,12 @@ impl ErrorTransicion {
             Self::ErrForma(ErrorFormaTx::VersionInactiva { .. }) => "VersionInactiva",
             Self::ErrForma(ErrorFormaTx::ImporteCero) => "ErrSaldo",
             Self::ErrForma(ErrorFormaTx::TransferenciaSinSalidas) => "ErrSaldo",
+            // Correspondencia de W02b: el oráculo T01 comprueba la autorización del depósito
+            // **antes** de consumir entradas, así que un depósito sin entradas y con firmante
+            // distinto de la clave da `ErrAutorizacion`; la forma lo rechaza antes con
+            // `DepositoSinEntradas` (F-07). Se traduce al nombre del oráculo para el diferencial
+            // (los vectores solo combinan `ent=[]` con firmante ≠ clave, ver `PROGRESO.md` FD-7).
+            Self::ErrForma(ErrorFormaTx::DepositoSinEntradas) => "ErrAutorizacion",
             Self::ErrGenesis => "ErrGenesis",
             Self::ErrPow => "ErrPow",
             Self::ErrEmision => "ErrEmision",
@@ -112,6 +121,7 @@ impl ErrorTransicion {
             Self::ErrDesbordamiento => "ErrDesbordamiento",
             Self::ErrFueraDeAlcanceV0 => "ErrFueraDeAlcanceV0",
             Self::ErrRetiroPendiente => "ErrRetiroPendiente",
+            Self::ErrNonce => "ErrNonce",
             Self::ErrForma(_) => "ErrForma",
             Self::ErrSinPadre => "ErrSinPadre",
         }

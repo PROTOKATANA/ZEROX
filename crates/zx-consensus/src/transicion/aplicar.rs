@@ -283,6 +283,12 @@ fn aplicar_coinbase_pow(
     let altura = punto
         .como_altura()
         .ok_or(ErrorTransicion::ErrOperacionFase)?;
+    // F-16: en la coinbase PoW `expiry_height` MUST ser la altura del bloque (restituye
+    // `C-EMIT-04`); cualquier otro valor ⇒ `ErrEmision`. El génesis (altura 0) lo valida
+    // `aplicar_genesis`, que no pasa por aquí.
+    if tx.expiry_height != altura {
+        return Err(ErrorTransicion::ErrEmision);
+    }
     let txid = zx_core::txid(tx, cbid);
     let mut pagada = Amount::CERO;
     for (j, out) in tx.outputs.iter().enumerate() {
@@ -341,7 +347,12 @@ fn aplicar_coinbase_post(
     if ap.estado.fase != Fase::PoST {
         return Err(ErrorTransicion::ErrOperacionFase);
     }
-    let ExtensionTx::CoinbasePost { clave, importe } = &tx.extension else {
+    let ExtensionTx::CoinbasePost {
+        clave,
+        importe,
+        slot,
+    } = &tx.extension
+    else {
         return Err(ErrorTransicion::ErrForma(
             ErrorFormaTx::ExtensionIncoherente {
                 version: tx.version,
@@ -355,6 +366,10 @@ fn aplicar_coinbase_post(
         .ok_or(ErrorTransicion::ErrGenesis)?;
     if *clave != productor {
         return Err(ErrorTransicion::ErrAutorizacion);
+    }
+    // F-17: el `slot` de la v3 MUST ser el slot del bloque que la contiene.
+    if Some(*slot) != bloque.hechos.slot() {
+        return Err(ErrorTransicion::ErrEmision);
     }
     creditar_post(ap, productor, *importe, punto, params)?;
     Ok(*importe)
@@ -376,7 +391,22 @@ fn aplicar_garantia(
     tipo: TipoGarantia,
     clave: zx_core::ClavePublica,
     importe: Amount,
+    nonce: u64,
 ) -> Result<(), ErrorTransicion> {
+    // F-15 · el nonce se comprueba **antes** que el resto de reglas de la operación, para toda
+    // operación de garantía de `clave` (depósito, retiro y liberación). Una clave sin registro se
+    // crea con `nonce_siguiente = 0` (lo hace `garantia_mut`). El incremento se registra en el undo
+    // por delta, así que un descarte en modo fusión lo revierte.
+    {
+        let g = ap.garantia_mut(clave);
+        if nonce != g.nonce_siguiente {
+            return Err(ErrorTransicion::ErrNonce);
+        }
+        g.nonce_siguiente = g
+            .nonce_siguiente
+            .checked_add(1)
+            .ok_or(ErrorTransicion::ErrDesbordamiento)?;
+    }
     match tipo {
         TipoGarantia::Deposito => {
             if ap.estado.fase == Fase::PoW {
@@ -517,17 +547,12 @@ fn aplicar_garantia(
                 }
             }
             g.en_retirada = nuevas;
+            // F-18: la salida implícita de la liberación es `(txid, 0)`; con F-15 el `txid` de cada
+            // liberación de la clave ya es único, así que no hace falta contador de salidas.
             let txid = zx_core::txid(tx, cbid);
-            let indice = u32::try_from(ap.estado.prox_salida)
-                .map_err(|_| ErrorTransicion::ErrDesbordamiento)?;
-            ap.estado.prox_salida = ap
-                .estado
-                .prox_salida
-                .checked_add(1)
-                .ok_or(ErrorTransicion::ErrDesbordamiento)?;
             let op = OutPoint {
                 prev_txid: txid,
-                prev_index: indice,
+                prev_index: 0,
             };
             if ap.estado.utxo.contains_key(&op) {
                 return Err(ErrorTransicion::ErrDobleGasto);
@@ -571,6 +596,7 @@ pub(crate) fn aplicar_tx(
                 tipo,
                 clave,
                 importe,
+                nonce,
             } = &tx.extension
             else {
                 return Err(ErrorTransicion::ErrForma(
@@ -581,7 +607,7 @@ pub(crate) fn aplicar_tx(
                 ));
             };
             aplicar_garantia(
-                ap, bloque, params, cbid, punto, tx, testigos, *tipo, *clave, *importe,
+                ap, bloque, params, cbid, punto, tx, testigos, *tipo, *clave, *importe, *nonce,
             )?;
             Ok(Efecto::Fee(Amount::CERO))
         }

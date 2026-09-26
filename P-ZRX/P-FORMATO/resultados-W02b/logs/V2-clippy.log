@@ -1,0 +1,12 @@
+    Checking zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02b/ws/crates/zx-poas)
+    Checking libp2p-quic v0.13.1
+    Checking libp2p-mdns v0.48.0
+    Checking libp2p-tcp v0.44.1
+    Checking zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02b/ws/crates/zx-dag)
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02b/ws/crates/zx-consensus)
+    Checking zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02b/ws/crates/zx-core)
+    Checking zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02b/ws/crates/zx-farmer)
+    Checking zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02b/ws/crates/zx-post)
+    Checking libp2p v0.56.0
+    Checking zx-p2p v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W02b/ws/crates/zx-p2p)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.91s

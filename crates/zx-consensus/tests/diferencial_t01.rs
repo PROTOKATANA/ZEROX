@@ -31,10 +31,14 @@ use zx_core::{
     SolucionPoas, SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
 
-/// Ruta al fichero de vectores dentro del workspace (`ws/testdata/...`).
+/// Rutas a los ficheros de vectores v0.1 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/transicion-v0/vectores-transicion-v0.txt"
+    "/../../testdata/transicion-v0.1/vectores-transicion-v0.1.txt"
+);
+const RUTA_NEGATIVOS: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../testdata/transicion-v0.1/vectores-transicion-negativos-v0.1.txt"
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,24 +66,6 @@ fn hash_de(id: u64) -> BlockHash {
     let mut bytes = [0u8; 32];
     bytes[24..].copy_from_slice(&id.to_be_bytes());
     BlockHash::from_digest(Digest::from_bytes(bytes))
-}
-
-/// Clave de firma **única por salida abstracta**: dos coinbases idénticas en bloques distintos
-/// tendrían el mismo `txid` real y colisionarían en el UTXO, algo que el oráculo no modela porque
-/// asigna un id de salida distinto a cada una. La clave se deriva de `(id, dueño)` en un dominio
-/// propio, así que cada salida real es distinta sin cambiar ninguna regla.
-fn sk_salida(id: u64, dueno: u64) -> SigningKey {
-    let mut mensaje = b"zx-t01-salida".to_vec();
-    mensaje.extend_from_slice(&id.to_le_bytes());
-    mensaje.extend_from_slice(&dueno.to_le_bytes());
-    let digest = zx_core::sha3_256_publico(&mensaje);
-    SigningKey::from(*digest.as_bytes())
-}
-
-fn clave_salida(id: u64, dueno: u64) -> ClavePublica {
-    let sk = sk_salida(id, dueno);
-    let vk = VerificationKey::from(&sk);
-    ClavePublica::desde_bytes(vk.into())
 }
 
 /// `OutPoint` sintético para una entrada abstracta sin salida registrada: el motor no lo encontrará
@@ -122,13 +108,6 @@ impl Claves {
 
     fn abstracta(&self, pk: &ClavePublica) -> Option<u64> {
         self.clave_a_id.get(pk.bytes()).copied()
-    }
-
-    /// Registra la clave única de una salida abstracta y la traduce de vuelta a su dueño.
-    fn registrar_salida(&mut self, id: u64, dueno: u64) -> ClavePublica {
-        let pk = clave_salida(id, dueno);
-        self.clave_a_id.insert(*pk.bytes(), dueno);
-        pk
     }
 }
 
@@ -191,6 +170,8 @@ struct TxCrudo {
     importe: u64,
     ent: Vec<u64>,
     sal: Vec<(u64, u64, u64)>,
+    /// F-15: nonce de una operación de garantía (0 en el resto).
+    nonce: u64,
 }
 
 /// Un bloque abstracto leído del fichero.
@@ -360,6 +341,8 @@ fn parsear_fichero(ruta: &str) -> Vec<Caso> {
                         importe: c.get("importe").expect("importe").parse().expect("importe"),
                         ent: parse_entradas(c.get("ent").expect("ent")),
                         sal: parse_salidas(c.get("sal").expect("sal")),
+                        // F-15: solo los vectores v0.1 traen `nonce=`; ausente = 0.
+                        nonce: c.get("nonce").map_or(0, |v| v.parse().expect("nonce")),
                     });
                 }
             }
@@ -442,6 +425,10 @@ struct Constructor {
     cbid: u32,
     claves: Claves,
     salidas: BTreeMap<u64, SalidaRef>,
+    /// Contador de ids abstractos de salidas implícitas de `Liberacion`, espejo del
+    /// `prox_salida` del oráculo T01. La F-18 fija la salida real en `(txid, 0)`, así que el
+    /// arnés registra el id abstracto del oráculo → ese `OutPoint`.
+    prox_salida: u64,
 }
 
 impl Constructor {
@@ -450,6 +437,7 @@ impl Constructor {
             cbid,
             claves: Claves::default(),
             salidas: BTreeMap::new(),
+            prox_salida: 1,
         }
     }
 
@@ -466,8 +454,11 @@ impl Constructor {
 
     fn salidas_reales(&mut self, sal: &[(u64, u64, u64)]) -> Vec<TxOut> {
         sal.iter()
-            .map(|(id, valor, dueno)| {
-                let pk = self.claves.registrar_salida(*id, *dueno);
+            .map(|(_id, valor, dueno)| {
+                // Decisión 4 de ORDEN-W02b: sin claves de salida artificiales. Con F-15/F-16 los
+                // `txid` de operaciones repetidas ya son únicos, así que cada salida se bloquea con
+                // la clave real de su dueño abstracto.
+                let pk = self.claves.id(*dueno);
                 TxOut {
                     value: Amount::nuevo(*valor as i64).expect("valor"),
                     lock: Lock::PubKey { pubkey: pk },
@@ -482,7 +473,7 @@ impl Constructor {
                 Some(s) => SpentOutput {
                     value: s.valor,
                     lock: Lock::PubKey {
-                        pubkey: clave_salida(*id, s.dueno),
+                        pubkey: clave_de(s.dueno),
                     },
                 },
                 None => SpentOutput {
@@ -511,20 +502,50 @@ impl Constructor {
                     dueno: *dueno,
                 },
             );
+            // Espejo de `crear_utxos!` del oráculo: el contador salta al mayor id explícito + 1.
+            self.prox_salida = self.prox_salida.max(id.saturating_add(1));
         }
+        Ok(())
+    }
+
+    /// Registra la salida implícita de una `Liberacion`: el oráculo le asigna el id
+    /// `prox_salida`; la F-18 la crea en el `OutPoint` real `(txid, 0)`.
+    fn registrar_liberacion(
+        &mut self,
+        tx: &Tx,
+        importe: i64,
+        clave_abstracta: u64,
+    ) -> Result<(), String> {
+        let txid = calcular_txid(tx, self.cbid);
+        let id = self.prox_salida;
+        self.salidas.insert(
+            id,
+            SalidaRef {
+                op: OutPoint {
+                    prev_txid: txid,
+                    prev_index: 0,
+                },
+                valor: Amount::nuevo(importe).expect("importe de liberación"),
+                dueno: clave_abstracta,
+            },
+        );
+        self.prox_salida = self
+            .prox_salida
+            .checked_add(1)
+            .ok_or_else(|| "desbordamiento de prox_salida".to_string())?;
         Ok(())
     }
 
     fn firmar_entradas(&self, tx: &Tx, ids: &[u64], firmante: u64) -> Vec<Vec<u8>> {
         let gastadas = self.gastadas(ids);
         let mut testigos = Vec::with_capacity(ids.len());
-        for (i, id) in ids.iter().enumerate() {
+        for (i, _id) in ids.iter().enumerate() {
             let digest: SigHash =
                 zx_core::sighash(tx, &gastadas, HashType::All, i, self.cbid).expect("sighash");
-            let sk = match self.salidas.get(id) {
-                Some(s) if s.dueno == firmante => sk_salida(*id, s.dueno),
-                _ => firmante_de(firmante),
-            };
+            // La firma siempre es del `firmante` abstracto: si no es el dueño de la salida, la
+            // verificación falla y el motor devuelve `ErrFirma` (que §4 lee como `ErrAutorizacion`),
+            // exactamente como el oráculo.
+            let sk = firmante_de(firmante);
             let firma: [u8; 64] = sk.sign(digest.as_bytes()).into();
             testigos.push(firma.to_vec());
         }
@@ -539,7 +560,16 @@ impl Constructor {
     }
 
     /// Construye una transacción abstracta como transacción real con sus testigos.
-    fn construir_tx(&mut self, tx: &TxCrudo, productor: u64) -> Result<(Tx, Vec<Vec<u8>>), String> {
+    ///
+    /// `altura` es la altura del bloque que la contiene (F-16: `expiry_height` de la coinbase PoW) y
+    /// `slot` su slot (F-17: `slot` de la coinbase PoST); para el resto de transacciones no aplican.
+    fn construir_tx(
+        &mut self,
+        tx: &TxCrudo,
+        productor: u64,
+        altura: u32,
+        slot: u64,
+    ) -> Result<(Tx, Vec<Vec<u8>>), String> {
         let (real, testigos) = match tx.tipo.as_str() {
             "Coinbase" => {
                 let salidas = self.salidas_reales(&tx.sal);
@@ -548,7 +578,8 @@ impl Constructor {
                     inputs: Vec::new(),
                     outputs: salidas,
                     lock_time: 0,
-                    expiry_height: 0,
+                    // F-16: `expiry_height` de la coinbase PoW = altura del bloque (el génesis, 0).
+                    expiry_height: altura,
                     extension: ExtensionTx::Ninguna,
                 };
                 (real, Vec::new())
@@ -592,6 +623,7 @@ impl Constructor {
                         tipo,
                         clave,
                         importe: Amount::nuevo(tx.importe as i64).expect("importe"),
+                        nonce: tx.nonce,
                     },
                 };
                 let mut testigos = self.firmar_entradas(&real, &tx.ent, tx.firmante);
@@ -609,6 +641,8 @@ impl Constructor {
                     extension: ExtensionTx::CoinbasePost {
                         clave,
                         importe: Amount::nuevo(tx.importe as i64).expect("importe"),
+                        // F-17: `slot` de la coinbase PoST = slot del bloque que la contiene.
+                        slot,
                     },
                 };
                 (real, Vec::new())
@@ -627,6 +661,9 @@ impl Constructor {
             otro => return Err(format!("tipo de transacción no soportado: {otro}")),
         };
         self.registrar(&real, &tx.sal)?;
+        if tx.tipo == "Liberacion" {
+            self.registrar_liberacion(&real, tx.importe as i64, tx.clave)?;
+        }
         Ok((real, testigos))
     }
 }
@@ -665,7 +702,7 @@ fn construir_caso(caso: &Caso) -> Result<Reales, String> {
         let productor = b.prod;
         let mut txs = Vec::with_capacity(b.txs.len());
         for tx in &b.txs {
-            txs.push(constructor.construir_tx(tx, productor)?);
+            txs.push(constructor.construir_tx(tx, productor, b.altura, b.slot)?);
         }
         let hash = hash_de(b.id);
         let hechos = match b.fam.as_str() {
@@ -814,9 +851,10 @@ fn render_gar(claves: &Claves, estado: &Estado) -> Result<Vec<(u64, String)>, St
         lineas.push((
             clave,
             format!(
-                "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={}",
+                "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}",
                 g.activo.brek(),
-                g.congelado.brek()
+                g.congelado.brek(),
+                g.nonce_siguiente
             ),
         ));
     }
@@ -984,20 +1022,19 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
     }
 }
 
-fn cargar_casos() -> Vec<Caso> {
-    let casos = parsear_fichero(RUTA_VECTORES);
-    assert!(!casos.is_empty(), "no se leyeron casos de {RUTA_VECTORES}");
+fn cargar_casos(ruta: &str) -> Vec<Caso> {
+    let casos = parsear_fichero(ruta);
+    assert!(!casos.is_empty(), "no se leyeron casos de {ruta}");
     casos
 }
 
-/// V4: diferencial completo contra el oráculo T01.
-#[test]
-fn diferencial_t01() {
-    let casos = cargar_casos();
+/// Corre el diferencial sobre `casos` y devuelve `(informe, nº de discrepancias)`.
+fn correr_diferencial(casos: &[Caso]) -> (String, usize) {
     let mut discrepancias: Vec<String> = Vec::new();
     let mut por_nombre: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut con_post = 0usize;
-    for caso in &casos {
+    let mut por_error: BTreeMap<String, usize> = BTreeMap::new();
+    for caso in casos {
         let antes = discrepancias.len();
         ejecutar_caso(caso, &mut discrepancias);
         let fallo = discrepancias.len() > antes;
@@ -1009,11 +1046,18 @@ fn diferencial_t01() {
         if caso.est.contains("fase=FasePoST") {
             con_post += 1;
         }
+        for res in caso.res.values() {
+            *por_error.entry(res.clone()).or_insert(0) += 1;
+        }
     }
     let mut informe = String::new();
     let _ = writeln!(informe, "casos leidos      = {}", casos.len());
     let _ = writeln!(informe, "con sufijo PoST   = {con_post}");
     let _ = writeln!(informe, "discrepancias     = {}", discrepancias.len());
+    let _ = writeln!(informe, "RES por error esperado:");
+    for (error, n) in &por_error {
+        let _ = writeln!(informe, "  {error}: {n}");
+    }
     let _ = writeln!(informe, "por nombre de caso:");
     for (nombre, (n, fallos)) in &por_nombre {
         let _ = writeln!(informe, "  {nombre}: {n} casos, {fallos} con discrepancia");
@@ -1021,10 +1065,30 @@ fn diferencial_t01() {
     for d in discrepancias.iter().take(40) {
         let _ = writeln!(informe, "  {d}");
     }
+    (informe, discrepancias.len())
+}
+
+/// V4: diferencial completo contra el oráculo T01-D (`vectores-transicion-v0.1.txt`).
+#[test]
+fn diferencial_t01() {
+    let casos = cargar_casos(RUTA_VECTORES);
+    let (informe, n) = correr_diferencial(&casos);
     println!("{informe}");
     assert!(
-        discrepancias.is_empty(),
-        "diferencial T01 con {} discrepancias:\n{informe}",
-        discrepancias.len()
+        n == 0,
+        "diferencial T01 (base) con {n} discrepancias:\n{informe}"
+    );
+}
+
+/// V4: diferencial contra los negativos de T01-C/T01-D (`…-negativos-v0.1.txt`), incluidos los de
+/// repetición (`ErrNonce`).
+#[test]
+fn diferencial_t01_negativos() {
+    let casos = cargar_casos(RUTA_NEGATIVOS);
+    let (informe, n) = correr_diferencial(&casos);
+    println!("{informe}");
+    assert!(
+        n == 0,
+        "diferencial T01 (negativos) con {n} discrepancias:\n{informe}"
     );
 }

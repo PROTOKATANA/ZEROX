@@ -79,6 +79,17 @@ fn tx2(
     k: ClavePublica,
     importe: i64,
 ) -> Tx {
+    tx2_nonce(entradas, salidas, tipo, k, importe, 0)
+}
+
+fn tx2_nonce(
+    entradas: Vec<TxIn>,
+    salidas: Vec<TxOut>,
+    tipo: TipoGarantia,
+    k: ClavePublica,
+    importe: i64,
+    nonce: u64,
+) -> Tx {
     Tx {
         version: 2,
         inputs: entradas,
@@ -89,11 +100,16 @@ fn tx2(
             tipo,
             clave: k,
             importe: Amount::nuevo(importe).unwrap(),
+            nonce,
         },
     }
 }
 
 fn tx3(k: ClavePublica, importe: i64) -> Tx {
+    tx3_slot(k, importe, 0)
+}
+
+fn tx3_slot(k: ClavePublica, importe: i64, slot: u64) -> Tx {
     Tx {
         version: 3,
         inputs: Vec::new(),
@@ -103,29 +119,32 @@ fn tx3(k: ClavePublica, importe: i64) -> Tx {
         extension: ExtensionTx::CoinbasePost {
             clave: k,
             importe: Amount::nuevo(importe).unwrap(),
+            slot,
         },
     }
 }
 
 /// Escenario de cada caso del oráculo, por nombre. Debe coincidir campo a campo con
-/// `oraculo-formato-v0/src/referencia.jl`; si divergen, el test lo caza.
+/// `oraculo-formato-v0.1/src/referencia.jl` (incluidos `nonce` de F-15 y `slot` de F-17); si
+/// divergen, el test lo caza.
 fn escenario(nombre: &str) -> Option<(Tx, Vec<Vec<u8>>, u32)> {
-    let deposito_1in_cambio = || {
-        tx2(
+    let deposito_1in_cambio = |nonce: u64| {
+        tx2_nonce(
             vec![entrada(0x21, 1, 0xffff_fffe)],
             vec![salida(1_000, 0xc3)],
             TipoGarantia::Deposito,
             clave(0xd4),
             9_000,
+            nonce,
         )
     };
-    let deposito_3in = |sin_cambio: bool| {
+    let deposito_3in = |sin_cambio: bool, nonce: u64| {
         let salidas = if sin_cambio {
             Vec::new()
         } else {
             vec![salida(700, 0xc3)]
         };
-        tx2(
+        tx2_nonce(
             vec![
                 entrada(0x31, 0, 0xffff_fffe),
                 entrada(0x32, 2, 0),
@@ -135,6 +154,7 @@ fn escenario(nombre: &str) -> Option<(Tx, Vec<Vec<u8>>, u32)> {
             TipoGarantia::Deposito,
             clave(0xd4),
             7_000,
+            nonce,
         )
     };
 
@@ -160,69 +180,81 @@ fn escenario(nombre: &str) -> Option<(Tx, Vec<Vec<u8>>, u32)> {
             Vec::new(),
             CBID_RED_DEV,
         ),
-        "v2_deposito_1in_cambio_dev" => (deposito_1in_cambio(), wit(&[0x44, 0x55]), CBID_RED_DEV),
-        "v2_deposito_1in_cambio_otro" => (deposito_1in_cambio(), wit(&[0x44, 0x55]), CBID_OTRO),
+        "v2_deposito_1in_cambio_dev" => (deposito_1in_cambio(0), wit(&[0x44, 0x55]), CBID_RED_DEV),
+        "v2_deposito_1in_cambio_otro" => (deposito_1in_cambio(7), wit(&[0x44, 0x55]), CBID_OTRO),
         "v2_deposito_1in_sin_cambio_dev" => (
-            tx2(
+            tx2_nonce(
                 vec![entrada(0x21, 1, 0xffff_fffe)],
                 Vec::new(),
                 TipoGarantia::Deposito,
                 clave(0xd5),
                 9_000,
+                1,
             ),
             wit(&[0x44, 0x55]),
             CBID_RED_DEV,
         ),
         "v2_deposito_3in_cambio_dev" => (
-            deposito_3in(false),
+            deposito_3in(false, 2),
             wit(&[0x61, 0x62, 0x63, 0x64]),
             CBID_RED_DEV,
         ),
         "v2_deposito_3in_cambio_otro" => (
-            deposito_3in(false),
+            deposito_3in(false, 0xdead),
             wit(&[0x61, 0x62, 0x63, 0x64]),
             CBID_OTRO,
         ),
         "v2_deposito_3in_sin_cambio_dev" => (
-            deposito_3in(true),
+            deposito_3in(true, 3),
             wit(&[0x61, 0x62, 0x63, 0x64]),
             CBID_RED_DEV,
         ),
         "v2_retiro_dev" => (
-            tx2(
+            tx2_nonce(
                 Vec::new(),
                 Vec::new(),
                 TipoGarantia::Retiro,
                 clave(0xe6),
                 2_500,
+                4,
             ),
             wit(&[0x71]),
             CBID_RED_DEV,
         ),
         "v2_retiro_otro" => (
-            tx2(
+            tx2_nonce(
                 Vec::new(),
                 Vec::new(),
                 TipoGarantia::Retiro,
                 clave(0xe6),
                 2_500,
+                5,
             ),
             wit(&[0x71]),
             CBID_OTRO,
         ),
         "v2_liberacion_dev" => (
-            tx2(
+            tx2_nonce(
                 Vec::new(),
                 Vec::new(),
                 TipoGarantia::Liberacion,
                 clave(0xf7),
                 2_500,
+                6,
             ),
             wit(&[0x72]),
             CBID_RED_DEV,
         ),
-        "v3_coinbase_post_dev" => (tx3(clave(0x1a), 5_000_000_000), Vec::new(), CBID_RED_DEV),
-        "v3_coinbase_post_otro" => (tx3(clave(0x1a), 5_000_000_000), Vec::new(), CBID_OTRO),
+        "v3_coinbase_post_dev" => (
+            tx3_slot(clave(0x1a), 5_000_000_000, 0),
+            Vec::new(),
+            CBID_RED_DEV,
+        ),
+        "v3_coinbase_post_otro" => (
+            tx3_slot(clave(0x1a), 5_000_000_000, 0x2a),
+            Vec::new(),
+            CBID_OTRO,
+        ),
         _ => return None,
     };
     Some(caso)
@@ -240,25 +272,25 @@ struct Caso {
     mensaje: Option<String>,
 }
 
-fn ruta_vectores() -> PathBuf {
+fn ruta_vectores(carpeta: &str) -> PathBuf {
     [
         env!("CARGO_MANIFEST_DIR"),
         "..",
         "..",
         "testdata",
-        "formato-v0",
+        carpeta,
         "vectores.txt",
     ]
     .iter()
     .collect()
 }
 
-fn leer_vectores() -> (HashMap<String, String>, HashMap<String, Caso>) {
-    let ruta = ruta_vectores();
+fn leer_vectores_de(carpeta: &str) -> (HashMap<String, String>, HashMap<String, Caso>) {
+    let ruta = ruta_vectores(carpeta);
     let texto = std::fs::read_to_string(&ruta).unwrap_or_else(|e| {
         panic!(
             "no se pudo leer el oráculo Julia en {}: {e}. Genera los vectores con \
-             deepseek/W02/oraculo-formato-v0/run.jl; este test MUST fallar, no degradarse.",
+             deepseek/W02b/oraculo-formato-v0.1/run.jl; este test MUST fallar, no degradarse.",
             ruta.display()
         )
     });
@@ -304,6 +336,11 @@ fn leer_vectores() -> (HashMap<String, String>, HashMap<String, Caso>) {
         }
     }
     (claves, casos)
+}
+
+/// Los vectores activos son los **v0.1** (Corrección v0.1 de `FORMATO-v0.md`).
+fn leer_vectores() -> (HashMap<String, String>, HashMap<String, Caso>) {
+    leer_vectores_de("formato-v0.1")
 }
 
 // ── V4: los vectores nuevos coinciden con el oráculo ─────────────────────────
@@ -391,6 +428,16 @@ fn los_vectores_del_oraculo_julia_coinciden() {
         assert_eq!(leida, tx, "{nombre}: ida y vuelta");
         assert_eq!(t, testigos, "{nombre}: testigos");
         assert!(resto.is_empty(), "{nombre}: bytes sobrantes");
+    }
+
+    // Decisión 2 de ORDEN-W02b: los casos **v1 no-coinbase** conservan byte a byte los bytes y el
+    // `txid` de los vectores v0; la corrección F-15/F-17 no toca la v1.
+    let (_, v0) = leer_vectores_de("formato-v0");
+    for nombre in ["v1_transferencia_dev", "v1_transferencia_otro"] {
+        let a = casos.get(nombre).unwrap();
+        let b = v0.get(nombre).unwrap();
+        assert_eq!(a.wire, b.wire, "{nombre}: bytes v1 no-coinbase intactos");
+        assert_eq!(a.txid, b.txid, "{nombre}: txid v1 no-coinbase intacto");
     }
 }
 
@@ -543,6 +590,7 @@ fn la_version_y_la_extension_deben_ser_coherentes() {
         tipo: TipoGarantia::Deposito,
         clave: clave(0xd4),
         importe: Amount::nuevo(1).unwrap(),
+        nonce: 0,
     };
     assert!(matches!(
         validar_forma_tx(&t, &[]),
@@ -850,8 +898,9 @@ fn el_codec_rechaza_una_extension_truncada_y_no_consume_sobrantes() {
     let mut b = Vec::new();
     tx_a_bytes(&mut b, &t, &w);
 
-    // La extensión de v2 vive en [14, 55): tipo(14) + clave[15,47) + importe[47,55).
-    for corte in 14..=56 {
+    // La extensión de v2 (F-15) vive en [14, 63): tipo(14) + clave[15,47) + importe[47,55) +
+    // nonce[55,63). Cualquier prefijo estricto a partir de ahí MUST rechazarse por truncamiento.
+    for corte in 14..b.len() {
         let truncado = b.get(..corte).unwrap();
         assert!(
             matches!(
@@ -928,6 +977,22 @@ fn cada_campo_de_la_extension_y_la_version_cambia_el_txid() {
         *importe = Amount::nuevo(8_999).unwrap();
     }
     assert_ne!(txid(&v, CBID_RED_DEV), original, "importe");
+
+    // F-15: el nonce entra en el txid.
+    let mut v = base.clone();
+    if let ExtensionTx::Garantia { nonce, .. } = &mut v.extension {
+        *nonce = 1;
+    }
+    assert_ne!(txid(&v, CBID_RED_DEV), original, "nonce");
+
+    // F-17: el slot de la coinbase PoST entra en el txid.
+    let post_a = tx3_slot(clave(0x1a), 5_000_000_000, 0);
+    let post_b = tx3_slot(clave(0x1a), 5_000_000_000, 1);
+    assert_ne!(
+        txid(&post_a, CBID_RED_DEV),
+        txid(&post_b, CBID_RED_DEV),
+        "slot"
+    );
 
     let mut v = base.clone();
     v.extension = ExtensionTx::Ninguna;

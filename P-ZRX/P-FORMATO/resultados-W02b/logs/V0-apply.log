@@ -1,0 +1,1 @@
+git apply --check -p1 ../cambios.patch -> exit 0 (aplica limpio sobre ws.orig, GIT_CEILING_DIRECTORIES=/home/katana/zeo/ZEROX/deepseek/W02b)

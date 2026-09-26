@@ -69,18 +69,18 @@ fn tx_out(valor: i64, pk: ClavePublica) -> TxOut {
     }
 }
 
-fn tx_coinbase_pow(salidas: Vec<TxOut>) -> Tx {
+fn tx_coinbase_pow(salidas: Vec<TxOut>, expiry_height: u32) -> Tx {
     Tx {
         version: 1,
         inputs: Vec::new(),
         outputs: salidas,
         lock_time: 0,
-        expiry_height: 0,
+        expiry_height,
         extension: ExtensionTx::Ninguna,
     }
 }
 
-fn tx_coinbase_post(clave: ClavePublica, importe: i64) -> Tx {
+fn tx_coinbase_post(clave: ClavePublica, importe: i64, slot: u64) -> Tx {
     Tx {
         version: 3,
         inputs: Vec::new(),
@@ -90,6 +90,7 @@ fn tx_coinbase_post(clave: ClavePublica, importe: i64) -> Tx {
         extension: ExtensionTx::CoinbasePost {
             clave,
             importe: Amount::nuevo(importe).unwrap(),
+            slot,
         },
     }
 }
@@ -108,6 +109,7 @@ fn tx_deposito(op: OutPoint, clave: ClavePublica, importe: i64) -> Tx {
             tipo: TipoGarantia::Deposito,
             clave,
             importe: Amount::nuevo(importe).unwrap(),
+            nonce: 0,
         },
     }
 }
@@ -142,7 +144,7 @@ fn generar(entropia: &[u8]) -> Vec<BloqueTransicion> {
 
     // PoW h = 1: coinbase a `k1`.
     let (sk1, pk1) = par(1);
-    let cb1 = tx_coinbase_pow(vec![tx_out(10, pk1)]);
+    let cb1 = tx_coinbase_pow(vec![tx_out(10, pk1)], 1);
     let op1 = OutPoint {
         prev_txid: zx_core::txid(&cb1, CBID_RED_DEV),
         prev_index: 0,
@@ -162,7 +164,7 @@ fn generar(entropia: &[u8]) -> Vec<BloqueTransicion> {
 
     // PoW h = 2: coinbase a `k2` y depósito del coinbase anterior (habilita la garantía).
     let (_sk2, pk2) = par(2);
-    let cb2 = tx_coinbase_pow(vec![tx_out(10, pk2)]);
+    let cb2 = tx_coinbase_pow(vec![tx_out(10, pk2)], 2);
     let dep = tx_deposito(op1, pk1, 10);
     let gastadas = vec![SpentOutput {
         value: Amount::nuevo(10).unwrap(),
@@ -190,7 +192,7 @@ fn generar(entropia: &[u8]) -> Vec<BloqueTransicion> {
         slot = slot
             .saturating_add(1)
             .saturating_add(u64::from(siguiente(2)));
-        let cb = tx_coinbase_post(pk1, 3);
+        let cb = tx_coinbase_post(pk1, 3, slot);
         let post = BloqueTransicion::nuevo(
             HechosCabecera::PoST {
                 hash: hash(10 + i as u8),

@@ -1,0 +1,31 @@
+He cumplido la ORDEN-W02b por completo. Resumen:
+
+## Faltas de definición detectadas (informadas por escrito antes de editar cada regla)
+
+Quedaron documentadas en `deepseek/W02b/PROGRESO.md` §«Faltas de definición detectadas ANTES de editar» (FD-1…FD-7). Las tres decisiones forzadas:
+
+- **FD-1 · F-16 contra la letra de `validar_forma_tx` «sin cambios».** F-10 rechazaba `expiry_height ≠ 0` para toda tx, pero F-16 exige `expiry == altura` en la coinbase PoW: era inalcanzable. Lectura: `validar_forma_tx` exime a las candidatas a coinbase PoW (igual que ya difería al contexto su posición); el motor exige la igualdad.
+- **FD-6 · El oráculo de formato no modela F-16** (un oráculo sin bloque no tiene altura). Lectura: el oráculo v0.1 mantiene `expiry = 0`; la identidad v0↔v0.1 se exige solo en los casos v1 **no-coinbase**, como pide la orden.
+- **FD-7 · Los negativos de T01-C que W03 nunca consumió.** Al correrlos aparecieron 93 discrepancias en 4 familias que exigían dos lecturas más: la correspondencia `ErrForma(DepositoSinEntradas) → ErrAutorizacion` (el oráculo T01 autoriza antes de consumir entradas) y el mapeo del id abstracto de la salida de `Liberacion` (contador `prox_salida` del oráculo) al `OutPoint` real `(txid, 0)` de F-18.
+
+## Implementación
+
+- **`zx-core`**: `ExtensionTx::Garantia { …, nonce }`, `ExtensionTx::CoinbasePost { …, slot }`, `extension_digest` (F-15/F-17), códec F-14, exención F-16 en forma.
+- **`zx-consensus::transicion`**: `Garantia::nonce_siguiente`, `ErrNonce`, comprobación F-15 al inicio de toda operación de garantía con undo exacto, F-16/F-17 ⇒ `ErrEmision`, F-18 `(txid, 0)` y eliminación de `prox_salida`. En fusión, repetición ⇒ descarte con `ErrNonce`.
+- **Arnés diferencial**: lee los dos ficheros v0.1, sin claves de salida artificiales, coinbases con `expiry=altura` y `slot` del bloque, garantías con el nonce del vector.
+- **`zx-post`**: la coinbase v3 lleva el `slot` de su cabecera.
+- **Oráculo v0.1** (`oraculo-formato-v0.1/`): actualizado a F-15/F-17, vectores regenerados e instalados.
+
+## Verificación (SUPERADO)
+
+| Paso | Resultado |
+|---|---|
+| V1 `fmt --check` | limpio |
+| V2 `clippy … -D warnings` | limpio |
+| V3 `cargo test --workspace --all-features --locked` | **630 pasan, 0 fallan, 1 ignorado**; 621→631 nombres, **0 tests perdidos, 10 añadidos** |
+| V4 diferencial v0.1 | **0 discrepancias en 2 055 base (1 947 con PoST)** y **0 en 3 939 negativos** (2 024 `ErrNonce`) |
+| V5 tests propios F-15…F-18 | 9 unitarios + `diferencial_t01_negativos`, todos verdes |
+| V6 oráculo v0.1 (Julia) | `Pkg.test()` **85/85**; v1 no-coinbase idénticos a v0 |
+| V7 deps/frontera/lock | 20 dependencias exactas, 6 fronteras OK, `Cargo.lock` **idéntico** |
+
+Entregables en `/home/katana/zeo/ZEROX/deepseek/W02b/`: `ws.orig/`, `ws/`, `oraculo-formato-v0.1/`, `cambios.patch` (23 ficheros, `git apply --check` OK), `MIGRACION.sha256` (155 huellas, `-c` OK), `logs/`, `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Entrada congelada: **47/47 OK** al empezar y al terminar. Sin Python, sin commit/push, nada escrito fuera de la zona.

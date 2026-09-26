@@ -306,9 +306,17 @@ fn fusion_post(
         return Err(ErrorTransicion::ErrEmision);
     };
     let declarado = match &tx_coinbase.extension {
-        ExtensionTx::CoinbasePost { clave, importe } => {
+        ExtensionTx::CoinbasePost {
+            clave,
+            importe,
+            slot: slot_tx,
+        } => {
             if *clave != *productor {
                 return Err(ErrorTransicion::ErrAutorizacion);
+            }
+            // F-17: el `slot` de la v3 MUST ser el slot del bloque que la contiene (FD-4).
+            if *slot_tx != *slot {
+                return Err(ErrorTransicion::ErrEmision);
             }
             *importe
         }

@@ -1,0 +1,10 @@
+diferencial_t01_negativos
+transicion::tests::dos_coinbases_pow_iguales_salvo_altura_no_colisionan
+transicion::tests::dos_depositos_con_nonces_consecutivos_valen_y_la_repeticion_no
+transicion::tests::el_nonce_se_comprueba_antes_que_el_saldo
+transicion::tests::el_undo_restituye_el_nonce
+transicion::tests::fusion_descarta_repeticion_con_err_nonce
+transicion::tests::la_coinbase_post_exige_el_slot_del_bloque
+transicion::tests::la_coinbase_pow_exige_expiry_igual_a_la_altura
+transicion::tests::repeticion_de_liberacion_invalida_el_bloque_estricto
+transicion::tests::repeticion_de_retiro_invalida_el_bloque_estricto

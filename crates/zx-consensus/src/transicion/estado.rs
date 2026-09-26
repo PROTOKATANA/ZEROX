@@ -30,7 +30,6 @@ impl Estado {
             peso_sufijo: 0,
             altura_terminal: None,
             subsidio_acum: 0,
-            prox_salida: 0,
         }
     }
 
@@ -154,7 +153,6 @@ pub fn deshacer(estado: &Estado, undo: &Undo) -> Estado {
     restaurado.peso_sufijo = undo.escalares.peso_sufijo;
     restaurado.altura_terminal = undo.escalares.altura_terminal;
     restaurado.subsidio_acum = undo.escalares.subsidio_acum;
-    restaurado.prox_salida = undo.escalares.prox_salida;
     for (op, previa) in &undo.utxo {
         match previa {
             Some(e) => {

@@ -301,6 +301,9 @@ pub struct Garantia {
     pub congelado: Amount,
     /// Créditos D-T08 pendientes de madurar.
     pub creditos: Vec<Pendiente>,
+    /// Nonce siguiente de la clave (F-15): 0 al crearse. Toda operación de garantía de esta clave
+    /// exige `nonce == nonce_siguiente` y lo incrementa al aplicarse.
+    pub nonce_siguiente: u64,
 }
 
 impl Garantia {
@@ -313,6 +316,7 @@ impl Garantia {
             en_retirada: Vec::new(),
             congelado: Amount::CERO,
             creditos: Vec::new(),
+            nonce_siguiente: 0,
         }
     }
 }
@@ -346,9 +350,6 @@ pub struct Estado {
     pub altura_terminal: Option<u32>,
     /// Suma de subsidios nominales, para `I-1b`.
     pub subsidio_acum: i128,
-    /// Contador de salidas implícitas (`Liberacion`), para que dos liberaciones idénticas no
-    /// colisionen en el mismo `OutPoint` (ver `PROGRESO.md`, falta de definición 9).
-    pub prox_salida: u64,
 }
 
 /// Escalares del estado, para el undo por delta (`ORDEN-W03` §3.5).
@@ -376,8 +377,6 @@ pub struct Escalares {
     pub altura_terminal: Option<u32>,
     /// `subsidio_acum`.
     pub subsidio_acum: i128,
-    /// `prox_salida`.
-    pub prox_salida: u64,
 }
 
 impl From<&Estado> for Escalares {
@@ -394,7 +393,6 @@ impl From<&Estado> for Escalares {
             peso_sufijo: e.peso_sufijo,
             altura_terminal: e.altura_terminal,
             subsidio_acum: e.subsidio_acum,
-            prox_salida: e.prox_salida,
         }
     }
 }

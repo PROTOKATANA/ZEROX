@@ -1,0 +1,25 @@
+# HORAS.log — ORDEN-W02b (zona horaria +02:00)
+
+2026-09-26T03:35  Arranque; lectura íntegra de ORDEN-W02b, LINEO, FORMATO-v0.1, CONTRATO-v0
+                  (v0.1), CONTRATO-ESTADO-DAG, informes W02/W03/W03-R, oráculo v0, vectores v0.1
+                  y oráculo T01-D. Comprobación de ENTRADA-W02b.sha256: 47/47 OK.
+2026-09-26T03:38  Montaje de la zona: ws.orig/ y ws/ (copias idénticas de la raíz), .cargo-home,
+                  .julia-depot, env.sh. PROGRESO.md con FD-1…FD-6 antes de editar código.
+2026-09-26T03:40  Oráculo de formato v0.1: referencia.jl/campos_extra/txid con nonce (F-15) y slot
+                  (F-17); runtests 85/85; vectores regenerados e instalados en
+                  ws/testdata/formato-v0.1/.
+2026-09-26T03:43  zx-core: ExtensionTx con nonce/slot, extension_digest, códec F-14, exención F-16 en
+                  validar_forma_tx; formato_v0.rs lee v0.1 y compara v1 no-coinbase con v0.
+2026-09-26T03:46  zx-consensus: Garantia::nonce_siguiente, ErrNonce, F-15/F-16/F-17/F-18, sin
+                  prox_salida; zx-post: coinbase v3 con slot.
+2026-09-26T03:48  Primer diferencial v0.1: base 2 055/2 055 OK; negativos 93 discrepancias
+                  (FD-7). Se documenta y se aplican las dos lecturas.
+2026-09-26T03:54  Segundo diferencial: 0/2 055 y 0/3 939 (257,85 s).
+2026-09-26T04:00  V1 fmt, V2 clippy y V3 completa: 630 pasan / 0 fallan / 1 ignorado; 0 tests
+                  perdidos, 10 añadidos.
+2026-09-26T04:03  V6 Pkg.test() del oráculo: 85/85. V7 deps (20 exactas), frontera (6 OK), lock
+                  idéntico.
+2026-09-26T04:06  Comparación de listas de tests con ws.orig (target separado por limpieza de los
+                  8 crates locales); 621 vs 631.
+2026-09-26T04:08  cambios.patch (23 ficheros), MIGRACION.sha256 (155 huellas, -c OK), `git apply
+                  --check` OK. Entrada congelada final: 47/47 OK.

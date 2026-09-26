@@ -239,21 +239,28 @@ pub fn tx_a_bytes(salida: &mut Vec<u8>, tx: &Tx, testigos: &[Vec<u8>]) {
         lock_a_bytes(salida, &s.lock);
     }
 
-    // F-14 · campos extra de v2/v3, en el orden y anchura de F-05, sin prefijo de longitud.
+    // F-14 · campos extra de v2/v3, en el orden y anchura de F-15/F-17, sin prefijo de longitud.
     match &tx.extension {
         ExtensionTx::Ninguna => {}
         ExtensionTx::Garantia {
             tipo,
             clave,
             importe,
+            nonce,
         } => {
             int::escribir_u8(salida, tipo.byte());
             salida.extend_from_slice(clave.bytes());
             int::escribir_u64(salida, importe.brek() as u64);
+            int::escribir_u64(salida, *nonce);
         }
-        ExtensionTx::CoinbasePost { clave, importe } => {
+        ExtensionTx::CoinbasePost {
+            clave,
+            importe,
+            slot,
+        } => {
             salida.extend_from_slice(clave.bytes());
             int::escribir_u64(salida, importe.brek() as u64);
+            int::escribir_u64(salida, *slot);
         }
     }
 
@@ -331,20 +338,24 @@ pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingEr
                 .ok_or(EncodingError::TipoGarantiaInvalido { tipo: tipo_byte })?;
             let (clave, resto) = leer_clave(resto)?;
             let (brek, resto) = int::leer_i64(resto)?;
+            let (nonce, resto) = int::leer_u64(resto)?;
             r = resto;
             ExtensionTx::Garantia {
                 tipo,
                 clave,
                 importe: Amount::nuevo(brek)?,
+                nonce,
             }
         }
         3 => {
             let (clave, resto) = leer_clave(r)?;
             let (brek, resto) = int::leer_i64(resto)?;
+            let (slot, resto) = int::leer_u64(resto)?;
             r = resto;
             ExtensionTx::CoinbasePost {
                 clave,
                 importe: Amount::nuevo(brek)?,
+                slot,
             }
         }
         // Ya se validó arriba: solo queda la 1.

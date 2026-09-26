@@ -303,7 +303,7 @@ fn v5_tres_semillas_construyen_y_comprueban_el_primer_bloque_post() {
         assert!(hechos.prueba_valida);
         assert_eq!(hechos.requisito_declarado, 0);
 
-        // El cuerpo es una única coinbase v3 pagada a la clave de la solución (F-05, F-09).
+        // El cuerpo es una única coinbase v3 pagada a la clave de la solución (F-05, F-09, F-17).
         assert_eq!(bloque.txs().len(), 1);
         assert_eq!(bloque.txs()[0].version, 3);
         assert_eq!(
@@ -311,6 +311,7 @@ fn v5_tres_semillas_construyen_y_comprueban_el_primer_bloque_post() {
             zx_core::ExtensionTx::CoinbasePost {
                 clave: clave_publica_de(&f.sk),
                 importe: Amount::nuevo(5).expect("importe"),
+                slot: bloque.cabecera.slot,
             }
         );
         assert!(
