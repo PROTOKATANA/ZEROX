@@ -1,0 +1,67 @@
+=== Parte 1 · corrección de convención (densidad = cola + 1) ===
+
+Autocomprobación (sin cambios): B(dist_alpha=2.2 EN CONVENCIÓN DE DENSIDAD) = 0.675466 (DS-3: 0.675466)
+
+[global] alpha_cola=0.1113 -> alpha_dens=1.1113  IC95=[1.1102; 1.1124]
+[cola_optima] alpha_cola=0.8560 -> alpha_dens=1.8560  IC95=[1.8096; 1.9069]
+
+Comprobación contra la cifra del director (cola óptima, eps=0.01, Tv=3600): B(ε)=0.0947 [0.0593; 0.1511] (esperado ≈0.095 [0.060;0.151])
+
+=== Parte 2 · B(ε) EMPÍRICO directo (sin ajustar ninguna ley) ===
+
+n granjeros = 2453 | suma TiB de la muestra (denom. 'pool') = 590182.09 TiB (576.35 PiB)
+Referencia mostrada por el sitio (crudo/page_home.html, 2026-09-26): 576,07 PiB (0.049% de diferencia con la suma de la muestra)
+
+--- Denominador POOL (autocontenido, primario: mi propia muestra) ---
+  Tv=3600    eps=0.001  -> B_emp = 9.89525e-06  IC95=[7.38755e-06; 1.26741e-05]
+  Tv=3600    eps=0.010  -> B_emp = 0.00017786  IC95=[0.00014922; 0.00020843]
+  Tv=3600    eps=0.100  -> B_emp = 0.00611499  IC95=[0.00550936; 0.00672334]
+  Tv=100000  eps=0.001  -> B_emp = 0  IC95=[0; 0]
+  Tv=100000  eps=0.010  -> B_emp = 5.76093e-07  IC95=[2.54159e-07; 9.65804e-07]
+  Tv=100000  eps=0.100  -> B_emp = 5.72027e-05  IC95=[4.65276e-05; 6.84369e-05]
+
+--- Denominador RED (secundario, banda de sensibilidad, ver reservas) ---
+  [1 EiB (piso especulativo) = 1024.0 PiB]
+    Tv=3600    eps=0.001  -> B_emp = 1.27792e-05  IC95=[1.00517e-05; 1.56214e-05]
+    Tv=3600    eps=0.010  -> B_emp = 0.000216827  IC95=[0.000183524; 0.000252449]
+    Tv=3600    eps=0.100  -> B_emp = 0.00862765  IC95=[0.00795586; 0.00928474]
+    Tv=100000  eps=0.001  -> B_emp = 2.86102e-08  IC95=[0; 6.67572e-08]
+    Tv=100000  eps=0.010  -> B_emp = 2.38419e-06  IC95=[1.64032e-06; 3.22366e-06]
+    Tv=100000  eps=0.100  -> B_emp = 7.43008e-05  IC95=[6.16834e-05; 8.70805e-05]
+  [3 EiB (XCH.today ago-2026, bruto) = 3072.0 PiB]
+    Tv=3600    eps=0.001  -> B_emp = 1.73155e-05  IC95=[1.42224e-05; 2.06409e-05]
+    Tv=3600    eps=0.010  -> B_emp = 0.000395387  IC95=[0.000348243; 0.000447121]
+    Tv=3600    eps=0.100  -> B_emp = 0.013699  IC95=[0.0129672; 0.0144483]
+    Tv=100000  eps=0.001  -> B_emp = 4.76837e-08  IC95=[1.58946e-08; 8.90096e-08]
+    Tv=100000  eps=0.010  -> B_emp = 4.64439e-06  IC95=[3.66203e-06; 5.67436e-06]
+    Tv=100000  eps=0.100  -> B_emp = 7.90373e-05  IC95=[6.71827e-05; 9.16231e-05]
+  [4 EiB (XCH.today ago-2026, efectivo) = 4096.0 PiB]
+    Tv=3600    eps=0.001  -> B_emp = 2.12145e-05  IC95=[1.77383e-05; 2.48314e-05]
+    Tv=3600    eps=0.010  -> B_emp = 0.000509987  IC95=[0.000457217; 0.000566245]
+    Tv=3600    eps=0.100  -> B_emp = 0.0143752  IC95=[0.0136426; 0.0151206]
+    Tv=100000  eps=0.001  -> B_emp = 4.52995e-08  IC95=[1.66893e-08; 8.10623e-08]
+    Tv=100000  eps=0.010  -> B_emp = 5.19276e-06  IC95=[4.16511e-06; 6.2418e-06]
+    Tv=100000  eps=0.100  -> B_emp = 9.92036e-05  IC95=[8.5189e-05; 0.00011465]
+  [10 EiB (escenario intermedio) = 10240.0 PiB]
+    Tv=3600    eps=0.001  -> B_emp = 2.16827e-05  IC95=[1.83524e-05; 2.52449e-05]
+    Tv=3600    eps=0.010  -> B_emp = 0.000862765  IC95=[0.000795586; 0.000928474]
+    Tv=3600    eps=0.100  -> B_emp = 0.0127804  IC95=[0.0121552; 0.0134013]
+    Tv=100000  eps=0.001  -> B_emp = 2.38419e-07  IC95=[1.64032e-07; 3.22366e-07]
+    Tv=100000  eps=0.010  -> B_emp = 7.43008e-06  IC95=[6.16834e-06; 8.70805e-06]
+    Tv=100000  eps=0.100  -> B_emp = 0.000164992  IC95=[0.000146752; 0.000184287]
+  [20 EiB (escenario intermedio-alto) = 20480.0 PiB]
+    Tv=3600    eps=0.001  -> B_emp = 3.2855e-05  IC95=[2.847e-05; 3.7416e-05]
+    Tv=3600    eps=0.010  -> B_emp = 0.00123292  IC95=[0.00116007; 0.00130989]
+    Tv=3600    eps=0.100  -> B_emp = 0.00929185  IC95=[0.00879146; 0.00980835]
+    Tv=100000  eps=0.001  -> B_emp = 4.22001e-07  IC95=[3.24237e-07; 5.29289e-07]
+    Tv=100000  eps=0.010  -> B_emp = 6.98328e-06  IC95=[5.88176e-06; 8.143e-06]
+    Tv=100000  eps=0.100  -> B_emp = 0.00026844  IC95=[0.000245375; 0.000292706]
+  [36,73 EiB (pico histórico, ATH) = 37611.52 PiB]
+    Tv=3600    eps=0.001  -> B_emp = 4.60241e-05  IC95=[4.09325e-05; 5.13318e-05]
+    Tv=3600    eps=0.010  -> B_emp = 0.00142048  IC95=[0.00134721; 0.00149427]
+    Tv=3600    eps=0.100  -> B_emp = 0.00700398  IC95=[0.00656673; 0.00745423]
+    Tv=100000  eps=0.001  -> B_emp = 5.13577e-07  IC95=[4.11011e-07; 6.19252e-07]
+    Tv=100000  eps=0.010  -> B_emp = 9.64398e-06  IC95=[8.25929e-06; 1.11433e-05]
+    Tv=100000  eps=0.100  -> B_emp = 0.000364339  IC95=[0.000340074; 0.00038973]
+
+Salida: resultados/correccionA-Beps-empirico.csv, resultados/correccionA-Beps-corregido.csv

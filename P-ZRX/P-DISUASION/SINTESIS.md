@@ -15,16 +15,18 @@ aplicado (Katana):** un mecanismo que no cierra un hueco pero encarece el ataque
 | **Sellado lento** (Filecoin F3, PoRep) | Reescribir la historia (largo alcance) | Horas por sector (Filecoin); obliga a resellar todo el periodo | **Sí**, si se adopta (cambia el objeto ploteado) | **Sí** contra largo alcance; **no** contra el doble farmeo |
 | **PoT de un solo flujo** (ya en ZEROX) | Fabricar historia falsa de golpe (*bootstrapping* de Baig-Pietrzak) | Obliga a recorrer el tiempo real | **Sí** | **Sí**: saca a ZEROX de la mitad de la imposibilidad de Baig-Pietrzak |
 | **Finalidad `C-FIN-01`** (ya en ZEROX) | Reorganizaciones profundas | Acota la profundidad, no el umbral | **Sí**, estructural | **Sí**, acota daño |
-| **Castigo por evidencia + retención** (M3 + M5) | Doble farmeo y equivocación | **Δ = 0** frente al atacante grande: compra el espacio en claves pequeñas sin saldo que perder | **No**: condicionado a que publique y a que tenga saldo | **Solo contra el atacante pequeño** |
+| **Castigo por evidencia + retención** (M3 + M5) | Doble farmeo y equivocación | Con el reparto supuesto por DS-3, **Δ = 0** (el atacante recluta gratis en claves sin saldo). **Con el reparto real de un pool de Chia (DS-6), esa grieta se cierra**: el atacante del 20–40 % que necesita espacio ajeno tiene que sobornar claves con saldo, y el castigo le cobra | **Condicionado**: a que los reclutados dejen evidencia; no alcanza al atacante con espacio propio suficiente | **Sí, contra el atacante que recluta**, si el espacio está concentrado; **no** contra el grande autosuficiente |
 | **Garantía sin castigo** (M1, M2 contra el doble farmeo) | — | El mismo colateral vale en todas las ramas | — | **No** contra el doble farmeo |
 | **Castigo correlacionado** (M4, ya en `SPEC.md` C-SLA) | Doble farmeo y equivocación | **Nulo** frente al atacante grande: no puede confiscar más saldo del que hay (máximo 2,79 u.e. frente a 510 570 de soborno evitado, DS-5) | No | **No**; además **empeora**: castiga a honestos con fallos comunes y abre *griefing* |
 
 ## 2. Lo que queda firme
 
 1. **El doble farmeo no lo encarece ningún mecanismo de PoStake ni de Filecoin de forma exigible**
-   frente a un atacante grande: lo confirman las fuentes (ningún sistema de espacio lo hace, DS-1), la
-   matriz (DS-2) y el modelo (DS-3: Δ = 0). El parámetro que decide si el castigo llega a morder no es
-   su tamaño sino **cómo se reparte el espacio entre claves**, que en ZEROX no se ha medido (DS-6).
+   frente a un atacante grande con espacio propio suficiente: lo confirman las fuentes (DS-1), la matriz
+   (DS-2), el modelo (DS-3) y el castigo correlacionado (DS-5). **Pero el castigo con evidencia sí encarece
+   al atacante que necesita reclutar espacio ajeno** si el espacio está concentrado, como en un pool real
+   de Chia (DS-6: la fracción de espacio en claves sin saldo es ≈ 2·10⁻⁴, muy por debajo del umbral 0,2–0,6
+   que haría gratis el reclutamiento). Es una barrera condicionada (exige evidencia), no un cierre.
 2. **Sí hay mejoras reales y exigibles** en otros frentes: espacio ajeno (O4), sembrador (sectores y
    auditorías), Sybil (garantía) y largo alcance (sellado lento, PoT, finalidad).
 3. **Baig y Pietrzak (FC 2025, comprobado):** un PoSpace de cadena más larga no puede ser seguro sin
@@ -46,7 +48,7 @@ aplicado (Katana):** un mecanismo que no cierra un hueco pero encarece el ataque
 
 - **DS-5 (hecho):** el castigo correlacionado tampoco encarece el doble farmeo y empeora el riesgo para
   honestos (`REVISION-DS5.md`). Con esto, ningún mecanismo de PoStake examinado lo encarece de forma exigible.
-- **DS-6** — estimar con datos públicos (Chia, Autonomys) cómo se reparte el espacio entre claves: es
-  el parámetro que domina el resultado de M3.
+- **DS-6 (hecho, con corrección del director):** en un pool real de Chia el espacio está muy concentrado;
+  la grieta del reclutamiento gratuito se cierra (`REVISION-DS6.md`). Autonomys no publica datos por clave.
 - Decisiones de diseño que salen de aquí, para Katana: adoptar O4 como regla candidata; si se activan
   auditorías, diseñarlas para `k > B` con el presupuesto de E/S doméstico; valorar la tabla v2.

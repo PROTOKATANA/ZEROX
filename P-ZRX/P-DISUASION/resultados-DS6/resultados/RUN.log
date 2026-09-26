@@ -1,0 +1,22 @@
+=== DS-6 · Chia SpaceFarmers.io (pool), 2026-09-26 ===
+Filas crudas: 2470 | duplicados por página frontera: 13 | ceros excluidos: 4 | n final: 2453
+rango de 'points': [1, 4039200]  (razón max/min = 4.04e+06)
+
+Autocomprobación B(eps=0.01,Tv=3600,dist_alpha=2.2) = 0.675466 (DS-3 publicó 0.675466)
+
+[Ajuste GLOBAL, xmin=min observado=1, cubre TODO el rango, n=2453]
+  dist_alpha_hat = 0.1113   IC 95% bootstrap = [0.1102, 0.1124]   KS = 0.3971
+
+[Ajuste de COLA óptima (Clauset-Shalizi-Newman), xmin=18339, n_cola=906 de 2453]
+  dist_alpha_hat = 0.8560   IC 95% bootstrap = [0.8096, 0.9069]   KS = 0.0393
+
+[Traducción con la fórmula NO truncada de DS-3 (F_max=∞, requiere dist_alpha>2)]
+  global (alpha=0.1113):      B(eps) = NaN (fuera de dominio si NaN)
+  cola óptima (alpha=0.8560): B(eps) = NaN
+
+[Traducción con la fórmula TRUNCADA F_max=1 (P-CLAVE MODELO §2.4, generalización)]
+  global (alpha=0.1113):      B(eps) = 3.20331e-11
+  cola óptima (alpha=0.8560): B(eps) = 4.3968e-07
+
+Tiempo total (1 hilo, sin optimización dedicada — n≈2453 no lo requiere): 0.492 s
+Salidas: resultados/resumen-ajuste.csv, resultados/traduccion-grieta.csv, resultados/muestra-limpia.csv

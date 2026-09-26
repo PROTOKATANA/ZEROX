@@ -1,0 +1,4 @@
+c1a43b4e847e0e2be422123ecbc48e3d4ec78ba5a1d6286d68dbe79b93a79ecc  src/correccion-a.jl
+155e8f91f73f3cd491b735c20d98e70c8a4732cb1a0629b95b0ec8572057b84d  resultados/correccionA-Beps-corregido.csv
+d9484c3238dcdc4200d63d2911ecfb7853ff6e85a4109716508978b9056dbce5  resultados/correccionA-Beps-empirico.csv
+3ff184be7789c61a59454991de8321aa269878a8cd263c240a0d2063cbe9d401  resultados/RUN-correccionA.log
