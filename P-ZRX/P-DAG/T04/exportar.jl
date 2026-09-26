@@ -1,11 +1,13 @@
 # exportar.jl — exportador determinista de vectores de estado DAG (ORDEN-T04 §4).
 #
 #     julia --project=. exportar.jl [--fecha ISO-8601] [--salida RUTA] \
-#         [--contrato RUTA] [--dirigidos 1] [--aleatorios 900]
+#         [--contrato RUTA] [--dirigidos 1] [--aleatorios 900] [--cobertura RUTA]
 #
-# Escribe `resultados/vectores-estado-dag-v0.1.txt` (formato de T01-B ampliado con
+# Escribe `resultados/vectores-estado-dag-v0.2.txt` (formato de T01-B ampliado con
 # `padres=[…]`, líneas `DESC` y `nonce=` en depósito/retiro/liberación y `GAR`) y su
-# `sha256` en el `.sha256` (formato `sha256sum`). Solo interfaces por defecto
+# `sha256` en el `.sha256` (formato `sha256sum`). Además escribe
+# `resultados/cobertura-v0.2.txt` (apartados vectores y run.jl) con la tabla de
+# cobertura por tipo de operación de la ORDEN-T04-C §2. Solo interfaces por defecto
 # (CUT_HWPhi, FC3, SEC0) y la rejilla declarada de T04. Un hilo, sin Python.
 #
 # El lector independiente vive en `src/lector_vectores.jl` y NO reutiliza ninguna
@@ -18,8 +20,10 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md"
-# T04-B: la salida lleva el formato v0 más `nonce=` (F-15). Los ficheros v0 se conservan.
-const SALIDA_DEF = "resultados/vectores-estado-dag-v0.1.txt"
+# T04-C: vectores v0.2 con el generador corregido (nonce por clave + retiros y
+# liberaciones). Los ficheros v0 y v0.1 se conservan.
+const SALIDA_DEF = "resultados/vectores-estado-dag-v0.2.txt"
+const COBERTURA_DEF = "resultados/cobertura-v0.2.txt"
 
 const NOMBRE_FAMILIA = Dict(Transicion.Genesis => "Genesis", Transicion.PoW => "PoW",
                             Transicion.PoST => "PoST")
@@ -192,6 +196,7 @@ function main()
     cfg = parsear(ARGS)
     fecha = get(cfg, "fecha", fecha_por_defecto())
     salida = get(cfg, "salida", SALIDA_DEF)
+    cobertura = get(cfg, "cobertura", COBERTURA_DEF)
     contrato = get(cfg, "contrato", CONTRATO_DEF)
     con_dirigidos = get(cfg, "dirigidos", "1") != "0"
     n_aleatorios = parse(Int, get(cfg, "aleatorios", "900"))
@@ -202,7 +207,7 @@ function main()
     flush(stdout)
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-estado-dag-v0.1 · T04 · ", fecha,
+    println(io, "# vectores-estado-dag-v0.2 · T04 · ", fecha,
             " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     if con_dirigidos
@@ -212,6 +217,7 @@ function main()
             escribir_caso(io, n, nombre, 1, 1, "-", A)
         end
     end
+    ac = EstadoDAG.AcumuladorCobertura()
     N = length(puntos)
     for r in 1:n_aleatorios
         idx = N == 1 ? 1 : 1 + round(Int, (r - 1) * (N - 1) / (n_aleatorios - 1))
@@ -219,9 +225,11 @@ function main()
         pd = ParamsDAG(PARAMS_DAG_BASE[pi], k)
         semilla = UInt64(0x5a5a) + UInt64(r)
         rng = StableRNG(semilla)
-        A = generar_dag_aleatorio(rng, pd; npost = 3 + (r % 12))
+        A = EstadoDAG.generar_dag_aleatorio(rng, pd; npost = EstadoDAG.npost_t04c(r),
+                                            pesos = EstadoDAG.PESOS_AJUSTADOS)
         n += 1
         escribir_caso(io, n, "aleatorio", pi, k, string(semilla), A)
+        EstadoDAG.acumular_caso!(ac, A)
         (r % 100 == 0) && (@printf("  aleatorios %d/%d\n", r, n_aleatorios); flush(stdout))
     end
     close(io)
@@ -229,6 +237,23 @@ function main()
     sha_path = replace(salida, r"\.txt$" => "") * ".sha256"
     write(sha_path, h * "  " * salida * "\n")   # formato `sha256sum` (T04-B)
     @printf("exportar: casos=%d sha256=%s -> %s\n", n, h, sha_path)
+    # Cobertura (ORDEN-T04-C §2): apartado vectores y apartado run.jl.
+    mkpath(dirname(cobertura))
+    ioc = open(cobertura, "w")
+    println(ioc, "# cobertura T04-C v0.2 · ", fecha, " · contrato ",
+            sha256_archivo(contrato))
+    println(ioc, "# generador: pesos=", EstadoDAG.PESOS_AJUSTADOS,
+            " npost=", min(EstadoDAG.npost_t04c(0), EstadoDAG.npost_t04c(1)), "..",
+            max(EstadoDAG.npost_t04c(0), EstadoDAG.npost_t04c(1)),
+            " p_tx=0.5 p_invalido=0.12 p_error_nonce=0.10")
+    println(ioc, "# minimos: depositos_aplicados>=150 retiros_aplicados>=100 ",
+            "liberaciones_aplicadas>=100 ErrNonce>=30 y <=25% de garantia ",
+            "construida ErrDobleGasto>=200 reorgs_garantia>=20")
+    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.2 (casos aleatorios)", ac)
+    acr = EstadoDAG.cobertura_run()
+    EstadoDAG.escribir_cobertura(ioc, "run.jl (seed 0x5a5a, replicas 200)", acr)
+    close(ioc)
+    @printf("exportar: cobertura -> %s\n", cobertura)
     flush(stdout)
 end
 

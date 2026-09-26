@@ -206,3 +206,137 @@ env -u LD_LIBRARY_PATH julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
 Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de `T04/`.
+
+---
+
+# T04-C — Generador del oráculo DAG con nonce correcto, retiros y liberaciones; vectores v0.2
+
+**Veredicto: SUPERADO.** Sobre `ORDEN-T04-C` y `REVISION-T04-B`, el generador aleatorio construye
+depósitos, retiros y liberaciones con el nonce del estado contra el que los construye (con un 10 %
+de nonce erróneo deliberado), IE-1…IE-6 siguen sin fallos en 3000 historias y los vectores v0.2
+superan todos los mínimos de cobertura de §3. Presupuesto consumido: 58,8 s de `run.jl` y 9,0 s de
+`Pkg.test()` (tope 1 h 30 min), 1 hilo, 8 GiB declarados.
+
+## C.1. Qué cambia y qué no
+
+- **Semántica intacta.** No se tocó `P-ZRX/P-TRANSICION/T01/` ni la lógica de `src/EstadoDAG.jl`.
+  Solo cambiaron `src/generadores.jl`, `src/dirigidos.jl`, `exportar.jl`, `run.jl`,
+  `src/lector_vectores.jl` y `test/`.
+- **Generador** (`generar_dag_aleatorio`, `src/generadores.jl`). Las transacciones se siguen
+  construyendo contra `S = A.post[pv]`, pero el tipo se elige **entre los factibles en `S` y en el
+  `slot` del bloque nuevo** con pesos (ajustados) 0,12/0,18/0,22/0,48:
+  - transferencia: hay salida gastable (`valor ≥ 2`); salida con `valor − 1` (como antes);
+  - depósito: hay salida gastable; importe = valor de la salida, a su dueño;
+  - retiro: `activo > 0` y `en_retirada` vacío; importe uniforme en `1:activo`;
+  - liberación: `vencido > 0` calculado en el `slot` del bloque nuevo con la regla de
+    `aplicar_liberacion!`; importe uniforme en `1:vencido`;
+  - `nonce = nonce_de(S, clave)`, con probabilidad 0,10 un nonce erróneo (`n+1`, o `n−1` si
+    `n > 0`, al 50 %).
+  El bug de `nonce = 0` de T04-B queda eliminado; el prefijo PoW ya deposita para las claves 1 y 2.
+  Los pesos de partida (0,35/0,30/0,20/0,15) daban 99 liberaciones aplicadas (una por debajo del
+  mínimo); se ajustaron y `npost` pasó a 15…16 (`npost_t04c(r) = 15 + r % 2`). El generador sigue
+  eligiendo solo entre los tipos factibles: el sesgo no inventa factibilidad.
+- **Casos dirigidos nuevos** D-12 y D-13 (abajo).
+- **Vectores v0.2.** `resultados/vectores-estado-dag-v0.2.txt` con el formato v0.1 (cabecera
+  `vectores-estado-dag-v0.2`), `.sha256` en formato `sha256sum` con ruta relativa a `T04/`. Se
+  conservan **intactos** `vectores-estado-dag-v0.txt` y `vectores-estado-dag-v0.1.txt` (hashes
+  verificados).
+- **`run.jl`** escribe `resultados/run-estado-dag-v0.2.log` sin sobrescribir los logs v0 y v0.1.
+
+## C.2. Tabla de cobertura (`resultados/cobertura-v0.2.txt`, generada por código Julia)
+
+Lectura de las cifras (AMBIGUEDAD-C1): `construidas` = operaciones que el generador produjo en
+cualquier bloque PoST; `aplicadas`/`descartadas` se miden en `Estado` de la punta seleccionada final
+(`aplicar_historia`); `evaluadas = aplicadas + descartadas`; la diferencia son operaciones en ramas
+no seleccionadas. El tope del 25 % de `ErrNonce` usa `garantia_construidas` (lectura literal de
+§3).
+
+```
+SECCION vectores-v0.2 (casos aleatorios)
+casos = 900
+TIPO Transferencia construidas=1112 aplicadas=351 descartadas=217 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=217 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Deposito construidas=1626 aplicadas=349 descartadas=394 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=295 ErrDobleGasto=99 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+garantia_construidas = 4663
+garantia_evaluadas = 2280
+garantia_errnonce = 853
+garantia_errnonce_pct_construidas = 18.29
+garantia_errnonce_pct_evaluadas = 37.41
+err_doble_gasto_total = 316
+reorganizaciones_que_deshacen_garantia = 312
+```
+
+El apartado `run.jl` de la misma tabla (3000 historias, `seed 0x5a5a`, `replicas 200`) da:
+transferencias 1151 aplicadas, depósitos 1290, retiros 2865, liberaciones 501, `ErrNonce` 3255
+(20,52 % de 15 860 garantías construidas), `ErrDobleGasto` 1110 y 1105 reorganizaciones que
+deshacen garantía. El log de `run.jl` reproduce exactamente esas cifras.
+
+## C.3. Mínimos exigidos en los vectores v0.2 (§3)
+
+| Medida | Mínimo | Vectores v0.2 | ¿Cumple? |
+|---|---:|---:|---|
+| Depósitos PoST aplicados | ≥ 150 | **349** | Sí |
+| Retiros aplicados | ≥ 100 | **808** | Sí |
+| Liberaciones aplicadas | ≥ 100 | **115** | Sí |
+| `ErrNonce` | ≥ 30 y ≤ 25 % de garantía construida | **853** (18,29 %) | Sí |
+| `ErrDobleGasto` | ≥ 200 | **316** | Sí |
+| Reorganizaciones que deshacen una operación de garantía | ≥ 20 | **312** | Sí |
+
+`run.jl` cumple también los seis mínimos (1290 / 2865 / 501 / 3255 = 20,52 % / 1110 / 1105).
+
+## C.4. Casos dirigidos nuevos
+
+- **D-12** (`caso_retiro_liberacion_reorg`). Rama A: retiro (slot 2) → liberación (slot 3) →
+  transferencia que gasta la salida de la liberación (slot 4). Rama B con los mismos slots y `sd`
+  menor: al pasar A a bloque de lado (aplicada en `slot(V)`), la liberación deja de estar vencida,
+  la salida de la liberación desaparece, el retiro queda en `en_retirada` (estado previo) y la
+  transferencia no existe; al volver a A, reaparecen. Medido: `libA=1`; con A seleccionada
+  `out=1, ret=0, nonce=n0+2`; con B seleccionada `lib=0, out=0, ret=1, nonce=n0+1`; de vuelta a A
+  `out=1, ret=0, nonce=n0+2`. Es una reorganización que **deshace** la liberación (operación de
+  garantía) y con ella la transferencia que dependía de su salida.
+- **D-13** (`caso_liberacion_punto_aplicacion`). Retiro en W (slot 2, `inicio=2`); liberación en X
+  (slot 2, `2 + R_slots > 2` ⇒ inmadura) y fusión de X por Y (slot 3, `3 ≥ inicio + R_slots`).
+  RD-4 fija el punto de aplicación: en `Estado(past(X))` (vista de X) la liberación se descarta con
+  `ErrSaldo` (`libX=0`, `descX=(2, ErrSaldo)`, `nonce=n0+1`); en `Estado(past(Y))` X se aplica en
+  `slot(Y)=3` y la liberación se aplica (`libY=1`, `creado_en_slot=3`, `nonce=n0+2`). **No hay dos
+  lecturas**: RD-4 resuelve el punto de aplicación y las dos vistas son la semántica buscada.
+
+## C.5. Vectores, relectura y batería
+
+| Comprobación | Resultado |
+|---|---|
+| Entrada congelada `ENTRADA-T04-C.sha256` | 5/5 `OK` |
+| Casos dirigidos | 13/13 sin fallos (D-1…D-13) |
+| Vectores v0.2 | **913 casos** (13 dirigidos + 900 aleatorios), 4,87 MB |
+| `sha256` v0.2 | `ee783b524c7fcac929fdd3859803205e046c3bab678efed69c5e603d2a94dd73` |
+| Relectura independiente (`src/lector_vectores.jl`) | 913 casos, **0 discrepancias** |
+| `run.jl --seed 0x5a5a --replicas 200` | 3000 historias, 46 500 bloques, 25 192 válidos, 4 536 descartes, 2 078 `rojo_U3`, 600 000 órdenes IE-3, **0 fallos**, 58,8 s |
+| `Pkg.test()` | **372/372 OK**, 9,0 s |
+| v0 y v0.1 | intactos (hashes verificados) |
+
+Pregunta falsable de la orden: con el generador corregido (nonce del estado, 10 % de error),
+IE-1…IE-6 siguen sin fallos y los vectores v0.2 cumplen los mínimos de §3. **No se refuta.**
+
+## C.6. Falta de definición (registrada antes de editar, `PROGRESO.md` §C.1)
+
+AMBIGUEDAD-C1 (alcance de «construidas»: se publican `construidas` y `evaluadas`, y el tope del
+25 % usa las construidas), C2 (clave uniforme entre las factibles para retiro/liberación), C3 (una
+operación por bloque), C4 (definición operativa de «reorganización que deshace garantía»), C5
+(D-13: RD-4 fija una única lectura, no se para), C6 (`exportar.jl` escribe el fichero de cobertura
+completo), C7 (`npost` 15…16 tras comprobar que los pesos de partida no bastaban). Ninguna obligó a
+elegir entre reglas incompatibles.
+
+## C.7. Reproducibilidad
+
+```
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export PATH=/home/katana/torio/.juliaup/bin:$PATH
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH julia --project=. run.jl --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH julia --project=. exportar.jl --dirigidos 1 --aleatorios 900
+env -u LD_LIBRARY_PATH julia --project=. src/lector_vectores.jl resultados/vectores-estado-dag-v0.2.txt
+env -u LD_LIBRARY_PATH julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de `T04/`.

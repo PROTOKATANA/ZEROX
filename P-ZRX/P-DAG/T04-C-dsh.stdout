@@ -1,0 +1,21 @@
+He leído íntegros `ORDEN-T04-C.md`, `REVISION-T04-B.md`, `LINEO.md`, el contrato, el formato y el oráculo T01, y he ejecutado la orden completa dentro de `T04/`. Informe final:
+
+## Falta de definición (registrada antes de editar)
+No encontré ninguna contradicción que obligara a parar; las 7 que sí eran menores quedaron escritas en `PROGRESO.md §C.1` **antes** de tocar código: C1 alcance de «construidas» (publico `construidas` y `evaluadas`; el tope del 25 % usa las construidas), C2 clave uniforme entre factibles, C3 una operación por bloque, C4 definición operativa de «reorg que deshace garantía», **C5 = D-13: RD-4 fija una única lectura, no hay dos lecturas y no se para**, C6 escritor del fichero de cobertura, C7 `npost` 15…16 y pesos ajustados.
+
+## Cambios (solo dentro de `T04/`)
+- `src/generadores.jl`: el tipo se elige entre los **factibles** en `S=A.post[pv]` y en el slot nuevo (transferencia/depósito con salida gastable; retiro `activo>0` y sin retirada; liberación `vencido>0` con la regla de `aplicar_liberacion!`); importe uniforme; `nonce = nonce_de(S, clave)` con 10 % de error deliberado. Pesos ajustados **0,12/0,18/0,22/0,48** y `npost ∈ {15,16}` (los de partida daban 99 liberaciones aplicadas: una por debajo). Se añade la maquinaria de cobertura.
+- `src/dirigidos.jl`: **D-12** y **D-13**.
+- `exportar.jl`, `run.jl`, `src/lector_vectores.jl`, `test/runtests.jl`, `INFORME.md`, `PROGRESO.md`, `HORAS.log` (`date -Is`). No se tocó T01 ni `src/EstadoDAG.jl`.
+
+## Resultados
+- Entrada congelada `ENTRADA-T04-C.sha256`: **5/5 OK** al empezar y al terminar.
+- **Vectores v0.2**: `resultados/vectores-estado-dag-v0.2.txt` (913 casos = 13 dirigidos + 900 aleatorios), `.sha256` `ee783b524c7f…d94dd73`; **relectura independiente: 913 casos, 0 discrepancias**. v0 y v0.1 intactos.
+- **Cobertura** (`resultados/cobertura-v0.2.txt`, generada por Julia): depósitos aplicados **349** ≥150; retiros **808** ≥100; liberaciones **115** ≥100; `ErrNonce` **853** = **18,29 %** (≥30 y ≤25 %); `ErrDobleGasto` **316** ≥200; reorganizaciones que deshacen garantía **312** ≥20. `run.jl` también cumple los seis.
+- **`run.jl --seed 0x5a5a --replicas 200`**: 3000 historias, 46 500 bloques, 600 000 órdenes IE-3, **0 fallos**, 58,8 s → `resultados/run-estado-dag-v0.2.log` (sin sobrescribir los anteriores).
+- **`Pkg.test()`**: **372/372 OK**, 9,0 s.
+
+## D-13 (punto de aplicación, RD-4)
+En `Estado(past(X))` la liberación inmadura se descarta (`ErrSaldo`, `libX=0`); en `Estado(past(Y))`, con `slot(Y)=3 ≥ inicio+R_slots`, X se aplica en el slot del fusionador y la liberación aplica (`libY=1`, `creado_en_slot=3`). No hay dos lecturas: RD-4 resuelve el punto de aplicación, así que documenté y continué.
+
+Nada escrito fuera de `T04/`; sin commit ni push; sin Python; sin secretos. Presupuesto consumido muy por debajo del tope (58,8 s + 9,0 s de 1 h 30 min), 1 hilo.

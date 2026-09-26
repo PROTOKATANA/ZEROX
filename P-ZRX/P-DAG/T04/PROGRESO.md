@@ -177,3 +177,113 @@ lecturas anteriores y se continúa.
 200` y `Pkg.test()` en verde. Nada escrito fuera de `T04/`; sin commit ni push; sin Python; sin
 secretos. Las 5 ambigüedades de T04-B quedan documentadas con su lectura adoptada.
 
+---
+
+# T04-C — Generador con nonce correcto, retiros y liberaciones; vectores v0.2
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Zona única escribible:** `T04/`.
+**Presupuesto declarado antes de ejecutar (LINEO §7):** 1 h 30 min, 1 hilo, 8 GiB de RAM.
+Si se agota: checkpoint y estado **inconcluso**.
+
+## C.0. Comprobación de la entrada congelada
+
+`cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-DAG/ENTRADA-T04-C.sha256` — **al
+empezar**: 5/5 `OK` (ORDEN-T04-C, REVISION-T04-B, CONTRATO-ESTADO-DAG-v0, FORMATO-v0, LINEO).
+
+## C.1. Falta de definición detectada antes de editar código
+
+Ninguna impide continuar: todas se resuelven con RD-4 del contrato o con una lectura que no altera
+ninguna regla. Se registran **antes** de tocar código.
+
+- **AMBIGUEDAD-C1 — alcance de «construidas» en la tabla de cobertura.** La orden pide, por tipo,
+  «construidas, aplicadas en `Estado` de la punta seleccionada final y descartadas por motivo».
+  Lectura adoptada: se publican **dos** cifras de construcción — `generadas` (todas las operaciones
+  en bloques PoST, salida bruta del generador) y `construidas` (las que llegan al orden de
+  aplicación seleccionado final, de modo que `construidas = aplicadas + descartadas`). El tope del
+  25 % de `ErrNonce` usa `construidas` (denominador estricto: solo lo evaluado en el estado final).
+  Se publican ambas para que la lectura sea inequívoca. No altera ninguna regla.
+- **AMBIGUEDAD-C2 — clave elegida en retiro y liberación.** La orden no la fija. Lectura adoptada:
+  **uniforme entre las claves factibles** (retiro: `activo > 0` y `en_retirada` vacío; liberación:
+  `vencido > 0` calculado en el `slot` del bloque nuevo con la regla de `aplicar_liberacion!`). El
+  depósito sigue usando el dueño de la salida gastada. No altera ninguna regla.
+- **AMBIGUEDAD-C3 — número de operaciones por bloque.** La orden habla de «tipo elegido» (singular)
+  entre los factibles. Lectura adoptada: **una operación opcional por bloque** (como en T04-B), más
+  la coinbase. Palancas para los mínimos: `npost ≤ 16` y los pesos de partida. No altera ninguna
+  regla.
+- **AMBIGUEDAD-C4 — «reorganizaciones que deshacen al menos una operación de garantía aplicada».**
+  No está definida operativamente. Lectura adoptada: se **reprocesan** los bloques generados en
+  orden de `id` (que es el orden de generación, topológico por construcción) sobre una `Admision`
+  nueva; tras cada bloque se calcula la punta seleccionada (`mejor_punta`) y el conjunto de
+  operaciones de garantía aplicadas en su `Estado` (`aplicar_historia`); se cuenta **una**
+  reorganización cuando cambia la punta y alguna operación antes aplicada deja de estarlo. No altera
+  ninguna regla.
+- **AMBIGUEDAD-C5 — D-13 y el punto de aplicación.** La orden pide documentar las dos vistas y
+  parar si el contrato admite dos lecturas. Análisis: RD-4 fija unívocamente que un bloque de lado
+  fusionado se aplica en el slot del fusionador y un bloque de cadena en su propio slot; por tanto
+  **no hay dos lecturas**: en `Estado(past(X))` (vista de X, slot `s`) la liberación inmadura se
+  descarta (`ErrSaldo`) y en `Estado(past(Y))` (punto `slot(Y) ≥ inicio + R_slots`) se aplica. Se
+  documenta el resultado exacto y se continúa (no se para).
+- **AMBIGUEDAD-C6 — escritor del fichero de cobertura.** La orden exige un único
+  `resultados/cobertura-v0.2.txt` con dos apartados. Lectura adoptada: `exportar.jl` escribe el
+  fichero completo (apartado vectores con los casos que él mismo genera, apartado `run.jl`
+  recalculado con la semilla y réplicas por defecto de `run.jl`), y `run.jl` acumula y registra su
+  propia cobertura en su log. No altera ninguna regla.
+- **AMBIGUEDAD-C7 — muestreo de `npost` en los vectores y en `run.jl`.** La orden permite subir
+  `npost` hasta 16. Lectura adoptada: se parte del muestreo vigente y solo se sube si un mínimo no se
+  alcanza; el valor finalmente usado queda declarado en `INFORME.md`. No altera ninguna regla.
+
+**Conclusión:** ninguna ambigüedad obliga a elegir entre reglas incompatibles; se aplican las
+lecturas anteriores y se continúa.
+
+
+## C.2. Diario de ejecución
+
+- *Lectura íntegra* de `ORDEN-T04-C`, `REVISION-T04-B`, `CONTRATO-ESTADO-DAG-v0` (RD-1…RD-10),
+  `FORMATO-v0` (F-15…F-18), `LINEO` y el oráculo T01 (`Transicion.jl`: `tx_retiro`,
+  `tx_liberacion`, `nonce_de`, `comprobar_nonce!`, `aplicar_liberacion!`, `gastable`).
+- *Entrada congelada* verificada al empezar (5/5 `OK`, `ENTRADA-T04-C.sha256`).
+- *Semántica intacta:* no se tocó T01 ni la lógica de `src/EstadoDAG.jl`; solo `src/generadores.jl`,
+  `src/dirigidos.jl`, `exportar.jl`, `run.jl`, `src/lector_vectores.jl` y `test/`.
+- *Generador corregido* (`src/generadores.jl`): el tipo se elige entre los **factibles** en
+  `S = A.post[pv]` (transferencia/depósito con salida gastable; retiro con `activo > 0` y sin
+  retirada en curso; liberación con `vencido > 0` en el `slot` del bloque nuevo), el importe es
+  uniforme (depósito = valor de la salida; retiro `1:activo`; liberación `1:vencido`) y el nonce es
+  `nonce_de(S, clave)` con un 10 % de error deliberado. El prefijo PoW ya deposita para las claves
+  1 y 2, de modo que el bug de `nonce = 0` queda eliminado.
+- *Pesos:* los de partida (0,35/0,30/0,20/0,15) daban 99 liberaciones aplicadas en los 900 casos
+  (una por debajo del mínimo). Se ajustaron a **0,12/0,18/0,22/0,48** y `npost ∈ {15,16}`
+  (`npost_t04c(r) = 15 + r % 2`), con lo que todos los mínimos se superan con holgura. El generador
+  sigue eligiendo **solo entre los tipos factibles** (el sesgo no inventa factibilidad).
+- *Cobertura* (`EstadoDAG.AcumuladorCobertura`, `acumular_caso!`, `reorgs_que_deshacen_garantia`,
+  `escribir_cobertura`): una operación es `construida` si el generador la produjo; `aplicada`/
+  `descartada` se miden en `Estado` de la punta seleccionada final (`aplicar_historia`); una
+  reorganización que deshace garantía se cuenta reprocesando los bloques en orden de `id` y
+  comparando, tras cada punta nueva, las operaciones de garantía aplicadas.
+- *Casos dirigidos nuevos* D-12 (retiro + liberación + transferencia bajo reorganización y vuelta) y
+  D-13 (liberación inmadura en su slot que madura en el de su fusionador, RD-4), con `descX` =
+  `ErrSaldo` y la salida creada en `creado_en_slot = slot(Y)`.
+- *Vectores v0.2:* `resultados/vectores-estado-dag-v0.2.txt` = **913 casos** (13 dirigidos + 900
+  aleatorios), 4,87 MB; `.sha256` en formato `sha256sum` (ruta relativa a `T04/`), hash
+  `ee783b524c7fcac929fdd3859803205e046c3bab678efed69c5e603d2a94dd73`. Relectura independiente
+  (`src/lector_vectores.jl`): **913 casos, 0 discrepancias**. v0 y v0.1 quedan intactos (hashes
+  verificados).
+- *Cobertura v0.2* (`resultados/cobertura-v0.2.txt`, generada por `exportar.jl`): apartado vectores
+  con 900 casos y apartado `run.jl` con 3000; **todos los mínimos de §3 se cumplen**:
+  depósitos aplicados 349, retiros 808, liberaciones 115, `ErrNonce` 853 = 18,29 % de las garantías
+  construidas, `ErrDobleGasto` 316, reorganizaciones que deshacen garantía 312.
+- *Batería completa* `run.jl --seed 0x5a5a --replicas 200`: 13 dirigidos sin fallos, 3000 historias,
+  46 500 bloques, 25 192 válidos, 4 536 descartes, 2 078 `rojo_U3`, 600 000 órdenes IE-3,
+  **0 fallos**, 58,8 s. Registro en `resultados/run-estado-dag-v0.2.log`; los logs v0 y v0.1 no se
+  sobrescriben.
+- *Tests* `Pkg.test()`: **372/372 OK** (9,0 s), incluida la relectura de v0.2 (913 casos, 0
+  discrepancias) y la cobertura mínima del generador. Registro en
+  `resultados/test-pkg-v0.2.log`.
+
+## C.3. Estado final T04-C
+
+**SUPERADO.** El generador construye depósitos, retiros y liberaciones con el nonce del estado
+contra el que construye (y un 10 % de nonce erróneo controlado); los vectores v0.2 superan todos los
+mínimos de cobertura de §3; IE-1…IE-6 siguen sin fallos en 3000 historias; D-12 y D-13 documentan
+la reorg con undo de garantía y el punto de aplicación de RD-4. Nada escrito fuera de `T04/`; sin
+commit ni push; sin Python; sin secretos. Las 7 ambigüedades de T04-C quedan documentadas con su
+lectura adoptada.

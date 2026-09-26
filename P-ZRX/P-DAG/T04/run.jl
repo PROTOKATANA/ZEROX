@@ -5,7 +5,9 @@
 #         [--seed 0x5a5a] [--replicas 200] [--ie3-presupuesto 8000] [--salida RUTA]
 #
 # Un hilo (LINEO §7: el tope no es objetivo). Sin Python. Escribe el registro en
-# `resultados/run-estado-dag.log` y termina con estado ≠ 0 si hay algún fallo.
+# `resultados/run-estado-dag-v0.2.log` (sin sobrescribir v0 ni v0.1), publica la
+# cobertura por tipo de operación (ORDEN-T04-C §2) y termina con estado ≠ 0 si
+# hay algún fallo.
 
 using EstadoDAG
 using EstadoDAG.Transicion
@@ -45,7 +47,7 @@ function main()
     seed = parsear_seed(get(cfg, "seed", "0x5a5a"))
     replicas = parse(Int, get(cfg, "replicas", "200"))
     ie3_exhaustivos = parse(Int, get(cfg, "ie3-exhaustivos", "5"))
-    salida = get(cfg, "salida", "resultados/run-estado-dag.log")
+    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.2.log")
     mkpath(dirname(salida))
     io = open(salida, "w")
     t0 = time()
@@ -117,6 +119,23 @@ function main()
      length(S11.garantias[1].en_retirada) == 1 &&
      S11.garantias[1].nonce_siguiente == m11.n + UInt64(1)) ||
         push!(fallos_globales, "dirigido D-11 reorg nonce")
+    # T04-C: retiro + liberación + transferencia bajo reorganización y vuelta.
+    _, A12, m12 = EstadoDAG.caso_retiro_liberacion_reorg(pd1)
+    (m12.libA == 1 && m12.libSA == 0 && m12.outSA == 1 && m12.retSA == 0 &&
+     m12.nonceSA == m12.n0 + UInt64(2) &&
+     m12.libSB == 0 && m12.outSB == 0 && m12.retSB == 1 &&
+     m12.nonceSB == m12.n0 + UInt64(1) &&
+     m12.libSA2 == 0 && m12.outSA2 == 1 && m12.retSA2 == 0 &&
+     m12.nonceSA2 == m12.n0 + UInt64(2) &&
+     m12.tipB == m12.B3 && m12.tipA == m12.A4) ||
+        push!(fallos_globales, "dirigido D-12 retiro/liberación/reorg")
+    # T04-C: punto de aplicación (RD-4) de una liberación inmadura en su propio slot.
+    _, A13, m13 = EstadoDAG.caso_liberacion_punto_aplicacion(pd1)
+    (m13.spY == m13.Z && m13.slotX == 2 && m13.slotY == 3 && m13.libX == 0 &&
+     m13.libY == 1 && m13.libY_slot == m13.slotY &&
+     m13.nonceX == m13.n0 + UInt64(1) && m13.nonceY == m13.n0 + UInt64(2) &&
+     length(m13.descX) == 1 && m13.descX[1][2] == Transicion.ErrSaldo) ||
+        push!(fallos_globales, "dirigido D-13 punto de aplicación")
 
     # 3) Propiedades IE-1…IE-6
     total_hist = 0
@@ -125,6 +144,7 @@ function main()
     total_desc = 0
     total_u3 = 0
     total_ie3 = 0
+    ac = EstadoDAG.AcumuladorCobertura()
     for (pi, k) in PUNTOS_T04
         pd = ParamsDAG(PARAMS_DAG_BASE[pi], k)
         fallos_punto = String[]
@@ -132,8 +152,9 @@ function main()
         ie3_gastado = 0
         for r in 1:replicas
             rng = StableRNG(seed + UInt64(10_000 * pi + r))
-            npost = 3 + (r % 12)
-            A = generar_dag_aleatorio(rng, pd; npost = npost)
+            npost = EstadoDAG.npost_t04c(r)
+            A = generar_dag_aleatorio(rng, pd; npost = npost,
+                                      pesos = EstadoDAG.PESOS_AJUSTADOS)
             bloques = collect(values(A.por_id))
             total_hist += 1
             total_bloques += length(bloques)
@@ -141,6 +162,7 @@ function main()
             _, _, desc = aplicar_historia(A)
             total_desc += length(desc)
             total_u3 += length(u3_virtual(A))
+            EstadoDAG.acumular_caso!(ac, A)
             f1 = verificar_ie1_ie2_ie4(A)
             f6 = verificar_ie6(A)
             for f in f1
@@ -184,6 +206,8 @@ function main()
 
     println(io, "TOTAL historias=$total_hist bloques=$(total_bloques) validos=$(total_validos) ",
             "descartes=$(total_desc) rojo_U3=$(total_u3) ie3_ordenes=$(total_ie3)")
+    EstadoDAG.escribir_cobertura(io, string("run.jl (seed=", seed,
+                                            " replicas=", replicas, ")"), ac)
     for f in Iterators.take(fallos_globales, 40)
         println(io, "FALLO: ", f)
     end

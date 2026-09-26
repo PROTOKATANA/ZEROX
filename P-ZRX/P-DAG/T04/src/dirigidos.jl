@@ -359,11 +359,146 @@ function caso_nonce_reorg(pd::ParamsDAG; seed::Int = 21)
                        tipA3 = tipA3, retiros_B = retiros_B, nonce_B = nonce_B)
 end
 
+"""
+D-12 · Retiro, liberación y transferencia que gasta la salida de la liberación
+en la rama A; reorganización a la rama B, que no las contiene: al pasar A a ser
+bloque de lado (aplicado en `slot(V)`), la liberación deja de estar vencida, la
+salida de la liberación desaparece, la garantía vuelve al estado previo (el
+retiro sigue en `en_retirada`) y la transferencia no existe; vuelta a A: todo
+reaparece una sola vez.
+"""
+function caso_retiro_liberacion_reorg(pd::ParamsDAG; seed::Int = 22)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    S0 = A.post[Tb.id]
+    activo0 = S0.garantias[1].activo
+    activo0 >= UInt64(1) || error("D-12: clave 1 sin activo")
+    n0 = Transicion.nonce_de(S0, 1)
+    # Rama A: retiro (slot 2) → liberación (slot 3) → transferencia (slot 4).
+    A1 = BloquePost(id = id1 + 1, padres = [Tb.id], slot = 2, sr = 0, sd = 5,
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                        Transicion.tx_retiro(1, 1, 1; nonce = n0)])
+    procesar_uno!(A, A1)
+    A2 = BloquePost(id = id1 + 2, padres = [A1.id], slot = 3, sr = 0, productor = 1,
+                    peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                        Transicion.tx_liberacion(1, 1, 1;
+                            nonce = Transicion.nonce_de(A.post[A1.id], 1))])
+    procesar_uno!(A, A2)
+    libA = [o for (_, o) in A.post[A2.id].utxo
+            if o.origen == Transicion.OrigenLiberacion]
+    length(libA) == 1 || error("D-12: la liberación no creó su salida")
+    lib = libA[1]
+    A3 = BloquePost(id = id1 + 3, padres = [A2.id], slot = 4, sr = 0, sd = 5,
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                        Transicion.tx_transferencia([lib.id],
+                            [Transicion.Salida(9501, lib.valor, 1,
+                                               Transicion.OrigenTx, -1, -1)], 1)])
+    procesar_uno!(A, A3)
+    SA = A.post[A3.id]
+    # Rama B (sin retiro/liberación/transferencia): mismos slots, sd menor ⇒ gana.
+    B1 = BloquePost(id = id1 + 4, padres = [Tb.id], slot = 2, sr = 0, sd = 0,
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B1)
+    B2 = BloquePost(id = id1 + 5, padres = [B1.id], slot = 3, sr = 0, productor = 1,
+                    peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B2)
+    B3 = BloquePost(id = id1 + 6, padres = [B2.id], slot = 4, sr = 0, sd = 0,
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B3)
+    tipB = mejor_punta(A, tips_validas(A))
+    SB, _, _ = estado_virtual(A)
+    # Vuelta a A: un bloque pesado más.
+    A4 = BloquePost(id = id1 + 7, padres = [A3.id], slot = 5, sr = 0, productor = 1,
+                    peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, A4)
+    tipA = mejor_punta(A, tips_validas(A))
+    SA2, _, _ = estado_virtual(A)
+    cuenta(E, campo) = campo == :lib ?
+        count(o -> o.origen == Transicion.OrigenLiberacion, values(E.utxo)) :
+        count(o -> o.id == 9501, values(E.utxo))
+    return "D-12", A, (Tb = Tb.id, A1 = A1.id, A2 = A2.id, A3 = A3.id,
+                       B1 = B1.id, B2 = B2.id, B3 = B3.id, A4 = A4.id,
+                       tipA3 = A3.id, tipB = tipB, tipA = tipA, lib = lib.id,
+                       libA = length(libA), activo0 = activo0, n0 = n0,
+                       libSA = cuenta(SA, :lib), outSA = cuenta(SA, :out),
+                       libSB = cuenta(SB, :lib), outSB = cuenta(SB, :out),
+                       libSA2 = cuenta(SA2, :lib), outSA2 = cuenta(SA2, :out),
+                       retSA = length(SA.garantias[1].en_retirada),
+                       retSB = length(SB.garantias[1].en_retirada),
+                       retSA2 = length(SA2.garantias[1].en_retirada),
+                       nonceSA = Transicion.nonce_de(SA, 1),
+                       nonceSB = Transicion.nonce_de(SB, 1),
+                       nonceSA2 = Transicion.nonce_de(SA2, 1))
+end
+
+"""
+D-13 · Liberación inmadura en el slot propio de X (`inicio + R_slots > s`) que sí
+madura en el slot de su fusionador Y (`slot(Y) ≥ inicio + R_slots`). RD-4 fija el
+punto de aplicación: un bloque de lado se aplica en el slot del fusionador. Se
+documentan las dos vistas: en `Estado(past(X))` la liberación se descarta
+(`ErrSaldo`); en `Estado(past(Y))` se aplica y crea la salida en `slot(Y)`.
+"""
+function caso_liberacion_punto_aplicacion(pd::ParamsDAG; seed::Int = 23)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    n0 = Transicion.nonce_de(A.post[Tb.id], 1)
+    # W: retiro en el slot 2 (inicio = 2).
+    W = BloquePost(id = id1 + 1, padres = [Tb.id], slot = 2, sr = 0, productor = 1,
+                   peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                       Transicion.tx_retiro(1, 1, 1; nonce = n0)])
+    procesar_uno!(A, W)
+    # X: liberación en su propio slot 2 (2 + R_slots = 3 > 2 ⇒ inmadura).
+    X = BloquePost(id = id1 + 2, padres = [W.id], slot = 2, sr = typemax(UInt64),
+                   sd = 10, productor = 1, peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                       Transicion.tx_liberacion(1, 1, 1;
+                           nonce = Transicion.nonce_de(A.post[W.id], 1))])
+    procesar_uno!(A, X)
+    # Z: bloque de cadena en el slot 3 (hijo de W), gana el desempate por `sd`.
+    Z = BloquePost(id = id1 + 3, padres = [W.id], slot = 3, sr = 0, sd = 0,
+                   productor = 1, peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Z)
+    # Y: fusiona Z (sp) y X en el slot 3 ⇒ X se aplica en slot 3 (vencida).
+    Y = BloquePost(id = id1 + 4, padres = [Z.id, X.id], slot = 3, sr = 0,
+                   productor = 1, peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Y)
+    spY = A.id_g[A.gdr.gd[A.gidx[Y.id]].sp]
+    libX = [o for (_, o) in A.post[X.id].utxo
+            if o.origen == Transicion.OrigenLiberacion]
+    libY = [o for (_, o) in A.past[Y.id].utxo
+            if o.origen == Transicion.OrigenLiberacion]
+    return "D-13", A, (Tb = Tb.id, W = W.id, X = X.id, Z = Z.id, Y = Y.id,
+                       spY = spY, slotX = A.por_id[X.id].slot,
+                       slotY = A.por_id[Y.id].slot, libX = length(libX),
+                       libY = length(libY),
+                       libY_slot = isempty(libY) ? -1 : libY[1].creada_en_slot,
+                       nonceX = Transicion.nonce_de(A.post[X.id], 1),
+                       nonceY = Transicion.nonce_de(A.past[Y.id], 1),
+                       n0 = n0,
+                       descX = copy(get(A.descartes, X.id,
+                                        Tuple{Int,Transicion.Err}[])))
+end
+
 "Todos los casos dirigidos sobre la rejilla T04."
 function casos_dirigidos(pd::ParamsDAG)
     return [caso_doble_gasto(pd), caso_coinbase_recortada(pd), caso_deposito_habilita(pd),
             caso_garantia_rama(pd), caso_rojo_u3(pd), caso_una_vez(pd),
             caso_reorg(pd), caso_hermanos_transicion(pd),
             caso_nonce_repeticion_fusionada(pd), caso_nonce_orden_inverso(pd),
-            caso_nonce_reorg(pd)]
+            caso_nonce_reorg(pd), caso_retiro_liberacion_reorg(pd),
+            caso_liberacion_punto_aplicacion(pd)]
 end
