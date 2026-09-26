@@ -4,6 +4,7 @@ members = [
     "crates/zx-core",
     "crates/zx-pot",
     "crates/zx-consensus",
+    "crates/zx-dag",
 ]
 
 [workspace.package]

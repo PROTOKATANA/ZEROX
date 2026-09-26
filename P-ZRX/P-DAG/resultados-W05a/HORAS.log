@@ -1,0 +1,25 @@
+# HORAS.log — ORDEN-W05a
+# Marcas `date -Is`; donde no hubo captura directa, hora de modificación del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W05a/
+2026-09-26T01:56:00+02:00  inicio de sesion; lectura integra de ORDEN-W05a.md, V-ZRX/LINEO.md, DECISIONES-W05.md, CONTRATO-v0.md §0/TRN-06 y PLAN-0.0.1.md
+2026-09-26T01:56:30+02:00  extraccion del codigo antiguo de 9681061 a ref/ (ghostdag.rs, bloque_dag.rs, identidad.rs, firmante/mod.rs, error.rs, dag_causal.rs y sus tests, vectores del oraculo)
+2026-09-26T01:58:10+02:00  ENTRADA INICIO: sha256sum -c de ENTRADA-W05a.sha256 -> 4/4 coinciden, exit=0 (logs/entrada-inicio.log)
+2026-09-26T01:58:00+02:00  falta de definicion: ninguna que impida la orden; se declaran 3 interpretaciones (orden de comprobaciones D-P08, genesis->terminal, bloque_dag entero con un test retirado por usar zx_consensus::testigo)
+2026-09-26T01:58:30+02:00  copia de Cargo.toml/Cargo.lock/rust-toolchain.toml/crates/testdata/ci/.github a ws.orig y ws; copia de .cargo-home de W04 (697 MiB)
+2026-09-26T01:59:00+02:00  crate zx-dag: Cargo.toml, README.md, lib.rs, error.rs (ErrorDag con D-P08)
+2026-09-26T01:59:40+02:00  identidad.rs (IdentidadTicket sin cambios de bytes + identidad_de_cabecera)
+2026-09-26T02:00:20+02:00  bloque_dag.rs con D-P08: ContextoDag pierde es_genesis y gana es_terminal; comprobar_padres_contextual con CabeceraPostSinPadres/TerminalConPadresExtra/TerminalComoPadreExtra
+2026-09-26T02:01:10+02:00  ghostdag.rs portado (logica identica) + AlmacenGhostdag::con_raiz_terminal (D-P07) + ContextoDag::es_terminal
+2026-09-26T02:01:40+02:00  dag_causal.rs: RegistroEstructural, FuenteRegistrosDag, PresupuestoVista, ErrorVistaCausal y VistaPasadoEstructural; NO FuenteIndiceAdmitidos (W06)
+2026-09-26T02:02:00+02:00  vectores copiados a testdata/ghostdag-rank-v1/ con PROCEDENCIA.md (commit 9681061, sha256, no re-validado)
+2026-09-26T02:02:40+02:00  tests portados: ghostdag_rust/prop/bench/oraculo, dag_causal; tests nuevos V6 (padres_dp08.rs) y de D-P07
+2026-09-26T02:03:20+02:00  primer clippy: una expectativa de lint sin cumplir en padres_dp08.rs; corregida
+2026-09-26T02:03:38+02:00  V1 cargo fmt --all -- --check -> exit 0 (logs/V1-fmt.log)
+2026-09-26T02:03:50+02:00  V2 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> exit 0, 0 avisos (logs/V2-clippy.log)
+2026-09-26T02:06:15+02:00  V3 cargo test --workspace --all-features --locked -> 371 pasan, 0 fallan, 1 ignorado (banco); 265 nombres previos presentes, 0 ausentes; 107 nuevos (logs/V3-test.log)
+2026-09-26T02:06:24+02:00  V4 ghostdag_oraculo: GDR-v0.2 en 28 DAGs (referencia y kernel) y rusty-kaspa 180 comprobaciones -> OK (logs/V4-oraculo.log)
+2026-09-26T02:06:27+02:00  V7 dependencias-exactas (10 exactas) y frontera zx-consensus->{zx-core} + zx-dag->{zx-core} -> OK (logs/V7-*.log)
+2026-09-26T02:06:54+02:00  banco release (ignorado): coloreo kernel 143.8 us / referencia 84.3 us con |mergeset|=179; coste/bloque 1.2-2.6 us (logs/bench-ghostdag.log)
+2026-09-26T02:07:02+02:00  cambios.patch (12348 lineas, 21 ficheros); MIGRACION.sha256 (87 huellas, sha256sum -c OK); logs/lock-subconjunto.txt (unica adicion zx-dag 0.0.0)
+2026-09-26T02:08:00+02:00  INFORME.md, PROGRESO.md y HORAS.log; ENTREGA FINAL: sha256sum -c ENTRADA-W05a.sha256 -> 4/4 coinciden
+2026-09-26T02:08:00+02:00  fin; presupuesto (2 h / 8 hilos / 16 GiB / 20 GiB) no agotado

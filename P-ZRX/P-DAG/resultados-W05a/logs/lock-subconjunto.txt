@@ -1,0 +1,14 @@
+# Comparación de subconjunto entre el Cargo.lock base (ws.orig, W02+W04) y el de ws/ (ORDEN-W05a §4).
+# Regla: añadir `zx-dag` no debe CAMBIAR la versión de ningún paquete existente.
+# Se comparan los conjuntos de pares (name, version) de ambos locks.
+
+base: 131 paquetes
+ws:   132 paquetes
+
+## Paquetes del ws AUSENTES en la base (adiciones):
+zx-dag 0.0.0
+
+## Paquetes de la base AUSENTES en el ws (desaparecidos):
+
+RESULTADO: OK - todo (name,version) de la base existe con la MISMA version en ws;
+la unica adicion es zx-dag 0.0.0.

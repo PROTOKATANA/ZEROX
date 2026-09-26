@@ -1,0 +1,73 @@
+# V5 — tests antiguos de GHOSTDAG / bloque_dag / dag_causal: portados, sustituidos y retirados
+
+Base antigua (`9681061`): 89 pruebas entre
+`crates/zx-consensus/src/ghostdag.rs` (5), `src/bloque_dag.rs` (19),
+`src/firmante/identidad.rs` (4), `crates/zx-node/src/dag_causal.rs` (4),
+`crates/zx-node/tests/dag_causal.rs` (16), `tests/ghostdag_rust.rs` (38),
+`tests/ghostdag_prop.rs` (3), `tests/ghostdag_oraculo.rs` (3),
+`tests/ghostdag_bench.rs` (1).
+
+En `ws` hay **372** nombres (371 pasan, 0 fallan, 1 ignorado = el banco) y los **265** nombres
+previos de W04 siguen presentes (0 ausentes). Los **107** nombres nuevos son 106 pruebas de
+`zx-dag` + 1 doc-test (`compile_fail` de `CandidatoSinRango`).
+
+## Portados (con el mismo nombre y la misma aserción; solo cambia el nombre del error)
+
+- `ghostdag.rs` (5): `acumular_sin_sr_almacenado_es_incoherencia`,
+  `el_duplicado_se_rechaza_antes_de_mutar_el_almacen`,
+  `los_extremos_del_sr_validado_dan_los_pesos_de_c_gd_01`,
+  `eq_hash_y_ord_de_la_identidad_son_consistentes`, `u2_con_estado_incoherente_falla_sin_mutar`.
+- `firmante/identidad.rs` (4): `la_huella_mide_32_bytes_y_es_determinista`,
+  `cambiar_cualquier_campo_cambia_la_huella`, `el_slot_se_lee_de_la_identidad`,
+  `el_dominio_y_la_version_forman_parte_de_la_preimagen`.
+- `bloque_dag.rs` (16 de 19): `acepta_ambos_compromisos_correctos`,
+  `distingue_cual_de_los_dos_falla`, `la_ruta_lineal_y_la_dag_son_tipos_distintos`,
+  `el_rango_se_exige_exacto_y_nunca_sale_del_campo`,
+  `el_rango_validado_sale_del_contexto_y_no_del_candidato`,
+  `el_constructor_de_oraculos_no_valida_y_lo_declara`,
+  `la_vista_de_rango_no_imprime_rango_solucion`, `un_padre_no_validado_se_rechaza`,
+  `dos_padres_en_relacion_de_ancestro_se_rechazan`, `un_prev_hash_que_no_es_sp_se_rechaza`,
+  `padres_validados_y_anticadena_pasan`, `el_padre_seleccionado_con_slot_posterior_se_rechaza`,
+  `el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpla`,
+  `todos_los_padres_con_el_mismo_slot_que_b_pasan`, `padres_con_slots_anteriores_pasan`,
+  `un_padre_validado_sin_slot_contextual_es_error_explicito`,
+  `un_padre_desconocido_no_tiene_slot_y_se_rechaza`.
+- `crates/zx-node/tests/dag_causal.rs` (15 de 16): todas salvo `el_genesis_no_tiene_pasado`; la
+  fuente `FuenteVector`/`FuenteClaveAjena`/`FuenteRota` es la misma y no depende del almacén.
+- `tests/ghostdag_rust.rs` (37 de 38), `tests/ghostdag_prop.rs` (3),
+  `tests/ghostdag_oraculo.rs` (3), `tests/ghostdag_bench.rs` (1, `#[ignore]`).
+
+## Sustituidos (D-P08: el génesis DAG deja de existir)
+
+| Antiguo | Nuevo | Motivo |
+|---|---|---|
+| `bloque_dag::tests::el_genesis_sin_padres_pasa_y_el_impostor_no` | `bloque_dag::tests::una_cabecera_sin_padres_se_rechaza_siempre` | 0 padres ya no es válido nunca (D-P08); se invierte la aserción |
+| `ghostdag_rust::el_genesis_sin_padres_pasa_contra_el_almacen_real` | `la_cabecera_sin_padres_se_rechaza_contra_el_almacen_real` | idem contra el almacén real con raíz `T` |
+| `dag_causal::tests::el_diamante_del_indice_coincide_con_la_vista_estructural` | `el_diamante_de_la_fuente_en_memoria_coincide_con_la_vista_estructural` | `IndiceFake` sobre `AlmacenAdmitidosDag` → `FuenteMemoria` (W06); mismos registros |
+| `dag_causal::tests::la_ausencia_en_el_indice_es_contexto_incompleto` | `la_ausencia_en_la_fuente_es_contexto_incompleto` | idem |
+| `dag_causal::tests::la_corrupcion_del_indice_llega_como_error_de_fuente` | `la_fuente_que_falla_llega_como_error_de_fuente` | idem, con `ErrorFuenteTest` en vez de `StorageError` |
+| `zx-node/tests/dag_causal::el_genesis_no_tiene_pasado` | `el_terminal_sin_padres_no_tiene_pasado` | el nombre «génesis» pasa a «terminal» (D-P08); misma aserción |
+
+## Retirados (declarados uno a uno)
+
+| Antiguo | Motivo |
+|---|---|
+| `bloque_dag::tests::un_testigo_invalido_puede_coincidir_con_el_compromiso` | usa `zx_consensus::testigo::satisface`, que **no** está en `zx-dag` (W05b/W03). Su aserción central —compromiso ≠ autorización— exige el verificador de testigos, fuera de esta orden. |
+| `dag_causal::tests::el_adaptador_lee_el_indice_y_no_la_cola_de_candidatos` | prueba `FuenteIndiceAdmitidos`, que la orden §3.6 manda **no** portar: depende de `AlmacenAdmitidosDag` (`zx-storage`, W06). |
+
+**Ningún test de lógica de GHOSTDAG se retira.** Los dos retiros son de compromiso del cuerpo
+(necesita `testigo`) y del adaptador de almacén (necesita `zx-storage`).
+
+## Añadidos (V6 y cobertura D-P08/P07)
+
+- `padres_dp08.rs` (6): `v6_cero_padres_se_rechaza`, `v6_transicion_con_dos_padres_se_rechaza`,
+  `v6_terminal_como_padre_extra_se_rechaza`, `v6_padre_pow_ajeno_se_rechaza`,
+  `v6_transicion_valida_con_el_terminal_como_unico_padre_pasa`, `v6_descendiente_post_valido_pasa`.
+- `bloque_dag::tests` (4): `una_cabecera_sin_padres_se_rechaza_siempre`,
+  `la_transicion_con_el_terminal_como_unico_padre_pasa`, `la_transicion_con_dos_padres_se_rechaza`,
+  `el_terminal_como_padre_extra_se_rechaza`, `un_padre_pow_ajeno_se_rechaza`.
+- `ghostdag_rust.rs` (3): `la_transicion_valida_con_el_terminal_como_unico_padre_pasa`,
+  `el_terminal_como_padre_extra_se_rechaza_contra_el_almacen_real`,
+  `un_padre_pow_ajeno_se_rechaza_contra_el_almacen_real`.
+- `ghostdag::tests` (1): `con_raiz_terminal_fija_slot_cero_y_hereda_el_peso_de_t` (D-P07).
+- `identidad::tests` (1): `identidad_de_cabecera_deriva_la_tupla_literal`.

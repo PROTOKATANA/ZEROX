@@ -1,0 +1,27 @@
+He completado la ORDEN-W05a. Resumen de lo hecho y evidencia:
+
+## Resultado
+Crate **nuevo** `crates/zx-dag` (miembro del workspace) con GHOSTDAG, comprobación contextual de padres con **D-P08**, rango validado (C-HDR-06), vista causal y la identidad de billete, con la raíz en el terminal PoW (**D-P07**). Depende solo de `zx-core`, `primitive-types` y `thiserror`.
+
+## Veredicto: **NO REFUTADA — SUPERADO**
+| Paso | Resultado |
+|---|---|
+| V1 `fmt --check` | OK, exit 0 |
+| V2 `clippy -D warnings` | OK, 0 avisos |
+| V3 `cargo test --workspace` | **371 pasan, 0 fallan, 1 ignorado**; los **265** nombres previos intactos (0 ausentes) |
+| V4 oráculos | GDR-v0.2 **28 DAGs** en referencia **y** kernel; rusty-kaspa **180 comprobaciones** |
+| V5 | Tabla portados/sustituidos/retirados en `logs/V5-tests.txt`; **ningún test de lógica GHOSTDAG retirado** |
+| V6 D-P08 | 6/6 casos con su resultado (`tests/padres_dp08.rs`) |
+| V7 | 10 dependencias exactas; fronteras `zx-consensus` y `zx-dag` → `{zx-core}` |
+| Entrada | 4/4 al inicio y al final |
+
+Caso falsable clave: transición con `T` como único padre → `Ok`; 0 padres → `CabeceraPostSinPadres`; `T` como padre adicional → `TerminalComoPadreExtra`; PoW ajeno → `PadreNoValidado`.
+
+## Falta de definición
+**Ninguna impide cumplir la orden.** Declaré tres interpretaciones (orden de comprobaciones D-P08, `genesis`→`terminal`, portado íntegro de `bloque_dag.rs` con un test retirado por usar `zx_consensus::testigo`), todas documentadas en `INFORME.md` §2 y `logs/V5-tests.txt`.
+
+## Entregables (todo en `deepseek/W05a/`)
+`ws/`, `ws.orig/`, `cambios.patch` (12 348 líneas/21 ficheros), `MIGRACION.sha256` (87 huellas, `sha256sum -c` OK), `logs/` (V1–V7, entrada, lock, banco, V5, migración), `INFORME.md`, `PROGRESO.md`, `HORAS.log`.
+`Cargo.lock`: única adición `zx-dag 0.0.0`; ninguna versión existente cambia.
+
+Sin Python, sin commit/push, nada escrito fuera de la zona, presupuesto (≈12 min de 2 h) no agotado. El `INFORME.md` incluye la API completa y «Lo que esta orden NO demuestra» (admisión en el nodo, PoT/PoAS, persistencia, controlador de `SR`, parámetros dev).

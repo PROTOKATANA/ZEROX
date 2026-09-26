@@ -1,0 +1,18 @@
+   Compiling hex v0.4.3
+   Compiling uint v0.10.1
+   Compiling primitive-types v0.14.0
+   Compiling zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05a/ws/crates/zx-core)
+   Compiling zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05a/ws/crates/zx-dag)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.94s
+     Running tests/ghostdag_oraculo.rs (target/debug/deps/ghostdag_oraculo-5c62c02e1bc4b939)
+
+running 3 tests
+vectores Kaspa: 180 comprobaciones
+test los_vectores_de_rusty_kaspa_pasan ... ok
+kernel Rust = GDR-v0.2 en 28 DAGs
+test el_kernel_rust_coincide_con_gdr_v0_2 ... ok
+referencia Rust = GDR-v0.2 en 28 DAGs
+test la_referencia_rust_coincide_con_gdr_v0_2 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+

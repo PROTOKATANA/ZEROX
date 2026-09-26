@@ -109,7 +109,7 @@ pánico (lints del workspace).
 | V1–V2 | `fmt --check`, `clippy -D warnings --locked` | limpio |
 | V3 | `cargo test --workspace --all-features --locked` | todo lo previo pasa con el mismo nombre + lo nuevo |
 | V4 | `diferencial_t01`: todos los casos del fichero | **0 discrepancias**; informe por nombre de caso |
-| V5 | Tests unitarios propios (no cubiertos por T01): depósito con cambio (F-07), MultiSig, coinbase PoW sin salidas rechazada, dos coinbases, coinbase PoST en posición 2, `clave ≠ productor` | cada uno con su error |
+| V5 | Tests unitarios propios (no cubiertos por T01): recuperar el test `un_testigo_invalido_puede_coincidir_con_el_compromiso` (retirado en W05a por falta de `testigo`), depósito con cambio (F-07), MultiSig, coinbase PoW sin salidas rechazada, dos coinbases, coinbase PoST en posición 2, `clave ≠ productor` | cada uno con su error |
 | V6 | Propiedades con `proptest` (semilla fija, como el resto del workspace): undo exacto e I-1 sobre secuencias aleatorias de bloques válidos del arnés | sin fallos |
 | V7 | `bash ci/dependencias-exactas.sh`; `Cargo.lock` sin cambios de versión | OK |
 
