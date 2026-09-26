@@ -1,4 +1,5 @@
-//! Modo **fusión** (`CONTRATO-ESTADO-DAG-v0` §3, `ORDEN-W03` §3.11).
+//! Modo **fusión** (`CONTRATO-ESTADO-DAG-v0` §3, `ORDEN-W03` §3.11; corregido en `ORDEN-W06a`
+//! según `REVISION-RI-1a`).
 //!
 //! A diferencia de [`crate::transicion::aplicar`], aquí una transacción que no valida **se
 //! descarta** con su motivo (`ED-4`…`ED-6`) en vez de invalidar el bloque; solo invalidan el bloque
@@ -6,8 +7,24 @@
 //! productor). La coinbase PoST se acredita por `mín(declarado, subsidio_post(slot(B)) + tarifas
 //! aceptadas)`.
 //!
-//! La orquestación completa del DAG (ED-1…ED-3, orden del mergeset, `rojo_U3`) es de W06a; aquí se
-//! implementan las primitivas que W03 exige y se prueban con los casos de V5.
+//! # Correcciones de `ORDEN-W06a` (decisiones 3 y 4, `REVISION-RI-1a`)
+//!
+//! - **RI-1a #1:** `fusion_post` fija `Estado.slot = punto` para **todo** bloque fusionado, como
+//!   `aplicar_bloque_fusion!` (`P-ZRX/P-DAG/T04/src/EstadoDAG.jl:303`). `peso_sufijo` **no** lo suma
+//!   el modo fusión: lo suma quien aplica, y solo por los bloques de **cadena** (`EstadoDAG.jl:395,
+//!   607`), reparto que implementa `zx-cadena`.
+//! - **RI-1a #2:** `aplicar_fusion` **rechaza** un bloque PoW: la fase PoW se aplica en modo
+//!   estricto con [`crate::transicion::aplicar`] (`ED-1`). Se elimina `fusion_pow`, que no exigía
+//!   `altura = altura_previa + 1`.
+//! - **RD-2:** la coinbase PoST es **opcional** (el productor puede renunciar a ella); si existe,
+//!   debe ser única, la primera y de tipo v3.
+//! - **RD-7:** se aplican primero las transacciones no-coinbase y después se materializa el crédito
+//!   recortado de la coinbase.
+//! - **RD-10:** la garantía del productor es una comprobación de **admisión** en `Estado(past(B))`;
+//!   **no** se vuelve a comprobar al fusionar el bloque como bloque de lado.
+//!
+//! La orquestación completa del DAG (ED-1…ED-3, orden del mergeset, `rojo_U3`) es de `zx-cadena`;
+//! aquí se implementan las primitivas.
 
 use zx_core::{Amount, ExtensionTx};
 
@@ -21,12 +38,13 @@ use crate::transicion::tipos::{
     TxDescartada, Undo,
 };
 
-/// Aplica un bloque en **modo fusión** desde `punto_aplicacion`.
+/// Aplica un bloque **PoST** en **modo fusión** desde `punto_aplicacion`.
 ///
 /// Devuelve el estado nuevo, el undo por delta y las transacciones descartadas con su motivo.
 ///
 /// # Errores
-/// Solo los que invalidan el bloque según la tabla de §3 del contrato de estado DAG.
+/// Solo los que invalidan el bloque según la tabla de §3 del contrato de estado DAG; un bloque PoW
+/// es un uso incorrecto del modo fusión (`ED-1`).
 pub fn aplicar_fusion(
     estado: &Estado,
     bloque: &BloqueTransicion,
@@ -39,35 +57,27 @@ pub fn aplicar_fusion(
         let (nuevo, undo) = aplicar_con_undo(estado, bloque, params, cbid)?;
         return Ok((nuevo, undo, Vec::new()));
     }
+    if matches!(bloque.hechos, HechosCabecera::PoW { .. }) {
+        // ED-1: la fase PoW se aplica con `aplicar` (estricto); no hay bloques PoW fusionados.
+        return Err(ErrorTransicion::ErrOperacionFase);
+    }
     let mut ap = Aplicador::nuevo(estado.clone());
     let mut descartadas: Vec<TxDescartada> = Vec::new();
-    match &bloque.hechos {
-        HechosCabecera::PoW { .. } => {
-            fusion_pow(
-                &mut ap,
-                bloque,
-                punto_aplicacion,
-                params,
-                cbid,
-                &mut descartadas,
-            )?;
-        }
-        HechosCabecera::PoST { .. } => {
-            fusion_post(
-                &mut ap,
-                bloque,
-                punto_aplicacion,
-                params,
-                cbid,
-                &mut descartadas,
-            )?;
-        }
-        HechosCabecera::Genesis { .. } => {}
-    }
+    fusion_post(
+        &mut ap,
+        bloque,
+        punto_aplicacion,
+        params,
+        cbid,
+        &mut descartadas,
+    )?;
     Ok((ap.estado, ap.undo, descartadas))
 }
 
 /// Cuenta coinbases y comprueba posición (tabla de §3: invalida el bloque).
+///
+/// Devuelve `Some(índice)` si hay exactamente una coinbase (siempre en la posición 0), `None` si no
+/// hay ninguna (RD-2: opcional en PoST).
 fn coinbase_unica(bloque: &BloqueTransicion) -> Result<Option<usize>, ErrorTransicion> {
     let mut ncb = 0usize;
     let mut idx = 0usize;
@@ -84,38 +94,6 @@ fn coinbase_unica(bloque: &BloqueTransicion) -> Result<Option<usize>, ErrorTrans
         return Err(ErrorTransicion::ErrEmision);
     }
     Ok((ncb == 1).then_some(idx))
-}
-
-/// Descartable auxiliar: aplica `tx` y, si falla, revierte y registra el motivo.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "reúne el contexto de la transacción; agruparlo escondería la regla"
-)]
-fn intentar(
-    ap: &mut Aplicador,
-    bloque: &BloqueTransicion,
-    params: &ParametrosTransicion,
-    cbid: u32,
-    punto: Punto,
-    indice: usize,
-    tx: &zx_core::Tx,
-    testigos: &[Vec<u8>],
-    descartadas: &mut Vec<TxDescartada>,
-) -> Result<Option<Amount>, ErrorTransicion> {
-    let marca = ap.marcar();
-    match aplicar_tx(ap, bloque, params, cbid, punto, tx, testigos) {
-        Ok(Efecto::Fee(fee)) => Ok(Some(fee)),
-        Ok(Efecto::Coinbase(_)) => Ok(None),
-        Err(motivo) => {
-            ap.revertir_a(marca);
-            descartadas.push(TxDescartada {
-                indice,
-                txid: zx_core::txid(tx, cbid),
-                motivo,
-            });
-            Ok(None)
-        }
-    }
 }
 
 /// Aplica una coinbase PoST v3 acreditando `importe` (ya recortado).
@@ -142,92 +120,37 @@ fn acreditar_coinbase_post(
     )
 }
 
-/// Fusiona un bloque PoW: la coinbase invalida el bloque si falla; el resto se descarta.
-fn fusion_pow(
-    ap: &mut Aplicador,
-    bloque: &BloqueTransicion,
-    punto: Punto,
-    params: &ParametrosTransicion,
-    cbid: u32,
-    descartadas: &mut Vec<TxDescartada>,
-) -> Result<(), ErrorTransicion> {
-    let HechosCabecera::PoW {
-        hash,
-        altura,
-        trabajo,
-        pow_valido,
-        ..
-    } = &bloque.hechos
-    else {
-        return Err(ErrorTransicion::ErrGenesis);
-    };
-    match ap.estado.fase {
-        Fase::PoW => {}
-        Fase::PoST => return Err(ErrorTransicion::ErrPowTrasCorte),
-        Fase::Genesis => return Err(ErrorTransicion::ErrGenesis),
-    }
-    if !pow_valido {
-        return Err(ErrorTransicion::ErrPow);
-    }
-    if trabajo.is_zero() {
-        return Err(ErrorTransicion::ErrPow);
-    }
-    ap.promover(punto, false, params)?;
-    let coinbase = coinbase_unica(bloque)?;
-    let mut coinbase_pagada = Amount::CERO;
-    if let Some(idx) = coinbase {
-        let Some((tx, testigos)) = bloque.txs.get(idx) else {
-            return Err(ErrorTransicion::ErrGenesis);
-        };
-        match aplicar_tx(ap, bloque, params, cbid, punto, tx, testigos)? {
-            Efecto::Coinbase(pagada) => coinbase_pagada = pagada,
-            Efecto::Fee(_) => return Err(ErrorTransicion::ErrEmision),
+/// Extrae el importe declarado de una coinbase PoST, comprobando F-09/F-17.
+fn declarado_de_coinbase(
+    tx: &zx_core::Tx,
+    productor: &zx_core::ClavePublica,
+    slot: u64,
+) -> Result<Amount, ErrorTransicion> {
+    match &tx.extension {
+        ExtensionTx::CoinbasePost {
+            clave,
+            importe,
+            slot: slot_tx,
+        } => {
+            if *clave != *productor {
+                return Err(ErrorTransicion::ErrAutorizacion);
+            }
+            // F-17: el `slot` de la v3 MUST ser el slot del bloque que la contiene.
+            if *slot_tx != slot {
+                return Err(ErrorTransicion::ErrEmision);
+            }
+            Ok(*importe)
         }
+        _ => Err(ErrorTransicion::ErrForma(
+            zx_core::ErrorFormaTx::ExtensionIncoherente {
+                version: tx.version,
+                esperada: "CoinbasePost",
+            },
+        )),
     }
-    let mut tarifas = Amount::CERO;
-    for (i, (tx, testigos)) in bloque.txs.iter().enumerate() {
-        if Some(i) == coinbase {
-            continue;
-        }
-        if let Some(fee) = intentar(
-            ap,
-            bloque,
-            params,
-            cbid,
-            punto,
-            i,
-            tx,
-            testigos,
-            descartadas,
-        )? {
-            tarifas = tarifas
-                .suma_comprobada(fee)
-                .ok_or(ErrorTransicion::ErrDesbordamiento)?;
-        }
-    }
-    let subsidio = (params.subsidio_pow)(*altura);
-    let tope = subsidio
-        .suma_comprobada(tarifas)
-        .ok_or(ErrorTransicion::ErrDesbordamiento)?;
-    if coinbase_pagada > tope {
-        return Err(ErrorTransicion::ErrEmision);
-    }
-    ap.estado.emitido += i128::from(coinbase_pagada.brek()) - i128::from(tarifas.brek());
-    ap.estado.subsidio_acum += i128::from(subsidio.brek());
-    ap.estado.trabajo = ap
-        .estado
-        .trabajo
-        .checked_add(*trabajo)
-        .ok_or(ErrorTransicion::ErrDesbordamiento)?;
-    ap.estado.altura = *altura;
-    if crate::transicion::aplicar::es_terminal_condiciones(&ap.estado, params, *altura) {
-        ap.estado.terminal = Some(*hash);
-        ap.estado.altura_terminal = Some(*altura);
-    }
-    Ok(())
 }
 
-/// Fusiona un bloque PoST: coinbase v3 recortada, resto descartable.
+/// Fusiona un bloque PoST: coinbase v3 recortada y opcional, resto descartable.
 fn fusion_post(
     ap: &mut Aplicador,
     bloque: &BloqueTransicion,
@@ -268,21 +191,28 @@ fn fusion_post(
     if *peso < 1 {
         return Err(ErrorTransicion::ErrSlot);
     }
+    // (b) promoción de pendientes y créditos en el punto de aplicación.
     ap.promover(punto, true, params)?;
-    if ap.estado.activo_de(productor) < params.q {
-        return Err(ErrorTransicion::ErrGarantia);
+    // RD-10: la garantía del productor **no** se recompueba al fusionar; es admisión (RD-9).
+    let coinbase = coinbase_unica(bloque)?;
+    if let Some(idx) = coinbase {
+        let Some((tx_coinbase, _)) = bloque.txs.get(idx) else {
+            return Err(ErrorTransicion::ErrEmision);
+        };
+        // R-8: importe 0 en la coinbase PoST invalida el bloque.
+        if declarado_de_coinbase(tx_coinbase, productor, *slot)?.brek() == 0 {
+            return Err(ErrorTransicion::ErrSaldo);
+        }
     }
-    let Some(cero) = coinbase_unica(bloque)? else {
-        return Err(ErrorTransicion::ErrEmision);
-    };
-    if cero != 0 {
-        return Err(ErrorTransicion::ErrEmision);
-    }
-    // Pre-pasada sobre una copia: conjunto aceptado, tarifas y descartes.
+    // Pre-pasada sobre una copia: conjunto aceptado y tarifas (RD-7 calcula el crédito con las
+    // tarifas de las transacciones que sí se aplican).
     let mut temporal = Aplicador::nuevo(ap.estado.clone());
     let mut tarifas = Amount::CERO;
     let mut aceptadas: Vec<usize> = Vec::new();
-    for (i, (tx, testigos)) in bloque.txs.iter().enumerate().skip(1) {
+    for (i, (tx, testigos)) in bloque.txs.iter().enumerate() {
+        if Some(i) == coinbase {
+            continue;
+        }
         let marca = temporal.marcar();
         match aplicar_tx(&mut temporal, bloque, params, cbid, punto, tx, testigos) {
             Ok(Efecto::Fee(fee)) => {
@@ -302,39 +232,7 @@ fn fusion_post(
             }
         }
     }
-    let Some((tx_coinbase, _)) = bloque.txs.get(cero) else {
-        return Err(ErrorTransicion::ErrEmision);
-    };
-    let declarado = match &tx_coinbase.extension {
-        ExtensionTx::CoinbasePost {
-            clave,
-            importe,
-            slot: slot_tx,
-        } => {
-            if *clave != *productor {
-                return Err(ErrorTransicion::ErrAutorizacion);
-            }
-            // F-17: el `slot` de la v3 MUST ser el slot del bloque que la contiene (FD-4).
-            if *slot_tx != *slot {
-                return Err(ErrorTransicion::ErrEmision);
-            }
-            *importe
-        }
-        _ => {
-            return Err(ErrorTransicion::ErrForma(
-                zx_core::ErrorFormaTx::ExtensionIncoherente {
-                    version: tx_coinbase.version,
-                    esperada: "CoinbasePost",
-                },
-            ));
-        }
-    };
-    let subsidio = (params.subsidio_post)(*slot);
-    let tope = subsidio
-        .suma_comprobada(tarifas)
-        .ok_or(ErrorTransicion::ErrDesbordamiento)?;
-    let efectiva = if declarado <= tope { declarado } else { tope };
-    acreditar_coinbase_post(ap, *productor, efectiva, punto, params)?;
+    // RD-7: primero las transacciones no-coinbase, después el crédito recortado de la coinbase.
     for i in aceptadas {
         let Some((tx, testigos)) = bloque.txs.get(i) else {
             continue;
@@ -349,7 +247,22 @@ fn fusion_post(
             });
         }
     }
+    let sub = (params.subsidio_post)(*slot);
+    let tope = sub
+        .suma_comprobada(tarifas)
+        .ok_or(ErrorTransicion::ErrDesbordamiento)?;
+    let mut efectiva = Amount::CERO;
+    if let Some(idx) = coinbase {
+        let Some((tx_coinbase, _)) = bloque.txs.get(idx) else {
+            return Err(ErrorTransicion::ErrEmision);
+        };
+        let declarado = declarado_de_coinbase(tx_coinbase, productor, *slot)?;
+        efectiva = if declarado <= tope { declarado } else { tope };
+        acreditar_coinbase_post(ap, *productor, efectiva, punto, params)?;
+    }
     ap.estado.emitido += i128::from(efectiva.brek()) - i128::from(tarifas.brek());
-    ap.estado.subsidio_acum += i128::from(subsidio.brek());
+    ap.estado.subsidio_acum += i128::from(sub.brek());
+    // RI-1a #1: el slot del estado es el punto de aplicación (EstadoDAG.jl:303).
+    ap.estado.slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)?;
     Ok(())
 }

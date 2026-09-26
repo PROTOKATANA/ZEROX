@@ -1,0 +1,96 @@
+   Compiling zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06a/ws/crates/zx-cadena)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running tests/diferencial_t04.rs (/home/katana/zeo/ZEROX/deepseek/W06a/target/debug/deps/diferencial_t04-337bcf8db2308811)
+
+running 1 test
+test diferencial_t04 has been running for over 60 seconds
+casos leidos      = 913
+discrepancias     = 6
+por nombre de caso:
+  D-1: 1 casos, 0 con discrepancia
+  D-10: 1 casos, 0 con discrepancia
+  D-11: 1 casos, 0 con discrepancia
+  D-12: 1 casos, 0 con discrepancia
+  D-13: 1 casos, 0 con discrepancia
+  D-2: 1 casos, 0 con discrepancia
+  D-3: 1 casos, 0 con discrepancia
+  D-4: 1 casos, 0 con discrepancia
+  D-5: 1 casos, 0 con discrepancia
+  D-6: 1 casos, 0 con discrepancia
+  D-7: 1 casos, 0 con discrepancia
+  D-8: 1 casos, 0 con discrepancia
+  D-9: 1 casos, 0 con discrepancia
+  aleatorio: 900 casos, 3 con discrepancia
+  CASO 303 (aleatorio) DESC esperado=[(14, 2, "ErrDobleGasto"), (18, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto")] obtenido=[(18, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto")]
+  CASO 303 (aleatorio) UTXO esperado=[(1, 9, 1, -1, 8)] obtenido=[(3, 8, 1, -1, 8)]
+  CASO 303 (aleatorio) GAR esperado=["GAR clave=1 activo=27 pend=[] ret=[] cred=[3@s12,3@s12,3@s12] congelado=0 nonce=1", "GAR clave=2 activo=0 pend=[] ret=[5@s10] cred=[3@s12,3@s12,3@s12,3@s12] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=28 pend=[] ret=[] cred=[3@s12,3@s12,3@s12] congelado=0 nonce=1", "GAR clave=2 activo=0 pend=[] ret=[5@s10] cred=[3@s12,3@s12,3@s12,3@s12] congelado=0 nonce=2"]
+  CASO 566 (aleatorio) DESC esperado=[(8, 2, "ErrNonce"), (9, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto"), (15, 2, "ErrDobleGasto"), (14, 2, "ErrDobleGasto")] obtenido=[(8, 2, "ErrNonce"), (9, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto"), (18, 2, "ErrNonce"), (14, 2, "ErrDobleGasto")]
+  CASO 813 (aleatorio) DESC esperado=[(12, 2, "ErrNonce"), (15, 2, "ErrNonce"), (17, 2, "ErrNonce"), (10, 2, "ErrDobleGasto")] obtenido=[(12, 2, "ErrNonce"), (15, 2, "ErrNonce"), (17, 2, "ErrNonce"), (10, 2, "ErrDobleGasto"), (16, 2, "ErrDobleGasto")]
+  CASO 813 (aleatorio) UTXO esperado=[(3, 1, 1, -1, 7)] obtenido=[(2, 1, 2, -1, 7)]
+cobertura (tabla del arnés):
+  SECCION vectores-v0.2 (casos aleatorios)
+  casos = 900
+  TIPO Transferencia construidas=1112 aplicadas=351 descartadas=217 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=217 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Deposito construidas=1626 aplicadas=349 descartadas=394 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=296 ErrDobleGasto=98 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  garantia_construidas = 4663
+  garantia_evaluadas = 2280
+  garantia_errnonce = 854
+  garantia_errnonce_pct_construidas = 18.31
+  garantia_errnonce_pct_evaluadas = 37.46
+  err_doble_gasto_total = 315
+  reorganizaciones_que_deshacen_garantia = 312
+
+
+thread 'diferencial_t04' (187) panicked at crates/zx-cadena/tests/diferencial_t04.rs:1387:5:
+diferencial T04 con 6 discrepancias:
+casos leidos      = 913
+discrepancias     = 6
+por nombre de caso:
+  D-1: 1 casos, 0 con discrepancia
+  D-10: 1 casos, 0 con discrepancia
+  D-11: 1 casos, 0 con discrepancia
+  D-12: 1 casos, 0 con discrepancia
+  D-13: 1 casos, 0 con discrepancia
+  D-2: 1 casos, 0 con discrepancia
+  D-3: 1 casos, 0 con discrepancia
+  D-4: 1 casos, 0 con discrepancia
+  D-5: 1 casos, 0 con discrepancia
+  D-6: 1 casos, 0 con discrepancia
+  D-7: 1 casos, 0 con discrepancia
+  D-8: 1 casos, 0 con discrepancia
+  D-9: 1 casos, 0 con discrepancia
+  aleatorio: 900 casos, 3 con discrepancia
+  CASO 303 (aleatorio) DESC esperado=[(14, 2, "ErrDobleGasto"), (18, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto")] obtenido=[(18, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto")]
+  CASO 303 (aleatorio) UTXO esperado=[(1, 9, 1, -1, 8)] obtenido=[(3, 8, 1, -1, 8)]
+  CASO 303 (aleatorio) GAR esperado=["GAR clave=1 activo=27 pend=[] ret=[] cred=[3@s12,3@s12,3@s12] congelado=0 nonce=1", "GAR clave=2 activo=0 pend=[] ret=[5@s10] cred=[3@s12,3@s12,3@s12,3@s12] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=28 pend=[] ret=[] cred=[3@s12,3@s12,3@s12] congelado=0 nonce=1", "GAR clave=2 activo=0 pend=[] ret=[5@s10] cred=[3@s12,3@s12,3@s12,3@s12] congelado=0 nonce=2"]
+  CASO 566 (aleatorio) DESC esperado=[(8, 2, "ErrNonce"), (9, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto"), (15, 2, "ErrDobleGasto"), (14, 2, "ErrDobleGasto")] obtenido=[(8, 2, "ErrNonce"), (9, 2, "ErrDobleGasto"), (11, 2, "ErrDobleGasto"), (18, 2, "ErrNonce"), (14, 2, "ErrDobleGasto")]
+  CASO 813 (aleatorio) DESC esperado=[(12, 2, "ErrNonce"), (15, 2, "ErrNonce"), (17, 2, "ErrNonce"), (10, 2, "ErrDobleGasto")] obtenido=[(12, 2, "ErrNonce"), (15, 2, "ErrNonce"), (17, 2, "ErrNonce"), (10, 2, "ErrDobleGasto"), (16, 2, "ErrDobleGasto")]
+  CASO 813 (aleatorio) UTXO esperado=[(3, 1, 1, -1, 7)] obtenido=[(2, 1, 2, -1, 7)]
+cobertura (tabla del arnés):
+  SECCION vectores-v0.2 (casos aleatorios)
+  casos = 900
+  TIPO Transferencia construidas=1112 aplicadas=351 descartadas=217 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=217 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Deposito construidas=1626 aplicadas=349 descartadas=394 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=296 ErrDobleGasto=98 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  garantia_construidas = 4663
+  garantia_evaluadas = 2280
+  garantia_errnonce = 854
+  garantia_errnonce_pct_construidas = 18.31
+  garantia_errnonce_pct_evaluadas = 37.46
+  err_doble_gasto_total = 315
+  reorganizaciones_que_deshacen_garantia = 312
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test diferencial_t04 ... FAILED
+
+failures:
+
+failures:
+    diferencial_t04
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 159.73s
+
+error: test failed, to rerun pass `-p zx-cadena --test diferencial_t04`

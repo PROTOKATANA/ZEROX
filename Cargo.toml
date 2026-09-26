@@ -9,6 +9,7 @@ members = [
     "crates/zx-farmer",
     "crates/zx-post",
     "crates/zx-p2p",
+    "crates/zx-cadena",
 ]
 # El clon fijado `PDF/autonomys-subspace` vive dentro de la copia de trabajo, así que Cargo lo
 # incluiría como miembro automático de este workspace al enlazarlo por `path` y resolvería su

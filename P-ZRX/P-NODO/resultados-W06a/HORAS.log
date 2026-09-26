@@ -1,0 +1,20 @@
+# HORAS.log — ORDEN-W06a
+# Marcas `date -Is`; donde no hubo captura directa, hora de modificación del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W06a/
+2026-09-26T04:11:00+02:00  inicio de sesión; lectura íntegra de ORDEN-W06a.md, V-ZRX/LINEO.md, CONTRATO-ESTADO-DAG-v0.md, CONTRATO-v0.md, FORMATO-v0.md, PLAN-W06.md, revisiones W03/W05a/W02b/T04-B/T04-C y RI-1a, oráculo T04 y arnés de W03
+2026-09-26T04:16:00+02:00  montaje de la zona: ws.orig/ y ws/ desde la raíz (sin target ni .git; PDF por enlace), .cargo-home, vectores v0.2 y cobertura en ws/testdata/estado-dag-v0.2/
+2026-09-26T04:20:07+02:00  ENTRADA INICIO: sha256sum -c P-ZRX/P-NODO/ENTRADA-W06a.sha256 -> 23/23 coinciden, exit=0 (logs/entrada-inicio.log)
+2026-09-26T04:22:00+02:00  faltas de definición declaradas en PROGRESO.md antes de editar (virtual en zx-dag, alcance de V4b, ErrMergeDepth, promover sin Aplicador, correcciones RI-1a); ninguna impide la orden
+2026-09-26T04:24:00+02:00  correcciones RI-1a/RD-2/RD-7/RD-10 en crates/zx-consensus/src/transicion/fusion.rs (PoW rechazado, slot=punto, coinbase opcional, garantía no recompueba)
+2026-09-26T04:30:00+02:00  crate zx-cadena: Cargo.toml, README.md, lib.rs, error.rs (MotivoBloque), bloque.rs (BloqueCadena/BloquePost), cadena.rs (admisión ED-1/ED-2, virtual ED-3, historia, reorg/undo)
+2026-09-26T04:33:00+02:00  primer cargo check y clippy del crate: 3 avisos corregidos (variante grande, tipo complejo, get-then-check)
+2026-09-26T04:36:00+02:00  arnés diferencial_t04 y propiedades.rs escritos; primer diferencial: 50 discrepancias en 18 casos aleatorios
+2026-09-26T04:40:45+02:00  diagnóstico: mapeo id->hash de GDR es textual ("B<id>"/"T"), no entero big-endian; se corrige hash_abstracto en el arnés
+2026-09-26T04:43:52+02:00  diagnóstico de la colisión de ids abstractos de T01/T04 (prox_salida vs out_id) y traducción por punto fijo (orden de aplicación -> ids de liberación y descartes -> reconstrucción); 4 casos residuales -> 0
+2026-09-26T04:44:00+02:00  V4: diferencial_t04 con 0 discrepancias en 913 casos y cobertura V4b idéntica (logs/diferencial-cuarta.log); V5: propiedades.rs IE-1..IE-4, 4/4 OK (logs/propiedades-primera.log)
+2026-09-26T04:44:21+02:00  V1 cargo fmt --all -- --check -> exit 0 (logs/V1-fmt.log)
+2026-09-26T04:47:00+02:00  V2 clippy workspace -> exit 0, 0 avisos (logs/V2-clippy.log)
+2026-09-26T04:49:00+02:00  V6 dependencias-exactas (20) y frontera-crates (7, incluida zx-cadena) -> OK (logs/V6-*.log)
+2026-09-26T04:57:00+02:00  V3 cargo test --workspace --all-features --locked -> 635 pasan, 0 fallan, 1 ignorado; diferencial_t01 y diferencial_t01_negativos verdes (logs/V3-test.log)
+2026-09-26T04:58:00+02:00  ENTREGA: cambios.patch (5,07 MB, 16 ficheros), MIGRACION.sha256 (167 huellas, sha256sum -c OK), lock-subconjunto.txt; ENTREGA FINAL: sha256sum -c ENTRADA-W06a.sha256 -> 23/23 coinciden
+2026-09-26T04:58:00+02:00  INFORME.md, PROGRESO.md y HORAS.log; fin; presupuesto (3 h / 8 hilos / 16 GiB) no agotado

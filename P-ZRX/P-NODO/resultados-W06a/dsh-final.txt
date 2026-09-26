@@ -1,0 +1,27 @@
+## ORDEN-W06a — ejecutada. Veredicto: **SUPERADO**
+
+Leí íntegros la orden, `LINEO.md` (antes de escribir código) y todos los insumos congelados. La entrada `ENTRADA-W06a.sha256` da **23/23** al inicio y al final. Todo quedó en `/home/katana/zeo/ZEROX/deepseek/W06a/`, sin commit/push, sin Python, sin secretos.
+
+### Falta de definición detectada e informada (antes de editar)
+1. **`Estado(past(V))` no es representable con la API actual de `zx-dag`** (`AlmacenGhostdag` no es `Clone` ni acepta un bloque virtual con límites relajados). No toqué `zx-dag`: `zx-cadena` reconstruye un almacén temporal con `max_padres` relajado y añade `V`, reproduciendo la copia del GDR de T04.
+2. **Alcance de V4b:** el arnés solo ve los vectores, así que compara la sección `vectores-v0.2 (casos aleatorios)`; el apartado `run.jl` sigue siendo evidencia de T04.
+3. **`ErrMergeDepth`** no existe en `ErrorTransicion`; se nombra en `MotivoBloque` (RD-5).
+4. **Garantía del productor sin `Aplicador::promover`** (es `pub(crate)`): se calcula el activo promovido por slot desde los campos públicos.
+5. **Correcciones RI-1a/RD** en `fusion.rs`, autorizadas por la decisión 4.
+
+### Defecto de T04-C destapado por el diferencial (hallazgo para el director)
+El generador de T04-C mantiene `out_id` para transferencias pero **no lo incrementa cuando una liberación consume `E.prox_salida`**; el oráculo T01 usa un espacio único de ids enteros y `crear_utxos!` descarta con `ErrDobleGasto` una transferencia cuyo id de salida ya está vivo. El formato real **F-18** (`OutPoint = (txid, índice)`) no puede representarlo. El arnés reproduce el espacio de ids del oráculo con un punto fijo declarado (orden de aplicación → ids de liberación/descartes → reconstrucción); el motivo sigue siendo `ErrDobleGasto` de W03, sin correspondencias nuevas. **Recomendación:** corregir `out_id` en un T04-D y reexportar v0.3.
+
+### Verificación (todas verdes)
+| Paso | Resultado |
+|---|---|
+| V1 `fmt --check` | exit 0 |
+| V2 `clippy -D warnings` (workspace) | exit 0, 0 avisos |
+| V3 `cargo test --workspace --all-features --locked` | **635 pasan, 0 fallan, 1 ignorado**; `diferencial_t01` y `_negativos` verdes |
+| V4 `diferencial_t04` | **913/913 casos, 0 discrepancias** |
+| V4b cobertura | **idéntica** a `cobertura-v0.2.txt` |
+| V5 `propiedades` (proptest, semilla fija) | IE-1…IE-4, 4/4 |
+| V6 deps/frontera | 20 exactas; 7 fronteras, incluida `zx-cadena → {zx-core,zx-consensus,zx-dag}` |
+
+### Entregables
+`ws/` y `ws.orig/`, `cambios.patch` (5,07 MB, 16 ficheros), `MIGRACION.sha256` (167 huellas, `sha256sum -c` OK), `logs/` (V1–V6, entrada, migración, lock), `INFORME.md`, `PROGRESO.md`, `HORAS.log`. `Cargo.lock`: única adición `zx-cadena 0.0.0`, cero cambios de versión. Presupuesto (3 h / 8 hilos / 16 GiB) no agotado (~50 min de reloj).

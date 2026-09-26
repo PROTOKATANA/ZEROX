@@ -1,0 +1,14 @@
+4633a4634,4646
+> name = "zx-cadena"
+> version = "0.0.0"
+> dependencies = [
+>  "ed25519-zebra",
+>  "primitive-types",
+>  "proptest",
+>  "thiserror 2.0.20",
+>  "zx-consensus",
+>  "zx-core",
+>  "zx-dag",
+> ]
+> 
+> [[package]]

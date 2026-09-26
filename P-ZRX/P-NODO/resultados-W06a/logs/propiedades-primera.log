@@ -1,0 +1,16 @@
+   Compiling zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06a/ws/crates/zx-cadena)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.39s
+     Running tests/propiedades.rs (/home/katana/zeo/ZEROX/deepseek/W06a/target/debug/deps/propiedades-b2ff6e1ff5efb9e8)
+
+running 4 tests
+proptest: FileFailurePersistence::SourceParallel set, but failed to find lib.rs or main.rs
+proptest: FileFailurePersistence::SourceParallel set, but failed to find lib.rs or main.rs
+proptest: FileFailurePersistence::SourceParallel set, but failed to find lib.rs or main.rs
+proptest: FileFailurePersistence::SourceParallel set, but failed to find lib.rs or main.rs
+test ie2_aplicacion_unica ... ok
+test ie3_orden_de_llegada ... ok
+test ie4_undo_y_reorg ... ok
+test ie1_conservacion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
