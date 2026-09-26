@@ -31,10 +31,11 @@
     reason = "hilo sin entrada ajena (sin red); un panic aquí es una incoherencia interna, y fase_regimen lo convierte en ErrorNodo fatal vía JoinHandle::join, nunca en un Ok silencioso"
 )]
 
+use std::collections::BTreeSet;
 use std::sync::mpsc::{Receiver, Sender};
 
-use zx_core::PadresDag;
 use zx_core::wire_dag::BloqueDag;
+use zx_core::{ClavePublica, PadresDag};
 use zx_farmer::farmer::ParcelaDisco;
 use zx_farmer::productor_poas::convertir_candidatos_locales;
 use zx_poas::HistoriaGenesis;
@@ -104,7 +105,16 @@ pub enum MsgBucle {
     /// cuando el propio hilo produce un bloque (`registrar_validado`, más abajo). Sin esta
     /// información, `producir_en_regimen` fallaba con «el padre seleccionado no está registrado en
     /// el `ServicioPot`» en cuanto GHOSTDAG elegía un padre de otro nodo.
-    Padres(PadresDag, Vec<(zx_core::BlockHash, u64)>),
+    ///
+    /// `ORDEN-W06d5` decisión 1: además, las claves (entre las que gestiona el hilo) con garantía
+    /// activa `>= q` en `Estado(padre_seleccionado)` — RD-9. El bucle las calcula porque solo él
+    /// tiene `Cadena`/`params.q`; el hilo nunca intenta `producir_en_regimen` para una clave que no
+    /// esté en este conjunto (causa de `ErrGarantia` fatal en V5 de `REVISION-W06d4.md`).
+    Padres(
+        PadresDag,
+        Vec<(zx_core::BlockHash, u64)>,
+        BTreeSet<ClavePublica>,
+    ),
     /// El bloque enviado se admitió: sigue produciendo.
     Continuar,
     /// Condición de parada alcanzada (`--parada-tras-slots`): el hilo debe terminar.
@@ -201,11 +211,18 @@ pub fn hilo_productor_regimen(
         if tx.send(MsgProductor::PeticionPadres).is_err() {
             return; // el bucle cerró el canal: apagado normal del proceso.
         }
-        let (padres, info_padres) = match rx.recv() {
-            Ok(MsgBucle::Padres(p, info)) => (p, info),
+        let (padres, info_padres, con_garantia) = match rx.recv() {
+            Ok(MsgBucle::Padres(p, info, g)) => (p, info, g),
             Ok(_otro) => panic!("hilo productor: se esperaba Padres, llegó otro mensaje del bucle"),
             Err(_) => return, // el bucle cerró el canal: apagado normal del proceso.
         };
+        // `ORDEN-W06d5` decisión 2 (`REVISION-W06d4.md`, V5-2): el padre seleccionado que incumple
+        // `slot(padre) < slot_objetivo` ya lo descarta con gracia `producir_en_regimen` más abajo
+        // (`ErrorRegimen::SlotNoProgreso`), pero ese cheque **no** cubre los padres extra del
+        // mergeset GHOSTDAG (`C-HDR-05`/`C-FLU-02`: la regla alcanza a **todos** los padres). Se
+        // excluyen aquí, antes de construir ningún bloque, en vez de descubrirlo en la verificación
+        // completa (donde, al ser un bloque propio, era fatal).
+        let padres = filtrar_padres_extra_por_slot(padres, &info_padres, slot);
         // Registra en el `ServicioPot` propio cualquier padre que este hilo no haya producido él
         // mismo (ver el docstring de `MsgBucle::Padres`). `BloqueDuplicado` es el caso normal (un
         // padre que sí produjo este mismo hilo, o que ya se registró en una vuelta anterior porque
@@ -236,6 +253,21 @@ pub fn hilo_productor_regimen(
             let Some(cp) = claves.get(i) else {
                 panic!("hilo productor: índice de clave {i} fuera de rango")
             };
+            // `ORDEN-W06d5` decisión 1 (`REVISION-W06d4.md`, V5-1): «producir solo con garantía».
+            // No se **intenta** `producir_en_regimen` para una clave sin garantía activa `>= q` en
+            // el estado de la punta elegida: intentarlo de todos modos solo para que el motor lo
+            // rechace con `ErrGarantia` (fatal, decisión 4 de `ORDEN-W06d1`) es exactamente el
+            // hallazgo V5-1 (un nodo que sincroniza tarde, con una clave nueva que nunca depositó).
+            if !con_garantia.contains(&cp.clave.pk) {
+                tracing::info!(
+                    indice = i,
+                    clave = ?cp.clave.pk,
+                    slot,
+                    "candidata descartada: la clave no tiene garantía activa >= q en el estado \
+                     de la punta elegida (RD-9); no se intenta producir"
+                );
+                continue;
+            }
             let mut parametros_bloque = parametros;
             parametros_bloque.timestamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -292,6 +324,50 @@ pub fn hilo_productor_regimen(
             }
         }
     }
+}
+
+/// `ORDEN-W06d5` decisión 2: reconstruye `padres` excluyendo cualquier padre **extra** cuyo `slot`
+/// no sea anterior a `slot_objetivo` (`C-HDR-05`/`C-FLU-02`: la cota alcanza a todos los padres, no
+/// solo al seleccionado). El padre seleccionado no se toca aquí — si él mismo incumple la cota, lo
+/// descarta con gracia `producir_en_regimen` (`ErrorRegimen::SlotNoProgreso`), más abajo.
+///
+/// `info_padres` **MUST** traer el slot de cada padre (seleccionado y extras): lo construye el
+/// bucle a partir de `Cadena::bloque`, que siempre lo conoce para un padre de régimen ya admitido
+/// (docstring de [`MsgBucle::Padres`]). Su ausencia es una incoherencia interna, no un caso de red.
+fn filtrar_padres_extra_por_slot(
+    padres: PadresDag,
+    info_padres: &[(zx_core::BlockHash, u64)],
+    slot_objetivo: u64,
+) -> PadresDag {
+    let seleccionado = padres.seleccionado();
+    let extras_validos: Vec<zx_core::BlockHash> = padres
+        .extras()
+        .iter()
+        .copied()
+        .filter(|h| {
+            let &(_, slot_padre) =
+                info_padres
+                    .iter()
+                    .find(|(hp, _)| hp == h)
+                    .unwrap_or_else(|| {
+                        panic!("hilo productor: padre extra {h} sin información de slot del bucle")
+                    });
+            if slot_padre >= slot_objetivo {
+                tracing::info!(
+                    padre = ?h,
+                    slot_padre,
+                    slot_objetivo,
+                    "padre extra descartado: su slot no es anterior al del bloque objetivo"
+                );
+                false
+            } else {
+                true
+            }
+        })
+        .collect();
+    PadresDag::nuevo(seleccionado, &extras_validos).unwrap_or_else(|e| {
+        panic!("hilo productor: reconstruir PadresDag tras filtrar padres extra: {e}")
+    })
 }
 
 /// Fuente de soluciones que siempre devuelve la misma candidata ya auditada (evita volver a auditar

@@ -1,0 +1,896 @@
+--- ws.orig/crates/zx-node/src/bin/zx-adversario.rs	2026-09-26 19:04:09.186366528 +0200
++++ ws/crates/zx-node/src/bin/zx-adversario.rs	2026-09-26 23:51:22.481659881 +0200
+@@ -35,6 +35,7 @@
+ //! el registro del nodo objetivo, no aquí — esta herramienta no tiene acceso a su estado interno,
+ //! solo al protocolo de red, que es exactamente el punto.
+ 
++use std::collections::BTreeSet;
+ use std::time::Duration;
+ 
+ use clap::Parser;
+@@ -327,7 +328,15 @@
+     };
+     println!("zx-adversario: conectado a {peer}");
+ 
+-    let Some(estado_objetivo) = pedir_estado(&manejo, &mut eventos, peer).await else {
++    // `ORDEN-W06d5` decisión 5 (`REVISION-W06d4.md`, V7): la conexión TCP no es la malla de
++    // gossipsub; publicar antes de que el objetivo confirme sus dos suscripciones (bloques
++    // pow/post) falla localmente con `NoPeersSubscribedToTopic`. Se pide el saludo y se esperan las
++    // suscripciones **en el mismo bucle** (`pedir_estado_y_suscripciones`): hacerlo en dos bucles
++    // consecutivos sobre el mismo canal perdía los eventos de suscripción que llegaran mientras se
++    // esperaba el saludo (ver el docstring de la función — encontrado en vivo, no hipotético).
++    let (estado_objetivo, pendientes) =
++        pedir_estado_y_suscripciones(&manejo, &mut eventos, peer, Duration::from_secs(10)).await;
++    let Some(estado_objetivo) = estado_objetivo else {
+         eprintln!("zx-adversario: el objetivo no respondió el saludo");
+         std::process::exit(1);
+     };
+@@ -338,14 +347,14 @@
+ 
+     let pausa = Duration::from_millis(cli.pausa_ms);
+ 
+-    // La conexión TCP no es la malla de gossipsub: publicar antes de que las dos suscripciones
+-    // (bloques pow/post) terminen su propio intercambio de control falla localmente con
+-    // `NoPeersSubscribedToTopic` (mismo motivo que `dos_nodos.rs::dos_conectados`, en `zx-p2p`,
+-    // espera las suscripciones antes de publicar). Una espera fija y corta —no un consumo del
+-    // canal de eventos, para no interferir con `pedir_estado`— basta en la práctica: la
+-    // suscripción se negocia en el primer RPC tras la conexión, casi siempre antes de que termine
+-    // el saludo de arriba.
+-    tokio::time::sleep(Duration::from_millis(500)).await;
++    if pendientes.is_empty() {
++        println!("zx-adversario: el objetivo confirmó su suscripción a los dos temas de gossipsub");
++    } else {
++        println!(
++            "zx-adversario: el objetivo no confirmó suscripción a {pendientes:?} en el plazo \
++             esperado; prosigo igualmente (la ráfaga puede perder mensajes por esto)"
++        );
++    }
+ 
+     // Orden deliberado: primero los escenarios que **no** violan consenso (`Ignorar`, la conexión
+     // sigue viva) y al final los que sí (`Rechazar` con `MotivoDesconexion::ViolacionDeConsenso`,
+@@ -446,28 +455,67 @@
+     }
+ }
+ 
+-async fn pedir_estado(
++/// Pide el saludo **y**, en el mismo bucle de consumo del canal de eventos, acumula las
++/// suscripciones de gossipsub del objetivo que lleguen mientras tanto.
++///
++/// `ORDEN-W06d5` decisión 5, corrección tras el primer intento de V7 con esta misma orden: separar
++/// esto en dos funciones consecutivas —cada una con su propio bucle sobre el **mismo** canal— hacía
++/// que la que corría primero (`pedir_estado`) descartara en silencio (`Ok(Some(_)) => {}`) los
++/// eventos `Suscripcion` que llegaran mientras esperaba el saludo, exactamente los que la segunda
++/// (`esperar_suscripcion`) necesitaba después: con las dos suscripciones anunciándose casi siempre
++/// junto con la respuesta al saludo (ambas llegan justo tras la conexión), la carrera se perdía casi
++/// siempre y el plazo de la segunda función expiraba sin ver nada — reproducido en vivo, no una
++/// hipótesis: el registro del intento anterior mostraba exactamente `"el objetivo no confirmó
++/// suscripción"` seguido de `NoPeersSubscribedToTopic` en la ráfaga.
++async fn pedir_estado_y_suscripciones(
+     manejo: &zx_p2p::servicio::ManejoRed,
+     eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>,
+     peer: PeerId,
+-) -> Option<Estado> {
+-    manejo.pedir(peer, Peticion::Estado).await.ok()?;
+-    let plazo = tokio::time::Instant::now() + Duration::from_secs(10);
++    plazo_suscripcion: Duration,
++) -> (Option<Estado>, BTreeSet<&'static str>) {
++    manejo.pedir(peer, Peticion::Estado).await.ok();
++    let mut pendientes: BTreeSet<&'static str> = [
++        ParametrosRed::dag_dev().topic_bloques_pow(),
++        ParametrosRed::dag_dev().topic_bloques_post(),
++    ]
++    .into_iter()
++    .collect();
++    let mut estado = None;
++    // El plazo total es el mayor de los dos: seguimos escuchando suscripciones después de tener ya
++    // el saludo, hasta `plazo_suscripcion`, pero no más allá de 10s si el saludo mismo no llega.
++    let fin_saludo = tokio::time::Instant::now() + Duration::from_secs(10);
++    let fin_suscripcion = tokio::time::Instant::now() + plazo_suscripcion;
+     loop {
+-        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
++        if estado.is_some() && pendientes.is_empty() {
++            break;
++        }
++        let limite = if estado.is_some() {
++            fin_suscripcion
++        } else {
++            fin_saludo.min(fin_suscripcion)
++        };
++        let resto = limite.saturating_duration_since(tokio::time::Instant::now());
+         if resto.is_zero() {
+-            return None;
++            break;
+         }
+         match tokio::time::timeout(resto, eventos.recv()).await {
+             Ok(Some(EventoRed::Respuesta { respuesta, .. })) => {
+                 if let Respuesta::Estado(e) = *respuesta {
+-                    return Some(e);
++                    estado = Some(e);
+                 }
+             }
++            Ok(Some(EventoRed::Suscripcion {
++                peer: p,
++                topico,
++                suscrito: true,
++            })) if p == peer => {
++                pendientes.retain(|t| topico != *t);
++            }
+             Ok(Some(_)) => {}
+-            _ => return None,
++            _ => break,
+         }
+     }
++    (estado, pendientes)
+ }
+ 
+ async fn ejecutar_escenario(
+--- ws.orig/crates/zx-node/src/error.rs	2026-09-26 09:50:47.342009989 +0200
++++ ws/crates/zx-node/src/error.rs	2026-09-26 21:56:04.690319265 +0200
+@@ -4,6 +4,8 @@
+ 
+ use zx_core::Red;
+ 
++use crate::rechazo::ClasificacionRechazo;
++
+ /// Fallo del nodo. Cualquier variante termina el proceso con código ≠ 0 (decisión 2 y 4 de la
+ /// orden).
+ #[derive(Debug, thiserror::Error)]
+@@ -36,14 +38,20 @@
+     /// El génesis de W04 no se pudo construir.
+     #[error("génesis de W04: {0}")]
+     Genesis(#[from] zx_consensus::ErrorPow),
+-    /// Un bloque **propio** fue rechazado por la tubería de admisión (decisión 4): es un error del
+-    /// nodo, no un evento normal.
++    /// Un bloque **propio** fue rechazado por la tubería de admisión.
++    ///
++    /// `ORDEN-W06d5` decisión 3: ya no es fatal por sí solo. `clasificacion` distingue un rechazo
++    /// **legítimo** del protocolo ante un caso de borde real (se registra y se descarta, el nodo
++    /// sigue) de una **violación de invariante interna** (fatal, decisión 4 de `ORDEN-W06d1`, sin
++    /// cambios). Ver `crate::rechazo` para el criterio completo.
+     #[error("bloque propio {hash} rechazado en la admisión: {motivo}")]
+     BloquePropioRechazado {
+         /// Hash del bloque propio rechazado.
+         hash: zx_core::BlockHash,
+         /// Motivo exacto.
+         motivo: String,
++        /// Legítimo (no fatal) o interno (fatal).
++        clasificacion: ClasificacionRechazo,
+     },
+     /// El almacén no reprodujo un bloque durante la repetición al reiniciar (D-N03′).
+     #[error(
+--- ws.orig/crates/zx-node/src/lib.rs	2026-09-26 14:08:45.173863909 +0200
++++ ws/crates/zx-node/src/lib.rs	2026-09-26 21:54:58.581010879 +0200
+@@ -16,6 +16,7 @@
+ pub mod padres;
+ pub mod perfil;
+ pub mod pow;
++pub mod rechazo;
+ pub mod red;
+ pub mod regimen;
+ pub mod registro;
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-26 21:25:21.774979301 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-26 23:11:37.381067491 +0200
+@@ -129,8 +129,20 @@
+     red: Option<ManijaRed>,
+     /// Cola de trabajo que el manejador de red encola y este hilo drena (decisión 1).
+     trabajo_red: Option<tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>>,
++    /// Bloques PoST **de red** descartados como [`crate::rechazo::ClasificacionRechazo::Pendiente`]
++    /// (aviso del director, `ORDEN-W06d5`, tras el hallazgo de V5): no son inválidos, solo faltó
++    /// contexto local (`Pot(PasadoIncompleto)` mientras este nodo sincroniza fuera de orden). Nunca
++    /// se cachean como inválidos ni penalizan al remitente; se reintentan en
++    /// [`Self::reintentar_post_pendientes`] cada vez que el propio pasado avanza. Acotada
++    /// (`TOPE_POST_PENDIENTES`): el más viejo se descarta sin más si se supera el tope — el riesgo
++    /// que se evita es RI-2a (un hueco local guardado para siempre como si fuera un defecto del
++    /// candidato), no un cachá sin límite.
++    post_pendientes: std::collections::VecDeque<BloqueDag>,
+ }
+ 
++/// Tope de [`Nodo::post_pendientes`]: acotar la cola, no la corrección (D-oS local, no de consenso).
++const TOPE_POST_PENDIENTES: usize = 64;
++
+ fn ruta_parcela(dir_datos: &Path, indice: u32) -> PathBuf {
+     dir_datos.join(format!("parcela-{indice}.plot"))
+ }
+@@ -242,6 +254,7 @@
+             huerfanos: red::nuevo_deposito_huerfanos(),
+             red: None,
+             trabajo_red: None,
++            post_pendientes: std::collections::VecDeque::new(),
+         };
+ 
+         let longitud = nodo.almacen.longitud_registro()?;
+@@ -274,6 +287,9 @@
+             .map_err(|m| ErrorNodo::BloquePropioRechazado {
+                 hash: cabecera_genesis.block_hash(),
+                 motivo: m.nombre().to_string(),
++                // Interno: el génesis dev es una constante fija (W04); un rechazo aquí es siempre
++                // un bug de construcción, nunca una carrera (no hay nada concurrente todavía).
++                clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+             })?;
+         let admitido = BloqueAdmitido::pow(&cabecera_genesis, &[tx_genesis], &testigos_genesis);
+         self.almacen.admitir(&admitido, true)?;
+@@ -402,6 +418,9 @@
+                     .ok_or_else(|| ErrorNodo::BloquePropioRechazado {
+                         hash,
+                         motivo: format!("padre {} desconocido (sin cabecera)", cabecera.prev_hash),
++                        // Interno: el padre de un bloque que este mismo nodo acaba de minar sobre
++                        // su propio `historial_pow` no puede ser desconocido salvo un bug real.
++                        clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+                     })?;
+             let target_esperado = pow::target_de_altura(&historial_padre, cabecera.height)
+                 .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
+@@ -424,6 +443,10 @@
+                 ErrorNodo::BloquePropioRechazado {
+                     hash,
+                     motivo: format!("validar_cabecera_pow: {e}"),
++                    // Interno: el propio minero acaba de encontrar este PoW contra el contexto que
++                    // el nodo mismo calculó; una discrepancia aquí es un bug de construcción, no
++                    // una carrera con otro proceso.
++                    clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+                 }
+             })?;
+         }
+@@ -478,6 +501,7 @@
+                 ErrorNodo::BloquePropioRechazado {
+                     hash,
+                     motivo: m.nombre().to_string(),
++                    clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
+                 }
+             })?;
+             self.vista_red.registrar_pow(cabecera.height, para_vista);
+@@ -656,12 +680,14 @@
+                     return Err(ErrorNodo::BloquePropioRechazado {
+                         hash,
+                         motivo: format!("{m:?}"),
++                        clasificacion: crate::rechazo::clasificar_cabecera_invalida(&m),
+                     });
+                 }
+                 EstadoCabeceraConjunta::Pendiente(m) => {
+                     return Err(ErrorNodo::BloquePropioRechazado {
+                         hash,
+                         motivo: format!("pendiente: {m:?}"),
++                        clasificacion: crate::rechazo::clasificar_cabecera_pendiente(&m),
+                     });
+                 }
+             }
+@@ -727,6 +753,7 @@
+                 ErrorNodo::BloquePropioRechazado {
+                     hash,
+                     motivo: m.nombre().to_string(),
++                    clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
+                 }
+             })?;
+             let para_vista = BloqueRed::Post {
+@@ -1175,6 +1202,17 @@
+             }
+         };
+         let indice = self.almacen.longitud_registro().unwrap_or(0);
++        // Aviso del director (`ORDEN-W06d5`, tras el hallazgo de V5): la simplificación que
++        // trataba `Invalida` y `Pendiente` como el mismo `Rechazar` (declarada en `W06d4`) es un
++        // bug real, no solo una simplificación — el mismo riesgo que RI-2a. `Pot(PasadoIncompleto)`
++        // es un hueco **local** del `ServicioPot` de verificación (un nodo que sincroniza fuera de
++        // orden), no un defecto demostrado del candidato: cachearlo como inválido lo perdería para
++        // siempre, y `Rechazar` penaliza (incluso desconecta, `TrabajoRed::BloqueDeSincronizacion`
++        // más abajo) a un par honesto por nuestro propio retraso. Ahora se usa la clasificación
++        // tipada (`crate::rechazo`, decisión 3): `Pendiente` ⇒ `Ignorar` + se reencola para
++        // reintentar cuando el pasado avance (`Self::reintentar_post_pendientes`); el resto, igual
++        // que antes.
++        let bloque_para_reintento = bloque_dag.clone();
+         match self.admitir_post_interno(bloque_dag, indice, true) {
+             Ok(()) => {
+                 // V9: este evento **solo** se escribe después de que `admitir_post_interno` terminó
+@@ -1187,13 +1225,26 @@
+                     .str("familia", "post")
+                     .str("veredicto", "Aceptar");
+                 let _ = self.registro.escribir(evento, false);
++                self.reintentar_post_pendientes();
+                 VeredictoFinal::Aceptar
+             }
++            Err(ErrorNodo::BloquePropioRechazado {
++                motivo,
++                clasificacion,
++                ..
++            }) if clasificacion.es_pendiente() => {
++                let evento = self
++                    .registro
++                    .evento("bloque_red_pendiente")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "post")
++                    .str("motivo", &motivo)
++                    .str("veredicto", "Ignorar (reintento encolado)");
++                let _ = self.registro.escribir(evento, false);
++                self.encolar_post_pendiente(bloque_para_reintento);
++                VeredictoFinal::Ignorar
++            }
+             Err(e) => {
+-                // Simplificación declarada (`PROGRESO.md`): tanto una cabecera conjunta `Invalida`
+-                // como `Pendiente` llegan aquí como el mismo `ErrorNodo::BloquePropioRechazado`; las
+-                // dos se tratan como `Rechazar`. Distinguirlas exigiría un tipo de error más rico en
+-                // `admitir_post_interno`, fuera del alcance de esta orden.
+                 let evento = self
+                     .registro
+                     .evento("bloque_red_rechazado")
+@@ -1206,6 +1257,58 @@
+         }
+     }
+ 
++    /// Encola un bloque PoST de red que quedó `Pendiente` (decisión 3 extendida): acotado, el más
++    /// viejo se descarta si se supera [`TOPE_POST_PENDIENTES`] — es una cola de mejor esfuerzo, no
++    /// una promesa de reintento infinito.
++    fn encolar_post_pendiente(&mut self, bloque: BloqueDag) {
++        if self.post_pendientes.len() >= TOPE_POST_PENDIENTES {
++            self.post_pendientes.pop_front();
++        }
++        self.post_pendientes.push_back(bloque);
++    }
++
++    /// Reintenta los bloques PoST pendientes (decisión 3 extendida, aviso del director tras V5): el
++    /// `ServicioPot` de verificación pudo completar el hueco que los frenaba desde la última
++    /// admisión. Sin bloqueo del resto del bucle: como mucho una pasada por bloque en cola, cada
++    /// vez que se llama. Los que sigan `Pendiente` vuelven a la cola; los que ahora sean
++    /// demostrablemente inválidos (o una violación interna) se descartan **sin** penalizar — el
++    /// remitente original ya no está atado a este intento.
++    fn reintentar_post_pendientes(&mut self) {
++        if self.post_pendientes.is_empty() {
++            return;
++        }
++        let pendientes: Vec<BloqueDag> = self.post_pendientes.drain(..).collect();
++        for bloque in pendientes {
++            let hash = bloque.cabecera.block_hash();
++            let indice = self.almacen.longitud_registro().unwrap_or(0);
++            match self.admitir_post_interno(bloque.clone(), indice, true) {
++                Ok(()) => {
++                    let evento = self
++                        .registro
++                        .evento("bloque_red_admitido")
++                        .str("hash", &hash.to_string())
++                        .str("familia", "post")
++                        .str("veredicto", "Aceptar (reintento)");
++                    let _ = self.registro.escribir(evento, false);
++                }
++                Err(ErrorNodo::BloquePropioRechazado { clasificacion, .. })
++                    if clasificacion.es_pendiente() =>
++                {
++                    self.encolar_post_pendiente(bloque);
++                }
++                Err(e) => {
++                    let evento = self
++                        .registro
++                        .evento("bloque_red_rechazado")
++                        .str("hash", &hash.to_string())
++                        .str("familia", "post")
++                        .str("motivo", &format!("reintento: {e}"));
++                    let _ = self.registro.escribir(evento, false);
++                }
++            }
++        }
++    }
++
+     /// Construye los depósitos F-15 pendientes (coinbases maduras propias sin depositar) para la
+     /// altura `altura_bloque` (decisión 5).
+     fn preparar_depositos(&self, altura_bloque: u32) -> ResultadoNodo<Vec<(Tx, Vec<Vec<u8>>)>> {
+@@ -1287,7 +1390,7 @@
+     /// lo permita (decisión 5). Devuelve cuando `Cadena` fija el terminal.
+     ///
+     /// # Errores
+-    /// [`ErrorNodo::BloquePropioRechazado`] si el motor rechaza un bloque propio (decisión 4, fatal).
++    /// [`ErrorNodo::BloquePropioRechazado`] con `clasificacion` interna (`ORDEN-W06d5` decisión 3, `crate::rechazo`); un rechazo legítimo se descarta y no llega a devolverse.
+     fn fase_pow(&mut self) -> ResultadoNodo<()> {
+         if self.cadena.terminal().is_some() {
+             return Ok(());
+@@ -1388,13 +1491,28 @@
+                 .str("hash", &cabecera_minada.block_hash().to_string());
+             self.registro.escribir(evento, false)?;
+ 
+-            self.admitir_pow_interno(
+-                cabecera_minada,
+-                txs,
+-                testigos,
+-                self.almacen.longitud_registro()?,
+-                true,
+-            )?;
++            // `ORDEN-W06d5` decisión 3: mismo criterio que `fase_regimen` — un rechazo legítimo
++            // (p. ej. `ErrPowTrasCorte`, el corte lo fijó un bloque de red justo entre que este
++            // nodo empezó a minar y a admitir; ver `crate::rechazo`) se registra y se descarta;
++            // solo una violación de invariante interna sigue siendo fatal.
++            let indice_registro = self.almacen.longitud_registro()?;
++            match self.admitir_pow_interno(cabecera_minada, txs, testigos, indice_registro, true) {
++                Ok(()) => {}
++                Err(ErrorNodo::BloquePropioRechazado {
++                    hash,
++                    motivo,
++                    clasificacion,
++                }) if clasificacion.es_legitimo() => {
++                    let evento = self
++                        .registro
++                        .evento("bloque_propio_rechazado_legitimo")
++                        .str("hash", &hash.to_string())
++                        .str("motivo", &motivo);
++                    self.registro.escribir(evento, false)?;
++                    continue;
++                }
++                Err(e) => return Err(e),
++            }
+             self.difundir_si_hay_red(cabecera_minada.block_hash());
+ 
+             if self.cadena.terminal().is_some() {
+@@ -1409,7 +1527,7 @@
+     /// productor, y atiende sus peticiones hasta que se agote (`--parada-tras-slots`) o falle.
+     ///
+     /// # Errores
+-    /// [`ErrorNodo::BloquePropioRechazado`] si el motor rechaza un bloque propio (decisión 4, fatal).
++    /// [`ErrorNodo::BloquePropioRechazado`] con `clasificacion` interna (`ORDEN-W06d5` decisión 3, `crate::rechazo`); un rechazo legítimo se descarta y no llega a devolverse.
+     fn fase_regimen(&mut self) -> ResultadoNodo<()> {
+         let terminal = self
+             .cadena
+@@ -1427,8 +1545,36 @@
+         }
+ 
+         // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
++        //
++        // `ORDEN-W06d5` decisión 1, extensión encontrada **en vivo** al repetir V5 con esta misma
++        // orden ya aplicada (evidencia en `PROGRESO.md`): un nodo que llega tarde también puede
++        // llegar aquí con `tips_validas()` vacío (los bloques PoST que le llegaron por red antes de
++        // fijar su propio terminal se ignoran como `bloque_post_de_red_sin_terminal`, sin
++        // reintentarse) y con la clave que firma la transición (`self.claves[0]`, decisión 6 de
++        // `producir_bloque_transicion`) **sin garantía propia** (nunca minó ni depositó: exactamente
++        // el perfil de una clave nueva de V5). Producir de todos modos repite el mismo `ErrGarantia`
++        // fatal que la decisión 1 ya evita en régimen — el hilo productor nunca llega a arrancar
++        // porque el proceso muere antes, en esta única producción previa al bucle de mensajes. Igual
++        // que en régimen: no se intenta sin garantía; en vez de eso, se espera (procesando red) a
++        // que **otro** nodo produzca y sincronice la transición, lo que llena `tips_validas()` por
++        // la vía normal de `intentar_admitir_post_de_red`.
+         if self.cadena.tips_validas().is_empty() {
+-            self.producir_bloque_transicion(terminal)?;
++            let hay_garantia_propia = self
++                .claves
++                .first()
++                .is_some_and(|c| self.cadena.estado_terminal().activo_de(&c.pk) >= self.params.q);
++            if hay_garantia_propia {
++                self.producir_bloque_transicion(terminal)?;
++            } else {
++                tracing::info!(
++                    "sin garantía propia en el terminal: no se intenta producir el bloque de \
++                     transición; se espera a sincronizarlo de otro nodo"
++                );
++                while self.cadena.tips_validas().is_empty() {
++                    self.procesar_trabajo_red_pendiente();
++                    std::thread::sleep(std::time::Duration::from_millis(50));
++                }
++            }
+         }
+ 
+         let mut claves_con_parcela = Vec::new();
+@@ -1499,8 +1645,25 @@
+                             info_padres.push((h, p.slot));
+                         }
+                     }
++                    // `ORDEN-W06d5` decisión 1 (RD-9): claves (de entre las que gestiona este
++                    // nodo) con garantía activa `>= q` en `Estado(padre_seleccionado)`. Solo el
++                    // bucle tiene `Cadena`/`self.params.q`; se calcula aquí, una vez por slot (los
++                    // hermanos del mismo slot comparten padres), y se manda al hilo productor para
++                    // que nunca intente `producir_en_regimen` con una clave que no lo alcance
++                    // (causa de `ErrGarantia` fatal en V5 de `REVISION-W06d4.md`).
++                    let con_garantia: std::collections::BTreeSet<zx_core::ClavePublica> = self
++                        .cadena
++                        .estado_post(&padres.seleccionado())
++                        .map(|estado| {
++                            self.claves
++                                .iter()
++                                .filter(|c| estado.activo_de(&c.pk) >= self.params.q)
++                                .map(|c| c.pk)
++                                .collect()
++                        })
++                        .unwrap_or_default();
+                     if tx_a_productor
+-                        .send(MsgBucle::Padres(padres, info_padres))
++                        .send(MsgBucle::Padres(padres, info_padres, con_garantia))
+                         .is_err()
+                     {
+                         break;
+@@ -1520,6 +1683,10 @@
+                                 .str("hash", &hash.to_string());
+                             self.registro.escribir(evento, false)?;
+                             self.difundir_si_hay_red(hash);
++                            // El pasado del `ServicioPot` de verificación acaba de avanzar: algún
++                            // bloque de red que quedó `Pendiente` (decisión 3 extendida) puede haber
++                            // dejado de estarlo.
++                            self.reintentar_post_pendientes();
+                             let continuar = self.parada_tras_slots.is_none_or(|limite| {
+                                 self.servicio_verificacion
+                                     .as_ref()
+@@ -1537,7 +1704,30 @@
+                                 break;
+                             }
+                         }
++                        // `ORDEN-W06d5` decisión 3: un rechazo **legítimo** (RD-9/RD-5/carrera de
++                        // padres, ver `crate::rechazo`) se registra y se descarta; el nodo sigue en
++                        // régimen, igual que ya hace con una candidata descartada por
++                        // `SlotNoProgreso`. Solo una violación de invariante interna sigue siendo
++                        // fatal (decisión 4 de `ORDEN-W06d1`, sin cambios).
+                         Err(e) => {
++                            if let ErrorNodo::BloquePropioRechazado {
++                                hash,
++                                motivo,
++                                clasificacion,
++                            } = &e
++                                && clasificacion.es_legitimo()
++                            {
++                                let evento = self
++                                    .registro
++                                    .evento("bloque_propio_rechazado_legitimo")
++                                    .str("hash", &hash.to_string())
++                                    .str("motivo", motivo);
++                                self.registro.escribir(evento, false)?;
++                                if tx_a_productor.send(MsgBucle::Continuar).is_err() {
++                                    break;
++                                }
++                                continue;
++                            }
+                             let _ = tx_a_productor.send(MsgBucle::Parar);
+                             return Err(e);
+                         }
+--- ws.orig/crates/zx-node/src/regimen.rs	2026-09-26 19:04:09.186442646 +0200
++++ ws/crates/zx-node/src/regimen.rs	2026-09-26 22:40:01.004297385 +0200
+@@ -31,10 +31,11 @@
+     reason = "hilo sin entrada ajena (sin red); un panic aquí es una incoherencia interna, y fase_regimen lo convierte en ErrorNodo fatal vía JoinHandle::join, nunca en un Ok silencioso"
+ )]
+ 
++use std::collections::BTreeSet;
+ use std::sync::mpsc::{Receiver, Sender};
+ 
+-use zx_core::PadresDag;
+ use zx_core::wire_dag::BloqueDag;
++use zx_core::{ClavePublica, PadresDag};
+ use zx_farmer::farmer::ParcelaDisco;
+ use zx_farmer::productor_poas::convertir_candidatos_locales;
+ use zx_poas::HistoriaGenesis;
+@@ -104,7 +105,16 @@
+     /// cuando el propio hilo produce un bloque (`registrar_validado`, más abajo). Sin esta
+     /// información, `producir_en_regimen` fallaba con «el padre seleccionado no está registrado en
+     /// el `ServicioPot`» en cuanto GHOSTDAG elegía un padre de otro nodo.
+-    Padres(PadresDag, Vec<(zx_core::BlockHash, u64)>),
++    ///
++    /// `ORDEN-W06d5` decisión 1: además, las claves (entre las que gestiona el hilo) con garantía
++    /// activa `>= q` en `Estado(padre_seleccionado)` — RD-9. El bucle las calcula porque solo él
++    /// tiene `Cadena`/`params.q`; el hilo nunca intenta `producir_en_regimen` para una clave que no
++    /// esté en este conjunto (causa de `ErrGarantia` fatal en V5 de `REVISION-W06d4.md`).
++    Padres(
++        PadresDag,
++        Vec<(zx_core::BlockHash, u64)>,
++        BTreeSet<ClavePublica>,
++    ),
+     /// El bloque enviado se admitió: sigue produciendo.
+     Continuar,
+     /// Condición de parada alcanzada (`--parada-tras-slots`): el hilo debe terminar.
+@@ -201,11 +211,18 @@
+         if tx.send(MsgProductor::PeticionPadres).is_err() {
+             return; // el bucle cerró el canal: apagado normal del proceso.
+         }
+-        let (padres, info_padres) = match rx.recv() {
+-            Ok(MsgBucle::Padres(p, info)) => (p, info),
++        let (padres, info_padres, con_garantia) = match rx.recv() {
++            Ok(MsgBucle::Padres(p, info, g)) => (p, info, g),
+             Ok(_otro) => panic!("hilo productor: se esperaba Padres, llegó otro mensaje del bucle"),
+             Err(_) => return, // el bucle cerró el canal: apagado normal del proceso.
+         };
++        // `ORDEN-W06d5` decisión 2 (`REVISION-W06d4.md`, V5-2): el padre seleccionado que incumple
++        // `slot(padre) < slot_objetivo` ya lo descarta con gracia `producir_en_regimen` más abajo
++        // (`ErrorRegimen::SlotNoProgreso`), pero ese cheque **no** cubre los padres extra del
++        // mergeset GHOSTDAG (`C-HDR-05`/`C-FLU-02`: la regla alcanza a **todos** los padres). Se
++        // excluyen aquí, antes de construir ningún bloque, en vez de descubrirlo en la verificación
++        // completa (donde, al ser un bloque propio, era fatal).
++        let padres = filtrar_padres_extra_por_slot(padres, &info_padres, slot);
+         // Registra en el `ServicioPot` propio cualquier padre que este hilo no haya producido él
+         // mismo (ver el docstring de `MsgBucle::Padres`). `BloqueDuplicado` es el caso normal (un
+         // padre que sí produjo este mismo hilo, o que ya se registró en una vuelta anterior porque
+@@ -236,6 +253,21 @@
+             let Some(cp) = claves.get(i) else {
+                 panic!("hilo productor: índice de clave {i} fuera de rango")
+             };
++            // `ORDEN-W06d5` decisión 1 (`REVISION-W06d4.md`, V5-1): «producir solo con garantía».
++            // No se **intenta** `producir_en_regimen` para una clave sin garantía activa `>= q` en
++            // el estado de la punta elegida: intentarlo de todos modos solo para que el motor lo
++            // rechace con `ErrGarantia` (fatal, decisión 4 de `ORDEN-W06d1`) es exactamente el
++            // hallazgo V5-1 (un nodo que sincroniza tarde, con una clave nueva que nunca depositó).
++            if !con_garantia.contains(&cp.clave.pk) {
++                tracing::info!(
++                    indice = i,
++                    clave = ?cp.clave.pk,
++                    slot,
++                    "candidata descartada: la clave no tiene garantía activa >= q en el estado \
++                     de la punta elegida (RD-9); no se intenta producir"
++                );
++                continue;
++            }
+             let mut parametros_bloque = parametros;
+             parametros_bloque.timestamp = std::time::SystemTime::now()
+                 .duration_since(std::time::UNIX_EPOCH)
+@@ -294,6 +326,50 @@
+     }
+ }
+ 
++/// `ORDEN-W06d5` decisión 2: reconstruye `padres` excluyendo cualquier padre **extra** cuyo `slot`
++/// no sea anterior a `slot_objetivo` (`C-HDR-05`/`C-FLU-02`: la cota alcanza a todos los padres, no
++/// solo al seleccionado). El padre seleccionado no se toca aquí — si él mismo incumple la cota, lo
++/// descarta con gracia `producir_en_regimen` (`ErrorRegimen::SlotNoProgreso`), más abajo.
++///
++/// `info_padres` **MUST** traer el slot de cada padre (seleccionado y extras): lo construye el
++/// bucle a partir de `Cadena::bloque`, que siempre lo conoce para un padre de régimen ya admitido
++/// (docstring de [`MsgBucle::Padres`]). Su ausencia es una incoherencia interna, no un caso de red.
++fn filtrar_padres_extra_por_slot(
++    padres: PadresDag,
++    info_padres: &[(zx_core::BlockHash, u64)],
++    slot_objetivo: u64,
++) -> PadresDag {
++    let seleccionado = padres.seleccionado();
++    let extras_validos: Vec<zx_core::BlockHash> = padres
++        .extras()
++        .iter()
++        .copied()
++        .filter(|h| {
++            let &(_, slot_padre) =
++                info_padres
++                    .iter()
++                    .find(|(hp, _)| hp == h)
++                    .unwrap_or_else(|| {
++                        panic!("hilo productor: padre extra {h} sin información de slot del bucle")
++                    });
++            if slot_padre >= slot_objetivo {
++                tracing::info!(
++                    padre = ?h,
++                    slot_padre,
++                    slot_objetivo,
++                    "padre extra descartado: su slot no es anterior al del bloque objetivo"
++                );
++                false
++            } else {
++                true
++            }
++        })
++        .collect();
++    PadresDag::nuevo(seleccionado, &extras_validos).unwrap_or_else(|e| {
++        panic!("hilo productor: reconstruir PadresDag tras filtrar padres extra: {e}")
++    })
++}
++
+ /// Fuente de soluciones que siempre devuelve la misma candidata ya auditada (evita volver a auditar
+ /// la parcela al construir el bloque: la auditoría ya se hizo una vez por slot, arriba).
+ struct SolucionFija(SolucionCandidata);
+--- ws.orig/crates/zx-node/src/rechazo.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/rechazo.rs	1970-01-01 01:00:00.000000000 +0100
+@@ -0,0 +1,234 @@
++//! Clasificación de un rechazo de bloque **propio** (`ORDEN-W06d5` decisión 3).
++//!
++//! Sustituye la regla general de `ORDEN-W06d1` («bloque propio rechazado ⇒ fallo fatal») por una
++//! distinción explícita:
++//!
++//! - **Legítimo**: el motivo depende de un estado externo/concurrente que pudo cambiar entre el
++//!   momento en que el nodo eligió (padres, slot, clave) y el momento en que verificó el bloque ya
++//!   construido, y el candidato **ya construido** es permanentemente inválido tal cual (su padre,
++//!   su slot o su clave no van a cambiar). Se registra con su motivo, se descarta el bloque y **el
++//!   nodo sigue**; para un bloque de red, sigue penalizando al remitente (es un defecto verificable
++//!   del candidato, `MotivoCabeceraInvalida`/`MotivoBloque`, no una carrera de contexto local).
++//! - **Pendiente**: falta de contexto **local** (típicamente `Pot(PasadoIncompleto)`, un nodo que
++//!   sincroniza fuera de orden y cuyo `ServicioPot` de verificación todavía no completó el pasado
++//!   PoT de algún ancestro): nunca es prueba de invalidez (contrato propio de
++//!   [`MotivoCabeceraPendiente`]). Aviso del director, `ORDEN-W06d5`, tras el hallazgo de V5: para
++//!   un bloque **propio**, se descarta igual que `Legitimo` (no hay reintento posible: el nodo no
++//!   va a producir el mismo bloque otra vez); para un bloque de **red**, **nunca** penaliza ni se
++//!   cachea como inválido (`Ignorar`, no `Rechazar`) y se reintenta cuando el propio pasado avance
++//!   (`Nodo::reintentar_post_pendientes`) — es exactamente el riesgo de RI-2a (un hueco local
++//!   guardado para siempre como si fuera un defecto del candidato).
++//! - **Interno**: una violación de invariante interna — un estado que el propio código garantiza
++//!   imposible (forma, firma, cuenta o estructura que el nodo construyó por completo desde su
++//!   propio estado). Sigue siendo **fatal** para un bloque propio (decisión 4 de `ORDEN-W06d1`, sin
++//!   cambios); para un bloque de red, penaliza igual que `Legitimo`.
++//!
++//! # Motivos legítimos y su justificación (`REVISION-W06d4.md`)
++//!
++//! - [`MotivoBloque::ErrGarantia`] — la garantía activa de un productor puede variar entre el
++//!   momento en que el hilo productor comprobó `Estado(padre_seleccionado)` (decisión 1 de esta
++//!   orden) y el momento en que el motor la vuelve a comprobar sobre `Estado(past(B))` completo
++//!   (RD-9): un incidente/confiscación (SL-4a, ahora integrada) admitido en una rama concurrente
++//!   entre medias puede bajarla. Evidenciado en V5-1.
++//! - [`MotivoBloque::ErrMergeDepth`] — cota RD-5 (`F_slots`): dispara con concurrencia/tiempo real
++//!   suficiente entre la elección de padres y la admisión, no por un bug. Evidenciado en V6(b).
++//! - [`MotivoBloque::ErrMergeset`] — cota R-FIN-12 análoga a `ErrMergeDepth` (demasiados bloques se
++//!   fusionaron mientras tanto): misma familia, mismo razonamiento, sin bug.
++//! - [`MotivoBloque::ErrU2`] — el billete pudo consumirse de verdad en una rama concurrente entre
++//!   la elección y la verificación: la protección U2 funcionando correctamente, no un defecto.
++//! - [`MotivoBloque::ErrTransicion`]` (`[`ErrorTransicion::ErrPowTrasCorte`]`)` — el corte (Φ) lo
++//!   pudo fijar un bloque de red admitido justo entre que este nodo empezó a minar y a admitir su
++//!   propio bloque PoW; es exactamente la misma familia de carrera que las anteriores.
++//! - [`MotivoCabeceraInvalida::Padres`]` con `[`ErrorDag::SlotDePadrePosterior`]`,
++//!   `[`ErrorDag::PadresNoAnticadena`]` o `[`ErrorDag::PadreSeleccionadoIncorrecto`]` — el GHOSTDAG
++//!   cambió (un padre extra o el propio DAG avanzó) entre que el hilo productor pidió los padres y
++//!   el bucle verificó el bloque ya construido. `SlotDePadrePosterior` evidenciado en V5-2; los
++//!   otros dos comparten idéntico mecanismo (mismo paso de verificación, mismo tipo de carrera).
++//! - [`MotivoCabeceraInvalida::Pot`]` con `[`MotivoPotInvalido::SlotDePadrePosterior`]` — la misma
++//!   carrera, vista desde la comprobación de rango PoT en vez de la de padres del DAG.
++//! - **Toda** variante de [`MotivoCabeceraPendiente`] — por contrato propio del tipo (docstring de
++//!   `zx_post::cabecera_conjunta`): "ninguno de estos casos es una prueba de invalidez: no deben
++//!   cachearse como rechazo permanente". Es una declaración categórica del propio autor del tipo,
++//!   no una inferencia de este módulo.
++//!
++//! Todo lo demás (forma, sello Ed25519, cuenta de la coinbase, estructura de la transición, PoAS,
++//! PoT que no ancla, etc.) es **interno**: el propio nodo construyó ese bloque desde su propio
++//! estado sin ninguna dependencia de qué hace otro proceso mientras tanto, así que un rechazo ahí
++//! delata un defecto real de construcción, no una carrera — el criterio y el valor por defecto son
++//! deliberadamente conservadores (a favor de fatal, no de silenciar un bug).
++
++use zx_cadena::MotivoBloque;
++use zx_consensus::transicion::ErrorTransicion;
++use zx_dag::ErrorDag;
++use zx_post::cabecera_conjunta::{MotivoCabeceraInvalida, MotivoCabeceraPendiente};
++use zx_post::pot_rango::MotivoPotInvalido;
++
++/// Si un rechazo de bloque propio debe tirar el proceso (`Interno`) o solo registrarse y descartar
++/// el bloque, dejando que el nodo siga (`Legitimo`). Ver el docstring del módulo para el criterio y
++/// la lista completa, con su justificación.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum ClasificacionRechazo {
++    /// Rechazo legítimo del protocolo ante un caso de borde real, con el candidato permanentemente
++    /// inválido tal cual se construyó: se registra y se descarta (propio); penaliza si es de red.
++    Legitimo,
++    /// Falta de contexto **local**, nunca prueba de invalidez (contrato de
++    /// `MotivoCabeceraPendiente`): se descarta sin penalizar si es propio; si es de red, **no**
++    /// penaliza ni se cachea como inválido, y se reintenta más tarde.
++    Pendiente,
++    /// Violación de invariante interna: fatal si es propio (decisión 4 de `ORDEN-W06d1`, sin
++    /// cambios); penaliza igual que `Legitimo` si es de red.
++    Interno,
++}
++
++impl ClasificacionRechazo {
++    /// ¿Es un rechazo no fatal para un bloque **propio** (`Legitimo` o `Pendiente`)?
++    #[must_use]
++    pub const fn es_legitimo(self) -> bool {
++        matches!(self, Self::Legitimo | Self::Pendiente)
++    }
++
++    /// ¿Es falta de contexto local, sin penalización ni caché de invalidez para un bloque de
++    /// **red** (`Ignorar`, no `Rechazar`)?
++    #[must_use]
++    pub const fn es_pendiente(self) -> bool {
++        matches!(self, Self::Pendiente)
++    }
++}
++
++/// Clasifica un [`MotivoCabeceraInvalida`] (fallo **del candidato**, `verificar_cabecera_conjunta`).
++#[must_use]
++pub fn clasificar_cabecera_invalida(m: &MotivoCabeceraInvalida) -> ClasificacionRechazo {
++    use ClasificacionRechazo::{Interno, Legitimo};
++    match m {
++        MotivoCabeceraInvalida::Padres(
++            ErrorDag::SlotDePadrePosterior { .. }
++            | ErrorDag::PadresNoAnticadena { .. }
++            | ErrorDag::PadreSeleccionadoIncorrecto { .. },
++        ) => Legitimo,
++        MotivoCabeceraInvalida::Pot(MotivoPotInvalido::SlotDePadrePosterior { .. }) => Legitimo,
++        _ => Interno,
++    }
++}
++
++/// Toda [`MotivoCabeceraPendiente`] es `Pendiente` (nunca prueba de invalidez) por contrato del
++/// propio tipo: ver el docstring del módulo.
++#[must_use]
++pub const fn clasificar_cabecera_pendiente(_m: &MotivoCabeceraPendiente) -> ClasificacionRechazo {
++    ClasificacionRechazo::Pendiente
++}
++
++/// Clasifica un [`MotivoBloque`] (`Cadena::admitir`).
++#[must_use]
++pub fn clasificar_motivo_bloque(m: &MotivoBloque) -> ClasificacionRechazo {
++    use ClasificacionRechazo::{Interno, Legitimo};
++    match m {
++        MotivoBloque::ErrGarantia
++        | MotivoBloque::ErrMergeDepth
++        | MotivoBloque::ErrMergeset
++        | MotivoBloque::ErrU2 => Legitimo,
++        MotivoBloque::ErrTransicion(ErrorTransicion::ErrPowTrasCorte) => Legitimo,
++        _ => Interno,
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use zx_cadena::MotivoBloque;
++    use zx_consensus::transicion::ErrorTransicion;
++    use zx_core::BlockHash;
++    use zx_dag::ErrorDag;
++    use zx_post::cabecera_conjunta::{MotivoCabeceraInvalida, MotivoCabeceraPendiente};
++    use zx_post::pot_rango::{MotivoPotInvalido, MotivoPotPendiente};
++
++    use super::{
++        ClasificacionRechazo, clasificar_cabecera_invalida, clasificar_cabecera_pendiente,
++        clasificar_motivo_bloque,
++    };
++
++    fn hash_prueba() -> BlockHash {
++        BlockHash::from_digest(zx_core::digest::Digest::from_bytes([0x7A; 32]))
++    }
++
++    /// `ORDEN-W06d5` decisión 3: los tres motivos evidenciados en V5/V6(b) de
++    /// `REVISION-W06d4.md` deben clasificarse como legítimos (no fatales).
++    #[test]
++    fn motivos_evidenciados_en_w06d4_son_legitimos() {
++        assert!(clasificar_motivo_bloque(&MotivoBloque::ErrGarantia).es_legitimo());
++        assert!(clasificar_motivo_bloque(&MotivoBloque::ErrMergeDepth).es_legitimo());
++        let motivo_padres = MotivoCabeceraInvalida::Padres(ErrorDag::SlotDePadrePosterior {
++            padre: hash_prueba(),
++            slot_padre: 10,
++            slot_b: 9,
++        });
++        assert!(clasificar_cabecera_invalida(&motivo_padres).es_legitimo());
++    }
++
++    /// El resto de la familia de carrera (misma justificación, no evidenciados directamente pero
++    /// idéntico mecanismo): también legítimos.
++    #[test]
++    fn resto_de_la_familia_de_carrera_es_legitima() {
++        assert!(clasificar_motivo_bloque(&MotivoBloque::ErrMergeset).es_legitimo());
++        assert!(clasificar_motivo_bloque(&MotivoBloque::ErrU2).es_legitimo());
++        assert!(
++            clasificar_motivo_bloque(&MotivoBloque::ErrTransicion(
++                ErrorTransicion::ErrPowTrasCorte
++            ))
++            .es_legitimo()
++        );
++        let padres_no_anticadena = MotivoCabeceraInvalida::Padres(ErrorDag::PadresNoAnticadena {
++            antepasado: hash_prueba(),
++            descendiente: hash_prueba(),
++        });
++        assert!(clasificar_cabecera_invalida(&padres_no_anticadena).es_legitimo());
++        let pot_slot_posterior =
++            MotivoCabeceraInvalida::Pot(MotivoPotInvalido::SlotDePadrePosterior {
++                padre: hash_prueba(),
++                slot_padre: 10,
++                slot_bloque: 9,
++            });
++        assert!(clasificar_cabecera_invalida(&pot_slot_posterior).es_legitimo());
++    }
++
++    /// Toda `MotivoCabeceraPendiente` es legítima (no fatal si es propia) y, específicamente,
++    /// `Pendiente` (nunca penaliza ni se cachea como inválida si es de red) — aviso del director
++    /// tras el hallazgo de V5 (`Pot(PasadoIncompleto)` no es un bloque inválido, es un hueco local).
++    #[test]
++    fn toda_cabecera_pendiente_es_legitima_y_pendiente() {
++        let pasado_incompleto = MotivoCabeceraPendiente::Pot(MotivoPotPendiente::PasadoIncompleto);
++        assert!(clasificar_cabecera_pendiente(&pasado_incompleto).es_legitimo());
++        assert!(clasificar_cabecera_pendiente(&pasado_incompleto).es_pendiente());
++        let contexto_ausente = MotivoCabeceraPendiente::ContextoPiezaAusente;
++        assert!(clasificar_cabecera_pendiente(&contexto_ausente).es_legitimo());
++        assert!(clasificar_cabecera_pendiente(&contexto_ausente).es_pendiente());
++    }
++
++    /// `Legitimo` (defecto verificable del candidato, no falta de contexto) no es `Pendiente`: la
++    /// distinción importa para un bloque de red (`Ignorar` sin penalizar frente a `Rechazar` con
++    /// penalización) aunque las dos sean no fatales para uno propio.
++    #[test]
++    fn legitimo_no_es_pendiente() {
++        assert!(!ClasificacionRechazo::Legitimo.es_pendiente());
++        assert!(ClasificacionRechazo::Legitimo.es_legitimo());
++        assert!(!ClasificacionRechazo::Interno.es_pendiente());
++        assert!(!ClasificacionRechazo::Interno.es_legitimo());
++    }
++
++    /// Un defecto de forma/firma/cuenta que el propio nodo construyó por completo sigue siendo
++    /// interno (fatal): el valor por defecto es conservador.
++    #[test]
++    fn defectos_de_construccion_propia_siguen_siendo_internos() {
++        assert!(!clasificar_motivo_bloque(&MotivoBloque::ErrSinPadre).es_legitimo());
++        assert!(!clasificar_motivo_bloque(&MotivoBloque::ErrEmision).es_legitimo());
++        assert!(!clasificar_motivo_bloque(&MotivoBloque::ErrSaldo).es_legitimo());
++        assert!(
++            !clasificar_motivo_bloque(&MotivoBloque::ErrTransicion(
++                ErrorTransicion::ErrDesbordamiento
++            ))
++            .es_legitimo()
++        );
++        let sello_malo = MotivoCabeceraInvalida::Sello(zx_core::EncodingError::PadreDuplicado);
++        assert!(!clasificar_cabecera_invalida(&sello_malo).es_legitimo());
++        let sin_padres_transicion = MotivoCabeceraInvalida::Padres(ErrorDag::CabeceraPostSinPadres);
++        assert!(!clasificar_cabecera_invalida(&sin_padres_transicion).es_legitimo());
++    }
++}

@@ -129,7 +129,19 @@ pub struct Nodo {
     red: Option<ManijaRed>,
     /// Cola de trabajo que el manejador de red encola y este hilo drena (decisión 1).
     trabajo_red: Option<tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>>,
+    /// Bloques PoST **de red** descartados como [`crate::rechazo::ClasificacionRechazo::Pendiente`]
+    /// (aviso del director, `ORDEN-W06d5`, tras el hallazgo de V5): no son inválidos, solo faltó
+    /// contexto local (`Pot(PasadoIncompleto)` mientras este nodo sincroniza fuera de orden). Nunca
+    /// se cachean como inválidos ni penalizan al remitente; se reintentan en
+    /// [`Self::reintentar_post_pendientes`] cada vez que el propio pasado avanza. Acotada
+    /// (`TOPE_POST_PENDIENTES`): el más viejo se descarta sin más si se supera el tope — el riesgo
+    /// que se evita es RI-2a (un hueco local guardado para siempre como si fuera un defecto del
+    /// candidato), no un cachá sin límite.
+    post_pendientes: std::collections::VecDeque<BloqueDag>,
 }
+
+/// Tope de [`Nodo::post_pendientes`]: acotar la cola, no la corrección (D-oS local, no de consenso).
+const TOPE_POST_PENDIENTES: usize = 64;
 
 fn ruta_parcela(dir_datos: &Path, indice: u32) -> PathBuf {
     dir_datos.join(format!("parcela-{indice}.plot"))
@@ -242,6 +254,7 @@ impl Nodo {
             huerfanos: red::nuevo_deposito_huerfanos(),
             red: None,
             trabajo_red: None,
+            post_pendientes: std::collections::VecDeque::new(),
         };
 
         let longitud = nodo.almacen.longitud_registro()?;
@@ -274,6 +287,9 @@ impl Nodo {
             .map_err(|m| ErrorNodo::BloquePropioRechazado {
                 hash: cabecera_genesis.block_hash(),
                 motivo: m.nombre().to_string(),
+                // Interno: el génesis dev es una constante fija (W04); un rechazo aquí es siempre
+                // un bug de construcción, nunca una carrera (no hay nada concurrente todavía).
+                clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
             })?;
         let admitido = BloqueAdmitido::pow(&cabecera_genesis, &[tx_genesis], &testigos_genesis);
         self.almacen.admitir(&admitido, true)?;
@@ -402,6 +418,9 @@ impl Nodo {
                     .ok_or_else(|| ErrorNodo::BloquePropioRechazado {
                         hash,
                         motivo: format!("padre {} desconocido (sin cabecera)", cabecera.prev_hash),
+                        // Interno: el padre de un bloque que este mismo nodo acaba de minar sobre
+                        // su propio `historial_pow` no puede ser desconocido salvo un bug real.
+                        clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
                     })?;
             let target_esperado = pow::target_de_altura(&historial_padre, cabecera.height)
                 .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
@@ -424,6 +443,10 @@ impl Nodo {
                 ErrorNodo::BloquePropioRechazado {
                     hash,
                     motivo: format!("validar_cabecera_pow: {e}"),
+                    // Interno: el propio minero acaba de encontrar este PoW contra el contexto que
+                    // el nodo mismo calculó; una discrepancia aquí es un bug de construcción, no
+                    // una carrera con otro proceso.
+                    clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
                 }
             })?;
         }
@@ -478,6 +501,7 @@ impl Nodo {
                 ErrorNodo::BloquePropioRechazado {
                     hash,
                     motivo: m.nombre().to_string(),
+                    clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
                 }
             })?;
             self.vista_red.registrar_pow(cabecera.height, para_vista);
@@ -656,12 +680,14 @@ impl Nodo {
                     return Err(ErrorNodo::BloquePropioRechazado {
                         hash,
                         motivo: format!("{m:?}"),
+                        clasificacion: crate::rechazo::clasificar_cabecera_invalida(&m),
                     });
                 }
                 EstadoCabeceraConjunta::Pendiente(m) => {
                     return Err(ErrorNodo::BloquePropioRechazado {
                         hash,
                         motivo: format!("pendiente: {m:?}"),
+                        clasificacion: crate::rechazo::clasificar_cabecera_pendiente(&m),
                     });
                 }
             }
@@ -727,6 +753,7 @@ impl Nodo {
                 ErrorNodo::BloquePropioRechazado {
                     hash,
                     motivo: m.nombre().to_string(),
+                    clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
                 }
             })?;
             let para_vista = BloqueRed::Post {
@@ -1175,6 +1202,17 @@ impl Nodo {
             }
         };
         let indice = self.almacen.longitud_registro().unwrap_or(0);
+        // Aviso del director (`ORDEN-W06d5`, tras el hallazgo de V5): la simplificación que
+        // trataba `Invalida` y `Pendiente` como el mismo `Rechazar` (declarada en `W06d4`) es un
+        // bug real, no solo una simplificación — el mismo riesgo que RI-2a. `Pot(PasadoIncompleto)`
+        // es un hueco **local** del `ServicioPot` de verificación (un nodo que sincroniza fuera de
+        // orden), no un defecto demostrado del candidato: cachearlo como inválido lo perdería para
+        // siempre, y `Rechazar` penaliza (incluso desconecta, `TrabajoRed::BloqueDeSincronizacion`
+        // más abajo) a un par honesto por nuestro propio retraso. Ahora se usa la clasificación
+        // tipada (`crate::rechazo`, decisión 3): `Pendiente` ⇒ `Ignorar` + se reencola para
+        // reintentar cuando el pasado avance (`Self::reintentar_post_pendientes`); el resto, igual
+        // que antes.
+        let bloque_para_reintento = bloque_dag.clone();
         match self.admitir_post_interno(bloque_dag, indice, true) {
             Ok(()) => {
                 // V9: este evento **solo** se escribe después de que `admitir_post_interno` terminó
@@ -1187,13 +1225,26 @@ impl Nodo {
                     .str("familia", "post")
                     .str("veredicto", "Aceptar");
                 let _ = self.registro.escribir(evento, false);
+                self.reintentar_post_pendientes();
                 VeredictoFinal::Aceptar
             }
+            Err(ErrorNodo::BloquePropioRechazado {
+                motivo,
+                clasificacion,
+                ..
+            }) if clasificacion.es_pendiente() => {
+                let evento = self
+                    .registro
+                    .evento("bloque_red_pendiente")
+                    .str("hash", &hash.to_string())
+                    .str("familia", "post")
+                    .str("motivo", &motivo)
+                    .str("veredicto", "Ignorar (reintento encolado)");
+                let _ = self.registro.escribir(evento, false);
+                self.encolar_post_pendiente(bloque_para_reintento);
+                VeredictoFinal::Ignorar
+            }
             Err(e) => {
-                // Simplificación declarada (`PROGRESO.md`): tanto una cabecera conjunta `Invalida`
-                // como `Pendiente` llegan aquí como el mismo `ErrorNodo::BloquePropioRechazado`; las
-                // dos se tratan como `Rechazar`. Distinguirlas exigiría un tipo de error más rico en
-                // `admitir_post_interno`, fuera del alcance de esta orden.
                 let evento = self
                     .registro
                     .evento("bloque_red_rechazado")
@@ -1202,6 +1253,58 @@ impl Nodo {
                     .str("motivo", &e.to_string());
                 let _ = self.registro.escribir(evento, false);
                 VeredictoFinal::Rechazar
+            }
+        }
+    }
+
+    /// Encola un bloque PoST de red que quedó `Pendiente` (decisión 3 extendida): acotado, el más
+    /// viejo se descarta si se supera [`TOPE_POST_PENDIENTES`] — es una cola de mejor esfuerzo, no
+    /// una promesa de reintento infinito.
+    fn encolar_post_pendiente(&mut self, bloque: BloqueDag) {
+        if self.post_pendientes.len() >= TOPE_POST_PENDIENTES {
+            self.post_pendientes.pop_front();
+        }
+        self.post_pendientes.push_back(bloque);
+    }
+
+    /// Reintenta los bloques PoST pendientes (decisión 3 extendida, aviso del director tras V5): el
+    /// `ServicioPot` de verificación pudo completar el hueco que los frenaba desde la última
+    /// admisión. Sin bloqueo del resto del bucle: como mucho una pasada por bloque en cola, cada
+    /// vez que se llama. Los que sigan `Pendiente` vuelven a la cola; los que ahora sean
+    /// demostrablemente inválidos (o una violación interna) se descartan **sin** penalizar — el
+    /// remitente original ya no está atado a este intento.
+    fn reintentar_post_pendientes(&mut self) {
+        if self.post_pendientes.is_empty() {
+            return;
+        }
+        let pendientes: Vec<BloqueDag> = self.post_pendientes.drain(..).collect();
+        for bloque in pendientes {
+            let hash = bloque.cabecera.block_hash();
+            let indice = self.almacen.longitud_registro().unwrap_or(0);
+            match self.admitir_post_interno(bloque.clone(), indice, true) {
+                Ok(()) => {
+                    let evento = self
+                        .registro
+                        .evento("bloque_red_admitido")
+                        .str("hash", &hash.to_string())
+                        .str("familia", "post")
+                        .str("veredicto", "Aceptar (reintento)");
+                    let _ = self.registro.escribir(evento, false);
+                }
+                Err(ErrorNodo::BloquePropioRechazado { clasificacion, .. })
+                    if clasificacion.es_pendiente() =>
+                {
+                    self.encolar_post_pendiente(bloque);
+                }
+                Err(e) => {
+                    let evento = self
+                        .registro
+                        .evento("bloque_red_rechazado")
+                        .str("hash", &hash.to_string())
+                        .str("familia", "post")
+                        .str("motivo", &format!("reintento: {e}"));
+                    let _ = self.registro.escribir(evento, false);
+                }
             }
         }
     }
@@ -1287,7 +1390,7 @@ impl Nodo {
     /// lo permita (decisión 5). Devuelve cuando `Cadena` fija el terminal.
     ///
     /// # Errores
-    /// [`ErrorNodo::BloquePropioRechazado`] si el motor rechaza un bloque propio (decisión 4, fatal).
+    /// [`ErrorNodo::BloquePropioRechazado`] con `clasificacion` interna (`ORDEN-W06d5` decisión 3, `crate::rechazo`); un rechazo legítimo se descarta y no llega a devolverse.
     fn fase_pow(&mut self) -> ResultadoNodo<()> {
         if self.cadena.terminal().is_some() {
             return Ok(());
@@ -1388,13 +1491,28 @@ impl Nodo {
                 .str("hash", &cabecera_minada.block_hash().to_string());
             self.registro.escribir(evento, false)?;
 
-            self.admitir_pow_interno(
-                cabecera_minada,
-                txs,
-                testigos,
-                self.almacen.longitud_registro()?,
-                true,
-            )?;
+            // `ORDEN-W06d5` decisión 3: mismo criterio que `fase_regimen` — un rechazo legítimo
+            // (p. ej. `ErrPowTrasCorte`, el corte lo fijó un bloque de red justo entre que este
+            // nodo empezó a minar y a admitir; ver `crate::rechazo`) se registra y se descarta;
+            // solo una violación de invariante interna sigue siendo fatal.
+            let indice_registro = self.almacen.longitud_registro()?;
+            match self.admitir_pow_interno(cabecera_minada, txs, testigos, indice_registro, true) {
+                Ok(()) => {}
+                Err(ErrorNodo::BloquePropioRechazado {
+                    hash,
+                    motivo,
+                    clasificacion,
+                }) if clasificacion.es_legitimo() => {
+                    let evento = self
+                        .registro
+                        .evento("bloque_propio_rechazado_legitimo")
+                        .str("hash", &hash.to_string())
+                        .str("motivo", &motivo);
+                    self.registro.escribir(evento, false)?;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
             self.difundir_si_hay_red(cabecera_minada.block_hash());
 
             if self.cadena.terminal().is_some() {
@@ -1409,7 +1527,7 @@ impl Nodo {
     /// productor, y atiende sus peticiones hasta que se agote (`--parada-tras-slots`) o falle.
     ///
     /// # Errores
-    /// [`ErrorNodo::BloquePropioRechazado`] si el motor rechaza un bloque propio (decisión 4, fatal).
+    /// [`ErrorNodo::BloquePropioRechazado`] con `clasificacion` interna (`ORDEN-W06d5` decisión 3, `crate::rechazo`); un rechazo legítimo se descarta y no llega a devolverse.
     fn fase_regimen(&mut self) -> ResultadoNodo<()> {
         let terminal = self
             .cadena
@@ -1427,8 +1545,36 @@ impl Nodo {
         }
 
         // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
+        //
+        // `ORDEN-W06d5` decisión 1, extensión encontrada **en vivo** al repetir V5 con esta misma
+        // orden ya aplicada (evidencia en `PROGRESO.md`): un nodo que llega tarde también puede
+        // llegar aquí con `tips_validas()` vacío (los bloques PoST que le llegaron por red antes de
+        // fijar su propio terminal se ignoran como `bloque_post_de_red_sin_terminal`, sin
+        // reintentarse) y con la clave que firma la transición (`self.claves[0]`, decisión 6 de
+        // `producir_bloque_transicion`) **sin garantía propia** (nunca minó ni depositó: exactamente
+        // el perfil de una clave nueva de V5). Producir de todos modos repite el mismo `ErrGarantia`
+        // fatal que la decisión 1 ya evita en régimen — el hilo productor nunca llega a arrancar
+        // porque el proceso muere antes, en esta única producción previa al bucle de mensajes. Igual
+        // que en régimen: no se intenta sin garantía; en vez de eso, se espera (procesando red) a
+        // que **otro** nodo produzca y sincronice la transición, lo que llena `tips_validas()` por
+        // la vía normal de `intentar_admitir_post_de_red`.
         if self.cadena.tips_validas().is_empty() {
-            self.producir_bloque_transicion(terminal)?;
+            let hay_garantia_propia = self
+                .claves
+                .first()
+                .is_some_and(|c| self.cadena.estado_terminal().activo_de(&c.pk) >= self.params.q);
+            if hay_garantia_propia {
+                self.producir_bloque_transicion(terminal)?;
+            } else {
+                tracing::info!(
+                    "sin garantía propia en el terminal: no se intenta producir el bloque de \
+                     transición; se espera a sincronizarlo de otro nodo"
+                );
+                while self.cadena.tips_validas().is_empty() {
+                    self.procesar_trabajo_red_pendiente();
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            }
         }
 
         let mut claves_con_parcela = Vec::new();
@@ -1499,8 +1645,25 @@ impl Nodo {
                             info_padres.push((h, p.slot));
                         }
                     }
+                    // `ORDEN-W06d5` decisión 1 (RD-9): claves (de entre las que gestiona este
+                    // nodo) con garantía activa `>= q` en `Estado(padre_seleccionado)`. Solo el
+                    // bucle tiene `Cadena`/`self.params.q`; se calcula aquí, una vez por slot (los
+                    // hermanos del mismo slot comparten padres), y se manda al hilo productor para
+                    // que nunca intente `producir_en_regimen` con una clave que no lo alcance
+                    // (causa de `ErrGarantia` fatal en V5 de `REVISION-W06d4.md`).
+                    let con_garantia: std::collections::BTreeSet<zx_core::ClavePublica> = self
+                        .cadena
+                        .estado_post(&padres.seleccionado())
+                        .map(|estado| {
+                            self.claves
+                                .iter()
+                                .filter(|c| estado.activo_de(&c.pk) >= self.params.q)
+                                .map(|c| c.pk)
+                                .collect()
+                        })
+                        .unwrap_or_default();
                     if tx_a_productor
-                        .send(MsgBucle::Padres(padres, info_padres))
+                        .send(MsgBucle::Padres(padres, info_padres, con_garantia))
                         .is_err()
                     {
                         break;
@@ -1520,6 +1683,10 @@ impl Nodo {
                                 .str("hash", &hash.to_string());
                             self.registro.escribir(evento, false)?;
                             self.difundir_si_hay_red(hash);
+                            // El pasado del `ServicioPot` de verificación acaba de avanzar: algún
+                            // bloque de red que quedó `Pendiente` (decisión 3 extendida) puede haber
+                            // dejado de estarlo.
+                            self.reintentar_post_pendientes();
                             let continuar = self.parada_tras_slots.is_none_or(|limite| {
                                 self.servicio_verificacion
                                     .as_ref()
@@ -1537,7 +1704,30 @@ impl Nodo {
                                 break;
                             }
                         }
+                        // `ORDEN-W06d5` decisión 3: un rechazo **legítimo** (RD-9/RD-5/carrera de
+                        // padres, ver `crate::rechazo`) se registra y se descarta; el nodo sigue en
+                        // régimen, igual que ya hace con una candidata descartada por
+                        // `SlotNoProgreso`. Solo una violación de invariante interna sigue siendo
+                        // fatal (decisión 4 de `ORDEN-W06d1`, sin cambios).
                         Err(e) => {
+                            if let ErrorNodo::BloquePropioRechazado {
+                                hash,
+                                motivo,
+                                clasificacion,
+                            } = &e
+                                && clasificacion.es_legitimo()
+                            {
+                                let evento = self
+                                    .registro
+                                    .evento("bloque_propio_rechazado_legitimo")
+                                    .str("hash", &hash.to_string())
+                                    .str("motivo", motivo);
+                                self.registro.escribir(evento, false)?;
+                                if tx_a_productor.send(MsgBucle::Continuar).is_err() {
+                                    break;
+                                }
+                                continue;
+                            }
                             let _ = tx_a_productor.send(MsgBucle::Parar);
                             return Err(e);
                         }

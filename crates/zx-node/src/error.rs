@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use zx_core::Red;
 
+use crate::rechazo::ClasificacionRechazo;
+
 /// Fallo del nodo. Cualquier variante termina el proceso con código ≠ 0 (decisión 2 y 4 de la
 /// orden).
 #[derive(Debug, thiserror::Error)]
@@ -36,14 +38,20 @@ pub enum ErrorNodo {
     /// El génesis de W04 no se pudo construir.
     #[error("génesis de W04: {0}")]
     Genesis(#[from] zx_consensus::ErrorPow),
-    /// Un bloque **propio** fue rechazado por la tubería de admisión (decisión 4): es un error del
-    /// nodo, no un evento normal.
+    /// Un bloque **propio** fue rechazado por la tubería de admisión.
+    ///
+    /// `ORDEN-W06d5` decisión 3: ya no es fatal por sí solo. `clasificacion` distingue un rechazo
+    /// **legítimo** del protocolo ante un caso de borde real (se registra y se descarta, el nodo
+    /// sigue) de una **violación de invariante interna** (fatal, decisión 4 de `ORDEN-W06d1`, sin
+    /// cambios). Ver `crate::rechazo` para el criterio completo.
     #[error("bloque propio {hash} rechazado en la admisión: {motivo}")]
     BloquePropioRechazado {
         /// Hash del bloque propio rechazado.
         hash: zx_core::BlockHash,
         /// Motivo exacto.
         motivo: String,
+        /// Legítimo (no fatal) o interno (fatal).
+        clasificacion: ClasificacionRechazo,
     },
     /// El almacén no reprodujo un bloque durante la repetición al reiniciar (D-N03′).
     #[error(

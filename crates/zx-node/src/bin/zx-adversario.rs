@@ -35,6 +35,7 @@
 //! el registro del nodo objetivo, no aquí — esta herramienta no tiene acceso a su estado interno,
 //! solo al protocolo de red, que es exactamente el punto.
 
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use clap::Parser;
@@ -327,7 +328,15 @@ async fn main() {
     };
     println!("zx-adversario: conectado a {peer}");
 
-    let Some(estado_objetivo) = pedir_estado(&manejo, &mut eventos, peer).await else {
+    // `ORDEN-W06d5` decisión 5 (`REVISION-W06d4.md`, V7): la conexión TCP no es la malla de
+    // gossipsub; publicar antes de que el objetivo confirme sus dos suscripciones (bloques
+    // pow/post) falla localmente con `NoPeersSubscribedToTopic`. Se pide el saludo y se esperan las
+    // suscripciones **en el mismo bucle** (`pedir_estado_y_suscripciones`): hacerlo en dos bucles
+    // consecutivos sobre el mismo canal perdía los eventos de suscripción que llegaran mientras se
+    // esperaba el saludo (ver el docstring de la función — encontrado en vivo, no hipotético).
+    let (estado_objetivo, pendientes) =
+        pedir_estado_y_suscripciones(&manejo, &mut eventos, peer, Duration::from_secs(10)).await;
+    let Some(estado_objetivo) = estado_objetivo else {
         eprintln!("zx-adversario: el objetivo no respondió el saludo");
         std::process::exit(1);
     };
@@ -338,14 +347,14 @@ async fn main() {
 
     let pausa = Duration::from_millis(cli.pausa_ms);
 
-    // La conexión TCP no es la malla de gossipsub: publicar antes de que las dos suscripciones
-    // (bloques pow/post) terminen su propio intercambio de control falla localmente con
-    // `NoPeersSubscribedToTopic` (mismo motivo que `dos_nodos.rs::dos_conectados`, en `zx-p2p`,
-    // espera las suscripciones antes de publicar). Una espera fija y corta —no un consumo del
-    // canal de eventos, para no interferir con `pedir_estado`— basta en la práctica: la
-    // suscripción se negocia en el primer RPC tras la conexión, casi siempre antes de que termine
-    // el saludo de arriba.
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    if pendientes.is_empty() {
+        println!("zx-adversario: el objetivo confirmó su suscripción a los dos temas de gossipsub");
+    } else {
+        println!(
+            "zx-adversario: el objetivo no confirmó suscripción a {pendientes:?} en el plazo \
+             esperado; prosigo igualmente (la ráfaga puede perder mensajes por esto)"
+        );
+    }
 
     // Orden deliberado: primero los escenarios que **no** violan consenso (`Ignorar`, la conexión
     // sigue viva) y al final los que sí (`Rechazar` con `MotivoDesconexion::ViolacionDeConsenso`,
@@ -446,28 +455,67 @@ async fn esperar_conexion(eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>) 
     }
 }
 
-async fn pedir_estado(
+/// Pide el saludo **y**, en el mismo bucle de consumo del canal de eventos, acumula las
+/// suscripciones de gossipsub del objetivo que lleguen mientras tanto.
+///
+/// `ORDEN-W06d5` decisión 5, corrección tras el primer intento de V7 con esta misma orden: separar
+/// esto en dos funciones consecutivas —cada una con su propio bucle sobre el **mismo** canal— hacía
+/// que la que corría primero (`pedir_estado`) descartara en silencio (`Ok(Some(_)) => {}`) los
+/// eventos `Suscripcion` que llegaran mientras esperaba el saludo, exactamente los que la segunda
+/// (`esperar_suscripcion`) necesitaba después: con las dos suscripciones anunciándose casi siempre
+/// junto con la respuesta al saludo (ambas llegan justo tras la conexión), la carrera se perdía casi
+/// siempre y el plazo de la segunda función expiraba sin ver nada — reproducido en vivo, no una
+/// hipótesis: el registro del intento anterior mostraba exactamente `"el objetivo no confirmó
+/// suscripción"` seguido de `NoPeersSubscribedToTopic` en la ráfaga.
+async fn pedir_estado_y_suscripciones(
     manejo: &zx_p2p::servicio::ManejoRed,
     eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>,
     peer: PeerId,
-) -> Option<Estado> {
-    manejo.pedir(peer, Peticion::Estado).await.ok()?;
-    let plazo = tokio::time::Instant::now() + Duration::from_secs(10);
+    plazo_suscripcion: Duration,
+) -> (Option<Estado>, BTreeSet<&'static str>) {
+    manejo.pedir(peer, Peticion::Estado).await.ok();
+    let mut pendientes: BTreeSet<&'static str> = [
+        ParametrosRed::dag_dev().topic_bloques_pow(),
+        ParametrosRed::dag_dev().topic_bloques_post(),
+    ]
+    .into_iter()
+    .collect();
+    let mut estado = None;
+    // El plazo total es el mayor de los dos: seguimos escuchando suscripciones después de tener ya
+    // el saludo, hasta `plazo_suscripcion`, pero no más allá de 10s si el saludo mismo no llega.
+    let fin_saludo = tokio::time::Instant::now() + Duration::from_secs(10);
+    let fin_suscripcion = tokio::time::Instant::now() + plazo_suscripcion;
     loop {
-        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
+        if estado.is_some() && pendientes.is_empty() {
+            break;
+        }
+        let limite = if estado.is_some() {
+            fin_suscripcion
+        } else {
+            fin_saludo.min(fin_suscripcion)
+        };
+        let resto = limite.saturating_duration_since(tokio::time::Instant::now());
         if resto.is_zero() {
-            return None;
+            break;
         }
         match tokio::time::timeout(resto, eventos.recv()).await {
             Ok(Some(EventoRed::Respuesta { respuesta, .. })) => {
                 if let Respuesta::Estado(e) = *respuesta {
-                    return Some(e);
+                    estado = Some(e);
                 }
             }
+            Ok(Some(EventoRed::Suscripcion {
+                peer: p,
+                topico,
+                suscrito: true,
+            })) if p == peer => {
+                pendientes.retain(|t| topico != *t);
+            }
             Ok(Some(_)) => {}
-            _ => return None,
+            _ => break,
         }
     }
+    (estado, pendientes)
 }
 
 async fn ejecutar_escenario(

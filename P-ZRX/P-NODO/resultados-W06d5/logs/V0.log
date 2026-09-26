@@ -1,0 +1,461 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling typenum v1.20.1
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling version_check v0.9.5
+   Compiling thiserror v2.0.20
+   Compiling semver v1.0.28
+   Compiling subtle v2.6.1
+   Compiling zerocopy v0.8.56
+   Compiling portable-atomic v1.15.0
+   Compiling generic-array v0.14.7
+   Compiling rustc_version v0.4.1
+   Compiling cpufeatures v0.2.17
+   Compiling critical-section v1.2.0
+   Compiling byteorder v1.5.0
+   Compiling static_assertions v1.1.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling syn v2.0.119
+   Compiling syn v3.0.4
+   Compiling once_cell v1.21.4
+   Compiling hybrid-array v0.4.14
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling equivalent v1.0.2
+   Compiling find-msvc-tools v0.1.12
+   Compiling getrandom v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling shlex v2.0.1
+   Compiling rand_core v0.6.4
+   Compiling signature v2.2.0
+   Compiling block-buffer v0.12.1
+   Compiling jobserver v0.1.35
+   Compiling crypto-common v0.2.2
+   Compiling autocfg v1.5.1
+   Compiling crunchy v0.2.4
+   Compiling cc v1.4.5
+   Compiling pin-project-lite v0.2.17
+   Compiling getrandom v0.3.4
+   Compiling num-traits v0.2.19
+   Compiling foldhash v0.2.0
+   Compiling const-oid v0.10.2
+   Compiling digest v0.11.3
+   Compiling rand_core v0.9.5
+   Compiling memchr v2.8.3
+   Compiling smallvec v1.16.0
+   Compiling allocator-api2 v0.2.21
+   Compiling rustc-hex v2.1.0
+   Compiling keccak v0.2.2
+   Compiling sponge-cursor v0.1.0
+   Compiling bech32 v0.12.0
+   Compiling sha3 v0.12.0
+   Compiling hashbrown v0.16.1
+   Compiling log v0.4.34
+   Compiling futures-core v0.3.34
+   Compiling fnv v1.0.7
+   Compiling slab v0.4.12
+   Compiling futures-io v0.3.34
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling futures-sink v0.3.34
+   Compiling futures-channel v0.3.34
+   Compiling futures-task v0.3.34
+   Compiling crossbeam-utils v0.8.22
+   Compiling tracing-core v0.1.36
+   Compiling bitflags v2.13.1
+   Compiling parking_lot v0.12.5
+   Compiling either v1.18.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling crossbeam-epoch v0.9.20
+   Compiling errno v0.3.14
+   Compiling socket2 v0.6.5
+   Compiling cpufeatures v0.3.1
+   Compiling anyhow v1.0.104
+   Compiling rand_chacha v0.3.1
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.8.8
+   Compiling rand v0.9.5
+   Compiling signal-hook-registry v1.4.8
+   Compiling mio v1.2.3
+   Compiling regex-syntax v0.8.11
+   Compiling arrayref v0.3.9
+   Compiling synstructure v0.13.2
+   Compiling rayon-core v1.13.0
+   Compiling fixed-hash v0.8.0
+   Compiling crossbeam-deque v0.8.7
+   Compiling inout v0.2.2
+   Compiling rustix v1.1.4
+   Compiling arrayvec v0.7.8
+   Compiling cipher v0.5.2
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling futures-macro v0.3.34
+   Compiling tokio-macros v2.7.2
+   Compiling rand_core v0.10.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling zeroize_derive v1.5.0
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling futures-util v0.3.34
+   Compiling tracing-attributes v0.1.31
+   Compiling zeroize v1.9.0
+   Compiling fastrand v2.5.0
+   Compiling blake3 v1.8.7
+   Compiling zerofrom-derive v0.1.7
+   Compiling tracing v0.1.44
+   Compiling displaydoc v0.2.7
+   Compiling siphasher v1.0.3
+   Compiling constant_time_eq v0.4.2
+   Compiling zerofrom v0.1.8
+   Compiling yoke-derive v0.8.2
+   Compiling stable_deref_trait v1.2.1
+   Compiling hashbrown v0.17.1
+   Compiling winnow v1.0.4
+   Compiling tempfile v3.24.0
+   Compiling unicode-xid v0.2.6
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling rustversion v1.0.23
+   Compiling zerovec-derive v0.11.6
+   Compiling indexmap v2.14.1
+   Compiling chacha20 v0.10.2
+   Compiling futures-executor v0.3.34
+   Compiling ed25519 v2.2.3
+   Compiling hex v0.4.3
+   Compiling bytes v1.12.1
+   Compiling ed25519-zebra v4.2.0
+   Compiling uint v0.10.1
+   Compiling futures v0.3.34
+   Compiling yoke v0.8.3
+   Compiling primitive-types v0.14.0
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling konst_macro_rules v0.2.19
+   Compiling parity-scale-codec v3.7.5
+   Compiling const_format_proc_macros v0.2.34
+   Compiling async-trait v0.1.92
+   Compiling konst v0.2.20
+   Compiling zerovec v0.11.8
+   Compiling unicode-segmentation v1.13.3
+   Compiling tokio v1.53.1
+   Compiling toml_edit v0.25.13+spec-1.1.0
+   Compiling convert_case v0.10.0
+   Compiling rayon v1.12.0
+   Compiling impl-trait-for-tuples v0.2.3
+   Compiling derive_more-impl v1.0.0
+   Compiling const_format v0.2.36
+   Compiling byte-slice-cast v1.2.3
+   Compiling zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-core)
+   Compiling proc-macro-crate v3.5.0
+   Compiling parking v2.2.1
+   Compiling parity-scale-codec-derive v3.7.5
+   Compiling event-listener v5.4.2
+   Compiling derive_more v1.0.0
+   Compiling scale-info-derive v2.11.6
+   Compiling derive_more-impl v2.1.1
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-consensus)
+   Compiling tinystr v0.8.4
+   Compiling blst v0.3.17
+   Compiling num_cpus v1.17.0
+   Compiling litemap v0.8.3
+   Compiling writeable v0.6.4
+   Compiling threadpool v1.8.1
+   Compiling icu_locale_core v2.3.0
+   Compiling event-listener-strategy v0.5.4
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling serde-big-array v0.5.1
+   Compiling wait-timeout v0.2.1
+   Compiling quick-error v1.2.3
+   Compiling icu_normalizer_data v2.3.0
+   Compiling bit-vec v0.8.0
+   Compiling icu_properties_data v2.3.0
+   Compiling scale-info v2.11.6
+   Compiling utf8_iter v1.0.4
+   Compiling bit-set v0.8.0
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling rusty-fork v0.3.1
+   Compiling rand_xorshift v0.4.0
+   Compiling unarray v0.1.4
+   Compiling proptest v1.11.0
+   Compiling branches v0.4.6
+   Compiling icu_properties v2.3.0
+   Compiling kzg v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+   Compiling icu_normalizer v2.3.0
+   Compiling rust-kzg-blst v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+   Compiling zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-dag)
+   Compiling spin v0.12.3
+   Compiling data-encoding v2.11.1
+   Compiling pin-project-internal v1.1.13
+   Compiling idna_adapter v1.2.2
+   Compiling minimal-lexical v0.2.1
+   Compiling percent-encoding v2.3.2
+   Compiling idna v1.1.0
+   Compiling pin-project v1.1.13
+   Compiling form_urlencoded v1.2.2
+   Compiling rclite v0.4.1
+   Compiling ab-blake3 v0.1.0
+   Compiling itertools v0.14.0
+   Compiling sha2 v0.11.0
+   Compiling seq-macro v0.3.6
+   Compiling derive_more v2.1.1
+   Compiling subspace-core-primitives v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/crates/subspace-core-primitives)
+   Compiling ab-chacha8 v0.1.1
+   Compiling radium v0.7.0
+   Compiling keccak v0.1.6
+   Compiling unsigned-varint v0.8.0
+   Compiling merlin v3.0.0
+   Compiling url v2.5.8
+   Compiling match-lookup v0.1.3
+   Compiling getrandom_or_panic v0.0.3
+   Compiling serde_bytes v0.11.19
+   Compiling hmac v0.12.1
+   Compiling tap v1.0.1
+   Compiling const-str v0.4.3
+   Compiling data-encoding-macro-internal v0.1.19
+   Compiling wyz v0.5.1
+   Compiling schnorrkel v0.11.5
+   Compiling hkdf v0.12.4
+   Compiling base256emoji v1.0.2
+   Compiling data-encoding-macro v0.1.21
+   Compiling multihash v0.19.5
+   Compiling prost-derive v0.14.4
+   Compiling ed25519-dalek v2.2.0
+   Compiling instant v0.1.13
+   Compiling base45 v3.2.0
+   Compiling funty v2.0.0
+   Compiling bs58 v0.5.1
+   Compiling base-x v0.2.11
+   Compiling backoff v0.4.0
+   Compiling multibase v0.9.3
+   Compiling async-lock v3.4.2
+   Compiling bitvec v1.1.1
+   Compiling fs2 v0.4.3
+   Compiling quick-protobuf v0.8.1
+   Compiling web-time v1.1.0
+   Compiling futures-timer v3.0.4
+   Compiling unsigned-varint v0.7.2
+   Compiling multistream-select v0.13.0
+   Compiling rw-stream-sink v0.4.0
+   Compiling heck v0.5.0
+   Compiling ring v0.17.14
+   Compiling subspace-kzg v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/shared/subspace-kzg)
+   Compiling ab-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/shared/ab-proof-of-space)
+   Compiling cfg_aliases v0.2.2
+   Compiling rustc-hash v2.1.3
+   Compiling prost v0.14.4
+   Compiling pkg-config v0.3.34
+   Compiling cpubits v0.1.1
+   Compiling aes v0.9.3
+   Compiling subspace-erasure-coding v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/crates/subspace-erasure-coding)
+   Compiling libp2p-identity v0.2.14
+   Compiling thiserror v1.0.69
+   Compiling foldhash v0.1.5
+   Compiling subspace-archiving v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/crates/subspace-archiving)
+   Compiling untrusted v0.9.0
+   Compiling hashbrown v0.15.5
+   Compiling zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-pot)
+   Compiling thiserror-impl v1.0.69
+   Compiling subspace-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/crates/subspace-proof-of-space)
+   Compiling multiaddr v0.18.2
+   Compiling num-conv v0.2.2
+   Compiling subspace-data-retrieval v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/shared/subspace-data-retrieval)
+   Compiling getrandom v0.4.3
+   Compiling libp2p-core v0.43.2
+   Compiling paste v1.0.15
+   Compiling time-core v0.1.9
+   Compiling glob v0.3.4
+   Compiling time-macros v0.2.32
+   Compiling clang-sys v1.9.1
+   Compiling hashlink v0.10.0
+   Compiling subspace-verification v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/crates/subspace-verification)
+   Compiling libp2p-swarm-derive v0.35.1
+   Compiling subspace-farmer-components v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/PDF/autonomys-subspace/crates/subspace-farmer-components)
+   Compiling powerfmt v0.2.0
+   Compiling deranged v0.5.8
+   Compiling libp2p-swarm v0.47.1
+   Compiling rustls-pki-types v1.15.1
+   Compiling tinyvec_macros v0.1.1
+   Compiling tinyvec v1.13.2
+   Compiling time v0.3.55
+   Compiling netlink-packet-core v0.8.2
+   Compiling zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-poas)
+   Compiling nom v7.1.3
+   Compiling zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-farmer)
+   Compiling regex-automata v0.4.18
+   Compiling nix v0.30.1
+   Compiling libloading v0.8.9
+   Compiling vcpkg v0.2.15
+   Compiling ipnet v2.12.1
+   Compiling bindgen v0.72.1
+   Compiling rustls v0.23.43
+   Compiling libz-sys v1.1.29
+   Compiling cexpr v0.6.0
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling netlink-sys v0.8.8
+   Compiling itertools v0.13.0
+   Compiling rusticata-macros v4.1.0
+   Compiling regex v1.13.1
+   Compiling asn1-rs-derive v0.6.0
+   Compiling asn1-rs-impl v0.2.0
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling libm v0.2.16
+   Compiling shlex v1.3.0
+   Compiling netlink-proto v0.12.2
+   Compiling asn1-rs v0.7.2
+   Compiling netlink-packet-route v0.28.0
+   Compiling asynchronous-codec v0.7.0
+   Compiling num-integer v0.1.47
+   Compiling socket2 v0.5.10
+   Compiling ahash v0.8.12
+   Compiling base64 v0.22.1
+   Compiling rustflags v0.1.7
+   Compiling oid-registry v0.8.1
+   Compiling num-bigint v0.4.8
+   Compiling rustls-webpki v0.103.15
+   Compiling zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-post)
+   Compiling quinn-udp v0.5.15
+   Compiling enum-as-inner v0.6.1
+   Compiling der-parser v10.0.0
+   Compiling hickory-proto v0.25.2
+   Compiling fastbloom v0.17.0
+   Compiling pem v3.0.6
+   Compiling quick-protobuf-codec v0.3.1
+   Compiling yasna v0.5.2
+   Compiling uuid v1.26.0
+   Compiling rand v0.10.2
+   Compiling rtnetlink v0.20.0
+   Compiling quinn v0.11.11
+   Compiling futures-bounded v0.2.4
+   Compiling rand_pcg v0.10.2
+   Compiling crossbeam-channel v0.5.16
+   Compiling librocksdb-sys v0.19.0+11.8.1
+   Compiling aho-corasick v1.1.5
+   Compiling snow v0.9.6
+   Compiling tagptr v0.2.0
+   Compiling lru-slab v0.1.2
+   Compiling lazy_static v1.5.0
+   Compiling nohash-hasher v0.2.0
+   Compiling x509-parser v0.17.0
+   Compiling quinn-proto v0.11.17
+   Compiling if-watch v3.2.2
+   Compiling moka v0.12.16
+   Compiling futures-rustls v0.26.0
+   Compiling rcgen v0.13.2
+   Compiling hashbrown v0.14.5
+   Compiling zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-cadena)
+   Compiling concurrent-queue v2.5.0
+   Compiling resolv-conf v0.7.6
+   Compiling async-channel v2.5.0
+   Compiling hickory-resolver v0.25.2
+   Compiling hashlink v0.9.1
+   Compiling libp2p-tls v0.6.2
+   Compiling yamux v0.13.10
+   Compiling yamux v0.12.1
+   Compiling x25519-dalek v2.0.1
+   Compiling hex_fmt v0.3.0
+   Compiling libp2p-gossipsub v0.49.5
+   Compiling libp2p-noise v0.46.1
+   Compiling libp2p-yamux v0.47.0
+   Compiling libp2p-quic v0.13.1
+   Compiling libp2p-dns v0.44.0
+   Compiling libp2p-mdns v0.48.0
+   Compiling libp2p-tcp v0.44.1
+   Compiling libp2p-request-response v0.29.0
+   Compiling libp2p-kad v0.48.0
+   Compiling libp2p-identify v0.47.0
+   Compiling libp2p-allow-block-list v0.6.0
+   Compiling libp2p-connection-limits v0.6.0
+   Compiling libp2p-ping v0.47.0
+   Compiling utf8parse v0.2.2
+   Compiling anstyle-parse v1.0.0
+   Compiling anstyle v1.0.14
+   Compiling anstyle-query v1.1.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling clap_lex v1.1.1
+   Compiling strsim v0.11.1
+   Compiling anstream v1.0.0
+   Compiling clap_derive v4.6.4
+   Compiling clap_builder v4.6.6
+   Compiling futures_ringbuf v0.4.0
+   Compiling ringbuf v0.3.3
+   Compiling libp2p v0.56.0
+   Compiling zx-p2p v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-p2p)
+   Compiling clap v4.6.6
+   Compiling rocksdb v0.25.0
+   Compiling zx-storage v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-storage)
+   Compiling zx-node v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d5/ws/crates/zx-node)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 07s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06d5/target/debug/deps/zx_cadena-68de83084677448b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/bifurcacion_pow.rs (/home/katana/zeo/ZEROX/deepseek/W06d5/target/debug/deps/bifurcacion_pow-4cb2e9a8280be1de)
+
+running 4 tests
+test mejor_punta_pow_sigue_la_rama_mas_pesada_sin_alcanzar_el_corte ... ok
+test el_terminal_es_el_de_mayor_trabajo_no_el_primero_en_llegar ... ok
+test el_terminal_no_cambia_por_una_rama_mas_ligera_llegada_despues ... ok
+test el_terminal_se_congela_en_cuanto_hay_un_bloque_post ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contexto_dag.rs (/home/katana/zeo/ZEROX/deepseek/W06d5/target/debug/deps/contexto_dag-f32df54f24a15a8e)
+
+running 2 tests
+test none_antes_del_terminal_y_none_justo_al_fijarlo_some_tras_el_primer_post ... ok
+test el_contexto_dag_es_el_mismo_que_usa_la_admision_real ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/diferencial_t04.rs (/home/katana/zeo/ZEROX/deepseek/W06d5/target/debug/deps/diferencial_t04-f5665f536c8b3603)
+
+running 1 test
+test diferencial_t04 ... FAILED
+
+failures:
+
+---- diferencial_t04 stdout ----
+
+thread 'diferencial_t04' (1314786) panicked at crates/zx-cadena/tests/diferencial_t04.rs:396:46:
+leer vectores: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/result.rs:1867:5
+   3: <core::result::Result<alloc::string::String, std::io::error::Error>>::expect
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1185:23
+   4: diferencial_t04::parsear_fichero
+             at ./tests/diferencial_t04.rs:396:46
+   5: diferencial_t04::cargar_casos
+             at ./tests/diferencial_t04.rs:1647:17
+   6: diferencial_t04::correr
+             at ./tests/diferencial_t04.rs:1653:17
+   7: diferencial_t04::diferencial_t04
+             at ./tests/diferencial_t04.rs:1702:59
+   8: diferencial_t04::diferencial_t04::{closure#0}
+             at ./tests/diferencial_t04.rs:1701:21
+   9: <diferencial_t04::diferencial_t04::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  10: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    diferencial_t04
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p zx-cadena --test diferencial_t04`
