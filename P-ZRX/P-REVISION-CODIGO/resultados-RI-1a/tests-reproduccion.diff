@@ -1,0 +1,107 @@
+--- crates/zx-consensus/src/transicion/tests.rs	2026-09-26 03:00:14.642167351 +0200
++++ deepseek/RI-1a/copia/crates/zx-consensus/src/transicion/tests.rs	2026-09-26 03:49:26.274339319 +0200
+@@ -527,3 +527,104 @@
+     assert!(invariante_i1(&nuevo));
+     assert!(invariante_i1b(&nuevo));
+ }
++
++// ── RI-1a · reproducción IE-5 ────────────────────────────────────────────────
++//
++// `CONTRATO-ESTADO-DAG-v0.md` §4, IE-5: «Con k = 0 y sin fusiones, el resultado coincide con el
++// oráculo T01 (compatibilidad)». Con un único bloque de cadena (sin mergeset), `aplicar_fusion` y
++// `aplicar` (modo estricto) deben producir el mismo `Estado.slot` y `Estado.peso_sufijo`.
++#[test]
++fn ri1a_fusion_post_actualiza_slot_y_peso_sufijo_como_el_modo_estricto() {
++    let (_, pk) = par(23);
++    let cb1 = tx_coinbase_post(pk, 3);
++    let cb2 = tx_coinbase_post(pk, 3);
++
++    let mut estado = estado_post();
++    con_garantia(&mut estado, pk, 10);
++    estado.emitido = 10;
++    estado.subsidio_acum = 10;
++
++    let bloque = bloque_post(1, pk, vec![(cb1, Vec::new())]);
++
++    let estricto = aplicar(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
++    let (fusion, _undo, descartadas) =
++        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
++
++    assert!(descartadas.is_empty());
++    assert_eq!(
++        estricto.slot, 1,
++        "modo estricto: el slot del bloque de cadena se refleja en Estado.slot"
++    );
++    assert_eq!(
++        fusion.slot, estricto.slot,
++        "IE-5: aplicar_fusion (sin mergeset) MUST coincidir con el modo estricto en Estado.slot; \
++         quedó en {} en vez de {}",
++        fusion.slot, estricto.slot
++    );
++    assert_eq!(
++        fusion.peso_sufijo, estricto.peso_sufijo,
++        "IE-5: aplicar_fusion (sin mergeset) MUST coincidir con el modo estricto en \
++         Estado.peso_sufijo; quedó en {} en vez de {}",
++        fusion.peso_sufijo, estricto.peso_sufijo
++    );
++
++    // Consecuencia práctica: si se encadenan dos bloques de cadena por fusión (como haría W06a al
++    // construir Estado(past(B)) según ED-2), el segundo bloque debería poder aplicarse en el slot 2
++    // sin violar la progresión de slot. Como `fusion.slot` nunca avanzó, esto no lo detecta un
++    // `ErrSlot` explícito (fusion_post no comprueba progresión), pero demuestra que el estado
++    // `fusion` diverge silenciosamente del estado que produciría el modo estricto.
++    let bloque2 = BloqueTransicion::nuevo(
++        HechosCabecera::PoST {
++            hash: hash(3),
++            padre: hash(2),
++            slot: 2,
++            productor: pk,
++            peso: 1,
++            prueba_valida: true,
++            requisito_declarado: 0,
++        },
++        vec![(cb2, Vec::new())],
++    );
++    let (fusion2, _undo2, descartadas2) =
++        aplicar_fusion(&fusion, &bloque2, Punto::Slot(2), &params(), CBID_RED_DEV).unwrap();
++    assert!(descartadas2.is_empty());
++    assert_eq!(
++        fusion2.slot, 0,
++        "el bug persiste: tras dos bloques de cadena en modo fusión, Estado.slot sigue en 0"
++    );
++    assert_eq!(
++        fusion2.peso_sufijo, 0,
++        "el bug persiste: tras dos bloques de cadena en modo fusión, Estado.peso_sufijo sigue en 0"
++    );
++}
++
++// ── RI-1a · fusion_pow no exige progresión de altura (R-10) ─────────────────
++//
++// `aplicar_pow` (modo estricto) exige `altura == altura_previa + 1` (R-10: «altura ... que no
++// progresa ⇒ ErrSlot»). `fusion_pow` no repite esa comprobación: solo mira `pow_valido` y
++// `trabajo != 0`. Un bloque PoW que salta de altura 0 a altura 5 se aplica igual en modo fusión.
++#[test]
++fn ri1a_fusion_pow_acepta_un_salto_de_altura() {
++    let cb = tx_coinbase_pow(vec![tx_out(10, par(30).1)]);
++    let estado = estado_pow();
++    let bloque = bloque_pow(5, vec![(cb, Vec::new())]); // salta de 0 a 5, no a 1
++    let resultado = aplicar_fusion(&estado, &bloque, Punto::Altura(5), &params(), CBID_RED_DEV);
++    assert!(
++        resultado.is_ok(),
++        "fusion_pow debería rechazar el salto de altura (R-10) como hace aplicar_pow, pero: {resultado:?}"
++    );
++    let (nuevo, _undo, descartadas) = resultado.unwrap();
++    assert!(descartadas.is_empty());
++    assert_eq!(
++        nuevo.altura, 5,
++        "el bug: fusion_pow adopta la altura declarada sin comprobar que sea altura_previa + 1"
++    );
++
++    // Contraste: el modo estricto sí lo rechaza.
++    let estricto = aplicar(&estado, &bloque, &params(), CBID_RED_DEV);
++    assert_eq!(
++        estricto,
++        Err(ErrorTransicion::ErrSlot),
++        "aplicar (modo estricto) sí exige progresión exacta de altura"
++    );
++}

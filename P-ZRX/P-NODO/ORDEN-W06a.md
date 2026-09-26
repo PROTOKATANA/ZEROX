@@ -19,7 +19,7 @@
 
 Lee íntegros: este archivo; `V-ZRX/LINEO.md`; `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md`;
 `P-ZRX/P-TRANSICION/CONTRATO-v0.md`; `P-ZRX/P-FORMATO/FORMATO-v0.md` (con v0.1);
-`P-ZRX/P-NODO/PLAN-W06.md`; las revisiones de W03, W05a, W02b, T04-B y T04-C; el oráculo T04
+`P-ZRX/P-NODO/PLAN-W06.md`; las revisiones de W03, W05a, W02b, T04-B, T04-C y RI-1a (`P-ZRX/P-REVISION-CODIGO/REVISION-RI-1a.md`); el oráculo T04
 (`P-ZRX/P-DAG/T04/src/`, como especificación ejecutable, **no** para traducirlo línea a línea) y sus
 vectores `resultados/vectores-estado-dag-v0.2.txt` con su `cobertura-v0.2.txt`. Base: el workspace de la raíz.
 Entrada congelada: `P-ZRX/P-NODO/ENTRADA-W06a.sha256`.
@@ -37,7 +37,7 @@ Entrada congelada: `P-ZRX/P-NODO/ENTRADA-W06a.sha256`.
    en su propio slot, fusionados de lado en el del fusionador); garantía del productor en
    `Estado(past(B))` (RD-9, RD-10); `rojo_U3` inerte; `merge_depth` dev (RD-5); virtual con
    `slot(V) = máx` (RD-6); reorganización con undo exacto.
-4. Si `aplicar_fusion` de W03 no cumple alguna de RD-1…RD-10 (p. ej. subsidio por `slot(X)`, RD-1;
+4. **Correcciones obligatorias de la revisión independiente RI-1a** (`P-ZRX/P-REVISION-CODIGO/REVISION-RI-1a.md`), con test cada una: (a) `fusion_post` fija `Estado.slot = punto` para todo bloque fusionado y `peso_sufijo` lo suma quien aplica, solo por los bloques de **cadena** (como `aplicar_bloque_fusion!` y sus llamantes en T04, `EstadoDAG.jl:303, 395, 607`); (b) `aplicar_fusion` con un bloque PoW devuelve un error explícito: la fase PoW se aplica con `aplicar` (ED-1). Además, si `aplicar_fusion` no cumple alguna otra de RD-1…RD-10 (p. ej. subsidio por `slot(X)`, RD-1;
    coinbase opcional, RD-2), **corrígelo en `zx-consensus::transicion`** con el mínimo cambio,
    documéntalo y demuestra que `diferencial_t01` sigue en 0 discrepancias.
 5. **Arnés diferencial** (`crates/zx-cadena/tests/diferencial_t04.rs`): mismo esquema que el de W03

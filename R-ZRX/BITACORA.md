@@ -168,3 +168,17 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   (construidas, aplicadas, descartadas por motivo) con mínimos exigidos.
 - Proceso: volví a lanzar una sonda `python3 --version` sin necesidad (sin código, sin salida). Tercera
   vez; queda anotado.
+
+### 03:50–04:05
+
+- **T04-C superada** (`9da8c70`): generador con nonce correcto, retiros y liberaciones; vectores v0.2
+  con tabla de cobertura (mínimos cumplidos). W06a usará v0.2 y comparará su cobertura.
+- **Revisión independiente RI-1** (Sonnet, `P-ZRX/P-REVISION-CODIGO/`): RI-1b sin críticos, coste de
+  admisión GHOSTDAG no acotado confirmado (IPA B-12); **RI-1a encontró un defecto crítico** que mi
+  revisión de W03 no vio: `fusion_post` no actualiza `slot` ni `peso_sufijo`, y `fusion_pow` no exige
+  progresión de altura. Ambos pasan a correcciones obligatorias de W06a.
+- **A10-M1**: CPU medida con carga ajena (1 hilo 4,85 MH/s; 32 hilos 68,5 MH/s, provisional); GPU sin
+  medir por incompatibilidad `nvcc` 12.9 / gcc 15. Segunda ronda por NVRTC + API del driver con
+  anfitrión en C (`CORRECCION-A10-M1-A`).
+- Órdenes nuevas: W05b3 (productor PoST en régimen: `producir` solo hacía el primer bloque), W06b
+  (almacén, D-N03′), escenarios de medición W07.
