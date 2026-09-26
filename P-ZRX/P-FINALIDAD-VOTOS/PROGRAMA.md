@@ -80,3 +80,9 @@ las correcciones del director y el problema del quórum con granjeros doméstico
 
 FV-2, FV-3 y FV-4 se redactan cuando FV-1 esté ratificado: su alcance depende de la prueba de
 disponibilidad, de `b` y del suelo `E` que salgan de FV-1.
+
+## Programas de la misma solución
+
+- **`P-ZRX/P-AUSENCIA-VOTO/`**: qué pasa cuando alguien sale elegido y no vota. Hay que hacer el sorteo
+  verificable después, y la consecuencia es la pérdida de la prima y una confiscación pequeña (decisión FV-D03).
+  Su primer encargo es AV-1.
