@@ -83,6 +83,7 @@ A-01 + C-01 + B-03 ──► B-08 ruta activa del nodo ──► A-09 sincroniza
 | C-06 | Complementariedad: más stake no aumenta oportunidades ni `blue_work` | I-5 **superado en el oráculo** (T01); falta en código (W03) | P0 | A-01 | Stake convertido en peso por la puerta de atrás | `ORDEN-T01`, luego test Rust | I-5 en oráculo y en el nodo |
 | C-07 | Exclusión de quien aporta espacio sin tokens (`C-BOT-03`) | abierto | P1 | C-02 | Barrera de entrada y concentración | Modelo económico | Fracción de espacio honesto excluida, por escenario |
 | C-08 | Responsabilidad de firmas antes del depósito, tras el retiro y entre ramas (`C-EVP-04` pendiente) | abierto | P2 | C-04 | Castigo sin garantía en el pasado causal | Tras C-04 | Regla y casos |
+| C-10 | **Repetición de operaciones de garantía y unicidad de `txid`** (defecto de FORMATO-v0) | corrección v0.1 diseñada (F-15…F-18 en `FORMATO-v0.md`); falta implementarla en formato, motor, productor y oráculos | P0 | W03-R, W05b2 | Retiro forzado de la garantía ajena; colisión de salidas | Orden de formato+motor y ampliación de T01/T04 | Diferencial con nonce y rechazo de repeticiones |
 | C-09 | Firmante seguro ligado a la identidad final (`archivo/crates/zx-consensus/src/firmante/`) | abierto | P1 | B-08 | Doble firma accidental castigable | Portado tras E-01 | Tests de persistencia antes de firmar en el árbol nuevo |
 
 ---

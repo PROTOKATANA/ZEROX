@@ -118,3 +118,42 @@ PoAS (D-T05) se especifica en W05, no aquí.
 
 Algoritmo PoW de producción (A-12), semántica de altura DAG (B-10), `EvidenceTx` (C-04), registro de
 sectores (D-*), formato de red (`C-WIRE`) más allá de los códecs de cabecera y transacción.
+
+---
+
+## Corrección v0.1 (2026-09-26) — unicidad de `txid` y protección contra repetición
+
+**Error del director en v0.** El diferencial real de W03 (`deepseek/W03/PROGRESO.md`, punto 9)
+destapó dos defectos que los oráculos abstractos no podían ver:
+
+1. **Coinbase PoW sin campo único.** F-10 desactivó `expiry_height` en toda transacción, y con ello la
+   regla antigua `C-EMIT-04` (`expiry_height = altura`), que era lo que hacía único el `txid` de una
+   coinbase. Dos coinbases iguales en bloques distintos colisionan en el UTXO (el problema que
+   Bitcoin resolvió con BIP30/BIP34).
+2. **Operaciones de garantía sin entradas repetibles.** Un retiro o una liberación (v2 tipos 2 y 3)
+   no consume nada y su firma de aceptación cubre solo su `txid`: **cualquiera puede volver a
+   publicar los mismos bytes** y forzar otro retiro de la víctima (pierde elegibilidad) u otra
+   liberación. Además, dos liberaciones iguales tienen la misma salida `(txid, 0)`.
+
+**Corrección (sustituye lo que contradiga a F-05…F-14):**
+
+- **F-15 · Nonce por clave de garantía.** La extensión v2 pasa a ser
+  `tipo u8 ‖ clave 32 B ‖ importe u64 ‖ nonce u64`. El registro de garantía guarda
+  `nonce_siguiente[P]` (inicial 0). Toda operación v2 para la clave `P` (depósito, retiro,
+  liberación) exige `nonce == nonce_siguiente[P]` y lo incrementa al aplicarse; si no coincide:
+  `ErrNonce` (en modo estricto invalida el bloque; en modo fusión se **descarta**). El undo restaura el
+  nonce. Así los `txid` de las operaciones de `P` son únicos y una operación firmada no se puede
+  repetir.
+- **F-16 · Coinbase PoW única.** Excepción a F-10: en la coinbase PoW, `expiry_height` **debe** ser la
+  altura del bloque (restituye `C-EMIT-04`); cualquier otro valor ⇒ `ErrEmision`. En el resto de
+  transacciones sigue valiendo 0.
+- **F-17 · Coinbase PoST única por bloque de un productor y slot.** La extensión v3 pasa a ser
+  `clave 32 B ‖ importe u64 ‖ slot u64`, con `slot` = slot del bloque que la contiene (si no,
+  `ErrEmision`). No crea salidas, así que no hay colisión en el UTXO.
+- **F-18 · Salida de la liberación** = `(txid, 0)`; con F-15 es única. Se elimina el contador de
+  salidas implícitas que W03 tuvo que introducir.
+
+**Qué se rehace:** formato y validación de forma (`zx-core`), motor de estado (`zx-consensus`), el
+productor de `zx-post` (coinbase v3 con `slot`), el oráculo de formato (vectores v2/v3) y los oráculos
+T01/T04 (nonce por clave y rechazo por repetición), con nuevo diferencial. Las transacciones v1 que no
+son coinbase **no cambian**.

@@ -138,3 +138,13 @@ nota A-07 para poder actualizarlas durante la ejecución.
   lectura de la coinbase en cualquier posición). T01-B lanzada 02:08.
 - **S02a** (medición de regeneración) retenida hasta que la máquina esté libre: es una medida de
   tiempo y no debe correr con compilaciones concurrentes.
+
+### 02:57 — Error de diseño del director en FORMATO-v0 (encontrado por el diferencial de W03)
+
+La coinbase PoW perdió su `txid` único al desactivar `expiry_height` (F-10), y los retiros y
+liberaciones de garantía sin entradas eran **repetibles por cualquiera** (ataque de repetición: forzar
+el retiro de la garantía de otra clave). Los oráculos no podían verlo porque abstraen la identidad de
+las transacciones; lo destapó el diferencial con transacciones reales. Corrección v0.1: nonce por
+clave (F-15), altura en la coinbase PoW (F-16), slot en la coinbase PoST (F-17), salida `(txid, 0)` de
+la liberación (F-18). Alternativa descartada: exigir una entrada UTXO en retiros y liberaciones, porque
+bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) y no tiene UTXO.
