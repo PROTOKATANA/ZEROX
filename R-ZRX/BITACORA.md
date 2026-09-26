@@ -268,3 +268,14 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   vio que el nodo no sigue bifurcaciones PoW. **W06d3** (Sonnet) lanzada para cerrarlos y demostrar tres
   nodos de extremo a extremo.
 - Error menor: congelé la entrada de W06d3 antes de editar el plan; recongelada antes de lanzar.
+
+### 14:10–22:10 — cierre de la sesión
+
+- Castigo: SL-1 (contrato, ratificado con RAT-1…RAT-4 y RAT-2′), SL-2/SL-2b (calibración), SL-3/SL-3b
+  (oráculos), **SL-4a migrada** (evidencia y castigo en Rust, 0 discrepancias). Decisiones de Katana:
+  2/8 al incluidor, identidad con `consensus_branch_id`.
+- Finalidad por votos: FV-1 (dos ejecuciones) y AV-1 revisados; Katana adopta la capa en principio y fija
+  `b = 2`, multa proporcional con mínimo y sin premio por votar.
+- Red: W06d2, W06d3, **W06d4 migrada** (tres nodos reales cruzan el corte); W06d5 en curso.
+- Revisión independiente RI-2 (a y b) con correcciones integradas.
+- **Traspaso para la próxima sesión: `R-ZRX/TRASPASO-2026-09-26.md`.**
