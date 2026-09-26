@@ -89,3 +89,26 @@ Patrón de las órdenes W (`ws.orig/`, `ws/` con el enlace `ws/PDF`, `cambios.pa
 copiable en `deepseek/W05b2R/.cargo-home`). Nada fuera de la zona; sin git; sin secretos; ningún `Ok`
 ficticio. Si una pieza migrada (W05b3, W06a, W06b) impide un paso, **para** e informa con la salida
 literal: no la parchees en silencio; los arreglos mínimos a otros crates se documentan uno a uno.
+
+## Relanzamiento (2026-09-26, 05:50) — obligatorio leerlo
+
+El primer intento se detuvo porque **dos escritores** trabajaron en la zona: el ejecutor y un *fork*
+que él mismo lanzó y que, al heredar su contexto, se creyó ejecutor (no fue otra sesión: comprobado
+por el director en las transcripciones). Evidencia en `deepseek/W06d1-intento1/`. Para el
+relanzamiento:
+
+1. **Prohibido lanzar subagentes, forks o agentes en paralelo.** Un solo ejecutor escribe en la zona.
+2. **LINEO sí rige este código.** `AUTO-ZRX.md` §52: «LINEO rige todo el código del proyecto:
+   producción, consenso, red, almacenamiento…»; se aplican sus reglas **pertinentes** (corrección,
+   referencia independiente, casos límite, perfiles antes de optimizar, control de recursos, versiones,
+   reproducibilidad, trazas). El reparto Julia/C++ es solo para cálculo de auditoría.
+3. **Padre seleccionado real.** `ContextoTransicion` de `zx-post` confía en el padre seleccionado
+   declarado (atajo dev). El nodo **no** puede usarlo para bloques ajenos: la puerta debe comprobar el
+   padre seleccionado con GHOSTDAG real. Si `zx-cadena` no expone lo necesario (p. ej. el padre
+   seleccionado de un conjunto de padres), añade el **accesor mínimo** a `zx-cadena`, con test, y
+   documéntalo; no dupliques GHOSTDAG en el nodo.
+4. **Sin doble firma accidental** (no hay firmante durable portado; `C-EVP` inactivo): el nodo
+   persiste un bloque propio **antes** de darlo por producido y, al reiniciar, no produce con una clave
+   en un slot menor o igual que el último bloque propio almacenado de esa clave. Test incluido en V5.
+5. **Codificación canónica del estado** para el resumen (decisión 8): no existe en `zx-cadena` ni en
+   `zx-consensus`; escríbela en `zx-node` sobre colecciones ordenadas y documenta el formato.
