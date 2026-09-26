@@ -94,3 +94,49 @@ contraejemplos; REFUTADO si aparece un contraejemplo atribuible al contrato;
 INCONCLUSO si se agota el presupuesto o hay una ambigüedad que obligue a elegir.
 Las 13 ambigüedades de `PROGRESO.md` se resolvieron con la lectura restrictiva o
 compatible sin alterar otra regla.
+
+---
+
+# METODO — T01-B (exportador y lector de vectores)
+
+## B.1. Qué se añade
+
+- `exportar.jl` (raíz): exportador determinista. Solo lee del oráculo
+  (`aplicar`/`seleccionar`/`construir_validos`) y escribe
+  `resultados/vectores-transicion-v0.txt` + `.sha256`. No reimplementa
+  semántica.
+- `src/lector_vectores.jl`: lector **independiente** (analizador y render
+  propios). Reejecuta cada caso con el oráculo y compara RES/SEL/UTXO/GAR/EST.
+- Ratificaciones R-6…R-9 en `src/Transicion.jl` (marcadas
+  `# RATIFICACION-v0.1-Rn`) y testset de regresión en `test/runtests.jl`.
+- `escenarios_rechazo` devuelve además `prefijo` (bloques que reproducen el
+  estado `padre`), para exportar los dirigidos como historias releíbles.
+
+## B.2. Formato y orden canónico
+
+Una línea por registro, campos `clave=valor` separados por un espacio, sin
+espacios dentro del valor. `CASO`/`PARAM`, `BLOQUE`+`TX`+`RES` en orden de
+entrega, `SEL`, `UTXO`/`GAR`/`EST` de la punta y `FIN`. Ordenaciones explícitas
+para neutralizar el orden del `Dict`: UTXO por
+`(dueño, valor, origen, orden_origen, altura, slot)`; GAR por `clave`; `pend`
+por `(importe, madura_en_altura, madura_en_slot)`; `ret` por `(inicio_slot,
+importe)`; `cred` por `(importe, madura_en_slot)`. Sin ids internos de salida en
+`UTXO`. `RES` es la validez releíble sobre el estado del padre; padre inválido o
+ausente ⇒ `ErrSinPadre`.
+
+## B.3. Puntos y azar
+
+- Interfaces por defecto, §3.1: `CUT_HWPhi`, `FC3`, `SEC0`; el resto de la
+  rejilla reducida no se exporta.
+- Dirigidos: índices 1, 4 096 y 8 192 de los 8 192 puntos por defecto.
+- Aleatorios: `r = 1:2000`, `StableRNG(0x5a5a + r)`, punto
+  `1 + round(Int, (r-1)*(N-1)/(n-1))` con `N=8192`, `n=2000`.
+- Fecha: `--fecha` (por defecto `date -Is`); el determinismo se comprueba con
+  la misma fecha en dos corridas.
+
+## B.4. Coste
+
+Exportar ≈ 3,2 s y leer ≈ 2,3 s (1 CPU, < 0,5 GiB RSS) para 2 055 casos.
+No hay kernel rápido ni optimización: es un oráculo de referencia (LINEO §10
+adaptado, igual que en T01). Sin `@fastmath`, `@simd`, `@inbounds` ni Python;
+un solo hilo.

@@ -1,0 +1,7 @@
+exportar: puntos por defecto=8192 n_aleatorios=2000 salida=resultados/vectores-transicion-v0.txt
+  aleatorios 500/2000
+  aleatorios 1000/2000
+  aleatorios 1500/2000
+  aleatorios 2000/2000
+exportar: casos=2055 sha256=06d95324c01083c297b1d1423845ee3c78f47dc3e7bf314e56d3083a41e6d766 -> resultados/vectores-transicion-v0.sha256
+exportar: dirigidos_con_error_inesperado=0

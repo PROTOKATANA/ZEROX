@@ -324,11 +324,13 @@ end
 # Escenarios X-01 … X-15
 # ---------------------------------------------------------------------------
 
-# Devuelve casos `(nombre, padre, B, esperado, historial)` donde `padre` es el
-# estado (posiblemente manual) sobre el que se aplica `B`, y `historial` es la
-# cadena asociada (vacía si no se necesita para `es_terminal`).
+# Devuelve casos `(nombre, padre, B, esperado, historial, prefijo)` donde
+# `padre` es el estado (posiblemente manual) sobre el que se aplica `B`,
+# `historial` es la cadena asociada (vacía si no se necesita para
+# `es_terminal`) y `prefijo` es la secuencia de bloques que reproduce `padre`
+# al reaplicarla desde el génesis (T01-B: sólo para los casos releíbles).
 function escenarios_rechazo(P::Params)
-    Caso = NamedTuple{(:nombre, :padre, :B, :esperado, :historial)}
+    Caso = NamedTuple{(:nombre, :padre, :B, :esperado, :historial, :prefijo)}
     casos = Caso[]
 
     gen_only = construir_poW(StableRNG(1), P; hasta = 0, depositar = false)
@@ -340,20 +342,23 @@ function escenarios_rechazo(P::Params)
     Bgen = Bloque(id = gid + 1, familia = Genesis, padre = 0, altura = 0,
                   txs = [tx_coinbase([Salida(1, UInt64(1), 1, OrigenTx, -1, -1)])])
     push!(casos, (nombre = "X-01", padre = Eg, B = Bgen,
-                  esperado = ErrGenesis, historial = Bloque[]))
+                  esperado = ErrGenesis, historial = Bloque[],
+                  prefijo = gen_only[1]))
 
     # --- X-02: coinbase PoW por encima del subsidio --------------------
     B2 = gen_pow(id = gid + 1, padre = gid, altura = 1,
                  txs = [tx_coinbase([Salida(1, UInt64(11), 1, OrigenTx, -1, -1)])])
     push!(casos, (nombre = "X-02", padre = Eg, B = B2,
-                  esperado = ErrEmision, historial = Bloque[]))
+                  esperado = ErrEmision, historial = Bloque[],
+                  prefijo = gen_only[1]))
 
     # --- X-03a: gasto de coinbase_pow inmadura en el mismo bloque ------
     B3 = gen_pow(id = gid + 1, padre = gid, altura = 1,
                  txs = [tx_coinbase([Salida(50, UInt64(10), 1, OrigenTx, -1, -1)]),
                         tx_transferencia([50], [Salida(51, UInt64(9), 2, OrigenTx, -1, -1)], 1)])
     push!(casos, (nombre = "X-03", padre = Eg, B = B3,
-                  esperado = ErrInmaduro, historial = Bloque[]))
+                  esperado = ErrInmaduro, historial = Bloque[],
+                  prefijo = gen_only[1]))
 
     # --- cadena con terminal -------------------------------------------
     tb = construir_poW(StableRNG(7), P; hasta = 10, depositar = true,
@@ -384,23 +389,27 @@ function escenarios_rechazo(P::Params)
                                         [Salida(500001, inm.valor - UInt64(1), 2, OrigenTx, -1, -1)],
                                         inm.dueño)])
                 push!(casos, (nombre = "X-03b", padre = ET, B = B3b,
-                              esperado = ErrInmaduro, historial = Bloque[]))
+                              esperado = ErrInmaduro, historial = Bloque[],
+                              prefijo = bloquesT))
             end
         end
         # --- X-07: PoW hijo del terminal -------------------------------
         B7 = gen_pow(id = T.id + 1, padre = T.id, altura = T.altura + 1,
                      txs = [tx_coinbase([Salida(700001, UInt64(10), 1, OrigenTx, -1, -1)])])
         push!(casos, (nombre = "X-07", padre = ET, B = B7,
-                      esperado = ErrPowTrasCorte, historial = Bloques_hist(bloquesT)))
+                      esperado = ErrPowTrasCorte, historial = Bloques_hist(bloquesT),
+                      prefijo = bloquesT))
         # --- X-09 / X-10: garantía insuficiente ------------------------
         B9 = gen_post(id = T.id + 1, padre = T.id, slot = 1, productor = 3, peso = 1,
                       sector = (P.sec == SECA ? Sector_de_ET(ET) : 0))
         push!(casos, (nombre = "X-09", padre = ET, B = B9,
-                      esperado = ErrGarantia, historial = Bloque[]))
+                      esperado = ErrGarantia, historial = Bloque[],
+                      prefijo = bloquesT))
         B10 = gen_post(id = T.id + 1, padre = T.id, slot = 1, productor = 3, peso = 1,
                        req = 0, sector = (P.sec == SECA ? Sector_de_ET(ET) : 0))
         push!(casos, (nombre = "X-10", padre = ET, B = B10,
-                      esperado = ErrGarantia, historial = Bloque[]))
+                      esperado = ErrGarantia, historial = Bloque[],
+                      prefijo = bloquesT))
         # --- X-12: no es el primero de su rama -------------------------
         B12 = gen_pow(id = T.id + 1, padre = T.id, altura = T.altura + 1,
                       txs = [tx_coinbase([Salida(700002, UInt64(10), 1, OrigenTx, -1, -1)])])
@@ -413,7 +422,8 @@ function escenarios_rechazo(P::Params)
         B12p = gen_post(id = B12.id + 1, padre = B12.id, slot = 1, productor = 1,
                         peso = 1, sector = (P.sec == SECA ? Sector_de_ET(ET) : 0))
         push!(casos, (nombre = "X-12", padre = Eman, B = B12p,
-                      esperado = ErrSinTerminal, historial = hist12))
+                      esperado = ErrSinTerminal, historial = hist12,
+                      prefijo = hist12))
     end
 
     # --- X-04: depósito antes de H_dep ---------------------------------
@@ -427,7 +437,8 @@ function escenarios_rechazo(P::Params)
                          txs = [tx_coinbase([Salida(cid, UInt64(10), 1, OrigenTx, -1, -1)]),
                                 tx_deposito([cid], 1, 10, 1)])
             push!(casos, (nombre = "X-04", padre = ED, B = B4,
-                          esperado = ErrDepositoTemprano, historial = pref[1]))
+                          esperado = ErrDepositoTemprano, historial = pref[1],
+                          prefijo = pref[1]))
         end
     end
 
@@ -440,12 +451,14 @@ function escenarios_rechazo(P::Params)
                      txs = [tx_coinbase([Salida(cid5, UInt64(10), 1, OrigenTx, -1, -1)]),
                             tx_deposito([cid5], 1, 10, 1)])
         push!(casos, (nombre = "X-05", padre = E5, B = B5,
-                      esperado = ErrInmaduro, historial = pref5[1]))
+                      esperado = ErrInmaduro, historial = pref5[1],
+                      prefijo = pref5[1]))
         B6 = gen_pow(id = pref5[3], padre = pref5[1][end].id, altura = P.H_dep,
                      txs = [tx_coinbase([Salida(cid5, UInt64(10), 1, OrigenTx, -1, -1)]),
                             tx_deposito([cid5], 2, 10, 1)])
         push!(casos, (nombre = "X-06", padre = E5, B = B6,
-                      esperado = ErrAutorizacion, historial = pref5[1]))
+                      esperado = ErrAutorizacion, historial = pref5[1],
+                      prefijo = pref5[1]))
     end
 
     # --- X-08: PoST sin terminal ---------------------------------------
@@ -454,7 +467,8 @@ function escenarios_rechazo(P::Params)
         B8 = gen_post(id = pref8[3], padre = pref8[1][end].id, slot = 1,
                       productor = 1, peso = 1)
         push!(casos, (nombre = "X-08", padre = pref8[2][end], B = B8,
-                      esperado = ErrSinTerminal, historial = pref8[1]))
+                      esperado = ErrSinTerminal, historial = pref8[1],
+                      prefijo = pref8[1]))
     end
 
     # --- X-11: no-terminal por trabajo, altura o Phi -------------------
@@ -465,7 +479,8 @@ function escenarios_rechazo(P::Params)
             B = gen_post(id = p11a[3], padre = p11a[1][end].id, slot = 1,
                          productor = 1, peso = 1)
             push!(casos, (nombre = "X-11a", padre = p11a[2][end], B = B,
-                          esperado = ErrSinTerminal, historial = p11a[1]))
+                          esperado = ErrSinTerminal, historial = p11a[1],
+                          prefijo = p11a[1]))
         end
     end
     p11b = construir_poW(StableRNG(22), P; hasta = P.H_corte_min - 1,
@@ -474,7 +489,8 @@ function escenarios_rechazo(P::Params)
         B = gen_post(id = p11b[3], padre = p11b[1][end].id, slot = 1,
                      productor = 1, peso = 1)
         push!(casos, (nombre = "X-11b", padre = p11b[2][end], B = B,
-                      esperado = ErrSinTerminal, historial = p11b[1]))
+                      esperado = ErrSinTerminal, historial = p11b[1],
+                      prefijo = p11b[1]))
     end
     p11c = construir_poW(StableRNG(23), P; hasta = max(P.H_corte_min, 4),
                          depositar = false)
@@ -482,16 +498,19 @@ function escenarios_rechazo(P::Params)
         B = gen_post(id = p11c[3], padre = p11c[1][end].id, slot = 1,
                      productor = 1, peso = 1)
         push!(casos, (nombre = "X-11c", padre = p11c[2][end], B = B,
-                      esperado = ErrSinTerminal, historial = p11c[1]))
+                      esperado = ErrSinTerminal, historial = p11c[1],
+                      prefijo = p11c[1]))
     end
 
     # --- X-13 / X-14: operación fuera de fase --------------------------
     B13 = gen_pow(id = gid + 1, padre = gid, altura = 1, txs = [tx_evidencia(1)])
     push!(casos, (nombre = "X-13", padre = Eg, B = B13,
-                  esperado = ErrOperacionFase, historial = Bloque[]))
+                  esperado = ErrOperacionFase, historial = Bloque[],
+                  prefijo = gen_only[1]))
     B14 = gen_pow(id = gid + 1, padre = gid, altura = 1, txs = [tx_liberacion(1, 1, 1)])
     push!(casos, (nombre = "X-14", padre = Eg, B = B14,
-                  esperado = ErrOperacionFase, historial = Bloque[]))
+                  esperado = ErrOperacionFase, historial = Bloque[],
+                  prefijo = gen_only[1]))
 
     # --- X-15: SEC-A ---------------------------------------------------
     if P.sec == SECA
@@ -503,7 +522,8 @@ function escenarios_rechazo(P::Params)
                            txs = [tx_coinbase([Salida(800000, UInt64(10), 1, OrigenTx, -1, -1)]),
                                   tx_prueba_sector(1, 1)])
             push!(casos, (nombre = "X-15a", padre = p15a[2][end], B = B15a,
-                          esperado = ErrPruebaTardia, historial = p15a[1]))
+                          esperado = ErrPruebaTardia, historial = p15a[1],
+                          prefijo = p15a[1]))
         end
         tb2 = construir_poW(StableRNG(32), P; hasta = 10, depositar = true,
                             alta_en = ha, prueba_en = ha, alta2_en = ha)
@@ -514,7 +534,8 @@ function escenarios_rechazo(P::Params)
             B15b = gen_post(id = tb2[1][end].id + 1, padre = tb2[1][end].id,
                             slot = 1, productor = 1, peso = 1, sector = 2)
             push!(casos, (nombre = "X-15b", padre = E15, B = B15b,
-                          esperado = ErrSectorInactivo, historial = tb2[1]))
+                          esperado = ErrSectorInactivo, historial = tb2[1],
+                          prefijo = tb2[1]))
         end
     end
 

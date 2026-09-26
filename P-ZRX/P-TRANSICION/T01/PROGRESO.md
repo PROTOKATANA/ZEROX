@@ -165,3 +165,183 @@ se comprueban en la rejilla reducida completa** (147 456 puntos). Único
 muestreo declarado: I-3 en `run.jl`, 1 de cada 200 historias (4 155 744
 permutaciones), por coste. El texto de §4 sobre un subconjunto para X-16 queda
 así corregido por esta pasada.
+
+---
+
+# PROGRESO — T01-B
+
+Bitácora de la orden T01-B (exportador de vectores del oráculo). Presupuesto
+declarado **antes** de ejecutar: 1 h 30 min de reloj, 1 hilo, 8 GiB de RAM,
+2 GiB de disco; prohibido Python. Horas solo de `date -Is` (`HORAS.log`).
+
+## T01-B.1. Comprobación de la entrada congelada (inicio)
+
+Comando (desde `/home/katana/zeo/ZEROX`):
+
+    LC_ALL=C sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01-B.sha256
+
+Salida completa:
+
+    P-ZRX/P-TRANSICION/ORDEN-T01-B.md: OK
+    P-ZRX/P-TRANSICION/CONTRATO-v0.md: OK
+    P-ZRX/P-TRANSICION/ORDEN-T01.md: OK
+    V-ZRX/LINEO.md: OK
+
+Lectura íntegra confirmada de `ORDEN-T01-B.md`, `V-ZRX/LINEO.md`,
+`CONTRATO-v0.md` (incluido «Ratificaciones v0.1»), `ORDEN-T01.md`, del código
+de `T01/` y, como contexto del consumidor, `ORDEN-W03.md`, `FORMATO-v0.md` y
+`REVISION-W02.md`.
+
+## T01-B.2. Falta de definición detectada ANTES de editar (obligatorio informar)
+
+Se registran aquí las reglas de `ORDEN-T01-B` que admiten más de una
+implementación, o que chocan con otra regla de la misma orden. Se aplica la
+lectura más compatible con §3.1 (solo interfaces por defecto) y con la
+reproducibilidad exigida en §4, sin alterar la semántica del contrato.
+
+### T01-B/AMBIGÜEDAD-1 — Los 3 puntos dirigidos frente a «solo interfaces por defecto»
+§3.2(a) pide los casos X-01…X-20 en 3 puntos «(el primero, el del medio y el
+último de la enumeración que ya usa `run.jl`)»; §3.1 exige exportar **solo**
+las interfaces por defecto (`CUT_HWPhi`, `FC3`, `SEC0`). La enumeración
+completa de `puntos_rejilla(:reducida)` (147 456 puntos) tiene en las
+posiciones central (73 728) y final (147 456) puntos con `SEC-A`, `CUT-W` y
+`FC-2`, que no se exportan. Lectura aplicada: se enumeran los puntos reducidos
+**restringidos a las interfaces por defecto** (8 192 puntos) y se toman sus
+índices primero = 1, medio = 4 096 y último = 8 192. Así los tres `PARAM`
+exportados usan `CUT_HWPhi`/`FC3`/`SEC0`. Regla afectada: §3.1 vs §3.2(a).
+
+### T01-B/AMBIGÜEDAD-2 — Reparto de las 2 000 historias aleatorias
+§3.2(b) pide 2 000 historias «repartidas uniformemente» sobre los puntos por
+defecto, con «semilla maestra `0x5a5a`, réplica `r` con `StableRNG(0x5a5a + r)`»,
+pero no fija cómo se asigna cada réplica `r` a un punto (2 000 < 8 192, así que
+no se cubren todos). Lectura aplicada (determinista y reproducible): `r` recorre
+`1:2000`; el punto de la réplica `r` es el índice
+`p(r) = 1 + round(Int, (r-1)*(N-1)/(2000-1))` con `N = 8192`, es decir un
+reparto equiespaciado que incluye el primero y el último; cada historia usa
+`StableRNG(0x5a5a + UInt64(r))` y su `semilla` es `0x5a5a + r` en decimal.
+Regla afectada: §3.2(b).
+
+### T01-B/AMBIGÜEDAD-3 — Fecha del encabezado frente a determinismo
+§3.4 exige un encabezado con `<fecha de date -Is>` y §4 exige que «dos
+ejecuciones del exportador producen el mismo `sha256`». Una marca de tiempo
+viva impide ambas cosas a la vez. Lectura aplicada: el exportador acepta
+`--fecha <ISO-8601>`; por defecto usa la hora actual con el formato de
+`date -Is`. La comprobación de determinismo se hace con la **misma** `--fecha`
+en las dos corridas y el fichero entregado registra la fecha usada. Regla
+afectada: §3.4 vs §4.
+
+### T01-B/AMBIGÜEDAD-4 — Casos dirigidos no representables como vector releíble
+§3.2(a) pide «todos los casos dirigidos X-01…X-20 que tengan sentido».
+- **X-12** (terminal que no es el primero) se construye en `escenarios_rechazo`
+  sobre un estado manual (`Eman`) al que ninguna secuencia de bloques puede
+  llegar: cualquier PoW posterior a un terminal se rechaza con
+  `ErrPowTrasCorte`. El formato v0 define `RES` como la validez **releíble** de
+  cada bloque sobre el estado de su padre, así que X-12 no es representable;
+  queda cubierto por `test/runtests.jl` e I-4/I-7. Se omite del fichero.
+- **X-15** (SEC-A: prueba tardía, sector inactivo) no pertenece a las
+  interfaces por defecto (`SEC0`); se omite.
+Regla afectada: §3.1 vs §3.2(a).
+
+### T01-B/AMBIGÜEDAD-5 — Alcance de R-7 en el génesis
+R-7 obliga a que la coinbase PoW tenga al menos una salida («la del génesis,
+una de valor 0»), pero el génesis del oráculo T01 (`genesis_bloque()`) no
+lleva transacción ninguna y `X-01` asigna `ErrGenesis` a un génesis mal formado.
+Lectura aplicada: R-7 se comprueba en **cualquier** `TxCoinbase` presente,
+incluido un génesis que la traiga; sin salidas ⇒ `ErrEmision` (nombre literal
+de R-7); el génesis por defecto con `ntx=0` sigue siendo válido y el génesis
+con salida `> 0` sigue dando `ErrGenesis`. Regla afectada: R-7 vs X-01.
+
+### T01-B/AMBIGÜEDAD-6 — Orden de las sublistas de `GAR`
+El formato fija «UTXO por `(dueño, valor, origen, altura, slot)`; GAR por
+`clave`» pero no el orden interno de `pend`, `ret` y `cred`. Lectura aplicada
+(canónica y compartida por exportador y lector): `pend` por
+`(importe, madura_en_altura, madura_en_slot)`; `ret` por
+`(inicio_slot, importe)`; `cred` por `(importe, madura_en_slot)`. Regla
+afectada: §3.4.
+
+### T01-B/AMBIGÜEDAD-7 — Hash del contrato en el encabezado
+`<sha256 del contrato <hash>>` no dice de qué fichero. Lectura aplicada:
+`CONTRATO-v0.md` (la ruta por defecto es la absoluta de
+`P-ZRX/P-TRANSICION/CONTRATO-v0.md`, parametrizable con `--contrato`).
+Regla afectada: §3.4.
+
+No hay ninguna falta de definición que impida exportar o que obligue a
+detenerse: todas se resuelven con una lectura determinista y compatible con
+§3.1 y §4, y se marcan en el código.
+
+## T01-B.3. Ratificaciones v0.1 aplicadas y tests
+
+Se aplican R-6…R-9 en `src/Transicion.jl`, marcadas con
+`# RATIFICACION-v0.1-Rn` (§3.3 de la orden): R-6 coinbase no primera ⇒
+`ErrEmision`; R-7 `TxCoinbase` sin salidas ⇒ `ErrEmision`; R-8 importe 0 en
+`CoinbasePost`/`Deposito`/`Retiro`/`Liberacion` ⇒ `ErrSaldo`; R-9
+transferencia sin entradas ⇒ `ErrEmision` y con entradas y sin salidas ⇒
+`ErrSaldo`. Se añade el testset «Ratificaciones v0.1 (R-6…R-9)» con 10
+comprobaciones dirigidas. Se amplía `escenarios_rechazo` con el campo
+`prefijo` (secuencia de bloques que reproduce el estado `padre`), para poder
+exportar los dirigidos como historias releíbles.
+
+Comando y resultado de `Pkg.test()` (salida completa en
+`resultados/test-T01-B.log`):
+
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+    X-01…X-15 (rechazos)           38/38   7,8 s
+    Ratificaciones v0.1 (R-6…R-9)  10/10   0,1 s
+    X-16 (orden de llegada)         2/2   10,3 s
+    X-17 / X-18                     2/2 cada uno
+    X-19 / X-20                     2/2 cada uno
+    I-1…I-7                         9/9   1 m 17 s
+    Testing Transicion tests passed — PKGTEST_EXIT=0
+
+`run.jl --seed 0x5a5a --replicas 50 --rejilla reducida` (salida completa en
+`resultados/run-reducida-50.log`):
+
+    puntos=147456  replicas/punto=50  historias=7372800
+    con sufijo PoST=5022400  undos exactos=45840000  permutaciones I-3=1090416
+    fallos I-1…I-7 = 0
+    dif FC-1 vs FC-3 = 0 ; dif FC-2 vs FC-3 = 7680
+    tiempo de pared = 597,2 s (9,95 min) ; VEREDICTO = SIN FALLOS ; RUN_EXIT=0
+
+Las cifras de la corrida de 50 réplicas son exactamente 1/4 de las de T01
+(7 372 800 = 29 491 200/4; 45 840 000 = 183 406 080/4) y con los mismos 0
+fallos: las ratificaciones no alteran ninguna historia aleatoria.
+
+## T01-B.4. Exportación, determinismo y relectura
+
+Comandos (1 hilo, sin Python; tiempos medidos con `/usr/bin/time`):
+
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. exportar.jl --fecha 2026-09-26T02:14:31+02:00
+    # casos=2055  dirigidos_con_error_inesperado=0
+    # sha256=06d95324c01083c297b1d1423845ee3c78f47dc3e7bf314e56d3083a41e6d766
+    # exportar: wall=3,22 s cpu=100% maxRSS≈439 MB
+
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. src/lector_vectores.jl resultados/vectores-transicion-v0.txt
+    # leidos_casos=2055  discrepancias=0  VEREDICTO_LECTURA = SIN DISCREPANCIAS
+    # lector: wall=2,31 s cpu=100% maxRSS≈382 MB
+
+Ficheros: `resultados/vectores-transicion-v0.txt` (8 070 348 B, 130 869
+líneas) y `resultados/vectores-transicion-v0.sha256`
+(`06d95324…d766`). Determinismo (`resultados/determinismo.log`): la corrida 2,
+con la misma `--fecha`, da el mismo sha256; sin fijar la fecha solo cambia la
+línea del encabezado. Relectura independiente en `src/lector_vectores.jl`
+(analizador y render propios, sin funciones del exportador): 0 discrepancias
+sobre RES, SEL, UTXO, GAR y EST, más X-16 con orden invertido y undo exacto en
+X-19/X-20.
+
+## T01-B.5. Cierre
+
+Comprobación de `ENTRADA-T01-B.sha256` al terminar (desde
+`/home/katana/zeo/ZEROX`):
+
+    P-ZRX/P-TRANSICION/ORDEN-T01-B.md: OK
+    P-ZRX/P-TRANSICION/CONTRATO-v0.md: OK
+    P-ZRX/P-TRANSICION/ORDEN-T01.md: OK
+    V-ZRX/LINEO.md: OK
+
+Nada fuera de `T01/` se modificó; sin commit ni push; sin secretos; sin Python.
+Presupuesto (1 h 30 min, 1 hilo, 8 GiB) respetado con holgura: sesión
+02:08–02:25 (~17 min de reloj).

@@ -52,6 +52,69 @@ puntos_eq() = puntos_rejilla(rejilla = REJILLA)[1:PASO_EQ:end]
 end
 
 # ---------------------------------------------------------------------------
+# Ratificaciones v0.1 (R-6…R-9) — regresión dirigida
+# ---------------------------------------------------------------------------
+
+@testset "Ratificaciones v0.1 (R-6…R-9)" begin
+    P = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+               S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+               M_rec_slots = 1, R_slots = 1, F_slots = typemax(Int), sec = SEC0)
+    E0 = estado_inicial(P)
+    G = genesis_bloque()
+    Eg = aplicar(E0, G, P)
+    # R-7: coinbase PoW sin salidas ⇒ ErrEmision.
+    BR7 = gen_pow(id = 2, padre = 1, altura = 1, txs = [tx_coinbase(Salida[])])
+    @test aplicar(Eg, BR7, P) == ErrEmision
+    # R-7 también en el génesis si trae una coinbase sin salidas.
+    Gvacio = Bloque(id = 1, familia = Genesis, padre = 0, altura = 0,
+                    txs = [tx_coinbase(Salida[])])
+    @test aplicar(E0, Gvacio, P) == ErrEmision
+    # Prefijo válido de 1 bloque PoW (salidas 1000:dueño1, 1001:dueño2).
+    pref, ests, _, _, _ = construir_poW(StableRNG(77), P; hasta = 1,
+                                        depositar = false, transferir = false)
+    E1 = ests[end]
+    pid = pref[end].id
+    # R-6: coinbase única en segunda posición ⇒ ErrEmision.
+    BR6 = gen_pow(id = pid + 1, padre = pid, altura = 2,
+                  txs = [tx_transferencia([1000], [Salida(1100, UInt64(4), 2, OrigenTx, -1, -1)], 1),
+                         tx_coinbase([Salida(1101, UInt64(10), 1, OrigenTx, -1, -1)])])
+    @test aplicar(E1, BR6, P) == ErrEmision
+    # R-9: transferencia sin entradas ⇒ ErrEmision.
+    BR9a = gen_pow(id = pid + 1, padre = pid, altura = 2,
+                   txs = [tx_coinbase([Salida(1102, UInt64(10), 1, OrigenTx, -1, -1)]),
+                          tx_transferencia(Int[], [Salida(1103, UInt64(1), 2, OrigenTx, -1, -1)], 1)])
+    @test aplicar(E1, BR9a, P) == ErrEmision
+    # R-9: transferencia con entradas y sin salidas ⇒ ErrSaldo.
+    BR9b = gen_pow(id = pid + 1, padre = pid, altura = 2,
+                   txs = [tx_coinbase([Salida(1104, UInt64(10), 1, OrigenTx, -1, -1)]),
+                          tx_transferencia([1000], Salida[], 1)])
+    @test aplicar(E1, BR9b, P) == ErrSaldo
+    # R-8: importe 0 en Depósito y Retiro ⇒ ErrSaldo.
+    BR8a = gen_pow(id = pid + 1, padre = pid, altura = 2,
+                   txs = [tx_coinbase([Salida(1105, UInt64(10), 1, OrigenTx, -1, -1)]),
+                          tx_deposito([1000], 1, 0, 1)])
+    @test aplicar(E1, BR8a, P) == ErrSaldo
+    BR8b = gen_pow(id = pid + 1, padre = pid, altura = 2,
+                   txs = [tx_coinbase([Salida(1106, UInt64(10), 1, OrigenTx, -1, -1)]),
+                          tx_retiro(1, 0, 1)])
+    @test aplicar(E1, BR8b, P) == ErrSaldo
+    # R-8 en PoST: CoinbasePost y Liberación con importe 0 ⇒ ErrSaldo.
+    tpost = construir_poW(StableRNG(78), P; hasta = 10, depositar = true,
+                          transferir = false)
+    ET = tpost[2][end]
+    @test ET.terminal != -1
+    if ET.terminal != -1
+        T = tpost[1][end]
+        BR8c = gen_post(id = T.id + 1, padre = T.id, slot = 1, productor = 1,
+                        peso = 1, txs = [tx_coinbase_post(0)])
+        @test aplicar(ET, BR8c, P) == ErrSaldo
+        BR8d = gen_post(id = T.id + 1, padre = T.id, slot = 1, productor = 1,
+                        peso = 1, txs = [tx_coinbase_post(3), tx_liberacion(1, 0, 1)])
+        @test aplicar(ET, BR8d, P) == ErrSaldo
+    end
+end
+
+# ---------------------------------------------------------------------------
 # X-16 — independencia del orden de llegada
 # ---------------------------------------------------------------------------
 

@@ -1,0 +1,24 @@
+**T01-B — Veredicto: SUPERADO.**
+
+**Ratificaciones v0.1 (R-6…R-9)** aplicadas en `src/Transicion.jl`, marcadas `# RATIFICACION-v0.1-Rn`: R-6 coinbase no primera ⇒ `ErrEmision`; R-7 `TxCoinbase` sin salidas ⇒ `ErrEmision`; R-8 importe 0 en `CoinbasePost`/`Deposito`/`Retiro`/`Liberacion` ⇒ `ErrSaldo`; R-9 transferencia sin entradas ⇒ `ErrEmision`, con entradas y sin salidas ⇒ `ErrSaldo`. Regresión nueva en `test/runtests.jl` (10/10). Las 7 372 800 historias de `run.jl --replicas 50` siguen dando 0 fallos.
+
+**Fichero:** `resultados/vectores-transicion-v0.txt` — 2 055 casos (55 dirigidos + 2 000 aleatorios), 8 070 348 B, `sha256 = 06d95324c01083c297b1d1423845ee3c78f47dc3e7bf314e56d3083a41e6d766` (en `...v0.sha256`). Solo interfaces por defecto (`CUT_HWPhi`/`FC3`/`SEC0`), 8 192 puntos.
+
+**Relectura independiente** (`src/lector_vectores.jl`, analizador y render propios, sin funciones del exportador): 2 055 casos leídos, **0 discrepancias** en RES/SEL/UTXO/GAR/EST; X-16 con orden invertido y undo exacto en X-19/X-20. **Determinismo:** dos corridas con la misma `--fecha` dan el mismo sha256 (`resultados/determinismo.log`).
+
+**Salidas guardadas:** `test-T01-B.log` (todos los testsets pasan), `run-reducida-50.log` (597,2 s, 9,95 min, `VEREDICTO = SIN FALLOS`), `exportar.log`, `relectura.log`, `determinismo.log`. Tiempos: exportar 3,22 s; lector 2,31 s (1 CPU, <0,5 GiB). Presupuesto 1 h 30 min / 1 hilo / 8 GiB respetado (~17 min de sesión). Sin Python, sin commit/push, nada fuera de `T01/`.
+
+**Faltas de definición detectadas ANTES de editar** (en `PROGRESO.md` §T01-B.2, resueltas con lectura determinista y compatible):
+1. Los 3 puntos dirigidos: la enumeración completa de `run.jl` no es de interfaces por defecto en el medio/final → se usa la enumeración reducida restringida a `CUT_HWPhi/FC3/SEC0` (índices 1, 4096, 8192).
+2. Reparto de las 2 000 historias: la orden no fija `punto(r)` → reparto equiespaciado `1+round((r-1)·8191/1999)`, `StableRNG(0x5a5a+r)`.
+3. Fecha del encabezado vs. determinismo → `--fecha` (por defecto `date -Is`); se compara con la misma fecha.
+4. X-12 no es releíble (estado manual inalcanzable) y X-15 es `SEC-A` → omitidos del fichero; siguen en los tests.
+5. Alcance de R-7 en el génesis → se exige a toda `TxCoinbase` presente; génesis por defecto (`ntx=0`) válido.
+6. Orden interno de `pend`/`ret`/`cred` no fijado → orden canónico compartido.
+7. `<sha256 del contrato>` no decía de qué fichero → `CONTRATO-v0.md`.
+
+**Cobertura dirigida:** X-01, X-02, X-03, X-03b, X-04, X-05, X-06, X-07, X-08, X-09, X-10, X-11b, X-11c, X-13, X-14, X-16, X-17, X-18, X-19, X-20. El exportador autocomprueba `RES` releíble == error esperado (`dirigidos_con_error_inesperado=0`).
+
+**Archivos creados/modificados:** `exportar.jl`, `src/lector_vectores.jl`, `src/Transicion.jl`, `src/generadores.jl`, `test/runtests.jl`, `INFORME.md` (§T01-B), `PROGRESO.md` (§T01-B), `METODO.md` (§T01-B), `HORAS.log`, `resultados/*`.
+
+**Comprobaciones `ENTRADA-T01-B.sha256`:** al empezar y como último paso, `OK` las cuatro entradas (`ORDEN-T01-B.md`, `CONTRATO-v0.md`, `ORDEN-T01.md`, `LINEO.md`). Sin contraejemplos.

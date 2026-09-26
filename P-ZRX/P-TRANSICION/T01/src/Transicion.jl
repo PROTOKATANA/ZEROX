@@ -458,6 +458,8 @@ function aplicar_transferencia!(E::Estado, P::Params, punto::Int, tx::Tx)
 end
 
 function aplicar_deposito!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
+    # RATIFICACION-v0.1-R8: importe 0 en un depósito ⇒ ErrSaldo.
+    tx.importe == 0 && return ErrSaldo
     tx.firmante == tx.clave || return ErrAutorizacion
     if E.fase == FasePoW
         B.altura >= P.H_dep || return ErrDepositoTemprano
@@ -485,6 +487,8 @@ function aplicar_deposito!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
 end
 
 function aplicar_retiro!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
+    # RATIFICACION-v0.1-R8: importe 0 en un retiro ⇒ ErrSaldo.
+    tx.importe == 0 && return ErrSaldo
     tx.firmante == tx.clave || return ErrAutorizacion
     g = obtener_garantia!(E, tx.clave)
     tx.importe <= g.activo || return ErrSaldo
@@ -498,6 +502,8 @@ end
 
 function aplicar_liberacion!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
     E.fase == FasePoST || return ErrOperacionFase
+    # RATIFICACION-v0.1-R8: importe 0 en una liberación ⇒ ErrSaldo.
+    tx.importe == 0 && return ErrSaldo
     tx.firmante == tx.clave || return ErrAutorizacion
     g = obtener_garantia!(E, tx.clave)
     vencido = Int128(0)
@@ -565,9 +571,11 @@ function aplicar_tx!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
     t = tx.tipo
     if t == TxCoinbase
         E.fase == FasePoW || return ErrOperacionFase
+        isempty(tx.salidas) && return ErrEmision   # RATIFICACION-v0.1-R7
         return crear_utxos!(E, tx.salidas, OrigenCoinbasePow, B.altura, -1)
     elseif t == TxCoinbasePost
         E.fase == FasePoST || return ErrOperacionFase
+        tx.importe == 0 && return ErrSaldo         # RATIFICACION-v0.1-R8
         return credito_post!(E, B, P, tx.importe)
     elseif t == TxTransferencia
         return aplicar_transferencia!(E, P, punto, tx)
@@ -587,8 +595,8 @@ function aplicar_tx!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
     end
 end
 
-# Aplica todas las transacciones (coinbase primera, AMBIGUEDAD-6) y actualiza
-# Emitido/I-1b. Devuelve `nothing` o `Err`.
+# Aplica todas las transacciones (R-6: la coinbase debe ser la primera) y
+# actualiza Emitido/I-1b. Devuelve `nothing` o `Err`.
 function aplicar_txs!(E::Estado, B::Bloque, P::Params, punto::Int)
     txs = B.txs
     ncb = 0
@@ -600,21 +608,17 @@ function aplicar_txs!(E::Estado, B::Bloque, P::Params, punto::Int)
         end
     end
     ncb > 1 && return ErrEmision
+    # RATIFICACION-v0.1-R6: la coinbase (única) debe ocupar la primera posición.
+    ncb == 1 && idx_cb != 1 && return ErrEmision
     orden = txs
-    if ncb == 1 && idx_cb != 1
-        orden = Vector{Tx}(undef, length(txs))
-        orden[1] = txs[idx_cb]
-        k = 1
-        for (i, t) in enumerate(txs)
-            i == idx_cb && continue
-            k += 1
-            orden[k] = t
-        end
-    end
     tarifas = Int128(0)
     coinbase_pagada = UInt64(0)
     for tx in orden
         if tx.tipo == TxTransferencia
+            # RATIFICACION-v0.1-R9: sin entradas es una coinbase fuera de lugar;
+            # con entradas y sin salidas, ErrSaldo.
+            isempty(tx.entradas) && return ErrEmision
+            isempty(tx.salidas) && return ErrSaldo
             ve = Int128(0)
             for id in tx.entradas
                 o = get(E.utxo, id, nothing)
@@ -660,6 +664,9 @@ function aplicar_genesis!(E::Estado, B::Bloque, P::Params)
     (B.padre == 0 && B.altura == 0) || return ErrGenesis
     if !isempty(B.txs)
         (length(B.txs) == 1 && B.txs[1].tipo == TxCoinbase) || return ErrGenesis
+        # RATIFICACION-v0.1-R7: la coinbase PoW exige al menos una salida
+        # (el génesis, una de valor 0). Sin salidas ⇒ ErrEmision.
+        isempty(B.txs[1].salidas) && return ErrEmision
         for o in B.txs[1].salidas
             o.valor == 0 || return ErrGenesis
         end
