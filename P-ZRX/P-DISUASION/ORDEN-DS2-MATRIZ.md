@@ -54,3 +54,14 @@ explotada**; si no la elimina, la celda hereda la refutación con su alcance.
 Solo lectura fuera de tu zona. **No lances subagentes ni forks.** Sin git; sin Python; sin
 credenciales. Distingue **hecho**, **derivación** e **hipótesis**; ninguna cifra sin procedencia.
 Presupuesto: 3 h. Entregable: `deepseek/DS2/INFORME.md` (y `MODELO.md` con el §3.4).
+
+## 5. Complemento tras la revisión de DS-1 (obligatorio)
+
+1. Lee `P-ZRX/P-DISUASION/REVISION-DS1.md` y `P-ZRX/P-DISUASION/resultados-DS1/INFORME.md`.
+2. **Descarga con `curl` a tu zona y lee con el lector de PDF** (no con la herramienta web, que no los
+   renderiza): el artículo completo de Baig y Pietrzak (`https://arxiv.org/pdf/2505.14891`), SpaceMint
+   (Park et al., FC 2018) y, si lo encuentras, el de consumo eléctrico de Filecoin que DS-1 no pudo leer.
+3. **Pregunta nueva, antes de la matriz:** según Baig y Pietrzak, ¿qué «supuestos adicionales» escapan a
+   su imposibilidad? ¿El PoT de un solo flujo de ZEROX (D-P10) o su finalidad `C-FIN-01` son de esa
+   clase? Responde con citas del artículo y di qué cambia para A1 y A7.
+4. Las celdas de SpaceMint que dependan de la lectura directa pasan de [S] a [P] solo si leíste el PDF.
