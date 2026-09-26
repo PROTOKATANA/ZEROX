@@ -23,10 +23,12 @@ T04 (oráculo del estado DAG).
 | Orden | Contenido | Depende de | Ejecutor previsto |
 |---|---|---|---|
 | W05b2 | PoT (`pot.rs`, `pot_rango.rs` sin rama génesis), puerta conjunta, contexto de transición (D-P09…D-P11) y primer bloque PoST real hijo de un terminal dev | W05a, W05b1 | DeepSeek |
+| W05b3 | Productor PoST **en régimen** (varios padres, PoT desde el padre seleccionado) y `ServicioPot` local; hueco detectado 2026-09-26: `producir` solo fabrica el primer bloque | W02b (en paralelo a W06a/W06b) | DeepSeek |
 | W06a | `zx-cadena` en memoria + diferencial contra T04 | W03, W05a, T04 | DeepSeek |
 | W06b | Almacén RocksDB de bloques admitidos y repetición al reiniciar (D-N03′) | W02b (en paralelo a W06a) | DeepSeek |
 | W06c | Red: mensajes y transporte | W02 | DeepSeek |
-| W06d | Binario del nodo: tubería, productores, configuración dev, CLI | W05b2, W06a–c | **Sonnet** (integración compleja: el «plus») con revisión del director |
+| W06d1 | Nodo sin red: configuración dev, claves, `zx-storage` + `zx-cadena`, minero PoW con depósitos propios, productor PoST en régimen con hilo PoT y granjero, contextos `ContextoDag`/`InstantaneaPot` sobre `zx-cadena`, registro estructurado (`P-ZRX/P-MEDICION/ESCENARIOS-0.0.1.md` §1); un proceso con 3 claves cruza el corte y reinicia | W05b3, W06a, W06b | **Sonnet** (integración compleja) con revisor independiente |
+| W06d2 | Red del nodo: anuncio, petición por hash, localizador PoW, huérfanos acotados, penalización; herramienta adversarial separada (E-7, E-8) | W06c, W06d1 | Sonnet o DeepSeek, con revisor independiente |
 | W06e | Integración multinodo en proceso: 3 nodos cruzan el corte, convergen, reinician, se reorganizan | W06d | DeepSeek |
 | W07 | Red de procesos reales y mediciones (latencia, recursos, errores, fallos y ataques especificados) | W06e | DeepSeek + revisión Sonnet |
 
