@@ -531,3 +531,92 @@ Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito
 - **No calibra parámetros** (`f`, `Plazo_slots`, `M_margen_slots`): son entradas.
 - La evidencia se **descarta** cuando no valida al fusionarse; el oráculo no decide si el
   motor Rust debe además penalizar la propagación de evidencia inválida (fuera de la orden).
+
+# T04-SL3b — Cobertura de evidencia corregida (`sin_saldo` y `deshecha` por reorg)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL3b.md` (motivo: `REVISION-SL3.md`) y `CONTRATO-EVIDENCIA-v0.md` con
+**RAT-2′**. **Zona:** `T04/`. Sin Python; sin commit ni push; sin secretos.
+
+## SL3b.1. Veredicto
+
+**SUPERADO.** Se cierran las dos lagunas de cobertura señaladas en `REVISION-SL3.md` §2: el
+generador aleatorio produce evidencia **contra clave sin saldo** (`sin_saldo = 80 ≥ 30`) y el
+contador **`deshecha`** pasa a medir «aplicada en algún estado y luego deshecha por una
+reorganización» (`deshecha = 115 ≥ 30`), no el undo exacto trivial que daba
+`deshecha = construida = 771`. Se documentan las definiciones de cada contador en
+`cobertura-v0.5.txt`. `Pkg.test()` **422/422**; `run.jl` **ESTADO = SUPERADO**; vectores
+`vectores-estado-dag-v0.5.txt` (1 878 casos) con relectura **0 discrepancias**; v0…v0.4
+**intactos**.
+
+## SL3b.2. Definición de cada contador de evidencia
+
+| Contador | Definición | v0.5 |
+|---|---|---:|
+| `construida` | `EvidenceTx` presente en la historia de aplicación seleccionada | 770 |
+| `aplicada` | se aplica sin descarte al aplicarse su bloque | 227 |
+| `sin_saldo` | aplicada con `V = 0` en su clave (EV-22): pérdida 0, incidente registrado | **80** |
+| `duplicada` | descartada por `ErrEvidenciaDuplicada` (EV-12) | 30 |
+| `tardia` | descartada por `ErrEvidenciaTardia` (EV-14) | 296 |
+| `cbid_ajeno` | descartada por `ErrCbidAjeno` (RAT-1) | 137 |
+| `con_entradas` | descartada por `ErrEvidenciaConEntradas` (EV-04) | 0 |
+| `deshecha` | aplicada en la historia seleccionada en algún momento y luego retirada por una reorganización (EV-27/EV-28) | **115** |
+
+`sin_saldo` se mide contra `A.past[bid]` (como en T01). `deshecha` se mide con
+`evidencias_deshechas_por_reorg(A)`: reprocesa la historia en orden de `id` sobre una
+`Admision` nueva y, tras cada cambio de punta, cuenta las evidencias que estaban aplicadas en
+la historia anterior y ya no lo están; **no** cuenta el undo exacto de un bloque que sigue en
+la cadena seleccionada.
+
+## SL3b.3. Qué se ha implementado
+
+- `src/generadores.jl`: `evidencias_aplicadas(A)` (conjunto aplicado en la historia
+  seleccionada) y `evidencias_deshechas_por_reorg(A)` (medición por replay + cambio de punta),
+  con salida temprana si la historia no tiene `EvidenceTx` (deja barato el apartado `run.jl`).
+- `exportar.jl`: reclasifica `aplicada`/`sin_saldo`, sustituye el contador `deshecha`,
+  escribe las definiciones en la cabecera de `cobertura-v0.5.txt` y pasa el defecto a **v0.5**.
+- `test/runtests.jl`: relee v0.5 y comprueba que D-17 produce al menos una evidencia deshecha
+  por reorganización (regresión de la definición nueva).
+- `run.jl`: el registro por defecto pasa a `run-estado-dag-v0.5.log`.
+
+## SL3b.4. Vectores y relectura
+
+- `resultados/vectores-estado-dag-v0.5.txt`: **1 878 casos** (4 dirigidos de evidencia + 900
+  aleatorios + 8×120 de evidencia), sha256
+  `c7de88de1fa8755ff1742f7c7b556994a9a27296609173030e990058dade77a5`; `.sha256` relativo a
+  `T04/`.
+- Relectura independiente (`src/lector_vectores.jl`): **1 878 casos, 0 discrepancias**.
+- v0.1…v0.4 **intactos** (`sha256sum -c` OK). Releer v0.4 con el oráculo RAT-2′ da
+  discrepancias en `quemado`/recompensa, porque v0.4 se generó con RAT-2 (`techo`); el fichero
+  queda byte a byte intacto y el intento bajo RAT-2′ se conserva en
+  `relectura-v0.4-con-RAT2p.log`. La calibración de operaciones de garantía no cambia
+  (depósitos 347, retiros 808, liberaciones 115, `ErrNonce` 853 = 18,29 %, `ErrDobleGasto`
+  305, reorgs de garantía 312).
+
+## SL3b.5. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl \
+    --dirigidos 1 --aleatorios 900 --ev-replicas 120
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-estado-dag-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de
+`T04/`.
+
+## SL3b.6. Lo que T04-SL3b NO demuestra
+
+- `deshecha` mide la historia **seleccionada** de la `Admision` generada; no es una garantía
+  sobre la tasa de reorganizaciones de una red real (el generador las produce con `npost` y
+  padres aleatorios).
+- `sin_saldo` verifica que la evidencia se aplica con `V = 0`; **no** cierra la grieta
+  A12/DS-3 (declarada en EV-22).
+- La definición de `deshecha` no cubre reorgs que deshacen una evidencia y la reaplican
+  después en la misma punta: eso cuenta como aplicación, no como deshecho, en cada cambio de
+  punta.

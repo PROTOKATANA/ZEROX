@@ -5,7 +5,7 @@
 #         [--seed 0x5a5a] [--replicas 200] [--ie3-presupuesto 8000] [--salida RUTA]
 #
 # Un hilo (LINEO §7: el tope no es objetivo). Sin Python. Escribe el registro en
-# `resultados/run-estado-dag-v0.3.log` (sin sobrescribir v0, v0.1 ni v0.2),
+# `resultados/run-estado-dag-v0.5.log` (sin sobrescribir v0…v0.4),
 # publica la cobertura por tipo de operación (ORDEN-T04-C §2) y termina con
 # estado ≠ 0 si hay algún fallo.
 
@@ -47,7 +47,7 @@ function main()
     seed = parsear_seed(get(cfg, "seed", "0x5a5a"))
     replicas = parse(Int, get(cfg, "replicas", "200"))
     ie3_exhaustivos = parse(Int, get(cfg, "ie3-exhaustivos", "5"))
-    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.4.log")
+    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.5.log")
     mkpath(dirname(salida))
     io = open(salida, "w")
     t0 = time()

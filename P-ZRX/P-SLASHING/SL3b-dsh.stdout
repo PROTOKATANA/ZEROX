@@ -1,0 +1,34 @@
+He cumplido la `ORDEN-SL3b`. Resumen de lo hecho y verificado, con las cifras finales.
+
+## Entrada congelada
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL3b.sha256` → **4/4 OK** (ORDEN-SL3b, REVISION-SL3, CONTRATO-EVIDENCIA-v0 con RAT-2′, `V-ZRX/LINEO.md`). Leí íntegros los cuatro documentos y `LINEO.md` antes de tocar código.
+
+## Falta de definición detectada (informo)
+No hubo ninguna que obligara a elegir entre reglas incompatibles. Registré **AMBIGUEDAD-SL3b-1**: la orden pide «≥ 5 000 historias con evidencia sin reducir el resto»; la leí como un **barrido de evidencia dedicado** (nuevo `--ev-historias`, por defecto 5 000) que **no toca** el barrido principal. Queda documentada en `PROGRESO.md`. RAT-2′ no es ambiguo.
+
+## 1 · RAT-2′ (T01)
+- `techo_dos_octavos` → **`suelo_dos_octavos(C) = C ÷ 4`** (exportada); `aplicar_evidencia!` acredita `suelo(C·2/8)` al incluidor y quema `C − suelo(C·2/8)`.
+- Test nuevo en el testset `SL-3`: **∀ C ∈ 0:1000**, `suelo(C/4) = C÷4` y `8·(C − suelo(C/4)) ≥ 6·C` (exacto en enteros).
+
+## 2 · Cobertura de T04
+- **`sin_saldo`**: evidencia aplicada con `V=0` en su clave (EV-22), medido contra `A.past[bloque]` → **80 ≥ 30**.
+- **`deshecha`**: ahora mide «aplicada en la historia seleccionada y luego retirada por una reorganización» (nuevo `evidencias_deshechas_por_reorg`, replay + cambio de punta), no el undo trivial (que daba `771 = construida`) → **115 ≥ 30**.
+- Definiciones de cada contador escritas en `cobertura-v0.5.txt` y en el docstring de `contar_evidencia`; regresión de D-17 añadida a los tests.
+
+## 3 · Barrido de T01
+`run.jl --seed 0x5a5a --replicas 5 --rejilla reducida`: **737 280** historias del barrido principal (intacto) + **5 060** historias con evidencia (≥ 5 000), I-1…I-7 = **0 fallos**, `VEREDICTO = SIN FALLOS`, 64,8 s. `--ev-historias` por defecto 5 000.
+
+## 4 · Reexportación, relectura y tests
+| | T01 | T04 |
+|---|---|---|
+| Vectores | `vectores-transicion-v0.4.txt` · **2 795 casos** | `vectores-estado-dag-v0.5.txt` · **1 878 casos** |
+| sha256 | `4f0a175a…86ad3b0f` | `c7de88de…58dade77a5` |
+| Relectura | **0 discrepancias** | **0 discrepancias** |
+| Cobertura | `cobertura-v0.4.txt` | `cobertura-v0.5.txt` |
+| `Pkg.test()` | **2 178/2 178** (SL-3 **2 084**) | **422/422** |
+| `run.jl` | 0 fallos | `ESTADO = SUPERADO`, 71,0 s |
+
+Vectores anteriores **intactos** (`sha256sum -c` OK para v0.1…v0.3 y v0.1…v0.4). Sección **SL-3b** añadida a `INFORME.md` y `PROGRESO.md` de ambos proyectos; `HORAS.log` actualizado. Sin Python, sin `@fastmath`/`@simd`/`@inbounds`, 1 hilo, sin commit ni push, sin secretos; **todo lo escrito está en `P-TRANSICION/T01/` y `P-DAG/T04/`**.
+
+## Advertencia que el director debe conocer
+Los vectores antiguos quedan byte a byte intactos, pero **ya no se releen con 0 discrepancias bajo el oráculo RAT-2′**: T01 v0.3 da 520/2 795 diferencias y T04 v0.4 también diverge, siempre en `quemado`/recompensa (`techo` vs `suelo`), que es exactamente la corrección de la orden. Lo dejé registrado en `relectura-v0.3-con-RAT2p.log` y `relectura-v0.4-con-RAT2p.log`, y explicado en los informes (los nuevos v0.4/v0.5 sí releen con 0 discrepancias). Mientras redactaba, otro proceso modificó `P-ZRX/P-FINALIDAD-VOTOS/ORDEN-FV1-DISENO.md` (19:26); no es mío.

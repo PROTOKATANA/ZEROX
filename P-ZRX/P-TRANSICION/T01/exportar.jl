@@ -4,13 +4,13 @@
 #     julia --project=. exportar.jl [--fecha <ISO-8601>] [--salida RUTA] \
 #         [--contrato RUTA] [--dirigidos 1] [--aleatorios 2000]
 #
-# Escribe `resultados/vectores-transicion-v0.2.txt` (mismo formato de texto
-# neutral de v0.1, §3.4 de la orden, con el `nonce=` de F-15) y su sha256 en
-# `resultados/vectores-transicion-v0.2.sha256` (formato `sha256sum`). Solo
-# interfaces por defecto: CUT_HWPhi, FC3, SEC0. Un hilo, sin Python.
+# Escribe `resultados/vectores-transicion-v0.4.txt` (formato de texto neutral de
+# v0.1, §3.4 de la orden, con el `nonce=` de F-15 y el `ev=` de SL-3) y su
+# sha256 en `resultados/vectores-transicion-v0.4.sha256` (formato `sha256sum`).
+# Solo interfaces por defecto: CUT_HWPhi, FC3, SEC0. Un hilo, sin Python.
 #
-# El lector independiente vive en `src/lector_vectores.jl` y NO reutiliza
-# ninguna función de este fichero.
+# El lector independiente vive en `src/lector_vectores.jl` y NO reutiliza ninguna
+# función de este fichero.
 
 using Transicion
 using StableRNGs
@@ -18,8 +18,9 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/CONTRATO-v0.md"
-const SALIDA_DEF = "resultados/vectores-transicion-v0.3.txt"
-const COBERTURA_DEF = "resultados/cobertura-v0.3.txt"
+# SL-3b: vectores v0.4 con RAT-2′ (recompensa `suelo(C·2/8)`); v0..v0.3 se conservan.
+const SALIDA_DEF = "resultados/vectores-transicion-v0.4.txt"
+const COBERTURA_DEF = "resultados/cobertura-v0.4.txt"
 
 # --- nombres del formato ---------------------------------------------------
 
@@ -352,7 +353,7 @@ function main()
 
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-transicion-v0.3 · T01-SL3 (EvidenceTx, CONTRATO-EVIDENCIA-v0+RAT) · ",
+    println(io, "# vectores-transicion-v0.4 · T01-SL3b (EvidenceTx, RAT-2′) · ",
             fecha, " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     fallos_dirigidos = Ref(0)
@@ -414,7 +415,17 @@ function main()
     close(io)
 
     open(cobertura, "w") do ioc
-        println(ioc, "# cobertura SL-3 T01 · ", fecha)
+        println(ioc, "# cobertura SL-3b T01 v0.4 · ", fecha)
+        println(ioc, "# contadores de EvidenceTx (dirigidos + aleatorios de evidencia):")
+        println(ioc, "#  aplicada    = aplicada sin descarte en la historia seleccionada")
+        println(ioc, "#  sin_saldo   = aplicada con la clave sin garantía (V=0, EV-22)")
+        println(ioc, "#  duplicada   = descartada por ErrEvidenciaDuplicada (EV-12)")
+        println(ioc, "#  tardia      = descartada por ErrEvidenciaTardia (EV-14)")
+        println(ioc, "#  cbid_ajeno  = descartada por ErrCbidAjeno (RAT-1)")
+        println(ioc, "#  con_entradas= descartada por ErrEvidenciaConEntradas (EV-04)")
+        println(ioc, "#  orden_canonico / sin_evidencia / puerta_rat3 / otro_error / malformada / sin_padre")
+        println(ioc, "#  deshecha    = aplicada y deshecha exactamente con `deshacer` (EV-27);")
+        println(ioc, "#                T01 no fusiona ramas, así que no mide reorganización")
         for k in sort(collect(keys(cov)))
             println(ioc, k, " = ", cov[k])
         end

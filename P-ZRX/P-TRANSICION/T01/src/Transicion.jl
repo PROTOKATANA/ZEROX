@@ -38,7 +38,7 @@ export subsidio_pow, subsidio_post, estado_inicial, clonar, aplicar, aplicar!,
        gastable_en, nonce_de
 export ID_LIB, LIMITE_ID_EXPLICITO
 export incident_id, total_garantia, debitar_garantia!, techo_fraccion,
-       techo_dos_octavos, podar_incidentes!, aplicar_evidencia!
+       suelo_dos_octavos, podar_incidentes!, aplicar_evidencia!
 export invariante_I1, invariante_I1b, suma_utxo, suma_garantias,
        representacion_canonica, hash_canonico
 export seleccionar, seleccionar_con, ResultadoSeleccion, nodo_en_linea,
@@ -1000,8 +1000,9 @@ function techo_fraccion(V::Int128, f_num::Int, f_den::Int)
     return (V * Int128(f_num) + Int128(f_den) - 1) ÷ Int128(f_den)
 end
 
-# RAT-2: techo_exacto(C·2/8) = ceil(C/4).
-techo_dos_octavos(C::Int128) = C <= 0 ? Int128(0) : (C + Int128(3)) ÷ Int128(4)
+# RAT-2′: suelo(C·2/8) = floor(C/4), división entera hacia abajo (corrige RAT-2,
+# que usaba techo y podía dejar la pérdida del infractor por debajo de 6/8·C).
+suelo_dos_octavos(C::Int128) = C <= 0 ? Int128(0) : C ÷ Int128(4)
 
 # Debita `c` de las sub-cuentas en orden determinista:
 # activo → pendientes → en_retirada → créditos (EV-19/EV-20).
@@ -1073,7 +1074,7 @@ function podar_incidentes!(E::Estado, P::Params, punto::Int)
     return nothing
 end
 
-# Crédito de la recompensa RAT-2 al productor del bloque que aplica, con la
+# Crédito de la recompensa RAT-2′ al productor del bloque que aplica, con la
 # madurez de la coinbase PoST (RD-1 en T04: punto de aplicación).
 function acreditar_credito!(E::Estado, P::Params, productor::Int,
                             importe::UInt64, punto::Int)
@@ -1126,9 +1127,9 @@ function aplicar_evidencia!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
     # EV-19: confiscación.
     C = min(V, techo_fraccion(V, P.f_num, P.f_den))
     debitar_garantia!(g, C)
-    # RAT-2: techo(C·2/8) al productor (coinbase del bloque que aplica); el
+    # RAT-2′: suelo(C·2/8) al productor (coinbase del bloque que aplica); el
     # resto se quema.
-    recompensa = techo_dos_octavos(C)
+    recompensa = suelo_dos_octavos(C)
     r = acreditar_credito!(E, P, B.productor, UInt64(recompensa), punto)
     r isa Err && return r
     E.quemado += C - recompensa

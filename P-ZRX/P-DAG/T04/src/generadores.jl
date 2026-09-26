@@ -377,6 +377,64 @@ function reorgs_que_deshacen_garantia(A::Admision)
     return reorgs
 end
 
+"¿Contiene `A` alguna `EvidenceTx` en algún bloque PoST?"
+function _hay_evidencia(A::Admision)
+    for b in values(A.por_id)
+        for tx in b.txs
+            tx.tipo == Transicion.TxEvidencia && return true
+        end
+    end
+    return false
+end
+
+"Conjunto `(idBloque, índiceTx)` de evidencias aplicadas en la historia seleccionada."
+function evidencias_aplicadas(A::Admision)
+    _, orden, desc = aplicar_historia(A)
+    descartadas = Set{Tuple{Int,Int}}((idb, itx) for (idb, itx, _) in desc)
+    ops = Set{Tuple{Int,Int}}()
+    for bid in orden
+        b = A.por_id[bid]
+        for (i, tx) in enumerate(b.txs)
+            tx.tipo == Transicion.TxEvidencia || continue
+            (bid, i) in descartadas || push!(ops, (bid, i))
+        end
+    end
+    return ops
+end
+
+"""
+Evidencias **aplicadas en algún estado y luego deshechas por una reorganización**
+(EV-27/EV-28): se reprocesa la historia en orden de `id` sobre una `Admision`
+nueva y, tras cada bloque que cambia la punta seleccionada, se cuentan las
+evidencias que estaban aplicadas en la historia anterior y ya no lo están. No
+cuenta el undo exacto de un bloque que sigue en la cadena seleccionada. Devuelve
+el conjunto de pares `(idBloque, índiceTx)`.
+"""
+function evidencias_deshechas_por_reorg(A::Admision)
+    _hay_evidencia(A) || return Set{Tuple{Int,Int}}()
+    A2 = Admision(A.pd, A.pow_bloques, A._id_T)
+    bloques = sort(collect(values(A.por_id)); by = b -> b.id)
+    prev_tip = A._id_T
+    prev_ev = Set{Tuple{Int,Int}}()
+    deshechas = Set{Tuple{Int,Int}}()
+    for b in bloques
+        b.id in A2.procesados && continue
+        procesar_uno!(A2, b)
+        tips = tips_validas(A2)
+        isempty(tips) && continue
+        tip = mejor_punta(A2, tips)
+        ev = evidencias_aplicadas(A2)
+        if tip != prev_tip
+            for x in setdiff(prev_ev, ev)
+                push!(deshechas, x)
+            end
+        end
+        prev_tip = tip
+        prev_ev = ev
+    end
+    return deshechas
+end
+
 "Acumula la cobertura de una historia `A` en `ac`."
 function acumular_caso!(ac::AcumuladorCobertura, A::Admision)
     for b in values(A.por_id)
@@ -409,7 +467,7 @@ end
 """
 Cobertura de la batería `run.jl` con sus valores por defecto (mismos casos que
 `run.jl --seed 0x5a5a --replicas 200`). La usa `exportar.jl` para el apartado
-`run.jl` de `resultados/cobertura-v0.3.txt`.
+`run.jl` de `resultados/cobertura-v0.5.txt`.
 """
 function cobertura_run(; seed::UInt64 = UInt64(0x5a5a), replicas::Int = 200)
     ac = AcumuladorCobertura()

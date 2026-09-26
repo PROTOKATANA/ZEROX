@@ -3,10 +3,10 @@
 #     julia --project=. exportar.jl [--fecha ISO-8601] [--salida RUTA] \
 #         [--contrato RUTA] [--dirigidos 1] [--aleatorios 900] [--cobertura RUTA]
 #
-# Escribe `resultados/vectores-estado-dag-v0.3.txt` (formato de T01-B ampliado con
+# Escribe `resultados/vectores-estado-dag-v0.5.txt` (formato de T01-B ampliado con
 # `padres=[…]`, líneas `DESC` y `nonce=` en depósito/retiro/liberación y `GAR`) y su
 # `sha256` en el `.sha256` (formato `sha256sum`). Además escribe
-# `resultados/cobertura-v0.3.txt` (apartados vectores y run.jl) con la tabla de
+# `resultados/cobertura-v0.5.txt` (apartados vectores y run.jl) con la tabla de
 # cobertura por tipo de operación de la ORDEN-T04-C §2. Solo interfaces por defecto
 # (CUT_HWPhi, FC3, SEC0) y la rejilla declarada de T04. Un hilo, sin Python.
 #
@@ -20,9 +20,10 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md"
-# SL-3: vectores v0.4 con EvidenceTx (C-EVP activo); v0..v0.3 se conservan.
-const SALIDA_DEF = "resultados/vectores-estado-dag-v0.4.txt"
-const COBERTURA_DEF = "resultados/cobertura-v0.4.txt"
+# SL-3b: vectores v0.5 con EvidenceTx (RAT-2′) y cobertura de sin_saldo/reorg;
+# v0..v0.4 se conservan.
+const SALIDA_DEF = "resultados/vectores-estado-dag-v0.5.txt"
+const COBERTURA_DEF = "resultados/cobertura-v0.5.txt"
 
 const NOMBRE_FAMILIA = Dict(Transicion.Genesis => "Genesis", Transicion.PoW => "PoW",
                             Transicion.PoST => "PoST")
@@ -212,7 +213,24 @@ end
 
 inc!(d::Dict{String,Int}, k::AbstractString) = (d[k] = get(d, k, 0) + 1)
 
-"Clasifica las `EvidenceTx` de `A` por su resultado en la historia seleccionada."
+"""
+Clasifica las `EvidenceTx` de `A` por su resultado en la historia seleccionada y
+acumula los contadores. Definición de cada contador (se copia a
+`cobertura-v0.5.txt`):
+
+ * `construida`   — EvidenceTx presente en la historia de aplicación seleccionada.
+ * `aplicada`     — se aplica sin descarte al aplicarse su bloque.
+ * `sin_saldo`    — aplicada con `V = 0` en su clave (EV-22): pérdida 0, incidente
+                    registrado; se mide contra el estado `past(bloque)`.
+ * `duplicada`    — descartada por `ErrEvidenciaDuplicada` (EV-12).
+ * `tardia`       — descartada por `ErrEvidenciaTardia` (EV-14).
+ * `cbid_ajeno`   — descartada por `ErrCbidAjeno` (RAT-1).
+ * `con_entradas` — descartada por `ErrEvidenciaConEntradas` (EV-04).
+ * `orden_canonico` / `sin_evidencia` / `otro` — resto de descartes.
+ * `deshecha`     — aplicada en la historia seleccionada en algún momento y luego
+                    retirada por una reorganización (EV-27/EV-28). No cuenta el
+                    undo exacto de un bloque que sigue en la cadena seleccionada.
+"""
 function contar_evidencia(A::Admision, acc::Dict{String,Int})
     _, orden, desc = aplicar_historia(A)
     dm = Dict{Tuple{Int,Int},Transicion.Err}()
@@ -226,7 +244,14 @@ function contar_evidencia(A::Admision, acc::Dict{String,Int})
             inc!(acc, "construida")
             e = get(dm, (bid, i), nothing)
             if e === nothing
-                inc!(acc, "aplicada")
+                ev = tx.evidencia
+                if ev === nothing
+                    inc!(acc, "malformada")
+                    continue
+                end
+                g = get(A.past[bid].garantias, ev.id1.clave, nothing)
+                V = g === nothing ? Int128(0) : Transicion.total_garantia(g)
+                inc!(acc, V == 0 ? "sin_saldo" : "aplicada")
             else
                 k = e == Transicion.ErrEvidenciaDuplicada ? "duplicada" :
                     e == Transicion.ErrEvidenciaTardia    ? "tardia" :
@@ -238,17 +263,8 @@ function contar_evidencia(A::Admision, acc::Dict{String,Int})
             end
         end
     end
-    # EV-27: undo exacto del bloque que aplica evidencia (medido, no por reorg).
-    for bid in orden
-        b = A.por_id[bid]
-        any(tx -> tx.tipo == Transicion.TxEvidencia, b.txs) || continue
-        E = A.past[bid]
-        r = aplicar_fusion_con_undo(A, E, b, b.slot)
-        if r isa Tuple
-            EstadoDAG.hash_canonico(r[2]) == EstadoDAG.hash_canonico(E) &&
-                inc!(acc, "deshecha")
-        end
-    end
+    n_deshechas = length(EstadoDAG.evidencias_deshechas_por_reorg(A))
+    n_deshechas > 0 && (acc["deshecha"] = get(acc, "deshecha", 0) + n_deshechas)
     return acc
 end
 
@@ -270,7 +286,7 @@ function main()
     flush(stdout)
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-estado-dag-v0.4 · T04-SL3 (EvidenceTx, C-EVP+RAT) · ",
+    println(io, "# vectores-estado-dag-v0.5 · T04-SL3b (EvidenceTx, RAT-2′) · ",
             fecha, " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     aev = Dict{String,Int}()
@@ -319,8 +335,19 @@ function main()
     # Cobertura (ORDEN-T04-C §2): apartado vectores y apartado run.jl.
     mkpath(dirname(cobertura))
     ioc = open(cobertura, "w")
-    println(ioc, "# cobertura T04-SL3 v0.4 · ", fecha, " · contrato ",
+    println(ioc, "# cobertura T04-SL3b v0.5 · ", fecha, " · contrato ",
             sha256_archivo(contrato))
+    println(ioc, "# definiciones de los contadores de evidencia (sec. evidencia):")
+    println(ioc, "#  construida   = EvidenceTx presente en la historia de aplicación seleccionada")
+    println(ioc, "#  aplicada     = se aplica sin descarte al aplicarse su bloque")
+    println(ioc, "#  sin_saldo    = aplicada con V=0 en su clave (EV-22, pérdida 0, incidente registrado)")
+    println(ioc, "#  duplicada    = descartada por ErrEvidenciaDuplicada (EV-12)")
+    println(ioc, "#  tardia       = descartada por ErrEvidenciaTardia (EV-14)")
+    println(ioc, "#  cbid_ajeno   = descartada por ErrCbidAjeno (RAT-1)")
+    println(ioc, "#  con_entradas = descartada por ErrEvidenciaConEntradas (EV-04)")
+    println(ioc, "#  deshecha     = aplicada en la historia seleccionada en algún momento y luego")
+    println(ioc, "#                 retirada por una reorganización (EV-27/EV-28); no cuenta el undo")
+    println(ioc, "#                 exacto de un bloque que sigue en la cadena seleccionada")
     println(ioc, "# generador: pesos=", EstadoDAG.PESOS_AJUSTADOS,
             " npost=", min(EstadoDAG.npost_t04c(0), EstadoDAG.npost_t04c(1)), "..",
             max(EstadoDAG.npost_t04c(0), EstadoDAG.npost_t04c(1)),
@@ -328,8 +355,8 @@ function main()
     println(ioc, "# minimos: depositos_aplicados>=150 retiros_aplicados>=100 ",
             "liberaciones_aplicadas>=100 ErrNonce>=30 y <=25% de garantia ",
             "construida ErrDobleGasto>=200 reorgs_garantia>=20")
-    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.4 (casos aleatorios)", ac)
-    println(ioc, "SECCION evidencia SL-3 (dirigidos + aleatorios C-EVP)")
+    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.5 (casos aleatorios)", ac)
+    println(ioc, "SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)")
     for k in sort(collect(keys(aev)))
         println(ioc, "EV ", k, " = ", aev[k])
     end

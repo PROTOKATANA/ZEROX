@@ -2,6 +2,9 @@
 #
 #     julia --project=. run.jl --seed 0x5a5a --replicas 200 --rejilla reducida
 #
+# Opciones extra: `--paso N`, `--i3-cada N`, `--i3-perm N` y
+# `--ev-historias N` (por defecto 5000; barrido de evidencia con ≥ N historias).
+#
 # No paraleliza (1 hilo): el oráculo es la referencia (ORDEN §6.5).
 
 using Transicion
@@ -149,11 +152,13 @@ function main()
     paso = parse(Int, get(cfg, "paso", "1"))
     i3_cada = parse(Int, get(cfg, "i3-cada", "200"))
     i3_perm = parse(Int, get(cfg, "i3-perm", "5"))
+    ev_historias = parse(Int, get(cfg, "ev-historias", "5000"))
 
     puntos = puntos_rejilla(rejilla = rejilla)[1:paso:end]
     @printf("T01 run: semilla=%s (0x%016x) replicas=%d rejilla=%s puntos=%d paso=%d\n",
             string(semilla), semilla, replicas, rejilla, length(puntos), paso)
-    @printf("subsidio_pow=10 subsidio_post=3  i3_cada=%d i3_perm=%d\n", i3_cada, i3_perm)
+    @printf("subsidio_pow=10 subsidio_post=3  i3_cada=%d i3_perm=%d ev_historias=%d\n",
+            i3_cada, i3_perm, ev_historias)
     flush(stdout)
 
     fallos = zeros(Int, 7)
@@ -193,12 +198,16 @@ function main()
             flush(stdout)
         end
     end
-    # --- SL-3: historias con evidencia ------------------------------------
+    # --- SL-3b: barrido de evidencia (≥ `ev_historias` historias) ----------
     total_ev = 0
     fallos_ev = zeros(Int, 7)
     undos_ev = 0
     n_rat3 = 0
-    for P in puntos_evidencia()
+    puntos_ev = puntos_evidencia()
+    # Cada punto aporta 6 tipos de caso (`casos_evidencia_cobertura`); se elige
+    # `n` para cubrir el objetivo sin reducir el barrido principal de arriba.
+    n_ev_tipo = max(1, cld(ev_historias, 6 * length(puntos_ev)))
+    for P in puntos_ev
         casos = Tuple{String,Vector{Bloque}}[]
         cam = caso_rat3_carrera(P)
         if cam !== nothing
@@ -206,7 +215,7 @@ function main()
         end
         au = caso_autodenuncia(P)
         isempty(au[1]) || push!(casos, ("EV-autodenuncia", au[1]))
-        append!(casos, casos_evidencia_cobertura(P; n = max(1, replicas ÷ 20)))
+        append!(casos, casos_evidencia_cobertura(P; n = n_ev_tipo))
         for (_, bl) in casos
             f, nu, _, _ = verificar(bl, P; con_i3 = false, i3_perm = 0)
             fallos_ev .+= f

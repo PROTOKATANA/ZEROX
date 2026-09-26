@@ -11,7 +11,7 @@ using EstadoDAG
 import EstadoDAG.Transicion
 using SHA
 
-const RUTA_DEF = "resultados/vectores-estado-dag-v0.4.txt"
+const RUTA_DEF = "resultados/vectores-estado-dag-v0.5.txt"
 
 const FAMILIA_DE = Dict("Genesis" => Transicion.Genesis, "PoW" => Transicion.PoW,
                         "PoST" => Transicion.PoST)

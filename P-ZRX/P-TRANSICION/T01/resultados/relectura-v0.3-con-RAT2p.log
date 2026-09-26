@@ -1,0 +1,23 @@
+leidos_casos = 2795
+discrepancias = 520
+SOLO-1 GAR caso=2056
+SOLO-1 EST caso=2056 esperado=EST emitido=26 quemado=4 fase=FasePoST terminal=3 altura=2 slot=2 peso_sufijo=2 obtenido=EST emitido=26 quemado=5 fase=FasePoST terminal=3 altura=2 slot=2 peso_sufijo=2
+SOLO-1 GAR caso=2057
+SOLO-1 EST caso=2057 esperado=EST emitido=29 quemado=5 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3 obtenido=EST emitido=29 quemado=6 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3
+SOLO-1 GAR caso=2058
+SOLO-1 EST caso=2058 esperado=EST emitido=29 quemado=5 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3 obtenido=EST emitido=29 quemado=6 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3
+SOLO-1 GAR caso=2063
+SOLO-1 EST caso=2063 esperado=EST emitido=32 quemado=6 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=4 obtenido=EST emitido=32 quemado=7 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=4
+SOLO-1 GAR caso=2064
+SOLO-1 EST caso=2064 esperado=EST emitido=32 quemado=6 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=4 obtenido=EST emitido=32 quemado=7 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=4
+SOLO-1 GAR caso=2069
+SOLO-1 EST caso=2069 esperado=EST emitido=26 quemado=4 fase=FasePoST terminal=3 altura=2 slot=2 peso_sufijo=2 obtenido=EST emitido=26 quemado=5 fase=FasePoST terminal=3 altura=2 slot=2 peso_sufijo=2
+SOLO-1 GAR caso=2070
+SOLO-1 EST caso=2070 esperado=EST emitido=26 quemado=4 fase=FasePoST terminal=3 altura=2 slot=2 peso_sufijo=2 obtenido=EST emitido=26 quemado=5 fase=FasePoST terminal=3 altura=2 slot=2 peso_sufijo=2
+SOLO-1 GAR caso=2075
+SOLO-1 EST caso=2075 esperado=EST emitido=29 quemado=5 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3 obtenido=EST emitido=29 quemado=6 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3
+SOLO-1 GAR caso=2076
+SOLO-1 EST caso=2076 esperado=EST emitido=29 quemado=5 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3 obtenido=EST emitido=29 quemado=6 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3
+SOLO-1 GAR caso=2081
+SOLO-1 EST caso=2081 esperado=EST emitido=32 quemado=6 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=4 obtenido=EST emitido=32 quemado=7 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=4
+VEREDICTO_LECTURA = CON DISCREPANCIAS

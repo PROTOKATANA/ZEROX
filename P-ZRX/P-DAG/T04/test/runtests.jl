@@ -173,6 +173,8 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
         @test m.undo
         @test m.I1
         @test isempty(verificar_ie1_ie2_ie4(A))
+        # SL-3b: la evidencia de Xa se aplicó y una reorganización la deshizo.
+        @test !isempty(EstadoDAG.evidencias_deshechas_por_reorg(A))
 
         nombre, A, m = EstadoDAG.caso_evidencia_descartes(pdev)
         @test m.cbid == 1
@@ -234,7 +236,7 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
     end
 
     @testset "relectura de vectores" begin
-        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.4.txt")
+        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.5.txt")
         if isfile(ruta)
             cmd = `$(Base.julia_cmd()) --project=$(dirname(@__DIR__)) $(joinpath(@__DIR__, "..", "src", "lector_vectores.jl")) $ruta`
             p = run(ignorestatus(cmd))

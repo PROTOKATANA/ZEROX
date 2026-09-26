@@ -1,0 +1,23 @@
+leidos_casos = 1878
+discrepancias = 285
+GAR caso=17
+EST caso=17 esperado=EST emitido=32 quemado=8 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3 obtenido=EST emitido=32 quemado=9 fase=FasePoST terminal=3 altura=2 slot=3 peso_sufijo=3
+GAR caso=920
+EST caso=920 esperado=EST emitido=61 quemado=13 fase=FasePoST terminal=3 altura=2 slot=7 peso_sufijo=6 obtenido=EST emitido=61 quemado=14 fase=FasePoST terminal=3 altura=2 slot=7 peso_sufijo=6
+GAR caso=936
+EST caso=936 esperado=EST emitido=56 quemado=17 fase=FasePoST terminal=3 altura=2 slot=5 peso_sufijo=6 obtenido=EST emitido=56 quemado=19 fase=FasePoST terminal=3 altura=2 slot=5 peso_sufijo=6
+GAR caso=939
+EST caso=939 esperado=EST emitido=55 quemado=5 fase=FasePoST terminal=3 altura=2 slot=8 peso_sufijo=5 obtenido=EST emitido=55 quemado=6 fase=FasePoST terminal=3 altura=2 slot=8 peso_sufijo=5
+GAR caso=951
+EST caso=951 esperado=EST emitido=38 quemado=10 fase=FasePoST terminal=3 altura=2 slot=5 peso_sufijo=5 obtenido=EST emitido=38 quemado=11 fase=FasePoST terminal=3 altura=2 slot=5 peso_sufijo=5
+GAR caso=969
+EST caso=969 esperado=EST emitido=61 quemado=17 fase=FasePoST terminal=3 altura=2 slot=8 peso_sufijo=5 obtenido=EST emitido=61 quemado=18 fase=FasePoST terminal=3 altura=2 slot=8 peso_sufijo=5
+GAR caso=972
+EST caso=972 esperado=EST emitido=62 quemado=6 fase=FasePoST terminal=3 altura=2 slot=8 peso_sufijo=4 obtenido=EST emitido=62 quemado=7 fase=FasePoST terminal=3 altura=2 slot=8 peso_sufijo=4
+GAR caso=975
+EST caso=975 esperado=EST emitido=64 quemado=5 fase=FasePoST terminal=3 altura=2 slot=7 peso_sufijo=6 obtenido=EST emitido=64 quemado=6 fase=FasePoST terminal=3 altura=2 slot=7 peso_sufijo=6
+GAR caso=988
+EST caso=988 esperado=EST emitido=59 quemado=4 fase=FasePoST terminal=3 altura=2 slot=10 peso_sufijo=6 obtenido=EST emitido=59 quemado=5 fase=FasePoST terminal=3 altura=2 slot=10 peso_sufijo=6
+GAR caso=994
+EST caso=994 esperado=EST emitido=53 quemado=5 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=6 obtenido=EST emitido=53 quemado=6 fase=FasePoST terminal=3 altura=2 slot=4 peso_sufijo=6
+VEREDICTO_LECTURA = CON DISCREPANCIAS

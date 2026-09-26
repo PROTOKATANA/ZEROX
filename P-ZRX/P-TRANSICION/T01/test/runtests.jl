@@ -609,7 +609,7 @@ end
         @test length(g.incidentes) == 1
         @test g.congelado == UInt64(total_garantia(g))
         @test invariante_I1(Eapl)
-        # EV-19 con f = 1: C = V (V > 0 aquí), recompensa techo(C/4), quema 6/8.
+        # EV-19 con f = 1: C = V (V > 0 aquí), recompensa suelo(C/4), quema ≥ 6/8.
         # V se recupera del estado padre del bloque que aplica.
         Epre = _aplicar_cadena(apl, P; hasta = length(apl) - 1)
         @test Epre isa Estado
@@ -626,7 +626,7 @@ end
         @test invariante_I1(Ess)
     end
 
-    # --- f = 1/2: C = techo(V/2), recompensa techo(C/4) --------------------
+    # --- f = 1/2: C = techo(V/2), recompensa suelo(C/4) --------------------
     P2 = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
                 S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
                 M_rec_slots = 1, R_slots = 4, F_slots = typemax(Int), sec = SEC0,
@@ -641,9 +641,9 @@ end
         V = _v_antes_evidencia(Epre2, bl2[end], P2, 1)
         C = min(V, techo_fraccion(V, 1, 2))
         @test V > 0
-        @test E2.quemado - Epre2.quemado == C - techo_dos_octavos(C)
+        @test E2.quemado - Epre2.quemado == C - suelo_dos_octavos(C)
         cred = [p.importe for p in E2.garantias[1].creditos]
-        @test UInt64(techo_dos_octavos(C)) in cred
+        @test UInt64(suelo_dos_octavos(C)) in cred
         @test invariante_I1(E2)
     end
 
@@ -673,11 +673,11 @@ end
         end
     end
 
-    # --- RAT-2: autodenuncia ----------------------------------------------
-    # Pérdida neta = C − techo(C/4). RAT-2 la enuncia como «6/8·C»; con el
-    # techo, la igualdad exacta 6/8·C se da cuando C ≡ 0 (mod 4)
-    # (AMBIGUEDAD-SL3-9). Se comprueba la fórmula exacta en 30 índices y, en
-    # cuanto aparece un C múltiplo de 8, la igualdad 6/8·C.
+    # --- RAT-2′: autodenuncia ---------------------------------------------
+    # Pérdida neta = C − suelo(C/4). RAT-2′ fija el reparto de forma que la
+    # pérdida del infractor es siempre ≥ 6/8·C (resuelve AMBIGUEDAD-SL3-9, que
+    # aparecía con el techo de RAT-2). Se comprueba la fórmula exacta en 30
+    # índices y, en cuanto aparece un C múltiplo de 8, la igualdad 6/8·C.
     n_auto = 0
     n_auto_8 = 0
     for idx in 1:30
@@ -688,7 +688,7 @@ end
         V = _v_antes_evidencia(Eprea, bla[end], P, 1)
         C = min(V, techo_fraccion(V, 1, 1))
         perdida = ra.quemado - Eprea.quemado
-        @test perdida == C - techo_dos_octavos(C)
+        @test perdida == C - suelo_dos_octavos(C)
         n_auto += 1
         if C % 8 == 0
             @test perdida == 6 * (C ÷ 8)
@@ -721,7 +721,7 @@ end
         E2 = aplicar(E1, Bev, P)
         @test E2 isa Estado
         if E2 isa Estado
-            @test E2.quemado - E1.quemado == C - techo_dos_octavos(C)
+            @test E2.quemado - E1.quemado == C - suelo_dos_octavos(C)
             if C % 8 == 0
                 @test E2.quemado - E1.quemado == 6 * (C ÷ 8)
                 n_auto_8 += 1
@@ -729,6 +729,16 @@ end
         end
     end
     @test n_auto_8 > 0
+
+    # --- RAT-2′: para todo C ∈ 0:1000, la pérdida del infractor ≥ 6/8·C -----
+    # `perdida = C − suelo(C·2/8)`; con enteros, `8·perdida ≥ 6·C` es la
+    # desigualdad exacta (sin comparar flotantes).
+    for C in 0:1000
+        recompensa = suelo_dos_octavos(Int128(C))
+        perdida = Int128(C) - recompensa
+        @test recompensa == Int128(C) ÷ Int128(4)
+        @test 8 * perdida >= 6 * Int128(C)
+    end
 
     # --- EV-01/EV-04/EV-06/EV-07: forma y semántica ------------------------
     blb, Eb = _base_post(P)

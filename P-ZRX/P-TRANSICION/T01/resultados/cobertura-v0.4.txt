@@ -1,0 +1,18 @@
+# cobertura SL-3b T01 v0.4 · 2026-09-26T19:20:29+02:00
+# contadores de EvidenceTx (dirigidos + aleatorios de evidencia):
+#  aplicada    = aplicada sin descarte en la historia seleccionada
+#  sin_saldo   = aplicada con la clave sin garantía (V=0, EV-22)
+#  duplicada   = descartada por ErrEvidenciaDuplicada (EV-12)
+#  tardia      = descartada por ErrEvidenciaTardia (EV-14)
+#  cbid_ajeno  = descartada por ErrCbidAjeno (RAT-1)
+#  con_entradas= descartada por ErrEvidenciaConEntradas (EV-04)
+#  orden_canonico / sin_evidencia / puerta_rat3 / otro_error / malformada / sin_padre
+#  deshecha    = aplicada y deshecha exactamente con `deshacer` (EV-27);
+#                T01 no fusiona ramas, así que no mide reorganización
+aplicada = 260
+cbid_ajeno = 120
+con_entradas = 120
+deshecha = 380
+duplicada = 40
+sin_saldo = 120
+tardia = 200

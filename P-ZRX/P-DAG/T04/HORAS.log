@@ -26,3 +26,5 @@
 2026-09-26T05:29:37+02:00  # T04-D Pkg.test(), artefacto y cierre
 2026-09-26T18:43:43+02:00
 2026-09-26T19:13:27+02:00
+2026-09-26T19:14:00+02:00  # SL-3b inicio (aprox., tras ENTRADA-SL3b 4/4 OK)
+2026-09-26T19:25:50+02:00  # SL-3b cierre (tests, run.jl, vectores v0.5)

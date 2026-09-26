@@ -746,7 +746,7 @@ Todas se resuelven con una lectura que no altera ninguna otra regla; se registra
   `C` no múltiplo de 4 la pérdida neta es `C − techo(C/4) ≥ 6/8·C` solo si `C ≥ 4`
   (p. ej. `C = 1` da recompensa 1 y pérdida 0). Se implementa la letra de RAT-2 y se
   documenta; los casos dirigidos usan `C` múltiplo de 8 para la comprobación exacta
-  `6/8·C`.
+  `6/8·C`. **Resuelta por RAT-2′ (SL-3b):** la recompensa pasa a `suelo(C·2/8) = C ÷ 4`.
 
 **Conclusión:** ninguna ambigüedad obliga a elegir entre reglas incompatibles; no
 procede detenerse. Se aplican las lecturas anteriores y se documentan en `INFORME.md`.
@@ -775,3 +775,53 @@ procede detenerse. Se aplican las lecturas anteriores y se documentan en `INFORM
 - *Nota de redondeo* (AMBIGUEDAD-SL3-9): `perdida = C − techo(C/4)`; la igualdad `6/8·C` es
   exacta cuando `C ≡ 0 (mod 8)`, y el caso dirigido controlado (depósito previo) lo verifica.
 - **Cierre T01: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push; sin Python.
+
+# SL-3b — Correcciones del oráculo de evidencia (T01)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL3b.md` (motivo: `REVISION-SL3.md`) y `CONTRATO-EVIDENCIA-v0.md` con
+**RAT-2′**. **Zona:** `T01/`. Sin Python; sin commit ni push.
+
+## SL3b.0. Entrada congelada (inicio)
+
+`LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL3b.sha256`: **4/4 OK** (ORDEN-SL3b,
+REVISION-SL3, CONTRATO-EVIDENCIA-v0 con RAT-2′, `V-ZRX/LINEO.md`).
+
+## SL3b.1. Falta de definición detectada antes de editar (obligatorio informar)
+
+- **AMBIGUEDAD-SL3b-1 — alcance del «barrido» de evidencia.** La orden pide «al menos
+  5 000 historias con evidencia (sin reducir el resto)». Lectura adoptada: el barrido
+  principal se conserva **intacto** (147 456 puntos × réplicas) y el bloque de evidencia de
+  `run.jl` escala al objetivo (`--ev-historias`, por defecto 5 000; 6 tipos × 12 puntos de
+  evidencia). No obliga a elegir entre reglas incompatibles; no se detuvo la ejecución.
+- **RAT-2′** no es ambiguo: sustituye `techo(C·2/8)` por `suelo(C·2/8) = C ÷ 4`.
+
+## SL3b.2. Diario de ejecución
+
+- *Código*: `techo_dos_octavos` → `suelo_dos_octavos` (`C ÷ 4`, exportada);
+  `aplicar_evidencia!` acredita `suelo(C·2/8)` al productor y quema `C − suelo(C·2/8)`.
+  `run.jl` gana `--ev-historias` (por defecto 5 000) con
+  `n_ev_tipo = cld(ev_historias, 6 · |puntos_evidencia|)`; el barrido principal no cambia.
+  `exportar.jl` a **v0.4** con cabecera SL-3b y definiciones de contadores;
+  `src/lector_vectores.jl` por defecto v0.4.
+- *Tests*: `Pkg.test()` **2 178/2 178** (testset `SL-3` **2 084/2 084**). Incluye la
+  propiedad nueva `∀ C ∈ 0:1000: 8·(C − suelo(C/4)) ≥ 6·C` y `suelo(C/4) = C ÷ 4`
+  (2 002 aserciones nuevas). Registro `resultados/test-pkg-SL3b.log`.
+- *run.jl* `--seed 0x5a5a --replicas 5 --rejilla reducida`: 147 456 puntos, **737 280**
+  historias (sin reducir), 4 595 520 undos, **I-1…I-7 = 0 fallos**; bloque de evidencia
+  **5 060** historias (≥ 5 000), 22 768 undos, **8** RAT-3 bloqueadas, 0 fallos; 64,8 s,
+  1 hilo. `VEREDICTO = SIN FALLOS`. Registro `resultados/run-reducida-SL3b.log`.
+- *Vectores v0.4*: **2 795 casos**, sha256
+  `4f0a175a3b4390e40248a70b62e22829c5233311d4dfdce5c2ed164786ad3b0f`; relectura
+  independiente (`src/lector_vectores.jl`) **0 discrepancias** (`relectura-v0.4.log`).
+  Cobertura `resultados/cobertura-v0.4.txt`: aplicada 260, `cbid` ajeno 120, con entradas
+  120, deshecha 380 (undo exacto EV-27), duplicada 40, sin saldo 120, tardía 200.
+- *Anteriores intactos*: `sha256sum -c` OK para v0.1, v0.2 y v0.3 (v0 conserva su
+  `.sha256` de formato antiguo). **Nota necesaria:** releer v0.3 con el oráculo RAT-2′ da
+  discrepancias en `quemado`/recompensa (520 de 2 795), porque v0.3 se generó con RAT-2
+  (`techo`); es exactamente el cambio de redondeo que corrige la orden. El fichero v0.3
+  queda byte a byte intacto y su relectura histórica bajo RAT-2
+  (`relectura-v0.3.log`) sigue siendo 0 discrepancias; el intento bajo RAT-2′ queda
+  registrado en `relectura-v0.3-con-RAT2p.log`.
+- **Cierre T01-SL3b: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push; sin
+  Python; sin secretos.

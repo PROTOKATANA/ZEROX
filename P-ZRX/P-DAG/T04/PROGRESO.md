@@ -435,3 +435,56 @@ de T04:
   **0 discrepancias**; v0.3 intacto y releído con 0 discrepancias. Cobertura de evidencia:
   aplicada 307, duplicada 30, tardía 297, `cbid` 137, deshecha 771.
 - **Cierre T04: SUPERADO.** Nada escrito fuera de `T04/`; sin commit ni push; sin Python.
+
+# SL-3b — Correcciones de cobertura de evidencia (T04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL3b.md` (motivo: `REVISION-SL3.md`) y `CONTRATO-EVIDENCIA-v0.md` con
+**RAT-2′**. **Zona:** `T04/`. Sin Python; sin commit ni push.
+
+## SL3b.0. Entrada congelada (inicio)
+
+`LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL3b.sha256`: **4/4 OK**.
+
+## SL3b.1. Falta de definición detectada antes de editar
+
+Ninguna regla incompatible. Se registran dos lecturas de medición, ambas exigidas por la
+orden:
+
+- **`sin_saldo`**: evidencia **aplicada** cuya clave tiene `V = 0` en `past(bloque)` (EV-22);
+  pérdida 0 pero incidente registrado. Se mide contra `A.past[bid]`, igual que el contador
+  homónimo de T01.
+- **`deshecha`**: evidencia **aplicada en la historia seleccionada en algún momento y luego
+  retirada por una reorganización** (EV-27/EV-28). Se mide reprocesando la historia en orden
+  de `id` sobre una `Admision` nueva y comparando el conjunto de evidencias aplicadas tras
+  cada cambio de punta (`evidencias_deshechas_por_reorg`); ya **no** cuenta el undo exacto de
+  un bloque que sigue seleccionado (que era lo que hacía `deshecha = construida = 771`).
+
+## SL3b.2. Diario de ejecución
+
+- *Código*: `src/generadores.jl` gana `evidencias_aplicadas` y
+  `evidencias_deshechas_por_reorg`; `exportar.jl` reclasifica `sin_saldo` y usa la nueva
+  `deshecha`, escribe las definiciones de cada contador en `cobertura-v0.5.txt` y pasa a
+  **v0.5**; `src/lector_vectores.jl` por defecto v0.5; `test/runtests.jl` relee v0.5 y añade
+  una aserción de reorg para D-17; `run.jl` por defecto escribe
+  `run-estado-dag-v0.5.log` (así no sobrescribe v0.4).
+- *Tests*: `Pkg.test()` **422/422** (una aserción nueva). Registro
+  `resultados/test-pkg-v0.5.log`.
+- *run.jl* `--seed 0x5a5a --replicas 200`: **ESTADO = SUPERADO**; 3 000 historias base
+  (46 500 bloques, 600 000 órdenes IE-3) + 1 600 con C-EVP (13 178 válidos, 3 183 descartes,
+  60 duplicadas, 465 tardías, 216 `cbid` ajeno), 0 fallos, 71,0 s. Registro
+  `resultados/run-estado-dag-v0.5.log`.
+- *Vectores v0.5*: **1 878 casos** (4 dirigidos de evidencia + 900 aleatorios + 8×120
+  evidencia), sha256
+  `c7de88de1fa8755ff1742f7c7b556994a9a27296609173030e990058dade77a5`; relectura independiente
+  **0 discrepancias** (`relectura-v0.5.log`).
+- *Cobertura `cobertura-v0.5.txt`*: EV `aplicada` **227**, `sin_saldo` **80** (≥30),
+  `deshecha` **115** (≥30), `duplicada` 30, `tardia` 296, `cbid_ajeno` 137, `construida` 770.
+  La sección de operaciones de garantía se mantiene (depósitos 347, retiros 808,
+  liberaciones 115, `ErrNonce` 853 = 18,29 %, `ErrDobleGasto` 305, reorgs de garantía 312).
+- *Anteriores intactos*: `sha256sum -c` OK para v0.1…v0.4 (v0 conserva su `.sha256` antiguo).
+  Releer v0.4 con el oráculo RAT-2′ da discrepancias en `quemado`/recompensa, porque v0.4 se
+  generó con RAT-2 (`techo`); el fichero queda byte a byte intacto y el intento bajo RAT-2′ se
+  conserva en `relectura-v0.4-con-RAT2p.log`.
+- **Cierre T04-SL3b: SUPERADO.** Nada escrito fuera de `T04/`; sin commit ni push; sin Python;
+  sin secretos.

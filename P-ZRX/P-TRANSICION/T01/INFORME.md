@@ -832,3 +832,103 @@ Julia 1.13.0; `JULIA_DEPOT_PATH=T01/.julia-depot`; 1 hilo
   RAT-2).
 - **La «deshecha» de T01 es undo exacto (EV-27)**, no una reorganización de ramas; las ramas
   hermanas y la reaparición en otra rama se ejercen en T04.
+
+# INFORME — T01-SL3b (RAT-2′ y barrido de evidencia)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL3b.md` (motivo: `REVISION-SL3.md`) y `CONTRATO-EVIDENCIA-v0.md` con
+**RAT-2′**. **Zona:** `T01/`. Sin Python; sin commit ni push; sin secretos.
+
+## SL3b.1. Veredicto
+
+**SUPERADO.** Se aplican las tres correcciones que tocan a T01: la recompensa del incluidor
+pasa a **`suelo(C·2/8)`** (RAT-2′; lo quemado es `C − suelo(C·2/8)`), el barrido de `run.jl`
+genera **5 060** historias con evidencia (≥ 5 000) **sin reducir** las 737 280 del barrido
+principal, y se reexportan los vectores a `vectores-transicion-v0.4.txt` con `.sha256` y
+cobertura. `Pkg.test()` **2 178/2 178** (SL-3 **2 084/2 084**), `run.jl` con **I-1…I-7 = 0
+fallos**, relectura independiente de v0.4 con **0 discrepancias**. Los vectores anteriores
+quedan **intactos**.
+
+## SL3b.2. Qué cambia y qué no
+
+| Elemento | Antes (SL-3, RAT-2) | Ahora (SL-3b, RAT-2′) |
+|---|---|---|
+| Recompensa al incluidor | `techo(C·2/8) = ⌈C/4⌉` | **`suelo(C·2/8) = ⌊C/4⌋`** |
+| Quemado | `C − ⌈C/4⌉` | **`C − ⌊C/4⌋`** |
+| Pérdida del infractor | podía ser `< 6/8·C` (p. ej. `C = 11` → 8) | **siempre `≥ 6/8·C`** |
+| Historias con evidencia en `run.jl` | 92 (con `replicas=5`) | **5 060** (5 060 con cualquier `replicas`) |
+| Barrido principal | 147 456 puntos × réplicas | **igual** (737 280 con `replicas=5`) |
+| Vectores por defecto | v0.3 | **v0.4** |
+
+El cambio de redondeo es el único que altera valores del oráculo. La función pasa de
+`techo_dos_octavos` a `suelo_dos_octavos` (división entera `C ÷ 4`), exportada para el test.
+
+## SL3b.3. Test de la propiedad pedida
+
+En el testset `SL-3` (fichero `test/runtests.jl`) se añade, para **todo `C` de 0 a 1 000**:
+
+```julia
+for C in 0:1000
+    recompensa = suelo_dos_octavos(Int128(C))   # == C ÷ 4
+    perdida = Int128(C) - recompensa
+    @test recompensa == Int128(C) ÷ Int128(4)
+    @test 8 * perdida >= 6 * Int128(C)          # pérdida ≥ 6/8·C, exacto en enteros
+end
+```
+
+`8·(C − ⌊C/4⌋) ≥ 6·C` se cumple para todo `C ≥ 0` (con igualdad cuando `C ≡ 0 (mod 4)`).
+Los casos dirigidos de autodenuncia siguen comprobando la fórmula exacta, ahora con `suelo`, y
+la igualdad `6/8·C` cuando `C` es múltiplo de 8. La antigua **AMBIGUEDAD-SL3-9** queda
+resuelta por RAT-2′ (se anota en `PROGRESO.md` §SL3.1).
+
+## SL3b.4. Barrido de evidencia y cobertura
+
+`run.jl` conserva el barrido principal y añade `--ev-historias` (por defecto **5 000**); con
+`puntos_evidencia()` (12 puntos) y 6 tipos por punto, `n = ⌈5 000 / 72⌉ = 70` por tipo:
+
+| Bloque | Historias | Undos | RAT-3 bloqueadas | Fallos I-1…I-7 |
+|---|---:|---:|---:|---:|
+| Barrido principal | 737 280 | 4 595 520 | — | 0 |
+| Evidencia | **5 060** | 22 768 | 8 | 0 |
+
+`resultados/cobertura-v0.4.txt` (mínimos de la orden entre paréntesis): aplicada **260** (≥100),
+sin saldo **120** (≥30), duplicada **40** (≥30), tardía **200** (≥30), `cbid` ajeno **120**
+(≥30), con entradas 120, deshecha 380 (undo exacto EV-27; T01 no fusiona ramas). Cada contador
+va definido en la cabecera del propio fichero.
+
+## SL3b.5. Vectores y relectura
+
+- `resultados/vectores-transicion-v0.4.txt`: **2 795 casos**, sha256
+  `4f0a175a3b4390e40248a70b62e22829c5233311d4dfdce5c2ed164786ad3b0f`, `.sha256` en formato
+  `sha256sum` relativo a `T01/`.
+- Relectura independiente (`src/lector_vectores.jl`): **2 795 casos, 0 discrepancias**.
+- v0.1, v0.2 y v0.3 **intactos** (`sha256sum -c` OK). Releer v0.3 con el oráculo RAT-2′
+  produce discrepancias en `quemado`/recompensa (520 de 2 795), porque v0.3 se generó con
+  `techo`; es la consecuencia exacta de la corrección. Su relectura histórica bajo RAT-2
+  (`relectura-v0.3.log`) sigue dando 0 discrepancias; el intento bajo RAT-2′ se conserva en
+  `relectura-v0.3-con-RAT2p.log`.
+
+## SL3b.6. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/T01
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl --aleatorios 2000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-transicion-v0.4.txt
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin `@fastmath`/`@simd`/`@inbounds`/`@turbo`; sin commit ni
+push; nada escrito fuera de `T01/`.
+
+## SL3b.7. Lo que T01-SL3b NO demuestra
+
+- La recompensa sigue siendo **aritmética abstracta**: no modela la coinbase real ni la
+  madurez de wire; es la fórmula de liquidación de EV-19/RAT-2′.
+- `suelo(C·2/8)` certifica `pérdida ≥ 6/8·C` en **enteros**; no decide la calibración de `f`
+  ni de `Plazo_slots` (SL-2/SL-2b).
+- Los vectores v0.3 y anteriores **no** se regeneran: su reparto es el de RAT-2 y así se
+  conservan como evidencia histórica.
