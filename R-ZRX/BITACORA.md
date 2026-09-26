@@ -123,3 +123,18 @@ nota A-07 para poder actualizarlas durante la ejecución.
   evidencia inactiva; campos de altura inactivos; `Red::Dev`. **W02** lanzada 01:23.
 - Nota de proceso: por dos veces lancé `python3 -c 1`/`--version` como sonda inútil; no ejecuta
   código de auditoría, pero sobra: no se repetirá.
+
+### 01:35–02:08
+
+- **S01** (sectores, encargo 01): G1 superada en su alcance; volcados binarios no versionados
+  (regenerables, con hash). Commit `b2a7f04`.
+- **T02-A** revisada: refuta la pregunta mal planteada; FC-3 se mantiene; RFT-13 y A-05b. `49e4434`.
+- **W02** y **W04** migradas (`f827b3c`, `492ac18`); W04 añade `zx-consensus` nuevo (PoW dev).
+- Mapa de adaptación del DAG/PoT/PoAS antiguo (subagente Sonnet, afirmaciones clave comprobadas) →
+  decisiones D-P07…D-P13 (`P-ZRX/P-DAG/DECISIONES-W05.md`). W05a lanzada 01:56.
+- Clon de Autonomys preparado en `PDF/autonomys-subspace` (`f8842d0`, desde la copia local);
+  `PDF/README.md` y `repositorio.txt` restaurados de `HEAD`.
+- **T01 SUPERADO** (29,5 M historias, 0 fallos). Contrato v0.1 con R-1…R-15 (R-6 sustituye la
+  lectura de la coinbase en cualquier posición). T01-B lanzada 02:08.
+- **S02a** (medición de regeneración) retenida hasta que la máquina esté libre: es una medida de
+  tiempo y no debe correr con compilaciones concurrentes.

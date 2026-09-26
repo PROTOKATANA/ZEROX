@@ -28,7 +28,7 @@ E-04 (credencial DeepSeek) ──► E-01 línea base ──► E-02 workspace n
 A-01 + C-01 + B-03 ──► B-08 ruta activa del nodo ──► A-09 sincronización/reinicio ──► 0.0.1 medible
 ```
 
-**Estado (01:17):** E-04 y E-01 cerrados; T01, T02-A y W01 en ejecución. Plan de órdenes: `P-ZRX/PLAN-0.0.1.md`.
+**Estado (02:08):** línea base, W01, W02, W04 y oráculos T01/T02 cerrados; en ejecución T01-B (vectores) y W05a (`zx-dag`); preparadas W03, W05b1 y S02a. Plan: `P-ZRX/PLAN-0.0.1.md`.
 
 ---
 
@@ -36,7 +36,7 @@ A-01 + C-01 + B-03 ──► B-08 ruta activa del nodo ──► A-09 sincroniza
 
 | ID | Problema | Estado | Prio | Depende de | Riesgo si se ignora | Siguiente encargo | Puerta que desbloquea |
 |---|---|---|---|---|---|---|---|
-| A-01 | Familias de bloque, fin del PoW, inicio del PoST, estado y rechazos de la transición | en encargo (`ORDEN-T01`) | P0 | CONTRATO | Historia con dos terminales, PoW tras el corte o bloque PoST sin garantía aceptados | `P-ZRX/P-TRANSICION/ORDEN-T01.md` | Oráculo pasa X-01…X-20 e I-1…I-7 en la rejilla pequeña |
+| A-01 | Familias de bloque, fin del PoW, inicio del PoST, estado y rechazos de la transición | **oráculo SUPERADO** (T01: 29,5 M historias, 0 fallos; contrato v0.1); falta motor Rust (W03) | P0 | CONTRATO | Historia con dos terminales, PoW tras el corte o bloque PoST sin garantía aceptados | `P-ZRX/P-TRANSICION/ORDEN-T01.md` | Oráculo pasa X-01…X-20 e I-1…I-7 en la rejilla pequeña |
 | A-02 | Emisión PoW (`subsidio_pow`), madurez `M_cb` y madurez residual al cruzar el corte | abierto | P1 | A-10, A-12 | Recompensa inmadura usada como garantía; emisión concentrada. **No heredar** `SHIFT=26`, `COINBASE_MATURITY=12 000` (`PLAN-ARRANQUE-HIBRIDO.md` §3) | Derivación de `M_cb` desde horizonte de reorg PoW, tras A-10 | Desigualdades de madurez publicadas y comprobadas por el oráculo |
 | A-03 | Depósitos bajo PoW (`H_dep`, `M_dep`), retiros que cruzan el corte | decidido provisional (TRN-03, TRN-10) | P0 simbólico / P1 valores | A-01 | Garantía que no existe al corte o que se libera sin retención | cubierto por `ORDEN-T01` | I-1, I-6, X-04…X-06 |
 | A-04 | Predicado de corte (CUT-HWΦ) y valores `H_corte_min`, `W_min`, `S_min`, `K_min` | decidido provisional (D-T04) | P0 forma / P1 valores | A-05, A-08, A-10 | Activación con garantía nula o sin espacio; varios terminales sin regla | `ORDEN-T01` (forma) + modelo adversarial A-05 (valores) | Rechazos X-11/X-12; valores con coste absoluto |
@@ -79,7 +79,7 @@ A-01 + C-01 + B-03 ──► B-08 ruta activa del nodo ──► A-09 sincroniza
 | C-03 | Retiro, `R_slots`, `M_estabilidad_slots`, liberación | abierto | P1 | C-04, B-05 | Retirar antes de que llegue la evidencia | Tras C-04 | Desigualdad `R_slots > Q_corr + T_reporte + M_estab` con valores medidos |
 | C-04 | `EvidenceTx`: codificación, deduplicación por incidente, plazo, disponibilidad, reorg | abierto | P1 | C-01 | Evidencia censurada o aplicada dos veces | Orden de formato (por redactar) | Oráculo de incidentes + casos adversariales |
 | C-05 | `C-SLA`: correlación `b`, `c`, `Q_corr`; falsos positivos honestos | abierto — SPEC lo declara «no implementable» hasta cerrar codificación y presupuesto | P2 | C-04 | Castigo catastrófico por error compartido | Tras C-04 | Tasa de castigo honesto medida |
-| C-06 | Complementariedad: más stake no aumenta oportunidades ni `blue_work` | en encargo (I-5 de `ORDEN-T01`) | P0 | A-01 | Stake convertido en peso por la puerta de atrás | `ORDEN-T01`, luego test Rust | I-5 en oráculo y en el nodo |
+| C-06 | Complementariedad: más stake no aumenta oportunidades ni `blue_work` | I-5 **superado en el oráculo** (T01); falta en código (W03) | P0 | A-01 | Stake convertido en peso por la puerta de atrás | `ORDEN-T01`, luego test Rust | I-5 en oráculo y en el nodo |
 | C-07 | Exclusión de quien aporta espacio sin tokens (`C-BOT-03`) | abierto | P1 | C-02 | Barrera de entrada y concentración | Modelo económico | Fracción de espacio honesto excluida, por escenario |
 | C-08 | Responsabilidad de firmas antes del depósito, tras el retiro y entre ramas (`C-EVP-04` pendiente) | abierto | P2 | C-04 | Castigo sin garantía en el pasado causal | Tras C-04 | Regla y casos |
 | C-09 | Firmante seguro ligado a la identidad final (`archivo/crates/zx-consensus/src/firmante/`) | abierto | P1 | B-08 | Doble firma accidental castigable | Portado tras E-01 | Tests de persistencia antes de firmar en el árbol nuevo |
