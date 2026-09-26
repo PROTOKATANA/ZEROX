@@ -1,6 +1,6 @@
 # P-TRANSICION · Contrato de transición PoW → PoAS + PoT + DAG, v0
 
-**ID:** P-TRANSICION/CONTRATO-v0. **Estado:** propuesta de investigación, **no normativa**.
+**ID:** P-TRANSICION/CONTRATO-v0 (revisión v0.1: apartado «Ratificaciones v0.1» al final). **Estado:** propuesta de investigación, **no normativa**.
 **Fecha:** 2026-09-26. **Firma:** Claude, director técnico bajo `AUTO-ZRX.md` (el mandato
 nombra a «Codex»; Katana lo encargó a esta sesión).
 **Desbloquea:** `ORDEN-T01` (oráculo mínimo de la transición) y las filas A-* de
@@ -265,3 +265,30 @@ rejilla pequeña de `ORDEN-T01`. El error esperado es explícito (nunca un `fals
 - Archivo `9681061` (= `.trash/zerox/`): `SPEC.md` `C-EMIT-02/03/05`, `C-GEN-01…07`, `C-GD-07`,
   `C-ORD-03/04`, `C-FIN-01`, `C-FLU-06`, `C-REORG-01…07` (sha256 de `SPEC.md`:
   `b59905c5…d4e0ae`); `P-ZRX/T-ZRX/LIBRO-DE-RESTRICCIONES.md` (sha256 `1592ecb8…71f8de`).
+
+---
+
+## Ratificaciones v0.1 (2026-09-26, tras T01)
+
+El oráculo T01 (`P-ZRX/P-TRANSICION/T01/`) documentó trece ambigüedades del contrato y de su orden
+antes de escribir código y aplicó siempre la lectura restrictiva o compatible. El director las
+**ratifica** como parte del contrato (identificadores `R-n` estables), y añade las reglas de forma que
+ya impone el formato v0 (`P-ZRX/P-FORMATO/FORMATO-v0.md`) para que oráculo y motor Rust coincidan.
+
+| ID | Regla ratificada | Origen |
+|---|---|---|
+| R-1 | `Emitido` y `Quemado` son enteros con signo de 128 bits; las salidas y garantías, `u64` comprobado | T01 AMBIGÜEDAD-1; ORDEN-T01 §3.11 |
+| R-2 | A lo sumo una retirada pendiente por clave; un segundo `Retiro` con otra viva se rechaza con `ErrRetiroPendiente` (lectura restrictiva de `C-BON-05`) | AMBIGÜEDAD-2 |
+| R-3 | Una transferencia no crea valor: `Σ salidas ≤ Σ entradas`, si no `ErrSaldo` | AMBIGÜEDAD-3 |
+| R-4 | Un pendiente cuya madurez ya se cumple en el punto del bloque que lo crea pasa directamente a `activo` (p. ej. `M_dep = 0`) | AMBIGÜEDAD-4 |
+| R-5 | I-7 se lee estructuralmente: un bloque PoST exige un terminal en su pasado, y el terminal es el primer bloque de su rama que cumple la interfaz `Corte`; con CUT-HWΦ eso implica `Φ` verdadero | AMBIGÜEDAD-5 |
+| R-6 | La coinbase **debe** ser la primera transacción del bloque; en otra posición, o más de una, ⇒ `ErrEmision` (sustituye la lectura de AMBIGÜEDAD-6, que aplicaba la coinbase primero estuviera donde estuviera) | AMBIGÜEDAD-6, `C-BLK-07` antiguo, FORMATO-v0 |
+| R-7 | La coinbase PoW tiene al menos una salida (la del génesis, una de valor 0); si no, `ErrEmision` | REVISION-W02 |
+| R-8 | Importe 0 en `CoinbasePost`, `Deposito`, `Retiro` o `Liberacion` ⇒ `ErrSaldo` (en Rust: `ErrForma(ImporteCero)`) | FORMATO-v0 F-07, F-09 |
+| R-9 | Una transferencia sin entradas es una coinbase fuera de lugar (`ErrEmision`); con entradas y sin salidas, `ErrSaldo` (en Rust: `ErrForma(TransferenciaSinSalidas)`) | `C-TX-17`, FORMATO-v0 |
+| R-10 | Errores de forma sin nombre propio: `pow_ok` falso o `trabajo < 1` ⇒ `ErrPow`; altura o slot que no progresa y `peso < 1` ⇒ `ErrSlot` | AMBIGÜEDAD-7 |
+| R-11 | En `SEC-0` las operaciones de sector se rechazan con `ErrFueraDeAlcanceV0`; en `SEC-A`, un alta antes de `H_dep` con `ErrDepositoTemprano` y en PoST con `ErrFueraDeAlcanceV0` | AMBIGÜEDADES 8 y 9 |
+| R-12 | `EvidenceTx`: en PoW `ErrOperacionFase`; en PoST `ErrFueraDeAlcanceV0` mientras `C-EVP` no esté activo (en Rust, la versión 4 es `VersionInactiva`) | AMBIGÜEDAD-10 |
+| R-13 | Un depósito aplicado en la fase PoST madura en `slot(B) + M_dep_slots` | AMBIGÜEDAD-11 |
+| R-14 | El undo debe restituir el estado exacto; la técnica (copia en el oráculo, delta en Rust) es libre | AMBIGÜEDAD-12 |
+| R-15 | Un bloque cuyo padre no es válido o no se conoce no es válido en `seleccionar` (`ErrSinPadre` en los vectores); un nodo en línea lo retiene como huérfano hasta que llega el padre | AMBIGÜEDAD-13 |

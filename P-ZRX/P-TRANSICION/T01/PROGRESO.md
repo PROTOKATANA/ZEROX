@@ -1,0 +1,167 @@
+# PROGRESO — T01
+
+Bitácora de ejecución. Las horas solo salen de `date -Is` (ver `HORAS.log`).
+
+## 1. Comprobación de la entrada congelada (inicio)
+
+Comando:
+
+    cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01.sha256
+
+Salida completa:
+
+    P-ZRX/P-TRANSICION/ORDEN-T01.md: OK
+    P-ZRX/P-TRANSICION/CONTRATO-v0.md: OK
+    V-ZRX/LINEO.md: OK
+    D-ZRX/SPEC.md: OK
+
+Lectura íntegra confirmada de `ORDEN-T01.md`, `V-ZRX/LINEO.md`,
+`P-ZRX/P-TRANSICION/CONTRATO-v0.md` y de `D-ZRX/SPEC.md` §§3–6 (contexto no normativo).
+Plantilla histórica revisada como estilo, sin copiar código.
+
+## 2. Falta de definición detectada antes de editar (obligatorio informar)
+
+Antes de escribir código se registran las reglas que admiten más de una implementación
+incompatible. Según la orden §3, se aplica **la lectura más restrictiva** (la que rechaza más)
+cuando no altera el significado de otra regla, se marca en el código con `# AMBIGUEDAD-n` y se
+reporta aquí y en `INFORME.md`. Ninguna de las lecturas elegidas altera otra regla del contrato,
+así que **no procede detenerse**; se documenta cada una.
+
+### AMBIGUEDAD-1 — Tipo de `Emitido` (orden §3.11 vs §4.2)
+`§4.2` escribe `emitido::UInt64`; `§3.11` define `Emitido := Σ_B (coinbase_pagada(B) − tarifas(B))`
+«en `Int128`» y avisa de que «el término puede ser negativo». Lectura aplicada: `emitido::Int128`
+(y `quemado::Int128`), con la aritmética monetaria por salida en `UInt64` comprobado. Regla
+afectada: I-1 / TRN-01.
+
+### AMBIGUEDAD-2 — Retirada múltiple por clave
+`C-BON-05` dice «a lo sumo hay una retirada pendiente por clave; otra se rechaza o consolida por
+una regla única todavía PENDIENTE». La orden `§3.15`/`§4.2` modela `en_retirada` como **lista** y no
+fija el caso de una segunda retirada. Lectura aplicada (restrictiva): una segunda `Retiro` con una
+`en_retirada` viva se **rechaza** con un error explícito propio `ErrRetiroPendiente` (la orden
+permite errores «al menos» los listados). Regla afectada: C-BON-05 / TRN-10.
+
+### AMBIGUEDAD-3 — Transferencia con salidas > entradas (tarifa negativa)
+`§3.11` define `tarifas(B) = Σ (entradas − salidas)` pero no prohíbe que sea negativa; con una
+transferencia que cree valor, `Emitido` crecería y I-1 seguiría cerrándose (acuñación silenciosa).
+Lectura aplicada (restrictiva): en `Transferencia`, `Σ salidas ≤ Σ entradas`, si no `ErrSaldo`.
+Regla afectada: C-TX / I-1 / X-02.
+
+### AMBIGUEDAD-4 — Madurez `M_dep = 0` y el orden (b) antes de (d)
+La orden `§3.9` promueve pendientes en (b) **antes** de aplicar transacciones (d), pero TRN-03 dice
+que un depósito pasa a activo en `h + M_dep`, y la rejilla admite `M_dep = 0`. Lectura aplicada: al
+crear un pendiente cuya madurez ya se cumple en el punto del bloque, se acredita **directo a
+`activo`** (equivale a promover dentro del mismo bloque). Regla afectada: TRN-03.
+
+### AMBIGUEDAD-5 — I-7 literal frente a `CUT-H` y `CUT-W`
+I-7 dice «`Φ` falso ⇒ no hay bloque PoST válido … hasta el primer bloque PoW posterior que haga
+verdadero TRN-04». Bajo `CUT-HWΦ` eso es consecuencia de TRN-04+TRN-06, pero `CUT-H`/`CUT-W`
+**definen** TRN-04 sin `Φ`, de modo que la lectura literal es incompatible con esas interfaces.
+Lectura aplicada (compatible con todas): un bloque PoST válido exige un terminal en su pasado
+(TRN-06) y el terminal es el primer bloque de la rama que cumple la interfaz `Corte` elegida; para
+`CUT-HWΦ` eso implica literalmente `Φ` verdadero. Se prueba I-7 estructuralmente en toda la rejilla
+y la forma literal en los puntos `CUT-HWΦ`. Regla afectada: TRN-04/TRN-06/I-7.
+
+### AMBIGUEDAD-6 — Posición de la coinbase dentro del bloque
+`§3.9(d)` dice «coinbase **primera**» pero no fija el error si no lo está, ni el número de coinbases.
+Lectura aplicada: se aplica la coinbase antes que el resto (independientemente de su posición en la
+lista) y **más de una** coinbase por bloque es `ErrEmision`. Regla afectada: C-EMIT-03.
+
+### AMBIGUEDAD-7 — Errores para violaciones de forma sin error asignado
+`§4.4`/§6 listan los errores, pero no asignan uno a: `trabajo < 1` o `pow_ok = false`; `altura` que
+no avanza; `peso PoST < 1`; `slot` no creciente. Lectura aplicada: `ErrPow` para `pow_ok`/`trabajo`
+y `ErrSlot` para progresión de altura/slot y `peso < 1`. Regla afectada: forma de bloque, TRN-04.
+
+### AMBIGUEDAD-8 — `SEC-0` con operaciones de sector
+En `SEC-0` no hay registro de sectores; la orden no fija qué pasa con `AltaSector`/`PruebaSector`.
+Lectura aplicada: `ErrFueraDeAlcanceV0`; el campo `sector` de un bloque PoST se ignora en `SEC-0`.
+Regla afectada: interfaz `Sectores`.
+
+### AMBIGUEDAD-9 — Alta de sector fuera de plazo/fase
+La orden `§3.7` saca de alcance v0 las altas en PoST ⇒ `ErrFueraDeAlcanceV0`. El contrato exige
+`H_dep` para el alta en PoW; se usa `ErrDepositoTemprano` antes de esa altura. Regla afectada:
+TRN-12 / interfaz `Sectores`.
+
+### AMBIGUEDAD-10 — `EvidenceTx` en PoW y en PoST
+La orden `§3.7` la declara fuera de alcance en PoST ⇒ `ErrFueraDeAlcanceV0`; X-13 fija
+`ErrOperacionFase` en PoW. Se implementa así. Regla afectada: C-EVP-03.
+
+### AMBIGUEDAD-11 — Madurez de un depósito creado en fase PoST
+TRN-03 solo describe depósitos PoW. Lectura aplicada: un depósito en PoST madura en
+`slot(B) + M_dep_slots`. Regla afectada: TRN-03.
+
+### AMBIGUEDAD-12 — Naturaleza del `undo`
+La orden exige undo exacto y permite «lo que necesites». Lectura aplicada: `aplicar` construye un
+estado **nuevo** (copia) y `deshacer` restituye una copia íntegra del estado previo; no hay lógica
+delta que pueda desincronizarse. Se declara en `METODO.md`/`INFORME.md`. Regla afectada: I-2.
+
+### AMBIGUEDAD-13 — Bloques huérfanos en `seleccionar`
+La orden no fija la validez de un bloque cuyo padre no está en el conjunto. Lectura aplicada
+(restrictiva): un huérfano no es válido y sus descendientes tampoco; `nodo_en_linea` sí los
+retiene hasta que llegue el padre. Regla afectada: TRN-09.
+
+## 3. Presupuesto y decisión
+
+Presupuesto declarado: 2 h de reloj, 1 hilo, 8 GiB RAM, 2 GiB disco (incluido `.julia-depot`).
+Criterio de aceptación fijado antes de ejecutar: SUPERADO si X-01…X-20 e I-1…I-7 pasan en toda la
+rejilla reducida sin contraejemplos; REFUTADO ante contraejemplo del contrato; INCONCLUSO si se
+agota el presupuesto o hay ambigüedad que obligue a elegir sin lectura compatible.
+
+No hay ambigüedad que obligue a elegir sin lectura compatible: las 13 anteriores se resuelven con
+la lectura restrictiva/compatible sin alterar otra regla.
+
+## 4. Ejecución — `Pkg.test()` (rejilla reducida completa)
+
+Comando (ORDEN §6.4), con `JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1` y la
+`JULIA_DEPOT_PATH` de la zona:
+
+    $JULIA --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+Resultado: **todos los testsets pasan** (salida completa en `resultados/test.log`).
+
+- `X-01…X-15 (rechazos)`: 38/38 en 6,8 s sobre los **147 456** puntos de la
+  rejilla reducida (cada caso se prueba en todos los puntos donde tiene sentido).
+- `X-16 (orden de llegada)`: 2/2 (subconjunto con paso `T01_PASO_XEQ=2000`,
+  por el coste combinatorio de permutar; ver `METODO.md` §4).
+- `X-17`, `X-18`, `X-19`, `X-20`: 2/2 cada uno.
+- `I-1…I-7 (historias aleatorias)`: 9/9. `n_hist = 294 912` historias
+  (147 456 puntos × `T01_REPLICAS=2`), `n_undo = 1 833 609`,
+  `n_perm = 344 073`; **cero fallos** en I-1, I-1b, I-2, I-3, I-4, I-5, I-6, I-7.
+
+Diferencias registradas (dato, sin juicio): X-17 `difiere FC-1=0`, `FC-2=6`;
+X-18 `difiere FC-1=52`, `FC-2=6` (paso `T01_PASO_XEQ=2000`).
+
+Desviación declarada: los casos de igualdad X-16…X-20 se recorren en un
+subconjunto de la rejilla (paso 2000), no en los 147 456 puntos, porque cada
+uno permuta el conjunto de bloques con `nodo_en_linea`; X-01…X-15 e I-1…I-7 sí
+recorren la rejilla completa. Se cuantifica en `INFORME.md`.
+
+## 5. Segunda pasada de `Pkg.test()` (X-17…X-20 en rejilla completa)
+
+Se repitió `Pkg.test()` dejando en subconjunto (paso 2000) solo X-16, por su
+coste combinatorio. Resultado: **todos los testsets pasan**.
+
+- `X-17` y `X-18`: 2/2, rejilla completa. Diferencias respecto a FC-3:
+  X-17 `FC-1=0`, `FC-2=6144`; X-18 `FC-1=96000`, `FC-2=6144`.
+- `X-19`: 2/2 (3,2 s). `X-20`: 2/2 (9,8 s), rejilla completa.
+- `I-1…I-7`: 9/9; `n_hist=294912`, `n_undo=1833609`, `n_perm=344073`, cero fallos.
+- Comprobación de `ENTRADA-T01.sha256` al terminar:
+
+      P-ZRX/P-TRANSICION/ORDEN-T01.md: OK
+      P-ZRX/P-TRANSICION/CONTRATO-v0.md: OK
+      V-ZRX/LINEO.md: OK
+      D-ZRX/SPEC.md: OK
+
+- `run.jl --replicas 200 --rejilla reducida`: 29 491 200 historias, 183 406 080
+  undos, 4 155 744 permutaciones (I-3 muestreado 1/200), **cero fallos** en
+  I-1…I-7; 38,77 min de pared. Supera el umbral de 30 min de ORDEN §6.5; se
+  perfila y documenta en `METODO.md` §2/§4 y `INFORME.md` §1.
+
+## 6. Cierre de la batería de tests (rejilla completa en los 20 X)
+
+Tercera pasada de `Pkg.test()`: X-16 también sobre los 147 456 puntos,
+revisando 7 órdenes por punto (identidad, inverso y 5 aleatorios). Todos los
+testsets pasan; X-16 tardó 9,9 s. Con esto los **20 casos X y los 7 invariantes
+se comprueban en la rejilla reducida completa** (147 456 puntos). Único
+muestreo declarado: I-3 en `run.jl`, 1 de cada 200 historias (4 155 744
+permutaciones), por coste. El texto de §4 sobre un subconjunto para X-16 queda
+así corregido por esta pasada.

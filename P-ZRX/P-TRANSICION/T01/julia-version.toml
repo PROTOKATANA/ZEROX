@@ -1,0 +1,4 @@
+# Versión de Julia fijada para T01 (LINEO §1).
+julia = "1.13.0"
+canal = "1.13"
+ruta = "/home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/julia"

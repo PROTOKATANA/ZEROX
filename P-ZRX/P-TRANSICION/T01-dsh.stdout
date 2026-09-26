@@ -1,0 +1,19 @@
+**Orden T01 — cumplida. Veredicto: SUPERADO.**
+
+**Resultado.** Los 20 casos X y los 7 invariantes I pasan en los **147 456 puntos** de la rejilla reducida, sin contraejemplos. La hipótesis falsable no se refuta.
+
+- `Pkg.test()` (`resultados/test.log`, exit 0): X-01…X-15 38/38; X-16 2/2 sobre la rejilla completa (7 órdenes por punto: identidad, inverso, 5 aleatorios); X-17…X-20 2/2 cada uno; I-1…I-7 9/9.
+- `run.jl --seed 0x5a5a --replicas 200 --rejilla reducida` (`resultados/run-reducida.log`, exit 0): **29 491 200** historias, 183 406 080 undos exactos, 4 155 744 permutaciones I-3 (muestreadas 1/200), **0 fallos** en I-1…I-7. Tiempo 38,77 min.
+- Diferencias registradas (dato, sin juicio): FC-1 vs FC-3 = 0 en `run.jl`; FC-2 vs FC-3 = 30 720 (CUT-W). X-17: FC-1 0 / FC-2 6 144. X-18: FC-1 96 000 / FC-2 6 144.
+
+**Contraejemplos.** Ninguno. `resultados/contraejemplos/` documenta el vacío.
+
+**Falta de definición (informada antes de editar).** 13 `AMBIGUEDAD-n` en `PROGRESO.md` §2, marcadas en el código: `Emitido` en `Int128`; segunda retirada ⇒ `ErrRetiroPendiente`; transferencia con salidas > entradas ⇒ `ErrSaldo`; promoción con `M_dep=0`; I-7 estructural (compatible con CUT-H/CUT-W); coinbase primero y coinbase doble ⇒ `ErrEmision`; `ErrPow`/`ErrSlot` de forma; sectores en SEC-0/PoST fuera de alcance; `EvidenceTx` por fase; depósito PoST madura por slot; undo por copia íntegra; huérfanos no válidos. Ninguna obligó a detenerse.
+
+**Aviso de presupuesto.** `run.jl` superó el umbral de 30 min de ORDEN §6.5 (38,77 min). Se perfiló (`Profile`) y se optimizó (`clonar`, I-6, I-7) antes, según la orden; queda declarado en `INFORME.md` §1 y `METODO.md` §4. Único muestreo: I-3 en `run.jl`.
+
+**Archivos creados en `T01/`.** `Project.toml`, `Manifest.toml`, `julia-version.toml`, `src/Transicion.jl` (tipos, estado, reglas), `src/seleccion.jl` (Corte y FC-1/2/3), `src/nodo.jl` (huérfanos y C-FIN-01), `src/generadores.jl` (historias y X-01…X-20), `test/runtests.jl`, `run.jl`, `resultados/{test.log,run-reducida.log,contraejemplos/}`, `INFORME.md`, `METODO.md`, `PROGRESO.md`, `HORAS.log`. Sin Python; solo stdlib + `StableRNGs` + `Combinatorics`; hilos = 1.
+
+**Comandos.** Los exactos de ORDEN §6.4 (`Pkg.instantiate(); Pkg.test()` y `run.jl --seed 0x5a5a --replicas 200 --rejilla reducida`).
+
+**ENTRADA-T01.sha256.** `sha256sum -c` al empezar y al terminar: `ORDEN-T01.md: OK`, `CONTRATO-v0.md: OK`, `LINEO.md: OK`, `SPEC.md: OK` (salidas completas en `PROGRESO.md` §1 y §5).
