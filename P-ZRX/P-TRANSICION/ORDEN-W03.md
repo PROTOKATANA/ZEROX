@@ -78,6 +78,14 @@ Entrada congelada: `P-ZRX/P-TRANSICION/ENTRADA-W03.sha256`, al empezar y como ú
     salida → `OutPoint` real; convierte `trabajo`, `peso`, alturas y slots; ejecuta el motor en el
     **orden de entrega** del fichero; y compara `RES`, `SEL` y el estado canónico traducido de vuelta a
     claves abstractas (`UTXO` como multiconjunto ordenado, `GAR`, `EST`).
+11. **Modo fusión** (`P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md` §3): además de `aplicar` (modo
+    estricto de T01: la primera transacción inválida invalida el bloque), expón
+    `aplicar_fusion(estado, bloque, punto_aplicacion, params, cbid) -> Result<(Estado, Undo, Vec<TxDescartada>), ErrorTransicion>`,
+    que aplica la coinbase con `mín(declarado, subsidio + tarifas aceptadas)` (tabla de §3 de ese contrato), **descarta** cada
+    transacción u operación de garantía que no valide (con su motivo, ED-4…ED-6) y solo devuelve error
+    por lo que invalida el bloque según la tabla de §3 de ese contrato. En esta orden se prueba con
+    tests unitarios propios (descarte de doble gasto, de retiro duplicado, de liberación prematura,
+    coinbase recortada); su diferencial es de otra orden (T04/W06a).
 
 ## 4. Correspondencias fijadas para el diferencial
 
