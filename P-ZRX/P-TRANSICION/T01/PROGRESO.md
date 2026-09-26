@@ -478,3 +478,86 @@ Comprobación de `ENTRADA-T01-C.sha256` al terminar (desde `/home/katana/zeo/ZER
 
 Nada fuera de `T01/` se modificó; sin commit ni push; sin secretos; sin Python.
 Presupuesto (1 h, 1 hilo, 4 GiB) respetado con holgura: sesión de ~12 min de reloj.
+
+# PROGRESO — T01-D
+
+Bitácora de la orden T01-D (nonce por clave de garantía, F-15). Presupuesto
+declarado **antes** de ejecutar: 1 h 30 min de reloj, 1 hilo, 8 GiB de RAM;
+prohibido Python. Horas solo de `date -Is` (`HORAS.log`).
+
+## T01-D.1. Comprobación de la entrada congelada (inicio)
+
+Comando (desde `/home/katana/zeo/ZEROX`):
+
+    sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01-D.sha256
+
+Salida completa:
+
+    P-ZRX/P-TRANSICION/ORDEN-T01-D.md: La suma coincide
+    P-ZRX/P-FORMATO/FORMATO-v0.md: La suma coincide
+    P-ZRX/P-TRANSICION/CONTRATO-v0.md: La suma coincide
+    V-ZRX/LINEO.md: La suma coincide
+
+Lectura íntegra de `ORDEN-T01-D.md`, la «Corrección v0.1» de `FORMATO-v0.md`
+(F-15…F-18), `V-ZRX/LINEO.md`, `CONTRATO-v0.md` (con «Ratificaciones v0.1») y
+todo el código y documentos de `T01/`.
+
+## T01-D.2. Falta de definición detectada ANTES de editar (obligatorio informar)
+
+Registradas y aplicadas las lecturas de `INFORME.md` §D.2:
+T01-D/AMBIGUEDAD-1 (destino del caso válido `n, n+1`), 2 (desbordamiento de
+`nonce_siguiente`), 3 (clave sin registro en retiro/liberación), 4 (orden del
+nonce frente a la fase en liberación), 5 (alcance de «≥ 30 cada uno, fases PoW y
+PoST»), 6 (posición del campo `nonce=`) y 7 (`.sha256` del base). **Ninguna
+bloquea la orden**; no hay choque entre el contrato y F-15.
+
+## T01-D.3. Código modificado
+
+- `src/Transicion.jl`: `ErrNonce`; `Garantia.nonce_siguiente`; `Tx.nonce`;
+  `nonce_de` y `comprobar_nonce!`; comprobación del nonce **primero** en
+  `aplicar_deposito!`/`aplicar_retiro!`/`aplicar_liberacion!`; `clonar` y
+  `representacion_canonica` actualizados.
+- `src/generadores.jl`: nonces correctos en depósitos, retiros y liberaciones
+  honestos (incluidos X-04/X-05/X-06/X-14 e `historia_dos_terminales`).
+- `src/generadores_negativos.jl`: nonces correctos en los 1 915 casos de T01-C;
+  `casos_nonce`, `casos_nonce_pow` (prefijos PoW pre-terminales) y
+  `casos_nonce_validos`.
+- `exportar.jl`: `nonce=` en `TX` de las tres operaciones y en `GAR`; salida
+  v0.1 y `.sha256` en formato `sha256sum`.
+- `exportar_negativos.jl`: ídem; añade `casos_nonce` y el recuento `ErrNonce`.
+- `src/lector_vectores.jl`: lee `nonce=` y lo incluye en el render de `GAR`.
+- `test/runtests.jl`: nonces en R-8 y testset «F-15 (nonce por clave)».
+
+## T01-D.4. Exportación, recuentos, relectura y determinismo
+
+    exportar.jl --fecha 2026-09-26T03:10:14+02:00
+    # casos=2055  dirigidos_con_error_inesperado=0
+    # sha256=0faec4a330b0ab96052b97c919b9e7bfa9ef494c2dd8fde25f38738658aa5527
+    exportar_negativos.jl --fecha 2026-09-26T03:10:14+02:00
+    # casos=3939  inesperados=0
+    # sha256=9ca55abde96702f61ac0762e22f0a861d9ab0603a4090eda04ccd818eb0326ad
+
+Recuento por error (`ErrNonce` incluido, 2 024; PoW 512, PoST 1 512) en
+`INFORME.md` §D.4. Las ocho familias de T01-C conservan sus recuentos exactos.
+Relectura independiente de ambos ficheros: **0 discrepancias**. Determinismo:
+dos ejecuciones por fichero con la misma `--fecha` dan el mismo hash. Los
+ficheros v0 (`06d95324…`, `2e407c88…`) no se tocaron.
+
+## T01-D.5. Tests, `run.jl` y cierre
+
+`Pkg.test()`: todos los testsets pasan (`PKGTEST_EXIT=0`), F-15 10/10.
+`run.jl --seed 0x5a5a --replicas 50 --rejilla reducida`: 7 372 800 historias,
+0 fallos I-1…I-7, `VEREDICTO = SIN FALLOS` (`resultados/run-reducida-50-T01-D.log`).
+
+Presupuesto (1 h 30 min, 1 hilo, 8 GiB) respetado; sin Python; sin commit ni
+push; sin secretos; nada fuera de `T01/`. Comprobación final de la entrada
+congelada: ver §T01-D.6.
+
+## T01-D.6. Comprobación de la entrada congelada (último paso)
+
+Comando (desde `/home/katana/zeo/ZEROX`):
+
+    sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01-D.sha256
+
+Salida: las cuatro líneas «La suma coincide» (ORDEN-T01-D, FORMATO-v0,
+CONTRATO-v0, LINEO).

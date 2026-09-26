@@ -54,7 +54,8 @@ function r_gar(E::Estado)
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
         push!(ls, string("GAR clave=", k, " activo=", g.activo,
                          " pend=[", ps, "] ret=[", rs, "] cred=[", cs,
-                         "] congelado=", g.congelado))
+                         "] congelado=", g.congelado,
+                         " nonce=", g.nonce_siguiente))
     end
     return ls
 end
@@ -110,11 +111,14 @@ function parsear_tx(linea::AbstractString)
     elseif tipo == "Transferencia"
         return tx_transferencia(ent, sal, firmante)
     elseif tipo == "Deposito"
-        return tx_deposito(ent, clave, importe, firmante)
+        return tx_deposito(ent, clave, importe, firmante;
+                           nonce = parse(UInt64, c["nonce"]))
     elseif tipo == "Retiro"
-        return tx_retiro(clave, importe, firmante)
+        return tx_retiro(clave, importe, firmante;
+                         nonce = parse(UInt64, c["nonce"]))
     elseif tipo == "Liberacion"
-        return tx_liberacion(clave, importe, firmante)
+        return tx_liberacion(clave, importe, firmante;
+                             nonce = parse(UInt64, c["nonce"]))
     elseif tipo == "Evidencia"
         return tx_evidencia(clave)
     end

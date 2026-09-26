@@ -25,13 +25,13 @@ export ErrGenesis, ErrPow, ErrEmision, ErrInmaduro, ErrDepositoTemprano,
        ErrAutorizacion, ErrSaldo, ErrDobleGasto, ErrPowTrasCorte, ErrSinTerminal,
        ErrTerminalAmbiguo, ErrGarantia, ErrOperacionFase, ErrPruebaTardia,
        ErrSectorInactivo, ErrSlot, ErrDesbordamiento, ErrFueraDeAlcanceV0,
-       ErrRetiroPendiente
+       ErrRetiroPendiente, ErrNonce
 export Salida, Pendiente, EnRetirada, Garantia, RegistroSector, Tx, Bloque, Estado, Params
 export tx_coinbase, tx_coinbase_post, tx_transferencia, tx_deposito, tx_retiro,
        tx_liberacion, tx_evidencia, tx_alta_sector, tx_prueba_sector
 export subsidio_pow, subsidio_post, estado_inicial, clonar, aplicar, aplicar!,
        aplicar_con_undo, deshacer, es_terminal, phi, sector_activo, gastable,
-       gastable_en
+       gastable_en, nonce_de
 export invariante_I1, invariante_I1b, suma_utxo, suma_garantias,
        representacion_canonica, hash_canonico
 export seleccionar, seleccionar_con, ResultadoSeleccion, nodo_en_linea,
@@ -42,7 +42,8 @@ export puntos_rejilla, generar_historia, construir_poW, extender_post,
        prefijo_comun, hijo_pow, cadena_post, historia_dos_terminales,
        historia_reorg
 export CasoNegativo, casos_negativos, casos_bloque, puntos_negativos,
-       casos_garantia_insuficiente, casos_garantia_pendiente, cadena_base
+       casos_garantia_insuficiente, casos_garantia_pendiente, cadena_base,
+       casos_nonce, casos_nonce_validos
 
 # ---------------------------------------------------------------------------
 # Enumeraciones
@@ -75,6 +76,7 @@ export CasoNegativo, casos_negativos, casos_bloque, puntos_negativos,
     ErrDesbordamiento
     ErrFueraDeAlcanceV0
     ErrRetiroPendiente      # AMBIGUEDAD-2
+    ErrNonce                # F-15: nonce por clave de garantía
 end
 
 @enum TipoTx begin
@@ -119,6 +121,7 @@ mutable struct Garantia
     en_retirada::Vector{EnRetirada}
     congelado::UInt64       # siempre 0 en v0
     creditos::Vector{Pendiente}   # D-T08
+    nonce_siguiente::UInt64       # F-15: nonce por clave de garantía
 end
 
 struct RegistroSector
@@ -138,6 +141,7 @@ struct Tx
     clave::Int
     importe::UInt64
     sector_id::Int
+    nonce::UInt64            # F-15: solo Deposito/Retiro/Liberacion (0 en el resto)
 end
 
 struct Bloque
@@ -220,23 +224,32 @@ conWmin(P::Params, w::Int) =
 # ---------------------------------------------------------------------------
 
 tx_coinbase(salidas::Vector{Salida}) =
-    Tx(TxCoinbase, salidas, Int[], 0, 0, UInt64(0), 0)
+    Tx(TxCoinbase, salidas, Int[], 0, 0, UInt64(0), 0, UInt64(0))
 tx_coinbase_post(importe::Integer) =
-    Tx(TxCoinbasePost, Salida[], Int[], 0, 0, UInt64(importe), 0)
+    Tx(TxCoinbasePost, Salida[], Int[], 0, 0, UInt64(importe), 0, UInt64(0))
 tx_transferencia(entradas::Vector{Int}, salidas::Vector{Salida}, firmante::Integer) =
-    Tx(TxTransferencia, salidas, entradas, Int(firmante), 0, UInt64(0), 0)
-tx_deposito(entradas::Vector{Int}, clave::Integer, importe::Integer, firmante::Integer) =
-    Tx(TxDeposito, Salida[], entradas, Int(firmante), Int(clave), UInt64(importe), 0)
-tx_retiro(clave::Integer, importe::Integer, firmante::Integer) =
-    Tx(TxRetiro, Salida[], Int[], Int(firmante), Int(clave), UInt64(importe), 0)
-tx_liberacion(clave::Integer, importe::Integer, firmante::Integer) =
-    Tx(TxLiberacion, Salida[], Int[], Int(firmante), Int(clave), UInt64(importe), 0)
+    Tx(TxTransferencia, salidas, entradas, Int(firmante), 0, UInt64(0), 0,
+       UInt64(0))
+tx_deposito(entradas::Vector{Int}, clave::Integer, importe::Integer,
+            firmante::Integer; nonce::Integer = 0) =
+    Tx(TxDeposito, Salida[], entradas, Int(firmante), Int(clave),
+       UInt64(importe), 0, UInt64(nonce))
+tx_retiro(clave::Integer, importe::Integer, firmante::Integer;
+          nonce::Integer = 0) =
+    Tx(TxRetiro, Salida[], Int[], Int(firmante), Int(clave), UInt64(importe),
+       0, UInt64(nonce))
+tx_liberacion(clave::Integer, importe::Integer, firmante::Integer;
+              nonce::Integer = 0) =
+    Tx(TxLiberacion, Salida[], Int[], Int(firmante), Int(clave),
+       UInt64(importe), 0, UInt64(nonce))
 tx_evidencia(clave::Integer) =
-    Tx(TxEvidencia, Salida[], Int[], 0, Int(clave), UInt64(0), 0)
+    Tx(TxEvidencia, Salida[], Int[], 0, Int(clave), UInt64(0), 0, UInt64(0))
 tx_alta_sector(id::Integer, clave::Integer, firmante::Integer) =
-    Tx(TxAltaSector, Salida[], Int[], Int(firmante), Int(clave), UInt64(0), Int(id))
+    Tx(TxAltaSector, Salida[], Int[], Int(firmante), Int(clave), UInt64(0),
+       Int(id), UInt64(0))
 tx_prueba_sector(id::Integer, firmante::Integer) =
-    Tx(TxPruebaSector, Salida[], Int[], Int(firmante), 0, UInt64(0), Int(id))
+    Tx(TxPruebaSector, Salida[], Int[], Int(firmante), 0, UInt64(0), Int(id),
+       UInt64(0))
 
 function Bloque(; id, familia, padre = 0, altura = 0, trabajo = 0, pow_ok = true,
                 slot = 0, productor = 0, sector = 0, peso = 0,
@@ -264,7 +277,7 @@ function clonar(E::Estado)
     g = Dict{Int,Garantia}()
     for (k, v) in E.garantias
         g[k] = Garantia(v.activo, copy(v.pendientes), copy(v.en_retirada),
-                        v.congelado, copy(v.creditos))
+                        v.congelado, copy(v.creditos), v.nonce_siguiente)
     end
     s = copy(E.sectores)
     Estado(u, g, E.emitido, E.quemado, E.fase, E.terminal, E.altura,
@@ -304,10 +317,26 @@ function obtener_garantia!(E::Estado, clave::Int)
     g = get(E.garantias, clave, nothing)
     if g === nothing
         g = Garantia(UInt64(0), Pendiente[], EnRetirada[], UInt64(0),
-                     Pendiente[])
+                     Pendiente[], UInt64(0))
         E.garantias[clave] = g
     end
     return g
+end
+
+# F-15: nonce siguiente de una clave (0 si no hay registro).
+nonce_de(E::Estado, clave::Int) =
+    haskey(E.garantias, clave) ? E.garantias[clave].nonce_siguiente : UInt64(0)
+
+# F-15: comprueba el nonce y, si coincide, lo incrementa. Un depósito a una
+# clave sin registro lo crea con `nonce_siguiente = 0` (lo hace
+# `obtener_garantia!`). El undo por copia íntegra lo restituye (R-14).
+function comprobar_nonce!(E::Estado, clave::Int, nonce::UInt64)
+    g = obtener_garantia!(E, clave)
+    nonce == g.nonce_siguiente || return ErrNonce
+    r, ovf = Base.Checked.add_with_overflow(g.nonce_siguiente, UInt64(1))
+    ovf && return ErrDesbordamiento
+    g.nonce_siguiente = r
+    return nothing
 end
 
 punto_actual(E::Estado) = E.fase == FasePoST ? E.slot : E.altura
@@ -460,6 +489,9 @@ function aplicar_transferencia!(E::Estado, P::Params, punto::Int, tx::Tx)
 end
 
 function aplicar_deposito!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
+    # F-15: el nonce se comprueba antes que el resto de reglas de la operación.
+    r = comprobar_nonce!(E, tx.clave, tx.nonce)
+    r isa Err && return r
     # RATIFICACION-v0.1-R8: importe 0 en un depósito ⇒ ErrSaldo.
     tx.importe == 0 && return ErrSaldo
     tx.firmante == tx.clave || return ErrAutorizacion
@@ -489,6 +521,9 @@ function aplicar_deposito!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
 end
 
 function aplicar_retiro!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
+    # F-15: el nonce se comprueba antes que el resto de reglas de la operación.
+    r = comprobar_nonce!(E, tx.clave, tx.nonce)
+    r isa Err && return r
     # RATIFICACION-v0.1-R8: importe 0 en un retiro ⇒ ErrSaldo.
     tx.importe == 0 && return ErrSaldo
     tx.firmante == tx.clave || return ErrAutorizacion
@@ -503,6 +538,9 @@ function aplicar_retiro!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
 end
 
 function aplicar_liberacion!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
+    # F-15: el nonce se comprueba antes que el resto de reglas de la operación.
+    r = comprobar_nonce!(E, tx.clave, tx.nonce)
+    r isa Err && return r
     E.fase == FasePoST || return ErrOperacionFase
     # RATIFICACION-v0.1-R8: importe 0 en una liberación ⇒ ErrSaldo.
     tx.importe == 0 && return ErrSaldo
@@ -859,7 +897,8 @@ function representacion_canonica(E::Estado)
     end
     for k in sort(collect(keys(E.garantias)))
         g = E.garantias[k]
-        print(io, "G:", k, ",", g.activo, ",", g.congelado, ";")
+        print(io, "G:", k, ",", g.activo, ",", g.congelado, ",",
+              g.nonce_siguiente, ";")
         for p in sort(g.pendientes, by = x -> (x.madura_en_altura,
                                                x.madura_en_slot, x.importe))
             print(io, "P:", p.importe, ",", p.madura_en_altura, ",",

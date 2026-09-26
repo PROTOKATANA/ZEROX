@@ -1,13 +1,14 @@
 # exportar_negativos.jl — T01-C: exportador determinista de vectores NEGATIVOS
-# de transacción (ORDEN-T01-C §3.3).
+# de transacción (ORDEN-T01-C §3.3; ampliado por T01-D con los casos de nonce
+# de F-15).
 #
 #     julia --project=. exportar_negativos.jl [--fecha <ISO-8601>] \
 #         [--salida RUTA] [--contrato RUTA]
 #
-# Escribe `resultados/vectores-transicion-negativos-v0.txt` (mismo formato de
-# líneas que T01-B, §3.4 de ORDEN-T01-B) y su sha256 en formato `sha256sum`
-# (`<hash>  <nombre>`). Solo interfaces por defecto (CUT_HWPhi, FC3, SEC0); un
-# hilo; sin Python.
+# Escribe `resultados/vectores-transicion-negativos-v0.1.txt` (mismo formato de
+# líneas que T01-B, con `nonce=` en TX de garantía y en GAR) y su sha256 en
+# formato `sha256sum` (`<hash>  <nombre>`). Solo interfaces por defecto
+# (CUT_HWPhi, FC3, SEC0); un hilo; sin Python.
 #
 # Cada caso trae el error esperado escrito a mano (`CasoNegativo.esperado`) y se
 # comprueba contra el oráculo antes de escribirlo; si alguno no coincide, no se
@@ -18,7 +19,7 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/CONTRATO-v0.md"
-const SALIDA_DEF = "resultados/vectores-transicion-negativos-v0.txt"
+const SALIDA_DEF = "resultados/vectores-transicion-negativos-v0.1.txt"
 
 # --- nombres del formato ---------------------------------------------------
 
@@ -89,9 +90,14 @@ bloque_str(b::Bloque) = string(
 function tx_str(tx::Tx)
     ent = join(string.(tx.entradas), ",")
     sal = join(["$(s.id):$(s.valor):$(s.dueño)" for s in tx.salidas], ",")
-    return string("TX tipo=", NOMBRE_TIPO[tx.tipo], " firmante=", tx.firmante,
+    base = string("TX tipo=", NOMBRE_TIPO[tx.tipo], " firmante=", tx.firmante,
                   " clave=", tx.clave, " importe=", tx.importe,
                   " ent=[", ent, "] sal=[", sal, "]")
+    # F-15: `nonce=` solo en las tres operaciones de garantía.
+    if tx.tipo == TxDeposito || tx.tipo == TxRetiro || tx.tipo == TxLiberacion
+        return string(base, " nonce=", tx.nonce)
+    end
+    return base
 end
 
 function utxo_str(E::Estado)
@@ -121,7 +127,8 @@ function gar_str(E::Estado)
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
         push!(lineas, string("GAR clave=", k, " activo=", g.activo,
                              " pend=[", ps, "] ret=[", rs, "] cred=[", cs,
-                             "] congelado=", g.congelado))
+                             "] congelado=", g.congelado,
+                             " nonce=", g.nonce_siguiente))
     end
     return lineas
 end
@@ -193,7 +200,7 @@ function main()
     mkpath(dirname(salida))
     parcial = salida * ".tmp"
     io = open(parcial, "w")
-    println(io, "# vectores-transicion-negativos-v0 · T01-C · ", fecha,
+    println(io, "# vectores-transicion-negativos-v0.1 · T01-D (F-15) · ", fecha,
             " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     inesperados = 0
@@ -203,7 +210,7 @@ function main()
     porsub = Dict{String,Dict{String,Int}}()
     for i in idxs
         P = puntos[i]
-        for c in casos_negativos(P)
+        for c in vcat(casos_negativos(P), casos_nonce(P))
             resmap = res_por_bloque(c.bloques, P)
             got = resmap[last(c.bloques).id]
             if got != string(c.esperado)
@@ -242,13 +249,13 @@ function main()
     println("RECUENTO POR ERROR")
     errores = ["ErrSaldo", "ErrDobleGasto", "ErrRetiroPendiente",
                "ErrAutorizacion", "ErrInmaduro", "ErrEmision",
-               "ErrOperacionFase", "ErrGarantia"]
+               "ErrOperacionFase", "ErrGarantia", "ErrNonce"]
     for e in errores
         @printf("  %-22s = %d\n", e, get(conteo_err, e, 0))
     end
     println("RECUENTO POR FAMILIA")
     for f in ["Saldo", "DobleGasto", "RetiroPendiente", "Autorizacion",
-              "Inmaduro", "Garantia", "Emision", "OperacionFase"]
+              "Inmaduro", "Garantia", "Emision", "OperacionFase", "Nonce"]
         @printf("  %-22s = %d\n", f, get(conteo_fam, f, 0))
     end
     println("RECUENTO POR FASE")

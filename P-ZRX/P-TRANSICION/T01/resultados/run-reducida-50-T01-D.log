@@ -1,0 +1,117 @@
+T01 run: semilla=23130 (0x0000000000005a5a) replicas=50 rejilla=reducida puntos=147456 paso=1
+subsidio_pow=10 subsidio_post=3  i3_cada=200 i3_perm=5
+  progreso: punto 2000/147456  historias=100000  t=4s
+  progreso: punto 4000/147456  historias=200000  t=10s
+  progreso: punto 6000/147456  historias=300000  t=19s
+  progreso: punto 8000/147456  historias=400000  t=27s
+  progreso: punto 10000/147456  historias=500000  t=33s
+  progreso: punto 12000/147456  historias=600000  t=38s
+  progreso: punto 14000/147456  historias=700000  t=44s
+  progreso: punto 16000/147456  historias=800000  t=51s
+  progreso: punto 18000/147456  historias=900000  t=59s
+  progreso: punto 20000/147456  historias=1000000  t=65s
+  progreso: punto 22000/147456  historias=1100000  t=72s
+  progreso: punto 24000/147456  historias=1200000  t=79s
+  progreso: punto 26000/147456  historias=1300000  t=88s
+  progreso: punto 28000/147456  historias=1400000  t=96s
+  progreso: punto 30000/147456  historias=1500000  t=103s
+  progreso: punto 32000/147456  historias=1600000  t=110s
+  progreso: punto 34000/147456  historias=1700000  t=119s
+  progreso: punto 36000/147456  historias=1800000  t=131s
+  progreso: punto 38000/147456  historias=1900000  t=139s
+  progreso: punto 40000/147456  historias=2000000  t=145s
+  progreso: punto 42000/147456  historias=2100000  t=152s
+  progreso: punto 44000/147456  historias=2200000  t=161s
+  progreso: punto 46000/147456  historias=2300000  t=170s
+  progreso: punto 48000/147456  historias=2400000  t=178s
+  progreso: punto 50000/147456  historias=2500000  t=185s
+  progreso: punto 52000/147456  historias=2600000  t=194s
+  progreso: punto 54000/147456  historias=2700000  t=206s
+  progreso: punto 56000/147456  historias=2800000  t=218s
+  progreso: punto 58000/147456  historias=2900000  t=227s
+  progreso: punto 60000/147456  historias=3000000  t=236s
+  progreso: punto 62000/147456  historias=3100000  t=247s
+  progreso: punto 64000/147456  historias=3200000  t=258s
+  progreso: punto 66000/147456  historias=3300000  t=268s
+  progreso: punto 68000/147456  historias=3400000  t=277s
+  progreso: punto 70000/147456  historias=3500000  t=288s
+  progreso: punto 72000/147456  historias=3600000  t=299s
+  progreso: punto 74000/147456  historias=3700000  t=310s
+  progreso: punto 76000/147456  historias=3800000  t=314s
+  progreso: punto 78000/147456  historias=3900000  t=318s
+  progreso: punto 80000/147456  historias=4000000  t=325s
+  progreso: punto 82000/147456  historias=4100000  t=331s
+  progreso: punto 84000/147456  historias=4200000  t=337s
+  progreso: punto 86000/147456  historias=4300000  t=342s
+  progreso: punto 88000/147456  historias=4400000  t=347s
+  progreso: punto 90000/147456  historias=4500000  t=355s
+  progreso: punto 92000/147456  historias=4600000  t=362s
+  progreso: punto 94000/147456  historias=4700000  t=368s
+  progreso: punto 96000/147456  historias=4800000  t=374s
+  progreso: punto 98000/147456  historias=4900000  t=382s
+  progreso: punto 100000/147456  historias=5000000  t=390s
+  progreso: punto 102000/147456  historias=5100000  t=398s
+  progreso: punto 104000/147456  historias=5200000  t=405s
+  progreso: punto 106000/147456  historias=5300000  t=412s
+  progreso: punto 108000/147456  historias=5400000  t=421s
+  progreso: punto 110000/147456  historias=5500000  t=430s
+  progreso: punto 112000/147456  historias=5600000  t=436s
+  progreso: punto 114000/147456  historias=5700000  t=442s
+  progreso: punto 116000/147456  historias=5800000  t=448s
+  progreso: punto 118000/147456  historias=5900000  t=455s
+  progreso: punto 120000/147456  historias=6000000  t=462s
+  progreso: punto 122000/147456  historias=6100000  t=469s
+  progreso: punto 124000/147456  historias=6200000  t=476s
+  progreso: punto 126000/147456  historias=6300000  t=485s
+  progreso: punto 128000/147456  historias=6400000  t=495s
+  progreso: punto 130000/147456  historias=6500000  t=504s
+  progreso: punto 132000/147456  historias=6600000  t=512s
+  progreso: punto 134000/147456  historias=6700000  t=521s
+  progreso: punto 136000/147456  historias=6800000  t=532s
+  progreso: punto 138000/147456  historias=6900000  t=542s
+  progreso: punto 140000/147456  historias=7000000  t=552s
+  progreso: punto 142000/147456  historias=7100000  t=561s
+  progreso: punto 144000/147456  historias=7200000  t=572s
+  progreso: punto 146000/147456  historias=7300000  t=584s
+
+RESUMEN
+puntos           = 147456
+replicas/punto   = 50
+historias        = 7372800
+con sufijo PoST  = 5022400
+undos exactos    = 45840000
+permutaciones I-3= 1090416
+fallos I-1       = 0
+fallos I-2       = 0
+fallos I-3       = 0
+fallos I-4       = 0
+fallos I-5       = 0
+fallos I-6       = 0
+fallos I-7       = 0
+dif FC-1 vs FC-3 = 0
+dif FC-2 vs FC-3 = 7680
+tiempo de pared  = 592.0 s (9.87 min)
+VEREDICTO        = SIN FALLOS
+	Command being timed: "/home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/julia --project=. run.jl --seed 0x5a5a --replicas 50 --rejilla reducida"
+	User time (seconds): 593.35
+	System time (seconds): 0.72
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 9:54.89
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 416596
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 50538
+	Voluntary context switches: 3
+	Involuntary context switches: 2066
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 136
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

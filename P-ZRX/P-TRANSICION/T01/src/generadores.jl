@@ -83,7 +83,9 @@ function construir_poW(rng::AbstractRNG, P::Params; hasta::Int = 10,
             end
             sort!(maduras, by = x -> x.id)
             for o in maduras
-                r2 = intentar(tx_deposito([o.id], o.dueño, Int(o.valor), o.dueño))
+                r2 = intentar(tx_deposito([o.id], o.dueño, Int(o.valor),
+                                          o.dueño;
+                                          nonce = nonce_de(Et, o.dueño)))
                 r2 === nothing || (Et = r2)
             end
         end
@@ -102,7 +104,8 @@ function construir_poW(rng::AbstractRNG, P::Params; hasta::Int = 10,
         if h == retirar_en
             g = get(Et.garantias, prod, nothing)
             if g !== nothing && g.activo >= UInt64(P.q)
-                r2 = intentar(tx_retiro(prod, 1, prod))
+                r2 = intentar(tx_retiro(prod, 1, prod;
+                                        nonce = nonce_de(Et, prod)))
                 r2 === nothing || (Et = r2)
             end
         end
@@ -176,7 +179,8 @@ function extender_post(rng::AbstractRNG, P::Params, bloques::Vector{Bloque},
 
         g = get(Et.garantias, prod, nothing)
         if !retiro_hecho && g !== nothing && g.activo > UInt64(P.q)
-            r2 = intentar_post(tx_retiro(prod, 1, prod))
+            r2 = intentar_post(tx_retiro(prod, 1, prod;
+                                         nonce = nonce_de(Et, prod)))
             if r2 !== nothing
                 Et = r2
                 retiro_hecho = true
@@ -186,7 +190,8 @@ function extender_post(rng::AbstractRNG, P::Params, bloques::Vector{Bloque},
         if gl !== nothing
             for er in gl.en_retirada
                 if er.inicio_slot + P.R_slots <= slot
-                    r2 = intentar_post(tx_liberacion(prod, er.importe, prod))
+                    r2 = intentar_post(tx_liberacion(prod, er.importe, prod;
+                                                     nonce = nonce_de(Et, prod)))
                     r2 === nothing || (Et = r2)
                     break
                 end
@@ -435,7 +440,8 @@ function escenarios_rechazo(P::Params)
             cid = 600000
             B4 = gen_pow(id = pref[3], padre = pref[1][end].id, altura = hD,
                          txs = [tx_coinbase([Salida(cid, UInt64(10), 1, OrigenTx, -1, -1)]),
-                                tx_deposito([cid], 1, 10, 1)])
+                                tx_deposito([cid], 1, 10, 1;
+                                            nonce = nonce_de(ED, 1))])
             push!(casos, (nombre = "X-04", padre = ED, B = B4,
                           esperado = ErrDepositoTemprano, historial = pref[1],
                           prefijo = pref[1]))
@@ -449,13 +455,15 @@ function escenarios_rechazo(P::Params)
         cid5 = 610000
         B5 = gen_pow(id = pref5[3], padre = pref5[1][end].id, altura = P.H_dep,
                      txs = [tx_coinbase([Salida(cid5, UInt64(10), 1, OrigenTx, -1, -1)]),
-                            tx_deposito([cid5], 1, 10, 1)])
+                            tx_deposito([cid5], 1, 10, 1;
+                                        nonce = nonce_de(E5, 1))])
         push!(casos, (nombre = "X-05", padre = E5, B = B5,
                       esperado = ErrInmaduro, historial = pref5[1],
                       prefijo = pref5[1]))
         B6 = gen_pow(id = pref5[3], padre = pref5[1][end].id, altura = P.H_dep,
                      txs = [tx_coinbase([Salida(cid5, UInt64(10), 1, OrigenTx, -1, -1)]),
-                            tx_deposito([cid5], 2, 10, 1)])
+                            tx_deposito([cid5], 2, 10, 1;
+                                        nonce = nonce_de(E5, 2))])
         push!(casos, (nombre = "X-06", padre = E5, B = B6,
                       esperado = ErrAutorizacion, historial = pref5[1],
                       prefijo = pref5[1]))
@@ -507,7 +515,8 @@ function escenarios_rechazo(P::Params)
     push!(casos, (nombre = "X-13", padre = Eg, B = B13,
                   esperado = ErrOperacionFase, historial = Bloque[],
                   prefijo = gen_only[1]))
-    B14 = gen_pow(id = gid + 1, padre = gid, altura = 1, txs = [tx_liberacion(1, 1, 1)])
+    B14 = gen_pow(id = gid + 1, padre = gid, altura = 1,
+                  txs = [tx_liberacion(1, 1, 1; nonce = nonce_de(Eg, 1))])
     push!(casos, (nombre = "X-14", padre = Eg, B = B14,
                   esperado = ErrOperacionFase, historial = Bloque[],
                   prefijo = gen_only[1]))
@@ -613,8 +622,12 @@ function historia_dos_terminales(P::Params; pesos = (2, 1), trabajo_extra = 1)
         end
     end
     sort!(maduras, by = x -> x.id)
+    nonces = Dict{Int,UInt64}()   # F-15: varios depósitos de la misma clave
     for o in maduras
-        push!(deps, tx_deposito([o.id], o.dueño, Int(o.valor), o.dueño))
+        k = o.dueño
+        n = get!(nonces, k, nonce_de(E0, k))
+        push!(deps, tx_deposito([o.id], k, Int(o.valor), k; nonce = n))
+        nonces[k] = n + UInt64(1)
     end
     cid1 = 950000
     cid2 = 950100

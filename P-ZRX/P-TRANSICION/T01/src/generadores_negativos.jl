@@ -113,6 +113,8 @@ function casos_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
     # Estado con la promoción ya aplicada: es el que ven las transacciones.
     Ef = estado_promovido(Ep, P, faseA, pt)
     gkeys = sort(collect(keys(Ef.garantias)))
+    # F-15: nonce siguiente de una clave en el estado (antes de las txs).
+    nc(g::Int) = nonce_de(Ef, g)
     gastados = sort(collect(ids_gastados(pref)))
     oid = Ref(900000 + 37 * last(pref).id)
     nuevo() = (oid[] += 1; oid[])
@@ -170,40 +172,42 @@ function casos_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
         for o in Iterators.take(sp, 2)
             agrega("neg-saldo-deposito-descuadra", "Saldo", ErrSaldo,
                    [cb(), tx_deposito([o.id], o.dueño, Int(o.valor) + 1,
-                                      o.dueño)])
+                                      o.dueño; nonce = nc(o.dueño))])
         end
     end
     # Retiro mayor que el activo.
     for g in Iterators.take(gkeys, 2)
         agrega("neg-saldo-retiro-mayor-activo", "Saldo", ErrSaldo,
-               [cb(), tx_retiro(g, Int(activo_de(Ef, g)) + 1, g)])
+               [cb(), tx_retiro(g, Int(activo_de(Ef, g)) + 1, g;
+                                nonce = nc(g))])
     end
     # Liberación mayor que lo vencido (solo PoST).
     if !es_pow
         for g in Iterators.take(gkeys, 2)
             v = Int(vencido_de(Ef, g, pt, P))
             agrega("neg-saldo-liberacion-mayor-vencido", "Saldo", ErrSaldo,
-                   [cb(), tx_liberacion(g, v + 1, g)])
+                   [cb(), tx_liberacion(g, v + 1, g; nonce = nc(g))])
         end
         # R-8: importe 0 en CoinbasePost / Liberacion.
         agrega("neg-saldo-r8-coinbasepost-cero", "Saldo", ErrSaldo,
                [tx_coinbase_post(0)])
         agrega("neg-saldo-r8-liberacion-cero", "Saldo", ErrSaldo,
-               [cb(), tx_liberacion(1, 0, 1)])
+               [cb(), tx_liberacion(1, 0, 1; nonce = nc(1))])
         # Liberación antes de R_slots: retiro en el mismo bloque y liberación.
         for g in Iterators.take(gkeys, 2)
             if isempty(Ef.garantias[g].en_retirada) &&
                activo_de(Ef, g) >= UInt64(2)
                 agrega("neg-saldo-liberacion-antes-R", "Saldo", ErrSaldo,
-                       [cb(), tx_retiro(g, 1, g), tx_liberacion(g, 1, g)])
+                       [cb(), tx_retiro(g, 1, g; nonce = nc(g)),
+                        tx_liberacion(g, 1, g; nonce = nc(g) + UInt64(1))])
             end
         end
     end
     # R-8: importe 0 en Deposito y Retiro.
     agrega("neg-saldo-r8-deposito-cero", "Saldo", ErrSaldo,
-           [cb(), tx_deposito(Int[], 1, 0, 1)])
+           [cb(), tx_deposito(Int[], 1, 0, 1; nonce = nc(1))])
     agrega("neg-saldo-r8-retiro-cero", "Saldo", ErrSaldo,
-           [cb(), tx_retiro(1, 0, 1)])
+           [cb(), tx_retiro(1, 0, 1; nonce = nc(1))])
 
     # ===== ErrDobleGasto ===============================================
     for o in Iterators.take(sp, 2)
@@ -228,7 +232,8 @@ function casos_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
                [cb(), tx_transferencia([id], [salida_neg(nuevo(), 1, 1)], 1)])
         if !es_pow || pt >= P.H_dep
             agrega("neg-doblegasto-deposito-salida-gastada", "DobleGasto",
-                   ErrDobleGasto, [cb(), tx_deposito([id], 1, 1, 1)])
+                   ErrDobleGasto,
+                   [cb(), tx_deposito([id], 1, 1, 1; nonce = nc(1))])
         end
     end
 
@@ -237,13 +242,14 @@ function casos_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
         if !isempty(Ef.garantias[g].en_retirada) &&
            activo_de(Ef, g) >= UInt64(1)
             agrega("neg-retiropendiente-segunda", "RetiroPendiente",
-                   ErrRetiroPendiente, [cb(), tx_retiro(g, 1, g)])
+                   ErrRetiroPendiente, [cb(), tx_retiro(g, 1, g; nonce = nc(g))])
         end
         if isempty(Ef.garantias[g].en_retirada) &&
            activo_de(Ef, g) >= UInt64(2)
             agrega("neg-retiropendiente-dos-en-bloque", "RetiroPendiente",
                    ErrRetiroPendiente,
-                   [cb(), tx_retiro(g, 1, g), tx_retiro(g, 1, g)])
+                   [cb(), tx_retiro(g, 1, g; nonce = nc(g)),
+                    tx_retiro(g, 1, g; nonce = nc(g) + UInt64(1))])
         end
     end
 
@@ -255,12 +261,12 @@ function casos_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
                         [salida_neg(nuevo(), Int(o.valor), o.dueño)], f2)])
     end
     agrega("neg-autorizacion-deposito", "Autorizacion", ErrAutorizacion,
-           [cb(), tx_deposito(Int[], 1, 1, 2)])
+           [cb(), tx_deposito(Int[], 1, 1, 2; nonce = nc(1))])
     agrega("neg-autorizacion-retiro", "Autorizacion", ErrAutorizacion,
-           [cb(), tx_retiro(1, 1, 2)])
+           [cb(), tx_retiro(1, 1, 2; nonce = nc(1))])
     if !es_pow
         agrega("neg-autorizacion-liberacion", "Autorizacion", ErrAutorizacion,
-               [cb(), tx_liberacion(1, 1, 2)])
+               [cb(), tx_liberacion(1, 1, 2; nonce = nc(1))])
     end
 
     # ===== ErrInmaduro =================================================
@@ -283,7 +289,7 @@ function casos_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
             agrega("neg-inmaduro-deposito-mismo-bloque", "Inmaduro",
                    ErrInmaduro,
                    [tx_coinbase([salida_neg(cbid2, 10, 1)]),
-                    tx_deposito([cbid2], 1, 10, 1)])
+                    tx_deposito([cbid2], 1, 10, 1; nonce = nc(1))])
         end
     else
         # Cruce del corte: gasto antes de s_0 + M_res_slots (madurez residual).
@@ -297,11 +303,11 @@ function casos_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
     # ===== ErrOperacionFase (solo PoW: liberación y evidencia) =========
     if es_pow
         agrega("neg-operacionfase-liberacion", "OperacionFase",
-               ErrOperacionFase, [cb(), tx_liberacion(1, 1, 1)])
+               ErrOperacionFase, [cb(), tx_liberacion(1, 1, 1; nonce = nc(1))])
         agrega("neg-operacionfase-evidencia", "OperacionFase",
                ErrOperacionFase, [cb(), tx_evidencia(1)])
         agrega("neg-operacionfase-liberacion-sola", "OperacionFase",
-               ErrOperacionFase, [tx_liberacion(1, 1, 1)])
+               ErrOperacionFase, [tx_liberacion(1, 1, 1; nonce = nc(1))])
         agrega("neg-operacionfase-evidencia-sola", "OperacionFase",
                ErrOperacionFase, [tx_evidencia(1)])
     end
@@ -364,7 +370,8 @@ function casos_garantia_pendiente(P::Params, pref0::Vector{Bloque},
     # V1: K deposita su salida ⇒ garantía pendiente (madura en s + M_dep_slots).
     V1 = gen_post(id = V0.id + 1, padre = V0.id, slot = slot0 + 1,
                   productor = 1, peso = 1, sector = 0,
-                  txs = [tx_coinbase_post(3), tx_deposito([k1], K, 1, K)])
+                  txs = [tx_coinbase_post(3),
+                         tx_deposito([k1], K, 1, K; nonce = nonce_de(E0, K))])
     E1 = aplicar(E0, V1, P)
     E1 isa Err && return CasoNegativo[]
     # B: K produce con solo el pendiente ⇒ ErrGarantia.
@@ -414,4 +421,186 @@ function puntos_negativos()
               if P.sec == SEC0 && P.corte == CUT_HWPhi && P.seleccion == FC3]
     N = length(puntos)
     return unique([1, div(1 + N, 2), N]), puntos
+end
+
+# ---------------------------------------------------------------------------
+# T01-D · F-15: casos dirigidos de nonce por clave de garantía
+# ---------------------------------------------------------------------------
+#
+# Sobre cadenas base válidas (`cadena_base`) se inyecta un bloque con
+# `[coinbase, ...]` cuyo error esperado es `ErrNonce`. El nonce de toda
+# operación honesta de la cadena base ya viene asignado por los generadores; la
+# comprobación de F-15 es lo primero que ejecuta el oráculo en Deposito/Retiro/
+# Liberacion, así que el error observado es `ErrNonce` y no otro.
+
+function _ctx_nonce(P::Params, Ep::Estado, Bk::Bloque)
+    es_pow = Bk.familia == PoW
+    fase = es_pow ? FasePoW : FasePoST
+    pt = punto_bloque_neg(Ep, Bk)
+    Ef = estado_promovido(Ep, P, fase, pt)
+    prod_ok = activo_de(Ef, 1) >= UInt64(P.q)
+    return es_pow, fase, pt, Ef, prod_ok
+end
+
+function _agrega_nonce!(out::Vector{CasoNegativo}, P::Params,
+                        pref::Vector{Bloque}, Ep::Estado, Bk::Bloque,
+                        nombre::String, familia::String, txs::Vector{Tx})
+    B = bloque_neg(P, pref, Ep, Bk, txs)
+    push!(out, CasoNegativo(nombre, ErrNonce,
+                            Bk.familia == PoW ? "PoW" : "PoST", familia,
+                            vcat(pref, [B])))
+    return out
+end
+
+# Un bloque negativo con todos los casos de nonce para (pref, Ep, Bk).
+function casos_nonce_bloque(P::Params, pref::Vector{Bloque}, Ep::Estado,
+                            Bk::Bloque)
+    out = CasoNegativo[]
+    es_pow, fase, pt, Ef, prod_ok = _ctx_nonce(P, Ep, Bk)
+    (es_pow || prod_ok) || return out
+    oid = Ref(970000 + 37 * last(pref).id + (es_pow ? 0 : 400000))
+    nuevo() = (oid[] += 1; oid[])
+    cb() = es_pow ? tx_coinbase([salida_neg(nuevo(), 10, 1)]) :
+                    tx_coinbase_post(3)
+
+    # (1) Repetición de un retiro / una liberación ya aplicados en `pref`:
+    #     el nonce de la tx es menor que `nonce_siguiente` de su clave.
+    for b in pref, tx in b.txs
+        (tx.tipo == TxRetiro || tx.tipo == TxLiberacion) || continue
+        nombre = tx.tipo == TxRetiro ? "neg-nonce-rep-retiro" :
+                                       "neg-nonce-rep-liberacion"
+        familia = "Nonce"
+        _agrega_nonce!(out, P, pref, Ep, Bk, nombre, familia, [cb(), tx])
+    end
+
+    # (2)/(3) Nonce saltado (+1) y nonce viejo (-1) sobre un retiro que, por lo
+    #         demás, sería válido (activo ≥ 1 y sin retirada pendiente).
+    for g in sort(collect(keys(Ef.garantias)))
+        ghas = Ef.garantias[g]
+        (ghas.activo >= UInt64(1) && isempty(ghas.en_retirada)) || continue
+        n = ghas.nonce_siguiente
+        _agrega_nonce!(out, P, pref, Ep, Bk, "neg-nonce-saltado",
+                       "Nonce",
+                       [cb(), tx_retiro(g, 1, g; nonce = n + UInt64(1))])
+        if n > 0
+            _agrega_nonce!(out, P, pref, Ep, Bk, "neg-nonce-viejo",
+                           "Nonce",
+                           [cb(), tx_retiro(g, 1, g; nonce = n - UInt64(1))])
+        end
+    end
+
+    # (4) Dos depósitos de la misma clave en el mismo bloque con nonces n, n:
+    #     el primero aplica y el segundo da ErrNonce.
+    if !es_pow || pt >= P.H_dep
+        for (g, oss) in _gastables_por_clave(Ep, P, fase, pt)
+            length(oss) >= 2 || continue
+            n = nonce_de(Ef, g)
+            o1, o2 = oss[1], oss[2]
+            _agrega_nonce!(out, P, pref, Ep, Bk, "neg-nonce-dos-nn", "Nonce",
+                           [cb(),
+                            tx_deposito([o1.id], g, Int(o1.valor), g; nonce = n),
+                            tx_deposito([o2.id], g, Int(o2.valor), g; nonce = n)])
+            break
+        end
+    end
+    return out
+end
+
+# Salidas gastables agrupadas por dueño, ordenadas por clave.
+function _gastables_por_clave(Ep::Estado, P::Params, fase::Fase, punto::Int)
+    d = Dict{Int,Vector{Salida}}()
+    for o in gastables_punto(Ep, P, fase, punto)
+        push!(get!(d, o.dueño, Salida[]), o)
+    end
+    return sort(collect(d), by = x -> x[1])
+end
+
+# Prefijos PoW que NO alcanzan el terminal (altura < H_corte_min): permiten
+# repetir un retiro aplicado en PoW y construir bloques con dos salidas
+# gastables de la misma clave. Variante (a): depósitos + retiro en el último
+# bloque; variante (b): sin depósitos y con varias salidas a la clave 1.
+function _prefijos_pow_nonce(P::Params; seeds = 1:16)
+    res = Tuple{Vector{Bloque},Estado,Int}[]
+    Hpre = max(P.H_corte_min - 1, 1)
+    for seed in seeds
+        ra = construir_poW(StableRNG(seed), P; hasta = Hpre, depositar = true,
+                           transferir = false, retirar_en = Hpre)
+        ra[2][end].terminal == -1 &&
+            push!(res, (ra[1], ra[2][end], ra[3]))
+        rb = construir_poW(StableRNG(1000 + seed), P; hasta = Hpre,
+                           depositar = false, transferir = false,
+                           claves_extra = [1])
+        rb[2][end].terminal == -1 &&
+            push!(res, (rb[1], rb[2][end], rb[3]))
+    end
+    return res
+end
+
+function casos_nonce_pow(P::Params; seeds = 1:16)
+    out = CasoNegativo[]
+    for (pref, E, next_id) in _prefijos_pow_nonce(P; seeds = seeds)
+        Bk = gen_pow(id = next_id, padre = last(pref).id,
+                     altura = E.altura + 1)
+        append!(out, casos_nonce_bloque(P, pref, E, Bk))
+    end
+    return out
+end
+
+# Casos de rechazo por nonce sobre `seeds` cadenas base por punto de rejilla,
+# más los bloques PoW pre-terminales.
+function casos_nonce(P::Params; seeds = 1:24, max_post::Int = 4)
+    out = CasoNegativo[]
+    for seed in seeds
+        bloques, estados = cadena_base(P; seed = seed, max_post = max_post)
+        for k in 2:length(bloques)
+            append!(out, casos_nonce_bloque(P, bloques[1:k - 1],
+                                            estados[k - 1], bloques[k]))
+        end
+    end
+    append!(out, casos_nonce_pow(P))
+    return out
+end
+
+# Bloque VÁLIDO con dos depósitos de la misma clave y nonces n, n+1 (F-15).
+function _valido_nn(P::Params, pref::Vector{Bloque}, Ep::Estado, Bk::Bloque)
+    es_pow, fase, pt, Ef, prod_ok = _ctx_nonce(P, Ep, Bk)
+    (es_pow || prod_ok) || return nothing
+    es_pow && pt < P.H_dep && return nothing
+    for (g, oss) in _gastables_por_clave(Ep, P, fase, pt)
+        length(oss) >= 2 || continue
+        n = nonce_de(Ef, g)
+        o1, o2 = oss[1], oss[2]
+        oid = 970000 + 37 * last(pref).id + (es_pow ? 0 : 400000) + 1
+        cb = es_pow ? tx_coinbase([salida_neg(oid, 10, 1)]) :
+                      tx_coinbase_post(3)
+        txs = [cb,
+               tx_deposito([o1.id], g, Int(o1.valor), g; nonce = n),
+               tx_deposito([o2.id], g, Int(o2.valor), g;
+                           nonce = n + UInt64(1))]
+        B = bloque_neg(P, pref, Ep, Bk, txs)
+        r = aplicar(Ep, B, P)
+        r isa Err && continue
+        return ("neg-nonce-valido-nn", vcat(pref, [B]))
+    end
+    return nothing
+end
+
+# Bloques VÁLIDOS con dos depósitos de la misma clave y nonces n, n+1 (F-15).
+# Devuelve `(nombre, bloques)`; el test comprueba que aplican sin error.
+function casos_nonce_validos(P::Params; seeds = 1:24, max_post::Int = 4)
+    out = Tuple{String,Vector{Bloque}}[]
+    for seed in seeds
+        bloques, estados = cadena_base(P; seed = seed, max_post = max_post)
+        for k in 2:length(bloques)
+            r = _valido_nn(P, bloques[1:k - 1], estados[k - 1], bloques[k])
+            r === nothing || push!(out, r)
+        end
+    end
+    for (pref, E, next_id) in _prefijos_pow_nonce(P; seeds = 1:16)
+        Bk = gen_pow(id = next_id, padre = last(pref).id,
+                     altura = E.altura + 1)
+        r = _valido_nn(P, pref, E, Bk)
+        r === nothing || push!(out, r)
+    end
+    return out
 end

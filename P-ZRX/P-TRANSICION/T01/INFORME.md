@@ -422,3 +422,165 @@ se contabilizan dentro de la familia `ErrSaldo`. Ningún caso se relabela.
 - **No exporta X-12/X-15** ni cambia los vectores de T01-B.
 - **No demuestra determinismo entre máquinas**: solo en esta máquina, versión y
   semilla; el orden interno se neutraliza con ordenaciones explícitas.
+
+# INFORME — T01-D (nonce por clave de garantía, F-15)
+
+## D.1. Veredicto
+
+**SUPERADO.** El oráculo incorpora el **nonce por clave** de la «Corrección v0.1»
+de `FORMATO-v0.md` (F-15). Se regeneran los mismos **2 055** casos base en
+`resultados/vectores-transicion-v0.1.txt` (con `nonce=` en las `TX` de `Deposito`/
+`Retiro`/`Liberacion` y en cada `GAR`) y se amplía el fichero de rechazos a
+`resultados/vectores-transicion-negativos-v0.1.txt` con los **1 915** casos de
+T01-C más **2 024** casos de `ErrNonce`. Un lector independiente relee ambos
+ficheros con **0 discrepancias**; dos ejecuciones con la misma `--fecha` dan el
+mismo `sha256`; `test/runtests.jl` y `run.jl --seed 0x5a5a --replicas 50
+--rejilla reducida` pasan sin fallos. Los ficheros v0 se conservan intactos.
+
+- Base: 2 055 casos, 130 869 líneas, 8 219 999 B,
+  `sha256 = 0faec4a330b0ab96052b97c919b9e7bfa9ef494c2dd8fde25f38738658aa5527`.
+- Negativos: 3 939 casos, 145 287 líneas, 9 045 511 B,
+  `sha256 = 9ca55abde96702f61ac0762e22f0a861d9ab0603a4090eda04ccd818eb0326ad`.
+- v0 intactos: base `06d95324…e6d766`, negativos `2e407c88…717e1792`.
+
+## D.2. Falta de definición detectada antes de editar
+
+Ninguna bloquea la orden; se aplica la lectura más compatible con las decisiones
+1–5 y con F-15 y se declara aquí y en `PROGRESO.md` §T01-D.
+
+- **D/AMBIGUEDAD-1 — Destino del caso válido `n, n+1`.** §3 pide el bloque válido
+  `n, n+1` y el `n, n`; §4 fija que el fichero base conserva **2 055** casos y
+  que el negativo lleva «los de T01-C más los de repetición». Lectura: el rechazo
+  `n, n` va al fichero negativo (`neg-nonce-dos-nn`) y el bloque válido `n, n+1`
+  se comprueba en `test/runtests.jl` (`casos_nonce_validos`), sin alterar el
+  recuento del base ni meter un caso válido en el fichero de rechazos.
+- **D/AMBIGUEDAD-2 — Desbordamiento de `nonce_siguiente`.** No se nombra error
+  para el máximo de `UInt64`. Lectura: suma comprobada (R-1) y
+  `ErrDesbordamiento`; inalcanzable en la rejilla, pero sin `wrap`.
+- **D/AMBIGUEDAD-3 — Clave sin registro en `Retiro`/`Liberacion`.** Solo se
+  explicita que un **depósito** crea el registro con 0. Lectura: se aplica la
+  misma (`obtener_garantia!` crea con 0) y luego el resto de reglas; al fallar la
+  operación, la copia se descarta (R-14), así que no persiste.
+- **D/AMBIGUEDAD-4 — Orden del nonce frente a la fase en `Liberacion`.** §2 dice
+  «antes que el resto de reglas». Lectura: también antes de `ErrOperacionFase`;
+  una liberación en PoW con nonce correcto sigue dando `ErrOperacionFase` (X-14
+  no cambia) y con nonce incorrecto da `ErrNonce`.
+- **D/AMBIGUEDAD-5 — Alcance de «≥ 30 cada uno, fases PoW y PoST».** Lectura: se
+  cuentan por subcaso; `rep-liberacion` solo puede ser PoST (la liberación no se
+  aplica en PoW) y los demás subcasos cubren PoW y PoST.
+- **D/AMBIGUEDAD-6 — Posición del campo `nonce=`.** No se fija. Lectura: al final
+  de la línea (`… sal=[…] nonce=<u64>`, `… congelado=<u64> nonce=<u64>`),
+  idéntica en exportadores y lector.
+- **D/AMBIGUEDAD-7 — `.sha256` del base.** T01-B escribió el base con solo el
+  hash; §4 pide formato `sha256sum` para «cada uno». Lectura: los v0.1 usan
+  `<hash>  <ruta>`; los v0 conservan su formato original.
+
+## D.3. F-15 en el oráculo
+
+- `Garantia` gana `nonce_siguiente::UInt64` (0 al crearse, incluido el registro
+  implícito de `obtener_garantia!`); `Tx` gana `nonce::UInt64` (0 salvo en las
+  tres operaciones de garantía). `clonar` y `representacion_canonica` lo
+  incluyen, de modo que el undo por copia (R-14) y el hash canónico lo reflejan.
+- `comprobar_nonce!` va **primero** en `aplicar_deposito!`, `aplicar_retiro!` y
+  `aplicar_liberacion!`: si `nonce ≠ nonce_siguiente[clave]` ⇒ `ErrNonce`; si
+  coincide, aplica e incrementa. El incremento es visible a las txs siguientes
+  del mismo bloque, lo que permite `n, n+1` y rechaza `n, n`.
+- Los generadores honestos (`construir_poW`, `extender_post`,
+  `escenarios_rechazo`, `historia_dos_terminales`, `casos_bloque`,
+  `casos_garantia_pendiente`) asignan el nonce correcto leyendo el estado
+  tentativo, por lo que X-01…X-20 no cambian de resultado (0 dirigidos
+  inesperados en el exportador).
+- `src/generadores_negativos.jl` añade `casos_nonce` (rechazos) y
+  `casos_nonce_validos` (bloques `n, n+1` válidos), con prefijos PoW
+  pre-terminales para cubrir también la fase PoW.
+
+## D.4. Recuento por error (incluido `ErrNonce`)
+
+Fichero `vectores-transicion-negativos-v0.1.txt` (3 939 casos; PoW = 1 553,
+PoST = 2 386). Las ocho familias de T01-C conservan **exactamente** sus 1 915
+casos y sus recuentos.
+
+| Error | Casos | PoW | PoST |
+|---|---:|---:|---:|
+| `ErrSaldo` | 571 | 240 | 331 |
+| `ErrDobleGasto` | 306 | 144 | 162 |
+| `ErrRetiroPendiente` | 78 | 24 | 54 |
+| `ErrAutorizacion` | 240 | 132 | 108 |
+| `ErrInmaduro` | 189 | 165 | 24 |
+| `ErrEmision` | 198 | 144 | 54 |
+| `ErrOperacionFase` | 192 | 192 | 0 |
+| `ErrGarantia` | 141 | 0 | 141 |
+| `ErrNonce` | **2 024** | **512** | **1 512** |
+
+Subcasos de `ErrNonce` (todos ≥ 30; PoW/PoST):
+
+| Subcaso | Total | PoW | PoST |
+|---|---:|---:|---:|
+| `neg-nonce-rep-retiro` (repetición) | 404 | 32 | 372 |
+| `neg-nonce-rep-liberacion` (repetición) | 180 | 0 | 180 |
+| `neg-nonce-saltado` (`+1`) | 608 | 224 | 384 |
+| `neg-nonce-viejo` (`-1`) | 608 | 224 | 384 |
+| `neg-nonce-dos-nn` (`n, n` ⇒ segunda `ErrNonce`) | 224 | 32 | 192 |
+
+Además, `casos_nonce_validos` produce **224** bloques válidos con dos depósitos
+de la misma clave y nonces `n, n+1` (PoW y PoST), comprobados en la batería.
+
+## D.5. Relectura independiente y determinismo
+
+`src/lector_vectores.jl` (analizador y render propios, sin funciones del
+exportador), adaptado para leer `nonce=`:
+
+    base      : leidos_casos = 2055  discrepancias = 0  SIN DISCREPANCIAS
+    negativos : leidos_casos = 3939  discrepancias = 0  SIN DISCREPANCIAS
+
+`sha256sum -c` pasa en ambos `.sha256`. Determinismo (`resultados/determinismo-v0.1.log`
+y `determinismo-negativos-v0.1.log`): dos ejecuciones con `--fecha
+2026-09-26T03:10:14+02:00` dan los mismos hashes.
+
+## D.6. Tests y `run.jl`
+
+`Pkg.test()` (`resultados/test-T01-D.log`): **todos los testsets pasan**
+(`PKGTEST_EXIT=0`); X-01…X-15 38/38, R-6…R-9 10/10, X-16…X-20 2/2 cada uno,
+I-1…I-7 9/9 (0 fallos) y el testset nuevo **F-15 10/10** (0,7 s). El testset
+F-15 comprueba los 2 024 rechazos contra el oráculo, exige ≥ 30 por subcaso y
+≥ 30 por fase, y que los 224 bloques válidos `n, n+1` apliquen.
+
+`run.jl --seed 0x5a5a --replicas 50 --rejilla reducida`
+(`resultados/run-reducida-50-T01-D.log`): 7 372 800 historias, 45 840 000 undos
+exactos, **0 fallos I-1…I-7**, `dif FC-1 vs FC-3 = 0`, `dif FC-2 vs FC-3 = 7680`,
+`VEREDICTO = SIN FALLOS`, 592,0 s (9,87 min).
+
+## D.7. Entorno, comandos y tiempos
+
+1 hilo (`JULIA_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`), Julia 1.13.0, sin
+Python. Presupuesto T01-D: 1 h 30 min, 1 hilo, 8 GiB.
+
+    export JULIA_DEPOT_PATH=…/T01/.julia-depot
+    export JULIA=…/julia-1.13.0+0.x64.linux.gnu/bin/julia
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. exportar.jl --fecha 2026-09-26T03:10:14+02:00
+    # casos=2055 dirigidos_con_error_inesperado=0
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. exportar_negativos.jl --fecha 2026-09-26T03:10:14+02:00
+    # casos=3939 inesperados=0
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. src/lector_vectores.jl <fichero>
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+- `exportar.jl`: 3,37 s, 99 % CPU, máx. RSS ≈ 430 MiB.
+- `exportar_negativos.jl`: 3,71 s, 99 % CPU, máx. RSS ≈ 492 MiB.
+- lector base: máx. RSS ≈ 373 MiB; lector negativos: ≈ 429 MiB.
+- `Pkg.test()`: `PKGTEST_EXIT=0` (testsets F-15 0,7 s, I-1…I-7 53,3 s).
+- Sesión: ver `HORAS.log`; muy por debajo del presupuesto de 1 h 30 min.
+
+## D.8. Lo que T01-D NO demuestra
+
+- **No implementa F-16/F-17** (coinbase PoW única y `slot` de la coinbase PoST):
+  la orden solo pide F-15 (nonce por clave).
+- **No firma**: `firmante`/`clave` son enteros simbólicos; el nonce modela la
+  protección contra repetición, no la firma de aceptación.
+- **No cubre F-15 en Rust**: el motor corregido se validará con estos vectores
+  (orden posterior).
+- **No demuestra determinismo entre máquinas**: solo en esta máquina, versión y
+  semilla; el orden interno se neutraliza con ordenaciones explícitas.

@@ -92,11 +92,11 @@ end
     # R-8: importe 0 en Depósito y Retiro ⇒ ErrSaldo.
     BR8a = gen_pow(id = pid + 1, padre = pid, altura = 2,
                    txs = [tx_coinbase([Salida(1105, UInt64(10), 1, OrigenTx, -1, -1)]),
-                          tx_deposito([1000], 1, 0, 1)])
+                          tx_deposito([1000], 1, 0, 1; nonce = nonce_de(E1, 1))])
     @test aplicar(E1, BR8a, P) == ErrSaldo
     BR8b = gen_pow(id = pid + 1, padre = pid, altura = 2,
                    txs = [tx_coinbase([Salida(1106, UInt64(10), 1, OrigenTx, -1, -1)]),
-                          tx_retiro(1, 0, 1)])
+                          tx_retiro(1, 0, 1; nonce = nonce_de(E1, 1))])
     @test aplicar(E1, BR8b, P) == ErrSaldo
     # R-8 en PoST: CoinbasePost y Liberación con importe 0 ⇒ ErrSaldo.
     tpost = construir_poW(StableRNG(78), P; hasta = 10, depositar = true,
@@ -109,7 +109,9 @@ end
                         peso = 1, txs = [tx_coinbase_post(0)])
         @test aplicar(ET, BR8c, P) == ErrSaldo
         BR8d = gen_post(id = T.id + 1, padre = T.id, slot = 1, productor = 1,
-                        peso = 1, txs = [tx_coinbase_post(3), tx_liberacion(1, 0, 1)])
+                        peso = 1, txs = [tx_coinbase_post(3),
+                                         tx_liberacion(1, 0, 1;
+                                                       nonce = nonce_de(ET, 1))])
         @test aplicar(ET, BR8d, P) == ErrSaldo
     end
 end
@@ -410,4 +412,53 @@ end
     @test fallos_i6 == 0
     @test fallos_i7 == 0
     @info "I-*" n_hist n_undo n_perm fallos_i1 fallos_i1b fallos_i2 fallos_i3 fallos_i4 fallos_i5 fallos_i6 fallos_i7
+end
+
+# ---------------------------------------------------------------------------
+# F-15 — nonce por clave de garantía (T01-D)
+# ---------------------------------------------------------------------------
+
+function _error_neg(bloques::Vector{Bloque}, P::Params)
+    memo, _ = construir_validos(bloques, P)
+    B = last(bloques)
+    Ep = get(memo, B.padre, nothing)
+    Ep === nothing && return :sinpadre
+    r = aplicar(Ep, B, P)
+    return r isa Err ? r : :ok
+end
+
+@testset "F-15 (nonce por clave)" begin
+    idxs, puntos = puntos_negativos()
+    fam = Dict{String,Int}()
+    fase = Dict{String,Int}()
+    ok_rech = true
+    ok_val = true
+    n_validos = 0
+    for i in idxs
+        P = puntos[i]
+        for c in casos_nonce(P)
+            got = _error_neg(c.bloques, P)
+            if got != c.esperado
+                ok_rech = false
+                @info "F-15 rechazo inesperado" c.nombre c.esperado got
+            end
+            fam[c.nombre] = get(fam, c.nombre, 0) + 1
+            fase[c.fase] = get(fase, c.fase, 0) + 1
+        end
+        for (_, bloques) in casos_nonce_validos(P)
+            memo, _ = construir_validos(bloques, P)
+            haskey(memo, last(bloques).id) || (ok_val = false)
+            n_validos += 1
+        end
+    end
+    for k in ["neg-nonce-rep-retiro", "neg-nonce-rep-liberacion",
+              "neg-nonce-saltado", "neg-nonce-viejo", "neg-nonce-dos-nn"]
+        @test get(fam, k, 0) >= 30
+    end
+    @test fase["PoW"] >= 30
+    @test fase["PoST"] >= 30
+    @test n_validos > 0
+    @test ok_rech
+    @test ok_val
+    @info "F-15" n_validos fam fase
 end

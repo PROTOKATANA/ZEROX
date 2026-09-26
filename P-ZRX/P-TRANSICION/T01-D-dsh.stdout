@@ -1,0 +1,30 @@
+He cumplido la ORDEN-T01-D. Resumen:
+
+## Falta de definición detectada (informada antes de editar)
+
+Ninguna bloquea la orden; no hay choque entre el contrato y F-15. Apliqué la lectura más compatible con las decisiones 1–5 y la declaré en `INFORME.md` §D.2 y `PROGRESO.md` §T01-D.2:
+
+1. **Destino del caso válido `n, n+1`**: el rechazo `n, n` va al fichero negativo (`neg-nonce-dos-nn`); el bloque válido `n, n+1` se comprueba en `test/runtests.jl` (`casos_nonce_validos`), sin alterar los 2 055 del base.
+2. **Desbordamiento de `nonce_siguiente`**: no se nombra error → suma comprobada y `ErrDesbordamiento` (R-1).
+3. **Clave sin registro en retiro/liberación**: solo se explicita para depósito; aplico la misma lectura (`obtener_garantia!` crea con 0) y descarto la copia si falla (R-14).
+4. **Orden del nonce vs fase en liberación**: nonce primero, también antes de `ErrOperacionFase` (X-14 no cambia).
+5. **Alcance de «≥30 cada uno, PoW y PoST»**: `rep-liberacion` es solo PoST (la operación no aplica en PoW); el resto cubre ambas fases.
+6. **Posición de `nonce=`**: al final de `TX`/`GAR`, idéntica en exportadores y lector.
+7. **`.sha256` del base**: los v0.1 en formato `sha256sum`; los v0 conservan el suyo.
+
+## Cambios
+`Transicion.jl` (ErrNonce, `Garantia.nonce_siguiente`, `Tx.nonce`, comprobación primero en depósito/retiro/liberación, undo y hash canónico), generadores honestos y negativos con nonces correctos, `casos_nonce`/`casos_nonce_pow`/`casos_nonce_validos`, exportadores con `nonce=`, lector independiente y testset F-15.
+
+## Entregables
+- `resultados/vectores-transicion-v0.1.txt`: **2 055** casos, `sha256 0faec4a3…aa5527` (+ `.sha256` sha256sum).
+- `resultados/vectores-transicion-negativos-v0.1.txt`: **3 939** casos (1 915 de T01-C + **2 024 `ErrNonce`**), `sha256 9ca55abd…326ad`.
+- v0 intactos (`06d95324…`, `2e407c88…`).
+
+## Verificación
+- Recuento: 8 familias de T01-C idénticas + `ErrNonce` 2 024 (PoW 512/PoST 1 512); subcasos rep-retiro 404, rep-liberación 180, saltado 608, viejo 608, dos-nn 224 (todos ≥30); 224 bloques válidos `n, n+1`.
+- Relectura independiente: **2 055 / 3 939 casos, 0 discrepancias**; determinismo por hash en ambos ficheros.
+- `Pkg.test()`: todo pasa, **F-15 10/10**.
+- `run.jl --seed 0x5a5a --replicas 50 --rejilla reducida`: 7 372 800 historias, **0 fallos I-1…I-7**, `SIN FALLOS`.
+- `sha256sum -c ENTRADA-T01-D.sha256`: las cuatro coinciden al empezar y como último paso.
+
+Sesión 03:10:14–03:27:17 (`HORAS.log`), 1 hilo, sin Python, sin commit/push, nada fuera de `T01/`.

@@ -1,11 +1,13 @@
-# exportar.jl — exportador determinista de vectores de transición (ORDEN-T01-B).
+# exportar.jl — exportador determinista de vectores de transición (ORDEN-T01-B,
+# revisado por T01-D: campo `nonce=` de F-15).
 #
 #     julia --project=. exportar.jl [--fecha <ISO-8601>] [--salida RUTA] \
 #         [--contrato RUTA] [--dirigidos 1] [--aleatorios 2000]
 #
-# Escribe `resultados/vectores-transicion-v0.txt` (formato de texto neutral,
-# §3.4 de la orden) y su sha256 en `resultados/vectores-transicion-v0.sha256`.
-# Solo interfaces por defecto: CUT_HWPhi, FC3, SEC0. Un hilo, sin Python.
+# Escribe `resultados/vectores-transicion-v0.1.txt` (formato de texto neutral,
+# §3.4 de la orden, con el `nonce=` de F-15) y su sha256 en
+# `resultados/vectores-transicion-v0.1.sha256` (formato `sha256sum`). Solo
+# interfaces por defecto: CUT_HWPhi, FC3, SEC0. Un hilo, sin Python.
 #
 # El lector independiente vive en `src/lector_vectores.jl` y NO reutiliza
 # ninguna función de este fichero.
@@ -16,7 +18,7 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/CONTRATO-v0.md"
-const SALIDA_DEF = "resultados/vectores-transicion-v0.txt"
+const SALIDA_DEF = "resultados/vectores-transicion-v0.1.txt"
 
 # --- nombres del formato ---------------------------------------------------
 
@@ -93,9 +95,14 @@ bloque_str(b::Bloque) = string(
 function tx_str(tx::Tx)
     ent = join(string.(tx.entradas), ",")
     sal = join(["$(s.id):$(s.valor):$(s.dueño)" for s in tx.salidas], ",")
-    return string("TX tipo=", NOMBRE_TIPO[tx.tipo], " firmante=", tx.firmante,
+    base = string("TX tipo=", NOMBRE_TIPO[tx.tipo], " firmante=", tx.firmante,
                   " clave=", tx.clave, " importe=", tx.importe,
                   " ent=[", ent, "] sal=[", sal, "]")
+    # F-15: `nonce=` solo en las tres operaciones de garantía.
+    if tx.tipo == TxDeposito || tx.tipo == TxRetiro || tx.tipo == TxLiberacion
+        return string(base, " nonce=", tx.nonce)
+    end
+    return base
 end
 
 function utxo_str(E::Estado)
@@ -125,7 +132,8 @@ function gar_str(E::Estado)
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
         push!(lineas, string("GAR clave=", k, " activo=", g.activo,
                              " pend=[", ps, "] ret=[", rs, "] cred=[", cs,
-                             "] congelado=", g.congelado))
+                             "] congelado=", g.congelado,
+                             " nonce=", g.nonce_siguiente))
     end
     return lineas
 end
@@ -271,7 +279,7 @@ function main()
 
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-transicion-v0 · T01 · ", fecha,
+    println(io, "# vectores-transicion-v0.1 · T01-D (F-15) · ", fecha,
             " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     fallos_dirigidos = Ref(0)
@@ -307,7 +315,7 @@ function main()
 
     h = sha256_archivo(salida)
     sha_path = replace(salida, r"\.txt$" => "") * ".sha256"
-    write(sha_path, h * "\n")
+    write(sha_path, h * "  " * salida * "\n")
     @printf("exportar: casos=%d sha256=%s -> %s\n", n, h, sha_path)
     @printf("exportar: dirigidos_con_error_inesperado=%d\n", fallos_dirigidos[])
     flush(stdout)
