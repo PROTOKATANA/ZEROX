@@ -1,0 +1,6 @@
+{"tipo":"arranque","reloj_ns":0,"reloj_pared_ns":0,"fase":"inicio"}
+{"tipo":"cambio_punta","reloj_ns":0,"reloj_pared_ns":0,"punta":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","resumen_estado":"s000000000000000000000000000000000000000000000000000000000000000a"}
+{"tipo":"arranque","reloj_ns":400,"reloj_pared_ns":400,"fase":"limpio"}
+{"tipo":"bloque_red_admitido","reloj_ns":700,"reloj_pared_ns":700,"hash":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","familia":"pow","altura":1}
+{"tipo":"cambio_punta","reloj_ns":200,"reloj_pared_ns":200,"punta":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","resumen_estado":"s000000000000000000000000000000000000000000000000000000000000000b"}
+{"tipo":"parada","reloj_ns":900,"reloj_pared_ns":900,"motivo":"fin"}

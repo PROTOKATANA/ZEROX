@@ -315,3 +315,19 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - **Incidente de carga (22:57):** carga 65 en 32 hilos con mis cuatro trabajos y los cuatro `zx-node` de
   W06d5 (≈ 5 núcleos cada uno). Para no falsear sus pruebas de reloj, bajé a `nice 19` los 69 procesos de mis
   trabajos (sin pararlos). Lección: con W06d5 vivo, lanzar como mucho dos compilaciones a la vez.
+
+### 23:06–23:18 — RI-3a, RI-3b y W07c revisadas
+
+- **RI-3a aceptada:** tres hallazgos altos de disponibilidad confirmados (petición con hashes repetidos que
+  clona 157 MB; reserva de 32 MiB antes de leer un byte; cola sin tope hacia el hilo de consenso). Se corrigen
+  en la **parte A de W07a** (mismos archivos que la instrumentación de red).
+- **RI-3b aceptada:** `cbid` ajeno y orden no canónico de la `EvidenceTx` son **forma** según el contrato y el
+  motor y los oráculos los tratan como semánticos (bloque aceptado con la transacción descartada). **Error del
+  director:** la revisión de SL-3b no vio que los oráculos se desviaban del contrato. **Decisión:** corregir
+  código y oráculos al contrato (no enmendarlo): son comprobaciones sin contexto y el orden canónico hace única
+  la codificación; coste para el honesto, ninguno. **SL-4c-O** (oráculos T01/T04, dos sesiones DeepSeek de un
+  hilo) lanzada 23:11; **SL-4c** (Rust, y decodificación de red de la v4, la brecha FD-5 que habría bloqueado
+  SL-4b2) redactada.
+- **W07c superada** y migrada a `P-ZRX/P-MEDICION/analisis-registro-v1/`; recuento de pares comprobado a mano
+  (1 223, exacto). Dos errores míos que destapa: llamé «V4» a registros de V6/V7, y comparar el estado final
+  exige un reposo → parámetro `--dejar-de-producir-en-slot` añadido a W07a.

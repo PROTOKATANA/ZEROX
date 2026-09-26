@@ -1,0 +1,20 @@
+metrica	ambito	n	ausentes	p50	p95	max	unidad
+latencia_propagacion_ns	A->B	181	125	79230504	847291665	1927966794	ns
+latencia_propagacion_ns	A->C	306	0	38717694	94607731	1134122264	ns
+latencia_propagacion_ns	B->A	186	32	86362058	3160966638	75939138275	ns
+latencia_propagacion_ns	B->C	218	0	45060053	202399463	330536638	ns
+latencia_propagacion_ns	C->A	144	160	39316872	10962763233	61415635735	ns
+latencia_propagacion_ns	C->B	188	116	45028404	126780659	936001039	ns
+latencia_propagacion_ns	total	1223	0	51113328	282175398	75939138275	ns
+t_cabecera_ns	todos	0	1227				ns
+t_admision_ns	todos	0	1227				ns
+t_persistencia_ns	todos	0	1227				ns
+t_total_ns	todos	0	1227				ns
+bloques_por_slot	todos	0	2007				bloques/slot
+padres_por_bloque	todos	0	2007				padres
+profundidad_reorg	todos	25	1621	1	5	5	bloques
+arranque_ns	todos	3	0	6963656687	7066438864	7066438864	ns
+duracion_reinicio_ns	todos	0	0				ns
+divergencia_fraccion_tiempo	total	1	0	0.348235	0.348235	0.348235	fraccion
+fraccion_rojos	todos	0	2007				fraccion
+estado_final_igual	total	1	0	0.000000	0.000000	0.000000	booleano

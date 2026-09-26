@@ -28,6 +28,7 @@ dependencias (huella: primeros 16 hex de `sha256`).
 | Calibración del castigo SL-2/SL-2b | `P-ZRX/P-SLASHING/SL2/` | `46562ff` | `688b622e36141b6a` | `REVISION-SL2.md`, `REVISION-SL2b.md` | Región de parámetros no vacía; valores dev; 97/97 tests; con `s = 0` reproduce SL-2 bit a bit | Parámetros dev, no producción |
 | Cálculo de la capa de votos FV-1 | `P-ZRX/P-FINALIDAD-VOTOS/resultados-FV1/calc/` | `bfc40b9` | `622db153743968a9` | `REVISION-FV1.md` (aritmética rehecha por el director) | Umbrales de pausa y sello con prima `b` (RFT-17) | Sin latencia real (`T_instancia` sin medir) |
 | Cálculo de la falta de ausencia AV-1 | `P-ZRX/P-AUSENCIA-VOTO/resultados-AV1/calc/` | `98ceea8` | `b3fd0c5957d706bd` | `REVISION-AV1.md` | Coste de pausa con `m_aus` fijo y proporcional (RFT-20) | Unidades hipotéticas |
+| Analizador de registros del nodo (W07c) | `P-ZRX/P-MEDICION/analisis-registro-v1/` | (este commit) | `22327796a9e8100c` | `P-ZRX/P-MEDICION/REVISION-W07c.md` | Métricas del esquema de registro v1 (§3): latencias por pareja con recuento comprobado a mano, divergencia, rechazos, admisión frente a profundidad, recursos; 70 + 36 + 402 casos exactos | Solo analiza lo que el nodo registra; el estado final solo es comparable tras un reposo |
 
 ## 2. Vectores de prueba (leídos por los crates)
 

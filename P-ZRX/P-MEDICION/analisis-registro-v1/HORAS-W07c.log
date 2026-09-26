@@ -1,0 +1,8 @@
+2026-09-26T23:01:23+02:00
+inicio W07c: lectura de orden, LINEO, esquema y escenarios; verificacion de ENTRADA-W07c.sha256 (verde); copia de W06d4/run/{A,B,C}/registro.jsonl a datos/W06d4-real (sha256 identicos); informe de faltas de definicion
+2026-09-26T23:07:28+02:00
+proyecto Julia creado (Project.toml+Manifest.toml, deps JSON3/StableRNGs/BenchmarkTools/Test/Statistics/Printf/Dates/Random/SHA); modulo, run.jl, tests V1(a-g)/V2/V3 y bench escritos; V1-V3 en verde; V4 sobre datos reales v0 ejecutado
+2026-09-26T23:09:48+02:00
+V4 sobre A,B,C v0: latencias 6 pares + total (n=1223), divergencia 0.348235 (372 episodios, 1 truncado), estado final distinto, 8 metricas no medidas declaradas; V5: real 15.696 ms, sintetico 10^6 eventos 3.730 s y pico RSS 846184 KiB; perfil: JSON3 parse ~1900/3888 y sha256 ~909; INFORME.md, PROGRESO.md y RESPUESTAS.md escritos; copia de INFORME.md en la raiz de la zona
+2026-09-26T23:09:58+02:00
+cierre: todos los entregables escritos; se genera HUELLAS.sha256 (ultimo paso, excluye .julia-depot/) y se verifica con sha256sum -c

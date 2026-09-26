@@ -5,7 +5,7 @@ arneses incluidos); léelo íntegro antes de escribir código y aplica sus regla
 
 ## 1. Identidad y contexto
 
-- **ID:** SL-4b2. **Fecha:** 2026-09-26 (redactada ≈ 23:00; se congela y lanza tras migrar W06d5, SL-4b1 y
+- **ID:** SL-4b2. **Fecha:** 2026-09-26 (redactada ≈ 23:00; se congela y lanza tras migrar W06d5, SL-4b1, SL-4c y
   W07a). **Director:** Claude. **Ejecutor:** subagente **Sonnet**, único (integración en el nodo con procesos
   reales, como W06d1…W06d5; `P-ZRX/PLAN-0.0.1.md` D-P06).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/SL4b2/`.
@@ -23,7 +23,7 @@ arneses incluidos); léelo íntegro antes de escribir código y aplica sus regla
 
 `P-ZRX/P-SLASHING/CONTRATO-EVIDENCIA-v0.md` (§2–§9 y **«Ratificación v0», que prevalece**),
 `P-ZRX/P-SLASHING/DECISIONES.md`, `P-ZRX/P-SLASHING/REVISION-SL2b.md`, `REVISION-SL4a.md`,
-`REVISION-SL4b1.md` (la escribe el director al migrar SL-4b1), `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md`
+`REVISION-SL4b1.md` y `REVISION-SL4c.md` (las escribe el director al migrar; SL-4c hace que la v4 viaje por red y que `cbid` y orden canónico sean forma), `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3c.md` (si deja hallazgos altos en `zx-node`, se corrigen en esta orden como **paso 0**, antes de lo demás), `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md`
 (eventos `evidencia_*`, `firmante_abstenido`), `P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`, `P-ZRX/P-NODO/PLAN-W06.md`
 y las órdenes y revisiones W06d1…W06d5 y W07a. Código: la raíz en el commit que indique la entrada.
 

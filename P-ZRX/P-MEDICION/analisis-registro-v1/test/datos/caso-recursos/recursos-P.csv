@@ -1,0 +1,4 @@
+reloj_pared_ns,pid,utime_ticks,stime_ticks,rss_kib,read_bytes,write_bytes,disco_datos_bytes
+1000000000,1234,10,5,1000,0,0,4096
+2000000000,1234,30,10,2000,100,50,8192
+3000000000,1234,60,20,1500,300,150,8192

@@ -1,0 +1,2 @@
+{"tipo":"arranque","reloj_ns":0,"reloj_pared_ns":0,"version_esquema":1,"fase":"limpio"}
+{"tipo":"bloque_producido","reloj_ns":1000,"reloj_pared_ns":1000,"hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","slot":1,"n_padres":1}

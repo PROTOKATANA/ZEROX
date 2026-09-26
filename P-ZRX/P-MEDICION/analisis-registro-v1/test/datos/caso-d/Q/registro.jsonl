@@ -1,0 +1,6 @@
+{"tipo":"arranque","reloj_ns":0,"reloj_pared_ns":0,"version_esquema":1,"fase":"limpio"}
+{"tipo":"cambio_punta","reloj_ns":0,"reloj_pared_ns":0,"punta":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","resumen_estado":"s000000000000000000000000000000000000000000000000000000000000000a"}
+{"tipo":"cambio_punta","reloj_ns":300,"reloj_pared_ns":300,"punta":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+{"tipo":"cambio_punta","reloj_ns":800,"reloj_pared_ns":800,"punta":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
+{"tipo":"cambio_punta","reloj_ns":1000,"reloj_pared_ns":1000,"punta":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","resumen_estado":"s000000000000000000000000000000000000000000000000000000000000000f"}
+{"tipo":"parada","reloj_ns":1100,"reloj_pared_ns":1100,"motivo":"fin"}

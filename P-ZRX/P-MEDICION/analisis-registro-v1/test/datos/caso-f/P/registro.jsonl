@@ -1,0 +1,6 @@
+{"tipo":"arranque","reloj_ns":0,"reloj_pared_ns":0,"fase":"inicio"}
+{"tipo":"cambio_punta","reloj_ns":0,"reloj_pared_ns":0,"punta":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","resumen_estado":"s000000000000000000000000000000000000000000000000000000000000000a"}
+{"tipo":"arranque","reloj_ns":500,"reloj_pared_ns":500,"fase":"limpio"}
+{"tipo":"cambio_punta","reloj_ns":100,"reloj_pared_ns":100,"punta":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","resumen_estado":"s000000000000000000000000000000000000000000000000000000000000000b"}
+{"tipo":"bloque_minado","reloj_ns":600,"reloj_pared_ns":600,"hash":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","altura":1}
+{"tipo":"parada","reloj_ns":1000,"reloj_pared_ns":1000,"motivo":"fin"}

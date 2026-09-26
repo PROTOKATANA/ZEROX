@@ -1,0 +1,8 @@
+# Versión de Julia fijada para W07c (LINEO §1: pinear la versión o documentarla).
+# Ruta exacta usada en todos los comandos:
+#   /home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/julia
+[julia]
+version = "1.13.0"
+ruta = "/home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/julia"
+ld_library_path = "eliminado con env -u LD_LIBRARY_PATH"
+julia_depot_path = "/home/katana/zeo/ZEROX/deepseek/W07c/.julia-depot:/home/katana/.julia"

@@ -1,0 +1,77 @@
+--- /home/katana/zeo/ZEROX/crates/zx-consensus/tests/evidencia.rs	2026-09-26 20:59:03.618588544 +0200
++++ crates/zx-consensus/tests/evidencia.rs	2026-09-26 23:02:28.113558277 +0200
+@@ -349,6 +349,74 @@
+     );
+ }
+ 
++/// RI-3b (hallazgo H1, caso cbid): `RAT-1` dice literalmente «si no [coincide el `consensus_branch_id`],
++/// ErrForma (no es evidencia de esta red)». Como con el orden canónico, el motor solo comprueba esto en
++/// la capa semántica (`ErrorTransicion::ErrCbidAjeno`, no `ErrForma`), así que en modo fusión el bloque
++/// se acepta y solo la tx se descarta, en vez de invalidar el bloque como exige RAT-1.
++#[test]
++fn ri3b_cbid_ajeno_no_invalida_el_bloque_en_fusion() {
++    let estado = estado_post();
++    let tx = ev_valida(99, 1, 1); // cbid de la evidencia (99) ≠ cbid de la red local (CBID_RED_DEV/evp(7)).
++    let bloque = bloque_post(1, clave_de(1), vec![(tx, Vec::new())]);
++
++    let estricto = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert_eq!(estricto, Err(ErrorTransicion::ErrCbidAjeno));
++
++    let (nuevo, _undo, descartes) = aplicar_fusion(
++        &estado,
++        &bloque,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &evp(7),
++    )
++    .expect("BUG confirmado: el bloque se acepta en modo fusión pese a RAT-1 (\"si no, ErrForma\")");
++    assert_eq!(descartes.len(), 1);
++    assert_eq!(descartes[0].motivo, ErrorTransicion::ErrCbidAjeno);
++    let g = nuevo.garantias.get(&clave_de(1)).expect("garantía");
++    assert!(g.incidentes.is_empty());
++    assert_eq!(nuevo.quemado, 0);
++}
++
++/// RI-3b (hallazgo H1): `EV-04` clasifica el orden canónico inválido como **rechazo de forma**
++/// ("el parser rechaza, sin llegar a la verificación semántica"), lo que en `CONTRATO-ESTADO-DAG-v0`
++/// §3 significa **bloque inválido** en admisión. El motor solo lo comprueba en la capa semántica
++/// (`aplicar_evidencia`, `ErrorTransicion::ErrOrdenCanonico`, no `ErrForma`), así que en **modo
++/// fusión** (`aplicar_fusion`, el camino real de `zx-cadena::admitir_post`) esa transacción se
++/// **descarta** y el bloque queda **válido** — justo lo que el test `orden_canonico_invalido` no
++/// muestra, porque usa `aplicar_con_undo` (modo estricto, donde cualquier fallo invalida el bloque).
++#[test]
++fn ri3b_orden_canonico_invalido_no_invalida_el_bloque_en_fusion() {
++    let estado = estado_post();
++    // H1 con pre_hash MAYOR que H2 (orden no canónico), misma identidad, ambos sellos válidos.
++    let tx = evidencia_tx(7, 1, 1, 22, 11, true, true, Vec::new());
++    let bloque = bloque_post(1, clave_de(1), vec![(tx, Vec::new())]);
++
++    // Confirmación de que el par sí viola EV-01 en modo estricto (control positivo).
++    let estricto = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert_eq!(estricto, Err(ErrorTransicion::ErrOrdenCanonico));
++
++    // El mismo bloque, en modo fusión (el que usa `zx-cadena`): la orden dice que EV-04 es un
++    // rechazo de FORMA y por tanto el bloque entero debería ser inválido. El motor lo trata como
++    // descarte semántico: el bloque se acepta y solo la tx se descarta.
++    let (nuevo, _undo, descartes) = aplicar_fusion(
++        &estado,
++        &bloque,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &evp(7),
++    )
++    .expect("BUG confirmado: el bloque se acepta en modo fusión pese a EV-04");
++    assert_eq!(descartes.len(), 1);
++    assert_eq!(descartes[0].motivo, ErrorTransicion::ErrOrdenCanonico);
++    // Ningún incidente se registra ni se confisca nada: la evidencia con orden inválido no tuvo
++    // ningún efecto, pero el bloque que la contenía es válido y se integra a la cadena.
++    let g = nuevo.garantias.get(&clave_de(1)).expect("garantía");
++    assert!(g.incidentes.is_empty(), "no debería registrarse incidente");
++    assert_eq!(nuevo.quemado, 0);
++}
++
+ /// `EV-04`: evidencia con salidas monetarias ⇒ `ErrEvidenciaConEntradas`.
+ #[test]
+ fn evidencia_con_salidas() {

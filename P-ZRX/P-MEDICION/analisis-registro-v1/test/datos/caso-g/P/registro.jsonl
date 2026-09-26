@@ -1,0 +1,12 @@
+{"tipo":"arranque","reloj_ns":0,"reloj_pared_ns":0,"version_esquema":1,"fase":"limpio"}
+{"tipo":"bloque_red_admitido","reloj_ns":10,"reloj_pared_ns":10,"hash":"1111111111111111111111111111111111111111111111111111111111111111","t_cabecera_ns":1,"t_admision_ns":10,"t_persistencia_ns":2,"t_total_ns":13,"n_bloques_dag":499,"slot":1,"n_padres":1,"azules_mergeset":1,"rojos_mergeset":0}
+{"tipo":"bloque_red_admitido","reloj_ns":20,"reloj_pared_ns":20,"hash":"2222222222222222222222222222222222222222222222222222222222222222","t_cabecera_ns":1,"t_admision_ns":20,"t_persistencia_ns":2,"t_total_ns":23,"n_bloques_dag":500,"slot":2,"n_padres":1,"azules_mergeset":1,"rojos_mergeset":0}
+{"tipo":"bloque_red_admitido","reloj_ns":30,"reloj_pared_ns":30,"hash":"3333333333333333333333333333333333333333333333333333333333333333","t_cabecera_ns":1,"t_admision_ns":30,"t_persistencia_ns":2,"t_total_ns":33,"n_bloques_dag":999,"slot":3,"n_padres":1,"azules_mergeset":1,"rojos_mergeset":0}
+{"tipo":"bloque_red_admitido","reloj_ns":40,"reloj_pared_ns":40,"hash":"4444444444444444444444444444444444444444444444444444444444444444","t_cabecera_ns":1,"t_admision_ns":40,"t_persistencia_ns":2,"t_total_ns":43,"n_bloques_dag":1000,"slot":4,"n_padres":1,"azules_mergeset":1,"rojos_mergeset":0}
+{"tipo":"bloque_red_rechazado","reloj_ns":100,"reloj_pared_ns":100,"hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01","etapa":"cabecera","motivo":"m1","t_hasta_rechazo_ns":100}
+{"tipo":"bloque_red_rechazado","reloj_ns":300,"reloj_pared_ns":300,"hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa02","etapa":"cabecera","motivo":"m1","t_hasta_rechazo_ns":300}
+{"tipo":"bloque_red_rechazado","reloj_ns":400,"reloj_pared_ns":400,"hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa03","etapa":"admision","motivo":"m2"}
+{"tipo":"cambio_punta","reloj_ns":500,"reloj_pared_ns":500,"punta":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01","resumen_estado":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc01","profundidad_reorg":1}
+{"tipo":"reorganizacion_pow","reloj_ns":600,"reloj_pared_ns":600,"punta_anterior":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01","punta_nueva":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb02","profundidad":3}
+{"tipo":"reinicio_completo","reloj_ns":700,"reloj_pared_ns":700,"bloques_repetidos":10,"duracion_ns":1234}
+{"tipo":"parada","reloj_ns":800,"reloj_pared_ns":800,"motivo":"fin"}
