@@ -2,27 +2,16 @@
 //!
 //! # Por qué se construye a mano y no con `libp2p-swarm-test`
 //!
-//! `swarm-test` es el crate de utilidades del propio libp2p y para dos nodos sería más corto. Pero
-//! su `listen()` escucha **siempre en TCP real** además de en memoria, sin importar qué helper se
-//! use después (`swarm-test/src/lib.rs:397-441`), y eso tiene dos consecuencias:
+//! `swarm-test` escucha **siempre en TCP real** además de en memoria, y con mDNS activo un nodo
+//! empieza a descubrir vecinos de la LAN. Así que el transporte es `MemoryTransport` **puro**,
+//! siguiendo el patrón de `protocols/kad/src/behaviour/test.rs`.
 //!
-//! 1. Con **mDNS** activo —y testnet lo tiene, por C-NET-14— el nodo empieza a descubrir a los
-//!    vecinos reales de la LAN. Es el issue #6062 de rust-libp2p, todavía abierto: el reportante ve
-//!    `Discovered(...)` con IPs de Docker en un test que creía hermético.
-//! 2. `ListenFuture::wait` hace **`panic!`** ante un evento inesperado. Con mDNS eso convierte a
-//!    cualquier vecino de la red en una causa de fallo intermitente.
+//! # Lo que este arnés NO cubre
 //!
-//! Así que el transporte es `MemoryTransport` **puro**, siguiendo el patrón de
-//! `protocols/kad/src/behaviour/test.rs`, que construye redes de hasta 20 nodos así.
-//!
-//! # Lo que este arnés NO cubre, y conviene tenerlo escrito
-//!
-//! - **Latencia, pérdida y reordenamiento reales.** `MemoryTransport` son canales `mpsc` de 4096.
-//! - **NAT y hole punching.** Necesitan procesos y contenedores reales.
-//! - **Caída de proceso.** Aquí "caer" un nodo es soltar su `Swarm`: prueba el cierre limpio, no un
-//!   `kill -9` con estado a medio escribir.
-//! - **Determinismo estricto.** Es hermético y rápido, no reproducible byte a byte: el orden de
-//!   entrega sigue dependiendo del planificador.
+//! - **Latencia, pérdida y reordenamiento reales.** `MemoryTransport` son canales `mpsc`.
+//! - **NAT y hole punching.**
+//! - **Caída de proceso.** Aquí "caer" un nodo es soltar su `Swarm`.
+//! - **Determinismo estricto.** Es hermético y rápido, no reproducible byte a byte.
 
 #![expect(
     clippy::expect_used,
@@ -38,32 +27,34 @@ use std::time::Duration;
 use libp2p::core::transport::{MemoryTransport, Transport};
 use libp2p::core::upgrade;
 use libp2p::{Multiaddr, PeerId, Swarm, identity, noise, yamux};
-use zx_core::Amount;
+use zx_core::amount::Amount;
 use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot, TxId};
 use zx_core::preimage::block::BlockHeader;
 use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
 use zx_core::red::Red;
-use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
 use zx_p2p::behaviour::ZxBehaviour;
 use zx_p2p::config::ParametrosRed;
 use zx_p2p::entrante::{ManejadorEntrante, Veredicto};
 use zx_p2p::limites;
-use zx_p2p::mensaje::{BloqueRed, Estado, Peticion, Respuesta};
+use zx_p2p::mensaje::{BloqueRed, Estado, FamiliaBloque, Fase, Peticion, PuntaPow, Respuesta};
 use zx_p2p::presupuesto::Presupuesto;
-use zx_p2p::rele_compacto::AnuncioCompacto;
 use zx_p2p::servicio::{EventoRed, arrancar_con};
 
-/// Manejador de juguete: cuenta llamadas y sirve un estado reconocible.
+/// Manejador de juguete: cuenta llamadas y sirve un estado y unos bloques reconocibles.
 struct Contador {
+    /// Bloques que llegaron por difusión.
     bloques: AtomicUsize,
+    /// Transacciones que llegaron por difusión (canal retirado en 0.0.1).
     txs: AtomicUsize,
-    /// Anuncios compactos que llegaron al callback. Sin validación DAG el callback devuelve
-    /// `Ignorar`; este contador es lo que prueba que **llegó** y que no se aceptó.
-    anuncios: AtomicUsize,
     /// Para distinguir de quién es la respuesta en un test con dos nodos.
     marca: u8,
-    /// Cabeceras que este nodo dice tener.
+    /// Génesis que este nodo dice tener.
+    genesis: BlockHash,
+    /// Cabeceras PoW que este nodo dice tener.
     cabeceras: Vec<BlockHeader>,
+    /// Bloques que este nodo sirve por `Bloques`.
+    cuerpos: Vec<BloqueRed>,
     /// El mismo contador de C-NET-21 que se pasa al códec y al bucle de este nodo.
     presupuesto: Presupuesto,
 }
@@ -73,33 +64,35 @@ impl Contador {
         Self {
             bloques: AtomicUsize::new(0),
             txs: AtomicUsize::new(0),
-            anuncios: AtomicUsize::new(0),
             marca,
+            genesis: BlockHash::from_digest(Digest::from_bytes([0; 32])),
             cabeceras: Vec::new(),
+            cuerpos: Vec::new(),
             presupuesto: Presupuesto::default(),
         }
+    }
+
+    fn con_genesis(marca: u8, genesis: u8) -> Self {
+        let mut c = Self::nuevo(marca);
+        c.genesis = BlockHash::from_digest(Digest::from_bytes([genesis; 32]));
+        c
     }
 
     fn con_cabeceras(marca: u8, n: usize) -> Self {
         let cabeceras = (0..n)
             .map(|i| BlockHeader {
-                consensus_branch_id: 0xc478_80ea,
+                consensus_branch_id: 0xa8b4_66a7,
                 prev_hash: BlockHash::from_digest(Digest::from_bytes([i as u8; 32])),
-                merkle_root: zx_core::digest::MerkleRoot::from_digest(Digest::from_bytes([9; 32])),
+                merkle_root: MerkleRoot::from_digest(Digest::from_bytes([9; 32])),
                 timestamp: 1_788_480_000 + i as u64,
                 bits: 0x1c07_fff8,
                 nonce: i as u64,
                 height: i as u32,
             })
             .collect();
-        Self {
-            bloques: AtomicUsize::new(0),
-            txs: AtomicUsize::new(0),
-            anuncios: AtomicUsize::new(0),
-            marca,
-            cabeceras,
-            presupuesto: Presupuesto::default(),
-        }
+        let mut c = Self::nuevo(marca);
+        c.cabeceras = cabeceras;
+        c
     }
 }
 
@@ -112,56 +105,56 @@ impl Default for Contador {
 impl ManejadorEntrante for Contador {
     fn estado(&self) -> Estado {
         Estado {
-            genesis: BlockHash::from_digest(Digest::from_bytes([0; 32])),
-            tip: BlockHash::from_digest(Digest::from_bytes([self.marca; 32])),
-            altura: u32::from(self.marca) * 100,
-            trabajo: [self.marca; 32],
+            hash_genesis: self.genesis,
+            red: Red::Dev,
+            fase: Fase::Pow,
+            punta_pow: PuntaPow {
+                hash: BlockHash::from_digest(Digest::from_bytes([self.marca; 32])),
+                altura: u32::from(self.marca) * 100,
+                trabajo_acumulado: [self.marca; 32],
+            },
+            terminal: None,
+            puntas_post: Vec::new(),
+            blue_work_virtual: [self.marca; 32],
         }
     }
+
     fn bloque_difundido(&self, _: &BloqueRed) -> Veredicto {
         self.bloques.fetch_add(1, Ordering::Relaxed);
         Veredicto::Aceptar
     }
+
     fn tx_difundida(&self, _: &[u8]) -> Veredicto {
         self.txs.fetch_add(1, Ordering::Relaxed);
         Veredicto::Aceptar
     }
-    fn anuncio_compacto(&self, _: &AnuncioCompacto) -> Veredicto {
-        self.anuncios.fetch_add(1, Ordering::Relaxed);
-        // C-NET-12 · sin validación DAG causal no se acepta ni se retransmite. `Ignorar`, nunca
-        // `Aceptar`: el éxito del parseo no es validación.
-        Veredicto::Ignorar
-    }
+
     fn cabeceras_desde(&self, _: &[BlockHash], _: Option<BlockHash>) -> Vec<BlockHeader> {
         self.cabeceras.clone()
     }
+
     fn bloques_por_hash(&self, _: &[BlockHash]) -> Vec<BloqueRed> {
-        Vec::new()
+        self.cuerpos.clone()
     }
 }
 
 /// Conecta dos nodos y devuelve sus piezas ya corriendo.
-///
-/// Se factoriza porque los tres tests de protocolo necesitan exactamente lo mismo, y repetirlo
-/// invitaría a que uno de ellos se desincronizara del resto.
 type Conectados = (
     zx_p2p::servicio::ManejoRed,
     tokio::sync::mpsc::Receiver<EventoRed>,
     PeerId,
     Vec<tokio::task::JoinHandle<()>>,
-    // El handle de B, que hay que mantener vivo o su bucle termina. Ver la nota de abajo.
+    // El handle de B, que hay que mantener vivo o su bucle termina.
     zx_p2p::servicio::ManejoRed,
     tokio::sync::mpsc::Receiver<EventoRed>,
 );
 
 async fn dos_conectados(a: Arc<Contador>, b: Arc<Contador>) -> Conectados {
-    // Cada nodo entrega **el mismo** contador a su códec y a su bucle: `nodo_en_memoria` lo clona
-    // dentro del `ZxCodec` y `arrancar_con` recibe otro clon.
     let swarm_a = nodo_en_memoria(&a.presupuesto);
     let swarm_b = nodo_en_memoria(&b.presupuesto);
     let id_b = *swarm_b.local_peer_id();
-    let tema_bloques = swarm_a.behaviour().parametros_de_red().topic_bloques();
-    let tema_txs = swarm_a.behaviour().parametros_de_red().topic_txs();
+    let tema_pow = swarm_a.behaviour().parametros_de_red().topic_bloques_pow();
+    let tema_post = swarm_a.behaviour().parametros_de_red().topic_bloques_post();
 
     let pa = arrancar_con(swarm_a, a.clone(), a.presupuesto.clone());
     let pb = arrancar_con(swarm_b, b.clone(), b.presupuesto.clone());
@@ -177,7 +170,6 @@ async fn dos_conectados(a: Arc<Contador>, b: Arc<Contador>) -> Conectados {
     // B escucha, A marca: así A conoce la dirección de B y puede pedirle cosas.
     let addr = addr_memoria();
     pb.manejo.escuchar(addr.clone()).await.expect("B escucha");
-    // No hay evento de "B escucha" en el canal de A, así que se espera a que A vea la conexión.
     manejo_a.marcar(addr).await.expect("A marca");
     assert!(
         esperar(&mut ev_a, |e| matches!(e, EventoRed::PeerConectado(_)))
@@ -185,28 +177,16 @@ async fn dos_conectados(a: Arc<Contador>, b: Arc<Contador>) -> Conectados {
             .is_some(),
         "A debería conectarse con B"
     );
-    // **Sincronización acotada con la malla, y en la dirección correcta.**
-    //
-    // Quien publica en las pruebas de anuncio es B y el destinatario es A. Para que
-    // `B.gossipsub.publish` tenga a alguien suscrito, la suscripción de **A** tiene que haber llegado
-    // a B: por eso se espera en el canal de eventos de B (`ev_b`), no en el de A. Esperar en `ev_a`
-    // la suscripción de B sería la dirección contraria. Publicar antes de que B vea a A tampoco
-    // sirve: el intento queda en la caché de deduplicación por `message_id` y reintentarlo devuelve
-    // `Duplicate` en vez de entregar.
-    //
+
     // Se esperan **los dos temas**, en el orden en que lleguen: A los envía al establecerse la
-    // conexión y el orden dentro del RPC no está garantizado. Esperar solo bloques y luego exigir
-    // txs volvería a perder el evento si llegó antes; sin la suscripción a `/txs/1`, publicar una
-    // transacción devolvería `NoPeersSubscribedToTopic`.
-    //
-    // La comparación es por **igualdad exacta** con el tema configurado, nunca `contains("/blocks/")`:
-    // eso último daría por buenos `/zerox/blocks/20` o `/zerox/blocks/2/extra`.
-    let mut vio_bloques = false;
-    let mut vio_txs = false;
-    while !(vio_bloques && vio_txs) {
+    // conexión y el orden dentro del RPC no está garantizado. La comparación es por igualdad
+    // exacta con el tema configurado.
+    let mut vio_pow = false;
+    let mut vio_post = false;
+    while !(vio_pow && vio_post) {
         let Some(e) = esperar(&mut ev_b, |e| matches!(e, EventoRed::Suscripcion { .. })).await
         else {
-            panic!("B no vio las dos suscripciones de A (bloques={vio_bloques}, txs={vio_txs})");
+            panic!("B no vio las dos suscripciones de A (pow={vio_pow}, post={vio_post})");
         };
         if let EventoRed::Suscripcion {
             topico,
@@ -214,27 +194,17 @@ async fn dos_conectados(a: Arc<Contador>, b: Arc<Contador>) -> Conectados {
             ..
         } = &e
         {
-            vio_bloques |= topico.as_str() == tema_bloques;
-            vio_txs |= topico.as_str() == tema_txs;
+            vio_pow |= topico.as_str() == tema_pow;
+            vio_post |= topico.as_str() == tema_post;
         }
     }
 
-    // ⚠️ El handle de B se DEVUELVE, no se suelta.
-    //
-    // La primera versión de este arnés hacía `drop(pb.manejo)` razonando que el test solo habla
-    // desde A. Los tres tests de protocolo se quedaban esperando hasta el tope de 10 s.
-    //
-    // La causa es el apagado cooperativo funcionando exactamente como debe: soltar el último
-    // `ManejoRed` cierra el canal de comandos, `comandos.recv()` devuelve `None`, y **el bucle de B
-    // termina**. B dejaba de existir antes de que A le preguntara nada.
+    // ⚠️ El handle de B se DEVUELVE, no se suelta: soltar el último `ManejoRed` cierra el canal de
+    // comandos y el bucle de B terminaría.
     (manejo_a, ev_a, id_b, tareas, pb.manejo, ev_b)
 }
 
 /// Arranca un nodo pasando **el mismo** `Presupuesto` de su manejador al bucle y al códec.
-///
-/// Es la forma de que estos tests ejerzan el contrato de C-NET-21: el contador del códec y el del
-/// despacho de gossip son el mismo. Un `arrancar` con un presupuesto nuevo por nodo probaría otra
-/// cosa.
 fn arrancar_de(c: &Arc<Contador>) -> zx_p2p::servicio::Piezas<Contador> {
     arrancar_con(
         nodo_en_memoria(&c.presupuesto),
@@ -243,13 +213,7 @@ fn arrancar_de(c: &Arc<Contador>) -> zx_p2p::servicio::Piezas<Contador> {
     )
 }
 
-/// Un `Swarm` sobre transporte en memoria. **Sin TCP**, a diferencia de `swarm-test`.
-///
-/// El `Presupuesto` recibido se **clona dentro del `ZxCodec`** de `sync`. Quien construye el nodo
-/// entrega después ese mismo contador a `arrancar_con`, de modo que el bucle de gossip y el códec
-/// comparten techo (C-NET-21). Un `ZxBehaviour::nueva` aquí —que crea su propio
-/// `Presupuesto::default()`— dejaría al códec con un contador distinto y el test de contador
-/// compartido afirmaría algo falso.
+/// Un `Swarm` sobre transporte en memoria. **Sin TCP**.
 fn nodo_en_memoria(presupuesto: &Presupuesto) -> Swarm<ZxBehaviour> {
     let clave = identity::Keypair::generate_ed25519();
     let peer_id = clave.public().to_peer_id();
@@ -262,8 +226,8 @@ fn nodo_en_memoria(presupuesto: &Presupuesto) -> Swarm<ZxBehaviour> {
 
     let behaviour = ZxBehaviour::con_presupuesto(
         &clave,
-        ParametrosRed::de(Red::Testnet),
-        limites::LIMITE_BLOQUE_GENESIS,
+        ParametrosRed::dag_dev(),
+        limites::LIMITE_BLOQUE_DEV,
         presupuesto.clone(),
     )
     .expect("behaviour");
@@ -273,23 +237,18 @@ fn nodo_en_memoria(presupuesto: &Presupuesto) -> Swarm<ZxBehaviour> {
         behaviour,
         peer_id,
         libp2p::swarm::Config::with_tokio_executor()
-            // Los tests no deben depender de que la conexión sobreviva a un hueco de tráfico.
             .with_idle_connection_timeout(Duration::from_secs(30)),
     )
 }
 
 /// Una dirección de memoria distinta por test, para que no colisionen en paralelo.
 fn addr_memoria() -> Multiaddr {
-    static SIGUIENTE: AtomicU64 = AtomicU64::new(40_001);
+    static SIGUIENTE: AtomicU64 = AtomicU64::new(50_001);
     let puerto = SIGUIENTE.fetch_add(1, Ordering::Relaxed);
     format!("/memory/{puerto}").parse().expect("multiaddr")
 }
 
 /// Espera al primer evento que cumpla el predicado, con tope de tiempo.
-///
-/// Se espera **al evento concreto**, no a que pase un rato. Un `sleep` fijo es la receta de los
-/// tests intermitentes: pasa en tu máquina y falla en un CI cargado. Es exactamente el antipatrón
-/// que rust-libp2p documenta en su issue #6421.
 async fn esperar<F>(rx: &mut tokio::sync::mpsc::Receiver<EventoRed>, f: F) -> Option<EventoRed>
 where
     F: Fn(&EventoRed) -> bool,
@@ -308,10 +267,69 @@ where
     }
 }
 
+/// Una transacción mínima con una entrada.
+fn tx_llave(n: u8) -> Tx {
+    Tx {
+        version: 1,
+        inputs: vec![TxIn {
+            outpoint: OutPoint {
+                prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
+                prev_index: 0,
+            },
+            sequence: 0,
+        }],
+        outputs: vec![TxOut {
+            value: Amount::nuevo(1_000).unwrap(),
+            lock: Lock::PubKey {
+                pubkey: zx_core::firma::ClavePublica::desde_bytes([n; 32]),
+            },
+        }],
+        lock_time: 0,
+        expiry_height: 0,
+        extension: ExtensionTx::Ninguna,
+    }
+}
+
+/// Un bloque PoW de fixture.
+fn bloque_pow(n: u8) -> BloqueRed {
+    BloqueRed::Pow {
+        cabecera: BlockHeader {
+            consensus_branch_id: 0xa8b4_66a7,
+            prev_hash: BlockHash::from_digest(Digest::from_bytes([n; 32])),
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
+            timestamp: 1_788_480_000,
+            bits: 0x1c07_fff8,
+            nonce: u64::from(n),
+            height: u32::from(n),
+        },
+        txs: vec![tx_llave(0x11)],
+        testigos: vec![vec![vec![0x66; 64]]],
+    }
+}
+
+/// Un bloque PoST de fixture.
+fn bloque_post(n: u8) -> BloqueRed {
+    BloqueRed::Post {
+        cabecera: DagBlockHeader {
+            consensus_branch_id: 0xa8b4_66a7,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
+            timestamp: 1_788_480_000,
+            height: 0,
+            slot: u64::from(n),
+            pot_output: [0; 16],
+            rango_solucion: 1,
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x44; 32])),
+            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x55; 32])), &[])
+                .unwrap(),
+            sello: [0; 64],
+        },
+        txs: vec![tx_llave(0x22)],
+        testigos: vec![vec![vec![0x77; 64]]],
+    }
+}
+
 /// **Dos nodos se encuentran y se ven.**
-///
-/// Demuestra que el bucle de eventos hace su trabajo: escucha, marca, y ambos extremos reciben
-/// `PeerConectado`. Sin sockets reales y sin dormir a ciegas.
 #[tokio::test]
 async fn dos_nodos_se_conectan_y_se_ven() {
     let piezas_a = arrancar_de(&Arc::new(Contador::default()));
@@ -328,7 +346,6 @@ async fn dos_nodos_se_conectan_y_se_ven() {
     let addr = addr_memoria();
     manejo_a.escuchar(addr.clone()).await.expect("A escucha");
 
-    // Esperar a que A confirme que escucha, antes de que B marque.
     assert!(
         esperar(&mut ev_a, |e| matches!(e, EventoRed::Escuchando(_)))
             .await
@@ -349,10 +366,6 @@ async fn dos_nodos_se_conectan_y_se_ven() {
 }
 
 /// **El bucle termina solo cuando se sueltan todos los handles.**
-///
-/// Apagado cooperativo: sin `abort()`, sin señal, sin tarea huérfana. Importa porque **soltar un
-/// `JoinHandle` en tokio NO cancela la tarea** — un bucle que no supiera terminar por su cuenta
-/// sobreviviría al nodo.
 #[tokio::test]
 async fn el_bucle_termina_al_soltar_los_handles() {
     let piezas = arrancar_de(&Arc::new(Contador::default()));
@@ -366,19 +379,17 @@ async fn el_bucle_termina_al_soltar_los_handles() {
     let fin = tokio::time::timeout(Duration::from_secs(5), tarea).await;
     assert!(
         fin.is_ok(),
-        "el bucle MUST terminar al soltarse el último handle, sin necesidad de abort()"
+        "el bucle MUST terminar al soltarse el último handle"
     );
 }
 
 /// **Un handle huérfano devuelve error, no entra en pánico.**
-///
-/// En un nodo real esto pasa durante el apagado, y ahí un pánico sería un apagado sucio.
 #[tokio::test]
 async fn un_handle_sin_bucle_devuelve_error_y_no_panic() {
     let piezas = arrancar_de(&Arc::new(Contador::default()));
     let manejo = piezas.manejo.clone();
 
-    drop(piezas.bucle); // el bucle nunca corre
+    drop(piezas.bucle);
     drop(piezas.eventos);
 
     assert!(
@@ -388,9 +399,6 @@ async fn un_handle_sin_bucle_devuelve_error_y_no_panic() {
 }
 
 /// **El saludo, de extremo a extremo.**
-///
-/// A le pregunta a B quién es, y B responde con **su** estado, no con el de A. Es el primer test
-/// que recorre el camino completo: comando → códec → transporte → manejador → códec → evento.
 #[tokio::test]
 async fn el_saludo_recorre_el_camino_completo() {
     let (manejo_a, mut ev_a, id_b, tareas, _vivo_b, _ev_b) =
@@ -410,9 +418,11 @@ async fn el_saludo_recorre_el_camino_completo() {
     };
     match *respuesta {
         Respuesta::Estado(s) => {
-            // La marca 7 es la de B. Si llegara la 1, el nodo se estaría respondiendo a sí mismo.
-            assert_eq!(s.altura, 700, "debe ser el estado de B, no el de A");
-            assert_eq!(s.trabajo, [7; 32]);
+            assert_eq!(
+                s.punta_pow.altura, 700,
+                "debe ser el estado de B, no el de A"
+            );
+            assert_eq!(s.punta_pow.trabajo_acumulado, [7; 32]);
         }
         otra => panic!("se esperaba Estado, llegó {otra:?}"),
     }
@@ -422,7 +432,7 @@ async fn el_saludo_recorre_el_camino_completo() {
     }
 }
 
-/// **Pedir cabeceras y que el manejador de B las sirva.**
+/// **Pedir cabeceras PoW y que el manejador de B las sirva.**
 #[tokio::test]
 async fn pedir_cabeceras_llega_al_manejador_del_otro_lado() {
     let (manejo_a, mut ev_a, id_b, tareas, _vivo_b, _ev_b) = dos_conectados(
@@ -434,9 +444,9 @@ async fn pedir_cabeceras_llega_al_manejador_del_otro_lado() {
     manejo_a
         .pedir(
             id_b,
-            Peticion::Cabeceras {
+            Peticion::CabecerasPow {
                 locator: vec![BlockHash::from_digest(Digest::from_bytes([0; 32]))],
-                hasta: None,
+                parada: None,
             },
         )
         .await
@@ -450,8 +460,8 @@ async fn pedir_cabeceras_llega_al_manejador_del_otro_lado() {
         panic!("se esperaba una respuesta");
     };
     match *respuesta {
-        Respuesta::Cabeceras(cs) => assert_eq!(cs.len(), 5, "las cinco que B dice tener"),
-        otra => panic!("se esperaba Cabeceras, llegó {otra:?}"),
+        Respuesta::CabecerasPow(cs) => assert_eq!(cs.len(), 5, "las cinco que B dice tener"),
+        otra => panic!("se esperaba CabecerasPow, llegó {otra:?}"),
     }
 
     for t in tareas {
@@ -460,9 +470,6 @@ async fn pedir_cabeceras_llega_al_manejador_del_otro_lado() {
 }
 
 /// **"No tengo eso" es una respuesta, no un error.**
-///
-/// B no tiene ningún bloque, así que responde `NoDisponible`. Por C-NET-05 eso **no puntúa**: un
-/// peer honesto puede haber podado el bloque, o pertenecer a una rama que descartó.
 #[tokio::test]
 async fn no_tener_un_bloque_es_una_respuesta_legitima() {
     let (manejo_a, mut ev_a, id_b, tareas, _vivo_b, _ev_b) =
@@ -496,227 +503,145 @@ async fn no_tener_un_bloque_es_una_respuesta_legitima() {
     }
 }
 
-/// Una transacción mínima con una entrada, para el anuncio compacto.
-fn tx_llave(n: u8) -> Tx {
-    Tx {
-        version: 1,
-        inputs: vec![TxIn {
-            outpoint: OutPoint {
-                prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
-                prev_index: 0,
-            },
-            sequence: 0,
-        }],
-        outputs: vec![TxOut {
-            value: Amount::nuevo(1_000).unwrap(),
-            lock: Lock::PubKey {
-                pubkey: zx_core::firma::ClavePublica::desde_bytes([n; 32]),
-            },
-        }],
-        lock_time: 0,
-        expiry_height: 0,
-    }
-}
+/// **Pedir bloques por hash devuelve el bloque, con su familia.**
+#[tokio::test]
+async fn pedir_bloques_por_hash_devuelve_el_bloque() {
+    let mut sirve = Contador::nuevo(2);
+    sirve.cuerpos = vec![bloque_pow(3), bloque_post(4)];
+    let (manejo_a, mut ev_a, id_b, tareas, _vivo_b, _ev_b) =
+        dos_conectados(Arc::new(Contador::nuevo(1)), Arc::new(sirve)).await;
 
-/// Un `AnuncioCompacto` real, serializable con `a_bytes`, con el nonce dado.
-fn anuncio(nonce: u64) -> AnuncioCompacto {
-    let cabecera = DagBlockHeader {
-        consensus_branch_id: 0xc478_80ea,
-        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
-        timestamp: 1_788_480_000,
-        height: 1,
-        slot: 1,
-        pot_output: [0; 16],
-        rango_solucion: 1,
-        sol: SolucionPoas::default(),
-        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x44; 32])),
-        padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x55; 32])), &[])
-            .unwrap(),
-        sello: [0; 64],
+    manejo_a
+        .pedir(
+            id_b,
+            Peticion::Bloques {
+                hashes: vec![
+                    BlockHash::from_digest(Digest::from_bytes([1; 32])),
+                    BlockHash::from_digest(Digest::from_bytes([2; 32])),
+                ],
+            },
+        )
+        .await
+        .expect("A pide");
+
+    let e = esperar(&mut ev_a, |e| matches!(e, EventoRed::Respuesta { .. }))
+        .await
+        .expect("A debería recibir bloques");
+    let EventoRed::Respuesta { respuesta, .. } = e else {
+        panic!("se esperaba una respuesta");
     };
-    AnuncioCompacto::nuevo(
-        cabecera,
-        nonce,
-        tx_llave(0x11),
-        vec![vec![0x66; 64]],
-        vec![[0x77; 6]],
-    )
-    .unwrap()
+    match *respuesta {
+        Respuesta::Bloques(bs) => {
+            assert_eq!(bs.len(), 2);
+            assert_eq!(bs.first().map(BloqueRed::familia), Some(FamiliaBloque::Pow));
+            assert_eq!(bs.get(1).map(BloqueRed::familia), Some(FamiliaBloque::Post));
+        }
+        otra => panic!("se esperaba Bloques, llegó {otra:?}"),
+    }
+
+    for t in tareas {
+        t.abort();
+    }
 }
 
-/// **C-NET-25/C-NET-26/C-NET-12 · un anuncio real viaja y el callback lo ignora, sin retransmitir.**
-///
-/// B publica por la **API tipada** —no hay forma de elegir el tema desde el test— y A lo recibe en
-/// su callback compacto. El callback devuelve `Ignorar`: como A no valida el DAG causal, no acepta
-/// ni retransmite. La sincronización con la malla es acotada por el evento `Suscripcion`, no por un
-/// `sleep` fijo.
-///
-/// # Límite declarado
-///
-/// Este arnés tiene **dos** nodos, así que no puede observar la retransmisión: para verla haría
-/// falta un tercero en la malla de A. Lo que sí prueba es lo que C-NET-12 exige en este punto —que
-/// el veredicto es `Ignorar` y no `Aceptar`—; la ausencia de retransmisión de extremo a extremo
-/// queda como límite explícito de esta prueba, no como verificada.
+/// **Un bloque PoW real viaja por su tema y llega al callback.**
 #[tokio::test]
-async fn un_anuncio_compacto_real_llega_al_callback_y_se_ignora() {
+async fn un_bloque_pow_viaja_y_llega_al_callback() {
     let a = Arc::new(Contador::nuevo(1));
     let b = Arc::new(Contador::nuevo(2));
-    let (manejo_a, mut ev_a, _id_b, tareas, manejo_b, _vivo_b) =
+    let (_manejo_a, mut ev_a, _id_b, tareas, manejo_b, _vivo_b) =
         dos_conectados(Arc::clone(&a), Arc::clone(&b)).await;
 
     manejo_b
-        .difundir_anuncio(&anuncio(7))
+        .difundir_bloque(&bloque_pow(7))
         .await
-        .expect("B publica el anuncio por su tema");
+        .expect("B publica el bloque PoW por su tema");
 
-    // A recibe el callback compacto. No es un evento de `EventoRed` —el callback no cruza a un
-    // evento— así que se espera al contador del manejador con un tope acotado y sin `sleep` fijo
-    // como única condición.
-    let plazo = tokio::time::Instant::now() + Duration::from_secs(10);
-    while a.anuncios.load(Ordering::Relaxed) == 0 {
-        assert!(
-            tokio::time::Instant::now() < plazo,
-            "el anuncio de B no llegó al callback de A"
-        );
-        // Se bombea el canal de eventos de B para que el planificador corra los dos bucles.
-        let _ = tokio::time::timeout(Duration::from_millis(20), ev_a.recv()).await;
-    }
-
-    assert_eq!(a.anuncios.load(Ordering::Relaxed), 1, "una sola entrega");
+    esperar_contador(&a.bloques, 1, &mut ev_a).await;
     assert_eq!(a.txs.load(Ordering::Relaxed), 0, "no es una transacción");
-    assert_eq!(a.bloques.load(Ordering::Relaxed), 0, "no es /blocks/1");
-    // Un anuncio **distinto**: republicar el mismo daría `Duplicate` en la caché de gossipsub. Lo
-    // que se comprueba es que el handle sigue vivo y que gossipsub acepta el envío local.
-    assert!(
-        manejo_a.difundir_anuncio(&anuncio(9)).await.is_ok(),
-        "el handle sigue vivo"
-    );
 
     for t in tareas {
         t.abort();
     }
 }
 
-/// **C-NET-25 · una transacción viaja por `/txs/1` y el canal de bloques no la recibe.**
-///
-/// B publica por la API tipada `difundir_tx` —que fija el tema a partir de los parámetros de red— y
-/// A la recibe en su callback `tx_difundida`. El canal `/blocks/2` **no** la ve: ni el callback
-/// compacto ni el de bloque lineal se disparan. La sincronización con la malla espera a las dos
-/// suscripciones de A en `dos_conectados`, sin `sleep` fijo.
-///
-/// La transacción va serializada de verdad con `zx_core::wire::tx_a_bytes`; hoy el dispatcher pasa
-/// los bytes crudos al manejador, pero el test no depende de que siga sin mirarlos.
+/// **Un bloque PoST real viaja por su tema y llega al callback.**
 #[tokio::test]
-async fn una_transaccion_viaja_por_txs_y_no_por_el_canal_de_bloques() {
+async fn un_bloque_post_viaja_y_llega_al_callback() {
     let a = Arc::new(Contador::nuevo(1));
     let b = Arc::new(Contador::nuevo(2));
-    let (_manejo_a, _ev_a, _id_b, tareas, manejo_b, _vivo_b) =
+    let (_manejo_a, mut ev_a, _id_b, tareas, manejo_b, _vivo_b) =
         dos_conectados(Arc::clone(&a), Arc::clone(&b)).await;
-
-    let mut tx_bytes = Vec::new();
-    zx_core::wire::tx_a_bytes(&mut tx_bytes, &tx_llave(0x22), &[vec![0x88; 64]]);
 
     manejo_b
-        .difundir_tx(tx_bytes)
+        .difundir_bloque(&bloque_post(9))
         .await
-        .expect("B publica la transacción por /txs/1");
+        .expect("B publica el bloque PoST por su tema");
 
-    let plazo = tokio::time::Instant::now() + Duration::from_secs(10);
-    while a.txs.load(Ordering::Relaxed) == 0 {
-        assert!(
-            tokio::time::Instant::now() < plazo,
-            "la transacción de B no llegó al callback de A"
-        );
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-
-    assert_eq!(a.txs.load(Ordering::Relaxed), 1, "una sola entrega");
-    assert_eq!(
-        a.anuncios.load(Ordering::Relaxed),
-        0,
-        "una transacción MUST NOT llegar por /blocks/2"
-    );
-    assert_eq!(
-        a.bloques.load(Ordering::Relaxed),
-        0,
-        "una transacción MUST NOT llegar por /blocks/1"
-    );
+    esperar_contador(&a.bloques, 1, &mut ev_a).await;
 
     for t in tareas {
         t.abort();
     }
 }
 
-/// **C-NET-21 · una reserva externa en el contador compartido agota el parseo de gossip.**
-///
-/// El nodo A entrega **el mismo** `Presupuesto` a su códec de `sync` y a su bucle de gossip. El test
-/// reserva casi todo ese contador **desde fuera** —no ejerce una reserva simultánea del códec—; con
-/// el techo ocupado, el anuncio de B no cabe en `desde_bytes`, el veredicto es `Ignorar` —recurso
-/// **local**, no culpa del par (C-NET-05)— y el callback compacto **no** se llama. Al liberar la
-/// reserva, el contador vuelve a cero y un anuncio distinto sí llega.
-///
-/// ⚠️ No es una garantía sobre objetos retenidos: la reserva del parseo se libera antes de retener
-/// el anuncio. Este test cubre el techo **en vuelo** y su liberación, con una reserva que ocupa el
-/// contador sin que el códec la haya pedido.
-#[tokio::test]
-async fn una_reserva_externa_en_el_contador_compartido_agota_el_parseo_de_gossip() {
-    let a = Arc::new(Contador::nuevo(1));
-    let b = Arc::new(Contador::nuevo(2));
-    let (_manejo_a, _ev_a, _id_b, tareas, manejo_b, _vivo_b) =
-        dos_conectados(Arc::clone(&a), Arc::clone(&b)).await;
-
-    let bytes = anuncio(7).a_bytes();
-
-    // Justo por debajo del techo: no cabe ninguna reserva de `bytes.len()`, pero sí queda sitio
-    // para la reserva mínima que necesita el parseo si se liberara.
-    let reservado = a
-        .presupuesto
-        .reservar(Presupuesto::default().disponible() - bytes.len() + 1)
-        .expect("reserva local");
-    assert!(
-        a.presupuesto.disponible() < bytes.len(),
-        "el anuncio debe superar el sitio libre"
-    );
-
-    // La publicación MUST ser aceptada localmente por gossipsub. Sin esta comprobación, que A no
-    // llame al callback no probaría nada del presupuesto: el anuncio podría no haber salido nunca.
-    let salio = manejo_b.difundir_anuncio(&anuncio(7)).await;
-    assert!(
-        salio.is_ok(),
-        "la primera publicación debía aceptarse localmente: {salio:?}"
-    );
-
-    // Se da tiempo acotado a que A procese el evento; el callback no debe dispararse.
-    let plazo = tokio::time::Instant::now() + Duration::from_secs(3);
-    while tokio::time::Instant::now() < plazo && a.anuncios.load(Ordering::Relaxed) == 0 {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-    assert_eq!(
-        a.anuncios.load(Ordering::Relaxed),
-        0,
-        "sin presupuesto no hay anuncio parseado ni callback"
-    );
-
-    drop(reservado);
-    assert_eq!(a.presupuesto.en_vuelo(), 0, "el contador vuelve a cero");
-
-    // Y ahora un anuncio distinto sí llega al callback: el agotamiento era local y pasajero. El
-    // contenido distinto evita el `Duplicate` de la caché de deduplicación.
-    let salio = manejo_b.difundir_anuncio(&anuncio(8)).await;
-    assert!(
-        salio.is_ok(),
-        "el segundo anuncio debía aceptarse localmente: {salio:?}"
-    );
+/// Espera acotada a que un contador llegue a `objetivo`, bombeando el canal de eventos.
+async fn esperar_contador(
+    contador: &AtomicUsize,
+    objetivo: usize,
+    ev: &mut tokio::sync::mpsc::Receiver<EventoRed>,
+) {
     let plazo = tokio::time::Instant::now() + Duration::from_secs(10);
-    while a.anuncios.load(Ordering::Relaxed) == 0 {
+    while contador.load(Ordering::Relaxed) < objetivo {
         assert!(
             tokio::time::Instant::now() < plazo,
-            "con presupuesto liberado el anuncio debe llegar"
+            "el bloque no llegó al callback"
         );
-        tokio::time::sleep(Duration::from_millis(20)).await;
+        let _ = tokio::time::timeout(Duration::from_millis(20), ev.recv()).await;
     }
-    assert_eq!(a.anuncios.load(Ordering::Relaxed), 1);
-    assert_eq!(a.presupuesto.en_vuelo(), 0, "el parseo devolvió su reserva");
+}
+
+/// **Un génesis ajeno se corta.** El nodo compara el `Estado` recibido con el suyo y desconecta.
+#[tokio::test]
+async fn un_genesis_ajeno_desconecta() {
+    // B tiene un génesis distinto del de A.
+    let a = Arc::new(Contador::con_genesis(1, 0x00));
+    let b = Arc::new(Contador::con_genesis(2, 0xAA));
+    let (manejo_a, mut ev_a, id_b, tareas, _vivo_b, mut ev_b) =
+        dos_conectados(Arc::clone(&a), Arc::clone(&b)).await;
+
+    manejo_a
+        .pedir(id_b, Peticion::Estado)
+        .await
+        .expect("A pregunta");
+
+    let e = esperar(&mut ev_a, |e| matches!(e, EventoRed::Respuesta { .. }))
+        .await
+        .expect("A debería recibir el estado de B");
+    let EventoRed::Respuesta { respuesta, .. } = e else {
+        panic!("se esperaba una respuesta");
+    };
+    let Respuesta::Estado(ajeno) = *respuesta else {
+        panic!("se esperaba Estado");
+    };
+    assert_ne!(
+        ajeno.hash_genesis,
+        a.estado().hash_genesis,
+        "el génesis de B MUST ser ajeno al de A"
+    );
+
+    // La decisión es del nodo, no de `zx-p2p` (este crate no valida): el nodo corta.
+    manejo_a
+        .desconectar(id_b, zx_p2p::error::MotivoDesconexion::ViolacionDeConsenso)
+        .await
+        .expect("A desconecta");
+
+    assert!(
+        esperar(&mut ev_b, |e| matches!(e, EventoRed::PeerDesconectado(_)))
+            .await
+            .is_some(),
+        "B debe ver la desconexión por génesis ajeno"
+    );
 
     for t in tareas {
         t.abort();

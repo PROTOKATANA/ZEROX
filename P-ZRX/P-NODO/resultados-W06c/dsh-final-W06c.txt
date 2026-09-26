@@ -1,0 +1,23 @@
+He cumplido la ORDEN-W06c completa. Resumen:
+
+## Resultado: **SUPERADO** (pregunta falsable no refutada)
+
+**Entregables** en `/home/katana/zeo/ZEROX/deepseek/W06c/`: `ws/`, `ws.orig/`, `ref/old/` (código de `9681061`), `cambios.patch`, `MIGRACION.sha256`, `logs/`, `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Nada fuera de la zona; sin commit/push; sin Python.
+
+**Verificación**
+
+| Paso | Resultado |
+|---|---|
+| V1 `fmt --check` | OK |
+| V2 `clippy -D warnings --locked` | OK, 0 avisos |
+| V3 `cargo test --workspace --all-features --locked` | **502 pasan, 0 fallan, 1 ignorado** |
+| V4 tests portados/adaptados/retirados | lista en `logs/V4-tests-portados.txt` |
+| V5 integración `MemoryTransport` | 10/10 (saludo, anuncio PoW y PoST, bloques por hash, `NoDisponible`, génesis ajeno) |
+| V6 códec | ida y vuelta + rechazos con su error (`logs/V6-codec.txt`) |
+| V7 deps/frontera | 20 deps exactas; `zx-p2p → {zx-core}` OK |
+| Lock `9681061` | **400/400** paquetes del cierre con versión idéntica |
+| Entrada congelada | `sha256sum -c` 4/4 al inicio y como último paso |
+
+**Qué se hizo:** se portó `zx-p2p` (transporte libp2p, `behaviour`, `limites`, `limites_ip`, `presupuesto`, `entrante`, `servicio`, `config`, `error`, `codec`) con los mensajes del híbrido: `BloqueRed::{Pow,Post}` con familia declarada en el wire (F-04, sin adivinar por longitud), `Estado` nuevo, `CabecerasPow`, protocolo `/zx-dev/1` y gossip en dos temas `/zx-dev/bloques/{pow,post}/1`. El relé compacto no se portó (archivado en `ref/old/`). Límites nuevos: bloque 2 MiB dev, 256 hashes/petición, 2000 cabeceras/respuesta.
+
+**Faltas de definición informadas antes de editar** (resueltas y documentadas en `INFORME.md` §5): tipo del campo `red` (se fija `Red` con byte cerrado); `punta_pow` como struct equivalente a la terna; no se revivió tema de transacciones (la orden enumera solo dos temas); límite de cuerpo 2 MiB dev porque `peso.rs` no existe; `parada` como `Option<BlockHash>`; se retiró el `SoloEstado` del perfil dev porque V5 exige sync completo; la desconexión por génesis es decisión del nodo (el test recorre el corte vía `desconectar`). No se dependió de `zx-consensus` ni como dev-dependency (W03 lo modifica en paralelo).

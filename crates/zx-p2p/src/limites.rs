@@ -4,91 +4,62 @@
 //!
 //! **La capa de transporte de libp2p no es segura por defecto para una cadena**, y lo peor es que
 //! ninguno de sus defectos falla al compilar. Cuatro defaults, verificados contra
-//! `rust-libp2p@v0.56.0` (ver `research/libp2p-arquitectura.md` §0 y §3):
+//! `rust-libp2p@v0.56.0`:
 //!
 //! | Límite | Default | Qué provoca en ZEROX |
 //! |---|---|---|
-//! | `gossipsub::max_transmit_size` | **65 536 B** | Un bloque típico mide 100-200 KB: **ninguno se propaga** |
-//!
-//! Y un quinto, que no es de libp2p sino nuestro: **el límite de gossip no puede ser una
-//! constante**, porque el tamaño de bloque de ZEROX crece sin techo. Ver [`limite_gossip`].
+//! | `gossipsub::max_transmit_size` | **65 536 B** | Un bloque completo no se propaga |
 //! | `gossipsub::validate_messages` | **`false`** | El mensaje se reenvía **antes** de validarlo |
 //! | `ConnectionLimits` | todo `None` | Sin límite de conexiones |
 //! | Tamaño en `request_response::Codec` | **no existe** | El trait no impone ninguno |
 //!
 //! Reunirlos aquí, con nombre y con la razón al lado, es lo que impide que alguien "simplifique"
 //! uno de ellos más adelante sin saber qué está quitando.
+//!
+//! # Los límites nuevos de la red dev
+//!
+//! La orden fija tres: tamaño máximo de [`crate::mensaje::BloqueRed`], hashes por petición (256) y
+//! cabeceras por respuesta (2 000). El primero se declara **con valor dev** porque `zx-core` todavía
+//! no ha portado `peso.rs`: cuando exista el límite de peso, este valor se derivará de él.
 
-/// Cuántas veces el límite de consenso vigente admite el transporte.
+use zx_core::preimage::block::TAMANO_CABECERA;
+use zx_core::preimage::dag::TAMANO_CABECERA_MAX;
+
+/// Cuerpo máximo de un bloque en la red dev, en bytes.
 ///
-/// El transporte **MUST** dejar pasar cualquier bloque que el consenso acepte, con holgura para la
-/// cabecera, los sobres del protocolo y el crecimiento de la mediana entre reinicios del nodo.
+/// **Valor dev declarado.** La orden pide «el límite de peso que ya use `zx-core`, o, si no existe,
+/// 2 MiB dev». `peso.rs` no está portado (lo dirá W03+), así que se toma 2 MiB. No es una medición
+/// ni una regla de consenso: es una cota de transporte provisional y revisable.
+pub const MAX_CUERPO_DEV_BYTES: u64 = 2 * 1024 * 1024;
+
+/// Tamaño máximo de un [`crate::mensaje::BloqueRed`], en bytes.
+///
+/// Desglose: cabecera PoST máxima ([`TAMANO_CABECERA_MAX`] = 1 037 B, la más grande de las dos
+/// familias) **más** el cuerpo máximo dev. No incluye el byte de familia ni el `CompactSize` del
+/// contador de transacciones: eso lo añade el códec al comprobar el buffer recibido.
+pub const MAX_BLOQUE_RED_BYTES: u64 = TAMANO_CABECERA_MAX as u64 + MAX_CUERPO_DEV_BYTES;
+
+/// Cuántas veces el límite de bloque dev admite el transporte.
+///
+/// El transporte **MUST** dejar pasar cualquier bloque que quepa con holgura para la cabecera, los
+/// sobres del protocolo y cambios futuros del límite de cuerpo.
 pub const FACTOR_MARGEN: u64 = 8;
 
-/// Zona libre de consenso, en unidades de peso (§6.5).
-///
-/// **Se declara aquí y no se importa de `zx-consensus` a propósito**: este crate no depende de
-/// consenso —ver el diagrama en `lib.rs`—, así que la copia se mantiene sincronizada por un test
-/// que sí lo importa como dev-dependency. Si alguien cambia `ZONA_LIBRE` en consenso, ese test falla.
-const ZONA_LIBRE_CONSENSO: u64 = 100_000;
-
-/// Límite de bloque en el génesis: `LIMITE(0) = 2·M(0) = 2·ZONA_LIBRE` (C-WGT-09).
-pub const LIMITE_BLOQUE_GENESIS: u64 = 2 * ZONA_LIBRE_CONSENSO;
-
-/// Tamaño máximo de un mensaje de gossipsub **derivado del límite de bloque vigente**.
-///
-/// # Por qué esto NO puede ser una constante, aunque lo fuera hasta hace un rato
-///
-/// El tamaño de bloque de ZEROX es **dinámico**: `LIMITE(H) = 2·M(H)` (C-WGT-09), y `M(H)` crece
-/// con la mediana larga, **sin techo**. El propio SPEC estima el crecimiento anual máximo de `Mlt`
-/// en **≈2,9×**. Partiendo de `LIMITE(0) = 200 000`:
-///
-/// | | `Mlt` | `LIMITE(H)` | ¿cabía en la constante fija de 800 000? |
-/// |---|---|---|---|
-/// | año 0 | 100 000 | 200 000 | sí |
-/// | año 1 | 290 000 | 580 000 | sí |
-/// | año 2 | 841 000 | **1 682 000** | **NO** |
-/// | año 3 | 2 438 900 | **4 877 800** | **NO** |
-///
-/// Con un límite de transporte fijo, **en el año 2 un bloque perfectamente válido deja de poder
-/// propagarse**. Y no hace falta ningún ataque: es exactamente el caso para el que existe la
-/// mediana larga, demanda legítima sostenida.
-///
-/// Peor todavía, el límite que decide es el del **receptor**, no el del emisor
-/// (`libp2p-gossipsub`, `src/protocol.rs`: el códec de lectura se construye con
-/// `default_max_transmit_size` propio). Así que nodos con versiones distintas de esta constante
-/// **se particionan entre sí** en silencio: unos aceptan el bloque y otros lo descartan por tamaño
-/// de frame, sin que ninguno emita un error de consenso.
-///
-/// Lo cazó la primera revisión adversarial del crate. Lo incómodo es que el docstring anterior
-/// **describía este mismo escenario** —"se convierte en una partición de red silenciosa el día que
-/// los bloques crezcan"— y la solución que implementaba era multiplicar por 8 la zona libre de
-/// **hoy**, que no está atada a nada que crezca. El aviso estaba escrito; el arreglo no.
 /// Techo absoluto que ningún `LIMITE(H)` legítimo puede alcanzar: **1 TiB**.
-///
-/// A un crecimiento máximo de 2,9×/año desde `LIMITE(0) = 200 000 B`, llegar aquí llevaría más de
-/// **quince años** de demanda al tope. Si un nodo ve un límite de bloque mayor, no está viendo una
-/// cadena que ha crecido: está viendo un valor corrupto, un desbordamiento o una cadena que no es
-/// la suya.
 pub const LIMITE_BLOQUE_ABSURDO: u64 = 1 << 40;
 
 /// Techo de gossip derivado del límite de bloque, o `None` si el límite es absurdo.
 ///
 /// # Por qué devuelve `Option` y no satura
 ///
-/// La primera versión hacía `saturating_mul` y devolvía `usize::MAX` ante un límite disparatado.
-/// Eso parecía prudente y era lo contrario: **`usize::MAX` como `max_transmit_size` significa "sin
-/// límite"**, que es exactamente el fallo que C-NET-11 existe para impedir. Un valor corrupto no
-/// debe traducirse en desactivar la defensa; debe traducirse en no arrancar.
-///
-/// Lo cazó un test que intentaba comprobar que un límite absurdo impedía construir el behaviour, y
-/// descubrió que lo permitía — con el límite de transporte apagado.
+/// Saturar a `usize::MAX` significaría "sin límite", que es exactamente el fallo que C-NET-11 existe
+/// para impedir. Un valor corrupto no debe traducirse en desactivar la defensa; debe traducirse en
+/// no arrancar.
 #[must_use]
 pub const fn limite_gossip(limite_bloque: u64) -> Option<usize> {
     if limite_bloque == 0 || limite_bloque > LIMITE_BLOQUE_ABSURDO {
         return None;
     }
-    // Con `limite_bloque ≤ 2^40` y `FACTOR_MARGEN = 8`, el producto cabe en 2^43: sin desbordar.
     let bytes = limite_bloque * FACTOR_MARGEN;
     if bytes > usize::MAX as u64 {
         // Solo alcanzable en un objetivo de 32 bits.
@@ -98,32 +69,25 @@ pub const fn limite_gossip(limite_bloque: u64) -> Option<usize> {
     }
 }
 
-/// Límite de gossip en el arranque de una cadena nueva. Es `limite_gossip(LIMITE_BLOQUE_GENESIS)`.
-pub const MAX_GOSSIP_BYTES_GENESIS: usize = match limite_gossip(LIMITE_BLOQUE_GENESIS) {
+/// Límite de bloque del arranque dev: [`MAX_BLOQUE_RED_BYTES`].
+pub const LIMITE_BLOQUE_DEV: u64 = MAX_BLOQUE_RED_BYTES;
+
+/// Tamaño máximo de un mensaje de gossipsub en el arranque dev.
+pub const MAX_GOSSIP_BYTES: usize = match limite_gossip(LIMITE_BLOQUE_DEV) {
     Some(v) => v,
-    // Inalcanzable: `LIMITE_BLOQUE_GENESIS` es 200 000. Si esto fallara al compilar, es que alguien
-    // ha tocado la zona libre hasta un valor imposible.
-    None => panic!("LIMITE_BLOQUE_GENESIS debe dar un techo de gossip válido"),
+    // Inalcanzable: `MAX_BLOQUE_RED_BYTES` es ~2 MiB. Si fallara al compilar, es que alguien ha
+    // tocado el límite del cuerpo hasta un valor imposible.
+    None => panic!("MAX_BLOQUE_RED_BYTES debe dar un techo de gossip válido"),
 };
 
 /// A partir de qué fracción del margen el nodo **se niega a seguir**.
-///
-/// Con `FACTOR_MARGEN = 8`, exigir que sobre un factor 2 significa parar cuando el límite de bloque
-/// ha consumido 4 de las 8 veces. A un crecimiento máximo de 2,9×/año, ir de 8× a 2× de margen
-/// lleva `log(4)/log(2,9) ≈ 1,3 años`: tiempo de sobra para publicar una versión nueva.
 pub const MARGEN_MINIMO: u64 = 2;
 
-/// ¿Puede este nodo seguir sirviendo la cadena con el límite de transporte que tiene?
+/// ¿Puede este nodo seguir sirviendo con el límite de transporte que tiene?
 ///
-/// # Por qué esto existe, y por qué falla ruidosamente
-///
-/// El límite de gossipsub se fija **al construir el behaviour** y no se puede cambiar en caliente.
-/// Un nodo que lleva meses encendido mientras la cadena crece puede quedarse con un límite que ya
-/// no da. La alternativa a comprobarlo es descubrirlo cuando los bloques dejen de llegar.
-///
-/// Es el mismo patrón que C-GEN-06: **convertir un fallo silencioso en una negativa a arrancar**.
-/// Un nodo que se para diciendo "mi límite de transporte se ha quedado corto, actualiza" es
-/// infinitamente mejor que uno que sigue corriendo y deja de ver la mitad de los bloques.
+/// El límite de gossipsub se fija al construir el behaviour y no cambia en caliente; un nodo que se
+/// para diciendo "mi límite de transporte se ha quedado corto" es mejor que uno que deja de ver la
+/// mitad de los mensajes sin decirlo.
 #[must_use]
 pub const fn margen_suficiente(limite_bloque: u64, limite_transporte: usize) -> bool {
     let necesario = limite_bloque.saturating_mul(MARGEN_MINIMO);
@@ -132,178 +96,127 @@ pub const fn margen_suficiente(limite_bloque: u64, limite_transporte: usize) -> 
 
 /// Tamaño máximo de una **petición** de sincronización, en bytes.
 ///
-/// Una petición es un locator: unos pocos cientos de hashes de 32 bytes como mucho. Que sea
-/// pequeño es la primera línea de defensa — no hay razón legítima para una petición grande.
+/// Una petición es un locator o una lista de hashes: unos pocos KiB como mucho. Que sea pequeño es
+/// la primera línea de defensa — no hay razón legítima para una petición grande.
 pub const MAX_PETICION_BYTES: u64 = 64 * 1024;
+
+/// Bloques por respuesta de `Bloques`.
+pub const MAX_BLOQUES_POR_RESPUESTA: usize = 16;
 
 /// Tamaño máximo de una **respuesta** de sincronización, en bytes.
 ///
-/// Una respuesta puede traer un lote de bloques, así que es el límite grande del crate. Aun así
-/// está acotado: sin él, un peer puede hacer que reservemos memoria arbitraria **antes** de que el
-/// parser tenga oportunidad de rechazar nada.
-pub const MAX_RESPUESTA_BYTES: u64 = MAX_GOSSIP_BYTES_GENESIS as u64 * 16;
+/// Una respuesta carga hasta [`MAX_BLOQUES_POR_RESPUESTA`] bloques completos. Sin cota, un peer
+/// puede hacer que reservemos memoria arbitraria **antes** de que el parser rechace nada.
+pub const MAX_RESPUESTA_BYTES: u64 =
+    MAX_BLOQUES_POR_RESPUESTA as u64 * MAX_BLOQUE_RED_BYTES + 64 * 1024;
 
-/// Tamaño máximo de un **anuncio compacto**, en bytes.
+/// Cabeceras PoW por respuesta de `CabecerasPow`.
 ///
-/// Cota superior **derivada**: el anuncio es cabecera DAG + nonce + `6 B` por transacción + una
-/// coinbase completa, todo lo cual es menor que el bloque entero, y un bloque entero **MUST** caber
-/// en el límite de gossip. No es una medición ni un formato cerrado.
-pub const MAX_ANUNCIO_COMPACTO_BYTES: u64 = MAX_GOSSIP_BYTES_GENESIS as u64;
-
-/// Tamaño máximo de una **respuesta de faltantes**, en bytes.
-///
-/// Cota superior derivada: `discriminante(1) + block_hash(32) + CompactSize(9)` más un subconjunto
-/// del cuerpo del bloque, que **MUST** caber en el límite de gossip.
-pub const MAX_RESPUESTA_FALTANTES_BYTES: u64 = 1 + 32 + 9 + MAX_GOSSIP_BYTES_GENESIS as u64;
-
-// El anuncio compacto no puede superar lo que el transporte de gossip admite.
-const _: () = assert!(MAX_ANUNCIO_COMPACTO_BYTES <= MAX_GOSSIP_BYTES_GENESIS as u64);
-// Y la respuesta de faltantes no puede superar el techo de respuesta.
-const _: () = assert!(MAX_RESPUESTA_FALTANTES_BYTES <= MAX_RESPUESTA_BYTES);
-
-/// Cabeceras por respuesta de `Headers`.
-///
-/// A 92 bytes por cabecera son ~184 KB por respuesta llena. Bitcoin usa 2000 y zcashd 160 —este
-/// último por el tamaño de las soluciones Equihash, que ZEROX no tiene.
+/// A 92 bytes por cabecera son ~184 KB por respuesta llena. Bitcoin usa 2000.
 pub const MAX_CABECERAS_POR_RESPUESTA: usize = 2_000;
 
-/// Bloques por respuesta de `Blocks`.
-pub const MAX_BLOQUES_POR_RESPUESTA: usize = 16;
+/// Hashes por petición de `Bloques`.
+///
+/// La orden lo fija en 256. Con 32 B por hash son 8 KiB de cuerpo: la petición sigue siendo diminuta
+/// y el receptor sabe de antemano cuánto va a servir.
+pub const MAX_HASHES_POR_PETICION: usize = 256;
 
 /// Peers salientes: los que **elegimos** nosotros.
 pub const MAX_PEERS_SALIENTES: u32 = 24;
 
 /// Peers entrantes: los que nos eligen a nosotros.
-///
-/// Mayor que el de salientes **a propósito**, y es un compromiso incómodo que conviene tener
-/// escrito: aceptar más entrantes hace la red más útil para los demás, pero significa que la
-/// mayoría de nuestros peers pueden ser peers que no elegimos. Zebra documenta exactamente el mismo
-/// trade-off con un multiplicador de 5 (`zebra-network/src/constants.rs:64-81`).
 pub const MAX_PEERS_ENTRANTES: u32 = 72;
 
 /// Conexiones establecidas simultáneas, en total.
 pub const MAX_CONEXIONES: u32 = MAX_PEERS_SALIENTES + MAX_PEERS_ENTRANTES;
 
 /// Conexiones establecidas con un **mismo** peer.
-///
-/// Una basta. Permitir varias multiplica por N lo que un solo peer puede consumir.
 pub const MAX_CONEXIONES_POR_PEER: u32 = 1;
 
-/// Conexiones entrantes a medio negociar.
-///
-/// Es la defensa contra *slowloris*: abrir conexiones y no terminar nunca el handshake.
+/// Conexiones entrantes a medio negociar (defensa contra *slowloris*).
 pub const MAX_CONEXIONES_PENDIENTES: u32 = 32;
 
 /// Peticiones de sincronización simultáneas que se aceptan de **un mismo peer**.
 ///
 /// El default de `request_response::Config` son **100**. Con respuestas de hasta
-/// [`MAX_RESPUESTA_BYTES`], eso son `100 × 25,6 MB = 2,56 GB` reservables **por peer** — y con
-/// [`MAX_PEERS_ENTRANTES`] peers, decenas de gigabytes.
-///
-/// Bajarlo a 8 es **la mitad** de la mitigación. La otra mitad es un presupuesto de memoria
-/// **agregado** —un contador global de bytes en vuelo— que todavía no existe: 🔶 **P-027**.
-/// Conviene tenerlo escrito porque `8 × 25,6 MB × 72 peers` siguen siendo **14,7 GB** en el peor
-/// caso. Lo cierra C-NET-21, no este límite.
+/// [`MAX_RESPUESTA_BYTES`], eso serían decenas de gigabytes por peer. Bajarlo a 8 es la mitad de la
+/// mitigación; la otra mitad es el presupuesto agregado de [`crate::presupuesto`].
 pub const MAX_STREAMS_SYNC: usize = 8;
 
-/// Peers en modo de **alto ancho de banda** para el relé compacto (C-NET-10).
-///
-/// Literal de BIP 152: *"Nodes MUST NOT send such sendcmpct messages to more than three peers, as
-/// it encourages wasting outbound bandwidth across the network."*
-pub const MAX_PEERS_ALTO_ANCHO_BANDA: usize = 3;
+// ── Coherencia de los límites ────────────────────────────────────────────────
+// Aserciones de compilación y no tests: una relación entre constantes no se puede saltar con
+// `--skip`, y un cambio que rompa la coherencia MUST impedir compilar.
 
-// El límite de gossip MUST superar cualquier transacción individual: si una tx que el consenso
-// acepta no cupiera en un mensaje, sería invalidez de facto impuesta por el transporte.
-// (`MAX_TX_WEIGHT == ZONA_LIBRE` en consenso; el test lo verifica contra el crate real.)
+// El techo de gossip cubre el bloque máximo completo.
 const _: () = assert!(
-    MAX_GOSSIP_BYTES_GENESIS as u64 > ZONA_LIBRE_CONSENSO,
-    "C-NET-11: el límite de gossip debe superar el peso máximo de una tx, o el transporte \
-     censuraría transacciones válidas"
+    MAX_GOSSIP_BYTES as u64 >= MAX_BLOQUE_RED_BYTES,
+    "C-NET-11: el techo de gossip debe admitir un bloque completo"
 );
 
-// Y el margen del génesis MUST ser suficiente, o el nodo no arrancaría nunca.
-const _: () = assert!(margen_suficiente(
-    LIMITE_BLOQUE_GENESIS,
-    MAX_GOSSIP_BYTES_GENESIS
-));
-
-// Y MUST superar el default de libp2p, o no estaríamos arreglando nada.
+// El techo de gossip supera el default de libp2p, o no estaríamos arreglando nada.
 const _: () = assert!(
-    MAX_GOSSIP_BYTES_GENESIS > 65_536,
-    "C-NET-11: el default de libp2p es 65536 y es demasiado pequeño para un bloque de ZEROX"
+    MAX_GOSSIP_BYTES > 65_536,
+    "C-NET-11: el default de libp2p es 65536 y es demasiado pequeño"
 );
+
+// El margen del arranque dev MUST ser suficiente, o el nodo no arrancaría nunca.
+const _: () = assert!(margen_suficiente(LIMITE_BLOQUE_DEV, MAX_GOSSIP_BYTES));
 
 // Una respuesta de sincronización carga varios bloques: MUST ser mayor que un mensaje suelto.
-const _: () = assert!(MAX_RESPUESTA_BYTES > MAX_GOSSIP_BYTES_GENESIS as u64);
+const _: () = assert!(MAX_RESPUESTA_BYTES > MAX_GOSSIP_BYTES as u64);
 
 // Una petición es un locator, no un lote: MUST ser mucho menor que una respuesta.
 const _: () = assert!(MAX_PETICION_BYTES * 100 < MAX_RESPUESTA_BYTES);
 
-// Coherencia de los límites de conexión. Son constantes, así que van aquí y no en un test: una
-// aserción de compilación no se puede saltar con `--skip`.
+// Un lote lleno de cabeceras PoW cabe en una respuesta.
+const _: () = assert!(
+    (MAX_CABECERAS_POR_RESPUESTA * TAMANO_CABECERA) as u64 <= MAX_RESPUESTA_BYTES,
+    "un lote de cabeceras al máximo MUST caber en una respuesta"
+);
+
+// Un lote lleno de hashes cabe en una petición (32 B por hash + discriminante + CompactSize).
+const _: () = assert!(
+    1 + 9 + (MAX_HASHES_POR_PETICION * 32) as u64 <= MAX_PETICION_BYTES,
+    "una petición con el máximo de hashes MUST caber en MAX_PETICION_BYTES"
+);
+
+// Coherencia de los límites de conexión.
 const _: () = assert!(MAX_CONEXIONES == MAX_PEERS_SALIENTES + MAX_PEERS_ENTRANTES);
 const _: () = assert!(
     MAX_PEERS_ENTRANTES > MAX_PEERS_SALIENTES,
     "trade-off asumido: aceptamos más peers de los que elegimos"
 );
 const _: () = assert!(MAX_PEERS_SALIENTES > 0 && MAX_CONEXIONES_POR_PEER == 1);
-const _: () = assert!(
-    MAX_PEERS_ALTO_ANCHO_BANDA < MAX_PEERS_SALIENTES as usize,
-    "C-NET-10: no se puede tener más peers de alto ancho de banda que peers salientes"
-);
 
 #[cfg(test)]
 #[expect(
-    clippy::expect_used,
     clippy::integer_division,
     reason = "aritmética entera deliberada: modelar el crecimiento con enteros evita floats"
 )]
 mod tests {
     use super::{
-        LIMITE_BLOQUE_ABSURDO, LIMITE_BLOQUE_GENESIS, MARGEN_MINIMO, MAX_BLOQUES_POR_RESPUESTA,
-        MAX_CABECERAS_POR_RESPUESTA, MAX_GOSSIP_BYTES_GENESIS, MAX_PEERS_ALTO_ANCHO_BANDA,
-        MAX_RESPUESTA_BYTES, limite_gossip, margen_suficiente,
+        FACTOR_MARGEN, LIMITE_BLOQUE_ABSURDO, LIMITE_BLOQUE_DEV, MARGEN_MINIMO,
+        MAX_BLOQUE_RED_BYTES, MAX_CABECERAS_POR_RESPUESTA, MAX_CUERPO_DEV_BYTES, MAX_GOSSIP_BYTES,
+        MAX_HASHES_POR_PETICION, MAX_PETICION_BYTES, MAX_RESPUESTA_BYTES, limite_gossip,
+        margen_suficiente,
     };
-    use zx_consensus::peso::{MAX_TX_WEIGHT, ZONA_LIBRE};
     use zx_core::preimage::block::TAMANO_CABECERA;
+    use zx_core::preimage::dag::TAMANO_CABECERA_MAX;
 
-    /// **C-NET-13 · el fallo que la revisión adversarial encontró, ahora como test.**
-    ///
-    /// Con un límite de transporte **fijo** de 800 000 B, un bloque legítimo del año 2 —cuando la
-    /// mediana larga ha crecido a su ritmo máximo permitido— no cabía. Este test reproduce esa
-    /// trayectoria y comprueba que ahora el techo la sigue.
+    /// El límite de BloqueRed se **deriva** de la cabecera PoST máxima y del cuerpo dev declarado.
     #[test]
-    fn el_limite_de_transporte_sigue_al_crecimiento_del_bloque() {
-        // ≈2,9×/año es el crecimiento máximo de Mlt que estima el propio SPEC (C-WGT-04).
-        let mut limite = LIMITE_BLOQUE_GENESIS;
-        for anio in 0..6u32 {
-            let techo = limite_gossip(limite).expect("un límite realista da techo");
-            assert!(
-                techo as u64 >= limite,
-                "año {anio}: un bloque de {limite} B no cabe en un techo de {techo} B"
-            );
-            assert!(
-                margen_suficiente(limite, techo),
-                "año {anio}: el margen debe bastar cuando el techo se deriva del límite"
-            );
-            limite = limite * 29 / 10;
-        }
-
-        // Y lo contrario: la constante vieja SÍ se quedaba corta.
-        const CONSTANTE_VIEJA: usize = 800_000;
-        let limite_ano_2 = LIMITE_BLOQUE_GENESIS * 29 / 10 * 29 / 10;
-        assert!(
-            limite_ano_2 > CONSTANTE_VIEJA as u64,
-            "el fallo original: {limite_ano_2} B no cabían en {CONSTANTE_VIEJA} B"
-        );
+    fn el_limite_de_bloque_red_se_deriva() {
+        assert_eq!(TAMANO_CABECERA_MAX, 1_037, "la cabecera PoST máxima");
+        assert_eq!(MAX_CUERPO_DEV_BYTES, 2 * 1024 * 1024);
+        assert_eq!(MAX_BLOQUE_RED_BYTES, 1_037 + 2 * 1024 * 1024);
+        assert_eq!(LIMITE_BLOQUE_DEV, MAX_BLOQUE_RED_BYTES);
     }
 
     /// **C-NET-13.** Cuando el margen se agota, el nodo debe **negarse**, no seguir a medias.
     #[test]
     fn sin_margen_suficiente_se_detecta() {
-        let techo = MAX_GOSSIP_BYTES_GENESIS;
+        let techo = MAX_GOSSIP_BYTES;
 
-        // Justo en el borde: el límite consume exactamente 1/MARGEN_MINIMO del techo.
         let borde = techo as u64 / MARGEN_MINIMO;
         assert!(margen_suficiente(borde, techo), "el borde exacto vale");
         assert!(
@@ -311,10 +224,6 @@ mod tests {
             "un byte más allá del borde MUST detectarse"
         );
 
-        // Y un límite absurdo **no da techo**: `None`, no `usize::MAX`.
-        //
-        // La diferencia importa: `usize::MAX` como `max_transmit_size` significa "sin límite", que
-        // es justo la defensa que C-NET-11 existe para mantener encendida.
         assert!(!margen_suficiente(u64::MAX, techo));
         assert_eq!(
             limite_gossip(u64::MAX),
@@ -327,81 +236,38 @@ mod tests {
             None,
             "un límite de cero también es absurdo"
         );
-        assert!(
-            limite_gossip(LIMITE_BLOQUE_ABSURDO).is_some(),
-            "el borde justo vale"
-        );
+        assert!(limite_gossip(LIMITE_BLOQUE_ABSURDO).is_some());
     }
 
-    /// **C-NET-11.** El límite de gossip supera un bloque típico con margen de sobra.
-    ///
-    /// Este test es el que habría cazado el default de 64 KiB. Un bloque en la zona libre mide
-    /// 100 KB, así que con el default **no se habría propagado ni uno solo**, sin error visible.
+    /// El techo de gossip cubre el bloque máximo con el margen pactado.
     #[test]
     fn el_limite_de_gossip_admite_bloques_reales() {
-        // LIMITE(0) = 2·ZONA_LIBRE = 200 000 B, por el margen de 8.
-        assert_eq!(MAX_GOSSIP_BYTES_GENESIS, 1_600_000);
+        assert_eq!(
+            MAX_GOSSIP_BYTES as u64,
+            MAX_BLOQUE_RED_BYTES * FACTOR_MARGEN
+        );
+        assert!(MAX_GOSSIP_BYTES as u64 >= MAX_BLOQUE_RED_BYTES);
     }
 
-    /// **La copia local de `ZONA_LIBRE` sigue coincidiendo con la de consenso.**
-    ///
-    /// `zx-p2p` **no depende** de `zx-consensus` (solo en dev, para este test): así el código de red
-    /// no puede llamar a consenso ni por accidente. El precio es una constante duplicada, y este
-    /// test es lo que la mantiene honesta — si alguien cambia `ZONA_LIBRE` en consenso, falla aquí
-    /// y no en producción.
-    #[test]
-    fn el_limite_de_gossip_se_deriva_de_la_zona_libre_de_consenso() {
-        assert_eq!(
-            super::ZONA_LIBRE_CONSENSO,
-            ZONA_LIBRE,
-            "la copia local de ZONA_LIBRE se ha desincronizado de zx-consensus"
-        );
-        // LIMITE(0) = 2·M(0) = 2·ZONA_LIBRE (C-WGT-09), y el techo es eso por el margen.
-        assert_eq!(LIMITE_BLOQUE_GENESIS, 2 * ZONA_LIBRE);
-        assert_eq!(
-            MAX_GOSSIP_BYTES_GENESIS as u64,
-            LIMITE_BLOQUE_GENESIS * super::FACTOR_MARGEN
-        );
-        assert!(
-            MAX_GOSSIP_BYTES_GENESIS as u64 > MAX_TX_WEIGHT,
-            "una tx que el consenso acepta MUST caber en un mensaje"
-        );
-    }
-
-    /// Un lote lleno de cabeceras **MUST** caber en el límite de respuesta.
-    ///
-    /// Sin esta comprobación, los dos límites podrían fijarse por separado y dejar un lote máximo
-    /// que nunca se puede entregar: el nodo pediría algo que su propio transporte rechaza.
+    /// Un lote lleno de cabeceras cabe en la respuesta.
     #[test]
     fn un_lote_lleno_de_cabeceras_cabe_en_una_respuesta() {
         let lote = (MAX_CABECERAS_POR_RESPUESTA * TAMANO_CABECERA) as u64;
-        assert!(
-            lote < MAX_RESPUESTA_BYTES,
-            "{MAX_CABECERAS_POR_RESPUESTA} cabeceras son {lote} B y el techo es \
-             {MAX_RESPUESTA_BYTES} B"
-        );
+        assert!(lote <= MAX_RESPUESTA_BYTES);
     }
 
-    /// Y un lote lleno de bloques también, contando cada uno en la zona libre.
+    /// Un lote lleno de hashes cabe en la petición.
+    #[test]
+    fn un_lote_lleno_de_hashes_cabe_en_una_peticion() {
+        let lote = 1 + 9 + (MAX_HASHES_POR_PETICION * 32) as u64;
+        assert!(lote <= MAX_PETICION_BYTES, "{lote} B");
+        assert_eq!(MAX_HASHES_POR_PETICION, 256);
+    }
+
+    /// Un lote lleno de bloques al máximo cabe en una respuesta.
     #[test]
     fn un_lote_lleno_de_bloques_cabe_en_una_respuesta() {
-        let lote = MAX_BLOQUES_POR_RESPUESTA as u64 * ZONA_LIBRE;
-        assert!(
-            lote <= MAX_RESPUESTA_BYTES,
-            "{MAX_BLOQUES_POR_RESPUESTA} bloques de {ZONA_LIBRE} B son {lote} B y el techo es \
-             {MAX_RESPUESTA_BYTES} B"
-        );
-    }
-
-    /// **C-NET-10, BIP 152.** Tres, y el BIP lo dice con MUST NOT.
-    ///
-    /// La coherencia con los demás límites está en aserciones de compilación, arriba. Aquí solo se
-    /// fija el número, que es el que cita el BIP literalmente.
-    #[test]
-    fn el_modo_de_alto_ancho_de_banda_esta_limitado_a_tres() {
-        assert_eq!(
-            MAX_PEERS_ALTO_ANCHO_BANDA, 3,
-            "BIP 152: MUST NOT send such sendcmpct messages to more than three peers"
-        );
+        let lote = super::MAX_BLOQUES_POR_RESPUESTA as u64 * MAX_BLOQUE_RED_BYTES;
+        assert!(lote <= MAX_RESPUESTA_BYTES);
     }
 }

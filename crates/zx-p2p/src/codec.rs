@@ -1,27 +1,27 @@
-//! Códec del protocolo de sincronización (SPEC §16.1, C-NET-11, C-WIRE-04).
+//! Códec del protocolo de sincronización y de los anuncios de bloque (C-NET-11, C-WIRE-04).
 //!
 //! # El trait `Codec` no impone ningún límite de tamaño
 //!
-//! Es el hallazgo más importante de la investigación de libp2p, y no es obvio leyendo el trait:
-//! `read_request`/`read_response` reciben un `AsyncRead` y **nada** acota cuánto leen. El
-//! `.take(N)` es responsabilidad de cada implementación. La de referencia del propio crate
+//! `read_request`/`read_response` reciben un `AsyncRead` y **nada** acota cuánto leen. El `.take(N)`
+//! es responsabilidad de cada implementación. La de referencia del propio crate
 //! (`request-response/src/cbor.rs`) lo hace explícitamente; una escrita "de forma natural" con
 //! `read_to_end` deja que un peer reserve la memoria que quiera **antes** de que el parser pueda
 //! rechazar nada.
 //!
 //! # Y `.take(N)` por sí solo NO basta
 //!
-//! Este es el matiz que casi se cuela. `AsyncReadExt::take(N)` acota la lectura a `N` bytes, así
-//! que la memoria queda contenida — bien. Pero si el emisor manda **más** de `N`, no produce un
-//! error de "demasiado grande": **trunca en silencio**, y lo que falla después es el parseo, con
-//! un error de datos corruptos que no dice nada del tamaño.
+//! `AsyncReadExt::take(N)` acota la lectura a `N` bytes, así que la memoria queda contenida — bien.
+//! Pero si el emisor manda **más** de `N`, no produce un error de "demasiado grande": **trunca en
+//! silencio**, y lo que falla después es el parseo, con un error de datos corruptos que no dice nada
+//! del tamaño. Eso importa: un truncamiento silencioso se clasificaría como `Ilegible` —"este peer
+//! habla otro dialecto"— cuando en realidad es `Excedido` —"este peer mandó algo que no debía"—.
+//! Así que aquí se lee hasta `N` y **se comprueba si se llegó al tope**.
 //!
-//! Eso importa por C-NET-05: un truncamiento silencioso se clasificaría como `Ilegible` —"este
-//! peer habla otro dialecto"— cuando en realidad es `Excedido` —"este peer mandó algo que no
-//! debía"—. Son motivos distintos con políticas distintas.
+//! # La familia de bloque se declara, no se adivina
 //!
-//! Así que aquí se lee hasta `N` y **se comprueba si se llegó al tope**: si se llegó, es que había
-//! más, y se rechaza como exceso antes de intentar parsear nada.
+//! [`bloque_desde_bytes`] recibe la familia esperada y **rechaza** otra (F-04). La variante
+//! [`bloque_desde_bytes_autotag`] existe para las respuestas, donde el wire lleva el byte de familia
+//! explícito por bloque; **nunca** se deduce por longitud.
 
 use std::io;
 
@@ -29,9 +29,13 @@ use async_trait::async_trait;
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use libp2p::StreamProtocol;
 use libp2p::request_response;
+use thiserror::Error;
 
 use crate::limites;
-use crate::mensaje::{BloqueRed, Estado, Peticion, Respuesta};
+use crate::mensaje::{
+    BloqueRed, Estado, FamiliaBloque, Fase, MAX_PUNTAS_POST, Peticion, PuntaPow, Respuesta,
+    red_desde_discriminante, red_discriminante,
+};
 use crate::presupuesto::Presupuesto;
 use zx_core::digest::{BlockHash, Digest};
 use zx_core::encoding::{compact_size, int};
@@ -45,76 +49,90 @@ use zx_core::wire;
 /// que no está construyendo un locator, sino gastándonos tiempo.
 pub const MAX_LOCATOR: usize = 64;
 
-/// Tamaño exacto en el wire de una petición `Estado`, en bytes.
+/// Sobre máximo del códec de un bloque: el byte de familia y el `CompactSize` del contador.
 ///
-/// `Peticion::Estado` **no lleva cuerpo**: solo el discriminante. Es el máximo que el perfil
-/// `dag-dev` admite leer, derivado del formato y no del límite lineal general.
-const PETICION_ESTADO_BYTES: u64 = 1; // discriminante
+/// [`limites::MAX_BLOQUE_RED_BYTES`] mide cabecera + cuerpo; el wire añade el byte de familia y, como
+/// mucho, un `CompactSize` de 9 bytes. Esta constante es la holgura que el códec admite por encima.
+pub const SOBRE_CODEC_BLOQUE: u64 = 1 + 9;
 
-/// Tamaño exacto en el wire de una respuesta `Estado`, en bytes.
+/// Error del códec de la red.
 ///
-/// Desglose por campo, para que no sea un número mágico:
-/// - discriminante de respuesta: `1`
-/// - `genesis`: `32`
-/// - `tip`: `32`
-/// - `altura` LE32: `4`
-/// - `trabajo`: `32`
-const RESPUESTA_ESTADO_BYTES: u64 = 1 + 32 + 32 + 4 + 32; // = 101
+/// Envuelve [`EncodingError`] de `zx-core` y añade solo lo que es específico de estos mensajes: la
+/// familia declarada, la red y la fase. Cada caso tiene **su** variante, para que un rechazo diga
+/// exactamente qué se rechazó.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum ErrorCodec {
+    /// Error de codificación de `zx-core` (truncado, contador no mínimo, etc.).
+    #[error(transparent)]
+    Codificacion(#[from] EncodingError),
 
-/// Alcance de variantes que admite un [`ZxCodec`].
-///
-/// Es un **modo privado del códec**, no una bandera pública: solo lo elige
-/// [`ZxBehaviour::con_presupuesto`](crate::behaviour::ZxBehaviour::con_presupuesto) a partir del
-/// perfil de red, y no se puede activar arbitrariamente desde fuera del crate.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-enum ModoCodec {
-    /// Todas las variantes de sync, como en mainnet/testnet.
-    #[default]
-    Completo,
-    /// **Solo** `Peticion::Estado` y `Respuesta::Estado(_)`. Perfil `dag-dev`.
-    SoloEstado,
+    /// F-04: el bloque llegó con una familia distinta de la declarada.
+    #[error("F-04: familia de bloque inesperada: se esperaba {esperada:?}, llegó {encontrada:?}")]
+    FamiliaInesperada {
+        /// Familia que el llamante exigía.
+        esperada: FamiliaBloque,
+        /// Familia que el wire declaró.
+        encontrada: FamiliaBloque,
+    },
+
+    /// El byte de familia del wire no es ninguna conocida.
+    #[error("F-04: familia de bloque desconocida en el wire: {discriminante:#04x}")]
+    FamiliaDesconocida {
+        /// Byte leído.
+        discriminante: u8,
+    },
+
+    /// C-NET-11: el bloque supera el tamaño máximo admitido.
+    #[error("C-NET-11: el bloque de red mide {bytes} B y el máximo es {max} B")]
+    BloqueDemasiadoGrande {
+        /// Bytes recibidos.
+        bytes: usize,
+        /// Cota del códec.
+        max: u64,
+    },
+
+    /// El byte de red del saludo no es ninguna red conocida.
+    #[error("red desconocida en el saludo: {discriminante:#04x}")]
+    RedDesconocida {
+        /// Byte leído.
+        discriminante: u8,
+    },
+
+    /// El byte de fase del saludo no es ninguna fase conocida.
+    #[error("fase desconocida en el saludo: {discriminante:#04x}")]
+    FaseDesconocida {
+        /// Byte leído.
+        discriminante: u8,
+    },
+
+    /// El booleano del wire **MUST** ser `0` o `1`: nada de "cualquier cosa distinta de cero".
+    ///
+    /// Sin esto habría dos codificaciones del mismo mensaje, y dos codificaciones del mismo mensaje
+    /// son maleabilidad — el mismo razonamiento que C-ENC-05 para `CompactSize`.
+    #[error("booleano no canónico: {valor:#04x} (MUST ser 0 o 1)")]
+    BooleanoNoCanonico {
+        /// Byte leído.
+        valor: u8,
+    },
 }
 
 /// El códec de ZEROX para `request-response`.
 ///
 /// Lleva el [`Presupuesto`] porque **es aquí donde se reserva la memoria**. Ponerlo más arriba
 /// significaría contabilizar después de haber leído, que es contabilizar tarde.
-///
-/// Lleva también un [`ModoCodec`] privado: en `dag-dev` el request-response solo sirve el saludo
-/// `Estado`, y **rechaza en lectura y escritura** las variantes lineales (`Cabeceras`, `Bloques`,
-/// `FaltantesCompactas`, `NoDisponible`). El modo se elige al construir el behaviour desde el
-/// perfil de red; el `Default` es el códec completo para no debilitar mainnet/testnet.
 #[derive(Clone, Debug, Default)]
 pub struct ZxCodec {
     presupuesto: Presupuesto,
-    modo: ModoCodec,
 }
 
 impl ZxCodec {
-    /// Uno que comparte presupuesto con los demás y admite **todas** las variantes.
+    /// Uno que comparte presupuesto con los demás.
     ///
     /// **Comparten el contador a propósito**: el recurso que se agota es global, así que repartirlo
     /// por conexión no acotaría la suma. Ver [`crate::presupuesto`].
     #[must_use]
     pub fn con_presupuesto(presupuesto: Presupuesto) -> Self {
-        Self {
-            presupuesto,
-            modo: ModoCodec::Completo,
-        }
-    }
-
-    /// Códec restringido al saludo `Estado`, para el perfil `dag-dev`.
-    ///
-    /// `pub(crate)` a propósito: **no** es una bandera pública. El único consumidor es el
-    /// constructor de [`ZxBehaviour`](crate::behaviour::ZxBehaviour), que la elige según
-    /// [`ParametrosRed`](crate::config::ParametrosRed). Así un llamante externo no puede degradar el
-    /// códec de mainnet/testnet ni abrir una ruta lineal por accidente.
-    #[must_use]
-    pub(crate) fn solo_estado(presupuesto: Presupuesto) -> Self {
-        Self {
-            presupuesto,
-            modo: ModoCodec::SoloEstado,
-        }
+        Self { presupuesto }
     }
 
     /// El presupuesto que usa.
@@ -134,35 +152,16 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        // El límite se elige **antes** de `leer_acotado` porque es ahí donde se reserva (C-NET-21).
-        // En dev el saludo tiene forma fija; reservar por el máximo lineal dejaría que cada saludo
-        // retuviera temporalmente la cuota de una petición enorme y que un peer lento la conservara.
-        let max = match self.modo {
-            ModoCodec::Completo => limites::MAX_PETICION_BYTES,
-            ModoCodec::SoloEstado => PETICION_ESTADO_BYTES,
-        };
-        let bytes = leer_acotado(io, max, &self.presupuesto).await?;
-        match self.modo {
-            ModoCodec::Completo => peticion_desde_bytes(&bytes).map_err(a_io),
-            ModoCodec::SoloEstado => peticion_solo_estado(&bytes),
-        }
+        let bytes = leer_acotado(io, limites::MAX_PETICION_BYTES, &self.presupuesto).await?;
+        peticion_desde_bytes(&bytes).map_err(a_io)
     }
 
     async fn read_response<T>(&mut self, _: &StreamProtocol, io: &mut T) -> io::Result<Respuesta>
     where
         T: AsyncRead + Unpin + Send,
     {
-        // Igual que en la petición: el límite exacto del formato dev (`101` B) se fija antes de la
-        // reserva, no el máximo lineal de `MAX_RESPUESTA_BYTES`.
-        let max = match self.modo {
-            ModoCodec::Completo => limites::MAX_RESPUESTA_BYTES,
-            ModoCodec::SoloEstado => RESPUESTA_ESTADO_BYTES,
-        };
-        let bytes = leer_acotado(io, max, &self.presupuesto).await?;
-        match self.modo {
-            ModoCodec::Completo => respuesta_desde_bytes(&bytes).map_err(a_io),
-            ModoCodec::SoloEstado => respuesta_solo_estado(&bytes),
-        }
+        let bytes = leer_acotado(io, limites::MAX_RESPUESTA_BYTES, &self.presupuesto).await?;
+        respuesta_desde_bytes(&bytes).map_err(a_io)
     }
 
     async fn write_request<T>(
@@ -174,12 +173,6 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        if self.modo == ModoCodec::SoloEstado && !matches!(req, Peticion::Estado) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "dag-dev: este perfil solo admite Peticion::Estado",
-            ));
-        }
         let bytes = peticion_a_bytes(&req);
         // Un emisor que se pasa de su propio límite es un bug nuestro, no de nadie más. Fallar aquí
         // es mejor que mandar algo que el otro extremo va a tirar.
@@ -202,12 +195,6 @@ impl request_response::Codec for ZxCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        if self.modo == ModoCodec::SoloEstado && !matches!(res, Respuesta::Estado(_)) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "dag-dev: este perfil solo admite Respuesta::Estado",
-            ));
-        }
         let bytes = respuesta_a_bytes(&res);
         if bytes.len() as u64 > limites::MAX_RESPUESTA_BYTES {
             return Err(io::Error::new(
@@ -217,38 +204,6 @@ impl request_response::Codec for ZxCodec {
         }
         io.write_all(&bytes).await?;
         io.close().await
-    }
-}
-
-/// Deserializa una petición exigiendo que sea **solo** el saludo `Estado` (perfil `dag-dev`).
-///
-/// Comprueba el discriminante **antes** de parsear el cuerpo, de modo que una variante lineal se
-/// rechaza sin reservar por su locator ni por sus listas. Un `Estado` con bytes de más tampoco
-/// cuela: el parser canónico rechaza el relleno (C-TX-06c).
-fn peticion_solo_estado(bytes: &[u8]) -> io::Result<Peticion> {
-    match bytes.first() {
-        Some(&Peticion::DISC_ESTADO) => peticion_desde_bytes(bytes).map_err(a_io),
-        Some(&disc) => Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("dag-dev: petición lineal 0x{disc:02x} prohibida en este perfil"),
-        )),
-        None => Err(a_io(truncado("petición vacía"))),
-    }
-}
-
-/// Deserializa una respuesta exigiendo que sea **solo** `Estado` (perfil `dag-dev`).
-///
-/// Igual que [`peticion_solo_estado`]: el discriminante se comprueba antes de parsear, así que
-/// `Cabeceras`, `Bloques`, `FaltantesCompactas` y `NoDisponible` se rechazan como datos inválidos
-/// **sin** materializar nada de la ruta lineal.
-fn respuesta_solo_estado(bytes: &[u8]) -> io::Result<Respuesta> {
-    match bytes.first() {
-        Some(&Respuesta::DISC_ESTADO) => respuesta_desde_bytes(bytes).map_err(a_io),
-        Some(&disc) => Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("dag-dev: respuesta lineal 0x{disc:02x} prohibida en este perfil"),
-        )),
-        None => Err(a_io(truncado("respuesta vacía"))),
     }
 }
 
@@ -284,16 +239,138 @@ where
     // `_reserva` se suelta aquí y devuelve el cupo — también por los `?` de arriba.
 }
 
-fn a_io(e: EncodingError) -> io::Error {
+fn a_io(e: ErrorCodec) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, e.to_string())
 }
 
-fn truncado(que: &'static str) -> EncodingError {
+fn truncado(que: &'static str) -> ErrorCodec {
     let _ = que;
-    EncodingError::Truncado {
+    ErrorCodec::Codificacion(EncodingError::Truncado {
         esperados: 1,
         disponibles: 0,
+    })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Serializa un bloque de red, con su byte de familia delante.
+#[must_use]
+pub fn bloque_a_bytes(b: &BloqueRed) -> Vec<u8> {
+    let mut out = Vec::new();
+    int::escribir_u8(&mut out, b.familia().discriminante());
+    match b {
+        BloqueRed::Pow {
+            cabecera,
+            txs,
+            testigos,
+        } => {
+            out.extend_from_slice(&wire::cabecera_a_bytes(cabecera));
+            escribir_cuerpo(&mut out, txs, testigos);
+        }
+        BloqueRed::Post {
+            cabecera,
+            txs,
+            testigos,
+        } => {
+            out.extend_from_slice(&zx_core::preimage::dag::dag_header_a_bytes(cabecera));
+            escribir_cuerpo(&mut out, txs, testigos);
+        }
     }
+    out
+}
+
+/// Escribe el cuerpo común: contador de transacciones y cada `(tx, testigos)`.
+fn escribir_cuerpo(out: &mut Vec<u8>, txs: &[zx_core::tx::Tx], testigos: &[Vec<Vec<u8>>]) {
+    compact_size::escribir(out, txs.len() as u64);
+    for (i, tx) in txs.iter().enumerate() {
+        let vacio = Vec::new();
+        let t = testigos.get(i).unwrap_or(&vacio);
+        wire::tx_a_bytes(out, tx, t);
+    }
+}
+
+/// Deserializa un bloque **exigiendo** la familia declarada (F-04).
+///
+/// # Errores
+/// [`ErrorCodec`] con la familia inesperada o desconocida, el exceso de tamaño, o el error de
+/// codificación del campo que no decodifique.
+pub fn bloque_desde_bytes(
+    bytes: &[u8],
+    familia: FamiliaBloque,
+) -> Result<(BloqueRed, &[u8]), ErrorCodec> {
+    let max = limites::MAX_BLOQUE_RED_BYTES + SOBRE_CODEC_BLOQUE;
+    if bytes.len() as u64 > max {
+        return Err(ErrorCodec::BloqueDemasiadoGrande {
+            bytes: bytes.len(),
+            max,
+        });
+    }
+
+    let (disc, r) = int::leer_u8(bytes)?;
+    let encontrada = FamiliaBloque::desde_byte(disc).ok_or(ErrorCodec::FamiliaDesconocida {
+        discriminante: disc,
+    })?;
+    if encontrada != familia {
+        return Err(ErrorCodec::FamiliaInesperada {
+            esperada: familia,
+            encontrada,
+        });
+    }
+    bloque_cuerpo(r, familia)
+}
+
+/// Deserializa un bloque tomando la familia del **byte de familia del wire**.
+///
+/// Es la ruta de las respuestas: el wire lleva la familia explícita por bloque y el parser la
+/// **exige** contra el cuerpo, sin deducirla por longitud.
+pub fn bloque_desde_bytes_autotag(bytes: &[u8]) -> Result<(BloqueRed, &[u8]), ErrorCodec> {
+    let (disc, _) = int::leer_u8(bytes)?;
+    let familia = FamiliaBloque::desde_byte(disc).ok_or(ErrorCodec::FamiliaDesconocida {
+        discriminante: disc,
+    })?;
+    bloque_desde_bytes(bytes, familia)
+}
+
+/// Parsea cabecera y cuerpo una vez ya comprobada la familia.
+fn bloque_cuerpo(bytes: &[u8], familia: FamiliaBloque) -> Result<(BloqueRed, &[u8]), ErrorCodec> {
+    let (cabecera_pow, cabecera_post, r) = match familia {
+        FamiliaBloque::Pow => {
+            let (c, r) = wire::cabecera_desde_bytes(bytes)?;
+            (Some(c), None, r)
+        }
+        FamiliaBloque::Post => {
+            let (c, r) = zx_core::preimage::dag::dag_header_desde_bytes(bytes)?;
+            (None, Some(c), r)
+        }
+    };
+
+    let (n_tx, mut r) = leer_contador(r, usize::MAX)?;
+    let mut txs = Vec::with_capacity(n_tx.min(4096));
+    let mut testigos = Vec::with_capacity(n_tx.min(4096));
+    for _ in 0..n_tx {
+        let ((tx, t), resto) = wire::tx_desde_bytes(r)?;
+        txs.push(tx);
+        testigos.push(t);
+        r = resto;
+    }
+
+    let bloque = match (cabecera_pow, cabecera_post) {
+        (Some(cabecera), None) => BloqueRed::Pow {
+            cabecera,
+            txs,
+            testigos,
+        },
+        (None, Some(cabecera)) => BloqueRed::Post {
+            cabecera,
+            txs,
+            testigos,
+        },
+        // Inalcanzable: el `match` de arriba es exhaustivo y mutuamente excluyente.
+        (Some(_), Some(_)) | (None, None) => return Err(truncado("familia incoherente")),
+    };
+    Ok((bloque, r))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -307,12 +384,12 @@ pub fn peticion_a_bytes(p: &Peticion) -> Vec<u8> {
     int::escribir_u8(&mut b, p.discriminante());
     match p {
         Peticion::Estado => {}
-        Peticion::Cabeceras { locator, hasta } => {
+        Peticion::CabecerasPow { locator, parada } => {
             compact_size::escribir(&mut b, locator.len() as u64);
             for h in locator {
                 b.extend_from_slice(h.as_bytes());
             }
-            match hasta {
+            match parada {
                 Some(h) => {
                     int::escribir_u8(&mut b, 1);
                     b.extend_from_slice(h.as_bytes());
@@ -326,13 +403,6 @@ pub fn peticion_a_bytes(p: &Peticion) -> Vec<u8> {
                 b.extend_from_slice(h.as_bytes());
             }
         }
-        Peticion::FaltantesCompactas { bloque, indices } => {
-            b.extend_from_slice(bloque.as_bytes());
-            compact_size::escribir(&mut b, indices.len() as u64);
-            for i in indices {
-                int::escribir_u32(&mut b, *i);
-            }
-        }
     }
     b
 }
@@ -341,65 +411,37 @@ pub fn peticion_a_bytes(p: &Peticion) -> Vec<u8> {
 ///
 /// # Errores
 /// El error de codificación que corresponda. **Nunca entra en pánico** (C-WIRE-05).
-pub fn peticion_desde_bytes(bytes: &[u8]) -> Result<Peticion, EncodingError> {
+pub fn peticion_desde_bytes(bytes: &[u8]) -> Result<Peticion, ErrorCodec> {
     let (disc, r) = int::leer_u8(bytes)?;
     let (p, resto) = match disc {
         Peticion::DISC_ESTADO => (Peticion::Estado, r),
-        Peticion::DISC_CABECERAS => {
+        Peticion::DISC_CABECERAS_POW => {
             let (locator, r) = leer_hashes(r, MAX_LOCATOR)?;
             let (tiene, r) = int::leer_u8(r)?;
-            let (hasta, r) = match tiene {
+            let (parada, r) = match tiene {
                 0 => (None, r),
                 1 => {
                     let (h, r) = int::leer_32(r)?;
                     (Some(BlockHash::from_digest(Digest::from_bytes(h))), r)
                 }
                 // C-ENC-09 · un booleano que no es 0 ni 1 es una segunda codificación del mismo
-                // valor lógico, y solo se acepta una. Se rechaza en vez de interpretarse como
-                // "cualquier cosa distinta de cero es verdadero": si dos nodos difieren en esa
-                // interpretación, difieren en qué mensajes existen.
-                _ => return Err(truncado("booleano no canónico en `hasta`")),
+                // valor lógico, y solo se acepta una.
+                otro => return Err(ErrorCodec::BooleanoNoCanonico { valor: otro }),
             };
-            (Peticion::Cabeceras { locator, hasta }, r)
+            (Peticion::CabecerasPow { locator, parada }, r)
         }
         Peticion::DISC_BLOQUES => {
-            let (hashes, r) = leer_hashes(r, limites::MAX_BLOQUES_POR_RESPUESTA)?;
+            let (hashes, r) = leer_hashes(r, limites::MAX_HASHES_POR_PETICION)?;
             (Peticion::Bloques { hashes }, r)
         }
-        Peticion::DISC_FALTANTES => {
-            let (bloque, r) = int::leer_32(r)?;
-            let (n, mut r) = compact_size::leer(r)?;
-            let n = acotar_rele(n)?;
-            let mut indices = Vec::with_capacity(n);
-            let mut anterior: Option<u32> = None;
-            for _ in 0..n {
-                let (i, resto) = int::leer_u32(r)?;
-                if let Some(a) = anterior
-                    && i <= a
-                {
-                    return Err(zx_core::error::EncodingError::IndicesNoCanonicos);
-                }
-                anterior = Some(i);
-                indices.push(i);
-                r = resto;
-            }
-            (
-                Peticion::FaltantesCompactas {
-                    bloque: BlockHash::from_digest(Digest::from_bytes(bloque)),
-                    indices,
-                },
-                r,
-            )
-        }
         otro => {
-            return Err(EncodingError::LockDesconocido {
+            return Err(ErrorCodec::Codificacion(EncodingError::LockDesconocido {
                 discriminante: otro,
-            });
+            }));
         }
     };
 
-    // Nada de relleno. Es el mismo razonamiento que C-TX-06c: sin esta comprobación, la basura
-    // sobrante viaja gratis y el atacante consigue banda a coste cero.
+    // Nada de relleno. Sin esta comprobación, la basura sobrante viaja gratis.
     if resto.is_empty() {
         Ok(p)
     } else {
@@ -417,13 +459,8 @@ pub fn respuesta_a_bytes(r: &Respuesta) -> Vec<u8> {
     let mut b = Vec::new();
     int::escribir_u8(&mut b, r.discriminante());
     match r {
-        Respuesta::Estado(e) => {
-            b.extend_from_slice(e.genesis.as_bytes());
-            b.extend_from_slice(e.tip.as_bytes());
-            int::escribir_u32(&mut b, e.altura);
-            b.extend_from_slice(&e.trabajo);
-        }
-        Respuesta::Cabeceras(cs) => {
+        Respuesta::Estado(e) => escribir_estado(&mut b, e),
+        Respuesta::CabecerasPow(cs) => {
             compact_size::escribir(&mut b, cs.len() as u64);
             for c in cs {
                 b.extend_from_slice(&wire::cabecera_a_bytes(c));
@@ -432,26 +469,10 @@ pub fn respuesta_a_bytes(r: &Respuesta) -> Vec<u8> {
         Respuesta::Bloques(bs) => {
             compact_size::escribir(&mut b, bs.len() as u64);
             for bl in bs {
-                b.extend_from_slice(&wire::cabecera_a_bytes(&bl.cabecera));
-                compact_size::escribir(&mut b, bl.txs.len() as u64);
-                for (i, tx) in bl.txs.iter().enumerate() {
-                    let vacio = Vec::new();
-                    let t = bl.testigos.get(i).unwrap_or(&vacio);
-                    wire::tx_a_bytes(&mut b, tx, t);
-                }
+                b.extend_from_slice(&bloque_a_bytes(bl));
             }
         }
         Respuesta::NoDisponible => {}
-        Respuesta::FaltantesCompactas {
-            bloque,
-            transacciones,
-        } => {
-            b.extend_from_slice(bloque.as_bytes());
-            compact_size::escribir(&mut b, transacciones.len() as u64);
-            for (tx, t) in transacciones {
-                wire::tx_a_bytes(&mut b, tx, t);
-            }
-        }
     }
     b
 }
@@ -460,25 +481,14 @@ pub fn respuesta_a_bytes(r: &Respuesta) -> Vec<u8> {
 ///
 /// # Errores
 /// El error de codificación que corresponda. **Nunca entra en pánico** (C-WIRE-05).
-pub fn respuesta_desde_bytes(bytes: &[u8]) -> Result<Respuesta, EncodingError> {
+pub fn respuesta_desde_bytes(bytes: &[u8]) -> Result<Respuesta, ErrorCodec> {
     let (disc, r) = int::leer_u8(bytes)?;
     let (resp, resto) = match disc {
         Respuesta::DISC_ESTADO => {
-            let (genesis, r) = int::leer_32(r)?;
-            let (tip, r) = int::leer_32(r)?;
-            let (altura, r) = int::leer_u32(r)?;
-            let (trabajo, r) = int::leer_32(r)?;
-            (
-                Respuesta::Estado(Estado {
-                    genesis: BlockHash::from_digest(Digest::from_bytes(genesis)),
-                    tip: BlockHash::from_digest(Digest::from_bytes(tip)),
-                    altura,
-                    trabajo,
-                }),
-                r,
-            )
+            let (e, r) = leer_estado(r)?;
+            (Respuesta::Estado(e), r)
         }
-        Respuesta::DISC_CABECERAS => {
+        Respuesta::DISC_CABECERAS_POW => {
             let (n, mut r) = leer_contador(r, limites::MAX_CABECERAS_POR_RESPUESTA)?;
             let mut cs = Vec::with_capacity(n);
             for _ in 0..n {
@@ -486,54 +496,23 @@ pub fn respuesta_desde_bytes(bytes: &[u8]) -> Result<Respuesta, EncodingError> {
                 cs.push(c);
                 r = resto;
             }
-            (Respuesta::Cabeceras(cs), r)
+            (Respuesta::CabecerasPow(cs), r)
         }
         Respuesta::DISC_BLOQUES => {
             let (n, mut r) = leer_contador(r, limites::MAX_BLOQUES_POR_RESPUESTA)?;
             let mut bs = Vec::with_capacity(n);
             for _ in 0..n {
-                let (cabecera, resto) = wire::cabecera_desde_bytes(r)?;
-                let (n_tx, mut resto) = leer_contador(resto, usize::MAX)?;
-                let mut txs = Vec::with_capacity(n_tx.min(4096));
-                let mut testigos = Vec::with_capacity(n_tx.min(4096));
-                for _ in 0..n_tx {
-                    let ((tx, t), r2) = wire::tx_desde_bytes(resto)?;
-                    txs.push(tx);
-                    testigos.push(t);
-                    resto = r2;
-                }
-                bs.push(BloqueRed {
-                    cabecera,
-                    txs,
-                    testigos,
-                });
+                let (bloque, resto) = bloque_desde_bytes_autotag(r)?;
+                bs.push(bloque);
                 r = resto;
             }
             (Respuesta::Bloques(bs), r)
         }
         Respuesta::DISC_NO_DISPONIBLE => (Respuesta::NoDisponible, r),
-        Respuesta::DISC_FALTANTES => {
-            let (bloque, r) = int::leer_32(r)?;
-            let (n, mut r) = compact_size::leer(r)?;
-            let n = acotar_rele(n)?;
-            let mut transacciones = Vec::with_capacity(n);
-            for _ in 0..n {
-                let ((tx, t), resto) = wire::tx_desde_bytes(r)?;
-                transacciones.push((tx, t));
-                r = resto;
-            }
-            (
-                Respuesta::FaltantesCompactas {
-                    bloque: BlockHash::from_digest(Digest::from_bytes(bloque)),
-                    transacciones,
-                },
-                r,
-            )
-        }
         otro => {
-            return Err(EncodingError::LockDesconocido {
+            return Err(ErrorCodec::Codificacion(EncodingError::LockDesconocido {
                 discriminante: otro,
-            });
+            }));
         }
     };
 
@@ -544,40 +523,96 @@ pub fn respuesta_desde_bytes(bytes: &[u8]) -> Result<Respuesta, EncodingError> {
     }
 }
 
+/// Escribe el saludo `Estado` con su longitud exacta.
+fn escribir_estado(b: &mut Vec<u8>, e: &Estado) {
+    b.extend_from_slice(e.hash_genesis.as_bytes());
+    int::escribir_u8(b, red_discriminante(e.red));
+    int::escribir_u8(b, e.fase.discriminante());
+    b.extend_from_slice(e.punta_pow.hash.as_bytes());
+    int::escribir_u32(b, e.punta_pow.altura);
+    b.extend_from_slice(&e.punta_pow.trabajo_acumulado);
+    match e.terminal {
+        Some(h) => {
+            int::escribir_u8(b, 1);
+            b.extend_from_slice(h.as_bytes());
+        }
+        None => int::escribir_u8(b, 0),
+    }
+    compact_size::escribir(b, e.puntas_post.len() as u64);
+    for h in &e.puntas_post {
+        b.extend_from_slice(h.as_bytes());
+    }
+    b.extend_from_slice(&e.blue_work_virtual);
+}
+
+/// Lee un saludo `Estado`.
+fn leer_estado(bytes: &[u8]) -> Result<(Estado, &[u8]), ErrorCodec> {
+    let (genesis, r) = int::leer_32(bytes)?;
+    let (red_b, r) = int::leer_u8(r)?;
+    let red = red_desde_discriminante(red_b).ok_or(ErrorCodec::RedDesconocida {
+        discriminante: red_b,
+    })?;
+    let (fase_b, r) = int::leer_u8(r)?;
+    let fase = Fase::desde_byte(fase_b).ok_or(ErrorCodec::FaseDesconocida {
+        discriminante: fase_b,
+    })?;
+    let (hash_pow, r) = int::leer_32(r)?;
+    let (altura, r) = int::leer_u32(r)?;
+    let (trabajo, r) = int::leer_32(r)?;
+    let (tiene_terminal, r) = int::leer_u8(r)?;
+    let (terminal, r) = match tiene_terminal {
+        0 => (None, r),
+        1 => {
+            let (h, r) = int::leer_32(r)?;
+            (Some(BlockHash::from_digest(Digest::from_bytes(h))), r)
+        }
+        otro => return Err(ErrorCodec::BooleanoNoCanonico { valor: otro }),
+    };
+    let (punta_post, r) = leer_hashes(r, MAX_PUNTAS_POST)?;
+    let (blue_work, r) = int::leer_32(r)?;
+
+    let estado = Estado {
+        hash_genesis: BlockHash::from_digest(Digest::from_bytes(genesis)),
+        red,
+        fase,
+        punta_pow: PuntaPow {
+            hash: BlockHash::from_digest(Digest::from_bytes(hash_pow)),
+            altura,
+            trabajo_acumulado: trabajo,
+        },
+        terminal,
+        puntas_post: punta_post,
+        blue_work_virtual: blue_work,
+    };
+    Ok((estado, r))
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Auxiliares
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Lee un contador y lo acota **antes** de reservar (C-WIRE-04).
-fn leer_contador(bytes: &[u8], max: usize) -> Result<(usize, &[u8]), EncodingError> {
+fn leer_contador(bytes: &[u8], max: usize) -> Result<(usize, &[u8]), ErrorCodec> {
     let (n, r) = compact_size::leer(bytes)?;
     let tope = (max as u64).min(wire::MAX_ELEMENTOS_DECLARADOS);
     if n > tope {
-        return Err(EncodingError::DemasiadosElementos {
+        return Err(ErrorCodec::Codificacion(
+            EncodingError::DemasiadosElementos {
+                declarados: n,
+                maximo: tope,
+            },
+        ));
+    }
+    let n = usize::try_from(n).map_err(|_| {
+        ErrorCodec::Codificacion(EncodingError::DemasiadosElementos {
             declarados: n,
             maximo: tope,
-        });
-    }
-    let n = usize::try_from(n).map_err(|_| EncodingError::DemasiadosElementos {
-        declarados: n,
-        maximo: tope,
+        })
     })?;
     Ok((n, r))
 }
 
-/// Acota un contador del relé por `reserva_acotada` (H-02 §2, punto 4).
-///
-/// La cota del relé vive en `rele_compacto`; aquí solo se traduce su error al de codificación. Así
-/// el camino real —el códec— pasa por la **misma** función que los tests, no por un límite
-/// paralelo que podría divergir.
-fn acotar_rele(n: u64) -> Result<usize, EncodingError> {
-    crate::rele_compacto::reserva_acotada(n).map_err(|_| EncodingError::DemasiadosElementos {
-        declarados: n,
-        maximo: crate::rele_compacto::MAX_TX_ANUNCIO,
-    })
-}
-
-fn leer_hashes(bytes: &[u8], max: usize) -> Result<(Vec<BlockHash>, &[u8]), EncodingError> {
+fn leer_hashes(bytes: &[u8], max: usize) -> Result<(Vec<BlockHash>, &[u8]), ErrorCodec> {
     let (n, mut r) = leer_contador(bytes, max)?;
     let mut v = Vec::with_capacity(n);
     for _ in 0..n {
@@ -596,20 +631,25 @@ fn leer_hashes(bytes: &[u8], max: usize) -> Result<(Vec<BlockHash>, &[u8]), Enco
 )]
 mod tests {
     use super::{
-        MAX_LOCATOR, ModoCodec, ZxCodec, peticion_a_bytes, peticion_desde_bytes, respuesta_a_bytes,
+        ErrorCodec, MAX_LOCATOR, ZxCodec, bloque_a_bytes, bloque_desde_bytes,
+        bloque_desde_bytes_autotag, peticion_a_bytes, peticion_desde_bytes, respuesta_a_bytes,
         respuesta_desde_bytes,
     };
     use crate::limites;
-    use crate::mensaje::{BloqueRed, Estado, Peticion, Respuesta};
+    use crate::mensaje::{
+        BloqueRed, Estado, FamiliaBloque, Fase, MAX_PUNTAS_POST, Peticion, PuntaPow, Respuesta,
+    };
     use crate::presupuesto::Presupuesto;
     use futures::AsyncWriteExt;
     use futures_ringbuf::Endpoint;
     use libp2p::StreamProtocol;
     use libp2p::request_response::Codec;
     use zx_core::amount::Amount;
-    use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot, TxId};
     use zx_core::firma::ClavePublica;
     use zx_core::preimage::block::BlockHeader;
+    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::red::Red;
     use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
 
     fn h(n: u8) -> BlockHash {
@@ -617,12 +657,12 @@ mod tests {
     }
 
     fn proto() -> StreamProtocol {
-        StreamProtocol::new("/zerox/sync/1")
+        StreamProtocol::new("/zx-dev/1")
     }
 
     fn cabecera(n: u8) -> BlockHeader {
         BlockHeader {
-            consensus_branch_id: 0xc478_80ea,
+            consensus_branch_id: 0xa8b4_66a7,
             prev_hash: h(n),
             merkle_root: MerkleRoot::from_digest(Digest::from_bytes([n ^ 0xff; 32])),
             timestamp: 1_788_480_000 + u64::from(n),
@@ -632,51 +672,20 @@ mod tests {
         }
     }
 
-    fn bloque(n: u8) -> BloqueRed {
-        let tx = Tx {
-            version: 1,
-            inputs: vec![TxIn {
-                outpoint: OutPoint {
-                    prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
-                    prev_index: 0,
-                },
-                sequence: 0,
-            }],
-            outputs: vec![TxOut {
-                value: Amount::nuevo(1_000).unwrap(),
-                lock: Lock::PubKey {
-                    pubkey: ClavePublica::desde_bytes([n; 32]),
-                },
-            }],
-            lock_time: 0,
-            expiry_height: 0,
-        };
-        BloqueRed {
-            cabecera: cabecera(n),
-            txs: vec![tx],
-            testigos: vec![vec![vec![0x11; 64]]],
+    fn cabecera_post(n: u8) -> DagBlockHeader {
+        DagBlockHeader {
+            consensus_branch_id: 0xa8b4_66a7,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([n ^ 0x55; 32])),
+            timestamp: 1_788_480_000 + u64::from(n),
+            height: 0,
+            slot: u64::from(n),
+            pot_output: [n; 16],
+            rango_solucion: 1,
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([n ^ 0xaa; 32])),
+            padres: PadresDag::nuevo(h(n), &[]).unwrap(),
+            sello: [n; 64],
         }
-    }
-
-    fn todas_las_peticiones() -> Vec<Peticion> {
-        vec![
-            Peticion::Estado,
-            Peticion::Cabeceras {
-                locator: vec![],
-                hasta: None,
-            },
-            Peticion::Cabeceras {
-                locator: vec![h(1), h(2), h(3)],
-                hasta: Some(h(9)),
-            },
-            Peticion::Bloques {
-                hashes: vec![h(4), h(5)],
-            },
-            Peticion::FaltantesCompactas {
-                bloque: h(6),
-                indices: vec![1, 3, 4],
-            },
-        ]
     }
 
     fn tx_simple(n: u8) -> Tx {
@@ -697,25 +706,66 @@ mod tests {
             }],
             lock_time: 0,
             expiry_height: 0,
+            extension: zx_core::tx::ExtensionTx::Ninguna,
         }
+    }
+
+    fn bloque_pow(n: u8) -> BloqueRed {
+        BloqueRed::Pow {
+            cabecera: cabecera(n),
+            txs: vec![tx_simple(n)],
+            testigos: vec![vec![vec![0x11; 64]]],
+        }
+    }
+
+    fn bloque_post(n: u8) -> BloqueRed {
+        BloqueRed::Post {
+            cabecera: cabecera_post(n),
+            txs: vec![tx_simple(n)],
+            testigos: vec![vec![vec![0x22; 64]]],
+        }
+    }
+
+    fn estado() -> Estado {
+        Estado {
+            hash_genesis: h(0),
+            red: Red::Dev,
+            fase: Fase::Pow,
+            punta_pow: PuntaPow {
+                hash: h(1),
+                altura: 12_345,
+                trabajo_acumulado: [0xab; 32],
+            },
+            terminal: Some(h(9)),
+            puntas_post: vec![h(2), h(3)],
+            blue_work_virtual: [0xcd; 32],
+        }
+    }
+
+    fn todas_las_peticiones() -> Vec<Peticion> {
+        vec![
+            Peticion::Estado,
+            Peticion::CabecerasPow {
+                locator: vec![],
+                parada: None,
+            },
+            Peticion::CabecerasPow {
+                locator: vec![h(1), h(2), h(3)],
+                parada: Some(h(9)),
+            },
+            Peticion::Bloques {
+                hashes: vec![h(4), h(5)],
+            },
+        ]
     }
 
     fn todas_las_respuestas() -> Vec<Respuesta> {
         vec![
-            Respuesta::Estado(Estado {
-                genesis: h(0),
-                tip: h(1),
-                altura: 12_345,
-                trabajo: [0xab; 32],
-            }),
-            Respuesta::Cabeceras(vec![]),
-            Respuesta::Cabeceras((0..5).map(cabecera).collect()),
+            Respuesta::Estado(estado()),
+            Respuesta::CabecerasPow(vec![]),
+            Respuesta::CabecerasPow((0..5).map(cabecera).collect()),
             Respuesta::Bloques(vec![]),
-            Respuesta::Bloques((0..3).map(bloque).collect()),
-            Respuesta::FaltantesCompactas {
-                bloque: h(6),
-                transacciones: vec![(tx_simple(2), vec![vec![0x22; 64]])],
-            },
+            Respuesta::Bloques(vec![bloque_pow(1), bloque_post(2)]),
             Respuesta::NoDisponible,
         ]
     }
@@ -738,8 +788,21 @@ mod tests {
         }
     }
 
-    /// **La ida y vuelta por un stream real**, con el patrón de `request-response/src/cbor.rs`:
-    /// un par de extremos en memoria, sin `Swarm`, sin transporte, sin negociación de protocolo.
+    /// Cada bloque da la vuelta por su familia declarada y por autotag.
+    #[test]
+    fn los_bloques_dan_la_vuelta_por_familia() {
+        for b in [bloque_pow(1), bloque_post(2)] {
+            let bytes = bloque_a_bytes(&b);
+            let (leido, resto) = bloque_desde_bytes(&bytes, b.familia()).unwrap();
+            assert_eq!(leido, b);
+            assert!(resto.is_empty());
+            let (leido2, resto2) = bloque_desde_bytes_autotag(&bytes).unwrap();
+            assert_eq!(leido2, b);
+            assert!(resto2.is_empty());
+        }
+    }
+
+    /// **La ida y vuelta por un stream real**, con el patrón de `request-response/src/cbor.rs`.
     #[tokio::test]
     async fn el_codec_da_la_vuelta_por_un_stream() {
         for p in todas_las_peticiones() {
@@ -757,7 +820,7 @@ mod tests {
         }
 
         for r in todas_las_respuestas() {
-            let (mut a, mut b) = Endpoint::pair(65_536, 65_536);
+            let (mut a, mut b) = Endpoint::pair(4 * 1024 * 1024, 4 * 1024 * 1024);
             let mut codec = ZxCodec::default();
 
             codec
@@ -771,300 +834,65 @@ mod tests {
         }
     }
 
-    // ── Perfil dev: solo el saludo `Estado` ──────────────────────────────────
+    // ── Familia declarada (F-04) ─────────────────────────────────────────────
 
-    /// Peticiones que el perfil `dag-dev` **MUST** rechazar.
-    fn peticiones_lineales() -> Vec<Peticion> {
-        vec![
-            Peticion::Cabeceras {
-                locator: vec![h(1), h(2)],
-                hasta: Some(h(3)),
-            },
-            Peticion::Bloques { hashes: vec![h(4)] },
-            Peticion::FaltantesCompactas {
-                bloque: h(5),
-                indices: vec![1, 2],
-            },
-        ]
-    }
-
-    /// Respuestas que el perfil `dag-dev` **MUST** rechazar.
-    fn respuestas_lineales() -> Vec<Respuesta> {
-        vec![
-            Respuesta::Cabeceras((0..3).map(cabecera).collect()),
-            Respuesta::Bloques(vec![bloque(1)]),
-            Respuesta::FaltantesCompactas {
-                bloque: h(6),
-                transacciones: vec![(tx_simple(2), vec![vec![0x22; 64]])],
-            },
-            Respuesta::NoDisponible,
-        ]
-    }
-
-    /// **`dag-dev`: `Estado` ida y vuelta por un stream real.**
-    #[tokio::test]
-    async fn en_dev_el_saludo_estado_da_la_vuelta() {
-        assert!(matches!(
-            ZxCodec::solo_estado(Presupuesto::default()).modo,
-            ModoCodec::SoloEstado
-        ));
-
-        let (mut a, mut b) = Endpoint::pair(4096, 4096);
-        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
-        codec
-            .write_request(&proto(), &mut a, Peticion::Estado)
-            .await
-            .expect("el saludo MUST poder escribirse");
-        a.close().await.unwrap();
-        assert_eq!(
-            codec.read_request(&proto(), &mut b).await.unwrap(),
-            Peticion::Estado
+    /// **Familia cambiada: se rechaza con su error, sin adivinar por longitud.**
+    #[test]
+    fn una_familia_cambiada_se_rechaza() {
+        let bytes_pow = bloque_a_bytes(&bloque_pow(1));
+        let e = bloque_desde_bytes(&bytes_pow, FamiliaBloque::Post).unwrap_err();
+        assert!(
+            matches!(
+                e,
+                ErrorCodec::FamiliaInesperada {
+                    esperada: FamiliaBloque::Post,
+                    encontrada: FamiliaBloque::Pow
+                }
+            ),
+            "{e}"
         );
 
-        let estado = Respuesta::Estado(Estado {
-            genesis: h(0),
-            tip: h(1),
-            altura: 7,
-            trabajo: [0xcd; 32],
-        });
-        let (mut a, mut b) = Endpoint::pair(4096, 4096);
-        codec
-            .write_response(&proto(), &mut a, estado.clone())
-            .await
-            .expect("el saludo MUST poder escribirse");
-        a.close().await.unwrap();
-        assert_eq!(codec.read_response(&proto(), &mut b).await.unwrap(), estado);
+        let bytes_post = bloque_a_bytes(&bloque_post(2));
+        let e = bloque_desde_bytes(&bytes_post, FamiliaBloque::Pow).unwrap_err();
+        assert!(
+            matches!(
+                e,
+                ErrorCodec::FamiliaInesperada {
+                    esperada: FamiliaBloque::Pow,
+                    encontrada: FamiliaBloque::Post
+                }
+            ),
+            "{e}"
+        );
     }
 
-    /// **El saludo dev reserva su tamaño exacto, no el máximo lineal.**
-    ///
-    /// La reserva de C-NET-21 ocurre **antes** de leer, así que usar `MAX_RESPUESTA_BYTES` en dev
-    /// dejaba que cada saludo retuviera temporalmente la cuota de una respuesta lineal de ~25,6 MB y
-    /// que un peer lento la conservara. Con el límite exacto (`1` en la petición, `101` en la
-    /// respuesta) un presupuesto de `102` basta: `101` del cuerpo máximo + `1` del `max + 1` que
-    /// pide `leer_acotado` para distinguir exceso de tamaño.
-    #[tokio::test]
-    async fn en_dev_el_saludo_reserva_su_tamano_exacto() {
-        let estado = Respuesta::Estado(Estado {
-            genesis: h(0),
-            tip: h(1),
-            altura: 7,
-            trabajo: [0xcd; 32],
-        });
-
-        // `Estado` = `101` bytes; `leer_acotado` reserva `max + 1` = `102`.
-        let p = Presupuesto::nuevo(102);
-        let mut codec = ZxCodec::solo_estado(p.clone());
-        let (mut a, mut b) = Endpoint::pair(4096, 4096);
-        codec
-            .write_response(&proto(), &mut a, estado.clone())
-            .await
-            .unwrap();
-        a.close().await.unwrap();
-        assert_eq!(codec.read_response(&proto(), &mut b).await.unwrap(), estado);
-        assert_eq!(p.en_vuelo(), 0, "la reserva del saludo se libera");
-
-        // El mismo presupuesto NO alcanza para el códec completo: su reserva normal es
-        // `MAX_RESPUESTA_BYTES + 1`, muy por encima de `102`.
-        let p = Presupuesto::nuevo(102);
-        let mut completo = ZxCodec::con_presupuesto(p.clone());
-        let (mut a, mut b) = Endpoint::pair(4096, 4096);
-        completo
-            .write_response(&proto(), &mut a, estado)
-            .await
-            .unwrap();
-        a.close().await.unwrap();
-        let e = completo
-            .read_response(&proto(), &mut b)
-            .await
-            .expect_err("el códec completo MUST rechazarse con un presupuesto de saludo");
-        assert_eq!(e.kind(), std::io::ErrorKind::OutOfMemory);
-        assert!(e.to_string().contains("C-NET-21"), "{e}");
-        assert_eq!(p.en_vuelo(), 0, "el rechazo no deja reserva");
-    }
-
-    /// **Un `Estado` dev con un byte de más no se acepta.**
-    ///
-    /// El límite del formato (`101` B en la respuesta, `1` B en la petición) se comprueba antes de
-    /// parsear, así que un byte añadido se rechaza como tamaño excesivo —o como relleno— y **nunca**
-    /// se devuelve un mensaje.
-    #[tokio::test]
-    async fn en_dev_un_estado_con_un_byte_de_mas_se_rechaza() {
-        let estado = Respuesta::Estado(Estado {
-            genesis: h(0),
-            tip: h(1),
-            altura: 7,
-            trabajo: [0xcd; 32],
-        });
-        let mut bytes = respuesta_a_bytes(&estado);
-        bytes.push(0x00);
-        let (mut a, mut b) = Endpoint::pair(4096, 4096);
-        a.write_all(&bytes).await.unwrap();
-        a.close().await.unwrap();
-        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
-        let e = codec
-            .read_response(&proto(), &mut b)
-            .await
-            .expect_err("un `Estado` con relleno MUST rechazarse");
-        assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{e}");
-
-        // Lo mismo en la petición: `Estado` ocupa `1` byte, así que `2` ya exceden.
-        let mut bytes = peticion_a_bytes(&Peticion::Estado);
-        bytes.push(0x00);
-        let (mut a, mut b) = Endpoint::pair(4096, 4096);
-        a.write_all(&bytes).await.unwrap();
-        a.close().await.unwrap();
-        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
-        let e = codec
-            .read_request(&proto(), &mut b)
-            .await
-            .expect_err("una petición `Estado` con relleno MUST rechazarse");
-        assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{e}");
-    }
-
-    /// **`dag-dev` · al escribir se rechaza antes de serializar.** Cada variante lineal devuelve
-    /// `InvalidInput` y **nunca** un `Ok` con datos omitidos.
-    #[tokio::test]
-    async fn en_dev_las_peticiones_lineales_se_rechazan_al_escribir() {
-        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
-        for p in peticiones_lineales() {
-            let (mut a, _b) = Endpoint::pair(4096, 4096);
-            let e = codec
-                .write_request(&proto(), &mut a, p.clone())
-                .await
-                .expect_err("una petición lineal MUST rechazarse");
-            assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput, "{p:?}");
-        }
-    }
-
-    /// **`dag-dev` · al escribir se rechaza antes de serializar.** También las respuestas, incluido
-    /// `NoDisponible`, que no aporta nada en un perfil que solo habla el saludo.
-    #[tokio::test]
-    async fn en_dev_las_respuestas_lineales_se_rechazan_al_escribir() {
-        let mut codec = ZxCodec::solo_estado(Presupuesto::default());
-        for r in respuestas_lineales() {
-            let (mut a, _b) = Endpoint::pair(65_536, 65_536);
-            let e = codec
-                .write_response(&proto(), &mut a, r.clone())
-                .await
-                .expect_err("una respuesta lineal MUST rechazarse");
-            assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput, "{r:?}");
-        }
-    }
-
-    /// **`dag-dev` · al leer se rechaza por tamaño o por discriminante, sin parsear el cuerpo
-    /// lineal.** Con el límite exacto (`1` B) una variante lineal excede el máximo y la corta
-    /// `leer_acotado` como `InvalidData` antes del parser; un único byte con discriminante lineal lo
-    /// rechaza `peticion_solo_estado`. En ningún caso se acepta.
-    #[tokio::test]
-    async fn en_dev_los_bytes_de_peticiones_lineales_se_rechazan_al_leer() {
-        for p in peticiones_lineales() {
-            let (mut a, mut b) = Endpoint::pair(4096, 4096);
-            let bytes = peticion_a_bytes(&p);
-            futures::AsyncWriteExt::write_all(&mut a, &bytes)
-                .await
-                .unwrap();
-            a.close().await.unwrap();
-
-            let mut codec = ZxCodec::solo_estado(Presupuesto::default());
-            let e = codec
-                .read_request(&proto(), &mut b)
-                .await
-                .expect_err("bytes lineales MUST rechazarse en lectura");
-            assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{p:?}");
-            assert!(
-                !matches!(e.kind(), std::io::ErrorKind::OutOfMemory),
-                "no es un fallo de presupuesto"
-            );
-        }
-    }
-
-    /// **`dag-dev` · respuestas lineales rechazadas al leer.** `Cabeceras`, `Bloques` y
-    /// `FaltantesCompactas` exceden los `101` B del saludo y se cortan por tamaño; `NoDisponible`,
-    /// que ocupa un único byte, se rechaza por discriminante. Ninguna se acepta.
-    #[tokio::test]
-    async fn en_dev_los_bytes_de_respuestas_lineales_se_rechazan_al_leer() {
-        for r in respuestas_lineales() {
-            let (mut a, mut b) = Endpoint::pair(65_536, 65_536);
-            let bytes = respuesta_a_bytes(&r);
-            futures::AsyncWriteExt::write_all(&mut a, &bytes)
-                .await
-                .unwrap();
-            a.close().await.unwrap();
-
-            let mut codec = ZxCodec::solo_estado(Presupuesto::default());
-            let e = codec
-                .read_response(&proto(), &mut b)
-                .await
-                .expect_err("bytes lineales MUST rechazarse en lectura");
-            assert_eq!(e.kind(), std::io::ErrorKind::InvalidData, "{r:?}");
-        }
-    }
-
-    /// **`dag-dev` no debilita mainnet/testnet.** El códec público sigue admitiendo todas las
-    /// variantes lineales, tanto los helpers libres como el camino real del stream.
-    #[tokio::test]
-    async fn el_codec_publico_sigue_admitiendo_las_variantes_lineales() {
-        for p in peticiones_lineales() {
-            let (mut a, mut b) = Endpoint::pair(4096, 4096);
-            let mut codec = ZxCodec::con_presupuesto(Presupuesto::default());
-            assert!(matches!(codec.modo, ModoCodec::Completo));
-            codec
-                .write_request(&proto(), &mut a, p.clone())
-                .await
-                .unwrap();
-            a.close().await.unwrap();
-            assert_eq!(codec.read_request(&proto(), &mut b).await.unwrap(), p);
-        }
-        for r in respuestas_lineales() {
-            let (mut a, mut b) = Endpoint::pair(65_536, 65_536);
-            let mut codec = ZxCodec::default();
-            codec
-                .write_response(&proto(), &mut a, r.clone())
-                .await
-                .unwrap();
-            a.close().await.unwrap();
-            assert_eq!(codec.read_response(&proto(), &mut b).await.unwrap(), r);
-        }
-    }
-
-    /// **El `magic` no está en el wire.** El saludo `Estado` serializado es idéntico con cualquier
-    /// perfil y no empieza por el prefijo mágico. Es la constatación que gobierna E1: un `magic`
-    /// distinto **no** aísla el tráfico; separar exige otra barrera (protocolos y temas propios, y
-    /// en el futuro el cotejo del saludo de génesis).
+    /// Un byte de familia desconocido se rechaza, no se interpreta como PoW.
     #[test]
-    fn el_magic_no_es_una_barrera_del_wire() {
-        let dev = crate::config::ParametrosRed::dag_dev().magic();
-        let peticion = peticion_a_bytes(&Peticion::Estado);
-        assert_eq!(peticion, vec![Peticion::DISC_ESTADO]);
-        assert_ne!(peticion.get(..4), Some(dev.as_slice()));
-
-        let respuesta = respuesta_a_bytes(&Respuesta::Estado(Estado {
-            genesis: h(0),
-            tip: h(1),
-            altura: 1,
-            trabajo: [0; 32],
-        }));
-        assert_eq!(respuesta.first().copied(), Some(Respuesta::DISC_ESTADO));
-        assert_ne!(respuesta.get(..4), Some(dev.as_slice()));
+    fn una_familia_desconocida_se_rechaza() {
+        let mut bytes = bloque_a_bytes(&bloque_pow(1));
+        if let Some(primero) = bytes.first_mut() {
+            *primero = 0x7f;
+        }
+        let e = bloque_desde_bytes_autotag(&bytes).unwrap_err();
+        assert!(
+            matches!(
+                e,
+                ErrorCodec::FamiliaDesconocida {
+                    discriminante: 0x7f
+                }
+            ),
+            "{e}"
+        );
     }
 
-    // ── Límites de tamaño ────────────────────────────────────────────────────
+    // ── Límites de tamaño y contadores ───────────────────────────────────────
 
     /// **El matiz que casi se cuela: `.take(N)` trunca en silencio.**
-    ///
-    /// Se manda una petición **más grande que el límite**. Con `take(max)` a secas, el lector
-    /// habría leído `max` bytes, el parseo habría fallado con "datos corruptos", y el peer se
-    /// habría clasificado como `Ilegible` —"habla otro dialecto"— en vez de `Excedido` —"mandó algo
-    /// que no debía"—. Son motivos distintos con políticas distintas (C-NET-05).
-    ///
-    /// Aquí se lee `max + 1` y se comprueba el tope, así que el error dice lo que es.
     #[tokio::test]
     async fn una_peticion_demasiado_grande_se_rechaza_por_tamano_y_no_por_parseo() {
         let exceso = (limites::MAX_PETICION_BYTES + 1_000) as usize;
         let (mut a, mut b) = Endpoint::pair(exceso + 4096, exceso + 4096);
 
-        // Bytes crudos, sin pasar por el escritor: simula a un peer que ignora el límite.
         let basura = vec![Peticion::DISC_ESTADO; exceso];
         a.write_all(&basura).await.unwrap();
         a.close().await.unwrap();
@@ -1080,14 +908,18 @@ mod tests {
         );
     }
 
+    /// Un bloque por encima del máximo se rechaza con su error, antes de parsear.
+    #[test]
+    fn un_bloque_demasiado_grande_se_rechaza() {
+        let max = limites::MAX_BLOQUE_RED_BYTES + super::SOBRE_CODEC_BLOQUE;
+        let basura = vec![FamiliaBloque::DISC_POW; (max + 1) as usize];
+        let e = bloque_desde_bytes(&basura, FamiliaBloque::Pow).unwrap_err();
+        assert!(matches!(e, ErrorCodec::BloqueDemasiadoGrande { .. }), "{e}");
+    }
+
     /// **C-NET-21 · sin presupuesto, no se lee.**
-    ///
-    /// Es la defensa que el `.take(MAX)` por petición no da: aquel acota **una** lectura, este
-    /// acota la **suma**. Sin él, `25,6 MB × 8 streams × 72 peers` son 14,7 GB reservables por
-    /// peticiones que un atacante emite gratis.
     #[tokio::test]
     async fn sin_presupuesto_la_lectura_se_rechaza() {
-        // Un presupuesto ridículo: no cabe ni una petición.
         let p = Presupuesto::nuevo(10);
         let mut codec = ZxCodec::con_presupuesto(p.clone());
 
@@ -1104,15 +936,10 @@ mod tests {
             .expect_err("MUST rechazarse por presupuesto");
         assert_eq!(e.kind(), std::io::ErrorKind::OutOfMemory);
         assert!(e.to_string().contains("C-NET-21"), "{e}");
-
-        // Y la reserva se devolvió: el rechazo no deja el contador tocado.
         assert_eq!(p.en_vuelo(), 0);
     }
 
     /// **La reserva se devuelve tras una lectura correcta.**
-    ///
-    /// Sin esto, el presupuesto se agotaría solo con tráfico legítimo — un DoS diferido que se
-    /// dispara sin que esté pasando nada.
     #[tokio::test]
     async fn una_lectura_correcta_devuelve_su_reserva() {
         let p = Presupuesto::nuevo(crate::presupuesto::PRESUPUESTO_BYTES);
@@ -1131,89 +958,103 @@ mod tests {
     }
 
     /// **El contador mentiroso, el ataque más barato.**
-    ///
-    /// El emisor declara millones de hashes en el locator y manda cuatro bytes. Sin la cota, el
-    /// lector reserva por lo declarado antes de descubrir que no hay cuerpo. Es el patrón que
-    /// lighthouse prueba mintiendo en el prefijo en vez de construir el payload real — así el test
-    /// es instantáneo y no estresa el CI.
     #[test]
     fn un_locator_mentiroso_se_rechaza_sin_reservar() {
         use zx_core::encoding::compact_size;
         for declarados in [MAX_LOCATOR as u64 + 1, u32::MAX as u64, u64::MAX] {
-            let mut b = vec![Peticion::DISC_CABECERAS];
+            let mut b = vec![Peticion::DISC_CABECERAS_POW];
             compact_size::escribir(&mut b, declarados);
-            // …y nada más.
             let e = peticion_desde_bytes(&b).expect_err("MUST rechazarse");
             assert!(
-                matches!(e, zx_core::error::EncodingError::DemasiadosElementos { .. }),
-                "declarar {declarados} hashes debe fallar por la cota, no por falta de bytes: {e}"
+                matches!(
+                    e,
+                    ErrorCodec::Codificacion(
+                        zx_core::error::EncodingError::DemasiadosElementos { .. }
+                    )
+                ),
+                "declarar {declarados} hashes debe fallar por la cota: {e}"
             );
         }
     }
 
-    /// Lo mismo en la respuesta: cabeceras y bloques declarados de más.
+    /// Una petición de bloques con más hashes que el límite se rechaza.
+    #[test]
+    fn una_peticion_con_demasiados_hashes_se_rechaza() {
+        use zx_core::encoding::compact_size;
+        let mut b = vec![Peticion::DISC_BLOQUES];
+        compact_size::escribir(&mut b, (limites::MAX_HASHES_POR_PETICION + 1) as u64);
+        let e = peticion_desde_bytes(&b).expect_err("MUST rechazarse");
+        assert!(
+            matches!(
+                e,
+                ErrorCodec::Codificacion(zx_core::error::EncodingError::DemasiadosElementos { .. })
+            ),
+            "{e}"
+        );
+    }
+
+    /// Un saludo con demasiadas puntas PoST se rechaza.
+    #[test]
+    fn un_estado_con_demasiadas_puntas_post_se_rechaza() {
+        use zx_core::encoding::compact_size;
+        let mut b = vec![Respuesta::DISC_ESTADO];
+        b.extend_from_slice(&[0u8; 32]); // genesis
+        b.push(0x02); // red Dev
+        b.push(0x00); // fase Pow
+        b.extend_from_slice(&[0u8; 32]); // punta pow hash
+        b.extend_from_slice(&[0u8; 4]); // altura
+        b.extend_from_slice(&[0u8; 32]); // trabajo
+        b.push(0x00); // sin terminal
+        compact_size::escribir(&mut b, (MAX_PUNTAS_POST + 1) as u64);
+        let e = respuesta_desde_bytes(&b).expect_err("MUST rechazarse");
+        assert!(
+            matches!(
+                e,
+                ErrorCodec::Codificacion(zx_core::error::EncodingError::DemasiadosElementos { .. })
+            ),
+            "{e}"
+        );
+    }
+
+    /// Una respuesta con contador mentiroso se rechaza.
     #[test]
     fn una_respuesta_con_contador_mentiroso_se_rechaza() {
         use zx_core::encoding::compact_size;
-        for disc in [Respuesta::DISC_CABECERAS, Respuesta::DISC_BLOQUES] {
+        for disc in [Respuesta::DISC_CABECERAS_POW, Respuesta::DISC_BLOQUES] {
             let mut b = vec![disc];
             compact_size::escribir(&mut b, u64::MAX);
             assert!(
                 matches!(
                     respuesta_desde_bytes(&b),
-                    Err(zx_core::error::EncodingError::DemasiadosElementos { .. })
+                    Err(ErrorCodec::Codificacion(
+                        zx_core::error::EncodingError::DemasiadosElementos { .. }
+                    ))
                 ),
                 "disc {disc:#04x}"
             );
         }
     }
 
-    /// **H-02.** Un contador del relé mentiroso se rechaza en el **códec real**, que pasa por
-    /// `reserva_acotada`.
+    /// **CompactSize no mínimo.** El mismo valor con un prefijo más largo se rechaza.
     #[test]
-    fn un_rele_con_contador_mentiroso_se_rechaza() {
-        use zx_core::encoding::compact_size;
-        let mut p = vec![Peticion::DISC_FALTANTES];
-        p.extend_from_slice(&[0u8; 32]);
-        compact_size::escribir(&mut p, u64::MAX);
-        assert!(matches!(
-            peticion_desde_bytes(&p),
-            Err(zx_core::error::EncodingError::DemasiadosElementos { .. })
-        ));
-
-        let mut r = vec![Respuesta::DISC_FALTANTES];
-        r.extend_from_slice(&[0u8; 32]);
-        compact_size::escribir(&mut r, u64::MAX);
-        assert!(matches!(
-            respuesta_desde_bytes(&r),
-            Err(zx_core::error::EncodingError::DemasiadosElementos { .. })
-        ));
-    }
-
-    /// Un lote lleno de cabeceras **sí** cabe: la cota no debe rechazar lo legítimo.
-    #[test]
-    fn un_lote_lleno_de_cabeceras_pasa_la_cota() {
-        let cs: Vec<_> = (0..limites::MAX_CABECERAS_POR_RESPUESTA)
-            .map(|i| cabecera((i % 256) as u8))
-            .collect();
-        let r = Respuesta::Cabeceras(cs);
-        let b = respuesta_a_bytes(&r);
-
+    fn un_contador_no_minimo_se_rechaza() {
+        // `CompactSize` de 5 con el prefijo de 2 bytes (0xfd) no es mínimo.
+        let mut b = vec![Peticion::DISC_BLOQUES];
+        b.push(0xfd);
+        b.extend_from_slice(&5u16.to_le_bytes());
+        let e = peticion_desde_bytes(&b).expect_err("MUST rechazarse");
         assert!(
-            b.len() as u64 <= limites::MAX_RESPUESTA_BYTES,
-            "{} B no caben en {} B",
-            b.len(),
-            limites::MAX_RESPUESTA_BYTES
+            matches!(
+                e,
+                ErrorCodec::Codificacion(zx_core::error::EncodingError::CompactSizeNoMinimo { .. })
+            ),
+            "{e}"
         );
-        assert_eq!(respuesta_desde_bytes(&b).unwrap(), r);
     }
-
-    // ── Robustez ─────────────────────────────────────────────────────────────
 
     /// **C-WIRE-05.** Ningún byte arbitrario hace entrar en pánico a los lectores.
     #[test]
     fn ningun_byte_arbitrario_hace_entrar_en_panico() {
-        // Determinista: un generador congruencial simple, para que un fallo sea reproducible.
         let mut x: u64 = 0x2545_F491_4F6C_DD1D;
         for _ in 0..2_000 {
             let mut buf = Vec::new();
@@ -1223,6 +1064,9 @@ mod tests {
             }
             let _ = peticion_desde_bytes(&buf);
             let _ = respuesta_desde_bytes(&buf);
+            let _ = bloque_desde_bytes_autotag(&buf);
+            let _ = bloque_desde_bytes(&buf, FamiliaBloque::Pow);
+            let _ = bloque_desde_bytes(&buf, FamiliaBloque::Post);
             x = x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
         }
     }
@@ -1239,10 +1083,18 @@ mod tests {
                 );
             }
         }
+        for b in [bloque_pow(1), bloque_post(2)] {
+            let bytes = bloque_a_bytes(&b);
+            for n in 0..bytes.len() {
+                assert!(
+                    bloque_desde_bytes(bytes.get(..n).unwrap(), b.familia()).is_err(),
+                    "bloque truncado a {n} bytes NO debe aceptarse"
+                );
+            }
+        }
     }
 
-    /// **Nada de relleno.** Un byte de más invalida, por el mismo razonamiento que C-TX-06c: sin
-    /// esta comprobación la basura sobrante viaja gratis.
+    /// **Nada de relleno.** Un byte de más invalida.
     #[test]
     fn el_relleno_sobrante_se_rechaza() {
         for p in todas_las_peticiones() {
@@ -1260,11 +1112,15 @@ mod tests {
     /// Un discriminante desconocido se rechaza, nunca se interpreta como otra cosa.
     #[test]
     fn un_discriminante_desconocido_se_rechaza() {
-        for disc in [0x04u8, 0x7f, 0x80, 0xff] {
+        // En la petición, 0x03 ya no es válido (solo 0x00..=0x02).
+        for disc in [0x03u8, 0x7f, 0x80, 0xff] {
             assert!(
                 peticion_desde_bytes(&[disc]).is_err(),
                 "petición {disc:#04x}"
             );
+        }
+        // En la respuesta, 0x03 es `NoDisponible`; el primero desconocido es 0x04.
+        for disc in [0x04u8, 0x7f, 0x80, 0xff] {
             assert!(
                 respuesta_desde_bytes(&[disc]).is_err(),
                 "respuesta {disc:#04x}"
@@ -1272,16 +1128,13 @@ mod tests {
         }
     }
 
-    /// El booleano de `hasta` **MUST** ser 0 o 1: nada de "cualquier cosa distinta de cero".
-    ///
-    /// Sin esto habría dos codificaciones del mismo mensaje, y dos codificaciones del mismo mensaje
-    /// son maleabilidad — el mismo razonamiento que C-ENC-05 para `CompactSize`.
+    /// El booleano de `parada` **MUST** ser 0 o 1.
     #[test]
-    fn el_booleano_de_hasta_debe_ser_canonico() {
+    fn el_booleano_de_parada_debe_ser_canonico() {
         use zx_core::encoding::compact_size;
         for valor in [2u8, 3, 0x7f, 0xff] {
-            let mut b = vec![Peticion::DISC_CABECERAS];
-            compact_size::escribir(&mut b, 0); // locator vacío
+            let mut b = vec![Peticion::DISC_CABECERAS_POW];
+            compact_size::escribir(&mut b, 0);
             b.push(valor);
             b.extend_from_slice(&[0u8; 32]);
             assert!(
@@ -1289,5 +1142,57 @@ mod tests {
                 "un booleano de {valor:#04x} MUST rechazarse"
             );
         }
+    }
+
+    /// El booleano del terminal del saludo **MUST** ser 0 o 1.
+    #[test]
+    fn el_booleano_del_terminal_debe_ser_canonico() {
+        for valor in [2u8, 0x7f, 0xff] {
+            let mut b = vec![Respuesta::DISC_ESTADO];
+            b.extend_from_slice(&[0u8; 32]);
+            b.push(0x02);
+            b.push(0x00);
+            b.extend_from_slice(&[0u8; 32]);
+            b.extend_from_slice(&[0u8; 4]);
+            b.extend_from_slice(&[0u8; 32]);
+            b.push(valor);
+            b.extend_from_slice(&[0u8; 32]);
+            let e = respuesta_desde_bytes(&b).expect_err("MUST rechazarse");
+            assert!(
+                matches!(e, ErrorCodec::BooleanoNoCanonico { valor: v } if v == valor),
+                "{e}"
+            );
+        }
+    }
+
+    /// El `magic` no está en el wire: el saludo empieza por su discriminante.
+    #[test]
+    fn el_magic_no_es_una_barrera_del_wire() {
+        let dev = crate::config::ParametrosRed::dag_dev().magic();
+        let peticion = peticion_a_bytes(&Peticion::Estado);
+        assert_eq!(peticion, vec![Peticion::DISC_ESTADO]);
+        assert_ne!(peticion.get(..4), Some(dev.as_slice()));
+
+        let respuesta = respuesta_a_bytes(&Respuesta::Estado(estado()));
+        assert_eq!(respuesta.first().copied(), Some(Respuesta::DISC_ESTADO));
+        assert_ne!(respuesta.get(..4), Some(dev.as_slice()));
+    }
+
+    /// Un lote lleno de cabeceras pasa la cota y da la vuelta.
+    #[test]
+    fn un_lote_lleno_de_cabeceras_pasa_la_cota() {
+        let cs: Vec<_> = (0..limites::MAX_CABECERAS_POR_RESPUESTA)
+            .map(|i| cabecera((i % 256) as u8))
+            .collect();
+        let r = Respuesta::CabecerasPow(cs);
+        let b = respuesta_a_bytes(&r);
+
+        assert!(
+            b.len() as u64 <= limites::MAX_RESPUESTA_BYTES,
+            "{} B no caben en {} B",
+            b.len(),
+            limites::MAX_RESPUESTA_BYTES
+        );
+        assert_eq!(respuesta_desde_bytes(&b).unwrap(), r);
     }
 }

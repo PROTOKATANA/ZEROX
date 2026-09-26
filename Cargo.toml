@@ -7,6 +7,7 @@ members = [
     "crates/zx-dag",
     "crates/zx-poas",
     "crates/zx-farmer",
+    "crates/zx-p2p",
 ]
 # El clon fijado `PDF/autonomys-subspace` vive dentro de la copia de trabajo, así que Cargo lo
 # incluiría como miembro automático de este workspace al enlazarlo por `path` y resolvería su
@@ -75,6 +76,17 @@ parity-scale-codec = { version = "=3.7.5", default-features = false, features = 
 
 # --- test ---
 proptest        = "=1.11.0"
+
+# --- red P2P (libp2p) — versiones exactas del `Cargo.lock` de `9681061` ---
+# `libp2p` 0.56 con transporte tokio, request-response y gossipsub; `tokio` como runtime;
+# `async-trait` porque el trait `Codec` de request-response lo exige; `tracing` para los logs del
+# bucle. `futures_ringbuf` solo en dev: par AsyncRead/AsyncWrite en memoria para testear el códec
+# sin levantar un `Swarm` (el patrón de `request-response/src/cbor.rs`).
+libp2p          = "=0.56.0"
+tokio           = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+async-trait     = "=0.1.92"
+tracing         = "=0.1.44"
+futures_ringbuf = "=0.4.0"
 
 # ─────────────────────────────────────────────────────────────────────────
 # Lints: en código de consenso un panic es un vector de DoS.

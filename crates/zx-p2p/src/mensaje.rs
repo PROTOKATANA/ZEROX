@@ -1,60 +1,230 @@
-//! Mensajes del protocolo de sincronización (SPEC §16.1).
+//! Mensajes del protocolo de la red dev híbrida (SPEC §16.1, FORMATO-v0).
 //!
 //! # El saludo va primero, y no es cortesía
 //!
-//! Antes de pedir nada, los dos extremos intercambian un [`Estado`]: dónde está tu punta, cuánto
-//! trabajo llevas, y **de qué génesis vienes**. Es el patrón `Status` de Ethereum
-//! (`consensus-specs`, `p2p-interface.md`), donde la spec lo hace obligatorio:
-//!
-//! > *"The dialing client MUST send a Status request upon connection."*
-//!
-//! Sirve para dos cosas distintas. La primera es decidir **quién pide a quién**: el que va por
-//! detrás sincroniza del que va por delante, y sin el saludo los dos se pedirían cabeceras
-//! mutuamente. La segunda es más importante: el **hash del génesis** detecta que estás hablando
-//! con otra cadena aunque el prefijo mágico haya coincidido. C-NET-01 evita que dos redes se
-//! saluden; esto evita que dos *bifurcaciones* de la misma red pierdan el tiempo.
+//! Antes de pedir nada, los dos extremos intercambian un [`Estado`]: de qué red y génesis vienen,
+//! en qué fase están, dónde tienen la punta PoW y qué puntas PoST conocen. Sirve para dos cosas:
+//! decidir **quién pide a quién**, y detectar que se habla con otra red o con otra bifurcación
+//! aunque el prefijo mágico haya coincidido. Génesis o red distintos ⇒ desconexión.
 //!
 //! # Por qué la petición de cabeceras lleva un *locator* y no una altura
 //!
 //! Pedir "las cabeceras desde la altura 1000" supone que los dos estáis en la misma cadena. Un
-//! **locator** —una lista de hashes conocidos, densa cerca de la punta y espaciada hacia atrás—
-//! no lo supone: el otro extremo busca el primero que reconoce y responde desde ahí. Es lo que
-//! permite descubrir el punto de bifurcación en `O(log n)` peticiones en vez de una búsqueda
-//! lineal, y es el mecanismo de Bitcoin desde el principio.
+//! **locator** —una lista de hashes conocidos, densa cerca de la punta y espaciada hacia atrás— no
+//! lo supone: el otro extremo busca el primero que reconoce y responde desde ahí. Es el mecanismo
+//! de Bitcoin desde el principio.
+//!
+//! # Las dos familias de bloque no se adivinan
+//!
+//! [`BloqueRed`] es un enum con la familia **explícita** en el wire ([`FamiliaBloque`]). El códec
+//! exige la familia declarada por el llamante (F-04): una cabecera PoW mide exactamente 92 B y una
+//! PoST entre 589 y 1 037 B, y **nunca** se intenta deducir cuál es por la longitud de un buffer
+//! ambiguo.
 
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
+use zx_core::preimage::dag::DagBlockHeader;
+use zx_core::red::Red;
 use zx_core::tx::Tx;
 
-/// Un bloque tal y como viaja: cabecera, transacciones y testigos.
+/// Máximo de puntas PoST que caben en un [`Estado`].
 ///
-/// Es una versión **con dueño** de lo que `zx-consensus` valida por referencia. Vive aquí y no allí
-/// porque este crate no depende de consenso (ver el diagrama en `lib.rs`), y sus tres campos son
+/// La cabecera PoST admite hasta 15 padres; 16 puntas cubren ese conjunto con holgura y acotan el
+/// saludo. No es una regla de consenso, es una cota del transporte.
+pub const MAX_PUNTAS_POST: usize = 16;
+
+/// Familia de bloque del híbrido.
+///
+/// El discriminante viaja **explícito** en el wire: es la familia declarada que el códec exige, no
+/// algo que se deduzca de la longitud (F-04). Son consenso de protocolo: no se reordenan.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum FamiliaBloque {
+    /// Cabecera lineal PoW (92 B).
+    Pow,
+    /// Cabecera DAG PoST (589–1 037 B).
+    Post,
+}
+
+impl FamiliaBloque {
+    /// Discriminante de [`FamiliaBloque::Pow`].
+    pub const DISC_POW: u8 = 0x00;
+    /// Discriminante de [`FamiliaBloque::Post`].
+    pub const DISC_POST: u8 = 0x01;
+
+    /// El byte que identifica esta familia en el wire.
+    #[must_use]
+    pub const fn discriminante(self) -> u8 {
+        match self {
+            Self::Pow => Self::DISC_POW,
+            Self::Post => Self::DISC_POST,
+        }
+    }
+
+    /// Interpreta un byte como familia, o `None` si no es ninguna.
+    ///
+    /// Devuelve `Option` en vez de un valor por defecto: un byte desconocido **no** se interpreta
+    /// como PoW "porque es lo primero".
+    #[must_use]
+    pub const fn desde_byte(b: u8) -> Option<Self> {
+        match b {
+            Self::DISC_POW => Some(Self::Pow),
+            Self::DISC_POST => Some(Self::Post),
+            _ => None,
+        }
+    }
+}
+
+/// Un bloque tal y como viaja: cabecera, transacciones y testigos, en su familia.
+///
+/// Es una versión **con dueño** de lo que el nodo valida por referencia. Vive aquí y no en otro
+/// crate porque este crate no depende de consenso (ver el diagrama en `lib.rs`), y sus campos son
 /// tipos de `zx-core`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BloqueRed {
-    /// Cabecera.
-    pub cabecera: BlockHeader,
-    /// Transacciones, la primera de las cuales es la coinbase.
-    pub txs: Vec<Tx>,
-    /// `testigos[i][j]` es el testigo de la entrada `j` de la transacción `i`.
-    pub testigos: Vec<Vec<Vec<u8>>>,
+#[expect(
+    clippy::large_enum_variant,
+    reason = "el enum define las dos familias con la cabecera en línea, como pide la orden; \
+              boxearla añadiría indirección sin cambiar el wire"
+)]
+pub enum BloqueRed {
+    /// Bloque PoW: cabecera lineal y cuerpo.
+    Pow {
+        /// Cabecera lineal (F-01).
+        cabecera: BlockHeader,
+        /// Transacciones, la primera de las cuales es la coinbase PoW.
+        txs: Vec<Tx>,
+        /// `testigos[i][j]` es el testigo de la entrada `j` de la transacción `i`.
+        testigos: Vec<Vec<Vec<u8>>>,
+    },
+    /// Bloque PoST: cabecera DAG y cuerpo.
+    Post {
+        /// Cabecera DAG (F-02).
+        cabecera: DagBlockHeader,
+        /// Transacciones, la primera de las cuales es la coinbase PoST.
+        txs: Vec<Tx>,
+        /// `testigos[i][j]` es el testigo de la entrada `j` de la transacción `i`.
+        testigos: Vec<Vec<Vec<u8>>>,
+    },
+}
+
+impl BloqueRed {
+    /// La familia declarada de este bloque.
+    #[must_use]
+    pub const fn familia(&self) -> FamiliaBloque {
+        match self {
+            Self::Pow { .. } => FamiliaBloque::Pow,
+            Self::Post { .. } => FamiliaBloque::Post,
+        }
+    }
+
+    /// Las transacciones del bloque, sea cual sea la familia.
+    #[must_use]
+    pub fn txs(&self) -> &[Tx] {
+        match self {
+            Self::Pow { txs, .. } | Self::Post { txs, .. } => txs,
+        }
+    }
+
+    /// Las listas de testigos del bloque, sea cual sea la familia.
+    #[must_use]
+    pub fn testigos(&self) -> &[Vec<Vec<u8>>] {
+        match self {
+            Self::Pow { testigos, .. } | Self::Post { testigos, .. } => testigos,
+        }
+    }
+}
+
+/// Fase del híbrido en la que está un nodo.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum Fase {
+    /// Fase PoW (antes del corte).
+    Pow,
+    /// Fase PoST (después del corte).
+    Post,
+}
+
+impl Fase {
+    /// Discriminante de [`Fase::Pow`].
+    pub const DISC_POW: u8 = 0x00;
+    /// Discriminante de [`Fase::Post`].
+    pub const DISC_POST: u8 = 0x01;
+
+    /// El byte que identifica esta fase en el wire.
+    #[must_use]
+    pub const fn discriminante(self) -> u8 {
+        match self {
+            Self::Pow => Self::DISC_POW,
+            Self::Post => Self::DISC_POST,
+        }
+    }
+
+    /// Interpreta un byte como fase, o `None` si no es ninguna.
+    #[must_use]
+    pub const fn desde_byte(b: u8) -> Option<Self> {
+        match b {
+            Self::DISC_POW => Some(Self::Pow),
+            Self::DISC_POST => Some(Self::Post),
+            _ => None,
+        }
+    }
+}
+
+/// La punta PoW declarada en el saludo: hash, altura y trabajo acumulado.
+///
+/// Es la terna `(hash, altura, trabajo_acumulado 32 B BE)` de la orden. El trabajo va en bytes
+/// crudos **big-endian** y no como entero porque el *fork choice* es del nodo y este crate no lo ve:
+/// aquí solo se transporta; quien compare será quien sepa comparar.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct PuntaPow {
+    /// Hash de la punta PoW.
+    pub hash: BlockHash,
+    /// Altura de esa punta.
+    pub altura: u32,
+    /// Trabajo acumulado, en big-endian de 32 bytes.
+    pub trabajo_acumulado: [u8; 32],
 }
 
 /// Lo que un peer dice de sí mismo al saludar.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Estado {
-    /// Hash del génesis. **Distinto ⇒ no hay nada que hablar**, aunque el prefijo mágico cuadrase.
-    pub genesis: BlockHash,
-    /// Hash de su punta.
-    pub tip: BlockHash,
-    /// Altura de su punta.
-    pub altura: u32,
-    /// Trabajo acumulado de su cadena, en big-endian de 32 bytes.
-    ///
-    /// Va en bytes crudos y no como entero porque el fork choice es de `zx-consensus` y este crate
-    /// no lo ve. Aquí solo se transporta; quien compare será quien sepa comparar.
-    pub trabajo: [u8; 32],
+    /// Hash del génesis. **Distinto ⇒ no hay nada que hablar**, aunque la red cuadrase.
+    pub hash_genesis: BlockHash,
+    /// Red de la que se viene. **Distinta ⇒ desconexión.**
+    pub red: Red,
+    /// Fase en la que está el peer.
+    pub fase: Fase,
+    /// Su punta PoW.
+    pub punta_pow: PuntaPow,
+    /// Hash del terminal PoW, si ya se cruzó el corte.
+    pub terminal: Option<BlockHash>,
+    /// Puntas PoST conocidas, como mucho [`MAX_PUNTAS_POST`].
+    pub puntas_post: Vec<BlockHash>,
+    /// `blue_work_virtual`, en big-endian de 32 bytes.
+    pub blue_work_virtual: [u8; 32],
+}
+
+/// El byte de red en el wire.
+///
+/// La orden nombra el campo `red` sin fijar su codificación. Se fija aquí, explícita y **cerrada**:
+/// `Mainnet = 0`, `Testnet = 1`, `Dev = 2`. Un byte fuera de ese conjunto se rechaza en el códec;
+/// no se interpreta como una red por defecto.
+#[must_use]
+pub const fn red_discriminante(red: Red) -> u8 {
+    match red {
+        Red::Mainnet => 0x00,
+        Red::Testnet => 0x01,
+        Red::Dev => 0x02,
+    }
+}
+
+/// Interpreta el byte de red del wire, o `None` si no es una red conocida.
+#[must_use]
+pub const fn red_desde_discriminante(b: u8) -> Option<Red> {
+    match b {
+        0x00 => Some(Red::Mainnet),
+        0x01 => Some(Red::Testnet),
+        0x02 => Some(Red::Dev),
+        _ => None,
+    }
 }
 
 /// Lo que se le pide a un peer.
@@ -62,27 +232,37 @@ pub struct Estado {
 pub enum Peticion {
     /// Saludo. Se manda al conectar, antes que nada.
     Estado,
-    /// Cabeceras a partir del primer hash del locator que el otro reconozca.
-    Cabeceras {
+    /// Cabeceras **PoW** a partir del primer hash del locator que el otro reconozca.
+    CabecerasPow {
         /// Hashes conocidos, **de la punta hacia atrás**, densos al principio y espaciados después.
         locator: Vec<BlockHash>,
         /// Dónde parar. `None` = hasta donde quepa en la respuesta.
-        hasta: Option<BlockHash>,
+        parada: Option<BlockHash>,
     },
-    /// Cuerpos de bloque, por hash. Solo se piden **tras** validar sus cabeceras (C-NET-03).
+    /// Bloques completos (PoW o PoST), por hash. Solo se piden **tras** validar sus cabeceras.
     Bloques {
-        /// Los bloques que faltan.
+        /// Los bloques que faltan, como mucho [`crate::limites::MAX_HASHES_POR_PETICION`].
         hashes: Vec<BlockHash>,
     },
-    /// **Relé compacto.** Las transacciones que faltan de un bloque anunciado, por índice.
-    ///
-    /// El `bloque` correlaciona la petición con el anuncio en curso (H-03 §2.2).
-    FaltantesCompactas {
-        /// Hash de la cabecera anunciada.
-        bloque: BlockHash,
-        /// Índices `u32` estrictamente crecientes y únicos, dentro del número anunciado.
-        indices: Vec<u32>,
-    },
+}
+
+impl Peticion {
+    /// Discriminante de wire. Son consenso de protocolo: no se reordenan.
+    pub const DISC_ESTADO: u8 = 0x00;
+    /// Discriminante de [`Peticion::CabecerasPow`].
+    pub const DISC_CABECERAS_POW: u8 = 0x01;
+    /// Discriminante de [`Peticion::Bloques`].
+    pub const DISC_BLOQUES: u8 = 0x02;
+
+    /// El byte que identifica esta variante.
+    #[must_use]
+    pub const fn discriminante(&self) -> u8 {
+        match self {
+            Self::Estado => Self::DISC_ESTADO,
+            Self::CabecerasPow { .. } => Self::DISC_CABECERAS_POW,
+            Self::Bloques { .. } => Self::DISC_BLOQUES,
+        }
+    }
 }
 
 /// Lo que un peer responde.
@@ -90,96 +270,57 @@ pub enum Peticion {
 pub enum Respuesta {
     /// Respuesta al saludo.
     Estado(Estado),
-    /// Cabeceras consecutivas, de menor a mayor altura.
-    Cabeceras(Vec<BlockHeader>),
+    /// Cabeceras **PoW** consecutivas, de menor a mayor altura.
+    CabecerasPow(Vec<BlockHeader>),
     /// Bloques completos, **en el orden en que se pidieron**.
     Bloques(Vec<BloqueRed>),
-    /// **Relé compacto.** Las transacciones pedidas, en el mismo orden que la petición.
-    FaltantesCompactas {
-        /// Hash de la cabecera a la que pertenecen.
-        bloque: BlockHash,
-        /// Pares `(transacción, testigos)`, en el orden de los índices pedidos.
-        transacciones: Vec<(Tx, Vec<Vec<u8>>)>,
-    },
     /// "No tengo eso." No es un error: un peer honesto puede no tener un bloque que ya podó, o que
     /// pertenece a una rama que él descartó.
     ///
-    /// Distinguirlo de un error de protocolo importa por C-NET-05: esto **no puntúa**.
+    /// Distinguirlo de un error de protocolo importa: esto **no puntúa**.
     NoDisponible,
-}
-
-impl Peticion {
-    /// Discriminante de wire. Son consenso de protocolo: no se reordenan.
-    pub const DISC_ESTADO: u8 = 0x00;
-    /// Discriminante de [`Peticion::Cabeceras`].
-    pub const DISC_CABECERAS: u8 = 0x01;
-    /// Discriminante de [`Peticion::Bloques`].
-    pub const DISC_BLOQUES: u8 = 0x02;
-    /// Discriminante de [`Peticion::FaltantesCompactas`]. **Nuevo; los anteriores no se mueven.**
-    pub const DISC_FALTANTES: u8 = 0x03;
-
-    /// El byte que identifica esta variante.
-    #[must_use]
-    pub const fn discriminante(&self) -> u8 {
-        match self {
-            Self::Estado => Self::DISC_ESTADO,
-            Self::Cabeceras { .. } => Self::DISC_CABECERAS,
-            Self::Bloques { .. } => Self::DISC_BLOQUES,
-            Self::FaltantesCompactas { .. } => Self::DISC_FALTANTES,
-        }
-    }
 }
 
 impl Respuesta {
     /// Discriminante de [`Respuesta::Estado`].
     pub const DISC_ESTADO: u8 = 0x00;
-    /// Discriminante de [`Respuesta::Cabeceras`].
-    pub const DISC_CABECERAS: u8 = 0x01;
+    /// Discriminante de [`Respuesta::CabecerasPow`].
+    pub const DISC_CABECERAS_POW: u8 = 0x01;
     /// Discriminante de [`Respuesta::Bloques`].
     pub const DISC_BLOQUES: u8 = 0x02;
     /// Discriminante de [`Respuesta::NoDisponible`].
     pub const DISC_NO_DISPONIBLE: u8 = 0x03;
-    /// Discriminante de [`Respuesta::FaltantesCompactas`]. **Nuevo; empieza en 0x04 porque 0x03 ya
-    /// estaba tomado por `NoDisponible`, que no se mueve.**
-    pub const DISC_FALTANTES: u8 = 0x04;
 
     /// El byte que identifica esta variante.
     #[must_use]
     pub const fn discriminante(&self) -> u8 {
         match self {
             Self::Estado(_) => Self::DISC_ESTADO,
-            Self::Cabeceras(_) => Self::DISC_CABECERAS,
+            Self::CabecerasPow(_) => Self::DISC_CABECERAS_POW,
             Self::Bloques(_) => Self::DISC_BLOQUES,
-            Self::FaltantesCompactas { .. } => Self::DISC_FALTANTES,
             Self::NoDisponible => Self::DISC_NO_DISPONIBLE,
         }
     }
 
     /// ¿Responde esta respuesta a esa petición?
     ///
-    /// **Comprobarlo no es paranoia.** libp2p correlaciona petición y respuesta por identificador
-    /// de stream, así que un peer no puede colar una respuesta a una petición que no hiciste. Pero
-    /// **sí puede responder con el tipo equivocado**: pides cabeceras y te manda bloques. Sin esta
-    /// comprobación, el código de sincronización tendría que hacer `match` sobre una respuesta que
-    /// no espera, y el camino menos malo de ese `match` acaba siendo ignorarla en silencio.
+    /// libp2p correlaciona petición y respuesta por identificador de stream, así que un peer no
+    /// puede colar una respuesta a una petición que no hiciste. Pero **sí puede responder con el
+    /// tipo equivocado**: pides cabeceras y te manda bloques. Sin esta comprobación, el código de
+    /// sincronización tendría que hacer `match` sobre una respuesta que no espera, y el camino menos
+    /// malo de ese `match` acaba siendo ignorarla en silencio.
     #[must_use]
     pub const fn responde_a(&self, p: &Peticion) -> bool {
         matches!(
             (self, p),
             (Self::Estado(_), Peticion::Estado)
-                | (Self::Cabeceras(_), Peticion::Cabeceras { .. })
+                | (Self::CabecerasPow(_), Peticion::CabecerasPow { .. })
                 | (Self::Bloques(_), Peticion::Bloques { .. })
-                | (
-                    Self::FaltantesCompactas { .. },
-                    Peticion::FaltantesCompactas { .. }
-                )
                 // NoDisponible vale para cualquier petición de datos, pero NO para el saludo:
                 // un peer que no sabe decir quién es no sirve para nada.
                 | (
                     Self::NoDisponible,
-                    Peticion::Cabeceras { .. }
-                        | Peticion::Bloques { .. }
-                        | Peticion::FaltantesCompactas { .. }
+                    Peticion::CabecerasPow { .. } | Peticion::Bloques { .. }
                 )
         )
     }
@@ -187,8 +328,12 @@ impl Respuesta {
 
 #[cfg(test)]
 mod tests {
-    use super::{Estado, Peticion, Respuesta};
+    use super::{
+        Estado, FamiliaBloque, Fase, MAX_PUNTAS_POST, Peticion, PuntaPow, Respuesta,
+        red_desde_discriminante, red_discriminante,
+    };
     use zx_core::digest::{BlockHash, Digest};
+    use zx_core::red::Red;
 
     fn h(n: u8) -> BlockHash {
         BlockHash::from_digest(Digest::from_bytes([n; 32]))
@@ -196,10 +341,17 @@ mod tests {
 
     fn estado() -> Estado {
         Estado {
-            genesis: h(1),
-            tip: h(2),
-            altura: 100,
-            trabajo: [3; 32],
+            hash_genesis: h(1),
+            red: Red::Dev,
+            fase: Fase::Pow,
+            punta_pow: PuntaPow {
+                hash: h(2),
+                altura: 100,
+                trabajo_acumulado: [3; 32],
+            },
+            terminal: None,
+            puntas_post: vec![h(4)],
+            blue_work_virtual: [5; 32],
         }
     }
 
@@ -209,15 +361,11 @@ mod tests {
     fn los_discriminantes_no_colisionan() {
         let peticiones = [
             Peticion::Estado,
-            Peticion::Cabeceras {
+            Peticion::CabecerasPow {
                 locator: vec![],
-                hasta: None,
+                parada: None,
             },
             Peticion::Bloques { hashes: vec![] },
-            Peticion::FaltantesCompactas {
-                bloque: h(0),
-                indices: vec![],
-            },
         ];
         let mut vistos = Vec::new();
         for p in &peticiones {
@@ -227,12 +375,8 @@ mod tests {
 
         let respuestas = [
             Respuesta::Estado(estado()),
-            Respuesta::Cabeceras(vec![]),
+            Respuesta::CabecerasPow(vec![]),
             Respuesta::Bloques(vec![]),
-            Respuesta::FaltantesCompactas {
-                bloque: h(0),
-                transacciones: vec![],
-            },
             Respuesta::NoDisponible,
         ];
         let mut vistos = Vec::new();
@@ -241,67 +385,76 @@ mod tests {
             vistos.push(r.discriminante());
         }
 
-        // Los viejos NO se han movido: son consenso de protocolo.
         assert_eq!(Peticion::Estado.discriminante(), 0x00);
-        assert_eq!(Peticion::DISC_CABECERAS, 0x01);
+        assert_eq!(Peticion::DISC_CABECERAS_POW, 0x01);
         assert_eq!(Peticion::DISC_BLOQUES, 0x02);
         assert_eq!(Respuesta::DISC_ESTADO, 0x00);
-        assert_eq!(Respuesta::DISC_CABECERAS, 0x01);
+        assert_eq!(Respuesta::DISC_CABECERAS_POW, 0x01);
         assert_eq!(Respuesta::DISC_BLOQUES, 0x02);
         assert_eq!(Respuesta::DISC_NO_DISPONIBLE, 0x03);
-        assert_eq!(Peticion::DISC_FALTANTES, 0x03);
-        assert_eq!(Respuesta::DISC_FALTANTES, 0x04);
+    }
+
+    /// Cada familia y cada fase tiene su byte, y no se interpreta un byte desconocido.
+    #[test]
+    fn las_familias_y_fases_tienen_byte_cerrado() {
+        assert_eq!(FamiliaBloque::Pow.discriminante(), 0x00);
+        assert_eq!(FamiliaBloque::Post.discriminante(), 0x01);
+        assert_eq!(FamiliaBloque::desde_byte(0x00), Some(FamiliaBloque::Pow));
+        assert_eq!(FamiliaBloque::desde_byte(0x01), Some(FamiliaBloque::Post));
+        for b in [0x02u8, 0x7f, 0xff] {
+            assert_eq!(FamiliaBloque::desde_byte(b), None, "familia {b:#04x}");
+        }
+
+        assert_eq!(Fase::Pow.discriminante(), 0x00);
+        assert_eq!(Fase::Post.discriminante(), 0x01);
+        assert_eq!(Fase::desde_byte(0x01), Some(Fase::Post));
+        assert_eq!(Fase::desde_byte(0x02), None);
+    }
+
+    /// El byte de red está cerrado: cada `Red` tiene el suyo y ninguno se adivina.
+    #[test]
+    fn el_byte_de_red_es_cerrado() {
+        for red in [Red::Mainnet, Red::Testnet, Red::Dev] {
+            let b = red_discriminante(red);
+            assert_eq!(red_desde_discriminante(b), Some(red), "{red:?}");
+        }
+        assert_eq!(red_desde_discriminante(0x03), None);
+        assert_eq!(red_desde_discriminante(0xff), None);
     }
 
     /// Cada respuesta responde a su petición y **solo** a la suya.
     #[test]
     fn una_respuesta_del_tipo_equivocado_se_detecta() {
-        let cabeceras = Peticion::Cabeceras {
+        let cabeceras = Peticion::CabecerasPow {
             locator: vec![h(1)],
-            hasta: None,
+            parada: None,
         };
         let bloques = Peticion::Bloques { hashes: vec![h(1)] };
-        let faltantes = Peticion::FaltantesCompactas {
-            bloque: h(1),
-            indices: vec![1, 2],
-        };
 
         assert!(Respuesta::Estado(estado()).responde_a(&Peticion::Estado));
-        assert!(Respuesta::Cabeceras(vec![]).responde_a(&cabeceras));
+        assert!(Respuesta::CabecerasPow(vec![]).responde_a(&cabeceras));
         assert!(Respuesta::Bloques(vec![]).responde_a(&bloques));
-        assert!(
-            Respuesta::FaltantesCompactas {
-                bloque: h(1),
-                transacciones: vec![]
-            }
-            .responde_a(&faltantes)
-        );
 
-        // Los cruces, que son lo que de verdad se comprueba aquí.
-        assert!(!Respuesta::Cabeceras(vec![]).responde_a(&bloques));
+        assert!(!Respuesta::CabecerasPow(vec![]).responde_a(&bloques));
         assert!(!Respuesta::Bloques(vec![]).responde_a(&cabeceras));
         assert!(!Respuesta::Estado(estado()).responde_a(&cabeceras));
-        assert!(!Respuesta::Cabeceras(vec![]).responde_a(&Peticion::Estado));
-        assert!(
-            !Respuesta::FaltantesCompactas {
-                bloque: h(1),
-                transacciones: vec![]
-            }
-            .responde_a(&bloques)
-        );
+        assert!(!Respuesta::CabecerasPow(vec![]).responde_a(&Peticion::Estado));
     }
 
     /// `NoDisponible` vale para datos, **nunca** para el saludo.
-    ///
-    /// Un peer que responde "no disponible" a "¿quién eres?" no es un peer con el que se pueda
-    /// hacer nada: no se sabe si va por delante, por detrás, ni si es de esta cadena.
     #[test]
     fn no_disponible_no_vale_como_saludo() {
         assert!(!Respuesta::NoDisponible.responde_a(&Peticion::Estado));
         assert!(Respuesta::NoDisponible.responde_a(&Peticion::Bloques { hashes: vec![] }));
-        assert!(Respuesta::NoDisponible.responde_a(&Peticion::Cabeceras {
+        assert!(Respuesta::NoDisponible.responde_a(&Peticion::CabecerasPow {
             locator: vec![],
-            hasta: None
+            parada: None
         }));
+    }
+
+    /// La cota de puntas PoST es la declarada.
+    #[test]
+    fn la_cota_de_puntas_post_es_dieciseis() {
+        assert_eq!(MAX_PUNTAS_POST, 16);
     }
 }

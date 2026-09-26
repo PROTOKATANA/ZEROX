@@ -1,0 +1,70 @@
+# V4 — Tests antiguos de `zx-p2p` (9681061): portados, adaptados o retirados
+
+Base antigua: `ref/old/` (extraído de `git show 9681061:crates/zx-p2p/**`).
+Estado nuevo: `ws/crates/zx-p2p/`.
+
+## Portados sin cambio
+
+- `src/error.rs` — los 3 tests (`lento_e_ilegible_nunca_puntuan`,
+  `la_violacion_de_consenso_banea_de_un_golpe`, `excedido_puntua_pero_admite_cinco_avisos`):
+  el enum `P2pError`/`MotivoDesconexion` no cambia.
+- `src/limites_ip.rs` — los 7 tests: el módulo se copia **literal** (no toca mensajes).
+- `src/presupuesto.rs` — los 7 tests: el contador agregado se copia literal; solo cambia el test
+  `el_presupuesto_por_defecto_acota_el_peor_caso`, que se recalcula con los límites nuevos
+  (MAX_RESPUESTA_BYTES deriva ahora de MAX_BLOQUE_RED_BYTES).
+- `src/servicio.rs` — la infraestructura del bucle (`EventoRed`, canales, apagado cooperativo) no
+  cambia; se adaptan los tests de despacho.
+
+## Adaptados (mensajes nuevos)
+
+- `src/mensaje.rs` — reescrito: `Estado` gana `red`, `fase`, `punta_pow`, `terminal`,
+  `puntas_post`, `blue_work_virtual`; `BloqueRed` pasa a enum `Pow`/`Post`; `Peticion` cambia
+  `Cabeceras`→`CabecerasPow` y pierde `FaltantesCompactas`; `Respuesta` cambia
+  `Cabeceras`→`CabecerasPow` y pierde `FaltantesCompactas`. Los tests de discriminantes y de
+  `responde_a` se reescriben para las variantes nuevas (mismos invariantes).
+- `src/codec.rs` — reescrito: `peticion_*`/`respuesta_*` con los campos nuevos y
+  `bloque_a_bytes`/`bloque_desde_bytes` con familia declarada. Los tests de ida y vuelta,
+  truncado, relleno, contador mentiroso, booleano canónico, bytes arbitrarios sin pánico y
+  límites de tamaño se conservan; se añaden los de familia cambiada/desconocida, contador no
+  mínimo, exceso de bloque y demasiadas puntas PoST. La prueba `el_magic_no_es_una_barrera_del_wire`
+  sigue, con el perfil dev nuevo.
+- `src/config.rs` — `ParametrosRed` cambia `topic_bloques`/`topic_txs` por
+  `topic_bloques_pow`/`topic_bloques_post`; el perfil dev pasa a `/zx-dev/1` y
+  `/zx-dev/bloques/{pow,post}/1`, con `Red::Dev` de `zx-core`. Tests reescritos para los tres
+  perfiles.
+- `src/behaviour.rs` — la suscripción pasa de dos temas (bloques+txs) a dos temas
+  (bloques PoW + PoST); se retira el `ModoCodec::SoloEstado` del perfil dev (la orden exige
+  sincronización completa en dev). Tests adaptados a los nombres nuevos.
+- `src/entrante.rs` — el trait conserva `estado`, `bloque_difundido`, `tx_difundida`,
+  `cabeceras_desde`, `bloques_por_hash`; se retiran `anuncio_compacto` y `transacciones_compactas`
+  (relé compacto no portado).
+- `tests/dos_nodos.rs` — arnés de dos nodos sobre `MemoryTransport`, adaptado a los mensajes y al
+  perfil dev. Se conservan los tests de conexión, apagado, saludo, cabeceras, `NoDisponible` y la
+  reserva compartida; los de anuncio compacto/tx se sustituyen por anuncio de bloque PoW/PoST y
+  petición de bloques por hash, y se añade la desconexión por génesis ajeno.
+
+## Retirados (con motivo)
+
+- `src/rele_compacto.rs` completo y sus ~25 tests: **el relé compacto no se porta en 0.0.1**
+  (decisión 3 de la orden). El código queda archivado en `ref/old/`.
+- `src/id_corto.rs` completo y sus 9 tests: solo lo usaba el relé compacto (SipHash de
+  identificadores cortos). Sin relé no hay identificadores que acortar.
+- `examples/medir_reconstruccion.rs`: medía la reconstrucción del relé; sin relé no aplica. No se
+  porta ningún `examples/`.
+- `codec::ModoCodec::SoloEstado` y sus 6 tests (`en_dev_*`): el perfil dev pasa a usar el códec
+  completo porque la orden exige petición/respuesta de bloques en la red dev. La restricción era
+  transitoria de la red lineal antigua.
+- `limites::MAX_PEERS_ALTO_ANCHO_BANDA` y su test: era del relé compacto (C-NET-10/BIP 152).
+- `limites::el_limite_de_gossip_se_deriva_de_la_zona_libre_de_consenso`: dependía de
+  `zx-consensus` como *dev-dependency*, prohibida por la orden (W03 modifica ese crate en
+  paralelo). El nuevo límite se deriva de `MAX_BLOQUE_RED_BYTES`.
+- `config::el_limite_de_transporte_sigue_al_crecimiento_del_bloque`: mismo motivo; el crecimiento
+  dinámico `LIMITE(H)` es de consenso y W06c no lo ve.
+- `presupuesto::el_presupuesto_sigue_siendo_256_mib` (nombre antiguo): la comprobación se
+  conserva con las constantes nuevas.
+
+## Recuento
+
+- Tests antiguos de `zx-p2p` (9681061): **130** funciones (incluye auxiliares de fixture).
+- Tests nuevos en `zx-p2p`: **77** de librería + **10** de integración = **87**.
+- La diferencia son los retirados por el relé compacto y el `SoloEstado`, listados arriba.

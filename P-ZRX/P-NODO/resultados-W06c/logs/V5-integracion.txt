@@ -1,0 +1,40 @@
+# V5 — Integración en proceso sobre `MemoryTransport` (zx-p2p/tests/dos_nodos.rs)
+
+Comando: `CARGO_HOME=<zona>/.cargo-home cargo test -p zx-p2p --all-features --locked`
+(captura íntegra en `logs/test-zx-p2p.log`). Transporte **en memoria puro** (`MemoryTransport`,
+noise + yamux), sin TCP ni mDNS; perfil `ParametrosRed::dag_dev()`.
+
+Los 10 tests pasan:
+
+```
+test el_bucle_termina_al_soltar_los_handles ... ok
+test dos_nodos_se_conectan_y_se_ven ... ok
+test un_handle_sin_bucle_devuelve_error_y_no_panic ... ok
+test no_tener_un_bloque_es_una_respuesta_legitima ... ok
+test un_genesis_ajeno_desconecta ... ok
+test el_saludo_recorre_el_camino_completo ... ok
+test pedir_cabeceras_llega_al_manejador_del_otro_lado ... ok
+test un_bloque_pow_viaja_y_llega_al_callback ... ok
+test pedir_bloques_por_hash_devuelve_el_bloque ... ok
+test un_bloque_post_viaja_y_llega_al_callback ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```
+
+Cobertura de los seis puntos de V5:
+
+| Punto de V5 | Test |
+|---|---|
+| saludo | `el_saludo_recorre_el_camino_completo` (A pide `Estado`, B responde con **su** estado) |
+| anuncio PoW recibido por el otro par | `un_bloque_pow_viaja_y_llega_al_callback` (B difunde por `/zx-dev/bloques/pow/1`) |
+| anuncio PoST recibido por el otro par | `un_bloque_post_viaja_y_llega_al_callback` (B difunde por `/zx-dev/bloques/post/1`) |
+| petición de bloques por hash | `pedir_bloques_por_hash_devuelve_el_bloque` (PoW y PoST con su familia) |
+| `NoDisponible` | `no_tener_un_bloque_es_una_respuesta_legitima` |
+| desconexión por génesis ajeno | `un_genesis_ajeno_desconecta` |
+
+**Nota sobre la desconexión por génesis.** La orden dice «Génesis o red distintos ⇒ desconexión».
+La comparación es **decisión del nodo**, no de `zx-p2p`: la orden (decisión 5) prohíbe que este
+crate valide, y el trait `ManejadorEntrante` es la frontera. El test recorre el camino completo:
+A recibe el `Respuesta::Estado` de B, comprueba que el génesis es ajeno, emite
+`ManejoRed::desconectar(_, MotivoDesconexion::ViolacionDeConsenso)` y verifica que B ve
+`PeerDesconectado`. Lo que queda demostrado es el **transporte de la orden de corte**, no una
+política automática dentro de `zx-p2p`.

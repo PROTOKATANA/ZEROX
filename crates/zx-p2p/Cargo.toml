@@ -1,6 +1,6 @@
 [package]
 name         = "zx-p2p"
-description  = "libp2p: transporte, descubrimiento, gossip, sync headers-first"
+description  = "libp2p: transporte, descubrimiento, gossip de bloques híbridos y sync PoW/DAG"
 version.workspace      = true
 edition.workspace      = true
 rust-version.workspace = true
@@ -20,14 +20,10 @@ libp2p       = { workspace = true, features = [
 tokio        = { workspace = true }
 async-trait  = { workspace = true }
 futures      = { workspace = true }
-siphasher    = { workspace = true }
 thiserror    = { workspace = true }
 tracing      = { workspace = true }
 
 [dev-dependencies]
-# SOLO en dev: los tests comprueban que los límites de transporte son coherentes con las
-# constantes de consenso, pero el CÓDIGO de este crate no puede llamar a consenso ni por accidente.
-# Ver el diagrama de dependencias en `lib.rs`.
-zx-consensus   = { path = "../zx-consensus" }
-proptest       = { workspace = true }
+# SOLO en dev: par de extremos AsyncRead/AsyncWrite en memoria para exercitar el codec sin `Swarm`.
+# El código de este crate NO depende de consenso ni por accidente: ver el diagrama de lib.rs.
 futures_ringbuf = { workspace = true }

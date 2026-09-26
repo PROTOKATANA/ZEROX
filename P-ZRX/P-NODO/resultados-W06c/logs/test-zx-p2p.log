@@ -1,0 +1,107 @@
+   Compiling zx-p2p v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06c/ws/crates/zx-p2p)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.88s
+     Running unittests src/lib.rs (target/debug/deps/zx_p2p-5f9d153e06dc8106)
+
+running 77 tests
+test behaviour::tests::la_malla_es_la_de_produccion_y_no_la_de_fabrica ... ok
+test behaviour::tests::identify_anuncia_zerox_y_no_la_libreria ... ok
+test behaviour::tests::el_id_de_mensaje_mide_32_bytes ... ok
+test behaviour::tests::parametros_del_nodo_no_emite_trafico_ni_eventos ... ok
+test codec::tests::el_booleano_de_parada_debe_ser_canonico ... ok
+test codec::tests::el_booleano_del_terminal_debe_ser_canonico ... ok
+test behaviour::tests::el_id_de_mensaje_depende_del_tema_y_del_contenido ... ok
+test codec::tests::el_magic_no_es_una_barrera_del_wire ... ok
+test codec::tests::el_relleno_sobrante_se_rechaza ... ok
+test codec::tests::los_bloques_dan_la_vuelta_por_familia ... ok
+test behaviour::tests::la_red_dev_construye_con_sync_y_temas_propios_y_sin_mdns ... ok
+test codec::tests::sin_presupuesto_la_lectura_se_rechaza ... ok
+test codec::tests::todas_las_peticiones_dan_la_vuelta ... ok
+test behaviour::tests::la_suscripcion_son_los_dos_temas_exactos_de_la_red ... ok
+test codec::tests::todas_las_respuestas_dan_la_vuelta ... ok
+test codec::tests::un_bloque_demasiado_grande_se_rechaza ... ok
+test codec::tests::un_contador_no_minimo_se_rechaza ... ok
+test codec::tests::un_discriminante_desconocido_se_rechaza ... ok
+test behaviour::tests::se_construye_en_las_tres_redes ... ok
+test codec::tests::un_estado_con_demasiadas_puntas_post_se_rechaza ... ok
+test codec::tests::un_locator_mentiroso_se_rechaza_sin_reservar ... ok
+test behaviour::tests::sin_margen_de_transporte_no_se_construye ... ok
+test codec::tests::una_familia_cambiada_se_rechaza ... ok
+test codec::tests::una_familia_desconocida_se_rechaza ... ok
+test codec::tests::una_peticion_con_demasiados_hashes_se_rechaza ... ok
+test behaviour::tests::ningun_tema_suscrito_viene_de_la_otra_red ... ok
+test codec::tests::ningun_byte_arbitrario_hace_entrar_en_panico ... ok
+test codec::tests::una_respuesta_con_contador_mentiroso_se_rechaza ... ok
+test behaviour::tests::mdns_solo_esta_en_testnet ... ok
+test config::tests::cada_perfil_tiene_sus_dos_temas_y_no_hay_suscripcion_cruzada ... ok
+test config::tests::el_agent_version_dev_no_se_hace_pasar_por_publico ... ok
+test config::tests::kademlia_nunca_usa_el_protocolo_de_ipfs ... ok
+test config::tests::la_red_dev_no_comparte_nada_con_las_publicas ... ok
+test config::tests::la_red_dev_usa_los_nombres_de_la_orden ... ok
+test config::tests::los_prefijos_vienen_de_la_red_y_no_de_una_copia ... ok
+test config::tests::los_nombres_de_protocolo_tienen_la_forma_que_libp2p_exige ... ok
+test config::tests::mainnet_y_testnet_conservan_sus_puertos ... ok
+test config::tests::ninguna_red_comparte_nada_con_la_otra ... ok
+test error::tests::excedido_puntua_pero_admite_cinco_avisos ... ok
+test error::tests::la_violacion_de_consenso_banea_de_un_golpe ... ok
+test error::tests::lento_e_ilegible_nunca_puntuan ... ok
+test limites::tests::el_limite_de_bloque_red_se_deriva ... ok
+test limites::tests::el_limite_de_gossip_admite_bloques_reales ... ok
+test limites::tests::sin_margen_suficiente_se_detecta ... ok
+test limites::tests::un_lote_lleno_de_bloques_cabe_en_una_respuesta ... ok
+test limites::tests::un_lote_lleno_de_cabeceras_cabe_en_una_respuesta ... ok
+test limites::tests::un_lote_lleno_de_hashes_cabe_en_una_peticion ... ok
+test codec::tests::un_mensaje_truncado_nunca_se_acepta_a_medias ... ok
+test limites_ip::tests::las_ips_del_mismo_prefijo_cuentan_como_una ... ok
+test limites_ip::tests::el_prefijo_se_extrae_de_una_multiaddr ... ok
+test limites_ip::tests::los_puntos_se_acumulan_hasta_el_umbral ... ok
+test limites_ip::tests::un_prefijo_baneado_se_deniega_de_inmediato ... ok
+test limites_ip::tests::una_violacion_de_consenso_banea_de_un_golpe ... ok
+test mensaje::tests::el_byte_de_red_es_cerrado ... ok
+test mensaje::tests::la_cota_de_puntas_post_es_dieciseis ... ok
+test mensaje::tests::las_familias_y_fases_tienen_byte_cerrado ... ok
+test mensaje::tests::los_discriminantes_no_colisionan ... ok
+test mensaje::tests::no_disponible_no_vale_como_saludo ... ok
+test mensaje::tests::una_respuesta_del_tipo_equivocado_se_detecta ... ok
+test presupuesto::tests::el_borde_exacto_del_techo ... ok
+test presupuesto::tests::el_presupuesto_por_defecto_acota_el_peor_caso ... ok
+test codec::tests::un_lote_lleno_de_cabeceras_pasa_la_cota ... ok
+test presupuesto::tests::liberar_deja_sitio ... ok
+test presupuesto::tests::no_se_puede_pasar_del_techo ... ok
+test presupuesto::tests::una_reserva_ocupa_y_al_soltarse_libera ... ok
+test servicio::tests::el_bloque_bien_formado_llega_una_vez ... ok
+test presupuesto::tests::un_panico_tambien_libera ... ok
+test servicio::tests::el_bloque_post_llega_por_su_tema ... ok
+test servicio::tests::el_presupuesto_agotado_ignora_y_no_penaliza ... ok
+test servicio::tests::la_clasificacion_es_exacta ... ok
+test servicio::tests::un_bloque_con_el_tema_de_otra_familia_se_rechaza ... ok
+test servicio::tests::residuo_truncado_y_tema_desconocido ... ok
+test codec::tests::una_peticion_demasiado_grande_se_rechaza_por_tamano_y_no_por_parseo ... ok
+test codec::tests::una_lectura_correcta_devuelve_su_reserva ... ok
+test presupuesto::tests::la_concurrencia_no_puede_superar_el_techo ... ok
+test codec::tests::el_codec_da_la_vuelta_por_un_stream ... ok
+test limites_ip::tests::el_registro_de_baneos_no_crece_sin_limite ... ok
+
+test result: ok. 77 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+
+     Running tests/dos_nodos.rs (target/debug/deps/dos_nodos-e3705e32026e0142)
+
+running 10 tests
+test el_bucle_termina_al_soltar_los_handles ... ok
+test dos_nodos_se_conectan_y_se_ven ... ok
+test un_handle_sin_bucle_devuelve_error_y_no_panic ... ok
+test no_tener_un_bloque_es_una_respuesta_legitima ... ok
+test un_genesis_ajeno_desconecta ... ok
+test el_saludo_recorre_el_camino_completo ... ok
+test pedir_cabeceras_llega_al_manejador_del_otro_lado ... ok
+test un_bloque_pow_viaja_y_llega_al_callback ... ok
+test pedir_bloques_por_hash_devuelve_el_bloque ... ok
+test un_bloque_post_viaja_y_llega_al_callback ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests zx_p2p
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

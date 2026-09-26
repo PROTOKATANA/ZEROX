@@ -1,0 +1,19 @@
+# HORAS.log — ORDEN-W06c
+# Marcas `date -Is` aproximadas; donde no hubo captura directa, hora de modificación del log
+# asociado. Zona: /home/katana/zeo/ZEROX/deepseek/W06c/
+2026-09-26T02:31:00+02:00  inicio de sesion; lectura integra de ORDEN-W06c.md, LINEO.md, PLAN-W06.md y FORMATO-v0.md
+2026-09-26T02:32:00+02:00  lectura del codigo antiguo (git show 9681061:crates/zx-p2p/**) extraido a ref/old; lectura de la API publica de zx-core (red, wire, wire_dag, error, encoding, tx)
+2026-09-26T02:33:00+02:00  hallazgos de definicion imperfecta (§5 del INFORME) informados antes de editar
+2026-09-26T02:34:00+02:00  copia base a ws.orig/ y ws/ (Cargo.toml, Cargo.lock, rust-toolchain.toml, crates/, ci/, testdata/, .github/); enlace PDF -> clon real para que Cargo resuelva las dependencias path de zx-poas/zx-farmer
+2026-09-26T02:35:00+02:00  CARGO_HOME local (.cargo-home) para escribir fuera de ~/.cargo (read-only en el sandbox)
+2026-09-26T02:36:00+02:00  implementacion de crates/zx-p2p: mensaje.rs nuevo, codec.rs nuevo, entrante.rs, config.rs, limites.rs, behaviour.rs, servicio.rs, tests/dos_nodos.rs; portados literales error.rs, limites_ip.rs, presupuesto.rs
+2026-09-26T02:39:24+02:00  Cargo.lock resuelto (logs/metadata.json); 18 paquetes bajados a la version exacta del lock de 9681061 con `cargo update --precise`
+2026-09-26T02:40:34+02:00  logs/lock-subconjunto.txt: 400/400 paquetes del cierre de zx-p2p con version identica a 9681061, 0 discrepancias
+2026-09-26T02:41:59+02:00  zx-p2p: fmt + clippy -D warnings limpios; 77 tests de libreria + 10 de integracion, 0 fallan (logs/test-zx-p2p.log)
+2026-09-26T02:46:50+02:00  V3: `cargo test --workspace --all-features --locked` -> 502 pasan, 0 fallan, 1 ignorado (logs/V3-test.log)
+2026-09-26T02:46:54+02:00  V1: `cargo fmt --all -- --check` -> 0 (logs/V1-fmt.log)
+2026-09-26T02:47:00+02:00  V2: `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` -> 0 (logs/V2-clippy.log)
+2026-09-26T02:47:00+02:00  V7: dependencias-exactas (20 exactas) y frontera-crates (5 fronteras OK, zx-p2p -> {zx-core}) (logs/V7-*.log)
+2026-09-26T02:47:05+02:00  ENTREGA FINAL: `sha256sum -c P-ZRX/P-NODO/ENTRADA-W06c.sha256` -> 4/4 La suma coincide, exit=0 (logs/ENTRADA-w06c.log)
+2026-09-26T02:47:36+02:00  cambios.patch (8933 lineas, aplica con `git apply -p1 --check`), MIGRACION.sha256 (118 huellas, `sha256sum -c` OK), INFORME.md, PROGRESO.md, V4/V5/V6
+2026-09-26T02:48:00+02:00  fin; presupuesto (2 h / 8 hilos / 16 GiB / 30 GiB) no agotado (aprox. 17 min de reloj)

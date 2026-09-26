@@ -1,0 +1,32 @@
+# V6 — Códec: ida y vuelta y rechazos, cada uno con su error
+
+Comando: `cargo test -p zx-p2p --all-features --locked` (captura en `logs/test-zx-p2p.log`).
+Todos los tests de `src/codec.rs` pasan.
+
+## Ida y vuelta
+
+| Qué | Test |
+|---|---|
+| Cada petición (`Estado`, `CabecerasPow` con/sin `parada`, `Bloques`) | `todas_las_peticiones_dan_la_vuelta` |
+| Cada respuesta (`Estado`, `CabecerasPow`, `Bloques` PoW+PoST, `NoDisponible`) | `todas_las_respuestas_dan_la_vuelta` |
+| Cada bloque por su familia declarada y por autotag | `los_bloques_dan_la_vuelta_por_familia` |
+| Por un stream real (`futures_ringbuf`) | `el_codec_da_la_vuelta_por_un_stream` |
+
+## Rechazos, con su error
+
+| Caso | Test | Error |
+|---|---|---|
+| familia cambiada (PoW declarado Post y viceversa) | `una_familia_cambiada_se_rechaza` | `ErrorCodec::FamiliaInesperada { esperada, encontrada }` |
+| byte de familia desconocido | `una_familia_desconocida_se_rechaza` | `ErrorCodec::FamiliaDesconocida { discriminante }` |
+| truncado en cualquier punto | `un_mensaje_truncado_nunca_se_acepta_a_medias` | `ErrorCodec::Codificacion(EncodingError::Truncado { .. })` |
+| byte sobrante (petición, respuesta y bloque) | `el_relleno_sobrante_se_rechaza` | `ErrorCodec::Codificacion(EncodingError::Truncado { .. })` (resto no vacío) |
+| contador `CompactSize` no mínimo | `un_contador_no_minimo_se_rechaza` | `ErrorCodec::Codificacion(EncodingError::CompactSizeNoMinimo { .. })` |
+| contador declarado por encima de la cota (locator, hashes, puntas, cabeceras, bloques) | `un_locator_mentiroso_se_rechaza_sin_reservar`, `una_peticion_con_demasiados_hashes_se_rechaza`, `un_estado_con_demasiadas_puntas_post_se_rechaza`, `una_respuesta_con_contador_mentiroso_se_rechaza` | `ErrorCodec::Codificacion(EncodingError::DemasiadosElementos { .. })` |
+| mensaje por encima de `MAX_PETICION_BYTES` | `una_peticion_demasiado_grande_se_rechaza_por_tamano_y_no_por_parseo` | `io::ErrorKind::InvalidData` con «C-NET-11» (exceso, no parseo) |
+| bloque por encima de `MAX_BLOQUE_RED_BYTES` | `un_bloque_demasiado_grande_se_rechaza` | `ErrorCodec::BloqueDemasiadoGrande { bytes, max }` |
+| booleano no canónico (`parada` y `terminal`) | `el_booleano_de_parada_debe_ser_canonico`, `el_booleano_del_terminal_debe_ser_canonico` | `ErrorCodec::BooleanoNoCanonico { valor }` |
+| byte de red desconocido en el saludo | (cubierto por `leer_estado`) | `ErrorCodec::RedDesconocida { discriminante }` |
+| byte de fase desconocido en el saludo | (cubierto por `leer_estado`) | `ErrorCodec::FaseDesconocida { discriminante }` |
+| discriminante de mensaje desconocido | `un_discriminante_desconocido_se_rechaza` | `ErrorCodec::Codificacion(EncodingError::LockDesconocido { .. })` |
+| sin presupuesto agregado | `sin_presupuesto_la_lectura_se_rechaza` | `io::ErrorKind::OutOfMemory` con «C-NET-21» |
+| bytes arbitrarios (sin pánico) | `ningun_byte_arbitrario_hace_entrar_en_panico` | (no debe entrar en pánico; C-WIRE-05) |
