@@ -254,3 +254,17 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   `SIGKILL`. El agente dejó de informar a las 08:14 esperando su suite; el parche estaba desfasado
   respecto a su último cambio y se regeneró. Migración por parche (su `ws/` contenía los documentos).
 - **W06a-C** lanzada: máximo de padres parametrizable e identidad GHOSTDAG real en `zx-cadena`.
+
+### 09:51–14:10
+
+- **W06a-C migrada** (`4042821`): `zx-cadena` acepta hasta 15 padres e identidad GHOSTDAG real. La primera
+  ejecución conjunta de la raíz destapó que la prueba de reinicio del nodo es intermitente.
+- **RI-2** (revisión independiente, Sonnet): RI-2a, `zx-cadena` guardaba para siempre el error «falta el
+  padre» (alta, confirmado); RI-2b, el nodo admitía sus bloques PoST antes de persistirlos (alta, plausible;
+  doble firma tras reinicio con red). Ambas corregidas dentro de W06d2 por avisos del director.
+- **W06d2 migrada, parcial** (`2b6a467`): validación diferida, huérfanos, sincronización PoW, herramienta
+  adversarial; 715 tests. **Dos errores del director**: el formato de red de W06c no llevaba la
+  justificación PoT de los bloques PoST (sin ella no se pueden verificar por red) y la revisión de W06d1 no
+  vio que el nodo no sigue bifurcaciones PoW. **W06d3** (Sonnet) lanzada para cerrarlos y demostrar tres
+  nodos de extremo a extremo.
+- Error menor: congelé la entrada de W06d3 antes de editar el plan; recongelada antes de lanzar.
