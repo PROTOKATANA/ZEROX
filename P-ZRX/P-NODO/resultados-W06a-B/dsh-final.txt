@@ -1,0 +1,30 @@
+He cumplido **ORDEN-W06a-B** en `/home/katana/zeo/ZEROX/deepseek/W06aB/`. Veredicto: **SUPERADO**, con un hallazgo declarado.
+
+## Verificación
+
+| Paso | Resultado |
+|---|---|
+| V0 (suite completa sin cambios) | **680 pasan, 0 fallan, 2 ignorados**, exit 0 — primera corrida conjunta W05b3+W06a |
+| V1 `fmt --check` | limpio (exit 0) |
+| V2 `clippy -D warnings --locked` | limpio (exit 0, 0 avisos) |
+| V3 `cargo test --workspace --all-features --locked` | **680 pasan, 0 fallan, 2 ignorados**; los 3 diferenciales verdes |
+| V4 `diferencial_t01` (v0.2: 2 055 + 3 914) | **0 discrepancias** |
+| V4 `diferencial_t04` (v0.3: 914) | **0 discrepancias**; `grep forzad\|colision\|prox_salida` **vacío** |
+| V5 cobertura | **idéntica** a la sección `vectores-v0.3` de `cobertura-v0.3.txt` |
+| V6 guardianes / lock | 22 dependencias exactas, 8 fronteras; `Cargo.lock` byte a byte idéntico |
+| Entrada congelada | **9/9** al inicio y al final |
+
+## Cambios
+
+- **`diferencial_t01.rs`**: eliminado `prox_salida`; `ID_LIB(clave,nonce,importe)` se decodifica y se resuelve al `OutPoint` real `(txid,0)`; lee v0.2.
+- **`diferencial_t04.rs`**: eliminados `detectar_colisiones`, `forzada`, `ContextoTx`, `Colisiones` y el punto fijo; `construir_reales` en una pasada; lee v0.3.
+- **`testdata/`**: `transicion-v0.2/` (base+negativos) y `estado-dag-v0.3/` (+`cobertura-v0.3.txt`), copiados sin editar con `PROCEDENCIA.md`; hashes contra la entrada; se conservan v0.1/v0.2.
+- Sin correspondencias de error nuevas.
+
+## Hallazgo (declarado, `INFORME.md` §4)
+
+La premisa de la orden («F-18 elimina la emulación») es cierta para la colisión liberación↔transferencia, pero queda una no inyectividad del formato real: dos transferencias abstractas con los **mismos prevouts y las mismas salidas en valor/dueño** pero distinto `id` de salida producen la **misma transacción real** y el mismo `OutPoint`, mientras el oráculo las distingue. Al quitar el punto fijo, **2 de 914 casos** (304 y 567) divergían. Corrección mínima en el arnés de T04: fijar `sequence` de las entradas al id abstracto de la primera salida (campo del `txid`/`sighash` que el motor **no interpreta**), sin contador, sin entradas inventadas y sin punto fijo. T01 no lo necesita (estados por rama, sin fusión de ramas hermanas).
+
+## Entregables
+
+`cambios.patch` (22,7 MB, 10 ficheros), `MIGRACION.sha256` (190 huellas, `sha256sum -c` OK), `logs/` (V0–V6, entrada, migración, lock, grep), `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Sin Python, sin commit/push, nada escrito fuera de la zona. Presupuesto: ≈45 min de los 90 min.

@@ -1,0 +1,21 @@
+# HORAS.log — ORDEN-W06a-B
+# Marcas `date -Is`; donde no hubo captura directa, hora de modificación del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W06aB/
+2026-09-26T05:30:40+02:00  inicio de sesión; lectura íntegra de ORDEN-W06a-B.md, V-ZRX/LINEO.md, REVISION-W06a.md, REVISION-T01-E.md, REVISION-T04-D.md, los dos arneses y el generador de T04
+2026-09-26T05:32:37+02:00  montaje de la zona: ws.orig/ y ws/ desde el workspace de la raíz (PDF por enlace, excluido de la migración), env.sh, CARGO_HOME y target reutilizados de W06a dentro de la zona
+2026-09-26T05:33:00+02:00  testdata en staging (entrada/): T01 v0.2 base+negativos y T04 v0.3+cobertura; sha256 contra ENTRADA-W06a-B.sha256 (9/9)
+2026-09-26T05:33:00+02:00  V0 lanzado: cargo test --workspace --all-features --locked sin cambios (primera corrida conjunta W05b3+W06a)
+2026-09-26T05:48:00+02:00  V0 OK: 680 pasan, 0 fallan, 2 ignorados, exit 0 (logs/V0-test.log)
+2026-09-26T05:48:00+02:00  testdata migrado a ws/testdata/transicion-v0.2/ y ws/testdata/estado-dag-v0.3/ con PROCEDENCIA.md; sha256 verificados
+2026-09-26T05:50:00+02:00  arnés T01: eliminado prox_salida; ID_LIB decodificado a (clave,nonce,importe)->(txid,0); lectura de v0.2
+2026-09-26T05:52:00+02:00  arnés T04: eliminados detectar_colisiones, forzada, ContextoTx, Colisiones y el punto fijo; construir_reales en una pasada; lectura de v0.3
+2026-09-26T05:56:00+02:00  V4 T01 OK: v0.2 base 2 055 + negativos 3 914, 0 discrepancias (logs/V4-diferencial-t01.log)
+2026-09-26T05:58:00+02:00  V4 T04 primer intento: 4 discrepancias en 2/914 casos (304: DESC+UTXO+GAR; 567: DESC)
+2026-09-26T06:00:00+02:00  diagnóstico con instrumentación temporal: (txid,índice) no inyectivo sobre ids explícitos (transferencias gemelas con distinto out_id); corrección mínima: sequence = id de la primera salida en el arnés de T04
+2026-09-26T06:01:00+02:00  V4 T04 OK: 914/914 casos, 0 discrepancias; cobertura idéntica a cobertura-v0.3.txt (logs/V4-diferencial-t04.log, logs/V5-cobertura.log)
+2026-09-26T06:01:00+02:00  V1 fmt --check exit 0 (logs/V1-fmt.log); V2 clippy -D warnings exit 0, 0 avisos (logs/V2-clippy.log)
+2026-09-26T06:01:00+02:00  V3 lanzado: cargo test --workspace --all-features --locked
+2026-09-26T06:14:00+02:00  V3 OK: 680 pasan, 0 fallan, 2 ignorados; los tres diferenciales verdes (logs/V3-test.log)
+2026-09-26T06:15:00+02:00  V4 grep forzad|colision|prox_salida vacío (logs/V4-grep.log); V6 22 dependencias exactas y 8 fronteras OK; Cargo.lock idéntico (logs/V6-guardianes.log, logs/lock-subconjunto.txt)
+2026-09-26T06:15:00+02:00  ENTREGA: cambios.patch (22 693 653 bytes, 10 ficheros), MIGRACION.sha256 (190 huellas, sha256sum -c OK), entrada-final 9/9; INFORME.md, PROGRESO.md y HORAS.log
+2026-09-26T06:15:31+02:00  fin; presupuesto (1 h 30 min / 8 hilos / 16 GiB) no agotado (≈45 min de reloj)

@@ -1,0 +1,4 @@
+# V4 grep de marcadores prohibidos en los arneses (debe estar vacio)
+$ grep -nE 'forzad|colision|prox_salida' crates/zx-consensus/tests/diferencial_t01.rs crates/zx-cadena/tests/diferencial_t04.rs
+exit=1
+VACIO: sin coincidencias

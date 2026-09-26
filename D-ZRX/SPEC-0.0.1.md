@@ -16,7 +16,7 @@ código con tests propios pero sin contraste independiente.
 |---|---|---|---|---|
 | F-01…F-04 | Cabecera PoW v1 (92/108 B), cabecera PoST DAG (589–1037 B), `height` reservado | `zx-core::preimage::{block,dag}` | W02; revisión independiente RI-1a sin hallazgos | validada (formato) |
 | F-05…F-14 | Versiones de transacción v1/v2/v3, forma, testigos, campos inactivos, códec | `zx-core::{tx, forma, wire}` | Oráculo de formato Julia (W02, W02b: 85/85; v1 no-coinbase idénticos a v0) | validada |
-| F-15…F-18 | Nonce por clave de garantía; `expiry_height = altura` en la coinbase PoW; `slot` en la v3; salida de la liberación en `(txid, 0)` | `zx-core`, `zx-consensus::transicion`, `zx-post` | W02b: diferencial contra T01-D, 0 discrepancias en 2 055 casos y 3 939 negativos; T01-E modela la salida de la liberación como F-18 (id por contenido) | validada (modo estricto); modo fusión: diferencial W06a provisional, definitivo con W06a-B |
+| F-15…F-18 | Nonce por clave de garantía; `expiry_height = altura` en la coinbase PoW; `slot` en la v3; salida de la liberación en `(txid, 0)` | `zx-core`, `zx-consensus::transicion`, `zx-post` | W02b: diferencial contra T01-D, 0 discrepancias en 2 055 casos y 3 939 negativos; T01-E modela la salida de la liberación como F-18 (id por contenido) | validada (modo estricto); modo fusión: validada (W06a-B) |
 
 ## 2. Transición PoW → PoAS + PoT + DAG (`P-ZRX/P-TRANSICION/CONTRATO-v0.md` v0.1)
 
@@ -33,7 +33,7 @@ código con tests propios pero sin contraste independiente.
 
 | Reglas | Contenido | Código | Evidencia | Estado |
 |---|---|---|---|---|
-| ED-1…ED-6, RD-1…RD-10 | Aplicación por fusión, descarte silencioso, punto de aplicación, garantía del productor en `past(B)`, virtual | `zx-consensus::transicion::fusion` + `zx-cadena` | Oráculo T04 (v0.3, T04-D); RI-1a (`slot`/`peso_sufijo` en fusión) corregido en W06a; diferencial W06a 913/913 **con emulación de ids** (`REVISION-W06a`) | **implementada**; validación definitiva con W06a-B (v0.3, sin emulación) |
+| ED-1…ED-6, RD-1…RD-10 | Aplicación por fusión, descarte silencioso, punto de aplicación, garantía del productor en `past(B)`, virtual | `zx-consensus::transicion::fusion` + `zx-cadena` | Oráculo T04 (v0.3, T04-D); RI-1a (`slot`/`peso_sufijo` en fusión) corregido en W06a; diferencial W06a 913/913 **con emulación de ids** (`REVISION-W06a`) | **validada**: W06a-B, 0 discrepancias en 914 casos v0.3 sin emulación |
 | IE-1…IE-6 | Conservación, aplicación única, independencia del orden, undo, compatibilidad con T01 | ídem | T04 (46 500 bloques, 600 000 órdenes, 0 fallos) | validada en el oráculo; código pendiente de W06a |
 | GHOSTDAG | Orden, `blue_work`, `C-GD-05/07`, admisión | `zx-dag` | Corpus antiguo reproducido (W05a); T04 revalida 2 290 + 84 bloques | validada; **coste de admisión no acotado** (IPA B-12) |
 

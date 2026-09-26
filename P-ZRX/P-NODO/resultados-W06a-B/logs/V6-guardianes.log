@@ -1,0 +1,13 @@
+=== V6 dependencias-exactas.sh ===
+OK — 22 dependencias con versión exacta
+exit=0
+=== V6 frontera-crates.sh ===
+"OK — frontera zx-consensus → {zx-core}"
+"OK — frontera zx-dag → {zx-core}"
+"OK — frontera zx-poas → {zx-core,zx-consensus}"
+"OK — frontera zx-farmer → {zx-core,zx-poas}"
+"OK — frontera zx-post → {zx-core,zx-pot,zx-dag,zx-poas}"
+"OK — frontera zx-p2p → {zx-core}"
+"OK — frontera zx-cadena → {zx-core,zx-consensus,zx-dag}"
+"OK — frontera zx-storage → {zx-core}"
+exit=0

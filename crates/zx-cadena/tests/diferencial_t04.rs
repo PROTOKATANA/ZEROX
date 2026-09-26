@@ -1,14 +1,19 @@
-//! Arnés **diferencial** contra el oráculo T04-C (`ORDEN-W06a` §4, V4 y V4b).
+//! Arnés **diferencial** contra el oráculo T04-D (`ORDEN-W06a-B`, V4 y V5).
 //!
-//! Lee `testdata/estado-dag-v0.2/vectores-estado-dag-v0.2.txt`, deriva claves Ed25519 deterministas
+//! Lee `testdata/estado-dag-v0.3/vectores-estado-dag-v0.3.txt`, deriva claves Ed25519 deterministas
 //! por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)`, igual que W03), construye
 //! transacciones **reales** v1/v2/v3 firmadas por el `firmante` abstracto, traduce cada bloque a
 //! [`BloqueCadena`] con `padres`, `sr`, `sd`, `ident` y `k` y ejecuta [`Cadena`] en el orden de
 //! entrega del fichero.
 //!
+//! T04-D / F-18: la salida implícita de una `Liberacion` tiene el id abstracto
+//! `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`; el arnés lo decodifica y
+//! lo traduce al `(txid, 0)` real. No hay contador de ids implícitos, ni entradas inventadas, ni
+//! punto fijo: los vectores v0.3 ya no tienen la colisión de ids del generador v0.2.
+//!
 //! Compara, por caso: `RES` de cada bloque, `DESC` (transacción descartada y motivo), `SEL`, `UTXO`,
-//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 913 casos; V4b exige que la tabla de cobertura
-//! de los 900 casos aleatorios sea idéntica a la sección `vectores-v0.2` de `cobertura-v0.2.txt`.
+//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 914 casos; V5 exige que la tabla de cobertura
+//! de los 900 casos aleatorios sea idéntica a la sección `vectores-v0.3` de `cobertura-v0.3.txt`.
 //!
 //! Las correspondencias de error son las de `ORDEN-W03` §4 (W03/W02b), sin añadir ninguna.
 
@@ -35,15 +40,15 @@ use zx_core::{
     SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
 
-/// Vectores v0.2 dentro del workspace (`ws/testdata/...`).
+/// Vectores v0.3 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/estado-dag-v0.2/vectores-estado-dag-v0.2.txt"
+    "/../../testdata/estado-dag-v0.3/vectores-estado-dag-v0.3.txt"
 );
-/// Tabla de cobertura esperada de T04-C.
+/// Tabla de cobertura esperada de T04-D.
 const RUTA_COBERTURA: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/estado-dag-v0.2/cobertura-v0.2.txt"
+    "/../../testdata/estado-dag-v0.3/cobertura-v0.3.txt"
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,6 +87,25 @@ fn outpoint_inexistente(id: u64) -> OutPoint {
         prev_txid: TxId::from_digest(digest),
         prev_index: 0,
     }
+}
+
+/// Base del rango reservado a las salidas de liberación (T01-E / F-18).
+const ID_LIB_BASE: u64 = 1 << 62;
+/// Máscara de 20 bits: `clave`, `nonce` e `importe` viven en `[0, 2²⁰)`.
+const MASCARA_20: u64 = (1 << 20) - 1;
+
+/// Deshace `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`.
+///
+/// Devuelve `None` para un id explícito (`< 2⁶²`) o fuera del rango de 60 bits de la codificación.
+fn decodificar_id_lib(id: u64) -> Option<(u64, u64, u64)> {
+    let resto = id.checked_sub(ID_LIB_BASE)?;
+    if (resto >> 60) != 0 {
+        return None;
+    }
+    let importe = resto & MASCARA_20;
+    let nonce = (resto >> 20) & MASCARA_20;
+    let clave = (resto >> 40) & MASCARA_20;
+    Some((clave, nonce, importe))
 }
 
 #[derive(Clone, Copy)]
@@ -440,17 +464,11 @@ fn parametros(p: &ParamCrudo) -> ParametrosTransicion {
 struct Constructor {
     cbid: u32,
     claves: Claves,
+    /// Salidas explícitas (`id < 2⁶²`): coinbases, transferencias y cambios.
     salidas: BTreeMap<u64, SalidaRef>,
-    prox_salida: u64,
-}
-
-/// Contexto de construcción de una transacción: si se fuerza el descarte, el id de liberación
-/// asignado en el orden de aplicación y si hay que registrar sus salidas.
-#[derive(Clone, Copy)]
-struct ContextoTx {
-    forzada: bool,
-    liberacion_id: Option<u64>,
-    registrar: bool,
+    /// Salidas de liberaciones, indexadas por el `(clave, nonce, importe)` que decodifica su
+    /// `ID_LIB`. Su `OutPoint` real es `(txid, 0)`; no hay contador de ids implícitos.
+    liberaciones: BTreeMap<(u64, u64, u64), SalidaRef>,
 }
 
 impl Constructor {
@@ -459,14 +477,24 @@ impl Constructor {
             cbid,
             claves: Claves::default(),
             salidas: BTreeMap::new(),
-            prox_salida: 1,
+            liberaciones: BTreeMap::new(),
+        }
+    }
+
+    /// Resuelve una entrada abstracta a su salida real: los ids explícitos por su mapa; los ids de
+    /// liberación (`≥ 2⁶²`) decodificando `(clave, nonce, importe)` y buscando el `(txid, 0)`
+    /// registrado al construirla. Una entrada sin salida creada queda ausente.
+    fn salida(&self, id: u64) -> Option<&SalidaRef> {
+        if let Some(triple) = decodificar_id_lib(id) {
+            self.liberaciones.get(&triple)
+        } else {
+            self.salidas.get(&id)
         }
     }
 
     fn txin(&self, id: u64) -> TxIn {
         let op = self
-            .salidas
-            .get(&id)
+            .salida(id)
             .map_or_else(|| outpoint_inexistente(id), |s| s.op);
         TxIn {
             outpoint: op,
@@ -488,7 +516,7 @@ impl Constructor {
 
     fn gastadas(&self, ids: &[u64]) -> Vec<SpentOutput> {
         ids.iter()
-            .map(|id| match self.salidas.get(id) {
+            .map(|id| match self.salida(*id) {
                 Some(s) => SpentOutput {
                     value: s.valor,
                     lock: Lock::PubKey {
@@ -521,33 +549,33 @@ impl Constructor {
                     dueno: *dueno,
                 },
             );
-            self.prox_salida = self.prox_salida.max(id.saturating_add(1));
         }
         Ok(())
     }
 
+    /// Registra la salida implícita de una `Liberacion` (F-18): su id abstracto es
+    /// `ID_LIB(clave, nonce, importe)` y su `OutPoint` real `(txid, 0)`. Se indexa por el triple
+    /// que decodifica ese id, sin contador.
     fn registrar_liberacion(
         &mut self,
         tx: &Tx,
-        importe: i64,
+        importe: u64,
         clave_abstracta: u64,
-        id: u64,
+        nonce: u64,
     ) -> Result<(), String> {
+        let valor = i64::try_from(importe)
+            .map_err(|_| "importe de liberación fuera de rango".to_string())?;
         let txid = calcular_txid(tx, self.cbid);
-        self.salidas.insert(
-            id,
+        self.liberaciones.insert(
+            (clave_abstracta, nonce, importe),
             SalidaRef {
                 op: OutPoint {
                     prev_txid: txid,
                     prev_index: 0,
                 },
-                valor: Amount::nuevo(importe).expect("importe de liberación"),
+                valor: Amount::nuevo(valor).expect("importe de liberación"),
                 dueno: clave_abstracta,
             },
-        );
-        self.prox_salida = self.prox_salida.max(
-            id.checked_add(1)
-                .ok_or_else(|| "desbordamiento de id".to_string())?,
         );
         Ok(())
     }
@@ -578,7 +606,6 @@ impl Constructor {
         productor: u64,
         altura: u32,
         slot: u64,
-        contexto: ContextoTx,
     ) -> Result<(Tx, Vec<Vec<u8>>), String> {
         let (real, testigos) = match tx.tipo.as_str() {
             "Coinbase" => {
@@ -598,8 +625,19 @@ impl Constructor {
                 for id in &tx.ent {
                     inputs.push(self.txin(*id));
                 }
+                // El formato real `OutPoint = (txid, índice)` no distingue dos transferencias
+                // abstractas con el mismo contenido (mismos prevouts y mismas salidas en
+                // valor/dueño) pero distinto id de salida, y el oráculo sí (sus ids son únicos).
+                // Se fija `sequence` (campo que el motor no interpreta) con el id abstracto de la
+                // primera salida para que el `txid` real sea inyectivo en el contenido abstracto.
+                let secuencia = tx.sal.first().map_or(0, |(id, _, _)| *id);
+                let secuencia = u32::try_from(secuencia)
+                    .map_err(|_| "id abstracto fuera de u32 para sequence".to_string())?;
+                for input in &mut inputs {
+                    input.sequence = secuencia;
+                }
                 let salidas = self.salidas_reales(&tx.sal);
-                let mut real = Tx {
+                let real = Tx {
                     version: 1,
                     inputs,
                     outputs: salidas,
@@ -607,15 +645,6 @@ impl Constructor {
                     expiry_height: 0,
                     extension: ExtensionTx::Ninguna,
                 };
-                if contexto.forzada {
-                    // Colisión de id abstracto con una salida viva: T04 la descarta con
-                    // `ErrDobleGasto` en `crear_utxos!`. Una entrada inexistente deja al motor
-                    // real el mismo descarte, sin tocar el estado.
-                    real.inputs.push(TxIn {
-                        outpoint: outpoint_inexistente(u64::MAX),
-                        sequence: 0,
-                    });
-                }
                 let testigos = self.firmar_entradas(&real, &tx.ent, tx.firmante);
                 (real, testigos)
             }
@@ -666,12 +695,9 @@ impl Constructor {
             }
             otro => return Err(format!("tipo de transacción no soportado: {otro}")),
         };
-        if contexto.registrar {
-            self.registrar(&real, &tx.sal)?;
-            if tx.tipo == "Liberacion" {
-                let id = contexto.liberacion_id.unwrap_or(self.prox_salida);
-                self.registrar_liberacion(&real, tx.importe as i64, tx.clave, id)?;
-            }
+        self.registrar(&real, &tx.sal)?;
+        if tx.tipo == "Liberacion" {
+            self.registrar_liberacion(&real, tx.importe, tx.clave, tx.nonce)?;
         }
         Ok((real, testigos))
     }
@@ -684,12 +710,7 @@ struct Reales {
     claves: Claves,
 }
 
-fn construir_reales(
-    caso: &Caso,
-    forzar: &BTreeSet<(u64, usize)>,
-    ids_liberacion: &BTreeMap<(u64, usize), u64>,
-    descartadas: &BTreeSet<(u64, usize)>,
-) -> Result<Reales, String> {
+fn construir_reales(caso: &Caso) -> Result<Reales, String> {
     // El terminal es el padre del primer bloque PoST; su id abstracto se mapea a `"T"`.
     let terminal_id = caso
         .bloques
@@ -704,14 +725,8 @@ fn construir_reales(
     for (idx, b) in caso.bloques.iter().enumerate() {
         let productor = b.prod;
         let mut txs = Vec::with_capacity(b.txs.len());
-        for (i, tx) in b.txs.iter().enumerate() {
-            let clave = (b.id, i);
-            let contexto = ContextoTx {
-                forzada: forzar.contains(&clave),
-                liberacion_id: ids_liberacion.get(&clave).copied(),
-                registrar: !descartadas.contains(&clave),
-            };
-            txs.push(constructor.construir_tx(tx, productor, b.altura, b.slot, contexto)?);
+        for tx in &b.txs {
+            txs.push(constructor.construir_tx(tx, productor, b.altura, b.slot)?);
         }
         let hash = h(b.id);
         let bloque = match b.fam.as_str() {
@@ -760,139 +775,23 @@ fn construir_reales(
     })
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Colisión de ids abstractos del oráculo (T01 `prox_salida` vs ids explícitos)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Reproduce el espacio de **ids abstractos** de T01/T04, que el formato real F-18 no tiene:
-/// las liberaciones consumen `prox_salida` y las transferencias traen ids explícitos, así que un
-/// id explícito puede colisionar con una salida viva y `crear_utxos!` la descarta con
-/// `ErrDobleGasto`. Devuelve las transacciones que hay que **forzar** a ese descarte (hoy, solo
-/// transferencias, que no cambian de forma al añadir una entrada inexistente).
-fn detectar_colisiones(
-    caso: &Caso,
-    reales: &Reales,
-    orden: &[BlockHash],
-    desc: &[Descarte],
-) -> Colisiones {
-    let mut vivos: BTreeSet<u64> = BTreeSet::new();
-    let mut prox: u64 = 1;
-    for b in &caso.bloques {
-        if b.fam == "PoST" {
-            continue;
-        }
-        for tx in &b.txs {
-            for id in &tx.ent {
-                vivos.remove(id);
-            }
-            for (id, _valor, _dueno) in &tx.sal {
-                vivos.insert(*id);
-                prox = prox.max(id.saturating_add(1));
-            }
-        }
-    }
-    let descartadas: BTreeMap<(BlockHash, usize), &ErrorTransicion> = desc
-        .iter()
-        .map(|d| ((d.bloque, d.indice), &d.motivo))
-        .collect();
-    let crudo_por_id: BTreeMap<u64, &BloqueCrudo> =
-        caso.bloques.iter().map(|b| (b.id, b)).collect();
-    let mut forzar = BTreeSet::new();
-    let mut ids_liberacion = BTreeMap::new();
-    for hash in orden {
-        let Some(idb) = reales.hash_a_id.get(hash).copied() else {
-            continue;
-        };
-        let Some(b) = crudo_por_id.get(&idb) else {
-            continue;
-        };
-        for (i, tx) in b.txs.iter().enumerate() {
-            let motivo = descartadas.get(&(*hash, i));
-            let doble_gasto = matches!(motivo, Some(ErrorTransicion::ErrDobleGasto));
-            if motivo.is_some() && !doble_gasto {
-                // Descartada por nonce/saldo/firma/…: T01 no llega a `crear_utxos!`.
-                continue;
-            }
-            match tx.tipo.as_str() {
-                "Transferencia" | "Deposito" => {
-                    // T01 consume las entradas **antes** de `crear_utxos!`; una entrada
-                    // inexistente descarta la tx antes de la colisión.
-                    if tx.ent.iter().any(|id| !vivos.contains(id)) {
-                        continue;
-                    }
-                    for id in &tx.ent {
-                        vivos.remove(id);
-                    }
-                    let colision = tx.sal.iter().any(|(oid, _, _)| vivos.contains(oid));
-                    if colision {
-                        for id in &tx.ent {
-                            vivos.insert(*id);
-                        }
-                        if tx.tipo == "Transferencia" {
-                            forzar.insert((idb, i));
-                        }
-                        continue;
-                    }
-                    for (id, _valor, _dueno) in &tx.sal {
-                        vivos.insert(*id);
-                        prox = prox.max(id.saturating_add(1));
-                    }
-                }
-                "Liberacion" => {
-                    let id = prox;
-                    vivos.insert(id);
-                    prox = prox.saturating_add(1);
-                    ids_liberacion.insert((idb, i), id);
-                }
-                _ => {}
-            }
-        }
-    }
-    (forzar, ids_liberacion)
-}
-
 /// Caso resuelto: bloques reales, cadena admitida, estado de la historia, orden y descartes.
 type Resuelto = (Reales, Cadena, Estado, Vec<BlockHash>, Vec<Descarte>);
 
-/// Colisiones detectadas: transacciones a forzar y ids de liberación en orden de aplicación.
-type Colisiones = (BTreeSet<(u64, usize)>, BTreeMap<(u64, usize), u64>);
-
-/// Construye los bloques reales y los resuelve iterando la colisión de ids abstractos hasta que el
-/// conjunto de descartes forzados se estabiliza.
+/// Construye los bloques reales una sola vez y aplica la historia. Con F-18 no hay colisión de ids
+/// que exija un punto fijo: la salida de cada liberación se traduce a su `(txid, 0)` real por
+/// contenido.
 fn construir_y_resolver(caso: &Caso) -> Result<Resuelto, String> {
     let params = parametros(&caso.param);
-    let mut forzar: BTreeSet<(u64, usize)> = BTreeSet::new();
-    let mut ids_liberacion: BTreeMap<(u64, usize), u64> = BTreeMap::new();
-    let mut descartadas_previas: BTreeSet<(u64, usize)> = BTreeSet::new();
-    loop {
-        let reales = construir_reales(caso, &forzar, &ids_liberacion, &descartadas_previas)?;
-        let mut cadena = Cadena::nueva(params, caso.param.k, CBID_RED_DEV);
-        for bloque in &reales.bloques {
-            let _ = cadena.admitir(bloque.clone());
-        }
-        let (estado, orden, desc) = cadena
-            .aplicar_historia()
-            .map_err(|motivo| motivo.nombre().to_string())?;
-        let descartadas: BTreeSet<(u64, usize)> = desc
-            .iter()
-            .map(|d| {
-                (
-                    reales.hash_a_id.get(&d.bloque).copied().unwrap_or(0),
-                    d.indice,
-                )
-            })
-            .collect();
-        let (nuevo_forzar, nuevos_ids) = detectar_colisiones(caso, &reales, &orden, &desc);
-        if nuevos_ids == ids_liberacion
-            && nuevo_forzar == forzar
-            && descartadas == descartadas_previas
-        {
-            return Ok((reales, cadena, estado, orden, desc));
-        }
-        forzar = nuevo_forzar;
-        ids_liberacion = nuevos_ids;
-        descartadas_previas = descartadas;
+    let reales = construir_reales(caso)?;
+    let mut cadena = Cadena::nueva(params, caso.param.k, CBID_RED_DEV);
+    for bloque in &reales.bloques {
+        let _ = cadena.admitir(bloque.clone());
     }
+    let (estado, orden, desc) = cadena
+        .aplicar_historia()
+        .map_err(|motivo| motivo.nombre().to_string())?;
+    Ok((reales, cadena, estado, orden, desc))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1155,7 +1054,7 @@ fn valor(mapa: &BTreeMap<String, u64>, clave: &str) -> u64 {
 
 fn generar_lineas(c: &Cobertura) -> Vec<String> {
     let mut out = Vec::new();
-    out.push("SECCION vectores-v0.2 (casos aleatorios)".to_string());
+    out.push("SECCION vectores-v0.3 (casos aleatorios)".to_string());
     out.push(format!("casos = {}", c.casos));
     for t in TIPOS_COBERTURA {
         let desc_t = c.descartes.get(t);
@@ -1249,7 +1148,7 @@ fn cobertura_esperada() -> Vec<String> {
     let mut lineas = Vec::new();
     let mut dentro = false;
     for linea in texto.lines() {
-        if linea.starts_with("SECCION vectores-v0.2") {
+        if linea.starts_with("SECCION vectores-v0.3") {
             dentro = true;
             lineas.push(linea.to_string());
             continue;
@@ -1427,7 +1326,7 @@ fn correr() -> (String, Vec<String>, Vec<String>, Vec<String>) {
     (informe, discrepancias, diferencias_cob, obtenido_cob)
 }
 
-/// V4 · diferencial completo contra T04-C (`vectores-estado-dag-v0.2.txt`).
+/// V4 · diferencial completo contra T04-D (`vectores-estado-dag-v0.3.txt`, 914 casos).
 #[test]
 fn diferencial_t04() {
     let (informe, discrepancias, diferencias_cob, _cob) = correr();

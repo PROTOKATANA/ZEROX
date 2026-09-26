@@ -1,10 +1,18 @@
-//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-W03` §3.10, V4).
+//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-W03` §3.10, V4; vectores v0.2 de
+//! T01-E con el id de liberación F-18).
 //!
-//! Lee `testdata/transicion-v0/vectores-transicion-v0.txt`, deriva claves Ed25519 deterministas por
-//! clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)` con `ed25519-zebra`), construye
-//! transacciones **reales** v1/v2/v3 firmadas por el `firmante` abstracto, mantiene la
-//! correspondencia id abstracto de salida → `OutPoint` real, ejecuta el motor en el orden de entrega
-//! del fichero y compara `RES`, `SEL` y el estado canónico traducido de vuelta a claves abstractas.
+//! Lee `testdata/transicion-v0.2/vectores-transicion-v0.2.txt` (y su fichero de negativos), deriva
+//! claves Ed25519 deterministas por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64
+//! LE)` con `ed25519-zebra`), construye transacciones **reales** v1/v2/v3 firmadas por el `firmante`
+//! abstracto, traduce la salida implícita de una `Liberacion` a su `OutPoint` real `(txid, 0)`,
+//! ejecuta el motor en el orden de entrega del fichero y compara `RES`, `SEL` y el estado canónico
+//! traducido de vuelta a claves abstractas.
+//!
+//! T01-E / F-18: el id abstracto de la salida de una liberación es
+//! `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`, inyectivo por contenido.
+//! El arnés lo decodifica y resuelve al `OutPoint` real; **no** mantiene ningún contador de ids
+//! implícitos ni inventa entradas. Los vectores v0.1 siguen en `testdata/transicion-v0.1/`, pero
+//! ya no se leen.
 //!
 //! Requisito de V4: **0 discrepancias** en todos los casos.
 
@@ -31,14 +39,14 @@ use zx_core::{
     SolucionPoas, SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
 
-/// Rutas a los ficheros de vectores v0.1 dentro del workspace (`ws/testdata/...`).
+/// Rutas a los ficheros de vectores v0.2 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/transicion-v0.1/vectores-transicion-v0.1.txt"
+    "/../../testdata/transicion-v0.2/vectores-transicion-v0.2.txt"
 );
 const RUTA_NEGATIVOS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/transicion-v0.1/vectores-transicion-negativos-v0.1.txt"
+    "/../../testdata/transicion-v0.2/vectores-transicion-negativos-v0.2.txt"
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,6 +86,25 @@ fn outpoint_inexistente(id: u64) -> OutPoint {
         prev_txid: TxId::from_digest(digest),
         prev_index: 0,
     }
+}
+
+/// Base del rango reservado a las salidas de liberación (T01-E / F-18).
+const ID_LIB_BASE: u64 = 1 << 62;
+/// Máscara de 20 bits: `clave`, `nonce` e `importe` viven en `[0, 2²⁰)`.
+const MASCARA_20: u64 = (1 << 20) - 1;
+
+/// Deshace `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`.
+///
+/// Devuelve `None` para un id explícito (`< 2⁶²`) o fuera del rango de 60 bits de la codificación.
+fn decodificar_id_lib(id: u64) -> Option<(u64, u64, u64)> {
+    let resto = id.checked_sub(ID_LIB_BASE)?;
+    if (resto >> 60) != 0 {
+        return None;
+    }
+    let importe = resto & MASCARA_20;
+    let nonce = (resto >> 20) & MASCARA_20;
+    let clave = (resto >> 40) & MASCARA_20;
+    Some((clave, nonce, importe))
 }
 
 /// Registro de una salida abstracta: su `OutPoint` real, valor y dueño.
@@ -424,11 +451,11 @@ fn parametros(p: &ParamCrudo) -> ParametrosTransicion {
 struct Constructor {
     cbid: u32,
     claves: Claves,
+    /// Salidas explícitas (`id < 2⁶²`): coinbases, transferencias y cambios.
     salidas: BTreeMap<u64, SalidaRef>,
-    /// Contador de ids abstractos de salidas implícitas de `Liberacion`, espejo del
-    /// `prox_salida` del oráculo T01. La F-18 fija la salida real en `(txid, 0)`, así que el
-    /// arnés registra el id abstracto del oráculo → ese `OutPoint`.
-    prox_salida: u64,
+    /// Salidas de liberaciones, indexadas por el `(clave, nonce, importe)` que decodifica su
+    /// `ID_LIB`. Su `OutPoint` real es `(txid, 0)`; no hay contador de ids implícitos.
+    liberaciones: BTreeMap<(u64, u64, u64), SalidaRef>,
 }
 
 impl Constructor {
@@ -437,14 +464,24 @@ impl Constructor {
             cbid,
             claves: Claves::default(),
             salidas: BTreeMap::new(),
-            prox_salida: 1,
+            liberaciones: BTreeMap::new(),
+        }
+    }
+
+    /// Resuelve una entrada abstracta a su salida real: los ids explícitos por su mapa; los ids de
+    /// liberación (`≥ 2⁶²`) decodificando `(clave, nonce, importe)` y buscando el `(txid, 0)`
+    /// registrado al construirla. Una entrada sin salida creada queda ausente.
+    fn salida(&self, id: u64) -> Option<&SalidaRef> {
+        if let Some(triple) = decodificar_id_lib(id) {
+            self.liberaciones.get(&triple)
+        } else {
+            self.salidas.get(&id)
         }
     }
 
     fn txin(&self, id: u64) -> TxIn {
         let op = self
-            .salidas
-            .get(&id)
+            .salida(id)
             .map_or_else(|| outpoint_inexistente(id), |s| s.op);
         TxIn {
             outpoint: op,
@@ -469,7 +506,7 @@ impl Constructor {
 
     fn gastadas(&self, ids: &[u64]) -> Vec<SpentOutput> {
         ids.iter()
-            .map(|id| match self.salidas.get(id) {
+            .map(|id| match self.salida(*id) {
                 Some(s) => SpentOutput {
                     value: s.valor,
                     lock: Lock::PubKey {
@@ -502,37 +539,34 @@ impl Constructor {
                     dueno: *dueno,
                 },
             );
-            // Espejo de `crear_utxos!` del oráculo: el contador salta al mayor id explícito + 1.
-            self.prox_salida = self.prox_salida.max(id.saturating_add(1));
         }
         Ok(())
     }
 
-    /// Registra la salida implícita de una `Liberacion`: el oráculo le asigna el id
-    /// `prox_salida`; la F-18 la crea en el `OutPoint` real `(txid, 0)`.
+    /// Registra la salida implícita de una `Liberacion` (F-18): su id abstracto es
+    /// `ID_LIB(clave, nonce, importe)` y su `OutPoint` real `(txid, 0)`. Se indexa por el triple
+    /// que decodifica ese id, sin contador.
     fn registrar_liberacion(
         &mut self,
         tx: &Tx,
-        importe: i64,
+        importe: u64,
         clave_abstracta: u64,
+        nonce: u64,
     ) -> Result<(), String> {
+        let valor = i64::try_from(importe)
+            .map_err(|_| "importe de liberación fuera de rango".to_string())?;
         let txid = calcular_txid(tx, self.cbid);
-        let id = self.prox_salida;
-        self.salidas.insert(
-            id,
+        self.liberaciones.insert(
+            (clave_abstracta, nonce, importe),
             SalidaRef {
                 op: OutPoint {
                     prev_txid: txid,
                     prev_index: 0,
                 },
-                valor: Amount::nuevo(importe).expect("importe de liberación"),
+                valor: Amount::nuevo(valor).expect("importe de liberación"),
                 dueno: clave_abstracta,
             },
         );
-        self.prox_salida = self
-            .prox_salida
-            .checked_add(1)
-            .ok_or_else(|| "desbordamiento de prox_salida".to_string())?;
         Ok(())
     }
 
@@ -662,7 +696,7 @@ impl Constructor {
         };
         self.registrar(&real, &tx.sal)?;
         if tx.tipo == "Liberacion" {
-            self.registrar_liberacion(&real, tx.importe as i64, tx.clave)?;
+            self.registrar_liberacion(&real, tx.importe, tx.clave, tx.nonce)?;
         }
         Ok((real, testigos))
     }
@@ -1068,7 +1102,7 @@ fn correr_diferencial(casos: &[Caso]) -> (String, usize) {
     (informe, discrepancias.len())
 }
 
-/// V4: diferencial completo contra el oráculo T01-D (`vectores-transicion-v0.1.txt`).
+/// V4: diferencial completo contra el oráculo T01-E (`vectores-transicion-v0.2.txt`, 2 055 casos).
 #[test]
 fn diferencial_t01() {
     let casos = cargar_casos(RUTA_VECTORES);
@@ -1080,8 +1114,8 @@ fn diferencial_t01() {
     );
 }
 
-/// V4: diferencial contra los negativos de T01-C/T01-D (`…-negativos-v0.1.txt`), incluidos los de
-/// repetición (`ErrNonce`).
+/// V4: diferencial contra los negativos de T01-E (`…-negativos-v0.2.txt`, 3 914 casos), incluidos
+/// los de repetición (`ErrNonce`).
 #[test]
 fn diferencial_t01_negativos() {
     let casos = cargar_casos(RUTA_NEGATIVOS);
