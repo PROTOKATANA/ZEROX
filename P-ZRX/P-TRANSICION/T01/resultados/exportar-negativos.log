@@ -1,0 +1,82 @@
+FECHA=2026-09-26T02:59:21+02:00
+exportar-negativos: puntos=[1, 4096, 8192] salida=resultados/vectores-transicion-negativos-v0.txt
+exportar-negativos: casos=1915 inesperados=0
+exportar-negativos: sha256=2e407c88118828d4ca2357fcdc21b43beb4b03f5874858b03c4860fb717e1792 -> resultados/vectores-transicion-negativos-v0.sha256
+RECUENTO POR ERROR
+  ErrSaldo               = 571
+  ErrDobleGasto          = 306
+  ErrRetiroPendiente     = 78
+  ErrAutorizacion        = 240
+  ErrInmaduro            = 189
+  ErrEmision             = 198
+  ErrOperacionFase       = 192
+  ErrGarantia            = 141
+RECUENTO POR FAMILIA
+  Saldo                  = 571
+  DobleGasto             = 306
+  RetiroPendiente        = 78
+  Autorizacion           = 240
+  Inmaduro               = 189
+  Garantia               = 141
+  Emision                = 198
+  OperacionFase          = 192
+RECUENTO POR FASE
+  PoW                    = 1041
+  PoST                   = 874
+RECUENTO POR SUBCASO (nombre -> error:cuenta)
+  neg-autorizacion-deposito                    ErrAutorizacion:75
+  neg-autorizacion-liberacion                  ErrAutorizacion:27
+  neg-autorizacion-retiro                      ErrAutorizacion:75
+  neg-autorizacion-transfer                    ErrAutorizacion:63
+  neg-doblegasto-deposito-salida-gastada       ErrDobleGasto:90
+  neg-doblegasto-entrada-dos-txs               ErrDobleGasto:63
+  neg-doblegasto-entrada-duplicada-tx          ErrDobleGasto:63
+  neg-doblegasto-salida-ya-gastada             ErrDobleGasto:90
+  neg-emision-r6-coinbase-no-primera           ErrEmision:75
+  neg-emision-r7-coinbase-vacia                ErrEmision:48
+  neg-emision-r9-transfer-sin-entradas         ErrEmision:75
+  neg-garantia-deposito-pendiente              ErrGarantia:6
+  neg-garantia-sin-activo                      ErrGarantia:135
+  neg-inmaduro-coinbase-inmadura-prev          ErrInmaduro:72
+  neg-inmaduro-coinbase-mismo-bloque           ErrInmaduro:48
+  neg-inmaduro-cruce-corte                     ErrInmaduro:24
+  neg-inmaduro-deposito-mismo-bloque           ErrInmaduro:45
+  neg-operacionfase-evidencia                  ErrOperacionFase:48
+  neg-operacionfase-evidencia-sola             ErrOperacionFase:48
+  neg-operacionfase-liberacion                 ErrOperacionFase:48
+  neg-operacionfase-liberacion-sola            ErrOperacionFase:48
+  neg-retiropendiente-dos-en-bloque            ErrRetiroPendiente:58
+  neg-retiropendiente-segunda                  ErrRetiroPendiente:20
+  neg-saldo-deposito-descuadra                 ErrSaldo:63
+  neg-saldo-liberacion-antes-R                 ErrSaldo:34
+  neg-saldo-liberacion-mayor-vencido           ErrSaldo:54
+  neg-saldo-r8-coinbasepost-cero               ErrSaldo:27
+  neg-saldo-r8-deposito-cero                   ErrSaldo:75
+  neg-saldo-r8-liberacion-cero                 ErrSaldo:27
+  neg-saldo-r8-retiro-cero                     ErrSaldo:75
+  neg-saldo-retiro-mayor-activo                ErrSaldo:90
+  neg-saldo-transfer-crea-valor                ErrSaldo:63
+  neg-saldo-transfer-sin-salidas               ErrSaldo:63
+	Command being timed: "env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 /home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/julia --project=. exportar_negativos.jl --fecha 2026-09-26T02:59:21+02:00"
+	User time (seconds): 3.28
+	System time (seconds): 0.06
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.34
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 446608
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 52976
+	Voluntary context switches: 5
+	Involuntary context switches: 39
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 7464
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

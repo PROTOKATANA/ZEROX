@@ -1,0 +1,39 @@
+He cumplido **ORDEN-T01-C**. Resumen verificable:
+
+## Falta de definición (informada antes de editar)
+No encontré ninguna que bloqueara la orden. Dejé declaradas 5 decisiones de lectura, todas resueltas con la interpretación más compatible y documentadas en `INFORME.md §C` y `PROGRESO.md §T01-C.2`:
+1. **Liberación antes de `R_slots`** — §3.2 delega el error al oráculo; el oráculo da **`ErrSaldo`** (`vencido = 0`). Se declara y se cuenta en `ErrSaldo`, sin relabelar (34 casos).
+2. **«Familia»** = nombre de error; publico además el desglose por subcaso.
+3. **«Varios puntos»** = los 3 de T01-B (índices 1, 4096, 8192 de los 8192 por defecto).
+4. **`.sha256`** con `<hash>  resultados/...txt` (verificable con `sha256sum -c` desde `T01/`).
+5. **«Depósito pendiente usado para producir»** → `ErrGarantia` con un prefijo válido de 2 bloques PoST; solo aplica con `M_dep_slots ≥ 2`.
+
+## Respuesta falsable: **SUPERADA**
+`resultados/vectores-transicion-negativos-v0.txt` — **1 915 casos**, todos con error esperado a mano y **confirmado por el oráculo (0 inesperados)**:
+
+| Error | Casos | PoW | PoST |
+|---|---:|---:|---:|
+| `ErrSaldo` | 571 | 240 | 331 |
+| `ErrDobleGasto` | 306 | 144 | 162 |
+| `ErrRetiroPendiente` | 78 | 24 | 54 |
+| `ErrAutorizacion` | 240 | 132 | 108 |
+| `ErrInmaduro` | 189 | 165 | 24 |
+| `ErrEmision` | 198 | 144 | 54 |
+| `ErrOperacionFase` | 192 | 192 | 0 |
+| `ErrGarantia` | 141 | 0 | 141 |
+
+Cubiertos todos los subcasos de §3.2 (R-6/R-7/R-8/R-9, doble gasto intra-tx/inter-tx/ya gastada, ambos sentidos de autorización, inmadurez PoW y cruce de corte, etc.). Los 8 errores del fichero son exactamente los 8 objetivos (10 810 `OK` solo en prefijos válidos).
+
+## Evidencia
+- **Relectura independiente** (`src/lector_vectores.jl`, sin funciones del exportador): `leidos_casos = 1915`, `discrepancias = 0`.
+- **Determinismo**: dos corridas con la misma `--fecha` → `sha256 = 2e407c88118828d4ca2357fcdc21b43beb4b03f5874858b03c4860fb717e1792`.
+- **`sha256sum -c`** → «La suma coincide». Los vectores de **T01-B quedan intactos** (`06d95324…41e6d766`, relectura sigue con 0 discrepancias).
+- **`Pkg.test()`**: todos los testsets pasan (`PKGTEST_EXIT=0`), `resultados/test-T01-C.log`.
+- **Entrada congelada** `ENTRADA-T01-C.sha256`: OK las 4 al empezar y al terminar.
+
+## Entregables
+- `src/generadores_negativos.jl` (nuevo) y `include`/exports en `src/Transicion.jl` (sin tocar la semántica de `Transicion.jl`/`seleccion.jl`/`nodo.jl`).
+- `exportar_negativos.jl` (nuevo).
+- `resultados/vectores-transicion-negativos-v0.txt` (3 783 196 B, 61 843 líneas) y `.sha256`.
+- Logs: `exportar-negativos.log`, `relectura-negativos.log`, `determinismo-negativos.log`, `test-T01-C.log`.
+- `INFORME.md`, `PROGRESO.md` (secciones T01-C) y `HORAS.log` (02:50:25–03:02:18, ~12 min; presupuesto 1 h). Sin Python, sin commit/push, nada fuera de `T01/`.

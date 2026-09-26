@@ -41,6 +41,8 @@ export puntos_rejilla, generar_historia, construir_poW, extender_post,
        genesis_bloque, gen_pow, gen_post, bloque_invalido, escenarios_rechazo,
        prefijo_comun, hijo_pow, cadena_post, historia_dos_terminales,
        historia_reorg
+export CasoNegativo, casos_negativos, casos_bloque, puntos_negativos,
+       casos_garantia_insuficiente, casos_garantia_pendiente, cadena_base
 
 # ---------------------------------------------------------------------------
 # Enumeraciones
@@ -883,5 +885,6 @@ hash_canonico(E::Estado) = bytes2hex(sha256(representacion_canonica(E)))
 include("seleccion.jl")
 include("nodo.jl")
 include("generadores.jl")
+include("generadores_negativos.jl")   # T01-C: casos negativos de transacción
 
 end # module

@@ -345,3 +345,136 @@ Comprobación de `ENTRADA-T01-B.sha256` al terminar (desde
 Nada fuera de `T01/` se modificó; sin commit ni push; sin secretos; sin Python.
 Presupuesto (1 h 30 min, 1 hilo, 8 GiB) respetado con holgura: sesión
 02:08–02:25 (~17 min de reloj).
+
+---
+
+# PROGRESO — T01-C
+
+Bitácora de la orden T01-C (vectores negativos de transacción). Presupuesto
+declarado **antes** de ejecutar: 1 h de reloj, 1 hilo, 4 GiB de RAM; prohibido
+Python. Horas solo de `date -Is` (`HORAS.log`): sesión 02:50:25–03:02:18.
+
+## T01-C.1. Comprobación de la entrada congelada (inicio)
+
+Comando (desde `/home/katana/zeo/ZEROX`):
+
+    LC_ALL=C sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01-C.sha256
+
+Salida completa:
+
+    P-ZRX/P-TRANSICION/ORDEN-T01-C.md: OK
+    P-ZRX/P-TRANSICION/CONTRATO-v0.md: OK
+    P-ZRX/P-TRANSICION/ORDEN-T01-B.md: OK
+    V-ZRX/LINEO.md: OK
+
+Lectura íntegra confirmada de `ORDEN-T01-C.md`, `V-ZRX/LINEO.md`,
+`CONTRATO-v0.md` (con «Ratificaciones v0.1»), `ORDEN-T01-B.md` y todo el código
+y documentos de `T01/`.
+
+## T01-C.2. Falta de definición detectada ANTES de editar (obligatorio informar)
+
+Se registran las lecturas que admiten más de una implementación; ninguna
+bloquea la orden ni obliga a detenerse. Se aplica la lectura más compatible con
+§3 y §4 y se declara aquí y en `INFORME.md` §C.
+
+### T01-C/AMBIGUEDAD-1 — «Liberación antes de `R_slots`»
+§3.2 pide el caso «el error que dé el oráculo, declarado». Lectura aplicada: se
+genera el caso (retiro y liberación en el mismo bloque PoST) y se **declara** el
+error real del oráculo, que es `ErrSaldo` (`vencido = 0`). Se contabiliza en la
+familia `ErrSaldo`; no se relabela. Regla afectada: §3.2.
+
+### T01-C/AMBIGUEDAD-2 — Unidad de recuento de «familia»
+§1 pide ≥30 casos por «familia»; §3.2 enumera subcasos. Lectura aplicada:
+familia = nombre de error (`ErrSaldo`…`ErrGarantia`); se cuenta por `RES`
+confirmado por el oráculo y se publica además el desglose por subcaso. Regla
+afectada: §1/§3.2.
+
+### T01-C/AMBIGUEDAD-3 — «Varios puntos de la rejilla por defecto»
+§3.2 no fija cuántos. Lectura aplicada: los mismos tres puntos que T01-B
+(índices 1, 4 096 y 8 192 de los 8 192 puntos por defecto), con lo que el
+fichero nuevo es comparable con `vectores-transicion-v0.txt`. Regla afectada:
+§3.2.
+
+### T01-C/AMBIGUEDAD-4 — Formato del `.sha256`
+§3.3 exige `<hash>  <nombre>` (`sha256sum`). Lectura aplicada: `<nombre>` es la
+ruta `resultados/vectores-transicion-negativos-v0.txt`, de modo que
+`sha256sum -c` funciona desde `T01/`. Regla afectada: §3.3.
+
+### T01-C/AMBIGUEDAD-5 — «Depósito pendiente usado para producir»
+§3.2 lo aparta a `ErrGarantia`. Lectura aplicada: además de productores sin
+garantía activa, se construye un prefijo válido de dos bloques PoST (transferencia
+a una clave sin garantía y depósito de esa salida) que deja `pend=[1@s…]`, y el
+bloque negativo produce con esa clave ⇒ `ErrGarantia`. Solo aplica con
+`M_dep_slots ≥ 2`; en el punto 1 (`M_dep_slots = 1`) el pendiente maduraría en el
+punto del bloque y no habría caso. Regla afectada: §3.2.
+
+No hay ninguna falta de definición que impida exportar.
+
+## T01-C.3. Código añadido
+
+Sin tocar la semántica de `src/Transicion.jl`/`src/seleccion.jl`/`src/nodo.jl`:
+
+- `src/generadores_negativos.jl` (nuevo): `CasoNegativo` y `casos_negativos(P)`;
+  construye los bloques de rechazo sobre cadenas base válidas
+  (`construir_poW`/`extender_post`) y fija el error esperado por subcaso. Usa el
+  estado **tras la promoción** y el punto del bloque negativo (altura/slot
+  propios) para elegir entradas gastables y calcular activos/vencidos, porque
+  `aplicar_pow!`/`aplicar_post!` promueven antes de las transacciones.
+- `src/Transicion.jl`: `include("generadores_negativos.jl")` y exports.
+- `exportar_negativos.jl` (nuevo): exportador determinista con el mismo formato
+  de líneas que T01-B, verificación de cada caso contra el oráculo (aborta si
+  hay inesperados), `sha256sum` y tablas de recuento.
+
+## T01-C.4. Exportación, recuentos, relectura y determinismo
+
+Comandos (1 hilo, sin Python, con `/usr/bin/time -v`):
+
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. exportar_negativos.jl --fecha 2026-09-26T02:59:21+02:00
+    # casos=1915  inesperados=0
+    # sha256=2e407c88118828d4ca2357fcdc21b43beb4b03f5874858b03c4860fb717e1792
+    # 3,34 s de pared, 100 % CPU, máx. RSS ≈ 436 MiB
+
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. src/lector_vectores.jl \
+        resultados/vectores-transicion-negativos-v0.txt
+    # leidos_casos=1915  discrepancias=0  SIN DISCREPANCIAS
+    # 2,08 s, máx. RSS ≈ 381 MiB
+
+    sha256sum -c resultados/vectores-transicion-negativos-v0.sha256
+    # resultados/vectores-transicion-negativos-v0.txt: La suma coincide
+
+Recuento por error (RES confirmado por el oráculo), mínimo 30 cada uno:
+
+| Error | Casos | PoW | PoST |
+|---|---:|---:|---:|
+| `ErrSaldo` | 571 | 240 | 331 |
+| `ErrDobleGasto` | 306 | 144 | 162 |
+| `ErrRetiroPendiente` | 78 | 24 | 54 |
+| `ErrAutorizacion` | 240 | 132 | 108 |
+| `ErrInmaduro` | 189 | 165 | 24 |
+| `ErrEmision` | 198 | 144 | 54 |
+| `ErrOperacionFase` | 192 | 192 | 0 |
+| `ErrGarantia` | 141 | 0 | 141 |
+
+Fichero: `resultados/vectores-transicion-negativos-v0.txt` (3 783 196 B,
+61 843 líneas, 1 915 casos) y `resultados/vectores-transicion-negativos-v0.sha256`
+(`<hash>  resultados/vectores-transicion-negativos-v0.txt`). Determinismo
+(`resultados/determinismo-negativos.log`): dos corridas con la misma `--fecha`
+dan `2e407c88…e1792`.
+
+## T01-C.5. Tests y cierre
+
+`Pkg.test()`: **todos los testsets pasan** (`PKGTEST_EXIT=0`,
+`resultados/test-T01-C.log`). Las 1 915 historias del fichero no se añaden a la
+batería (el exportador ya las confirma una a una); `test/runtests.jl` no se toca.
+
+Comprobación de `ENTRADA-T01-C.sha256` al terminar (desde `/home/katana/zeo/ZEROX`):
+
+    P-ZRX/P-TRANSICION/ORDEN-T01-C.md: OK
+    P-ZRX/P-TRANSICION/CONTRATO-v0.md: OK
+    P-ZRX/P-TRANSICION/ORDEN-T01-B.md: OK
+    V-ZRX/LINEO.md: OK
+
+Nada fuera de `T01/` se modificó; sin commit ni push; sin secretos; sin Python.
+Presupuesto (1 h, 1 hilo, 4 GiB) respetado con holgura: sesión de ~12 min de reloj.

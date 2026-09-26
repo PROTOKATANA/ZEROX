@@ -289,3 +289,136 @@ solo en esa línea.
 - **No demuestra determinismo entre máquinas**: solo reproducibilidad en esta
   máquina, versión y semilla; el orden del `Dict` interno se neutraliza con
   ordenaciones explícitas, pero no se ha comparado con otro hardware.
+
+---
+
+# INFORME — T01-C (vectores negativos de transacción)
+
+## C.1. Veredicto
+
+**SUPERADO.** `resultados/vectores-transicion-negativos-v0.txt` contiene
+**1 915** casos dirigidos, cada uno con el error esperado **escrito a mano**
+(`CasoNegativo.esperado`) y **confirmado por el oráculo** (0 inesperados). Los
+casos cubren los tres puntos de la rejilla por defecto que ya usó T01-B
+(índices 1, 4 096 y 8 192 de los 8 192 puntos con `CUT_HWPhi`/`FC3`/`SEC0`) y
+ambas fases. **Las ocho familias** de rechazo de transacción superan el mínimo
+de 30 casos (tabla C.2). Un lector independiente (`src/lector_vectores.jl`, que
+no reutiliza nada del exportador) reconstruye, reejecuta y compara los 1 915
+casos con **0 discrepancias**; dos ejecuciones con la misma `--fecha` producen
+el mismo `sha256`. `test/runtests.jl` sigue pasando entero.
+
+- Fichero: 3 783 196 B, 61 843 líneas, 1 915 casos (`CASO` = `FIN` = 1 915).
+- `sha256`: `2e407c88118828d4ca2357fcdc21b43beb4b03f5874858b03c4860fb717e1792`
+  (formato `sha256sum`: `<hash>  resultados/vectores-transicion-negativos-v0.txt`).
+- Encabezado con la fecha `2026-09-26T02:59:21+02:00` y el sha256 del contrato
+  (`e84d5717…f02c916`, el mismo de `ENTRADA-T01-C.sha256`).
+- Solo se exportan `RES` con **un** error de la lista objetivo; no aparece ningún
+  `ErrSinPadre`, `ErrPow`, `ErrSlot`, `ErrGenesis`, `ErrFueraDeAlcanceV0` ni
+  `OK` en el bloque negativo (10 810 `OK` en los prefijos válidos).
+
+## C.2. Recuento por familia (RES confirmado por el oráculo)
+
+| Familia (error) | Casos | PoW | PoST | Mínimo §3.2 | Subcasos |
+|---|---:|---:|---:|---:|---|
+| `ErrSaldo` | **571** | 240 | 331 | ≥30 | 10 |
+| `ErrDobleGasto` | **306** | 144 | 162 | ≥30 | 4 |
+| `ErrRetiroPendiente` | **78** | 24 | 54 | ≥30 | 2 |
+| `ErrAutorizacion` | **240** | 132 | 108 | ≥30 | 4 |
+| `ErrInmaduro` | **189** | 165 | 24 | ≥30 | 4 |
+| `ErrEmision` | **198** | 144 | 54 | ≥30 | 3 (R-6/R-7/R-9) |
+| `ErrOperacionFase` | **192** | 192 | 0 | ≥30 | 4 |
+| `ErrGarantia` | **141** | 0 | 141 | ≥30 | 2 |
+
+Totales por fase: **PoW = 1 041**, **PoST = 874**. `ErrOperacionFase` solo aplica
+en PoW (evidencia/liberación en PoW); `ErrGarantia` solo aplica en PoST (garantía
+de producción); el resto cubre ambas fases. El recuento completo por subcaso está
+en `resultados/exportar-negativos.log`.
+
+## C.3. Subcasos exigidos por §3.2
+
+- **`ErrSaldo`**: transferencia que crea valor (63); transferencia con entradas y
+  sin salidas de R-9 (63); depósito que no cuadra (63); retiro mayor que el
+  activo (90); liberación mayor que lo vencido (54); importe 0 de R-8 en
+  `CoinbasePost` (27), `Deposito` (75), `Retiro` (75) y `Liberacion` (27); y
+  **liberación antes de `R_slots`** (34, ver C.6).
+- **`ErrDobleGasto`**: misma entrada dos veces en una tx (63); misma entrada en
+  dos txs del mismo bloque (63); gasto de una salida ya gastada en transferencia
+  (90) y en depósito (90).
+- **`ErrRetiroPendiente`**: segunda retirada con una `en_retirada` viva (20); dos
+  retiros en el mismo bloque (58).
+- **`ErrAutorizacion`**: transferencia (63), depósito (75), retiro (75) y
+  liberación (27) firmados por otra clave.
+- **`ErrInmaduro`**: gasto de la coinbase del propio bloque en PoW (48); gasto de
+  una coinbase inmadura del estado padre (72); depósito de la coinbase del propio
+  bloque (45); y gasto cruzando el corte antes de `s_0 + M_res_slots` (24).
+- **`ErrEmision`**: R-7 coinbase PoW sin salidas (48); R-6 coinbase única fuera
+  de la primera posición (75); R-9 transferencia sin entradas (75).
+- **`ErrOperacionFase`**: liberación en PoW (48), evidencia en PoW (48) y sus
+  variantes sin coinbase previa (48 + 48).
+- **`ErrGarantia`**: productor sin garantía activa (135) y **depósito pendiente
+  usado para producir** (6): un bloque PoST válido transfiere 1 brek a una clave
+  sin garantía, el siguiente bloque válido lo deposita (queda `pend=[importe@s…]`)
+  y el bloque negativo produce con esa clave; el oráculo solo mira `past(B)` y
+  devuelve `ErrGarantia` en los 6 casos (puntos 4 096 y 8 192, `M_dep_slots = 2`).
+
+## C.4. Relectura independiente y determinismo
+
+`src/lector_vectores.jl` (analizador y render propios, sin funciones del
+exportador) sobre el fichero nuevo:
+
+    leidos_casos = 1915
+    discrepancias = 0
+    VEREDICTO_LECTURA = SIN DISCREPANCIAS
+
+Comprueba `RES`, `SEL`, `UTXO`, `GAR` y `EST` de cada caso, además de las
+propiedades extra que ya traía para T01-B (no aplican a estos nombres). La
+comprobación `sha256sum -c` pasa:
+
+    resultados/vectores-transicion-negativos-v0.txt: La suma coincide
+
+Determinismo (`resultados/determinismo-negativos.log`): dos ejecuciones con
+`--fecha 2026-09-26T02:59:21+02:00` dan el mismo hash `2e407c88…e1792`.
+
+## C.5. Entorno, comandos y tiempos
+
+1 hilo (`JULIA_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`), Julia 1.13.0, sin
+Python. Presupuesto T01-C: 1 h, 1 hilo, 4 GiB.
+
+    export JULIA_DEPOT_PATH=…/T01/.julia-depot:
+    export JULIA=…/julia-1.13.0+0.x64.linux.gnu/bin/julia
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. exportar_negativos.jl --fecha 2026-09-26T02:59:21+02:00
+    # casos=1915 inesperados=0
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. src/lector_vectores.jl \
+        resultados/vectores-transicion-negativos-v0.txt
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+- `exportar_negativos.jl`: 3,34 s de pared, 100 % CPU, máx. RSS ≈ 436 MiB.
+- lector independiente: 2,08 s, máx. RSS ≈ 381 MiB.
+- `Pkg.test()`: todos los testsets pasan (`PKGTEST_EXIT=0`), ver
+  `resultados/test-T01-C.log`; X-01…X-15 38/38, R-6…R-9 10/10, X-16…X-20 2/2
+  cada uno, I-1…I-7 9/9 con 0 fallos (58,2 s).
+- Tiempo total de la sesión: 02:50:25–03:02:18 (`HORAS.log`), muy por debajo de
+  la hora de presupuesto.
+
+## C.6. Declaración sobre «liberación antes de `R_slots`»
+
+§3.2 pide ese caso «el error que dé el oráculo, declarado». El oráculo
+(`aplicar_liberacion!`) calcula `vencido` como la suma de las retiradas con
+`inicio_slot + R_slots ≤ slot`; antes de `R_slots` vale 0 y
+`importe > vencido ⇒ ErrSaldo`. Por tanto los 34 casos «liberación antes de
+`R_slots`» se confirman y **se declaran como `ErrSaldo`** (no `ErrInmaduro`), y
+se contabilizan dentro de la familia `ErrSaldo`. Ningún caso se relabela.
+
+## C.7. Lo que T01-C NO demuestra
+
+- **No añade semántica**: los generadores solo construyen bloques de rechazo
+  sobre estados válidos de T01; no tocan `Transicion.jl`/`seleccion.jl`/`nodo.jl`.
+- **No cubre operaciones de sector** (`SEC-A`), fuera de las interfaces por
+  defecto; `AltaSector`/`PruebaSector` no aparecen en el fichero.
+- **No prueba firmas reales**: `firmante`/`clave` son enteros simbólicos.
+- **No exporta X-12/X-15** ni cambia los vectores de T01-B.
+- **No demuestra determinismo entre máquinas**: solo en esta máquina, versión y
+  semilla; el orden interno se neutraliza con ordenaciones explícitas.
