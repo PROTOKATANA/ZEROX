@@ -11,7 +11,7 @@ using EstadoDAG
 import EstadoDAG.Transicion
 using SHA
 
-const RUTA_DEF = "resultados/vectores-estado-dag-v0.txt"
+const RUTA_DEF = "resultados/vectores-estado-dag-v0.1.txt"
 
 const FAMILIA_DE = Dict("Genesis" => Transicion.Genesis, "PoW" => Transicion.PoW,
                         "PoST" => Transicion.PoST)
@@ -49,7 +49,8 @@ function r_gar(E::Transicion.Estado)
         cred = sort(g.creditos, by = p -> (p.importe, p.madura_en_slot))
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
         push!(ls, string("GAR clave=", k, " activo=", g.activo, " pend=[", ps,
-                         "] ret=[", rs, "] cred=[", cs, "] congelado=", g.congelado))
+                         "] ret=[", rs, "] cred=[", cs, "] congelado=", g.congelado,
+                         " nonce=", g.nonce_siguiente))
     end
     return ls
 end
@@ -102,6 +103,8 @@ function parsear_tx(linea::AbstractString)
     importe = parse(UInt64, c["importe"])
     ent = parsear_entradas(c["ent"])
     sal = parsear_salidas(c["sal"])
+    # T04-B (F-15): el `nonce=` de las operaciones de garantía; 0 si no aparece.
+    nonce = haskey(c, "nonce") ? parse(UInt64, c["nonce"]) : UInt64(0)
     if tipo == "Coinbase"
         return Transicion.tx_coinbase(sal)
     elseif tipo == "CoinbasePost"
@@ -109,15 +112,15 @@ function parsear_tx(linea::AbstractString)
     elseif tipo == "Transferencia"
         return Transicion.tx_transferencia(ent, sal, firmante)
     elseif tipo == "Deposito"
-        return Transicion.tx_deposito(ent, clave, importe, firmante)
+        return Transicion.tx_deposito(ent, clave, importe, firmante; nonce = nonce)
     elseif tipo == "Retiro"
-        return Transicion.tx_retiro(clave, importe, firmante)
+        return Transicion.tx_retiro(clave, importe, firmante; nonce = nonce)
     elseif tipo == "Liberacion"
-        return Transicion.tx_liberacion(clave, importe, firmante)
+        return Transicion.tx_liberacion(clave, importe, firmante; nonce = nonce)
     elseif tipo == "Evidencia"
         return Transicion.tx_evidencia(clave)
     end
-    error("tipo de tx no releíble en formato v0 (SEC-0): $tipo")
+    error("tipo de tx no releíble en formato v0.1 (SEC-0): $tipo")
 end
 
 function parsear_params(c::Dict{String,String})

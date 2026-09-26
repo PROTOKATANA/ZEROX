@@ -72,6 +72,34 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
         @test A.validos[m.Tb1]
         @test A.validos[m.Tb2]
         @test A.por_id[m.Tb1].slot == A.por_id[m.Tb2].slot
+
+        # T04-B (F-15): repetición, orden inverso de nonces y reorg.
+        nombre, A, m = EstadoDAG.caso_nonce_repeticion_fusionada(pd)
+        S, _, desc = aplicar_historia(A)
+        errs = [d for d in desc if d[3] == Transicion.ErrNonce]
+        @test A.validos[m.X1] && A.validos[m.X2]
+        @test length(errs) == 1
+        @test errs[1][1] == m.segundo
+        @test errs[1][2] == 2
+        @test length(S.garantias[1].en_retirada) == 1
+        @test S.garantias[1].nonce_siguiente == m.n + UInt64(1)
+
+        nombre, A, m = EstadoDAG.caso_nonce_orden_inverso(pd)
+        S, _, desc = aplicar_historia(A)
+        errs = [d for d in desc if d[3] == Transicion.ErrNonce]
+        @test length(errs) == 1
+        @test errs[1][1] == m.Xa
+        @test S.garantias[m.clave].nonce_siguiente == m.n + UInt64(1)
+        @test !haskey(S.utxo, m.utxo)
+
+        nombre, A, m = EstadoDAG.caso_nonce_reorg(pd)
+        S, _, _ = aplicar_historia(A)
+        @test m.tipA1 == m.A1
+        @test m.tipB3 == m.B3
+        @test m.tipA3 == m.A3
+        @test m.retiros_B == 1
+        @test S.garantias[1].nonce_siguiente == m.n + UInt64(1)
+        @test length(S.garantias[1].en_retirada) == 1
     end
 
     @testset "propiedades IE-1…IE-6" begin
@@ -102,7 +130,7 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
     end
 
     @testset "relectura de vectores" begin
-        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.txt")
+        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.1.txt")
         if isfile(ruta)
             cmd = `$(Base.julia_cmd()) --project=$(dirname(@__DIR__)) $(joinpath(@__DIR__, "..", "src", "lector_vectores.jl")) $ruta`
             p = run(ignorestatus(cmd))

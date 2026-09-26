@@ -1,0 +1,32 @@
+     Testing EstadoDAG
+      Status `/tmp/jl_1dYthN/Project.toml`
+  [861a8166] Combinatorics v1.1.0
+  [56f23c91] EstadoDAG v0.1.0 `~/zeo/ZEROX/P-ZRX/P-DAG/T04`
+  [860ef19b] StableRNGs v1.0.4
+  [de0858da] Printf v1.11.0
+  [9a3f8284] Random v1.11.0
+  [ea8e919c] SHA v1.0.0
+  [8dfed614] Test v1.11.0
+      Status `/tmp/jl_1dYthN/Manifest.toml`
+  [861a8166] Combinatorics v1.1.0
+  [56f23c91] EstadoDAG v0.1.0 `~/zeo/ZEROX/P-ZRX/P-DAG/T04`
+  [860ef19b] StableRNGs v1.0.4
+  [2a0f44e3] Base64 v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [ac6e5ff7] JuliaSyntaxHighlighting v1.12.0
+  [56ddb016] Logging v1.11.0
+  [d6f4376e] Markdown v1.11.0
+  [de0858da] Printf v1.11.0
+  [9a3f8284] Random v1.11.0
+  [ea8e919c] SHA v1.0.0
+  [9e88b42a] Serialization v1.11.0
+  [f489334b] StyledStrings v1.11.0
+  [8dfed614] Test v1.11.0
+  [4ec0a83e] Unicode v1.11.0
+     Testing Running tests...
+leidos_casos = 911
+discrepancias = 0
+VEREDICTO_LECTURA = SIN DISCREPANCIAS
+Test Summary: | Pass  Total  Time
+T04           |  377    377  8.3s
+     Testing EstadoDAG tests passed 

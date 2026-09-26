@@ -137,3 +137,72 @@ referencia y la batería completa cabe en 50 s.
 17. La pregunta falsable de la orden no se refuta: ED-1…ED-6 conservan el valor, aplican una vez,
     no dependen del orden, se deshacen y coinciden con T01 con `k=0` sin fusiones.
 18. Veredicto: **SUPERADO**.
+
+---
+
+# T04-B — Nonce por clave (F-15) en el estado DAG y reexportación
+
+**Veredicto: SUPERADO.** Sobre `ORDEN-T04-B` y la «Corrección v0.1» de `FORMATO-v0.md` (F-15), el
+oráculo conserva ED-1…ED-6 e IE-1…IE-6, descarta la operación de garantía repetida con `ErrNonce`
+en modo fusión, y los vectores reexportados se releen sin discrepancias. Presupuesto consumido:
+46,7 s de `run.jl` (tope 1 h 30 min), 1 hilo, 8 GiB declarados.
+
+## B.1. Qué cambia y qué no
+
+- **Semántica sin cambios.** F-15 no obliga a tocar `aplicar_bloque_fusion!`: la tabla §3 del
+  contrato ya ordena **descartar** toda transacción que no valida, y en T01-D `comprobar_nonce!` va
+  **primero** en depósito, retiro y liberación. Una operación con `nonce ≠ nonce_siguiente[P]`
+  produce `ErrNonce`, que el modo fusión descarta dejando el estado intacto (no consume entradas).
+  No se modificó ningún fichero de T01 ni la lógica de T04 (AMBIGUEDAD-B4).
+- **Casos dirigidos nuevos** (`src/dirigidos.jl`), construidos a mano:
+  - **D-9** — el mismo retiro (mismo `txid`, nonce `n`) en dos bloques hermanos fusionados: se aplica
+    la primera en `C-GD-05`, la segunda se descarta con `ErrNonce`; ambos bloques válidos.
+  - **D-10** — dos depósitos de la misma clave con nonces `n` y `n+1` en hermanos, en orden inverso a
+    `C-GD-05`: el de `n+1` (que va primero) se descarta; el de `n` se aplica. El UTXO compartido no
+    se quema con el descarte (la comprobación de nonce precede al consumo).
+  - **D-11** — repetición tras reorganización: el mismo retiro firmado en dos ramas hermanas; al
+    reorganizar hacia la rama que lo contiene, el efecto aparece **una sola vez** y
+    `nonce_siguiente` avanza una sola vez; al reorganizar de vuelta, sigue una sola vez.
+- **Vectores v0.1.** `resultados/vectores-estado-dag-v0.1.txt` con el formato de T04 más `nonce=` al
+  final de las líneas `TX` de depósito, retiro y liberación y `nonce=<nonce_siguiente>` en `GAR`.
+  Se conservan intactos `vectores-estado-dag-v0.txt` y su `.sha256`.
+
+## B.2. Resultados
+
+| Comprobación | Resultado |
+|---|---|
+| Entrada congelada `ENTRADA-T04-B.sha256` | 4/4 `OK` |
+| Casos dirigidos D-1…D-11 | 11/11 sin fallos |
+| D-9 repetición fusionada | 1 `ErrNonce` (segundo en `C-GD-05`), 1 retiro aplicado |
+| D-10 nonces `n`/`n+1` invertidos | 1 `ErrNonce` (el de `n+1`), depósito de `n` aplicado, UTXO consumido |
+| D-11 reorg con replay | 1 retiro y `nonce_siguiente = n+1` en ambas selecciones |
+| Vectores v0.1 | **911 casos** (11 dirigidos + 900 aleatorios), 737 descartes `ErrNonce` |
+| `sha256` v0.1 | `e8f7a6dcce5bcb2cfdb50dd49f59205d9a045dc492be71eca93a788ccf74b51f` |
+| Relectura independiente (`src/lector_vectores.jl`) | 911 casos, **0 discrepancias** |
+| `run.jl --seed 0x5a5a --replicas 200` | 3000 historias, 25380 bloques, 16020 válidos, 3721 descartes, 1393 `rojo_U3`, 673650 órdenes IE-3, **0 fallos**, 46,7 s |
+| `Pkg.test()` | **377/377 OK**, 8,3 s (incluye relectura v0.1) |
+
+Pregunta falsable de la orden: con F-15, IE-1…IE-6 siguen sin fallos, la operación repetida en dos
+bloques fusionados se aplica una sola vez (la segunda se descarta con `ErrNonce`) y los vectores
+reexportados se releen sin discrepancias. **No se refuta.**
+
+## B.3. Falta de definición (registrada antes de editar, `PROGRESO.md` §B.1)
+
+AMBIGUEDAD-B1 (posición de `nonce=` en `TX`: al final, como T01-D), B2 (`GAR`: `nonce_siguiente` al
+final), B3 (911 casos: 900 aleatorios como v0 + 11 dirigidos), B4 (no se cambia el modo fusión: el
+descarte genérico ya cumple F-15), B5 (repetición tras reorg: mismo retiro en dos ramas, reorg y
+vuelta). Ninguna obligó a elegir entre reglas incompatibles.
+
+## B.4. Reproducibilidad
+
+```
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export PATH=/home/katana/torio/.juliaup/bin:$PATH
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH julia --project=. run.jl --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH julia --project=. exportar.jl --dirigidos 1 --aleatorios 900
+env -u LD_LIBRARY_PATH julia --project=. src/lector_vectores.jl resultados/vectores-estado-dag-v0.1.txt
+env -u LD_LIBRARY_PATH julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de `T04/`.

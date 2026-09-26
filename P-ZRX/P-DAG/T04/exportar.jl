@@ -1,11 +1,12 @@
 # exportar.jl — exportador determinista de vectores de estado DAG (ORDEN-T04 §4).
 #
 #     julia --project=. exportar.jl [--fecha ISO-8601] [--salida RUTA] \
-#         [--contrato RUTA] [--dirigidos 1] [--aleatorios 600]
+#         [--contrato RUTA] [--dirigidos 1] [--aleatorios 900]
 #
-# Escribe `resultados/vectores-estado-dag-v0.txt` (formato de T01-B ampliado con
-# `padres=[…]` y líneas `DESC`) y su `sha256` en el `.sha256`. Solo interfaces por
-# defecto (CUT_HWPhi, FC3, SEC0) y la rejilla declarada de T04. Un hilo, sin Python.
+# Escribe `resultados/vectores-estado-dag-v0.1.txt` (formato de T01-B ampliado con
+# `padres=[…]`, líneas `DESC` y `nonce=` en depósito/retiro/liberación y `GAR`) y su
+# `sha256` en el `.sha256` (formato `sha256sum`). Solo interfaces por defecto
+# (CUT_HWPhi, FC3, SEC0) y la rejilla declarada de T04. Un hilo, sin Python.
 #
 # El lector independiente vive en `src/lector_vectores.jl` y NO reutiliza ninguna
 # función de este fichero.
@@ -17,7 +18,8 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md"
-const SALIDA_DEF = "resultados/vectores-estado-dag-v0.txt"
+# T04-B: la salida lleva el formato v0 más `nonce=` (F-15). Los ficheros v0 se conservan.
+const SALIDA_DEF = "resultados/vectores-estado-dag-v0.1.txt"
 
 const NOMBRE_FAMILIA = Dict(Transicion.Genesis => "Genesis", Transicion.PoW => "PoW",
                             Transicion.PoST => "PoST")
@@ -81,12 +83,18 @@ param_str(pd::ParamsDAG) = begin
            " k=", pd.k, " sec=SEC0 corte=CUT_HWPhi seleccion=FC3")
 end
 
+# T04-B: `nonce=` al final de la línea en depósito, retiro y liberación (F-15),
+# siguiendo la convención de T01-D (D/AMBIGUEDAD-6).
 function tx_str(tx::Transicion.Tx)
     ent = join(string.(tx.entradas), ",")
     sal = join(["$(s.id):$(s.valor):$(s.dueño)" for s in tx.salidas], ",")
-    string("TX tipo=", NOMBRE_TIPO[tx.tipo], " firmante=", tx.firmante,
-           " clave=", tx.clave, " importe=", tx.importe, " ent=[", ent,
-           "] sal=[", sal, "]")
+    base = string("TX tipo=", NOMBRE_TIPO[tx.tipo], " firmante=", tx.firmante,
+                  " clave=", tx.clave, " importe=", tx.importe, " ent=[", ent,
+                  "] sal=[", sal, "]")
+    if tx.tipo in (Transicion.TxDeposito, Transicion.TxRetiro, Transicion.TxLiberacion)
+        return base * " nonce=" * string(tx.nonce)
+    end
+    return base
 end
 
 function bloque_pow_str(b::Transicion.Bloque)
@@ -126,7 +134,8 @@ function gar_str(E::Transicion.Estado)
         cred = sort(g.creditos, by = p -> (p.importe, p.madura_en_slot))
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
         push!(ls, string("GAR clave=", k, " activo=", g.activo, " pend=[", ps,
-                         "] ret=[", rs, "] cred=[", cs, "] congelado=", g.congelado))
+                         "] ret=[", rs, "] cred=[", cs, "] congelado=", g.congelado,
+                         " nonce=", g.nonce_siguiente))
     end
     return ls
 end
@@ -185,7 +194,7 @@ function main()
     salida = get(cfg, "salida", SALIDA_DEF)
     contrato = get(cfg, "contrato", CONTRATO_DEF)
     con_dirigidos = get(cfg, "dirigidos", "1") != "0"
-    n_aleatorios = parse(Int, get(cfg, "aleatorios", "600"))
+    n_aleatorios = parse(Int, get(cfg, "aleatorios", "900"))
 
     puntos = PUNTOS_T04
     @printf("exportar: puntos=%d aleatorios=%d salida=%s\n", length(puntos),
@@ -193,7 +202,7 @@ function main()
     flush(stdout)
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-estado-dag-v0 · T04 · ", fecha,
+    println(io, "# vectores-estado-dag-v0.1 · T04 · ", fecha,
             " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     if con_dirigidos
@@ -218,7 +227,7 @@ function main()
     close(io)
     h = sha256_archivo(salida)
     sha_path = replace(salida, r"\.txt$" => "") * ".sha256"
-    write(sha_path, h * "\n")
+    write(sha_path, h * "  " * salida * "\n")   # formato `sha256sum` (T04-B)
     @printf("exportar: casos=%d sha256=%s -> %s\n", n, h, sha_path)
     flush(stdout)
 end

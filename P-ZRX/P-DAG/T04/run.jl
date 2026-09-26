@@ -96,6 +96,27 @@ function main()
     _, Ah, mh = EstadoDAG.caso_hermanos_transicion(pd1)
     (Ah.validos[mh.Tb1] && Ah.validos[mh.Tb2]) ||
         push!(fallos_globales, "dirigido D-8 hermanos")
+    # T04-B (F-15): repetición, orden inverso de nonces y reorganización.
+    _, A9, m9 = EstadoDAG.caso_nonce_repeticion_fusionada(pd1)
+    S9, _, d9 = aplicar_historia(A9)
+    e9 = [d for d in d9 if d[3] == Transicion.ErrNonce]
+    (length(e9) == 1 && e9[1][1] == m9.segundo &&
+     length(S9.garantias[1].en_retirada) == 1 &&
+     S9.garantias[1].nonce_siguiente == m9.n + UInt64(1)) ||
+        push!(fallos_globales, "dirigido D-9 repetición fusionada")
+    _, A10, m10 = EstadoDAG.caso_nonce_orden_inverso(pd1)
+    S10, _, d10 = aplicar_historia(A10)
+    e10 = [d for d in d10 if d[3] == Transicion.ErrNonce]
+    (length(e10) == 1 && e10[1][1] == m10.Xa &&
+     S10.garantias[m10.clave].nonce_siguiente == m10.n + UInt64(1) &&
+     !haskey(S10.utxo, m10.utxo)) ||
+        push!(fallos_globales, "dirigido D-10 nonce inverso")
+    _, A11, m11 = EstadoDAG.caso_nonce_reorg(pd1)
+    S11, _, _ = aplicar_historia(A11)
+    (m11.tipB3 == m11.B3 && m11.tipA3 == m11.A3 && m11.retiros_B == 1 &&
+     length(S11.garantias[1].en_retirada) == 1 &&
+     S11.garantias[1].nonce_siguiente == m11.n + UInt64(1)) ||
+        push!(fallos_globales, "dirigido D-11 reorg nonce")
 
     # 3) Propiedades IE-1…IE-6
     total_hist = 0

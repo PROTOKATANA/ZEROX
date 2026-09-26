@@ -99,3 +99,81 @@ se aplican las lecturas anteriores y se continúa. Las 10 quedan documentadas aq
 **SUPERADO.** Entregables completos en `T04/`. Nada escrito fuera de `T04/`; sin commit ni push;
 sin Python; sin `Ok` ficticio. Las 10 ambigüedades quedan documentadas con su lectura adoptada.
 
+---
+
+# T04-B — Nonce por clave (F-15) en el oráculo del estado DAG y reexportación
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Zona única escribible:** `T04/`.
+**Presupuesto declarado antes de ejecutar (LINEO §7):** 1 h 30 min, 1 hilo, 8 GiB de RAM.
+Si se agota: checkpoint y estado **inconcluso**.
+
+## B.0. Comprobación de la entrada congelada
+
+`cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-DAG/ENTRADA-T04-B.sha256` — **al
+empezar**: 4/4 `OK` (ORDEN-T04-B, FORMATO-v0, CONTRATO-ESTADO-DAG-v0, LINEO). Verificado.
+
+## B.1. Falta de definición detectada antes de editar código
+
+Ninguna de las siguientes impide continuar: en todas se adopta la lectura forzada por una regla
+superior (FORMATO v0.1 F-15, contrato DAG §3) o la convención ya fijada por T01-D. Se registran
+**antes** de tocar código.
+
+- **AMBIGUEDAD-B1 — posición del campo `nonce=` en las líneas `TX` de T04.** La orden no fija dónde
+  va. Lectura adoptada: **al final de la línea** (`… sal=[…] nonce=<u64>`), siguiendo T01-D
+  (D/AMBIGUEDAD-6). No altera ninguna regla.
+- **AMBIGUEDAD-B2 — contenido y posición del `nonce=` en las líneas `GAR`.** La orden solo dice «en
+  `GAR`». Lectura adoptada: **`nonce=<nonce_siguiente[clave]>` al final de la línea** (tras
+  `congelado=`), que es el estado que hace única cada operación de la clave (F-15) y lo que el
+  undo debe restaurar. No altera ninguna regla.
+- **AMBIGUEDAD-B3 — número de casos de `vectores-estado-dag-v0.1.txt`.** No se fija. Lectura
+  adoptada: **conservar el muestreo de v0 (900 aleatorios) más los 11 dirigidos** (los 8 de T04 y
+  los 3 nuevos), = 911 casos, para que la diferencia con v0 sea exactamente el formato `nonce=` y
+  los casos nuevos. Se documenta el recuento.
+- **AMBIGUEDAD-B4 — ¿cambia el código de fusión?** F-15 exige descartar con `ErrNonce` en modo
+  fusión. La tabla §3 del contrato ya manda descartar toda transacción que no valida, y
+  `comprobar_nonce!` de T01-D va **primero** en depósito/retiro/liberación. Lectura adoptada: **el
+  modo fusión genérico ya cumple F-15; no se toca `aplicar_bloque_fusion!`** (solo se añaden casos
+  dirigidos, exportación y relectura). Motivo: cambiar la semántica de T04 iría contra la decisión 1
+  de la orden.
+- **AMBIGUEDAD-B5 — escenario exacto de «repetición tras una reorganización».** No se fija.
+  Lectura adoptada: **el mismo retiro firmado (mismo `txid`, mismo nonce `n`) en dos ramas
+  hermanas**; se reorganiza a la rama que lo contiene, se comprueba que el efecto aparece **una sola
+  vez** y que `nonce_siguiente` avanza **una sola vez** (undo exacto por copia restaura el nonce), y
+  se reorganiza de vuelta. No altera ninguna regla.
+
+**Conclusión:** ninguna ambigüedad obliga a elegir entre reglas incompatibles; se aplican las
+lecturas anteriores y se continúa.
+
+## B.2. Diario de ejecución
+
+- *Lectura íntegra* de `ORDEN-T04-B`, la «Corrección v0.1» de `FORMATO-v0` (F-15…F-18),
+  `CONTRATO-ESTADO-DAG-v0` (+ ratificaciones v0.1), `LINEO` y el oráculo T01-D
+  (`Transicion.jl`, `nonce_de`, `comprobar_nonce!`, extensión v2 con `nonce u64`).
+- *Entrada congelada* verificada al empezar (4/4 OK).
+- *Sin cambios de semántica:* `aplicar_bloque_fusion!` ya descarta con `ErrNonce` porque T01-D
+  comprueba el nonce antes del resto y el modo fusión descarta cualquier `Err` sin tocar el estado
+  (AMBIGUEDAD-B4). No se editó nada de T01.
+- *Casos dirigidos D-9…D-11* añadidos en `src/dirigidos.jl` y probados (`test/runtests.jl` y
+  `run.jl`).
+- *Exportador v0.1:* `tx_str` añade `nonce=` al final en depósito/retiro/liberación; `gar_str` añade
+  `nonce=<nonce_siguiente>`; salida por defecto `vectores-estado-dag-v0.1.txt`; `.sha256` en formato
+  `sha256sum` (`<hash>  <ruta>`). Los ficheros v0 quedan intactos.
+- *Lector independiente* actualizado para releer `nonce=` y `GAR … nonce=`; salida por defecto v0.1.
+- *Vectores:* 911 casos exportados (`--dirigidos 1 --aleatorios 900`) y releídos de forma
+  independiente: **0 discrepancias**. 737 descartes `ErrNonce` en los vectores.
+- *Batería completa* `run.jl --seed 0x5a5a --replicas 200`: 3000 historias, 25380 bloques, 16020
+  válidos, 3721 descartes, 1393 `rojo_U3`, 673650 órdenes IE-3, **0 fallos** (11 dirigidos, D-1…D-11),
+  46,7 s. Estado **SUPERADO**. Registro en `resultados/run-estado-dag-v0.1.log`; el
+  `resultados/run-estado-dag.log` por defecto quedó con esta corrida (los **vectores** v0 sí se
+  conservan intactos).
+- *Tests* `Pkg.test()`: **377/377 OK** (8,3 s), incluida la relectura de v0.1 (911 casos, 0
+  discrepancias).
+- *Cierre*: `INFORME.md` §T04-B, `HORAS.log`; entrada congelada re-verificada al terminar.
+
+## B.3. Estado final T04-B
+
+**SUPERADO.** Entregables completos en `T04/`. `vectores-estado-dag-v0.1.txt` (911 casos) +
+`.sha256` en formato `sha256sum`; relectura independiente con 0 discrepancias; `run.jl --replicas
+200` y `Pkg.test()` en verde. Nada escrito fuera de `T04/`; sin commit ni push; sin Python; sin
+secretos. Las 5 ambigüedades de T04-B quedan documentadas con su lectura adoptada.
+

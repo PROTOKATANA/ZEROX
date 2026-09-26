@@ -244,9 +244,126 @@ function caso_hermanos_transicion(pd::ParamsDAG; seed::Int = 18)
     return "D-8", A, (Tb1 = Tb1.id, Tb2 = Tb2.id)
 end
 
+"""
+D-9 · F-15: la **misma** operación de retiro (mismo `txid`, mismo nonce `n`) en dos
+bloques hermanos fusionados. La primera en orden `C-GD-05` se aplica; la segunda se
+**descarta** con `ErrNonce` (`ErrNonce`). Los dos bloques siguen válidos.
+"""
+function caso_nonce_repeticion_fusionada(pd::ParamsDAG; seed::Int = 19)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    n = Transicion.nonce_de(A.post[Tb.id], 1)
+    ret = Transicion.tx_retiro(1, 1, 1; nonce = n)     # misma Tx reutilizada
+    X1 = BloquePost(id = id1 + 1, padres = [Tb.id], slot = 2, sd = 0, productor = 1,
+                    peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3), ret])
+    X2 = BloquePost(id = id1 + 2, padres = [Tb.id], slot = 2, sd = 1, productor = 1,
+                    peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3), ret])
+    procesar_uno!(A, X1)
+    procesar_uno!(A, X2)
+    B = BloquePost(id = id1 + 3, padres = [X1.id, X2.id], slot = 3, productor = 1,
+                   peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B)
+    primero = GDR.cmp_orden(A.gdr, A.gidx[X1.id], A.gidx[X2.id]) < 0 ? X1.id : X2.id
+    segundo = primero == X1.id ? X2.id : X1.id
+    return "D-9", A, (Tb = Tb.id, X1 = X1.id, X2 = X2.id, B = B.id, n = n,
+                      primero = primero, segundo = segundo)
+end
+
+"""
+D-10 · F-15: dos depósitos de la **misma clave** con nonces `n` y `n+1` en bloques
+hermanos, en orden **inverso** a `C-GD-05`: el de `n+1` se aplica primero y se
+descarta (`ErrNonce`); el de `n` —que llega después— se aplica. Como la comprobación
+de nonce va antes de consumir entradas, el UTXO compartido no se quema con el
+descarte.
+"""
+function caso_nonce_orden_inverso(pd::ParamsDAG; seed::Int = 20)
+    A, pow = base_dirigida(pd; seed = seed)
+    P = pd.P
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    o = utxo_gastable(A.post[Tb.id], P, 2, 2)
+    o === nothing && error("D-10: sin UTXO gastable")
+    n = Transicion.nonce_de(A.post[Tb.id], o.dueño)
+    # Xa (sd=0) va primero en C-GD-05 y lleva el nonce n+1 (inválido).
+    Xa = BloquePost(id = id1 + 1, padres = [Tb.id], slot = 2, sd = 0, productor = 1,
+                    peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                        Transicion.tx_deposito([o.id], o.dueño, o.valor, o.dueño;
+                                               nonce = n + UInt64(1))])
+    Xb = BloquePost(id = id1 + 2, padres = [Tb.id], slot = 2, sd = 1, productor = 1,
+                    peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                        Transicion.tx_deposito([o.id], o.dueño, o.valor, o.dueño;
+                                               nonce = n)])
+    procesar_uno!(A, Xa)
+    procesar_uno!(A, Xb)
+    B = BloquePost(id = id1 + 3, padres = [Xa.id, Xb.id], slot = 3, productor = 1,
+                   peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B)
+    return "D-10", A, (Tb = Tb.id, Xa = Xa.id, Xb = Xb.id, B = B.id, n = n,
+                       utxo = o.id, clave = o.dueño)
+end
+
+"""
+D-11 · F-15 + ED-3: **repetición tras una reorganización**. El mismo retiro firmado
+(mismo `txid`, nonce `n`) vive en dos ramas hermanas; al reorganizar hacia la rama
+que lo contiene el efecto aparece **una sola vez** y `nonce_siguiente` avanza **una
+sola vez**; al reorganizar de vuelta, sigue apareciendo una sola vez.
+"""
+function caso_nonce_reorg(pd::ParamsDAG; seed::Int = 21)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    n = Transicion.nonce_de(A.post[Tb.id], 1)
+    ret = Transicion.tx_retiro(1, 1, 1; nonce = n)
+    # Rama A (pesada de inmediato).
+    A1 = BloquePost(id = id1 + 1, padres = [Tb.id], slot = 2, sr = 0, productor = 1,
+                    peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3), ret])
+    procesar_uno!(A, A1)
+    tipA1 = mejor_punta(A, tips_validas(A))
+    # Rama B (ligera al principio) con la MISMA operación.
+    B1 = BloquePost(id = id1 + 2, padres = [Tb.id], slot = 2, sr = typemax(UInt64),
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3), ret])
+    procesar_uno!(A, B1)
+    B2 = BloquePost(id = id1 + 3, padres = [B1.id], slot = 3, sr = 0, productor = 1,
+                    peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    B3 = BloquePost(id = id1 + 4, padres = [B2.id], slot = 4, sr = 0, productor = 1,
+                    peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B2)
+    procesar_uno!(A, B3)
+    tipB3 = mejor_punta(A, tips_validas(A))
+    SB, _, _ = estado_virtual(A)
+    retiros_B = length(SB.garantias[1].en_retirada)
+    nonce_B = SB.garantias[1].nonce_siguiente
+    # Reorganización de vuelta a A.
+    A2 = BloquePost(id = id1 + 5, padres = [A1.id], slot = 3, sr = 0, productor = 1,
+                    peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    A3 = BloquePost(id = id1 + 6, padres = [A2.id], slot = 4, sr = 0, productor = 1,
+                    peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, A2)
+    procesar_uno!(A, A3)
+    tipA3 = mejor_punta(A, tips_validas(A))
+    return "D-11", A, (Tb = Tb.id, A1 = A1.id, A2 = A2.id, A3 = A3.id, B1 = B1.id,
+                       B2 = B2.id, B3 = B3.id, n = n, tipA1 = tipA1, tipB3 = tipB3,
+                       tipA3 = tipA3, retiros_B = retiros_B, nonce_B = nonce_B)
+end
+
 "Todos los casos dirigidos sobre la rejilla T04."
 function casos_dirigidos(pd::ParamsDAG)
     return [caso_doble_gasto(pd), caso_coinbase_recortada(pd), caso_deposito_habilita(pd),
             caso_garantia_rama(pd), caso_rojo_u3(pd), caso_una_vez(pd),
-            caso_reorg(pd), caso_hermanos_transicion(pd)]
+            caso_reorg(pd), caso_hermanos_transicion(pd),
+            caso_nonce_repeticion_fusionada(pd), caso_nonce_orden_inverso(pd),
+            caso_nonce_reorg(pd)]
 end

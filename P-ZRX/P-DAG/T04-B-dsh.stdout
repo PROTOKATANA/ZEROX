@@ -1,0 +1,31 @@
+T04-B completado. Resumen de lo ejecutado y del resultado.
+
+## Falta de definición detectada (informada antes de editar)
+
+Registré 5 huecos en `PROGRESO.md` §B.1 **antes** de tocar código, todos resueltos con la lectura forzada por una regla superior (FORMATO v0.1 F‑15, contrato DAG §3) o la convención de T01‑D; ninguno obligó a parar:
+
+- **B1** — posición de `nonce=` en las líneas `TX`: al final, como T01‑D.
+- **B2** — `GAR`: `nonce=<nonce_siguiente>` al final (tras `congelado=`).
+- **B3** — número de casos de v0.1: 900 aleatorios (como v0) + 11 dirigidos = **911**.
+- **B4** — ¿cambia el modo fusión? No: T01‑D comprueba el nonce **antes** del resto y el descarte genérico ya produce `ErrNonce`; no se tocó T01 ni la lógica de T04.
+- **B5** — «repetición tras reorganización»: mismo retiro firmado en dos ramas; reorg de ida y vuelta; efecto y nonce una sola vez.
+
+## Cambios (solo en `T04/`)
+
+- `src/dirigidos.jl`: **D‑9** (mismo retiro en dos hermanos fusionados → 2.º `ErrNonce`), **D‑10** (depósitos de la misma clave con nonces `n`/`n+1` en orden inverso → se descarta el de `n+1`, sin quemar el UTXO), **D‑11** (replay del mismo retiro tras reorg).
+- `exportar.jl`: `nonce=` en `TX` de depósito/retiro/liberación y `nonce_siguiente` en `GAR`; salida v0.1; `.sha256` en formato `sha256sum`.
+- `src/lector_vectores.jl`: relectura de `nonce=`/`GAR … nonce=`, salida por defecto v0.1.
+- `run.jl` y `test/runtests.jl`: aserciones de D‑9…D‑11 y relectura de v0.1.
+
+## Resultados
+
+| Comprobación | Resultado |
+|---|---|
+| Entrada congelada `ENTRADA-T04-B.sha256` | 4/4 OK |
+| `vectores-estado-dag-v0.1.txt` | **911 casos**, 737 descartes `ErrNonce` |
+| `sha256` v0.1 | `e8f7a6dcce5bcb2cfdb50dd49f59205d9a045dc492be71eca93a788ccf74b51f` |
+| Relectura independiente | 911 casos, **0 discrepancias** |
+| `run.jl --seed 0x5a5a --replicas 200` | 0 fallos, 46,7 s, `ESTADO = SUPERADO` |
+| `Pkg.test()` | **377/377 OK** (incluye relectura v0.1) |
+
+Los ficheros v0 quedan intactos (sha del `.txt` v0 = `29096f…af84`). La pregunta falsable **no se refuta**: IE‑1…IE‑6 sin fallos, la operación repetida en dos bloques fusionados se aplica una sola vez y los vectores se releen sin discrepancias. Nada escrito fuera de `T04/`; sin commit/push; sin Python; 1 hilo. Veredicto: **SUPERADO**.
