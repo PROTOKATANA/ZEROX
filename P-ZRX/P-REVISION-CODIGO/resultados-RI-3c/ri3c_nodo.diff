@@ -1,0 +1,129 @@
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-27 00:37:31.722201458 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-27 00:53:16.285272832 +0200
+@@ -2123,3 +2123,126 @@
+         );
+     }
+ }
++
++/// RI-3c: `admitir_pow_interno`/`admitir_post_interno` escriben en el almacén (D-N03′) **antes**
++/// de llamar a `cadena.admitir`, y no deshacen esa escritura si `cadena.admitir` rechaza el
++/// bloque (`Legitimo` o `Interno`, `crate::rechazo`). El bloque rechazado queda persistido como si
++/// hubiera sido admitido. `Nodo::reiniciar` repite **todo** el registro sin distinguir esta
++/// entrada fantasma de una real, y su propio `?` no la absorbe: el rechazo se repite y el reinicio
++/// entero falla. Reproduce con un motivo `Interno` (`ErrEmision`, coinbase con importe
++/// incorrecto) porque no requiere el aparato PoST/parcela: el mismo defecto de orden
++/// (persistir → admitir, sin deshacer) alcanza igual a un motivo `Legitimo` (`ErrGarantia`,
++/// `ErrMergeDepth`, `ErrMergeset`, `ErrU2`, `ErrPowTrasCorte`), que son precisamente los que
++/// `ORDEN-W06d5` decisión 3 declara **normales y esperables** en producción (evidenciados en V5-1
++/// y V6(b) de `REVISION-W06d4.md`).
++#[cfg(test)]
++#[expect(
++    clippy::expect_used,
++    clippy::indexing_slicing,
++    reason = "el test falla con panic por diseño"
++)]
++mod pruebas_ri3c_persistencia_antes_de_admitir {
++    use core::sync::atomic::AtomicBool;
++
++    use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev, minar};
++    use zx_core::preimage::block::{BlockHeader, merkle_root};
++    use zx_core::{Amount, decodificar_con, txid};
++
++    use zx_storage::Almacen as _;
++
++    use super::{Config, Nodo, Red};
++    use crate::pow;
++
++    #[test]
++    fn bloque_pow_propio_rechazado_por_cadena_queda_persistido_y_bloquea_el_reinicio() {
++        let dir = tempfile::tempdir().expect("tempdir");
++        let cfg = Config {
++            dir_datos: dir.path().join("datos"),
++            ruta_registro: dir.path().join("registro.jsonl"),
++            red: Red::Dev,
++            semilla: 42,
++            indices_claves: vec![0],
++            n_dev: 16,
++            sr_dev: u64::MAX,
++            parada_tras_slots: Some(0),
++        };
++        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
++
++        let genesis = nodo.historial_pow[nodo.historial_pow.len() - 1];
++        let clave = nodo.claves.first().expect("al menos una clave").pk;
++
++        // Coinbase que paga **más** que `subsidio_pow(1)` (perfil dev: 50 ZZK): el motor de
++        // transición (`aplicar_txs`, `coinbase_pagada > tope` en `aplicar.rs`) la rechaza con
++        // `ErrEmision` (`MotivoBloque::ErrTransicion`, `Interno` para
++        // `crate::rechazo::clasificar_motivo_bloque`). El PoW en sí es real y válido: solo la
++        // coinbase es incorrecta.
++        let mut coinbase = pow::construir_coinbase_pow(clave, 1);
++        coinbase.outputs[0].value = Amount::nuevo(51).expect("importe representable");
++
++        let txid_coinbase = txid(&coinbase, nodo.cbid);
++        let target = decodificar_con(
++            PARAMETROS_POW_DEV.bits_iniciales,
++            &PARAMETROS_POW_DEV.limites,
++        )
++        .expect("bits_iniciales decodifica");
++        let cabecera_base = BlockHeader {
++            consensus_branch_id: nodo.cbid,
++            prev_hash: genesis.block_hash(),
++            merkle_root: merkle_root(&[txid_coinbase]),
++            timestamp: genesis.timestamp + 1,
++            bits: PARAMETROS_POW_DEV.bits_iniciales,
++            nonce: 0,
++            height: 1,
++        };
++        let cancelar = AtomicBool::new(false);
++        let cabecera_minada = minar(&cabecera_base, target, &Sha3Dev, u64::MAX, &cancelar)
++            .expect("un PoW real se encuentra con la dificultad dev inicial (~2^17 intentos)");
++        let hash = cabecera_minada.block_hash();
++
++        // Paso 1: admitir con `verificar = true`, la misma ruta que usan la red y la producción
++        // propia (`intentar_admitir_pow_de_red`, `fase_pow`). El motor de transición debe
++        // rechazarlo por la coinbase incorrecta.
++        let resultado =
++            nodo.admitir_pow_interno(cabecera_minada, vec![coinbase], vec![Vec::new()], 0, true);
++        assert!(
++            resultado.is_err(),
++            "la coinbase con importe incorrecto debe rechazarse"
++        );
++        assert!(
++            !nodo.cadena.es_valido(&hash),
++            "el bloque rechazado no debe quedar admitido en zx-cadena"
++        );
++
++        // Paso 2 (el hallazgo): pese al rechazo, el bloque quedó PERSISTIDO en el almacén, porque
++        // `admitir_pow_interno` escribe en disco (D-N03′) antes de llamar a `cadena.admitir` y no
++        // deshace esa escritura si el motor rechaza el bloque.
++        let longitud_tras_rechazo = nodo
++            .almacen
++            .longitud_registro()
++            .expect("longitud del almacén");
++        assert_eq!(
++            longitud_tras_rechazo, 2,
++            "el bloque rechazado quedó persistido en el almacén: génesis (1) + este bloque \
++             rechazado (2), aunque zx-cadena nunca lo admitió"
++        );
++
++        drop(nodo);
++
++        // Paso 3: reiniciar el nodo desde el mismo directorio de datos. `Nodo::reiniciar` (D-N03′)
++        // repite **todo** el registro del almacén con `verificar = false` y no distingue esta
++        // entrada fantasma de una real: `cadena.admitir` vuelve a fallar con el mismo `ErrEmision`,
++        // y `Nodo::reiniciar`/`Nodo::arrancar` no absorben ese error (no hay ningún `match` sobre
++        // `ClasificacionRechazo` en el bucle de repetición): el reinicio entero falla.
++        let reinicio = Nodo::arrancar(&cfg);
++        match &reinicio {
++            Ok(_) => {}
++            Err(e) => eprintln!("RI-3c: Nodo::arrancar (reinicio) devolvió Err: {e}"),
++        }
++        assert!(
++            reinicio.is_err(),
++            "el nodo debería poder reiniciar (el bloque nunca fue válido, nada que preservar), \
++             pero el reinicio falla porque repite la entrada fantasma persistida en el paso 1 y \
++             su rechazo, sin manejo especial, tira todo el arranque"
++        );
++    }
++}

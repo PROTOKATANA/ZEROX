@@ -62,8 +62,12 @@ partida del arnés.
 6. **Parámetro de medición `--dejar-de-producir-en-slot <S>`** (CLI, solo red dev, no es consenso): desde el
    slot `S` el nodo no produce, pero sigue validando, propagando y sincronizando. Sirve para el **reposo**
    antes de comparar estados (`P-ZRX/P-MEDICION/REVISION-W07c.md`).
-7. Si `REVISION-RI-3c.md` deja hallazgos **altos** en `zx-node`, se corrigen aquí como paso previo; los
-   demás, no.
+7. **Paso previo, `REVISION-RI-3c.md`:** (H1, crítico) orden **admitir en `zx-cadena` → persistir → difundir**
+   en bloques propios y de red y en las dos familias; un bloque rechazado nunca se persiste; el test de RI-3c
+   (`P-ZRX/P-REVISION-CODIGO/resultados-RI-3c/ri3c_nodo.diff`) pasa a regresión, más un punto de inyección de
+   fallo entre admitir y persistir que compruebe que el bloque no se difunde y que el nodo reinicia bien.
+   (H2) `PruebaPotIncoherente` y `RangoSinAtadura` dejan de ser `Pendiente`: bloque de red → rechazo sin
+   penalizar; bloque propio → `Interno`.
 
 ## 4. Contrato de implementación
 
@@ -78,7 +82,7 @@ nuevas. Ningún `unwrap` fuera de tests; nada de lo que llega de un par puede ti
 |---|---|---|
 | V0 | `sha256sum -c` de la entrada; suite completa de la raíz sin cambios | verde; si no, para |
 | V1 | Tests de `zx-p2p` de los mensajes nuevos: ida y vuelta, no canónicos, sobredimensionados, `desde` fuera de rango | todos |
-| V2 | Regresiones de RI-3a (antes/después) y tests de las decisiones 2, 5 | todos, con salida antes y después |
+| V2 | Regresiones de RI-3a y RI-3c (antes/después), inyección de fallo de la decisión 7 y tests de las decisiones 2, 5 | todos, con salida antes y después |
 | V3 | **V4 otra vez:** tres nodos cruzan el corte y convergen (regresión) | superado |
 | V4 | **V5, nodo tardío**, con `N_dev` real (138 873 760) y `SR_dev = u64::MAX`: D arranca cuando la red lleva ≥ 500 bloques PoST; la red sigue produciendo. Se exige: en ≤ 15 min, la diferencia de slot entre la punta de D y la de A es ≤ 5 durante los 2 últimos minutos; el depósito de huérfanos de D nunca supera su tope; después, reposo (`--dejar-de-producir-en-slot` igual en los cuatro) y **misma punta y mismo `resumen_estado`** en los cuatro | superado en 2 repeticiones |
 | V5 | **V6(b), partición PoST:** `{A}` / `{B, C}` durante ≥ 20 slots (dentro de `F_SLOTS`), reunión (técnica del nodo puente de W06d4 u otra, declarada); se exige que cada lado admita bloques de la rama del otro (recuento en los registros), 0 fatales, y tras el reposo misma punta y mismo `resumen_estado` en los tres | superado en 2 repeticiones |
