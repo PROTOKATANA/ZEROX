@@ -346,3 +346,15 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   **Lección:** toda orden dice «tu base es la raíz en el commit de la entrada; no leas otras zonas de
   `deepseek/`». La compatibilidad entre SL-4b1 (test nuevo que llama a `validar_forma_tx_v4`) y SL-4c se
   resuelve en la migración.
+
+### 00:38–00:45 — W06d5 migrada (parcial) por la otra sesión; reorganización
+
+- `e2eee98`: W06d5 **parcial**. V4 y V6(a) superados; **V5 (nodo tardío) y V6(b) (partición PoST) no**: el nodo
+  resuelve huérfanos PoST de uno en uno y la producción lo adelanta. Es un hueco de 0.0.1 («sincronizar»).
+- **SL-4b1 migrada** (`de26376`, 10 rutas en `zx-post`, 10/10 huellas).
+- **RI-3c** lanzada (Sonnet) sobre `de26376`.
+- **W06d6 redactada** (Sonnet): sincronización por **páginas del registro de admisión** con cursor por par (el
+  orden de admisión es topológico y solo crece: servirlo cuesta O(1); ordenar por slot no basta porque la regla
+  es `slot(p) ≤ slot(B)`, no estricta), dial con reintento, V7, correcciones de RI-3a (se mueven aquí desde
+  W07a: mismos archivos), tests pendientes de W06d5 y el parámetro de reposo. W07a queda solo como
+  instrumentación, tras W06d6.

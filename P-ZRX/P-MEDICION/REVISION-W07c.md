@@ -26,7 +26,7 @@ regenerable con `bench/`), con `HUELLAS.sha256` propias. **Veredicto: SUPERADO.*
    C siguió seis minutos más que A y B). El estado **virtual** depende además de las puntas laterales que cada
    nodo conoce (`REVISION-W06d4.md`). **Consecuencia para W07b:** comparar el estado exige un **reposo**: los
    nodos dejan de producir en el mismo slot, siguen validando y propagando, y solo entonces se compara. Se
-   añade a W07a un parámetro de medición `--dejar-de-producir-en-slot` (no es consenso).
+   añade (en W06d6) un parámetro de medición `--dejar-de-producir-en-slot` (no es consenso).
 
 ## Límites
 

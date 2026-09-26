@@ -13,6 +13,6 @@ sin tocar.
 | 3 (alta, CONFIRMADO) | La cola `TrabajoRed` hacia el hilo de consenso es un `unbounded_channel` (`crates/zx-node/src/red/mod.rs:203`): 40 960 bloques encolados en 16,7 ms sin rechazo | Leído | **Corregir:** cola acotada en elementos y en bytes; al llenarse, descartar lo nuevo sin bloquear la red, con evento `limite_alcanzado`; declarar que un bloque honesto descartado se recupera por la petición de padres o por la sincronización |
 | 4 (baja, PLAUSIBLE) | `cabeceras_desde` recorre todo el historial PoW por cada hash del localizador | Leído | Corregir en la misma orden si es barato (índice hash → altura); si no, IPA |
 
-**Dónde se corrigen:** en la **parte A de W07a** (antes de instrumentar), porque tocan los mismos archivos de red
-que la instrumentación de `bloque_recibido`; los tres tests de reproducción pasan a ser **regresiones** que
+**Dónde se corrigen:** en **W06d6** (cambio de ≈ 00:42: W06d5 dejó pendiente la sincronización PoST, que toca los
+mismos archivos de red; antes se habían asignado a la parte A de W07a); los tres tests de reproducción pasan a ser **regresiones** que
 deben fallar antes de la corrección y pasar después.
