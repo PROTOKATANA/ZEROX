@@ -128,7 +128,7 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 |---|---|---|---|---|
 | X-01 | Ensayar juntas las cuatro familias: sesgo del ancla, alta tardía, stake inmaduro, reorg que deshace una prueba, auditoría censurada, capacidad duplicada, rama privada | abierto | P2 | A-05, A-07, C-04, D-03 |
 | X-02 | Comparador «candidato A»: PoST sin garantía en el arranque (`C-BOT-02`) y arranque sin PoW con requisito proporcional a la oferta (`R-ZRX/LEGADO/stake/MAPA.md` §4), bajo el mismo adversario, red y horizonte | abierto | P2 | A-05, A-10 |
-| X-03 | **Disuasión por coste** (Katana, 2026-09-26): qué problemas resuelven o encarecen PoStake y Filecoin frente a B0 (PoST puro de `9681061`) y a B1 (0.0.1), con coste absoluto de X por dimensión (riesgo, inmovilización, adquisición, energía, hardware, tiempo) | **en encargo**: DS-1 (fuentes) y DS-4 (GPU del sembrador) en curso; DS-2 (matriz) y DS-3 (modelo) preparadas (`P-ZRX/P-DISUASION/`) | P1 | A-10, C-02, D-02 |
+| X-03 | **Disuasión por coste** (Katana, 2026-09-26): qué problemas resuelven o encarecen PoStake y Filecoin frente a B0 (PoST puro de `9681061`) y a B1 (0.0.1), con coste absoluto de X por dimensión (riesgo, inmovilización, adquisición, energía, hardware, tiempo) | **resultados** (`P-ZRX/P-DISUASION/SINTESIS.md`): ningún mecanismo encarece el doble farmeo de forma exigible frente al atacante grande; mejoras exigibles contra espacio ajeno (O4), sembrador (sectores y auditorías), Sybil (garantía) y largo alcance (sellado, PoT, finalidad). En encargo: DS-5 (castigo correlacionado), DS-6 (reparto del espacio entre claves) | P1 | A-10, C-02, D-02 |
 
 ---
 
