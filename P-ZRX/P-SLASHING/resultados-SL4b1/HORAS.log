@@ -1,0 +1,7 @@
+2026-09-26T23:01:37+02:00 V0: hashes ENTRADA-SL4b1 verdes; suite zx-post baseline verde (34 unit + integración, 1 ignored) en logs/v0-zx-post.log
+2026-09-26T23:01:37+02:00 DF-1…DF-8 en DEFINICIONES-FALTANTES.md; copiado ws/ y ws.orig/; firmante (identidad RAT-1, registro v3, Firmante) y productores _con_firmante escritos
+2026-09-27T00:00:03+02:00 V7: fmt --check limpio; clippy --workspace --all-targets --all-features --locked -- -D warnings EXIT=0 (3m18s, logs/clippy-workspace.log)
+2026-09-27T00:00:03+02:00 V7: cargo test --workspace --all-features --locked EXIT=0: 789 pasan, 0 fallan, 5 ignorados (23:10:08→23:59:08, logs/test-workspace.log)
+2026-09-27T00:00:03+02:00 V7: ci/dependencias-exactas.sh OK (23); ci/frontera-crates.sh OK (9/9); Cargo.lock idéntico a la raíz
+2026-09-27T00:00:03+02:00 V8: firmar+fsync n=2000 mediana 3,697 ms p99 4,636 ms (btrfs de la zona; FIR-14 ≈ 0,81 ms), logs/coste-firmante.log
+2026-09-27T00:00:03+02:00 cierre: cambios.patch (10 archivos) y MIGRACION.sha256 (10 huellas) verificados con sha256sum -c; ENTRADA-SL4b1 10/10; zx-node/zx-consensus/zx-core/Cargo.* intactos

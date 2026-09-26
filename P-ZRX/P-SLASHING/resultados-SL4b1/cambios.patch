@@ -1,0 +1,4369 @@
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/src/firmante/identidad.rs ws/crates/zx-post/src/firmante/identidad.rs
+--- ws.orig/crates/zx-post/src/firmante/identidad.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-post/src/firmante/identidad.rs	2026-09-26 23:06:05.493113290 +0200
+@@ -0,0 +1,264 @@
++//! La **identidad de oportunidad** que indexa el registro local del firmante (`RAT-1`).
++//!
++//! # Qué es y qué no es
++//!
++//! Es la clave lógica con la que el productor apunta «esta oportunidad ya se usó para firmar este
++//! `pre_hash`». La definición vigente es la de `RAT-1`/`EV-05`/`DS-L04`:
++//! `(consensus_branch_id, public_key, sector_index, history_size, chunk, slot)`. Se deriva de la
++//! cabecera: `consensus_branch_id` y `slot` del bloque, y el resto de los campos de la solución
++//! PoAS. Es la **misma** identidad que usa la evidencia de consenso (`RAT-1` prevalece sobre EV-05):
++//! `zx_core::preimage::tx::incident_id_evidencia`, así que dos cabeceras comparten identidad de
++//! firmante si y solo si producen el mismo `incident_id` de la evidencia.
++//!
++//! **No es consenso.** La huella es un marcador **local**: no entra en ningún `pre_hash`, no viaja
++//! por el wire y no altera `C-HASH-05`. Un verificador **MUST NOT** consultarla ni rechazar un
++//! bloque remoto por ella: es política de producción (FIR-15).
++//!
++//! # La huella, no la tupla
++//!
++//! El índice del registro guarda una **huella de 32 bytes** con dominio propio, no la tupla. Dos
++//! codificaciones distintas —o una definición futura de la identidad— producen espacios de claves
++//! disjuntos, y el registro no mezcla oportunidades.
++//!
++//! La huella es `SHA3-256(dominio ‖ versión ‖ campos)`, con todos los campos de anchura fija. Se
++//! usa [`zx_core::sha3_256_publico`], la función sin dominio que el repositorio reserva para lo que
++//! no entra en consenso, en vez de añadir una dependencia de hash.
++//!
++//! # La versión 2 cierra `FP8`
++//!
++//! La v1 antigua no llevaba red: el mismo billete en mainnet y en testnet colisionaba. La v2
++//! incluye `consensus_branch_id` en la identidad y sube [`VERSION_ESQUEMA`] a 2; cambiar el orden o
++//! la anchura de un campo obliga a subir la versión.
++
++use std::cmp::Ordering;
++use std::hash::{Hash, Hasher};
++
++use zx_core::{ClavePublica, sha3_256_publico};
++
++/// Longitud de la huella de identidad que indexa el registro, en bytes.
++pub const LONGITUD_HUELLA: usize = 32;
++
++/// Dominio de la huella de [`IdentidadTicket`] (RAT-1, con `cbid`).
++///
++/// Es un marcador **local del firmante**: no es una etiqueta de `SPEC.md` §4.5, no entra en ninguna
++/// preimagen de consenso y **no** debe pasar por `C-HASH-05`.
++pub const DOMINIO_TICKET_RAT1: &[u8] = b"ZXRFIRM/ticket-rat1/cbid-c-gd-07";
++
++/// Marca de versión del esquema de codificación de la identidad dentro de la huella.
++///
++/// La v1 (código antiguo) no llevaba `consensus_branch_id`; la v2 es la identidad de `RAT-1`.
++/// Cambiar el orden o el ancho de un campo **obliga** a subir esto: si no, dos codificaciones
++/// distintas con los mismos bytes producirían la misma huella y el registro daría por iguales dos
++/// oportunidades distintas.
++pub const VERSION_ESQUEMA: u8 = 2;
++
++/// La identidad de oportunidad de `RAT-1`/`EV-05`.
++///
++/// Los campos son privados: la única forma de construirla es [`IdentidadTicket::rat1`], que recibe
++/// exactamente la tupla de la regla. El firmante la deriva de la cabecera y **no** acepta una
++/// identidad declarada por el llamante.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub struct IdentidadTicket {
++    /// Rama de consenso de la red (`header.consensus_branch_id`, RAT-1).
++    consensus_branch_id: u32,
++    /// Clave pública que firma el sello (`sol.public_key` de la cabecera).
++    public_key: ClavePublica,
++    /// Índice de sector (`sol.sector_index`).
++    sector_index: u16,
++    /// Tamaño de historia (`sol.history_size`).
++    history_size: u64,
++    /// Chunk de la solución (`sol.chunk`, 32 B).
++    chunk: [u8; 32],
++    /// Índice de PoT del bloque (`header.slot`).
++    slot: u64,
++}
++
++impl IdentidadTicket {
++    /// Construye la identidad de `RAT-1` con la tupla literal.
++    #[must_use]
++    pub const fn rat1(
++        consensus_branch_id: u32,
++        public_key: ClavePublica,
++        sector_index: u16,
++        history_size: u64,
++        chunk: [u8; 32],
++        slot: u64,
++    ) -> Self {
++        Self {
++            consensus_branch_id,
++            public_key,
++            sector_index,
++            history_size,
++            chunk,
++            slot,
++        }
++    }
++
++    /// La huella de 32 bytes que indexa el registro: `SHA3-256(dominio ‖ versión ‖ campos)`.
++    #[must_use]
++    pub fn huella(&self) -> [u8; LONGITUD_HUELLA] {
++        let mut preimagen =
++            Vec::with_capacity(DOMINIO_TICKET_RAT1.len() + 1 + 4 + 32 + 2 + 8 + 32 + 8);
++        preimagen.extend_from_slice(DOMINIO_TICKET_RAT1);
++        preimagen.push(VERSION_ESQUEMA);
++        preimagen.extend_from_slice(&self.bytes_canonicos());
++        *sha3_256_publico(&preimagen).as_bytes()
++    }
++
++    /// Los bytes canónicos de la identidad, para diagnóstico y para comprobar la inyectividad de la
++    /// codificación.
++    ///
++    /// El orden es el de la tupla de `RAT-1` y la anchura es fija por campo: `consensus_branch_id`
++    /// (4, LE) ‖ `public_key` (32) ‖ `sector_index` (2, LE) ‖ `history_size` (8, LE) ‖ `chunk` (32)
++    /// ‖ `slot` (8, LE). El ancho de `consensus_branch_id` coincide con el de
++    /// [`zx_core::incident_id_evidencia`] para que la relación de igualdad de ambas sea la misma.
++    #[must_use]
++    pub fn bytes_canonicos(&self) -> Vec<u8> {
++        let mut v = Vec::with_capacity(4 + 32 + 2 + 8 + 32 + 8);
++        v.extend_from_slice(&self.consensus_branch_id.to_le_bytes());
++        v.extend_from_slice(self.public_key.bytes());
++        v.extend_from_slice(&self.sector_index.to_le_bytes());
++        v.extend_from_slice(&self.history_size.to_le_bytes());
++        v.extend_from_slice(&self.chunk);
++        v.extend_from_slice(&self.slot.to_le_bytes());
++        v
++    }
++
++    /// El slot de la oportunidad. Va **también** en la clave del registro, aparte de la huella.
++    ///
++    /// Redundante a propósito: la clave es `(TicketId(B), slot(B))` —`RAT-1` para la identidad y el
++    /// `slot` de la cabecera— y si una definición futura de la identidad dejara de incluir el slot,
++    /// la clave seguiría siendo la misma. El coste son 8 bytes por entrada.
++    #[must_use]
++    pub const fn slot(&self) -> u64 {
++        self.slot
++    }
++}
++
++impl Hash for IdentidadTicket {
++    /// Hash **campo a campo**, sin `Vec` intermedio. Solo elige cubeta: la igualdad la decide el
++    /// `Eq` derivado de `IdentidadTicket`, que compara los mismos campos. El orden y la anchura
++    /// coinciden con el de `bytes_canonicos`, pero esta vía no asigna en el heap.
++    fn hash<H: Hasher>(&self, state: &mut H) {
++        self.consensus_branch_id.hash(state);
++        self.public_key.bytes().hash(state);
++        self.sector_index.hash(state);
++        self.history_size.hash(state);
++        self.chunk.hash(state);
++        self.slot.hash(state);
++    }
++}
++
++impl Ord for IdentidadTicket {
++    /// Orden total determinista, **campo a campo** y en el orden de la tupla de `RAT-1`.
++    ///
++    /// Es consistente con `Eq` (`cmp == Equal` si y solo si todos los campos son iguales) y no
++    /// reserva memoria, a diferencia de comparar `bytes_canonicos()` (que devuelve un `Vec`).
++    fn cmp(&self, other: &Self) -> Ordering {
++        self.consensus_branch_id
++            .cmp(&other.consensus_branch_id)
++            .then_with(|| self.public_key.bytes().cmp(other.public_key.bytes()))
++            .then_with(|| self.sector_index.cmp(&other.sector_index))
++            .then_with(|| self.history_size.cmp(&other.history_size))
++            .then_with(|| self.chunk.cmp(&other.chunk))
++            .then_with(|| self.slot.cmp(&other.slot))
++    }
++}
++
++impl PartialOrd for IdentidadTicket {
++    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
++        Some(self.cmp(other))
++    }
++}
++
++#[cfg(test)]
++#[allow(
++    clippy::unwrap_used,
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño y usan índices constantes"
++)]
++mod tests {
++    use super::{DOMINIO_TICKET_RAT1, IdentidadTicket, LONGITUD_HUELLA, VERSION_ESQUEMA};
++    use zx_core::ClavePublica;
++
++    fn rat1(chunk_byte: u8, slot: u64) -> IdentidadTicket {
++        IdentidadTicket::rat1(
++            7,
++            ClavePublica::desde_bytes([7u8; 32]),
++            3,
++            1 << 20,
++            [chunk_byte; 32],
++            slot,
++        )
++    }
++
++    #[test]
++    fn la_huella_mide_32_bytes_y_es_determinista() {
++        let a = rat1(1, 100);
++        assert_eq!(a.huella().len(), LONGITUD_HUELLA);
++        assert_eq!(a.huella(), rat1(1, 100).huella());
++    }
++
++    #[test]
++    fn cambiar_cualquier_campo_cambia_la_huella() {
++        let base = rat1(1, 100);
++        // chunk y slot.
++        assert_ne!(base.huella(), rat1(2, 100).huella());
++        assert_ne!(base.huella(), rat1(1, 101).huella());
++        // sector_index.
++        let otro_sector = IdentidadTicket::rat1(
++            7,
++            ClavePublica::desde_bytes([7u8; 32]),
++            4,
++            1 << 20,
++            [1u8; 32],
++            100,
++        );
++        assert_ne!(base.huella(), otro_sector.huella());
++        // history_size.
++        let otra_historia = IdentidadTicket::rat1(
++            7,
++            ClavePublica::desde_bytes([7u8; 32]),
++            3,
++            (1 << 20) + 1,
++            [1u8; 32],
++            100,
++        );
++        assert_ne!(base.huella(), otra_historia.huella());
++        // public_key.
++        let otra_clave = IdentidadTicket::rat1(
++            7,
++            ClavePublica::desde_bytes([8u8; 32]),
++            3,
++            1 << 20,
++            [1u8; 32],
++            100,
++        );
++        assert_ne!(base.huella(), otra_clave.huella());
++        // consensus_branch_id (RAT-1: cierra FP8).
++        let otra_red = IdentidadTicket::rat1(
++            8,
++            ClavePublica::desde_bytes([7u8; 32]),
++            3,
++            1 << 20,
++            [1u8; 32],
++            100,
++        );
++        assert_ne!(base.huella(), otra_red.huella());
++    }
++
++    #[test]
++    fn el_slot_se_lee_de_la_identidad() {
++        assert_eq!(rat1(1, 4_242).slot(), 4_242);
++    }
++
++    #[test]
++    fn el_dominio_y_la_version_forman_parte_de_la_preimagen() {
++        // Si el dominio o la versión no entraran, la huella coincidiría con un SHA3 de los campos.
++        let id = rat1(1, 100);
++        let crudo = *zx_core::sha3_256_publico(&id.bytes_canonicos()).as_bytes();
++        assert_ne!(id.huella(), crudo);
++        assert!(!DOMINIO_TICKET_RAT1.is_empty());
++        assert_eq!(VERSION_ESQUEMA, 2);
++    }
++}
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/src/firmante/mod.rs ws/crates/zx-post/src/firmante/mod.rs
+--- ws.orig/crates/zx-post/src/firmante/mod.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-post/src/firmante/mod.rs	2026-09-26 23:06:26.790559545 +0200
+@@ -0,0 +1,526 @@
++//! El **firmante local**: la política de «persistir antes de firmar» (`C-EVP-06`, FIR-01…FIR-15).
++//!
++//! # Frontera: política local, no consenso
++//!
++//! Este módulo es **política local del productor**. Ningún verificador DAG puede invocarlo ni
++//! rechazar un bloque remoto porque falte registro: la abstención, el registro y el envenenamiento
++//! son decisiones del productor honesto, no condiciones de validez. Un bloque remoto con o sin
++//! entrada local en el registro se valida con las reglas de consenso, no con esto. La huella de
++//! identidad es un marcador local que no entra en el wire ni altera `C-HASH-05` (FIR-15).
++//!
++//! # La regla, y por qué el orden de las operaciones es el contrato
++//!
++//! Antes de emitir el sello de un bloque `B`:
++//!
++//! 1. Calcular su `pre_hash` (`C-HDR-03`).
++//! 2. Derivar **internamente** la identidad de oportunidad vigente de `RAT-1`
++//!    `(consensus_branch_id, public_key, sector_index, history_size, chunk, slot)` a partir de la
++//!    cabecera, nunca declarada por el llamante.
++//! 3. Consultar el registro persistente por `(identidad, slot)`.
++//! 4. Sin entrada: escribirla y sincronizarla, y **solo entonces** firmar
++//!    ([`Resultado::Sellado`]).
++//! 5. Con la misma entrada y el mismo `pre_hash`: reemitir ([`Resultado::Reemitido`]).
++//! 6. Con la misma entrada y otro `pre_hash`: **no firmar** y descartar el candidato
++//!    ([`Resultado::AbstenidoPorConflicto`]).
++//!
++//! El error por defecto —apuntar el bloque **después** de publicarlo— está cerrado:
++//! [`Firmante::firmar`] no tiene ninguna ruta que escriba el sello antes de que el registro
++//! devuelva `Ok`.
++//!
++//! # Qué comprueba antes de reservar
++//!
++//! [`Firmante::firmar`] exige que la clave del firmador corresponda a `header.sol.public_key`
++//! **antes** de tocar el registro (FIR-04). Una clave que no corresponde devuelve
++//! [`FirmanteError::ClaveNoCoincide`] sin mutar `header.sello` ni ocupar la oportunidad. Después de
++//! firmar, comprueba el sello resultante con
++//! [`zx_core::preimage::dag::DagBlockHeader::verificar_sello`] (`C-HDR-04`, FIR-05); si no
++//! verificara, el sello de entrada queda intacto.
++//!
++//! # Qué no expone
++//!
++//! No hay ninguna variante pública que permita al llamante declarar una identidad no vinculada a la
++//! cabecera: la identidad se deriva dentro de [`Firmante::firmar`]. Tampoco se acepta el
++//! `s_max_slots` del candidato: entra como parámetro explícito del perfil en [`Registro::abrir`],
++//! que es quien lo usa para fijar el horizonte de abstención (FIR-10).
++//!
++//! # Lo que este tipo no es
++//!
++//! Es un **filtro de accidentes honestos**, no un mecanismo de seguridad (FIR-13). No cubre dos
++//! máquinas con registros distintos, ni a un atacante que borre el registro, ni un `sync_all` que
++//! mienta. No cubre clave robada o compartida, ni un registro en red.
++
++pub mod identidad;
++pub mod registro;
++
++#[cfg(test)]
++use std::sync::atomic::{AtomicBool, Ordering};
++
++use ed25519_zebra::{SigningKey, VerificationKey};
++use zx_core::PreHash;
++use zx_core::preimage::dag::DagBlockHeader;
++
++use registro::Resolucion;
++
++pub use identidad::{DOMINIO_TICKET_RAT1, IdentidadTicket, LONGITUD_HUELLA, VERSION_ESQUEMA};
++pub use registro::{
++    MAGIA, OFFSET_ABSTENCION_ACTIVA, OFFSET_ABSTENER_HASTA, OFFSET_COMPROBACION_CABECERA,
++    OFFSET_SLOT_PERDIDA, Registro, RegistroError, TAMANO_CABECERA, TAMANO_ENTRADA, VERSION_FORMATO,
++};
++
++/// Qué hizo el firmante con un candidato.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub enum Resultado {
++    /// No había entrada: se persistió y **después** se selló. Es el camino normal.
++    Sellado,
++    /// Ya había entrada con el mismo `pre_hash`: es el mismo bloque y se ha vuelto a sellar.
++    Reemitido,
++    /// El candidato se descartó y **no** se selló. El candidato no llegó a firmarse, así que no
++    /// puede producir la evidencia de equivocación.
++    AbstenidoPorConflicto {
++        /// El `pre_hash` que ya estaba en el registro, con la misma identidad y el mismo slot.
++        pre_hash_registrado: PreHash,
++    },
++    /// El registro perdió el estado y aún está en su ventana de abstención (FIR-10). Es un
++    /// **resultado**, distinguible de un error de E/S: no se sella, pero el registro funciona.
++    AbstenidoPorPerdida {
++        /// Último slot en el que todavía se abstiene.
++        hasta: u64,
++        /// `s_max_slots` del perfil con el que se abrió el registro.
++        s_max_slots: u64,
++    },
++}
++
++/// Fallos del firmante. Todos significan que **no se emitió sello**.
++#[derive(Debug, thiserror::Error)]
++pub enum FirmanteError {
++    /// El registro falló (E/S, bloqueo, corrupción o envenenamiento). Si dudas, no firmes: es la
++    /// decisión segura y es la que toma este tipo. La abstención por pérdida **no** cae aquí: es
++    /// [`Resultado::AbstenidoPorPerdida`].
++    #[error("firmante: {0}")]
++    Registro(#[from] RegistroError),
++
++    /// La clave del firmador no corresponde a `header.sol.public_key`.
++    ///
++    /// La comprobación ocurre **antes** de reservar la oportunidad y **antes** de tocar el sello:
++    /// una clave ajena no ocupa el registro ni muta la cabecera (FIR-04).
++    #[error("firmante: la clave del firmador no corresponde a header.sol.public_key")]
++    ClaveNoCoincide,
++
++    /// El sello se construyó pero no verifica con las reglas del repositorio (`C-HDR-04`, FIR-05).
++    ///
++    /// Es un fallo interno: `header.sello` queda intacto y no se publica nada.
++    #[error("firmante: el sello construido no verifica bajo header.sol.public_key")]
++    SelloInvalido,
++}
++
++/// El firmante: un registro compartido.
++///
++/// Lleva el registro por referencia, así que **varios hilos** pueden llamar a [`Firmante::firmar`]
++/// a la vez: la exclusión la impone el `Mutex` del registro. Dos **procesos** sobre el mismo
++/// fichero quedan excluidos por el bloqueo de fichero del registro.
++///
++/// No guarda ninguna copia de `s_max_slots`: el perfil vive en [`Registro::abrir`], que es quien
++/// gobierna la abstención. Duplicarlo aquí crearía un valor que no decide nada.
++#[derive(Debug)]
++pub struct Firmante<'a> {
++    registro: &'a Registro,
++    /// Inyección solo de test: fuerza que el sello construido no verifique para poder cubrir
++    /// [`FirmanteError::SelloInvalido`]. En producción no existe el campo.
++    #[cfg(test)]
++    forzar_sello_invalido: AtomicBool,
++}
++
++impl<'a> Firmante<'a> {
++    /// Construye el firmante sobre un registro ya abierto con su perfil.
++    #[must_use]
++    pub const fn nuevo(registro: &'a Registro) -> Self {
++        Self {
++            registro,
++            #[cfg(test)]
++            forzar_sello_invalido: AtomicBool::new(false),
++        }
++    }
++
++    /// La identidad de oportunidad de `RAT-1` de un candidato.
++    ///
++    /// Es una consulta de **solo lectura**, para diagnóstico y tests. No firma y no permite pasar
++    /// una identidad distinta a [`Firmante::firmar`].
++    #[must_use]
++    pub fn identidad(header: &DagBlockHeader) -> IdentidadTicket {
++        IdentidadTicket::rat1(
++            header.consensus_branch_id,
++            header.sol.public_key,
++            header.sol.sector_index,
++            header.sol.history_size,
++            header.sol.chunk,
++            header.slot,
++        )
++    }
++
++    /// Inyección solo de test para cubrir [`FirmanteError::SelloInvalido`].
++    #[cfg(test)]
++    pub(crate) fn forzar_sello_invalido(&self) {
++        self.forzar_sello_invalido.store(true, Ordering::Relaxed);
++    }
++
++    /// Aplica la regla a un candidato y, **solo si procede**, escribe el sello Ed25519 en
++    /// `header.sello`.
++    ///
++    /// El sello es `Ed25519(sk, pre_hash(B))`: el mensaje es el `pre_hash` (`C-HDR-03`), no la
++    /// prefirma ni el `block_hash`.
++    ///
++    /// `header.sello` se escribe **únicamente** en el camino de éxito. Si hay conflicto o
++    /// abstención por pérdida, si el registro falla o si la clave no corresponde, el sello de
++    /// entrada queda intacto y no se publica nada; quien llama debe descartar el candidato cuando
++    /// el resultado sea [`Resultado::AbstenidoPorConflicto`] o
++    /// [`Resultado::AbstenidoPorPerdida`].
++    ///
++    /// # Errores
++    /// [`FirmanteError::ClaveNoCoincide`] si la clave no corresponde a `header.sol.public_key`;
++    /// [`FirmanteError::Registro`] si el registro falla de verdad (E/S, envenenamiento, corrupción);
++    /// [`FirmanteError::SelloInvalido`] si el sello construido no verifica.
++    pub fn firmar(
++        &self,
++        header: &mut DagBlockHeader,
++        sk: &SigningKey,
++    ) -> Result<Resultado, FirmanteError> {
++        // 1. La clave tiene que ser la de la cabecera ANTES de reservar la oportunidad.
++        let clave_del_firmador: [u8; 32] = VerificationKey::from(sk).into();
++        if &clave_del_firmador != header.sol.public_key.bytes() {
++            return Err(FirmanteError::ClaveNoCoincide);
++        }
++
++        // 2. `pre_hash` canónico (C-HDR-03) e identidad de RAT-1, derivada aquí dentro.
++        let pre_hash = header.pre_hash();
++        let identidad = Self::identidad(header);
++
++        // 3. El registro decide y, si la entrada es nueva, ya la dejó persistida y sincronizada.
++        let resultado = match self.registro.resolver(&identidad, pre_hash) {
++            Ok(Resolucion::Nueva) => Resultado::Sellado,
++            Ok(Resolucion::Conocida) => Resultado::Reemitido,
++            Ok(Resolucion::Conflicto {
++                pre_hash_registrado,
++            }) => {
++                return Ok(Resultado::AbstenidoPorConflicto {
++                    pre_hash_registrado,
++                });
++            }
++            // FIR-10: la abstención por pérdida es un resultado, no un error de E/S.
++            Err(RegistroError::EnAbstinencia {
++                hasta, s_max_slots, ..
++            }) => {
++                return Ok(Resultado::AbstenidoPorPerdida { hasta, s_max_slots });
++            }
++            Err(fallo) => return Err(FirmanteError::Registro(fallo)),
++        };
++
++        // 4. Solo ahora se firma. Se comprueba sobre una copia para no dejar un sello inválido en
++        //    la cabecera de entrada si la verificación fallara.
++        let firma: [u8; 64] = sk.sign(pre_hash.as_bytes()).into();
++        let mut comprobacion = *header;
++        comprobacion.sello = firma;
++        #[cfg(test)]
++        if self.forzar_sello_invalido.load(Ordering::Relaxed)
++            && let Some(byte) = comprobacion.sello.first_mut()
++        {
++            *byte ^= 0x01;
++        }
++        comprobacion
++            .verificar_sello()
++            .map_err(|_| FirmanteError::SelloInvalido)?;
++        header.sello = firma;
++        Ok(resultado)
++    }
++}
++
++#[cfg(test)]
++#[allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño"
++)]
++mod tests {
++    use super::{Firmante, FirmanteError, Registro, RegistroError, Resultado};
++    use ed25519_zebra::{SigningKey, VerificationKey};
++    use std::path::{Path, PathBuf};
++    use std::process::Command;
++    use std::sync::atomic::{AtomicU64, Ordering};
++    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
++    use zx_core::{BlockHash, BodyCommitment, ClavePublica, Digest, MerkleRoot};
++
++    static CONTADOR: AtomicU64 = AtomicU64::new(0);
++
++    struct DirTemporal {
++        ruta: PathBuf,
++    }
++
++    impl DirTemporal {
++        fn nuevo(etiqueta: &str) -> Self {
++            let pid = std::process::id();
++            let n = CONTADOR.fetch_add(1, Ordering::Relaxed);
++            let unico = format!("zx-firmante-mod-{pid}-{n}-{etiqueta}");
++            let ruta = std::env::temp_dir().join(unico);
++            std::fs::create_dir_all(&ruta).unwrap();
++            Self { ruta }
++        }
++
++        fn ruta(&self) -> &Path {
++            &self.ruta
++        }
++    }
++
++    impl Drop for DirTemporal {
++        fn drop(&mut self) {
++            let _ = std::fs::remove_dir_all(&self.ruta);
++        }
++    }
++
++    fn sk() -> SigningKey {
++        SigningKey::from([42u8; 32])
++    }
++
++    fn clave_publica() -> ClavePublica {
++        ClavePublica::desde_bytes(VerificationKey::from(&sk()).into())
++    }
++
++    fn cabecera(padre: u8, chunk: u8, slot: u64) -> DagBlockHeader {
++        DagBlockHeader {
++            consensus_branch_id: 0,
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x22; 32])),
++            timestamp: 1_700_000_000,
++            height: 10,
++            slot,
++            pot_output: [0x11; 16],
++            rango_solucion: 7,
++            sol: SolucionPoas {
++                public_key: clave_publica(),
++                sector_index: 1,
++                history_size: 1 << 20,
++                chunk: [chunk; 32],
++                ..SolucionPoas::default()
++            },
++            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x33; 32])),
++            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([padre; 32])), &[])
++                .unwrap(),
++            sello: [0u8; 64],
++        }
++    }
++
++    /// Registro sin abstención efectiva para el camino normal de test: `abrir` sobre fichero nuevo
++    /// se abstiene hasta el slot 1, y los slots de prueba van muy por encima.
++    fn registro_sin_abstencion(ruta: &Path) -> Registro {
++        Registro::abrir(ruta, 0, 1).unwrap()
++    }
++
++    #[test]
++    fn caso_5_con_entrada_previa_y_otro_pre_hash_no_firma() {
++        let dir = DirTemporal::nuevo("caso5");
++        let mut a = cabecera(1, 5, 100);
++        let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++        let f = Firmante::nuevo(&reg);
++
++        assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++        let sello_a = a.sello;
++        assert_ne!(sello_a, [0u8; 64]);
++
++        let mut b = cabecera(2, 5, 100);
++        assert_ne!(a.pre_hash(), b.pre_hash());
++        let r = f.firmar(&mut b, &sk()).unwrap();
++        assert!(matches!(r, Resultado::AbstenidoPorConflicto { .. }));
++        assert_eq!(
++            b.sello, [0u8; 64],
++            "el candidato descartado NO puede llevar sello"
++        );
++    }
++
++    #[test]
++    fn caso_4_reemitir_el_mismo_bloque_funciona() {
++        let dir = DirTemporal::nuevo("caso4");
++        let mut a = cabecera(1, 5, 100);
++        let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++        let f = Firmante::nuevo(&reg);
++        assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++        let sello = a.sello;
++
++        let mut otra_vez = cabecera(1, 5, 100);
++        assert_eq!(
++            f.firmar(&mut otra_vez, &sk()).unwrap(),
++            Resultado::Reemitido
++        );
++        assert_eq!(otra_vez.sello, sello, "el sello es determinista y válido");
++        otra_vez.verificar_sello().unwrap();
++    }
++
++    #[test]
++    fn la_clave_ajena_no_ocupa_la_oportunidad_ni_muta_el_sello() {
++        let dir = DirTemporal::nuevo("clave");
++        let mut a = cabecera(1, 5, 100);
++        let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++        let f = Firmante::nuevo(&reg);
++        let ajena = SigningKey::from([7u8; 32]);
++
++        assert!(matches!(
++            f.firmar(&mut a, &ajena).unwrap_err(),
++            FirmanteError::ClaveNoCoincide
++        ));
++        assert_eq!(a.sello, [0u8; 64]);
++        assert_eq!(
++            reg.entradas(),
++            0,
++            "la clave ajena no puede reservar la oportunidad"
++        );
++
++        // Con la clave correcta, la oportunidad sigue libre.
++        assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++    }
++
++    #[test]
++    fn el_sello_verifica_bajo_la_clave_publica() {
++        let dir = DirTemporal::nuevo("sello");
++        let mut a = cabecera(1, 5, 100);
++        let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++        let f = Firmante::nuevo(&reg);
++        assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++        a.verificar_sello().unwrap();
++    }
++
++    #[test]
++    fn el_sello_invalido_no_muta_la_cabecera() {
++        // Inyección solo de test (DF-5): con la clave correcta, el único modo de que la
++        // comprobación de FIR-05 falle es forzarla. La cabecera de entrada queda intacta.
++        let dir = DirTemporal::nuevo("sello-invalido");
++        let mut a = cabecera(1, 5, 100);
++        let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++        let f = Firmante::nuevo(&reg);
++        f.forzar_sello_invalido();
++        let e = f.firmar(&mut a, &sk()).unwrap_err();
++        assert!(matches!(e, FirmanteError::SelloInvalido), "{e:?}");
++        assert_eq!(a.sello, [0u8; 64]);
++    }
++
++    #[test]
++    fn la_abstencion_usa_el_perfil_de_registro_abrir() {
++        // El firmante no guarda `s_max_slots`: el horizonte de abstención sale del perfil que se
++        // pasó a `Registro::abrir`. Y la abstención por pérdida es un **resultado**, no un error.
++        let dir = DirTemporal::nuevo("perfil-abstencion");
++        let ruta = dir.ruta().join("r.log");
++        let slot_perdida = 500u64;
++        let s_max = 40u64;
++
++        let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++        assert_eq!(reg.abstener_hasta(), Some(slot_perdida + s_max));
++        let f = Firmante::nuevo(&reg);
++
++        let mut bloqueado = cabecera(1, 5, slot_perdida + s_max);
++        let r = f.firmar(&mut bloqueado, &sk()).unwrap();
++        assert!(
++            matches!(
++                r,
++                Resultado::AbstenidoPorPerdida {
++                    hasta,
++                    s_max_slots,
++                } if hasta == slot_perdida + s_max && s_max_slots == s_max
++            ),
++            "{r:?}"
++        );
++        assert_eq!(bloqueado.sello, [0u8; 64]);
++
++        let mut libre = cabecera(1, 5, slot_perdida + s_max + 1);
++        assert_eq!(f.firmar(&mut libre, &sk()).unwrap(), Resultado::Sellado);
++        assert_ne!(libre.sello, [0u8; 64]);
++    }
++
++    #[test]
++    fn el_error_de_registro_no_se_confunde_con_la_abstencion() {
++        // Un registro envenenado devuelve error, no `AbstenidoPorPerdida`.
++        let dir = DirTemporal::nuevo("envenenado-firmante");
++        let reg = Registro::nueva(dir.ruta().join("r.log")).unwrap();
++        reg.forzar_envenenamiento_para_test();
++        let f = Firmante::nuevo(&reg);
++        let mut a = cabecera(1, 5, 100);
++        assert!(matches!(
++            f.firmar(&mut a, &sk()).unwrap_err(),
++            FirmanteError::Registro(RegistroError::Envenenado { .. })
++        ));
++    }
++
++    // ─────────────────────────────────────────────────────────────────────────
++    // Durabilidad con proceso hijo (V2)
++    // ─────────────────────────────────────────────────────────────────────────
++
++    /// Punto de entrada del proceso hijo: persiste la oportunidad por el camino real y **aborta
++    /// sin firmar**, justo en el hueco entre la persistencia y la firma.
++    ///
++    /// Está **guardado**: sin `FIRMANTE_TEST_RUTA` no hace nada y el test pasa. Así,
++    /// `--include-ignored` no aborta el arnés.
++    #[test]
++    #[ignore = "punto de entrada para el proceso hijo; aborta a propósito"]
++    fn hijo_persiste_y_aborta() {
++        let Some(ruta) = std::env::var_os("FIRMANTE_TEST_RUTA") else {
++            return;
++        };
++        let slot: u64 = std::env::var("FIRMANTE_TEST_SLOT")
++            .unwrap()
++            .parse()
++            .unwrap();
++        let chunk: u8 = std::env::var("FIRMANTE_TEST_CHUNK")
++            .unwrap()
++            .parse()
++            .unwrap();
++
++        let header = cabecera(1, chunk, slot);
++        // `abrir` sobre fichero nuevo se abstiene hasta 1; el slot de prueba va muy por encima.
++        let reg = Registro::abrir(ruta, 0, 1).unwrap();
++        let identidad = Firmante::identidad(&header);
++        let _ = reg.resolver(&identidad, header.pre_hash());
++        std::process::abort();
++    }
++
++    #[test]
++    fn durabilidad_el_proceso_muere_entre_la_persistencia_y_la_firma_veinte_veces() {
++        use std::os::unix::process::ExitStatusExt as _;
++
++        let dir = DirTemporal::nuevo("aborto");
++        for i in 0..20u64 {
++            let ruta = dir.ruta().join(format!("r-{i}.log"));
++            let slot = 100 + i;
++
++            let salida = Command::new(std::env::current_exe().unwrap())
++                .arg("--ignored")
++                .arg("--exact")
++                .arg("firmante::tests::hijo_persiste_y_aborta")
++                .arg("--test-threads=1")
++                .env("FIRMANTE_TEST_RUTA", &ruta)
++                .env("FIRMANTE_TEST_SLOT", slot.to_string())
++                .env("FIRMANTE_TEST_CHUNK", "7")
++                .output()
++                .unwrap();
++            assert_eq!(
++                salida.status.signal(),
++                Some(6),
++                "iteración {i}: el hijo debe morir por SIGABRT, no salir limpiamente: {:?}\n{}",
++                salida.status,
++                String::from_utf8_lossy(&salida.stderr)
++            );
++
++            // La entrada persistida sobrevive al SIGABRT y el conflicto se detecta al reiniciar.
++            let reg = Registro::abrir(&ruta, slot, 1).unwrap();
++            let f = Firmante::nuevo(&reg);
++            let mut b = cabecera(1, 7, slot);
++            assert_eq!(
++                f.firmar(&mut b, &sk()).unwrap(),
++                Resultado::Reemitido,
++                "iteración {i}"
++            );
++            let mut c = cabecera(2, 7, slot);
++            let r = f.firmar(&mut c, &sk()).unwrap();
++            assert!(
++                matches!(r, Resultado::AbstenidoPorConflicto { .. }),
++                "iteración {i}: el candidato contradictorio no puede sellar tras el reinicio: {r:?}"
++            );
++            assert_eq!(c.sello, [0u8; 64], "iteración {i}");
++        }
++    }
++}
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/src/firmante/registro.rs ws/crates/zx-post/src/firmante/registro.rs
+--- ws.orig/crates/zx-post/src/firmante/registro.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-post/src/firmante/registro.rs	2026-09-26 23:06:05.497113373 +0200
+@@ -0,0 +1,1484 @@
++//! Registro persistente de oportunidades: `(huella, slot) -> pre_hash`.
++//!
++//! Es la pieza que hace que el firmante local sirva de algo: **persistir antes de firmar**, de
++//! forma atómica y duradera. Un `Vec` en memoria, o un `write` sin `sync_all`, reproducen
++//! exactamente el accidente que se quiere evitar —corte de energía entre la firma y el apunte—.
++//!
++//! # Frontera
++//!
++//! Este registro es **política local del productor**: ningún verificador DAG puede consultarlo ni
++//! rechazar un bloque remoto porque falte. No entra en ningún `pre_hash`, no viaja por el wire y no
++//! fija ningún parámetro de consenso: `s_max_slots` entra como argumento del perfil (FIR-10).
++//!
++//! # Formato (versión 3)
++//!
++//! Un fichero por registro, solo-anexar, con cabecera de 56 bytes y entradas de 80:
++//!
++//! ```text
++//! cabecera (56 B)
++//!   0..8    magia "ZXRGFIRM"
++//!   8..16   versión de formato (u64 LE) = 3
++//!   16..24  slot_perdida: slot del alta conservadora (u64 LE)
++//!   24..32  abstener_hasta: último slot de la ventana de abstención (u64 LE)
++//!   32..40  abstencion_activa (u64 LE: 0 o 1)
++//!   40..56  comprobación = SHA3-256(cabecera[0..40])[0..16]
++//! entrada (80 B)
++//!   0..8    slot (u64 LE)
++//!   8..40   huella de la identidad de oportunidad (32 B)
++//!   40..72  pre_hash (32 B)
++//!   72..80  comprobación = SHA3-256(entrada[0..72])[0..8]
++//! ```
++//!
++//! La versión 2 guardaba la abstención en una cabecera de 40 B **sin integridad**: cambiar la
++//! bandera de 1 a 0 o acortar el horizonte borraba la abstención sin entrada alguna. La versión 3
++//! añade el checksum de cabecera y **no se migra** desde 1/2: un fichero de versión desconocida
++//! falla cerrado ([`RegistroError::VersionInvalida`]).
++//!
++//! La cabecera es **inmutable tras crearse** (no hay poda en 0.0.1): el slot de pérdida, el
++//! horizonte y la bandera se escriben una vez. La abstención se decide con `slot <= horizonte` para
++//! siempre, y `max_slot` se deriva en memoria del slot de pérdida y las entradas validadas. Así no
++//! hay ninguna reescritura en sitio que un corte a mitad de `append` pueda romper.
++//!
++//! # Qué garantiza y qué no
++//!
++//! - **Durabilidad**: [`Registro::resolver`] escribe la entrada y llama a `sync_all` **antes** de
++//!   devolver `Ok`. Si devuelve `Ok`, la entrada está en disco; si falla, el índice en memoria no
++//!   cambia y el firmante no firma.
++//! - **Exclusión entre procesos**: `File::try_lock` (bloqueo exclusivo de fichero) durante toda la
++//!   vida del [`Registro`]. Un segundo proceso recibe [`RegistroError::Bloqueado`].
++//! - **Exclusión entre hilos**: `Mutex` alrededor del estado.
++//! - **Envenenamiento**: cualquier fallo ambiguo de escritura o de `sync_all` deja la instancia
++//!   envenenada. Toda llamada posterior a [`Registro::resolver`] —la única que puede autorizar una
++//!   firma— devuelve [`RegistroError::Envenenado`] hasta cerrar y reabrir, momento en que la
++//!   recuperación relee el log. Las consultas de solo lectura no firman.
++//! - **Recuperación**: al reabrir un fichero existente se valida **entero** y se **sincroniza**
++//!   antes de devolver el [`Registro`]. Un fallo de esa sincronización devuelve error y no crea
++//!   instancia utilizable: no basta con releer una entrada que quizá solo estaba en caché.
++//! - **NO** cubre: dos procesos con registros distintos, un atacante que borre el fichero, ni un
++//!   `sync_all` que mienta (p. ej. un sistema de ficheros en red). Es un filtro de accidentes
++//!   honestos, no un mecanismo de seguridad.
++//! - **NO** guarda claves privadas: solo huellas de identidad y `pre_hash`.
++//! - **NO** implementa poda durante 0.0.1: el log solo crece. Reescribir en sitio podía dejar un
++//!   log válido pero incompleto tras un corte, así que no se porta esa operación (FIR-09).
++
++use std::collections::HashMap;
++use std::fs::{File, OpenOptions, TryLockError};
++use std::io::{Read, Seek, SeekFrom, Write};
++use std::path::{Path, PathBuf};
++use std::sync::Mutex;
++
++use zx_core::PreHash;
++
++use super::identidad::{IdentidadTicket, LONGITUD_HUELLA};
++
++/// Magia del fichero. Ocho bytes, sin ceros, para que un fichero vacío o de basura no se confunda.
++pub const MAGIA: [u8; 8] = *b"ZXRGFIRM";
++
++/// Versión del formato de fichero. La 3 añade el checksum de cabecera a la abstención durable.
++pub const VERSION_FORMATO: u64 = 3;
++
++/// Longitud de la cabecera, en bytes.
++pub const TAMANO_CABECERA: u64 = 56;
++
++/// Longitud de la parte **firmada** de la cabecera: los campos que cubre el checksum.
++const TAMANO_CABECERA_FIRMADA: usize = 40;
++
++/// Longitud del checksum de cabecera, en bytes.
++const TAMANO_COMPROBACION_CABECERA: usize = 16;
++
++/// Longitud de una entrada, en bytes.
++pub const TAMANO_ENTRADA: u64 = 80;
++
++/// Offset de `slot_perdida` dentro de la cabecera.
++pub const OFFSET_SLOT_PERDIDA: usize = 16;
++
++/// Offset de `abstener_hasta` dentro de la cabecera.
++pub const OFFSET_ABSTENER_HASTA: usize = 24;
++
++/// Offset de la bandera de abstención dentro de la cabecera.
++pub const OFFSET_ABSTENCION_ACTIVA: usize = 32;
++
++/// Offset del checksum de la cabecera dentro de la cabecera.
++pub const OFFSET_COMPROBACION_CABECERA: usize = 40;
++
++/// Offset del campo de comprobación dentro de la entrada.
++const OFFSET_COMPROBACION: usize = 72;
++
++/// Longitud del campo de comprobación de una entrada.
++const TAMANO_COMPROBACION: usize = 8;
++
++/// Offset de la huella dentro de la entrada.
++const OFFSET_HUELLA: usize = 8;
++
++/// Offset del `pre_hash` dentro de la entrada.
++const OFFSET_PRE_HASH: usize = 40;
++
++/// Lo que el registro sabe de una oportunidad.
++///
++/// Es un tipo interno: la única ruta que lo consume es [`crate::firmante::Firmante::firmar`], que
++/// traduce el resultado a [`crate::firmante::Resultado`].
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub(crate) enum Resolucion {
++    /// No había entrada: se escribió, se sincronizó y **ahora** se puede firmar.
++    Nueva,
++    /// Ya había entrada con el **mismo** `pre_hash`: es el mismo bloque. Se puede reemitir.
++    Conocida,
++    /// Ya había entrada con **otro** `pre_hash`: no se firma y el candidato se descarta.
++    Conflicto {
++        /// El `pre_hash` que ya estaba registrado.
++        pre_hash_registrado: PreHash,
++    },
++}
++
++/// Fallos del registro. Todos son **motivo para no firmar**.
++#[derive(Debug, thiserror::Error)]
++pub enum RegistroError {
++    /// El fichero no se pudo abrir, crear, leer o sincronizar.
++    #[error("registro: E/S en {ruta}: {origen}")]
++    Io {
++        /// Ruta del registro.
++        ruta: PathBuf,
++        /// Error de E/S subyacente.
++        #[source]
++        origen: std::io::Error,
++    },
++
++    /// Otro proceso tiene el registro bloqueado. No se escribe nada.
++    #[error("registro: {ruta} está bloqueado por otro proceso")]
++    Bloqueado {
++        /// Ruta del registro.
++        ruta: PathBuf,
++    },
++
++    /// El fichero no empieza por la magia esperada.
++    #[error("registro: {ruta} no es un registro del firmante (magia inesperada)")]
++    MagiaInvalida {
++        /// Ruta del registro.
++        ruta: PathBuf,
++    },
++
++    /// El fichero declara una versión de formato que este binario no sabe leer.
++    #[error("registro: {ruta} declara versión de formato {encontrada}, esperada {esperada}")]
++    VersionInvalida {
++        /// Ruta del registro.
++        ruta: PathBuf,
++        /// Versión encontrada.
++        encontrada: u64,
++        /// Versión que este binario escribe.
++        esperada: u64,
++    },
++
++    /// Una entrada **completa** con comprobación inválida. **No se trunca**, ni aunque la entrada
++    /// sea toda cero ni aunque esté al final: olvidar una entrada es la única forma de
++    /// doble-firmar, así que se falla cerrado y el operador decide.
++    #[error(
++        "registro: {ruta} corrupto en el byte {offset} (entrada completa con comprobación inválida)"
++    )]
++    Corrupto {
++        /// Ruta del registro.
++        ruta: PathBuf,
++        /// Offset del primer byte de la entrada inválida.
++        offset: u64,
++        /// Bytes desde `offset` hasta el final del fichero.
++        bytes_perdidos: u64,
++    },
++
++    /// La cabecera no supera su comprobación de integridad.
++    ///
++    /// Un bit cambiado en la bandera, en el horizonte o en el slot de pérdida la invalida. Falla
++    /// cerrado: una abstención no se puede borrar editando el fichero.
++    #[error("registro: {ruta} tiene la cabecera corrupta (comprobación SHA3-256 inválida)")]
++    CabeceraCorrupta {
++        /// Ruta del registro.
++        ruta: PathBuf,
++    },
++
++    /// El fichero termina en una cola parcial (< 80 B).
++    ///
++    /// Esa cola no lleva marca de comprobación que demuestre que la entrada llegó a ser durable,
++    /// así que no se trunca: falla cerrado (FIR-08).
++    #[error("registro: {ruta} termina en una cola parcial de {bytes} bytes en el offset {offset}")]
++    ColaParcial {
++        /// Ruta del registro.
++        ruta: PathBuf,
++        /// Offset donde empieza la cola parcial.
++        offset: u64,
++        /// Bytes de la cola parcial (menos de una entrada).
++        bytes: u64,
++    },
++
++    /// Una entrada completa aparece dos veces con el mismo índice y **distinto** `pre_hash`.
++    ///
++    /// Rechaza el fichero: elegir por orden de llegada es exactamente lo que el registro existe
++    /// para no hacer.
++    #[error(
++        "registro: {ruta} repite la misma oportunidad con dos pre_hash distintos (slot {slot})"
++    )]
++    DuplicadoConflictivo {
++        /// Ruta del registro.
++        ruta: PathBuf,
++        /// Slot de la oportunidad repetida.
++        slot: u64,
++    },
++
++    /// Un tamaño o desplazamiento del fichero no cabe en `u64`. Se falla cerrado en vez de
++    /// saturar, porque ese número podría autorizar una firma.
++    #[error("registro: {ruta} tiene un tamaño o desplazamiento no representable")]
++    TamanoNoRepresentable {
++        /// Ruta del registro.
++        ruta: PathBuf,
++    },
++
++    /// El registro está en su ventana de abstención: perdió el estado y aún no puede firmar.
++    ///
++    /// El firmante lo traduce a [`crate::firmante::Resultado::AbstenidoPorPerdida`], que es un
++    /// resultado distinguible de un error de E/S.
++    #[error(
++        "registro: abstinencia por pérdida; slot actual {slot_actual} ≤ {hasta} (S_max_slots = {s_max_slots})"
++    )]
++    EnAbstinencia {
++        /// Slot actual de la consulta.
++        slot_actual: u64,
++        /// Último slot en el que todavía se abstiene (`slot_perdida + s_max_slots`).
++        hasta: u64,
++        /// `s_max_slots` vigente en esta instancia.
++        s_max_slots: u64,
++    },
++
++    /// La instancia quedó envenenada por un fallo ambiguo de persistencia.
++    ///
++    /// Toda llamada posterior a [`Registro::resolver`] falla cerrado hasta cerrar y reabrir el
++    /// registro, momento en que la recuperación relee el log (FIR-07).
++    #[error("registro: {ruta} envenenado por un fallo de persistencia; hay que reabrir")]
++    Envenenado {
++        /// Ruta del registro.
++        ruta: PathBuf,
++    },
++}
++
++/// Clave del índice en memoria: la huella de la identidad (`RAT-1`) y el slot.
++type Clave = ([u8; LONGITUD_HUELLA], u64);
++
++/// Índice en memoria del registro.
++type Indice = HashMap<Clave, PreHash>;
++
++/// Punto de inyección de fallo de E/S, **solo para tests**.
++///
++/// En producción es un tipo vacío y la rama que lo consulta no existe: no hay ninguna ruta que
++/// convierta un `Ok` falso en real.
++#[derive(Debug, Default)]
++struct InyeccionSync {
++    /// Fuerza que la siguiente sincronización falle.
++    #[cfg(test)]
++    falla_sync: bool,
++    /// Cuántas sincronizaciones reales se han pedido. Permite comprobar que la recuperación
++    /// sincroniza el fichero y no se limita a releerlo.
++    #[cfg(test)]
++    syncs: std::sync::atomic::AtomicU32,
++}
++
++/// Estado mutable protegido por el mutex.
++#[derive(Debug)]
++struct Estado {
++    fichero: File,
++    ruta: PathBuf,
++    /// Índice en memoria: `(huella, slot) -> pre_hash`. Se actualiza **solo** tras un `sync_all`
++    /// correcto.
++    indice: Indice,
++    /// Mayor slot conocido por el registro: el de pérdida de la cabecera o el mayor de las
++    /// entradas validadas, el que sea mayor. Se deriva en memoria; la cabecera no se reescribe.
++    max_slot: u64,
++    /// Último slot en el que todavía se abstiene, si [`Estado::abstencion_activa`].
++    abstener_hasta: u64,
++    /// ¿Está activa la abstención por pérdida de estado? La cabecera es inmutable, así que esta
++    /// bandera no se limpia al anexar: pasado el horizonte no impide firmar.
++    abstencion_activa: bool,
++    /// Número de entradas vivas en el índice.
++    entradas: u64,
++    /// `s_max_slots` con el que se abrió. La ruta [`Registro::nueva`] lo deja a 0 porque no se
++    /// abstiene nunca.
++    s_max_slots: u64,
++    /// La instancia dejó de ser fiable tras un fallo ambiguo de persistencia.
++    envenenado: bool,
++    /// Inyección de fallo de sincronización, solo para tests.
++    inyeccion: InyeccionSync,
++}
++
++impl Estado {
++    /// Último slot en el que este registro todavía se abstiene.
++    ///
++    /// Un bloque para el slot `s` solo puede aparecer mientras `slot(B) − slot(sp(B)) ≤ S_max`
++    /// (`C-GD-04`), así que pasado `s + S_max` ningún bloque nuevo puede reclamar `s`. La
++    /// abstención se decide con `slot <= horizonte`: para slots posteriores la cabecera ya no
++    /// impide firmar aunque la bandera siga activa. Devuelve `None` cuando no hay abstención
++    /// declarada (registro de test sin pérdida, o cabecera con la bandera a 0).
++    fn abstencion_hasta(&self) -> Option<u64> {
++        if self.abstencion_activa {
++            Some(self.abstener_hasta)
++        } else {
++            None
++        }
++    }
++
++    /// Escribe una entrada nueva y **solo después** actualiza el índice en memoria.
++    ///
++    /// Cualquier fallo deja el estado envenenado: no se puede saber si la escritura llegó a disco,
++    /// y esa duda es exactamente lo que prohíbe firmar.
++    fn escribir_entrada(
++        &mut self,
++        slot: u64,
++        huella: &[u8; LONGITUD_HUELLA],
++        pre_hash: PreHash,
++    ) -> Result<(), RegistroError> {
++        let ruta = self.ruta.clone();
++        let bytes = entrada_bytes(slot, huella, pre_hash);
++
++        // Solo-anexar: la posición de escritura se calcula desde el tamaño lógico del fichero. El
++        // desplazamiento tiene que ser exacto; si no lo es, el fichero no está íntegro.
++        let fin = match self.fichero.seek(SeekFrom::End(0)) {
++            Ok(fin) => fin,
++            Err(origen) => {
++                self.envenenado = true;
++                return Err(io_err(&ruta, origen));
++            }
++        };
++        if fin < TAMANO_CABECERA || !(fin - TAMANO_CABECERA).is_multiple_of(TAMANO_ENTRADA) {
++            self.envenenado = true;
++            return Err(RegistroError::Corrupto {
++                ruta,
++                offset: fin,
++                bytes_perdidos: 0,
++            });
++        }
++
++        if let Err(origen) = self.fichero.write_all(&bytes) {
++            self.envenenado = true;
++            return Err(io_err(&ruta, origen));
++        }
++        if let Err(fallo) = sincronizar(&self.fichero, &ruta, &self.inyeccion) {
++            self.envenenado = true;
++            return Err(fallo);
++        }
++
++        // A partir de aquí la entrada está en disco. El índice en memoria se actualiza después.
++        self.indice.insert((*huella, slot), pre_hash);
++        match a_u64(self.indice.len(), &ruta) {
++            Ok(n) => self.entradas = n,
++            Err(fallo) => {
++                self.envenenado = true;
++                return Err(fallo);
++            }
++        }
++
++        // La cabecera es inmutable tras crearse: no se reescribe al anexar. La abstención se sigue
++        // decidiendo con `slot <= horizonte` y `max_slot` vive solo en memoria, así que un corte a
++        // mitad de un `append` ya no puede romper la cabecera.
++        self.max_slot = self.max_slot.max(slot);
++        Ok(())
++    }
++}
++
++/// El registro persistente.
++///
++/// Se comparte entre hilos con `&Registro` (lleva su propio `Mutex`); ver
++/// [`crate::firmante::Firmante`].
++#[derive(Debug)]
++pub struct Registro {
++    estado: Mutex<Estado>,
++}
++
++impl Registro {
++    /// Abre el registro de `ruta`, creándolo si no existe.
++    ///
++    /// Si el fichero **no existe**, se crea en abstención: el registro no sabe qué firmó antes de
++    /// existir, así que se ancla al `slot_actual` y no firma hasta pasado
++    /// `slot_actual + s_max_slots`. Es la ruta segura para una clave que **ya existía** y perdió su
++    /// estado (FIR-10/FIR-11). Para una identidad genuinamente nueva, la ruta es
++    /// [`Registro::nueva`].
++    ///
++    /// `s_max_slots` es un valor **explícito del perfil**; este módulo no fija ninguna constante
++    /// de consenso.
++    ///
++    /// # Errores
++    /// [`RegistroError::Bloqueado`] si otro proceso lo tiene abierto;
++    /// [`RegistroError::VersionInvalida`] si la versión de formato es desconocida (1 y 2 incluidas:
++    /// no se migran en silencio); [`RegistroError::CabeceraCorrupta`] si el checksum de la cabecera
++    /// no cuadra; [`RegistroError::Corrupto`], [`RegistroError::ColaParcial`] o
++    /// [`RegistroError::DuplicadoConflictivo`] si el log no es íntegro; [`RegistroError::Io`] para
++    /// el resto de fallos de E/S, incluida la imposibilidad de sincronizar el fichero recuperado o
++    /// el directorio padre.
++    pub fn abrir(
++        ruta: impl AsRef<Path>,
++        slot_actual: u64,
++        s_max_slots: u64,
++    ) -> Result<Self, RegistroError> {
++        Self::abrir_con_politica(
++            ruta,
++            slot_actual,
++            s_max_slots,
++            true,
++            InyeccionSync::default(),
++        )
++    }
++
++    /// Implementación común de [`Registro::abrir`] y de la ruta sin abstención que solo usan los
++    /// tests del crate (`abstener_si_nuevo = false`).
++    ///
++    /// No hay una ruta pública de «registro nuevo sin historia» aleatoria: la única ruta sin
++    /// abstención y con historia es [`Registro::nueva`], que exige que el fichero **no** exista y
++    /// la usa el aprovisionamiento de una identidad nueva.
++    fn abrir_con_politica(
++        ruta: impl AsRef<Path>,
++        slot_actual: u64,
++        s_max_slots: u64,
++        abstener_si_nuevo: bool,
++        inyeccion: InyeccionSync,
++    ) -> Result<Self, RegistroError> {
++        let ruta = ruta.as_ref().to_path_buf();
++        let mut fichero = OpenOptions::new()
++            .read(true)
++            .write(true)
++            .create(true)
++            .truncate(false)
++            .open(&ruta)
++            .map_err(|origen| io_err(&ruta, origen))?;
++
++        // `try_lock` toma el bloqueo exclusivo del fichero durante toda la vida del `Registro`.
++        // `File` se abre con `O_CLOEXEC` en Unix, así que el cerrojo no sobrevive a un `exec`.
++        bloquear(&fichero, &ruta)?;
++
++        let len = fichero
++            .metadata()
++            .map_err(|origen| io_err(&ruta, origen))?
++            .len();
++
++        let (indice, max_slot, abstener_hasta, abstencion_activa) = if len == 0 {
++            // Fichero recién creado: cabecera. Sin historia, la única alta segura es abstenerse.
++            let slot_perdida = if abstener_si_nuevo { slot_actual } else { 0 };
++            let activa = abstener_si_nuevo;
++            // Un horizonte que desborda `u64` se satura a `u64::MAX` **a propósito**: sigue
++            // absteniéndose para siempre, que es la decisión segura. No es un tamaño de fichero ni
++            // un desplazamiento, así que la saturación no puede autorizar una firma.
++            let hasta = if activa {
++                slot_actual.saturating_add(s_max_slots)
++            } else {
++                0
++            };
++            let cabecera = cabecera_bytes(slot_perdida, hasta, activa);
++            fichero
++                .write_all(&cabecera)
++                .and_then(|()| fichero.sync_all())
++                .map_err(|origen| io_err(&ruta, origen))?;
++            // La creación del fichero también tiene que ser durable: se sincroniza el directorio
++            // padre cuando el sistema lo permite; si no, se falla cerrado.
++            sincronizar_directorio(&ruta)?;
++            (HashMap::new(), slot_perdida, hasta, activa)
++        } else {
++            let recuperado = recuperar(&mut fichero, &ruta)?;
++            // El fichero validado se sincroniza **antes** de devolver el registro. Un `write_all`
++            // anterior pudo llegar solo a la caché y que su `sync_all` fallara; releerlo no
++            // demuestra que sea durable, y una reemisión sin esa garantía es justo lo que el
++            // registro existe para impedir. Un fallo aquí devuelve error: no hay instancia.
++            sincronizar(&fichero, &ruta, &inyeccion)?;
++            (
++                recuperado.indice,
++                recuperado.max_slot,
++                recuperado.abstener_hasta,
++                recuperado.abstencion_activa,
++            )
++        };
++
++        let entradas = a_u64(indice.len(), &ruta)?;
++        Ok(Self {
++            estado: Mutex::new(Estado {
++                fichero,
++                ruta,
++                indice,
++                max_slot,
++                abstener_hasta,
++                abstencion_activa,
++                entradas,
++                s_max_slots,
++                envenenado: false,
++                inyeccion,
++            }),
++        })
++    }
++
++    /// Crea un registro **inicialmente limpio** para una identidad nueva: cabecera v3 con
++    /// `slot_perdida = 0`, `abstener_hasta = 0` y `abstencion_activa = false`, sin abstención.
++    ///
++    /// # Uso restringido al alta local
++    ///
++    /// Esta función **no** es la ruta de una pérdida de registro y no debe usarse como tal: un
++    /// registro sin historia solo es legítimo si la clave que va a firmar se generó en la misma
++    /// operación de aprovisionamiento y no ha firmado nunca (FIR-12). Tras una pérdida, la única
++    /// entrada es [`Registro::abrir`], que se abstiene `s_max_slots`.
++    ///
++    /// A diferencia de [`Registro::abrir`], aquí el fichero se abre con `create_new(true)`: si ya
++    /// existe un fichero —aunque esté vacío— la llamada falla y **no** se sobrescribe ni se
++    /// interpreta como un alta nueva. Toma el mismo bloqueo exclusivo y escribe la misma cabecera
++    /// v3, con `sync_all` del fichero y del directorio padre antes de devolver.
++    ///
++    /// No recibe `s_max_slots` (DF-2): esta ruta no se abstiene nunca, así que el perfil es inerte
++    /// aquí y la instancia guarda 0. El horizonte de abstención de una pérdida lo fija
++    /// [`Registro::abrir`], que es la única ruta que sí lo necesita (FIR-10).
++    ///
++    /// # Errores
++    /// [`RegistroError::Io`] si el fichero ya existe, si falla la apertura, la escritura o
++    /// cualquiera de las dos sincronizaciones; [`RegistroError::Bloqueado`] si otro proceso lo
++    /// tiene abierto.
++    pub fn nueva(ruta: impl AsRef<Path>) -> Result<Self, RegistroError> {
++        let ruta = ruta.as_ref().to_path_buf();
++        let mut fichero = OpenOptions::new()
++            .read(true)
++            .write(true)
++            .create_new(true)
++            .open(&ruta)
++            .map_err(|origen| io_err(&ruta, origen))?;
++
++        // El mismo bloqueo exclusivo que `abrir`, antes de escribir nada.
++        bloquear(&fichero, &ruta)?;
++
++        // La misma cabecera v3, pero sin historia: no hay firma previa que perder.
++        let cabecera = cabecera_bytes(0, 0, false);
++        fichero
++            .write_all(&cabecera)
++            .and_then(|()| fichero.sync_all())
++            .map_err(|origen| io_err(&ruta, origen))?;
++        sincronizar_directorio(&ruta)?;
++
++        Ok(Self {
++            estado: Mutex::new(Estado {
++                fichero,
++                ruta,
++                indice: HashMap::new(),
++                max_slot: 0,
++                abstener_hasta: 0,
++                abstencion_activa: false,
++                entradas: 0,
++                s_max_slots: 0,
++                envenenado: false,
++                inyeccion: InyeccionSync::default(),
++            }),
++        })
++    }
++
++    /// Consulta y, si procede, **persiste antes de devolver**.
++    ///
++    /// Es la única operación de escritura que el firmante usa, y es atómica respecto de la clave:
++    /// mira, decide, escribe y sincroniza bajo el mismo cerrojo.
++    ///
++    /// - Sin entrada: escribe `(huella, slot) -> pre_hash`, sincroniza y devuelve
++    ///   [`Resolucion::Nueva`]. **Solo entonces** el llamante puede firmar.
++    /// - Con entrada y el mismo `pre_hash`: [`Resolucion::Conocida`], sin escritura.
++    /// - Con entrada y otro `pre_hash`: [`Resolucion::Conflicto`], **sin escritura**.
++    ///
++    /// # Errores
++    /// [`RegistroError::EnAbstinencia`] si el registro perdió el estado y aún no puede firmar (el
++    /// firmante lo convierte en un resultado, no en error); [`RegistroError::Envenenado`] si una
++    /// persistencia anterior quedó en duda; [`RegistroError::Io`] si la escritura o la
++    /// sincronización fallan (y entonces el índice en memoria no cambia y la instancia queda
++    /// envenenada).
++    pub(crate) fn resolver(
++        &self,
++        identidad: &IdentidadTicket,
++        pre_hash: PreHash,
++    ) -> Result<Resolucion, RegistroError> {
++        let mut estado = self.estado.lock().unwrap_or_else(|e| e.into_inner());
++        if estado.envenenado {
++            return Err(RegistroError::Envenenado {
++                ruta: estado.ruta.clone(),
++            });
++        }
++
++        let slot = identidad.slot();
++        let huella = identidad.huella();
++
++        // La abstención va primero: si el registro no es de fiar, no se escribe ni se firma.
++        if let Some(hasta) = estado.abstencion_hasta()
++            && slot <= hasta
++        {
++            return Err(RegistroError::EnAbstinencia {
++                slot_actual: slot,
++                hasta,
++                s_max_slots: estado.s_max_slots,
++            });
++        }
++
++        if let Some(registrado) = estado.indice.get(&(huella, slot)).copied() {
++            if registrado == pre_hash {
++                return Ok(Resolucion::Conocida);
++            }
++            return Ok(Resolucion::Conflicto {
++                pre_hash_registrado: registrado,
++            });
++        }
++
++        // Camino de escritura: entrada nueva. Se persiste y se sincroniza ANTES de devolver.
++        estado.escribir_entrada(slot, &huella, pre_hash)?;
++        Ok(Resolucion::Nueva)
++    }
++
++    /// ¿Está el registro en abstención para `slot`?
++    #[must_use]
++    pub fn en_abstinencia(&self, slot: u64) -> bool {
++        let estado = self.estado.lock().unwrap_or_else(|e| e.into_inner());
++        estado.abstencion_hasta().is_some_and(|hasta| slot <= hasta)
++    }
++
++    /// Horizonte **histórico** de la abstención, si la cabecera la declara activa.
++    ///
++    /// Puede devolver un horizonte ya pasado: la cabecera es inmutable y no se limpia al anexar.
++    /// La respuesta para un slot concreto es [`Registro::en_abstinencia`], que compara
++    /// `slot <= horizonte`.
++    #[must_use]
++    pub fn abstener_hasta(&self) -> Option<u64> {
++        self.estado
++            .lock()
++            .unwrap_or_else(|e| e.into_inner())
++            .abstencion_hasta()
++    }
++
++    /// El mayor slot conocido: el de pérdida de la cabecera o el mayor de las entradas.
++    #[must_use]
++    pub fn max_slot(&self) -> u64 {
++        self.estado
++            .lock()
++            .unwrap_or_else(|e| e.into_inner())
++            .max_slot
++    }
++
++    /// Número de entradas vivas en el índice.
++    #[must_use]
++    pub fn entradas(&self) -> u64 {
++        self.estado
++            .lock()
++            .unwrap_or_else(|e| e.into_inner())
++            .entradas
++    }
++
++    /// La ruta del fichero.
++    #[must_use]
++    pub fn ruta(&self) -> PathBuf {
++        self.estado
++            .lock()
++            .unwrap_or_else(|e| e.into_inner())
++            .ruta
++            .clone()
++    }
++
++    /// Tamaño del fichero en bytes.
++    ///
++    /// # Errores
++    /// [`RegistroError::Io`] si el `metadata` falla.
++    pub fn tamano_bytes(&self) -> Result<u64, RegistroError> {
++        let estado = self.estado.lock().unwrap_or_else(|e| e.into_inner());
++        estado
++            .fichero
++            .metadata()
++            .map(|m| m.len())
++            .map_err(|origen| io_err(&estado.ruta, origen))
++    }
++
++    /// Fuerza el envenenamiento de la instancia, **solo para tests**.
++    ///
++    /// Permite cubrir `FirmanteError::Registro(Envenenado)` sin depender de un fallo de E/S real.
++    /// No existe en builds de producción.
++    #[cfg(test)]
++    pub(crate) fn forzar_envenenamiento_para_test(&self) {
++        self.estado
++            .lock()
++            .unwrap_or_else(|e| e.into_inner())
++            .envenenado = true;
++    }
++}
++
++/// Cabecera de formato 3: 56 bytes, con checksum sobre los 40 primeros.
++fn cabecera_bytes(
++    slot_perdida: u64,
++    abstener_hasta: u64,
++    abstencion_activa: bool,
++) -> [u8; TAMANO_CABECERA as usize] {
++    let mut firmada = Vec::with_capacity(TAMANO_CABECERA_FIRMADA);
++    firmada.extend_from_slice(&MAGIA);
++    firmada.extend_from_slice(&VERSION_FORMATO.to_le_bytes());
++    firmada.extend_from_slice(&slot_perdida.to_le_bytes());
++    firmada.extend_from_slice(&abstener_hasta.to_le_bytes());
++    firmada.extend_from_slice(&u64::from(abstencion_activa).to_le_bytes());
++
++    let comprobacion = comprobacion_cabecera(&firmada);
++    firmada.extend_from_slice(&comprobacion);
++
++    let mut cabecera = [0u8; TAMANO_CABECERA as usize];
++    if let Some(destino) = cabecera.get_mut(..) {
++        destino.copy_from_slice(&firmada);
++    }
++    cabecera
++}
++
++/// Comprobación de integridad de la cabecera: `SHA3-256(cabecera[0..40])[0..16]`.
++fn comprobacion_cabecera(firmada: &[u8]) -> [u8; TAMANO_COMPROBACION_CABECERA] {
++    let d = zx_core::sha3_256_publico(firmada.get(..TAMANO_CABECERA_FIRMADA).unwrap_or(&[]));
++    let mut comprobacion = [0u8; TAMANO_COMPROBACION_CABECERA];
++    if let (Some(destino), Some(origen)) = (
++        comprobacion.get_mut(..),
++        d.as_bytes().get(..TAMANO_COMPROBACION_CABECERA),
++    ) {
++        destino.copy_from_slice(origen);
++    }
++    comprobacion
++}
++
++/// Comprobación de integridad de una entrada: `SHA3-256(entrada[0..72])[0..8]`.
++fn comprobacion(entrada: &[u8]) -> [u8; TAMANO_COMPROBACION] {
++    let d = zx_core::sha3_256_publico(entrada.get(..OFFSET_COMPROBACION).unwrap_or(&[]));
++    let mut comprobacion = [0u8; TAMANO_COMPROBACION];
++    if let (Some(destino), Some(origen)) = (
++        comprobacion.get_mut(..),
++        d.as_bytes().get(..TAMANO_COMPROBACION),
++    ) {
++        destino.copy_from_slice(origen);
++    }
++    comprobacion
++}
++
++/// Serializa una entrada.
++fn entrada_bytes(slot: u64, huella: &[u8; LONGITUD_HUELLA], pre_hash: PreHash) -> [u8; 80] {
++    let mut entrada = Vec::with_capacity(TAMANO_ENTRADA as usize);
++    entrada.extend_from_slice(&slot.to_le_bytes());
++    entrada.extend_from_slice(huella);
++    entrada.extend_from_slice(pre_hash.as_bytes());
++    let comprobacion = comprobacion(&entrada);
++    entrada.extend_from_slice(&comprobacion);
++
++    let mut salida = [0u8; 80];
++    if let Some(destino) = salida.get_mut(..) {
++        destino.copy_from_slice(&entrada);
++    }
++    salida
++}
++
++/// Lo recuperado de un fichero existente.
++#[derive(Debug)]
++struct Recuperado {
++    indice: Indice,
++    max_slot: u64,
++    abstener_hasta: u64,
++    abstencion_activa: bool,
++}
++
++/// Recupera el índice y la cabecera. **No trunca nada**: falla cerrado (FIR-08).
++///
++/// - La cabecera debe medir 56 B, empezar por la magia, declarar la versión 3 y superar su
++///   checksum. Cualquier discordancia rechaza el fichero antes de construir estado.
++/// - Toda entrada **completa** (80 B) con comprobación inválida rechaza el fichero, aunque sea
++///   toda cero y aunque esté al final: truncarla olvidaría una firma previa si hubo corrupción.
++/// - Una cola **parcial** (< 80 B) no lleva marca que demuestre que fuera durable: también rechaza.
++/// - Dos entradas completas con el mismo `(huella, slot)` y distinto `pre_hash` rechazan el
++///   fichero: nunca se elige por orden de llegada.
++fn recuperar(fichero: &mut File, ruta: &Path) -> Result<Recuperado, RegistroError> {
++    let mut todo = Vec::new();
++    fichero
++        .seek(SeekFrom::Start(0))
++        .and_then(|_| fichero.read_to_end(&mut todo))
++        .map_err(|origen| io_err(ruta, origen))?;
++
++    let cabecera = match todo.get(..TAMANO_CABECERA as usize) {
++        Some(cabecera) => cabecera,
++        None => {
++            return Err(RegistroError::Corrupto {
++                ruta: ruta.to_path_buf(),
++                offset: 0,
++                bytes_perdidos: a_u64(todo.len(), ruta)?,
++            });
++        }
++    };
++    if cabecera.get(..8) != Some(MAGIA.as_slice()) {
++        return Err(RegistroError::MagiaInvalida {
++            ruta: ruta.to_path_buf(),
++        });
++    }
++    let version = leer_u64(cabecera.get(8..16), ruta)?;
++    if version != VERSION_FORMATO {
++        // No se migran formatos 1/2 en silencio: la 2 no tenía integridad de cabecera.
++        return Err(RegistroError::VersionInvalida {
++            ruta: ruta.to_path_buf(),
++            encontrada: version,
++            esperada: VERSION_FORMATO,
++        });
++    }
++
++    // Integridad de la cabecera antes de mirar ningún campo: la bandera y el horizonte no se
++    // pueden editar sin que el checksum deje de cuadrar.
++    let firmada = cabecera.get(..TAMANO_CABECERA_FIRMADA).unwrap_or(&[][..]);
++    let esperado = comprobacion_cabecera(firmada);
++    if cabecera.get(OFFSET_COMPROBACION_CABECERA..TAMANO_CABECERA as usize)
++        != Some(esperado.as_slice())
++    {
++        return Err(RegistroError::CabeceraCorrupta {
++            ruta: ruta.to_path_buf(),
++        });
++    }
++
++    let slot_perdida = leer_u64(
++        cabecera.get(OFFSET_SLOT_PERDIDA..OFFSET_SLOT_PERDIDA + 8),
++        ruta,
++    )?;
++    let abstener_hasta = leer_u64(
++        cabecera.get(OFFSET_ABSTENER_HASTA..OFFSET_ABSTENER_HASTA + 8),
++        ruta,
++    )?;
++    let bandera = leer_u64(
++        cabecera.get(OFFSET_ABSTENCION_ACTIVA..OFFSET_ABSTENCION_ACTIVA + 8),
++        ruta,
++    )?;
++    let abstencion_activa = match bandera {
++        0 => false,
++        1 => true,
++        _ => {
++            return Err(RegistroError::Corrupto {
++                ruta: ruta.to_path_buf(),
++                offset: OFFSET_ABSTENCION_ACTIVA as u64,
++                bytes_perdidos: 0,
++            });
++        }
++    };
++
++    let mut indice = HashMap::new();
++    let mut max_slot = slot_perdida;
++    let mut offset = TAMANO_CABECERA as usize;
++    while offset + TAMANO_ENTRADA as usize <= todo.len() {
++        let entrada = match todo.get(offset..offset + TAMANO_ENTRADA as usize) {
++            Some(entrada) => entrada,
++            None => break,
++        };
++        let c = comprobacion(entrada);
++        if entrada.get(OFFSET_COMPROBACION..) != Some(c.as_slice()) {
++            // Entrada completa con comprobación inválida: no se trunca, ni aunque sea cero.
++            return Err(RegistroError::Corrupto {
++                ruta: ruta.to_path_buf(),
++                offset: a_u64(offset, ruta)?,
++                bytes_perdidos: a_u64(todo.len() - offset, ruta)?,
++            });
++        }
++        let slot = leer_u64(entrada.get(0..8), ruta)?;
++        let mut huella = [0u8; LONGITUD_HUELLA];
++        if let Some(h) = entrada.get(OFFSET_HUELLA..OFFSET_HUELLA + LONGITUD_HUELLA) {
++            huella.copy_from_slice(h);
++        }
++        let mut bytes_pre_hash = [0u8; 32];
++        if let Some(p) = entrada.get(OFFSET_PRE_HASH..OFFSET_PRE_HASH + 32) {
++            bytes_pre_hash.copy_from_slice(p);
++        }
++        let pre_hash = PreHash::from_digest(zx_core::Digest::from_bytes(bytes_pre_hash));
++        match indice.entry((huella, slot)) {
++            std::collections::hash_map::Entry::Occupied(ya) => {
++                if ya.get() != &pre_hash {
++                    return Err(RegistroError::DuplicadoConflictivo {
++                        ruta: ruta.to_path_buf(),
++                        slot,
++                    });
++                }
++            }
++            std::collections::hash_map::Entry::Vacant(hueco) => {
++                hueco.insert(pre_hash);
++            }
++        }
++        max_slot = max_slot.max(slot);
++        offset += TAMANO_ENTRADA as usize;
++    }
++
++    if offset < todo.len() {
++        // Cola parcial (< 80 B): sin marca de commit no se puede demostrar que fuera durable.
++        return Err(RegistroError::ColaParcial {
++            ruta: ruta.to_path_buf(),
++            offset: a_u64(offset, ruta)?,
++            bytes: a_u64(todo.len() - offset, ruta)?,
++        });
++    }
++
++    Ok(Recuperado {
++        indice,
++        max_slot,
++        abstener_hasta,
++        abstencion_activa,
++    })
++}
++
++/// Lee un `u64` LE de ocho bytes exactos. Falla cerrado si el campo no mide ocho bytes.
++fn leer_u64(bytes: Option<&[u8]>, ruta: &Path) -> Result<u64, RegistroError> {
++    let array: [u8; 8] =
++        bytes
++            .and_then(|s| s.try_into().ok())
++            .ok_or_else(|| RegistroError::Corrupto {
++                ruta: ruta.to_path_buf(),
++                offset: 0,
++                bytes_perdidos: 0,
++            })?;
++    Ok(u64::from_le_bytes(array))
++}
++
++/// Convierte un tamaño o desplazamiento de memoria a `u64` sin saturar ni inventar un cero.
++fn a_u64(valor: usize, ruta: &Path) -> Result<u64, RegistroError> {
++    u64::try_from(valor).map_err(|_| RegistroError::TamanoNoRepresentable {
++        ruta: ruta.to_path_buf(),
++    })
++}
++
++/// Envuelve un `io::Error` con la ruta del registro.
++fn io_err(ruta: &Path, origen: std::io::Error) -> RegistroError {
++    RegistroError::Io {
++        ruta: ruta.to_path_buf(),
++        origen,
++    }
++}
++
++/// Sincroniza el fichero en disco. En tests puede fallar de forma inyectada y cuenta las llamadas.
++fn sincronizar(
++    fichero: &File,
++    ruta: &Path,
++    inyeccion: &InyeccionSync,
++) -> Result<(), RegistroError> {
++    #[cfg(test)]
++    {
++        inyeccion
++            .syncs
++            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++        if inyeccion.falla_sync {
++            return Err(io_err(
++                ruta,
++                std::io::Error::other("fallo de sync inyectado en test"),
++            ));
++        }
++    }
++    let _ = inyeccion;
++    fichero.sync_all().map_err(|origen| io_err(ruta, origen))
++}
++
++/// Sincroniza el directorio padre para que la creación del fichero sea durable.
++///
++/// Si no se puede abrir o sincronizar el directorio, se devuelve error: el módulo no finge una
++/// durabilidad que no puede garantizar.
++fn sincronizar_directorio(ruta: &Path) -> Result<(), RegistroError> {
++    let padre = ruta
++        .parent()
++        .filter(|p| !p.as_os_str().is_empty())
++        .unwrap_or_else(|| Path::new("."));
++    let dir = File::open(padre).map_err(|origen| io_err(ruta, origen))?;
++    dir.sync_all().map_err(|origen| io_err(ruta, origen))
++}
++
++/// Toma el bloqueo exclusivo del fichero, con reintentos acotados.
++///
++/// `flock` vive en la *open file description*: un `fork` —el de cualquier `Command::spawn`— duplica
++/// los descriptores del padre y, entre el `fork` y el `exec`, el hijo comparte el cerrojo. Si el
++/// padre cierra y reabre su registro en ese hueco, `try_lock` devuelve `WouldBlock` **sin que haya
++/// un segundo escritor**: es un titular transitorio. Por eso se reintenta durante un plazo corto;
++/// un segundo escritor real no suelta el cerrojo, así que al agotar el plazo se devuelve
++/// [`RegistroError::Bloqueado`] igual. El cerrojo se toma antes de leer o escribir nada.
++fn bloquear(fichero: &File, ruta: &Path) -> Result<(), RegistroError> {
++    use std::time::{Duration, Instant};
++
++    // Cuánto se espera a que un titular transitorio suelte el cerrojo.
++    const PLAZO: Duration = Duration::from_secs(2);
++    // Primer intervalo entre reintentos.
++    const INTERVALO_INICIAL: Duration = Duration::from_micros(50);
++    // Techo del intervalo entre reintentos.
++    const INTERVALO_MAXIMO: Duration = Duration::from_millis(20);
++
++    let inicio = Instant::now();
++    let mut intervalo = INTERVALO_INICIAL;
++    loop {
++        match fichero.try_lock() {
++            Ok(()) => return Ok(()),
++            Err(TryLockError::Error(origen)) => return Err(io_err(ruta, origen)),
++            Err(TryLockError::WouldBlock) => {
++                let esperado = inicio.elapsed();
++                if esperado >= PLAZO {
++                    return Err(RegistroError::Bloqueado {
++                        ruta: ruta.to_path_buf(),
++                    });
++                }
++                std::thread::sleep(intervalo.min(PLAZO.saturating_sub(esperado)));
++                intervalo = (intervalo * 2).min(INTERVALO_MAXIMO);
++            }
++        }
++    }
++}
++
++#[cfg(test)]
++#[allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño y manipulan bytes con índices constantes"
++)]
++mod tests {
++    use super::{
++        InyeccionSync, MAGIA, OFFSET_ABSTENCION_ACTIVA, OFFSET_ABSTENER_HASTA, Registro,
++        RegistroError, Resolucion, TAMANO_CABECERA, TAMANO_ENTRADA, VERSION_FORMATO,
++        cabecera_bytes, comprobacion_cabecera, entrada_bytes, sincronizar_directorio,
++    };
++    use crate::firmante::identidad::IdentidadTicket;
++    use std::path::{Path, PathBuf};
++    use std::sync::atomic::{AtomicU64, Ordering};
++    use zx_core::{ClavePublica, Digest, PreHash};
++
++    static CONTADOR: AtomicU64 = AtomicU64::new(0);
++
++    struct DirTemporal {
++        ruta: PathBuf,
++    }
++
++    impl DirTemporal {
++        fn nuevo(etiqueta: &str) -> Self {
++            let pid = std::process::id();
++            let n = CONTADOR.fetch_add(1, Ordering::Relaxed);
++            let unico = format!("zx-firmante-{pid}-{n}-{etiqueta}");
++            let ruta = std::env::temp_dir().join(unico);
++            std::fs::create_dir_all(&ruta).unwrap();
++            Self { ruta }
++        }
++
++        fn ruta(&self) -> &Path {
++            &self.ruta
++        }
++    }
++
++    impl Drop for DirTemporal {
++        fn drop(&mut self) {
++            let _ = std::fs::remove_dir_all(&self.ruta);
++        }
++    }
++
++    fn id(chunk: u8, slot: u64) -> IdentidadTicket {
++        IdentidadTicket::rat1(
++            7,
++            ClavePublica::desde_bytes([1u8; 32]),
++            0,
++            1 << 20,
++            [chunk; 32],
++            slot,
++        )
++    }
++
++    fn ph(n: u8) -> PreHash {
++        PreHash::from_digest(Digest::from_bytes([n; 32]))
++    }
++
++    fn sin_abstencion(ruta: &Path, s_max: u64) -> Registro {
++        Registro::abrir_con_politica(ruta, 0, s_max, false, InyeccionSync::default()).unwrap()
++    }
++
++    #[test]
++    fn entrada_nueva_conocida_y_conflicto() {
++        let dir = DirTemporal::nuevo("resolver");
++        let reg = sin_abstencion(&dir.ruta().join("r.log"), 150);
++
++        assert_eq!(reg.resolver(&id(1, 100), ph(1)).unwrap(), Resolucion::Nueva);
++        assert_eq!(
++            reg.resolver(&id(1, 100), ph(1)).unwrap(),
++            Resolucion::Conocida
++        );
++        assert_eq!(
++            reg.resolver(&id(1, 100), ph(2)).unwrap(),
++            Resolucion::Conflicto {
++                pre_hash_registrado: ph(1)
++            }
++        );
++        // La clave incluye el slot: otra oportunidad no colisiona.
++        assert_eq!(reg.resolver(&id(1, 101), ph(2)).unwrap(), Resolucion::Nueva);
++        assert_eq!(reg.entradas(), 2);
++    }
++
++    #[test]
++    fn el_formato_declara_version_tres_y_cabecera_de_cincuenta_y_seis() {
++        let dir = DirTemporal::nuevo("formato");
++        let ruta = dir.ruta().join("r.log");
++        let reg = sin_abstencion(&ruta, 150);
++        reg.resolver(&id(1, 7), ph(1)).unwrap();
++        drop(reg);
++
++        let bytes = std::fs::read(&ruta).unwrap();
++        assert_eq!(&bytes[..8], &MAGIA);
++        let mut b = [0u8; 8];
++        b.copy_from_slice(&bytes[8..16]);
++        assert_eq!(u64::from_le_bytes(b), VERSION_FORMATO);
++        assert_eq!(VERSION_FORMATO, 3);
++        assert_eq!(bytes.len() as u64, TAMANO_CABECERA + TAMANO_ENTRADA);
++
++        // El checksum de la cabecera cubre los 40 primeros bytes y se guarda en los 16 siguientes.
++        let esperado = comprobacion_cabecera(&bytes[..40]);
++        assert_eq!(&bytes[40..56], esperado.as_slice());
++    }
++
++    #[test]
++    fn sobrevive_a_reabrir_y_conserva_entradas() {
++        let dir = DirTemporal::nuevo("reabrir");
++        let ruta = dir.ruta().join("r.log");
++        {
++            let reg = sin_abstencion(&ruta, 150);
++            assert_eq!(reg.resolver(&id(1, 100), ph(1)).unwrap(), Resolucion::Nueva);
++            assert_eq!(reg.resolver(&id(2, 140), ph(3)).unwrap(), Resolucion::Nueva);
++        }
++        let reg = Registro::abrir(&ruta, 140, 150).unwrap();
++        assert_eq!(reg.entradas(), 2);
++        assert_eq!(reg.max_slot(), 140);
++        assert_eq!(
++            reg.resolver(&id(1, 100), ph(9)).unwrap(),
++            Resolucion::Conflicto {
++                pre_hash_registrado: ph(1)
++            }
++        );
++    }
++
++    #[test]
++    fn nueva_falla_si_el_fichero_ya_existe() {
++        let dir = DirTemporal::nuevo("nueva-existe");
++        let ruta = dir.ruta().join("r.log");
++        let primera = Registro::nueva(&ruta).unwrap();
++        assert_eq!(primera.entradas(), 0);
++        assert_eq!(primera.abstener_hasta(), None);
++        drop(primera);
++
++        // Un segundo alta sobre el mismo fichero NO se interpreta como registro limpio.
++        assert!(matches!(
++            Registro::nueva(&ruta).unwrap_err(),
++            RegistroError::Io { .. }
++        ));
++    }
++
++    #[test]
++    fn nueva_permite_firmar_de_inmediato() {
++        let dir = DirTemporal::nuevo("nueva-firma");
++        let reg = Registro::nueva(dir.ruta().join("r.log")).unwrap();
++        assert_eq!(reg.resolver(&id(1, 5), ph(1)).unwrap(), Resolucion::Nueva);
++        assert_eq!(reg.entradas(), 1);
++    }
++
++    #[test]
++    fn una_entrada_completa_a_ceros_tras_una_valida_falla_cerrado() {
++        let dir = DirTemporal::nuevo("ceros-80");
++        let ruta = dir.ruta().join("r.log");
++        {
++            let reg = sin_abstencion(&ruta, 150);
++            assert_eq!(reg.resolver(&id(1, 100), ph(1)).unwrap(), Resolucion::Nueva);
++        }
++        // 80 bytes a cero tras la entrada válida: es una entrada **completa** con comprobación
++        // inválida. Truncarla olvidaría una firma previa si hubo corrupción; falla cerrado.
++        let mut f = std::fs::OpenOptions::new().write(true).open(&ruta).unwrap();
++        use std::io::{Seek, SeekFrom, Write};
++        f.seek(SeekFrom::End(0)).unwrap();
++        f.write_all(&[0u8; 80]).unwrap();
++        f.sync_all().unwrap();
++        drop(f);
++
++        match Registro::abrir(&ruta, 100, 150).unwrap_err() {
++            RegistroError::Corrupto { offset, .. } => {
++                assert_eq!(offset, TAMANO_CABECERA + TAMANO_ENTRADA);
++            }
++            otro => panic!("se esperaba Corrupto, llegó {otro:?}"),
++        }
++        // Y el fichero sigue con los 80 bytes: no se truncó.
++        assert_eq!(
++            std::fs::metadata(&ruta).unwrap().len(),
++            TAMANO_CABECERA + 2 * TAMANO_ENTRADA
++        );
++    }
++
++    #[test]
++    fn una_cola_parcial_falla_cerrado() {
++        let dir = DirTemporal::nuevo("cola-parcial");
++        let ruta = dir.ruta().join("r.log");
++        {
++            let reg = sin_abstencion(&ruta, 150);
++            assert_eq!(reg.resolver(&id(1, 100), ph(1)).unwrap(), Resolucion::Nueva);
++        }
++        // Media entrada a cero: cola parcial sin marca de comprobación que demuestre durabilidad.
++        let mut f = std::fs::OpenOptions::new().write(true).open(&ruta).unwrap();
++        use std::io::{Seek, SeekFrom, Write};
++        f.seek(SeekFrom::End(0)).unwrap();
++        f.write_all(&[0u8; 40]).unwrap();
++        f.sync_all().unwrap();
++        drop(f);
++
++        match Registro::abrir(&ruta, 100, 150).unwrap_err() {
++            RegistroError::ColaParcial { offset, bytes, .. } => {
++                assert_eq!(offset, TAMANO_CABECERA + TAMANO_ENTRADA);
++                assert_eq!(bytes, 40);
++            }
++            otro => panic!("se esperaba ColaParcial, llegó {otro:?}"),
++        }
++    }
++
++    #[test]
++    fn bytes_alterados_en_medio_fallan_cerrado() {
++        let dir = DirTemporal::nuevo("corrupto");
++        let ruta = dir.ruta().join("r.log");
++        {
++            let reg = sin_abstencion(&ruta, 150);
++            assert_eq!(reg.resolver(&id(1, 100), ph(1)).unwrap(), Resolucion::Nueva);
++            assert_eq!(reg.resolver(&id(2, 200), ph(2)).unwrap(), Resolucion::Nueva);
++        }
++        // Un bit cambiado en la PRIMERA entrada, con una segunda válida detrás.
++        let mut f = std::fs::OpenOptions::new().write(true).open(&ruta).unwrap();
++        use std::io::{Seek, SeekFrom, Write};
++        f.seek(SeekFrom::Start(TAMANO_CABECERA + 10)).unwrap();
++        f.write_all(&[0xFF]).unwrap();
++        f.sync_all().unwrap();
++        drop(f);
++
++        match Registro::abrir(&ruta, 200, 150).unwrap_err() {
++            RegistroError::Corrupto { offset, .. } => assert_eq!(offset, TAMANO_CABECERA),
++            otro => panic!("se esperaba Corrupto, llegó {otro:?}"),
++        }
++    }
++
++    #[test]
++    fn un_duplicado_conflictivo_falla_cerrado() {
++        let dir = DirTemporal::nuevo("duplicado");
++        let ruta = dir.ruta().join("r.log");
++        let huella = id(5, 300).huella();
++        let mut bytes = cabecera_bytes(0, 0, false).to_vec();
++        bytes.extend_from_slice(&entrada_bytes(300, &huella, ph(1)));
++        bytes.extend_from_slice(&entrada_bytes(300, &huella, ph(2)));
++        std::fs::write(&ruta, &bytes).unwrap();
++
++        match Registro::abrir(&ruta, 300, 150).unwrap_err() {
++            RegistroError::DuplicadoConflictivo { slot, .. } => assert_eq!(slot, 300),
++            otro => panic!("se esperaba DuplicadoConflictivo, llegó {otro:?}"),
++        }
++    }
++
++    #[test]
++    fn un_duplicado_identico_no_falla() {
++        let dir = DirTemporal::nuevo("duplicado-igual");
++        let ruta = dir.ruta().join("r.log");
++        let huella = id(5, 300).huella();
++        let mut bytes = cabecera_bytes(0, 0, false).to_vec();
++        bytes.extend_from_slice(&entrada_bytes(300, &huella, ph(1)));
++        bytes.extend_from_slice(&entrada_bytes(300, &huella, ph(1)));
++        std::fs::write(&ruta, &bytes).unwrap();
++
++        let reg = Registro::abrir(&ruta, 300, 150).unwrap();
++        assert_eq!(reg.entradas(), 1);
++    }
++
++    #[test]
++    fn una_magia_ajena_se_rechaza() {
++        let dir = DirTemporal::nuevo("magia");
++        let ruta = dir.ruta().join("r.log");
++        std::fs::write(&ruta, [0u8; TAMANO_CABECERA as usize]).unwrap();
++        assert!(matches!(
++            Registro::abrir(&ruta, 0, 150).unwrap_err(),
++            RegistroError::MagiaInvalida { .. }
++        ));
++        assert_eq!(&MAGIA, b"ZXRGFIRM");
++    }
++
++    #[test]
++    fn una_version_desconocida_falla_cerrado() {
++        let dir = DirTemporal::nuevo("version");
++        let ruta = dir.ruta().join("r.log");
++        let mut cabecera = cabecera_bytes(0, 0, false);
++        cabecera[8..16].copy_from_slice(&99u64.to_le_bytes());
++        std::fs::write(&ruta, cabecera).unwrap();
++        assert!(matches!(
++            Registro::abrir(&ruta, 0, 150).unwrap_err(),
++            RegistroError::VersionInvalida {
++                encontrada: 99,
++                esperada: VERSION_FORMATO,
++                ..
++            }
++        ));
++    }
++
++    #[test]
++    fn un_formato_dos_no_se_migra_en_silencio() {
++        let dir = DirTemporal::nuevo("version-2");
++        let ruta = dir.ruta().join("r.log");
++        // Cabecera de formato 2: 40 B, versión 2. No se migra; se rechaza.
++        let mut cabecera = [0u8; TAMANO_CABECERA as usize];
++        cabecera[..8].copy_from_slice(&MAGIA);
++        cabecera[8..16].copy_from_slice(&2u64.to_le_bytes());
++        std::fs::write(&ruta, cabecera).unwrap();
++        assert!(matches!(
++            Registro::abrir(&ruta, 0, 150).unwrap_err(),
++            RegistroError::VersionInvalida {
++                encontrada: 2,
++                esperada: VERSION_FORMATO,
++                ..
++            }
++        ));
++    }
++
++    #[test]
++    fn un_bit_en_la_cabecera_rompe_el_checksum() {
++        let dir = DirTemporal::nuevo("cabecera-bits");
++        let ruta = dir.ruta().join("r.log");
++        let slot_perdida = 1_000u64;
++        let s_max = 150u64;
++        {
++            let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++            assert!(reg.en_abstinencia(slot_perdida));
++        }
++        let original = std::fs::read(&ruta).unwrap();
++
++        // Bandera de abstención (1 -> 0 al invertir el bit bajo) y horizonte por separado.
++        for (etiqueta, offset) in [
++            ("bandera", OFFSET_ABSTENCION_ACTIVA),
++            ("horizonte", OFFSET_ABSTENER_HASTA),
++        ] {
++            let mut bytes = original.clone();
++            bytes[offset] ^= 0x01;
++            let ruta_editada = dir.ruta().join(format!("{etiqueta}.log"));
++            std::fs::write(&ruta_editada, &bytes).unwrap();
++            assert!(
++                matches!(
++                    Registro::abrir(&ruta_editada, slot_perdida, s_max).unwrap_err(),
++                    RegistroError::CabeceraCorrupta { .. }
++                ),
++                "{etiqueta}: un bit cambiado debe fallar cerrado"
++            );
++        }
++    }
++
++    #[test]
++    fn la_recuperacion_sincroniza_antes_de_autorizar_firma() {
++        let dir = DirTemporal::nuevo("recuperacion-sync");
++        let ruta = dir.ruta().join("r.log");
++
++        // Primer proceso: `write_all` llega a la caché, `sync_all` falla inyectado y la instancia
++        // se envenena. La entrada puede estar en el fichero sin ser durable.
++        {
++            let reg = sin_abstencion(&ruta, 150);
++            reg.estado.lock().unwrap().inyeccion.falla_sync = true;
++            let e = reg.resolver(&id(1, 100), ph(1)).unwrap_err();
++            assert!(matches!(e, RegistroError::Io { .. }), "{e:?}");
++        }
++
++        // Reapertura con la sincronización de recuperación fallando: no hay `Registro` utilizable.
++        let inyeccion = InyeccionSync {
++            falla_sync: true,
++            ..InyeccionSync::default()
++        };
++        let e = Registro::abrir_con_politica(&ruta, 100, 150, false, inyeccion).unwrap_err();
++        assert!(matches!(e, RegistroError::Io { .. }), "{e:?}");
++
++        // Reapertura real: la recuperación sincroniza el fichero (no se limita a releerlo) y solo
++        // entonces autoriza reemitir la firma.
++        let reg =
++            Registro::abrir_con_politica(&ruta, 100, 150, false, InyeccionSync::default()).unwrap();
++        assert_eq!(reg.entradas(), 1);
++        assert!(
++            reg.estado
++                .lock()
++                .unwrap()
++                .inyeccion
++                .syncs
++                .load(Ordering::Relaxed)
++                >= 1,
++            "la recuperación debe sincronizar el fichero, no solo releerlo"
++        );
++        assert_eq!(
++            reg.resolver(&id(1, 100), ph(1)).unwrap(),
++            Resolucion::Conocida
++        );
++    }
++
++    #[test]
++    fn la_abstencion_de_un_alta_nueva_persiste_tras_dos_reinicios() {
++        let dir = DirTemporal::nuevo("abstencion");
++        let ruta = dir.ruta().join("r.log");
++        let s_max = 150;
++        let slot_perdida = 1_000;
++
++        // Alta conservadora sobre fichero inexistente.
++        {
++            let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++            assert!(reg.en_abstinencia(slot_perdida + s_max));
++            assert_eq!(reg.abstener_hasta(), Some(slot_perdida + s_max));
++        }
++        // Primer reinicio: sigue en abstención.
++        {
++            let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++            assert!(reg.en_abstinencia(slot_perdida + s_max));
++            let e = reg
++                .resolver(&id(1, slot_perdida + s_max), ph(1))
++                .unwrap_err();
++            assert!(matches!(e, RegistroError::EnAbstinencia { .. }));
++        }
++        // Segundo reinicio: sigue en abstención, y el slot siguiente ya se firma.
++        let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++        assert!(reg.en_abstinencia(slot_perdida + s_max));
++        assert_eq!(
++            reg.resolver(&id(1, slot_perdida + s_max + 1), ph(1))
++                .unwrap(),
++            Resolucion::Nueva
++        );
++        assert!(!reg.en_abstinencia(slot_perdida + s_max + 1));
++        assert_eq!(reg.entradas(), 1);
++    }
++
++    #[test]
++    fn un_horizonte_que_desborda_u64_sigue_absteniendose() {
++        let dir = DirTemporal::nuevo("desborde");
++        let ruta = dir.ruta().join("r.log");
++        let reg = Registro::abrir(&ruta, u64::MAX - 1, 150).unwrap();
++        assert_eq!(reg.abstener_hasta(), Some(u64::MAX));
++        assert!(reg.en_abstinencia(u64::MAX));
++    }
++
++    #[test]
++    fn el_fallo_de_persistencia_envenena_la_instancia() {
++        let dir = DirTemporal::nuevo("envenenado");
++        let ruta = dir.ruta().join("r.log");
++        let reg = sin_abstencion(&ruta, 150);
++        reg.estado.lock().unwrap().inyeccion.falla_sync = true;
++
++        let e = reg.resolver(&id(1, 100), ph(1)).unwrap_err();
++        assert!(matches!(e, RegistroError::Io { .. }), "{e:?}");
++        // Aunque el fallo se desactive, la instancia ya no es de fiar: hay que reabrir.
++        reg.estado.lock().unwrap().inyeccion.falla_sync = false;
++        assert!(matches!(
++            reg.resolver(&id(1, 100), ph(1)).unwrap_err(),
++            RegistroError::Envenenado { .. }
++        ));
++        drop(reg);
++
++        // Al reabrir, la recuperación valida, **sincroniza** y solo entonces devuelve instancia.
++        // El `write_all` anterior llegó a la caché, así que la entrada está y es reemitible.
++        let reg = Registro::abrir(&ruta, 100, 150).unwrap();
++        assert_eq!(reg.entradas(), 1);
++        assert_eq!(
++            reg.resolver(&id(1, 100), ph(1)).unwrap(),
++            Resolucion::Conocida
++        );
++    }
++
++    #[test]
++    fn el_bloqueo_entre_dos_descriptores_se_detecta() {
++        // `try_lock` es por open file description: dos `File` distintos del mismo proceso chocan,
++        // que es lo que permite probar el camino de Bloqueado sin lanzar un proceso.
++        let dir = DirTemporal::nuevo("bloqueo");
++        let ruta = dir.ruta().join("r.log");
++        let _primero = sin_abstencion(&ruta, 150);
++        assert!(matches!(
++            Registro::abrir(&ruta, 0, 150),
++            Err(RegistroError::Bloqueado { .. })
++        ));
++    }
++
++    #[test]
++    fn la_creacion_sincroniza_el_directorio_padre() {
++        // No se puede observar el fsync del directorio directamente, pero sí que la ruta sin
++        // directorio padre no falla y que la función existe y devuelve Ok en un directorio real.
++        let dir = DirTemporal::nuevo("directorio");
++        let ruta = dir.ruta().join("r.log");
++        let _reg = sin_abstencion(&ruta, 150);
++        sincronizar_directorio(&ruta).unwrap();
++        assert!(ruta.exists());
++    }
++}
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/src/lib.rs ws/crates/zx-post/src/lib.rs
+--- ws.orig/crates/zx-post/src/lib.rs	2026-09-26 04:17:18.624456396 +0200
++++ ws/crates/zx-post/src/lib.rs	2026-09-26 22:58:47.340928169 +0200
+@@ -1,6 +1,6 @@
+ //! Crate `zx-post`: PoT puro, rango PoT, puerta conjunta, contexto de transición dev,
+ //! justificación PoT del wire, productor del bloque de transición (W05b2), servicio PoT local y
+-//! productor en régimen (W05b3) (D-P14).
++//! productor en régimen (W05b3) y firmante seguro local (SL-4b1) (D-P14).
+ //!
+ //! Depende solo de `zx-core`, `zx-pot`, `zx-dag` y `zx-poas` (frontera §V8). No depende de
+ //! `zx-consensus` salvo como `dev-dependency` para minar la cadena PoW de los tests de extremo a
+@@ -16,6 +16,7 @@
+ 
+ pub mod cabecera_conjunta;
+ pub mod contexto_transicion;
++pub mod firmante;
+ pub mod justificacion;
+ pub mod pot;
+ pub mod pot_rango;
+@@ -46,8 +47,11 @@
+     verificar_rango_pot_fase_previa,
+ };
+ pub use productor::{
+-    ErrorProductor, FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de,
+-    producir,
++    ErrorProductor, FuenteSoluciones, MotivoAbstencion, ParametrosProductor, ProductoFirmado,
++    SolucionCandidata, clave_publica_de, producir, producir_con_firmante,
++};
++pub use productor_regimen::{
++    CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen,
++    producir_en_regimen_con_firmante,
+ };
+-pub use productor_regimen::{CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen};
+ pub use servicio_pot::{ErrorServicioPot, ServicioPot};
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/src/productor.rs ws/crates/zx-post/src/productor.rs
+--- ws.orig/crates/zx-post/src/productor.rs	2026-09-26 03:43:38.291031698 +0200
++++ ws/crates/zx-post/src/productor.rs	2026-09-26 23:06:35.719746642 +0200
+@@ -24,6 +24,14 @@
+ //! no elige padres con GHOSTDAG (el de transición es hijo único de `T`), no firma con una clave de
+ //! red, no publica y no admite. No arranca desde génesis: el terminal lo aporta el llamante.
+ //!
++//! # Firmante seguro (SL-4b1)
++//!
++//! [`producir`] sella directamente y **no** protege contra la doble firma: es la ruta antigua,
++//! conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La variante
++//! [`producir_con_firmante`] construye **exactamente** la misma cabecera y el mismo cuerpo y los
++//! sella **solo** a través de [`Firmante`], que persiste `(identidad, slot) -> pre_hash` con `fsync`
++//! antes de emitir el sello (`C-EVP-06`, FIR-01…FIR-15).
++//!
+ //! # Por qué la parcela es un rasgo
+ //!
+ //! La frontera §V8 `zx-post → {zx-core, zx-pot, zx-dag, zx-poas}` **no** incluye `zx-farmer`, pero
+@@ -46,10 +54,11 @@
+ use zx_core::wire_dag::{BloqueDag, JustificacionPot, MAX_BUNDLES_POT, PotCheckpoints};
+ use zx_core::{
+     Amount, BlockHash, ClavePublica, DagBlockHeader, EncodingError, ExtensionTx, PadresDag,
+-    SolucionPoas, Tx, body_commitment, txid,
++    PreHash, SolucionPoas, Tx, body_commitment, txid,
+ };
+ use zx_pot::tipos::PotSeed;
+ 
++use crate::firmante::{Firmante, FirmanteError, Resultado as ResultadoFirmante};
+ use crate::pot::{
+     ErrorContextoPot, checkpoints_a_wire, proyectar_iteraciones, semilla_genesis, semilla_siguiente,
+ };
+@@ -101,6 +110,56 @@
+     pub importe_coinbase: Amount,
+ }
+ 
++/// Motivo por el que un productor con firmante **no** emite bloque.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub enum MotivoAbstencion {
++    /// El firmante ya registró otro `pre_hash` para esta identidad y slot: el candidato se
++    /// descarta y no se sella.
++    Conflicto {
++        /// El `pre_hash` que ya estaba registrado.
++        pre_hash_registrado: PreHash,
++    },
++    /// El registro se perdió y el firmante sigue en su ventana de abstención (FIR-10).
++    PerdidaRegistro {
++        /// Último slot en el que todavía se abstiene.
++        hasta: u64,
++        /// `s_max_slots` del perfil con el que se abrió el registro.
++        s_max_slots: u64,
++    },
++}
++
++/// Lo que devuelve un productor que sella a través de [`Firmante`].
++#[derive(Debug)]
++#[expect(
++    clippy::large_enum_variant,
++    reason = "el bloque es el producto normal; boxearlo obligaría a desempaquetar en cada llamante sin ganancia medible"
++)]
++pub enum ProductoFirmado {
++    /// Se ensambló y selló el bloque. El segundo campo es el veredicto del firmante: `Sellado`
++    /// (entrada nueva) o `Reemitido` (mismo `pre_hash`).
++    Bloque(BloqueDag, ResultadoFirmante),
++    /// El firmante se abstuvo: no se emitió bloque y el candidato se descarta.
++    Abstenido {
++        /// Causa de la abstención.
++        motivo: MotivoAbstencion,
++    },
++}
++
++/// Traduce el veredicto del firmante a un motivo de abstención, si lo hay.
++fn motivo_de(resultado: ResultadoFirmante) -> Option<MotivoAbstencion> {
++    match resultado {
++        ResultadoFirmante::Sellado | ResultadoFirmante::Reemitido => None,
++        ResultadoFirmante::AbstenidoPorConflicto {
++            pre_hash_registrado,
++        } => Some(MotivoAbstencion::Conflicto {
++            pre_hash_registrado,
++        }),
++        ResultadoFirmante::AbstenidoPorPerdida { hasta, s_max_slots } => {
++            Some(MotivoAbstencion::PerdidaRegistro { hasta, s_max_slots })
++        }
++    }
++}
++
+ /// Fallo al producir el bloque de transición.
+ #[derive(Debug, thiserror::Error)]
+ pub enum ErrorProductor<E>
+@@ -132,6 +191,9 @@
+     /// `zx-core` rechazó el formato (padres o compromiso del cuerpo).
+     #[error("formato del bloque: {0}")]
+     Formato(#[from] EncodingError),
++    /// Fallo del firmante (clave ajena, sello inválido o E/S del registro).
++    #[error("firmante: {0}")]
++    Firmante(#[from] FirmanteError),
+     /// Fallo de la fuente de soluciones.
+     #[error("fuente de soluciones: {0}")]
+     Fuente(#[source] E),
+@@ -143,8 +205,89 @@
+     },
+ }
+ 
++/// Fallo interno del sellado, común a las dos rutas del productor.
++#[derive(Debug)]
++pub(crate) enum ErrorSellado {
++    /// El firmante rechazó el candidato.
++    Firmante(FirmanteError),
++    /// `zx-core` rechazó el bloque ensamblado.
++    Formato(EncodingError),
++}
++
++impl<E> From<ErrorSellado> for ErrorProductor<E>
++where
++    E: std::error::Error + 'static,
++{
++    fn from(fallo: ErrorSellado) -> Self {
++        match fallo {
++            ErrorSellado::Firmante(e) => Self::Firmante(e),
++            ErrorSellado::Formato(e) => Self::Formato(e),
++        }
++    }
++}
++
++/// Candidato PoST ensamblado **sin sello**: cabecera con `sello = 0`, justificación y cuerpo.
++///
++/// La construcción vive aquí una sola vez; las dos rutas de sellado ([`finalizar_directo`] y
++/// [`finalizar_con_firmante`]) la comparten para que el bloque sea idéntico byte a byte.
++pub(crate) struct CandidatoPoST {
++    /// Cabecera con `sello = [0; 64]`.
++    pub(crate) cabecera: DagBlockHeader,
++    /// Justificación del rango de slots.
++    pub(crate) justificacion: JustificacionPot,
++    /// Transacciones (la primera es la coinbase).
++    pub(crate) txs: Vec<Tx>,
++    /// Testigos paralelos a `txs`.
++    pub(crate) testigos: Vec<Vec<Vec<u8>>>,
++}
++
++/// Sella directamente el candidato con la clave (ruta antigua, sin firmante seguro).
++pub(crate) fn finalizar_directo(
++    candidato: CandidatoPoST,
++    clave: &SigningKey,
++) -> Result<BloqueDag, ErrorSellado> {
++    let CandidatoPoST {
++        mut cabecera,
++        justificacion,
++        txs,
++        testigos,
++    } = candidato;
++    let pre_hash = cabecera.pre_hash();
++    cabecera.sello = clave.sign(pre_hash.as_bytes()).into();
++    BloqueDag::nuevo(cabecera, justificacion, txs, testigos).map_err(ErrorSellado::Formato)
++}
++
++/// Sella el candidato **solo** a través del firmante seguro y traduce su veredicto.
++pub(crate) fn finalizar_con_firmante(
++    candidato: CandidatoPoST,
++    clave: &SigningKey,
++    firmante: &mut Firmante<'_>,
++) -> Result<ProductoFirmado, ErrorSellado> {
++    let CandidatoPoST {
++        mut cabecera,
++        justificacion,
++        txs,
++        testigos,
++    } = candidato;
++    let resultado = firmante
++        .firmar(&mut cabecera, clave)
++        .map_err(ErrorSellado::Firmante)?;
++    match motivo_de(resultado) {
++        Some(motivo) => Ok(ProductoFirmado::Abstenido { motivo }),
++        None => {
++            let bloque = BloqueDag::nuevo(cabecera, justificacion, txs, testigos)
++                .map_err(ErrorSellado::Formato)?;
++            Ok(ProductoFirmado::Bloque(bloque, resultado))
++        }
++    }
++}
++
+ /// Produce el primer bloque PoST hijo de `terminal` (D-P09…D-P11, F-03, F-09).
+ ///
++/// **No protege contra la doble firma.** Es la ruta antigua: sella directamente con `clave` sin
++/// consultar registro alguno. La variante segura es [`producir_con_firmante`]; SL-4b2 retirará esta
++/// del nodo.
++///
+ /// # Procedimiento
+ /// Arranca de S1, avanza el PoT slot a slot con `N_dev` y, en cada slot, pide a `fuente` las
+ /// soluciones verificadas. Con la primera, ensambla cabecera y cuerpo, sella y devuelve el bloque.
+@@ -163,6 +306,45 @@
+     F: FuenteSoluciones,
+     F::Error: std::error::Error + 'static,
+ {
++    let candidato = ensamblar(terminal, fuente, clave, parametros)?;
++    finalizar_directo(candidato, clave).map_err(ErrorProductor::from)
++}
++
++/// Produce el primer bloque PoST hijo de `terminal` sellándolo **solo** con `firmante` (SL-4b1).
++///
++/// Construye exactamente el mismo candidato que [`producir`] y lo sella por
++/// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
++/// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
++///
++/// # Errores
++/// Los mismos que [`producir`], más [`ErrorProductor::Firmante`] para un fallo real del registro
++/// (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
++pub fn producir_con_firmante<F>(
++    terminal: BlockHash,
++    fuente: &F,
++    clave: &SigningKey,
++    parametros: &ParametrosProductor,
++    firmante: &mut Firmante<'_>,
++) -> Result<ProductoFirmado, ErrorProductor<F::Error>>
++where
++    F: FuenteSoluciones,
++    F::Error: std::error::Error + 'static,
++{
++    let candidato = ensamblar(terminal, fuente, clave, parametros)?;
++    finalizar_con_firmante(candidato, clave, firmante).map_err(ErrorProductor::from)
++}
++
++/// Barre los slots desde S1 y ensambla el primer candidato con solución.
++fn ensamblar<F>(
++    terminal: BlockHash,
++    fuente: &F,
++    clave: &SigningKey,
++    parametros: &ParametrosProductor,
++) -> Result<CandidatoPoST, ErrorProductor<F::Error>>
++where
++    F: FuenteSoluciones,
++    F::Error: std::error::Error + 'static,
++{
+     let iteraciones: NonZeroU32 = proyectar_iteraciones(parametros.n_dev)?;
+     if parametros.max_slots == 0 || parametros.max_slots > MAX_BUNDLES_POT as u64 {
+         return Err(ErrorProductor::MaxSlotsFueraDeRango {
+@@ -199,10 +381,9 @@
+             });
+         }
+ 
+-        return construir_bloque(
++        return construir_sin_sello(
+             terminal,
+             parametros,
+-            clave,
+             slot,
+             salida,
+             portadores,
+@@ -215,22 +396,21 @@
+     })
+ }
+ 
+-/// Ensambla cabecera y cuerpo (coinbase v3) y sella la prefirma.
+-fn construir_bloque<E>(
++/// Ensambla cabecera (sin sello) y cuerpo (coinbase v3) del candidato.
++fn construir_sin_sello<E>(
+     terminal: BlockHash,
+     parametros: &ParametrosProductor,
+-    clave: &SigningKey,
+     slot: u64,
+     pot_output: [u8; 16],
+     portadores: Vec<PotCheckpoints>,
+     solucion: SolucionPoas,
+-) -> Result<BloqueDag, ErrorProductor<E>>
++) -> Result<CandidatoPoST, ErrorProductor<E>>
+ where
+     E: std::error::Error + 'static,
+ {
+     let productor = solucion.public_key;
+     // Coinbase v3 (F-05, F-09, F-17): sin entradas ni salidas, campos extra `clave ‖ importe ‖
+-    // slot`, con el slot de **esta** cabecera (el que se le pasa a `construir_bloque`).
++    // slot`, con el slot de **esta** cabecera (el que se le pasa a `construir_sin_sello`).
+     let coinbase = Tx {
+         version: 3,
+         inputs: Vec::new(),
+@@ -251,7 +431,7 @@
+     let merkle_root = merkle_root(&txids);
+     let body_commitment = body_commitment(&txs, &testigos, parametros.consensus_branch_id)?;
+ 
+-    let mut cabecera = DagBlockHeader {
++    let cabecera = DagBlockHeader {
+         consensus_branch_id: parametros.consensus_branch_id,
+         merkle_root,
+         timestamp: parametros.timestamp,
+@@ -266,12 +446,13 @@
+         sello: [0u8; LONGITUD_FIRMA],
+     };
+ 
+-    // El sello cubre la prefirma canónica (C-HDR-03, C-HDR-04).
+-    let pre_hash = cabecera.pre_hash();
+-    cabecera.sello = clave.sign(pre_hash.as_bytes()).into();
+-
+     let justificacion = JustificacionPot::nueva(portadores)?;
+-    Ok(BloqueDag::nuevo(cabecera, justificacion, txs, testigos)?)
++    Ok(CandidatoPoST {
++        cabecera,
++        justificacion,
++        txs,
++        testigos,
++    })
+ }
+ 
+ /// La clave pública Ed25519 que firmará el bloque de una `SigningKey` dada.
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/src/productor_regimen.rs ws/crates/zx-post/src/productor_regimen.rs
+--- ws.orig/crates/zx-post/src/productor_regimen.rs	2026-09-26 04:26:00.818346048 +0200
++++ ws/crates/zx-post/src/productor_regimen.rs	2026-09-26 23:06:24.290507160 +0200
+@@ -27,6 +27,13 @@
+ //! No decide si la clave tiene garantía: eso es del motor de estado (`zx-cadena`). No elige `SR`
+ //! (constante dev, D-P11), no admite el bloque, no comprueba el cuerpo y no publica.
+ //!
++//! # Firmante seguro (SL-4b1)
++//!
++//! [`producir_en_regimen`] sella directamente y **no** protege contra la doble firma: es la ruta
++//! antigua, conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La
++//! variante [`producir_en_regimen_con_firmante`] construye **exactamente** el mismo bloque y lo
++//! sella **solo** a través de [`Firmante`] (`C-EVP-06`, FIR-01…FIR-15).
++//!
+ //! # Frontera de confianza
+ //!
+ //! [`FuenteSoluciones`] afirma que la solución verificó contra las entradas proporcionadas; el
+@@ -42,7 +49,11 @@
+     ClavePublica, DagBlockHeader, EncodingError, ExtensionTx, PadresDag, Tx, body_commitment, txid,
+ };
+ 
+-use crate::productor::{FuenteSoluciones, ParametrosProductor, clave_publica_de};
++use crate::firmante::{Firmante, FirmanteError};
++use crate::productor::{
++    CandidatoPoST, ErrorSellado, FuenteSoluciones, ParametrosProductor, ProductoFirmado,
++    clave_publica_de, finalizar_con_firmante, finalizar_directo,
++};
+ use crate::servicio_pot::{ErrorServicioPot, ServicioPot};
+ 
+ /// Cuerpo que aporta el llamante: transacciones **sin** la coinbase y sus testigos, en paralelo.
+@@ -176,6 +187,9 @@
+         /// Clave del firmante.
+         firma: ClavePublica,
+     },
++    /// Fallo del firmante (clave ajena, sello inválido o E/S del registro).
++    #[error("firmante: {0}")]
++    Firmante(#[from] FirmanteError),
+     /// Fallo de la fuente de soluciones.
+     #[error("fuente de soluciones: {0}")]
+     Fuente(#[source] E),
+@@ -190,8 +204,23 @@
+     Formato(#[from] EncodingError),
+ }
+ 
++impl<E> From<ErrorSellado> for ErrorRegimen<E>
++where
++    E: std::error::Error + 'static,
++{
++    fn from(fallo: ErrorSellado) -> Self {
++        match fallo {
++            ErrorSellado::Firmante(e) => Self::Firmante(e),
++            ErrorSellado::Formato(e) => Self::Formato(e),
++        }
++    }
++}
++
+ /// Produce un bloque PoST en régimen para los padres y el slot dados.
+ ///
++/// **No protege contra la doble firma:** sella directamente con `clave`. La variante segura es
++/// [`producir_en_regimen_con_firmante`]; SL-4b2 retirará esta del nodo.
++///
+ /// # Argumentos
+ /// - `padres`: padres ya elegidos por el llamante (seleccionado primero, `≤ 15`). El productor no
+ ///   los reordena.
+@@ -219,6 +248,75 @@
+     F: FuenteSoluciones,
+     F::Error: std::error::Error + 'static,
+ {
++    let candidato = ensamblar_regimen(
++        padres,
++        slot_objetivo,
++        servicio,
++        fuente,
++        clave,
++        parametros,
++        cuerpo,
++    )?;
++    finalizar_directo(candidato, clave).map_err(ErrorRegimen::from)
++}
++
++/// Produce un bloque PoST en régimen sellándolo **solo** con `firmante` (SL-4b1).
++///
++/// Construye exactamente el mismo bloque que [`producir_en_regimen`] y lo sella por
++/// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
++/// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
++///
++/// # Errores
++/// Los mismos que [`producir_en_regimen`], más [`ErrorRegimen::Firmante`] para un fallo real del
++/// registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
++#[expect(
++    clippy::too_many_arguments,
++    reason = "firma pública del productor seguro; agrupar rompería la simetría con producir_en_regimen"
++)]
++pub fn producir_en_regimen_con_firmante<F>(
++    padres: PadresDag,
++    slot_objetivo: u64,
++    servicio: &mut ServicioPot,
++    fuente: &F,
++    clave: &SigningKey,
++    parametros: &ParametrosProductor,
++    cuerpo: CuerpoProductor,
++    firmante: &mut Firmante<'_>,
++) -> Result<ProductoFirmado, ErrorRegimen<F::Error>>
++where
++    F: FuenteSoluciones,
++    F::Error: std::error::Error + 'static,
++{
++    let candidato = ensamblar_regimen(
++        padres,
++        slot_objetivo,
++        servicio,
++        fuente,
++        clave,
++        parametros,
++        cuerpo,
++    )?;
++    finalizar_con_firmante(candidato, clave, firmante).map_err(ErrorRegimen::from)
++}
++
++/// Valida el rango, avanza el servicio y ensambla cabecera (sin sello) y cuerpo (coinbase v3).
++#[allow(
++    clippy::too_many_arguments,
++    reason = "mismos argumentos públicos del productor"
++)]
++fn ensamblar_regimen<F>(
++    padres: PadresDag,
++    slot_objetivo: u64,
++    servicio: &mut ServicioPot,
++    fuente: &F,
++    clave: &SigningKey,
++    parametros: &ParametrosProductor,
++    cuerpo: CuerpoProductor,
++) -> Result<CandidatoPoST, ErrorRegimen<F::Error>>
++where
++    F: FuenteSoluciones,
++    F::Error: std::error::Error + 'static,
++{
+     if padres.es_genesis() || padres.count() == 0 {
+         return Err(ErrorRegimen::SinPadres);
+     }
+@@ -308,7 +406,7 @@
+     let merkle_root = merkle_root(&txids);
+     let body_commitment = body_commitment(&txs, &testigos, parametros.consensus_branch_id)?;
+ 
+-    let mut cabecera = DagBlockHeader {
++    let cabecera = DagBlockHeader {
+         consensus_branch_id: parametros.consensus_branch_id,
+         merkle_root,
+         timestamp: parametros.timestamp,
+@@ -322,11 +420,14 @@
+         padres,
+         sello: [0u8; LONGITUD_FIRMA],
+     };
+-    let pre_hash = cabecera.pre_hash();
+-    cabecera.sello = clave.sign(pre_hash.as_bytes()).into();
+ 
+     let justificacion = JustificacionPot::nueva(portadores)?;
+-    Ok(BloqueDag::nuevo(cabecera, justificacion, txs, testigos)?)
++    Ok(CandidatoPoST {
++        cabecera,
++        justificacion,
++        txs,
++        testigos,
++    })
+ }
+ 
+ #[cfg(test)]
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/tests/firmante_coste.rs ws/crates/zx-post/tests/firmante_coste.rs
+--- ws.orig/crates/zx-post/tests/firmante_coste.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-post/tests/firmante_coste.rs	2026-09-26 23:05:56.156917664 +0200
+@@ -0,0 +1,105 @@
++//! V8 de `ORDEN-SL4b1`: coste de `Firmante::firmar` con `fsync` real.
++//!
++//! Se ejecuta explícitamente porque mide tiempos de disco y no es criterio de aceptación:
++//!
++//! ```text
++//! FIRMANTE_COSTE_DIR=/home/katana/zeo/ZEROX/deepseek/SL4b1/target/coste \
++//!   cargo test -p zx-post --test firmante_coste -- --ignored --nocapture
++//! ```
++//!
++//! `FIRMANTE_COSTE_DIR` debe apuntar al **disco de la zona** (no a un `tmpfs`): el `fsync` que se
++//! mide es el del registro real. Cada muestra usa una oportunidad `(identidad, slot)` distinta para
++//! forzar escritura + `sync_all` en cada llamada.
++
++#![allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño"
++)]
++
++use std::path::PathBuf;
++use std::time::{Duration, Instant};
++
++use ed25519_zebra::{SigningKey, VerificationKey};
++use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
++use zx_core::{BlockHash, BodyCommitment, ClavePublica, Digest, MerkleRoot};
++use zx_post::firmante::{Firmante, Registro, Resultado};
++
++fn sk() -> SigningKey {
++    SigningKey::from([42u8; 32])
++}
++
++fn clave_publica() -> ClavePublica {
++    ClavePublica::desde_bytes(VerificationKey::from(&sk()).into())
++}
++
++fn candidato(padre: u8, slot: u64) -> DagBlockHeader {
++    DagBlockHeader {
++        consensus_branch_id: zx_core::CBID_RED_DEV,
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x22; 32])),
++        timestamp: 1_700_000_000,
++        height: 0,
++        slot,
++        pot_output: [0x11; 16],
++        rango_solucion: 7,
++        sol: SolucionPoas {
++            public_key: clave_publica(),
++            sector_index: 1,
++            history_size: 1 << 20,
++            chunk: [5u8; 32],
++            ..SolucionPoas::default()
++        },
++        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x33; 32])),
++        padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([padre; 32])), &[])
++            .unwrap(),
++        sello: [0u8; 64],
++    }
++}
++
++/// Mediana y p99 de una lista de duraciones.
++fn percentil(ordenadas: &[Duration], p: f64) -> Duration {
++    if ordenadas.is_empty() {
++        return Duration::ZERO;
++    }
++    let indice = ((ordenadas.len() - 1) as f64 * p).round() as usize;
++    ordenadas[indice.min(ordenadas.len() - 1)]
++}
++
++#[test]
++#[ignore = "V8: mide fsync real; se ejecuta explícitamente con --ignored"]
++fn coste_de_firmar_con_fsync() {
++    let dir: PathBuf = std::env::var_os("FIRMANTE_COSTE_DIR")
++        .map(PathBuf::from)
++        .expect("define FIRMANTE_COSTE_DIR al disco de la zona");
++    std::fs::create_dir_all(&dir).expect("crear el directorio de coste");
++    let ruta = dir.join("coste-firmante.log");
++    let _ = std::fs::remove_file(&ruta);
++
++    let reg = Registro::nueva(&ruta).expect("registro limpio en la zona");
++    let f = Firmante::nuevo(&reg);
++
++    const MUESTRAS: u64 = 2_000;
++    let mut tiempos = Vec::with_capacity(MUESTRAS as usize);
++    for i in 0..MUESTRAS {
++        let mut c = candidato(1, 100_000 + i);
++        let inicio = Instant::now();
++        let r = f.firmar(&mut c, &sk()).expect("firmar sella");
++        tiempos.push(inicio.elapsed());
++        assert_eq!(r, Resultado::Sellado);
++    }
++    tiempos.sort();
++    let total: Duration = tiempos.iter().sum();
++    let mediana = percentil(&tiempos, 0.50);
++    let p99 = percentil(&tiempos, 0.99);
++    let media = total / u32::try_from(MUESTRAS).expect("muestras caben en u32");
++    eprintln!(
++        "[V8] firmar+fsync: n={MUESTRAS} mediana={:.3} ms p99={:.3} ms media={:.3} ms total={:.3} s",
++        mediana.as_secs_f64() * 1e3,
++        p99.as_secs_f64() * 1e3,
++        media.as_secs_f64() * 1e3,
++        total.as_secs_f64()
++    );
++    assert_eq!(reg.entradas(), MUESTRAS);
++}
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/tests/firmante_identidad_evidencia.rs ws/crates/zx-post/tests/firmante_identidad_evidencia.rs
+--- ws.orig/crates/zx-post/tests/firmante_identidad_evidencia.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-post/tests/firmante_identidad_evidencia.rs	2026-09-26 23:06:05.509113625 +0200
+@@ -0,0 +1,481 @@
++//! V5 de `ORDEN-SL4b1`: la identidad del firmante es la identidad de la evidencia (`RAT-1`).
++//!
++//! - (a) para cabeceras reales firmadas, «misma identidad del firmante» ⟺ «mismo
++//!   `zx_core::incident_id_evidencia`» calculado de cada cabecera;
++//! - (b) con dos cabeceras de la misma identidad y distinto `pre_hash`, la `EvidenceTx` v4 pasa
++//!   `zx_core::validar_forma_tx_v4` y **se aplica** en el motor (`zx-consensus`, dev-dependency);
++//! - (c) cambiando **uno** de los seis campos de la identidad (uno por test, incluido
++//!   `consensus_branch_id`), el firmante las trata como oportunidades distintas **y** el motor
++//!   rechaza la evidencia (`ErrSinEvidencia`, o `ErrCbidAjeno` para el `cbid`);
++//! - (d) cambiar un campo que no es de la identidad (padres, cuerpo, `timestamp`) no cambia la
++//!   identidad del firmante.
++//!
++//! El modelo del motor está portado de `crates/zx-consensus/tests/evidencia.rs`.
++
++#![allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño"
++)]
++
++use ed25519_zebra::SigningKey;
++use primitive_types::U256;
++use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
++use zx_core::{
++    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, MerkleRoot,
++    Tx, incident_id_evidencia, validar_forma_tx_v4,
++};
++use zx_post::firmante::{Firmante, Registro, Resultado};
++
++use zx_consensus::transicion::{
++    BloqueTransicion, ErrorTransicion, Estado, Fase, Garantia, HechosCabecera, ParametrosEvidencia,
++    ParametrosTransicion, aplicar_con_undo,
++};
++
++/// `cbid` de la red de prueba de la evidencia.
++const CBID_EVP: u32 = 7;
++
++fn firmante_de(k: u64) -> SigningKey {
++    let mut mensaje = b"zx-sl4b1-clave".to_vec();
++    mensaje.extend_from_slice(&k.to_le_bytes());
++    let digest = zx_core::sha3_256_publico(&mensaje);
++    SigningKey::from(*digest.as_bytes())
++}
++
++fn clave_de(k: u64) -> ClavePublica {
++    let sk = firmante_de(k);
++    let vk = ed25519_zebra::VerificationKey::from(&sk);
++    ClavePublica::desde_bytes(vk.into())
++}
++
++fn hash_de(id: u64) -> BlockHash {
++    let mut bytes = [0u8; 32];
++    bytes[24..].copy_from_slice(&id.to_be_bytes());
++    BlockHash::from_digest(Digest::from_bytes(bytes))
++}
++
++/// Cabecera con la identidad `RAT-1` fijada por los campos de `sol` + `slot` + `cbid`, y `pre_hash`
++/// controlado por `(ph, sal)` y por `padre`/cuerpo.
++fn cabecera(cbid: u32, clave_idx: u64, slot: u64, ph: u64, sal: u64) -> DagBlockHeader {
++    let sol = SolucionPoas {
++        public_key: clave_de(clave_idx),
++        sector_index: 3,
++        history_size: 1 << 20,
++        chunk: [0x11; 32],
++        ..Default::default()
++    };
++    DagBlockHeader {
++        consensus_branch_id: cbid,
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x22; 32])),
++        timestamp: sal,
++        height: 0,
++        slot,
++        pot_output: [0x33; 16],
++        rango_solucion: ph,
++        sol,
++        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x44; 32])),
++        padres: PadresDag::genesis(),
++        sello: [0u8; 64],
++    }
++}
++
++/// Firma la cabecera con la clave de su `sol.public_key` si `clave_idx` la identifica.
++fn firmar(c: &mut DagBlockHeader, clave_idx: u64) {
++    let sk = firmante_de(clave_idx);
++    let pre = c.pre_hash();
++    c.sello = sk.sign(pre.as_bytes()).into();
++}
++
++/// La identidad de la evidencia calculada desde la cabecera (RAT-1).
++fn incident_id_de(c: &DagBlockHeader) -> Digest {
++    incident_id_evidencia(
++        c.consensus_branch_id,
++        c.sol.public_key.bytes(),
++        c.sol.sector_index,
++        c.sol.history_size,
++        &c.sol.chunk,
++        c.slot,
++    )
++}
++
++/// ¿Tienen la **misma** identidad de firmante?
++fn misma_identidad_firmante(a: &DagBlockHeader, b: &DagBlockHeader) -> bool {
++    Firmante::identidad(a).huella() == Firmante::identidad(b).huella()
++}
++
++/// ¿Tienen el **mismo** `incident_id` de la evidencia?
++fn mismo_incident_id(a: &DagBlockHeader, b: &DagBlockHeader) -> bool {
++    incident_id_de(a) == incident_id_de(b)
++}
++
++// ─────────────────────────────────────────────────────────────────────────────
++// Modelo del motor (portado de zx-consensus/tests/evidencia.rs)
++// ─────────────────────────────────────────────────────────────────────────────
++
++fn subsidio_pow(_h: u32) -> Amount {
++    Amount::nuevo(10).expect("subsidio pow")
++}
++fn subsidio_post(_s: u64) -> Amount {
++    Amount::nuevo(3).expect("subsidio post")
++}
++
++fn params() -> ParametrosTransicion {
++    ParametrosTransicion {
++        h_dep: 1,
++        m_cb: 1,
++        m_dep: 0,
++        h_corte_min: 1,
++        w_min: U256::from(1u32),
++        s_min: Amount::nuevo(1).expect("s_min"),
++        q: Amount::nuevo(1).expect("q"),
++        k_min: 1,
++        m_res_slots: 1,
++        m_dep_slots: 1,
++        m_rec_slots: 1,
++        r_slots: 3,
++        f_slots: Some(2),
++        subsidio_pow,
++        subsidio_post,
++    }
++}
++
++fn evp(cbid: u32) -> ParametrosEvidencia {
++    ParametrosEvidencia {
++        f_num: 1,
++        f_den: 1,
++        plazo_slots: 2,
++        m_margen_slots: 0,
++        cbid,
++        evp: true,
++    }
++}
++
++/// Estado PoST con una garantía de 8 brek en la clave 1 y otra en la 2 (productor).
++fn estado_post() -> Estado {
++    let mut estado = Estado::inicial();
++    estado.fase = Fase::PoST;
++    estado.terminal = Some(hash_de(1));
++    estado.slot = 0;
++    let garantia = |activo: i64| Garantia {
++        activo: Amount::nuevo(activo).expect("activo"),
++        pendientes: Vec::new(),
++        en_retirada: Vec::new(),
++        congelado: Amount::CERO,
++        creditos: Vec::new(),
++        nonce_siguiente: 0,
++        incidentes: Vec::new(),
++    };
++    estado.garantias.insert(clave_de(1), garantia(8));
++    estado.garantias.insert(clave_de(2), garantia(1));
++    estado
++}
++
++fn bloque_post(
++    slot: u64,
++    productor: ClavePublica,
++    txs: Vec<(Tx, Vec<Vec<u8>>)>,
++) -> BloqueTransicion {
++    BloqueTransicion::nuevo(
++        HechosCabecera::PoST {
++            hash: hash_de(slot + 100),
++            padre: hash_de(1),
++            slot,
++            productor,
++            peso: 1,
++            prueba_valida: true,
++            requisito_declarado: 0,
++        },
++        txs,
++    )
++}
++
++/// Aplica una `EvidenceTx` v4 al motor con el perfil de evidencia activo.
++fn aplicar(tx: Tx) -> Result<(), ErrorTransicion> {
++    let estado = estado_post();
++    let bloque = bloque_post(1, clave_de(2), vec![(tx, Vec::new())]);
++    aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(CBID_EVP)).map(|_| ())
++}
++
++fn tx_evidencia(h1: DagBlockHeader, h2: DagBlockHeader) -> Tx {
++    Tx {
++        version: 4,
++        inputs: Vec::new(),
++        outputs: Vec::new(),
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::Evidencia { h1, h2 },
++    }
++}
++
++/// Construye dos cabeceras de la misma identidad, distinto `pre_hash` y orden canónico
++/// (`pre_hash(h1) < pre_hash(h2)`), ambas firmadas.
++fn par_canonico(clave_idx: u64, slot: u64) -> (DagBlockHeader, DagBlockHeader) {
++    let mut h1 = cabecera(CBID_EVP, clave_idx, slot, 11, 0);
++    let mut sal = 0u64;
++    let mut h2 = cabecera(CBID_EVP, clave_idx, slot, 22, sal);
++    while h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
++        sal += 1;
++        h2 = cabecera(CBID_EVP, clave_idx, slot, 22, sal);
++    }
++    firmar(&mut h1, clave_idx);
++    firmar(&mut h2, clave_idx);
++    (h1, h2)
++}
++
++/// Registro limpio para el firmante en un directorio temporal propio.
++struct DirTemporal {
++    ruta: std::path::PathBuf,
++}
++
++impl DirTemporal {
++    fn nuevo(etiqueta: &str) -> Self {
++        use std::sync::atomic::{AtomicU64, Ordering};
++        static CONTADOR: AtomicU64 = AtomicU64::new(0);
++        let n = CONTADOR.fetch_add(1, Ordering::Relaxed);
++        let base = std::env::temp_dir().join(format!(
++            "zx-firmante-v5-{}-{}-{etiqueta}",
++            std::process::id(),
++            n
++        ));
++        let _ = std::fs::remove_dir_all(&base);
++        std::fs::create_dir_all(&base).expect("directorio temporal");
++        Self { ruta: base }
++    }
++}
++
++impl Drop for DirTemporal {
++    fn drop(&mut self) {
++        let _ = std::fs::remove_dir_all(&self.ruta);
++    }
++}
++
++// ─────────────────────────────────────────────────────────────────────────────
++// V5(a) · Identidad del firmante ⟺ incident_id de la evidencia
++// ─────────────────────────────────────────────────────────────────────────────
++
++#[test]
++fn v5a_misma_identidad_firmante_si_y_solo_si_mismo_incident_id() {
++    // Cabeceras reales firmadas: un par de la misma identidad con distinto `pre_hash`, otro con
++    // otra clave, otro con otro slot y otro con otro cbid.
++    let (mut a1, mut a2) = par_canonico(1, 1);
++    let mut b = cabecera(CBID_EVP, 2, 1, 11, 0);
++    let mut c = cabecera(CBID_EVP, 1, 2, 11, 0);
++    let mut d = cabecera(CBID_EVP + 1, 1, 1, 11, 0);
++    firmar(&mut b, 2);
++    firmar(&mut c, 1);
++    firmar(&mut d, 1);
++    for h in [&mut a1, &mut a2, &mut b, &mut c, &mut d] {
++        h.verificar_sello().expect("sello real");
++    }
++
++    let cabeceras = [&a1, &a2, &b, &c, &d];
++    for (i, x) in cabeceras.iter().enumerate() {
++        for (j, y) in cabeceras.iter().enumerate() {
++            assert_eq!(
++                misma_identidad_firmante(x, y),
++                mismo_incident_id(x, y),
++                "par ({i},{j}): la igualdad de identidad del firmante y la del incident_id difieren"
++            );
++        }
++    }
++    // Controles positivos: (0,1) misma identidad; (0,2) distinta clave; (0,3) distinto slot;
++    // (0,4) distinto cbid.
++    assert!(misma_identidad_firmante(&a1, &a2));
++    assert!(!misma_identidad_firmante(&a1, &b));
++    assert!(!misma_identidad_firmante(&a1, &c));
++    assert!(!misma_identidad_firmante(&a1, &d));
++}
++
++// ─────────────────────────────────────────────────────────────────────────────
++// V5(b) · La evidencia de dos cabeceras reales pasa forma y se aplica
++// ─────────────────────────────────────────────────────────────────────────────
++
++#[test]
++fn v5b_evidencia_v4_valida_pasa_forma_y_se_aplica() {
++    let (h1, h2) = par_canonico(1, 1);
++    let tx = tx_evidencia(h1, h2);
++    validar_forma_tx_v4(&tx, &[]).expect("forma v4 válida");
++    assert!(
++        aplicar(tx).is_ok(),
++        "la evidencia de dos firmas reales debe aplicarse"
++    );
++}
++
++// ─────────────────────────────────────────────────────────────────────────────
++// V5(c) · Un campo de la identidad cambiado ⇒ oportunidad distinta y motor rechaza
++// ─────────────────────────────────────────────────────────────────────────────
++
++/// Cambia **un** campo de identidad en `h2` y comprueba: el firmante la ve como oportunidad
++/// distinta (Sellado) y el motor rechaza la evidencia con `esperado`.
++fn caso_campo_identidad(
++    etiqueta: &str,
++    variar: impl FnOnce(&mut DagBlockHeader, &mut u64),
++    esperado: ErrorTransicion,
++) {
++    let dir = DirTemporal::nuevo(etiqueta);
++    let mut h1 = cabecera(CBID_EVP, 1, 1, 11, 0);
++    firmar(&mut h1, 1);
++
++    // h2 parte de la misma identidad y se le cambia un campo.
++    let mut h2 = cabecera(CBID_EVP, 1, 1, 22, 0);
++    let mut clave_h2 = 1u64;
++    variar(&mut h2, &mut clave_h2);
++    firmar(&mut h2, clave_h2);
++
++    // (1) El firmante las trata como oportunidades distintas.
++    let registro = Registro::nueva(dir.ruta.join("r.log")).expect("registro limpio");
++    let firmante = Firmante::nuevo(&registro);
++    let mut c1 = h1;
++    assert_eq!(
++        firmante.firmar(&mut c1, &firmante_de(1)).unwrap(),
++        Resultado::Sellado
++    );
++    let mut c2 = h2;
++    assert_eq!(
++        firmante.firmar(&mut c2, &firmante_de(clave_h2)).unwrap(),
++        Resultado::Sellado,
++        "{etiqueta}: el firmante debe ver otra oportunidad"
++    );
++    assert!(!misma_identidad_firmante(&h1, &h2), "{etiqueta}");
++
++    // (2) El motor rechaza la evidencia.
++    let tx = tx_evidencia(h1, h2);
++    assert_eq!(aplicar(tx), Err(esperado), "{etiqueta}");
++}
++
++#[test]
++fn v5c_cbid_cambiado_oportunidad_distinta_y_err_cbid_ajeno() {
++    caso_campo_identidad(
++        "cbid",
++        |h2, _| h2.consensus_branch_id = CBID_EVP + 1,
++        ErrorTransicion::ErrCbidAjeno,
++    );
++}
++
++#[test]
++fn v5c_clave_cambiada_oportunidad_distinta_y_err_sin_evidencia() {
++    caso_campo_identidad(
++        "clave",
++        |h2, clave| {
++            *clave = 3;
++            h2.sol.public_key = clave_de(3);
++        },
++        ErrorTransicion::ErrSinEvidencia,
++    );
++}
++
++#[test]
++fn v5c_sector_cambiado_oportunidad_distinta_y_err_sin_evidencia() {
++    caso_campo_identidad(
++        "sector",
++        |h2, _| h2.sol.sector_index += 1,
++        ErrorTransicion::ErrSinEvidencia,
++    );
++}
++
++#[test]
++fn v5c_historia_cambiada_oportunidad_distinta_y_err_sin_evidencia() {
++    caso_campo_identidad(
++        "historia",
++        |h2, _| h2.sol.history_size += 1,
++        ErrorTransicion::ErrSinEvidencia,
++    );
++}
++
++#[test]
++fn v5c_chunk_cambiado_oportunidad_distinta_y_err_sin_evidencia() {
++    caso_campo_identidad(
++        "chunk",
++        |h2, _| h2.sol.chunk[0] ^= 0x01,
++        ErrorTransicion::ErrSinEvidencia,
++    );
++}
++
++#[test]
++fn v5c_slot_cambiado_oportunidad_distinta_y_err_sin_evidencia() {
++    caso_campo_identidad(
++        "slot",
++        |h2, _| h2.slot += 1,
++        ErrorTransicion::ErrSinEvidencia,
++    );
++}
++
++// ─────────────────────────────────────────────────────────────────────────────
++// V5(d) · Un campo que no es de la identidad no cambia la identidad del firmante
++// ─────────────────────────────────────────────────────────────────────────────
++
++/// Cambia un campo que **no** es de la identidad y comprueba que la huella del firmante no cambia
++/// y que, con otro `pre_hash`, el firmante se abstiene por conflicto (misma oportunidad).
++fn caso_campo_ajeno(etiqueta: &str, variar: impl FnOnce(&mut DagBlockHeader)) {
++    let dir = DirTemporal::nuevo(etiqueta);
++    let mut h1 = cabecera(CBID_EVP, 1, 1, 11, 0);
++    firmar(&mut h1, 1);
++    let mut h2 = cabecera(CBID_EVP, 1, 1, 11, 0);
++    variar(&mut h2);
++    firmar(&mut h2, 1);
++
++    assert_eq!(
++        Firmante::identidad(&h1).huella(),
++        Firmante::identidad(&h2).huella()
++    );
++    assert_ne!(
++        h1.pre_hash(),
++        h2.pre_hash(),
++        "{etiqueta}: cambia el pre_hash"
++    );
++
++    let registro = Registro::nueva(dir.ruta.join("r.log")).expect("registro limpio");
++    let firmante = Firmante::nuevo(&registro);
++    let mut c1 = h1;
++    assert_eq!(
++        firmante.firmar(&mut c1, &firmante_de(1)).unwrap(),
++        Resultado::Sellado
++    );
++    let mut c2 = h2;
++    assert!(
++        matches!(
++            firmante.firmar(&mut c2, &firmante_de(1)).unwrap(),
++            Resultado::AbstenidoPorConflicto { .. }
++        ),
++        "{etiqueta}: misma identidad, otro pre_hash ⇒ abstención"
++    );
++}
++
++#[test]
++fn v5d_padres_distintos_no_cambian_la_identidad() {
++    caso_campo_ajeno("ajeno-padres", |h| {
++        h.padres = PadresDag::nuevo(hash_de(0xAA), &[hash_de(0xBB)]).expect("dos padres");
++    });
++}
++
++#[test]
++fn v5d_cuerpo_distinto_no_cambia_la_identidad() {
++    caso_campo_ajeno("ajeno-cuerpo", |h| {
++        h.merkle_root = MerkleRoot::from_digest(Digest::from_bytes([0x55; 32]));
++        h.body_commitment = BodyCommitment::from_digest(Digest::from_bytes([0x66; 32]));
++    });
++}
++
++#[test]
++fn v5d_timestamp_distinto_no_cambia_la_identidad() {
++    caso_campo_ajeno("ajeno-timestamp", |h| {
++        h.timestamp += 1;
++    });
++}
++
++/// La forma v4 no depende de la identidad: un par con distinto `cbid`, clave y slot pasa
++/// `validar_forma_tx_v4` (el rechazo por identidad es semántico y vive en el motor).
++#[test]
++fn v5d_la_forma_v4_no_mira_la_identidad() {
++    let mut h1 = cabecera(CBID_EVP, 1, 1, 11, 0);
++    let mut h2 = cabecera(CBID_EVP + 1, 3, 2, 22, 0);
++    firmar(&mut h1, 1);
++    firmar(&mut h2, 3);
++    let tx = tx_evidencia(h1, h2);
++    assert!(
++        validar_forma_tx_v4(&tx, &[]).is_ok(),
++        "la forma v4 no mira cbid, identidad ni sellos"
++    );
++}
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/tests/firmante_productores.rs ws/crates/zx-post/tests/firmante_productores.rs
+--- ws.orig/crates/zx-post/tests/firmante_productores.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-post/tests/firmante_productores.rs	2026-09-26 23:06:05.511113667 +0200
+@@ -0,0 +1,558 @@
++//! V6 de `ORDEN-SL4b1`: productores `_con_firmante`.
++//!
++//! - (a) mismo slot y padres, segunda llamada → `Reemitido` y bloque idéntico byte a byte;
++//! - (b) mismos billete y slot con otro cuerpo → `Abstenido` por conflicto, sin bloque;
++//! - (c) el bloque de (a) pasa la puerta conjunta de `zx-post` igual que el de la función antigua
++//!   con los mismos datos.
++//!
++//! El fixture es real, portado de `crates/zx-post/tests/regimen.rs`: `ServicioPot` real, GHOSTDAG
++//! real y `FuenteSoluciones` sobre `zx_farmer::ParcelaDisco` (auditoría PoAS + KZG). No se usa
++//! `regimen.rs` ni se modifica.
++
++#![allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    clippy::indexing_slicing,
++    reason = "instrumento de test: un fallo del fixture o del veredicto debe producir panic"
++)]
++
++use std::path::PathBuf;
++use std::sync::OnceLock;
++use std::sync::atomic::AtomicBool;
++
++use ed25519_zebra::{SigningKey, VerificationKey};
++use subspace_core_primitives::PublicKey;
++
++use zx_consensus::{
++    GENESIS_DEV, PARAMETROS_POW_DEV, Sha3Dev, construir as construir_genesis, minar,
++};
++use zx_core::digest::Digest;
++use zx_core::preimage::block::BlockHeader;
++use zx_core::wire_dag::{BloqueDag, MAX_BUNDLES_POT};
++use zx_core::{
++    Amount, BlockHash, ExtensionTx, Lock, OutPoint, PadresDag, Tx, TxId, TxIn, TxOut,
++    bloque_dag_a_bytes, decodificar_con,
++};
++use zx_dag::{
++    Algoritmo, AlmacenGhostdag, CandidatoSinRango, ContextoRangoDag, ErrorDag, Parametros,
++    RangoSolucionValidado, peso,
++};
++use zx_farmer::farmer::{ParcelaDisco, plotear_sector_en_disco};
++use zx_farmer::productor_poas::convertir_candidatos_locales;
++use zx_poas::HistoriaGenesis;
++
++use zx_post::cabecera_conjunta::{EstadoCabeceraConjunta, verificar_cabecera_conjunta};
++use zx_post::firmante::{Firmante, Registro, Resultado as ResultadoFirmante};
++use zx_post::pot_rango::{CachePotVerificada, PresupuestoPot};
++use zx_post::productor::{
++    FuenteSoluciones, MotivoAbstencion, ParametrosProductor, ProductoFirmado, SolucionCandidata,
++    clave_publica_de,
++};
++use zx_post::productor_regimen::{
++    CuerpoProductor, producir_en_regimen, producir_en_regimen_con_firmante,
++};
++use zx_post::servicio_pot::ServicioPot;
++
++/// `N_dev` de prueba: pequeño y múltiplo de 16 (`C-POT-04`).
++const N_DEV: u64 = 2_048;
++
++/// `SR_dev` de prueba: `u64::MAX` para que los ganadores sean frecuentes.
++const SR_DEV: u64 = u64::MAX;
++
++/// Ventana del servicio, mayor que el hueco máximo de 150 slots.
++const VENTANA: u64 = 300;
++
++/// Cota de búsqueda y de rango: `MAX_BUNDLES_POT`.
++const MAX: u64 = MAX_BUNDLES_POT as u64;
++
++/// Altura de la cadena PoW dev minada antes del terminal.
++const ALTURA_POW: u32 = 3;
++
++/// Índice de sector del fixture.
++const INDICE_SECTOR: u16 = 3;
++
++/// Piezas por sector del protocolo dev.
++const PIEZAS: u16 = 2;
++
++fn historia() -> &'static HistoriaGenesis {
++    static HISTORIA: OnceLock<HistoriaGenesis> = OnceLock::new();
++    HISTORIA.get_or_init(|| HistoriaGenesis::construir().expect("historia génesis dev"))
++}
++
++fn terminal() -> BlockHash {
++    static TERMINAL: OnceLock<BlockHash> = OnceLock::new();
++    *TERMINAL.get_or_init(|| {
++        let (mut cabecera, _) = construir_genesis(GENESIS_DEV).expect("génesis dev");
++        let target = decodificar_con(
++            PARAMETROS_POW_DEV.bits_iniciales,
++            &PARAMETROS_POW_DEV.limites,
++        )
++        .expect("bits dev válidos");
++        let cancelar = AtomicBool::new(false);
++        for altura in 1..=ALTURA_POW {
++            let plantilla = BlockHeader {
++                consensus_branch_id: cabecera.consensus_branch_id,
++                prev_hash: cabecera.block_hash(),
++                merkle_root: cabecera.merkle_root,
++                timestamp: cabecera.timestamp + u64::from(altura) * 2,
++                bits: PARAMETROS_POW_DEV.bits_iniciales,
++                nonce: 0,
++                height: altura,
++            };
++            cabecera = minar(&plantilla, target, &Sha3Dev, 50_000_000, &cancelar)
++                .expect("la cadena PoW dev debe minar");
++        }
++        cabecera.block_hash()
++    })
++}
++
++struct Fondo {
++    sk: SigningKey,
++    public_key: PublicKey,
++    ruta: PathBuf,
++    _dir: DirTemporal,
++}
++
++impl Fondo {
++    fn nuevo(semilla: u8) -> Self {
++        let sk = SigningKey::from([semilla; 32]);
++        let bytes: [u8; 32] = VerificationKey::from(&sk).into();
++        let public_key = PublicKey::from(bytes);
++        let historia = historia();
++        let dir = DirTemporal::nuevo("zx-post-sl4b1");
++        let ruta = dir.unir("sector.plot");
++        plotear_sector_en_disco(
++            &ruta,
++            &public_key,
++            INDICE_SECTOR,
++            PIEZAS,
++            historia.historial(),
++            historia.protocolo(),
++            historia.kzg(),
++            historia.erasure_coding(),
++        )
++        .expect("el ploteo del fixture debe funcionar");
++        Self {
++            sk,
++            public_key,
++            ruta,
++            _dir: dir,
++        }
++    }
++
++    fn parcela(&self) -> ParcelaDisco {
++        ParcelaDisco::abrir(&self.ruta, &self.public_key).expect("la parcela debe abrir")
++    }
++}
++
++fn fondos() -> &'static [Fondo] {
++    static FONDOS: OnceLock<Vec<Fondo>> = OnceLock::new();
++    FONDOS.get_or_init(|| [0x11u8, 0x22].into_iter().map(Fondo::nuevo).collect())
++}
++
++fn fondo(i: usize) -> &'static Fondo {
++    fondos().get(i % 2).expect("hay dos fondos de fixture")
++}
++
++struct FuenteParcela<'a> {
++    parcela: &'a ParcelaDisco,
++    historia: &'a HistoriaGenesis,
++}
++
++impl FuenteSoluciones for FuenteParcela<'_> {
++    type Error = zx_farmer::ErrorProductorPoas;
++
++    fn soluciones(
++        &self,
++        salida: [u8; 16],
++        slot: u64,
++        rango: u64,
++    ) -> Result<Vec<SolucionCandidata>, Self::Error> {
++        let params = self.historia.params_pieza();
++        let resultado = convertir_candidatos_locales(
++            self.parcela,
++            salida,
++            slot,
++            rango,
++            &params,
++            self.historia.kzg(),
++            self.historia.erasure_coding(),
++        )?;
++        Ok(resultado
++            .soluciones()
++            .iter()
++            .map(|c| SolucionCandidata {
++                solucion: *c.solucion(),
++                distancia: c.distancia(),
++            })
++            .collect())
++    }
++}
++
++struct PresupuestoIlimitado;
++
++impl PresupuestoPot for PresupuestoIlimitado {
++    fn consumir_slot(&mut self, _slot: u64) -> bool {
++        true
++    }
++}
++
++struct RangoDev;
++
++impl ContextoRangoDag for RangoDev {
++    fn rango_esperado(&self, _candidato: &CandidatoSinRango<'_>) -> Result<u64, ErrorDag> {
++        Ok(SR_DEV)
++    }
++}
++
++struct Cadena {
++    almacen: AlmacenGhostdag,
++    servicio: ServicioPot,
++}
++
++impl Cadena {
++    fn nueva() -> Self {
++        let t = terminal();
++        let servicio = ServicioPot::nuevo(t, N_DEV, VENTANA).expect("servicio PoT dev");
++        let almacen = AlmacenGhostdag::con_raiz_terminal(
++            Parametros::default(),
++            Algoritmo::Kernel,
++            t,
++            RangoSolucionValidado::para_oraculos(SR_DEV),
++        );
++        Self { almacen, servicio }
++    }
++
++    fn parametros(&self) -> ParametrosProductor {
++        ParametrosProductor {
++            n_dev: N_DEV,
++            sr_dev: SR_DEV,
++            max_slots: MAX,
++            consensus_branch_id: zx_core::CBID_RED_DEV,
++            timestamp: 1_788_480_000,
++            importe_coinbase: Amount::nuevo(5).expect("importe de coinbase > 0"),
++        }
++    }
++
++    fn comprobar(&self, bloque: &BloqueDag) -> EstadoCabeceraConjunta {
++        let params = historia().params_pieza();
++        let mut cache = CachePotVerificada::nueva();
++        let mut presupuesto = PresupuestoIlimitado;
++        verificar_cabecera_conjunta(
++            bloque,
++            &self.servicio,
++            &self.almacen,
++            &RangoDev,
++            u64::MAX,
++            &mut cache,
++            &mut presupuesto,
++            Some(&params),
++            historia().kzg(),
++        )
++    }
++}
++
++/// Primer slot `s ∈ (desde, desde + max]` con solución PoAS para `f`; avanza el servicio hasta él.
++fn primer_slot_con_solucion(c: &mut Cadena, f: &Fondo, desde: u64, max: u64) -> u64 {
++    let parcela = f.parcela();
++    let fuente = FuenteParcela {
++        parcela: &parcela,
++        historia: historia(),
++    };
++    for slot in (desde + 1)..=(desde + max) {
++        if c.servicio.slot_actual() < slot {
++            c.servicio.avanzar_hasta(slot).expect("avance del servicio");
++        }
++        let salida = c.servicio.salida_de(slot).expect("salida retenida");
++        if !fuente
++            .soluciones(salida, slot, SR_DEV)
++            .expect("auditoría")
++            .is_empty()
++        {
++            return slot;
++        }
++    }
++    panic!("sin solución para el fondo en ({desde}, {}]", desde + max);
++}
++
++/// Transacción de efecto v1 (con una entrada) para el cuerpo del productor.
++fn tx_de_efecto(semilla: u8, valor: i64) -> Tx {
++    Tx {
++        version: 1,
++        inputs: vec![TxIn {
++            outpoint: OutPoint {
++                prev_txid: TxId::from_digest(Digest::from_bytes([semilla; 32])),
++                prev_index: 0,
++            },
++            sequence: 0,
++        }],
++        outputs: vec![TxOut {
++            value: Amount::nuevo(valor).expect("valor > 0"),
++            lock: Lock::PubKey {
++                pubkey: zx_core::ClavePublica::desde_bytes([semilla; 32]),
++            },
++        }],
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::Ninguna,
++    }
++}
++
++/// Serializa un bloque DAG a sus bytes canónicos de wire.
++fn bytes_de(bloque: &BloqueDag) -> Vec<u8> {
++    let mut salida = Vec::new();
++    bloque_dag_a_bytes(&mut salida, bloque);
++    salida
++}
++
++/// Producir un candidato por cada ruta y devolver (antiguo, `_con_firmante`).
++fn producir_par(
++    c: &mut Cadena,
++    f: &Fondo,
++    slot: u64,
++    dir: &DirTemporal,
++) -> (BloqueDag, BloqueDag, ResultadoFirmante) {
++    let parcela = f.parcela();
++    let fuente = FuenteParcela {
++        parcela: &parcela,
++        historia: historia(),
++    };
++    let padres = PadresDag::nuevo(terminal(), &[]).expect("un padre");
++    let parametros = c.parametros();
++
++    let antiguo = producir_en_regimen(
++        padres,
++        slot,
++        &mut c.servicio,
++        &fuente,
++        &f.sk,
++        &parametros,
++        CuerpoProductor::vacio(),
++    )
++    .expect("productor antiguo");
++
++    let registro = Registro::nueva(dir.unir("firmante.log")).expect("registro limpio");
++    let mut firmante = Firmante::nuevo(&registro);
++    let producto = producir_en_regimen_con_firmante(
++        padres,
++        slot,
++        &mut c.servicio,
++        &fuente,
++        &f.sk,
++        &parametros,
++        CuerpoProductor::vacio(),
++        &mut firmante,
++    )
++    .expect("productor con firmante");
++    let (nuevo, resultado) = match producto {
++        ProductoFirmado::Bloque(bloque, resultado) => (bloque, resultado),
++        ProductoFirmado::Abstenido { motivo } => panic!("no debía abstenerse: {motivo:?}"),
++    };
++    (antiguo, nuevo, resultado)
++}
++
++/// V6(a)+V6(c): el bloque de `_con_firmante` es idéntico al antiguo, la segunda llamada reemite, y
++/// ambos pasan la puerta conjunta.
++#[test]
++fn v6a_v6c_bloque_identico_reemision_y_puerta_conjunta() {
++    let dir = DirTemporal::nuevo("v6a");
++    let f = fondo(0);
++    let mut c = Cadena::nueva();
++    let slot = primer_slot_con_solucion(&mut c, f, 0, MAX);
++
++    let (antiguo, nuevo, resultado) = producir_par(&mut c, f, slot, &dir);
++    assert_eq!(resultado, ResultadoFirmante::Sellado);
++    assert_eq!(
++        bytes_de(&antiguo),
++        bytes_de(&nuevo),
++        "mismos datos ⇒ bloque idéntico byte a byte"
++    );
++    assert_eq!(nuevo.cabecera.slot, slot);
++
++    // La puerta conjunta acepta los dos con el mismo veredicto y los mismos hechos.
++    let hechos_antiguo = match c.comprobar(&antiguo) {
++        EstadoCabeceraConjunta::Comprobada(h) => h,
++        otro => panic!("bloque antiguo: se esperaba Comprobada, llegó {otro:?}"),
++    };
++    let hechos_nuevo = match c.comprobar(&nuevo) {
++        EstadoCabeceraConjunta::Comprobada(h) => h,
++        otro => panic!("bloque con firmante: se esperaba Comprobada, llegó {otro:?}"),
++    };
++    assert_eq!(hechos_antiguo, hechos_nuevo);
++    assert_eq!(hechos_nuevo.hash, nuevo.cabecera.block_hash());
++    assert_eq!(hechos_nuevo.padre_seleccionado, terminal());
++    assert_eq!(hechos_nuevo.slot, slot);
++    assert_eq!(hechos_nuevo.productor, clave_publica_de(&f.sk));
++    assert_eq!(hechos_nuevo.peso, peso(SR_DEV));
++    assert!(hechos_nuevo.prueba_valida);
++    assert_eq!(hechos_nuevo.requisito_declarado, 0);
++
++    // Segunda llamada con el mismo firmante y los mismos datos: `Reemitido` y bloque idéntico.
++    let parcela = f.parcela();
++    let fuente = FuenteParcela {
++        parcela: &parcela,
++        historia: historia(),
++    };
++    let registro = Registro::nueva(dir.unir("firmante2.log")).expect("registro limpio");
++    let mut firmante = Firmante::nuevo(&registro);
++    let parametros = c.parametros();
++    let padres = PadresDag::nuevo(terminal(), &[]).expect("un padre");
++    let primera = producir_en_regimen_con_firmante(
++        padres,
++        slot,
++        &mut c.servicio,
++        &fuente,
++        &f.sk,
++        &parametros,
++        CuerpoProductor::vacio(),
++        &mut firmante,
++    )
++    .expect("primera");
++    let bloque_1 = match primera {
++        ProductoFirmado::Bloque(b, ResultadoFirmante::Sellado) => b,
++        otro => panic!("se esperaba Bloque/Sellado, llegó {otro:?}"),
++    };
++    let segunda = producir_en_regimen_con_firmante(
++        padres,
++        slot,
++        &mut c.servicio,
++        &fuente,
++        &f.sk,
++        &parametros,
++        CuerpoProductor::vacio(),
++        &mut firmante,
++    )
++    .expect("segunda");
++    let bloque_2 = match segunda {
++        ProductoFirmado::Bloque(b, ResultadoFirmante::Reemitido) => b,
++        otro => panic!("se esperaba Bloque/Reemitido, llegó {otro:?}"),
++    };
++    assert_eq!(bytes_de(&bloque_1), bytes_de(&bloque_2));
++    assert_eq!(registro.entradas(), 1, "la reemisión no añade entradas");
++}
++
++/// V6(b): mismos billete y slot con otro cuerpo ⇒ `Abstenido` por conflicto.
++#[test]
++fn v6b_otro_cuerpo_mismo_billete_y_slot_se_abstiene() {
++    let dir = DirTemporal::nuevo("v6b");
++    let f = fondo(0);
++    let mut c = Cadena::nueva();
++    let slot = primer_slot_con_solucion(&mut c, f, 0, MAX);
++
++    let parcela = f.parcela();
++    let fuente = FuenteParcela {
++        parcela: &parcela,
++        historia: historia(),
++    };
++    let parametros = c.parametros();
++    let padres = PadresDag::nuevo(terminal(), &[]).expect("un padre");
++    let registro = Registro::nueva(dir.unir("firmante.log")).expect("registro limpio");
++    let mut firmante = Firmante::nuevo(&registro);
++
++    let primera = producir_en_regimen_con_firmante(
++        padres,
++        slot,
++        &mut c.servicio,
++        &fuente,
++        &f.sk,
++        &parametros,
++        CuerpoProductor::vacio(),
++        &mut firmante,
++    )
++    .expect("primera");
++    assert!(matches!(
++        primera,
++        ProductoFirmado::Bloque(_, ResultadoFirmante::Sellado)
++    ));
++
++    let cuerpo = CuerpoProductor::nuevo(vec![tx_de_efecto(0x51, 7)], vec![Vec::new()])
++        .expect("cuerpo con una tx");
++    let segunda = producir_en_regimen_con_firmante(
++        padres,
++        slot,
++        &mut c.servicio,
++        &fuente,
++        &f.sk,
++        &parametros,
++        cuerpo,
++        &mut firmante,
++    )
++    .expect("segunda");
++    match segunda {
++        ProductoFirmado::Abstenido {
++            motivo: MotivoAbstencion::Conflicto { .. },
++        } => {}
++        otro => panic!("se esperaba abstención por conflicto, llegó {otro:?}"),
++    }
++    assert_eq!(
++        registro.entradas(),
++        1,
++        "la abstención no reserva oportunidad"
++    );
++}
++
++/// El productor `_con_firmante` no cambia el comportamiento del primer bloque PoST: mismo bloque y
++/// sellado con la misma clave.
++#[test]
++fn v6_primer_bloque_con_firmante_es_identico() {
++    use zx_post::productor::{producir, producir_con_firmante};
++
++    let dir = DirTemporal::nuevo("v6-primer");
++    let f = fondo(0);
++    let parcela = f.parcela();
++    let fuente = FuenteParcela {
++        parcela: &parcela,
++        historia: historia(),
++    };
++    let parametros = ParametrosProductor {
++        n_dev: N_DEV,
++        sr_dev: SR_DEV,
++        max_slots: MAX,
++        consensus_branch_id: zx_core::CBID_RED_DEV,
++        timestamp: 1_788_480_000,
++        importe_coinbase: Amount::nuevo(5).expect("importe"),
++    };
++
++    let antiguo = producir(terminal(), &fuente, &f.sk, &parametros).expect("antiguo");
++    let registro = Registro::nueva(dir.unir("firmante.log")).expect("registro limpio");
++    let mut firmante = Firmante::nuevo(&registro);
++    let producto = producir_con_firmante(terminal(), &fuente, &f.sk, &parametros, &mut firmante)
++        .expect("nuevo");
++    let nuevo = match producto {
++        ProductoFirmado::Bloque(b, ResultadoFirmante::Sellado) => b,
++        otro => panic!("se esperaba Bloque/Sellado, llegó {otro:?}"),
++    };
++    assert_eq!(bytes_de(&antiguo), bytes_de(&nuevo));
++}
++
++struct DirTemporal {
++    ruta: PathBuf,
++}
++
++impl DirTemporal {
++    fn nuevo(nombre: &str) -> Self {
++        use std::sync::atomic::{AtomicU64, Ordering};
++        static CONTADOR: AtomicU64 = AtomicU64::new(0);
++        let n = CONTADOR.fetch_add(1, Ordering::Relaxed);
++        let base = std::env::temp_dir().join(format!(
++            "zx-post-sl4b1-{}-{}-{}",
++            std::process::id(),
++            nombre,
++            n
++        ));
++        let _ = std::fs::remove_dir_all(&base);
++        std::fs::create_dir_all(&base).expect("crear directorio temporal");
++        Self { ruta: base }
++    }
++
++    fn unir(&self, hijo: &str) -> PathBuf {
++        self.ruta.join(hijo)
++    }
++}
++
++impl Drop for DirTemporal {
++    fn drop(&mut self) {
++        let _ = std::fs::remove_dir_all(&self.ruta);
++    }
++}
+diff -ruN --no-dereference '--exclude=PDF' '--exclude=target' ws.orig/crates/zx-post/tests/firmante_publico.rs ws/crates/zx-post/tests/firmante_publico.rs
+--- ws.orig/crates/zx-post/tests/firmante_publico.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-post/tests/firmante_publico.rs	2026-09-26 23:02:35.901721613 +0200
+@@ -0,0 +1,421 @@
++//! Contrato público del firmante local y del registro (SL-4b1): las rutas independientes del
++//! encargo D3, portadas de `zx-consensus/tests/firmante_local.rs` y adaptadas a la identidad
++//! `RAT-1`.
++//!
++//! Solo usa la API pública (`zx_post::firmante`). Las pruebas de recuperación interna —corrupción,
++//! cola incompleta, duplicado conflictivo, envenenamiento por fallo de sincronización, sello
++//! inválido y durabilidad con proceso hijo— viven en los tests unitarios de `src/firmante/`, donde
++//! la inyección de E/S existe solo en `cfg(test)`.
++//!
++//! Los puntos de entrada `hijo_*` están `#[ignore]` a propósito y **guardados**: el padre los
++//! re-ejecuta con `--ignored --exact` y una variable de entorno; sin ella no hacen nada, así que
++//! `--include-ignored` no rompe el arnés.
++
++#![allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño"
++)]
++
++use std::path::{Path, PathBuf};
++use std::process::Command;
++use std::sync::atomic::{AtomicU64, Ordering};
++
++use ed25519_zebra::{SigningKey, VerificationKey};
++use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
++use zx_core::{BlockHash, BodyCommitment, ClavePublica, Digest, MerkleRoot};
++use zx_post::firmante::{
++    Firmante, FirmanteError, IdentidadTicket, OFFSET_ABSTENCION_ACTIVA, OFFSET_ABSTENER_HASTA,
++    Registro, RegistroError, Resultado, TAMANO_CABECERA,
++};
++
++static CONTADOR: AtomicU64 = AtomicU64::new(0);
++
++struct DirTemporal {
++    ruta: PathBuf,
++}
++
++impl DirTemporal {
++    fn nuevo(etiqueta: &str) -> Self {
++        let pid = std::process::id();
++        let n = CONTADOR.fetch_add(1, Ordering::Relaxed);
++        let unico = format!("zx-firmante-int-{pid}-{n}-{etiqueta}");
++        let ruta = std::env::temp_dir().join(unico);
++        std::fs::create_dir_all(&ruta).unwrap();
++        Self { ruta }
++    }
++
++    fn ruta(&self) -> &Path {
++        &self.ruta
++    }
++}
++
++impl Drop for DirTemporal {
++    fn drop(&mut self) {
++        let _ = std::fs::remove_dir_all(&self.ruta);
++    }
++}
++
++fn sk() -> SigningKey {
++    SigningKey::from([42u8; 32])
++}
++
++fn clave_publica() -> ClavePublica {
++    ClavePublica::desde_bytes(VerificationKey::from(&sk()).into())
++}
++
++/// Un candidato distinto por `padre` (y opcionalmente por `chunk`/`slot`). Cambiar el padre cambia
++/// el `pre_hash` y **no** cambia la identidad de oportunidad.
++fn candidato(padre: u8, chunk: u8, slot: u64) -> DagBlockHeader {
++    DagBlockHeader {
++        consensus_branch_id: zx_core::CBID_RED_DEV,
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x22; 32])),
++        timestamp: 1_700_000_000,
++        height: 10,
++        slot,
++        pot_output: [0x11; 16],
++        rango_solucion: 7,
++        sol: SolucionPoas {
++            public_key: clave_publica(),
++            sector_index: 1,
++            history_size: 1 << 20,
++            chunk: [chunk; 32],
++            ..SolucionPoas::default()
++        },
++        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x33; 32])),
++        padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([padre; 32])), &[])
++            .unwrap(),
++        sello: [0u8; 64],
++    }
++}
++
++/// Registro sin abstención efectiva: `abrir` sobre fichero nuevo se abstiene hasta el slot 1 y los
++/// slots de prueba van muy por encima.
++fn registro_sin_abstencion(ruta: &Path) -> Registro {
++    Registro::abrir(ruta, 0, 1).unwrap()
++}
++
++/// **Caso 5.** Distinto padre con el mismo billete y slot se abstiene y deja el sello intacto.
++#[test]
++fn distinto_padre_mismo_billete_y_slot_se_abstiene() {
++    let dir = DirTemporal::nuevo("caso5");
++    let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++    let f = Firmante::nuevo(&reg);
++
++    let mut a = candidato(1, 5, 100);
++    assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++    let sello_a = a.sello;
++    assert_ne!(sello_a, [0u8; 64]);
++    a.verificar_sello().unwrap();
++
++    let mut b = candidato(2, 5, 100);
++    assert_ne!(a.pre_hash(), b.pre_hash());
++    assert_eq!(
++        Firmante::identidad(&a).huella(),
++        Firmante::identidad(&b).huella()
++    );
++    let r = f.firmar(&mut b, &sk()).unwrap();
++    assert!(
++        matches!(r, Resultado::AbstenidoPorConflicto { .. }),
++        "{r:?}"
++    );
++    assert_eq!(b.sello, [0u8; 64]);
++}
++
++/// **Caso 4.** El mismo `pre_hash` se reemite incluso tras reabrir el registro desde disco.
++#[test]
++fn mismo_pre_hash_se_reemite_tras_reinicio() {
++    let dir = DirTemporal::nuevo("caso4");
++    let ruta = dir.ruta().join("r.log");
++    let sello;
++    {
++        let reg = registro_sin_abstencion(&ruta);
++        let f = Firmante::nuevo(&reg);
++        let mut a = candidato(1, 5, 100);
++        assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++        sello = a.sello;
++    }
++
++    let reg = Registro::abrir(&ruta, 100, 1).unwrap();
++    assert_eq!(reg.entradas(), 1);
++    let f = Firmante::nuevo(&reg);
++    let mut otra_vez = candidato(1, 5, 100);
++    assert_eq!(
++        f.firmar(&mut otra_vez, &sk()).unwrap(),
++        Resultado::Reemitido
++    );
++    assert_eq!(otra_vez.sello, sello);
++    otra_vez.verificar_sello().unwrap();
++}
++
++/// Billete (identidad) distinto o slot distinto: la oportunidad es otra y se puede firmar.
++#[test]
++fn billete_o_slot_diferente_puede_firmarse() {
++    let dir = DirTemporal::nuevo("billete");
++    let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++    let f = Firmante::nuevo(&reg);
++
++    let mut mismo = candidato(1, 5, 100);
++    assert_eq!(f.firmar(&mut mismo, &sk()).unwrap(), Resultado::Sellado);
++
++    // Otro `chunk` ⇒ otra identidad de billete.
++    let mut otro_chunk = candidato(1, 6, 100);
++    assert_ne!(
++        Firmante::identidad(&mismo).huella(),
++        Firmante::identidad(&otro_chunk).huella()
++    );
++    assert_eq!(
++        f.firmar(&mut otro_chunk, &sk()).unwrap(),
++        Resultado::Sellado
++    );
++
++    // Otro slot ⇒ otra oportunidad.
++    let mut otro_slot = candidato(1, 5, 101);
++    assert_eq!(f.firmar(&mut otro_slot, &sk()).unwrap(), Resultado::Sellado);
++
++    assert_eq!(reg.entradas(), 3);
++}
++
++/// La clave del firmador que no corresponde a la cabecera no reserva la oportunidad.
++#[test]
++fn la_clave_que_no_corresponde_no_ocupa_la_oportunidad() {
++    let dir = DirTemporal::nuevo("clave");
++    let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++    let f = Firmante::nuevo(&reg);
++
++    let mut a = candidato(1, 5, 100);
++    let ajena = SigningKey::from([9u8; 32]);
++    assert!(matches!(
++        f.firmar(&mut a, &ajena).unwrap_err(),
++        FirmanteError::ClaveNoCoincide
++    ));
++    assert_eq!(a.sello, [0u8; 64]);
++    assert_eq!(reg.entradas(), 0);
++
++    assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++}
++
++/// Ocho hilos con la misma oportunidad y ocho `pre_hash` distintos: **solo uno** sella.
++#[test]
++fn dos_hilos_no_firman_dos_hashes() {
++    let dir = DirTemporal::nuevo("hilos");
++    let reg = registro_sin_abstencion(&dir.ruta().join("r.log"));
++    let f = Firmante::nuevo(&reg);
++    let slot = 2_000u64;
++
++    let mut cabeceras: Vec<DagBlockHeader> = (1u8..=8).map(|p| candidato(p, 3, slot)).collect();
++    let huella = Firmante::identidad(&cabeceras[0]).huella();
++
++    let resultados: Vec<Resultado> = std::thread::scope(|s| {
++        let mut handles = Vec::new();
++        for c in cabeceras.iter_mut() {
++            let f = &f;
++            handles.push(s.spawn(move || f.firmar(c, &sk()).unwrap()));
++        }
++        handles.into_iter().map(|h| h.join().unwrap()).collect()
++    });
++
++    for c in &cabeceras {
++        assert_eq!(Firmante::identidad(c).huella(), huella);
++    }
++    let sellados = resultados
++        .iter()
++        .filter(|r| matches!(r, Resultado::Sellado | Resultado::Reemitido))
++        .count();
++    let abstenidos = resultados
++        .iter()
++        .filter(|r| matches!(r, Resultado::AbstenidoPorConflicto { .. }))
++        .count();
++    assert_eq!(sellados, 1, "exactamente uno sella: {resultados:?}");
++    assert_eq!(abstenidos, 7);
++    assert_eq!(cabeceras.iter().filter(|c| c.sello != [0u8; 64]).count(), 1);
++}
++
++/// La pérdida de registro se ancla al slot actual y la abstención sobrevive a **otro** reinicio.
++///
++/// Adaptado a `RAT-1` (SL-4b1): la abstención por pérdida es un **resultado**
++/// (`AbstenidoPorPerdida`), no un error de E/S (FIR-10 / DF-3).
++#[test]
++fn la_abstencion_tras_perder_el_registro_persiste_tras_reinicio() {
++    let dir = DirTemporal::nuevo("abstencion");
++    let ruta = dir.ruta().join("r.log");
++    let s_max = 150u64;
++    let slot_perdida = 1_000u64;
++
++    // `abrir` sobre fichero inexistente: alta conservadora.
++    {
++        let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++        assert!(reg.en_abstinencia(slot_perdida + s_max));
++        assert_eq!(reg.abstener_hasta(), Some(slot_perdida + s_max));
++    }
++
++    // Primer reinicio: la abstención está en la cabecera durable.
++    {
++        let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++        assert!(reg.en_abstinencia(slot_perdida + s_max));
++    }
++
++    // Segundo reinicio: sigue; y el slot siguiente ya se firma.
++    let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++    let f = Firmante::nuevo(&reg);
++    let mut bloqueado = candidato(1, 9, slot_perdida + s_max);
++    let r = f.firmar(&mut bloqueado, &sk()).unwrap();
++    assert!(
++        matches!(
++            r,
++            Resultado::AbstenidoPorPerdida {
++                hasta,
++                s_max_slots,
++            } if hasta == slot_perdida + s_max && s_max_slots == s_max
++        ),
++        "{r:?}"
++    );
++    assert_eq!(bloqueado.sello, [0u8; 64]);
++
++    let mut libre = candidato(1, 9, slot_perdida + s_max + 1);
++    assert_eq!(f.firmar(&mut libre, &sk()).unwrap(), Resultado::Sellado);
++    assert_ne!(libre.sello, [0u8; 64]);
++    assert_eq!(reg.entradas(), 1);
++}
++
++/// La identidad `RAT-1` se deriva de la cabecera, incluido el `consensus_branch_id`.
++#[test]
++fn la_identidad_se_deriva_de_la_cabecera() {
++    let a = candidato(1, 5, 100);
++    let identidad: IdentidadTicket = Firmante::identidad(&a);
++    assert_eq!(identidad.slot(), 100);
++    // Mismo billete, distinto padre: misma identidad.
++    assert_eq!(
++        Firmante::identidad(&a).huella(),
++        Firmante::identidad(&candidato(2, 5, 100)).huella()
++    );
++    // Distinto sector: otra identidad (se construye a mano porque `candidato` fija el sector).
++    let mut b = a;
++    b.sol.sector_index = 2;
++    assert_ne!(
++        Firmante::identidad(&a).huella(),
++        Firmante::identidad(&b).huella()
++    );
++    // Distinta red: otra identidad (RAT-1 cierra FP8).
++    let mut c = a;
++    c.consensus_branch_id = a.consensus_branch_id.wrapping_add(1);
++    assert_ne!(
++        Firmante::identidad(&a).huella(),
++        Firmante::identidad(&c).huella()
++    );
++}
++
++/// Un segundo **proceso** sobre el mismo fichero no puede abrir el registro: no hay dos escritores
++/// descoordinados, así que no puede firmar un segundo `pre_hash`.
++#[test]
++fn dos_procesos_sobre_el_mismo_fichero_no_firman_dos_hashes() {
++    let dir = DirTemporal::nuevo("procesos");
++    let ruta = dir.ruta().join("r.log");
++    let acta = dir.ruta().join("acta.txt");
++
++    let reg = registro_sin_abstencion(&ruta);
++    let f = Firmante::nuevo(&reg);
++    let mut a = candidato(1, 7, 100);
++    assert_eq!(f.firmar(&mut a, &sk()).unwrap(), Resultado::Sellado);
++
++    let salida = Command::new(std::env::current_exe().unwrap())
++        .arg("--ignored")
++        .arg("--exact")
++        .arg("hijo_intenta_abrir_y_reporta")
++        .arg("--test-threads=1")
++        .env("FIRMANTE_TEST_RUTA", &ruta)
++        .env("FIRMANTE_TEST_ACTA", &acta)
++        .output()
++        .expect("lanzar el proceso hijo");
++    assert!(
++        salida.status.success(),
++        "el hijo falló: {:?}\n{}",
++        salida.status,
++        String::from_utf8_lossy(&salida.stderr)
++    );
++    assert_eq!(
++        std::fs::read_to_string(&acta).unwrap(),
++        "BLOQUEADO",
++        "el segundo proceso no puede abrir el registro"
++    );
++    // El padre sigue con una sola firma.
++    assert_eq!(reg.entradas(), 1);
++}
++
++/// Cambiar un bit de la bandera de abstención o del horizonte invalida el checksum de la cabecera:
++/// `abrir` falla cerrado y no hay firma posible (FIR-06, V3).
++#[test]
++fn una_cabecera_manipulada_falla_cerrado_y_no_firma() {
++    let slot_perdida = 1_000u64;
++    let s_max = 150u64;
++
++    for (etiqueta, offset) in [
++        ("bandera", OFFSET_ABSTENCION_ACTIVA),
++        ("horizonte", OFFSET_ABSTENER_HASTA),
++    ] {
++        let dir = DirTemporal::nuevo(&format!("cabecera-{etiqueta}"));
++        let ruta = dir.ruta().join("r.log");
++        {
++            let reg = Registro::abrir(&ruta, slot_perdida, s_max).unwrap();
++            assert!(reg.en_abstinencia(slot_perdida));
++        }
++        let mut bytes = std::fs::read(&ruta).unwrap();
++        bytes[offset] ^= 0x01;
++        std::fs::write(&ruta, &bytes).unwrap();
++
++        assert!(
++            matches!(
++                Registro::abrir(&ruta, slot_perdida, s_max),
++                Err(RegistroError::CabeceraCorrupta { .. })
++            ),
++            "{etiqueta}: un bit cambiado debe fallar cerrado"
++        );
++        // No se anexó ni se firmó nada: el fichero sigue midiendo solo la cabecera.
++        assert_eq!(std::fs::metadata(&ruta).unwrap().len(), TAMANO_CABECERA);
++    }
++}
++
++/// Un registro de formato 2 (40 B, versión 2) no se migra en silencio.
++#[test]
++fn un_formato_dos_no_se_migra_en_silencio() {
++    let dir = DirTemporal::nuevo("formato-2");
++    let ruta = dir.ruta().join("r.log");
++    let mut cabecera = [0u8; TAMANO_CABECERA as usize];
++    cabecera[..8].copy_from_slice(b"ZXRGFIRM");
++    cabecera[8..16].copy_from_slice(&2u64.to_le_bytes());
++    std::fs::write(&ruta, cabecera).unwrap();
++    assert!(matches!(
++        Registro::abrir(&ruta, 0, 150).unwrap_err(),
++        RegistroError::VersionInvalida { encontrada: 2, .. }
++    ));
++}
++
++/// El horizonte de abstención sale del `s_max_slots` que se pasa a `Registro::abrir`.
++#[test]
++fn la_abstencion_depende_del_perfil_de_abrir() {
++    let dir = DirTemporal::nuevo("perfil");
++    let corto = Registro::abrir(dir.ruta().join("corto.log"), 100, 10).unwrap();
++    assert_eq!(corto.abstener_hasta(), Some(110));
++    let largo = Registro::abrir(dir.ruta().join("largo.log"), 100, 20).unwrap();
++    assert_eq!(largo.abstener_hasta(), Some(120));
++    assert!(largo.en_abstinencia(120));
++    assert!(!corto.en_abstinencia(111));
++}
++
++/// Punto de entrada del proceso hijo. **Guardado**: sin `FIRMANTE_TEST_RUTA` no hace nada.
++#[test]
++#[ignore = "punto de entrada para el proceso hijo"]
++fn hijo_intenta_abrir_y_reporta() {
++    let Some(ruta) = std::env::var_os("FIRMANTE_TEST_RUTA") else {
++        return;
++    };
++    let acta = std::env::var("FIRMANTE_TEST_ACTA").expect("acta");
++    let texto = match Registro::abrir(ruta, 0, 1) {
++        Ok(_) => "ABIERTO",
++        Err(RegistroError::Bloqueado { .. }) => "BLOQUEADO",
++        Err(_) => "OTRO",
++    };
++    std::fs::write(acta, texto).unwrap();
++}
