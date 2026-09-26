@@ -61,3 +61,4 @@ aporta a Keccak. **Cociente corregido por el director:** la comparación justa e
 la CPU, **GTX 1070 / CPU = 561,1 / 73,8 = 7,6×** (el ejecutor dio 8,25–9,21× con la serie de 32 hilos).
 La pregunta «≥ 10×» sigue refutada. Límite: el sandbox de `dsh` solo ve sus propios procesos; la carga
 ajena se siguió por `/proc/loadavg`.
+La tabla de derivación de arriba usa la CPU de 32 hilos con carga (68,5 MH/s); con el máximo en reposo (73,8 MH/s) los tiempos de la columna CPU son un 7 % menores (p. ej. 2⁴⁰ en 4,14 h en vez de 4,46 h).
