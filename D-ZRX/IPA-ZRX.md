@@ -68,6 +68,7 @@ A-01 + C-01 + B-03 ──► B-08 ruta activa del nodo ──► A-09 sincroniza
 | B-09 | Sesgo eligiendo la clave (`public_key → sector_id → bucket`); ocupación bimodal de s-buckets | abierto, sin medir | P2 | B-01 | El stake no lo corrige: se muelen claves antes de depositar | Medición con plotter real | Ventaja de molienda cuantificada |
 | B-11 | **Semántica de estado en el DAG**: aplicación al fusionar (`C-ORD-03`), descarte silencioso (`C-ORD-04`), cobro de azules y `rojo_k` (`R-FIN-8′`) combinados con garantía, coinbase atribuida y corte | contrato redactado (`P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md`); falta oráculo T04 | P0 | W03, W05a | Nodo que inventa la semántica de fusión o que invalida bloques por conflictos de tx | T04 (oráculo) y W06a | Diferencial Rust ↔ T04 |
 | B-10 | Semántica de altura/slot en el DAG (`C-HDR-02` pendiente en SPEC-v); reglas que dependían de altura lineal (`C-EMIT`, `C-EXP`, `C-CHK`, `C-UPG`, `C-REORG-07`) | abierto | P1 | A-01 | Mezclar bloques y slots sin `λ` | Parte de los contratos de integración | Cada regla con unidad única |
+| B-12 | **Coste de admisión GHOSTDAG no acotado**: U2 (`pasado_contiene_ident`) y la unión de `anc` recorren el pasado entero del padre; `blue_idents` se copia por bloque. Medido por RI-1b: 90 µs → 1,66 ms por inserción de N = 2 000 a 16 000 en una **cadena lineal honesta** | abierto; **no** bloquea 0.0.1 dev (≈ 2 000 bloques en 30 min), **sí** cualquier red larga | P1 | B-11 | Degradación del validador con el tiempo, sin coste para el atacante; memoria O(N²) | Índice de alcanzabilidad acotado (intervalos, tipo Kaspa) + índice de identidades por pasado | Coste por admisión constante (o logarítmico) medido hasta 10⁶ bloques |
 
 ---
 
@@ -136,3 +137,4 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 |---|---|
 | 2026-09-26 | Alta inicial: familias A–E y X, camino crítico y bloqueo E-04 |
 | 2026-09-26 03:55 | C-10 en encargo; E-02 cerrado; E-03 reabierto (la CI remota no materializa el clon); E-10 (reinicio sin instantáneas) y E-11 (revisión independiente omitida) nuevos; A-10 en encargo |
+| 2026-09-26 04:10 | B-12 nuevo (RI-1b H1, coste de admisión GHOSTDAG con la profundidad) |

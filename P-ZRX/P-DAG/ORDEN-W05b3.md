@@ -39,7 +39,8 @@ Base: el workspace de la raíz tras W02b. Entrada congelada: `P-ZRX/P-DAG/ENTRAD
    el `slot` del bloque, F-17). Salida = bloque DAG con cabecera sellada, justificación y cuerpo. **No**
    elige padres ni decide si la clave tiene garantía: eso es del nodo (`zx-cadena`). Error explícito si
    `slot ≤ slot(sp)` o si el rango excede `MAX_BUNDLES_POT = 150`.
-4. **Contextos de prueba reales:** en los tests, `ContextoDag` e `InstantaneaPot` se implementan sobre
+4. **Hallazgo H2 de RI-1b:** `ContextoTransicion::nuevo` debe devolver un error explícito si dos registros validados del mismo slot traen `salida` distinta (hoy `or_insert` lo oculta, `contexto_transicion.rs:176-181`), con test.
+5. **Contextos de prueba reales:** en los tests, `ContextoDag` e `InstantaneaPot` se implementan sobre
    `zx-dag` (GHOSTDAG de verdad sobre los bloques producidos) y sobre el `ServicioPot`; ningún mock que
    devuelva «válido».
 

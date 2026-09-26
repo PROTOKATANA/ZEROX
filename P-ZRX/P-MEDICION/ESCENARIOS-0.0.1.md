@@ -26,7 +26,7 @@ que se inyecte. **No** mide una red pública adversarial (`AUTO-ZRX.md` §7): ca
 
 ## 2. Métricas comunes
 
-Latencia de propagación (producción en A → admisión en B: p50, p95, máx.); tiempo de verificación por
+Latencia de propagación (producción en A → admisión en B: p50, p95, máx.); tiempo de admisión GHOSTDAG **frente a la profundidad del DAG** (IPA B-12: crece con la historia; declarar el límite de duración); tiempo de verificación por
 etapa; bloques por slot y padres por bloque; fracción de rojos; número de puntas; CPU, RSS y disco por
 nodo (muestreo cada 1 s de `/proc`); tasa de rechazos por motivo; divergencia (slots en que los nodos
 no comparten punta seleccionada) y tiempo hasta converger.
