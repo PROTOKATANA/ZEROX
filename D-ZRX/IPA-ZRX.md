@@ -138,4 +138,4 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 | 2026-09-26 | Alta inicial: familias A–E y X, camino crítico y bloqueo E-04 |
 | 2026-09-26 03:55 | C-10 en encargo; E-02 cerrado; E-03 reabierto (la CI remota no materializa el clon); E-10 (reinicio sin instantáneas) y E-11 (revisión independiente omitida) nuevos; A-10 en encargo |
 | 2026-09-26 03:57 | B-12 nuevo (RI-1b H1, coste de admisión GHOSTDAG con la profundidad) |
-| 2026-09-26 04:15 | A-10 parcial: hashrate CPU\/GPU medido (A10-M1) |
+| 2026-09-26 04:09 | A-10 parcial: hashrate CPU\/GPU medido (A10-M1) |
