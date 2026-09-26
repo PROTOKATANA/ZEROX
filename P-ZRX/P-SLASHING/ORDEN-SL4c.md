@@ -5,7 +5,7 @@ código y aplica sus reglas pertinentes.
 
 ## 1. Identidad y contexto
 
-- **ID:** SL-4c. **Fecha:** 2026-09-26 (≈ 23:16; se congela y lanza cuando SL-4c-O entregue los vectores).
+- **ID:** SL-4c. **Fecha:** 2026-09-26 (redactada ≈ 23:16; congelada y lanzada ≈ 23:51).
   **Director:** Claude. **Ejecutor:** DeepSeek (`deepseek-flash`, esfuerzo `high`, DeepSeek Harness).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/SL4c/`.
 - **Motivo:** `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3b.md`: (H1) el `cbid` ajeno (RAT-1) y el orden no canónico
@@ -19,9 +19,11 @@ código y aplica sus reglas pertinentes.
 
 ## 2. Entradas (congeladas en `P-ZRX/P-SLASHING/ENTRADA-SL4c.sha256`)
 
-`CONTRATO-EVIDENCIA-v0.md` (§2 y «Ratificación v0»), `REVISION-RI-3b.md`, `ORDEN-SL4c-O.md` y su revisión,
-los vectores nuevos (`vectores-transicion-v0.5.txt`, `vectores-estado-dag-v0.6.txt` con sus `.sha256` y
-coberturas, y los `DIFERENCIAS-*.md`), `P-ZRX/P-FORMATO/FORMATO-v0.md` (F-04, F-05, F-14). Código: la raíz en
+`CONTRATO-EVIDENCIA-v0.md` (§2 y «Ratificación v0»), `REVISION-RI-3b.md`, `ORDEN-SL4c-O.md`, `-O-B.md`,
+`-O-C.md` y `REVISION-SL4c-O.md` (la regla de precedencia definitiva), los vectores nuevos
+`P-ZRX/P-TRANSICION/T01/resultados/{vectores-transicion-v0.5.txt, .sha256, cobertura-v0.5.txt}` y
+`P-ZRX/P-DAG/T04/resultados/{vectores-estado-dag-v0.6.txt, .sha256, cobertura-v0.6.txt}`, y los informes de
+diferencias `P-ZRX/P-TRANSICION/T01/DIFERENCIAS-v0.4-v0.5.md` y `P-ZRX/P-DAG/T04/resultados/DIFERENCIAS-v0.5-v0.6.md`, `P-ZRX/P-FORMATO/FORMATO-v0.md` (F-04, F-05, F-14). Código: la raíz en
 el commit que indique la entrada.
 
 ## 3. Decisiones del director
