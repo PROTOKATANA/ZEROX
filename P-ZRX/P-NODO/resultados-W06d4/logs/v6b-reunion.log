@@ -1,0 +1,5 @@
+progreso reorg_total=5 c2_bloque_producido=0 2026-09-26T21:10:42+02:00
+progreso reorg_total=6 c2_bloque_producido=0 2026-09-26T21:10:48+02:00
+progreso reorg_total=8 c2_bloque_producido=0 2026-09-26T21:10:54+02:00
+FATAL_DETECTADO
+/home/katana/zeo/ZEROX/deepseek/W06d4/run/B/stderr.log:zx-node: error fatal: bloque propio 28261d6bf96d5de6162570a677e8af26f806a80d46af1eb42306ca4a6a9163c6 rechazado en la admisión: ErrMergeDepth

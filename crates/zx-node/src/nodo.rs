@@ -14,14 +14,14 @@ use subspace_core_primitives::PublicKey;
 use subspace_verification::PieceCheckParams;
 use zx_cadena::{BloqueCadena, BloquePost, Cadena};
 use zx_consensus::genesis::{GENESIS_DEV, HASH_GENESIS_DEV, construir as construir_genesis};
-use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, ParametrosTransicion};
+use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, Origen, ParametrosTransicion};
 use zx_consensus::verificador::{ContextoPow, validar_cabecera_pow};
 use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev};
 use zx_core::digest::Digest;
 use zx_core::preimage::block::BlockHeader;
 use zx_core::wire::cuerpo_desde_bytes;
 use zx_core::wire_dag::{BloqueDag, bloque_dag_desde_bytes};
-use zx_core::{BlockHash, PadresDag, Red, Tx, trabajo_bloque, txid};
+use zx_core::{BlockHash, PadresDag, Red, Tx, trabajo_bloque};
 use zx_dag::ErrorDag;
 use zx_dag::bloque_dag::{CandidatoSinRango, ContextoRangoDag};
 use zx_farmer::farmer::{ParcelaDisco, plotear_sector_en_disco};
@@ -41,7 +41,7 @@ use crate::estado_resumen::resumen_estado;
 use crate::identidad::identidad_de_cabecera_post;
 use crate::padres::padres_de_regimen;
 use crate::perfil;
-use crate::pow::{self, CoinbasePropia};
+use crate::pow;
 use crate::red::huerfanos::DepositoHuerfanos;
 use crate::red::vista::VistaRed;
 use crate::red::{self, ManijaRed, TrabajoRed};
@@ -106,7 +106,6 @@ pub struct Nodo {
     /// reconstruirlo tras un cambio de terminal tentativo (FC-3, antes de que exista ningún bloque
     /// PoST; `ORDEN-W06d3` decisión 3).
     terminal_servicio: Option<BlockHash>,
-    coinbases: Vec<CoinbasePropia>,
     servicio_verificacion: Option<ServicioPot>,
     historia: Arc<HistoriaGenesis>,
     ultima_punta_registrada: Option<BlockHash>,
@@ -229,7 +228,6 @@ impl Nodo {
             historial_pow: Vec::new(),
             headers_pow: BTreeMap::new(),
             terminal_servicio: None,
-            coinbases: Vec::new(),
             servicio_verificacion: None,
             historia,
             ultima_punta_registrada: None,
@@ -447,35 +445,19 @@ impl Nodo {
                 pow_valido: true,
             }
         };
-        // Rastro de coinbases/depósitos propios (decisión 5), antes de que `txs` se consuma: marca
-        // depositadas las que este bloque gasta y registra la coinbase nueva si paga a una clave
-        // propia. Funciona igual en producción que en repetición (mismos `txs`).
-        for tx in &txs {
-            for input in &tx.inputs {
-                if input.outpoint.prev_index == 0 {
-                    for c in &mut self.coinbases {
-                        if c.txid == input.outpoint.prev_txid {
-                            c.depositada = true;
-                        }
-                    }
-                }
-            }
-        }
-        if !es_genesis
-            && let Some(coinbase) = txs.first()
-            && let Some(salida) = coinbase.outputs.first()
-            && let zx_core::Lock::PubKey { pubkey } = salida.lock
-            && let Some(indice_clave) = self.claves.iter().position(|c| c.pk == pubkey)
-        {
-            self.coinbases.push(CoinbasePropia {
-                indice_clave,
-                altura: cabecera.height,
-                bloque: hash,
-                txid: txid(coinbase, self.cbid),
-                valor: salida.value,
-                depositada: false,
-            });
-        }
+        // `ORDEN-W06d4` decisión 1/2: hasta aquí, el rastro de coinbases/depósitos propios era un
+        // indicador local (`CoinbasePropia.depositada`) que marcaba "ya gastada" en cuanto **algún**
+        // bloque admitido (propio o ajeno, en cualquier rama) gastaba el `OutPoint`, sin comprobar si
+        // ese bloque seguía en la rama seleccionada. Confirmado con evidencia
+        // (`pruebas_deposito_sensible_a_la_rama`, más abajo): tras una reorganización que descarta el
+        // bloque del depósito pero conserva la coinbase (todavía viva en la rama nueva), el
+        // indicador quedaba en `true` para siempre y el nodo nunca volvía a depositarla, así que las
+        // `K_min` claves con garantía activa que exige `Φ` nunca llegaban a reunirse con varios
+        // procesos minando a la vez (`REVISION-W06d3.md`). `preparar_depositos` ya no mantiene ese
+        // indicador: decide qué depositar leyendo directamente `estado.utxo`/`estado.garantias` de
+        // la punta PoW **seleccionada** en el momento de construir el bloque, que es sensible a la
+        // rama por construcción (una salida gastada en una rama descartada sigue viva en `utxo` de
+        // cualquier otra rama que no la gastó).
 
         let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
         if !ya_admitido {
@@ -553,18 +535,10 @@ impl Nodo {
             .take_while(|(a, b)| a.block_hash() == b.block_hash())
             .count();
         let profundidad = historial_anterior.len().saturating_sub(comunes);
-        if profundidad > 0 {
-            // La rama anterior (más allá del ancestro común) queda descartada: cualquier
-            // `CoinbasePropia` que viviera solo en esos bloques ya no existe en el estado de la
-            // rama nueva (`ORDEN-W06d3` decisión 3). Sin esta poda, `preparar_depositos` seguiría
-            // viéndola como "madura y sin depositar" y construiría un depósito que gasta un
-            // `OutPoint` inexistente en la rama seleccionada.
-            let en_rama_nueva: std::collections::BTreeSet<BlockHash> = nuevo_historial
-                .iter()
-                .map(BlockHeader::block_hash)
-                .collect();
-            self.coinbases.retain(|c| en_rama_nueva.contains(&c.bloque));
-        }
+        // `ORDEN-W06d4` decisión 2: ya no hay una lista local de `CoinbasePropia` que podar tras una
+        // reorganización (`ORDEN-W06d3` la podaba por `bloque`, pero eso no bastaba: ver el
+        // comentario en `admitir_pow_interno`). `preparar_depositos` lee `estado.utxo` de la punta
+        // ya seleccionada en cada llamada, así que no hay ningún indicador que desincronizar aquí.
         self.historial_pow = nuevo_historial;
         // `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): `VistaRed::registrar_pow` es
         // *append-only por altura* y nunca sustituye una altura ya ocupada, aunque la rama
@@ -794,15 +768,18 @@ impl Nodo {
                 bloque.cabecera.block_hash()
             )));
         };
+        // `ORDEN-W06d4` decisión 3: antes, un slot `<= slot_actual()` se reconciliaba solo con
+        // `salida_de`, que exige que el slot **ya tenga** una salida calculada. Si el hueco lo dejó
+        // un salto de OTRA rama (`insertar_calculado` los permite a propósito, D-P10), `salida_de`
+        // fallaba con `FueraDeVentana` aunque este bloque, ya admitido y verificado, traiga su
+        // `pot_output` real — y el bloque se rechazaba sin entrar nunca en `pasado()`: la causa
+        // confirmada de `Pot(PasadoIncompleto)` en un hijo que lo declarara padre más tarde
+        // (`REVISION-W06d3.md`, hallazgo no resuelto). `declarar_salida_pasada` reconcilia el hueco
+        // con el dato ya verificado y sigue detectando una discrepancia real (D-P10) como error.
         if slot <= servicio.slot_actual() {
-            let ya = servicio
-                .salida_de(slot)
+            servicio
+                .declarar_salida_pasada(slot, salida, portador)
                 .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
-            if ya != salida {
-                return Err(ErrorNodo::Otro(format!(
-                    "D-P10 violado: dos bloques del slot {slot} traen salidas PoT distintas"
-                )));
-            }
         } else {
             servicio
                 .insertar_calculado(slot, salida, portador)
@@ -1263,19 +1240,34 @@ impl Nodo {
         // (que no cambia hasta que el bloque se aplique de verdad).
         let mut siguiente_nonce: std::collections::BTreeMap<zx_core::ClavePublica, u64> =
             std::collections::BTreeMap::new();
-        for c in &self.coinbases {
-            if c.depositada {
+        // `ORDEN-W06d4` decisión 2: qué depositar se decide leyendo **directamente**
+        // `estado.utxo`/`estado.garantias` de la punta PoW ya seleccionada, no un indicador local
+        // (`CoinbasePropia.depositada`, `ORDEN-W06d3`) que podía desincronizarse de la rama. Una
+        // coinbase propia sigue siendo candidata a depósito exactamente mientras su salida está sin
+        // gastar **en el estado de esta rama** (`estado.utxo` la vuelve a mostrar por sí solo si el
+        // bloque que la gastó queda descartado por una reorganización, sin ninguna poda aparte); y
+        // deja de serlo en el instante en que un bloque de esta rama la gasta de verdad (sale de
+        // `estado.utxo`). Iterar `estado.utxo` (`BTreeMap`, orden determinista por `OutPoint`) evita
+        // además tener que reconstruir qué coinbases siguen vivas tras cada reorganización.
+        for (outpoint, entrada) in &estado.utxo {
+            if outpoint.prev_index != 0 || entrada.origen != Origen::CoinbasePow {
                 continue;
             }
-            let Some(madura_en) = c.altura.checked_add(self.params.m_cb) else {
+            let zx_core::Lock::PubKey { pubkey } = entrada.lock else {
+                continue;
+            };
+            let Some(clave) = self.claves.iter().find(|c| c.pk == pubkey) else {
+                continue;
+            };
+            let Some(altura_creacion) = entrada.creada.como_altura() else {
+                continue;
+            };
+            let Some(madura_en) = altura_creacion.checked_add(self.params.m_cb) else {
                 continue;
             };
             if altura_bloque < madura_en {
                 continue;
             }
-            let Some(clave) = self.claves.get(c.indice_clave) else {
-                continue;
-            };
             let nonce = *siguiente_nonce.entry(clave.pk).or_insert_with(|| {
                 estado
                     .garantias
@@ -1283,8 +1275,9 @@ impl Nodo {
                     .map_or(0, |g| g.nonce_siguiente)
             });
             siguiente_nonce.insert(clave.pk, nonce.saturating_add(1));
-            let (tx, testigos) = pow::construir_deposito(c, clave, nonce, self.cbid)
-                .map_err(|e| ErrorNodo::Otro(format!("construir depósito: {e}")))?;
+            let (tx, testigos) =
+                pow::construir_deposito(outpoint.prev_txid, entrada.valor, clave, nonce, self.cbid)
+                    .map_err(|e| ErrorNodo::Otro(format!("construir depósito: {e}")))?;
             depositos.push((tx, testigos));
         }
         Ok(depositos)
@@ -1718,7 +1711,9 @@ fn peso_u128(bloque: &BloqueDag) -> Result<u128, ErrorNodo> {
 mod pruebas_v7 {
     use zx_core::preimage::block::merkle_root;
 
-    use super::{BlockHeader, Config, Nodo, Red, txid};
+    use zx_core::txid;
+
+    use super::{BlockHeader, Config, Nodo, Red};
 
     #[test]
     fn bloque_pow_propio_alterado_se_rechaza_y_no_cambia_el_estado() {
@@ -1771,6 +1766,170 @@ mod pruebas_v7 {
             nodo.resumen_estado_actual(),
             estado_antes,
             "el estado no debe cambiar tras el rechazo"
+        );
+    }
+}
+
+/// `ORDEN-W06d4` decisión 1/2: reproduce y corrige que el indicador local de depósito no sea
+/// sensible a la rama (`REVISION-W06d3.md`, hipótesis del director).
+///
+/// Construye, con la tubería real de admisión (`admitir_pow_interno`, sin red), dos ramas PoW que
+/// comparten el bloque `A1` (paga una coinbase a una clave propia): la rama `A` gasta esa coinbase
+/// en su segundo bloque (el depósito F-15); la rama `B` (más pesada, sin ese depósito) se acaba
+/// seleccionando por FC-3. Tras la reorganización, la coinbase de `A1` nunca se gastó en la rama
+/// `B`: `preparar_depositos`, evaluado sobre la punta ya seleccionada, debe volver a proponerla.
+#[cfg(test)]
+#[expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "el test falla con panic por diseño"
+)]
+mod pruebas_deposito_sensible_a_la_rama {
+    use zx_consensus::PARAMETROS_POW_DEV;
+    use zx_core::preimage::block::merkle_root;
+    use zx_core::txid as calc_txid;
+
+    use super::{BlockHeader, Config, Nodo, Red};
+    use crate::claves::ClaveDev;
+    use crate::pow;
+
+    fn cabecera(prev: BlockHeader, height: u32, txids: &[zx_core::TxId], cbid: u32) -> BlockHeader {
+        BlockHeader {
+            consensus_branch_id: cbid,
+            prev_hash: prev.block_hash(),
+            merkle_root: merkle_root(txids),
+            timestamp: prev.timestamp + 1,
+            bits: PARAMETROS_POW_DEV.bits_iniciales,
+            nonce: 0,
+            height,
+        }
+    }
+
+    #[test]
+    fn preparar_depositos_vuelve_a_depositar_tras_perder_el_bloque_del_deposito() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = Config {
+            dir_datos: dir.path().join("datos"),
+            ruta_registro: dir.path().join("registro.jsonl"),
+            red: Red::Dev,
+            semilla: 11,
+            indices_claves: vec![0],
+            n_dev: 16,
+            sr_dev: u64::MAX,
+            parada_tras_slots: Some(0),
+        };
+        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
+        let clave_propia = nodo.claves.first().cloned().expect("al menos una clave");
+        let clave_ajena = ClaveDev::derivar(cfg.semilla, 999);
+        let cbid = nodo.cbid;
+
+        #[expect(
+            clippy::indexing_slicing,
+            reason = "el arranque deja al menos el génesis"
+        )]
+        let genesis = nodo.historial_pow[0];
+
+        // A1 (altura 1, común a las dos ramas): coinbase paga a la clave propia.
+        let cb_a1 = pow::construir_coinbase_pow(clave_propia.pk, 1);
+        #[expect(clippy::indexing_slicing, reason = "una coinbase tiene una salida")]
+        let valor_a1 = cb_a1.outputs[0].value;
+        let txid_a1 = calc_txid(&cb_a1, cbid);
+        let cab_a1 = cabecera(genesis, 1, &[txid_a1], cbid);
+        nodo.admitir_pow_interno(cab_a1, vec![cb_a1], vec![Vec::new()], 0, false)
+            .expect("A1 se admite");
+
+        // M2..M6 (comunes a las dos ramas): solo hacen madurar la coinbase de A1 (`M_CB = 5`:
+        // madura en la altura 6). Ninguno la toca.
+        let mut prev = cab_a1;
+        for altura in 2..=6u32 {
+            let cb = pow::construir_coinbase_pow(clave_ajena.pk, altura);
+            let txid_cb = calc_txid(&cb, cbid);
+            let cab = cabecera(prev, altura, &[txid_cb], cbid);
+            nodo.admitir_pow_interno(cab, vec![cb], vec![Vec::new()], 0, false)
+                .unwrap_or_else(|e| panic!("M{altura} se admite: {e}"));
+            prev = cab;
+        }
+        let cab_m6 = prev;
+
+        // A7 (altura 7, rama A): la coinbase de A1 ya está madura; la gasta con el depósito F-15.
+        let (tx_deposito, testigos_deposito) =
+            pow::construir_deposito(txid_a1, valor_a1, &clave_propia, 0, cbid)
+                .expect("depósito firmado");
+        let cb_a7 = pow::construir_coinbase_pow(clave_ajena.pk, 7);
+        let txid_a7 = calc_txid(&cb_a7, cbid);
+        let txid_dep = calc_txid(&tx_deposito, cbid);
+        let cab_a7 = cabecera(cab_m6, 7, &[txid_a7, txid_dep], cbid);
+        nodo.admitir_pow_interno(
+            cab_a7,
+            vec![cb_a7, tx_deposito],
+            vec![Vec::new(), testigos_deposito],
+            0,
+            false,
+        )
+        .expect("A7 (con el depósito) se admite");
+
+        // Antes de la reorganización: la rama seleccionada es A7, donde la coinbase de A1 ya se
+        // gastó; no hay nada pendiente que depositar.
+        let depositos_antes = nodo
+            .preparar_depositos(10)
+            .expect("preparar_depositos (antes de la reorganización)");
+        assert!(
+            depositos_antes.is_empty(),
+            "tras depositar en A7 no debería haber depósitos pendientes todavía"
+        );
+
+        // Rama B (más pesada, sin el depósito): B7, B8, ambas descendientes de M6 (no de A7), sin
+        // gastar la coinbase de A1. Dos bloques (B7, B8) pesan más que el único bloque de la rama A
+        // (A7) desde el ancestro común M6, así que FC-3 debe conmutar la selección.
+        let mut prev = cab_m6;
+        for altura in 7..=8u32 {
+            let cb = pow::construir_coinbase_pow(clave_ajena.pk, altura);
+            let txid_cb = calc_txid(&cb, cbid);
+            let cab = cabecera(prev, altura, &[txid_cb], cbid);
+            nodo.admitir_pow_interno(cab, vec![cb], vec![Vec::new()], 0, false)
+                .unwrap_or_else(|e| panic!("B{altura} se admite: {e}"));
+            prev = cab;
+        }
+        let punta_b = prev.block_hash();
+        assert_eq!(
+            nodo.cadena.mejor_punta_pow(),
+            Some(punta_b),
+            "la rama B, más pesada, debe ser la punta PoW seleccionada (FC-3)"
+        );
+        assert_eq!(
+            nodo.historial_pow.last().map(BlockHeader::block_hash),
+            Some(punta_b),
+            "historial_pow debe reflejar la reorganización a la rama B"
+        );
+
+        // La coinbase de A1 nunca se gastó en la rama B: sigue viva (sin gastar) en su estado.
+        let estado_b = nodo
+            .cadena
+            .estado_post(&punta_b)
+            .expect("estado de la punta B");
+        assert!(
+            estado_b.utxo.contains_key(&zx_core::OutPoint {
+                prev_txid: txid_a1,
+                prev_index: 0,
+            }),
+            "la coinbase de A1 debe seguir viva (sin gastar) en el estado de la rama B"
+        );
+
+        // La corrección (`ORDEN-W06d4` decisión 2): evaluado sobre la rama B ya seleccionada,
+        // `preparar_depositos` debe volver a proponer el depósito de la coinbase de A1 (madura en
+        // la altura 1 + M_CB(5) = 6; se evalúa en la altura 8). Con el indicador local
+        // `depositada` (bug de `ORDEN-W06d3`, `PROGRESO.md`), esta lista queda vacía: el nodo
+        // nunca vuelve a intentar depositar esa coinbase, y con ella nunca reúne `Φ`.
+        let depositos_despues = nodo
+            .preparar_depositos(8)
+            .expect("preparar_depositos (después de la reorganización)");
+        assert!(
+            depositos_despues
+                .iter()
+                .any(|(tx, _)| tx.inputs.first().map(|i| i.outpoint.prev_txid) == Some(txid_a1)),
+            "tras perder el bloque del depósito por la reorganización, el nodo debe volver a \
+             proponer el depósito de la coinbase de A1 (bug de ORDEN-W06d3, corregido en \
+             ORDEN-W06d4)"
         );
     }
 }

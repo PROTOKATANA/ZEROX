@@ -1,0 +1,1 @@
+zx-node: error fatal: bloque propio e370ccc5110e71c34a6c1eb568bc4973845c8000006798742539504b231fff19 rechazado en la admisión: Padres(SlotDePadrePosterior { padre: BlockHash(72e0dba2738e04515464381a76211175312775ff80a24d8e47145608c87da637), slot_padre: 663, slot_b: 661 })

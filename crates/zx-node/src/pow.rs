@@ -22,26 +22,6 @@ use crate::claves::ClaveDev;
 use crate::error::ErrorNodo;
 use crate::perfil::subsidio_pow;
 
-/// Una salida de coinbase PoW propia, para seguir su madurez (decisión 5).
-#[derive(Clone, Copy, Debug)]
-pub struct CoinbasePropia {
-    /// Índice de la clave dueña (posición en `claves`, no el índice de derivación).
-    pub indice_clave: usize,
-    /// Altura en la que se creó.
-    pub altura: u32,
-    /// Hash del bloque PoW que la creó (`ORDEN-W06d3` decisión 3): permite podar esta lista tras
-    /// una reorganización, comprobando qué entradas siguen en `historial_pow` de la rama
-    /// seleccionada. La altura sola no basta: dos ramas pueden tener, cada una, un bloque distinto
-    /// en la misma altura.
-    pub bloque: zx_core::BlockHash,
-    /// `txid` de la coinbase.
-    pub txid: TxId,
-    /// Importe de la salida (única, índice 0).
-    pub valor: Amount,
-    /// ¿Ya se depositó (para no repetirlo)?
-    pub depositada: bool,
-}
-
 /// Plantilla PoW completa que el bucle entrega al hilo minero.
 #[derive(Clone)]
 pub struct PlantillaPow {
@@ -120,23 +100,28 @@ pub fn construir_coinbase_pow(clave: ClavePublica, altura: u32) -> Tx {
 
 /// Construye un depósito v2 (F-15) que gasta **toda** una coinbase madura propia, ya firmado.
 ///
-/// Consume `(coinbase.txid, 0)` entero como depósito (sin cambio): `q = 10 ZZK` y la coinbase vale
+/// Consume `(txid_coinbase, 0)` entero como depósito (sin cambio): `q = 10 ZZK` y la coinbase vale
 /// `50 ZZK`, así que un único depósito por clave basta con margen. Devuelve la transacción y sus
 /// testigos (firma de la entrada 0 y aceptación, en ese orden: el mismo patrón que
 /// `crates/zx-consensus/src/transicion/tests.rs`).
+///
+/// `txid_coinbase`/`valor_coinbase` identifican la salida a gastar; el llamante (`ORDEN-W06d4`
+/// decisión 2, `bucle::preparar_depositos`) los lee de `estado.utxo` de la punta ya seleccionada,
+/// no de un indicador local por rama.
 ///
 /// # Errores
 /// [`EncodingError`] si el `sighash`/importe no son representables (no debería con las constantes
 /// dev).
 pub fn construir_deposito(
-    coinbase: &CoinbasePropia,
+    txid_coinbase: TxId,
+    valor_coinbase: Amount,
     clave: &ClaveDev,
     nonce: u64,
     cbid: u32,
 ) -> Result<(Tx, Vec<Vec<u8>>), EncodingError> {
     let entrada = TxIn {
         outpoint: OutPoint {
-            prev_txid: coinbase.txid,
+            prev_txid: txid_coinbase,
             prev_index: 0,
         },
         sequence: 0,
@@ -150,11 +135,11 @@ pub fn construir_deposito(
         extension: ExtensionTx::Garantia {
             tipo: TipoGarantia::Deposito,
             clave: clave.pk,
-            importe: coinbase.valor,
+            importe: valor_coinbase,
             nonce,
         },
     };
-    let testigos = testigos_deposito(&tx, coinbase.valor, clave.pk, &clave.sk, cbid)?;
+    let testigos = testigos_deposito(&tx, valor_coinbase, clave.pk, &clave.sk, cbid)?;
     Ok((tx, testigos))
 }
 

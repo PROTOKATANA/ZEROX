@@ -1,0 +1,14 @@
+Diff in /home/katana/zeo/ZEROX/deepseek/W06d4/ws/crates/zx-node/src/nodo.rs:1789:
+     use crate::claves::ClaveDev;
+     use crate::pow;
+ 
+[31m-    fn cabecera(
+(B[m[31m-        prev: BlockHeader,
+(B[m[31m-        height: u32,
+(B[m[31m-        txids: &[zx_core::TxId],
+(B[m[31m-        cbid: u32,
+(B[m[31m-    ) -> BlockHeader {
+(B[m[32m+    fn cabecera(prev: BlockHeader, height: u32, txids: &[zx_core::TxId], cbid: u32) -> BlockHeader {
+(B[m         BlockHeader {
+             consensus_branch_id: cbid,
+             prev_hash: prev.block_hash(),

@@ -130,6 +130,14 @@ pub enum ErrorServicioPot {
         #[source]
         error: zx_pot::PotError,
     },
+    /// `declarar_salida_pasada` encontró, para el mismo slot, una salida ya registrada distinta
+    /// (violaría D-P10: el flujo es único, así que dos declaraciones del mismo slot deben coincidir
+    /// siempre; no debería ocurrir con datos de cabeceras ya verificadas).
+    #[error("el slot {slot} ya tenía una salida PoT distinta registrada (D-P10)")]
+    SalidaPasadaDiscrepante {
+        /// Slot en conflicto.
+        slot: u64,
+    },
 }
 
 /// Servicio PoT local de una historia dev, con ventana acotada de slots.
@@ -332,6 +340,59 @@ impl ServicioPot {
         Ok(())
     }
 
+    /// Declara la salida y el portador PoT, **ya verificados**, de un slot que quedó **detrás** de
+    /// `slot_actual()` (`ORDEN-W06d4` decisión 3, `REVISION-W06d3.md`: causa de
+    /// `Pot(PasadoIncompleto)` en un bloque propio de un nodo que se incorpora tarde al régimen).
+    ///
+    /// `insertar_calculado` permite (a propósito, D-P10) saltar directamente a un slot posterior
+    /// sin calcular los intermedios: si ese salto lo hizo un bloque de **otra rama** (el flujo PoT
+    /// es único y compartido por todas las ramas, `ORDEN-W06d1`), un slot anterior que otra rama sí
+    /// usó de verdad queda como hueco — sin salida ni portador — aunque su bloque sea perfectamente
+    /// válido y ya esté admitido en `Cadena`. `salida_de`/`insertar_calculado` no tienen forma de
+    /// reconciliar ese slot (el primero exige que ya exista; el segundo exige `slot >
+    /// slot_actual()`), así que antes de este método el llamante (`Nodo::actualizar_servicio_
+    /// verificacion`) no tenía más opción que rechazar el bloque — quedaba admitido en `Cadena`
+    /// pero nunca entraba en `pasado()`, y cualquier hijo que lo declarara padre fallaba después con
+    /// `PasadoIncompleto`.
+    ///
+    /// Rellenar el hueco es siempre seguro: D-P10 garantiza que la salida de un slot es la misma
+    /// para cualquier rama, así que un dato ya verificado (viene de `pot_output` de una cabecera
+    /// admitida, no de una suposición) nunca puede legítimamente discrepar de uno que ya estuviera
+    /// registrado; si discrepa, es una violación real de D-P10, no un hueco, y se rechaza.
+    ///
+    /// # Errores
+    /// [`ErrorServicioPot::SalidaPasadaDiscrepante`] si el slot ya tenía una salida registrada
+    /// **distinta**.
+    pub fn declarar_salida_pasada(
+        &mut self,
+        slot: u64,
+        salida: [u8; POT_OUTPUT_BYTES],
+        portador: PotCheckpoints,
+    ) -> Result<(), ErrorServicioPot> {
+        if slot == 0 {
+            if salida != self.s1 {
+                return Err(ErrorServicioPot::SalidaPasadaDiscrepante { slot });
+            }
+            return Ok(());
+        }
+        if slot > self.slot_actual {
+            // No es un hueco detrás de `slot_actual()`: es exactamente el caso de
+            // `insertar_calculado` (aún no llegamos a ese slot por ninguna rama).
+            return self.insertar_calculado(slot, salida, portador);
+        }
+        match self.salidas.get(&slot) {
+            Some(existente) if *existente != salida => {
+                Err(ErrorServicioPot::SalidaPasadaDiscrepante { slot })
+            }
+            _ => {
+                self.salidas.insert(slot, salida);
+                self.portadores.insert(slot, portador);
+                self.podar();
+                Ok(())
+            }
+        }
+    }
+
     /// Registra un bloque **ya validado por el llamante** `(hash, slot)` en el pasado del servicio.
     ///
     /// No aporta ninguna prueba: es la declaración explícita que `InstantaneaPot::pasado()` no puede
@@ -467,6 +528,8 @@ mod pruebas {
     use zx_core::BlockHash;
     use zx_core::digest::Digest;
     use zx_pot::tipos::PotSeed;
+
+    use zx_core::wire_dag::POT_OUTPUT_BYTES;
 
     use super::{ErrorServicioPot, ServicioPot};
     use crate::pot::semilla_genesis;
@@ -654,6 +717,66 @@ mod pruebas {
                 pedido: 3,
                 actual: 5
             })
+        ));
+    }
+
+    /// `ORDEN-W06d4` decisión 3: reproduce y corrige la causa confirmada de `Pot(PasadoIncompleto)`
+    /// en un bloque propio de un nodo que se incorpora tarde al régimen
+    /// (`REVISION-W06d3.md`/`PROGRESO.md`, hallazgo no resuelto).
+    ///
+    /// El flujo PoT es único y compartido por todas las ramas (D-P10): si una rama más rápida hace
+    /// que el `ServicioPot` de verificación salte directamente a un slot posterior
+    /// (`insertar_calculado` lo permite a propósito, ver el test de arriba), un slot **anterior** que
+    /// otra rama sí usó de verdad queda como hueco — sin salida ni portador calculados — aunque su
+    /// bloque sea válido y ya esté admitido en `Cadena`. Antes de esta corrección, el único camino
+    /// para reconciliar un slot `<= slot_actual()` era `salida_de`, que exige que el slot **ya
+    /// tenga** una salida: con un hueco, fallaba con `FueraDeVentana` aunque el llamante trajera el
+    /// `pot_output` real de una cabecera ya admitida y verificada. El bloque se rechazaba sin entrar
+    /// nunca en `pasado()`, así que cualquier hijo que lo declarase padre fallaba después con
+    /// `PasadoIncompleto` (`zx_post::pot_rango::verificar_rango_pot_fase_previa`) — exactamente el
+    /// síntoma observado con tres procesos reales.
+    #[test]
+    fn declarar_salida_pasada_rellena_un_hueco_dejado_por_otra_rama() {
+        let mut s = servicio(16);
+        let carrier = zx_pot::prove(PotSeed::from(s.s1()), iteraciones()).expect("N válido");
+        let portador = crate::pot::checkpoints_a_wire(&carrier);
+        let salida_10 = [10u8; POT_OUTPUT_BYTES];
+        let salida_7 = [7u8; POT_OUTPUT_BYTES];
+
+        // Rama B (más rápida): el flujo PoT único ya avanzó hasta el slot 10. El slot 7 queda como
+        // hueco, sin calcular.
+        s.insertar_calculado(10, salida_10, portador)
+            .expect("avanzar con hueco es válido (D-P10)");
+
+        // Llega, por sincronización y en cualquier orden, un bloque de la rama A con slot 7: el nodo
+        // ya conoce su `pot_output` real (de una cabecera admitida), no una suposición.
+        //
+        // Antes del arreglo: el único camino disponible para `slot <= slot_actual()` era
+        // `salida_de`, que aquí falla porque el slot 7 es justo un hueco.
+        assert!(matches!(
+            s.salida_de(7),
+            Err(ErrorServicioPot::FueraDeVentana { slot: 7, .. })
+        ));
+
+        // La corrección: un slot detrás de `slot_actual()` sin salida calculada todavía es un hueco
+        // legítimo (D-P10), no un conflicto; se rellena con el dato ya verificado y el bloque queda
+        // disponible para `registrar_validado` (y por tanto para `pasado()`).
+        s.declarar_salida_pasada(7, salida_7, portador)
+            .expect("un hueco se rellena con un dato ya verificado, sin error");
+        assert_eq!(s.salida_de(7).expect("ya rellenado"), salida_7);
+        s.registrar_validado(hash(0x07), 7).expect("registro");
+        assert_eq!(s.slot_de(&hash(0x07)), Some(7));
+
+        // Repetir la misma salida para un slot ya presente no es un conflicto (dos ramas legítimas
+        // pueden compartir el mismo slot, D-P10).
+        s.declarar_salida_pasada(7, salida_7, portador)
+            .expect("repetir la misma salida para el mismo slot no es un conflicto");
+
+        // D-P10 sigue detectando un conflicto real: una salida **distinta** para un slot ya
+        // presente es un error, nunca se sobrescribe en silencio.
+        assert!(matches!(
+            s.declarar_salida_pasada(7, salida_10, portador),
+            Err(ErrorServicioPot::SalidaPasadaDiscrepante { slot: 7 })
         ));
     }
 
