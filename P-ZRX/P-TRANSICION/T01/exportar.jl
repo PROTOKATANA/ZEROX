@@ -18,7 +18,8 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/CONTRATO-v0.md"
-const SALIDA_DEF = "resultados/vectores-transicion-v0.2.txt"
+const SALIDA_DEF = "resultados/vectores-transicion-v0.3.txt"
+const COBERTURA_DEF = "resultados/cobertura-v0.3.txt"
 
 # --- nombres del formato ---------------------------------------------------
 
@@ -84,13 +85,26 @@ param_str(P::Params) = string(
     " K_min=", P.K_min, " q=", P.q, " M_res_slots=", P.M_res_slots,
     " M_dep_slots=", P.M_dep_slots, " M_rec_slots=", P.M_rec_slots,
     " R_slots=", P.R_slots, " F_slots=",
-    P.F_slots == typemax(Int) ? "inf" : string(P.F_slots))
+    P.F_slots == typemax(Int) ? "inf" : string(P.F_slots),
+    " f_num=", P.f_num, " f_den=", P.f_den, " Plazo_slots=", P.Plazo_slots,
+    " M_margen_slots=", P.M_margen_slots, " cbid=", P.cbid,
+    " evp=", P.evp ? 1 : 0)
 
 bloque_str(b::Bloque) = string(
     "BLOQUE id=", b.id, " fam=", NOMBRE_FAMILIA[b.familia], " padre=", b.padre,
     " altura=", b.altura, " trabajo=", b.trabajo,
     " pow_ok=", b.pow_ok ? 1 : 0, " slot=", b.slot, " prod=", b.productor,
     " peso=", b.peso, " reqdecl=", b.requisito_declarado, " ntx=", length(b.txs))
+
+# SL-3: cabeceras de evidencia `cb:clave:sector:historia:chunk:slot:ph:sello|...`.
+function ev_str(ev::Evidencia)
+    return string(ev.id1.cbid, ":", ev.id1.clave, ":", ev.id1.sector, ":",
+                  ev.id1.historia, ":", ev.id1.chunk, ":", ev.id1.slot, ":",
+                  ev.h1.pre_hash, ":", ev.h1.sello_ok ? 1 : 0, "|",
+                  ev.id2.cbid, ":", ev.id2.clave, ":", ev.id2.sector, ":",
+                  ev.id2.historia, ":", ev.id2.chunk, ":", ev.id2.slot, ":",
+                  ev.h2.pre_hash, ":", ev.h2.sello_ok ? 1 : 0)
+end
 
 function tx_str(tx::Tx)
     ent = join(string.(tx.entradas), ",")
@@ -101,6 +115,10 @@ function tx_str(tx::Tx)
     # F-15: `nonce=` solo en las tres operaciones de garantía.
     if tx.tipo == TxDeposito || tx.tipo == TxRetiro || tx.tipo == TxLiberacion
         return string(base, " nonce=", tx.nonce)
+    end
+    # SL-3: cabeceras de la evidencia.
+    if tx.tipo == TxEvidencia && tx.evidencia !== nothing
+        return string(base, " ev=", ev_str(tx.evidencia))
     end
     return base
 end
@@ -130,10 +148,13 @@ function gar_str(E::Estado)
         rs = join(["$(r.importe)@s$(r.inicio_slot)" for r in ret], ",")
         cred = sort(g.creditos, by = p -> (p.importe, p.madura_en_slot))
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
+        inc = sort(g.incidentes, by = x -> x[1])
+        is_ = isempty(inc) ? "" :
+              string(" inc=", join(["$(iid)@$(sf)" for (iid, sf) in inc], ","))
         push!(lineas, string("GAR clave=", k, " activo=", g.activo,
                              " pend=[", ps, "] ret=[", rs, "] cred=[", cs,
                              "] congelado=", g.congelado,
-                             " nonce=", g.nonce_siguiente))
+                             " nonce=", g.nonce_siguiente, is_))
     end
     return lineas
 end
@@ -262,15 +283,67 @@ function casos_dirigidos(P::Params, punto::Int, n_esperado_fallos::Base.RefValue
     return out
 end
 
+# --- SL-3: cobertura por tipo de evidencia --------------------------------
+
+inc!(d::Dict{String,Int}, k::AbstractString) = (d[k] = get(d, k, 0) + 1)
+
+function contar_cobertura(bloques::Vector{Bloque}, P::Params, acc::Dict{String,Int})
+    memo, _ = construir_validos(bloques, P)
+    for b in bloques
+        txev = nothing
+        for tx in b.txs
+            if tx.tipo == TxEvidencia
+                txev = tx
+                break
+            end
+        end
+        txev === nothing && continue
+        Ep = get(memo, b.padre, nothing)
+        if haskey(memo, b.id)
+            ev = txev.evidencia
+            if ev === nothing
+                inc!(acc, "malformada")
+                continue
+            end
+            V = (Ep !== nothing && haskey(Ep.garantias, ev.id1.clave)) ?
+                total_garantia(Ep.garantias[ev.id1.clave]) : Int128(0)
+            inc!(acc, V == 0 ? "sin_saldo" : "aplicada")
+            if Ep !== nothing
+                r = aplicar_con_undo(Ep, b, P)
+                if !(r isa Err)
+                    E2, undo = r
+                    hash_canonico(deshacer(E2, undo)) == hash_canonico(Ep) &&
+                        inc!(acc, "deshecha")
+                end
+            end
+        elseif Ep === nothing
+            inc!(acc, "sin_padre")
+        else
+            r = aplicar(Ep, b, P)
+            nombre = r == ErrEvidenciaDuplicada ? "duplicada" :
+                     r == ErrEvidenciaTardia    ? "tardia" :
+                     r == ErrCbidAjeno          ? "cbid_ajeno" :
+                     r == ErrOrdenCanonico      ? "orden_canonico" :
+                     r == ErrSinEvidencia       ? "sin_evidencia" :
+                     r == ErrEvidenciaConEntradas ? "con_entradas" :
+                     r == ErrPuertaRAT3         ? "puerta_rat3" : "otro_error"
+            inc!(acc, nombre)
+        end
+    end
+    return acc
+end
+
 # --- main ------------------------------------------------------------------
 
 function main()
     cfg = parsear(ARGS)
     fecha = get(cfg, "fecha", fecha_por_defecto())
     salida = get(cfg, "salida", SALIDA_DEF)
+    cobertura = get(cfg, "cobertura", COBERTURA_DEF)
     contrato = get(cfg, "contrato", CONTRATO_DEF)
     con_dirigidos = get(cfg, "dirigidos", "1") != "0"
     n_aleatorios = parse(Int, get(cfg, "aleatorios", "2000"))
+    n_ev_por_tipo = parse(Int, get(cfg, "ev-por-tipo", "40"))
 
     puntos = puntos_por_defecto()
     @printf("exportar: puntos por defecto=%d n_aleatorios=%d salida=%s\n",
@@ -279,10 +352,11 @@ function main()
 
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-transicion-v0.2 · T01-E (F-18, formato v0.1) · ",
+    println(io, "# vectores-transicion-v0.3 · T01-SL3 (EvidenceTx, CONTRATO-EVIDENCIA-v0+RAT) · ",
             fecha, " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     fallos_dirigidos = Ref(0)
+    cov = Dict{String,Int}()
 
     if con_dirigidos
         N = length(puntos)
@@ -311,12 +385,46 @@ function main()
                                flush(stdout))
         end
     end
+    # --- SL-3: casos con evidencia ----------------------------------------
+    puntos_ev = puntos_evidencia()
+    for (pi, P) in enumerate(puntos_ev)
+        cam = caso_rat3_carrera(P)
+        if cam !== nothing
+            bl, _, _ = cam
+            n += 1
+            escribir_caso(io, n, "EV-RAT3-carrera", pi, "-", bl, P)
+            contar_cobertura(bl, P, cov)
+        end
+        au = caso_autodenuncia(P)
+        if !isempty(au[1])
+            n += 1
+            escribir_caso(io, n, "EV-autodenuncia", pi, "-", au[1], P)
+            contar_cobertura(au[1], P, cov)
+        end
+        if pi <= 3
+            for (nombre, bl) in casos_evidencia_cobertura(P; n = n_ev_por_tipo)
+                n += 1
+                escribir_caso(io, n, nombre, pi, "-", bl, P)
+                contar_cobertura(bl, P, cov)
+            end
+        end
+        (pi % 4 == 0) && (@printf("  evidencia punto %d/%d\n", pi,
+                                  length(puntos_ev)); flush(stdout))
+    end
     close(io)
+
+    open(cobertura, "w") do ioc
+        println(ioc, "# cobertura SL-3 T01 · ", fecha)
+        for k in sort(collect(keys(cov)))
+            println(ioc, k, " = ", cov[k])
+        end
+    end
 
     h = sha256_archivo(salida)
     sha_path = replace(salida, r"\.txt$" => "") * ".sha256"
     write(sha_path, h * "  " * salida * "\n")
     @printf("exportar: casos=%d sha256=%s -> %s\n", n, h, sha_path)
+    @printf("exportar: cobertura=%s %s\n", cobertura, string(cov))
     @printf("exportar: dirigidos_con_error_inesperado=%d\n", fallos_dirigidos[])
     flush(stdout)
 end

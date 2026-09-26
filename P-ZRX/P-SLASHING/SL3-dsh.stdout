@@ -1,0 +1,26 @@
+He cumplido la orden **SL-3**. He leído íntegros `ORDEN-SL3-ORACULO.md`, `CONTRATO-EVIDENCIA-v0.md` (con su «Ratificación v0», que prevalece) y `V-ZRX/LINEO.md`. Solo he escrito en `P-TRANSICION/T01/` y `P-DAG/T04/`. La entrada congelada `ENTRADA-SL3.sha256` sigue **6/6 OK**; sin commit, push, secretos ni Python.
+
+## Faltas de definición informadas antes de editar
+
+Las registré en `PROGRESO.md` §SL3.1 de cada zona **antes** de tocar código (marcadas `# AMBIGUEDAD-SL3-n`), con lectura restrictiva/compatible. Ninguna obligó a elegir entre reglas incompatibles:
+
+- **T01**: (1) momento/permanencia de la congelación frente a la liquidación, (2) `congelado` como cuenta o gravamen, (3) activación de C-EVP, (4) `ErrForma` de `cbid` ajeno sin `ErrForma` plano, (5) `H_d` abstracto, (6) momento de la poda, (7) puerta RAT-3, (8) `último_slot_producido` en el pasado, (9) **redondeo de RAT-2**.
+- **T04**: D1 dedup como descarte y no bloque inválido, D2 punto de aplicación RD-4, D3 evidencias hermanas, D4 `cbid` local.
+
+**Hallazgo para el director (AMBIGUEDAD-SL3-9):** RAT-2 dice que el autodenunciante pierde «al menos `6/8·C`», pero con `recompensa = techo(C·2/8) = techo(C/4)` la pérdida neta es `C − techo(C/4)`, que **solo** es exactamente `6/8·C` cuando `C ≡ 0 (mod 4)` (p. ej. `C=11` da 8 < 8,25). Implementé la letra de RAT-2 y lo documento; el caso dirigido de autodenuncia usa un `C` múltiplo de 8 para verificar la igualdad exacta.
+
+## Qué se implementó
+
+- **T01**: tipos `IdentidadEvidencia`/`CabeceraEvidencia`/`Evidencia`; `Params` con `f_num/f_den`, `Plazo_slots`, `M_margen_slots`, `cbid`, `evp`; `Garantia.incidentes`; `Estado.ultimo_slot_producido`. Reglas EV-01…EV-22, RAT-1 (identidad con `consensus_branch_id`), RAT-2 (`techo(C·2/8)` a la coinbase del bloque que aplica, resto quemado), RAT-3/EV-15b (liberación exige (i) sin caso abierto y (ii) ventana desde el último bloque producido; el retiro no se bloquea), poda EV-11 y undo exacto EV-27. Generadores `casos_evidencia_cobertura`, `caso_rat3_carrera`, `caso_autodenuncia`.
+- **T04**: evidencia en modo fusión (se **descarta** sin invalidar el bloque), dedup EV-12, undo EV-27 y reaparición en rama hermana EV-28, punto de aplicación RD-4; `PARAMS_DAG_EV` (8 puntos con `f∈{1/2,1}`), dirigidos D-15…D-18 y aleatorios con evidencia.
+
+## Verificación (V1–V4)
+
+| Paso | Resultado |
+|---|---|
+| V1 | `Pkg.test()` T01 **176/176** (SL-3 **82/82**); T04 **421/421** |
+| V2 | T01 `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida`: 737 280 historias, **I-1…I-7 = 0 fallos** (conservación ampliada), 92 historias de evidencia, 8 RAT-3 bloqueadas, 0 fallos. T04 `run.jl --replicas 200`: **ESTADO = SUPERADO**, 0 fallos IE-1…IE-6 (3 000 base + 1 600 evidencia) |
+| V3 | `vectores-transicion-v0.3.txt` (**2 795** casos, sha256 `d3b73b06…`) y `vectores-estado-dag-v0.4.txt` (**1 878** casos, sha256 `37c04f12…`) con `.sha256`; relectura independiente **0 discrepancias**; v0.2 y v0.3 anteriores intactos y releídos sin discrepancias |
+| V4 | Cobertura: T01 aplicada 260, duplicada 40, tardía 200, `cbid` 120, sin saldo 120, deshecha 380. T04 aplicada 307, duplicada 30, tardía 297, `cbid` 137, deshecha 771. Mínimos de T04-C también cumplidos |
+
+Sección **SL-3** en los `INFORME.md`/`PROGRESO.md` de cada zona y `HORAS.log` con `date -Is` real. Los cambios están en `T01/src/{Transicion.jl,evidencia.jl,lector_vectores.jl}`, `T01/{exportar.jl,run.jl,test/runtests.jl}` y en `T04/src/{EstadoDAG.jl,generadores.jl,dirigidos.jl,lector_vectores.jl}`, `T04/{exportar.jl,run.jl,test/runtests.jl}`.

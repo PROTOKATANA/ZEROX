@@ -532,3 +532,302 @@ end
         end
     end
 end
+
+# ---------------------------------------------------------------------------
+# SL-3 — evidencia, incidente, congelación, confiscación, RAT-2/RAT-3 (EV-*)
+# ---------------------------------------------------------------------------
+
+function _base_post(P::Params; seed::Int = 7, n_post::Int = 1)
+    t = construir_poW(StableRNG(seed), P; hasta = 10, depositar = true,
+                      transferir = false)
+    bl, es = t[1], t[2]
+    E = es[end]
+    for _ in 1:n_post
+        B = gen_post(id = bl[end].id + 1, padre = bl[end].id, slot = E.slot + 1,
+                     productor = 1, peso = 1, txs = [tx_coinbase_post(3)])
+        r = aplicar(E, B, P)
+        r isa Err && break
+        E = r
+        push!(bl, B)
+    end
+    return bl, E
+end
+
+function _aplicar_cadena(bl::Vector{Bloque}, P::Params; hasta::Int = length(bl))
+    E = estado_inicial(P)
+    for j in 1:hasta
+        r = aplicar(E, bl[j], P)
+        r isa Err && return r
+        E = r
+    end
+    return E
+end
+
+# Total de garantía de `clave` justo antes de aplicar la evidencia de `b`: se
+# reproducen promoción, poda y las transacciones previas (p. ej. la coinbase).
+function _v_antes_evidencia(Epre::Estado, b::Bloque, P::Params, clave::Int)
+    Ep = clonar(Epre)
+    Transicion.promover!(Ep, b.slot, true)
+    podar_incidentes!(Ep, P, b.slot)
+    for tx in b.txs
+        tx.tipo == TxEvidencia && break
+        r = Transicion.aplicar_tx!(Ep, b, P, b.slot, tx)
+        r isa Err && return total_garantia(Ep.garantias[clave])
+    end
+    return total_garantia(Ep.garantias[clave])
+end
+
+@testset "SL-3 (evidencia y castigo)" begin
+    P = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+               S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+               M_rec_slots = 1, R_slots = 4, F_slots = typemax(Int), sec = SEC0,
+               f_num = 1, f_den = 1, Plazo_slots = 3, M_margen_slots = 0,
+               cbid = 7, evp = true)
+
+    # --- cobertura: cada tipo produce el error esperado --------------------
+    esperado = Dict("ev-tardia" => ErrEvidenciaTardia,
+                    "ev-cbid" => ErrCbidAjeno,
+                    "ev-con_entradas" => ErrEvidenciaConEntradas,
+                    "ev-duplicada" => ErrEvidenciaDuplicada)
+    for (nombre, bl) in casos_evidencia_cobertura(P; n = 1)
+        got = _error_neg(bl, P)
+        if haskey(esperado, nombre)
+            @test got == esperado[nombre]
+        end
+        # I-1 en todos los estados válidos alcanzables.
+        memo, _ = construir_validos(bl, P)
+        @test all(E -> invariante_I1(E), values(memo))
+    end
+
+    # --- EV-10/EV-11/EV-17/EV-19/RAT-2: aplicada y contabilidad ------------
+    blc = casos_evidencia_cobertura(P; n = 1)
+    apl = first(bl for (n, bl) in blc if n == "ev-aplicada")
+    Eapl = _aplicar_cadena(apl, P)
+    @test Eapl isa Estado
+    if Eapl isa Estado
+        g = Eapl.garantias[1]
+        @test length(g.incidentes) == 1
+        @test g.congelado == UInt64(total_garantia(g))
+        @test invariante_I1(Eapl)
+        # EV-19 con f = 1: C = V (V > 0 aquí), recompensa techo(C/4), quema 6/8.
+        # V se recupera del estado padre del bloque que aplica.
+        Epre = _aplicar_cadena(apl, P; hasta = length(apl) - 1)
+        @test Epre isa Estado
+    end
+
+    # --- EV-22: clave sin saldo ⇒ pérdida 0, incidente registrado ----------
+    ss = first(bl for (n, bl) in blc if n == "ev-sin_saldo")
+    Ess = _aplicar_cadena(ss, P)
+    @test Ess isa Estado
+    if Ess isa Estado
+        @test any(k -> k == 99, keys(Ess.garantias))
+        @test Ess.garantias[99].congelado == UInt64(0)
+        @test length(Ess.garantias[99].incidentes) == 1
+        @test invariante_I1(Ess)
+    end
+
+    # --- f = 1/2: C = techo(V/2), recompensa techo(C/4) --------------------
+    P2 = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+                S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+                M_rec_slots = 1, R_slots = 4, F_slots = typemax(Int), sec = SEC0,
+                f_num = 1, f_den = 2, Plazo_slots = 3, M_margen_slots = 0,
+                cbid = 7, evp = true)
+    bl2 = first(bl for (n, bl) in casos_evidencia_cobertura(P2; n = 1)
+                if n == "ev-aplicada")
+    Epre2 = _aplicar_cadena(bl2, P2; hasta = length(bl2) - 1)
+    E2 = _aplicar_cadena(bl2, P2)
+    @test Epre2 isa Estado && E2 isa Estado
+    if Epre2 isa Estado && E2 isa Estado
+        V = _v_antes_evidencia(Epre2, bl2[end], P2, 1)
+        C = min(V, techo_fraccion(V, 1, 2))
+        @test V > 0
+        @test E2.quemado - Epre2.quemado == C - techo_dos_octavos(C)
+        cred = [p.importe for p in E2.garantias[1].creditos]
+        @test UInt64(techo_dos_octavos(C)) in cred
+        @test invariante_I1(E2)
+    end
+
+    # --- EV-27: undo exacto del bloque que aplica evidencia ----------------
+    if Epre2 isa Estado
+        b = bl2[end]
+        r = aplicar_con_undo(Epre2, b, P2)
+        @test !(r isa Err)
+        if !(r isa Err)
+            E3, undo = r
+            @test hash_canonico(deshacer(E3, undo)) == hash_canonico(Epre2)
+        end
+    end
+
+    # --- RAT-3 / EV-15b: la carrera bloquea la liberación ------------------
+    cam = caso_rat3_carrera(P)
+    @test cam !== nothing
+    if cam !== nothing
+        blr, _, ilib = cam
+        Eprev = _aplicar_cadena(blr, P; hasta = ilib - 1)
+        @test Eprev isa Estado
+        if Eprev isa Estado
+            Ep = clonar(Eprev)
+            podar_incidentes!(Ep, P, blr[ilib].slot)
+            @test isempty(Ep.garantias[1].incidentes)   # (i) ya no bloquea
+            @test aplicar(Eprev, blr[ilib], P) == ErrVentanaAbierta
+        end
+    end
+
+    # --- RAT-2: autodenuncia ----------------------------------------------
+    # Pérdida neta = C − techo(C/4). RAT-2 la enuncia como «6/8·C»; con el
+    # techo, la igualdad exacta 6/8·C se da cuando C ≡ 0 (mod 4)
+    # (AMBIGUEDAD-SL3-9). Se comprueba la fórmula exacta en 30 índices y, en
+    # cuanto aparece un C múltiplo de 8, la igualdad 6/8·C.
+    n_auto = 0
+    n_auto_8 = 0
+    for idx in 1:30
+        bla, ra = caso_autodenuncia(P; idx = idx)
+        ra isa Err && continue
+        Eprea = _aplicar_cadena(bla, P; hasta = length(bla) - 1)
+        Eprea isa Estado || continue
+        V = _v_antes_evidencia(Eprea, bla[end], P, 1)
+        C = min(V, techo_fraccion(V, 1, 1))
+        perdida = ra.quemado - Eprea.quemado
+        @test perdida == C - techo_dos_octavos(C)
+        n_auto += 1
+        if C % 8 == 0
+            @test perdida == 6 * (C ÷ 8)
+            n_auto_8 += 1
+        end
+    end
+    @test n_auto > 0
+
+    # Caso controlado con C múltiplo de 8 (igualdad exacta 6/8·C): se deposita
+    # un UTXO de la clave 1 antes de la evidencia para fijar V.
+    blauto, Eauto = _base_post(P)
+    for (_, o) in sort(collect(Eauto.utxo); by = x -> x.first)
+        (o.dueño == 1 && o.valor >= UInt64(2) &&
+         gastable(Eauto, o, P, Eauto.slot + 1)) || continue
+        Bdep = gen_post(id = blauto[end].id + 1, padre = blauto[end].id,
+                        slot = Eauto.slot + 1, productor = 1, peso = 1,
+                        txs = [tx_coinbase_post(3),
+                               tx_deposito([o.id], 1, Int(o.valor), 1;
+                                           nonce = nonce_de(Eauto, 1))])
+        E1 = aplicar(Eauto, Bdep, P)
+        E1 isa Estado || continue
+        sf = E1.slot + 1
+        Bev = gen_post(id = Bdep.id + 1, padre = Bdep.id, slot = sf,
+                       productor = 1, peso = 1,
+                       txs = [tx_coinbase_post(3),
+                              tx_evidencia(evidencia(P.cbid, 1, 0, 0, 0, sf,
+                                                      UInt64(811), UInt64(822)))])
+        V = _v_antes_evidencia(E1, Bev, P, 1)
+        C = min(V, techo_fraccion(V, 1, 1))
+        E2 = aplicar(E1, Bev, P)
+        @test E2 isa Estado
+        if E2 isa Estado
+            @test E2.quemado - E1.quemado == C - techo_dos_octavos(C)
+            if C % 8 == 0
+                @test E2.quemado - E1.quemado == 6 * (C ÷ 8)
+                n_auto_8 += 1
+            end
+        end
+    end
+    @test n_auto_8 > 0
+
+    # --- EV-01/EV-04/EV-06/EV-07: forma y semántica ------------------------
+    blb, Eb = _base_post(P)
+    s = Eb.slot + 1
+    id = IdentidadEvidencia(P.cbid, 1, 0, 0, 0, s)
+    mk(ev) = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                      productor = 1, peso = 1,
+                      txs = [tx_coinbase_post(3), tx_evidencia(ev)])
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrOrdenCanonico
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 50)), P) ==
+          ErrOrdenCanonico
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60)), P) ==
+          ErrCbidAjeno
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60;
+                                   id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0,
+                                                            s + 1))), P) ==
+          ErrSinEvidencia
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60;
+                                   sello1 = false)), P) == ErrSinEvidencia
+    # EV-04: con salidas monetarias.
+    Bev = Tx(TxEvidencia, [Salida(900001, UInt64(1), 1, OrigenTx, -1, -1)],
+             Int[], 0, 1, UInt64(0), 0, UInt64(0),
+             evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60))
+    Bmal = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                    productor = 1, peso = 1,
+                    txs = [tx_coinbase_post(3), Bev])
+    @test aplicar(Eb, Bmal, P) == ErrEvidenciaConEntradas
+
+    # --- EV-24(i): liberación bloqueada con caso abierto -------------------
+    Bla = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                   productor = 1, peso = 1,
+                   txs = [tx_coinbase_post(3),
+                          tx_evidencia(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60))])
+    Ela = aplicar(Eb, Bla, P)
+    @test Ela isa Estado
+    if Ela isa Estado
+        @test !isempty(Ela.garantias[1].incidentes)     # caso abierto
+        Blib = gen_post(id = Bla.id + 1, padre = Bla.id, slot = s + 1,
+                        productor = 1, peso = 1,
+                        txs = [tx_coinbase_post(3),
+                               tx_liberacion(1, 1, 1; nonce = nonce_de(Ela, 1))])
+        @test aplicar(Ela, Blib, P) == ErrCasoAbierto
+    end
+
+    # --- EV-24: el retiro no se bloquea por el caso abierto ----------------
+    P3 = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+                S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+                M_rec_slots = 1, R_slots = 5, F_slots = typemax(Int), sec = SEC0,
+                f_num = 1, f_den = 2, Plazo_slots = 3, M_margen_slots = 0,
+                cbid = 7, evp = true)
+    bl3, E3b = _base_post(P3)
+    s3 = E3b.slot + 1
+    B3 = gen_post(id = bl3[end].id + 1, padre = bl3[end].id, slot = s3,
+                  productor = 1, peso = 1,
+                  txs = [tx_coinbase_post(3),
+                         tx_evidencia(evidencia(7, 1, 0, 0, 0, s3, 50, 60))])
+    E3c = aplicar(E3b, B3, P3)
+    @test E3c isa Estado
+    if E3c isa Estado
+        @test !isempty(E3c.garantias[1].incidentes)
+        activo = E3c.garantias[1].activo
+        @test activo > 0                              # f=1/2 deja activo
+        B3r = gen_post(id = B3.id + 1, padre = B3.id, slot = s3 + 1,
+                       productor = 1, peso = 1,
+                       txs = [tx_coinbase_post(3),
+                              tx_retiro(1, 1, 1; nonce = nonce_de(E3c, 1))])
+        @test !(aplicar(E3c, B3r, P3) isa Err)
+    end
+
+    # --- RAT-3 puerta + R-12 / X-13 ---------------------------------------
+    Pgate = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+                   S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+                   M_rec_slots = 1, R_slots = 2, F_slots = typemax(Int), sec = SEC0,
+                   f_num = 1, f_den = 1, Plazo_slots = 2, M_margen_slots = 0,
+                   cbid = 7, evp = true)
+    blg, Eg = _base_post(Pgate)
+    Bg = gen_post(id = blg[end].id + 1, padre = blg[end].id, slot = Eg.slot + 1,
+                  productor = 1, peso = 1,
+                  txs = [tx_coinbase_post(3),
+                         tx_evidencia(evidencia(7, 1, 0, 0, 0, Eg.slot + 1, 50, 60))])
+    @test aplicar(Eg, Bg, Pgate) == ErrPuertaRAT3
+    # EvidenceTx en PoW ⇒ ErrOperacionFase (X-13).
+    Egw = estado_inicial(P)
+    G = genesis_bloque()
+    Egw2 = aplicar(Egw, G, P)
+    Bpw = gen_pow(id = 2, padre = 1, altura = 1,
+                  txs = [tx_coinbase([Salida(1, UInt64(10), 1, OrigenTx, -1, -1)]),
+                         tx_evidencia(evidencia(7, 1, 0, 0, 0, 1, 50, 60))])
+    @test aplicar(Egw2, Bpw, P) == ErrOperacionFase
+    # C-EVP desactivado en PoST ⇒ ErrFueraDeAlcanceV0 (R-12).
+    Pl = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+                S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+                M_rec_slots = 1, R_slots = 2, F_slots = typemax(Int), sec = SEC0,
+                cbid = 7, evp = false)
+    bll, El = _base_post(Pl)
+    Bl = gen_post(id = bll[end].id + 1, padre = bll[end].id, slot = El.slot + 1,
+                  productor = 1, peso = 1,
+                  txs = [tx_coinbase_post(3),
+                         tx_evidencia(evidencia(7, 1, 0, 0, 0, El.slot + 1, 50, 60))])
+    @test aplicar(El, Bl, Pl) == ErrFueraDeAlcanceV0
+end

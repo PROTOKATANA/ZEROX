@@ -373,3 +373,65 @@ v0.2 por colisión de ids son 0 en v0.3; D-14 documenta que, al fusionar dos lib
 con el mismo nonce, una cae por `ErrNonce` y la transferencia de la otra rama cae por entrada
 ausente, nunca por colisión. Nada escrito fuera de `T04/`; sin commit ni push; sin Python; sin
 secretos. Las 3 ambigüedades de T04-D quedan documentadas con su lectura adoptada.
+
+---
+
+# SL-3 — Evidencia y castigo en el DAG (T04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Zona escribible:** `T04/`.
+**Presupuesto declarado antes de ejecutar (LINEO §7):** se comparte el de la orden SL-3
+(2 h de reloj, 1 hilo, 8 GiB). Prohibido Python.
+
+## SL3.0. Comprobación de la entrada congelada (inicio)
+
+`cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL3.sha256` —
+**al empezar**: 6/6 `OK`.
+
+## SL3.1. Falta de definición detectada ANTES de editar
+
+Además de las de T01 (`P-TRANSICION/T01/PROGRESO.md` §SL3.1, que se heredan), las propias
+de T04:
+
+- **AMBIGUEDAD-SL3-D1 — deduplicación en modo fusión (EV-12).** En T01 una evidencia
+  duplicada es un `Err` que invalida el bloque (cadena). En T04, por ED-6/C-ORD-04, una
+  transacción que no valida al fusionarse **se descarta** sin invalidar el bloque.
+  Lectura adoptada: `aplicar_bloque_fusion!` ya captura el `Err` de `aplicar_tx!` y lo
+  añade a `descartes`; una segunda `EvidenceTx` del mismo incidente devuelve
+  `ErrEvidenciaDuplicada` y queda registrada como descarte, sin congelar ni confiscar y
+  sin invalidar el bloque.
+- **AMBIGUEDAD-SL3-D2 — efecto de la evidencia según el punto de aplicación (RD-4).**
+  El contrato exige que la evidencia siga el punto de aplicación. Lectura adoptada: la
+  ventana de admisión y la madurez del crédito de la recompensa usan el `punto` de
+  fusión que recibe `aplicar_tx!` (slot del bloque de cadena que fusiona, RD-4); el
+  registro en `incidentes_procesados` y el gravamen viven en el `Estado` y por tanto el
+  undo exacto por copia íntegra (EV-27) los revierte con el bloque.
+- **AMBIGUEDAD-SL3-D3 — dos evidencias hermanas del mismo incidente.** El caso dirigido
+  lo exige. Lectura adoptada: cada rama se evalúa en su `Estado(past)`, de modo que la
+  primera que se aplique en la cadena seleccionada registra el incidente y la otra, al
+  fusionarse, devuelve `ErrEvidenciaDuplicada` (descarte).
+- **AMBIGUEDAD-SL3-D4 — `cbid` de la red local en el DAG.** El `cbid` es un campo de
+  `Params` (compartido por todos los bloques del oráculo); se fija el mismo en toda la
+  rejilla T04 y la evidencia con `cbid` ajeno se descarta con `ErrCbidAjeno`.
+
+**Conclusión:** ninguna ambigüedad obliga a elegir entre reglas incompatibles.
+
+## SL3.2. Diario de ejecución
+
+- **19:0x** inicio; entrada congelada 6/6 OK; `HORAS.log` con `date -Is`.
+- *Código T04*: `aplicar_bloque_fusion!` poda incidentes (EV-11) y actualiza
+  `ultimo_slot_producido` (EV-24(ii)); `PARAMS_DAG_EV` (8 puntos con `cbid=7`, `evp=true`,
+  `f ∈ {1/2,1}`, `Plazo ∈ {2,3}`); `evidencia_aleatoria` y duplicados en
+  `generar_dag_aleatorio`; dirigidos D-15…D-18 en `src/dirigidos.jl`; `exportar.jl` a v0.4 con
+  cobertura de evidencia; `src/lector_vectores.jl` con `ev=`/`inc=`; `run.jl` con la rejilla
+  C-EVP y las assertions D-15…D-18; testset «SL-3 evidencia (T04)».
+- *Tests*: `Pkg.test()` **421/421**, incluida la relectura de v0.4 (1 878 casos, 0
+  discrepancias). Registro `resultados/test-pkg-v0.4.log`.
+- *run.jl* `--seed 0x5a5a --replicas 200`: 3 000 historias base (46 500 bloques, 600 000
+  órdenes IE-3) + 1 600 con C-EVP (13 181 válidos, 3 181 descartes, 60 duplicadas, 466
+  tardías, 216 `cbid` ajeno), **0 fallos**, 70,8 s, `ESTADO = SUPERADO`. Registro
+  `resultados/run-estado-dag-v0.4.log`.
+- *Vectores v0.4*: **1 878 casos**, sha256
+  `37c04f1250775f25ea4a2cab355f9201c7454b4ba06fa6d892d3b83fe924ebff`; relectura independiente
+  **0 discrepancias**; v0.3 intacto y releído con 0 discrepancias. Cobertura de evidencia:
+  aplicada 307, duplicada 30, tardía 297, `cbid` 137, deshecha 771.
+- **Cierre T04: SUPERADO.** Nada escrito fuera de `T04/`; sin commit ni push; sin Python.

@@ -607,3 +607,7 @@ más estas ratificaciones, que **sustituyen** a lo que contradigan.
 - **RAT-4:** sin castigo correlacionado (DS-L02): las cohortes de `C-SLA-01` no existen en v0.
 - Parámetros (`f`, `ρ_ret`, `T_v`, `R_slots`, `Plazo_slots`, `M_margen_slots`, `q`): los calibra SL-2/SL-2b;
   en la red dev, los que ratifique `REVISION-SL2b.md`.
+- **RAT-2′ (2026-09-26, corrige RAT-2; error de redacción del director detectado por SL-3):** la recompensa
+  del incluidor es `suelo(C·2/8)` (división entera **hacia abajo**), no `techo`. Así el infractor pierde
+  siempre `C − suelo(C/4) ≥ 6/8·C`; con `techo` y `C = 11` perdía 8 < 8,25. Lo quemado es
+  `C − suelo(C·2/8)`.

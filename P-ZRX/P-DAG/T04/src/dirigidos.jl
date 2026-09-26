@@ -559,12 +559,170 @@ function caso_dos_liberaciones_hermanas(pd::ParamsDAG; seed::Int = 24)
                        validos = count(v -> v, values(A.validos)))
 end
 
-"Todos los casos dirigidos sobre la rejilla T04."
+"Copia de un `ParamsDAG` con C-EVP activo (SL-3) y la puerta RAT-3 satisfecha."
+function _pd_ev(pd::ParamsDAG; Plazo::Int = 3, Mm::Int = 0, fn::Int = 1, fd::Int = 1)
+    P = pd.P
+    R = max(P.R_slots, Plazo + Mm + 1)
+    Pe = Transicion.Params(H_dep = P.H_dep, M_cb = P.M_cb, M_dep = P.M_dep,
+        H_corte_min = P.H_corte_min, W_min = P.W_min, S_min = P.S_min,
+        K_min = P.K_min, q = P.q, M_res_slots = P.M_res_slots,
+        M_dep_slots = P.M_dep_slots, M_rec_slots = P.M_rec_slots, R_slots = R,
+        F_slots = P.F_slots, sec = P.sec, M_sec = P.M_sec, P_sec = P.P_sec,
+        C_min = P.C_min, corte = P.corte, seleccion = P.seleccion, f_num = fn,
+        f_den = fd, Plazo_slots = Plazo, M_margen_slots = Mm, cbid = 7, evp = true)
+    return ParamsDAG(Pe, pd.k)
+end
+
+"Bloque PoST con coinbase + una evidencia (SL-3)."
+_ev_bloque(id, padres, slot, P, ev; sd = 0, productor = 1, txs_extra = Transicion.Tx[]) =
+    BloquePost(id = id, padres = padres, slot = slot, sd = sd, productor = productor,
+               peso = 1, txs = vcat(Transicion.Tx[Transicion.tx_coinbase_post(3)],
+                                    txs_extra, Transicion.Tx[Transicion.tx_evidencia(ev)]))
+
+"Descartes de la aplicación del mergeset de `b` (id de bloque, índice de tx, error)."
+function _descartes_mergeset(A::Admision, b::BloquePost)
+    gd = A.gdr.gd[A.gidx[b.id]]
+    sp_g = gd.sp
+    base = sp_g == 1 ? Transicion.clonar(A.estado_T) :
+                       Transicion.clonar(A.post[A.id_g[sp_g]])
+    out = Tuple{Int,Int,Transicion.Err}[]
+    for xg in gd.ms_ordenado
+        get(gd.tipos, xg, 0x00) == 0x02 && continue
+        x_id = A.id_g[xg]
+        xb = A.por_id[x_id]
+        base, d = aplicar_bloque_fusion!(A, base, xb, b.slot)
+        for (i, e) in d
+            push!(out, (x_id, i, e))
+        end
+    end
+    return out
+end
+
+"""
+D-15 · Evidencia aplicada en modo fusión: congela, confisca (RAT-2), registra el
+incidente y conserva I-1.
+"""
+function caso_evidencia_aplicada(pd::ParamsDAG; seed::Int = 31)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    ev = Transicion.evidencia(pd.P.cbid, 1, 0, 0, 0, 2, UInt64(101), UInt64(202))
+    X = _ev_bloque(id1 + 1, [Tb.id], 2, pd.P, ev)
+    procesar_uno!(A, X)
+    S = A.post[X.id]
+    return "D-15", A, (Tb = Tb.id, X = X.id, valido = A.validos[X.id],
+                       incidentes = isempty(S.garantias[1].incidentes) ? 0 : 1,
+                       quemado = S.quemado, I1 = invariante_I1(S))
+end
+
+"""
+D-16 · Dos evidencias del mismo incidente en ramas hermanas (EV-12): la primera
+en orden C-GD-05 aplica; la segunda se descarta al fusionarse sin invalidar el
+bloque ni volver a congelar.
+"""
+function caso_evidencia_hermanas(pd::ParamsDAG; seed::Int = 32)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    ev = Transicion.evidencia(pd.P.cbid, 1, 0, 0, 0, 2, UInt64(301), UInt64(302))
+    Xa = _ev_bloque(id1 + 1, [Tb.id], 2, pd.P, ev; sd = 0)
+    Xc = _ev_bloque(id1 + 2, [Tb.id], 2, pd.P, ev; sd = 1)
+    procesar_uno!(A, Xa)
+    procesar_uno!(A, Xc)
+    B = BloquePost(id = id1 + 3, padres = [Xa.id, Xc.id], slot = 3, productor = 1,
+                   peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B)
+    S = A.past[B.id]
+    desc = _descartes_mergeset(A, B)
+    dup = [d for d in desc if d[3] == Transicion.ErrEvidenciaDuplicada]
+    return "D-16", A, (Tb = Tb.id, Xa = Xa.id, Xc = Xc.id, B = B.id,
+                       dup = length(dup), incidentes = isempty(S.garantias[1].incidentes) ? 0 : 1,
+                       validos = A.validos[Xa.id] && A.validos[Xc.id] && A.validos[B.id],
+                       I1 = invariante_I1(S))
+end
+
+"""
+D-17 · EV-27/EV-28: el incidente vive en la historia seleccionada. En el pasado
+de la rama hermana no está; una evidencia del mismo incidente aplicada allí es
+«primera»; el undo del bloque que la aplicó restituye el estado exacto.
+"""
+function caso_evidencia_reorg(pd::ParamsDAG; seed::Int = 33)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    ev = Transicion.evidencia(pd.P.cbid, 1, 0, 0, 0, 2, UInt64(401), UInt64(402))
+    Xa = _ev_bloque(id1 + 1, [Tb.id], 2, pd.P, ev; sd = 0)
+    Xc = BloquePost(id = id1 + 2, padres = [Tb.id], slot = 2, sd = 1, productor = 1,
+                    peso = 1, txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Xa)
+    procesar_uno!(A, Xc)
+    # Hermana que reaplica la misma evidencia en la rama sin la primera aplicación.
+    Ye = _ev_bloque(id1 + 3, [Xc.id], 3, pd.P, ev)
+    procesar_uno!(A, Ye)
+    inc_past_Xc = length(A.past[Xc.id].garantias[1].incidentes)
+    inc_post_Ye = length(A.post[Ye.id].garantias[1].incidentes)
+    r = aplicar_fusion_con_undo(A, A.past[Xa.id], Xa, Xa.slot)
+    ok_undo = !(r isa Tuple) ? false :
+              hash_canonico(r[2]) == hash_canonico(A.past[Xa.id])
+    return "D-17", A, (Tb = Tb.id, Xa = Xa.id, Xc = Xc.id, Ye = Ye.id,
+                       inc_past_Xc = inc_past_Xc, inc_post_Ye = inc_post_Ye,
+                       undo = ok_undo, I1 = invariante_I1(A.post[Ye.id]))
+end
+
+"""
+D-18/19/20 · Descartes de evidencia en modo fusión: `cbid` ajeno, tardía y
+contra clave sin saldo (aplicada con pérdida cero).
+"""
+function caso_evidencia_descartes(pd::ParamsDAG; seed::Int = 34)
+    A, pow = base_dirigida(pd; seed = seed)
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    ev_cbid = Transicion.evidencia(pd.P.cbid + 1, 1, 0, 0, 0, 2, UInt64(501), UInt64(502))
+    Xc = _ev_bloque(id1 + 1, [Tb.id], 2, pd.P, ev_cbid)
+    procesar_uno!(A, Xc)
+    ev_tar = Transicion.evidencia(pd.P.cbid, 1, 0, 0, 0,
+                                  2 - pd.P.Plazo_slots, UInt64(503), UInt64(504))
+    Xt = _ev_bloque(id1 + 2, [Tb.id], 2, pd.P, ev_tar; sd = 1)
+    procesar_uno!(A, Xt)
+    ev_ss = Transicion.evidencia(pd.P.cbid, 99, 0, 0, 0, 2, UInt64(505), UInt64(506))
+    Xs = _ev_bloque(id1 + 3, [Tb.id], 2, pd.P, ev_ss; sd = 2)
+    procesar_uno!(A, Xs)
+    B = BloquePost(id = id1 + 4, padres = [Xc.id, Xt.id, Xs.id], slot = 3,
+                   productor = 1, peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, B)
+    S = A.past[B.id]
+    # `sp(B)` no entra en el mergeset: su descarte vive en `A.descartes[sp]`.
+    dsp = A.descartes[Xc.id]
+    dms = _descartes_mergeset(A, B)
+    cbid = count(x -> x[2] == Transicion.ErrCbidAjeno, dsp) +
+           count(x -> x[3] == Transicion.ErrCbidAjeno, dms)
+    tardia = count(x -> x[2] == Transicion.ErrEvidenciaTardia, dsp) +
+             count(x -> x[3] == Transicion.ErrEvidenciaTardia, dms)
+    return "D-18", A, (Tb = Tb.id, Xc = Xc.id, Xt = Xt.id, Xs = Xs.id, B = B.id,
+                       cbid = cbid, tardia = tardia,
+                       sin_saldo = any(k -> k == 99, keys(S.garantias)) &&
+                                   length(S.garantias[99].incidentes) == 1,
+                       I1 = invariante_I1(S))
+end
+
+"Todos los casos dirigidos sobre la rejilla T04 (incluye SL-3 con C-EVP activo)."
 function casos_dirigidos(pd::ParamsDAG)
-    return [caso_doble_gasto(pd), caso_coinbase_recortada(pd), caso_deposito_habilita(pd),
+    base = [caso_doble_gasto(pd), caso_coinbase_recortada(pd), caso_deposito_habilita(pd),
             caso_garantia_rama(pd), caso_rojo_u3(pd), caso_una_vez(pd),
             caso_reorg(pd), caso_hermanos_transicion(pd),
             caso_nonce_repeticion_fusionada(pd), caso_nonce_orden_inverso(pd),
             caso_nonce_reorg(pd), caso_retiro_liberacion_reorg(pd),
             caso_liberacion_punto_aplicacion(pd), caso_dos_liberaciones_hermanas(pd)]
+    pdev = _pd_ev(pd)
+    return vcat(base, [caso_evidencia_aplicada(pdev), caso_evidencia_hermanas(pdev),
+                       caso_evidencia_reorg(pdev), caso_evidencia_descartes(pdev)])
 end

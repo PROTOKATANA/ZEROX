@@ -1,0 +1,20 @@
+exportar: puntos=15 aleatorios=900 ev-replicas=120 salida=resultados/vectores-estado-dag-v0.4.txt
+  aleatorios 100/900
+  aleatorios 200/900
+  aleatorios 300/900
+  aleatorios 400/900
+  aleatorios 500/900
+  aleatorios 600/900
+  aleatorios 700/900
+  aleatorios 800/900
+  aleatorios 900/900
+  evidencia punto 1/8
+  evidencia punto 2/8
+  evidencia punto 3/8
+  evidencia punto 4/8
+  evidencia punto 5/8
+  evidencia punto 6/8
+  evidencia punto 7/8
+  evidencia punto 8/8
+exportar: casos=1878 sha256=37c04f1250775f25ea4a2cab355f9201c7454b4ba06fa6d892d3b83fe924ebff -> resultados/vectores-estado-dag-v0.4.sha256
+exportar: cobertura -> resultados/cobertura-v0.4.txt evidencia=Dict("tardia" => 297, "construida" => 771, "aplicada" => 307, "duplicada" => 30, "cbid_ajeno" => 137, "deshecha" => 771)

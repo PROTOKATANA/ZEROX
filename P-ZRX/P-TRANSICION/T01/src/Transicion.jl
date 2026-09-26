@@ -25,14 +25,20 @@ export ErrGenesis, ErrPow, ErrEmision, ErrInmaduro, ErrDepositoTemprano,
        ErrAutorizacion, ErrSaldo, ErrDobleGasto, ErrPowTrasCorte, ErrSinTerminal,
        ErrTerminalAmbiguo, ErrGarantia, ErrOperacionFase, ErrPruebaTardia,
        ErrSectorInactivo, ErrSlot, ErrDesbordamiento, ErrFueraDeAlcanceV0,
-       ErrRetiroPendiente, ErrNonce
+       ErrRetiroPendiente, ErrNonce,
+       ErrSinEvidencia, ErrCbidAjeno, ErrOrdenCanonico, ErrEvidenciaTardia,
+       ErrEvidenciaDuplicada, ErrEvidenciaConEntradas, ErrCasoAbierto,
+       ErrVentanaAbierta, ErrPuertaRAT3
 export Salida, Pendiente, EnRetirada, Garantia, RegistroSector, Tx, Bloque, Estado, Params
+export IdentidadEvidencia, CabeceraEvidencia, Evidencia
 export tx_coinbase, tx_coinbase_post, tx_transferencia, tx_deposito, tx_retiro,
-       tx_liberacion, tx_evidencia, tx_alta_sector, tx_prueba_sector
+       tx_liberacion, tx_evidencia, tx_alta_sector, tx_prueba_sector, evidencia
 export subsidio_pow, subsidio_post, estado_inicial, clonar, aplicar, aplicar!,
        aplicar_con_undo, deshacer, es_terminal, phi, sector_activo, gastable,
        gastable_en, nonce_de
 export ID_LIB, LIMITE_ID_EXPLICITO
+export incident_id, total_garantia, debitar_garantia!, techo_fraccion,
+       techo_dos_octavos, podar_incidentes!, aplicar_evidencia!
 export invariante_I1, invariante_I1b, suma_utxo, suma_garantias,
        representacion_canonica, hash_canonico
 export seleccionar, seleccionar_con, ResultadoSeleccion, nodo_en_linea,
@@ -45,6 +51,8 @@ export puntos_rejilla, generar_historia, construir_poW, extender_post,
 export CasoNegativo, casos_negativos, casos_bloque, puntos_negativos,
        casos_garantia_insuficiente, casos_garantia_pendiente, cadena_base,
        casos_nonce, casos_nonce_validos
+export casos_evidencia_cobertura, caso_rat3_carrera, caso_autodenuncia,
+       puntos_evidencia
 
 # ---------------------------------------------------------------------------
 # Enumeraciones
@@ -78,6 +86,16 @@ export CasoNegativo, casos_negativos, casos_bloque, puntos_negativos,
     ErrFueraDeAlcanceV0
     ErrRetiroPendiente      # AMBIGUEDAD-2
     ErrNonce                # F-15: nonce por clave de garantía
+    # SL-3 (CONTRATO-EVIDENCIA-v0 con Ratificación v0)
+    ErrSinEvidencia         # EV-06/EV-07: no hay dos decisiones de firma válidas
+    ErrCbidAjeno            # RAT-1: cbid distinto del de la red local (Rust ErrForma)
+    ErrOrdenCanonico        # EV-01: pre_hash(H1) < pre_hash(H2) estricto
+    ErrEvidenciaTardia      # EV-14: fuera de Plazo_slots
+    ErrEvidenciaDuplicada   # EV-12: incident_id ya procesado
+    ErrEvidenciaConEntradas # EV-04: EvidenceTx con entradas o salidas monetarias
+    ErrCasoAbierto          # EV-24(i): incidente admitido y no liquidado
+    ErrVentanaAbierta       # EV-24(ii)/EV-15b: producción reciente de P
+    ErrPuertaRAT3           # RAT-3: R_slots > Plazo_slots + M_margen_slots
 end
 
 @enum TipoTx begin
@@ -120,9 +138,10 @@ mutable struct Garantia
     activo::UInt64
     pendientes::Vector{Pendiente}
     en_retirada::Vector{EnRetirada}
-    congelado::UInt64       # siempre 0 en v0
+    congelado::UInt64       # AMBIGUEDAD-SL3-2: gravamen derivado, no bucket (v0: 0)
     creditos::Vector{Pendiente}   # D-T08
     nonce_siguiente::UInt64       # F-15: nonce por clave de garantía
+    incidentes::Vector{Tuple{String,Int}}  # SL-3 EV-11: (incident_id, slot_falta)
 end
 
 struct RegistroSector
@@ -134,6 +153,28 @@ struct RegistroSector
     prueba_en::Int          # -1 si no probado
 end
 
+# SL-3 · EvidenceTx (CONTRATO-EVIDENCIA-v0 §2/§3, con RAT-1)
+struct IdentidadEvidencia
+    cbid::Int
+    clave::Int
+    sector::Int
+    historia::Int
+    chunk::Int
+    slot::Int
+end
+
+struct CabeceraEvidencia
+    pre_hash::UInt64
+    sello_ok::Bool
+end
+
+struct Evidencia
+    id1::IdentidadEvidencia
+    id2::IdentidadEvidencia
+    h1::CabeceraEvidencia
+    h2::CabeceraEvidencia
+end
+
 struct Tx
     tipo::TipoTx
     salidas::Vector{Salida}
@@ -143,6 +184,7 @@ struct Tx
     importe::UInt64
     sector_id::Int
     nonce::UInt64            # F-15: solo Deposito/Retiro/Liberacion (0 en el resto)
+    evidencia::Union{Nothing,Evidencia}  # SL-3: solo TxEvidencia
 end
 
 struct Bloque
@@ -176,6 +218,7 @@ mutable struct Estado
     bloque_raiz::Int         # bloque cuyo aplicar produjo este estado
     altura_terminal::Int     # altura del terminal (para madurez residual)
     peso_sufijo::Int         # Σ peso PoST del sufijo
+    ultimo_slot_producido::Dict{Int,Int}  # SL-3 EV-24(ii): clave -> último slot PoST
 end
 
 struct Params
@@ -198,58 +241,90 @@ struct Params
     C_min::Int
     corte::CorteModo
     seleccion::SeleccionModo
+    # SL-3 (CONTRATO-EVIDENCIA-v0 con Ratificación v0)
+    f_num::Int           # f = f_num / f_den  (EV-19; RAT-2)
+    f_den::Int
+    Plazo_slots::Int     # EV-13
+    M_margen_slots::Int  # EV-15/EV-15b
+    cbid::Int            # RAT-1: consensus_branch_id de la red local
+    evp::Bool            # AMBIGUEDAD-SL3-3: activación de C-EVP
 end
 
 function Params(; H_dep, M_cb, M_dep, H_corte_min, W_min, S_min, K_min, q,
                 M_res_slots, M_dep_slots, M_rec_slots, R_slots, F_slots,
                 sec, M_sec = 1, P_sec = 2, C_min = 1,
-                corte = CUT_HWPhi, seleccion = FC3)
+                corte = CUT_HWPhi, seleccion = FC3,
+                f_num = 1, f_den = 1, Plazo_slots = 0, M_margen_slots = 0,
+                cbid = 0, evp = false)
     Params(H_dep, M_cb, M_dep, H_corte_min, W_min, S_min, K_min, q,
            M_res_slots, M_dep_slots, M_rec_slots, R_slots, F_slots,
-           sec, M_sec, P_sec, C_min, corte, seleccion)
+           sec, M_sec, P_sec, C_min, corte, seleccion,
+           f_num, f_den, Plazo_slots, M_margen_slots, cbid, evp)
 end
 
 conseleccion(P::Params, s::SeleccionModo) =
     Params(P.H_dep, P.M_cb, P.M_dep, P.H_corte_min, P.W_min, P.S_min, P.K_min,
            P.q, P.M_res_slots, P.M_dep_slots, P.M_rec_slots, P.R_slots,
-           P.F_slots, P.sec, P.M_sec, P.P_sec, P.C_min, P.corte, s)
+           P.F_slots, P.sec, P.M_sec, P.P_sec, P.C_min, P.corte, s,
+           P.f_num, P.f_den, P.Plazo_slots, P.M_margen_slots, P.cbid, P.evp)
 
 conWmin(P::Params, w::Int) =
     Params(P.H_dep, P.M_cb, P.M_dep, P.H_corte_min, w, P.S_min, P.K_min,
            P.q, P.M_res_slots, P.M_dep_slots, P.M_rec_slots, P.R_slots,
-           P.F_slots, P.sec, P.M_sec, P.P_sec, P.C_min, P.corte, P.seleccion)
+           P.F_slots, P.sec, P.M_sec, P.P_sec, P.C_min, P.corte, P.seleccion,
+           P.f_num, P.f_den, P.Plazo_slots, P.M_margen_slots, P.cbid, P.evp)
 
 # ---------------------------------------------------------------------------
 # Constructores cómodos de Tx
 # ---------------------------------------------------------------------------
 
 tx_coinbase(salidas::Vector{Salida}) =
-    Tx(TxCoinbase, salidas, Int[], 0, 0, UInt64(0), 0, UInt64(0))
+    Tx(TxCoinbase, salidas, Int[], 0, 0, UInt64(0), 0, UInt64(0), nothing)
 tx_coinbase_post(importe::Integer) =
-    Tx(TxCoinbasePost, Salida[], Int[], 0, 0, UInt64(importe), 0, UInt64(0))
+    Tx(TxCoinbasePost, Salida[], Int[], 0, 0, UInt64(importe), 0, UInt64(0),
+       nothing)
 tx_transferencia(entradas::Vector{Int}, salidas::Vector{Salida}, firmante::Integer) =
     Tx(TxTransferencia, salidas, entradas, Int(firmante), 0, UInt64(0), 0,
-       UInt64(0))
+       UInt64(0), nothing)
 tx_deposito(entradas::Vector{Int}, clave::Integer, importe::Integer,
             firmante::Integer; nonce::Integer = 0) =
     Tx(TxDeposito, Salida[], entradas, Int(firmante), Int(clave),
-       UInt64(importe), 0, UInt64(nonce))
+       UInt64(importe), 0, UInt64(nonce), nothing)
 tx_retiro(clave::Integer, importe::Integer, firmante::Integer;
           nonce::Integer = 0) =
     Tx(TxRetiro, Salida[], Int[], Int(firmante), Int(clave), UInt64(importe),
-       0, UInt64(nonce))
+       0, UInt64(nonce), nothing)
 tx_liberacion(clave::Integer, importe::Integer, firmante::Integer;
               nonce::Integer = 0) =
     Tx(TxLiberacion, Salida[], Int[], Int(firmante), Int(clave),
-       UInt64(importe), 0, UInt64(nonce))
+       UInt64(importe), 0, UInt64(nonce), nothing)
+# SL-3: EvidenceTx con cabeceras. `tx_evidencia(clave)` (sin cabeceras) queda
+# como operación malformada para los casos heredados de R-12/X-13.
 tx_evidencia(clave::Integer) =
-    Tx(TxEvidencia, Salida[], Int[], 0, Int(clave), UInt64(0), 0, UInt64(0))
+    Tx(TxEvidencia, Salida[], Int[], 0, Int(clave), UInt64(0), 0, UInt64(0),
+       nothing)
+tx_evidencia(ev::Evidencia) =
+    Tx(TxEvidencia, Salida[], Int[], 0, ev.id1.clave, UInt64(0), 0, UInt64(0),
+       ev)
 tx_alta_sector(id::Integer, clave::Integer, firmante::Integer) =
     Tx(TxAltaSector, Salida[], Int[], Int(firmante), Int(clave), UInt64(0),
-       Int(id), UInt64(0))
+       Int(id), UInt64(0), nothing)
 tx_prueba_sector(id::Integer, firmante::Integer) =
     Tx(TxPruebaSector, Salida[], Int[], Int(firmante), 0, UInt64(0), Int(id),
-       UInt64(0))
+       UInt64(0), nothing)
+
+# SL-3 · Constructor abstracto de evidencia (dos cabeceras con su sello).
+function evidencia(cbid::Integer, clave::Integer, sector::Integer,
+                   historia::Integer, chunk::Integer, slot::Integer,
+                   ph1::Integer, ph2::Integer;
+                   sello1::Bool = true, sello2::Bool = true,
+                   id2::Union{Nothing,IdentidadEvidencia} = nothing)
+    id = IdentidadEvidencia(Int(cbid), Int(clave), Int(sector),
+                            Int(historia), Int(chunk), Int(slot))
+    idb = id2 === nothing ? id : id2
+    return Evidencia(id, idb, CabeceraEvidencia(UInt64(ph1), sello1),
+                     CabeceraEvidencia(UInt64(ph2), sello2))
+end
 
 function Bloque(; id, familia, padre = 0, altura = 0, trabajo = 0, pow_ok = true,
                 slot = 0, productor = 0, sector = 0, peso = 0,
@@ -269,7 +344,7 @@ subsidio_post(s::Int, P::Params) = UInt64(3)
 function estado_inicial(P::Params)
     Estado(Dict{Int,Salida}(), Dict{Int,Garantia}(), Int128(0), Int128(0),
            FaseGenesis, -1, 0, 0, 0, 0, Dict{Int,RegistroSector}(), Int128(0),
-           0, -1, 0)
+           0, -1, 0, Dict{Int,Int}())
 end
 
 function clonar(E::Estado)
@@ -277,12 +352,14 @@ function clonar(E::Estado)
     g = Dict{Int,Garantia}()
     for (k, v) in E.garantias
         g[k] = Garantia(v.activo, copy(v.pendientes), copy(v.en_retirada),
-                        v.congelado, copy(v.creditos), v.nonce_siguiente)
+                        v.congelado, copy(v.creditos), v.nonce_siguiente,
+                        copy(v.incidentes))
     end
     s = copy(E.sectores)
     Estado(u, g, E.emitido, E.quemado, E.fase, E.terminal, E.altura,
            E.trabajo_acum, E.slot, E.s0, s, E.subsidio_acum,
-           E.bloque_raiz, E.altura_terminal, E.peso_sufijo)
+           E.bloque_raiz, E.altura_terminal, E.peso_sufijo,
+           copy(E.ultimo_slot_producido))
 end
 
 # ---------------------------------------------------------------------------
@@ -317,7 +394,7 @@ function obtener_garantia!(E::Estado, clave::Int)
     g = get(E.garantias, clave, nothing)
     if g === nothing
         g = Garantia(UInt64(0), Pendiente[], EnRetirada[], UInt64(0),
-                     Pendiente[], UInt64(0))
+                     Pendiente[], UInt64(0), Tuple{String,Int}[])
         E.garantias[clave] = g
     end
     return g
@@ -571,6 +648,14 @@ function aplicar_liberacion!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx
     tx.importe == 0 && return ErrSaldo
     tx.firmante == tx.clave || return ErrAutorizacion
     g = obtener_garantia!(E, tx.clave)
+    # EV-24(i): un incidente admitido y no liquidado bloquea la liberación.
+    isempty(g.incidentes) || return ErrCasoAbierto
+    # EV-24(ii)/EV-15b/RAT-3: ventana desde el último bloque producido por P
+    # (en el pasado del punto de aplicación; AMBIGUEDAD-SL3-8).
+    usp = get(E.ultimo_slot_producido, tx.clave, -1)
+    if usp != -1 && punto < usp + P.Plazo_slots + P.M_margen_slots
+        return ErrVentanaAbierta
+    end
     vencido = Int128(0)
     for r in g.en_retirada
         r.inicio_slot + P.R_slots <= B.slot && (vencido += Int128(r.importe))
@@ -652,7 +737,8 @@ function aplicar_tx!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
         return aplicar_liberacion!(E, B, P, punto, tx)
     elseif t == TxEvidencia
         E.fase == FasePoW && return ErrOperacionFase    # X-13
-        return ErrFueraDeAlcanceV0                      # AMBIGUEDAD-10
+        P.evp || return ErrFueraDeAlcanceV0              # AMBIGUEDAD-SL3-3 (R-12)
+        return aplicar_evidencia!(E, B, P, punto, tx)
     elseif t == TxAltaSector
         return aplicar_alta_sector!(E, B, P, tx)
     else
@@ -791,6 +877,7 @@ function aplicar_post!(E::Estado, B::Bloque, P::Params)
     B.peso >= 1 || return ErrSlot
     r = promover!(E, B.slot, true)
     r isa Err && return r
+    podar_incidentes!(E, P, B.slot)      # EV-11 (solo en PoST: punto en slots)
     g = get(E.garantias, B.productor, nothing)
     activo = g === nothing ? UInt64(0) : g.activo
     activo >= UInt64(P.q) || return ErrGarantia
@@ -805,6 +892,11 @@ function aplicar_post!(E::Estado, B::Bloque, P::Params)
     E.slot = B.slot
     E.peso_sufijo += B.peso
     E.bloque_raiz = B.id
+    # EV-24(ii): el bloque en curso entra en el pasado de los siguientes.
+    prev = get(E.ultimo_slot_producido, B.productor, -1)
+    if B.slot > prev
+        E.ultimo_slot_producido[B.productor] = B.slot
+    end
     return nothing
 end
 
@@ -874,6 +966,178 @@ function es_terminal(hist::Vector{Bloque}, P::Params)
 end
 
 # ---------------------------------------------------------------------------
+# SL-3 · Evidencia: identidad, incidente, congelación, confiscación y poda
+# ---------------------------------------------------------------------------
+
+# AMBIGUEDAD-SL3-5: marcador determinista de `H_d` sobre la identidad canónica.
+# RAT-1: la identidad incluye el `consensus_branch_id`.
+function incident_id(id::IdentidadEvidencia)
+    txt = string("ZZKEvpIncidente_", id.cbid, "|", id.clave, "|", id.sector, "|",
+                 id.historia, "|", id.chunk, "|", id.slot)
+    return bytes2hex(sha256(txt))
+end
+
+# Total de la garantía en sub-cuentas (el gravamen `congelado` no suma).
+function total_garantia(g::Garantia)
+    t = Int128(g.activo)
+    for p in g.pendientes
+        t += Int128(p.importe)
+    end
+    for r in g.en_retirada
+        t += Int128(r.importe)
+    end
+    for p in g.creditos
+        t += Int128(p.importe)
+    end
+    return t
+end
+
+# techo_exacto(f·V) = ceil(V·f_num/f_den) con aritmética entera (EV-19).
+function techo_fraccion(V::Int128, f_num::Int, f_den::Int)
+    f_den > 0 || return Int128(0)
+    f_num <= 0 && return Int128(0)
+    V <= 0 && return Int128(0)
+    return (V * Int128(f_num) + Int128(f_den) - 1) ÷ Int128(f_den)
+end
+
+# RAT-2: techo_exacto(C·2/8) = ceil(C/4).
+techo_dos_octavos(C::Int128) = C <= 0 ? Int128(0) : (C + Int128(3)) ÷ Int128(4)
+
+# Debita `c` de las sub-cuentas en orden determinista:
+# activo → pendientes → en_retirada → créditos (EV-19/EV-20).
+function debitar_garantia!(g::Garantia, c::Int128)
+    c <= 0 && return nothing
+    restante = c
+
+    d = min(restante, Int128(g.activo))
+    g.activo -= UInt64(d)
+    restante -= d
+
+    nuevas = Pendiente[]
+    for p in g.pendientes
+        if restante > 0
+            d = min(restante, Int128(p.importe))
+            restante -= d
+            d == Int128(p.importe) && continue
+            push!(nuevas, Pendiente(p.importe - UInt64(d), p.madura_en_altura,
+                                    p.madura_en_slot))
+            continue
+        end
+        push!(nuevas, p)
+    end
+    g.pendientes = nuevas
+
+    nuevasr = EnRetirada[]
+    for r in g.en_retirada
+        if restante > 0
+            d = min(restante, Int128(r.importe))
+            restante -= d
+            d == Int128(r.importe) && continue
+            push!(nuevasr, EnRetirada(r.importe - UInt64(d), r.inicio_slot))
+            continue
+        end
+        push!(nuevasr, r)
+    end
+    g.en_retirada = nuevasr
+
+    nuevasc = Pendiente[]
+    for p in g.creditos
+        if restante > 0
+            d = min(restante, Int128(p.importe))
+            restante -= d
+            d == Int128(p.importe) && continue
+            push!(nuevasc, Pendiente(p.importe - UInt64(d), p.madura_en_altura,
+                                     p.madura_en_slot))
+            continue
+        end
+        push!(nuevasc, p)
+    end
+    g.creditos = nuevasc
+    return nothing
+end
+
+# EV-11: poda de incidentes cuya ventana cerró; al quedar sin casos abiertos se
+# libera el gravamen (AMBIGUEDAD-SL3-1/2). Se llama al inicio de cada bloque.
+function podar_incidentes!(E::Estado, P::Params, punto::Int)
+    for (_, g) in E.garantias
+        isempty(g.incidentes) && continue
+        quedan = Tuple{String,Int}[]
+        for (iid, sf) in g.incidentes
+            punto < sf + P.Plazo_slots && push!(quedan, (iid, sf))
+        end
+        if length(quedan) != length(g.incidentes)
+            g.incidentes = quedan
+            isempty(quedan) && (g.congelado = UInt64(0))
+        end
+    end
+    return nothing
+end
+
+# Crédito de la recompensa RAT-2 al productor del bloque que aplica, con la
+# madurez de la coinbase PoST (RD-1 en T04: punto de aplicación).
+function acreditar_credito!(E::Estado, P::Params, productor::Int,
+                            importe::UInt64, punto::Int)
+    importe == 0 && return nothing
+    g = obtener_garantia!(E, productor)
+    madura = punto + P.M_rec_slots
+    if madura <= punto
+        return add_activo!(g, importe)
+    end
+    push!(g.creditos, Pendiente(importe, -1, madura))
+    return nothing
+end
+
+"""
+Aplica una `EvidenceTx` (EV-05…EV-22, RAT-1/RAT-2) en el punto de aplicación
+`punto`. Devuelve `nothing` o el `Err` correspondiente. La transacción nunca
+tiene entradas ni salidas monetarias (EV-01).
+"""
+function aplicar_evidencia!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
+    tx.evidencia === nothing && return ErrSinEvidencia      # EV-01/EV-04
+    # EV-04: sin entradas ni salidas monetarias.
+    (isempty(tx.entradas) && isempty(tx.salidas)) || return ErrEvidenciaConEntradas
+    ev = tx.evidencia
+    # RAT-1: ambas cabeceras deben ser de la red local.
+    (ev.id1.cbid == P.cbid && ev.id2.cbid == P.cbid) || return ErrCbidAjeno
+    # EV-06: identidad común exacta (los cinco campos + cbid).
+    ev.id1 == ev.id2 || return ErrSinEvidencia
+    # EV-01: orden canónico estricto por pre_hash.
+    ev.h1.pre_hash < ev.h2.pre_hash || return ErrOrdenCanonico
+    # EV-07: sellos válidos bajo la misma clave.
+    (ev.h1.sello_ok && ev.h2.sello_ok) || return ErrSinEvidencia
+    # RAT-3: puerta estructural.
+    P.R_slots > P.Plazo_slots + P.M_margen_slots || return ErrPuertaRAT3
+    # EV-13/EV-14: ventana de admisión en slots absolutos.
+    sf = ev.id1.slot
+    (sf <= punto < sf + P.Plazo_slots) || return ErrEvidenciaTardia
+
+    clave = ev.id1.clave
+    g = obtener_garantia!(E, clave)
+    iid = incident_id(ev.id1)
+    for (x, _) in g.incidentes
+        x == iid && return ErrEvidenciaDuplicada        # EV-12
+    end
+    # EV-11: registro del incidente.
+    push!(g.incidentes, (iid, sf))
+    sort!(g.incidentes, by = x -> x[1])
+    # EV-17: congelación total (gravamen sobre el total disponible).
+    V = total_garantia(g)
+    g.congelado = V > Int128(typemax(UInt64)) ? typemax(UInt64) : UInt64(V)
+    # EV-19: confiscación.
+    C = min(V, techo_fraccion(V, P.f_num, P.f_den))
+    debitar_garantia!(g, C)
+    # RAT-2: techo(C·2/8) al productor (coinbase del bloque que aplica); el
+    # resto se quema.
+    recompensa = techo_dos_octavos(C)
+    r = acreditar_credito!(E, P, B.productor, UInt64(recompensa), punto)
+    r isa Err && return r
+    E.quemado += C - recompensa
+    # Remanente congelado tras la liquidación (EV-20: base del siguiente).
+    g.congelado = UInt64(total_garantia(g))
+    return nothing
+end
+
+# ---------------------------------------------------------------------------
 # Invariantes de contabilidad
 # ---------------------------------------------------------------------------
 
@@ -888,7 +1152,8 @@ end
 function suma_garantias(E::Estado)
     s = Int128(0)
     for (_, g) in E.garantias
-        s += Int128(g.activo) + Int128(g.congelado)
+        # AMBIGUEDAD-SL3-2: `congelado` es un gravamen derivado, no un bucket.
+        s += Int128(g.activo)
         for p in g.pendientes
             s += Int128(p.importe)
         end
@@ -935,6 +1200,12 @@ function representacion_canonica(E::Estado)
         for r in sort(g.en_retirada, by = x -> (x.inicio_slot, x.importe))
             print(io, "R:", r.importe, ",", r.inicio_slot, ";")
         end
+        for (iid, sf) in sort(g.incidentes, by = x -> x[1])
+            print(io, "I:", iid, ",", sf, ";")
+        end
+    end
+    for k in sort(collect(keys(E.ultimo_slot_producido)))
+        print(io, "L:", k, ",", E.ultimo_slot_producido[k], ";")
     end
     for id in sort(collect(keys(E.sectores)))
         s = E.sectores[id]
@@ -950,5 +1221,6 @@ include("seleccion.jl")
 include("nodo.jl")
 include("generadores.jl")
 include("generadores_negativos.jl")   # T01-C: casos negativos de transacción
+include("evidencia.jl")               # SL-3: generadores con EvidenceTx
 
 end # module

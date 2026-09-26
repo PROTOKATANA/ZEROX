@@ -665,3 +665,113 @@ gasta `ID_LIB(1, n, a)`; un bloque `B` fusión. Al aplicar: una liberación apli
 la otra se descarta con `ErrNonce`; la transferencia aplica si su salida existe en
 `Estado(past(B))` y, si no, se descarta por entrada ausente (`ErrDobleGasto`),
 **nunca** porque `ID_LIB(1, n, a) == ID_LIB(1, n, b)` (son distintos).
+
+---
+
+# SL-3 — Oráculo de evidencia y castigo en T01
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Zona escribible:** `T01/`.
+**Presupuesto declarado antes de ejecutar (LINEO §7):** 2 h de reloj, 1 hilo, 8 GiB de RAM,
+2 GiB de disco. Si se agota: checkpoint y estado **inconcluso**. Prohibido Python.
+
+## SL3.0. Comprobación de la entrada congelada (inicio)
+
+Comando (desde `/home/katana/zeo/ZEROX`):
+
+    LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL3.sha256
+
+Salida: 6/6 `OK` (ORDEN-SL3, CONTRATO-EVIDENCIA-v0, DECISIONES, CONTRATO-v0,
+CONTRATO-ESTADO-DAG-v0, LINEO).
+
+Lectura íntegra de `ORDEN-SL3-ORACULO.md`, `CONTRATO-EVIDENCIA-v0.md` (con la
+«Ratificación v0»), `DECISIONES.md`, `V-ZRX/LINEO.md`, `CONTRATO-v0.md`,
+`CONTRATO-ESTADO-DAG-v0.md`, `ENTRADA-SL3.sha256` y todo el código de `T01/` y `T04/`.
+
+## SL3.1. Falta de definición detectada ANTES de editar (obligatorio informar)
+
+Todas se resuelven con una lectura que no altera ninguna otra regla; se registran
+**antes** de tocar código y se aplican marcadas con `# AMBIGUEDAD-SL3-n` / `# EV-n`.
+
+- **AMBIGUEDAD-SL3-1 — momento y permanencia de la congelación frente a la
+  liquidación.** EV-17/18 congelan al aplicar la primera prueba admisible; EV-19/20 y
+  RAT-2 ligan la confiscación y la recompensa al bloque que **aplica** la `EvidenceTx`
+  (luego la liquidación es inmediata); pero EV-24(i) bloquea una liberación mientras
+  «hay un incidente admitido y no liquidado». Si la liquidación fuese atómica y borrase
+  el caso, (i) sería vacuo y el caso dirigido de EV-24 no sería reproducible. Lectura
+  adoptada: la congelación y la confiscación ocurren **en el bloque que aplica**; el
+  `incident_id` permanece registrado (caso abierto) hasta que cierra su ventana
+  (`punto ≥ slot_falta + Plazo_slots`, EV-11); mientras siga registrado, la
+  **liberación** se rechaza con `ErrCasoAbierto` y el remanente congelado queda como
+  **gravamen**; el **retiro** no se bloquea (EV-24: mover a `en_retirada` no escapa). No
+  altera I-1 ni EV-19/EV-20 (cada nuevo incidente congela el total disponible y debita
+  el remanente).
+- **AMBIGUEDAD-SL3-2 — `Garantia.congelado` como cuenta o como gravamen.** El oráculo
+  v0 tenía `congelado` como bucket y `suma_garantias` lo sumaba. Si la congelación
+  total moviera todo a `congelado`, un `Retiro` (que EV-24 declara aceptado) no tendría
+  `activo` del que tirar. Lectura adoptada: `congelado` es un **gravamen derivado**
+  (`= total de la garantía sujeto a casos abiertos`), no un bucket; `suma_garantias`
+  deja de sumarlo (en v0 era siempre 0, así que I-1 no cambia) y las sub-cuentas
+  conservan su estado. La confiscación debita las sub-cuentas en orden determinista
+  `activo → pendientes → en_retirada → créditos`.
+- **AMBIGUEDAD-SL3-3 — activación de C-EVP.** R-12 rechaza `EvidenceTx` con
+  `ErrFueraDeAlcanceV0` «mientras C-EVP no esté activo», pero ni el contrato ni la
+  orden fijan cómo se activa. Lectura adoptada: campo booleano `Params.evp`
+  (por defecto `false`), interfaz de activación; los puntos con evidencia lo ponen a
+  `true`. Sin él, las reglas de EV-24 quedan además inertes para `Plazo_slots = 0`
+  (la condición (ii) es trivial) y no cambia ningún vector anterior.
+- **AMBIGUEDAD-SL3-4 — forma del error de `cbid` ajeno.** RAT-1 dice «`ErrForma`».
+  El oráculo plano no tiene `ErrForma`; se adopta `ErrCbidAjeno`, documentado como
+  `ErrForma(CbidAjeno)` en Rust.
+- **AMBIGUEDAD-SL3-5 — `H_d` en el oráculo abstracto.** El contrato usa `H_d(SHA3)`.
+  El oráculo no modela criptografía; como en `hash_canonico` (ya `sha256`), se usa
+  SHA2-256 sobre los bytes canónicos de la identidad como marcador de posición
+  determinista de `incident_id`.
+- **AMBIGUEDAD-SL3-6 — momento de la poda (EV-11).** Se poda al **inicio** de cada
+  bloque, antes de aplicar sus transacciones, con la condición estricta
+  `punto ≥ slot_falta + Plazo_slots` (coherente con EV-13, que admite
+  `slot_falta ≤ punto < slot_falta + Plazo_slots`). Así, una prueba aplicada en el
+  mismo bloque que cierra la ventana ya no es admisible.
+- **AMBIGUEDAD-SL3-7 — puerta RAT-3.** «La activación del castigo comprueba
+  `R_slots > Plazo_slots + M_margen_slots` como puerta». Se comprueba al aplicar
+  evidencia; si falla, `ErrPuertaRAT3` (no se congela ni confisca). Los puntos con
+  evidencia de la rejilla cumplen la desigualdad.
+- **AMBIGUEDAD-SL3-8 — `último_slot_producido(P)`.** La condición (ii) de EV-24 usa el
+  mayor slot de un bloque `PoST` aplicado con `sol.public_key = P` **en el pasado** del
+  punto de liberación. Se añade `Estado.ultimo_slot_producido::Dict{Int,Int}`; se
+  actualiza **después** de aplicar las transacciones de cada bloque PoST (con
+  `máx(slot previo, slot(B))`), de modo que la liberación dentro del propio bloque
+  producido por `P` evalúa el pasado, no el bloque en curso.
+- **AMBIGUEDAD-SL3-9 — redondeo de RAT-2 en cantidades mínimas.** RAT-2 afirma que el
+  autodenunciante pierde «al menos `6/8·C`»; con `recompensa = techo(C·2/8)`, para
+  `C` no múltiplo de 4 la pérdida neta es `C − techo(C/4) ≥ 6/8·C` solo si `C ≥ 4`
+  (p. ej. `C = 1` da recompensa 1 y pérdida 0). Se implementa la letra de RAT-2 y se
+  documenta; los casos dirigidos usan `C` múltiplo de 8 para la comprobación exacta
+  `6/8·C`.
+
+**Conclusión:** ninguna ambigüedad obliga a elegir entre reglas incompatibles; no
+procede detenerse. Se aplican las lecturas anteriores y se documentan en `INFORME.md`.
+
+## SL3.2. Diario de ejecución
+
+- **18:43** inicio; `date -Is` en `HORAS.log`; entrada congelada 6/6 OK.
+- *Lectura íntegra* de la orden, el contrato con RAT, `DECISIONES.md`, `LINEO.md`, los dos
+  contratos de oráculo y todo el código de `T01/` y `T04/`.
+- *Código T01*: `Params` gana `f_num/f_den/Plazo_slots/M_margen_slots/cbid/evp`;
+  `Garantia.incidentes`; `Estado.ultimo_slot_producido`; `Tx.evidencia`; tipos
+  `IdentidadEvidencia`/`CabeceraEvidencia`/`Evidencia`; `aplicar_evidencia!` (EV-05…EV-22,
+  RAT-1/2), `podar_incidentes!`, `debitar_garantia!`, `techo_fraccion`,
+  `techo_dos_octavos`; RAT-3 en `aplicar_liberacion!`; `src/evidencia.jl` con los generadores
+  (cobertura, RAT-3 y autodenuncia); `src/lector_vectores.jl` con `ev=`/`inc=`; `exportar.jl`
+  a v0.3; `run.jl` con el bloque de evidencia; testset `SL-3` en `test/runtests.jl`.
+- *Tests*: `Pkg.test()` **176/176**, SL-3 **82/82**. Registro `resultados/test-T01-SL3.log`.
+- *run.jl* `--seed 0x5a5a --replicas 5 --rejilla reducida`: 147 456 puntos, 737 280 historias,
+  4 595 520 undos, I-1…I-7 = 0 fallos; evidencia 92 historias, 412 undos, 8 RAT-3 bloqueadas,
+  0 fallos; 75,6 s. Registro `resultados/run-reducida-SL3.log`.
+- *Vectores*: `exportar.jl` → **2 795 casos**, sha256
+  `d3b73b06664fb4dbd4311cc163ddf937605192bf99f928e260dc67e02ad7897b`;
+  `cobertura-v0.3.txt` con aplicada 260, duplicada 40, tardía 200, `cbid` 120, sin saldo 120,
+  deshecha 380, con entradas 120. Relectura con `src/lector_vectores.jl`: **0 discrepancias**
+  (`resultados/relectura-v0.3.log`); v0.2 intacto y releído con 0 discrepancias.
+- *Nota de redondeo* (AMBIGUEDAD-SL3-9): `perdida = C − techo(C/4)`; la igualdad `6/8·C` es
+  exacta cuando `C ≡ 0 (mod 8)`, y el caso dirigido controlado (depósito previo) lo verifica.
+- **Cierre T01: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push; sin Python.

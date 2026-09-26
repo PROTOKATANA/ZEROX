@@ -193,6 +193,39 @@ function main()
             flush(stdout)
         end
     end
+    # --- SL-3: historias con evidencia ------------------------------------
+    total_ev = 0
+    fallos_ev = zeros(Int, 7)
+    undos_ev = 0
+    n_rat3 = 0
+    for P in puntos_evidencia()
+        casos = Tuple{String,Vector{Bloque}}[]
+        cam = caso_rat3_carrera(P)
+        if cam !== nothing
+            push!(casos, ("EV-RAT3-carrera", cam[1]))
+        end
+        au = caso_autodenuncia(P)
+        isempty(au[1]) || push!(casos, ("EV-autodenuncia", au[1]))
+        append!(casos, casos_evidencia_cobertura(P; n = max(1, replicas ÷ 20)))
+        for (_, bl) in casos
+            f, nu, _, _ = verificar(bl, P; con_i3 = false, i3_perm = 0)
+            fallos_ev .+= f
+            total_ev += 1
+            undos_ev += nu
+        end
+        # RAT-3: la liberación debe caer con ErrVentanaAbierta.
+        if cam !== nothing
+            bl, _, ilib = cam
+            E = estado_inicial(P)
+            for j in 1:ilib-1
+                r = aplicar(E, bl[j], P)
+                r isa Err && break
+                E = r
+            end
+            rlib = aplicar(E, bl[ilib], P)
+            (rlib == ErrVentanaAbierta) && (n_rat3 += 1)
+        end
+    end
     t1 = time()
     @printf("\nRESUMEN\n")
     @printf("puntos           = %d\n", length(puntos))
@@ -204,10 +237,16 @@ function main()
     for k in 1:7
         @printf("fallos I-%d       = %d\n", k, fallos[k])
     end
+    @printf("historias evid.  = %d\n", total_ev)
+    @printf("undos evid.      = %d\n", undos_ev)
+    @printf("RAT-3 bloqueadas = %d\n", n_rat3)
+    for k in 1:7
+        @printf("fallos evid I-%d = %d\n", k, fallos_ev[k])
+    end
     @printf("dif FC-1 vs FC-3 = %d\n", dif_fc1)
     @printf("dif FC-2 vs FC-3 = %d\n", dif_fc2)
     @printf("tiempo de pared  = %.1f s (%.2f min)\n", t1 - t0, (t1 - t0) / 60)
-    total_fallos = sum(fallos)
+    total_fallos = sum(fallos) + sum(fallos_ev)
     @printf("VEREDICTO        = %s\n", total_fallos == 0 ? "SIN FALLOS" : "CON FALLOS")
 end
 

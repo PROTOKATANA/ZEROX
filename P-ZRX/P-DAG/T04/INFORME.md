@@ -458,3 +458,76 @@ env -u LD_LIBRARY_PATH julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
 Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de `T04/`.
+
+---
+
+# T04-SL3 — Evidencia y castigo en el DAG (EV-12/EV-27/EV-28)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL3-ORACULO.md` y `CONTRATO-EVIDENCIA-v0.md` con su «Ratificación v0».
+**Zona:** `T04/`. Sin Python; sin commit ni push.
+
+## SL3.1. Veredicto
+
+**SUPERADO.** La `EvidenceTx` de T01 se aplica en **modo fusión** (ED-6/C-ORD-04): una
+transacción de evidencia que no valida **se descarta** sin invalidar su bloque; la segunda
+evidencia del mismo incidente queda inerte (`ErrEvidenciaDuplicada`, EV-12); el registro, el
+gravamen y la confiscación viven en el `Estado` y el undo es exacto (EV-27); el incidente es
+propio de la historia seleccionada, así que en el pasado de una rama hermana no está y allí una
+evidencia del mismo incidente vuelve a ser «primera» (EV-28). La ventana de admisión y la
+madurez del crédito de la recompensa usan el **punto de aplicación** de RD-4.
+
+- `Pkg.test()`: **421/421**.
+- `run.jl --seed 0x5a5a --replicas 200`: **ESTADO = SUPERADO**; 3 000 historias base (46 500
+  bloques, 600 000 órdenes IE-3) y 1 600 historias con C-EVP (13 181 bloques válidos, 3 181
+  descartes, 60 duplicadas, 466 tardías, 216 `cbid` ajeno), **0 fallos** de IE-1…IE-6. 70,8 s.
+- `vectores-estado-dag-v0.4.txt`: **1 878 casos** (14 dirigidos + 900 aleatorios + 8×120
+  evidencia), sha256 `37c04f1250775f25ea4a2cab355f9201c7454b4ba06fa6d892d3b83fe924ebff`;
+  relectura independiente **0 discrepancias**. v0…v0.3 intactos; v0.3 se relee con 0
+  discrepancias.
+
+## SL3.2. Faltas de definición detectadas antes de editar
+
+Además de las nueve de T01 (`PROGRESO.md` §SL3.1), cuatro propias
+(`PROGRESO.md` §SL3.1-D1…D4): deduplicación como descarte y no como bloque inválido (D1),
+efecto según el punto de aplicación de RD-4 (D2), evidencias hermanas (D3) y `cbid` de la red
+local (D4). Ninguna obliga a elegir entre reglas incompatibles.
+
+## SL3.3. Casos dirigidos nuevos
+
+- **D-15** evidencia aplicada en fusión: congela, confisca (RAT-2), registra el incidente, I-1.
+- **D-16** dos evidencias del mismo incidente en ramas hermanas: la primera en orden C-GD-05
+  aplica y la segunda se descarta (`ErrEvidenciaDuplicada`), sin invalidar los bloques.
+- **D-17** EV-27/EV-28: `past(Xc)` sin el incidente, `post(Ye)` con él aplicado como primera,
+  undo exacto del bloque que aplicó.
+- **D-18** descartes por `cbid` ajeno y por tardía, y evidencia contra clave sin saldo
+  (aplicada con pérdida cero), todo en un mergeset.
+
+## SL3.4. Cobertura (V4)
+
+`resultados/cobertura-v0.4.txt`, sección «evidencia SL-3»: aplicada **307** (≥100),
+duplicada **30** (≥30), tardía **297** (≥30), `cbid` ajeno **137** (≥30) y deshecha
+**771** (≥30). Los mínimos de T04-C siguen cumpliéndose en v0.4: depósitos aplicados 347,
+retiros 808, liberaciones 115, `ErrNonce` 853 = 18,29 % (≤25 %), `ErrDobleGasto` 305 y
+reorganizaciones que deshacen garantía 312.
+
+## SL3.5. Reproducibilidad
+
+```
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export PATH=/home/katana/torio/.juliaup/bin:$PATH
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH julia --project=. exportar.jl --dirigidos 1 --aleatorios 900 --ev-replicas 120
+env -u LD_LIBRARY_PATH julia --project=. src/lector_vectores.jl resultados/vectores-estado-dag-v0.4.txt
+env -u LD_LIBRARY_PATH julia --project=. run.jl --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de `T04/`.
+
+## SL3.6. Lo que T04-SL3 NO demuestra
+
+- **No modela la forma de wire v4** ni criptografía real (igual que T01).
+- **No calibra parámetros** (`f`, `Plazo_slots`, `M_margen_slots`): son entradas.
+- La evidencia se **descarta** cuando no valida al fusionarse; el oráculo no decide si el
+  motor Rust debe además penalizar la propagación de evidencia inválida (fuera de la orden).

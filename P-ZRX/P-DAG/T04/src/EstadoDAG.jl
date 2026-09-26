@@ -32,8 +32,8 @@ export estado_past, estado_post, tips_validas, estado_virtual, cadena_virtual,
 export representacion_canonica, hash_canonico, invariante_I1, invariante_I1b
 export id_T, k_de, params_T
 export generar_pow_terminal, generar_dag_aleatorio, generar_cadena_post,
-       sr_peso, bl_desde_post
-export PARAMS_DAG_BASE, PUNTOS_T04
+       sr_peso, bl_desde_post, evidencia_aleatoria
+export PARAMS_DAG_BASE, PUNTOS_T04, PARAMS_DAG_EV
 
 # ---------------------------------------------------------------------------
 # Parámetros
@@ -227,6 +227,8 @@ function aplicar_bloque_fusion!(A::Admision, S::Transicion.Estado, b::BloquePost
         S.s0 = 0
     end
     Transicion.promover!(S, punto, true)
+    # SL-3 EV-11: poda de incidentes cuya ventana cerró (punto de aplicación).
+    Transicion.podar_incidentes!(S, P, punto)
 
     ncb = 0
     icb = 0
@@ -302,6 +304,11 @@ function aplicar_bloque_fusion!(A::Admision, S::Transicion.Estado, b::BloquePost
     S.subsidio_acum += sub
     S.slot = punto
     S.bloque_raiz = b.id
+    # SL-3 EV-24(ii): slot propio del bloque producido por `b.productor`.
+    prev = get(S.ultimo_slot_producido, b.productor, -1)
+    if b.slot > prev
+        S.ultimo_slot_producido[b.productor] = b.slot
+    end
     return S, desc
 end
 
@@ -697,6 +704,20 @@ const PARAMS_DAG_BASE = [
 
 "`(punto, k)` de la rejilla T04: 5 puntos × k ∈ {0,1,3}."
 const PUNTOS_T04 = [(p, k) for p in 1:length(PARAMS_DAG_BASE) for k in (0, 1, 3)]
+
+"""
+Rejilla SL-3 de T04 con C-EVP activo: `f ∈ {1/2,1}`, `Plazo_slots ∈ {2,3}`,
+`M_margen_slots = 0`, `R_slots = Plazo + 1`, `cbid = 7`, `k ∈ {1,3}`.
+"""
+const PARAMS_DAG_EV = [
+    ParamsDAG(Transicion.Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2,
+        W_min = 1, S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+        M_rec_slots = 1, R_slots = Pl + 1, F_slots = typemax(Int),
+        sec = Transicion.SEC0, corte = Transicion.CUT_HWPhi,
+        seleccion = Transicion.FC3, f_num = fn, f_den = fd, Plazo_slots = Pl,
+        M_margen_slots = 0, cbid = 7, evp = true), k)
+    for (fn, fd) in ((1, 2), (1, 1)) for Pl in (2, 3) for k in (1, 3)
+]
 
 include("generadores.jl")
 include("dirigidos.jl")

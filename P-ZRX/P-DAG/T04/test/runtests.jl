@@ -149,6 +149,46 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
         @test isempty(verificar_ie1_ie2_ie4(A))
     end
 
+    @testset "SL-3 evidencia (T04)" begin
+        pd = ParamsDAG(PARAMS_DAG_BASE[1], 1)
+        pdev = EstadoDAG._pd_ev(pd)
+
+        nombre, A, m = EstadoDAG.caso_evidencia_aplicada(pdev)
+        @test m.valido
+        @test m.incidentes == 1
+        @test m.quemado > 0
+        @test m.I1
+        @test isempty(verificar_ie1_ie2_ie4(A))
+
+        nombre, A, m = EstadoDAG.caso_evidencia_hermanas(pdev)
+        @test m.dup == 1
+        @test m.incidentes == 1
+        @test m.validos
+        @test m.I1
+        @test isempty(verificar_ie1_ie2_ie4(A))
+
+        nombre, A, m = EstadoDAG.caso_evidencia_reorg(pdev)
+        @test m.inc_past_Xc == 0
+        @test m.inc_post_Ye == 1
+        @test m.undo
+        @test m.I1
+        @test isempty(verificar_ie1_ie2_ie4(A))
+
+        nombre, A, m = EstadoDAG.caso_evidencia_descartes(pdev)
+        @test m.cbid == 1
+        @test m.tardia == 1
+        @test m.sin_saldo
+        @test m.I1
+
+        for (i, p2) in enumerate(PARAMS_DAG_EV)
+            rng = StableRNG(0x9e00 + UInt64(i))
+            A = generar_dag_aleatorio(rng, p2; npost = EstadoDAG.npost_t04c(i),
+                                      pesos = EstadoDAG.PESOS_AJUSTADOS)
+            @test isempty(verificar_ie1_ie2_ie4(A))
+            @test isempty(verificar_ie6(A))
+        end
+    end
+
     @testset "propiedades IE-1…IE-6" begin
         for (pi, k) in PUNTOS_T04
             pd = ParamsDAG(PARAMS_DAG_BASE[pi], k)
@@ -194,7 +234,7 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
     end
 
     @testset "relectura de vectores" begin
-        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.3.txt")
+        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.4.txt")
         if isfile(ruta)
             cmd = `$(Base.julia_cmd()) --project=$(dirname(@__DIR__)) $(joinpath(@__DIR__, "..", "src", "lector_vectores.jl")) $ruta`
             p = run(ignorestatus(cmd))

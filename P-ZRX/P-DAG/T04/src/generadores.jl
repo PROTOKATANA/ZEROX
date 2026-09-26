@@ -147,16 +147,45 @@ function operacion_aleatoria(rng::AbstractRNG, S::Transicion.Estado,
 end
 
 """
+Evidencia aleatoria (SL-3) contra `S`. `modo` selecciona la variante: válida,
+`cbid` ajeno, fuera de plazo, clave sin saldo o una clave con saldo.
+"""
+function evidencia_aleatoria(rng::AbstractRNG, S::Transicion.Estado,
+                             P::Transicion.Params, slot::Int; modo::Symbol = :valida)
+    c = P.cbid
+    k = 1
+    s = slot
+    if modo == :cbid
+        c = P.cbid + 1
+    elseif modo == :tardia
+        s = slot - P.Plazo_slots
+    elseif modo == :sin_saldo
+        k = 99
+    elseif modo == :clave
+        ks = sort(collect(keys(S.garantias)))
+        isempty(ks) || (k = ks[rand(rng, 1:length(ks))])
+    end
+    r1 = rand(rng, UInt64)
+    r2 = rand(rng, UInt64)
+    r1 == r2 && (r2 = r1 + UInt64(1))
+    lo, hi = min(r1, r2), max(r1, r2)
+    ev = Transicion.evidencia(c, k, 0, 0, 0, s, lo, hi)
+    return Transicion.tx_evidencia(ev)
+end
+
+"""
 Historia DAG aleatoria: prefijo PoW con terminal + `npost` bloques PoST con ≤3
 padres. Las transacciones se construyen contra `post[padre]` (por lo que suelen
 validar; si un bloque fusionado consume la misma salida, el oráculo la descarta).
 El tipo se elige entre los factibles en `S` (transferencia, depósito, retiro,
 liberación) con los pesos de la orden, y el nonce es el del estado contra el que
-se construye, con un 10 % de error deliberado. Devuelve la `Admision` resuelta.
+se construye, con un 10 % de error deliberado. Con `P.evp`, además inyecta
+`EvidenceTx` (SL-3) con probabilidad `p_ev`. Devuelve la `Admision` resuelta.
 """
 function generar_dag_aleatorio(rng::AbstractRNG, pd::ParamsDAG;
                                npost::Int = 8, p_tx::Float64 = 0.5,
-                               p_invalido::Float64 = 0.12,
+                               p_invalido::Float64 = 0.12, p_ev::Float64 = 0.12,
+                               p_dup::Float64 = 0.50,
                                pesos = (PESO_TRANSFERENCIA, PESO_DEPOSITO,
                                         PESO_RETIRO, PESO_LIBERACION))
     P = pd.P
@@ -164,6 +193,7 @@ function generar_dag_aleatorio(rng::AbstractRNG, pd::ParamsDAG;
     A = _admision_desde_pow(pd, pow)
     ids = Int[]                 # todos los ids PoST creados
     validos = Int[]             # ids PoST válidos
+    evidencias = Transicion.Evidencia[]  # SL-3: evidencias ya emitidas (duplicados)
     next_id = pow[3]
     out_id = pow[4]
     ident_pendiente = UInt64(0)
@@ -218,6 +248,20 @@ function generar_dag_aleatorio(rng::AbstractRNG, pd::ParamsDAG;
             if op !== nothing
                 push!(txs, op.tx)
                 out_id = op.out_id
+            end
+        end
+        # SL-3: evidencia aleatoria (solo con C-EVP activo). Con probabilidad
+        # `p_dup` se reemite una evidencia anterior para cubrir EV-12.
+        if P.evp && !isempty(validos) && rand(rng) < p_ev
+            pv = validos[rand(rng, 1:length(validos))]
+            S = A.post[pv]
+            if !isempty(evidencias) && rand(rng) < p_dup
+                push!(txs, Transicion.tx_evidencia(evidencias[rand(rng, 1:length(evidencias))]))
+            else
+                modo = rand(rng, (:valida, :valida, :clave, :cbid, :tardia, :sin_saldo))
+                txev = evidencia_aleatoria(rng, S, P, slot; modo = modo)
+                push!(txs, txev)
+                txev.evidencia !== nothing && push!(evidencias, txev.evidencia)
             end
         end
         b = BloquePost(id = next_id, padres = padres, slot = slot, sr = sr, sd = sd,

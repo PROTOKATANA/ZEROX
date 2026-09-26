@@ -20,10 +20,9 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md"
-# T04-D: vectores v0.3 (id de la salida de la liberación como en F-18, T01-E); el
-# generador y la rejilla no cambian. Los ficheros v0, v0.1 y v0.2 se conservan.
-const SALIDA_DEF = "resultados/vectores-estado-dag-v0.3.txt"
-const COBERTURA_DEF = "resultados/cobertura-v0.3.txt"
+# SL-3: vectores v0.4 con EvidenceTx (C-EVP activo); v0..v0.3 se conservan.
+const SALIDA_DEF = "resultados/vectores-estado-dag-v0.4.txt"
+const COBERTURA_DEF = "resultados/cobertura-v0.4.txt"
 
 const NOMBRE_FAMILIA = Dict(Transicion.Genesis => "Genesis", Transicion.PoW => "PoW",
                             Transicion.PoST => "PoST")
@@ -84,7 +83,20 @@ param_str(pd::ParamsDAG) = begin
            " M_dep_slots=", P.M_dep_slots, " M_rec_slots=", P.M_rec_slots,
            " R_slots=", P.R_slots, " F_slots=",
            P.F_slots == typemax(Int) ? "inf" : string(P.F_slots),
+           " f_num=", P.f_num, " f_den=", P.f_den, " Plazo_slots=", P.Plazo_slots,
+           " M_margen_slots=", P.M_margen_slots, " cbid=", P.cbid,
+           " evp=", P.evp ? 1 : 0,
            " k=", pd.k, " sec=SEC0 corte=CUT_HWPhi seleccion=FC3")
+end
+
+# SL-3: cabeceras de evidencia.
+function ev_str(ev::Transicion.Evidencia)
+    return string(ev.id1.cbid, ":", ev.id1.clave, ":", ev.id1.sector, ":",
+                  ev.id1.historia, ":", ev.id1.chunk, ":", ev.id1.slot, ":",
+                  ev.h1.pre_hash, ":", ev.h1.sello_ok ? 1 : 0, "|",
+                  ev.id2.cbid, ":", ev.id2.clave, ":", ev.id2.sector, ":",
+                  ev.id2.historia, ":", ev.id2.chunk, ":", ev.id2.slot, ":",
+                  ev.h2.pre_hash, ":", ev.h2.sello_ok ? 1 : 0)
 end
 
 # T04-B: `nonce=` al final de la línea en depósito, retiro y liberación (F-15),
@@ -97,6 +109,9 @@ function tx_str(tx::Transicion.Tx)
                   "] sal=[", sal, "]")
     if tx.tipo in (Transicion.TxDeposito, Transicion.TxRetiro, Transicion.TxLiberacion)
         return base * " nonce=" * string(tx.nonce)
+    end
+    if tx.tipo == Transicion.TxEvidencia && tx.evidencia !== nothing
+        return base * " ev=" * ev_str(tx.evidencia)
     end
     return base
 end
@@ -137,9 +152,12 @@ function gar_str(E::Transicion.Estado)
         rs = join(["$(r.importe)@s$(r.inicio_slot)" for r in ret], ",")
         cred = sort(g.creditos, by = p -> (p.importe, p.madura_en_slot))
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
+        inc = sort(g.incidentes, by = x -> x[1])
+        is_ = isempty(inc) ? "" :
+              string(" inc=", join(["$(iid)@$(sf)" for (iid, sf) in inc], ","))
         push!(ls, string("GAR clave=", k, " activo=", g.activo, " pend=[", ps,
                          "] ret=[", rs, "] cred=[", cs, "] congelado=", g.congelado,
-                         " nonce=", g.nonce_siguiente))
+                         " nonce=", g.nonce_siguiente, is_))
     end
     return ls
 end
@@ -190,6 +208,50 @@ function escribir_caso(io::IO, n::Int, nombre::AbstractString, punto::Int,
     return nothing
 end
 
+# --- SL-3: cobertura de evidencia en el DAG ---------------------------------
+
+inc!(d::Dict{String,Int}, k::AbstractString) = (d[k] = get(d, k, 0) + 1)
+
+"Clasifica las `EvidenceTx` de `A` por su resultado en la historia seleccionada."
+function contar_evidencia(A::Admision, acc::Dict{String,Int})
+    _, orden, desc = aplicar_historia(A)
+    dm = Dict{Tuple{Int,Int},Transicion.Err}()
+    for (idb, itx, e) in desc
+        dm[(idb, itx)] = e
+    end
+    for bid in orden
+        b = A.por_id[bid]
+        for (i, tx) in enumerate(b.txs)
+            tx.tipo == Transicion.TxEvidencia || continue
+            inc!(acc, "construida")
+            e = get(dm, (bid, i), nothing)
+            if e === nothing
+                inc!(acc, "aplicada")
+            else
+                k = e == Transicion.ErrEvidenciaDuplicada ? "duplicada" :
+                    e == Transicion.ErrEvidenciaTardia    ? "tardia" :
+                    e == Transicion.ErrCbidAjeno          ? "cbid_ajeno" :
+                    e == Transicion.ErrEvidenciaConEntradas ? "con_entradas" :
+                    e == Transicion.ErrOrdenCanonico      ? "orden_canonico" :
+                    e == Transicion.ErrSinEvidencia       ? "sin_evidencia" : "otro"
+                inc!(acc, k)
+            end
+        end
+    end
+    # EV-27: undo exacto del bloque que aplica evidencia (medido, no por reorg).
+    for bid in orden
+        b = A.por_id[bid]
+        any(tx -> tx.tipo == Transicion.TxEvidencia, b.txs) || continue
+        E = A.past[bid]
+        r = aplicar_fusion_con_undo(A, E, b, b.slot)
+        if r isa Tuple
+            EstadoDAG.hash_canonico(r[2]) == EstadoDAG.hash_canonico(E) &&
+                inc!(acc, "deshecha")
+        end
+    end
+    return acc
+end
+
 # --- main -------------------------------------------------------------------
 
 function main()
@@ -200,21 +262,24 @@ function main()
     contrato = get(cfg, "contrato", CONTRATO_DEF)
     con_dirigidos = get(cfg, "dirigidos", "1") != "0"
     n_aleatorios = parse(Int, get(cfg, "aleatorios", "900"))
+    n_ev = parse(Int, get(cfg, "ev-replicas", "60"))
 
     puntos = PUNTOS_T04
-    @printf("exportar: puntos=%d aleatorios=%d salida=%s\n", length(puntos),
-            n_aleatorios, salida)
+    @printf("exportar: puntos=%d aleatorios=%d ev-replicas=%d salida=%s\n",
+            length(puntos), n_aleatorios, n_ev, salida)
     flush(stdout)
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-estado-dag-v0.3 · T04 · ", fecha,
-            " · sha256 del contrato ", sha256_archivo(contrato))
+    println(io, "# vectores-estado-dag-v0.4 · T04-SL3 (EvidenceTx, C-EVP+RAT) · ",
+            fecha, " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
+    aev = Dict{String,Int}()
     if con_dirigidos
         pd = ParamsDAG(PARAMS_DAG_BASE[1], 1)
         for (nombre, A, _) in casos_dirigidos(pd)
             n += 1
             escribir_caso(io, n, nombre, 1, 1, "-", A)
+            startswith(nombre, "D-1") && contar_evidencia(A, aev)
         end
     end
     ac = EstadoDAG.AcumuladorCobertura()
@@ -232,6 +297,20 @@ function main()
         EstadoDAG.acumular_caso!(ac, A)
         (r % 100 == 0) && (@printf("  aleatorios %d/%d\n", r, n_aleatorios); flush(stdout))
     end
+    # SL-3: evidencias sobre la rejilla con C-EVP activo.
+    for (i, pdev) in enumerate(PARAMS_DAG_EV)
+        for r in 1:n_ev
+            semilla = UInt64(0x6000) + UInt64(100 * i + r)
+            rng = StableRNG(semilla)
+            A = EstadoDAG.generar_dag_aleatorio(rng, pdev; npost = EstadoDAG.npost_t04c(r),
+                                                pesos = EstadoDAG.PESOS_AJUSTADOS)
+            n += 1
+            escribir_caso(io, n, "ev-aleatorio", i, Int(pdev.k), string(semilla), A)
+            contar_evidencia(A, aev)
+        end
+        @printf("  evidencia punto %d/%d\n", i, length(PARAMS_DAG_EV))
+        flush(stdout)
+    end
     close(io)
     h = sha256_archivo(salida)
     sha_path = replace(salida, r"\.txt$" => "") * ".sha256"
@@ -240,20 +319,24 @@ function main()
     # Cobertura (ORDEN-T04-C §2): apartado vectores y apartado run.jl.
     mkpath(dirname(cobertura))
     ioc = open(cobertura, "w")
-    println(ioc, "# cobertura T04-D v0.3 · ", fecha, " · contrato ",
+    println(ioc, "# cobertura T04-SL3 v0.4 · ", fecha, " · contrato ",
             sha256_archivo(contrato))
     println(ioc, "# generador: pesos=", EstadoDAG.PESOS_AJUSTADOS,
             " npost=", min(EstadoDAG.npost_t04c(0), EstadoDAG.npost_t04c(1)), "..",
             max(EstadoDAG.npost_t04c(0), EstadoDAG.npost_t04c(1)),
-            " p_tx=0.5 p_invalido=0.12 p_error_nonce=0.10")
+            " p_tx=0.5 p_invalido=0.12 p_error_nonce=0.10 p_ev=0.12")
     println(ioc, "# minimos: depositos_aplicados>=150 retiros_aplicados>=100 ",
             "liberaciones_aplicadas>=100 ErrNonce>=30 y <=25% de garantia ",
             "construida ErrDobleGasto>=200 reorgs_garantia>=20")
-    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.3 (casos aleatorios)", ac)
+    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.4 (casos aleatorios)", ac)
+    println(ioc, "SECCION evidencia SL-3 (dirigidos + aleatorios C-EVP)")
+    for k in sort(collect(keys(aev)))
+        println(ioc, "EV ", k, " = ", aev[k])
+    end
     acr = EstadoDAG.cobertura_run()
     EstadoDAG.escribir_cobertura(ioc, "run.jl (seed 0x5a5a, replicas 200)", acr)
     close(ioc)
-    @printf("exportar: cobertura -> %s\n", cobertura)
+    @printf("exportar: cobertura -> %s evidencia=%s\n", cobertura, string(aev))
     flush(stdout)
 end
 

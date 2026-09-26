@@ -11,7 +11,7 @@ using EstadoDAG
 import EstadoDAG.Transicion
 using SHA
 
-const RUTA_DEF = "resultados/vectores-estado-dag-v0.3.txt"
+const RUTA_DEF = "resultados/vectores-estado-dag-v0.4.txt"
 
 const FAMILIA_DE = Dict("Genesis" => Transicion.Genesis, "PoW" => Transicion.PoW,
                         "PoST" => Transicion.PoST)
@@ -48,9 +48,12 @@ function r_gar(E::Transicion.Estado)
         rs = join(["$(r.importe)@s$(r.inicio_slot)" for r in ret], ",")
         cred = sort(g.creditos, by = p -> (p.importe, p.madura_en_slot))
         cs = join(["$(p.importe)@s$(p.madura_en_slot)" for p in cred], ",")
+        inc = sort(g.incidentes, by = x -> x[1])
+        is_ = isempty(inc) ? "" :
+              string(" inc=", join(["$(iid)@$(sf)" for (iid, sf) in inc], ","))
         push!(ls, string("GAR clave=", k, " activo=", g.activo, " pend=[", ps,
                          "] ret=[", rs, "] cred=[", cs, "] congelado=", g.congelado,
-                         " nonce=", g.nonce_siguiente))
+                         " nonce=", g.nonce_siguiente, is_))
     end
     return ls
 end
@@ -95,6 +98,23 @@ function parsear_entradas(s::AbstractString)
     return [parse(Int, x) for x in split(interior, ",")]
 end
 
+# SL-3: `cb:clave:sector:historia:chunk:slot:pre_hash:sello|...`.
+function parsear_evidencia(s::AbstractString)
+    partes = split(s, "|")
+    length(partes) == 2 || error("evidencia malformada: $s")
+    ids = Vector{Transicion.IdentidadEvidencia}(undef, 2)
+    cabs = Vector{Transicion.CabeceraEvidencia}(undef, 2)
+    for (j, p) in enumerate(partes)
+        f = split(p, ":")
+        length(f) == 8 || error("cabecera de evidencia malformada: $p")
+        ids[j] = Transicion.IdentidadEvidencia(parse(Int, f[1]), parse(Int, f[2]),
+                                               parse(Int, f[3]), parse(Int, f[4]),
+                                               parse(Int, f[5]), parse(Int, f[6]))
+        cabs[j] = Transicion.CabeceraEvidencia(parse(UInt64, f[7]), f[8] == "1")
+    end
+    return Transicion.Evidencia(ids[1], ids[2], cabs[1], cabs[2])
+end
+
 function parsear_tx(linea::AbstractString)
     c = campos(linea)
     tipo = c["tipo"]
@@ -118,9 +138,17 @@ function parsear_tx(linea::AbstractString)
     elseif tipo == "Liberacion"
         return Transicion.tx_liberacion(clave, importe, firmante; nonce = nonce)
     elseif tipo == "Evidencia"
+        if haskey(c, "ev")
+            ev = parsear_evidencia(c["ev"])
+            if isempty(ent) && isempty(sal)
+                return Transicion.tx_evidencia(ev)
+            end
+            return Transicion.Tx(Transicion.TxEvidencia, sal, ent, firmante, clave,
+                                 importe, 0, UInt64(0), ev)
+        end
         return Transicion.tx_evidencia(clave)
     end
-    error("tipo de tx no releíble en formato v0.3 (SEC-0): $tipo")
+    error("tipo de tx no releíble en formato v0.4 (SEC-0): $tipo")
 end
 
 function parsear_params(c::Dict{String,String})
@@ -135,7 +163,13 @@ function parsear_params(c::Dict{String,String})
                           M_rec_slots = parse(Int, c["M_rec_slots"]),
                           R_slots = parse(Int, c["R_slots"]), F_slots = f,
                           sec = Transicion.SEC0, corte = Transicion.CUT_HWPhi,
-                          seleccion = Transicion.FC3)
+                          seleccion = Transicion.FC3,
+                          f_num = parse(Int, get(c, "f_num", "1")),
+                          f_den = parse(Int, get(c, "f_den", "1")),
+                          Plazo_slots = parse(Int, get(c, "Plazo_slots", "0")),
+                          M_margen_slots = parse(Int, get(c, "M_margen_slots", "0")),
+                          cbid = parse(Int, get(c, "cbid", "0")),
+                          evp = get(c, "evp", "0") == "1")
     return ParamsDAG(P, parse(Int, c["k"]))
 end
 

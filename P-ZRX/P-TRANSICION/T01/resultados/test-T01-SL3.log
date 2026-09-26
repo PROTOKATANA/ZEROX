@@ -1,0 +1,50 @@
+┌ Info: X-17 diferencias respecto a FC-3
+│   difiere_fc1 = 0
+└   difiere_fc2 = 6144
+┌ Info: X-18 diferencias respecto a FC-3
+│   difiere_fc1 = 96000
+└   difiere_fc2 = 6144
+┌ Info: I-*
+│   n_hist = 294912
+│   n_undo = 1833609
+│   n_perm = 344073
+│   fallos_i1 = 0
+│   fallos_i1b = 0
+│   fallos_i2 = 0
+│   fallos_i3 = 0
+│   fallos_i4 = 0
+│   fallos_i5 = 0
+│   fallos_i6 = 0
+└   fallos_i7 = 0
+┌ Info: F-15
+│   n_validos = 199
+│   fam =
+│    Dict{String, Int64} with 5 entries:
+│      "neg-nonce-saltado" => 608
+│      ⋮                   => ⋮
+│   fase =
+│    Dict{String, Int64} with 2 entries:
+│      "PoW"  => 512
+└      "PoST" => 1487
+Test Summary:        | Pass  Total  Time
+X-01…X-15 (rechazos) |   38     38  8.0s
+Test Summary:                 | Pass  Total  Time
+Ratificaciones v0.1 (R-6…R-9) |   10     10  0.1s
+Test Summary:           | Pass  Total   Time
+X-16 (orden de llegada) |    2      2  11.0s
+Test Summary:                   | Pass  Total  Time
+X-17 (dos terminales con pesos) |    2      2  2.7s
+Test Summary:                          | Pass  Total  Time
+X-18 (rama PoW tardía con más trabajo) |    2      2  2.4s
+Test Summary:                 | Pass  Total  Time
+X-19 (reorg elimina depósito) |    2      2  3.4s
+Test Summary:      | Pass  Total  Time
+X-20 (undo exacto) |    2      2  9.9s
+Test Summary:                  | Pass  Total   Time
+I-1…I-7 (historias aleatorias) |    9      9  56.2s
+Test Summary:          | Pass  Total  Time
+F-15 (nonce por clave) |   10     10  0.7s
+Test Summary:                 | Pass  Total  Time
+T01-E (id de liberación F-18) |   17     17  0.1s
+Test Summary:              | Pass  Total  Time
+SL-3 (evidencia y castigo) |   82     82  0.5s

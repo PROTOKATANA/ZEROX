@@ -47,7 +47,7 @@ function main()
     seed = parsear_seed(get(cfg, "seed", "0x5a5a"))
     replicas = parse(Int, get(cfg, "replicas", "200"))
     ie3_exhaustivos = parse(Int, get(cfg, "ie3-exhaustivos", "5"))
-    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.3.log")
+    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.4.log")
     mkpath(dirname(salida))
     io = open(salida, "w")
     t0 = time()
@@ -151,6 +151,22 @@ function main()
      length(g14) == 1 && g14[1][1] == m14.Xd) ||
         push!(fallos_globales, "dirigido D-14 dos liberaciones hermanas")
 
+    # SL-3 (D-15…D-18): evidencia aplicada, duplicada en ramas hermanas,
+    # reaparición/undo y descartes (cbid, tardía, sin saldo).
+    pdev = EstadoDAG._pd_ev(pd1)
+    _, A15, m15 = EstadoDAG.caso_evidencia_aplicada(pdev)
+    (m15.valido && m15.incidentes == 1 && m15.quemado > 0 && m15.I1) ||
+        push!(fallos_globales, "dirigido D-15 evidencia aplicada")
+    _, A16, m16 = EstadoDAG.caso_evidencia_hermanas(pdev)
+    (m16.dup == 1 && m16.incidentes == 1 && m16.validos && m16.I1) ||
+        push!(fallos_globales, "dirigido D-16 evidencia duplicada")
+    _, A17, m17 = EstadoDAG.caso_evidencia_reorg(pdev)
+    (m17.inc_past_Xc == 0 && m17.inc_post_Ye == 1 && m17.undo && m17.I1) ||
+        push!(fallos_globales, "dirigido D-17 reaparición/undo")
+    _, A18, m18 = EstadoDAG.caso_evidencia_descartes(pdev)
+    (m18.cbid == 1 && m18.tardia == 1 && m18.sin_saldo && m18.I1) ||
+        push!(fallos_globales, "dirigido D-18 descartes")
+
     # 3) Propiedades IE-1…IE-6
     total_hist = 0
     total_bloques = 0
@@ -217,6 +233,48 @@ function main()
         append!(fallos_globales, fallos_punto)
         flush(io)
     end
+
+    # 4) SL-3: rejilla con C-EVP activo y evidencia.
+    total_ev = 0
+    total_ev_validos = 0
+    total_ev_desc = 0
+    ev_dup = 0
+    ev_tar = 0
+    ev_cbid = 0
+    for (pi, pdev) in enumerate(PARAMS_DAG_EV)
+        fallos_punto = String[]
+        for r in 1:replicas
+            rng = StableRNG(seed + UInt64(20_000 * pi + r))
+            A = generar_dag_aleatorio(rng, pdev; npost = EstadoDAG.npost_t04c(r),
+                                      pesos = EstadoDAG.PESOS_AJUSTADOS)
+            total_ev += 1
+            total_ev_validos += count(v -> v, values(A.validos))
+            _, _, desc = aplicar_historia(A)
+            total_ev_desc += length(desc)
+            for (_, _, e) in desc
+                e == Transicion.ErrEvidenciaDuplicada && (ev_dup += 1)
+                e == Transicion.ErrEvidenciaTardia && (ev_tar += 1)
+                e == Transicion.ErrCbidAjeno && (ev_cbid += 1)
+            end
+            for f in verificar_ie1_ie2_ie4(A)
+                push!(fallos_punto, "EV$pi r$r: $f")
+            end
+            for f in verificar_ie6(A)
+                push!(fallos_punto, "EV$pi r$r: $f")
+            end
+            bloques = collect(values(A.por_id))
+            for f in verificar_ie3(A, bloques; intentos = 50,
+                                   semilla = UInt64(2_000_000 + 10_000 * pi + r))
+                push!(fallos_punto, "EV$pi r$r: $f")
+            end
+        end
+        append!(fallos_globales, fallos_punto)
+        println(io, "PUNTO-EV EV=$pi f=$(pdev.P.f_num)/$(pdev.P.f_den) ",
+                "Plazo=$(pdev.P.Plazo_slots) k=$(pdev.k) fallos=$(length(fallos_punto))")
+        flush(io)
+    end
+    println(io, "TOTAL-EV historias=$total_ev validos=$total_ev_validos ",
+            "descartes=$total_ev_desc duplicadas=$ev_dup tardias=$ev_tar cbid=$ev_cbid")
 
     println(io, "TOTAL historias=$total_hist bloques=$(total_bloques) validos=$(total_validos) ",
             "descartes=$(total_desc) rojo_U3=$(total_u3) ie3_ordenes=$(total_ie3)")

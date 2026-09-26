@@ -727,3 +727,108 @@ dobles gastos reales. El detalle del bloqueo y el diseño de D-14 están en
   como el `(txid, 0)` de F-18, no un hash de 32 bytes.
 - **No demuestra determinismo entre máquinas**: solo en esta máquina, versión y
   semilla.
+
+---
+
+# INFORME — T01-SL3 (evidencia y castigo: `CONTRATO-EVIDENCIA-v0` + Ratificación v0)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `P-ZRX/P-SLASHING/ORDEN-SL3-ORACULO.md` y `CONTRATO-EVIDENCIA-v0.md` con su
+«Ratificación v0» (que prevalece). **Zona:** `T01/`. Sin Python; sin commit ni push.
+
+## SL3.1. Veredicto
+
+**SUPERADO.** T01 implementa `EvidenceTx` (identidad `(cbid, clave, sector, historia, chunk,
+slot)`), verificación (EV-05…EV-09), registro de incidentes y poda (EV-10/EV-11), ventana de
+admisión (EV-13/EV-14), congelación total (EV-17/EV-18), confiscación con reparto RAT-2
+(EV-19…EV-22), regla de liberación RAT-3 (EV-24 con EV-15b) y undo exacto (EV-27…EV-29).
+`Pkg.test()` **176/176**; `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida` con **0 fallos
+de I-1…I-7** (ampliadas a quemado y recompensa del incluidor); vectores
+`vectores-transicion-v0.3.txt` (2 795 casos) releídos con **0 discrepancias**; los vectores v0,
+v0.1 y v0.2 quedan **intactos** y se releen con 0 discrepancias.
+
+## SL3.2. Faltas de definición detectadas antes de editar
+
+Nueve, registradas en `PROGRESO.md` §SL3.1 con su lectura adoptada
+(`# AMBIGUEDAD-SL3-n`): momento/permanencia de la congelación frente a la liquidación (1),
+`congelado` como cuenta o gravamen (2), activación de C-EVP (3), forma del error de `cbid`
+ajeno (4), `H_d` abstracto (5), momento de la poda (6), puerta RAT-3 (7),
+`último_slot_producido` (8) y redondeo de RAT-2 (9). Ninguna obliga a elegir entre reglas
+incompatibles; todas se resuelven sin alterar otra regla. **No se detuvo la ejecución.**
+
+## SL3.3. Qué se ha implementado
+
+| Regla | Implementación en `src/Transicion.jl` / `src/evidencia.jl` |
+|---|---|
+| EV-01/EV-04 | `Evidencia` con dos cabeceras; `pre_hash(H1) < pre_hash(H2)` estricto (`ErrOrdenCanonico`); sin entradas ni salidas (`ErrEvidenciaConEntradas`) |
+| EV-05 (RAT-1) | identidad `(cbid, clave, sector, historia, chunk, slot)`; `cbid ≠ P.cbid` ⇒ `ErrCbidAjeno` (Rust `ErrForma`) |
+| EV-06/EV-07 | identidad común exacta y sellos válidos; si no, `ErrSinEvidencia` |
+| EV-10/EV-11 | `incident_id = sha256(identidad canónica)` (marcador de `H_d`); registro en `Garantia.incidentes` y poda al cerrar la ventana |
+| EV-12 | segunda evidencia del mismo incidente ⇒ `ErrEvidenciaDuplicada` (rechazo en cadena; descarte en T04) |
+| EV-13/EV-14 | `slot_falta ≤ punto < slot_falta + Plazo_slots`; fuera ⇒ `ErrEvidenciaTardia` |
+| EV-17/EV-18 | congelación total (gravamen `Garantia.congelado`) sobre activo, pendientes, en retirada y créditos |
+| EV-19…EV-22 | `C = mín(V, techo(f·V))` con enteros (`f = f_num/f_den`); `techo(C·2/8)` a la coinbase del bloque que aplica, el resto a `Quemado` (RAT-2); clave sin saldo ⇒ pérdida 0 (EV-22) |
+| EV-24/EV-15b (RAT-3) | liberación exige (i) sin caso abierto y (ii) `punto ≥ último_slot_producido(P) + Plazo_slots + M_margen_slots`; puerta `R_slots > Plazo_slots + M_margen_slots` (`ErrPuertaRAT3`). El retiro no se bloquea |
+| EV-27…EV-29 | `Estado.ultimo_slot_producido`; undo por copia íntegra; ventanas en slots absolutos |
+
+## SL3.4. Casos dirigidos
+
+`casos_evidencia_cobertura` (aplicada, duplicada, tardía, `cbid` ajeno, clave sin saldo,
+`con_entradas`), `caso_rat3_carrera` (retiro parcial, producción continuada, doble firma cerca
+del final de la retención con `sf = t0 + R_slots − Plazo` y liberación en `t0 + R_slots`: se
+comprueba que (i) ya no bloquea y (ii) sí ⇒ `ErrVentanaAbierta`), `caso_autodenuncia` (el
+productor es el infractor; se comprueba la fórmula exacta y, con `C` múltiplo de 8, la pérdida
+`6/8·C`). En `test/runtests.jl` se cubren además orden canónico, sellos, identidad, EV-22,
+EV-24(i), el retiro aceptado con caso abierto, la puerta RAT-3, X-13 y R-12.
+
+## SL3.5. Tabla de cobertura (V4)
+
+`resultados/cobertura-v0.3.txt` (generada por `exportar.jl`):
+
+| Tipo | Mínimo | v0.3 |
+|---|---:|---:|
+| aplicada | ≥ 100 | **260** |
+| duplicada (inerte/rechazo) | ≥ 30 | **40** |
+| fuera de plazo | ≥ 30 | **200** |
+| `cbid` ajeno | ≥ 30 | **120** |
+| contra clave sin saldo | ≥ 30 | **120** |
+| deshecha (undo exacto EV-27) | ≥ 30 | **380** |
+| (extra) con entradas | — | 120 |
+
+## SL3.6. Vectores y relectura (V3)
+
+- `resultados/vectores-transicion-v0.3.txt`: **2 795 casos**, sha256
+  `d3b73b06664fb4dbd4311cc163ddf937605192bf99f928e260dc67e02ad7897b`; `.sha256` en formato
+  `sha256sum` relativo a `T01/`.
+- Relectura independiente (`src/lector_vectores.jl`, analizador y render propios, ahora con
+  `ev=` y `inc=`): **2 795 casos, 0 discrepancias**.
+- v0, v0.1 y v0.2 intactos (`sha256sum -c` OK) y releídos con 0 discrepancias.
+- El formato de las líneas `GAR` sólo añade ` inc=…` cuando la lista no está vacía, así que
+  los vectores antiguos conservan su texto exacto.
+
+## SL3.7. Tests y `run.jl`
+
+- `Pkg.test()` (rejilla reducida, `T01_REPLICAS=2`): **176/176**, incluido el testset
+  `SL-3 (evidencia y castigo)` **82/82**. Registro `resultados/test-T01-SL3.log`.
+- `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida`: 147 456 puntos, **737 280** historias,
+  4 595 520 undos exactos, **I-1…I-7 = 0 fallos**; bloque de evidencia: 92 historias, 412
+  undos, **8** liberaciones RAT-3 bloqueadas, **0 fallos** en las siete invariantes. 75,6 s de
+  pared, 1 hilo, RSS ≈ 0,4 GiB. Registro `resultados/run-reducida-SL3.log`.
+
+## SL3.8. Entorno
+
+Julia 1.13.0; `JULIA_DEPOT_PATH=T01/.julia-depot`; 1 hilo
+(`JULIA_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`); sin `@fastmath`, `@simd`, `@inbounds`,
+`@turbo`; sin Python. Dependencias: las de `Project.toml` (sin añadir ninguna).
+
+## SL3.9. Lo que T01-SL3 NO demuestra
+
+- **No modela criptografía real**: los sellos son un booleano abstracto y `incident_id` es un
+  SHA2-256 marcador de `H_d`, no la verificación Ed25519 ni la codificación v4 real.
+- **No modela forma de wire v4** (EV-01…EV-04 de bytes, pesos, `txid`): el oráculo comprueba
+  semántica, no el parser de `FORMATO-v0`.
+- **No calibra** `f`, `Plazo_slots`, `M_margen_slots`, `R_slots`: son entradas (SL-2/SL-2b).
+- **No cierra la grieta A12/DS-3** (EV-22) ni decide el destino de los fondos (resuelto por
+  RAT-2).
+- **La «deshecha» de T01 es undo exacto (EV-27)**, no una reorganización de ramas; las ramas
+  hermanas y la reaparición en otra rama se ejercen en T04.
