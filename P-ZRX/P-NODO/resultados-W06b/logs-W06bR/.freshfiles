@@ -1,0 +1,14 @@
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/Cargo.lock ws/Cargo.lock
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/Cargo.toml ws/Cargo.toml
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/ci/frontera-crates.sh ws/ci/frontera-crates.sh
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/Cargo.toml ws/crates/zx-storage/Cargo.toml
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/README.md ws/crates/zx-storage/README.md
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/examples/medir_almacen.rs ws/crates/zx-storage/examples/medir_almacen.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/src/almacen.rs ws/crates/zx-storage/src/almacen.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/src/disco.rs ws/crates/zx-storage/src/disco.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/src/error.rs ws/crates/zx-storage/src/error.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/src/formato.rs ws/crates/zx-storage/src/formato.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/src/lib.rs ws/crates/zx-storage/src/lib.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/src/memoria.rs ws/crates/zx-storage/src/memoria.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/tests/matar_a_mitad.rs ws/crates/zx-storage/tests/matar_a_mitad.rs
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-storage/tests/propiedades.rs ws/crates/zx-storage/tests/propiedades.rs

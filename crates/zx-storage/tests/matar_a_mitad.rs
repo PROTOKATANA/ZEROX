@@ -1,45 +1,25 @@
-//! **Matar el proceso a mitad de una escritura y comprobar que el almacén queda coherente.**
+//! **Matar el proceso a mitad de una admisión y comprobar que el almacén queda coherente.**
 //!
 //! # Lo que este test NO pretende demostrar
 //!
-//! Que RocksDB sea atómico. Eso ya lo demuestra RocksDB con `db_crashtest.py`, que corre en su CI
-//! en dos modos —`kill -9` y puntos de fallo inyectados con `SyncPoint`— con años de fuzzing
-//! detrás. Repetirlo aquí sería gastar tiempo en verificar a un tercero.
-//!
-//! # Lo que sí prueba
-//!
-//! Que el almacén **reabre coherente** tras un `SIGKILL` en cualquier punto: que la punta nunca
-//! menciona una cabecera que no está, que no hay agujeros en el índice de alturas, y que el UTXO
-//! set nunca va por delante de la cadena. Y de paso valida nuestra configuración de recuperación
-//! —`PointInTimeRecovery`, C-STORE-10— contra colas de WAL truncadas de verdad.
-//!
-//! # ⚠️ Lo que NO consigue probar, y conviene saberlo
-//!
-//! **No caza de forma fiable una operación lógica partida en dos `db.write()`**, que es el fallo
-//! de C-STORE-07 y el que ya existió aquí con `fijar_punta` fuera del lote.
-//!
-//! Comprobado, no supuesto: se mutó `aplicar_lote` para escribir la punta en su propio lote y
-//! **antes** de las cabeceras —el orden prohibido y la partición prohibida, las dos a la vez— y el
-//! test **pasó tres veces de tres**. La razón es aritmética: la ventana entre las dos escrituras
-//! dura nanosegundos, y diez `kill` repartidos por milisegundos no caen dentro. Subirlo a miles de
-//! rondas lo haría inviable en CI.
-//!
-//! Para una propiedad **estructural** hace falta una comprobación estructural, no una carrera de
-//! probabilidades: la hace `una_operacion_logica_es_una_sola_escritura` en `disco.rs`, que lee el
-//! código y cuenta.
+//! Que RocksDB sea atómico. Eso lo demuestra RocksDB con su `db_crashtest.py`. Aquí se prueba que
+//! **nuestro** uso del `WriteBatch` (bloque + entrada del registro) deja tras un `SIGKILL` un
+//! **prefijo exacto** del registro: sin huecos, sin entradas sin su bloque y con los mismos bytes.
 //!
 //! # Por qué la ruta es matar un proceso de verdad
 //!
-//! `rust-rocksdb` **no expone** `SyncPoint` ni `FaultInjectionTestEnv` — comprobado buscándolos en
-//! el índice completo de la API de la versión pineada: cero coincidencias. La ruta whitebox de
-//! RocksDB no está disponible desde Rust sin escribir C++ propio. Queda la blackbox, que es la que
-//! el propio RocksDB usa para la mitad de sus pruebas de recuperación.
+//! `rust-rocksdb` no expone `SyncPoint` ni `FaultInjectionTestEnv`; la ruta whitebox no está
+//! disponible sin escribir C++ propio. Queda la blackbox: el binario de test se relanza a sí mismo
+//! con una variable de entorno, y `Child::kill` manda `SIGKILL` en Unix.
 //!
-//! Sin dependencias nuevas: el binario de test se relanza a sí mismo con una variable de entorno, y
-//! `Child::kill` ya manda `SIGKILL` en Unix.
+//! # Sincronización del golpe
+//!
+//! Se espera a la **primera** señal del trabajador (confirma que abrió y escribió) y a partir de
+//! ahí se le deja correr una espera pseudoaleatoria distinta en cada ronda, con semilla fija, antes
+//! de matarlo. Así el `kill` no está sincronizado con el final de una escritura y cae donde caiga.
 
 #![cfg(feature = "rocksdb")]
-#![expect(
+#![allow(
     clippy::expect_used,
     clippy::unwrap_used,
     clippy::panic,
@@ -50,149 +30,104 @@ use std::io::{BufRead as _, BufReader, Write as _};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use zx_core::digest::{BlockHash, Digest, MerkleRoot};
-use zx_core::preimage::block::BlockHeader;
-use zx_storage::AlmacenEnDisco;
-use zx_storage::almacen::{AlmacenCadena, Punta};
-use zx_storage::utxo::DeltaUtxo;
+use zx_core::digest::{BlockHash, Digest};
+use zx_core::preimage::block::{BlockHeader, merkle_root};
+use zx_core::red::Red;
+use zx_storage::almacen::{Almacen, BloqueAdmitido};
+use zx_storage::disco::AlmacenEnDisco;
 
 /// Con esta variable puesta, el binario de test se comporta como el trabajador al que se mata.
 const VAR_RUTA: &str = "ZX_MATAR_A_MITAD_RUTA";
-/// Cuántas veces se repite el experimento, matando en un punto distinto cada vez.
-const RONDAS: u32 = 10;
-const RAMA: u32 = 0xc478_80ea;
+/// Semilla fija de las esperas (splitmix64).
+const SEMILLA: u64 = 0x57_30_36_62_5f_6d_61_74;
+/// Rondas: cada una mata en un punto distinto.
+const RONDAS: u32 = 64;
 
-fn cabecera(altura: u32, prev: BlockHash) -> BlockHeader {
-    BlockHeader {
-        consensus_branch_id: RAMA,
-        prev_hash: prev,
-        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([(altura % 251) as u8; 32])),
-        timestamp: 1_788_480_000 + u64::from(altura) * 120,
+fn genesis() -> BlockHash {
+    BlockHash::from_digest(Digest::from_bytes([0x9a; 32]))
+}
+
+/// El bloque `i` de la secuencia, determinista y conocido por las dos partes.
+fn bloque(i: u64) -> BloqueAdmitido<'static> {
+    let cabecera = BlockHeader {
+        consensus_branch_id: zx_core::CBID_RED_DEV,
+        prev_hash: BlockHash::from_digest(Digest::from_bytes([(i % 251) as u8; 32])),
+        merkle_root: merkle_root(&[]),
+        timestamp: 1_788_480_000 + i,
         bits: 0x1d00_ffff,
-        nonce: u64::from(altura),
-        height: altura,
-    }
-}
-
-fn coinbase(altura: u32) -> zx_core::tx::Tx {
-    zx_core::tx::Tx {
-        version: 1,
-        inputs: vec![],
-        outputs: vec![zx_core::tx::TxOut {
-            value: zx_core::amount::Amount::nuevo(1_000 + i64::from(altura)).unwrap(),
-            lock: zx_core::tx::Lock::PubKey {
-                pubkey: zx_core::firma::ClavePublica::desde_bytes([9; 32]),
-            },
-        }],
-        lock_time: 0,
-        expiry_height: altura,
-    }
-}
-
-/// El trabajador: avanza la cadena en bucle y anuncia cada avance, hasta que lo maten.
-fn trabajar(ruta: &Path) -> ! {
-    let almacen = AlmacenEnDisco::abrir(ruta).expect("abre");
-
-    // Se retoma donde estuviera, que es lo que haría un nodo tras reiniciar.
-    let (mut altura, mut prev) = match almacen.punta().expect("punta") {
-        Some(p) => (p.altura + 1, p.hash),
-        None => (0, BlockHash::from_digest(Digest::from_bytes([0; 32]))),
+        nonce: i,
+        height: u32::try_from(i).unwrap_or(u32::MAX),
     };
+    BloqueAdmitido::pow(&cabecera, &[], &[])
+}
+
+/// Genera una espera pseudoaleatoria a partir de una semilla fija (splitmix64).
+fn espera_micros(ronda: u32) -> u64 {
+    let mut z = SEMILLA ^ u64::from(ronda).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    z = z.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^= z >> 31;
+    z % 3_000
+}
+
+/// El trabajador: admite bloques en bucle y anuncia cada avance, hasta que lo maten.
+fn trabajar(ruta: &Path) -> ! {
+    let almacen = AlmacenEnDisco::abrir(ruta, Red::Dev, genesis()).expect("abre");
+    // Se retoma donde estuviera, que es lo que haría un nodo tras reiniciar.
+    let mut i = almacen.longitud_registro().expect("longitud");
 
     let salida = std::io::stdout();
     loop {
-        let c = cabecera(altura, prev);
-        prev = c.block_hash();
-        let punta = Punta { hash: prev, altura };
-        almacen
-            .aplicar_lote(core::slice::from_ref(&c), punta)
-            .expect("aplica el lote");
-
-        // Y, por separado, finalizar un bloque atrasado: son dos operaciones lógicas distintas, y
-        // el test tiene que cubrir también la ventana ENTRE ellas.
-        if altura >= 3 {
-            let fin = altura - 3;
-            let d = DeltaUtxo::de_bloque(&[coinbase(fin)], fin, RAMA).expect("delta");
-            almacen.finalizar(fin, &d).expect("finaliza");
-        }
-
+        let b = bloque(i);
+        almacen.admitir(&b, true).expect("admite con sync");
         let mut s = salida.lock();
-        writeln!(s, "AVANCE {altura}").expect("anuncia");
+        writeln!(s, "AVANCE {i}").expect("anuncia");
         s.flush().expect("vacía");
         drop(s);
-
-        altura += 1;
+        i = i.checked_add(1).expect("la secuencia no desborda");
     }
 }
 
-/// **El invariante: ningún componente del estado puede ir por delante de otro.**
-///
-/// Se comprueba tras reabrir. Quedarse **corto** es legítimo —es lo que un `kill -9` produce, y el
-/// nodo lo arregla resincronizando—; que la punta mencione una cabecera que no está, o que el UTXO
-/// set diga una altura que la cadena no alcanza, no lo es.
-///
-/// Devuelve la altura alcanzada, para que quien llame pueda comprobar que el test no se ha quedado
-/// vacío. Devolverla en vez de abrir el almacén otra vez no es estética: **la segunda apertura
-/// fallaba**, porque la primera todavía tenía el fichero de bloqueo de RocksDB.
-fn comprobar(ruta: &Path, ronda: u32) -> u32 {
-    let a = AlmacenEnDisco::abrir(ruta).expect("reabre tras el kill -9");
+/// Comprueba que lo reabierto es un prefijo exacto y devuelve su longitud.
+fn comprobar(ruta: &Path, ronda: u32) -> u64 {
+    let a = AlmacenEnDisco::abrir(ruta, Red::Dev, genesis()).expect("reabre tras el SIGKILL");
+    let n = a.longitud_registro().expect("longitud");
 
-    let Some(p) = a.punta().expect("punta") else {
-        // Nada escrito todavía: legítimo si se mató muy pronto.
+    let mut vistos = 0u64;
+    a.repetir(&mut |hash, valor| {
+        let esperado = bloque(vistos);
         assert_eq!(
-            a.altura_finalizada().expect("finalizada"),
-            None,
-            "ronda {ronda}: sin punta pero con altura finalizada — el UTXO va por delante de la cadena"
+            hash,
+            esperado.hash(),
+            "ronda {ronda}: hash inesperado en {vistos}"
         );
-        return 0;
-    };
+        assert_eq!(
+            valor,
+            esperado.a_bytes_almacen().as_slice(),
+            "ronda {ronda}: bytes inesperados en {vistos}"
+        );
+        vistos += 1;
+        Ok::<(), ()>(())
+    })
+    .expect("la repetición de un almacén coherente no debe fallar");
 
-    // C-STORE-01 · la punta apunta a algo que existe.
-    assert!(
-        a.cabecera(&p.hash).expect("lee").is_some(),
-        "ronda {ronda}: la punta menciona una cabecera que no está guardada"
-    );
     assert_eq!(
-        a.hash_en_altura(p.altura).expect("lee"),
-        Some(p.hash),
-        "ronda {ronda}: el índice de alturas no coincide con la punta"
+        vistos, n,
+        "ronda {ronda}: el registro y la repetición descuadran"
     );
-
-    // Sin agujeros: toda altura hasta la punta tiene su cabecera.
-    for h in 0..=p.altura {
-        let hash = a.hash_en_altura(h).expect("lee").unwrap_or_else(|| {
-            panic!(
-                "ronda {ronda}: falta la altura {h}, con la punta en {}",
-                p.altura
-            )
-        });
-        assert!(
-            a.cabecera(&hash).expect("lee").is_some(),
-            "ronda {ronda}: la altura {h} apunta a una cabecera que no está"
-        );
-    }
-
-    // C-STORE-06 · el UTXO set nunca por delante de la cadena de cabeceras.
-    if let Some(fin) = a.altura_finalizada().expect("finalizada") {
-        assert!(
-            fin <= p.altura,
-            "ronda {ronda}: finalizado hasta {fin} con la cadena solo hasta {}",
-            p.altura
-        );
-    }
-
-    p.altura
+    n
 }
 
 #[test]
-fn matar_a_mitad_de_escritura_no_deja_el_almacen_incoherente() {
+fn matar_a_mitad_de_escritura_no_deja_entrada_sin_bloque() {
     // ── ¿Somos el hijo? ──────────────────────────────────────────────────────
     if let Ok(ruta) = std::env::var(VAR_RUTA) {
         trabajar(Path::new(&ruta));
     }
 
     let exe = std::env::current_exe().expect("ruta del propio binario");
-    let mut alcanzadas: Vec<u32> = Vec::new();
+    let mut alcanzadas: Vec<u64> = Vec::new();
 
     for ronda in 1..=RONDAS {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -200,7 +135,7 @@ fn matar_a_mitad_de_escritura_no_deja_el_almacen_incoherente() {
         let mut hijo = Command::new(&exe)
             .args([
                 "--exact",
-                "matar_a_mitad_de_escritura_no_deja_el_almacen_incoherente",
+                "matar_a_mitad_de_escritura_no_deja_entrada_sin_bloque",
                 "--nocapture",
             ])
             .env(VAR_RUTA, dir.path())
@@ -209,48 +144,37 @@ fn matar_a_mitad_de_escritura_no_deja_el_almacen_incoherente() {
             .spawn()
             .expect("lanza al trabajador");
 
-        // Se espera a la PRIMERA señal —confirma que el trabajador abrió y escribe— y a partir de
-        // ahí se le deja correr una espera distinta en cada ronda antes de matarlo.
-        //
-        // La primera versión leía N señales y mataba justo después de la N-ésima: eso sincroniza el
-        // `kill` con el final de una escritura, y entonces nunca cae **a mitad** de ninguna. Con una
-        // espera en microsegundos el trabajador sigue escribiendo mientras tanto, y el golpe cae
-        // donde caiga — que es todo el sentido de la prueba.
-        let mut arrancó = false;
+        // Se espera a la PRIMERA señal: confirma que el trabajador abrió y escribió algo.
+        let mut arranco = false;
         let salida = hijo.stdout.take().expect("stdout");
         let mut lector = BufReader::new(salida);
         let mut linea = String::new();
         while lector.read_line(&mut linea).unwrap_or(0) > 0 {
             if linea.starts_with("AVANCE ") {
-                arrancó = true;
+                arranco = true;
                 break;
             }
             linea.clear();
         }
         assert!(
-            arrancó,
-            "ronda {ronda}: el trabajador no llegó a escribir nada. Si esto salta, el test no está \
-             probando nada y lleva sin hacerlo desde que se rompiera lo que lo impide."
+            arranco,
+            "ronda {ronda}: el trabajador no llegó a escribir nada; el test no está probando nada"
         );
-        std::thread::sleep(std::time::Duration::from_micros(u64::from(ronda) * 211));
 
-        // SIGKILL: ni destructores, ni cierre de la base de datos, ni volcado. `wait` no es
-        // opcional — sin él, el hijo sigue teniendo el fichero de bloqueo de RocksDB y la
-        // reapertura falla con `Resource temporarily unavailable`.
+        // Espera pseudoaleatoria (semilla fija) y SIGKILL: ni destructores, ni cierre de la base.
+        std::thread::sleep(std::time::Duration::from_micros(espera_micros(ronda)));
         hijo.kill().expect("mata al trabajador");
         hijo.wait().expect("lo entierra");
 
         alcanzadas.push(comprobar(dir.path(), ronda));
     }
 
-    // **Que el test no se vuelva vacío en silencio.** Si un día el trabajador dejara de escribir,
-    // `comprobar` aprobaría cada ronda por la vía rápida —«sin punta, legítimo»— y este archivo
-    // seguiría en verde sin probar nada. Que las alturas alcanzadas varíen demuestra dos cosas: que
-    // hubo trabajo, y que el golpe cayó en puntos distintos.
+    // Que el test no se vuelva vacío en silencio: hubo trabajo y los golpes cayeron en puntos
+    // distintos.
     let maxima = alcanzadas.iter().copied().max().unwrap_or(0);
     assert!(
         maxima > 0,
-        "ninguna ronda llegó a escribir una punta: el test no está probando nada"
+        "ninguna ronda llegó a admitir un bloque: el test no prueba nada"
     );
     let distintas = {
         let mut v = alcanzadas.clone();
@@ -260,7 +184,6 @@ fn matar_a_mitad_de_escritura_no_deja_el_almacen_incoherente() {
     };
     assert!(
         distintas > 1,
-        "todas las rondas murieron en el mismo punto ({alcanzadas:?}): el `kill` está \
-         sincronizado con la escritura y nunca cae a mitad"
+        "todas las rondas murieron en el mismo punto ({alcanzadas:?}): el `kill` está sincronizado"
     );
 }

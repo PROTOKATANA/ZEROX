@@ -1,31 +1,33 @@
-//! Almacenamiento de bloques, cabeceras y UTXO en memoria o disco (feature `rocksdb`).
+//! Almacén de bloques admitidos y registro de admisión (decisión D-N03′).
 //!
-//! Contiene implementación y tests. Existen el **almacenamiento de candidatos DAG** (cola no
-//! validada por `block_hash`, ver [`almacen_dag`]) y la **lectura de un índice separado de bloques
-//! DAG plenamente admitidos** (ver [`almacen_admitidos_dag`]), cuya admisión, orden y estado siguen
-//! pendientes; el índice de admitidos todavía no tiene escritor de producción y está **vacío en la
-//! ruta activa** —solo lo llenan fixtures de test con bytes no verificados—. La capa blindada
-//! también sigue pendiente. Véanse README.md de este crate y MIGRACION.md en la raíz del proyecto.
+//! La pregunta falsable de W06b: tras cualquier secuencia de admisiones interrumpida por la muerte
+//! del proceso en un punto arbitrario, el almacén reabre con un **prefijo exacto** de lo confirmado
+//! —ni bloques a medias ni entradas del registro sin su bloque—, **rechaza con error explícito**
+//! cualquier corrupción de bytes, y la repetición entrega los bloques **en el mismo orden y con los
+//! mismos bytes**.
+//!
+//! # Piezas
+//!
+//! - [`almacen`]: el rasgo [`Almacen`] —admitir, leer, repetir— y [`BloqueAdmitido`], el bloque con
+//!   su familia y sus bytes canónicos.
+//! - [`formato`]: el sobre de disco `familia(1) ‖ bloque canónico`, el recálculo del hash con el
+//!   código de `zx-core` y la exigencia de forma canónica.
+//! - [`memoria`]: la implementación de referencia, para los tests rápidos.
+//! - [`disco`]: la implementación sobre RocksDB, tras la feature `rocksdb`.
+//! - [`error`]: [`StorageError`], que traduce toda anomalía en un error visible.
 
 #![doc = include_str!("../README.md")]
 
 pub mod almacen;
-pub mod almacen_admitidos_dag;
-pub mod almacen_dag;
 #[cfg(feature = "rocksdb")]
 pub mod disco;
 pub mod error;
 pub mod formato;
 pub mod memoria;
-pub mod utxo;
 
-pub use almacen::{AlmacenCadena, Punta};
-pub use almacen_admitidos_dag::AlmacenAdmitidosDag;
-pub use almacen_dag::AlmacenCandidatosDag;
+pub use almacen::{Almacen, BloqueAdmitido, ErrorRepeticion};
 #[cfg(feature = "rocksdb")]
 pub use disco::AlmacenEnDisco;
 pub use error::StorageError;
+pub use formato::{Familia, VERSION_ESQUEMA};
 pub use memoria::AlmacenEnMemoria;
-pub use utxo::{
-    ConjuntoEnMemoria, UndoData, aplicar_bloque, revertir_bloque, revertir_hasta_el_fork,
-};

@@ -1,0 +1,3 @@
+# Identidad de crates/zx-storage entre W06b (revisado) y W06b-R
+# Comando: diff -r /home/katana/zeo/ZEROX/deepseek/W06b/ws/crates/zx-storage /home/katana/zeo/ZEROX/deepseek/W06bR/ws/crates/zx-storage
+IDENTICO: los 11 ficheros de zx-storage (W06b + Correccion A) se conservan byte a byte.

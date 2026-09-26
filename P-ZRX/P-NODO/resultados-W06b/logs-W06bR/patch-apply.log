@@ -1,0 +1,6 @@
+# Verificación de cambios.patch — ORDEN-W06b-R
+# 1) cambios.patch = diff -ruN -x target -x .cargo-home -x PDF ws.orig ws
+#    Ficheros en el parche: 14
+# 2) Sobre una copia limpia de ws.orig (.check-ws), 'git apply -p1 cambios.patch' aplica
+#    sin errores y reconstruye ws byte a byte (diff -r sin diferencias).
+# Resultado: OK

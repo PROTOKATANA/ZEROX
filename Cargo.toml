@@ -10,6 +10,7 @@ members = [
     "crates/zx-post",
     "crates/zx-p2p",
     "crates/zx-cadena",
+    "crates/zx-storage",
 ]
 # El clon fijado `PDF/autonomys-subspace` vive dentro de la copia de trabajo, así que Cargo lo
 # incluiría como miembro automático de este workspace al enlazarlo por `path` y resolvería su
@@ -75,6 +76,12 @@ rand_chacha        = "=0.9.0"
 futures            = "=0.3.34"
 async-lock         = "=3.4.2"
 parity-scale-codec = { version = "=3.7.5", default-features = false, features = ["derive"] }
+
+# --- almacén (W06b) — versiones exactas del `Cargo.lock` de `9681061` ---
+# `rocksdb` 0.25 con sus features por defecto (snappy, lz4, zstd, zlib, bzip2) y `tempfile` para
+# los tests del almacén en disco.
+rocksdb  = "=0.25.0"
+tempfile = "=3.24.0"
 
 # --- test ---
 proptest        = "=1.11.0"

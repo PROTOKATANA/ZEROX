@@ -1,376 +1,402 @@
-//! Almacén sobre RocksDB (SPEC §12).
+//! Almacén sobre RocksDB (feature `rocksdb`).
 //!
-//! Tras la feature `rocksdb`. Ver [`crate::memoria`] para por qué es opcional y por qué existe una
-//! implementación de referencia contra la que compararlo.
+//! Ver [`crate::memoria`] para por qué existe una implementación de referencia en memoria contra la
+//! que este backend se contrasta.
 //!
-//! # Siete familias de columnas, no una
+//! # Tres familias de columnas
 //!
 //! | Familia | Clave → valor | Por qué separada |
 //! |---|---|---|
-//! | `cabeceras` | hash(32) → 92 B | Se lee constantemente y es diminuta: comparte caché con todo lo demás si va junta |
-//! | `alturas` | altura(4 BE) → hash(32) | El índice de la cadena principal. **Cambia en cada reorg**, y las otras no |
-//! | `cuerpos` | hash(32) → bytes | Grandes y de acceso raro. Mezclarlos con las cabeceras arruinaría la caché |
-//! | `meta` | clave corta → valor | La punta, la altura finalizada, y lo que venga |
-//! | `utxo` | outpoint(36 B) → entrada | El UTXO set **finalizado**. Enorme y de acceso aleatorio: separarlo es lo que evita que se coma la caché de las cabeceras |
-//! | `candidatos_dag` | `block_hash`(32) → bloque DAG completo | La cola **no confiable** de candidatos DAG, separada de la cadena lineal para no reinterpretar ni mezclar sus familias |
-//! | `admitidos_dag` | `block_hash`(32) → sobre versionado | El índice de bloques DAG **plenamente admitidos** —destino, hoy **vacío en la ruta activa**—, de **solo lectura** hoy. Separado de la cola reemplazable: el futuro escritor no sobrescribirá la evidencia |
+//! | `bloques` | `block_hash`(32) → `familia`(1) ‖ canónicos | Los bloques admitidos, con su familia PoW/PoST |
+//! | `registro` | índice(`u64` BE) → `block_hash`(32) | El orden de admisión; se recorre para repetir |
+//! | `meta` | clave corta → valor | red, génesis y versión del esquema |
 //!
-//! Las familias `candidatos_dag` y `admitidos_dag` las añade la preparación C1 (ver
-//! [`crate::almacen_dag`] y [`crate::almacen_admitidos_dag`]): guardan bloques DAG **sin validar**
-//! y **admitidos** respectivamente —la segunda es hoy un destino vacío en la ruta activa, que solo
-//! los tests llenan con bytes no verificados—, y **no** participan de la punta, las alturas ni el
-//! UTXO. Se crean con `create_missing_column_families`, así que un almacén lineal anterior se abre
-//! sin migración y gana las familias vacías.
-//!
-//! La altura se codifica en **big-endian a propósito**: RocksDB ordena las claves por bytes, así
-//! que big-endian hace que el orden lexicográfico coincida con el numérico. Con little-endian, la
-//! altura 256 quedaría antes que la 2, y recorrer la cadena por rango dejaría de funcionar.
+//! El índice va en **big-endian a propósito**: RocksDB ordena las claves por bytes, así que
+//! big-endian hace que el orden lexicográfico coincida con el numérico y el registro se recorra en
+//! orden ascendente sin ordenar nada.
 //!
 //! # Escrituras atómicas
 //!
-//! Guardar una cabecera toca **dos** familias —`cabeceras` y `alturas`—, y hacerlo en dos
-//! operaciones deja una ventana donde el índice de alturas apunta a algo que aún no existe. Se usa
-//! `WriteBatch`, que RocksDB aplica de forma atómica.
+//! Cada admisión toca **dos** familias —`bloques` y `registro`— y se hace con un solo `WriteBatch`:
+//! RocksDB lo aplica de forma atómica porque las familias comparten el WAL. Sin el lote, un corte
+//! entre las dos escrituras dejaría una entrada de registro sin su bloque o un bloque sin entrada.
+//!
+//! # Integridad al abrir y al leer
+//!
+//! Al abrir se recorre el registro exigiendo que sea contiguo desde `0` y que cada entrada tenga su
+//! bloque con el hash correcto. Al leer un bloque se vuelve a recalcular su hash con el código de
+//! `zx-core`. Cualquier anomalía es error explícito; no hay reparación silenciosa.
 
-use rocksdb::{ColumnFamilyDescriptor, DB, DBRecoveryMode, Options, WriteBatch};
 use std::path::Path;
+use std::sync::Mutex;
 
-use zx_consensus::validacion::EntradaUtxo;
+use rocksdb::{
+    ColumnFamily, ColumnFamilyDescriptor, DB, DBRecoveryMode, IteratorMode, Options, WriteBatch,
+    WriteOptions,
+};
+
 use zx_core::digest::{BlockHash, Digest};
-use zx_core::preimage::block::{BlockHeader, TAMANO_CABECERA};
-use zx_core::tx::OutPoint;
-use zx_core::wire;
-use zx_core::wire_dag::{BloqueDag, bloque_dag_a_bytes, bloque_dag_desde_bytes};
+use zx_core::red::Red;
 
-use crate::almacen::{AlmacenCadena, Punta};
-use crate::almacen_admitidos_dag::{AlmacenAdmitidosDag, bloque_admitido_con_clave};
-use crate::almacen_dag::AlmacenCandidatosDag;
+use crate::almacen::{Almacen, BloqueAdmitido, ErrorRepeticion};
 use crate::error::StorageError;
-use crate::formato;
-use crate::utxo::DeltaUtxo;
+use crate::formato::{self, VERSION_ESQUEMA};
 
-const CF_CABECERAS: &str = "cabeceras";
-const CF_ALTURAS: &str = "alturas";
-const CF_CUERPOS: &str = "cuerpos";
+/// Los bloques admitidos: `block_hash`(32) → `familia`(1) ‖ canónicos.
+const CF_BLOQUES: &str = "bloques";
+/// El orden de admisión: índice(`u64` BE) → `block_hash`(32).
+const CF_REGISTRO: &str = "registro";
+/// La identidad del almacén: red, génesis y versión del esquema.
 const CF_META: &str = "meta";
-/// El UTXO set finalizado: clave de 36 B → entrada serializada (C-STORE-05).
-const CF_UTXO: &str = "utxo";
-/// La cola **no confiable** de candidatos DAG: `block_hash`(32) → bloque DAG completo.
-///
-/// Familia nueva de la preparación C1. No es el estado validado del DAG ni su punta: ver
-/// [`crate::almacen_dag`].
-const CF_CANDIDATOS_DAG: &str = "candidatos_dag";
-/// El índice de bloques DAG **plenamente admitidos**: `block_hash`(32) → sobre versionado.
-///
-/// Familia nueva de la preparación C1, de **solo lectura** hoy y **vacía en la ruta activa**: solo
-/// las inyecciones de fixture de los tests la llenan, con bytes no verificados. Separada de
-/// `candidatos_dag`: el futuro escritor no sobrescribirá la evidencia. Ver
-/// [`crate::almacen_admitidos_dag`].
-const CF_ADMITIDOS_DAG: &str = "admitidos_dag";
 
-/// Clave de la punta dentro de `meta`.
-const CLAVE_PUNTA: &[u8] = b"punta";
+/// Clave de la red dentro de `meta`.
+const META_RED: &[u8] = b"red";
+/// Clave del hash del génesis dentro de `meta`.
+const META_GENESIS: &[u8] = b"genesis";
+/// Clave de la versión del esquema dentro de `meta`.
+const META_VERSION: &[u8] = b"version_esquema";
 
-/// Clave de la altura finalizada dentro de `meta`.
-///
-/// Va aparte de la punta a propósito: son **dos marcadores de progreso distintos** que difieren
-/// hasta en `MAX_REORG_LENGTH` bloques. La punta es hasta dónde llega la cadena de cabeceras; esta
-/// es hasta dónde llega el UTXO set (C-STORE-06).
-const CLAVE_FINALIZADA: &[u8] = b"finalizada";
-
-/// Almacén persistente.
+/// Almacén persistente sobre RocksDB.
 #[derive(Debug)]
 pub struct AlmacenEnDisco {
     db: DB,
+    red: Red,
+    genesis: BlockHash,
+    /// Índice de la próxima admisión. Se inicializa con la longitud verificada del registro.
+    siguiente: Mutex<u64>,
 }
 
-fn backend<E: std::fmt::Display>(e: E) -> StorageError {
-    StorageError::Backend(e.to_string())
+fn backend<E: core::fmt::Display>(e: E) -> StorageError {
+    StorageError::backend(e)
 }
 
-impl AlmacenEnDisco {
-    /// Abre —o crea— el almacén en un directorio.
-    ///
-    /// # Errores
-    /// [`StorageError::Backend`] si RocksDB no puede abrir el directorio.
-    pub fn abrir(ruta: &Path) -> Result<Self, StorageError> {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        opts.create_missing_column_families(true);
-
-        // C-STORE-10 · el modo de recuperación se fija **explícitamente**, aunque hoy coincida con
-        // el valor por omisión de RocksDB. Depender de un default es depender de que nadie lo
-        // mueva, y este ya se movió una vez: en RocksDB 6.6 pasó de tolerar la cola corrupta a
-        // `PointInTimeRecovery`.
-        //
-        // Y NO se usa `AbsoluteConsistency`, aunque el nombre suene a más seguro: convierte la cola
-        // truncada normal de un `kill -9` en una base de datos **que no abre**. Reproducido por
-        // PingCAP en facebook/rocksdb#2871. Un nodo que no arranca es peor que uno que resincroniza
-        // los últimos bloques.
-        opts.set_wal_recovery_mode(DBRecoveryMode::PointInTime);
-
-        // El WAL se queda activo —es lo que da la atomicidad entre familias— y por eso NO hace
-        // falta `atomic_flush`. Comentario textual de `options.h`: "it is not necessary to set
-        // atomic_flush to true if WAL is always enabled […] This option is useful when there are
-        // column families with writes NOT protected by WAL". Aquí no hay ninguna así.
-
-        let familias = [
-            CF_CABECERAS,
-            CF_ALTURAS,
-            CF_CUERPOS,
-            CF_META,
-            CF_UTXO,
-            CF_CANDIDATOS_DAG,
-            CF_ADMITIDOS_DAG,
-        ]
-        .into_iter()
-        .map(|n| ColumnFamilyDescriptor::new(n, Options::default()))
-        .collect::<Vec<_>>();
-
-        let db = DB::open_cf_descriptors(&opts, ruta, familias).map_err(backend)?;
-        Ok(Self { db })
-    }
-
-    fn cf(&self, nombre: &str) -> Result<&rocksdb::ColumnFamily, StorageError> {
-        self.db
-            .cf_handle(nombre)
-            .ok_or_else(|| StorageError::Backend(format!("falta la familia {nombre}")))
+/// El byte con el que la red viaja a `meta`.
+fn codigo_red(red: Red) -> u8 {
+    match red {
+        Red::Mainnet => 0,
+        Red::Testnet => 1,
+        Red::Dev => 2,
     }
 }
 
-/// La altura como clave, **big-endian** (C-STORE-03): ver la nota de módulo.
-fn clave_altura(a: u32) -> [u8; 4] {
-    a.to_be_bytes()
+/// Interpreta el byte de red de `meta`.
+///
+/// # Errores
+/// [`StorageError::Corrupto`] si no es una red conocida.
+fn red_desde_codigo(codigo: u8) -> Result<Red, StorageError> {
+    match codigo {
+        0 => Ok(Red::Mainnet),
+        1 => Ok(Red::Testnet),
+        2 => Ok(Red::Dev),
+        _ => Err(StorageError::Corrupto {
+            que: "la red en `meta` no es conocida",
+        }),
+    }
 }
 
-impl AlmacenCadena for AlmacenEnDisco {
-    fn guardar_cabecera(&self, cabecera: &BlockHeader) -> Result<(), StorageError> {
-        let hash = cabecera.block_hash();
-        let bytes = wire::cabecera_a_bytes(cabecera);
+/// Accede a una familia de columnas.
+///
+/// # Errores
+/// [`StorageError::Backend`] si la familia no existe (no debería: se abren todas).
+fn cf<'a>(db: &'a DB, nombre: &str) -> Result<&'a ColumnFamily, StorageError> {
+    db.cf_handle(nombre)
+        .ok_or_else(|| StorageError::Backend(format!("falta la familia {nombre}")))
+}
 
-        // C-STORE-02 · atómico: sin esto, el índice de alturas puede apuntar a una cabecera que
-        // todavía no está guardada.
-        let mut lote = WriteBatch::default();
-        lote.put_cf(self.cf(CF_CABECERAS)?, hash.as_bytes(), bytes);
-        lote.put_cf(
-            self.cf(CF_ALTURAS)?,
-            clave_altura(cabecera.height),
-            hash.as_bytes(),
-        );
-        self.db.write(lote).map_err(backend)
+/// ¿Está la familia vacía?
+///
+/// # Errores
+/// [`StorageError`] si el iterador falla.
+fn esta_vacio(db: &DB, nombre: &str) -> Result<bool, StorageError> {
+    let cf = cf(db, nombre)?;
+    match db.iterator_cf(cf, IteratorMode::Start).next() {
+        None => Ok(true),
+        Some(Ok(_)) => Ok(false),
+        Some(Err(e)) => Err(backend(e)),
     }
+}
 
-    fn cabecera(&self, hash: &BlockHash) -> Result<Option<BlockHeader>, StorageError> {
-        let Some(bytes) = self
-            .db
-            .get_cf(self.cf(CF_CABECERAS)?, hash.as_bytes())
-            .map_err(backend)?
-        else {
-            return Ok(None);
-        };
-        let (c, resto) =
-            wire::cabecera_desde_bytes(&bytes).map_err(|_| StorageError::Corrupto {
-                que: "una cabecera guardada",
-            })?;
-        // Sobrar bytes significa que lo guardado no es lo que creemos: corrupción, no "casi bien".
-        if !resto.is_empty() || bytes.len() != TAMANO_CABECERA {
-            return Err(StorageError::Corrupto {
-                que: "una cabecera guardada, con longitud inesperada",
-            });
-        }
-        Ok(Some(c))
-    }
+/// Lee el valor de un bloque verificando que su hash recalculado coincide con la clave.
+///
+/// # Errores
+/// [`StorageError::Corrupto`] o [`StorageError::HashNoCoincide`] si lo guardado no cuadra.
+fn leer_verificado(db: &DB, hash: &BlockHash) -> Result<Option<Vec<u8>>, StorageError> {
+    let cf_bloques = cf(db, CF_BLOQUES)?;
+    let Some(valor) = db.get_cf(cf_bloques, hash.as_bytes()).map_err(backend)? else {
+        return Ok(None);
+    };
+    let _ = formato::hash_de_valor(hash, &valor)?;
+    Ok(Some(valor))
+}
 
-    fn hash_en_altura(&self, altura: u32) -> Result<Option<BlockHash>, StorageError> {
-        let Some(bytes) = self
-            .db
-            .get_cf(self.cf(CF_ALTURAS)?, clave_altura(altura))
-            .map_err(backend)?
-        else {
-            return Ok(None);
-        };
-        let arr: [u8; 32] = bytes.try_into().map_err(|_| StorageError::Corrupto {
-            que: "un hash del índice de alturas",
-        })?;
-        Ok(Some(BlockHash::from_digest(Digest::from_bytes(arr))))
-    }
-
-    fn guardar_cuerpo(&self, hash: &BlockHash, bytes: &[u8]) -> Result<(), StorageError> {
-        self.db
-            .put_cf(self.cf(CF_CUERPOS)?, hash.as_bytes(), bytes)
-            .map_err(backend)
-    }
-
-    fn cuerpo(&self, hash: &BlockHash) -> Result<Option<Vec<u8>>, StorageError> {
-        self.db
-            .get_cf(self.cf(CF_CUERPOS)?, hash.as_bytes())
-            .map_err(backend)
-    }
-
-    fn tiene_cuerpo(&self, hash: &BlockHash) -> Result<bool, StorageError> {
-        // `get_pinned_cf` devuelve una vista sobre el bloque de RocksDB en vez de copiar el valor
-        // al montón. Para un cuerpo de cientos de kilobytes, la diferencia entre esto y `get_cf`
-        // es toda la copia — y aquí solo interesa si existe.
-        Ok(self
-            .db
-            .get_pinned_cf(self.cf(CF_CUERPOS)?, hash.as_bytes())
-            .map_err(backend)?
-            .is_some())
-    }
-
-    fn punta(&self) -> Result<Option<Punta>, StorageError> {
-        let Some(bytes) = self
-            .db
-            .get_cf(self.cf(CF_META)?, CLAVE_PUNTA)
-            .map_err(backend)?
-        else {
-            return Ok(None);
-        };
-        // hash(32) ‖ altura(4 BE)
-        let (h, a) = bytes.split_at_checked(32).ok_or(StorageError::Corrupto {
-            que: "la punta guardada",
-        })?;
-        let hash: [u8; 32] = h.try_into().map_err(|_| StorageError::Corrupto {
-            que: "el hash de la punta",
-        })?;
-        let altura: [u8; 4] = a.try_into().map_err(|_| StorageError::Corrupto {
-            que: "la altura de la punta",
-        })?;
-        Ok(Some(Punta {
-            hash: BlockHash::from_digest(Digest::from_bytes(hash)),
-            altura: u32::from_be_bytes(altura),
-        }))
-    }
-
-    fn fijar_punta(&self, punta: Punta) -> Result<(), StorageError> {
-        // C-STORE-01 · la punta MUST apuntar a algo que existe. Se comprueba **leyendo**, no
-        // confiando: es lo único que separa un almacén recuperable de uno corrupto.
-        if self.cabecera(&punta.hash)?.is_none() {
-            return Err(StorageError::PuntaSinCabecera {
-                altura: punta.altura,
-            });
-        }
-        let mut v = Vec::with_capacity(36);
-        v.extend_from_slice(punta.hash.as_bytes());
-        v.extend_from_slice(&punta.altura.to_be_bytes());
-        self.db
-            .put_cf(self.cf(CF_META)?, CLAVE_PUNTA, v)
-            .map_err(backend)
-    }
-
-    fn aplicar_lote(&self, cabeceras: &[BlockHeader], punta: Punta) -> Result<(), StorageError> {
-        // C-STORE-07 · un `WriteBatch`, una llamada a `write`. RocksDB garantiza atomicidad entre
-        // familias de columnas porque **comparten el WAL** —cita de su wiki: "By sharing
-        // write-ahead logs we get awesome benefit of atomic writes"— pero esa garantía es **por
-        // lote**, no por operación lógica. Dos `write()` seguidos son dos átomos, no uno.
-        let mut lote = WriteBatch::default();
-        let mut en_el_lote = false;
-
-        for c in cabeceras {
-            let hash = c.block_hash();
-            if hash == punta.hash {
-                en_el_lote = true;
+/// Comprueba —o escribe por primera vez— la identidad del almacén.
+///
+/// Un almacén sin marca de esquema solo puede ser nuevo: si tuviera datos, es corrupción y no se
+/// reescribe nada.
+///
+/// # Errores
+/// [`StorageError::RedDistinta`], [`StorageError::GenesisDistinto`], [`StorageError::VersionEsquema`]
+/// o [`StorageError::Corrupto`].
+fn inicializar_o_verificar_meta(db: &DB, red: Red, genesis: BlockHash) -> Result<(), StorageError> {
+    let cf_meta = cf(db, CF_META)?;
+    match db.get_cf(cf_meta, META_VERSION).map_err(backend)? {
+        None => {
+            if !esta_vacio(db, CF_BLOQUES)? || !esta_vacio(db, CF_REGISTRO)? {
+                return Err(StorageError::Corrupto {
+                    que: "un almacén con datos y sin marca de esquema",
+                });
             }
-            lote.put_cf(
-                self.cf(CF_CABECERAS)?,
-                hash.as_bytes(),
-                wire::cabecera_a_bytes(c),
-            );
-            lote.put_cf(
-                self.cf(CF_ALTURAS)?,
-                clave_altura(c.height),
-                hash.as_bytes(),
-            );
+            let mut lote = WriteBatch::default();
+            lote.put_cf(cf_meta, META_RED, [codigo_red(red)]);
+            lote.put_cf(cf_meta, META_GENESIS, genesis.as_bytes());
+            lote.put_cf(cf_meta, META_VERSION, VERSION_ESQUEMA.to_be_bytes());
+            let mut opciones = WriteOptions::default();
+            opciones.set_sync(true);
+            db.write_opt(lote, &opciones).map_err(backend)
         }
-
-        // C-STORE-01 · la punta MUST apuntar a algo que existe. Si viene en el lote, existirá
-        // cuando el lote se aplique; si no, tiene que estar ya guardada. Se comprueba **antes** de
-        // escribir: una punta colgando es lo único que este almacén no sabe recuperar.
-        if !en_el_lote && self.cabecera(&punta.hash)?.is_none() {
-            return Err(StorageError::PuntaSinCabecera {
-                altura: punta.altura,
-            });
-        }
-
-        let mut v = Vec::with_capacity(36);
-        v.extend_from_slice(punta.hash.as_bytes());
-        v.extend_from_slice(&punta.altura.to_be_bytes());
-        lote.put_cf(self.cf(CF_META)?, CLAVE_PUNTA, v);
-
-        self.db.write(lote).map_err(backend)
-    }
-
-    fn utxo(&self, o: &OutPoint) -> Result<Option<EntradaUtxo>, StorageError> {
-        let Some(bytes) = self
-            .db
-            .get_pinned_cf(self.cf(CF_UTXO)?, formato::clave(o))
-            .map_err(backend)?
-        else {
-            return Ok(None);
-        };
-        formato::entrada_desde_bytes(&bytes).map(Some)
-    }
-
-    fn finalizar(&self, altura: u32, delta: &DeltaUtxo) -> Result<(), StorageError> {
-        let cf_utxo = self.cf(CF_UTXO)?;
-        let mut lote = WriteBatch::default();
-
-        // Se comprueba **leyendo** antes de escribir, igual que C-STORE-01 hace con la punta.
-        // RocksDB no avisa de una sobrescritura: un `put` sobre una clave que ya existe la pisa en
-        // silencio, y eso perdería un UTXO que solo se echaría de menos el día que alguien lo
-        // intentara gastar. Es la defensa de BIP-30, y aquí además C-EMIT-04 la hace imposible —
-        // pero comprobarla cuesta una lectura y no comprobarla costó a Bitcoin una regla de
-        // consenso con dos excepciones grabadas por hash.
-        for o in delta.gastados_planos() {
-            let clave = formato::clave(o);
-            if self
-                .db
-                .get_pinned_cf(cf_utxo, clave)
-                .map_err(backend)?
-                .is_none()
-            {
-                return Err(StorageError::OutpointAusente);
+        Some(bytes) => {
+            let version: [u8; 4] =
+                bytes
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| StorageError::Corrupto {
+                        que: "la versión del esquema en `meta`",
+                    })?;
+            let encontrada = u32::from_be_bytes(version);
+            if encontrada != VERSION_ESQUEMA {
+                return Err(StorageError::VersionEsquema {
+                    encontrada,
+                    esperada: VERSION_ESQUEMA,
+                });
             }
-            lote.delete_cf(cf_utxo, clave);
-        }
 
-        for (o, e) in &delta.creados {
-            let clave = formato::clave(o);
-            if self
-                .db
-                .get_pinned_cf(cf_utxo, clave)
-                .map_err(backend)?
-                .is_some()
-            {
-                return Err(StorageError::OutpointDuplicado);
+            let red_bytes =
+                db.get_cf(cf_meta, META_RED)
+                    .map_err(backend)?
+                    .ok_or(StorageError::Corrupto {
+                        que: "falta la red en `meta`",
+                    })?;
+            let encontrada_red =
+                red_desde_codigo(*red_bytes.first().ok_or(StorageError::Corrupto {
+                    que: "la red en `meta` está vacía",
+                })?)?;
+            if encontrada_red != red {
+                return Err(StorageError::RedDistinta {
+                    encontrada: encontrada_red,
+                    pedida: red,
+                });
             }
-            let mut valor = Vec::with_capacity(64);
-            formato::entrada_a_bytes(&mut valor, e);
-            lote.put_cf(cf_utxo, clave, valor);
+
+            let genesis_bytes = db.get_cf(cf_meta, META_GENESIS).map_err(backend)?.ok_or(
+                StorageError::Corrupto {
+                    que: "falta el génesis en `meta`",
+                },
+            )?;
+            let genesis_arr: [u8; 32] =
+                genesis_bytes
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| StorageError::Corrupto {
+                        que: "el génesis en `meta`",
+                    })?;
+            let encontrado = BlockHash::from_digest(Digest::from_bytes(genesis_arr));
+            if encontrado != genesis {
+                return Err(StorageError::GenesisDistinto {
+                    encontrado,
+                    pedido: genesis,
+                });
+            }
+            Ok(())
         }
-
-        // C-STORE-07 · la altura finalizada entra en el MISMO lote que las mutaciones. Escribirla
-        // aparte dejaría una ventana en la que el marcador dice una cosa y el conjunto otra.
-        lote.put_cf(self.cf(CF_META)?, CLAVE_FINALIZADA, altura.to_be_bytes());
-
-        self.db.write(lote).map_err(backend)
     }
+}
 
-    fn altura_finalizada(&self) -> Result<Option<u32>, StorageError> {
-        let Some(bytes) = self
-            .db
-            .get_pinned_cf(self.cf(CF_META)?, CLAVE_FINALIZADA)
-            .map_err(backend)?
-        else {
-            return Ok(None);
-        };
-        let arr: [u8; 4] = bytes
+/// Recorre el registro exigiendo contigüidad y que cada entrada tenga su bloque verificado.
+///
+/// Devuelve cuántas entradas hay (el índice de la próxima admisión).
+///
+/// # Errores
+/// [`StorageError::HuecoEnRegistro`], [`StorageError::EntradaSinBloque`] o las de
+/// [`leer_verificado`].
+fn verificar_estructura(db: &DB) -> Result<u64, StorageError> {
+    let cf_registro = cf(db, CF_REGISTRO)?;
+    let mut esperado: u64 = 0;
+    for item in db.iterator_cf(cf_registro, IteratorMode::Start) {
+        let (clave, valor) = item.map_err(backend)?;
+        let clave_arr: [u8; 8] = clave
             .as_ref()
             .try_into()
             .map_err(|_| StorageError::Corrupto {
-                que: "la altura finalizada",
+                que: "una clave del registro con tamaño distinto de 8",
             })?;
-        Ok(Some(u32::from_be_bytes(arr)))
+        let indice = u64::from_be_bytes(clave_arr);
+        if indice != esperado {
+            return Err(StorageError::HuecoEnRegistro {
+                esperado,
+                encontrado: indice,
+            });
+        }
+        let hash_arr: [u8; 32] = valor
+            .as_ref()
+            .try_into()
+            .map_err(|_| StorageError::Corrupto {
+                que: "un hash del registro con tamaño distinto de 32",
+            })?;
+        let hash = BlockHash::from_digest(Digest::from_bytes(hash_arr));
+        if leer_verificado(db, &hash)?.is_none() {
+            return Err(StorageError::EntradaSinBloque { indice });
+        }
+        esperado = esperado.checked_add(1).ok_or_else(|| {
+            StorageError::Backend("el registro desbordó el contador de u64".to_owned())
+        })?;
+    }
+    Ok(esperado)
+}
+
+impl AlmacenEnDisco {
+    /// Abre —o crea— el almacén en un directorio, para una red y un génesis.
+    ///
+    /// Si el almacén ya existía con otra red, otro génesis u otra versión de esquema, devuelve
+    /// error y **no** reescribe nada.
+    ///
+    /// # Errores
+    /// [`StorageError::Backend`] si RocksDB no puede abrir el directorio; [`StorageError::Corrupto`],
+    /// [`StorageError::RedDistinta`], [`StorageError::GenesisDistinto`] o
+    /// [`StorageError::VersionEsquema`] si lo guardado no cuadra.
+    pub fn abrir(ruta: &Path, red: Red, genesis: BlockHash) -> Result<Self, StorageError> {
+        let mut opciones = Options::default();
+        opciones.create_if_missing(true);
+        opciones.create_missing_column_families(true);
+
+        // El modo de recuperación se fija explícitamente, aunque hoy coincida con el valor por
+        // omisión: depender de un default es depender de que nadie lo mueva, y ya se movió una vez
+        // (RocksDB 6.6). NO se usa `AbsoluteConsistency`: convierte la cola truncada normal de un
+        // `kill -9` en una base de datos que no abre (facebook/rocksdb#2871), y un nodo que no
+        // arranca es peor que uno que re-sincroniza los últimos bloques.
+        opciones.set_wal_recovery_mode(DBRecoveryMode::PointInTime);
+
+        let familias = [CF_BLOQUES, CF_REGISTRO, CF_META]
+            .into_iter()
+            .map(|nombre| ColumnFamilyDescriptor::new(nombre, Options::default()))
+            .collect::<Vec<_>>();
+
+        let db = DB::open_cf_descriptors(&opciones, ruta, familias).map_err(backend)?;
+        inicializar_o_verificar_meta(&db, red, genesis)?;
+        let longitud = verificar_estructura(&db)?;
+
+        Ok(Self {
+            db,
+            red,
+            genesis,
+            siguiente: Mutex::new(longitud),
+        })
+    }
+
+    /// Los hashes del registro, en orden.
+    fn hashes_del_registro(&self) -> Result<Vec<BlockHash>, StorageError> {
+        let cf_registro = cf(&self.db, CF_REGISTRO)?;
+        let mut hashes = Vec::new();
+        for item in self.db.iterator_cf(cf_registro, IteratorMode::Start) {
+            let (_clave, valor) = item.map_err(backend)?;
+            let arr: [u8; 32] = valor
+                .as_ref()
+                .try_into()
+                .map_err(|_| StorageError::Corrupto {
+                    que: "un hash del registro con tamaño distinto de 32",
+                })?;
+            hashes.push(BlockHash::from_digest(Digest::from_bytes(arr)));
+        }
+        Ok(hashes)
+    }
+}
+
+impl Almacen for AlmacenEnDisco {
+    fn red(&self) -> Red {
+        self.red
+    }
+
+    fn genesis(&self) -> BlockHash {
+        self.genesis
+    }
+
+    fn admitir(&self, bloque: &BloqueAdmitido<'_>, sync: bool) -> Result<BlockHash, StorageError> {
+        let hash = bloque.hash();
+        let valor = bloque.a_bytes_almacen();
+
+        // El lock serializa la comprobación de duplicado **y** la asignación del índice. Hacer la
+        // comprobación fuera dejaría que dos hilos admitieran a la vez el mismo hash nuevo y
+        // crearan dos entradas del registro. El lock se mantiene durante la escritura, de modo que
+        // un fallo del backend tampoco consume un índice.
+        let mut siguiente = self.siguiente.lock().map_err(|_| {
+            StorageError::Backend("lock envenenado: otro hilo entró en pánico".to_owned())
+        })?;
+
+        // Idempotencia: el mismo hash no añade una segunda entrada al registro. Si los bytes
+        // guardados difieren, es corrupción y se denuncia.
+        let cf_bloques = cf(&self.db, CF_BLOQUES)?;
+        if let Some(existente) = self
+            .db
+            .get_cf(cf_bloques, hash.as_bytes())
+            .map_err(backend)?
+        {
+            if existente != valor {
+                return Err(StorageError::Corrupto {
+                    que: "dos admisiones del mismo hash con bytes distintos",
+                });
+            }
+            return Ok(hash);
+        }
+
+        let indice = *siguiente;
+        let siguiente_indice = indice.checked_add(1).ok_or_else(|| {
+            StorageError::Backend("el registro desbordó el contador de u64".to_owned())
+        })?;
+
+        let cf_registro = cf(&self.db, CF_REGISTRO)?;
+        let mut lote = WriteBatch::default();
+        lote.put_cf(cf_bloques, hash.as_bytes(), valor);
+        lote.put_cf(cf_registro, indice.to_be_bytes(), hash.as_bytes());
+        let mut opciones = WriteOptions::default();
+        opciones.set_sync(sync);
+        self.db.write_opt(lote, &opciones).map_err(backend)?;
+
+        *siguiente = siguiente_indice;
+        Ok(hash)
+    }
+
+    fn bloque(&self, hash: &BlockHash) -> Result<Option<Vec<u8>>, StorageError> {
+        leer_verificado(&self.db, hash)
+    }
+
+    fn repetir<E>(
+        &self,
+        destino: &mut impl FnMut(BlockHash, &[u8]) -> Result<(), E>,
+    ) -> Result<(), ErrorRepeticion<E>> {
+        let hashes = self
+            .hashes_del_registro()
+            .map_err(ErrorRepeticion::Almacen)?;
+        for (posicion, hash) in hashes.into_iter().enumerate() {
+            let indice = u64::try_from(posicion).map_err(|_| {
+                ErrorRepeticion::Almacen(StorageError::Backend(
+                    "el registro no cabe en u64".to_owned(),
+                ))
+            })?;
+            let valor = self
+                .bloque(&hash)
+                .map_err(ErrorRepeticion::Almacen)?
+                .ok_or(ErrorRepeticion::Almacen(StorageError::EntradaSinBloque {
+                    indice,
+                }))?;
+            destino(hash, &valor).map_err(ErrorRepeticion::Destino)?;
+        }
+        Ok(())
+    }
+
+    fn longitud_registro(&self) -> Result<u64, StorageError> {
+        let guard = self.siguiente.lock().map_err(|_| {
+            StorageError::Backend("lock envenenado: otro hilo entró en pánico".to_owned())
+        })?;
+        Ok(*guard)
     }
 
     fn sincronizar(&self) -> Result<(), StorageError> {
@@ -378,411 +404,622 @@ impl AlmacenCadena for AlmacenEnDisco {
     }
 }
 
-impl AlmacenCandidatosDag for AlmacenEnDisco {
-    fn guardar_candidato_dag(&self, bloque: &BloqueDag) -> Result<(), StorageError> {
-        let clave = bloque.cabecera.block_hash();
-        let mut bytes = Vec::new();
-        // Único códec de C-WIRE-07: cabecera, justificación PoT y cuerpo, tal cual. Guardarlo no
-        // valida nada; una `put_cf` del bloque completo es atómica por sí sola.
-        bloque_dag_a_bytes(&mut bytes, bloque);
-        self.db
-            .put_cf(self.cf(CF_CANDIDATOS_DAG)?, clave.as_bytes(), bytes)
-            .map_err(backend)
-    }
-
-    fn candidato_dag(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
-        let Some(bytes) = self
-            .db
-            .get_cf(self.cf(CF_CANDIDATOS_DAG)?, hash.as_bytes())
-            .map_err(backend)?
-        else {
-            // `None` es "no lo tengo", no un veredicto de validez (C-HDR-07).
-            return Ok(None);
-        };
-        let (bloque, resto) =
-            bloque_dag_desde_bytes(&bytes).map_err(|_| StorageError::Corrupto {
-                que: "un candidato DAG guardado",
-            })?;
-        // Sobrar bytes significa que lo guardado no es el bloque que decimos: corrupción, no
-        // "casi bien". Deserializar no es aceptar.
-        if !resto.is_empty() {
-            return Err(StorageError::Corrupto {
-                que: "un candidato DAG guardado, con bytes finales",
-            });
-        }
-        // La clave es el `block_hash` (C-HDR-09). Que decodifique no basta: tiene que ser el
-        // bloque de esa clave, o el almacén estaría sirviendo un candidato por otro.
-        if bloque.cabecera.block_hash() != *hash {
-            return Err(StorageError::Corrupto {
-                que: "un candidato DAG guardado bajo una clave que no es su block_hash",
-            });
-        }
-        Ok(Some(bloque))
-    }
-}
-
-impl AlmacenAdmitidosDag for AlmacenEnDisco {
-    fn bloque_admitido(&self, hash: &BlockHash) -> Result<Option<BloqueDag>, StorageError> {
-        let Some(bytes) = self
-            .db
-            .get_cf(self.cf(CF_ADMITIDOS_DAG)?, hash.as_bytes())
-            .map_err(backend)?
-        else {
-            // `None` es "no está en el índice", no un veredicto de validez (C-HDR-07).
-            return Ok(None);
-        };
-        bloque_admitido_con_clave(hash, &bytes).map(Some)
-    }
-}
-
-impl AlmacenEnDisco {
-    /// **Inyección de fixture, sin autoridad.** Escribe una entrada en la familia de admitidos para
-    /// que los tests puedan ejercitar la lectura.
-    ///
-    /// No existe en el binario de producción: está tras `#[cfg(test)]`. No valida nada y rechaza
-    /// reemplazar en el propio helper una clave ya presente; eso **no** demuestra la inmutabilidad
-    /// de la futura escritura de admisión, ni su atomicidad con estado, undo y GHOSTDAG, ni que los
-    /// bytes inyectados sean evidencia PoST verificada.
-    ///
-    /// # Errores
-    /// [`StorageError::AdmitidoDuplicado`] si la clave ya está; [`StorageError`] si el backend falla.
-    #[cfg(test)]
-    pub(crate) fn inyectar_fixture_admitido(&self, bloque: &BloqueDag) -> Result<(), StorageError> {
-        let clave = bloque.cabecera.block_hash();
-        let cf = self.cf(CF_ADMITIDOS_DAG)?;
-        if self
-            .db
-            .get_pinned_cf(cf, clave.as_bytes())
-            .map_err(backend)?
-            .is_some()
-        {
-            return Err(StorageError::AdmitidoDuplicado);
-        }
-        let bytes = crate::almacen_admitidos_dag::bloque_admitido_a_bytes(bloque);
-        self.db.put_cf(cf, clave.as_bytes(), bytes).map_err(backend)
-    }
-
-    /// **Inyección de fixture cruda, sin autoridad.** Inserta bytes arbitrarios bajo una clave para
-    /// probar la defensa contra corrupción. No existe en producción.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla.
-    #[cfg(test)]
-    pub(crate) fn inyectar_fixture_admitido_crudo(
-        &self,
-        clave: &BlockHash,
-        bytes: &[u8],
-    ) -> Result<(), StorageError> {
-        self.db
-            .put_cf(self.cf(CF_ADMITIDOS_DAG)?, clave.as_bytes(), bytes)
-            .map_err(backend)
-    }
-}
-
 #[cfg(test)]
-#[expect(clippy::panic, reason = "los tests fallan con panic por diseño")]
-mod tests_estructura {
-    /// **C-STORE-07 leído en el código: una operación lógica, una sola llamada a `write`.**
-    ///
-    /// Existe porque el test de `kill -9` **no puede** demostrarlo. Se comprobó: mutando
-    /// `aplicar_lote` para partir la escritura en dos, aquel test pasó tres veces de tres — la
-    /// ventana entre las dos llamadas dura nanosegundos y ningún golpe repartido por milisegundos
-    /// cae dentro.
-    ///
-    /// Una propiedad estructural se comprueba mirando la estructura. Es el mismo recurso que
-    /// `spec_numeros.rs` usa para atar el SPEC al código: leer el fuente y contar.
-    ///
-    /// Si algún día una de estas funciones necesita de verdad dos escrituras, habrá que cambiar
-    /// también C-STORE-07 — que es exactamente la conversación que este test fuerza a tener.
-    #[test]
-    fn una_operacion_logica_es_una_sola_escritura() {
-        let fuente = include_str!("disco.rs");
-
-        for nombre in ["fn aplicar_lote", "fn finalizar"] {
-            let desde = fuente
-                .find(nombre)
-                .unwrap_or_else(|| panic!("no se encuentra `{nombre}` en disco.rs"));
-            let cuerpo = fuente.get(desde..).unwrap_or_default();
-            // Hasta el cierre de la función: la primera línea que empieza en la columna 4 con `}`.
-            let hasta = cuerpo.find("\n    }\n").unwrap_or(cuerpo.len());
-            let cuerpo = cuerpo.get(..hasta).unwrap_or_default();
-
-            let escrituras = cuerpo.matches("self.db.write(").count();
-            assert_eq!(
-                escrituras, 1,
-                "`{nombre}` hace {escrituras} llamadas a `self.db.write(` y C-STORE-07 exige una.\n\
-                 Dos escrituras son dos átomos, no uno: entre ellas hay una ventana en la que un \
-                 componente del estado va por delante de otro, y un corte ahí no se arregla \
-                 ignorando lo que sobra."
-            );
-        }
-    }
-}
-
-/// **La corrupción no se convierte en `None`.** El backend de disco es el único que puede recibir
-/// bytes que no decodifiquen —una escritura ajena a esta API, un sector dañado—, así que aquí se
-/// inyectan **directamente en la familia** para probar la defensa. Es una prueba de test: no se
-/// expone ninguna mutación peligrosa en la API de producción.
-#[cfg(test)]
-#[expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
-mod tests_candidatos_dag {
-    use super::{AlmacenEnDisco, CF_CANDIDATOS_DAG};
-    use crate::almacen_dag::AlmacenCandidatosDag;
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "los tests fallan con panic por diseño"
+)]
+mod tests {
+    use super::{
+        AlmacenEnDisco, CF_BLOQUES, CF_META, CF_REGISTRO, META_VERSION, VERSION_ESQUEMA, cf,
+    };
+    use crate::almacen::{Almacen, BloqueAdmitido};
     use crate::error::StorageError;
-    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
+    use crate::formato::{self, Familia};
+    use zx_core::amount::Amount;
+    use zx_core::body_commitment;
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot, TxId};
+    use zx_core::firma::ClavePublica;
+    use zx_core::preimage::block::{BlockHeader, merkle_root};
     use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::red::Red;
+    use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
+    use zx_core::txid;
     use zx_core::wire_dag::{
         BUNDLE_BYTES, BloqueDag, JustificacionPot, PotCheckpoints, bloque_dag_a_bytes,
     };
 
-    /// Cabecera de fixture, etiquetada **candidata**: sin PoAS válida.
-    fn cabecera_candidata(slot: u64, marca: u8) -> DagBlockHeader {
+    /// Rama de consenso de la red dev, la que usan los fixtures.
+    const CBID: u32 = zx_core::CBID_RED_DEV;
+
+    fn genesis() -> BlockHash {
+        BlockHash::from_digest(Digest::from_bytes([0x9a; 32]))
+    }
+
+    fn clave(n: u8) -> ClavePublica {
+        ClavePublica::desde_bytes([n; 32])
+    }
+
+    /// La raíz de Merkle de los `txid` del cuerpo: lo que la cabecera debe declarar.
+    fn raiz_de(txs: &[Tx]) -> MerkleRoot {
+        let txids: Vec<TxId> = txs.iter().map(|t| txid(t, CBID)).collect();
+        merkle_root(&txids)
+    }
+
+    fn cabecera_pow(nonce: u64, altura: u32, raiz: MerkleRoot) -> BlockHeader {
+        BlockHeader {
+            consensus_branch_id: CBID,
+            prev_hash: BlockHash::from_digest(Digest::from_bytes([(altura % 251) as u8; 32])),
+            merkle_root: raiz,
+            timestamp: 1_788_480_000 + nonce,
+            bits: 0x1d00_ffff,
+            nonce,
+            height: altura,
+        }
+    }
+
+    /// Bloque PoW de cuerpo vacío: `merkle_root(&[])` es lo que compromete la cabecera.
+    fn bloque_pow(nonce: u64, altura: u32) -> BloqueAdmitido<'static> {
+        BloqueAdmitido::pow(&cabecera_pow(nonce, altura, merkle_root(&[])), &[], &[])
+    }
+
+    /// Transacción de coinbase PoW (v1 sin entradas) con una salida de `brek`.
+    fn tx_pow_coinbase(brek: i64) -> Tx {
+        Tx {
+            version: 1,
+            inputs: Vec::new(),
+            outputs: vec![TxOut {
+                value: Amount::nuevo(brek).expect("importe dentro de rango"),
+                lock: Lock::PubKey {
+                    pubkey: clave(0x09),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: 0,
+            extension: ExtensionTx::Ninguna,
+        }
+    }
+
+    /// Bloque PoW con una coinbase de `brek`; la cabecera compromete sus `txid`.
+    fn bloque_pow_coinbase(nonce: u64, altura: u32, brek: i64) -> BloqueAdmitido<'static> {
+        let txs = vec![tx_pow_coinbase(brek)];
+        let testigos = vec![Vec::new()];
+        let cabecera = cabecera_pow(nonce, altura, raiz_de(&txs));
+        BloqueAdmitido::pow(&cabecera, &txs, &testigos)
+    }
+
+    fn cabecera_post(marca: u8, raiz: MerkleRoot, compromiso: BodyCommitment) -> DagBlockHeader {
         DagBlockHeader {
-            consensus_branch_id: 0xc478_80ea,
-            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([marca; 32])),
-            timestamp: 1_788_480_000 + slot,
-            height: 1,
-            slot,
+            consensus_branch_id: CBID,
+            merkle_root: raiz,
+            timestamp: 1_788_480_000 + u64::from(marca),
+            height: 0,
+            slot: u64::from(marca),
             pot_output: [marca; 16],
             rango_solucion: u64::from(marca),
             sol: SolucionPoas::default(),
-            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([marca; 32])),
+            body_commitment: compromiso,
             padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x07; 32])), &[])
                 .expect("un padre seleccionado es canónico"),
             sello: [marca; 64],
         }
     }
 
-    fn bloque(cabecera: DagBlockHeader, marca: u8) -> BloqueDag {
-        let just =
+    /// Bloque PoST con el cuerpo y los testigos dados; la cabecera compromete ambos.
+    fn bloque_post_con(
+        marca: u8,
+        txs: Vec<Tx>,
+        testigos: Vec<Vec<Vec<u8>>>,
+    ) -> BloqueAdmitido<'static> {
+        let raiz = raiz_de(&txs);
+        let compromiso = body_commitment(&txs, &testigos, CBID).expect("tx y testigos cuadran");
+        let justificacion =
             JustificacionPot::nueva(vec![PotCheckpoints::desde_bytes([marca; BUNDLE_BYTES])])
                 .expect("un portador está dentro del máximo");
-        BloqueDag::nuevo(cabecera, just, vec![], vec![]).expect("sin txs no hay descuadre")
-    }
-
-    /// Inyecta bytes crudos bajo una clave de la familia de candidatos.
-    fn inyectar(a: &AlmacenEnDisco, clave: &BlockHash, bytes: &[u8]) {
-        a.db.put_cf(
-            a.cf(CF_CANDIDATOS_DAG).expect("la familia existe"),
-            clave.as_bytes(),
-            bytes,
+        let bloque = BloqueDag::nuevo(
+            cabecera_post(marca, raiz, compromiso),
+            justificacion,
+            txs,
+            testigos,
         )
-        .expect("inyecta bytes crudos");
+        .expect("tx y testigos cuadran");
+        BloqueAdmitido::post(&bloque)
     }
 
-    #[test]
-    fn rechaza_bytes_que_no_decodifican() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let h = cabecera_candidata(3, 0x01).block_hash();
-        inyectar(&a, &h, b"esto no es un bloque DAG");
-
-        assert!(
-            matches!(a.candidato_dag(&h), Err(StorageError::Corrupto { .. })),
-            "una entrada ilegible MUST ser corrupción, nunca `None`"
-        );
+    /// Bloque PoST de cuerpo vacío.
+    fn bloque_post(marca: u8) -> BloqueAdmitido<'static> {
+        bloque_post_con(marca, Vec::new(), Vec::new())
     }
 
-    #[test]
-    fn rechaza_bytes_finales_sobrantes() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let b = bloque(cabecera_candidata(4, 0x02), 0x02);
-        let mut bytes = Vec::new();
-        bloque_dag_a_bytes(&mut bytes, &b);
-        bytes.extend_from_slice(b"cola");
-        inyectar(&a, &b.cabecera.block_hash(), &bytes);
-
-        assert!(
-            matches!(
-                a.candidato_dag(&b.cabecera.block_hash()),
-                Err(StorageError::Corrupto { .. })
-            ),
-            "bytes finales sobrantes MUST rechazarse: decodificar no es aceptar"
-        );
-    }
-
-    #[test]
-    fn rechaza_una_clave_que_no_es_el_block_hash() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let b = bloque(cabecera_candidata(5, 0x03), 0x03);
-        let clave_ajena = cabecera_candidata(5, 0x04).block_hash();
-        let mut bytes = Vec::new();
-        bloque_dag_a_bytes(&mut bytes, &b);
-        inyectar(&a, &clave_ajena, &bytes);
-
-        assert!(
-            matches!(
-                a.candidato_dag(&clave_ajena),
-                Err(StorageError::Corrupto { .. })
-            ),
-            "un bloque bajo una clave que no es su block_hash MUST rechazarse"
-        );
-    }
-}
-
-/// **El índice de admitidos en disco.** Corrupción, ausencia y reapertura. La inyección de fixture
-/// es de test y no existe en producción; los bloques son bytes, **no** evidencia PoST verificada.
-#[cfg(test)]
-#[expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
-mod tests_admitidos_dag {
-    use super::AlmacenEnDisco;
-    use crate::almacen::AlmacenCadena;
-    use crate::almacen_admitidos_dag::{
-        AlmacenAdmitidosDag, VERSION_ADMITIDOS_DAG, bloque_admitido_a_bytes,
-    };
-    use crate::almacen_dag::AlmacenCandidatosDag;
-    use crate::error::StorageError;
-    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
-    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
-    use zx_core::wire_dag::{BUNDLE_BYTES, BloqueDag, JustificacionPot, PotCheckpoints};
-
-    /// Cabecera de **fixture**: bytes para probar el índice, **no** una cabecera admitida.
-    fn cabecera_de_fixture(slot: u64, marca: u8) -> DagBlockHeader {
-        DagBlockHeader {
-            consensus_branch_id: 0xc478_80ea,
-            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([marca; 32])),
-            timestamp: 1_788_480_000 + slot,
-            height: 1,
-            slot,
-            pot_output: [marca; 16],
-            rango_solucion: u64::from(marca),
-            sol: SolucionPoas::default(),
-            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([marca; 32])),
-            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([marca; 32])), &[])
-                .expect("un padre seleccionado es canónico"),
-            sello: [marca; 64],
+    /// Coinbase PoST v3: sin entradas ni salidas; `importe` y `slot` van en la extensión.
+    fn tx_post_coinbase(brek: i64, slot: u64) -> Tx {
+        Tx {
+            version: 3,
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            lock_time: 0,
+            expiry_height: 0,
+            extension: ExtensionTx::CoinbasePost {
+                clave: clave(0x33),
+                importe: Amount::nuevo(brek).expect("importe dentro de rango"),
+                slot,
+            },
         }
     }
 
-    fn justificacion(marca: u8, bundles: usize) -> JustificacionPot {
-        let lista: Vec<PotCheckpoints> = (0..bundles)
-            .map(|i| PotCheckpoints::desde_bytes([marca.wrapping_add(i as u8); BUNDLE_BYTES]))
-            .collect();
-        JustificacionPot::nueva(lista).expect("dentro del máximo de portadores")
+    /// Transacción no coinbase (v1) con una entrada y una salida.
+    fn tx_post_transferencia(marca: u8, brek: i64) -> Tx {
+        Tx {
+            version: 1,
+            inputs: vec![TxIn {
+                outpoint: OutPoint {
+                    prev_txid: TxId::from_digest(Digest::from_bytes([marca; 32])),
+                    prev_index: 0,
+                },
+                sequence: 0,
+            }],
+            outputs: vec![TxOut {
+                value: Amount::nuevo(brek).expect("importe dentro de rango"),
+                lock: Lock::PubKey {
+                    pubkey: clave(marca),
+                },
+            }],
+            lock_time: 0,
+            expiry_height: 0,
+            extension: ExtensionTx::Ninguna,
+        }
     }
 
-    fn bloque(cabecera: DagBlockHeader, justificacion: JustificacionPot) -> BloqueDag {
-        BloqueDag::nuevo(cabecera, justificacion, vec![], vec![]).expect("sin txs no hay descuadre")
+    /// Escribe un valor bajo la clave que ya existía: inyecta la corrupción saltándose `admitir`.
+    fn reescribir_valor(a: &AlmacenEnDisco, hash: &BlockHash, valor: Vec<u8>) {
+        let cf_bloques = cf(&a.db, CF_BLOQUES).expect("familia");
+        a.db.put_cf(cf_bloques, hash.as_bytes(), valor)
+            .expect("corrompe el valor guardado");
+    }
+
+    /// Decodifica el valor guardado de un bloque PoW.
+    fn decodificar_pow(valor: &[u8]) -> (BlockHeader, Vec<Tx>, Vec<Vec<Vec<u8>>>) {
+        let (familia, canonicos) = formato::separar(valor).expect("sobre");
+        assert_eq!(familia, Familia::Pow);
+        let (cuerpo, sobra) = zx_core::wire::cuerpo_desde_bytes(canonicos).expect("decodifica");
+        assert!(sobra.is_empty(), "no debe sobrar nada");
+        cuerpo
+    }
+
+    /// Decodifica el valor guardado de un bloque PoST.
+    fn decodificar_post(valor: &[u8]) -> BloqueDag {
+        let (familia, canonicos) = formato::separar(valor).expect("sobre");
+        assert_eq!(familia, Familia::Post);
+        let (bloque, sobra) =
+            zx_core::wire_dag::bloque_dag_desde_bytes(canonicos).expect("decodifica");
+        assert!(sobra.is_empty(), "no debe sobrar nada");
+        bloque
+    }
+
+    /// Recodifica el cuerpo PoW dado bajo la misma cabecera para el sobre de `bloques`.
+    fn valor_pow_con_cuerpo(
+        cabecera: &BlockHeader,
+        txs: &[Tx],
+        testigos: &[Vec<Vec<u8>>],
+    ) -> Vec<u8> {
+        let mut canonicos = Vec::new();
+        zx_core::wire::cuerpo_a_bytes(&mut canonicos, cabecera, txs, testigos);
+        formato::bloque_a_bytes(Familia::Pow, &canonicos)
+    }
+
+    /// Recodifica el cuerpo PoST dado bajo la misma cabecera para el sobre de `bloques`.
+    fn valor_post_con_cuerpo(
+        base: &BloqueDag,
+        txs: Vec<Tx>,
+        testigos: Vec<Vec<Vec<u8>>>,
+    ) -> Vec<u8> {
+        let nuevo = BloqueDag::nuevo(base.cabecera, base.justificacion.clone(), txs, testigos)
+            .expect("tx y testigos cuadran");
+        let mut canonicos = Vec::new();
+        bloque_dag_a_bytes(&mut canonicos, &nuevo);
+        formato::bloque_a_bytes(Familia::Post, &canonicos)
     }
 
     #[test]
-    fn rechaza_bytes_que_no_decodifican() {
+    fn admite_lee_repite_y_reapertura_conserva() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let h = cabecera_de_fixture(3, 0x01).block_hash();
-        a.inyectar_fixture_admitido_crudo(&h, b"esto no es un bloque DAG")
-            .expect("inyecta bytes crudos");
-
-        assert!(
-            matches!(a.bloque_admitido(&h), Err(StorageError::Corrupto { .. })),
-            "una entrada ilegible MUST ser corrupción, nunca `None`"
-        );
-    }
-
-    #[test]
-    fn rechaza_bytes_finales_sobrantes() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let b = bloque(cabecera_de_fixture(4, 0x02), justificacion(0x02, 1));
-        let mut bytes = bloque_admitido_a_bytes(&b);
-        bytes.extend_from_slice(b"cola");
-        a.inyectar_fixture_admitido_crudo(&b.cabecera.block_hash(), &bytes)
-            .expect("inyecta bytes crudos");
-
-        assert!(
-            matches!(
-                a.bloque_admitido(&b.cabecera.block_hash()),
-                Err(StorageError::Corrupto { .. })
-            ),
-            "bytes finales sobrantes MUST rechazarse: decodificar no es aceptar"
-        );
-    }
-
-    #[test]
-    fn rechaza_una_clave_que_no_es_el_block_hash() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let b = bloque(cabecera_de_fixture(5, 0x03), justificacion(0x03, 1));
-        let clave_ajena = cabecera_de_fixture(5, 0x04).block_hash();
-        a.inyectar_fixture_admitido_crudo(&clave_ajena, &bloque_admitido_a_bytes(&b))
-            .expect("inyecta bytes crudos");
-
-        assert!(
-            matches!(
-                a.bloque_admitido(&clave_ajena),
-                Err(StorageError::Corrupto { .. })
-            ),
-            "un bloque bajo una clave que no es su block_hash MUST rechazarse"
-        );
-    }
-
-    #[test]
-    fn rechaza_version_desconocida() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let h = cabecera_de_fixture(6, 0x05).block_hash();
-        let mut bytes = vec![VERSION_ADMITIDOS_DAG.wrapping_add(1)];
-        bytes.extend_from_slice(b"cuerpo de una version futura");
-        a.inyectar_fixture_admitido_crudo(&h, &bytes)
-            .expect("inyecta bytes crudos");
-
-        assert!(matches!(
-            a.bloque_admitido(&h),
-            Err(StorageError::Corrupto { .. })
-        ));
-    }
-
-    /// Cerrar y reabrir RocksDB conserva la lectura del fixture de admitidos.
-    #[test]
-    fn reabrir_conserva_la_lectura_de_fixture() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let b = bloque(cabecera_de_fixture(7, 0x06), justificacion(0x06, 3));
-        let hash = b.cabecera.block_hash();
+        let pow = bloque_pow(1, 0);
+        let post = bloque_post(0x33);
+        let (h_pow, h_post) = (pow.hash(), post.hash());
 
         {
-            let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-            a.inyectar_fixture_admitido(&b).expect("fixture");
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            assert_eq!(a.longitud_registro().expect("longitud"), 0);
+            a.admitir(&pow, true).expect("admite pow");
+            a.admitir(&post, true).expect("admite post");
+            assert_eq!(a.admitir(&pow, true).expect("idempotente"), h_pow);
+            assert_eq!(a.longitud_registro().expect("longitud"), 2);
             a.sincronizar().expect("sincroniza");
         }
 
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("reabre");
-        assert_eq!(a.bloque_admitido(&hash).expect("lee"), Some(b));
-    }
-
-    /// **La cola no es el índice, tampoco en disco.**
-    #[test]
-    fn un_candidato_presente_sin_entrada_admitida_devuelve_none() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let b = bloque(cabecera_de_fixture(8, 0x07), justificacion(0x07, 1));
-        let hash = b.cabecera.block_hash();
-        a.guardar_candidato_dag(&b).expect("la cola guarda");
-        assert_eq!(a.candidato_dag(&hash).expect("lee candidato"), Some(b));
-        assert_eq!(a.bloque_admitido(&hash).expect("consulta el índice"), None);
-    }
-
-    #[test]
-    fn dos_cabeceras_mismo_slot_coexisten_en_disco() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let a = AlmacenEnDisco::abrir(dir.path()).expect("abre");
-        let c1 = cabecera_de_fixture(9, 0x08);
-        let c2 = cabecera_de_fixture(9, 0x09);
-        assert_eq!(c1.slot, c2.slot);
-        assert_ne!(c1.block_hash(), c2.block_hash());
-        let b1 = bloque(c1, justificacion(0x08, 1));
-        let b2 = bloque(c2, justificacion(0x09, 2));
-        a.inyectar_fixture_admitido(&b1).expect("fixture 1");
-        a.inyectar_fixture_admitido(&b2).expect("fixture 2");
-
+        let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("reabre");
         assert_eq!(
-            a.bloque_admitido(&c1.block_hash()).expect("lee 1"),
-            Some(b1)
+            a.bloque(&h_pow).expect("lee pow"),
+            Some(pow.a_bytes_almacen())
         );
         assert_eq!(
-            a.bloque_admitido(&c2.block_hash()).expect("lee 2"),
-            Some(b2)
+            a.bloque(&h_post).expect("lee post"),
+            Some(post.a_bytes_almacen())
         );
+        let mut vistos: Vec<BlockHash> = Vec::new();
+        a.repetir(&mut |h, valor| {
+            let b = BloqueAdmitido::desde_almacen(valor).expect("el valor decodifica");
+            assert_eq!(b.hash(), h);
+            vistos.push(h);
+            Ok::<(), ()>(())
+        })
+        .expect("repite");
+        assert_eq!(vistos, vec![h_pow, h_post], "el orden es el del registro");
+    }
+
+    #[test]
+    fn abrir_con_otra_red_no_reescribe() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pow = bloque_pow(2, 0);
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre dev");
+            a.admitir(&pow, true).expect("admite");
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Mainnet, genesis())
+            .expect_err("otra red MUST fallar");
+        assert!(matches!(
+            err,
+            StorageError::RedDistinta {
+                encontrada: Red::Dev,
+                pedida: Red::Mainnet
+            }
+        ));
+        // Y reabrir con la red correcta sigue viendo el bloque: no se tocó nada.
+        let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("reabre dev");
+        assert_eq!(a.longitud_registro().expect("longitud"), 1);
+        assert_eq!(
+            a.bloque(&pow.hash()).expect("lee"),
+            Some(pow.a_bytes_almacen())
+        );
+    }
+
+    #[test]
+    fn abrir_con_otro_genesis_falla() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        {
+            let _a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+        }
+        let otro = BlockHash::from_digest(Digest::from_bytes([0x01; 32]));
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, otro)
+            .expect_err("otro génesis MUST fallar");
+        assert!(matches!(err, StorageError::GenesisDistinto { .. }));
+    }
+
+    #[test]
+    fn bit_cambiado_en_un_bloque_es_corrupcion() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pow = bloque_pow(3, 0);
+        let hash = pow.hash();
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            a.admitir(&pow, true).expect("admite");
+            let cf_bloques = cf(&a.db, CF_BLOQUES).expect("familia");
+            let mut valor =
+                a.db.get_cf(cf_bloques, hash.as_bytes())
+                    .expect("lee crudo")
+                    .expect("existe");
+            let ultimo = valor.last_mut().expect("no está vacío");
+            *ultimo ^= 0x01;
+            a.db.put_cf(cf_bloques, hash.as_bytes(), valor)
+                .expect("corrompe");
+
+            assert!(
+                a.bloque(&hash).is_err(),
+                "leer un bloque corrupto MUST ser error, no `None`"
+            );
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("reabrir MUST detectar la corrupción");
+        assert!(matches!(
+            err,
+            StorageError::Corrupto { .. } | StorageError::HashNoCoincide { .. }
+        ));
+    }
+
+    #[test]
+    fn entrada_borrada_del_registro_es_un_hueco() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            for i in 0..3u64 {
+                a.admitir(&bloque_pow(i, i as u32), true).expect("admite");
+            }
+            let cf_registro = cf(&a.db, CF_REGISTRO).expect("familia");
+            a.db.delete_cf(cf_registro, 1u64.to_be_bytes())
+                .expect("borra la entrada 1");
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("el hueco MUST detectarse");
+        assert!(matches!(
+            err,
+            StorageError::HuecoEnRegistro {
+                esperado: 1,
+                encontrado: 2
+            }
+        ));
+    }
+
+    #[test]
+    fn version_de_esquema_desconocida_falla() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            let cf_meta = cf(&a.db, CF_META).expect("familia");
+            a.db.put_cf(
+                cf_meta,
+                META_VERSION,
+                VERSION_ESQUEMA.wrapping_add(1).to_be_bytes(),
+            )
+            .expect("reescribe la versión");
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("otra versión MUST fallar");
+        assert!(matches!(
+            err,
+            StorageError::VersionEsquema {
+                esperada: VERSION_ESQUEMA,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn datos_sin_marca_de_esquema_es_corrupcion() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pow = bloque_pow(4, 0);
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            a.admitir(&pow, true).expect("admite");
+            let cf_meta = cf(&a.db, CF_META).expect("familia");
+            a.db.delete_cf(cf_meta, META_VERSION)
+                .expect("borra la marca");
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("sin marca y con datos MUST fallar");
+        assert!(matches!(err, StorageError::Corrupto { .. }));
+    }
+
+    /// **Idempotencia bajo concurrencia.** La comprobación de duplicado va dentro del lock: ocho
+    /// hilos que admiten el mismo bloque dejan **una** entrada, no ocho.
+    #[test]
+    fn admisiones_concurrentes_del_mismo_bloque_no_duplican() {
+        use std::sync::Arc;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = Arc::new(AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre"));
+        let pow = bloque_pow(5, 5);
+        let hash = pow.hash();
+
+        let mut hilos = Vec::new();
+        for _ in 0..8 {
+            let a = Arc::clone(&a);
+            let pow = pow.clone();
+            hilos.push(std::thread::spawn(move || {
+                a.admitir(&pow, false).expect("admite");
+            }));
+        }
+        for hilo in hilos {
+            hilo.join().expect("el hilo no debe entrar en pánico");
+        }
+
+        assert_eq!(a.longitud_registro().expect("longitud"), 1);
+        assert_eq!(a.bloque(&hash).expect("lee"), Some(pow.a_bytes_almacen()));
+    }
+
+    /// Admisiones concurrentes de bloques **distintos**: el registro queda contiguo y con todos.
+    #[test]
+    fn admisiones_concurrentes_de_bloques_distintos_son_contiguas() {
+        use std::sync::Arc;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let a = Arc::new(AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre"));
+
+        let mut hilos = Vec::new();
+        for i in 0..8u64 {
+            let a = Arc::clone(&a);
+            hilos.push(std::thread::spawn(move || {
+                a.admitir(&bloque_pow(i, u32::try_from(i).unwrap_or(0)), false)
+                    .expect("admite");
+            }));
+        }
+        for hilo in hilos {
+            hilo.join().expect("el hilo no debe entrar en pánico");
+        }
+
+        assert_eq!(a.longitud_registro().expect("longitud"), 8);
+        let mut contados = 0u64;
+        a.repetir(&mut |_hash, _valor| {
+            contados += 1;
+            Ok::<(), ()>(())
+        })
+        .expect("la repetición no debe fallar");
+        assert_eq!(contados, 8);
+    }
+
+    // ── V5 (Corrección A) · El compromiso del cuerpo se recalcula al abrir y al leer ─────────────
+    //
+    // Un bit cambiado **dentro del cuerpo** deja el `block_hash` intacto. Estos tests inyectan el
+    // cuerpo alterado bajo la misma clave y exigen error explícito en la lectura y en la reapertura.
+
+    /// **(a)** Importe cambiado en la coinbase de un bloque **PoW** ⇒ el `merkle_root` recalculado
+    /// sobre los `txid` deja de cuadrar.
+    #[test]
+    fn importe_cambiado_en_coinbase_pow_es_cuerpo_no_coincide() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = bloque_pow_coinbase(0x11, 1, 1_000);
+        let hash = base.hash();
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            a.admitir(&base, true).expect("admite");
+            let (cabecera, mut txs, testigos) = decodificar_pow(&base.a_bytes_almacen());
+            txs.first_mut()
+                .expect("hay coinbase")
+                .outputs
+                .first_mut()
+                .expect("hay salida")
+                .value = Amount::nuevo(1_001).expect("importe dentro de rango");
+            reescribir_valor(&a, &hash, valor_pow_con_cuerpo(&cabecera, &txs, &testigos));
+            assert!(
+                matches!(a.bloque(&hash), Err(StorageError::CuerpoNoCoincide)),
+                "leer un cuerpo cambiado MUST ser CuerpoNoCoincide"
+            );
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("reabrir MUST detectar el cuerpo cambiado");
+        assert!(matches!(err, StorageError::CuerpoNoCoincide));
+    }
+
+    /// **(b)** Importe cambiado en la coinbase **v3** de un bloque **PoST** ⇒ cambia el `txid` y el
+    /// `body_commitment` recalculado deja de cuadrar.
+    #[test]
+    fn importe_cambiado_en_coinbase_v3_post_es_cuerpo_no_coincide() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = bloque_post_con(0x22, vec![tx_post_coinbase(1_000, 7)], vec![Vec::new()]);
+        let hash = base.hash();
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            a.admitir(&base, true).expect("admite");
+            let guardado = decodificar_post(&base.a_bytes_almacen());
+            let testigos = guardado.testigos().to_vec();
+            let txs = vec![tx_post_coinbase(1_001, 7)];
+            reescribir_valor(&a, &hash, valor_post_con_cuerpo(&guardado, txs, testigos));
+            assert!(
+                matches!(a.bloque(&hash), Err(StorageError::CuerpoNoCoincide)),
+                "leer un cuerpo cambiado MUST ser CuerpoNoCoincide"
+            );
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("reabrir MUST detectar el cuerpo cambiado");
+        assert!(matches!(err, StorageError::CuerpoNoCoincide));
+    }
+
+    /// **(c)** Un campo (importe de salida) cambiado en una transacción **no coinbase** de un
+    /// bloque PoST ⇒ error explícito.
+    #[test]
+    fn campo_cambiado_en_tx_no_coinbase_post_es_cuerpo_no_coincide() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = bloque_post_con(
+            0x33,
+            vec![tx_post_coinbase(1_000, 7), tx_post_transferencia(0x40, 500)],
+            vec![Vec::new(), Vec::new()],
+        );
+        let hash = base.hash();
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            a.admitir(&base, true).expect("admite");
+            let guardado = decodificar_post(&base.a_bytes_almacen());
+            let testigos = guardado.testigos().to_vec();
+            let txs = vec![tx_post_coinbase(1_000, 7), tx_post_transferencia(0x40, 501)];
+            reescribir_valor(&a, &hash, valor_post_con_cuerpo(&guardado, txs, testigos));
+            assert!(
+                matches!(a.bloque(&hash), Err(StorageError::CuerpoNoCoincide)),
+                "leer un cuerpo cambiado MUST ser CuerpoNoCoincide"
+            );
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("reabrir MUST detectar el cuerpo cambiado");
+        assert!(matches!(err, StorageError::CuerpoNoCoincide));
+    }
+
+    /// **(d)** Un testigo cambiado en un bloque **PoST** ⇒ error explícito: `body_commitment` liga
+    /// `(txid, auth_digest)`.
+    #[test]
+    fn testigo_cambiado_en_post_es_cuerpo_no_coincide() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = bloque_post_con(
+            0x44,
+            vec![tx_post_coinbase(1_000, 7)],
+            vec![vec![vec![0xAA; 64]]],
+        );
+        let hash = base.hash();
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            a.admitir(&base, true).expect("admite");
+            let guardado = decodificar_post(&base.a_bytes_almacen());
+            let txs = guardado.txs().to_vec();
+            let testigos = vec![vec![vec![0xAB; 64]]];
+            reescribir_valor(&a, &hash, valor_post_con_cuerpo(&guardado, txs, testigos));
+            assert!(
+                matches!(a.bloque(&hash), Err(StorageError::CuerpoNoCoincide)),
+                "leer un testigo cambiado MUST ser CuerpoNoCoincide"
+            );
+        }
+        let err = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect_err("reabrir MUST detectar el testigo cambiado");
+        assert!(matches!(err, StorageError::CuerpoNoCoincide));
+    }
+
+    /// **(e)** Un testigo cambiado en un bloque **PoW** **no** está comprometido: `merkle_root` solo
+    /// cubre los `txid`, y el `txid` excluye los testigos (C-TX-01). El almacén **no** puede
+    /// detectarlo y lo acepta; quien lo detecta es la **verificación de firmas del motor al
+    /// re-aplicar** la transacción en la repetición (D-N03′). Este test fija el comportamiento real
+    /// en vez de fingir una detección inexistente.
+    #[test]
+    fn testigo_cambiado_en_pow_no_lo_detecta_el_almacen() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let txs = vec![tx_pow_coinbase(1_000)];
+        let testigos = vec![vec![vec![0xAA; 64]]];
+        let cabecera = cabecera_pow(0x55, 1, raiz_de(&txs));
+        let base = BloqueAdmitido::pow(&cabecera, &txs, &testigos);
+        let hash = base.hash();
+
+        {
+            let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis()).expect("abre");
+            a.admitir(&base, true).expect("admite");
+
+            let (cabecera_leida, txs_leidas, _testigos_leidos) =
+                decodificar_pow(&base.a_bytes_almacen());
+            let testigos_alterados = vec![vec![vec![0xAB; 64]]];
+
+            // Contraste: un compromiso sobre `(txid, auth_digest)` —el que PoST sí lleva en su
+            // cabecera y PoW no— **sí** distinguiría el testigo cambiado. No hay tal campo en la
+            // cabecera PoW, así que el almacén no puede compararlo.
+            assert_ne!(
+                body_commitment(&txs_leidas, &testigos, CBID).expect("tx y testigos cuadran"),
+                body_commitment(&txs_leidas, &testigos_alterados, CBID)
+                    .expect("tx y testigos cuadran"),
+                "el auth_digest del testigo cambiado es distinto"
+            );
+
+            reescribir_valor(
+                &a,
+                &hash,
+                valor_pow_con_cuerpo(&cabecera_leida, &txs_leidas, &testigos_alterados),
+            );
+
+            // El almacén acepta: el `block_hash` y el `merkle_root` no cambian con el testigo.
+            let leido = a
+                .bloque(&hash)
+                .expect("el almacén no detecta el testigo PoW; lo hará el motor al re-aplicar");
+            assert!(leido.is_some(), "el bloque sigue guardado bajo su clave");
+        }
+
+        // Reabrir tampoco lo detecta: la integridad del almacén no cubre los testigos PoW.
+        let a = AlmacenEnDisco::abrir(dir.path(), Red::Dev, genesis())
+            .expect("reabrir no debe fallar por un testigo PoW");
+        assert_eq!(
+            a.longitud_registro().expect("longitud"),
+            1,
+            "la entrada del registro sigue siendo exacta"
+        );
+        let mut vistos = 0u64;
+        a.repetir(&mut |_hash, _valor| {
+            vistos += 1;
+            Ok::<(), ()>(())
+        })
+        .expect("la repetición entrega el bloque; el motor lo rechazará al verificar la firma");
+        assert_eq!(vistos, 1);
     }
 }

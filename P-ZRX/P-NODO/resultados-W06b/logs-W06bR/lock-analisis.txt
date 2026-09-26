@@ -1,0 +1,48 @@
+# logs/lock-analisis.txt — ORDEN-W06b-R
+# Base:  ws.orig/Cargo.lock (raiz actual) sha256 e2f950dc033b011017cbaba90b72239478888299da788068597c7102491946e6
+# Final: ws/Cargo.lock                  sha256 03801a9e83c733bf379e0987fdb52e6c90217c97e46a727f65246a81a9ef3f2e
+# Comando unico (sin cargo update): cargo metadata --offline --format-version 1 >/dev/null
+#   (en la raiz del workspace ws/; --offline usa la cache de .cargo-home, que fija el indice)
+
+Paquetes base:  457
+Paquetes final: 474
+
+## Anadidos (17)
+  + bindgen 0.72.1
+  + bzip2-sys 0.1.13+1.0.8
+  + cexpr 0.6.0
+  + clang-sys 1.9.1
+  + itertools 0.13.0
+  + jobserver 0.1.35
+  + libloading 0.8.9
+  + librocksdb-sys 0.19.0+11.8.1
+  + libz-sys 1.1.29
+  + lz4-sys 1.11.1+lz4-1.10.0
+  + pkg-config 0.3.34
+  + rocksdb 0.25.0
+  + rustflags 0.1.7
+  + shlex 1.3.0
+  + vcpkg 0.2.15
+  + zstd-sys 2.1.0+zstd.1.5.7
+  + zx-storage 0.0.0
+
+## Eliminados (0)
+  (ninguno)
+
+## Pares (nombre, version) de la base ausentes en el final: 0
+   => ninguna version existente cambia; los anadidos son todos paquetes nuevos.
+
+## Unicas lineas de dependencia modificadas (desambiguaciones de version, no cambios de version):
+  - "shlex",
+  - "syn 2.0.119",
+  - "itertools",
+   - cc 1.4.5: "shlex" -> "shlex 2.0.1" (+ jobserver, libc)
+   - data-encoding-macro-internal 0.1.19: "syn 2.0.119" -> "syn 3.0.4"
+   - prost-derive 0.14.4: "itertools" -> "itertools 0.14.0"
+
+## Comparacion con el lock-diff de W06b
+   El cuerpo del diff (desde la primera linea @@) es identico al de
+   deepseek/W06b/logs/lock-diff.txt salvo la ultima cabecera de hunk y el nombre
+   del paquete de contexto (zx-cadena en lugar de zx-consensus), porque la base
+   actual ya incluye zx-cadena (W06a). Mismos 17 paquetes anadidos, a las mismas
+   versiones; 0 eliminados; 0 versiones cambiadas.

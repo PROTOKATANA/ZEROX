@@ -1,0 +1,56 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_cadena-68de83084677448b)
+     Running tests/diferencial_t04.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/diferencial_t04-f5665f536c8b3603)
+     Running tests/propiedades.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/propiedades-87f2744bd54fe342)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_consensus-c4ded41f623171f4)
+     Running tests/diferencial_t01.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/diferencial_t01-589c3a69dae66d0e)
+     Running tests/pow_dev.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/pow_dev-f92b17b8552ce9d2)
+     Running tests/transicion_prop.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/transicion_prop-c7a9cf88e0f1c7ab)
+     Running tests/verificador_pow.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/verificador_pow-1a6215bdc0bf7370)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_core-e8f2dfba90ee8dcc)
+     Running tests/cavp_sha3_256.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/cavp_sha3_256-b4e1b300efea0aed)
+     Running tests/ed25519_no_unicidad.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/ed25519_no_unicidad-9c29c82273a4aaba)
+     Running tests/formato_v0.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/formato_v0-d971c849ca7a2f9c)
+     Running tests/oraculo_julia.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/oraculo_julia-4a9b75d62fe9a044)
+     Running tests/parsers_dag_prop.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/parsers_dag_prop-eecb5cac2af6bcde)
+     Running tests/vectores_dag.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/vectores_dag-e31453d016adb19c)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_dag-38bd978038e59f99)
+     Running tests/dag_causal.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/dag_causal-508ccd286b526412)
+     Running tests/ghostdag_bench.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/ghostdag_bench-6d997aefda44eec1)
+     Running tests/ghostdag_oraculo.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/ghostdag_oraculo-8d86fcc67a5054b3)
+     Running tests/ghostdag_prop.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/ghostdag_prop-6456211b1f801f1b)
+     Running tests/ghostdag_rust.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/ghostdag_rust-94b5622fc9a60bf1)
+     Running tests/padres_dp08.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/padres_dp08-d259671ff351838f)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_farmer-590846d7eb804ba8)
+     Running tests/extremo_a_extremo.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/extremo_a_extremo-34c0f983c5eed240)
+     Running tests/farmer_disco.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/farmer_disco-8eaf899409835039)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_p2p-0b6eac7a7fb65fdf)
+     Running tests/dos_nodos.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/dos_nodos-47c622a3e3cb3d5f)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_poas-2166b5ced5728f94)
+     Running tests/historia_genesis.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/historia_genesis-a437c9c4f30bd7fd)
+     Running tests/poas.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/poas-60ba2b5b8a099125)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_post-90e2e1986d248fd0)
+     Running tests/cabecera_conjunta.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/cabecera_conjunta-0b265d8a9b40c92d)
+     Running tests/extremo_a_extremo.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/extremo_a_extremo-824126f91465a4e0)
+     Running tests/flow.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/flow-a2978e4efb031f67)
+     Running tests/justificacion.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/justificacion-328494469372f9db)
+     Running tests/pot_derivaciones.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/pot_derivaciones-581c9f98125515b8)
+     Running tests/pot_rango.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/pot_rango-e042132c7ca6a4b2)
+     Running tests/pot_slot.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/pot_slot-8e12ef4991b71768)
+     Running tests/regimen.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/regimen-7a99f81eec7ba90b)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_pot-ce10f8b3582458de)
+     Running tests/contexto_verificado.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/contexto_verificado-dfcfdb03cdae1128)
+     Running tests/diferencial.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/diferencial-4ab383b4798572a4)
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/zx_storage-7bbe4bf6e5a83856)
+     Running tests/matar_a_mitad.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/matar_a_mitad-19e66f602eafdc97)
+     Running tests/propiedades.rs (/home/katana/zeo/ZEROX/deepseek/W06bR/target/debug/deps/propiedades-4be779b53d9113c6)
+   Doc-tests zx_cadena
+   Doc-tests zx_consensus
+   Doc-tests zx_core
+   Doc-tests zx_dag
+   Doc-tests zx_farmer
+   Doc-tests zx_p2p
+   Doc-tests zx_poas
+   Doc-tests zx_post
+   Doc-tests zx_pot
+   Doc-tests zx_storage

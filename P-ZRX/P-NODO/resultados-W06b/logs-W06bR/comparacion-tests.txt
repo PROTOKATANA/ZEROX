@@ -1,0 +1,30 @@
+# ORDEN-W06b-R — comparación de tests: ws.orig (662) vs ws (682)
+# Comando: cargo test --workspace --all-features --locked -- --list (en cada árbol; logs/tests-ws.orig.list, logs/tests-ws.list)
+# ws.orig = raíz actual (con W05b3 y W06a). ws = raíz actual + zx-storage (W06b + Corrección A).
+# Perdidos: 0
+# Añadidos: 20 (15 de W06b + 5 de la Corrección A)
+
+## Añadidos (14 unit de disco + 3 unit de memoria + 2 de propiedades/diferencial + 1 matar_a_mitad)
+disco::tests::abrir_con_otra_red_no_reescribe
+disco::tests::abrir_con_otro_genesis_falla
+disco::tests::admisiones_concurrentes_de_bloques_distintos_son_contiguas
+disco::tests::admisiones_concurrentes_del_mismo_bloque_no_duplican
+disco::tests::admite_lee_repite_y_reapertura_conserva
+disco::tests::bit_cambiado_en_un_bloque_es_corrupcion
+disco::tests::campo_cambiado_en_tx_no_coinbase_post_es_cuerpo_no_coincide
+disco::tests::datos_sin_marca_de_esquema_es_corrupcion
+disco::tests::entrada_borrada_del_registro_es_un_hueco
+disco::tests::importe_cambiado_en_coinbase_pow_es_cuerpo_no_coincide
+disco::tests::importe_cambiado_en_coinbase_v3_post_es_cuerpo_no_coincide
+disco::tests::testigo_cambiado_en_post_es_cuerpo_no_coincide
+disco::tests::testigo_cambiado_en_pow_no_lo_detecta_el_almacen
+disco::tests::version_de_esquema_desconocida_falla
+la_repeticion_es_la_secuencia_sin_duplicados
+matar_a_mitad_de_escritura_no_deja_entrada_sin_bloque
+memoria::tests::admite_lee_y_repite_en_orden
+memoria::tests::admitir_dos_veces_es_idempotente
+memoria::tests::el_destino_detiene_la_repeticion
+memoria_y_disco_repiten_igual
+
+## Perdidos
+(ninguno)

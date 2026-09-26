@@ -1,162 +1,202 @@
-//! El almacén de la cadena: cabeceras, cuerpos y punta (SPEC §12, C-STORE).
+//! El rasgo del almacén y el bloque que se admite.
 //!
-//! # Por qué un trait y no RocksDB directamente
-//!
-//! Tres razones, en orden de importancia:
-//!
-//! 1. **Los tests no deben tocar disco.** Un test que abre una base de datos es lento, deja basura
-//!    y falla de formas que no tienen que ver con lo que prueba. Con una implementación en memoria,
-//!    la lógica de cadena se prueba a velocidad de RAM.
-//! 2. **La corrección se prueba una vez, no por backend.** Un test diferencial puede correr la
-//!    misma secuencia de operaciones contra los dos y exigir que coincidan byte a byte. Sin trait,
-//!    eso no se puede escribir.
-//! 3. **RocksDB es una dependencia enorme.** Que compilarla sea opcional mantiene el ciclo de
-//!    desarrollo rápido para todo lo que no la necesita.
-//!
-//! # La invariante que no puede romperse: primero el dato, después la punta
-//!
-//! **La punta se escribe SIEMPRE al final.** Si el proceso muere entre medias, un almacén con
-//! cabeceras que la punta no menciona es **recuperable** —sobra información, se ignora—, mientras
-//! que una punta que apunta a una cabecera que no se llegó a escribir es un almacén **corrupto**:
-//! el nodo arranca creyendo estar en una altura de la que no tiene datos.
-//!
-//! Es la misma razón por la que `revertir_bloque` aplica el undo data antes de mover el tip.
+//! [`Almacen`] es lo único que el nodo necesita para persistir: admitir un bloque, leerlo por hash
+//! y repetir el registro en orden. Lo implementan [`crate::memoria::AlmacenEnMemoria`] y
+//! [`crate::disco::AlmacenEnDisco`], y los tests diferenciales exigen que respondan igual.
+
+use core::fmt;
+use std::borrow::Cow;
 
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
-use zx_core::tx::OutPoint;
+use zx_core::red::Red;
+use zx_core::tx::Tx;
+use zx_core::wire;
+use zx_core::wire_dag::{BloqueDag, bloque_dag_a_bytes};
 
 use crate::error::StorageError;
-use crate::utxo::DeltaUtxo;
-use zx_consensus::validacion::EntradaUtxo;
+use crate::formato::{self, Familia};
 
-/// Dónde está la punta de la cadena.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Punta {
-    /// Hash de la cabecera de la punta.
-    pub hash: BlockHash,
-    /// Su altura.
-    pub altura: u32,
+/// Un bloque listo para admitir: su familia, sus bytes canónicos y su hash ya calculado.
+///
+/// Se construye de tres formas:
+///
+/// - [`BloqueAdmitido::pow`] y [`BloqueAdmitido::post`] codifican un bloque tipado con el códec
+///   canónico de `zx-core` y calculan su hash.
+/// - [`BloqueAdmitido::desde_canonicos`] toma bytes ya codificados y **exige** que decodifiquen y
+///   que la re-codificación coincida (forma canónica).
+/// - [`BloqueAdmitido::desde_almacen`] toma el valor guardado `familia(1) ‖ canónicos`, como el que
+///   entrega [`Almacen::repetir`].
+#[derive(Debug, Clone)]
+pub struct BloqueAdmitido<'a> {
+    familia: Familia,
+    canonicos: Cow<'a, [u8]>,
+    hash: BlockHash,
 }
 
-/// Lo que el nodo necesita guardar de la cadena.
+impl<'a> BloqueAdmitido<'a> {
+    /// Codifica un bloque PoW con `cuerpo_a_bytes` y calcula su `block_hash`.
+    #[must_use]
+    pub fn pow(cabecera: &BlockHeader, txs: &[Tx], testigos: &[Vec<Vec<u8>>]) -> Self {
+        let mut canonicos = Vec::new();
+        wire::cuerpo_a_bytes(&mut canonicos, cabecera, txs, testigos);
+        Self {
+            familia: Familia::Pow,
+            canonicos: Cow::Owned(canonicos),
+            hash: cabecera.block_hash(),
+        }
+    }
+
+    /// Codifica un bloque PoST con `bloque_dag_a_bytes` y calcula su `block_hash`.
+    #[must_use]
+    pub fn post(bloque: &BloqueDag) -> Self {
+        let mut canonicos = Vec::new();
+        bloque_dag_a_bytes(&mut canonicos, bloque);
+        Self {
+            familia: Familia::Post,
+            canonicos: Cow::Owned(canonicos),
+            hash: bloque.cabecera.block_hash(),
+        }
+    }
+
+    /// Toma bytes canónicos ya codificados, comprueba que lo sean y calcula su hash.
+    ///
+    /// # Errores
+    /// [`StorageError::Corrupto`] si no decodifican, sobran bytes o la forma no es canónica.
+    pub fn desde_canonicos(familia: Familia, canonicos: &'a [u8]) -> Result<Self, StorageError> {
+        let hash = formato::hash_canonico(familia, canonicos)?;
+        Ok(Self {
+            familia,
+            canonicos: Cow::Borrowed(canonicos),
+            hash,
+        })
+    }
+
+    /// Toma el valor guardado `familia(1) ‖ canónicos`.
+    ///
+    /// # Errores
+    /// [`StorageError::Corrupto`] si el sobre está vacío, la familia es desconocida o los canónicos
+    /// no son válidos.
+    pub fn desde_almacen(valor: &'a [u8]) -> Result<Self, StorageError> {
+        let (familia, canonicos) = formato::separar(valor)?;
+        Self::desde_canonicos(familia, canonicos)
+    }
+
+    /// El hash de la cabecera, ya calculado.
+    #[must_use]
+    pub fn hash(&self) -> BlockHash {
+        self.hash
+    }
+
+    /// La familia del bloque.
+    #[must_use]
+    pub fn familia(&self) -> Familia {
+        self.familia
+    }
+
+    /// Los bytes canónicos del bloque, sin el sobre de familia.
+    #[must_use]
+    pub fn canonicos(&self) -> &[u8] {
+        &self.canonicos
+    }
+
+    /// El valor tal y como se guarda en la familia `bloques`.
+    #[must_use]
+    pub fn a_bytes_almacen(&self) -> Vec<u8> {
+        formato::bloque_a_bytes(self.familia, &self.canonicos)
+    }
+}
+
+/// El fallo de una repetición: o fue del almacén, o lo devolvió el destino.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ErrorRepeticion<E> {
+    /// El almacén no pudo entregar el siguiente bloque.
+    Almacen(StorageError),
+    /// El destino rechazó el bloque. La repetición se detuvo en él.
+    Destino(E),
+}
+
+impl<E: fmt::Display> fmt::Display for ErrorRepeticion<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Almacen(e) => write!(f, "la repetición falló en el almacén: {e}"),
+            Self::Destino(e) => write!(f, "la repetición falló en el destino: {e}"),
+        }
+    }
+}
+
+impl<E: fmt::Debug + fmt::Display> std::error::Error for ErrorRepeticion<E> {}
+
+/// Almacén de bloques admitidos y de su orden de admisión.
 ///
-/// Los cuerpos se guardan como **bytes ya serializados** y no como estructuras: el almacén no
-/// necesita entender lo que guarda, y hacerle entenderlo lo ataría al formato de wire. Quien los
-/// escribe y los lee es quien sabe interpretarlos.
-pub trait AlmacenCadena: Send + Sync {
-    /// Guarda una cabecera, indexada por su hash y por su altura.
+/// # Contrato
+///
+/// - **Atomicidad:** cada admisión es una sola operación lógica —el bloque y su entrada del
+///   registro—. Un corte del proceso deja el registro en un prefijo contiguo, nunca a medias.
+/// - **Idempotencia:** admitir otra vez el mismo `block_hash` no añade entrada al registro.
+/// - **Integridad:** al abrir y al leer se recalcula el hash del bloque y se compara con la clave;
+///   un hueco del registro, una entrada sin bloque o un hash que no coincide son error explícito,
+///   sin reparación silenciosa.
+/// - **Repetición:** los bloques salen en el orden del registro, con los mismos bytes.
+pub trait Almacen: Send + Sync {
+    /// La red con la que se abrió el almacén.
+    fn red(&self) -> Red;
+
+    /// El hash del génesis con el que se abrió el almacén.
+    fn genesis(&self) -> BlockHash;
+
+    /// Admite un bloque y devuelve su hash.
+    ///
+    /// `sync` decide si la escritura se fuerza a disco antes de volver (`true` en los tests de
+    /// muerte). Admitir dos veces el mismo bloque es idempotente.
+    ///
+    /// # Errores
+    /// [`StorageError`] si el backend falla o si ya había bytes distintos bajo el mismo hash.
+    fn admitir(&self, bloque: &BloqueAdmitido<'_>, sync: bool) -> Result<BlockHash, StorageError>;
+
+    /// Admite bytes canónicos ya codificados, sin construirlos antes a mano.
+    ///
+    /// # Errores
+    /// Las de [`BloqueAdmitido::desde_canonicos`] y [`Almacen::admitir`].
+    fn admitir_canonicos(
+        &self,
+        familia: Familia,
+        canonicos: &[u8],
+        sync: bool,
+    ) -> Result<BlockHash, StorageError> {
+        let bloque = BloqueAdmitido::desde_canonicos(familia, canonicos)?;
+        self.admitir(&bloque, sync)
+    }
+
+    /// Lee el valor guardado de un bloque, `familia(1) ‖ canónicos`, verificando su hash.
+    ///
+    /// `Ok(None)` significa que el hash no está admitido; una entrada corrupta devuelve error.
+    ///
+    /// # Errores
+    /// [`StorageError::Corrupto`] o [`StorageError::HashNoCoincide`] si lo guardado no cuadra.
+    fn bloque(&self, hash: &BlockHash) -> Result<Option<Vec<u8>>, StorageError>;
+
+    /// Recorre el registro en orden y entrega cada bloque.
+    ///
+    /// El destino recibe `(block_hash, valor_guardado)`, donde el valor es
+    /// `familia(1) ‖ canónicos` (reconstruible con [`BloqueAdmitido::desde_almacen`]). Se detiene en
+    /// el primer error y lo devuelve en [`ErrorRepeticion`].
+    ///
+    /// # Errores
+    /// [`ErrorRepeticion::Almacen`] si el almacén falla; [`ErrorRepeticion::Destino`] si el destino
+    /// devuelve error.
+    fn repetir<E>(
+        &self,
+        destino: &mut impl FnMut(BlockHash, &[u8]) -> Result<(), E>,
+    ) -> Result<(), ErrorRepeticion<E>>;
+
+    /// Cuántas entradas tiene el registro: el índice de la próxima admisión.
     ///
     /// # Errores
     /// [`StorageError`] si el backend falla.
-    fn guardar_cabecera(&self, cabecera: &BlockHeader) -> Result<(), StorageError>;
+    fn longitud_registro(&self) -> Result<u64, StorageError>;
 
-    /// Recupera una cabecera por su hash.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla. **No encontrarla no es un error**: es `Ok(None)`.
-    fn cabecera(&self, hash: &BlockHash) -> Result<Option<BlockHeader>, StorageError>;
-
-    /// El hash de la cabecera a una altura dada, en la cadena principal.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla.
-    fn hash_en_altura(&self, altura: u32) -> Result<Option<BlockHash>, StorageError>;
-
-    /// Guarda el cuerpo de un bloque, ya serializado.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla.
-    fn guardar_cuerpo(&self, hash: &BlockHash, bytes: &[u8]) -> Result<(), StorageError>;
-
-    /// Recupera el cuerpo de un bloque.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla.
-    fn cuerpo(&self, hash: &BlockHash) -> Result<Option<Vec<u8>>, StorageError>;
-
-    /// **Guarda un lote de cabeceras y avanza la punta, en UNA SOLA escritura atómica**
-    /// (C-STORE-07).
-    ///
-    /// Existe porque [`Self::guardar_cabecera`] y [`Self::fijar_punta`] son dos escrituras, y entre
-    /// las dos hay una ventana: un corte deja las cabeceras escritas y la punta sin mover. Hoy eso
-    /// es **recuperable** —C-STORE-01 pone la punta después del dato, así que lo que sobra se
-    /// ignora y el nodo resincroniza— pero deja de serlo en cuanto el UTXO set entre en el mismo
-    /// avance: entonces una mitad del estado iría por delante de la otra, y eso no se arregla
-    /// ignorando nada.
-    ///
-    /// Un lote y no una cabecera porque es como se usa: extender la cadena con `n` cabeceras y
-    /// mover la punta una vez. Hacerlo cabecera a cabecera serían `n` escrituras donde basta una, y
-    /// ninguna de las intermedias aporta nada.
-    ///
-    /// # Errores
-    /// [`StorageError::PuntaSinCabecera`] si la punta no es ninguna de las cabeceras del lote ni
-    /// algo que ya tuviéramos; [`StorageError`] del backend si la escritura falla.
-    fn aplicar_lote(&self, cabeceras: &[BlockHeader], punta: Punta) -> Result<(), StorageError>;
-
-    /// ¿Tenemos el cuerpo de este bloque?
-    ///
-    /// Existe aparte de [`Self::cuerpo`] porque la pregunta se hace en bucle sobre la cadena
-    /// entera —"¿qué cuerpos me faltan?"— y responderla leyendo cada cuerpo significaría mover
-    /// gigabytes por el bus para acabar mirando solo si había algo. Las implementaciones **MUST**
-    /// responder sin materializar el valor.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla.
-    fn tiene_cuerpo(&self, hash: &BlockHash) -> Result<bool, StorageError>;
-
-    /// La punta actual, o `None` si el almacén está vacío.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla.
-    fn punta(&self) -> Result<Option<Punta>, StorageError>;
-
-    /// Mueve la punta.
-    ///
-    /// **MUST llamarse después** de haber guardado la cabecera correspondiente: ver la nota de
-    /// módulo sobre por qué el orden importa.
-    ///
-    /// # Errores
-    /// [`StorageError::PuntaSinCabecera`] si la cabecera no está guardada — la comprobación que
-    /// convierte un almacén corrupto en un error visible.
-    fn fijar_punta(&self, punta: Punta) -> Result<(), StorageError>;
-
-    /// El UTXO **finalizado** que corresponde a un outpoint, si existe y no está gastado.
-    ///
-    /// Solo ve el estado finalizado (C-STORE-06): lo que hayan hecho los últimos bloques vive en
-    /// memoria y lo resuelve quien llame, mirando su solapamiento antes de bajar aquí.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla o si lo guardado no decodifica.
-    fn utxo(&self, o: &OutPoint) -> Result<Option<EntradaUtxo>, StorageError>;
-
-    /// **Finaliza un bloque**: aplica su delta al UTXO set y avanza la altura finalizada, en UNA
-    /// SOLA escritura atómica (C-STORE-06, C-STORE-07).
-    ///
-    /// No hay operación inversa, y es deliberado: el disco **nunca revierte**. Un bloque solo se
-    /// finaliza cuando su profundidad alcanza `MAX_REORG_LENGTH`, y más allá de ahí C-REORG-07
-    /// detiene el nodo — así que no existe reorganización que soportar sobre lo ya escrito.
-    ///
-    /// # Errores
-    /// [`StorageError::OutpointDuplicado`] si el delta crea algo que ya estaba —es la defensa de
-    /// BIP-30, y aquí no puede pasar porque C-EMIT-04 hace único el txid de coinbase, pero se
-    /// comprueba igual: una sobrescritura silenciosa perdería un UTXO y solo se notaría el día que
-    /// alguien intentara gastarlo—; [`StorageError::OutpointAusente`] si gasta algo que no está.
-    fn finalizar(&self, altura: u32, delta: &DeltaUtxo) -> Result<(), StorageError>;
-
-    /// Hasta qué altura está finalizado el UTXO set, o `None` si no se ha finalizado nada.
-    ///
-    /// Es lo que dice cuántos bloques hay que reproducir al arrancar para reconstruir el
-    /// solapamiento en memoria (C-STORE-06). Como mucho serán `MAX_REORG_LENGTH`.
-    ///
-    /// # Errores
-    /// [`StorageError`] si el backend falla.
-    fn altura_finalizada(&self) -> Result<Option<u32>, StorageError>;
-
-    /// Fuerza a que lo escrito llegue a disco.
-    ///
-    /// En memoria no hace nada. En RocksDB importa: sin esto, un corte de corriente pierde lo que
-    /// estuviera en el buffer del sistema operativo.
+    /// Fuerza el volcado a disco de lo pendiente.
     ///
     /// # Errores
     /// [`StorageError`] si el backend falla.
