@@ -1,0 +1,227 @@
+== ORDEN-A10-M1: banco CPU (zx_core::sha3_256_publico sobre preimagen del PoW) ==
+--- ANTES-DE-TODO 2026-09-26T03:51:07+02:00 ---
+ 03:51:07  arriba 10:53,  2 users,  carga promedio: 4,97, 3,30, 3,10
+32
+    PID %CPU %MEM COMMAND
+ 305832  189  0.0 diferencial_t01
+ 306851 99.9  0.0 pow_dev-d659e1c
+ 306449 99.9  0.0 pow_dev-d659e1c
+  48233  3.0  0.4 claude
+  34380  2.8  0.4 chrome
+ 279974  2.3  0.2 MainThread
+ 278494  2.2  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+--- ANTES-t1 2026-09-26T03:51:07+02:00 ---
+ 03:51:07  arriba 10:53,  2 users,  carga promedio: 4,97, 3,30, 3,10
+32
+    PID %CPU %MEM COMMAND
+ 305832  189  0.0 diferencial_t01
+ 306851 99.9  0.0 pow_dev-d659e1c
+ 306449 99.9  0.0 pow_dev-d659e1c
+  48233  3.0  0.4 claude
+  34380  2.8  0.4 chrome
+ 279974  2.3  0.2 MainThread
+ 278494  2.2  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+t=1 rep=1 cpuset=0-0 hilos=1 hashes=48168960 segundos=10.011362 hs=4811429.159
+t=1 rep=2 cpuset=0-0 hilos=1 hashes=48300032 segundos=10.009024 hs=4825648.684
+t=1 rep=3 cpuset=0-0 hilos=1 hashes=47972352 segundos=10.005431 hs=4794631.390
+t=1 rep=4 cpuset=0-0 hilos=1 hashes=48889856 segundos=10.005705 hs=4886197.915
+t=1 rep=5 cpuset=0-0 hilos=1 hashes=49152000 segundos=10.012612 hs=4909008.997
+--- DESPUES-t1 2026-09-26T03:51:57+02:00 ---
+ 03:51:57  arriba 10:54,  2 users,  carga promedio: 4,17, 3,37, 3,14
+32
+    PID %CPU %MEM COMMAND
+ 309991  192  0.3 julia
+ 309982  3.7  0.0 bwrap
+  48233  3.0  0.4 claude
+  34380  2.8  0.4 chrome
+ 279974  2.3  0.2 MainThread
+ 278494  2.1  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+--- ANTES-t2 2026-09-26T03:51:57+02:00 ---
+ 03:51:57  arriba 10:54,  2 users,  carga promedio: 4,17, 3,37, 3,14
+32
+    PID %CPU %MEM COMMAND
+ 309991  191  0.3 julia
+ 309982  3.7  0.0 bwrap
+  48233  3.0  0.4 claude
+  34380  2.8  0.4 chrome
+ 279974  2.3  0.2 MainThread
+ 278494  2.1  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+t=2 rep=1 cpuset=0-1 hilos=2 hashes=98238464 segundos=10.005459 hs=9818486.029
+t=2 rep=2 cpuset=0-1 hilos=2 hashes=98107392 segundos=10.010189 hs=9800752.812
+t=2 rep=3 cpuset=0-1 hilos=2 hashes=98172928 segundos=10.008206 hs=9809243.573
+t=2 rep=4 cpuset=0-1 hilos=2 hashes=98304000 segundos=10.013736 hs=9816915.033
+t=2 rep=5 cpuset=0-1 hilos=2 hashes=98172928 segundos=10.012311 hs=9805221.290
+--- DESPUES-t2 2026-09-26T03:52:47+02:00 ---
+ 03:52:47  arriba 10:55,  2 users,  carga promedio: 4,00, 3,44, 3,18
+32
+    PID %CPU %MEM COMMAND
+ 309991  101  0.4 julia
+ 310430  100  0.0 diferencial_t01
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 279974  2.1  0.2 MainThread
+ 278494  2.1  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+--- ANTES-t4 2026-09-26T03:52:47+02:00 ---
+ 03:52:47  arriba 10:55,  2 users,  carga promedio: 4,00, 3,44, 3,18
+32
+    PID %CPU %MEM COMMAND
+ 309991  101  0.4 julia
+ 310430  100  0.0 diferencial_t01
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 279974  2.1  0.2 MainThread
+ 278494  2.1  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+t=4 rep=1 cpuset=0-3 hilos=4 hashes=193462272 segundos=10.011568 hs=19323874.167
+t=4 rep=2 cpuset=0-3 hilos=4 hashes=193396736 segundos=10.013762 hs=19313094.936
+t=4 rep=3 cpuset=0-3 hilos=4 hashes=193462272 segundos=10.012833 hs=19321431.507
+t=4 rep=4 cpuset=0-3 hilos=4 hashes=193134592 segundos=10.012654 hs=19289050.118
+t=4 rep=5 cpuset=0-3 hilos=4 hashes=193331200 segundos=10.013538 hs=19306981.870
+--- DESPUES-t4 2026-09-26T03:53:37+02:00 ---
+ 03:53:37  arriba 10:56,  2 users,  carga promedio: 4,72, 3,73, 3,29
+32
+    PID %CPU %MEM COMMAND
+ 310430  100  0.0 diferencial_t01
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  2.0  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+   3484  0.3  0.0 nv_queue
+  48174  0.3  0.1 alacritty
+--- ANTES-t8 2026-09-26T03:53:37+02:00 ---
+ 03:53:37  arriba 10:56,  2 users,  carga promedio: 4,72, 3,73, 3,29
+32
+    PID %CPU %MEM COMMAND
+ 310430 99.9  0.0 diferencial_t01
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  2.0  0.1 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+   3484  0.3  0.0 nv_queue
+  48174  0.3  0.1 alacritty
+t=8 rep=1 cpuset=0-7 hilos=8 hashes=376373248 segundos=10.011100 hs=37595593.759
+t=8 rep=2 cpuset=0-7 hilos=8 hashes=375717888 segundos=10.014477 hs=37517472.927
+t=8 rep=3 cpuset=0-7 hilos=8 hashes=370671616 segundos=10.010851 hs=37026983.783
+t=8 rep=4 cpuset=0-7 hilos=8 hashes=375193600 segundos=10.014483 hs=37465100.838
+t=8 rep=5 cpuset=0-7 hilos=8 hashes=374996992 segundos=10.013886 hs=37447700.338
+--- DESPUES-t8 2026-09-26T03:54:27+02:00 ---
+ 03:54:27  arriba 10:56,  2 users,  carga promedio: 7,87, 4,72, 3,65
+32
+    PID %CPU %MEM COMMAND
+ 311611  200  0.0 diferencial_t01
+ 310430 99.9  0.0 diferencial_t01
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  2.0  0.2 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+ 311638  0.7  0.1 chrome
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+--- ANTES-t16 2026-09-26T03:54:27+02:00 ---
+ 03:54:27  arriba 10:56,  2 users,  carga promedio: 7,87, 4,72, 3,65
+32
+    PID %CPU %MEM COMMAND
+ 311611  199  0.0 diferencial_t01
+ 310430 99.9  0.0 diferencial_t01
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  2.0  0.2 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+ 311638  0.7  0.1 chrome
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+t=16 rep=1 cpuset=0-15 hilos=16 hashes=683278336 segundos=10.014774 hs=68227036.668
+t=16 rep=2 cpuset=0-15 hilos=16 hashes=676462592 segundos=10.013380 hs=67555866.762
+t=16 rep=3 cpuset=0-15 hilos=16 hashes=672923648 segundos=10.017229 hs=67176628.035
+t=16 rep=4 cpuset=0-15 hilos=16 hashes=678166528 segundos=10.019122 hs=67687219.816
+t=16 rep=5 cpuset=0-15 hilos=16 hashes=677838848 segundos=10.017889 hs=67662843.875
+--- DESPUES-t16 2026-09-26T03:55:17+02:00 ---
+ 03:55:17  arriba 10:57,  2 users,  carga promedio: 14,17, 6,92, 4,46
+32
+    PID %CPU %MEM COMMAND
+ 311611  199  0.0 diferencial_t01
+ 312187 99.8  0.0 pow_dev-d659e1c
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  1.9  0.2 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+   3484  0.3  0.0 nv_queue
+--- ANTES-t32 2026-09-26T03:55:17+02:00 ---
+ 03:55:17  arriba 10:57,  2 users,  carga promedio: 14,17, 6,92, 4,46
+32
+    PID %CPU %MEM COMMAND
+ 311611  200  0.0 diferencial_t01
+ 312187  100  0.0 pow_dev-d659e1c
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  1.9  0.2 MainThread
+   4307  1.3  0.3 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+   4197  0.6  0.4 chrome
+   3484  0.3  0.0 nv_queue
+t=32 rep=1 cpuset=0-31 hilos=32 hashes=685965312 segundos=10.027737 hs=68406793.630
+t=32 rep=2 cpuset=0-31 hilos=32 hashes=688062464 segundos=10.023487 hs=68645019.458
+t=32 rep=3 cpuset=0-31 hilos=32 hashes=687341568 segundos=10.024866 hs=68563668.576
+t=32 rep=4 cpuset=0-31 hilos=32 hashes=689831936 segundos=10.027192 hs=68796120.053
+t=32 rep=5 cpuset=0-31 hilos=32 hashes=682622976 segundos=10.021843 hs=68113519.847
+--- DESPUES-t32 2026-09-26T03:56:08+02:00 ---
+ 03:56:08  arriba 10:58,  2 users,  carga promedio: 25,96, 11,25, 6,06
+32
+    PID %CPU %MEM COMMAND
+ 311611  193  0.0 diferencial_t01
+ 312187 91.7  0.0 pow_dev-d659e1c
+ 312434  8.0  0.1 chrome
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  1.8  0.1 MainThread
+   4307  1.3  0.3 chrome
+ 312424  0.9  0.0 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland
+--- DESPUES-DE-TODO 2026-09-26T03:56:08+02:00 ---
+ 03:56:08  arriba 10:58,  2 users,  carga promedio: 25,96, 11,25, 6,06
+32
+    PID %CPU %MEM COMMAND
+ 311611  193  0.0 diferencial_t01
+ 312187 91.7  0.0 pow_dev-d659e1c
+ 312434  7.9  0.1 chrome
+  48233  3.0  0.4 claude
+  34380  2.7  0.4 chrome
+ 278494  1.8  0.1 MainThread
+   4307  1.3  0.3 chrome
+ 312424  0.9  0.0 chrome
+  39717  0.7  0.2 claude
+   4080  0.7  0.0 Hyprland

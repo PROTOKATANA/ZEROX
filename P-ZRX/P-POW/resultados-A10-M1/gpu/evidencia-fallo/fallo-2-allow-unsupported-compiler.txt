@@ -1,0 +1,159 @@
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+/usr/include/c++/15/type_traits(555): error: type name is not allowed
+      : public __bool_constant<__is_pointer(_Tp)>
+                                            ^
+
+/usr/include/c++/15/type_traits(555): error: identifier "__is_pointer" is undefined
+      : public __bool_constant<__is_pointer(_Tp)>
+                               ^
+
+/usr/include/c++/15/type_traits(877): error: type name is not allowed
+      : public __bool_constant<__is_volatile(_Tp)>
+                                             ^
+
+/usr/include/c++/15/type_traits(877): error: identifier "__is_volatile" is undefined
+      : public __bool_constant<__is_volatile(_Tp)>
+                               ^
+
+/usr/include/c++/15/type_traits(1492): error: type name is not allowed
+      : public integral_constant<std::size_t, __array_rank(_Tp)> { };
+                                                           ^
+
+/usr/include/c++/15/type_traits(1492): error: identifier "__array_rank" is undefined
+      : public integral_constant<std::size_t, __array_rank(_Tp)> { };
+                                              ^
+
+/usr/include/c++/15/type_traits(1844): error: incomplete type "std::__cv_selector<std::__make_unsigned_selector<wchar_t, false, true>::__unsigned_type, false, <error-constant>>" (aka "std::__cv_selector<unsigned int, false, <error-constant>>") is not allowed
+        using __type = typename __match::__type;
+                                ^
+          detected during:
+            instantiation of class "std::__match_cv_qualifiers<_Qualified, _Unqualified, _IsConst, _IsVol> [with _Qualified=wchar_t, _Unqualified=unsigned int, _IsConst=false, _IsVol=<error-constant>]" at line 1953
+            instantiation of class "std::__make_unsigned_selector<_Tp, false, true> [with _Tp=wchar_t]" at line 1964
+
+/usr/include/c++/15/type_traits(1844): error: incomplete type "std::__cv_selector<std::__make_unsigned_selector<char16_t, false, true>::__unsigned_type, false, <error-constant>>" (aka "std::__cv_selector<unsigned short, false, <error-constant>>") is not allowed
+        using __type = typename __match::__type;
+                                ^
+          detected during:
+            instantiation of class "std::__match_cv_qualifiers<_Qualified, _Unqualified, _IsConst, _IsVol> [with _Qualified=char16_t, _Unqualified=unsigned short, _IsConst=false, _IsVol=<error-constant>]" at line 1953
+            instantiation of class "std::__make_unsigned_selector<_Tp, false, true> [with _Tp=char16_t]" at line 1980
+
+/usr/include/c++/15/type_traits(1844): error: incomplete type "std::__cv_selector<std::__make_unsigned_selector<wchar_t, false, true>::__unsigned_type, false, <error-constant>>" (aka "std::__cv_selector<unsigned int, false, <error-constant>>") is not allowed
+        using __type = typename __match::__type;
+                                ^
+          detected during:
+            instantiation of class "std::__match_cv_qualifiers<_Qualified, _Unqualified, _IsConst, _IsVol> [with _Qualified=char32_t, _Unqualified=unsigned int, _IsConst=false, _IsVol=<error-constant>]" at line 1953
+            instantiation of class "std::__make_unsigned_selector<_Tp, false, true> [with _Tp=char32_t]" at line 1987
+
+/usr/include/c++/15/type_traits(1844): error: incomplete type "std::__cv_selector<std::__make_unsigned_selector<wchar_t, true, false>::__unsigned_type, false, <error-constant>>" is not allowed
+        using __type = typename __match::__type;
+                                ^
+          detected during:
+            instantiation of class "std::__match_cv_qualifiers<_Qualified, _Unqualified, _IsConst, _IsVol> [with _Qualified=wchar_t, _Unqualified=<error-type>, _IsConst=false, _IsVol=<error-constant>]" at line 1915
+            instantiation of class "std::__make_unsigned_selector<_Tp, true, false> [with _Tp=wchar_t]" at line 2082
+            instantiation of class "std::__make_signed_selector<_Tp, false, true> [with _Tp=wchar_t]" at line 2096
+
+/usr/include/c++/15/type_traits(2085): error: incomplete type "std::__make_signed_selector<std::__make_signed_selector<wchar_t, false, true>::__unsigned_type, false, <error-constant>>" is not allowed
+        using __type = typename __make_signed_selector<__unsigned_type>::__type;
+                                ^
+          detected during instantiation of class "std::__make_signed_selector<_Tp, false, true> [with _Tp=wchar_t]" at line 2096
+
+/usr/include/c++/15/type_traits(1844): error: incomplete type "std::__cv_selector<std::__make_unsigned_selector<wchar_t, true, false>::__unsigned_type, false, <error-constant>>" is not allowed
+        using __type = typename __match::__type;
+                                ^
+          detected during:
+            instantiation of class "std::__match_cv_qualifiers<_Qualified, _Unqualified, _IsConst, _IsVol> [with _Qualified=char16_t, _Unqualified=<error-type>, _IsConst=false, _IsVol=<error-constant>]" at line 1915
+            instantiation of class "std::__make_unsigned_selector<_Tp, true, false> [with _Tp=char16_t]" at line 2082
+            instantiation of class "std::__make_signed_selector<_Tp, false, true> [with _Tp=char16_t]" at line 2112
+
+/usr/include/c++/15/type_traits(2085): error: incomplete type "std::__make_signed_selector<std::__make_signed_selector<wchar_t, false, true>::__unsigned_type, false, <error-constant>>" is not allowed
+        using __type = typename __make_signed_selector<__unsigned_type>::__type;
+                                ^
+          detected during instantiation of class "std::__make_signed_selector<_Tp, false, true> [with _Tp=char16_t]" at line 2112
+
+/usr/include/c++/15/type_traits(1844): error: incomplete type "std::__cv_selector<std::__make_unsigned_selector<wchar_t, true, false>::__unsigned_type, false, <error-constant>>" is not allowed
+        using __type = typename __match::__type;
+                                ^
+          detected during:
+            instantiation of class "std::__match_cv_qualifiers<_Qualified, _Unqualified, _IsConst, _IsVol> [with _Qualified=char32_t, _Unqualified=<error-type>, _IsConst=false, _IsVol=<error-constant>]" at line 1915
+            instantiation of class "std::__make_unsigned_selector<_Tp, true, false> [with _Tp=char32_t]" at line 2082
+            instantiation of class "std::__make_signed_selector<_Tp, false, true> [with _Tp=char32_t]" at line 2119
+
+/usr/include/c++/15/type_traits(2085): error: incomplete type "std::__make_signed_selector<std::__make_signed_selector<wchar_t, false, true>::__unsigned_type, false, <error-constant>>" is not allowed
+        using __type = typename __make_signed_selector<__unsigned_type>::__type;
+                                ^
+          detected during instantiation of class "std::__make_signed_selector<_Tp, false, true> [with _Tp=char32_t]" at line 2119
+
+/usr/include/c++/15/type_traits(3303): error: type name is not allowed
+      : public __bool_constant<__is_invocable(_Fn, _ArgTypes...)>
+                                              ^
+
+/usr/include/c++/15/type_traits(3303): error: type name is not allowed
+      : public __bool_constant<__is_invocable(_Fn, _ArgTypes...)>
+                                                   ^
+
+/usr/include/c++/15/type_traits(3333): error: type name is not allowed
+      : public __bool_constant<__is_nothrow_invocable(_Fn, _ArgTypes...)>
+                                                      ^
+
+/usr/include/c++/15/type_traits(3333): error: type name is not allowed
+      : public __bool_constant<__is_nothrow_invocable(_Fn, _ArgTypes...)>
+                                                           ^
+
+/usr/include/c++/15/type_traits(3409): error: type name is not allowed
+    inline constexpr bool is_pointer_v = __is_pointer(_Tp);
+                                                      ^
+
+/usr/include/c++/15/type_traits(3522): error: type name is not allowed
+    inline constexpr bool is_volatile_v = __is_volatile(_Tp);
+                                                        ^
+
+/usr/include/c++/15/type_traits(3664): error: type name is not allowed
+    inline constexpr size_t rank_v = __array_rank(_Tp);
+                                                  ^
+
+/usr/include/bits/mathcalls.h(83): error: exception specification is incompatible with that of previous function "cospi" (declared at line 2601 of /usr/local/cuda-12.9/bin/../targets/x86_64-linux/include/crt/math_functions.h)
+   extern double cospi (double __x) noexcept (true); extern double __cospi (double __x) noexcept (true);
+                                    ^
+
+/usr/include/bits/mathcalls.h(85): error: exception specification is incompatible with that of previous function "sinpi" (declared at line 2556 of /usr/local/cuda-12.9/bin/../targets/x86_64-linux/include/crt/math_functions.h)
+   extern double sinpi (double __x) noexcept (true); extern double __sinpi (double __x) noexcept (true);
+                                    ^
+
+/usr/include/bits/mathcalls.h(206): error: exception specification is incompatible with that of previous function "rsqrt" (declared at line 597 of /usr/local/cuda-12.9/bin/../targets/x86_64-linux/include/crt/math_functions.h)
+   extern double rsqrt (double __x) noexcept (true); extern double __rsqrt (double __x) noexcept (true);
+                                    ^
+
+/usr/include/bits/mathcalls.h(83): error: exception specification is incompatible with that of previous function "cospif" (declared at line 2623 of /usr/local/cuda-12.9/bin/../targets/x86_64-linux/include/crt/math_functions.h)
+   extern float cospif (float __x) noexcept (true); extern float __cospif (float __x) noexcept (true);
+                                   ^
+
+/usr/include/bits/mathcalls.h(85): error: exception specification is incompatible with that of previous function "sinpif" (declared at line 2579 of /usr/local/cuda-12.9/bin/../targets/x86_64-linux/include/crt/math_functions.h)
+   extern float sinpif (float __x) noexcept (true); extern float __sinpif (float __x) noexcept (true);
+                                   ^
+
+/usr/include/bits/mathcalls.h(206): error: exception specification is incompatible with that of previous function "rsqrtf" (declared at line 621 of /usr/local/cuda-12.9/bin/../targets/x86_64-linux/include/crt/math_functions.h)
+   extern float rsqrtf (float __x) noexcept (true); extern float __rsqrtf (float __x) noexcept (true);
+                                   ^
+
+/usr/include/c++/15/bits/stl_algobase.h(1239): error: type name is not allowed
+      || __is_pointer(_ValueType1)
+                      ^
+
+/usr/include/c++/15/bits/stl_algobase.h(1412): error: type name is not allowed
+    && __is_pointer(_II1) && __is_pointer(_II2)
+                    ^
+
+/usr/include/c++/15/bits/stl_algobase.h(1412): error: type name is not allowed
+    && __is_pointer(_II1) && __is_pointer(_II2)
+                                          ^
+
+/usr/include/c++/15/bits/new_allocator.h(147): error: identifier "__builtin_operator_new" is undefined
+       return static_cast<_Tp*>(__builtin_operator_new(__n * sizeof(_Tp),
+                                ^
+
+/usr/include/c++/15/bits/new_allocator.h(151): error: identifier "__builtin_operator_new" is undefined
+   return static_cast<_Tp*>(__builtin_operator_new(__n * sizeof(_Tp)));
+                            ^
+
+33 errors detected in the compilation of "pow_gpu.cu".
+exit=2

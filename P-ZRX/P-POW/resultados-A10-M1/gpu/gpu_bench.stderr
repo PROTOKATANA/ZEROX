@@ -1,0 +1,6 @@
+GPU: NVIDIA GeForce GTX 1070 (CC 6.1)
+== log de NVRTC ==
+nvrtc: warning: Architectures prior to '<compute/sm>_75' are deprecated and may be removed in a future release
+
+===================
+NVRTC: compilado y cargado OK (compute_61, sin nvcc)

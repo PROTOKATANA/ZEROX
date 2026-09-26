@@ -1,0 +1,5 @@
+rep=1 blocks=120 threads=256 hashes=19027353600 segundos=30.356394 hs=626798875.430 hits=0
+rep=2 blocks=120 threads=256 hashes=18106675200 segundos=30.159374 hs=600366415.710 hits=0
+rep=3 blocks=120 threads=256 hashes=16879104000 segundos=30.079798 hs=561144194.917 hits=0
+rep=4 blocks=120 threads=256 hashes=16879104000 segundos=30.085154 hs=561044293.707 hits=0
+rep=5 blocks=120 threads=256 hashes=16879104000 segundos=30.084042 hs=561065033.313 hits=0
