@@ -182,3 +182,22 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   anfitrión en C (`CORRECCION-A10-M1-A`).
 - Órdenes nuevas: W05b3 (productor PoST en régimen: `producir` solo hacía el primer bloque), W06b
   (almacén, D-N03′), escenarios de medición W07.
+
+### 04:05–05:10
+
+- **A10-M1** (Sonnet, 2 rondas): GPU medida por NVRTC + API del driver (anfitrión en C; `nvcc` 12.9
+  no acepta gcc 15). Validación completa (136 CAVP, 10⁶ digests idénticos, mismo nonce). GTX 1070:
+  561 MH/s sostenidos, 109 W, 1,94·10⁻⁷ J/hash; **8,2×** la CPU de 32 hilos (con carga ajena): refuta
+  «≥ 10×». IPA A-10 parcial.
+- **W02b migrada** (`ccf4b6d`): FORMATO v0.1 en formato, motor y productor; diferencial con 0
+  discrepancias en 2 055 casos y **3 939 negativos, que W03 nunca había consumido** (tercer caso de
+  verificación aceptada sin mirar qué recorre; queda en `REVISION-W02b`).
+- **W05b3 migrada** (`2092e0b`): productor PoST en régimen y `ServicioPot`; con `N_dev` real, 1,43 s
+  por bloque producido y 0,066 s por verificación.
+- **W06a migrada con reserva** (`0313682`): `zx-cadena` + correcciones RI-1a. El diferencial contra
+  T04 (913/913) **emula** colisiones de ids que solo existen en el modelo abstracto del oráculo
+  (salida de la liberación por contador). Causa de modelado: se corrige en los oráculos
+  (T01E-T04D, en curso) y el arnés se rehace sin emulación (W06a-B, preparada).
+- **W06b** superada tras mi **Corrección A** (la integridad solo miraba la cabecera: error de mi orden);
+  rebase W06b-R en curso. Límite: testigos PoW no comprometidos → prueba obligatoria en W06d1.
+- `SPEC-0.0.1.md` en borrador: índice de lo implementado y validado, con estado por regla.
