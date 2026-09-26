@@ -1,0 +1,22 @@
+# AV-1 - huellas de los entregables de deepseek/AV1/.
+# Excluido a proposito: calc/.julia-depot/ (cache de paquetes Julia, copiada de
+# P-ZRX/P-DISUASION/DS3/.julia-depot; no es un entregable de este encargo).
+# Comprobar con: sha256sum -c HUELLAS.sha256 (desde deepseek/AV1/).
+5003a24742fc0178b35ab8411d5cadc3686dfdee86338398431a1a52ed1ef905  ./calc/julia-version.toml
+b3fd0c5957d706bd7cfdfd0c402a74696490c54254ecf9e336ea23067e4cf008  ./calc/Manifest.toml
+be616541b7b29b5d5f8c87a243b288ba199b0f4682bbb28ff6aee54f29b5a5fa  ./calc/Project.toml
+2260e03f0002ab2eb0eb54554a16e1ce351a81823fe05cadb8b40edece09871e  ./calc/resultados/C1-datos-por-dia.csv
+4915e8fc8f456f6af3abe23856981538a371431831bdf18e26194d30f4a42ae5  ./calc/resultados/C2-costo-pausa-hora.csv
+e2e4dbe065321a4b3e3fcf4d1e5e6b4e6c29fee78f4dad1f30aa73e3487fe0c9  ./calc/resultados/C3-perdida-honesto-perfil.csv
+d2fd973dec768a7c15dea710b896802f2e7dcdb36c097e6ff3b3a3174f47516c  ./calc/resultados/C4-fp-censura.csv
+24e6f33ba60395e89067162cec64a74ac2ae61bba7d5d0707be05f7d7db70991  ./calc/resultados/C5-region-m_aus.csv
+e813bda4d970b97ef7a07a68a96715eeb296c8d0de64ee0ef123dbaad6403632  ./calc/resultados/C6-concentracion-vs-fragmentacion.csv
+3f5db4ba2952e957385b100ce85245fd7001dc6a95aaed547c15bfb24d7b131a  ./calc/resultados/RESUMEN.txt
+41ba3bcffd75d9960693f571f510af6e9c2d2fe1fdb25388f4263ef1cf9b0ae7  ./calc/resultados/salida-run.txt
+3859a71051b45a983c6a1aa9bd95b14c410511858ad3352181b929c9e750fa7f  ./calc/resultados/salida-test.txt
+aa6cdef255a9e5c7be864389b5ed92e998e0b60e2987232e8adb8abd757057d3  ./calc/run.jl
+1adcf17f866c4156016220260178b9c4ce47efbf260139d57ce334363c4b1819  ./calc/src/modelo.jl
+4904ca96f014b01f35643ec0b40ccd30871779a77f6ba83e2c3c8c07bd1ac801  ./calc/src/referencia.jl
+10b6395037b53bc791f7b0bd5a908ac9359e9b9d01d0d5232cb1ae4d3b231ecd  ./calc/test/runtests.jl
+ee05dea155b59dff6ef36973906c548135d9514cd7273d39ab0808a8a0197b66  ./CONTRATO-AUSENCIA-v0.md
+42f3338395aba32b4acd74c9a3929bf4a08706135f46f7f7b48b9b8eab8b4ad3  ./INFORME.md

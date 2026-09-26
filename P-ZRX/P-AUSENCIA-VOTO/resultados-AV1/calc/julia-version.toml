@@ -1,0 +1,5 @@
+# AV-1 · versión de Julia fijada (V-ZRX/LINEO.md §1)
+julia = "1.13.0"
+juliaup = "1.22.7"
+sistema = "linux/x86_64"
+nota = "JULIA_DEPOT_PATH local en deepseek/AV1/calc/.julia-depot (copiado de P-ZRX/P-DISUASION/DS3/.julia-depot, LD_LIBRARY_PATH desactivado por AOCC, ver LINEO.md)"

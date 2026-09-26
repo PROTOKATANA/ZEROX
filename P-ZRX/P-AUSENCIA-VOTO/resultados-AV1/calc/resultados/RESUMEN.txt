@@ -1,0 +1,11 @@
+AV-1 · resumen de ejecución de run.jl
+Fecha: 2026-09-26T21:18:51.048
+Julia: 1.13.0
+Tiempo de pared (cálculo, sin JIT separado): 0.553 s
+Hilos Threads.nthreads(:default): 1
+Archivos generados: C1..C6 + RESUMEN.txt en resultados/
+Hallazgo central (e): con m_aus FIJO y concentración (m_split=1),
+el coste de la pausa por hora es ~independiente de `a` para a≫1/K
+(ver C2, columna costo_hora_m_aus_fijo a m_split=1: apenas varía con a).
+Con m_aus PROPORCIONAL a la garantía, el coste SÍ crece con `a` (ver C2,
+columna costo_hora_m_aus_proporcional) y es ~invariante a m_split (ver C6 para el contraste de incidentes, que SÍ varía con m_split).

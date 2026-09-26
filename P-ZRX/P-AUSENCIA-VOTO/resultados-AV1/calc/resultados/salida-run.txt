@@ -1,0 +1,1 @@
+AV-1 run.jl completo en 0.553 s. Resultados en /home/katana/zeo/ZEROX/deepseek/AV1/calc/resultados
