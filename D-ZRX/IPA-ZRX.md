@@ -130,6 +130,7 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 | X-01 | Ensayar juntas las cuatro familias: sesgo del ancla, alta tardía, stake inmaduro, reorg que deshace una prueba, auditoría censurada, capacidad duplicada, rama privada | abierto | P2 | A-05, A-07, C-04, D-03 |
 | X-02 | Comparador «candidato A»: PoST sin garantía en el arranque (`C-BOT-02`) y arranque sin PoW con requisito proporcional a la oferta (`R-ZRX/LEGADO/stake/MAPA.md` §4), bajo el mismo adversario, red y horizonte | abierto | P2 | A-05, A-10 |
 | X-03 | **Disuasión por coste** (Katana, 2026-09-26): qué problemas resuelven o encarecen PoStake y Filecoin frente a B0 (PoST puro de `9681061`) y a B1 (0.0.1), con coste absoluto de X por dimensión (riesgo, inmovilización, adquisición, energía, hardware, tiempo) | **resultados** (`P-ZRX/P-DISUASION/SINTESIS.md`): ningún mecanismo encarece el doble farmeo de forma exigible frente al atacante grande; mejoras exigibles contra espacio ajeno (O4), sembrador (sectores y auditorías), Sybil (garantía) y largo alcance (sellado, PoT, finalidad). En encargo: DS-5 (castigo correlacionado), DS-6 (reparto del espacio entre claves) | P1 | A-10, C-02, D-02 |
+| X-04 | **Finalidad por votos bajo R1–R5** (mitigación del doble farmeo): adoptada en principio por Katana (FV-D02) | **en encargo**: FV-1 segunda ejecución (con FV-D01); después FV-2…FV-4 (`P-ZRX/P-FINALIDAD-VOTOS/`) | P1 | B-05 (Δ), D-01…D-03 (registro de sectores) |
 
 ---
 
@@ -142,3 +143,4 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 | 2026-09-26 03:57 | B-12 nuevo (RI-1b H1, coste de admisión GHOSTDAG con la profundidad) |
 | 2026-09-26 04:09 | A-10 parcial: hashrate CPU\/GPU medido (A10-M1) |
 | 2026-09-26 08:30 | X-03 nuevo: programa P-DISUASION (DS-1…DS-4) a petición de Katana |
+| 2026-09-26 19:49 | X-04 nuevo: capa de finalidad por votos adoptada en principio por Katana |
