@@ -86,6 +86,7 @@ A-01 + C-01 + B-03 ──► B-08 ruta activa del nodo ──► A-09 sincroniza
 | C-08 | Responsabilidad de firmas antes del depósito, tras el retiro y entre ramas (`C-EVP-04` pendiente) | abierto | P2 | C-04 | Castigo sin garantía en el pasado causal | Tras C-04 | Regla y casos |
 | C-10 | **Repetición de operaciones de garantía y unicidad de `txid`** (defecto de FORMATO-v0) | **en encargo**: oráculo T01 con nonce (T01-D, superado); oráculo DAG (T04-B, regresión de cobertura → T04-C); formato, motor y productor (W02b, en curso) | P0 | W03-R, W05b2 | Retiro forzado de la garantía ajena; colisión de salidas | Orden de formato+motor y ampliación de T01/T04 | Diferencial con nonce y rechazo de repeticiones |
 | C-09 | Firmante seguro ligado a la identidad final (`archivo/crates/zx-consensus/src/firmante/`) | abierto | P1 | B-08 | Doble firma accidental castigable | Portado tras E-01 | Tests de persistencia antes de firmar en el árbol nuevo |
+| C-11 | **Activar evidencia y castigo** (Katana, 2026-09-26): contrato de `EvidenceTx` v4, firmante seguro, calibración contra falsos positivos, oráculo e implementación | **en encargo**: SL-1 (contrato) y SL-2 (calibración) lanzados; SL-3 (oráculo) y SL-4 (Rust) tras ratificar SL-1 | P1 | C-04, C-05, C-09 | Castigar a honestos; evidencia censurada; retirar antes de la evidencia | `P-ZRX/P-SLASHING/PROGRAMA.md` | Contrato ratificado; región de parámetros no vacía; diferencial SL-3/SL-4 |
 
 ---
 
@@ -129,7 +130,6 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 | X-01 | Ensayar juntas las cuatro familias: sesgo del ancla, alta tardía, stake inmaduro, reorg que deshace una prueba, auditoría censurada, capacidad duplicada, rama privada | abierto | P2 | A-05, A-07, C-04, D-03 |
 | X-02 | Comparador «candidato A»: PoST sin garantía en el arranque (`C-BOT-02`) y arranque sin PoW con requisito proporcional a la oferta (`R-ZRX/LEGADO/stake/MAPA.md` §4), bajo el mismo adversario, red y horizonte | abierto | P2 | A-05, A-10 |
 | X-03 | **Disuasión por coste** (Katana, 2026-09-26): qué problemas resuelven o encarecen PoStake y Filecoin frente a B0 (PoST puro de `9681061`) y a B1 (0.0.1), con coste absoluto de X por dimensión (riesgo, inmovilización, adquisición, energía, hardware, tiempo) | **resultados** (`P-ZRX/P-DISUASION/SINTESIS.md`): ningún mecanismo encarece el doble farmeo de forma exigible frente al atacante grande; mejoras exigibles contra espacio ajeno (O4), sembrador (sectores y auditorías), Sybil (garantía) y largo alcance (sellado, PoT, finalidad). En encargo: DS-5 (castigo correlacionado), DS-6 (reparto del espacio entre claves) | P1 | A-10, C-02, D-02 |
-| C-11 | **Activar evidencia y castigo** (Katana, 2026-09-26): contrato de `EvidenceTx` v4, firmante seguro, calibración contra falsos positivos, oráculo e implementación | **en encargo**: SL-1 (contrato, Sonnet) y SL-2 (calibración, DeepSeek) lanzados; SL-3 (oráculo) y SL-4 (Rust) tras ratificar SL-1 (`P-ZRX/P-SLASHING/PROGRAMA.md`) | P1 | C-04, C-05, C-09 |
 
 ---
 
