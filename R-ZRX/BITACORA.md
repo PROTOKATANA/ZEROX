@@ -358,3 +358,12 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   es `slot(p) ≤ slot(B)`, no estricta), dial con reintento, V7, correcciones de RI-3a (se mueven aquí desde
   W07a: mismos archivos), tests pendientes de W06d5 y el parámetro de reposo. W07a queda solo como
   instrumentación, tras W06d6.
+
+### 00:57–01:00 — RI-3c y W06d6
+
+- **RI-3c** (crítico, confirmado): el nodo persistía antes de admitir y no deshacía la escritura si la admisión
+  rechazaba el bloque: un bloque verificable pero inadmisible dejaba al nodo **sin poder reiniciar**. Lo
+  introdujo la corrección de RI-2b que dirigí yo (objetivo correcto, forma equivocada: lo peligroso era
+  difundir antes de persistir). Decisión: admitir → persistir → difundir.
+- **W06d6 congelada y lanzada** (Sonnet, `394cb6e`): paso previo RI-3c, sincronización por registro de
+  admisión, dial con reintento, V7, RI-3a, tests pendientes de W06d5 y parámetro de reposo.
