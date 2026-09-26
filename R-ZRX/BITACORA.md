@@ -340,3 +340,9 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   (2 108), 0 cambios sin defecto. Dos rondas extra por errores míos al redactar (alcance de la precedencia sin
   fijar; «estructura vigente» intocable que dejaba EV-04 a medias). Límite: los oráculos no modelan testigos.
 - **SL-4c** (Rust: forma, motor, arneses y decodificación de red de la v4) congelada y lanzada 23:51.
+- 23:54 **SL-4c, primer lanzamiento:** el ejecutor informó dos faltas de definición antes de editar (bien); una
+  venía de haber leído la zona de **otra orden** (`deepseek/SL4b1/ws`) como si fuera su base. Aclaración escrita
+  (`ACLARACION-SL4c.md`: base = raíz; `cbid` local = `ParametrosEvidencia::cbid`) y relanzada 23:55.
+  **Lección:** toda orden dice «tu base es la raíz en el commit de la entrada; no leas otras zonas de
+  `deepseek/`». La compatibilidad entre SL-4b1 (test nuevo que llama a `validar_forma_tx_v4`) y SL-4c se
+  resuelve en la migración.
