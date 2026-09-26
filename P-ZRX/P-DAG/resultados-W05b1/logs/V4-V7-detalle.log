@@ -1,0 +1,90 @@
+===== V4 poas (15) =====
+   Compiling zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b1/ws/crates/zx-poas)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running tests/poas.rs (target/debug/deps/poas-00f35f3ee3873975)
+
+running 15 tests
+test history_size_del_candidato_que_no_cabe_es_entrada_no_canonica ... ok
+test proof_of_space_mutada_falla ... ok
+test producto_del_umbral_reciente_es_contexto_invalido_sin_panic ... ok
+test current_history_size_maximo_es_contexto_invalido_sin_panic ... ok
+test chunk_witness_mutada_falla ... ok
+test history_size_cero_es_error_sin_panic ... ok
+test min_sector_lifetime_desbordado_devuelve_invalid_history_size_sin_panic ... ok
+test salida_pot_equivocada_falla ... ok
+test slot_equivocado_falla ... ok
+test recent_segments_saturado_es_contexto_invalido_sin_panic ... ok
+test resta_reciente_negativa_es_contexto_invalido_sin_panic ... ok
+test record_witness_mutada_falla ... ok
+test record_commitment_mutada_falla ... ok
+test positivo_devuelve_la_distancia_de_la_fixture ... ok
+test rango_por_debajo_de_la_distancia_falla ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.64s
+
+EXIT=0
+
+===== V4 farmer_disco (12) =====
+   Compiling zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b1/ws/crates/zx-poas)
+   Compiling zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b1/ws/crates/zx-farmer)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.83s
+     Running tests/farmer_disco.rs (target/debug/deps/farmer_disco-aa4e802a641d3b26)
+
+running 12 tests
+[medición local, no consenso] ploteo de fixture D1: 4.932942513s; hilos visibles: 32
+test abrir_rechaza_metadata_sparse_sobredimensionada_sin_leerla ... ok
+test lock_preexistente_falla_cerrado_sin_tocar_al_primero ... ok
+test abrir_rechaza_metadata_bien_checksummada_pero_incoherente ... ok
+test abrir_rechaza_sector_y_metadata_corruptos ... ok
+[medición local, no consenso] primer slot determinista con candidatos: Some(0) (salida [11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11])
+test auditar_candidatos_coincide_con_oraculo_y_resumen ... ok
+test auditoria_usa_el_descriptor_verificado_tras_sustituir_la_ruta ... ok
+test abrir_rechaza_par_incompleto_clave_erronea_y_truncado ... ok
+test ploteo_sobre_par_existente_rechaza_y_conserva_el_previo ... ok
+[medición local, no consenso] slots 0..64 con candidatos: 41; rango de prueba 18446744073709551615
+test plotea_reabre_y_audita_por_slot_con_reinicio ... ok
+test plotter_fallido_no_deja_par_ni_lock ... ok
+test dos_escritores_concurrentes_publican_uno_solo ... ok
+[medición local, no consenso] D2: primera solución verificada en slot 0; diagnóstico DiagnosticoLocal { candidatos: 2, soluciones_generadas: 2, rechazos_a1: 0, soluciones_verificadas: 2 }; hilos visibles 32
+test convierte_candidatos_y_verifica_a1 ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.57s
+
+EXIT=0
+
+===== V5/V6 extremo_a_extremo (12) =====
+   Compiling zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b1/ws/crates/zx-farmer)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running tests/extremo_a_extremo.rs (target/debug/deps/extremo_a_extremo-04ae75e4748aaf17)
+
+running 12 tests
+test v5_auditoria_con_reto_explicito_coincide ... ok
+test v6_contexto_con_recent_segments_desbordado_se_rechaza ... ok
+test v6_history_size_cero_se_rechaza ... ok
+test v6_contexto_con_otro_history_size_se_rechaza ... ok
+test v6_history_size_no_nulo_alterado_se_rechaza ... ok
+test v6_piece_offset_alterado_se_rechaza ... ok
+test v6_chunk_alterado_se_rechaza ... ok
+test v6_proof_of_space_alterada_se_rechaza ... ok
+test v6_sector_index_alterado_se_rechaza ... ok
+test v6_public_key_alterada_se_rechaza ... ok
+test v6_contexto_con_otro_compromiso_se_rechaza ... ok
+[medición local de fixture, no consenso] V5: 3 soluciones verificadas en los primeros slots; primera en el slot 0 con distancia 5380497425846111175
+test v5_tres_soluciones_honestas_son_aceptadas ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.09s
+
+EXIT=0
+
+===== V7 historia_genesis (2) =====
+   Compiling zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b1/ws/crates/zx-poas)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running tests/historia_genesis.rs (target/debug/deps/historia_genesis-88f4180f5200ad75)
+
+running 2 tests
+test un_compromiso_mutado_devuelve_el_error_tipado ... ok
+test el_compromiso_de_la_historia_genesis_es_determinista_y_congelado ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.54s
+
+EXIT=0

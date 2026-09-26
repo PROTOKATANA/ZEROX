@@ -1,0 +1,28 @@
+# HORAS.log — ORDEN-W05b1
+# Marcas `date -Is`; donde no hubo captura directa, hora de modificación del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W05b1/
+2026-09-26T02:13:28+02:00  inicio de sesión; lectura íntegra de ORDEN-W05b1.md, V-ZRX/LINEO.md, DECISIONES-W05.md (D-P12/D-P13), FORMATO-v0.md §3 y CONTRATO-v0.md (D-T05)
+2026-09-26T02:13:28+02:00  ENTRADA INICIO: sha256sum -c de ENTRADA-W05b1.sha256 -> 4/4 coinciden, exit=0 (logs/entrada-inicio.log)
+2026-09-26T02:13:40+02:00  extracción del código antiguo de 9681061 a ref/ (poas.rs, sus tests, farmer.rs, productor_poas.rs, historia_dag_dev.rs, farmer_disco.rs, Cargo.toml)
+2026-09-26T02:14:00+02:00  falta de definición informada: reto de auditoría (reto_desde_salida) sin crate donde vivir por la frontera §6 V8; protocolo_dev dentro de zx-poas; rand además de rand_chacha; clon por enlace. Se declaran 4 interpretaciones sin lógica nueva
+2026-09-26T02:14:10+02:00  montaje: ws.orig = W01+W02+W04+W05a; ws = copia de trabajo; cargo-home de L01 copiado (697 MiB); symlink ws/PDF -> ZEROX/PDF
+2026-09-26T02:15:00+02:00  raíz: members zx-poas y zx-farmer, exclude de los 9 paquetes del clon, workspace.dependencies rand/rand_chacha/futures/async-lock/parity-scale-codec
+2026-09-26T02:16:00+02:00  Cargo.lock resuelto en --offline: 220 paquetes; toda adición externa con versión del lock de 9681061 (logs/lock-subconjunto.txt)
+2026-09-26T02:16:30+02:00  crate zx-poas: verificador.rs (verbatim de poas.rs), historia.rs (D-P12), protocolo_dev.rs, reto.rs, lib.rs, README.md, Cargo.toml
+2026-09-26T02:17:30+02:00  crate zx-farmer: farmer.rs y productor_poas.rs portados apuntando a HistoriaGenesis; se añade ParcelaDisco::auditar_con_reto; lib.rs, README.md, Cargo.toml
+2026-09-26T02:17:55+02:00  raíz: ci/frontera-crates.sh con las dos fronteras nuevas; cabecera del workflow CI
+2026-09-26T02:18:00+02:00  primer cargo check --workspace --locked: falla solo el reexport de LIMITE_METADATA_BYTES (privado); corregido
+2026-09-26T02:18:36+02:00  primera corrida de historia_genesis: el cotejo falla con el compromiso observado 8126fdbed3260227c9beb655673b19545d3e412bf9ad7e8a36daf70e64d33d8ceacdc941ac781e9ce2fa1df529f24af9; se congela
+2026-09-26T02:19:00+02:00  tests portados: 15 de poas.rs; 12 de farmer_disco.rs (HistoriaDagDev -> HistoriaGenesis); retirado convierte_pot_dev_y_solucion_disco (PoT, W05b2)
+2026-09-26T02:20:00+02:00  tests nuevos: historia_genesis.rs (V7), extremo_a_extremo.rs (V5+10 V6), unitarios de reto y protocolo_dev
+2026-09-26T02:21:00+02:00  primera corrida V5/V6: 10/11; se corrige la expectativa de contexto (recent_segments) y el error de chunk (InvalidChunk("Invalid scalar"))
+2026-09-26T02:22:00+02:00  primer clippy -D warnings: dos expectativas de lint sin cumplir en zx-poas; corregidas
+2026-09-26T02:22:38+02:00  V1 cargo fmt --all -- --check -> exit 0 (logs/V1-fmt.log); V2 cargo clippy ... -> exit 0, 0 avisos (logs/V2-clippy.log)
+2026-09-26T02:26:31+02:00  V3 cargo test --workspace --all-features --locked -> exit 0, 415 pasan, 0 fallan, 1 ignorado; 372 nombres previos presentes, 0 ausentes, 44 nuevos (logs/V3-test.log, logs/V3-nombres.txt)
+2026-09-26T02:27:00+02:00  V4 lista portados/adaptados/retirados (logs/V4-tests.txt); V5/V6/V7 en logs/V4-V7-detalle.log: poas 15/15, farmer_disco 12/12, e2e 12/12, historia_genesis 2/2
+2026-09-26T02:29:00+02:00  V5: 3/3 soluciones verificadas (primera en el slot 0, distancia 5380497425846111175); V6: 10 negativos con su error; V7: compromiso determinista y congelado
+2026-09-26T02:29:10+02:00  V8 dependencias-exactas (15 exactas) y frontera (zx-poas -> {zx-core,zx-consensus}; zx-farmer -> {zx-core,zx-poas}) -> OK (logs/V8-*.log)
+2026-09-26T02:29:15+02:00  cambios.patch (20 ficheros); MIGRACION.sha256 (103 huellas, sha256sum -c OK)
+2026-09-26T02:29:30+02:00  INFORME.md, PROGRESO.md y HORAS.log; inventario informativo en debug (historia ~18 s, ploteo ~4,9 s)
+2026-09-26T02:30:00+02:00  ENTREGA FINAL: sha256sum -c ENTRADA-W05b1.sha256 -> 4/4 coinciden
+2026-09-26T02:30:00+02:00  fin; presupuesto (3 h / 8 hilos / 32 GiB / 40 GiB) no agotado

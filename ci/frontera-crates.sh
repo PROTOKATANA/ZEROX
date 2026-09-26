@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Fronteras de dependencias de los crates de consenso (adaptado de `9681061`; W04 + W05a).
+# Fronteras de dependencias de los crates de consenso (adaptado de `9681061`; W04 + W05a + W05b1).
 #
 # Regla: `zx-consensus` y `zx-dag` pueden ver `zx-core` y **solo** `zx-core` dentro del workspace:
 # una primitiva de cálculo, no red, estado ni mempool. En particular, `zx-dag` (D-P13) **no** puede
-# depender de `zx-consensus` ni de `zx-storage`. No se porta la regla de `zx-p2p`/`zx-mempool`
-# porque esos crates todavía no existen en el workspace nuevo; se reintroducirán con sus órdenes.
+# depender de `zx-consensus` ni de `zx-storage`. `zx-poas` añade `zx-consensus` (génesis dev de W04)
+# y `zx-farmer` depende de `zx-core` y `zx-poas`, nunca de `zx-consensus` (W05b1 §6 V8). No se
+# porta la regla de `zx-p2p`/`zx-mempool` porque esos crates todavía no existen en el workspace
+# nuevo; se reintroducirán con sus órdenes.
 #
 # Se usa `jq` (disponible en la máquina del proyecto y en los runners ubuntu de CI). Si no estuviera,
 # el script falla con un mensaje explícito en vez de dar un OK falso.
@@ -36,4 +38,6 @@ cargo metadata --locked --no-deps --format-version 1 | jq -e '
         end;
 
     frontera("zx-consensus"; ["zx-core"]),
-    frontera("zx-dag"; ["zx-core"])'
+    frontera("zx-dag"; ["zx-core"]),
+    frontera("zx-poas"; ["zx-core", "zx-consensus"]),
+    frontera("zx-farmer"; ["zx-core", "zx-poas"])'

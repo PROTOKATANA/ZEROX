@@ -1,0 +1,25 @@
+**ORDEN-W05b1 cumplida — veredicto: SUPERADO.** Zona única `deepseek/W05b1/`; nada fuera de ella, sin Python, sin commit/push, sin secretos.
+
+## Falta de definición detectada (informada aquí antes de fijar la interpretación)
+
+**La única que exigía decisión es la derivación del reto de auditoría.** §3.2 pide `farmer.rs`/`productor_poas.rs` «sin cambio de lógica», y el código de `9681061` deriva el reto con `zx_consensus::reto_desde_salida(salida, slot)`, que allí vivía en `zx-consensus::pot`. Pero §5 prohíbe portar PoT, W04 dejó `zx-consensus` sin `pot.rs`, y la frontera §6 V8 (`zx-farmer → {zx-core, zx-poas}`) impide que `zx-farmer` lo tome de `zx-consensus`. Resolución declarada, sin lógica nueva: se porta la función **pura** (blake3 de sus argumentos; sin AES, flujo, `N(s)` ni cabecera) a `zx-poas::reto`, se conserva `auditar_candidatos(salida, slot, rango)` y se añade `ParcelaDisco::auditar_con_reto(reto: [u8;32], rango)` para fijar el reto de 32 B explícitamente. Los tests usan `salida` (16 B) + `slot` de prueba fijos, de los que sale el reto. Otras tres interpretaciones (menores) están declaradas en `PROGRESO.md` §Falta de definición: `protocolo_dev.rs` dentro de `zx-poas` (arrastra `subspace-farmer-components`), `rand =0.9.5` además de `rand_chacha =0.9.0` para `Rng::fill`, y el clon por enlace simbólico `ws/PDF` (declarado, fuera de `cambios.patch`/`MIGRACION.sha256`).
+
+## Resultado V1–V8
+
+| Paso | Resultado |
+|---|---|
+| V1–V2 | `fmt --check` limpio; `clippy -D warnings --locked` 0 avisos |
+| V3 | **415 pasan, 0 fallan, 1 ignorado**; 372 nombres previos intactos, **44 nuevos** |
+| V4 | 15 portados (`poas.rs`), 12 adaptados (`farmer_disco.rs`), **1 retirado** (`convierte_pot_dev_y_solucion_disco`: PoT es W05b2) |
+| V5 | **3/3** soluciones del sector ploteado aceptadas (`verify_solution` real); primera en el slot 0, distancia `5380497425846111175`; `verificador.rs` es byte a byte el `poas.rs` antiguo |
+| V6 | los 10 negativos con su error exacto (`InvalidChunk`, `InvalidProofOfSpace`, `EntradaNoCanonica`, `InvalidPiece`, `ContextoInvalido…`) |
+| V7 | `COMPROMISO_HISTORIA_GENESIS_DEV = 8126fdbe…29f24af9`, recalculado dos veces por caminos distintos |
+| V8 | 15 dependencias exactas; `zx-poas → {zx-core, zx-consensus}`, `zx-farmer → {zx-core, zx-poas}` |
+| Lock | 220 paquetes; +88 pares, **toda adición externa con la versión del lock de `9681061`**; ninguna existente cambia |
+| Entrada | `sha256sum -c` 4/4 al inicio y al final |
+
+**Historia D-P12**: `cuerpo_a_bytes(génesis dev)` + relleno `ChaCha8Rng::from_seed(block_hash(génesis))` hasta `RecordedHistorySegment::SIZE` + `Archiver::add_block(.., BlockObjectMapping::default(), false)` + primer `NewArchivedSegment`. Informativo en `debug`: archivar ≈18 s, plotear ≈4,9 s. Clon `f8842d0` intacto (`git status` limpio).
+
+**Entregables** en `/home/katana/zeo/ZEROX/deepseek/W05b1/`: `ws/` (6 crates), `cambios.patch` (20 ficheros), `MIGRACION.sha256` (103 huellas, `sha256sum -c` OK), `logs/` (entrada, lock, V1–V8, nombres e inventario), `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Resumen final del informe: 34 líneas.
+
+**Lo que esta orden NO demuestra** (declarado en `INFORME.md` §8): PoT/flujo/AES/`N(s)`/`D` y la derivación del reto desde el PoT (W05b2), cabecera conjunta, sello, admisión, historia más allá de un segmento, parámetros de red y procedencia causal del lote.

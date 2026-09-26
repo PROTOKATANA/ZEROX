@@ -1,0 +1,68 @@
+# V4 — Inventario de tests: portados, adaptados y retirados (ORDEN-W05b1 §6)
+
+Referencia antigua: `crates/zx-consensus/tests/poas.rs` (15) y `crates/zx-node/tests/farmer_disco.rs`
+(13) del commit `9681061`. Ejecución: `cargo test --workspace --all-features --locked` (V3) y las
+corridas por fichero de `logs/V4-V7-detalle.log`.
+
+## Portados sin cambio de lógica (16)
+
+| Origen | Destino | N | Nota |
+|---|---|---:|---|
+| `crates/zx-consensus/src/poas.rs` | `zx-poas/src/verificador.rs` | — | Módulo portado **verbatim** (sin cambio de lógica ni de imports). |
+| `crates/zx-consensus/tests/poas.rs` | `zx-poas/tests/poas.rs` | 15 | Único cambio: `use zx_consensus::poas::…` → `use zx_poas::…`. Conserva su **fixture sintético propio** (record constante, `history_size = 3`, `slot = 4`, `bucket = 22412`, tres distancias congeladas), que **no** depende de `HistoriaGenesis`. |
+| `crates/zx-node/src/productor_poas.rs` | `zx-farmer/src/productor_poas.rs` | — | Portado verbatim; imports `zx_consensus::{ErrorPoas, poas::…}` → `zx_poas::{ErrorPoas, …}` y ajustes de doc (`zx_consensus` → `zx_poas`). |
+
+Nombres (15, todos verdes): `positivo_devuelve_la_distancia_de_la_fixture`,
+`proof_of_space_mutada_falla`, `chunk_witness_mutada_falla`, `record_witness_mutada_falla`,
+`record_commitment_mutada_falla`, `rango_por_debajo_de_la_distancia_falla`,
+`history_size_cero_es_error_sin_panic`, `salida_pot_equivocada_falla`, `slot_equivocado_falla`,
+`current_history_size_maximo_es_contexto_invalido_sin_panic`,
+`producto_del_umbral_reciente_es_contexto_invalido_sin_panic`,
+`recent_segments_saturado_es_contexto_invalido_sin_panic`,
+`history_size_del_candidato_que_no_cabe_es_entrada_no_canonica`,
+`resta_reciente_negativa_es_contexto_invalido_sin_panic`,
+`min_sector_lifetime_desbordado_devuelve_invalid_history_size_sin_panic`.
+
+## Adaptados (12)
+
+| Origen | Destino | N |
+|---|---|---:|
+| `crates/zx-node/tests/farmer_disco.rs` | `zx-farmer/tests/farmer_disco.rs` | 12 |
+
+Adaptaciones, sin cambio de lógica de los tests:
+
+1. `HistoriaDagDev` → `zx_poas::HistoriaGenesis` (D-P12) en el fixture (`Fondo`) y en
+   `construir_fondo`; el resto de la receta (ploteo, oráculo independiente, par en disco) no cambia.
+2. Imports `zx_node::farmer` / `zx_node::productor_poas` → `zx_farmer::…`; `zx_consensus::poas` →
+   `zx_poas`; `reto_desde_salida` → `zx_poas::reto_desde_salida`.
+3. Se elimina `#![cfg(feature = "farmer")]`: `zx-farmer` no tiene features.
+4. Se retira el test de PoT (abajo) y los imports que solo él usaba
+   (`zx_consensus::pot`, `zx_node::bootstrap_dag_dev`, `zx_pot`, `zx_core::wire_dag`).
+
+Nombres (12, todos verdes): `plotea_reabre_y_audita_por_slot_con_reinicio`,
+`abrir_rechaza_sector_y_metadata_corruptos`, `abrir_rechaza_par_incompleto_clave_erronea_y_truncado`,
+`ploteo_sobre_par_existente_rechaza_y_conserva_el_previo`, `plotter_fallido_no_deja_par_ni_lock`,
+`lock_preexistente_falla_cerrado_sin_tocar_al_primero`, `dos_escritores_concurrentes_publican_uno_solo`,
+`auditoria_usa_el_descriptor_verificado_tras_sustituir_la_ruta`,
+`auditar_candidatos_coincide_con_oraculo_y_resumen`, `convierte_candidatos_y_verifica_a1`,
+`abrir_rechaza_metadata_sparse_sobredimensionada_sin_leerla`,
+`abrir_rechaza_metadata_bien_checksummada_pero_incoherente`.
+
+## Retirado (1)
+
+| Nombre | Origen | Motivo |
+|---|---|---|
+| `convierte_pot_dev_y_solucion_disco` | `farmer_disco.rs` | Encadena PoT AES desde el ancla del génesis (`zx_consensus::pot::{semilla_siguiente, verificar_slot_aes, checkpoints_a_wire}`, `zx_pot::prove`, `zx_node::bootstrap_dag_dev`). **Nada de PoT en esta orden** (§5); su lógica es de W05b2. |
+
+## Nuevos de esta orden (17)
+
+| Fichero | N | Qué cubre |
+|---|---:|---|
+| `zx-poas/src/reto.rs` (unit) | 2 | derivación pura del reto `C-POT-03` |
+| `zx-poas/src/protocolo_dev.rs` (unit) | 1 | valores dev del `FarmerProtocolInfo` |
+| `zx-poas/tests/historia_genesis.rs` | 2 | **V7**: compromiso determinista y congelado; cotejo rechaza un byte mutado |
+| `zx-farmer/tests/extremo_a_extremo.rs` | 12 | **V5**: ≥3 soluciones honestas + reto explícito; **V6**: 10 negativos |
+
+Recuento global V3: **415 pasan, 0 fallan, 1 ignorado** (banco `bench_coloreo_mergeset_maximo`); 372
+nombres previos de W05a siguen presentes (**0 ausentes**) y **44** nombres nuevos
+(`logs/V3-nombres.txt`).

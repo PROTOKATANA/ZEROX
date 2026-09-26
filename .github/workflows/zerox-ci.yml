@@ -1,12 +1,18 @@
-# ZEROX CI — workspace nuevo, crates portados de `9681061` (W01, W02, W04, W05a)
+# ZEROX CI — workspace nuevo, crates portados de `9681061` (W01, W02, W04, W05a, W05b1)
 #
-# Cubre `zx-core`, `zx-pot`, `zx-consensus` y `zx-dag`: formato, clippy estricto, build, tests (con
-# sus vectores NIST CAVP, los oráculos Julia copiados a `testdata/`, el motor PoW dev y el orden
-# DAG), la regla de versiones exactas y las fronteras de dependencias de los crates de consenso.
+# Cubre `zx-core`, `zx-pot`, `zx-consensus`, `zx-dag`, `zx-poas` y `zx-farmer`: formato, clippy
+# estricto, build, tests (con sus vectores NIST CAVP, los oráculos Julia copiados a `testdata/`, el
+# motor PoW dev, el orden DAG, el verificador PoAS, la historia génesis dev y el granjero), la regla
+# de versiones exactas y las fronteras de dependencias de los crates de consenso.
+#
+# `zx-poas` y `zx-farmer` enlazan por `path` el clon fijado `PDF/autonomys-subspace` @ f8842d0, que
+# no se versiona (`.gitignore`). Un runner que quiera construir estos dos crates debe materializar
+# ese clon en su árbol antes del paso de build; el clon no se incluye en el workspace (ver
+# `exclude` en `Cargo.toml`).
 #
 # NO cubre todavía: nodo ni red. Los jobs `almacen` del CI antiguo dependían de `zx-storage`,
 # `zx-p2p` y de scripts retirados; se reintroducirán cuando las órdenes posteriores porten esos
-# crates. `zx-consensus` y `zx-dag` entran por `--workspace` sin pasos adicionales.
+# crates. Los crates del workspace entran por `--workspace` sin pasos adicionales.
 name: ZEROX CI
 
 on:
@@ -43,5 +49,5 @@ jobs:
       # Un rango en workspace.dependencies deja que `cargo update` mueva consenso.
       - name: Rechazar rangos de versión en [workspace.dependencies]
         run: bash ci/dependencias-exactas.sh
-      - name: Fronteras de dependencias de zx-consensus y zx-dag → {zx-core}
+      - name: Fronteras de dependencias (zx-poas → {zx-core,zx-consensus}; zx-farmer → {zx-core,zx-poas})
         run: bash ci/frontera-crates.sh
