@@ -1,0 +1,15 @@
+2026-09-26T02:10:00+02:00 — inicio de la sesión S02a (reconocimiento; marca retroactiva aproximada).
+2026-09-26T02:12:56+02:00 — verificada ENTRADA-S02a.sha256 (4/4); zona creada (clon, caché, prototipo).
+2026-09-26T02:13:42+02:00 — compilación base `--release` del prototipo copiado.
+2026-09-26T02:17:49+02:00 — calibración inicial `treg` (incidencia de `entorno.sh` ya corregida).
+2026-09-26T02:18:58+02:00 — validación de corrección p=2: 0 discrepancias, 0 fallos.
+2026-09-26T02:19:11+02:00 — validación p=3: 0/0.
+2026-09-26T02:19:26+02:00 — validación p=4: 0/0.
+2026-09-26T02:22:21+02:00 — validación p=16: 0/0.
+2026-09-26T02:23:12+02:00 — serie `treg` T=1,2,4,8,16 (12 repeticiones por configuración).
+2026-09-26T02:24:20+02:00 — inicio de las series `medir` (espera de carga antes de cada serie).
+2026-09-26T02:28:08+02:00 — series `medir` a 16 hilos: P2 (72 s), P3 (82 s), P4 (102 s).
+2026-09-26T02:34:55+02:00 — series de escalado: P2·T1 (96 s), P4·T1 (159 s), P4·T4 (58 s), P4·T8 (43 s).
+2026-09-26T02:47:34+02:00 — serie P16·T16 (342 s); fin de la malla. 1080/1080 aperturas verifican.
+2026-09-26T02:48:23+02:00 — entorno final, integridad ENTRADA-S02a (4/4) y hashes de artefactos.
+2026-09-26T02:52:00+02:00 — INFORME.md, METODO.md, PROGRESO.md, ENTORNO.txt y resúmenes escritos; cierre.

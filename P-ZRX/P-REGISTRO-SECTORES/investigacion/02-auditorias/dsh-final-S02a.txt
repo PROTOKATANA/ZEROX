@@ -1,0 +1,14 @@
+**S02a — cierre**
+
+1. **Veredicto: se confirma «encarece, no impide» (RFT-04).** La condición de refutación —tiempo indistinguible del de disco— **no se cumple**.
+2. Zona `deepseek/S02a/` aislada: prototipo copiado de S01, clon `f8842d0`, caché cargo, `--release`. Sin Python, sin commit/push, nada fuera de la zona. `ENTRADA-S02a.sha256` **4/4** al inicio y al cierre.
+3. **Regeneración real** (tabla PoS `generate_parallel` + erasure coding + enmascarado), no simulada. Estrategias E-disco, E-árbol(L) y E-nada; p = 2, 3, 4, 16; hilos 1, 2, 4, 8, 16.
+4. **Corrección antes de medir:** regeneradas las `n` hojas y cotejadas byte a byte contra el sector → **0 discrepancias**; 100 aperturas/estrategia/tamaño contra R2 con el verificador de S01 → **0 fallos**; **1080/1080** aperturas medidas verifican.
+5. **`t_reg`:** 900,6 → 157,7 ms (1 → 16 hilos); speedup 5,71×, eficiencia 36 % (cuello de memoria, no de cómputo).
+6. **Latencia por apertura (16 hilos):** E-disco 0,2–0,3 µs; E-árbol(0) 0,17–0,29 s; E-árbol(L ≥ log₂p) hasta 2,7 s; E-nada 0,44–4,06 s. **8,8·10⁵ – 1,35·10⁷×** más caro.
+7. **Cota inferior `c·t_reg` confirmada** (`c` = tablas distintas medidas, **≤ p**, no `2^L`). Núcleos efectivos 4,3–6,5 por apertura.
+8. **Curva:** E-árbol(0) ahorra solo el **0,79 %** del sector y ya paga ≥ `t_reg`; ahorrar de verdad exige podar profundo, donde la latencia se satura en `p·t_reg` y E-nada suma el `O(n)` del árbol. Es un acantilado, no un compromiso.
+9. **Definiciones abiertas informadas y resueltas:** nivel L y ancestros de E-árbol; caché del árbol en E-disco; `Solution` con `PosProof` real para muestrear posición uniforme; `t_reg` = tabla + erasure coding (pieza local gratuita). Detalle en `INFORME.md` §1.
+10. **Carga externa:** cada serie empezó con carga 1-min ≤ 4 (presupuesto global de espera 20 min), pero las de 16 hilos la subieron a 5–14 durante la corrida; las medianas son estables y los `p99` se leen con esa cautela. Registrado en `logs/series.log` e `INFORME.md` §10.
+11. **Entregables:** `INFORME.md` (tabla y curva), `METODO.md`, `PROGRESO.md`, `HORAS.log`, `ENTORNO.txt`, código (`regeneracion.rs`, `estrategias.rs`, `bin/s02a.rs`), crudos y resúmenes en `resultados/` + `HUELLAS.sha256`.
+12. **No medido (declarado):** GPU/ASIC (ruta `ab-proof-of-space-gpu` abierta), red/descarga de piezas, retención parcial, plazos y falsos positivos (S02b).

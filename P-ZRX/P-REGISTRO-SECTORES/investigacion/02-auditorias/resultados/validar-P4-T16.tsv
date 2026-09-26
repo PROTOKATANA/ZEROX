@@ -1,0 +1,9 @@
+validar	piezas=4	hilos=16	n=131072	m=131072	profundidad=17	cod1=131072	sector_bytes=4227648
+REGENERACION	piezas=4	hilos=16	n=131072	chunks_discrepantes=0	hojas_discrepantes=0	t_reg_total_ns=1106083471	vmhwm_kib=599368
+CORRECCION	piezas=4	hilos=16	estrategia=E-disco	L=None	posiciones=100	fallos=0
+CORRECCION	piezas=4	hilos=16	estrategia=E-arbol(L=0)	L=Some(0)	posiciones=100	fallos=0
+CORRECCION	piezas=4	hilos=16	estrategia=E-arbol(L=1)	L=Some(1)	posiciones=100	fallos=0
+CORRECCION	piezas=4	hilos=16	estrategia=E-arbol(L=2)	L=Some(2)	posiciones=100	fallos=0
+CORRECCION	piezas=4	hilos=16	estrategia=E-arbol(L=4)	L=Some(4)	posiciones=100	fallos=0
+CORRECCION	piezas=4	hilos=16	estrategia=E-nada	L=Some(17)	posiciones=100	fallos=0
+real=15.98 user=74.50 sys=2.25

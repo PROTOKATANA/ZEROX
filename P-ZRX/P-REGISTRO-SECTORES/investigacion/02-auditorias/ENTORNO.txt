@@ -1,0 +1,43 @@
+=== S02a ENTORNO ===
+2026-09-26T02:48:23+02:00
+
+--- agente / sesión ---
+harness: DeepSeek Harness; modelo: deepseek-flash; esfuerzo: high
+
+--- hardware ---
+CPU(s):                                   32
+«Socket(s)»:                              1
+CPU(s) factor de escala MHz:              38%
+CPU(s) del nodo NUMA 0:                   0-31
+nproc: 32
+               total       usado       libre  compartido   búf/caché  disponible
+Mem:             123           9          67           0          47         113
+
+--- carga (uptime) ahora ---
+ 02:48:23  arriba  9:50,  0 users,  carga promedio: 6,39, 9,31, 6,79
+
+--- toolchain Rust (desde prototipo/) ---
+rustc 1.97.0-nightly (20de910db 2026-05-02)
+cargo 1.97.0-nightly (4f9b52075 2026-05-01)
+nightly-2026-05-03-x86_64-unknown-linux-gnu (overridden by '/home/katana/zeo/ZEROX/deepseek/S02a/prototipo/rust-toolchain.toml')
+
+--- fuentes ---
+Autonomys clone HEAD: f8842d019cdf0f7163421b9644db5a9ff82b2a73
+Autonomys clone status: 0 cambios
+prototipo Cargo.lock sha256: 0dd126262dfd0a5a9bdce32d8bc117441573f4e8c34f94aa1a5a9e6068065001
+prototipo Cargo.lock paquetes: 174
+s02a binario sha256: 5cd490a43a45c8e03ec2e199df721d53364d3f0fb1544cfd2eb21b9410a07860
+
+--- entrada congelada (ENTRADA-S02a.sha256), verificacion final ---
+P-ZRX/P-REGISTRO-SECTORES/ORDEN-S02a.md: La suma coincide
+P-ZRX/P-REGISTRO-SECTORES/ENCARGO-02-AUDITORIAS.md: La suma coincide
+P-ZRX/P-REGISTRO-SECTORES/ANALISIS.md: La suma coincide
+V-ZRX/LINEO.md: La suma coincide
+
+--- ficheros de la zona ---
+176K	prototipo
+343M	target
+697M	.cargo-home
+81M	autonomys-subspace
+148K	resultados
+60K	logs

@@ -1,0 +1,9 @@
+validar	piezas=2	hilos=16	n=65536	m=65536	profundidad=16	cod1=65536	sector_bytes=2113856
+REGENERACION	piezas=2	hilos=16	n=65536	chunks_discrepantes=0	hojas_discrepantes=0	t_reg_total_ns=510780391	vmhwm_kib=580664
+CORRECCION	piezas=2	hilos=16	estrategia=E-disco	L=None	posiciones=100	fallos=0
+CORRECCION	piezas=2	hilos=16	estrategia=E-arbol(L=0)	L=Some(0)	posiciones=100	fallos=0
+CORRECCION	piezas=2	hilos=16	estrategia=E-arbol(L=1)	L=Some(1)	posiciones=100	fallos=0
+CORRECCION	piezas=2	hilos=16	estrategia=E-arbol(L=2)	L=Some(2)	posiciones=100	fallos=0
+CORRECCION	piezas=2	hilos=16	estrategia=E-arbol(L=4)	L=Some(4)	posiciones=100	fallos=0
+CORRECCION	piezas=2	hilos=16	estrategia=E-nada	L=Some(16)	posiciones=100	fallos=0
+real=8.76 user=65.26 sys=1.84

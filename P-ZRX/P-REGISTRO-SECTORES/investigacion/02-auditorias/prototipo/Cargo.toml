@@ -1,0 +1,43 @@
+# Prototipo S01 — compromiso R1/R2 de un sector PoAS real y apertura de una solución.
+#
+# Crate INDEPENDIENTE: el `[workspace]` vacío de abajo lo saca de facto del workspace de la raíz
+# (`/home/katana/zeo/ZEROX/Cargo.toml`), como exige ORDEN-S01 §4. Las dependencias de Autonomys
+# se enlazan por `path` al clon fijado en ESTA zona (`../autonomys-subspace` @ f8842d0), nunca al
+# original de `.trash`. Las versiones de crates.io se fijan con `=` a las que ya resolvió L01 y
+# que están en la caché copiada en `../.cargo-home`, para no mover el árbol transitivo.
+[workspace]
+
+[package]
+name = "prototipo-s01"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "s01"
+path = "src/bin/s01.rs"
+
+[[bin]]
+name = "s02a"
+path = "src/bin/s02a.rs"
+
+[dependencies]
+# H_d(tag, m) = SHA3-256(tag ‖ m). Misma versión exacta que pinea `zx-core` (SPEC §3, C-HASH-04).
+sha3 = "=0.12.0"
+# Salida legible de digests. Versión exacta del workspace de la raíz.
+hex = "=0.4.3"
+# `block_on` para el `plot_sector` asíncrono y el mutex que exige `CpuRecordsEncoder`.
+futures = "=0.3.34"
+async-lock = "=3.4.2"
+# Errores tipados del prototipo.
+thiserror = "=2.0.20"
+
+# API pública del clon fijado. No se copia ni se reimplementa PoS, KZG ni erasure coding.
+subspace-archiving = { path = "../autonomys-subspace/crates/subspace-archiving" }
+subspace-core-primitives = { path = "../autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
+subspace-data-retrieval = { path = "../autonomys-subspace/shared/subspace-data-retrieval" }
+subspace-erasure-coding = { path = "../autonomys-subspace/crates/subspace-erasure-coding" }
+subspace-farmer-components = { path = "../autonomys-subspace/crates/subspace-farmer-components" }
+subspace-kzg = { path = "../autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
+subspace-proof-of-space = { path = "../autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc", "parallel"] }
+subspace-verification = { path = "../autonomys-subspace/crates/subspace-verification" }
