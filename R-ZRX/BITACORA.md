@@ -279,3 +279,13 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - Red: W06d2, W06d3, **W06d4 migrada** (tres nodos reales cruzan el corte); W06d5 en curso.
 - Revisión independiente RI-2 (a y b) con correcciones integradas.
 - **Traspaso para la próxima sesión: `R-ZRX/TRASPASO-2026-09-26.md`.**
+
+### 22:15–22:26 — documentación al día (petición de Katana)
+
+- Katana pide revisar que SPEC, P, V, R, S, RFT e IPA no queden desactualizados. Hecho: `RFT-ZRX` (RFT-14…RFT-23,
+  notas en RFT-01 y RFT-04), `IPA-ZRX` (estado, camino crítico y 22 filas), `SPEC-0.0.1` (nodo W06a…W06d5,
+  evidencia y castigo, finalidad como propuesta), `V-ZRX/REGISTRO.md` nuevo (registro, no copia: mover rompería
+  las entradas congeladas), `S-ZRX/` (índice y síntesis de seguridad del híbrido), `MAPA-RESCATE` y el
+  traspaso con la sección «Katana ausente». Hallazgo al hacerlo: el código de W06d2…W06d5 y SL-4a no ha tenido
+  revisor independiente (IPA E-11 → RI-3).
+- W06d5: suite conjunta (intento 4) en marcha, 461 tests pasados y 0 fallos a las 22:22.

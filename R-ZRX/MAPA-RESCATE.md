@@ -48,7 +48,7 @@ Líneas de código de `wc -l` sobre `src/` + `tests/`.
 | `zx-consensus/src/ghostdag.rs` + oráculos (GDR-v0.2, vectores rusty-kaspa) | (en `zx-consensus`) | GHOSTDAG con modos Zerox/Kaspa | `k = 30`, 15 padres, mergeset 180, `S_max = 150` (`:68-74`); almacén en memoria; no integrado en el nodo | algoritmo **reproducido** (L01-C1, oráculos incluidos); constantes **condicionales** | portado en W05 |
 | `zx-core/src/preimage/dag.rs` (cabecera DAG 589–1037 B) | (en `zx-core`) | Códec canónico | Campo `HEIGHT` (`:51`); sin campos de garantía/transición | **adaptar** | Tras decidir formato post-corte |
 | `zx-storage/src/utxo.rs` (`UndoData`, `aplicar_bloque`, `revertir_bloque`) | `fe713883…6fe` | Conservación y rollback | Indexado por altura (`almacen.rs:64`) | **adaptar**; base **reproducida** (L01-C1: 60/60 con `rocksdb`, incluido `matar_a_mitad`) | Contrato de estado T01 → W03 |
-| `zx-consensus/src/firmante/` (registro durable, firmar tras `sync_all`) | (en `zx-consensus`) | Defensa operativa `C-EVP-06` | Identidad de billete vieja | **adaptar** | C-09 |
+| `zx-consensus/src/firmante/` (registro durable, firmar tras `sync_all`) | (en `zx-consensus`) | Defensa operativa `C-EVP-06` | Identidad de billete vieja | **adaptar**: `FIR-*` del contrato de evidencia; portado en SL-4b | C-09 |
 | `genesis.rs`, `genesis_dag.rs` | (en `zx-consensus`) | Génesis constructivo | Génesis DAG separado (contrario a D-T02) | **adaptar** | Tras T01 |
 | `cabecera_conjunta.rs` (puerta conjunta PoT→sello→AES→SR→PoAS) | (en `zx-consensus`) | Orden de validación `C-POT-08` | Sin pasado causal ni garantía | **adaptar** | Integración B-08 |
 | `zx-node` `cadena.rs`, `sync.rs`, `contextual.rs`, `nodo.rs` | (en `zx-node`) | Ingeniería de nodo | Lineales; LWMA cableado (`contextual.rs:73,159`) | **obsoleto** como ruta activa; referencia | — |
@@ -76,17 +76,17 @@ casos que **no** entraron en RFT.
 
 | Afirmación antigua | Fuente (archivo) | Clasificación | Por qué | Siguiente acción |
 |---|---|---|---|---|
-| Doble farmeo no se cierra sin dejar de ser PoST puro; stake no crea evidencia | `ESTADO-DOBLE-FARMEO.md` (`a667b25a…`), `P-STAKE/MAPA.md` | **sobrevive** | El híbrido no añade votos obligatorios | RFT-01 |
+| Doble farmeo no se cierra sin dejar de ser PoST puro; stake no crea evidencia | `ESTADO-DOBLE-FARMEO.md` (`a667b25a…`), `P-STAKE/MAPA.md` | **sobrevive** | Hasta el sello no hay evidencia; la capa de votos adoptada en principio (FV-D02) acota el tiempo, no lo cierra; ningún mecanismo de PoStake ni de Filecoin lo encarece de forma exigible (P-DISUASION) | RFT-01, RFT-14 |
 | `κ = 0` con `m = 4` bajo identidad `C-GD-07` | `P-EQUIVOCACION` (`c4720eab…`) | **sobrevive** | `C-EVP-01` usa esa identidad | RFT-02 |
 | Corolario 4 (ningún compromiso fecha nada); Cor. 1 (regenerado indistinguible) | `P-COBERTURA` (`63935b0d…`) | **sobrevive** | No dependen del consenso | RFT-03, RFT-04 |
-| Retención por clave no disuade: claves de saldo cero, soborno cero | `P-CLAVE` (`74d512be…`) | **condicional** | `C-BON-04` exige `requisito > 0`: retira la premisa «claves gratis». Queda R-5 (coste fijo solo domina bajo un tamaño) | IPA C-02: medir con requisito positivo |
+| Retención por clave no disuade: claves de saldo cero, soborno cero | `P-CLAVE` (`74d512be…`) | **condicional** | `C-BON-04` exige `requisito > 0`: retira la premisa «claves gratis». Queda R-5 (coste fijo solo domina bajo un tamaño) | **Medido 2026-09-26:** con cola larga de claves diminutas el castigo no encarece (Δ = 0, DS-3); con el reparto real de un pool de Chia la grieta se cierra (DS-6) y la región de parámetros no es vacía (SL-2, SL-2b). Queda condicional al reparto de ZEROX, no medido. RFT-14 |
 | `α* = (1 − β_d − 2β_x)/2` | `P-PRESTAMO` (`cf020a69…`) | **sobrevive** (identidad) | — | Usar en C-02/X-01 |
-| Pools producen con espacio ajeno; atar coinbase a `sol.public_key` quita el premio, no la capacidad | `P-POOLS` (`bfac1d85…`) | **adaptar** | `C-BON-03` ya ata la coinbase; falta la arquitectura | IPA B-06 |
+| Pools producen con espacio ajeno; atar coinbase a `sol.public_key` quita el premio, no la capacidad | `P-POOLS` (`bfac1d85…`) | **adaptar** | `C-BON-03` ya ata la coinbase: **implementado** en la puerta conjunta (`zx-post::cabecera_conjunta`, coinbase v3 a `sol.public_key`); falta la arquitectura | IPA B-06 |
 | Pata PoW concurrente aditiva no baja `V` con `θ` | `P-RIVAL` (`8488417a…`) | **sobrevive** como advertencia; **no aplica** al arranque (no hay PoW tras el corte) | Premisa «PoW concurrente» ausente | RFT-09 |
 | «No evaluar PoW de arranque (Decred)» | `R-ZRX/LEGADO/stake/MAPA.md` §5 | **obsoleto como recomendación** por instrucción vigente de Katana (`AUTO-ZRX.md`, `D-ZRX/SPEC.md` C-BOT-04); la **preocupación** (concentración de emisión PoW, DCP-0012) **sobrevive** | Las instrucciones actuales prevalecen | IPA A-10 |
 | Arranque sin PoW con requisito ∝ oferta circulante | `R-ZRX/LEGADO/stake/MAPA.md` §4 | **condicional** | Comparador, no ruta elegida | IPA X-02 |
 | «Una pata de PoW pequeña la domina un Estado y controla la entropía del ancla» | `T-ZRX/AGUJEROS-Y-SOLUCIONES.md` (`81ae2c92…`), lectura de Claude sin validar | **condicional** (hipótesis) | Aplica a la semilla del corte | IPA A-07 |
-| Sembrador ≈ 100× peor que comprar disco (CPU; GPU sin medir); ploteo 83,6 s/GiB | `P-INTENTO` (`d7630deb…`), `research/coste-ploteo-medido.md` (`e4b7cbf7…`) | **pendiente de reproducir** | Hardware y carga de 2026-09-21 (medido con carga ajena según memoria) | D-02 |
+| Sembrador ≈ 100× peor que comprar disco (CPU; GPU sin medir); ploteo 83,6 s/GiB | `P-INTENTO` (`d7630deb…`), `research/coste-ploteo-medido.md` (`e4b7cbf7…`) | **reproducido y ampliado** (DS-4, 2026-09-26): GPU medida, 0,0545 s/registro en GTX 1070 con la tabla v2 ⇒ ≈ 7,1 GPU y ≈ 677 W por TiB frente a ≈ 5 W de almacenar | CPU 0,921 s/registro (coherente con S02a); la GPU es de la tabla v2, no la v1 de ZEROX | D-02, RFT-04, `V-ZRX/REGISTRO.md` |
 | `ρ_max = ε·K`, `K = 16` medido (VAES), `AESENC` 4,001 ciclos | `R-ZRX/LEGADO/reloj/ESTADO-RELOJ.md` | **sobrevive** como medida de esa máquina; **pendiente** para hardware objetivo | Física de la CPU | B-02 |
 | Ventana de adelanto no anulada con segundo VDF | `P-REVELACION` (`2abfab32…`), `P-SEGUNDO-VDF` (`70bcd723…`) | **sobrevive** (refuta P-ADELANTO) | — | RFT-12 |
 | Ocupación bimodal de s-buckets (9,0668 % vacíos) y molienda de clave | `LIBRO-DE-RESTRICCIONES.md` R-12 | **sobrevive** para el formato `f8842d0` | — | IPA B-09 |
@@ -97,7 +97,10 @@ casos que **no** entraron en RFT.
 | `C-UPG-01…08` (hard forks por altura, `CONSENSUS_BRANCH_ID`) | `SPEC.md` antiguo | **adaptar** | Altura de activación sin semántica DAG | IPA B-10 |
 | `C-EXP-01…06` (caducidad por `altura_ploteo`) | `SPEC.md` antiguo | **obsoleto** en su forma; necesidad **sobrevive** | Alturas lineales | IPA A-06 |
 | `C-REORG-07` (`MAX_REORG_LENGTH = 11 999`) | `SPEC.md` antiguo | **obsoleto** (el propio SPEC la declaraba transitoria) | — | — |
-| `C-GD-07`, `C-ORD-03/04` | `SPEC.md` antiguo | **sobrevive** como contrato (sin código activo) | — | B-03 |
+| Castigo correlacionado `C-SLA-01…04` | `D-ZRX/SPEC.md` §5 (propuesta de Katana) | **refutado** (DS-5, 2026-09-26) | No confisca saldo inexistente y castiga a honestos con fallos comunes | RFT-15; `DS-L02` |
+| Región de retención «≳ 4.000» | `P-PRESTAMO/investigacion/INFORME.md` línea 49 | **refutado** (aritmética): la desigualdad da `ρ_ret·T_v > 370`; los propios ejemplos del informe multiplican 300 | Incoherente en la fuente; detectado por DS-3 | `P-ZRX/P-DISUASION/REVISION-DS3.md` |
+| Capa de finalidad por votos: tabla de poder «función de `past(A_n)` y de nada más» (R-FIN-15) | `research/dag-poas-capa-finalidad.md` | **adaptar**: la lectura literal rompe la finalidad bajo partición; se encadena la tabla por certificado (FV-01b, como FIP-0086) | Contraejemplo de FV-1 (primera ejecución) | RFT-19; `P-ZRX/P-FINALIDAD-VOTOS/` |
+| `C-GD-07`, `C-ORD-03/04` | `SPEC.md` antiguo | **sobrevive**, ahora con código: `zx-cadena` (identidad real, W06a-C) y fusión del motor (W06a-B) | — | B-03, B-11 (cerrados) |
 | Progreso 0.0.1 antiguo (A1…F4): adaptador PoAS, puerta parcial, primer hijo dev, firmante, D1 plotter | `PIEZAS-DE-CODIGO/PROGRESO-0.0.1.md` (`6ef45cb5…`), `HOJA-DE-RUTA.md` (`e6d3f445…`) | referencia de ingeniería; **ninguna pieza cerraba una ruta activa** (lo dice la hoja de ruta) | — | Usar sus correcciones como casos de prueba al portar |
 
 ---
@@ -121,3 +124,4 @@ aquí no es un instrumento validado** y no se promueve a `V-ZRX/`.
 |---|---|---|
 | 2026-09-26 | Alta inicial por lectura (inventario de código, catálogo de refutaciones y reglas del SPEC antiguo, con citas comprobadas) | — (sin ejecución: B-HARNESS-01) |
 | 2026-09-26 01:17 | `zx-core`, `zx-pot`, `zx-consensus` (incl. PoAS, GHOSTDAG, firmante), `zx-storage` (+`rocksdb`) y `farmer_disco` pasan de **pendiente de reproducir** a **reproducido** en su contrato antiguo | L01 + L01-C1 (`P-ZRX/P-LINEA-BASE/REVISION.md`) |
+| 2026-09-26 22:25 | Puesta al día tras P-DISUASION, P-SLASHING, FV-1 y AV-1: doble farmeo (RFT-14), `P-CLAVE` medido, coinbase atada implementada, sembrador reproducido en GPU (DS-4), `C-GD-07`/`C-ORD` con código, firmante hacia SL-4b; filas nuevas: `C-SLA` refutado, «≳ 4.000» refutado, R-FIN-15 adaptada | DS-3, DS-4, DS-5, DS-6, SL-2, W06a-B/C, FV-1 |

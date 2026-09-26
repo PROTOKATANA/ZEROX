@@ -8,9 +8,10 @@ exacto y la evidencia que los reabriría. Cuando el híbrido **retira** la premi
 antigua, esa refutación no está aquí: queda como histórica y **condicional** en
 `R-ZRX/MAPA-RESCATE.md` y su pregunta nueva en `D-ZRX/IPA-ZRX.md` (`AUTO-ZRX.md` §2).
 
-**Procedencia.** Todas las fuentes están en el archivo `/home/katana/zeo/.trash/zerox/`
+**Procedencia.** RFT-01…RFT-13: todas las fuentes están en el archivo `/home/katana/zeo/.trash/zerox/`
 (= commit `9681061`, salvo los 95 archivos que solo existen en `.trash`). Rutas relativas a esa
-raíz; hash sha256 completo del archivo citado. Cada cita literal se comprobó en la fuente el
+raíz; hash sha256 completo del archivo citado. **Desde RFT-14:** las fuentes están en **este**
+repositorio (rama `rediseno/v1-spec-first`), con el commit que las registró. Cada cita literal se comprobó en la fuente el
 2026-09-26. **Los números de línea del SPEC antiguo se desplazaron por ediciones concurrentes:
 citar por ID de regla.**
 
@@ -45,6 +46,12 @@ propuesto se limita a doble firma publicada. La fase PoW **no** cambia esto desp
 **Lo reabriría.** Un mecanismo que haga observable la rama privada sin votos obligatorios, con
 prueba de que no cae en R-6; o una decisión de Katana que admita votos de finalidad por stake
 (hoy excluidos por `D-ZRX/SPEC.md` §0).
+
+**Actualización 2026-09-26.** La decisión llegó: Katana adopta en principio la capa de finalidad por
+votos (`P-ZRX/P-FINALIDAD-VOTOS/DECISIONES.md` FV-D02). **La refutación sigue en pie:** hasta que un
+certificado sella, la rama privada no deja evidencia y ningún depósito la castiga. Lo que cambia es la
+**duración** del riesgo (de `F_slots` a la franja sin sellar) y que reescribir lo ya sellado exija firmar
+dos certificados (evidencia castigable). No está implementada ni tiene contrato ratificado (IPA X-04).
 
 ---
 
@@ -116,6 +123,13 @@ solo **encarece**, y hay que dar el coste absoluto.
 **Lo reabriría.** Cambiar el objeto ploteado: romper el determinismo público (semilla secreta) o la
 paralelizabilidad (sellado secuencial tipo PoRep) — encargos 04/05 de `P-REGISTRO-SECTORES`. La
 latencia o «materializar N a la vez» no son vías: son desigualdades sobre hardware.
+
+**Actualización 2026-09-26 (coste absoluto, P-DISUASION).** Regenerar en vez de almacenar cuesta
+117,238 núcleos por TiB en continuo, ≈ 7,1 GTX 1070 y ≈ 677 W por TiB (medida GPU de DS-4 con la tabla
+**v2** de Autonomys; ZEROX usa la v1, 0,92 frente a 0,90 s por registro en CPU). Es un encarecimiento
+**exigible**, pero la auditoría solo **detecta** la regeneración si abre más de 181 092 posiciones por TiB
+en el plazo del reto (un SSD lo sirve, un disco duro doméstico no). Fuente: `P-ZRX/P-DISUASION/REVISION-DS3.md`
+(`54add85`), `REVISION-DS4.md` (`4147520`). Una GTX 1070 es cota inferior de una GPU actual.
 
 ---
 
@@ -276,9 +290,223 @@ antes de la ventana (IPA A-05b), demostrada con latencia real.
 
 ---
 
+## RFT-14 · Ningún mecanismo de PoStake ni de Filecoin encarece de forma exigible el doble farmeo del atacante con espacio propio suficiente
+
+**Enunciado.** La garantía sin castigo no encarece el doble farmeo: el mismo colateral vale en todas las
+ramas. El castigo con evidencia más retención (M3 + M5) solo muerde si hay evidencia y saldo: con el
+reparto de claves supuesto por DS-3 (cola larga de claves diminutas), el atacante recluta en claves sin
+saldo el espacio que cruza la deriva y el sobrecoste es **Δ = 0** para toda probabilidad de éxito ≤ 0,5.
+Registro, auditorías, colateral de sectores y sellado encarecen **otros** ataques (sembrador, Sybil, largo
+alcance), no el doble farmeo simultáneo. Ningún sistema de espacio puro revisado (Chia, SpaceMint,
+Autonomys) lo encarece de forma exigible; el castigo de SpaceMint exige que se publiquen los dos bloques.
+
+**Alcance.** Atacante grande que no necesita espacio ajeno. **Excepción medida:** con el reparto real de
+un pool de Chia (2 470 granjeros), la fracción del espacio en claves sin saldo suficiente es
+1,78·10⁻⁴ [1,49·10⁻⁴; 2,08·10⁻⁴] (`ε = 0,01`, `T_v = 3 600`), muy por debajo del umbral que haría gratis el
+reclutamiento: el atacante que **recluta** sí paga el castigo. Es una barrera condicionada a que haya
+evidencia, no un cierre. Las cifras en unidades de token son escenarios hipotéticos y el modelo de DS-2
+mezclaba saldo por clave y pérdida por reclutado (SL-2, F5): la escala absoluta es dudosa; la conclusión
+es estructural.
+
+**Aplicación al híbrido.** **Aplica.** No presentar la garantía, el castigo ni el registro de sectores como
+solución del doble farmeo. La capa de finalidad por votos (FV-D02) lo **mitiga en el tiempo**; tampoco lo
+encarece antes del sello.
+
+**Fuente.** `P-ZRX/P-DISUASION/SINTESIS.md` (`a9b42a7`), `REVISION-DS1.md` (`96caf72`), `REVISION-DS3.md`
+(`54add85`), `REVISION-DS6.md` (`8e1e93d`); `P-ZRX/P-SLASHING/REVISION-SL2.md` (F5).
+
+**Lo reabriría.** Un mecanismo cuyo coste el atacante pague en todas las ramas sin depender de que
+publique evidencia, con prueba de que no cae en RFT-01 ni en R-6.
+
+---
+
+## RFT-15 · El castigo correlacionado (`C-SLA`) no disuade al atacante grande y castiga a honestos
+
+**Enunciado.** Ninguna forma de castigo correlacionado confisca más que el saldo `V` que existe. Con la
+grieta de DS-3 (279 claves reclutadas con saldo ≤ 0,01), el máximo confiscable es 2,79 u.e. frente a
+510 570 u.e. de soborno evitado. Solo alcanza a quien deja evidencia y tiene saldo, un subconjunto de lo
+que ya cubre el castigo simple. Además **empeora**: con la forma de `D-ZRX/SPEC.md` §5 y `b = 0,1`, un fallo
+compartido del 5 % de 10 000 claves satura el castigo salvo `c < 0,0018`; abre *griefing* y, al escalar con
+el número de claves, incentiva concentrar identidades.
+
+**Alcance.** Las dos formas examinadas (la de `SPEC.md` y la tipo Ethereum, por fracción de saldo); la
+segunda es menos mala para honestos, pero tampoco cierra el doble farmeo ni la equivocación. Las cifras
+en u.e. tienen la reserva de escala de SL-2 (F5).
+
+**Aplicación al híbrido.** **Aplica.** `C-SLA-01…04` de `D-ZRX/SPEC.md` (propuesta de Katana, no
+ratificada) no se implementa: pérdida no correlacionada con fracción fija `f` (`P-ZRX/P-SLASHING/DECISIONES.md`
+DS-L02). Tampoco se correlaciona la multa por ausencia de voto (AV-1).
+
+**Fuente.** `P-ZRX/P-DISUASION/REVISION-DS5.md` (`07dc551`).
+
+**Lo reabriría.** Una forma de correlación que alcance al atacante sin evidencia o sin saldo, con tasa de
+castigo a honestos medida y acotada.
+
+---
+
+## RFT-16 · Una cadena más larga basada en prueba de espacio no es segura sin supuestos adicionales
+
+**Enunciado.** Baig y Pietrzak (FC 2025, arXiv:2505.14891), resumen: «we prove that without additional
+assumptions no such protocol exists» (cadena más larga basada en PoSpace, segura bajo disponibilidad
+dinámica), con una cota de la longitud del fork válida para cualquier regla de selección. El artículo
+reconoce dos salidas: un VDF (Chia) contra el *bootstrapping* y registro + BFT (Filecoin) contra el
+*replotting*.
+
+**Alcance.** Resultado publicado, leído por el director en arxiv.org el 2026-09-26. La cota transcrita en
+el modelo de DS-3 (4 253) no coincide con la del resumen (`φ²ρ/ε = 1 600`): mismo orden de magnitud;
+**no** se usa como cifra de ZEROX.
+
+**Aplicación al híbrido.** **Aplica a medias.** El PoT de un solo flujo saca a ZEROX del *bootstrapping*;
+el *replotting* sigue abierto mientras no haya registro de sectores y una capa tipo BFT. La finalidad por
+votos sobre sectores registrados (FV-D01, FV-D02) es la candidata para esa mitad y depende del registro,
+que no existe.
+
+**Fuente.** `P-ZRX/P-DISUASION/REVISION-DS1.md` (`96caf72`), `REVISION-DS3.md` (F7).
+
+**Lo reabriría.** Una demostración de que el híbrido cumple el supuesto adicional del artículo para el
+*replotting* (registro + finalidad por votos implementados y medidos).
+
+---
+
+## RFT-17 · Con prima `b > 1` en el sorteo de votos y censura de las pruebas de disponibilidad, pausar la finalidad exige menos de un tercio
+
+**Enunciado.** Si el atacante (siempre encendido, siempre con prima) censura todas las pruebas de
+disponibilidad de los honestos, su fracción de plazas es `a·b/(a·b + 1 − a)`. Pausa (≥ 1/3 de las plazas)
+con `a ≥ 1/(2b+1)` y sella a solas (≥ 2/3) con `a ≥ 2/(b+2)`. Con `b = 2` (FV-D05): pausa con el **20 %**,
+sella a solas con el **50 %**. Es la esperanza, no varianza del sorteo. La prima es un trilema: `b` mueve a
+la vez la viveza, la seguridad de pausa y la de sellar a solas, y ningún valor gana en las tres.
+
+**Alcance.** Atacante con control de red suficiente para censurar las pruebas de disponibilidad.
+Aritmética rehecha por el director. Sin censura, el umbral de pausa vuelve a 1/3.
+
+**Aplicación al híbrido.** **Aplica** a la capa adoptada con `b = 2`. Pausar devuelve a la situación sin
+capa (`C-FIN-01`); desde AV-1 pausar ya **cuesta** (falta «elegido sin voto», `m_aus` proporcional, FV-D06),
+pero el umbral no sube.
+
+**Fuente.** `P-ZRX/P-FINALIDAD-VOTOS/REVISION-FV1.md` (`bfc40b9`), `resultados-FV1/`.
+
+**Lo reabriría.** Pruebas de disponibilidad no censurables por quien controla la red, o `b = 1` (que exige
+el 66,7 % de participación honesta para sellar).
+
+---
+
+## RFT-18 · Un certificado de finalidad falso ya adoptado no se revierte con trabajo honesto
+
+**Enunciado.** Con la capa pausada o sin activar ningún nodo queda peor que con `C-FIN-01`; pero un nodo
+que **adoptó** un certificado falso no lo abandona por más trabajo honesto posterior («mentira
+permanente»): ahí sí queda peor. Sellar a solas exige `a ≥ 2/(b+2)` con censura (50 % con `b = 2`).
+
+**Alcance.** Condición (c) de la orden FV-1, refutada **en parte**. Firmar dos certificados contradictorios
+deja evidencia castigable (`EvidenceVoto`), así que el ataque cuesta garantía, pero el daño a quien adoptó
+es irreversible.
+
+**Aplicación al híbrido.** **Aplica.** Es el coste explícito aceptado por Katana al adoptar la capa y la
+razón para no bajar el umbral de sellar a solas (`b = 2`, no 4).
+
+**Fuente.** `P-ZRX/P-FINALIDAD-VOTOS/REVISION-FV1.md` (`bfc40b9`); `resultados-FV1/INFORME.md` (FV-18).
+
+**Lo reabriría.** Una regla de recuperación que saque de un certificado falso sin hacer reversibles los
+certificados honestos, demostrada bajo partición.
+
+---
+
+## RFT-19 · Una tabla de poder que cada nodo recalcula desde su propio pasado rompe la finalidad bajo partición
+
+**Enunciado.** Si la tabla de poder de la instancia `n` es «función de `past(A_n)` y de nada más», una
+partición pura, sin ninguna doble firma, basta para que cada mitad certifique una historia distinta: cada
+una recalcula la tabla con las claves que ve y reúne 2/3 de **su** tabla con menos de un tercio del peso
+real. Es peor que `C-FIN-01` sola.
+
+**Alcance.** Refuta la lectura literal de la propuesta antigua (R-FIN-15). Se cierra con **FV-01b**: la
+tabla de `n` es la que comprometió el certificado de `n − 1` (como FIP-0086 de Filecoin F3). **Residuo:** la
+ventana de arranque antes del primer certificado.
+
+**Aplicación al híbrido.** **Aplica como restricción:** toda variante de la capa encadena la tabla por
+certificado.
+
+**Fuente.** `P-ZRX/P-FINALIDAD-VOTOS/resultados-FV1-v1/INFORME.md` §1.1 (`3bfcf1a`).
+
+**Lo reabriría.** Nada que recalcule la tabla localmente; solo una tabla derivable igual por todos sin
+certificado previo, demostrada bajo partición.
+
+---
+
+## RFT-20 · Una multa fija por no votar no crece con el tamaño del atacante
+
+**Enunciado.** La falta «elegido sin voto» es por clave e instancia. Con `m_aus` **fijo** y el peso en una
+sola clave, pausar cuesta **36 000 u.e./h para cualquier `a` entre 0,10 y 0,40**; repartir el peso en más
+claves multiplica los incidentes (de 1 a 95 por instancia al pasar de 1 a 1 000 claves con `a = 0,1`), lo
+que castiga la fragmentación y premia concentrar.
+
+**Alcance.** Cálculo de AV-1 en Julia (`calc/resultados/C2-costo-pausa-hora.csv`,
+`C6-concentracion-vs-fragmentacion.csv`), leído por el director. Unidades hipotéticas.
+
+**Aplicación al híbrido.** **Aplica:** Katana decidió `m_aus` proporcional a la garantía con un mínimo
+(FV-D06); proporcional, el coste crece con `a` (1,8·10⁷ → 7,2·10⁷ u.e./h).
+
+**Fuente.** `P-ZRX/P-AUSENCIA-VOTO/REVISION-AV1.md` (`98ceea8`).
+
+**Lo reabriría.** Una falta por unidad de peso que no dependa del número de claves.
+
+---
+
+## RFT-21 · Una sola VRF por ventana revela el calendario de votos
+
+**Enunciado.** Si una única salida VRF por ventana decide todas las instancias en que sale elegido un
+granjero, en cuanto vota una vez revela el calendario completo del resto de la ventana: el atacante puede
+censurarlo de forma selectiva. Hace falta una VRF **independiente por instancia**, comprometida por
+Merkle al abrir la ventana y revelada al cerrarla. SSLE se descarta: resuelve el problema contrario (que
+solo el elegido pueda probarlo).
+
+**Alcance.** Diseño de AV-1 (`CONTRATO-AUSENCIA-v0.md`), sin implementación.
+
+**Aplicación al híbrido.** **Aplica** al contrato de la falta de ausencia y a FV-2.
+
+**Fuente.** `P-ZRX/P-AUSENCIA-VOTO/resultados-AV1/CONTRATO-AUSENCIA-v0.md`, `INFORME.md`; revisión
+`REVISION-AV1.md` (`98ceea8`).
+
+**Lo reabriría.** Una construcción de una VRF por ventana que no filtre el calendario, con prueba.
+
+---
+
+## RFT-22 · Redondear hacia arriba la recompensa del incluidor deja al infractor perder menos de 6/8
+
+**Enunciado.** Con recompensa `techo(C·2/8)`, el infractor que se autodenuncia puede perder menos de
+`6/8·C` (con `C = 11`: pierde 8 < 8,25). La regla vigente es **RAT-2′**: `suelo(C·2/8)`.
+
+**Alcance.** Aritmética entera exacta; detectado por el ejecutor de SL-3 (AMBIGUEDAD-SL3-9). Error del
+director en RAT-2.
+
+**Aplicación al híbrido.** **Aplica:** oráculos T01 v0.4 / T04 v0.5 y Rust (SL-4a) usan el suelo.
+
+**Fuente.** `P-ZRX/P-SLASHING/REVISION-SL3.md` (`50c9a13`), `CONTRATO-EVIDENCIA-v0.md` («Ratificación v0»).
+
+**Lo reabriría.** Nada: es aritmética.
+
+---
+
+## RFT-23 · Una garantía fija por identidad expulsa al granjero diminuto
+
+**Enunciado.** Con garantía **por identidad**, el granjero honesto con fracción de red `f_h ≲ 10⁻⁵` paga
+más de garantía que lo que ingresa: el mecanismo es regresivo.
+
+**Alcance.** Calibración de SL-2 con los escenarios hipotéticos de DS-2/DS-3; coincide con la
+regresividad que ya señalaban DS-2 y DS-3 (A4 Sybil).
+
+**Aplicación al híbrido.** **Aplica** al perfil dev (`q = 20` por clave): aceptable para la red dev, no
+para producción. Recomendación: garantía **por unidad de espacio** (IPA C-02, C-07).
+
+**Fuente.** `P-ZRX/P-SLASHING/REVISION-SL2.md` (`a9b42a7`).
+
+**Lo reabriría.** Precios y parámetros de producción que saquen del rango al granjero pequeño real, o un
+requisito proporcional al espacio.
+
+---
+
 ## Registro de altas
 
 | Fecha | Filas | Motivo |
 |---|---|---|
 | 2026-09-26 | RFT-01 … RFT-12 | Alta inicial tras releer el archivo antiguo para el rediseño híbrido |
 | 2026-09-26 01:40 | RFT-13 | T02-A (ventana previa al primer bloque PoST) |
+| 2026-09-26 22:25 | RFT-14 … RFT-23; actualización de RFT-01 y RFT-04 | P-DISUASION (DS-1…DS-6), P-SLASHING (SL-2, SL-3), P-FINALIDAD-VOTOS (FV-1, dos ejecuciones) y P-AUSENCIA-VOTO (AV-1) |
