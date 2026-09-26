@@ -1,0 +1,85 @@
+   Compiling zx-node v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d3/ws/crates/zx-node)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.79s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/zx_node-1e3c2c4b380181e5)
+
+running 19 tests
+test identidad::tests::es_determinista_y_nunca_cero ... ok
+test estado_resumen::tests::es_determinista_y_sensible_a_cambios ... ok
+test perfil::tests::el_perfil_dev_construye ... ok
+test red::huerfanos::tests::el_cupo_por_padre_desaloja_al_mas_viejo_de_ese_padre ... ok
+test red::huerfanos::tests::inserta_y_recupera_por_padre ... ok
+test red::huerfanos::tests::el_cupo_total_desaloja_al_mas_viejo_global ... ok
+test red::huerfanos::tests::no_duplica_el_mismo_hijo ... ok
+test red::manejador::tests::bloque_difundido_siempre_difiere_y_encola ... ok
+test red::manejador::tests::estado_y_lecturas_delegan_en_la_vista ... ok
+test red::manejador::tests::sin_hilo_de_consenso_se_ignora_sin_penalizar ... ok
+test red::huerfanos::tests::tomar_para_un_padre_sin_huerfanos_no_falla ... ok
+test red::vista::tests::bloques_por_hash_respeta_el_orden_pedido_y_omite_lo_ausente ... ok
+test red::vista::tests::sin_nada_registrado_las_cabeceras_desde_cualquier_locator_estan_vacias ... ok
+test red::vista::tests::fijar_cabeceras_pow_sustituye_una_altura_ya_ocupada_por_registrar_pow ... ok
+test claves::tests::es_determinista_y_distinta_por_indice ... ok
+test red::vista::tests::el_locator_devuelve_lo_que_sigue_al_primero_reconocido ... ok
+test red::vista::tests::el_locator_siempre_termina_en_el_genesis_y_es_denso_cerca_de_la_punta ... ok
+test red::huerfanos::tests::un_tope_cero_entra_en_panico_al_construir - should panic ... ok
+test nodo::pruebas_v7::bloque_pow_propio_alterado_se_rechaza_y_no_cambia_el_estado ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.97s
+
+     Running unittests src/bin/zx-adversario.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/zx_adversario-d7a4347e04ffa1e7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/zx_node-6c580d68d34f5878)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/integracion.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/integracion-2d450e50b0717966)
+
+running 1 test
+test un_proceso_cruza_el_corte_y_produce_al_menos_30_bloques_post has been running for over 60 seconds
+test un_proceso_cruza_el_corte_y_produce_al_menos_30_bloques_post ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 496.61s
+
+     Running tests/padres_maximos.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/padres_maximos-49a516f18ad61ddc)
+
+running 1 test
+test padres_de_regimen_usa_hasta_quince_puntas ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/red_no_dev.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/red_no_dev-ccffc93a22ae57c1)
+
+running 2 tests
+test mainnet_se_rechaza_sin_crear_nada ... ok
+test testnet_se_rechaza_sin_crear_nada ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/red_tcp.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/red_tcp-675d6c7fddc20644)
+
+running 1 test
+test dos_nodos_reales_sobre_tcp_se_conectan ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/reinicio.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/reinicio-bd920339b63d93a5)
+
+running 2 tests
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar ... ok
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 448.27s
+
+   Doc-tests zx_node
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

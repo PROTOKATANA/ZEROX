@@ -1,0 +1,1790 @@
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/src/cadena.rs ws/crates/zx-cadena/src/cadena.rs
+--- ws.orig/crates/zx-cadena/src/cadena.rs	2026-09-26 14:08:45.173706642 +0200
++++ ws/crates/zx-cadena/src/cadena.rs	2026-09-26 14:47:05.895581601 +0200
+@@ -19,6 +19,7 @@
+ use std::cmp::Ordering;
+ use std::collections::{BTreeMap, BTreeSet};
+ 
++use primitive_types::U256;
+ use zx_consensus::transicion::{
+     Estado, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar, aplicar_fusion, deshacer,
+     es_terminal_condiciones,
+@@ -85,6 +86,14 @@
+     dag_idx: BTreeMap<BlockHash, Idx>,
+     dag_orden: Vec<BlockHash>,
+     dag_datos: BTreeMap<BlockHash, DatosDag>,
++    /// Puntas PoW válidas conocidas: bloques PoW sin ningún hijo PoW válido todavía
++    /// (`ORDEN-W06d3` decisión 3). Varias a la vez es exactamente una bifurcación PoW.
++    tips_pow: BTreeSet<BlockHash>,
++    /// Bloques PoW que, en su propia rama, ya cumplen `es_terminal_condiciones` (altura, trabajo,
++    /// `Φ`). Candidatos a terminal mientras no exista ningún bloque PoST (`self.dag.is_none()`):
++    /// FC-3 (`P-ZRX/P-TRANSICION/ORDEN-T01.md` §CorteSelección) dice que, sin sufijo PoST, gana el
++    /// de más trabajo PoW, no el primero que llegó.
++    terminal_candidatos: BTreeSet<BlockHash>,
+ }
+ 
+ impl Cadena {
+@@ -114,6 +123,8 @@
+             dag_idx: BTreeMap::new(),
+             dag_orden: Vec::new(),
+             dag_datos: BTreeMap::new(),
++            tips_pow: BTreeSet::new(),
++            terminal_candidatos: BTreeSet::new(),
+         }
+     }
+ 
+@@ -346,6 +357,12 @@
+     }
+ 
+     /// Admite un bloque PoW en modo estricto (`ED-1`).
++    ///
++    /// Cada bloque se valida contra el estado de **su padre declarado** (`self.post.get(&p)`), no
++    /// contra ninguna noción de "la punta": dos bloques con el mismo padre (una bifurcación PoW) se
++    /// admiten los dos, cada uno con su propio `Estado(past)`/`Estado(post)` independiente. Es lo
++    /// que hace posible una bifurcación PoW real sin ningún "undo": los dos ya coexisten en `past`/
++    /// `post`, indexados por hash (`ORDEN-W06d3` decisión 3).
+     fn admitir_pow(&mut self, bloque: &BloqueCadena) -> Result<(), MotivoBloque> {
+         let (hash, padre) = match bloque {
+             BloqueCadena::Pow(b) => (b.hash(), b.padre()),
+@@ -365,18 +382,70 @@
+             &self.params,
+             self.cbid,
+         )?;
+-        if self.terminal.is_none()
++
++        // Una bifurcación PoW real: el padre deja de ser punta (si lo era) y este bloque lo es.
++        if let Some(p) = padre {
++            self.tips_pow.remove(&p);
++        }
++        self.tips_pow.insert(hash);
++
++        // FC-3 (`P-ZRX/P-TRANSICION/ORDEN-T01.md` §159): sin ningún sufijo PoST, el terminal es el
++        // de mayor trabajo PoW entre los que ya cumplen las condiciones de corte, no el primero que
++        // llegó. Se congela para siempre en cuanto se admite el primer bloque PoST (`self.dag` deja
++        // de ser `None`): a partir de ahí cambiar el terminal invalidaría todo el DAG construido
++        // sobre él, así que ni se busca un candidato nuevo ni se recalcula.
++        let dag_ya_existe = self.dag.is_some();
++        if !dag_ya_existe
+             && let Some(altura) = bloque.como_transicion().hechos.altura()
+             && es_terminal_condiciones(&nuevo, &self.params, altura)
+         {
+-            self.terminal = Some(hash);
+-            self.estado_t = nuevo.clone();
++            self.terminal_candidatos.insert(hash);
+         }
+         self.past.insert(hash, estado_padre);
+         self.post.insert(hash, nuevo);
++        if !dag_ya_existe {
++            self.recalcular_terminal();
++        }
+         Ok(())
+     }
+ 
++    /// Recalcula, entre [`Self::terminal_candidatos`], cuál es el terminal según FC-3: mayor
++    /// `Estado::trabajo` acumulado (empate: hash menor, determinista y ajeno al orden de llegada).
++    /// Solo se llama mientras `self.dag.is_none()` (sin sufijo PoST todavía): una vez congelado, el
++    /// terminal ya no se toca desde aquí.
++    fn recalcular_terminal(&mut self) {
++        let mejor = self.terminal_candidatos.iter().copied().min_by(|a, b| {
++            let wa = self.post.get(a).map(|e| e.trabajo).unwrap_or_default();
++            let wb = self.post.get(b).map(|e| e.trabajo).unwrap_or_default();
++            wb.cmp(&wa).then_with(|| a.cmp(b))
++        });
++        if let Some(hash) = mejor
++            && let Some(estado) = self.post.get(&hash).cloned()
++        {
++            self.terminal = Some(hash);
++            self.estado_t = estado;
++        }
++    }
++
++    /// Mejor punta PoW conocida por trabajo acumulado (empate: hash menor), sea o no ya terminal
++    /// (`ORDEN-W06d3` decisión 3): es lo que sigue la plantilla de minado, para que un bloque propio
++    /// siempre extienda la rama más pesada conocida, no una punta cualquiera.
++    #[must_use]
++    pub fn mejor_punta_pow(&self) -> Option<BlockHash> {
++        self.tips_pow.iter().copied().min_by(|a, b| {
++            let wa = self.post.get(a).map(|e| e.trabajo).unwrap_or_default();
++            let wb = self.post.get(b).map(|e| e.trabajo).unwrap_or_default();
++            wb.cmp(&wa).then_with(|| a.cmp(b))
++        })
++    }
++
++    /// Trabajo PoW acumulado de un bloque admitido, si se conoce (`ORDEN-W06d3` decisión 3): lo que
++    /// el nodo publica como `trabajo_acumulado` de su punta seleccionada en el saludo de red.
++    #[must_use]
++    pub fn trabajo_pow(&self, hash: &BlockHash) -> Option<U256> {
++        self.post.get(hash).map(|e| e.trabajo)
++    }
++
+     /// Admite un bloque PoST: forma, GHOSTDAG, `Estado(past(B))`, garantía y `post(B)`.
+     fn admitir_post(&mut self, bloque: &BloqueCadena) -> Result<(), MotivoBloque> {
+         let BloqueCadena::Post(p) = bloque else {
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/tests/bifurcacion_pow.rs ws/crates/zx-cadena/tests/bifurcacion_pow.rs
+--- ws.orig/crates/zx-cadena/tests/bifurcacion_pow.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-cadena/tests/bifurcacion_pow.rs	2026-09-26 15:34:23.915169506 +0200
+@@ -0,0 +1,235 @@
++//! Bifurcaciones PoW y FC-3 (`ORDEN-W06d3` decisión 3).
++//!
++//! `Cadena::admitir` ya validaba cada bloque PoW contra el estado de su **padre declarado**
++//! (`admitir_pow`, `past`/`post` indexados por hash), no contra ninguna "punta" implícita: dos
++//! bloques con el mismo padre se admiten los dos, cada uno con su propio estado. Lo que faltaba (el
++//! motivo de esta orden) era: (a) saber cuál de las puntas PoW conocidas es la "mejor" (más trabajo
++//! acumulado), y (b) fijar el terminal según FC-3 (`P-ZRX/P-TRANSICION/ORDEN-T01.md` §159: sin
++//! ningún sufijo PoST, gana el de más trabajo, no el primero que llegó) — antes, `admitir_pow`
++//! fijaba `self.terminal` con el primero que llegaba y nunca lo revisaba.
++//!
++//! Este archivo prueba justo eso: [`Cadena::mejor_punta_pow`] y la selección de terminal por FC-3,
++//! incluida su congelación en cuanto existe el primer bloque PoST.
++
++#![expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
++
++use primitive_types::U256;
++use zx_cadena::{BloqueCadena, BloquePost, Cadena};
++use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, ParametrosTransicion};
++use zx_core::{Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, Tx};
++use zx_dag::{IdentidadGhostdag, IdentidadTicket};
++
++fn subsidio_pow(_h: u32) -> Amount {
++    Amount::nuevo(10).unwrap()
++}
++
++fn subsidio_post(_s: u64) -> Amount {
++    Amount::nuevo(3).unwrap()
++}
++
++/// `h_corte_min = 2`, `w_min = 3`: ni la altura 1 ni un trabajo total < 3 alcanzan el corte por sí
++/// solos, así que se puede construir una rama que "casi" llega y otra que sí, y decidir el orden de
++/// llegada libremente en el test. `q = s_min = 0`, `k_min = 0`: `Φ` nunca bloquea.
++fn params() -> ParametrosTransicion {
++    ParametrosTransicion {
++        h_dep: 1,
++        m_cb: 1,
++        m_dep: 0,
++        h_corte_min: 2,
++        w_min: U256::from(3u64),
++        s_min: Amount::CERO,
++        q: Amount::CERO,
++        k_min: 0,
++        m_res_slots: 1,
++        m_dep_slots: 1,
++        m_rec_slots: 1,
++        r_slots: 1,
++        f_slots: None,
++        subsidio_pow,
++        subsidio_post,
++    }
++}
++
++fn hash(n: u8) -> BlockHash {
++    BlockHash::from_digest(Digest::from_bytes([n; 32]))
++}
++
++fn productor(byte: u8) -> ClavePublica {
++    ClavePublica::desde_bytes([byte; 32])
++}
++
++fn ticket(byte: u8, slot: u64) -> IdentidadGhostdag {
++    IdentidadGhostdag::Billete(IdentidadTicket::vigente(
++        productor(byte),
++        3,
++        1 << 20,
++        [byte; 32],
++        slot,
++    ))
++}
++
++fn tx_coinbase_post(clave: ClavePublica, importe: i64, slot: u64) -> Tx {
++    Tx {
++        version: 3,
++        inputs: Vec::new(),
++        outputs: Vec::new(),
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::CoinbasePost {
++            clave,
++            importe: Amount::nuevo(importe).unwrap(),
++            slot,
++        },
++    }
++}
++
++fn post(hash_n: u8, padres: Vec<BlockHash>, slot: u64, prod: ClavePublica) -> BloqueCadena {
++    BloqueCadena::Post(BloquePost {
++        hash: hash(hash_n),
++        padres,
++        slot,
++        productor: prod,
++        peso: 5,
++        prueba_valida: true,
++        requisito_declarado: 0,
++        sr: 1,
++        distancia: 0,
++        identidad: ticket(hash_n, slot),
++        txs: vec![(tx_coinbase_post(prod, 3, slot), Vec::new())],
++    })
++}
++
++fn genesis() -> BloqueCadena {
++    BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::Genesis { hash: hash(0) },
++        Vec::new(),
++    ))
++}
++
++/// Un bloque PoW con `trabajo` explícito (el test decide la asimetría entre ramas; no se recalcula
++/// de ningún target real, esto vive por debajo de `zx-node::pow`).
++fn pow(hash_n: u8, padre: BlockHash, altura: u32, trabajo: u64) -> BloqueCadena {
++    BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::PoW {
++            hash: hash(hash_n),
++            padre,
++            altura,
++            trabajo: U256::from(trabajo),
++            pow_valido: true,
++        },
++        Vec::new(),
++    ))
++}
++
++fn nueva_cadena() -> Cadena {
++    let mut c = Cadena::nueva(params(), 1, CBID_RED_DEV, 15);
++    c.admitir(genesis()).unwrap();
++    c
++}
++
++/// **FC-3.** Dos ramas PoW desde el génesis: la rama `A` (un bloque, trabajo 1, no llega a
++/// `w_min = 3`) se admite primero y no fija terminal; la rama `B` (dos bloques, trabajo 2 + 2 = 4)
++/// llega después y sí alcanza `h_corte_min`/`w_min`. El terminal MUST ser el de `B`, no un
++/// candidato de `A` (que ni siquiera llegó a cumplir las condiciones: sirve para comprobar que un
++/// bloque que no cumple no se cachea como candidato).
++#[test]
++fn el_terminal_es_el_de_mayor_trabajo_no_el_primero_en_llegar() {
++    let mut c = nueva_cadena();
++
++    // Rama A: un solo bloque, trabajo 1. Altura 1 < h_corte_min = 2: no es candidato a terminal.
++    c.admitir(pow(1, hash(0), 1, 1)).unwrap();
++    assert_eq!(c.terminal(), None, "A solo no alcanza h_corte_min");
++
++    // Rama B: dos bloques encadenados sobre el género, trabajo 2 cada uno (total 4 >= w_min = 3).
++    c.admitir(pow(10, hash(0), 1, 2)).unwrap();
++    c.admitir(pow(11, hash(10), 2, 2)).unwrap();
++
++    assert_eq!(
++        c.terminal(),
++        Some(hash(11)),
++        "FC-3: el terminal es la punta de mayor trabajo (B), no A"
++    );
++    assert_eq!(
++        c.mejor_punta_pow(),
++        Some(hash(11)),
++        "la punta PoW seleccionada también es la de B"
++    );
++    assert_eq!(c.trabajo_pow(&hash(11)), Some(U256::from(4u64)));
++    assert_eq!(c.trabajo_pow(&hash(1)), Some(U256::from(1u64)));
++}
++
++/// **FC-3, orden de llegada invertido.** Mismo escenario que el anterior, pero la rama pesada (`B`)
++/// llega **antes** que la ligera (`A`): el terminal ya estaba fijado en `B` cuando `A` llega, y
++/// `A` (más ligera) no debe desplazarlo. El resultado no depende del orden de llegada.
++#[test]
++fn el_terminal_no_cambia_por_una_rama_mas_ligera_llegada_despues() {
++    let mut c = nueva_cadena();
++
++    c.admitir(pow(10, hash(0), 1, 2)).unwrap();
++    c.admitir(pow(11, hash(10), 2, 2)).unwrap();
++    assert_eq!(c.terminal(), Some(hash(11)));
++
++    // Una rama nueva, independiente, con menos trabajo total y que también cumple el corte por sí
++    // sola (para comprobar que "cumple las condiciones" no basta si hay algo más pesado).
++    c.admitir(pow(20, hash(0), 1, 2)).unwrap();
++    c.admitir(pow(21, hash(20), 2, 1)).unwrap(); // total 3: cumple w_min = 3 igual, pero es menos.
++
++    assert_eq!(
++        c.terminal(),
++        Some(hash(11)),
++        "FC-3: una rama de menos trabajo no desplaza al terminal ya fijado"
++    );
++}
++
++/// **Congelación tras el primer bloque PoST.** Con el terminal ya fijado, un bloque PoST de
++/// transición se admite sobre él (`self.dag` deja de ser `None`); una rama PoW nueva, más pesada
++/// que cualquiera de las anteriores, ya **no** puede cambiar el terminal ni el resumen de estado
++/// que arrastra: eso invalidaría todo lo construido sobre el terminal viejo.
++#[test]
++fn el_terminal_se_congela_en_cuanto_hay_un_bloque_post() {
++    let mut c = nueva_cadena();
++    c.admitir(pow(10, hash(0), 1, 2)).unwrap();
++    c.admitir(pow(11, hash(10), 2, 2)).unwrap();
++    let terminal = hash(11);
++    assert_eq!(c.terminal(), Some(terminal));
++
++    // Primer bloque PoST (de transición): único padre posible, el terminal.
++    c.admitir(post(200, vec![terminal], 1, productor(200)))
++        .unwrap();
++    assert!(c.contexto_dag().is_some(), "el DAG ya existe");
++
++    // Una rama PoW nueva, mucho más pesada, que en fase pura habría ganado FC-3 con holgura.
++    c.admitir(pow(30, hash(0), 1, 1_000)).unwrap();
++    c.admitir(pow(31, hash(30), 2, 1_000)).unwrap();
++
++    assert_eq!(
++        c.terminal(),
++        Some(terminal),
++        "el terminal está congelado: ninguna rama PoW posterior lo mueve"
++    );
++}
++
++/// [`Cadena::mejor_punta_pow`] sigue la rama más pesada **aunque ninguna** cumpla todavía las
++/// condiciones de corte (`h_corte_min` alto): es la punta que debe seguir la plantilla de minado,
++/// no solo un candidato a terminal.
++#[test]
++fn mejor_punta_pow_sigue_la_rama_mas_pesada_sin_alcanzar_el_corte() {
++    let mut params = params();
++    params.h_corte_min = 1_000; // inalcanzable en este test: nadie llega a ser terminal.
++    let mut c = Cadena::nueva(params, 1, CBID_RED_DEV, 15);
++    c.admitir(genesis()).unwrap();
++
++    c.admitir(pow(1, hash(0), 1, 5)).unwrap();
++    c.admitir(pow(2, hash(0), 1, 9)).unwrap();
++    assert_eq!(c.terminal(), None, "h_corte_min inalcanzable: sin terminal");
++    assert_eq!(
++        c.mejor_punta_pow(),
++        Some(hash(2)),
++        "entre dos puntas de altura 1, gana la de más trabajo (9 > 5)"
++    );
++
++    // Extender la rama más ligera la hace más pesada en total (5 + 100 = 105 > 9): la punta
++    // seleccionada cambia de rama.
++    c.admitir(pow(3, hash(1), 2, 100)).unwrap();
++    assert_eq!(c.mejor_punta_pow(), Some(hash(3)));
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/tests/equivocacion.rs ws/crates/zx-cadena/tests/equivocacion.rs
+--- ws.orig/crates/zx-cadena/tests/equivocacion.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-cadena/tests/equivocacion.rs	2026-09-26 15:34:52.316765732 +0200
+@@ -0,0 +1,160 @@
++//! E-8 «equivocación» (`P-ZRX/P-MEDICION/ESCENARIOS-0.0.1.md` §3): la misma clave firma dos
++//! bloques PoST del mismo slot. `C-EVP` está inactivo en 0.0.1 (declarado en el propio escenario):
++//! no hay castigo. Lo que este test comprueba es exactamente lo que E-8 pide **registrar**: los dos
++//! bloques se admiten (nada los rechaza por ser una repetición de slot/productor — `Cadena` no
++//! implementa, ni la orden lo pide, un detector de doble firma), y GHOSTDAG los distingue como dos
++//! puntas distintas del mismo padre (el color relativo de un mergeset repetido, blue/red, ya lo
++//! prueba `zx-dag/tests/ghostdag_rust.rs::u2_invalida_y_u3_colorea`, a nivel del motor GHOSTDAG;
++//! este archivo se queda en el nivel de `Cadena`, que es lo que la orden `W06d3` puede demostrar
++//! sin depender de claves de productor reales ni del motor de recompensas completo — ver
++//! `INFORME.md`, "no demostrado").
++
++#![expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
++
++use primitive_types::U256;
++use zx_cadena::{BloqueCadena, BloquePost, Cadena};
++use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, ParametrosTransicion};
++use zx_core::{Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, Tx};
++use zx_dag::{IdentidadGhostdag, IdentidadTicket};
++
++fn subsidio_pow(_h: u32) -> Amount {
++    Amount::nuevo(10).unwrap()
++}
++fn subsidio_post(_s: u64) -> Amount {
++    Amount::nuevo(3).unwrap()
++}
++
++fn params() -> ParametrosTransicion {
++    ParametrosTransicion {
++        h_dep: 1,
++        m_cb: 1,
++        m_dep: 0,
++        h_corte_min: 1,
++        w_min: U256::one(),
++        s_min: Amount::CERO,
++        q: Amount::CERO,
++        k_min: 0,
++        m_res_slots: 1,
++        m_dep_slots: 1,
++        m_rec_slots: 1,
++        r_slots: 1,
++        f_slots: None,
++        subsidio_pow,
++        subsidio_post,
++    }
++}
++
++fn hash(n: u8) -> BlockHash {
++    BlockHash::from_digest(Digest::from_bytes([n; 32]))
++}
++
++fn productor(byte: u8) -> ClavePublica {
++    ClavePublica::desde_bytes([byte; 32])
++}
++
++fn tx_coinbase_post(clave: ClavePublica, importe: i64, slot: u64) -> Tx {
++    Tx {
++        version: 3,
++        inputs: Vec::new(),
++        outputs: Vec::new(),
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::CoinbasePost {
++            clave,
++            importe: Amount::nuevo(importe).unwrap(),
++            slot,
++        },
++    }
++}
++
++fn cadena_con_terminal() -> Cadena {
++    let mut c = Cadena::nueva(params(), 1, CBID_RED_DEV, 15);
++    c.admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::Genesis { hash: hash(0) },
++        Vec::new(),
++    )))
++    .unwrap();
++    c.admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::PoW {
++            hash: hash(1),
++            padre: hash(0),
++            altura: 1,
++            trabajo: U256::one(),
++            pow_valido: true,
++        },
++        Vec::new(),
++    )))
++    .unwrap();
++    c
++}
++
++/// **E-8.** La misma identidad (misma clave, mismo slot, mismo billete real de `C-GD-07`) firma dos
++/// bloques distintos, ambos hijos directos del terminal. `Cadena::admitir` no tiene ningún cheque
++/// de "esta identidad ya produjo este slot en otra rama": los admite los dos.
++#[test]
++fn la_misma_identidad_firma_dos_bloques_del_mismo_slot_y_los_dos_se_admiten() {
++    let mut c = cadena_con_terminal();
++    let terminal = hash(1);
++    let prod = productor(42);
++    let slot = 5u64;
++    // La misma tupla real de C-GD-07 (clave, sector, history_size, chunk, slot): una equivocación
++    // de verdad, no dos productores distintos que coinciden en slot por casualidad.
++    let identidad =
++        IdentidadGhostdag::Billete(IdentidadTicket::vigente(prod, 3, 1 << 20, [42; 32], slot));
++
++    let bloque_a = BloqueCadena::Post(BloquePost {
++        hash: hash(50),
++        padres: vec![terminal],
++        slot,
++        productor: prod,
++        peso: 5,
++        prueba_valida: true,
++        requisito_declarado: 0,
++        sr: 1,
++        distancia: 0,
++        identidad,
++        txs: vec![(tx_coinbase_post(prod, 3, slot), Vec::new())],
++    });
++    let bloque_b = BloqueCadena::Post(BloquePost {
++        hash: hash(51),
++        padres: vec![terminal],
++        slot,
++        productor: prod,
++        peso: 5,
++        prueba_valida: true,
++        requisito_declarado: 0,
++        sr: 1,
++        distancia: 0,
++        identidad, // misma identidad real: la equivocación.
++        txs: vec![(tx_coinbase_post(prod, 3, slot), Vec::new())],
++    });
++
++    // «Se registra qué ocurre» (E-8): ninguno de los dos se rechaza por repetir slot/productor —
++    // `C-EVP` inactivo, tal como declara el propio escenario. Esto es el hallazgo, no un defecto de
++    // este test: no hay una regla en `Cadena` que lo impida (ORDEN-W06d3 no pide añadirla).
++    assert!(
++        c.admitir(bloque_a.clone()).is_ok(),
++        "el primer bloque de la equivocación se admite"
++    );
++    assert!(
++        c.admitir(bloque_b.clone()).is_ok(),
++        "el segundo bloque de la misma identidad y slot TAMBIÉN se admite: no hay castigo (C-EVP \
++         inactivo en 0.0.1)"
++    );
++
++    // Ambos quedan como puntas válidas y distintas: «ambos bloques» de E-8.
++    let tips = c.tips_validas();
++    assert!(tips.contains(&bloque_a.hash()));
++    assert!(tips.contains(&bloque_b.hash()));
++    assert_eq!(
++        tips.len(),
++        2,
++        "las dos caras de la equivocación coexisten como puntas independientes"
++    );
++
++    // El color relativo de dos bloques con la misma identidad en el mismo mergeset (uno blue, uno
++    // red_U2 o red_U3 según la regla de GHOSTDAG) ya está probado en
++    // `padres_e_identidad.rs::identidades_reales_distintas_no_colapsan_en_ocho_bytes` y
++    // `u2_invalida_y_u3_colorea` (mismo repositorio, no duplicado aquí): «su color» de E-8 depende
++    // de cuál mergeset los junta, no de esta prueba a nivel de dos puntas independientes.
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/bin/zx-adversario.rs ws/crates/zx-node/src/bin/zx-adversario.rs
+--- ws.orig/crates/zx-node/src/bin/zx-adversario.rs	2026-09-26 14:08:45.173706642 +0200
++++ ws/crates/zx-node/src/bin/zx-adversario.rs	2026-09-26 14:40:33.400338074 +0200
+@@ -7,16 +7,21 @@
+ //!
+ //! # Qué cubre esta versión, y qué no (ver `PROGRESO.md` del encargo)
+ //!
+-//! `BloqueRed::Post` no lleva `JustificacionPot` (bloqueo documentado): `zx-node` trata **todo**
+-//! bloque PoST de red como no juzgable (`Ignorar`) sin mirar su contenido. Los escenarios de E-7
+-//! que dependen de PoAS/PoT/sello **PoST** malos, y el escenario E-8 (equivocación), no se pueden
+-//! observar todavía como un rechazo con motivo específico por esta vía: el objetivo los ignora por
+-//! el formato, no por el contenido. Se envían igualmente (ejercitan de verdad el códec y el
+-//! transporte) pero el veredicto esperado documentado aquí es «ignorado por bloqueo de formato»,
+-//! no «rechazado por PoAS/PoT inválido». Los escenarios de la familia **PoW** sí se validan de
+-//! extremo a extremo: esta herramienta primero pregunta el estado real del objetivo (`Peticion::
+-//! Estado`) y construye los bloques adversariales **extendiendo su punta real**, para que lleguen
+-//! al validador de verdad en vez de quedarse en «huérfano, no juzgable».
++//! `BloqueRed::Post` ya lleva `JustificacionPot` (`ORDEN-W06d3` decisión 1): el objetivo puede
++//! verificar de verdad la cabecera conjunta de un PoST ajeno. Los escenarios de E-7 con PoAS/PoT/
++//! sello **PoST** malos declaran como único padre el **terminal real** del objetivo (pedido con
++//! `Peticion::Estado`, igual que ya hacían los de PoW): así el bloque llega a la verificación de
++//! contenido en vez de quedarse en «huérfano, padre desconocido». Si el objetivo todavía no tiene
++//! terminal (sigue en fase PoW), esos escenarios se omiten: enviarlos sin un padre real solo
++//! probaría el camino de huérfanos, ya cubierto por la ráfaga de E-7. El escenario **E-8**
++//! (equivocación) sigue limitado: esta herramienta no tiene la clave privada de ningún productor
++//! real, así que no puede construir dos bloques **válidos** del mismo slot y observar cómo los
++//! colorea GHOSTDAG (eso se demuestra en un test dedicado con claves propias, no por red); lo que
++//! sí demuestra es que dos bloques distintos con contenido inválido para el mismo slot se rechazan
++//! cada uno por su motivo, sin que el segundo cambie el estado. Los escenarios de la familia
++//! **PoW** se validan de extremo a extremo: esta herramienta primero pregunta el estado real del
++//! objetivo (`Peticion::Estado`) y construye los bloques adversariales **extendiendo su punta
++//! real**, para que lleguen al validador de verdad en vez de quedarse en «huérfano, no juzgable».
+ //!
+ //! # Cómo se usa
+ //!
+@@ -42,6 +47,7 @@
+ use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+ use zx_core::red::Red;
+ use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
++use zx_core::wire_dag::{JustificacionPot, PotCheckpoints};
+ use zx_p2p::behaviour::ZxBehaviour;
+ use zx_p2p::config::ParametrosRed;
+ use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
+@@ -255,30 +261,42 @@
+         .collect()
+ }
+ 
+-/// E-7 «PoST con PoAS/PoT/sello malos» y E-8 «equivocación»: se envían igual (ejercitan el códec y
+-/// el transporte reales), pero ver el docstring del módulo: el objetivo los ignora por el bloqueo
+-/// de formato, no por su contenido, en esta versión.
+-fn escenario_post_malo(n: u8) -> BloqueRed {
+-    BloqueRed::Post {
++/// Justificación PoT que no corresponde a ningún flujo real: basta un portador de relleno para que
++/// `verificar_cabecera_conjunta` la lea y la rechace en la comprobación de PoT, en vez de fallar
++/// antes por tener la lista vacía (que también sería un rechazo, pero uno de forma, no de PoT).
++fn justificacion_mala(variante: u8) -> JustificacionPot {
++    let portador = PotCheckpoints::desde_outputs([[0xEE ^ variante; 16]; 8]);
++    JustificacionPot::nueva(vec![portador]).unwrap_or_else(|_| unreachable!("1 <= MAX_BUNDLES_POT"))
++}
++
++/// E-7 «PoST con PoAS/PoT/sello malos» y E-8 «equivocación» (ver el docstring del módulo: E-8
++/// sigue limitado por no tener claves reales). `variante` distingue el hash de dos bloques del
++/// mismo `slot` sin cambiar nada más. Declara como único padre el **terminal real** del objetivo:
++/// sin eso, el objetivo lo trataría como huérfano (`Ignorar`) en vez de verificar su contenido.
++/// `None` si el objetivo todavía no tiene terminal (nada útil que demostrar por esta vía todavía).
++fn escenario_post_malo(slot: u8, variante: u8, estado_objetivo: &Estado) -> Option<BloqueRed> {
++    let terminal = estado_objetivo.terminal?;
++    Some(BloqueRed::Post {
+         cabecera: DagBlockHeader {
+             consensus_branch_id: zx_core::CBID_RED_DEV,
+-            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x99; 32])),
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x99 ^ variante; 32])),
+             timestamp: 1_800_000_000,
+             height: 0,
+-            slot: u64::from(n),
++            slot: u64::from(slot),
+             pot_output: [0xFF; 16], // PoT que no corresponde a ningún flujo real.
+             rango_solucion: 1,
+             sol: SolucionPoas::default(), // PoAS vacía/inválida.
+             body_commitment: zx_core::digest::BodyCommitment::from_digest(Digest::from_bytes(
+-                [0x11; 32],
++                [0x11 ^ variante; 32],
+             )),
+-            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x22; 32])), &[])
++            padres: PadresDag::nuevo(terminal, &[])
+                 .unwrap_or_else(|_| unreachable!("un solo padre siempre construye")),
+             sello: [0xFF; 64], // sello arbitrario, no una firma real.
+         },
+-        txs: vec![tx_llave(n)],
++        justificacion: justificacion_mala(variante),
++        txs: vec![tx_llave(slot)],
+         testigos: vec![vec![vec![0xBB; 64]]],
+-    }
++    })
+ }
+ 
+ #[tokio::main]
+@@ -344,23 +362,40 @@
+     )
+     .await;
+ 
+-    ejecutar_escenario(
+-        &manejo,
+-        &mut eventos,
+-        "E-7 PoST con PoAS/PoT/sello malos (limitado: ver docstring del módulo)",
+-        vec![escenario_post_malo(1)],
+-        pausa,
+-    )
+-    .await;
++    if let Some(b) = escenario_post_malo(1, 0, &estado_objetivo) {
++        ejecutar_escenario(
++            &manejo,
++            &mut eventos,
++            "E-7 PoST con PoAS/PoT/sello malos (padre = terminal real del objetivo)",
++            vec![b],
++            pausa,
++        )
++        .await;
++    } else {
++        println!(
++            "zx-adversario: E-7 PoST malo OMITIDO (el objetivo todavía no fijó terminal, sigue en \
++             fase PoW)"
++        );
++    }
+ 
+-    ejecutar_escenario(
+-        &manejo,
+-        &mut eventos,
+-        "E-8 equivocación: misma clave, dos bloques del mismo slot (limitado: ver docstring)",
+-        vec![escenario_post_malo(2), escenario_post_malo(2)],
+-        pausa,
+-    )
+-    .await;
++    match (
++        escenario_post_malo(2, 1, &estado_objetivo),
++        escenario_post_malo(2, 2, &estado_objetivo),
++    ) {
++        (Some(b1), Some(b2)) => {
++            ejecutar_escenario(
++                &manejo,
++                &mut eventos,
++                "E-8 equivocación: dos bloques distintos del mismo slot (limitado: ver docstring)",
++                vec![b1, b2],
++                pausa,
++            )
++            .await;
++        }
++        _ => println!(
++            "zx-adversario: E-8 OMITIDO (el objetivo todavía no fijó terminal, sigue en fase PoW)"
++        ),
++    }
+ 
+     // A partir de aquí, cada escenario puede banear la conexión: van al final.
+     ejecutar_escenario(
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/nodo.rs ws/crates/zx-node/src/nodo.rs
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-26 14:08:45.173882519 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-26 16:36:57.525926337 +0200
+@@ -3,6 +3,7 @@
+ //! Arranque limpio o reinicio (D-N03′), tubería de admisión única (decisión 4), fases PoW y PoST en
+ //! régimen (decisión 5, 6), resumen de estado (decisión 8) y registro estructurado (decisión 9).
+ 
++use std::collections::BTreeMap;
+ use std::path::{Path, PathBuf};
+ use std::sync::Arc;
+ use std::sync::mpsc;
+@@ -93,7 +94,18 @@
+     registro: Registro,
+     claves: Vec<ClaveDev>,
+     cbid: u32,
++    /// Cadena de cabeceras `[0..=altura]` de la punta PoW **seleccionada** (mayor trabajo
++    /// acumulado, `ORDEN-W06d3` decisión 3): la reconstruye [`Nodo::actualizar_seleccion_pow`] cada
++    /// vez que cambia. No es "todo lo que se ha visto": para eso está [`Self::headers_pow`].
+     historial_pow: Vec<BlockHeader>,
++    /// Todas las cabeceras PoW conocidas y válidas, indexadas por hash, de cualquier rama
++    /// (`ORDEN-W06d3` decisión 3): permite reconstruir el historial de **cualquier** punta con
++    /// `Nodo::historial_hasta`, no solo el de la rama seleccionada hoy.
++    headers_pow: BTreeMap<BlockHash, BlockHeader>,
++    /// El terminal sobre el que se construyó `servicio_verificacion`, para saber si hay que
++    /// reconstruirlo tras un cambio de terminal tentativo (FC-3, antes de que exista ningún bloque
++    /// PoST; `ORDEN-W06d3` decisión 3).
++    terminal_servicio: Option<BlockHash>,
+     coinbases: Vec<CoinbasePropia>,
+     servicio_verificacion: Option<ServicioPot>,
+     historia: Arc<HistoriaGenesis>,
+@@ -215,6 +227,8 @@
+             claves,
+             cbid,
+             historial_pow: Vec::new(),
++            headers_pow: BTreeMap::new(),
++            terminal_servicio: None,
+             coinbases: Vec::new(),
+             servicio_verificacion: None,
+             historia,
+@@ -265,7 +279,15 @@
+             })?;
+         let admitido = BloqueAdmitido::pow(&cabecera_genesis, &[tx_genesis], &testigos_genesis);
+         self.almacen.admitir(&admitido, true)?;
++        self.headers_pow
++            .insert(cabecera_genesis.block_hash(), cabecera_genesis);
+         self.historial_pow.push(cabecera_genesis);
++        // `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): en un arranque limpio (a diferencia de
++        // un reinicio, que sí pasa por `admitir_pow_interno`) nada más registraba el génesis en
++        // `VistaRed::cabeceras_pow`; el primer bloque real quedaba como "hueco de altura" para
++        // siempre y el localizador de sincronización nunca llegaba a funcionar. `Self::historial_pow`
++        // es la fuente de verdad; `fijar_cabeceras_pow` la copia entera a la vista.
++        self.vista_red.fijar_cabeceras_pow(&self.historial_pow);
+         Ok(())
+     }
+ 
+@@ -371,12 +393,19 @@
+         };
+ 
+         if verificar && !es_genesis {
+-            #[expect(
+-                clippy::indexing_slicing,
+-                reason = "historial_pow siempre tiene al menos el génesis en índice 0"
+-            )]
+-            let padre = &self.historial_pow[self.historial_pow.len() - 1];
+-            let target_esperado = pow::target_de_altura(&self.historial_pow, cabecera.height)
++            // `ORDEN-W06d3` decisión 3: el contexto de validación (target, altura, timestamp) se
++            // calcula contra el **padre declarado** de este bloque (`cabecera.prev_hash`), nunca
++            // contra `historial_pow.last()`: eso es precisamente lo que hacía imposible admitir una
++            // bifurcación PoW real con un contexto correcto (`REVISION-W06d2.md`, límite conocido).
++            let historial_padre = self.historial_hasta(cabecera.prev_hash);
++            let padre =
++                *historial_padre
++                    .last()
++                    .ok_or_else(|| ErrorNodo::BloquePropioRechazado {
++                        hash,
++                        motivo: format!("padre {} desconocido (sin cabecera)", cabecera.prev_hash),
++                    })?;
++            let target_esperado = pow::target_de_altura(&historial_padre, cabecera.height)
+                 .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
+             let ctx = ContextoPow {
+                 red: Red::Dev,
+@@ -400,15 +429,16 @@
+                 }
+             })?;
+         }
++        // Se registra la cabecera (válida, o el génesis) para poder reconstruir el historial de
++        // cualquier rama que la tenga como ancestro, sea o no la punta seleccionada hoy.
++        self.headers_pow.insert(hash, cabecera);
+ 
+-        let mut trabajo_de_este_bloque = U256::zero();
+         let hechos = if es_genesis {
+             HechosCabecera::Genesis { hash }
+         } else {
+             let target = pow_target_de(&cabecera)?;
+             let trabajo = trabajo_bloque(target)
+                 .ok_or_else(|| ErrorNodo::Otro(format!("trabajo del bloque {hash} desborda")))?;
+-            trabajo_de_este_bloque = trabajo;
+             HechosCabecera::PoW {
+                 hash,
+                 padre: cabecera.prev_hash,
+@@ -440,6 +470,7 @@
+             self.coinbases.push(CoinbasePropia {
+                 indice_clave,
+                 altura: cabecera.height,
++                bloque: hash,
+                 txid: txid(coinbase, self.cbid),
+                 valor: salida.value,
+                 depositada: false,
+@@ -467,32 +498,120 @@
+                     motivo: m.nombre().to_string(),
+                 }
+             })?;
+-            self.trabajo_acumulado = self
+-                .trabajo_acumulado
+-                .saturating_add(trabajo_de_este_bloque);
+             self.vista_red.registrar_pow(cabecera.height, para_vista);
+             // Un hijo que esperaba justo este padre puede reintentarse ya (decisión 3).
+             self.resolver_huerfanos_de(hash);
+         }
+ 
+-        self.historial_pow.push(cabecera);
++        // `ORDEN-W06d3` decisión 3: `historial_pow`/`trabajo_acumulado` ya no se extienden a
++        // ciegas con cada bloque admitido (eso asumía una única cadena lineal); se recalculan desde
++        // la punta PoW **seleccionada** por `zx-cadena` (mayor trabajo acumulado), lo mismo si este
++        // bloque la extiende como si es un bloque de una rama lateral que no la cambia.
++        self.actualizar_seleccion_pow()?;
+         // El `ServicioPot` de verificación se necesita en cuanto el terminal existe, tanto en
+         // producción en vivo (lo crea `fase_regimen` antes de producir) como en la **repetición**
+         // (D-N03′): si el registro trae ya bloques PoST, `admitir_post_interno` los procesa aquí
+         // mismo, dentro de `Nodo::arrancar`, antes de que `fase_regimen` llegue a ejecutarse. Sin
+         // esto, reabrir un nodo que ya había cruzado el corte fallaba siempre en la primera entrada
+         // PoST del registro (bug real encontrado por `tests/reinicio.rs`, ver `PROGRESO.md`).
+-        if self.servicio_verificacion.is_none()
+-            && let Some(terminal) = self.cadena.terminal()
+-        {
+-            let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
+-                .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
+-            self.servicio_verificacion = Some(servicio);
++        //
++        // Se reconstruye también si el terminal **cambió** desde la última vez (posible mientras
++        // `Cadena::contexto_dag()` sigue en `None`, FC-3: una rama más pesada puede desplazar al
++        // terminal tentativo antes de que exista ningún bloque PoST, `ORDEN-W06d3` decisión 3): un
++        // `ServicioPot` construido sobre el terminal viejo verificaría contra el flujo PoT
++        // equivocado.
++        if let Some(terminal) = self.cadena.terminal() {
++            let necesita_reconstruir =
++                self.servicio_verificacion.is_none() || self.terminal_servicio != Some(terminal);
++            if necesita_reconstruir && self.cadena.contexto_dag().is_none() {
++                let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
++                    .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
++                self.servicio_verificacion = Some(servicio);
++                self.terminal_servicio = Some(terminal);
++            }
+         }
+         self.registrar_cambio_de_punta()?;
+         Ok(())
+     }
+ 
++    /// Reconstruye, si hace falta, `historial_pow` (y `trabajo_acumulado`) desde la punta PoW que
++    /// `Cadena::mejor_punta_pow` selecciona ahora (`ORDEN-W06d3` decisión 3). Registra la
++    /// profundidad de la reorganización cuando la punta cambia de rama, no solo de altura.
++    fn actualizar_seleccion_pow(&mut self) -> Result<(), ErrorNodo> {
++        let Some(nueva_punta) = self.cadena.mejor_punta_pow() else {
++            return Ok(());
++        };
++        let punta_anterior = self.historial_pow.last().map(BlockHeader::block_hash);
++        if punta_anterior == Some(nueva_punta) {
++            return Ok(());
++        }
++        let historial_anterior = std::mem::take(&mut self.historial_pow);
++        let nuevo_historial = self.historial_hasta(nueva_punta);
++        let comunes = historial_anterior
++            .iter()
++            .zip(nuevo_historial.iter())
++            .take_while(|(a, b)| a.block_hash() == b.block_hash())
++            .count();
++        let profundidad = historial_anterior.len().saturating_sub(comunes);
++        if profundidad > 0 {
++            // La rama anterior (más allá del ancestro común) queda descartada: cualquier
++            // `CoinbasePropia` que viviera solo en esos bloques ya no existe en el estado de la
++            // rama nueva (`ORDEN-W06d3` decisión 3). Sin esta poda, `preparar_depositos` seguiría
++            // viéndola como "madura y sin depositar" y construiría un depósito que gasta un
++            // `OutPoint` inexistente en la rama seleccionada.
++            let en_rama_nueva: std::collections::BTreeSet<BlockHash> = nuevo_historial
++                .iter()
++                .map(BlockHeader::block_hash)
++                .collect();
++            self.coinbases.retain(|c| en_rama_nueva.contains(&c.bloque));
++        }
++        self.historial_pow = nuevo_historial;
++        // `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): `VistaRed::registrar_pow` es
++        // *append-only por altura* y nunca sustituye una altura ya ocupada, aunque la rama
++        // seleccionada cambie. Se fija aquí la secuencia completa (siempre desde el génesis) para
++        // que el localizador y `cabeceras_desde` que sirven a los pares reflejen exactamente la
++        // rama que este nodo tiene por buena, tanto en una extensión simple como en una
++        // reorganización.
++        self.vista_red.fijar_cabeceras_pow(&self.historial_pow);
++        self.trabajo_acumulado = self
++            .cadena
++            .trabajo_pow(&nueva_punta)
++            .unwrap_or_else(U256::zero);
++        if profundidad > 0 {
++            let evento = self
++                .registro
++                .evento("reorganizacion_pow")
++                .str(
++                    "punta_anterior",
++                    &punta_anterior.map(|h| h.to_string()).unwrap_or_default(),
++                )
++                .str("punta_nueva", &nueva_punta.to_string())
++                .u64("profundidad", profundidad as u64);
++            self.registro.escribir(evento, false)?;
++        }
++        Ok(())
++    }
++
++    /// Reconstruye, desde [`Self::headers_pow`], la cadena de cabeceras `[0..=altura(tip)]` que
++    /// termina en `tip`, caminando `prev_hash` hacia atrás hasta el génesis. Vacío si `tip` no se
++    /// conoce todavía (huérfano o hash ajeno): el llamante lo trata como "sin padre disponible".
++    fn historial_hasta(&self, tip: BlockHash) -> Vec<BlockHeader> {
++        let mut inverso = Vec::new();
++        let mut actual = tip;
++        loop {
++            let Some(h) = self.headers_pow.get(&actual) else {
++                return Vec::new();
++            };
++            inverso.push(*h);
++            if h.height == 0 {
++                break;
++            }
++            actual = h.prev_hash;
++        }
++        inverso.reverse();
++        inverso
++    }
++
+     /// Admite un bloque PoST: tubería única (decisión 4) o repetición (`verificar = false`).
+     fn admitir_post_interno(
+         &mut self,
+@@ -638,6 +757,7 @@
+             })?;
+             let para_vista = BloqueRed::Post {
+                 cabecera: bloque.cabecera,
++                justificacion: bloque.justificacion.clone(),
+                 txs: bloque.txs().to_vec(),
+                 testigos: bloque.testigos().to_vec(),
+             };
+@@ -861,24 +981,18 @@
+                 txs,
+                 testigos,
+             } => self.intentar_admitir_pow_de_red(*cabecera, txs.clone(), testigos.clone(), origen),
+-            BloqueRed::Post { .. } => {
+-                // BLOQUEO documentado en PROGRESO.md: `BloqueRed::Post` no lleva `JustificacionPot`,
+-                // así que `verificar_cabecera_conjunta` no se puede ejecutar sobre un bloque PoST
+-                // ajeno. Aceptar sin verificar sería exactamente el `Ok` ficticio que la orden
+-                // prohíbe (decisión 2). `Ignorar`, no `Rechazar`: la falta es del formato de
+-                // transporte, no del par que lo mandó.
+-                let hash = red::hash_de(bloque);
+-                let evento = self
+-                    .registro
+-                    .evento("bloque_post_de_red_no_verificable")
+-                    .str("hash", &hash.to_string())
+-                    .str(
+-                        "motivo",
+-                        "BloqueRed::Post sin JustificacionPot (PROGRESO.md)",
+-                    );
+-                let _ = self.registro.escribir(evento, false);
+-                VeredictoFinal::Ignorar
+-            }
++            BloqueRed::Post {
++                cabecera,
++                justificacion,
++                txs,
++                testigos,
++            } => self.intentar_admitir_post_de_red(
++                *cabecera,
++                justificacion.clone(),
++                txs.clone(),
++                testigos.clone(),
++                origen,
++            ),
+         }
+     }
+ 
+@@ -949,26 +1063,13 @@
+             let _ = self.registro.escribir(evento, false);
+             return VeredictoFinal::Rechazar;
+         }
+-        let extiende_la_punta = self
+-            .historial_pow
+-            .last()
+-            .is_some_and(|u| u.block_hash() == padre);
+-        if !extiende_la_punta {
+-            // Reorg/fork de PoW: `admitir_pow_interno` asume que todo bloque nuevo extiende
+-            // `historial_pow` (su último elemento). Un bloque que extiende un padre admitido pero
+-            // que no es nuestra punta actual es un fork legítimo que esta orden **no** resuelve
+-            // (límite conocido, `PROGRESO.md`): se ignora en vez de admitirlo con un contexto de
+-            // validación incorrecto (target/altura de la rama equivocada).
+-            let evento = self
+-                .registro
+-                .evento("bloque_red_fork_no_soportado")
+-                .str("hash", &hash.to_string())
+-                .str("padre", &padre.to_string())
+-                .str("veredicto", "Ignorar");
+-            let _ = self.registro.escribir(evento, false);
+-            return VeredictoFinal::Ignorar;
+-        }
+-
++        // `ORDEN-W06d3` decisión 3: ya no se exige que el padre sea `historial_pow.last()`.
++        // `admitir_pow_interno` calcula el contexto de validación (target, altura, timestamp) a
++        // partir del padre **declarado** (`Self::historial_hasta`), así que un bloque que extiende
++        // un padre admitido y válido que no es la punta actual es una bifurcación PoW real y se
++        // admite con su propio contexto correcto, nunca con el de otra rama. Si tras admitirlo
++        // resulta ser la rama más pesada, `Self::actualizar_seleccion_pow` conmuta la punta
++        // seleccionada (con la profundidad de la reorganización registrada).
+         let indice = self.almacen.longitud_registro().unwrap_or(0);
+         match self.admitir_pow_interno(cabecera, txs, testigos, indice, true) {
+             Ok(()) => {
+@@ -997,6 +1098,137 @@
+         }
+     }
+ 
++    /// Decide y aplica el veredicto de un bloque PoST llegado por red (`ORDEN-W06d3` decisión 2).
++    ///
++    /// Con `BloqueRed::Post` llevando ya `JustificacionPot` (decisión 1), la tubería única
++    /// (`Self::admitir_post_interno`, `verificar = true`) puede verificar de verdad la cabecera
++    /// conjunta (PoT, PoAS, sello) y los padres de un bloque ajeno. Antes de eso: si no hay terminal
++    /// todavía, el bloque no es juzgable (`Ignorar`, la falta es de fase, no del par); si algún padre
++    /// declarado (salvo el terminal, que siempre vale como padre del bloque de transición) no se
++    /// conoce, se deposita como huérfano y se pide, igual que en la ruta PoW.
++    fn intentar_admitir_post_de_red(
++        &mut self,
++        cabecera: zx_core::preimage::dag::DagBlockHeader,
++        justificacion: zx_core::wire_dag::JustificacionPot,
++        txs: Vec<Tx>,
++        testigos: Vec<Vec<Vec<u8>>>,
++        origen: Option<libp2p::PeerId>,
++    ) -> VeredictoFinal {
++        let hash = cabecera.block_hash();
++        if self.cadena.es_valido(&hash) {
++            return VeredictoFinal::Ignorar; // ya lo teníamos: nada que hacer, no penaliza.
++        }
++        if self.cadena.motivo(&hash).is_some() {
++            return VeredictoFinal::Rechazar; // ya sabíamos que es inválido.
++        }
++        let Some(terminal) = self.cadena.terminal() else {
++            // Todavía en fase PoW pura: sin terminal no hay `ServicioPot` ni GHOSTDAG con los que
++            // verificar nada. No es demostrablemente inválido (podríamos cruzar el corte nosotros
++            // mismos en breve): `Ignorar`, no `Rechazar`.
++            let evento = self
++                .registro
++                .evento("bloque_post_de_red_sin_terminal")
++                .str("hash", &hash.to_string());
++            let _ = self.registro.escribir(evento, false);
++            return VeredictoFinal::Ignorar;
++        };
++
++        let bloque_red = BloqueRed::Post {
++            cabecera,
++            justificacion: justificacion.clone(),
++            txs: txs.clone(),
++            testigos: testigos.clone(),
++        };
++        for padre in red::padres_declarados(&bloque_red) {
++            if padre == terminal {
++                continue; // el terminal siempre es un padre válido y conocido, por definición.
++            }
++            let padre_conocido =
++                self.cadena.es_valido(&padre) || self.cadena.motivo(&padre).is_some();
++            if !padre_conocido {
++                for d in self.huerfanos.insertar(padre, hash, bloque_red) {
++                    let evento = self
++                        .registro
++                        .evento("huerfano_desalojado")
++                        .str("hijo", &d.hijo.to_string())
++                        .str("padre_esperado", &d.padre_esperado.to_string());
++                    let _ = self.registro.escribir(evento, false);
++                }
++                let evento = self
++                    .registro
++                    .evento("bloque_red_huerfano")
++                    .str("hash", &hash.to_string())
++                    .str("padre_ausente", &padre.to_string())
++                    .str("familia", "post")
++                    .str("veredicto", "Ignorar");
++                let _ = self.registro.escribir(evento, false);
++                if let (Some(red), Some(peer)) = (self.red.as_ref(), origen) {
++                    red.pedir(
++                        peer,
++                        zx_p2p::mensaje::Peticion::Bloques {
++                            hashes: vec![padre],
++                        },
++                    );
++                }
++                return VeredictoFinal::Ignorar;
++            }
++            if !self.cadena.es_valido(&padre) {
++                let evento = self
++                    .registro
++                    .evento("bloque_red_rechazado")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "post")
++                    .str("motivo", "padre conocido e inválido");
++                let _ = self.registro.escribir(evento, false);
++                return VeredictoFinal::Rechazar;
++            }
++        }
++
++        let bloque_dag = match BloqueDag::nuevo(cabecera, justificacion, txs, testigos) {
++            Ok(b) => b,
++            Err(e) => {
++                let evento = self
++                    .registro
++                    .evento("bloque_red_rechazado")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "post")
++                    .str("motivo", &format!("forma: {e}"));
++                let _ = self.registro.escribir(evento, false);
++                return VeredictoFinal::Rechazar;
++            }
++        };
++        let indice = self.almacen.longitud_registro().unwrap_or(0);
++        match self.admitir_post_interno(bloque_dag, indice, true) {
++            Ok(()) => {
++                // V9: este evento **solo** se escribe después de que `admitir_post_interno` terminó
++                // la tubería completa (cabecera conjunta, PoAS, motor de transición, persistencia):
++                // nunca antes.
++                let evento = self
++                    .registro
++                    .evento("bloque_red_admitido")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "post")
++                    .str("veredicto", "Aceptar");
++                let _ = self.registro.escribir(evento, false);
++                VeredictoFinal::Aceptar
++            }
++            Err(e) => {
++                // Simplificación declarada (`PROGRESO.md`): tanto una cabecera conjunta `Invalida`
++                // como `Pendiente` llegan aquí como el mismo `ErrorNodo::BloquePropioRechazado`; las
++                // dos se tratan como `Rechazar`. Distinguirlas exigiría un tipo de error más rico en
++                // `admitir_post_interno`, fuera del alcance de esta orden.
++                let evento = self
++                    .registro
++                    .evento("bloque_red_rechazado")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "post")
++                    .str("motivo", &e.to_string());
++                let _ = self.registro.escribir(evento, false);
++                VeredictoFinal::Rechazar
++            }
++        }
++    }
++
+     /// Construye los depósitos F-15 pendientes (coinbases maduras propias sin depositar) para la
+     /// altura `altura_bloque` (decisión 5).
+     fn preparar_depositos(&self, altura_bloque: u32) -> ResultadoNodo<Vec<(Tx, Vec<Vec<u8>>)>> {
+@@ -1016,6 +1248,21 @@
+             .estado_post(&ultimo_hash)
+             .ok_or_else(|| ErrorNodo::Otro("estado del último bloque PoW ausente".to_string()))?;
+         let mut depositos = Vec::new();
++        // Hallazgo en vivo (`PROGRESO.md`, primera corrida real de V4, no es un bug de esta orden
++        // pero impide demostrarla): el `nonce` de una operación de garantía es un contador **por
++        // clave**, no por coinbase. Si la misma clave acumula más de una coinbase madura sin
++        // depositar todavía (le basta con que el nodo pase un rato sin que su primer depósito
++        // tenga éxito — p. ej. mientras está aislado de la red, ver el diagnóstico de la decisión
++        // 4), el bucle de abajo construía **todos** los depósitos de esa clave con el mismo
++        // `nonce` leído una sola vez del estado: el segundo, en el mismo bloque, siempre
++        // discrepaba con el `nonce_siguiente` que el primero ya había incrementado (`ErrNonce`,
++        // modo estricto ⇒ bloque entero inválido ⇒ bloque propio rechazado ⇒ fatal). Se lleva un
++        // nonce local por clave, sembrado con el real del estado la primera vez que esa clave
++        // aparece en este bloque y luego incrementado en memoria por cada depósito adicional de la
++        // misma clave — exactamente lo que el motor de transición espera ver, sin tocar el estado
++        // (que no cambia hasta que el bloque se aplique de verdad).
++        let mut siguiente_nonce: std::collections::BTreeMap<zx_core::ClavePublica, u64> =
++            std::collections::BTreeMap::new();
+         for c in &self.coinbases {
+             if c.depositada {
+                 continue;
+@@ -1029,10 +1276,13 @@
+             let Some(clave) = self.claves.get(c.indice_clave) else {
+                 continue;
+             };
+-            let nonce = estado
+-                .garantias
+-                .get(&clave.pk)
+-                .map_or(0, |g| g.nonce_siguiente);
++            let nonce = *siguiente_nonce.entry(clave.pk).or_insert_with(|| {
++                estado
++                    .garantias
++                    .get(&clave.pk)
++                    .map_or(0, |g| g.nonce_siguiente)
++            });
++            siguiente_nonce.insert(clave.pk, nonce.saturating_add(1));
+             let (tx, testigos) = pow::construir_deposito(c, clave, nonce, self.cbid)
+                 .map_err(|e| ErrorNodo::Otro(format!("construir depósito: {e}")))?;
+             depositos.push((tx, testigos));
+@@ -1111,6 +1361,22 @@
+             // comprueba justo aquí si la red ya avanzó la punta mientras minábamos y, si es así, se
+             // descarta el bloque propio (obsoleto) y se reintenta sobre la punta nueva.
+             self.procesar_trabajo_red_pendiente();
++            // `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): el terminal puede fijarlo un bloque
++            // de **red** admitido aquí mismo (dentro de `procesar_trabajo_red_pendiente`), no solo
++            // uno propio. La comprobación de `self.cadena.terminal()` de más abajo, al final del
++            // cuerpo del bucle, solo se alcanza si el bloque propio de esta vuelta se admite; si es
++            // obsoleto (`continue`, justo abajo) el bucle vuelve a la cabecera **sin** pasar por
++            // ella. Sin este cheque aquí, una vuelta puede minar sobre un padre cuyo propio estado
++            // ya tiene `terminal = Some` (fijado por el bloque de red que el `procesar_trabajo_red_
++            // pendiente` de arriba acaba de admitir) y `zx-cadena` la rechaza con
++            // `ErrPowTrasCorte` — un bloque propio rechazado, fatal por la decisión 4 general de
++            // `ORDEN-W06d1`. El bloque recién minado en esta vuelta queda descartado (ya es tarde
++            // para él de todas formas: el corte ya ocurrió).
++            if self.cadena.terminal().is_some() {
++                drop(tx_trabajo);
++                let _ = hilo.join();
++                return Ok(());
++            }
+             let punta_sigue_siendo_la_esperada = self
+                 .historial_pow
+                 .last()
+@@ -1156,10 +1422,15 @@
+             .cadena
+             .terminal()
+             .ok_or_else(|| ErrorNodo::Otro("fase_regimen sin terminal".to_string()))?;
+-        if self.servicio_verificacion.is_none() {
++        // Mismo ratchet que `admitir_pow_interno` (`ORDEN-W06d3` decisión 3): entre que `fase_pow`
++        // vio el terminal por última vez y aquí, una rama más pesada llegada por red podría haberlo
++        // desplazado (FC-3), siempre que todavía no exista ningún bloque PoST (`contexto_dag`
++        // `None`). Se reconstruye el `ServicioPot` si el terminal no es el que tenía.
++        if self.servicio_verificacion.is_none() || self.terminal_servicio != Some(terminal) {
+             let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
+                 .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
+             self.servicio_verificacion = Some(servicio);
++            self.terminal_servicio = Some(terminal);
+         }
+ 
+         // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
+@@ -1222,7 +1493,23 @@
+                 MsgProductor::PeticionPadres => {
+                     let padres = padres_de_regimen(&self.cadena)
+                         .map_err(|e| ErrorNodo::Otro(format!("padres de régimen: {e}")))?;
+-                    if tx_a_productor.send(MsgBucle::Padres(padres)).is_err() {
++                    // `(hash, slot)` de cada padre (seleccionado y extras): el hilo productor
++                    // necesita esto para registrar en su propio `ServicioPot` cualquier padre que
++                    // no haya producido él mismo (`ORDEN-W06d3`, ver el docstring de
++                    // `MsgBucle::Padres`). Todo padre de régimen es un `BloqueCadena::Post` (el
++                    // único `Pow` posible, el terminal, no aparece en `tips_validas`).
++                    let mut info_padres = Vec::with_capacity(1 + padres.extras().len());
++                    for h in std::iter::once(padres.seleccionado())
++                        .chain(padres.extras().iter().copied())
++                    {
++                        if let Some(BloqueCadena::Post(p)) = self.cadena.bloque(&h) {
++                            info_padres.push((h, p.slot));
++                        }
++                    }
++                    if tx_a_productor
++                        .send(MsgBucle::Padres(padres, info_padres))
++                        .is_err()
++                    {
+                         break;
+                     }
+                 }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/pow.rs ws/crates/zx-node/src/pow.rs
+--- ws.orig/crates/zx-node/src/pow.rs	2026-09-26 09:50:47.342123846 +0200
++++ ws/crates/zx-node/src/pow.rs	2026-09-26 15:03:36.674384112 +0200
+@@ -29,6 +29,11 @@
+     pub indice_clave: usize,
+     /// Altura en la que se creó.
+     pub altura: u32,
++    /// Hash del bloque PoW que la creó (`ORDEN-W06d3` decisión 3): permite podar esta lista tras
++    /// una reorganización, comprobando qué entradas siguen en `historial_pow` de la rama
++    /// seleccionada. La altura sola no basta: dos ramas pueden tener, cada una, un bloque distinto
++    /// en la misma altura.
++    pub bloque: zx_core::BlockHash,
+     /// `txid` de la coinbase.
+     pub txid: TxId,
+     /// Importe de la salida (única, índice 0).
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/red/sync.rs ws/crates/zx-node/src/red/sync.rs
+--- ws.orig/crates/zx-node/src/red/sync.rs	2026-09-26 14:08:45.173971187 +0200
++++ ws/crates/zx-node/src/red/sync.rs	2026-09-26 16:25:55.663035609 +0200
+@@ -21,9 +21,12 @@
+ //! ([`super::LIMITE_SALTOS_RECORRIDO_ATRAS`]) lo aplica el hilo de consenso, no esta tarea.
+ 
+ use std::collections::HashMap;
++use std::sync::Arc;
++use std::time::Duration;
+ 
+ use libp2p::PeerId;
+ use tokio::sync::mpsc;
++use tokio::time::{self, MissedTickBehavior};
+ 
+ use zx_p2p::error::MotivoDesconexion;
+ use zx_p2p::mensaje::{Peticion, Respuesta};
+@@ -31,12 +34,24 @@
+ 
+ use super::TrabajoRed;
+ use super::vista::VistaRed;
+-use std::sync::Arc;
+ 
+ /// Cuántos hashes se piden a la vez en una `Peticion::Bloques` de sincronización (el tope del
+ /// protocolo, no un valor propio: pedir más de golpe es un `Excedido` seguro).
+ const LOTE_BLOQUES: usize = zx_p2p::limites::MAX_HASHES_POR_PETICION;
+ 
++/// Cada cuánto se repite el saludo a los pares **ya conectados**, no solo al conectar.
++///
++/// `ORDEN-W06d3`, diagnóstico de la decisión 4 (`PROGRESO.md`): un bloque perdido por gossip —por
++/// ejemplo, publicado antes de que la malla de gossipsub terminara de formarse tras conectar— deja
++/// una cadena de huérfanos que **nadie vuelve a pedir**: `intentar_admitir_*_de_red` solo pide
++/// activamente el padre que falta cuando conoce el origen (`Some(peer)`, la ruta de sincronización),
++/// nunca para un huérfano llegado por gossip (`origen = None`, no se sabe quién lo propagó), y el
++/// único disparador de un nuevo `Peticion::CabecerasPow`/`Peticion::Bloques` era el saludo **al
++/// conectar**. Sin un reintento periódico, un nodo que se queda atrás una sola vez no se recupera
++/// nunca por sí solo, aunque la red entera siga viva y minando. Valor dev: generoso frente al ritmo
++/// de bloques PoW (dificultad trivial, sub-segundo) para no saturar de peticiones un par que va bien.
++const PLAZO_REINTENTO_SALUDO: Duration = Duration::from_secs(5);
++
+ /// Qué sabemos de un par para no repetirle la misma petición sin sentido.
+ #[derive(Default)]
+ struct EstadoPeer {
+@@ -51,24 +66,41 @@
+     trabajo: mpsc::UnboundedSender<TrabajoRed>,
+ ) {
+     let mut peers: HashMap<PeerId, EstadoPeer> = HashMap::new();
+-    while let Some(evento) = eventos.recv().await {
+-        match evento {
+-            EventoRed::PeerConectado(peer) => {
+-                peers.entry(peer).or_default();
+-                if manejo.pedir(peer, Peticion::Estado).await.is_err() {
+-                    tracing::debug!(%peer, "no se pudo pedir el saludo: el bucle de red ya no está");
++    let mut reintento = time::interval(PLAZO_REINTENTO_SALUDO);
++    reintento.set_missed_tick_behavior(MissedTickBehavior::Delay);
++    // El primer `tick()` de un `interval` es inmediato: se consume aquí, antes del bucle, para no
++    // repetir el saludo del `PeerConectado` inicial un instante después de haberlo pedido ya.
++    reintento.tick().await;
++    loop {
++        tokio::select! {
++            evento = eventos.recv() => {
++                let Some(evento) = evento else { break; };
++                match evento {
++                    EventoRed::PeerConectado(peer) => {
++                        peers.entry(peer).or_default();
++                        if manejo.pedir(peer, Peticion::Estado).await.is_err() {
++                            tracing::debug!(%peer, "no se pudo pedir el saludo: el bucle de red ya no está");
++                        }
++                    }
++                    EventoRed::PeerDesconectado(peer) => {
++                        peers.remove(&peer);
++                    }
++                    EventoRed::PeticionFallida { peer } => {
++                        tracing::debug!(%peer, "una petición de sincronización no llegó a completarse");
++                    }
++                    EventoRed::Respuesta { peer, respuesta, .. } => {
++                        atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await;
++                    }
++                    EventoRed::Escuchando(_) | EventoRed::Suscripcion { .. } => {}
+                 }
+             }
+-            EventoRed::PeerDesconectado(peer) => {
+-                peers.remove(&peer);
+-            }
+-            EventoRed::PeticionFallida { peer } => {
+-                tracing::debug!(%peer, "una petición de sincronización no llegó a completarse");
++            _ = reintento.tick() => {
++                for peer in peers.keys().copied().collect::<Vec<_>>() {
++                    if manejo.pedir(peer, Peticion::Estado).await.is_err() {
++                        tracing::debug!(%peer, "no se pudo repetir el saludo periódico");
++                    }
++                }
+             }
+-            EventoRed::Respuesta {
+-                peer, respuesta, ..
+-            } => atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await,
+-            EventoRed::Escuchando(_) | EventoRed::Suscripcion { .. } => {}
+         }
+     }
+ }
+@@ -96,9 +128,20 @@
+                 e.saludo_pedido = true;
+             }
+ 
+-            // Fase PoW: si el par declara más altura que nosotros, pedimos cabeceras desde nuestro
+-            // propio localizador (denso cerca de nuestra punta, espaciado hacia atrás).
+-            if otro.punta_pow.altura > vista.altura_pow() {
++            // Fase PoW: pedimos cabeceras si el par declara más altura que nosotros, **o** si su
++            // punta declarada es un hash que no reconocemos todavía (aunque su altura sea igual o
++            // menor). `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): comparar solo la altura
++            // asume que "más alto" es siempre "más trabajo", lo que es falso frente a una
++            // bifurcación real — un nodo que ha estado minando **en solitario** (p. ej. porque el
++            // primer bloque de otro par se perdió antes de que la malla de gossipsub terminara de
++            // formarse, el mismo diagnóstico de la decisión 4) puede alcanzar, sin compartir ningún
++            // bloque con nadie, una altura igual o mayor que la de la red compartida, y entonces
++            // esta condición **nunca** se disparaba: el nodo aislado se quedaba así para siempre,
++            // sin pedir jamás las cabeceras de la rama que en realidad pesa más (`FC-3` lo decidiría
++            // bien si llegara a verla; el problema es que nunca llega). Pedir también por "punta
++            // desconocida" no cuesta más que una petición de más cuando de verdad coincide.
++            let punta_desconocida = !vista.tiene_cuerpo(&otro.punta_pow.hash);
++            if otro.punta_pow.altura > vista.altura_pow() || punta_desconocida {
+                 let locator = vista.locator();
+                 if manejo
+                     .pedir(
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/red/vista.rs ws/crates/zx-node/src/red/vista.rs
+--- ws.orig/crates/zx-node/src/red/vista.rs	2026-09-26 14:08:45.173981597 +0200
++++ ws/crates/zx-node/src/red/vista.rs	2026-09-26 16:31:22.024884939 +0200
+@@ -79,6 +79,25 @@
+         i.cuerpos_pow.insert(cabecera.block_hash(), bloque);
+     }
+ 
++    /// El hilo de consenso fija la secuencia **completa** de cabeceras de la punta PoW
++    /// seleccionada, tras admitir un bloque o tras una reorganización (`ORDEN-W06d3` decisión 3).
++    ///
++    /// `registrar_pow` (arriba) es *append-only por altura*: una vez que una altura tiene cabecera,
++    /// nunca la sustituye, aunque `zx-cadena` reorganice y esa altura pase a pertenecer a **otro**
++    /// bloque. Sin esto, el locator y `cabeceras_desde` seguirían ofreciendo a los pares la rama que
++    /// ya se descartó localmente — observado en vivo (`PROGRESO.md`): un nodo que reorganiza sobre
++    /// sí mismo puede acabar sirviendo un historial que ni él mismo considera ya canónico. Se llama
++    /// con `historial_pow` completo (siempre empieza en el génesis): reemplaza `cabeceras_pow`
++    /// entero, no solo la cola divergente, para no tener que calcular aquí el punto de corte.
++    /// `cuerpos_pow` no se toca: los cuerpos de bloques de una rama descartada siguen siendo cuerpos
++    /// válidos que se pueden servir si alguien los pide por hash.
++    pub fn fijar_cabeceras_pow(&self, cabeceras: &[BlockHeader]) {
++        if let Ok(mut i) = self.interior.write() {
++            i.cabeceras_pow.clear();
++            i.cabeceras_pow.extend_from_slice(cabeceras);
++        }
++    }
++
+     /// El hilo de consenso registra un bloque PoST recién admitido.
+     pub fn registrar_post(&self, hash: BlockHash, bloque: BloqueRed) {
+         if let Ok(mut i) = self.interior.write() {
+@@ -313,4 +332,34 @@
+             matches!(&salida[0], BloqueRed::Pow { cabecera, .. } if cabecera.block_hash() == hash0)
+         );
+     }
++
++    /// **`ORDEN-W06d3`, hallazgo en vivo.** `registrar_pow` nunca sustituye una altura ya ocupada
++    /// (`PROGRESO.md`): tras una reorganización, `fijar_cabeceras_pow` es lo único que corrige la
++    /// secuencia para que el localizador refleje la rama seleccionada de verdad, no la primera que
++    /// ocupó cada altura.
++    #[test]
++    fn fijar_cabeceras_pow_sustituye_una_altura_ya_ocupada_por_registrar_pow() {
++        let v = VistaRed::nueva(estado_vacio());
++        let c0 = cabecera(0, h(0));
++        v.registrar_pow(0, bloque_pow(0, h(0)));
++        let c1_vieja = cabecera(1, c0.block_hash());
++        v.registrar_pow(1, bloque_pow(1, c0.block_hash()));
++        assert_eq!(v.altura_pow(), 1);
++        assert_eq!(v.locator().first(), Some(&c1_vieja.block_hash()));
++
++        // Una reorganización cambia la altura 1 por un bloque distinto.
++        let c1_nueva = cabecera(1, c0.block_hash());
++        // `cabecera(1, ..)` con la misma entrada da el mismo hash (determinista): se fuerza un
++        // contenido distinto para simular de verdad "otro bloque en la misma altura".
++        let mut c1_nueva_distinta = c1_nueva;
++        c1_nueva_distinta.nonce = 9_999;
++        v.fijar_cabeceras_pow(&[c0, c1_nueva_distinta]);
++
++        assert_eq!(v.altura_pow(), 1, "la altura no cambia, solo el contenido");
++        assert_eq!(
++            v.locator().first(),
++            Some(&c1_nueva_distinta.block_hash()),
++            "la vista ya no ofrece la rama descartada en la altura 1"
++        );
++    }
+ }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/regimen.rs ws/crates/zx-node/src/regimen.rs
+--- ws.orig/crates/zx-node/src/regimen.rs	2026-09-26 09:50:47.342135856 +0200
++++ ws/crates/zx-node/src/regimen.rs	2026-09-26 17:21:48.478243707 +0200
+@@ -94,8 +94,17 @@
+     reason = "un mensaje por producción intentada (~1/s); boxear `PadresDag` (Copy, 481 B) solo movería el coste a una asignación de montón sin beneficio medible"
+ )]
+ pub enum MsgBucle {
+-    /// Padres canónicos (`padres::padres_de_regimen`).
+-    Padres(PadresDag),
++    /// Padres canónicos (`padres::padres_de_regimen`), con `(hash, slot)` de **cada** padre
++    /// (seleccionado y extras).
++    ///
++    /// `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): con red, un padre puede ser un bloque
++    /// **ajeno** que este proceso nunca produjo — el bucle lo admitió y lo conoce (`Cadena`,
++    /// `self.servicio_verificacion`), pero el `ServicioPot` **propio** del hilo productor (una
++    /// copia independiente, ver el docstring del módulo) nunca lo vio, porque solo se actualiza
++    /// cuando el propio hilo produce un bloque (`registrar_validado`, más abajo). Sin esta
++    /// información, `producir_en_regimen` fallaba con «el padre seleccionado no está registrado en
++    /// el `ServicioPot`» en cuanto GHOSTDAG elegía un padre de otro nodo.
++    Padres(PadresDag, Vec<(zx_core::BlockHash, u64)>),
+     /// El bloque enviado se admitió: sigue produciendo.
+     Continuar,
+     /// Condición de parada alcanzada (`--parada-tras-slots`): el hilo debe terminar.
+@@ -192,11 +201,36 @@
+         if tx.send(MsgProductor::PeticionPadres).is_err() {
+             return; // el bucle cerró el canal: apagado normal del proceso.
+         }
+-        let padres = match rx.recv() {
+-            Ok(MsgBucle::Padres(p)) => p,
++        let (padres, info_padres) = match rx.recv() {
++            Ok(MsgBucle::Padres(p, info)) => (p, info),
+             Ok(_otro) => panic!("hilo productor: se esperaba Padres, llegó otro mensaje del bucle"),
+             Err(_) => return, // el bucle cerró el canal: apagado normal del proceso.
+         };
++        // Registra en el `ServicioPot` propio cualquier padre que este hilo no haya producido él
++        // mismo (ver el docstring de `MsgBucle::Padres`). `BloqueDuplicado` es el caso normal (un
++        // padre que sí produjo este mismo hilo, o que ya se registró en una vuelta anterior porque
++        // dos candidatas del mismo slot comparten padres): no es un error, es la confirmación de que
++        // ya estaba. Cualquier otro fallo (`SlotFuturo`, `NDevInvalido`) sí es una incoherencia real.
++        for (hash, slot_padre) in info_padres {
++            // El flujo PoT es único y global (D-P10): si un padre ajeno viene de un slot **más
++            // adelantado** que el que este hilo lleva calculado localmente (su propio `avanzar()`
++            // va a su propio ritmo de AES, independiente de qué tan rápido admita el bucle
++            // principal bloques de red ya calculados por otros), `avanzar_hasta` recalcula de
++            // verdad las salidas que faltan —no las inventa ni las salta— hasta alcanzarlo. Es el
++            // mismo coste que ya paga el flujo normal, solo que de golpe en vez de un slot por
++            // vuelta.
++            if slot_padre > servicio.slot_actual() {
++                servicio.avanzar_hasta(slot_padre).unwrap_or_else(|e| {
++                    panic!("hilo productor: no se pudo alcanzar el slot {slot_padre} del padre ajeno {hash}: {e}")
++                });
++            }
++            match servicio.registrar_validado(hash, slot_padre) {
++                Ok(()) | Err(zx_post::servicio_pot::ErrorServicioPot::BloqueDuplicado { .. }) => {}
++                Err(e) => panic!(
++                    "hilo productor: no se pudo registrar el padre ajeno {hash} (slot {slot_padre}): {e}"
++                ),
++            }
++        }
+ 
+         for (i, candidata) in ganadoras {
+             let Some(cp) = claves.get(i) else {
+@@ -208,7 +242,7 @@
+                 .map(|d| d.as_secs())
+                 .unwrap_or(0);
+             let fuente_fija = SolucionFija(candidata);
+-            let bloque = producir_en_regimen(
++            let bloque = match producir_en_regimen(
+                 padres,
+                 slot,
+                 &mut servicio,
+@@ -216,8 +250,31 @@
+                 &cp.clave.sk,
+                 &parametros_bloque,
+                 CuerpoProductor::vacio(),
+-            )
+-            .unwrap_or_else(|e| panic!("hilo productor: producir_en_regimen falló: {e}"));
++            ) {
++                Ok(b) => b,
++                // `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): con red, el padre elegido por
++                // GHOSTDAG puede ser un bloque **más nuevo** que `slot` (otro nodo ya produjo, para
++                // el mismo slot o uno posterior, con el padre que este hilo eligió cuando pidió
++                // `PeticionPadres` — el propio catch-up de arriba, que adelanta `servicio` hasta el
++                // slot del padre, es la prueba de que esto es normal, no un error). No es un bug de
++                // este nodo: el candidato ya no puede ser un bloque de cadena válido (`slot(B)` MUST
++                // ser mayor que `slot(sp)`), así que se descarta esta candidata concreta y se sigue
++                // con la siguiente (o con el siguiente slot si no hay más). Cualquier otro error de
++                // `producir_en_regimen` sigue siendo una incoherencia interna real.
++                Err(zx_post::productor_regimen::ErrorRegimen::SlotNoProgreso {
++                    slot: slot_bloque,
++                    slot_sp,
++                }) => {
++                    tracing::info!(
++                        slot_bloque,
++                        slot_sp,
++                        "candidata descartada: el padre elegido ya es de este slot o uno \
++                         posterior (otro nodo se adelantó)"
++                    );
++                    continue;
++                }
++                Err(e) => panic!("hilo productor: producir_en_regimen falló: {e}"),
++            };
+             let hash = bloque.cabecera.block_hash();
+             servicio
+                 .registrar_validado(hash, slot)
+@@ -229,7 +286,7 @@
+             match rx.recv() {
+                 Ok(MsgBucle::Continuar) => {}
+                 Ok(MsgBucle::Parar) | Err(_) => return,
+-                Ok(MsgBucle::Padres(_)) => {
++                Ok(MsgBucle::Padres(..)) => {
+                     panic!("hilo productor: se esperaba Continuar/Parar, llegó Padres")
+                 }
+             }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/src/codec.rs ws/crates/zx-p2p/src/codec.rs
+--- ws.orig/crates/zx-p2p/src/codec.rs	2026-09-26 02:41:52.712214892 +0200
++++ ws/crates/zx-p2p/src/codec.rs	2026-09-26 14:35:13.154608436 +0200
+@@ -271,10 +271,15 @@
+         }
+         BloqueRed::Post {
+             cabecera,
++            justificacion,
+             txs,
+             testigos,
+         } => {
++            // `ORDEN-W06d3` decisión 1: mismo orden que [`zx_core::wire_dag::bloque_dag_a_bytes`]
++            // (cabecera ‖ justificación PoT ‖ cuerpo) — es también lo que `zx-storage` persiste, así
++            // que un `BloqueRed::Post` y el `BloqueDag` que guarda el almacén tienen el mismo códec.
+             out.extend_from_slice(&zx_core::preimage::dag::dag_header_a_bytes(cabecera));
++            justificacion.escribir(&mut out);
+             escribir_cuerpo(&mut out, txs, testigos);
+         }
+     }
+@@ -334,43 +339,50 @@
+ }
+ 
+ /// Parsea cabecera y cuerpo una vez ya comprobada la familia.
++///
++/// PoST usa directamente [`zx_core::wire_dag::bloque_dag_desde_bytes`] (cabecera, justificación PoT
++/// y cuerpo en un único parser, ya acotado en `pot_bundle_count` antes de reservar): es el mismo
++/// códec que `zx-storage` persiste, así que no hay dos formas de leer un bloque PoST (`ORDEN-W06d3`
++/// decisión 1). PoW no lleva justificación y sigue con su propio parser de cabecera + cuerpo.
+ fn bloque_cuerpo(bytes: &[u8], familia: FamiliaBloque) -> Result<(BloqueRed, &[u8]), ErrorCodec> {
+-    let (cabecera_pow, cabecera_post, r) = match familia {
++    match familia {
+         FamiliaBloque::Pow => {
+-            let (c, r) = wire::cabecera_desde_bytes(bytes)?;
+-            (Some(c), None, r)
++            let (cabecera, r) = wire::cabecera_desde_bytes(bytes)?;
++            let (n_tx, mut r) = leer_contador(r, usize::MAX)?;
++            let mut txs = Vec::with_capacity(n_tx.min(4096));
++            let mut testigos = Vec::with_capacity(n_tx.min(4096));
++            for _ in 0..n_tx {
++                let ((tx, t), resto) = wire::tx_desde_bytes(r)?;
++                txs.push(tx);
++                testigos.push(t);
++                r = resto;
++            }
++            Ok((
++                BloqueRed::Pow {
++                    cabecera,
++                    txs,
++                    testigos,
++                },
++                r,
++            ))
+         }
+         FamiliaBloque::Post => {
+-            let (c, r) = zx_core::preimage::dag::dag_header_desde_bytes(bytes)?;
+-            (None, Some(c), r)
++            let (bloque_dag, r) = zx_core::wire_dag::bloque_dag_desde_bytes(bytes)?;
++            let cabecera = bloque_dag.cabecera;
++            let justificacion = bloque_dag.justificacion.clone();
++            let txs = bloque_dag.txs().to_vec();
++            let testigos = bloque_dag.testigos().to_vec();
++            Ok((
++                BloqueRed::Post {
++                    cabecera,
++                    justificacion,
++                    txs,
++                    testigos,
++                },
++                r,
++            ))
+         }
+-    };
+-
+-    let (n_tx, mut r) = leer_contador(r, usize::MAX)?;
+-    let mut txs = Vec::with_capacity(n_tx.min(4096));
+-    let mut testigos = Vec::with_capacity(n_tx.min(4096));
+-    for _ in 0..n_tx {
+-        let ((tx, t), resto) = wire::tx_desde_bytes(r)?;
+-        txs.push(tx);
+-        testigos.push(t);
+-        r = resto;
+     }
+-
+-    let bloque = match (cabecera_pow, cabecera_post) {
+-        (Some(cabecera), None) => BloqueRed::Pow {
+-            cabecera,
+-            txs,
+-            testigos,
+-        },
+-        (None, Some(cabecera)) => BloqueRed::Post {
+-            cabecera,
+-            txs,
+-            testigos,
+-        },
+-        // Inalcanzable: el `match` de arriba es exhaustivo y mutuamente excluyente.
+-        (Some(_), Some(_)) | (None, None) => return Err(truncado("familia incoherente")),
+-    };
+-    Ok((bloque, r))
+ }
+ 
+ // ─────────────────────────────────────────────────────────────────────────────
+@@ -651,6 +663,7 @@
+     use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+     use zx_core::red::Red;
+     use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
++    use zx_core::wire_dag::{JustificacionPot, PotCheckpoints};
+ 
+     fn h(n: u8) -> BlockHash {
+         BlockHash::from_digest(Digest::from_bytes([n; 32]))
+@@ -718,9 +731,17 @@
+         }
+     }
+ 
++    /// Una justificación PoT no vacía (dos portadores), para ejercitar de verdad el nuevo campo del
++    /// wire (`ORDEN-W06d3` decisión 1), no solo el caso trivial `vacia()`.
++    fn justificacion_simple(n: u8) -> JustificacionPot {
++        let portador = PotCheckpoints::desde_outputs([[n; 16]; 8]);
++        JustificacionPot::nueva(vec![portador, portador]).expect("2 <= MAX_BUNDLES_POT")
++    }
++
+     fn bloque_post(n: u8) -> BloqueRed {
+         BloqueRed::Post {
+             cabecera: cabecera_post(n),
++            justificacion: justificacion_simple(n),
+             txs: vec![tx_simple(n)],
+             testigos: vec![vec![vec![0x22; 64]]],
+         }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/src/limites.rs ws/crates/zx-p2p/src/limites.rs
+--- ws.orig/crates/zx-p2p/src/limites.rs	2026-09-26 14:08:45.174032906 +0200
++++ ws/crates/zx-p2p/src/limites.rs	2026-09-26 14:34:36.809844685 +0200
+@@ -24,6 +24,7 @@
+ 
+ use zx_core::preimage::block::TAMANO_CABECERA;
+ use zx_core::preimage::dag::TAMANO_CABECERA_MAX;
++use zx_core::wire_dag::MAX_JUSTIFICACION_POT_CODIFICADA;
+ 
+ /// Cuerpo máximo de un bloque en la red dev, en bytes.
+ ///
+@@ -35,9 +36,14 @@
+ /// Tamaño máximo de un [`crate::mensaje::BloqueRed`], en bytes.
+ ///
+ /// Desglose: cabecera PoST máxima ([`TAMANO_CABECERA_MAX`] = 1 037 B, la más grande de las dos
+-/// familias) **más** el cuerpo máximo dev. No incluye el byte de familia ni el `CompactSize` del
+-/// contador de transacciones: eso lo añade el códec al comprobar el buffer recibido.
+-pub const MAX_BLOQUE_RED_BYTES: u64 = TAMANO_CABECERA_MAX as u64 + MAX_CUERPO_DEV_BYTES;
++/// familias) **más** la justificación PoT codificada al máximo
++/// ([`MAX_JUSTIFICACION_POT_CODIFICADA`] = 19 201 B; `ORDEN-W06d3` decisión 1: `BloqueRed::Post`
++/// ahora la lleva, igual que `zx_core::wire_dag::BloqueDag`) **más** el cuerpo máximo dev. Un bloque
++/// PoW no tiene justificación y por tanto siempre mide menos que este máximo. No incluye el byte de
++/// familia ni el `CompactSize` del contador de transacciones: eso lo añade el códec al comprobar el
++/// buffer recibido.
++pub const MAX_BLOQUE_RED_BYTES: u64 =
++    TAMANO_CABECERA_MAX as u64 + MAX_JUSTIFICACION_POT_CODIFICADA as u64 + MAX_CUERPO_DEV_BYTES;
+ 
+ /// Cuántas veces el límite de bloque dev admite el transporte.
+ ///
+@@ -217,13 +223,20 @@
+     };
+     use zx_core::preimage::block::TAMANO_CABECERA;
+     use zx_core::preimage::dag::TAMANO_CABECERA_MAX;
++    use zx_core::wire_dag::MAX_JUSTIFICACION_POT_CODIFICADA;
+ 
+-    /// El límite de BloqueRed se **deriva** de la cabecera PoST máxima y del cuerpo dev declarado.
++    /// El límite de `BloqueRed` se **deriva** de la cabecera PoST máxima, la justificación PoT
++    /// codificada al máximo y el cuerpo dev declarado (`ORDEN-W06d3` decisión 1).
+     #[test]
+     fn el_limite_de_bloque_red_se_deriva() {
+         assert_eq!(TAMANO_CABECERA_MAX, 1_037, "la cabecera PoST máxima");
++        assert_eq!(MAX_JUSTIFICACION_POT_CODIFICADA, 19_201);
+         assert_eq!(MAX_CUERPO_DEV_BYTES, 2 * 1024 * 1024);
+-        assert_eq!(MAX_BLOQUE_RED_BYTES, 1_037 + 2 * 1024 * 1024);
++        assert_eq!(
++            MAX_BLOQUE_RED_BYTES,
++            1_037 + 19_201 + 2 * 1024 * 1024,
++            "cabecera + justificación PoT + cuerpo"
++        );
+         assert_eq!(LIMITE_BLOQUE_DEV, MAX_BLOQUE_RED_BYTES);
+     }
+ 
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/src/mensaje.rs ws/crates/zx-p2p/src/mensaje.rs
+--- ws.orig/crates/zx-p2p/src/mensaje.rs	2026-09-26 02:41:10.864336040 +0200
++++ ws/crates/zx-p2p/src/mensaje.rs	2026-09-26 14:33:03.050874439 +0200
+@@ -26,6 +26,7 @@
+ use zx_core::preimage::dag::DagBlockHeader;
+ use zx_core::red::Red;
+ use zx_core::tx::Tx;
++use zx_core::wire_dag::JustificacionPot;
+ 
+ /// Máximo de puntas PoST que caben en un [`Estado`].
+ ///
+@@ -95,10 +96,16 @@
+         /// `testigos[i][j]` es el testigo de la entrada `j` de la transacción `i`.
+         testigos: Vec<Vec<Vec<u8>>>,
+     },
+-    /// Bloque PoST: cabecera DAG y cuerpo.
++    /// Bloque PoST: cabecera DAG, justificación PoT y cuerpo.
+     Post {
+         /// Cabecera DAG (F-02).
+         cabecera: DagBlockHeader,
++        /// Justificación PoT (`ORDEN-W06d3` decisión 1): sin ella,
++        /// `zx_post::cabecera_conjunta::verificar_cabecera_conjunta` no puede comprobar el PoT ni el
++        /// PoAS de un bloque ajeno (`REVISION-W06d2.md`, bloqueo). Va **fuera** de `block_hash`
++        /// (igual que en [`zx_core::wire_dag::BloqueDag`]): es evidencia contextual, no consenso de
++        /// la cabecera.
++        justificacion: JustificacionPot,
+         /// Transacciones, la primera de las cuales es la coinbase PoST.
+         txs: Vec<Tx>,
+         /// `testigos[i][j]` es el testigo de la entrada `j` de la transacción `i`.
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/tests/dos_nodos.rs ws/crates/zx-p2p/tests/dos_nodos.rs
+--- ws.orig/crates/zx-p2p/tests/dos_nodos.rs	2026-09-26 14:08:45.174045676 +0200
++++ ws/crates/zx-p2p/tests/dos_nodos.rs	2026-09-26 14:59:07.125723839 +0200
+@@ -33,6 +33,7 @@
+ use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+ use zx_core::red::Red;
+ use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
++use zx_core::wire_dag::{JustificacionPot, PotCheckpoints};
+ use zx_p2p::behaviour::ZxBehaviour;
+ use zx_p2p::config::ParametrosRed;
+ use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto, VeredictoFinal};
+@@ -308,8 +309,14 @@
+ }
+ 
+ /// Un bloque PoST de fixture.
++fn justificacion_simple(n: u8) -> JustificacionPot {
++    let portador = PotCheckpoints::desde_outputs([[n; 16]; 8]);
++    JustificacionPot::nueva(vec![portador]).unwrap_or_else(|_| unreachable!("1 <= MAX_BUNDLES_POT"))
++}
++
+ fn bloque_post(n: u8) -> BloqueRed {
+     BloqueRed::Post {
++        justificacion: justificacion_simple(n),
+         cabecera: DagBlockHeader {
+             consensus_branch_id: 0xa8b4_66a7,
+             merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),

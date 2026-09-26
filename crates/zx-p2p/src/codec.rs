@@ -271,10 +271,15 @@ pub fn bloque_a_bytes(b: &BloqueRed) -> Vec<u8> {
         }
         BloqueRed::Post {
             cabecera,
+            justificacion,
             txs,
             testigos,
         } => {
+            // `ORDEN-W06d3` decisión 1: mismo orden que [`zx_core::wire_dag::bloque_dag_a_bytes`]
+            // (cabecera ‖ justificación PoT ‖ cuerpo) — es también lo que `zx-storage` persiste, así
+            // que un `BloqueRed::Post` y el `BloqueDag` que guarda el almacén tienen el mismo códec.
             out.extend_from_slice(&zx_core::preimage::dag::dag_header_a_bytes(cabecera));
+            justificacion.escribir(&mut out);
             escribir_cuerpo(&mut out, txs, testigos);
         }
     }
@@ -334,43 +339,50 @@ pub fn bloque_desde_bytes_autotag(bytes: &[u8]) -> Result<(BloqueRed, &[u8]), Er
 }
 
 /// Parsea cabecera y cuerpo una vez ya comprobada la familia.
+///
+/// PoST usa directamente [`zx_core::wire_dag::bloque_dag_desde_bytes`] (cabecera, justificación PoT
+/// y cuerpo en un único parser, ya acotado en `pot_bundle_count` antes de reservar): es el mismo
+/// códec que `zx-storage` persiste, así que no hay dos formas de leer un bloque PoST (`ORDEN-W06d3`
+/// decisión 1). PoW no lleva justificación y sigue con su propio parser de cabecera + cuerpo.
 fn bloque_cuerpo(bytes: &[u8], familia: FamiliaBloque) -> Result<(BloqueRed, &[u8]), ErrorCodec> {
-    let (cabecera_pow, cabecera_post, r) = match familia {
+    match familia {
         FamiliaBloque::Pow => {
-            let (c, r) = wire::cabecera_desde_bytes(bytes)?;
-            (Some(c), None, r)
+            let (cabecera, r) = wire::cabecera_desde_bytes(bytes)?;
+            let (n_tx, mut r) = leer_contador(r, usize::MAX)?;
+            let mut txs = Vec::with_capacity(n_tx.min(4096));
+            let mut testigos = Vec::with_capacity(n_tx.min(4096));
+            for _ in 0..n_tx {
+                let ((tx, t), resto) = wire::tx_desde_bytes(r)?;
+                txs.push(tx);
+                testigos.push(t);
+                r = resto;
+            }
+            Ok((
+                BloqueRed::Pow {
+                    cabecera,
+                    txs,
+                    testigos,
+                },
+                r,
+            ))
         }
         FamiliaBloque::Post => {
-            let (c, r) = zx_core::preimage::dag::dag_header_desde_bytes(bytes)?;
-            (None, Some(c), r)
+            let (bloque_dag, r) = zx_core::wire_dag::bloque_dag_desde_bytes(bytes)?;
+            let cabecera = bloque_dag.cabecera;
+            let justificacion = bloque_dag.justificacion.clone();
+            let txs = bloque_dag.txs().to_vec();
+            let testigos = bloque_dag.testigos().to_vec();
+            Ok((
+                BloqueRed::Post {
+                    cabecera,
+                    justificacion,
+                    txs,
+                    testigos,
+                },
+                r,
+            ))
         }
-    };
-
-    let (n_tx, mut r) = leer_contador(r, usize::MAX)?;
-    let mut txs = Vec::with_capacity(n_tx.min(4096));
-    let mut testigos = Vec::with_capacity(n_tx.min(4096));
-    for _ in 0..n_tx {
-        let ((tx, t), resto) = wire::tx_desde_bytes(r)?;
-        txs.push(tx);
-        testigos.push(t);
-        r = resto;
     }
-
-    let bloque = match (cabecera_pow, cabecera_post) {
-        (Some(cabecera), None) => BloqueRed::Pow {
-            cabecera,
-            txs,
-            testigos,
-        },
-        (None, Some(cabecera)) => BloqueRed::Post {
-            cabecera,
-            txs,
-            testigos,
-        },
-        // Inalcanzable: el `match` de arriba es exhaustivo y mutuamente excluyente.
-        (Some(_), Some(_)) | (None, None) => return Err(truncado("familia incoherente")),
-    };
-    Ok((bloque, r))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -651,6 +663,7 @@ mod tests {
     use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
     use zx_core::red::Red;
     use zx_core::tx::{Lock, OutPoint, Tx, TxIn, TxOut};
+    use zx_core::wire_dag::{JustificacionPot, PotCheckpoints};
 
     fn h(n: u8) -> BlockHash {
         BlockHash::from_digest(Digest::from_bytes([n; 32]))
@@ -718,9 +731,17 @@ mod tests {
         }
     }
 
+    /// Una justificación PoT no vacía (dos portadores), para ejercitar de verdad el nuevo campo del
+    /// wire (`ORDEN-W06d3` decisión 1), no solo el caso trivial `vacia()`.
+    fn justificacion_simple(n: u8) -> JustificacionPot {
+        let portador = PotCheckpoints::desde_outputs([[n; 16]; 8]);
+        JustificacionPot::nueva(vec![portador, portador]).expect("2 <= MAX_BUNDLES_POT")
+    }
+
     fn bloque_post(n: u8) -> BloqueRed {
         BloqueRed::Post {
             cabecera: cabecera_post(n),
+            justificacion: justificacion_simple(n),
             txs: vec![tx_simple(n)],
             testigos: vec![vec![vec![0x22; 64]]],
         }

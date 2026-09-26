@@ -21,9 +21,12 @@
 //! ([`super::LIMITE_SALTOS_RECORRIDO_ATRAS`]) lo aplica el hilo de consenso, no esta tarea.
 
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 
 use libp2p::PeerId;
 use tokio::sync::mpsc;
+use tokio::time::{self, MissedTickBehavior};
 
 use zx_p2p::error::MotivoDesconexion;
 use zx_p2p::mensaje::{Peticion, Respuesta};
@@ -31,11 +34,23 @@ use zx_p2p::servicio::{EventoRed, ManejoRed};
 
 use super::TrabajoRed;
 use super::vista::VistaRed;
-use std::sync::Arc;
 
 /// Cuántos hashes se piden a la vez en una `Peticion::Bloques` de sincronización (el tope del
 /// protocolo, no un valor propio: pedir más de golpe es un `Excedido` seguro).
 const LOTE_BLOQUES: usize = zx_p2p::limites::MAX_HASHES_POR_PETICION;
+
+/// Cada cuánto se repite el saludo a los pares **ya conectados**, no solo al conectar.
+///
+/// `ORDEN-W06d3`, diagnóstico de la decisión 4 (`PROGRESO.md`): un bloque perdido por gossip —por
+/// ejemplo, publicado antes de que la malla de gossipsub terminara de formarse tras conectar— deja
+/// una cadena de huérfanos que **nadie vuelve a pedir**: `intentar_admitir_*_de_red` solo pide
+/// activamente el padre que falta cuando conoce el origen (`Some(peer)`, la ruta de sincronización),
+/// nunca para un huérfano llegado por gossip (`origen = None`, no se sabe quién lo propagó), y el
+/// único disparador de un nuevo `Peticion::CabecerasPow`/`Peticion::Bloques` era el saludo **al
+/// conectar**. Sin un reintento periódico, un nodo que se queda atrás una sola vez no se recupera
+/// nunca por sí solo, aunque la red entera siga viva y minando. Valor dev: generoso frente al ritmo
+/// de bloques PoW (dificultad trivial, sub-segundo) para no saturar de peticiones un par que va bien.
+const PLAZO_REINTENTO_SALUDO: Duration = Duration::from_secs(5);
 
 /// Qué sabemos de un par para no repetirle la misma petición sin sentido.
 #[derive(Default)]
@@ -51,24 +66,41 @@ pub async fn tarea_sincronizacion(
     trabajo: mpsc::UnboundedSender<TrabajoRed>,
 ) {
     let mut peers: HashMap<PeerId, EstadoPeer> = HashMap::new();
-    while let Some(evento) = eventos.recv().await {
-        match evento {
-            EventoRed::PeerConectado(peer) => {
-                peers.entry(peer).or_default();
-                if manejo.pedir(peer, Peticion::Estado).await.is_err() {
-                    tracing::debug!(%peer, "no se pudo pedir el saludo: el bucle de red ya no está");
+    let mut reintento = time::interval(PLAZO_REINTENTO_SALUDO);
+    reintento.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    // El primer `tick()` de un `interval` es inmediato: se consume aquí, antes del bucle, para no
+    // repetir el saludo del `PeerConectado` inicial un instante después de haberlo pedido ya.
+    reintento.tick().await;
+    loop {
+        tokio::select! {
+            evento = eventos.recv() => {
+                let Some(evento) = evento else { break; };
+                match evento {
+                    EventoRed::PeerConectado(peer) => {
+                        peers.entry(peer).or_default();
+                        if manejo.pedir(peer, Peticion::Estado).await.is_err() {
+                            tracing::debug!(%peer, "no se pudo pedir el saludo: el bucle de red ya no está");
+                        }
+                    }
+                    EventoRed::PeerDesconectado(peer) => {
+                        peers.remove(&peer);
+                    }
+                    EventoRed::PeticionFallida { peer } => {
+                        tracing::debug!(%peer, "una petición de sincronización no llegó a completarse");
+                    }
+                    EventoRed::Respuesta { peer, respuesta, .. } => {
+                        atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await;
+                    }
+                    EventoRed::Escuchando(_) | EventoRed::Suscripcion { .. } => {}
                 }
             }
-            EventoRed::PeerDesconectado(peer) => {
-                peers.remove(&peer);
+            _ = reintento.tick() => {
+                for peer in peers.keys().copied().collect::<Vec<_>>() {
+                    if manejo.pedir(peer, Peticion::Estado).await.is_err() {
+                        tracing::debug!(%peer, "no se pudo repetir el saludo periódico");
+                    }
+                }
             }
-            EventoRed::PeticionFallida { peer } => {
-                tracing::debug!(%peer, "una petición de sincronización no llegó a completarse");
-            }
-            EventoRed::Respuesta {
-                peer, respuesta, ..
-            } => atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await,
-            EventoRed::Escuchando(_) | EventoRed::Suscripcion { .. } => {}
         }
     }
 }
@@ -96,9 +128,20 @@ async fn atender_respuesta(
                 e.saludo_pedido = true;
             }
 
-            // Fase PoW: si el par declara más altura que nosotros, pedimos cabeceras desde nuestro
-            // propio localizador (denso cerca de nuestra punta, espaciado hacia atrás).
-            if otro.punta_pow.altura > vista.altura_pow() {
+            // Fase PoW: pedimos cabeceras si el par declara más altura que nosotros, **o** si su
+            // punta declarada es un hash que no reconocemos todavía (aunque su altura sea igual o
+            // menor). `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): comparar solo la altura
+            // asume que "más alto" es siempre "más trabajo", lo que es falso frente a una
+            // bifurcación real — un nodo que ha estado minando **en solitario** (p. ej. porque el
+            // primer bloque de otro par se perdió antes de que la malla de gossipsub terminara de
+            // formarse, el mismo diagnóstico de la decisión 4) puede alcanzar, sin compartir ningún
+            // bloque con nadie, una altura igual o mayor que la de la red compartida, y entonces
+            // esta condición **nunca** se disparaba: el nodo aislado se quedaba así para siempre,
+            // sin pedir jamás las cabeceras de la rama que en realidad pesa más (`FC-3` lo decidiría
+            // bien si llegara a verla; el problema es que nunca llega). Pedir también por "punta
+            // desconocida" no cuesta más que una petición de más cuando de verdad coincide.
+            let punta_desconocida = !vista.tiene_cuerpo(&otro.punta_pow.hash);
+            if otro.punta_pow.altura > vista.altura_pow() || punta_desconocida {
                 let locator = vista.locator();
                 if manejo
                     .pedir(

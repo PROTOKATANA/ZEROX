@@ -79,6 +79,25 @@ impl VistaRed {
         i.cuerpos_pow.insert(cabecera.block_hash(), bloque);
     }
 
+    /// El hilo de consenso fija la secuencia **completa** de cabeceras de la punta PoW
+    /// seleccionada, tras admitir un bloque o tras una reorganización (`ORDEN-W06d3` decisión 3).
+    ///
+    /// `registrar_pow` (arriba) es *append-only por altura*: una vez que una altura tiene cabecera,
+    /// nunca la sustituye, aunque `zx-cadena` reorganice y esa altura pase a pertenecer a **otro**
+    /// bloque. Sin esto, el locator y `cabeceras_desde` seguirían ofreciendo a los pares la rama que
+    /// ya se descartó localmente — observado en vivo (`PROGRESO.md`): un nodo que reorganiza sobre
+    /// sí mismo puede acabar sirviendo un historial que ni él mismo considera ya canónico. Se llama
+    /// con `historial_pow` completo (siempre empieza en el génesis): reemplaza `cabeceras_pow`
+    /// entero, no solo la cola divergente, para no tener que calcular aquí el punto de corte.
+    /// `cuerpos_pow` no se toca: los cuerpos de bloques de una rama descartada siguen siendo cuerpos
+    /// válidos que se pueden servir si alguien los pide por hash.
+    pub fn fijar_cabeceras_pow(&self, cabeceras: &[BlockHeader]) {
+        if let Ok(mut i) = self.interior.write() {
+            i.cabeceras_pow.clear();
+            i.cabeceras_pow.extend_from_slice(cabeceras);
+        }
+    }
+
     /// El hilo de consenso registra un bloque PoST recién admitido.
     pub fn registrar_post(&self, hash: BlockHash, bloque: BloqueRed) {
         if let Ok(mut i) = self.interior.write() {
@@ -311,6 +330,36 @@ mod tests {
         assert_eq!(salida.len(), 1);
         assert!(
             matches!(&salida[0], BloqueRed::Pow { cabecera, .. } if cabecera.block_hash() == hash0)
+        );
+    }
+
+    /// **`ORDEN-W06d3`, hallazgo en vivo.** `registrar_pow` nunca sustituye una altura ya ocupada
+    /// (`PROGRESO.md`): tras una reorganización, `fijar_cabeceras_pow` es lo único que corrige la
+    /// secuencia para que el localizador refleje la rama seleccionada de verdad, no la primera que
+    /// ocupó cada altura.
+    #[test]
+    fn fijar_cabeceras_pow_sustituye_una_altura_ya_ocupada_por_registrar_pow() {
+        let v = VistaRed::nueva(estado_vacio());
+        let c0 = cabecera(0, h(0));
+        v.registrar_pow(0, bloque_pow(0, h(0)));
+        let c1_vieja = cabecera(1, c0.block_hash());
+        v.registrar_pow(1, bloque_pow(1, c0.block_hash()));
+        assert_eq!(v.altura_pow(), 1);
+        assert_eq!(v.locator().first(), Some(&c1_vieja.block_hash()));
+
+        // Una reorganización cambia la altura 1 por un bloque distinto.
+        let c1_nueva = cabecera(1, c0.block_hash());
+        // `cabecera(1, ..)` con la misma entrada da el mismo hash (determinista): se fuerza un
+        // contenido distinto para simular de verdad "otro bloque en la misma altura".
+        let mut c1_nueva_distinta = c1_nueva;
+        c1_nueva_distinta.nonce = 9_999;
+        v.fijar_cabeceras_pow(&[c0, c1_nueva_distinta]);
+
+        assert_eq!(v.altura_pow(), 1, "la altura no cambia, solo el contenido");
+        assert_eq!(
+            v.locator().first(),
+            Some(&c1_nueva_distinta.block_hash()),
+            "la vista ya no ofrece la rama descartada en la altura 1"
         );
     }
 }

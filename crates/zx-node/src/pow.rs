@@ -29,6 +29,11 @@ pub struct CoinbasePropia {
     pub indice_clave: usize,
     /// Altura en la que se creó.
     pub altura: u32,
+    /// Hash del bloque PoW que la creó (`ORDEN-W06d3` decisión 3): permite podar esta lista tras
+    /// una reorganización, comprobando qué entradas siguen en `historial_pow` de la rama
+    /// seleccionada. La altura sola no basta: dos ramas pueden tener, cada una, un bloque distinto
+    /// en la misma altura.
+    pub bloque: zx_core::BlockHash,
     /// `txid` de la coinbase.
     pub txid: TxId,
     /// Importe de la salida (única, índice 0).

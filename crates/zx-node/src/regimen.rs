@@ -94,8 +94,17 @@ pub enum MsgProductor {
     reason = "un mensaje por producción intentada (~1/s); boxear `PadresDag` (Copy, 481 B) solo movería el coste a una asignación de montón sin beneficio medible"
 )]
 pub enum MsgBucle {
-    /// Padres canónicos (`padres::padres_de_regimen`).
-    Padres(PadresDag),
+    /// Padres canónicos (`padres::padres_de_regimen`), con `(hash, slot)` de **cada** padre
+    /// (seleccionado y extras).
+    ///
+    /// `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): con red, un padre puede ser un bloque
+    /// **ajeno** que este proceso nunca produjo — el bucle lo admitió y lo conoce (`Cadena`,
+    /// `self.servicio_verificacion`), pero el `ServicioPot` **propio** del hilo productor (una
+    /// copia independiente, ver el docstring del módulo) nunca lo vio, porque solo se actualiza
+    /// cuando el propio hilo produce un bloque (`registrar_validado`, más abajo). Sin esta
+    /// información, `producir_en_regimen` fallaba con «el padre seleccionado no está registrado en
+    /// el `ServicioPot`» en cuanto GHOSTDAG elegía un padre de otro nodo.
+    Padres(PadresDag, Vec<(zx_core::BlockHash, u64)>),
     /// El bloque enviado se admitió: sigue produciendo.
     Continuar,
     /// Condición de parada alcanzada (`--parada-tras-slots`): el hilo debe terminar.
@@ -192,11 +201,36 @@ pub fn hilo_productor_regimen(
         if tx.send(MsgProductor::PeticionPadres).is_err() {
             return; // el bucle cerró el canal: apagado normal del proceso.
         }
-        let padres = match rx.recv() {
-            Ok(MsgBucle::Padres(p)) => p,
+        let (padres, info_padres) = match rx.recv() {
+            Ok(MsgBucle::Padres(p, info)) => (p, info),
             Ok(_otro) => panic!("hilo productor: se esperaba Padres, llegó otro mensaje del bucle"),
             Err(_) => return, // el bucle cerró el canal: apagado normal del proceso.
         };
+        // Registra en el `ServicioPot` propio cualquier padre que este hilo no haya producido él
+        // mismo (ver el docstring de `MsgBucle::Padres`). `BloqueDuplicado` es el caso normal (un
+        // padre que sí produjo este mismo hilo, o que ya se registró en una vuelta anterior porque
+        // dos candidatas del mismo slot comparten padres): no es un error, es la confirmación de que
+        // ya estaba. Cualquier otro fallo (`SlotFuturo`, `NDevInvalido`) sí es una incoherencia real.
+        for (hash, slot_padre) in info_padres {
+            // El flujo PoT es único y global (D-P10): si un padre ajeno viene de un slot **más
+            // adelantado** que el que este hilo lleva calculado localmente (su propio `avanzar()`
+            // va a su propio ritmo de AES, independiente de qué tan rápido admita el bucle
+            // principal bloques de red ya calculados por otros), `avanzar_hasta` recalcula de
+            // verdad las salidas que faltan —no las inventa ni las salta— hasta alcanzarlo. Es el
+            // mismo coste que ya paga el flujo normal, solo que de golpe en vez de un slot por
+            // vuelta.
+            if slot_padre > servicio.slot_actual() {
+                servicio.avanzar_hasta(slot_padre).unwrap_or_else(|e| {
+                    panic!("hilo productor: no se pudo alcanzar el slot {slot_padre} del padre ajeno {hash}: {e}")
+                });
+            }
+            match servicio.registrar_validado(hash, slot_padre) {
+                Ok(()) | Err(zx_post::servicio_pot::ErrorServicioPot::BloqueDuplicado { .. }) => {}
+                Err(e) => panic!(
+                    "hilo productor: no se pudo registrar el padre ajeno {hash} (slot {slot_padre}): {e}"
+                ),
+            }
+        }
 
         for (i, candidata) in ganadoras {
             let Some(cp) = claves.get(i) else {
@@ -208,7 +242,7 @@ pub fn hilo_productor_regimen(
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
             let fuente_fija = SolucionFija(candidata);
-            let bloque = producir_en_regimen(
+            let bloque = match producir_en_regimen(
                 padres,
                 slot,
                 &mut servicio,
@@ -216,8 +250,31 @@ pub fn hilo_productor_regimen(
                 &cp.clave.sk,
                 &parametros_bloque,
                 CuerpoProductor::vacio(),
-            )
-            .unwrap_or_else(|e| panic!("hilo productor: producir_en_regimen falló: {e}"));
+            ) {
+                Ok(b) => b,
+                // `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): con red, el padre elegido por
+                // GHOSTDAG puede ser un bloque **más nuevo** que `slot` (otro nodo ya produjo, para
+                // el mismo slot o uno posterior, con el padre que este hilo eligió cuando pidió
+                // `PeticionPadres` — el propio catch-up de arriba, que adelanta `servicio` hasta el
+                // slot del padre, es la prueba de que esto es normal, no un error). No es un bug de
+                // este nodo: el candidato ya no puede ser un bloque de cadena válido (`slot(B)` MUST
+                // ser mayor que `slot(sp)`), así que se descarta esta candidata concreta y se sigue
+                // con la siguiente (o con el siguiente slot si no hay más). Cualquier otro error de
+                // `producir_en_regimen` sigue siendo una incoherencia interna real.
+                Err(zx_post::productor_regimen::ErrorRegimen::SlotNoProgreso {
+                    slot: slot_bloque,
+                    slot_sp,
+                }) => {
+                    tracing::info!(
+                        slot_bloque,
+                        slot_sp,
+                        "candidata descartada: el padre elegido ya es de este slot o uno \
+                         posterior (otro nodo se adelantó)"
+                    );
+                    continue;
+                }
+                Err(e) => panic!("hilo productor: producir_en_regimen falló: {e}"),
+            };
             let hash = bloque.cabecera.block_hash();
             servicio
                 .registrar_validado(hash, slot)
@@ -229,7 +286,7 @@ pub fn hilo_productor_regimen(
             match rx.recv() {
                 Ok(MsgBucle::Continuar) => {}
                 Ok(MsgBucle::Parar) | Err(_) => return,
-                Ok(MsgBucle::Padres(_)) => {
+                Ok(MsgBucle::Padres(..)) => {
                     panic!("hilo productor: se esperaba Continuar/Parar, llegó Padres")
                 }
             }

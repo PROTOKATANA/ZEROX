@@ -33,6 +33,7 @@ use zx_core::preimage::block::BlockHeader;
 use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
 use zx_core::red::Red;
 use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
+use zx_core::wire_dag::{JustificacionPot, PotCheckpoints};
 use zx_p2p::behaviour::ZxBehaviour;
 use zx_p2p::config::ParametrosRed;
 use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto, VeredictoFinal};
@@ -308,8 +309,14 @@ fn bloque_pow(n: u8) -> BloqueRed {
 }
 
 /// Un bloque PoST de fixture.
+fn justificacion_simple(n: u8) -> JustificacionPot {
+    let portador = PotCheckpoints::desde_outputs([[n; 16]; 8]);
+    JustificacionPot::nueva(vec![portador]).unwrap_or_else(|_| unreachable!("1 <= MAX_BUNDLES_POT"))
+}
+
 fn bloque_post(n: u8) -> BloqueRed {
     BloqueRed::Post {
+        justificacion: justificacion_simple(n),
         cabecera: DagBlockHeader {
             consensus_branch_id: 0xa8b4_66a7,
             merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),

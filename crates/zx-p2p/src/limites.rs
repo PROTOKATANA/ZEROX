@@ -24,6 +24,7 @@
 
 use zx_core::preimage::block::TAMANO_CABECERA;
 use zx_core::preimage::dag::TAMANO_CABECERA_MAX;
+use zx_core::wire_dag::MAX_JUSTIFICACION_POT_CODIFICADA;
 
 /// Cuerpo máximo de un bloque en la red dev, en bytes.
 ///
@@ -35,9 +36,14 @@ pub const MAX_CUERPO_DEV_BYTES: u64 = 2 * 1024 * 1024;
 /// Tamaño máximo de un [`crate::mensaje::BloqueRed`], en bytes.
 ///
 /// Desglose: cabecera PoST máxima ([`TAMANO_CABECERA_MAX`] = 1 037 B, la más grande de las dos
-/// familias) **más** el cuerpo máximo dev. No incluye el byte de familia ni el `CompactSize` del
-/// contador de transacciones: eso lo añade el códec al comprobar el buffer recibido.
-pub const MAX_BLOQUE_RED_BYTES: u64 = TAMANO_CABECERA_MAX as u64 + MAX_CUERPO_DEV_BYTES;
+/// familias) **más** la justificación PoT codificada al máximo
+/// ([`MAX_JUSTIFICACION_POT_CODIFICADA`] = 19 201 B; `ORDEN-W06d3` decisión 1: `BloqueRed::Post`
+/// ahora la lleva, igual que `zx_core::wire_dag::BloqueDag`) **más** el cuerpo máximo dev. Un bloque
+/// PoW no tiene justificación y por tanto siempre mide menos que este máximo. No incluye el byte de
+/// familia ni el `CompactSize` del contador de transacciones: eso lo añade el códec al comprobar el
+/// buffer recibido.
+pub const MAX_BLOQUE_RED_BYTES: u64 =
+    TAMANO_CABECERA_MAX as u64 + MAX_JUSTIFICACION_POT_CODIFICADA as u64 + MAX_CUERPO_DEV_BYTES;
 
 /// Cuántas veces el límite de bloque dev admite el transporte.
 ///
@@ -217,13 +223,20 @@ mod tests {
     };
     use zx_core::preimage::block::TAMANO_CABECERA;
     use zx_core::preimage::dag::TAMANO_CABECERA_MAX;
+    use zx_core::wire_dag::MAX_JUSTIFICACION_POT_CODIFICADA;
 
-    /// El límite de BloqueRed se **deriva** de la cabecera PoST máxima y del cuerpo dev declarado.
+    /// El límite de `BloqueRed` se **deriva** de la cabecera PoST máxima, la justificación PoT
+    /// codificada al máximo y el cuerpo dev declarado (`ORDEN-W06d3` decisión 1).
     #[test]
     fn el_limite_de_bloque_red_se_deriva() {
         assert_eq!(TAMANO_CABECERA_MAX, 1_037, "la cabecera PoST máxima");
+        assert_eq!(MAX_JUSTIFICACION_POT_CODIFICADA, 19_201);
         assert_eq!(MAX_CUERPO_DEV_BYTES, 2 * 1024 * 1024);
-        assert_eq!(MAX_BLOQUE_RED_BYTES, 1_037 + 2 * 1024 * 1024);
+        assert_eq!(
+            MAX_BLOQUE_RED_BYTES,
+            1_037 + 19_201 + 2 * 1024 * 1024,
+            "cabecera + justificación PoT + cuerpo"
+        );
         assert_eq!(LIMITE_BLOQUE_DEV, MAX_BLOQUE_RED_BYTES);
     }
 

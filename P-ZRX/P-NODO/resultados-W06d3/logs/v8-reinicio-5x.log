@@ -1,0 +1,60 @@
+=== RONDA 1 ===
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running tests/reinicio.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/reinicio-bd920339b63d93a5)
+
+running 2 tests
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar ... ok
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 401.31s
+
+=== RONDA 2 ===
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running tests/reinicio.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/reinicio-bd920339b63d93a5)
+
+running 2 tests
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar ... ok
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 415.25s
+
+=== RONDA 3 ===
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running tests/reinicio.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/reinicio-bd920339b63d93a5)
+
+running 2 tests
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar ... ok
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 424.43s
+
+=== RONDA 4 ===
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/reinicio.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/reinicio-bd920339b63d93a5)
+
+running 2 tests
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar ... ok
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 452.24s
+
+=== RONDA 5 ===
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running tests/reinicio.rs (/home/katana/zeo/ZEROX/deepseek/W06d3/target/debug/deps/reinicio-bd920339b63d93a5)
+
+running 2 tests
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar has been running for over 60 seconds
+test v5b_testigo_pow_corrupto_impide_arrancar ... ok
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 457.73s
+

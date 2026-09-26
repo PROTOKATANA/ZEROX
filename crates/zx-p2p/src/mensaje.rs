@@ -26,6 +26,7 @@ use zx_core::preimage::block::BlockHeader;
 use zx_core::preimage::dag::DagBlockHeader;
 use zx_core::red::Red;
 use zx_core::tx::Tx;
+use zx_core::wire_dag::JustificacionPot;
 
 /// Máximo de puntas PoST que caben en un [`Estado`].
 ///
@@ -95,10 +96,16 @@ pub enum BloqueRed {
         /// `testigos[i][j]` es el testigo de la entrada `j` de la transacción `i`.
         testigos: Vec<Vec<Vec<u8>>>,
     },
-    /// Bloque PoST: cabecera DAG y cuerpo.
+    /// Bloque PoST: cabecera DAG, justificación PoT y cuerpo.
     Post {
         /// Cabecera DAG (F-02).
         cabecera: DagBlockHeader,
+        /// Justificación PoT (`ORDEN-W06d3` decisión 1): sin ella,
+        /// `zx_post::cabecera_conjunta::verificar_cabecera_conjunta` no puede comprobar el PoT ni el
+        /// PoAS de un bloque ajeno (`REVISION-W06d2.md`, bloqueo). Va **fuera** de `block_hash`
+        /// (igual que en [`zx_core::wire_dag::BloqueDag`]): es evidencia contextual, no consenso de
+        /// la cabecera.
+        justificacion: JustificacionPot,
         /// Transacciones, la primera de las cuales es la coinbase PoST.
         txs: Vec<Tx>,
         /// `testigos[i][j]` es el testigo de la entrada `j` de la transacción `i`.

@@ -7,16 +7,21 @@
 //!
 //! # Qué cubre esta versión, y qué no (ver `PROGRESO.md` del encargo)
 //!
-//! `BloqueRed::Post` no lleva `JustificacionPot` (bloqueo documentado): `zx-node` trata **todo**
-//! bloque PoST de red como no juzgable (`Ignorar`) sin mirar su contenido. Los escenarios de E-7
-//! que dependen de PoAS/PoT/sello **PoST** malos, y el escenario E-8 (equivocación), no se pueden
-//! observar todavía como un rechazo con motivo específico por esta vía: el objetivo los ignora por
-//! el formato, no por el contenido. Se envían igualmente (ejercitan de verdad el códec y el
-//! transporte) pero el veredicto esperado documentado aquí es «ignorado por bloqueo de formato»,
-//! no «rechazado por PoAS/PoT inválido». Los escenarios de la familia **PoW** sí se validan de
-//! extremo a extremo: esta herramienta primero pregunta el estado real del objetivo (`Peticion::
-//! Estado`) y construye los bloques adversariales **extendiendo su punta real**, para que lleguen
-//! al validador de verdad en vez de quedarse en «huérfano, no juzgable».
+//! `BloqueRed::Post` ya lleva `JustificacionPot` (`ORDEN-W06d3` decisión 1): el objetivo puede
+//! verificar de verdad la cabecera conjunta de un PoST ajeno. Los escenarios de E-7 con PoAS/PoT/
+//! sello **PoST** malos declaran como único padre el **terminal real** del objetivo (pedido con
+//! `Peticion::Estado`, igual que ya hacían los de PoW): así el bloque llega a la verificación de
+//! contenido en vez de quedarse en «huérfano, padre desconocido». Si el objetivo todavía no tiene
+//! terminal (sigue en fase PoW), esos escenarios se omiten: enviarlos sin un padre real solo
+//! probaría el camino de huérfanos, ya cubierto por la ráfaga de E-7. El escenario **E-8**
+//! (equivocación) sigue limitado: esta herramienta no tiene la clave privada de ningún productor
+//! real, así que no puede construir dos bloques **válidos** del mismo slot y observar cómo los
+//! colorea GHOSTDAG (eso se demuestra en un test dedicado con claves propias, no por red); lo que
+//! sí demuestra es que dos bloques distintos con contenido inválido para el mismo slot se rechazan
+//! cada uno por su motivo, sin que el segundo cambie el estado. Los escenarios de la familia
+//! **PoW** se validan de extremo a extremo: esta herramienta primero pregunta el estado real del
+//! objetivo (`Peticion::Estado`) y construye los bloques adversariales **extendiendo su punta
+//! real**, para que lleguen al validador de verdad en vez de quedarse en «huérfano, no juzgable».
 //!
 //! # Cómo se usa
 //!
@@ -42,6 +47,7 @@ use zx_core::preimage::block::{BlockHeader, merkle_root};
 use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
 use zx_core::red::Red;
 use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
+use zx_core::wire_dag::{JustificacionPot, PotCheckpoints};
 use zx_p2p::behaviour::ZxBehaviour;
 use zx_p2p::config::ParametrosRed;
 use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
@@ -255,30 +261,42 @@ fn escenario_rafaga_huerfanos(n: usize) -> Vec<BloqueRed> {
         .collect()
 }
 
-/// E-7 «PoST con PoAS/PoT/sello malos» y E-8 «equivocación»: se envían igual (ejercitan el códec y
-/// el transporte reales), pero ver el docstring del módulo: el objetivo los ignora por el bloqueo
-/// de formato, no por su contenido, en esta versión.
-fn escenario_post_malo(n: u8) -> BloqueRed {
-    BloqueRed::Post {
+/// Justificación PoT que no corresponde a ningún flujo real: basta un portador de relleno para que
+/// `verificar_cabecera_conjunta` la lea y la rechace en la comprobación de PoT, en vez de fallar
+/// antes por tener la lista vacía (que también sería un rechazo, pero uno de forma, no de PoT).
+fn justificacion_mala(variante: u8) -> JustificacionPot {
+    let portador = PotCheckpoints::desde_outputs([[0xEE ^ variante; 16]; 8]);
+    JustificacionPot::nueva(vec![portador]).unwrap_or_else(|_| unreachable!("1 <= MAX_BUNDLES_POT"))
+}
+
+/// E-7 «PoST con PoAS/PoT/sello malos» y E-8 «equivocación» (ver el docstring del módulo: E-8
+/// sigue limitado por no tener claves reales). `variante` distingue el hash de dos bloques del
+/// mismo `slot` sin cambiar nada más. Declara como único padre el **terminal real** del objetivo:
+/// sin eso, el objetivo lo trataría como huérfano (`Ignorar`) en vez de verificar su contenido.
+/// `None` si el objetivo todavía no tiene terminal (nada útil que demostrar por esta vía todavía).
+fn escenario_post_malo(slot: u8, variante: u8, estado_objetivo: &Estado) -> Option<BloqueRed> {
+    let terminal = estado_objetivo.terminal?;
+    Some(BloqueRed::Post {
         cabecera: DagBlockHeader {
             consensus_branch_id: zx_core::CBID_RED_DEV,
-            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x99; 32])),
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x99 ^ variante; 32])),
             timestamp: 1_800_000_000,
             height: 0,
-            slot: u64::from(n),
+            slot: u64::from(slot),
             pot_output: [0xFF; 16], // PoT que no corresponde a ningún flujo real.
             rango_solucion: 1,
             sol: SolucionPoas::default(), // PoAS vacía/inválida.
             body_commitment: zx_core::digest::BodyCommitment::from_digest(Digest::from_bytes(
-                [0x11; 32],
+                [0x11 ^ variante; 32],
             )),
-            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x22; 32])), &[])
+            padres: PadresDag::nuevo(terminal, &[])
                 .unwrap_or_else(|_| unreachable!("un solo padre siempre construye")),
             sello: [0xFF; 64], // sello arbitrario, no una firma real.
         },
-        txs: vec![tx_llave(n)],
+        justificacion: justificacion_mala(variante),
+        txs: vec![tx_llave(slot)],
         testigos: vec![vec![vec![0xBB; 64]]],
-    }
+    })
 }
 
 #[tokio::main]
@@ -344,23 +362,40 @@ async fn main() {
     )
     .await;
 
-    ejecutar_escenario(
-        &manejo,
-        &mut eventos,
-        "E-7 PoST con PoAS/PoT/sello malos (limitado: ver docstring del módulo)",
-        vec![escenario_post_malo(1)],
-        pausa,
-    )
-    .await;
+    if let Some(b) = escenario_post_malo(1, 0, &estado_objetivo) {
+        ejecutar_escenario(
+            &manejo,
+            &mut eventos,
+            "E-7 PoST con PoAS/PoT/sello malos (padre = terminal real del objetivo)",
+            vec![b],
+            pausa,
+        )
+        .await;
+    } else {
+        println!(
+            "zx-adversario: E-7 PoST malo OMITIDO (el objetivo todavía no fijó terminal, sigue en \
+             fase PoW)"
+        );
+    }
 
-    ejecutar_escenario(
-        &manejo,
-        &mut eventos,
-        "E-8 equivocación: misma clave, dos bloques del mismo slot (limitado: ver docstring)",
-        vec![escenario_post_malo(2), escenario_post_malo(2)],
-        pausa,
-    )
-    .await;
+    match (
+        escenario_post_malo(2, 1, &estado_objetivo),
+        escenario_post_malo(2, 2, &estado_objetivo),
+    ) {
+        (Some(b1), Some(b2)) => {
+            ejecutar_escenario(
+                &manejo,
+                &mut eventos,
+                "E-8 equivocación: dos bloques distintos del mismo slot (limitado: ver docstring)",
+                vec![b1, b2],
+                pausa,
+            )
+            .await;
+        }
+        _ => println!(
+            "zx-adversario: E-8 OMITIDO (el objetivo todavía no fijó terminal, sigue en fase PoW)"
+        ),
+    }
 
     // A partir de aquí, cada escenario puede banear la conexión: van al final.
     ejecutar_escenario(

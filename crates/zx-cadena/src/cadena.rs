@@ -19,6 +19,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
+use primitive_types::U256;
 use zx_consensus::transicion::{
     Estado, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar, aplicar_fusion, deshacer,
     es_terminal_condiciones,
@@ -85,6 +86,14 @@ pub struct Cadena {
     dag_idx: BTreeMap<BlockHash, Idx>,
     dag_orden: Vec<BlockHash>,
     dag_datos: BTreeMap<BlockHash, DatosDag>,
+    /// Puntas PoW válidas conocidas: bloques PoW sin ningún hijo PoW válido todavía
+    /// (`ORDEN-W06d3` decisión 3). Varias a la vez es exactamente una bifurcación PoW.
+    tips_pow: BTreeSet<BlockHash>,
+    /// Bloques PoW que, en su propia rama, ya cumplen `es_terminal_condiciones` (altura, trabajo,
+    /// `Φ`). Candidatos a terminal mientras no exista ningún bloque PoST (`self.dag.is_none()`):
+    /// FC-3 (`P-ZRX/P-TRANSICION/ORDEN-T01.md` §CorteSelección) dice que, sin sufijo PoST, gana el
+    /// de más trabajo PoW, no el primero que llegó.
+    terminal_candidatos: BTreeSet<BlockHash>,
 }
 
 impl Cadena {
@@ -114,6 +123,8 @@ impl Cadena {
             dag_idx: BTreeMap::new(),
             dag_orden: Vec::new(),
             dag_datos: BTreeMap::new(),
+            tips_pow: BTreeSet::new(),
+            terminal_candidatos: BTreeSet::new(),
         }
     }
 
@@ -346,6 +357,12 @@ impl Cadena {
     }
 
     /// Admite un bloque PoW en modo estricto (`ED-1`).
+    ///
+    /// Cada bloque se valida contra el estado de **su padre declarado** (`self.post.get(&p)`), no
+    /// contra ninguna noción de "la punta": dos bloques con el mismo padre (una bifurcación PoW) se
+    /// admiten los dos, cada uno con su propio `Estado(past)`/`Estado(post)` independiente. Es lo
+    /// que hace posible una bifurcación PoW real sin ningún "undo": los dos ya coexisten en `past`/
+    /// `post`, indexados por hash (`ORDEN-W06d3` decisión 3).
     fn admitir_pow(&mut self, bloque: &BloqueCadena) -> Result<(), MotivoBloque> {
         let (hash, padre) = match bloque {
             BloqueCadena::Pow(b) => (b.hash(), b.padre()),
@@ -365,16 +382,68 @@ impl Cadena {
             &self.params,
             self.cbid,
         )?;
-        if self.terminal.is_none()
+
+        // Una bifurcación PoW real: el padre deja de ser punta (si lo era) y este bloque lo es.
+        if let Some(p) = padre {
+            self.tips_pow.remove(&p);
+        }
+        self.tips_pow.insert(hash);
+
+        // FC-3 (`P-ZRX/P-TRANSICION/ORDEN-T01.md` §159): sin ningún sufijo PoST, el terminal es el
+        // de mayor trabajo PoW entre los que ya cumplen las condiciones de corte, no el primero que
+        // llegó. Se congela para siempre en cuanto se admite el primer bloque PoST (`self.dag` deja
+        // de ser `None`): a partir de ahí cambiar el terminal invalidaría todo el DAG construido
+        // sobre él, así que ni se busca un candidato nuevo ni se recalcula.
+        let dag_ya_existe = self.dag.is_some();
+        if !dag_ya_existe
             && let Some(altura) = bloque.como_transicion().hechos.altura()
             && es_terminal_condiciones(&nuevo, &self.params, altura)
         {
-            self.terminal = Some(hash);
-            self.estado_t = nuevo.clone();
+            self.terminal_candidatos.insert(hash);
         }
         self.past.insert(hash, estado_padre);
         self.post.insert(hash, nuevo);
+        if !dag_ya_existe {
+            self.recalcular_terminal();
+        }
         Ok(())
+    }
+
+    /// Recalcula, entre [`Self::terminal_candidatos`], cuál es el terminal según FC-3: mayor
+    /// `Estado::trabajo` acumulado (empate: hash menor, determinista y ajeno al orden de llegada).
+    /// Solo se llama mientras `self.dag.is_none()` (sin sufijo PoST todavía): una vez congelado, el
+    /// terminal ya no se toca desde aquí.
+    fn recalcular_terminal(&mut self) {
+        let mejor = self.terminal_candidatos.iter().copied().min_by(|a, b| {
+            let wa = self.post.get(a).map(|e| e.trabajo).unwrap_or_default();
+            let wb = self.post.get(b).map(|e| e.trabajo).unwrap_or_default();
+            wb.cmp(&wa).then_with(|| a.cmp(b))
+        });
+        if let Some(hash) = mejor
+            && let Some(estado) = self.post.get(&hash).cloned()
+        {
+            self.terminal = Some(hash);
+            self.estado_t = estado;
+        }
+    }
+
+    /// Mejor punta PoW conocida por trabajo acumulado (empate: hash menor), sea o no ya terminal
+    /// (`ORDEN-W06d3` decisión 3): es lo que sigue la plantilla de minado, para que un bloque propio
+    /// siempre extienda la rama más pesada conocida, no una punta cualquiera.
+    #[must_use]
+    pub fn mejor_punta_pow(&self) -> Option<BlockHash> {
+        self.tips_pow.iter().copied().min_by(|a, b| {
+            let wa = self.post.get(a).map(|e| e.trabajo).unwrap_or_default();
+            let wb = self.post.get(b).map(|e| e.trabajo).unwrap_or_default();
+            wb.cmp(&wa).then_with(|| a.cmp(b))
+        })
+    }
+
+    /// Trabajo PoW acumulado de un bloque admitido, si se conoce (`ORDEN-W06d3` decisión 3): lo que
+    /// el nodo publica como `trabajo_acumulado` de su punta seleccionada en el saludo de red.
+    #[must_use]
+    pub fn trabajo_pow(&self, hash: &BlockHash) -> Option<U256> {
+        self.post.get(hash).map(|e| e.trabajo)
     }
 
     /// Admite un bloque PoST: forma, GHOSTDAG, `Estado(past(B))`, garantía y `post(B)`.
