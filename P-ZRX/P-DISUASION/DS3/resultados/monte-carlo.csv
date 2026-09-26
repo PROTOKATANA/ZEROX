@@ -1,0 +1,4 @@
+caso,replicas,valor_exacto,mc,ic95_lo,ic95_hi,resultado
+ventana p=1/3 d=5 T=400,20000,0.015625,0.0159,0.014257031,0.017728899,DENTRO
+retención P(B=0) θ=0.36,20000,0.69767633,0.69925,0.6928567,0.70556678,DENTRO
+cola profunda 9.75e-108,20000,9.75e-108,no alcanzable,—,—,MC NO APLICA (P << 1/nrep): se usa oráculo exacto

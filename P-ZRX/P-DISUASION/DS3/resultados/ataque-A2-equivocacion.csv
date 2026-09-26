@@ -1,0 +1,6 @@
+identidad,m_soluciones_slot,kappa,perdida_ue,soborno_ue,coste_reclutamiento_ue,veredicto,etiqueta
+C-GD-07; m≤0.05,0.05,1,1830,1830,0,Ec (evidencia necesaria),condicionado a κ>0 y a que la evidencia llegue
+C-GD-07; m=1,1,0.455,1830,832.65,0,Ec (evidencia necesaria),condicionado a κ>0 y a que la evidencia llegue
+C-GD-07; m=4,4,0,1830,0,0,N (κ=0: sin evidencia),condicionado a κ>0 y a que la evidencia llegue
+flujo divergente,NaN,0,1830,0,0,N (κ=0: sin evidencia),condicionado a κ>0 y a que la evidencia llegue
+misma-parcela IDV-01,NaN,1,1830,1830,0,Ec (evidencia necesaria),condicionado a κ>0 y a que la evidencia llegue

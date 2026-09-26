@@ -1,0 +1,45 @@
+# DS-3 · escenarios.tsv — parámetros de escenario leídos por run.jl
+# Formato: clave<TAB>valor<TAB>unidad<TAB>etiqueta<TAB>procedencia<TAB>barrido
+# NINGUNA constante oculta: todo parámetro que entra en un cálculo sale de aquí.
+# Etiquetas: medido | hecho | derivado | hipótesis | condicionado
+clave	valor	unidad	etiqueta	procedencia	barrido
+alpha	0.33	fracción de espacio	hipótesis	MODELO §3 (rejilla P-CLAVE/P-PRESTAMO)	0.10;0.20;0.25;0.33;0.40
+beta_d	0.34	fracción de espacio	hipótesis	MODELO §3 (rejilla de comprobación)	0.20;0.34;0.50
+beta_x	0.0	fracción de espacio	hipótesis	MODELO §3	0
+F_slots	1019	slots	hipótesis (símbolo sin fijar)	P-PRESTAMO §2	1019;3600
+eta_h	1.0	adimensional	hipótesis (idealizado)	MODELO §2.1	1
+eta_a	1.0	adimensional	hipótesis (idealizado)	MODELO §2.1	1
+lambda	1.0	bloques/slot	entrada	MODELO §1	1
+T_v	3600	slots	hipótesis	MODELO §3 (rejilla P-CLAVE §6)	1000;3600;10000;100000
+rho_ret	0.50	fracción	hipótesis	MODELO §3 (rejilla P-CLAVE §6)	0.10;0.25;0.50;1.00
+kappa	1.0	adimensional	hipótesis (tabla exacta P-EQUIVOCACION)	MODELO §2.6	0;0.455;1.0
+q_gana	1.0	adimensional	hipótesis	MODELO §1 (censura de la prueba)	0.1;1.0
+I	1.0	u.e. por bloque	hipótesis	MODELO §2.3	1
+c_r	10.0	u.e.	hipótesis	P-PRESTAMO §5	10
+M	20.0	slots	hipótesis	P-PRESTAMO §5	20
+V	400.0	u.e. por reclutado	hipótesis	P-PRESTAMO §5	400
+N_recl	100	conteo	hipótesis	P-PRESTAMO §4	100
+nu	0.0001	reorgs/slot	hipótesis	MODELO §3 (rejilla P-CLAVE §6)	0.0001;0.0003;0.001
+q_garantia	1000.0	u.e.	hipótesis (3 escenarios)	MODELO §3 (CONTRATO-v0 §1: forma pendiente)	100;1000;10000
+tipo_interes	0.05	1/año	hipótesis	MODELO §3 (mercado cripto 2024-2025, no verificado)	0;0.05;0.15
+f_media	0.001	fracción de espacio	hipótesis H3	P-CLAVE H3	0.001
+eps_saldo	0.01	u.e.	hipótesis	P-CLAVE §3 (umbral de saldo cero)	0.001;0.01
+dist_f_min	1e-8	fracción de espacio	hipótesis H3	P-CLAVE H3	1e-8
+dist_alpha	2.2	adimensional	hipótesis H3	P-CLAVE H3	2.05;2.2;2.5;3.0
+w_sin_vdf	7175	slots	hecho (medido/derivado, sin revalidar)	MODELO §3 / P-REVELACION	7175;8030
+w_con_vdf	4830.6	slots	hecho (segundo VDF, ρ=2.5)	MODELO §3 / P-REVELACION	4830.6
+N_TiB	1048480	piezas	hecho	P-COBERTURA (1 TiB / Piece::SIZE)	1048480
+k_auditoria	1000000	aperturas por TiB	hipótesis	P-COBERTURA §5.2	1000;100000;1000000
+D_a	60	s	hecho	P-COBERTURA	60
+r_maquina	25.03	unidades/s	medido	P-COBERTURA / P-INTENTO §11	25.03
+t_unidad	0.809	s/unidad	medido	P-INTENTO §11	0.809
+t_M3	0.02299	s	medido	P-INTENTO §7	0.02299
+pi_DAG	1.0	adimensional	hipótesis (límite favorable al atacante)	P-INTENTO §11	0.5;1.0
+N_h_20TB	19071000	piezas	hecho (20 TB / Piece::SIZE)	P-INTENTO §12	19071000
+precio_token	1.0	referencia arbitraria	hipótesis	MODELO §3 (ZEROX no tiene mercado)	0.1;1;10
+P_objetivo	1e-6	probabilidad	hipótesis DS-3 (falta F2 de orden)	DS-3 DEFINICIONES-FALTANTES F2	1e-6;1e-3;0.5;0.99
+eps_honesto	0.001	1/año	hipótesis	P-PRESTAMO §6	0.001
+vatio_nucleo	65.0	W/núcleo	hipótesis	P-COBERTURA §5.4	65
+vatio_TiB	5.0	W/TiB	hipótesis	P-COBERTURA §5.4	5
+nucleos_por_farmer_slot	0.092	núcleos·slot/granjero·slot	hecho (heredado P-PRESTAMO §4)	P-PRESTAMO §4	0.092;0.190
+factor_gpu	17.0	adimensional	hipótesis NO MEDIDA (documentación ajena)	MODELO §2.7	17

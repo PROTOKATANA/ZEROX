@@ -1,0 +1,19 @@
+alpha,beta_d,F_slots,p_adv,d,P_primera,log10P,etiqueta,condicion
+0.2,0,1019,0.2,611,0,-368.461,limite_ruina,condicionado H-PUENTE
+0.2,0,3600,0.2,2160,0,-1301.05,limite_ruina,condicionado H-PUENTE
+0.2,0.34,1019,0.402985,265,6.57947e-48,-47.1818,exacto,condicionado H-PUENTE
+0.2,0.34,3600,0.402985,936,3.08962e-165,-164.51,exacto,condicionado H-PUENTE
+0.2,0.7,1019,0.529412,0,0.999228,-0.000335506,exacto,condicionado H-PUENTE
+0.2,0.7,3600,0.529412,0,0.999998,-7.88627e-07,exacto,condicionado H-PUENTE
+0.33,0,1019,0.33,346,9.75216e-108,-107.011,exacto,condicionado H-PUENTE
+0.33,0,3600,0.33,1224,0,-376.762,limite_ruina,condicionado H-PUENTE
+0.33,0.34,1019,0.5,0,0.975023,-0.010985,exacto,condicionado H-PUENTE
+0.33,0.34,3600,0.5,0,0.986703,-0.00581362,exacto,condicionado H-PUENTE
+0.33,0.5,1019,0.553333,0,0.999994,-2.45915e-06,exacto,condicionado H-PUENTE
+0.33,0.5,3600,0.553333,0,1,-1.64852e-13,exacto,condicionado H-PUENTE
+0.4,0,1019,0.4,204,4.13029e-37,-36.384,exacto,condicionado H-PUENTE
+0.4,0,3600,0.4,720,5.56797e-128,-127.254,exacto,condicionado H-PUENTE
+0.4,0.34,1019,0.552239,0,0.999993,-3.2237e-06,exacto,condicionado H-PUENTE
+0.4,0.34,3600,0.552239,0,1,-3.98074e-13,exacto,condicionado H-PUENTE
+0.4,0.5,1019,0.6,0,1,-2.71024e-13,exacto,condicionado H-PUENTE
+0.4,0.5,3600,0.6,0,1,-2.89298e-16,exacto,condicionado H-PUENTE

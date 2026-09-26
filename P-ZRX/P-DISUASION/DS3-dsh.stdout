@@ -1,0 +1,39 @@
+Orden DS-3 cumplida. Todo el trabajo vive en `/home/katana/zeo/ZEROX/P-ZRX/P-DISUASION/DS3/` (nada escrito fuera de la zona). Entrada congelada verificada (`sha256sum -c ENTRADA-DS3.sha256` → las 6 sumas coinciden) y `Pkg.test()` en verde.
+
+## Falta de definición (informada antes de editar, en `DEFINICIONES-FALTANTES.md`)
+
+Ninguna bloqueó la ejecución; todas se resolvieron con una decisión declarada:
+
+- **F1** — DS-2 **no** formula el «multiplica el coste por al menos …» por celda E: DS-3 lo construye y lo marca como suyo.
+- **F2** — el MODELO no define una función coste↔probabilidad para A4/A5/A7/A8/A9/A10: se invierte donde hay fórmula y el resto se publica **no cuantificado**.
+- **F3** — redondeo de `d` a entero: se adopta `round(Int, ·)`.
+- **F4** — derivación de semillas no consecutivas: SplitMix64 de P-CLAVE.
+- **F5** — forma funcional de `q`/`S_min` para A4: modelo DS-3 declarado (`q` por identidad).
+- **F6** — M4, F3-en-ZEROX, O3, F5, O5 sin fórmula: no se inventan cifras.
+- **F7** — la cota de Baig–Pietrzak transcrita en el MODELO da **4.253** (3.297+816+140), no «≈1.233+140»; se implementa la fórmula y se publica la discrepancia.
+- **F8/F9** — H-PUENTE, precios y traslado de energía: etiquetados; `coste_honesto` definido explícitamente.
+- **F10** — el ejemplo «ρ_ret·T_v ≳ 4.000» de §2.5 no cuadra con su propia desigualdad (da 370): se implementa la desigualdad y se declara la discrepancia.
+
+## Resultado central (coste mínimo B0 → B1 → candidato)
+
+| Celda E | Δ de coste de X | Veredicto |
+|---|---|---|
+| **A1 · M3+M5** | **0** para todo `P*≤0,5` (β_d≤0,585 < B(ε)=0,675) | **REFUTADA**: la grieta compra el `β_d` que cruza la deriva a coste 0 |
+| **A2 · M3** (κ escalonado) | soborno nominal 1.830 → 833 → 0 según `m`; coste real **0** por la grieta | **Ec** solo al atacante pequeño |
+| **A3 · F1+F2+F4** | **117,238 núcleos/TiB** continuos, **1.524×** la energía de almacenar | **E exigible**; detección **0** si `k≤181.092` |
+| **A4 · M1/F4** | `1000 u.e./identidad`; **165 %** del ingreso semanal de `f=10⁻³` | **Ee regresivo**; marginal→0 para el grande |
+| **A5 · O4** | regla de consenso, sin coste en tokens | **Ee sin detección** (la celda más limpia) |
+| A7/A8/A9/A10 | no cuantificables con el MODELO ratificado | declarado |
+
+Los 7 casos de regresión de `MODELO` §4 reproducen: `P=9,75216·10⁻¹⁰⁸`, `P(B=0)=0,697676`, `B(ε)=0,675466/0,369043`, frontera `k=B` con `M=189.670/189.671 → 9,8712·10⁻³/1,0181·10⁻²`, `w_eq=761.926`, `117,238 núcleos/TiB` y `4.253`.
+
+## Verificación
+
+- 4 vías independientes de la primera pasada coinciden en **4.216 celdas** (error `1,1·10⁻¹⁵`); enumeración en 2.728 celdas (`2,2·10⁻¹⁶`).
+- Monte Carlo `StableRNGs` (semilla `0x5a5a`, 20.000 réplicas) dentro del IC de Wilson; serie ≡ paralelo.
+- Optimización validada (LINEO §2): la DP absorbente equivalente es ~1.000× más rápida y deja `run.jl` en **1,4 s** sin cambiar ninguna cifra.
+- Presupuesto de la orden respetado: **4 hilos**, 8 GiB, <2 h.
+
+Comando reproducible: `JULIA_DEPOT_PATH="$PWD/.julia-depot:/home/katana/.julia" JULIA_NUM_THREADS=4 julia --project=. --threads=4,0 run.jl --seed 0x5a5a --reps 20000`.
+
+Entregables: `INFORME.md`, `DEFINICIONES-FALTANTES.md`, `escenarios.tsv` (33 parámetros etiquetados con procedencia y barrido), `src/`, `test/`, `bench/`, `run.jl`, `Manifest.toml`, `HUELLAS.sha256` y 11 CSV en `resultados/`.

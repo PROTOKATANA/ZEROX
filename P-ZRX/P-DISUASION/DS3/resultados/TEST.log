@@ -1,0 +1,10 @@
+Test Summary:                            | Pass  Total  Time
+DS-3 · casos de comprobación (MODELO §4) |   63     63  7.9s
+Test Summary:                               | Pass  Total  Time
+DS-3 · equivalencia de vías (LINEO §7, §10) |    8      8  0.4s
+Test Summary:                                  | Pass  Total  Time
+DS-3 · Monte Carlo reproducible y sin carreras |    4      4  0.1s
+Test Summary:                                  | Pass  Total  Time
+DS-3 · monótona e inversión coste↔probabilidad |    5      5  6.2s
+Test Summary:                            | Pass  Total  Time
+DS-3 · región de disuasión (MODELO §2.5) |    6      6  0.0s

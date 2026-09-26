@@ -1,0 +1,11 @@
+caso,valor,esperado,via,etiqueta
+§4.2 P(F=1019;α=0.33;βd=0),9.75215842976e-108,9.75e-108,exacto DP,H-PUENTE
+§4.3 P(B=0) θ=0.36,0.6976763261,0.69768,exacto Poisson,—
+§4.3 normal (delator),0.3016658861,0.3017,aproximación,no decide
+§4.4 B(ε=0.01; Tv=3600),0.675466,0.675,derivado H3,grieta SÍ
+§4.4 B(ε=0.01; Tv=1e5),0.369043,0.369,derivado H3,grieta NO (heredado)
+§4.5 detección M=189670 k=1e6,0.00987123,0.0098712,exacto-redondeado,k>B
+§4.5 detección M=189671 k=1e6,0.0101808,0.010181,exacto-redondeado,k>B
+§4.6 w_equilibrio 20 TB,761926,7.6e5,derivado,disco 20 TB
+§4.6 núcleos/TiB w=7175,117.238,117.238,derivado,65 W/núcleo
+§4.7 Baig–Pietrzak total,4253,1233+140 [sic],fórmula MODELO §2.11,reserva F7

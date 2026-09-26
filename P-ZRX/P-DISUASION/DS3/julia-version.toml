@@ -1,0 +1,7 @@
+# DS-3 · versión de Julia fijada (LINEO §1)
+# El contenedor de juliaup de la máquina de referencia tiene esta versión estable.
+julia = "1.13.0"
+juliaup = "1.22.7"
+sistema = "linux/x86_64"
+cpu = "AMD Ryzen 9 9950X3D (znver5)"
+nota = "usar JULIA_DEPOT_PATH con un depósito local dentro de DS3; el paquete se resuelve contra el depósito compartido de solo lectura"

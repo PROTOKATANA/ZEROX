@@ -1,0 +1,10 @@
+w_slots,B_unidades,k_auditoria,almacenamiento_forzado,phi_almacenado,M_omitido,deteccion,nucleos_por_TiB,maquinas_por_TiB,kWh_regenerar_TiB_ventana,kWh_almacenar_TiB_ventana,razon_regenerar_almacenar,veredicto,etiqueta
+7175,181092,1000,0,0.8,209696,0,117.2,5.79,15.3151,0.010048611,1524.1,Ee coste / detección CERO (k≤B),condicionado k>B; regeneración medida P-INTENTO
+7175,181092,100000,0,0.8,209696,0,117.2,5.79,15.3151,0.010048611,1524.1,Ee coste / detección CERO (k≤B),condicionado k>B; regeneración medida P-INTENTO
+7175,181092,1000000,0.827281,0.8,209696,1,117.2,5.79,15.3151,0.010048611,1524.1,Ee coste / Ec detección (k>B),condicionado k>B; regeneración medida P-INTENTO
+8030,202492,1000,0,0.8,209696,0,104.8,5.178,15.3151,0.011236111,1363.02,Ee coste / detección CERO (k≤B),condicionado k>B; regeneración medida P-INTENTO
+8030,202492,100000,0,0.8,209696,0,104.8,5.178,15.3151,0.011236111,1363.02,Ee coste / detección CERO (k≤B),condicionado k>B; regeneración medida P-INTENTO
+8030,202492,1000000,0.806871,0.8,209696,6.27263e-198,104.8,5.178,15.3151,0.011236111,1363.02,Ee coste / Ec detección (k>B),condicionado k>B; regeneración medida P-INTENTO
+4830.6,122411,1000,0,0.8,209696,0,173.4,8.565,15.3151,0.0067925,2254.71,Ee coste / detección CERO (k≤B),condicionado k>B; regeneración medida P-INTENTO
+4830.6,122411,100000,0,0.8,209696,0,173.4,8.565,15.3151,0.0067925,2254.71,Ee coste / detección CERO (k≤B),condicionado k>B; regeneración medida P-INTENTO
+4830.6,122411,1000000,0.883249,0.8,209696,1,173.4,8.565,15.3151,0.0067925,2254.71,Ee coste / Ec detección (k>B),condicionado k>B; regeneración medida P-INTENTO

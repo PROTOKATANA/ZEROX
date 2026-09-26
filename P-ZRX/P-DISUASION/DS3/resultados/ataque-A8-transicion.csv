@@ -1,0 +1,7 @@
+hardware,tasa_H_s,hashes,energia_J,energia_kWh,tiempo_s,etiqueta
+CPU 16 núcleos reposo,7.37894e+07,1e+09,194,5.38889e-05,13.5521,medido A10-M1; falta hash/bloque y precio para coste absoluto
+CPU 16 núcleos reposo,7.37894e+07,1e+12,194000,0.0538889,13552.1,medido A10-M1; falta hash/bloque y precio para coste absoluto
+CPU 16 núcleos reposo,7.37894e+07,1e+15,1.94e+08,53.8889,1.35521e+07,medido A10-M1; falta hash/bloque y precio para coste absoluto
+GPU GTX 1070,5.61085e+08,1e+09,194,5.38889e-05,1.78226,medido A10-M1; falta hash/bloque y precio para coste absoluto
+GPU GTX 1070,5.61085e+08,1e+12,194000,0.0538889,1782.26,medido A10-M1; falta hash/bloque y precio para coste absoluto
+GPU GTX 1070,5.61085e+08,1e+15,1.94e+08,53.8889,1.78226e+06,medido A10-M1; falta hash/bloque y precio para coste absoluto

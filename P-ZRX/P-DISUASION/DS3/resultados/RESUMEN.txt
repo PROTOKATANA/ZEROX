@@ -1,0 +1,30 @@
+DS-3 · resumen de ejecución
+fecha_local = 2026-09-26 (fecha de la orden)
+julia = 1.13.0
+nthreads_default = 4
+nthreads_interactive = 0
+cpu = znver5
+memoria_total_GiB = 123.4
+semilla = 23130
+reps = 20000
+escenarios = /home/katana/zeo/ZEROX/P-ZRX/P-DISUASION/DS3/escenarios.tsv
+segundos_pared = 0.79
+
+validaciones:
+  primera_pasada = (celdas = 4216, error_max = 1.1102230246251565e-15, celdas_enum = 2728, error_enum = 2.220446049250313e-16)
+  cobertura = (casos = 120, error_max = 2.4110713425784525e-12)
+  almacenamiento = (casos = 12, error_max = 0.0)
+  alpha = (filas = 12, error_max = 0.0)
+
+artefactos:
+  ataque-A1-doble-farmeo.csv
+  ataque-A2-equivocacion.csv
+  ataque-A3-sembrador.csv
+  ataque-A4-sybil.csv
+  ataque-A8-transicion.csv
+  cobertura-barrido.csv
+  comprobaciones.csv
+  monte-carlo.csv
+  por-mecanismo.csv
+  sensibilidad-A1.csv
+  ventana-barrido.csv

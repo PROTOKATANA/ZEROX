@@ -1,0 +1,10 @@
+alpha,F_slots,P_objetivo,beta_d_min,P_alcanzada,N_recl,C_candidato_M3M5_total_ue,C_candidato_por_reclutado_ue,soborno_por_reclutado_ue,C_B0_ue,C_B1_ue,C_honesto_ue,cociente_X_honesto,param_dominante,etiqueta
+0.2,1019,1e-06,0.505619,1e-06,506,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.2,1019,0.001,0.53474,0.00103995,535,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.2,1019,0.5,0.584789,0.52063,585,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.33,1019,1e-06,0.252169,1.10922e-06,253,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.33,1019,0.001,0.278665,0.00100581,279,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.33,1019,0.5,0.324789,0.501932,325,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.4,1019,1e-06,0.116094,1.07904e-06,117,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.4,1019,0.001,0.141609,0.00108548,142,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)
+0.4,1019,0.5,0.18577,0.521672,186,0,0,1830,0,0.00161561,1.83162,0,dist_alpha,condicionado H-PUENTE; grieta B(ε)≥β_d: coste 0; domina el umbral B(ε)

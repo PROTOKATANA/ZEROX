@@ -1,0 +1,10 @@
+q_garantia_ue,f_fraccion_clave,coste_por_identidad_ue,coste_por_byte_ue,fraccion_ingreso_semanal,etiqueta
+100,1e-06,100,1e+08,165.344,Ee exigible; regresivo (P-TASA F4)
+100,0.001,100,100000,0.165344,Ee exigible; regresivo (P-TASA F4)
+100,0.1,100,1000,0.00165344,Ee exigible; regresivo (P-TASA F4)
+1000,1e-06,1000,1e+09,1653.44,Ee exigible; regresivo (P-TASA F4)
+1000,0.001,1000,1e+06,1.65344,Ee exigible; regresivo (P-TASA F4)
+1000,0.1,1000,10000,0.0165344,Ee exigible; regresivo (P-TASA F4)
+10000,1e-06,10000,1e+10,16534.4,Ee exigible; regresivo (P-TASA F4)
+10000,0.001,10000,1e+07,16.5344,Ee exigible; regresivo (P-TASA F4)
+10000,0.1,10000,100000,0.165344,Ee exigible; regresivo (P-TASA F4)
