@@ -1,0 +1,242 @@
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Checking derive_more v2.1.1
+    Checking kzg v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+    Checking pin-project v1.1.13
+    Checking spin v0.12.3
+    Checking wait-timeout v0.2.1
+    Checking unsigned-varint v0.8.0
+   Compiling data-encoding v2.11.1
+    Checking bit-vec v0.8.0
+    Checking quick-error v1.2.3
+    Checking subspace-core-primitives v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/crates/subspace-core-primitives)
+   Compiling prost-derive v0.14.4
+    Checking branches v0.4.6
+    Checking rusty-fork v0.3.1
+    Checking url v2.5.8
+    Checking bit-set v0.8.0
+    Checking rand_xorshift v0.4.0
+    Checking hmac v0.12.1
+   Compiling match-lookup v0.1.3
+    Checking const-str v0.4.3
+    Checking rust-kzg-blst v0.1.0 (https://github.com/grandinetech/rust-kzg?rev=8f5f1a0f73b3c529c77cb880ff8d265830c7d7ac#8f5f1a0f)
+    Checking unarray v0.1.4
+    Checking proptest v1.11.0
+    Checking hkdf v0.12.4
+    Checking rclite v0.4.1
+    Checking base256emoji v1.0.2
+    Checking multihash v0.19.5
+   Compiling data-encoding-macro-internal v0.1.19
+    Checking ab-blake3 v0.1.0
+    Checking sha2 v0.11.0
+    Checking ed25519-dalek v2.2.0
+    Checking base45 v3.2.0
+    Checking base-x v0.2.11
+    Checking keccak v0.1.6
+   Compiling radium v0.7.0
+   Compiling seq-macro v0.3.6
+    Checking bs58 v0.5.1
+    Checking data-encoding-macro v0.1.21
+    Checking ab-chacha8 v0.1.1
+    Checking multibase v0.9.3
+    Checking merlin v3.0.0
+    Checking getrandom_or_panic v0.0.3
+    Checking quick-protobuf v0.8.1
+    Checking serde_bytes v0.11.19
+    Checking tap v1.0.1
+    Checking futures-timer v3.0.4
+    Checking web-time v1.1.0
+    Checking unsigned-varint v0.7.2
+    Checking schnorrkel v0.11.5
+    Checking wyz v0.5.1
+    Checking multistream-select v0.13.0
+    Checking rw-stream-sink v0.4.0
+    Checking anyhow v1.0.104
+    Checking instant v0.1.13
+   Compiling heck v0.5.0
+    Checking funty v2.0.0
+    Checking backoff v0.4.0
+    Checking async-lock v3.4.2
+    Checking fs2 v0.4.3
+   Compiling ring v0.17.14
+   Compiling cfg_aliases v0.2.2
+   Compiling pkg-config v0.3.34
+    Checking cpubits v0.1.1
+    Checking aes v0.9.3
+    Checking prost v0.14.4
+    Checking bitvec v1.1.1
+    Checking foldhash v0.1.5
+    Checking untrusted v0.9.0
+   Compiling thiserror v1.0.69
+    Checking libp2p-identity v0.2.14
+    Checking subspace-kzg v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/shared/subspace-kzg)
+    Checking ab-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/shared/ab-proof-of-space)
+    Checking hashbrown v0.15.5
+   Compiling thiserror-impl v1.0.69
+    Checking multiaddr v0.18.2
+    Checking subspace-erasure-coding v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/crates/subspace-erasure-coding)
+    Checking subspace-archiving v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/crates/subspace-archiving)
+    Checking libp2p-core v0.43.2
+   Compiling glob v0.3.4
+    Checking subspace-data-retrieval v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/shared/subspace-data-retrieval)
+   Compiling paste v1.0.15
+   Compiling num-conv v0.2.2
+    Checking subspace-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/crates/subspace-proof-of-space)
+   Compiling getrandom v0.4.3
+   Compiling time-core v0.1.9
+   Compiling clang-sys v1.9.1
+   Compiling time-macros v0.2.32
+    Checking hashlink v0.10.0
+    Checking zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-pot)
+   Compiling libp2p-swarm-derive v0.35.1
+    Checking deranged v0.5.8
+    Checking powerfmt v0.2.0
+    Checking subspace-verification v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/crates/subspace-verification)
+    Checking rustls-pki-types v1.15.1
+    Checking minimal-lexical v0.2.1
+    Checking subspace-farmer-components v0.1.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/PDF/autonomys-subspace/crates/subspace-farmer-components)
+    Checking libp2p-swarm v0.47.1
+   Compiling memchr v2.8.3
+   Compiling regex-syntax v0.8.11
+   Compiling cfg-if v1.0.4
+    Checking tinyvec_macros v0.1.1
+    Checking tinyvec v1.13.2
+   Compiling libloading v0.8.9
+    Checking time v0.3.55
+    Checking netlink-packet-core v0.8.2
+   Compiling nom v7.1.3
+   Compiling nix v0.30.1
+    Checking zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-poas)
+    Checking ipnet v2.12.1
+   Compiling bindgen v0.72.1
+    Checking zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-farmer)
+   Compiling vcpkg v0.2.15
+   Compiling rustls v0.23.43
+   Compiling regex-automata v0.4.18
+   Compiling libz-sys v1.1.29
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+    Checking rusticata-macros v4.1.0
+   Compiling itertools v0.13.0
+    Checking netlink-sys v0.8.8
+   Compiling cexpr v0.6.0
+   Compiling asn1-rs-derive v0.6.0
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling asn1-rs-impl v0.2.0
+   Compiling bitflags v2.13.1
+   Compiling rustc-hash v2.1.3
+   Compiling libm v0.2.16
+   Compiling shlex v1.3.0
+    Checking asn1-rs v0.7.2
+    Checking netlink-proto v0.12.2
+   Compiling regex v1.13.1
+    Checking netlink-packet-route v0.28.0
+    Checking asynchronous-codec v0.7.0
+    Checking num-integer v0.1.47
+    Checking socket2 v0.5.10
+   Compiling ahash v0.8.12
+   Compiling rustflags v0.1.7
+   Compiling oid-registry v0.8.1
+    Checking base64 v0.22.1
+    Checking num-bigint v0.4.8
+    Checking zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-post)
+   Compiling quinn-udp v0.5.15
+   Compiling enum-as-inner v0.6.1
+    Checking der-parser v10.0.0
+    Checking hickory-proto v0.25.2
+    Checking fastbloom v0.17.0
+    Checking pem v3.0.6
+    Checking quick-protobuf-codec v0.3.1
+    Checking yasna v0.5.2
+    Checking uuid v1.26.0
+    Checking rand v0.10.2
+   Compiling quinn v0.11.11
+    Checking futures-bounded v0.2.4
+    Checking rustls-webpki v0.103.15
+    Checking rand_pcg v0.10.2
+    Checking crossbeam-channel v0.5.16
+    Checking aho-corasick v1.1.5
+    Checking rtnetlink v0.20.0
+   Compiling snow v0.9.6
+    Checking lazy_static v1.5.0
+    Checking tagptr v0.2.0
+    Checking lru-slab v0.1.2
+    Checking if-watch v3.2.2
+    Checking nohash-hasher v0.2.0
+    Checking moka v0.12.16
+    Checking x509-parser v0.17.0
+   Compiling librocksdb-sys v0.19.0+11.8.1
+    Checking rcgen v0.13.2
+    Checking hashbrown v0.14.5
+    Checking zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+    Checking concurrent-queue v2.5.0
+    Checking resolv-conf v0.7.6
+    Checking async-channel v2.5.0
+    Checking hickory-resolver v0.25.2
+    Checking yamux v0.13.10
+    Checking hashlink v0.9.1
+    Checking yamux v0.12.1
+    Checking x25519-dalek v2.0.1
+    Checking hex_fmt v0.3.0
+    Checking libp2p-noise v0.46.1
+    Checking libp2p-mdns v0.48.0
+    Checking libp2p-yamux v0.47.0
+    Checking libp2p-tcp v0.44.1
+    Checking libp2p-identify v0.47.0
+    Checking libp2p-kad v0.48.0
+    Checking libp2p-dns v0.44.0
+    Checking libp2p-request-response v0.29.0
+    Checking libp2p-ping v0.47.0
+    Checking libp2p-allow-block-list v0.6.0
+    Checking libp2p-connection-limits v0.6.0
+    Checking utf8parse v0.2.2
+    Checking libp2p-gossipsub v0.49.5
+    Checking anstyle-parse v1.0.0
+    Checking futures-rustls v0.26.0
+    Checking quinn-proto v0.11.17
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle-query v1.1.5
+    Checking anstyle v1.0.14
+    Checking colorchoice v1.0.5
+    Checking strsim v0.11.1
+    Checking libp2p-tls v0.6.2
+    Checking anstream v1.0.0
+    Checking clap_lex v1.1.1
+   Compiling clap_derive v4.6.4
+   Compiling futures_ringbuf v0.4.0
+    Checking clap_builder v4.6.6
+    Checking ringbuf v0.3.3
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+    --> crates/zx-post/tests/regimen.rs:1012:13
+     |
+1012 |             aplicar(&estado, &bloque(slot), &params, zx_core::CBID_RED_DEV),
+     |             ^^^^^^^-------------------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+     |
+note: function defined here
+    --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+     |
+  30 | pub fn aplicar(
+     |        ^^^^^^^
+help: provide the argument
+     |
+1012 |             aplicar(&estado, &bloque(slot), &params, zx_core::CBID_RED_DEV, /* &ParametrosEvidencia */),
+     |                                                                           ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+    --> crates/zx-post/tests/regimen.rs:1018:9
+     |
+1018 |         aplicar(&estado, &bloque(1), &params, zx_core::CBID_RED_DEV).is_ok(),
+     |         ^^^^^^^----------------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+     |
+note: function defined here
+    --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+     |
+  30 | pub fn aplicar(
+     |        ^^^^^^^
+help: provide the argument
+     |
+1018 |         aplicar(&estado, &bloque(1), &params, zx_core::CBID_RED_DEV, /* &ParametrosEvidencia */).is_ok(),
+     |                                                                    ++++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `zx-post` (test "regimen") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

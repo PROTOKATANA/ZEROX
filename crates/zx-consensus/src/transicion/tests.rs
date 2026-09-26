@@ -20,8 +20,8 @@ use zx_core::{
 use crate::transicion::estado::{invariante_i1, invariante_i1b};
 use crate::transicion::{
     BloqueTransicion, EnRetirada, EntradaUtxo, ErrorTransicion, Estado, Fase, Garantia,
-    HechosCabecera, Origen, ParametrosTransicion, Punto, aplicar, aplicar_con_undo, aplicar_fusion,
-    deshacer,
+    HechosCabecera, Origen, ParametrosEvidencia, ParametrosTransicion, Punto, aplicar,
+    aplicar_con_undo, aplicar_fusion, deshacer,
 };
 
 fn subsidio_pow_test(_h: u32) -> Amount {
@@ -207,6 +207,7 @@ fn con_garantia(estado: &mut Estado, pk: ClavePublica, activo: i64) {
             congelado: Amount::CERO,
             creditos: Vec::new(),
             nonce_siguiente: 0,
+            incidentes: Vec::new(),
         },
     );
 }
@@ -283,7 +284,13 @@ fn un_testigo_invalido_puede_coincidir_con_el_compromiso() {
     );
     let bloque = bloque_pow(1, vec![(tx, testigos)]);
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrFirma),
         "la verificación criptográfica MUST rechazarlos"
     );
@@ -317,7 +324,14 @@ fn deposito_con_cambio_crea_el_cambio_y_acredita_la_garantia() {
     estado.emitido = 10;
     estado.subsidio_acum = 10;
     let bloque = bloque_pow(1, vec![(tx, testigos)]);
-    let nuevo = aplicar(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
+    let nuevo = aplicar(
+        &estado,
+        &bloque,
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
 
     assert!(invariante_i1(&nuevo));
     assert!(invariante_i1b(&nuevo));
@@ -364,11 +378,26 @@ fn multisig_2_de_3_autoriza_y_el_orden_importa() {
         .utxo
         .insert(op, entrada(10, lock, Origen::Tx, Punto::Altura(0)));
     let valido = bloque_pow(1, vec![(tx.clone(), vec![ordenado])]);
-    assert!(aplicar(&estado, &valido, &params(), CBID_RED_DEV).is_ok());
+    assert!(
+        aplicar(
+            &estado,
+            &valido,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        )
+        .is_ok()
+    );
 
     let invalido = bloque_pow(1, vec![(tx, vec![desordenado])]);
     assert_eq!(
-        aplicar(&estado, &invalido, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &invalido,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrFirma),
         "los índices de MultiSig MUST ser estrictamente crecientes"
     );
@@ -382,7 +411,13 @@ fn coinbase_pow_sin_salidas_se_rechaza() {
     let estado = estado_pow();
     let bloque = bloque_pow(1, vec![(tx_coinbase_pow(Vec::new()), Vec::new())]);
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrEmision)
     );
 }
@@ -394,7 +429,13 @@ fn dos_coinbases_se_rechazan() {
     let cb = tx_coinbase_pow(vec![tx_out(1, pk)]);
     let bloque = bloque_pow(1, vec![(cb.clone(), Vec::new()), (cb, Vec::new())]);
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrEmision)
     );
 }
@@ -412,7 +453,13 @@ fn coinbase_post_en_posicion_dos_se_rechaza() {
     let cb = tx_coinbase_post(pk, 3, 1);
     let bloque = bloque_post(1, pk, vec![(retiro, vec![testigo]), (cb, Vec::new())]);
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrEmision)
     );
 }
@@ -429,7 +476,13 @@ fn coinbase_post_a_otra_clave_se_rechaza() {
     let cb = tx_coinbase_post(otra, 3, 1);
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrAutorizacion)
     );
 }
@@ -465,8 +518,15 @@ fn fusion_descarta_doble_gasto() {
     estado.emitido = 20;
     estado.subsidio_acum = 20;
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (t1, w1), (t2, w2)]);
-    let (nuevo, _undo, descartadas) =
-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    let (nuevo, _undo, descartadas) = aplicar_fusion(
+        &estado,
+        &bloque,
+        Punto::Slot(1),
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     assert_eq!(descartadas.len(), 1);
     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrDobleGasto);
     assert!(invariante_i1(&nuevo));
@@ -486,8 +546,15 @@ fn fusion_descarta_retiro_duplicado() {
     estado.emitido = 10;
     estado.subsidio_acum = 10;
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (t1, w1), (t2, w2)]);
-    let (nuevo, _undo, descartadas) =
-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    let (nuevo, _undo, descartadas) = aplicar_fusion(
+        &estado,
+        &bloque,
+        Punto::Slot(1),
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     assert_eq!(descartadas.len(), 1);
     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrRetiroPendiente);
     let g = nuevo.garantias.get(&pk).unwrap();
@@ -513,8 +580,15 @@ fn fusion_descarta_liberacion_prematura() {
     estado.emitido = 6;
     estado.subsidio_acum = 6;
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (t1, w1)]);
-    let (nuevo, _undo, descartadas) =
-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    let (nuevo, _undo, descartadas) = aplicar_fusion(
+        &estado,
+        &bloque,
+        Punto::Slot(1),
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     assert_eq!(descartadas.len(), 1);
     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrSaldo);
     let _ = nuevo;
@@ -529,8 +603,15 @@ fn fusion_recorta_la_coinbase_post() {
     estado.emitido = 10;
     estado.subsidio_acum = 10;
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
-    let (nuevo, _undo, descartadas) =
-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    let (nuevo, _undo, descartadas) = aplicar_fusion(
+        &estado,
+        &bloque,
+        Punto::Slot(1),
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     assert!(descartadas.is_empty());
     let g = nuevo.garantias.get(&pk).unwrap();
     assert_eq!(
@@ -602,7 +683,14 @@ fn dos_depositos_con_nonces_consecutivos_valen_y_la_repeticion_no() {
     estado.subsidio_acum = 20;
 
     let bloque_ok = bloque_pow(1, vec![(d1.clone(), w1.clone()), (d2.clone(), w2.clone())]);
-    let nuevo = aplicar(&estado, &bloque_ok, &params(), CBID_RED_DEV).unwrap();
+    let nuevo = aplicar(
+        &estado,
+        &bloque_ok,
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     let g = nuevo.garantias.get(&pk).unwrap();
     assert_eq!(g.activo, Amount::nuevo(20).unwrap());
     assert_eq!(g.nonce_siguiente, 2, "cada operación incrementa el nonce");
@@ -618,7 +706,13 @@ fn dos_depositos_con_nonces_consecutivos_valen_y_la_repeticion_no() {
     ];
     let bloque_mal = bloque_pow(1, vec![(d1.clone(), w1), (d2_repetido, w2r)]);
     assert_eq!(
-        aplicar(&estado, &bloque_mal, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque_mal,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrNonce)
     );
     let _ = d2;
@@ -643,7 +737,13 @@ fn repeticion_de_retiro_invalida_el_bloque_estricto() {
         vec![(cb, Vec::new()), (retiro.clone(), w.clone()), (retiro, w)],
     );
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrNonce)
     );
 }
@@ -669,6 +769,7 @@ fn repeticion_de_liberacion_invalida_el_bloque_estricto() {
             congelado: Amount::CERO,
             creditos: Vec::new(),
             nonce_siguiente: 0,
+            incidentes: Vec::new(),
         },
     );
     estado.emitido = 11;
@@ -680,7 +781,13 @@ fn repeticion_de_liberacion_invalida_el_bloque_estricto() {
         vec![(cb, Vec::new()), (lib.clone(), w.clone()), (lib, w)],
     );
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrNonce)
     );
 }
@@ -703,8 +810,15 @@ fn fusion_descarta_repeticion_con_err_nonce() {
         pk,
         vec![(cb, Vec::new()), (retiro.clone(), w.clone()), (retiro, w)],
     );
-    let (nuevo, _undo, descartadas) =
-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    let (nuevo, _undo, descartadas) = aplicar_fusion(
+        &estado,
+        &bloque,
+        Punto::Slot(1),
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     assert_eq!(descartadas.len(), 1);
     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrNonce);
     let g = nuevo.garantias.get(&pk).unwrap();
@@ -727,7 +841,13 @@ fn el_nonce_se_comprueba_antes_que_el_saldo() {
 
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (retiro, w)]);
     assert_eq!(
-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        ),
         Err(ErrorTransicion::ErrNonce)
     );
 }
@@ -746,7 +866,14 @@ fn el_undo_restituye_el_nonce() {
     estado.subsidio_acum = 10;
 
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (retiro, w)]);
-    let (nuevo, undo) = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
+    let (nuevo, undo) = aplicar_con_undo(
+        &estado,
+        &bloque,
+        &params(),
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     assert_eq!(nuevo.garantias.get(&pk).unwrap().nonce_siguiente, 1);
     assert_eq!(deshacer(&nuevo, &undo), estado);
     assert_eq!(
@@ -771,7 +898,13 @@ fn la_coinbase_pow_exige_expiry_igual_a_la_altura() {
         let cb = tx_coinbase_pow_exp(vec![tx_out(1, pk)], expiry);
         let bloque = bloque_pow(1, vec![(cb, Vec::new())]);
         assert_eq!(
-            aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+            aplicar(
+                &estado,
+                &bloque,
+                &params(),
+                CBID_RED_DEV,
+                &ParametrosEvidencia::inactiva()
+            ),
             Err(ErrorTransicion::ErrEmision),
             "expiry {expiry} ≠ altura 1"
         );
@@ -779,7 +912,16 @@ fn la_coinbase_pow_exige_expiry_igual_a_la_altura() {
 
     let cb = tx_coinbase_pow_exp(vec![tx_out(1, pk)], 1);
     let bloque = bloque_pow(1, vec![(cb, Vec::new())]);
-    assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
+    assert!(
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        )
+        .is_ok()
+    );
 }
 
 /// F-16 · dos coinbases PoW idénticas salvo la altura (y por tanto el `expiry_height`) tienen
@@ -801,6 +943,7 @@ fn dos_coinbases_pow_iguales_salvo_altura_no_colisionan() {
         &bloque_pow(1, vec![(cb1, Vec::new())]),
         &params(),
         CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
     )
     .unwrap();
     let s2 = aplicar(
@@ -808,6 +951,7 @@ fn dos_coinbases_pow_iguales_salvo_altura_no_colisionan() {
         &bloque_pow(2, vec![(cb2, Vec::new())]),
         &params(),
         CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
     )
     .unwrap();
     assert_eq!(s2.utxo.len(), 2, "las dos coinbases coexisten");
@@ -828,7 +972,13 @@ fn la_coinbase_post_exige_el_slot_del_bloque() {
         let cb = tx_coinbase_post(pk, 3, slot);
         let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
         assert_eq!(
-            aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+            aplicar(
+                &estado,
+                &bloque,
+                &params(),
+                CBID_RED_DEV,
+                &ParametrosEvidencia::inactiva()
+            ),
             Err(ErrorTransicion::ErrEmision),
             "slot {slot} ≠ slot del bloque 1"
         );
@@ -836,5 +986,14 @@ fn la_coinbase_post_exige_el_slot_del_bloque() {
 
     let cb = tx_coinbase_post(pk, 3, 1);
     let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
-    assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
+    assert!(
+        aplicar(
+            &estado,
+            &bloque,
+            &params(),
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva()
+        )
+        .is_ok()
+    );
 }

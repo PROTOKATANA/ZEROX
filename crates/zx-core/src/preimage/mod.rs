@@ -60,6 +60,12 @@ impl PreimageWriter {
         self
     }
 
+    /// Escribe un `u16` little-endian (SL-4a: identidad de evidencia).
+    pub(crate) fn u16(&mut self, v: u16) -> &mut Self {
+        self.0.extend_from_slice(&v.to_le_bytes());
+        self
+    }
+
     /// Escribe un `CompactSize` en su forma mínima (C-ENC-05).
     pub(crate) fn compact_size(&mut self, v: u64) -> &mut Self {
         compact_size::escribir(&mut self.0, v);
@@ -85,6 +91,16 @@ impl PreimageWriter {
     /// Escribe un digest ya calculado — así se anidan los sub-árboles de §4.
     pub(crate) fn digest(&mut self, d: &Digest) -> &mut Self {
         self.0.extend_from_slice(d.as_bytes());
+        self
+    }
+
+    /// Escribe los bytes de una **preimagen canónica ya serializada**.
+    ///
+    /// Solo lo usa SL-4a para concatenar las codificaciones canónicas de dos cabeceras
+    /// `PoAS_PoT_DAG` (`DagBlockHeader::a_bytes`) dentro del `extension_digest` de la v4 (EV-03).
+    /// No es un atajo genérico: no debe recibir bytes de wire.
+    pub(crate) fn canonical(&mut self, b: &[u8]) -> &mut Self {
+        self.0.extend_from_slice(b);
         self
     }
 

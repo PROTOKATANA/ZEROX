@@ -7,9 +7,10 @@
 use primitive_types::U256;
 use zx_core::{Amount, ClavePublica, OutPoint};
 
+use crate::transicion::ErrorTransicion;
 use crate::transicion::tipos::{
-    EntradaUtxo, Escalares, Estado, Fase, Garantia, Marca, Origen, ParametrosTransicion, Pendiente,
-    Punto, Undo,
+    EnRetirada, EntradaUtxo, Escalares, Estado, Fase, Garantia, Marca, Origen, ParametrosEvidencia,
+    ParametrosTransicion, Pendiente, Punto, Undo,
 };
 
 impl Estado {
@@ -30,6 +31,7 @@ impl Estado {
             peso_sufijo: 0,
             altura_terminal: None,
             subsidio_acum: 0,
+            ultimo_slot_producido: std::collections::BTreeMap::new(),
         }
     }
 
@@ -107,12 +109,15 @@ pub fn suma_utxo(estado: &Estado) -> i128 {
         .sum()
 }
 
-/// Suma de valor inmovilizado en garantías (activo, congelado, pendientes, créditos y retiradas).
+/// Suma de valor inmovilizado en garantías (activo, pendientes, créditos y retiradas).
+///
+/// SL-4a: `congelado` es un **gravamen derivado** (EV-17), no una sub-cuenta; no suma, igual que en
+/// el oráculo T01 (`total_garantia`/`suma_garantias`).
 #[must_use]
 pub fn suma_garantias(estado: &Estado) -> i128 {
     let mut total: i128 = 0;
     for g in estado.garantias.values() {
-        total += i128::from(g.activo.brek()) + i128::from(g.congelado.brek());
+        total += i128::from(g.activo.brek());
         for p in &g.pendientes {
             total += i128::from(p.importe.brek());
         }
@@ -138,6 +143,142 @@ pub fn invariante_i1b(estado: &Estado) -> bool {
     estado.emitido <= estado.subsidio_acum
 }
 
+/// `Amount` a partir de un `i128` que ya se sabe no negativo y dentro de rango.
+fn amount_brek(v: i128) -> Result<Amount, ErrorTransicion> {
+    let b = i64::try_from(v).map_err(|_| ErrorTransicion::ErrDesbordamiento)?;
+    Amount::nuevo(b).map_err(|_| ErrorTransicion::ErrDesbordamiento)
+}
+
+/// Suma total de una garantía (`EV-19`): `activo + pendientes + en_retirada + créditos`.
+///
+/// `congelado` es un gravamen derivado y **no** suma, igual que en el oráculo T01.
+#[must_use]
+pub fn total_garantia(g: &Garantia) -> i128 {
+    let mut t = i128::from(g.activo.brek());
+    for p in &g.pendientes {
+        t += i128::from(p.importe.brek());
+    }
+    for r in &g.en_retirada {
+        t += i128::from(r.importe.brek());
+    }
+    for p in &g.creditos {
+        t += i128::from(p.importe.brek());
+    }
+    t
+}
+
+/// `techo_exacto(f·V) = ceil(V·f_num/f_den)` con enteros (`EV-19`).
+#[must_use]
+#[expect(
+    clippy::integer_division,
+    reason = "C-ENC-04 prohíbe floats; la división entera comprobada es la especificación de EV-19"
+)]
+pub fn techo_fraccion(v: i128, f_num: u64, f_den: u64) -> i128 {
+    if f_den == 0 || f_num == 0 || v <= 0 {
+        return 0;
+    }
+    let num = v
+        .checked_mul(i128::from(f_num))
+        .unwrap_or(i128::MAX)
+        .saturating_add(i128::from(f_den) - 1);
+    num / i128::from(f_den)
+}
+
+/// `RAT-2′`: `suelo(C·2/8) = C ÷ 4`, división entera **hacia abajo**.
+#[must_use]
+#[expect(
+    clippy::integer_division,
+    reason = "RAT-2′ exige división entera hacia abajo; no es aritmética de coma flotante"
+)]
+pub const fn suelo_dos_octavos(c: i128) -> i128 {
+    if c <= 0 { 0 } else { c / 4 }
+}
+
+/// Debita `c` de las sub-cuentas en orden determinista:
+/// `activo → pendientes → en_retirada → créditos` (`EV-19`/`EV-20`).
+pub fn debitar_garantia(g: &mut Garantia, c: i128) -> Result<(), ErrorTransicion> {
+    if c <= 0 {
+        return Ok(());
+    }
+    let mut restante = c;
+
+    let d = core::cmp::min(restante, i128::from(g.activo.brek()));
+    g.activo = amount_brek(i128::from(g.activo.brek()) - d)?;
+    restante -= d;
+
+    let mut nuevas: Vec<Pendiente> = Vec::with_capacity(g.pendientes.len());
+    for p in g.pendientes.drain(..) {
+        if restante > 0 {
+            let d = core::cmp::min(restante, i128::from(p.importe.brek()));
+            restante -= d;
+            if d == i128::from(p.importe.brek()) {
+                continue;
+            }
+            nuevas.push(Pendiente {
+                importe: amount_brek(i128::from(p.importe.brek()) - d)?,
+                ..p
+            });
+            continue;
+        }
+        nuevas.push(p);
+    }
+    g.pendientes = nuevas;
+
+    let mut nuevasr: Vec<EnRetirada> = Vec::with_capacity(g.en_retirada.len());
+    for r in g.en_retirada.drain(..) {
+        if restante > 0 {
+            let d = core::cmp::min(restante, i128::from(r.importe.brek()));
+            restante -= d;
+            if d == i128::from(r.importe.brek()) {
+                continue;
+            }
+            nuevasr.push(EnRetirada {
+                importe: amount_brek(i128::from(r.importe.brek()) - d)?,
+                inicio_slot: r.inicio_slot,
+            });
+            continue;
+        }
+        nuevasr.push(r);
+    }
+    g.en_retirada = nuevasr;
+
+    let mut nuevasc: Vec<Pendiente> = Vec::with_capacity(g.creditos.len());
+    for p in g.creditos.drain(..) {
+        if restante > 0 {
+            let d = core::cmp::min(restante, i128::from(p.importe.brek()));
+            restante -= d;
+            if d == i128::from(p.importe.brek()) {
+                continue;
+            }
+            nuevasc.push(Pendiente {
+                importe: amount_brek(i128::from(p.importe.brek()) - d)?,
+                ..p
+            });
+            continue;
+        }
+        nuevasc.push(p);
+    }
+    g.creditos = nuevasc;
+    Ok(())
+}
+
+/// Poda los incidentes cuya ventana de admisión cerró (`EV-11`): se conserva `sf` si
+/// `punto < sf + Plazo_slots`; al quedarse sin incidentes se libera el gravamen (`congelado = 0`).
+pub fn podar_incidentes(estado: &mut Estado, evp: &ParametrosEvidencia, punto: u64) {
+    let punto = punto as i64;
+    for g in estado.garantias.values_mut() {
+        if g.incidentes.is_empty() {
+            continue;
+        }
+        let antes = g.incidentes.len();
+        g.incidentes
+            .retain(|i| punto < i.slot_falta.saturating_add(evp.plazo_slots as i64));
+        if g.incidentes.len() != antes && g.incidentes.is_empty() {
+            g.congelado = Amount::CERO;
+        }
+    }
+}
+
 /// Restituye el estado previo a partir del undo por delta (`I-2`, `R-14`).
 #[must_use]
 pub fn deshacer(estado: &Estado, undo: &Undo) -> Estado {
@@ -153,6 +294,7 @@ pub fn deshacer(estado: &Estado, undo: &Undo) -> Estado {
     restaurado.peso_sufijo = undo.escalares.peso_sufijo;
     restaurado.altura_terminal = undo.escalares.altura_terminal;
     restaurado.subsidio_acum = undo.escalares.subsidio_acum;
+    restaurado.ultimo_slot_producido = undo.escalares.ultimo_slot_producido.clone();
     for (op, previa) in &undo.utxo {
         match previa {
             Some(e) => {

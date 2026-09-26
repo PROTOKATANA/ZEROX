@@ -13,8 +13,8 @@ use primitive_types::U256;
 use proptest::prelude::*;
 use proptest::test_runner::RngSeed;
 use zx_consensus::transicion::{
-    BloqueTransicion, Estado, HechosCabecera, ParametrosTransicion, aplicar, aplicar_con_undo,
-    deshacer, invariante_i1, invariante_i1b,
+    BloqueTransicion, Estado, HechosCabecera, ParametrosEvidencia, ParametrosTransicion, aplicar,
+    aplicar_con_undo, deshacer, invariante_i1, invariante_i1b,
 };
 use zx_core::{
     Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, HashType, Lock, OutPoint,
@@ -139,7 +139,14 @@ fn generar(entropia: &[u8]) -> Vec<BloqueTransicion> {
     let mut bloques = Vec::new();
 
     let genesis = BloqueTransicion::nuevo(HechosCabecera::Genesis { hash: hash(0) }, Vec::new());
-    estado = aplicar(&estado, &genesis, &params, CBID_RED_DEV).unwrap();
+    estado = aplicar(
+        &estado,
+        &genesis,
+        &params,
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     bloques.push(genesis);
 
     // PoW h = 1: coinbase a `k1`.
@@ -159,7 +166,14 @@ fn generar(entropia: &[u8]) -> Vec<BloqueTransicion> {
         },
         vec![(cb1, Vec::new())],
     );
-    estado = aplicar(&estado, &b1, &params, CBID_RED_DEV).unwrap();
+    estado = aplicar(
+        &estado,
+        &b1,
+        &params,
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     bloques.push(b1);
 
     // PoW h = 2: coinbase a `k2` y depósito del coinbase anterior (habilita la garantía).
@@ -181,7 +195,14 @@ fn generar(entropia: &[u8]) -> Vec<BloqueTransicion> {
         },
         vec![(cb2, Vec::new()), (dep, testigos)],
     );
-    estado = aplicar(&estado, &b2, &params, CBID_RED_DEV).unwrap();
+    estado = aplicar(
+        &estado,
+        &b2,
+        &params,
+        CBID_RED_DEV,
+        &ParametrosEvidencia::inactiva(),
+    )
+    .unwrap();
     bloques.push(b2);
 
     // 0–3 bloques PoST acreditando al productor con garantía (`k1`).
@@ -205,7 +226,13 @@ fn generar(entropia: &[u8]) -> Vec<BloqueTransicion> {
             },
             vec![(cb, Vec::new())],
         );
-        let Ok(nuevo) = aplicar(&estado, &post, &params, CBID_RED_DEV) else {
+        let Ok(nuevo) = aplicar(
+            &estado,
+            &post,
+            &params,
+            CBID_RED_DEV,
+            &ParametrosEvidencia::inactiva(),
+        ) else {
             break;
         };
         padre = hash(10 + i as u8);
@@ -231,7 +258,7 @@ proptest! {
         let mut estado = Estado::inicial();
         for bloque in &bloques {
             let (nuevo, undo) =
-                aplicar_con_undo(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+                aplicar_con_undo(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
             prop_assert_eq!(&deshacer(&nuevo, &undo), &estado);
             prop_assert!(invariante_i1(&nuevo));
             prop_assert!(invariante_i1b(&nuevo));
@@ -249,10 +276,10 @@ proptest! {
         let bloques = generar(&entropia);
         let mut estado = Estado::inicial();
         for bloque in &bloques {
-            let a = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
-            let b = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+            let a = aplicar(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+            let b = aplicar(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
             prop_assert_eq!(a, b);
-            estado = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+            estado = aplicar(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
         }
     }
 }

@@ -1,0 +1,58 @@
+   Compiling zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-dag)
+   Compiling zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+warning: unused import: `total_garantia`
+  --> crates/zx-cadena/tests/diferencial_t04.rs:32:5
+   |
+32 |     total_garantia,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `zx-cadena` (test "diferencial_t04") generated 1 warning (run `cargo fix --test "diferencial_t04" -p zx-cadena` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.86s
+     Running tests/diferencial_t04.rs (/home/katana/zeo/ZEROX/deepseek/SL4a/target/debug/deps/diferencial_t04-337bcf8db2308811)
+
+running 1 test
+
+thread 'diferencial_t04' (361) panicked at crates/zx-cadena/tests/diferencial_t04.rs:249:32:
+slot: ParseIntError { kind: InvalidDigit }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/result.rs:1867:5
+   3: <core::result::Result<u64, core::num::error::ParseIntError>>::expect
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1185:23
+   4: diferencial_t04::parsear_evidencia
+             at ./tests/diferencial_t04.rs:249:32
+   5: diferencial_t04::parsear_fichero::{closure#1}
+             at ./tests/diferencial_t04.rs:458:49
+   6: <core::option::Option<&alloc::string::String>>::map::<diferencial_t04::EvCrudo, diferencial_t04::parsear_fichero::{closure#1}>
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1162:29
+   7: diferencial_t04::parsear_fichero
+             at ./tests/diferencial_t04.rs:458:41
+   8: diferencial_t04::cargar_casos
+             at ./tests/diferencial_t04.rs:1499:17
+   9: diferencial_t04::correr
+             at ./tests/diferencial_t04.rs:1505:17
+  10: diferencial_t04::diferencial_t04
+             at ./tests/diferencial_t04.rs:1554:59
+  11: diferencial_t04::diferencial_t04::{closure#0}
+             at ./tests/diferencial_t04.rs:1553:21
+  12: <diferencial_t04::diferencial_t04::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  13: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test diferencial_t04 ... FAILED
+
+failures:
+
+failures:
+    diferencial_t04
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p zx-cadena --test diferencial_t04`

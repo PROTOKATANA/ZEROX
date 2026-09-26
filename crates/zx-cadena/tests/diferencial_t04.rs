@@ -1,21 +1,18 @@
-//! Arnés **diferencial** contra el oráculo T04-D (`ORDEN-W06a-B`, V4 y V5).
+//! Arnés **diferencial** contra el oráculo T04 (`ORDEN-SL4a`, V4 y V5).
 //!
-//! Lee `testdata/estado-dag-v0.3/vectores-estado-dag-v0.3.txt`, deriva claves Ed25519 deterministas
+//! Lee `testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt`, deriva claves Ed25519 deterministas
 //! por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)`, igual que W03), construye
-//! transacciones **reales** v1/v2/v3 firmadas por el `firmante` abstracto, traduce cada bloque a
+//! transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante` abstracto, traduce cada bloque a
 //! [`BloqueCadena`] con `padres`, `sr`, `sd`, `ident` y `k` y ejecuta [`Cadena`] en el orden de
 //! entrega del fichero.
 //!
-//! T04-D / F-18: la salida implícita de una `Liberacion` tiene el id abstracto
-//! `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`; el arnés lo decodifica y
-//! lo traduce al `(txid, 0)` real. No hay contador de ids implícitos, ni entradas inventadas, ni
-//! punto fijo: los vectores v0.3 ya no tienen la colisión de ids del generador v0.2.
+//! La `EvidenceTx` v4 se traduce a **dos cabeceras `PoAS_PoT_DAG` reales** con sellos Ed25519
+//! reales; el `incident_id` es opaco (se compara número y `@slot_falta`, FD-1).
 //!
 //! Compara, por caso: `RES` de cada bloque, `DESC` (transacción descartada y motivo), `SEL`, `UTXO`,
-//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 914 casos; V5 exige que la tabla de cobertura
-//! de los 900 casos aleatorios sea idéntica a la sección `vectores-v0.3` de `cobertura-v0.3.txt`.
-//!
-//! Las correspondencias de error son las de `ORDEN-W03` §4 (W03/W02b), sin añadir ninguna.
+//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 1 878 casos; V5 exige que la tabla de
+//! cobertura de los 900 casos aleatorios y la sección de evidencia sean idénticas a
+//! `cobertura-v0.5.txt` (la sección `run.jl` no se reproduce desde el fichero de vectores).
 
 #![expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
 #![expect(
@@ -31,25 +28,27 @@ use ed25519_zebra::{SigningKey, VerificationKey};
 use primitive_types::U256;
 use zx_cadena::{BloqueCadena, BloquePost, Cadena, Descarte};
 use zx_consensus::transicion::{
-    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosTransicion,
+    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
+    total_garantia,
 };
 use zx_consensus::transicion::{ErrorTransicion, Origen, Punto};
 use zx_core::preimage::tx::txid as calcular_txid;
 use zx_core::{
-    Amount, BlockHash, CBID_RED_DEV, ClavePublica, ExtensionTx, HashType, Lock, OutPoint,
-    SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
+    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, DagBlockHeader, Digest,
+    ExtensionTx, HashType, Lock, MerkleRoot, OutPoint, PadresDag, SolucionPoas, SpentOutput,
+    TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
 use zx_dag::IdentidadGhostdag;
 
-/// Vectores v0.3 dentro del workspace (`ws/testdata/...`).
+/// Vectores v0.5 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/estado-dag-v0.3/vectores-estado-dag-v0.3.txt"
+    "/../../testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt"
 );
-/// Tabla de cobertura esperada de T04-D.
+/// Tabla de cobertura esperada de T04.
 const RUTA_COBERTURA: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/estado-dag-v0.3/cobertura-v0.3.txt"
+    "/../../testdata/estado-dag-v0.5/cobertura-v0.5.txt"
 );
 /// Máximo de padres del generador de T04, declarado (`ORDEN-W06a-C` decisión 1): sus vectores no
 /// admiten más de 3 y la identidad viaja como `u64` de fixture (`IdentidadGhostdag::de_fixture`).
@@ -201,6 +200,63 @@ struct TxCrudo {
     ent: Vec<u64>,
     sal: Vec<(u64, u64, u64)>,
     nonce: u64,
+    /// SL-4a: evidencia abstracta de una `EvidenceTx` v4.
+    ev: Option<EvCrudo>,
+}
+
+/// Una cabecera abstracta de evidencia (`ev=` de T04).
+///
+/// `slot` es `i64`: el generador de evidencia tardía de T04 produce slots negativos.
+#[derive(Clone, Copy, Debug)]
+struct EvCab {
+    cbid: u32,
+    clave: u64,
+    sector: u16,
+    historia: u64,
+    chunk: u64,
+    slot: i64,
+    ph: u64,
+    sello_ok: bool,
+}
+
+/// La evidencia abstracta de una `EvidenceTx` v4.
+#[derive(Clone, Copy, Debug)]
+struct EvCrudo {
+    id1: EvCab,
+    id2: EvCab,
+}
+
+fn parsear_evidencia(texto: &str) -> EvCrudo {
+    let partes: Vec<&str> = texto.split('|').collect();
+    assert_eq!(partes.len(), 2, "evidencia malformada: {texto}");
+    let mut ids = [EvCab {
+        cbid: 0,
+        clave: 0,
+        sector: 0,
+        historia: 0,
+        chunk: 0,
+        slot: 0,
+        ph: 0,
+        sello_ok: true,
+    }; 2];
+    for (j, p) in partes.iter().enumerate() {
+        let f: Vec<&str> = p.split(':').collect();
+        assert_eq!(f.len(), 8, "cabecera de evidencia malformada: {p}");
+        ids[j] = EvCab {
+            cbid: f[0].parse().expect("cbid"),
+            clave: f[1].parse().expect("clave"),
+            sector: f[2].parse().expect("sector"),
+            historia: f[3].parse().expect("historia"),
+            chunk: f[4].parse().expect("chunk"),
+            slot: f[5].parse().expect("slot"),
+            ph: f[6].parse().expect("pre_hash"),
+            sello_ok: f[7] == "1",
+        };
+    }
+    EvCrudo {
+        id1: ids[0],
+        id2: ids[1],
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -237,6 +293,12 @@ struct ParamCrudo {
     r_slots: u64,
     f_slots: Option<u64>,
     k: u32,
+    f_num: u64,
+    f_den: u64,
+    plazo_slots: u64,
+    m_margen_slots: u64,
+    cbid: u32,
+    evp: bool,
 }
 
 impl ParamCrudo {
@@ -256,6 +318,12 @@ impl ParamCrudo {
             r_slots: 0,
             f_slots: None,
             k: 0,
+            f_num: 1,
+            f_den: 1,
+            plazo_slots: 0,
+            m_margen_slots: 0,
+            cbid: 0,
+            evp: false,
         }
     }
 }
@@ -311,6 +379,16 @@ fn parsear_parametros(c: &BTreeMap<String, String>) -> ParamCrudo {
             Some(f.parse().expect("F_slots"))
         },
         k: c.get("k").expect("k").parse().expect("k"),
+        f_num: c.get("f_num").map_or(1, |v| v.parse().expect("f_num")),
+        f_den: c.get("f_den").map_or(1, |v| v.parse().expect("f_den")),
+        plazo_slots: c
+            .get("Plazo_slots")
+            .map_or(0, |v| v.parse().expect("Plazo_slots")),
+        m_margen_slots: c
+            .get("M_margen_slots")
+            .map_or(0, |v| v.parse().expect("M_margen_slots")),
+        cbid: c.get("cbid").map_or(0, |v| v.parse().expect("cbid")),
+        evp: c.get("evp").is_some_and(|v| v == "1"),
     }
 }
 
@@ -379,6 +457,7 @@ fn parsear_fichero(ruta: &str) -> Vec<Caso> {
                         ent: parse_lista_u64(c.get("ent").expect("ent")),
                         sal: parse_salidas(c.get("sal").expect("sal")),
                         nonce: c.get("nonce").map_or(0, |v| v.parse().expect("nonce")),
+                        ev: c.get("ev").map(|v| parsear_evidencia(v)),
                     });
                 }
             }
@@ -464,6 +543,70 @@ fn parametros(p: &ParamCrudo) -> ParametrosTransicion {
         subsidio_pow,
         subsidio_post,
     }
+}
+
+/// SL-4a: parámetros de evidencia del caso.
+fn parametros_evidencia(p: &ParamCrudo) -> ParametrosEvidencia {
+    ParametrosEvidencia {
+        f_num: p.f_num,
+        f_den: p.f_den,
+        plazo_slots: p.plazo_slots,
+        m_margen_slots: p.m_margen_slots,
+        cbid: p.cbid,
+        evp: p.evp,
+    }
+}
+
+/// Cabecera `PoAS_PoT_DAG` real con la identidad abstracta `cab` y una sal.
+fn cabecera_evidencia(cab: &EvCab, sal: u64) -> DagBlockHeader {
+    let mut chunk = [0u8; 32];
+    chunk[..8].copy_from_slice(&cab.chunk.to_le_bytes());
+    let sol = SolucionPoas {
+        public_key: clave_de(cab.clave),
+        sector_index: cab.sector,
+        history_size: cab.historia,
+        chunk,
+        ..Default::default()
+    };
+    DagBlockHeader {
+        consensus_branch_id: cab.cbid,
+        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
+        timestamp: sal,
+        height: 0,
+        slot: cab.slot as u64,
+        pot_output: [0u8; 16],
+        rango_solucion: cab.ph,
+        sol,
+        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0u8; 32])),
+        padres: PadresDag::genesis(),
+        sello: [0u8; 64],
+    }
+}
+
+/// Traduce la evidencia abstracta a dos cabeceras reales con sellos Ed25519 reales.
+fn cabeceras_de_evidencia(ev: &EvCrudo) -> (DagBlockHeader, DagBlockHeader) {
+    let mut h1 = cabecera_evidencia(&ev.id1, 0);
+    let mut h2;
+    let quiere_menor = ev.id1.ph < ev.id2.ph;
+    let mut sal = 0u64;
+    loop {
+        h2 = cabecera_evidencia(&ev.id2, sal);
+        let menor = h1.pre_hash().as_bytes() < h2.pre_hash().as_bytes();
+        if menor == quiere_menor {
+            break;
+        }
+        sal += 1;
+    }
+    for (cab, h) in [(&ev.id1, &mut h1), (&ev.id2, &mut h2)] {
+        if cab.sello_ok {
+            let sk = firmante_de(cab.clave);
+            let firma: [u8; 64] = sk.sign(h.pre_hash().as_bytes()).into();
+            h.sello = firma;
+        } else {
+            h.sello = [0u8; 64];
+        }
+    }
+    (h1, h2)
 }
 
 struct Constructor {
@@ -698,6 +841,31 @@ impl Constructor {
                 };
                 (real, Vec::new())
             }
+            "Evidencia" => {
+                let Some(ev) = tx.ev else {
+                    let real = Tx {
+                        version: 4,
+                        inputs: Vec::new(),
+                        outputs: Vec::new(),
+                        lock_time: 0,
+                        expiry_height: 0,
+                        extension: ExtensionTx::Ninguna,
+                    };
+                    return Ok((real, Vec::new()));
+                };
+                let _ = self.claves.id(ev.id1.clave);
+                let _ = self.claves.id(ev.id2.clave);
+                let (h1, h2) = cabeceras_de_evidencia(&ev);
+                let real = Tx {
+                    version: 4,
+                    inputs: Vec::new(),
+                    outputs: Vec::new(),
+                    lock_time: 0,
+                    expiry_height: 0,
+                    extension: ExtensionTx::Evidencia { h1, h2 },
+                };
+                (real, Vec::new())
+            }
             otro => return Err(format!("tipo de transacción no soportado: {otro}")),
         };
         self.registrar(&real, &tx.sal)?;
@@ -789,7 +957,13 @@ type Resuelto = (Reales, Cadena, Estado, Vec<BlockHash>, Vec<Descarte>);
 fn construir_y_resolver(caso: &Caso) -> Result<Resuelto, String> {
     let params = parametros(&caso.param);
     let reales = construir_reales(caso)?;
-    let mut cadena = Cadena::nueva(params, caso.param.k, CBID_RED_DEV, MAX_PADRES_ARNES);
+    let mut cadena = Cadena::nueva_con_evidencia(
+        params,
+        caso.param.k,
+        CBID_RED_DEV,
+        MAX_PADRES_ARNES,
+        parametros_evidencia(&caso.param),
+    );
     for bloque in &reales.bloques {
         let _ = cadena.admitir(bloque.clone());
     }
@@ -902,8 +1076,25 @@ fn render_gar(claves: &Claves, estado: &Estado) -> Result<Vec<String>, String> {
             .map(|p| format!("{}@s{}", p.importe.brek(), p.madura_en_slot.unwrap_or(0)))
             .collect::<Vec<_>>()
             .join(",");
+        let inc = if g.incidentes.is_empty() {
+            String::new()
+        } else {
+            let lista = g
+                .incidentes
+                .iter()
+                .map(|i| {
+                    let mut hex = String::with_capacity(64);
+                    for b in &i.id {
+                        let _ = write!(hex, "{b:02x}");
+                    }
+                    format!("{hex}@{}", i.slot_falta)
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!(" inc={lista}")
+        };
         lineas.push(format!(
-            "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}",
+            "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}{inc}",
             g.activo.brek(),
             g.congelado.brek(),
             g.nonce_siguiente
@@ -911,6 +1102,22 @@ fn render_gar(claves: &Claves, estado: &Estado) -> Result<Vec<String>, String> {
     }
     lineas.sort();
     Ok(lineas)
+}
+
+/// Normaliza el `incident_id` de una línea `GAR` (id opaco; ver FD-1). El orden de los incidentes
+/// es el del id del motor, que no coincide con el del oráculo, así que se compara el **multiconjunto**
+/// de `@slot_falta`.
+fn normalizar_gar(linea: &str) -> String {
+    let Some(pos) = linea.find(" inc=") else {
+        return linea.to_string();
+    };
+    let (pref, inc) = linea.split_at(pos + 5);
+    let mut slots: Vec<&str> = inc
+        .split(',')
+        .map(|item| item.split('@').nth(1).unwrap_or(""))
+        .collect();
+    slots.sort_unstable();
+    format!("{pref}{}", slots.join(","))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -937,6 +1144,8 @@ struct Cobertura {
     descartes: BTreeMap<String, BTreeMap<String, u64>>,
     reorgs: u64,
     casos: u64,
+    /// SL-4a · contadores `EV ...` de la sección de evidencia.
+    ev: BTreeMap<String, u64>,
 }
 
 fn tipo_cobertura(tx: &Tx) -> Option<&'static str> {
@@ -981,8 +1190,13 @@ fn operaciones_garantia_aplicadas(cadena: &Cadena) -> BTreeSet<(BlockHash, usize
     ops
 }
 
-fn reorgs_que_deshacen_garantia(reales: &Reales, params: ParametrosTransicion, k: u32) -> u64 {
-    let mut cadena = Cadena::nueva(params, k, CBID_RED_DEV, MAX_PADRES_ARNES);
+fn reorgs_que_deshacen_garantia(
+    reales: &Reales,
+    params: ParametrosTransicion,
+    k: u32,
+    evp: ParametrosEvidencia,
+) -> u64 {
+    let mut cadena = Cadena::nueva_con_evidencia(params, k, CBID_RED_DEV, MAX_PADRES_ARNES, evp);
     let mut prev_tip: Option<BlockHash> = None;
     let mut prev_ops: BTreeSet<(BlockHash, usize)> = BTreeSet::new();
     let mut reorgs = 0u64;
@@ -1005,6 +1219,131 @@ fn reorgs_que_deshacen_garantia(reales: &Reales, params: ParametrosTransicion, k
     reorgs
 }
 
+/// ¿La transacción es una `EvidenceTx` v4 (bien formada o no)?
+fn es_evidencia(tx: &Tx) -> bool {
+    tx.version == 4
+}
+
+/// Pares `(bloque, índice)` de evidencia aplicada en la historia seleccionada (ED-*).
+fn evidencias_aplicadas(cadena: &Cadena) -> BTreeSet<(BlockHash, usize)> {
+    let Ok((_estado, orden, desc)) = cadena.aplicar_historia() else {
+        return BTreeSet::new();
+    };
+    let descartadas: BTreeSet<(BlockHash, usize)> =
+        desc.iter().map(|d| (d.bloque, d.indice)).collect();
+    let mut set = BTreeSet::new();
+    for hash in orden {
+        let Some(bloque) = cadena.bloque(&hash) else {
+            continue;
+        };
+        for (i, (tx, _)) in bloque.txs().iter().enumerate() {
+            if es_evidencia(tx) && !descartadas.contains(&(hash, i)) {
+                set.insert((hash, i));
+            }
+        }
+    }
+    set
+}
+
+/// Evidencias aplicadas en alguna historia seleccionada y luego retiradas por una reorganización
+/// (`EV-27`/`EV-28`), contadas como conjunto (igual que `evidencias_deshechas_por_reorg`).
+fn evidencias_deshechas_por_reorg(
+    reales: &Reales,
+    params: ParametrosTransicion,
+    k: u32,
+    evp: ParametrosEvidencia,
+) -> u64 {
+    let mut cadena = Cadena::nueva_con_evidencia(params, k, CBID_RED_DEV, MAX_PADRES_ARNES, evp);
+    let mut prev_tip: Option<BlockHash> = None;
+    let mut prev_ev: BTreeSet<(BlockHash, usize)> = BTreeSet::new();
+    let mut perdidas: BTreeSet<(BlockHash, usize)> = BTreeSet::new();
+    for bloque in &reales.bloques {
+        let _ = cadena.admitir(bloque.clone());
+        if !matches!(bloque, BloqueCadena::Post(_)) {
+            continue;
+        }
+        let Some(tip) = cadena.mejor_punta() else {
+            continue;
+        };
+        // El oráculo recalcula el conjunto **tras cada bloque**; solo compara al cambiar la punta.
+        let ev = evidencias_aplicadas(&cadena);
+        if Some(tip) != prev_tip {
+            for p in prev_ev.difference(&ev) {
+                perdidas.insert(*p);
+            }
+        }
+        prev_tip = Some(tip);
+        prev_ev = ev;
+    }
+    perdidas.len() as u64
+}
+
+/// Reproduce `contar_evidencia` del oráculo T04 (`exportar.jl:234-269`).
+#[expect(
+    clippy::too_many_arguments,
+    reason = "el contexto del caso ya viene partido por el arnés"
+)]
+fn contar_evidencia(
+    reales: &Reales,
+    cadena: &Cadena,
+    orden: &[BlockHash],
+    desc: &[Descarte],
+    cobertura: &mut Cobertura,
+    params: ParametrosTransicion,
+    k: u32,
+    evp: ParametrosEvidencia,
+) {
+    let hay_evidencia = reales
+        .bloques
+        .iter()
+        .any(|b| b.txs().iter().any(|(tx, _)| es_evidencia(tx)));
+    if !hay_evidencia {
+        return;
+    }
+    let descartadas: BTreeMap<(BlockHash, usize), &ErrorTransicion> = desc
+        .iter()
+        .map(|d| ((d.bloque, d.indice), &d.motivo))
+        .collect();
+    for hash in orden {
+        let Some(bloque) = cadena.bloque(hash) else {
+            continue;
+        };
+        for (i, (tx, _)) in bloque.txs().iter().enumerate() {
+            if !es_evidencia(tx) {
+                continue;
+            }
+            *cobertura.ev.entry("construida".to_string()).or_insert(0) += 1;
+            if let Some(motivo) = descartadas.get(&(*hash, i)) {
+                let nombre = match motivo.nombre_t01() {
+                    "ErrEvidenciaDuplicada" => "duplicada",
+                    "ErrEvidenciaTardia" => "tardia",
+                    "ErrCbidAjeno" => "cbid_ajeno",
+                    "ErrEvidenciaConEntradas" => "con_entradas",
+                    "ErrOrdenCanonico" => "orden_canonico",
+                    "ErrSinEvidencia" => "sin_evidencia",
+                    _ => "otro",
+                };
+                *cobertura.ev.entry(nombre.to_string()).or_insert(0) += 1;
+            } else {
+                let ExtensionTx::Evidencia { h1, .. } = &tx.extension else {
+                    *cobertura.ev.entry("malformada".to_string()).or_insert(0) += 1;
+                    continue;
+                };
+                let v = cadena
+                    .estado_past(hash)
+                    .and_then(|e| e.garantias.get(&h1.sol.public_key))
+                    .map_or(0, total_garantia);
+                let nombre = if v == 0 { "sin_saldo" } else { "aplicada" };
+                *cobertura.ev.entry(nombre.to_string()).or_insert(0) += 1;
+            }
+        }
+    }
+    let d = evidencias_deshechas_por_reorg(reales, params, k, evp);
+    if d > 0 {
+        *cobertura.ev.entry("deshecha".to_string()).or_insert(0) += d;
+    }
+}
+
 fn acumular_caso(
     cobertura: &mut Cobertura,
     reales: &Reales,
@@ -1012,6 +1351,7 @@ fn acumular_caso(
     desc: &[Descarte],
     params: ParametrosTransicion,
     k: u32,
+    evp: ParametrosEvidencia,
 ) {
     for bloque in &reales.bloques {
         if let BloqueCadena::Post(p) = bloque {
@@ -1049,7 +1389,7 @@ fn acumular_caso(
             }
         }
     }
-    cobertura.reorgs += reorgs_que_deshacen_garantia(reales, params, k);
+    cobertura.reorgs += reorgs_que_deshacen_garantia(reales, params, k, evp);
     cobertura.casos += 1;
 }
 
@@ -1059,7 +1399,7 @@ fn valor(mapa: &BTreeMap<String, u64>, clave: &str) -> u64 {
 
 fn generar_lineas(c: &Cobertura) -> Vec<String> {
     let mut out = Vec::new();
-    out.push("SECCION vectores-v0.3 (casos aleatorios)".to_string());
+    out.push("SECCION vectores-v0.5 (casos aleatorios)".to_string());
     out.push(format!("casos = {}", c.casos));
     for t in TIPOS_COBERTURA {
         let desc_t = c.descartes.get(t);
@@ -1145,6 +1485,18 @@ fn generar_lineas(c: &Cobertura) -> Vec<String> {
         "reorganizaciones_que_deshacen_garantia = {}",
         c.reorgs
     ));
+    out.extend(generar_lineas_evidencia(c));
+    out
+}
+
+/// Sección `EV ...` de la cobertura de evidencia (orden alfabético como el oráculo).
+fn generar_lineas_evidencia(c: &Cobertura) -> Vec<String> {
+    let mut out = vec!["SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)".to_string()];
+    let mut claves: Vec<&String> = c.ev.keys().collect();
+    claves.sort();
+    for k in claves {
+        out.push(format!("EV {k} = {}", c.ev[k]));
+    }
     out
 }
 
@@ -1153,13 +1505,13 @@ fn cobertura_esperada() -> Vec<String> {
     let mut lineas = Vec::new();
     let mut dentro = false;
     for linea in texto.lines() {
-        if linea.starts_with("SECCION vectores-v0.3") {
+        if linea.starts_with("SECCION vectores-v0.5") {
             dentro = true;
             lineas.push(linea.to_string());
             continue;
         }
         if dentro {
-            if linea.starts_with("SECCION ") {
+            if linea.starts_with("SECCION run.jl") {
                 break;
             }
             lineas.push(linea.to_string());
@@ -1244,7 +1596,9 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>, cobertura: &mut C
     // GAR.
     match render_gar(&reales.claves, &estado) {
         Ok(obtenido) => {
-            if obtenido != caso.gar {
+            let esperado_n: Vec<String> = caso.gar.iter().map(|l| normalizar_gar(l)).collect();
+            let obtenido_n: Vec<String> = obtenido.iter().map(|l| normalizar_gar(l)).collect();
+            if obtenido_n != esperado_n {
                 discrepancias.push(format!(
                     "CASO {} ({}) GAR esperado={:?} obtenido={:?}",
                     caso.n, caso.nombre, caso.gar, obtenido
@@ -1273,8 +1627,19 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>, cobertura: &mut C
             caso.n, caso.nombre, caso.est
         ));
     }
+    let evp = parametros_evidencia(&caso.param);
+    contar_evidencia(
+        &reales,
+        &cadena,
+        &orden,
+        &desc,
+        cobertura,
+        params,
+        caso.param.k,
+        evp,
+    );
     if caso.nombre == "aleatorio" {
-        acumular_caso(cobertura, &reales, &orden, &desc, params, caso.param.k);
+        acumular_caso(cobertura, &reales, &orden, &desc, params, caso.param.k, evp);
     }
 }
 

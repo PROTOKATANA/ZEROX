@@ -1,0 +1,347 @@
+   Compiling cfg-if v1.0.4
+   Compiling typenum v1.20.1
+   Compiling libc v0.2.189
+   Compiling zerocopy v0.8.56
+   Compiling serde_core v1.0.229
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling serde v1.0.229
+   Compiling curve25519-dalek v4.1.3
+   Compiling byteorder v1.5.0
+   Compiling cpufeatures v0.2.17
+   Compiling static_assertions v1.1.0
+   Compiling crunchy v0.2.4
+   Compiling signature v2.2.0
+   Compiling rustc-hex v2.1.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling subtle v2.6.1
+   Compiling equivalent v1.0.2
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling getrandom v0.2.17
+   Compiling getrandom v0.3.4
+   Compiling bitflags v2.13.1
+   Compiling rand_core v0.6.4
+   Compiling rand_core v0.9.5
+   Compiling generic-array v0.14.7
+   Compiling hybrid-array v0.4.14
+   Compiling hex v0.4.3
+   Compiling const-oid v0.10.2
+   Compiling uint v0.10.1
+   Compiling rustix v1.1.4
+   Compiling hashbrown v0.16.1
+   Compiling crypto-common v0.2.2
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling num-traits v0.2.19
+   Compiling digest v0.11.3
+   Compiling keccak v0.2.2
+   Compiling sponge-cursor v0.1.0
+   Compiling fastrand v2.5.0
+   Compiling once_cell v1.21.4
+   Compiling sha3 v0.12.0
+   Compiling wait-timeout v0.2.1
+   Compiling bit-vec v0.8.0
+   Compiling fnv v1.0.7
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling bech32 v0.12.0
+   Compiling quick-error v1.2.3
+   Compiling bit-set v0.8.0
+   Compiling rand v0.9.5
+   Compiling tempfile v3.24.0
+   Compiling rand_xorshift v0.4.0
+   Compiling regex-syntax v0.8.11
+   Compiling unarray v0.1.4
+   Compiling rusty-fork v0.3.1
+   Compiling ppv-lite86 v0.2.21
+   Compiling thiserror v2.0.20
+   Compiling rand_chacha v0.3.1
+   Compiling rand_chacha v0.9.0
+   Compiling zeroize_derive v1.5.0
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling rand v0.8.8
+   Compiling zeroize v1.9.0
+   Compiling fixed-hash v0.8.0
+   Compiling primitive-types v0.14.0
+   Compiling ed25519 v2.2.3
+   Compiling proptest v1.11.0
+   Compiling ed25519-zebra v4.2.0
+   Compiling zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-core)
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.27s
+     Running tests/diferencial_t01.rs (/home/katana/zeo/ZEROX/deepseek/SL4a/target/debug/deps/diferencial_t01-67e7e38912278acd)
+
+running 2 tests
+test diferencial_t01 has been running for over 60 seconds
+test diferencial_t01_negativos has been running for over 60 seconds
+casos leidos      = 2795
+con sufijo PoST   = 2687
+discrepancias     = 120
+RES por error esperado:
+  ErrAutorizacion: 3
+  ErrCbidAjeno: 120
+  ErrDepositoTemprano: 1
+  ErrEmision: 3
+  ErrEvidenciaConEntradas: 120
+  ErrEvidenciaDuplicada: 40
+  ErrEvidenciaTardia: 200
+  ErrGarantia: 7
+  ErrGenesis: 3
+  ErrInmaduro: 8
+  ErrOperacionFase: 6
+  ErrPow: 1414
+  ErrPowTrasCorte: 3389
+  ErrSinPadre: 4887
+  ErrSinTerminal: 2997
+  ErrSlot: 5079
+  ErrVentanaAbierta: 8
+  OK: 22057
+por nombre de caso:
+  EV-RAT3-carrera: 8 casos, 0 con discrepancia
+  EV-autodenuncia: 12 casos, 0 con discrepancia
+  X-01: 3 casos, 0 con discrepancia
+  X-02: 3 casos, 0 con discrepancia
+  X-03: 3 casos, 0 con discrepancia
+  X-03b: 2 casos, 0 con discrepancia
+  X-04: 1 casos, 0 con discrepancia
+  X-05: 3 casos, 0 con discrepancia
+  X-06: 3 casos, 0 con discrepancia
+  X-07: 3 casos, 0 con discrepancia
+  X-08: 3 casos, 0 con discrepancia
+  X-09: 3 casos, 0 con discrepancia
+  X-10: 3 casos, 0 con discrepancia
+  X-11b: 3 casos, 0 con discrepancia
+  X-11c: 3 casos, 0 con discrepancia
+  X-13: 3 casos, 0 con discrepancia
+  X-14: 3 casos, 0 con discrepancia
+  X-16: 3 casos, 0 con discrepancia
+  X-17: 3 casos, 0 con discrepancia
+  X-18: 3 casos, 0 con discrepancia
+  X-19: 1 casos, 0 con discrepancia
+  X-20: 3 casos, 0 con discrepancia
+  aleatorio: 2000 casos, 0 con discrepancia
+  ev-aplicada: 120 casos, 0 con discrepancia
+  ev-cbid: 120 casos, 0 con discrepancia
+  ev-con_entradas: 120 casos, 0 con discrepancia
+  ev-duplicada: 120 casos, 0 con discrepancia
+  ev-sin_saldo: 120 casos, 120 con discrepancia
+  ev-tardia: 120 casos, 0 con discrepancia
+  CASO 2061 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2067 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2073 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2079 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2085 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2091 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2097 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2103 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2109 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2115 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2121 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2127 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2133 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2139 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2145 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2151 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2157 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2163 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2169 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2175 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2181 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2187 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2193 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2199 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2205 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2211 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2217 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2223 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2229 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2235 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2241 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2247 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2253 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2259 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2265 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2271 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2277 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2283 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2289 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2295 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+
+
+thread 'diferencial_t01' (1312) panicked at crates/zx-consensus/tests/diferencial_t01.rs:1394:5:
+diferencial T01 (base) con 120 discrepancias:
+casos leidos      = 2795
+con sufijo PoST   = 2687
+discrepancias     = 120
+RES por error esperado:
+  ErrAutorizacion: 3
+  ErrCbidAjeno: 120
+  ErrDepositoTemprano: 1
+  ErrEmision: 3
+  ErrEvidenciaConEntradas: 120
+  ErrEvidenciaDuplicada: 40
+  ErrEvidenciaTardia: 200
+  ErrGarantia: 7
+  ErrGenesis: 3
+  ErrInmaduro: 8
+  ErrOperacionFase: 6
+  ErrPow: 1414
+  ErrPowTrasCorte: 3389
+  ErrSinPadre: 4887
+  ErrSinTerminal: 2997
+  ErrSlot: 5079
+  ErrVentanaAbierta: 8
+  OK: 22057
+por nombre de caso:
+  EV-RAT3-carrera: 8 casos, 0 con discrepancia
+  EV-autodenuncia: 12 casos, 0 con discrepancia
+  X-01: 3 casos, 0 con discrepancia
+  X-02: 3 casos, 0 con discrepancia
+  X-03: 3 casos, 0 con discrepancia
+  X-03b: 2 casos, 0 con discrepancia
+  X-04: 1 casos, 0 con discrepancia
+  X-05: 3 casos, 0 con discrepancia
+  X-06: 3 casos, 0 con discrepancia
+  X-07: 3 casos, 0 con discrepancia
+  X-08: 3 casos, 0 con discrepancia
+  X-09: 3 casos, 0 con discrepancia
+  X-10: 3 casos, 0 con discrepancia
+  X-11b: 3 casos, 0 con discrepancia
+  X-11c: 3 casos, 0 con discrepancia
+  X-13: 3 casos, 0 con discrepancia
+  X-14: 3 casos, 0 con discrepancia
+  X-16: 3 casos, 0 con discrepancia
+  X-17: 3 casos, 0 con discrepancia
+  X-18: 3 casos, 0 con discrepancia
+  X-19: 1 casos, 0 con discrepancia
+  X-20: 3 casos, 0 con discrepancia
+  aleatorio: 2000 casos, 0 con discrepancia
+  ev-aplicada: 120 casos, 0 con discrepancia
+  ev-cbid: 120 casos, 0 con discrepancia
+  ev-con_entradas: 120 casos, 0 con discrepancia
+  ev-duplicada: 120 casos, 0 con discrepancia
+  ev-sin_saldo: 120 casos, 120 con discrepancia
+  ev-tardia: 120 casos, 0 con discrepancia
+  CASO 2061 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2067 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2073 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2079 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2085 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2091 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2097 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2103 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2109 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2115 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2121 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2127 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2133 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2139 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2145 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2151 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2157 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2163 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2169 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2175 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2181 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2187 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2193 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2199 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2205 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2211 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2217 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2223 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2229 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2235 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2241 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2247 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2253 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2259 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2265 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2271 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2277 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2283 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2289 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+  CASO 2295 GAR: clave desconocida en garantía ClavePublica([49, 168, 83, 62, 252, 227, 66, 206, 123, 240, 45, 254, 143, 252, 249, 228, 20, 47, 192, 112, 58, 5, 22, 93, 126, 194, 86, 31, 54, 250, 192, 229])
+
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: diferencial_t01::diferencial_t01
+             at ./tests/diferencial_t01.rs:1394:5
+   3: diferencial_t01::diferencial_t01::{closure#0}
+             at ./tests/diferencial_t01.rs:1385:21
+   4: <diferencial_t01::diferencial_t01::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test diferencial_t01 ... FAILED
+casos leidos      = 3914
+con sufijo PoST   = 1890
+discrepancias     = 0
+RES por error esperado:
+  ErrAutorizacion: 240
+  ErrDobleGasto: 306
+  ErrEmision: 198
+  ErrGarantia: 141
+  ErrInmaduro: 189
+  ErrNonce: 1999
+  ErrOperacionFase: 192
+  ErrRetiroPendiente: 78
+  ErrSaldo: 571
+  OK: 25955
+por nombre de caso:
+  neg-autorizacion-deposito: 75 casos, 0 con discrepancia
+  neg-autorizacion-liberacion: 27 casos, 0 con discrepancia
+  neg-autorizacion-retiro: 75 casos, 0 con discrepancia
+  neg-autorizacion-transfer: 63 casos, 0 con discrepancia
+  neg-doblegasto-deposito-salida-gastada: 90 casos, 0 con discrepancia
+  neg-doblegasto-entrada-dos-txs: 63 casos, 0 con discrepancia
+  neg-doblegasto-entrada-duplicada-tx: 63 casos, 0 con discrepancia
+  neg-doblegasto-salida-ya-gastada: 90 casos, 0 con discrepancia
+  neg-emision-r6-coinbase-no-primera: 75 casos, 0 con discrepancia
+  neg-emision-r7-coinbase-vacia: 48 casos, 0 con discrepancia
+  neg-emision-r9-transfer-sin-entradas: 75 casos, 0 con discrepancia
+  neg-garantia-deposito-pendiente: 6 casos, 0 con discrepancia
+  neg-garantia-sin-activo: 135 casos, 0 con discrepancia
+  neg-inmaduro-coinbase-inmadura-prev: 72 casos, 0 con discrepancia
+  neg-inmaduro-coinbase-mismo-bloque: 48 casos, 0 con discrepancia
+  neg-inmaduro-cruce-corte: 24 casos, 0 con discrepancia
+  neg-inmaduro-deposito-mismo-bloque: 45 casos, 0 con discrepancia
+  neg-nonce-dos-nn: 199 casos, 0 con discrepancia
+  neg-nonce-rep-liberacion: 180 casos, 0 con discrepancia
+  neg-nonce-rep-retiro: 404 casos, 0 con discrepancia
+  neg-nonce-saltado: 608 casos, 0 con discrepancia
+  neg-nonce-viejo: 608 casos, 0 con discrepancia
+  neg-operacionfase-evidencia: 48 casos, 0 con discrepancia
+  neg-operacionfase-evidencia-sola: 48 casos, 0 con discrepancia
+  neg-operacionfase-liberacion: 48 casos, 0 con discrepancia
+  neg-operacionfase-liberacion-sola: 48 casos, 0 con discrepancia
+  neg-retiropendiente-dos-en-bloque: 58 casos, 0 con discrepancia
+  neg-retiropendiente-segunda: 20 casos, 0 con discrepancia
+  neg-saldo-deposito-descuadra: 63 casos, 0 con discrepancia
+  neg-saldo-liberacion-antes-R: 34 casos, 0 con discrepancia
+  neg-saldo-liberacion-mayor-vencido: 54 casos, 0 con discrepancia
+  neg-saldo-r8-coinbasepost-cero: 27 casos, 0 con discrepancia
+  neg-saldo-r8-deposito-cero: 75 casos, 0 con discrepancia
+  neg-saldo-r8-liberacion-cero: 27 casos, 0 con discrepancia
+  neg-saldo-r8-retiro-cero: 75 casos, 0 con discrepancia
+  neg-saldo-retiro-mayor-activo: 90 casos, 0 con discrepancia
+  neg-saldo-transfer-crea-valor: 63 casos, 0 con discrepancia
+  neg-saldo-transfer-sin-salidas: 63 casos, 0 con discrepancia
+
+test diferencial_t01_negativos ... ok
+
+failures:
+
+failures:
+    diferencial_t01
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 230.92s
+
+error: test failed, to rerun pass `-p zx-consensus --test diferencial_t01`

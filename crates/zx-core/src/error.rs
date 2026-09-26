@@ -343,6 +343,15 @@ pub enum ErrorFormaTx {
         height: u32,
     },
 
+    /// `EV-04`: una `EvidenceTx` v4 con entradas, salidas o testigos de transacción.
+    #[error("EV-04: EvidenceTx con entradas, salidas o testigos (MUST ser 0)")]
+    EvidenciaConEntradasOSalidas,
+
+    /// `EV-01`/`EV-04`: las dos cabeceras de una `EvidenceTx` no están en orden canónico
+    /// estrictamente ascendente por `pre_hash`.
+    #[error("EV-01: cabeceras de EvidenceTx fuera de orden canónico por pre_hash")]
+    OrdenCanonicoInvalido,
+
     /// Error de codificación al verificar una firma de aceptación.
     #[error(transparent)]
     Codificacion(#[from] EncodingError),

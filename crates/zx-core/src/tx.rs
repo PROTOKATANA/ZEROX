@@ -8,6 +8,7 @@ use crate::amount::Amount;
 use crate::digest::TxId;
 use crate::error::EncodingError;
 use crate::firma::ClavePublica;
+use crate::preimage::dag::DagBlockHeader;
 
 /// Máximo de claves en un `MultiSig` (C-TX-11).
 pub const MAX_MULTISIG_KEYS: usize = 16;
@@ -168,11 +169,17 @@ impl TipoGarantia {
     }
 }
 
-/// Campos de efecto extra por versión (F-05, F-06, F-07).
+/// Campos de efecto extra por versión (F-05, F-06, F-07, F-06/SL-4a).
 ///
 /// Es el «gancho de extensión» de `C-TX-07`. La coherencia con `version` es obligatoria:
-/// `1 ⇔ Ninguna`, `2 ⇔ Garantia`, `3 ⇔ CoinbasePost`; `validar_forma_tx` la exige.
+/// `1 ⇔ Ninguna`, `2 ⇔ Garantia`, `3 ⇔ CoinbasePost`, `4 ⇔ Evidencia`; `validar_forma_tx` la exige
+/// (para la v4, `validar_forma_tx_v4`, que el motor invoca cuando el perfil activa la evidencia).
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "EV-01/EV-02: la v4 transporta dos cabeceras PoAS_PoT_DAG completas (hasta 1 037 B \
+              cada una); boxearlas complicaría el wire, la preimagen y el undo sin beneficio"
+)]
 pub enum ExtensionTx {
     /// Versión 1: sin campos extra (idéntica a `9681061`).
     Ninguna,
@@ -196,6 +203,17 @@ pub enum ExtensionTx {
         importe: Amount,
         /// Slot del bloque que la contiene (F-17).
         slot: u64,
+    },
+    /// Versión 4 · `EvidenceTx` (EV-01…EV-04): **exactamente dos** cabeceras `PoAS_PoT_DAG`
+    /// completas, con su sello, en orden canónico `pre_hash(h1) < pre_hash(h2)`.
+    ///
+    /// No lleva entradas, ni salidas, ni testigos de transacción: el sello vive dentro de cada
+    /// cabecera. El `txid` compromete los bytes completos de ambas (`EV-03`).
+    Evidencia {
+        /// `H1`: cabecera con el `pre_hash` lexicográficamente menor.
+        h1: DagBlockHeader,
+        /// `H2`: cabecera con el `pre_hash` lexicográficamente mayor.
+        h2: DagBlockHeader,
     },
 }
 

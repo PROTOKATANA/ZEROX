@@ -1,0 +1,65 @@
+    Checking rocksdb v0.25.0
+    Checking zx-p2p v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-p2p)
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:801:14
+    |
+801 |       let s1 = aplicar(
+    |  ______________^^^^^^^-
+802 | |         &estado,
+803 | |         &bloque_pow(1, vec![(cb1, Vec::new())]),
+804 | |         &params(),
+805 | |         CBID_RED_DEV,
+806 | |     )
+    | |_____- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+801 |     let s1 = aplicar(
+...
+805 |         CBID_RED_DEV,
+806 ~         /* &ParametrosEvidencia */,
+807 ~     )
+    |
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:808:14
+    |
+808 |       let s2 = aplicar(
+    |  ______________^^^^^^^-
+809 | |         &s1,
+810 | |         &bloque_pow(2, vec![(cb2, Vec::new())]),
+811 | |         &params(),
+812 | |         CBID_RED_DEV,
+813 | |     )
+    | |_____- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+808 |     let s2 = aplicar(
+...
+812 |         CBID_RED_DEV,
+813 ~         /* &ParametrosEvidencia */,
+814 ~     )
+    |
+
+For more information about this error, try `rustc --explain E0061`.
+    Checking zx-storage v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-storage)
+error: could not compile `zx-consensus` (lib test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

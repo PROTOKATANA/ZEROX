@@ -1,0 +1,14 @@
+2026-09-26T19:30:16+02:00 inicio: leída ORDEN-SL4a-MOTOR.md, CONTRATO-EVIDENCIA-v0.md (con Ratificación v0), LINEO.md, DECISIONES.md, REVISION-SL2b/SL3b y PROGRAMA.md; zona vacía
+2026-09-26T19:32:00+02:00 copiados ws.orig/ y ws/ (Cargo.toml, Cargo.lock, rust-toolchain.toml, crates/, testdata/, ci/, .github/, enlace PDF) y los vectores v0.4 (T01) y v0.5 (T04) a testdata/; .cargo-home copiado de W06d3
+2026-09-26T19:34:00+02:00 escrito DEFINICIONES-FALTANTES.md (FD-1…FD-7) antes de editar
+2026-09-26T19:36:00+02:00 zx-core: ExtensionTx::Evidencia, forma v4, tags SL-4a, extension_digest con dom_txid_evp, incident_id_evidencia
+2026-09-26T19:45:00+02:00 zx-consensus: ParametrosEvidencia, Incidente, ultimo_slot_producido, errores de evidencia, debitar/techo/suelo/poda, aplicar_evidencia, EV-24(i)/(ii), undo con ultimo_slot_producido
+2026-09-26T19:52:00+02:00 zx-cadena: Cadena::nueva_con_evidencia y paso de evidencia a aplicar/aplicar_fusion
+2026-09-26T19:57:00+02:00 diferencial_t01 v0.4: 0 discrepancias y cobertura idéntica (2 795 casos); negativos v0.2 0 discrepancias
+2026-09-26T20:10:00+02:00 arnés T04 v0.5 con evidencia; corregida la poda EV-11 al punto de aplicación (caso 972); 0 discrepancias y cobertura idéntica (1 878 casos)
+2026-09-26T20:18:00+02:00 tests propios V5 (zx-consensus/tests/evidencia.rs): 8/8
+2026-09-26T20:21:00+02:00 V1 fmt y V2 clippy en verde tras expect justificados
+2026-09-26T20:30:00+02:00 cierre previsto: suite completa V3, scripts V6, cambios.patch y MIGRACION.sha256
+2026-09-26T20:35:00+02:00 V3 cargo test --workspace --all-features --locked: 729 pasan, 0 fallan, 2 ignorados (721/0/2 antes; +8 tests V5)
+2026-09-26T20:36:00+02:00 V6 dependencias-exactas (23) y frontera-crates (9/9) en verde; Cargo.lock idéntico a la raíz
+2026-09-26T20:38:00+02:00 cierre: cambios.patch (22 archivos) y MIGRACION.sha256 (22 huellas) verificados; ENTRADA-SL4a.sha256 9/9; zx-node intacto

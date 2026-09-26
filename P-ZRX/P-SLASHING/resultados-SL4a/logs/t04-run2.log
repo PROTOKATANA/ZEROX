@@ -1,0 +1,136 @@
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+   Compiling zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running tests/diferencial_t04.rs (/home/katana/zeo/ZEROX/deepseek/SL4a/target/debug/deps/diferencial_t04-337bcf8db2308811)
+
+running 1 test
+test diferencial_t04 has been running for over 60 seconds
+casos leidos      = 1878
+discrepancias     = 5
+por nombre de caso:
+  D-1: 1 casos, 0 con discrepancia
+  D-10: 1 casos, 0 con discrepancia
+  D-11: 1 casos, 0 con discrepancia
+  D-12: 1 casos, 0 con discrepancia
+  D-13: 1 casos, 0 con discrepancia
+  D-14: 1 casos, 0 con discrepancia
+  D-15: 1 casos, 0 con discrepancia
+  D-16: 1 casos, 0 con discrepancia
+  D-17: 1 casos, 0 con discrepancia
+  D-18: 1 casos, 0 con discrepancia
+  D-2: 1 casos, 0 con discrepancia
+  D-3: 1 casos, 0 con discrepancia
+  D-4: 1 casos, 0 con discrepancia
+  D-5: 1 casos, 0 con discrepancia
+  D-6: 1 casos, 0 con discrepancia
+  D-7: 1 casos, 0 con discrepancia
+  D-8: 1 casos, 0 con discrepancia
+  D-9: 1 casos, 0 con discrepancia
+  aleatorio: 900 casos, 0 con discrepancia
+  ev-aleatorio: 960 casos, 5 con discrepancia
+  CASO 972 (ev-aleatorio) DESC esperado=[(17, 2, "ErrSaldo"), (16, 2, "ErrCbidAjeno"), (12, 2, "ErrNonce")] obtenido=[(17, 2, "ErrCasoAbierto"), (16, 2, "ErrCbidAjeno"), (12, 2, "ErrNonce")]
+  CASO 1232 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,4@s5] congelado=22 nonce=3 inc=e3139e66e99b960ae2b403ec7279389031cf546947bf661013769a289d8551f5@4,fe8e03d6f2677ffee431775ccd6fc22d9b1a07d0d46d7f9994969d344eab91e5@3", "GAR clave=2 activo=1 pend=[] ret=[4@s4] cred=[] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,4@s5] congelado=22 nonce=3 inc=57fc3854b6489ba057d31c0247b476e6f7a49d3ecb08bd952a180f677932174b@3,a39d919e004d24d25df882baf011adc9aeeaf1b6ab4a30cca0c10c5f9997fdd1@4", "GAR clave=2 activo=1 pend=[] ret=[4@s4] cred=[] congelado=0 nonce=2"]
+  CASO 1754 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=25f306a1ba4210ca116dac5cb7652f8f18b562ad429104be59ed495d7afea288@6,e3139e66e99b960ae2b403ec7279389031cf546947bf661013769a289d8551f5@4", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=a39d919e004d24d25df882baf011adc9aeeaf1b6ab4a30cca0c10c5f9997fdd1@4,e2fe95ba21cf10a7004509c977d29187138149d218c294f54c793c038082f8fc@6", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"]
+  CASO 1774 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=25f306a1ba4210ca116dac5cb7652f8f18b562ad429104be59ed495d7afea288@6,e3139e66e99b960ae2b403ec7279389031cf546947bf661013769a289d8551f5@4", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=a39d919e004d24d25df882baf011adc9aeeaf1b6ab4a30cca0c10c5f9997fdd1@4,e2fe95ba21cf10a7004509c977d29187138149d218c294f54c793c038082f8fc@6", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"]
+  CASO 1815 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[] congelado=0 nonce=1 inc=25f306a1ba4210ca116dac5cb7652f8f18b562ad429104be59ed495d7afea288@6,7a9971382f897d189340c326b7b5da71fc9cfd47446f499035291d38a0b58bb3@5", "GAR clave=2 activo=0 pend=[] ret=[] cred=[3@s8,4@s8] congelado=0 nonce=2 inc=458959cfdbfc26e81cadc6f79d88c89c90ae9c6677ab18af213473378f5a3929@7", "GAR clave=3 activo=0 pend=[9@s8] ret=[] cred=[] congelado=0 nonce=1"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[] congelado=0 nonce=1 inc=4a419fdd763869fdb9b137ba9c60f2727b9ac1e0d49ed33b5836b4a1e4419e65@5,e2fe95ba21cf10a7004509c977d29187138149d218c294f54c793c038082f8fc@6", "GAR clave=2 activo=0 pend=[] ret=[] cred=[3@s8,4@s8] congelado=0 nonce=2 inc=508461335873b046a36d0484728801b022be8880a70b69589d1ebf8260e8b825@7", "GAR clave=3 activo=0 pend=[9@s8] ret=[] cred=[] congelado=0 nonce=1"]
+cobertura (tabla del arnés):
+  SECCION vectores-v0.5 (casos aleatorios)
+  casos = 900
+  TIPO Transferencia construidas=1112 aplicadas=364 descartadas=204 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=204 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Deposito construidas=1626 aplicadas=347 descartadas=396 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=295 ErrDobleGasto=101 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  garantia_construidas = 4663
+  garantia_evaluadas = 2280
+  garantia_errnonce = 853
+  garantia_errnonce_pct_construidas = 18.29
+  garantia_errnonce_pct_evaluadas = 37.41
+  err_doble_gasto_total = 305
+  reorganizaciones_que_deshacen_garantia = 312
+  SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)
+  EV aplicada = 227
+  EV cbid_ajeno = 137
+  EV construida = 770
+  EV deshecha = 108
+  EV duplicada = 30
+  EV sin_saldo = 80
+  EV tardia = 296
+
+
+thread 'diferencial_t04' (379) panicked at crates/zx-cadena/tests/diferencial_t04.rs:1699:5:
+diferencial T04 con 5 discrepancias:
+casos leidos      = 1878
+discrepancias     = 5
+por nombre de caso:
+  D-1: 1 casos, 0 con discrepancia
+  D-10: 1 casos, 0 con discrepancia
+  D-11: 1 casos, 0 con discrepancia
+  D-12: 1 casos, 0 con discrepancia
+  D-13: 1 casos, 0 con discrepancia
+  D-14: 1 casos, 0 con discrepancia
+  D-15: 1 casos, 0 con discrepancia
+  D-16: 1 casos, 0 con discrepancia
+  D-17: 1 casos, 0 con discrepancia
+  D-18: 1 casos, 0 con discrepancia
+  D-2: 1 casos, 0 con discrepancia
+  D-3: 1 casos, 0 con discrepancia
+  D-4: 1 casos, 0 con discrepancia
+  D-5: 1 casos, 0 con discrepancia
+  D-6: 1 casos, 0 con discrepancia
+  D-7: 1 casos, 0 con discrepancia
+  D-8: 1 casos, 0 con discrepancia
+  D-9: 1 casos, 0 con discrepancia
+  aleatorio: 900 casos, 0 con discrepancia
+  ev-aleatorio: 960 casos, 5 con discrepancia
+  CASO 972 (ev-aleatorio) DESC esperado=[(17, 2, "ErrSaldo"), (16, 2, "ErrCbidAjeno"), (12, 2, "ErrNonce")] obtenido=[(17, 2, "ErrCasoAbierto"), (16, 2, "ErrCbidAjeno"), (12, 2, "ErrNonce")]
+  CASO 1232 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,4@s5] congelado=22 nonce=3 inc=e3139e66e99b960ae2b403ec7279389031cf546947bf661013769a289d8551f5@4,fe8e03d6f2677ffee431775ccd6fc22d9b1a07d0d46d7f9994969d344eab91e5@3", "GAR clave=2 activo=1 pend=[] ret=[4@s4] cred=[] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,3@s5,4@s5] congelado=22 nonce=3 inc=57fc3854b6489ba057d31c0247b476e6f7a49d3ecb08bd952a180f677932174b@3,a39d919e004d24d25df882baf011adc9aeeaf1b6ab4a30cca0c10c5f9997fdd1@4", "GAR clave=2 activo=1 pend=[] ret=[4@s4] cred=[] congelado=0 nonce=2"]
+  CASO 1754 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=25f306a1ba4210ca116dac5cb7652f8f18b562ad429104be59ed495d7afea288@6,e3139e66e99b960ae2b403ec7279389031cf546947bf661013769a289d8551f5@4", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=a39d919e004d24d25df882baf011adc9aeeaf1b6ab4a30cca0c10c5f9997fdd1@4,e2fe95ba21cf10a7004509c977d29187138149d218c294f54c793c038082f8fc@6", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"]
+  CASO 1774 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=25f306a1ba4210ca116dac5cb7652f8f18b562ad429104be59ed495d7afea288@6,e3139e66e99b960ae2b403ec7279389031cf546947bf661013769a289d8551f5@4", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[1@s7,3@s7,3@s7,3@s7,3@s7] congelado=1 nonce=1 inc=a39d919e004d24d25df882baf011adc9aeeaf1b6ab4a30cca0c10c5f9997fdd1@4,e2fe95ba21cf10a7004509c977d29187138149d218c294f54c793c038082f8fc@6", "GAR clave=2 activo=11 pend=[9@s7] ret=[] cred=[] congelado=0 nonce=2"]
+  CASO 1815 (ev-aleatorio) GAR esperado=["GAR clave=1 activo=0 pend=[] ret=[] cred=[] congelado=0 nonce=1 inc=25f306a1ba4210ca116dac5cb7652f8f18b562ad429104be59ed495d7afea288@6,7a9971382f897d189340c326b7b5da71fc9cfd47446f499035291d38a0b58bb3@5", "GAR clave=2 activo=0 pend=[] ret=[] cred=[3@s8,4@s8] congelado=0 nonce=2 inc=458959cfdbfc26e81cadc6f79d88c89c90ae9c6677ab18af213473378f5a3929@7", "GAR clave=3 activo=0 pend=[9@s8] ret=[] cred=[] congelado=0 nonce=1"] obtenido=["GAR clave=1 activo=0 pend=[] ret=[] cred=[] congelado=0 nonce=1 inc=4a419fdd763869fdb9b137ba9c60f2727b9ac1e0d49ed33b5836b4a1e4419e65@5,e2fe95ba21cf10a7004509c977d29187138149d218c294f54c793c038082f8fc@6", "GAR clave=2 activo=0 pend=[] ret=[] cred=[3@s8,4@s8] congelado=0 nonce=2 inc=508461335873b046a36d0484728801b022be8880a70b69589d1ebf8260e8b825@7", "GAR clave=3 activo=0 pend=[9@s8] ret=[] cred=[] congelado=0 nonce=1"]
+cobertura (tabla del arnés):
+  SECCION vectores-v0.5 (casos aleatorios)
+  casos = 900
+  TIPO Transferencia construidas=1112 aplicadas=364 descartadas=204 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=204 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Deposito construidas=1626 aplicadas=347 descartadas=396 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=295 ErrDobleGasto=101 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  garantia_construidas = 4663
+  garantia_evaluadas = 2280
+  garantia_errnonce = 853
+  garantia_errnonce_pct_construidas = 18.29
+  garantia_errnonce_pct_evaluadas = 37.41
+  err_doble_gasto_total = 305
+  reorganizaciones_que_deshacen_garantia = 312
+  SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)
+  EV aplicada = 227
+  EV cbid_ajeno = 137
+  EV construida = 770
+  EV deshecha = 108
+  EV duplicada = 30
+  EV sin_saldo = 80
+  EV tardia = 296
+
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: diferencial_t04::diferencial_t04
+             at ./tests/diferencial_t04.rs:1699:5
+   3: diferencial_t04::diferencial_t04::{closure#0}
+             at ./tests/diferencial_t04.rs:1696:21
+   4: <diferencial_t04::diferencial_t04::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test diferencial_t04 ... FAILED
+
+failures:
+
+failures:
+    diferencial_t04
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 417.26s
+
+error: test failed, to rerun pass `-p zx-cadena --test diferencial_t04`

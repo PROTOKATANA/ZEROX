@@ -1,0 +1,3448 @@
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/src/cadena.rs ws/crates/zx-cadena/src/cadena.rs
+--- ws.orig/crates/zx-cadena/src/cadena.rs	2026-09-26 19:04:09.186318929 +0200
++++ ws/crates/zx-cadena/src/cadena.rs	2026-09-26 19:40:18.322560488 +0200
+@@ -21,8 +21,8 @@
+ 
+ use primitive_types::U256;
+ use zx_consensus::transicion::{
+-    Estado, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar, aplicar_fusion, deshacer,
+-    es_terminal_condiciones,
++    Estado, ParametrosEvidencia, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar,
++    aplicar_fusion, deshacer, es_terminal_condiciones,
+ };
+ use zx_core::{Amount, BlockHash, ClavePublica, Tx};
+ use zx_dag::ghostdag::{
+@@ -71,6 +71,9 @@
+ /// Gestor del estado del DAG en memoria.
+ pub struct Cadena {
+     params: ParametrosTransicion,
++    /// SL-4a · parámetros de evidencia. `zx-node` los deja inactivos (SL-4b); los arneses usan
++    /// [`Cadena::nueva_con_evidencia`].
++    evidencia: ParametrosEvidencia,
+     k: u32,
+     cbid: u32,
+     max_padres: u8,
+@@ -106,8 +109,21 @@
+     /// acota a [`zx_core::MAX_PADRES`] (15) y a `u8`.
+     #[must_use]
+     pub fn nueva(params: ParametrosTransicion, k: u32, cbid: u32, max_padres: u8) -> Self {
++        Self::nueva_con_evidencia(params, k, cbid, max_padres, ParametrosEvidencia::inactiva())
++    }
++
++    /// Igual que [`Cadena::nueva`], con los parámetros de evidencia explícitos (SL-4a).
++    #[must_use]
++    pub fn nueva_con_evidencia(
++        params: ParametrosTransicion,
++        k: u32,
++        cbid: u32,
++        max_padres: u8,
++        evidencia: ParametrosEvidencia,
++    ) -> Self {
+         Self {
+             params,
++            evidencia,
+             k,
+             cbid,
+             max_padres,
+@@ -381,6 +397,7 @@
+             &bloque.como_transicion(),
+             &self.params,
+             self.cbid,
++            &self.evidencia,
+         )?;
+ 
+         // Una bifurcación PoW real: el padre deja de ser punta (si lo era) y este bloque lo es.
+@@ -463,6 +480,7 @@
+             Punto::Slot(p.slot),
+             &self.params,
+             self.cbid,
++            &self.evidencia,
+         )?;
+         nuevo.peso_sufijo =
+             nuevo
+@@ -625,6 +643,7 @@
+                 Punto::Slot(p.slot),
+                 &self.params,
+                 self.cbid,
++                &self.evidencia,
+             )?;
+             base = nuevo;
+         }
+@@ -770,6 +789,7 @@
+                 Punto::Slot(virtual_dag.slot),
+                 &self.params,
+                 self.cbid,
++                &self.evidencia,
+             )?;
+             estado = nuevo;
+         }
+@@ -813,6 +833,7 @@
+                 Punto::Slot(virtual_dag.slot),
+                 &self.params,
+                 self.cbid,
++                &self.evidencia,
+             )?;
+             estado = nuevo;
+             orden.push(x_hash);
+@@ -905,6 +926,7 @@
+                     Punto::Slot(c_slot),
+                     &self.params,
+                     self.cbid,
++                    &self.evidencia,
+                 )?;
+                 estado = nuevo;
+                 orden.push(x_hash);
+@@ -923,6 +945,7 @@
+                 Punto::Slot(c_slot),
+                 &self.params,
+                 self.cbid,
++                &self.evidencia,
+             )?;
+             let Some(peso) = c.peso() else {
+                 return Err(MotivoBloque::ErrSinPadre);
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/tests/diferencial_t04.rs ws/crates/zx-cadena/tests/diferencial_t04.rs
+--- ws.orig/crates/zx-cadena/tests/diferencial_t04.rs	2026-09-26 11:59:54.996865812 +0200
++++ ws/crates/zx-cadena/tests/diferencial_t04.rs	2026-09-26 20:22:30.081094976 +0200
+@@ -1,21 +1,18 @@
+-//! Arnés **diferencial** contra el oráculo T04-D (`ORDEN-W06a-B`, V4 y V5).
++//! Arnés **diferencial** contra el oráculo T04 (`ORDEN-SL4a`, V4 y V5).
+ //!
+-//! Lee `testdata/estado-dag-v0.3/vectores-estado-dag-v0.3.txt`, deriva claves Ed25519 deterministas
++//! Lee `testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt`, deriva claves Ed25519 deterministas
+ //! por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)`, igual que W03), construye
+-//! transacciones **reales** v1/v2/v3 firmadas por el `firmante` abstracto, traduce cada bloque a
++//! transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante` abstracto, traduce cada bloque a
+ //! [`BloqueCadena`] con `padres`, `sr`, `sd`, `ident` y `k` y ejecuta [`Cadena`] en el orden de
+ //! entrega del fichero.
+ //!
+-//! T04-D / F-18: la salida implícita de una `Liberacion` tiene el id abstracto
+-//! `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`; el arnés lo decodifica y
+-//! lo traduce al `(txid, 0)` real. No hay contador de ids implícitos, ni entradas inventadas, ni
+-//! punto fijo: los vectores v0.3 ya no tienen la colisión de ids del generador v0.2.
++//! La `EvidenceTx` v4 se traduce a **dos cabeceras `PoAS_PoT_DAG` reales** con sellos Ed25519
++//! reales; el `incident_id` es opaco (se compara número y `@slot_falta`, FD-1).
+ //!
+ //! Compara, por caso: `RES` de cada bloque, `DESC` (transacción descartada y motivo), `SEL`, `UTXO`,
+-//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 914 casos; V5 exige que la tabla de cobertura
+-//! de los 900 casos aleatorios sea idéntica a la sección `vectores-v0.3` de `cobertura-v0.3.txt`.
+-//!
+-//! Las correspondencias de error son las de `ORDEN-W03` §4 (W03/W02b), sin añadir ninguna.
++//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 1 878 casos; V5 exige que la tabla de
++//! cobertura de los 900 casos aleatorios y la sección de evidencia sean idénticas a
++//! `cobertura-v0.5.txt` (la sección `run.jl` no se reproduce desde el fichero de vectores).
+ 
+ #![expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
+ #![expect(
+@@ -31,25 +28,27 @@
+ use primitive_types::U256;
+ use zx_cadena::{BloqueCadena, BloquePost, Cadena, Descarte};
+ use zx_consensus::transicion::{
+-    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosTransicion,
++    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
++    total_garantia,
+ };
+ use zx_consensus::transicion::{ErrorTransicion, Origen, Punto};
+ use zx_core::preimage::tx::txid as calcular_txid;
+ use zx_core::{
+-    Amount, BlockHash, CBID_RED_DEV, ClavePublica, ExtensionTx, HashType, Lock, OutPoint,
+-    SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
++    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, DagBlockHeader, Digest,
++    ExtensionTx, HashType, Lock, MerkleRoot, OutPoint, PadresDag, SolucionPoas, SpentOutput,
++    TipoGarantia, Tx, TxId, TxIn, TxOut,
+ };
+ use zx_dag::IdentidadGhostdag;
+ 
+-/// Vectores v0.3 dentro del workspace (`ws/testdata/...`).
++/// Vectores v0.5 dentro del workspace (`ws/testdata/...`).
+ const RUTA_VECTORES: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+-    "/../../testdata/estado-dag-v0.3/vectores-estado-dag-v0.3.txt"
++    "/../../testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt"
+ );
+-/// Tabla de cobertura esperada de T04-D.
++/// Tabla de cobertura esperada de T04.
+ const RUTA_COBERTURA: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+-    "/../../testdata/estado-dag-v0.3/cobertura-v0.3.txt"
++    "/../../testdata/estado-dag-v0.5/cobertura-v0.5.txt"
+ );
+ /// Máximo de padres del generador de T04, declarado (`ORDEN-W06a-C` decisión 1): sus vectores no
+ /// admiten más de 3 y la identidad viaja como `u64` de fixture (`IdentidadGhostdag::de_fixture`).
+@@ -201,6 +200,63 @@
+     ent: Vec<u64>,
+     sal: Vec<(u64, u64, u64)>,
+     nonce: u64,
++    /// SL-4a: evidencia abstracta de una `EvidenceTx` v4.
++    ev: Option<EvCrudo>,
++}
++
++/// Una cabecera abstracta de evidencia (`ev=` de T04).
++///
++/// `slot` es `i64`: el generador de evidencia tardía de T04 produce slots negativos.
++#[derive(Clone, Copy, Debug)]
++struct EvCab {
++    cbid: u32,
++    clave: u64,
++    sector: u16,
++    historia: u64,
++    chunk: u64,
++    slot: i64,
++    ph: u64,
++    sello_ok: bool,
++}
++
++/// La evidencia abstracta de una `EvidenceTx` v4.
++#[derive(Clone, Copy, Debug)]
++struct EvCrudo {
++    id1: EvCab,
++    id2: EvCab,
++}
++
++fn parsear_evidencia(texto: &str) -> EvCrudo {
++    let partes: Vec<&str> = texto.split('|').collect();
++    assert_eq!(partes.len(), 2, "evidencia malformada: {texto}");
++    let mut ids = [EvCab {
++        cbid: 0,
++        clave: 0,
++        sector: 0,
++        historia: 0,
++        chunk: 0,
++        slot: 0,
++        ph: 0,
++        sello_ok: true,
++    }; 2];
++    for (j, p) in partes.iter().enumerate() {
++        let f: Vec<&str> = p.split(':').collect();
++        assert_eq!(f.len(), 8, "cabecera de evidencia malformada: {p}");
++        ids[j] = EvCab {
++            cbid: f[0].parse().expect("cbid"),
++            clave: f[1].parse().expect("clave"),
++            sector: f[2].parse().expect("sector"),
++            historia: f[3].parse().expect("historia"),
++            chunk: f[4].parse().expect("chunk"),
++            slot: f[5].parse().expect("slot"),
++            ph: f[6].parse().expect("pre_hash"),
++            sello_ok: f[7] == "1",
++        };
++    }
++    EvCrudo {
++        id1: ids[0],
++        id2: ids[1],
++    }
+ }
+ 
+ #[derive(Clone, Debug)]
+@@ -237,6 +293,12 @@
+     r_slots: u64,
+     f_slots: Option<u64>,
+     k: u32,
++    f_num: u64,
++    f_den: u64,
++    plazo_slots: u64,
++    m_margen_slots: u64,
++    cbid: u32,
++    evp: bool,
+ }
+ 
+ impl ParamCrudo {
+@@ -256,6 +318,12 @@
+             r_slots: 0,
+             f_slots: None,
+             k: 0,
++            f_num: 1,
++            f_den: 1,
++            plazo_slots: 0,
++            m_margen_slots: 0,
++            cbid: 0,
++            evp: false,
+         }
+     }
+ }
+@@ -311,6 +379,16 @@
+             Some(f.parse().expect("F_slots"))
+         },
+         k: c.get("k").expect("k").parse().expect("k"),
++        f_num: c.get("f_num").map_or(1, |v| v.parse().expect("f_num")),
++        f_den: c.get("f_den").map_or(1, |v| v.parse().expect("f_den")),
++        plazo_slots: c
++            .get("Plazo_slots")
++            .map_or(0, |v| v.parse().expect("Plazo_slots")),
++        m_margen_slots: c
++            .get("M_margen_slots")
++            .map_or(0, |v| v.parse().expect("M_margen_slots")),
++        cbid: c.get("cbid").map_or(0, |v| v.parse().expect("cbid")),
++        evp: c.get("evp").is_some_and(|v| v == "1"),
+     }
+ }
+ 
+@@ -379,6 +457,7 @@
+                         ent: parse_lista_u64(c.get("ent").expect("ent")),
+                         sal: parse_salidas(c.get("sal").expect("sal")),
+                         nonce: c.get("nonce").map_or(0, |v| v.parse().expect("nonce")),
++                        ev: c.get("ev").map(|v| parsear_evidencia(v)),
+                     });
+                 }
+             }
+@@ -466,6 +545,70 @@
+     }
+ }
+ 
++/// SL-4a: parámetros de evidencia del caso.
++fn parametros_evidencia(p: &ParamCrudo) -> ParametrosEvidencia {
++    ParametrosEvidencia {
++        f_num: p.f_num,
++        f_den: p.f_den,
++        plazo_slots: p.plazo_slots,
++        m_margen_slots: p.m_margen_slots,
++        cbid: p.cbid,
++        evp: p.evp,
++    }
++}
++
++/// Cabecera `PoAS_PoT_DAG` real con la identidad abstracta `cab` y una sal.
++fn cabecera_evidencia(cab: &EvCab, sal: u64) -> DagBlockHeader {
++    let mut chunk = [0u8; 32];
++    chunk[..8].copy_from_slice(&cab.chunk.to_le_bytes());
++    let sol = SolucionPoas {
++        public_key: clave_de(cab.clave),
++        sector_index: cab.sector,
++        history_size: cab.historia,
++        chunk,
++        ..Default::default()
++    };
++    DagBlockHeader {
++        consensus_branch_id: cab.cbid,
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
++        timestamp: sal,
++        height: 0,
++        slot: cab.slot as u64,
++        pot_output: [0u8; 16],
++        rango_solucion: cab.ph,
++        sol,
++        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0u8; 32])),
++        padres: PadresDag::genesis(),
++        sello: [0u8; 64],
++    }
++}
++
++/// Traduce la evidencia abstracta a dos cabeceras reales con sellos Ed25519 reales.
++fn cabeceras_de_evidencia(ev: &EvCrudo) -> (DagBlockHeader, DagBlockHeader) {
++    let mut h1 = cabecera_evidencia(&ev.id1, 0);
++    let mut h2;
++    let quiere_menor = ev.id1.ph < ev.id2.ph;
++    let mut sal = 0u64;
++    loop {
++        h2 = cabecera_evidencia(&ev.id2, sal);
++        let menor = h1.pre_hash().as_bytes() < h2.pre_hash().as_bytes();
++        if menor == quiere_menor {
++            break;
++        }
++        sal += 1;
++    }
++    for (cab, h) in [(&ev.id1, &mut h1), (&ev.id2, &mut h2)] {
++        if cab.sello_ok {
++            let sk = firmante_de(cab.clave);
++            let firma: [u8; 64] = sk.sign(h.pre_hash().as_bytes()).into();
++            h.sello = firma;
++        } else {
++            h.sello = [0u8; 64];
++        }
++    }
++    (h1, h2)
++}
++
+ struct Constructor {
+     cbid: u32,
+     claves: Claves,
+@@ -698,6 +841,31 @@
+                 };
+                 (real, Vec::new())
+             }
++            "Evidencia" => {
++                let Some(ev) = tx.ev else {
++                    let real = Tx {
++                        version: 4,
++                        inputs: Vec::new(),
++                        outputs: Vec::new(),
++                        lock_time: 0,
++                        expiry_height: 0,
++                        extension: ExtensionTx::Ninguna,
++                    };
++                    return Ok((real, Vec::new()));
++                };
++                let _ = self.claves.id(ev.id1.clave);
++                let _ = self.claves.id(ev.id2.clave);
++                let (h1, h2) = cabeceras_de_evidencia(&ev);
++                let real = Tx {
++                    version: 4,
++                    inputs: Vec::new(),
++                    outputs: Vec::new(),
++                    lock_time: 0,
++                    expiry_height: 0,
++                    extension: ExtensionTx::Evidencia { h1, h2 },
++                };
++                (real, Vec::new())
++            }
+             otro => return Err(format!("tipo de transacción no soportado: {otro}")),
+         };
+         self.registrar(&real, &tx.sal)?;
+@@ -789,7 +957,13 @@
+ fn construir_y_resolver(caso: &Caso) -> Result<Resuelto, String> {
+     let params = parametros(&caso.param);
+     let reales = construir_reales(caso)?;
+-    let mut cadena = Cadena::nueva(params, caso.param.k, CBID_RED_DEV, MAX_PADRES_ARNES);
++    let mut cadena = Cadena::nueva_con_evidencia(
++        params,
++        caso.param.k,
++        CBID_RED_DEV,
++        MAX_PADRES_ARNES,
++        parametros_evidencia(&caso.param),
++    );
+     for bloque in &reales.bloques {
+         let _ = cadena.admitir(bloque.clone());
+     }
+@@ -902,8 +1076,25 @@
+             .map(|p| format!("{}@s{}", p.importe.brek(), p.madura_en_slot.unwrap_or(0)))
+             .collect::<Vec<_>>()
+             .join(",");
++        let inc = if g.incidentes.is_empty() {
++            String::new()
++        } else {
++            let lista = g
++                .incidentes
++                .iter()
++                .map(|i| {
++                    let mut hex = String::with_capacity(64);
++                    for b in &i.id {
++                        let _ = write!(hex, "{b:02x}");
++                    }
++                    format!("{hex}@{}", i.slot_falta)
++                })
++                .collect::<Vec<_>>()
++                .join(",");
++            format!(" inc={lista}")
++        };
+         lineas.push(format!(
+-            "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}",
++            "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}{inc}",
+             g.activo.brek(),
+             g.congelado.brek(),
+             g.nonce_siguiente
+@@ -913,6 +1104,22 @@
+     Ok(lineas)
+ }
+ 
++/// Normaliza el `incident_id` de una línea `GAR` (id opaco; ver FD-1). El orden de los incidentes
++/// es el del id del motor, que no coincide con el del oráculo, así que se compara el **multiconjunto**
++/// de `@slot_falta`.
++fn normalizar_gar(linea: &str) -> String {
++    let Some(pos) = linea.find(" inc=") else {
++        return linea.to_string();
++    };
++    let (pref, inc) = linea.split_at(pos + 5);
++    let mut slots: Vec<&str> = inc
++        .split(',')
++        .map(|item| item.split('@').nth(1).unwrap_or(""))
++        .collect();
++    slots.sort_unstable();
++    format!("{pref}{}", slots.join(","))
++}
++
+ // ─────────────────────────────────────────────────────────────────────────────
+ // Tabla de cobertura (V4b)
+ // ─────────────────────────────────────────────────────────────────────────────
+@@ -937,6 +1144,8 @@
+     descartes: BTreeMap<String, BTreeMap<String, u64>>,
+     reorgs: u64,
+     casos: u64,
++    /// SL-4a · contadores `EV ...` de la sección de evidencia.
++    ev: BTreeMap<String, u64>,
+ }
+ 
+ fn tipo_cobertura(tx: &Tx) -> Option<&'static str> {
+@@ -981,8 +1190,13 @@
+     ops
+ }
+ 
+-fn reorgs_que_deshacen_garantia(reales: &Reales, params: ParametrosTransicion, k: u32) -> u64 {
+-    let mut cadena = Cadena::nueva(params, k, CBID_RED_DEV, MAX_PADRES_ARNES);
++fn reorgs_que_deshacen_garantia(
++    reales: &Reales,
++    params: ParametrosTransicion,
++    k: u32,
++    evp: ParametrosEvidencia,
++) -> u64 {
++    let mut cadena = Cadena::nueva_con_evidencia(params, k, CBID_RED_DEV, MAX_PADRES_ARNES, evp);
+     let mut prev_tip: Option<BlockHash> = None;
+     let mut prev_ops: BTreeSet<(BlockHash, usize)> = BTreeSet::new();
+     let mut reorgs = 0u64;
+@@ -1005,6 +1219,131 @@
+     reorgs
+ }
+ 
++/// ¿La transacción es una `EvidenceTx` v4 (bien formada o no)?
++fn es_evidencia(tx: &Tx) -> bool {
++    tx.version == 4
++}
++
++/// Pares `(bloque, índice)` de evidencia aplicada en la historia seleccionada (ED-*).
++fn evidencias_aplicadas(cadena: &Cadena) -> BTreeSet<(BlockHash, usize)> {
++    let Ok((_estado, orden, desc)) = cadena.aplicar_historia() else {
++        return BTreeSet::new();
++    };
++    let descartadas: BTreeSet<(BlockHash, usize)> =
++        desc.iter().map(|d| (d.bloque, d.indice)).collect();
++    let mut set = BTreeSet::new();
++    for hash in orden {
++        let Some(bloque) = cadena.bloque(&hash) else {
++            continue;
++        };
++        for (i, (tx, _)) in bloque.txs().iter().enumerate() {
++            if es_evidencia(tx) && !descartadas.contains(&(hash, i)) {
++                set.insert((hash, i));
++            }
++        }
++    }
++    set
++}
++
++/// Evidencias aplicadas en alguna historia seleccionada y luego retiradas por una reorganización
++/// (`EV-27`/`EV-28`), contadas como conjunto (igual que `evidencias_deshechas_por_reorg`).
++fn evidencias_deshechas_por_reorg(
++    reales: &Reales,
++    params: ParametrosTransicion,
++    k: u32,
++    evp: ParametrosEvidencia,
++) -> u64 {
++    let mut cadena = Cadena::nueva_con_evidencia(params, k, CBID_RED_DEV, MAX_PADRES_ARNES, evp);
++    let mut prev_tip: Option<BlockHash> = None;
++    let mut prev_ev: BTreeSet<(BlockHash, usize)> = BTreeSet::new();
++    let mut perdidas: BTreeSet<(BlockHash, usize)> = BTreeSet::new();
++    for bloque in &reales.bloques {
++        let _ = cadena.admitir(bloque.clone());
++        if !matches!(bloque, BloqueCadena::Post(_)) {
++            continue;
++        }
++        let Some(tip) = cadena.mejor_punta() else {
++            continue;
++        };
++        // El oráculo recalcula el conjunto **tras cada bloque**; solo compara al cambiar la punta.
++        let ev = evidencias_aplicadas(&cadena);
++        if Some(tip) != prev_tip {
++            for p in prev_ev.difference(&ev) {
++                perdidas.insert(*p);
++            }
++        }
++        prev_tip = Some(tip);
++        prev_ev = ev;
++    }
++    perdidas.len() as u64
++}
++
++/// Reproduce `contar_evidencia` del oráculo T04 (`exportar.jl:234-269`).
++#[expect(
++    clippy::too_many_arguments,
++    reason = "el contexto del caso ya viene partido por el arnés"
++)]
++fn contar_evidencia(
++    reales: &Reales,
++    cadena: &Cadena,
++    orden: &[BlockHash],
++    desc: &[Descarte],
++    cobertura: &mut Cobertura,
++    params: ParametrosTransicion,
++    k: u32,
++    evp: ParametrosEvidencia,
++) {
++    let hay_evidencia = reales
++        .bloques
++        .iter()
++        .any(|b| b.txs().iter().any(|(tx, _)| es_evidencia(tx)));
++    if !hay_evidencia {
++        return;
++    }
++    let descartadas: BTreeMap<(BlockHash, usize), &ErrorTransicion> = desc
++        .iter()
++        .map(|d| ((d.bloque, d.indice), &d.motivo))
++        .collect();
++    for hash in orden {
++        let Some(bloque) = cadena.bloque(hash) else {
++            continue;
++        };
++        for (i, (tx, _)) in bloque.txs().iter().enumerate() {
++            if !es_evidencia(tx) {
++                continue;
++            }
++            *cobertura.ev.entry("construida".to_string()).or_insert(0) += 1;
++            if let Some(motivo) = descartadas.get(&(*hash, i)) {
++                let nombre = match motivo.nombre_t01() {
++                    "ErrEvidenciaDuplicada" => "duplicada",
++                    "ErrEvidenciaTardia" => "tardia",
++                    "ErrCbidAjeno" => "cbid_ajeno",
++                    "ErrEvidenciaConEntradas" => "con_entradas",
++                    "ErrOrdenCanonico" => "orden_canonico",
++                    "ErrSinEvidencia" => "sin_evidencia",
++                    _ => "otro",
++                };
++                *cobertura.ev.entry(nombre.to_string()).or_insert(0) += 1;
++            } else {
++                let ExtensionTx::Evidencia { h1, .. } = &tx.extension else {
++                    *cobertura.ev.entry("malformada".to_string()).or_insert(0) += 1;
++                    continue;
++                };
++                let v = cadena
++                    .estado_past(hash)
++                    .and_then(|e| e.garantias.get(&h1.sol.public_key))
++                    .map_or(0, total_garantia);
++                let nombre = if v == 0 { "sin_saldo" } else { "aplicada" };
++                *cobertura.ev.entry(nombre.to_string()).or_insert(0) += 1;
++            }
++        }
++    }
++    let d = evidencias_deshechas_por_reorg(reales, params, k, evp);
++    if d > 0 {
++        *cobertura.ev.entry("deshecha".to_string()).or_insert(0) += d;
++    }
++}
++
+ fn acumular_caso(
+     cobertura: &mut Cobertura,
+     reales: &Reales,
+@@ -1012,6 +1351,7 @@
+     desc: &[Descarte],
+     params: ParametrosTransicion,
+     k: u32,
++    evp: ParametrosEvidencia,
+ ) {
+     for bloque in &reales.bloques {
+         if let BloqueCadena::Post(p) = bloque {
+@@ -1049,7 +1389,7 @@
+             }
+         }
+     }
+-    cobertura.reorgs += reorgs_que_deshacen_garantia(reales, params, k);
++    cobertura.reorgs += reorgs_que_deshacen_garantia(reales, params, k, evp);
+     cobertura.casos += 1;
+ }
+ 
+@@ -1059,7 +1399,7 @@
+ 
+ fn generar_lineas(c: &Cobertura) -> Vec<String> {
+     let mut out = Vec::new();
+-    out.push("SECCION vectores-v0.3 (casos aleatorios)".to_string());
++    out.push("SECCION vectores-v0.5 (casos aleatorios)".to_string());
+     out.push(format!("casos = {}", c.casos));
+     for t in TIPOS_COBERTURA {
+         let desc_t = c.descartes.get(t);
+@@ -1145,6 +1485,18 @@
+         "reorganizaciones_que_deshacen_garantia = {}",
+         c.reorgs
+     ));
++    out.extend(generar_lineas_evidencia(c));
++    out
++}
++
++/// Sección `EV ...` de la cobertura de evidencia (orden alfabético como el oráculo).
++fn generar_lineas_evidencia(c: &Cobertura) -> Vec<String> {
++    let mut out = vec!["SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)".to_string()];
++    let mut claves: Vec<&String> = c.ev.keys().collect();
++    claves.sort();
++    for k in claves {
++        out.push(format!("EV {k} = {}", c.ev[k]));
++    }
+     out
+ }
+ 
+@@ -1153,13 +1505,13 @@
+     let mut lineas = Vec::new();
+     let mut dentro = false;
+     for linea in texto.lines() {
+-        if linea.starts_with("SECCION vectores-v0.3") {
++        if linea.starts_with("SECCION vectores-v0.5") {
+             dentro = true;
+             lineas.push(linea.to_string());
+             continue;
+         }
+         if dentro {
+-            if linea.starts_with("SECCION ") {
++            if linea.starts_with("SECCION run.jl") {
+                 break;
+             }
+             lineas.push(linea.to_string());
+@@ -1244,7 +1596,9 @@
+     // GAR.
+     match render_gar(&reales.claves, &estado) {
+         Ok(obtenido) => {
+-            if obtenido != caso.gar {
++            let esperado_n: Vec<String> = caso.gar.iter().map(|l| normalizar_gar(l)).collect();
++            let obtenido_n: Vec<String> = obtenido.iter().map(|l| normalizar_gar(l)).collect();
++            if obtenido_n != esperado_n {
+                 discrepancias.push(format!(
+                     "CASO {} ({}) GAR esperado={:?} obtenido={:?}",
+                     caso.n, caso.nombre, caso.gar, obtenido
+@@ -1273,8 +1627,19 @@
+             caso.n, caso.nombre, caso.est
+         ));
+     }
++    let evp = parametros_evidencia(&caso.param);
++    contar_evidencia(
++        &reales,
++        &cadena,
++        &orden,
++        &desc,
++        cobertura,
++        params,
++        caso.param.k,
++        evp,
++    );
+     if caso.nombre == "aleatorio" {
+-        acumular_caso(cobertura, &reales, &orden, &desc, params, caso.param.k);
++        acumular_caso(cobertura, &reales, &orden, &desc, params, caso.param.k, evp);
+     }
+ }
+ 
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/aplicar.rs ws/crates/zx-consensus/src/transicion/aplicar.rs
+--- ws.orig/crates/zx-consensus/src/transicion/aplicar.rs	2026-09-26 03:43:26.513784378 +0200
++++ ws/crates/zx-consensus/src/transicion/aplicar.rs	2026-09-26 20:22:05.559170510 +0200
+@@ -8,17 +8,19 @@
+ 
+ use primitive_types::U256;
+ use zx_core::{
+-    Amount, ErrorFormaTx, ExtensionTx, Firma, HashType, Lock, OutPoint, SpentOutput, TipoGarantia,
+-    Tx, TxId, TxOut, validar_forma_cabecera_post, validar_forma_tx,
++    Amount, ClavePublica, DagBlockHeader, ErrorFormaTx, ExtensionTx, Firma, HashType, Lock,
++    OutPoint, SpentOutput, TipoGarantia, Tx, TxId, TxOut, ZX_VALUE_SANITY_LIMIT,
++    incident_id_evidencia, validar_forma_cabecera_post, validar_forma_tx, validar_forma_tx_v4,
+ };
+ 
+ use crate::transicion::ErrorTransicion;
+ use crate::transicion::estado::{
+-    Aplicador, acreditar_credito, acreditar_pendiente, gastable_en, phi,
++    Aplicador, acreditar_credito, acreditar_pendiente, debitar_garantia, gastable_en, phi,
++    podar_incidentes, suelo_dos_octavos, techo_fraccion, total_garantia,
+ };
+ use crate::transicion::tipos::{
+-    BloqueTransicion, EnRetirada, EntradaUtxo, Estado, Fase, HechosCabecera, Origen,
+-    ParametrosTransicion, Pendiente, Punto, Undo,
++    BloqueTransicion, EnRetirada, EntradaUtxo, Estado, Fase, HechosCabecera, Incidente, Origen,
++    ParametrosEvidencia, ParametrosTransicion, Pendiente, Punto, Undo,
+ };
+ 
+ /// Aplica un bloque y devuelve el estado nuevo (sin undo).
+@@ -30,8 +32,9 @@
+     bloque: &BloqueTransicion,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<Estado, ErrorTransicion> {
+-    let (nuevo, _) = aplicar_con_undo(estado, bloque, params, cbid)?;
++    let (nuevo, _) = aplicar_con_undo(estado, bloque, params, cbid, evp)?;
+     Ok(nuevo)
+ }
+ 
+@@ -46,24 +49,35 @@
+     bloque: &BloqueTransicion,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<(Estado, Undo), ErrorTransicion> {
+-    validar_bloque(bloque)?;
++    validar_bloque(bloque, evp.evp)?;
+     let mut ap = Aplicador::nuevo(estado.clone());
+     match &bloque.hechos {
+         HechosCabecera::Genesis { .. } => aplicar_genesis(&mut ap, &bloque.txs)?,
+-        HechosCabecera::PoW { .. } => aplicar_pow(&mut ap, bloque, params, cbid)?,
+-        HechosCabecera::PoST { .. } => aplicar_post(&mut ap, bloque, params, cbid)?,
++        HechosCabecera::PoW { .. } => aplicar_pow(&mut ap, bloque, params, cbid, evp)?,
++        HechosCabecera::PoST { .. } => aplicar_post(&mut ap, bloque, params, cbid, evp)?,
+     }
+     Ok((ap.estado, ap.undo))
+ }
+ 
+ /// `validar_forma_tx` para cada transacción y `validar_forma_cabecera_post` si hay cabecera (§3.6).
+-pub(crate) fn validar_bloque(bloque: &BloqueTransicion) -> Result<(), ErrorTransicion> {
++///
++/// SL-4a: la v4 solo se valida con su forma propia cuando el perfil activa la evidencia (`evp`); en
++/// otro caso `validar_forma_tx` la rechaza como inactiva, como antes.
++pub(crate) fn validar_bloque(
++    bloque: &BloqueTransicion,
++    evidencia_activa: bool,
++) -> Result<(), ErrorTransicion> {
+     if let Some(cabecera) = &bloque.cabecera_post {
+         validar_forma_cabecera_post(cabecera)?;
+     }
+     for (tx, testigos) in &bloque.txs {
+-        validar_forma_tx(tx, testigos)?;
++        if tx.version == 4 && evidencia_activa {
++            validar_forma_tx_v4(tx, testigos)?;
++        } else {
++            validar_forma_tx(tx, testigos)?;
++        }
+     }
+     Ok(())
+ }
+@@ -385,6 +399,7 @@
+     bloque: &BloqueTransicion,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+     punto: Punto,
+     tx: &Tx,
+     testigos: &[Vec<u8>],
+@@ -505,6 +520,22 @@
+             verificar_aceptacion_tx(tx, testigos, cbid)?;
+             let slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)?;
+             let r_slots = params.r_slots;
++            // EV-24(i): un incidente admitido y no liquidado bloquea la liberación.
++            {
++                let g = ap.garantia_mut(clave);
++                if !g.incidentes.is_empty() {
++                    return Err(ErrorTransicion::ErrCasoAbierto);
++                }
++            }
++            // EV-24(ii)/EV-15b/RAT-3: ventana desde el último bloque producido por P.
++            if let Some(usp) = ap.estado.ultimo_slot_producido.get(&clave).copied() {
++                let limite = usp
++                    .saturating_add(evp.plazo_slots)
++                    .saturating_add(evp.m_margen_slots);
++                if slot < limite {
++                    return Err(ErrorTransicion::ErrVentanaAbierta);
++                }
++            }
+             let g = ap.garantia_mut(clave);
+             let mut vencido = Amount::CERO;
+             for r in &g.en_retirada {
+@@ -571,12 +602,158 @@
+     }
+ }
+ 
++/// Identidad de oportunidad de una cabecera de evidencia (`C-EVP-01` + `RAT-1`).
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++struct IdentidadEvidencia {
++    cbid: u32,
++    clave: ClavePublica,
++    sector_index: u16,
++    history_size: u64,
++    chunk: [u8; 32],
++    /// `i64`: el oráculo admite slots negativos; la cabecera los lleva en dos's complemento.
++    slot: i64,
++}
++
++fn identidad_de_cabecera(h: &DagBlockHeader) -> IdentidadEvidencia {
++    IdentidadEvidencia {
++        cbid: h.consensus_branch_id,
++        clave: h.sol.public_key,
++        sector_index: h.sol.sector_index,
++        history_size: h.sol.history_size,
++        chunk: h.sol.chunk,
++        slot: h.slot as i64,
++    }
++}
++
++/// `Amount` saturado al límite de cordura, para el gravamen `congelado` (`EV-17`).
++fn amount_saturado(v: i128) -> Amount {
++    let b = i64::try_from(v)
++        .unwrap_or(ZX_VALUE_SANITY_LIMIT)
++        .min(ZX_VALUE_SANITY_LIMIT);
++    Amount::nuevo(b).unwrap_or(Amount::CERO)
++}
++
++/// Aplica una `EvidenceTx` v4 (`EV-01`…`EV-22`, `RAT-1`/`RAT-2′`/`RAT-3`).
++///
++/// El orden de validación es **el del oráculo T01** (identidad antes que orden, ventana antes que
++/// duplicado), para que el diferencial no dependa de combinaciones de fallos.
++fn aplicar_evidencia(
++    ap: &mut Aplicador,
++    bloque: &BloqueTransicion,
++    params: &ParametrosTransicion,
++    evp: &ParametrosEvidencia,
++    punto: Punto,
++    tx: &Tx,
++) -> Result<(), ErrorTransicion> {
++    let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
++        return Err(ErrorTransicion::ErrForma(
++            ErrorFormaTx::ExtensionIncoherente {
++                version: 4,
++                esperada: "Evidencia",
++            },
++        ));
++    };
++    // EV-04: sin entradas ni salidas monetarias.
++    if !tx.inputs.is_empty() || !tx.outputs.is_empty() {
++        return Err(ErrorTransicion::ErrEvidenciaConEntradas);
++    }
++    // RAT-1: ambas cabeceras, de la red local.
++    let id1 = identidad_de_cabecera(h1);
++    let id2 = identidad_de_cabecera(h2);
++    if id1.cbid != evp.cbid || id2.cbid != evp.cbid {
++        return Err(ErrorTransicion::ErrCbidAjeno);
++    }
++    // EV-06: identidad común exacta.
++    if id1 != id2 {
++        return Err(ErrorTransicion::ErrSinEvidencia);
++    }
++    // EV-01: orden canónico estricto por `pre_hash`.
++    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
++        return Err(ErrorTransicion::ErrOrdenCanonico);
++    }
++    // EV-07: sellos válidos bajo la misma `sol.public_key`.
++    h1.verificar_sello()
++        .map_err(|_| ErrorTransicion::ErrSinEvidencia)?;
++    h2.verificar_sello()
++        .map_err(|_| ErrorTransicion::ErrSinEvidencia)?;
++    // RAT-3: puerta estructural.
++    if params.r_slots <= evp.plazo_slots.saturating_add(evp.m_margen_slots) {
++        return Err(ErrorTransicion::ErrPuertaRAT3);
++    }
++    // EV-13/EV-14: ventana de admisión en slots absolutos (i64: el oráculo admite negativos).
++    let sf = id1.slot;
++    let punto_slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)? as i64;
++    let fin = sf.saturating_add(evp.plazo_slots as i64);
++    if punto_slot < sf || punto_slot >= fin {
++        return Err(ErrorTransicion::ErrEvidenciaTardia);
++    }
++    // EV-10/EV-12: `incident_id` y deduplicación.
++    let clave = id1.clave;
++    let iid = *incident_id_evidencia(
++        id1.cbid,
++        id1.clave.bytes(),
++        id1.sector_index,
++        id1.history_size,
++        &id1.chunk,
++        id1.slot as u64,
++    )
++    .as_bytes();
++    {
++        let g = ap.garantia_mut(clave);
++        if g.incidentes.iter().any(|i| i.id == iid) {
++            return Err(ErrorTransicion::ErrEvidenciaDuplicada);
++        }
++    }
++    // EV-11: registro del incidente.
++    let v = {
++        let g = ap.garantia_mut(clave);
++        g.incidentes.push(Incidente {
++            id: iid,
++            slot_falta: sf,
++        });
++        g.incidentes.sort_by_key(|a| a.id);
++        total_garantia(g)
++    };
++    // EV-17: congelación total (gravamen derivado).
++    {
++        let g = ap.garantia_mut(clave);
++        g.congelado = amount_saturado(v);
++    }
++    // EV-19: confiscación `C = min(V, techo(f·V))`.
++    let c = core::cmp::min(v, techo_fraccion(v, evp.f_num, evp.f_den));
++    {
++        let g = ap.garantia_mut(clave);
++        debitar_garantia(g, c)?;
++    }
++    // RAT-2′: `suelo(C·2/8)` a la coinbase del bloque que aplica; el resto se quema.
++    let productor = bloque
++        .hechos
++        .productor()
++        .ok_or(ErrorTransicion::ErrGenesis)?;
++    let recompensa = suelo_dos_octavos(c);
++    if recompensa > 0 {
++        creditar_post(ap, productor, amount_saturado(recompensa), punto, params)?;
++    }
++    ap.estado.quemado += c - recompensa;
++    // EV-20: remanente congelado tras la liquidación.
++    {
++        let g = ap.garantia_mut(clave);
++        g.congelado = amount_saturado(total_garantia(g));
++    }
++    Ok(())
++}
++
+ /// Aplica una transacción según su versión.
++#[expect(
++    clippy::too_many_arguments,
++    reason = "sumar `evp` a la firma ya partida es preferible a agrupar el contexto en una struct opaca"
++)]
+ pub(crate) fn aplicar_tx(
+     ap: &mut Aplicador,
+     bloque: &BloqueTransicion,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+     punto: Punto,
+     tx: &Tx,
+     testigos: &[Vec<u8>],
+@@ -607,7 +784,7 @@
+                 ));
+             };
+             aplicar_garantia(
+-                ap, bloque, params, cbid, punto, tx, testigos, *tipo, *clave, *importe, *nonce,
++                ap, bloque, params, cbid, evp, punto, tx, testigos, *tipo, *clave, *importe, *nonce,
+             )?;
+             Ok(Efecto::Fee(Amount::CERO))
+         }
+@@ -615,6 +792,17 @@
+             let importe = aplicar_coinbase_post(ap, bloque, params, punto, tx)?;
+             Ok(Efecto::Coinbase(importe))
+         }
++        4 => {
++            // X-13: la evidencia no existe en la fase PoW.
++            if ap.estado.fase == Fase::PoW {
++                return Err(ErrorTransicion::ErrOperacionFase);
++            }
++            if !evp.evp {
++                return Err(ErrorTransicion::ErrFueraDeAlcanceV0);
++            }
++            aplicar_evidencia(ap, bloque, params, evp, punto, tx)?;
++            Ok(Efecto::Fee(Amount::CERO))
++        }
+         version => Err(ErrorTransicion::ErrForma(ErrorFormaTx::VersionInactiva {
+             version,
+         })),
+@@ -627,6 +815,7 @@
+     bloque: &BloqueTransicion,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+     punto: Punto,
+ ) -> Result<(), ErrorTransicion> {
+     let mut ncb = 0usize;
+@@ -646,7 +835,7 @@
+     let mut tarifas = Amount::CERO;
+     let mut coinbase_pagada = Amount::CERO;
+     for (tx, testigos) in &bloque.txs {
+-        match aplicar_tx(ap, bloque, params, cbid, punto, tx, testigos)? {
++        match aplicar_tx(ap, bloque, params, cbid, evp, punto, tx, testigos)? {
+             Efecto::Fee(fee) => {
+                 tarifas = tarifas
+                     .suma_comprobada(fee)
+@@ -722,6 +911,7 @@
+     bloque: &BloqueTransicion,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<(), ErrorTransicion> {
+     let HechosCabecera::PoW {
+         hash,
+@@ -756,7 +946,7 @@
+         return Err(ErrorTransicion::ErrSlot);
+     }
+     ap.promover(Punto::Altura(*altura), false, params)?;
+-    aplicar_txs(ap, bloque, params, cbid, Punto::Altura(*altura))?;
++    aplicar_txs(ap, bloque, params, cbid, evp, Punto::Altura(*altura))?;
+     ap.estado.trabajo = ap
+         .estado
+         .trabajo
+@@ -776,6 +966,7 @@
+     bloque: &BloqueTransicion,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<(), ErrorTransicion> {
+     let HechosCabecera::PoST {
+         padre,
+@@ -814,17 +1005,23 @@
+         return Err(ErrorTransicion::ErrSlot);
+     }
+     ap.promover(Punto::Slot(*slot), true, params)?;
++    podar_incidentes(&mut ap.estado, evp, *slot); // EV-11
+     let activo = ap.estado.activo_de(productor);
+     if activo < params.q {
+         return Err(ErrorTransicion::ErrGarantia);
+     }
+-    aplicar_txs(ap, bloque, params, cbid, Punto::Slot(*slot))?;
++    aplicar_txs(ap, bloque, params, cbid, evp, Punto::Slot(*slot))?;
+     ap.estado.slot = *slot;
+     ap.estado.peso_sufijo = ap
+         .estado
+         .peso_sufijo
+         .checked_add(*peso)
+         .ok_or(ErrorTransicion::ErrDesbordamiento)?;
++    // EV-24(ii): el bloque en curso entra en el pasado de los siguientes.
++    let prev = ap.estado.ultimo_slot_producido.get(productor).copied();
++    if prev.is_none_or(|p| *slot > p) {
++        ap.estado.ultimo_slot_producido.insert(*productor, *slot);
++    }
+     Ok(())
+ }
+ 
+@@ -836,11 +1033,12 @@
+     historia: &[BloqueTransicion],
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<bool, ErrorTransicion> {
+     let mut estado = Estado::inicial();
+     let mut terminal: Option<zx_core::BlockHash> = None;
+     for bloque in historia {
+-        let (nuevo, _) = aplicar_con_undo(&estado, bloque, params, cbid)?;
++        let (nuevo, _) = aplicar_con_undo(&estado, bloque, params, cbid, evp)?;
+         if matches!(bloque.hechos, HechosCabecera::PoW { .. }) && terminal.is_none() {
+             terminal = nuevo.terminal;
+         }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/error.rs ws/crates/zx-consensus/src/transicion/error.rs
+--- ws.orig/crates/zx-consensus/src/transicion/error.rs	2026-09-26 03:53:38.808642639 +0200
++++ ws/crates/zx-consensus/src/transicion/error.rs	2026-09-26 19:36:11.370379072 +0200
+@@ -83,6 +83,34 @@
+     /// Un bloque cuyo padre no es válido o no se conoce (`R-15`).
+     #[error("ErrSinPadre")]
+     ErrSinPadre,
++    // ── SL-4a · evidencia y castigo (CONTRATO-EVIDENCIA-v0 con Ratificación v0) ──────────────
++    /// `EV-01`/`EV-06`/`EV-07`: no hay dos decisiones de firma válidas.
++    #[error("ErrSinEvidencia")]
++    ErrSinEvidencia,
++    /// `RAT-1`: alguna cabecera no pertenece a la red local.
++    #[error("ErrCbidAjeno")]
++    ErrCbidAjeno,
++    /// `EV-01`: `pre_hash(H1) < pre_hash(H2)` no se cumple estrictamente.
++    #[error("ErrOrdenCanonico")]
++    ErrOrdenCanonico,
++    /// `EV-14`: `slot_aplicacion ≥ slot_falta + Plazo_slots`.
++    #[error("ErrEvidenciaTardia")]
++    ErrEvidenciaTardia,
++    /// `EV-12`: el `incident_id` ya está registrado.
++    #[error("ErrEvidenciaDuplicada")]
++    ErrEvidenciaDuplicada,
++    /// `EV-04`: la `EvidenceTx` lleva entradas o salidas monetarias.
++    #[error("ErrEvidenciaConEntradas")]
++    ErrEvidenciaConEntradas,
++    /// `EV-24(i)`: la liberación encuentra un incidente admitido y no liquidado.
++    #[error("ErrCasoAbierto")]
++    ErrCasoAbierto,
++    /// `EV-24(ii)`/`EV-15b`: producción reciente de la clave (ventana abierta).
++    #[error("ErrVentanaAbierta")]
++    ErrVentanaAbierta,
++    /// `RAT-3`: la puerta `R_slots > Plazo_slots + M_margen_slots` no se cumple.
++    #[error("ErrPuertaRAT3")]
++    ErrPuertaRAT3,
+ }
+ 
+ impl ErrorTransicion {
+@@ -103,6 +131,8 @@
+             // `DepositoSinEntradas` (F-07). Se traduce al nombre del oráculo para el diferencial
+             // (los vectores solo combinan `ent=[]` con firmante ≠ clave, ver `PROGRESO.md` FD-7).
+             Self::ErrForma(ErrorFormaTx::DepositoSinEntradas) => "ErrAutorizacion",
++            Self::ErrForma(ErrorFormaTx::EvidenciaConEntradasOSalidas) => "ErrEvidenciaConEntradas",
++            Self::ErrForma(ErrorFormaTx::OrdenCanonicoInvalido) => "ErrOrdenCanonico",
+             Self::ErrGenesis => "ErrGenesis",
+             Self::ErrPow => "ErrPow",
+             Self::ErrEmision => "ErrEmision",
+@@ -122,6 +152,15 @@
+             Self::ErrFueraDeAlcanceV0 => "ErrFueraDeAlcanceV0",
+             Self::ErrRetiroPendiente => "ErrRetiroPendiente",
+             Self::ErrNonce => "ErrNonce",
++            Self::ErrSinEvidencia => "ErrSinEvidencia",
++            Self::ErrCbidAjeno => "ErrCbidAjeno",
++            Self::ErrOrdenCanonico => "ErrOrdenCanonico",
++            Self::ErrEvidenciaTardia => "ErrEvidenciaTardia",
++            Self::ErrEvidenciaDuplicada => "ErrEvidenciaDuplicada",
++            Self::ErrEvidenciaConEntradas => "ErrEvidenciaConEntradas",
++            Self::ErrCasoAbierto => "ErrCasoAbierto",
++            Self::ErrVentanaAbierta => "ErrVentanaAbierta",
++            Self::ErrPuertaRAT3 => "ErrPuertaRAT3",
+             Self::ErrForma(_) => "ErrForma",
+             Self::ErrSinPadre => "ErrSinPadre",
+         }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/estado.rs ws/crates/zx-consensus/src/transicion/estado.rs
+--- ws.orig/crates/zx-consensus/src/transicion/estado.rs	2026-09-26 03:42:43.114873013 +0200
++++ ws/crates/zx-consensus/src/transicion/estado.rs	2026-09-26 20:22:12.161309089 +0200
+@@ -7,9 +7,10 @@
+ use primitive_types::U256;
+ use zx_core::{Amount, ClavePublica, OutPoint};
+ 
++use crate::transicion::ErrorTransicion;
+ use crate::transicion::tipos::{
+-    EntradaUtxo, Escalares, Estado, Fase, Garantia, Marca, Origen, ParametrosTransicion, Pendiente,
+-    Punto, Undo,
++    EnRetirada, EntradaUtxo, Escalares, Estado, Fase, Garantia, Marca, Origen, ParametrosEvidencia,
++    ParametrosTransicion, Pendiente, Punto, Undo,
+ };
+ 
+ impl Estado {
+@@ -30,6 +31,7 @@
+             peso_sufijo: 0,
+             altura_terminal: None,
+             subsidio_acum: 0,
++            ultimo_slot_producido: std::collections::BTreeMap::new(),
+         }
+     }
+ 
+@@ -107,12 +109,15 @@
+         .sum()
+ }
+ 
+-/// Suma de valor inmovilizado en garantías (activo, congelado, pendientes, créditos y retiradas).
++/// Suma de valor inmovilizado en garantías (activo, pendientes, créditos y retiradas).
++///
++/// SL-4a: `congelado` es un **gravamen derivado** (EV-17), no una sub-cuenta; no suma, igual que en
++/// el oráculo T01 (`total_garantia`/`suma_garantias`).
+ #[must_use]
+ pub fn suma_garantias(estado: &Estado) -> i128 {
+     let mut total: i128 = 0;
+     for g in estado.garantias.values() {
+-        total += i128::from(g.activo.brek()) + i128::from(g.congelado.brek());
++        total += i128::from(g.activo.brek());
+         for p in &g.pendientes {
+             total += i128::from(p.importe.brek());
+         }
+@@ -138,6 +143,142 @@
+     estado.emitido <= estado.subsidio_acum
+ }
+ 
++/// `Amount` a partir de un `i128` que ya se sabe no negativo y dentro de rango.
++fn amount_brek(v: i128) -> Result<Amount, ErrorTransicion> {
++    let b = i64::try_from(v).map_err(|_| ErrorTransicion::ErrDesbordamiento)?;
++    Amount::nuevo(b).map_err(|_| ErrorTransicion::ErrDesbordamiento)
++}
++
++/// Suma total de una garantía (`EV-19`): `activo + pendientes + en_retirada + créditos`.
++///
++/// `congelado` es un gravamen derivado y **no** suma, igual que en el oráculo T01.
++#[must_use]
++pub fn total_garantia(g: &Garantia) -> i128 {
++    let mut t = i128::from(g.activo.brek());
++    for p in &g.pendientes {
++        t += i128::from(p.importe.brek());
++    }
++    for r in &g.en_retirada {
++        t += i128::from(r.importe.brek());
++    }
++    for p in &g.creditos {
++        t += i128::from(p.importe.brek());
++    }
++    t
++}
++
++/// `techo_exacto(f·V) = ceil(V·f_num/f_den)` con enteros (`EV-19`).
++#[must_use]
++#[expect(
++    clippy::integer_division,
++    reason = "C-ENC-04 prohíbe floats; la división entera comprobada es la especificación de EV-19"
++)]
++pub fn techo_fraccion(v: i128, f_num: u64, f_den: u64) -> i128 {
++    if f_den == 0 || f_num == 0 || v <= 0 {
++        return 0;
++    }
++    let num = v
++        .checked_mul(i128::from(f_num))
++        .unwrap_or(i128::MAX)
++        .saturating_add(i128::from(f_den) - 1);
++    num / i128::from(f_den)
++}
++
++/// `RAT-2′`: `suelo(C·2/8) = C ÷ 4`, división entera **hacia abajo**.
++#[must_use]
++#[expect(
++    clippy::integer_division,
++    reason = "RAT-2′ exige división entera hacia abajo; no es aritmética de coma flotante"
++)]
++pub const fn suelo_dos_octavos(c: i128) -> i128 {
++    if c <= 0 { 0 } else { c / 4 }
++}
++
++/// Debita `c` de las sub-cuentas en orden determinista:
++/// `activo → pendientes → en_retirada → créditos` (`EV-19`/`EV-20`).
++pub fn debitar_garantia(g: &mut Garantia, c: i128) -> Result<(), ErrorTransicion> {
++    if c <= 0 {
++        return Ok(());
++    }
++    let mut restante = c;
++
++    let d = core::cmp::min(restante, i128::from(g.activo.brek()));
++    g.activo = amount_brek(i128::from(g.activo.brek()) - d)?;
++    restante -= d;
++
++    let mut nuevas: Vec<Pendiente> = Vec::with_capacity(g.pendientes.len());
++    for p in g.pendientes.drain(..) {
++        if restante > 0 {
++            let d = core::cmp::min(restante, i128::from(p.importe.brek()));
++            restante -= d;
++            if d == i128::from(p.importe.brek()) {
++                continue;
++            }
++            nuevas.push(Pendiente {
++                importe: amount_brek(i128::from(p.importe.brek()) - d)?,
++                ..p
++            });
++            continue;
++        }
++        nuevas.push(p);
++    }
++    g.pendientes = nuevas;
++
++    let mut nuevasr: Vec<EnRetirada> = Vec::with_capacity(g.en_retirada.len());
++    for r in g.en_retirada.drain(..) {
++        if restante > 0 {
++            let d = core::cmp::min(restante, i128::from(r.importe.brek()));
++            restante -= d;
++            if d == i128::from(r.importe.brek()) {
++                continue;
++            }
++            nuevasr.push(EnRetirada {
++                importe: amount_brek(i128::from(r.importe.brek()) - d)?,
++                inicio_slot: r.inicio_slot,
++            });
++            continue;
++        }
++        nuevasr.push(r);
++    }
++    g.en_retirada = nuevasr;
++
++    let mut nuevasc: Vec<Pendiente> = Vec::with_capacity(g.creditos.len());
++    for p in g.creditos.drain(..) {
++        if restante > 0 {
++            let d = core::cmp::min(restante, i128::from(p.importe.brek()));
++            restante -= d;
++            if d == i128::from(p.importe.brek()) {
++                continue;
++            }
++            nuevasc.push(Pendiente {
++                importe: amount_brek(i128::from(p.importe.brek()) - d)?,
++                ..p
++            });
++            continue;
++        }
++        nuevasc.push(p);
++    }
++    g.creditos = nuevasc;
++    Ok(())
++}
++
++/// Poda los incidentes cuya ventana de admisión cerró (`EV-11`): se conserva `sf` si
++/// `punto < sf + Plazo_slots`; al quedarse sin incidentes se libera el gravamen (`congelado = 0`).
++pub fn podar_incidentes(estado: &mut Estado, evp: &ParametrosEvidencia, punto: u64) {
++    let punto = punto as i64;
++    for g in estado.garantias.values_mut() {
++        if g.incidentes.is_empty() {
++            continue;
++        }
++        let antes = g.incidentes.len();
++        g.incidentes
++            .retain(|i| punto < i.slot_falta.saturating_add(evp.plazo_slots as i64));
++        if g.incidentes.len() != antes && g.incidentes.is_empty() {
++            g.congelado = Amount::CERO;
++        }
++    }
++}
++
+ /// Restituye el estado previo a partir del undo por delta (`I-2`, `R-14`).
+ #[must_use]
+ pub fn deshacer(estado: &Estado, undo: &Undo) -> Estado {
+@@ -153,6 +294,7 @@
+     restaurado.peso_sufijo = undo.escalares.peso_sufijo;
+     restaurado.altura_terminal = undo.escalares.altura_terminal;
+     restaurado.subsidio_acum = undo.escalares.subsidio_acum;
++    restaurado.ultimo_slot_producido = undo.escalares.ultimo_slot_producido.clone();
+     for (op, previa) in &undo.utxo {
+         match previa {
+             Some(e) => {
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/fusion.rs ws/crates/zx-consensus/src/transicion/fusion.rs
+--- ws.orig/crates/zx-consensus/src/transicion/fusion.rs	2026-09-26 05:00:50.525471761 +0200
++++ ws/crates/zx-consensus/src/transicion/fusion.rs	2026-09-26 20:05:30.457286213 +0200
+@@ -32,10 +32,10 @@
+ use crate::transicion::aplicar::{
+     Efecto, aplicar_con_undo, aplicar_tx, es_coinbase, validar_bloque,
+ };
+-use crate::transicion::estado::{Aplicador, acreditar_credito};
++use crate::transicion::estado::{Aplicador, acreditar_credito, podar_incidentes};
+ use crate::transicion::tipos::{
+-    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosTransicion, Pendiente, Punto,
+-    TxDescartada, Undo,
++    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
++    Pendiente, Punto, TxDescartada, Undo,
+ };
+ 
+ /// Aplica un bloque **PoST** en **modo fusión** desde `punto_aplicacion`.
+@@ -51,10 +51,11 @@
+     punto_aplicacion: Punto,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<(Estado, Undo, Vec<TxDescartada>), ErrorTransicion> {
+-    validar_bloque(bloque)?;
++    validar_bloque(bloque, evp.evp)?;
+     if matches!(bloque.hechos, HechosCabecera::Genesis { .. }) {
+-        let (nuevo, undo) = aplicar_con_undo(estado, bloque, params, cbid)?;
++        let (nuevo, undo) = aplicar_con_undo(estado, bloque, params, cbid, evp)?;
+         return Ok((nuevo, undo, Vec::new()));
+     }
+     if matches!(bloque.hechos, HechosCabecera::PoW { .. }) {
+@@ -69,6 +70,7 @@
+         punto_aplicacion,
+         params,
+         cbid,
++        evp,
+         &mut descartadas,
+     )?;
+     Ok((ap.estado, ap.undo, descartadas))
+@@ -157,6 +159,7 @@
+     punto: Punto,
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+     descartadas: &mut Vec<TxDescartada>,
+ ) -> Result<(), ErrorTransicion> {
+     let HechosCabecera::PoST {
+@@ -193,6 +196,9 @@
+     }
+     // (b) promoción de pendientes y créditos en el punto de aplicación.
+     ap.promover(punto, true, params)?;
++    // EV-11: la poda usa el **punto de aplicación**, no el slot propio del bloque fusionado.
++    let punto_slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)?;
++    podar_incidentes(&mut ap.estado, evp, punto_slot);
+     // RD-10: la garantía del productor **no** se recompueba al fusionar; es admisión (RD-9).
+     let coinbase = coinbase_unica(bloque)?;
+     if let Some(idx) = coinbase {
+@@ -214,7 +220,16 @@
+             continue;
+         }
+         let marca = temporal.marcar();
+-        match aplicar_tx(&mut temporal, bloque, params, cbid, punto, tx, testigos) {
++        match aplicar_tx(
++            &mut temporal,
++            bloque,
++            params,
++            cbid,
++            evp,
++            punto,
++            tx,
++            testigos,
++        ) {
+             Ok(Efecto::Fee(fee)) => {
+                 tarifas = tarifas
+                     .suma_comprobada(fee)
+@@ -238,7 +253,7 @@
+             continue;
+         };
+         let marca = ap.marcar();
+-        if let Err(motivo) = aplicar_tx(ap, bloque, params, cbid, punto, tx, testigos) {
++        if let Err(motivo) = aplicar_tx(ap, bloque, params, cbid, evp, punto, tx, testigos) {
+             ap.revertir_a(marca);
+             descartadas.push(TxDescartada {
+                 indice: i,
+@@ -264,5 +279,10 @@
+     ap.estado.subsidio_acum += i128::from(sub.brek());
+     // RI-1a #1: el slot del estado es el punto de aplicación (EstadoDAG.jl:303).
+     ap.estado.slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)?;
++    // EV-24(ii): se registra el slot **propio** del bloque, no el punto de aplicación.
++    let prev = ap.estado.ultimo_slot_producido.get(productor).copied();
++    if prev.is_none_or(|p| *slot > p) {
++        ap.estado.ultimo_slot_producido.insert(*productor, *slot);
++    }
+     Ok(())
+ }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/mod.rs ws/crates/zx-consensus/src/transicion/mod.rs
+--- ws.orig/crates/zx-consensus/src/transicion/mod.rs	2026-09-26 03:00:14.642147351 +0200
++++ ws/crates/zx-consensus/src/transicion/mod.rs	2026-09-26 19:39:53.976049664 +0200
+@@ -25,7 +25,8 @@
+ pub use aplicar::{aplicar, aplicar_con_undo, es_terminal, es_terminal_condiciones};
+ pub use error::ErrorTransicion;
+ pub use estado::{
+-    deshacer, gastable_en, invariante_i1, invariante_i1b, phi, suma_garantias, suma_utxo,
++    debitar_garantia, deshacer, gastable_en, invariante_i1, invariante_i1b, phi, podar_incidentes,
++    suelo_dos_octavos, suma_garantias, suma_utxo, techo_fraccion, total_garantia,
+ };
+ pub use fusion::aplicar_fusion;
+ pub use seleccion::{
+@@ -33,5 +34,6 @@
+ };
+ pub use tipos::{
+     BloqueTransicion, EnRetirada, EntradaUtxo, Escalares, Estado, Fase, Garantia, HechosCabecera,
+-    Marca, Origen, ParametrosTransicion, Pendiente, Punto, TxDescartada, Undo,
++    Incidente, Marca, Origen, ParametrosEvidencia, ParametrosTransicion, Pendiente, Punto,
++    TxDescartada, Undo,
+ };
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/seleccion.rs ws/crates/zx-consensus/src/transicion/seleccion.rs
+--- ws.orig/crates/zx-consensus/src/transicion/seleccion.rs	2026-09-26 03:00:14.642153521 +0200
++++ ws/crates/zx-consensus/src/transicion/seleccion.rs	2026-09-26 19:39:53.973049601 +0200
+@@ -12,7 +12,9 @@
+ 
+ use crate::transicion::ErrorTransicion;
+ use crate::transicion::aplicar::aplicar_con_undo;
+-use crate::transicion::tipos::{BloqueTransicion, Estado, HechosCabecera, ParametrosTransicion};
++use crate::transicion::tipos::{
++    BloqueTransicion, Estado, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
++};
+ 
+ /// Resultado de seleccionar: punta, estado de la punta y estados de todos los válidos.
+ #[derive(Clone, PartialEq, Eq, Debug)]
+@@ -46,6 +48,7 @@
+     bloques: &[BloqueTransicion],
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<BTreeMap<BlockHash, Estado>, ErrorTransicion> {
+     let mut memo: BTreeMap<BlockHash, Estado> = BTreeMap::new();
+     let Some(genesis) = bloques
+@@ -55,7 +58,7 @@
+         return Ok(memo);
+     };
+     let inicial = Estado::inicial();
+-    let Ok((estado_genesis, _)) = aplicar_con_undo(&inicial, genesis, params, cbid) else {
++    let Ok((estado_genesis, _)) = aplicar_con_undo(&inicial, genesis, params, cbid, evp) else {
+         return Ok(memo);
+     };
+     memo.insert(genesis.hash(), estado_genesis);
+@@ -72,7 +75,7 @@
+             if padre != pid || memo.contains_key(&b.hash()) {
+                 continue;
+             }
+-            if let Ok((nuevo, _)) = aplicar_con_undo(&estado_padre, b, params, cbid) {
++            if let Ok((nuevo, _)) = aplicar_con_undo(&estado_padre, b, params, cbid, evp) {
+                 memo.insert(b.hash(), nuevo);
+                 cola.push_back(b.hash());
+             }
+@@ -118,8 +121,9 @@
+     bloques: &[BloqueTransicion],
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<ResultadoSeleccion, ErrorTransicion> {
+-    let memo = construir_validos(bloques, params, cbid)?;
++    let memo = construir_validos(bloques, params, cbid, evp)?;
+     if memo.is_empty() {
+         return Ok(ResultadoSeleccion {
+             punta: None,
+@@ -224,13 +228,14 @@
+     secuencia: &[BloqueTransicion],
+     params: &ParametrosTransicion,
+     cbid: u32,
++    evp: &ParametrosEvidencia,
+ ) -> Result<(Option<BlockHash>, Estado), ErrorTransicion> {
+     let mut buffer: Vec<BloqueTransicion> = Vec::new();
+     let mut punta: Option<BlockHash> = None;
+     let mut estado_punta = Estado::inicial();
+     for b in secuencia {
+         buffer.push(b.clone());
+-        let resultado = seleccionar(&buffer, params, cbid)?;
++        let resultado = seleccionar(&buffer, params, cbid, evp)?;
+         let Some(nueva) = resultado.punta else {
+             continue;
+         };
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/tests.rs ws/crates/zx-consensus/src/transicion/tests.rs
+--- ws.orig/crates/zx-consensus/src/transicion/tests.rs	2026-09-26 03:47:13.012540789 +0200
++++ ws/crates/zx-consensus/src/transicion/tests.rs	2026-09-26 20:05:30.460286276 +0200
+@@ -20,8 +20,8 @@
+ use crate::transicion::estado::{invariante_i1, invariante_i1b};
+ use crate::transicion::{
+     BloqueTransicion, EnRetirada, EntradaUtxo, ErrorTransicion, Estado, Fase, Garantia,
+-    HechosCabecera, Origen, ParametrosTransicion, Punto, aplicar, aplicar_con_undo, aplicar_fusion,
+-    deshacer,
++    HechosCabecera, Origen, ParametrosEvidencia, ParametrosTransicion, Punto, aplicar,
++    aplicar_con_undo, aplicar_fusion, deshacer,
+ };
+ 
+ fn subsidio_pow_test(_h: u32) -> Amount {
+@@ -207,6 +207,7 @@
+             congelado: Amount::CERO,
+             creditos: Vec::new(),
+             nonce_siguiente: 0,
++            incidentes: Vec::new(),
+         },
+     );
+ }
+@@ -283,7 +284,13 @@
+     );
+     let bloque = bloque_pow(1, vec![(tx, testigos)]);
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrFirma),
+         "la verificación criptográfica MUST rechazarlos"
+     );
+@@ -317,7 +324,14 @@
+     estado.emitido = 10;
+     estado.subsidio_acum = 10;
+     let bloque = bloque_pow(1, vec![(tx, testigos)]);
+-    let nuevo = aplicar(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
++    let nuevo = aplicar(
++        &estado,
++        &bloque,
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+ 
+     assert!(invariante_i1(&nuevo));
+     assert!(invariante_i1b(&nuevo));
+@@ -364,11 +378,26 @@
+         .utxo
+         .insert(op, entrada(10, lock, Origen::Tx, Punto::Altura(0)));
+     let valido = bloque_pow(1, vec![(tx.clone(), vec![ordenado])]);
+-    assert!(aplicar(&estado, &valido, &params(), CBID_RED_DEV).is_ok());
++    assert!(
++        aplicar(
++            &estado,
++            &valido,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        )
++        .is_ok()
++    );
+ 
+     let invalido = bloque_pow(1, vec![(tx, vec![desordenado])]);
+     assert_eq!(
+-        aplicar(&estado, &invalido, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &invalido,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrFirma),
+         "los índices de MultiSig MUST ser estrictamente crecientes"
+     );
+@@ -382,7 +411,13 @@
+     let estado = estado_pow();
+     let bloque = bloque_pow(1, vec![(tx_coinbase_pow(Vec::new()), Vec::new())]);
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrEmision)
+     );
+ }
+@@ -394,7 +429,13 @@
+     let cb = tx_coinbase_pow(vec![tx_out(1, pk)]);
+     let bloque = bloque_pow(1, vec![(cb.clone(), Vec::new()), (cb, Vec::new())]);
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrEmision)
+     );
+ }
+@@ -412,7 +453,13 @@
+     let cb = tx_coinbase_post(pk, 3, 1);
+     let bloque = bloque_post(1, pk, vec![(retiro, vec![testigo]), (cb, Vec::new())]);
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrEmision)
+     );
+ }
+@@ -429,7 +476,13 @@
+     let cb = tx_coinbase_post(otra, 3, 1);
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrAutorizacion)
+     );
+ }
+@@ -465,8 +518,15 @@
+     estado.emitido = 20;
+     estado.subsidio_acum = 20;
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (t1, w1), (t2, w2)]);
+-    let (nuevo, _undo, descartadas) =
+-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
++    let (nuevo, _undo, descartadas) = aplicar_fusion(
++        &estado,
++        &bloque,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     assert_eq!(descartadas.len(), 1);
+     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrDobleGasto);
+     assert!(invariante_i1(&nuevo));
+@@ -486,8 +546,15 @@
+     estado.emitido = 10;
+     estado.subsidio_acum = 10;
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (t1, w1), (t2, w2)]);
+-    let (nuevo, _undo, descartadas) =
+-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
++    let (nuevo, _undo, descartadas) = aplicar_fusion(
++        &estado,
++        &bloque,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     assert_eq!(descartadas.len(), 1);
+     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrRetiroPendiente);
+     let g = nuevo.garantias.get(&pk).unwrap();
+@@ -513,8 +580,15 @@
+     estado.emitido = 6;
+     estado.subsidio_acum = 6;
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (t1, w1)]);
+-    let (nuevo, _undo, descartadas) =
+-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
++    let (nuevo, _undo, descartadas) = aplicar_fusion(
++        &estado,
++        &bloque,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     assert_eq!(descartadas.len(), 1);
+     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrSaldo);
+     let _ = nuevo;
+@@ -529,8 +603,15 @@
+     estado.emitido = 10;
+     estado.subsidio_acum = 10;
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
+-    let (nuevo, _undo, descartadas) =
+-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
++    let (nuevo, _undo, descartadas) = aplicar_fusion(
++        &estado,
++        &bloque,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     assert!(descartadas.is_empty());
+     let g = nuevo.garantias.get(&pk).unwrap();
+     assert_eq!(
+@@ -602,7 +683,14 @@
+     estado.subsidio_acum = 20;
+ 
+     let bloque_ok = bloque_pow(1, vec![(d1.clone(), w1.clone()), (d2.clone(), w2.clone())]);
+-    let nuevo = aplicar(&estado, &bloque_ok, &params(), CBID_RED_DEV).unwrap();
++    let nuevo = aplicar(
++        &estado,
++        &bloque_ok,
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     let g = nuevo.garantias.get(&pk).unwrap();
+     assert_eq!(g.activo, Amount::nuevo(20).unwrap());
+     assert_eq!(g.nonce_siguiente, 2, "cada operación incrementa el nonce");
+@@ -618,7 +706,13 @@
+     ];
+     let bloque_mal = bloque_pow(1, vec![(d1.clone(), w1), (d2_repetido, w2r)]);
+     assert_eq!(
+-        aplicar(&estado, &bloque_mal, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque_mal,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrNonce)
+     );
+     let _ = d2;
+@@ -643,7 +737,13 @@
+         vec![(cb, Vec::new()), (retiro.clone(), w.clone()), (retiro, w)],
+     );
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrNonce)
+     );
+ }
+@@ -669,6 +769,7 @@
+             congelado: Amount::CERO,
+             creditos: Vec::new(),
+             nonce_siguiente: 0,
++            incidentes: Vec::new(),
+         },
+     );
+     estado.emitido = 11;
+@@ -680,7 +781,13 @@
+         vec![(cb, Vec::new()), (lib.clone(), w.clone()), (lib, w)],
+     );
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrNonce)
+     );
+ }
+@@ -703,8 +810,15 @@
+         pk,
+         vec![(cb, Vec::new()), (retiro.clone(), w.clone()), (retiro, w)],
+     );
+-    let (nuevo, _undo, descartadas) =
+-        aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
++    let (nuevo, _undo, descartadas) = aplicar_fusion(
++        &estado,
++        &bloque,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     assert_eq!(descartadas.len(), 1);
+     assert_eq!(descartadas[0].motivo, ErrorTransicion::ErrNonce);
+     let g = nuevo.garantias.get(&pk).unwrap();
+@@ -727,7 +841,13 @@
+ 
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (retiro, w)]);
+     assert_eq!(
+-        aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        ),
+         Err(ErrorTransicion::ErrNonce)
+     );
+ }
+@@ -746,7 +866,14 @@
+     estado.subsidio_acum = 10;
+ 
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new()), (retiro, w)]);
+-    let (nuevo, undo) = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
++    let (nuevo, undo) = aplicar_con_undo(
++        &estado,
++        &bloque,
++        &params(),
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     assert_eq!(nuevo.garantias.get(&pk).unwrap().nonce_siguiente, 1);
+     assert_eq!(deshacer(&nuevo, &undo), estado);
+     assert_eq!(
+@@ -771,7 +898,13 @@
+         let cb = tx_coinbase_pow_exp(vec![tx_out(1, pk)], expiry);
+         let bloque = bloque_pow(1, vec![(cb, Vec::new())]);
+         assert_eq!(
+-            aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++            aplicar(
++                &estado,
++                &bloque,
++                &params(),
++                CBID_RED_DEV,
++                &ParametrosEvidencia::inactiva()
++            ),
+             Err(ErrorTransicion::ErrEmision),
+             "expiry {expiry} ≠ altura 1"
+         );
+@@ -779,7 +912,16 @@
+ 
+     let cb = tx_coinbase_pow_exp(vec![tx_out(1, pk)], 1);
+     let bloque = bloque_pow(1, vec![(cb, Vec::new())]);
+-    assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
++    assert!(
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        )
++        .is_ok()
++    );
+ }
+ 
+ /// F-16 · dos coinbases PoW idénticas salvo la altura (y por tanto el `expiry_height`) tienen
+@@ -801,6 +943,7 @@
+         &bloque_pow(1, vec![(cb1, Vec::new())]),
+         &params(),
+         CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
+     )
+     .unwrap();
+     let s2 = aplicar(
+@@ -808,6 +951,7 @@
+         &bloque_pow(2, vec![(cb2, Vec::new())]),
+         &params(),
+         CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
+     )
+     .unwrap();
+     assert_eq!(s2.utxo.len(), 2, "las dos coinbases coexisten");
+@@ -828,7 +972,13 @@
+         let cb = tx_coinbase_post(pk, 3, slot);
+         let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
+         assert_eq!(
+-            aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
++            aplicar(
++                &estado,
++                &bloque,
++                &params(),
++                CBID_RED_DEV,
++                &ParametrosEvidencia::inactiva()
++            ),
+             Err(ErrorTransicion::ErrEmision),
+             "slot {slot} ≠ slot del bloque 1"
+         );
+@@ -836,5 +986,14 @@
+ 
+     let cb = tx_coinbase_post(pk, 3, 1);
+     let bloque = bloque_post(1, pk, vec![(cb, Vec::new())]);
+-    assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
++    assert!(
++        aplicar(
++            &estado,
++            &bloque,
++            &params(),
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva()
++        )
++        .is_ok()
++    );
+ }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/tipos.rs ws/crates/zx-consensus/src/transicion/tipos.rs
+--- ws.orig/crates/zx-consensus/src/transicion/tipos.rs	2026-09-26 03:42:32.951659590 +0200
++++ ws/crates/zx-consensus/src/transicion/tipos.rs	2026-09-26 19:56:27.571896481 +0200
+@@ -192,6 +192,54 @@
+     pub subsidio_post: fn(u64) -> Amount,
+ }
+ 
++/// Parámetros de la evidencia (`SL-4a`, `CONTRATO-EVIDENCIA-v0` con Ratificación v0).
++///
++/// Se mantienen **fuera** de [`ParametrosTransicion`] para no tocar los perfiles de `zx-node`
++/// (fuera de alcance de SL-4a): el nodo sigue con la evidencia inactiva hasta SL-4b. Los arneses
++/// diferenciales y los tests construyen este bloque con los valores de cada vector.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub struct ParametrosEvidencia {
++    /// Numerador de `f = f_num/f_den` (EV-19).
++    pub f_num: u64,
++    /// Denominador de `f` (`> 0`).
++    pub f_den: u64,
++    /// Ventana de admisión `Plazo_slots` (EV-13).
++    pub plazo_slots: u64,
++    /// Margen `M_margen_slots` (EV-15/EV-15b).
++    pub m_margen_slots: u64,
++    /// `consensus_branch_id` de la red local (RAT-1).
++    pub cbid: u32,
++    /// Activación de `C-EVP` (equivalente a `P.evp` del oráculo).
++    pub evp: bool,
++}
++
++impl Default for ParametrosEvidencia {
++    fn default() -> Self {
++        Self::inactiva()
++    }
++}
++
++impl ParametrosEvidencia {
++    /// Perfil con la evidencia **desactivada** (el de `zx-node` hasta SL-4b).
++    #[must_use]
++    pub const fn inactiva() -> Self {
++        Self {
++            f_num: 1,
++            f_den: 1,
++            plazo_slots: 0,
++            m_margen_slots: 0,
++            cbid: 0,
++            evp: false,
++        }
++    }
++
++    /// `true` si la evidencia está activa.
++    #[must_use]
++    pub const fn activa(&self) -> bool {
++        self.evp
++    }
++}
++
+ /// Fase del estado.
+ #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+ pub enum Fase {
+@@ -288,6 +336,17 @@
+     pub inicio_slot: u64,
+ }
+ 
++/// Un incidente de evidencia registrado en una garantía (EV-11).
++#[derive(Clone, PartialEq, Eq, Debug)]
++pub struct Incidente {
++    /// `incident_id` (32 B). En esta implementación es `H_d(dom_incidente, bytes de la identidad)`.
++    pub id: [u8; 32],
++    /// `slot_falta = slot(H1) = slot(H2)` (EV-13). **`i64`**: el oráculo T04 admite slots
++    /// negativos en su generador de evidencia tardía; la cabecera real los transporta en dos's
++    /// complemento (`u64`) y el motor los reinterpreta.
++    pub slot_falta: i64,
++}
++
+ /// Garantía de una clave (`C-BON-01`).
+ #[derive(Clone, PartialEq, Eq, Debug)]
+ pub struct Garantia {
+@@ -297,13 +356,15 @@
+     pub pendientes: Vec<Pendiente>,
+     /// Retiradas vivas.
+     pub en_retirada: Vec<EnRetirada>,
+-    /// Congelado (siempre 0 en v0).
++    /// Congelado: gravamen **derivado** (no bucket) mientras haya incidentes abiertos (EV-17).
+     pub congelado: Amount,
+     /// Créditos D-T08 pendientes de madurar.
+     pub creditos: Vec<Pendiente>,
+     /// Nonce siguiente de la clave (F-15): 0 al crearse. Toda operación de garantía de esta clave
+     /// exige `nonce == nonce_siguiente` y lo incrementa al aplicarse.
+     pub nonce_siguiente: u64,
++    /// Incidentes de evidencia admitidos y aún no podados (EV-11).
++    pub incidentes: Vec<Incidente>,
+ }
+ 
+ impl Garantia {
+@@ -317,6 +378,7 @@
+             congelado: Amount::CERO,
+             creditos: Vec::new(),
+             nonce_siguiente: 0,
++            incidentes: Vec::new(),
+         }
+     }
+ }
+@@ -350,6 +412,9 @@
+     pub altura_terminal: Option<u32>,
+     /// Suma de subsidios nominales, para `I-1b`.
+     pub subsidio_acum: i128,
++    /// SL-4a · `último_slot_producido(P)`: mayor `slot(B)` de un bloque PoST aplicado con
++    /// `sol.public_key = P` (EV-15b/EV-24(ii)). Solo lo consume la liberación.
++    pub ultimo_slot_producido: BTreeMap<ClavePublica, u64>,
+ }
+ 
+ /// Escalares del estado, para el undo por delta (`ORDEN-W03` §3.5).
+@@ -377,6 +442,8 @@
+     pub altura_terminal: Option<u32>,
+     /// `subsidio_acum`.
+     pub subsidio_acum: i128,
++    /// `ultimo_slot_producido` (SL-4a). Se restaura completo en `deshacer`.
++    pub ultimo_slot_producido: BTreeMap<ClavePublica, u64>,
+ }
+ 
+ impl From<&Estado> for Escalares {
+@@ -393,6 +460,7 @@
+             peso_sufijo: e.peso_sufijo,
+             altura_terminal: e.altura_terminal,
+             subsidio_acum: e.subsidio_acum,
++            ultimo_slot_producido: e.ultimo_slot_producido.clone(),
+         }
+     }
+ }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/tests/diferencial_t01.rs ws/crates/zx-consensus/tests/diferencial_t01.rs
+--- ws.orig/crates/zx-consensus/tests/diferencial_t01.rs	2026-09-26 05:49:22.741431533 +0200
++++ ws/crates/zx-consensus/tests/diferencial_t01.rs	2026-09-26 20:22:30.080097765 +0200
+@@ -1,18 +1,17 @@
+-//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-W03` §3.10, V4; vectores v0.2 de
+-//! T01-E con el id de liberación F-18).
++//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-SL4a` §2.3, V4; vectores v0.4 con
++//! `EvidenceTx`).
+ //!
+-//! Lee `testdata/transicion-v0.2/vectores-transicion-v0.2.txt` (y su fichero de negativos), deriva
+-//! claves Ed25519 deterministas por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64
+-//! LE)` con `ed25519-zebra`), construye transacciones **reales** v1/v2/v3 firmadas por el `firmante`
++//! Lee `testdata/transicion-v0.4/vectores-transicion-v0.4.txt` (y su cobertura), deriva claves
++//! Ed25519 deterministas por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)` con
++//! `ed25519-zebra`), construye transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante`
+ //! abstracto, traduce la salida implícita de una `Liberacion` a su `OutPoint` real `(txid, 0)`,
+-//! ejecuta el motor en el orden de entrega del fichero y compara `RES`, `SEL` y el estado canónico
+-//! traducido de vuelta a claves abstractas.
++//! ejecuta el motor en el orden de entrega del fichero y compara `RES`, `SEL`, la cobertura y el
++//! estado canónico traducido de vuelta a claves abstractas.
+ //!
+-//! T01-E / F-18: el id abstracto de la salida de una liberación es
+-//! `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`, inyectivo por contenido.
+-//! El arnés lo decodifica y resuelve al `OutPoint` real; **no** mantiene ningún contador de ids
+-//! implícitos ni inventa entradas. Los vectores v0.1 siguen en `testdata/transicion-v0.1/`, pero
+-//! ya no se leen.
++//! La `EvidenceTx` v4 se traduce a **dos cabeceras `PoAS_PoT_DAG` reales** con sellos Ed25519
++//! reales (`EV-01`…`EV-07`), no a una emulación: el orden canónico real por `pre_hash` reproduce la
++//! relación abstracta de cada vector. El `incident_id` es **opaco**: la cobertura y el `GAR` se
++//! comparan por número y `@slot_falta`, no por el hex (ver `DEFINICIONES-FALTANTES.md` FD-1).
+ //!
+ //! Requisito de V4: **0 discrepancias** en todos los casos.
+ 
+@@ -29,8 +28,8 @@
+ use ed25519_zebra::{SigningKey, VerificationKey};
+ use primitive_types::U256;
+ use zx_consensus::transicion::{
+-    BloqueTransicion, ErrorTransicion, Estado, Fase, HechosCabecera, Origen, ParametrosTransicion,
+-    Punto, aplicar_con_undo, deshacer, seleccionar,
++    BloqueTransicion, ErrorTransicion, Estado, Fase, HechosCabecera, Origen, ParametrosEvidencia,
++    ParametrosTransicion, Punto, aplicar_con_undo, deshacer, seleccionar,
+ };
+ use zx_core::preimage::tx::txid as calcular_txid;
+ use zx_core::{
+@@ -39,10 +38,14 @@
+     SolucionPoas, SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
+ };
+ 
+-/// Rutas a los ficheros de vectores v0.2 dentro del workspace (`ws/testdata/...`).
++/// Rutas a los ficheros de vectores v0.4 dentro del workspace (`ws/testdata/...`).
+ const RUTA_VECTORES: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+-    "/../../testdata/transicion-v0.2/vectores-transicion-v0.2.txt"
++    "/../../testdata/transicion-v0.4/vectores-transicion-v0.4.txt"
++);
++const RUTA_COBERTURA: &str = concat!(
++    env!("CARGO_MANIFEST_DIR"),
++    "/../../testdata/transicion-v0.4/cobertura-v0.4.txt"
+ );
+ const RUTA_NEGATIVOS: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+@@ -199,6 +202,61 @@
+     sal: Vec<(u64, u64, u64)>,
+     /// F-15: nonce de una operación de garantía (0 en el resto).
+     nonce: u64,
++    /// SL-4a: evidencia abstracta de una `EvidenceTx` v4, si el vector la trae.
++    ev: Option<EvCrudo>,
++}
++
++/// Una cabecera abstracta de evidencia (`ev=` de T01).
++#[derive(Clone, Copy, Debug)]
++struct EvCab {
++    cbid: u32,
++    clave: u64,
++    sector: u16,
++    historia: u64,
++    chunk: u64,
++    slot: u64,
++    ph: u64,
++    sello_ok: bool,
++}
++
++/// La evidencia abstracta de una `EvidenceTx` v4.
++#[derive(Clone, Copy, Debug)]
++struct EvCrudo {
++    id1: EvCab,
++    id2: EvCab,
++}
++
++fn parsear_evidencia(texto: &str) -> EvCrudo {
++    let partes: Vec<&str> = texto.split('|').collect();
++    assert_eq!(partes.len(), 2, "evidencia malformada: {texto}");
++    let mut cab = [EvCab {
++        cbid: 0,
++        clave: 0,
++        sector: 0,
++        historia: 0,
++        chunk: 0,
++        slot: 0,
++        ph: 0,
++        sello_ok: true,
++    }; 2];
++    for (j, p) in partes.iter().enumerate() {
++        let f: Vec<&str> = p.split(':').collect();
++        assert_eq!(f.len(), 8, "cabecera de evidencia malformada: {p}");
++        cab[j] = EvCab {
++            cbid: f[0].parse().expect("cbid"),
++            clave: f[1].parse().expect("clave"),
++            sector: f[2].parse().expect("sector"),
++            historia: f[3].parse().expect("historia"),
++            chunk: f[4].parse().expect("chunk"),
++            slot: f[5].parse().expect("slot"),
++            ph: f[6].parse().expect("pre_hash"),
++            sello_ok: f[7] == "1",
++        };
++    }
++    EvCrudo {
++        id1: cab[0],
++        id2: cab[1],
++    }
+ }
+ 
+ /// Un bloque abstracto leído del fichero.
+@@ -233,6 +291,12 @@
+     m_rec_slots: u64,
+     r_slots: u64,
+     f_slots: Option<u64>,
++    f_num: u64,
++    f_den: u64,
++    plazo_slots: u64,
++    m_margen_slots: u64,
++    cbid: u32,
++    evp: bool,
+ }
+ 
+ impl ParamCrudo {
+@@ -251,6 +315,12 @@
+             m_rec_slots: 0,
+             r_slots: 0,
+             f_slots: None,
++            f_num: 1,
++            f_den: 1,
++            plazo_slots: 0,
++            m_margen_slots: 0,
++            cbid: 0,
++            evp: false,
+         }
+     }
+ }
+@@ -305,6 +375,16 @@
+         } else {
+             Some(f.parse().expect("F_slots"))
+         },
++        f_num: c.get("f_num").map_or(1, |v| v.parse().expect("f_num")),
++        f_den: c.get("f_den").map_or(1, |v| v.parse().expect("f_den")),
++        plazo_slots: c
++            .get("Plazo_slots")
++            .map_or(0, |v| v.parse().expect("Plazo_slots")),
++        m_margen_slots: c
++            .get("M_margen_slots")
++            .map_or(0, |v| v.parse().expect("M_margen_slots")),
++        cbid: c.get("cbid").map_or(0, |v| v.parse().expect("cbid")),
++        evp: c.get("evp").is_some_and(|v| v == "1"),
+     }
+ }
+ 
+@@ -370,6 +450,8 @@
+                         sal: parse_salidas(c.get("sal").expect("sal")),
+                         // F-15: solo los vectores v0.1 traen `nonce=`; ausente = 0.
+                         nonce: c.get("nonce").map_or(0, |v| v.parse().expect("nonce")),
++                        // SL-4a: `ev=` solo en las `EvidenceTx` v4 con cabeceras.
++                        ev: c.get("ev").map(|v| parsear_evidencia(v)),
+                     });
+                 }
+             }
+@@ -447,6 +529,18 @@
+     }
+ }
+ 
++/// SL-4a: parámetros de evidencia del caso.
++fn parametros_evidencia(p: &ParamCrudo) -> ParametrosEvidencia {
++    ParametrosEvidencia {
++        f_num: p.f_num,
++        f_den: p.f_den,
++        plazo_slots: p.plazo_slots,
++        m_margen_slots: p.m_margen_slots,
++        cbid: p.cbid,
++        evp: p.evp,
++    }
++}
++
+ /// Constructor de transacciones reales con la correspondencia de salidas abstractas.
+ struct Constructor {
+     cbid: u32,
+@@ -682,13 +776,31 @@
+                 (real, Vec::new())
+             }
+             "Evidencia" => {
++                let Some(ev) = tx.ev else {
++                    // Evidencia malformada heredada (sin cabeceras): v4 inactiva.
++                    let real = Tx {
++                        version: 4,
++                        inputs: Vec::new(),
++                        outputs: Vec::new(),
++                        lock_time: 0,
++                        expiry_height: 0,
++                        extension: ExtensionTx::Ninguna,
++                    };
++                    return Ok((real, Vec::new()));
++                };
++                // Registra las claves abstractas de la identidad para que `render_gar` pueda
++                // traducir de vuelta la garantía que el motor cree (p. ej. la clave 99).
++                let _ = self.claves.id(ev.id1.clave);
++                let _ = self.claves.id(ev.id2.clave);
++                let (h1, h2) = cabeceras_de_evidencia(&ev);
++                let salidas = self.salidas_reales(&tx.sal);
+                 let real = Tx {
+                     version: 4,
+                     inputs: Vec::new(),
+-                    outputs: Vec::new(),
++                    outputs: salidas,
+                     lock_time: 0,
+                     expiry_height: 0,
+-                    extension: ExtensionTx::Ninguna,
++                    extension: ExtensionTx::Evidencia { h1, h2 },
+                 };
+                 (real, Vec::new())
+             }
+@@ -719,6 +831,63 @@
+     }
+ }
+ 
++/// Construye una cabecera `PoAS_PoT_DAG` real con la identidad abstracta `cab` y una sal.
++fn cabecera_evidencia(cab: &EvCab, sal: u64) -> DagBlockHeader {
++    let mut chunk = [0u8; 32];
++    chunk[..8].copy_from_slice(&cab.chunk.to_le_bytes());
++    let sol = SolucionPoas {
++        public_key: clave_de(cab.clave),
++        sector_index: cab.sector,
++        history_size: cab.historia,
++        chunk,
++        ..Default::default()
++    };
++    DagBlockHeader {
++        consensus_branch_id: cab.cbid,
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
++        timestamp: sal,
++        height: 0,
++        slot: cab.slot,
++        pot_output: [0u8; 16],
++        rango_solucion: cab.ph,
++        sol,
++        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0u8; 32])),
++        padres: PadresDag::genesis(),
++        sello: [0u8; 64],
++    }
++}
++
++/// Traduce una evidencia abstracta a dos cabeceras reales con sellos Ed25519 reales.
++///
++/// El orden canónico real por `pre_hash` reproduce la relación `ph1 < ph2` del vector: se busca una
++/// sal en `H2` hasta que la comparación real coincide con la abstracta. Si la identidad y la
++/// `pre_hash` abstractas son iguales, las prefirmas son idénticas y el `pre_hash` real también lo
++/// es (`ErrOrdenCanonico`). La identidad/cbid/sellos del motor se comprueban sobre las cabeceras.
++fn cabeceras_de_evidencia(ev: &EvCrudo) -> (DagBlockHeader, DagBlockHeader) {
++    let mut h1 = cabecera_evidencia(&ev.id1, 0);
++    let mut h2;
++    let quiere_menor = ev.id1.ph < ev.id2.ph;
++    let mut sal = 0u64;
++    loop {
++        h2 = cabecera_evidencia(&ev.id2, sal);
++        let menor = h1.pre_hash().as_bytes() < h2.pre_hash().as_bytes();
++        if menor == quiere_menor {
++            break;
++        }
++        sal += 1;
++    }
++    for (cab, h) in [(&ev.id1, &mut h1), (&ev.id2, &mut h2)] {
++        if cab.sello_ok {
++            let sk = firmante_de(cab.clave);
++            let firma: [u8; 64] = sk.sign(h.pre_hash().as_bytes()).into();
++            h.sello = firma;
++        } else {
++            h.sello = [0u8; 64];
++        }
++    }
++    (h1, h2)
++}
++
+ /// Bloques reales de un caso, con la correspondencia hash ↔ id abstracto.
+ struct Reales {
+     bloques: Vec<BloqueTransicion>,
+@@ -882,10 +1051,27 @@
+             .map(|p| format!("{}@s{}", p.importe.brek(), p.madura_en_slot.unwrap_or(0)))
+             .collect::<Vec<_>>()
+             .join(",");
++        let inc = if g.incidentes.is_empty() {
++            String::new()
++        } else {
++            let lista = g
++                .incidentes
++                .iter()
++                .map(|i| {
++                    let mut hex = String::with_capacity(64);
++                    for b in &i.id {
++                        let _ = write!(hex, "{b:02x}");
++                    }
++                    format!("{hex}@{}", i.slot_falta)
++                })
++                .collect::<Vec<_>>()
++                .join(",");
++            format!(" inc={lista}")
++        };
+         lineas.push((
+             clave,
+             format!(
+-                "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}",
++                "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}{inc}",
+                 g.activo.brek(),
+                 g.congelado.brek(),
+                 g.nonce_siguiente
+@@ -900,6 +1086,22 @@
+ // Ejecución diferencial
+ // ─────────────────────────────────────────────────────────────────────────────
+ 
++/// Normaliza el `incident_id` de una línea `GAR`: el id es **opaco**, así que se compara su número
++/// y su `@slot_falta`, no el hex (ver `DEFINICIONES-FALTANTES.md` FD-1). Se ordenan los slots para
++/// que la comparación no dependa del orden del id del motor.
++fn normalizar_gar(linea: &str) -> String {
++    let Some(pos) = linea.find(" inc=") else {
++        return linea.to_string();
++    };
++    let (pref, inc) = linea.split_at(pos + 5);
++    let mut slots: Vec<&str> = inc
++        .split(',')
++        .map(|item| item.split('@').nth(1).unwrap_or(""))
++        .collect();
++    slots.sort_unstable();
++    format!("{pref}{}", slots.join(","))
++}
++
+ /// Nombre aceptado para un error del motor frente al esperado del fichero (§4).
+ fn coincide(esperado: &str, error: &ErrorTransicion) -> bool {
+     if let ErrorTransicion::ErrForma(ErrorFormaTx::VersionInactiva { .. }) = error {
+@@ -908,8 +1110,67 @@
+     error.nombre_t01() == esperado
+ }
+ 
+-fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
++fn inc_cov(cov: &mut BTreeMap<String, usize>, k: &str) {
++    *cov.entry(k.to_string()).or_insert(0) += 1;
++}
++
++/// Reproduce `contar_cobertura` del oráculo T01 (`exportar.jl:291-335`) sobre el `memo` del BFS.
++fn contar_cobertura(
++    caso: &Caso,
++    reales: &Reales,
++    params: &ParametrosTransicion,
++    evp: &ParametrosEvidencia,
++    memo: &BTreeMap<u64, Estado>,
++    cov: &mut BTreeMap<String, usize>,
++) {
++    if !caso.param.evp {
++        return;
++    }
++    for (i, b) in caso.bloques.iter().enumerate() {
++        let Some(txev) = b.txs.iter().find(|t| t.tipo == "Evidencia") else {
++            continue;
++        };
++        let ep = memo.get(&b.padre);
++        if memo.contains_key(&b.id) {
++            let Some(ev) = txev.ev else {
++                inc_cov(cov, "malformada");
++                continue;
++            };
++            let v = ep
++                .and_then(|e| e.garantias.get(&clave_de(ev.id1.clave)))
++                .map_or(0, zx_consensus::transicion::total_garantia);
++            inc_cov(cov, if v == 0 { "sin_saldo" } else { "aplicada" });
++            if let Some(ep) = ep
++                && let Ok((e2, undo)) =
++                    aplicar_con_undo(ep, &reales.bloques[i], params, CBID_RED_DEV, evp)
++                && deshacer(&e2, &undo) == *ep
++            {
++                inc_cov(cov, "deshecha");
++            }
++        } else if ep.is_none() {
++            inc_cov(cov, "sin_padre");
++        } else if let Some(ep) = ep {
++            let nombre = match aplicar_con_undo(ep, &reales.bloques[i], params, CBID_RED_DEV, evp) {
++                Ok(_) => "otro_error",
++                Err(e) => match e.nombre_t01() {
++                    "ErrEvidenciaDuplicada" => "duplicada",
++                    "ErrEvidenciaTardia" => "tardia",
++                    "ErrCbidAjeno" => "cbid_ajeno",
++                    "ErrOrdenCanonico" => "orden_canonico",
++                    "ErrSinEvidencia" => "sin_evidencia",
++                    "ErrEvidenciaConEntradas" => "con_entradas",
++                    "ErrPuertaRAT3" => "puerta_rat3",
++                    _ => "otro_error",
++                },
++            };
++            inc_cov(cov, nombre);
++        }
++    }
++}
++
++fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>, cov: &mut BTreeMap<String, usize>) {
+     let params = parametros(&caso.param);
++    let evp = parametros_evidencia(&caso.param);
+     let reales = match construir_caso(caso) {
+         Ok(r) => r,
+         Err(e) => {
+@@ -921,7 +1182,8 @@
+     // BFS sobre los padres abstractos (el génesis no lleva padre en los hechos reales).
+     let mut memo: BTreeMap<u64, Estado> = BTreeMap::new();
+     if let Some(gi) = caso.bloques.iter().position(|b| b.fam == "Genesis")
+-        && let Ok((e, _)) = aplicar_con_undo(&inicial, &reales.bloques[gi], &params, CBID_RED_DEV)
++        && let Ok((e, _)) =
++            aplicar_con_undo(&inicial, &reales.bloques[gi], &params, CBID_RED_DEV, &evp)
+     {
+         memo.insert(caso.bloques[gi].id, e);
+     }
+@@ -934,9 +1196,13 @@
+             if b.padre != pid || memo.contains_key(&b.id) {
+                 continue;
+             }
+-            if let Ok((nuevo, undo)) =
+-                aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV)
+-            {
++            if let Ok((nuevo, undo)) = aplicar_con_undo(
++                &estado_padre,
++                &reales.bloques[i],
++                &params,
++                CBID_RED_DEV,
++                &evp,
++            ) {
+                 if deshacer(&nuevo, &undo) != estado_padre {
+                     discrepancias.push(format!("CASO {} undo bloque {}", caso.n, b.id));
+                 }
+@@ -955,7 +1221,13 @@
+             esperado != "ErrSinPadre"
+         } else {
+             let estado_padre = memo.get(&b.padre).cloned().unwrap_or_else(Estado::inicial);
+-            match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV) {
++            match aplicar_con_undo(
++                &estado_padre,
++                &reales.bloques[i],
++                &params,
++                CBID_RED_DEV,
++                &evp,
++            ) {
+                 Ok(_) => esperado != "OK",
+                 Err(e) => !coincide(&esperado, &e),
+             }
+@@ -967,7 +1239,13 @@
+                 "ErrSinPadre".to_string()
+             } else {
+                 let estado_padre = memo.get(&b.padre).cloned().unwrap_or_else(Estado::inicial);
+-                match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV) {
++                match aplicar_con_undo(
++                    &estado_padre,
++                    &reales.bloques[i],
++                    &params,
++                    CBID_RED_DEV,
++                    &evp,
++                ) {
+                     Ok(_) => "OK".to_string(),
+                     Err(e) => e.nombre_t01().to_string(),
+                 }
+@@ -978,8 +1256,9 @@
+             ));
+         }
+     }
++    contar_cobertura(caso, &reales, &params, &evp, &memo, cov);
+     // SEL.
+-    let seleccion = match seleccionar(&reales.bloques, &params, CBID_RED_DEV) {
++    let seleccion = match seleccionar(&reales.bloques, &params, CBID_RED_DEV, &evp) {
+         Ok(s) => s,
+         Err(e) => {
+             discrepancias.push(format!("CASO {}: seleccionar: {e:?}", caso.n));
+@@ -1014,7 +1293,9 @@
+     match render_gar(&reales.claves, &seleccion.estado) {
+         Ok(obtenido) => {
+             let obtenido: Vec<String> = obtenido.into_iter().map(|(_, l)| l).collect();
+-            if obtenido != caso.gar {
++            let esperado_n: Vec<String> = caso.gar.iter().map(|l| normalizar_gar(l)).collect();
++            let obtenido_n: Vec<String> = obtenido.iter().map(|l| normalizar_gar(l)).collect();
++            if obtenido_n != esperado_n {
+                 discrepancias.push(format!(
+                     "CASO {} ({}) GAR esperado={:?} obtenido={:?}",
+                     caso.n, caso.nombre, caso.gar, obtenido
+@@ -1048,7 +1329,7 @@
+     if caso.nombre == "X-16" && reales.bloques.len() > 1 {
+         let mut invertidos = reales.bloques.clone();
+         invertidos.reverse();
+-        if let Ok(inv) = seleccionar(&invertidos, &params, CBID_RED_DEV)
++        if let Ok(inv) = seleccionar(&invertidos, &params, CBID_RED_DEV, &evp)
+             && (inv.punta != seleccion.punta || inv.estado != seleccion.estado)
+         {
+             discrepancias.push(format!("CASO {} X-16 orden inverso difiere", caso.n));
+@@ -1062,15 +1343,16 @@
+     casos
+ }
+ 
+-/// Corre el diferencial sobre `casos` y devuelve `(informe, nº de discrepancias)`.
+-fn correr_diferencial(casos: &[Caso]) -> (String, usize) {
++/// Corre el diferencial sobre `casos` y devuelve `(informe, nº de discrepancias, cobertura)`.
++fn correr_diferencial(casos: &[Caso]) -> (String, usize, BTreeMap<String, usize>) {
+     let mut discrepancias: Vec<String> = Vec::new();
+     let mut por_nombre: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+     let mut con_post = 0usize;
+     let mut por_error: BTreeMap<String, usize> = BTreeMap::new();
++    let mut cov: BTreeMap<String, usize> = BTreeMap::new();
+     for caso in casos {
+         let antes = discrepancias.len();
+-        ejecutar_caso(caso, &mut discrepancias);
++        ejecutar_caso(caso, &mut discrepancias, &mut cov);
+         let fallo = discrepancias.len() > antes;
+         let entrada = por_nombre.entry(caso.nombre.clone()).or_insert((0, 0));
+         entrada.0 += 1;
+@@ -1099,19 +1381,48 @@
+     for d in discrepancias.iter().take(40) {
+         let _ = writeln!(informe, "  {d}");
+     }
+-    (informe, discrepancias.len())
++    (informe, discrepancias.len(), cov)
++}
++
++/// Lee los contadores de `cobertura-v0.4.txt` (líneas `clave = valor`).
++fn cargar_cobertura() -> BTreeMap<String, usize> {
++    let contenido = fs::read_to_string(RUTA_COBERTURA).expect("leer cobertura");
++    let mut mapa = BTreeMap::new();
++    for linea in contenido.lines() {
++        if linea.starts_with('#') || linea.trim().is_empty() {
++            continue;
++        }
++        if let Some((k, v)) = linea.split_once('=') {
++            mapa.insert(k.trim().to_string(), v.trim().parse().expect("contador"));
++        }
++    }
++    mapa
+ }
+ 
+-/// V4: diferencial completo contra el oráculo T01-E (`vectores-transicion-v0.2.txt`, 2 055 casos).
++/// V4: diferencial completo contra el oráculo T01 (`vectores-transicion-v0.4.txt`, 2 795 casos) y
++/// tabla de cobertura **idéntica** a `cobertura-v0.4.txt`.
+ #[test]
+ fn diferencial_t01() {
+     let casos = cargar_casos(RUTA_VECTORES);
+-    let (informe, n) = correr_diferencial(&casos);
++    let (informe, n, cov) = correr_diferencial(&casos);
+     println!("{informe}");
++    let esperada = cargar_cobertura();
++    let mut cob_informe = String::new();
++    for (k, v) in &cov {
++        let _ = writeln!(
++            cob_informe,
++            "  {k} = {v} (esperado {})",
++            esperada.get(k).copied().unwrap_or(0)
++        );
++    }
+     assert!(
+         n == 0,
+         "diferencial T01 (base) con {n} discrepancias:\n{informe}"
+     );
++    assert_eq!(
++        cov, esperada,
++        "cobertura T01 distinta de cobertura-v0.4.txt:\n{cob_informe}"
++    );
+ }
+ 
+ /// V4: diferencial contra los negativos de T01-E (`…-negativos-v0.2.txt`, 3 914 casos), incluidos
+@@ -1119,7 +1430,7 @@
+ #[test]
+ fn diferencial_t01_negativos() {
+     let casos = cargar_casos(RUTA_NEGATIVOS);
+-    let (informe, n) = correr_diferencial(&casos);
++    let (informe, n, _) = correr_diferencial(&casos);
+     println!("{informe}");
+     assert!(
+         n == 0,
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/tests/evidencia.rs ws/crates/zx-consensus/tests/evidencia.rs
+--- ws.orig/crates/zx-consensus/tests/evidencia.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-consensus/tests/evidencia.rs	2026-09-26 20:22:36.811826512 +0200
+@@ -0,0 +1,371 @@
++//! Tests propios de evidencia (`ORDEN-SL4a` §3 V5): RAT-3, autodenuncia, `cbid` ajeno,
++//! evidencia duplicada en hermanos y undo/reaparición (`EV-27`/`EV-28`).
++//!
++//! Construyen cabeceras `PoAS_PoT_DAG` reales con sellos Ed25519 reales y aplican el motor con
++//! `ParametrosEvidencia` activos. La carrera completa de RAT-3 y los casos dirigidos de reorg están
++//! además en los diferenciales `diferencial_t01` (`EV-RAT3-carrera`, `EV-autodenuncia`) y
++//! `diferencial_t04` (D-15…D-18).
++
++#![expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
++#![expect(
++    clippy::indexing_slicing,
++    reason = "índices sobre vectores construidos en el propio test"
++)]
++
++use ed25519_zebra::SigningKey;
++use primitive_types::U256;
++use zx_consensus::transicion::{
++    BloqueTransicion, EnRetirada, ErrorTransicion, Estado, Fase, Garantia, HechosCabecera,
++    ParametrosEvidencia, ParametrosTransicion, Punto, aplicar_con_undo, aplicar_fusion, deshacer,
++};
++use zx_core::{
++    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, DagBlockHeader, Digest,
++    ErrorFormaTx, ExtensionTx, Lock, MerkleRoot, PadresDag, SolucionPoas, TipoGarantia, Tx, TxOut,
++};
++
++fn firmante_de(k: u64) -> SigningKey {
++    let mut mensaje = b"zx-t01-clave".to_vec();
++    mensaje.extend_from_slice(&k.to_le_bytes());
++    let digest = zx_core::sha3_256_publico(&mensaje);
++    SigningKey::from(*digest.as_bytes())
++}
++
++fn clave_de(k: u64) -> ClavePublica {
++    let sk = firmante_de(k);
++    let vk = ed25519_zebra::VerificationKey::from(&sk);
++    ClavePublica::desde_bytes(vk.into())
++}
++
++fn hash_de(id: u64) -> BlockHash {
++    let mut bytes = [0u8; 32];
++    bytes[24..].copy_from_slice(&id.to_be_bytes());
++    BlockHash::from_digest(Digest::from_bytes(bytes))
++}
++
++fn subsidio_pow(_h: u32) -> Amount {
++    Amount::nuevo(10).expect("subsidio pow")
++}
++fn subsidio_post(_s: u64) -> Amount {
++    Amount::nuevo(3).expect("subsidio post")
++}
++
++fn params() -> ParametrosTransicion {
++    ParametrosTransicion {
++        h_dep: 1,
++        m_cb: 1,
++        m_dep: 0,
++        h_corte_min: 1,
++        w_min: U256::from(1u32),
++        s_min: Amount::nuevo(1).expect("s_min"),
++        q: Amount::nuevo(1).expect("q"),
++        k_min: 1,
++        m_res_slots: 1,
++        m_dep_slots: 1,
++        m_rec_slots: 1,
++        r_slots: 3,
++        f_slots: Some(2),
++        subsidio_pow,
++        subsidio_post,
++    }
++}
++
++fn evp(cbid: u32) -> ParametrosEvidencia {
++    ParametrosEvidencia {
++        f_num: 1,
++        f_den: 1,
++        plazo_slots: 2,
++        m_margen_slots: 0,
++        cbid,
++        evp: true,
++    }
++}
++
++/// Cabecera real con identidad `(cbid, clave, slot)` y `pre_hash` controlado por `(ph, sal)`.
++fn cabecera(cbid: u32, clave: ClavePublica, slot: i64, ph: u64, sal: u64) -> DagBlockHeader {
++    let sol = SolucionPoas {
++        public_key: clave,
++        ..Default::default()
++    };
++    DagBlockHeader {
++        consensus_branch_id: cbid,
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
++        timestamp: sal,
++        height: 0,
++        slot: slot as u64,
++        pot_output: [0u8; 16],
++        rango_solucion: ph,
++        sol,
++        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0u8; 32])),
++        padres: PadresDag::genesis(),
++        sello: [0u8; 64],
++    }
++}
++
++/// `EvidenceTx` v4 con dos cabeceras reales de la misma identidad y sellos reales.
++#[expect(
++    clippy::too_many_arguments,
++    reason = "el test construye el caso campo a campo"
++)]
++fn evidencia_tx(
++    cbid: u32,
++    clave_idx: u64,
++    slot: i64,
++    ph1: u64,
++    ph2: u64,
++    sello1: bool,
++    sello2: bool,
++    salidas: Vec<TxOut>,
++) -> Tx {
++    let clave = clave_de(clave_idx);
++    let mut h1 = cabecera(cbid, clave, slot, ph1, 0);
++    let mut h2;
++    let quiere_menor = ph1 < ph2;
++    let mut sal = 0u64;
++    loop {
++        h2 = cabecera(cbid, clave, slot, ph2, sal);
++        if (h1.pre_hash().as_bytes() < h2.pre_hash().as_bytes()) == quiere_menor {
++            break;
++        }
++        sal += 1;
++    }
++    let sk = firmante_de(clave_idx);
++    for (ok, h) in [(sello1, &mut h1), (sello2, &mut h2)] {
++        if ok {
++            let firma: [u8; 64] = sk.sign(h.pre_hash().as_bytes()).into();
++            h.sello = firma;
++        } else {
++            h.sello = [0u8; 64];
++        }
++    }
++    Tx {
++        version: 4,
++        inputs: Vec::new(),
++        outputs: salidas,
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::Evidencia { h1, h2 },
++    }
++}
++
++fn bloque_post(
++    slot: u64,
++    productor: ClavePublica,
++    txs: Vec<(Tx, Vec<Vec<u8>>)>,
++) -> BloqueTransicion {
++    BloqueTransicion::nuevo(
++        HechosCabecera::PoST {
++            hash: hash_de(slot + 100),
++            padre: hash_de(1),
++            slot,
++            productor,
++            peso: 1,
++            prueba_valida: true,
++            requisito_declarado: 0,
++        },
++        txs,
++    )
++}
++
++/// Estado PoST con una garantía de 8 brek en la clave 1 y terminal `hash_de(1)`.
++fn estado_post() -> Estado {
++    let mut estado = Estado::inicial();
++    estado.fase = Fase::PoST;
++    estado.terminal = Some(hash_de(1));
++    estado.slot = 0;
++    estado.garantias.insert(
++        clave_de(1),
++        Garantia {
++            activo: Amount::nuevo(8).expect("activo"),
++            pendientes: Vec::new(),
++            en_retirada: Vec::new(),
++            congelado: Amount::CERO,
++            creditos: Vec::new(),
++            nonce_siguiente: 0,
++            incidentes: Vec::new(),
++        },
++    );
++    // Clave 2, productora de bloques en los tests que no deben fallar por `ErrGarantia`.
++    estado.garantias.insert(
++        clave_de(2),
++        Garantia {
++            activo: Amount::nuevo(1).expect("activo"),
++            pendientes: Vec::new(),
++            en_retirada: Vec::new(),
++            congelado: Amount::CERO,
++            creditos: Vec::new(),
++            nonce_siguiente: 0,
++            incidentes: Vec::new(),
++        },
++    );
++    estado
++}
++
++fn ev_valida(cbid: u32, clave_idx: u64, slot: i64) -> Tx {
++    evidencia_tx(cbid, clave_idx, slot, 11, 22, true, true, Vec::new())
++}
++
++/// `cbid` ajeno ⇒ `ErrCbidAjeno` (RAT-1).
++#[test]
++fn cbid_ajeno() {
++    let estado = estado_post();
++    let bloque = bloque_post(1, clave_de(1), vec![(ev_valida(99, 1, 1), Vec::new())]);
++    let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert_eq!(r, Err(ErrorTransicion::ErrCbidAjeno));
++}
++
++/// Orden canónico inválido (`pre_hash` iguales) ⇒ `ErrOrdenCanonico` (EV-01).
++#[test]
++fn orden_canonico_invalido() {
++    let estado = estado_post();
++    // ph1 == ph2 e identidad igual ⇒ prefirmas iguales ⇒ pre_hash real igual.
++    let tx = evidencia_tx(7, 1, 1, 5, 5, true, true, Vec::new());
++    let bloque = bloque_post(1, clave_de(1), vec![(tx, Vec::new())]);
++    let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert_eq!(r, Err(ErrorTransicion::ErrOrdenCanonico));
++}
++
++/// Sellos inválidos ⇒ `ErrSinEvidencia` (EV-07).
++#[test]
++fn sello_invalido() {
++    let estado = estado_post();
++    let tx = evidencia_tx(7, 1, 1, 11, 22, false, true, Vec::new());
++    let bloque = bloque_post(1, clave_de(1), vec![(tx, Vec::new())]);
++    let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert_eq!(r, Err(ErrorTransicion::ErrSinEvidencia));
++}
++
++/// Autodenuncia (RAT-2′): el infractor pierde al menos `6/8·C`; con `V = C = 8`, pierde 6 y el
++/// productor recibe `suelo(8·2/8) = 2`.
++#[test]
++fn autodenuncia() {
++    let estado = estado_post();
++    // El productor es la propia clave infractora.
++    let bloque = bloque_post(1, clave_de(1), vec![(ev_valida(7, 1, 1), Vec::new())]);
++    let (nuevo, _) = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7))
++        .expect("evidencia admitida");
++    assert_eq!(nuevo.quemado, 6, "quemado = C - suelo(C/4) = 8 - 2");
++    let g = nuevo.garantias.get(&clave_de(1)).expect("garantía");
++    assert_eq!(g.activo.brek(), 0);
++    // La recompensa queda como crédito pendiente; `congelado` es el total remanente (EV-20).
++    assert_eq!(g.congelado.brek(), 2);
++    let credito: i64 = g.creditos.iter().map(|p| p.importe.brek()).sum();
++    assert_eq!(credito, 2, "recompensa al productor = suelo(C·2/8)");
++    assert_eq!(nuevo.emitido, 0);
++}
++
++/// Evidencia duplicada en **hermanos** (modo fusión): la segunda se descarta (`ErrEvidenciaDuplicada`).
++#[test]
++fn duplicada_en_hermanos() {
++    let estado = estado_post();
++    let tx = ev_valida(7, 1, 1);
++    let a = bloque_post(1, clave_de(1), vec![(tx.clone(), Vec::new())]);
++    let b = bloque_post(2, clave_de(1), vec![(tx, Vec::new())]);
++    let (e1, _u1, d1) = aplicar_fusion(
++        &estado,
++        &a,
++        Punto::Slot(1),
++        &params(),
++        CBID_RED_DEV,
++        &evp(7),
++    )
++    .expect("primer hermano");
++    assert!(d1.is_empty());
++    let (e2, _u2, d2) = aplicar_fusion(&e1, &b, Punto::Slot(2), &params(), CBID_RED_DEV, &evp(7))
++        .expect("bloque válido con descarte");
++    assert_eq!(d2.len(), 1);
++    assert_eq!(d2[0].motivo, ErrorTransicion::ErrEvidenciaDuplicada);
++    // La segunda no vuelve a congelar ni confiscar: mismo `quemado` y un solo incidente.
++    assert_eq!(e2.quemado, e1.quemado);
++    let g = e2.garantias.get(&clave_de(1)).expect("garantía");
++    assert_eq!(g.incidentes.len(), 1, "un único incidente registrado");
++    assert_eq!(g.congelado.brek(), 2, "sin segundo gravamen");
++}
++
++/// `EV-27`/`EV-28`: el undo exacto devuelve el estado; la misma evidencia vuelve a aplicarse como
++/// primera (no como duplicada) si la aplicación se deshizo.
++#[test]
++fn undo_y_reaparicion() {
++    let estado = estado_post();
++    let bloque = bloque_post(1, clave_de(1), vec![(ev_valida(7, 1, 1), Vec::new())]);
++    let (nuevo, undo) =
++        aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7)).expect("aplicada");
++    assert_eq!(deshacer(&nuevo, &undo), estado, "undo exacto EV-27");
++    let (nuevo2, _undo2) = aplicar_con_undo(
++        &deshacer(&nuevo, &undo),
++        &bloque,
++        &params(),
++        CBID_RED_DEV,
++        &evp(7),
++    )
++    .expect("se reaplica como primera EV-28");
++    assert_eq!(nuevo2, nuevo);
++}
++
++/// `EV-24(ii)`/RAT-3: una liberación con producción reciente (`último_slot_producido`) se rechaza
++/// aunque el retiro esté vencido; pasada la ventana `Plazo + M_margen`, se admite.
++#[test]
++fn ventana_de_liberacion_rat3() {
++    let mut estado = estado_post();
++    // Retirada vencida de 8 brek y último bloque producido en el slot 5.
++    let g = estado.garantias.get_mut(&clave_de(1)).expect("garantía");
++    g.activo = Amount::CERO;
++    g.en_retirada.push(EnRetirada {
++        importe: Amount::nuevo(8).expect("importe"),
++        inicio_slot: 0,
++    });
++    estado.ultimo_slot_producido.insert(clave_de(1), 5);
++
++    let liberacion = |nonce: u64| {
++        let tx = Tx {
++            version: 2,
++            inputs: Vec::new(),
++            outputs: Vec::new(),
++            lock_time: 0,
++            expiry_height: 0,
++            extension: ExtensionTx::Garantia {
++                tipo: TipoGarantia::Liberacion,
++                clave: clave_de(1),
++                importe: Amount::nuevo(8).expect("importe"),
++                nonce,
++            },
++        };
++        let sk = firmante_de(1);
++        let firma: [u8; 64] = sk
++            .sign(&zx_core::mensaje_aceptacion(&tx, CBID_RED_DEV))
++            .into();
++        (tx, vec![firma.to_vec()])
++    };
++
++    // slot 5 < 5 + Plazo(2) + M_margen(0) = 7 ⇒ ErrVentanaAbierta.
++    let bloque = bloque_post(5, clave_de(2), vec![liberacion(0)]);
++    let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert_eq!(r, Err(ErrorTransicion::ErrVentanaAbierta));
++    // slot 7 ≥ 7 y retirada vencida (0 + R_slots(3) <= 7) ⇒ se admite.
++    let bloque = bloque_post(7, clave_de(2), vec![liberacion(0)]);
++    let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert!(
++        r.is_ok(),
++        "la liberación tras la ventana debe admitirse: {r:?}"
++    );
++}
++
++/// `EV-04`: evidencia con salidas monetarias ⇒ `ErrEvidenciaConEntradas`.
++#[test]
++fn evidencia_con_salidas() {
++    let estado = estado_post();
++    let salida = TxOut {
++        value: Amount::nuevo(1).expect("valor"),
++        lock: Lock::PubKey {
++            pubkey: clave_de(2),
++        },
++    };
++    let tx = evidencia_tx(7, 1, 1, 11, 22, true, true, vec![salida]);
++    let bloque = bloque_post(1, clave_de(1), vec![(tx, Vec::new())]);
++    let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
++    assert_eq!(
++        r,
++        Err(ErrorTransicion::ErrForma(
++            ErrorFormaTx::EvidenciaConEntradasOSalidas
++        ))
++    );
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/tests/transicion_prop.rs ws/crates/zx-consensus/tests/transicion_prop.rs
+--- ws.orig/crates/zx-consensus/tests/transicion_prop.rs	2026-09-26 03:45:33.331447515 +0200
++++ ws/crates/zx-consensus/tests/transicion_prop.rs	2026-09-26 20:05:30.469286465 +0200
+@@ -13,8 +13,8 @@
+ use proptest::prelude::*;
+ use proptest::test_runner::RngSeed;
+ use zx_consensus::transicion::{
+-    BloqueTransicion, Estado, HechosCabecera, ParametrosTransicion, aplicar, aplicar_con_undo,
+-    deshacer, invariante_i1, invariante_i1b,
++    BloqueTransicion, Estado, HechosCabecera, ParametrosEvidencia, ParametrosTransicion, aplicar,
++    aplicar_con_undo, deshacer, invariante_i1, invariante_i1b,
+ };
+ use zx_core::{
+     Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, HashType, Lock, OutPoint,
+@@ -139,7 +139,14 @@
+     let mut bloques = Vec::new();
+ 
+     let genesis = BloqueTransicion::nuevo(HechosCabecera::Genesis { hash: hash(0) }, Vec::new());
+-    estado = aplicar(&estado, &genesis, &params, CBID_RED_DEV).unwrap();
++    estado = aplicar(
++        &estado,
++        &genesis,
++        &params,
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     bloques.push(genesis);
+ 
+     // PoW h = 1: coinbase a `k1`.
+@@ -159,7 +166,14 @@
+         },
+         vec![(cb1, Vec::new())],
+     );
+-    estado = aplicar(&estado, &b1, &params, CBID_RED_DEV).unwrap();
++    estado = aplicar(
++        &estado,
++        &b1,
++        &params,
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     bloques.push(b1);
+ 
+     // PoW h = 2: coinbase a `k2` y depósito del coinbase anterior (habilita la garantía).
+@@ -181,7 +195,14 @@
+         },
+         vec![(cb2, Vec::new()), (dep, testigos)],
+     );
+-    estado = aplicar(&estado, &b2, &params, CBID_RED_DEV).unwrap();
++    estado = aplicar(
++        &estado,
++        &b2,
++        &params,
++        CBID_RED_DEV,
++        &ParametrosEvidencia::inactiva(),
++    )
++    .unwrap();
+     bloques.push(b2);
+ 
+     // 0–3 bloques PoST acreditando al productor con garantía (`k1`).
+@@ -205,7 +226,13 @@
+             },
+             vec![(cb, Vec::new())],
+         );
+-        let Ok(nuevo) = aplicar(&estado, &post, &params, CBID_RED_DEV) else {
++        let Ok(nuevo) = aplicar(
++            &estado,
++            &post,
++            &params,
++            CBID_RED_DEV,
++            &ParametrosEvidencia::inactiva(),
++        ) else {
+             break;
+         };
+         padre = hash(10 + i as u8);
+@@ -231,7 +258,7 @@
+         let mut estado = Estado::inicial();
+         for bloque in &bloques {
+             let (nuevo, undo) =
+-                aplicar_con_undo(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
++                aplicar_con_undo(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+             prop_assert_eq!(&deshacer(&nuevo, &undo), &estado);
+             prop_assert!(invariante_i1(&nuevo));
+             prop_assert!(invariante_i1b(&nuevo));
+@@ -249,10 +276,10 @@
+         let bloques = generar(&entropia);
+         let mut estado = Estado::inicial();
+         for bloque in &bloques {
+-            let a = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+-            let b = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
++            let a = aplicar(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
++            let b = aplicar(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+             prop_assert_eq!(a, b);
+-            estado = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
++            estado = aplicar(&estado, bloque, &params(), CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+         }
+     }
+ }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/error.rs ws/crates/zx-core/src/error.rs
+--- ws.orig/crates/zx-core/src/error.rs	2026-09-26 02:09:39.839509642 +0200
++++ ws/crates/zx-core/src/error.rs	2026-09-26 19:36:17.097499238 +0200
+@@ -343,6 +343,15 @@
+         height: u32,
+     },
+ 
++    /// `EV-04`: una `EvidenceTx` v4 con entradas, salidas o testigos de transacción.
++    #[error("EV-04: EvidenceTx con entradas, salidas o testigos (MUST ser 0)")]
++    EvidenciaConEntradasOSalidas,
++
++    /// `EV-01`/`EV-04`: las dos cabeceras de una `EvidenceTx` no están en orden canónico
++    /// estrictamente ascendente por `pre_hash`.
++    #[error("EV-01: cabeceras de EvidenceTx fuera de orden canónico por pre_hash")]
++    OrdenCanonicoInvalido,
++
+     /// Error de codificación al verificar una firma de aceptación.
+     #[error(transparent)]
+     Codificacion(#[from] EncodingError),
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/forma.rs ws/crates/zx-core/src/forma.rs
+--- ws.orig/crates/zx-core/src/forma.rs	2026-09-26 03:41:15.033023322 +0200
++++ ws/crates/zx-core/src/forma.rs	2026-09-26 19:36:48.002147661 +0200
+@@ -199,3 +199,46 @@
+     }
+     Ok(())
+ }
++
++/// Valida la **forma** de una `EvidenceTx` v4 (`EV-01`…`EV-04`), sin contexto ni activación.
++///
++/// Lo meramente estructural: coherencia `version = 4 ⇔ Evidencia`, `lock_time = 0`,
++/// `expiry_height = 0`, sin entradas, salidas ni testigos de transacción (`EV-01`, `EV-02`,
++/// `EV-04`), y cada cabecera con forma válida de `PoAS_PoT_DAG` (F-03).
++///
++/// **No** comprueba el orden canónico ni el `cbid`, la identidad, los sellos, la puerta RAT-3 o la
++/// ventana: esas comprobaciones son semánticas y viven en `zx_consensus::transicion`, en el mismo
++/// orden que el oráculo T01 (que comprueba identidad antes que orden).
++///
++/// # Errores
++/// [`ErrorFormaTx`]; ver las variantes usadas.
++pub fn validar_forma_tx_v4(tx: &Tx, testigos: &[Vec<u8>]) -> Result<(), ErrorFormaTx> {
++    if tx.version != 4 {
++        return Err(ErrorFormaTx::VersionDesconocida {
++            version: tx.version,
++        });
++    }
++    let (h1, h2) = match &tx.extension {
++        ExtensionTx::Evidencia { h1, h2 } => (h1, h2),
++        _ => {
++            return Err(ErrorFormaTx::ExtensionIncoherente {
++                version: 4,
++                esperada: "Evidencia",
++            });
++        }
++    };
++    if !tx.inputs.is_empty() || !tx.outputs.is_empty() || !testigos.is_empty() {
++        return Err(ErrorFormaTx::EvidenciaConEntradasOSalidas);
++    }
++    if tx.lock_time != 0 {
++        return Err(ErrorFormaTx::CampoInactivo { campo: "lock_time" });
++    }
++    if tx.expiry_height != 0 {
++        return Err(ErrorFormaTx::CampoInactivo {
++            campo: "expiry_height",
++        });
++    }
++    validar_forma_cabecera_post(h1)?;
++    validar_forma_cabecera_post(h2)?;
++    Ok(())
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/hash.rs ws/crates/zx-core/src/hash.rs
+--- ws.orig/crates/zx-core/src/hash.rs	2026-09-26 02:09:39.839509642 +0200
++++ ws/crates/zx-core/src/hash.rs	2026-09-26 19:34:30.636265492 +0200
+@@ -175,13 +175,23 @@
+ pub(crate) const TAG_TXID_GARANTIA: DomainTag = DomainTag::fija(*b"ZZKTxIdGarantia_");
+ /// F-08 · mensaje de la firma de aceptación de v2: `H_d("ZZKTxSigGarant__", txid)`.
+ pub(crate) const TAG_TXSIG_GARANT: DomainTag = DomainTag::fija(*b"ZZKTxSigGarant__");
++/// SL-4a / EV-03 · sub-digest de la extensión de la `EvidenceTx` v4 (`extension_digest`).
++///
++/// Añadida por SL-4a: cambiar su valor es un cambio de consenso (C-HASH-05). No comparte los 12
++/// primeros bytes con `ZZKTxIdHash_`, así que la invariante de `DomainTag::raiz` se conserva.
++pub(crate) const TAG_TXID_EVP: DomainTag = DomainTag::fija(*b"ZZKTxIdEvidencia");
++/// SL-4a / EV-10 · etiqueta de dominio del `incident_id` (`dom_incidente`).
++///
++/// El contrato la fija en `TAGS_FIJAS`. La implementación la usa desde
++/// [`crate::preimage::tx::incident_id_evidencia`].
++pub(crate) const TAG_EVP_INCIDENTE: DomainTag = DomainTag::fija(*b"ZZKEvpIncidente_");
+ 
+-/// Las diecisiete etiquetas ASCII fijas, para las comprobaciones de invariante.
++/// Las diecinueve etiquetas ASCII fijas, para las comprobaciones de invariante.
+ #[allow(
+     dead_code,
+-    reason = "solo lo usan los tests de invariante de este módulo"
++    reason = "solo lo usan los tests de invariante de este módulo y la preimagen de evidencia"
+ )]
+-pub(crate) const TAGS_FIJAS: [DomainTag; 17] = [
++pub(crate) const TAGS_FIJAS: [DomainTag; 19] = [
+     TAG_TXID_HEADER,
+     TAG_TXID_INPUTS,
+     TAG_TXID_PREVOUT,
+@@ -192,6 +202,8 @@
+     TAG_TXSIG_LOCKS,
+     TAG_TXSIG_THIS_IN,
+     TAG_TXSIG_GARANT,
++    TAG_TXID_EVP,
++    TAG_EVP_INCIDENTE,
+     TAG_TX_AUTH,
+     TAG_BLK_MERKLE,
+     TAG_BLK_HEADER,
+@@ -235,7 +247,7 @@
+             );
+             vistas.push(b);
+         }
+-        assert_eq!(vistas.len(), 17);
++        assert_eq!(vistas.len(), 19);
+     }
+ 
+     /// Las dos etiquetas del flujo son exactamente las de la tabla C-HASH-06.
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/lib.rs ws/crates/zx-core/src/lib.rs
+--- ws.orig/crates/zx-core/src/lib.rs	2026-09-26 02:09:39.839509642 +0200
++++ ws/crates/zx-core/src/lib.rs	2026-09-26 19:36:34.847871668 +0200
+@@ -42,7 +42,7 @@
+ };
+ pub use error::{CompromisosError, CoreError, EncodingError, ErrorFormaTx};
+ pub use firma::{ClavePublica, Firma, verificar};
+-pub use forma::{validar_forma_cabecera_post, validar_forma_tx};
++pub use forma::{validar_forma_cabecera_post, validar_forma_tx, validar_forma_tx_v4};
+ // El módulo `hash` sigue privado: `h_d` MUST ser inalcanzable desde fuera. Se reexporta únicamente
+ // `sha3_256_publico`, que no acepta etiqueta de dominio y por tanto no puede producir un digest de
+ // consenso. Ver la nota de diseño de `crate::hash`.
+@@ -55,7 +55,8 @@
+     tamano_prefirma,
+ };
+ pub use preimage::tx::{
+-    HashType, auth_digest, mensaje_aceptacion, sighash, txid, verificar_aceptacion,
++    HashType, auth_digest, incident_id_evidencia, mensaje_aceptacion, sighash, txid,
++    verificar_aceptacion,
+ };
+ pub use red::{CBID_RED_DEV, MAGIC_DEV, Red};
+ pub use target::{
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/preimage/mod.rs ws/crates/zx-core/src/preimage/mod.rs
+--- ws.orig/crates/zx-core/src/preimage/mod.rs	2026-09-26 02:09:39.839509642 +0200
++++ ws/crates/zx-core/src/preimage/mod.rs	2026-09-26 19:36:29.056750163 +0200
+@@ -60,6 +60,12 @@
+         self
+     }
+ 
++    /// Escribe un `u16` little-endian (SL-4a: identidad de evidencia).
++    pub(crate) fn u16(&mut self, v: u16) -> &mut Self {
++        self.0.extend_from_slice(&v.to_le_bytes());
++        self
++    }
++
+     /// Escribe un `CompactSize` en su forma mínima (C-ENC-05).
+     pub(crate) fn compact_size(&mut self, v: u64) -> &mut Self {
+         compact_size::escribir(&mut self.0, v);
+@@ -88,6 +94,16 @@
+         self
+     }
+ 
++    /// Escribe los bytes de una **preimagen canónica ya serializada**.
++    ///
++    /// Solo lo usa SL-4a para concatenar las codificaciones canónicas de dos cabeceras
++    /// `PoAS_PoT_DAG` (`DagBlockHeader::a_bytes`) dentro del `extension_digest` de la v4 (EV-03).
++    /// No es un atajo genérico: no debe recibir bytes de wire.
++    pub(crate) fn canonical(&mut self, b: &[u8]) -> &mut Self {
++        self.0.extend_from_slice(b);
++        self
++    }
++
+     /// Escribe la codificación canónica de un [`Lock`] (C-TX-09).
+     ///
+     /// `discriminante ‖ campos`. Para `MultiSig`, la lista de claves va precedida de su longitud en
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/preimage/tx.rs ws/crates/zx-core/src/preimage/tx.rs
+--- ws.orig/crates/zx-core/src/preimage/tx.rs	2026-09-26 03:40:55.952622639 +0200
++++ ws/crates/zx-core/src/preimage/tx.rs	2026-09-26 19:36:24.692658598 +0200
+@@ -11,11 +11,12 @@
+ use crate::error::{EncodingError, ErrorFormaTx};
+ use crate::firma::{Firma, LONGITUD_FIRMA};
+ use crate::hash::{
+-    DomainTag, TAG_TX_AUTH, TAG_TXID_GARANTIA, TAG_TXID_HEADER, TAG_TXID_INPUTS, TAG_TXID_OUTPUTS,
+-    TAG_TXID_PREVOUT, TAG_TXID_SEQUENCE, TAG_TXSIG_AMOUNTS, TAG_TXSIG_GARANT, TAG_TXSIG_LOCKS,
+-    TAG_TXSIG_THIS_IN, h_d,
++    DomainTag, TAG_EVP_INCIDENTE, TAG_TX_AUTH, TAG_TXID_EVP, TAG_TXID_GARANTIA, TAG_TXID_HEADER,
++    TAG_TXID_INPUTS, TAG_TXID_OUTPUTS, TAG_TXID_PREVOUT, TAG_TXID_SEQUENCE, TAG_TXSIG_AMOUNTS,
++    TAG_TXSIG_GARANT, TAG_TXSIG_LOCKS, TAG_TXSIG_THIS_IN, h_d,
+ };
+ use crate::preimage::PreimageWriter;
++use crate::preimage::dag::dag_header_a_bytes;
+ use crate::tx::{ExtensionTx, SpentOutput, Tx, TxOut};
+ 
+ /// Modo de firma (C-SIG-03). Conjunto **cerrado**: cualquier otro byte es inválido.
+@@ -171,9 +172,41 @@
+             w.clave(clave).u64(importe.brek() as u64).u64(*slot);
+             Some(w.finish(TAG_TXID_GARANTIA))
+         }
++        // EV-03: `H_d("ZZKTxIdEvidencia", dag_header_a_bytes(H1) ‖ dag_header_a_bytes(H2))`.
++        ExtensionTx::Evidencia { h1, h2 } => {
++            let b1 = dag_header_a_bytes(h1);
++            let b2 = dag_header_a_bytes(h2);
++            let mut w = PreimageWriter::con_capacidad(b1.len() + b2.len());
++            w.canonical(&b1).canonical(&b2);
++            Some(w.finish(TAG_TXID_EVP))
++        }
+     }
+ }
+ 
++/// `incident_id` de la identidad de una `EvidenceTx` (`EV-10`, `RAT-1`).
++///
++/// `H_d("ZZKEvpIncidente_", cbid ‖ public_key ‖ sector_index ‖ history_size ‖ chunk ‖ slot)`,
++/// con todos los enteros en little-endian. La identidad es la de `C-EVP-01` más el
++/// `consensus_branch_id` (RAT-1). Es un digest **opaco**: solo se compara por igualdad.
++#[must_use]
++pub fn incident_id_evidencia(
++    cbid: u32,
++    public_key: &[u8; 32],
++    sector_index: u16,
++    history_size: u64,
++    chunk: &[u8; 32],
++    slot: u64,
++) -> Digest {
++    let mut w = PreimageWriter::con_capacidad(4 + 32 + 2 + 8 + 32 + 8);
++    w.u32(cbid)
++        .h32(public_key)
++        .u16(sector_index)
++        .u64(history_size)
++        .h32(chunk)
++        .u64(slot);
++    w.finish(TAG_EVP_INCIDENTE)
++}
++
+ /// El **txid** (C-TX-01): solo datos de efecto, **sin firmas**.
+ ///
+ /// Que excluya las firmas es lo que lo hace no maleable, y por tanto lo que permite construir una
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/tx.rs ws/crates/zx-core/src/tx.rs
+--- ws.orig/crates/zx-core/src/tx.rs	2026-09-26 03:40:49.287482673 +0200
++++ ws/crates/zx-core/src/tx.rs	2026-09-26 20:21:42.605688709 +0200
+@@ -8,6 +8,7 @@
+ use crate::digest::TxId;
+ use crate::error::EncodingError;
+ use crate::firma::ClavePublica;
++use crate::preimage::dag::DagBlockHeader;
+ 
+ /// Máximo de claves en un `MultiSig` (C-TX-11).
+ pub const MAX_MULTISIG_KEYS: usize = 16;
+@@ -168,11 +169,17 @@
+     }
+ }
+ 
+-/// Campos de efecto extra por versión (F-05, F-06, F-07).
++/// Campos de efecto extra por versión (F-05, F-06, F-07, F-06/SL-4a).
+ ///
+ /// Es el «gancho de extensión» de `C-TX-07`. La coherencia con `version` es obligatoria:
+-/// `1 ⇔ Ninguna`, `2 ⇔ Garantia`, `3 ⇔ CoinbasePost`; `validar_forma_tx` la exige.
++/// `1 ⇔ Ninguna`, `2 ⇔ Garantia`, `3 ⇔ CoinbasePost`, `4 ⇔ Evidencia`; `validar_forma_tx` la exige
++/// (para la v4, `validar_forma_tx_v4`, que el motor invoca cuando el perfil activa la evidencia).
+ #[derive(Clone, PartialEq, Eq, Debug)]
++#[expect(
++    clippy::large_enum_variant,
++    reason = "EV-01/EV-02: la v4 transporta dos cabeceras PoAS_PoT_DAG completas (hasta 1 037 B \
++              cada una); boxearlas complicaría el wire, la preimagen y el undo sin beneficio"
++)]
+ pub enum ExtensionTx {
+     /// Versión 1: sin campos extra (idéntica a `9681061`).
+     Ninguna,
+@@ -197,6 +204,17 @@
+         /// Slot del bloque que la contiene (F-17).
+         slot: u64,
+     },
++    /// Versión 4 · `EvidenceTx` (EV-01…EV-04): **exactamente dos** cabeceras `PoAS_PoT_DAG`
++    /// completas, con su sello, en orden canónico `pre_hash(h1) < pre_hash(h2)`.
++    ///
++    /// No lleva entradas, ni salidas, ni testigos de transacción: el sello vive dentro de cada
++    /// cabecera. El `txid` compromete los bytes completos de ambas (`EV-03`).
++    Evidencia {
++        /// `H1`: cabecera con el `pre_hash` lexicográficamente menor.
++        h1: DagBlockHeader,
++        /// `H2`: cabecera con el `pre_hash` lexicográficamente mayor.
++        h2: DagBlockHeader,
++    },
+ }
+ 
+ /// Una transacción, solo con sus **datos de efecto** (§5.1).
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/wire.rs ws/crates/zx-core/src/wire.rs
+--- ws.orig/crates/zx-core/src/wire.rs	2026-09-26 03:41:06.530844780 +0200
++++ ws/crates/zx-core/src/wire.rs	2026-09-26 19:36:58.033358130 +0200
+@@ -262,6 +262,13 @@
+             int::escribir_u64(salida, importe.brek() as u64);
+             int::escribir_u64(salida, *slot);
+         }
++        // SL-4a · v4: `H1 ‖ H2`, cada cabecera autodelimitada por su `parent_count`. El contrato
++        // (EV-02) no fija el wire de la v4; esta es la extensión elegida y queda declarada en
++        // `DEFINICIONES-FALTANTES.md` (FD-5). `tx_desde_bytes` sigue rechazando la v4.
++        ExtensionTx::Evidencia { h1, h2 } => {
++            salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h1));
++            salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h2));
++        }
+     }
+ 
+     compact_size::escribir(salida, testigos.len() as u64);
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-post/tests/regimen.rs ws/crates/zx-post/tests/regimen.rs
+--- ws.orig/crates/zx-post/tests/regimen.rs	2026-09-26 04:38:53.403444160 +0200
++++ ws/crates/zx-post/tests/regimen.rs	2026-09-26 19:41:03.650511536 +0200
+@@ -1009,13 +1009,26 @@
+ 
+     for slot in [0u64, 2, 99] {
+         assert_eq!(
+-            aplicar(&estado, &bloque(slot), &params, zx_core::CBID_RED_DEV),
++            aplicar(
++                &estado,
++                &bloque(slot),
++                &params,
++                zx_core::CBID_RED_DEV,
++                &zx_consensus::transicion::ParametrosEvidencia::inactiva(),
++            ),
+             Err(ErrorTransicion::ErrEmision),
+             "F-17: slot {slot} ≠ slot del bloque 1"
+         );
+     }
+     assert!(
+-        aplicar(&estado, &bloque(1), &params, zx_core::CBID_RED_DEV).is_ok(),
++        aplicar(
++            &estado,
++            &bloque(1),
++            &params,
++            zx_core::CBID_RED_DEV,
++            &zx_consensus::transicion::ParametrosEvidencia::inactiva(),
++        )
++        .is_ok(),
+         "el slot correcto sí se aplica"
+     );
+ 

@@ -12,7 +12,9 @@ use zx_core::BlockHash;
 
 use crate::transicion::ErrorTransicion;
 use crate::transicion::aplicar::aplicar_con_undo;
-use crate::transicion::tipos::{BloqueTransicion, Estado, HechosCabecera, ParametrosTransicion};
+use crate::transicion::tipos::{
+    BloqueTransicion, Estado, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
+};
 
 /// Resultado de seleccionar: punta, estado de la punta y estados de todos los válidos.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -46,6 +48,7 @@ pub fn construir_validos(
     bloques: &[BloqueTransicion],
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<BTreeMap<BlockHash, Estado>, ErrorTransicion> {
     let mut memo: BTreeMap<BlockHash, Estado> = BTreeMap::new();
     let Some(genesis) = bloques
@@ -55,7 +58,7 @@ pub fn construir_validos(
         return Ok(memo);
     };
     let inicial = Estado::inicial();
-    let Ok((estado_genesis, _)) = aplicar_con_undo(&inicial, genesis, params, cbid) else {
+    let Ok((estado_genesis, _)) = aplicar_con_undo(&inicial, genesis, params, cbid, evp) else {
         return Ok(memo);
     };
     memo.insert(genesis.hash(), estado_genesis);
@@ -72,7 +75,7 @@ pub fn construir_validos(
             if padre != pid || memo.contains_key(&b.hash()) {
                 continue;
             }
-            if let Ok((nuevo, _)) = aplicar_con_undo(&estado_padre, b, params, cbid) {
+            if let Ok((nuevo, _)) = aplicar_con_undo(&estado_padre, b, params, cbid, evp) {
                 memo.insert(b.hash(), nuevo);
                 cola.push_back(b.hash());
             }
@@ -118,8 +121,9 @@ pub fn seleccionar(
     bloques: &[BloqueTransicion],
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<ResultadoSeleccion, ErrorTransicion> {
-    let memo = construir_validos(bloques, params, cbid)?;
+    let memo = construir_validos(bloques, params, cbid, evp)?;
     if memo.is_empty() {
         return Ok(ResultadoSeleccion {
             punta: None,
@@ -224,13 +228,14 @@ pub fn nodo_en_linea(
     secuencia: &[BloqueTransicion],
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<(Option<BlockHash>, Estado), ErrorTransicion> {
     let mut buffer: Vec<BloqueTransicion> = Vec::new();
     let mut punta: Option<BlockHash> = None;
     let mut estado_punta = Estado::inicial();
     for b in secuencia {
         buffer.push(b.clone());
-        let resultado = seleccionar(&buffer, params, cbid)?;
+        let resultado = seleccionar(&buffer, params, cbid, evp)?;
         let Some(nueva) = resultado.punta else {
             continue;
         };

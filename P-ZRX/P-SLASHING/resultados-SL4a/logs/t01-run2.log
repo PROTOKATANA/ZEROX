@@ -1,0 +1,119 @@
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running tests/diferencial_t01.rs (/home/katana/zeo/ZEROX/deepseek/SL4a/target/debug/deps/diferencial_t01-67e7e38912278acd)
+
+running 2 tests
+test diferencial_t01 has been running for over 60 seconds
+test diferencial_t01_negativos has been running for over 60 seconds
+casos leidos      = 2795
+con sufijo PoST   = 2687
+discrepancias     = 0
+RES por error esperado:
+  ErrAutorizacion: 3
+  ErrCbidAjeno: 120
+  ErrDepositoTemprano: 1
+  ErrEmision: 3
+  ErrEvidenciaConEntradas: 120
+  ErrEvidenciaDuplicada: 40
+  ErrEvidenciaTardia: 200
+  ErrGarantia: 7
+  ErrGenesis: 3
+  ErrInmaduro: 8
+  ErrOperacionFase: 6
+  ErrPow: 1414
+  ErrPowTrasCorte: 3389
+  ErrSinPadre: 4887
+  ErrSinTerminal: 2997
+  ErrSlot: 5079
+  ErrVentanaAbierta: 8
+  OK: 22057
+por nombre de caso:
+  EV-RAT3-carrera: 8 casos, 0 con discrepancia
+  EV-autodenuncia: 12 casos, 0 con discrepancia
+  X-01: 3 casos, 0 con discrepancia
+  X-02: 3 casos, 0 con discrepancia
+  X-03: 3 casos, 0 con discrepancia
+  X-03b: 2 casos, 0 con discrepancia
+  X-04: 1 casos, 0 con discrepancia
+  X-05: 3 casos, 0 con discrepancia
+  X-06: 3 casos, 0 con discrepancia
+  X-07: 3 casos, 0 con discrepancia
+  X-08: 3 casos, 0 con discrepancia
+  X-09: 3 casos, 0 con discrepancia
+  X-10: 3 casos, 0 con discrepancia
+  X-11b: 3 casos, 0 con discrepancia
+  X-11c: 3 casos, 0 con discrepancia
+  X-13: 3 casos, 0 con discrepancia
+  X-14: 3 casos, 0 con discrepancia
+  X-16: 3 casos, 0 con discrepancia
+  X-17: 3 casos, 0 con discrepancia
+  X-18: 3 casos, 0 con discrepancia
+  X-19: 1 casos, 0 con discrepancia
+  X-20: 3 casos, 0 con discrepancia
+  aleatorio: 2000 casos, 0 con discrepancia
+  ev-aplicada: 120 casos, 0 con discrepancia
+  ev-cbid: 120 casos, 0 con discrepancia
+  ev-con_entradas: 120 casos, 0 con discrepancia
+  ev-duplicada: 120 casos, 0 con discrepancia
+  ev-sin_saldo: 120 casos, 0 con discrepancia
+  ev-tardia: 120 casos, 0 con discrepancia
+
+test diferencial_t01 ... ok
+casos leidos      = 3914
+con sufijo PoST   = 1890
+discrepancias     = 0
+RES por error esperado:
+  ErrAutorizacion: 240
+  ErrDobleGasto: 306
+  ErrEmision: 198
+  ErrGarantia: 141
+  ErrInmaduro: 189
+  ErrNonce: 1999
+  ErrOperacionFase: 192
+  ErrRetiroPendiente: 78
+  ErrSaldo: 571
+  OK: 25955
+por nombre de caso:
+  neg-autorizacion-deposito: 75 casos, 0 con discrepancia
+  neg-autorizacion-liberacion: 27 casos, 0 con discrepancia
+  neg-autorizacion-retiro: 75 casos, 0 con discrepancia
+  neg-autorizacion-transfer: 63 casos, 0 con discrepancia
+  neg-doblegasto-deposito-salida-gastada: 90 casos, 0 con discrepancia
+  neg-doblegasto-entrada-dos-txs: 63 casos, 0 con discrepancia
+  neg-doblegasto-entrada-duplicada-tx: 63 casos, 0 con discrepancia
+  neg-doblegasto-salida-ya-gastada: 90 casos, 0 con discrepancia
+  neg-emision-r6-coinbase-no-primera: 75 casos, 0 con discrepancia
+  neg-emision-r7-coinbase-vacia: 48 casos, 0 con discrepancia
+  neg-emision-r9-transfer-sin-entradas: 75 casos, 0 con discrepancia
+  neg-garantia-deposito-pendiente: 6 casos, 0 con discrepancia
+  neg-garantia-sin-activo: 135 casos, 0 con discrepancia
+  neg-inmaduro-coinbase-inmadura-prev: 72 casos, 0 con discrepancia
+  neg-inmaduro-coinbase-mismo-bloque: 48 casos, 0 con discrepancia
+  neg-inmaduro-cruce-corte: 24 casos, 0 con discrepancia
+  neg-inmaduro-deposito-mismo-bloque: 45 casos, 0 con discrepancia
+  neg-nonce-dos-nn: 199 casos, 0 con discrepancia
+  neg-nonce-rep-liberacion: 180 casos, 0 con discrepancia
+  neg-nonce-rep-retiro: 404 casos, 0 con discrepancia
+  neg-nonce-saltado: 608 casos, 0 con discrepancia
+  neg-nonce-viejo: 608 casos, 0 con discrepancia
+  neg-operacionfase-evidencia: 48 casos, 0 con discrepancia
+  neg-operacionfase-evidencia-sola: 48 casos, 0 con discrepancia
+  neg-operacionfase-liberacion: 48 casos, 0 con discrepancia
+  neg-operacionfase-liberacion-sola: 48 casos, 0 con discrepancia
+  neg-retiropendiente-dos-en-bloque: 58 casos, 0 con discrepancia
+  neg-retiropendiente-segunda: 20 casos, 0 con discrepancia
+  neg-saldo-deposito-descuadra: 63 casos, 0 con discrepancia
+  neg-saldo-liberacion-antes-R: 34 casos, 0 con discrepancia
+  neg-saldo-liberacion-mayor-vencido: 54 casos, 0 con discrepancia
+  neg-saldo-r8-coinbasepost-cero: 27 casos, 0 con discrepancia
+  neg-saldo-r8-deposito-cero: 75 casos, 0 con discrepancia
+  neg-saldo-r8-liberacion-cero: 27 casos, 0 con discrepancia
+  neg-saldo-r8-retiro-cero: 75 casos, 0 con discrepancia
+  neg-saldo-retiro-mayor-activo: 90 casos, 0 con discrepancia
+  neg-saldo-transfer-crea-valor: 63 casos, 0 con discrepancia
+  neg-saldo-transfer-sin-salidas: 63 casos, 0 con discrepancia
+
+test diferencial_t01_negativos ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 230.23s
+

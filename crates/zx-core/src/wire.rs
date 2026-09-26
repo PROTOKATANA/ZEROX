@@ -262,6 +262,13 @@ pub fn tx_a_bytes(salida: &mut Vec<u8>, tx: &Tx, testigos: &[Vec<u8>]) {
             int::escribir_u64(salida, importe.brek() as u64);
             int::escribir_u64(salida, *slot);
         }
+        // SL-4a · v4: `H1 ‖ H2`, cada cabecera autodelimitada por su `parent_count`. El contrato
+        // (EV-02) no fija el wire de la v4; esta es la extensión elegida y queda declarada en
+        // `DEFINICIONES-FALTANTES.md` (FD-5). `tx_desde_bytes` sigue rechazando la v4.
+        ExtensionTx::Evidencia { h1, h2 } => {
+            salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h1));
+            salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h2));
+        }
     }
 
     compact_size::escribir(salida, testigos.len() as u64);

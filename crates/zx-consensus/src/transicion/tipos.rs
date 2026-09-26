@@ -192,6 +192,54 @@ pub struct ParametrosTransicion {
     pub subsidio_post: fn(u64) -> Amount,
 }
 
+/// Parámetros de la evidencia (`SL-4a`, `CONTRATO-EVIDENCIA-v0` con Ratificación v0).
+///
+/// Se mantienen **fuera** de [`ParametrosTransicion`] para no tocar los perfiles de `zx-node`
+/// (fuera de alcance de SL-4a): el nodo sigue con la evidencia inactiva hasta SL-4b. Los arneses
+/// diferenciales y los tests construyen este bloque con los valores de cada vector.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ParametrosEvidencia {
+    /// Numerador de `f = f_num/f_den` (EV-19).
+    pub f_num: u64,
+    /// Denominador de `f` (`> 0`).
+    pub f_den: u64,
+    /// Ventana de admisión `Plazo_slots` (EV-13).
+    pub plazo_slots: u64,
+    /// Margen `M_margen_slots` (EV-15/EV-15b).
+    pub m_margen_slots: u64,
+    /// `consensus_branch_id` de la red local (RAT-1).
+    pub cbid: u32,
+    /// Activación de `C-EVP` (equivalente a `P.evp` del oráculo).
+    pub evp: bool,
+}
+
+impl Default for ParametrosEvidencia {
+    fn default() -> Self {
+        Self::inactiva()
+    }
+}
+
+impl ParametrosEvidencia {
+    /// Perfil con la evidencia **desactivada** (el de `zx-node` hasta SL-4b).
+    #[must_use]
+    pub const fn inactiva() -> Self {
+        Self {
+            f_num: 1,
+            f_den: 1,
+            plazo_slots: 0,
+            m_margen_slots: 0,
+            cbid: 0,
+            evp: false,
+        }
+    }
+
+    /// `true` si la evidencia está activa.
+    #[must_use]
+    pub const fn activa(&self) -> bool {
+        self.evp
+    }
+}
+
 /// Fase del estado.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Fase {
@@ -288,6 +336,17 @@ pub struct EnRetirada {
     pub inicio_slot: u64,
 }
 
+/// Un incidente de evidencia registrado en una garantía (EV-11).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Incidente {
+    /// `incident_id` (32 B). En esta implementación es `H_d(dom_incidente, bytes de la identidad)`.
+    pub id: [u8; 32],
+    /// `slot_falta = slot(H1) = slot(H2)` (EV-13). **`i64`**: el oráculo T04 admite slots
+    /// negativos en su generador de evidencia tardía; la cabecera real los transporta en dos's
+    /// complemento (`u64`) y el motor los reinterpreta.
+    pub slot_falta: i64,
+}
+
 /// Garantía de una clave (`C-BON-01`).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Garantia {
@@ -297,13 +356,15 @@ pub struct Garantia {
     pub pendientes: Vec<Pendiente>,
     /// Retiradas vivas.
     pub en_retirada: Vec<EnRetirada>,
-    /// Congelado (siempre 0 en v0).
+    /// Congelado: gravamen **derivado** (no bucket) mientras haya incidentes abiertos (EV-17).
     pub congelado: Amount,
     /// Créditos D-T08 pendientes de madurar.
     pub creditos: Vec<Pendiente>,
     /// Nonce siguiente de la clave (F-15): 0 al crearse. Toda operación de garantía de esta clave
     /// exige `nonce == nonce_siguiente` y lo incrementa al aplicarse.
     pub nonce_siguiente: u64,
+    /// Incidentes de evidencia admitidos y aún no podados (EV-11).
+    pub incidentes: Vec<Incidente>,
 }
 
 impl Garantia {
@@ -317,6 +378,7 @@ impl Garantia {
             congelado: Amount::CERO,
             creditos: Vec::new(),
             nonce_siguiente: 0,
+            incidentes: Vec::new(),
         }
     }
 }
@@ -350,6 +412,9 @@ pub struct Estado {
     pub altura_terminal: Option<u32>,
     /// Suma de subsidios nominales, para `I-1b`.
     pub subsidio_acum: i128,
+    /// SL-4a · `último_slot_producido(P)`: mayor `slot(B)` de un bloque PoST aplicado con
+    /// `sol.public_key = P` (EV-15b/EV-24(ii)). Solo lo consume la liberación.
+    pub ultimo_slot_producido: BTreeMap<ClavePublica, u64>,
 }
 
 /// Escalares del estado, para el undo por delta (`ORDEN-W03` §3.5).
@@ -377,6 +442,8 @@ pub struct Escalares {
     pub altura_terminal: Option<u32>,
     /// `subsidio_acum`.
     pub subsidio_acum: i128,
+    /// `ultimo_slot_producido` (SL-4a). Se restaura completo en `deshacer`.
+    pub ultimo_slot_producido: BTreeMap<ClavePublica, u64>,
 }
 
 impl From<&Estado> for Escalares {
@@ -393,6 +460,7 @@ impl From<&Estado> for Escalares {
             peso_sufijo: e.peso_sufijo,
             altura_terminal: e.altura_terminal,
             subsidio_acum: e.subsidio_acum,
+            ultimo_slot_producido: e.ultimo_slot_producido.clone(),
         }
     }
 }

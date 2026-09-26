@@ -1,0 +1,16 @@
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/evidencia.rs (/home/katana/zeo/ZEROX/deepseek/SL4a/target/debug/deps/evidencia-4f980bf01dfb1a78)
+
+running 8 tests
+test orden_canonico_invalido ... ok
+test evidencia_con_salidas ... ok
+test cbid_ajeno ... ok
+test sello_invalido ... ok
+test ventana_de_liberacion_rat3 ... ok
+test autodenuncia ... ok
+test undo_y_reaparicion ... ok
+test duplicada_en_hermanos ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

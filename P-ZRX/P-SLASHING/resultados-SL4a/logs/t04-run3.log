@@ -1,0 +1,81 @@
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+   Compiling zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running tests/diferencial_t04.rs (/home/katana/zeo/ZEROX/deepseek/SL4a/target/debug/deps/diferencial_t04-337bcf8db2308811)
+
+running 1 test
+test diferencial_t04 has been running for over 60 seconds
+casos leidos      = 1878
+discrepancias     = 0
+por nombre de caso:
+  D-1: 1 casos, 0 con discrepancia
+  D-10: 1 casos, 0 con discrepancia
+  D-11: 1 casos, 0 con discrepancia
+  D-12: 1 casos, 0 con discrepancia
+  D-13: 1 casos, 0 con discrepancia
+  D-14: 1 casos, 0 con discrepancia
+  D-15: 1 casos, 0 con discrepancia
+  D-16: 1 casos, 0 con discrepancia
+  D-17: 1 casos, 0 con discrepancia
+  D-18: 1 casos, 0 con discrepancia
+  D-2: 1 casos, 0 con discrepancia
+  D-3: 1 casos, 0 con discrepancia
+  D-4: 1 casos, 0 con discrepancia
+  D-5: 1 casos, 0 con discrepancia
+  D-6: 1 casos, 0 con discrepancia
+  D-7: 1 casos, 0 con discrepancia
+  D-8: 1 casos, 0 con discrepancia
+  D-9: 1 casos, 0 con discrepancia
+  aleatorio: 900 casos, 0 con discrepancia
+  ev-aleatorio: 960 casos, 0 con discrepancia
+cobertura (tabla del arnés):
+  SECCION vectores-v0.5 (casos aleatorios)
+  casos = 900
+  TIPO Transferencia construidas=1112 aplicadas=364 descartadas=204 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=204 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Deposito construidas=1626 aplicadas=347 descartadas=396 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=295 ErrDobleGasto=101 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  garantia_construidas = 4663
+  garantia_evaluadas = 2280
+  garantia_errnonce = 853
+  garantia_errnonce_pct_construidas = 18.29
+  garantia_errnonce_pct_evaluadas = 37.41
+  err_doble_gasto_total = 305
+  reorganizaciones_que_deshacen_garantia = 312
+  SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)
+  EV aplicada = 227
+  EV cbid_ajeno = 137
+  EV construida = 770
+  EV deshecha = 108
+  EV duplicada = 30
+  EV sin_saldo = 80
+  EV tardia = 296
+
+
+thread 'diferencial_t04' (379) panicked at crates/zx-cadena/tests/diferencial_t04.rs:1706:5:
+cobertura V4b con 1 diferencias:
+esperado=EV deshecha = 115 obtenido=EV deshecha = 108
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: diferencial_t04::diferencial_t04
+             at ./tests/diferencial_t04.rs:1706:5
+   3: diferencial_t04::diferencial_t04::{closure#0}
+             at ./tests/diferencial_t04.rs:1698:21
+   4: <diferencial_t04::diferencial_t04::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test diferencial_t04 ... FAILED
+
+failures:
+
+failures:
+    diferencial_t04
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 430.10s
+
+error: test failed, to rerun pass `-p zx-cadena --test diferencial_t04`

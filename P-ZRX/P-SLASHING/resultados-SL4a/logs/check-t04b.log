@@ -1,0 +1,11 @@
+    Checking zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+warning: unused import: `total_garantia`
+  --> crates/zx-cadena/tests/diferencial_t04.rs:32:5
+   |
+32 |     total_garantia,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `zx-cadena` (test "diferencial_t04") generated 1 warning (run `cargo fix --test "diferencial_t04" -p zx-cadena` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s

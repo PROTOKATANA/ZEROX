@@ -1,0 +1,752 @@
+   Compiling librocksdb-sys v0.19.0+11.8.1
+    Checking zstd-sys v2.1.0+zstd.1.5.7
+    Checking lz4-sys v1.11.1+lz4-1.10.0
+    Checking quinn v0.11.11
+    Checking clap v4.6.6
+    Checking zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-post)
+    Checking zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-farmer)
+    Checking zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-pot)
+    Checking zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-poas)
+    Checking zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-core)
+    Checking zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-dag)
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Checking zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+    Checking libp2p-quic v0.13.1
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:142:14
+    |
+142 |     estado = aplicar(&estado, &genesis, &params, CBID_RED_DEV).unwrap();
+    |              ^^^^^^^------------------------------------------ argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+help: provide the argument
+    |
+142 |     estado = aplicar(&estado, &genesis, &params, CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                              ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:162:14
+    |
+162 |     estado = aplicar(&estado, &b1, &params, CBID_RED_DEV).unwrap();
+    |              ^^^^^^^------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+help: provide the argument
+    |
+162 |     estado = aplicar(&estado, &b1, &params, CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                         ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:184:14
+    |
+184 |     estado = aplicar(&estado, &b2, &params, CBID_RED_DEV).unwrap();
+    |              ^^^^^^^------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+help: provide the argument
+    |
+184 |     estado = aplicar(&estado, &b2, &params, CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                         ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:208:25
+    |
+208 |         let Ok(nuevo) = aplicar(&estado, &post, &params, CBID_RED_DEV) else {
+    |                         ^^^^^^^--------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+help: provide the argument
+    |
+208 |         let Ok(nuevo) = aplicar(&estado, &post, &params, CBID_RED_DEV, /* &ParametrosEvidencia */) else {
+    |                                                                      ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:234:17
+    |
+234 |                 aplicar_con_undo(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+    |                 ^^^^^^^^^^^^^^^^------------------------------------------ argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:47:8
+    |
+ 47 | pub fn aplicar_con_undo(
+    |        ^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+234 |                 aplicar_con_undo(&estado, bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:252:21
+    |
+252 |             let a = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+    |                     ^^^^^^^------------------------------------------ argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+help: provide the argument
+    |
+252 |             let a = aplicar(&estado, bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                     ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:253:21
+    |
+253 |             let b = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+    |                     ^^^^^^^------------------------------------------ argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+help: provide the argument
+    |
+253 |             let b = aplicar(&estado, bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                     ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:255:22
+    |
+255 |             estado = aplicar(&estado, bloque, &params(), CBID_RED_DEV).unwrap();
+    |                      ^^^^^^^------------------------------------------ argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+help: provide the argument
+    |
+255 |             estado = aplicar(&estado, bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                      ++++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `zx-consensus` (test "transicion_prop") due to 8 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/diferencial_t01.rs:924:29
+    |
+924 |         && let Ok((e, _)) = aplicar_con_undo(&inicial, &reales.bloques[gi], &params, CBID_RED_DEV)
+    |                             ^^^^^^^^^^^^^^^^------------------------------------------------------ argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:47:8
+    |
+ 47 | pub fn aplicar_con_undo(
+    |        ^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+924 |         && let Ok((e, _)) = aplicar_con_undo(&inicial, &reales.bloques[gi], &params, CBID_RED_DEV, /* &ParametrosEvidencia */)
+    |                                                                                                  ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/diferencial_t01.rs:938:17
+    |
+938 |                 aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV)
+    |                 ^^^^^^^^^^^^^^^^---------------------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:47:8
+    |
+ 47 | pub fn aplicar_con_undo(
+    |        ^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+938 |                 aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV, /* &ParametrosEvidencia */)
+    |                                                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/diferencial_t01.rs:958:19
+    |
+958 |             match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV) {
+    |                   ^^^^^^^^^^^^^^^^---------------------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:47:8
+    |
+ 47 | pub fn aplicar_con_undo(
+    |        ^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+958 |             match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV, /* &ParametrosEvidencia */) {
+    |                                                                                            ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/tests/diferencial_t01.rs:970:23
+    |
+970 |                 match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV) {
+    |                       ^^^^^^^^^^^^^^^^---------------------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:47:8
+    |
+ 47 | pub fn aplicar_con_undo(
+    |        ^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+970 |                 match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV, /* &ParametrosEvidencia */) {
+    |                                                                                                ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 4 arguments but 3 arguments were supplied
+   --> crates/zx-consensus/tests/diferencial_t01.rs:982:27
+    |
+982 |     let seleccion = match seleccionar(&reales.bloques, &params, CBID_RED_DEV) {
+    |                           ^^^^^^^^^^^---------------------------------------- argument #4 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/seleccion.rs:120:8
+    |
+120 | pub fn seleccionar(
+    |        ^^^^^^^^^^^
+help: provide the argument
+    |
+982 |     let seleccion = match seleccionar(&reales.bloques, &params, CBID_RED_DEV, /* &ParametrosEvidencia */) {
+    |                                                                             ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 4 arguments but 3 arguments were supplied
+    --> crates/zx-consensus/tests/diferencial_t01.rs:1051:26
+     |
+1051 |         if let Ok(inv) = seleccionar(&invertidos, &params, CBID_RED_DEV)
+     |                          ^^^^^^^^^^^------------------------------------ argument #4 of type `&ParametrosEvidencia` is missing
+     |
+note: function defined here
+    --> crates/zx-consensus/src/transicion/seleccion.rs:120:8
+     |
+ 120 | pub fn seleccionar(
+     |        ^^^^^^^^^^^
+help: provide the argument
+     |
+1051 |         if let Ok(inv) = seleccionar(&invertidos, &params, CBID_RED_DEV, /* &ParametrosEvidencia */)
+     |                                                                        ++++++++++++++++++++++++++++
+
+error: could not compile `zx-consensus` (test "diferencial_t01") due to 6 previous errors
+error[E0063]: missing field `incidentes` in initializer of `tipos::Garantia`
+   --> crates/zx-consensus/src/transicion/tests.rs:203:9
+    |
+203 |         Garantia {
+    |         ^^^^^^^^ missing `incidentes`
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:286:9
+    |
+286 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+286 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:320:17
+    |
+320 |     let nuevo = aplicar(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
+    |                 ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+320 |     let nuevo = aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                  ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:367:13
+    |
+367 |     assert!(aplicar(&estado, &valido, &params(), CBID_RED_DEV).is_ok());
+    |             ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+367 |     assert!(aplicar(&estado, &valido, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).is_ok());
+    |                                                              ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:371:9
+    |
+371 |         aplicar(&estado, &invalido, &params(), CBID_RED_DEV),
+    |         ^^^^^^^--------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+371 |         aplicar(&estado, &invalido, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                            ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:385:9
+    |
+385 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+385 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:397:9
+    |
+397 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+397 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:415:9
+    |
+415 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+415 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:432:9
+    |
+432 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+432 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 6 arguments but 5 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:469:9
+    |
+469 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    |         ^^^^^^^^^^^^^^----------------------------------------------------------- argument #6 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/fusion.rs:48:8
+    |
+ 48 | pub fn aplicar_fusion(
+    |        ^^^^^^^^^^^^^^
+...
+ 54 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+469 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                                 ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 6 arguments but 5 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:490:9
+    |
+490 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    |         ^^^^^^^^^^^^^^----------------------------------------------------------- argument #6 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/fusion.rs:48:8
+    |
+ 48 | pub fn aplicar_fusion(
+    |        ^^^^^^^^^^^^^^
+...
+ 54 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+490 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                                 ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 6 arguments but 5 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:517:9
+    |
+517 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    |         ^^^^^^^^^^^^^^----------------------------------------------------------- argument #6 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/fusion.rs:48:8
+    |
+ 48 | pub fn aplicar_fusion(
+    |        ^^^^^^^^^^^^^^
+...
+ 54 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+517 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                                 ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 6 arguments but 5 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:533:9
+    |
+533 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    |         ^^^^^^^^^^^^^^----------------------------------------------------------- argument #6 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/fusion.rs:48:8
+    |
+ 48 | pub fn aplicar_fusion(
+    |        ^^^^^^^^^^^^^^
+...
+ 54 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+533 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                                 ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:605:17
+    |
+605 |     let nuevo = aplicar(&estado, &bloque_ok, &params(), CBID_RED_DEV).unwrap();
+    |                 ^^^^^^^---------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+605 |     let nuevo = aplicar(&estado, &bloque_ok, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                     ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:621:9
+    |
+621 |         aplicar(&estado, &bloque_mal, &params(), CBID_RED_DEV),
+    |         ^^^^^^^----------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+621 |         aplicar(&estado, &bloque_mal, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                              ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:646:9
+    |
+646 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+646 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0063]: missing field `incidentes` in initializer of `tipos::Garantia`
+   --> crates/zx-consensus/src/transicion/tests.rs:662:9
+    |
+662 |         Garantia {
+    |         ^^^^^^^^ missing `incidentes`
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:683:9
+    |
+683 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+683 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 6 arguments but 5 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:707:9
+    |
+707 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV).unwrap();
+    |         ^^^^^^^^^^^^^^----------------------------------------------------------- argument #6 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/fusion.rs:48:8
+    |
+ 48 | pub fn aplicar_fusion(
+    |        ^^^^^^^^^^^^^^
+...
+ 54 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+707 |         aplicar_fusion(&estado, &bloque, Punto::Slot(1), &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                                 ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:730:9
+    |
+730 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |         ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+730 |         aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                          ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:749:25
+    |
+749 |     let (nuevo, undo) = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV).unwrap();
+    |                         ^^^^^^^^^^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:47:8
+    |
+ 47 | pub fn aplicar_con_undo(
+    |        ^^^^^^^^^^^^^^^^
+...
+ 52 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+749 |     let (nuevo, undo) = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).unwrap();
+    |                                                                                   ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:774:13
+    |
+774 |             aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |             ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+774 |             aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                              ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:782:13
+    |
+782 |     assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
+    |             ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+782 |     assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).is_ok());
+    |                                                              ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:799:14
+    |
+799 |       let s1 = aplicar(
+    |  ______________^^^^^^^-
+800 | |         &estado,
+801 | |         &bloque_pow(1, vec![(cb1, Vec::new())]),
+802 | |         &params(),
+803 | |         CBID_RED_DEV,
+804 | |     )
+    | |_____- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+799 |     let s1 = aplicar(
+...
+803 |         CBID_RED_DEV,
+804 ~         /* &ParametrosEvidencia */,
+805 ~     )
+    |
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:806:14
+    |
+806 |       let s2 = aplicar(
+    |  ______________^^^^^^^-
+807 | |         &s1,
+808 | |         &bloque_pow(2, vec![(cb2, Vec::new())]),
+809 | |         &params(),
+810 | |         CBID_RED_DEV,
+811 | |     )
+    | |_____- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+806 |     let s2 = aplicar(
+...
+810 |         CBID_RED_DEV,
+811 ~         /* &ParametrosEvidencia */,
+812 ~     )
+    |
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:831:13
+    |
+831 |             aplicar(&estado, &bloque, &params(), CBID_RED_DEV),
+    |             ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+831 |             aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */),
+    |                                                              ++++++++++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:839:13
+    |
+839 |     assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV).is_ok());
+    |             ^^^^^^^------------------------------------------- argument #5 of type `&ParametrosEvidencia` is missing
+    |
+note: function defined here
+   --> crates/zx-consensus/src/transicion/aplicar.rs:30:8
+    |
+ 30 | pub fn aplicar(
+    |        ^^^^^^^
+...
+ 35 |     evp: &ParametrosEvidencia,
+    |     -------------------------
+help: provide the argument
+    |
+839 |     assert!(aplicar(&estado, &bloque, &params(), CBID_RED_DEV, /* &ParametrosEvidencia */).is_ok());
+    |                                                              ++++++++++++++++++++++++++++
+
+Some errors have detailed explanations: E0061, E0063.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `zx-consensus` (lib test) due to 27 previous errors

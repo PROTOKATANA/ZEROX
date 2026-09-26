@@ -1,0 +1,39 @@
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Checking zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-dag)
+    Checking zx-p2p v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-p2p)
+    Checking zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-core)
+    Checking zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-poas)
+    Checking zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+error: field assignment outside of initializer for an instance created with Default::default()
+  --> crates/zx-consensus/tests/evidencia.rs:86:5
+   |
+86 |     sol.public_key = clave;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider initializing the variable with `zx_core::SolucionPoas { public_key: clave, ..Default::default() }` and removing relevant reassignments
+  --> crates/zx-consensus/tests/evidencia.rs:85:5
+   |
+85 |     let mut sol = SolucionPoas::default();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+   = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: could not compile `zx-consensus` (test "evidencia") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/zx-consensus/tests/diferencial_t01.rs:837:5
+    |
+837 |     sol.public_key = clave_de(cab.clave);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `zx_core::SolucionPoas { public_key: clave_de(cab.clave), sector_index: cab.sector, history_size: cab.historia, ..Default::default() }` and removing relevant reassignments
+   --> crates/zx-consensus/tests/diferencial_t01.rs:836:5
+    |
+836 |     let mut sol = SolucionPoas::default();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+    = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: could not compile `zx-consensus` (test "diferencial_t01") due to 1 previous error

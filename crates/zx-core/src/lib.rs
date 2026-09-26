@@ -42,7 +42,7 @@ pub use digest::{
 };
 pub use error::{CompromisosError, CoreError, EncodingError, ErrorFormaTx};
 pub use firma::{ClavePublica, Firma, verificar};
-pub use forma::{validar_forma_cabecera_post, validar_forma_tx};
+pub use forma::{validar_forma_cabecera_post, validar_forma_tx, validar_forma_tx_v4};
 // El módulo `hash` sigue privado: `h_d` MUST ser inalcanzable desde fuera. Se reexporta únicamente
 // `sha3_256_publico`, que no acepta etiqueta de dominio y por tanto no puede producir un digest de
 // consenso. Ver la nota de diseño de `crate::hash`.
@@ -55,7 +55,8 @@ pub use preimage::dag::{
     tamano_prefirma,
 };
 pub use preimage::tx::{
-    HashType, auth_digest, mensaje_aceptacion, sighash, txid, verificar_aceptacion,
+    HashType, auth_digest, incident_id_evidencia, mensaje_aceptacion, sighash, txid,
+    verificar_aceptacion,
 };
 pub use red::{CBID_RED_DEV, MAGIC_DEV, Red};
 pub use target::{

@@ -8,17 +8,19 @@ use std::collections::BTreeSet;
 
 use primitive_types::U256;
 use zx_core::{
-    Amount, ErrorFormaTx, ExtensionTx, Firma, HashType, Lock, OutPoint, SpentOutput, TipoGarantia,
-    Tx, TxId, TxOut, validar_forma_cabecera_post, validar_forma_tx,
+    Amount, ClavePublica, DagBlockHeader, ErrorFormaTx, ExtensionTx, Firma, HashType, Lock,
+    OutPoint, SpentOutput, TipoGarantia, Tx, TxId, TxOut, ZX_VALUE_SANITY_LIMIT,
+    incident_id_evidencia, validar_forma_cabecera_post, validar_forma_tx, validar_forma_tx_v4,
 };
 
 use crate::transicion::ErrorTransicion;
 use crate::transicion::estado::{
-    Aplicador, acreditar_credito, acreditar_pendiente, gastable_en, phi,
+    Aplicador, acreditar_credito, acreditar_pendiente, debitar_garantia, gastable_en, phi,
+    podar_incidentes, suelo_dos_octavos, techo_fraccion, total_garantia,
 };
 use crate::transicion::tipos::{
-    BloqueTransicion, EnRetirada, EntradaUtxo, Estado, Fase, HechosCabecera, Origen,
-    ParametrosTransicion, Pendiente, Punto, Undo,
+    BloqueTransicion, EnRetirada, EntradaUtxo, Estado, Fase, HechosCabecera, Incidente, Origen,
+    ParametrosEvidencia, ParametrosTransicion, Pendiente, Punto, Undo,
 };
 
 /// Aplica un bloque y devuelve el estado nuevo (sin undo).
@@ -30,8 +32,9 @@ pub fn aplicar(
     bloque: &BloqueTransicion,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<Estado, ErrorTransicion> {
-    let (nuevo, _) = aplicar_con_undo(estado, bloque, params, cbid)?;
+    let (nuevo, _) = aplicar_con_undo(estado, bloque, params, cbid, evp)?;
     Ok(nuevo)
 }
 
@@ -46,24 +49,35 @@ pub fn aplicar_con_undo(
     bloque: &BloqueTransicion,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<(Estado, Undo), ErrorTransicion> {
-    validar_bloque(bloque)?;
+    validar_bloque(bloque, evp.evp)?;
     let mut ap = Aplicador::nuevo(estado.clone());
     match &bloque.hechos {
         HechosCabecera::Genesis { .. } => aplicar_genesis(&mut ap, &bloque.txs)?,
-        HechosCabecera::PoW { .. } => aplicar_pow(&mut ap, bloque, params, cbid)?,
-        HechosCabecera::PoST { .. } => aplicar_post(&mut ap, bloque, params, cbid)?,
+        HechosCabecera::PoW { .. } => aplicar_pow(&mut ap, bloque, params, cbid, evp)?,
+        HechosCabecera::PoST { .. } => aplicar_post(&mut ap, bloque, params, cbid, evp)?,
     }
     Ok((ap.estado, ap.undo))
 }
 
 /// `validar_forma_tx` para cada transacción y `validar_forma_cabecera_post` si hay cabecera (§3.6).
-pub(crate) fn validar_bloque(bloque: &BloqueTransicion) -> Result<(), ErrorTransicion> {
+///
+/// SL-4a: la v4 solo se valida con su forma propia cuando el perfil activa la evidencia (`evp`); en
+/// otro caso `validar_forma_tx` la rechaza como inactiva, como antes.
+pub(crate) fn validar_bloque(
+    bloque: &BloqueTransicion,
+    evidencia_activa: bool,
+) -> Result<(), ErrorTransicion> {
     if let Some(cabecera) = &bloque.cabecera_post {
         validar_forma_cabecera_post(cabecera)?;
     }
     for (tx, testigos) in &bloque.txs {
-        validar_forma_tx(tx, testigos)?;
+        if tx.version == 4 && evidencia_activa {
+            validar_forma_tx_v4(tx, testigos)?;
+        } else {
+            validar_forma_tx(tx, testigos)?;
+        }
     }
     Ok(())
 }
@@ -385,6 +399,7 @@ fn aplicar_garantia(
     bloque: &BloqueTransicion,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
     punto: Punto,
     tx: &Tx,
     testigos: &[Vec<u8>],
@@ -505,6 +520,22 @@ fn aplicar_garantia(
             verificar_aceptacion_tx(tx, testigos, cbid)?;
             let slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)?;
             let r_slots = params.r_slots;
+            // EV-24(i): un incidente admitido y no liquidado bloquea la liberación.
+            {
+                let g = ap.garantia_mut(clave);
+                if !g.incidentes.is_empty() {
+                    return Err(ErrorTransicion::ErrCasoAbierto);
+                }
+            }
+            // EV-24(ii)/EV-15b/RAT-3: ventana desde el último bloque producido por P.
+            if let Some(usp) = ap.estado.ultimo_slot_producido.get(&clave).copied() {
+                let limite = usp
+                    .saturating_add(evp.plazo_slots)
+                    .saturating_add(evp.m_margen_slots);
+                if slot < limite {
+                    return Err(ErrorTransicion::ErrVentanaAbierta);
+                }
+            }
             let g = ap.garantia_mut(clave);
             let mut vencido = Amount::CERO;
             for r in &g.en_retirada {
@@ -571,12 +602,158 @@ fn aplicar_garantia(
     }
 }
 
+/// Identidad de oportunidad de una cabecera de evidencia (`C-EVP-01` + `RAT-1`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct IdentidadEvidencia {
+    cbid: u32,
+    clave: ClavePublica,
+    sector_index: u16,
+    history_size: u64,
+    chunk: [u8; 32],
+    /// `i64`: el oráculo admite slots negativos; la cabecera los lleva en dos's complemento.
+    slot: i64,
+}
+
+fn identidad_de_cabecera(h: &DagBlockHeader) -> IdentidadEvidencia {
+    IdentidadEvidencia {
+        cbid: h.consensus_branch_id,
+        clave: h.sol.public_key,
+        sector_index: h.sol.sector_index,
+        history_size: h.sol.history_size,
+        chunk: h.sol.chunk,
+        slot: h.slot as i64,
+    }
+}
+
+/// `Amount` saturado al límite de cordura, para el gravamen `congelado` (`EV-17`).
+fn amount_saturado(v: i128) -> Amount {
+    let b = i64::try_from(v)
+        .unwrap_or(ZX_VALUE_SANITY_LIMIT)
+        .min(ZX_VALUE_SANITY_LIMIT);
+    Amount::nuevo(b).unwrap_or(Amount::CERO)
+}
+
+/// Aplica una `EvidenceTx` v4 (`EV-01`…`EV-22`, `RAT-1`/`RAT-2′`/`RAT-3`).
+///
+/// El orden de validación es **el del oráculo T01** (identidad antes que orden, ventana antes que
+/// duplicado), para que el diferencial no dependa de combinaciones de fallos.
+fn aplicar_evidencia(
+    ap: &mut Aplicador,
+    bloque: &BloqueTransicion,
+    params: &ParametrosTransicion,
+    evp: &ParametrosEvidencia,
+    punto: Punto,
+    tx: &Tx,
+) -> Result<(), ErrorTransicion> {
+    let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
+        return Err(ErrorTransicion::ErrForma(
+            ErrorFormaTx::ExtensionIncoherente {
+                version: 4,
+                esperada: "Evidencia",
+            },
+        ));
+    };
+    // EV-04: sin entradas ni salidas monetarias.
+    if !tx.inputs.is_empty() || !tx.outputs.is_empty() {
+        return Err(ErrorTransicion::ErrEvidenciaConEntradas);
+    }
+    // RAT-1: ambas cabeceras, de la red local.
+    let id1 = identidad_de_cabecera(h1);
+    let id2 = identidad_de_cabecera(h2);
+    if id1.cbid != evp.cbid || id2.cbid != evp.cbid {
+        return Err(ErrorTransicion::ErrCbidAjeno);
+    }
+    // EV-06: identidad común exacta.
+    if id1 != id2 {
+        return Err(ErrorTransicion::ErrSinEvidencia);
+    }
+    // EV-01: orden canónico estricto por `pre_hash`.
+    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
+        return Err(ErrorTransicion::ErrOrdenCanonico);
+    }
+    // EV-07: sellos válidos bajo la misma `sol.public_key`.
+    h1.verificar_sello()
+        .map_err(|_| ErrorTransicion::ErrSinEvidencia)?;
+    h2.verificar_sello()
+        .map_err(|_| ErrorTransicion::ErrSinEvidencia)?;
+    // RAT-3: puerta estructural.
+    if params.r_slots <= evp.plazo_slots.saturating_add(evp.m_margen_slots) {
+        return Err(ErrorTransicion::ErrPuertaRAT3);
+    }
+    // EV-13/EV-14: ventana de admisión en slots absolutos (i64: el oráculo admite negativos).
+    let sf = id1.slot;
+    let punto_slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)? as i64;
+    let fin = sf.saturating_add(evp.plazo_slots as i64);
+    if punto_slot < sf || punto_slot >= fin {
+        return Err(ErrorTransicion::ErrEvidenciaTardia);
+    }
+    // EV-10/EV-12: `incident_id` y deduplicación.
+    let clave = id1.clave;
+    let iid = *incident_id_evidencia(
+        id1.cbid,
+        id1.clave.bytes(),
+        id1.sector_index,
+        id1.history_size,
+        &id1.chunk,
+        id1.slot as u64,
+    )
+    .as_bytes();
+    {
+        let g = ap.garantia_mut(clave);
+        if g.incidentes.iter().any(|i| i.id == iid) {
+            return Err(ErrorTransicion::ErrEvidenciaDuplicada);
+        }
+    }
+    // EV-11: registro del incidente.
+    let v = {
+        let g = ap.garantia_mut(clave);
+        g.incidentes.push(Incidente {
+            id: iid,
+            slot_falta: sf,
+        });
+        g.incidentes.sort_by_key(|a| a.id);
+        total_garantia(g)
+    };
+    // EV-17: congelación total (gravamen derivado).
+    {
+        let g = ap.garantia_mut(clave);
+        g.congelado = amount_saturado(v);
+    }
+    // EV-19: confiscación `C = min(V, techo(f·V))`.
+    let c = core::cmp::min(v, techo_fraccion(v, evp.f_num, evp.f_den));
+    {
+        let g = ap.garantia_mut(clave);
+        debitar_garantia(g, c)?;
+    }
+    // RAT-2′: `suelo(C·2/8)` a la coinbase del bloque que aplica; el resto se quema.
+    let productor = bloque
+        .hechos
+        .productor()
+        .ok_or(ErrorTransicion::ErrGenesis)?;
+    let recompensa = suelo_dos_octavos(c);
+    if recompensa > 0 {
+        creditar_post(ap, productor, amount_saturado(recompensa), punto, params)?;
+    }
+    ap.estado.quemado += c - recompensa;
+    // EV-20: remanente congelado tras la liquidación.
+    {
+        let g = ap.garantia_mut(clave);
+        g.congelado = amount_saturado(total_garantia(g));
+    }
+    Ok(())
+}
+
 /// Aplica una transacción según su versión.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "sumar `evp` a la firma ya partida es preferible a agrupar el contexto en una struct opaca"
+)]
 pub(crate) fn aplicar_tx(
     ap: &mut Aplicador,
     bloque: &BloqueTransicion,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
     punto: Punto,
     tx: &Tx,
     testigos: &[Vec<u8>],
@@ -607,13 +784,24 @@ pub(crate) fn aplicar_tx(
                 ));
             };
             aplicar_garantia(
-                ap, bloque, params, cbid, punto, tx, testigos, *tipo, *clave, *importe, *nonce,
+                ap, bloque, params, cbid, evp, punto, tx, testigos, *tipo, *clave, *importe, *nonce,
             )?;
             Ok(Efecto::Fee(Amount::CERO))
         }
         3 => {
             let importe = aplicar_coinbase_post(ap, bloque, params, punto, tx)?;
             Ok(Efecto::Coinbase(importe))
+        }
+        4 => {
+            // X-13: la evidencia no existe en la fase PoW.
+            if ap.estado.fase == Fase::PoW {
+                return Err(ErrorTransicion::ErrOperacionFase);
+            }
+            if !evp.evp {
+                return Err(ErrorTransicion::ErrFueraDeAlcanceV0);
+            }
+            aplicar_evidencia(ap, bloque, params, evp, punto, tx)?;
+            Ok(Efecto::Fee(Amount::CERO))
         }
         version => Err(ErrorTransicion::ErrForma(ErrorFormaTx::VersionInactiva {
             version,
@@ -627,6 +815,7 @@ fn aplicar_txs(
     bloque: &BloqueTransicion,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
     punto: Punto,
 ) -> Result<(), ErrorTransicion> {
     let mut ncb = 0usize;
@@ -646,7 +835,7 @@ fn aplicar_txs(
     let mut tarifas = Amount::CERO;
     let mut coinbase_pagada = Amount::CERO;
     for (tx, testigos) in &bloque.txs {
-        match aplicar_tx(ap, bloque, params, cbid, punto, tx, testigos)? {
+        match aplicar_tx(ap, bloque, params, cbid, evp, punto, tx, testigos)? {
             Efecto::Fee(fee) => {
                 tarifas = tarifas
                     .suma_comprobada(fee)
@@ -722,6 +911,7 @@ fn aplicar_pow(
     bloque: &BloqueTransicion,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<(), ErrorTransicion> {
     let HechosCabecera::PoW {
         hash,
@@ -756,7 +946,7 @@ fn aplicar_pow(
         return Err(ErrorTransicion::ErrSlot);
     }
     ap.promover(Punto::Altura(*altura), false, params)?;
-    aplicar_txs(ap, bloque, params, cbid, Punto::Altura(*altura))?;
+    aplicar_txs(ap, bloque, params, cbid, evp, Punto::Altura(*altura))?;
     ap.estado.trabajo = ap
         .estado
         .trabajo
@@ -776,6 +966,7 @@ fn aplicar_post(
     bloque: &BloqueTransicion,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<(), ErrorTransicion> {
     let HechosCabecera::PoST {
         padre,
@@ -814,17 +1005,23 @@ fn aplicar_post(
         return Err(ErrorTransicion::ErrSlot);
     }
     ap.promover(Punto::Slot(*slot), true, params)?;
+    podar_incidentes(&mut ap.estado, evp, *slot); // EV-11
     let activo = ap.estado.activo_de(productor);
     if activo < params.q {
         return Err(ErrorTransicion::ErrGarantia);
     }
-    aplicar_txs(ap, bloque, params, cbid, Punto::Slot(*slot))?;
+    aplicar_txs(ap, bloque, params, cbid, evp, Punto::Slot(*slot))?;
     ap.estado.slot = *slot;
     ap.estado.peso_sufijo = ap
         .estado
         .peso_sufijo
         .checked_add(*peso)
         .ok_or(ErrorTransicion::ErrDesbordamiento)?;
+    // EV-24(ii): el bloque en curso entra en el pasado de los siguientes.
+    let prev = ap.estado.ultimo_slot_producido.get(productor).copied();
+    if prev.is_none_or(|p| *slot > p) {
+        ap.estado.ultimo_slot_producido.insert(*productor, *slot);
+    }
     Ok(())
 }
 
@@ -836,11 +1033,12 @@ pub fn es_terminal(
     historia: &[BloqueTransicion],
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<bool, ErrorTransicion> {
     let mut estado = Estado::inicial();
     let mut terminal: Option<zx_core::BlockHash> = None;
     for bloque in historia {
-        let (nuevo, _) = aplicar_con_undo(&estado, bloque, params, cbid)?;
+        let (nuevo, _) = aplicar_con_undo(&estado, bloque, params, cbid, evp)?;
         if matches!(bloque.hechos, HechosCabecera::PoW { .. }) && terminal.is_none() {
             terminal = nuevo.terminal;
         }

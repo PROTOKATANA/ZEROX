@@ -1,0 +1,41 @@
+    Checking zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-core)
+    Checking zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-pot)
+error: large size difference between variants
+   --> crates/zx-core/src/tx.rs:178:1
+    |
+178 | /   pub enum ExtensionTx {
+179 | |       /// Versión 1: sin campos extra (idéntica a `9681061`).
+180 | |       Ninguna,
+181 | |       /// Versión 2: operación de garantía (F-07), con el nonce por clave de F-15.
+182 | | /     Garantia {
+183 | | |         /// Operación.
+184 | | |         tipo: TipoGarantia,
+185 | | |         /// Clave a la que se acredita / de la que se retira / a la que se libera.
+...   | |
+190 | | |         nonce: u64,
+191 | | |     },
+    | | |_____- the second-largest variant contains at least 49 bytes
+...   |
+207 | | /     Evidencia {
+208 | | |         /// `H1`: cabecera con el `pre_hash` lexicográficamente menor.
+209 | | |         h1: DagBlockHeader,
+210 | | |         /// `H2`: cabecera con el `pre_hash` lexicográficamente mayor.
+211 | | |         h2: DagBlockHeader,
+212 | | |     },
+    | | |_____- the largest variant contains at least 2096 bytes
+213 | |   }
+    | |___^ the entire enum is at least 2104 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#large_enum_variant
+    = note: `-D clippy::large-enum-variant` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+209 ~         h1: Box<DagBlockHeader>,
+210 |         /// `H2`: cabecera con el `pre_hash` lexicográficamente mayor.
+211 ~         h2: Box<DagBlockHeader>,
+    |
+
+error: could not compile `zx-core` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `zx-core` (lib test) due to 1 previous error

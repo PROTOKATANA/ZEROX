@@ -1,0 +1,7 @@
+    Checking zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-farmer)
+    Checking zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-post)
+    Checking zx-cadena v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-cadena)
+    Checking zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-poas)
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Checking zx-node v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-node)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.93s

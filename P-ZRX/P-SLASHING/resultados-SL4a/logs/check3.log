@@ -1,0 +1,198 @@
+    Checking librocksdb-sys v0.19.0+11.8.1
+    Checking libp2p v0.56.0
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Checking zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-dag)
+error[E0061]: this function takes 5 arguments but 6 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:118:18
+    |
+118 |     let digest = zx_core::sighash(tx, gastadas, HashType::All, i, CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+    |                  ^^^^^^^^^^^^^^^^                                               -------------------------------- unexpected argument #6 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:397:8
+    |
+397 | pub fn sighash(
+    |        ^^^^^^^
+help: remove the extra argument
+    |
+118 -     let digest = zx_core::sighash(tx, gastadas, HashType::All, i, CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+118 +     let digest = zx_core::sighash(tx, gastadas, HashType::All, i, CBID_RED_DEV).unwrap();
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:124:19
+    |
+124 |     let mensaje = zx_core::mensaje_aceptacion(tx, CBID_RED_DEV, &ParametrosEvidencia::inactiva());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^                   -------------------------------- unexpected argument #3 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:238:8
+    |
+238 | pub fn mensaje_aceptacion(tx: &Tx, consensus_branch_id: u32) -> [u8; 32] {
+    |        ^^^^^^^^^^^^^^^^^^
+help: remove the extra argument
+    |
+124 -     let mensaje = zx_core::mensaje_aceptacion(tx, CBID_RED_DEV, &ParametrosEvidencia::inactiva());
+124 +     let mensaje = zx_core::mensaje_aceptacion(tx, CBID_RED_DEV);
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> crates/zx-consensus/tests/transicion_prop.rs:149:20
+    |
+149 |         prev_txid: zx_core::txid(&cb1, CBID_RED_DEV, &ParametrosEvidencia::inactiva()),
+    |                    ^^^^^^^^^^^^^                     -------------------------------- unexpected argument #3 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:221:8
+    |
+221 | pub fn txid(tx: &Tx, consensus_branch_id: u32) -> TxId {
+    |        ^^^^
+help: remove the extra argument
+    |
+149 -         prev_txid: zx_core::txid(&cb1, CBID_RED_DEV, &ParametrosEvidencia::inactiva()),
+149 +         prev_txid: zx_core::txid(&cb1, CBID_RED_DEV),
+    |
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `zx-consensus` (test "transicion_prop") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: value assigned to `h2` is never read
+   --> crates/zx-consensus/tests/diferencial_t01.rs:862:18
+    |
+862 |     let mut h2 = cabecera_evidencia(&ev.id2, 0);
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ this value is reassigned later and never used
+...
+866 |         h2 = cabecera_evidencia(&ev.id2, sal);
+    |         ------------------------------------- `h2` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `zx-consensus` (test "diferencial_t01") generated 1 warning
+error[E0061]: this function takes 5 arguments but 6 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:177:18
+    |
+177 |     let digest = zx_core::sighash(tx, gastadas, HashType::All, i, CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+    |                  ^^^^^^^^^^^^^^^^                                               -------------------------------- unexpected argument #6 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:397:8
+    |
+397 | pub fn sighash(
+    |        ^^^^^^^
+help: remove the extra argument
+    |
+177 -     let digest = zx_core::sighash(tx, gastadas, HashType::All, i, CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+177 +     let digest = zx_core::sighash(tx, gastadas, HashType::All, i, CBID_RED_DEV).unwrap();
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:183:19
+    |
+183 |     let mensaje = zx_core::mensaje_aceptacion(tx, CBID_RED_DEV, &ParametrosEvidencia::inactiva());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^                   -------------------------------- unexpected argument #3 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:238:8
+    |
+238 | pub fn mensaje_aceptacion(tx: &Tx, consensus_branch_id: u32) -> [u8; 32] {
+    |        ^^^^^^^^^^^^^^^^^^
+help: remove the extra argument
+    |
+183 -     let mensaje = zx_core::mensaje_aceptacion(tx, CBID_RED_DEV, &ParametrosEvidencia::inactiva());
+183 +     let mensaje = zx_core::mensaje_aceptacion(tx, CBID_RED_DEV);
+    |
+
+error[E0061]: this function takes 3 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:258:22
+    |
+258 |     let compromiso = zx_core::body_commitment(
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+262 |         &ParametrosEvidencia::inactiva(),
+    |         -------------------------------- unexpected argument #4 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/dag.rs:598:8
+    |
+598 | pub fn body_commitment(
+    |        ^^^^^^^^^^^^^^^
+help: remove the extra argument
+    |
+261 -         CBID_RED_DEV,
+262 -         &ParametrosEvidencia::inactiva(),
+261 +         CBID_RED_DEV,
+    |
+
+error[E0061]: this function takes 3 arguments but 4 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:265:23
+    |
+265 |     let recomputado = zx_core::body_commitment(
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+269 |         &ParametrosEvidencia::inactiva(),
+    |         -------------------------------- unexpected argument #4 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/dag.rs:598:8
+    |
+598 | pub fn body_commitment(
+    |        ^^^^^^^^^^^^^^^
+help: remove the extra argument
+    |
+268 -         CBID_RED_DEV,
+269 -         &ParametrosEvidencia::inactiva(),
+268 +         CBID_RED_DEV,
+    |
+
+error[E0061]: this function takes 5 arguments but 6 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:351:18
+    |
+351 |     let digest = zx_core::sighash(&tx, &gastadas, HashType::All, 0, CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+    |                  ^^^^^^^^^^^^^^^^                                                 -------------------------------- unexpected argument #6 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:397:8
+    |
+397 | pub fn sighash(
+    |        ^^^^^^^
+help: remove the extra argument
+    |
+351 -     let digest = zx_core::sighash(&tx, &gastadas, HashType::All, 0, CBID_RED_DEV, &ParametrosEvidencia::inactiva()).unwrap();
+351 +     let digest = zx_core::sighash(&tx, &gastadas, HashType::All, 0, CBID_RED_DEV).unwrap();
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:797:9
+    |
+797 |         zx_core::txid(&cb1, CBID_RED_DEV, &ParametrosEvidencia::inactiva()),
+    |         ^^^^^^^^^^^^^                     -------------------------------- unexpected argument #3 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:221:8
+    |
+221 | pub fn txid(tx: &Tx, consensus_branch_id: u32) -> TxId {
+    |        ^^^^
+help: remove the extra argument
+    |
+797 -         zx_core::txid(&cb1, CBID_RED_DEV, &ParametrosEvidencia::inactiva()),
+797 +         zx_core::txid(&cb1, CBID_RED_DEV),
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> crates/zx-consensus/src/transicion/tests.rs:798:9
+    |
+798 |         zx_core::txid(&cb2, CBID_RED_DEV, &ParametrosEvidencia::inactiva()),
+    |         ^^^^^^^^^^^^^                     -------------------------------- unexpected argument #3 of type `&ParametrosEvidencia`
+    |
+note: function defined here
+   --> crates/zx-core/src/preimage/tx.rs:221:8
+    |
+221 | pub fn txid(tx: &Tx, consensus_branch_id: u32) -> TxId {
+    |        ^^^^
+help: remove the extra argument
+    |
+798 -         zx_core::txid(&cb2, CBID_RED_DEV, &ParametrosEvidencia::inactiva()),
+798 +         zx_core::txid(&cb2, CBID_RED_DEV),
+    |
+
+error: could not compile `zx-consensus` (lib test) due to 7 previous errors

@@ -32,10 +32,10 @@ use crate::transicion::ErrorTransicion;
 use crate::transicion::aplicar::{
     Efecto, aplicar_con_undo, aplicar_tx, es_coinbase, validar_bloque,
 };
-use crate::transicion::estado::{Aplicador, acreditar_credito};
+use crate::transicion::estado::{Aplicador, acreditar_credito, podar_incidentes};
 use crate::transicion::tipos::{
-    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosTransicion, Pendiente, Punto,
-    TxDescartada, Undo,
+    BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
+    Pendiente, Punto, TxDescartada, Undo,
 };
 
 /// Aplica un bloque **PoST** en **modo fusión** desde `punto_aplicacion`.
@@ -51,10 +51,11 @@ pub fn aplicar_fusion(
     punto_aplicacion: Punto,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
 ) -> Result<(Estado, Undo, Vec<TxDescartada>), ErrorTransicion> {
-    validar_bloque(bloque)?;
+    validar_bloque(bloque, evp.evp)?;
     if matches!(bloque.hechos, HechosCabecera::Genesis { .. }) {
-        let (nuevo, undo) = aplicar_con_undo(estado, bloque, params, cbid)?;
+        let (nuevo, undo) = aplicar_con_undo(estado, bloque, params, cbid, evp)?;
         return Ok((nuevo, undo, Vec::new()));
     }
     if matches!(bloque.hechos, HechosCabecera::PoW { .. }) {
@@ -69,6 +70,7 @@ pub fn aplicar_fusion(
         punto_aplicacion,
         params,
         cbid,
+        evp,
         &mut descartadas,
     )?;
     Ok((ap.estado, ap.undo, descartadas))
@@ -157,6 +159,7 @@ fn fusion_post(
     punto: Punto,
     params: &ParametrosTransicion,
     cbid: u32,
+    evp: &ParametrosEvidencia,
     descartadas: &mut Vec<TxDescartada>,
 ) -> Result<(), ErrorTransicion> {
     let HechosCabecera::PoST {
@@ -193,6 +196,9 @@ fn fusion_post(
     }
     // (b) promoción de pendientes y créditos en el punto de aplicación.
     ap.promover(punto, true, params)?;
+    // EV-11: la poda usa el **punto de aplicación**, no el slot propio del bloque fusionado.
+    let punto_slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)?;
+    podar_incidentes(&mut ap.estado, evp, punto_slot);
     // RD-10: la garantía del productor **no** se recompueba al fusionar; es admisión (RD-9).
     let coinbase = coinbase_unica(bloque)?;
     if let Some(idx) = coinbase {
@@ -214,7 +220,16 @@ fn fusion_post(
             continue;
         }
         let marca = temporal.marcar();
-        match aplicar_tx(&mut temporal, bloque, params, cbid, punto, tx, testigos) {
+        match aplicar_tx(
+            &mut temporal,
+            bloque,
+            params,
+            cbid,
+            evp,
+            punto,
+            tx,
+            testigos,
+        ) {
             Ok(Efecto::Fee(fee)) => {
                 tarifas = tarifas
                     .suma_comprobada(fee)
@@ -238,7 +253,7 @@ fn fusion_post(
             continue;
         };
         let marca = ap.marcar();
-        if let Err(motivo) = aplicar_tx(ap, bloque, params, cbid, punto, tx, testigos) {
+        if let Err(motivo) = aplicar_tx(ap, bloque, params, cbid, evp, punto, tx, testigos) {
             ap.revertir_a(marca);
             descartadas.push(TxDescartada {
                 indice: i,
@@ -264,5 +279,10 @@ fn fusion_post(
     ap.estado.subsidio_acum += i128::from(sub.brek());
     // RI-1a #1: el slot del estado es el punto de aplicación (EstadoDAG.jl:303).
     ap.estado.slot = punto.como_slot().ok_or(ErrorTransicion::ErrOperacionFase)?;
+    // EV-24(ii): se registra el slot **propio** del bloque, no el punto de aplicación.
+    let prev = ap.estado.ultimo_slot_producido.get(productor).copied();
+    if prev.is_none_or(|p| *slot > p) {
+        ap.estado.ultimo_slot_producido.insert(*productor, *slot);
+    }
     Ok(())
 }

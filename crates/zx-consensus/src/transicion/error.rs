@@ -83,6 +83,34 @@ pub enum ErrorTransicion {
     /// Un bloque cuyo padre no es válido o no se conoce (`R-15`).
     #[error("ErrSinPadre")]
     ErrSinPadre,
+    // ── SL-4a · evidencia y castigo (CONTRATO-EVIDENCIA-v0 con Ratificación v0) ──────────────
+    /// `EV-01`/`EV-06`/`EV-07`: no hay dos decisiones de firma válidas.
+    #[error("ErrSinEvidencia")]
+    ErrSinEvidencia,
+    /// `RAT-1`: alguna cabecera no pertenece a la red local.
+    #[error("ErrCbidAjeno")]
+    ErrCbidAjeno,
+    /// `EV-01`: `pre_hash(H1) < pre_hash(H2)` no se cumple estrictamente.
+    #[error("ErrOrdenCanonico")]
+    ErrOrdenCanonico,
+    /// `EV-14`: `slot_aplicacion ≥ slot_falta + Plazo_slots`.
+    #[error("ErrEvidenciaTardia")]
+    ErrEvidenciaTardia,
+    /// `EV-12`: el `incident_id` ya está registrado.
+    #[error("ErrEvidenciaDuplicada")]
+    ErrEvidenciaDuplicada,
+    /// `EV-04`: la `EvidenceTx` lleva entradas o salidas monetarias.
+    #[error("ErrEvidenciaConEntradas")]
+    ErrEvidenciaConEntradas,
+    /// `EV-24(i)`: la liberación encuentra un incidente admitido y no liquidado.
+    #[error("ErrCasoAbierto")]
+    ErrCasoAbierto,
+    /// `EV-24(ii)`/`EV-15b`: producción reciente de la clave (ventana abierta).
+    #[error("ErrVentanaAbierta")]
+    ErrVentanaAbierta,
+    /// `RAT-3`: la puerta `R_slots > Plazo_slots + M_margen_slots` no se cumple.
+    #[error("ErrPuertaRAT3")]
+    ErrPuertaRAT3,
 }
 
 impl ErrorTransicion {
@@ -103,6 +131,8 @@ impl ErrorTransicion {
             // `DepositoSinEntradas` (F-07). Se traduce al nombre del oráculo para el diferencial
             // (los vectores solo combinan `ent=[]` con firmante ≠ clave, ver `PROGRESO.md` FD-7).
             Self::ErrForma(ErrorFormaTx::DepositoSinEntradas) => "ErrAutorizacion",
+            Self::ErrForma(ErrorFormaTx::EvidenciaConEntradasOSalidas) => "ErrEvidenciaConEntradas",
+            Self::ErrForma(ErrorFormaTx::OrdenCanonicoInvalido) => "ErrOrdenCanonico",
             Self::ErrGenesis => "ErrGenesis",
             Self::ErrPow => "ErrPow",
             Self::ErrEmision => "ErrEmision",
@@ -122,6 +152,15 @@ impl ErrorTransicion {
             Self::ErrFueraDeAlcanceV0 => "ErrFueraDeAlcanceV0",
             Self::ErrRetiroPendiente => "ErrRetiroPendiente",
             Self::ErrNonce => "ErrNonce",
+            Self::ErrSinEvidencia => "ErrSinEvidencia",
+            Self::ErrCbidAjeno => "ErrCbidAjeno",
+            Self::ErrOrdenCanonico => "ErrOrdenCanonico",
+            Self::ErrEvidenciaTardia => "ErrEvidenciaTardia",
+            Self::ErrEvidenciaDuplicada => "ErrEvidenciaDuplicada",
+            Self::ErrEvidenciaConEntradas => "ErrEvidenciaConEntradas",
+            Self::ErrCasoAbierto => "ErrCasoAbierto",
+            Self::ErrVentanaAbierta => "ErrVentanaAbierta",
+            Self::ErrPuertaRAT3 => "ErrPuertaRAT3",
             Self::ErrForma(_) => "ErrForma",
             Self::ErrSinPadre => "ErrSinPadre",
         }

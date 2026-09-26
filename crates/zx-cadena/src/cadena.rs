@@ -21,8 +21,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use primitive_types::U256;
 use zx_consensus::transicion::{
-    Estado, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar, aplicar_fusion, deshacer,
-    es_terminal_condiciones,
+    Estado, ParametrosEvidencia, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar,
+    aplicar_fusion, deshacer, es_terminal_condiciones,
 };
 use zx_core::{Amount, BlockHash, ClavePublica, Tx};
 use zx_dag::ghostdag::{
@@ -71,6 +71,9 @@ struct Virtual {
 /// Gestor del estado del DAG en memoria.
 pub struct Cadena {
     params: ParametrosTransicion,
+    /// SL-4a · parámetros de evidencia. `zx-node` los deja inactivos (SL-4b); los arneses usan
+    /// [`Cadena::nueva_con_evidencia`].
+    evidencia: ParametrosEvidencia,
     k: u32,
     cbid: u32,
     max_padres: u8,
@@ -106,8 +109,21 @@ impl Cadena {
     /// acota a [`zx_core::MAX_PADRES`] (15) y a `u8`.
     #[must_use]
     pub fn nueva(params: ParametrosTransicion, k: u32, cbid: u32, max_padres: u8) -> Self {
+        Self::nueva_con_evidencia(params, k, cbid, max_padres, ParametrosEvidencia::inactiva())
+    }
+
+    /// Igual que [`Cadena::nueva`], con los parámetros de evidencia explícitos (SL-4a).
+    #[must_use]
+    pub fn nueva_con_evidencia(
+        params: ParametrosTransicion,
+        k: u32,
+        cbid: u32,
+        max_padres: u8,
+        evidencia: ParametrosEvidencia,
+    ) -> Self {
         Self {
             params,
+            evidencia,
             k,
             cbid,
             max_padres,
@@ -381,6 +397,7 @@ impl Cadena {
             &bloque.como_transicion(),
             &self.params,
             self.cbid,
+            &self.evidencia,
         )?;
 
         // Una bifurcación PoW real: el padre deja de ser punta (si lo era) y este bloque lo es.
@@ -463,6 +480,7 @@ impl Cadena {
             Punto::Slot(p.slot),
             &self.params,
             self.cbid,
+            &self.evidencia,
         )?;
         nuevo.peso_sufijo =
             nuevo
@@ -625,6 +643,7 @@ impl Cadena {
                 Punto::Slot(p.slot),
                 &self.params,
                 self.cbid,
+                &self.evidencia,
             )?;
             base = nuevo;
         }
@@ -770,6 +789,7 @@ impl Cadena {
                 Punto::Slot(virtual_dag.slot),
                 &self.params,
                 self.cbid,
+                &self.evidencia,
             )?;
             estado = nuevo;
         }
@@ -813,6 +833,7 @@ impl Cadena {
                 Punto::Slot(virtual_dag.slot),
                 &self.params,
                 self.cbid,
+                &self.evidencia,
             )?;
             estado = nuevo;
             orden.push(x_hash);
@@ -905,6 +926,7 @@ impl Cadena {
                     Punto::Slot(c_slot),
                     &self.params,
                     self.cbid,
+                    &self.evidencia,
                 )?;
                 estado = nuevo;
                 orden.push(x_hash);
@@ -923,6 +945,7 @@ impl Cadena {
                 Punto::Slot(c_slot),
                 &self.params,
                 self.cbid,
+                &self.evidencia,
             )?;
             let Some(peso) = c.peso() else {
                 return Err(MotivoBloque::ErrSinPadre);

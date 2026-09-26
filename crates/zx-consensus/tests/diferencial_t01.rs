@@ -1,18 +1,17 @@
-//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-W03` §3.10, V4; vectores v0.2 de
-//! T01-E con el id de liberación F-18).
+//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-SL4a` §2.3, V4; vectores v0.4 con
+//! `EvidenceTx`).
 //!
-//! Lee `testdata/transicion-v0.2/vectores-transicion-v0.2.txt` (y su fichero de negativos), deriva
-//! claves Ed25519 deterministas por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64
-//! LE)` con `ed25519-zebra`), construye transacciones **reales** v1/v2/v3 firmadas por el `firmante`
+//! Lee `testdata/transicion-v0.4/vectores-transicion-v0.4.txt` (y su cobertura), deriva claves
+//! Ed25519 deterministas por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)` con
+//! `ed25519-zebra`), construye transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante`
 //! abstracto, traduce la salida implícita de una `Liberacion` a su `OutPoint` real `(txid, 0)`,
-//! ejecuta el motor en el orden de entrega del fichero y compara `RES`, `SEL` y el estado canónico
-//! traducido de vuelta a claves abstractas.
+//! ejecuta el motor en el orden de entrega del fichero y compara `RES`, `SEL`, la cobertura y el
+//! estado canónico traducido de vuelta a claves abstractas.
 //!
-//! T01-E / F-18: el id abstracto de la salida de una liberación es
-//! `ID_LIB(clave, nonce, importe) = 2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe`, inyectivo por contenido.
-//! El arnés lo decodifica y resuelve al `OutPoint` real; **no** mantiene ningún contador de ids
-//! implícitos ni inventa entradas. Los vectores v0.1 siguen en `testdata/transicion-v0.1/`, pero
-//! ya no se leen.
+//! La `EvidenceTx` v4 se traduce a **dos cabeceras `PoAS_PoT_DAG` reales** con sellos Ed25519
+//! reales (`EV-01`…`EV-07`), no a una emulación: el orden canónico real por `pre_hash` reproduce la
+//! relación abstracta de cada vector. El `incident_id` es **opaco**: la cobertura y el `GAR` se
+//! comparan por número y `@slot_falta`, no por el hex (ver `DEFINICIONES-FALTANTES.md` FD-1).
 //!
 //! Requisito de V4: **0 discrepancias** en todos los casos.
 
@@ -29,8 +28,8 @@ use std::fs;
 use ed25519_zebra::{SigningKey, VerificationKey};
 use primitive_types::U256;
 use zx_consensus::transicion::{
-    BloqueTransicion, ErrorTransicion, Estado, Fase, HechosCabecera, Origen, ParametrosTransicion,
-    Punto, aplicar_con_undo, deshacer, seleccionar,
+    BloqueTransicion, ErrorTransicion, Estado, Fase, HechosCabecera, Origen, ParametrosEvidencia,
+    ParametrosTransicion, Punto, aplicar_con_undo, deshacer, seleccionar,
 };
 use zx_core::preimage::tx::txid as calcular_txid;
 use zx_core::{
@@ -39,10 +38,14 @@ use zx_core::{
     SolucionPoas, SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
 
-/// Rutas a los ficheros de vectores v0.2 dentro del workspace (`ws/testdata/...`).
+/// Rutas a los ficheros de vectores v0.4 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/transicion-v0.2/vectores-transicion-v0.2.txt"
+    "/../../testdata/transicion-v0.4/vectores-transicion-v0.4.txt"
+);
+const RUTA_COBERTURA: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../testdata/transicion-v0.4/cobertura-v0.4.txt"
 );
 const RUTA_NEGATIVOS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -199,6 +202,61 @@ struct TxCrudo {
     sal: Vec<(u64, u64, u64)>,
     /// F-15: nonce de una operación de garantía (0 en el resto).
     nonce: u64,
+    /// SL-4a: evidencia abstracta de una `EvidenceTx` v4, si el vector la trae.
+    ev: Option<EvCrudo>,
+}
+
+/// Una cabecera abstracta de evidencia (`ev=` de T01).
+#[derive(Clone, Copy, Debug)]
+struct EvCab {
+    cbid: u32,
+    clave: u64,
+    sector: u16,
+    historia: u64,
+    chunk: u64,
+    slot: u64,
+    ph: u64,
+    sello_ok: bool,
+}
+
+/// La evidencia abstracta de una `EvidenceTx` v4.
+#[derive(Clone, Copy, Debug)]
+struct EvCrudo {
+    id1: EvCab,
+    id2: EvCab,
+}
+
+fn parsear_evidencia(texto: &str) -> EvCrudo {
+    let partes: Vec<&str> = texto.split('|').collect();
+    assert_eq!(partes.len(), 2, "evidencia malformada: {texto}");
+    let mut cab = [EvCab {
+        cbid: 0,
+        clave: 0,
+        sector: 0,
+        historia: 0,
+        chunk: 0,
+        slot: 0,
+        ph: 0,
+        sello_ok: true,
+    }; 2];
+    for (j, p) in partes.iter().enumerate() {
+        let f: Vec<&str> = p.split(':').collect();
+        assert_eq!(f.len(), 8, "cabecera de evidencia malformada: {p}");
+        cab[j] = EvCab {
+            cbid: f[0].parse().expect("cbid"),
+            clave: f[1].parse().expect("clave"),
+            sector: f[2].parse().expect("sector"),
+            historia: f[3].parse().expect("historia"),
+            chunk: f[4].parse().expect("chunk"),
+            slot: f[5].parse().expect("slot"),
+            ph: f[6].parse().expect("pre_hash"),
+            sello_ok: f[7] == "1",
+        };
+    }
+    EvCrudo {
+        id1: cab[0],
+        id2: cab[1],
+    }
 }
 
 /// Un bloque abstracto leído del fichero.
@@ -233,6 +291,12 @@ struct ParamCrudo {
     m_rec_slots: u64,
     r_slots: u64,
     f_slots: Option<u64>,
+    f_num: u64,
+    f_den: u64,
+    plazo_slots: u64,
+    m_margen_slots: u64,
+    cbid: u32,
+    evp: bool,
 }
 
 impl ParamCrudo {
@@ -251,6 +315,12 @@ impl ParamCrudo {
             m_rec_slots: 0,
             r_slots: 0,
             f_slots: None,
+            f_num: 1,
+            f_den: 1,
+            plazo_slots: 0,
+            m_margen_slots: 0,
+            cbid: 0,
+            evp: false,
         }
     }
 }
@@ -305,6 +375,16 @@ fn parsear_parametros(c: &BTreeMap<String, String>) -> ParamCrudo {
         } else {
             Some(f.parse().expect("F_slots"))
         },
+        f_num: c.get("f_num").map_or(1, |v| v.parse().expect("f_num")),
+        f_den: c.get("f_den").map_or(1, |v| v.parse().expect("f_den")),
+        plazo_slots: c
+            .get("Plazo_slots")
+            .map_or(0, |v| v.parse().expect("Plazo_slots")),
+        m_margen_slots: c
+            .get("M_margen_slots")
+            .map_or(0, |v| v.parse().expect("M_margen_slots")),
+        cbid: c.get("cbid").map_or(0, |v| v.parse().expect("cbid")),
+        evp: c.get("evp").is_some_and(|v| v == "1"),
     }
 }
 
@@ -370,6 +450,8 @@ fn parsear_fichero(ruta: &str) -> Vec<Caso> {
                         sal: parse_salidas(c.get("sal").expect("sal")),
                         // F-15: solo los vectores v0.1 traen `nonce=`; ausente = 0.
                         nonce: c.get("nonce").map_or(0, |v| v.parse().expect("nonce")),
+                        // SL-4a: `ev=` solo en las `EvidenceTx` v4 con cabeceras.
+                        ev: c.get("ev").map(|v| parsear_evidencia(v)),
                     });
                 }
             }
@@ -444,6 +526,18 @@ fn parametros(p: &ParamCrudo) -> ParametrosTransicion {
         f_slots: p.f_slots,
         subsidio_pow,
         subsidio_post,
+    }
+}
+
+/// SL-4a: parámetros de evidencia del caso.
+fn parametros_evidencia(p: &ParamCrudo) -> ParametrosEvidencia {
+    ParametrosEvidencia {
+        f_num: p.f_num,
+        f_den: p.f_den,
+        plazo_slots: p.plazo_slots,
+        m_margen_slots: p.m_margen_slots,
+        cbid: p.cbid,
+        evp: p.evp,
     }
 }
 
@@ -682,13 +776,31 @@ impl Constructor {
                 (real, Vec::new())
             }
             "Evidencia" => {
+                let Some(ev) = tx.ev else {
+                    // Evidencia malformada heredada (sin cabeceras): v4 inactiva.
+                    let real = Tx {
+                        version: 4,
+                        inputs: Vec::new(),
+                        outputs: Vec::new(),
+                        lock_time: 0,
+                        expiry_height: 0,
+                        extension: ExtensionTx::Ninguna,
+                    };
+                    return Ok((real, Vec::new()));
+                };
+                // Registra las claves abstractas de la identidad para que `render_gar` pueda
+                // traducir de vuelta la garantía que el motor cree (p. ej. la clave 99).
+                let _ = self.claves.id(ev.id1.clave);
+                let _ = self.claves.id(ev.id2.clave);
+                let (h1, h2) = cabeceras_de_evidencia(&ev);
+                let salidas = self.salidas_reales(&tx.sal);
                 let real = Tx {
                     version: 4,
                     inputs: Vec::new(),
-                    outputs: Vec::new(),
+                    outputs: salidas,
                     lock_time: 0,
                     expiry_height: 0,
-                    extension: ExtensionTx::Ninguna,
+                    extension: ExtensionTx::Evidencia { h1, h2 },
                 };
                 (real, Vec::new())
             }
@@ -717,6 +829,63 @@ fn cabecera_post(padre: BlockHash) -> DagBlockHeader {
         padres: PadresDag::nuevo(padre, &[]).expect("padres"),
         sello: [0u8; 64],
     }
+}
+
+/// Construye una cabecera `PoAS_PoT_DAG` real con la identidad abstracta `cab` y una sal.
+fn cabecera_evidencia(cab: &EvCab, sal: u64) -> DagBlockHeader {
+    let mut chunk = [0u8; 32];
+    chunk[..8].copy_from_slice(&cab.chunk.to_le_bytes());
+    let sol = SolucionPoas {
+        public_key: clave_de(cab.clave),
+        sector_index: cab.sector,
+        history_size: cab.historia,
+        chunk,
+        ..Default::default()
+    };
+    DagBlockHeader {
+        consensus_branch_id: cab.cbid,
+        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
+        timestamp: sal,
+        height: 0,
+        slot: cab.slot,
+        pot_output: [0u8; 16],
+        rango_solucion: cab.ph,
+        sol,
+        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0u8; 32])),
+        padres: PadresDag::genesis(),
+        sello: [0u8; 64],
+    }
+}
+
+/// Traduce una evidencia abstracta a dos cabeceras reales con sellos Ed25519 reales.
+///
+/// El orden canónico real por `pre_hash` reproduce la relación `ph1 < ph2` del vector: se busca una
+/// sal en `H2` hasta que la comparación real coincide con la abstracta. Si la identidad y la
+/// `pre_hash` abstractas son iguales, las prefirmas son idénticas y el `pre_hash` real también lo
+/// es (`ErrOrdenCanonico`). La identidad/cbid/sellos del motor se comprueban sobre las cabeceras.
+fn cabeceras_de_evidencia(ev: &EvCrudo) -> (DagBlockHeader, DagBlockHeader) {
+    let mut h1 = cabecera_evidencia(&ev.id1, 0);
+    let mut h2;
+    let quiere_menor = ev.id1.ph < ev.id2.ph;
+    let mut sal = 0u64;
+    loop {
+        h2 = cabecera_evidencia(&ev.id2, sal);
+        let menor = h1.pre_hash().as_bytes() < h2.pre_hash().as_bytes();
+        if menor == quiere_menor {
+            break;
+        }
+        sal += 1;
+    }
+    for (cab, h) in [(&ev.id1, &mut h1), (&ev.id2, &mut h2)] {
+        if cab.sello_ok {
+            let sk = firmante_de(cab.clave);
+            let firma: [u8; 64] = sk.sign(h.pre_hash().as_bytes()).into();
+            h.sello = firma;
+        } else {
+            h.sello = [0u8; 64];
+        }
+    }
+    (h1, h2)
 }
 
 /// Bloques reales de un caso, con la correspondencia hash ↔ id abstracto.
@@ -882,10 +1051,27 @@ fn render_gar(claves: &Claves, estado: &Estado) -> Result<Vec<(u64, String)>, St
             .map(|p| format!("{}@s{}", p.importe.brek(), p.madura_en_slot.unwrap_or(0)))
             .collect::<Vec<_>>()
             .join(",");
+        let inc = if g.incidentes.is_empty() {
+            String::new()
+        } else {
+            let lista = g
+                .incidentes
+                .iter()
+                .map(|i| {
+                    let mut hex = String::with_capacity(64);
+                    for b in &i.id {
+                        let _ = write!(hex, "{b:02x}");
+                    }
+                    format!("{hex}@{}", i.slot_falta)
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!(" inc={lista}")
+        };
         lineas.push((
             clave,
             format!(
-                "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}",
+                "GAR clave={clave} activo={} pend=[{ps}] ret=[{rs}] cred=[{cs}] congelado={} nonce={}{inc}",
                 g.activo.brek(),
                 g.congelado.brek(),
                 g.nonce_siguiente
@@ -900,6 +1086,22 @@ fn render_gar(claves: &Claves, estado: &Estado) -> Result<Vec<(u64, String)>, St
 // Ejecución diferencial
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Normaliza el `incident_id` de una línea `GAR`: el id es **opaco**, así que se compara su número
+/// y su `@slot_falta`, no el hex (ver `DEFINICIONES-FALTANTES.md` FD-1). Se ordenan los slots para
+/// que la comparación no dependa del orden del id del motor.
+fn normalizar_gar(linea: &str) -> String {
+    let Some(pos) = linea.find(" inc=") else {
+        return linea.to_string();
+    };
+    let (pref, inc) = linea.split_at(pos + 5);
+    let mut slots: Vec<&str> = inc
+        .split(',')
+        .map(|item| item.split('@').nth(1).unwrap_or(""))
+        .collect();
+    slots.sort_unstable();
+    format!("{pref}{}", slots.join(","))
+}
+
 /// Nombre aceptado para un error del motor frente al esperado del fichero (§4).
 fn coincide(esperado: &str, error: &ErrorTransicion) -> bool {
     if let ErrorTransicion::ErrForma(ErrorFormaTx::VersionInactiva { .. }) = error {
@@ -908,8 +1110,67 @@ fn coincide(esperado: &str, error: &ErrorTransicion) -> bool {
     error.nombre_t01() == esperado
 }
 
-fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
+fn inc_cov(cov: &mut BTreeMap<String, usize>, k: &str) {
+    *cov.entry(k.to_string()).or_insert(0) += 1;
+}
+
+/// Reproduce `contar_cobertura` del oráculo T01 (`exportar.jl:291-335`) sobre el `memo` del BFS.
+fn contar_cobertura(
+    caso: &Caso,
+    reales: &Reales,
+    params: &ParametrosTransicion,
+    evp: &ParametrosEvidencia,
+    memo: &BTreeMap<u64, Estado>,
+    cov: &mut BTreeMap<String, usize>,
+) {
+    if !caso.param.evp {
+        return;
+    }
+    for (i, b) in caso.bloques.iter().enumerate() {
+        let Some(txev) = b.txs.iter().find(|t| t.tipo == "Evidencia") else {
+            continue;
+        };
+        let ep = memo.get(&b.padre);
+        if memo.contains_key(&b.id) {
+            let Some(ev) = txev.ev else {
+                inc_cov(cov, "malformada");
+                continue;
+            };
+            let v = ep
+                .and_then(|e| e.garantias.get(&clave_de(ev.id1.clave)))
+                .map_or(0, zx_consensus::transicion::total_garantia);
+            inc_cov(cov, if v == 0 { "sin_saldo" } else { "aplicada" });
+            if let Some(ep) = ep
+                && let Ok((e2, undo)) =
+                    aplicar_con_undo(ep, &reales.bloques[i], params, CBID_RED_DEV, evp)
+                && deshacer(&e2, &undo) == *ep
+            {
+                inc_cov(cov, "deshecha");
+            }
+        } else if ep.is_none() {
+            inc_cov(cov, "sin_padre");
+        } else if let Some(ep) = ep {
+            let nombre = match aplicar_con_undo(ep, &reales.bloques[i], params, CBID_RED_DEV, evp) {
+                Ok(_) => "otro_error",
+                Err(e) => match e.nombre_t01() {
+                    "ErrEvidenciaDuplicada" => "duplicada",
+                    "ErrEvidenciaTardia" => "tardia",
+                    "ErrCbidAjeno" => "cbid_ajeno",
+                    "ErrOrdenCanonico" => "orden_canonico",
+                    "ErrSinEvidencia" => "sin_evidencia",
+                    "ErrEvidenciaConEntradas" => "con_entradas",
+                    "ErrPuertaRAT3" => "puerta_rat3",
+                    _ => "otro_error",
+                },
+            };
+            inc_cov(cov, nombre);
+        }
+    }
+}
+
+fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>, cov: &mut BTreeMap<String, usize>) {
     let params = parametros(&caso.param);
+    let evp = parametros_evidencia(&caso.param);
     let reales = match construir_caso(caso) {
         Ok(r) => r,
         Err(e) => {
@@ -921,7 +1182,8 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
     // BFS sobre los padres abstractos (el génesis no lleva padre en los hechos reales).
     let mut memo: BTreeMap<u64, Estado> = BTreeMap::new();
     if let Some(gi) = caso.bloques.iter().position(|b| b.fam == "Genesis")
-        && let Ok((e, _)) = aplicar_con_undo(&inicial, &reales.bloques[gi], &params, CBID_RED_DEV)
+        && let Ok((e, _)) =
+            aplicar_con_undo(&inicial, &reales.bloques[gi], &params, CBID_RED_DEV, &evp)
     {
         memo.insert(caso.bloques[gi].id, e);
     }
@@ -934,9 +1196,13 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
             if b.padre != pid || memo.contains_key(&b.id) {
                 continue;
             }
-            if let Ok((nuevo, undo)) =
-                aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV)
-            {
+            if let Ok((nuevo, undo)) = aplicar_con_undo(
+                &estado_padre,
+                &reales.bloques[i],
+                &params,
+                CBID_RED_DEV,
+                &evp,
+            ) {
                 if deshacer(&nuevo, &undo) != estado_padre {
                     discrepancias.push(format!("CASO {} undo bloque {}", caso.n, b.id));
                 }
@@ -955,7 +1221,13 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
             esperado != "ErrSinPadre"
         } else {
             let estado_padre = memo.get(&b.padre).cloned().unwrap_or_else(Estado::inicial);
-            match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV) {
+            match aplicar_con_undo(
+                &estado_padre,
+                &reales.bloques[i],
+                &params,
+                CBID_RED_DEV,
+                &evp,
+            ) {
                 Ok(_) => esperado != "OK",
                 Err(e) => !coincide(&esperado, &e),
             }
@@ -967,7 +1239,13 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
                 "ErrSinPadre".to_string()
             } else {
                 let estado_padre = memo.get(&b.padre).cloned().unwrap_or_else(Estado::inicial);
-                match aplicar_con_undo(&estado_padre, &reales.bloques[i], &params, CBID_RED_DEV) {
+                match aplicar_con_undo(
+                    &estado_padre,
+                    &reales.bloques[i],
+                    &params,
+                    CBID_RED_DEV,
+                    &evp,
+                ) {
                     Ok(_) => "OK".to_string(),
                     Err(e) => e.nombre_t01().to_string(),
                 }
@@ -978,8 +1256,9 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
             ));
         }
     }
+    contar_cobertura(caso, &reales, &params, &evp, &memo, cov);
     // SEL.
-    let seleccion = match seleccionar(&reales.bloques, &params, CBID_RED_DEV) {
+    let seleccion = match seleccionar(&reales.bloques, &params, CBID_RED_DEV, &evp) {
         Ok(s) => s,
         Err(e) => {
             discrepancias.push(format!("CASO {}: seleccionar: {e:?}", caso.n));
@@ -1014,7 +1293,9 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
     match render_gar(&reales.claves, &seleccion.estado) {
         Ok(obtenido) => {
             let obtenido: Vec<String> = obtenido.into_iter().map(|(_, l)| l).collect();
-            if obtenido != caso.gar {
+            let esperado_n: Vec<String> = caso.gar.iter().map(|l| normalizar_gar(l)).collect();
+            let obtenido_n: Vec<String> = obtenido.iter().map(|l| normalizar_gar(l)).collect();
+            if obtenido_n != esperado_n {
                 discrepancias.push(format!(
                     "CASO {} ({}) GAR esperado={:?} obtenido={:?}",
                     caso.n, caso.nombre, caso.gar, obtenido
@@ -1048,7 +1329,7 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>) {
     if caso.nombre == "X-16" && reales.bloques.len() > 1 {
         let mut invertidos = reales.bloques.clone();
         invertidos.reverse();
-        if let Ok(inv) = seleccionar(&invertidos, &params, CBID_RED_DEV)
+        if let Ok(inv) = seleccionar(&invertidos, &params, CBID_RED_DEV, &evp)
             && (inv.punta != seleccion.punta || inv.estado != seleccion.estado)
         {
             discrepancias.push(format!("CASO {} X-16 orden inverso difiere", caso.n));
@@ -1062,15 +1343,16 @@ fn cargar_casos(ruta: &str) -> Vec<Caso> {
     casos
 }
 
-/// Corre el diferencial sobre `casos` y devuelve `(informe, nº de discrepancias)`.
-fn correr_diferencial(casos: &[Caso]) -> (String, usize) {
+/// Corre el diferencial sobre `casos` y devuelve `(informe, nº de discrepancias, cobertura)`.
+fn correr_diferencial(casos: &[Caso]) -> (String, usize, BTreeMap<String, usize>) {
     let mut discrepancias: Vec<String> = Vec::new();
     let mut por_nombre: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let mut con_post = 0usize;
     let mut por_error: BTreeMap<String, usize> = BTreeMap::new();
+    let mut cov: BTreeMap<String, usize> = BTreeMap::new();
     for caso in casos {
         let antes = discrepancias.len();
-        ejecutar_caso(caso, &mut discrepancias);
+        ejecutar_caso(caso, &mut discrepancias, &mut cov);
         let fallo = discrepancias.len() > antes;
         let entrada = por_nombre.entry(caso.nombre.clone()).or_insert((0, 0));
         entrada.0 += 1;
@@ -1099,18 +1381,47 @@ fn correr_diferencial(casos: &[Caso]) -> (String, usize) {
     for d in discrepancias.iter().take(40) {
         let _ = writeln!(informe, "  {d}");
     }
-    (informe, discrepancias.len())
+    (informe, discrepancias.len(), cov)
 }
 
-/// V4: diferencial completo contra el oráculo T01-E (`vectores-transicion-v0.2.txt`, 2 055 casos).
+/// Lee los contadores de `cobertura-v0.4.txt` (líneas `clave = valor`).
+fn cargar_cobertura() -> BTreeMap<String, usize> {
+    let contenido = fs::read_to_string(RUTA_COBERTURA).expect("leer cobertura");
+    let mut mapa = BTreeMap::new();
+    for linea in contenido.lines() {
+        if linea.starts_with('#') || linea.trim().is_empty() {
+            continue;
+        }
+        if let Some((k, v)) = linea.split_once('=') {
+            mapa.insert(k.trim().to_string(), v.trim().parse().expect("contador"));
+        }
+    }
+    mapa
+}
+
+/// V4: diferencial completo contra el oráculo T01 (`vectores-transicion-v0.4.txt`, 2 795 casos) y
+/// tabla de cobertura **idéntica** a `cobertura-v0.4.txt`.
 #[test]
 fn diferencial_t01() {
     let casos = cargar_casos(RUTA_VECTORES);
-    let (informe, n) = correr_diferencial(&casos);
+    let (informe, n, cov) = correr_diferencial(&casos);
     println!("{informe}");
+    let esperada = cargar_cobertura();
+    let mut cob_informe = String::new();
+    for (k, v) in &cov {
+        let _ = writeln!(
+            cob_informe,
+            "  {k} = {v} (esperado {})",
+            esperada.get(k).copied().unwrap_or(0)
+        );
+    }
     assert!(
         n == 0,
         "diferencial T01 (base) con {n} discrepancias:\n{informe}"
+    );
+    assert_eq!(
+        cov, esperada,
+        "cobertura T01 distinta de cobertura-v0.4.txt:\n{cob_informe}"
     );
 }
 
@@ -1119,7 +1430,7 @@ fn diferencial_t01() {
 #[test]
 fn diferencial_t01_negativos() {
     let casos = cargar_casos(RUTA_NEGATIVOS);
-    let (informe, n) = correr_diferencial(&casos);
+    let (informe, n, _) = correr_diferencial(&casos);
     println!("{informe}");
     assert!(
         n == 0,

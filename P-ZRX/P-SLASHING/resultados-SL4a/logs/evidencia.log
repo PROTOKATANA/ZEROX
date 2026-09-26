@@ -1,0 +1,117 @@
+   Compiling zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running tests/evidencia.rs (/home/katana/zeo/ZEROX/deepseek/SL4a/target/debug/deps/evidencia-4f980bf01dfb1a78)
+
+running 8 tests
+
+thread 'ventana_de_liberacion_rat3' (139) panicked at crates/zx-consensus/tests/evidencia.rs:306:5:
+assertion `left == right` failed
+  left: Err(ErrGarantia)
+ right: Err(ErrVentanaAbierta)
+stack backtrace:
+test orden_canonico_invalido ... ok
+test cbid_ajeno ... ok
+test sello_invalido ... ok
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<core::result::Result<(zx_consensus::transicion::tipos::Estado, zx_consensus::transicion::tipos::Undo), zx_consensus::transicion::error::ErrorTransicion>, core::result::Result<(zx_consensus::transicion::tipos::Estado, zx_consensus::transicion::tipos::Undo), zx_consensus::transicion::error::ErrorTransicion>>
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: evidencia::ventana_de_liberacion_rat3
+             at ./tests/evidencia.rs:306:5
+   5: evidencia::ventana_de_liberacion_rat3::{closure#0}
+             at ./tests/evidencia.rs:273:32
+   6: <evidencia::ventana_de_liberacion_rat3::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+thread 'evidencia_con_salidas' (135) panicked at crates/zx-consensus/tests/evidencia.rs:325:5:
+assertion `left == right` failed
+  left: Err(ErrForma(EvidenciaConEntradasOSalidas))
+ right: Err(ErrEvidenciaConEntradas)
+stack backtrace:
+test ventana_de_liberacion_rat3 ... FAILED
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<core::result::Result<(zx_consensus::transicion::tipos::Estado, zx_consensus::transicion::tipos::Undo), zx_consensus::transicion::error::ErrorTransicion>, core::result::Result<(zx_consensus::transicion::tipos::Estado, zx_consensus::transicion::tipos::Undo), zx_consensus::transicion::error::ErrorTransicion>>
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: evidencia::evidencia_con_salidas
+             at ./tests/evidencia.rs:325:5
+   5: evidencia::evidencia_con_salidas::{closure#0}
+             at ./tests/evidencia.rs:316:27
+   6: <evidencia::evidencia_con_salidas::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+thread 'autodenuncia' (132) panicked at crates/zx-consensus/tests/evidencia.rs:230:5:
+assertion `left == right` failed
+  left: 2
+ right: 0
+stack backtrace:
+test evidencia_con_salidas ... FAILED
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<i64, i64>
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: evidencia::autodenuncia
+             at ./tests/evidencia.rs:230:5
+   5: evidencia::autodenuncia::{closure#0}
+             at ./tests/evidencia.rs:221:18
+   6: <evidencia::autodenuncia::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test autodenuncia ... FAILED
+test undo_y_reaparicion ... ok
+
+thread 'duplicada_en_hermanos' (134) panicked at crates/zx-consensus/tests/evidencia.rs:252:5:
+assertion `left == right` failed: la segunda no vuelve a congelar ni confiscar
+  left: Estado { utxo: {}, garantias: {ClavePublica([200, 148, 26, 80, 22, 121, 70, 3, 194, 66, 54, 34, 60, 60, 84, 253, 109, 20, 154, 50, 31, 30, 131, 250, 3, 104, 128, 36, 83, 231, 210, 214]): Garantia { activo: Amount(2), pendientes: [], en_retirada: [], congelado: Amount(2), creditos: [], nonce_siguiente: 0, incidentes: [Incidente { id: [167, 200, 214, 105, 25, 157, 251, 14, 132, 38, 125, 198, 53, 76, 30, 203, 229, 196, 217, 179, 36, 43, 161, 122, 82, 133, 137, 230, 119, 99, 2, 201], slot_falta: 1 }] }}, emitido: 0, quemado: 6, fase: PoST, terminal: Some(BlockHash(0000000000000000000000000000000000000000000000000000000000000001)), altura: 0, trabajo: 0, slot: 2, s0: 0, peso_sufijo: 0, altura_terminal: None, subsidio_acum: 6, ultimo_slot_producido: {ClavePublica([200, 148, 26, 80, 22, 121, 70, 3, 194, 66, 54, 34, 60, 60, 84, 253, 109, 20, 154, 50, 31, 30, 131, 250, 3, 104, 128, 36, 83, 231, 210, 214]): 2} }
+ right: Estado { utxo: {}, garantias: {ClavePublica([200, 148, 26, 80, 22, 121, 70, 3, 194, 66, 54, 34, 60, 60, 84, 253, 109, 20, 154, 50, 31, 30, 131, 250, 3, 104, 128, 36, 83, 231, 210, 214]): Garantia { activo: Amount(0), pendientes: [], en_retirada: [], congelado: Amount(2), creditos: [Pendiente { importe: Amount(2), madura_en_altura: None, madura_en_slot: Some(2) }], nonce_siguiente: 0, incidentes: [Incidente { id: [167, 200, 214, 105, 25, 157, 251, 14, 132, 38, 125, 198, 53, 76, 30, 203, 229, 196, 217, 179, 36, 43, 161, 122, 82, 133, 137, 230, 119, 99, 2, 201], slot_falta: 1 }] }}, emitido: 0, quemado: 6, fase: PoST, terminal: Some(BlockHash(0000000000000000000000000000000000000000000000000000000000000001)), altura: 0, trabajo: 0, slot: 1, s0: 0, peso_sufijo: 0, altura_terminal: None, subsidio_acum: 3, ultimo_slot_producido: {ClavePublica([200, 148, 26, 80, 22, 121, 70, 3, 194, 66, 54, 34, 60, 60, 84, 253, 109, 20, 154, 50, 31, 30, 131, 250, 3, 104, 128, 36, 83, 231, 210, 214]): 1} }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<zx_consensus::transicion::tipos::Estado, zx_consensus::transicion::tipos::Estado>
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: evidencia::duplicada_en_hermanos
+             at ./tests/evidencia.rs:252:5
+   5: evidencia::duplicada_en_hermanos::{closure#0}
+             at ./tests/evidencia.rs:238:27
+   6: <evidencia::duplicada_en_hermanos::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/katana/.rustup/toolchains/nightly-2026-05-03-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/20de910db49d3476ccf49ea79a4b22e2b5dface0/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test duplicada_en_hermanos ... FAILED
+
+failures:
+
+failures:
+    autodenuncia
+    duplicada_en_hermanos
+    evidencia_con_salidas
+    ventana_de_liberacion_rat3
+
+test result: FAILED. 4 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p zx-consensus --test evidencia`

@@ -25,7 +25,8 @@ mod tests;
 pub use aplicar::{aplicar, aplicar_con_undo, es_terminal, es_terminal_condiciones};
 pub use error::ErrorTransicion;
 pub use estado::{
-    deshacer, gastable_en, invariante_i1, invariante_i1b, phi, suma_garantias, suma_utxo,
+    debitar_garantia, deshacer, gastable_en, invariante_i1, invariante_i1b, phi, podar_incidentes,
+    suelo_dos_octavos, suma_garantias, suma_utxo, techo_fraccion, total_garantia,
 };
 pub use fusion::aplicar_fusion;
 pub use seleccion::{
@@ -33,5 +34,6 @@ pub use seleccion::{
 };
 pub use tipos::{
     BloqueTransicion, EnRetirada, EntradaUtxo, Escalares, Estado, Fase, Garantia, HechosCabecera,
-    Marca, Origen, ParametrosTransicion, Pendiente, Punto, TxDescartada, Undo,
+    Incidente, Marca, Origen, ParametrosEvidencia, ParametrosTransicion, Pendiente, Punto,
+    TxDescartada, Undo,
 };

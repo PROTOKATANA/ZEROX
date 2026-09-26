@@ -1,0 +1,58 @@
+    Checking zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-core)
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Checking zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-dag)
+    Checking zx-storage v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-storage)
+    Checking zx-p2p v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-p2p)
+error: consider using `sort_by_key`
+   --> crates/zx-consensus/src/transicion/aplicar.rs:714:9
+    |
+714 |         g.incidentes.sort_by(|a, b| a.id.cmp(&b.id));
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_sort_by
+    = note: `-D clippy::unnecessary-sort-by` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_sort_by)]`
+help: try
+    |
+714 -         g.incidentes.sort_by(|a, b| a.id.cmp(&b.id));
+714 +         g.incidentes.sort_by_key(|a| a.id);
+    |
+
+error: this function has too many arguments (8/7)
+   --> crates/zx-consensus/src/transicion/aplicar.rs:747:1
+    |
+747 | / pub(crate) fn aplicar_tx(
+748 | |     ap: &mut Aplicador,
+749 | |     bloque: &BloqueTransicion,
+750 | |     params: &ParametrosTransicion,
+...   |
+755 | |     testigos: &[Vec<u8>],
+756 | | ) -> Result<Efecto, ErrorTransicion> {
+    | |____________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+    = note: `-D clippy::too-many-arguments` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`
+
+error: integer division
+   --> crates/zx-consensus/src/transicion/estado.rs:180:5
+    |
+180 |     num / i128::from(f_den)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: division of integers may cause loss of precision. consider using floats
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#integer_division
+    = note: `-D clippy::integer-division` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::integer_division)]`
+
+error: integer division
+   --> crates/zx-consensus/src/transicion/estado.rs:186:28
+    |
+186 |     if c <= 0 { 0 } else { c / 4 }
+    |                            ^^^^^
+    |
+    = help: division of integers may cause loss of precision. consider using floats
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#integer_division
+
+error: could not compile `zx-consensus` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...

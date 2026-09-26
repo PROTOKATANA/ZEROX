@@ -175,13 +175,23 @@ pub(crate) const TAG_FLOW_GENESIS: DomainTag = DomainTag::fija(*b"ZZKFlowGenesis
 pub(crate) const TAG_TXID_GARANTIA: DomainTag = DomainTag::fija(*b"ZZKTxIdGarantia_");
 /// F-08 · mensaje de la firma de aceptación de v2: `H_d("ZZKTxSigGarant__", txid)`.
 pub(crate) const TAG_TXSIG_GARANT: DomainTag = DomainTag::fija(*b"ZZKTxSigGarant__");
+/// SL-4a / EV-03 · sub-digest de la extensión de la `EvidenceTx` v4 (`extension_digest`).
+///
+/// Añadida por SL-4a: cambiar su valor es un cambio de consenso (C-HASH-05). No comparte los 12
+/// primeros bytes con `ZZKTxIdHash_`, así que la invariante de `DomainTag::raiz` se conserva.
+pub(crate) const TAG_TXID_EVP: DomainTag = DomainTag::fija(*b"ZZKTxIdEvidencia");
+/// SL-4a / EV-10 · etiqueta de dominio del `incident_id` (`dom_incidente`).
+///
+/// El contrato la fija en `TAGS_FIJAS`. La implementación la usa desde
+/// [`crate::preimage::tx::incident_id_evidencia`].
+pub(crate) const TAG_EVP_INCIDENTE: DomainTag = DomainTag::fija(*b"ZZKEvpIncidente_");
 
-/// Las diecisiete etiquetas ASCII fijas, para las comprobaciones de invariante.
+/// Las diecinueve etiquetas ASCII fijas, para las comprobaciones de invariante.
 #[allow(
     dead_code,
-    reason = "solo lo usan los tests de invariante de este módulo"
+    reason = "solo lo usan los tests de invariante de este módulo y la preimagen de evidencia"
 )]
-pub(crate) const TAGS_FIJAS: [DomainTag; 17] = [
+pub(crate) const TAGS_FIJAS: [DomainTag; 19] = [
     TAG_TXID_HEADER,
     TAG_TXID_INPUTS,
     TAG_TXID_PREVOUT,
@@ -192,6 +202,8 @@ pub(crate) const TAGS_FIJAS: [DomainTag; 17] = [
     TAG_TXSIG_LOCKS,
     TAG_TXSIG_THIS_IN,
     TAG_TXSIG_GARANT,
+    TAG_TXID_EVP,
+    TAG_EVP_INCIDENTE,
     TAG_TX_AUTH,
     TAG_BLK_MERKLE,
     TAG_BLK_HEADER,
@@ -235,7 +247,7 @@ mod tests {
             );
             vistas.push(b);
         }
-        assert_eq!(vistas.len(), 17);
+        assert_eq!(vistas.len(), 19);
     }
 
     /// Las dos etiquetas del flujo son exactamente las de la tabla C-HASH-06.

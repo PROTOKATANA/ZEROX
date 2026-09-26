@@ -1009,13 +1009,26 @@ fn v5_coinbase_v3_con_slot_distinto_se_rechaza_en_consenso() {
 
     for slot in [0u64, 2, 99] {
         assert_eq!(
-            aplicar(&estado, &bloque(slot), &params, zx_core::CBID_RED_DEV),
+            aplicar(
+                &estado,
+                &bloque(slot),
+                &params,
+                zx_core::CBID_RED_DEV,
+                &zx_consensus::transicion::ParametrosEvidencia::inactiva(),
+            ),
             Err(ErrorTransicion::ErrEmision),
             "F-17: slot {slot} ≠ slot del bloque 1"
         );
     }
     assert!(
-        aplicar(&estado, &bloque(1), &params, zx_core::CBID_RED_DEV).is_ok(),
+        aplicar(
+            &estado,
+            &bloque(1),
+            &params,
+            zx_core::CBID_RED_DEV,
+            &zx_consensus::transicion::ParametrosEvidencia::inactiva(),
+        )
+        .is_ok(),
         "el slot correcto sí se aplica"
     );
 

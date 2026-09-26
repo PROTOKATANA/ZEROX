@@ -11,11 +11,12 @@ use crate::digest::{AuthDigest, Digest, SigHash, TxId};
 use crate::error::{EncodingError, ErrorFormaTx};
 use crate::firma::{Firma, LONGITUD_FIRMA};
 use crate::hash::{
-    DomainTag, TAG_TX_AUTH, TAG_TXID_GARANTIA, TAG_TXID_HEADER, TAG_TXID_INPUTS, TAG_TXID_OUTPUTS,
-    TAG_TXID_PREVOUT, TAG_TXID_SEQUENCE, TAG_TXSIG_AMOUNTS, TAG_TXSIG_GARANT, TAG_TXSIG_LOCKS,
-    TAG_TXSIG_THIS_IN, h_d,
+    DomainTag, TAG_EVP_INCIDENTE, TAG_TX_AUTH, TAG_TXID_EVP, TAG_TXID_GARANTIA, TAG_TXID_HEADER,
+    TAG_TXID_INPUTS, TAG_TXID_OUTPUTS, TAG_TXID_PREVOUT, TAG_TXID_SEQUENCE, TAG_TXSIG_AMOUNTS,
+    TAG_TXSIG_GARANT, TAG_TXSIG_LOCKS, TAG_TXSIG_THIS_IN, h_d,
 };
 use crate::preimage::PreimageWriter;
+use crate::preimage::dag::dag_header_a_bytes;
 use crate::tx::{ExtensionTx, SpentOutput, Tx, TxOut};
 
 /// Modo de firma (C-SIG-03). Conjunto **cerrado**: cualquier otro byte es inválido.
@@ -171,7 +172,39 @@ fn extension_digest(tx: &Tx) -> Option<Digest> {
             w.clave(clave).u64(importe.brek() as u64).u64(*slot);
             Some(w.finish(TAG_TXID_GARANTIA))
         }
+        // EV-03: `H_d("ZZKTxIdEvidencia", dag_header_a_bytes(H1) ‖ dag_header_a_bytes(H2))`.
+        ExtensionTx::Evidencia { h1, h2 } => {
+            let b1 = dag_header_a_bytes(h1);
+            let b2 = dag_header_a_bytes(h2);
+            let mut w = PreimageWriter::con_capacidad(b1.len() + b2.len());
+            w.canonical(&b1).canonical(&b2);
+            Some(w.finish(TAG_TXID_EVP))
+        }
     }
+}
+
+/// `incident_id` de la identidad de una `EvidenceTx` (`EV-10`, `RAT-1`).
+///
+/// `H_d("ZZKEvpIncidente_", cbid ‖ public_key ‖ sector_index ‖ history_size ‖ chunk ‖ slot)`,
+/// con todos los enteros en little-endian. La identidad es la de `C-EVP-01` más el
+/// `consensus_branch_id` (RAT-1). Es un digest **opaco**: solo se compara por igualdad.
+#[must_use]
+pub fn incident_id_evidencia(
+    cbid: u32,
+    public_key: &[u8; 32],
+    sector_index: u16,
+    history_size: u64,
+    chunk: &[u8; 32],
+    slot: u64,
+) -> Digest {
+    let mut w = PreimageWriter::con_capacidad(4 + 32 + 2 + 8 + 32 + 8);
+    w.u32(cbid)
+        .h32(public_key)
+        .u16(sector_index)
+        .u64(history_size)
+        .h32(chunk)
+        .u64(slot);
+    w.finish(TAG_EVP_INCIDENTE)
 }
 
 /// El **txid** (C-TX-01): solo datos de efecto, **sin firmas**.

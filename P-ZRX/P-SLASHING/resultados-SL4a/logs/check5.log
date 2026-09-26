@@ -1,0 +1,5 @@
+    Checking zx-storage v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-storage)
+    Checking zx-node v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-node)
+    Checking zx-p2p v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-p2p)
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/SL4a/ws/crates/zx-consensus)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.65s
