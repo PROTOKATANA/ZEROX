@@ -215,7 +215,7 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   que ningún commit posterior tocó (`cb77c55`). El resto del árbol antiguo (documentos) no se toca.
 - **W06d1** (nodo sin red, Sonnet) lanzada con entrada congelada.
 
-### 05:30–05:52 — incidente en W06d1
+### 05:30–05:46 — incidente en W06d1
 
 - **T04-D superado** (`007e106`): vectores DAG v0.3; el artefacto de ids cuantificado (16 descartes en
   v0.2 → 0). **W06a-B** lanzada (arneses sin emulación).
@@ -229,3 +229,4 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   escritor, sin forks; padre seleccionado real con GHOSTDAG; sin doble firma tras reiniciar) y
   relanzada con un ejecutor nuevo.
 - Lección: en las órdenes a subagentes, prohibir expresamente lanzar subagentes o forks.
+- Nota de exactitud: la sección «Relanzamiento» de `ORDEN-W06d1.md` dice «05:50»; se escribió a las 05:45 (no se corrige el archivo porque está congelado con la orden en curso). Desde ahora las horas se toman de `date` al escribir.
