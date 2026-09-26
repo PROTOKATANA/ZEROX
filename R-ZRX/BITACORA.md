@@ -201,3 +201,16 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - **W06b** superada tras mi **Corrección A** (la integridad solo miraba la cabecera: error de mi orden);
   rebase W06b-R en curso. Límite: testigos PoW no comprometidos → prueba obligatoria en W06d1.
 - `SPEC-0.0.1.md` en borrador: índice de lo implementado y validado, con estado por regla.
+
+### 05:10–05:35
+
+- **T01-E superado** (`b924ad0`): el oráculo T01 identifica la salida de la liberación por su contenido
+  (como F-18). Revela que el artefacto de ids ya afectaba a T01: 1 434 de 2 055 casos base cambian
+  (transferencias que se descartaban al construir la historia). **Error de lanzamiento mío** en la
+  parte T04-D (lanzada desde `P-TRANSICION`, sin escritura en `P-DAG`); relanzada desde su zona.
+- **W06b migrada** (rebase W06b-R, `83d03ee`): la suite completa de la raíz con W05b3 + W06a + W06b da
+  680 pasan, 0 fallan.
+- **Decisión:** `HEAD` no era reproducible (34 tests antiguos en `crates/` solo borrados en la copia de
+  trabajo). Registro en git los 98 borrados de archivos de `9681061` bajo `crates/`, `ci/` y `.github/`
+  que ningún commit posterior tocó (`cb77c55`). El resto del árbol antiguo (documentos) no se toca.
+- **W06d1** (nodo sin red, Sonnet) lanzada con entrada congelada.
