@@ -1,0 +1,3 @@
+2026-09-26T05:48:43+02:00 inicio ORDEN-W06d1 (relanzamiento); ejecutor único Sonnet, sin subagentes
+2026-09-26T07:15:25+02:00 V1/V2/V6/V7/V9 en verde; V4 en verde (78 bloques PoST, release); V5/V5b en curso; V8 pendiente por presupuesto de tiempo
+2026-09-26T09:49:59+02:00 cierre: V3-después final en logs/V3-despues2.log (694/0/2, 0 perdidos, 14 añadidos); arreglada fase PoW de tests/reinicio.rs (PROGRESO.md puntos 8-9); cambios.patch y MIGRACION.sha256 regenerados sobre ws/ actual, sha256sum -c en verde; INFORME.md completo

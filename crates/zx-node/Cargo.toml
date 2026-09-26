@@ -1,0 +1,46 @@
+[package]
+name         = "zx-node"
+description  = "Nodo `zx-node` de la red dev: un proceso sin red que mina PoW, cruza el corte y produce PoST en régimen con persistencia y reinicio (ORDEN-W06d1, D-N01)"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "zx-node"
+path = "src/main.rs"
+
+[dependencies]
+thiserror       = { workspace = true }
+blake3          = { workspace = true }
+ed25519-zebra   = { workspace = true }
+primitive-types = { workspace = true }
+clap            = { workspace = true }
+zx-core         = { path = "../zx-core" }
+zx-consensus    = { path = "../zx-consensus" }
+zx-dag          = { path = "../zx-dag" }
+zx-poas         = { path = "../zx-poas" }
+zx-farmer       = { path = "../zx-farmer" }
+zx-post         = { path = "../zx-post" }
+zx-cadena       = { path = "../zx-cadena" }
+zx-storage      = { path = "../zx-storage", features = ["rocksdb"] }
+
+# ── Autonomys por ruta al clon fijado `PDF/autonomys-subspace` @ f8842d0 ────────────────────────
+# Mismas instancias que `zx-farmer`/`zx-post`: el nodo no reimplementa PoS, KZG ni erasure coding,
+# solo nombra los tipos que ya cruzan las firmas de esos dos crates (`Kzg`, `PieceCheckParams`,
+# `ErasureCoding`, `PublicKey`, `SectorIndex`).
+subspace-core-primitives = { path = "../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
+subspace-erasure-coding  = { path = "../../PDF/autonomys-subspace/crates/subspace-erasure-coding" }
+subspace-kzg             = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
+subspace-verification    = { path = "../../PDF/autonomys-subspace/crates/subspace-verification" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+# Solo para V5b: reabre el mismo RocksDB por debajo de `Almacen` y corrompe a mano el testigo de un
+# bloque PoW ya persistido (el compromiso del cuerpo PoW no cubre los testigos, `REVISION-W06b.md`).
+# `Almacen` no expone (a propósito) una vía para escribir bytes sin pasar por `admitir`.
+rocksdb = { workspace = true }

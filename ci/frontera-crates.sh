@@ -9,6 +9,11 @@
 # el ciclo red↔consenso se rompe en `zx-node`. `zx-storage` (D-N03′, W06b) depende **solo** de
 # `zx-core`: persistir bloques no es validarlos ni conocer el estado derivado.
 #
+# `zx-node` (D-N01, W06d1) puede ver **todos** los crates del workspace: es el único que integra
+# red, consenso y almacén. La regla recíproca —que ningún otro crate dependa de `zx-node`— ya la
+# impone este mismo script: `zx-node` no aparece en ninguna lista de `permitidos` de abajo, así que
+# si alguno lo declarara como dependencia, esa `frontera(...)` lo rechazaría.
+#
 # Se usa `jq` (disponible en la máquina del proyecto y en los runners ubuntu de CI). Si no estuviera,
 # el script falla con un mensaje explícito en vez de dar un OK falso.
 set -euo pipefail
@@ -45,4 +50,5 @@ cargo metadata --locked --no-deps --format-version 1 | jq -e '
     frontera("zx-post"; ["zx-core", "zx-pot", "zx-dag", "zx-poas"]),
     frontera("zx-p2p"; ["zx-core"]),
     frontera("zx-cadena"; ["zx-core", "zx-consensus", "zx-dag"]),
-    frontera("zx-storage"; ["zx-core"])'
+    frontera("zx-storage"; ["zx-core"]),
+    frontera("zx-node"; ["zx-core", "zx-consensus", "zx-dag", "zx-pot", "zx-poas", "zx-farmer", "zx-post", "zx-p2p", "zx-cadena", "zx-storage"])'

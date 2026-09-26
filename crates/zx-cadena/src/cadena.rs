@@ -159,6 +159,27 @@ impl Cadena {
         self.por_hash.get(hash)
     }
 
+    /// El `AlmacenGhostdag` real de esta cadena, si el terminal ya se fijó (`ORDEN-W06d1`,
+    /// «Relanzamiento» punto 3).
+    ///
+    /// `AlmacenGhostdag` ya implementa [`zx_dag::bloque_dag::ContextoDag`] sobre sus propios
+    /// bloques admitidos, con `padre_seleccionado` calculado por GHOSTDAG real (`comparar_sp`,
+    /// `C-GD-03`), no declarado por el candidato. Este accesor es lo que le faltaba a `Cadena` para
+    /// que un llamante externo (el nodo) pueda verificar la cabecera de un candidato **antes** de
+    /// admitirlo, sin volver a implementar la selección de padre en otro sitio: el nodo NO debe
+    /// confiar en `ContextoTransicion::padre_seleccionado` (el atajo dev de `zx-post`) para
+    /// bloques ajenos, porque ese atajo devuelve el declarado sin comprobarlo.
+    ///
+    /// `None` hasta que se admite el **primer bloque PoST** (`inicializar_dag` vive dentro de
+    /// [`Self::admitir`] para la variante `Post`, no al fijar el terminal): en la fase PoW pura, y
+    /// también justo después de fijarse el terminal pero antes de admitir ningún bloque PoST,
+    /// sigue siendo `None`. El bloque de transición (único padre posible: el terminal) no tiene,
+    /// por tanto, GHOSTDAG real que consultar; se verifica con `zx_post::ContextoTransicion`.
+    #[must_use]
+    pub fn contexto_dag(&self) -> Option<&zx_dag::ghostdag::AlmacenGhostdag> {
+        self.dag.as_ref()
+    }
+
     /// Bloques PoST conocidos (válidos e inválidos), en orden de hash.
     #[must_use]
     pub fn bloques_post(&self) -> Vec<&BloquePost> {

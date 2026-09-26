@@ -1,0 +1,7 @@
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling librocksdb-sys v0.19.0+11.8.1
+   Compiling rocksdb v0.25.0
+   Compiling zx-storage v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d1/ws/crates/zx-storage)
+   Compiling zx-node v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d1/ws/crates/zx-node)
+    Finished `release` profile [optimized] target(s) in 1m 55s
+exit=0

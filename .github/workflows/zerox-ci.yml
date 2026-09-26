@@ -10,9 +10,13 @@
 # ese clon en su árbol antes del paso de build; el clon no se incluye en el workspace (ver
 # `exclude` en `Cargo.toml`).
 #
-# NO cubre todavía: nodo ni red. Los jobs `almacen` del CI antiguo dependían de `zx-storage`,
-# `zx-p2p` y de scripts retirados; se reintroducirán cuando las órdenes posteriores porten esos
-# crates. Los crates del workspace entran por `--workspace` sin pasos adicionales.
+# `zx-node` (W06d1) integra los crates de consenso, PoT, PoAS/farmer, DAG, cadena y almacén en un
+# solo proceso sin red; también enlaza por `path` el clon fijado, así que el paso de clon de abajo
+# es imprescindible para que `zx-poas`, `zx-farmer`, `zx-post` y `zx-node` compilen en el runner.
+#
+# Los jobs `almacen` del CI antiguo dependían de scripts retirados; se reintroducirán cuando las
+# órdenes posteriores porten la red (`W06d2`). Los crates del workspace entran por `--workspace` sin
+# pasos adicionales.
 name: ZEROX CI
 
 on:
@@ -35,6 +39,12 @@ jobs:
           toolchain: nightly-2026-05-03
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      # IPA E-03: clon fijado de Autonomys (tabla de `PDF/README.md`). Sin él, `zx-poas`,
+      # `zx-farmer`, `zx-post` y `zx-node` no compilan (enlazan `PDF/autonomys-subspace` por `path`).
+      - name: Clonar Autonomys (clon fijado, IPA E-03)
+        run: |
+          git clone https://github.com/autonomys/subspace PDF/autonomys-subspace
+          git -C PDF/autonomys-subspace checkout --detach f8842d019cdf0f7163421b9644db5a9ff82b2a73
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo build --workspace --all-features --locked

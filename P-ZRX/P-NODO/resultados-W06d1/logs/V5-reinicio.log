@@ -1,0 +1,11 @@
+    Finished `release` profile [optimized] target(s) in 0.10s
+     Running tests/reinicio.rs (/home/katana/zeo/ZEROX/deepseek/W06d1/target/release/deps/reinicio-42a5eedde3d7ca1d)
+
+running 2 tests
+test v5b_testigo_pow_corrupto_impide_arrancar ... ok
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo has been running for over 60 seconds
+test v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 93.13s
+
+exit=0

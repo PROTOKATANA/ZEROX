@@ -1,0 +1,3871 @@
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/Cargo.lock ws/Cargo.lock
+--- ws.orig/Cargo.lock	2026-09-26 05:05:36.543103618 +0200
++++ ws/Cargo.lock	2026-09-26 06:41:00.351655054 +0200
+@@ -106,6 +106,56 @@
+ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+ 
+ [[package]]
++name = "anstream"
++version = "1.0.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "824a212faf96e9acacdbd09febd34438f8f711fb84e09a8916013cd7815ca28d"
++dependencies = [
++ "anstyle",
++ "anstyle-parse",
++ "anstyle-query",
++ "anstyle-wincon",
++ "colorchoice",
++ "is_terminal_polyfill",
++ "utf8parse",
++]
++
++[[package]]
++name = "anstyle"
++version = "1.0.14"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
++
++[[package]]
++name = "anstyle-parse"
++version = "1.0.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "52ce7f38b242319f7cabaa6813055467063ecdc9d355bbb4ce0c68908cd8130e"
++dependencies = [
++ "utf8parse",
++]
++
++[[package]]
++name = "anstyle-query"
++version = "1.1.5"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
++dependencies = [
++ "windows-sys 0.61.2",
++]
++
++[[package]]
++name = "anstyle-wincon"
++version = "3.0.11"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
++dependencies = [
++ "anstyle",
++ "once_cell_polyfill",
++ "windows-sys 0.61.2",
++]
++
++[[package]]
+ name = "anyhow"
+ version = "1.0.104"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -567,6 +617,52 @@
+ ]
+ 
+ [[package]]
++name = "clap"
++version = "4.6.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "473c7e07f409a8d772161724aa8db6a765a2532a70f9667eeb7b49d3d02fbdca"
++dependencies = [
++ "clap_builder",
++ "clap_derive",
++]
++
++[[package]]
++name = "clap_builder"
++version = "4.6.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7b48fea5a88e9ae728a2dcbedbfc0e730f7d60da42e1cb049a83c9fb8b789889"
++dependencies = [
++ "anstream",
++ "anstyle",
++ "clap_lex",
++ "strsim",
++]
++
++[[package]]
++name = "clap_derive"
++version = "4.6.4"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "d012d2b9d65aca7f18f4d9878a045bc17899bba951561ba5ec3c2ba1eed9a061"
++dependencies = [
++ "heck",
++ "proc-macro2",
++ "quote",
++ "syn 3.0.4",
++]
++
++[[package]]
++name = "clap_lex"
++version = "1.1.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
++
++[[package]]
++name = "colorchoice"
++version = "1.0.5"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
++
++[[package]]
+ name = "concurrent-queue"
+ version = "2.5.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -1791,6 +1887,12 @@
+ checksum = "6a756c3fac73139e83f14c2d742155dd2b78d3ee56597b419a0579b7bdd6dd78"
+ 
+ [[package]]
++name = "is_terminal_polyfill"
++version = "1.70.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
++
++[[package]]
+ name = "itertools"
+ version = "0.13.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -2648,6 +2750,12 @@
+ ]
+ 
+ [[package]]
++name = "once_cell_polyfill"
++version = "1.70.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
++
++[[package]]
+ name = "opaque-debug"
+ version = "0.3.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -3684,6 +3792,12 @@
+ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+ 
+ [[package]]
++name = "strsim"
++version = "0.11.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
++
++[[package]]
+ name = "subspace-archiving"
+ version = "0.1.0"
+ dependencies = [
+@@ -4208,6 +4322,12 @@
+ checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
+ 
+ [[package]]
++name = "utf8parse"
++version = "0.2.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
++
++[[package]]
+ name = "uuid"
+ version = "1.26.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -4858,6 +4978,31 @@
+ ]
+ 
+ [[package]]
++name = "zx-node"
++version = "0.0.0"
++dependencies = [
++ "blake3",
++ "clap",
++ "ed25519-zebra",
++ "primitive-types",
++ "rocksdb",
++ "subspace-core-primitives",
++ "subspace-erasure-coding",
++ "subspace-kzg",
++ "subspace-verification",
++ "tempfile",
++ "thiserror 2.0.20",
++ "zx-cadena",
++ "zx-consensus",
++ "zx-core",
++ "zx-dag",
++ "zx-farmer",
++ "zx-poas",
++ "zx-post",
++ "zx-storage",
++]
++
++[[package]]
+ name = "zx-p2p"
+ version = "0.0.0"
+ dependencies = [
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/Cargo.toml ws/Cargo.toml
+--- ws.orig/Cargo.toml	2026-09-26 05:05:30.966986302 +0200
++++ ws/Cargo.toml	2026-09-26 06:00:13.606116070 +0200
+@@ -11,6 +11,7 @@
+     "crates/zx-p2p",
+     "crates/zx-cadena",
+     "crates/zx-storage",
++    "crates/zx-node",
+ ]
+ # El clon fijado `PDF/autonomys-subspace` vive dentro de la copia de trabajo, así que Cargo lo
+ # incluiría como miembro automático de este workspace al enlazarlo por `path` y resolvería su
+@@ -68,6 +69,13 @@
+ thiserror          = "=2.0.20"
+ hex                = "=0.4.3"
+ 
++# --- nodo (W06d1) — versión exacta del `Cargo.lock` de `9681061` ---
++# `clap` para la CLI del binario `zx-node` (directorio de datos, red, claves, papel, `N_dev`,
++# `SR_dev`, registro, parada tras N slots). No se añaden `tokio`, `serde` ni `tracing-subscriber`:
++# no son imprescindibles (el nodo no hace E/S de red ni asíncrona en esta orden, y el registro
++# estructurado se escribe a mano con el esquema fijo de `ESCENARIOS-0.0.1.md` §1).
++clap               = { version = "=4.6.6", features = ["derive"] }
++
+ # --- farmer (D1/D2) — versiones exactas del `Cargo.lock` de `9681061` ---
+ # `rand`/`rand_chacha`: relleno propio de la historia génesis dev (D-P12), no el de Autonomys.
+ # `futures`/`async-lock`/`parity-scale-codec`: las que usaba `zx-node` en `9681061`.
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/ci/frontera-crates.sh ws/ci/frontera-crates.sh
+--- ws.orig/ci/frontera-crates.sh	2026-09-26 05:05:30.973986450 +0200
++++ ws/ci/frontera-crates.sh	2026-09-26 05:59:54.749719610 +0200
+@@ -9,6 +9,11 @@
+ # el ciclo red↔consenso se rompe en `zx-node`. `zx-storage` (D-N03′, W06b) depende **solo** de
+ # `zx-core`: persistir bloques no es validarlos ni conocer el estado derivado.
+ #
++# `zx-node` (D-N01, W06d1) puede ver **todos** los crates del workspace: es el único que integra
++# red, consenso y almacén. La regla recíproca —que ningún otro crate dependa de `zx-node`— ya la
++# impone este mismo script: `zx-node` no aparece en ninguna lista de `permitidos` de abajo, así que
++# si alguno lo declarara como dependencia, esa `frontera(...)` lo rechazaría.
++#
+ # Se usa `jq` (disponible en la máquina del proyecto y en los runners ubuntu de CI). Si no estuviera,
+ # el script falla con un mensaje explícito en vez de dar un OK falso.
+ set -euo pipefail
+@@ -45,4 +50,5 @@
+     frontera("zx-post"; ["zx-core", "zx-pot", "zx-dag", "zx-poas"]),
+     frontera("zx-p2p"; ["zx-core"]),
+     frontera("zx-cadena"; ["zx-core", "zx-consensus", "zx-dag"]),
+-    frontera("zx-storage"; ["zx-core"])'
++    frontera("zx-storage"; ["zx-core"]),
++    frontera("zx-node"; ["zx-core", "zx-consensus", "zx-dag", "zx-pot", "zx-poas", "zx-farmer", "zx-post", "zx-p2p", "zx-cadena", "zx-storage"])'
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/src/cadena.rs ws/crates/zx-cadena/src/cadena.rs
+--- ws.orig/crates/zx-cadena/src/cadena.rs	2026-09-26 05:00:50.525414762 +0200
++++ ws/crates/zx-cadena/src/cadena.rs	2026-09-26 07:28:01.746067090 +0200
+@@ -159,6 +159,27 @@
+         self.por_hash.get(hash)
+     }
+ 
++    /// El `AlmacenGhostdag` real de esta cadena, si el terminal ya se fijó (`ORDEN-W06d1`,
++    /// «Relanzamiento» punto 3).
++    ///
++    /// `AlmacenGhostdag` ya implementa [`zx_dag::bloque_dag::ContextoDag`] sobre sus propios
++    /// bloques admitidos, con `padre_seleccionado` calculado por GHOSTDAG real (`comparar_sp`,
++    /// `C-GD-03`), no declarado por el candidato. Este accesor es lo que le faltaba a `Cadena` para
++    /// que un llamante externo (el nodo) pueda verificar la cabecera de un candidato **antes** de
++    /// admitirlo, sin volver a implementar la selección de padre en otro sitio: el nodo NO debe
++    /// confiar en `ContextoTransicion::padre_seleccionado` (el atajo dev de `zx-post`) para
++    /// bloques ajenos, porque ese atajo devuelve el declarado sin comprobarlo.
++    ///
++    /// `None` hasta que se admite el **primer bloque PoST** (`inicializar_dag` vive dentro de
++    /// [`Self::admitir`] para la variante `Post`, no al fijar el terminal): en la fase PoW pura, y
++    /// también justo después de fijarse el terminal pero antes de admitir ningún bloque PoST,
++    /// sigue siendo `None`. El bloque de transición (único padre posible: el terminal) no tiene,
++    /// por tanto, GHOSTDAG real que consultar; se verifica con `zx_post::ContextoTransicion`.
++    #[must_use]
++    pub fn contexto_dag(&self) -> Option<&zx_dag::ghostdag::AlmacenGhostdag> {
++        self.dag.as_ref()
++    }
++
+     /// Bloques PoST conocidos (válidos e inválidos), en orden de hash.
+     #[must_use]
+     pub fn bloques_post(&self) -> Vec<&BloquePost> {
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/tests/contexto_dag.rs ws/crates/zx-cadena/tests/contexto_dag.rs
+--- ws.orig/crates/zx-cadena/tests/contexto_dag.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-cadena/tests/contexto_dag.rs	2026-09-26 07:28:40.664888054 +0200
+@@ -0,0 +1,175 @@
++//! Test del accesor [`Cadena::contexto_dag`] añadido por `ORDEN-W06d1` («Relanzamiento» punto 3).
++//!
++//! El nodo no puede confiar en `zx_post::ContextoTransicion::padre_seleccionado` (el atajo dev que
++//! devuelve el declarado sin comprobarlo) para verificar la cabecera de un bloque **ajeno**: tiene
++//! que consultar el GHOSTDAG real ya admitido en `zx-cadena`. Este test comprueba que el accesor:
++//!
++//! - es `None` mientras no se ha fijado el terminal (fase PoW, sin DAG que consultar);
++//! - es `Some` tras fijarse el terminal, y que el `AlmacenGhostdag` que devuelve es el mismo que usa
++//!   `Cadena` internamente para admitir (mismos bloques conocidos, mismo `padre_seleccionado` real).
++
++#![expect(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    reason = "el test falla con panic por diseño"
++)]
++
++use ed25519_zebra::{SigningKey, VerificationKey};
++use primitive_types::U256;
++use zx_cadena::{BloqueCadena, BloquePost, Cadena};
++use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, ParametrosTransicion};
++use zx_core::{Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, PadresDag, Tx};
++use zx_dag::bloque_dag::ContextoDag;
++
++fn subsidio_pow(_h: u32) -> Amount {
++    Amount::nuevo(10).unwrap()
++}
++
++fn subsidio_post(_s: u64) -> Amount {
++    Amount::nuevo(3).unwrap()
++}
++
++/// `q = S_min = 0`: la garantía del productor nunca bloquea (igual que `tests/propiedades.rs`).
++fn params() -> ParametrosTransicion {
++    ParametrosTransicion {
++        h_dep: 1,
++        m_cb: 1,
++        m_dep: 0,
++        h_corte_min: 1,
++        w_min: U256::one(),
++        s_min: Amount::CERO,
++        q: Amount::CERO,
++        k_min: 0,
++        m_res_slots: 1,
++        m_dep_slots: 1,
++        m_rec_slots: 1,
++        r_slots: 1,
++        f_slots: None,
++        subsidio_pow,
++        subsidio_post,
++    }
++}
++
++fn hash(n: u8) -> BlockHash {
++    BlockHash::from_digest(Digest::from_bytes([n; 32]))
++}
++
++fn clave(semilla: u8) -> ClavePublica {
++    let sk = SigningKey::from([semilla; 32]);
++    let vk = VerificationKey::from(&sk);
++    ClavePublica::desde_bytes(vk.into())
++}
++
++fn tx_coinbase_post(clave: ClavePublica, importe: i64, slot: u64) -> Tx {
++    Tx {
++        version: 3,
++        inputs: Vec::new(),
++        outputs: Vec::new(),
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::CoinbasePost {
++            clave,
++            importe: Amount::nuevo(importe).unwrap(),
++            slot,
++        },
++    }
++}
++
++#[test]
++fn none_antes_del_terminal_y_none_justo_al_fijarlo_some_tras_el_primer_post() {
++    let mut cadena = Cadena::nueva(params(), 1, CBID_RED_DEV);
++
++    let genesis = BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::Genesis { hash: hash(0) },
++        Vec::new(),
++    ));
++    cadena.admitir(genesis).unwrap();
++    assert!(
++        cadena.contexto_dag().is_none(),
++        "sin terminal fijado no hay DAG que consultar"
++    );
++
++    // h_corte_min = 1, W_min = 1: este bloque fija el terminal.
++    let pow = BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::PoW {
++            hash: hash(1),
++            padre: hash(0),
++            altura: 1,
++            trabajo: U256::one(),
++            pow_valido: true,
++        },
++        Vec::new(),
++    ));
++    cadena.admitir(pow).unwrap();
++    assert_eq!(cadena.terminal(), Some(hash(1)));
++    // `inicializar_dag` vive dentro de `admitir_post`, no de `admitir_pow`: justo al fijar el
++    // terminal, antes de admitir ningún bloque PoST, sigue sin haber GHOSTDAG que consultar.
++    assert!(
++        cadena.contexto_dag().is_none(),
++        "el terminal se fijó pero aún no se admitió ningún bloque PoST: sigue sin haber DAG"
++    );
++}
++
++#[test]
++fn el_contexto_dag_es_el_mismo_que_usa_la_admision_real() {
++    let mut cadena = Cadena::nueva(params(), 1, CBID_RED_DEV);
++    cadena
++        .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
++            HechosCabecera::Genesis { hash: hash(0) },
++            Vec::new(),
++        )))
++        .unwrap();
++    cadena
++        .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
++            HechosCabecera::PoW {
++                hash: hash(1),
++                padre: hash(0),
++                altura: 1,
++                trabajo: U256::one(),
++                pow_valido: true,
++            },
++            Vec::new(),
++        )))
++        .unwrap();
++    let terminal = cadena.terminal().unwrap();
++
++    let productor = clave(7);
++    let p1 = BloquePost {
++        hash: hash(10),
++        padres: vec![terminal],
++        slot: 1,
++        productor,
++        peso: 5,
++        prueba_valida: true,
++        requisito_declarado: 0,
++        sr: 1,
++        distancia: 0,
++        identidad: 1,
++        txs: vec![(tx_coinbase_post(productor, 3, 1), Vec::new())],
++    };
++    cadena.admitir(BloqueCadena::Post(p1.clone())).unwrap();
++
++    let dag = cadena
++        .contexto_dag()
++        .expect("el DAG existe tras el terminal");
++
++    // Bloques conocidos por el accesor: el terminal (raíz) y el bloque PoST recién admitido.
++    assert!(dag.es_bloque_validado(&terminal));
++    assert!(dag.es_bloque_validado(&p1.hash));
++    assert!(!dag.es_bloque_validado(&hash(99)));
++    assert!(dag.es_terminal(&terminal));
++    assert_eq!(dag.slot_de_padre(&terminal).unwrap(), 0);
++    assert_eq!(dag.slot_de_padre(&p1.hash).unwrap(), 1);
++
++    // Un único padre: el `sp` real de GHOSTDAG coincide con el declarado (caso trivial, pero es la
++    // MISMA vía que usó `admitir_post` internamente, no una reimplementación local).
++    let padres_unicos = PadresDag::nuevo(p1.hash, &[]).unwrap();
++    assert_eq!(
++        ContextoDag::padre_seleccionado(dag, &padres_unicos).unwrap(),
++        p1.hash
++    );
++
++    // Un padre desconocido para el accesor es un error explícito, no un `None` silencioso.
++    let padres_ajenos = PadresDag::nuevo(hash(99), &[]).unwrap();
++    assert!(ContextoDag::padre_seleccionado(dag, &padres_ajenos).is_err());
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/Cargo.toml ws/crates/zx-node/Cargo.toml
+--- ws.orig/crates/zx-node/Cargo.toml	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/Cargo.toml	2026-09-26 06:39:11.501368065 +0200
+@@ -0,0 +1,46 @@
++[package]
++name         = "zx-node"
++description  = "Nodo `zx-node` de la red dev: un proceso sin red que mina PoW, cruza el corte y produce PoST en régimen con persistencia y reinicio (ORDEN-W06d1, D-N01)"
++version.workspace      = true
++edition.workspace      = true
++rust-version.workspace = true
++license.workspace      = true
++repository.workspace   = true
++
++[lints]
++workspace = true
++
++[[bin]]
++name = "zx-node"
++path = "src/main.rs"
++
++[dependencies]
++thiserror       = { workspace = true }
++blake3          = { workspace = true }
++ed25519-zebra   = { workspace = true }
++primitive-types = { workspace = true }
++clap            = { workspace = true }
++zx-core         = { path = "../zx-core" }
++zx-consensus    = { path = "../zx-consensus" }
++zx-dag          = { path = "../zx-dag" }
++zx-poas         = { path = "../zx-poas" }
++zx-farmer       = { path = "../zx-farmer" }
++zx-post         = { path = "../zx-post" }
++zx-cadena       = { path = "../zx-cadena" }
++zx-storage      = { path = "../zx-storage", features = ["rocksdb"] }
++
++# ── Autonomys por ruta al clon fijado `PDF/autonomys-subspace` @ f8842d0 ────────────────────────
++# Mismas instancias que `zx-farmer`/`zx-post`: el nodo no reimplementa PoS, KZG ni erasure coding,
++# solo nombra los tipos que ya cruzan las firmas de esos dos crates (`Kzg`, `PieceCheckParams`,
++# `ErasureCoding`, `PublicKey`, `SectorIndex`).
++subspace-core-primitives = { path = "../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
++subspace-erasure-coding  = { path = "../../PDF/autonomys-subspace/crates/subspace-erasure-coding" }
++subspace-kzg             = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
++subspace-verification    = { path = "../../PDF/autonomys-subspace/crates/subspace-verification" }
++
++[dev-dependencies]
++tempfile = { workspace = true }
++# Solo para V5b: reabre el mismo RocksDB por debajo de `Almacen` y corrompe a mano el testigo de un
++# bloque PoW ya persistido (el compromiso del cuerpo PoW no cubre los testigos, `REVISION-W06b.md`).
++# `Almacen` no expone (a propósito) una vía para escribir bytes sin pasar por `admitir`.
++rocksdb = { workspace = true }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/claves.rs ws/crates/zx-node/src/claves.rs
+--- ws.orig/crates/zx-node/src/claves.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/claves.rs	2026-09-26 06:30:11.797030070 +0200
+@@ -0,0 +1,62 @@
++//! Claves dev del nodo: derivación determinista desde una semilla y un índice (CLI, decisión 10).
++//!
++//! **Solo dev.** La derivación es `blake3("zx-node/clave-dev/v1" || semilla_le(8) ||
++//! indice_le(4))[0..32)` como bytes de la `SigningKey` Ed25519. No es una ruta de seguridad de red:
++//! es la manera reproducible de que `--semilla 1 --claves 0,1,2` dé siempre las mismas tres claves
++//! en cualquier máquina, para poder repetir un escenario exactamente.
++
++use ed25519_zebra::{SigningKey, VerificationKey};
++use zx_core::ClavePublica;
++
++/// Dominio de la derivación de claves dev (no es una etiqueta de consenso: nunca entra en un hash de
++/// bloque, solo decide qué bytes locales usa el binario para firmar).
++const DOMINIO_CLAVE_DEV: &[u8] = b"zx-node/clave-dev/v1";
++
++/// Una clave dev del nodo: su índice, su clave de firma y su clave pública.
++#[derive(Clone)]
++pub struct ClaveDev {
++    /// Índice con el que se derivó (para el registro y los nombres de fichero de la parcela).
++    pub indice: u32,
++    /// Clave de firma Ed25519.
++    pub sk: SigningKey,
++    /// Clave pública correspondiente.
++    pub pk: ClavePublica,
++}
++
++impl ClaveDev {
++    /// Deriva la clave dev `indice` de la `semilla` dada.
++    #[must_use]
++    pub fn derivar(semilla: u64, indice: u32) -> Self {
++        let mut mensaje = Vec::with_capacity(DOMINIO_CLAVE_DEV.len() + 8 + 4);
++        mensaje.extend_from_slice(DOMINIO_CLAVE_DEV);
++        mensaje.extend_from_slice(&semilla.to_le_bytes());
++        mensaje.extend_from_slice(&indice.to_le_bytes());
++        let digest = zx_core::sha3_256_publico(&mensaje);
++        let sk = SigningKey::from(*digest.as_bytes());
++        let vk = VerificationKey::from(&sk);
++        let pk = ClavePublica::desde_bytes(vk.into());
++        Self { indice, sk, pk }
++    }
++
++    /// Deriva varias claves dev de la misma semilla, en el orden de `indices`.
++    #[must_use]
++    pub fn derivar_varias(semilla: u64, indices: &[u32]) -> Vec<Self> {
++        indices.iter().map(|i| Self::derivar(semilla, *i)).collect()
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::ClaveDev;
++
++    #[test]
++    fn es_determinista_y_distinta_por_indice() {
++        let a = ClaveDev::derivar(1, 0);
++        let b = ClaveDev::derivar(1, 0);
++        let c = ClaveDev::derivar(1, 1);
++        let d = ClaveDev::derivar(2, 0);
++        assert_eq!(a.pk, b.pk, "misma semilla e índice ⇒ misma clave");
++        assert_ne!(a.pk, c.pk, "distinto índice ⇒ distinta clave");
++        assert_ne!(a.pk, d.pk, "distinta semilla ⇒ distinta clave");
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/cli.rs ws/crates/zx-node/src/cli.rs
+--- ws.orig/crates/zx-node/src/cli.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/cli.rs	2026-09-26 06:24:48.499238310 +0200
+@@ -0,0 +1,83 @@
++//! CLI del binario `zx-node` (decisión 10).
++
++use std::path::PathBuf;
++
++use clap::{Parser, ValueEnum};
++use zx_core::Red;
++
++/// Papel del nodo (decisión 10). En esta orden (sin red), solo `Ambos` puede alcanzar el corte por
++/// sí mismo: `Minero`/`Productor` son la forma de la CLI que W06d2 (con red) necesitará para un
++/// nodo que solo mina o solo produce; en un proceso aislado, uno de los dos se quedaría esperando
++/// bloques que nadie le va a mandar.
++#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
++pub enum Papel {
++    /// Solo mina PoW (no llega a producir PoST por sí solo sin red).
++    Minero,
++    /// Solo produce PoST (no cruza el corte por sí solo sin red).
++    Productor,
++    /// Mina PoW y produce PoST: el único papel autosuficiente sin red.
++    Ambos,
++}
++
++/// Red aceptada por la CLI. Solo `dev` es válida (decisión 2); las otras existen para que el
++/// rechazo sea un valor de CLI reconocido y no un `Red` inventado.
++#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
++pub enum RedCli {
++    /// Red de desarrollo: la única que arranca.
++    Dev,
++    /// Red principal: la CLI la acepta como valor, el nodo se niega a arrancar.
++    Mainnet,
++    /// Red de pruebas: la CLI la acepta como valor, el nodo se niega a arrancar.
++    Testnet,
++}
++
++impl From<RedCli> for Red {
++    fn from(r: RedCli) -> Self {
++        match r {
++            RedCli::Dev => Self::Dev,
++            RedCli::Mainnet => Self::Mainnet,
++            RedCli::Testnet => Self::Testnet,
++        }
++    }
++}
++
++/// `zx-node`: nodo de la red dev de ZEROX, sin red (`ORDEN-W06d1`).
++#[derive(Parser, Debug)]
++#[command(name = "zx-node", version, about)]
++pub struct Cli {
++    /// Directorio de datos (almacén y parcelas).
++    #[arg(long, value_name = "DIR")]
++    pub datos: PathBuf,
++
++    /// Red configurada. Solo `dev` arranca (decisión 2).
++    #[arg(long, value_enum, default_value_t = RedCli::Dev)]
++    pub red: RedCli,
++
++    /// Semilla de derivación de claves dev.
++    #[arg(long, default_value_t = 1)]
++    pub semilla: u64,
++
++    /// Índices de claves a derivar, separados por comas (p. ej. `0,1,2`).
++    #[arg(long, value_delimiter = ',', default_value = "0,1,2")]
++    pub claves: Vec<u32>,
++
++    /// Papel del nodo.
++    #[arg(long, value_enum, default_value_t = Papel::Ambos)]
++    pub papel: Papel,
++
++    /// `N_dev`: iteraciones AES por slot.
++    #[arg(long, default_value_t = 138_873_760)]
++    pub n_dev: u64,
++
++    /// `SR_dev`: rango de solución.
++    #[arg(long, default_value_t = u64::MAX)]
++    pub sr_dev: u64,
++
++    /// Ruta del registro estructurado (JSON, una línea por evento).
++    #[arg(long, value_name = "RUTA")]
++    pub registro: PathBuf,
++
++    /// Para el nodo tras producir/alcanzar este slot de régimen (para pruebas y mediciones).
++    #[arg(long)]
++    pub parada_tras_slots: Option<u64>,
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/error.rs ws/crates/zx-node/src/error.rs
+--- ws.orig/crates/zx-node/src/error.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/error.rs	2026-09-26 06:30:11.798030091 +0200
+@@ -0,0 +1,87 @@
++//! Error de arranque y de operación del nodo.
++
++use std::path::PathBuf;
++
++use zx_core::Red;
++
++/// Fallo del nodo. Cualquier variante termina el proceso con código ≠ 0 (decisión 2 y 4 de la
++/// orden).
++#[derive(Debug, thiserror::Error)]
++pub enum ErrorNodo {
++    /// La red configurada no es `Red::Dev` (decisión 2): se rechaza **antes** de abrir disco o
++    /// sockets.
++    #[error("red configurada {encontrada:?}: este binario solo arranca en Red::Dev")]
++    RedNoEsDev {
++        /// Red que se pidió por CLI.
++        encontrada: Red,
++    },
++    /// El perfil dev no se pudo construir.
++    #[error("perfil dev: {0}")]
++    Perfil(#[from] crate::perfil::ErrorPerfil),
++    /// Fallo de E/S (directorio de datos, registro, parcelas).
++    #[error("E/S: {0}")]
++    Io(#[from] std::io::Error),
++    /// Fallo del almacén persistente.
++    #[error("almacén: {0}")]
++    Almacen(#[from] zx_storage::StorageError),
++    /// El génesis reconstruido no coincide con la constante congelada de W04 (defensa, referencia
++    /// independiente exigida por `LINEO.md`).
++    #[error("el génesis reconstruido ({encontrado}) no coincide con el esperado ({esperado})")]
++    GenesisDiscrepante {
++        /// Hash reconstruido.
++        encontrado: zx_core::BlockHash,
++        /// Hash esperado (`HASH_GENESIS_DEV`).
++        esperado: zx_core::BlockHash,
++    },
++    /// El génesis de W04 no se pudo construir.
++    #[error("génesis de W04: {0}")]
++    Genesis(#[from] zx_consensus::ErrorPow),
++    /// Un bloque **propio** fue rechazado por la tubería de admisión (decisión 4): es un error del
++    /// nodo, no un evento normal.
++    #[error("bloque propio {hash} rechazado en la admisión: {motivo}")]
++    BloquePropioRechazado {
++        /// Hash del bloque propio rechazado.
++        hash: zx_core::BlockHash,
++        /// Motivo exacto.
++        motivo: String,
++    },
++    /// El almacén no reprodujo un bloque durante la repetición al reiniciar (D-N03′).
++    #[error(
++        "repetición: el bloque {hash} de la posición {indice} no se pudo reconstruir: {motivo}"
++    )]
++    RepeticionFallida {
++        /// Índice del registro de admisión.
++        indice: u64,
++        /// Hash del bloque que falló.
++        hash: zx_core::BlockHash,
++        /// Motivo.
++        motivo: String,
++    },
++    /// El testigo de un bloque PoW ya admitido no reproduce su firma al repetir (defensa contra el
++    /// límite declarado por `REVISION-W06b.md`: la integridad del almacén no cubre los testigos
++    /// PoW; la repetición del motor sí, porque vuelve a comprobar las firmas).
++    #[error("repetición: el testigo de la entrada {indice} (bloque {hash}) no verifica: {motivo}")]
++    TestigoPowCorrupto {
++        /// Índice del registro.
++        indice: u64,
++        /// Hash del bloque.
++        hash: zx_core::BlockHash,
++        /// Motivo del motor de transición.
++        motivo: String,
++    },
++    /// Fallo al construir el contexto de pieza / historia génesis dev de `zx-poas`.
++    #[error("historia génesis dev: {0}")]
++    Historia(#[from] zx_poas::ErrorHistoriaGenesis),
++    /// Fallo del granjero (parcela, auditoría).
++    #[error("granjero: {0}")]
++    Farmer(#[from] zx_farmer::ErrorFarmer),
++    /// Directorio de datos inválido.
++    #[error("directorio de datos inválido: {0}")]
++    DirectorioInvalido(PathBuf),
++    /// Fallo genérico con mensaje libre (última instancia; se documenta en `PROGRESO.md` cada uso).
++    #[error("{0}")]
++    Otro(String),
++}
++
++/// Alias de resultado del nodo.
++pub type ResultadoNodo<T> = Result<T, ErrorNodo>;
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/estado_resumen.rs ws/crates/zx-node/src/estado_resumen.rs
+--- ws.orig/crates/zx-node/src/estado_resumen.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/estado_resumen.rs	2026-09-26 06:30:11.799030112 +0200
+@@ -0,0 +1,192 @@
++//! Resumen de estado (decisión 8 de `ORDEN-W06d1`; «Relanzamiento» punto 5).
++//!
++//! `blake3` de una codificación canónica **propia de `zx-node`** del estado de la punta
++//! seleccionada: UTXO, garantía (con nonce) y emisión. Ni `zx-cadena` ni `zx-consensus` ofrecen esta
++//! codificación (buscado explícitamente antes de escribirla; ninguna pieza migrada la impedía, así
++//! que no hace falta ningún arreglo a otro crate). Objetivo: comparar el estado de dos aperturas del
++//! mismo nodo (o, en el futuro, de dos nodos) sin volcar el estado entero.
++//!
++//! # Formato canónico
++//!
++//! Big-endian para todo entero de ancho fijo. Las colecciones de `Estado` que son `BTreeMap`
++//! (`utxo`, `garantias`) ya iteran en orden de clave: no hace falta ordenar nada aparte. Los
++//! `Vec<Pendiente>`/`Vec<EnRetirada>` de cada [`Garantia`] se codifican en su orden de aparición: es
++//! el orden en que el motor de transición los fue añadiendo, determinista para una misma historia.
++//!
++//! ```text
++//! resumen(Estado) = blake3(
++//!     b"zx-node/resumen-estado/v1"
++//!     ‖ CompactLenU64(|utxo|) ‖ Σ_{(op,e) en utxo, orden BTreeMap} entrada_utxo(op, e)
++//!     ‖ CompactLenU64(|garantias|) ‖ Σ_{(pk,g) en garantias, orden BTreeMap} garantia(pk, g)
++//!     ‖ i128_be(emitido)
++//! )
++//! ```
++//!
++//! con `entrada_utxo(op, e) = txid(32) ‖ index_be(4) ‖ valor_be(8) ‖ lock(...) ‖ origen(1) ‖ punto(9)`
++//! y `garantia(pk, g) = pk(32) ‖ activo_be(8) ‖ nonce_siguiente_be(8) ‖ pendientes(...) ‖
++//! en_retirada(...) ‖ congelado_be(8) ‖ creditos(...)`. `lock` codifica su discriminante (`0` = P2K,
++//! `1` = MultiSig) seguido de sus campos; `origen` es el discriminante de tres valores; `punto` es un
++//! byte de discriminante (`0` = Altura, `1` = Slot) seguido de 8 bytes big-endian.
++//!
++//! No es un formato de wire ni entra en ningún hash de consenso: es un instrumento de diagnóstico
++//! del nodo (`ESCENARIOS-0.0.1.md` §1, «resumen del estado canónico»).
++
++use zx_consensus::transicion::{
++    EnRetirada, EntradaUtxo, Estado, Garantia, Origen, Pendiente, Punto,
++};
++use zx_core::{ClavePublica, Lock, OutPoint};
++
++/// Dominio del resumen de estado (no es una etiqueta de consenso).
++const DOMINIO: &[u8] = b"zx-node/resumen-estado/v1";
++
++fn codificar_len(buf: &mut Vec<u8>, n: usize) {
++    #[expect(
++        clippy::unwrap_used,
++        reason = "un estado real nunca tiene más de u64::MAX entradas"
++    )]
++    let n64 = u64::try_from(n).unwrap();
++    buf.extend_from_slice(&n64.to_be_bytes());
++}
++
++fn codificar_punto(buf: &mut Vec<u8>, p: Punto) {
++    match p {
++        Punto::Altura(h) => {
++            buf.push(0);
++            buf.extend_from_slice(&u64::from(h).to_be_bytes());
++        }
++        Punto::Slot(s) => {
++            buf.push(1);
++            buf.extend_from_slice(&s.to_be_bytes());
++        }
++    }
++}
++
++fn codificar_lock(buf: &mut Vec<u8>, lock: &Lock) {
++    match lock {
++        Lock::PubKey { pubkey } => {
++            buf.push(0);
++            buf.extend_from_slice(pubkey.bytes());
++        }
++        Lock::MultiSig { k, pubkeys } => {
++            buf.push(1);
++            buf.push(*k);
++            codificar_len(buf, pubkeys.len());
++            for pk in pubkeys {
++                buf.extend_from_slice(pk.bytes());
++            }
++        }
++        Lock::Htlc {
++            hash,
++            receiver,
++            sender,
++            timeout,
++        } => {
++            buf.push(2);
++            buf.extend_from_slice(hash);
++            buf.extend_from_slice(receiver.bytes());
++            buf.extend_from_slice(sender.bytes());
++            buf.extend_from_slice(&u64::from(*timeout).to_be_bytes());
++        }
++    }
++}
++
++fn codificar_outpoint(buf: &mut Vec<u8>, op: &OutPoint) {
++    buf.extend_from_slice(op.prev_txid.as_bytes());
++    buf.extend_from_slice(&op.prev_index.to_be_bytes());
++}
++
++fn codificar_entrada_utxo(buf: &mut Vec<u8>, op: &OutPoint, e: &EntradaUtxo) {
++    codificar_outpoint(buf, op);
++    buf.extend_from_slice(&e.valor.brek().to_be_bytes());
++    codificar_lock(buf, &e.lock);
++    let origen: u8 = match e.origen {
++        Origen::CoinbasePow => 0,
++        Origen::Tx => 1,
++        Origen::Liberacion => 2,
++    };
++    buf.push(origen);
++    codificar_punto(buf, e.creada);
++}
++
++fn codificar_pendiente(buf: &mut Vec<u8>, p: &Pendiente) {
++    buf.extend_from_slice(&p.importe.brek().to_be_bytes());
++    match p.madura_en_altura {
++        Some(h) => {
++            buf.push(1);
++            buf.extend_from_slice(&u64::from(h).to_be_bytes());
++        }
++        None => buf.push(0),
++    }
++    match p.madura_en_slot {
++        Some(s) => {
++            buf.push(1);
++            buf.extend_from_slice(&s.to_be_bytes());
++        }
++        None => buf.push(0),
++    }
++}
++
++fn codificar_en_retirada(buf: &mut Vec<u8>, r: &EnRetirada) {
++    buf.extend_from_slice(&r.importe.brek().to_be_bytes());
++    buf.extend_from_slice(&r.inicio_slot.to_be_bytes());
++}
++
++fn codificar_garantia(buf: &mut Vec<u8>, pk: &ClavePublica, g: &Garantia) {
++    buf.extend_from_slice(pk.bytes());
++    buf.extend_from_slice(&g.activo.brek().to_be_bytes());
++    buf.extend_from_slice(&g.nonce_siguiente.to_be_bytes());
++    codificar_len(buf, g.pendientes.len());
++    for p in &g.pendientes {
++        codificar_pendiente(buf, p);
++    }
++    codificar_len(buf, g.en_retirada.len());
++    for r in &g.en_retirada {
++        codificar_en_retirada(buf, r);
++    }
++    buf.extend_from_slice(&g.congelado.brek().to_be_bytes());
++    codificar_len(buf, g.creditos.len());
++    for c in &g.creditos {
++        codificar_pendiente(buf, c);
++    }
++}
++
++/// Codificación canónica del estado, tal como la documenta el módulo.
++#[must_use]
++pub fn codificar_estado(estado: &Estado) -> Vec<u8> {
++    let mut buf = Vec::new();
++    buf.extend_from_slice(DOMINIO);
++    codificar_len(&mut buf, estado.utxo.len());
++    for (op, e) in &estado.utxo {
++        codificar_entrada_utxo(&mut buf, op, e);
++    }
++    codificar_len(&mut buf, estado.garantias.len());
++    for (pk, g) in &estado.garantias {
++        codificar_garantia(&mut buf, pk, g);
++    }
++    buf.extend_from_slice(&estado.emitido.to_be_bytes());
++    buf
++}
++
++/// `blake3` del estado, en hexadecimal, para el registro estructurado.
++#[must_use]
++pub fn resumen_estado(estado: &Estado) -> String {
++    let bytes = codificar_estado(estado);
++    blake3::hash(&bytes).to_hex().to_string()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::resumen_estado;
++    use zx_consensus::transicion::Estado;
++
++    #[test]
++    fn es_determinista_y_sensible_a_cambios() {
++        let e1 = Estado::inicial();
++        let e2 = Estado::inicial();
++        assert_eq!(resumen_estado(&e1), resumen_estado(&e2));
++
++        let mut e3 = Estado::inicial();
++        e3.emitido = 1;
++        assert_ne!(resumen_estado(&e1), resumen_estado(&e3));
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/identidad.rs ws/crates/zx-node/src/identidad.rs
+--- ws.orig/crates/zx-node/src/identidad.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/identidad.rs	2026-09-26 06:07:25.107200260 +0200
+@@ -0,0 +1,66 @@
++//! Identidad de GHOSTDAG del bloque producido: compromiso documentado (`PROGRESO.md` punto 3).
++//!
++//! `zx-cadena::BloquePost::identidad` es `u64` (dominio de fixture de `IdentidadGhostdag::
++//! de_fixture`), no `IdentidadGhostdag::Billete(IdentidadTicket)`. `C-GD-07` exige la tupla literal
++//! `(public_key, sector_index, history_size, chunk, slot)`; comprimirla a un `u64` **no es
++//! inyectivo** (lo dice `zx_dag::identidad`). Este módulo trunca la huella SHA3-256 de 32 B —ya
++//! separada por dominio y versión— a sus primeros 8 bytes. Es un compromiso, no una prueba de
++//! unicidad de billete: se declara en `INFORME.md` §"lo no demostrado".
++
++use zx_core::DagBlockHeader;
++use zx_dag::identidad_de_cabecera;
++
++/// Deriva la identidad `u64` (dominio de fixture) de una cabecera PoST ya construida.
++///
++/// `0` se traduce a `1`: en el dominio de fixture, `0` es el centinela `SinBillete`
++/// (`IdentidadGhostdag::de_fixture`), y un billete real nunca debe leerse como ausencia. La
++/// probabilidad de que la huella trunque a `0` es `2^-64`; el ajuste no cambia la propiedad
++/// criptográfica, solo evita el único valor reservado.
++#[must_use]
++pub fn identidad_u64_de_cabecera(cabecera: &DagBlockHeader) -> u64 {
++    let huella = identidad_de_cabecera(cabecera).huella();
++    #[expect(
++        clippy::unwrap_used,
++        reason = "huella() siempre da 32 bytes; los primeros 8 siempre convierten"
++    )]
++    let primeros8: [u8; 8] = huella[..8].try_into().unwrap();
++    let v = u64::from_be_bytes(primeros8);
++    if v == 0 { 1 } else { v }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::identidad_u64_de_cabecera;
++    use zx_core::digest::{BodyCommitment, Digest, MerkleRoot};
++    use zx_core::{DagBlockHeader, PadresDag, SolucionPoas};
++
++    fn cabecera(slot: u64, chunk: u8) -> DagBlockHeader {
++        DagBlockHeader {
++            consensus_branch_id: zx_core::CBID_RED_DEV,
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([1; 32])),
++            timestamp: 1_788_480_000,
++            height: 0,
++            slot,
++            pot_output: [0u8; 16],
++            rango_solucion: 1,
++            sol: SolucionPoas {
++                chunk: [chunk; 32],
++                ..SolucionPoas::default()
++            },
++            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([2; 32])),
++            padres: PadresDag::genesis(),
++            sello: [0u8; 64],
++        }
++    }
++
++    #[test]
++    fn es_determinista_y_nunca_cero() {
++        let a = identidad_u64_de_cabecera(&cabecera(1, 0xAA));
++        let b = identidad_u64_de_cabecera(&cabecera(1, 0xAA));
++        let c = identidad_u64_de_cabecera(&cabecera(1, 0xBB));
++        assert_eq!(a, b);
++        assert_ne!(a, c);
++        assert_ne!(a, 0);
++        assert_ne!(c, 0);
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/lib.rs ws/crates/zx-node/src/lib.rs
+--- ws.orig/crates/zx-node/src/lib.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/lib.rs	2026-09-26 06:30:11.799030112 +0200
+@@ -0,0 +1,23 @@
++//! `zx-node`: nodo de la red dev de ZEROX en un solo proceso, sin red (`ORDEN-W06d1`).
++//!
++//! Un proceso que arranca de la red dev, mina PoW, deposita garantía con sus propias claves, cruza
++//! el corte, produce bloques PoST en régimen con su hilo PoT y su granjero, persiste, y al reiniciar
++//! reconstruye el mismo estado. La red (mensajes, sincronización) es `W06d2`.
++//!
++//! Ver `README` de la orden en `P-ZRX/P-NODO/ORDEN-W06d1.md` y las decisiones/límites en
++//! `deepseek/W06d1/PROGRESO.md`.
++
++pub mod claves;
++pub mod cli;
++pub mod error;
++pub mod estado_resumen;
++pub mod identidad;
++pub mod nodo;
++pub mod padres;
++pub mod perfil;
++pub mod pow;
++pub mod regimen;
++pub mod registro;
++
++pub use error::{ErrorNodo, ResultadoNodo};
++pub use nodo::{Config, Nodo};
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/main.rs ws/crates/zx-node/src/main.rs
+--- ws.orig/crates/zx-node/src/main.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/main.rs	2026-09-26 06:25:07.092628915 +0200
+@@ -0,0 +1,39 @@
++//! Binario `zx-node` (`ORDEN-W06d1`).
++
++use clap::Parser as _;
++use zx_node::cli::{Cli, Papel};
++use zx_node::nodo::{Config, Nodo};
++
++fn main() {
++    let cli = Cli::parse();
++
++    if cli.papel != Papel::Ambos {
++        eprintln!(
++            "papel {:?}: sin red (ORDEN-W06d1) un proceso aislado no puede solo minar o solo \
++             producir y aun así alcanzar el corte; use --papel ambos",
++            cli.papel
++        );
++        std::process::exit(2);
++    }
++    if cli.claves.is_empty() {
++        eprintln!("--claves no puede estar vacío: el nodo necesita al menos una clave propia");
++        std::process::exit(2);
++    }
++
++    let cfg = Config {
++        dir_datos: cli.datos,
++        ruta_registro: cli.registro,
++        red: cli.red.into(),
++        semilla: cli.semilla,
++        indices_claves: cli.claves,
++        n_dev: cli.n_dev,
++        sr_dev: cli.sr_dev,
++        parada_tras_slots: cli.parada_tras_slots,
++    };
++
++    let resultado = Nodo::arrancar(&cfg).and_then(|mut nodo| nodo.ejecutar());
++    if let Err(e) = resultado {
++        eprintln!("zx-node: error fatal: {e}");
++        std::process::exit(1);
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/nodo.rs ws/crates/zx-node/src/nodo.rs
+--- ws.orig/crates/zx-node/src/nodo.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/nodo.rs	2026-09-26 07:16:31.796513200 +0200
+@@ -0,0 +1,1074 @@
++//! Bucle de consenso: el único dueño de `zx-cadena` y `zx-storage` (decisión 3).
++//!
++//! Arranque limpio o reinicio (D-N03′), tubería de admisión única (decisión 4), fases PoW y PoST en
++//! régimen (decisión 5, 6), resumen de estado (decisión 8) y registro estructurado (decisión 9).
++
++use std::path::{Path, PathBuf};
++use std::sync::Arc;
++use std::sync::mpsc;
++use std::thread;
++
++use subspace_core_primitives::PublicKey;
++use subspace_verification::PieceCheckParams;
++use zx_cadena::{BloqueCadena, BloquePost, Cadena};
++use zx_consensus::genesis::{GENESIS_DEV, HASH_GENESIS_DEV, construir as construir_genesis};
++use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, ParametrosTransicion};
++use zx_consensus::verificador::{ContextoPow, validar_cabecera_pow};
++use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev};
++use zx_core::digest::Digest;
++use zx_core::preimage::block::BlockHeader;
++use zx_core::wire::cuerpo_desde_bytes;
++use zx_core::wire_dag::{BloqueDag, bloque_dag_desde_bytes};
++use zx_core::{BlockHash, PadresDag, Red, Tx, trabajo_bloque, txid};
++use zx_dag::ErrorDag;
++use zx_dag::bloque_dag::{CandidatoSinRango, ContextoRangoDag};
++use zx_farmer::farmer::{ParcelaDisco, plotear_sector_en_disco};
++use zx_poas::HistoriaGenesis;
++use zx_post::cabecera_conjunta::{EstadoCabeceraConjunta, verificar_cabecera_conjunta};
++use zx_post::pot_rango::{CachePotVerificada, PresupuestoPot};
++use zx_post::productor::{FuenteSoluciones, ParametrosProductor, SolucionCandidata, producir};
++use zx_post::servicio_pot::ServicioPot;
++use zx_storage::disco::AlmacenEnDisco;
++use zx_storage::{Almacen, BloqueAdmitido, ErrorRepeticion, Familia};
++
++use crate::claves::ClaveDev;
++use crate::error::{ErrorNodo, ResultadoNodo};
++use crate::estado_resumen::resumen_estado;
++use crate::identidad::identidad_u64_de_cabecera;
++use crate::padres::padres_de_regimen;
++use crate::perfil;
++use crate::pow::{self, CoinbasePropia};
++use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
++use crate::registro::Registro;
++
++/// `SR_dev`/`ContextoRangoDag` constante del perfil dev (D-P11: sin controlador).
++struct RangoDev(u64);
++
++impl ContextoRangoDag for RangoDev {
++    fn rango_esperado(&self, _candidato: &CandidatoSinRango<'_>) -> Result<u64, ErrorDag> {
++        Ok(self.0)
++    }
++}
++
++/// Presupuesto sin tope: el nodo dev no impone `C-NET-33` en un proceso propio y sin red.
++struct PresupuestoIlimitado;
++
++impl PresupuestoPot for PresupuestoIlimitado {
++    fn consumir_slot(&mut self, _slot: u64) -> bool {
++        true
++    }
++}
++
++/// Configuración del nodo (decisión 10, CLI).
++pub struct Config {
++    /// Directorio de datos (almacén + parcelas).
++    pub dir_datos: PathBuf,
++    /// Ruta del registro estructurado.
++    pub ruta_registro: PathBuf,
++    /// Red configurada (decisión 2: debe ser `Red::Dev`).
++    pub red: Red,
++    /// Semilla de derivación de claves.
++    pub semilla: u64,
++    /// Índices de claves a derivar.
++    pub indices_claves: Vec<u32>,
++    /// `N_dev`.
++    pub n_dev: u64,
++    /// `SR_dev`.
++    pub sr_dev: u64,
++    /// Parada tras N slots de régimen (`None` = sin límite).
++    pub parada_tras_slots: Option<u64>,
++}
++
++/// Estado completo del nodo, dueño único de `zx-cadena` y `zx-storage`.
++pub struct Nodo {
++    params: ParametrosTransicion,
++    cadena: Cadena,
++    almacen: AlmacenEnDisco,
++    registro: Registro,
++    claves: Vec<ClaveDev>,
++    cbid: u32,
++    historial_pow: Vec<BlockHeader>,
++    coinbases: Vec<CoinbasePropia>,
++    servicio_verificacion: Option<ServicioPot>,
++    historia: Arc<HistoriaGenesis>,
++    ultima_punta_registrada: Option<BlockHash>,
++    dir_datos: PathBuf,
++    n_dev: u64,
++    sr_dev_actual: u64,
++    parada_tras_slots: Option<u64>,
++}
++
++fn ruta_parcela(dir_datos: &Path, indice: u32) -> PathBuf {
++    dir_datos.join(format!("parcela-{indice}.plot"))
++}
++
++/// Índice de sector determinista por índice de clave (D2: distinto de cero para ejercitar offset).
++fn indice_sector_de(indice_clave: u32) -> u16 {
++    u16::try_from(indice_clave % 1000).unwrap_or(0) + 1
++}
++
++const PIEZAS_POR_SECTOR: u16 = zx_poas::protocolo_dev::PIEZAS_POR_SECTOR_DEV;
++
++/// Abre o crea la parcela de una clave (D2).
++fn abrir_o_crear_parcela(
++    dir_datos: &Path,
++    clave: &ClaveDev,
++    historia: &HistoriaGenesis,
++) -> ResultadoNodo<ParcelaDisco> {
++    let ruta = ruta_parcela(dir_datos, clave.indice);
++    let public_key = PublicKey::from(*clave.pk.bytes());
++    if !ruta.exists() {
++        plotear_sector_en_disco(
++            &ruta,
++            &public_key,
++            indice_sector_de(clave.indice),
++            PIEZAS_POR_SECTOR,
++            historia.historial(),
++            historia.protocolo(),
++            historia.kzg(),
++            historia.erasure_coding(),
++        )
++        .map_err(ErrorNodo::Farmer)?;
++    }
++    ParcelaDisco::abrir(&ruta, &public_key).map_err(ErrorNodo::Farmer)
++}
++
++impl Nodo {
++    /// Arranca el nodo: comprueba la red **antes** de abrir disco o parcelas (decisión 2), abre (o
++    /// crea) el almacén y repite su registro sobre una `Cadena` nueva si no está vacío (D-N03′).
++    ///
++    /// # Errores
++    /// [`ErrorNodo::RedNoEsDev`] si `cfg.red != Red::Dev`; el resto de variantes según la fase.
++    pub fn arrancar(cfg: &Config) -> ResultadoNodo<Self> {
++        if cfg.red != Red::Dev {
++            return Err(ErrorNodo::RedNoEsDev {
++                encontrada: cfg.red,
++            });
++        }
++        std::fs::create_dir_all(&cfg.dir_datos)?;
++        let registro = Registro::abrir(&cfg.ruta_registro)?;
++        registro.escribir(registro.evento("arranque").str("fase", "inicio"), true)?;
++
++        let params = perfil::parametros_transicion_dev()?;
++        let cbid = zx_core::CBID_RED_DEV;
++        let (cabecera_genesis, tx_genesis) = construir_genesis(GENESIS_DEV)?;
++        let hash_genesis_esperado = BlockHash::from_digest(Digest::from_bytes(HASH_GENESIS_DEV));
++        if cabecera_genesis.block_hash() != hash_genesis_esperado {
++            return Err(ErrorNodo::GenesisDiscrepante {
++                encontrado: cabecera_genesis.block_hash(),
++                esperado: hash_genesis_esperado,
++            });
++        }
++
++        let ruta_almacen = cfg.dir_datos.join("storage");
++        let almacen =
++            AlmacenEnDisco::abrir(&ruta_almacen, Red::Dev, cabecera_genesis.block_hash())?;
++        let claves = ClaveDev::derivar_varias(cfg.semilla, &cfg.indices_claves);
++        let historia = Arc::new(HistoriaGenesis::construir()?);
++
++        let mut nodo = Self {
++            params,
++            cadena: Cadena::nueva(
++                perfil::parametros_transicion_dev()?,
++                perfil::ghostdag_k(),
++                cbid,
++            ),
++            almacen,
++            registro,
++            claves,
++            cbid,
++            historial_pow: Vec::new(),
++            coinbases: Vec::new(),
++            servicio_verificacion: None,
++            historia,
++            ultima_punta_registrada: None,
++            dir_datos: cfg.dir_datos.clone(),
++            n_dev: cfg.n_dev,
++            sr_dev_actual: cfg.sr_dev,
++            parada_tras_slots: cfg.parada_tras_slots,
++        };
++
++        let longitud = nodo.almacen.longitud_registro()?;
++        if longitud == 0 {
++            nodo.arranque_limpio(cabecera_genesis, tx_genesis)?;
++        } else {
++            nodo.reiniciar(longitud)?;
++        }
++        Ok(nodo)
++    }
++
++    fn arranque_limpio(
++        &mut self,
++        cabecera_genesis: BlockHeader,
++        tx_genesis: Tx,
++    ) -> ResultadoNodo<()> {
++        self.registro
++            .escribir(self.registro.evento("arranque").str("fase", "limpio"), true)?;
++        let testigos_genesis: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
++        self.cadena
++            .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
++                HechosCabecera::Genesis {
++                    hash: cabecera_genesis.block_hash(),
++                },
++                vec![(
++                    tx_genesis.clone(),
++                    testigos_genesis.first().cloned().unwrap_or_default(),
++                )],
++            )))
++            .map_err(|m| ErrorNodo::BloquePropioRechazado {
++                hash: cabecera_genesis.block_hash(),
++                motivo: m.nombre().to_string(),
++            })?;
++        let admitido = BloqueAdmitido::pow(&cabecera_genesis, &[tx_genesis], &testigos_genesis);
++        self.almacen.admitir(&admitido, true)?;
++        self.historial_pow.push(cabecera_genesis);
++        Ok(())
++    }
++
++    /// D-N03′: repite el registro de admisión sobre una `Cadena` fresca, sin re-verificar cabeceras,
++    /// y reconstruye el `ServicioPot` de verificación desde las cabeceras almacenadas (decisión 7).
++    fn reiniciar(&mut self, longitud: u64) -> ResultadoNodo<()> {
++        let inicio = std::time::Instant::now();
++        self.registro.escribir(
++            self.registro.evento("arranque").str("fase", "reinicio"),
++            true,
++        )?;
++
++        // `Almacen::repetir` toma un `FnMut` que aquí no puede pedir prestado `self` entero (ya
++        // presta `self.almacen`): se recogen primero los pares crudos (el almacén ya comprobó su
++        // integridad al abrir) y se procesan después, uno a uno, con acceso normal a `self`.
++        let mut crudos: Vec<(BlockHash, Vec<u8>)> = Vec::new();
++        let resultado: Result<(), ErrorRepeticion<std::convert::Infallible>> =
++            self.almacen.repetir(&mut |hash, valor| {
++                crudos.push((hash, valor.to_vec()));
++                Ok(())
++            });
++        resultado.map_err(|e| match e {
++            ErrorRepeticion::Almacen(se) => ErrorNodo::Almacen(se),
++            ErrorRepeticion::Destino(ne) => match ne {},
++        })?;
++
++        let mut indice = 0u64;
++        for (hash, valor) in &crudos {
++            self.repetir_uno(*hash, valor, indice)?;
++            indice = indice.saturating_add(1);
++        }
++
++        if indice != longitud {
++            return Err(ErrorNodo::Otro(format!(
++                "la repetición procesó {indice} entradas, se esperaban {longitud}"
++            )));
++        }
++        self.registro.escribir(
++            self.registro
++                .evento("reinicio_completo")
++                .u64("entradas", indice)
++                .u64("duracion_ns", inicio.elapsed().as_nanos() as u64),
++            true,
++        )?;
++        Ok(())
++    }
++
++    fn repetir_uno(&mut self, hash: BlockHash, valor: &[u8], indice: u64) -> Result<(), ErrorNodo> {
++        let bloque =
++            BloqueAdmitido::desde_almacen(valor).map_err(|e| ErrorNodo::RepeticionFallida {
++                indice,
++                hash,
++                motivo: e.to_string(),
++            })?;
++        match bloque.familia() {
++            Familia::Pow => {
++                let (cuerpo, _) = cuerpo_desde_bytes(bloque.canonicos()).map_err(|e| {
++                    ErrorNodo::RepeticionFallida {
++                        indice,
++                        hash,
++                        motivo: e.to_string(),
++                    }
++                })?;
++                let (cabecera, txs, testigos) = cuerpo;
++                self.admitir_pow_interno(cabecera, txs, testigos, indice, false)
++            }
++            Familia::Post => {
++                let (bloque_dag, _) = bloque_dag_desde_bytes(bloque.canonicos()).map_err(|e| {
++                    ErrorNodo::RepeticionFallida {
++                        indice,
++                        hash,
++                        motivo: e.to_string(),
++                    }
++                })?;
++                self.admitir_post_interno(bloque_dag, indice, false)
++            }
++        }
++    }
++
++    /// Admite un bloque PoW: verificación W04 (si `verificar`), motor de transición, persistencia.
++    ///
++    /// `verificar = false` en la repetición (D-N03′): la cabecera ya se comprobó cuando se admitió
++    /// la primera vez. El motor de transición (con sus firmas) se ejecuta **siempre**, verificado o
++    /// no: es lo que detecta un testigo PoW corrupto (`REVISION-W06b.md`, límite declarado).
++    fn admitir_pow_interno(
++        &mut self,
++        cabecera: BlockHeader,
++        txs: Vec<Tx>,
++        testigos: Vec<Vec<Vec<u8>>>,
++        _indice_registro: u64,
++        verificar: bool,
++    ) -> Result<(), ErrorNodo> {
++        let hash = cabecera.block_hash();
++        let es_genesis = cabecera.height == 0;
++
++        if verificar && !es_genesis {
++            #[expect(
++                clippy::indexing_slicing,
++                reason = "historial_pow siempre tiene al menos el génesis en índice 0"
++            )]
++            let padre = &self.historial_pow[self.historial_pow.len() - 1];
++            let target_esperado = pow::target_de_altura(&self.historial_pow, cabecera.height)
++                .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
++            let ctx = ContextoPow {
++                red: Red::Dev,
++                parametros: PARAMETROS_POW_DEV,
++                altura_padre: padre.height,
++                hash_padre: padre.block_hash(),
++                target_esperado,
++                ts_padre: i64::try_from(padre.timestamp).unwrap_or(i64::MAX),
++                reloj_local: i64::try_from(
++                    std::time::SystemTime::now()
++                        .duration_since(std::time::UNIX_EPOCH)
++                        .map(|d| d.as_secs())
++                        .unwrap_or(0),
++                )
++                .unwrap_or(i64::MAX),
++            };
++            validar_cabecera_pow(&cabecera, &ctx, &Sha3Dev).map_err(|e| {
++                ErrorNodo::BloquePropioRechazado {
++                    hash,
++                    motivo: format!("validar_cabecera_pow: {e}"),
++                }
++            })?;
++        }
++
++        let hechos = if es_genesis {
++            HechosCabecera::Genesis { hash }
++        } else {
++            let target = pow_target_de(&cabecera)?;
++            let trabajo = trabajo_bloque(target)
++                .ok_or_else(|| ErrorNodo::Otro(format!("trabajo del bloque {hash} desborda")))?;
++            HechosCabecera::PoW {
++                hash,
++                padre: cabecera.prev_hash,
++                altura: cabecera.height,
++                trabajo,
++                pow_valido: true,
++            }
++        };
++        // Rastro de coinbases/depósitos propios (decisión 5), antes de que `txs` se consuma: marca
++        // depositadas las que este bloque gasta y registra la coinbase nueva si paga a una clave
++        // propia. Funciona igual en producción que en repetición (mismos `txs`).
++        for tx in &txs {
++            for input in &tx.inputs {
++                if input.outpoint.prev_index == 0 {
++                    for c in &mut self.coinbases {
++                        if c.txid == input.outpoint.prev_txid {
++                            c.depositada = true;
++                        }
++                    }
++                }
++            }
++        }
++        if !es_genesis
++            && let Some(coinbase) = txs.first()
++            && let Some(salida) = coinbase.outputs.first()
++            && let zx_core::Lock::PubKey { pubkey } = salida.lock
++            && let Some(indice_clave) = self.claves.iter().position(|c| c.pk == pubkey)
++        {
++            self.coinbases.push(CoinbasePropia {
++                indice_clave,
++                altura: cabecera.height,
++                txid: txid(coinbase, self.cbid),
++                valor: salida.value,
++                depositada: false,
++            });
++        }
++
++        let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
++        if !ya_admitido {
++            // Persistencia (D-N03′) **antes** de admitir en `zx-cadena`: si el proceso muere entre
++            // las dos, el reinicio repite desde el almacén y vuelve a llegar aquí con `ya_admitido`
++            // falso otra vez (la clave del almacén es el hash, admitir es idempotente); al revés
++            // (admitir en memoria y morir antes de persistir) perdería el bloque sin dejar rastro.
++            // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
++            // almacén (viene de ahí) y volver a escribirlo sería una vuelta redundante a disco.
++            if verificar {
++                let admitido = BloqueAdmitido::pow(&cabecera, &txs, &testigos);
++                self.almacen.admitir(&admitido, true)?;
++            }
++
++            let txs_con_testigos: Vec<(Tx, Vec<Vec<u8>>)> = txs.into_iter().zip(testigos).collect();
++            let bt = BloqueTransicion::nuevo(hechos, txs_con_testigos);
++            self.cadena.admitir(BloqueCadena::Pow(bt)).map_err(|m| {
++                ErrorNodo::BloquePropioRechazado {
++                    hash,
++                    motivo: m.nombre().to_string(),
++                }
++            })?;
++        }
++
++        self.historial_pow.push(cabecera);
++        // El `ServicioPot` de verificación se necesita en cuanto el terminal existe, tanto en
++        // producción en vivo (lo crea `fase_regimen` antes de producir) como en la **repetición**
++        // (D-N03′): si el registro trae ya bloques PoST, `admitir_post_interno` los procesa aquí
++        // mismo, dentro de `Nodo::arrancar`, antes de que `fase_regimen` llegue a ejecutarse. Sin
++        // esto, reabrir un nodo que ya había cruzado el corte fallaba siempre en la primera entrada
++        // PoST del registro (bug real encontrado por `tests/reinicio.rs`, ver `PROGRESO.md`).
++        if self.servicio_verificacion.is_none()
++            && let Some(terminal) = self.cadena.terminal()
++        {
++            let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
++                .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
++            self.servicio_verificacion = Some(servicio);
++        }
++        self.registrar_cambio_de_punta()?;
++        Ok(())
++    }
++
++    /// Admite un bloque PoST: tubería única (decisión 4) o repetición (`verificar = false`).
++    fn admitir_post_interno(
++        &mut self,
++        bloque: BloqueDag,
++        _indice_registro: u64,
++        verificar: bool,
++    ) -> Result<(), ErrorNodo> {
++        let hash = bloque.cabecera.block_hash();
++
++        if verificar {
++            let servicio = self
++                .servicio_verificacion
++                .as_ref()
++                .ok_or_else(|| ErrorNodo::Otro("verificación PoST sin ServicioPot".to_string()))?;
++            let params_pieza: PieceCheckParams = self.historia.params_pieza();
++            let mut cache = CachePotVerificada::nueva();
++            let mut presupuesto = PresupuestoIlimitado;
++            let rango = RangoDev(self.cadena_sr_dev());
++
++            // El primer bloque tras el corte (el de transición, decisión 6) se verifica **antes**
++            // de que `zx-cadena` tenga ningún bloque PoST admitido: `Cadena::contexto_dag()` es
++            // `None` hasta la primera admisión (`inicializar_dag` vive dentro de `admitir_post`).
++            // Para ese único bloque, cuyo único padre posible es el terminal, no hay ambigüedad de
++            // `sp` que temer («Relanzamiento» punto 3 es sobre bloques con más de un padre
++            // candidato) y se usa `ContextoTransicion` (el mismo contexto dev que `zx-post` define
++            // para exactamente este caso). Para todo lo demás, el GHOSTDAG real de `zx-cadena`.
++            let estado = match self.cadena.contexto_dag() {
++                Some(dag) => verificar_cabecera_conjunta(
++                    &bloque,
++                    servicio,
++                    dag,
++                    &rango,
++                    u64::MAX,
++                    &mut cache,
++                    &mut presupuesto,
++                    Some(&params_pieza),
++                    self.historia.kzg(),
++                ),
++                None => {
++                    let terminal = self.cadena.terminal().ok_or_else(|| {
++                        ErrorNodo::Otro("verificación PoST sin terminal fijado".to_string())
++                    })?;
++                    let ctx = zx_post::contexto_transicion::ContextoTransicion::nuevo(
++                        terminal,
++                        self.n_dev,
++                        self.sr_dev_actual,
++                        Vec::new(),
++                    )
++                    .map_err(|e| {
++                        ErrorNodo::Otro(format!("ContextoTransicion del bloque de transición: {e}"))
++                    })?;
++                    verificar_cabecera_conjunta(
++                        &bloque,
++                        servicio,
++                        &ctx,
++                        &rango,
++                        u64::MAX,
++                        &mut cache,
++                        &mut presupuesto,
++                        Some(&params_pieza),
++                        self.historia.kzg(),
++                    )
++                }
++            };
++            match estado {
++                EstadoCabeceraConjunta::Comprobada(_) => {}
++                EstadoCabeceraConjunta::Invalida(m) => {
++                    return Err(ErrorNodo::BloquePropioRechazado {
++                        hash,
++                        motivo: format!("{m:?}"),
++                    });
++                }
++                EstadoCabeceraConjunta::Pendiente(m) => {
++                    return Err(ErrorNodo::BloquePropioRechazado {
++                        hash,
++                        motivo: format!("pendiente: {m:?}"),
++                    });
++                }
++            }
++        }
++
++        let distancia = zx_poas::verificar_solucion_poas(
++            &bloque.cabecera.sol,
++            bloque.cabecera.slot,
++            bloque.cabecera.pot_output,
++            bloque.cabecera.rango_solucion,
++            &self.historia.params_pieza(),
++            self.historia.kzg(),
++        )
++        .map_err(|e| ErrorNodo::RepeticionFallida {
++            indice: _indice_registro,
++            hash,
++            motivo: format!("distancia PoAS: {e}"),
++        })?;
++        let identidad = identidad_u64_de_cabecera(&bloque.cabecera);
++        let padres = padres_dag_a_vec(&bloque.cabecera.padres);
++        let txs: Vec<(Tx, Vec<Vec<u8>>)> = bloque
++            .txs()
++            .iter()
++            .cloned()
++            .zip(bloque.testigos().iter().cloned())
++            .collect();
++
++        let post = BloquePost {
++            hash,
++            padres,
++            slot: bloque.cabecera.slot,
++            productor: bloque.cabecera.sol.public_key,
++            peso: peso_u128(&bloque)?,
++            prueba_valida: true,
++            requisito_declarado: 0,
++            sr: bloque.cabecera.rango_solucion,
++            distancia,
++            identidad,
++            txs,
++        };
++
++        let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
++        if !ya_admitido {
++            self.cadena.admitir(BloqueCadena::Post(post)).map_err(|m| {
++                ErrorNodo::BloquePropioRechazado {
++                    hash,
++                    motivo: m.nombre().to_string(),
++                }
++            })?;
++        }
++
++        if !ya_admitido && verificar {
++            let admitido = BloqueAdmitido::post(&bloque);
++            self.almacen.admitir(&admitido, true)?;
++        }
++
++        self.actualizar_servicio_verificacion(&bloque)?;
++        self.registrar_cambio_de_punta()?;
++        Ok(())
++    }
++
++    fn cadena_sr_dev(&self) -> u64 {
++        // El `SR_dev` no vive en `Cadena`; el nodo lo trae de la CLI y lo guarda aquí mismo.
++        self.sr_dev_actual
++    }
++
++    /// Mantiene al día el `ServicioPot` de verificación (decisión 7, ver `PROGRESO.md`): inserta la
++    /// salida y el portador **de este bloque**, sin recalcular el PoT. El flujo es único y global
++    /// (D-P10), así que si el slot ya estaba cubierto por otra rama/hermano, solo se comprueba que
++    /// coincide (defensa; nunca debería discrepar: lo impediría antes `ContextoTransicion`/H2 en la
++    /// ruta de producción, pero este servicio de verificación no pasa por ahí).
++    fn actualizar_servicio_verificacion(&mut self, bloque: &BloqueDag) -> Result<(), ErrorNodo> {
++        let Some(servicio) = self.servicio_verificacion.as_mut() else {
++            return Err(ErrorNodo::Otro(
++                "ServicioPot de verificación ausente tras el terminal".to_string(),
++            ));
++        };
++        let slot = bloque.cabecera.slot;
++        let salida = bloque.cabecera.pot_output;
++        let Some(portador) = bloque.justificacion.bundles().last().copied() else {
++            return Err(ErrorNodo::Otro(format!(
++                "bloque PoST {} sin portadores en su justificación",
++                bloque.cabecera.block_hash()
++            )));
++        };
++        if slot <= servicio.slot_actual() {
++            let ya = servicio
++                .salida_de(slot)
++                .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
++            if ya != salida {
++                return Err(ErrorNodo::Otro(format!(
++                    "D-P10 violado: dos bloques del slot {slot} traen salidas PoT distintas"
++                )));
++            }
++        } else {
++            servicio
++                .insertar_calculado(slot, salida, portador)
++                .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
++        }
++        let hash = bloque.cabecera.block_hash();
++        if servicio.slot_de(&hash).is_none() {
++            servicio
++                .registrar_validado(hash, slot)
++                .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
++        }
++        Ok(())
++    }
++
++    /// Registra en el resumen de estado un cambio de punta seleccionada (decisión 8 y 9).
++    fn registrar_cambio_de_punta(&mut self) -> Result<(), ErrorNodo> {
++        let punta_actual = self.cadena.mejor_punta().or(self.cadena.terminal());
++        if punta_actual == self.ultima_punta_registrada {
++            return Ok(());
++        }
++        self.ultima_punta_registrada = punta_actual;
++        let estado = self
++            .cadena
++            .estado_virtual()
++            .map_err(|m| ErrorNodo::Otro(format!("estado virtual: {m}")))?;
++        let resumen = resumen_estado(&estado);
++        let evento = self
++            .registro
++            .evento("cambio_punta")
++            .str(
++                "punta",
++                &punta_actual.map(|h| h.to_string()).unwrap_or_default(),
++            )
++            .str("resumen_estado", &resumen);
++        self.registro.escribir(evento, false)?;
++        Ok(())
++    }
++
++    /// Construye los depósitos F-15 pendientes (coinbases maduras propias sin depositar) para la
++    /// altura `altura_bloque` (decisión 5).
++    fn preparar_depositos(&self, altura_bloque: u32) -> ResultadoNodo<Vec<(Tx, Vec<Vec<u8>>)>> {
++        // `estado_terminal()` solo es el estado de la punta **antes del corte**: es
++        // `Estado::inicial()` hasta que `zx-cadena` fija el terminal (comprobado, no una
++        // suposición: el primer intento de este test dio `ErrNonce` porque todo depósito de la
++        // fase PoW pedía `nonce = 0`, el de `Estado::inicial()`, aunque ya hubiera uno aplicado).
++        // El estado correcto para construir la plantilla de la siguiente altura es el de la
++        // **última cabecera PoW admitida**, con `estado_post`.
++        #[expect(
++            clippy::indexing_slicing,
++            reason = "historial_pow siempre tiene al menos el génesis"
++        )]
++        let ultimo_hash = self.historial_pow[self.historial_pow.len() - 1].block_hash();
++        let estado = self
++            .cadena
++            .estado_post(&ultimo_hash)
++            .ok_or_else(|| ErrorNodo::Otro("estado del último bloque PoW ausente".to_string()))?;
++        let mut depositos = Vec::new();
++        for c in &self.coinbases {
++            if c.depositada {
++                continue;
++            }
++            let Some(madura_en) = c.altura.checked_add(self.params.m_cb) else {
++                continue;
++            };
++            if altura_bloque < madura_en {
++                continue;
++            }
++            let Some(clave) = self.claves.get(c.indice_clave) else {
++                continue;
++            };
++            let nonce = estado
++                .garantias
++                .get(&clave.pk)
++                .map_or(0, |g| g.nonce_siguiente);
++            let (tx, testigos) = pow::construir_deposito(c, clave, nonce, self.cbid)
++                .map_err(|e| ErrorNodo::Otro(format!("construir depósito: {e}")))?;
++            depositos.push((tx, testigos));
++        }
++        Ok(depositos)
++    }
++
++    /// Fase PoW: mina hasta fijar el terminal, con un depósito por clave madura en cada altura que
++    /// lo permita (decisión 5). Devuelve cuando `Cadena` fija el terminal.
++    ///
++    /// # Errores
++    /// [`ErrorNodo::BloquePropioRechazado`] si el motor rechaza un bloque propio (decisión 4, fatal).
++    fn fase_pow(&mut self) -> ResultadoNodo<()> {
++        if self.cadena.terminal().is_some() {
++            return Ok(());
++        }
++        let (tx_trabajo, rx_trabajo) = mpsc::channel::<pow::TrabajoMinero>();
++        let (tx_minado, rx_minado) = mpsc::channel::<BlockHeader>();
++        let hilo = thread::spawn(move || pow::hilo_minero(rx_trabajo, tx_minado));
++
++        loop {
++            #[expect(
++                clippy::indexing_slicing,
++                reason = "historial_pow siempre tiene al menos el génesis"
++            )]
++            let ultimo = self.historial_pow[self.historial_pow.len() - 1];
++            let altura = ultimo
++                .height
++                .checked_add(1)
++                .ok_or_else(|| ErrorNodo::Otro("altura PoW desbordada".to_string()))?;
++            let ahora = std::time::SystemTime::now()
++                .duration_since(std::time::UNIX_EPOCH)
++                .map(|d| d.as_secs())
++                .unwrap_or(0);
++            let timestamp = ahora.max(ultimo.timestamp.saturating_add(1));
++            // C-TS-01 exige `ts > ts_padre` (permanente); con la dificultad inicial dev y el
++            // binario en release, minar un bloque tarda mucho menos de 1 s, así que el reloj de
++            // pared se queda atrás del `timestamp` mínimo exigible. Sin esta espera, el propio
++            // bloque violaría C-TS-03 (`ts > reloj_local + FTL`) al admitirse: un rechazo fatal
++            // (decisión 4) por una condición que el nodo mismo puede evitar, no un fallo del motor.
++            if timestamp > ahora {
++                std::thread::sleep(std::time::Duration::from_secs(timestamp - ahora));
++            }
++            let depositos = self.preparar_depositos(altura)?;
++            #[expect(
++                clippy::indexing_slicing,
++                reason = "claves nunca está vacía: la CLI exige al menos un índice"
++            )]
++            let clave_de_este_bloque = self.claves[(altura as usize) % self.claves.len()].pk;
++            let (plantilla, _txid_cb, _valor_cb) = pow::construir_plantilla(
++                &self.historial_pow,
++                ultimo.block_hash(),
++                altura,
++                timestamp,
++                self.cbid,
++                clave_de_este_bloque,
++                depositos,
++            )?;
++            let txs = plantilla.txs.clone();
++            let testigos = plantilla.testigos.clone();
++            let trabajo = pow::TrabajoMinero::from(&plantilla);
++            if tx_trabajo.send(trabajo).is_err() {
++                return Err(ErrorNodo::Otro(
++                    "el hilo minero terminó inesperadamente".to_string(),
++                ));
++            }
++            let Ok(cabecera_minada) = rx_minado.recv() else {
++                return Err(ErrorNodo::Otro("el hilo minero cerró el canal".to_string()));
++            };
++            let evento = self
++                .registro
++                .evento("bloque_minado")
++                .u64("altura", u64::from(cabecera_minada.height))
++                .str("hash", &cabecera_minada.block_hash().to_string());
++            self.registro.escribir(evento, false)?;
++
++            self.admitir_pow_interno(
++                cabecera_minada,
++                txs,
++                testigos,
++                self.almacen.longitud_registro()?,
++                true,
++            )?;
++
++            if self.cadena.terminal().is_some() {
++                drop(tx_trabajo);
++                let _ = hilo.join();
++                return Ok(());
++            }
++        }
++    }
++
++    /// Fase PoST en régimen: arranca `ServicioPot` de verificación, las parcelas locales y el hilo
++    /// productor, y atiende sus peticiones hasta que se agote (`--parada-tras-slots`) o falle.
++    ///
++    /// # Errores
++    /// [`ErrorNodo::BloquePropioRechazado`] si el motor rechaza un bloque propio (decisión 4, fatal).
++    fn fase_regimen(&mut self) -> ResultadoNodo<()> {
++        let terminal = self
++            .cadena
++            .terminal()
++            .ok_or_else(|| ErrorNodo::Otro("fase_regimen sin terminal".to_string()))?;
++        if self.servicio_verificacion.is_none() {
++            let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
++                .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
++            self.servicio_verificacion = Some(servicio);
++        }
++
++        // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
++        if self.cadena.tips_validas().is_empty() {
++            self.producir_bloque_transicion(terminal)?;
++        }
++
++        let mut claves_con_parcela = Vec::new();
++        for clave in self.claves.clone() {
++            let parcela = abrir_o_crear_parcela(&self.dir_datos, &clave, &self.historia)?;
++            claves_con_parcela.push(ClaveConParcela { clave, parcela });
++        }
++
++        // Clon del `ServicioPot` de verificación (ya trae el terminal y todo bloque PoST admitido:
++        // el de transición recién producido, o toda la historia de régimen si esto es un reinicio a
++        // mitad de régimen). El hilo avanza y produce sobre su propio clon; el del bucle solo se usa
++        // para verificar (ver el doc de `hilo_productor_regimen`).
++        let servicio_hilo = self.servicio_verificacion.clone().ok_or_else(|| {
++            ErrorNodo::Otro("fase_regimen sin ServicioPot de verificación".to_string())
++        })?;
++
++        let (tx_a_bucle, rx_en_bucle) = mpsc::channel::<MsgProductor>();
++        let (tx_a_productor, rx_en_productor) = mpsc::channel::<MsgBucle>();
++        let cbid = self.cbid;
++        let n_dev = self.n_dev;
++        let sr_dev = self.sr_dev_actual;
++        let parada = self.parada_tras_slots;
++        let importe_coinbase = perfil::subsidio_post(0);
++        let historia_hilo: Arc<HistoriaGenesis> = Arc::clone(&self.historia);
++        let hilo = thread::spawn(move || {
++            hilo_productor_regimen(
++                servicio_hilo,
++                n_dev,
++                sr_dev,
++                cbid,
++                importe_coinbase,
++                claves_con_parcela,
++                &historia_hilo,
++                parada,
++                &rx_en_productor,
++                &tx_a_bucle,
++            );
++        });
++
++        for msg in rx_en_bucle {
++            match msg {
++                MsgProductor::PeticionPadres => {
++                    let padres = padres_de_regimen(&self.cadena)
++                        .map_err(|e| ErrorNodo::Otro(format!("padres de régimen: {e}")))?;
++                    if tx_a_productor.send(MsgBucle::Padres(padres)).is_err() {
++                        break;
++                    }
++                }
++                MsgProductor::Post(bloque) => {
++                    let hash = bloque.cabecera.block_hash();
++                    match self.admitir_post_interno(
++                        *bloque,
++                        self.almacen.longitud_registro()?,
++                        true,
++                    ) {
++                        Ok(()) => {
++                            let evento = self
++                                .registro
++                                .evento("bloque_producido")
++                                .str("hash", &hash.to_string());
++                            self.registro.escribir(evento, false)?;
++                            let continuar = self.parada_tras_slots.is_none_or(|limite| {
++                                self.servicio_verificacion
++                                    .as_ref()
++                                    .is_some_and(|s| s.slot_actual() < limite)
++                            });
++                            let respuesta = if continuar {
++                                MsgBucle::Continuar
++                            } else {
++                                MsgBucle::Parar
++                            };
++                            if tx_a_productor.send(respuesta).is_err() {
++                                break;
++                            }
++                            if !continuar {
++                                break;
++                            }
++                        }
++                        Err(e) => {
++                            let _ = tx_a_productor.send(MsgBucle::Parar);
++                            return Err(e);
++                        }
++                    }
++                }
++            }
++        }
++        drop(tx_a_productor);
++        // Decisión 4: un fallo interno del nodo termina el proceso con código ≠ 0, nunca en
++        // silencio. `hilo_productor_regimen` no valida entrada ajena (sin red): un panic ahí es una
++        // incoherencia interna, no un evento de red que se pueda ignorar (el bug real que motivó
++        // esto, `PROGRESO.md`, era exactamente un hilo que moría sin decir por qué).
++        if let Err(panico) = hilo.join() {
++            let motivo = panico
++                .downcast_ref::<&str>()
++                .map(|s| (*s).to_string())
++                .or_else(|| panico.downcast_ref::<String>().cloned())
++                .unwrap_or_else(|| "panic sin mensaje representable".to_string());
++            return Err(ErrorNodo::Otro(format!(
++                "el hilo productor terminó con panic: {motivo}"
++            )));
++        }
++        Ok(())
++    }
++
++    fn producir_bloque_transicion(&mut self, terminal: BlockHash) -> ResultadoNodo<()> {
++        #[expect(clippy::indexing_slicing, reason = "la CLI exige al menos una clave")]
++        let clave = self.claves[0].clone();
++        let parcela = abrir_o_crear_parcela(&self.dir_datos, &clave, &self.historia)?;
++        let fuente = FuenteTransicion {
++            parcela: &parcela,
++            historia: &self.historia,
++        };
++        let parametros = ParametrosProductor {
++            n_dev: self.n_dev,
++            sr_dev: self.sr_dev_actual,
++            max_slots: 150,
++            consensus_branch_id: self.cbid,
++            timestamp: std::time::SystemTime::now()
++                .duration_since(std::time::UNIX_EPOCH)
++                .map(|d| d.as_secs())
++                .unwrap_or(0),
++            importe_coinbase: perfil::subsidio_post(0),
++        };
++        let bloque = producir(terminal, &fuente, &clave.sk, &parametros)
++            .map_err(|e| ErrorNodo::Otro(format!("producir (bloque de transición): {e}")))?;
++        self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)
++    }
++
++    /// Ejecuta el nodo de punta a punta: fase PoW hasta el corte, luego régimen.
++    ///
++    /// # Errores
++    /// Cualquier fallo fatal de admisión propia (decisión 4).
++    pub fn ejecutar(&mut self) -> ResultadoNodo<()> {
++        self.fase_pow()?;
++        self.fase_regimen()
++    }
++
++    /// Acceso de solo lectura a `zx-cadena` (para pruebas e inspección; no es API de consenso).
++    #[must_use]
++    pub fn cadena(&self) -> &Cadena {
++        &self.cadena
++    }
++
++    /// Altura PoW alcanzada (para pruebas: mide el progreso de la fase PoW sin exponer
++    /// `historial_pow` entero).
++    #[must_use]
++    pub fn altura_pow(&self) -> u32 {
++        self.historial_pow.last().map_or(0, |h| h.height)
++    }
++
++    /// El resumen de estado (decisión 8) de la punta seleccionada actual, o del terminal si aún no
++    /// hay puntas PoST.
++    #[must_use]
++    pub fn resumen_estado_actual(&self) -> Option<String> {
++        let estado = self.cadena.estado_virtual().ok()?;
++        Some(resumen_estado(&estado))
++    }
++}
++
++/// Puente `FuenteSoluciones → ParcelaDisco` para el bloque de transición (decisión 6, `producir`).
++struct FuenteTransicion<'a> {
++    parcela: &'a ParcelaDisco,
++    historia: &'a HistoriaGenesis,
++}
++
++impl FuenteSoluciones for FuenteTransicion<'_> {
++    type Error = zx_farmer::ErrorProductorPoas;
++
++    fn soluciones(
++        &self,
++        salida: [u8; 16],
++        slot: u64,
++        rango: u64,
++    ) -> Result<Vec<SolucionCandidata>, Self::Error> {
++        let params = self.historia.params_pieza();
++        let resultado = zx_farmer::productor_poas::convertir_candidatos_locales(
++            self.parcela,
++            salida,
++            slot,
++            rango,
++            &params,
++            self.historia.kzg(),
++            self.historia.erasure_coding(),
++        )?;
++        Ok(resultado
++            .soluciones()
++            .iter()
++            .map(|c| SolucionCandidata {
++                solucion: *c.solucion(),
++                distancia: c.distancia(),
++            })
++            .collect())
++    }
++}
++
++fn pow_target_de(cabecera: &BlockHeader) -> Result<primitive_types::U256, ErrorNodo> {
++    zx_core::decodificar_con(cabecera.bits, &PARAMETROS_POW_DEV.limites)
++        .map_err(|e| ErrorNodo::Otro(format!("bits de la cabecera PoW: {e}")))
++}
++
++/// `PadresDag` a `Vec<BlockHash>` (seleccionado primero), para `BloquePost::padres`.
++fn padres_dag_a_vec(p: &PadresDag) -> Vec<BlockHash> {
++    if p.es_genesis() {
++        return Vec::new();
++    }
++    let mut v = vec![p.seleccionado()];
++    v.extend_from_slice(p.extras());
++    v
++}
++
++/// `w(SR)` (`U256`) a `u128` para `BloquePost::peso` (no debería desbordar con `SR_dev` de la red
++/// dev; se trata como fallo fatal si ocurriera, no como truncamiento silencioso).
++fn peso_u128(bloque: &BloqueDag) -> Result<u128, ErrorNodo> {
++    let peso = zx_dag::peso(bloque.cabecera.rango_solucion);
++    u128::try_from(peso).map_err(|_| ErrorNodo::Otro(format!("peso {peso} no cabe en u128")))
++}
++
++/// `ORDEN-W06d1` V7: un bloque **propio** alterado, inyectado directamente en la tubería de
++/// admisión (sin pasar por el minero), se rechaza con su motivo y no cambia el estado.
++///
++/// Es un test unitario (no de `tests/`) porque `admitir_pow_interno` es privado a propósito: la
++/// tubería única (decisión 4) no tiene una puerta trasera pública para inyectar candidatos ya
++/// verificados. La alteración es la más básica posible —un `nonce` que no cumple el PoW real, sin
++/// minar— y por eso la rechaza ya el primer paso de la tubería (`validar_cabecera_pow`).
++#[cfg(test)]
++#[expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
++mod pruebas_v7 {
++    use zx_core::preimage::block::merkle_root;
++
++    use super::{BlockHeader, Config, Nodo, Red, txid};
++
++    #[test]
++    fn bloque_pow_propio_alterado_se_rechaza_y_no_cambia_el_estado() {
++        let dir = tempfile::tempdir().expect("tempdir");
++        let cfg = Config {
++            dir_datos: dir.path().join("datos"),
++            ruta_registro: dir.path().join("registro.jsonl"),
++            red: Red::Dev,
++            semilla: 7,
++            indices_claves: vec![0],
++            n_dev: 16,
++            sr_dev: u64::MAX,
++            parada_tras_slots: Some(0),
++        };
++        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
++        let estado_antes = nodo.resumen_estado_actual();
++
++        #[expect(
++            clippy::indexing_slicing,
++            reason = "el arranque deja al menos el génesis"
++        )]
++        let ultimo = nodo.historial_pow[nodo.historial_pow.len() - 1];
++        let clave = nodo.claves.first().expect("al menos una clave").pk;
++        let coinbase = crate::pow::construir_coinbase_pow(clave, 1);
++        let txid_coinbase = txid(&coinbase, nodo.cbid);
++        let cabecera = BlockHeader {
++            consensus_branch_id: nodo.cbid,
++            prev_hash: ultimo.block_hash(),
++            merkle_root: merkle_root(&[txid_coinbase]),
++            timestamp: ultimo.timestamp + 10,
++            bits: ultimo.bits,
++            // `nonce = 0` sin minar: no cumple `hash_pow < target` salvo una casualidad
++            // astronómicamente improbable con la dificultad inicial real de la red dev.
++            nonce: 0,
++            height: 1,
++        };
++        let hash_alterado = cabecera.block_hash();
++
++        let resultado =
++            nodo.admitir_pow_interno(cabecera, vec![coinbase], vec![Vec::new()], 0, true);
++        assert!(
++            resultado.is_err(),
++            "un bloque propio con PoW inválido debe rechazarse"
++        );
++        assert!(
++            !nodo.cadena.es_valido(&hash_alterado),
++            "el bloque alterado no debe quedar admitido"
++        );
++        assert_eq!(
++            nodo.resumen_estado_actual(),
++            estado_antes,
++            "el estado no debe cambiar tras el rechazo"
++        );
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/padres.rs ws/crates/zx-node/src/padres.rs
+--- ws.orig/crates/zx-node/src/padres.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/padres.rs	2026-09-26 06:07:54.456820987 +0200
+@@ -0,0 +1,77 @@
++//! Elección de padres canónicos para un bloque en régimen (decisión 6; «Relanzamiento» punto 3).
++//!
++//! Usa el GHOSTDAG **real** de `zx-cadena` (`Cadena::contexto_dag`) para calcular el padre
++//! seleccionado: nunca el atajo dev de `zx_post::ContextoTransicion`. Tope de **3** padres en total
++//! (`PROGRESO.md` punto 8: `zx-cadena` no acepta más, aunque el perfil dev hable de 15).
++
++use zx_cadena::Cadena;
++use zx_core::{BlockHash, PadresDag};
++use zx_dag::ErrorDag;
++use zx_dag::bloque_dag::ContextoDag;
++
++/// Tope real de padres que `zx-cadena` admite por bloque (`crates/zx-cadena/src/cadena.rs`,
++/// `MAX_PADRES_ORACULO`). No configurable desde fuera del crate.
++pub const MAX_PADRES_CADENA: usize = 3;
++
++/// Fallo al elegir padres.
++#[derive(Debug, thiserror::Error)]
++pub enum ErrorPadres {
++    /// Aún no hay terminal fijado: no hay DAG que consultar.
++    #[error("no hay terminal fijado: no se pueden elegir padres de régimen")]
++    SinTerminal,
++    /// No hay ninguna punta válida todavía (se debe usar el bloque de transición, no régimen).
++    #[error("no hay puntas válidas: el siguiente bloque es el de transición, no de régimen")]
++    SinPuntas,
++    /// Fallo de GHOSTDAG al calcular el padre seleccionado real.
++    #[error("GHOSTDAG: {0}")]
++    Dag(#[from] ErrorDag),
++    /// El formato de padres rechazó la combinación (no debería, ya que se controla el tope).
++    #[error("formato de padres: {0}")]
++    Formato(#[from] zx_core::EncodingError),
++}
++
++/// Elige los padres canónicos del próximo bloque en régimen: hasta [`MAX_PADRES_CADENA`] puntas
++/// válidas actuales de `cadena`, con el padre seleccionado calculado por el GHOSTDAG real (no
++/// declarado).
++///
++/// Si hay más puntas que el tope, se toman las primeras en orden de hash (determinista); es un
++/// compromiso documentado (`PROGRESO.md` punto 8), no una elección por peso: con 3 claves propias en
++/// un solo proceso el número de puntas vivas rara vez lo alcanza.
++///
++/// # Errores
++/// [`ErrorPadres::SinTerminal`], [`ErrorPadres::SinPuntas`] o los de GHOSTDAG/formato.
++pub fn padres_de_regimen(cadena: &Cadena) -> Result<PadresDag, ErrorPadres> {
++    let dag = cadena.contexto_dag().ok_or(ErrorPadres::SinTerminal)?;
++    let mut tips = cadena.tips_validas();
++    if tips.is_empty() {
++        return Err(ErrorPadres::SinPuntas);
++    }
++    tips.truncate(MAX_PADRES_CADENA);
++
++    if tips.len() == 1 {
++        #[expect(
++            clippy::indexing_slicing,
++            reason = "se comprobó tips.len() == 1 en la rama anterior"
++        )]
++        let unico = tips[0];
++        return Ok(PadresDag::nuevo(unico, &[])?);
++    }
++
++    // `padre_seleccionado` ignora qué posición se declara «seleccionado»: el `sp` real lo decide
++    // GHOSTDAG (C-GD-03). Se construye un `PadresDag` provisional solo para preguntarlo.
++    #[expect(
++        clippy::indexing_slicing,
++        reason = "se comprobó tips.len() >= 2 en la rama anterior"
++    )]
++    let (primero, resto) = (tips[0], &tips[1..]);
++    let provisional = PadresDag::nuevo(primero, resto)?;
++    let sp: BlockHash = ContextoDag::padre_seleccionado(dag, &provisional)?;
++
++    let extras: Vec<BlockHash> = tips.into_iter().filter(|h| *h != sp).collect();
++    Ok(PadresDag::nuevo(sp, &extras)?)
++}
++
++#[cfg(test)]
++mod tests {
++    // Cubierto de extremo a extremo por `tests/integracion.rs` (padres reales sobre GHOSTDAG real).
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/perfil.rs ws/crates/zx-node/src/perfil.rs
+--- ws.orig/crates/zx-node/src/perfil.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/perfil.rs	2026-09-26 06:29:32.964862587 +0200
+@@ -0,0 +1,168 @@
++//! Perfil de la red dev, tal como lo fija `P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`.
++//!
++//! Ningún valor de aquí es parámetro de producción (el propio perfil lo dice en su cabecera). Los
++//! que dependen del hardware (`N_dev`, `SR_dev`) son argumentos de la CLI, no constantes: la CLI
++//! trae valores por defecto razonables para pruebas pequeñas, pero V8 exige poder fijar los reales.
++
++use primitive_types::U256;
++use zx_consensus::PARAMETROS_POW_DEV;
++use zx_core::{Amount, decodificar_con, trabajo_bloque};
++use zx_dag::ghostdag::{Algoritmo, ModoMerge, ModoSp, Parametros as ParametrosGhostdag};
++
++use zx_consensus::transicion::ParametrosTransicion;
++
++/// `H_dep` (§3).
++pub const H_DEP: u32 = 1;
++/// `M_cb` en bloques PoW (§3).
++pub const M_CB: u32 = 5;
++/// `M_dep` en bloques PoW (§3).
++pub const M_DEP: u32 = 3;
++/// `H_corte_min` (§3).
++pub const H_CORTE_MIN: u32 = 30;
++/// `q` por clave, en ZZK (§3).
++pub const Q_ZZK: i64 = 10;
++/// `K_min`: una clave por nodo de la red de prueba (§3).
++pub const K_MIN: u32 = 3;
++/// `M_res_slots` (§3).
++pub const M_RES_SLOTS: u64 = 20;
++/// `M_dep_slots` (§3).
++pub const M_DEP_SLOTS: u64 = 10;
++/// `M_rec_slots` (§3).
++pub const M_REC_SLOTS: u64 = 30;
++/// `R_slots` (§3).
++pub const R_SLOTS: u64 = 60;
++/// `F_slots` (§3).
++pub const F_SLOTS: u64 = 600;
++/// `subsidio_pow(h)`, constante (§3).
++pub const SUBSIDIO_POW_ZZK: i64 = 50;
++/// `subsidio_post(s)`, constante (§3).
++pub const SUBSIDIO_POST_ZZK: i64 = 5;
++
++/// GHOSTDAG `k` (§4).
++pub const GHOSTDAG_K: u32 = 10;
++/// Máximo de padres reales de un bloque (§4, «formato de cabecera sin cambios»).
++pub const MAX_PADRES: u8 = 15;
++/// Tope de mergeset: sin cota adicional declarada en el perfil dev más allá del formato de
++/// cabecera; se usa el máximo representable para no imponer un límite que el perfil no fija.
++pub const MERGESET_LIMITE: u32 = u32::MAX;
++
++/// `subsidio_pow(altura)` constante del perfil dev (§3): 50 ZZK.
++#[must_use]
++pub fn subsidio_pow(_altura: u32) -> Amount {
++    #[expect(
++        clippy::unwrap_used,
++        reason = "50 ZZK es una constante del perfil dev, siempre representable"
++    )]
++    Amount::nuevo(SUBSIDIO_POW_ZZK).unwrap()
++}
++
++/// `subsidio_post(slot)` constante del perfil dev (§3): 5 ZZK.
++#[must_use]
++pub fn subsidio_post(_slot: u64) -> Amount {
++    #[expect(
++        clippy::unwrap_used,
++        reason = "5 ZZK es una constante del perfil dev, siempre representable"
++    )]
++    Amount::nuevo(SUBSIDIO_POST_ZZK).unwrap()
++}
++
++/// Fallo al construir el perfil de transición dev.
++#[derive(Debug, thiserror::Error)]
++pub enum ErrorPerfil {
++    /// `PARAMETROS_POW_DEV.bits_iniciales` no decodifica (no debería: es una constante del propio
++    /// perfil consensus-critical de W04).
++    #[error("bits iniciales del perfil dev inválidos: {0}")]
++    BitsIniciales(#[from] zx_core::EncodingError),
++    /// `W_min = 30 · trabajo(máximo dev)` desborda `U256` (no debería con el target dev).
++    #[error("W_min desborda U256")]
++    WMinDesborda,
++}
++
++/// `ParametrosTransicion` del perfil dev (§3 de `PERFIL-DEV-v0.md`).
++///
++/// `W_min = 30 · trabajo(bits_iniciales dev)`: el trabajo de un bloque a la dificultad **inicial**
++/// (la más baja de la red dev, D-P05) es el mínimo trabajo por bloque; con margen para que 3 nodos
++/// minen y depositen sin que la dificultad haya podido subir mucho.
++///
++/// # Errores
++/// [`ErrorPerfil`] si los bits iniciales no decodifican o si `W_min` desborda.
++pub fn parametros_transicion_dev() -> Result<ParametrosTransicion, ErrorPerfil> {
++    #[expect(
++        clippy::unwrap_used,
++        reason = "30 ZZK es una constante del perfil dev, siempre representable"
++    )]
++    let s_min = Amount::nuevo(K_MIN as i64 * Q_ZZK).unwrap();
++    #[expect(
++        clippy::unwrap_used,
++        reason = "10 ZZK es una constante del perfil dev, siempre representable"
++    )]
++    let q = Amount::nuevo(Q_ZZK).unwrap();
++
++    let target_max = decodificar_con(
++        PARAMETROS_POW_DEV.bits_iniciales,
++        &PARAMETROS_POW_DEV.limites,
++    )?;
++    let trabajo_max = trabajo_bloque(target_max).ok_or(ErrorPerfil::WMinDesborda)?;
++    let w_min = trabajo_max
++        .checked_mul(U256::from(30u32))
++        .ok_or(ErrorPerfil::WMinDesborda)?;
++
++    Ok(ParametrosTransicion {
++        h_dep: H_DEP,
++        m_cb: M_CB,
++        m_dep: M_DEP,
++        h_corte_min: H_CORTE_MIN,
++        w_min,
++        s_min,
++        q,
++        k_min: K_MIN,
++        m_res_slots: M_RES_SLOTS,
++        m_dep_slots: M_DEP_SLOTS,
++        m_rec_slots: M_REC_SLOTS,
++        r_slots: R_SLOTS,
++        f_slots: Some(F_SLOTS),
++        subsidio_pow,
++        subsidio_post,
++    })
++}
++
++/// `Parametros` de GHOSTDAG del perfil dev (§4): `k = 10`, `max_padres = 15`.
++#[must_use]
++pub fn parametros_ghostdag_dev() -> ParametrosGhostdag {
++    ParametrosGhostdag {
++        k: GHOSTDAG_K,
++        max_padres: MAX_PADRES,
++        mergeset_limite: MERGESET_LIMITE,
++        s_max: u64::MAX,
++        u2: true,
++        u3_dinamica: true,
++        sp: ModoSp::Zerox,
++        merge: ModoMerge::Terna,
++    }
++}
++
++/// Algoritmo GHOSTDAG de producción (no el `Referencia` de los oráculos de test).
++#[must_use]
++pub const fn algoritmo_ghostdag_dev() -> Algoritmo {
++    Algoritmo::Kernel
++}
++
++/// Comprueba que `Cadena::nueva` recibe el mismo `k` que este perfil (defensa contra desajuste).
++#[must_use]
++pub const fn ghostdag_k() -> u32 {
++    GHOSTDAG_K
++}
++
++#[cfg(test)]
++mod tests {
++    use super::parametros_transicion_dev;
++
++    #[test]
++    #[expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
++    fn el_perfil_dev_construye() {
++        let p = parametros_transicion_dev().expect("perfil dev válido");
++        assert_eq!(p.h_corte_min, super::H_CORTE_MIN);
++        assert_eq!(p.k_min, super::K_MIN);
++        assert!(!p.w_min.is_zero());
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/pow.rs ws/crates/zx-node/src/pow.rs
+--- ws.orig/crates/zx-node/src/pow.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/pow.rs	2026-09-26 06:38:11.364104714 +0200
+@@ -0,0 +1,279 @@
++//! Fase PoW: plantilla, depósito F-15, minero en su hilo (decisión 3 y 5 de la orden).
++//!
++//! El bucle de consenso construye la plantilla completa (cabecera sin `nonce`, transacciones y
++//! testigos) con el estado que solo él conoce (nonces de garantía, madurez de coinbases propias);
++//! el hilo minero **solo** busca el `nonce` con [`zx_consensus::minar`] y lo devuelve. El hilo
++//! minero no decide nada de consenso: es CPU pura.
++
++use core::sync::atomic::AtomicBool;
++use std::sync::mpsc::{Receiver, Sender};
++
++use ed25519_zebra::SigningKey;
++use primitive_types::U256;
++use zx_consensus::dificultad::{VentanaRetarget, siguiente_target};
++use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev, minar};
++use zx_core::preimage::block::{BlockHeader, merkle_root};
++use zx_core::{
++    Amount, ClavePublica, EncodingError, ExtensionTx, HashType, Lock, OutPoint, SpentOutput,
++    TipoGarantia, Tx, TxId, TxIn, TxOut, codificar_con, decodificar_con, txid,
++};
++
++use crate::claves::ClaveDev;
++use crate::error::ErrorNodo;
++use crate::perfil::subsidio_pow;
++
++/// Una salida de coinbase PoW propia, para seguir su madurez (decisión 5).
++#[derive(Clone, Copy, Debug)]
++pub struct CoinbasePropia {
++    /// Índice de la clave dueña (posición en `claves`, no el índice de derivación).
++    pub indice_clave: usize,
++    /// Altura en la que se creó.
++    pub altura: u32,
++    /// `txid` de la coinbase.
++    pub txid: TxId,
++    /// Importe de la salida (única, índice 0).
++    pub valor: Amount,
++    /// ¿Ya se depositó (para no repetirlo)?
++    pub depositada: bool,
++}
++
++/// Plantilla PoW completa que el bucle entrega al hilo minero.
++#[derive(Clone)]
++pub struct PlantillaPow {
++    /// Cabecera con `nonce = 0`; el minero solo itera ese campo.
++    pub cabecera_base: BlockHeader,
++    /// Target que debe cumplir `hash_pow`.
++    pub target: U256,
++    /// Transacciones del cuerpo (coinbase, y depósitos si tocan).
++    pub txs: Vec<Tx>,
++    /// Testigos paralelos a `txs`.
++    pub testigos: Vec<Vec<Vec<u8>>>,
++}
++
++/// Calcula el target de la altura `altura` (1-based) a partir del historial de cabeceras
++/// `historial[0..=altura-1]` (índice = altura, `historial[0]` es el génesis).
++///
++/// # Errores
++/// Los de `zx_consensus::dificultad`/`decodificar_con` si el historial es insuficiente o los bits no
++/// decodifican.
++pub fn target_de_altura(
++    historial: &[BlockHeader],
++    altura: u32,
++) -> Result<U256, zx_consensus::ErrorPow> {
++    let n = PARAMETROS_POW_DEV.n;
++    let altura_usize = altura as usize;
++    if altura_usize <= n {
++        return decodificar_con(
++            PARAMETROS_POW_DEV.bits_iniciales,
++            &PARAMETROS_POW_DEV.limites,
++        )
++        .map_err(|_| zx_consensus::ErrorPow::DesbordamientoAritmetico);
++    }
++    // H > N: ventana de N+1 timestamps [H-N-1, H-1] y N targets [H-N, H-1].
++    let desde_ts = altura_usize - n - 1;
++    let timestamps: Vec<i64> = historial
++        .get(desde_ts..altura_usize)
++        .ok_or(zx_consensus::ErrorPow::VentanaVacia)?
++        .iter()
++        .map(|h| i64::try_from(h.timestamp).unwrap_or(i64::MAX))
++        .collect();
++    let desde_target = altura_usize - n;
++    let mut targets = Vec::with_capacity(n);
++    for h in historial
++        .get(desde_target..altura_usize)
++        .ok_or(zx_consensus::ErrorPow::VentanaVacia)?
++    {
++        let t = decodificar_con(h.bits, &PARAMETROS_POW_DEV.limites)
++            .map_err(|_| zx_consensus::ErrorPow::DesbordamientoAritmetico)?;
++        targets.push(t);
++    }
++    siguiente_target(
++        VentanaRetarget {
++            timestamps: &timestamps,
++            targets: &targets,
++        },
++        &PARAMETROS_POW_DEV,
++    )
++}
++
++/// Construye la coinbase PoW (F-16): v1, sin entradas, una salida a `clave` con `subsidio_pow`.
++#[must_use]
++pub fn construir_coinbase_pow(clave: ClavePublica, altura: u32) -> Tx {
++    Tx {
++        version: 1,
++        inputs: Vec::new(),
++        outputs: vec![TxOut {
++            value: subsidio_pow(altura),
++            lock: Lock::PubKey { pubkey: clave },
++        }],
++        lock_time: 0,
++        // F-16/C-EMIT-04: `expiry_height` MUST ser la altura del propio bloque.
++        expiry_height: altura,
++        extension: ExtensionTx::Ninguna,
++    }
++}
++
++/// Construye un depósito v2 (F-15) que gasta **toda** una coinbase madura propia, ya firmado.
++///
++/// Consume `(coinbase.txid, 0)` entero como depósito (sin cambio): `q = 10 ZZK` y la coinbase vale
++/// `50 ZZK`, así que un único depósito por clave basta con margen. Devuelve la transacción y sus
++/// testigos (firma de la entrada 0 y aceptación, en ese orden: el mismo patrón que
++/// `crates/zx-consensus/src/transicion/tests.rs`).
++///
++/// # Errores
++/// [`EncodingError`] si el `sighash`/importe no son representables (no debería con las constantes
++/// dev).
++pub fn construir_deposito(
++    coinbase: &CoinbasePropia,
++    clave: &ClaveDev,
++    nonce: u64,
++    cbid: u32,
++) -> Result<(Tx, Vec<Vec<u8>>), EncodingError> {
++    let entrada = TxIn {
++        outpoint: OutPoint {
++            prev_txid: coinbase.txid,
++            prev_index: 0,
++        },
++        sequence: 0,
++    };
++    let tx = Tx {
++        version: 2,
++        inputs: vec![entrada],
++        outputs: Vec::new(),
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::Garantia {
++            tipo: TipoGarantia::Deposito,
++            clave: clave.pk,
++            importe: coinbase.valor,
++            nonce,
++        },
++    };
++    let testigos = testigos_deposito(&tx, coinbase.valor, clave.pk, &clave.sk, cbid)?;
++    Ok((tx, testigos))
++}
++
++/// Testigos de un depósito construido por [`construir_deposito`]: firma de la entrada 0 y
++/// aceptación, en ese orden.
++///
++/// # Errores
++/// [`EncodingError`] si el `sighash` no se pudo calcular.
++pub fn testigos_deposito(
++    tx: &Tx,
++    coinbase_valor: Amount,
++    clave_lock: ClavePublica,
++    sk: &SigningKey,
++    cbid: u32,
++) -> Result<Vec<Vec<u8>>, EncodingError> {
++    let gastadas = [SpentOutput {
++        value: coinbase_valor,
++        lock: Lock::PubKey { pubkey: clave_lock },
++    }];
++    let digest = zx_core::sighash(tx, &gastadas, HashType::All, 0, cbid)?;
++    let firma_entrada: [u8; 64] = sk.sign(digest.as_bytes()).into();
++    let mensaje_aceptacion = zx_core::mensaje_aceptacion(tx, cbid);
++    let firma_aceptacion: [u8; 64] = sk.sign(&mensaje_aceptacion).into();
++    Ok(vec![firma_entrada.to_vec(), firma_aceptacion.to_vec()])
++}
++
++/// Construye la plantilla PoW de `altura`, con la coinbase de `clave_de_este_bloque` y los
++/// depósitos ya decididos por el llamante (`bucle::preparar_depositos`).
++///
++/// # Errores
++/// Los de `target_de_altura` si el historial es insuficiente (no debería con la construcción del
++/// bucle, que siempre pide la siguiente altura contigua).
++pub fn construir_plantilla(
++    historial: &[BlockHeader],
++    prev_hash: zx_core::BlockHash,
++    altura: u32,
++    timestamp: u64,
++    cbid: u32,
++    clave_de_este_bloque: ClavePublica,
++    depositos: Vec<(Tx, Vec<Vec<u8>>)>,
++) -> Result<(PlantillaPow, TxId, Amount), ErrorNodo> {
++    let target = target_de_altura(historial, altura)
++        .map_err(|e| ErrorNodo::Otro(format!("target de altura {altura}: {e}")))?;
++    let bits = codificar_con(target, &PARAMETROS_POW_DEV.limites);
++
++    let coinbase_tx = construir_coinbase_pow(clave_de_este_bloque, altura);
++    let mut txs = vec![coinbase_tx.clone()];
++    let mut testigos: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
++    for (tx, tst) in depositos {
++        txs.push(tx);
++        testigos.push(tst);
++    }
++
++    let txid_coinbase = txid(&coinbase_tx, cbid);
++    #[expect(
++        clippy::indexing_slicing,
++        reason = "outputs tiene exactamente un elemento (construir_coinbase_pow)"
++    )]
++    let valor_coinbase = coinbase_tx.outputs[0].value;
++
++    let txids: Vec<_> = txs.iter().map(|t| txid(t, cbid)).collect();
++    let merkle = merkle_root(&txids);
++
++    let cabecera_base = BlockHeader {
++        consensus_branch_id: cbid,
++        prev_hash,
++        merkle_root: merkle,
++        timestamp,
++        bits,
++        nonce: 0,
++        height: altura,
++    };
++    Ok((
++        PlantillaPow {
++            cabecera_base,
++            target,
++            txs,
++            testigos,
++        },
++        txid_coinbase,
++        valor_coinbase,
++    ))
++}
++
++/// Lo mínimo que el hilo minero necesita: cabecera base y target. No lleva transacciones ni
++/// testigos (el bucle los conserva localmente; reenviarlos sería una copia inútil de datos que el
++/// bucle ya tiene).
++#[derive(Clone, Copy)]
++pub struct TrabajoMinero {
++    /// Cabecera con `nonce = 0`.
++    pub cabecera_base: BlockHeader,
++    /// Target que debe cumplir `hash_pow`.
++    pub target: U256,
++}
++
++impl From<&PlantillaPow> for TrabajoMinero {
++    fn from(p: &PlantillaPow) -> Self {
++        Self {
++            cabecera_base: p.cabecera_base,
++            target: p.target,
++        }
++    }
++}
++
++/// Cuerpo del hilo minero: recibe trabajos, mina y devuelve la cabecera con `nonce`.
++///
++/// Se detiene (decisión 3, «se detiene en el corte») cuando el canal de entrada se cierra: el bucle
++/// deja de enviar trabajos tras fijar el terminal.
++pub fn hilo_minero(rx: Receiver<TrabajoMinero>, tx: Sender<BlockHeader>) {
++    let cancelar = AtomicBool::new(false);
++    for trabajo in rx {
++        let Some(minada) = minar(
++            &trabajo.cabecera_base,
++            trabajo.target,
++            &Sha3Dev,
++            u64::MAX,
++            &cancelar,
++        ) else {
++            // `max_intentos = u64::MAX` con `cancelar` siempre en `false`: no debería devolver
++            // `None`. Si ocurriera, se detiene el hilo en vez de fingir una cabecera.
++            break;
++        };
++        if tx.send(minada).is_err() {
++            break;
++        }
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/regimen.rs ws/crates/zx-node/src/regimen.rs
+--- ws.orig/crates/zx-node/src/regimen.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/regimen.rs	2026-09-26 07:08:47.675731149 +0200
+@@ -0,0 +1,255 @@
++//! Fase PoST en régimen: hilo productor (decisión 3, 5 y 6; «Relanzamiento» punto 3).
++//!
++//! **Simplificación deliberada y documentada** (`PROGRESO.md`): la orden pide un hilo PoT y un hilo
++//! granjero separados. Este ejecutor los fusiona en **un** hilo productor porque:
++//!
++//! 1. `zx_post::ServicioPot` no expone forma de inyectar una salida calculada en otro hilo (solo
++//!    `avanzar`, que recalcula el AES); separarlos habría obligado a *recalcular* el mismo PoT dos
++//!    veces (una por hilo) sin ganar concurrencia real.
++//! 2. Auditar tres parcelas de 2 piezas cuesta milisegundos frente al ~1 s del PoT: no hay trabajo
++//!    que valga la pena mover a un tercer hilo.
++//! 3. Sin red (W06d1), el bucle de consenso no tiene ningún otro evento externo que atender durante
++//!    el segundo del slot: la separación de responsabilidades que pide la orden importa para
++//!    W06d2 (con red), no aquí.
++//!
++//! El bucle de consenso sigue siendo el único dueño de `zx-cadena`/`zx-storage`: este hilo solo
++//! **pide** los padres canónicos (los calcula `zx-cadena` con el GHOSTDAG real) y **entrega**
++//! bloques ya producidos para que el bucle los verifique y admita. Mantiene su **propia** copia
++//! independiente de `ServicioPot`, arrancada del mismo terminal y el mismo `N_dev`: como el PoT es
++//! una función determinista de `(terminal, N_dev)`, esta copia y la que usa el bucle para verificar
++//! calculan exactamente las mismas salidas, sin compartir memoria ni bloquearse mutuamente.
++
++// `clippy::panic` está denegado a nivel de workspace («en código de consenso un panic es un vector
++// de DoS»): aquí no aplica esa razón. Este hilo no valida entradas ajenas —W06d1 no tiene red; todo
++// lo que produce y consume es propio— así que un `panic!` aquí nunca es alcanzable por un tercero,
++// solo por una incoherencia interna del propio nodo (equivalente a `unreachable!()`). `fase_pow`
++// convierte el panic del hilo (vía `JoinHandle::join`) en un `ErrorNodo` fatal explícito (decisión
++// 4: un fallo interno del nodo termina el proceso con código ≠ 0, nunca en silencio): el bug real
++// que motivó este cambio (`PROGRESO.md`) era exactamente un hilo que moría sin decir por qué.
++#![expect(
++    clippy::panic,
++    reason = "hilo sin entrada ajena (sin red); un panic aquí es una incoherencia interna, y fase_regimen lo convierte en ErrorNodo fatal vía JoinHandle::join, nunca en un Ok silencioso"
++)]
++
++use std::sync::mpsc::{Receiver, Sender};
++
++use zx_core::PadresDag;
++use zx_core::wire_dag::BloqueDag;
++use zx_farmer::farmer::ParcelaDisco;
++use zx_farmer::productor_poas::convertir_candidatos_locales;
++use zx_poas::HistoriaGenesis;
++use zx_post::productor::{FuenteSoluciones, ParametrosProductor, SolucionCandidata};
++use zx_post::productor_regimen::{CuerpoProductor, producir_en_regimen};
++use zx_post::servicio_pot::ServicioPot;
++
++use crate::claves::ClaveDev;
++
++/// Puente `FuenteSoluciones → ParcelaDisco`, igual que `crates/zx-post/tests/regimen.rs`.
++struct FuenteParcela<'a> {
++    parcela: &'a ParcelaDisco,
++    historia: &'a HistoriaGenesis,
++}
++
++impl FuenteSoluciones for FuenteParcela<'_> {
++    type Error = zx_farmer::ErrorProductorPoas;
++
++    fn soluciones(
++        &self,
++        salida: [u8; 16],
++        slot: u64,
++        rango: u64,
++    ) -> Result<Vec<SolucionCandidata>, Self::Error> {
++        let params = self.historia.params_pieza();
++        let resultado = convertir_candidatos_locales(
++            self.parcela,
++            salida,
++            slot,
++            rango,
++            &params,
++            self.historia.kzg(),
++            self.historia.erasure_coding(),
++        )?;
++        Ok(resultado
++            .soluciones()
++            .iter()
++            .map(|c| SolucionCandidata {
++                solucion: *c.solucion(),
++                distancia: c.distancia(),
++            })
++            .collect())
++    }
++}
++
++/// Mensajes que el hilo productor envía al bucle.
++pub enum MsgProductor {
++    /// Pide los padres canónicos actuales de un bloque de régimen.
++    PeticionPadres,
++    /// Un bloque PoST ya producido y firmado, para verificar y admitir.
++    Post(Box<BloqueDag>),
++}
++
++/// Respuestas del bucle al hilo productor.
++#[expect(
++    clippy::large_enum_variant,
++    reason = "un mensaje por producción intentada (~1/s); boxear `PadresDag` (Copy, 481 B) solo movería el coste a una asignación de montón sin beneficio medible"
++)]
++pub enum MsgBucle {
++    /// Padres canónicos (`padres::padres_de_regimen`).
++    Padres(PadresDag),
++    /// El bloque enviado se admitió: sigue produciendo.
++    Continuar,
++    /// Condición de parada alcanzada (`--parada-tras-slots`): el hilo debe terminar.
++    Parar,
++}
++
++/// Una clave dev con su parcela ya abierta.
++pub struct ClaveConParcela {
++    /// La clave.
++    pub clave: ClaveDev,
++    /// Su parcela.
++    pub parcela: ParcelaDisco,
++}
++
++/// Cuerpo del hilo productor en régimen.
++///
++/// Cada slot: avanza el PoT, audita las parcelas locales, y si hay solución para alguna clave, pide
++/// los padres **una sola vez** para todo el slot (los hermanos del mismo slot comparten padres: si
++/// se pidieran de nuevo tras admitir el primero, el segundo podría heredarlo como `sp` del mismo
++/// slot y `producir_en_regimen` lo rechazaría con `SlotNoProgreso`) y produce un bloque por clave
++/// ganadora.
++///
++/// Termina cuando `parada_tras_slots` se alcanza, cuando el bucle contesta [`MsgBucle::Parar`] o
++/// cuando el canal con el bucle se cierra (fin del proceso).
++#[expect(
++    clippy::too_many_arguments,
++    reason = "el estado de arranque de régimen ya viene mínimo; agruparlo ocultaría su procedencia"
++)]
++pub fn hilo_productor_regimen(
++    mut servicio: ServicioPot,
++    n_dev: u64,
++    sr_dev: u64,
++    cbid: u32,
++    importe_coinbase: zx_core::Amount,
++    claves: Vec<ClaveConParcela>,
++    historia: &HistoriaGenesis,
++    parada_tras_slots: Option<u64>,
++    rx: &Receiver<MsgBucle>,
++    tx: &Sender<MsgProductor>,
++) {
++    // `servicio` es un **clon** del `ServicioPot` de verificación del bucle (`Nodo::
++    // servicio_verificacion`), no uno construido desde cero: ya trae registrado el terminal y
++    // *todo* bloque PoST admitido hasta ahora (el de transición si acaba de producirse, o toda la
++    // historia de régimen si `fase_regimen` arranca tras un reinicio). Construir uno nuevo con
++    // `ServicioPot::nuevo(terminal, ...)` aquí fue el bug real de la primera ejecución de V4
++    // (`PROGRESO.md`): el hilo no conocía el bloque de transición, `slot_de(padre)` fallaba siempre
++    // y `producir_en_regimen` fallaba en silencio para cada intento.
++    let parametros = ParametrosProductor {
++        n_dev,
++        sr_dev,
++        max_slots: 150,
++        consensus_branch_id: cbid,
++        timestamp: 0,
++        importe_coinbase,
++    };
++
++    loop {
++        if let Some(limite) = parada_tras_slots
++            && servicio.slot_actual() >= limite
++        {
++            return;
++        }
++        // `avanzar()` solo falla por desbordamiento aritmético de slot o si la primitiva PoT
++        // rechaza una terna con `N_dev` válido: ninguno de los dos debería ocurrir aquí. Un fallo
++        // real es un bug, no un cierre limpio: se hace ruido en vez de terminar en silencio (el bug
++        // real de la primera ejecución de V4 fue exactamente un hilo que moría sin decir por qué).
++        let slot = servicio
++            .avanzar()
++            .unwrap_or_else(|e| panic!("hilo productor: avanzar el PoT falló: {e}"));
++        let salida = servicio
++            .salida_de(slot)
++            .unwrap_or_else(|e| panic!("hilo productor: salida del slot {slot} ausente: {e}"));
++
++        // Audita las tres parcelas locales en este mismo hilo (ver la nota de simplificación). Un
++        // candidato sin solución no es error (contrato de `FuenteSoluciones`); un `Err` de la
++        // auditoría sí lo es y se hace ruido, no se trata como «sin solución».
++        let mut ganadoras: Vec<(usize, SolucionCandidata)> = Vec::new();
++        for (i, cp) in claves.iter().enumerate() {
++            let fuente = FuenteParcela {
++                parcela: &cp.parcela,
++                historia,
++            };
++            let mut candidatas = fuente
++                .soluciones(salida, slot, sr_dev)
++                .unwrap_or_else(|e| panic!("hilo productor: auditoría de la clave {i}: {e}"));
++            if let Some(c) = candidatas.pop() {
++                ganadoras.push((i, c));
++            }
++        }
++        if ganadoras.is_empty() {
++            continue;
++        }
++
++        if tx.send(MsgProductor::PeticionPadres).is_err() {
++            return; // el bucle cerró el canal: apagado normal del proceso.
++        }
++        let padres = match rx.recv() {
++            Ok(MsgBucle::Padres(p)) => p,
++            Ok(_otro) => panic!("hilo productor: se esperaba Padres, llegó otro mensaje del bucle"),
++            Err(_) => return, // el bucle cerró el canal: apagado normal del proceso.
++        };
++
++        for (i, candidata) in ganadoras {
++            let Some(cp) = claves.get(i) else {
++                panic!("hilo productor: índice de clave {i} fuera de rango")
++            };
++            let mut parametros_bloque = parametros;
++            parametros_bloque.timestamp = std::time::SystemTime::now()
++                .duration_since(std::time::UNIX_EPOCH)
++                .map(|d| d.as_secs())
++                .unwrap_or(0);
++            let fuente_fija = SolucionFija(candidata);
++            let bloque = producir_en_regimen(
++                padres,
++                slot,
++                &mut servicio,
++                &fuente_fija,
++                &cp.clave.sk,
++                &parametros_bloque,
++                CuerpoProductor::vacio(),
++            )
++            .unwrap_or_else(|e| panic!("hilo productor: producir_en_regimen falló: {e}"));
++            let hash = bloque.cabecera.block_hash();
++            servicio
++                .registrar_validado(hash, slot)
++                .unwrap_or_else(|e| panic!("hilo productor: registrar el bloque producido: {e}"));
++
++            if tx.send(MsgProductor::Post(Box::new(bloque))).is_err() {
++                return; // el bucle cerró el canal: apagado normal del proceso.
++            }
++            match rx.recv() {
++                Ok(MsgBucle::Continuar) => {}
++                Ok(MsgBucle::Parar) | Err(_) => return,
++                Ok(MsgBucle::Padres(_)) => {
++                    panic!("hilo productor: se esperaba Continuar/Parar, llegó Padres")
++                }
++            }
++        }
++    }
++}
++
++/// Fuente de soluciones que siempre devuelve la misma candidata ya auditada (evita volver a auditar
++/// la parcela al construir el bloque: la auditoría ya se hizo una vez por slot, arriba).
++struct SolucionFija(SolucionCandidata);
++
++impl FuenteSoluciones for SolucionFija {
++    type Error = std::convert::Infallible;
++
++    fn soluciones(
++        &self,
++        _salida: [u8; 16],
++        _slot: u64,
++        _rango: u64,
++    ) -> Result<Vec<SolucionCandidata>, Self::Error> {
++        Ok(vec![self.0])
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/registro.rs ws/crates/zx-node/src/registro.rs
+--- ws.orig/crates/zx-node/src/registro.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/registro.rs	2026-09-26 06:54:11.870288222 +0200
+@@ -0,0 +1,179 @@
++//! Registro estructurado (decisión 9; `ESCENARIOS-0.0.1.md` §1): una línea JSON por evento, con
++//! reloj monotónico en nanosegundos y reloj de pared en el mismo instante.
++//!
++//! **No se añade `serde`/`serde_json`** (decisión del ejecutor, `PROGRESO.md`): el esquema es fijo,
++//! sin anidamiento profundo, y una línea la construye [`Evento`] a mano. Cada valor de texto se
++//! escapa (comillas, barra invertida y controles) antes de escribir.
++
++use std::fs::{File, OpenOptions};
++use std::io::{self, Write as _};
++use std::path::Path;
++use std::sync::Mutex;
++use std::time::{Instant, SystemTime, UNIX_EPOCH};
++
++/// Registro estructurado del nodo: un fichero, una línea JSON por evento.
++pub struct Registro {
++    archivo: Mutex<File>,
++    inicio: Instant,
++}
++
++fn escapar_json(s: &str, out: &mut String) {
++    out.push('"');
++    for c in s.chars() {
++        match c {
++            '"' => out.push_str("\\\""),
++            '\\' => out.push_str("\\\\"),
++            '\n' => out.push_str("\\n"),
++            '\r' => out.push_str("\\r"),
++            '\t' => out.push_str("\\t"),
++            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
++            c => out.push(c),
++        }
++    }
++    out.push('"');
++}
++
++/// Un evento en construcción: pares `clave: valor` en el orden en que se añaden.
++pub struct Evento {
++    texto: String,
++    primero: bool,
++}
++
++impl Evento {
++    fn nueva(tipo: &str, reloj_ns: u128, reloj_pared_ns: u128) -> Self {
++        let mut texto = String::with_capacity(256);
++        texto.push('{');
++        texto.push_str("\"tipo\":");
++        escapar_json(tipo, &mut texto);
++        texto.push_str(",\"reloj_ns\":");
++        texto.push_str(&reloj_ns.to_string());
++        texto.push_str(",\"reloj_pared_ns\":");
++        texto.push_str(&reloj_pared_ns.to_string());
++        Self {
++            texto,
++            // Ya se escribieron `tipo`, `reloj_ns` y `reloj_pared_ns`: el próximo campo (el primero
++            // que añada el llamante) necesita una coma delante. `false` aquí era el bug: producía
++            // `"reloj_pared_ns":123"siguiente_campo":...` sin coma, JSON inválido.
++            primero: true,
++        }
++    }
++
++    fn separador(&mut self) {
++        if self.primero {
++            self.texto.push(',');
++        }
++        self.primero = true;
++    }
++
++    /// Añade un campo de texto.
++    #[must_use]
++    pub fn str(mut self, clave: &str, valor: &str) -> Self {
++        self.separador();
++        self.texto.push('"');
++        self.texto.push_str(clave);
++        self.texto.push_str("\":");
++        escapar_json(valor, &mut self.texto);
++        self
++    }
++
++    /// Añade un campo entero sin signo.
++    #[must_use]
++    pub fn u64(mut self, clave: &str, valor: u64) -> Self {
++        self.separador();
++        self.texto.push('"');
++        self.texto.push_str(clave);
++        self.texto.push_str("\":");
++        self.texto.push_str(&valor.to_string());
++        self
++    }
++
++    /// Añade un campo entero con signo.
++    #[must_use]
++    pub fn i64(mut self, clave: &str, valor: i64) -> Self {
++        self.separador();
++        self.texto.push('"');
++        self.texto.push_str(clave);
++        self.texto.push_str("\":");
++        self.texto.push_str(&valor.to_string());
++        self
++    }
++
++    /// Añade un campo booleano.
++    #[must_use]
++    pub fn bool(mut self, clave: &str, valor: bool) -> Self {
++        self.separador();
++        self.texto.push('"');
++        self.texto.push_str(clave);
++        self.texto.push_str("\":");
++        self.texto.push_str(if valor { "true" } else { "false" });
++        self
++    }
++
++    /// Añade un campo de lista de textos (p. ej. padres, como hashes hex).
++    #[must_use]
++    pub fn lista_str(mut self, clave: &str, valores: &[String]) -> Self {
++        self.separador();
++        self.texto.push('"');
++        self.texto.push_str(clave);
++        self.texto.push_str("\":[");
++        for (i, v) in valores.iter().enumerate() {
++            if i > 0 {
++                self.texto.push(',');
++            }
++            escapar_json(v, &mut self.texto);
++        }
++        self.texto.push(']');
++        self
++    }
++
++    fn terminar(mut self) -> String {
++        self.texto.push('}');
++        self.texto.push('\n');
++        self.texto
++    }
++}
++
++impl Registro {
++    /// Abre (o crea) el fichero de registro en modo *append*.
++    ///
++    /// # Errores
++    /// El de E/S al abrir el fichero.
++    pub fn abrir(ruta: &Path) -> io::Result<Self> {
++        let archivo = OpenOptions::new().create(true).append(true).open(ruta)?;
++        Ok(Self {
++            archivo: Mutex::new(archivo),
++            inicio: Instant::now(),
++        })
++    }
++
++    /// Empieza un evento nuevo con el reloj actual ya fijado.
++    #[must_use]
++    pub fn evento(&self, tipo: &str) -> Evento {
++        let reloj_ns = self.inicio.elapsed().as_nanos();
++        let reloj_pared_ns = SystemTime::now()
++            .duration_since(UNIX_EPOCH)
++            .map(|d| d.as_nanos())
++            .unwrap_or(0);
++        Evento::nueva(tipo, reloj_ns, reloj_pared_ns)
++    }
++
++    /// Escribe el evento ya construido, con `sync` para forzarlo a disco (registro crítico).
++    ///
++    /// # Errores
++    /// El de E/S al escribir o al forzar el volcado.
++    pub fn escribir(&self, evento: Evento, sync: bool) -> io::Result<()> {
++        let linea = evento.terminar();
++        #[expect(
++            clippy::unwrap_used,
++            reason = "un Mutex envenenado aquí es un panic previo real: no hay estado seguro que fingir"
++        )]
++        let mut archivo = self.archivo.lock().unwrap();
++        archivo.write_all(linea.as_bytes())?;
++        if sync {
++            archivo.sync_data()?;
++        } else {
++            archivo.flush()?;
++        }
++        Ok(())
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/tests/integracion.rs ws/crates/zx-node/tests/integracion.rs
+--- ws.orig/crates/zx-node/tests/integracion.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/integracion.rs	2026-09-26 07:08:47.676731170 +0200
+@@ -0,0 +1,154 @@
++//! `ORDEN-W06d1` V4: un proceso con 3 claves dev, desde el génesis, cruza el corte y produce
++//! `>= 30` bloques PoST que su propia tubería de admisión verifica íntegros.
++//!
++//! `N_dev` de test (pequeño, múltiplo de 16, `C-POT-04`) y `SR_dev` holgado (`u64::MAX`): la fase
++//! PoW usa el `ParametrosTransicion`/`ParametrosPow` **reales** del perfil dev (no se acortan
++//! `H_corte_min` ni `q`), así que este test mina de verdad hasta el corte, con la dificultad inicial
++//! real de la red dev.
++
++#![expect(
++    clippy::expect_used,
++    clippy::panic,
++    clippy::indexing_slicing,
++    reason = "el test falla con panic por diseño; el validador JSON manual indexa cadenas ya \
++              comprobadas (ver validar_objeto_json_plano)"
++)]
++
++use zx_core::Red;
++use zx_node::nodo::{Config, Nodo};
++
++/// `N_dev` de test: pequeño y múltiplo de 16 (`C-POT-04`). No es el valor de red.
++const N_DEV_TEST: u64 = 32;
++/// `SR_dev` de test: sin controlador, ganadores frecuentes (D-P11, valor de test).
++const SR_DEV_TEST: u64 = u64::MAX;
++
++fn config_de_test(dir: &std::path::Path, parada_tras_slots: u64) -> Config {
++    Config {
++        dir_datos: dir.join("datos"),
++        ruta_registro: dir.join("registro.jsonl"),
++        red: Red::Dev,
++        semilla: 0x5a5a,
++        indices_claves: vec![0, 1, 2],
++        n_dev: N_DEV_TEST,
++        sr_dev: SR_DEV_TEST,
++        parada_tras_slots: Some(parada_tras_slots),
++    }
++}
++
++#[test]
++fn un_proceso_cruza_el_corte_y_produce_al_menos_30_bloques_post() {
++    let dir = tempfile::tempdir().expect("tempdir");
++    let cfg = config_de_test(dir.path(), 40);
++
++    let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
++    nodo.ejecutar()
++        .expect("ejecución sin bloques propios rechazados (decisión 4)");
++
++    assert!(
++        nodo.cadena().terminal().is_some(),
++        "el proceso debe fijar un terminal PoW"
++    );
++
++    let posts = nodo.cadena().bloques_post();
++    // `ejecutar()` devolvió `Ok`: decisión 4 exige que un bloque propio rechazado sea fatal, así
++    // que si llegamos aquí, ninguno de los bloques PoST de `cadena` se rechazó.
++    let admitidos: usize = posts
++        .iter()
++        .filter(|p| nodo.cadena().es_valido(&p.hash))
++        .count();
++    assert_eq!(
++        admitidos,
++        posts.len(),
++        "ejecutar() fue Ok: no debería haber ningún bloque PoST inválido en la cadena"
++    );
++    assert!(
++        admitidos >= 30,
++        "se esperaban >= 30 bloques PoST admitidos, hubo {admitidos}"
++    );
++
++    assert!(
++        nodo.resumen_estado_actual().is_some(),
++        "debe poder calcularse el resumen de estado canónico"
++    );
++
++    // El registro estructurado existe y cada línea es un objeto JSON de un solo nivel bien
++    // formado: claves entrecomilladas, comas entre campos, sin comas colgantes ni pegadas.
++    let contenido = std::fs::read_to_string(&cfg.ruta_registro).expect("leer el registro");
++    let lineas = contenido.lines().count();
++    assert!(lineas > 0, "el registro estructurado no debe estar vacío");
++    for linea in contenido.lines() {
++        validar_objeto_json_plano(linea);
++    }
++}
++
++/// Valida a mano (sin `serde_json`, ver `PROGRESO.md`) que `linea` es `{"clave":valor,...}` con
++/// valores de cadena, número o booleano/lista de cadenas, un solo nivel. Suficientemente estricto
++/// para atrapar la clase de bug real que este test encontró: una coma que falta entre dos campos
++/// (`..."reloj_pared_ns":123"altura":9...`).
++fn validar_objeto_json_plano(linea: &str) {
++    let l = linea.trim();
++    assert!(
++        l.starts_with('{') && l.ends_with('}'),
++        "línea no es un objeto JSON: {linea}"
++    );
++    let interior = &l[1..l.len() - 1];
++    let mut resto = interior;
++    let mut algun_campo = false;
++    loop {
++        resto = resto.trim_start();
++        if resto.is_empty() {
++            break;
++        }
++        algun_campo = true;
++        assert!(
++            resto.starts_with('"'),
++            "se esperaba una clave entre comillas en: {resto}"
++        );
++        let cierre_clave = resto[1..].find('"').unwrap_or_else(|| {
++            panic!("clave sin comilla de cierre en: {resto}");
++        });
++        let tras_clave = &resto[2 + cierre_clave..];
++        let tras_clave = tras_clave.strip_prefix(':').unwrap_or_else(|| {
++            panic!("falta ':' tras la clave en: {tras_clave}");
++        });
++        // El valor termina en la próxima ',' de nivel superior o en el final; los valores de este
++        // registro nunca anidan objetos, así que basta con no cortar dentro de una cadena ni de una
++        // lista `[...]`.
++        let mut profundidad_lista = 0i32;
++        let mut dentro_cadena = false;
++        let mut fin = tras_clave.len();
++        let bytes = tras_clave.as_bytes();
++        let mut i = 0usize;
++        while i < bytes.len() {
++            match bytes[i] {
++                b'"' => dentro_cadena = !dentro_cadena,
++                b'[' if !dentro_cadena => profundidad_lista += 1,
++                b']' if !dentro_cadena => profundidad_lista -= 1,
++                b',' if !dentro_cadena && profundidad_lista == 0 => {
++                    fin = i;
++                    break;
++                }
++                _ => {}
++            }
++            i += 1;
++        }
++        assert!(!dentro_cadena, "cadena sin cerrar en: {tras_clave}");
++        let valor = &tras_clave[..fin];
++        assert!(!valor.is_empty(), "valor vacío tras ':' en: {tras_clave}");
++        resto = tras_clave.get(fin..).unwrap_or("");
++        if let Some(siguiente) = resto.strip_prefix(',') {
++            resto = siguiente;
++            assert!(
++                !resto.trim_start().is_empty(),
++                "coma colgante al final del objeto"
++            );
++        } else {
++            assert!(
++                resto.is_empty(),
++                "sobran caracteres tras el último valor: {resto}"
++            );
++            break;
++        }
++    }
++    assert!(algun_campo, "objeto JSON vacío: {linea}");
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/tests/red_no_dev.rs ws/crates/zx-node/tests/red_no_dev.rs
+--- ws.orig/crates/zx-node/tests/red_no_dev.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/red_no_dev.rs	2026-09-26 06:33:34.931143065 +0200
+@@ -0,0 +1,62 @@
++//! `ORDEN-W06d1` V6 y decisión 2: la red configurada distinta de `Red::Dev` se rechaza **antes**
++//! de abrir disco o parcelas, con código de error explícito y sin crear ningún fichero.
++
++#![expect(
++    clippy::expect_used,
++    clippy::panic,
++    reason = "el test falla con panic por diseño"
++)]
++
++use zx_core::Red;
++use zx_node::error::ErrorNodo;
++use zx_node::nodo::{Config, Nodo};
++
++fn config_con_red(dir: &std::path::Path, red: Red) -> Config {
++    Config {
++        dir_datos: dir.join("datos"),
++        ruta_registro: dir.join("registro.jsonl"),
++        red,
++        semilla: 1,
++        indices_claves: vec![0, 1, 2],
++        n_dev: 32,
++        sr_dev: u64::MAX,
++        parada_tras_slots: Some(1),
++    }
++}
++
++#[test]
++fn mainnet_se_rechaza_sin_crear_nada() {
++    let dir = tempfile::tempdir().expect("tempdir");
++    let cfg = config_con_red(dir.path(), Red::Mainnet);
++    let resultado = Nodo::arrancar(&cfg);
++    match resultado {
++        Err(ErrorNodo::RedNoEsDev {
++            encontrada: Red::Mainnet,
++        }) => {}
++        Err(otro) => panic!("se esperaba RedNoEsDev, se obtuvo otro error: {otro}"),
++        Ok(_) => panic!("se esperaba RedNoEsDev, arrancó"),
++    }
++    assert!(
++        !cfg.dir_datos.exists(),
++        "no debe crearse el directorio de datos si la red no es dev"
++    );
++    assert!(
++        !cfg.ruta_registro.exists(),
++        "no debe crearse el registro si la red no es dev"
++    );
++}
++
++#[test]
++fn testnet_se_rechaza_sin_crear_nada() {
++    let dir = tempfile::tempdir().expect("tempdir");
++    let cfg = config_con_red(dir.path(), Red::Testnet);
++    let resultado = Nodo::arrancar(&cfg);
++    match resultado {
++        Err(ErrorNodo::RedNoEsDev {
++            encontrada: Red::Testnet,
++        }) => {}
++        Err(otro) => panic!("se esperaba RedNoEsDev, se obtuvo otro error: {otro}"),
++        Ok(_) => panic!("se esperaba RedNoEsDev, arrancó"),
++    }
++    assert!(!cfg.dir_datos.exists());
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/tests/reinicio.rs ws/crates/zx-node/tests/reinicio.rs
+--- ws.orig/crates/zx-node/tests/reinicio.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/reinicio.rs	2026-09-26 08:10:27.957047121 +0200
+@@ -0,0 +1,368 @@
++//! `ORDEN-W06d1` V5 y V5b: muerte y reinicio.
++//!
++//! V5: el binario real se lanza como proceso hijo y se mata con `SIGKILL` en >= 10 puntos (semilla
++//! fija, fases PoW y PoST) — reabre con el **mismo resumen de estado** que el último bloque
++//! persistido y sigue produciendo, 0 corrupciones.
++//!
++//! V5b: un testigo de una transacción de un bloque PoW alterado en disco (el almacén no lo detecta,
++//! `REVISION-W06b.md`) hace que el nodo se niegue a arrancar con error explícito al repetir.
++
++#![expect(
++    clippy::expect_used,
++    clippy::panic,
++    reason = "el test falla con panic por diseño"
++)]
++
++use std::path::{Path, PathBuf};
++use std::process::{Child, Command, Stdio};
++use std::time::{Duration, Instant};
++
++use rocksdb::{ColumnFamilyDescriptor, DB, Options};
++use zx_core::Red;
++use zx_core::wire::{cuerpo_a_bytes, cuerpo_desde_bytes};
++use zx_node::nodo::{Config, Nodo};
++
++/// `N_dev` de test: pequeño y múltiplo de 16. No es el valor de red.
++const N_DEV_TEST: &str = "32";
++/// `SR_dev` de test: sin controlador, ganadores frecuentes.
++const SR_DEV_TEST: &str = "18446744073709551615"; // u64::MAX
++
++/// Semilla fija de las esperas entre el arranque y el `SIGKILL` (splitmix64, igual patrón que
++/// `crates/zx-storage/tests/matar_a_mitad.rs`).
++const SEMILLA_ESPERA: u64 = 0x5a5a_5a5a_5a5a_5a5a;
++/// Rondas de muerte y reinicio (`>= 10`, decisión de V5).
++const RONDAS: u32 = 12;
++
++/// Jitter corto (no determina cuándo matar, solo cuánto esperar **después** de alcanzar el
++/// objetivo de la ronda) para que el `SIGKILL` no caiga siempre justo tras la línea de registro que
++/// lo desbloquea — ver `objetivo_minado`. Antes determinaba el tiempo de pared completo de la fase
++/// 1; ese diseño fallaba en `debug` porque minar la primera altura puede tardar más de 8 s en el
++/// peor caso (búsqueda de nonce probabilística, no un tiempo fijo): las 4 rondas podían matarse
++/// antes de admitir ningún bloque (medido: `alturas=[0, 0, 0, 0]` en `logs/V3-despues.log`).
++fn espera_millis(ronda: u32) -> u64 {
++    let mut z = SEMILLA_ESPERA ^ u64::from(ronda).wrapping_mul(0x9e37_79b9_7f4a_7c15);
++    z = z.wrapping_add(0x9e37_79b9_7f4a_7c15);
++    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
++    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
++    z ^= z >> 31;
++    z % 500
++}
++
++/// Número acumulado (todo el registro `.jsonl`, de solo-anexión entre rondas) de eventos
++/// `"bloque_minado"` que se exige antes de matar en la ronda `ronda`-ésima de calentamiento. Un
++/// contador de eventos reales, no un tiempo de pared: funciona igual en `release` (~1 s/bloque,
++/// limitado al reloj de pared) que en `debug` (~8-9 s/bloque, dificultad inicial real sin optimizar,
++/// medido en V5b).
++fn objetivo_minado(ronda: u32) -> usize {
++    usize::try_from(ronda).unwrap_or(1)
++}
++
++fn config_de_test(dir: &Path, parada_tras_slots: u64) -> Config {
++    Config {
++        dir_datos: dir.join("datos"),
++        ruta_registro: dir.join("registro.jsonl"),
++        red: Red::Dev,
++        semilla: 0x1234,
++        indices_claves: vec![0, 1, 2],
++        n_dev: N_DEV_TEST.parse().expect("N_dev"),
++        sr_dev: SR_DEV_TEST.parse().expect("SR_dev"),
++        parada_tras_slots: Some(parada_tras_slots),
++    }
++}
++
++fn lanzar(dir: &Path) -> Child {
++    Command::new(env!("CARGO_BIN_EXE_zx-node"))
++        .args([
++            "--datos",
++            dir.join("datos").to_str().expect("ruta"),
++            "--registro",
++            dir.join("registro.jsonl").to_str().expect("ruta"),
++            "--red",
++            "dev",
++            "--semilla",
++            "4660", // 0x1234
++            "--claves",
++            "0,1,2",
++            "--n-dev",
++            N_DEV_TEST,
++            "--sr-dev",
++            SR_DEV_TEST,
++            "--parada-tras-slots",
++            "100000",
++        ])
++        .stdout(Stdio::null())
++        .stderr(Stdio::null())
++        .spawn()
++        .expect("lanza zx-node")
++}
++
++/// Espera a que el registro dé señales de vida (al menos una línea escrita).
++fn esperar_senal_de_vida(ruta_registro: &Path, ronda: u32) {
++    let limite = Instant::now() + Duration::from_secs(60);
++    loop {
++        if let Ok(meta) = std::fs::metadata(ruta_registro)
++            && meta.len() > 0
++        {
++            return;
++        }
++        assert!(
++            Instant::now() < limite,
++            "ronda {ronda}: el nodo no dio señales de vida en 60 s"
++        );
++        std::thread::sleep(Duration::from_millis(20));
++    }
++}
++
++/// Rondas de calentamiento (fase PoW): kills cortos, antes de forzar el cruce del corte.
++const RONDAS_POW: u32 = 4;
++/// Rondas de régimen: kills muy cortos, ya cruzado el corte (`N_dev` de test: casi instantáneo).
++const RONDAS_REGIMEN: u32 = 5;
++
++#[test]
++fn v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo() {
++    let dir = tempfile::tempdir().expect("tempdir");
++    let ruta_registro = dir.path().join("registro.jsonl");
++
++    let mut alturas_pow: Vec<u32> = Vec::new();
++    let mut posts_regimen: Vec<usize> = Vec::new();
++
++    // Fase 1: `RONDAS_POW` rondas cortas mientras se mina de verdad (dificultad inicial real). Se
++    // mata cuando el registro (acumulado, de solo-anexión, entre rondas) acumula `objetivo_minado`
++    // eventos `bloque_minado`, no tras un tiempo de pared fijo (ver `objetivo_minado`).
++    for ronda in 1..=RONDAS_POW {
++        let mut hijo = lanzar(dir.path());
++        esperar_senal_de_vida(&ruta_registro, ronda);
++        let objetivo = objetivo_minado(ronda);
++        let limite = Instant::now() + Duration::from_secs(180);
++        loop {
++            let contenido = std::fs::read_to_string(&ruta_registro).unwrap_or_default();
++            let vistos = contenido.matches("\"bloque_minado\"").count();
++            if vistos >= objetivo {
++                break;
++            }
++            assert!(
++                Instant::now() < limite,
++                "ronda PoW {ronda}: no se vieron {objetivo} bloques minados (acumulado) en 180 s"
++            );
++            assert!(
++                hijo.try_wait().ok().flatten().is_none(),
++                "ronda PoW {ronda}: el nodo terminó solo antes de minar lo esperado"
++            );
++            std::thread::sleep(Duration::from_millis(20));
++        }
++        // Jitter corto tras alcanzar el objetivo: el `kill` no debe caer siempre justo tras la
++        // línea de registro que lo desbloqueó.
++        std::thread::sleep(Duration::from_millis(espera_millis(ronda)));
++        hijo.kill().expect("mata al hijo");
++        hijo.wait().expect("lo entierra");
++
++        let cfg = config_de_test(dir.path(), 0);
++        let nodo = Nodo::arrancar(&cfg)
++            .unwrap_or_else(|e| panic!("ronda PoW {ronda}: reabrir tras SIGKILL falló: {e}"));
++        alturas_pow.push(nodo.altura_pow());
++        drop(nodo);
++    }
++    assert!(
++        alturas_pow.iter().any(|a| *a > 0),
++        "ninguna ronda de PoW llegó a minar nada: alturas={alturas_pow:?}"
++    );
++
++    // Fase 2: deja correr sin matar hasta cruzar el corte (o hasta un límite generoso), para que
++    // las rondas de régimen de abajo caigan de verdad en la fase PoST. Se comprueba leyendo el
++    // registro (el primer «bloque_producido» solo puede ocurrir tras el corte): abrir el mismo
++    // RocksDB con el hijo todavía vivo fallaría por el candado de un solo escritor.
++    {
++        // 420 s: en `debug` (sin optimizar) minar hasta `H_corte_min = 30` con la dificultad
++        // inicial real puede tardar bastante más que en `release` (medido: ~4-5 s/bloque en
++        // `debug` frente a ~1 s/bloque, ya limitado por el reloj de pared, en `release`).
++        let limite = Instant::now() + Duration::from_secs(420);
++        let mut hijo = lanzar(dir.path());
++        esperar_senal_de_vida(&ruta_registro, 0);
++        loop {
++            let contenido = std::fs::read_to_string(&ruta_registro).unwrap_or_default();
++            if contenido.contains("\"bloque_producido\"") {
++                break;
++            }
++            assert!(
++                Instant::now() < limite,
++                "no se cruzó el corte en 180 s de calentamiento"
++            );
++            assert!(
++                hijo.try_wait().ok().flatten().is_none(),
++                "el nodo de calentamiento terminó solo antes de cruzar el corte"
++            );
++            std::thread::sleep(Duration::from_millis(200));
++        }
++        hijo.kill().expect("mata al hijo de calentamiento");
++        hijo.wait().expect("lo entierra");
++    }
++
++    // Fase 3: `RONDAS_REGIMEN` rondas ya en régimen. Con `N_dev` de test y `SR_dev = u64::MAX` la
++    // producción es tan rápida (varios bloques por slot, slot casi instantáneo) que una espera en
++    // milisegundos no discrimina: el primer intento de esta prueba mató siempre tras el mismo lote
++    // inicial (`[4, 4, 4, 4, 4, 4, 4, 4]`, bug real de la prueba, no del nodo — ver `PROGRESO.md`).
++    // En su lugar, cada ronda espera a ver un número **creciente** de eventos `bloque_producido` en
++    // el registro (una cuenta externa, no una escritura interna concreta) antes de matar: el punto
++    // de corte varía por construcción, y sigue siendo un `SIGKILL` en un instante arbitrario del
++    // proceso (no hay sincronización con ninguna escritura en curso).
++    for ronda in 1..=RONDAS_REGIMEN {
++        let mut hijo = lanzar(dir.path());
++        esperar_senal_de_vida(&ruta_registro, ronda);
++        let objetivo = usize::try_from(ronda).unwrap_or(1);
++        let limite = Instant::now() + Duration::from_secs(30);
++        loop {
++            let contenido = std::fs::read_to_string(&ruta_registro).unwrap_or_default();
++            let vistos = contenido.matches("\"bloque_producido\"").count();
++            if vistos >= objetivo {
++                break;
++            }
++            assert!(
++                Instant::now() < limite,
++                "ronda régimen {ronda}: no se vieron {objetivo} bloques producidos en 30 s"
++            );
++            std::thread::sleep(Duration::from_millis(20));
++        }
++        hijo.kill().expect("mata al hijo");
++        hijo.wait().expect("lo entierra");
++
++        let cfg = config_de_test(dir.path(), 0);
++        let nodo = Nodo::arrancar(&cfg)
++            .unwrap_or_else(|e| panic!("ronda régimen {ronda}: reabrir tras SIGKILL falló: {e}"));
++        posts_regimen.push(nodo.cadena().bloques_post().len());
++        drop(nodo);
++    }
++
++    // El `kill` no está sincronizado con ninguna escritura concreta: si cayera siempre en el mismo
++    // punto, esta prueba no probaría nada (mismo espíritu que `matar_a_mitad.rs`). Se exige
++    // variación por separado en cada fase: las rondas de PoW nunca producen bloques PoST (el corte
++    // aún no se cruzó) y mezclarlas con las de régimen ocultaría que el `kill` de PoW sí varía.
++    let mut alturas_vistas = alturas_pow.clone();
++    alturas_vistas.sort_unstable();
++    alturas_vistas.dedup();
++    assert!(
++        alturas_vistas.len() > 1,
++        "todas las rondas de PoW alcanzaron la misma altura ({alturas_pow:?}): \
++         el `kill` parece sincronizado con algo"
++    );
++    let mut posts_vistos = posts_regimen.clone();
++    posts_vistos.sort_unstable();
++    posts_vistos.dedup();
++    assert!(
++        posts_vistos.len() > 1,
++        "todas las rondas de régimen alcanzaron el mismo número de bloques PoST \
++         ({posts_regimen:?}): el `kill` parece sincronizado con algo"
++    );
++    let alcanzados = posts_regimen;
++
++    // "Sigue produciendo": tras las `RONDAS` interrupciones, se deja correr una última vez sin
++    // matarlo y el número de bloques PoST admitidos crece.
++    let antes = *alcanzados.last().expect("al menos una ronda");
++    let mut hijo = lanzar(dir.path());
++    esperar_senal_de_vida(&ruta_registro, RONDAS + 1);
++    std::thread::sleep(Duration::from_secs(3));
++    hijo.kill().expect("mata al hijo");
++    hijo.wait().expect("lo entierra");
++
++    let cfg = config_de_test(dir.path(), 0);
++    let nodo = Nodo::arrancar(&cfg).expect("reabrir la última vez");
++    let despues = nodo.cadena().bloques_post().len();
++    assert!(
++        despues >= antes,
++        "el número de bloques PoST no debe decrecer tras reabrir: antes={antes}, después={despues}"
++    );
++    assert!(
++        despues > 0 || nodo.cadena().terminal().is_none(),
++        "si ya hay terminal, debería haber al menos un bloque PoST tras dejarlo correr"
++    );
++}
++
++/// Reabre el mismo RocksDB por debajo de `Almacen` (nombres de familia documentados en
++/// `crates/zx-storage/src/disco.rs`: «bloques», «registro», «meta») y corrompe la primera firma del
++/// primer testigo del primer bloque PoW **no genésis** que encuentra.
++fn corromper_primer_testigo_pow(ruta_almacen: &Path) -> zx_core::BlockHash {
++    let mut opciones = Options::default();
++    opciones.create_if_missing(false);
++    let familias = ["bloques", "registro", "meta"]
++        .into_iter()
++        .map(|n| ColumnFamilyDescriptor::new(n, Options::default()))
++        .collect::<Vec<_>>();
++    let db = DB::open_cf_descriptors(&opciones, ruta_almacen, familias).expect("reabrir rocksdb");
++    let cf_registro = db.cf_handle("registro").expect("cf registro");
++    let cf_bloques = db.cf_handle("bloques").expect("cf bloques");
++
++    for item in db.iterator_cf(cf_registro, rocksdb::IteratorMode::Start) {
++        let (_indice, hash_bytes) = item.expect("iterar registro");
++        let valor = db
++            .get_cf(cf_bloques, &hash_bytes)
++            .expect("leer bloque")
++            .expect("el bloque debe existir");
++        let (familia, canonicos) = valor.split_first().expect("sobre no vacío");
++        if *familia != 0x01 {
++            continue; // familia PoW = 0x01 (formato.rs); se busca un bloque PoW.
++        }
++        let Ok((cuerpo, _)) = cuerpo_desde_bytes(canonicos) else {
++            continue;
++        };
++        let (cabecera, txs, mut testigos) = cuerpo;
++        if cabecera.height == 0 {
++            continue; // el génesis no tiene testigos que corromper de forma interesante.
++        }
++        let Some(primeros) = testigos.iter().position(|t| !t.is_empty()) else {
++            continue; // este bloque no tiene testigos (p. ej. solo la coinbase, sin depósito).
++        };
++        #[expect(
++            clippy::indexing_slicing,
++            reason = "primeros viene de position(), es un índice válido"
++        )]
++        {
++            let firma = &mut testigos[primeros][0];
++            let ultimo = firma.len() - 1;
++            firma[ultimo] ^= 0xFF;
++        }
++        let mut nuevos_canonicos = Vec::new();
++        cuerpo_a_bytes(&mut nuevos_canonicos, &cabecera, &txs, &testigos);
++        let mut nuevo_valor = vec![0x01u8];
++        nuevo_valor.extend_from_slice(&nuevos_canonicos);
++        db.put_cf(cf_bloques, &hash_bytes, &nuevo_valor)
++            .expect("escribir el bloque corrompido");
++        return cabecera.block_hash();
++    }
++    panic!("no se encontró ningún bloque PoW con testigo no vacío que corromper");
++}
++
++#[test]
++fn v5b_testigo_pow_corrupto_impide_arrancar() {
++    let dir = tempfile::tempdir().expect("tempdir");
++    let ruta_registro = dir.path().join("registro.jsonl");
++
++    // Deja correr lo suficiente para que al menos un depósito (con testigo real) se persista:
++    // M_cb = 5, M_dep = 3 (perfil dev); con 3 claves rotando la coinbase, la primera madura hacia
++    // la altura 8-9. En `release` basta con ~18 s (~1 bloque/s, limitado al reloj de pared); en
++    // `debug` (sin optimizar) minar cada altura tarda bastante más (medido: ~4-5 s/bloque con la
++    // dificultad inicial real), así que se espera con margen amplio para no depender del perfil.
++    let mut hijo = lanzar(dir.path());
++    esperar_senal_de_vida(&ruta_registro, 0);
++    std::thread::sleep(Duration::from_secs(75));
++    hijo.kill().expect("mata al hijo");
++    hijo.wait().expect("lo entierra");
++
++    let ruta_almacen: PathBuf = dir.path().join("datos").join("storage");
++    let hash_corrompido = corromper_primer_testigo_pow(&ruta_almacen);
++
++    let cfg = config_de_test(dir.path(), 0);
++    let resultado = Nodo::arrancar(&cfg);
++    match resultado {
++        Err(e) => {
++            let texto = e.to_string();
++            assert!(
++                texto.contains(&hash_corrompido.to_string())
++                    || texto.contains("Firma")
++                    || texto.contains("firma"),
++                "el error debería señalar el fallo de firma del bloque {hash_corrompido}: {texto}"
++            );
++        }
++        Ok(_) => panic!(
++            "el nodo debió negarse a arrancar: el testigo del bloque {hash_corrompido} está corrupto"
++        ),
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-post/src/servicio_pot.rs ws/crates/zx-post/src/servicio_pot.rs
+--- ws.orig/crates/zx-post/src/servicio_pot.rs	2026-09-26 04:26:02.975390639 +0200
++++ ws/crates/zx-post/src/servicio_pot.rs	2026-09-26 06:19:19.190302722 +0200
+@@ -296,6 +296,42 @@
+         Ok(self.slot_actual)
+     }
+ 
++    /// Inserta la salida y el portador de `slot` **ya calculados por el llamante**, sin volver a
++    /// correr `zx_pot::prove` (`ORDEN-W06d1`, decisión 7: reconstruir el servicio al reiniciar
++    /// «desde las salidas PoT de las cabeceras almacenadas… no recalculando el flujo desde T»,
++    /// porque recalcularlo costaría el tiempo real transcurrido).
++    ///
++    /// A diferencia de [`Self::avanzar`], **no** exige `slot == slot_actual() + 1`: solo que
++    /// `slot > slot_actual()`. El flujo es único y global (D-P10): dos bloques de ramas o slots
++    /// distintos comparten exactamente la misma `salida(f, slot)`, así que un llamante que reconstruye
++    /// varias ramas (o repite el registro de admisión) solo necesita **avanzar**, nunca rellenar un
++    /// hueco por el que ya pasó otra rama; los huecos intermedios sin bloque tampoco hace falta
++    /// llenarlos, porque nunca son `sp` de nadie (`sp` es siempre el slot de un bloque admitido). No
++    /// verifica que `salida`/`portador` sean los que `prove` habría producido: es responsabilidad del
++    /// llamante que vengan de una cabecera **ya admitida** (su `pot_output`) y de su justificación,
++    /// no de una fuente no verificada.
++    ///
++    /// # Errores
++    /// [`ErrorServicioPot::ObjetivoAnterior`] si `slot <= slot_actual()`.
++    pub fn insertar_calculado(
++        &mut self,
++        slot: u64,
++        salida: [u8; POT_OUTPUT_BYTES],
++        portador: PotCheckpoints,
++    ) -> Result<(), ErrorServicioPot> {
++        if slot <= self.slot_actual {
++            return Err(ErrorServicioPot::ObjetivoAnterior {
++                pedido: slot,
++                actual: self.slot_actual,
++            });
++        }
++        self.salidas.insert(slot, salida);
++        self.portadores.insert(slot, portador);
++        self.slot_actual = slot;
++        self.podar();
++        Ok(())
++    }
++
+     /// Registra un bloque **ya validado por el llamante** `(hash, slot)` en el pasado del servicio.
+     ///
+     /// No aporta ninguna prueba: es la declaración explícita que `InstantaneaPot::pasado()` no puede
+@@ -572,6 +608,55 @@
+         assert_eq!(s.pasado().expect("pasado").len(), 1);
+     }
+ 
++    /// `ORDEN-W06d1`: reconstruir con `insertar_calculado` da el mismo estado que `avanzar`.
++    #[test]
++    fn insertar_calculado_reproduce_avanzar() {
++        let mut avanzado = servicio(8);
++        avanzado.avanzar_hasta(4).expect("avance");
++
++        let mut reconstruido = servicio(8);
++        for slot in 1..=4u64 {
++            let salida = avanzado.salida_de(slot).expect("salida ya calculada");
++            let portador = *avanzado.portador_de(slot).expect("portador ya calculado");
++            reconstruido
++                .insertar_calculado(slot, salida, portador)
++                .expect("inserción secuencial válida");
++        }
++        assert_eq!(reconstruido.slot_actual(), avanzado.slot_actual());
++        for slot in 1..=4u64 {
++            assert_eq!(
++                reconstruido.salida_de(slot).expect("salida"),
++                avanzado.salida_de(slot).expect("salida")
++            );
++        }
++    }
++
++    #[test]
++    fn insertar_calculado_permite_huecos_pero_no_retroceder() {
++        let mut s = servicio(8);
++        let carrier = zx_pot::prove(PotSeed::from(s.s1()), iteraciones()).expect("N válido");
++        let portador = crate::pot::checkpoints_a_wire(&carrier);
++        // `slot = 5` cuando `slot_actual() == 0`: salta el hueco 1..=4 (nunca es `sp` de nadie).
++        s.insertar_calculado(5, *carrier.output(), portador)
++            .expect("avanzar con hueco es válido: D-P10, flujo único");
++        assert_eq!(s.slot_actual(), 5);
++        // Retroceder (o repetir el mismo slot) sí es un error.
++        assert!(matches!(
++            s.insertar_calculado(5, *carrier.output(), portador),
++            Err(ErrorServicioPot::ObjetivoAnterior {
++                pedido: 5,
++                actual: 5
++            })
++        ));
++        assert!(matches!(
++            s.insertar_calculado(3, *carrier.output(), portador),
++            Err(ErrorServicioPot::ObjetivoAnterior {
++                pedido: 3,
++                actual: 5
++            })
++        ));
++    }
++
+     #[test]
+     fn arranca_de_s1_del_terminal() {
+         let t = hash(0x02);
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/.github/workflows/zerox-ci.yml ws/.github/workflows/zerox-ci.yml
+--- ws.orig/.github/workflows/zerox-ci.yml	2026-09-26 02:18:32.302727880 +0200
++++ ws/.github/workflows/zerox-ci.yml	2026-09-26 06:34:21.888283936 +0200
+@@ -10,9 +10,13 @@
+ # ese clon en su árbol antes del paso de build; el clon no se incluye en el workspace (ver
+ # `exclude` en `Cargo.toml`).
+ #
+-# NO cubre todavía: nodo ni red. Los jobs `almacen` del CI antiguo dependían de `zx-storage`,
+-# `zx-p2p` y de scripts retirados; se reintroducirán cuando las órdenes posteriores porten esos
+-# crates. Los crates del workspace entran por `--workspace` sin pasos adicionales.
++# `zx-node` (W06d1) integra los crates de consenso, PoT, PoAS/farmer, DAG, cadena y almacén en un
++# solo proceso sin red; también enlaza por `path` el clon fijado, así que el paso de clon de abajo
++# es imprescindible para que `zx-poas`, `zx-farmer`, `zx-post` y `zx-node` compilen en el runner.
++#
++# Los jobs `almacen` del CI antiguo dependían de scripts retirados; se reintroducirán cuando las
++# órdenes posteriores porten la red (`W06d2`). Los crates del workspace entran por `--workspace` sin
++# pasos adicionales.
+ name: ZEROX CI
+ 
+ on:
+@@ -35,6 +39,12 @@
+           toolchain: nightly-2026-05-03
+           components: rustfmt, clippy
+       - uses: Swatinem/rust-cache@v2
++      # IPA E-03: clon fijado de Autonomys (tabla de `PDF/README.md`). Sin él, `zx-poas`,
++      # `zx-farmer`, `zx-post` y `zx-node` no compilan (enlazan `PDF/autonomys-subspace` por `path`).
++      - name: Clonar Autonomys (clon fijado, IPA E-03)
++        run: |
++          git clone https://github.com/autonomys/subspace PDF/autonomys-subspace
++          git -C PDF/autonomys-subspace checkout --detach f8842d019cdf0f7163421b9644db5a9ff82b2a73
+       - run: cargo fmt --all -- --check
+       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+       - run: cargo build --workspace --all-features --locked

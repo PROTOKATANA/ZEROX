@@ -296,6 +296,42 @@ impl ServicioPot {
         Ok(self.slot_actual)
     }
 
+    /// Inserta la salida y el portador de `slot` **ya calculados por el llamante**, sin volver a
+    /// correr `zx_pot::prove` (`ORDEN-W06d1`, decisión 7: reconstruir el servicio al reiniciar
+    /// «desde las salidas PoT de las cabeceras almacenadas… no recalculando el flujo desde T»,
+    /// porque recalcularlo costaría el tiempo real transcurrido).
+    ///
+    /// A diferencia de [`Self::avanzar`], **no** exige `slot == slot_actual() + 1`: solo que
+    /// `slot > slot_actual()`. El flujo es único y global (D-P10): dos bloques de ramas o slots
+    /// distintos comparten exactamente la misma `salida(f, slot)`, así que un llamante que reconstruye
+    /// varias ramas (o repite el registro de admisión) solo necesita **avanzar**, nunca rellenar un
+    /// hueco por el que ya pasó otra rama; los huecos intermedios sin bloque tampoco hace falta
+    /// llenarlos, porque nunca son `sp` de nadie (`sp` es siempre el slot de un bloque admitido). No
+    /// verifica que `salida`/`portador` sean los que `prove` habría producido: es responsabilidad del
+    /// llamante que vengan de una cabecera **ya admitida** (su `pot_output`) y de su justificación,
+    /// no de una fuente no verificada.
+    ///
+    /// # Errores
+    /// [`ErrorServicioPot::ObjetivoAnterior`] si `slot <= slot_actual()`.
+    pub fn insertar_calculado(
+        &mut self,
+        slot: u64,
+        salida: [u8; POT_OUTPUT_BYTES],
+        portador: PotCheckpoints,
+    ) -> Result<(), ErrorServicioPot> {
+        if slot <= self.slot_actual {
+            return Err(ErrorServicioPot::ObjetivoAnterior {
+                pedido: slot,
+                actual: self.slot_actual,
+            });
+        }
+        self.salidas.insert(slot, salida);
+        self.portadores.insert(slot, portador);
+        self.slot_actual = slot;
+        self.podar();
+        Ok(())
+    }
+
     /// Registra un bloque **ya validado por el llamante** `(hash, slot)` en el pasado del servicio.
     ///
     /// No aporta ninguna prueba: es la declaración explícita que `InstantaneaPot::pasado()` no puede
@@ -570,6 +606,55 @@ mod pruebas {
             })
         );
         assert_eq!(s.pasado().expect("pasado").len(), 1);
+    }
+
+    /// `ORDEN-W06d1`: reconstruir con `insertar_calculado` da el mismo estado que `avanzar`.
+    #[test]
+    fn insertar_calculado_reproduce_avanzar() {
+        let mut avanzado = servicio(8);
+        avanzado.avanzar_hasta(4).expect("avance");
+
+        let mut reconstruido = servicio(8);
+        for slot in 1..=4u64 {
+            let salida = avanzado.salida_de(slot).expect("salida ya calculada");
+            let portador = *avanzado.portador_de(slot).expect("portador ya calculado");
+            reconstruido
+                .insertar_calculado(slot, salida, portador)
+                .expect("inserción secuencial válida");
+        }
+        assert_eq!(reconstruido.slot_actual(), avanzado.slot_actual());
+        for slot in 1..=4u64 {
+            assert_eq!(
+                reconstruido.salida_de(slot).expect("salida"),
+                avanzado.salida_de(slot).expect("salida")
+            );
+        }
+    }
+
+    #[test]
+    fn insertar_calculado_permite_huecos_pero_no_retroceder() {
+        let mut s = servicio(8);
+        let carrier = zx_pot::prove(PotSeed::from(s.s1()), iteraciones()).expect("N válido");
+        let portador = crate::pot::checkpoints_a_wire(&carrier);
+        // `slot = 5` cuando `slot_actual() == 0`: salta el hueco 1..=4 (nunca es `sp` de nadie).
+        s.insertar_calculado(5, *carrier.output(), portador)
+            .expect("avanzar con hueco es válido: D-P10, flujo único");
+        assert_eq!(s.slot_actual(), 5);
+        // Retroceder (o repetir el mismo slot) sí es un error.
+        assert!(matches!(
+            s.insertar_calculado(5, *carrier.output(), portador),
+            Err(ErrorServicioPot::ObjetivoAnterior {
+                pedido: 5,
+                actual: 5
+            })
+        ));
+        assert!(matches!(
+            s.insertar_calculado(3, *carrier.output(), portador),
+            Err(ErrorServicioPot::ObjetivoAnterior {
+                pedido: 3,
+                actual: 5
+            })
+        ));
     }
 
     #[test]

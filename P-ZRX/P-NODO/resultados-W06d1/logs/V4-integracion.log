@@ -1,0 +1,14 @@
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling librocksdb-sys v0.19.0+11.8.1
+   Compiling rocksdb v0.25.0
+   Compiling zx-storage v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d1/ws/crates/zx-storage)
+   Compiling zx-node v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W06d1/ws/crates/zx-node)
+    Finished `release` profile [optimized] target(s) in 13.78s
+     Running tests/integracion.rs (/home/katana/zeo/ZEROX/deepseek/W06d1/target/release/deps/integracion-c6e9fde57d3f7234)
+
+running 1 test
+test un_proceso_cruza_el_corte_y_produce_al_menos_30_bloques_post ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 57.74s
+
+exit=0

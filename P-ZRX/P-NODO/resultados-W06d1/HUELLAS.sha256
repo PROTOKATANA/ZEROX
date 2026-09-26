@@ -1,0 +1,16 @@
+d0bdaf3ee2dd4e68962d8b85ab522626b985a8ae6efeaa8e0a0e8fd59951541f  ./cambios.patch
+4a8cfe2e3f0fc4264704bbcd1a5e89877053899d66dcb81d6b4cbc3d84fd132b  ./HORAS.log
+5f4f3862b0f2d77267d95238a9267d980b95826c93c4c144610990878f58e69b  ./INFORME.md
+112e5a06b8ade541a3ccf52a2458377692e03d74ce03708e1a26b1c38a5e6c51  ./logs/build-release.log
+d853ca04a4120e5e268ff6d900b624f3d31f9bb0d1a65a753132b58bcbc9ac8e  ./logs/rel-run.log
+19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061  ./logs/V1-fmt.log
+585e747290e35fabb47e6fa1c06ac28ce03a9b907a5c28e66a24a7336c67e0de  ./logs/V2-clippy-all-features.log
+3ebb97f1cda02fc859494aed49b5efa55826e6fe4f2cc5aabb75d6bcdc0a3b59  ./logs/V2-clippy-sin-rocksdb.log
+bfd1c8abe5f76d4d7feb011505b25d3f74e7fef5e77e12be8fbfa6c8c6fb4373  ./logs/V3-antes.log
+1b2d488a81dffc51a2b4efd7e99c695fe9565e9e94c5f8dc356f6918e602f185  ./logs/V3-despues2.log
+368a52e4bacae58fbfe1fe2c453c5dc275e2203ce1358e5dd407a6bc5b5cea67  ./logs/V3-despues.log
+4c7912e9e7109687ecc7591fc125761b9e524d886592676e1ecf182daf7c8671  ./logs/V4-integracion.log
+9c83d09ae98b97ff5d45c338120e3fcfe89fef063fbbf52834dc45ead08a4211  ./logs/V5-reinicio-despues-debug.log
+2a7080579328a3c065261be0ce4b556d574bde8d98c7a7543b4be03a9f6735c8  ./logs/V5-reinicio.log
+c5339d103182bb5085ab6200ffff6d9b01980e9c77d5be076eadfc751d38bbda  ./logs/V6-red-no-dev.log
+96c32e32827159cfd5e9ddae62f974aa376ad04a9ba40cc3a30aa530d113bc10  ./PROGRESO.md
