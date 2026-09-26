@@ -331,3 +331,12 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - **W07c superada** y migrada a `P-ZRX/P-MEDICION/analisis-registro-v1/`; recuento de pares comprobado a mano
   (1 223, exacto). Dos errores míos que destapa: llamé «V4» a registros de V6/V7, y comparar el estado final
   exige un reposo → parámetro `--dejar-de-producir-en-slot` añadido a W07a.
+
+### 23:10–23:52 — oráculos alineados con el contrato de evidencia (SL-4c-O, -B, -C)
+
+- Tres rondas cortas de DeepSeek (dos sesiones de un hilo cada una): en T01 y T04, **entradas/salidas, `cbid`
+  ajeno y orden no canónico** de la `EvidenceTx` son errores de **forma** que invalidan el bloque (EV-04,
+  RAT-1, contrato de estado DAG), con precedencia por transacción. Vectores T01 v0.5 (3 179) y T04 v0.6
+  (2 108), 0 cambios sin defecto. Dos rondas extra por errores míos al redactar (alcance de la precedencia sin
+  fijar; «estructura vigente» intocable que dejaba EV-04 a medias). Límite: los oráculos no modelan testigos.
+- **SL-4c** (Rust: forma, motor, arneses y decodificación de red de la v4) congelada y lanzada 23:51.
