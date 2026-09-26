@@ -239,3 +239,18 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   mecanismos, 7 dimensiones de coste, veredicto I/E-exigible/E-condicionado/N/W) y cuatro encargos:
   DS-1 fuentes (Sonnet, web) y DS-4 GPU del sembrador por Vulkan (Sonnet) lanzados; DS-2 matriz y
   DS-3 modelo cuantitativo preparados. W06d1 sigue en curso.
+
+### 08:30–09:51
+
+- **P-DISUASION** (petición de Katana): DS-1 (fuentes), DS-2 (matriz), DS-3 (modelo en Julia), DS-4 (GPU
+  del sembrador por Vulkan), DS-5 (castigo correlacionado) y DS-6 (reparto del espacio entre claves)
+  hechos y revisados; síntesis en `P-ZRX/P-DISUASION/SINTESIS.md`. Verificado por el director en las
+  fuentes: la imposibilidad de Baig y Pietrzak (FC 2025) y sus dos salidas (VDF como Chia; BFT + registro
+  como Filecoin); las cifras del sembrador de P-COBERTURA. **Dos errores cazados en revisión:** la región
+  de retención «≳ 4.000» (era 370; la incoherencia venía de P-PRESTAMO y la ratifiqué sin rehacer la
+  cuenta) y la convención del exponente de Pareto en DS-6 (cola frente a densidad; corregido, la
+  conclusión se sostiene con margen menor y el cálculo empírico la confirma).
+- **W06d1 migrada** (`60498ea`): el nodo sin red cruza el corte, produce en régimen y sobrevive a
+  `SIGKILL`. El agente dejó de informar a las 08:14 esperando su suite; el parche estaba desfasado
+  respecto a su último cambio y se regeneró. Migración por parche (su `ws/` contenía los documentos).
+- **W06a-C** lanzada: máximo de padres parametrizable e identidad GHOSTDAG real en `zx-cadena`.
