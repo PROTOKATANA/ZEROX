@@ -1,0 +1,32 @@
+# DS-4 — banco de medida CPU/GPU de la regeneración de un registro PoAS (record_encoding).
+#
+# Crate INDEPENDIENTE: el `[workspace]` vacío lo saca del workspace de la raíz de ZEROX
+# (obligatorio: no se toca `crates/` ni su Cargo.lock). Las dependencias de Autonomys se enlazan
+# por `path` al clon fijado en PDF/autonomys-subspace @ f8842d0, solo lectura.
+[workspace]
+
+[package]
+name = "ds4-banco"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "ds4"
+path = "src/main.rs"
+
+[dependencies]
+blake3 = "1.8.5"
+futures = "0.3"
+sha2 = "0.10"
+hex = "0.4.3"
+
+# API pública del clon fijado f8842d0. No se reimplementa PoS, KZG ni erasure coding.
+subspace-core-primitives = { path = "../../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }
+subspace-erasure-coding = { path = "../../../PDF/autonomys-subspace/crates/subspace-erasure-coding" }
+subspace-kzg = { path = "../../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
+subspace-proof-of-space = { path = "../../../PDF/autonomys-subspace/crates/subspace-proof-of-space", default-features = false, features = ["alloc", "parallel"] }
+subspace-proof-of-space-wgpu = { path = "../../../PDF/autonomys-subspace/shared/subspace-proof-of-space-wgpu" }
+
+[profile.release]
+opt-level = 3

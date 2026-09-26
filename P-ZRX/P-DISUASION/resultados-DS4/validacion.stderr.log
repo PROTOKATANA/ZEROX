@@ -1,0 +1,9 @@
+DISPOSITIVO	id=0	nombre=NVIDIA GeForce GTX 1070	tipo=DiscreteGpu	backend=Vulkan
+DISPOSITIVO	id=1	nombre=AMD Ryzen 9 9950X3D 16-Core Processor (RADV RAPHAEL_MENDOCINO)	tipo=IntegratedGpu	backend=Vulkan
+DISPOSITIVO	id=2	nombre=llvmpipe (LLVM 22.1.5, 256 bits)	tipo=Cpu	backend=Vulkan
+ELEGIDO	NVIDIA GeForce GTX 1070 (Vulkan)
+DISCREPANCIA	semilla_idx=0
+DISCREPANCIA	semilla_idx=1
+DISCREPANCIA	semilla_idx=2
+DISCREPANCIA	semilla_idx=3
+DISCREPANCIA	semilla_idx=4
