@@ -442,3 +442,161 @@ deepseek/A10M1/gpu/nvidia_smi_muestreo.csv — muestreo cada 1 s durante las 5 r
 deepseek/A10M1/gpu/cpu_dump.bin / gpu_dump.bin — los 32 MB de la validación (b), sha256 idénticos
 ```
 
+---
+
+# Ronda 3 (CORRECCIÓN-A10-M1-B) — escala CPU en reposo
+
+**Resultado en una frase:** repetida la escala de hilos con el mismo binario ya compilado y el mismo
+método de la Ronda 1, esperando a que la carga de 1 minuto de `/proc/loadavg` bajara de 1,0 antes de
+cada serie, cinco series (1, 2, 4, 8, 16 hilos) se midieron **en reposo** y solo la de **32 hilos**
+quedó marcada **«con carga»** (la carga ajena no bajó de 1,0 en los 20 min de espera). Frente a la
+Ronda 1, la CPU rinde prácticamente lo mismo a 1–8 hilos (+0,5 % a +2,3 %), pero **a 16 hilos rinde un
+9,1 % más** (73,79 vs 67,66 MH/s), que es justo el tramo donde la Ronda 1 acumulaba la mayor carga
+ajena. La serie de 32 hilos, aun marcada «con carga», da 68,03 MH/s (≈ −0,7 % que la Ronda 1): el
+aplanamiento 16→32 **no** desaparece.
+
+## R3.1 Método y ficheros
+
+- Script: `deepseek/A10M1/correr_cpu_bench_reposo.sh`; salida íntegra: `deepseek/A10M1/cpu_bench_reposo.log`.
+- Binario: `cargo-target/release/examples/bench_pow`, **el ya compilado en la Ronda 1** (no se recompiló).
+- Comando por repetición, idéntico al de la Ronda 1:
+  `taskset -c 0-$((t-1)) cargo-target/release/examples/bench_pow cpu-bench-mt <t> 10`,
+  con `t ∈ {1,2,4,8,16,32}` y 5 repeticiones de 10 s por nivel.
+- Antes de cada serie se lee `/proc/loadavg`: si la carga de 1 minuto es ≥ 1,0, se espera en pasos de
+  30 s (máximo 20 min = 1200 s por serie), registrando cada espera; si no baja, la serie se marca
+  `CON_CARGA` y se mide igualmente. En cada serie se registra `uptime`, `loadavg`, `nproc` y los 10
+  procesos con más `%CPU` antes y después.
+- Sin Python. Nada se escribió fuera de la zona. Sin git.
+
+## R3.2 Tabla de medidas por repetición
+
+| hilos | rep | hashes | segundos | H/s |
+|---|---|---|---|---|
+| 1 | 1 | 49 545 216 | 10.005847 | 4 951 626 |
+| 1 | 2 | 49 610 752 | 10.010516 | 4 955 863 |
+| 1 | 3 | 49 610 752 | 10.011305 | 4 955 473 |
+| 1 | 4 | 49 610 752 | 10.009690 | 4 956 272 |
+| 1 | 5 | 49 610 752 | 10.004762 | 4 958 713 |
+| 2 | 1 | 98 893 824 | 10.005134 | 9 884 307 |
+| 2 | 2 | 98 893 824 | 10.011878 | 9 877 649 |
+| 2 | 3 | 98 893 824 | 10.011782 | 9 877 744 |
+| 2 | 4 | 98 828 288 | 10.014065 | 9 868 947 |
+| 2 | 5 | 98 828 288 | 10.011357 | 9 871 617 |
+| 4 | 1 | 194 183 168 | 10.010949 | 19 397 079 |
+| 4 | 2 | 194 314 240 | 10.007019 | 19 417 794 |
+| 4 | 3 | 194 248 704 | 10.012444 | 19 400 727 |
+| 4 | 4 | 194 379 776 | 10.010613 | 19 417 369 |
+| 4 | 5 | 194 379 776 | 10.011248 | 19 416 138 |
+| 8 | 1 | 378 994 688 | 10.013383 | 37 848 817 |
+| 8 | 2 | 378 929 152 | 10.010820 | 37 851 959 |
+| 8 | 3 | 378 470 400 | 10.011630 | 37 803 076 |
+| 8 | 4 | 378 077 184 | 10.013529 | 37 756 638 |
+| 8 | 5 | 377 880 576 | 10.013571 | 37 736 843 |
+| 16 | 1 | 742 719 488 | 10.015913 | 74 153 946 |
+| 16 | 2 | 740 818 944 | 10.010975 | 74 000 675 |
+| 16 | 3 | 738 983 936 | 10.013302 | 73 800 228 |
+| 16 | 4 | 739 573 760 | 10.015350 | 73 844 022 |
+| 16 | 5 | 732 430 336 | 10.012943 | 73 148 360 |
+| 32 | 1 | 692 518 912 | 10.036655 | 68 998 974 |
+| 32 | 2 | 678 166 528 | 10.057676 | 67 427 755 |
+| 32 | 3 | 685 899 776 | 10.020886 | 68 447 016 |
+| 32 | 4 | 678 559 744 | 10.025767 | 67 681 581 |
+| 32 | 5 | 677 773 312 | 10.024619 | 67 610 877 |
+
+(Las cinco filas de 32 hilos se midieron con carga ajena; ver R3.4. El resto, en reposo.)
+
+## R3.3 Media por número de hilos y estado de la serie
+
+| hilos | H/s (media de 5) | estado | espera antes de medir | carga 1-min inicio → fin | escalado vs 1 hilo |
+|---|---|---|---|---|---|
+| 1 | 4 955 590 | EN_REPOSO | 0 s | 0,29 → 0,70 | 1,00× |
+| 2 | 9 876 053 | EN_REPOSO | 0 s | 0,70 → 1,52 | 1,99× |
+| 4 | 19 409 822 | EN_REPOSO | 30 s | 0,92 → 2,66 | 3,92× |
+| 8 | 37 799 467 | EN_REPOSO | 90 s | 0,71 → 4,84 | 7,63× |
+| 16 | 73 789 447 | EN_REPOSO | 270 s | 0,75 → 9,45 | 14,89× |
+| 32 | 68 033 241 | **CON_CARGA** | 1200 s (máx. agotado) | 4,00 → 28,98 | 13,73× |
+
+La «carga 1-min inicio → fin» es la de `/proc/loadavg` justo antes de la primera repetición y justo
+después de la última; la «fin» incluye el propio banco (los hilos que acaban de correr), por eso sube
+aunque el sistema estuviera en reposo al empezar.
+
+## R3.4 Qué series quedaron «con carga»
+
+Solo **32 hilos**. El script esperó los 1200 s completos (40 pasos de 30 s) sin que la carga de 1
+minuto bajara de 1,0; durante la espera osciló entre 1,12 y 9,55, con picos de carga ajena
+(la máquina está ejecutando otros encargos). Al agotarse el máximo se marcó `CON_CARGA` y se midió
+igual. La carga de 1 minuto al terminar la serie fue 28,98.
+
+Las series de **1, 2, 4, 8 y 16 hilos** quedaron `EN_REPOSO`: cargas de 1 minuto al iniciar la medida
+0,29 / 0,70 / 0,92 / 0,71 / 0,75 respectivamente (< 1,0). La de 16 hilos necesitó 270 s de espera; las
+de 1 y 2, ninguna. La de 32 hilos es, por tanto, la **única** que no pudo medirse en reposo.
+
+**Limitación de registro (honesta):** las llamadas de shell de este ejecutor corren dentro de un
+sandbox con su propio *PID namespace*: `ps -e` y `/proc` solo exponen los procesos del sandbox
+(`bwrap`, `bash`, `ps`, `head`), no los procesos ajenos del anfitrión. El top-10 de `%CPU` pedido
+queda por eso **incompleto**; la carga ajena solo es visible a través de `/proc/loadavg` (que sí es
+del sistema completo) y de `uptime`, y fue esa lectura la que gobernó las esperas. El registro de
+`uptime`/`loadavg`/`nproc`/`ps` antes y después de cada serie está igualmente en
+`cpu_bench_reposo.log`.
+
+## R3.5 Comparación con la Ronda 1
+
+| hilos | R3 (en reposo) H/s | R1 (con carga ajena) H/s | R3 / R1 |
+|---|---|---|---|
+| 1 | 4 955 590 | 4 845 383 | **+2,3 %** |
+| 2 | 9 876 053 | 9 810 124 | +0,7 % |
+| 4 | 19 409 822 | 19 310 887 | +0,5 % |
+| 8 | 37 799 467 | 37 410 570 | +1,0 % |
+| 16 | 73 789 447 | 67 661 919 | **+9,1 %** |
+| 32 | 68 033 241 (con carga) | 68 505 024 (con carga) | −0,7 % |
+
+| hilos | escalado R3 | escalado R1 |
+|---|---|---|
+| 1 | 1,00× | 1,00× |
+| 2 | 1,99× | 2,02× |
+| 4 | 3,92× | 3,99× |
+| 8 | 7,63× | 7,72× |
+| 16 | **14,89×** | 13,97× |
+| 32 | 13,73× | 14,14× |
+
+Lectura:
+
+- A **1–8 hilos** la Ronda 1 ya estaba prácticamente limpia: la repetición en reposo solo sube la
+  cifra entre un 0,5 % y un 2,3 %. La contaminación de la Ronda 1 no era apreciable en ese tramo
+  (el `uptime` de entonces daba carga ~5, pero repartida entre núcleos).
+- A **16 hilos** sí se nota: 67,66 → 73,79 MH/s (+9,1 %). Es coherente con que la Ronda 1 registrara
+  `diferencial_t01`/`pow_dev-d659e1c` ocupando núcleos justo en el tramo de 8/16/32 hilos; con la
+  máquina más quieta, los 16 hilos físicos rinden más. El escalado a 16 hilos sube de 13,97× a
+  **14,89×**.
+- A **32 hilos** la serie volvió a caer en carga ajena y no es una medida en reposo comparable. Aun
+  así, su media (68,03 MH/s) es casi idéntica a la de la Ronda 1 (68,51 MH/s), y sigue **por debajo**
+  de los 16 hilos en reposo (73,79 MH/s): la conclusión de la Ronda 1 se mantiene —los 16 hilos
+  lógicos extra de SMT sobre los 16 núcleos físicos no añaden throughput en Keccak-f[1600]— y el
+  aplanamiento 16→32 **no** era solo efecto de la carga ajena.
+- La cifra principal de 1 hilo en reposo es **4 955 590 H/s**.
+
+## R3.6 Consecuencia para el ratio GPU/CPU-32 (derivación)
+
+No se recalcula la pregunta falsable con una CPU-32 en reposo porque **no la hay**: la serie de 32
+hilos volvió a quedar «con carga». Usando la cifra de 32 hilos de esta ronda (68 033 241 H/s, con
+carga) frente a la GPU de la Ronda 2 (régimen estable 561 084 507 H/s; pico en frío 626 798 875 H/s)
+el ratio GPU/CPU-32 es **8,25×–9,21×**, igual que en la Ronda 2 y todavía **por debajo de 10×**. El
+veredicto de la Ronda 2 (pregunta falsable **refutada** en esta máquina) no cambia; lo único que la
+Ronda 3 separa es que el techo multihilo limpio de esta CPU está en ~16 hilos (14,89× sobre 1 hilo),
+no en 32.
+
+## R3.7 Ficheros nuevos de la zona (con `sha256`)
+
+```
+deepseek/A10M1/correr_cpu_bench_reposo.sh  c683d0f1353b9479069568f67256f3db32e404b43246c982341e6e312c73b2ce
+deepseek/A10M1/cpu_bench_reposo.log        5ca0577da9a4c83503c81664b3913f0d51fa079f14ac0a0b9115708a090217c5
+```
+
+## R3.8 Qué sigue sin quedar demostrado (Ronda 3)
+
+- Una CPU-32 **en reposo**: la carga ajena no lo permitió en 20 min; la serie de 32 hilos quedó
+  marcada «con carga». Lo que sí quedó demostrado es que el techo limpio está en 16 hilos.
+- El top-10 real de procesos del anfitrión: el sandbox solo expone sus propios procesos (R3.4).
+- Energía CPU: sin cambios (RAPL no legible sin privilegios); no se estimó.
+- Todo lo que la Ronda 2 dejó abierto (régimen GPU >30 s, ASIC, GPU moderna) sigue abierto.
+

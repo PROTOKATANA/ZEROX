@@ -51,3 +51,13 @@ núcleos y ~116× más que un núcleo; el trabajo de un prefijo dev (`W_min` de 
 `0x1e7fffff`, ≈ 2²² hashes) cuesta **segundos** con cualquier plataforma: el PoW dev no protege nada,
 como ya declara `PERFIL-DEV-v0.md`. Para producción, el dato cierra la parte «hashrate CPU/GPU» de
 A-10; faltan hash alquilable, precios y hash honesto plausible al arranque.
+
+## Ronda 3 — CPU en reposo (`CORRECCION-A10-M1-B`, DeepSeek, 06:18–06:52)
+
+Mismo binario y método; cada serie espera a carga de 1 min < 1,0. En reposo: 1 hilo 4 955 590 H/s;
+8 hilos 37 799 467; **16 hilos 73 789 447 H/s** (14,9× un hilo). La serie de 32 hilos no encontró
+reposo en 20 min: 68 033 241 H/s «con carga». **El máximo de la CPU está en 16 hilos**: el SMT no
+aporta a Keccak. **Cociente corregido por el director:** la comparación justa es contra el máximo de
+la CPU, **GTX 1070 / CPU = 561,1 / 73,8 = 7,6×** (el ejecutor dio 8,25–9,21× con la serie de 32 hilos).
+La pregunta «≥ 10×» sigue refutada. Límite: el sandbox de `dsh` solo ve sus propios procesos; la carga
+ajena se siguió por `/proc/loadavg`.

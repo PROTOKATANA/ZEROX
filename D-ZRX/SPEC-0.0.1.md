@@ -54,7 +54,7 @@ transporte), W06d1 (nodo sin red, en curso), W06d2 (red), W06e (integración), W
 
 `EvidenceTx`, congelación y `C-SLA` (IPA C-04, C-05); registro de sectores Filecoin (`SEC-0`); relevo
 de transacciones; controlador de `SR` y de `N`; inyecciones PoT; semilla del corte no sesgable;
-algoritmo PoW de producción (A-12: con SHA3-256 una GTX 1070 rinde 8,2× una CPU de 16 núcleos,
+algoritmo PoW de producción (A-12: con SHA3-256 una GTX 1070 rinde 7,6× una CPU de 16 núcleos en reposo,
 `P-ZRX/P-POW/REVISION-A10-M1.md`).
 
 ## 7. Propuesto para fases posteriores (no es regla de 0.0.1)

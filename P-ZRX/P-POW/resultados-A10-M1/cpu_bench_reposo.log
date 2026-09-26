@@ -1,0 +1,235 @@
+== CORRECCION-A10-M1-B: banco CPU en reposo (binario y metodo de ORDEN-A10-M1) ==
+== umbral carga 1-min = 1.0 ; espera en pasos de 30s ; maximo 1200s (20 min) por serie ==
+--- ANTES-DE-TODO 2026-09-26T06:19:32+02:00 ---
+ 06:19:32  arriba 13:22,  0 users,  carga promedio: 0,29, 4,00, 5,62
+loadavg: 0.29 4.00 5.62 1/1818 5
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+      7  0.0  0.0 ps
+      8  0.0  0.0 head
+--- ANTES-t1 2026-09-26T06:19:32+02:00 ---
+ 06:19:32  arriba 13:22,  0 users,  carga promedio: 0,29, 4,00, 5,62
+loadavg: 0.29 4.00 5.62 1/1818 11
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+     13  0.0  0.0 ps
+     14  0.0  0.0 head
+t=1 REPOSO: carga_1min=0.29 < 1.0 (espera acumulada 0s)
+t=1 INICIO-MEDIDA: 2026-09-26T06:19:32+02:00 carga_1min=0.29 cpuset=0-0
+t=1 rep=1 cpuset=0-0 hilos=1 hashes=49545216 segundos=10.005847 hs=4951626.329
+t=1 rep=2 cpuset=0-0 hilos=1 hashes=49610752 segundos=10.010516 hs=4955863.443
+t=1 rep=3 cpuset=0-0 hilos=1 hashes=49610752 segundos=10.011305 hs=4955473.023
+t=1 rep=4 cpuset=0-0 hilos=1 hashes=49610752 segundos=10.009690 hs=4956272.671
+t=1 rep=5 cpuset=0-0 hilos=1 hashes=49610752 segundos=10.004762 hs=4958713.854
+t=1 FIN-MEDIDA: 2026-09-26T06:20:22+02:00 carga_1min=0.70
+t=1 ESTADO=EN_REPOSO espera_s=0
+--- DESPUES-t1 2026-09-26T06:20:22+02:00 ---
+ 06:20:22  arriba 13:22,  0 users,  carga promedio: 0,70, 3,54, 5,38
+loadavg: 0.70 3.54 5.38 1/1826 39
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+     41  0.0  0.0 ps
+     42  0.0  0.0 head
+--- ANTES-t2 2026-09-26T06:20:22+02:00 ---
+ 06:20:22  arriba 13:22,  0 users,  carga promedio: 0,70, 3,54, 5,38
+loadavg: 0.70 3.54 5.38 1/1826 45
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+     47  0.0  0.0 ps
+     48  0.0  0.0 head
+t=2 REPOSO: carga_1min=0.70 < 1.0 (espera acumulada 0s)
+t=2 INICIO-MEDIDA: 2026-09-26T06:20:22+02:00 carga_1min=0.70 cpuset=0-1
+t=2 rep=1 cpuset=0-1 hilos=2 hashes=98893824 segundos=10.005134 hs=9884307.623
+t=2 rep=2 cpuset=0-1 hilos=2 hashes=98893824 segundos=10.011878 hs=9877649.266
+t=2 rep=3 cpuset=0-1 hilos=2 hashes=98893824 segundos=10.011782 hs=9877744.875
+t=2 rep=4 cpuset=0-1 hilos=2 hashes=98828288 segundos=10.014065 hs=9868947.850
+t=2 rep=5 cpuset=0-1 hilos=2 hashes=98828288 segundos=10.011357 hs=9871617.340
+t=2 FIN-MEDIDA: 2026-09-26T06:21:12+02:00 carga_1min=1.52
+t=2 ESTADO=EN_REPOSO espera_s=0
+--- DESPUES-t2 2026-09-26T06:21:12+02:00 ---
+ 06:21:12  arriba 13:23,  0 users,  carga promedio: 1,52, 3,32, 5,20
+loadavg: 1.52 3.32 5.20 2/1821 78
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+     80  0.0  0.0 ps
+     81  0.0  0.0 head
+--- ANTES-t4 2026-09-26T06:21:12+02:00 ---
+ 06:21:12  arriba 13:23,  0 users,  carga promedio: 1,52, 3,32, 5,20
+loadavg: 1.52 3.32 5.20 1/1821 84
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+     86  0.0  0.0 ps
+     87  0.0  0.0 head
+t=4 ESPERA: carga_1min=1.52 >= 1.0; duerme 30s (acumulado 0s)
+t=4 REPOSO: carga_1min=0.92 < 1.0 (espera acumulada 30s)
+t=4 INICIO-MEDIDA: 2026-09-26T06:21:42+02:00 carga_1min=0.92 cpuset=0-3
+t=4 rep=1 cpuset=0-3 hilos=4 hashes=194183168 segundos=10.010949 hs=19397079.543
+t=4 rep=2 cpuset=0-3 hilos=4 hashes=194314240 segundos=10.007019 hs=19417794.821
+t=4 rep=3 cpuset=0-3 hilos=4 hashes=194248704 segundos=10.012444 hs=19400727.940
+t=4 rep=4 cpuset=0-3 hilos=4 hashes=194379776 segundos=10.010613 hs=19417369.918
+t=4 rep=5 cpuset=0-3 hilos=4 hashes=194379776 segundos=10.011248 hs=19416138.867
+t=4 FIN-MEDIDA: 2026-09-26T06:22:32+02:00 carga_1min=2.66
+t=4 ESTADO=EN_REPOSO espera_s=30
+--- DESPUES-t4 2026-09-26T06:22:32+02:00 ---
+ 06:22:32  arriba 13:25,  0 users,  carga promedio: 2,66, 3,15, 4,98
+loadavg: 2.66 3.15 4.98 1/1780 130
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+    132  0.0  0.0 ps
+    133  0.0  0.0 head
+--- ANTES-t8 2026-09-26T06:22:32+02:00 ---
+ 06:22:32  arriba 13:25,  0 users,  carga promedio: 2,66, 3,15, 4,98
+loadavg: 2.66 3.15 4.98 1/1780 136
+32
+    PID %CPU %MEM COMMAND
+      1  0.0  0.0 bwrap
+      2  0.0  0.0 bash
+    138  0.0  0.0 ps
+    139  0.0  0.0 head
+t=8 ESPERA: carga_1min=2.66 >= 1.0; duerme 30s (acumulado 0s)
+t=8 ESPERA: carga_1min=1.61 >= 1.0; duerme 30s (acumulado 30s)
+t=8 ESPERA: carga_1min=1.04 >= 1.0; duerme 30s (acumulado 60s)
+t=8 REPOSO: carga_1min=0.71 < 1.0 (espera acumulada 90s)
+t=8 INICIO-MEDIDA: 2026-09-26T06:24:02+02:00 carga_1min=0.71 cpuset=0-7
+t=8 rep=1 cpuset=0-7 hilos=8 hashes=378994688 segundos=10.013383 hs=37848817.310
+t=8 rep=2 cpuset=0-7 hilos=8 hashes=378929152 segundos=10.010820 hs=37851959.074
+t=8 rep=3 cpuset=0-7 hilos=8 hashes=378470400 segundos=10.011630 hs=37803076.704
+t=8 rep=4 cpuset=0-7 hilos=8 hashes=378077184 segundos=10.013529 hs=37756638.015
+t=8 rep=5 cpuset=0-7 hilos=8 hashes=377880576 segundos=10.013571 hs=37736843.160
+t=8 FIN-MEDIDA: 2026-09-26T06:24:53+02:00 carga_1min=4.84
+t=8 ESTADO=EN_REPOSO espera_s=90
+--- DESPUES-t8 2026-09-26T06:24:53+02:00 ---
+ 06:24:53  arriba 13:27,  0 users,  carga promedio: 4,84, 3,23, 4,71
+loadavg: 4.84 3.23 4.71 1/1805 208
+32
+    PID %CPU %MEM COMMAND
+      2  0.0  0.0 bash
+      1  0.0  0.0 bwrap
+    210  0.0  0.0 ps
+    211  0.0  0.0 head
+--- ANTES-t16 2026-09-26T06:24:53+02:00 ---
+ 06:24:53  arriba 13:27,  0 users,  carga promedio: 4,84, 3,23, 4,71
+loadavg: 4.84 3.23 4.71 1/1805 214
+32
+    PID %CPU %MEM COMMAND
+      2  0.0  0.0 bash
+      1  0.0  0.0 bwrap
+    216  0.0  0.0 ps
+    217  0.0  0.0 head
+t=16 ESPERA: carga_1min=4.84 >= 1.0; duerme 30s (acumulado 0s)
+t=16 ESPERA: carga_1min=4.90 >= 1.0; duerme 30s (acumulado 30s)
+t=16 ESPERA: carga_1min=5.63 >= 1.0; duerme 30s (acumulado 60s)
+t=16 ESPERA: carga_1min=6.64 >= 1.0; duerme 30s (acumulado 90s)
+t=16 ESPERA: carga_1min=7.14 >= 1.0; duerme 30s (acumulado 120s)
+t=16 ESPERA: carga_1min=4.76 >= 1.0; duerme 30s (acumulado 150s)
+t=16 ESPERA: carga_1min=2.88 >= 1.0; duerme 30s (acumulado 180s)
+t=16 ESPERA: carga_1min=1.74 >= 1.0; duerme 30s (acumulado 210s)
+t=16 ESPERA: carga_1min=1.11 >= 1.0; duerme 30s (acumulado 240s)
+t=16 REPOSO: carga_1min=0.75 < 1.0 (espera acumulada 270s)
+t=16 INICIO-MEDIDA: 2026-09-26T06:29:23+02:00 carga_1min=0.75 cpuset=0-15
+t=16 rep=1 cpuset=0-15 hilos=16 hashes=742719488 segundos=10.015913 hs=74153946.416
+t=16 rep=2 cpuset=0-15 hilos=16 hashes=740818944 segundos=10.010975 hs=74000675.129
+t=16 rep=3 cpuset=0-15 hilos=16 hashes=738983936 segundos=10.013302 hs=73800228.057
+t=16 rep=4 cpuset=0-15 hilos=16 hashes=739573760 segundos=10.015350 hs=73844022.369
+t=16 rep=5 cpuset=0-15 hilos=16 hashes=732430336 segundos=10.012943 hs=73148360.749
+t=16 FIN-MEDIDA: 2026-09-26T06:30:13+02:00 carga_1min=9.45
+t=16 ESTADO=EN_REPOSO espera_s=270
+--- DESPUES-t16 2026-09-26T06:30:13+02:00 ---
+ 06:30:13  arriba 13:32,  0 users,  carga promedio: 9,45, 4,85, 4,88
+loadavg: 9.45 4.85 4.88 2/1800 344
+32
+    PID %CPU %MEM COMMAND
+      2  0.0  0.0 bash
+      1  0.0  0.0 bwrap
+    346  0.0  0.0 ps
+    347  0.0  0.0 head
+--- ANTES-t32 2026-09-26T06:30:13+02:00 ---
+ 06:30:13  arriba 13:32,  0 users,  carga promedio: 9,45, 4,85, 4,88
+loadavg: 9.45 4.85 4.88 2/1800 350
+32
+    PID %CPU %MEM COMMAND
+      2  0.0  0.0 bash
+      1  0.0  0.0 bwrap
+    352  0.0  0.0 ps
+    353  0.0  0.0 head
+t=32 ESPERA: carga_1min=9.45 >= 1.0; duerme 30s (acumulado 0s)
+t=32 ESPERA: carga_1min=5.73 >= 1.0; duerme 30s (acumulado 30s)
+t=32 ESPERA: carga_1min=5.72 >= 1.0; duerme 30s (acumulado 60s)
+t=32 ESPERA: carga_1min=6.62 >= 1.0; duerme 30s (acumulado 90s)
+t=32 ESPERA: carga_1min=7.30 >= 1.0; duerme 30s (acumulado 120s)
+t=32 ESPERA: carga_1min=5.92 >= 1.0; duerme 30s (acumulado 150s)
+t=32 ESPERA: carga_1min=3.59 >= 1.0; duerme 30s (acumulado 180s)
+t=32 ESPERA: carga_1min=2.17 >= 1.0; duerme 30s (acumulado 210s)
+t=32 ESPERA: carga_1min=2.95 >= 1.0; duerme 30s (acumulado 240s)
+t=32 ESPERA: carga_1min=4.84 >= 1.0; duerme 30s (acumulado 270s)
+t=32 ESPERA: carga_1min=6.02 >= 1.0; duerme 30s (acumulado 300s)
+t=32 ESPERA: carga_1min=5.25 >= 1.0; duerme 30s (acumulado 330s)
+t=32 ESPERA: carga_1min=3.18 >= 1.0; duerme 30s (acumulado 360s)
+t=32 ESPERA: carga_1min=3.79 >= 1.0; duerme 30s (acumulado 390s)
+t=32 ESPERA: carga_1min=4.98 >= 1.0; duerme 30s (acumulado 420s)
+t=32 ESPERA: carga_1min=3.01 >= 1.0; duerme 30s (acumulado 450s)
+t=32 ESPERA: carga_1min=1.91 >= 1.0; duerme 30s (acumulado 480s)
+t=32 ESPERA: carga_1min=3.65 >= 1.0; duerme 30s (acumulado 510s)
+t=32 ESPERA: carga_1min=5.04 >= 1.0; duerme 30s (acumulado 540s)
+t=32 ESPERA: carga_1min=3.05 >= 1.0; duerme 30s (acumulado 570s)
+t=32 ESPERA: carga_1min=1.85 >= 1.0; duerme 30s (acumulado 600s)
+t=32 ESPERA: carga_1min=1.12 >= 1.0; duerme 30s (acumulado 630s)
+t=32 ESPERA: carga_1min=5.08 >= 1.0; duerme 30s (acumulado 660s)
+t=32 ESPERA: carga_1min=5.97 >= 1.0; duerme 30s (acumulado 690s)
+t=32 ESPERA: carga_1min=4.01 >= 1.0; duerme 30s (acumulado 720s)
+t=32 ESPERA: carga_1min=3.14 >= 1.0; duerme 30s (acumulado 750s)
+t=32 ESPERA: carga_1min=4.30 >= 1.0; duerme 30s (acumulado 780s)
+t=32 ESPERA: carga_1min=2.61 >= 1.0; duerme 30s (acumulado 810s)
+t=32 ESPERA: carga_1min=2.92 >= 1.0; duerme 30s (acumulado 840s)
+t=32 ESPERA: carga_1min=5.39 >= 1.0; duerme 30s (acumulado 870s)
+t=32 ESPERA: carga_1min=3.82 >= 1.0; duerme 30s (acumulado 900s)
+t=32 ESPERA: carga_1min=2.71 >= 1.0; duerme 30s (acumulado 930s)
+t=32 ESPERA: carga_1min=4.63 >= 1.0; duerme 30s (acumulado 960s)
+t=32 ESPERA: carga_1min=5.81 >= 1.0; duerme 30s (acumulado 990s)
+t=32 ESPERA: carga_1min=5.63 >= 1.0; duerme 30s (acumulado 1020s)
+t=32 ESPERA: carga_1min=8.98 >= 1.0; duerme 30s (acumulado 1050s)
+t=32 ESPERA: carga_1min=9.55 >= 1.0; duerme 30s (acumulado 1080s)
+t=32 ESPERA: carga_1min=6.90 >= 1.0; duerme 30s (acumulado 1110s)
+t=32 ESPERA: carga_1min=4.82 >= 1.0; duerme 30s (acumulado 1140s)
+t=32 ESPERA: carga_1min=5.95 >= 1.0; duerme 30s (acumulado 1170s)
+t=32 ESPERA: carga_1min=4.00 >= 1.0 tras 1200s; se agota el maximo de 1200s -> serie CON CARGA
+t=32 INICIO-MEDIDA: 2026-09-26T06:50:13+02:00 carga_1min=4.00 cpuset=0-31
+t=32 rep=1 cpuset=0-31 hilos=32 hashes=692518912 segundos=10.036655 hs=68998974.734
+t=32 rep=2 cpuset=0-31 hilos=32 hashes=678166528 segundos=10.057676 hs=67427755.299
+t=32 rep=3 cpuset=0-31 hilos=32 hashes=685899776 segundos=10.020886 hs=68447016.389
+t=32 rep=4 cpuset=0-31 hilos=32 hashes=678559744 segundos=10.025767 hs=67681581.084
+t=32 rep=5 cpuset=0-31 hilos=32 hashes=677773312 segundos=10.024619 hs=67610877.594
+t=32 FIN-MEDIDA: 2026-09-26T06:51:03+02:00 carga_1min=28.98
+t=32 ESTADO=CON_CARGA espera_s=1200
+--- DESPUES-t32 2026-09-26T06:51:03+02:00 ---
+ 06:51:03  arriba 13:53,  0 users,  carga promedio: 28,98, 11,61, 6,94
+loadavg: 28.98 11.61 6.94 2/1892 653
+32
+    PID %CPU %MEM COMMAND
+      2  0.0  0.0 bash
+      1  0.0  0.0 bwrap
+    655  0.0  0.0 ps
+    656  0.0  0.0 head
+--- DESPUES-DE-TODO 2026-09-26T06:51:03+02:00 ---
+ 06:51:03  arriba 13:53,  0 users,  carga promedio: 28,98, 11,61, 6,94
+loadavg: 28.98 11.61 6.94 2/1892 659
+32
+    PID %CPU %MEM COMMAND
+      2  0.0  0.0 bash
+      1  0.0  0.0 bwrap
+    661  0.0  0.0 ps
+    662  0.0  0.0 head
