@@ -1,0 +1,6 @@
+leidos_casos = 908
+discrepancias = 0
+VEREDICTO_LECTURA = SIN DISCREPANCIAS
+Test Summary: | Pass  Total   Time
+T04           |  361    361  11.8s
+exit=0

@@ -1,0 +1,21 @@
+**Orden T04 cumplida — veredicto: SUPERADO.** Todo vive en `/home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04/`; nada fuera de ahí, sin Python, sin commit/push, sin secretos.
+
+**Falta de definición informada antes de editar.** Leí íntegros ORDEN‑T04, LINEO, CONTRATO‑ESTADO‑DAG‑v0, CONTRATO‑v0 (ratificaciones v0.1), DECISIONES‑W05, el oráculo T01 y GDR‑v0.2. Registré **10 ambigüedades** en `PROGRESO.md` §1 antes de escribir código. Ninguna obliga a elegir entre reglas incompatibles; las más relevantes:
+- **A‑1** subsidio de la coinbase fusionada: importe por `slot(X)`, madurez/retiros/créditos por el punto de aplicación (si no, se rompe IE‑5).
+- **A‑4** `sp(B)` se aplica en su propio slot (forzado por IE‑5).
+- **A‑5** `merge_depth` = `slot(B) − slot(X) > F_slots` invalida.
+- **A‑6** `slot(V) = max slot(puntas)`.
+- **A‑7** la coinbase se materializa tras las demás transacciones; la rejilla fija `M_rec_slots ≥ 1`.
+
+**Implementado.** Módulo Julia `EstadoDAG`: T01 por `include` de solo lectura (declarado), GDR‑v0.2 copiado sin cambios de lógica (`modelo.jl`+`referencia.jl`) con raíz = terminal; `aplicar_fusion` (§3: descarte silencioso, `rojo_U3` inerte, recorte de coinbase), ED‑2/ED‑3, virtual con mergeset completo, reorg y undo exacto.
+
+**Verificación.**
+- **GDR‑v0.2 revalidado exacto** (paso previo obligatorio): corpus 28 DAGs/2290 bloques y fixtures kaspa 84 bloques, **0 discrepancias**.
+- **8 casos dirigidos** (doble gasto, recorte, depósito que habilita productor, garantía en rama no fusionada, `rojo_U3`, aplicación única, reorg, hermanos de transición) coinciden con lo construido a mano.
+- **`run.jl --seed 0x5a5a --replicas 200`**: 3000 historias, 25 380 bloques PoST, 15 858 válidos, 1977 descartes, 1374 `rojo_U3`, **673 650 órdenes IE‑3, 0 fallos**, 50,1 s → **SUPERADO**.
+- **908 vectores** exportados (`resultados/vectores-estado-dag-v0.txt`, formato T01‑B ampliado con `padres=[…]` y `DESC`), sha256 `29096f74…4af84`; **relectura independiente: 908 casos, 0 discrepancias**.
+- `Pkg.test()`: **361/361 OK**.
+
+**Entregables:** `Project.toml`, `Manifest.toml`, `julia-version.toml`, `src/` (9 ficheros), `test/runtests.jl`, `run.jl`, `exportar.jl`, `bench/benchmarks.jl`, `resultados/` (vectores + logs), `INFORME.md` (con «Lo que este oráculo NO demuestra» y resumen ≤40 líneas), `METODO.md`, `PROGRESO.md`, `HORAS.log`.
+
+`ENTRADA-T04.sha256` verificado **al empezar y al terminar**: 5/5 OK.

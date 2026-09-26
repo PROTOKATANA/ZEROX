@@ -1,0 +1,6 @@
+# Versión de Julia fijada para T04 (LINEO §1).
+julia = "1.13.0"
+canal = "1.13"
+ruta = "/home/katana/torio/.juliaup/bin/julia"
+entorno = "JULIA_DEPOT_PATH=T04/.julia-depot (copia local del depot de T01); JULIA_PKG_OFFLINE=true"
+nota = "Sin red: el Manifest.toml se resolvió contra el depot local copiado de T01."

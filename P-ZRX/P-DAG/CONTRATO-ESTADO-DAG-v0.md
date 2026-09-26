@@ -81,3 +81,22 @@ transición en el punto de aplicación; si fallan (p. ej. `ErrRetiroPendiente`, 
   especificación, o los vectores GDR para el orden) + ED-1…ED-6 + IE-1…IE-6, con vectores exportables.
 - **W06a** (Rust): orquestación del estado DAG en `zx-consensus`/`zx-node` sobre el motor de W03 en
   «modo fusión», con diferencial contra T04.
+
+---
+
+## Ratificaciones v0.1 (2026-09-26, tras T04)
+
+El oráculo T04 documentó diez ambigüedades antes de escribir código. El director las ratifica:
+
+| ID | Regla ratificada | Origen |
+|---|---|---|
+| RD-1 | El importe máximo de la coinbase de un bloque fusionado usa `subsidio_post(slot(X))` (slot del propio bloque); madurez del crédito, inicio de retiros y vencimientos usan el punto de aplicación | T04 A-1 |
+| RD-2 | La coinbase es **opcional** en un bloque PoST (el productor renuncia a ella); si existe, única y primera (R-6) | T04 A-2; compatible con T01 |
+| RD-3 | Importe 0 en la coinbase PoST invalida el bloque (R-8); el recorte se aplica a todo importe positivo | T04 A-3 |
+| RD-4 | **Punto de aplicación:** un bloque de la cadena seleccionada se aplica en **su propio slot**; un bloque fusionado de lado (mergeset sin el padre seleccionado), en el slot del bloque de cadena que lo fusiona. **Corrige** la letra de ED-2, que aplicaba también `sp(B)` en `slot(B)` y contradecía IE-5. Desviación declarada respecto a la letra de `C-BON-07` (que usa siempre el slot del fusionador): adelanta en un bloque la madurez de los bloques de cadena | T04 A-4 |
+| RD-5 | `merge_depth` dev: B es inválido si fusiona un bloque no `rojo_U3` con `slot(B) − slot(X) > F_slots` | T04 A-5 |
+| RD-6 | `slot(V) = máx(slot(puntas válidas))` | T04 A-6 |
+| RD-7 | Dentro de un bloque se aplican primero las transacciones no-coinbase y después se materializa el crédito recortado de la coinbase (la posición en la lista sigue siendo la primera) | T04 A-7 |
+| RD-8 | Las reglas estructurales heredadas del GHOSTDAG antiguo (`slot(sp) ≤ slot(B)`, máximo de padres, U2, U3″ dinámica) invalidan el bloque; en el oráculo, `max_parents = 3`; en la red dev, 15 | T04 A-8 |
+| RD-9 | La garantía del productor se evalúa sobre `Estado(past(B))` tras promover en `slot(B)` | T04 A-9; TRN-07 |
+| RD-10 | La garantía es comprobación de **admisión** de cada bloque en su propio pasado; no se vuelve a comprobar al fusionarlo | T04 A-10 |

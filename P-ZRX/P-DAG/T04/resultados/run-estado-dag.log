@@ -1,0 +1,33 @@
+# run.jl T04 · 2026-09-26 02:45:21
+seed = 0x5a5a replicas = 200 ie3_exhaustivos_por_punto = 5
+julia = 1.13.0 hilos_default = 1 hilos_interactive = 1
+CPU = znver5 RAM_GB = 123.4
+salida = resultados/run-estado-dag.log
+REVALIDACION corpus: dags=28 bloques=2290 discrepancias=0
+REVALIDACION kaspa:  bloques=84 discrepancias=0
+DIRIGIDO D-1 validos=4/4 fallos=0
+DIRIGIDO D-2 validos=2/2 fallos=0
+DIRIGIDO D-3 validos=4/5 fallos=0
+DIRIGIDO D-4 validos=3/4 fallos=0
+DIRIGIDO D-5 validos=4/4 fallos=0
+DIRIGIDO D-6 validos=4/4 fallos=0
+DIRIGIDO D-7 validos=6/6 fallos=0
+DIRIGIDO D-8 validos=2/2 fallos=0
+PUNTO P=1 k=0 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=1 k=1 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=1 k=3 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=2 k=0 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=2 k=1 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=2 k=3 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=3 k=0 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=3 k=1 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=3 k=3 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=4 k=0 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=4 k=1 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=4 k=3 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=5 k=0 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=5 k=1 replicas=200 fallos=0 ie3_ordenes=44910
+PUNTO P=5 k=3 replicas=200 fallos=0 ie3_ordenes=44910
+TOTAL historias=3000 bloques=25380 validos=15858 descartes=1977 rojo_U3=1374 ie3_ordenes=673650
+ESTADO = SUPERADO
+tiempo_pared_s = 50.1
