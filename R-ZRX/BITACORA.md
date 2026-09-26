@@ -148,3 +148,23 @@ las transacciones; lo destapó el diferencial con transacciones reales. Correcci
 clave (F-15), altura en la coinbase PoW (F-16), slot en la coinbase PoST (F-17), salida `(txid, 0)` de
 la liberación (F-18). Alternativa descartada: exigir una entrada UTXO en retiros y liberaciones, porque
 bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) y no tiene UTXO.
+
+### 03:00–03:50
+
+- **T01-D** superada: nonce por clave en el oráculo de transición, vectores v0.1 (5 994 casos,
+  0 discrepancias). `7c24b98`.
+- **W03-R** (rebase del motor de transición) y **W05b2-R** (rebase de `zx-post`) migradas a la raíz
+  con `MIGRACION.sha256` verificado y 0 borrados (`5453407`, `83e71a1`). La raíz produce y verifica un
+  bloque PoST real hijo de un terminal dev (620 tests).
+- **W02b** (FORMATO v0.1 en `zx-core`, motor y productor) lanzada 03:38 con entrada congelada `3ce3112`.
+- **T04-B revisada: cumple la letra, regresión de cobertura.** El generador aleatorio del oráculo DAG
+  construye los depósitos PoST con `nonce = 0`: casi todos se descartan con `ErrNonce` (737 de 969
+  descartes; `run.jl` pasa de 1 977 a 3 721 descartes con los mismos bloques). Además, **error mío
+  anterior**: el generador de T04 nunca produjo retiros ni liberaciones y `REVISION-T04` no lo vio; y
+  `ORDEN-T04-B` no exigió nonces correctos en el generador ni un criterio de cobertura. Orden
+  **T04-C** lanzada (nonce correcto, retiros y liberaciones, D-12/D-13, mínimos de cobertura, vectores
+  v0.2); W06a pasa a depender de v0.2 y a comparar su tabla de cobertura con la del oráculo.
+- Regla de método nueva para toda orden con generadores: tabla de cobertura por tipo de operación
+  (construidas, aplicadas, descartadas por motivo) con mínimos exigidos.
+- Proceso: volví a lanzar una sonda `python3 --version` sin necesidad (sin código, sin salida). Tercera
+  vez; queda anotado.

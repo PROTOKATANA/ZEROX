@@ -3,14 +3,15 @@
 ## 1. Identidad y contexto
 
 - **ID:** W06a. **Fecha:** 2026-09-26. **Director:** Claude. **Ejecutor:** DeepSeek. Se lanza tras
-  migrar W02b (FORMATO v0.1 en el motor) y con los vectores v0.1 de T04-B.
+  migrar W02b (FORMATO v0.1 en el motor) y con los vectores v0.2 de T04-C (los v0.1 de T04-B no sirven:
+  `REVISION-T04-B`).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/W06a/`.
 - **Objetivo único:** crate nuevo `zx-cadena` (D-N02) que mantiene en memoria el estado del DAG según
   `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md` (ED-1…ED-6, RD-1…RD-10): admisión de bloques PoW y PoST,
   GHOSTDAG (`zx-dag`), `Estado(past(B))` de cada bloque, virtual, cadena seleccionada, reorganización
   con undo exacto; y demostrar que coincide con el oráculo T04.
 - **Pregunta falsable:** «`zx-cadena`, alimentado con los bloques reales que el arnés construye de
-  cada caso de `vectores-estado-dag-v0.1.txt`, da el mismo resultado por bloque (incluidas las
+  cada caso de `vectores-estado-dag-v0.2.txt`, da el mismo resultado por bloque (incluidas las
   transacciones descartadas y su motivo), la misma punta seleccionada y el mismo estado canónico que
   T04, en todos los casos.»
 
@@ -18,9 +19,9 @@
 
 Lee íntegros: este archivo; `V-ZRX/LINEO.md`; `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md`;
 `P-ZRX/P-TRANSICION/CONTRATO-v0.md`; `P-ZRX/P-FORMATO/FORMATO-v0.md` (con v0.1);
-`P-ZRX/P-NODO/PLAN-W06.md`; las revisiones de W03, W05a y W02b; el oráculo T04
+`P-ZRX/P-NODO/PLAN-W06.md`; las revisiones de W03, W05a, W02b, T04-B y T04-C; el oráculo T04
 (`P-ZRX/P-DAG/T04/src/`, como especificación ejecutable, **no** para traducirlo línea a línea) y sus
-vectores `resultados/vectores-estado-dag-v0.1.txt`. Base: el workspace de la raíz.
+vectores `resultados/vectores-estado-dag-v0.2.txt` con su `cobertura-v0.2.txt`. Base: el workspace de la raíz.
 Entrada congelada: `P-ZRX/P-NODO/ENTRADA-W06a.sha256`.
 
 ## 3. Decisiones del director
@@ -51,6 +52,7 @@ Entrada congelada: `P-ZRX/P-NODO/ENTRADA-W06a.sha256`.
 | V1–V2 | `fmt --check`, `clippy -D warnings --locked` | limpio |
 | V3 | `cargo test --workspace --all-features --locked` | todo lo previo con su nombre + lo nuevo; `diferencial_t01` sigue en 0 |
 | V4 | `diferencial_t04` sobre todos los casos | **0 discrepancias** |
+| V4b | El arnés imprime su propia tabla de cobertura (por tipo: aplicadas y descartadas por motivo, casos aleatorios) | idéntica a `cobertura-v0.2.txt`; una diferencia es un fallo aunque V4 dé 0 |
 | V5 | Propiedades con `proptest` (semilla fija): IE-1 (conservación), IE-2 (aplicación única), IE-3 (independencia del orden de llegada, permutando la entrega de bloques), IE-4 (undo tras reorganización) | sin fallos |
 | V6 | `dependencias-exactas.sh`, `frontera-crates.sh` (añade `zx-cadena → {zx-core, zx-consensus, zx-dag}`) | OK |
 
