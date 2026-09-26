@@ -1,0 +1,47 @@
+--- crates/zx-cadena/tests/padres_e_identidad.rs	2026-09-26 11:59:54.996884062 +0200
++++ deepseek/RI-2a/ws/crates/zx-cadena/tests/padres_e_identidad.rs	2026-09-26 12:06:16.447101839 +0200
+@@ -237,3 +237,44 @@
+         Err(MotivoBloque::ErrU2)
+     );
+ }
++
++#[test]
++fn ri2a_huerfano_cacheado_no_se_reintenta_al_llegar_el_padre() {
++    // RI-2a: `admitir` cachea el resultado por hash. Si un bloque B se somete a `admitir` antes
++    // de que su padre P exista, B queda marcado ErrSinPadre PARA SIEMPRE, incluso si P llega y es
++    // válido después. Esto demuestra que `Cadena::admitir` por sí solo puede producir estado que
++    // diverge según el orden de llegada si el llamante (zx-node) no garantiza que los padres
++    // lleguen antes (huérfanos retenidos fuera de `zx-cadena`, como dice el contrato R-15).
++    let mut cadena = cadena_con_terminal(15);
++    let terminal = hash(1);
++
++    // P: bloque PoST válido, hijo del terminal.
++    let p = post(50, vec![terminal], 1, productor(50), ticket(50, 1));
++    let p_hash = p.hash();
++
++    // B: bloque PoST cuyo único padre es P, sometido ANTES de que P se admita.
++    let b = post(60, vec![p_hash], 2, productor(60), ticket(60, 2));
++    let b_hash = b.hash();
++
++    let r1 = cadena.admitir(b.clone());
++    assert_eq!(
++        r1,
++        Err(MotivoBloque::ErrSinPadre),
++        "B debe rechazarse: su padre P aún no existe"
++    );
++
++    // Ahora llega P, y es válido.
++    let rp = cadena.admitir(p);
++    assert!(rp.is_ok(), "P debe admitirse: es un bloque PoST válido");
++    assert!(cadena.es_valido(&p_hash), "P debe quedar válido");
++
++    // Se reintenta B (mismo hash, ahora con el padre ya válido).
++    let r2 = cadena.admitir(b);
++    // Comportamiento esperado si el llamante reintenta huérfanos ingenuamente: B debería poder
++    // admitirse ahora que P es válido. `Cadena::admitir` cachea por hash y NO reevalúa: sigue
++    // devolviendo el error cacheado.
++    assert!(
++        r2.is_ok(),
++        "BUG confirmado: B quedó permanentemente ErrSinPadre aunque P ya es válido: {r2:?}"
++    );
++}
