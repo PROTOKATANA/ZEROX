@@ -1,0 +1,23 @@
+# HORAS.log — ORDEN-W05b2
+# Marcas `date -Is`; donde no hubo captura directa, hora de modificación del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W05b2/
+2026-09-26T02:33:40+02:00  inicio de sesión; lectura íntegra de ORDEN-W05b2.md, V-ZRX/LINEO.md, DECISIONES-W05.md (D-P07…D-P14), REVISION-W05a/W05b1, PERFIL-DEV-v0.md §4, CONTRATO-v0.md (TRN-06…TRN-08) y FORMATO-v0.md (F-03/F-05/F-09/F-10)
+2026-09-26T02:33:40+02:00  ENTRADA INICIO: sha256sum -c de ENTRADA-W05b2.sha256 -> 6/6 coinciden, exit=0 (logs/entrada-inicio.log)
+2026-09-26T02:33:40+02:00  extracción del código antiguo de 9681061 a ref/ (pot.rs, pot_rango.rs, cabecera_conjunta.rs, poas.rs, sus tests y las plantillas de zx-node)
+2026-09-26T02:33:40+02:00  montaje: ws.orig = raíz congelada de W05b1; ws = copia de trabajo; cargo-home copiado de W05b1 (697 MiB); symlink ws/PDF -> ZEROX/PDF
+2026-09-26T02:34:00+02:00  faltas de definición informadas antes de escribir código (5): productor/zx-farmer vs frontera V8; justificacion vs ContextoVerificacionPot sin pasado/ancla; reto reutilizado de zx_poas::reto; rango siempre Ok(sr_dev) sin variantes nuevas en zx-dag; campos exactos de HechosPost. Se declaran las interpretaciones
+2026-09-26T02:34:30+02:00  raíz ws/: member zx-post; ci/frontera-crates.sh con la frontera zx-post -> {zx-core,zx-pot,zx-dag,zx-poas}
+2026-09-26T02:35:00+02:00  crate zx-post: pot.rs (AES/semilla, sin duplicar reto), pot_rango.rs (portado; rama de génesis -> PotInvalido(SinPadres), D-P08), cabecera_conjunta.rs (HechosPost, ErrorDag, zx_poas::verificar_solucion_poas), contexto_transicion.rs (D-P09…D-P11), justificacion.rs (sustituye IntegracionPotPendiente), productor.rs (PoT slot a slot, coinbase v3, sello)
+2026-09-26T02:38:59+02:00  primer cargo check -p zx-post --offline (lock gana solo zx-post; ningún par externo cambia)
+2026-09-26T02:41:00+02:00  tests portados y adaptados: pot_slot (7), pot_derivaciones (9), flow (6), pot_rango (33 + 6 internos), cabecera_conjunta (11 + 9 internos); retirado: ninguno; adaptado el test de génesis a D-P08 (logs/V4-tests.txt)
+2026-09-26T02:43:00+02:00  tests nuevos: contexto_transicion::tests (6), tests/justificacion.rs (3), tests/extremo_a_extremo.rs (12: V5 3 semillas, V6 9 negativos + 1 pendiente, V7 núcleo). E2E: 92,78 s, 12/12 (logs/V4-V7-detalle.log)
+2026-09-26T02:52:00+02:00  V1 fmt --check exit 0; V2 clippy --workspace --all-features --locked exit 0; V3 cargo test --workspace --all-features --locked: 519 pasan, 0 fallan, 1 ignorado; 415 nombres previos presentes, 0 ausentes; ~104 nuevos (logs/V1-V3.log, logs/V3-nombres-*.txt)
+2026-09-26T02:57:00+02:00  V8: dependencias-exactas (15 exactas) y frontera (5/5, incluida zx-post) OK (logs/V8-*.log)
+2026-09-26T02:57:39+02:00  Medición §6 en release, taskset -c 3 (1 CPU): prove 1,389e8 iter/s (mediana 144,0 ms para 20e6), N(1 s) ≈ 138 873 760; verify 2,201e9 iter/s (mediana 9,086 ms), N(1 s) ≈ 2 201 286 288; 11 corridas; uptime carga 3,21; Ryzen 9 9950X3D, 32 hilos lógicos (logs/V9-medicion.log)
+2026-09-26T02:57:55+02:00  cambios.patch (20 ficheros) y MIGRACION.sha256 (120 huellas, sha256sum -c OK)
+2026-09-26T03:00:00+02:00  V2 ampliado a `--all-targets` (incluye examples/medir_pot.rs): 0 avisos (logs/V2-clippy-alltargets.log); V1 fmt --check exit 0
+2026-09-26T03:10:00+02:00  hueco cerrado: la regla TRN-08/CONTRATO §1 (`slot > s_0`) se aplica en la puerta (`MotivoCabeceraInvalida::TransicionSinProgresoDeSlot`) antes de tocar AES; el negativo V6 de slot 0 cubre el ataque con justificación vacía y pot_output=S1
+2026-09-26T03:12:00+02:00  V3 de cierre `cargo test --workspace --all-features --locked`: 519 pasan, 0 fallan, 1 ignorado; 415 previos presentes, 0 ausentes (logs/V3-test-final.log, logs/V3-nombres-post.txt)
+2026-09-26T03:13:00+02:00  cambios.patch y MIGRACION.sha256 regenerados con la regla nueva (MIGRACION sha256sum -c OK)
+2026-09-26T03:14:00+02:00  ENTREGA FINAL: sha256sum -c ENTRADA-W05b2.sha256 -> 6/6 coinciden (logs/entrada-final.log)
+2026-09-26T03:14:00+02:00  fin; presupuesto (3 h / 8 hilos / 16 GiB / 40 GiB) no agotado (≈ 41 min)

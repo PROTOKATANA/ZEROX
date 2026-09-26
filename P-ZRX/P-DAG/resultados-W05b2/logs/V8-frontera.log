@@ -1,0 +1,5 @@
+"OK — frontera zx-consensus → {zx-core}"
+"OK — frontera zx-dag → {zx-core}"
+"OK — frontera zx-poas → {zx-core,zx-consensus}"
+"OK — frontera zx-farmer → {zx-core,zx-poas}"
+"OK — frontera zx-post → {zx-core,zx-pot,zx-dag,zx-poas}"

@@ -1,0 +1,40 @@
+2026-09-26T02:57:32+02:00
+uptime:  02:57:32  arriba 10:00,  0 users,  carga promedio: 0,31, 3,24, 5,17
+nproc: 32
+lscpu: 
+   Compiling proc-macro2 v1.0.107
+   Compiling typenum v1.20.1
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling find-msvc-tools v0.1.12
+   Compiling shlex v2.0.1
+   Compiling cpufeatures v0.3.1
+   Compiling thiserror v2.0.20
+   Compiling cfg-if v1.0.4
+   Compiling cpubits v0.1.1
+   Compiling arrayvec v0.7.8
+   Compiling cc v1.4.5
+   Compiling constant_time_eq v0.4.2
+   Compiling cpufeatures v0.2.17
+   Compiling syn v3.0.4
+   Compiling hybrid-array v0.4.14
+   Compiling blake3 v1.8.7
+   Compiling crypto-common v0.2.2
+   Compiling inout v0.2.2
+   Compiling cipher v0.5.2
+   Compiling aes v0.9.3
+   Compiling thiserror-impl v2.0.20
+   Compiling zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-pot)
+    Finished `release` profile [optimized] target(s) in 5.53s
+     Running `target/release/examples/medir_pot`
+== Medición informativa zx-pot (§6 W05b2) ==
+uptime: 02:57:39  arriba 10:00,  0 users,  carga promedio: 0,36, 3,21, 5,15
+nproc:  1
+N por corrida: 20000000 (múltiplo de 16), corridas: 11
+prove : mediana 144.015693ms | 1.389e8 iter/s | N(1 s/slot) ≈ 138873760
+verify: mediana 9.085597ms | 2.201e9 iter/s | N(1 s/slot) ≈ 2201286288
+cociente verify/prove: 0.06
+measure_exit=0
+2026-09-26T02:57:39+02:00
+nproc real (sin taskset): 32
+model name	: AMD Ryzen 9 9950X3D 16-Core Processor

@@ -1,0 +1,40 @@
+Orden W05b2 completada. Resumen de lo ejecutado y verificado:
+
+## Qué se hizo
+
+Crate nuevo **`crates/zx-post`** (D-P14) con los seis módulos pedidos y frontera §V8 estricta
+(`zx-post → {zx-core, zx-pot, zx-dag, zx-poas}`; `zx-consensus`/`zx-farmer` solo `dev-dependency`):
+
+- `pot.rs` — AES/semilla; el reto se reutiliza de `zx_poas::reto` (no se duplica).
+- `pot_rango.rs` — portado; la rama de génesis se sustituye por `PotInvalido(SinPadres)` (D-P08/§3.2).
+- `cabecera_conjunta.rs` — orden `C-POT-08`, padres con `zx-dag`, rango con `RangoSolucionValidado`, PoAS con `zx-poas`, salida `HechosPost`.
+- `contexto_transicion.rs` — D-P09…D-P11 (`f0`, S1, sin inyecciones, D=0, `N_dev`, `SR_dev`, `es_terminal ⟺ T`), etiquetado dev/marcador S1.
+- `justificacion.rs` — decodifica y verifica el wire con `pot_rango`, sustituyendo `IntegracionPotPendiente`.
+- `productor.rs` — PoT slot a slot desde S1, auditado real, cabecera, coinbase v3, sello.
+
+## Faltas de definición informadas antes de editar (5)
+
+1. §V8 excluye `zx-farmer` pero §3.6 pide una parcela → `FuenteSoluciones` + puente real en tests (dev-dep).
+2. `ContextoVerificacionPot` no aporta `pasado` ni `salida_validada` → la verificación real va sobre `InstantaneaPot` (lo que la orden sanciona al nombrar `pot_rango`).
+3. `reto_desde_salida`/`aleatoriedad_de_salida` se reutilizan de `zx-poas`.
+4. D-P11 fija `SR` constante → `Ok(sr_dev)`, sin variantes nuevas en `zx-dag`.
+5. `HechosPost` con exactamente los campos listados.
+
+Detecté además un hueco real: `slot = 0` con justificación vacía y `pot_output = S1` pasaba el núcleo PoT sin AES (viola CONTRATO §1 `slot > s_0`). Lo cerré en la puerta (`MotivoCabeceraInvalida::TransicionSinProgresoDeSlot`) y lo cubrí con un negativo específico.
+
+## Resultado
+
+| | |
+|---|---|
+| V1 `fmt --check` | 0 |
+| V2 `clippy --workspace --all-targets -D warnings --locked` | 0 avisos |
+| V3 `cargo test --workspace --all-features --locked` | **519 pasan, 0 fallan, 1 ignorado**; 415 previos presentes, 0 ausentes |
+| V4 | 81 tests antiguos portados/adaptados, **0 retirados** |
+| V5 | 3/3 semillas → `Comprobada` + `HechosPost` coherentes |
+| V6 | 9 `Invalida(motivo)` + 1 `Pendiente(RelojFuturo)`, sin pánicos |
+| V7 | espías heredadas en verde |
+| V8 | 15 deps exactas; 5/5 fronteras OK |
+
+**Medición §6** (release, 1 hilo, 11 corridas, Ryzen 9 9950X3D): `prove` 1,389·10⁸ iter/s → N(1 s) ≈ 138 873 760; `verify` 2,201·10⁹ iter/s → N(1 s) ≈ 2 201 286 288. Dato de perfil dev, no parámetro.
+
+Entregables en `deepseek/W05b2/`: `ws/`, `cambios.patch` (20 ficheros), `MIGRACION.sha256` (120 huellas, `-c` OK), `logs/`, `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Entrada congelada verificada al inicio y al final (6/6). Sin commit ni push; nada fuera de la zona; presupuesto no agotado (~41 min).

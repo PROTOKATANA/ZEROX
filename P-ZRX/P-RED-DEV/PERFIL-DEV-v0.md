@@ -46,7 +46,7 @@ medir»).
 | Parámetro | Valor dev | Motivo |
 |---|---|---|
 | Duración nominal del slot `τ` | 1 s | — |
-| `N_dev` (iteraciones AES por slot) | **por medir** en W05b2: el valor que dé ≈ 1 s por slot en la máquina de referencia, y un valor pequeño para tests | D-P10 |
+| `N_dev` (iteraciones AES por slot) | **138 873 760** para `τ ≈ 1 s` en la máquina de referencia (W05b2: `prove` 1,389·10⁸ iter/s, `verify` 2,201·10⁹ iter/s, release, 1 hilo, carga ajena posible; coherente con la medida antigua de 1,561 s para 200 032 000); valores pequeños en tests | D-P10 |
 | `D` (retardo de autoría) | 0 | D-P10 |
 | `SR_dev` (rango de solución) | **por medir** en W07: el que dé ≈ 1 bloque por slot en la red de 3 nodos con los sectores dev | D-P11 (sin controlador) |
 | GHOSTDAG `k` | 10 | Holgura para bloques paralelos en la red local |

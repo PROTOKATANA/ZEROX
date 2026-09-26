@@ -1,0 +1,51 @@
+# V4 — Tests antiguos de PoT y puerta: portados, adaptados y retirados (ORDEN-W05b2 §6)
+
+Base: tests de `9681061` en `crates/zx-consensus/tests/` y módulos `#[cfg(test)]` de
+`crates/zx-consensus/src/{pot_rango.rs,cabecera_conjunta.rs}`, extraídos a `ref/`.
+Destino: `crates/zx-post/`. La lógica AES/flujo **no** se retiró en ningún caso.
+
+## Portados (sin cambio de lógica; solo rutas `zx_consensus::* → zx_post::{pot,pot_rango,cabecera_conjunta}` y `zx_poas`/`zx_dag`)
+
+| Origen (9681061) | Destino (zx-post) | Nº |
+|---|---|---:|
+| `tests/pot_slot.rs` | `tests/pot_slot.rs` | 7 |
+| `tests/pot_derivaciones.rs` | `tests/pot_derivaciones.rs` | 9 |
+| `tests/flow.rs` | `tests/flow.rs` | 6 |
+| `tests/pot_rango.rs` | `tests/pot_rango.rs` | 33 |
+| `tests/cabecera_conjunta.rs` | `tests/cabecera_conjunta.rs` | 11 |
+| `pot_rango.rs` módulo `pruebas_salida_auditada` | `src/pot_rango.rs` mismo módulo | 6 |
+| `pot.rs` módulo `pruebas` (implícito en cabecera) | `src/cabecera_conjunta.rs` módulo `pruebas` | 9 |
+
+## Adaptados (con motivo)
+
+1. `pot_rango` · `el_genesis_no_lleva_portadores_ni_se_inventa_entropia_externa`
+   → `una_cabecera_sin_padres_es_invalida_y_no_toca_aes`.
+   **Motivo:** §3.2/D-P08. No hay génesis DAG: la rama de génesis de `pot_rango.rs:555-572`
+   antigua se sustituye por `PotInvalido(SinPadres)` incondicional, sin tocar AES. La expectativa
+   antigua (`PotPendiente(GenesisSinEntropiaExterna)` / `PortadoresEnGenesis`) ya no aplica.
+2. `cabecera_conjunta` · `padres_invalidos_no_gastan_presupuesto`:
+   `ConsensusError::GenesisConCeroPadresNoEsGenesis` → `ErrorDag::CabeceraPostSinPadres`.
+   **Motivo:** D-P08 renombra el rechazo de «cabecera no génesis con cero padres» a
+   «cabecera PoST sin padres»; el resto del test es idéntico.
+3. `cabecera_conjunta` · `ContextoDag::es_genesis` → `es_terminal` en los mocks.
+   **Motivo:** D-P08 sustituye `es_genesis` por `es_terminal` (raíz = terminal `T`).
+4. `cabecera_conjunta` · `ComprobacionCabecera` → `HechosPost` en
+   `la_espia_de_poas_ok_registra_los_hechos_solo_al_final`.
+   **Motivo:** §3.3 fija los campos de `HechosPost` (`hash, padre_seleccionado, slot, productor,
+   peso, prueba_valida, requisito_declarado`); la distancia de solución y la salida auditada dejan
+   de exponerse.
+5. `pot.rs` · `reto_desde_salida` y `aleatoriedad_de_salida`: **no** se duplican; se reexportan
+   desde `zx_poas::reto` (revisión W05b1: W05b2 debe usar esa misma función).
+
+## Retirados
+
+**Ninguno.** Los 81 tests antiguos de PoT y puerta siguen presentes con su nombre (uno renombrado en
+el punto 1 y otro en el punto 4); ningún test de lógica AES/flujo se retiró. El stub de `zx-core`
+(`wire_dag::verificar_justificacion_pot` y su test `el_verificador_pot_no_finge_exito`) se conserva
+intacto como interfaz superada; la verificación real vive en `zx-post::justificacion`.
+
+## Nuevos (zx-post)
+
+`tests/extremo_a_extremo.rs` (12: V5 + V6 + V7), `tests/justificacion.rs` (3), módulo
+`contexto_transicion::tests` (6), y los internos de `productor`/`justificacion`/`cabecera` ya
+contados. Total `zx-post`: 104 tests (21 lib + 81 de integración + 2 doctests).

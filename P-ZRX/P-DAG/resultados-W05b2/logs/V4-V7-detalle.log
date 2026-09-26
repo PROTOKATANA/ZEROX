@@ -1,0 +1,223 @@
+   Compiling zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-post)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.72s
+     Running unittests src/lib.rs (target/debug/deps/zx_post-83c1dc5edb4fbfad)
+
+running 21 tests
+test cabecera_conjunta::pruebas::pot_invalido_no_invoca_poas ... ok
+test cabecera_conjunta::pruebas::invalid_history_size_de_upstream_es_pendiente_y_conserva_la_causa ... ok
+test cabecera_conjunta::pruebas::padres_invalidos_no_llaman_sello_ni_tocan_presupuesto ... ok
+test contexto_transicion::tests::contexto_dag_reconoce_terminal_y_cadena ... ok
+test contexto_transicion::tests::f0_y_s1_salen_del_terminal_y_no_se_uniforman ... ok
+test contexto_transicion::tests::instantanea_pot_del_terminal ... ok
+test contexto_transicion::tests::n_dev_invalido_se_rechaza ... ok
+test cabecera_conjunta::pruebas::la_espia_de_poas_ok_registra_los_hechos_solo_al_final ... ok
+test cabecera_conjunta::pruebas::flujo_discrepante_no_llama_sello_ni_toca_presupuesto ... ok
+test cabecera_conjunta::pruebas::pot_pendiente_no_invoca_poas ... ok
+test contexto_transicion::tests::registros_duplicados_o_del_terminal_se_rechazan ... ok
+test contexto_transicion::tests::rango_esperado_es_la_constante_dev ... ok
+test pot_rango::pruebas_salida_auditada::con_d_cero_y_d_positivo_la_prueba_lleva_el_ultimo_portador_sin_tocar_el_contexto ... ok
+test pot_rango::pruebas_salida_auditada::con_d_cero_y_d_cero_la_salida_auditada_es_el_ancla_de_slot_b ... ok
+test pot_rango::pruebas_salida_auditada::con_d_menor_o_igual_que_d_la_prueba_lleva_la_salida_del_contexto ... ok
+test pot_rango::pruebas_salida_auditada::dos_verificaciones_del_mismo_candidato_dan_la_misma_prueba ... ok
+test pot_rango::pruebas_salida_auditada::sin_la_salida_auditada_del_contexto_no_hay_prueba ... ok
+test pot_rango::pruebas_salida_auditada::con_d_mayor_que_d_la_prueba_lleva_la_salida_del_portador_auditado ... ok
+test cabecera_conjunta::pruebas::contexto_de_pieza_ausente_es_pendiente_y_no_invoca_poas ... ok
+test cabecera_conjunta::pruebas::la_funcion_publica_usa_el_sello_real_y_termina_pendiente_sin_pieza ... ok
+test cabecera_conjunta::pruebas::sello_invalido_tras_la_fase_previa_no_toca_cache_ni_presupuesto ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+     Running tests/cabecera_conjunta.rs (target/debug/deps/cabecera_conjunta-93158dfa43ba338f)
+
+running 11 tests
+test rango_declarado_incorrecto_es_invalida ... ok
+test sello_invalido_no_gasta_presupuesto ... ok
+test el_motivo_invalido_conserva_el_tipo_del_nucleo_pot ... ok
+test sin_contexto_de_pieza_es_pendiente_tras_sello_y_aes ... ok
+test reloj_futuro_es_pendiente_y_no_invoca_poas ... ok
+test la_reexportacion_es_la_misma_funcion ... ok
+test el_poas_real_rechaza_entrada_no_canonica ... ok
+test padres_invalidos_no_gastan_presupuesto ... ok
+test un_padre_desconocido_es_pendiente ... ok
+test un_pot_valido_de_mock_no_admite_la_cabecera ... ok
+test un_contexto_de_pieza_aritmeticamente_invalido_es_pendiente ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running tests/extremo_a_extremo.rs (target/debug/deps/extremo_a_extremo-0aafdc80c9b2516d)
+
+running 12 tests
+test v6_padres_extra_es_invalida ... ok
+test v6_rango_distinto_del_esperado_es_invalido ... ok
+test v6_sello_sobre_otra_prefirma_es_invalido ... ok
+test v6_sello_de_otra_clave_es_invalido ... ok
+test v6_slot_cero_es_invalido ... ok
+test v6_pot_output_falso_es_invalido ... ok
+test v6_portador_de_otro_flujo_es_invalido ... ok
+[medición local, no consenso] V5 semilla 0x00: bloque en el slot 1 con 1 portadores y peso 18446744073709551616
+test v6_slot_por_delante_del_reloj_queda_pendiente ... ok
+test v6_solucion_de_otra_clave_es_invalida ... ok
+test v6_solucion_de_otro_sector_es_invalida ... ok
+test v7_el_nucleo_pot_produce_prueba_con_el_contexto_dev ... ok
+[medición local, no consenso] V5 semilla 0x01: bloque en el slot 2 con 2 portadores y peso 18446744073709551616
+[medición local, no consenso] V5 semilla 0x02: bloque en el slot 1 con 1 portadores y peso 18446744073709551616
+test v5_tres_semillas_construyen_y_comprueban_el_primer_bloque_post ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.33s
+
+     Running tests/flow.rs (target/debug/deps/flow-e03ff8c74a15bf05)
+
+running 6 tests
+test cambiar_el_genesis_cambia_la_semilla ... ok
+test coincide_con_la_concatenacion_y_el_orden_importa ... ok
+test cambiar_la_entropia_cambia_la_semilla ... ok
+test entropias_con_prefijo_comun_dan_semillas_distintas ... ok
+test es_determinista ... ok
+test mide_16_bytes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/justificacion.rs (target/debug/deps/justificacion-eb76f9bc2a079887)
+
+running 3 tests
+test leer_justificacion_hace_ida_y_vuelta_y_acota ... ok
+test un_portador_ajeno_es_invalido ... ok
+test el_portador_honesto_verifica_con_el_contexto_dev ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pot_derivaciones.rs (target/debug/deps/pot_derivaciones-9345f1ea49f953f4)
+
+running 9 tests
+test control_detecta_big_endian_en_el_reto ... ok
+test control_detecta_invertir_entropia_y_salida ... ok
+test la_formula_no_acredita_quien_inyecta_ni_en_que_slot ... ok
+test control_detecta_cambiar_el_slot_o_cambiar_la_salida ... ok
+test v1_encadenado_sin_inyeccion_devuelve_la_salida_anterior ... ok
+test v2_inyeccion_usa_la_entropia_primero_y_trunca_a_16 ... ok
+test v3_aleatoriedad_es_blake3_de_la_salida ... ok
+test microtraza_de_ocho_slots_con_inyeccion_en_el_slot_tres ... ok
+test v4_reto_codifica_slot_42_en_little_endian_sobre_una_salida_fija ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pot_rango.rs (target/debug/deps/pot_rango-a2bb495448d23965)
+
+running 33 tests
+test cambiar_solo_pot_output_no_fabrica_prueba_ni_toca_la_salida_del_contexto ... ok
+test dos_inyecciones_en_el_mismo_slot_son_pendiente ... ok
+test con_d_mayor_que_d_la_salida_auditada_no_la_aporta_el_contexto ... ok
+test con_d_cero_la_salida_auditada_la_aporta_el_contexto ... ok
+test con_d_menor_o_igual_que_d_la_salida_auditada_la_aporta_el_contexto ... ok
+test el_acierto_de_cache_usa_el_flujo_del_slot_al_cruzar_una_inyeccion ... ok
+test el_cambio_de_n_en_el_slot_de_inyeccion_se_respeta ... ok
+test el_presupuesto_agotado_es_pendiente_y_nunca_invalido ... ok
+test la_fase_previa_invalida_o_pendiente_no_toca_cache_ni_presupuesto ... ok
+test mutar_un_checkpoint_intermedio_con_el_ultimo_intacto_invalida ... ok
+test un_descuadre_del_numero_de_portadores_invalida ... ok
+test slot_mas_d_desbordado_es_pendiente ... ok
+test mutar_un_portador_posterior_al_auditado_no_deja_prueba ... ok
+test la_inyeccion_se_aplica_exactamente_en_su_slot ... ok
+test un_flujo_de_pasado_discrepante_invalida ... ok
+test un_padre_ausente_del_pasado_es_pendiente ... ok
+test un_ancla_que_es_el_propio_candidato_es_contexto_circular ... ok
+test un_pot_output_incorrecto_invalida ... ok
+test un_acierto_de_cache_completo_no_gasta_aes ... ok
+test un_rango_de_varios_slots_consecutivos_verifica ... ok
+test un_slot_de_padre_posterior_invalida ... ok
+test n_cero_no_multiplo_o_mayor_que_u32_max_es_pendiente ... ok
+test una_cabecera_sin_padres_es_invalida_y_no_toca_aes ... ok
+test un_portador_alterado_bajo_la_misma_clave_invalida_sin_gastar_aes ... ok
+test un_rango_vacio_exige_que_el_ancla_acreditada_sea_pot_output ... ok
+test un_rango_vacio_sin_ancla_en_el_contexto_es_pendiente ... ok
+test un_token_no_sirve_para_otro_contexto ... ok
+test un_slot_por_delante_del_reloj_es_pendiente ... ok
+test ciento_cincuenta_portadores_verifican ... ok
+test una_salida_distinta_bajo_la_misma_clave_invalida_sin_gastar_aes ... ok
+test una_entrada_de_cache_de_otra_clave_no_invalida ... ok
+test una_diferencia_de_151_es_exceso_estructural ... ok
+test un_token_no_sirve_para_otro_candidato ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pot_slot.rs (target/debug/deps/pot_slot-e70780e8359bddc0)
+
+running 7 tests
+test el_dominio_del_contexto_se_rechaza_sin_ejecutar_aes ... ok
+test la_proyeccion_de_ns_comprueba_cero_rango_y_multiplo_de_16 ... ok
+test la_conversion_wire_a_primitiva_y_vuelta_conserva_los_ocho_valores_en_orden ... ok
+test la_conversion_no_reordena_los_ocho_bloques_crudos ... ok
+test la_salida_es_el_ultimo_de_los_ocho_checkpoints ... ok
+test semilla_o_trabajo_distintos_del_contexto_no_verifican_la_misma_prueba ... ok
+test corromper_cualquiera_de_los_ocho_checkpoints_del_wire_rompe_la_verificacion ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zx_post
+
+running 2 tests
+error[E0451]: fields `bloque`, `slot_auditado` and `salida_auditada` of struct `PruebaPotValidada` are private
+   --> crates/zx-post/src/pot_rango.rs:207:9
+    |
+206 |     PruebaPotValidada {
+    |     ----------------- in this type
+207 |         bloque,
+    |         ^^^^^^ private field
+208 |         slot_auditado: 0,
+    |         ^^^^^^^^^^^^^ private field
+209 |         salida_auditada: [0u8; 16],
+    |         ^^^^^^^^^^^^^^^ private field
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0451`.
+test crates/zx-post/src/pot_rango.rs - pot_rango::PruebaPotValidada (line 200) - compile fail ... ok
+error[E0277]: the trait bound `CachePotVerificada: PresupuestoPot` is not satisfied
+   --> crates/zx-post/src/pot_rango.rs:676:63
+    |
+676 |     let _ = verificar_rango_pot_fase_aes(token, ctx_b, reloj, cache, presupuesto);
+    |             ----------------------------                      ^^^^^ the trait `PresupuestoPot` is not implemented for `CachePotVerificada`
+    |             |
+    |             required by a bound introduced by this call
+    |
+note: required by a bound in `verificar_rango_pot_fase_aes`
+   --> crates/zx-post/src/pot_rango.rs:695:8
+    |
+687 | pub fn verificar_rango_pot_fase_aes<C, P>(
+    |        ---------------------------- required by a bound in this function
+...
+695 |     P: PresupuestoPot,
+    |        ^^^^^^^^^^^^^^ required by this bound in `verificar_rango_pot_fase_aes`
+
+error[E0061]: this function takes 4 arguments but 5 arguments were supplied
+   --> crates/zx-post/src/pot_rango.rs:676:13
+    |
+676 |     let _ = verificar_rango_pot_fase_aes(token, ctx_b, reloj, cache, presupuesto);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^        ----- unexpected argument #2 of type `&C`
+    |
+note: expected `&mut CachePotVerificada`, found `&mut P`
+   --> crates/zx-post/src/pot_rango.rs:676:70
+    |
+676 |     let _ = verificar_rango_pot_fase_aes(token, ctx_b, reloj, cache, presupuesto);
+    |                                                                      ^^^^^^^^^^^
+    = note: expected mutable reference `&mut CachePotVerificada`
+               found mutable reference `&mut P`
+note: function defined here
+   --> crates/zx-post/src/pot_rango.rs:687:8
+    |
+687 | pub fn verificar_rango_pot_fase_aes<C, P>(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: remove the extra argument
+    |
+676 -     let _ = verificar_rango_pot_fase_aes(token, ctx_b, reloj, cache, presupuesto);
+676 +     let _ = verificar_rango_pot_fase_aes(token, reloj, /* &mut CachePotVerificada */, presupuesto);
+    |
+
+error: aborting due to 2 previous errors
+
+Some errors have detailed explanations: E0061, E0277.
+For more information about an error, try `rustc --explain E0061`.
+test crates/zx-post/src/pot_rango.rs - pot_rango::verificar_rango_pot_fase_aes (line 661) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

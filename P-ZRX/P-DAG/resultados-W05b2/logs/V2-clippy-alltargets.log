@@ -1,0 +1,22 @@
+    Checking primitive-types v0.14.0
+    Checking subspace-core-primitives v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/crates/subspace-core-primitives)
+    Checking rustix v1.1.4
+    Checking zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-pot)
+    Checking zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-core)
+    Checking tempfile v3.24.0
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-consensus)
+    Checking zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-dag)
+    Checking rusty-fork v0.3.1
+    Checking subspace-kzg v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/shared/subspace-kzg)
+    Checking ab-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/shared/ab-proof-of-space)
+    Checking proptest v1.11.0
+    Checking subspace-erasure-coding v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/crates/subspace-erasure-coding)
+    Checking subspace-archiving v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/crates/subspace-archiving)
+    Checking subspace-data-retrieval v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/shared/subspace-data-retrieval)
+    Checking subspace-proof-of-space v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/crates/subspace-proof-of-space)
+    Checking subspace-verification v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/crates/subspace-verification)
+    Checking subspace-farmer-components v0.1.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/PDF/autonomys-subspace/crates/subspace-farmer-components)
+    Checking zx-poas v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-poas)
+    Checking zx-farmer v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-farmer)
+    Checking zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b2/ws/crates/zx-post)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.01s
