@@ -23,6 +23,19 @@ adelante»*.
 hoy borrado; `D-ZRX/SPEC.md` §0 aún la invoca; IPA E-06). `SPEC.md` §0 **no** se edita hasta que FV-1
 entregue y Katana ratifique.
 
+## Decisiones de Katana (2026-09-26, provisionales hasta FV-1)
+
+- **Peso:** sectores registrados con garantía, para que R5 tenga algo que castigar.
+- **En el sorteo están todos los registrados**, no solo los que demostraron estar encendidos.
+- **Sorteo secreto en cada ronda, como en Algorand (AGR1):** nadie sabe quién vota hasta que ya ha votado.
+  Solo votan los que salen elegidos.
+- **Probabilidad = espacio registrado × prima `b`** para quien demostró disponibilidad hace poco. La prueba es
+  de sí o no y verificable en la cadena, no una puntuación. Ganar un bloque cuenta como prueba, pero no es la
+  única ni da peso extra.
+- **Advertencia del director:** el atacante siempre cobra la prima. `b` es un dial entre seguridad (`b = 1`)
+  y viveza (`b → ∞`); con `b` finito, la fracción de plazas del atacante tiene techo aunque censure las
+  pruebas de los honestos. FV-1 entrega las curvas en `(b, E)` (`ORDEN-FV1-DISENO.md`, decisión 6).
+
 ## Por qué
 
 El razonamiento completo de la conversación está en `CONTEXTO.md`: por qué el doble farmeo no tiene cierre
@@ -65,5 +78,5 @@ las correcciones del director y el problema del quórum con granjeros doméstico
 | FV-3 | Oráculo Julia y vectores | DeepSeek | FV-2 |
 | FV-4 | Implementación Rust; diferencial contra FV-3 | Sonnet | FV-3; `Δ` medida en la red dev |
 
-FV-2, FV-3 y FV-4 se redactan cuando FV-1 esté ratificado: su alcance depende de la fuente de peso que se
-elija.
+FV-2, FV-3 y FV-4 se redactan cuando FV-1 esté ratificado: su alcance depende de la prueba de
+disponibilidad, de `b` y del suelo `E` que salgan de FV-1.

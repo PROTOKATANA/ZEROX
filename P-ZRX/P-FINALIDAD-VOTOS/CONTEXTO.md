@@ -134,7 +134,99 @@ castigo con evidencia funcionan sin ningún comité.
   - **Delegación del voto.** Si los granjeros ceden su clave de voto a un servicio, aparece un comité **de
     hecho**, como pasó con los pools. Es el ataque 7 de la orden.
 
-### 3.5 R1–R5
+### 3.5 Otros comités, y la elección de Katana
+
+Katana preguntó qué otros comités existen y cuáles darían mejores resultados.
+
+| Tipo | Ejemplo | ¿Pasa R1–R5? | Por qué no, o qué cuesta |
+|---|---|---|---|
+| Fijo o con permiso | BFT clásico, cadenas de consorcio | No (R1, R2) | Es el más rápido y simple, precisamente porque centraliza |
+| Elegido por votación | DPoS (EOS, 21 productores) | No (R2) | Cárteles y compra de votos |
+| Los N más grandes | Conjuntos activos de algunas cadenas PoS | No (R1) | El pequeño nunca vota (con Zipf, 400 de 10.000 cubren el 67 %, según la propuesta antigua) |
+| Federación o anclaje externo | Federaciones de puentes; puntos de control en Bitcoin | No | Depende de alguien o de algo externo |
+| Confianza subjetiva | Stellar, Ripple | No (R2) | La seguridad depende de a quién elige confiar cada nodo, y tiende a concentrarse |
+| Muestreo repetido sin firmas | Avalanche | No (R5) | Sin firmas contradictorias que castigar ni certificados |
+| Todos, ponderados por el recurso | Casper, F3 | Sí | Muchas firmas; 2/3 del peso total encendido en cada momento |
+| Sorteo secreto ponderado | Algorand | Sí, en esperanza | El pequeño vota con probabilidad proporcional a su espacio |
+| Productores recientes | Hybrid consensus (Pass y Shi), ByzCoin, propuesta antigua | Sí, en esperanza | Peso con ruido y sesgable reteniendo bloques |
+
+Los comités que mejor rinden en velocidad y sencillez son justo los que centralizan: renunciar a ellos tiene un
+coste real, y es el que Katana eligió pagar. Límite de principio: ningún diseño puede a la vez seguir
+funcionando con participación fluctuante y dar un sello que deje culpables identificados cuando se rompe (el
+dilema entre disponibilidad y responsabilidad de Neu, Tas y Tse). La respuesta son los dos libros de R3.
+
+**Primera elección de Katana**, sobre la recomendación del director: una mezcla. **La sustituyó después el
+diseño de §3.6**; se conserva porque su riesgo es el extremo `b → ∞` de ese diseño.
+- **Peso:** sectores registrados con garantía, para que R5 tenga algo que castigar.
+- **Votantes:** sorteo con probabilidad proporcional al espacio, entre quienes han demostrado buena
+  disponibilidad estando encendidos. Así no se depende de que el 89–95 % de los honestos tenga el PC
+  encendido.
+- **Katana preguntó si quien ha ganado bloques hace poco también debe estar.** Respuesta: sí, como **prueba de
+  disponibilidad alternativa**, pero no la única ni con peso extra. Si fuera la única, el pequeño quedaría
+  filtrado dos veces por su espacio (para ser elegible y en el sorteo).
+
+**Riesgo que el director no dijo al recomendarla y declaró después:** sortear entre los disponibles hace que la
+seguridad dependa de cuántos honestos estén encendidos. La cuota del atacante entre los elegibles es
+`a / (a + (1−a)·p)`:
+
+| Atacante `a` | `p = 1,0` | `p = 0,8` | `p = 0,6` | `p = 0,4` | `p` con la que llega a 2/3 |
+|---:|---:|---:|---:|---:|---:|
+| 0,20 | 0,200 | 0,238 | 0,294 | 0,385 | ≤ 0,125 |
+| 0,25 | 0,250 | 0,294 | **0,357** | **0,455** | ≤ 0,167 |
+| 0,30 | 0,300 | **0,349** | **0,417** | **0,517** | ≤ 0,214 |
+
+En negrita, cuando supera el tercio. La propuesta antigua ya había descartado este efecto con el nombre «⅔ de
+los presentes». Además, el atacante puede expulsar a honestos censurando sus pruebas de disponibilidad.
+**Defensa propuesta, a medir por FV-1:** un suelo de representatividad `E` (solo se sella si el peso elegible es
+al menos `E` del total). Con él, el sello aguanta si `a < E/3`: con `E = 0,75`, hasta un 25 %; con `E = 0,9`,
+hasta un 30 %. `E` es el dial entre viveza y seguridad; «votan todos, 2/3 del total» aguanta hasta un tercio,
+pero exige 2/3 del peso encendido en cada momento.
+
+### 3.6 ¿Votan todos? El diseño final de Katana
+
+Katana preguntó si todos seguirían votando, dado que antes se dijo que «todos eran el comité».
+
+- **Aclaración.** En F3 y en Casper sí votan todos: en F3 cada participante vota en cada ronda; en Ethereum
+  cada validador vota una vez por época, repartidos en turnos. Con sorteo (Algorand, la propuesta antigua y la
+  mezcla) **solo vota la muestra de cada ronda**, y «todos son el comité» pasa a significar que **todos entran
+  en el sorteo**, como un jurado popular sacado del censo. El director cambió de diseño sin decirlo con
+  claridad.
+- **Matiz de palabras.** Los votantes no se eligen «por métricas»; salen de un sorteo ponderado por el
+  recurso. Elegir por métricas es lo que R2 prohíbe.
+
+**Diseño que quiere Katana:**
+1. Entran en el sorteo **todos los registrados**, no solo los encendidos.
+2. **Sorteo secreto** en cada ronda, como en Algorand (**AGR1**): nadie sabe quién vota hasta que ya ha votado.
+3. **Probabilidad proporcional al espacio registrado.**
+4. Quien ha **demostrado estar encendido** (o ha ganado un bloque hace poco) tiene **más probabilidad** de
+   salir: multiplica por una prima `b`.
+
+**Opinión del director.** Es mejor que «solo los encendidos», por dos razones:
+- R1 se cumple exactamente, porque nadie queda fuera.
+- La fracción de plazas del atacante tiene techo aunque censure todas las pruebas de los honestos:
+  `a·b / (a·b + 1 − a)`.
+
+El precio es que **el atacante siempre está encendido y siempre cobra la prima**, así que `b` es un dial.
+Cifras con `a = 0,25` (esperanzas, sin la varianza del sorteo):
+
+| Prima `b` | Atacante, con 80 % de honestos encendidos | ¿Sella con 80 %? | Atacante si censura todas las pruebas honestas |
+|---:|---:|:---:|---:|
+| 1 (sin prima) | 0,250 | No (necesita 88,9 %) | 0,250 |
+| 2 | 0,270 | No | 0,400 |
+| 4 | 0,282 | Sí | 0,571 |
+| 10 | 0,289 | Sí | 0,769 |
+| ∞ (solo encendidos) | 0,294 | Sí (necesita 66,7 %) | 1,000 |
+
+- Con una prima moderada (alrededor de 4), sella con el 80 % de honestos encendidos, y ni censurándolo todo
+  el atacante llega a 2/3 de las plazas (no llega mientras `b < 6`).
+- Con censura total sí supera el tercio, así que puede pausar el sello, o romperlo si además controla la red,
+  siempre dejando firmas.
+- La prueba de disponibilidad tiene que ser de sí o no y verificable en la cadena, no una puntuación: una
+  puntuación premia al granjero profesional y choca con R2.
+
+Con sorteo, solo se puede castigar lo sorteado. FV-1 lo cuantifica.
+
+### 3.7 R1–R5
 
 De ahí salen las cinco reglas de `PROGRAMA.md`. Descartan DPoS, los comités fijos, las fundaciones y cualquier
 multifirma de puntos de control; admiten un diseño tipo F3. Katana las aceptó como criterio para este
@@ -262,13 +354,9 @@ finalidad rápida de Filecoin.
 
 ## 7. Lo que decide Katana
 
-1. **Fuente del peso:**
-   - (A) bloques cobrados: sin registro ni moneda, con ruido y sesgable;
-   - (B) sectores registrados con garantía: **recomendación del director**, fiel a «ZEROX sobrevive con sus
-     cultivadores» y a F3; depende del registro de sectores y llega más tarde;
-   - (C) stake: más simple, pero la finalidad pasa a quien tiene moneda.
-
-   FV-1 compara las tres antes de que se decida.
+1. ~~Fuente del peso~~ **Decidido (provisional hasta FV-1):** sectores registrados con garantía; sorteo
+   secreto entre todos los registrados, proporcional al espacio, con prima `b` para quien demostró
+   disponibilidad (§3.6). Queda para después de FV-1 elegir `b` y `E` sobre las curvas que entregue.
 2. **Ratificar R1–R5** como sustituto de «sin comités» en `SPEC.md` §0, después de FV-1.
 3. **Lanzar FV-1.**
 

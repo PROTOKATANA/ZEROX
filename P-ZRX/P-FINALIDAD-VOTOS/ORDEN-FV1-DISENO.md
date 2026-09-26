@@ -15,9 +15,13 @@
     castigables con una garantía que crece con el peso;
   - (c) con la capa pausada, rota o sin activar, ningún nodo queda peor que con `C-FIN-01` sola;
   - (d) en marcha normal, el tiempo hasta el sello es menor que `F_slots` como función de `Δ` y del número
-    de votantes.»
+    de votantes;
+  - (e) con el sorteo de la decisión 6 existen una prima `b > 1` y, si hace falta, un suelo `E` con los que
+    se cumplen dos cosas a la vez. Primera: la capa sella con menos participación honesta que la que exige
+    «votan todos» (88,9 % con `a = 0,25`). Segunda: el atacante no reúne 2/3 de las plazas ni siquiera
+    censurando todas las pruebas de disponibilidad de los honestos.»
 
-  Se refuta con un contraejemplo concreto a (a), (b), (c) o (d), o demostrando que dos de R1–R5 son
+  Se refuta con un contraejemplo concreto a (a), (b), (c), (d) o (e), o demostrando que dos de R1–R5 son
   incompatibles.
 
 ## 2. Entradas (leer íntegras)
@@ -69,14 +73,45 @@ en local):**
 5. **Castigo.** La única falta nueva es el doble voto; su definición exacta es un entregable. No se castiga
    ninguna ausencia y no hay castigo correlacionado (DS-5). La evidencia se diseña en la familia de
    `EvidenceTx`, coherente con el contrato de SL-1 y con `P-SLASHING/DECISIONES.md`.
-6. **La fuente del peso no está decidida.** Se comparan tres fuentes y se recomienda una:
-   - **(A) Derivado de los bloques cobrados en una ventana** (R-FIN-15 antigua). No necesita registro;
-     tiene ruido, puede dejar con peso cero al granjero pequeño y es sesgable reteniendo bloques.
-   - **(B) Sectores registrados con auditorías y garantía** (`P-REGISTRO-SECTORES`; F3 pondera por QAP).
-   - **(C) Garantía `C-BON` (stake).** Es el comparador; cambia el sentido de §0.
+6. **Peso y votantes: decisión de Katana (2026-09-26), provisional hasta que este encargo la pruebe.**
+   - **Peso:** los sectores registrados con garantía (`P-REGISTRO-SECTORES`; F3 pondera igual, por QAP),
+     para que R5 tenga algo que castigar.
+   - **En el sorteo están todos los registrados.** Nadie queda fuera por estar apagado, así que R1 se
+     cumple de forma exacta.
+   - **Sorteo secreto en cada ronda, como en Algorand (AGR1).** Cada registrado comprueba en privado, con
+     una función aleatoria verificable (VRF) sobre su clave, si le ha tocado plaza. Nadie sabe quién vota
+     hasta que ya ha votado. Solo votan los que salen.
+   - **Probabilidad = espacio registrado × prima.** Quien ha demostrado estar encendido hace poco multiplica
+     su probabilidad por `b > 1`; quien no, conserva la suya sin prima.
+   - **La prueba de disponibilidad es de sí o no, reciente y verificable en la cadena,** no una puntuación
+     ni una métrica externa (R2). Ganar un bloque hace poco cuenta como prueba, pero no puede ser la única:
+     si lo fuera, el granjero pequeño quedaría filtrado dos veces por su espacio. Ganar bloques no da peso
+     extra.
+   - Las otras fuentes de peso —(A) bloques cobrados en una ventana, que era la R-FIN-15 antigua, y (C) la
+     garantía `C-BON`, o stake— quedan solo como **comparador**, en una fila, sin diseñarlas.
 
-   Para cada una hay que decir si cumple R1, R2 y R5 (¿hay garantía proporcional al peso que castigar?),
-   cuánto le cuesta al honesto y qué puede hacer el atacante.
+   **Lo que advierte el director y este encargo tiene que medir.** El atacante siempre está encendido, así
+   que siempre cobra la prima. `b` funciona como un dial entre dos extremos:
+   - **`b = 1`** (sorteo entre todos, sin prima): el atacante tiene una fracción `a` de las plazas, que es
+     lo más seguro. Pero las plazas que caen en honestos apagados no firman, y sellar exige
+     `(1−a)·p ≥ 2/3`, es decir, el 88,9 % de los honestos encendidos con `a = 0,25`.
+   - **`b → ∞`** (solo los encendidos): sella con `p ≥ 2a/(1−a)`, el 66,7 % con `a = 0,25`. Pero la
+     fracción del atacante sube a `a / (a + (1−a)·p)`, y si censura todas las pruebas honestas llega a 1.
+     Es el efecto que la propuesta antigua descartó bajo el nombre «⅔ de los presentes».
+   - **Con `b` finito, la fracción del atacante tiene techo** aunque censure todas las pruebas honestas:
+     `a·b / (a·b + 1 − a)`. Con `a = 0,25` es 0,400 si `b = 2` y 0,571 si `b = 4`, y no llega a 2/3
+     mientras `b < 2(1−a)/a` (es decir, `b < 6`). Ese techo es la ventaja del diseño de Katana frente a
+     «solo los encendidos».
+   - Estas cifras son esperanzas, sin la varianza del sorteo. FV-1 las rehace con `K` finito.
+
+   El diseño tiene que incluir:
+   1. una prueba de disponibilidad que resista la censura y la denegación de servicio, con su frecuencia y
+      su vigencia;
+   2. el valor de `b` y, si hace falta, un suelo `E` (solo se sella si al menos una fracción `E` del peso
+      total ha demostrado disponibilidad). Se entregan como **curvas** de viveza y seguridad en `(b, E)`, con
+      los dos extremos y la variante «votan todos, 2/3 del total» como referencia;
+   3. si ningún par razonable da a la vez viveza con granjeros domésticos y seguridad frente a un atacante
+      del 20–25 %, hay que decirlo y recomendar la alternativa.
 7. **Modelo de amenaza de Katana.** El atacante tiene recursos de Estado. Para cada ataque hay que dar el
    coste absoluto (TiB, garantía en símbolos, hardware) y decir si queda **imposible** o solo **caro**.
    «No compensa» no es un argumento.
@@ -90,8 +125,15 @@ en local):**
 
 1. **Fuente del peso y tabla de pesos:** función solo del pasado validado; retardo (*lookback*);
    compromiso de la tabla siguiente dentro del certificado.
-2. **Quién vota:** todos los que tienen peso, o un sorteo ponderado. Admisión sin elección (R2); plazas por
-   clave; si se usa prueba de vida (`W_VIVO` antigua), comprobar que no viola R1.
+2. **Quién vota** (decisión 6): sorteo secreto por ronda entre **todos** los registrados, con probabilidad
+   igual al espacio registrado multiplicado por la prima `b` si hay prueba de disponibilidad vigente.
+   - Definir la prueba de disponibilidad (qué demuestra, cada cuánto, cuánto dura), con ganar un bloque
+     como vía alternativa.
+   - Definir el sorteo secreto: la VRF (primitiva auditada), qué entra en su entrada para que no se pueda
+     manipular, cómo se demuestra la plaza al votar y cómo se evita elegir la entropía.
+   - Definir `K`, las plazas por clave, `b` y `E`.
+   - Admisión sin elección (R2). Comprobar R1 y que el granjero pequeño no queda filtrado dos veces por su
+     espacio.
 3. **Protocolo de acuerdo:** GossiPBFT como candidato; fases y temporizadores en función de `Δ`. Solo
    puede sellar prefijos de la cadena seleccionada y nada sobre su contenido (R4).
 4. **Certificado:** contenido, esquema de firma (BLS agregada o Ed25519, con tamaños), coste de
@@ -133,17 +175,31 @@ Ataques obligatorios:
 9. denegación de servicio con certificados inválidos;
 10. falsos positivos de R5: la misma clave en dos máquinas y el fallo común del cliente;
 11. activación prematura, con poca garantía repartida tras el corte;
-12. ventana residual del doble farmeo: el atacante grande en la franja aún no sellada.
+12. ventana residual del doble farmeo: el atacante grande en la franja aún no sellada;
+13. **quitar la prima a los honestos:** censurar sus pruebas de disponibilidad, retrasarlas o tumbarlos con
+    denegación de servicio para subir la fracción de plazas del atacante, con techo `a·b / (a·b + 1 − a)`;
+14. **sesgar el sorteo:** elegir la entropía o el ancla, manipular la entrada de la VRF, repartirse en
+    muchas claves y retener pruebas de disponibilidad propias. Con sorteo, solo se puede castigar lo
+    sorteado: hay que cuantificar cuánta garantía del atacante queda expuesta si se reparte en muchas
+    claves;
+15. **atacar a un votante después de revelarse:** el secreto dura hasta que el votante vota. Hay que
+    comprobar que tumbarlo o sobornarlo en ese momento ya no cambia nada de esa ronda.
 
 Antes de proponer una pieza, contrástala con `LIBRO-DE-RESTRICCIONES.md` (R-1…R-12) y di qué restricción
 toca.
 
 ### C. Comprobaciones numéricas (Julia, proyecto fijado en `deepseek/FV1/calc/`)
 
-1. **Quórum frente a la participación honesta `p` y a `a`,** con ausencias correlacionadas por tamaño de
-   clave (el error que §7 de la propuesta antigua declara).
-2. **Sorteo, si se usa,** y su sesgo por elección de ancla y de tabla: recalcular §4.A y §4.D antiguos y
-   declarar cualquier discrepancia.
+1. **Viveza y seguridad frente a `a`, `p`, `b` y `E`,** con ausencias correlacionadas por tamaño de clave
+   (el error que declara §7 de la propuesta antigua):
+   - la fracción de plazas del atacante, sin censura y con censura total de las pruebas honestas;
+   - la probabilidad de que una ronda selle;
+   - el umbral de rotura, con las curvas del dial `(b, E)`;
+   - los extremos `b = 1` y `b → ∞`, y «votan todos, 2/3 del total», como referencia.
+
+   Hay que empezar reproduciendo las cifras de esperanza de la decisión 6.
+2. **Sorteo:** el tamaño `K` necesario y su sesgo por elección de ancla y de tabla. Hay que recalcular
+   §4.A y §4.D antiguos y declarar cualquier discrepancia.
 3. **Tamaño y coste anual del certificado.**
 4. **Ventana del doble farmeo** (tiempo hasta el sello frente a `F_slots`), paramétrica en `Δ`.
 
@@ -155,7 +211,9 @@ caso, con mínimos**. Hay que reproducir primero los números antiguos como comp
 - Respuesta a la pregunta falsable.
 - Tabla R1–R5, con uno de tres estados por regla: se cumple, se cumple con condición o falla (con el
   contraejemplo).
-- Tabla comparativa de las tres fuentes de peso.
+- El diseño elegido (sectores registrados; sorteo secreto entre todos con prima `b`) frente a tres
+  comparadores: las fuentes de peso (A) y (C), «solo los encendidos» (`b → ∞`) y «votan todos, 2/3 del
+  total».
 - Qué mejora frente a `C-FIN-01` sola y qué no, con el residuo del doble farmeo explícito.
 - Decisiones para Katana, con opciones, coste de cada una y recomendación.
 - Qué no está medido (`Δ`, `p` real) y cómo se mediría en la red dev.
