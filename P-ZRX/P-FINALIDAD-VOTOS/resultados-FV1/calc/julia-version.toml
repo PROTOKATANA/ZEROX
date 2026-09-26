@@ -1,0 +1,4 @@
+# FV-1 - version de Julia fijada (V-ZRX/LINEO.md §1)
+julia = "1.13.0"
+sistema = "linux/x86_64"
+nota = "JULIA_DEPOT_PATH apunta al deposito local .julia-depot de esta zona, copiado de P-ZRX/P-DISUASION/DS3/.julia-depot (misma maquina de referencia). Ejecutar con env -u LD_LIBRARY_PATH."

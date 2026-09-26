@@ -1,0 +1,140 @@
+==============================================================================
+FV-1 · Seccion C.1 -- Reproduccion de las cifras de esperanza de la decision 6
+==============================================================================
+
+(a=0,25) Fraccion ESPERADA de asientos del atacante, por prima b:
+b                 p=1,0          p=0,8  p=0 (censura total)
+1.0              0.2500         0.2500               0.2500
+2.0              0.2500         0.2703               0.4000
+4.0              0.2500         0.2817               0.5714
+10.0             0.2500         0.2890               0.7692
+1000000.0         0.2500         0.2941               1.0000
+
+¿Sella con la participacion honesta dada? (frac_honesto_firmable >= 2/3)
+b=1.0     frac_honesto(p=0,8)=0.6000  -> no    p_necesaria=0.8889 (88.9%)
+b=2.0     frac_honesto(p=0,8)=0.6486  -> no    p_necesaria=0.8333 (83.3%)
+b=4.0     frac_honesto(p=0,8)=0.6761  -> SI    p_necesaria=0.7778 (77.8%)
+b=10.0    frac_honesto(p=0,8)=0.6936  -> SI    p_necesaria=0.7222 (72.2%)
+b=1000000.0  frac_honesto(p=0,8)=0.7059  -> SI    p_necesaria=0.6667 (66.7%)
+
+==============================================================================
+Seccion C.1(D) -- HALLAZGO CENTRAL: umbrales de pausa y de ruptura bajo
+censura total de las pruebas de disponibilidad honestas (p=0), funcion de b
+==============================================================================
+b        a_pausa(b)=1/(2b+1) a_rompe(b)=2/(b+2)
+1.0                0.3333           0.6667
+2.0                0.2000           0.5000
+3.0                0.1429           0.4000
+4.0                0.1111           0.3333
+5.0                0.0909           0.2857
+6.0                0.0769           0.2500
+8.0                0.0588           0.2000
+10.0               0.0476           0.1667
+20.0               0.0244           0.0909
+Lectura: con b=1 (sin prima) los dos umbrales son 1/3 y 2/3, los del diseno
+"votan todos". Con CUALQUIER b>1, a_pausa(b) < 1/3: un atacante con MENOS de
+un tercio del peso total, si ademas puede censurar la red (prueba de
+disponibilidad honesta -> p=0), puede pausar el sello. A b=4 (la prima que
+CONTEXTO.md recomienda como "moderada"), a_pausa=1/9=11,1%. a_rompe(4)=1/3
+exactamente: al atacante de referencia (a=0,25) todavia no le alcanza para
+romper (0,25<1/3), pero a partir de b>4 el umbral de ROMPER tambien cae por
+debajo de 1/3.
+
+==============================================================================
+Seccion C.1 -- Viveza/seguridad con K finito (extiende verif_sorteo.py)
+==============================================================================
+
+P(el atacante toma >= 1/3 de los K asientos), con CENSURA TOTAL (p=0):
+K      b=1         b=2         b=4         b=6         b=10        
+100        2.76e-02    9.09e-01    1.00e+00    1.00e+00    1.00e+00
+400        8.68e-05    9.97e-01    1.00e+00    1.00e+00    1.00e+00
+1000       1.70e-09    1.00e+00    1.00e+00    1.00e+00    1.00e+00
+4000       2.02e-32    1.00e+00    1.00e+00    1.00e+00    1.00e+00
+
+P(el atacante toma >= 2/3 de los K asientos: rompe el sello), CENSURA TOTAL (p=0):
+K      b=1         b=2         b=4         b=6         b=10        
+100        1.21e-18    4.49e-08    2.82e-02    5.19e-01    9.91e-01
+400        6.47e-69    3.29e-27    5.27e-05    5.09e-01    1.00e+00
+1000      4.59e-169    4.31e-65    3.86e-10    5.06e-01    1.00e+00
+4000       0.00e+00   8.13e-254    3.50e-35    5.03e-01    1.00e+00
+Lectura: para b<=4 y K>=1000, la probabilidad de romper el sello por PURA
+VARIANZA del sorteo (sin que el umbral en esperanza ya lo permita) sigue
+siendo despreciable -- el riesgo real no es la varianza, es el DESPLAZAMIENTO
+de la esperanza que muestra la tabla anterior. Para b=10, q_atacante(0,25,10,0)
+= 0,769 > 2/3 ya EN ESPERANZA, así que con K grande P(rompe) -> 1: subir K no
+protege de un umbral desplazado, solo protege de una excursion de varianza
+alrededor de un umbral que sigue siendo seguro.
+
+==============================================================================
+Seccion C.2 -- Tamano de K y su sesgo por eleccion de ancla (extiende
+verif_sesgo_sorteo.py con la fraccion q_atacante en vez de alpha desnudo)
+==============================================================================
+K minimo tal que P(>=1/3)<1e-9 y P(>=2/3)<1e-18, bajo censura total, por b:
+b          K(1/3)     K(2/3)
+1.0          1030        110
+2.0    N/A (q_a>=1/3 en esperanza)        N/A
+4.0    N/A (q_a>=1/3 en esperanza)        N/A
+
+Sesgo por eleccion de m anclas (m=2,955 medido; m=151 cota por construccion,
+D9-f del diseno antiguo), con K=4000, censura total, por b:
+b               m        P(para)       P(rompe)
+1.0         2.955       6.05e-32       0.00e+00
+1.0       151.000       3.04e-30       0.00e+00
+2.0         2.955       1.00e+00      2.44e-253
+2.0       151.000       1.00e+00      1.23e-251
+4.0         2.955       1.00e+00       1.05e-34
+4.0       151.000       1.00e+00       5.28e-33
+==============================================================================
+Seccion C.3 -- Tamano y coste anual del certificado
+==============================================================================
+K         Ed25519 (B) BLS agreg. (B)   GB/ano@30s   GB/ano@10s
+1000         66096 B         317 B     69.48/0.3332    208.44/0.9997
+4000        264096 B         692 B    277.62/0.7274    832.85/2.1823
+10000       660096 B        1442 B    693.89/1.5158   2081.68/4.5475
+Referencia (SPEC 0.0.1): cabeceras PoST ~21,5 GB/ano, PoT ~4,0 GB/ano (mismas
+cifras que citaba la propuesta antigua de 2026-09-09). Con Ed25519 y K>=4000
+el certificado por si solo ya iguala o supera esa cifra si se emite cada 10 s;
+con BLS agregada queda en una fraccion menor al 1%. NO se recomputa aqui la
+verificacion de BLS por nodo: se remite a P-ZRX/T-ZRX/AGUJEROS-Y-SOLUCIONES.md
+§2.4 (blst auditado) como unico candidato ya evaluado en el repositorio.
+
+==============================================================================
+Seccion C.4 -- Ventana del doble farmeo: tiempo esperado hasta el sello
+==============================================================================
+Delta (retardo de red) NO esta medida (IPA B-05); Delta_simulada de DMS-v0.1
+da un p99 de 0,26-0,60 s por SALTO de overlay (no por enlace). Se deja
+Delta como parametro simbolico y T_round_slots = c_fases * Delta/tau, con
+tau=1 s/slot (perfil dev) y c_fases=3 (GossiPBFT: prepare+commit+difusion
+del certificado, FIP-0086 declara 2 fases utiles de acuerdo mas 1 de
+difusion, cifra no verificada linea a linea en este encargo: c_fases queda
+como parametro simbolico, no un numero fijado por FV-1).
+
+a      b      p_sella(p=0,8) T_sello (rondas)
+0.20   1.0        2.1043e-04       4.7521e+03
+0.20   4.0        1.0000e+00       1.0000e+00
+0.25   1.0        1.7246e-18       5.7985e+17
+0.25   4.0        8.9856e-01       1.1129e+00
+0.30   1.0        2.1961e-43       4.5535e+42
+0.30   4.0        3.5153e-08       2.8447e+07
+Lectura: con b=1 y participacion real p=0,8, el sello NUNCA llega en
+esperanza finita para a>=0,20 (p_sella=0 exacto porque frac_honesto_firmable
+< 2/3, ver C.1): la capa se queda permanentemente en C-FIN-01 (F_slots) sin
+la prima. Con b=4 sella (t_rondas finito) para a=0,20 y a=0,25 pero no ya
+para a=0,30 (frac_honesto_firmable(0,30;4;0,8) < 2/3, comprobado en C.1).
+El tiempo hasta el sello es entonces T_sello = t_rondas * c_fases * Delta;
+con Delta_p99 simulada (0,26-0,60 s/salto) y un puñado de rondas, T_sello es
+del orden de segundos a minutos, muy por debajo de F_slots (horas): esto
+cuantifica -bajo las condiciones declaradas y sin Delta medida en red real-
+cuanto arrincona la capa al doble farmeo, tal como pide ORDEN-FV1 §3.8.
+
+==============================================================================
+Seccion C.1(coverage) -- Cruce Monte Carlo de la formula cerrada
+(V-ZRX/LINEO.md: semillas fijas NO consecutivas, tabla de cobertura)
+==============================================================================
+a=0.25 b=1.0 p=0.8 K=4000 | MC(n=8): media_a=0.2544 [0.2495,0.2612]  teorico=0.2500  |err|=0.00438
+a=0.25 b=4.0 p=0.8 K=4000 | MC(n=8): media_a=0.2855 [0.2772,0.2953]  teorico=0.2817  |err|=0.00378
+a=0.25 b=4.0 p=0.0 K=4000 | MC(n=8): media_a=0.5733 [0.5627,0.5813]  teorico=0.5714  |err|=0.00192
+a=0.20 b=4.0 p=0.0 K=4000 | MC(n=8): media_a=0.5046 [0.4938,0.5148]  teorico=0.5000  |err|=0.00459
+
+Cobertura: 8 replicas por caso (semillas no consecutivas), 4 casos, min-max reportado.
+Fin de run.jl -- ver resultados/*.csv para las tablas completas.

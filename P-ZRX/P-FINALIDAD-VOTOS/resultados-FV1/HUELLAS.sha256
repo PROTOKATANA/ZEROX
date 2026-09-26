@@ -1,0 +1,24 @@
+# FV-1 (segunda ejecucion) - huellas de los entregables de deepseek/FV1/.
+# Excluido a proposito: calc/.julia-depot/ (cache de paquetes Julia, copiada de
+# P-ZRX/P-DISUASION/DS3/.julia-depot; no es un entregable de este encargo).
+# Comprobar con: sha256sum -c HUELLAS.sha256 (desde deepseek/FV1/).
+a9ac3a14a4f9c36e4c3b5d3ad3a7afe6c7a187fa3876204c965b8163727e362c  calc/julia-version.toml
+622db153743968a954d2202bd882f9be7792b6ffbb51dda56f119b7e27411c93  calc/Manifest.toml
+95ac85396a9a1e868012a62a4d36a89d9f319f3732bf378c69024b486c889eb7  calc/Project.toml
+d05f3d5b14c5b87ffd054c962e2f58960e8275f5e376156bad35e7800a1e1146  calc/resultados/C1-cobertura-montecarlo.csv
+9fa12da287480dbeb81758c83fbff0f00521ef958b02eec23f9d638c7aa5f6f1  calc/resultados/C1-esperanza-qa.csv
+e1da9f58903ce4751086028355dae8215d907c72c22f5cd364a124deb7fae983  calc/resultados/C1-p-al-menos-dostercios-censura.csv
+cab6a5f98cfff670b541f1af7da024ef86f3356f56a9b7aaa49d0ac66c096534  calc/resultados/C1-p-al-menos-tercio-censura.csv
+604f445ba3caafc83ef4827de29c459542d048beec19ca0ebb45c77a6f6c180f  calc/resultados/C1-sella-y-p-necesaria.csv
+48ec434d2a1d61f97c4928bd30efc1780e01684035c17ec8d1ec9eb0ac18be27  calc/resultados/C1-umbral-pausa-rompe.csv
+f1aeb930239336ac3a44ac358dee7471a902ec95258c511a4aa3ac9591d6209e  calc/resultados/C2-K-minimo-censura.csv
+943b616ab3d5785dee48a302195602c2ec7f37bab5935bc49c1377ac5e76890a  calc/resultados/C2-sesgo-ancla.csv
+744f8e957e3caf66ea48636a90acc6b3a0eb15fabd0cca4aee958830453a8203  calc/resultados/C3-certificado.csv
+552ff78b3c445f8efd78bc55e4e9c37791a45b04f068bda48e546d742ee3734c  calc/resultados/C4-ventana-doble-farmeo.csv
+092dc0bedf4b087f9281dec9da514daf913df680e1ed108ce07ec765c21ebbb3  calc/resultados/salida-run.txt
+2a55005dd1832c13b4184cf475ab53840c120707e77c7d46004a467dd50e11ad  calc/run.jl
+0fa53f934964d674c120da36519c1ac3887ddedac06be515055f1ab42a0cfc20  calc/src/modelo.jl
+e5f42784925f3c0142f944f1c65e0e36428a0395df1f4be79720151fc4397d24  calc/src/referencia.jl
+a2699df9a5143a9ccbe262053d2fd7bacd70c13fb484459438f127cdd16db89a  calc/test/runtests.jl
+b4d87ab64d04da7aa3dfa56ed39cd47295114bf5b09433b48f0379bc54bdbab0  CONTRATO-FINALIDAD-VOTOS-v0.md
+b6032304417ba74ecbd6cf9908019eb3e851b5f07cd5b513c84d513973bab106  INFORME.md
