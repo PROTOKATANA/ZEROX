@@ -1,0 +1,76 @@
+     Testing Transicion
+      Status `/tmp/jl_ELuik9/Project.toml`
+  [861a8166] Combinatorics v1.1.0
+  [860ef19b] StableRNGs v1.0.4
+  [8815c946] Transicion v0.1.0 `~/zeo/ZEROX/P-ZRX/P-TRANSICION/T01`
+  [de0858da] Printf v1.11.0
+  [9a3f8284] Random v1.11.0
+  [ea8e919c] SHA v1.0.0
+  [8dfed614] Test v1.11.0
+      Status `/tmp/jl_ELuik9/Manifest.toml`
+  [861a8166] Combinatorics v1.1.0
+  [860ef19b] StableRNGs v1.0.4
+  [8815c946] Transicion v0.1.0 `~/zeo/ZEROX/P-ZRX/P-TRANSICION/T01`
+  [2a0f44e3] Base64 v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [ac6e5ff7] JuliaSyntaxHighlighting v1.12.0
+  [56ddb016] Logging v1.11.0
+  [d6f4376e] Markdown v1.11.0
+  [de0858da] Printf v1.11.0
+  [9a3f8284] Random v1.11.0
+  [ea8e919c] SHA v1.0.0
+  [9e88b42a] Serialization v1.11.0
+  [f489334b] StyledStrings v1.11.0
+  [8dfed614] Test v1.11.0
+  [4ec0a83e] Unicode v1.11.0
+     Testing Running tests...
+┌ Info: X-17 diferencias respecto a FC-3
+│   difiere_fc1 = 0
+└   difiere_fc2 = 6144
+┌ Info: X-18 diferencias respecto a FC-3
+│   difiere_fc1 = 96000
+└   difiere_fc2 = 6144
+┌ Info: I-*
+│   n_hist = 294912
+│   n_undo = 1833609
+│   n_perm = 344073
+│   fallos_i1 = 0
+│   fallos_i1b = 0
+│   fallos_i2 = 0
+│   fallos_i3 = 0
+│   fallos_i4 = 0
+│   fallos_i5 = 0
+│   fallos_i6 = 0
+└   fallos_i7 = 0
+┌ Info: F-15
+│   n_validos = 199
+│   fam =
+│    Dict{String, Int64} with 5 entries:
+│      "neg-nonce-saltado" => 608
+│      ⋮                   => ⋮
+│   fase =
+│    Dict{String, Int64} with 2 entries:
+│      "PoW"  => 512
+└      "PoST" => 1487
+Test Summary:        | Pass  Total  Time
+X-01…X-15 (rechazos) |   38     38  6.9s
+Test Summary:                 | Pass  Total  Time
+Ratificaciones v0.1 (R-6…R-9) |   10     10  0.1s
+Test Summary:           | Pass  Total   Time
+X-16 (orden de llegada) |    2      2  10.1s
+Test Summary:                   | Pass  Total  Time
+X-17 (dos terminales con pesos) |    2      2  2.5s
+Test Summary:                          | Pass  Total  Time
+X-18 (rama PoW tardía con más trabajo) |    2      2  2.1s
+Test Summary:                 | Pass  Total  Time
+X-19 (reorg elimina depósito) |    2      2  3.1s
+Test Summary:      | Pass  Total  Time
+X-20 (undo exacto) |    2      2  9.0s
+Test Summary:                  | Pass  Total   Time
+I-1…I-7 (historias aleatorias) |    9      9  56.5s
+Test Summary:          | Pass  Total  Time
+F-15 (nonce por clave) |   10     10  0.8s
+Test Summary:                 | Pass  Total  Time
+T01-E (id de liberación F-18) |   17     17  0.2s
+     Testing Transicion tests passed 
+PKGTEST_EXIT=0

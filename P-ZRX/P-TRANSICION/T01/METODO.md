@@ -16,7 +16,8 @@ cadenas con un solo padre; el «peso PoST del sufijo» es la suma de pesos
 - **Estado** (`mutable struct Estado`): `UTXO` (`Dict{Int,Salida}`), `Garantía`
   por clave (`Dict{Int,Garantia}`), `emitido`/`quemado` (`Int128`), `fase`,
   `terminal`, `altura`, `trabajo_acum`, `slot`, `s0`, registro de sectores,
-  `subsidio_acum`, `prox_salida`, `bloque_raiz`, `altura_terminal`, `peso_sufijo`.
+  `subsidio_acum`, `bloque_raiz`, `altura_terminal`, `peso_sufijo`. (T01-E/F-18:
+  sin `prox_salida`; la salida de una liberación lleva `ID_LIB`.)
 - **Transacciones** (`struct Tx` con un `TipoTx`): `Coinbase`, `CoinbasePost`,
   `Transferencia`, `Deposito`, `Retiro`, `Liberacion`, `Evidencia`,
   `AltaSector`, `PruebaSector`.

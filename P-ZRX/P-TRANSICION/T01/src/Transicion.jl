@@ -32,6 +32,7 @@ export tx_coinbase, tx_coinbase_post, tx_transferencia, tx_deposito, tx_retiro,
 export subsidio_pow, subsidio_post, estado_inicial, clonar, aplicar, aplicar!,
        aplicar_con_undo, deshacer, es_terminal, phi, sector_activo, gastable,
        gastable_en, nonce_de
+export ID_LIB, LIMITE_ID_EXPLICITO
 export invariante_I1, invariante_I1b, suma_utxo, suma_garantias,
        representacion_canonica, hash_canonico
 export seleccionar, seleccionar_con, ResultadoSeleccion, nodo_en_linea,
@@ -172,7 +173,6 @@ mutable struct Estado
     s0::Int
     sectores::Dict{Int,RegistroSector}
     subsidio_acum::Int128
-    prox_salida::Int         # reserva de ids para salidas sin id explícito
     bloque_raiz::Int         # bloque cuyo aplicar produjo este estado
     altura_terminal::Int     # altura del terminal (para madurez residual)
     peso_sufijo::Int         # Σ peso PoST del sufijo
@@ -269,7 +269,7 @@ subsidio_post(s::Int, P::Params) = UInt64(3)
 function estado_inicial(P::Params)
     Estado(Dict{Int,Salida}(), Dict{Int,Garantia}(), Int128(0), Int128(0),
            FaseGenesis, -1, 0, 0, 0, 0, Dict{Int,RegistroSector}(), Int128(0),
-           1, 0, -1, 0)
+           0, -1, 0)
 end
 
 function clonar(E::Estado)
@@ -281,7 +281,7 @@ function clonar(E::Estado)
     end
     s = copy(E.sectores)
     Estado(u, g, E.emitido, E.quemado, E.fase, E.terminal, E.altura,
-           E.trabajo_acum, E.slot, E.s0, s, E.subsidio_acum, E.prox_salida,
+           E.trabajo_acum, E.slot, E.s0, s, E.subsidio_acum,
            E.bloque_raiz, E.altura_terminal, E.peso_sufijo)
 end
 
@@ -437,17 +437,42 @@ end
 # UTXO
 # ---------------------------------------------------------------------------
 
+# T01-E / F-18: el espacio de ids está partido en dos rangos disjuntos.
+#   * ids explícitos (coinbases, transferencias, cambios): [0, 2⁶²);
+#   * salida de una liberación: ID_LIB(clave, nonce, importe) ∈ [2⁶², 2⁶²+2⁶⁰),
+#     función inyectiva del contenido de la operación.
+# `clave`, `nonce` e `importe` deben ser < 2²⁰; fuera de rango el oráculo
+# devuelve `ErrDesbordamiento`, nunca un id truncado. Se elimina `prox_salida`
+# (F-18 lo suprimió del motor): ya no hay contador de ids implícitos.
+const LIMITE_ID_EXPLICITO = Int(1) << 62
+const ID_LIB_BASE = Int(1) << 62
+const ID_LIB_CLAVE = Int(1) << 40
+const ID_LIB_NONCE = Int(1) << 20
+const ID_LIB_MAX = Int(1) << 20
+
+function ID_LIB(clave::Integer, nonce::Integer, importe::Integer)
+    (0 <= clave < ID_LIB_MAX) || return ErrDesbordamiento
+    (0 <= nonce < ID_LIB_MAX) || return ErrDesbordamiento
+    (0 <= importe < ID_LIB_MAX) || return ErrDesbordamiento
+    return ID_LIB_BASE + Int(clave) * ID_LIB_CLAVE +
+           Int(nonce) * ID_LIB_NONCE + Int(importe)
+end
+
 function crear_utxos!(E::Estado, salidas::Vector{Salida}, origen::Origen,
                       altura::Int, slot::Int)
     vistos = Set{Int}()
     for s in salidas
+        if origen == OrigenLiberacion
+            s.id >= LIMITE_ID_EXPLICITO || return ErrDesbordamiento
+        else
+            s.id < LIMITE_ID_EXPLICITO || return ErrDesbordamiento
+        end
         (s.id in vistos) && return ErrDobleGasto
         push!(vistos, s.id)
         haskey(E.utxo, s.id) && return ErrDobleGasto
     end
     for s in salidas
         E.utxo[s.id] = Salida(s.id, s.valor, s.dueño, origen, altura, slot)
-        s.id >= E.prox_salida && (E.prox_salida = s.id + 1)
     end
     return nothing
 end
@@ -566,8 +591,8 @@ function aplicar_liberacion!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx
         end
     end
     g.en_retirada = nuevas
-    id = E.prox_salida
-    E.prox_salida += 1
+    id = ID_LIB(tx.clave, tx.nonce, tx.importe)
+    id isa Err && return id
     return crear_utxos!(E, [Salida(id, tx.importe, tx.clave, OrigenLiberacion,
                                    -1, B.slot)], OrigenLiberacion, -1, B.slot)
 end
@@ -888,7 +913,7 @@ function representacion_canonica(E::Estado)
     io = IOBuffer()
     print(io, "E|", E.emitido, "|", E.quemado, "|", E.fase, "|", E.terminal,
           "|", E.altura, "|", E.trabajo_acum, "|", E.slot, "|", E.s0, "|",
-          E.subsidio_acum, "|", E.prox_salida, "|", E.altura_terminal, "|",
+          E.subsidio_acum, "|", E.altura_terminal, "|",
           E.peso_sufijo, "|")
     for id in sort(collect(keys(E.utxo)))
         o = E.utxo[id]

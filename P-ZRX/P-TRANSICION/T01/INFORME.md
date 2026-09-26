@@ -584,3 +584,146 @@ Python. Presupuesto T01-D: 1 h 30 min, 1 hilo, 8 GiB.
   (orden posterior).
 - **No demuestra determinismo entre máquinas**: solo en esta máquina, versión y
   semilla; el orden interno se neutraliza con ordenaciones explícitas.
+
+# INFORME — T01-E (id de la salida de la liberación, F-18)
+
+## E.1. Veredicto
+
+**SUPERADO en T01; T04-D BLOQUEADO por el entorno (§E.7).** El oráculo T01 da a
+la salida de una liberación el id `ID_LIB(clave, nonce, importe) =
+2⁶² + clave·2⁴⁰ + nonce·2²⁰ + importe` (F-18), con `clave`, `nonce`, `importe <
+2²⁰`; los ids explícitos quedan en `[0, 2⁶²)` y la partición se comprueba en
+`crear_utxos!`. Se elimina `prox_salida` del estado. Se regeneran
+`resultados/vectores-transicion-v0.2.txt` (2 055 casos) y
+`resultados/vectores-transicion-negativos-v0.2.txt` (3 914 casos); un lector
+independiente los relee con **0 discrepancias**; dos corridas con la misma
+`--fecha` dan el mismo `sha256`; `Pkg.test()` (con el testset nuevo T01-E) y
+`run.jl --seed 0x5a5a --replicas 50 --rejilla reducida` pasan sin fallos. Los
+ficheros v0 y v0.1 se conservan intactos.
+
+- Base v0.2: 2 055 casos, 132 852 líneas, 8 357 914 B,
+  `sha256 = da3dcc4859da8590c32559ea57cd2342b6a3c54fb7533fa21c66a15d9c91b080`.
+- Negativos v0.2: 3 914 casos, 145 669 líneas, 9 079 237 B,
+  `sha256 = 3d2dedae145ec67772ed66db2e0601fc82bc87db8c2cdeefe250978e3771c889`.
+- v0.1 conservados: base `0faec4a3…a5527` (2 055 casos), negativos `9ca55abd…26ad`
+  (3 939 casos); v0 intactos.
+
+## E.2. Falta de definición detectada antes de editar
+
+Ninguna bloquea la orden; se aplica la lectura más compatible con la decisión 1
+del director y se declara aquí y en `PROGRESO.md` §T01-E.
+
+- **E/AMBIGUEDAD-1 — Error para un id fuera de rango.** La orden pide «error
+  explícito del oráculo, nunca un id truncado» y llama «comprobado» al rango en
+  `crear_utxos!`, pero no nombra el `Err`. Lectura: `ErrDesbordamiento` (el error
+  ya existente para valores fuera del dominio). `ID_LIB` lo devuelve si `clave`,
+  `nonce` o `importe` no están en `[0, 2²⁰)`; `crear_utxos!` lo devuelve si un id
+  explícito cae en `[2⁶², …)` o si una salida de liberación cae por debajo de
+  `2⁶²`. Cubierto por el testset T01-E.
+- **E/AMBIGUEDAD-2 — Nombre/versión de los ficheros.** Lectura: se escriben
+  `…-v0.2.txt` y `…-v0.2.sha256` (mismo formato de líneas v0.1, `.sha256` en
+  formato `sha256sum`) y el encabezado declara `T01-E (F-18, formato v0.1)`.
+- **E/AMBIGUEDAD-3 — Réplicas de `run.jl`.** La orden solo fija la semilla
+  habitual. Lectura: se mantiene la escala de T01-D (`--replicas 50`), que cabe
+  en el presupuesto de 1 h 30 min; semilla `0x5a5a` sin cambios.
+- **E/AMBIGUEDAD-4 — Exportar `ID_LIB`.** Lectura: se exportan `ID_LIB` y
+  `LIMITE_ID_EXPLICITO` para el testset y para que T04 pueda citarlos.
+
+## E.3. F-18 en el oráculo
+
+- `src/Transicion.jl`: constantes `LIMITE_ID_EXPLICITO = 2⁶²`, `ID_LIB_BASE`,
+  `ID_LIB_CLAVE = 2⁴⁰`, `ID_LIB_NONCE = 2²⁰`, `ID_LIB_MAX = 2²⁰` y función
+  `ID_LIB(clave, nonce, importe)`, que devuelve `Int` o `ErrDesbordamiento`.
+- `aplicar_liberacion!` usa `id = ID_LIB(tx.clave, tx.nonce, tx.importe)` tras
+  todas las comprobaciones de la operación (nonce, fase, importe, autorización,
+  vencido); si es `Err`, no crea nada.
+- `crear_utxos!` exige `id < 2⁶²` para `OrigenCoinbasePow`/`OrigenTx` e
+  `id ≥ 2⁶²` para `OrigenLiberacion`; ya no mantiene contador.
+- `Estado` pierde `prox_salida`; `estado_inicial`, `clonar` y
+  `representacion_canonica` se ajustan (se quita de la representación canónica,
+  documentado). Ninguna otra regla cambia.
+
+## E.4. Diferencias v0.1 → v0.2, relectura y determinismo
+
+- **Base:** 1 434 de 2 055 casos cambian (69,78 %): 1 dirigido (X-20 en un punto)
+  y 1 433 aleatorios. **Ningún** caso cambia `RES`, `SEL` ni `GAR`; cambian
+  `BLOQUE`/`TX`/`UTXO`/`EST`. Causa: el antiguo `prox_salida` valía
+  `max(id explícito visto) + 1`, y el generador asigna a la transferencia
+  siguiente exactamente ese id; la salida de la liberación colisionaba con la
+  salida de la transferencia, que se descartaba con `ErrDobleGasto` al construir
+  la historia. Con F-18 la transferencia aplica y la historia (guiada por RNG
+  contra el estado) continúa distinta. Las `TX tipo=Transferencia` pasan de
+  3 826 a 5 809 (+1 983). Es «lo que dependía» del id de la liberación.
+- **Negativos:** 3 914 casos (−25 respecto de 3 939). El único recuento que baja
+  es `neg-nonce-dos-nn` (224 → 199): necesita dos salidas gastables de la misma
+  clave y, al cambiar las historias base, 25 instancias dejan de tenerlas. Las
+  otras 40 clases de subcaso y los totales por error (salvo `ErrNonce`) son
+  idénticos.
+- **Relectura independiente** (`src/lector_vectores.jl`, sin funciones del
+  exportador): base 2 055 casos / 0 discrepancias; negativos 3 914 / 0.
+  `sha256sum -c` pasa en ambos `.sha256`.
+- **Determinismo:** dos corridas con `--fecha 2026-09-26T05:07:25+02:00` dan
+  `da3dcc48…` (base) y `3d2dedae…` (negativos).
+
+## E.5. Tests y `run.jl`
+
+`Pkg.test()` (`resultados/test-T01-E.log`): **todos los testsets pasan**
+(`PKGTEST_EXIT=0`); el testset nuevo **T01-E 17/17** comprueba la fórmula, la
+inyectividad en un dominio pequeño, los rechazos por rango, el rechazo de un id
+explícito en `[2⁶², …)`, la aceptación de `2⁶² − 1` y que la salida de una
+liberación real lleva `ID_LIB`. X-01…X-15 38/38, R-6…R-9 10/10, X-16…X-20 2/2,
+I-1…I-7 9/9 (0 fallos), F-15 10/10.
+
+`run.jl --seed 0x5a5a --replicas 50 --rejilla reducida`
+(`resultados/run-reducida-50-T01-E.log`): 7 372 800 historias, 45 840 000 undos
+exactos, **0 fallos I-1…I-7**, `dif FC-1 vs FC-3 = 0`, `dif FC-2 vs FC-3 = 7680`,
+`VEREDICTO = SIN FALLOS`, 602,9 s (10,05 min), máx. RSS ≈ 426 MiB.
+
+## E.6. Entorno, comandos y tiempos
+
+1 hilo (`JULIA_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`), Julia 1.13.0, sin
+Python. Presupuesto T01-E: 1 h 30 min, 1 hilo, 8 GiB.
+
+    export JULIA_DEPOT_PATH=…/T01/.julia-depot
+    export JULIA=…/julia-1.13.0+0.x64.linux.gnu/bin/julia
+    env -u LD_LIBRARY_PATH JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+        $JULIA --project=. exportar.jl --fecha <ISO>          # 2055, 0 inesperados
+    env -u LD_LIBRARY_PATH … $JULIA --project=. exportar_negativos.jl --fecha <ISO>
+    env -u LD_LIBRARY_PATH … $JULIA --project=. src/lector_vectores.jl <fichero>
+    env -u LD_LIBRARY_PATH … $JULIA --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+    env -u LD_LIBRARY_PATH … $JULIA --project=. run.jl --seed 0x5a5a --replicas 50 --rejilla reducida
+
+- `exportar.jl`: 3,4 s; `exportar_negativos.jl`: 5,6 s; lectores: 2-3 s.
+- `Pkg.test()`: testsets ≈ 90 s (I-* 56,5 s; T01-E 0,2 s) más compilación.
+- `run.jl`: 602,9 s (10,05 min). Sesión por debajo del presupuesto; ver `HORAS.log`.
+
+## E.7. T04-D: bloqueo de entorno (no ejecutado)
+
+La orden declara dos zonas escribibles, `P-TRANSICION/T01/` y `P-DAG/T04/`. En
+esta sesión `/home` está montado **solo lectura** (`/proc/self/mountinfo`:
+`/home ro`); solo `P-TRANSICION` se vuelve a montar `rw`. Escribir en
+`/home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04/` falla con
+`Sistema de ficheros de sólo lectura` y el intento de ampliar el sandbox
+(`danger-full-access`) se rechaza con «requires approval, but no approval channel
+is available». Por tanto **no se pudo**: editar `dirigidos.jl` (D-14), reexportar
+`vectores-estado-dag-v0.3.txt`/`cobertura-v0.3.txt`, ejecutar
+`run.jl --seed 0x5a5a --replicas 200` ni `Pkg.test()` de T04, ni contar el
+artefacto y confirmar 0 en v0.3.
+
+Consecuencia inmediata: T04 incluye `Transicion.jl` por ruta absoluta, así que
+**el arreglo F-18 ya rige en T04**, pero sus vectores congelados v0.2 y el test de
+relectura siguen siendo los antiguos y quedan **obsoletos** hasta reexportar
+v0.3. Datos de solo lectura de v0.2: 318 líneas `DESC … ErrDobleGasto` (217 sobre
+`Transferencia`; el resto, depósitos), cota superior del artefacto porque incluye
+dobles gastos reales. El detalle del bloqueo y el diseño de D-14 están en
+`PROGRESO.md` §T01-E.7.
+
+## E.8. Lo que T01-E NO demuestra
+
+- **No demuestra F-16/F-17** (unicidad de coinbase PoW/PoST): fuera de la orden.
+- **No cubre el motor Rust**: los vectores v0.2 son la entrada del diferencial
+  posterior (W06a-B); el arnés debe dejar de emular la colisión.
+- **No sustituye el `txid` real**: `ID_LIB` es una función inyectiva del contenido
+  como el `(txid, 0)` de F-18, no un hash de 32 bytes.
+- **No demuestra determinismo entre máquinas**: solo en esta máquina, versión y
+  semilla.

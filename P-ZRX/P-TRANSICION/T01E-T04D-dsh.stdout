@@ -1,0 +1,51 @@
+He cumplido la orden hasta donde la zona escribible lo permite: **T01-E está completo**; **T04-D no pudo ejecutarse** por un bloqueo de entorno que debía informar antes de tocar nada.
+
+## 1. Bloqueo de T04-D (informado antes de editar T04)
+
+La orden declara dos zonas escribibles: `P-TRANSICION/T01/` y `P-DAG/T04/`. En esta sesión **`/home` está montado solo lectura** (`/proc/self/mountinfo`: `/home ro`); únicamente `P-TRANSICION` se remonta `rw`. Escribir en `P-DAG/T04/` falla con `Sistema de ficheros de sólo lectura`, y el intento de ampliar el sandbox (`danger-full-access`) se rechazó: *«requires approval, but no approval channel is available»*. No usé sudo ni otra vía para rodear la denegación.
+
+Por eso **no ejecuté**: D-14 en `dirigidos.jl`, reexportación `vectores-estado-dag-v0.3.txt`/`cobertura-v0.3.txt`, `run.jl --seed 0x5a5a --replicas 200`, `Pkg.test()` de T04, ni el recuento del artefacto/confirmación de 0 en v0.3.
+
+Consecuencia que debe conocer el director: T04 hace `include("/…/P-TRANSICION/T01/src/Transicion.jl")`, así que **el arreglo F-18 ya rige en T04**, pero sus **vectores v0.2 y su test de relectura quedan obsoletos** hasta reexportar v0.3. Dato de solo lectura de v0.2: 318 líneas `DESC … ErrDobleGasto` (217 en `Transferencia`), cota superior del artefacto (incluye dobles gastos reales).
+
+## 2. Falta de definición detectada (T01) y lectura aplicada
+
+Registrada en `T01/INFORME.md` §E.2 y `T01/PROGRESO.md` §T01-E.2:
+
+- **E/AMBIGUEDAD-1**: la orden no nombra el error para id fuera de rango. Lectura: `ErrDesbordamiento` en `ID_LIB` y en `crear_utxos!` (id explícito en `[2⁶², …)` o salida de liberación por debajo de `2⁶²`).
+- **E/AMBIGUEDAD-2**: nombres/versión de salida → `…-v0.2.txt`/`…-v0.2.sha256`, encabezado `T01-E (F-18, formato v0.1)`.
+- **E/AMBIGUEDAD-3**: `run.jl` no fija réplicas en la orden → mantengo la escala de T01-D (`--replicas 50`), semilla `0x5a5a`.
+- **E/AMBIGUEDAD-4**: se exportan `ID_LIB` y `LIMITE_ID_EXPLICITO`.
+
+Ninguna bloqueaba la orden.
+
+## 3. T01-E ejecutado (zona `P-TRANSICION/T01/`)
+
+**Código** (`src/Transicion.jl`): `ID_LIB(clave,nonce,importe)=2⁶²+clave·2⁴⁰+nonce·2²⁰+importe` con `clave,nonce,importe<2²⁰`; ids explícitos `<2⁶²` comprobados en `crear_utxos!` (partición por `Origen`); `aplicar_liberacion!` usa `ID_LIB`; **`prox_salida` eliminado** de `Estado`, `estado_inicial`, `clonar` y `representacion_canonica`. `exportar.jl`/`exportar_negativos.jl` a v0.2; testset nuevo en `test/runtests.jl`.
+
+**Resultados** (todo en `T01/resultados/`):
+
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | todos pasan, `PKGTEST_EXIT=0`; **T01-E 17/17** |
+| `run.jl --seed 0x5a5a --replicas 50 --rejilla reducida` | 7 372 800 historias, 45 840 000 undos, **0 fallos I-1…I-7**, `SIN FALLOS`, 602,9 s |
+| Base v0.2 | 2 055 casos, `sha256 da3dcc48…b080` |
+| Negativos v0.2 | 3 914 casos, `sha256 3d2dedae…c889` |
+| Relectura independiente | **0 discrepancias** en ambos; `sha256sum -c` OK |
+| Determinismo | dos corridas con `--fecha 2026-09-26T05:07:25+02:00` → mismo hash |
+
+**Diferencias v0.1→v0.2 y por qué**: base 1 434/2 055 casos (69,78 %; 1 dirigido X-20 + 1 433 aleatorios); ningún `RES`/`SEL`/`GAR` cambia; `TX Transferencia` 3 826→5 809 (+1 983). Causa: el viejo `prox_salida` = `max(id explícito)+1` coincidía con el siguiente id explícito del generador, y la salida de la liberación colisionaba con la de la transferencia, que se descartaba con `ErrDobleGasto` al construir la historia; con F-18 la transferencia aplica y la historia RNG diverge. Negativos: −25 casos, todos `neg-nonce-dos-nn` (224→199); el resto de subcasos y errores idénticos.
+
+**Cumplimiento**: sin Python, sin commit/push, sin secretos, nada fuera de `T01/`; `ENTRADA-T01E-T04D.sha256` verificado al inicio y al final (5/5 «La suma coincide»); `HORAS.log` con `date -Is` real.
+
+## 4. Pendiente T04-D (para el director, zona bloqueada)
+
+1. `exportar.jl`: `SALIDA_DEF`/`COBERTURA_DEF` y encabezado → v0.3.
+2. `run.jl`: salida por defecto `run-estado-dag-v0.3.log` + aserción D-14.
+3. `src/dirigidos.jl`: `caso_dos_liberaciones_hermanas` (D-14) y añadirlo a `casos_dirigidos`.
+4. `test/runtests.jl`: relectura del v0.3 + asserts D-14.
+5. Reexportar v0.3 + cobertura, `run.jl --seed 0x5a5a --replicas 200`, `Pkg.test()`, relectura 0 discrepancias y recuento del artefacto (0 en v0.3).
+
+Diseño de **D-14**: sobre `W` con un retiro (inicio `s`, vencido en `s+R_slots`), ramas hermanas `Xa` (liberación importe `a`, `sd` menor) y `Xc` (liberación importe `b≠a`, **mismo nonce `n`**), y `Xb` hijo de `Xa` con transferencia que gasta `ID_LIB(1,n,a)`; bloque `B` de fusión. Al aplicar: una liberación aplica y la otra se descarta con `ErrNonce`; la transferencia aplica o se descarta por entrada ausente según exista su salida en `Estado(past(B))`, **nunca** porque `ID_LIB(1,n,a)==ID_LIB(1,n,b)` (son distintos). El detalle está en `T01/PROGRESO.md` §T01-E.7.
+
+La evidencia y las secciones T01-E quedaron en `T01/INFORME.md`, `T01/PROGRESO.md`, `T01/HORAS.log` y `T01/resultados/`.

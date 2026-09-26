@@ -1,12 +1,12 @@
 # exportar_negativos.jl — T01-C: exportador determinista de vectores NEGATIVOS
 # de transacción (ORDEN-T01-C §3.3; ampliado por T01-D con los casos de nonce
-# de F-15).
+# de F-15; T01-E: id de liberación F-18).
 #
 #     julia --project=. exportar_negativos.jl [--fecha <ISO-8601>] \
 #         [--salida RUTA] [--contrato RUTA]
 #
-# Escribe `resultados/vectores-transicion-negativos-v0.1.txt` (mismo formato de
-# líneas que T01-B, con `nonce=` en TX de garantía y en GAR) y su sha256 en
+# Escribe `resultados/vectores-transicion-negativos-v0.2.txt` (mismo formato de
+# líneas de v0.1, con `nonce=` en TX de garantía y en GAR) y su sha256 en
 # formato `sha256sum` (`<hash>  <nombre>`). Solo interfaces por defecto
 # (CUT_HWPhi, FC3, SEC0); un hilo; sin Python.
 #
@@ -19,7 +19,7 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/CONTRATO-v0.md"
-const SALIDA_DEF = "resultados/vectores-transicion-negativos-v0.1.txt"
+const SALIDA_DEF = "resultados/vectores-transicion-negativos-v0.2.txt"
 
 # --- nombres del formato ---------------------------------------------------
 
@@ -200,8 +200,9 @@ function main()
     mkpath(dirname(salida))
     parcial = salida * ".tmp"
     io = open(parcial, "w")
-    println(io, "# vectores-transicion-negativos-v0.1 · T01-D (F-15) · ", fecha,
-            " · sha256 del contrato ", sha256_archivo(contrato))
+    println(io, "# vectores-transicion-negativos-v0.2 · T01-E (F-18, formato ",
+            "v0.1) · ", fecha, " · sha256 del contrato ",
+            sha256_archivo(contrato))
     n = 0
     inesperados = 0
     conteo_err = Dict{String,Int}()

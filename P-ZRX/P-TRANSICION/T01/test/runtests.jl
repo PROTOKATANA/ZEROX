@@ -462,3 +462,73 @@ end
     @test ok_val
     @info "F-15" n_validos fam fase
 end
+
+# ---------------------------------------------------------------------------
+# T01-E — id de la salida de una liberación (F-18) y partición del espacio de ids
+# ---------------------------------------------------------------------------
+
+@testset "T01-E (id de liberación F-18)" begin
+    # (1) Fórmula e inyectividad en un dominio pequeño.
+    tup = [(c, n, i) for c in (0, 1, 2, 5) for n in (0, 1, 2, 3)
+           for i in (0, 1, 2, 7)]
+    ids = [ID_LIB(c, n, i) for (c, n, i) in tup]
+    @test all(x -> x >= LIMITE_ID_EXPLICITO, ids)
+    @test length(unique(ids)) == length(ids)
+    @test ID_LIB(2, 3, 7) == (Int(1) << 62) + 2 * (Int(1) << 40) +
+                              3 * (Int(1) << 20) + 7
+    @test ID_LIB(0, 0, 0) == LIMITE_ID_EXPLICITO
+    # (2) Fuera de rango ⇒ error explícito, nunca un id truncado.
+    @test ID_LIB(Int(1) << 20, 0, 0) === ErrDesbordamiento
+    @test ID_LIB(0, Int(1) << 20, 0) === ErrDesbordamiento
+    @test ID_LIB(0, 0, Int(1) << 20) === ErrDesbordamiento
+    @test ID_LIB(-1, 0, 0) === ErrDesbordamiento
+    @test ID_LIB(0, -1, 0) === ErrDesbordamiento
+    # (3) Un id explícito en el rango reservado [2⁶², …) ⇒ ErrDesbordamiento;
+    #     el mayor id explícito permitido (2⁶² − 1) sí aplica.
+    P = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+               S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+               M_rec_slots = 1, R_slots = 1, F_slots = typemax(Int), sec = SEC0)
+    pref, ests, _, _, _ = construir_poW(StableRNG(79), P; hasta = 1,
+                                        depositar = false, transferir = false)
+    E1 = ests[end]
+    pid = pref[end].id
+    Bmal = gen_pow(id = pid + 1, padre = pid, altura = 2,
+                   txs = [tx_coinbase([Salida(LIMITE_ID_EXPLICITO, UInt64(1), 1,
+                                              OrigenTx, -1, -1)])])
+    @test aplicar(E1, Bmal, P) == ErrDesbordamiento
+    Bokl = gen_pow(id = pid + 1, padre = pid, altura = 2,
+                   txs = [tx_coinbase([Salida(LIMITE_ID_EXPLICITO - 1, UInt64(1),
+                                              1, OrigenTx, -1, -1)])])
+    @test !(aplicar(E1, Bokl, P) isa Err)
+    # (4) La salida de una liberación lleva exactamente ID_LIB(clave, nonce, importe).
+    tpost = construir_poW(StableRNG(80), P; hasta = 10, depositar = true,
+                          transferir = false)
+    ET = tpost[2][end]
+    @test ET.terminal != -1
+    if ET.terminal != -1
+        T = tpost[1][end]
+        nret = nonce_de(ET, 1)
+        B_ret = gen_post(id = T.id + 1, padre = T.id, slot = 1, productor = 1,
+                         peso = 1,
+                         txs = [tx_coinbase_post(3),
+                                tx_retiro(1, 1, 1; nonce = nret)])
+        E_ret = aplicar(ET, B_ret, P)
+        @test !(E_ret isa Err)
+        if !(E_ret isa Err)
+            nlib = nonce_de(E_ret, 1)
+            B_lib = gen_post(id = B_ret.id + 1, padre = B_ret.id, slot = 2,
+                             productor = 1, peso = 1,
+                             txs = [tx_coinbase_post(3),
+                                    tx_liberacion(1, 1, 1; nonce = nlib)])
+            E_lib = aplicar(E_ret, B_lib, P)
+            @test !(E_lib isa Err)
+            if !(E_lib isa Err)
+                libs = [o for (_, o) in E_lib.utxo
+                        if o.origen == OrigenLiberacion]
+                @test length(libs) == 1
+                @test libs[1].id == ID_LIB(1, nlib, 1)
+                @test libs[1].id >= LIMITE_ID_EXPLICITO
+            end
+        end
+    end
+end

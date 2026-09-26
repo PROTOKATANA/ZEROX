@@ -561,3 +561,107 @@ Comando (desde `/home/katana/zeo/ZEROX`):
 
 Salida: las cuatro líneas «La suma coincide» (ORDEN-T01-D, FORMATO-v0,
 CONTRATO-v0, LINEO).
+
+# PROGRESO — T01-E
+
+Bitácora de la orden T01E-T04D (id de la salida de la liberación, F-18).
+Presupuesto declarado **antes** de ejecutar: 1 h 30 min de reloj, 1 hilo, 8 GiB de
+RAM; prohibido Python. Horas solo de `date -Is` (`HORAS.log`).
+
+## T01-E.1. Comprobación de la entrada congelada (inicio)
+
+Comando (desde `/home/katana/zeo/ZEROX`):
+
+    sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01E-T04D.sha256
+
+Salida completa: las cinco líneas «La suma coincide» (ORDEN-T01E-T04D,
+REVISION-W06a, FORMATO-v0, CONTRATO-ESTADO-DAG-v0, LINEO). Lectura íntegra de la
+orden, `REVISION-W06a.md`, `FORMATO-v0.md` (F-15…F-18), `LINEO.md` y todo el
+código y documentos de `T01/` y de `P-DAG/T04/`.
+
+## T01-E.2. Falta de definición detectada ANTES de editar (obligatorio informar)
+
+Registradas y aplicadas las lecturas de `INFORME.md` §E.2:
+T01-E/AMBIGUEDAD-1 (error para id fuera de rango: `ErrDesbordamiento`),
+2 (nombres v0.2 y encabezado «F-18, formato v0.1»), 3 (réplicas de `run.jl`: 50,
+la escala de T01-D) y 4 (exportar `ID_LIB`/`LIMITE_ID_EXPLICITO`). **Ninguna
+bloquea la orden.**
+
+**Bloqueo de entorno (no es una ambigüedad de la especificación).** La orden pide
+escribir también en `P-DAG/T04/`, pero en esta sesión `/home` está montado en solo
+lectura y solo `P-TRANSICION` es `rw`; el intento de ampliar el sandbox se rechaza
+sin canal de aprobación. Se informa antes de tocar T04 y se ejecuta solo la mitad
+T01 (zona escribible). Detalle en §T01-E.7.
+
+## T01-E.3. Código modificado
+
+- `src/Transicion.jl`: `ID_LIB` y constantes de la partición de ids; `crear_utxos!`
+  comprueba el rango por origen y deja de actualizar `prox_salida`;
+  `aplicar_liberacion!` calcula el id con `ID_LIB`; se elimina `prox_salida` de
+  `Estado`, `estado_inicial`, `clonar` y `representacion_canonica`; se exportan
+  `ID_LIB` y `LIMITE_ID_EXPLICITO`.
+- `exportar.jl` / `exportar_negativos.jl`: salida y `.sha256` v0.2; encabezado
+  `T01-E (F-18, formato v0.1)`.
+- `test/runtests.jl`: testset nuevo «T01-E (id de liberación F-18)» (17 asserts).
+
+## T01-E.4. Exportación, diferencias, relectura y determinismo
+
+    exportar.jl --fecha 2026-09-26T05:07:25+02:00
+    # casos=2055 dirigidos_con_error_inesperado=0 sha256=da3dcc48…b080
+    exportar_negativos.jl --fecha 2026-09-26T05:07:25+02:00
+    # casos=3914 inesperados=0 sha256=3d2dedae…c889
+
+Base: 1 434/2 055 casos cambian (1 dirigido y 1 433 aleatorios); ningún `RES`,
+`SEL` ni `GAR` cambia; `TX Transferencia` 3 826 → 5 809. Negativos: −25
+(`neg-nonce-dos-nn` 224 → 199); el resto idéntico. Relectura independiente de
+ambos ficheros: **0 discrepancias**; `sha256sum -c` pasa. Determinismo: dos
+corridas por fichero con la misma `--fecha` dan el mismo hash. Los ficheros v0 y
+v0.1 no se tocaron.
+
+## T01-E.5. Tests, `run.jl` y cierre
+
+`Pkg.test()`: todos los testsets pasan (`PKGTEST_EXIT=0`), T01-E 17/17.
+`run.jl --seed 0x5a5a --replicas 50 --rejilla reducida`: 7 372 800 historias,
+45 840 000 undos, 0 fallos I-1…I-7, `VEREDICTO = SIN FALLOS`, 602,9 s
+(`resultados/run-reducida-50-T01-E.log`).
+
+Presupuesto respetado; sin Python; sin commit ni push; sin secretos; nada fuera de
+`T01/`. Comprobación final de la entrada congelada: ver §T01-E.6.
+
+## T01-E.6. Comprobación de la entrada congelada (último paso)
+
+Comando (desde `/home/katana/zeo/ZEROX`):
+
+    sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01E-T04D.sha256
+
+Salida: las cinco líneas «La suma coincide».
+
+## T01-E.7. T04-D bloqueado por el entorno (no ejecutado)
+
+- Causa: `/home` montado `ro`; solo `P-TRANSICION` es `rw`; la escritura en
+  `P-DAG/T04/` devuelve `Sistema de ficheros de sólo lectura`; la ampliación de
+  sandbox se rechaza sin canal de aprobación.
+- No ejecutado: D-14 en `dirigidos.jl`, reexportación
+  `vectores-estado-dag-v0.3.txt`/`cobertura-v0.3.txt`, `run.jl --seed 0x5a5a
+  --replicas 200`, `Pkg.test()` de T04, recuento del artefacto y confirmación de
+  0 en v0.3.
+- Efecto: T04 ya usa el `Transicion.jl` corregido por `include`, pero sus vectores
+  v0.2 y su test de relectura quedan obsoletos hasta reexportar v0.3.
+- Datos de solo lectura de v0.2: 318 `DESC … ErrDobleGasto` (217 en
+  `Transferencia`), cota superior del artefacto.
+- Cambios propuestos para T04-D (para el director):
+  1. `exportar.jl`: `SALIDA_DEF`/`COBERTURA_DEF` y encabezado a v0.3.
+  2. `run.jl`: `salida` por defecto a `run-estado-dag-v0.3.log` y aserción D-14.
+  3. `src/dirigidos.jl`: `caso_dos_liberaciones_hermanas` (D-14) y añadirlo a
+     `casos_dirigidos`.
+  4. `test/runtests.jl`: relectura del v0.3 y asserts de D-14.
+  5. Reexportar v0.3 + cobertura, `run.jl --seed 0x5a5a --replicas 200`,
+     `Pkg.test()`, relectura 0 discrepancias y recuento del artefacto (0 en v0.3).
+
+D-14 (diseño): sobre `W` con un retiro (inicio `s`, vencido en `s+R_slots`), ramas
+hermanas `Xa` (liberación de importe `a`, `sd` menor) y `Xc` (liberación de
+importe `b ≠ a`, mismo nonce `n`), y `Xb` hijo de `Xa` con una transferencia que
+gasta `ID_LIB(1, n, a)`; un bloque `B` fusión. Al aplicar: una liberación aplica y
+la otra se descarta con `ErrNonce`; la transferencia aplica si su salida existe en
+`Estado(past(B))` y, si no, se descarta por entrada ausente (`ErrDobleGasto`),
+**nunca** porque `ID_LIB(1, n, a) == ID_LIB(1, n, b)` (son distintos).

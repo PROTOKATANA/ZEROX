@@ -1,12 +1,12 @@
 # exportar.jl — exportador determinista de vectores de transición (ORDEN-T01-B,
-# revisado por T01-D: campo `nonce=` de F-15).
+# revisado por T01-D: campo `nonce=` de F-15; T01-E: id de liberación F-18).
 #
 #     julia --project=. exportar.jl [--fecha <ISO-8601>] [--salida RUTA] \
 #         [--contrato RUTA] [--dirigidos 1] [--aleatorios 2000]
 #
-# Escribe `resultados/vectores-transicion-v0.1.txt` (formato de texto neutral,
-# §3.4 de la orden, con el `nonce=` de F-15) y su sha256 en
-# `resultados/vectores-transicion-v0.1.sha256` (formato `sha256sum`). Solo
+# Escribe `resultados/vectores-transicion-v0.2.txt` (mismo formato de texto
+# neutral de v0.1, §3.4 de la orden, con el `nonce=` de F-15) y su sha256 en
+# `resultados/vectores-transicion-v0.2.sha256` (formato `sha256sum`). Solo
 # interfaces por defecto: CUT_HWPhi, FC3, SEC0. Un hilo, sin Python.
 #
 # El lector independiente vive en `src/lector_vectores.jl` y NO reutiliza
@@ -18,7 +18,7 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/CONTRATO-v0.md"
-const SALIDA_DEF = "resultados/vectores-transicion-v0.1.txt"
+const SALIDA_DEF = "resultados/vectores-transicion-v0.2.txt"
 
 # --- nombres del formato ---------------------------------------------------
 
@@ -279,8 +279,8 @@ function main()
 
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-transicion-v0.1 · T01-D (F-15) · ", fecha,
-            " · sha256 del contrato ", sha256_archivo(contrato))
+    println(io, "# vectores-transicion-v0.2 · T01-E (F-18, formato v0.1) · ",
+            fecha, " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     fallos_dirigidos = Ref(0)
 
