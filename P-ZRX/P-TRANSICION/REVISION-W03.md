@@ -18,6 +18,5 @@
 (`FORMATO-v0.md` §«Corrección v0.1»). El motor migrado todavía usa el contador de salidas de
 liberación (`prox_salida`) que W03 añadió para sortearlo; lo elimina W02b junto con el nonce por clave.
 
-**Pendiente:** recuperar el test retirado en W05a si no lo hizo W03 (verificado: W03 añade el test de
-testigo en `transicion/tests.rs`); diferencial de `aplicar_fusion` contra T04 (W06a); vectores
+**Hecho:** el test retirado en W05a está recuperado en `crates/zx-consensus/src/transicion/tests.rs:234` (comprobado por el director). **Pendiente:** diferencial de `aplicar_fusion` contra T04 (W06a); vectores
 negativos de T01-C y de repetición de T01-D (W02b).
