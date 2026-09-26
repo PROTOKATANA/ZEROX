@@ -1,0 +1,41 @@
+# logs/lock-diff.txt — ORDEN-W05b2-R, paso 3
+# Raiz actual == ws.orig/Cargo.lock. Tras aplicar el parche de W05b2 (excluyendo Cargo.toml,
+# Cargo.lock y ci/frontera-crates.sh) anadiendo a mano el miembro y la frontera, y ejecutar UNA
+# sola vez 'cargo metadata --format-version 1 >/dev/null' dentro de ws (sin 'cargo update').
+# Comando: cd /home/katana/zeo/ZEROX/deepseek/W05b2R/ws && cargo metadata --format-version 1 >/dev/null
+# Comprobacion: diff -u ws.orig/Cargo.lock ws/Cargo.lock
+
+--- ws.orig/Cargo.lock	2026-09-26 03:00:39.794884317 +0200
++++ ws/Cargo.lock	2026-09-26 03:23:48.246041029 +0200
+@@ -4720,6 +4720,25 @@
+ ]
+ 
+ [[package]]
++name = "zx-post"
++version = "0.0.0"
++dependencies = [
++ "blake3",
++ "ed25519-zebra",
++ "primitive-types",
++ "subspace-core-primitives",
++ "subspace-kzg",
++ "subspace-verification",
++ "thiserror 2.0.20",
++ "zx-consensus",
++ "zx-core",
++ "zx-dag",
++ "zx-farmer",
++ "zx-poas",
++ "zx-pot",
++]
++
++[[package]]
+ name = "zx-pot"
+ version = "0.0.0"
+ dependencies = [
+
+# Recuento: lineas anadidas = 19 ; lineas eliminadas = 0
+# Ninguna version cambia: solo se anade el paquete zx-post y su lista de dependencias (aristas).
+# Hash sha256 de ambos locks:
+4da3e37c69fa0e374d7d7b0d5931cb502d3c83f8459485a3318efa1f2ce2257d  ws.orig/Cargo.lock
+c113c061beef3e46f4fad651a1add9212402e8b7ddc7385a3ba0ad83d6ac7d62  ws/Cargo.lock

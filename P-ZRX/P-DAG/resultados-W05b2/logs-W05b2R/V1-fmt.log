@@ -1,0 +1,5 @@
+# ORDEN-W05b2-R V1-fmt
+# cd /home/katana/zeo/ZEROX/deepseek/W05b2R/ws
+# cargo fmt --all -- --check
+
+exit=0

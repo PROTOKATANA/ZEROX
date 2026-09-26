@@ -1,0 +1,5 @@
+# ORDEN-W05b2-R V0-apply-check
+# cd /home/katana/zeo/ZEROX/deepseek/W05b2R/ws
+# GIT_CEILING_DIRECTORIES=/home/katana/zeo/ZEROX/deepseek/W05b2R git apply -p1 --check --exclude=Cargo.toml --exclude=Cargo.lock --exclude=ci/frontera-crates.sh /home/katana/zeo/ZEROX/deepseek/W05b2/cambios.patch
+# salida literal: (vacia)
+exit=0

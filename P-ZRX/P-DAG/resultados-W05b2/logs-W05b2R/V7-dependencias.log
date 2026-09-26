@@ -1,0 +1,6 @@
+# ORDEN-W05b2-R V7-dependencias-exactas
+# cd /home/katana/zeo/ZEROX/deepseek/W05b2R/ws
+# bash ci/dependencias-exactas.sh
+
+OK — 20 dependencias con versión exacta
+exit=0

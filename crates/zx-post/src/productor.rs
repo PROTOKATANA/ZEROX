@@ -1,0 +1,282 @@
+//! Productor del **bloque de transición** PoST hijo de un terminal dev (`C-POT-03`, `C-POT-05`,
+//! `C-HDR-03`, `C-HDR-04`, `C-HDR-09`, `C-BON-03`, F-03, F-09, D-P09…D-P11).
+//!
+//! # Qué produce
+//!
+//! Dado el terminal PoW `T`, una fuente de soluciones PoAS (el puente real a `zx-farmer` lo aporta
+//! el llamante), una clave Ed25519 dev y los parámetros de desarrollo, [`producir`]:
+//!
+//! 1. arranca el PoT desde S1 (`semilla(f_0, 0)`, D-P09) y **calcula el PoT slot a slot** desde S1
+//!    con `N_dev` ([`zx_pot::prove`]);
+//! 2. para cada slot `s`, deriva la salida `salida(f, s)` y **audita la parcela** por
+//!    [`FuenteSoluciones::soluciones`], que recibe `(salida, slot, rango)` —la fuente deriva el reto
+//!    con `zx_poas::reto_desde_salida(salida, slot)`, la función que la revisión W05b1 ordena
+//!    reutilizar— hasta hallar una solución verificada;
+//! 3. con la primera solución construye la cabecera: `padres = [T]`, `height = 0` (F-03), `slot`,
+//!    `pot_output = salida(f, s)`, la **justificación** con los portadores de los slots 1..=s, el
+//!    rango `SR_dev`, los campos de la solución, el compromiso del cuerpo de una **coinbase v3**
+//!    pagada a la clave (`F-09`), y el **sello** Ed25519 sobre la prefirma (`C-HDR-04`);
+//! 4. devuelve el [`BloqueDag`] completo con su cuerpo.
+//!
+//! # Lo que NO hace
+//!
+//! No elige `SR` desde el pasado (usa la constante dev, D-P11), no aplica el controlador de rango,
+//! no elige padres con GHOSTDAG (el de transición es hijo único de `T`), no firma con una clave de
+//! red, no publica y no admite. No arranca desde génesis: el terminal lo aporta el llamante.
+//!
+//! # Por qué la parcela es un rasgo
+//!
+//! La frontera §V8 `zx-post → {zx-core, zx-pot, zx-dag, zx-poas}` **no** incluye `zx-farmer`, pero
+//! §3.6 pide al productor usar una parcela. [`FuenteSoluciones`] abstrae ese puente: el test de
+//! extremo a extremo lo implementa sobre `zx_farmer::ParcelaDisco` (dev-dependency) y W06 lo
+//! aportará en el nodo. Así el crate de producción respeta la frontera explícita.
+//!
+//! # Frontera de confianza
+//!
+//! [`SolucionCandidata`] afirma que la solución verificó **contra las entradas proporcionadas**: el
+//! mismo `slot`, la misma salida y el mismo `rango`. La fuente no acredita la procedencia causal de
+//! esas entradas; la puerta conjunta ([`crate::cabecera_conjunta`]) las vuelve a comprobar con su
+//! propio contexto. Producir no es admitir.
+
+use core::num::NonZeroU32;
+
+use ed25519_zebra::{SigningKey, VerificationKey};
+use zx_core::firma::LONGITUD_FIRMA;
+use zx_core::preimage::block::merkle_root;
+use zx_core::wire_dag::{BloqueDag, JustificacionPot, MAX_BUNDLES_POT, PotCheckpoints};
+use zx_core::{
+    Amount, BlockHash, ClavePublica, DagBlockHeader, EncodingError, ExtensionTx, PadresDag,
+    SolucionPoas, Tx, body_commitment, txid,
+};
+use zx_pot::tipos::PotSeed;
+
+use crate::pot::{
+    ErrorContextoPot, checkpoints_a_wire, proyectar_iteraciones, semilla_genesis, semilla_siguiente,
+};
+
+/// Una solución PoAS ya verificada contra `(salida, slot, rango)` por la fuente.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SolucionCandidata {
+    /// La solución verificada.
+    pub solucion: SolucionPoas,
+    /// Distancia de solución que devolvió la primitiva.
+    pub distancia: u64,
+}
+
+/// Fuente de soluciones PoAS para un `(salida, slot, rango)`.
+///
+/// El contrato de una implementación de producción es auditar la parcela con el reto
+/// `zx_poas::reto_desde_salida(salida, slot)` y verificar cada candidato con
+/// `zx_poas::verificar_solucion_poas`. Un vector vacío significa «sin candidato», **no** error.
+pub trait FuenteSoluciones {
+    /// Error de la fuente (auditoría, conversión, lectura de disco…).
+    type Error;
+
+    /// Soluciones verificadas para ese `(salida, slot, rango)`.
+    ///
+    /// # Errores
+    /// El error propio de la fuente.
+    fn soluciones(
+        &self,
+        salida: [u8; 16],
+        slot: u64,
+        rango: u64,
+    ) -> Result<Vec<SolucionCandidata>, Self::Error>;
+}
+
+/// Parámetros de desarrollo del productor. **No** son parámetros de red.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParametrosProductor {
+    /// `N_dev`: iteraciones AES por slot (D-P10).
+    pub n_dev: u64,
+    /// `SR_dev`: rango de solución constante (D-P11).
+    pub sr_dev: u64,
+    /// Máximo de slots a barrer; los portadores de la justificación lo acotan a 150 (`C-HDR-07`).
+    pub max_slots: u64,
+    /// Rama de consenso (red dev).
+    pub consensus_branch_id: u32,
+    /// `timestamp` declarado por la cabecera.
+    pub timestamp: u64,
+    /// Importe de la coinbase v3 (`> 0`, F-09 / R-8).
+    pub importe_coinbase: Amount,
+}
+
+/// Fallo al producir el bloque de transición.
+#[derive(Debug, thiserror::Error)]
+pub enum ErrorProductor<E>
+where
+    E: std::error::Error + 'static,
+{
+    /// `N_dev` fuera del dominio de la primitiva.
+    #[error("N_dev inválido: {0}")]
+    NDevInvalido(#[from] ErrorContextoPot),
+    /// `max_slots` fuera de `1..=150`.
+    #[error("max_slots {declarados} fuera de 1..={maximo}")]
+    MaxSlotsFueraDeRango {
+        /// Valor pedido.
+        declarados: u64,
+        /// `MAX_BUNDLES_POT`.
+        maximo: u64,
+    },
+    /// La primitiva PoT rechazó la terna (no debería ocurrir con `N_dev` válido).
+    #[error("la primitiva PoT rechazó el slot: {0}")]
+    Pot(#[from] zx_pot::PotError),
+    /// La solución no está sellada por la clave que firma: violaría `C-HDR-04` y F-09.
+    #[error("la solución no es de la clave que firma: solución {solucion:?}, firma {firma:?}")]
+    ClaveDeLaSolucionNoCoincide {
+        /// Clave de la solución.
+        solucion: ClavePublica,
+        /// Clave del firmante.
+        firma: ClavePublica,
+    },
+    /// `zx-core` rechazó el formato (padres o compromiso del cuerpo).
+    #[error("formato del bloque: {0}")]
+    Formato(#[from] EncodingError),
+    /// Fallo de la fuente de soluciones.
+    #[error("fuente de soluciones: {0}")]
+    Fuente(#[source] E),
+    /// No apareció ninguna solución en la ventana barrida.
+    #[error("sin solución PoAS en los primeros {hasta_slot} slots")]
+    SinSolucion {
+        /// Último slot barrido.
+        hasta_slot: u64,
+    },
+}
+
+/// Produce el primer bloque PoST hijo de `terminal` (D-P09…D-P11, F-03, F-09).
+///
+/// # Procedimiento
+/// Arranca de S1, avanza el PoT slot a slot con `N_dev` y, en cada slot, pide a `fuente` las
+/// soluciones verificadas. Con la primera, ensambla cabecera y cuerpo, sella y devuelve el bloque.
+///
+/// # Errores
+/// [`ErrorProductor::NDevInvalido`], [`ErrorProductor::MaxSlotsFueraDeRango`],
+/// [`ErrorProductor::Pot`], [`ErrorProductor::Fuente`], [`ErrorProductor::Formato`],
+/// [`ErrorProductor::ClaveDeLaSolucionNoCoincide`] o [`ErrorProductor::SinSolucion`].
+pub fn producir<F>(
+    terminal: BlockHash,
+    fuente: &F,
+    clave: &SigningKey,
+    parametros: &ParametrosProductor,
+) -> Result<BloqueDag, ErrorProductor<F::Error>>
+where
+    F: FuenteSoluciones,
+    F::Error: std::error::Error + 'static,
+{
+    let iteraciones: NonZeroU32 = proyectar_iteraciones(parametros.n_dev)?;
+    if parametros.max_slots == 0 || parametros.max_slots > MAX_BUNDLES_POT as u64 {
+        return Err(ErrorProductor::MaxSlotsFueraDeRango {
+            declarados: parametros.max_slots,
+            maximo: MAX_BUNDLES_POT as u64,
+        });
+    }
+
+    let productor = ClavePublica::desde_bytes(VerificationKey::from(clave).into());
+
+    // S1: salida confiada del slot 0 (D-P09).
+    let mut salida = semilla_genesis(&terminal, &[]);
+    let mut portadores: Vec<PotCheckpoints> = Vec::new();
+
+    for slot in 1..=parametros.max_slots {
+        // Sin inyecciones en dev: la semilla del slot es la salida anterior tal cual.
+        let semilla = semilla_siguiente(salida, None);
+        let carrier = zx_pot::prove(PotSeed::from(semilla), iteraciones)?;
+        salida = *carrier.output();
+        portadores.push(checkpoints_a_wire(&carrier));
+
+        let candidatas = fuente
+            .soluciones(salida, slot, parametros.sr_dev)
+            .map_err(ErrorProductor::Fuente)?;
+        let Some(candidata) = candidatas.into_iter().next() else {
+            continue;
+        };
+
+        // C-HDR-04 y F-09: la solución debe ser de la clave que firma y paga la coinbase.
+        if candidata.solucion.public_key != productor {
+            return Err(ErrorProductor::ClaveDeLaSolucionNoCoincide {
+                solucion: candidata.solucion.public_key,
+                firma: productor,
+            });
+        }
+
+        return construir_bloque(
+            terminal,
+            parametros,
+            clave,
+            slot,
+            salida,
+            portadores,
+            candidata.solucion,
+        );
+    }
+
+    Err(ErrorProductor::SinSolucion {
+        hasta_slot: parametros.max_slots,
+    })
+}
+
+/// Ensambla cabecera y cuerpo (coinbase v3) y sella la prefirma.
+fn construir_bloque<E>(
+    terminal: BlockHash,
+    parametros: &ParametrosProductor,
+    clave: &SigningKey,
+    slot: u64,
+    pot_output: [u8; 16],
+    portadores: Vec<PotCheckpoints>,
+    solucion: SolucionPoas,
+) -> Result<BloqueDag, ErrorProductor<E>>
+where
+    E: std::error::Error + 'static,
+{
+    let productor = solucion.public_key;
+    // Coinbase v3 (F-05, F-09): sin entradas ni salidas, campos extra `clave ‖ importe`.
+    let coinbase = Tx {
+        version: 3,
+        inputs: Vec::new(),
+        outputs: Vec::new(),
+        lock_time: 0,
+        expiry_height: 0,
+        extension: ExtensionTx::CoinbasePost {
+            clave: productor,
+            importe: parametros.importe_coinbase,
+        },
+    };
+    // El `txid` de la coinbase se calcula antes de moverla al vector del cuerpo.
+    let txid_coinbase = txid(&coinbase, parametros.consensus_branch_id);
+    let txs = vec![coinbase];
+    let testigos: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
+    let txids = vec![txid_coinbase];
+    let merkle_root = merkle_root(&txids);
+    let body_commitment = body_commitment(&txs, &testigos, parametros.consensus_branch_id)?;
+
+    let mut cabecera = DagBlockHeader {
+        consensus_branch_id: parametros.consensus_branch_id,
+        merkle_root,
+        timestamp: parametros.timestamp,
+        // F-03: el campo `height` de la cabecera PoST está reservado y MUST ser 0 en v0.
+        height: 0,
+        slot,
+        pot_output,
+        rango_solucion: parametros.sr_dev,
+        sol: solucion,
+        body_commitment,
+        padres: PadresDag::nuevo(terminal, &[])?,
+        sello: [0u8; LONGITUD_FIRMA],
+    };
+
+    // El sello cubre la prefirma canónica (C-HDR-03, C-HDR-04).
+    let pre_hash = cabecera.pre_hash();
+    cabecera.sello = clave.sign(pre_hash.as_bytes()).into();
+
+    let justificacion = JustificacionPot::nueva(portadores)?;
+    Ok(BloqueDag::nuevo(cabecera, justificacion, txs, testigos)?)
+}
+
+/// La clave pública Ed25519 que firmará el bloque de una `SigningKey` dada.
+///
+/// Es la misma clave que la solución PoAS debe tener en `sol.public_key` para que sello y coinbase
+/// sean coherentes (`C-HDR-04`, F-09).
+#[must_use]
+pub fn clave_publica_de(clave: &SigningKey) -> ClavePublica {
+    ClavePublica::desde_bytes(VerificationKey::from(clave).into())
+}

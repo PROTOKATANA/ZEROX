@@ -4720,6 +4720,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "zx-post"
+version = "0.0.0"
+dependencies = [
+ "blake3",
+ "ed25519-zebra",
+ "primitive-types",
+ "subspace-core-primitives",
+ "subspace-kzg",
+ "subspace-verification",
+ "thiserror 2.0.20",
+ "zx-consensus",
+ "zx-core",
+ "zx-dag",
+ "zx-farmer",
+ "zx-poas",
+ "zx-pot",
+]
+
+[[package]]
 name = "zx-pot"
 version = "0.0.0"
 dependencies = [

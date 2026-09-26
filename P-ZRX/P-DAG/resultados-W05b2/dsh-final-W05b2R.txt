@@ -1,0 +1,37 @@
+## ORDEN-W05b2-R cumplida — veredicto: **SUPERADO**
+
+Leí íntegros `ORDEN-W05b2-R.md` y `V-ZRX/LINEO.md` antes de actuar. Todo el trabajo quedó dentro de
+`/home/katana/zeo/ZEROX/deepseek/W05b2R/`, con `GIT_CEILING_DIRECTORIES` fijado a la zona y cargo
+siempre desde `ws/`. Sin Python, sin commit/push, sin secretos, sin resolver el repo raíz.
+
+### Lo hecho
+1. **Copia** de la raíz actual (`Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `crates/`,
+   `testdata/`, `ci/`, `.github/`) a `ws.orig/` y `ws/`, con `PDF -> ../../../PDF` en ambos. Verificado
+   que la raíz viva es idéntica byte a byte a W03-R, lo que permitió reutilizar su `target` y
+   `.cargo-home` (sin red).
+2. **Parche W05b2** aplicado en `ws` con
+   `git apply -p1 --exclude=Cargo.toml --exclude=Cargo.lock --exclude=ci/frontera-crates.sh` →
+   `exit=0`. Los 17 ficheros nuevos (`crates/zx-post/*` y `zx-pot/examples/medir_pot.rs`) quedan
+   idénticos a `deepseek/W05b2/ws`.
+3. **Rehecho a mano (mínimo):** `"crates/zx-post",` en los miembros; regla
+   `frontera("zx-post"; ["zx-core","zx-pot","zx-dag","zx-poas"])` conservando `zx-p2p`; y **un único**
+   `cargo metadata --format-version 1 >/dev/null` (sin `cargo update`) → `Cargo.lock` **+19 / −0**, solo
+   el paquete `zx-post` y sus aristas, **sin cambios de versión** (`logs/lock-diff.txt`).
+4. **Validación `--locked`:** `fmt --all -- --check` ✅ · `clippy --workspace --all-targets
+   --all-features --locked -D warnings` ✅ (8,75 s) · `cargo test --workspace --all-features --locked`
+   → **620 pasan, 0 fallan, 1 ignorado** (46 bloques). CI: `dependencias-exactas.sh` → 20 exactas ✅;
+   `frontera-crates.sh` → 6/6, incluida `zx-post` ✅.
+5. **Criterio de tests:** raíz 517 nombres vs `ws` 621 → **0 perdidos, 104 añadidos**; el extremo a
+   extremo del bloque de transición pasa (V5 3/3 semillas, V6 9 negativos + 1 pendiente, V7 núcleo PoT).
+6. El parche generado **reconstruye `ws`** desde una copia limpia de `ws.orig` (`git apply` + `diff -rq`
+   vacío).
+
+### Entregables (zona)
+- `cambios.patch` — 20 ficheros, 299 329 B, `sha256 f116ca55…`
+- `MIGRACION.sha256` — 147 huellas, `sha256sum -c` OK, `sha256 2d20fd6c…`
+- `logs/` — `V0-apply`, `V0-apply-check`, `V0-metadata`, `V1-fmt`, `V2-clippy`, `V3-test`,
+  `V7-dependencias`, `V8-frontera`, `lock-diff`, `comparacion-tests`, `raiz-test-list`, `ws-test-list`
+- `INFORME.md`, `HORAS.log`
+
+Nada falló ni quedó sin aplicar; no hubo que parar. Presupuesto 1 h / 8 hilos / 16 GiB no agotado
+(~11 min de reloj).

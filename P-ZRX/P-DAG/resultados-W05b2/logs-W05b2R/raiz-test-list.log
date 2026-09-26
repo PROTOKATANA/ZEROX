@@ -1,0 +1,622 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/zx_consensus-c4ded41f623171f4)
+activacion::tests::el_branch_id_no_es_cero: test
+activacion::tests::el_cbid_de_dev_se_reproduce: test
+activacion::tests::la_rama_v1_rige_desde_el_genesis: test
+activacion::tests::la_tabla_real_esta_bien_formada: test
+activacion::tests::las_constantes_derivadas_se_reproducen: test
+activacion::tests::se_detecta_una_tabla_mal_formada: test
+activacion::tests::se_rechaza_una_cabecera_con_el_branch_id_equivocado: test
+activacion::tests::un_bloque_de_la_rama_vieja_no_vale_en_la_nueva: test
+algoritmo::tests::el_hash_pow_dev_es_sha3_del_prefijo_y_la_cabecera: test
+algoritmo::tests::sha3_dev_coincide_con_el_block_hash: test
+dificultad::tests::bloques_lentos_ablandan: test
+dificultad::tests::bloques_rapidos_endurecen: test
+dificultad::tests::el_clamp_sesga_el_solvetime_a_la_baja: test
+dificultad::tests::el_mtp_es_la_mediana_y_no_le_afecta_el_orden: test
+dificultad::tests::el_mtp_exige_exactamente_once_timestamps: test
+dificultad::tests::el_numerador_de_c_diff_07_cabe_en_u512: test
+dificultad::tests::el_resultado_siempre_esta_acotado: test
+dificultad::tests::el_suelo_acota_el_endurecimiento_a_diez_veces: test
+dificultad::tests::en_regimen_estable_el_target_apenas_se_mueve: test
+dificultad::tests::es_determinista: test
+dificultad::tests::la_correccion_del_sesgo_sigue_en_la_identidad: test
+dificultad::tests::los_timestamps_que_retroceden_no_hunden_la_dificultad: test
+dificultad::tests::se_rechaza_una_ventana_de_tamano_incorrecto: test
+error::tests::solo_el_timestamp_futuro_es_diferible: test
+fork_choice::tests::el_desempate_es_independiente_del_orden_de_llegada: test
+fork_choice::tests::el_desempate_es_por_el_menor_hash: test
+fork_choice::tests::el_trabajo_acumulado_se_puede_recalcular: test
+fork_choice::tests::gana_el_trabajo_acumulado_no_la_altura: test
+fork_choice::tests::la_cadena_vacia_tiene_trabajo_cero: test
+genesis::tests::cada_parametro_cambia_el_hash_del_genesis: test
+genesis::tests::cada_red_arranca_con_su_propia_dificultad: test
+genesis::tests::el_arranque_de_testnet_valida_y_compara_el_hash: test
+genesis::tests::el_arranque_dev_valida_y_compara_el_hash: test
+genesis::tests::el_borde_exacto_del_suelo_de_timestamp: test
+genesis::tests::el_genesis_de_mainnet_todavia_no_arranca: test
+genesis::tests::el_genesis_de_testnet_es_valido: test
+genesis::tests::el_genesis_declara_la_rama_activa: test
+genesis::tests::el_genesis_dev_es_valido: test
+genesis::tests::el_genesis_es_determinista: test
+genesis::tests::el_genesis_esta_en_la_altura_cero_y_no_tiene_padre: test
+genesis::tests::el_genesis_no_necesita_resolver_el_pow: test
+genesis::tests::el_hash_del_genesis_de_testnet_esta_congelado: test
+genesis::tests::el_hash_del_genesis_dev_esta_congelado: test
+genesis::tests::la_coinbase_del_genesis_vale_cero: test
+genesis::tests::la_red_dev_tiene_genesis_propio: test
+genesis::tests::mainnet_no_arranca_porque_no_tiene_hash_congelado: test
+genesis::tests::mainnet_y_testnet_no_comparten_genesis: test
+genesis::tests::mainnet_y_testnet_tienen_genesis_distintos: test
+genesis::tests::se_rechaza_un_genesis_con_padre: test
+genesis::tests::se_rechaza_un_genesis_con_premine: test
+genesis::tests::se_rechaza_un_genesis_fuera_de_la_altura_cero: test
+genesis::tests::un_genesis_en_el_ano_cero_sesga_el_primer_retarget: test
+genesis::tests::un_parametro_tocado_impide_arrancar: test
+genesis::tests::una_coinbase_cambiada_invalida_el_genesis: test
+minero_dev::tests::agota_los_intentos: test
+minero_dev::tests::el_nonce_iterado_es_el_rango_c_hdr_04: test
+minero_dev::tests::encuentra_en_el_primer_intento: test
+minero_dev::tests::es_determinista: test
+minero_dev::tests::la_cancelacion_detiene_el_minado: test
+parametros::tests::el_maximo_dev_es_la_expansion_de_su_bits_iniciales: test
+parametros::tests::las_constantes_precomputadas_cuadran: test
+parametros::tests::los_limites_por_red_son_los_esperados: test
+timestamps::tests::el_ftl_es_no_permanente_y_depende_del_perfil: test
+timestamps::tests::el_minero_avanza_respecto_al_padre: test
+timestamps::tests::la_monotonia_es_estricta_y_permanente: test
+transicion::tests::coinbase_post_a_otra_clave_se_rechaza: test
+transicion::tests::coinbase_post_en_posicion_dos_se_rechaza: test
+transicion::tests::coinbase_pow_sin_salidas_se_rechaza: test
+transicion::tests::deposito_con_cambio_crea_el_cambio_y_acredita_la_garantia: test
+transicion::tests::dos_coinbases_se_rechazan: test
+transicion::tests::fusion_descarta_doble_gasto: test
+transicion::tests::fusion_descarta_liberacion_prematura: test
+transicion::tests::fusion_descarta_retiro_duplicado: test
+transicion::tests::fusion_recorta_la_coinbase_post: test
+transicion::tests::multisig_2_de_3_autoriza_y_el_orden_importa: test
+transicion::tests::un_testigo_invalido_puede_coincidir_con_el_compromiso: test
+
+76 tests, 0 benchmarks
+     Running tests/diferencial_t01.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/diferencial_t01-589c3a69dae66d0e)
+diferencial_t01: test
+
+1 test, 0 benchmarks
+     Running tests/pow_dev.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/pow_dev-f92b17b8552ce9d2)
+v5_cadena_dev_minada_y_validada: test
+v6_retarget_dev_responde_y_no_supera_el_maximo: test
+
+2 tests, 0 benchmarks
+     Running tests/transicion_prop.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/transicion_prop-c7a9cf88e0f1c7ab)
+la_aplicacion_es_determinista: test
+undo_exacto_e_i1_en_secuencias_validas: test
+
+2 tests, 0 benchmarks
+     Running tests/verificador_pow.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/verificador_pow-1a6215bdc0bf7370)
+el_hash_pow_de_sha3_dev_tambien_valida: test
+el_target_esperado_estable_es_el_de_arranque: test
+un_branch_id_de_mainnet_en_la_red_dev_invalida: test
+un_hash_pow_igual_al_target_invalida: test
+un_hash_pow_mayor_que_el_target_invalida: test
+un_prev_hash_distinto_invalida: test
+un_timestamp_futuro_es_rechazo_diferible: test
+un_timestamp_igual_al_del_padre_invalida_permanentemente: test
+una_altura_dos_por_encima_del_padre_invalida: test
+una_altura_igual_a_la_del_padre_invalida: test
+una_cabecera_correcta_valida: test
+unos_bits_distintos_de_los_esperados_invalidan: test
+unos_bits_fuera_de_los_limites_de_la_red_invalidan: test
+unos_bits_no_canonicos_invalidan: test
+
+14 tests, 0 benchmarks
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/zx_core-e8f2dfba90ee8dcc)
+address::tests::bech32_tiene_el_defecto_de_insercion_y_bech32m_no: test
+address::tests::el_hrp_identifica_la_red: test
+address::tests::ida_y_vuelta: test
+address::tests::no_se_puede_cambiar_de_red_editando_el_hrp: test
+address::tests::se_rechaza_el_checksum_bech32_antiguo: test
+address::tests::se_rechaza_una_longitud_distinta_de_32: test
+address::tests::un_caracter_cambiado_invalida: test
+amount::tests::la_suma_no_desborda_en_silencio: test
+amount::tests::las_fronteras_exactas_son_validas: test
+amount::tests::se_rechazan_los_importes_fuera_de_rango: test
+amount::tests::una_zzk_son_cien_millones_de_brek: test
+digest::tests::digest_se_muestra_en_hex_big_endian: test
+digest::tests::los_newtypes_no_son_intercambiables: test
+encoding::compact_size::tests::cada_forma_ocupa_lo_que_debe: test
+encoding::compact_size::tests::el_valor_minimo_de_cada_forma_es_valido: test
+encoding::compact_size::tests::fronteras_exactas_de_cada_forma: test
+encoding::compact_size::tests::se_devuelve_el_resto_sin_tocar: test
+encoding::compact_size::tests::se_rechazan_las_codificaciones_no_minimas: test
+encoding::compact_size::tests::un_buffer_truncado_no_se_lee_a_medias: test
+encoding::int::tests::i64_negativo_en_complemento_a_dos: test
+encoding::int::tests::leer_deja_el_resto_intacto: test
+encoding::int::tests::u32_ida_y_vuelta_en_little_endian: test
+encoding::int::tests::un_buffer_corto_no_se_lee_a_medias: test
+firma::tests::cambiar_el_mensaje_invalida: test
+firma::tests::firmas_de_mensajes_distintos_difieren: test
+firma::tests::la_clave_enlaza_con_la_salida_por_igualdad: test
+firma::tests::la_firma_es_determinista: test
+firma::tests::otra_clave_no_verifica: test
+firma::tests::una_clave_que_no_es_un_punto_se_rechaza: test
+firma::tests::una_firma_manipulada_no_verifica: test
+firma::tests::una_firma_valida_verifica: test
+hash::tests::el_dominio_separa: test
+hash::tests::el_hash_del_vacio_no_es_cero: test
+hash::tests::la_raiz_depende_del_branch_id: test
+hash::tests::las_etiquetas_de_flujo_son_las_de_la_tabla: test
+hash::tests::las_etiquetas_de_garantia_son_las_de_la_tabla: test
+hash::tests::las_etiquetas_fijas_son_unicas: test
+hash::tests::ninguna_etiqueta_fija_empieza_por_el_prefijo_de_la_raiz: test
+hash::tests::sha3_256_del_mensaje_vacio: test
+preimage::block::tests::bits_esta_justo_antes_del_nonce: test
+preimage::block::tests::cada_campo_de_la_cabecera_entra_en_el_hash: test
+preimage::block::tests::cambiar_el_nonce_solo_toca_su_rango: test
+preimage::block::tests::duplicar_la_ultima_hoja_no_da_la_misma_raiz: test
+preimage::block::tests::el_nonce_esta_donde_dice_c_hdr_04: test
+preimage::block::tests::la_cabecera_mide_92_bytes_y_la_preimagen_108: test
+preimage::block::tests::la_lista_vacia_tiene_raiz_propia: test
+preimage::block::tests::la_raiz_depende_del_numero_de_hojas: test
+preimage::block::tests::la_raiz_depende_del_orden: test
+preimage::block::tests::la_raiz_es_determinista: test
+preimage::block::tests::una_sola_hoja_no_es_su_propia_raiz: test
+preimage::dag::tests::bytes_arbitrarios_no_hacen_entrar_en_panico: test
+preimage::dag::tests::cada_campo_de_la_cabecera_y_de_solucion_entra_en_pre_hash: test
+preimage::dag::tests::el_compromiso_del_cuerpo_es_sensible: test
+preimage::dag::tests::el_constructor_rechaza_duplicados_y_repeticion_del_seleccionado: test
+preimage::dag::tests::el_parser_devuelve_el_resto: test
+preimage::dag::tests::el_sello_esta_al_final: test
+preimage::dag::tests::el_sello_zip215_se_verifica: test
+preimage::dag::tests::los_bytes_de_wire_son_los_que_se_hashean: test
+preimage::dag::tests::los_offsets_y_tamanos_son_los_fijados: test
+preimage::dag::tests::los_tamanos_por_numero_de_padres: test
+preimage::dag::tests::merkle_ignora_testigos_y_el_compromiso_no: test
+preimage::dag::tests::mutar_el_sello_cambia_block_hash_pero_no_pre_hash: test
+preimage::dag::tests::rechaza_padres_desordenados: test
+preimage::dag::tests::rechaza_padres_repetidos_y_repetir_el_seleccionado: test
+preimage::dag::tests::rechaza_parent_count_mayor_que_15: test
+preimage::dag::tests::rechaza_truncados_en_cada_frontera: test
+preimage::dag::tests::roundtrip_para_genesis_uno_dos_y_quince_padres: test
+preimage::flow::tests::cambiar_el_hash_del_genesis_cambia_f0: test
+preimage::flow::tests::cambiar_la_entropia_cambia_el_flujo: test
+preimage::flow::tests::cambiar_la_etiqueta_de_flujo_cambia_la_salida: test
+preimage::flow::tests::cambiar_t_j_cambia_el_flujo: test
+preimage::flow::tests::control_detecta_big_endian_en_t_j: test
+preimage::flow::tests::control_detecta_invertir_flujo_y_entropia: test
+preimage::flow::tests::f0_vector_fijo_openssl: test
+preimage::flow::tests::flujo_siguiente_vector_fijo_openssl: test
+preimage::flow::tests::flujo_y_entropia_no_son_intercambiables: test
+preimage::flow::tests::las_salidas_miden_32_bytes_y_son_deterministas: test
+preimage::flow::tests::omitir_la_etiqueta_del_genesis_cambia_f0: test
+preimage::tx::tests::anyonecanpay_aisla_la_entrada_firmada: test
+preimage::tx::tests::cada_campo_de_efecto_entra_en_el_txid: test
+preimage::tx::tests::el_auth_digest_delimita_los_testigos: test
+preimage::tx::tests::el_hash_type_es_un_conjunto_cerrado: test
+preimage::tx::tests::el_importe_gastado_entra_en_el_sighash_pero_no_en_el_txid: test
+preimage::tx::tests::el_sighash_cambia_por_entrada: test
+preimage::tx::tests::el_sighash_cambia_por_modo: test
+preimage::tx::tests::el_txid_depende_del_branch_id: test
+preimage::tx::tests::el_txid_es_determinista: test
+preimage::tx::tests::la_codificacion_de_lock_es_autodelimitada: test
+preimage::tx::tests::las_variantes_de_lock_no_colisionan: test
+preimage::tx::tests::single_sin_salida_correspondiente_falla: test
+preimage::tx::tests::un_indice_de_entrada_invalido_falla: test
+red::tests::cada_red_tiene_su_propio_prefijo: test
+red::tests::el_cbid_de_dev_se_deriva_de_su_formula: test
+red::tests::las_dos_redes_tienen_nombres_distintos: test
+red::tests::los_prefijos_magicos_no_son_utf8_valido: test
+red::tests::los_prefijos_magicos_se_derivan_de_su_formula: test
+target::tests::decodificar_con_aplica_los_limites_de_la_red: test
+target::tests::el_acumulado_aguanta_siglos: test
+target::tests::el_hash_se_interpreta_big_endian: test
+target::tests::el_pow_compara_estrictamente_menor: test
+target::tests::el_target_inicial_apunta_a_un_bloque_de_t_segundos: test
+target::tests::el_target_inicial_es_representable_y_cabe_bajo_pow_limit: test
+target::tests::el_trabajo_acumulado_no_desborda_en_silencio: test
+target::tests::el_trabajo_es_2_elevado_256_entre_target_mas_uno: test
+target::tests::ida_y_vuelta_de_bits_canonico: test
+target::tests::los_limites_antiguos_coinciden_con_sus_funciones: test
+target::tests::mainnet_arranca_32_veces_mas_dificil_que_testnet: test
+target::tests::menos_target_es_mas_trabajo: test
+target::tests::se_rechaza_el_target_fuera_de_rango: test
+target::tests::se_rechazan_los_bits_no_canonicos: test
+tx::tests::dieciseis_claves_es_el_limite_exacto: test
+tx::tests::los_discriminantes_son_los_del_spec: test
+tx::tests::multisig_rechaza_claves_repetidas: test
+tx::tests::multisig_rechaza_k_fuera_de_rango: test
+tx::tests::multisig_rechaza_n_fuera_de_rango: test
+tx::tests::multisig_valido: test
+wire::tests::cada_campo_de_la_cabecera_llega_a_los_bytes: test
+wire::tests::la_cabecera_da_la_vuelta_completa: test
+wire::tests::la_transaccion_da_la_vuelta_completa: test
+wire::tests::las_longitudes_de_lock_son_las_del_spec: test
+wire::tests::los_bytes_de_la_cabecera_son_los_que_se_hashean: test
+wire::tests::los_tres_locks_dan_la_vuelta: test
+wire::tests::un_compact_size_no_minimo_se_rechaza: test
+wire::tests::un_contador_mentiroso_de_testigos_tambien_se_rechaza: test
+wire::tests::un_contador_mentiroso_se_rechaza_sin_reservar: test
+wire::tests::un_discriminante_desconocido_se_rechaza: test
+wire::tests::un_importe_fuera_de_rango_se_rechaza_al_leer: test
+wire::tests::un_multisig_con_claves_repetidas_se_rechaza_al_leer: test
+wire::tests::un_multisig_con_n_absurdo_no_reserva_memoria: test
+wire::tests::un_testigo_que_miente_su_longitud_se_rechaza: test
+wire::tests::una_cabecera_truncada_se_rechaza_en_todo_punto: test
+wire::tests::una_transaccion_truncada_se_rechaza_en_todo_punto: test
+wire::tests_cuerpo::ningun_byte_arbitrario_hace_entrar_en_panico: test
+wire::tests_cuerpo::un_bloque_da_la_vuelta_completa: test
+wire::tests_cuerpo::un_bloque_truncado_nunca_se_acepta_a_medias: test
+wire::tests_cuerpo::un_bloque_vacio_da_la_vuelta: test
+wire::tests_cuerpo::un_contador_de_transacciones_mentiroso_se_rechaza: test
+wire_dag::tests::el_bloque_maximo_mide_exactamente_el_agregado: test
+wire_dag::tests::el_verificador_pot_no_finge_exito: test
+wire_dag::tests::justificacion_de_cero_uno_y_150_bundles: test
+wire_dag::tests::la_cabecera_minima_y_la_maxima: test
+wire_dag::tests::la_codificacion_del_bloque_es_inyectiva: test
+wire_dag::tests::la_diferencia_de_slots_se_comprueba_sobre_el_bloque: test
+wire_dag::tests::los_tamanos_son_los_presupuestados: test
+wire_dag::tests::nuevo_rechaza_el_descuadre_en_las_dos_direcciones: test
+wire_dag::tests::rechaza_151_bundles_antes_de_reservar: test
+wire_dag::tests::truncados_y_basura_no_hacen_panico: test
+wire_dag::tests::un_bundle_conserva_ocho_outputs: test
+
+148 tests, 0 benchmarks
+     Running tests/cavp_sha3_256.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/cavp_sha3_256-b4e1b300efea0aed)
+ancla_mensaje_vacio: test
+cavp_long_msg: test
+cavp_monte_carlo: test
+cavp_short_msg: test
+
+4 tests, 0 benchmarks
+     Running tests/ed25519_no_unicidad.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/ed25519_no_unicidad-9c29c82273a4aaba)
+dos_firmas_distintas_del_propietario_verifican_el_mismo_mensaje: test
+
+1 test, 0 benchmarks
+     Running tests/formato_v0.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/formato_v0-d971c849ca7a2f9c)
+cada_campo_de_la_extension_y_la_version_cambia_el_txid: test
+el_codec_rechaza_un_importe_de_extension_fuera_de_rango: test
+el_codec_rechaza_una_extension_truncada_y_no_consume_sobrantes: test
+el_codec_rechaza_versiones_y_tipos_fuera_de_rango: test
+el_deposito_sin_entradas_se_rechaza: test
+el_importe_de_la_extension_debe_ser_positivo: test
+el_recuento_de_testigos_de_v2_es_n_in_mas_uno: test
+el_testigo_de_aceptacion_mide_64_bytes: test
+la_altura_de_una_cabecera_post_debe_ser_cero: test
+la_coinbase_post_no_lleva_entradas_salidas_ni_testigos: test
+la_firma_de_aceptacion_verifica_y_rechaza: test
+la_version_y_la_extension_deben_ser_coherentes: test
+las_salidas_htlc_estan_inactivas: test
+las_versiones_fuera_de_rango_se_rechazan: test
+los_campos_de_altura_estan_inactivos: test
+los_casos_validos_de_forma_pasan: test
+los_tres_txid_v1_antiguos_se_reproducen: test
+los_vectores_del_oraculo_julia_coinciden: test
+retiro_y_liberacion_no_admiten_entradas_ni_salidas: test
+
+19 tests, 0 benchmarks
+     Running tests/oraculo_julia.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/oraculo_julia-4a9b75d62fe9a044)
+el_oraculo_julia_coincide_con_la_implementacion: test
+
+1 test, 0 benchmarks
+     Running tests/parsers_dag_prop.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/parsers_dag_prop-eecb5cac2af6bcde)
+bloque_dag_desde_bytes_no_entra_en_panico: test
+dag_header_desde_bytes_no_entra_en_panico: test
+
+2 tests, 0 benchmarks
+     Running tests/vectores_dag.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/vectores_dag-e31453d016adb19c)
+el_wire_congelado_se_recalcula: test
+los_hashes_congelados_se_recalculan: test
+los_offsets_congelados_del_wire: test
+un_byte_del_wire_cambia_el_hash: test
+
+4 tests, 0 benchmarks
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/zx_dag-38bd978038e59f99)
+bloque_dag::tests::acepta_ambos_compromisos_correctos: test
+bloque_dag::tests::distingue_cual_de_los_dos_falla: test
+bloque_dag::tests::dos_padres_en_relacion_de_ancestro_se_rechazan: test
+bloque_dag::tests::el_constructor_de_oraculos_no_valida_y_lo_declara: test
+bloque_dag::tests::el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpla: test
+bloque_dag::tests::el_padre_seleccionado_con_slot_posterior_se_rechaza: test
+bloque_dag::tests::el_rango_se_exige_exacto_y_nunca_sale_del_campo: test
+bloque_dag::tests::el_rango_validado_sale_del_contexto_y_no_del_candidato: test
+bloque_dag::tests::el_terminal_como_padre_extra_se_rechaza: test
+bloque_dag::tests::la_ruta_lineal_y_la_dag_son_tipos_distintos: test
+bloque_dag::tests::la_transicion_con_dos_padres_se_rechaza: test
+bloque_dag::tests::la_transicion_con_el_terminal_como_unico_padre_pasa: test
+bloque_dag::tests::la_vista_de_rango_no_imprime_rango_solucion: test
+bloque_dag::tests::padres_con_slots_anteriores_pasan: test
+bloque_dag::tests::padres_validados_y_anticadena_pasan: test
+bloque_dag::tests::todos_los_padres_con_el_mismo_slot_que_b_pasan: test
+bloque_dag::tests::un_padre_desconocido_no_tiene_slot_y_se_rechaza: test
+bloque_dag::tests::un_padre_no_validado_se_rechaza: test
+bloque_dag::tests::un_padre_pow_ajeno_se_rechaza: test
+bloque_dag::tests::un_padre_validado_sin_slot_contextual_es_error_explicito: test
+bloque_dag::tests::un_prev_hash_que_no_es_sp_se_rechaza: test
+bloque_dag::tests::una_cabecera_sin_padres_se_rechaza_siempre: test
+dag_causal::tests::el_diamante_de_la_fuente_en_memoria_coincide_con_la_vista_estructural: test
+dag_causal::tests::la_ausencia_en_la_fuente_es_contexto_incompleto: test
+dag_causal::tests::la_fuente_que_falla_llega_como_error_de_fuente: test
+ghostdag::tests::acumular_sin_sr_almacenado_es_incoherencia: test
+ghostdag::tests::con_raiz_terminal_fija_slot_cero_y_hereda_el_peso_de_t: test
+ghostdag::tests::el_duplicado_se_rechaza_antes_de_mutar_el_almacen: test
+ghostdag::tests::eq_hash_y_ord_de_la_identidad_son_consistentes: test
+ghostdag::tests::los_extremos_del_sr_validado_dan_los_pesos_de_c_gd_01: test
+ghostdag::tests::u2_con_estado_incoherente_falla_sin_mutar: test
+identidad::tests::cambiar_cualquier_campo_cambia_la_huella: test
+identidad::tests::el_dominio_y_la_version_forman_parte_de_la_preimagen: test
+identidad::tests::el_slot_se_lee_de_la_identidad: test
+identidad::tests::identidad_de_cabecera_deriva_la_tupla_literal: test
+identidad::tests::la_huella_mide_32_bytes_y_es_determinista: test
+
+36 tests, 0 benchmarks
+     Running tests/dag_causal.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/dag_causal-508ccd286b526412)
+dos_padres_del_mismo_slot_se_conservan_sin_indexar_por_slot: test
+el_candidato_en_su_propio_pasado_por_la_fuente_es_error_tipado: test
+el_diamante_une_los_padres_y_comparte_el_ancestro_una_vez: test
+el_error_de_la_fuente_se_propaga_por_su_variante: test
+el_orden_interno_de_la_fuente_no_cambia_la_vista: test
+el_presupuesto_suficiente_construye_y_el_menor_falla_sin_truncar: test
+el_terminal_sin_padres_no_tiene_pasado: test
+falta_el_padre_seleccionado_da_contexto_incompleto: test
+falta_un_ancestro_profundo_da_contexto_incompleto: test
+falta_un_padre_extra_da_contexto_incompleto: test
+los_ancestros_salen_en_orden_ascendente_de_hash: test
+presupuesto_cero_agota_antes_de_leer: test
+un_candidato_que_la_fuente_no_ofrece_no_cuenta_como_ancestro: test
+un_ciclo_es_incoherencia_y_no_un_bucle_infinito: test
+un_padre_directo_igual_al_candidato_se_rechaza_antes_del_presupuesto: test
+un_registro_bajo_otra_clave_es_incoherencia: test
+
+16 tests, 0 benchmarks
+     Running tests/ghostdag_bench.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/ghostdag_bench-6d997aefda44eec1)
+bench_coloreo_mergeset_maximo: test
+
+1 test, 0 benchmarks
+     Running tests/ghostdag_oraculo.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/ghostdag_oraculo-8d86fcc67a5054b3)
+el_kernel_rust_coincide_con_gdr_v0_2: test
+la_referencia_rust_coincide_con_gdr_v0_2: test
+los_vectores_de_rusty_kaspa_pasan: test
+
+3 tests, 0 benchmarks
+     Running tests/ghostdag_prop.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/ghostdag_prop-6456211b1f801f1b)
+ancestria_estricta: test
+la_semilla_fija_es_reproducible: test
+referencia_y_kernel_coinciden: test
+
+3 tests, 0 benchmarks
+     Running tests/ghostdag_rust.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/ghostdag_rust-94b5622fc9a60bf1)
+admitir_deriva_la_identidad_de_la_cabecera: test
+admitir_rechaza_el_rango_declarado_que_no_es_el_esperado: test
+bordes_exactos_de_mergeset_180_y_181: test
+copia_de_billete_direccion_coherente_entre_padres_y_mergeset: test
+desbordamiento_de_blue_work_es_error_explicito: test
+determinismo_con_mil_ordenes_de_llegada: test
+el_duplicado_por_admitir_se_rechaza_sin_consultar_el_contexto: test
+el_duplicado_por_anadir_sintetico_se_rechaza_sin_mutar: test
+el_padre_adicional_con_slot_posterior_se_rechaza_aunque_el_seleccionado_cumpla: test
+el_padre_seleccionado_con_slot_posterior_se_rechaza_en_los_dos_algoritmos: test
+el_peso_usa_el_sr_validado_en_los_dos_algoritmos: test
+el_prev_hash_que_no_es_sp_se_rechaza_contra_el_almacen_real: test
+el_rango_contextual_correcto_e_incorrecto: test
+el_rechazo_por_slot_deja_el_almacen_intacto: test
+el_slot_contextual_del_almacen_real_es_explicito: test
+el_sr_sintetico_libre_sigue_siendo_una_puerta_trasera: test
+el_terminal_como_padre_extra_se_rechaza_contra_el_almacen_real: test
+identidades_distintas_con_misma_proyeccion_no_disparan_u2_ni_u3: test
+la_anticadena_se_comprueba_contra_el_almacen_real: test
+la_cabecera_sin_padres_se_rechaza_contra_el_almacen_real: test
+la_misma_identidad_literal_dispara_u2_y_u3: test
+la_transicion_valida_con_el_terminal_como_unico_padre_pasa: test
+los_extremos_del_sr_se_acumulan_en_blue_work: test
+padres_con_slots_anteriores_se_aceptan: test
+padres_validados_y_anticadena_pasan_contra_el_almacen_real: test
+peso_fronteras: test
+quince_padres_se_aceptan_y_dieciseis_se_rechazan: test
+rank_es_total_sobre_el_corpus: test
+referencia_y_kernel_coinciden_en_dags_generados: test
+sp_elige_el_mayor_blue_work: test
+sp_empatado_en_bw_elige_el_menor_sd: test
+sp_empatado_en_bw_y_sd_elige_el_menor_id: test
+todo_padre_tiene_menor_rank_que_su_hijo: test
+todos_los_padres_con_el_mismo_slot_que_b_se_aceptan: test
+u2_invalida_y_u3_colorea: test
+un_billete_real_de_bytes_cero_no_es_ausencia: test
+un_contexto_puede_devolver_el_sr_declarado_como_esperado: test
+un_padre_desconocido_se_rechaza_sin_tocar_el_almacen: test
+un_padre_no_validado_se_rechaza_contra_el_almacen_real: test
+un_padre_pow_ajeno_se_rechaza_contra_el_almacen_real: test
+un_sr_validado_no_se_puede_colocar_en_otro_bloque: test
+
+41 tests, 0 benchmarks
+     Running tests/padres_dp08.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/padres_dp08-d259671ff351838f)
+v6_cero_padres_se_rechaza: test
+v6_descendiente_post_valido_pasa: test
+v6_padre_pow_ajeno_se_rechaza: test
+v6_terminal_como_padre_extra_se_rechaza: test
+v6_transicion_con_dos_padres_se_rechaza: test
+v6_transicion_valida_con_el_terminal_como_unico_padre_pasa: test
+
+6 tests, 0 benchmarks
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/zx_farmer-46afe91822749bca)
+0 tests, 0 benchmarks
+     Running tests/extremo_a_extremo.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/extremo_a_extremo-6cf66e945d276c35)
+v5_auditoria_con_reto_explicito_coincide: test
+v5_tres_soluciones_honestas_son_aceptadas: test
+v6_chunk_alterado_se_rechaza: test
+v6_contexto_con_otro_compromiso_se_rechaza: test
+v6_contexto_con_otro_history_size_se_rechaza: test
+v6_contexto_con_recent_segments_desbordado_se_rechaza: test
+v6_history_size_cero_se_rechaza: test
+v6_history_size_no_nulo_alterado_se_rechaza: test
+v6_piece_offset_alterado_se_rechaza: test
+v6_proof_of_space_alterada_se_rechaza: test
+v6_public_key_alterada_se_rechaza: test
+v6_sector_index_alterado_se_rechaza: test
+
+12 tests, 0 benchmarks
+     Running tests/farmer_disco.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/farmer_disco-01ad182bee34ba3f)
+abrir_rechaza_metadata_bien_checksummada_pero_incoherente: test
+abrir_rechaza_metadata_sparse_sobredimensionada_sin_leerla: test
+abrir_rechaza_par_incompleto_clave_erronea_y_truncado: test
+abrir_rechaza_sector_y_metadata_corruptos: test
+auditar_candidatos_coincide_con_oraculo_y_resumen: test
+auditoria_usa_el_descriptor_verificado_tras_sustituir_la_ruta: test
+convierte_candidatos_y_verifica_a1: test
+dos_escritores_concurrentes_publican_uno_solo: test
+lock_preexistente_falla_cerrado_sin_tocar_al_primero: test
+plotea_reabre_y_audita_por_slot_con_reinicio: test
+ploteo_sobre_par_existente_rechaza_y_conserva_el_previo: test
+plotter_fallido_no_deja_par_ni_lock: test
+
+12 tests, 0 benchmarks
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/zx_p2p-0a33637b5e1c07de)
+behaviour::tests::el_id_de_mensaje_depende_del_tema_y_del_contenido: test
+behaviour::tests::el_id_de_mensaje_mide_32_bytes: test
+behaviour::tests::identify_anuncia_zerox_y_no_la_libreria: test
+behaviour::tests::la_malla_es_la_de_produccion_y_no_la_de_fabrica: test
+behaviour::tests::la_red_dev_construye_con_sync_y_temas_propios_y_sin_mdns: test
+behaviour::tests::la_suscripcion_son_los_dos_temas_exactos_de_la_red: test
+behaviour::tests::mdns_solo_esta_en_testnet: test
+behaviour::tests::ningun_tema_suscrito_viene_de_la_otra_red: test
+behaviour::tests::parametros_del_nodo_no_emite_trafico_ni_eventos: test
+behaviour::tests::se_construye_en_las_tres_redes: test
+behaviour::tests::sin_margen_de_transporte_no_se_construye: test
+codec::tests::el_booleano_de_parada_debe_ser_canonico: test
+codec::tests::el_booleano_del_terminal_debe_ser_canonico: test
+codec::tests::el_codec_da_la_vuelta_por_un_stream: test
+codec::tests::el_magic_no_es_una_barrera_del_wire: test
+codec::tests::el_relleno_sobrante_se_rechaza: test
+codec::tests::los_bloques_dan_la_vuelta_por_familia: test
+codec::tests::ningun_byte_arbitrario_hace_entrar_en_panico: test
+codec::tests::sin_presupuesto_la_lectura_se_rechaza: test
+codec::tests::todas_las_peticiones_dan_la_vuelta: test
+codec::tests::todas_las_respuestas_dan_la_vuelta: test
+codec::tests::un_bloque_demasiado_grande_se_rechaza: test
+codec::tests::un_contador_no_minimo_se_rechaza: test
+codec::tests::un_discriminante_desconocido_se_rechaza: test
+codec::tests::un_estado_con_demasiadas_puntas_post_se_rechaza: test
+codec::tests::un_locator_mentiroso_se_rechaza_sin_reservar: test
+codec::tests::un_lote_lleno_de_cabeceras_pasa_la_cota: test
+codec::tests::un_mensaje_truncado_nunca_se_acepta_a_medias: test
+codec::tests::una_familia_cambiada_se_rechaza: test
+codec::tests::una_familia_desconocida_se_rechaza: test
+codec::tests::una_lectura_correcta_devuelve_su_reserva: test
+codec::tests::una_peticion_con_demasiados_hashes_se_rechaza: test
+codec::tests::una_peticion_demasiado_grande_se_rechaza_por_tamano_y_no_por_parseo: test
+codec::tests::una_respuesta_con_contador_mentiroso_se_rechaza: test
+config::tests::cada_perfil_tiene_sus_dos_temas_y_no_hay_suscripcion_cruzada: test
+config::tests::el_agent_version_dev_no_se_hace_pasar_por_publico: test
+config::tests::kademlia_nunca_usa_el_protocolo_de_ipfs: test
+config::tests::la_red_dev_no_comparte_nada_con_las_publicas: test
+config::tests::la_red_dev_usa_los_nombres_de_la_orden: test
+config::tests::los_nombres_de_protocolo_tienen_la_forma_que_libp2p_exige: test
+config::tests::los_prefijos_vienen_de_la_red_y_no_de_una_copia: test
+config::tests::mainnet_y_testnet_conservan_sus_puertos: test
+config::tests::ninguna_red_comparte_nada_con_la_otra: test
+error::tests::excedido_puntua_pero_admite_cinco_avisos: test
+error::tests::la_violacion_de_consenso_banea_de_un_golpe: test
+error::tests::lento_e_ilegible_nunca_puntuan: test
+limites::tests::el_limite_de_bloque_red_se_deriva: test
+limites::tests::el_limite_de_gossip_admite_bloques_reales: test
+limites::tests::sin_margen_suficiente_se_detecta: test
+limites::tests::un_lote_lleno_de_bloques_cabe_en_una_respuesta: test
+limites::tests::un_lote_lleno_de_cabeceras_cabe_en_una_respuesta: test
+limites::tests::un_lote_lleno_de_hashes_cabe_en_una_peticion: test
+limites_ip::tests::el_prefijo_se_extrae_de_una_multiaddr: test
+limites_ip::tests::el_registro_de_baneos_no_crece_sin_limite: test
+limites_ip::tests::las_ips_del_mismo_prefijo_cuentan_como_una: test
+limites_ip::tests::los_puntos_se_acumulan_hasta_el_umbral: test
+limites_ip::tests::un_prefijo_baneado_se_deniega_de_inmediato: test
+limites_ip::tests::una_violacion_de_consenso_banea_de_un_golpe: test
+mensaje::tests::el_byte_de_red_es_cerrado: test
+mensaje::tests::la_cota_de_puntas_post_es_dieciseis: test
+mensaje::tests::las_familias_y_fases_tienen_byte_cerrado: test
+mensaje::tests::los_discriminantes_no_colisionan: test
+mensaje::tests::no_disponible_no_vale_como_saludo: test
+mensaje::tests::una_respuesta_del_tipo_equivocado_se_detecta: test
+presupuesto::tests::el_borde_exacto_del_techo: test
+presupuesto::tests::el_presupuesto_por_defecto_acota_el_peor_caso: test
+presupuesto::tests::la_concurrencia_no_puede_superar_el_techo: test
+presupuesto::tests::liberar_deja_sitio: test
+presupuesto::tests::no_se_puede_pasar_del_techo: test
+presupuesto::tests::un_panico_tambien_libera: test
+presupuesto::tests::una_reserva_ocupa_y_al_soltarse_libera: test
+servicio::tests::el_bloque_bien_formado_llega_una_vez: test
+servicio::tests::el_bloque_post_llega_por_su_tema: test
+servicio::tests::el_presupuesto_agotado_ignora_y_no_penaliza: test
+servicio::tests::la_clasificacion_es_exacta: test
+servicio::tests::residuo_truncado_y_tema_desconocido: test
+servicio::tests::un_bloque_con_el_tema_de_otra_familia_se_rechaza: test
+
+77 tests, 0 benchmarks
+     Running tests/dos_nodos.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/dos_nodos-fa2b0ce3428653e1)
+dos_nodos_se_conectan_y_se_ven: test
+el_bucle_termina_al_soltar_los_handles: test
+el_saludo_recorre_el_camino_completo: test
+no_tener_un_bloque_es_una_respuesta_legitima: test
+pedir_bloques_por_hash_devuelve_el_bloque: test
+pedir_cabeceras_llega_al_manejador_del_otro_lado: test
+un_bloque_post_viaja_y_llega_al_callback: test
+un_bloque_pow_viaja_y_llega_al_callback: test
+un_genesis_ajeno_desconecta: test
+un_handle_sin_bucle_devuelve_error_y_no_panic: test
+
+10 tests, 0 benchmarks
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/zx_poas-fa4b710941fd2ad8)
+protocolo_dev::tests::los_valores_dev_son_los_de_la_orden: test
+reto::tests::el_reto_es_blake3_de_aleatoriedad_mas_slot_le: test
+reto::tests::el_slot_cambia_el_reto_y_la_salida_tambien: test
+
+3 tests, 0 benchmarks
+     Running tests/historia_genesis.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/historia_genesis-2b08362560d0ba7a)
+el_compromiso_de_la_historia_genesis_es_determinista_y_congelado: test
+un_compromiso_mutado_devuelve_el_error_tipado: test
+
+2 tests, 0 benchmarks
+     Running tests/poas.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/poas-cdca6f4b827ba06e)
+chunk_witness_mutada_falla: test
+current_history_size_maximo_es_contexto_invalido_sin_panic: test
+history_size_cero_es_error_sin_panic: test
+history_size_del_candidato_que_no_cabe_es_entrada_no_canonica: test
+min_sector_lifetime_desbordado_devuelve_invalid_history_size_sin_panic: test
+positivo_devuelve_la_distancia_de_la_fixture: test
+producto_del_umbral_reciente_es_contexto_invalido_sin_panic: test
+proof_of_space_mutada_falla: test
+rango_por_debajo_de_la_distancia_falla: test
+recent_segments_saturado_es_contexto_invalido_sin_panic: test
+record_commitment_mutada_falla: test
+record_witness_mutada_falla: test
+resta_reciente_negativa_es_contexto_invalido_sin_panic: test
+salida_pot_equivocada_falla: test
+slot_equivocado_falla: test
+
+15 tests, 0 benchmarks
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/zx_pot-0009b46f1bce74bc)
+aes::tests::test_create_verify: test
+
+1 test, 0 benchmarks
+     Running tests/contexto_verificado.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/contexto_verificado-f3eff286d9f8f7b8)
+cada_checkpoint_es_necesario_aunque_la_salida_final_coincida: test
+trabajo_mal_formado_es_error_no_un_checkpoint_pendiente: test
+una_prueba_no_se_reutiliza_con_otra_semilla_o_cantidad_de_trabajo: test
+
+3 tests, 0 benchmarks
+     Running tests/diferencial.rs (/home/katana/zeo/ZEROX/deepseek/W05b2R/target/debug/deps/diferencial-797fa14be214d753)
+el_port_a_estable_es_byte_a_byte_identico_al_original: test
+
+1 test, 0 benchmarks
+   Doc-tests zx_consensus
+0 tests, 0 benchmarks
+   Doc-tests zx_core
+0 tests, 0 benchmarks
+   Doc-tests zx_dag
+crates/zx-dag/src/bloque_dag.rs - bloque_dag::ContextoRangoDag (line 95): test
+
+1 test, 0 benchmarks
+   Doc-tests zx_farmer
+0 tests, 0 benchmarks
+   Doc-tests zx_p2p
+0 tests, 0 benchmarks
+   Doc-tests zx_poas
+0 tests, 0 benchmarks
+   Doc-tests zx_pot
+0 tests, 0 benchmarks

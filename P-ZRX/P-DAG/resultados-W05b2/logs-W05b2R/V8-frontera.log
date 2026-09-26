@@ -1,0 +1,11 @@
+# ORDEN-W05b2-R V8-frontera-crates
+# cd /home/katana/zeo/ZEROX/deepseek/W05b2R/ws
+# bash ci/frontera-crates.sh
+
+"OK — frontera zx-consensus → {zx-core}"
+"OK — frontera zx-dag → {zx-core}"
+"OK — frontera zx-poas → {zx-core,zx-consensus}"
+"OK — frontera zx-farmer → {zx-core,zx-poas}"
+"OK — frontera zx-post → {zx-core,zx-pot,zx-dag,zx-poas}"
+"OK — frontera zx-p2p → {zx-core}"
+exit=0

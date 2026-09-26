@@ -19,3 +19,6 @@ precede a la migración de W06c).
 
 **No demuestra:** estado ni garantía del productor (motor W03/W06a), admisión en el nodo, red, sesgo
 de la semilla (A-07), seguridad de los parámetros dev.
+
+**Migración (03:34):** rebase W05b2-R (DeepSeek, 03:22–03:33) sobre la raíz con W06c y W03: 620 tests,
+0 perdidos; lock +19/−0 (solo `zx-post`); `MIGRACION.sha256` (147 archivos) verificado en la raíz.

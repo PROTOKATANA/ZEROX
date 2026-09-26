@@ -41,4 +41,5 @@ cargo metadata --locked --no-deps --format-version 1 | jq -e '
     frontera("zx-dag"; ["zx-core"]),
     frontera("zx-poas"; ["zx-core", "zx-consensus"]),
     frontera("zx-farmer"; ["zx-core", "zx-poas"]),
+    frontera("zx-post"; ["zx-core", "zx-pot", "zx-dag", "zx-poas"]),
     frontera("zx-p2p"; ["zx-core"])'

@@ -1,0 +1,36 @@
+[package]
+name         = "zx-post"
+description  = "PoT puro, núcleo de rango PoT, puerta conjunta de cabecera PoST, contexto de transición dev, justificación PoT del wire y productor del bloque de transición"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror       = { workspace = true }
+blake3          = { workspace = true }
+primitive-types = { workspace = true }
+ed25519-zebra   = { workspace = true }
+zx-core         = { path = "../zx-core" }
+zx-pot          = { path = "../zx-pot" }
+zx-dag          = { path = "../zx-dag" }
+zx-poas         = { path = "../zx-poas" }
+
+# ── Autonomys por ruta al clon fijado `PDF/autonomys-subspace` @ f8842d0 ────────────────────────
+# La puerta conjunta recibe el contexto de pieza y el KZG por firma; no se copia ni se reimplementa
+# PoS, KZG ni erasure coding. El verificador real (paso 5) vive en `zx-poas`.
+subspace-kzg          = { path = "../../PDF/autonomys-subspace/shared/subspace-kzg", default-features = false, features = ["std"] }
+subspace-verification = { path = "../../PDF/autonomys-subspace/crates/subspace-verification" }
+
+[dev-dependencies]
+# §3.1: `zx-consensus` entra solo como `dev-dependency` (la excepción declarada) para minar la cadena
+# PoW dev de la prueba V5. `zx-farmer` entra como `dev-dependency` para implementar el puente real
+# `FuenteSoluciones → ParcelaDisco` en los tests; `frontera-crates.sh` solo mira dependencias que no
+# son `dev`, así que la frontera §V8 `zx-post → {zx-core, zx-pot, zx-dag, zx-poas}` se conserva.
+zx-consensus             = { path = "../zx-consensus" }
+zx-farmer                = { path = "../zx-farmer" }
+subspace-core-primitives = { path = "../../PDF/autonomys-subspace/crates/subspace-core-primitives", default-features = false, features = ["std"] }

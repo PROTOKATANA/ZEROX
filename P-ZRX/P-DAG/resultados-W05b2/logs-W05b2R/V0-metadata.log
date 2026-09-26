@@ -1,0 +1,5 @@
+# ORDEN-W05b2-R V0-metadata
+# cd /home/katana/zeo/ZEROX/deepseek/W05b2R/ws
+# cargo metadata --format-version 1 >/dev/null
+
+exit=0
