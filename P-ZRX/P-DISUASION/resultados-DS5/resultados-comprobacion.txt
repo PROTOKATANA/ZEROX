@@ -1,0 +1,41 @@
+=== 1) Cota superior de M4 bajo la grieta (cualquier forma con perdida<=V) ===
+f_e=0.0  perdida/clave<=0.0 u.e.  total<=0.0 u.e.  razon frente al soborno nominal total = 0.0
+f_e=0.5  perdida/clave<=0.005 u.e.  total<=1.395 u.e.  razon frente al soborno nominal total = 2.73e-6
+f_e=1.0  perdida/clave<=0.01 u.e.  total<=2.79 u.e.  razon frente al soborno nominal total = 5.46e-6
+
+=== 2) Forma M4-1 (C-SLA-03, cuenta n_e) con b,c ilustrativos (PENDIENTES en SPEC) ===
+b=0.1 c=0.01 n_e=1 -> f_e=0.1
+b=0.1 c=0.01 n_e=10 -> f_e=0.19
+b=0.1 c=0.01 n_e=100 -> f_e=1.0
+b=0.1 c=0.01 n_e=279 -> f_e=1.0
+b=0.1 c=0.001 n_e=1 -> f_e=0.1
+b=0.1 c=0.001 n_e=10 -> f_e=0.109
+b=0.1 c=0.001 n_e=100 -> f_e=0.199
+b=0.1 c=0.001 n_e=279 -> f_e=0.378
+b=0.05 c=0.0001 n_e=1 -> f_e=0.05
+b=0.05 c=0.0001 n_e=10 -> f_e=0.0509
+b=0.05 c=0.0001 n_e=100 -> f_e=0.0599
+b=0.05 c=0.0001 n_e=279 -> f_e=0.0778
+
+=== 3) Forma M4-2 (estilo Ethereum, fraccion de saldo S_e/T) ===
+gamma=1.0 S_e=1.0 T=1.0e6 -> f_e=1.0e-6
+gamma=1.0 S_e=100.0 T=1.0e6 -> f_e=0.0001
+gamma=1.0 S_e=10000.0 T=1.0e6 -> f_e=0.01
+gamma=1.0 S_e=334000.0 T=1.0e6 -> f_e=0.334
+gamma=3.0 S_e=1.0 T=1.0e6 -> f_e=3.0e-6
+gamma=3.0 S_e=100.0 T=1.0e6 -> f_e=0.0003
+gamma=3.0 S_e=10000.0 T=1.0e6 -> f_e=0.03
+gamma=3.0 S_e=334000.0 T=1.0e6 -> f_e=1.0
+
+=== 4) Honesto correlacionado catastrofico (M4-1): umbral de c para no saturar ===
+N_activos=1000 p_share=0.01 -> n_e=10  c_max_sin_saturar=0.1
+N_activos=1000 p_share=0.05 -> n_e=50  c_max_sin_saturar=0.01837
+N_activos=1000 p_share=0.1 -> n_e=100  c_max_sin_saturar=0.009091
+N_activos=10000 p_share=0.01 -> n_e=100  c_max_sin_saturar=0.009091
+N_activos=10000 p_share=0.05 -> n_e=500  c_max_sin_saturar=0.001804
+N_activos=10000 p_share=0.1 -> n_e=1000  c_max_sin_saturar=0.0009009
+N_activos=100000 p_share=0.01 -> n_e=1000  c_max_sin_saturar=0.0009009
+N_activos=100000 p_share=0.05 -> n_e=5000  c_max_sin_saturar=0.00018
+N_activos=100000 p_share=0.1 -> n_e=10000  c_max_sin_saturar=9.001e-5
+julia version 1.13.0
+Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux

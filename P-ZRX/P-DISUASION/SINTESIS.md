@@ -17,7 +17,7 @@ aplicado (Katana):** un mecanismo que no cierra un hueco pero encarece el ataque
 | **Finalidad `C-FIN-01`** (ya en ZEROX) | Reorganizaciones profundas | Acota la profundidad, no el umbral | **Sí**, estructural | **Sí**, acota daño |
 | **Castigo por evidencia + retención** (M3 + M5) | Doble farmeo y equivocación | **Δ = 0** frente al atacante grande: compra el espacio en claves pequeñas sin saldo que perder | **No**: condicionado a que publique y a que tenga saldo | **Solo contra el atacante pequeño** |
 | **Garantía sin castigo** (M1, M2 contra el doble farmeo) | — | El mismo colateral vale en todas las ramas | — | **No** contra el doble farmeo |
-| **Castigo correlacionado** (M4) | Doble farmeo | **Nunca evaluado** | — | Pendiente (DS-5) |
+| **Castigo correlacionado** (M4, ya en `SPEC.md` C-SLA) | Doble farmeo y equivocación | **Nulo** frente al atacante grande: no puede confiscar más saldo del que hay (máximo 2,79 u.e. frente a 510 570 de soborno evitado, DS-5) | No | **No**; además **empeora**: castiga a honestos con fallos comunes y abre *griefing* |
 
 ## 2. Lo que queda firme
 
@@ -44,8 +44,8 @@ aplicado (Katana):** un mecanismo que no cierra un hueco pero encarece el ataque
 
 ## 4. Siguiente
 
-- **DS-5** — evaluar el castigo correlacionado (M4), la única vía de PoStake contra el doble farmeo
-  que queda sin examinar.
+- **DS-5 (hecho):** el castigo correlacionado tampoco encarece el doble farmeo y empeora el riesgo para
+  honestos (`REVISION-DS5.md`). Con esto, ningún mecanismo de PoStake examinado lo encarece de forma exigible.
 - **DS-6** — estimar con datos públicos (Chia, Autonomys) cómo se reparte el espacio entre claves: es
   el parámetro que domina el resultado de M3.
 - Decisiones de diseño que salen de aquí, para Katana: adoptar O4 como regla candidata; si se activan
