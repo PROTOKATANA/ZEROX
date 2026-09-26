@@ -25,3 +25,11 @@
 **Prohibido Python.** Presupuesto: 2 h, 4 hilos, 8 GiB. DeepSeek `deepseek-flash`, esfuerzo `high`;
 LINEO antes del código; nada fuera de la zona; sin commit ni push; sin secretos. Entrada congelada
 `P-ZRX/P-DISUASION/ENTRADA-DS3.sha256`.
+
+## Ratificación (tras DS-2)
+
+Especificación: `P-ZRX/P-DISUASION/resultados-DS2/MODELO.md` (copia fiel de `deepseek/DS2/MODELO.md`),
+ratificada en `REVISION-DS2.md`. Los siete casos de su §4 son la regresión obligatoria de `Pkg.test()`.
+Además de su tabla por ataque, entrega una tabla **por mecanismo** con el Δ de coste absoluto de X y el
+coste para el honesto en los escenarios del §3, para responder a Katana qué mecanismo encarece qué y
+cuánto.
