@@ -1,0 +1,12 @@
+exportar: puntos=15 aleatorios=900 salida=resultados/vectores-estado-dag-v0.3.txt
+  aleatorios 100/900
+  aleatorios 200/900
+  aleatorios 300/900
+  aleatorios 400/900
+  aleatorios 500/900
+  aleatorios 600/900
+  aleatorios 700/900
+  aleatorios 800/900
+  aleatorios 900/900
+exportar: casos=914 sha256=016ad975cddea854349ef57241acbeb2f6b84f45d1035c765f245d54c9c748e1 -> resultados/vectores-estado-dag-v0.3.sha256
+exportar: cobertura -> resultados/cobertura-v0.3.txt

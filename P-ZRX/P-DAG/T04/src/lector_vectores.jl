@@ -11,7 +11,7 @@ using EstadoDAG
 import EstadoDAG.Transicion
 using SHA
 
-const RUTA_DEF = "resultados/vectores-estado-dag-v0.2.txt"
+const RUTA_DEF = "resultados/vectores-estado-dag-v0.3.txt"
 
 const FAMILIA_DE = Dict("Genesis" => Transicion.Genesis, "PoW" => Transicion.PoW,
                         "PoST" => Transicion.PoST)
@@ -120,7 +120,7 @@ function parsear_tx(linea::AbstractString)
     elseif tipo == "Evidencia"
         return Transicion.tx_evidencia(clave)
     end
-    error("tipo de tx no releíble en formato v0.2 (SEC-0): $tipo")
+    error("tipo de tx no releíble en formato v0.3 (SEC-0): $tipo")
 end
 
 function parsear_params(c::Dict{String,String})

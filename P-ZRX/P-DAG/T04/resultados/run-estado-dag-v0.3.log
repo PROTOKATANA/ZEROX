@@ -1,0 +1,52 @@
+# run.jl T04 · 2026-09-26 05:26:49
+seed = 0x5a5a replicas = 200 ie3_exhaustivos_por_punto = 5
+julia = 1.13.0 hilos_default = 1 hilos_interactive = 0
+CPU = znver5 RAM_GB = 123.4
+salida = resultados/run-estado-dag-v0.3.log
+REVALIDACION corpus: dags=28 bloques=2290 discrepancias=0
+REVALIDACION kaspa:  bloques=84 discrepancias=0
+DIRIGIDO D-1 validos=4/4 fallos=0
+DIRIGIDO D-2 validos=2/2 fallos=0
+DIRIGIDO D-3 validos=4/5 fallos=0
+DIRIGIDO D-4 validos=3/4 fallos=0
+DIRIGIDO D-5 validos=4/4 fallos=0
+DIRIGIDO D-6 validos=4/4 fallos=0
+DIRIGIDO D-7 validos=6/6 fallos=0
+DIRIGIDO D-8 validos=2/2 fallos=0
+DIRIGIDO D-9 validos=4/4 fallos=0
+DIRIGIDO D-10 validos=4/4 fallos=0
+DIRIGIDO D-11 validos=7/7 fallos=0
+DIRIGIDO D-12 validos=8/8 fallos=0
+DIRIGIDO D-13 validos=5/5 fallos=0
+DIRIGIDO D-14 validos=7/7 fallos=0
+PUNTO P=1 k=0 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=1 k=1 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=1 k=3 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=2 k=0 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=2 k=1 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=2 k=3 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=3 k=0 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=3 k=1 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=3 k=3 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=4 k=0 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=4 k=1 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=4 k=3 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=5 k=0 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=5 k=1 replicas=200 fallos=0 ie3_ordenes=40000
+PUNTO P=5 k=3 replicas=200 fallos=0 ie3_ordenes=40000
+TOTAL historias=3000 bloques=46500 validos=25192 descartes=4497 rojo_U3=2078 ie3_ordenes=600000
+SECCION run.jl (seed=23130 replicas=200)
+casos = 3000
+TIPO Transferencia construidas=3622 aplicadas=1192 descartadas=712 evaluadas=1904 en_ramas_no_seleccionadas=1718 ErrNonce=0 ErrDobleGasto=712 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Deposito construidas=5542 aplicadas=1288 descartadas=1590 evaluadas=2878 en_ramas_no_seleccionadas=2664 ErrNonce=1228 ErrDobleGasto=362 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Retiro construidas=8593 aplicadas=2865 descartadas=1773 evaluadas=4638 en_ramas_no_seleccionadas=3955 ErrNonce=1695 ErrDobleGasto=0 ErrSaldo=29 ErrRetiroPendiente=49 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Liberacion construidas=1725 aplicadas=501 descartadas=422 evaluadas=923 en_ramas_no_seleccionadas=802 ErrNonce=335 ErrDobleGasto=0 ErrSaldo=87 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+garantia_construidas = 15860
+garantia_evaluadas = 8439
+garantia_errnonce = 3258
+garantia_errnonce_pct_construidas = 20.54
+garantia_errnonce_pct_evaluadas = 38.61
+err_doble_gasto_total = 1074
+reorganizaciones_que_deshacen_garantia = 1108
+ESTADO = SUPERADO
+tiempo_pared_s = 58.0

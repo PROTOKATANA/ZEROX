@@ -287,3 +287,89 @@ mínimos de cobertura de §3; IE-1…IE-6 siguen sin fallos en 3000 historias; D
 la reorg con undo de garantía y el punto de aplicación de RD-4. Nada escrito fuera de `T04/`; sin
 commit ni push; sin Python; sin secretos. Las 7 ambigüedades de T04-C quedan documentadas con su
 lectura adoptada.
+
+---
+
+# T04-D — Id de la salida de la liberación como en F-18; vectores v0.3 y caso D-14
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Zona única escribible:** `T04/`.
+**Presupuesto declarado antes de ejecutar (LINEO §7):** 1 h 30 min, 1 hilo, 8 GiB de RAM.
+Si se agota: checkpoint y estado **inconcluso**. Prohibido Python. La parte T01-E ya está hecha y
+revisada (`P-ZRX/P-TRANSICION/REVISION-T01-E.md`); esta corrida ejecuta solo T04-D.
+
+## D.0. Comprobación de la entrada congelada (inicio)
+
+`cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T01E-T04D.sha256` —
+**al empezar**: 5/5 `OK` (ORDEN-T01E-T04D, REVISION-W06a, FORMATO-v0, CONTRATO-ESTADO-DAG-v0,
+LINEO).
+
+## D.1. Falta de definición detectada ANTES de editar
+
+Ninguna impide continuar; todas se resuelven con una lectura que no altera ninguna regla. Se
+registran **antes** de tocar código y se aplican.
+
+- **AMBIGUEDAD-D1 — alcance del enunciado de D-14.** La orden dice «una transferencia que gasta la
+  salida de una de ellas» y, a la vez, «la transferencia se aplica o se descarta según exista su
+  salida». Lectura adoptada: se construyen **dos** hijos, uno por rama (`Xb` hijo de `Xa` gasta
+  `ID_LIB(1,n,a)`; `Xd` hijo de `Xc` gasta `ID_LIB(1,n,b)`), de modo que el caso documenta las dos
+  ramas del enunciado (aplica / se descarta). No altera ninguna regla.
+- **AMBIGUEDAD-D2 — método de recuento del artefacto en los vectores v0.2.** La orden no lo fija.
+  Lectura adoptada: relectura con un oráculo **instrumentado** que cuenta las colisiones de una
+  salida de transferencia con una entrada ya existente de origen `OrigenLiberacion`; se usa una
+  copia de solo lectura del T01 con `prox_salida` (el que exportó v0.2) y una del T01 actual, ambas
+  en `analisis-artefacto/`. El recuento queda validado porque la copia vieja reproduce el `DESC` de
+  v0.2 con **0 discrepancias**. No altera ninguna regla ni ningún fichero de T01.
+- **AMBIGUEDAD-D3 — ¿v0.3 debe ser idéntico a v0.2 salvo los ids?** La orden no lo exige. El
+  generador consulta `S.utxo` (orden de iteración de `Dict`) al elegir la salida gastada, así que el
+  cambio de ids puede variar unas pocas historias aleatorias. Se acepta: los mínimos de §3 se
+  recalcularon sobre v0.3 y se cumplen. No altera ninguna regla.
+
+**Conclusión:** ninguna ambigüedad obliga a elegir entre reglas incompatibles; se aplican las
+lecturas anteriores y se continúa.
+
+## D.2. Diario de ejecución
+
+- *Lectura íntegra* de `ORDEN-T01E-T04D`, `REVISION-W06a`, `REVISION-T01-E`, la sección T01-E.7 de
+  `P-TRANSICION/T01/PROGRESO.md`, `LINEO`, `FORMATO-v0` (F-18), `CONTRATO-ESTADO-DAG-v0` y todo el
+  código de `T04/`.
+- *Semántica intacta:* no se tocó `P-ZRX/P-TRANSICION/T01/` ni la lógica de `src/EstadoDAG.jl`; el
+  generador no cambia (la decisión 1 ya se aplicó en T01). Solo se editaron `src/dirigidos.jl`
+  (D-14), `src/lector_vectores.jl` (ruta v0.3), un docstring de `src/generadores.jl`, `exportar.jl`,
+  `run.jl` y `test/runtests.jl`.
+- *D-14* (`caso_dos_liberaciones_hermanas`): `W` retira 3 de la clave 1 en el slot 2; `Xa` (sd=0) y
+  `Xc` (sd=1) liberan importes `a=1` y `b=2` con el mismo nonce `n1=2`; `Xb` (hijo de `Xa`) gasta
+  `ID_LIB(1,n1,1)=4611687117941112833` y `Xd` (hijo de `Xc`) gasta `ID_LIB(1,n1,2)=4611687117941112834`;
+  `B` (slot 4) fusiona `[Xb,Xd]`. Medido en `Estado(past(B))`: `Xc` se descarta con `ErrNonce`
+  (`e14[1]=(7,2,ErrNonce)`), `Xd` se descarta con `ErrDobleGasto` por entrada ausente
+  (`g14[1]=(9,2,ErrDobleGasto)`), la salida 9701 de `Xb` existe, la 9702 no, `nonce_siguiente=3` y
+  `B` válido. Nunca hay colisión de ids: los dos `ID_LIB` son distintos.
+- *Vectores v0.3:* `resultados/vectores-estado-dag-v0.3.txt` = **914 casos** (14 dirigidos + 900
+  aleatorios), 4 872 956 bytes; `.sha256` en formato `sha256sum` (ruta relativa a `T04/`), hash
+  `016ad975cddea854349ef57241acbeb2f6b84f45d1035c765f245d54c9c748e1`. Relectura independiente
+  (`src/lector_vectores.jl`): **914 casos, 0 discrepancias**. v0, v0.1 y v0.2 quedan intactos
+  (hashes verificados).
+- *Artefacto de ids (decisión 3):* recuento instrumentado (`analisis-artefacto/`, log
+  `resultados/artefacto-v0.2-v0.3.log`). En **v0.2**: **16** transferencias descartadas por colisión
+  de su salida con una liberación, de **219** `ErrDobleGasto` en transferencia (el resto, genuinos).
+  En **v0.3**: **0** colisiones, con **207** `ErrDobleGasto` en transferencia (todos genuinos). La
+  relectura del oráculo viejo reproduce el `DESC` de v0.2 con 0 discrepancias y la del actual el de
+  v0.3 con 0 discrepancias.
+- *Cobertura v0.3* (`resultados/cobertura-v0.3.txt`): **todos los mínimos de §3 se cumplen**:
+  depósitos aplicados 347 (≥150), retiros 808 (≥100), liberaciones 115 (≥100), `ErrNonce` 853 =
+  18,29 % de las garantías construidas (≥30 y ≤25 %), `ErrDobleGasto` 305 (≥200) y
+  reorganizaciones que deshacen garantía 312 (≥20).
+- *Batería completa* `run.jl --seed 0x5a5a --replicas 200`: 14 dirigidos sin fallos (D-1…D-14),
+  3000 historias, 46 500 bloques, 25 192 válidos, 4 497 descartes, 2 078 `rojo_U3`, 600 000 órdenes
+  IE-3, **0 fallos**, 58,0 s. Registro en `resultados/run-estado-dag-v0.3.log`; los logs v0, v0.1 y
+  v0.2 no se sobrescriben.
+- *Tests* `Pkg.test()`: **386/386 OK** (9,1 s), incluida la relectura de v0.3 (914 casos, 0
+  discrepancias) y los 14 asserts de D-14. Registro en `resultados/test-pkg-v0.3.log`.
+
+## D.3. Estado final T04-D
+
+**SUPERADO.** La salida de la liberación recibe un id inyectivo del contenido (T01-E); los vectores
+v0.3 (914 casos) se releen sin discrepancias y cumplen los mínimos de T04-C; los 16 descartes de
+v0.2 por colisión de ids son 0 en v0.3; D-14 documenta que, al fusionar dos liberaciones hermanas
+con el mismo nonce, una cae por `ErrNonce` y la transferencia de la otra rama cae por entrada
+ausente, nunca por colisión. Nada escrito fuera de `T04/`; sin commit ni push; sin Python; sin
+secretos. Las 3 ambigüedades de T04-D quedan documentadas con su lectura adoptada.

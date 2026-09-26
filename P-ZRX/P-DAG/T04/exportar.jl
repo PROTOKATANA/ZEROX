@@ -3,10 +3,10 @@
 #     julia --project=. exportar.jl [--fecha ISO-8601] [--salida RUTA] \
 #         [--contrato RUTA] [--dirigidos 1] [--aleatorios 900] [--cobertura RUTA]
 #
-# Escribe `resultados/vectores-estado-dag-v0.2.txt` (formato de T01-B ampliado con
+# Escribe `resultados/vectores-estado-dag-v0.3.txt` (formato de T01-B ampliado con
 # `padres=[…]`, líneas `DESC` y `nonce=` en depósito/retiro/liberación y `GAR`) y su
 # `sha256` en el `.sha256` (formato `sha256sum`). Además escribe
-# `resultados/cobertura-v0.2.txt` (apartados vectores y run.jl) con la tabla de
+# `resultados/cobertura-v0.3.txt` (apartados vectores y run.jl) con la tabla de
 # cobertura por tipo de operación de la ORDEN-T04-C §2. Solo interfaces por defecto
 # (CUT_HWPhi, FC3, SEC0) y la rejilla declarada de T04. Un hilo, sin Python.
 #
@@ -20,10 +20,10 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md"
-# T04-C: vectores v0.2 con el generador corregido (nonce por clave + retiros y
-# liberaciones). Los ficheros v0 y v0.1 se conservan.
-const SALIDA_DEF = "resultados/vectores-estado-dag-v0.2.txt"
-const COBERTURA_DEF = "resultados/cobertura-v0.2.txt"
+# T04-D: vectores v0.3 (id de la salida de la liberación como en F-18, T01-E); el
+# generador y la rejilla no cambian. Los ficheros v0, v0.1 y v0.2 se conservan.
+const SALIDA_DEF = "resultados/vectores-estado-dag-v0.3.txt"
+const COBERTURA_DEF = "resultados/cobertura-v0.3.txt"
 
 const NOMBRE_FAMILIA = Dict(Transicion.Genesis => "Genesis", Transicion.PoW => "PoW",
                             Transicion.PoST => "PoST")
@@ -207,7 +207,7 @@ function main()
     flush(stdout)
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-estado-dag-v0.2 · T04 · ", fecha,
+    println(io, "# vectores-estado-dag-v0.3 · T04 · ", fecha,
             " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     if con_dirigidos
@@ -240,7 +240,7 @@ function main()
     # Cobertura (ORDEN-T04-C §2): apartado vectores y apartado run.jl.
     mkpath(dirname(cobertura))
     ioc = open(cobertura, "w")
-    println(ioc, "# cobertura T04-C v0.2 · ", fecha, " · contrato ",
+    println(ioc, "# cobertura T04-D v0.3 · ", fecha, " · contrato ",
             sha256_archivo(contrato))
     println(ioc, "# generador: pesos=", EstadoDAG.PESOS_AJUSTADOS,
             " npost=", min(EstadoDAG.npost_t04c(0), EstadoDAG.npost_t04c(1)), "..",
@@ -249,7 +249,7 @@ function main()
     println(ioc, "# minimos: depositos_aplicados>=150 retiros_aplicados>=100 ",
             "liberaciones_aplicadas>=100 ErrNonce>=30 y <=25% de garantia ",
             "construida ErrDobleGasto>=200 reorgs_garantia>=20")
-    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.2 (casos aleatorios)", ac)
+    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.3 (casos aleatorios)", ac)
     acr = EstadoDAG.cobertura_run()
     EstadoDAG.escribir_cobertura(ioc, "run.jl (seed 0x5a5a, replicas 200)", acr)
     close(ioc)

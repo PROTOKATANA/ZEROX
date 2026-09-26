@@ -1,0 +1,29 @@
+# cobertura T04-D v0.3 · 2026-09-26T05:26:23+02:00 · contrato 614dc72aab9105268699cd8fa5d0f2d4210f13f8feef63c69b214d8ed6c97c6c
+# generador: pesos=(0.12, 0.18, 0.22, 0.48) npost=15..16 p_tx=0.5 p_invalido=0.12 p_error_nonce=0.10
+# minimos: depositos_aplicados>=150 retiros_aplicados>=100 liberaciones_aplicadas>=100 ErrNonce>=30 y <=25% de garantia construida ErrDobleGasto>=200 reorgs_garantia>=20
+SECCION vectores-v0.3 (casos aleatorios)
+casos = 900
+TIPO Transferencia construidas=1112 aplicadas=364 descartadas=204 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=204 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Deposito construidas=1626 aplicadas=347 descartadas=396 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=295 ErrDobleGasto=101 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+garantia_construidas = 4663
+garantia_evaluadas = 2280
+garantia_errnonce = 853
+garantia_errnonce_pct_construidas = 18.29
+garantia_errnonce_pct_evaluadas = 37.41
+err_doble_gasto_total = 305
+reorganizaciones_que_deshacen_garantia = 312
+SECCION run.jl (seed 0x5a5a, replicas 200)
+casos = 3000
+TIPO Transferencia construidas=3622 aplicadas=1192 descartadas=712 evaluadas=1904 en_ramas_no_seleccionadas=1718 ErrNonce=0 ErrDobleGasto=712 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Deposito construidas=5542 aplicadas=1288 descartadas=1590 evaluadas=2878 en_ramas_no_seleccionadas=2664 ErrNonce=1228 ErrDobleGasto=362 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Retiro construidas=8593 aplicadas=2865 descartadas=1773 evaluadas=4638 en_ramas_no_seleccionadas=3955 ErrNonce=1695 ErrDobleGasto=0 ErrSaldo=29 ErrRetiroPendiente=49 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+TIPO Liberacion construidas=1725 aplicadas=501 descartadas=422 evaluadas=923 en_ramas_no_seleccionadas=802 ErrNonce=335 ErrDobleGasto=0 ErrSaldo=87 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+garantia_construidas = 15860
+garantia_evaluadas = 8439
+garantia_errnonce = 3258
+garantia_errnonce_pct_construidas = 20.54
+garantia_errnonce_pct_evaluadas = 38.61
+err_doble_gasto_total = 1074
+reorganizaciones_que_deshacen_garantia = 1108

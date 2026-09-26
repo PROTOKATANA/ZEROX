@@ -5,9 +5,9 @@
 #         [--seed 0x5a5a] [--replicas 200] [--ie3-presupuesto 8000] [--salida RUTA]
 #
 # Un hilo (LINEO §7: el tope no es objetivo). Sin Python. Escribe el registro en
-# `resultados/run-estado-dag-v0.2.log` (sin sobrescribir v0 ni v0.1), publica la
-# cobertura por tipo de operación (ORDEN-T04-C §2) y termina con estado ≠ 0 si
-# hay algún fallo.
+# `resultados/run-estado-dag-v0.3.log` (sin sobrescribir v0, v0.1 ni v0.2),
+# publica la cobertura por tipo de operación (ORDEN-T04-C §2) y termina con
+# estado ≠ 0 si hay algún fallo.
 
 using EstadoDAG
 using EstadoDAG.Transicion
@@ -47,7 +47,7 @@ function main()
     seed = parsear_seed(get(cfg, "seed", "0x5a5a"))
     replicas = parse(Int, get(cfg, "replicas", "200"))
     ie3_exhaustivos = parse(Int, get(cfg, "ie3-exhaustivos", "5"))
-    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.2.log")
+    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.3.log")
     mkpath(dirname(salida))
     io = open(salida, "w")
     t0 = time()
@@ -136,6 +136,20 @@ function main()
      m13.nonceX == m13.n0 + UInt64(1) && m13.nonceY == m13.n0 + UInt64(2) &&
      length(m13.descX) == 1 && m13.descX[1][2] == Transicion.ErrSaldo) ||
         push!(fallos_globales, "dirigido D-13 punto de aplicación")
+    # T04-D (F-18): dos liberaciones hermanas (mismo nonce, importes distintos) y
+    # sendas transferencias; una liberación aplica y la otra cae por ErrNonce; la
+    # transferencia de la rama aplicada aplica y la otra cae por entrada ausente,
+    # nunca por colisión de ids.
+    _, A14, m14 = EstadoDAG.caso_dos_liberaciones_hermanas(pd1)
+    S14, _, d14 = aplicar_historia(A14)
+    e14 = [d for d in d14 if d[3] == Transicion.ErrNonce]
+    g14 = [d for d in d14 if d[3] == Transicion.ErrDobleGasto]
+    (m14.a != m14.b && m14.id_a != m14.id_b && m14.outXb == 1 && m14.outXd == 0 &&
+     m14.nonceS == m14.n1 + UInt64(1) && A14.validos[m14.B] &&
+     !haskey(S14.utxo, m14.id_b) &&
+     length(e14) == 1 && e14[1][1] == m14.segundo &&
+     length(g14) == 1 && g14[1][1] == m14.Xd) ||
+        push!(fallos_globales, "dirigido D-14 dos liberaciones hermanas")
 
     # 3) Propiedades IE-1…IE-6
     total_hist = 0

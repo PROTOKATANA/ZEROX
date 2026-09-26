@@ -21,3 +21,6 @@
 2026-09-26T03:50:00+02:00
 2026-09-26T03:50:00+02:00
 2026-09-26T03:53:16+02:00
+2026-09-26T05:26:23+02:00  # T04-D exportar v0.3 (cabecera del fichero)
+2026-09-26T05:26:49+02:00  # T04-D run.jl --replicas 200 (cabecera del log)
+2026-09-26T05:29:37+02:00  # T04-D Pkg.test(), artefacto y cierre

@@ -125,6 +125,28 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
         @test length(m.descX) == 1
         @test m.descX[1][2] == Transicion.ErrSaldo
         @test isempty(verificar_ie1_ie2_ie4(A))
+
+        # T04-D (F-18): dos liberaciones hermanas con el mismo nonce e importes
+        # distintos; una aplica y la otra cae por ErrNonce; la transferencia de la
+        # rama aplicada aplica y la otra cae por entrada ausente, nunca por colisión.
+        nombre, A, m = EstadoDAG.caso_dos_liberaciones_hermanas(pd)
+        S, _, desc = aplicar_historia(A)
+        e = [d for d in desc if d[3] == Transicion.ErrNonce]
+        g = [d for d in desc if d[3] == Transicion.ErrDobleGasto]
+        @test m.a != m.b
+        @test m.id_a != m.id_b
+        @test m.id_a == Transicion.ID_LIB(Int(1), m.n1, m.a)
+        @test m.id_b == Transicion.ID_LIB(Int(1), m.n1, m.b)
+        @test A.validos[m.B]
+        @test m.outXb == 1 && m.outXd == 0
+        @test m.nonceS == m.n1 + UInt64(1)
+        @test length(e) == 1
+        @test e[1][1] == m.segundo
+        @test length(g) == 1
+        @test g[1][1] == m.Xd
+        @test !haskey(S.utxo, m.id_b)
+        @test haskey(S.utxo, 9701)
+        @test isempty(verificar_ie1_ie2_ie4(A))
     end
 
     @testset "propiedades IE-1…IE-6" begin
@@ -172,7 +194,7 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
     end
 
     @testset "relectura de vectores" begin
-        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.2.txt")
+        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.3.txt")
         if isfile(ruta)
             cmd = `$(Base.julia_cmd()) --project=$(dirname(@__DIR__)) $(joinpath(@__DIR__, "..", "src", "lector_vectores.jl")) $ruta`
             p = run(ignorestatus(cmd))

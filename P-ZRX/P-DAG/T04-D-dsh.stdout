@@ -1,0 +1,24 @@
+He ejecutado solo la parte **T04-D** (decisiones 3 y 4), escribiendo únicamente en `T04/` y sin tocar nada de `T01/` (mtimes de T01 anteriores a esta sesión y entrada congelada 5/5 `OK` al empezar y al terminar).
+
+## Falta de definición informada antes de editar
+No bloqueante; documentada en `PROGRESO.md` §D.1 y `INFORME.md` §D.6:
+- **D1** — D-14 dice «una transferencia» pero también «se aplica o se descarta»: construí **dos** hijos, uno por rama, para cubrir ambos casos.
+- **D2** — el método de recuento del artefacto no estaba fijado: usé un oráculo instrumentado (`analisis-artefacto/`) que cuenta colisiones salida-de-transferencia ↔ salida-de-liberación, validado porque la copia vieja reproduce el `DESC` de v0.2 con 0 discrepancias.
+- **D3** — no se exige que v0.3 sea idéntico a v0.2 salvo ids; el orden de iteración del `Dict` del UTXO puede variar unas pocas historias aleatorias.
+
+## Cambios (solo T04)
+- `src/dirigidos.jl`: caso **D-14** (`caso_dos_liberaciones_hermanas`) + registro.
+- `run.jl`: salida por defecto `run-estado-dag-v0.3.log` y aserción D-14.
+- `exportar.jl`: `SALIDA_DEF`/`COBERTURA_DEF` a v0.3 y cabeceras.
+- `src/lector_vectores.jl`: `RUTA_DEF` a v0.3.
+- `test/runtests.jl`: relectura v0.3 + 14 asserts de D-14.
+- `analisis-artefacto/`: instrumento de recuento (con README).
+- `PROGRESO.md`, `INFORME.md` §T04-D, `HORAS.log`.
+
+## Resultados
+- **D-14**: con `W` (retiro de 3, slot 2), `Xa`/`Xc` liberan `a=1`/`b=2` con el mismo nonce `n1=2`; al fusionar, `Xc` cae por `ErrNonce`, `Xb` aplica gastando `ID_LIB(1,n1,1)`, `Xd` cae por **entrada ausente** (`ErrDobleGasto`), nunca por colisión (`ID_LIB(a) ≠ ID_LIB(b)`).
+- **Artefacto de ids**: v0.2 con T01 viejo → **16** descartes por colisión (de 219 `ErrDobleGasto` en transferencia; cota superior publicada 217); v0.3 con F-18 → **0** (207 genuinos). Relecturas de validación con 0 discrepancias en ambos.
+- **Vectores v0.3**: 914 casos (14 dirigidos + 900 aleatorios), 4,87 MB, `sha256 016ad975…48e1`; relectura independiente **0 discrepancias**; v0/v0.1/v0.2 intactos.
+- **Cobertura v0.3**: todos los mínimos de T04-C (347 / 808 / 115 / 853 = 18,29 % / 305 / 312).
+- `run.jl --seed 0x5a5a --replicas 200`: 3000 historias, 0 fallos, 58,0 s; `Pkg.test()`: **386/386 OK**, 9,1 s.
+- Sin Python, sin commit ni push, sin secretos; nada escrito fuera de `T04/`.

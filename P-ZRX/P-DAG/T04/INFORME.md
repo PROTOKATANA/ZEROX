@@ -340,3 +340,121 @@ env -u LD_LIBRARY_PATH julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
 Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de `T04/`.
+
+---
+
+# T04-D — Id de la salida de la liberación como en F-18 (T01-E); vectores v0.3 y caso D-14
+
+**Veredicto: SUPERADO.** Sobre `ORDEN-T01E-T04D` (parte T04; la parte T01-E ya está revisada en
+`REVISION-T01-E.md`), T04 usa el id inyectivo de la salida de la liberación, reexporta
+`vectores-estado-dag-v0.3.txt` con los mismos mínimos de T04-C, lo relee con 0 discrepancias y
+confirma que el artefacto de colisión de ids pasa de 16 a 0. El caso dirigido D-14 documenta la
+fusión de dos liberaciones hermanas. Presupuesto consumido: 58,0 s de `run.jl` y 9,1 s de
+`Pkg.test()` (tope 1 h 30 min), 1 hilo, 8 GiB declarados.
+
+## D.1. Qué cambia y qué no
+
+- **Semántica intacta.** No se tocó `P-ZRX/P-TRANSICION/T01/` ni la lógica de `src/EstadoDAG.jl`; el
+  generador tampoco cambia (la decisión 1 de la orden ya se aplicó en T01-E). T04 obtiene el id de
+  la liberación por `include` de `Transicion.jl` (F-18).
+- **`src/dirigidos.jl`** — caso dirigido nuevo D-14 (abajo).
+- **`exportar.jl`** — `SALIDA_DEF`/`COBERTURA_DEF` a v0.3 y cabeceras `vectores-estado-dag-v0.3` /
+  `cobertura T04-D v0.3`; el resto del código de exportación no cambia.
+- **`src/lector_vectores.jl`** — `RUTA_DEF` a v0.3 (el analizador independiente no cambia).
+- **`run.jl`** — salida por defecto a `resultados/run-estado-dag-v0.3.log` y aserción semántica de
+  D-14.
+- **`test/runtests.jl`** — relectura de v0.3 y 14 asserts de D-14.
+- **`analisis-artefacto/`** — instrumento de recuento del artefacto (copias de solo lectura de T01
+  viejo/actual con `COLISION_LIB_TX`); no forma parte del oráculo ni lo toca.
+
+## D.2. Caso dirigido D-14 (`caso_dos_liberaciones_hermanas`)
+
+Sobre `W` (retiro de 3 de la clave 1 en el slot 2), dos liberaciones **hermanas** de la misma clave
+con el **mismo nonce** `n1 = 2` e importes distintos `a = 1`, `b = 2`: `Xa` (sd 0) y `Xc` (sd 1).
+`Xb` (hijo de `Xa`) gasta `ID_LIB(1, n1, 1)` y `Xd` (hijo de `Xc`) gasta `ID_LIB(1, n1, 2)`. Un
+bloque `B` (slot 4) fusiona `[Xb, Xd]`.
+
+Medido en `Estado(past(B))`:
+
+- una liberación aplica y la otra se descarta con `ErrNonce` (`(Xc, 2, ErrNonce)`);
+- `Xb` aplica (su salida 9701 existe) porque `ID_LIB(1, n1, 1)` está en el estado;
+- `Xd` se descarta con `ErrDobleGasto` (`(Xd, 2, ErrDobleGasto)`) porque `ID_LIB(1, n1, 2)` no
+  existe (su liberación cayó por nonce), **no** por colisión de ids;
+- `ID_LIB(1, n1, 1) = 4611687117941112833 ≠ ID_LIB(1, n1, 2) = 4611687117941112834`;
+- `nonce_siguiente = 3`, `B` válido y sin fallos IE-1/IE-2/IE-4.
+
+## D.3. Artefacto de ids: 16 descartes en v0.2, 0 en v0.3
+
+La causa de la reserva de W06a (un id de liberación igual a un id de transferencia) se mide con un
+oráculo instrumentado que cuenta, en `crear_utxos!`, las colisiones de una salida de transferencia
+con una entrada ya existente de origen `OrigenLiberacion` (log
+`resultados/artefacto-v0.2-v0.3.log`):
+
+| Vectores | Casos | Colisiones (artefacto) | `ErrDobleGasto` en transferencia (total) |
+|---|---:|---:|---:|
+| v0.2 con T01 viejo (`prox_salida`) | 913 | **16** | 219 |
+| v0.3 con T01 actual (F-18) | 914 | **0** | 207 |
+
+Los 16 descartes de v0.2 son el artefacto (cota superior publicada en T01-E.7: 217); los 207 de v0.3
+son dobles gastos genuinos (entrada ausente), imposibles de confundir con una colisión porque los
+ids explícitos son `< 2⁶²` y los de liberación `≥ 2⁶²`. La copia vieja del oráculo reproduce el
+`DESC` de v0.2 con 0 discrepancias y la actual el de v0.3 con 0 discrepancias, lo que valida el
+recuento.
+
+## D.4. Cobertura v0.3 y mínimos de T04-C (§3)
+
+`resultados/cobertura-v0.3.txt` (generada por `exportar.jl`); apartado vectores (900 casos):
+
+| Medida | Mínimo | Vectores v0.3 | ¿Cumple? |
+|---|---:|---:|---|
+| Depósitos PoST aplicados | ≥ 150 | **347** | Sí |
+| Retiros aplicados | ≥ 100 | **808** | Sí |
+| Liberaciones aplicadas | ≥ 100 | **115** | Sí |
+| `ErrNonce` | ≥ 30 y ≤ 25 % de garantía construida | **853** (18,29 %) | Sí |
+| `ErrDobleGasto` | ≥ 200 | **305** | Sí |
+| Reorganizaciones que deshacen garantía | ≥ 20 | **312** | Sí |
+
+El apartado `run.jl` (3000 historias, `seed 0x5a5a`, `replicas 200`) da: transferencias 1192
+aplicadas, depósitos 1288, retiros 2865, liberaciones 501, `ErrNonce` 3258 (20,54 % de 15 860
+garantías construidas), `ErrDobleGasto` total 1074 y 1108 reorganizaciones que deshacen garantía;
+también cumple los seis mínimos.
+
+## D.5. Vectores, relectura y batería
+
+| Comprobación | Resultado |
+|---|---|
+| Entrada congelada `ENTRADA-T01E-T04D.sha256` | 5/5 `OK` |
+| Casos dirigidos | 14/14 sin fallos (D-1…D-14) |
+| Vectores v0.3 | **914 casos** (14 dirigidos + 900 aleatorios), 4,87 MB |
+| `sha256` v0.3 | `016ad975cddea854349ef57241acbeb2f6b84f45d1035c765f245d54c9c748e1` |
+| Relectura independiente (`src/lector_vectores.jl`) | 914 casos, **0 discrepancias** |
+| `run.jl --seed 0x5a5a --replicas 200` | 3000 historias, 46 500 bloques, 25 192 válidos, 4 497 descartes, 2 078 `rojo_U3`, 600 000 órdenes IE-3, **0 fallos**, 58,0 s |
+| `Pkg.test()` | **386/386 OK**, 9,1 s |
+| v0, v0.1 y v0.2 | intactos (hashes verificados) |
+
+Pregunta falsable de la orden: con el id de la salida de la liberación inyectivo (F-18), T04 sigue
+cumpliendo sus propiedades, los vectores reexportados se releen sin discrepancias y ninguna
+transacción se descarta ya por coincidencia de ids entre una liberación y otra salida. **No se
+refuta** (0 colisiones en v0.3; IE-1…IE-6 sin fallos en 3000 historias).
+
+## D.6. Falta de definición (registrada antes de editar, `PROGRESO.md` §D.1)
+
+AMBIGUEDAD-D1 (D-14: el enunciado admite una o dos transferencias; se construyen dos, una por
+rama), D2 (método de recuento del artefacto: oráculo instrumentado validado contra el `DESC` de
+v0.2), D3 (no se exige que v0.3 sea idéntico a v0.2 salvo los ids; el orden de iteración del `Dict`
+del UTXO puede variar unas pocas historias). Ninguna obligó a elegir entre reglas incompatibles.
+
+## D.7. Reproducibilidad
+
+```
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export PATH=/home/katana/torio/.juliaup/bin:$PATH
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH julia --project=. run.jl --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH julia --project=. exportar.jl --dirigidos 1 --aleatorios 900
+env -u LD_LIBRARY_PATH julia --project=. src/lector_vectores.jl resultados/vectores-estado-dag-v0.3.txt
+env -u LD_LIBRARY_PATH julia --project=. analisis-artefacto/contar_artefacto.jl
+env -u LD_LIBRARY_PATH julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito fuera de `T04/`.
