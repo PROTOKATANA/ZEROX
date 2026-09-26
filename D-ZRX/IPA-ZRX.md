@@ -128,6 +128,7 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 |---|---|---|---|---|
 | X-01 | Ensayar juntas las cuatro familias: sesgo del ancla, alta tardía, stake inmaduro, reorg que deshace una prueba, auditoría censurada, capacidad duplicada, rama privada | abierto | P2 | A-05, A-07, C-04, D-03 |
 | X-02 | Comparador «candidato A»: PoST sin garantía en el arranque (`C-BOT-02`) y arranque sin PoW con requisito proporcional a la oferta (`R-ZRX/LEGADO/stake/MAPA.md` §4), bajo el mismo adversario, red y horizonte | abierto | P2 | A-05, A-10 |
+| X-03 | **Disuasión por coste** (Katana, 2026-09-26): qué problemas resuelven o encarecen PoStake y Filecoin frente a B0 (PoST puro de `9681061`) y a B1 (0.0.1), con coste absoluto de X por dimensión (riesgo, inmovilización, adquisición, energía, hardware, tiempo) | **en encargo**: DS-1 (fuentes) y DS-4 (GPU del sembrador) en curso; DS-2 (matriz) y DS-3 (modelo) preparadas (`P-ZRX/P-DISUASION/`) | P1 | A-10, C-02, D-02 |
 
 ---
 
@@ -139,3 +140,4 @@ reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión
 | 2026-09-26 03:55 | C-10 en encargo; E-02 cerrado; E-03 reabierto (la CI remota no materializa el clon); E-10 (reinicio sin instantáneas) y E-11 (revisión independiente omitida) nuevos; A-10 en encargo |
 | 2026-09-26 03:57 | B-12 nuevo (RI-1b H1, coste de admisión GHOSTDAG con la profundidad) |
 | 2026-09-26 04:09 | A-10 parcial: hashrate CPU\/GPU medido (A10-M1) |
+| 2026-09-26 08:30 | X-03 nuevo: programa P-DISUASION (DS-1…DS-4) a petición de Katana |

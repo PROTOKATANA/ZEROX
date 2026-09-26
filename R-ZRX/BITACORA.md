@@ -230,3 +230,12 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   relanzada con un ejecutor nuevo.
 - Lección: en las órdenes a subagentes, prohibir expresamente lanzar subagentes o forks.
 - Nota de exactitud: la sección «Relanzamiento» de `ORDEN-W06d1.md` dice «05:50»; se escribió a las 05:45 (no se corrige el archivo porque está congelado con la orden en curso). Desde ahora las horas se toman de `date` al escribir.
+
+### 08:30 — programa P-DISUASION (petición de Katana)
+
+- Katana pide determinar qué resuelven PoStake y Filecoin en ZEROX y si encarecen o disuaden a un
+  atacante X; criterio: un mecanismo que no cierra un hueco pero encarece el ataque es una mejora real
+  frente al protocolo antiguo sin stake. Marco común (`P-ZRX/P-DISUASION/MARCO.md`: 12 ataques, 16
+  mecanismos, 7 dimensiones de coste, veredicto I/E-exigible/E-condicionado/N/W) y cuatro encargos:
+  DS-1 fuentes (Sonnet, web) y DS-4 GPU del sembrador por Vulkan (Sonnet) lanzados; DS-2 matriz y
+  DS-3 modelo cuantitativo preparados. W06d1 sigue en curso.
