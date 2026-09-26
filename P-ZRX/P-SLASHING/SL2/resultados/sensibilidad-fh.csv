@@ -1,0 +1,73 @@
+caso,f_h,eps_h,q_g,rho_ret,existe,Tv_min,Tv_max,borde_inf,borde_sup
+empirico,1e-06,0.001,1000,0.25,NO,Inf,-2778.56,—,honesto
+empirico,1e-06,0.001,1000,0.5,NO,Inf,-1389.28,—,honesto
+empirico,1e-06,0.001,1000,1,NO,Inf,-694.64,—,honesto
+empirico,1e-06,0.001,10000,0.25,NO,Inf,-38778.6,—,honesto
+empirico,1e-06,0.001,10000,0.5,NO,Inf,-19389.3,—,honesto
+empirico,1e-06,0.001,10000,1,NO,Inf,-9694.64,—,honesto
+empirico,1e-06,0.1,1000,0.25,NO,Inf,-4027.39,—,honesto
+empirico,1e-06,0.1,1000,0.5,NO,Inf,-2013.69,—,honesto
+empirico,1e-06,0.1,1000,1,NO,Inf,-1006.85,—,honesto
+empirico,1e-06,0.1,10000,0.25,NO,Inf,-40027.4,—,honesto
+empirico,1e-06,0.1,10000,0.5,NO,Inf,-20013.7,—,honesto
+empirico,1e-06,0.1,10000,1,NO,Inf,-10006.8,—,honesto
+empirico,0.001,0.001,1000,0.25,SI,1019,1.2574e+06,F (viabilidad T_v>F),honesto
+empirico,0.001,0.001,1000,0.5,SI,1019,628700,F (viabilidad T_v>F),honesto
+empirico,0.001,0.001,1000,1,SI,1019,314350,F (viabilidad T_v>F),honesto
+empirico,0.001,0.001,10000,0.25,SI,1019,1.2214e+06,F (viabilidad T_v>F),honesto
+empirico,0.001,0.001,10000,0.5,SI,1019,610700,F (viabilidad T_v>F),honesto
+empirico,0.001,0.001,10000,1,SI,1019,305350,F (viabilidad T_v>F),honesto
+empirico,0.001,0.1,1000,0.25,SI,1019,8574.4,F (viabilidad T_v>F),honesto
+empirico,0.001,0.1,1000,0.5,SI,1019,4287.2,F (viabilidad T_v>F),honesto
+empirico,0.001,0.1,1000,1,SI,1019,2143.6,F (viabilidad T_v>F),honesto
+empirico,0.001,0.1,10000,0.25,NO,Inf,-27425.6,—,honesto
+empirico,0.001,0.1,10000,0.5,NO,Inf,-13712.8,—,honesto
+empirico,0.001,0.1,10000,1,NO,Inf,-6856.4,—,honesto
+empirico,0.1,0.001,1000,0.25,SI,1019,1.2614e+08,F (viabilidad T_v>F),honesto
+empirico,0.1,0.001,1000,0.5,SI,1019,6.307e+07,F (viabilidad T_v>F),honesto
+empirico,0.1,0.001,1000,1,SI,1019,3.1535e+07,F (viabilidad T_v>F),honesto
+empirico,0.1,0.001,10000,0.25,SI,1019,1.26104e+08,F (viabilidad T_v>F),honesto
+empirico,0.1,0.001,10000,0.5,SI,1019,6.3052e+07,F (viabilidad T_v>F),honesto
+empirico,0.1,0.001,10000,1,SI,1019,3.1526e+07,F (viabilidad T_v>F),honesto
+empirico,0.1,0.1,1000,0.25,SI,1019,1.2574e+06,F (viabilidad T_v>F),honesto
+empirico,0.1,0.1,1000,0.5,SI,1019,628700,F (viabilidad T_v>F),honesto
+empirico,0.1,0.1,1000,1,SI,1019,314350,F (viabilidad T_v>F),honesto
+empirico,0.1,0.1,10000,0.25,SI,1019,1.2214e+06,F (viabilidad T_v>F),honesto
+empirico,0.1,0.1,10000,0.5,SI,1019,610700,F (viabilidad T_v>F),honesto
+empirico,0.1,0.1,10000,1,SI,1019,305350,F (viabilidad T_v>F),honesto
+pareto_3_0,1e-06,0.001,1000,0.25,NO,Inf,-2778.56,—,honesto
+pareto_3_0,1e-06,0.001,1000,0.5,NO,Inf,-1389.28,—,honesto
+pareto_3_0,1e-06,0.001,1000,1,NO,Inf,-694.64,—,honesto
+pareto_3_0,1e-06,0.001,10000,0.25,NO,Inf,-38778.6,—,honesto
+pareto_3_0,1e-06,0.001,10000,0.5,NO,Inf,-19389.3,—,honesto
+pareto_3_0,1e-06,0.001,10000,1,NO,Inf,-9694.64,—,honesto
+pareto_3_0,1e-06,0.1,1000,0.25,NO,Inf,-4027.39,—,honesto
+pareto_3_0,1e-06,0.1,1000,0.5,NO,Inf,-2013.69,—,honesto
+pareto_3_0,1e-06,0.1,1000,1,NO,Inf,-1006.85,—,honesto
+pareto_3_0,1e-06,0.1,10000,0.25,NO,Inf,-40027.4,—,honesto
+pareto_3_0,1e-06,0.1,10000,0.5,NO,Inf,-20013.7,—,honesto
+pareto_3_0,1e-06,0.1,10000,1,NO,Inf,-10006.8,—,honesto
+pareto_3_0,0.001,0.001,1000,0.25,SI,721390,1.2574e+06,A (disuasión),honesto
+pareto_3_0,0.001,0.001,1000,0.5,NO,Inf,628700,A,honesto
+pareto_3_0,0.001,0.001,1000,1,NO,Inf,314350,A,honesto
+pareto_3_0,0.001,0.001,10000,0.25,SI,721387,1.2214e+06,A (disuasión),honesto
+pareto_3_0,0.001,0.001,10000,0.5,NO,Inf,610700,A,honesto
+pareto_3_0,0.001,0.001,10000,1,NO,Inf,305350,A,honesto
+pareto_3_0,0.001,0.1,1000,0.25,NO,Inf,8574.4,A,honesto
+pareto_3_0,0.001,0.1,1000,0.5,NO,Inf,4287.2,A,honesto
+pareto_3_0,0.001,0.1,1000,1,NO,Inf,2143.6,A,honesto
+pareto_3_0,0.001,0.1,10000,0.25,NO,Inf,-27425.6,—,honesto
+pareto_3_0,0.001,0.1,10000,0.5,NO,Inf,-13712.8,—,honesto
+pareto_3_0,0.001,0.1,10000,1,NO,Inf,-6856.4,—,honesto
+pareto_3_0,0.1,0.001,1000,0.25,SI,721390,1.2614e+08,A (disuasión),honesto
+pareto_3_0,0.1,0.001,1000,0.5,SI,721363,6.307e+07,A (disuasión),honesto
+pareto_3_0,0.1,0.001,1000,1,SI,721349,3.1535e+07,A (disuasión),honesto
+pareto_3_0,0.1,0.001,10000,0.25,SI,721387,1.26104e+08,A (disuasión),honesto
+pareto_3_0,0.1,0.001,10000,0.5,SI,721362,6.3052e+07,A (disuasión),honesto
+pareto_3_0,0.1,0.001,10000,1,SI,721348,3.1526e+07,A (disuasión),honesto
+pareto_3_0,0.1,0.1,1000,0.25,SI,721390,1.2574e+06,A (disuasión),honesto
+pareto_3_0,0.1,0.1,1000,0.5,NO,Inf,628700,A,honesto
+pareto_3_0,0.1,0.1,1000,1,NO,Inf,314350,A,honesto
+pareto_3_0,0.1,0.1,10000,0.25,SI,721387,1.2214e+06,A (disuasión),honesto
+pareto_3_0,0.1,0.1,10000,0.5,NO,Inf,610700,A,honesto
+pareto_3_0,0.1,0.1,10000,1,NO,Inf,305350,A,honesto

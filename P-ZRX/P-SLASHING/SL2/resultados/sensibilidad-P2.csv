@@ -1,0 +1,289 @@
+caso,alpha,V,f_conf,q_g,eps_h,rho_ret,existe,Tv_min,Tv_max,borde_inf,borde_sup,motivo
+empirico,0.33,1000,0.5,20,0.001,0.25,SI,1019,1.23765e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,20,0.001,0.5,SI,1019,6.18823e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,20,0.001,1,SI,1019,3.09412e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,20,0.1,0.25,SI,1019,1.22988e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,20,0.1,0.5,SI,1019,6.14938e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,20,0.1,1,SI,1019,3.07469e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,1000,0.001,0.25,SI,1019,1.23572e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,1000,0.001,0.5,SI,1019,6.17862e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,1000,0.001,1,SI,1019,3.08931e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,1000,0.1,0.25,SI,1019,1.03756e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,1000,0.1,0.5,SI,1019,5.1878e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,0.5,1000,0.1,1,SI,1019,2.5939e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,20,0.001,0.25,SI,1019,6.18804e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,20,0.001,0.5,SI,1019,3.09402e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,20,0.001,1,SI,1019,1.54701e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,20,0.1,0.25,SI,1019,6.12975e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,20,0.1,0.5,SI,1019,3.06488e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,20,0.1,1,SI,1019,1.53244e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,1000,0.001,0.25,SI,1019,6.1688e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,1000,0.001,0.5,SI,1019,3.0844e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,1000,0.001,1,SI,1019,1.5422e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,1000,0.1,0.25,SI,1019,4.2066e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,1000,0.1,0.5,SI,1019,2.1033e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,1000,1,1000,0.1,1,SI,1019,1.05165e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,20,0.001,0.25,SI,1019,1.23765e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,20,0.001,0.5,SI,1019,6.18823e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,20,0.001,1,SI,1019,3.09412e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,20,0.1,0.25,SI,1019,1.22988e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,20,0.1,0.5,SI,1019,6.14938e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,20,0.1,1,SI,1019,3.07469e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,1000,0.001,0.25,SI,1019,1.23572e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,1000,0.001,0.5,SI,1019,6.17862e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,1000,0.001,1,SI,1019,3.08931e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,1000,0.1,0.25,SI,1019,1.03756e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,1000,0.1,0.5,SI,1019,5.1878e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,0.5,1000,0.1,1,SI,1019,2.5939e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,20,0.001,0.25,SI,1019,6.18804e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,20,0.001,0.5,SI,1019,3.09402e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,20,0.001,1,SI,1019,1.54701e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,20,0.1,0.25,SI,1019,6.12975e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,20,0.1,0.5,SI,1019,3.06488e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,20,0.1,1,SI,1019,1.53244e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,1000,0.001,0.25,SI,1019,6.1688e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,1000,0.001,0.5,SI,1019,3.0844e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,1000,0.001,1,SI,1019,1.5422e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,1000,0.1,0.25,SI,1019,4.2066e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,1000,0.1,0.5,SI,1019,2.1033e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,10000,1,1000,0.1,1,SI,1019,1.05165e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,0.5,20,0.001,0.25,SI,4.9567e+06,1.23765e+10,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,0.5,20,0.001,0.5,SI,2.47835e+06,6.18823e+09,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,0.5,20,0.001,1,SI,1.23917e+06,3.09412e+09,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,0.5,20,0.1,0.25,SI,4.9567e+06,1.22988e+08,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,0.5,20,0.1,0.5,SI,2.47835e+06,6.14938e+07,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,0.5,20,0.1,1,SI,1.23917e+06,3.07469e+07,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,0.5,1000,0.001,0.25,SI,1019,1.23572e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,0.5,1000,0.001,0.5,SI,1019,6.17862e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,0.5,1000,0.001,1,SI,1019,3.08931e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,0.5,1000,0.1,0.25,SI,1019,1.03756e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,0.5,1000,0.1,0.5,SI,1019,5.1878e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,0.5,1000,0.1,1,SI,1019,2.5939e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,1,20,0.001,0.25,SI,2.28211e+06,6.18804e+09,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,1,20,0.001,0.5,SI,1.14105e+06,3.09402e+09,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,1,20,0.001,1,SI,570527,1.54701e+09,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,1,20,0.1,0.25,SI,2.28211e+06,6.12975e+07,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,1,20,0.1,0.5,SI,1.14105e+06,3.06488e+07,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,1,20,0.1,1,SI,570527,1.53244e+07,A (disuasión),honesto,región no vacía
+empirico,0.33,100000,1,1000,0.001,0.25,SI,1019,6.1688e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,1,1000,0.001,0.5,SI,1019,3.0844e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,1,1000,0.001,1,SI,1019,1.5422e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,1,1000,0.1,0.25,SI,1019,4.2066e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,1,1000,0.1,0.5,SI,1019,2.1033e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.33,100000,1,1000,0.1,1,SI,1019,1.05165e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,20,0.001,0.25,SI,1019,1.23765e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,20,0.001,0.5,SI,1019,6.18823e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,20,0.001,1,SI,1019,3.09412e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,20,0.1,0.25,SI,1019,1.22988e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,20,0.1,0.5,SI,1019,6.14938e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,20,0.1,1,SI,1019,3.07469e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,1000,0.001,0.25,SI,1019,1.23572e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,1000,0.001,0.5,SI,1019,6.17862e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,1000,0.001,1,SI,1019,3.08931e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,1000,0.1,0.25,SI,1019,1.03756e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,1000,0.1,0.5,SI,1019,5.1878e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,0.5,1000,0.1,1,SI,1019,2.5939e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,20,0.001,0.25,SI,1019,6.18804e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,20,0.001,0.5,SI,1019,3.09402e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,20,0.001,1,SI,1019,1.54701e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,20,0.1,0.25,SI,1019,6.12975e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,20,0.1,0.5,SI,1019,3.06488e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,20,0.1,1,SI,1019,1.53244e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,1000,0.001,0.25,SI,1019,6.1688e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,1000,0.001,0.5,SI,1019,3.0844e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,1000,0.001,1,SI,1019,1.5422e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,1000,0.1,0.25,SI,1019,4.2066e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,1000,0.1,0.5,SI,1019,2.1033e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,1000,1,1000,0.1,1,SI,1019,1.05165e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,0.5,20,0.001,0.25,SI,344910,1.23765e+10,A (disuasión),honesto,región no vacía
+empirico,0.4,10000,0.5,20,0.001,0.5,SI,172459,6.18823e+09,A (disuasión),honesto,región no vacía
+empirico,0.4,10000,0.5,20,0.001,1,SI,86241.6,3.09412e+09,A (disuasión),honesto,región no vacía
+empirico,0.4,10000,0.5,20,0.1,0.25,SI,344911,1.22988e+08,A (disuasión),honesto,región no vacía
+empirico,0.4,10000,0.5,20,0.1,0.5,SI,172459,6.14938e+07,A (disuasión),honesto,región no vacía
+empirico,0.4,10000,0.5,20,0.1,1,SI,86241.7,3.07469e+07,A (disuasión),honesto,región no vacía
+empirico,0.4,10000,0.5,1000,0.001,0.25,SI,1019,1.23572e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,0.5,1000,0.001,0.5,SI,1019,6.17862e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,0.5,1000,0.001,1,SI,1019,3.08931e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,0.5,1000,0.1,0.25,SI,1019,1.03756e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,0.5,1000,0.1,0.5,SI,1019,5.1878e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,0.5,1000,0.1,1,SI,1019,2.5939e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,20,0.001,0.25,SI,1019,6.18804e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,20,0.001,0.5,SI,1019,3.09402e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,20,0.001,1,SI,1019,1.54701e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,20,0.1,0.25,SI,1019,6.12975e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,20,0.1,0.5,SI,1019,3.06488e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,20,0.1,1,SI,1019,1.53244e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,1000,0.001,0.25,SI,1019,6.1688e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,1000,0.001,0.5,SI,1019,3.0844e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,1000,0.001,1,SI,1019,1.5422e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,1000,0.1,0.25,SI,1019,4.2066e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,1000,0.1,0.5,SI,1019,2.1033e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,10000,1,1000,0.1,1,SI,1019,1.05165e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,0.5,20,0.001,0.25,SI,1.05137e+07,1.23765e+10,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,0.5,20,0.001,0.5,SI,5.25686e+06,6.18823e+09,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,0.5,20,0.001,1,SI,2.62843e+06,3.09412e+09,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,0.5,20,0.1,0.25,SI,1.05137e+07,1.22988e+08,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,0.5,20,0.1,0.5,SI,5.25686e+06,6.14938e+07,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,0.5,20,0.1,1,SI,2.62843e+06,3.07469e+07,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,0.5,1000,0.001,0.25,SI,1019,1.23572e+10,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,0.5,1000,0.001,0.5,SI,1019,6.17862e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,0.5,1000,0.001,1,SI,1019,3.08931e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,0.5,1000,0.1,0.25,SI,1019,1.03756e+08,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,0.5,1000,0.1,0.5,SI,1019,5.1878e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,0.5,1000,0.1,1,SI,1019,2.5939e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,1,20,0.001,0.25,SI,5.06062e+06,6.18804e+09,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,1,20,0.001,0.5,SI,2.53031e+06,3.09402e+09,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,1,20,0.001,1,SI,1.26516e+06,1.54701e+09,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,1,20,0.1,0.25,SI,5.06062e+06,6.12975e+07,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,1,20,0.1,0.5,SI,2.53031e+06,3.06488e+07,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,1,20,0.1,1,SI,1.26516e+06,1.53244e+07,A (disuasión),honesto,región no vacía
+empirico,0.4,100000,1,1000,0.001,0.25,SI,1019,6.1688e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,1,1000,0.001,0.5,SI,1019,3.0844e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,1,1000,0.001,1,SI,1019,1.5422e+09,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,1,1000,0.1,0.25,SI,1019,4.2066e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,1,1000,0.1,0.5,SI,1019,2.1033e+07,F (viabilidad T_v>F),honesto,región no vacía
+empirico,0.4,100000,1,1000,0.1,1,SI,1019,1.05165e+07,F (viabilidad T_v>F),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,20,0.001,0.25,SI,1.46064e+06,5.04544e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,20,0.001,0.5,SI,1.45259e+06,2.52272e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,20,0.001,1,SI,1.44791e+06,1.26136e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,20,0.1,0.25,SI,1.46064e+06,5.01376e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,20,0.1,0.5,SI,1.45259e+06,2.50688e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,20,0.1,1,SI,1.44791e+06,1.25344e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,1000,0.001,0.25,SI,1.446e+06,5.0376e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,1000,0.001,0.5,SI,1.44557e+06,2.5188e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,1000,0.001,1,SI,1.44497e+06,1.2594e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,1000,0.1,0.25,SI,1.446e+06,4.22976e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,1000,0.1,0.5,SI,1.44557e+06,2.11488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,0.5,1000,0.1,1,SI,1.44496e+06,1.05744e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,20,0.001,0.25,SI,729586,2.52264e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,20,0.001,0.5,SI,726063,1.26132e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,20,0.001,1,SI,723886,6.3066e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,20,0.1,0.25,SI,729586,2.49888e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,20,0.1,0.5,SI,726063,1.24944e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,20,0.1,1,SI,723886,6.2472e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,1000,0.001,0.25,SI,722244,2.5148e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,1000,0.001,0.5,SI,722175,1.2574e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,1000,0.001,1,SI,722064,6.287e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,1000,0.1,0.25,SI,722244,1.71488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,1000,0.1,0.5,SI,722175,8.5744e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,1000,1,1000,0.1,1,SI,722064,4.2872e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,20,0.001,0.25,SI,1.60859e+06,5.04544e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,20,0.001,0.5,SI,1.53696e+06,2.52272e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,20,0.001,1,SI,1.49351e+06,1.26136e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,20,0.1,0.25,SI,1.60859e+06,5.01376e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,20,0.1,0.5,SI,1.53696e+06,2.50688e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,20,0.1,1,SI,1.49351e+06,1.25344e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,1000,0.001,0.25,SI,1.47588e+06,5.0376e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,1000,0.001,0.5,SI,1.47149e+06,2.5188e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,1000,0.001,1,SI,1.46549e+06,1.2594e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,1000,0.1,0.25,SI,1.47588e+06,4.22976e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,1000,0.1,0.5,SI,1.47149e+06,2.11488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,0.5,1000,0.1,1,SI,1.46549e+06,1.05744e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,20,0.001,0.25,SI,798378,2.52264e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,20,0.001,0.5,SI,766458,1.26132e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,20,0.001,1,SI,746144,6.3066e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,20,0.1,0.25,SI,798378,2.49888e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,20,0.1,0.5,SI,766459,1.24944e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,20,0.1,1,SI,746145,6.2472e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,1000,0.001,0.25,SI,730415,2.5148e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,1000,0.001,0.5,SI,729721,1.2574e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,1000,0.001,1,SI,728612,6.287e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,1000,0.1,0.25,SI,730415,1.71488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,1000,0.1,0.5,SI,729721,8.5744e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,10000,1,1000,0.1,1,SI,728611,4.2872e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,20,0.001,0.25,SI,5.42165e+06,5.04544e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,20,0.001,0.5,SI,2.71083e+06,2.52272e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,20,0.001,1,SI,1.85591e+06,1.26136e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,20,0.1,0.25,SI,5.42166e+06,5.01376e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,20,0.1,0.5,SI,2.71083e+06,2.50688e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,20,0.1,1,SI,1.85591e+06,1.25344e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,1000,0.001,0.25,SI,1.76509e+06,5.0376e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,1000,0.001,0.5,SI,1.7186e+06,2.5188e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,1000,0.001,1,SI,1.65895e+06,1.2594e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,1000,0.1,0.25,SI,1.76509e+06,4.22976e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,1000,0.1,0.5,SI,1.7186e+06,2.11488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,0.5,1000,0.1,1,SI,1.65895e+06,1.05744e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,20,0.001,0.25,SI,2.63083e+06,2.52264e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,20,0.001,0.5,SI,1.31541e+06,1.26132e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,20,0.001,1,SI,924486,6.3066e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,20,0.1,0.25,SI,2.63083e+06,2.49888e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,20,0.1,0.5,SI,1.31541e+06,1.24944e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,20,0.1,1,SI,924487,6.2472e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,1000,0.001,0.25,SI,811310,2.5148e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,1000,0.001,0.5,SI,803913,1.2574e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,1000,0.001,1,SI,792447,6.287e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,1000,0.1,0.25,SI,811310,1.71488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,1000,0.1,0.5,SI,803913,8.5744e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.33,100000,1,1000,0.1,1,SI,792447,4.2872e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,20,0.001,0.25,SI,1.73237e+06,5.04544e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,20,0.001,0.5,SI,1.72527e+06,2.52272e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,20,0.001,1,SI,1.72122e+06,1.26136e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,20,0.1,0.25,SI,1.73237e+06,5.01376e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,20,0.1,0.5,SI,1.72527e+06,2.50688e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,20,0.1,1,SI,1.72122e+06,1.25344e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,1000,0.001,0.25,SI,1.72002e+06,5.0376e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,1000,0.001,0.5,SI,1.71954e+06,2.5188e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,1000,0.001,1,SI,1.71891e+06,1.2594e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,1000,0.1,0.25,SI,1.72002e+06,4.22976e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,1000,0.1,0.5,SI,1.71954e+06,2.11488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,0.5,1000,0.1,1,SI,1.71891e+06,1.05744e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,20,0.001,0.25,SI,865626,2.52264e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,20,0.001,0.5,SI,862462,1.26132e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,20,0.001,1,SI,860564,6.3066e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,20,0.1,0.25,SI,865626,2.49888e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,20,0.1,0.5,SI,862462,1.24944e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,20,0.1,1,SI,860564,6.2472e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,1000,0.001,0.25,SI,859286,2.5148e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,1000,0.001,0.5,SI,859208,1.2574e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,1000,0.001,1,SI,859086,6.287e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,1000,0.1,0.25,SI,859286,1.71488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,1000,0.1,0.5,SI,859207,8.5744e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,1000,1,1000,0.1,1,SI,859086,4.2872e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,20,0.001,0.25,SI,1.86335e+06,5.04544e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,20,0.001,0.5,SI,1.79848e+06,2.52272e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,20,0.001,1,SI,1.76025e+06,1.26136e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,20,0.1,0.25,SI,1.86335e+06,5.01376e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,20,0.1,0.5,SI,1.79848e+06,2.50688e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,20,0.1,1,SI,1.76025e+06,1.25344e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,1000,0.001,0.25,SI,1.74908e+06,5.0376e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,1000,0.001,0.5,SI,1.74425e+06,2.5188e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,1000,0.001,1,SI,1.73796e+06,1.2594e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,1000,0.1,0.25,SI,1.74908e+06,4.22976e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,1000,0.1,0.5,SI,1.74425e+06,2.11488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,0.5,1000,0.1,1,SI,1.73796e+06,1.05744e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,20,0.001,0.25,SI,926946,2.52264e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,20,0.001,0.5,SI,897695,1.26132e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,20,0.001,1,SI,879675,6.3066e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,20,0.1,0.25,SI,926946,2.49888e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,20,0.1,0.5,SI,897695,1.24944e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,20,0.1,1,SI,879675,6.2472e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,1000,0.001,0.25,SI,867332,2.5148e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,1000,0.001,0.5,SI,866544,1.2574e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,1000,0.001,1,SI,865323,6.287e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,1000,0.1,0.25,SI,867332,1.71488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,1000,0.1,0.5,SI,866543,8.5744e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,10000,1,1000,0.1,1,SI,865322,4.2872e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,20,0.001,0.25,SI,1.09787e+07,5.04544e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,20,0.001,0.5,SI,5.48935e+06,2.52272e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,20,0.001,1,SI,2.74467e+06,1.26136e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,20,0.1,0.25,SI,1.09787e+07,5.01376e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,20,0.1,0.5,SI,5.48934e+06,2.50688e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,20,0.1,1,SI,2.74467e+06,1.25344e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,1000,0.001,0.25,SI,3.13868e+06,5.0376e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,1000,0.001,0.5,SI,1.98077e+06,2.5188e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,1000,0.001,1,SI,1.91886e+06,1.2594e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,1000,0.1,0.25,SI,3.13869e+06,4.22976e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,1000,0.1,0.5,SI,1.98077e+06,2.11488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,0.5,1000,0.1,1,SI,1.91886e+06,1.05744e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,20,0.001,0.25,SI,5.40934e+06,2.52264e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,20,0.001,0.5,SI,2.70467e+06,1.26132e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,20,0.001,1,SI,1.35234e+06,6.3066e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,20,0.1,0.25,SI,5.40934e+06,2.49888e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,20,0.1,0.5,SI,2.70467e+06,1.24944e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,20,0.1,1,SI,1.35234e+06,6.2472e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,1000,0.001,0.25,SI,947014,2.5148e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,1000,0.001,0.5,SI,938733,1.2574e+09,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,1000,0.001,1,SI,926273,6.287e+08,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,1000,0.1,0.25,SI,947014,1.71488e+07,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,1000,0.1,0.5,SI,938733,8.5744e+06,A (disuasión),honesto,región no vacía
+pareto_3_0,0.4,100000,1,1000,0.1,1,SI,926273,4.2872e+06,A (disuasión),honesto,región no vacía

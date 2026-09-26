@@ -1,0 +1,32 @@
+Orden SL-2 cumplida. Resumen de la entrega en `P-ZRX/P-SLASHING/SL2/`:
+
+## Faltas de definición detectadas (informadas antes de escribir código)
+Están en `DEFINICIONES-FALTANTES.md` (F1–F10); ninguna bloquea, todas se resuelven declarando y publicando la sensibilidad. Las de mayor peso:
+- **F1**: la «fracción confiscada `f`» no existe en el modelo ratificado (la pérdida de DS-3 no la tiene). Se adopta una ley declarada y se barre `f∈{0.25,0.5,1}`.
+- **F2**: colisión `q` (garantía M1) vs `q` (`q_gana`). Se renombran a `q_g` y `q_ev`.
+- **F3**: `R_slots` no está en el modelo; se adopta `T_v^eff=T_v+R_slots` (monótono).
+- **F4**: no había definición de «ingreso anual del honesto»; se define adimensional.
+- **F5**: inconsistencia de unidades de DS-3 (`ρ_ret I T_v` por clave vs por unidad de espacio). Se implementan las dos vías (P1 fiel a DS-3 y P2 corregida); el veredicto no cambia.
+- **F10**: la Pareto «pesimista» H3 choca con el exponente que midió DS-6 (`≤2`); se usa la forma truncada.
+
+## Resultado (pregunta falsable)
+- **Caso central (empírico de DS-6, único dato real): SÍ.** La grieta de reclutamiento gratuito está cerrada (`B_emp≈1.8·10⁻⁴`), y hay región no vacía en **2880/2880** celdas para `ε_h≤10⁻³`, con `α∈[0.20,0.40]`, `V≤10⁶`, `f`, `q_g` y `P*` barridos.
+- **Caso pesimista (Pareto H3): SÍ, condicionado.** Con `T_v=3600` la grieta sigue abierta; la región solo se abre con `T_v≈6.7·10⁴…8.6·10⁵` slots (1.2 h–10.4 d) según `α_dens`. Con `ε_h≥10⁻²` y `α_dens≥2.5` se vacía por honestidad.
+- **Se refuta** para un honesto diminuto (`f_h≲10⁻⁵`): la garantía M1 por identidad es regresiva.
+- **Bordes:** inferior por disuasión `A` (o viabilidad `T_v>F`), superior por honestidad `B`.
+
+## Recomendación dev (no producción)
+`recomendacion-dev.csv`: **primario** `f=1, ρ_ret=0.10, T_v=10⁵` (≈1.16 d), `R_slots≥F`, `q_g=20`; **robusto** (cubre H3) `f=1, ρ_ret=0.25, T_v=9·10⁵` (≈10.4 d).
+
+## Verificación
+- `Pkg.test()`: **39/39**; `run.jl` reproducible: **2.39 s** con 4 hilos (memoizar `β_d` bajó 66 s→2.4 s).
+- Monte Carlo independiente con `StableRNGs` (semillas no consecutivas) coincide en todos los casos de comprobación.
+- Entrada congelada verificada 8/8; `HUELLAS.sha256` de la zona verificado; sin commit/push; todo dentro de la zona. Cálculo íntegramente en Julia 1.13.0.
+
+**Comando:**
+```bash
+export PATH=/home/katana/torio/.juliaup/bin:$PATH
+export JULIA_DEPOT_PATH="$PWD/.julia-depot:/home/katana/.julia"
+JULIA_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 \
+  env -u LD_LIBRARY_PATH julia --project=. --threads=4,0 run.jl --seed 0x5a5a --reps 20000
+```

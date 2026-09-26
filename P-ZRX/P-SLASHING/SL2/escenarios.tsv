@@ -1,0 +1,30 @@
+# SL-2 · escenarios.tsv — parámetros de escenario leídos por run.jl
+# Formato: clave<TAB>valor<TAB>unidad<TAB>etiqueta<TAB>procedencia<TAB>barrido
+# NINGUNA constante oculta: todo parámetro que entra en un cálculo sale de aquí.
+# Etiquetas: medido | hecho | derivado | hipótesis | condicionado
+# Faltas de definición resueltas en DEFINICIONES-FALTANTES.md (F1..F10).
+clave	valor	unidad	etiqueta	procedencia	barrido
+# — parámetros de escenario (base; run.jl barre las rejillas de la última columna) —
+alpha_atacante	0.33	fracción de espacio	hipótesis	MODELO §3 (rejilla P-CLAVE/P-PRESTAMO)	0.20;0.25;0.33;0.40
+P_objetivo	0.001	probabilidad	hipótesis DS-3 (F2)	DS-3 DEFINICIONES-FALTANTES F2	1e-6;1e-3;0.5
+V	10000	u.e. (total)	hipótesis (F6)	MODELO §1 (reinterpretado como total, F6)	1e2;1e3;1e4;1e5;1e6
+f_conf	1.0	fracción	hipótesis (F1)	ORDEN-SL1 §3.2/§4.5 (fracción confiscada)	0.25;0.5;1.0
+rho_ret	0.5	fracción	hipótesis	MODELO §3 (rejilla P-CLAVE §6)	0.10;0.25;0.50;1.00
+T_v	3600	slots	hipótesis	MODELO §3 (rejilla P-CLAVE §6)	1000;3600;10000;100000
+R_slots	0	slots	hipótesis (F3)	ORDEN-SL1 §4.4; efecto declarado T_v^eff=T_v+R	0;1019;2038
+q_g	20	u.e. por identidad	hipótesis (F2)	M1; base = I·M de DS-3	20;100;1000;10000
+eps_honesto	0.001	1/año por clave	hipótesis (orden)	ORDEN-SL2 §1 (con firmante seguro ≤1e-3)	1e-4;1e-3;1e-2;1e-1
+f_honesto	0.001	fracción de la clave honesta	hipótesis (F4)	P-CLAVE H3 (f_media)	1e-6;1e-3;1e-1
+frac_ingreso_max	0.01	fracción del ingreso anual	orden	ORDEN-SL2 §1 (≤1 %)	0.01
+# — parámetros del modelo (fijos, citados) —
+kappa	1.0	adimensional	hipótesis (tabla exacta P-EQUIVOCACION)	MODELO §2.6	1.0
+q_ev	1.0	adimensional	hipótesis	MODELO §1 (antes q_gana; F2)	1.0
+I	1.0	u.e. por bloque	hipótesis	MODELO §2.3	1.0
+c_r	10.0	u.e.	hipótesis	P-PRESTAMO §5	10.0
+lambda	1.0	bloques/slot	entrada	MODELO §1	1.0
+F_slots	1019	slots	hipótesis (símbolo sin fijar)	P-PRESTAMO §2	1019
+eps_saldo	0.01	u.e.	hipótesis	P-CLAVE §3 (umbral de saldo cero)	0.01
+dist_f_min	1e-8	fracción de espacio	hipótesis H3	P-CLAVE H3	1e-8
+dist_alpha	2.2	adimensional (densidad)	hipótesis H3	P-CLAVE H3 (convención de densidad, DS-6 A.1)	2.05;2.2;2.5;3.0
+f_media_hipotesis	0.001	fracción de espacio	hipótesis H3	P-CLAVE H3 (media de clave; F5)	0.001
+via_perdida	P1	adimensional	declarado (F1/F5)	P1 fiel a DS-3; P2 corrección de unidades	P1;P2

@@ -1,0 +1,38 @@
+SL-2 · benchmark (LINEO §6)
+julia = 1.13.0
+cpu = znver5
+memoria_total_GiB = 123.4
+
+Kernel (mínimo de BenchmarkTools; calentado antes de medir):
+
+  variante                                      t (1 hilo)     t (4 hilos)   allocs   memoria
+  -------------------------------------------- ------------- ------------- ------- ----------
+  primera_dp_absorbente(d=346,T=1019)             469.7 us        457.6 us        6     22 kB
+  primera_dp(mín,pos) d=346,T=1019                579.7 ms        547.0 ms        6    7.6 MB
+  beta_minimo_para_p(0.33,1e-3) [40 bisecciones]   16.4 ms         16.3 ms      258    759 kB
+  region_tv empírica rho=0.5                        0.048 us        0.048 us      0      0 B
+  B_empirico (búsqueda binaria sobre 2453)          0.007 us        0.007 us      0      0 B
+
+Monte Carlo de la ventana (200000 réplicas), mc_ventana:
+
+  hilos   ruta          t mínimo        speedup   eficiencia
+  ------- ------------- --------------- --------- ----------
+  1       hilos=true       75.52 ms       1.00x      —
+  4       hilos=true       19.55 ms       3.86x      96.6 %
+  1       serial           75.62 ms       —          —
+  4       serial           75.71 ms       —          —
+
+Escalado 1→4 hilos medido en la MISMA máquina (AMD Ryzen 9 9950X3D, znver5), OPENBLAS_NUM_THREADS=1.
+El speedup 3.86x y la eficiencia 96.6 % justifican conservar la ruta con hilos para `nrep ≥ 4096`.
+
+@allocated region_tv = 0 B (cero asignaciones en el camino caliente).
+
+Mejora medida de `run.jl` (mismo resultado): 66.0 s → 2.4 s de pared al memoizar β_d(α,P*) — solo
+hay 12 pares y se recalculaban miles de veces. Es la aplicación de LINEO §2 (eliminar trabajo
+redundante antes de paralelizar).
+
+Reproducción:
+  export PATH=/home/katana/torio/.juliaup/bin:$PATH
+  export JULIA_DEPOT_PATH="$PWD/.julia-depot:/home/katana/.julia"
+  JULIA_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 \
+    env -u LD_LIBRARY_PATH julia --project=. --threads=4,0 bench/benchmarks.jl

@@ -1,0 +1,7 @@
+# SL-2 · versión de Julia fijada (LINEO §1)
+# El contenedor de juliaup de la máquina de referencia tiene esta versión estable.
+julia = "1.13.0"
+juliaup = "1.22.7"
+sistema = "linux/x86_64"
+cpu = "AMD Ryzen 9 9950X3D (znver5)"
+nota = "JULIA_DEPOT_PATH dentro de la zona; el depósito compartido de /home/katana/.julia se usa como respaldo de solo lectura para las fuentes de los paquetes. Manifest.toml congelado."

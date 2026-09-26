@@ -40,7 +40,7 @@ aplicado (Katana):** un mecanismo que no cierra un hueco pero encarece el ataque
   `ρ_ret·T_v > 370`, no «≳ 4.000» (la incoherencia venía ya de P-PRESTAMO y la detectó DS-3).
 - La medida GPU es de la tabla **v2** de Autonomys; ZEROX usa la **v1**. En CPU cuestan casi lo mismo
   (0,92 frente a 0,90 s por registro), pero no es la medida exacta del objeto de ZEROX.
-- Todas las cifras en tokens son **escenarios hipotéticos** (no hay precios ni parámetros de producción).
+- Todas las cifras en tokens son **escenarios hipotéticos** (no hay precios ni parámetros de producción), y el modelo de DS-2 mezclaba saldo por clave y pérdida por reclutado (SL-2, F5): las cifras absolutas en u.e. son de escala dudosa; las conclusiones no cambian.
 - Una GTX 1070 es **cota inferior** de una GPU actual: el sembrador con hardware actual es más barato en
   un factor no medido.
 

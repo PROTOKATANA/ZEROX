@@ -1,0 +1,9 @@
+caso,valor,esperado,via,etiqueta
+MODELO §4.2 P(F=1019;α=0.33),9.75215842976e-108,9.75e-108,DP exacta,condicionado H-PUENTE
+MODELO §4.3 P(B=0) θ=0.36,0.6976763261,0.69768,Poisson exacta,—
+MODELO §4.4 B(0.01;Tv=3600;α=2.2),0.675466,0.675466,Pareto truncada H3,reproduce DS-3
+MODELO §4.4 B(0.01;Tv=1e5;α=2.2),0.369043,0.369,Pareto truncada H3,—
+DS-3 reserva F7 Baig–Pietrzak,4253,1233+140 [sic],fórmula MODELO,reserva
+SL-2 α*(βd=0.34),0.33,0.33,identidad,REVISION-DS3
+SL-2 B_emp(0.01;Tv=3600) DS-6,0.00017786,1.78e-4,empírico directo,DS-6 Corrección A
+SL-2 ingreso anual f_h=1e-3,31536,31536,derivado,resolución F4

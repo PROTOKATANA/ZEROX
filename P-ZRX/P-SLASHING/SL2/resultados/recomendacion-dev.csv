@@ -1,0 +1,7 @@
+rho_ret,cubre_5_casos,Tv_min_peor,detalle_por_caso,etiqueta
+0.1,SI,859554,empirico=2584; pareto_2_05=6.662e+04; pareto_2_2=4.718e+05; pareto_2_5=7.392e+05; pareto_3_0=8.596e+05,dev; cubre los 5 casos; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3
+0.25,SI,858856,empirico=1041; pareto_2_05=5.571e+04; pareto_2_2=4.684e+05; pareto_2_5=7.378e+05; pareto_3_0=8.589e+05,dev; cubre los 5 casos; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3
+0.5,NO,467205,empirico=1019; pareto_2_05=5.161e+04; pareto_2_2=4.672e+05; pareto_2_5=NO; pareto_3_0=NO,dev; cubre los 5 casos; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3
+1,NO,49445.5,empirico=1019; pareto_2_05=4.945e+04; pareto_2_2=NO; pareto_2_5=NO; pareto_3_0=NO,dev; cubre los 5 casos; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3
+0.100,SI,2584.22,empirico=2584,DEV PRIMARIO (medido DS-6): f=1; rho=0.10; T_v recomendado=100000; q_g=20
+0.25,SI,858856,empirico=1041; pareto_2_05=5.571e+04; pareto_2_2=4.684e+05; pareto_2_5=7.378e+05; pareto_3_0=8.589e+05,DEV ROBUSTO (cubre Pareto H3): f=1; rho=0.25; T_v recomendado=9e+05; q_g=20

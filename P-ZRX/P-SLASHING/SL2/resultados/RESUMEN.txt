@@ -1,0 +1,32 @@
+SL-2 · resumen de ejecución
+fecha_local = 2026-09-26 (fecha de la orden)
+julia = 1.13.0
+nthreads_default = 4
+nthreads_interactive = 0
+cpu = znver5
+memoria_total_GiB = 123.4
+semilla = 23130
+reps = 20000
+rapido = false
+escenarios = /home/katana/zeo/ZEROX/P-ZRX/P-SLASHING/SL2/escenarios.tsv
+datos = /home/katana/zeo/ZEROX/P-ZRX/P-SLASHING/SL2/datos/farmers-raw.csv (sha256 a18b7738...fdd18)
+segundos_pared = 2.39
+
+validaciones:
+  primera_pasada = (celdas = 816, error_max = 9.992007221626409e-16, celdas_enum = 528, error_enum = 2.220446049250313e-16)
+  alpha = (filas = 12, error_max = 1.1102230246251565e-16)
+  Bemp = (directo = 0.00017786036170633368, ic_lo = 0.00014907263620961444, ic_hi = 0.00020880335423258941, dentro = true, monotono = true, nrep = 4000)
+  Bpar_2.05 = (cerrada = 0.24522913938841528, exacta = 0.24524027326684592, err_exacta = 1.1133878430630295e-5, mc_media = 0.4625352733292868, ic_lo = 0.16505253227605898, ic_hi = 0.6052090001774636, dentro = true)
+
+artefactos:
+  Beps-escenarios.csv
+  beta-d.csv
+  comprobaciones.csv
+  frontera-central.csv
+  grieta.csv
+  monte-carlo.csv
+  recomendacion-dev.csv
+  region.csv
+  sensibilidad-P2.csv
+  sensibilidad-R.csv
+  sensibilidad-fh.csv
