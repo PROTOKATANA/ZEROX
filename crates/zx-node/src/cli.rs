@@ -80,4 +80,13 @@ pub struct Cli {
     /// Para el nodo tras producir/alcanzar este slot de régimen (para pruebas y mediciones).
     #[arg(long)]
     pub parada_tras_slots: Option<u64>,
+
+    /// Dirección donde escuchar (`ORDEN-W06d2`). Sin esto ni `--red-marcar`, el nodo corre
+    /// exactamente como en `ORDEN-W06d1`: sin red.
+    #[arg(long, value_name = "MULTIADDR")]
+    pub red_escuchar: Option<String>,
+
+    /// Direcciones de pares a marcar al arrancar, repetible.
+    #[arg(long = "red-marcar", value_name = "MULTIADDR")]
+    pub red_marcar: Vec<String>,
 }

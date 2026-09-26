@@ -14,6 +14,10 @@ workspace = true
 name = "zx-node"
 path = "src/main.rs"
 
+[[bin]]
+name = "zx-adversario"
+path = "src/bin/zx-adversario.rs"
+
 [dependencies]
 thiserror       = { workspace = true }
 blake3          = { workspace = true }
@@ -28,6 +32,11 @@ zx-farmer       = { path = "../zx-farmer" }
 zx-post         = { path = "../zx-post" }
 zx-cadena       = { path = "../zx-cadena" }
 zx-storage      = { path = "../zx-storage", features = ["rocksdb"] }
+# --- red (ORDEN-W06d2) ---
+zx-p2p          = { path = "../zx-p2p" }
+tokio           = { workspace = true }
+tracing         = { workspace = true }
+libp2p          = { workspace = true, features = ["tokio", "tcp", "noise", "yamux", "macros", "ed25519"] }
 
 # ── Autonomys por ruta al clon fijado `PDF/autonomys-subspace` @ f8842d0 ────────────────────────
 # Mismas instancias que `zx-farmer`/`zx-post`: el nodo no reimplementa PoS, KZG ni erasure coding,

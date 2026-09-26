@@ -209,7 +209,15 @@ fn v5_sigkill_en_varios_puntos_reabre_sin_corrupcion_y_sigue_produciendo() {
         let mut hijo = lanzar(dir.path());
         esperar_senal_de_vida(&ruta_registro, ronda);
         let objetivo = usize::try_from(ronda).unwrap_or(1);
-        let limite = Instant::now() + Duration::from_secs(30);
+        // `ORDEN-W06d2` punto 7 / `REVISION-W06a-C.md`: esta espera **ya** era por eventos del
+        // registro (el bucle de abajo sondea `bloque_producido`, no un `sleep` fijo), pero el
+        // plazo de 30 s que la acotaba era demasiado ajustado en `debug` bajo carga — la suite
+        // conjunta con W06a-B falló una vez exactamente aquí ("ronda régimen 4: no se vieron 4
+        // bloques producidos en 30 s"), aislada pasaba siempre. El plazo se sube a 120 s, el mismo
+        // orden de magnitud que ya usan las rondas PoW de esta prueba (180 s) para la misma razón
+        // (máquina compartida, `debug` sin optimizar): sigue siendo un límite, no una espera fija,
+        // y una intermitencia real (el nodo de verdad colgado) sigue haciendo fallar el test.
+        let limite = Instant::now() + Duration::from_secs(120);
         loop {
             let contenido = std::fs::read_to_string(&ruta_registro).unwrap_or_default();
             let vistos = contenido.matches("\"bloque_producido\"").count();

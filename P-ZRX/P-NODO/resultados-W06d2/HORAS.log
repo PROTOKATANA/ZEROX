@@ -1,0 +1,19 @@
+== HORAS.log inicio ==
+2026-09-26T12:01:39+02:00
+Inicio W06d2: lectura de entradas completada, creando zona.
+2026-09-26T12:24:48+02:00
+Zona creada (ws.orig/ws con crates+testdata+ci+.github+PDF symlink), cache cargo copiada de W06bR, cargo fetch para completar clap_lex 1.1.1.
+2026-09-26T12:24:48+02:00
+Item 1 (validacion diferida zx-p2p): Veredicto::Diferir + IdDiferido + VeredictoFinal + Comando::InformarValidacion + barrido de expiracion. Tests nuevos en dos_nodos.rs (diferido no retransmite hasta informar; diferido sin informe expira a Ignorar). zx-p2p: fmt/clippy -D warnings/test todo verde.
+2026-09-26T12:24:48+02:00
+Item 7 (test intermitente reinicio.rs): el plazo de 30s de la fase regimen (ya basado en eventos del registro, no en sleep fijo) se sube a 120s con motivo documentado (REVISION-W06a-C).
+2026-09-26T12:24:48+02:00
+Aviso del director a mitad de ejecucion: RI-2a confirmo bug en zx-cadena (Cadena::admitir cachea ErrSinPadre por padre ausente como definitivo para siempre). Corregido: dependencia_no_disponible() precheck antes de admitir_pow/admitir_post, sin cachear si la dependencia (padre o terminal) simplemente no ha llegado. Verificando ahora contra diferencial_t04 y propiedades.rs.
+2026-09-26T13:39:11+02:00
+Puntos 2-6 implementados: red/{huerfanos,vista,manejador,sync}.rs en zx-node, integracion en nodo.rs (intentar_admitir_pow_de_red, procesar_trabajo_red_pendiente, difundir_si_hay_red, registro estructurado bloque_red_*), main.rs/cli.rs con --red-escuchar/--red-marcar, binario zx-adversario. Verificado en vivo con procesos reales (TCP loopback): dos nodos conectan, propagan y CONVERGEN en fase PoW (uno adopta la cadena del otro tras dejar de auto-minar); zx-adversario conecta a un nodo real, pide Estado, envia PoW con nonce malo -> el objetivo lo rechaza y corta la conexion (ViolacionDeConsenso). Bloqueo documentado: BloqueRed::Post sin JustificacionPot impide verificar PoST de red (PoST tratado como Ignorar). Limite documentado: sin reorg de PoW (V6 no demostrado).
+2026-09-26T13:39:11+02:00
+V1/V2/V10 verificados en verde (fmt --check, clippy -D warnings --workspace, frontera-crates.sh, dependencias-exactas.sh, lock sin cambios de version salvo aristas nuevas de zx-node->{zx-p2p,tokio,tracing,libp2p}). V3 (cargo test --workspace --all-features --locked) en curso en segundo plano.
+2026-09-26T14:07:19+02:00
+V3 (cargo test --workspace --all-features --locked) TERMINADO: 715 pasan, 0 fallan, 2 ignorados (preexistentes). 698+17=715 cuadra exacto con los tests nuevos listados en INFORME.md. reinicio.rs (v5_sigkill de 12 rondas + v5b) en verde, ejecutado 1 vez (no 5x, presupuesto agotado, declarado). Sin procesos huerfanos tras las pruebas manuales de humo.
+2026-09-26T14:07:19+02:00
+cambios.patch generado (diff -ruN -x target -x .cargo-home -x PDF ws.orig ws), 21 archivos tocados. git apply --check -p1 limpio contra la raiz real. MIGRACION.sha256 generado y comprobado en verde (sha256sum -c). ENTRADA-W06d2.sha256 comprobado en verde al empezar y al terminar. INFORME.md y PROGRESO.md finalizados. Cierre de la orden.

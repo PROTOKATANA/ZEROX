@@ -16,6 +16,7 @@ pub mod nodo;
 pub mod padres;
 pub mod perfil;
 pub mod pow;
+pub mod red;
 pub mod regimen;
 pub mod registro;
 

@@ -202,6 +202,23 @@ impl Cadena {
     ///
     /// Un bloque ya procesado devuelve el resultado almacenado, sin reprocesarlo.
     ///
+    /// # `ErrSinPadre` por una dependencia que **todavía no ha llegado** no se cachea (RI-2a #1)
+    ///
+    /// Si el padre (o, en PoST, el terminal) del bloque no está disponible **todavía**, el rechazo
+    /// es provisional: el mismo bloque, sometido otra vez después de que su dependencia llegue,
+    /// MUST poder admitirse. Antes de este arreglo, `admitir` cacheaba `ErrSinPadre` igual que
+    /// cualquier otro motivo, y un bloque que llegaba antes que su padre —una condición de carrera
+    /// de red ordinaria, sin ningún adversario de por medio— quedaba inválido **para siempre** en
+    /// esta instancia aunque el padre llegara después y fuera válido: dos nodos honestos que
+    /// reciben los mismos bloques en órdenes distintos divergirían. La comprobación
+    /// ([`Self::dependencia_no_disponible`]) se hace **antes** de tocar `admitir_pow`/`admitir_post`
+    /// —y por tanto antes de cualquier mutación del DAG interno—, así que reintentar más tarde
+    /// vuelve a ejecutar la tubería completa desde cero, nunca a medias.
+    ///
+    /// Los motivos de rechazo que sí dependen únicamente del contenido del propio bloque (padres
+    /// duplicados, forma inválida, PoW/PoAS/PoT/firma incorrectos, etc.) siguen cacheados como
+    /// antes: no cambian si se reintentan.
+    ///
     /// # Errores
     /// El [`MotivoBloque`] que haya invalidado el bloque.
     pub fn admitir(&mut self, bloque: BloqueCadena) -> Result<(), MotivoBloque> {
@@ -216,6 +233,10 @@ impl Cadena {
                     .cloned()
                     .unwrap_or(MotivoBloque::ErrSinPadre))
             };
+        }
+        if self.dependencia_no_disponible(&bloque) {
+            self.por_hash.insert(hash, bloque);
+            return Err(MotivoBloque::ErrSinPadre);
         }
         self.por_hash.insert(hash, bloque.clone());
         let resultado = match &bloque {
@@ -232,6 +253,34 @@ impl Cadena {
             }
         }
         resultado
+    }
+
+    /// ¿Depende `bloque` de algo (un padre, o el terminal) que esta `Cadena` todavía no tiene?
+    ///
+    /// Réplica, **de solo lectura**, exactamente las comprobaciones de disponibilidad que
+    /// `admitir_pow`/`chequear_forma` hacen de todas formas (mismo padre, misma noción de
+    /// "conocido y válido", mismo terminal); duplicarlas aquí es necesario porque esta comprobación
+    /// se hace **antes** de decidir si el resultado se cachea, y ese antes tiene que ser anterior a
+    /// cualquier mutación del DAG (`anadir_al_dag`). Un padre **conocido y definitivamente
+    /// inválido** también cuenta como "no disponible" aquí (en vez de "definitivamente inválido
+    /// para siempre"): es una posición conservadora, nunca insegura — el peor caso es repetir el
+    /// cómputo si alguien reenvía el mismo bloque doomed, no cachear por error un huérfano como
+    /// inválido para siempre.
+    #[must_use]
+    fn dependencia_no_disponible(&self, bloque: &BloqueCadena) -> bool {
+        match bloque {
+            BloqueCadena::Pow(_) => bloque
+                .padre_seleccionado()
+                .is_some_and(|p| !self.post.contains_key(&p)),
+            BloqueCadena::Post(p) => {
+                let Some(terminal) = self.terminal else {
+                    return true;
+                };
+                p.padres
+                    .iter()
+                    .any(|x| *x != terminal && !self.es_valido(x))
+            }
+        }
     }
 
     /// Procesa un conjunto de bloques con un orden de llegada arbitrario, reintentando los que

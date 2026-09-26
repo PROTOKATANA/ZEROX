@@ -237,3 +237,44 @@ fn identidades_reales_distintas_no_colapsan_en_ocho_bytes() {
         Err(MotivoBloque::ErrU2)
     );
 }
+
+/// **`ORDEN-W06d2` / RI-2a #1 (ALTA, CONFIRMADO).** Un hijo sometido antes que su padre no debe
+/// quedar inválido para siempre: al llegar el padre y volver a someter exactamente el mismo hijo,
+/// `admitir` debe admitirlo.
+///
+/// Antes del arreglo (`Cadena::dependencia_no_disponible`), el primer `admitir(hijo)` cacheaba
+/// `ErrSinPadre` en `validos`/`motivos` de forma permanente; el segundo `admitir(hijo)` devolvía el
+/// error cacheado sin volver a intentar la tubería, aunque el padre ya fuera válido. Es exactamente
+/// la condición de carrera de red que produce divergencia entre nodos honestos según el orden de
+/// llegada (sin ningún adversario de por medio).
+#[test]
+fn w06d2_hijo_antes_que_el_padre_se_admite_al_llegar_el_padre() {
+    let mut cadena = cadena_con_terminal(15);
+    let terminal = hash(1);
+
+    let padre = post(50, vec![terminal], 1, productor(50), ticket(50, 1));
+    let hash_padre = hash(50);
+    let hijo = post(60, vec![hash_padre], 2, productor(60), ticket(60, 2));
+
+    // 1) El hijo llega primero: su padre todavía no existe en esta `Cadena`.
+    assert_eq!(
+        cadena.admitir(hijo.clone()),
+        Err(MotivoBloque::ErrSinPadre),
+        "sin el padre, el rechazo es correcto (y debe ser provisional, no cacheado)"
+    );
+
+    // 2) El padre llega y es válido.
+    assert!(
+        cadena.admitir(padre).is_ok(),
+        "el padre por sí solo es válido"
+    );
+    assert!(cadena.es_valido(&hash_padre));
+
+    // 3) El mismo hijo, sometido otra vez: MUST admitirse ahora que el padre está disponible.
+    assert!(
+        cadena.admitir(hijo.clone()).is_ok(),
+        "BUG RI-2a #1: el hijo debe admitirse una vez que su padre ya es válido, no quedar \
+         cacheado como ErrSinPadre para siempre"
+    );
+    assert!(cadena.es_valido(&hijo.hash()));
+}

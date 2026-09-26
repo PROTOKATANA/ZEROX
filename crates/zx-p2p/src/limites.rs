@@ -143,6 +143,21 @@ pub const MAX_CONEXIONES_PENDIENTES: u32 = 32;
 /// mitigación; la otra mitad es el presupuesto agregado de [`crate::presupuesto`].
 pub const MAX_STREAMS_SYNC: usize = 8;
 
+/// Plazo, en segundos, para que llegue el veredicto de una validación diferida
+/// (`ORDEN-W06d2` decisión 1) antes de tratarla como [`crate::entrante::Veredicto::Ignorar`].
+///
+/// Un bloque PoST real verifica en decenas de milisegundos (PoT + PoAS); 5 s es generoso incluso
+/// bajo carga y sigue acotando cuánto tiempo puede quedar un mensaje de gossipsub retenido sin
+/// reenviarse ni descartarse.
+pub const PLAZO_VALIDACION_DIFERIDA_S: u64 = 5;
+
+/// Cuántas validaciones diferidas puede tener pendientes `zx-p2p` a la vez.
+///
+/// Acota la memoria de la tabla de pendientes (`ORDEN-W06d2`, disciplina de recursos de `LINEO`):
+/// un manejador que difiere sin nunca informar no debe crecer sin límite entre barridos del plazo.
+/// Al llegar al tope, la entrada más antigua se expira como `Ignorar` para dejar sitio.
+pub const MAX_DIFERIDOS_PENDIENTES: usize = 4_096;
+
 // ── Coherencia de los límites ────────────────────────────────────────────────
 // Aserciones de compilación y no tests: una relación entre constantes no se puede saltar con
 // `--skip`, y un cambio que rompa la coherencia MUST impedir compilar.

@@ -15,18 +15,22 @@
 //! Regla dura de este bucle: **nada que venga de un peer puede propagar un `Err` fuera del
 //! `select!`**. Se registra, se desconecta a quien haga falta, y se sigue.
 
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use libp2p::swarm::SwarmEvent;
 use libp2p::{Multiaddr, PeerId, Swarm};
 use tokio::sync::{mpsc, oneshot};
+use tokio::time::MissedTickBehavior;
 
 use libp2p::{gossipsub, request_response};
 
 use crate::behaviour::{ZxBehaviour, ZxBehaviourEvent};
 use crate::config::ParametrosRed;
-use crate::entrante::{ManejadorEntrante, Veredicto};
+use crate::entrante::{IdDiferido, ManejadorEntrante, Veredicto, VeredictoFinal};
 use crate::error::{MotivoDesconexion, P2pError};
+use crate::limites::{MAX_DIFERIDOS_PENDIENTES, PLAZO_VALIDACION_DIFERIDA_S};
 use crate::mensaje::{BloqueRed, FamiliaBloque, Peticion, Respuesta};
 use crate::presupuesto::Presupuesto;
 
@@ -79,6 +83,18 @@ pub(crate) enum Comando {
         peer: PeerId,
         /// Por qué. Solo [`MotivoDesconexion::ViolacionDeConsenso`] puntúa.
         motivo: MotivoDesconexion,
+    },
+    /// El veredicto final de una validación que [`ManejadorEntrante::bloque_difundido`] había
+    /// diferido (decisión 1 de `ORDEN-W06d2`).
+    ///
+    /// Si `id` ya no está en la tabla de pendientes —porque expiró (§`PLAZO_VALIDACION_DIFERIDA_S`)
+    /// o porque ya se informó antes—, el comando **no hace nada**: es idempotente a propósito, para
+    /// que un manejador que informe dos veces (o tarde) no cause un error de protocolo.
+    InformarValidacion {
+        /// El mismo identificador que trajo la llamada a `bloque_difundido`.
+        id: IdDiferido,
+        /// El veredicto de verdad.
+        veredicto: VeredictoFinal,
     },
 }
 
@@ -214,12 +230,58 @@ impl ManejoRed {
         self.enviar(Comando::Desconectar { peer, motivo }).await
     }
 
+    /// Informa el veredicto final de una validación diferida (decisión 1 de `ORDEN-W06d2`).
+    ///
+    /// Para usar desde una tarea `tokio`. Si el manejador vive en un hilo normal (el hilo de
+    /// consenso de `zx-node`, D-N07), usar [`Self::informar_validacion_bloqueante`].
+    ///
+    /// # Errores
+    /// [`P2pError::Transporte`] si el bucle de red ya no está.
+    pub async fn informar_validacion(
+        &self,
+        id: IdDiferido,
+        veredicto: VeredictoFinal,
+    ) -> Result<(), P2pError> {
+        self.enviar(Comando::InformarValidacion { id, veredicto })
+            .await
+    }
+
+    /// Igual que [`Self::informar_validacion`], pero bloqueante: para llamarse desde un hilo que no
+    /// corre sobre el *runtime* de `tokio` (el hilo de consenso, D-N07).
+    ///
+    /// # Pánico
+    /// Como cualquier `blocking_send` de `tokio`, entra en pánico si se llama desde dentro de un
+    /// hilo *worker* de un runtime `tokio` (ver la documentación de
+    /// [`tokio::sync::mpsc::Sender::blocking_send`]). El hilo de consenso no lo es.
+    ///
+    /// # Errores
+    /// [`P2pError::Transporte`] si el bucle de red ya no está.
+    pub fn informar_validacion_bloqueante(
+        &self,
+        id: IdDiferido,
+        veredicto: VeredictoFinal,
+    ) -> Result<(), P2pError> {
+        self.comandos
+            .blocking_send(Comando::InformarValidacion { id, veredicto })
+            .map_err(|_| P2pError::Transporte("el bucle de red ya no está escuchando comandos"))
+    }
+
     async fn enviar(&self, c: Comando) -> Result<(), P2pError> {
         self.comandos
             .send(c)
             .await
             .map_err(|_| P2pError::Transporte("el bucle de red ya no está escuchando comandos"))
     }
+}
+
+/// Lo que el bucle guarda de un mensaje de gossipsub cuyo veredicto se difirió.
+struct PendienteDiferido {
+    /// El mensaje al que hay que responder cuando llegue el veredicto final.
+    message_id: gossipsub::MessageId,
+    /// Quién lo propagó (a quién penalizar si el veredicto final es `Rechazar`).
+    propagador: PeerId,
+    /// Cuándo se difirió, para el barrido de [`BucleRed::expirar_diferidos_vencidos`].
+    creado: Instant,
 }
 
 /// El bucle. Posee el `Swarm` y corre en su propia tarea.
@@ -233,6 +295,16 @@ pub struct BucleRed<M: ManejadorEntrante> {
     /// Es el mismo que lleva el códec de `sync`: la reserva del parseo de una respuesta y la del
     /// parseo de un bloque difundido salen del mismo techo.
     presupuesto: Presupuesto,
+    /// Validaciones diferidas (decisión 1 de `ORDEN-W06d2`) a la espera de
+    /// [`Comando::InformarValidacion`], acotadas por [`MAX_DIFERIDOS_PENDIENTES`].
+    pendientes: HashMap<IdDiferido, PendienteDiferido>,
+    /// Siguiente [`IdDiferido`] a repartir. Un contador simple basta: `BucleRed` tiene un único
+    /// dueño (esta tarea), no hace falta que sea atómico.
+    siguiente_id: u64,
+    /// Plazo tras el cual un diferido sin informe se trata como `Ignorar`. Configurable solo para
+    /// que los tests puedan acortarlo; la ruta de producción usa
+    /// [`PLAZO_VALIDACION_DIFERIDA_S`].
+    plazo_diferido: Duration,
 }
 
 /// Lo que devuelve [`arrancar`]: el handle, el flujo de eventos y el bucle listo para correr.
@@ -246,10 +318,28 @@ pub struct Piezas<M: ManejadorEntrante> {
 }
 
 /// Prepara las tres piezas con un presupuesto agregado **concreto**. No arranca nada.
+///
+/// Usa el plazo de validación diferida de producción ([`PLAZO_VALIDACION_DIFERIDA_S`]). Para
+/// pruebas que necesiten un plazo corto, usar [`arrancar_con_plazo`].
 pub fn arrancar_con<M: ManejadorEntrante>(
     swarm: Swarm<ZxBehaviour>,
     manejador: Arc<M>,
     presupuesto: Presupuesto,
+) -> Piezas<M> {
+    arrancar_con_plazo(
+        swarm,
+        manejador,
+        presupuesto,
+        Duration::from_secs(PLAZO_VALIDACION_DIFERIDA_S),
+    )
+}
+
+/// Igual que [`arrancar_con`], con el plazo de validación diferida explícito.
+pub fn arrancar_con_plazo<M: ManejadorEntrante>(
+    swarm: Swarm<ZxBehaviour>,
+    manejador: Arc<M>,
+    presupuesto: Presupuesto,
+    plazo_diferido: Duration,
 ) -> Piezas<M> {
     let (tx_cmd, rx_cmd) = mpsc::channel(CAPACIDAD_COMANDOS);
     let (tx_ev, rx_ev) = mpsc::channel(CAPACIDAD_EVENTOS);
@@ -268,6 +358,9 @@ pub fn arrancar_con<M: ManejadorEntrante>(
             eventos: tx_ev,
             manejador,
             presupuesto,
+            pendientes: HashMap::new(),
+            siguiente_id: 0,
+            plazo_diferido,
         },
     }
 }
@@ -286,6 +379,16 @@ impl<M: ManejadorEntrante> BucleRed<M> {
     /// Termina **de forma cooperativa**: cuando el canal de comandos se cierra —porque nadie
     /// conserva un handle—, el bucle sale tras procesar lo que tuviera entre manos.
     pub async fn correr(mut self) {
+        // El barrido corre al **cuarto** del plazo: así un diferido nunca espera más de
+        // `plazo_diferido + plazo_diferido/4` antes de expirar, sin necesidad de un temporizador
+        // por entrada. `Duration::max(1 ms)` evita un `interval` de período cero si algún test
+        // pasara un plazo absurdamente corto.
+        let periodo_barrido = (self.plazo_diferido / 4).max(Duration::from_millis(1));
+        let mut barrido = tokio::time::interval(periodo_barrido);
+        // Un barrido tarde (p. ej. tras una pausa larga del proceso) no debe intentar "ponerse al
+        // día" disparando varias veces seguidas: solo importa el estado actual.
+        barrido.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
         loop {
             tokio::select! {
                 evento = futures::StreamExt::select_next_some(&mut self.swarm) => {
@@ -300,6 +403,29 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                         }
                     }
                 }
+                _ = barrido.tick() => {
+                    self.expirar_diferidos_vencidos();
+                }
+            }
+        }
+    }
+
+    /// Trata como [`Veredicto::Ignorar`] todo diferido más viejo que [`Self::plazo_diferido`].
+    ///
+    /// **No penaliza.** Un veredicto que no llega a tiempo es un fallo del manejador o del hilo de
+    /// validación, nunca una prueba de que el peer que propagó el mensaje hizo algo malo.
+    fn expirar_diferidos_vencidos(&mut self) {
+        let ahora = Instant::now();
+        let vencidos: Vec<IdDiferido> = self
+            .pendientes
+            .iter()
+            .filter(|(_, p)| ahora.duration_since(p.creado) >= self.plazo_diferido)
+            .map(|(id, _)| *id)
+            .collect();
+        for id in vencidos {
+            if let Some(p) = self.pendientes.remove(&id) {
+                tracing::debug!(?id, "validación diferida sin informe a tiempo: se ignora");
+                self.reportar_a_gossipsub(&p.message_id, &p.propagador, Veredicto::Ignorar);
             }
         }
     }
@@ -419,23 +545,86 @@ impl<M: ManejadorEntrante> BucleRed<M> {
         }
     }
 
-    /// Evalúa un mensaje de gossip y reporta el resultado a gossipsub.
+    /// Evalúa un mensaje de gossip y reporta el resultado a gossipsub, o lo retiene si el manejador
+    /// difirió el veredicto (decisión 1 de `ORDEN-W06d2`).
     fn juzgar_y_reportar(
         &mut self,
         propagation_source: &PeerId,
         message_id: &gossipsub::MessageId,
         message: &gossipsub::Message,
     ) {
-        let veredicto = self.juzgar(message);
+        let id = self.siguiente_id_diferido();
+        let veredicto = despachar(
+            self.manejador.as_ref(),
+            id,
+            message.topic.as_str(),
+            &message.data,
+            &self.presupuesto,
+        );
 
-        let acceptance = match veredicto {
-            Veredicto::Aceptar => gossipsub::MessageAcceptance::Accept,
-            Veredicto::Ignorar => gossipsub::MessageAcceptance::Ignore,
-            Veredicto::Rechazar => gossipsub::MessageAcceptance::Reject,
+        if veredicto == Veredicto::Diferir {
+            self.retener_diferido(id, message_id, propagation_source);
+            return;
+        }
+
+        self.reportar_a_gossipsub(message_id, propagation_source, veredicto);
+    }
+
+    /// Guarda la correlación de un diferido, acotando la tabla a [`MAX_DIFERIDOS_PENDIENTES`].
+    ///
+    /// Al llegar al tope, expira como `Ignorar` la entrada más antigua para dejar sitio: no penaliza
+    /// (un manejador saturado no es culpa del peer más antiguo en cola), y evita crecer sin límite
+    /// si el manejador difiere sin nunca informar.
+    fn retener_diferido(
+        &mut self,
+        id: IdDiferido,
+        message_id: &gossipsub::MessageId,
+        propagador: &PeerId,
+    ) {
+        if self.pendientes.len() >= MAX_DIFERIDOS_PENDIENTES
+            && let Some(mas_vieja) = self
+                .pendientes
+                .iter()
+                .min_by_key(|(_, p)| p.creado)
+                .map(|(id, _)| *id)
+        {
+            tracing::warn!(
+                "tabla de diferidos llena ({MAX_DIFERIDOS_PENDIENTES}): se expira la más antigua"
+            );
+            if let Some(vieja) = self.pendientes.remove(&mas_vieja) {
+                self.reportar_a_gossipsub(&vieja.message_id, &vieja.propagador, Veredicto::Ignorar);
+            }
+        }
+        self.pendientes.insert(
+            id,
+            PendienteDiferido {
+                message_id: message_id.clone(),
+                propagador: *propagador,
+                creado: Instant::now(),
+            },
+        );
+    }
+
+    /// El identificador opaco que se le entrega al manejador. `zx-p2p` es su único dueño.
+    fn siguiente_id_diferido(&mut self) -> IdDiferido {
+        self.siguiente_id = self.siguiente_id.wrapping_add(1);
+        IdDiferido(self.siguiente_id)
+    }
+
+    /// Reporta un veredicto a gossipsub. Sin esta llamada el mensaje se queda **pendiente para
+    /// siempre** en la cola de validación de gossipsub: ni se reenvía ni se descarta.
+    fn reportar_a_gossipsub(
+        &mut self,
+        message_id: &gossipsub::MessageId,
+        propagation_source: &PeerId,
+        veredicto: Veredicto,
+    ) {
+        let Some(acceptance) = a_acceptance(veredicto) else {
+            // No debería llegar aquí con `Diferir`: es un error de este módulo, no de un peer.
+            tracing::error!("reportar_a_gossipsub llamado con Diferir; se trata como Ignorar");
+            self.reportar_a_gossipsub(message_id, propagation_source, Veredicto::Ignorar);
+            return;
         };
-
-        // Sin esta llamada el mensaje se queda **pendiente para siempre** en la cola de validación:
-        // ni se reenvía ni se descarta.
         if !self
             .swarm
             .behaviour_mut()
@@ -447,16 +636,6 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                 "el mensaje ya no estaba en la caché de validación"
             );
         }
-    }
-
-    /// Decide qué es el mensaje y se lo pasa al manejador.
-    fn juzgar(&self, m: &gossipsub::Message) -> Veredicto {
-        despachar(
-            self.manejador.as_ref(),
-            m.topic.as_str(),
-            &m.data,
-            &self.presupuesto,
-        )
     }
 
     /// Atiende un comando. No es `async`: nada de lo que hace debe esperar.
@@ -526,6 +705,24 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                     })
                     .map(|_| ());
                 let _ = respuesta.send(r);
+            }
+            Comando::InformarValidacion { id, veredicto } => {
+                // Idempotente a propósito (ver la doc de `Comando::InformarValidacion`): un `id`
+                // que ya no está pudo expirar (`expirar_diferidos_vencidos`) o ya haberse informado.
+                let Some(p) = self.pendientes.remove(&id) else {
+                    tracing::debug!(
+                        ?id,
+                        ?veredicto,
+                        "informe de validación diferida sin diferido pendiente (expiró o ya se informó)"
+                    );
+                    return;
+                };
+                let veredicto = match veredicto {
+                    VeredictoFinal::Aceptar => Veredicto::Aceptar,
+                    VeredictoFinal::Ignorar => Veredicto::Ignorar,
+                    VeredictoFinal::Rechazar => Veredicto::Rechazar,
+                };
+                self.reportar_a_gossipsub(&p.message_id, &p.propagador, veredicto);
             }
             Comando::Desconectar { peer, motivo } => {
                 tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
@@ -600,12 +797,16 @@ fn clasificar_tema(topico: &str) -> TemaDifusion {
 /// El `presupuesto` se **inyecta** en vez de crearse dentro: es lo que permite a un test forzar una
 /// reserva fallida con `Presupuesto::nuevo(0)` y comprobar que el agotamiento local no penaliza.
 ///
+/// `id` es el identificador opaco que se le pasa al manejador; solo tiene sentido si el manejador
+/// devuelve [`Veredicto::Diferir`] (decisión 1 de `ORDEN-W06d2`).
+///
 /// # El tema desconocido no se decodifica
 ///
 /// Un tema que no sea uno de los seis exactos devuelve [`Veredicto::Ignorar`] **sin** tocar los
 /// bytes ni llamar al manejador: puede ser una versión más nueva del protocolo, no un ataque.
 fn despachar<M: ManejadorEntrante>(
     manejador: &M,
+    id: IdDiferido,
     topico: &str,
     datos: &[u8],
     presupuesto: &Presupuesto,
@@ -628,9 +829,20 @@ fn despachar<M: ManejadorEntrante>(
     // El éxito del parseo **no** es validación: el veredicto de un bloque lo decide el manejador.
     // Un fallo de formato o un byte residual sí es basura indiscutible y penaliza.
     match crate::codec::bloque_desde_bytes(datos, familia) {
-        Ok((bloque, [])) => manejador.bloque_difundido(&bloque),
+        Ok((bloque, [])) => manejador.bloque_difundido(id, &bloque),
         Ok((_, _)) => Veredicto::Rechazar,
         Err(_) => Veredicto::Rechazar,
+    }
+}
+
+/// Traduce un [`Veredicto`] a lo que entiende gossipsub. `None` para [`Veredicto::Diferir`]: no es
+/// un veredicto final, así que no hay una `MessageAcceptance` que le corresponda todavía.
+const fn a_acceptance(v: Veredicto) -> Option<gossipsub::MessageAcceptance> {
+    match v {
+        Veredicto::Aceptar => Some(gossipsub::MessageAcceptance::Accept),
+        Veredicto::Ignorar => Some(gossipsub::MessageAcceptance::Ignore),
+        Veredicto::Rechazar => Some(gossipsub::MessageAcceptance::Reject),
+        Veredicto::Diferir => None,
     }
 }
 
@@ -657,10 +869,15 @@ fn request_id_a_u64(id: request_response::OutboundRequestId) -> u64 {
 mod tests {
     use super::{TemaDifusion, clasificar_tema, despachar};
     use crate::codec::bloque_a_bytes;
-    use crate::entrante::{ManejadorEntrante, Veredicto};
+    use crate::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
     use crate::mensaje::{BloqueRed, Estado, FamiliaBloque, Fase, PuntaPow};
     use crate::presupuesto::Presupuesto;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// Un `IdDiferido` cualquiera: estos tests no difieren nada, así que su valor es indiferente.
+    fn id_prueba() -> IdDiferido {
+        IdDiferido(0)
+    }
     use zx_core::amount::Amount;
     use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
     use zx_core::firma::ClavePublica;
@@ -692,7 +909,7 @@ mod tests {
             }
         }
 
-        fn bloque_difundido(&self, _: &BloqueRed) -> Veredicto {
+        fn bloque_difundido(&self, _id: IdDiferido, _: &BloqueRed) -> Veredicto {
             self.bloques.fetch_add(1, Ordering::Relaxed);
             Veredicto::Aceptar
         }
@@ -785,6 +1002,7 @@ mod tests {
         let espia = Espia::default();
         let v = despachar(
             &espia,
+            id_prueba(),
             "/zx-dev/bloques/pow/1",
             &bytes,
             &Presupuesto::default(),
@@ -803,6 +1021,7 @@ mod tests {
         assert_eq!(
             despachar(
                 &espia,
+                id_prueba(),
                 "/zx-dev/bloques/post/1",
                 &bytes,
                 &Presupuesto::default()
@@ -822,6 +1041,7 @@ mod tests {
         assert_eq!(
             despachar(
                 &espia,
+                id_prueba(),
                 "/zx-dev/bloques/pow/1",
                 &bytes,
                 &Presupuesto::nuevo(0)
@@ -840,6 +1060,7 @@ mod tests {
         assert_eq!(
             despachar(
                 &espia,
+                id_prueba(),
                 "/zx-dev/bloques/pow/1",
                 &bytes,
                 &Presupuesto::default()
@@ -863,6 +1084,7 @@ mod tests {
         assert_eq!(
             despachar(
                 &espia,
+                id_prueba(),
                 "/zx-dev/bloques/pow/1",
                 &con_residuo,
                 &Presupuesto::default()
@@ -873,6 +1095,7 @@ mod tests {
         assert_eq!(
             despachar(
                 &espia,
+                id_prueba(),
                 "/zx-dev/bloques/pow/1",
                 &truncado,
                 &Presupuesto::default()
@@ -889,7 +1112,13 @@ mod tests {
             "/zx-dev/bloques/pow/2",
         ] {
             assert_eq!(
-                despachar(&espia2, falso, &con_residuo, &Presupuesto::default()),
+                despachar(
+                    &espia2,
+                    id_prueba(),
+                    falso,
+                    &con_residuo,
+                    &Presupuesto::default()
+                ),
                 Veredicto::Ignorar,
                 "{falso}"
             );
@@ -908,6 +1137,7 @@ mod tests {
         assert_eq!(
             despachar(
                 &espia,
+                id_prueba(),
                 "/zx-dev/bloques/post/1",
                 &[FamiliaBloque::DISC_POST],
                 &Presupuesto::default()

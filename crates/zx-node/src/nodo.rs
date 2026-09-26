@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
 
+use primitive_types::U256;
 use subspace_core_primitives::PublicKey;
 use subspace_verification::PieceCheckParams;
 use zx_cadena::{BloqueCadena, BloquePost, Cadena};
@@ -23,6 +24,8 @@ use zx_core::{BlockHash, PadresDag, Red, Tx, trabajo_bloque, txid};
 use zx_dag::ErrorDag;
 use zx_dag::bloque_dag::{CandidatoSinRango, ContextoRangoDag};
 use zx_farmer::farmer::{ParcelaDisco, plotear_sector_en_disco};
+use zx_p2p::entrante::VeredictoFinal;
+use zx_p2p::mensaje::{BloqueRed, Estado, Fase as FaseRed, PuntaPow};
 use zx_poas::HistoriaGenesis;
 use zx_post::cabecera_conjunta::{EstadoCabeceraConjunta, verificar_cabecera_conjunta};
 use zx_post::pot_rango::{CachePotVerificada, PresupuestoPot};
@@ -38,6 +41,9 @@ use crate::identidad::identidad_de_cabecera_post;
 use crate::padres::padres_de_regimen;
 use crate::perfil;
 use crate::pow::{self, CoinbasePropia};
+use crate::red::huerfanos::DepositoHuerfanos;
+use crate::red::vista::VistaRed;
+use crate::red::{self, ManijaRed, TrabajoRed};
 use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
 use crate::registro::Registro;
 
@@ -96,6 +102,22 @@ pub struct Nodo {
     n_dev: u64,
     sr_dev_actual: u64,
     parada_tras_slots: Option<u64>,
+    /// Trabajo PoW acumulado de la cadena admitida (para el saludo de red, decisión 4).
+    trabajo_acumulado: U256,
+    /// Hash del génesis (cacheado: `ORDEN-W06d2` lo necesita en cada saludo).
+    hash_genesis: BlockHash,
+    /// Red configurada (`ORDEN-W06d2` lo necesita en cada saludo).
+    red_configurada: Red,
+    /// Instantánea de solo lectura que sirve el saludo y la sincronización (`ORDEN-W06d2`).
+    /// Existe siempre, con o sin red: así no hay dos caminos de construcción de `Nodo`.
+    vista_red: Arc<VistaRed>,
+    /// Depósito acotado de bloques huérfanos (decisión 3).
+    huerfanos: DepositoHuerfanos,
+    /// El handle hacia la red, si [`Self::conectar_red`] se llamó. `None` reproduce exactamente el
+    /// comportamiento de `ORDEN-W06d1`: un nodo sin red.
+    red: Option<ManijaRed>,
+    /// Cola de trabajo que el manejador de red encola y este hilo drena (decisión 1).
+    trabajo_red: Option<tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>>,
 }
 
 fn ruta_parcela(dir_datos: &Path, indice: u32) -> PathBuf {
@@ -166,6 +188,20 @@ impl Nodo {
         let claves = ClaveDev::derivar_varias(cfg.semilla, &cfg.indices_claves);
         let historia = Arc::new(HistoriaGenesis::construir()?);
 
+        let estado_inicial = Estado {
+            hash_genesis: hash_genesis_esperado,
+            red: cfg.red,
+            fase: FaseRed::Pow,
+            punta_pow: PuntaPow {
+                hash: hash_genesis_esperado,
+                altura: 0,
+                trabajo_acumulado: [0; 32],
+            },
+            terminal: None,
+            puntas_post: Vec::new(),
+            blue_work_virtual: [0; 32],
+        };
+
         let mut nodo = Self {
             params,
             cadena: Cadena::nueva(
@@ -187,6 +223,13 @@ impl Nodo {
             n_dev: cfg.n_dev,
             sr_dev_actual: cfg.sr_dev,
             parada_tras_slots: cfg.parada_tras_slots,
+            trabajo_acumulado: U256::zero(),
+            hash_genesis: hash_genesis_esperado,
+            red_configurada: cfg.red,
+            vista_red: Arc::new(VistaRed::nueva(estado_inicial)),
+            huerfanos: red::nuevo_deposito_huerfanos(),
+            red: None,
+            trabajo_red: None,
         };
 
         let longitud = nodo.almacen.longitud_registro()?;
@@ -317,6 +360,15 @@ impl Nodo {
     ) -> Result<(), ErrorNodo> {
         let hash = cabecera.block_hash();
         let es_genesis = cabecera.height == 0;
+        // Instantánea para la vista de red (decisión 4): se toma **antes** de que `txs`/`testigos`
+        // se consuman más abajo (`into_iter().zip`). Solo se usa si el bloque resulta nuevo
+        // (`!ya_admitido`, comprobado antes de publicarla); el coste de clonar es aceptable en la
+        // red dev (bloques con pocas transacciones) y se revisa si el perfil (W07) lo desmiente.
+        let para_vista = BloqueRed::Pow {
+            cabecera,
+            txs: txs.clone(),
+            testigos: testigos.clone(),
+        };
 
         if verificar && !es_genesis {
             #[expect(
@@ -349,12 +401,14 @@ impl Nodo {
             })?;
         }
 
+        let mut trabajo_de_este_bloque = U256::zero();
         let hechos = if es_genesis {
             HechosCabecera::Genesis { hash }
         } else {
             let target = pow_target_de(&cabecera)?;
             let trabajo = trabajo_bloque(target)
                 .ok_or_else(|| ErrorNodo::Otro(format!("trabajo del bloque {hash} desborda")))?;
+            trabajo_de_este_bloque = trabajo;
             HechosCabecera::PoW {
                 hash,
                 padre: cabecera.prev_hash,
@@ -413,6 +467,12 @@ impl Nodo {
                     motivo: m.nombre().to_string(),
                 }
             })?;
+            self.trabajo_acumulado = self
+                .trabajo_acumulado
+                .saturating_add(trabajo_de_este_bloque);
+            self.vista_red.registrar_pow(cabecera.height, para_vista);
+            // Un hijo que esperaba justo este padre puede reintentarse ya (decisión 3).
+            self.resolver_huerfanos_de(hash);
         }
 
         self.historial_pow.push(cabecera);
@@ -553,6 +613,22 @@ impl Nodo {
         };
 
         let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
+        // Aviso del director a mitad de ejecución (RI-2b, `deepseek/RI-2b/INFORME.md` H1): persistir
+        // **antes** de admitir en `zx-cadena`, igual que `admitir_pow_interno` y por el mismo motivo
+        // (su propio comentario, arriba): si el proceso muere entre las dos, el reinicio repite
+        // desde el almacén y vuelve a llegar aquí con `ya_admitido` falso otra vez (idempotente por
+        // hash). Al revés —como estaba— un `SIGKILL` entre `cadena.admitir` (memoria) y
+        // `almacen.admitir` (disco) perdía el bloque **sin dejar rastro**: al reiniciar,
+        // `ServicioPot` se reconstruye solo desde lo persistido (D-N03′), el mismo slot queda
+        // libre otra vez y, con un solo flujo PoT determinista (D-P10), la misma clave puede volver
+        // a ganarlo y firmar un bloque **distinto** para el mismo slot — la doble firma que
+        // «Relanzamiento» punto 4 de `ORDEN-W06d1` prohíbe. Solo en la ruta en vivo (`verificar`):
+        // en la repetición el bloque ya está en el almacén (viene de ahí).
+        if !ya_admitido && verificar {
+            let admitido = BloqueAdmitido::post(&bloque);
+            self.almacen.admitir(&admitido, true)?;
+        }
+
         if !ya_admitido {
             self.cadena.admitir(BloqueCadena::Post(post)).map_err(|m| {
                 ErrorNodo::BloquePropioRechazado {
@@ -560,11 +636,13 @@ impl Nodo {
                     motivo: m.nombre().to_string(),
                 }
             })?;
-        }
-
-        if !ya_admitido && verificar {
-            let admitido = BloqueAdmitido::post(&bloque);
-            self.almacen.admitir(&admitido, true)?;
+            let para_vista = BloqueRed::Post {
+                cabecera: bloque.cabecera,
+                txs: bloque.txs().to_vec(),
+                testigos: bloque.testigos().to_vec(),
+            };
+            self.vista_red.registrar_post(hash, para_vista);
+            self.resolver_huerfanos_de(hash);
         }
 
         self.actualizar_servicio_verificacion(&bloque)?;
@@ -619,8 +697,14 @@ impl Nodo {
         Ok(())
     }
 
-    /// Registra en el resumen de estado un cambio de punta seleccionada (decisión 8 y 9).
+    /// Registra en el resumen de estado un cambio de punta seleccionada (decisión 8 y 9), y
+    /// republica el saludo de red (`ORDEN-W06d2` decisión 4) tanto si cambió la punta como si no:
+    /// la altura PoW/las puntas PoST pueden cambiar sin que la punta *seleccionada* cambie (p. ej.
+    /// un huérfano lateral que se resuelve).
     fn registrar_cambio_de_punta(&mut self) -> Result<(), ErrorNodo> {
+        self.vista_red
+            .actualizar_estado(self.construir_estado_red());
+
         let punta_actual = self.cadena.mejor_punta().or(self.cadena.terminal());
         if punta_actual == self.ultima_punta_registrada {
             return Ok(());
@@ -641,6 +725,276 @@ impl Nodo {
             .str("resumen_estado", &resumen);
         self.registro.escribir(evento, false)?;
         Ok(())
+    }
+
+    /// Construye el saludo de red actual (`ORDEN-W06d2` decisión 4) a partir del estado propio.
+    ///
+    /// `blue_work_virtual` queda en cero: 0.0.1 no elige *fork choice* PoST por red (el bloqueo de
+    /// `PROGRESO.md` sobre `JustificacionPot` impide verificar un PoST ajeno), así que ningún par
+    /// decide todavía nada a partir de este campo. Se deja el tipo correcto para no romper el wire
+    /// el día que se resuelva.
+    fn construir_estado_red(&self) -> Estado {
+        #[expect(
+            clippy::indexing_slicing,
+            reason = "historial_pow siempre tiene al menos el génesis"
+        )]
+        let ultimo = self.historial_pow[self.historial_pow.len() - 1];
+        let trabajo_be = self.trabajo_acumulado.to_big_endian();
+        let mut puntas_post = self.cadena.tips_validas();
+        puntas_post.truncate(zx_p2p::mensaje::MAX_PUNTAS_POST);
+        Estado {
+            hash_genesis: self.hash_genesis,
+            red: self.red_configurada,
+            fase: if self.cadena.terminal().is_some() {
+                FaseRed::Post
+            } else {
+                FaseRed::Pow
+            },
+            punta_pow: PuntaPow {
+                hash: ultimo.block_hash(),
+                altura: ultimo.height,
+                trabajo_acumulado: trabajo_be,
+            },
+            terminal: self.cadena.terminal(),
+            puntas_post,
+            blue_work_virtual: [0; 32],
+        }
+    }
+
+    /// Difunde un bloque **propio** ya admitido, si hay red (decisión 2: solo **después** de
+    /// persistirse, que ya ocurrió dentro de `admitir_pow_interno`/`admitir_post_interno` antes de
+    /// que esta función pueda llamarse con su hash). Se relee de [`VistaRed`] en vez de repetir la
+    /// construcción del `BloqueRed`: es el mismo valor exacto que ya se guardó allí al admitir.
+    fn difundir_si_hay_red(&self, hash: BlockHash) {
+        let Some(red) = self.red.as_ref() else {
+            return;
+        };
+        let Some(bloque) = self.vista_red.bloques_por_hash(&[hash]).into_iter().next() else {
+            tracing::error!(%hash, "bloque propio recién admitido sin instantánea en VistaRed");
+            return;
+        };
+        if let Err(e) = red.difundir_bloque(&bloque) {
+            tracing::warn!(%hash, %e, "no se pudo difundir un bloque propio");
+        }
+    }
+
+    /// Reintenta contra la tubería de admisión cualquier huérfano que estuviera esperando a
+    /// `padre`, ahora que `padre` se acaba de admitir (decisión 3). Recursivo por construcción: si
+    /// un huérfano se admite, `admitir_*_interno` vuelve a llamar a esto con su propio hash.
+    ///
+    /// Sin par de origen (`None`): no se sabe quién mandó el huérfano originalmente (el depósito no
+    /// guarda esa procedencia, límite documentado en `PROGRESO.md`), así que si a su vez le falta
+    /// otro padre, ese nuevo padre se deposita **sin** disparar una petición dirigida; queda para el
+    /// siguiente ciclo de `sync` basado en el saludo.
+    fn resolver_huerfanos_de(&mut self, padre: BlockHash) {
+        for (_hijo, bloque) in self.huerfanos.tomar_para_padre(&padre) {
+            let veredicto = self.intentar_admitir_bloque_red(&bloque, None);
+            // Sin `IdDiferido` que informar (no llegó por gossipsub en este turno): el único rastro
+            // es el registro. La retransmisión de un huérfano que ahora prospera queda pendiente
+            // (límite conocido, ver `PROGRESO.md`): difundirlo exigiría reconstruir un `IdDiferido`
+            // que no existe para un bloque que nunca pasó por `report_message_validation_result`.
+            let evento = self
+                .registro
+                .evento("huerfano_resuelto")
+                .str("padre", &padre.to_string())
+                .str("veredicto", &format!("{veredicto:?}"));
+            let _ = self.registro.escribir(evento, false);
+        }
+    }
+
+    /// Drena, sin bloquear, el trabajo que el manejador de red encoló (decisión 1). Se llama desde
+    /// los bucles de `fase_pow`/`fase_regimen`: el hilo de consenso es el único que muta
+    /// `zx-cadena`/`zx-storage` (D-N07), así que la admisión de red ocurre aquí, intercalada con la
+    /// propia producción, nunca en el hilo asíncrono de `zx-p2p`.
+    fn procesar_trabajo_red_pendiente(&mut self) {
+        // Se saca el receptor de `self` temporalmente: `intentar_admitir_bloque_red` necesita
+        // `&mut self` completo (muta `cadena`, `almacen`, `huerfanos`...) y el propio receptor vive
+        // dentro de `self.trabajo_red`, así que no se puede tomar prestado a la vez.
+        let Some(mut receptor) = self.trabajo_red.take() else {
+            return;
+        };
+        loop {
+            let trabajo = match receptor.try_recv() {
+                Ok(t) => t,
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
+            };
+            match trabajo {
+                TrabajoRed::BloqueDifundido { id, bloque } => {
+                    // Gossipsub no dice quién lo propagó a este nivel (`ManejadorEntrante` no lo
+                    // expone); si resulta huérfano, no hay a quién pedirle el padre directamente.
+                    let veredicto = self.intentar_admitir_bloque_red(&bloque, None);
+                    if let Some(red) = self.red.as_ref() {
+                        red.informar_validacion(id, veredicto);
+                    }
+                }
+                TrabajoRed::BloqueDeSincronizacion { de, bloque } => {
+                    let veredicto = self.intentar_admitir_bloque_red(&bloque, Some(de));
+                    // Un bloque de sincronización demostrablemente inválido sí penaliza: no pasó
+                    // por gossipsub (no hay `report_message_validation_result` que llame a esto),
+                    // así que la única forma de aplicar C-NET-05/C-EVP es desconectar aquí.
+                    if veredicto == VeredictoFinal::Rechazar
+                        && let Some(red) = self.red.as_ref()
+                    {
+                        red.desconectar(de, zx_p2p::error::MotivoDesconexion::ViolacionDeConsenso);
+                    }
+                }
+            }
+        }
+        self.trabajo_red = Some(receptor);
+    }
+
+    /// Decide y aplica el veredicto de un bloque llegado por red (gossip o sincronización), sin
+    /// propagar nunca un error fatal: a diferencia de un bloque **propio** (decisión 4 general de
+    /// `ORDEN-W06d1`), un bloque ajeno inválido es un evento normal de la red, no un bug del nodo.
+    ///
+    /// `origen`: el par que lo mandó, si se conoce (sincronización) — se usa **solo** para pedirle
+    /// directamente un padre que falte; nunca para decidir el veredicto del propio bloque.
+    fn intentar_admitir_bloque_red(
+        &mut self,
+        bloque: &BloqueRed,
+        origen: Option<libp2p::PeerId>,
+    ) -> VeredictoFinal {
+        match bloque {
+            BloqueRed::Pow {
+                cabecera,
+                txs,
+                testigos,
+            } => self.intentar_admitir_pow_de_red(*cabecera, txs.clone(), testigos.clone(), origen),
+            BloqueRed::Post { .. } => {
+                // BLOQUEO documentado en PROGRESO.md: `BloqueRed::Post` no lleva `JustificacionPot`,
+                // así que `verificar_cabecera_conjunta` no se puede ejecutar sobre un bloque PoST
+                // ajeno. Aceptar sin verificar sería exactamente el `Ok` ficticio que la orden
+                // prohíbe (decisión 2). `Ignorar`, no `Rechazar`: la falta es del formato de
+                // transporte, no del par que lo mandó.
+                let hash = red::hash_de(bloque);
+                let evento = self
+                    .registro
+                    .evento("bloque_post_de_red_no_verificable")
+                    .str("hash", &hash.to_string())
+                    .str(
+                        "motivo",
+                        "BloqueRed::Post sin JustificacionPot (PROGRESO.md)",
+                    );
+                let _ = self.registro.escribir(evento, false);
+                VeredictoFinal::Ignorar
+            }
+        }
+    }
+
+    fn intentar_admitir_pow_de_red(
+        &mut self,
+        cabecera: BlockHeader,
+        txs: Vec<Tx>,
+        testigos: Vec<Vec<Vec<u8>>>,
+        origen: Option<libp2p::PeerId>,
+    ) -> VeredictoFinal {
+        let hash = cabecera.block_hash();
+        if self.cadena.es_valido(&hash) {
+            return VeredictoFinal::Ignorar; // ya lo teníamos: nada que hacer, no penaliza.
+        }
+        if self.cadena.motivo(&hash).is_some() {
+            return VeredictoFinal::Rechazar; // ya sabíamos que es inválido.
+        }
+        if cabecera.height == 0 {
+            // Un génesis declarado por red nunca sustituye al nuestro (ya comprobado contra
+            // `HASH_GENESIS_DEV` al arrancar): no es demostrablemente inválido en sí mismo (podría
+            // ser el génesis real, coincidiendo), así que no penaliza.
+            return VeredictoFinal::Ignorar;
+        }
+
+        let padre = cabecera.prev_hash;
+        let padre_conocido = self.cadena.es_valido(&padre) || self.cadena.motivo(&padre).is_some();
+        if !padre_conocido {
+            let bloque = BloqueRed::Pow {
+                cabecera,
+                txs,
+                testigos,
+            };
+            let hijo = red::hash_de(&bloque);
+            for d in self.huerfanos.insertar(padre, hijo, bloque) {
+                let evento = self
+                    .registro
+                    .evento("huerfano_desalojado")
+                    .str("hijo", &d.hijo.to_string())
+                    .str("padre_esperado", &d.padre_esperado.to_string());
+                let _ = self.registro.escribir(evento, false);
+            }
+            let evento = self
+                .registro
+                .evento("bloque_red_huerfano")
+                .str("hash", &hash.to_string())
+                .str("padre_ausente", &padre.to_string())
+                .str("familia", "pow")
+                .str("veredicto", "Ignorar");
+            let _ = self.registro.escribir(evento, false);
+            if let (Some(red), Some(peer)) = (self.red.as_ref(), origen) {
+                red.pedir(
+                    peer,
+                    zx_p2p::mensaje::Peticion::Bloques {
+                        hashes: vec![padre],
+                    },
+                );
+            }
+            return VeredictoFinal::Ignorar;
+        }
+        if !self.cadena.es_valido(&padre) {
+            // El padre es conocido y definitivamente inválido: este bloque no puede ser válido.
+            let evento = self
+                .registro
+                .evento("bloque_red_rechazado")
+                .str("hash", &hash.to_string())
+                .str("familia", "pow")
+                .str("motivo", "padre conocido e inválido");
+            let _ = self.registro.escribir(evento, false);
+            return VeredictoFinal::Rechazar;
+        }
+        let extiende_la_punta = self
+            .historial_pow
+            .last()
+            .is_some_and(|u| u.block_hash() == padre);
+        if !extiende_la_punta {
+            // Reorg/fork de PoW: `admitir_pow_interno` asume que todo bloque nuevo extiende
+            // `historial_pow` (su último elemento). Un bloque que extiende un padre admitido pero
+            // que no es nuestra punta actual es un fork legítimo que esta orden **no** resuelve
+            // (límite conocido, `PROGRESO.md`): se ignora en vez de admitirlo con un contexto de
+            // validación incorrecto (target/altura de la rama equivocada).
+            let evento = self
+                .registro
+                .evento("bloque_red_fork_no_soportado")
+                .str("hash", &hash.to_string())
+                .str("padre", &padre.to_string())
+                .str("veredicto", "Ignorar");
+            let _ = self.registro.escribir(evento, false);
+            return VeredictoFinal::Ignorar;
+        }
+
+        let indice = self.almacen.longitud_registro().unwrap_or(0);
+        match self.admitir_pow_interno(cabecera, txs, testigos, indice, true) {
+            Ok(()) => {
+                // V9: este evento **solo** se escribe después de que `admitir_pow_interno` terminó
+                // la tubería completa (cabecera, PoW, motor de transición, persistencia): nunca
+                // antes. Es la traza que V9 exige comprobar.
+                let evento = self
+                    .registro
+                    .evento("bloque_red_admitido")
+                    .str("hash", &hash.to_string())
+                    .str("familia", "pow")
+                    .str("veredicto", "Aceptar");
+                let _ = self.registro.escribir(evento, false);
+                VeredictoFinal::Aceptar
+            }
+            Err(e) => {
+                let evento = self
+                    .registro
+                    .evento("bloque_red_rechazado")
+                    .str("hash", &hash.to_string())
+                    .str("familia", "pow")
+                    .str("motivo", &e.to_string());
+                let _ = self.registro.escribir(evento, false);
+                VeredictoFinal::Rechazar
+            }
+        }
     }
 
     /// Construye los depósitos F-15 pendientes (coinbases maduras propias sin depositar) para la
@@ -748,6 +1102,26 @@ impl Nodo {
             let Ok(cabecera_minada) = rx_minado.recv() else {
                 return Err(ErrorNodo::Otro("el hilo minero cerró el canal".to_string()));
             };
+            // Se drena el trabajo de red **entre** intentos de minado, nunca durante uno: si se
+            // interleara mientras `rx_minado` está bloqueado, un bloque de red podría admitirse a
+            // la misma altura que estamos minando, y cuando nuestro propio hilo termine,
+            // `admitir_pow_interno` lo admitiría como una bifurcación real de PoW —cosa que ni
+            // `zx-cadena::admitir_pow` ni el `historial_pow` lineal de este nodo saben resolver
+            // (límite conocido, `PROGRESO.md`: sin reorg de PoW en W06d2). En vez de eso, se
+            // comprueba justo aquí si la red ya avanzó la punta mientras minábamos y, si es así, se
+            // descarta el bloque propio (obsoleto) y se reintenta sobre la punta nueva.
+            self.procesar_trabajo_red_pendiente();
+            let punta_sigue_siendo_la_esperada = self
+                .historial_pow
+                .last()
+                .is_some_and(|u| u.block_hash() == cabecera_minada.prev_hash);
+            if !punta_sigue_siendo_la_esperada {
+                tracing::info!(
+                    altura = cabecera_minada.height,
+                    "bloque propio obsoleto: la red ya avanzó la punta mientras se minaba"
+                );
+                continue;
+            }
             let evento = self
                 .registro
                 .evento("bloque_minado")
@@ -762,6 +1136,7 @@ impl Nodo {
                 self.almacen.longitud_registro()?,
                 true,
             )?;
+            self.difundir_si_hay_red(cabecera_minada.block_hash());
 
             if self.cadena.terminal().is_some() {
                 drop(tx_trabajo);
@@ -829,7 +1204,20 @@ impl Nodo {
             );
         });
 
-        for msg in rx_en_bucle {
+        // `recv_timeout`, no `for msg in rx_en_bucle`: entre dos mensajes del productor (que puede
+        // tardar hasta un slot entero) hace falta seguir drenando `procesar_trabajo_red_pendiente`
+        // (decisión 1/3/4 de `ORDEN-W06d2`), o un bloque de red llegaría y esperaría sin motivo
+        // hasta el siguiente mensaje del hilo productor.
+        loop {
+            let msg = match rx_en_bucle.recv_timeout(std::time::Duration::from_millis(50)) {
+                Ok(m) => m,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    self.procesar_trabajo_red_pendiente();
+                    continue;
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            };
+            self.procesar_trabajo_red_pendiente();
             match msg {
                 MsgProductor::PeticionPadres => {
                     let padres = padres_de_regimen(&self.cadena)
@@ -851,6 +1239,7 @@ impl Nodo {
                                 .evento("bloque_producido")
                                 .str("hash", &hash.to_string());
                             self.registro.escribir(evento, false)?;
+                            self.difundir_si_hay_red(hash);
                             let continuar = self.parada_tras_slots.is_none_or(|limite| {
                                 self.servicio_verificacion
                                     .as_ref()
@@ -915,7 +1304,30 @@ impl Nodo {
         };
         let bloque = producir(terminal, &fuente, &clave.sk, &parametros)
             .map_err(|e| ErrorNodo::Otro(format!("producir (bloque de transición): {e}")))?;
-        self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)
+        let hash = bloque.cabecera.block_hash();
+        self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)?;
+        self.difundir_si_hay_red(hash);
+        Ok(())
+    }
+
+    /// La instantánea compartida de red (para construir el manejador antes de llamar a
+    /// [`Self::conectar_red`], y para que las pruebas la inspeccionen).
+    #[must_use]
+    pub fn vista_red(&self) -> Arc<VistaRed> {
+        Arc::clone(&self.vista_red)
+    }
+
+    /// Conecta el nodo a la red (`ORDEN-W06d2`): a partir de aquí, `ejecutar` también procesa el
+    /// trabajo de red (bloques difundidos o de sincronización) intercalado con su propia
+    /// producción (D-N07: un único hilo de consenso). Sin llamar a esto, el nodo se comporta
+    /// exactamente como en `ORDEN-W06d1` (sin red).
+    pub fn conectar_red(
+        &mut self,
+        manija: ManijaRed,
+        receptor: tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>,
+    ) {
+        self.red = Some(manija);
+        self.trabajo_red = Some(receptor);
     }
 
     /// Ejecuta el nodo de punta a punta: fase PoW hasta el corte, luego régimen.

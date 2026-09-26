@@ -35,11 +35,11 @@ use zx_core::red::Red;
 use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
 use zx_p2p::behaviour::ZxBehaviour;
 use zx_p2p::config::ParametrosRed;
-use zx_p2p::entrante::{ManejadorEntrante, Veredicto};
+use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto, VeredictoFinal};
 use zx_p2p::limites;
 use zx_p2p::mensaje::{BloqueRed, Estado, FamiliaBloque, Fase, Peticion, PuntaPow, Respuesta};
 use zx_p2p::presupuesto::Presupuesto;
-use zx_p2p::servicio::{EventoRed, arrancar_con};
+use zx_p2p::servicio::{EventoRed, arrancar_con, arrancar_con_plazo};
 
 /// Manejador de juguete: cuenta llamadas y sirve un estado y unos bloques reconocibles.
 struct Contador {
@@ -119,7 +119,7 @@ impl ManejadorEntrante for Contador {
         }
     }
 
-    fn bloque_difundido(&self, _: &BloqueRed) -> Veredicto {
+    fn bloque_difundido(&self, _id: IdDiferido, _: &BloqueRed) -> Veredicto {
         self.bloques.fetch_add(1, Ordering::Relaxed);
         Veredicto::Aceptar
     }
@@ -598,6 +598,244 @@ async fn esperar_contador(
             "el bloque no llegó al callback"
         );
         let _ = tokio::time::timeout(Duration::from_millis(20), ev.recv()).await;
+    }
+}
+
+/// Manejador que **siempre difiere** un bloque, avisando el `IdDiferido` por un canal, para que el
+/// test controle cuándo (y con qué veredicto final) se resuelve (`ORDEN-W06d2`, decisión 1).
+struct Diferidor {
+    aviso: tokio::sync::mpsc::UnboundedSender<IdDiferido>,
+}
+
+impl ManejadorEntrante for Diferidor {
+    fn estado(&self) -> Estado {
+        Estado {
+            hash_genesis: BlockHash::from_digest(Digest::from_bytes([0; 32])),
+            red: Red::Dev,
+            fase: Fase::Pow,
+            punta_pow: PuntaPow {
+                hash: BlockHash::from_digest(Digest::from_bytes([9; 32])),
+                altura: 0,
+                trabajo_acumulado: [0; 32],
+            },
+            terminal: None,
+            puntas_post: Vec::new(),
+            blue_work_virtual: [0; 32],
+        }
+    }
+
+    fn bloque_difundido(&self, id: IdDiferido, _: &BloqueRed) -> Veredicto {
+        // Si el test ya no escucha (canal cerrado), no hay nada que informar: se difiere igual y
+        // expirará por plazo, que es exactamente lo que debe pasar.
+        let _ = self.aviso.send(id);
+        Veredicto::Diferir
+    }
+
+    fn tx_difundida(&self, _: &[u8]) -> Veredicto {
+        Veredicto::Ignorar
+    }
+
+    fn cabeceras_desde(&self, _: &[BlockHash], _: Option<BlockHash>) -> Vec<BlockHeader> {
+        Vec::new()
+    }
+
+    fn bloques_por_hash(&self, _: &[BlockHash]) -> Vec<BloqueRed> {
+        Vec::new()
+    }
+}
+
+/// **Un veredicto diferido no se retransmite hasta que se informa `Aceptar`.**
+///
+/// A → B (`Diferidor`) → C. B recibe el bloque de A y lo difiere: mientras tanto no debe llegar a
+/// C. Solo tras `informar_validacion(id, Aceptar)` gossipsub reenvía el mensaje y C lo ve.
+#[tokio::test]
+async fn un_diferido_no_se_retransmite_hasta_informar_aceptar() {
+    let (tx_aviso, mut rx_aviso) = tokio::sync::mpsc::unbounded_channel();
+    let b = Arc::new(Diferidor { aviso: tx_aviso });
+    let c = Arc::new(Contador::nuevo(3));
+
+    let (manejo_a, _ev_a, manejo_b, ev_b, manejo_c, mut ev_c, mut tareas) =
+        cadena_de_tres(Arc::new(Contador::nuevo(1)), Arc::clone(&b), Arc::clone(&c)).await;
+
+    manejo_a
+        .difundir_bloque(&bloque_pow(11))
+        .await
+        .expect("A publica");
+
+    let id = tokio::time::timeout(Duration::from_secs(10), rx_aviso.recv())
+        .await
+        .expect("el aviso de diferido debe llegar")
+        .expect("canal abierto");
+
+    // Ventana corta: mientras no se informe, C no debe ver nada.
+    let _ = tokio::time::timeout(Duration::from_millis(300), ev_c.recv()).await;
+    assert_eq!(
+        c.bloques.load(Ordering::Relaxed),
+        0,
+        "C no debe recibir el bloque antes de que B informe el veredicto"
+    );
+
+    manejo_b
+        .informar_validacion(id, VeredictoFinal::Aceptar)
+        .await
+        .expect("B informa Aceptar");
+
+    esperar_contador(&c.bloques, 1, &mut ev_c).await;
+
+    for t in tareas.drain(..) {
+        t.abort();
+    }
+    drop((manejo_a, manejo_b, manejo_c, ev_b));
+}
+
+/// **Un diferido sin informe a tiempo se trata como `Ignorar`: nunca se retransmite.**
+///
+/// Con un plazo corto (para no alargar el test), B difiere y **no** informa nada. Pasado el plazo,
+/// C sigue sin ver el bloque.
+#[tokio::test]
+async fn un_diferido_sin_informe_a_tiempo_no_se_retransmite() {
+    let (tx_aviso, mut rx_aviso) = tokio::sync::mpsc::unbounded_channel();
+    let b = Arc::new(Diferidor { aviso: tx_aviso });
+    let c = Arc::new(Contador::nuevo(3));
+
+    let plazo_corto = Duration::from_millis(200);
+    let (manejo_a, _ev_a, _manejo_b, _ev_b, _manejo_c, mut ev_c, mut tareas) =
+        cadena_de_tres_con_plazo(
+            Arc::new(Contador::nuevo(1)),
+            Arc::clone(&b),
+            Arc::clone(&c),
+            plazo_corto,
+        )
+        .await;
+
+    manejo_a
+        .difundir_bloque(&bloque_pow(12))
+        .await
+        .expect("A publica");
+
+    let _id = tokio::time::timeout(Duration::from_secs(10), rx_aviso.recv())
+        .await
+        .expect("el aviso de diferido debe llegar")
+        .expect("canal abierto");
+
+    // Se espera bastante más que el plazo de expiración, sin informar nunca: C no debe ver nada.
+    let _ = tokio::time::timeout(plazo_corto * 6, ev_c.recv()).await;
+    assert_eq!(
+        c.bloques.load(Ordering::Relaxed),
+        0,
+        "un diferido que expira MUST tratarse como Ignorar: nunca se retransmite"
+    );
+
+    for t in tareas.drain(..) {
+        t.abort();
+    }
+}
+
+/// Encadena A → B → C (cada uno marca al siguiente) con el plazo de diferido por defecto.
+async fn cadena_de_tres(
+    a: Arc<impl ManejadorEntrante>,
+    b: Arc<impl ManejadorEntrante>,
+    c: Arc<impl ManejadorEntrante>,
+) -> Cadena3 {
+    cadena_de_tres_con_plazo(
+        a,
+        b,
+        c,
+        Duration::from_secs(zx_p2p::limites::PLAZO_VALIDACION_DIFERIDA_S),
+    )
+    .await
+}
+
+type Cadena3 = (
+    zx_p2p::servicio::ManejoRed,
+    tokio::sync::mpsc::Receiver<EventoRed>,
+    zx_p2p::servicio::ManejoRed,
+    tokio::sync::mpsc::Receiver<EventoRed>,
+    zx_p2p::servicio::ManejoRed,
+    tokio::sync::mpsc::Receiver<EventoRed>,
+    Vec<tokio::task::JoinHandle<()>>,
+);
+
+/// Igual que [`cadena_de_tres`], con el plazo de validación diferida explícito para B (el único que
+/// difiere en los tests de este módulo).
+async fn cadena_de_tres_con_plazo(
+    a: Arc<impl ManejadorEntrante>,
+    b: Arc<impl ManejadorEntrante>,
+    c: Arc<impl ManejadorEntrante>,
+    plazo_b: Duration,
+) -> Cadena3 {
+    let presupuesto_a = Presupuesto::default();
+    let presupuesto_b = Presupuesto::default();
+    let presupuesto_c = Presupuesto::default();
+
+    let swarm_a = nodo_en_memoria(&presupuesto_a);
+    let swarm_b = nodo_en_memoria(&presupuesto_b);
+    let swarm_c = nodo_en_memoria(&presupuesto_c);
+
+    let pa = arrancar_con(swarm_a, a, presupuesto_a);
+    let pb = arrancar_con_plazo(swarm_b, b, presupuesto_b, plazo_b);
+    let pc = arrancar_con(swarm_c, c, presupuesto_c);
+
+    let manejo_a = pa.manejo;
+    let manejo_b = pb.manejo;
+    let manejo_c = pc.manejo;
+    let mut ev_a = pa.eventos;
+    let mut ev_b = pb.eventos;
+    let ev_c = pc.eventos;
+
+    let tareas = vec![
+        tokio::spawn(pa.bucle.correr()),
+        tokio::spawn(pb.bucle.correr()),
+        tokio::spawn(pc.bucle.correr()),
+    ];
+
+    let addr_b = addr_memoria();
+    manejo_b.escuchar(addr_b.clone()).await.expect("B escucha");
+    manejo_a.marcar(addr_b.clone()).await.expect("A marca B");
+    assert!(
+        esperar(&mut ev_a, |e| matches!(e, EventoRed::PeerConectado(_)))
+            .await
+            .is_some(),
+        "A debería conectarse con B"
+    );
+    esperar_ambas_suscripciones(&mut ev_b).await;
+
+    let addr_c = addr_memoria();
+    manejo_c.escuchar(addr_c.clone()).await.expect("C escucha");
+    manejo_b.marcar(addr_c.clone()).await.expect("B marca C");
+    assert!(
+        esperar(&mut ev_b, |e| matches!(e, EventoRed::PeerConectado(_)))
+            .await
+            .is_some(),
+        "B debería conectarse con C"
+    );
+    // B debe ver la suscripción de C, y viceversa, antes de publicar nada.
+    let mut ev_c = ev_c;
+    esperar_ambas_suscripciones(&mut ev_c).await;
+    esperar_ambas_suscripciones(&mut ev_b).await;
+
+    (manejo_a, ev_a, manejo_b, ev_b, manejo_c, ev_c, tareas)
+}
+
+/// Espera a ver las suscripciones a los dos temas de bloques en el canal de eventos dado.
+async fn esperar_ambas_suscripciones(ev: &mut tokio::sync::mpsc::Receiver<EventoRed>) {
+    let tema_pow = ParametrosRed::dag_dev().topic_bloques_pow().to_owned();
+    let tema_post = ParametrosRed::dag_dev().topic_bloques_post().to_owned();
+    let mut vio_pow = false;
+    let mut vio_post = false;
+    while !(vio_pow && vio_post) {
+        let Some(e) = esperar(ev, |e| matches!(e, EventoRed::Suscripcion { .. })).await else {
+            panic!("no se vieron las dos suscripciones (pow={vio_pow}, post={vio_post})");
+        };
+        if let EventoRed::Suscripcion {
+            topico,
+            suscrito: true,
+            ..
+        } = &e
+        {
+            vio_pow |= *topico == tema_pow;
+            vio_post |= *topico == tema_post;
+        }
     }
 }
 

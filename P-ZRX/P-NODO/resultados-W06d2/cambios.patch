@@ -1,0 +1,3590 @@
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/Cargo.lock ws/Cargo.lock
+--- ws.orig/Cargo.lock	2026-09-26 09:50:47.341657895 +0200
++++ ws/Cargo.lock	2026-09-26 12:35:52.563443776 +0200
+@@ -4984,6 +4984,7 @@
+  "blake3",
+  "clap",
+  "ed25519-zebra",
++ "libp2p",
+  "primitive-types",
+  "rocksdb",
+  "subspace-core-primitives",
+@@ -4992,11 +4993,14 @@
+  "subspace-verification",
+  "tempfile",
+  "thiserror 2.0.20",
++ "tokio",
++ "tracing",
+  "zx-cadena",
+  "zx-consensus",
+  "zx-core",
+  "zx-dag",
+  "zx-farmer",
++ "zx-p2p",
+  "zx-poas",
+  "zx-post",
+  "zx-storage",
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/Cargo.toml ws/Cargo.toml
+--- ws.orig/Cargo.toml	2026-09-26 09:50:47.341657895 +0200
++++ ws/Cargo.toml	2026-09-26 12:28:28.860115797 +0200
+@@ -69,11 +69,13 @@
+ thiserror          = "=2.0.20"
+ hex                = "=0.4.3"
+ 
+-# --- nodo (W06d1) — versión exacta del `Cargo.lock` de `9681061` ---
++# --- nodo (W06d1/W06d2) — versión exacta del `Cargo.lock` de `9681061` ---
+ # `clap` para la CLI del binario `zx-node` (directorio de datos, red, claves, papel, `N_dev`,
+-# `SR_dev`, registro, parada tras N slots). No se añaden `tokio`, `serde` ni `tracing-subscriber`:
+-# no son imprescindibles (el nodo no hace E/S de red ni asíncrona en esta orden, y el registro
+-# estructurado se escribe a mano con el esquema fijo de `ESCENARIOS-0.0.1.md` §1).
++# `SR_dev`, registro, parada tras N slots). No se añade `serde` ni `tracing-subscriber`: no son
++# imprescindibles (el registro estructurado se escribe a mano con el esquema fijo de
++# `ESCENARIOS-0.0.1.md` §1). `tokio` **sí** se añade desde `ORDEN-W06d2`: `zx-node` pasa a
++# depender de `zx-p2p` para hablar la red real; reutiliza la misma instancia de `tokio` que ya
++# fijó `zx-p2p` más abajo (nunca dos runtimes async con versiones distintas en el mismo binario).
+ clap               = { version = "=4.6.6", features = ["derive"] }
+ 
+ # --- farmer (D1/D2) — versiones exactas del `Cargo.lock` de `9681061` ---
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/src/cadena.rs ws/crates/zx-cadena/src/cadena.rs
+--- ws.orig/crates/zx-cadena/src/cadena.rs	2026-09-26 11:59:54.996835403 +0200
++++ ws/crates/zx-cadena/src/cadena.rs	2026-09-26 12:22:16.270282412 +0200
+@@ -202,6 +202,23 @@
+     ///
+     /// Un bloque ya procesado devuelve el resultado almacenado, sin reprocesarlo.
+     ///
++    /// # `ErrSinPadre` por una dependencia que **todavía no ha llegado** no se cachea (RI-2a #1)
++    ///
++    /// Si el padre (o, en PoST, el terminal) del bloque no está disponible **todavía**, el rechazo
++    /// es provisional: el mismo bloque, sometido otra vez después de que su dependencia llegue,
++    /// MUST poder admitirse. Antes de este arreglo, `admitir` cacheaba `ErrSinPadre` igual que
++    /// cualquier otro motivo, y un bloque que llegaba antes que su padre —una condición de carrera
++    /// de red ordinaria, sin ningún adversario de por medio— quedaba inválido **para siempre** en
++    /// esta instancia aunque el padre llegara después y fuera válido: dos nodos honestos que
++    /// reciben los mismos bloques en órdenes distintos divergirían. La comprobación
++    /// ([`Self::dependencia_no_disponible`]) se hace **antes** de tocar `admitir_pow`/`admitir_post`
++    /// —y por tanto antes de cualquier mutación del DAG interno—, así que reintentar más tarde
++    /// vuelve a ejecutar la tubería completa desde cero, nunca a medias.
++    ///
++    /// Los motivos de rechazo que sí dependen únicamente del contenido del propio bloque (padres
++    /// duplicados, forma inválida, PoW/PoAS/PoT/firma incorrectos, etc.) siguen cacheados como
++    /// antes: no cambian si se reintentan.
++    ///
+     /// # Errores
+     /// El [`MotivoBloque`] que haya invalidado el bloque.
+     pub fn admitir(&mut self, bloque: BloqueCadena) -> Result<(), MotivoBloque> {
+@@ -217,6 +234,10 @@
+                     .unwrap_or(MotivoBloque::ErrSinPadre))
+             };
+         }
++        if self.dependencia_no_disponible(&bloque) {
++            self.por_hash.insert(hash, bloque);
++            return Err(MotivoBloque::ErrSinPadre);
++        }
+         self.por_hash.insert(hash, bloque.clone());
+         let resultado = match &bloque {
+             BloqueCadena::Pow(_) => self.admitir_pow(&bloque),
+@@ -234,6 +255,34 @@
+         resultado
+     }
+ 
++    /// ¿Depende `bloque` de algo (un padre, o el terminal) que esta `Cadena` todavía no tiene?
++    ///
++    /// Réplica, **de solo lectura**, exactamente las comprobaciones de disponibilidad que
++    /// `admitir_pow`/`chequear_forma` hacen de todas formas (mismo padre, misma noción de
++    /// "conocido y válido", mismo terminal); duplicarlas aquí es necesario porque esta comprobación
++    /// se hace **antes** de decidir si el resultado se cachea, y ese antes tiene que ser anterior a
++    /// cualquier mutación del DAG (`anadir_al_dag`). Un padre **conocido y definitivamente
++    /// inválido** también cuenta como "no disponible" aquí (en vez de "definitivamente inválido
++    /// para siempre"): es una posición conservadora, nunca insegura — el peor caso es repetir el
++    /// cómputo si alguien reenvía el mismo bloque doomed, no cachear por error un huérfano como
++    /// inválido para siempre.
++    #[must_use]
++    fn dependencia_no_disponible(&self, bloque: &BloqueCadena) -> bool {
++        match bloque {
++            BloqueCadena::Pow(_) => bloque
++                .padre_seleccionado()
++                .is_some_and(|p| !self.post.contains_key(&p)),
++            BloqueCadena::Post(p) => {
++                let Some(terminal) = self.terminal else {
++                    return true;
++                };
++                p.padres
++                    .iter()
++                    .any(|x| *x != terminal && !self.es_valido(x))
++            }
++        }
++    }
++
+     /// Procesa un conjunto de bloques con un orden de llegada arbitrario, reintentando los que
+     /// tienen padres aún no procesados (espejo de `resolver!`/`padres_listos` del oráculo T04).
+     ///
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/tests/padres_e_identidad.rs ws/crates/zx-cadena/tests/padres_e_identidad.rs
+--- ws.orig/crates/zx-cadena/tests/padres_e_identidad.rs	2026-09-26 11:59:54.996884062 +0200
++++ ws/crates/zx-cadena/tests/padres_e_identidad.rs	2026-09-26 12:26:06.680126742 +0200
+@@ -237,3 +237,44 @@
+         Err(MotivoBloque::ErrU2)
+     );
+ }
++
++/// **`ORDEN-W06d2` / RI-2a #1 (ALTA, CONFIRMADO).** Un hijo sometido antes que su padre no debe
++/// quedar inválido para siempre: al llegar el padre y volver a someter exactamente el mismo hijo,
++/// `admitir` debe admitirlo.
++///
++/// Antes del arreglo (`Cadena::dependencia_no_disponible`), el primer `admitir(hijo)` cacheaba
++/// `ErrSinPadre` en `validos`/`motivos` de forma permanente; el segundo `admitir(hijo)` devolvía el
++/// error cacheado sin volver a intentar la tubería, aunque el padre ya fuera válido. Es exactamente
++/// la condición de carrera de red que produce divergencia entre nodos honestos según el orden de
++/// llegada (sin ningún adversario de por medio).
++#[test]
++fn w06d2_hijo_antes_que_el_padre_se_admite_al_llegar_el_padre() {
++    let mut cadena = cadena_con_terminal(15);
++    let terminal = hash(1);
++
++    let padre = post(50, vec![terminal], 1, productor(50), ticket(50, 1));
++    let hash_padre = hash(50);
++    let hijo = post(60, vec![hash_padre], 2, productor(60), ticket(60, 2));
++
++    // 1) El hijo llega primero: su padre todavía no existe en esta `Cadena`.
++    assert_eq!(
++        cadena.admitir(hijo.clone()),
++        Err(MotivoBloque::ErrSinPadre),
++        "sin el padre, el rechazo es correcto (y debe ser provisional, no cacheado)"
++    );
++
++    // 2) El padre llega y es válido.
++    assert!(
++        cadena.admitir(padre).is_ok(),
++        "el padre por sí solo es válido"
++    );
++    assert!(cadena.es_valido(&hash_padre));
++
++    // 3) El mismo hijo, sometido otra vez: MUST admitirse ahora que el padre está disponible.
++    assert!(
++        cadena.admitir(hijo.clone()).is_ok(),
++        "BUG RI-2a #1: el hijo debe admitirse una vez que su padre ya es válido, no quedar \
++         cacheado como ErrSinPadre para siempre"
++    );
++    assert!(cadena.es_valido(&hijo.hash()));
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/Cargo.toml ws/crates/zx-node/Cargo.toml
+--- ws.orig/crates/zx-node/Cargo.toml	2026-09-26 09:50:47.341657895 +0200
++++ ws/crates/zx-node/Cargo.toml	2026-09-26 13:04:09.400050673 +0200
+@@ -14,6 +14,10 @@
+ name = "zx-node"
+ path = "src/main.rs"
+ 
++[[bin]]
++name = "zx-adversario"
++path = "src/bin/zx-adversario.rs"
++
+ [dependencies]
+ thiserror       = { workspace = true }
+ blake3          = { workspace = true }
+@@ -28,6 +32,11 @@
+ zx-post         = { path = "../zx-post" }
+ zx-cadena       = { path = "../zx-cadena" }
+ zx-storage      = { path = "../zx-storage", features = ["rocksdb"] }
++# --- red (ORDEN-W06d2) ---
++zx-p2p          = { path = "../zx-p2p" }
++tokio           = { workspace = true }
++tracing         = { workspace = true }
++libp2p          = { workspace = true, features = ["tokio", "tcp", "noise", "yamux", "macros", "ed25519"] }
+ 
+ # ── Autonomys por ruta al clon fijado `PDF/autonomys-subspace` @ f8842d0 ────────────────────────
+ # Mismas instancias que `zx-farmer`/`zx-post`: el nodo no reimplementa PoS, KZG ni erasure coding,
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/bin/zx-adversario.rs ws/crates/zx-node/src/bin/zx-adversario.rs
+--- ws.orig/crates/zx-node/src/bin/zx-adversario.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/bin/zx-adversario.rs	2026-09-26 13:36:33.381772876 +0200
+@@ -0,0 +1,473 @@
++//! `zx-adversario`: herramienta adversarial separada (`ORDEN-W06d2` decisión 6).
++//!
++//! Un binario aparte —**nunca** un modo de `zx-node`— que habla el protocolo real de `zx-p2p`
++//! (mismo transporte, mismo behaviour, misma red dev) para enviarle a un nodo objetivo las
++//! entradas inválidas de `P-ZRX/P-MEDICION/ESCENARIOS-0.0.1.md` §3 E-7 y E-8, y observar si las
++//! rechaza sin cambiar de estado.
++//!
++//! # Qué cubre esta versión, y qué no (ver `PROGRESO.md` del encargo)
++//!
++//! `BloqueRed::Post` no lleva `JustificacionPot` (bloqueo documentado): `zx-node` trata **todo**
++//! bloque PoST de red como no juzgable (`Ignorar`) sin mirar su contenido. Los escenarios de E-7
++//! que dependen de PoAS/PoT/sello **PoST** malos, y el escenario E-8 (equivocación), no se pueden
++//! observar todavía como un rechazo con motivo específico por esta vía: el objetivo los ignora por
++//! el formato, no por el contenido. Se envían igualmente (ejercitan de verdad el códec y el
++//! transporte) pero el veredicto esperado documentado aquí es «ignorado por bloqueo de formato»,
++//! no «rechazado por PoAS/PoT inválido». Los escenarios de la familia **PoW** sí se validan de
++//! extremo a extremo: esta herramienta primero pregunta el estado real del objetivo (`Peticion::
++//! Estado`) y construye los bloques adversariales **extendiendo su punta real**, para que lleguen
++//! al validador de verdad en vez de quedarse en «huérfano, no juzgable».
++//!
++//! # Cómo se usa
++//!
++//! ```text
++//! zx-adversario --objetivo /ip4/127.0.0.1/tcp/PUERTO
++//! ```
++//!
++//! Corre cada escenario una vez, en orden, con una pausa entre cada uno para poder leer el
++//! registro estructurado del objetivo. Imprime a stdout qué mandó y qué observó (conexión viva o
++//! cortada) en cada paso; el veredicto de fondo (aceptado/ignorado/rechazado, y por qué) se lee en
++//! el registro del nodo objetivo, no aquí — esta herramienta no tiene acceso a su estado interno,
++//! solo al protocolo de red, que es exactamente el punto.
++
++use std::time::Duration;
++
++use clap::Parser;
++use libp2p::core::transport::Transport as _;
++use libp2p::{Multiaddr, PeerId, Swarm, identity, noise, yamux};
++use zx_core::amount::Amount;
++use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
++use zx_core::firma::ClavePublica;
++use zx_core::preimage::block::{BlockHeader, merkle_root};
++use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
++use zx_core::red::Red;
++use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
++use zx_p2p::behaviour::ZxBehaviour;
++use zx_p2p::config::ParametrosRed;
++use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
++use zx_p2p::mensaje::{BloqueRed, Estado, FamiliaBloque, Fase, Peticion, Respuesta};
++use zx_p2p::servicio::{EventoRed, arrancar};
++
++/// CLI de la herramienta adversarial.
++#[derive(Parser, Debug)]
++#[command(
++    name = "zx-adversario",
++    about = "Herramienta adversarial de ORDEN-W06d2 (E-7/E-8)"
++)]
++struct Cli {
++    /// Dirección del nodo objetivo.
++    #[arg(long, value_name = "MULTIADDR")]
++    objetivo: Multiaddr,
++
++    /// Pausa entre escenarios, en milisegundos (para poder leer el registro del objetivo).
++    #[arg(long, default_value_t = 300)]
++    pausa_ms: u64,
++}
++
++/// Manejador espía: no se necesita servir nada de verdad (la herramienta no es un nodo, no tiene
++/// cadena que ofrecer); cuenta lo que le llega para el resumen final.
++#[derive(Default)]
++struct Espia {
++    respuestas: std::sync::atomic::AtomicUsize,
++}
++
++impl ManejadorEntrante for Espia {
++    fn estado(&self) -> Estado {
++        // La herramienta no es un nodo real: declara un génesis vacío. Si el objetivo comprueba
++        // esto y desconecta, es exactamente C-NET del lado del objetivo funcionando; no rompe nada
++        // del lado de la herramienta (no le pedimos que confíe en nuestro estado).
++        Estado {
++            hash_genesis: BlockHash::from_digest(Digest::from_bytes([0xEE; 32])),
++            red: Red::Dev,
++            fase: Fase::Pow,
++            punta_pow: zx_p2p::mensaje::PuntaPow {
++                hash: BlockHash::from_digest(Digest::from_bytes([0xEE; 32])),
++                altura: 0,
++                trabajo_acumulado: [0; 32],
++            },
++            terminal: None,
++            puntas_post: Vec::new(),
++            blue_work_virtual: [0; 32],
++        }
++    }
++
++    fn bloque_difundido(&self, _id: IdDiferido, _bloque: &BloqueRed) -> Veredicto {
++        Veredicto::Ignorar
++    }
++
++    fn tx_difundida(&self, _tx: &[u8]) -> Veredicto {
++        Veredicto::Ignorar
++    }
++
++    fn cabeceras_desde(
++        &self,
++        _locator: &[BlockHash],
++        _hasta: Option<BlockHash>,
++    ) -> Vec<BlockHeader> {
++        Vec::new()
++    }
++
++    fn bloques_por_hash(&self, _hashes: &[BlockHash]) -> Vec<BloqueRed> {
++        Vec::new()
++    }
++}
++
++fn swarm_tcp() -> Result<Swarm<ZxBehaviour>, String> {
++    let clave = identity::Keypair::generate_ed25519();
++    let peer_id = clave.public().to_peer_id();
++    let ruido = noise::Config::new(&clave).map_err(|e| format!("noise: {e}"))?;
++    let transporte = libp2p::tcp::tokio::Transport::new(libp2p::tcp::Config::default())
++        .upgrade(libp2p::core::upgrade::Version::V1Lazy)
++        .authenticate(ruido)
++        .multiplex(yamux::Config::default())
++        .boxed();
++    let behaviour = ZxBehaviour::nueva(
++        &clave,
++        ParametrosRed::dag_dev(),
++        zx_p2p::limites::LIMITE_BLOQUE_DEV,
++    )
++    .map_err(|e| format!("behaviour de la red dev: {e}"))?;
++    Ok(Swarm::new(
++        transporte,
++        behaviour,
++        peer_id,
++        libp2p::swarm::Config::with_tokio_executor()
++            .with_idle_connection_timeout(Duration::from_secs(30)),
++    ))
++}
++
++fn tx_llave(n: u8) -> Tx {
++    Tx {
++        version: 1,
++        inputs: vec![TxIn {
++            outpoint: OutPoint {
++                prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
++                prev_index: 0,
++            },
++            sequence: 0,
++        }],
++        outputs: vec![TxOut {
++            value: Amount::nuevo(1_000).unwrap_or(Amount::CERO),
++            lock: Lock::PubKey {
++                pubkey: ClavePublica::desde_bytes([n; 32]),
++            },
++        }],
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::Ninguna,
++    }
++}
++
++/// E-7 «PoW con nonce malo»: extiende la punta real del objetivo con una cabecera cuyo `nonce` no
++/// cumple el PoW real (probabilidad astronómicamente en contra de que cumpla por azar con la
++/// dificultad dev). El motor de transición la rechazaría igual por su coinbase (no está firmada por
++/// nadie que el objetivo conozca como productor válido de esa altura salvo que coincida una clave
++/// real), pero la comprobación de PoW real es la primera de la tubería (`validar_cabecera_pow`) y
++/// MUST fallar antes de llegar a mirar la coinbase.
++fn escenario_pow_nonce_malo(estado_objetivo: &Estado) -> BloqueRed {
++    let altura = estado_objetivo.punta_pow.altura + 1;
++    let clave = ClavePublica::desde_bytes([0x41; 32]);
++    let coinbase = zx_node::pow::construir_coinbase_pow(clave, altura);
++    let txid_coinbase = zx_core::txid(&coinbase, zx_core::CBID_RED_DEV);
++    BloqueRed::Pow {
++        cabecera: BlockHeader {
++            consensus_branch_id: zx_core::CBID_RED_DEV,
++            prev_hash: estado_objetivo.punta_pow.hash,
++            merkle_root: merkle_root(&[txid_coinbase]),
++            timestamp: 1_800_000_000,
++            bits: 0x1c07_fff8,
++            nonce: 0, // no minado: no cumple `hash_pow < target` con la dificultad dev real.
++            height: altura,
++        },
++        txs: vec![coinbase],
++        testigos: vec![Vec::new()],
++    }
++}
++
++/// E-7 «coinbase mayor que el subsidio»: mismo bloque que el anterior pero con PoW real (minado de
++/// verdad, presupuesto acotado) y una coinbase que paga de más. Si la dificultad dev real tarda más
++/// que el presupuesto de esta herramienta en encontrar un nonce válido, se declara `None` y el
++/// escenario se omite (no se falsea un PoW).
++fn escenario_coinbase_excesiva(estado_objetivo: &Estado) -> Option<BloqueRed> {
++    let altura = estado_objetivo.punta_pow.altura + 1;
++    let clave = ClavePublica::desde_bytes([0x42; 32]);
++    let mut coinbase = zx_node::pow::construir_coinbase_pow(clave, altura);
++    // El doble del subsidio dev declarado: demostrablemente por encima de lo que F-16 permite.
++    let salida = coinbase.outputs.first_mut()?;
++    let doble = salida.value.brek().checked_mul(2)?;
++    salida.value = Amount::nuevo(doble).ok()?;
++    let txid_coinbase = zx_core::txid(&coinbase, zx_core::CBID_RED_DEV);
++    let objetivo_pow =
++        zx_core::decodificar_con(0x1c07_fff8, &zx_consensus::PARAMETROS_POW_DEV.limites).ok()?;
++    let cabecera_base = BlockHeader {
++        consensus_branch_id: zx_core::CBID_RED_DEV,
++        prev_hash: estado_objetivo.punta_pow.hash,
++        merkle_root: merkle_root(&[txid_coinbase]),
++        timestamp: 1_800_000_000,
++        bits: 0x1c07_fff8,
++        nonce: 0,
++        height: altura,
++    };
++    // Presupuesto acotado y declarado, reusando el minero real (`zx_consensus::minar`): hasta
++    // 2_000_000 intentos. Con la dificultad inicial dev real esto puede no bastar (se ha medido en
++    // otras órdenes ~4-5 s/bloque en `debug`); si no se encuentra, se omite el escenario en vez de
++    // mandar un PoW falso.
++    let cancelar = core::sync::atomic::AtomicBool::new(false);
++    let minada = zx_consensus::minar(
++        &cabecera_base,
++        objetivo_pow,
++        &zx_consensus::Sha3Dev,
++        2_000_000,
++        &cancelar,
++    )?;
++    Some(BloqueRed::Pow {
++        cabecera: minada,
++        txs: vec![coinbase],
++        testigos: vec![Vec::new()],
++    })
++}
++
++/// E-7 «ráfaga de huérfanos»: muchos bloques PoW con padres inexistentes (aleatorios), para
++/// comprobar que el objetivo los deposita acotado y no se cae ni penaliza al remitente (son
++/// indistinguibles de "llegó antes que su padre").
++fn escenario_rafaga_huerfanos(n: usize) -> Vec<BloqueRed> {
++    (0..n)
++        .map(|i| {
++            // Un hash "aleatorio" distinto por índice basta: no necesita ser impredecible, solo no
++            // coincidir con ningún padre real. `sha3_256_publico` de los bytes de `i` (`u64`
++            // big-endian) da 32 bytes bien repartidos sin aritmética manual por byte.
++            let semilla = u64::try_from(i).unwrap_or(0).to_be_bytes();
++            let padre_inexistente = BlockHash::from_digest(zx_core::sha3_256_publico(&semilla));
++            BloqueRed::Pow {
++                cabecera: BlockHeader {
++                    consensus_branch_id: zx_core::CBID_RED_DEV,
++                    prev_hash: padre_inexistente,
++                    merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
++                    timestamp: 1_800_000_000,
++                    bits: 0x1c07_fff8,
++                    nonce: u64::try_from(i).unwrap_or(0),
++                    height: 1,
++                },
++                txs: vec![tx_llave(u8::try_from(i % 256).unwrap_or(0))],
++                testigos: vec![vec![vec![0xAA; 64]]],
++            }
++        })
++        .collect()
++}
++
++/// E-7 «PoST con PoAS/PoT/sello malos» y E-8 «equivocación»: se envían igual (ejercitan el códec y
++/// el transporte reales), pero ver el docstring del módulo: el objetivo los ignora por el bloqueo
++/// de formato, no por su contenido, en esta versión.
++fn escenario_post_malo(n: u8) -> BloqueRed {
++    BloqueRed::Post {
++        cabecera: DagBlockHeader {
++            consensus_branch_id: zx_core::CBID_RED_DEV,
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x99; 32])),
++            timestamp: 1_800_000_000,
++            height: 0,
++            slot: u64::from(n),
++            pot_output: [0xFF; 16], // PoT que no corresponde a ningún flujo real.
++            rango_solucion: 1,
++            sol: SolucionPoas::default(), // PoAS vacía/inválida.
++            body_commitment: zx_core::digest::BodyCommitment::from_digest(Digest::from_bytes(
++                [0x11; 32],
++            )),
++            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0x22; 32])), &[])
++                .unwrap_or_else(|_| unreachable!("un solo padre siempre construye")),
++            sello: [0xFF; 64], // sello arbitrario, no una firma real.
++        },
++        txs: vec![tx_llave(n)],
++        testigos: vec![vec![vec![0xBB; 64]]],
++    }
++}
++
++#[tokio::main]
++async fn main() {
++    let cli = Cli::parse();
++    let swarm = match swarm_tcp() {
++        Ok(s) => s,
++        Err(e) => {
++            eprintln!("zx-adversario: no se pudo construir la red: {e}");
++            std::process::exit(1);
++        }
++    };
++    let espia = std::sync::Arc::new(Espia::default());
++    let piezas = arrancar(swarm, std::sync::Arc::clone(&espia));
++    let manejo = piezas.manejo;
++    let mut eventos = piezas.eventos;
++    let tarea = tokio::spawn(piezas.bucle.correr());
++
++    println!("zx-adversario: marcando {} ...", cli.objetivo);
++    if let Err(e) = manejo.marcar(cli.objetivo.clone()).await {
++        eprintln!("zx-adversario: no se pudo marcar: {e}");
++        std::process::exit(1);
++    }
++
++    let Some(peer) = esperar_conexion(&mut eventos).await else {
++        eprintln!("zx-adversario: el objetivo no conectó en el plazo esperado");
++        std::process::exit(1);
++    };
++    println!("zx-adversario: conectado a {peer}");
++
++    let Some(estado_objetivo) = pedir_estado(&manejo, &mut eventos, peer).await else {
++        eprintln!("zx-adversario: el objetivo no respondió el saludo");
++        std::process::exit(1);
++    };
++    println!(
++        "zx-adversario: objetivo declara altura PoW {} fase {:?}",
++        estado_objetivo.punta_pow.altura, estado_objetivo.fase
++    );
++
++    let pausa = Duration::from_millis(cli.pausa_ms);
++
++    // La conexión TCP no es la malla de gossipsub: publicar antes de que las dos suscripciones
++    // (bloques pow/post) terminen su propio intercambio de control falla localmente con
++    // `NoPeersSubscribedToTopic` (mismo motivo que `dos_nodos.rs::dos_conectados`, en `zx-p2p`,
++    // espera las suscripciones antes de publicar). Una espera fija y corta —no un consumo del
++    // canal de eventos, para no interferir con `pedir_estado`— basta en la práctica: la
++    // suscripción se negocia en el primer RPC tras la conexión, casi siempre antes de que termine
++    // el saludo de arriba.
++    tokio::time::sleep(Duration::from_millis(500)).await;
++
++    // Orden deliberado: primero los escenarios que **no** violan consenso (`Ignorar`, la conexión
++    // sigue viva) y al final los que sí (`Rechazar` con `MotivoDesconexion::ViolacionDeConsenso`,
++    // que banea de un golpe — C-NET-05/`error.rs`). Con una sola conexión persistente por
++    // simplicidad, un baneo temprano dejaría sin mesh de gossipsub los escenarios restantes (medido:
++    // exactamente lo que pasaba con el orden anterior). Reconectar entre escenarios queda para una
++    // versión futura de esta herramienta.
++    ejecutar_escenario(
++        &manejo,
++        &mut eventos,
++        "E-7 ráfaga de huérfanos (256 padres inexistentes)",
++        escenario_rafaga_huerfanos(256),
++        pausa,
++    )
++    .await;
++
++    ejecutar_escenario(
++        &manejo,
++        &mut eventos,
++        "E-7 PoST con PoAS/PoT/sello malos (limitado: ver docstring del módulo)",
++        vec![escenario_post_malo(1)],
++        pausa,
++    )
++    .await;
++
++    ejecutar_escenario(
++        &manejo,
++        &mut eventos,
++        "E-8 equivocación: misma clave, dos bloques del mismo slot (limitado: ver docstring)",
++        vec![escenario_post_malo(2), escenario_post_malo(2)],
++        pausa,
++    )
++    .await;
++
++    // A partir de aquí, cada escenario puede banear la conexión: van al final.
++    ejecutar_escenario(
++        &manejo,
++        &mut eventos,
++        "E-7 PoW nonce malo",
++        vec![escenario_pow_nonce_malo(&estado_objetivo)],
++        pausa,
++    )
++    .await;
++
++    if let Some(b) = escenario_coinbase_excesiva(&estado_objetivo) {
++        ejecutar_escenario(
++            &manejo,
++            &mut eventos,
++            "E-7 coinbase mayor que el subsidio",
++            vec![b],
++            pausa,
++        )
++        .await;
++    } else {
++        println!(
++            "zx-adversario: E-7 coinbase excesiva OMITIDO (no se encontró nonce PoW real en el \
++             presupuesto de esta herramienta; no se manda un PoW falso)"
++        );
++    }
++
++    println!(
++        "zx-adversario: fin. Respuestas de sincronización recibidas: {}. \
++         El veredicto de fondo de cada envío se lee en el registro del objetivo.",
++        espia.respuestas.load(std::sync::atomic::Ordering::Relaxed)
++    );
++    tarea.abort();
++}
++
++async fn esperar_conexion(eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>) -> Option<PeerId> {
++    let plazo = tokio::time::Instant::now() + Duration::from_secs(15);
++    loop {
++        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
++        if resto.is_zero() {
++            return None;
++        }
++        match tokio::time::timeout(resto, eventos.recv()).await {
++            Ok(Some(EventoRed::PeerConectado(p))) => return Some(p),
++            Ok(Some(_)) => {}
++            _ => return None,
++        }
++    }
++}
++
++async fn pedir_estado(
++    manejo: &zx_p2p::servicio::ManejoRed,
++    eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>,
++    peer: PeerId,
++) -> Option<Estado> {
++    manejo.pedir(peer, Peticion::Estado).await.ok()?;
++    let plazo = tokio::time::Instant::now() + Duration::from_secs(10);
++    loop {
++        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
++        if resto.is_zero() {
++            return None;
++        }
++        match tokio::time::timeout(resto, eventos.recv()).await {
++            Ok(Some(EventoRed::Respuesta { respuesta, .. })) => {
++                if let Respuesta::Estado(e) = *respuesta {
++                    return Some(e);
++                }
++            }
++            Ok(Some(_)) => {}
++            _ => return None,
++        }
++    }
++}
++
++async fn ejecutar_escenario(
++    manejo: &zx_p2p::servicio::ManejoRed,
++    eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>,
++    nombre: &str,
++    bloques: Vec<BloqueRed>,
++    pausa: Duration,
++) {
++    println!("--- {nombre} ({} mensaje(s)) ---", bloques.len());
++    for b in &bloques {
++        let familia = match b.familia() {
++            FamiliaBloque::Pow => "pow",
++            FamiliaBloque::Post => "post",
++        };
++        match manejo.difundir_bloque(b).await {
++            Ok(()) => println!("  difundido ({familia}): aceptado localmente por gossipsub"),
++            Err(e) => println!("  difundido ({familia}): RECHAZADO localmente: {e}"),
++        }
++        tokio::time::sleep(Duration::from_millis(20)).await;
++    }
++    // Ventana corta para ver si el objetivo nos corta la conexión (penalización).
++    let vivo = tokio::time::timeout(pausa, esperar_desconexion(eventos)).await;
++    match vivo {
++        Ok(Some(_)) => println!("  el objetivo CORTÓ la conexión tras este escenario"),
++        _ => println!("  la conexión sigue viva tras este escenario"),
++    }
++}
++
++async fn esperar_desconexion(eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>) -> Option<()> {
++    loop {
++        match eventos.recv().await {
++            Some(EventoRed::PeerDesconectado(_)) => return Some(()),
++            Some(_) => {}
++            None => return None,
++        }
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/cli.rs ws/crates/zx-node/src/cli.rs
+--- ws.orig/crates/zx-node/src/cli.rs	2026-09-26 09:50:47.341994189 +0200
++++ ws/crates/zx-node/src/cli.rs	2026-09-26 12:58:21.779776890 +0200
+@@ -80,4 +80,13 @@
+     /// Para el nodo tras producir/alcanzar este slot de régimen (para pruebas y mediciones).
+     #[arg(long)]
+     pub parada_tras_slots: Option<u64>,
++
++    /// Dirección donde escuchar (`ORDEN-W06d2`). Sin esto ni `--red-marcar`, el nodo corre
++    /// exactamente como en `ORDEN-W06d1`: sin red.
++    #[arg(long, value_name = "MULTIADDR")]
++    pub red_escuchar: Option<String>,
++
++    /// Direcciones de pares a marcar al arrancar, repetible.
++    #[arg(long = "red-marcar", value_name = "MULTIADDR")]
++    pub red_marcar: Vec<String>,
+ }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/lib.rs ws/crates/zx-node/src/lib.rs
+--- ws.orig/crates/zx-node/src/lib.rs	2026-09-26 09:50:47.342040848 +0200
++++ ws/crates/zx-node/src/lib.rs	2026-09-26 12:35:38.569149574 +0200
+@@ -16,6 +16,7 @@
+ pub mod padres;
+ pub mod perfil;
+ pub mod pow;
++pub mod red;
+ pub mod regimen;
+ pub mod registro;
+ 
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/main.rs ws/crates/zx-node/src/main.rs
+--- ws.orig/crates/zx-node/src/main.rs	2026-09-26 09:50:47.342050388 +0200
++++ ws/crates/zx-node/src/main.rs	2026-09-26 12:58:36.288081415 +0200
+@@ -1,4 +1,4 @@
+-//! Binario `zx-node` (`ORDEN-W06d1`).
++//! Binario `zx-node` (`ORDEN-W06d1`, red en `ORDEN-W06d2`).
+ 
+ use clap::Parser as _;
+ use zx_node::cli::{Cli, Papel};
+@@ -9,8 +9,8 @@
+ 
+     if cli.papel != Papel::Ambos {
+         eprintln!(
+-            "papel {:?}: sin red (ORDEN-W06d1) un proceso aislado no puede solo minar o solo \
+-             producir y aun así alcanzar el corte; use --papel ambos",
++            "papel {:?}: un nodo que solo mina o solo produce necesita pares que le manden lo que \
++             le falta; use --papel ambos, o conecte red con --red-escuchar/--red-marcar",
+             cli.papel
+         );
+         std::process::exit(2);
+@@ -20,6 +20,26 @@
+         std::process::exit(2);
+     }
+ 
++    let escuchar = match cli.red_escuchar.as_deref().map(str::parse) {
++        None => None,
++        Some(Ok(a)) => Some(a),
++        Some(Err(e)) => {
++            eprintln!("--red-escuchar: dirección inválida: {e}");
++            std::process::exit(2);
++        }
++    };
++    let mut marcar = Vec::new();
++    for m in &cli.red_marcar {
++        match m.parse() {
++            Ok(a) => marcar.push(a),
++            Err(e) => {
++                eprintln!("--red-marcar {m:?}: dirección inválida: {e}");
++                std::process::exit(2);
++            }
++        }
++    }
++    let con_red = escuchar.is_some() || !marcar.is_empty();
++
+     let cfg = Config {
+         dir_datos: cli.datos,
+         ruta_registro: cli.registro,
+@@ -31,8 +51,32 @@
+         parada_tras_slots: cli.parada_tras_slots,
+     };
+ 
+-    let resultado = Nodo::arrancar(&cfg).and_then(|mut nodo| nodo.ejecutar());
+-    if let Err(e) = resultado {
++    let mut nodo = match Nodo::arrancar(&cfg) {
++        Ok(n) => n,
++        Err(e) => {
++            eprintln!("zx-node: error fatal: {e}");
++            std::process::exit(1);
++        }
++    };
++
++    // `_red_arrancada` se mantiene viva hasta el final de `main`: soltar el runtime `tokio` que
++    // contiene cancelaría el bucle de red y la sincronización (decisión 1/4 de `ORDEN-W06d2`).
++    let _red_arrancada = if con_red {
++        match zx_node::red::arrancar(escuchar, marcar, nodo.vista_red()) {
++            Ok(r) => {
++                nodo.conectar_red(r.manija, r.trabajo);
++                Some(r.runtime)
++            }
++            Err(e) => {
++                eprintln!("zx-node: no se pudo arrancar la red: {e}");
++                std::process::exit(1);
++            }
++        }
++    } else {
++        None
++    };
++
++    if let Err(e) = nodo.ejecutar() {
+         eprintln!("zx-node: error fatal: {e}");
+         std::process::exit(1);
+     }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/nodo.rs ws/crates/zx-node/src/nodo.rs
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-26 11:59:54.996916611 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-26 13:36:33.392773106 +0200
+@@ -8,6 +8,7 @@
+ use std::sync::mpsc;
+ use std::thread;
+ 
++use primitive_types::U256;
+ use subspace_core_primitives::PublicKey;
+ use subspace_verification::PieceCheckParams;
+ use zx_cadena::{BloqueCadena, BloquePost, Cadena};
+@@ -23,6 +24,8 @@
+ use zx_dag::ErrorDag;
+ use zx_dag::bloque_dag::{CandidatoSinRango, ContextoRangoDag};
+ use zx_farmer::farmer::{ParcelaDisco, plotear_sector_en_disco};
++use zx_p2p::entrante::VeredictoFinal;
++use zx_p2p::mensaje::{BloqueRed, Estado, Fase as FaseRed, PuntaPow};
+ use zx_poas::HistoriaGenesis;
+ use zx_post::cabecera_conjunta::{EstadoCabeceraConjunta, verificar_cabecera_conjunta};
+ use zx_post::pot_rango::{CachePotVerificada, PresupuestoPot};
+@@ -38,6 +41,9 @@
+ use crate::padres::padres_de_regimen;
+ use crate::perfil;
+ use crate::pow::{self, CoinbasePropia};
++use crate::red::huerfanos::DepositoHuerfanos;
++use crate::red::vista::VistaRed;
++use crate::red::{self, ManijaRed, TrabajoRed};
+ use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
+ use crate::registro::Registro;
+ 
+@@ -96,6 +102,22 @@
+     n_dev: u64,
+     sr_dev_actual: u64,
+     parada_tras_slots: Option<u64>,
++    /// Trabajo PoW acumulado de la cadena admitida (para el saludo de red, decisión 4).
++    trabajo_acumulado: U256,
++    /// Hash del génesis (cacheado: `ORDEN-W06d2` lo necesita en cada saludo).
++    hash_genesis: BlockHash,
++    /// Red configurada (`ORDEN-W06d2` lo necesita en cada saludo).
++    red_configurada: Red,
++    /// Instantánea de solo lectura que sirve el saludo y la sincronización (`ORDEN-W06d2`).
++    /// Existe siempre, con o sin red: así no hay dos caminos de construcción de `Nodo`.
++    vista_red: Arc<VistaRed>,
++    /// Depósito acotado de bloques huérfanos (decisión 3).
++    huerfanos: DepositoHuerfanos,
++    /// El handle hacia la red, si [`Self::conectar_red`] se llamó. `None` reproduce exactamente el
++    /// comportamiento de `ORDEN-W06d1`: un nodo sin red.
++    red: Option<ManijaRed>,
++    /// Cola de trabajo que el manejador de red encola y este hilo drena (decisión 1).
++    trabajo_red: Option<tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>>,
+ }
+ 
+ fn ruta_parcela(dir_datos: &Path, indice: u32) -> PathBuf {
+@@ -166,6 +188,20 @@
+         let claves = ClaveDev::derivar_varias(cfg.semilla, &cfg.indices_claves);
+         let historia = Arc::new(HistoriaGenesis::construir()?);
+ 
++        let estado_inicial = Estado {
++            hash_genesis: hash_genesis_esperado,
++            red: cfg.red,
++            fase: FaseRed::Pow,
++            punta_pow: PuntaPow {
++                hash: hash_genesis_esperado,
++                altura: 0,
++                trabajo_acumulado: [0; 32],
++            },
++            terminal: None,
++            puntas_post: Vec::new(),
++            blue_work_virtual: [0; 32],
++        };
++
+         let mut nodo = Self {
+             params,
+             cadena: Cadena::nueva(
+@@ -187,6 +223,13 @@
+             n_dev: cfg.n_dev,
+             sr_dev_actual: cfg.sr_dev,
+             parada_tras_slots: cfg.parada_tras_slots,
++            trabajo_acumulado: U256::zero(),
++            hash_genesis: hash_genesis_esperado,
++            red_configurada: cfg.red,
++            vista_red: Arc::new(VistaRed::nueva(estado_inicial)),
++            huerfanos: red::nuevo_deposito_huerfanos(),
++            red: None,
++            trabajo_red: None,
+         };
+ 
+         let longitud = nodo.almacen.longitud_registro()?;
+@@ -317,6 +360,15 @@
+     ) -> Result<(), ErrorNodo> {
+         let hash = cabecera.block_hash();
+         let es_genesis = cabecera.height == 0;
++        // Instantánea para la vista de red (decisión 4): se toma **antes** de que `txs`/`testigos`
++        // se consuman más abajo (`into_iter().zip`). Solo se usa si el bloque resulta nuevo
++        // (`!ya_admitido`, comprobado antes de publicarla); el coste de clonar es aceptable en la
++        // red dev (bloques con pocas transacciones) y se revisa si el perfil (W07) lo desmiente.
++        let para_vista = BloqueRed::Pow {
++            cabecera,
++            txs: txs.clone(),
++            testigos: testigos.clone(),
++        };
+ 
+         if verificar && !es_genesis {
+             #[expect(
+@@ -349,12 +401,14 @@
+             })?;
+         }
+ 
++        let mut trabajo_de_este_bloque = U256::zero();
+         let hechos = if es_genesis {
+             HechosCabecera::Genesis { hash }
+         } else {
+             let target = pow_target_de(&cabecera)?;
+             let trabajo = trabajo_bloque(target)
+                 .ok_or_else(|| ErrorNodo::Otro(format!("trabajo del bloque {hash} desborda")))?;
++            trabajo_de_este_bloque = trabajo;
+             HechosCabecera::PoW {
+                 hash,
+                 padre: cabecera.prev_hash,
+@@ -413,6 +467,12 @@
+                     motivo: m.nombre().to_string(),
+                 }
+             })?;
++            self.trabajo_acumulado = self
++                .trabajo_acumulado
++                .saturating_add(trabajo_de_este_bloque);
++            self.vista_red.registrar_pow(cabecera.height, para_vista);
++            // Un hijo que esperaba justo este padre puede reintentarse ya (decisión 3).
++            self.resolver_huerfanos_de(hash);
+         }
+ 
+         self.historial_pow.push(cabecera);
+@@ -553,6 +613,22 @@
+         };
+ 
+         let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
++        // Aviso del director a mitad de ejecución (RI-2b, `deepseek/RI-2b/INFORME.md` H1): persistir
++        // **antes** de admitir en `zx-cadena`, igual que `admitir_pow_interno` y por el mismo motivo
++        // (su propio comentario, arriba): si el proceso muere entre las dos, el reinicio repite
++        // desde el almacén y vuelve a llegar aquí con `ya_admitido` falso otra vez (idempotente por
++        // hash). Al revés —como estaba— un `SIGKILL` entre `cadena.admitir` (memoria) y
++        // `almacen.admitir` (disco) perdía el bloque **sin dejar rastro**: al reiniciar,
++        // `ServicioPot` se reconstruye solo desde lo persistido (D-N03′), el mismo slot queda
++        // libre otra vez y, con un solo flujo PoT determinista (D-P10), la misma clave puede volver
++        // a ganarlo y firmar un bloque **distinto** para el mismo slot — la doble firma que
++        // «Relanzamiento» punto 4 de `ORDEN-W06d1` prohíbe. Solo en la ruta en vivo (`verificar`):
++        // en la repetición el bloque ya está en el almacén (viene de ahí).
++        if !ya_admitido && verificar {
++            let admitido = BloqueAdmitido::post(&bloque);
++            self.almacen.admitir(&admitido, true)?;
++        }
++
+         if !ya_admitido {
+             self.cadena.admitir(BloqueCadena::Post(post)).map_err(|m| {
+                 ErrorNodo::BloquePropioRechazado {
+@@ -560,11 +636,13 @@
+                     motivo: m.nombre().to_string(),
+                 }
+             })?;
+-        }
+-
+-        if !ya_admitido && verificar {
+-            let admitido = BloqueAdmitido::post(&bloque);
+-            self.almacen.admitir(&admitido, true)?;
++            let para_vista = BloqueRed::Post {
++                cabecera: bloque.cabecera,
++                txs: bloque.txs().to_vec(),
++                testigos: bloque.testigos().to_vec(),
++            };
++            self.vista_red.registrar_post(hash, para_vista);
++            self.resolver_huerfanos_de(hash);
+         }
+ 
+         self.actualizar_servicio_verificacion(&bloque)?;
+@@ -619,8 +697,14 @@
+         Ok(())
+     }
+ 
+-    /// Registra en el resumen de estado un cambio de punta seleccionada (decisión 8 y 9).
++    /// Registra en el resumen de estado un cambio de punta seleccionada (decisión 8 y 9), y
++    /// republica el saludo de red (`ORDEN-W06d2` decisión 4) tanto si cambió la punta como si no:
++    /// la altura PoW/las puntas PoST pueden cambiar sin que la punta *seleccionada* cambie (p. ej.
++    /// un huérfano lateral que se resuelve).
+     fn registrar_cambio_de_punta(&mut self) -> Result<(), ErrorNodo> {
++        self.vista_red
++            .actualizar_estado(self.construir_estado_red());
++
+         let punta_actual = self.cadena.mejor_punta().or(self.cadena.terminal());
+         if punta_actual == self.ultima_punta_registrada {
+             return Ok(());
+@@ -643,6 +727,276 @@
+         Ok(())
+     }
+ 
++    /// Construye el saludo de red actual (`ORDEN-W06d2` decisión 4) a partir del estado propio.
++    ///
++    /// `blue_work_virtual` queda en cero: 0.0.1 no elige *fork choice* PoST por red (el bloqueo de
++    /// `PROGRESO.md` sobre `JustificacionPot` impide verificar un PoST ajeno), así que ningún par
++    /// decide todavía nada a partir de este campo. Se deja el tipo correcto para no romper el wire
++    /// el día que se resuelva.
++    fn construir_estado_red(&self) -> Estado {
++        #[expect(
++            clippy::indexing_slicing,
++            reason = "historial_pow siempre tiene al menos el génesis"
++        )]
++        let ultimo = self.historial_pow[self.historial_pow.len() - 1];
++        let trabajo_be = self.trabajo_acumulado.to_big_endian();
++        let mut puntas_post = self.cadena.tips_validas();
++        puntas_post.truncate(zx_p2p::mensaje::MAX_PUNTAS_POST);
++        Estado {
++            hash_genesis: self.hash_genesis,
++            red: self.red_configurada,
++            fase: if self.cadena.terminal().is_some() {
++                FaseRed::Post
++            } else {
++                FaseRed::Pow
++            },
++            punta_pow: PuntaPow {
++                hash: ultimo.block_hash(),
++                altura: ultimo.height,
++                trabajo_acumulado: trabajo_be,
++            },
++            terminal: self.cadena.terminal(),
++            puntas_post,
++            blue_work_virtual: [0; 32],
++        }
++    }
++
++    /// Difunde un bloque **propio** ya admitido, si hay red (decisión 2: solo **después** de
++    /// persistirse, que ya ocurrió dentro de `admitir_pow_interno`/`admitir_post_interno` antes de
++    /// que esta función pueda llamarse con su hash). Se relee de [`VistaRed`] en vez de repetir la
++    /// construcción del `BloqueRed`: es el mismo valor exacto que ya se guardó allí al admitir.
++    fn difundir_si_hay_red(&self, hash: BlockHash) {
++        let Some(red) = self.red.as_ref() else {
++            return;
++        };
++        let Some(bloque) = self.vista_red.bloques_por_hash(&[hash]).into_iter().next() else {
++            tracing::error!(%hash, "bloque propio recién admitido sin instantánea en VistaRed");
++            return;
++        };
++        if let Err(e) = red.difundir_bloque(&bloque) {
++            tracing::warn!(%hash, %e, "no se pudo difundir un bloque propio");
++        }
++    }
++
++    /// Reintenta contra la tubería de admisión cualquier huérfano que estuviera esperando a
++    /// `padre`, ahora que `padre` se acaba de admitir (decisión 3). Recursivo por construcción: si
++    /// un huérfano se admite, `admitir_*_interno` vuelve a llamar a esto con su propio hash.
++    ///
++    /// Sin par de origen (`None`): no se sabe quién mandó el huérfano originalmente (el depósito no
++    /// guarda esa procedencia, límite documentado en `PROGRESO.md`), así que si a su vez le falta
++    /// otro padre, ese nuevo padre se deposita **sin** disparar una petición dirigida; queda para el
++    /// siguiente ciclo de `sync` basado en el saludo.
++    fn resolver_huerfanos_de(&mut self, padre: BlockHash) {
++        for (_hijo, bloque) in self.huerfanos.tomar_para_padre(&padre) {
++            let veredicto = self.intentar_admitir_bloque_red(&bloque, None);
++            // Sin `IdDiferido` que informar (no llegó por gossipsub en este turno): el único rastro
++            // es el registro. La retransmisión de un huérfano que ahora prospera queda pendiente
++            // (límite conocido, ver `PROGRESO.md`): difundirlo exigiría reconstruir un `IdDiferido`
++            // que no existe para un bloque que nunca pasó por `report_message_validation_result`.
++            let evento = self
++                .registro
++                .evento("huerfano_resuelto")
++                .str("padre", &padre.to_string())
++                .str("veredicto", &format!("{veredicto:?}"));
++            let _ = self.registro.escribir(evento, false);
++        }
++    }
++
++    /// Drena, sin bloquear, el trabajo que el manejador de red encoló (decisión 1). Se llama desde
++    /// los bucles de `fase_pow`/`fase_regimen`: el hilo de consenso es el único que muta
++    /// `zx-cadena`/`zx-storage` (D-N07), así que la admisión de red ocurre aquí, intercalada con la
++    /// propia producción, nunca en el hilo asíncrono de `zx-p2p`.
++    fn procesar_trabajo_red_pendiente(&mut self) {
++        // Se saca el receptor de `self` temporalmente: `intentar_admitir_bloque_red` necesita
++        // `&mut self` completo (muta `cadena`, `almacen`, `huerfanos`...) y el propio receptor vive
++        // dentro de `self.trabajo_red`, así que no se puede tomar prestado a la vez.
++        let Some(mut receptor) = self.trabajo_red.take() else {
++            return;
++        };
++        loop {
++            let trabajo = match receptor.try_recv() {
++                Ok(t) => t,
++                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
++                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
++            };
++            match trabajo {
++                TrabajoRed::BloqueDifundido { id, bloque } => {
++                    // Gossipsub no dice quién lo propagó a este nivel (`ManejadorEntrante` no lo
++                    // expone); si resulta huérfano, no hay a quién pedirle el padre directamente.
++                    let veredicto = self.intentar_admitir_bloque_red(&bloque, None);
++                    if let Some(red) = self.red.as_ref() {
++                        red.informar_validacion(id, veredicto);
++                    }
++                }
++                TrabajoRed::BloqueDeSincronizacion { de, bloque } => {
++                    let veredicto = self.intentar_admitir_bloque_red(&bloque, Some(de));
++                    // Un bloque de sincronización demostrablemente inválido sí penaliza: no pasó
++                    // por gossipsub (no hay `report_message_validation_result` que llame a esto),
++                    // así que la única forma de aplicar C-NET-05/C-EVP es desconectar aquí.
++                    if veredicto == VeredictoFinal::Rechazar
++                        && let Some(red) = self.red.as_ref()
++                    {
++                        red.desconectar(de, zx_p2p::error::MotivoDesconexion::ViolacionDeConsenso);
++                    }
++                }
++            }
++        }
++        self.trabajo_red = Some(receptor);
++    }
++
++    /// Decide y aplica el veredicto de un bloque llegado por red (gossip o sincronización), sin
++    /// propagar nunca un error fatal: a diferencia de un bloque **propio** (decisión 4 general de
++    /// `ORDEN-W06d1`), un bloque ajeno inválido es un evento normal de la red, no un bug del nodo.
++    ///
++    /// `origen`: el par que lo mandó, si se conoce (sincronización) — se usa **solo** para pedirle
++    /// directamente un padre que falte; nunca para decidir el veredicto del propio bloque.
++    fn intentar_admitir_bloque_red(
++        &mut self,
++        bloque: &BloqueRed,
++        origen: Option<libp2p::PeerId>,
++    ) -> VeredictoFinal {
++        match bloque {
++            BloqueRed::Pow {
++                cabecera,
++                txs,
++                testigos,
++            } => self.intentar_admitir_pow_de_red(*cabecera, txs.clone(), testigos.clone(), origen),
++            BloqueRed::Post { .. } => {
++                // BLOQUEO documentado en PROGRESO.md: `BloqueRed::Post` no lleva `JustificacionPot`,
++                // así que `verificar_cabecera_conjunta` no se puede ejecutar sobre un bloque PoST
++                // ajeno. Aceptar sin verificar sería exactamente el `Ok` ficticio que la orden
++                // prohíbe (decisión 2). `Ignorar`, no `Rechazar`: la falta es del formato de
++                // transporte, no del par que lo mandó.
++                let hash = red::hash_de(bloque);
++                let evento = self
++                    .registro
++                    .evento("bloque_post_de_red_no_verificable")
++                    .str("hash", &hash.to_string())
++                    .str(
++                        "motivo",
++                        "BloqueRed::Post sin JustificacionPot (PROGRESO.md)",
++                    );
++                let _ = self.registro.escribir(evento, false);
++                VeredictoFinal::Ignorar
++            }
++        }
++    }
++
++    fn intentar_admitir_pow_de_red(
++        &mut self,
++        cabecera: BlockHeader,
++        txs: Vec<Tx>,
++        testigos: Vec<Vec<Vec<u8>>>,
++        origen: Option<libp2p::PeerId>,
++    ) -> VeredictoFinal {
++        let hash = cabecera.block_hash();
++        if self.cadena.es_valido(&hash) {
++            return VeredictoFinal::Ignorar; // ya lo teníamos: nada que hacer, no penaliza.
++        }
++        if self.cadena.motivo(&hash).is_some() {
++            return VeredictoFinal::Rechazar; // ya sabíamos que es inválido.
++        }
++        if cabecera.height == 0 {
++            // Un génesis declarado por red nunca sustituye al nuestro (ya comprobado contra
++            // `HASH_GENESIS_DEV` al arrancar): no es demostrablemente inválido en sí mismo (podría
++            // ser el génesis real, coincidiendo), así que no penaliza.
++            return VeredictoFinal::Ignorar;
++        }
++
++        let padre = cabecera.prev_hash;
++        let padre_conocido = self.cadena.es_valido(&padre) || self.cadena.motivo(&padre).is_some();
++        if !padre_conocido {
++            let bloque = BloqueRed::Pow {
++                cabecera,
++                txs,
++                testigos,
++            };
++            let hijo = red::hash_de(&bloque);
++            for d in self.huerfanos.insertar(padre, hijo, bloque) {
++                let evento = self
++                    .registro
++                    .evento("huerfano_desalojado")
++                    .str("hijo", &d.hijo.to_string())
++                    .str("padre_esperado", &d.padre_esperado.to_string());
++                let _ = self.registro.escribir(evento, false);
++            }
++            let evento = self
++                .registro
++                .evento("bloque_red_huerfano")
++                .str("hash", &hash.to_string())
++                .str("padre_ausente", &padre.to_string())
++                .str("familia", "pow")
++                .str("veredicto", "Ignorar");
++            let _ = self.registro.escribir(evento, false);
++            if let (Some(red), Some(peer)) = (self.red.as_ref(), origen) {
++                red.pedir(
++                    peer,
++                    zx_p2p::mensaje::Peticion::Bloques {
++                        hashes: vec![padre],
++                    },
++                );
++            }
++            return VeredictoFinal::Ignorar;
++        }
++        if !self.cadena.es_valido(&padre) {
++            // El padre es conocido y definitivamente inválido: este bloque no puede ser válido.
++            let evento = self
++                .registro
++                .evento("bloque_red_rechazado")
++                .str("hash", &hash.to_string())
++                .str("familia", "pow")
++                .str("motivo", "padre conocido e inválido");
++            let _ = self.registro.escribir(evento, false);
++            return VeredictoFinal::Rechazar;
++        }
++        let extiende_la_punta = self
++            .historial_pow
++            .last()
++            .is_some_and(|u| u.block_hash() == padre);
++        if !extiende_la_punta {
++            // Reorg/fork de PoW: `admitir_pow_interno` asume que todo bloque nuevo extiende
++            // `historial_pow` (su último elemento). Un bloque que extiende un padre admitido pero
++            // que no es nuestra punta actual es un fork legítimo que esta orden **no** resuelve
++            // (límite conocido, `PROGRESO.md`): se ignora en vez de admitirlo con un contexto de
++            // validación incorrecto (target/altura de la rama equivocada).
++            let evento = self
++                .registro
++                .evento("bloque_red_fork_no_soportado")
++                .str("hash", &hash.to_string())
++                .str("padre", &padre.to_string())
++                .str("veredicto", "Ignorar");
++            let _ = self.registro.escribir(evento, false);
++            return VeredictoFinal::Ignorar;
++        }
++
++        let indice = self.almacen.longitud_registro().unwrap_or(0);
++        match self.admitir_pow_interno(cabecera, txs, testigos, indice, true) {
++            Ok(()) => {
++                // V9: este evento **solo** se escribe después de que `admitir_pow_interno` terminó
++                // la tubería completa (cabecera, PoW, motor de transición, persistencia): nunca
++                // antes. Es la traza que V9 exige comprobar.
++                let evento = self
++                    .registro
++                    .evento("bloque_red_admitido")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "pow")
++                    .str("veredicto", "Aceptar");
++                let _ = self.registro.escribir(evento, false);
++                VeredictoFinal::Aceptar
++            }
++            Err(e) => {
++                let evento = self
++                    .registro
++                    .evento("bloque_red_rechazado")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "pow")
++                    .str("motivo", &e.to_string());
++                let _ = self.registro.escribir(evento, false);
++                VeredictoFinal::Rechazar
++            }
++        }
++    }
++
+     /// Construye los depósitos F-15 pendientes (coinbases maduras propias sin depositar) para la
+     /// altura `altura_bloque` (decisión 5).
+     fn preparar_depositos(&self, altura_bloque: u32) -> ResultadoNodo<Vec<(Tx, Vec<Vec<u8>>)>> {
+@@ -748,6 +1102,26 @@
+             let Ok(cabecera_minada) = rx_minado.recv() else {
+                 return Err(ErrorNodo::Otro("el hilo minero cerró el canal".to_string()));
+             };
++            // Se drena el trabajo de red **entre** intentos de minado, nunca durante uno: si se
++            // interleara mientras `rx_minado` está bloqueado, un bloque de red podría admitirse a
++            // la misma altura que estamos minando, y cuando nuestro propio hilo termine,
++            // `admitir_pow_interno` lo admitiría como una bifurcación real de PoW —cosa que ni
++            // `zx-cadena::admitir_pow` ni el `historial_pow` lineal de este nodo saben resolver
++            // (límite conocido, `PROGRESO.md`: sin reorg de PoW en W06d2). En vez de eso, se
++            // comprueba justo aquí si la red ya avanzó la punta mientras minábamos y, si es así, se
++            // descarta el bloque propio (obsoleto) y se reintenta sobre la punta nueva.
++            self.procesar_trabajo_red_pendiente();
++            let punta_sigue_siendo_la_esperada = self
++                .historial_pow
++                .last()
++                .is_some_and(|u| u.block_hash() == cabecera_minada.prev_hash);
++            if !punta_sigue_siendo_la_esperada {
++                tracing::info!(
++                    altura = cabecera_minada.height,
++                    "bloque propio obsoleto: la red ya avanzó la punta mientras se minaba"
++                );
++                continue;
++            }
+             let evento = self
+                 .registro
+                 .evento("bloque_minado")
+@@ -762,6 +1136,7 @@
+                 self.almacen.longitud_registro()?,
+                 true,
+             )?;
++            self.difundir_si_hay_red(cabecera_minada.block_hash());
+ 
+             if self.cadena.terminal().is_some() {
+                 drop(tx_trabajo);
+@@ -829,7 +1204,20 @@
+             );
+         });
+ 
+-        for msg in rx_en_bucle {
++        // `recv_timeout`, no `for msg in rx_en_bucle`: entre dos mensajes del productor (que puede
++        // tardar hasta un slot entero) hace falta seguir drenando `procesar_trabajo_red_pendiente`
++        // (decisión 1/3/4 de `ORDEN-W06d2`), o un bloque de red llegaría y esperaría sin motivo
++        // hasta el siguiente mensaje del hilo productor.
++        loop {
++            let msg = match rx_en_bucle.recv_timeout(std::time::Duration::from_millis(50)) {
++                Ok(m) => m,
++                Err(mpsc::RecvTimeoutError::Timeout) => {
++                    self.procesar_trabajo_red_pendiente();
++                    continue;
++                }
++                Err(mpsc::RecvTimeoutError::Disconnected) => break,
++            };
++            self.procesar_trabajo_red_pendiente();
+             match msg {
+                 MsgProductor::PeticionPadres => {
+                     let padres = padres_de_regimen(&self.cadena)
+@@ -851,6 +1239,7 @@
+                                 .evento("bloque_producido")
+                                 .str("hash", &hash.to_string());
+                             self.registro.escribir(evento, false)?;
++                            self.difundir_si_hay_red(hash);
+                             let continuar = self.parada_tras_slots.is_none_or(|limite| {
+                                 self.servicio_verificacion
+                                     .as_ref()
+@@ -915,7 +1304,30 @@
+         };
+         let bloque = producir(terminal, &fuente, &clave.sk, &parametros)
+             .map_err(|e| ErrorNodo::Otro(format!("producir (bloque de transición): {e}")))?;
+-        self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)
++        let hash = bloque.cabecera.block_hash();
++        self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)?;
++        self.difundir_si_hay_red(hash);
++        Ok(())
++    }
++
++    /// La instantánea compartida de red (para construir el manejador antes de llamar a
++    /// [`Self::conectar_red`], y para que las pruebas la inspeccionen).
++    #[must_use]
++    pub fn vista_red(&self) -> Arc<VistaRed> {
++        Arc::clone(&self.vista_red)
++    }
++
++    /// Conecta el nodo a la red (`ORDEN-W06d2`): a partir de aquí, `ejecutar` también procesa el
++    /// trabajo de red (bloques difundidos o de sincronización) intercalado con su propia
++    /// producción (D-N07: un único hilo de consenso). Sin llamar a esto, el nodo se comporta
++    /// exactamente como en `ORDEN-W06d1` (sin red).
++    pub fn conectar_red(
++        &mut self,
++        manija: ManijaRed,
++        receptor: tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>,
++    ) {
++        self.red = Some(manija);
++        self.trabajo_red = Some(receptor);
+     }
+ 
+     /// Ejecuta el nodo de punta a punta: fase PoW hasta el corte, luego régimen.
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/red/huerfanos.rs ws/crates/zx-node/src/red/huerfanos.rs
+--- ws.orig/crates/zx-node/src/red/huerfanos.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/red/huerfanos.rs	2026-09-26 13:36:33.394773148 +0200
+@@ -0,0 +1,252 @@
++//! Depósito **acotado** de bloques huérfanos (`ORDEN-W06d2` decisión 3).
++//!
++//! Un bloque cuyo padre no conocemos todavía no es inválido: puede haber llegado por una ruta más
++//! rápida que la de su padre. Se retiene aquí, indexado por el padre que le falta, hasta que ese
++//! padre se admite (o hasta que el desalojo determinista de este depósito lo descarta por falta de
++//! sitio: nunca por edad de reloj, siempre por orden de llegada — FIFO).
++//!
++//! Dos topes, los dos declarados por quien construye el depósito, nunca ocultos:
++//! - **por padre** (`max_por_padre`): una ráfaga de huérfanos que apuntan al mismo padre ausente no
++//!   puede agotar por sí sola el depósito entero.
++//! - **total** (`max_total`): el depósito entero tiene un techo de memoria, sea cual sea la
++//!   distribución de padres.
++//!
++//! El desalojo es **FIFO determinista**: al llenarse un cupo, se descarta siempre el huérfano más
++//! viejo de ese cupo (nunca uno al azar, nunca "el que estorbe"). Desalojar **no penaliza** a nadie:
++//! es la misma razón que [`zx_p2p::entrante::Veredicto::Ignorar`] — falta de recursos locales, no
++//! una prueba de mala fe del par que lo mandó.
++
++use std::collections::{BTreeMap, VecDeque};
++
++use zx_core::BlockHash;
++use zx_p2p::mensaje::BloqueRed;
++
++/// Un huérfano desalojado por falta de sitio (para que quien llama pueda registrarlo).
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct Desalojado {
++    /// El padre que este huérfano estaba esperando.
++    pub padre_esperado: BlockHash,
++    /// El hash del propio huérfano desalojado.
++    pub hijo: BlockHash,
++}
++
++/// El depósito. Ver el docstring del módulo.
++pub struct DepositoHuerfanos {
++    max_total: usize,
++    max_por_padre: usize,
++    espera: BTreeMap<BlockHash, Vec<(BlockHash, BloqueRed)>>,
++    /// Orden de llegada real, `(padre_esperado, hijo)`: la única fuente de "qué es más viejo" para
++    /// el desalojo FIFO. `espera` por sí solo no basta porque un `Vec` por padre no ordena entre
++    /// padres distintos.
++    orden: VecDeque<(BlockHash, BlockHash)>,
++}
++
++impl DepositoHuerfanos {
++    /// Un depósito vacío con los dos topes dados.
++    ///
++    /// # Pánico
++    /// Si algún tope es cero: un depósito que no puede guardar nada no es un depósito, es un `Ignorar`
++    /// disfrazado, y hay que decidirlo explícitamente en la llamada, no dejar que ocurra por un `0`
++    /// puesto por error.
++    #[must_use]
++    pub fn nuevo(max_total: usize, max_por_padre: usize) -> Self {
++        assert!(
++            max_total > 0 && max_por_padre > 0,
++            "los topes deben ser > 0"
++        );
++        Self {
++            max_total,
++            max_por_padre,
++            espera: BTreeMap::new(),
++            orden: VecDeque::new(),
++        }
++    }
++
++    /// Cuántos huérfanos hay en total.
++    #[must_use]
++    pub fn total(&self) -> usize {
++        self.orden.len()
++    }
++
++    /// Cuántos huérfanos esperan a `padre`.
++    #[must_use]
++    pub fn por_padre(&self, padre: &BlockHash) -> usize {
++        self.espera.get(padre).map_or(0, Vec::len)
++    }
++
++    /// ¿Ya hay un huérfano con este hash en el depósito? (deduplicación; el mismo bloque puede
++    /// llegar dos veces por rutas de gossip distintas antes de que su padre aparezca).
++    #[must_use]
++    pub fn contiene_hijo(&self, hijo: &BlockHash) -> bool {
++        self.orden.iter().any(|(_, h)| h == hijo)
++    }
++
++    /// Inserta un huérfano que espera a `padre_esperado`. Si ya hay un huérfano con el mismo `hijo`,
++    /// no se duplica (se ignora la inserción; quien llama no necesita tratarlo como error).
++    ///
++    /// Devuelve lo que el desalojo determinista tuvo que sacar para hacer sitio (0, 1 o 2 entradas:
++    /// como mucho una por el cupo de este padre y una por el cupo total).
++    pub fn insertar(
++        &mut self,
++        padre_esperado: BlockHash,
++        hijo: BlockHash,
++        bloque: BloqueRed,
++    ) -> Vec<Desalojado> {
++        if self.contiene_hijo(&hijo) {
++            return Vec::new();
++        }
++        let mut desalojados = Vec::new();
++
++        if self
++            .espera
++            .get(&padre_esperado)
++            .is_some_and(|v| v.len() >= self.max_por_padre)
++            && let Some(d) = self.desalojar_mas_viejo_de(&padre_esperado)
++        {
++            desalojados.push(d);
++        }
++        if self.orden.len() >= self.max_total
++            && let Some((p, _)) = self.orden.front().copied()
++            && let Some(d) = self.desalojar_mas_viejo_de(&p)
++        {
++            desalojados.push(d);
++        }
++
++        self.espera
++            .entry(padre_esperado)
++            .or_default()
++            .push((hijo, bloque));
++        self.orden.push_back((padre_esperado, hijo));
++        desalojados
++    }
++
++    /// Saca el huérfano más viejo que espera a `padre` (el primero en `orden` con ese padre).
++    fn desalojar_mas_viejo_de(&mut self, padre: &BlockHash) -> Option<Desalojado> {
++        let pos = self.orden.iter().position(|(p, _)| p == padre)?;
++        let (p, h) = self.orden.remove(pos)?;
++        if let Some(v) = self.espera.get_mut(&p) {
++            v.retain(|(hh, _)| *hh != h);
++            if v.is_empty() {
++                self.espera.remove(&p);
++            }
++        }
++        Some(Desalojado {
++            padre_esperado: p,
++            hijo: h,
++        })
++    }
++
++    /// `padre` acaba de admitirse: saca (y quita del depósito) todos los huérfanos que lo esperaban,
++    /// para que quien llama los reintente contra la tubería de admisión.
++    pub fn tomar_para_padre(&mut self, padre: &BlockHash) -> Vec<(BlockHash, BloqueRed)> {
++        let v = self.espera.remove(padre).unwrap_or_default();
++        if !v.is_empty() {
++            self.orden.retain(|(p, _)| p != padre);
++        }
++        v
++    }
++}
++
++#[cfg(test)]
++#[expect(
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño"
++)]
++mod tests {
++    use super::DepositoHuerfanos;
++    use zx_core::digest::{BlockHash, Digest};
++    use zx_core::preimage::block::BlockHeader;
++    use zx_p2p::mensaje::BloqueRed;
++
++    fn h(n: u8) -> BlockHash {
++        BlockHash::from_digest(Digest::from_bytes([n; 32]))
++    }
++
++    fn bloque(n: u8) -> BloqueRed {
++        BloqueRed::Pow {
++            cabecera: BlockHeader {
++                consensus_branch_id: 0,
++                prev_hash: h(n),
++                merkle_root: zx_core::digest::MerkleRoot::from_digest(Digest::from_bytes([0; 32])),
++                timestamp: 0,
++                bits: 0,
++                nonce: u64::from(n),
++                height: u32::from(n),
++            },
++            txs: Vec::new(),
++            testigos: Vec::new(),
++        }
++    }
++
++    #[test]
++    fn inserta_y_recupera_por_padre() {
++        let mut d = DepositoHuerfanos::nuevo(10, 10);
++        assert!(d.insertar(h(1), h(10), bloque(10)).is_empty());
++        assert_eq!(d.total(), 1);
++        assert_eq!(d.por_padre(&h(1)), 1);
++        assert!(d.contiene_hijo(&h(10)));
++
++        let salen = d.tomar_para_padre(&h(1));
++        assert_eq!(salen.len(), 1);
++        assert_eq!(salen[0].0, h(10));
++        assert_eq!(d.total(), 0);
++        assert!(!d.contiene_hijo(&h(10)));
++    }
++
++    #[test]
++    fn no_duplica_el_mismo_hijo() {
++        let mut d = DepositoHuerfanos::nuevo(10, 10);
++        d.insertar(h(1), h(10), bloque(10));
++        let desalojados = d.insertar(h(1), h(10), bloque(10));
++        assert!(desalojados.is_empty());
++        assert_eq!(d.total(), 1, "el segundo intento no debe duplicar");
++    }
++
++    #[test]
++    fn el_cupo_por_padre_desaloja_al_mas_viejo_de_ese_padre() {
++        let mut d = DepositoHuerfanos::nuevo(100, 2);
++        d.insertar(h(1), h(10), bloque(10));
++        d.insertar(h(1), h(11), bloque(11));
++        // El tercero del mismo padre desaloja al primero (h(10)), no a uno de otro padre.
++        let desalojados = d.insertar(h(1), h(12), bloque(12));
++        assert_eq!(desalojados.len(), 1);
++        assert_eq!(
++            desalojados[0].hijo,
++            h(10),
++            "FIFO: el más viejo de ese padre"
++        );
++        assert_eq!(d.por_padre(&h(1)), 2);
++        assert!(!d.contiene_hijo(&h(10)));
++        assert!(d.contiene_hijo(&h(11)));
++        assert!(d.contiene_hijo(&h(12)));
++    }
++
++    #[test]
++    fn el_cupo_total_desaloja_al_mas_viejo_global() {
++        let mut d = DepositoHuerfanos::nuevo(2, 10);
++        d.insertar(h(1), h(10), bloque(10));
++        d.insertar(h(2), h(20), bloque(20));
++        let desalojados = d.insertar(h(3), h(30), bloque(30));
++        assert_eq!(desalojados.len(), 1);
++        assert_eq!(
++            desalojados[0].hijo,
++            h(10),
++            "FIFO global: el primero que llegó"
++        );
++        assert_eq!(d.total(), 2);
++        assert!(d.contiene_hijo(&h(20)));
++        assert!(d.contiene_hijo(&h(30)));
++    }
++
++    #[test]
++    fn tomar_para_un_padre_sin_huerfanos_no_falla() {
++        let mut d = DepositoHuerfanos::nuevo(10, 10);
++        assert!(d.tomar_para_padre(&h(99)).is_empty());
++    }
++
++    #[test]
++    #[should_panic(expected = "los topes deben ser > 0")]
++    fn un_tope_cero_entra_en_panico_al_construir() {
++        let _ = DepositoHuerfanos::nuevo(0, 10);
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/red/manejador.rs ws/crates/zx-node/src/red/manejador.rs
+--- ws.orig/crates/zx-node/src/red/manejador.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/red/manejador.rs	2026-09-26 13:36:33.395773168 +0200
+@@ -0,0 +1,186 @@
++//! [`ManejadorEntrante`] real: el puente entre el bucle asíncrono de `zx-p2p` y el hilo de consenso
++//! síncrono (`ORDEN-W06d2`, decisión 1).
++//!
++//! Cada método es deliberadamente trivial: una lectura de [`VistaRed`] (rápida, sin bloquear) o un
++//! `send` a un canal **no bloqueante** hacia el hilo de consenso. Ninguno ejecuta la tubería de
++//! admisión — eso es exactamente lo que la orden prohíbe hacer aquí (`~66 ms` de PoT pararían la
++//! red). El veredicto real llega después, informado por el hilo de consenso con
++//! [`zx_p2p::servicio::ManejoRed::informar_validacion_bloqueante`].
++
++use std::sync::Arc;
++
++use tokio::sync::mpsc::UnboundedSender;
++
++use zx_core::digest::BlockHash;
++use zx_core::preimage::block::BlockHeader;
++use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
++use zx_p2p::mensaje::{BloqueRed, Estado};
++
++use super::TrabajoRed;
++use super::vista::VistaRed;
++
++/// El manejador. Barato de clonar (todo dentro es `Arc`/canal clonable), pero se comparte como
++/// `Arc<ManejadorRed>` porque [`zx_p2p::servicio::arrancar_con`] lo exige.
++pub struct ManejadorRed {
++    trabajo: UnboundedSender<TrabajoRed>,
++    vista: Arc<VistaRed>,
++}
++
++impl ManejadorRed {
++    /// Construye el manejador con el canal hacia el hilo de consenso y la vista compartida.
++    #[must_use]
++    pub const fn nuevo(trabajo: UnboundedSender<TrabajoRed>, vista: Arc<VistaRed>) -> Self {
++        Self { trabajo, vista }
++    }
++}
++
++impl ManejadorEntrante for ManejadorRed {
++    fn estado(&self) -> Estado {
++        self.vista.estado()
++    }
++
++    fn bloque_difundido(&self, id: IdDiferido, bloque: &BloqueRed) -> Veredicto {
++        if self
++            .trabajo
++            .send(TrabajoRed::BloqueDifundido {
++                id,
++                bloque: bloque.clone(),
++            })
++            .is_err()
++        {
++            // El hilo de consenso ya no existe: no hay a quién diferirle nada. No es un defecto del
++            // par que lo propagó, así que `Ignorar` (nunca `Rechazar`) es la única lectura honesta.
++            tracing::error!("hilo de consenso caído: bloque difundido descartado sin juzgar");
++            return Veredicto::Ignorar;
++        }
++        Veredicto::Diferir
++    }
++
++    fn tx_difundida(&self, _tx_serializada: &[u8]) -> Veredicto {
++        // 0.0.1 no tiene tema de transacciones (REVISION-W06c.md): nada que hacer con esto todavía.
++        Veredicto::Ignorar
++    }
++
++    fn cabeceras_desde(&self, locator: &[BlockHash], hasta: Option<BlockHash>) -> Vec<BlockHeader> {
++        self.vista.cabeceras_desde(locator, hasta)
++    }
++
++    fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed> {
++        self.vista.bloques_por_hash(hashes)
++    }
++}
++
++#[cfg(test)]
++#[expect(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    reason = "los tests fallan con panic por diseño"
++)]
++mod tests {
++    use super::super::TrabajoRed;
++    use super::super::vista::VistaRed;
++    use super::ManejadorRed;
++    use std::sync::Arc;
++    use zx_core::amount::Amount;
++    use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
++    use zx_core::firma::ClavePublica;
++    use zx_core::preimage::block::BlockHeader;
++    use zx_core::red::Red;
++    use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
++    use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
++    use zx_p2p::mensaje::{BloqueRed, Estado, Fase, PuntaPow};
++
++    fn h(n: u8) -> BlockHash {
++        BlockHash::from_digest(Digest::from_bytes([n; 32]))
++    }
++
++    fn estado_vacio() -> Estado {
++        Estado {
++            hash_genesis: h(0),
++            red: Red::Dev,
++            fase: Fase::Pow,
++            punta_pow: PuntaPow {
++                hash: h(0),
++                altura: 0,
++                trabajo_acumulado: [0; 32],
++            },
++            terminal: None,
++            puntas_post: Vec::new(),
++            blue_work_virtual: [0; 32],
++        }
++    }
++
++    fn bloque_pow(n: u8) -> BloqueRed {
++        BloqueRed::Pow {
++            cabecera: BlockHeader {
++                consensus_branch_id: 0xa8b4_66a7,
++                prev_hash: h(n),
++                merkle_root: MerkleRoot::from_digest(Digest::from_bytes([2; 32])),
++                timestamp: 1_000,
++                bits: 0x1c07_fff8,
++                nonce: u64::from(n),
++                height: u32::from(n),
++            },
++            txs: vec![Tx {
++                version: 1,
++                inputs: vec![TxIn {
++                    outpoint: OutPoint {
++                        prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
++                        prev_index: 0,
++                    },
++                    sequence: 0,
++                }],
++                outputs: vec![TxOut {
++                    value: Amount::nuevo(1).unwrap(),
++                    lock: Lock::PubKey {
++                        pubkey: ClavePublica::desde_bytes([n; 32]),
++                    },
++                }],
++                lock_time: 0,
++                expiry_height: 0,
++                extension: ExtensionTx::Ninguna,
++            }],
++            testigos: vec![vec![vec![0xAA; 64]]],
++        }
++    }
++
++    #[test]
++    fn bloque_difundido_siempre_difiere_y_encola() {
++        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++        let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
++
++        let v = m.bloque_difundido(IdDiferido::default(), &bloque_pow(1));
++        assert_eq!(v, Veredicto::Diferir);
++
++        let recibido = rx.try_recv().expect("debe haber encolado trabajo");
++        match recibido {
++            TrabajoRed::BloqueDifundido { id, bloque } => {
++                assert_eq!(id, IdDiferido::default());
++                assert_eq!(bloque, bloque_pow(1));
++            }
++            TrabajoRed::BloqueDeSincronizacion { .. } => panic!("no es de sincronización"),
++        }
++    }
++
++    #[test]
++    fn sin_hilo_de_consenso_se_ignora_sin_penalizar() {
++        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
++        drop(rx); // el hilo de consenso "murió": el canal está cerrado.
++        let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
++        assert_eq!(
++            m.bloque_difundido(IdDiferido::default(), &bloque_pow(1)),
++            Veredicto::Ignorar
++        );
++    }
++
++    #[test]
++    fn estado_y_lecturas_delegan_en_la_vista() {
++        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
++        let vista = Arc::new(VistaRed::nueva(estado_vacio()));
++        let m = ManejadorRed::nuevo(tx, Arc::clone(&vista));
++        assert_eq!(m.estado(), estado_vacio());
++        assert!(m.cabeceras_desde(&[h(5)], None).is_empty());
++        assert!(m.bloques_por_hash(&[h(5)]).is_empty());
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/red/mod.rs ws/crates/zx-node/src/red/mod.rs
+--- ws.orig/crates/zx-node/src/red/mod.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/red/mod.rs	2026-09-26 13:36:33.396773189 +0200
+@@ -0,0 +1,239 @@
++//! Red del nodo (`ORDEN-W06d2`): puente entre el bucle asíncrono de `zx-p2p` y el hilo de consenso
++//! síncrono que posee `zx-cadena`/`zx-storage` (D-N07).
++//!
++//! Ver los submódulos para cada pieza: [`huerfanos`] (depósito acotado, decisión 3),
++//! [`vista`] (instantánea de solo lectura que sirve el saludo y las peticiones de sincronización),
++//! [`manejador`] ([`zx_p2p::entrante::ManejadorEntrante`] real, decisión 1) y [`sync`] (localizador
++//! PoW + recorrido hacia atrás del DAG, decisión 4).
++
++pub mod huerfanos;
++pub mod manejador;
++pub mod sync;
++pub mod vista;
++
++use std::sync::Arc;
++
++use zx_core::BlockHash;
++use zx_p2p::entrante::IdDiferido;
++use zx_p2p::mensaje::BloqueRed;
++
++/// Lo que el manejador (lado asíncrono) encola para que el hilo de consenso lo procese.
++///
++/// El manejador **nunca** valida nada: solo mete esto en la cola y devuelve
++/// [`zx_p2p::entrante::Veredicto::Diferir`] de inmediato (decisión 1). El hilo de consenso decide,
++/// a su ritmo, y responde con [`zx_p2p::servicio::ManejoRed::informar_validacion_bloqueante`].
++pub enum TrabajoRed {
++    /// Un bloque llegó por difusión (gossipsub) y su veredicto está diferido con `id`.
++    BloqueDifundido {
++        /// El identificador opaco a devolver.
++        id: IdDiferido,
++        /// El bloque, ya deserializado.
++        bloque: BloqueRed,
++    },
++    /// Un bloque llegó como respuesta a una petición de sincronización (no lleva `IdDiferido`: no
++    /// pasó por gossipsub, así que no hay nada que informarle a `report_message_validation_result`).
++    /// Penalizar a quien lo mandó, si hace falta, es cosa de quien conduce la sincronización
++    /// ([`sync`]), no de esta cola.
++    BloqueDeSincronizacion {
++        /// Quién lo mandó (para que la sincronización pueda desconectar si es basura).
++        de: libp2p::PeerId,
++        /// El bloque.
++        bloque: BloqueRed,
++    },
++}
++
++/// Un límite de recursión declarado para el recorrido hacia atrás del DAG (decisión 3 y 4): cuántos
++/// saltos de "pide al padre que falta" se permiten antes de darse por vencido con esa rama. Evita
++/// una cascada sin fin si un par miente sobre una cadena de padres arbitrariamente larga.
++pub const LIMITE_SALTOS_RECORRIDO_ATRAS: u32 = 4096;
++
++/// Cuántos huérfanos puede tener el depósito en total (decisión 3).
++///
++/// Valor dev: generoso para no penalizar una ráfaga honesta durante IBD, acotado para no crecer sin
++/// límite. 🔶 Revisable con medición real (W07).
++pub const MAX_HUERFANOS_TOTAL: usize = 4_096;
++
++/// Cuántos huérfanos puede tener el depósito esperando al **mismo** padre.
++pub const MAX_HUERFANOS_POR_PADRE: usize = 64;
++
++/// Construye el depósito de huérfanos con los topes de producción declarados arriba.
++#[must_use]
++pub fn nuevo_deposito_huerfanos() -> huerfanos::DepositoHuerfanos {
++    huerfanos::DepositoHuerfanos::nuevo(MAX_HUERFANOS_TOTAL, MAX_HUERFANOS_POR_PADRE)
++}
++
++/// Los tres hashes de un bloque que hacen falta para decidir si es huérfano, ya extraídos de
++/// [`BloqueRed`] sin tocar consenso (`zx-p2p` no expone `padres()`, así que se replica aquí lo
++/// mínimo: el padre PoW o los padres PoST declarados).
++#[must_use]
++pub fn padres_declarados(bloque: &BloqueRed) -> Vec<BlockHash> {
++    match bloque {
++        BloqueRed::Pow { cabecera, .. } => {
++            if cabecera.height == 0 {
++                Vec::new()
++            } else {
++                vec![cabecera.prev_hash]
++            }
++        }
++        BloqueRed::Post { cabecera, .. } => {
++            let p = &cabecera.padres;
++            if p.es_genesis() {
++                Vec::new()
++            } else {
++                let mut v = vec![p.seleccionado()];
++                v.extend_from_slice(p.extras());
++                v
++            }
++        }
++    }
++}
++
++/// Hash del bloque, sin depender de a qué familia pertenece.
++#[must_use]
++pub fn hash_de(bloque: &BloqueRed) -> BlockHash {
++    match bloque {
++        BloqueRed::Pow { cabecera, .. } => cabecera.block_hash(),
++        BloqueRed::Post { cabecera, .. } => cabecera.block_hash(),
++    }
++}
++
++/// Handle compartido hacia la red, más los canales por los que el hilo de consenso recibe trabajo y
++/// eventos de sincronización. Construido por [`crate::nodo::Nodo`] al arrancar con red.
++pub struct ManijaRed {
++    /// Para hablarle a `zx-p2p` desde el hilo de consenso (métodos bloqueantes o vía `runtime`).
++    pub manejo: zx_p2p::servicio::ManejoRed,
++    /// El `Handle` del runtime `tokio` que corre el bucle de `zx-p2p`, para los métodos de
++    /// `ManejoRed` que sólo existen en versión `async` (`pedir`, `desconectar`, `difundir_bloque`).
++    pub runtime: tokio::runtime::Handle,
++    /// Instantánea compartida que sirve el saludo y las respuestas de sincronización.
++    pub vista: Arc<vista::VistaRed>,
++}
++
++impl ManijaRed {
++    /// Difunde un bloque propio. Bloqueante: se llama desde el hilo de consenso.
++    pub fn difundir_bloque(&self, bloque: &BloqueRed) -> Result<(), zx_p2p::error::P2pError> {
++        self.runtime.block_on(self.manejo.difundir_bloque(bloque))
++    }
++
++    /// Pide algo a un par. Bloqueante.
++    pub fn pedir(&self, peer: libp2p::PeerId, peticion: zx_p2p::mensaje::Peticion) {
++        if let Err(e) = self.runtime.block_on(self.manejo.pedir(peer, peticion)) {
++            tracing::debug!(%e, "no se pudo encolar una petición de sincronización");
++        }
++    }
++
++    /// Corta con un par por un motivo dado. Bloqueante.
++    pub fn desconectar(&self, peer: libp2p::PeerId, motivo: zx_p2p::error::MotivoDesconexion) {
++        let _ = self.runtime.block_on(self.manejo.desconectar(peer, motivo));
++    }
++
++    /// Informa el veredicto final de una validación diferida. Ya es bloqueante de por sí (no hace
++    /// falta `runtime.block_on`, ver `informar_validacion_bloqueante`).
++    pub fn informar_validacion(&self, id: IdDiferido, veredicto: zx_p2p::entrante::VeredictoFinal) {
++        if let Err(e) = self.manejo.informar_validacion_bloqueante(id, veredicto) {
++            tracing::debug!(%e, "no se pudo informar el veredicto diferido");
++        }
++    }
++}
++
++/// Todo lo que arranca la red de un nodo (`ORDEN-W06d2`): el runtime `tokio` (que hay que
++/// mantener vivo mientras el nodo corra: soltarlo para el bucle y la sincronización), la
++/// [`ManijaRed`] a entregarle a [`crate::nodo::Nodo::conectar_red`] y el receptor de trabajo.
++pub struct RedArrancada {
++    /// **No soltar** mientras el nodo esté vivo: al soltarse, `tokio` cancela sus tareas.
++    pub runtime: tokio::runtime::Runtime,
++    /// Para `Nodo::conectar_red`.
++    pub manija: ManijaRed,
++    /// Para `Nodo::conectar_red`.
++    pub trabajo: tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>,
++}
++
++/// Construye el transporte TCP real (decisión 8 de la orden: `127.0.0.1` en pruebas, cualquier
++/// dirección en un despliegue), el behaviour de la red dev, y arranca el bucle y la tarea de
++/// sincronización en un runtime `tokio` nuevo. Escucha en `escuchar` (si se da) y marca cada
++/// dirección de `marcar`.
++///
++/// # Errores
++/// [`zx_p2p::error::P2pError`] si el behaviour o el transporte no se pueden construir; un error
++/// libre si el runtime `tokio` no arranca (out-of-resources, no un caso de test).
++pub fn arrancar(
++    escuchar: Option<libp2p::Multiaddr>,
++    marcar: Vec<libp2p::Multiaddr>,
++    vista: Arc<vista::VistaRed>,
++) -> Result<RedArrancada, String> {
++    let runtime = tokio::runtime::Builder::new_multi_thread()
++        .worker_threads(2)
++        .enable_all()
++        .build()
++        .map_err(|e| format!("runtime tokio: {e}"))?;
++
++    let clave = libp2p::identity::Keypair::generate_ed25519();
++    let behaviour = zx_p2p::behaviour::ZxBehaviour::nueva(
++        &clave,
++        zx_p2p::config::ParametrosRed::dag_dev(),
++        zx_p2p::limites::LIMITE_BLOQUE_DEV,
++    )
++    .map_err(|e| format!("behaviour de red: {e}"))?;
++
++    // Construcción síncrona (ninguno de estos métodos de `SwarmBuilder` es `async`): un cierre sin
++    // argumentos con el tipo de retorno anotado, para que el `?` de `with_tcp` no confunda al
++    // compilador con el `Result<_, Infallible>` de `with_behaviour` (`TryIntoBehaviour<B> for B`
++    // tiene `Error = Infallible`: no hay nada que manejar salvo el `match` exhaustivo de abajo).
++    let construir_swarm = || -> Result<libp2p::Swarm<zx_p2p::behaviour::ZxBehaviour>, String> {
++        let builder = libp2p::SwarmBuilder::with_existing_identity(clave)
++            .with_tokio()
++            .with_tcp(
++                libp2p::tcp::Config::default(),
++                libp2p::noise::Config::new,
++                libp2p::yamux::Config::default,
++            )
++            .map_err(|e| format!("transporte TCP: {e}"))?;
++        let builder = match builder.with_behaviour(|_| behaviour) {
++            Ok(b) => b,
++            Err(nunca) => match nunca {},
++        };
++        Ok(builder
++            .with_swarm_config(|c| {
++                c.with_idle_connection_timeout(std::time::Duration::from_secs(30))
++            })
++            .build())
++    };
++    let swarm = construir_swarm()?;
++
++    let (tx_trabajo, rx_trabajo) = tokio::sync::mpsc::unbounded_channel();
++    let manejador = Arc::new(manejador::ManejadorRed::nuevo(
++        tx_trabajo.clone(),
++        Arc::clone(&vista),
++    ));
++    let piezas = zx_p2p::servicio::arrancar(swarm, manejador);
++    let manejo = piezas.manejo;
++
++    runtime.spawn(piezas.bucle.correr());
++    runtime.spawn(sync::tarea_sincronizacion(
++        piezas.eventos,
++        manejo.clone(),
++        Arc::clone(&vista),
++        tx_trabajo,
++    ));
++
++    if let Some(addr) = escuchar {
++        runtime
++            .block_on(manejo.escuchar(addr))
++            .map_err(|e| format!("escuchar: {e}"))?;
++    }
++    for addr in marcar {
++        if let Err(e) = runtime.block_on(manejo.marcar(addr.clone())) {
++            tracing::warn!(%addr, %e, "no se pudo marcar la dirección al arrancar");
++        }
++    }
++
++    Ok(RedArrancada {
++        manija: ManijaRed {
++            manejo,
++            runtime: runtime.handle().clone(),
++            vista,
++        },
++        runtime,
++        trabajo: rx_trabajo,
++    })
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/red/sync.rs ws/crates/zx-node/src/red/sync.rs
+--- ws.orig/crates/zx-node/src/red/sync.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/red/sync.rs	2026-09-26 12:35:28.509938099 +0200
+@@ -0,0 +1,180 @@
++//! Sincronización (`ORDEN-W06d2` decisión 4): saludo, localizador PoW y recorrido hacia atrás del
++//! DAG por padres.
++//!
++//! # Por qué esto es una tarea `tokio` aparte, y no el hilo de consenso
++//!
++//! Orquestar peticiones (a quién le pido qué, cuándo reintentar) es protocolo, no consenso: no
++//! necesita `zx-cadena`. Vive en su propia tarea asíncrona, hablando con [`zx_p2p::servicio::ManejoRed`]
++//! directamente y leyendo [`super::vista::VistaRed`] para saber qué nos falta. Los bloques que
++//! consigue no se admiten aquí: se encolan como [`super::TrabajoRed::BloqueDeSincronizacion`] para
++//! que el hilo de consenso los pase por la tubería única — la misma que usa un bloque llegado por
++//! gossip. Así ningún bloque de red evita la validación completa (decisión 2 de la orden), venga por
++//! donde venga.
++//!
++//! # El recorrido del DAG reutiliza el depósito de huérfanos
++//!
++//! Esta tarea no implementa un algoritmo de recorrido de DAG propio: pide como `Bloques` las puntas
++//! PoST que un par anuncia en su saludo. Si no tenemos sus padres, el hilo de consenso los deposita
++//! como huérfanos y pide él mismo los padres que faltan (decisión 3) — la misma cascada que resuelve
++//! un huérfano llegado por gossip resuelve, sin código nuevo, el "recorrido hacia atrás desde las
++//! puntas del par" que pide la decisión 4. El límite de saltos
++//! ([`super::LIMITE_SALTOS_RECORRIDO_ATRAS`]) lo aplica el hilo de consenso, no esta tarea.
++
++use std::collections::HashMap;
++
++use libp2p::PeerId;
++use tokio::sync::mpsc;
++
++use zx_p2p::error::MotivoDesconexion;
++use zx_p2p::mensaje::{Peticion, Respuesta};
++use zx_p2p::servicio::{EventoRed, ManejoRed};
++
++use super::TrabajoRed;
++use super::vista::VistaRed;
++use std::sync::Arc;
++
++/// Cuántos hashes se piden a la vez en una `Peticion::Bloques` de sincronización (el tope del
++/// protocolo, no un valor propio: pedir más de golpe es un `Excedido` seguro).
++const LOTE_BLOQUES: usize = zx_p2p::limites::MAX_HASHES_POR_PETICION;
++
++/// Qué sabemos de un par para no repetirle la misma petición sin sentido.
++#[derive(Default)]
++struct EstadoPeer {
++    saludo_pedido: bool,
++}
++
++/// Corre para siempre (hasta que el canal de eventos se cierra): la tarea de sincronización.
++pub async fn tarea_sincronizacion(
++    mut eventos: mpsc::Receiver<EventoRed>,
++    manejo: ManejoRed,
++    vista: Arc<VistaRed>,
++    trabajo: mpsc::UnboundedSender<TrabajoRed>,
++) {
++    let mut peers: HashMap<PeerId, EstadoPeer> = HashMap::new();
++    while let Some(evento) = eventos.recv().await {
++        match evento {
++            EventoRed::PeerConectado(peer) => {
++                peers.entry(peer).or_default();
++                if manejo.pedir(peer, Peticion::Estado).await.is_err() {
++                    tracing::debug!(%peer, "no se pudo pedir el saludo: el bucle de red ya no está");
++                }
++            }
++            EventoRed::PeerDesconectado(peer) => {
++                peers.remove(&peer);
++            }
++            EventoRed::PeticionFallida { peer } => {
++                tracing::debug!(%peer, "una petición de sincronización no llegó a completarse");
++            }
++            EventoRed::Respuesta {
++                peer, respuesta, ..
++            } => atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await,
++            EventoRed::Escuchando(_) | EventoRed::Suscripcion { .. } => {}
++        }
++    }
++}
++
++async fn atender_respuesta(
++    manejo: &ManejoRed,
++    vista: &VistaRed,
++    trabajo: &mpsc::UnboundedSender<TrabajoRed>,
++    peers: &mut HashMap<PeerId, EstadoPeer>,
++    peer: PeerId,
++    respuesta: Respuesta,
++) {
++    match respuesta {
++        Respuesta::Estado(otro) => {
++            let nuestro = vista.estado();
++            if otro.hash_genesis != nuestro.hash_genesis || otro.red != nuestro.red {
++                tracing::warn!(%peer, "génesis o red ajenos: desconectando");
++                manejo
++                    .desconectar(peer, MotivoDesconexion::ViolacionDeConsenso)
++                    .await
++                    .ok();
++                return;
++            }
++            if let Some(e) = peers.get_mut(&peer) {
++                e.saludo_pedido = true;
++            }
++
++            // Fase PoW: si el par declara más altura que nosotros, pedimos cabeceras desde nuestro
++            // propio localizador (denso cerca de nuestra punta, espaciado hacia atrás).
++            if otro.punta_pow.altura > vista.altura_pow() {
++                let locator = vista.locator();
++                if manejo
++                    .pedir(
++                        peer,
++                        Peticion::CabecerasPow {
++                            locator,
++                            parada: None,
++                        },
++                    )
++                    .await
++                    .is_err()
++                {
++                    tracing::debug!(%peer, "no se pudo pedir cabeceras PoW");
++                }
++            }
++
++            // Fase PoST: pedimos directamente sus puntas que no tengamos ya. Si sus padres nos
++            // faltan, el hilo de consenso los deposita como huérfanos y pide él mismo lo que falte
++            // (ver el docstring del módulo): esto basta para arrancar el recorrido hacia atrás.
++            let puntas_ausentes: Vec<_> = otro
++                .puntas_post
++                .iter()
++                .copied()
++                .filter(|h| !vista.tiene_cuerpo(h))
++                .collect();
++            for lote in puntas_ausentes.chunks(LOTE_BLOQUES) {
++                if manejo
++                    .pedir(
++                        peer,
++                        Peticion::Bloques {
++                            hashes: lote.to_vec(),
++                        },
++                    )
++                    .await
++                    .is_err()
++                {
++                    tracing::debug!(%peer, "no se pudo pedir puntas PoST");
++                }
++            }
++        }
++        Respuesta::CabecerasPow(cabeceras) => {
++            // No se valida aquí (esta tarea no ve consenso): se piden los cuerpos completos en
++            // lotes, y es la tubería única del hilo de consenso la que decide si son válidas.
++            let hashes: Vec<_> = cabeceras
++                .iter()
++                .map(zx_core::preimage::block::BlockHeader::block_hash)
++                .filter(|h| !vista.tiene_cuerpo(h))
++                .collect();
++            for lote in hashes.chunks(LOTE_BLOQUES) {
++                if manejo
++                    .pedir(
++                        peer,
++                        Peticion::Bloques {
++                            hashes: lote.to_vec(),
++                        },
++                    )
++                    .await
++                    .is_err()
++                {
++                    tracing::debug!(%peer, "no se pudo pedir cuerpos PoW");
++                }
++            }
++        }
++        Respuesta::Bloques(bloques) => {
++            for bloque in bloques {
++                if trabajo
++                    .send(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque })
++                    .is_err()
++                {
++                    tracing::error!("hilo de consenso caído: bloque de sincronización descartado");
++                    return;
++                }
++            }
++        }
++        Respuesta::NoDisponible => {
++            // Legítimo (el par podó esa rama, o nunca la tuvo): no penaliza (C-NET-05).
++        }
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/src/red/vista.rs ws/crates/zx-node/src/red/vista.rs
+--- ws.orig/crates/zx-node/src/red/vista.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/red/vista.rs	2026-09-26 13:36:33.397773211 +0200
+@@ -0,0 +1,316 @@
++//! Instantánea de solo lectura de lo que el nodo tiene admitido, compartida entre el hilo de
++//! consenso (que la escribe tras cada admisión) y el bucle asíncrono de `zx-p2p` (que la lee para
++//! responder al saludo y a las peticiones de sincronización, decisión 4 de `ORDEN-W06d2`).
++//!
++//! # Por qué una instantánea, y no una llamada al hilo de consenso
++//!
++//! [`zx_p2p::entrante::ManejadorEntrante`] exige métodos **rápidos y no bloqueantes** (se llaman
++//! desde el bucle de eventos de `zx-p2p`; mientras uno corre, el `Swarm` no se pollea). Pedirle la
++//! respuesta al hilo de consenso por un canal y esperarla bloquearía exactamente ese bucle. Una
++//! instantánea protegida por `RwLock`, actualizada por el hilo de consenso cada vez que cambia algo
++//! que el saludo o la sincronización necesitan, resuelve la lectura sin ida y vuelta.
++
++use std::collections::BTreeMap;
++use std::sync::RwLock;
++
++use zx_core::digest::BlockHash;
++use zx_core::preimage::block::BlockHeader;
++use zx_p2p::mensaje::{BloqueRed, Estado};
++
++struct Interior {
++    estado: Estado,
++    /// Cabeceras PoW admitidas, en orden de altura ascendente (índice == altura).
++    cabeceras_pow: Vec<BlockHeader>,
++    cuerpos_pow: BTreeMap<BlockHash, BloqueRed>,
++    cuerpos_post: BTreeMap<BlockHash, BloqueRed>,
++}
++
++/// La instantánea. Ver el docstring del módulo.
++pub struct VistaRed {
++    interior: RwLock<Interior>,
++}
++
++impl VistaRed {
++    /// Una instantánea nueva con el saludo inicial (normalmente, justo tras el génesis).
++    #[must_use]
++    pub fn nueva(estado_inicial: Estado) -> Self {
++        Self {
++            interior: RwLock::new(Interior {
++                estado: estado_inicial,
++                cabeceras_pow: Vec::new(),
++                cuerpos_pow: BTreeMap::new(),
++                cuerpos_post: BTreeMap::new(),
++            }),
++        }
++    }
++
++    /// El hilo de consenso reemplaza el saludo tras cada cambio de punta.
++    pub fn actualizar_estado(&self, estado: Estado) {
++        if let Ok(mut i) = self.interior.write() {
++            i.estado = estado;
++        }
++    }
++
++    /// El hilo de consenso registra un bloque PoW recién admitido (para servir `CabecerasPow` y
++    /// `Bloques`). `altura` MUST ser exactamente `cabeceras_pow.len()` (secuencial, sin huecos): la
++    /// fase PoW nunca reordena.
++    pub fn registrar_pow(&self, altura: u32, bloque: BloqueRed) {
++        let Ok(mut i) = self.interior.write() else {
++            return;
++        };
++        let BloqueRed::Pow { cabecera, .. } = &bloque else {
++            debug_assert!(false, "registrar_pow con un bloque que no es PoW");
++            return;
++        };
++        let esperado = i.cabeceras_pow.len();
++        if altura as usize == esperado {
++            i.cabeceras_pow.push(*cabecera);
++        } else if (altura as usize) < esperado {
++            // Repetición al reiniciar (D-N03′): ya está, no se duplica.
++        } else {
++            // Un hueco de verdad sería un bug del llamante; no hay nada seguro que hacer aquí salvo
++            // no corromper el índice por altura (dejarlo tal cual y solo indexar el cuerpo).
++            tracing::error!(
++                altura,
++                esperado,
++                "registrar_pow con un hueco de altura: la vista de cabeceras queda incompleta"
++            );
++        }
++        i.cuerpos_pow.insert(cabecera.block_hash(), bloque);
++    }
++
++    /// El hilo de consenso registra un bloque PoST recién admitido.
++    pub fn registrar_post(&self, hash: BlockHash, bloque: BloqueRed) {
++        if let Ok(mut i) = self.interior.write() {
++            i.cuerpos_post.insert(hash, bloque);
++        }
++    }
++
++    /// El saludo actual (para responder `Peticion::Estado`).
++    #[must_use]
++    pub fn estado(&self) -> Estado {
++        self.interior
++            .read()
++            .map(|i| i.estado.clone())
++            .unwrap_or_else(|e| e.into_inner().estado.clone())
++    }
++
++    /// Cabeceras PoW desde el primer hash del locator que reconozcamos, hasta `hasta` o hasta donde
++    /// tengamos. Vacío si no reconocemos nada del locator (respuesta legítima, ver
++    /// [`zx_p2p::entrante::ManejadorEntrante::cabeceras_desde`]).
++    #[must_use]
++    pub fn cabeceras_desde(
++        &self,
++        locator: &[BlockHash],
++        hasta: Option<BlockHash>,
++    ) -> Vec<BlockHeader> {
++        let Ok(i) = self.interior.read() else {
++            return Vec::new();
++        };
++        let Some(inicio) = locator
++            .iter()
++            .find_map(|h| i.cabeceras_pow.iter().position(|c| c.block_hash() == *h))
++        else {
++            return Vec::new();
++        };
++        let mut salida = Vec::new();
++        for c in i.cabeceras_pow.iter().skip(inicio + 1) {
++            salida.push(*c);
++            if Some(c.block_hash()) == hasta {
++                break;
++            }
++        }
++        salida
++    }
++
++    /// Los bloques completos (PoW o PoST) que tengamos de los pedidos, en el orden pedido.
++    #[must_use]
++    pub fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed> {
++        let Ok(i) = self.interior.read() else {
++            return Vec::new();
++        };
++        hashes
++            .iter()
++            .filter_map(|h| {
++                i.cuerpos_pow
++                    .get(h)
++                    .or_else(|| i.cuerpos_post.get(h))
++                    .cloned()
++            })
++            .collect()
++    }
++
++    /// ¿Tenemos ya el cuerpo de este hash (PoW o PoST), lo pidamos o no otra vez?
++    #[must_use]
++    pub fn tiene_cuerpo(&self, hash: &BlockHash) -> bool {
++        self.interior
++            .read()
++            .is_ok_and(|i| i.cuerpos_pow.contains_key(hash) || i.cuerpos_post.contains_key(hash))
++    }
++
++    /// Un *locator* al estilo Bitcoin: denso cerca de la punta, espaciado hacia atrás,
++    /// **siempre** termina en el génesis (`ORDEN-W06d2`, decisión 4). Sirve para pedirle a un par
++    /// `CabecerasPow` sin suponer que las dos cadenas coinciden más allá del primer hash que
++    /// reconozca.
++    #[must_use]
++    pub fn locator(&self) -> Vec<BlockHash> {
++        let Ok(i) = self.interior.read() else {
++            return Vec::new();
++        };
++        let n = i.cabeceras_pow.len();
++        if n == 0 {
++            return Vec::new();
++        }
++        let mut salida = Vec::new();
++        let mut paso: usize = 1;
++        let mut idx = n - 1;
++        loop {
++            #[expect(
++                clippy::indexing_slicing,
++                reason = "idx siempre es < n por construcción del bucle"
++            )]
++            salida.push(i.cabeceras_pow[idx].block_hash());
++            if idx == 0 {
++                break;
++            }
++            idx = idx.saturating_sub(paso);
++            paso = paso.saturating_mul(2);
++        }
++        salida
++    }
++
++    /// Nuestra altura PoW más alta conocida (0 si solo tenemos el génesis o nada aún).
++    #[must_use]
++    pub fn altura_pow(&self) -> u32 {
++        self.interior
++            .read()
++            .map(|i| i.cabeceras_pow.len().saturating_sub(1) as u32)
++            .unwrap_or(0)
++    }
++}
++
++#[cfg(test)]
++#[expect(
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño"
++)]
++mod tests {
++    use super::VistaRed;
++    use zx_core::digest::{BlockHash, Digest, MerkleRoot};
++    use zx_core::preimage::block::BlockHeader;
++    use zx_core::red::Red;
++    use zx_p2p::mensaje::{BloqueRed, Estado, Fase, PuntaPow};
++
++    fn h(n: u8) -> BlockHash {
++        BlockHash::from_digest(Digest::from_bytes([n; 32]))
++    }
++
++    fn estado_vacio() -> Estado {
++        Estado {
++            hash_genesis: h(0),
++            red: Red::Dev,
++            fase: Fase::Pow,
++            punta_pow: PuntaPow {
++                hash: h(0),
++                altura: 0,
++                trabajo_acumulado: [0; 32],
++            },
++            terminal: None,
++            puntas_post: Vec::new(),
++            blue_work_virtual: [0; 32],
++        }
++    }
++
++    fn cabecera(altura: u32, prev: BlockHash) -> BlockHeader {
++        BlockHeader {
++            consensus_branch_id: 0xa8b4_66a7,
++            prev_hash: prev,
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([9; 32])),
++            timestamp: 1_000 + u64::from(altura),
++            bits: 0x1c07_fff8,
++            nonce: u64::from(altura),
++            height: altura,
++        }
++    }
++
++    fn bloque_pow(altura: u32, prev: BlockHash) -> BloqueRed {
++        BloqueRed::Pow {
++            cabecera: cabecera(altura, prev),
++            txs: Vec::new(),
++            testigos: Vec::new(),
++        }
++    }
++
++    #[test]
++    fn sin_nada_registrado_las_cabeceras_desde_cualquier_locator_estan_vacias() {
++        let v = VistaRed::nueva(estado_vacio());
++        assert!(v.cabeceras_desde(&[h(5)], None).is_empty());
++    }
++
++    #[test]
++    fn el_locator_devuelve_lo_que_sigue_al_primero_reconocido() {
++        let v = VistaRed::nueva(estado_vacio());
++        let mut prev = h(0);
++        for altura in 0..5u32 {
++            let b = bloque_pow(altura, prev);
++            let BloqueRed::Pow { cabecera, .. } = &b else {
++                unreachable!()
++            };
++            prev = cabecera.block_hash();
++            v.registrar_pow(altura, b);
++        }
++        // El locator reconoce la altura 2; deben volver las alturas 3 y 4.
++        let hash_altura_2 = {
++            let mut p = h(0);
++            for altura in 0..3u32 {
++                let c = cabecera(altura, p);
++                p = c.block_hash();
++            }
++            p
++        };
++        let resultado = v.cabeceras_desde(&[hash_altura_2], None);
++        assert_eq!(resultado.len(), 2);
++        assert_eq!(resultado[0].height, 3);
++        assert_eq!(resultado[1].height, 4);
++    }
++
++    #[test]
++    fn el_locator_siempre_termina_en_el_genesis_y_es_denso_cerca_de_la_punta() {
++        let v = VistaRed::nueva(estado_vacio());
++        let mut prev = h(0);
++        let mut hashes = Vec::new();
++        for altura in 0..20u32 {
++            let b = bloque_pow(altura, prev);
++            let BloqueRed::Pow { cabecera, .. } = &b else {
++                unreachable!()
++            };
++            prev = cabecera.block_hash();
++            hashes.push(prev);
++            v.registrar_pow(altura, b);
++        }
++        let locator = v.locator();
++        assert_eq!(locator.first(), Some(&hashes[19]), "empieza en la punta");
++        assert_eq!(locator.last(), Some(&hashes[0]), "termina en el génesis");
++        // Denso al principio: los dos primeros pasos son de distancia 1 y 2.
++        assert_eq!(locator[1], hashes[18]);
++        assert_eq!(locator[2], hashes[16]);
++    }
++
++    #[test]
++    fn bloques_por_hash_respeta_el_orden_pedido_y_omite_lo_ausente() {
++        let v = VistaRed::nueva(estado_vacio());
++        let b0 = bloque_pow(0, h(0));
++        let BloqueRed::Pow { cabecera: c0, .. } = &b0 else {
++            unreachable!()
++        };
++        let hash0 = c0.block_hash();
++        v.registrar_pow(0, b0);
++
++        let ausente = h(200);
++        let salida = v.bloques_por_hash(&[ausente, hash0]);
++        assert_eq!(salida.len(), 1);
++        assert!(
++            matches!(&salida[0], BloqueRed::Pow { cabecera, .. } if cabecera.block_hash() == hash0)
++        );
++    }
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/tests/red_tcp.rs ws/crates/zx-node/tests/red_tcp.rs
+--- ws.orig/crates/zx-node/tests/red_tcp.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/red_tcp.rs	2026-09-26 13:36:33.401773294 +0200
+@@ -0,0 +1,152 @@
++//! `ORDEN-W06d2` decisión 8: prueba en proceso con transporte TCP real en `127.0.0.1`.
++//!
++//! Dos nodos de red reales (mismo behaviour/transporte que construye `zx_node::red::arrancar`, pero
++//! con acceso directo a [`EventoRed`] en el test, en vez de dejar que
++//! `zx_node::red::sync::tarea_sincronizacion` se los coma) deben conectarse de verdad sobre TCP.
++
++#![expect(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    reason = "el test falla con panic por diseño"
++)]
++
++use std::sync::Arc;
++use std::sync::atomic::{AtomicU16, Ordering};
++use std::time::Duration;
++
++use libp2p::core::transport::Transport as _;
++use libp2p::{Swarm, identity, noise, tcp, yamux};
++use tokio::sync::mpsc::UnboundedReceiver;
++use zx_core::digest::{BlockHash, Digest};
++use zx_core::red::Red;
++use zx_node::red::TrabajoRed;
++use zx_node::red::manejador::ManejadorRed;
++use zx_node::red::vista::VistaRed;
++use zx_p2p::behaviour::ZxBehaviour;
++use zx_p2p::config::ParametrosRed;
++use zx_p2p::mensaje::{Estado, Fase, PuntaPow};
++use zx_p2p::servicio::{EventoRed, ManejoRed, arrancar};
++
++fn estado_vacio(n: u8) -> Estado {
++    Estado {
++        hash_genesis: BlockHash::from_digest(Digest::from_bytes([n; 32])),
++        red: Red::Dev,
++        fase: Fase::Pow,
++        punta_pow: PuntaPow {
++            hash: BlockHash::from_digest(Digest::from_bytes([n; 32])),
++            altura: 0,
++            trabajo_acumulado: [0; 32],
++        },
++        terminal: None,
++        puntas_post: Vec::new(),
++        blue_work_virtual: [0; 32],
++    }
++}
++
++fn puerto() -> u16 {
++    static SIGUIENTE: AtomicU16 = AtomicU16::new(41_101);
++    SIGUIENTE.fetch_add(1, Ordering::Relaxed)
++}
++
++fn swarm_tcp() -> Swarm<ZxBehaviour> {
++    let clave = identity::Keypair::generate_ed25519();
++    let peer_id = clave.public().to_peer_id();
++    let transporte = tcp::tokio::Transport::new(tcp::Config::default())
++        .upgrade(libp2p::core::upgrade::Version::V1Lazy)
++        .authenticate(noise::Config::new(&clave).expect("noise"))
++        .multiplex(yamux::Config::default())
++        .boxed();
++    let behaviour = ZxBehaviour::nueva(
++        &clave,
++        ParametrosRed::dag_dev(),
++        zx_p2p::limites::LIMITE_BLOQUE_DEV,
++    )
++    .expect("behaviour");
++    Swarm::new(
++        transporte,
++        behaviour,
++        peer_id,
++        libp2p::swarm::Config::with_tokio_executor()
++            .with_idle_connection_timeout(Duration::from_secs(30)),
++    )
++}
++
++/// Nodo de red de juguete: arranca el bucle, deja el receptor de eventos accesible al test (no lo
++/// consume `sync`, a propósito, para poder comprobar `EventoRed::PeerConectado` directamente).
++struct NodoDeJuguete {
++    manejo: ManejoRed,
++    eventos: tokio::sync::mpsc::Receiver<EventoRed>,
++}
++
++fn arrancar_de_juguete() -> (NodoDeJuguete, tokio::task::JoinHandle<()>) {
++    let vista = Arc::new(VistaRed::nueva(estado_vacio(9)));
++    let (tx_trabajo, _rx_trabajo): (
++        tokio::sync::mpsc::UnboundedSender<TrabajoRed>,
++        UnboundedReceiver<TrabajoRed>,
++    ) = tokio::sync::mpsc::unbounded_channel();
++    let manejador = Arc::new(ManejadorRed::nuevo(tx_trabajo, vista));
++    let piezas = arrancar(swarm_tcp(), manejador);
++    let manejo = piezas.manejo;
++    let eventos = piezas.eventos;
++    let tarea = tokio::spawn(piezas.bucle.correr());
++    (NodoDeJuguete { manejo, eventos }, tarea)
++}
++
++async fn esperar(
++    ev: &mut tokio::sync::mpsc::Receiver<EventoRed>,
++    f: impl Fn(&EventoRed) -> bool,
++    plazo: Duration,
++) -> Option<EventoRed> {
++    let limite = tokio::time::Instant::now() + plazo;
++    loop {
++        let resto = limite.saturating_duration_since(tokio::time::Instant::now());
++        if resto.is_zero() {
++            return None;
++        }
++        match tokio::time::timeout(resto, ev.recv()).await {
++            Ok(Some(e)) if f(&e) => return Some(e),
++            Ok(Some(_)) => {}
++            Ok(None) | Err(_) => return None,
++        }
++    }
++}
++
++#[tokio::test]
++async fn dos_nodos_reales_sobre_tcp_se_conectan() {
++    let (mut a, tarea_a) = arrancar_de_juguete();
++    let (mut b, tarea_b) = arrancar_de_juguete();
++
++    let addr: libp2p::Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", puerto()).parse().unwrap();
++    a.manejo.escuchar(addr.clone()).await.expect("A escucha");
++    assert!(
++        esperar(
++            &mut a.eventos,
++            |e| matches!(e, EventoRed::Escuchando(_)),
++            Duration::from_secs(5)
++        )
++        .await
++        .is_some(),
++        "A debe anunciar que escucha"
++    );
++
++    b.manejo.marcar(addr).await.expect("B marca a A");
++
++    let vio_a = esperar(
++        &mut a.eventos,
++        |e| matches!(e, EventoRed::PeerConectado(_)),
++        Duration::from_secs(10),
++    )
++    .await;
++    let vio_b = esperar(
++        &mut b.eventos,
++        |e| matches!(e, EventoRed::PeerConectado(_)),
++        Duration::from_secs(10),
++    )
++    .await;
++
++    assert!(vio_a.is_some(), "A debe ver conectarse a B por TCP real");
++    assert!(vio_b.is_some(), "B debe ver conectarse a A por TCP real");
++
++    tarea_a.abort();
++    tarea_b.abort();
++}
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-node/tests/reinicio.rs ws/crates/zx-node/tests/reinicio.rs
+--- ws.orig/crates/zx-node/tests/reinicio.rs	2026-09-26 09:50:47.342202355 +0200
++++ ws/crates/zx-node/tests/reinicio.rs	2026-09-26 12:16:41.635246585 +0200
+@@ -209,7 +209,15 @@
+         let mut hijo = lanzar(dir.path());
+         esperar_senal_de_vida(&ruta_registro, ronda);
+         let objetivo = usize::try_from(ronda).unwrap_or(1);
+-        let limite = Instant::now() + Duration::from_secs(30);
++        // `ORDEN-W06d2` punto 7 / `REVISION-W06a-C.md`: esta espera **ya** era por eventos del
++        // registro (el bucle de abajo sondea `bloque_producido`, no un `sleep` fijo), pero el
++        // plazo de 30 s que la acotaba era demasiado ajustado en `debug` bajo carga — la suite
++        // conjunta con W06a-B falló una vez exactamente aquí ("ronda régimen 4: no se vieron 4
++        // bloques producidos en 30 s"), aislada pasaba siempre. El plazo se sube a 120 s, el mismo
++        // orden de magnitud que ya usan las rondas PoW de esta prueba (180 s) para la misma razón
++        // (máquina compartida, `debug` sin optimizar): sigue siendo un límite, no una espera fija,
++        // y una intermitencia real (el nodo de verdad colgado) sigue haciendo fallar el test.
++        let limite = Instant::now() + Duration::from_secs(120);
+         loop {
+             let contenido = std::fs::read_to_string(&ruta_registro).unwrap_or_default();
+             let vistos = contenido.matches("\"bloque_producido\"").count();
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/src/entrante.rs ws/crates/zx-p2p/src/entrante.rs
+--- ws.orig/crates/zx-p2p/src/entrante.rs	2026-09-26 02:36:48.190812438 +0200
++++ ws/crates/zx-p2p/src/entrante.rs	2026-09-26 12:34:16.308420206 +0200
+@@ -12,18 +12,44 @@
+ //! crate que ve la red y el consenso a la vez. Así el ciclo se rompe donde debe romperse, y el
+ //! `Cargo.toml` de este crate no menciona `zx-consensus` — lo comprueba `ci/frontera-crates.sh`.
+ //!
+-//! # Los veredictos son tres, no dos
++//! # Los veredictos son cuatro, no tres (`ORDEN-W06d2`)
+ //!
+ //! Un bloque cuyo padre todavía no conocemos **no es un bloque inválido**: es un bloque que llegó
+ //! antes de tiempo. Distinguirlo importa: en gossipsub es literalmente la diferencia entre
+ //! `MessageAcceptance::Ignore` y `::Reject` — solo el segundo aplica la penalización. Castigar a
+ //! quien nos adelanta un bloque penaliza a peers honestos con otro *timing*.
++//!
++//! # Por qué existe [`Veredicto::Diferir`]
++//!
++//! Un bloque PoST real tarda del orden de decenas de milisegundos en verificarse (PoT + PoAS). Si
++//! [`ManejadorEntrante::bloque_difundido`] se queda ahí dentro, el bucle de `zx-p2p` — que también
++//! pollea el `Swarm` — deja de hacerlo mientras tanto, y la red entera se para. `Diferir` deja que
++//! el manejador conteste **de inmediato** "todavía no lo sé" y siga la validación de verdad en su
++//! propio hilo; cuando termine, informa el veredicto final con
++//! [`crate::servicio::ManejoRed::informar_validacion`] (o su variante bloqueante para un hilo que no
++//! es `tokio`), usando el mismo [`IdDiferido`] que recibió aquí. `zx-p2p` retiene el mensaje de
++//! gossipsub entre tanto (`report_message_validation_result` no se llama hasta entonces) y, si el
++//! informe no llega dentro de un plazo declarado, lo trata como `Ignorar` — nunca como `Rechazar`:
++//! un manejador lento o caído no es un peer culpable.
+ 
+ use zx_core::digest::BlockHash;
+ use zx_core::preimage::block::BlockHeader;
+ 
+ use crate::mensaje::{BloqueRed, Estado};
+ 
++/// Identificador opaco de una validación diferida.
++///
++/// Lo asigna `zx-p2p` **antes** de llamar a [`ManejadorEntrante::bloque_difundido`] y no significa
++/// nada fuera del crate: el manejador solo lo guarda y lo devuelve tal cual con
++/// [`crate::servicio::ManejoRed::informar_validacion`]. El campo es `pub(crate)` para que los tests
++/// de este crate puedan construirlo directamente; fuera de aquí es opaco (no hay forma pública de
++/// leer su valor). `Default` existe **solo** para que un manejador de otro crate pueda escribir un
++/// test unitario de su propio `bloque_difundido` sin depender de un `Swarm` real; el valor que
++/// produce no tiene ningún significado de protocolo y nunca coincide con uno de producción salvo
++/// por casualidad de conteo.
++#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
++pub struct IdDiferido(pub(crate) u64);
++
+ /// Qué hacer con algo que llegó por difusión.
+ #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+ pub enum Veredicto {
+@@ -34,22 +60,39 @@
+     Ignorar,
+     /// Inválido de forma demostrable. Se descarta **y** se penaliza al que lo propagó.
+     Rechazar,
++    /// **Todavía no se sabe.** La validación de verdad sigue en otro hilo; el resultado llegará
++    /// después por [`crate::servicio::ManejoRed::informar_validacion`] con el mismo [`IdDiferido`]
++    /// que trajo la llamada a [`ManejadorEntrante::bloque_difundido`]. `zx-p2p` retiene el mensaje.
++    Diferir,
++}
++
++/// El veredicto final de una validación que se difirió. No incluye `Diferir`: una validación
++/// diferida no puede volver a diferirse indefinidamente sin que alguien acabe decidiendo.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub enum VeredictoFinal {
++    /// Válido. Se retransmite a la malla.
++    Aceptar,
++    /// No juzgable (p. ej. quedó huérfano, o llegó duplicado mientras se validaba). No penaliza.
++    Ignorar,
++    /// Inválido de forma demostrable. Penaliza a quien lo propagó.
++    Rechazar,
+ }
+ 
+ /// Lo que `zx-p2p` necesita del resto del nodo.
+ ///
+ /// Implementarlo es trabajo de `zx-node`. Cada método debe ser **rápido y no bloqueante**: se
+ /// llaman desde el bucle de eventos, y mientras uno corre el `Swarm` no se pollea — o sea, la red
+-/// entera está parada. Lo que tarde debe delegarse a otra tarea.
++/// entera está parada. Lo que tarde debe delegarse a otra tarea y devolver [`Veredicto::Diferir`].
+ pub trait ManejadorEntrante: Send + Sync + 'static {
+     /// Nuestro estado, para responder a un saludo.
+     fn estado(&self) -> Estado;
+ 
+     /// Un bloque llegó por difusión. **Se valida antes de retransmitir.**
+     ///
+-    /// El default de este trait no existe: cada implementación decide. El veredicto es del
+-    /// manejador, no del códec.
+-    fn bloque_difundido(&self, bloque: &BloqueRed) -> Veredicto;
++    /// `id` es el identificador opaco a devolver más tarde si el veredicto es
++    /// [`Veredicto::Diferir`]. El default de este trait no existe: cada implementación decide. El
++    /// veredicto es del manejador, no del códec.
++    fn bloque_difundido(&self, id: IdDiferido, bloque: &BloqueRed) -> Veredicto;
+ 
+     /// Una transacción llegó por difusión.
+     ///
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/src/limites.rs ws/crates/zx-p2p/src/limites.rs
+--- ws.orig/crates/zx-p2p/src/limites.rs	2026-09-26 02:41:17.795481601 +0200
++++ ws/crates/zx-p2p/src/limites.rs	2026-09-26 12:07:07.548176230 +0200
+@@ -143,6 +143,21 @@
+ /// mitigación; la otra mitad es el presupuesto agregado de [`crate::presupuesto`].
+ pub const MAX_STREAMS_SYNC: usize = 8;
+ 
++/// Plazo, en segundos, para que llegue el veredicto de una validación diferida
++/// (`ORDEN-W06d2` decisión 1) antes de tratarla como [`crate::entrante::Veredicto::Ignorar`].
++///
++/// Un bloque PoST real verifica en decenas de milisegundos (PoT + PoAS); 5 s es generoso incluso
++/// bajo carga y sigue acotando cuánto tiempo puede quedar un mensaje de gossipsub retenido sin
++/// reenviarse ni descartarse.
++pub const PLAZO_VALIDACION_DIFERIDA_S: u64 = 5;
++
++/// Cuántas validaciones diferidas puede tener pendientes `zx-p2p` a la vez.
++///
++/// Acota la memoria de la tabla de pendientes (`ORDEN-W06d2`, disciplina de recursos de `LINEO`):
++/// un manejador que difiere sin nunca informar no debe crecer sin límite entre barridos del plazo.
++/// Al llegar al tope, la entrada más antigua se expira como `Ignorar` para dejar sitio.
++pub const MAX_DIFERIDOS_PENDIENTES: usize = 4_096;
++
+ // ── Coherencia de los límites ────────────────────────────────────────────────
+ // Aserciones de compilación y no tests: una relación entre constantes no se puede saltar con
+ // `--skip`, y un cambio que rompa la coherencia MUST impedir compilar.
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/src/servicio.rs ws/crates/zx-p2p/src/servicio.rs
+--- ws.orig/crates/zx-p2p/src/servicio.rs	2026-09-26 02:40:54.167985397 +0200
++++ ws/crates/zx-p2p/src/servicio.rs	2026-09-26 12:13:22.224053892 +0200
+@@ -15,18 +15,22 @@
+ //! Regla dura de este bucle: **nada que venga de un peer puede propagar un `Err` fuera del
+ //! `select!`**. Se registra, se desconecta a quien haga falta, y se sigue.
+ 
++use std::collections::HashMap;
+ use std::sync::Arc;
++use std::time::{Duration, Instant};
+ 
+ use libp2p::swarm::SwarmEvent;
+ use libp2p::{Multiaddr, PeerId, Swarm};
+ use tokio::sync::{mpsc, oneshot};
++use tokio::time::MissedTickBehavior;
+ 
+ use libp2p::{gossipsub, request_response};
+ 
+ use crate::behaviour::{ZxBehaviour, ZxBehaviourEvent};
+ use crate::config::ParametrosRed;
+-use crate::entrante::{ManejadorEntrante, Veredicto};
++use crate::entrante::{IdDiferido, ManejadorEntrante, Veredicto, VeredictoFinal};
+ use crate::error::{MotivoDesconexion, P2pError};
++use crate::limites::{MAX_DIFERIDOS_PENDIENTES, PLAZO_VALIDACION_DIFERIDA_S};
+ use crate::mensaje::{BloqueRed, FamiliaBloque, Peticion, Respuesta};
+ use crate::presupuesto::Presupuesto;
+ 
+@@ -80,6 +84,18 @@
+         /// Por qué. Solo [`MotivoDesconexion::ViolacionDeConsenso`] puntúa.
+         motivo: MotivoDesconexion,
+     },
++    /// El veredicto final de una validación que [`ManejadorEntrante::bloque_difundido`] había
++    /// diferido (decisión 1 de `ORDEN-W06d2`).
++    ///
++    /// Si `id` ya no está en la tabla de pendientes —porque expiró (§`PLAZO_VALIDACION_DIFERIDA_S`)
++    /// o porque ya se informó antes—, el comando **no hace nada**: es idempotente a propósito, para
++    /// que un manejador que informe dos veces (o tarde) no cause un error de protocolo.
++    InformarValidacion {
++        /// El mismo identificador que trajo la llamada a `bloque_difundido`.
++        id: IdDiferido,
++        /// El veredicto de verdad.
++        veredicto: VeredictoFinal,
++    },
+ }
+ 
+ /// Lo que el bucle cuenta hacia fuera. **Ningún tipo de libp2p asoma aquí.**
+@@ -214,6 +230,42 @@
+         self.enviar(Comando::Desconectar { peer, motivo }).await
+     }
+ 
++    /// Informa el veredicto final de una validación diferida (decisión 1 de `ORDEN-W06d2`).
++    ///
++    /// Para usar desde una tarea `tokio`. Si el manejador vive en un hilo normal (el hilo de
++    /// consenso de `zx-node`, D-N07), usar [`Self::informar_validacion_bloqueante`].
++    ///
++    /// # Errores
++    /// [`P2pError::Transporte`] si el bucle de red ya no está.
++    pub async fn informar_validacion(
++        &self,
++        id: IdDiferido,
++        veredicto: VeredictoFinal,
++    ) -> Result<(), P2pError> {
++        self.enviar(Comando::InformarValidacion { id, veredicto })
++            .await
++    }
++
++    /// Igual que [`Self::informar_validacion`], pero bloqueante: para llamarse desde un hilo que no
++    /// corre sobre el *runtime* de `tokio` (el hilo de consenso, D-N07).
++    ///
++    /// # Pánico
++    /// Como cualquier `blocking_send` de `tokio`, entra en pánico si se llama desde dentro de un
++    /// hilo *worker* de un runtime `tokio` (ver la documentación de
++    /// [`tokio::sync::mpsc::Sender::blocking_send`]). El hilo de consenso no lo es.
++    ///
++    /// # Errores
++    /// [`P2pError::Transporte`] si el bucle de red ya no está.
++    pub fn informar_validacion_bloqueante(
++        &self,
++        id: IdDiferido,
++        veredicto: VeredictoFinal,
++    ) -> Result<(), P2pError> {
++        self.comandos
++            .blocking_send(Comando::InformarValidacion { id, veredicto })
++            .map_err(|_| P2pError::Transporte("el bucle de red ya no está escuchando comandos"))
++    }
++
+     async fn enviar(&self, c: Comando) -> Result<(), P2pError> {
+         self.comandos
+             .send(c)
+@@ -222,6 +274,16 @@
+     }
+ }
+ 
++/// Lo que el bucle guarda de un mensaje de gossipsub cuyo veredicto se difirió.
++struct PendienteDiferido {
++    /// El mensaje al que hay que responder cuando llegue el veredicto final.
++    message_id: gossipsub::MessageId,
++    /// Quién lo propagó (a quién penalizar si el veredicto final es `Rechazar`).
++    propagador: PeerId,
++    /// Cuándo se difirió, para el barrido de [`BucleRed::expirar_diferidos_vencidos`].
++    creado: Instant,
++}
++
+ /// El bucle. Posee el `Swarm` y corre en su propia tarea.
+ pub struct BucleRed<M: ManejadorEntrante> {
+     swarm: Swarm<ZxBehaviour>,
+@@ -233,6 +295,16 @@
+     /// Es el mismo que lleva el códec de `sync`: la reserva del parseo de una respuesta y la del
+     /// parseo de un bloque difundido salen del mismo techo.
+     presupuesto: Presupuesto,
++    /// Validaciones diferidas (decisión 1 de `ORDEN-W06d2`) a la espera de
++    /// [`Comando::InformarValidacion`], acotadas por [`MAX_DIFERIDOS_PENDIENTES`].
++    pendientes: HashMap<IdDiferido, PendienteDiferido>,
++    /// Siguiente [`IdDiferido`] a repartir. Un contador simple basta: `BucleRed` tiene un único
++    /// dueño (esta tarea), no hace falta que sea atómico.
++    siguiente_id: u64,
++    /// Plazo tras el cual un diferido sin informe se trata como `Ignorar`. Configurable solo para
++    /// que los tests puedan acortarlo; la ruta de producción usa
++    /// [`PLAZO_VALIDACION_DIFERIDA_S`].
++    plazo_diferido: Duration,
+ }
+ 
+ /// Lo que devuelve [`arrancar`]: el handle, el flujo de eventos y el bucle listo para correr.
+@@ -246,11 +318,29 @@
+ }
+ 
+ /// Prepara las tres piezas con un presupuesto agregado **concreto**. No arranca nada.
++///
++/// Usa el plazo de validación diferida de producción ([`PLAZO_VALIDACION_DIFERIDA_S`]). Para
++/// pruebas que necesiten un plazo corto, usar [`arrancar_con_plazo`].
+ pub fn arrancar_con<M: ManejadorEntrante>(
+     swarm: Swarm<ZxBehaviour>,
+     manejador: Arc<M>,
+     presupuesto: Presupuesto,
+ ) -> Piezas<M> {
++    arrancar_con_plazo(
++        swarm,
++        manejador,
++        presupuesto,
++        Duration::from_secs(PLAZO_VALIDACION_DIFERIDA_S),
++    )
++}
++
++/// Igual que [`arrancar_con`], con el plazo de validación diferida explícito.
++pub fn arrancar_con_plazo<M: ManejadorEntrante>(
++    swarm: Swarm<ZxBehaviour>,
++    manejador: Arc<M>,
++    presupuesto: Presupuesto,
++    plazo_diferido: Duration,
++) -> Piezas<M> {
+     let (tx_cmd, rx_cmd) = mpsc::channel(CAPACIDAD_COMANDOS);
+     let (tx_ev, rx_ev) = mpsc::channel(CAPACIDAD_EVENTOS);
+ 
+@@ -268,6 +358,9 @@
+             eventos: tx_ev,
+             manejador,
+             presupuesto,
++            pendientes: HashMap::new(),
++            siguiente_id: 0,
++            plazo_diferido,
+         },
+     }
+ }
+@@ -286,6 +379,16 @@
+     /// Termina **de forma cooperativa**: cuando el canal de comandos se cierra —porque nadie
+     /// conserva un handle—, el bucle sale tras procesar lo que tuviera entre manos.
+     pub async fn correr(mut self) {
++        // El barrido corre al **cuarto** del plazo: así un diferido nunca espera más de
++        // `plazo_diferido + plazo_diferido/4` antes de expirar, sin necesidad de un temporizador
++        // por entrada. `Duration::max(1 ms)` evita un `interval` de período cero si algún test
++        // pasara un plazo absurdamente corto.
++        let periodo_barrido = (self.plazo_diferido / 4).max(Duration::from_millis(1));
++        let mut barrido = tokio::time::interval(periodo_barrido);
++        // Un barrido tarde (p. ej. tras una pausa larga del proceso) no debe intentar "ponerse al
++        // día" disparando varias veces seguidas: solo importa el estado actual.
++        barrido.set_missed_tick_behavior(MissedTickBehavior::Skip);
++
+         loop {
+             tokio::select! {
+                 evento = futures::StreamExt::select_next_some(&mut self.swarm) => {
+@@ -300,6 +403,29 @@
+                         }
+                     }
+                 }
++                _ = barrido.tick() => {
++                    self.expirar_diferidos_vencidos();
++                }
++            }
++        }
++    }
++
++    /// Trata como [`Veredicto::Ignorar`] todo diferido más viejo que [`Self::plazo_diferido`].
++    ///
++    /// **No penaliza.** Un veredicto que no llega a tiempo es un fallo del manejador o del hilo de
++    /// validación, nunca una prueba de que el peer que propagó el mensaje hizo algo malo.
++    fn expirar_diferidos_vencidos(&mut self) {
++        let ahora = Instant::now();
++        let vencidos: Vec<IdDiferido> = self
++            .pendientes
++            .iter()
++            .filter(|(_, p)| ahora.duration_since(p.creado) >= self.plazo_diferido)
++            .map(|(id, _)| *id)
++            .collect();
++        for id in vencidos {
++            if let Some(p) = self.pendientes.remove(&id) {
++                tracing::debug!(?id, "validación diferida sin informe a tiempo: se ignora");
++                self.reportar_a_gossipsub(&p.message_id, &p.propagador, Veredicto::Ignorar);
+             }
+         }
+     }
+@@ -419,23 +545,86 @@
+         }
+     }
+ 
+-    /// Evalúa un mensaje de gossip y reporta el resultado a gossipsub.
++    /// Evalúa un mensaje de gossip y reporta el resultado a gossipsub, o lo retiene si el manejador
++    /// difirió el veredicto (decisión 1 de `ORDEN-W06d2`).
+     fn juzgar_y_reportar(
+         &mut self,
+         propagation_source: &PeerId,
+         message_id: &gossipsub::MessageId,
+         message: &gossipsub::Message,
+     ) {
+-        let veredicto = self.juzgar(message);
++        let id = self.siguiente_id_diferido();
++        let veredicto = despachar(
++            self.manejador.as_ref(),
++            id,
++            message.topic.as_str(),
++            &message.data,
++            &self.presupuesto,
++        );
++
++        if veredicto == Veredicto::Diferir {
++            self.retener_diferido(id, message_id, propagation_source);
++            return;
++        }
++
++        self.reportar_a_gossipsub(message_id, propagation_source, veredicto);
++    }
++
++    /// Guarda la correlación de un diferido, acotando la tabla a [`MAX_DIFERIDOS_PENDIENTES`].
++    ///
++    /// Al llegar al tope, expira como `Ignorar` la entrada más antigua para dejar sitio: no penaliza
++    /// (un manejador saturado no es culpa del peer más antiguo en cola), y evita crecer sin límite
++    /// si el manejador difiere sin nunca informar.
++    fn retener_diferido(
++        &mut self,
++        id: IdDiferido,
++        message_id: &gossipsub::MessageId,
++        propagador: &PeerId,
++    ) {
++        if self.pendientes.len() >= MAX_DIFERIDOS_PENDIENTES
++            && let Some(mas_vieja) = self
++                .pendientes
++                .iter()
++                .min_by_key(|(_, p)| p.creado)
++                .map(|(id, _)| *id)
++        {
++            tracing::warn!(
++                "tabla de diferidos llena ({MAX_DIFERIDOS_PENDIENTES}): se expira la más antigua"
++            );
++            if let Some(vieja) = self.pendientes.remove(&mas_vieja) {
++                self.reportar_a_gossipsub(&vieja.message_id, &vieja.propagador, Veredicto::Ignorar);
++            }
++        }
++        self.pendientes.insert(
++            id,
++            PendienteDiferido {
++                message_id: message_id.clone(),
++                propagador: *propagador,
++                creado: Instant::now(),
++            },
++        );
++    }
+ 
+-        let acceptance = match veredicto {
+-            Veredicto::Aceptar => gossipsub::MessageAcceptance::Accept,
+-            Veredicto::Ignorar => gossipsub::MessageAcceptance::Ignore,
+-            Veredicto::Rechazar => gossipsub::MessageAcceptance::Reject,
+-        };
++    /// El identificador opaco que se le entrega al manejador. `zx-p2p` es su único dueño.
++    fn siguiente_id_diferido(&mut self) -> IdDiferido {
++        self.siguiente_id = self.siguiente_id.wrapping_add(1);
++        IdDiferido(self.siguiente_id)
++    }
+ 
+-        // Sin esta llamada el mensaje se queda **pendiente para siempre** en la cola de validación:
+-        // ni se reenvía ni se descarta.
++    /// Reporta un veredicto a gossipsub. Sin esta llamada el mensaje se queda **pendiente para
++    /// siempre** en la cola de validación de gossipsub: ni se reenvía ni se descarta.
++    fn reportar_a_gossipsub(
++        &mut self,
++        message_id: &gossipsub::MessageId,
++        propagation_source: &PeerId,
++        veredicto: Veredicto,
++    ) {
++        let Some(acceptance) = a_acceptance(veredicto) else {
++            // No debería llegar aquí con `Diferir`: es un error de este módulo, no de un peer.
++            tracing::error!("reportar_a_gossipsub llamado con Diferir; se trata como Ignorar");
++            self.reportar_a_gossipsub(message_id, propagation_source, Veredicto::Ignorar);
++            return;
++        };
+         if !self
+             .swarm
+             .behaviour_mut()
+@@ -449,16 +638,6 @@
+         }
+     }
+ 
+-    /// Decide qué es el mensaje y se lo pasa al manejador.
+-    fn juzgar(&self, m: &gossipsub::Message) -> Veredicto {
+-        despachar(
+-            self.manejador.as_ref(),
+-            m.topic.as_str(),
+-            &m.data,
+-            &self.presupuesto,
+-        )
+-    }
+-
+     /// Atiende un comando. No es `async`: nada de lo que hace debe esperar.
+     fn atender_comando(&mut self, c: Comando) {
+         match c {
+@@ -527,6 +706,24 @@
+                     .map(|_| ());
+                 let _ = respuesta.send(r);
+             }
++            Comando::InformarValidacion { id, veredicto } => {
++                // Idempotente a propósito (ver la doc de `Comando::InformarValidacion`): un `id`
++                // que ya no está pudo expirar (`expirar_diferidos_vencidos`) o ya haberse informado.
++                let Some(p) = self.pendientes.remove(&id) else {
++                    tracing::debug!(
++                        ?id,
++                        ?veredicto,
++                        "informe de validación diferida sin diferido pendiente (expiró o ya se informó)"
++                    );
++                    return;
++                };
++                let veredicto = match veredicto {
++                    VeredictoFinal::Aceptar => Veredicto::Aceptar,
++                    VeredictoFinal::Ignorar => Veredicto::Ignorar,
++                    VeredictoFinal::Rechazar => Veredicto::Rechazar,
++                };
++                self.reportar_a_gossipsub(&p.message_id, &p.propagador, veredicto);
++            }
+             Comando::Desconectar { peer, motivo } => {
+                 tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
+ 
+@@ -600,12 +797,16 @@
+ /// El `presupuesto` se **inyecta** en vez de crearse dentro: es lo que permite a un test forzar una
+ /// reserva fallida con `Presupuesto::nuevo(0)` y comprobar que el agotamiento local no penaliza.
+ ///
++/// `id` es el identificador opaco que se le pasa al manejador; solo tiene sentido si el manejador
++/// devuelve [`Veredicto::Diferir`] (decisión 1 de `ORDEN-W06d2`).
++///
+ /// # El tema desconocido no se decodifica
+ ///
+ /// Un tema que no sea uno de los seis exactos devuelve [`Veredicto::Ignorar`] **sin** tocar los
+ /// bytes ni llamar al manejador: puede ser una versión más nueva del protocolo, no un ataque.
+ fn despachar<M: ManejadorEntrante>(
+     manejador: &M,
++    id: IdDiferido,
+     topico: &str,
+     datos: &[u8],
+     presupuesto: &Presupuesto,
+@@ -628,12 +829,23 @@
+     // El éxito del parseo **no** es validación: el veredicto de un bloque lo decide el manejador.
+     // Un fallo de formato o un byte residual sí es basura indiscutible y penaliza.
+     match crate::codec::bloque_desde_bytes(datos, familia) {
+-        Ok((bloque, [])) => manejador.bloque_difundido(&bloque),
++        Ok((bloque, [])) => manejador.bloque_difundido(id, &bloque),
+         Ok((_, _)) => Veredicto::Rechazar,
+         Err(_) => Veredicto::Rechazar,
+     }
+ }
+ 
++/// Traduce un [`Veredicto`] a lo que entiende gossipsub. `None` para [`Veredicto::Diferir`]: no es
++/// un veredicto final, así que no hay una `MessageAcceptance` que le corresponda todavía.
++const fn a_acceptance(v: Veredicto) -> Option<gossipsub::MessageAcceptance> {
++    match v {
++        Veredicto::Aceptar => Some(gossipsub::MessageAcceptance::Accept),
++        Veredicto::Ignorar => Some(gossipsub::MessageAcceptance::Ignore),
++        Veredicto::Rechazar => Some(gossipsub::MessageAcceptance::Reject),
++        Veredicto::Diferir => None,
++    }
++}
++
+ /// Recorta una lista al límite del protocolo.
+ fn recortar<T>(mut v: Vec<T>, max: usize) -> Vec<T> {
+     if v.len() > max {
+@@ -657,10 +869,15 @@
+ mod tests {
+     use super::{TemaDifusion, clasificar_tema, despachar};
+     use crate::codec::bloque_a_bytes;
+-    use crate::entrante::{ManejadorEntrante, Veredicto};
++    use crate::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
+     use crate::mensaje::{BloqueRed, Estado, FamiliaBloque, Fase, PuntaPow};
+     use crate::presupuesto::Presupuesto;
+     use std::sync::atomic::{AtomicUsize, Ordering};
++
++    /// Un `IdDiferido` cualquiera: estos tests no difieren nada, así que su valor es indiferente.
++    fn id_prueba() -> IdDiferido {
++        IdDiferido(0)
++    }
+     use zx_core::amount::Amount;
+     use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
+     use zx_core::firma::ClavePublica;
+@@ -692,7 +909,7 @@
+             }
+         }
+ 
+-        fn bloque_difundido(&self, _: &BloqueRed) -> Veredicto {
++        fn bloque_difundido(&self, _id: IdDiferido, _: &BloqueRed) -> Veredicto {
+             self.bloques.fetch_add(1, Ordering::Relaxed);
+             Veredicto::Aceptar
+         }
+@@ -785,6 +1002,7 @@
+         let espia = Espia::default();
+         let v = despachar(
+             &espia,
++            id_prueba(),
+             "/zx-dev/bloques/pow/1",
+             &bytes,
+             &Presupuesto::default(),
+@@ -803,6 +1021,7 @@
+         assert_eq!(
+             despachar(
+                 &espia,
++                id_prueba(),
+                 "/zx-dev/bloques/post/1",
+                 &bytes,
+                 &Presupuesto::default()
+@@ -822,6 +1041,7 @@
+         assert_eq!(
+             despachar(
+                 &espia,
++                id_prueba(),
+                 "/zx-dev/bloques/pow/1",
+                 &bytes,
+                 &Presupuesto::nuevo(0)
+@@ -840,6 +1060,7 @@
+         assert_eq!(
+             despachar(
+                 &espia,
++                id_prueba(),
+                 "/zx-dev/bloques/pow/1",
+                 &bytes,
+                 &Presupuesto::default()
+@@ -863,6 +1084,7 @@
+         assert_eq!(
+             despachar(
+                 &espia,
++                id_prueba(),
+                 "/zx-dev/bloques/pow/1",
+                 &con_residuo,
+                 &Presupuesto::default()
+@@ -873,6 +1095,7 @@
+         assert_eq!(
+             despachar(
+                 &espia,
++                id_prueba(),
+                 "/zx-dev/bloques/pow/1",
+                 &truncado,
+                 &Presupuesto::default()
+@@ -889,7 +1112,13 @@
+             "/zx-dev/bloques/pow/2",
+         ] {
+             assert_eq!(
+-                despachar(&espia2, falso, &con_residuo, &Presupuesto::default()),
++                despachar(
++                    &espia2,
++                    id_prueba(),
++                    falso,
++                    &con_residuo,
++                    &Presupuesto::default()
++                ),
+                 Veredicto::Ignorar,
+                 "{falso}"
+             );
+@@ -908,6 +1137,7 @@
+         assert_eq!(
+             despachar(
+                 &espia,
++                id_prueba(),
+                 "/zx-dev/bloques/post/1",
+                 &[FamiliaBloque::DISC_POST],
+                 &Presupuesto::default()
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-p2p/tests/dos_nodos.rs ws/crates/zx-p2p/tests/dos_nodos.rs
+--- ws.orig/crates/zx-p2p/tests/dos_nodos.rs	2026-09-26 02:40:54.169985439 +0200
++++ ws/crates/zx-p2p/tests/dos_nodos.rs	2026-09-26 12:11:57.603274711 +0200
+@@ -35,11 +35,11 @@
+ use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
+ use zx_p2p::behaviour::ZxBehaviour;
+ use zx_p2p::config::ParametrosRed;
+-use zx_p2p::entrante::{ManejadorEntrante, Veredicto};
++use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto, VeredictoFinal};
+ use zx_p2p::limites;
+ use zx_p2p::mensaje::{BloqueRed, Estado, FamiliaBloque, Fase, Peticion, PuntaPow, Respuesta};
+ use zx_p2p::presupuesto::Presupuesto;
+-use zx_p2p::servicio::{EventoRed, arrancar_con};
++use zx_p2p::servicio::{EventoRed, arrancar_con, arrancar_con_plazo};
+ 
+ /// Manejador de juguete: cuenta llamadas y sirve un estado y unos bloques reconocibles.
+ struct Contador {
+@@ -119,7 +119,7 @@
+         }
+     }
+ 
+-    fn bloque_difundido(&self, _: &BloqueRed) -> Veredicto {
++    fn bloque_difundido(&self, _id: IdDiferido, _: &BloqueRed) -> Veredicto {
+         self.bloques.fetch_add(1, Ordering::Relaxed);
+         Veredicto::Aceptar
+     }
+@@ -601,6 +601,244 @@
+     }
+ }
+ 
++/// Manejador que **siempre difiere** un bloque, avisando el `IdDiferido` por un canal, para que el
++/// test controle cuándo (y con qué veredicto final) se resuelve (`ORDEN-W06d2`, decisión 1).
++struct Diferidor {
++    aviso: tokio::sync::mpsc::UnboundedSender<IdDiferido>,
++}
++
++impl ManejadorEntrante for Diferidor {
++    fn estado(&self) -> Estado {
++        Estado {
++            hash_genesis: BlockHash::from_digest(Digest::from_bytes([0; 32])),
++            red: Red::Dev,
++            fase: Fase::Pow,
++            punta_pow: PuntaPow {
++                hash: BlockHash::from_digest(Digest::from_bytes([9; 32])),
++                altura: 0,
++                trabajo_acumulado: [0; 32],
++            },
++            terminal: None,
++            puntas_post: Vec::new(),
++            blue_work_virtual: [0; 32],
++        }
++    }
++
++    fn bloque_difundido(&self, id: IdDiferido, _: &BloqueRed) -> Veredicto {
++        // Si el test ya no escucha (canal cerrado), no hay nada que informar: se difiere igual y
++        // expirará por plazo, que es exactamente lo que debe pasar.
++        let _ = self.aviso.send(id);
++        Veredicto::Diferir
++    }
++
++    fn tx_difundida(&self, _: &[u8]) -> Veredicto {
++        Veredicto::Ignorar
++    }
++
++    fn cabeceras_desde(&self, _: &[BlockHash], _: Option<BlockHash>) -> Vec<BlockHeader> {
++        Vec::new()
++    }
++
++    fn bloques_por_hash(&self, _: &[BlockHash]) -> Vec<BloqueRed> {
++        Vec::new()
++    }
++}
++
++/// **Un veredicto diferido no se retransmite hasta que se informa `Aceptar`.**
++///
++/// A → B (`Diferidor`) → C. B recibe el bloque de A y lo difiere: mientras tanto no debe llegar a
++/// C. Solo tras `informar_validacion(id, Aceptar)` gossipsub reenvía el mensaje y C lo ve.
++#[tokio::test]
++async fn un_diferido_no_se_retransmite_hasta_informar_aceptar() {
++    let (tx_aviso, mut rx_aviso) = tokio::sync::mpsc::unbounded_channel();
++    let b = Arc::new(Diferidor { aviso: tx_aviso });
++    let c = Arc::new(Contador::nuevo(3));
++
++    let (manejo_a, _ev_a, manejo_b, ev_b, manejo_c, mut ev_c, mut tareas) =
++        cadena_de_tres(Arc::new(Contador::nuevo(1)), Arc::clone(&b), Arc::clone(&c)).await;
++
++    manejo_a
++        .difundir_bloque(&bloque_pow(11))
++        .await
++        .expect("A publica");
++
++    let id = tokio::time::timeout(Duration::from_secs(10), rx_aviso.recv())
++        .await
++        .expect("el aviso de diferido debe llegar")
++        .expect("canal abierto");
++
++    // Ventana corta: mientras no se informe, C no debe ver nada.
++    let _ = tokio::time::timeout(Duration::from_millis(300), ev_c.recv()).await;
++    assert_eq!(
++        c.bloques.load(Ordering::Relaxed),
++        0,
++        "C no debe recibir el bloque antes de que B informe el veredicto"
++    );
++
++    manejo_b
++        .informar_validacion(id, VeredictoFinal::Aceptar)
++        .await
++        .expect("B informa Aceptar");
++
++    esperar_contador(&c.bloques, 1, &mut ev_c).await;
++
++    for t in tareas.drain(..) {
++        t.abort();
++    }
++    drop((manejo_a, manejo_b, manejo_c, ev_b));
++}
++
++/// **Un diferido sin informe a tiempo se trata como `Ignorar`: nunca se retransmite.**
++///
++/// Con un plazo corto (para no alargar el test), B difiere y **no** informa nada. Pasado el plazo,
++/// C sigue sin ver el bloque.
++#[tokio::test]
++async fn un_diferido_sin_informe_a_tiempo_no_se_retransmite() {
++    let (tx_aviso, mut rx_aviso) = tokio::sync::mpsc::unbounded_channel();
++    let b = Arc::new(Diferidor { aviso: tx_aviso });
++    let c = Arc::new(Contador::nuevo(3));
++
++    let plazo_corto = Duration::from_millis(200);
++    let (manejo_a, _ev_a, _manejo_b, _ev_b, _manejo_c, mut ev_c, mut tareas) =
++        cadena_de_tres_con_plazo(
++            Arc::new(Contador::nuevo(1)),
++            Arc::clone(&b),
++            Arc::clone(&c),
++            plazo_corto,
++        )
++        .await;
++
++    manejo_a
++        .difundir_bloque(&bloque_pow(12))
++        .await
++        .expect("A publica");
++
++    let _id = tokio::time::timeout(Duration::from_secs(10), rx_aviso.recv())
++        .await
++        .expect("el aviso de diferido debe llegar")
++        .expect("canal abierto");
++
++    // Se espera bastante más que el plazo de expiración, sin informar nunca: C no debe ver nada.
++    let _ = tokio::time::timeout(plazo_corto * 6, ev_c.recv()).await;
++    assert_eq!(
++        c.bloques.load(Ordering::Relaxed),
++        0,
++        "un diferido que expira MUST tratarse como Ignorar: nunca se retransmite"
++    );
++
++    for t in tareas.drain(..) {
++        t.abort();
++    }
++}
++
++/// Encadena A → B → C (cada uno marca al siguiente) con el plazo de diferido por defecto.
++async fn cadena_de_tres(
++    a: Arc<impl ManejadorEntrante>,
++    b: Arc<impl ManejadorEntrante>,
++    c: Arc<impl ManejadorEntrante>,
++) -> Cadena3 {
++    cadena_de_tres_con_plazo(
++        a,
++        b,
++        c,
++        Duration::from_secs(zx_p2p::limites::PLAZO_VALIDACION_DIFERIDA_S),
++    )
++    .await
++}
++
++type Cadena3 = (
++    zx_p2p::servicio::ManejoRed,
++    tokio::sync::mpsc::Receiver<EventoRed>,
++    zx_p2p::servicio::ManejoRed,
++    tokio::sync::mpsc::Receiver<EventoRed>,
++    zx_p2p::servicio::ManejoRed,
++    tokio::sync::mpsc::Receiver<EventoRed>,
++    Vec<tokio::task::JoinHandle<()>>,
++);
++
++/// Igual que [`cadena_de_tres`], con el plazo de validación diferida explícito para B (el único que
++/// difiere en los tests de este módulo).
++async fn cadena_de_tres_con_plazo(
++    a: Arc<impl ManejadorEntrante>,
++    b: Arc<impl ManejadorEntrante>,
++    c: Arc<impl ManejadorEntrante>,
++    plazo_b: Duration,
++) -> Cadena3 {
++    let presupuesto_a = Presupuesto::default();
++    let presupuesto_b = Presupuesto::default();
++    let presupuesto_c = Presupuesto::default();
++
++    let swarm_a = nodo_en_memoria(&presupuesto_a);
++    let swarm_b = nodo_en_memoria(&presupuesto_b);
++    let swarm_c = nodo_en_memoria(&presupuesto_c);
++
++    let pa = arrancar_con(swarm_a, a, presupuesto_a);
++    let pb = arrancar_con_plazo(swarm_b, b, presupuesto_b, plazo_b);
++    let pc = arrancar_con(swarm_c, c, presupuesto_c);
++
++    let manejo_a = pa.manejo;
++    let manejo_b = pb.manejo;
++    let manejo_c = pc.manejo;
++    let mut ev_a = pa.eventos;
++    let mut ev_b = pb.eventos;
++    let ev_c = pc.eventos;
++
++    let tareas = vec![
++        tokio::spawn(pa.bucle.correr()),
++        tokio::spawn(pb.bucle.correr()),
++        tokio::spawn(pc.bucle.correr()),
++    ];
++
++    let addr_b = addr_memoria();
++    manejo_b.escuchar(addr_b.clone()).await.expect("B escucha");
++    manejo_a.marcar(addr_b.clone()).await.expect("A marca B");
++    assert!(
++        esperar(&mut ev_a, |e| matches!(e, EventoRed::PeerConectado(_)))
++            .await
++            .is_some(),
++        "A debería conectarse con B"
++    );
++    esperar_ambas_suscripciones(&mut ev_b).await;
++
++    let addr_c = addr_memoria();
++    manejo_c.escuchar(addr_c.clone()).await.expect("C escucha");
++    manejo_b.marcar(addr_c.clone()).await.expect("B marca C");
++    assert!(
++        esperar(&mut ev_b, |e| matches!(e, EventoRed::PeerConectado(_)))
++            .await
++            .is_some(),
++        "B debería conectarse con C"
++    );
++    // B debe ver la suscripción de C, y viceversa, antes de publicar nada.
++    let mut ev_c = ev_c;
++    esperar_ambas_suscripciones(&mut ev_c).await;
++    esperar_ambas_suscripciones(&mut ev_b).await;
++
++    (manejo_a, ev_a, manejo_b, ev_b, manejo_c, ev_c, tareas)
++}
++
++/// Espera a ver las suscripciones a los dos temas de bloques en el canal de eventos dado.
++async fn esperar_ambas_suscripciones(ev: &mut tokio::sync::mpsc::Receiver<EventoRed>) {
++    let tema_pow = ParametrosRed::dag_dev().topic_bloques_pow().to_owned();
++    let tema_post = ParametrosRed::dag_dev().topic_bloques_post().to_owned();
++    let mut vio_pow = false;
++    let mut vio_post = false;
++    while !(vio_pow && vio_post) {
++        let Some(e) = esperar(ev, |e| matches!(e, EventoRed::Suscripcion { .. })).await else {
++            panic!("no se vieron las dos suscripciones (pow={vio_pow}, post={vio_post})");
++        };
++        if let EventoRed::Suscripcion {
++            topico,
++            suscrito: true,
++            ..
++        } = &e
++        {
++            vio_pow |= *topico == tema_pow;
++            vio_post |= *topico == tema_post;
++        }
++    }
++}
++
+ /// **Un génesis ajeno se corta.** El nodo compara el `Estado` recibido con el suyo y desconecta.
+ #[tokio::test]
+ async fn un_genesis_ajeno_desconecta() {
