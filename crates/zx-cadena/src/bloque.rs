@@ -12,6 +12,7 @@
 
 use zx_consensus::transicion::{BloqueTransicion, HechosCabecera};
 use zx_core::{BlockHash, ClavePublica, Tx};
+use zx_dag::ghostdag::IdentidadGhostdag;
 
 /// Bloque `PoAS_PoT_DAG` con los campos que consumen `zx-dag` y `zx-consensus`.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -35,8 +36,14 @@ pub struct BloquePost {
     pub sr: u64,
     /// `solution_distance` de GHOSTDAG (`C-GD-05`).
     pub distancia: u64,
-    /// Identidad de billete de GHOSTDAG (`C-GD-07`), en el dominio de fixture.
-    pub identidad: u64,
+    /// Identidad de billete de GHOSTDAG (`C-GD-07`) **real**: la tupla literal
+    /// `(public_key, sector_index, history_size, chunk, slot)`.
+    ///
+    /// La ruta de producción la deriva de la misma cabecera que aporta `block_hash`, `slot` y `SR`
+    /// con `zx_dag::identidad_de_cabecera` (`IdentidadGhostdag::Billete`). El arnés diferencial de
+    /// T04 usa [`IdentidadGhostdag::de_fixture`] porque sus vectores sólo traen un `u64`; su uso
+    /// queda limitado a ese arnés.
+    pub identidad: IdentidadGhostdag,
     /// Transacciones del bloque con sus testigos.
     pub txs: Vec<(Tx, Vec<Vec<u8>>)>,
 }

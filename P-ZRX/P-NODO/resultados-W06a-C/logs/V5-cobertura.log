@@ -1,0 +1,14 @@
+diferencial_t04 V5: cobertura del arnés vs cobertura-v0.3.txt (la aserción vive en el test)
+  SECCION vectores-v0.3 (casos aleatorios)
+  casos = 900
+  TIPO Transferencia construidas=1112 aplicadas=364 descartadas=204 evaluadas=568 en_ramas_no_seleccionadas=544 ErrNonce=0 ErrDobleGasto=204 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Deposito construidas=1626 aplicadas=347 descartadas=396 evaluadas=743 en_ramas_no_seleccionadas=883 ErrNonce=295 ErrDobleGasto=101 ErrSaldo=0 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Retiro construidas=2579 aplicadas=808 descartadas=510 evaluadas=1318 en_ramas_no_seleccionadas=1261 ErrNonce=474 ErrDobleGasto=0 ErrSaldo=11 ErrRetiroPendiente=25 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  TIPO Liberacion construidas=458 aplicadas=115 descartadas=104 evaluadas=219 en_ramas_no_seleccionadas=239 ErrNonce=84 ErrDobleGasto=0 ErrSaldo=20 ErrRetiroPendiente=0 ErrAutorizacion=0 ErrInmaduro=0 ErrOperacionFase=0 ErrEmision=0 otros=0
+  garantia_construidas = 4663
+  garantia_evaluadas = 2280
+  garantia_errnonce = 853
+  garantia_errnonce_pct_construidas = 18.29
+  garantia_errnonce_pct_evaluadas = 37.41
+  err_doble_gasto_total = 305
+  reorganizaciones_que_deshacen_garantia = 312

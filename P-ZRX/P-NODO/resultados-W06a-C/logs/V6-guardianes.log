@@ -1,0 +1,14 @@
+== dependencias-exactas.sh ==
+OK — 23 dependencias con versión exacta
+exit=0
+== frontera-crates.sh ==
+"OK — frontera zx-consensus → {zx-core}"
+"OK — frontera zx-dag → {zx-core}"
+"OK — frontera zx-poas → {zx-core,zx-consensus}"
+"OK — frontera zx-farmer → {zx-core,zx-poas}"
+"OK — frontera zx-post → {zx-core,zx-pot,zx-dag,zx-poas}"
+"OK — frontera zx-p2p → {zx-core}"
+"OK — frontera zx-cadena → {zx-core,zx-consensus,zx-dag}"
+"OK — frontera zx-storage → {zx-core}"
+"OK — frontera zx-node → {zx-core,zx-consensus,zx-dag,zx-pot,zx-poas,zx-farmer,zx-post,zx-p2p,zx-cadena,zx-storage}"
+exit=0

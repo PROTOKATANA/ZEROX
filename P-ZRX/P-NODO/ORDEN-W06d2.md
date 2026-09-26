@@ -47,7 +47,8 @@ congelada: `P-ZRX/P-NODO/ENTRADA-W06d2.sha256`.
    PoST con PoAS, PoT o sello malos, coinbase mayor que el subsidio, ráfaga de huérfanos, operación de
    garantía repetida, mensaje sobredimensionado) y E-8 (dos bloques de la misma clave en el mismo slot,
    que **se registran** porque `C-EVP` está inactivo).
-7. Pruebas en proceso con transporte TCP en `127.0.0.1` (o `MemoryTransport` si el TCP no es
+7. **Prueba de reinicio intermitente** (`REVISION-W06a-C.md`): `crates/zx-node/tests/reinicio.rs` falla a veces en `debug` por una espera fija de 30 s; hazla determinista (espera por eventos del registro con límite generoso y declarado, o `release`) y demuéstralo con 5 ejecuciones seguidas de la suite completa sin fallo.
+8. Pruebas en proceso con transporte TCP en `127.0.0.1` (o `MemoryTransport` si el TCP no es
    determinista en el entorno; decláralo), `N_dev` pequeño.
 
 ## 4. Verificación

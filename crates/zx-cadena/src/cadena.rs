@@ -33,8 +33,6 @@ use zx_dag::{ErrorDag, RangoSolucionValidado, hash_de_id_textual};
 use crate::bloque::{BloqueCadena, BloquePost};
 use crate::error::MotivoBloque;
 
-/// Máximo de padres de un bloque real en el oráculo T04 (`RD-8`).
-const MAX_PADRES_ORACULO: u8 = 3;
 /// Tope de mergeset del oráculo (`C-GD-04`).
 const MERGESET_LIMITE_ORACULO: u32 = 180;
 
@@ -59,7 +57,7 @@ struct DatosDag {
     slot: u64,
     distancia: u64,
     sr: u64,
-    identidad: u64,
+    identidad: IdentidadGhostdag,
 }
 
 /// Almacén virtual `V` (una copia del DAG con la punta virtual añadida).
@@ -74,6 +72,7 @@ pub struct Cadena {
     params: ParametrosTransicion,
     k: u32,
     cbid: u32,
+    max_padres: u8,
     por_hash: BTreeMap<BlockHash, BloqueCadena>,
     validos: BTreeMap<BlockHash, bool>,
     motivos: BTreeMap<BlockHash, MotivoBloque>,
@@ -89,13 +88,20 @@ pub struct Cadena {
 }
 
 impl Cadena {
-    /// Crea una cadena vacía con los parámetros de transición, el `k` de GHOSTDAG y el `CBID`.
+    /// Crea una cadena vacía con los parámetros de transición, el `k` de GHOSTDAG, el `CBID` y el
+    /// **máximo de padres** de un bloque PoST.
+    ///
+    /// `max_padres` no tiene valor por defecto oculto (`ORDEN-W06a-C` decisión 1): el nodo usa el
+    /// del perfil dev (15, `PERFIL-DEV-v0.md` §4) y el arnés diferencial de T04 usa 3, el límite de
+    /// su generador. Es el tope que `zx-cadena` impone al `AlmacenGhostdag` interno; `zx-dag` lo
+    /// acota a [`zx_core::MAX_PADRES`] (15) y a `u8`.
     #[must_use]
-    pub fn nueva(params: ParametrosTransicion, k: u32, cbid: u32) -> Self {
+    pub fn nueva(params: ParametrosTransicion, k: u32, cbid: u32, max_padres: u8) -> Self {
         Self {
             params,
             k,
             cbid,
+            max_padres,
             por_hash: BTreeMap::new(),
             validos: BTreeMap::new(),
             motivos: BTreeMap::new(),
@@ -414,7 +420,7 @@ impl Cadena {
         }
         let params = ParametrosGhostdag {
             k: self.k,
-            max_padres: MAX_PADRES_ORACULO,
+            max_padres: self.max_padres,
             mergeset_limite: MERGESET_LIMITE_ORACULO,
             s_max: u64::MAX,
             u2: true,
@@ -908,13 +914,17 @@ impl Cadena {
 }
 
 /// Construye la entrada de `zx-dag` de un bloque PoST.
+///
+/// La identidad se recibe ya construida: la ruta real (`IdentidadGhostdag::Billete`, derivada de la
+/// cabecera por `zx_dag::identidad_de_cabecera`) no se proyecta a `u64`; el arnés diferencial pasa
+/// `de_fixture` explícitamente.
 fn bloque_ghostdag(
     id: BlockHash,
     padres: &[BlockHash],
     slot: u64,
     distancia: u64,
     sr: u64,
-    identidad: u64,
+    identidad: IdentidadGhostdag,
 ) -> BloqueGhostdag {
     BloqueGhostdag {
         id,
@@ -922,7 +932,7 @@ fn bloque_ghostdag(
         slot,
         solution_distance: distancia,
         rango_espacio: RangoSolucionValidado::para_oraculos(sr),
-        identidad: IdentidadGhostdag::de_fixture(identidad),
+        identidad,
     }
 }
 

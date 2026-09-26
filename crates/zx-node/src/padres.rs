@@ -1,17 +1,19 @@
 //! Elección de padres canónicos para un bloque en régimen (decisión 6; «Relanzamiento» punto 3).
 //!
 //! Usa el GHOSTDAG **real** de `zx-cadena` (`Cadena::contexto_dag`) para calcular el padre
-//! seleccionado: nunca el atajo dev de `zx_post::ContextoTransicion`. Tope de **3** padres en total
-//! (`PROGRESO.md` punto 8: `zx-cadena` no acepta más, aunque el perfil dev hable de 15).
+//! seleccionado: nunca el atajo dev de `zx_post::ContextoTransicion`. Tope de **15** padres en total
+//! (`PERFIL-DEV-v0.md` §4): `zx-cadena` lo recibe como parámetro de construcción y el nodo le pasa
+//! el del perfil (`ORDEN-W06a-C` decisión 1).
 
 use zx_cadena::Cadena;
 use zx_core::{BlockHash, PadresDag};
 use zx_dag::ErrorDag;
 use zx_dag::bloque_dag::ContextoDag;
 
-/// Tope real de padres que `zx-cadena` admite por bloque (`crates/zx-cadena/src/cadena.rs`,
-/// `MAX_PADRES_ORACULO`). No configurable desde fuera del crate.
-pub const MAX_PADRES_CADENA: usize = 3;
+/// Tope real de padres que `zx-cadena` admite por bloque: el máximo del perfil dev
+/// (`PERFIL-DEV-v0.md` §4), que el nodo pasa a `Cadena::nueva`. Se mantiene en sincronía con
+/// [`crate::perfil::MAX_PADRES`] mediante esta constante.
+pub const MAX_PADRES_CADENA: usize = crate::perfil::MAX_PADRES as usize;
 
 /// Fallo al elegir padres.
 #[derive(Debug, thiserror::Error)]
@@ -35,8 +37,9 @@ pub enum ErrorPadres {
 /// declarado).
 ///
 /// Si hay más puntas que el tope, se toman las primeras en orden de hash (determinista); es un
-/// compromiso documentado (`PROGRESO.md` punto 8), no una elección por peso: con 3 claves propias en
-/// un solo proceso el número de puntas vivas rara vez lo alcanza.
+/// compromiso documentado, no una elección por peso: con 3 claves propias en un solo proceso el
+/// número de puntas vivas rara vez lo alcanza. El tope (15) es el del perfil dev; el caso de 15
+/// puntas se fija en `tests/padres_maximos.rs`.
 ///
 /// # Errores
 /// [`ErrorPadres::SinTerminal`], [`ErrorPadres::SinPuntas`] o los de GHOSTDAG/formato.

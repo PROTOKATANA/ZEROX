@@ -39,6 +39,7 @@ use zx_core::{
     Amount, BlockHash, CBID_RED_DEV, ClavePublica, ExtensionTx, HashType, Lock, OutPoint,
     SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
+use zx_dag::IdentidadGhostdag;
 
 /// Vectores v0.3 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
@@ -50,6 +51,10 @@ const RUTA_COBERTURA: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../testdata/estado-dag-v0.3/cobertura-v0.3.txt"
 );
+/// Máximo de padres del generador de T04, declarado (`ORDEN-W06a-C` decisión 1): sus vectores no
+/// admiten más de 3 y la identidad viaja como `u64` de fixture (`IdentidadGhostdag::de_fixture`).
+/// Es el **único** consumidor de ese dominio: la ruta de producción usa la tupla real.
+const MAX_PADRES_ARNES: u8 = 3;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Claves y salidas abstractas
@@ -757,7 +762,7 @@ fn construir_reales(caso: &Caso) -> Result<Reales, String> {
                 requisito_declarado: b.reqdecl,
                 sr: b.sr,
                 distancia: b.sd,
-                identidad: b.ident,
+                identidad: IdentidadGhostdag::de_fixture(b.ident),
                 txs,
             }),
             otra => return Err(format!("familia desconocida: {otra}")),
@@ -784,7 +789,7 @@ type Resuelto = (Reales, Cadena, Estado, Vec<BlockHash>, Vec<Descarte>);
 fn construir_y_resolver(caso: &Caso) -> Result<Resuelto, String> {
     let params = parametros(&caso.param);
     let reales = construir_reales(caso)?;
-    let mut cadena = Cadena::nueva(params, caso.param.k, CBID_RED_DEV);
+    let mut cadena = Cadena::nueva(params, caso.param.k, CBID_RED_DEV, MAX_PADRES_ARNES);
     for bloque in &reales.bloques {
         let _ = cadena.admitir(bloque.clone());
     }
@@ -977,7 +982,7 @@ fn operaciones_garantia_aplicadas(cadena: &Cadena) -> BTreeSet<(BlockHash, usize
 }
 
 fn reorgs_que_deshacen_garantia(reales: &Reales, params: ParametrosTransicion, k: u32) -> u64 {
-    let mut cadena = Cadena::nueva(params, k, CBID_RED_DEV);
+    let mut cadena = Cadena::nueva(params, k, CBID_RED_DEV, MAX_PADRES_ARNES);
     let mut prev_tip: Option<BlockHash> = None;
     let mut prev_ops: BTreeSet<(BlockHash, usize)> = BTreeSet::new();
     let mut reorgs = 0u64;

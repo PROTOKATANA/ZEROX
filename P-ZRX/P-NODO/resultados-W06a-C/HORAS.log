@@ -1,0 +1,5 @@
+2026-09-26T09:54:22+02:00  V0 inicio suite completa (ws sin cambios)
+2026-09-26T10:29:27+02:00  V0 falla (reinicio V5, ronda regimen 4, flake); V0-reintento aislado OK 428.69s; lanzo V0b suite completa
+2026-09-26T11:03:06+02:00  V1 fmt OK; V2 clippy OK; tests nuevos OK; V4 diferencial_t04 0 discrepancias; lanzo V3 suite completa
+2026-09-26T11:31:03+02:00  restaurado test previo es_determinista_y_nunca_cero; fmt+clippy OK; relanzo V3 final
+2026-09-26T11:58:55+02:00  FIN: V3 698/0/2, V4 0 discrepancias+cobertura, V6 OK, entrada 5/5; entregables generados

@@ -1,0 +1,2 @@
+git apply --check -p1 ../cambios.patch
+OK: el parche aplica limpio sobre ws.orig

@@ -34,7 +34,7 @@ use zx_storage::{Almacen, BloqueAdmitido, ErrorRepeticion, Familia};
 use crate::claves::ClaveDev;
 use crate::error::{ErrorNodo, ResultadoNodo};
 use crate::estado_resumen::resumen_estado;
-use crate::identidad::identidad_u64_de_cabecera;
+use crate::identidad::identidad_de_cabecera_post;
 use crate::padres::padres_de_regimen;
 use crate::perfil;
 use crate::pow::{self, CoinbasePropia};
@@ -172,6 +172,7 @@ impl Nodo {
                 perfil::parametros_transicion_dev()?,
                 perfil::ghostdag_k(),
                 cbid,
+                perfil::ghostdag_max_padres(),
             ),
             almacen,
             registro,
@@ -526,7 +527,9 @@ impl Nodo {
             hash,
             motivo: format!("distancia PoAS: {e}"),
         })?;
-        let identidad = identidad_u64_de_cabecera(&bloque.cabecera);
+        // Identidad real de `C-GD-07` (`ORDEN-W06a-C` decisión 2): la tupla literal derivada de la
+        // misma cabecera que aporta `block_hash`, `slot` y `SR`. Ya **no** se trunca a un `u64`.
+        let identidad = identidad_de_cabecera_post(&bloque.cabecera);
         let padres = padres_dag_a_vec(&bloque.cabecera.padres);
         let txs: Vec<(Tx, Vec<Vec<u8>>)> = bloque
             .txs()

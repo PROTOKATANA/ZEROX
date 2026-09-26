@@ -1,38 +1,27 @@
-//! Identidad de GHOSTDAG del bloque producido: compromiso documentado (`PROGRESO.md` punto 3).
+//! Identidad GHOSTDAG del bloque producido (`C-GD-07`, `ORDEN-W06a-C` decisión 2).
 //!
-//! `zx-cadena::BloquePost::identidad` es `u64` (dominio de fixture de `IdentidadGhostdag::
-//! de_fixture`), no `IdentidadGhostdag::Billete(IdentidadTicket)`. `C-GD-07` exige la tupla literal
-//! `(public_key, sector_index, history_size, chunk, slot)`; comprimirla a un `u64` **no es
-//! inyectivo** (lo dice `zx_dag::identidad`). Este módulo trunca la huella SHA3-256 de 32 B —ya
-//! separada por dominio y versión— a sus primeros 8 bytes. Es un compromiso, no una prueba de
-//! unicidad de billete: se declara en `INFORME.md` §"lo no demostrado".
+//! `zx-cadena::BloquePost::identidad` es hoy una [`IdentidadGhostdag`] **real**, no un `u64` de
+//! fixture. Este módulo es la puerta única del nodo: deriva la tupla literal
+//! `(public_key, sector_index, history_size, chunk, slot)` de la **misma** cabecera que aporta
+//! `block_hash`, `slot` y `SR` con `zx_dag::identidad_de_cabecera`, y **no la trunca** (antes se
+//! proyectaba a los 8 primeros bytes de `huella()`, que no es inyectivo).
 
 use zx_core::DagBlockHeader;
+use zx_dag::ghostdag::IdentidadGhostdag;
 use zx_dag::identidad_de_cabecera;
 
-/// Deriva la identidad `u64` (dominio de fixture) de una cabecera PoST ya construida.
-///
-/// `0` se traduce a `1`: en el dominio de fixture, `0` es el centinela `SinBillete`
-/// (`IdentidadGhostdag::de_fixture`), y un billete real nunca debe leerse como ausencia. La
-/// probabilidad de que la huella trunque a `0` es `2^-64`; el ajuste no cambia la propiedad
-/// criptográfica, solo evita el único valor reservado.
+/// Deriva la identidad real de `C-GD-07` de una cabecera PoST ya construida.
 #[must_use]
-pub fn identidad_u64_de_cabecera(cabecera: &DagBlockHeader) -> u64 {
-    let huella = identidad_de_cabecera(cabecera).huella();
-    #[expect(
-        clippy::unwrap_used,
-        reason = "huella() siempre da 32 bytes; los primeros 8 siempre convierten"
-    )]
-    let primeros8: [u8; 8] = huella[..8].try_into().unwrap();
-    let v = u64::from_be_bytes(primeros8);
-    if v == 0 { 1 } else { v }
+pub fn identidad_de_cabecera_post(cabecera: &DagBlockHeader) -> IdentidadGhostdag {
+    IdentidadGhostdag::Billete(identidad_de_cabecera(cabecera))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::identidad_u64_de_cabecera;
+    use super::identidad_de_cabecera_post;
     use zx_core::digest::{BodyCommitment, Digest, MerkleRoot};
     use zx_core::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_dag::ghostdag::IdentidadGhostdag;
 
     fn cabecera(slot: u64, chunk: u8) -> DagBlockHeader {
         DagBlockHeader {
@@ -55,12 +44,14 @@ mod tests {
 
     #[test]
     fn es_determinista_y_nunca_cero() {
-        let a = identidad_u64_de_cabecera(&cabecera(1, 0xAA));
-        let b = identidad_u64_de_cabecera(&cabecera(1, 0xAA));
-        let c = identidad_u64_de_cabecera(&cabecera(1, 0xBB));
+        let a = identidad_de_cabecera_post(&cabecera(1, 0xAA));
+        let b = identidad_de_cabecera_post(&cabecera(1, 0xAA));
+        let c = identidad_de_cabecera_post(&cabecera(1, 0xBB));
         assert_eq!(a, b);
         assert_ne!(a, c);
-        assert_ne!(a, 0);
-        assert_ne!(c, 0);
+        // La identidad es un billete real: nunca el centinela `SinBillete` ni el dominio sintético
+        // (el truncamiento a `u64` que este módulo hacía antes está eliminado).
+        assert!(matches!(a, IdentidadGhostdag::Billete(_)));
+        assert!(matches!(c, IdentidadGhostdag::Billete(_)));
     }
 }

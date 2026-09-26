@@ -20,6 +20,10 @@ use zx_cadena::{BloqueCadena, BloquePost, Cadena};
 use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, ParametrosTransicion};
 use zx_core::{Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, PadresDag, Tx};
 use zx_dag::bloque_dag::ContextoDag;
+use zx_dag::{IdentidadGhostdag, IdentidadTicket};
+
+/// Máximo de padres del perfil dev (`PERFIL-DEV-v0.md` §4).
+const MAX_PADRES_PRODUCCION: u8 = 15;
 
 fn subsidio_pow(_h: u32) -> Amount {
     Amount::nuevo(10).unwrap()
@@ -77,7 +81,7 @@ fn tx_coinbase_post(clave: ClavePublica, importe: i64, slot: u64) -> Tx {
 
 #[test]
 fn none_antes_del_terminal_y_none_justo_al_fijarlo_some_tras_el_primer_post() {
-    let mut cadena = Cadena::nueva(params(), 1, CBID_RED_DEV);
+    let mut cadena = Cadena::nueva(params(), 1, CBID_RED_DEV, MAX_PADRES_PRODUCCION);
 
     let genesis = BloqueCadena::Pow(BloqueTransicion::nuevo(
         HechosCabecera::Genesis { hash: hash(0) },
@@ -112,7 +116,7 @@ fn none_antes_del_terminal_y_none_justo_al_fijarlo_some_tras_el_primer_post() {
 
 #[test]
 fn el_contexto_dag_es_el_mismo_que_usa_la_admision_real() {
-    let mut cadena = Cadena::nueva(params(), 1, CBID_RED_DEV);
+    let mut cadena = Cadena::nueva(params(), 1, CBID_RED_DEV, MAX_PADRES_PRODUCCION);
     cadena
         .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
             HechosCabecera::Genesis { hash: hash(0) },
@@ -144,7 +148,9 @@ fn el_contexto_dag_es_el_mismo_que_usa_la_admision_real() {
         requisito_declarado: 0,
         sr: 1,
         distancia: 0,
-        identidad: 1,
+        identidad: IdentidadGhostdag::Billete(IdentidadTicket::vigente(
+            productor, 0, 1, [0x11; 32], 1,
+        )),
         txs: vec![(tx_coinbase_post(productor, 3, 1), Vec::new())],
     };
     cadena.admitir(BloqueCadena::Post(p1.clone())).unwrap();

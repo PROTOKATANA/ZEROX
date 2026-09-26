@@ -153,6 +153,12 @@ pub const fn ghostdag_k() -> u32 {
     GHOSTDAG_K
 }
 
+/// Máximo de padres que `Cadena::nueva` recibe del perfil dev (§4, `ORDEN-W06a-C` decisión 1).
+#[must_use]
+pub const fn ghostdag_max_padres() -> u8 {
+    MAX_PADRES
+}
+
 #[cfg(test)]
 mod tests {
     use super::parametros_transicion_dev;

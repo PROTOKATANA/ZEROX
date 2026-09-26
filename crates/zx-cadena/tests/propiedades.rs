@@ -22,6 +22,12 @@ use zx_consensus::transicion::{
     BloqueTransicion, Estado, HechosCabecera, ParametrosTransicion, invariante_i1,
 };
 use zx_core::{Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, Tx};
+use zx_dag::{IdentidadGhostdag, IdentidadTicket};
+
+/// Máximo de padres del perfil dev (`PERFIL-DEV-v0.md` §4). El generador produce como mucho 3
+/// padres por bloque, así que este valor no cambia ninguna propiedad; se declara explícitamente
+/// porque `Cadena::nueva` no tiene valor por defecto oculto (`ORDEN-W06a-C` decisión 1).
+const MAX_PADRES_PRODUCCION: u8 = 15;
 
 fn subsidio_pow_prop(_h: u32) -> Amount {
     Amount::nuevo(10).unwrap()
@@ -107,7 +113,7 @@ fn generar(entropia: &[u8]) -> Historia {
         pos: 0,
     };
     let params = params();
-    let mut cadena = Cadena::nueva(params, 1, CBID_RED_DEV);
+    let mut cadena = Cadena::nueva(params, 1, CBID_RED_DEV, MAX_PADRES_PRODUCCION);
     let mut bloques = Vec::new();
 
     let genesis = BloqueCadena::Pow(BloqueTransicion::nuevo(
@@ -173,6 +179,14 @@ fn generar(entropia: &[u8]) -> Historia {
         let sr = u64::from(cursor.siguiente(255)) + 1;
         let sd = u64::from(cursor.siguiente(255));
         let tx = tx_coinbase_post(productor, importe, slot);
+        // Identidad real de `C-GD-07`, distinta por bloque (`de_fixture` es sólo del arnés T04).
+        let identidad = IdentidadGhostdag::Billete(IdentidadTicket::vigente(
+            productor,
+            0,
+            u64::from(i) + 1,
+            [i as u8; 32],
+            slot,
+        ));
         let bloque = BloqueCadena::Post(BloquePost {
             hash: bhash,
             padres,
@@ -183,7 +197,7 @@ fn generar(entropia: &[u8]) -> Historia {
             requisito_declarado: 0,
             sr,
             distancia: sd,
-            identidad: u64::from(i) + 1,
+            identidad,
             txs: vec![(tx, Vec::new())],
         });
         if cadena.admitir(bloque.clone()).is_ok() {
@@ -289,7 +303,7 @@ proptest! {
         let h = generar(&entropia);
         let orden = orden_topologico(&h.bloques, &entropia);
         prop_assert_eq!(orden.len(), h.bloques.len());
-        let mut cadena2 = Cadena::nueva(params(), 1, CBID_RED_DEV);
+        let mut cadena2 = Cadena::nueva(params(), 1, CBID_RED_DEV, MAX_PADRES_PRODUCCION);
         cadena2.resolver(&h.bloques, &orden).unwrap();
         for hash_post in &h.posts {
             prop_assert_eq!(cadena2.estado_past(hash_post), h.cadena.estado_past(hash_post));
