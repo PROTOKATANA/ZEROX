@@ -25,12 +25,14 @@ export Reparto, Retencion, Pareto, Escenario, DistribucionEspacio, Empirica, Par
        eventual, eventual_log10,
        beta_minimo_para_p, masa_prob, funcion_umbral, B_de,
        balance_medio, balance_var, p_saldo_cero, theta,
-       perdida_castigo, coste_disuasion, ingreso_anual, max_perdida_honesta, f_media_de,
+       perdida_castigo, parte_confiscable, premio_incluidor, parte_quemada, autodenuncia,
+       q_inclusion, coste_disuasion, ingreso_anual, max_perdida_honesta, f_media_de,
        condicion_disuasion, condicion_honesta, region_tv,
        B_empirico, B_par, B_par_exacta, cargar_farmers, limpiar_farmers, empirica,
        bootstrap_Bemp, ic_percentil,
        mc_ventana, mc_saldo_cero, mc_Bpar, mc_honesto, wilson, hash64, rng_replica,
-       validar_primera_pasada, validar_alpha, validar_Bemp, validar_Bpar, validar_region
+       validar_primera_pasada, validar_alpha, validar_Bemp, validar_Bpar, validar_region,
+       validar_s2b
 
 include("modelo.jl")
 include("referencia.jl")

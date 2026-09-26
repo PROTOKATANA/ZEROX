@@ -211,9 +211,10 @@ end
 
 # ───────────────────────────────────────────── 4 · barrido de la región
 
-function escenario_de(caso, V, f, qg, R, eh, fh, via, P; ρ = 0.5, Tv = 3600.0)
-    return Escenario(caso.dist, V, f, qg, p("c_r"), p("I"), p("lambda"), p("kappa"), p("q_ev"),
-                     p("eps_saldo"), R, p("F_slots"), P, eh, fh, p("frac_ingreso_max"), via)
+function escenario_de(caso, V, f, qg, R, eh, fh, via, P; ρ = 0.5, Tv = 3600.0, s = 0.0,
+                      q_ev = p("q_ev"))
+    return Escenario(caso.dist, V, f, qg, p("c_r"), p("I"), p("lambda"), p("kappa"), q_ev,
+                     p("eps_saldo"), R, p("F_slots"), P, eh, fh, p("frac_ingreso_max"), via, s)
 end
 
 "Barrido principal P1 (fiel a DS-3): región `(ρ_ret, T_v)` por escenario."
@@ -483,6 +484,226 @@ function recomendacion_dev(casos)
 end
 
 # =============================================================================
+# 9 · SL-2b · recompensa al incluidor (s = 2/8) y censura de la evidencia
+#     (G-SL2b-1..G-SL2b-5). No toca las tablas de SL-2: con s=0 se reproducen.
+# =============================================================================
+
+atacante(conf::Bool) = conf ? "confabulado" : "no_confabulado"
+
+"""
+    barrido_region_s2(casos) -> Vector{Vector{String}}
+
+Repite el barrido de `region.csv` para los dos atacantes con `s = s_incluidor` (2/8) y las **dos
+lecturas de unidades** P1/P2 (F5): la región completa en `region-s2.csv`, las celdas que se pierden
+en `celdas-perdidas-s2b.csv` y el recuento por (caso, vía) en `resumen-s2b.csv`. Una celda se pierde
+si existía para el no confabulado y no existe para el confabulado (el borde superior de honestidad
+no cambia).
+"""
+function barrido_region_s2(casos)
+    s2 = p("s_incluidor")
+    filas = Vector{Vector{String}}()
+    perdidas = Vector{Vector{String}}()
+    resumen = Vector{Vector{String}}()
+    for caso in casos, via in (:P1, :P2)
+        n = 0; ex_no = 0; ex_si = 0; n_perd = 0
+        for α in grid("alpha_atacante", [0.20, 0.25, 0.33, 0.40]),
+            P in grid("P_objetivo", [1e-6, 1e-3, 0.5])
+            bm = beta_cache(α, P)
+            βd = bm.βd
+            for V in grid("V", [1e4]), f in grid("f_conf", [1.0]), qg in grid("q_g", [20.0]),
+                eh in grid("eps_honesto", [1e-3]), ρ in grid("rho_ret", [0.5])
+                regs = Vector{NamedTuple}()
+                for conf in (false, true)
+                    esc = escenario_de(caso, V, f, qg, 0.0, eh, p("f_honesto"), via, P; s = s2)
+                    reg = isnan(βd) ?
+                          (existe = false, Tv_min = Inf, Tv_max = 0.0, borde_inf = "—",
+                           borde_sup = "—", B_min = NaN, N_paid_min = NaN, L_min = NaN,
+                           motivo = "P* inalcanzable") :
+                          region_tv(esc, βd; ρ_ret = ρ, confabulado = conf)
+                    push!(regs, reg)
+                    push!(filas, [caso.nombre, string(via), fmt(α; d = 3), fmt(P; d = 3),
+                                  fmt(βd; d = 6), fmt(V; d = 6), fmt(f; d = 3), fmt(qg; d = 6),
+                                  fmt(eh; d = 4), fmt(s2; d = 4), atacante(conf), fmt(ρ; d = 3),
+                                  bool(reg.existe), fmt(reg.Tv_min; d = 6), fmt(reg.Tv_max; d = 6),
+                                  reg.borde_inf, reg.borde_sup, fmt(reg.B_min; d = 6),
+                                  fmt(reg.N_paid_min; d = 6), fmt(reg.L_min; d = 6), reg.motivo])
+                end
+                n += 1
+                ex_no += regs[1].existe
+                ex_si += regs[2].existe
+                if regs[1].existe && !regs[2].existe
+                    n_perd += 1
+                    push!(perdidas, [caso.nombre, string(via), fmt(α; d = 3), fmt(P; d = 3),
+                                     fmt(βd; d = 6), fmt(V; d = 6), fmt(f; d = 3), fmt(qg; d = 6),
+                                     fmt(eh; d = 4), fmt(s2; d = 4), fmt(ρ; d = 3),
+                                     fmt(regs[1].Tv_min; d = 6), fmt(regs[1].Tv_max; d = 6),
+                                     fmt(regs[2].Tv_min; d = 6), regs[2].motivo])
+                end
+            end
+        end
+        push!(resumen, [caso.nombre, string(via), string(n), string(ex_no), string(ex_si),
+                        string(n_perd), "s=" * fmt(s2; d = 4)])
+    end
+    escribir_csv("region-s2.csv",
+        ["caso", "via", "alpha", "P_objetivo", "beta_d", "V", "f_conf", "q_g", "eps_h",
+         "s_incluidor", "atacante", "rho_ret", "existe", "Tv_min", "Tv_max", "borde_inf",
+         "borde_sup", "B_en_Tv_min", "N_paid_en_Tv_min", "L_en_Tv_min", "motivo"], filas)
+    escribir_csv("celdas-perdidas-s2b.csv",
+        ["caso", "via", "alpha", "P_objetivo", "beta_d", "V", "f_conf", "q_g", "eps_h",
+         "s_incluidor", "rho_ret", "Tv_min_no", "Tv_max_no", "Tv_min_conf", "motivo_conf"],
+        perdidas)
+    escribir_csv("resumen-s2b.csv",
+        ["caso", "via", "celdas", "existe_no_confabulado", "existe_confabulado", "celdas_perdidas",
+         "s_incluidor"], resumen)
+    return resumen
+end
+
+"""
+    frontera_central_s2(casos) -> Vector{Vector{String}}
+
+Igual que `frontera-central.csv` (punto central empírico, mejor `ρ` de la rejilla) pero para los
+dos atacantes con `s = 2/8`: `frontera-central-s2.csv`.
+"""
+function frontera_central_s2(casos)
+    s2 = p("s_incluidor")
+    filas = Vector{Vector{String}}()
+    central = casos[1]
+    for P in (1e-6, 1e-3, 0.5), V in grid("V", [1e2, 1e3, 1e4, 1e5, 1e6]),
+        f in grid("f_conf", [0.25, 0.5, 1.0]), qg in grid("q_g", [20.0, 1000.0, 10000.0]),
+        eh in grid("eps_honesto", [1e-4, 1e-3])
+        for α in grid("alpha_atacante", [0.20, 0.25, 0.33, 0.40]), via in (:P1, :P2)
+            bm = beta_cache(α, P)
+            for conf in (false, true)
+                mejor = (existe = false, rho = NaN, Tv_min = NaN, Tv_max = NaN,
+                         borde_inf = "—", borde_sup = "—", margen = -Inf, L = NaN)
+                for ρ in grid("rho_ret", [0.10, 0.25, 0.50, 1.00])
+                    esc = escenario_de(central, V, f, qg, 0.0, eh, p("f_honesto"), via, P; s = s2)
+                    reg = region_tv(esc, bm.βd; ρ_ret = ρ, confabulado = conf)
+                    if reg.existe && (reg.Tv_max - reg.Tv_min) > mejor.margen
+                        mejor = (existe = true, rho = ρ, Tv_min = reg.Tv_min, Tv_max = reg.Tv_max,
+                                 borde_inf = reg.borde_inf, borde_sup = reg.borde_sup,
+                                 margen = reg.Tv_max - reg.Tv_min, L = reg.L_min)
+                    end
+                end
+                push!(filas, [central.nombre, string(via), atacante(conf), fmt(α; d = 3),
+                              fmt(P; d = 3), fmt(bm.βd; d = 6), fmt(V; d = 6), fmt(f; d = 3),
+                              fmt(qg; d = 6), fmt(eh; d = 4), fmt(s2; d = 4), bool(mejor.existe),
+                              fmt(mejor.rho; d = 3), fmt(mejor.Tv_min; d = 6),
+                              fmt(mejor.Tv_max; d = 6), mejor.borde_inf, mejor.borde_sup,
+                              fmt(mejor.margen; d = 6), fmt(mejor.L; d = 6),
+                              "empírico DS-6; mejor ρ de la rejilla; s=2/8"])
+            end
+        end
+    end
+    return escribir_csv("frontera-central-s2.csv",
+        ["caso", "via", "atacante", "alpha", "P_objetivo", "beta_d", "V", "f_conf", "q_g", "eps_h",
+         "s_incluidor", "existe_region", "rho_mejor", "Tv_min", "Tv_max", "borde_inf", "borde_sup",
+         "margen_Tv", "L_en_Tv_min", "etiqueta"], filas)
+end
+
+"""
+    recomendacion_dev_s2(casos) -> Vector{Vector{String}}
+
+Valores de desarrollo (NO producción) para los dos atacantes, las dos lecturas P1/P2 y
+`s ∈ {0; 2/8; 3/8}`: para cada `ρ_ret` se exige región en los cinco repartos en el punto duro
+`α=0.40, P*=1e-3, V=1e5, f=1, q_g=20, ε_h=1e-3`; se elige el `ρ_ret` que minimiza el `T_v`
+necesario. `s=0` es el control de SL-2.
+"""
+function recomendacion_dev_s2(casos)
+    filas = Vector{Vector{String}}()
+    αref, Pref, Vref, ehref, qgref = 0.40, 1e-3, 1e5, 1e-3, 20.0
+    bm = beta_cache(αref, Pref)
+    for s in grid("s_incluidor", [0.25]), via in (:P1, :P2), conf in (false, true)
+        mejor = (rho = NaN, Tv = Inf)
+        for ρ in (0.10, 0.25, 0.50, 1.00)
+            todos = true
+            maxTv = 0.0
+            for caso in casos
+                esc = escenario_de(caso, Vref, 1.0, qgref, 0.0, ehref, p("f_honesto"), via,
+                                   Pref; s = s)
+                reg = region_tv(esc, bm.βd; ρ_ret = ρ, confabulado = conf)
+                if reg.existe
+                    maxTv = max(maxTv, reg.Tv_min)
+                else
+                    todos = false
+                    break
+                end
+            end
+            todos && maxTv < mejor.Tv && (mejor = (rho = ρ, Tv = maxTv))
+        end
+        push!(filas, [fmt(s; d = 4), string(via), atacante(conf), fmt(mejor.rho; d = 3),
+                      bool(isfinite(mejor.Tv)), fmt(mejor.Tv; d = 6),
+                      fmt(isfinite(mejor.Tv) ? ceil(mejor.Tv / 1e5) * 1e5 : 0.0; d = 4),
+                      "dev; α=0.40,P*=1e-3,V=1e5,f=1,q_g=20,ε_h=1e-3; cubre los 5 casos"])
+    end
+    return escribir_csv("recomendacion-dev-s2.csv",
+        ["s_incluidor", "via", "atacante", "rho_ret", "cubre_5_casos", "Tv_min_peor",
+         "Tv_recomendado", "etiqueta"], filas)
+end
+
+"""
+    censura_s2(casos) -> Vector{Vector{String}}
+
+Barrido de la fracción `c` de producción que censura la evidencia (G-SL2b-4): `q_ev = 1 − c^n` con
+`n = 1` (conservador) y `n = F_slots` (ventana). Punto duro, `ρ_ret = 0.25`, `s = 2/8`, para el
+caso empírico y los Pareto 2,5 y 3,0, en los dos atacantes. `censura-s2b.csv`.
+"""
+function censura_s2(casos)
+    filas = Vector{Vector{String}}()
+    αref, Pref, Vref, ehref, qgref = 0.40, 1e-3, 1e5, 1e-3, 20.0
+    bm = beta_cache(αref, Pref)
+    for c in grid("censura_c", [0.0]), n in (1, round(Int, p("F_slots"))),
+        caso in (casos[1], casos[4], casos[5]), conf in (false, true), ρ in (0.25,)
+        q = q_inclusion(c, n)
+        esc = escenario_de(caso, Vref, 1.0, qgref, 0.0, ehref, p("f_honesto"), :P1, Pref;
+                           s = p("s_incluidor"), q_ev = q)
+        reg = region_tv(esc, bm.βd; ρ_ret = ρ, confabulado = conf)
+        push!(filas, [fmt(c; d = 3), string(n), fmt(q; d = 6), caso.nombre, atacante(conf),
+                      fmt(ρ; d = 3), bool(reg.existe), fmt(reg.Tv_min; d = 6),
+                      fmt(reg.Tv_max; d = 6), reg.motivo])
+    end
+    return escribir_csv("censura-s2b.csv",
+        ["c", "n_oportunidades", "q_ev", "caso", "atacante", "rho_ret", "existe", "Tv_min",
+         "Tv_max", "motivo"], filas)
+end
+
+"""
+    comprobaciones_s2b(casos) -> Vector{Vector{String}}
+
+Comprobaciones de la orden §1: `s=0` no cambia la pérdida; el reparto `premio + quemado = C`;
+la autodenuncia **nunca** es rentable; y los bordes de `q_inclusion`. `comprobaciones-s2b.csv`.
+"""
+function comprobaciones_s2b(casos)
+    filas = Vector{Vector{String}}()
+    s2 = p("s_incluidor")
+    central = casos[1]
+    e0 = escenario_de(central, 1e5, 1.0, 20.0, 0.0, 1e-3, 1e-3, :P1, 1e-3; s = 0.0)
+    L0n = perdida_castigo(e0; ρ_ret = 0.5, Tv = 3600.0, confabulado = false)
+    L0c = perdida_castigo(e0; ρ_ret = 0.5, Tv = 3600.0, confabulado = true)
+    push!(filas, ["s=0 · L_conf == L_no", fmt(L0c; d = 12), fmt(L0n; d = 12),
+                  "control reproduce SL-2", L0c == L0n ? "OK" : "FALLA"])
+    e2 = escenario_de(central, 1e5, 1.0, 20.0, 0.0, 1e-3, 1e-3, :P1, 1e-3; s = s2)
+    for (ρ, Tv) in ((0.5, 3600.0), (0.1, 1e5))
+        C = parte_confiscable(e2; ρ_ret = ρ, Tv = Tv)
+        prem = premio_incluidor(e2; ρ_ret = ρ, Tv = Tv)
+        quem = parte_quemada(e2; ρ_ret = ρ, Tv = Tv)
+        push!(filas, ["reparto premio+quemado ρ=$ρ Tv=$(Int(Tv))", fmt(prem + quem; d = 12),
+                      fmt(C; d = 12), "premio=" * fmt(prem; d = 6) * "; quemado=" * fmt(quem; d = 6),
+                      abs(prem + quem - C) <= 1e-9 * max(1.0, C) ? "OK" : "FALLA"])
+        ad = autodenuncia(e2; ρ_ret = ρ, Tv = Tv)
+        push!(filas, ["autodenuncia perdida_neta ρ=$ρ Tv=$(Int(Tv))", fmt(ad.perdida_neta; d = 12),
+                      "> 0; cota ≥ (1−s)C = " * fmt(ad.cota_inferior; d = 6), "s=" * fmt(s2; d = 4),
+                      (!ad.rentable && ad.perdida_neta > 0) ? "OK" : "FALLA"])
+    end
+    for (c, n) in ((0.0, 1), (0.5, 1), (1.0, 1), (0.5, 1019), (0.9, 1019))
+        push!(filas, ["q_inclusion(c=" * fmt(c; d = 2) * ",n=$n)", fmt(q_inclusion(c, n); d = 12),
+                      "1−c^n", "G-SL2b-4", q_inclusion(c, n) ≈ 1 - c^n ? "OK" : "FALLA"])
+    end
+    return escribir_csv("comprobaciones-s2b.csv",
+        ["caso", "valor", "esperado", "etiqueta", "resultado"], filas)
+end
+
+# =============================================================================
 # main
 # =============================================================================
 
@@ -500,6 +721,15 @@ function main()
     tabla_sensibilidades(casos)
     monte_carlo(casos, emp)
     recomendacion_dev(casos)
+
+    # ── SL-2b: recomposición con la recompensa s = 2/8 (no altera las tablas SL-2, que son s=0) ──
+    resumen_s2b = barrido_region_s2(casos)
+    if !RAPIDO
+        frontera_central_s2(casos)
+    end
+    recomendacion_dev_s2(casos)
+    censura_s2(casos)
+    comprobaciones_s2b(casos)
 
     open(joinpath(DIR_RES, "RESUMEN.txt"), "w") do io
         println(io, "SL-2 · resumen de ejecución")
@@ -522,6 +752,16 @@ function main()
         println(io, "  alpha = ", validar_alpha())
         println(io, "  Bemp = ", validar_Bemp(emp, 0.01 / 3600, SEMILLA; nrep = 4000))
         println(io, "  Bpar_2.05 = ", validar_Bpar(2.05, 0.01 / 3600; m = 200_000, nrep = 200))
+        e0 = escenario_de(casos[1], 1e5, 1.0, 20.0, 0.0, 1e-3, 1e-3, :P1, 1e-3; s = 0.0)
+        e2 = escenario_de(casos[1], 1e5, 1.0, 20.0, 0.0, 1e-3, 1e-3, :P1, 1e-3;
+                          s = p("s_incluidor"))
+        println(io, "  s2b = ", validar_s2b(e0, e2; ρ_ret = 0.5, Tv = 3600.0))
+        println(io)
+        println(io, "SL-2b (recompensa s = ", fmt(p("s_incluidor"); d = 4), " = 2/8):")
+        for r in resumen_s2b
+            println(io, "  ", r[1], " [", r[2], "]: celdas=", r[3], " existe_no=", r[4],
+                    " existe_conf=", r[5], " perdidas=", r[6], " (", r[7], ")")
+        end
         println(io)
         println(io, "artefactos:")
         for f in sort(readdir(DIR_RES))

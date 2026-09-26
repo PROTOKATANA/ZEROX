@@ -1,0 +1,85 @@
+c,n_oportunidades,q_ev,caso,atacante,rho_ret,existe,Tv_min,Tv_max,motivo
+0,1,1,empirico,no_confabulado,0.25,SI,1040.93,1.26132e+06,región no vacía
+0,1,1,empirico,confabulado,0.25,SI,1413.84,1.26132e+06,región no vacía
+0,1,1,pareto_2_5,no_confabulado,0.25,SI,737766,1.26132e+06,región no vacía
+0,1,1,pareto_2_5,confabulado,0.25,SI,983687,1.26132e+06,región no vacía
+0,1,1,pareto_3_0,no_confabulado,0.25,SI,858856,1.26132e+06,región no vacía
+0,1,1,pareto_3_0,confabulado,0.25,SI,1.14514e+06,1.26132e+06,región no vacía
+0,1019,1,empirico,no_confabulado,0.25,SI,1040.93,1.26132e+06,región no vacía
+0,1019,1,empirico,confabulado,0.25,SI,1413.84,1.26132e+06,región no vacía
+0,1019,1,pareto_2_5,no_confabulado,0.25,SI,737766,1.26132e+06,región no vacía
+0,1019,1,pareto_2_5,confabulado,0.25,SI,983687,1.26132e+06,región no vacía
+0,1019,1,pareto_3_0,no_confabulado,0.25,SI,858856,1.26132e+06,región no vacía
+0,1019,1,pareto_3_0,confabulado,0.25,SI,1.14514e+06,1.26132e+06,región no vacía
+0.1,1,0.9,empirico,no_confabulado,0.25,SI,1167.98,1.26132e+06,región no vacía
+0.1,1,0.9,empirico,confabulado,0.25,SI,1583.46,1.26132e+06,región no vacía
+0.1,1,0.9,pareto_2_5,no_confabulado,0.25,SI,737869,1.26132e+06,región no vacía
+0.1,1,0.9,pareto_2_5,confabulado,0.25,SI,983825,1.26132e+06,región no vacía
+0.1,1,0.9,pareto_3_0,no_confabulado,0.25,SI,858908,1.26132e+06,región no vacía
+0.1,1,0.9,pareto_3_0,confabulado,0.25,SI,1.14521e+06,1.26132e+06,región no vacía
+0.1,1019,1,empirico,no_confabulado,0.25,SI,1040.93,1.26132e+06,región no vacía
+0.1,1019,1,empirico,confabulado,0.25,SI,1413.84,1.26132e+06,región no vacía
+0.1,1019,1,pareto_2_5,no_confabulado,0.25,SI,737766,1.26132e+06,región no vacía
+0.1,1019,1,pareto_2_5,confabulado,0.25,SI,983687,1.26132e+06,región no vacía
+0.1,1019,1,pareto_3_0,no_confabulado,0.25,SI,858856,1.26132e+06,región no vacía
+0.1,1019,1,pareto_3_0,confabulado,0.25,SI,1.14514e+06,1.26132e+06,región no vacía
+0.25,1,0.75,empirico,no_confabulado,0.25,SI,1422.81,1.26132e+06,región no vacía
+0.25,1,0.75,empirico,confabulado,0.25,SI,1923.64,1.26132e+06,región no vacía
+0.25,1,0.75,pareto_2_5,no_confabulado,0.25,SI,738076,1.26132e+06,región no vacía
+0.25,1,0.75,pareto_2_5,confabulado,0.25,SI,984101,1.26132e+06,región no vacía
+0.25,1,0.75,pareto_3_0,no_confabulado,0.25,SI,859011,1.26132e+06,región no vacía
+0.25,1,0.75,pareto_3_0,confabulado,0.25,SI,1.14535e+06,1.26132e+06,región no vacía
+0.25,1019,1,empirico,no_confabulado,0.25,SI,1040.93,1.26132e+06,región no vacía
+0.25,1019,1,empirico,confabulado,0.25,SI,1413.84,1.26132e+06,región no vacía
+0.25,1019,1,pareto_2_5,no_confabulado,0.25,SI,737766,1.26132e+06,región no vacía
+0.25,1019,1,pareto_2_5,confabulado,0.25,SI,983687,1.26132e+06,región no vacía
+0.25,1019,1,pareto_3_0,no_confabulado,0.25,SI,858856,1.26132e+06,región no vacía
+0.25,1019,1,pareto_3_0,confabulado,0.25,SI,1.14514e+06,1.26132e+06,región no vacía
+0.5,1,0.5,empirico,no_confabulado,0.25,SI,2188.77,1.26132e+06,región no vacía
+0.5,1,0.5,empirico,confabulado,0.25,SI,2944.74,1.26132e+06,región no vacía
+0.5,1,0.5,pareto_2_5,no_confabulado,0.25,SI,738695,1.26132e+06,región no vacía
+0.5,1,0.5,pareto_2_5,confabulado,0.25,SI,984927,1.26132e+06,región no vacía
+0.5,1,0.5,pareto_3_0,no_confabulado,0.25,SI,859322,1.26132e+06,región no vacía
+0.5,1,0.5,pareto_3_0,confabulado,0.25,SI,1.14576e+06,1.26132e+06,región no vacía
+0.5,1019,1,empirico,no_confabulado,0.25,SI,1040.93,1.26132e+06,región no vacía
+0.5,1019,1,empirico,confabulado,0.25,SI,1413.84,1.26132e+06,región no vacía
+0.5,1019,1,pareto_2_5,no_confabulado,0.25,SI,737766,1.26132e+06,región no vacía
+0.5,1019,1,pareto_2_5,confabulado,0.25,SI,983687,1.26132e+06,región no vacía
+0.5,1019,1,pareto_3_0,no_confabulado,0.25,SI,858856,1.26132e+06,región no vacía
+0.5,1019,1,pareto_3_0,confabulado,0.25,SI,1.14514e+06,1.26132e+06,región no vacía
+0.75,1,0.25,empirico,no_confabulado,0.25,SI,4491.39,1.26132e+06,región no vacía
+0.75,1,0.25,empirico,confabulado,0.25,SI,6015.19,1.26132e+06,región no vacía
+0.75,1,0.25,pareto_2_5,no_confabulado,0.25,SI,740548,1.26132e+06,región no vacía
+0.75,1,0.25,pareto_2_5,confabulado,0.25,SI,987397,1.26132e+06,región no vacía
+0.75,1,0.25,pareto_3_0,no_confabulado,0.25,SI,860251,1.26132e+06,región no vacía
+0.75,1,0.25,pareto_3_0,confabulado,0.25,SI,1.147e+06,1.26132e+06,región no vacía
+0.75,1019,1,empirico,no_confabulado,0.25,SI,1040.93,1.26132e+06,región no vacía
+0.75,1019,1,empirico,confabulado,0.25,SI,1413.84,1.26132e+06,región no vacía
+0.75,1019,1,pareto_2_5,no_confabulado,0.25,SI,737766,1.26132e+06,región no vacía
+0.75,1019,1,pareto_2_5,confabulado,0.25,SI,983687,1.26132e+06,región no vacía
+0.75,1019,1,pareto_3_0,no_confabulado,0.25,SI,858856,1.26132e+06,región no vacía
+0.75,1019,1,pareto_3_0,confabulado,0.25,SI,1.14514e+06,1.26132e+06,región no vacía
+0.9,1,0.1,empirico,no_confabulado,0.25,SI,11399.1,1.26132e+06,región no vacía
+0.9,1,0.1,empirico,confabulado,0.25,SI,15225.5,1.26132e+06,región no vacía
+0.9,1,0.1,pareto_2_5,no_confabulado,0.25,SI,746066,1.26132e+06,región no vacía
+0.9,1,0.1,pareto_2_5,confabulado,0.25,SI,994755,1.26132e+06,región no vacía
+0.9,1,0.1,pareto_3_0,no_confabulado,0.25,SI,863025,1.26132e+06,región no vacía
+0.9,1,0.1,pareto_3_0,confabulado,0.25,SI,1.1507e+06,1.26132e+06,región no vacía
+0.9,1019,1,empirico,no_confabulado,0.25,SI,1040.93,1.26132e+06,región no vacía
+0.9,1019,1,empirico,confabulado,0.25,SI,1413.84,1.26132e+06,región no vacía
+0.9,1019,1,pareto_2_5,no_confabulado,0.25,SI,737766,1.26132e+06,región no vacía
+0.9,1019,1,pareto_2_5,confabulado,0.25,SI,983687,1.26132e+06,región no vacía
+0.9,1019,1,pareto_3_0,no_confabulado,0.25,SI,858856,1.26132e+06,región no vacía
+0.9,1019,1,pareto_3_0,confabulado,0.25,SI,1.14514e+06,1.26132e+06,región no vacía
+1,1,0,empirico,no_confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1,0,empirico,confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1,0,pareto_2_5,no_confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1,0,pareto_2_5,confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1,0,pareto_3_0,no_confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1,0,pareto_3_0,confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1019,0,empirico,no_confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1019,0,empirico,confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1019,0,pareto_2_5,no_confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1019,0,pareto_2_5,confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1019,0,pareto_3_0,no_confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión
+1,1019,0,pareto_3_0,confabulado,0.25,NO,Inf,1.26132e+06,κq_ev = 0: sin evidencia no hay soborno ni disuasión

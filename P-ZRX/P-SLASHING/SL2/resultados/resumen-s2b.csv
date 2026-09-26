@@ -1,0 +1,11 @@
+caso,via,celdas,existe_no_confabulado,existe_confabulado,celdas_perdidas,s_incluidor
+empirico,P1,11520,11000,10960,40,s=0.25
+empirico,P2,11520,11000,10960,40,s=0.25
+pareto_2_05,P1,11520,9893,9731,162,s=0.25
+pareto_2_05,P2,11520,10840,10760,80,s=0.25
+pareto_2_2,P1,11520,6991,6671,320,s=0.25
+pareto_2_2,P2,11520,10840,10760,80,s=0.25
+pareto_2_5,P1,11520,5318,4952,366,s=0.25
+pareto_2_5,P2,11520,10840,10759,81,s=0.25
+pareto_3_0,P1,11520,4680,4432,248,s=0.25
+pareto_3_0,P2,11520,10840,10759,81,s=0.25

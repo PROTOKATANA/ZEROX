@@ -1,0 +1,11 @@
+caso,valor,esperado,etiqueta,resultado
+s=0 · L_conf == L_no,1830,1830,control reproduce SL-2,OK
+reparto premio+quemado ρ=0.5 Tv=3600,1820,1820,premio=455; quemado=1365,OK
+autodenuncia perdida_neta ρ=0.5 Tv=3600,1375,> 0; cota ≥ (1−s)C = 1365,s=0.25,OK
+reparto premio+quemado ρ=0.1 Tv=100000,10020,10020,premio=2505; quemado=7515,OK
+autodenuncia perdida_neta ρ=0.1 Tv=100000,7525,> 0; cota ≥ (1−s)C = 7515,s=0.25,OK
+q_inclusion(c=0;n=1),1,1−c^n,G-SL2b-4,OK
+q_inclusion(c=0.5;n=1),0.5,1−c^n,G-SL2b-4,OK
+q_inclusion(c=1;n=1),0,1−c^n,G-SL2b-4,OK
+q_inclusion(c=0.5;n=1019),1,1−c^n,G-SL2b-4,OK
+q_inclusion(c=0.9;n=1019),1,1−c^n,G-SL2b-4,OK

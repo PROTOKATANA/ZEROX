@@ -87,7 +87,14 @@ struct Escenario
     f_h::Float64          # fracción de la clave honesta representativa
     frac_max::Float64     # tope de pérdida del honesto como fracción de su ingreso
     via_perdida::Symbol   # :P1 (fiel DS-3) o :P2 (corrección de unidades, F5)
+    s::Float64            # fracción de lo confiscado que va al incluidor (DS-L03; G-SL2b-1/G2)
 end
+
+"Constructor heredado de SL-2 (17 campos): `s = 0` reproduce SL-2 exactamente (G-SL2b-5)."
+Escenario(dist, V, f_conf, q_g, c_r, I, λ, κ, q_ev, eps_saldo, R_slots, F_slots, P_obj,
+         eps_h, f_h, frac_max, via_perdida) =
+    Escenario(dist, V, f_conf, q_g, c_r, I, λ, κ, q_ev, eps_saldo, R_slots, F_slots, P_obj,
+              eps_h, f_h, frac_max, via_perdida, 0.0)
 
 # ─────────────────────────────────── frontera de deriva (MODELO §2.1)
 
@@ -189,9 +196,10 @@ function B_empirico(d::Empirica, x)
     return k == 0 ? 0.0 : d.suma_acum[k + 1] / d.denom
 end
 
-"Umbral `x = ε/(f·λ·T_v^eff)` con `T_v^eff = T_v + R_slots` (resoluciones F3, F7)."
-@inline funcion_umbral(eps_saldo, f_conf, λ, Tv, R_slots) =
-    eps_saldo / (f_conf * λ * (Tv + R_slots))
+"Umbral `x = ε/(factor·f·λ·T_v^eff)` con `T_v^eff = T_v + R_slots` (resoluciones F3, F7).
+`factor = 1` es SL-2; `factor = 1−s` es el confabulado que recupera `s` (G-SL2b-3)."
+@inline funcion_umbral(eps_saldo, f_conf, λ, Tv, R_slots, factor = 1.0) =
+    eps_saldo / (factor * f_conf * λ * (Tv + R_slots))
 
 "`B` del escenario en `T_v` (empírica o Pareto)."
 B_de(d::Empirica, x) = B_empirico(d, x)
@@ -200,18 +208,32 @@ B_de(d::ParetoDist, x) = B_par(d, x)
 # ─────────────────────────────── pérdida y condiciones (MODELO §2.5 + F1/F5)
 
 """
-    perdida_castigo(esc; ρ_ret, Tv) -> Float64
+    parte_confiscable(esc; ρ_ret, Tv) -> Float64
 
-Pérdida expuesta por reclutado (garantía + saldo retenido + recargo) según la vía declarada:
-  · `:P1` (fiel a DS-3): `f·(ρ_ret·I·T_v^eff + q_g) + c_r`;
-  · `:P2` (corrección de unidades F5): saldo retenido por clave `ρ_ret·I·λ·f_media·T_v^eff/2`.
+Parte **confiscable** de la pérdida por reclutado, `C = f·(retenido + q_g)`: es la base que se
+reparte (`s` al incluidor, `1−s` quemado) y la que usa EV-19 (`f·V(P,incidente)`). No incluye el
+recargo fijo `c_r`, que no se confisca ni se reparte (G-SL2b-1, G-SL2b-2).
 """
-function perdida_castigo(esc::Escenario; ρ_ret, Tv)
+function parte_confiscable(esc::Escenario; ρ_ret, Tv)
     Tveff = Tv + esc.R_slots
     retenido = esc.via_perdida === :P2 ?
         ρ_ret * esc.I * esc.λ * f_media_de(esc.dist) * Tveff / 2 :
         ρ_ret * esc.I * Tveff
-    return esc.f_conf * (retenido + esc.q_g) + esc.c_r
+    return esc.f_conf * (retenido + esc.q_g)
+end
+
+"""
+    perdida_castigo(esc; ρ_ret, Tv, confabulado = false) -> Float64
+
+Pérdida expuesta por reclutado (garantía + saldo retenido + recargo) según la vía declarada:
+  · `:P1` (fiel a DS-3): `f·(ρ_ret·I·T_v^eff + q_g) + c_r`;
+  · `:P2` (corrección de unidades F5): saldo retenido por clave `ρ_ret·I·λ·f_media·T_v^eff/2`.
+Si `confabulado = true`, el infractor recupera `s` de la parte confiscable vía la coinbase de quien
+incluye: `(1−s)·C + c_r`. Con `s = 0` (o `confabulado = false`) coincide con SL-2.
+"""
+function perdida_castigo(esc::Escenario; ρ_ret, Tv, confabulado::Bool = false)
+    C = parte_confiscable(esc; ρ_ret = ρ_ret, Tv = Tv)
+    return (confabulado ? (1 - esc.s) : 1.0) * C + esc.c_r
 end
 
 "Fracción de espacio por clave media usada en la vía P2 y en `N_paid`."
@@ -219,23 +241,26 @@ f_media_de(d::Empirica) = d.f_media
 f_media_de(d::ParetoDist) = d.f_media
 
 """
-    coste_disuasion(esc, β_d; ρ_ret, Tv) -> (coste, N_paid, L, B)
+    coste_disuasion(esc, β_d; ρ_ret, Tv, confabulado = false) -> (coste, N_paid, L, B)
 
 Coste total que el atacante debe pagar para reclutar `β_d`, contando que las claves sin saldo
 (`B(ε)`) se reclutan gratis y solo las pagadas cobran soborno esperado `κ·q_ev·L`:
 `N_paid = max(0, β_d − B)/f_media`. Con `B = 0` reproduce `N_recl·κq·L` de DS-3 (resolución F6).
+Si `confabulado = true`, `L` se rebaja por `s` y el umbral de saldo «gratis» pasa a
+`x = ε/((1−s)·f·λ·T_v^eff)` (G-SL2b-3).
 """
-function coste_disuasion(esc::Escenario, βd; ρ_ret, Tv)
-    x = funcion_umbral(esc.eps_saldo, esc.f_conf, esc.λ, Tv, esc.R_slots)
+function coste_disuasion(esc::Escenario, βd; ρ_ret, Tv, confabulado::Bool = false)
+    factor = confabulado ? (1 - esc.s) : 1.0
+    x = funcion_umbral(esc.eps_saldo, esc.f_conf, esc.λ, Tv, esc.R_slots, factor)
     B = B_de(esc.dist, x)
     N_paid = max(0.0, βd - B) / f_media_de(esc.dist)
-    L = perdida_castigo(esc; ρ_ret = ρ_ret, Tv = Tv)
+    L = perdida_castigo(esc; ρ_ret = ρ_ret, Tv = Tv, confabulado = confabulado)
     return (coste = N_paid * esc.κ * esc.q_ev * L, N_paid = N_paid, L = L, B = B)
 end
 
 "¿Disuade? coste total > valor total `V` (resolución F6)."
-@inline condicion_disuasion(esc::Escenario, βd; ρ_ret, Tv) =
-    coste_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv).coste > esc.V
+@inline condicion_disuasion(esc::Escenario, βd; ρ_ret, Tv, confabulado::Bool = false) =
+    coste_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv, confabulado = confabulado).coste > esc.V
 
 "Ingreso anual de una clave de fracción `f_h` (resolución F4)."
 @inline ingreso_anual(esc::Escenario; f_h) = esc.λ * f_h * esc.I * T_AÑO_S
@@ -258,19 +283,19 @@ end
 # ─────────────────────────────── región en `T_v` para `ρ_ret` fijo (fórmulas cerradas)
 
 """
-    region_tv(dist, β_d, esc; ρ_ret) -> NamedTuple
+    region_tv(esc, β_d; ρ_ret, confabulado = false) -> NamedTuple
 
 Región `(ρ_ret, T_v)` con fórmulas cerradas, en `T_v` para `ρ_ret` fijo:
   · cota inferior `Tv_min`: la cierra la disuasión `A` (o la viabilidad `T_v > F`);
   · cota superior `Tv_max`: la cierra la honestidad `B` (`ε_h·L ≤ frac_max·ingreso`);
   · `existe` y el motivo cuando se vacía (``A``, ``honesto`` o ``κq_ev=0``).
 Monótona: `N_paid` y `L` crecen con `T_v`, así que si `A` falla en `Tv_max` falla en todo el
-intervalo.
+intervalo. `confabulado = true` usa `L_conf` y el umbral `(1−s)` en `A` (G-SL2b-3); el borde
+superior de honestidad usa siempre `L_no`, porque el honesto accidental no es confabulado.
 """
-function region_tv(esc::Escenario, βd; ρ_ret)
+function region_tv(esc::Escenario, βd; ρ_ret, confabulado::Bool = false)
     F = esc.F_slots
-    L(Tv) = perdida_castigo(esc; ρ_ret = ρ_ret, Tv = Tv)
-    # cota superior por la honestidad: L(Tv) ≤ Cmax
+    # cota superior por la honestidad (no confabulado): ε_h·L_no(Tv) ≤ Cmax
     Cmax = max_perdida_honesta(esc; f_h = esc.f_h) / esc.eps_h
     retenido_unit = esc.via_perdida === :P2 ?
         ρ_ret * esc.I * esc.λ * f_media_de(esc.dist) / 2 : ρ_ret * esc.I
@@ -279,7 +304,8 @@ function region_tv(esc::Escenario, βd; ρ_ret)
     Tv_max = pendiente > 0 ? (Cmax - intercepto) / pendiente : Inf
 
     # cota inferior por la disuasión A: coste(Tv) > V (monótono creciente en Tv)
-    A_ok(Tv) = esc.κ * esc.q_ev > 0 && condicion_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv)
+    A_ok(Tv) = esc.κ * esc.q_ev > 0 &&
+               condicion_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv, confabulado = confabulado)
 
     if esc.κ * esc.q_ev <= 0
         return (existe = false, Tv_min = Inf, Tv_max = Tv_max, borde_inf = "κq_ev=0",
@@ -292,7 +318,7 @@ function region_tv(esc::Escenario, βd; ρ_ret)
                 motivo = "la honestidad cierra antes de T_v > F (Tv_max ≤ F)")
     end
     if !A_ok(Tv_max)
-        c = coste_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv_max)
+        c = coste_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv_max, confabulado = confabulado)
         return (existe = false, Tv_min = Inf, Tv_max = Tv_max, borde_inf = "A", borde_sup = "honesto",
                 B_min = c.B, N_paid_min = c.N_paid, L_min = c.L,
                 motivo = "A no disuade ni en Tv_max (grieta o coste insuficiente)")
@@ -314,10 +340,50 @@ function region_tv(esc::Escenario, βd; ρ_ret)
         Tv_min = hi
         borde_inf = "A (disuasión)"
     end
-    cmin = coste_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv_min)
+    cmin = coste_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = Tv_min, confabulado = confabulado)
     return (existe = Tv_min < Tv_max, Tv_min = Tv_min, Tv_max = Tv_max, borde_inf = borde_inf,
             borde_sup = "honesto", B_min = cmin.B, N_paid_min = cmin.N_paid, L_min = cmin.L,
             motivo = Tv_min < Tv_max ? "región no vacía" : "Tv_min ≥ Tv_max")
+end
+
+# ─────────────────────────── recompensa al incluidor, autodenuncia e inclusión (SL-2b)
+# Órdenes §1 y §3. `s` = fracción de lo confiscado que va a la coinbase del bloque que aplica la
+# `EvidenceTx` (DS-L03): 2/8 ratificado; 3/8 solo sensibilidad.
+
+"Premio que cobra quien incluye la prueba: `s·C` (fracción `s` de la parte confiscable `C`)."
+@inline premio_incluidor(esc::Escenario; ρ_ret, Tv) =
+    esc.s * parte_confiscable(esc; ρ_ret = ρ_ret, Tv = Tv)
+
+"Parte quemada: `(1−s)·C`."
+@inline parte_quemada(esc::Escenario; ρ_ret, Tv) =
+    (1 - esc.s) * parte_confiscable(esc; ρ_ret = ρ_ret, Tv = Tv)
+
+"""
+    autodenuncia(esc; ρ_ret, Tv) -> NamedTuple
+
+Comprueba que la autodenuncia **nunca** es rentable: el infractor que incluye su propia prueba
+pierde `(1−s)·C` de lo confiscado (recupera `s·C` en su propia coinbase) y además paga `c_r`.
+`rentable = perdida_neta <= 0` debe ser `false` siempre que `C > 0` (con `s < 1`).
+"""
+function autodenuncia(esc::Escenario; ρ_ret, Tv)
+    C = parte_confiscable(esc; ρ_ret = ρ_ret, Tv = Tv)
+    premi = esc.s * C
+    perdida_neta = C - premi + esc.c_r
+    return (C = C, premio = premi, perdida_neta = perdida_neta,
+            cota_inferior = (1 - esc.s) * C, rentable = perdida_neta <= 0)
+end
+
+"""
+    q_inclusion(c, n = 1) -> Float64
+
+Probabilidad de inclusión con una fracción `c` de la producción censurando la evidencia y `n`
+oportunidades independientes: `q_ev = 1 − c^n` (G-SL2b-4). `c = 0` ⇒ inclusión segura (`q_ev = 1`,
+hipótesis declarada de la orden); `c ≥ 1` ⇒ censura total; `n = 1` es la lectura conservadora.
+"""
+@inline function q_inclusion(c::Real, n::Integer = 1)
+    c <= 0 && return 1.0
+    c >= 1 && return 0.0
+    return 1.0 - Float64(c)^n
 end
 
 # ───────────────────────────────────────────── lectura de datos de DS-6

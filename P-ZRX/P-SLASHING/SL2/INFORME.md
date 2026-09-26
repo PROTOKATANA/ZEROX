@@ -1,12 +1,19 @@
 # INFORME — SL-2 · Calibración del castigo: disuadir al que recluta sin castigar al honesto
 
-**ID:** SL-2. **Fecha:** 2026-09-26. **Director:** Claude. **Ejecutor:** DeepSeek (Julia).
-**Zona:** `P-ZRX/P-SLASHING/SL2/`. **Entrada congelada:** `ENTRADA-SL2.sha256` (verificada 8/8).
+> Incluye **SL-2b**: recalibración con la recompensa de 2/8 a quien incluye la evidencia (§9).
+
+**ID:** SL-2 (y SL-2b). **Fecha:** 2026-09-26. **Director:** Claude. **Ejecutor:** DeepSeek (Julia).
+**Zona:** `P-ZRX/P-SLASHING/SL2/`. **Entradas congeladas:** `ENTRADA-SL2.sha256` (8/8) y
+`ENTRADA-SL2b.sha256` (5 entradas). **Nota de integridad:** al arrancar, SL-2b verificó 5/5; durante
+la ejecución, Katana actualizó `DECISIONES.md` (18:40:32) llenando **DS-L04** (pasó de `Pendiente`
+a la opción C, identidad con `consensus_branch_id`). **DS-L03 — base de SL-2b — no cambió**; el
+cambio no afecta a ningún número de este informe y está fuera de la zona escribible.
 **Base:** modelo ratificado de DS-3 (`resultados-DS2/MODELO.md`, `DS3/src/`) con la corrección de
 `REVISION-DS3.md` (la región de retención es `ρ_ret·T_v > V/N − c_r − I·M`), sin castigo
 correlacionado (`REVISION-DS5.md`), y reparto de espacio de DS-6 (`farmers-raw.csv`, corrección A de
 convención) como caso central y la Pareto de H3 como pesimista.
-**Faltas de definición:** `DEFINICIONES-FALTANTES.md` (F1–F10), escritas **antes** de tocar código.
+**Faltas de definición:** `DEFINICIONES-FALTANTES.md` (F1–F10) y
+`DEFINICIONES-FALTANTES-SL2b.md` (G1–G6), escritas **antes** de tocar código.
 
 ---
 
@@ -133,7 +140,8 @@ respaldo**; y **el firmante seguro es lo que hace posible el perfil primario** �
 
 ## 5 · Validación y Monte Carlo
 
-`Pkg.test()` en verde: **39/39** (`test/runtests.jl`). `run.jl` revalida lo mismo en `RESUMEN.txt`.
+`Pkg.test()` en verde: **97/97** (`test/runtests.jl`; 39 de SL-2 + 58 de SL-2b, §9.5). `run.jl`
+revalida lo mismo en `RESUMEN.txt`.
 
 | Comprobación | Resultado | Error / IC |
 |---|---|---|
@@ -203,22 +211,144 @@ JULIA_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 \
 
 ```
 SL2/
-├── DEFINICIONES-FALTANTES.md   F1–F10 (antes de código)
-├── INFORME.md                  este documento
-├── Project.toml Manifest.toml  entorno congelado (Julia 1.13.0)
-├── escenarios.tsv              parámetros con etiqueta y barrido
-├── datos/farmers-raw.csv       copia congelada de DS-6 (sha256 a18b7738…fdd18)
+├── DEFINICIONES-FALTANTES.md       F1–F10 (antes de código)
+├── DEFINICIONES-FALTANTES-SL2b.md  G1–G6 (antes de editar SL-2b)
+├── INFORME.md                      este documento
+├── Project.toml Manifest.toml      entorno congelado (Julia 1.13.0)
+├── escenarios.tsv                  parámetros con etiqueta y barrido
+├── datos/farmers-raw.csv           copia congelada de DS-6 (sha256 a18b7738…fdd18)
 ├── src/{SL2,modelo,referencia,rapido,validacion}.jl
-├── test/runtests.jl            Pkg.test() 39/39
+├── test/runtests.jl                Pkg.test() 97/97
 ├── bench/benchmarks.jl
 └── resultados/
     ├── comprobaciones.csv beta-d.csv Beps-escenarios.csv grieta.csv
     ├── region.csv (57 600 filas) frontera-central.csv
     ├── sensibilidad-P2.csv sensibilidad-R.csv sensibilidad-fh.csv
     ├── monte-carlo.csv recomendacion-dev.csv
+    ├── region-s2.csv (230 400 filas; P1 y P2) resumen-s2b.csv celdas-perdidas-s2b.csv
+    ├── frontera-central-s2.csv recomendacion-dev-s2.csv
+    ├── censura-s2b.csv comprobaciones-s2b.csv
     ├── BENCH.txt RESUMEN.txt
     └── HUELLAS.sha256
 ```
 
 Presupuesto declarado (LINEO §7): 4 hilos, 8 GiB de RAM, 256 MiB de disco; usado ≈2,4 s de pared y
 <1 GiB. Estado: **completo** (no inconcluso).
+
+---
+
+# 9 · SL-2b · Recompensa al incluidor (`s = 2/8`): recalibración con DS-L03
+
+**Orden:** `ORDEN-SL2b-RECOMPENSA.md`. **Faltas de definición:** `DEFINICIONES-FALTANTES-SL2b.md`
+(G1–G6), escritas antes de tocar código. **Decisión:** `DECISIONES.md` DS-L03 — **2/8** de lo
+confiscado a la coinbase del bloque que aplica la `EvidenceTx`, 6/8 quemado (Katana fijó 3/8 y lo
+corrigió a 2/8 el mismo día; 3/8 se publica **solo como sensibilidad**).
+
+## 9.1 · Qué cambia en el modelo
+
+- **Símbolo.** El `f·V` de la orden es la **parte confiscable** `C = f·(retenido + q_g)` del modelo
+  SL-2 (EV-19 de SL-1), **no** el `V` de SL-2 (valor del ataque): la colisión se resuelve llamando a
+  la base `parte_confiscable` (G1). El premio al incluidor es `s·C`; se quema `(1−s)·C`.
+- **Dos atacantes (G3).** *No confabulado*: pérdida por reclutado `L_no = C + c_r`, idéntica a SL-2
+  (no depende de `s`). *Confabulado*: recupera `s` de `C` vía la coinbase de quien incluye,
+  `L_conf = (1−s)·C + c_r`, y su umbral de saldo «gratis» pasa a `x = ε/((1−s)·f·λ·T_v^eff)`. El
+  **borde superior de honestidad no cambia**: el honesto accidental no es confabulado y usa `L_no`.
+- **Autodenuncia (orden §1).** Comprobada en `comprobaciones-s2b.csv`: el infractor que incluye su
+  propia prueba pierde `C − s·C + c_r = (1−s)·C + c_r > 0`; con `C = f·V > 0` y `s < 1` nunca es
+  rentable (con `s=2/8`, `c_r=10`, `C=1820`: pierde `1375 > (1−s)·C = 1365`). `Pkg.test()` lo cubre.
+- **Inclusión y censura (G4).** `q_ev(c) = 1 − c^n`: `c=0` ⇒ inclusión segura (hipótesis de la
+  orden), `c=1` ⇒ censura total, `n=1` (lectura conservadora) y `n=F_slots=1019` (ventana).
+
+## 9.2 · La región y las celdas que se pierden
+
+Con `s=2/8`, el atacante **no confabulado reproduce exactamente la región de SL-2** (mismos
+artefactos) en las dos lecturas de unidades P1/P2. El confabulado pierde celdas en las esquinas
+duras (borde inferior `A`, que ahora exige más `T_v`):
+
+| Reparto | Vía | Celdas con región (de 11 520) | Celdas perdidas |
+|---|---|---:|---:|
+| **Empírico DS-6** | P1 | 10 960 (vs 11 000) | **40** |
+| **Empírico DS-6** | P2 | 10 960 (vs 11 000) | **40** |
+| Pareto 2,05 | P1 | 9 731 (vs 9 893) | 162 |
+| Pareto 2,05 | P2 | 10 760 (vs 10 840) | 80 |
+| Pareto 2,2 | P1 | 6 671 (vs 6 991) | 320 |
+| Pareto 2,2 | P2 | 10 760 (vs 10 840) | 80 |
+| Pareto 2,5 | P1 | 4 952 (vs 5 318) | 366 |
+| Pareto 2,5 | P2 | 10 759 (vs 10 840) | 81 |
+| Pareto 3,0 | P1 | 4 432 (vs 4 680) | 248 |
+| Pareto 3,0 | P2 | 10 759 (vs 10 840) | 81 |
+
+- **Las 40 celdas empíricas perdidas** tienen todas `ε_h = 10⁻¹` (sin firmante seguro), `V = 10⁶`,
+  `α = 0,40`, `f ∈ {0,25;0,5;1}` y las cuatro `ρ_ret`, en P1 y P2 por igual. **Con firmante seguro
+  (`ε_h ≤ 10⁻³`) el caso central no pierde ninguna celda** (el borde inferior sube un factor ≈1,36,
+  muy por debajo del `T_v` disponible). Detalle en `celdas-perdidas-s2b.csv`.
+- El Pareto pierde más celdas en P1 porque su grieta es mayor y `A` necesita `L` completo; en P2 la
+  parte confiscable está dominada por `q_g` (constante), el rebote `s` pesa menos en proporción y
+  caen menos celdas. En ninguna lectura se invierte el signo: la región sobrevive.
+
+## 9.3 · Valores recomendados para la red dev (NO producción)
+
+Punto duro `α=0,40`, `P*=10⁻³`, `V=10⁵`, `f=1`, `q_g=20`, `ε_h=10⁻³`, `f_h=10⁻³`, cubriendo los
+cinco repartos y cada lectura de unidades:
+
+| `s` | Vía | Atacante | `ρ_ret` | `T_v` (peor caso) | `T_v` redondeado |
+|---|---:|---|---:|---:|---:|
+| 0 (control = SL-2) | P1 | no confabulado | 0,25 | 858 856 | **900 000** |
+| 2/8 | P1 | no confabulado | 0,25 | 858 856 | **900 000** |
+| **2/8 (ratificado)** | **P1** | **confabulado** | **0,25** | **1 145 140** | **1 200 000** (≈13,9 d) |
+| 3/8 (descartado) | P1 | confabulado | 0,10 | 1 375 290 | **1 400 000** (≈16,2 d) |
+| 0 | P2 | ambos | 1,00 | 1 352 340 | **1 400 000** |
+| **2/8** | **P2** | **confabulado** | **1,00** | **1 816 450** | **1 900 000** (≈22,0 d) |
+| 3/8 (descartado) | P2 | confabulado | 1,00 | 2 187 740 | **2 200 000** (≈25,5 d) |
+
+- **El perfil primario de SL-2 no cambia** para el caso central medido en P1: `ρ_ret=0,10`,
+  `T_v=10⁵` cubre al confabulado con `T_v^min = 3 512` slots (vs `2 584` sin connivencia; ×1,36).
+- **Con la lectura P2 (saldo por clave, más pequeña)** el `T_v` robusto es mayor en todas las
+  variantes (`ρ_ret=1,0`, `1,4·10⁶` sin `s` y `1,9·10⁶` con `s=2/8`), pero el veredicto no cambia:
+  la región existe. **El perfil robusto P1 sube de 900 000 a 1 200 000 slots** con `s=2/8`, y a
+  1 400 000 con `s=3/8`: es el coste de mantener la disuasión cuando el infractor comparte `s`.
+
+## 9.4 · Censura de la evidencia (barrido de `c`)
+
+`censura-s2b.csv` (punto duro, `ρ_ret=0,25`, `s=2/8`):
+
+- Con `n=1` (una sola oportunidad), `q_ev = 1−c` y el `T_v^min` del confabulado crece con `c`
+  (empírico: 1 414 → 15 226 slots de `c=0` a `c=0,9`); a `c=1` la región se vacía (`q_ev=0`).
+- Con `n=F_slots=1019` (ventana de admisión), `q_ev ≈ 1` para todo `c<1` y el barrido es
+  **idéntico** al caso sin censura: **cualquier productor honesto dentro de la ventana derrota a un
+  censor minoritario**. La censura solo mordería con ventana de una sola oportunidad o `c→1`.
+- Límite declarado (G4): se asume que el premio `s·C` basta para que el honesto incluya; con saldos
+  diminutos `C` puede no cubrir el coste fijo de la transacción.
+
+## 9.5 · Validación, rendimiento y reproducción
+
+- `Pkg.test()`: **97/97** (39 de SL-2 + 58 de SL-2b). `run.jl` completo en **≈5,3 s** de pared con
+  4 hilos (SL-2 era 2,39 s); el barrido nuevo `region-s2.csv` (230 400 filas, P1 y P2) domina el
+  extra. Sin `@fastmath`/`@simd`/`Float32`; memoización de `β_d` intacta; `region_tv` sigue con 0
+  asignaciones.
+- **Reproducción de SL-2 comprobada:** los once CSV de SL-2 regenerados por `run.jl` tienen
+  **hash idéntico** a `resultados/HUELLAS.sha256` de SL-2 (`s=0`, control); solo `RESUMEN.txt` cambia
+  (añade el bloque SL-2b). `region.csv` (57 600 filas) y `frontera-central.csv` son byte a byte los
+  de SL-2.
+- `RESUMEN.txt` publica `s2b = (coincide_s0=true, cotas_ok=true, autodenuncia_ok=true,
+  perdida_menor=true, err=0.0)`.
+- Artefactos nuevos: `region-s2.csv`, `resumen-s2b.csv`, `celdas-perdidas-s2b.csv`,
+  `frontera-central-s2.csv`, `recomendacion-dev-s2.csv`, `censura-s2b.csv`,
+  `comprobaciones-s2b.csv`.
+
+## 9.6 · Veredicto de la pregunta falsable de SL-2b
+
+> «Con la recompensa de 2/8, ¿la región del caso central (reparto empírico de DS-6) sigue siendo no
+> vacía para `α_atacante ∈ [0,20;0,40]` y `ε_h ≤ 10⁻³`, incluso contra un atacante confabulado con
+> quien incluye su evidencia?»
+
+**SÍ.** En el caso central (reparto empírico DS-6) la región del atacante **confabulado** sigue
+siendo no vacía en todas las celdas con `ε_h ≤ 10⁻³`; las 40 celdas que se pierden son todas de
+`ε_h = 10⁻¹` (sin firmante seguro), `V = 10⁶` y `α = 0,40`, es decir, celdas que la honestidad o la
+grieta ya tenían al límite. En el caso pesimista (Pareto H3) la región también sobrevive, a costa de
+un `T_v` mayor. El precio de la recompensa es acotado y explícito: el perfil robusto pasa de
+`9·10⁵` a `1,2·10⁶` slots (`s=2/8`) y a `1,4·10⁶` (`s=3/8`, descartado); el perfil primario del
+caso medido no cambia.
+
+Presupuesto SL-2b (LINEO §7): 4 hilos, 8 GiB de RAM, 256 MiB de disco; usado ≈5,3 s de pared y
+<1 GiB (los nuevos CSV ocupan ≈40 MiB). Estado: **completo** (no inconcluso).

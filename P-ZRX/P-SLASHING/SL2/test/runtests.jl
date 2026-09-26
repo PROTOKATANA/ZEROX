@@ -8,10 +8,11 @@ using SL2
 
 const SEMILLA = UInt64(0x5a5a)
 
-"Escenario base de prueba (Pareto, vía P1 fiel a DS-3)."
+"Escenario base de prueba (Pareto, vía P1 fiel a DS-3). `s=0` y `q_ev=1` reproducen SL-2."
 function escenario_prueba(; dist = ParetoDist(1e-8, 2.5, 1e-3), V = 1e4, f = 1.0, qg = 20.0,
-                          R = 0.0, eh = 1e-3, fh = 1e-3, via = :P1, P = 1e-3, eps = 0.01)
-    Escenario(dist, V, f, qg, 10.0, 1.0, 1.0, 1.0, 1.0, eps, R, 1019.0, P, eh, fh, 0.01, via)
+                          R = 0.0, eh = 1e-3, fh = 1e-3, via = :P1, P = 1e-3, eps = 0.01,
+                          s = 0.0, q_ev = 1.0)
+    Escenario(dist, V, f, qg, 10.0, 1.0, 1.0, 1.0, q_ev, eps, R, 1019.0, P, eh, fh, 0.01, via, s)
 end
 
 @testset "SL-2" begin
@@ -127,6 +128,76 @@ end
     @test abs(mch.media - cerrada) / cerrada < 0.05
 
     @test hash64(SEMILLA, UInt64(1)) != hash64(SEMILLA, UInt64(2))
+end
+
+@testset "SL-2b · recompensa al incluidor (s) y censura" begin
+    base = escenario_prueba()                       # s = 0, q_ev = 1
+    e_s2 = escenario_prueba(s = 0.25)               # valor ratificado 2/8
+    e_s3 = escenario_prueba(s = 0.375)              # sensibilidad 3/8 (descartada)
+
+    # (1) s = 0 reproduce SL-2 exactamente, confabulado o no
+    @test perdida_castigo(base; ρ_ret = 0.5, Tv = 3600.0, confabulado = true) ==
+          perdida_castigo(base; ρ_ret = 0.5, Tv = 3600.0, confabulado = false)
+
+    # (2) reparto y pérdida del confabulado
+    C = parte_confiscable(e_s2; ρ_ret = 0.5, Tv = 3600.0)
+    Lc = perdida_castigo(e_s2; ρ_ret = 0.5, Tv = 3600.0, confabulado = true)
+    Ln = perdida_castigo(e_s2; ρ_ret = 0.5, Tv = 3600.0, confabulado = false)
+    @test Lc == (1 - 0.25) * C + e_s2.c_r
+    @test Lc < Ln
+    @test premio_incluidor(e_s2; ρ_ret = 0.5, Tv = 3600.0) == 0.25 * C
+    @test premio_incluidor(e_s2; ρ_ret = 0.5, Tv = 3600.0) +
+          parte_quemada(e_s2; ρ_ret = 0.5, Tv = 3600.0) ≈ C
+
+    # (3) la autodenuncia nunca es rentable
+    for ρ in (0.1, 0.25, 0.5, 1.0), Tv in (1019.0, 3600.0, 1e5)
+        ad = autodenuncia(e_s2; ρ_ret = ρ, Tv = Tv)
+        @test !ad.rentable
+        @test ad.perdida_neta > 0
+        @test ad.perdida_neta >= ad.cota_inferior
+    end
+    vs = validar_s2b(base, e_s2; ρ_ret = 0.5, Tv = 3600.0)
+    @test vs.coincide_s0 && vs.cotas_ok && vs.autodenuncia_ok && vs.perdida_menor
+
+    # (4) monotonía: la región del confabulado es subconjunto de la del no confabulado
+    bm = beta_minimo_para_p(0.33, 1019.0, 1e-3)
+    rn = region_tv(e_s2, bm.βd; ρ_ret = 0.25, confabulado = false)
+    rc = region_tv(e_s2, bm.βd; ρ_ret = 0.25, confabulado = true)
+    @test rn.existe
+    @test rc.existe
+    @test rc.Tv_min >= rn.Tv_min - 1e-9
+    @test rc.Tv_max == rn.Tv_max                  # el borde de honestidad no cambia
+    vr = validar_region(e_s2, bm.βd, 0.25; confabulado = true)
+    @test vr.existe && vr.a_en_min && vr.b_en_max
+    # regresión del fenómeno «celda perdida»: con ρ=0.5 la región existía en SL-2 y con s=2/8
+    # el confabulado ya no la tiene (Pareto 2.5, V=1e4, α=0.33, P*=1e-3)
+    rn5 = region_tv(e_s2, bm.βd; ρ_ret = 0.5, confabulado = false)
+    rc5 = region_tv(e_s2, bm.βd; ρ_ret = 0.5, confabulado = true)
+    @test rn5.existe
+    @test !rc5.existe
+    # s mayor ⇒ pérdida menor (el atacante gana más con la connivencia)
+    @test perdida_castigo(e_s3; ρ_ret = 0.5, Tv = 3600.0, confabulado = true) < Lc
+
+    # (5) modelo de inclusión y censura
+    @test q_inclusion(0.0) == 1.0
+    @test q_inclusion(1.0) == 0.0
+    @test q_inclusion(0.5) == 0.5
+    @test q_inclusion(0.5, 1019) ≈ 1 - 0.5^1019
+    @test q_inclusion(0.5, 2) ≈ 0.75
+    e_segura = escenario_prueba(s = 0.25, q_ev = q_inclusion(0.0))
+    e_cens = escenario_prueba(s = 0.25, q_ev = q_inclusion(1.0))
+    @test region_tv(e_segura, bm.βd; ρ_ret = 0.25, confabulado = true).existe
+    @test !region_tv(e_cens, bm.βd; ρ_ret = 0.25, confabulado = true).existe
+    # más censura ⇒ menos coste de soborno ⇒ Tv_min no baja (región no mayor)
+    e_c50 = escenario_prueba(s = 0.25, q_ev = q_inclusion(0.5))
+    e_c90 = escenario_prueba(s = 0.25, q_ev = q_inclusion(0.9))
+    r50 = region_tv(e_c50, bm.βd; ρ_ret = 0.25, confabulado = true)
+    r90 = region_tv(e_c90, bm.βd; ρ_ret = 0.25, confabulado = true)
+    if r50.existe && r90.existe
+        @test r90.Tv_min >= r50.Tv_min - 1e-9
+    else
+        @test true
+    end
 end
 
 end # @testset SL-2

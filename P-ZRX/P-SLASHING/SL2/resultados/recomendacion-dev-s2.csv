@@ -1,0 +1,13 @@
+s_incluidor,via,atacante,rho_ret,cubre_5_casos,Tv_min_peor,Tv_recomendado,etiqueta
+0,P1,no_confabulado,0.25,SI,858856,9e+05,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0,P1,confabulado,0.25,SI,858856,9e+05,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0,P2,no_confabulado,1,SI,1.35234e+06,1.4e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0,P2,confabulado,1,SI,1.35234e+06,1.4e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.25,P1,no_confabulado,0.25,SI,858856,9e+05,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.25,P1,confabulado,0.25,SI,1.14514e+06,1.2e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.25,P2,no_confabulado,1,SI,1.35234e+06,1.4e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.25,P2,confabulado,1,SI,1.81645e+06,1.9e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.375,P1,no_confabulado,0.25,SI,858856,9e+05,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.375,P1,confabulado,0.1,SI,1.37529e+06,1.4e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.375,P2,no_confabulado,1,SI,1.35234e+06,1.4e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos
+0.375,P2,confabulado,1,SI,2.18774e+06,2.2e+06,dev; α=0.40;P*=1e-3;V=1e5;f=1;q_g=20;ε_h=1e-3; cubre los 5 casos

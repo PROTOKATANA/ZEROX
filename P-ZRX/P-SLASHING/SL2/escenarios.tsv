@@ -28,3 +28,7 @@ dist_f_min	1e-8	fracción de espacio	hipótesis H3	P-CLAVE H3	1e-8
 dist_alpha	2.2	adimensional (densidad)	hipótesis H3	P-CLAVE H3 (convención de densidad, DS-6 A.1)	2.05;2.2;2.5;3.0
 f_media_hipotesis	0.001	fracción de espacio	hipótesis H3	P-CLAVE H3 (media de clave; F5)	0.001
 via_perdida	P1	adimensional	declarado (F1/F5)	P1 fiel a DS-3; P2 corrección de unidades	P1;P2
+# — parámetros de SL-2b (recompensa al incluidor; G-SL2b-1..G-SL2b-5) —
+s_incluidor	0.25	fracción de lo confiscado	orden (DS-L03)	Katana, 2026-09-26 (2/8 ratificado; 3/8 descartado)	0;0.25;0.375
+censura_c	0	fracción de la producción	hipótesis (G-SL2b-4)	ORDEN-SL2b §3 (barrido de censura)	0;0.1;0.25;0.5;0.75;0.9;1.0
+censura_n	1	nº de oportunidades	hipótesis (G-SL2b-4)	lectura conservadora; sensibilidad F_slots	1;1019

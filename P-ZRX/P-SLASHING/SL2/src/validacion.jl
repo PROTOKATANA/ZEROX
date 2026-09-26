@@ -86,18 +86,42 @@ function validar_Bpar(alpha::Float64, x::Float64; f_min::Float64 = 1e-8, m::Inte
 end
 
 """
-    validar_region(esc, βd, ρ_ret) -> NamedTuple
+    validar_region(esc, βd, ρ_ret; confabulado = false) -> NamedTuple
 
 Comprueba que los bordes devueltos por `region_tv` son de verdad los que cierran la región:
 `A` se cumple en `Tv_min` y falla justo por debajo; `B` (honestidad) se cumple en `Tv_max` y falla
-por encima. Márgenes relativos declarados.
+por encima. Márgenes relativos declarados. `confabulado` selecciona la pérdida de `A` (G-SL2b-3).
 """
-function validar_region(esc::Escenario, βd, ρ_ret)
-    reg = region_tv(esc, βd; ρ_ret = ρ_ret)
+function validar_region(esc::Escenario, βd, ρ_ret; confabulado::Bool = false)
+    reg = region_tv(esc, βd; ρ_ret = ρ_ret, confabulado = confabulado)
     reg.existe || return (existe = false, a_en_min = false, b_en_max = false, margen = NaN)
-    a_min = condicion_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = reg.Tv_min + 1e-6)
+    a_min = condicion_disuasion(esc, βd; ρ_ret = ρ_ret, Tv = reg.Tv_min + 1e-6,
+                                confabulado = confabulado)
     b_max = condicion_honesta(esc; ρ_ret = ρ_ret, Tv = reg.Tv_max, f_h = esc.f_h)
     margen = reg.Tv_max - reg.Tv_min
     return (existe = true, a_en_min = a_min, b_en_max = b_max.ok,
             margen = margen, borde_inf = reg.borde_inf, borde_sup = reg.borde_sup)
+end
+
+"""
+    validar_s2b(esc_nos, esc_con; ρ_ret, Tv) -> NamedTuple
+
+Invariantes de la recompensa `s`: (i) `s = 0` no cambia la pérdida (`confabulado` irrelevante);
+(ii) `premio + quemado = C`; (iii) la pérdida del confabulado es `≥ (1−s)·C` y `≤` la del no
+confabulado; (iv) la autodenuncia nunca es rentable. Devuelve el máximo error.
+"""
+function validar_s2b(esc_nos::Escenario, esc_con::Escenario; ρ_ret, Tv)
+    Cc = parte_confiscable(esc_con; ρ_ret = ρ_ret, Tv = Tv)
+    Ln = perdida_castigo(esc_nos; ρ_ret = ρ_ret, Tv = Tv, confabulado = true)
+    Ln2 = perdida_castigo(esc_nos; ρ_ret = ρ_ret, Tv = Tv, confabulado = false)
+    Lc = perdida_castigo(esc_con; ρ_ret = ρ_ret, Tv = Tv, confabulado = true)
+    Lno = perdida_castigo(esc_con; ρ_ret = ρ_ret, Tv = Tv, confabulado = false)
+    ad = autodenuncia(esc_con; ρ_ret = ρ_ret, Tv = Tv)
+    err = max(abs(Ln - Ln2),                              # s=0: confabulado irrelevante
+              abs(Lc - ((1 - esc_con.s) * Cc + esc_con.c_r)))
+    err = max(err, abs(premio_incluidor(esc_con; ρ_ret = ρ_ret, Tv = Tv) +
+                       parte_quemada(esc_con; ρ_ret = ρ_ret, Tv = Tv) - Cc))
+    cotas_ok = Lc >= (1 - esc_con.s) * Cc - 1e-12 && Lc <= Lno + 1e-12
+    return (coincide_s0 = err <= 1e-9 * max(1.0, Cc), cotas_ok = cotas_ok,
+            autodenuncia_ok = !ad.rentable, perdida_menor = Lc < Lno, err = err)
 end

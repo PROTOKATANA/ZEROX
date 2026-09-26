@@ -10,23 +10,43 @@ reps = 20000
 rapido = false
 escenarios = /home/katana/zeo/ZEROX/P-ZRX/P-SLASHING/SL2/escenarios.tsv
 datos = /home/katana/zeo/ZEROX/P-ZRX/P-SLASHING/SL2/datos/farmers-raw.csv (sha256 a18b7738...fdd18)
-segundos_pared = 2.39
+segundos_pared = 4.24
 
 validaciones:
   primera_pasada = (celdas = 816, error_max = 9.992007221626409e-16, celdas_enum = 528, error_enum = 2.220446049250313e-16)
   alpha = (filas = 12, error_max = 1.1102230246251565e-16)
   Bemp = (directo = 0.00017786036170633368, ic_lo = 0.00014907263620961444, ic_hi = 0.00020880335423258941, dentro = true, monotono = true, nrep = 4000)
   Bpar_2.05 = (cerrada = 0.24522913938841528, exacta = 0.24524027326684592, err_exacta = 1.1133878430630295e-5, mc_media = 0.4625352733292868, ic_lo = 0.16505253227605898, ic_hi = 0.6052090001774636, dentro = true)
+  s2b = (coincide_s0 = true, cotas_ok = true, autodenuncia_ok = true, perdida_menor = true, err = 0.0)
+
+SL-2b (recompensa s = 0.25 = 2/8):
+  empirico [P1]: celdas=11520 existe_no=11000 existe_conf=10960 perdidas=40 (s=0.25)
+  empirico [P2]: celdas=11520 existe_no=11000 existe_conf=10960 perdidas=40 (s=0.25)
+  pareto_2_05 [P1]: celdas=11520 existe_no=9893 existe_conf=9731 perdidas=162 (s=0.25)
+  pareto_2_05 [P2]: celdas=11520 existe_no=10840 existe_conf=10760 perdidas=80 (s=0.25)
+  pareto_2_2 [P1]: celdas=11520 existe_no=6991 existe_conf=6671 perdidas=320 (s=0.25)
+  pareto_2_2 [P2]: celdas=11520 existe_no=10840 existe_conf=10760 perdidas=80 (s=0.25)
+  pareto_2_5 [P1]: celdas=11520 existe_no=5318 existe_conf=4952 perdidas=366 (s=0.25)
+  pareto_2_5 [P2]: celdas=11520 existe_no=10840 existe_conf=10759 perdidas=81 (s=0.25)
+  pareto_3_0 [P1]: celdas=11520 existe_no=4680 existe_conf=4432 perdidas=248 (s=0.25)
+  pareto_3_0 [P2]: celdas=11520 existe_no=10840 existe_conf=10759 perdidas=81 (s=0.25)
 
 artefactos:
   Beps-escenarios.csv
   beta-d.csv
+  celdas-perdidas-s2b.csv
+  censura-s2b.csv
+  comprobaciones-s2b.csv
   comprobaciones.csv
+  frontera-central-s2.csv
   frontera-central.csv
   grieta.csv
   monte-carlo.csv
+  recomendacion-dev-s2.csv
   recomendacion-dev.csv
+  region-s2.csv
   region.csv
+  resumen-s2b.csv
   sensibilidad-P2.csv
   sensibilidad-R.csv
   sensibilidad-fh.csv

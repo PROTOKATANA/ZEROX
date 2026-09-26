@@ -1,0 +1,36 @@
+Todo verificado. Resumen final del trabajo.
+
+## Orden SL‑2b cumplida — proyecto `P-ZRX/P-SLASHING/SL2/`
+
+### Primero: faltas de definición detectadas (informadas antes de editar)
+Las dejé por escrito en **`DEFINICIONES-FALTANTES-SL2b.md` (G1–G6)** antes de tocar código:
+
+1. **G1 — colisión de símbolo `V`:** el `f·V` de la orden es la **parte confiscable** de SL‑1 (EV‑19), `C = f·(retenido + q_g)`, **no** el `V` de SL‑2 (valor del ataque). Se implementó como `parte_confiscable`.
+2. **G2 — `c_r`:** la rebaja `s` se aplica solo a `C`; el recargo fijo no se reparte (`L_conf = (1−s)·C + c_r`, `L_no = C + c_r`). Con `s=0` reproduce SL‑2 bit a bit.
+3. **G3 — «ambos atacantes»:** `confabulado ∈ {no, sí}`; el borde de honestidad usa siempre `L_no`; el umbral «gratis» del confabulado pasa a `x = ε/((1−s)·f·λ·T_v^eff)`.
+4. **G4 — censura:** `q_ev(c)=1−c^n`; `n=1` (conservador) y `n=F_slots=1019` (ventana); `c=0` = inclusión segura (hipótesis de la orden).
+5. **G5–G6:** `s=2/8` ratificado, `s=3/8` solo sensibilidad, `s=0` control; `Plazo_slots` sigue siendo de SL‑1.
+
+### Implementación
+- `src/modelo.jl`: campo `s` (constructor de 17 campos intacto ⇒ compatibilidad), `parte_confiscable`, `premio_incluidor`, `parte_quemada`, `autodenuncia`, `q_inclusion`, `perdida_castigo(...; confabulado)` y `region_tv(...; confabulado)`.
+- `escenarios.tsv`: filas `s_incluidor=0,25` (barrido `0;0,25;0,375`), `censura_c`, `censura_n`.
+- `run.jl`: `region-s2.csv` (230 400 filas, **P1 y P2**, ambos atacantes), `celdas-perdidas-s2b.csv`, `resumen-s2b.csv`, `frontera-central-s2.csv`, `recomendacion-dev-s2.csv`, `censura-s2b.csv`, `comprobaciones-s2b.csv`.
+- `test/runtests.jl`: 58 tests nuevos.
+
+### Resultados clave (pregunta falsable: **SÍ**)
+- **Caso central DS‑6:** con `ε_h ≤ 10⁻³` el atacante confabulado **no pierde ninguna celda**. Las 40/11 520 celdas perdidas (en P1 y P2) son todas `ε_h=10⁻¹` (sin firmante seguro), `V=10⁶`, `α=0,40`.
+- Pareto H3: región también no vacía; pierde 162/320/366/248 celdas en P1 y 80/80/81/81 en P2.
+- **Recomendación dev (NO producción):** perfil primario P1 `ρ=0,10, T_v=10⁵` **no cambia**; robusto P1 sube de `9·10⁵` (SL‑2) a **`1,2·10⁶`** (`s=2/8`) y `1,4·10⁶` (`s=3/8`); en P2, `1,9·10⁶` (`s=2/8`).
+- **Autodenuncia:** nunca rentable, `(1−s)·C + c_r = 1375 > 0`.
+- **Censura:** con `n=1`, `T_v^min` crece con `c` y se vacía en `c=1`; con `n=1019`, cualquier productor honesto en la ventana la neutraliza.
+
+### Verificación
+- **`Pkg.test()`: 97/97** (39 de SL‑2 + 58 de SL‑2b).
+- **`run.jl`: ≈5,3 s**, 4 hilos, comando documentado.
+- **Reproducción de SL‑2:** los once CSV de SL‑2 regenerados tienen **hash idéntico**; solo cambia `RESUMEN.txt` (añade el bloque SL‑2b).
+- **`HUELLAS.sha256`** (36 entradas) y `resultados/HUELLAS.sha256` (20) rehéchos y verificados.
+
+### Incidencia de integridad (no causada por mí)
+Durante la ejecución, **Katana actualizó `DECISIONES.md` a las 18:40:32** (DS‑L04 pasó de `Pendiente` a la opción C). Por eso `ENTRADA-SL2b.sha256` ahora da 4/5. **DS‑L03 — la decisión que gobierna SL‑2b — no cambió**, y el cambio no afecta a ningún número. Queda registrado en `INFORME.md` y en `DEFINICIONES-FALTANTES-SL2b.md`. La entrada de SL‑2 (`ENTRADA-SL2.sha256`) sigue 8/8.
+
+Sin Python, sin commit/push, sin editar nada fuera de la zona escribible (las dos copias temporales en `/tmp` usadas para comparar hashes no persistieron ni modificaron ningún fichero externo).
