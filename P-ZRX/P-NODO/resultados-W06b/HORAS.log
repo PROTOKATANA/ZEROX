@@ -1,0 +1,23 @@
+# HORAS.log — ORDEN-W06b
+# Marcas `date -Is` (hora local, +02:00). Todas reales: las de los pasos ya ejecutados se toman
+# del mtime del log asociado; las demás, de `date -Is` en el momento de la anotación.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W06b/
+2026-09-26T04:11:00+02:00  inicio; lectura integra de ORDEN-W06b.md, V-ZRX/LINEO.md, PLAN-W06.md, FORMATO-v0.md (v0.1) y fuentes antiguas de 9681061 (disco.rs, formato.rs, memoria.rs, error.rs, almacen_admitidos_dag.rs, matar_a_mitad.rs, Cargo.toml); ENTRADA-W06b.sha256 verificado (4/4)
+2026-09-26T04:13:00+02:00  zona preparada: ws.orig/ y ws/ (Cargo.toml, Cargo.lock, rust-toolchain.toml, crates/, ci/, testdata/, .github/), enlace ws/PDF -> ../../../PDF; CARGO_HOME = W05b2R/.cargo-home (2,6 GiB) y CARGO_TARGET_DIR = L01/target (copia reflink) en la zona
+2026-09-26T04:17:26+02:00  un unico `cargo metadata --offline --format-version 1` en ws (sin cargo update): Cargo.lock +17 paquetes, 0 versiones cambiadas, 0 eliminados (logs/lock-diff.txt, logs/lock-analisis.txt)
+2026-09-26T04:19:31+02:00  build debug de zx-storage con `--all-features` (librocksdb-sys reutilizado del target: 50,2 s); tests de zx-storage con rocksdb OK (logs/rocksdb-build.log, logs/V3b-storage-all-features.log)
+2026-09-26T04:21:00+02:00  V2 `cargo clippy --workspace --all-targets --locked -- -D warnings` (sin rocksdb) limpio (logs/V2-clippy-sin-rocksdb.log)
+2026-09-26T04:22:02+02:00  V2 `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` limpio (logs/V2-clippy-con-rocksdb.log)
+2026-09-26T04:21:07+02:00  V1 `cargo fmt --all -- --check` limpio (logs/V1-fmt.log)
+2026-09-26T04:31:53+02:00  V3 `cargo test --workspace --all-features --locked`: 643 pasan, 0 fallan, 1 ignorado en 9 min 48 s (logs/V3-test.log)
+2026-09-26T04:32:33+02:00  listados `--list` de ws.orig (631) y ws (644): 0 perdidos, 13 añadidos (logs/comparacion-tests.txt)
+2026-09-26T04:33:25+02:00  V7 `cargo run --release -p zx-storage --features rocksdb --example medir_almacen`: alta 0,036 s (277 221 admisiones/s), apertura con verificacion completa 0,028 s, repeticion 0,011 s (logs/V7-medicion.log, logs/V7-entorno.log)
+2026-09-26T04:33:30+02:00  V8 `ci/dependencias-exactas.sh` OK (22 exactas) y `ci/frontera-crates.sh` OK (7 fronteras, incluida zx-storage -> {zx-core}) (logs/V8-dependencias.log, logs/V8-frontera.log)
+2026-09-26T04:33:53+02:00  entregables: cambios.patch (14 ficheros, 87 345 bytes; `git apply -p1` sobre copia limpia de ws.orig reconstruye ws byte a byte, logs/patch-apply.log) y MIGRACION.sha256 (166 huellas, sha256sum -c OK)
+2026-09-26T04:34:02+02:00  primer cierre; cifras superadas por la corrección de concurrencia posterior; presupuesto (2 h 30 min / 8 hilos / 16 GiB) no agotado
+2026-09-26T04:44:52+02:00  corrección de concurrencia en AlmacenEnDisco::admitir (la comprobación de duplicado y la asignación del índice pasan a ir dentro del lock) + 2 tests de concurrencia; re-ejecutados V1 (limpio), V2 sin/con rocksdb (limpios), V3 (645 pasan, 0 fallan, 1 ignorado), V7 y V8; comparación de tests actualizada a 0 perdidos / 15 añadidos
+2026-09-26T04:44:52+02:00  entregables regenerados: cambios.patch (14 ficheros, 89 672 bytes) y MIGRACION.sha256 (166 huellas, sha256sum -c OK); `git apply -p1` sobre copia limpia de ws.orig reconstruye ws byte a byte
+2026-09-26T04:44:52+02:00  fin (cierre definitivo); presupuesto (2 h 30 min / 8 hilos / 16 GiB) no agotado
+2026-09-26T05:02:07+02:00  corrección W06b-A: leídos CORRECCION-W06b-A.md y ORDEN-W06b.md; verificación del compromiso del cuerpo en formato.rs (merkle_root PoW, body_commitment PoST), StorageError::CuerpoNoCoincide, fixtures con compromisos reales, 5 tests V5 nuevos (a)-(e)
+2026-09-26T05:02:07+02:00  V1 fmt limpio; V2 clippy sin/con rocksdb limpios; V3 (650 pasan, 0 fallan, 1 ignorado; 41 binarios; logs/V3-test.log); V5 (a)-(d) CuerpoNoCoincide al leer y al reabrir y (e) límite PoW fijado; 20 añadidos/0 perdidos (logs/comparacion-tests.txt)
+2026-09-26T05:02:07+02:00  V7 re-medido (alta 0,047 s; apertura 0,043 s; repetición 0,025 s) y V8 OK (22 exactas, 7 fronteras); entregables regenerados: cambios.patch (14 ficheros, 109 413 bytes) y MIGRACION.sha256 (166 huellas, sha256sum -c OK); parche == diff -ruN (cmp); sin git ni patch disponibles

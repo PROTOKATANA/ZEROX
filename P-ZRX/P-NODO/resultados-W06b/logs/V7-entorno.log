@@ -1,0 +1,9 @@
+== Entorno V7 (capturado 2026-09-26T05:01:19+02:00) ==
+rustc 1.97.0-nightly (20de910db 2026-05-02)
+cargo 1.97.0-nightly (4f9b52075 2026-05-01)
+Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+model name	: AMD Ryzen 9 9950X3D 16-Core Processor
+nproc: 32
+               total       usado       libre  compartido   búf/caché  disponible
+Mem:           123Gi       9,5Gi        17Gi       263Mi        97Gi       113Gi
+Inter:            0B          0B          0B

@@ -1,0 +1,17 @@
+     Locking 16 packages to latest Rust 1.90 compatible versions
+      Adding bindgen v0.72.1
+      Adding bzip2-sys v0.1.13+1.0.8
+      Adding cexpr v0.6.0
+      Adding clang-sys v1.9.1
+      Adding itertools v0.13.0
+      Adding jobserver v0.1.35
+      Adding libloading v0.8.9
+      Adding librocksdb-sys v0.19.0+11.8.1
+      Adding libz-sys v1.1.29
+      Adding lz4-sys v1.11.1+lz4-1.10.0
+      Adding pkg-config v0.3.34
+      Adding rocksdb v0.25.0
+      Adding rustflags v0.1.7
+      Adding shlex v1.3.0
+      Adding vcpkg v0.2.15
+      Adding zstd-sys v2.1.0+zstd.1.5.7

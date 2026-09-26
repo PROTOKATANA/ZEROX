@@ -1,0 +1,34 @@
+Corrección W06b-A aplicada sobre `ws/`. No detecté ninguna falta de definición bloqueante: la corrección fija el compromiso por familia y los casos de prueba; procedí.
+
+## Qué cambió
+
+**`ws/crates/zx-storage/src/formato.rs`** — `hash_canonico` (la única rutina de decodificación validada) ahora recalcula el compromiso del cuerpo con el código de `zx-core` y lo compara con la cabecera:
+- **PoW:** `merkle_root(txids)` (con `zx_core::txid`) contra `cabecera.merkle_root`.
+- **PoST:** `body_commitment(txs, testigos, cbid)` sobre `(txid, auth_digest)` contra `cabecera.body_commitment`.
+
+Como `hash_de_valor` la usa, el recálculo alcanza **lectura** (`disco::bloque`) y **apertura** (`verificar_estructura`), y también `desde_canonicos`/`desde_almacen`. Módulo y `README.md` documentan el límite PoW.
+
+**`src/error.rs`** — variante nueva `StorageError::CuerpoNoCoincide`, sin reparación.
+
+**Límite PoW (documentado y probado):** los testigos quedan fuera de `merkle_root` porque el `txid` los excluye (C-TX-01); un testigo PoW cambiado **no** lo detecta el almacén, lo detecta la verificación de firmas del motor al re-aplicar (D-N03′). En PoST sí lo cubre `body_commitment`.
+
+**Fixtures rehechos** (`disco.rs`, `memoria.rs`, `propiedades.rs`, `matar_a_mitad.rs`, `examples/medir_almacen.rs`): antes las cabeceras declaraban raíces ficticias con cuerpos vacíos; ahora comprometen su cuerpo real.
+
+**V5 nuevos** en `src/disco.rs` (inyección escribiendo el cuerpo recodificado bajo la misma clave):
+(a) importe coinbase PoW, (b) importe coinbase v3 PoST, (c) campo de tx no coinbase PoST, (d) testigo PoST → `CuerpoNoCoincide` al leer y al reabrir; (e) testigo PoW → el almacén no lo detecta (comportamiento fijado, con el contraste de `body_commitment`).
+
+## Verificación (repetida)
+
+| Paso | Resultado |
+|---|---|
+| V1 `fmt --check` | limpio |
+| V2 clippy sin/con `rocksdb` | limpio |
+| V3 `test --workspace --all-features` | **650 pasan, 0 fallan, 1 ignorado** (antes 645) |
+| V5 | (a)–(d) `CuerpoNoCoincide`; (e) límite PoW |
+| Añadidos/Perdidos | **+20 / 0** (15 de W06b + 5 de Corrección A) |
+| V7 | alta 0,047 s · apertura 0,043 s · repetición 0,025 s (bajan porque ahora se recalcula el compromiso) |
+| V8 | 22 dependencias exactas; 7 fronteras OK (incl. `zx-storage → {zx-core}`) |
+
+## Entregables
+
+`cambios.patch` (14 ficheros, 109 413 B), `MIGRACION.sha256` (166 huellas, `sha256sum -c` OK), `logs/` rehechos, "Corrección A" en `INFORME.md` (§1bis) y `PROGRESO.md` (§5), y `HORAS.log` con marcas reales. El parche es exactamente `diff -ruN ws.orig ws` (verificado con `cmp`); como la corrección prohíbe `git` y la máquina no tiene `patch`, la verificación estructural queda en `logs/patch-apply.log`. Nada fuera de la zona; sin Python ni secretos.

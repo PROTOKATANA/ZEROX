@@ -1,0 +1,11 @@
+    Finished `release` profile [optimized] target(s) in 0.06s
+     Running `/home/katana/zeo/ZEROX/deepseek/W06b/target/release/examples/medir_almacen /home/katana/zeo/ZEROX/deepseek/W06b/target/medir-db`
+zona: /home/katana/zeo/ZEROX/deepseek/W06b/target/medir-db
+bloques: 10000
+alta: 0.047 s, 211358 admisiones/s, 30.24 MiB/s (1500000 bytes, 1.43 MiB)
+apertura (con verificación completa): 0.043 s, 233790 bloques/s
+repeticion: 0.025 s, 396926 bloques/s, 56.78 MiB/s (10000 bloques, 1500000 bytes)
+
+real	0m0,199s
+user	0m0,144s
+sys	0m0,047s

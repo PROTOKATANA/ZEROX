@@ -1,0 +1,31 @@
+He cumplido la ORDEN-W06b. Resumen:
+
+## Trabajo realizado
+
+**Crate nuevo `crates/zx-storage`** (D‑N03′), dependiente solo de `zx-core` (+ `thiserror`; `rocksdb = "=0.25.0"` tras la feature `rocksdb`) e implementación en memoria del mismo rasgo. Esquema `bloques` / `registro` / `meta`, admisión atómica con un `WriteBatch`, idempotencia por hash, integridad por recálculo del hash al abrir y al leer, y `repetir` en orden del registro.
+
+## Faltas de definición informadas antes de editar
+
+1. **§4.2** no fija el discriminante de familia en `bloques`; los códecs PoW y PoST empiezan por el mismo `consensus_branch_id` y F‑04 prohíbe adivinarlo → sobre de 1 byte (`0x01`/`0x02`), con el precedente del antiguo `VERSION_ADMITIDOS_DAG`.
+2. **§4.3/§4.5** no fijan la función de admisión → rasgo `Almacen` con `admitir(&BloqueAdmitido, sync)`.
+3. El índice inicial del registro no se fija → empieza en `0`, contiguo.
+4. Las claves de `meta` no se nombran → `red`, `genesis`, `version_esquema` (versión 1).
+
+## Verificación (V1–V8)
+
+| Paso | Resultado |
+|---|---|
+| V1 `fmt --check` | limpio |
+| V2 clippy `-D warnings` sin/con `rocksdb` | limpio |
+| V3 `test --workspace --all-features --locked` | **645 pasan, 0 fallan, 1 ignorado** (41 binarios) |
+| V4 `matar_a_mitad` | 64 rondas con `SIGKILL`+`sync`; siempre prefijo exacto, 0 corrupciones no detectadas |
+| V5 corrupción | bit cambiado, entrada borrada, `meta` de otra red → error explícito |
+| V6 proptest (semilla fija) + diferencial | sin fallos |
+| V7 release (10 000 bloques) | alta 0,034 s (292 038 adm./s); apertura 0,030 s; repetición 0,011 s |
+| V8 deps/frontera/lock | 22 dependencias exactas; 7 fronteras OK; lock **+17 paquetes, 0 versiones cambiadas**, todos a la versión de `9681061` |
+
+0 tests perdidos, **15 añadidos**. Durante la revisión detecté y corregí un defecto de concurrencia (la comprobación de duplicado salía fuera del lock y dos hilos podían crear dos entradas del mismo hash); ahora va dentro y hay 2 tests de concurrencia.
+
+## Entregables (en `/home/katana/zeo/ZEROX/deepseek/W06b/`)
+
+`ws.orig/`, `ws/` (con `ws/PDF` excluido), `cambios.patch` (14 ficheros, 89 672 bytes; verificado: `git apply -p1` sobre copia limpia de `ws.orig` reconstruye `ws` byte a byte), `MIGRACION.sha256` (166 huellas, `sha256sum -c` OK), `logs/` (V1–V8 y lock), `INFORME.md`, `PROGRESO.md`, `HORAS.log` (`date -Is` reales). Sin commit ni push; nada escrito fuera de la zona. Presupuesto consumido: ~34 min de reloj de los 2 h 30 min (la caché de L01 permitió reutilizar `librocksdb-sys`).

@@ -1,0 +1,45 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (/home/katana/zeo/ZEROX/deepseek/W06b/target/debug/deps/zx_storage-5c6deb11a6d3463f)
+
+running 17 tests
+test memoria::tests::el_destino_detiene_la_repeticion ... ok
+test memoria::tests::admite_lee_y_repite_en_orden ... ok
+test memoria::tests::admitir_dos_veces_es_idempotente ... ok
+test disco::tests::admite_lee_repite_y_reapertura_conserva ... ok
+test disco::tests::version_de_esquema_desconocida_falla ... ok
+test disco::tests::campo_cambiado_en_tx_no_coinbase_post_es_cuerpo_no_coincide ... ok
+test disco::tests::entrada_borrada_del_registro_es_un_hueco ... ok
+test disco::tests::testigo_cambiado_en_post_es_cuerpo_no_coincide ... ok
+test disco::tests::admisiones_concurrentes_de_bloques_distintos_son_contiguas ... ok
+test disco::tests::admisiones_concurrentes_del_mismo_bloque_no_duplican ... ok
+test disco::tests::abrir_con_otro_genesis_falla ... ok
+test disco::tests::importe_cambiado_en_coinbase_v3_post_es_cuerpo_no_coincide ... ok
+test disco::tests::bit_cambiado_en_un_bloque_es_corrupcion ... ok
+test disco::tests::datos_sin_marca_de_esquema_es_corrupcion ... ok
+test disco::tests::importe_cambiado_en_coinbase_pow_es_cuerpo_no_coincide ... ok
+test disco::tests::testigo_cambiado_en_pow_no_lo_detecta_el_almacen ... ok
+test disco::tests::abrir_con_otra_red_no_reescribe ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/matar_a_mitad.rs (/home/katana/zeo/ZEROX/deepseek/W06b/target/debug/deps/matar_a_mitad-e6e4d853391b0a28)
+
+running 1 test
+test matar_a_mitad_de_escritura_no_deja_entrada_sin_bloque ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s
+
+     Running tests/propiedades.rs (/home/katana/zeo/ZEROX/deepseek/W06b/target/debug/deps/propiedades-c68f7892ce1b8d60)
+
+running 2 tests
+test memoria_y_disco_repiten_igual ... ok
+test la_repeticion_es_la_secuencia_sin_duplicados ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
+
+   Doc-tests zx_storage
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

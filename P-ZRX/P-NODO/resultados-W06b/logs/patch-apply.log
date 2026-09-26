@@ -1,0 +1,17 @@
+# Verificación de cambios.patch — ORDEN-W06b + Corrección A
+#
+# La corrección prohíbe `git` y la máquina no tiene `patch` instalado, así que no se aplica el
+# parche con una herramienta externa. Se verifica de forma estructural:
+#
+# 1) `cambios.patch` (desde su primera línea `diff -ruN`) es byte a byte igual a:
+#        diff -ruN -x target -x .cargo-home -x PDF ws.orig ws
+#    comprobado con `cmp`.
+#
+# Resultado: OK: cambios.patch == diff -ruN ws.orig ws
+# Ficheros en el parche: 14
+#
+# 2) `MIGRACION.sha256` (166 huellas) verifica con `sha256sum -c` sobre `ws`:
+#        OK
+#
+# Con (1) el parche es exactamente la diferencia entre el árbol base y el árbol migrado; con (2)
+# los ficheros del árbol migrado son los que el parche describe.

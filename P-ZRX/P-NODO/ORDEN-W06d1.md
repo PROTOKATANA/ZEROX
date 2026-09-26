@@ -73,6 +73,7 @@ congelada: `P-ZRX/P-NODO/ENTRADA-W06d1.sha256`.
 | V3 | `cargo test --workspace --all-features --locked` | todo lo previo con su nombre + lo nuevo |
 | V4 | Integración (`crates/zx-node/tests/`): proceso con 3 claves, `N_dev` de test y `SR_dev` holgado, desde el génesis hasta ≥ 30 bloques PoST admitidos | terminal fijado; 0 bloques propios rechazados; resumen de estado en el registro |
 | V5 | Muerte y reinicio: el test lanza el binario como proceso hijo, lo mata con `SIGKILL` en ≥ 10 puntos (semilla fija, fases PoW y PoST), lo reabre | mismo resumen de estado que el último bloque persistido; sigue produciendo; 0 corrupciones |
+| V5b | Reinicio con un **testigo** de una transacción de un bloque PoW alterado en disco (el almacén no lo detecta: `REVISION-W06b.md`) | el nodo se niega a arrancar con error explícito al repetir; nunca un estado distinto |
 | V6 | Red distinta de `dev` | se niega a arrancar, código ≠ 0, sin crear ficheros |
 | V7 | Bloque propio alterado inyectado en la tubería (test) | rechazado con su motivo; el estado no cambia |
 | V8 | Ejecución de 10 min con `N_dev` real (138 873 760) y `SR_dev` elegido para ≈ 1 bloque por slot con 3 claves (medido y declarado) | registro conservado; bloques/slot, tiempos de verificación por etapa, CPU y RSS |
