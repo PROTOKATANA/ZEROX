@@ -202,7 +202,7 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   rebase W06b-R en curso. Límite: testigos PoW no comprometidos → prueba obligatoria en W06d1.
 - `SPEC-0.0.1.md` en borrador: índice de lo implementado y validado, con estado por regla.
 
-### 05:10–05:35
+### 05:10–05:30
 
 - **T01-E superado** (`b924ad0`): el oráculo T01 identifica la salida de la liberación por su contenido
   (como F-18). Revela que el artefacto de ids ya afectaba a T01: 1 434 de 2 055 casos base cambian
@@ -214,3 +214,18 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   trabajo). Registro en git los 98 borrados de archivos de `9681061` bajo `crates/`, `ci/` y `.github/`
   que ningún commit posterior tocó (`cb77c55`). El resto del árbol antiguo (documentos) no se toca.
 - **W06d1** (nodo sin red, Sonnet) lanzada con entrada congelada.
+
+### 05:30–05:52 — incidente en W06d1
+
+- **T04-D superado** (`007e106`): vectores DAG v0.3; el artefacto de ids cuantificado (16 descartes en
+  v0.2 → 0). **W06a-B** lanzada (arneses sin emulación).
+- **W06d1, primer intento, detenido.** El ejecutor Sonnet informó de «otro proceso `claude`» (la
+  sesión `zerox-3b`, PID 39717) escribiendo en su zona. **Falso en la atribución:** la transcripción de
+  esa sesión no cambia desde las 05:12, antes de que existiera la zona. El segundo escritor era un
+  **fork que el propio ejecutor lanzó** («Investigar API de zx-cadena y zx-storage»), que heredó su
+  contexto y escribió `PROGRESO.md` y `zx-node/Cargo.toml`. Lo detuve (`TaskStop`). El ejecutor
+  además leyó mal el alcance de LINEO (lo creyó solo Julia/C++; `AUTO-ZRX.md` §52 lo extiende a todo el
+  código). Zona archivada como `deepseek/W06d1-intento1/`; orden ampliada («Relanzamiento»: un solo
+  escritor, sin forks; padre seleccionado real con GHOSTDAG; sin doble firma tras reiniciar) y
+  relanzada con un ejecutor nuevo.
+- Lección: en las órdenes a subagentes, prohibir expresamente lanzar subagentes o forks.
