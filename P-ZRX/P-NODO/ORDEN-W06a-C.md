@@ -3,6 +3,7 @@
 - **ID:** W06a-C. **Fecha:** 2026-09-26. **Director:** Claude. **Ejecutor:** DeepSeek. Se lanza tras
   migrar W06d1.
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/W06aC/`.
+- **Primero:** ejecuta la suite completa de la raíz sin cambios y guárdala (`logs/V0.log`): es la primera ejecución conjunta de W06d1 y W06a-B (`REVISION-W06d1.md`, reserva 4); si falla algo, **para** e informa.
 - **Motivo (`REVISION-W06d1.md`, reservas 1 y 2):** `crates/zx-cadena/src/cadena.rs` fija
   `MAX_PADRES_ORACULO = 3` (línea 37: el límite del generador de T04) para todo bloque PoST, aunque
   `PERFIL-DEV-v0.md` §4 dice 15; y la identidad GHOSTDAG entra como `u64` y se construye con
