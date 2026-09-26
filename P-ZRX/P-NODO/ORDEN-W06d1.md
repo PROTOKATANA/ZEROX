@@ -62,7 +62,7 @@ congelada: `P-ZRX/P-NODO/ENTRADA-W06d1.sha256`.
 10. **CLI** (`clap`): directorio de datos, red (solo `dev`), semilla e índices de claves, papel
     (`minero`, `productor`, `ambos`), `N_dev`, `SR_dev`, ruta del registro, parada tras `X` slots.
 11. **CI (IPA E-03):** añade a `.github/workflows/zerox-ci.yml` un paso que clone Autonomys en
-    `PDF/autonomys-subspace` y haga `checkout` de `f8842d019cdf…` (hash completo de `PDF/repositorio.txt`)
+    `PDF/autonomys-subspace` y haga `checkout` de `f8842d019cdf0f7163421b9644db5a9ff82b2a73` (`https://github.com/autonomys/subspace`, tabla de `PDF/README.md`)
     antes del build; sin él la CI remota no compila `zx-poas`, `zx-farmer`, `zx-post` ni `zx-node`.
 
 ## 4. Verificación
