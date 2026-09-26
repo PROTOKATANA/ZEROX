@@ -26,6 +26,9 @@ using .Transicion
 
 export ParamsDAG, BloquePost, Admision, MOTIVOS
 export procesar_uno!, resolver!, admite_todo, marcar_invalido!
+export chequear_forma, chequear_forma_evidencia, primer_defecto_forma,
+       MOTIVO_FORMA_CBID, MOTIVO_FORMA_ORDEN, MOTIVO_FORMA_ESTRUCTURA,
+       defecto_estructura_evidencia
 export aplicar_bloque_fusion!, aplicar_fusion_con_undo
 export estado_past, estado_post, tips_validas, estado_virtual, cadena_virtual,
        orden_aplicacion_virtual, descartes_virtual, aplicar_historia, u3_virtual, mejor_punta
@@ -161,6 +164,96 @@ mapear_motivo_gdr(m::Symbol) =
     m === :u2               ? :ErrU2 :
     :ErrSinPadre
 
+# ---------------------------------------------------------------------------
+# SL-4c-O · Forma de la EvidenceTx v4 (RAT-1, EV-04)
+# SL-4c-O-B · Precedencia por transacción y los dos tipos de orden no canónico
+# SL-4c-O-C · Entradas/salidas (EV-04) también son forma
+# ---------------------------------------------------------------------------
+
+# Motivos de bloque de forma de la v4. Se codifican como `Symbol` con el nombre
+# exacto del contrato (`ErrForma(EvidenciaConEntradasOSalidas)`,
+# `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`);
+# `string(sym)` produce ese texto en `RES` y en el lector independiente, sin
+# introducir un tipo nuevo ni depender del `Err` de T01 (O1 lo cambia en paralelo).
+const MOTIVO_FORMA_ESTRUCTURA = Symbol("ErrForma(EvidenciaConEntradasOSalidas)")
+const MOTIVO_FORMA_CBID = Symbol("ErrForma(EvidenciaCbidAjeno)")
+const MOTIVO_FORMA_ORDEN = Symbol("ErrForma(OrdenCanonicoInvalido)")
+
+"""
+Sub-defecto **estructural** EV-04 de una `EvidenceTx`: `:entradas`, `:salidas`,
+`:entradas_salidas` o `nothing` si no trae entradas ni salidas monetarias.
+
+T04 hereda de T01 el modelo tipado: `Tx` solo distingue `entradas` (`n_in`) y
+`salidas` (`n_out`); `n_wit`/testigos no existe en el modelo (el códec de wire de
+la v4 sigue fuera de alcance) y por eso no se puede comprobar aquí.
+"""
+function defecto_estructura_evidencia(tx::Transicion.Tx)
+    n_in = !isempty(tx.entradas)
+    n_out = !isempty(tx.salidas)
+    n_in && n_out && return :entradas_salidas
+    n_in && return :entradas
+    n_out && return :salidas
+    return nothing
+end
+
+"""
+Primer defecto de **forma v4** de la `EvidenceTx` del bloque, en el orden de las
+transacciones del bloque (SL-4c-O-B / SL-4c-O-C).
+
+Para cada `EvidenceTx`, en el orden en que aparece, se comprueba su forma
+completa `entradas/salidas/testigos` → `cbid` → orden canónico; la **primera
+transacción defectuosa** fija el defecto del bloque. Distingue los dos tipos de
+orden no canónico: `pre_hash(H1) == pre_hash(H2)` (`:orden_igual`) y
+`pre_hash(H1) > pre_hash(H2)` (`:orden_desc`).
+
+Devuelve `:entradas`, `:salidas`, `:entradas_salidas`, `:cbid`, `:orden_igual`,
+`:orden_desc` o `nothing`. Es la precedencia exacta que aplica
+`chequear_forma_evidencia` y la que usan el exportador y la cobertura.
+
+Una `EvidenceTx` sin cabeceras (`evidencia === nothing`) se deja fuera (sigue
+siendo el rechazo semántico `ErrSinEvidencia`): es lo mismo que hace T01, que
+comprueba la ausencia de cabeceras antes de la estructura.
+"""
+function primer_defecto_forma(A::Admision, b::BloquePost)
+    cbid_red = A.pd.P.cbid
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        # Forma completa de esta transacción: estructura → cbid → orden canónico.
+        e = defecto_estructura_evidencia(tx)
+        e === nothing || return e
+        (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return :cbid
+        if !(ev.h1.pre_hash < ev.h2.pre_hash)
+            return ev.h1.pre_hash == ev.h2.pre_hash ? :orden_igual : :orden_desc
+        end
+    end
+    return nothing
+end
+
+"""
+Comprueba la **forma v4** de las `EvidenceTx` del bloque (SL-4c-O / SL-4c-O-B /
+SL-4c-O-C, RAT-1/EV-04).
+
+Precedencia fija del contrato (idéntica en T01 y T04): las transacciones del
+bloque se comprueban **en su orden**; para cada `EvidenceTx`, su forma completa
+en el orden `entradas/salidas/testigos` → `cbid` → orden canónico; la **primera
+transacción defectuosa** determina el motivo del rechazo del bloque. La
+estructura (EV-04) es la primera clase de forma y gana a `cbid` y al orden.
+
+Una `EvidenceTx` sin cabeceras (`evidencia === nothing`) no se toca aquí: sigue
+siendo un rechazo semántico (`ErrSinEvidencia`), fuera del alcance de esta orden.
+
+Devuelve `nothing` si pasa, o el motivo de bloque (`Symbol`).
+"""
+function chequear_forma_evidencia(A::Admision, b::BloquePost)
+    d = primer_defecto_forma(A, b)
+    d === nothing && return nothing
+    (d === :cbid) && return MOTIVO_FORMA_CBID
+    (d === :orden_igual || d === :orden_desc) && return MOTIVO_FORMA_ORDEN
+    return MOTIVO_FORMA_ESTRUCTURA
+end
+
 """
 Comprueba la forma/padres de `b` **sin** tocar GDR. Devuelve `nothing` si pasa, o
 el símbolo de error de bloque.
@@ -196,6 +289,9 @@ function chequear_forma(A::Admision, b::BloquePost)
         txcb.tipo == Transicion.TxCoinbasePost || return :ErrEmision
         txcb.importe == 0 && return :ErrSaldo   # R-8
     end
+    # SL-4c-O/SL-4c-O-C: forma v4 de la evidencia (estructura → cbid → orden).
+    mf = chequear_forma_evidencia(A, b)
+    mf !== nothing && return mf
     return nothing
 end
 
@@ -725,6 +821,7 @@ include("revalidacion_gdr.jl")
 include("propiedades.jl")
 
 export casos_dirigidos, utxo_gastable, base_dirigida
+export caso_forma_evidencia, casos_forma_cobertura
 export revalidar_corpus, revalidar_kaspa, texto_id32, leer_json
 export verificar_ie1_ie2_ie4, verificar_ie3, verificar_ie5, verificar_ie6
 

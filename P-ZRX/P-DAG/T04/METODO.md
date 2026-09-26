@@ -28,7 +28,15 @@ descartes. Los estados son `Transicion.Estado` (tipos concretos de T01).
 
 1. **Admisión / forma.** Padres: ≥1; el terminal `T` solo como padre único (D-P08); padres existentes
    y válidos (si no, `ErrSinPadre`); `slot ≥ 1`; coinbase única, primera y `CoinbasePost` (R-6),
-   `importe > 0` (R-8). GDR valida U2 y la monotonía de slot.
+   `importe > 0` (R-8). GDR valida U2 y la monotonía de slot. **SL-4c-O / SL-4c-O-B:** forma v4
+   de la `EvidenceTx` — estructura ya vigente → `cbid` de ambas cabeceras = red local (RAT-1) →
+   orden canónico estricto `pre_hash(H1) < pre_hash(H2)` (EV-04), con precedencia **por
+   transacción**: dentro del bloque, en su orden, cada `EvidenceTx` se comprueba completa y la
+   primera defectuosa fija el motivo (`primer_defecto_forma`); el fallo es
+   `ErrForma(EvidenciaCbidAjeno)` / `ErrForma(OrdenCanonicoInvalido)` / `ErrForma(EvidenciaConEntradasOSalidas)`
+   y **invalida el bloque**, no lo descarta. **SL-4c-O-C:** la estructura de EV-04 (entradas/salidas;
+   `testigos`/`n_wit` no existe en el modelo `Tx` de T01) también es forma y precede a `cbid`/orden
+   (`ErrForma(EvidenciaConEntradasOSalidas)`).
 2. **`Estado(past(B))` (ED-2).** Parte de `post[sp(B)]` (o `Estado(T)` si `sp(B)=T`) y aplica en
    orden C-GD-05 cada bloque de `mergeset(B)\{sp(B)}` no `rojo_U3`, en **modo fusión** con punto
    `slot(B)`. `B` no se aplica en su propio estado. `sp(B)` se aplica en **su propio** slot.

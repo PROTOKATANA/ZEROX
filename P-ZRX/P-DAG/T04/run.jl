@@ -5,7 +5,7 @@
 #         [--seed 0x5a5a] [--replicas 200] [--ie3-presupuesto 8000] [--salida RUTA]
 #
 # Un hilo (LINEO §7: el tope no es objetivo). Sin Python. Escribe el registro en
-# `resultados/run-estado-dag-v0.5.log` (sin sobrescribir v0…v0.4),
+# `resultados/run-estado-dag-v0.6.log` (sin sobrescribir v0…v0.4),
 # publica la cobertura por tipo de operación (ORDEN-T04-C §2) y termina con
 # estado ≠ 0 si hay algún fallo.
 
@@ -47,7 +47,7 @@ function main()
     seed = parsear_seed(get(cfg, "seed", "0x5a5a"))
     replicas = parse(Int, get(cfg, "replicas", "200"))
     ie3_exhaustivos = parse(Int, get(cfg, "ie3-exhaustivos", "5"))
-    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.5.log")
+    salida = get(cfg, "salida", "resultados/run-estado-dag-v0.6.log")
     mkpath(dirname(salida))
     io = open(salida, "w")
     t0 = time()
@@ -164,8 +164,34 @@ function main()
     (m17.inc_past_Xc == 0 && m17.inc_post_Ye == 1 && m17.undo && m17.I1) ||
         push!(fallos_globales, "dirigido D-17 reaparición/undo")
     _, A18, m18 = EstadoDAG.caso_evidencia_descartes(pdev)
-    (m18.cbid == 1 && m18.tardia == 1 && m18.sin_saldo && m18.I1) ||
+    (m18.tardia == 1 && m18.sin_saldo && m18.I1) ||
         push!(fallos_globales, "dirigido D-18 descartes")
+    # SL-4c-O/SL-4c-O-B/SL-4c-O-C: la forma v4 (estructura, cbid, orden y
+    # combinaciones) invalida el bloque entero en la admisión; el gemelo canónico
+    # es válido y la tx válida del bloque no aplica. SL-4c-O-B cubre los dos tipos
+    # de orden no canónico y SL-4c-O-C la estructura de EV-04 (entradas/salidas).
+    for (modo, motivo, sd) in ((:cbid, MOTIVO_FORMA_CBID, 51),
+                               (:orden_igual, MOTIVO_FORMA_ORDEN, 55),
+                               (:orden_desc, MOTIVO_FORMA_ORDEN, 52),
+                               (:ambos, MOTIVO_FORMA_CBID, 53),
+                               (:entradas, MOTIVO_FORMA_ESTRUCTURA, 58),
+                               (:salidas, MOTIVO_FORMA_ESTRUCTURA, 59),
+                               (:entradas_salidas, MOTIVO_FORMA_ESTRUCTURA, 60),
+                               (:entradas_cbid_orden, MOTIVO_FORMA_ESTRUCTURA, 61))
+        _, Af, mf = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, seed = sd)
+        (mf.invalido && mf.motivo == motivo && mf.hijo_invalido &&
+         mf.gemelo_valido && !mf.tx_aplicada && mf.I1) ||
+            push!(fallos_globales, "dirigido D-19 forma $modo")
+    end
+    # SL-4c-O-B: precedencia por transacción con dos evidencias defectuosas en el
+    # mismo bloque; la primera en el orden de las transacciones fija el motivo.
+    for (primero, motivo, sd) in ((:orden, MOTIVO_FORMA_ORDEN, 56),
+                                  (:cbid, MOTIVO_FORMA_CBID, 57))
+        _, Ap, mp = EstadoDAG.caso_forma_dos_evidencias(pdev; primero = primero, seed = sd)
+        (mp.invalido && mp.motivo == motivo && mp.motivo == mp.motivo_esperado &&
+         mp.hijo_invalido && mp.gemelo_valido && !mp.tx_aplicada && mp.I1) ||
+            push!(fallos_globales, "dirigido D-20/D-21 precedencia $primero")
+    end
 
     # 3) Propiedades IE-1…IE-6
     total_hist = 0
@@ -240,7 +266,14 @@ function main()
     total_ev_desc = 0
     ev_dup = 0
     ev_tar = 0
-    ev_cbid = 0
+    ev_forma_cbid = 0
+    ev_forma_orden = 0
+    ev_forma_orden_igual = 0
+    ev_forma_orden_desc = 0
+    ev_forma_estructura = 0
+    ev_forma_estructura_entradas = 0
+    ev_forma_estructura_salidas = 0
+    ev_forma_estructura_ambos = 0
     for (pi, pdev) in enumerate(PARAMS_DAG_EV)
         fallos_punto = String[]
         for r in 1:replicas
@@ -254,7 +287,24 @@ function main()
             for (_, _, e) in desc
                 e == Transicion.ErrEvidenciaDuplicada && (ev_dup += 1)
                 e == Transicion.ErrEvidenciaTardia && (ev_tar += 1)
-                e == Transicion.ErrCbidAjeno && (ev_cbid += 1)
+            end
+            # SL-4c-O / SL-4c-O-B / SL-4c-O-C: bloques invalidados por la forma
+            # v4 de la evidencia, desglosando orden no canónico y estructura.
+            for b in values(A.por_id)
+                m = get(A.motivos, b.id, :OK)
+                m == MOTIVO_FORMA_CBID && (ev_forma_cbid += 1)
+                if m == MOTIVO_FORMA_ORDEN
+                    ev_forma_orden += 1
+                    d = primer_defecto_forma(A, b)
+                    d === :orden_igual ? (ev_forma_orden_igual += 1) :
+                                         (ev_forma_orden_desc += 1)
+                elseif m == MOTIVO_FORMA_ESTRUCTURA
+                    ev_forma_estructura += 1
+                    d = primer_defecto_forma(A, b)
+                    d === :entradas ? (ev_forma_estructura_entradas += 1) :
+                        d === :salidas ? (ev_forma_estructura_salidas += 1) :
+                        (ev_forma_estructura_ambos += 1)
+                end
             end
             for f in verificar_ie1_ie2_ie4(A)
                 push!(fallos_punto, "EV$pi r$r: $f")
@@ -274,7 +324,14 @@ function main()
         flush(io)
     end
     println(io, "TOTAL-EV historias=$total_ev validos=$total_ev_validos ",
-            "descartes=$total_ev_desc duplicadas=$ev_dup tardias=$ev_tar cbid=$ev_cbid")
+            "descartes=$total_ev_desc duplicadas=$ev_dup tardias=$ev_tar ",
+            "forma_cbid=$ev_forma_cbid forma_orden=$ev_forma_orden ",
+            "forma_orden_igual=$ev_forma_orden_igual ",
+            "forma_orden_desc=$ev_forma_orden_desc ",
+            "forma_estructura=$ev_forma_estructura ",
+            "forma_estructura_entradas=$ev_forma_estructura_entradas ",
+            "forma_estructura_salidas=$ev_forma_estructura_salidas ",
+            "forma_estructura_ambos=$ev_forma_estructura_ambos")
 
     println(io, "TOTAL historias=$total_hist bloques=$(total_bloques) validos=$(total_validos) ",
             "descartes=$(total_desc) rojo_U3=$(total_u3) ie3_ordenes=$(total_ie3)")

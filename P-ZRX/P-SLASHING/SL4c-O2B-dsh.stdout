@@ -1,0 +1,25 @@
+He cumplido la parte **O2 (T04)** de `ORDEN-SL4c-O-B`.
+
+## Falta de definición informada (antes de editar)
+1. **«Estructura vigente» en T04.** La regla manda por transacción «estructura → `cbid` → orden», pero en T04 el único chequeo estructural de la evidencia (`ErrEvidenciaConEntradas`) es **descarte semántico** al fusionar, no forma; moverlo cambiaría casos sin los dos defectos (lo que SL-4c-O prohíbe). El bucle por transacción aplica solo `cbid → orden`; la estructura queda donde estaba. Declarado en `INFORME.md` §SL4cOB.6.
+2. **Reparto de mínimos.** Se conservan los de SL-4c-O y se añaden `bloque_orden_igual≥10` y `bloque_orden_desc≥10`.
+3. **Versionado.** Se sobrescriben los v0.6 de SL-4c-O con el mismo nombre (aún sin consumidores).
+
+## Cambio aplicado
+- `src/EstadoDAG.jl`: `chequear_forma_evidencia` pasa de **global al bloque** a **por transacción** (recorre `b.txs`; para cada `EvidenceTx`, `cbid` → orden; la primera defectuosa fija el motivo). Nuevo `primer_defecto_forma` (`:cbid`/`:orden_igual`/`:orden_desc`) usado por oráculo, exportador, `run.jl` y tests.
+- `src/generadores.jl`: `:orden_igual` (`H1=H2`) y `:orden_desc` (`H1>H2`) separados (+`:ambos_desc`).
+- `src/dirigidos.jl`: **D-20/D-21** (`caso_forma_dos_evidencias`) con `[orden, cbid]`→`ErrForma(OrdenCanonicoInvalido)` y `[cbid, orden]`→`ErrForma(EvidenciaCbidAjeno)`; cobertura dedicada 36 `cbid` + 36 igualdad + 36 descenso + 8 ambos.
+- `exportar.jl`, `run.jl`, `test/runtests.jl`, `src/diferencias.jl`, `METODO.md` actualizados.
+
+## Resultados (todo en verde)
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | **472/472** (`test-pkg-v0.6.log`) |
+| `run.jl --seed 0x5a5a --replicas 200` | **ESTADO = SUPERADO**, 0 fallos, 129,7 s |
+| Relectura independiente de v0.6 | **2 000 casos, 0 discrepancias** |
+| `DIFERENCIAS-v0.5-v0.6.md` | 1 878 entradas; **181** con defecto, **135** cambian, **0** sin defecto |
+| Cobertura forma | `bloque_cbid=283`; `bloque_orden=243` (**igual 115**, **desc 128**); `con_tx_cbid=166`, `con_tx_orden=152`, `ambos_cbid=161` (`minimos_SL4cO=OK`) |
+| `run.jl` orden | `forma_orden=286` (**igual 142**, **desc 144**) |
+| Entradas congeladas | SL4c-O-B **3/3 OK**; SL4c-O **7/7 OK** (v0.4 y v0.5 intactos) |
+
+Artefactos regenerados: `vectores-estado-dag-v0.6.txt` (2 000 casos, sha256 `b1710e4c…79a331`), `.sha256`, `cobertura-v0.6.txt`, `DIFERENCIAS-v0.5-v0.6.md`, `entrada-SL4c-O-B.log`, y secciones **SL-4c-O-B** en `INFORME.md`/`PROGRESO.md` + `HORAS.log` (`date -Is` real). Julia 1.13.0, 1 hilo, sin Python, sin git, nada escrito fuera de `T04/`.

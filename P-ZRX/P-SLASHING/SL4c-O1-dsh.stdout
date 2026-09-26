@@ -1,0 +1,24 @@
+He cumplido la parte **O1** de `ORDEN-SL4c-O` en `P-ZRX/P-TRANSICION/T01/`. Resumen:
+
+## Falta de definición detectada (informada antes de editar)
+La orden fija *qué* cambia y los nombres `ErrForma(EvidenciaCbidAjeno)` / `ErrForma(OrdenCanonicoInvalido)`, pero **no dice cómo representarlos en el oráculo T01**, que tenía un `@enum Err` plano (era la `AMBIGUEDAD-SL3-4`, diferida por SL-3). Quedó registrada en `PROGRESO.md` §SL4c.1 (FD-SL4c-1…3) antes de tocar código, con estas lecturas (ninguna obliga a elegir entre reglas incompatibles):
+1. **Representación:** `@enum ClaseForma`, `struct ErrForma(clase)` y `const Err = Union{ErrSemantico, ErrForma}`, para que todo `isa Err` siga significando «error de transición» y `RES` sea exactamente `ErrForma(<clase>)` (igual que Rust `ErrorTransicion::ErrForma(ErrorFormaTx)`).
+2. **«Cambio de resultado» en T01:** en modo estricto ambos errores ya invalidaban el bloque; el cambio observable es la **clase del `RES`** y la precedencia, no la validez.
+3. **Casos con ambos defectos:** cuentan al mínimo de `EvidenciaCbidAjeno` (precedencia) y además se contabilizan como `ambos`.
+
+## Cambios
+- `src/Transicion.jl`: forma de dos niveles; `aplicar_evidencia!` con precedencia **estructura → `cbid` → orden canónico → semántica** (EV-06/EV-07/RAT-3/ventana/dedup sin cambios); alias transitorios `ErrCbidAjeno`/`ErrOrdenCanonico` (T04 incluye este módulo; O2 los retira).
+- `src/evidencia.jl`: nuevos casos `:orden` y `:ambos`.
+- `exportar.jl` a **v0.5** (cobertura con `orden_canonico` y `ambos`), `run.jl` (8 tipos), `src/lector_vectores.jl` (v0.5), `test/runtests.jl` (testset `SL-4c-O (forma de EvidenceTx)`).
+- `comparar_vectores.jl` + `DIFERENCIAS-v0.4-v0.5.md`.
+
+## Verificación
+- `Pkg.test()`: **2212/2212** (SL-4c-O **30/30**, SL-3 **2088/2088** con su nombre).
+- `run.jl` (5 réplicas, rejilla reducida): **I-1…I-7 = 0 fallos**; 5 108 historias de evidencia; forma `cbid`/orden/ambos = **1272/636/636**; `VEREDICTO = SIN FALLOS`.
+- `vectores-transicion-v0.5.txt`: **3035 casos**, sha256 `64d983ac…`; relectura independiente **0 discrepancias**.
+- `cobertura-v0.5.txt`: `cbid_ajeno` **240** (≥30), `orden_canonico` **120** (≥30), `ambos` **120** (≥5).
+- `DIFERENCIAS-v0.4-v0.5.md`: **120 cambios** de `RES` (todos `ev-cbid`, `ErrCbidAjeno`→`ErrForma(EvidenciaCbidAjeno)`), **240 nuevos** (`ev-orden`/`ev-ambos`), **0 cuerpos distintos**, **0 cambios sin los dos defectos**.
+- **v0.4 intacto** (`sha256sum -c` OK) y entrada congelada **7/7 OK**. Su relectura histórica da 120 discrepancias, exactamente la re-clasificación.
+- `INFORME.md` y `PROGRESO.md` con sección `SL-4c-O`; `HORAS.log` con `date -Is` real. Modelo: `deepseek-flash`. Sin Python, sin git, nada escrito fuera de `T01/`.
+
+Nota de coordinación: T04 incluye `Transicion.jl` por `include`; los alias se mantienen solo como transitorios para no romper su carga mientras O2 (parte O2) elimina las referencias semánticas.

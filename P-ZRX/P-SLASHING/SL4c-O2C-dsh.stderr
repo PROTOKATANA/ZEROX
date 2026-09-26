@@ -1,0 +1,2244 @@
+dsh: reasoning:
+Let me start by reading the order file and the referenced files. Let me first explore the workspace and read the order.
+
+Let me read the ORDEN-SL4c-O-C.md file.
+dsh: reasoning:
+Now let me read the cited documents. The order mentions ORDEN-SL4c-O.md, ENTrada freeze file, INFORME.md, PROGRESO.md, and the T04 project. Let me explore the directory structure.
+
+Let me read ORDEN-SL4c-O.md and the current T04 workspace.
+dsh: reasoning:
+Now let me read the ENTRADA-SL4c-O-C.sha256, the previous order O-B, and the contract references. Also I need to inspect T04 source. Let me look at the entry hash file and the T04 source layout.
+dsh: reasoning:
+Interesting: it appears a previous run (SL4c-O2C, launched at 23:37) may have already been launched but with no stdout and 433 bytes stderr. The workspace has v0.6 vectors already generated at 23:33, INFORME/PROGRESO updated at 23:35. Wait, the timestamps suggest that O2B run may have partially completed. Let me check the stderr of SL4c-O2C and O1C.
+
+Actually, the current session is presumably the O2C run. The order was created at 23:37. The files v0.6 were generated at 23:33, which is before the order at 23:37. Hmm, that's odd. Wait, ENTRADA-SL4c-O-C.sha256 is at 23:37. But v0.6 files at 23:33. Let me check the O-B order and O2B stderr. It seems maybe O-B already did some of this work? Let me read ORDEN-SL4c-O-B.md.
+
+Actually wait — the order says "Regenerar vectores-estado-dag-v0.6.txt (sigue sin consumidor)". Maybe O-B was about something else. Let me read.
+dsh: reasoning:
+Interesting — the stderr of O2C is actually the reasoning of the current session? No wait, this is weird. It shows "dsh: reasoning:" with content that mirrors what I'm doing. It appears the current session is O2C and the stderr is being written live to that file. Actually the stderr contains my reasoning steps! That means the harness logs reasoning to the stderr file. So O2C started at 23:37 and is the current run. The file v0.6 was generated at 23:33 by O2B... but wait, O2B is SL4c-O-B part O2. Let me check the order dates. O-B order is at 23:24. So O2B ran and generated v0.6 at 23:33. But now SL4c-O-C part O2 asks to regenerate v0.6 for the new rule about entradas/salidas/testigos.
+
+Wait, so actually O2B already generated v0.6 with cbid/orden changes. Now O2C (this order) asks to update v0.6 further to add entradas/salidas/testigos cases.
+
+Hmm, but the order says "Regenerar vectores-estado-dag-v0.6.txt (sigue sin consumidor)". So it's the same v0.6 file, regenerated again. That's fine.
+
+Also, O1C is running concurrently (launched at 23:37). The order says O2 must not run its final tests until O1 has finished editing Transicion.jl (T04 includes it). Wait, "T04 lo incluye" — T04 includes Transicion.jl? Let me understand: T04 has analisis-artefacto/t01_nuevo and t01_viejo. T04 imports or copies T01's Transicion.jl. Let me check.
+
+Actually, "O2 no ejecuta sus pruebas finales hasta que O1 haya terminado de editar Transicion.jl (T04 lo incluye)". So T04's test suite includes T01's Transicion.jl (probably in analisis-artefacto/t01_nuevo or referenced). So we need to check the mtime of T01's Transicion.jl and wait until it's updated by O1.
+
+This is a concurrent execution setup. O1 is running in parallel in another directory. We need to coordinate via mtime.
+
+Let me now deeply understand the T04 code. Let me read the key files. First let me check the current state, the relevant error definitions, and how entradas/salidas/testigos are currently handled.
+
+Let me grep for the relevant terms.
+dsh: reasoning:
+Let me read EstadoDAG.jl around lines 150-260 and also the validation functions. Let me read the file more fully. It's 31KB. Let me start around key areas.
+dsh: reasoning:
+Key finding: The current T04 handles the "estructura" (entradas/salidas/testigos) as a semantic discard inherited from T01's `ErrEvidenciaConEntradas`. The order O-C requires this to become a *forma* error `ErrForma(EvidenciaConEntradasOSalidas)` that invalidates the block at admission. Precedence: per transaction, in block order: estructura → cbid → orden canónico. First defective transaction fixes the reason.
+
+Wait — the order says "Por transacción, en su orden dentro del bloque: entradas/salidas/testigos → cbid → orden canónico; la primera transacción defectuosa fija el motivo."
+
+So the structure check comes FIRST, before cbid and orden. That's the "estructura ya vigente (entradas/salidas/testigos, campos inactivos, forma de las dos cabeceras) → cbid → orden canónico" from O order decision 1. So I need to add structure checks into `primer_defecto_forma`.
+
+Wait, but the "estructura ya vigente" includes: entradas/salidas/testigos, campos inactivos, forma de las dos cabeceras. The order O-C specifically says EV-04's row "n_in ≠ 0 o n_out ≠ 0 o n_wit ≠ 0 → ErrForma(EvidenciaConEntradasOSalidas)". But the other structural checks (campos inactivos, forma de cabeceras) presumably are also form errors that already invalidate? Let me check T01's Transicion.jl to see how structure is validated. And the contract EV-04.
+
+Let me read the contract EV-04 section in CONTRATO-EVIDENCIA-v0.md. Let me find it.
+
+Also, the current `primer_defecto_forma` comment says structure "sigue siendo el descarte semántico ErrEvidenciaConEntradas de T01, fuera del alcance de la orden." Now O-C brings it into scope.
+
+Let me look at T01's Transicion.jl to understand the structure validation and what `ErrEvidenciaConEntradas` is. T01 is in a different directory but read-only. Note it's being edited by O1 concurrently. Let me read current state.
+
+Let me read CONTRATO-EVIDENCIA-v0.md EV-04 and RAT-1. Let me grep.
+dsh: reasoning:
+The T01 file at line 21-22 and around 102-124 and 1128-1136. Note that T01 currently (mtime 23:27, likely pre-O1C edit or mid-edit) still has `ErrEvidenciaConEntradas` and the structure check at 1128. O1C is running concurrently and will change that. Let me read the relevant parts of T01 Transicion.jl (read-only).
+
+Let me read lines 80-140 and 1100-1160. Also the contract lines 79-90 and 555-600.
+dsh: reasoning:
+Now I understand the structure of T04. Let me look at the T01 Transicion.jl validation of EvidenceTx, especially the function that validates form (which currently returns ErrEvidenciaConEntradas). And how T04's `aplicar_bloque_fusion!` handles EvidenceTx. Let me search T01.
+
+Let me read T01 Transicion.jl around 1080-1180 and the error definitions 80-130.
+dsh: reasoning:
+Interesting: T01's Transicion.jl at 23:27 already shows SL-4c-O changes partially (ErrForma, precedence structure → cbid → orden). Note line 1128 still returns `ErrEvidenciaConEntradas` for structure. O1C is presumably in the middle of changing it to `ErrForma(EvidenciaConEntradasOSalidas)` and adding structure to ClaseForma. The file mtime is 23:27, before O1C launch (23:37), so O1C hasn't yet edited. Wait, but the comment at line 1121 says "SL-4c-O: la precedencia de forma es estructura → cbid → orden canónico". That was from O1B? Or earlier. Actually, SL-4c-O already implemented structure→cbid→orden. And O1B refined precedence per-transaction. Hmm, but the file mtime 23:27 predates O-B (23:24)? No, O-B launched 23:24. Its section says O1B ran and produced v0.5 at 23:35 in T01? Let me check.
+
+Wait, the O2B stderr was 23:36 and O1B stderr 23:36. The files in T04 v0.6 at 23:33. T01's Transicion.jl mtime is 23:27, which is odd — maybe O1B changed other files. Actually let me not overthink. O1C is running now and will edit Transicion.jl. The order says T04 includes T01's Transicion.jl via include, so T04's final tests must wait until O1C finishes editing Transicion.jl. I need to check its mtime.
+
+Now, key question about what exactly O-C wants for T04:
+- Evidence with entradas, salidas, or testigos makes the block invalid at admission: `ErrForma(EvidenciaConEntradasOSalidas)`.
+- ≥30 cases in vectors, ≥10 in a block with valid transactions, ≥5 with all three defects at once (entradas wins).
+- Regenerate v0.6 vectors, .sha256, coverage, DIFERENCIAS-v0.5-v0.6.md (0 changes without defect; since v0.5 had no cases of this type expect 0 new changes from it).
+- Precedence: per transaction, in block order: entradas/salidas/testigos → cbid → orden canónico; first defective transaction fixes reason.
+
+Wait, but the current `primer_defecto_forma` checks cbid then orden. Structure is not checked there. Where does structure get checked in T04 currently? Look at `chequear_forma`—it doesn't check EvidenceTx structure. The `aplicar_bloque_fusion!` handles EvidenceTx via `aplicar_tx!` and discards if error. So currently an EvidenceTx with entradas is discarded semantically (ErrEvidenciaConEntradas) and the block remains valid.
+
+In T04, there's a vector generator that creates evidence txs with entradas to test the discard. Let me find that. Search in generadores.jl and exportar.jl.
+
+Also note the order says "testigos" (witnesses). The T01 `Tx` struct has no `n_wit` field explicitly. Let me look: Tx has `tipo, salidas, entradas, firmante, clave, importe, sector_id, nonce, evidencia`. Hmm, no `testigos`. The contract EV-04 says n_in, n_out, n_wit. But the model has `entradas` and `salidas` only. "testigos" might be modeled elsewhere. Let me check how T01 exports n_wit. Search for "testigo" / "wit" in T01 and T04.
+
+Let me grep.
+dsh: reasoning:
+No `testigos` field exists in the model. The contract says n_in, n_out, n_wit; but the Tx model has `entradas` (n_in) and `salidas` (n_out), and no witnesses field. So "testigos" (n_wit) may not be representable. This is a potential "falta de definición" to report.
+
+The order explicitly says: "la evidencia con entradas, salidas o testigos hace inválido el bloque" and "≥ 5 con los tres defectos a la vez (gana «entradas»)". So we need cases with entradas, salidas, and testigos. But the model doesn't have a testigos field! Let me double-check by reading the Tx struct again: fields are tipo, salidas, entradas, firmante, clave, importe, sector_id, nonce, evidencia. No witnesses.
+
+Hmm. Maybe "testigos" is represented via `firmante`/`clave` or via something else? In the contract, EvidenceTx has two headers (cabeceras) with seals (sellos) — those are the "testigos"? Actually "n_wit" in the contract format is witness count. Let me read the contract around line 55-90 to understand the EvidenceTx format.
+
+Let me read CONTRATO-EVIDENCIA-v0.md lines 40-100.
+
+Also, how does T01/exportar.jl represent evidence cases? The order O-C says O1 changes RES from ErrEvidenciaConEntradas to ErrForma(...). Let me look at T01's exportar to understand the `con_entradas` category. And T04's exportar.
+
+Let me read the contract and T04 exportar around 220-300 and 410-450.
+dsh: reasoning:
+Now I need to understand how T04 builds evidence txs with entradas and salidas. Let me search in generadores.jl and dirigidos.jl.
+
+Also, the "testigos" issue: the model's `Tx` has no witnesses field. The contract's EV-04 says n_wit ≠ 0 → ErrForma(EvidenciaConEntradasOSalidas). But the Julia model can't express testigos. Hmm. Let me check the T01 exportar for evidence cases and how they model `con_entradas`. In O1's task, "el RES de esos casos pasa de ErrEvidenciaConEntradas a ErrForma(EvidenciaConEntradasOSalidas)". There must be existing vectors with `con_entradas` cases. Let me check T01's vectors and how they encode entradas/salidas/testigos.
+
+Let me look at the vector format and the lector. Actually T04's `lector_vectores.jl` reads vectors. Let me look at how entradas and testigos are represented. But first, let me check how T04 generates evidence txs with entradas.
+
+Let me grep for `evidencia` in generadores.jl and dirigidos.jl.
+dsh: reasoning:
+Now let me look at the T04 `src/dirigidos.jl` around 717-900 to understand the form evidence cases. And generadores around 140-290 for evidencia_aleatoria modes. Let me read those.
+dsh: reasoning:
+Now I understand the current structure. Now I need to understand the T01 side for how it generates `con_entradas` cases in vectors (v0.4/v0.5), so I can understand the expected representation for T04. Let me look at T01's exportar.jl and comparar_vectores.jl, plus the vector format. Actually, more relevant: T04's `exportar.jl` generates vectors v0.6. Let me read the full exportar.jl to understand the vector categories and generation.
+
+Let me read T04 exportar.jl entirely (480 lines). Let me read from 1 to 210 and 330 to 480.
+dsh: reasoning:
+Now let me read the rest of exportar.jl (330-480) to understand `contar_forma_evidencia` and how vectors are assembled.
+dsh: reasoning:
+Now I have a good picture. Let me also read the T01 current exportar / how it handles the structure case, to understand "testigos". Let me check T01's src (there might not be an exportar.jl in T01 — actually T01 has exportar.jl, comparar_vectores.jl, etc.). Let me list T01.
+dsh: reasoning:
+T01 doesn't have a "testigos" field either. This is important. The order explicitly says "entradas, salidas o testigos". The model only has `entradas` and `salidas` on `Tx`. So "testigos" cannot be represented as a third count. 
+
+Wait — maybe "testigos" refers to a `nonce` field? No. Or perhaps in the EvidenceTx format, witnesses are the seals inside the headers and there's no field. The contract says n_wit=0 for EvidenceTx. The model's `Tx` has no `n_wit`. So the three defects "entradas, salidas o testigos" — but T01's `ErrEvidenciaConEntradas` covers only `entradas` and `salidas` (line 1128: `(isempty(tx.entradas) && isempty(tx.salidas)) || return ErrEvidenciaConEntradas`). 
+
+So there's a genuine lack of definition: the model cannot express `testigos`/`n_wit`. The order requires "≥ 5 con los tres defectos a la vez (gana entradas)". If "testigos" is not modelable, we cannot create a case with all three defects. This is exactly the kind of "falta de definición" the prompt asks me to report before editing.
+
+But wait — maybe there is a way: perhaps the `firmante` field or `nonce`? No, those have semantic meaning. Let me check whether the model or contract has any "testigos" concept. Let me grep the whole P-ZRX for "testigo" and "n_wit" and "wit".
+
+Actually, I already grepped T04 and T01 for testigo/wit and found nothing except comments. Let me grep the broader repo/contract.
+dsh: reasoning:
+This confirms there's a known ambiguity. Let me read `P-ZRX/P-SLASHING/resultados-SL4a/DEFINICIONES-FALTANTES.md` around line 56, and T04/INFORME.md around 740-780. These likely discuss the missing testigos/n_wit field.
+
+Let me read those.
+dsh: reasoning:
+This is very relevant. Now let me read the rest of INFORME.md (805-853) and the section on SL-4c-O in T04 (around 600-725) to understand the format and what O2B did.
+
+Actually let me now think about the "falta de definición". The issue: the Tx model has no `testigos` field, so `n_wit` cannot be nonzero. The order requires the three defects including testigos. In T01, `ErrEvidenciaConEntradas` covers only entradas and salidas. So there's no existing way to represent testigos.
+
+But wait: maybe the intended interpretation is that "testigos" maps to the existing `entradas`/`salidas` structure differently? Let me re-read the contract: EV-01: "sin entradas, salidas ni testigos de transacción — el sello va dentro de cada cabecera, no en la lista de testigos". So in the real v4 wire, the transaction has n_in=0, n_out=0, n_wit=0. The model `Tx` has `entradas` (n_in) and `salidas` (n_out), but no witnesses list. So the `n_wit` case cannot be represented in the typed model — it's a wire-level concept (FD-5 in SL4a says v4 wire format isn't implemented).
+
+So the request "≥ 5 con los tres defectos a la vez (gana entradas)" is not faithfully representable: we can only create entradas+salidas (two defects), not three. That's a genuine falta de definición.
+
+But hold on — maybe I should check whether T01's O1 part handles testigos. O1's order says "el RES de esos casos pasa de ErrEvidenciaConEntradas a ErrForma(EvidenciaConEntradasOSalidas)". The existing T01 vectors have `con_entradas` cases. How do those cases encode "entradas"? Let me look at how T01 vectors represent them and what the "con_entradas" cases are. It might be that only entradas or only salidas exist. Then O1 doesn't need testigos either — it just renames the existing error for whatever structure cases exist. But O-C explicitly says "entradas, salidas o testigos" and "≥5 con los tres defectos a la vez (gana entradas)". Hmm.
+
+Actually, re-reading O-C's "Qué hacer" for O2: "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas, y ≥ 5 con los tres defectos a la vez (gana «entradas»)." The "tres defectos" refers to entradas, salidas, testigos. So the director expects the model to represent all three.
+
+Given the model lacks `testigos`, this is a falta de definición that I must report BEFORE editing. But maybe the expected behavior is to add a `testigos` field? That would be a model change in T01's `Tx` struct, which is T01's territory (O1) and not mine. Also the order says "no cambias ninguna otra regla (si el cambio exige tocar otra, para e informa antes de editar)".
+
+Hmm, but wait. Let me reconsider. Maybe "testigos" here can be interpreted in the T04 model as a Tx with nonempty `entradas` or `salidas` plus something. Let me look at how T01's existing vectors represent `con_entradas` and whether there's a `testigo` representation. Let me look at T01's exportar.jl around the con_entradas generation and the vectors. Let me also check T01's lector_vectores and how it reconstructs Tx from vector lines (it must map "ent=" / "sal=" back to Tx). It cannot reconstruct testigos because there's no field.
+
+Actually, let me reconsider the phrase. In O-C, "con entradas, salidas o testigos" — in the contract EV-04 row it's "n_in ≠ 0 o n_out ≠ 0 o n_wit ≠ 0". The T01 error `ErrEvidenciaConEntradas` is described as "EvidenceTx con entradas o salidas monetarias". So maybe the director is using "testigos" loosely as part of the wire header counts but the actual oráculo only models entradas/salidas. The requirement "≥5 con los tres defectos a la vez (gana entradas)" would then be impossible.
+
+Let me look at the T01 vectors currently to see if there are cases with salidas only, entradas only, etc. And how the "con_entradas" category is produced. Let me grep T01 exportar.jl around the evidence generation.
+
+Actually — critical: I should check the T01 side because O1C is running concurrently and may be defining how to handle "testigos". But I shouldn't coordinate; I should inspect what's in the current T01 code. Let me look at T01's generadores for evidence with entradas/salidas.
+
+Let me grep T01.
+dsh: reasoning:
+Let me read T01 `src/evidencia.jl` around 40-120 to see how `:con_entradas` is generated.
+dsh: reasoning:
+Confirmed: T01's `:con_entradas` case only uses `salidas` (one Salida), with `entradas = Int[]`. So even T01 only models "salidas" for that category, and the error name is `ErrEvidenciaConEntradas`. There's no testigos.
+
+So the "tres defectos a la vez (gana entradas)" implies a model capability that doesn't exist. However, maybe the intent is: the `Tx` struct could have `entradas`, `salidas`, and we could interpret "testigos" as... hmm.
+
+Let me reconsider. Actually, the contract's error name is `EvidenciaConEntradasOSalidas` (inputs or outputs). The order O-C title says "la EvidenceTx con entradas, salidas o testigos también es forma (EV-04)". And it says "≥ 5 con los tres defectos a la vez (gana «entradas»)". 
+
+Interpretation possibility: "los tres defectos" might mean the three categories tested (entradas-only, salidas-only, testigos-only) rather than all three simultaneously. But "a la vez" clearly means simultaneously. And "(gana «entradas»)" means precedence: entradas wins when multiple present. That confirms a case with all three simultaneously.
+
+Given the model has only `entradas` and `salidas`, "testigos" cannot be added without extending the T01 `Tx` type (which is O1's zone, and would be a model change). 
+
+Hmm, but this is precisely the kind of thing I should report as a falta de definición before editing. However, I should also consider: maybe I can implement it within T04 only. But the Tx type comes from T01 via include; I can't extend a struct. I could add a parallel notion... but that would be inventing.
+
+Wait, maybe I'm wrong and there IS a way. Let me check the `nonce` field: `nonce::UInt64 # F-15: solo Deposito/Retiro/Liberacion (0 en el resto)`. For TxEvidencia, the field is unused (0). Could we repurpose `nonce` as "testigos"? No, that's hacky and would change the vector format/semantics.
+
+Let me look more carefully: In T04's `tx_str`, evidence lines are `TX tipo=Evidencia firmante=... clave=... importe=... ent=[...] sal=[...] ev=...`. There's no witness field. The vectors don't encode witnesses. So adding testigos requires serializing a new field, which is far beyond O-C.
+
+So: I have a genuine falta de definición. Per instructions, "Si detectas una falta de definición, infórmala antes de editar." And O-C says "si el cambio exige tocar otra, para e informa antes de editar". 
+
+But should I stop entirely, or report and proceed with a sensible interpretation? The prompt says "Si detectas una falta de definición, infórmala antes de editar." It says inform before editing, not necessarily halt. But O-C §4 says "si el cambio exige tocar otra, para e informa antes de editar" — if the change requires touching another rule, stop and inform before editing.
+
+However, note that O1 is running concurrently. Maybe O1's implementation will add a `testigos` concept? Let me check O1C's progress... Actually the T01 file mtime is 23:27, hasn't changed. But maybe O1 will add a `testigos` field. Hmm.
+
+Let me think about what the most sensible, minimal, and faithful interpretation is, and whether I can proceed without touching T01.
+
+Key insight: The T04 oracle models transactions with `entradas` and `salidas` vectors. The contract's `n_wit` is part of the wire format which is explicitly out of scope (FD-5 in SL4a: "el códec de wire queda fuera de alcance"). T04 only sees the decoded `Tx`. Since `Tx` has no witness list, a nonzero `n_wit` cannot appear in T04's inputs. Therefore, in T04's model, the EV-04 structure defect can only manifest via `entradas` or `salidas`. The "testigos" part of the requirement is not representable in T04's typed model.
+
+Given the order explicitly demands ≥5 cases with all three defects simultaneously and the model cannot express testigos, I must report this falta de definición before editing.
+
+But then how do I fulfill the order? Options:
+(a) Report and stop, waiting for director clarification. But this is an autonomous run; the director isn't available interactively. The instruction "infórmala antes de editar" suggests I should document it (as previous orders did with "Falta de definición detectada antes de editar") and then proceed with the best faithful interpretation, declaring it.
+
+Actually, look at the precedent: in SL4c-O-B (O2B), the agent documented "Falta de definición detectada antes de editar: ninguna bloqueante; tres lecturas informadas". And in SL4a, DEFINICIONES-FALTANTES.md documents decisions taken and justified, "ninguna se resuelve en silencio". So the project's convention is: document the falta de definición with the decision taken, then proceed.
+
+So I should:
+1. Document the falta de definición: `Tx` has no `testigos`/`n_wit` field; the typed model can only express `entradas` (n_in) and `salidas` (n_out); "testigos" is a wire-level count not modeled (FD-5 SL4a). 
+2. Decide: implement entradas and salidas as the two representable sub-defects of `ErrForma(EvidenciaConEntradasOSalidas)`, and for the "tres defectos a la vez" requirement, model the three variants as: entradas-only, salidas-only, and entradas+salidas (both). Hmm, but that's not "tres".
+
+Wait. Let me reconsider whether "testigos" could be represented by the existing fields in a legitimate way. In the contract, EvidenceTx has exactly two headers H1, H2. The "testigos" of a v4 transaction is a separate wire list. In the typed model, an EvidenceTx's seals are stored in CabeceraEvidencia.sello_ok. No list.
+
+Hmm, what if we treat "testigos" as `salidas` on a *second* evidence tx? No.
+
+Alternatively, maybe I'm overcomplicating. Perhaps the director, when saying "los tres defectos", is thinking of the T01 model where there are entradas and salidas and testigos as three count fields (n_in, n_out, n_wit) from the contract. The oráculo T01 currently only implements entradas+salidas. O1's task says "el RES de esos casos pasa de ErrEvidenciaConEntradas a ErrForma(EvidenciaConEntradasOSalidas)" — i.e., O1 just renames the error class for the *existing* cases. It doesn't ask O1 to add testigos cases (the ≥counts are only specified for O2). Actually re-read O1: "el `RES` de esos casos pasa de `ErrEvidenciaConEntradas` a `ErrForma(EvidenciaConEntradasOSalidas)` (en modo estricto ya invalidaban el bloque: cambia la clase, no la validez) con la precedencia de arriba; regenerar ... (los únicos cambios nuevos admitidos son esos renombres)." So O1 does NOT add new cases; it only renames. So for O1, no testigos needed.
+
+For O2 (T04), the order asks to add ≥30 cases etc. Since T04's oracle is typed and lacks testigos, the faithful approach is to model the *representable* structure defects: entradas and salidas. And reinterpret "tres defectos a la vez" as the combination entradas+salidas... but that's only two.
+
+Hold on. Let me reconsider: maybe T04 could add a `testigos` field to its *own* Tx representation? No, it uses T01.Tx directly. `BloquePost.txs::Vector{Transicion.Tx}`.
+
+Hmm, could I add a field to T01's `Tx` in my zone? No, T01 is O1's zone. The order says "nada fuera de tu zona".
+
+So the honest resolution: the "testigos" defect is not representable in T04's typed model; I will implement `entradas` and `salidas` (the two representable sub-defects), create ≥5 cases with both simultaneously (which is the maximum simultaneity representable), and document clearly that `n_wit`/testigos is not modeled (wire-level, FD-5), so the "three at once" is delivered as the two representable ones. I must report this falta de definición before editing.
+
+But wait — the instruction says "Si detectas una falta de definición, infórmala antes de editar." Maybe the expected action is to STOP and report, not proceed. Let me re-read the user's message: "cumple la parte O2. Antes de escribir código, lee íntegro LINEO.md. Si detectas una falta de definición, infórmala antes de editar." 
+
+This is ambiguous whether to halt after informing. The order O-C §4 is stronger: "no cambias ninguna otra regla (si el cambio exige tocar otra, para e informa antes de editar)". The "testigos" gap doesn't necessarily require touching another rule if I interpret it as not representable. But delivering the literal "tres defectos" would require touching T01's Tx model (another rule). 
+
+Given the project convention and the need to make progress, I think the right move is: report the falta de definición prominently in my response and in a DEFINICIONES-FALTANTES section of the INFORME/PROGRESO, then proceed with the faithful, declared interpretation, because stopping entirely would fail the order and the director is not interactive.
+
+Hmm, but actually let me reconsider once more. Is there a chance that the "tres defectos" refers to something else entirely? Let me re-read: "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas, y ≥ 5 con los tres defectos a la vez (gana «entradas»)."
+
+The three defects = entradas, salidas, testigos. "gana entradas" = precedence entradas > salidas > testigos. This strongly implies three representable count fields.
+
+Now, in the T04 model, is there any way to have three structure defects? `entradas` nonempty, `salidas` nonempty, and... `nonce`? Hmm. Actually! Maybe "testigos" corresponds to `firmante` or... no.
+
+Wait, let me reconsider the Tx struct: `tipo, salidas, entradas, firmante, clave, importe, sector_id, nonce, evidencia`. For an EvidenceTx, `firmante`, `clave`, `importe`, `sector_id`, `nonce` are all unused. Could "testigos" be encoded as `nonce != 0`? No, that's semantically wrong; nonce is F-15 for Deposito/Retiro/Liberacion.
+
+OK. Given all this, I'll report the gap. But maybe I should be even more careful: maybe there's an upstream decision document that resolves it. Let me check the SL4a/resultados or CONTRATO for how `ErrEvidenciaConEntradasOSalidas` is expected to be built, and whether "testigos" is explicitly out of scope. Also check the T01 test/runtests for `con_entradas`.
+
+Actually, let me look at what O1C is doing / has decided, since it's the parallel part and shares the model. Let me check if T01's Transicion.jl changed (mtime) and read its current structure check. Right now it's 23:27. Let me monitor later.
+
+Let me also check the P-REVISION-CODIGO review H1 that motivated O-C, and any DEFINICIONES-FALTANTES for SL4c.
+
+Let me search for SL4c-related definition docs.
+dsh: reasoning:
+REVISION-RI-3b.md doesn't exist yet (only ORDEN-RI-3). The order references `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3b.md` H1. Let me check if it exists maybe under resultados. Actually the grep found it in the list of files containing "EvidenciaConEntradasOSalidas"? No, the grep -l list included P-REVISION-CODIGO/REVISION-RI-3b.md. But ls doesn't show it. Hmm, maybe ls output was truncated (head). Let me check. Actually ls shows only ORDEN-RI-1/2/3 and resultados-RI-1a/1b/2a. No REVISION-RI-3b.md. The grep -l result might be stale? Let me not worry.
+
+Let me focus. I need to make a decision on how to handle "testigos". Let me look at the current T04 vector v0.6 and its DIFERENCIAS to understand exactly what changes are expected. Also check `src/diferencias.jl` and `run.jl` and `test/runtests.jl`.
+
+Actually, let me step back and consider: maybe the director intends "testigos" to be representable via the `nonce` field? Let me check T01's `validar_forma_tx` (in Rust, zx-core) — the order says "zx-core ya lo comprueba en validar_forma_tx_v4". But the Julia T01 model doesn't have witnesses. Let me check if there's a Julia wire model in P-FORMATO that has testigos, and whether T01/T04 are supposed to reuse it. FD-5 says wire codec out of scope.
+
+So the definitive answer: the Julia typed model T01/T04 cannot express testigos. This is a falta de definición.
+
+Now, how to proceed? Let me look at how the director's O-C could be satisfied. The core requirement is: evidence with entradas, salidas, or testigos → invalid block. In the model, implement:
+- `primer_defecto_forma` now returns `:estructura` (or `:con_entradas_os_salidas`) first, if `!isempty(tx.entradas) || !isempty(tx.salidas)`.
+- The block error is `ErrForma(EvidenciaConEntradasOSalidas)`.
+
+For the "tres defectos a la vez": since testigos isn't representable, we create cases with entradas+salidas (two simultaneous defects) and, to honor the spirit, maybe also cases where the evidence has salidas+entradas, and we declare that n_wit is unrepresentable. Or... we could model "testigos" by adding a field to T04's own wrapper? No.
+
+Hmm, actually, wait. Let me reconsider the possibility of interpreting the existing `nonce` field as the witness count in the context of an EvidenceTx. In the real wire, n_wit is a compact-size count. The typed model's `nonce` is a UInt64. But for an EvidenceTx, nonce is unused/0. If I treated `nonce != 0` on an EvidenceTx as "testigos presentes", that would be a new rule not in the contract (contract says n_wit). It would also change the vector semantics. Not acceptable without director's decision. And T01's `aplicar_evidencia!` ignores nonce. So no.
+
+Alternatively, could `firmante`/`clave`/`importe`/`sector_id` non-default indicate testigos? No.
+
+I think the correct professional action is:
+1. Report the falta de definición clearly (in my response, and documented in a file).
+2. Proceed with the representable interpretation: implement entradas and salidas as the structure defect, add cases for entradas-only, salidas-only, and entradas+salidas (both), which covers the precedence "entradas gana". For the "tres defectos a la vez", since testigos is not modelable, deliver ≥5 cases with the two representable defects simultaneously (entradas+salidas), and explicitly declare that n_wit/testigos cannot appear in the typed T04 inputs (wire-level, FD-5 SL4a) and therefore the literal three-defect case is impossible without changing T01's `Tx` model (which is out of O2's zone and would be a rule change).
+
+But hold on — is that acceptable per the order's verification ("relectura 0 discrepancias", coverage minimums)? The coverage minimums are checked in exportar.jl and are under my control. I could add `estructura` counters. Actually, the director specified "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas, y ≥ 5 con los tres defectos a la vez". Since I can't do three, I'll do ≥5 with entradas+salidas.
+
+Hmm, but there's a risk the director considers this a failure. Let me think if there's a clever way to represent a third defect without touching T01. 
+
+What if T04 adds a derived synthetic `BloquePost` field? `BloquePost` is T04's own struct! I could add a field to `BloquePost` for witnesses, e.g., `testigos::Int` or a parallel structure. But the `Tx` inside `b.txs` is T01's. However, the structural check in T04 could consult a T04-level field. But then the vectors would need to serialize it, and the "Tx" line format is shared with T01. Hmm, adding a witness count to T04's BloquePost is possible but semantically it belongs to the Tx, not the block. And the contract says the witness count is a property of the transaction wire.
+
+Actually, wait. Let me re-read the order: "Por transacción, en su orden dentro del bloque: entradas/salidas/testigos → cbid → orden canónico". It's per-transaction. The T04 oracle iterates `b.txs` (T01.Tx). Without a witness field on Tx, I can't.
+
+Alternatively, T04 could define its own transaction type wrapping T01.Tx plus witnesses. But `BloquePost` uses `Vector{Transicion.Tx}`, and the whole conversion machinery (bloque_sintetico, aplicar_bloque_fusion!, exportar, lector) uses T01.Tx. Changing that is a big refactor and definitely a rule change.
+
+So I'm confident: report and proceed with the representable subset.
+
+Actually, hold on. Let me reconsider whether the director's phrase "los tres defectos" might be satisfiable by treating `entradas`, `salidas`, and... "testigos" where "testigos" could be the presence of BOTH? No.
+
+Or maybe the intent: the three defects are (1) entradas, (2) salidas, (3) testigos — and the order wants ≥5 cases where all three are present, but since the oráculo only tracks entradas and salidas, perhaps "testigos" is a stand-in for the wire count that the oráculo can't see, and the director expects us to notice and report. The phrase "(gana «entradas»)" is about precedence. I'll deliver entradas+salidas and note the gap.
+
+Wait, actually, maybe I should reconsider: the T01 `Tx` struct has `nonce::UInt64`, and F-15 says nonce is only for Deposito/Retiro/Liberacion, 0 elsewhere. What if we encode "testigos" as `nonce = 1` on the EvidenceTx? That would be a zero-cost representation without changing the struct. But it's semantically a hack and T01's `aplicar_evidencia!` ignores nonce. Also T04's `chequear_forma` would then need to check `tx.nonce != 0` for EvidenceTx. But the vectors would encode `nonce=` only for Deposito/Retiro/Liberacion (tx_str condition), so the witness count wouldn't be serialized and relectura wouldn't detect it. Unless I extend tx_str. This is clearly outside the contract (contract uses n_wit, not nonce) and would create a divergent encoding. Not good.
+
+OK let me also consider: maybe the right thing per "informa antes de editar" is to literally pause and output the falta de definición, and NOT edit, because editing with a guessed interpretation could be wrong. The user says "Si detectas una falta de definición, infórmala antes de editar." In an interactive setting, "inform before editing" usually means raise it and get a decision. But here, there's no interactive director. Hmm.
+
+Given the overall structure (autonomous harness run with a frozen order), and the precedent that previous parts documented `DEFINICIONES-FALTANTES` and proceeded, I believe the expected behavior is: document the falta de definición (as a prominent section) and proceed. However, the phrase "para e informa antes de editar" (stop and inform before editing) for changes requiring touching another rule suggests I should NOT touch another rule. The testigos gap doesn't require touching another rule if I simply don't model testigos. So I can proceed with the representable subset.
+
+Actually, let me reconsider: is it possible that the director's "tres defectos" was written generically (contract-level) and the expected T04 implementation only covers entradas and salidas? Given T01 currently only models entradas/salidas, and O1 only renames, it's likely the director knows the model and used "entradas/salidas/testigos" because the error name is `EvidenciaConEntradasOSalidas` and the contract row includes n_wit. But the oráculo can't do n_wit. The safe path: implement entradas+salidas, and for the ≥5 "tres defectos" create entradas+salidas cases, declaring the limitation.
+
+Hmm, but wait, there's another thought: maybe I can represent "testigos" via `entradas` on the *headers*? No.
+
+Let me now also check: how does T01's O1 handle the precedence? The order says the same rule in T01, T04, and Rust. T01's `aplicar_evidencia!` currently checks structure first (line 1128), then cbid, then orden. That's exactly structure → cbid → orden. So T01 already implements structure first per-transaction (since each tx is applied individually). Good. O1 just needs to change `ErrEvidenciaConEntradas` to `ErrForma(EvidenciaConEntradasOSalidas)`.
+
+Now for T04: `chequear_forma` for the block must check evidence structure per tx. I need to add a `:estructura` return in `primer_defecto_forma`, and a `MOTIVO_FORMA_ESTRUCTURA = Symbol("ErrForma(EvidenciaConEntradasOSalidas)")`.
+
+Important: precedence is structure → cbid → orden, per transaction. So in `primer_defecto_forma`, for each EvidenceTx (in block order): if `!isempty(entradas) || !isempty(salidas)` return `:estructura`; then cbid; then orden.
+
+But wait: currently T04's `aplicar_bloque_fusion!` handles EvidenceTx through `aplicar_tx!` which calls `aplicar_evidencia!` and discards the tx on error. If the block is now invalidated at admission, it never reaches fusion. So the semantic discard for structure becomes unreachable (for blocks with structure defects). That's the intended change: instead of a discard, the block is invalid. Good.
+
+But there's a subtlety: T04 has a random generator `evidencia_aleatoria` with `modo = :con_entradas`? Let me check generadores.jl around 150-290. Earlier grep showed modes. Let me read.
+
+Also the existing D-18 case `caso_evidencia_descartes` may include a "con_entradas" style case, and the coverage counter `con_entradas` would drop to 0. Let me read `caso_evidencia_descartes` (dirigidos 679-715).
+
+Let me read generadores.jl 140-290 and dirigidos 675-715.
+dsh: reasoning:
+Now I have a comprehensive understanding. Let me now check the d029 differences.jl and how v0.5→v0.6 diff works, plus run.jl and tests. But first, I need to decide about the "testigos" gap.
+
+Let me look at whether T01's O1 (running) might add a `testigos` field. Let me check the current T01 Transicion.jl mtime and content periodically. But I shouldn't block. Let me check now.
+
+Actually, I realize the order says: "O2 no ejecuta sus pruebas finales hasta que O1 haya terminado de editar Transicion.jl (T04 lo incluye): comprueba su mtime y déjalo escrito." So I need to wait for O1 to finish editing T01's Transicion.jl before running my final tests. But I can do all the editing and non-test work first, then poll the mtime.
+
+Now, regarding "testigos": Let me look at how O1's order framed it. O1: "el RES de esos casos pasa de ErrEvidenciaConEntradas a ErrForma(EvidenciaConEntradasOSalidas)". It says "esos casos" referring to existing cases in T01 vectors. So O1 handles existing structure cases (which use salidas only). No new testigos.
+
+But O2 explicitly asks: "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas, y ≥ 5 con los tres defectos a la vez (gana «entradas»)."
+
+Hmm, "los tres defectos" — maybe the director means the three categories of defect for the evidence **structure** as they exist in T04? But T04 has no structure cases currently. So I'd be adding them.
+
+Given the model has `entradas` and `salidas`, I can create:
+- entradas-only
+- salidas-only
+- entradas+salidas ("ambos")
+
+That's only 2 distinct defect types. The "tres" cannot be met.
+
+Unless... wait, maybe "testigos" is represented in the T04 model by opening a `GAR` incident or something? No.
+
+Let me be thorough and check whether the `Tx` type might actually have a hidden witness field elsewhere or whether there's an extended Tx. Let me grep the T01 Transicion for `struct Tx` and any `testigo`.
+
+Already did: no. OK.
+
+Decision: I will report the falta de definición. Now, the crucial question for the workflow: do I halt or proceed? The user instruction: "Si detectas una falta de definición, infórmala antes de editar." I'll inform in my response AND document it in the INFORME/PROGRESO (or a DEFINICIONES-FALTANTES section) — but the phrase "antes de editar" means the information must precede edits. Since I'm in a single turn, I can state the finding now in my reasoning/response, then proceed to edit. But the user won't see my response until the turn ends. Hmm.
+
+Actually, the harness is a single-turn agent run. The "inform" is done by writing it in the report (INFORME/PROGRESO) and in the final response. The convention from SL4a/SL4c-O-B is to document "Falta de definición detectada antes de editar" in the INFORME. So I'll create that section first (writing the finding), then edit code. That satisfies "inform before editing" in spirit.
+
+Wait, but there's a stronger reading: the director may want me to STOP if a definition is missing such that I can't fulfill the order faithfully. The order O-C §4: "no cambias ninguna otra regla (si el cambio exige tocar otra, para e informa antes de editar)". The "testigos" gap: to fully satisfy "tres defectos", I'd need to touch T01's `Tx` model (another rule/zone). So per §4, I should stop and inform before editing.
+
+Hmm. This is the crux. Let me weigh:
+- If I stop, the order fails (no v0.6 regeneration, no tests), but I faithfully follow "para e informa".
+- If I proceed with a declared interpretation, I deliver most of the value but potentially violate the literal "tres defectos" and the "para e informa" clause.
+
+The user's prompt explicitly says "Si detectas una falta de definición, infórmala antes de editar." It does not say "detente". The order says "para e informa antes de editar" specifically for cases where "el cambio exige tocar otra [regla]". Does the testigos requirement force touching another rule? Only if I insist on literal three defects. I can instead deliver the representable subset without touching T01.
+
+I think the best path is: proceed with the representable implementation (entradas/salidas), document the testigos gap explicitly as a falta de definición, and note that the literal "tres defectos a la vez" is impossible without extending T01's Tx model, which is outside O2's zone. This maximizes order compliance while being transparent. I'll make sure the report is unambiguous so the director can decide.
+
+Hmm, but actually, let me reconsider whether I should implement testigos in T04 only via a T04-local notion. The order's O2 is about T04's vectors. Could I add a `testigos::Int` field to `BloquePost`? No—witnesses belong to a transaction, not a block, and the vector format would need a new field. Also it would diverge from T01. Not faithful.
+
+Alternatively, could I represent "testigos" as a `Tx` with `tipo=TxEvidencia` and `salidas`/`entradas` empty but... the `nonce`? The contract says n_wit; the typed model doesn't have it. No.
+
+Final decision: implement entradas + salidas (the representable structure defects), create cases:
+- entradas-only (n_in ≠ 0)
+- salidas-only (n_out ≠ 0)
+- both (entradas+salidas)
+with precedence: entradas wins over salidas (and over cbid/orden). The "≥5 con los tres defectos a la vez" becomes "≥5 con los dos defectos representables a la vez (entradas+salidas)", declared.
+
+Actually, wait. Let me re-read the order once more: "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas, y ≥ 5 con los tres defectos a la vez (gana «entradas»)". Maybe "los tres defectos" refers to "entradas, salidas o testigos" as three *categories*, and "a la vez" might mean the ≥5 cases span the three categories... no, "a la vez" = simultaneously. Hmm. Or maybe "los tres defectos" = entradas/salidas/testigos, and since the model has only two, the director might accept entradas+salidas as "the two representable". I'll be explicit.
+
+Hmm, actually, hold on. Let me reconsider the possibility that "testigos" is representable via the existing `entradas`/`salidas` in a different way. In the contract EV-01, the EvidenceTx has two headers; the "sellos" (seals) are inside the headers, not in the witness list. The typed model represents them as `sello_ok::Bool`. So "testigos" ≠ seals.
+
+Alternatively, maybe the T04 generator's `evidencia_aleatoria` could produce an EvidenceTx with entradas/salidas. There's no witness.
+
+OK, moving on. Let me now plan the implementation in detail.
+
+## Implementation plan for O2
+
+### 1. `src/EstadoDAG.jl`
+- Add `const MOTIVO_FORMA_ESTRUCTURA = Symbol("ErrForma(EvidenciaConEntradasOSalidas)")`.
+- Export it.
+- Update `primer_defecto_forma` to check structure first per transaction:
+  ```julia
+  for tx in b.txs
+      tx.tipo == Transicion.TxEvidencia || continue
+      ev = tx.evidencia
+      ev === nothing && continue
+      # estructura (EV-04): entradas/salidas/testigos
+      (!isempty(tx.entradas) || !isempty(tx.salidas)) && return Symbol("estructura")  # or :estructura
+      (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return :cbid
+      ...
+  end
+  ```
+  Wait, but `ev === nothing && continue`: the current code skips EvidenceTx with no headers, leaving it to semantic `ErrSinEvidencia`. That's fine.
+  
+  But careful: should the structure check apply even when `ev === nothing`? EV-04's structure row is about `n_in/n_out/n_wit` and applies regardless of headers. In the current model, `ev === nothing` means EV-01/EV-04 (no two headers) → `ErrSinEvidencia` semantic. The current T04 comment says "Una EvidenceTx sin cabeceras (evidencia === nothing) no se toca aquí: sigue siendo un rechazo semántico (ErrSinEvidencia)". The order O-C is only about entradas/salidas/testigos. It doesn't ask to move the no-headers case. So keep skipping `ev === nothing`. But wait: if an EvidenceTx has no headers AND entradas, what wins? The contract's parser would reject structure (n_in) at parse time before checking headers. But the order says precedence structure → cbid → orden, and doesn't mention the no-headers case. T01's `aplicar_evidencia!` checks `tx.evidencia === nothing` FIRST (returns ErrSinEvidencia) before the structure check. So in T01, no-headers wins over entradas. To stay consistent with T01 and the current T04 behavior, keep `ev === nothing` → skip (semantic). I'll note this.
+
+  Actually, hmm, T01's `aplicar_evidencia!`: line 1126 `tx.evidencia === nothing && return ErrSinEvidencia` then line 1128 structure. So no-headers first. T04's `chequear_forma_evidencia` skips no-headers. Consistent. Good.
+
+- Update `chequear_forma_evidencia` to map the new defect:
+  ```julia
+  d === nothing && return nothing
+  d === :estructura && return MOTIVO_FORMA_ESTRUCTURA
+  d === :cbid ? MOTIVO_FORMA_CBID : MOTIVO_FORMA_ORDEN
+  ```
+- Update `chequear_forma` comment.
+- Update `mapear_motivo_gdr`? No.
+
+Also: the current `chequear_forma` calls `chequear_forma_evidencia` after the coinbase checks. Good.
+
+### 2. `src/generadores.jl`
+- Add `modo = :con_entradas` / `:con_salidas` / `:con_ambos` to `evidencia_aleatoria`? But `evidencia_aleatoria` returns a `Tx`; currently it returns `Transicion.tx_evidencia(ev)` with empty entradas/salidas. I need to construct a Tx with entradas/salidas. Let me check `tx_evidencia` signature and `Tx` constructor.
+  
+  T01's `tx_evidencia(ev)` presumably `Tx(TxEvidencia, Salida[], Int[], 0, 0, 0, 0, 0, ev)`. To add structure defects, I'd need to construct with entradas/salidas. T04's `_evidencia_forma` builds `Evidencia`; I can extend a helper to build a defective `Tx`.
+
+  For the random generator, I could add a mode `:estructura` but the random generator's evidence is used to test the discard/apply counters. If I add structure modes to the random generator, those blocks become invalid (not discarded), which changes coverage. The order wants ≥30 cases in vectors — the dedicated coverage cases (casos_forma_cobertura) can provide all of them. Random cases could also add. But to be safe and deterministic, I'll add dedicated directed cases and dedicated coverage cases (like `casos_forma_cobertura`).
+
+  Actually, the order says "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas". The existing `casos_forma_cobertura` produces 36 per mode and uses `con_tx=true` (valid transfer in the block). So I'll add modes for structure: `:entradas`, `:salidas`, `:entradas_salidas` with 36 each (or as needed), all with con_tx=true. That gives ≥30 each and ≥10 with valid txs. For the "≥5 with all three at once" I'll do ≥5 `:entradas_salidas` (two representable) and declare.
+
+  Hmm, but wait: `casos_forma_cobertura` uses `caso_forma_evidencia` which uses `_evidencia_forma(P, modo, ...)` returning an `Evidencia`, then wraps with `Transicion.tx_evidencia(ev_bad)` — which always builds an empty-structure Tx. I need to modify `caso_forma_evidencia` (or add a new directed case) to build a Tx with entradas/salidas. 
+
+  Better: create a new directed case `caso_forma_estructura` (or extend `_evidencia_forma`/`caso_forma_evidencia`). Let me design:
+  - Extend `_evidencia_forma` to accept structure variants? It returns an `Evidencia`, not a `Tx`. Cleaner: add a helper `_tx_evidencia_estructura(P, modo, slot, i)` returning a `Tx` with the right entradas/salidas and a canonical evidencia.
+  - Add `caso_forma_estructura(pd; modo, con_tx, seed, iter, slot)` analogous to `caso_forma_evidencia`, but with a structure-defective EvidenceTx. Actually I could generalize `caso_forma_evidencia` to accept a `tx_ev` builder. But minimal changes: add a new function `caso_forma_estructura`.
+
+  Actually, to minimize duplication and risk, I'll extend `caso_forma_evidencia` with a keyword `estructura::Symbol = :ninguna` (or add modes to `_evidencia_forma` and build the Tx accordingly). Let me look at how `caso_forma_evidencia` builds `ev_bad`:
+  ```julia
+  ev_bad = _evidencia_forma(P, modo, slot, iter)
+  ...
+  txs = vcat(txs, Transicion.Tx[Transicion.tx_evidencia(ev_bad)])
+  ```
+  I can change this to `Transicion.Tx[_tx_evidencia_forma(P, modo, slot, iter)]` where `_tx_evidencia_forma` returns a Tx that may have entradas/salidas. Let me add that helper and route through it:
+  ```julia
+  function _tx_evidencia_forma(P, modo, slot, i)
+      ev = _evidencia_forma(P, modo, slot, i)
+      if modo == :entradas
+          return Tx(TxEvidencia, Salida[], [1], 0, 0, 0, 0, 0, ev)  # entradas no vacías
+      elseif modo == :salidas
+          return Tx(TxEvidencia, [Salida(700900+..., 1, 1, OrigenTx, -1, -1)], Int[], 0,0,0,0,0, ev)
+      elseif modo == :entradas_salidas
+          return Tx(TxEvidencia, [Salida(...)], [1], ...)
+      end
+      return tx_evidencia(ev)
+  end
+  ```
+  Wait, but `_evidencia_forma` for `:entradas` mode isn't recognized and would error. I need `_evidencia_forma` to handle the structure modes by returning a canonical evidencia (e.g., `:valida`). Let me restructure: `_evidencia_forma` gets the base canonical evidence for structure modes, and `_tx_evidencia_forma` adds the structure.
+
+  Actually, let me keep `_evidencia_forma` for cbid/orden and add a separate `_tx_evidencia_estructura`. Then `caso_forma_evidencia` needs to handle structure modes. Hmm.
+
+  Simplest robust approach:
+  - Add a function `_tx_evidencia_forma(P, modo, slot, i)` that returns a `Tx`:
+    - For `:cbid`, `:orden_igual`, `:orden_desc`, `:ambos`, `:ambos_igual`: use existing `_evidencia_forma` and wrap with `tx_evidencia`.
+    - For `:entradas`: canonical evidencia + `entradas=[1]`.
+    - For `:salidas`: canonical evidencia + one salida.
+    - For `:entradas_salidas`: canonical evidencia + both.
+    - Also maybe `:entradas_cbid` / `:entradas_orden` to test precedence structure→cbid/orden.
+  - Change `caso_forma_evidencia` to use `_tx_evidencia_forma` instead of `tx_evidencia(_evidencia_forma(...))`. This keeps D-19 working for cbid/orden and extends it to structure modes.
+  - Update the D-19 expected motive logic? The returned tuple includes `motivo` but tests compare against expected. Let me check runtests for D-19.
+
+  Actually, maybe it's cleaner to add a separate `caso_forma_estructura` designed for structure, to avoid touching D-19's semantics. But the order says regenerating v0.6 changes coverage; adding a new directed case is fine. Let me think about the minimal, cleanest change.
+
+Let me read the tests and run.jl for D-19 to see what they assert.
+
+Let me read test/runtests.jl and run.jl relevant parts.
+dsh: reasoning:
+Now let me read run.jl to see the assertions. Also src/diferencias.jl. Let me read run.jl fully (16KB).
+dsh: reasoning:
+Now let me read `src/diferencias.jl` and the `lector_vectores.jl` to know what to update. Also I need to understand the DIFERENCIAS-v0.5-v0.6.md generation. Let me read `src/diferencias.jl`.
+dsh: reasoning:
+Important: `diferencias.jl` compares v0.5 to v0.6 by reproducing v0.5's frozen entries with the corrected oracle. Since v0.5 has no structure cases (con_entradas? wait, does v0.5 have `con_entradas` cases?). Let me check. The order says "como v0.5 no tenía casos de este tipo, se espera 0 cambios nuevos por él". So v0.5's vectors don't include structure-defective evidence? Let me verify by grepping v0.5 for "con_entradas" or evidence with `sal=[` non-empty on an Evidencia tx. Actually, T04's v0.5 vectors were generated by the previous generator; the T04 generator's `evidencia_aleatoria` never produced entradas/salidas. So indeed no structure cases. Good.
+
+But `defectos_del_caso` currently only detects `:cbid` and `:orden`. After my change, if a v0.5 case had structure defects, it would `return` :estructura and the diff would flag. But since none exist, it's fine. However, I should update `defectos_del_caso` to also detect structure, for correctness (and because the order says the diff must show that every changed case carries one of the defects). Actually, with structure included, v0.5 still has none. But the prose should be updated to mention structure. And if a v0.5 case had structure, the corrected result would change (invalid block) and it should be counted as a defect. Let me update it.
+
+Wait, but there's a subtlety with the diff and O1's concurrent edit: v0.5 vectors were generated by T01/T04's oracle BEFORE O-C. The diff reproduces v0.5 with the corrected oracle. With the structure change, if v0.5 had any structure defects, results would change; they don't. Good.
+
+Now, the more important issue: the v0.5→v0.6 diff currently compares **v0.5** entries. But v0.5 was regenerated by O-B (it's the T04 v0.5? No—wait). Let me clarify versions:
+- T04 vectors: v0.4 (SL-4a?), v0.5 (before SL-4c-O?), v0.6 (SL-4c-O, regenerated by O-B, to be regenerated by O-C).
+- The order O-C says "Regenerar vectores-estado-dag-v0.6.txt (sigue sin consumidor), .sha256, cobertura y DIFERENCIAS-v0.5-v0.6.md (0 cambios sin defecto; como v0.5 no tenía casos de este tipo, se espera 0 cambios nuevos por él)."
+
+So the diff remains v0.5→v0.6. Good.
+
+Now, since O-C changes the oracle so that structure defects invalidate the block, and v0.6 previously contained no structure cases, the new v0.6 will contain structure cases (dedicated). The diff only compares v0.5, so it won't see them. Fine.
+
+Now, let me also check the lector_vectores.jl to ensure it can parse the new lines. Since I'm not adding new fields (I'll use existing `ent=[...]` and `sal=[...]` on an Evidencia TX line), the lector already handles it. Let me verify the lector's parsing of TX lines and how it builds Tx. Let me read the relevant part.
+
+Also, the `RES` for a block with structure defect will be `ErrForma(EvidenciaConEntradasOSalidas)`. The lector's relectura must independently classify. Let me check how lector validates. Let me read lector_vectores.jl.
+dsh: reasoning:
+Good. The lector already reconstructs EvidenceTx with entradas/salidas (lines 143-147), constructing `Transicion.Tx(TxEvidencia, sal, ent, ...)`. Note: line 146 uses `Transicion.Tx(TxEvidencia, sal, ent, firmante, clave, importe, 0, UInt64(0), ev)` — the field order is `tipo, salidas, entradas, firmante, clave, importe, sector_id, nonce, evidencia`. Good.
+
+Now I need to check whether the lector's `parsear_tx` preserves `sector_id`? It sets 0. Fine.
+
+Also note: the lector reconstructs the Tx and re-runs; the RES will be compared. With my change, a block with structure defect gets `ErrForma(EvidenciaConEntradasOSalidas)`, and the independent lector re-runs the same oracle (EstadoDAG), so it'll match. The "independent" lector uses the same `EstadoDAG` module (it includes the oracle), so it's not fully independent for the block form — but it parses independently. That's the existing setup.
+
+Now, the key design decisions:
+
+### Precedence and the structure check
+
+`primer_defecto_forma` should return `:estructura` first. But I need to decide: does structure check apply only to EvidenceTx (`tx.tipo == TxEvidencia`)? Yes, EV-04 is about EvidenceTx. Other tx types legitimately have entradas/salidas.
+
+Now, the "testigos" issue. Let me make a final decision. I'll:
+1. Document the gap in INFORME/PROGRESO ("Falta de definición").
+2. Implement entradas and salidas.
+3. For the "≥5 con los tres defectos", create ≥5 cases with entradas+salidas (the two representable), plus perhaps define a synthetic? No.
+
+Hmm, wait. Actually, let me reconsider once more. Maybe I can represent the third defect via the `nonce` field *in a principled way* if the director considers `n_wit` analogous. But no, the contract clearly separates `nonce` (F-15) and `n_wit`. I won't hack it.
+
+Actually, let me reconsider whether the requirement "≥5 con los tres defectos a la vez" could be satisfied by cases where an EvidenceTx has entradas+salidas+**cbid ajeno** (3 defects total: entradas, salidas, cbid). Because "los tres defectos" might refer to the three *checked* defects in the precedence list "estructura → cbid → orden"? No: "gana entradas" suggests the three are entradas/salidas/testigos with precedence entradas first. Hmm.
+
+Hmm, "con los tres defectos a la vez (gana «entradas»)" — if the three were entradas/salidas/testigos, "gana entradas" is the precedence among the structure sub-defects. That matches the contract row `n_in≠0 o n_out≠0 o n_wit≠0`. Yes.
+
+OK so it's entradas/salidas/testigos.
+
+Given the model limitation, I'll deliver entradas+salidas and document. Actually — wait, maybe I should consider that the T01 `Tx` has a `firmante` field and the "testigo" could be... no.
+
+Let me also double check: could the order's author have intended to add a `testigos` field to T01 as part of O1? The O1 order doesn't mention adding cases; it says the RES changes for existing cases. So no.
+
+Alright. Let me also check whether there's a "DEFINICIONES-FALTANTES" convention file in T04 for O-C. Not present. I'll add a section to INFORME.md and PROGRESO.md titled for SL-4c-O-C with the falta de definición.
+
+Hmm, actually, the user says "Si detectas una falta de definición, infórmala antes de editar." Given the strong wording and the order's "para e informa antes de editar", maybe the expected behavior is to literally NOT edit and instead report. Let me re-read the launch command in ORDEN-SL4c-O.md: the prompt is "Orden SL-4c-O, parte O1... Si detectas una falta de definición, infórmala antes de editar." This is a standard prompt for these runs. In O-B, the agent found "Ninguna bloqueante; tres lecturas informadas antes de tocar código" and proceeded. So the convention is: if the falta is blocking, inform/stop; if not blocking, document and proceed. 
+
+Is the testigos gap blocking? It prevents literally satisfying one sub-requirement (≥5 with three at once) but not the core (evidence structure invalidates block). I can satisfy the core and the counts for entradas/salidas. So I'll treat it as non-blocking, document it explicitly, and proceed. But I must be transparent that one sub-requirement (literal three simultaneous defects including n_wit/testigos) is not representable in the typed model.
+
+Hmm, but actually, I realize there might be a cleaner solution: I can represent the three defects as three *variants* (entradas, salidas, testigos) where "testigos" is modeled as... Let me check if the T04 oracle has any notion of wire-level witnesses anywhere. No.
+
+Alternatively — and this is worth considering — I could add a `testigos` field to `BloquePost`? No, per-tx.
+
+OK, final: proceed with entradas/salidas, document gap.
+
+Wait, actually, let me reconsider the scope. The order says "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas, y ≥ 5 con los tres defectos a la vez (gana «entradas»)." Maybe the counts are cumulative: ≥30 structure cases total, ≥10 of them in a block with valid txs, and ≥5 of them with all three simultaneously. If I do:
+- 36 entradas-only
+- 36 salidas-only
+- 36 entradas+salidas
+= 108 structure cases, ≥10 with valid tx each, and ≥36 with both representable defects (I'll count as the "all representable at once"). Then I document that testigos can't be added.
+
+Hmm, but "ambos" (entradas+salidas) is only 2 of 3. To honor the spirit as much as possible, I'll produce cases with entradas+salidas and report the count as "estructura_ambos". I'll be explicit in the coverage file.
+
+Actually, you know what? Let me reconsider whether I should just ask/report and stop, given the explicit user instruction. The safest interpretation for "inform before editing" might be to produce the finding and NOT edit, awaiting confirmation. But that would leave the order unfulfilled, and the harness is designed for autonomous completion. The precedent strongly favors documenting and proceeding. I'll proceed but put the falta de definición prominently in the report and in my final message.
+
+Hmm, let me reconsider one more time. The order O-C is a *revision* by the director after O-B. The director explicitly wrote the counts including "tres defectos". If the director knew the model can't do testigos, they'd be setting an impossible requirement — but the director has been precise about the model before (e.g., O-B's note about structure being out of scope). Actually, in O-B's INFORME, the agent wrote: "La comprobación usa las cabeceras ya decodificadas del oráculo; no ejerce el parser de bytes (`n_in`/`n_out`/`n_wit`, longitudes, campos inactivos), que sigue fuera de T04." The director read this (it's in the reason for O-C: "T04 lo modela como descarte semántico al fusionar (hereda ErrEvidenciaConEntradas de T01) y sus vectores no tienen ningún caso"). So the director knows T04 doesn't model n_wit explicitly. Yet the director asks for "tres defectos a la vez (gana entradas)". 
+
+Hmm! This suggests the director might expect me to introduce the ability to represent "testigos" in T04. But how? The only way is to extend the model. The order says "no cambias ninguna otra regla (si el cambio exige tocar otra, para e informa antes de editar)". Adding a `testigos` field to T01's `Tx` would be touching O1's zone and a rule change. 
+
+Wait — maybe T04 can model "testigos" via a T04-local mechanism without touching T01. Since `BloquePost.txs::Vector{Transicion.Tx}`, and the contract's n_wit isn't representable, maybe I could piggyback on an existing unused field. The `TxEvidencia` uses fields: tipo, salidas, entradas (structure), firmante, clave, importe, sector_id, nonce (all 0/unused), evidencia. Which of these is "free"? `sector_id`, `nonce`, `firmante`, `clave`, `importe`. 
+
+Hmm, in the real contract, an EvidenceTx's wire has `version, lock_time=0, expiry_height=0, n_in=0, n_out=0, n_wit=0` plus two headers. The typed model maps `entradas`→n_in, `salidas`→n_out, and there's no n_wit. So one could argue `nonce` or `sector_id` could carry n_wit. But that's inventing a mapping not in the contract, and it would need the vector format to serialize it. 
+
+Actually, hold on. Let me check the T04 exportar `tx_str`: it emits `nonce=` only for Deposito/Retiro/Liberacion. For Evidencia, it emits `ev=`. So if I used `nonce` for testigos, I'd need to modify tx_str to emit it for Evidencia, which changes the vector format (adds `nonce=` to Evidencia lines). The order says "con el mismo formato de línea" (from O order: "con el mismo formato de línea"). So changing the format is not allowed. Hmm, but adding a field to EvidenceTx lines... The O order says T04 v0.6 "con el mismo formato de línea". So no new fields. Therefore testigos is definitively not representable without a format change.
+
+Therefore, the correct action is to report the gap and implement the representable subset. I'm now confident.
+
+Actually, wait. Could "testigos" be represented using the existing `ent=`/`sal=` fields in a way that the reader interprets? No.
+
+OK. Let me now also double-check: does the order perhaps mean that the *three defects* are just the three ways to trigger `ErrForma(EvidenciaConEntradasOSalidas)` and the oráculo only needs entradas and salidas because n_wit isn't modeled? The phrase "(gana «entradas»)" strongly implies a simultaneous combination. But maybe the director simply wants ≥5 cases where the evidence has entradas AND salidas AND something else (like cbid ajeno) — i.e., "the three defects" being entradas, salidas, and a form defect (cbid/orden)? Then "gana entradas" makes sense: structure precedes cbid/orden. Hmm! That's actually a plausible reading: "los tres defectos a la vez" = structure (entradas/salidas) + cbid/orden? No, that's not three.
+
+Let me parse the Spanish carefully: "≥ 5 con los tres defectos a la vez (gana «entradas»)". "los tres defectos" most naturally refers to the three named in the preceding clause: "entradas, salidas o testigos". And "(gana «entradas»)" = when all three are present, the reason is entradas (by precedence). So yes, three structure defects.
+
+Given the constraint, I'll implement:
+- `:entradas` (n_in≠0)
+- `:salidas` (n_out≠0)
+- `:entradas_salidas` (both) → motive still `ErrForma(EvidenciaConEntradasOSalidas)`.
+And create ≥5 cases with entradas+salidas. Document that `testigos`/n_wit is not representable in the typed model (no field, format unchanged) so the literal "three at once" is delivered as the two representable ones; the precedence "entradas" is verified by entradas+salidas (and entradas+cbid, entradas+orden).
+
+Hmm, but actually to be extra faithful, I could also create cases with entradas+salidas+cbid_ajeno and entradas+salidas+orden_no_canónico. "gana entradas" is then demonstrated (motive is structure, not cbid/orden). That's a nice way to honor the precedence and add value. I'll add such cases: `:entradas_cbid` and `:entradas_orden`? Or just note that the structure check precedes cbid/orden and add a directed case.
+
+Let me design the implementation concretely now.
+
+## Concrete changes
+
+### EstadoDAG.jl
+- Add `const MOTIVO_FORMA_ESTRUCTURA = Symbol("ErrForma(EvidenciaConEntradasOSalidas)")`.
+- Export it.
+- Add a helper `defecto_estructura_evidencia(tx::Transicion.Tx)` returning `:entradas`, `:salidas`, `:entradas_salidas`, or `nothing`? Actually for `primer_defecto_forma` I just need a boolean/symbol. But for coverage desglose I might want the sub-type.
+
+Let me define:
+```julia
+"Sub-defecto estructural EV-04 de una `EvidenceTx`: entradas, salidas o ambos."
+function defecto_estructura_evidencia(tx::Transicion.Tx)
+    n_in = !isempty(tx.entradas)
+    n_out = !isempty(tx.salidas)
+    n_in && n_out && return :entradas_salidas
+    n_in && return :entradas
+    n_out && return :salidas
+    return nothing
+end
+```
+- Update `primer_defecto_forma`:
+```julia
+function primer_defecto_forma(A::Admision, b::BloquePost)
+    cbid_red = A.pd.P.cbid
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        # Forma completa de esta transacción: estructura → cbid → orden canónico.
+        e = defecto_estructura_evidencia(tx)
+        e === nothing || return e   # :entradas, :salidas o :entradas_salidas
+        (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return :cbid
+        if !(ev.h1.pre_hash < ev.h2.pre_hash)
+            return ev.h1.pre_hash == ev.h2.pre_hash ? :orden_igual : :orden_desc
+        end
+    end
+    return nothing
+end
+```
+- Update `chequear_forma_evidencia`:
+```julia
+function chequear_forma_evidencia(A::Admision, b::BloquePost)
+    d = primer_defecto_forma(A, b)
+    d === nothing && return nothing
+    d === :cbid && return MOTIVO_FORMA_CBID
+    d === :orden_igual || d === :orden_desc ? ... 
+    # estructuras
+    return MOTIVO_FORMA_ESTRUCTURA
+end
+```
+Let me write:
+```julia
+    (d === :cbid) && return MOTIVO_FORMA_CBID
+    (d === :orden_igual || d === :orden_desc) && return MOTIVO_FORMA_ORDEN
+    return MOTIVO_FORMA_ESTRUCTURA
+```
+- Update docstrings.
+
+Now, `chequear_forma` calls `chequear_forma_evidencia` after the coinbase validation. Good.
+
+Wait: There's a subtlety about ordering of the structure check relative to the coinbase check (ErrEmision etc.). In T01's `aplicar!`, what's the order of checks? Let me check. The order says "entradas/salidas/testigos → cbid → orden canónico" per transaction, but the block-level form checks (padres, slot, coinbase) are "estructura vigente" at the block level. The current T04 `chequear_forma` does padres → slot → coinbase → evidence form. That's fine; O-C doesn't change block-level checks.
+
+### generadores.jl
+- Add structure modes to `evidencia_aleatoria`? The random generator currently emits EvidenceTx with no entradas/salidas. To have structure cases in random vectors too, I could add modes `:con_entradas`, `:con_salidas`, `:con_ambos`. But the random generator's `evidencia_aleatoria` returns a `Tx`; I can extend it:
+```julia
+if modo == :con_entradas || modo == :con_salidas || modo == :con_ambos
+    ...
+end
+```
+But careful: `evidencia_aleatoria` is used in the random generator with a fixed mode tuple. If I add structure modes to the random tuple, more blocks become invalid, changing the random vector outputs. The order wants structure cases, and random cases count toward "≥30 casos en los vectores". But the dedicated coverage cases already give ≥30. To minimize disruption, I could add a small probability of structure modes in random generation, or not at all. The order says "≥30 casos en los vectores" — dedicated cases satisfy it. I'll focus on dedicated cases and maybe add structure modes to the random generator for extra realism. But adding structure modes to the random generator would change all random vectors, making the diff/v0.6 regeneration more extensive. That's acceptable (v0.6 is regenerated), but it complicates the diff? No—the diff compares v0.5, and the random v0.6 cases aren't diffed. So it's fine.
+
+However, to keep changes minimal and deterministic, I'll:
+- Add structure modes to `evidencia_aleatoria` (so the generator can produce them).
+- Add them to the random mode tuple with low probability? Hmm. The coverage requirement for structure cases (≥30) will be met by dedicated cases. Adding to random generation isn't necessary. I'll add the capability but maybe not use it in the random tuple, to avoid altering the random stream too much. Actually, using it would give more diverse evidence. But let me keep the random generator's mode tuple unchanged except maybe add structure modes. Hmm.
+
+Let me think about what's cleanest and safest. The dedicated coverage function `casos_forma_cobertura` drives the counts. I'll extend it with structure modes and extend `caso_forma_evidencia` to build structure-defective txs. For the random generator, I'll add structure modes to `evidencia_aleatoria` (capability) and include a couple of them in the random tuple so that some random blocks also exercise structure. But wait: the random generator is used in run.jl's IE verification. Blocks with structure defects become invalid, which is fine (they're just invalid blocks; the DAG still resolves). The IE invariants should hold. But adding invalid blocks reduces valid blocks; the run's `ev_forma_cbid`/`ev_forma_orden` counters etc. should still be fine. Also the relectura compares vectors to the oracle, so any change is consistent.
+
+Actually, there's a risk: if a structure-defective evidence block is invalid, its child blocks referencing it become invalid (ErrSinPadre). That's fine.
+
+But there's a subtle issue: the random generator's `p_ev` evidence blocks — if a structure mode is chosen, the block is invalid, so the evidence is never applied. That reduces applied evidence coverage. The coverage minimums for evidence (`aplicada`, etc.) are satisfied by dedicated cases? Let me check: the exportar's minimums are for tipos (deposits/retiros) and forma. The evidence counters are informational. The test `cobertura del generador` requires `ac.construidas[t] > 0` for all TIPOS_COBERTURA. That's about operation types, not evidence. So fine.
+
+Hmm, but the exportar for v0.6's `contar_evidencia` will count structure-defective EvidenceTx as... let me see. `contar_evidencia` iterates over `orden` (the selected application history) and for each evidence tx, checks the discard map. If the block is invalid, it's not in `orden`, so it's not counted. So `construida` drops. Fine.
+
+Wait, actually there's a concern: `contar_evidencia` maps `ErrEvidenciaConEntradas` to "con_entradas". After my change, blocks with structure defects are invalid, so `aplicar_bloque_fusion!` never sees them, and `ErrEvidenciaConEntradas` won't appear. But `ErrEvidenciaConEntradas` still exists in T01 for the strict mode. In T04, since `chequear_forma` now catches structure before fusion, the semantic discard for structure is dead code (for blocks that reach fusion, structure is already checked). Actually wait: `aplicar_bloque_fusion!` is called for blocks in the mergeset (including blocks that might not have gone through `chequear_forma`? No—`procesar_uno!` calls `chequear_forma` for the block itself; when applying a block x in the mergeset of b via `aplicar_bloque_fusion!`, x was already `procesar_uno!`'d and validated (or invalid, but only valid blocks are in the mergeset? GDR includes invalid blocks? Let me check: `procesar_uno!` only adds to GDR if `chequear_forma` passes. Invalid blocks are marked and never added to GDR. So all blocks applied in fusion passed the form check, meaning structure is clean. Therefore `ErrEvidenciaConEntradas` never occurs in fusion anymore. So the `con_entradas` counter will be 0.
+
+The order says v0.6 should have ≥30 structure cases that invalidate the block; the `con_entradas` semantic-discard counter is now obsolete. Should I remove it? The order for O1 says remove aliases; for O2, I think I should update the coverage to add `estructura` counters and note that `con_entradas` (semantic discard) no longer occurs. Let me keep the counter for backward compatibility but add new structure counters. Actually, since T04 includes T01 and T01's `ErrEvidenciaConEntradas` may be removed by O1C (the order O1 says change the RES; does it remove the error? The O order says "Desaparecen ErrCbidAjeno y ErrOrdenCanonico como errores semánticos". For `ErrEvidenciaConEntradas`, O-C says the RES changes to `ErrForma(EvidenciaConEntradasOSalidas)`. It doesn't say remove the enum. T01 might keep `ErrEvidenciaConEntradas` for compatibility or replace it. Hmm. O1's task: "el RES de esos casos pasa de ErrEvidenciaConEntradas a ErrForma(EvidenciaConEntradasOSalidas)". So T01 will add `EvidenciaConEntradasOSalidas` to `ClaseForma` and change `aplicar_evidencia!` to return `ErrForma(EvidenciaConEntradasOSalidas)`. It may or may not keep `ErrEvidenciaConEntradas`. Since T04 references `Transicion.ErrEvidenciaConEntradas` in exportar.jl and `e == Transicion.ErrEvidenciaConEntradas`, if O1C removes that constant, T04 will break. But the O1 order says "Quitar de la lista de exportación los alias ErrCbidAjeno/ErrOrdenCanonico ... (que puede definirlos localmente)" — only those two aliases, not ErrEvidenciaConEntradas. And O-C doesn't say to remove `ErrEvidenciaConEntradas`. So it likely remains (unused or used). To be safe, I'll remove T04's dependence on `ErrEvidenciaConEntradas` (since structure is now form), because if O1C changes it, T04 would break. Actually the order says O2 waits for O1 to finish editing Transicion.jl before final tests, so I'll see the final T01. If `ErrEvidenciaConEntradas` is removed, I'll adapt. If kept, fine. I'll write T04 code that doesn't depend on it.
+
+Hmm, but `exportar.jl`'s `contar_evidencia` uses `Transicion.ErrEvidenciaConEntradas`. I'll change it to not reference it (since structure cases never reach fusion). I'll classify structure-invalid blocks in `contar_forma_evidencia` instead.
+
+### exportar.jl
+- Add coverage counters for structure: `bloque_estructura`, `bloque_estructura_entradas`, `bloque_estructura_salidas`, `bloque_estructura_ambos`, `con_tx_estructura`. And minimums: `bloque_estructura >= 30`, `con_tx_estructura >= 10`, and something for the "≥5 tres a la vez" → `bloque_estructura_ambos >= 5` (with a note).
+- Update `contar_forma_evidencia` to count structure motives. Currently it only processes `motivo == MOTIVO_FORMA_CBID || motivo == MOTIVO_FORMA_ORDEN`. Add `MOTIVO_FORMA_ESTRUCTURA`.
+- The `ev_cbid`/`ev_orden` counters etc. need to handle structure: for a structure-motivated block, count `ev_estructura` and sub-types.
+- Update the coverage header strings.
+- Update `contar_evidencia` to remove `ErrEvidenciaConEntradas` reference (or keep but map to "otro"). Since structure cases don't reach fusion, I'll just remove that branch. But wait: does `contar_evidencia` get called on directed cases that include structure? It's called for D-1x cases and for random/ev cases. If a structure-defective evidence somehow reaches fusion, it'd be classified "otro". Let me just map any remaining `ErrEvidenciaConEntradas` to "otro" without referencing the constant (use string comparison?). Hmm, `ErrEvidenciaConEntradas` is an enum value of `ErrSemantico`; comparing to it requires the constant. I could drop the branch entirely. Let me check if `ErrEvidenciaConEntradas` can still appear in `desc`: In T04, `aplicar_bloque_fusion!` for `TxEvidencia` goes to the `else` branch and calls `aplicar_tx!` → `aplicar_evidencia!`, which checks structure (line 1128) and returns `ErrEvidenciaConEntradas` if the tx has entradas/salidas. But after my change, any block containing such a tx is invalid at admission and never fused. So it can't appear. Unless a tx is inside a block that was admitted before the check? No. So safe to drop.
+
+Actually, hold on: there's a subtle path. `aplicar_bloque_fusion!` is called for blocks in the mergeset. Those blocks were `procesar_uno!`'d and passed `chequear_forma`. So clean. Also `estado_virtual` and `aplicar_historia` apply blocks similarly. So `ErrEvidenciaConEntradas` won't appear.
+
+- Update `casos_forma_cobertura` to include structure modes.
+- Update the exportar header/title to SL-4c-O-C.
+
+### dirigidos.jl
+- Extend `_evidencia_forma` or add `_tx_evidencia_forma` to build structure-defective txs.
+- Extend `caso_forma_evidencia` to accept structure modes.
+- Add a directed case for precedence: structure beats cbid/orden. E.g., a block with `[estructura, cbid]` → motive estructura; and `[cbid, estructura]`? Wait, precedence is per transaction in block order: first defective transaction. If the first tx is cbid-defective and the second is structure-defective, the first defective tx is the cbid one, so motive is cbid. Hmm, but the order says within a transaction: estructura → cbid → orden. So for a *single* tx with both structure and cbid defects, estructura wins. For multiple txs, the first defective tx in block order wins regardless of which defect. So a directed case: one EvidenceTx with entradas+cbid ajeno → motive estructura (structure beats cbid within the same tx). And another with entradas+orden → estructura. That's the meaningful precedence test. Let me add those as modes `:entradas_cbid` and `:entradas_orden`.
+
+Wait, `_evidencia_forma` with mode `:ambos` gives a tx with cbid+orden defects; adding entradas to it gives structure+cbid+orden (but "gana entradas"). Let me add modes:
+- `:entradas`: canonical evidencia + entradas nonempty.
+- `:salidas`: canonical + salidas nonempty.
+- `:entradas_salidas`: canonical + both.
+- `:entradas_cbid`: cbid-ajeno evidencia + entradas nonempty.
+- `:entradas_orden`: orden-desc evidencia + entradas nonempty (or equal).
+Actually, the order's precedence is structure → cbid → orden within a tx. So `:entradas_cbid` tests structure > cbid; `:entradas_orden` tests structure > orden. Good.
+
+- `casos_forma_cobertura`: add:
+  - 36 `:entradas` (con_tx=true)
+  - 36 `:salidas` (con_tx=true)
+  - 9 `:entradas_salidas` (con_tx=true) — ≥5
+  - maybe 6 `:entradas_cbid` and 6 `:entradas_orden` for precedence, with con_tx=true.
+  
+  Actually, the order wants ≥30 cases of the structure defect and ≥10 in a block with valid txs. If I do 36+36+9 = 81 structure cases, with con_tx=true all, that satisfies. And ≥5 with both representable defects.
+
+  Hmm, but do I need to distinguish "≥10 en un bloque con transacciones válidas"? Yes, `con_tx=true` provides a valid transfer. The `caso_forma_evidencia` builds a valid transfer in the block. Good.
+
+- Add new directed case numbers D-22/D-23 for structure? The existing D-19 covers forma modes. I'll extend D-19 to structure modes and add D-22 for precedence structure vs cbid/orden. Let me see: the order says "≥30 casos en los vectores... y ≥5 con los tres defectos". It doesn't require new directed case names, but the project convention names them. I'll add:
+  - D-22: evidencia con estructura defectuosa (entradas/salidas/ambos) → bloque inválido, motive `ErrForma(EvidenciaConEntradasOSalidas)`.
+  - D-23: precedencia structure > cbid/orden within a tx.
+
+Actually, `caso_forma_evidencia` already handles all of D-19's modes and returns a tuple. I can just extend it and use it for both directed and coverage. I'll add a separate `caso_forma_estructura` maybe. Let me keep it simple: extend `caso_forma_evidencia` to handle structure modes via `_tx_evidencia_forma`, and add these modes to `casos_dirigidos` (D-19 variants) and `casos_forma_cobertura`.
+
+Let me now check `_evidencia_forma` and `caso_forma_evidencia` more carefully. `caso_forma_evidencia` uses `_evidencia_forma(P, modo, slot, iter)` then wraps. I'll refactor to `_tx_evidencia_forma(P, modo, slot, i)` returning a Tx. Let me write:
+
+```julia
+"Evidencia con el defecto de forma pedido (SL-4c-O / SL-4c-O-B); `a < b`."
+function _evidencia_forma(P::Transicion.Params, modo::Symbol, slot::Int, i::Int)
+    a = UInt64(700001 + 2 * i)
+    b = UInt64(700002 + 2 * i)
+    if modo == :cbid
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, b)
+    elseif modo == :orden_desc || modo == :orden
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :orden_igual
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, a, a)
+    elseif modo == :ambos
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :ambos_igual
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, a)
+    elseif modo == :entradas || modo == :salidas || modo == :entradas_salidas
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, a, b)   # canónica
+    elseif modo == :entradas_cbid
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, b)
+    elseif modo == :entradas_orden
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)
+    end
+    error("modo de forma desconocido: $modo")
+end
+
+"`Tx` de evidencia con el defecto pedido: estructura (EV-04), `cbid`/orden o ambos."
+function _tx_evidencia_forma(P::Transicion.Params, modo::Symbol, slot::Int, i::Int)
+    ev = _evidencia_forma(P, modo, slot, i)
+    ent = modo in (:entradas, :entradas_salidas, :entradas_cbid, :entradas_orden) ?
+          [1] : Int[]
+    sal = modo in (:salidas, :entradas_salidas) ?
+          [Transicion.Salida(700900 + 10 * i, UInt64(1), 1, Transicion.OrigenTx, -1, -1)] :
+          Transicion.Salida[]
+    isempty(ent) && isempty(sal) && return Transicion.tx_evidencia(ev)
+    return Transicion.Tx(Transicion.TxEvidencia, sal, ent, 0, 0, UInt64(0), 0,
+                         UInt64(0), ev)
+end
+```
+Wait, constructors: `Transicion.Tx(tipo, salidas, entradas, firmante, clave, importe, sector_id, nonce, evidencia)`. Let me confirm the field order: from the struct:
+```julia
+struct Tx
+    tipo::TipoTx
+    salidas::Vector{Salida}
+    entradas::Vector{Int}
+    firmante::Int
+    clave::Int
+    importe::UInt64
+    sector_id::Int
+    nonce::UInt64
+    evidencia::Union{Nothing,Evidencia}
+end
+```
+So `Tx(TxEvidencia, sal, ent, 0, 0, UInt64(0), 0, UInt64(0), ev)`. The `[1]` for entradas should be `Int[1]`. Fine.
+
+Then in `caso_forma_evidencia`, replace `Transicion.tx_evidencia(ev_bad)` with `_tx_evidencia_forma(P, modo, slot, iter)` and remove `ev_bad = _evidencia_forma(...)`.
+
+Let me check the rest of `caso_forma_evidencia`: it uses `ev_bad` only in that one place. Good.
+
+Now, `caso_forma_evidencia`'s `modo` is passed and returned in the metadata. The tests iterate specific modes. I'll add the new modes to tests/run.
+
+### Precedence directed case
+For the "first defective tx in block order" rule with structure, I want a case:
+- Block with two EvidenceTx: first has structure defect (entradas), second has cbid ajeno → motive estructura.
+- Block with two EvidenceTx: first has cbid ajeno, second has structure defect → motive cbid. (This demonstrates that the per-transaction order still applies: the first defective transaction's defect wins, and within a transaction structure wins.)
+- Single tx with entradas+cbid → motive estructura (structure > cbid within tx).
+
+I'll add `:entradas_cbid` and `:entradas_orden` to `casos_forma_cobertura` and to the directed list and tests. That covers within-tx precedence. For the two-tx ordering, I could add a directed case `caso_forma_dos_evidencias` with `primero=:estructura`? Hmm, `caso_forma_dos_evidencias` currently builds `ev_orden` and `ev_cbid`. I could extend it to include a structure evidence. Let me add a new case `caso_forma_tres_evidencias`? That may be overkill. The order's main point is structure invalidates the block; precedence is secondary. I'll add `:entradas_cbid` and `:entradas_orden` modes to the coverage to demonstrate within-tx precedence, which is what the order's rule states ("entradas/salidas/testigos → cbid → orden"). And I'll add a directed case D-22 for structure and D-23 for structure-beats-cbid/orden.
+
+Hmm, let me not over-engineer. Let me plan the minimal set that satisfies the order:
+
+1. Core oracle change.
+2. `casos_forma_cobertura` extended:
+   - 36 `:entradas`
+   - 36 `:salidas`
+   - 8 `:entradas_salidas` (≥5)
+   - 8 `:entradas_cbid` (precedence structure > cbid)
+   - 8 `:entradas_orden` (precedence structure > orden)
+   Total structure-defective: 96, all con_tx=true → ≥10 with valid txs. 
+3. Coverage counters: `bloque_estructura` (total structure-invalid blocks), `bloque_estructura_entradas`, `bloque_estructura_salidas`, `bloque_estructura_ambos`, `con_tx_estructura`. Minimum checks: `bloque_estructura >= 30`, `con_tx_estructura >= 10`, `bloque_estructura_ambos >= 5`.
+   Wait, but `bloque_estructura_ambos` counts blocks whose first structure defect is `:entradas_salidas`. That's the "both representable" count.
+4. Tests: add structure modes to `@testset "SL-4c-O/SL-4c-O-B forma v4"` and coverage assertions. Add a `@test` that `MOTIVO_FORMA_ESTRUCTURA` is returned.
+5. run.jl: add directed assertions for structure.
+6. exportar.jl: coverage + minimums + header.
+7. diferencias.jl: detect structure in `defectos_del_caso` and update prose.
+8. INFORME.md, PROGRESO.md, HORAS.log sections. Also entrada log.
+9. Regenerate v0.6, .sha256, cobertura, DIFERENCIAS.
+10. Check T01's Transicion.jl mtime before final tests.
+
+### The "T04 includes T01" and concurrent O1
+Since O1C will edit T01's Transicion.jl, and T04 `include`s it, T04's tests import the live T01. During my editing and intermediate test runs, T01 might be mid-edit and broken. The order says O2 must not run its final tests until O1 finishes editing Transicion.jl. So I should:
+- Wait for T01's Transicion.jl mtime to be newer than the O1C launch (23:37) and stable.
+- Before then, I can prepare code but not run Pkg.test()/exportar (which include T01) — or I can run them but they might fail due to O1's in-progress edits. Actually, I need T01 in a working state to test my changes. If O1C is mid-edit, I can't test. I'll wait/poll.
+
+But note: the final T01 must have `ErrForma(EvidenciaConEntradasOSalidas)`. My T04 code should not depend on that constant; it uses its own Symbol `MOTIVO_FORMA_ESTRUCTURA`. Good. And I should remove dependency on `Transicion.ErrEvidenciaConEntradas`.
+
+Wait — but there's a deeper issue: after O1's change, T01's `aplicar_evidencia!` will return `ErrForma(EvidenciaConEntradasOSalidas)` for structure defects. In T04's fusion, blocks with structure defects are already invalid at admission, so this path is unreachable. Fine.
+
+Also, T04's `primer_defecto_forma` uses `Transicion.Tx` fields `entradas`/`salidas`, which won't change.
+
+### Timing/budget
+The order says 30 min, 1 thread. Working concurrently with O1. Let me check the current time and T01 mtime. Also note the O1C process is running. Let me check.
+
+Actually, wait. This is important: I'm O2C, running concurrently with O1C. If O1C finishes and edits T01's Transicion.jl, my T04 include will pick it up. I need to wait. Let me plan to do all edits first, then poll T01 mtime. Meanwhile, I can't run tests that import T01 until O1 is done. But I could temporarily test with the current T01 (if it works). Hmm, but O1C is actively editing, so T01 might be inconsistent at any moment. Let me check the current mtime and whether T01 currently loads.
+
+Let me check the current time and files.
+
+Let me first check `date` and T01 mtime.
+dsh: reasoning:
+T01's Transicion.jl mtime is 23:39:41, which is after O1C launch (23:37:49). So O1C has already started editing. It's still running (no stdout yet). The `ps` didn't show it because the harness runs differently. The stderr tail shows O1C is mid-thought about tests. So O1C is actively editing T01.
+
+I must not run T04 tests until O1C finishes. But I can prepare my edits. However, T04's `include` of T01 means the module won't load if T01 is mid-edit/broken. Let me check whether T01 currently loads (maybe O1C's edits are consistent). Actually, let me not disturb; I'll do my edits in T04 and wait.
+
+Wait, there's a bigger concern: O1C's edit to `ClaseForma` will add `EvidenciaConEntradasOSalidas`. Does T04 reference `ClaseForma` or its symbols? T04 uses `MOTIVO_FORMA_CBID`/`MOTIVO_FORMA_ORDEN` Symbols and does not import `EvidenciaCbidAjeno`/`OrdenCanonicoInvalido` from T01 (it defines its own Symbols). Let me verify T04 doesn't use `Transicion.ErrCbidAjeno` etc. Earlier grep showed only T01 defines them, and T04's EstadoDAG uses `Symbol("ErrForma(...)")`. Good. Let me double check T04 references to `Transicion.Err...`:
+- `Transicion.ErrEvidenciaConEntradas` in exportar.jl (to remove).
+- `Transicion.ErrEvidenciaDuplicada`, `ErrEvidenciaTardia`, `ErrSinEvidencia` — these remain.
+- `mapear_motivo_gdr` uses symbols.
+- test/runtests uses `Transicion.ErrDobleGasto`, etc.
+
+So I need to remove the `ErrEvidenciaConEntradas` reference.
+
+Now, let me plan the work order:
+1. Write a `DEFINICIONES-FALTANTES` note (or a section in INFORME) documenting the testigos gap — before editing code.
+2. Edit `src/EstadoDAG.jl`.
+3. Edit `src/dirigidos.jl`.
+4. Edit `src/generadores.jl` (maybe).
+5. Edit `exportar.jl`, `run.jl`, `test/runtests.jl`, `src/diferencias.jl`.
+6. Once O1C finishes (T01 mtime stable and T01 loads), run tests, export, relectura, diff.
+
+Let me use a todo list to track.
+
+Actually, let me first verify the "falta de definición" is real by checking whether O1C adds a testigos field. Let me grep the current T01 Transicion.jl (mid-edit) for testigos/n_wit. It won't have it. Let me confirm and also read the O1C stderr to see what it's doing — maybe it addresses testigos.
+
+Let me read the O1C stderr fully (898 bytes earlier, now maybe more). Actually it's 433 earlier, now the tail shows code. Let me read it.
+dsh: reasoning:
+Wait — this output is the FULL O1C stderr, which contains the other agent's reasoning. And crucially, the end shows the O1C agent's reasoning about the SAME ambiguities I identified (n_wit not modeled). It says its plan. This is fine—it's a different agent (O1). But hold on: the content in the O1C stderr is very detailed and mirrors my own analysis. This is just the sibling agent's log. It doesn't change my plan.
+
+Wait, actually, I need to be careful: the O1C stderr is 58KB now and contains O1C's reasoning. The tail I saw is O1C planning. It's still running.
+
+Also important: O1C's plan includes removing `ErrEvidenciaConEntradas` from `ErrSemantico`? It seems it's planning the same. It also plans to keep the alias. Good—consistent.
+
+But another critical detail from O1C's reasoning: it plans to append a test set and run `Pkg.test()`, regenerate v0.5, etc. It's working. Good.
+
+Now, I should be careful not to interfere with T01. My zone is T04 only.
+
+Let me now proceed with my T04 edits. But first, let me re-read the O1C reasoning about "no new cases" — it noted the order says O1 doesn't add new cases. And it noted the test `n_con_entradas == 30`. Good.
+
+Now, back to my plan. Let me reconsider the "≥5 con los tres defectos a la vez" for O2. Since O1C also concluded T01 doesn't model testigos, and the director asked O2 for "tres defectos", I'll implement the representable two and document. 
+
+Wait, actually, hmm. Let me reconsider: maybe I *can* represent "testigos" in T04 by adding a T04-local field to `BloquePost` since it's T04's own struct. But the order says "con el mismo formato de línea" (from O order). Adding a `testigos` field to Tx would require serialization. However, maybe I don't need to serialize it: the vectors are generated and read by T04's own code, but the lector is independent and wouldn't know about a new field unless serialized. Since relectura must have 0 discrepancies, the witness count must be reconstructible from the vector, i.e., serialized. So a format change is needed. The order says same line format. So no.
+
+Alternatively, I could interpret `n_wit` as the count of `Tx`'s `evidencia` headers? No, those are always 2.
+
+OK, final: implement entradas/salidas and document.
+
+Hmm wait, actually, let me reconsider yet another interpretation that avoids the gap entirely: maybe "los tres defectos" refers to the three *form defects* in the precedence rule: estructura, cbid, orden. And "a la vez" means a single block containing all three defect types, with "gana entradas" meaning structure wins. Then I could create a block with three EvidenceTx: one with structure defect, one with cbid ajeno, one with orden no canónico. The first in block order determines the motive; to make "gana entradas" I'd order structure first. That's fully representable! And it doesn't require testigos.
+
+Hmm, that's a plausible reading too. But "los tres defectos" in the context "entradas, salidas o testigos" more naturally means those three. Yet the director wrote "(gana «entradas»)", which fits both readings (either entradas beats salidas/testigos, or estructura beats cbid/orden).
+
+Given the ambiguity, the robust solution: implement BOTH:
+1. Within-tx: entradas+salidas (both representable) → estructura wins.
+2. Within-tx: entradas+cbid+orden → estructura wins.
+3. Block-level: three EvidenceTx with [estructura, cbid, orden] → first (estructura) wins; and variants.
+Wait, but within-tx we can't have testigos. But we can have all three *checked categories* (estructura, cbid, orden) in one tx: entradas + cbid ajeno + orden_desc. That's a single tx with all three precedence categories. And "gana estructura". That satisfies "los tres defectos a la vez" if interpreted as the three precedence categories!
+
+Hmm, this is getting speculative. Let me just cover as much as possible:
+- `:entradas` (entradas only)
+- `:salidas` (salidas only)
+- `:entradas_salidas` (both structure)
+- `:entradas_cbid` (structure + cbid)
+- `:entradas_orden` (structure + orden)
+- `:entradas_cbid_orden` (structure + cbid + orden) — the "three defects at once" in the precedence sense.
+And create ≥5 of `:entradas_salidas` (two structure defects) and ≥5 of `:entradas_cbid_orden` (three defects) to cover both readings. Document the testigos gap.
+
+Actually, that's a good approach: it maximizes coverage under ambiguity, and the coverage minimum `bloque_estructura_ambos >= 5` plus a `bloque_estructura_cbid_orden >= 5` would satisfy either interpretation. And I'll document that `n_wit`/testigos is not modelable.
+
+Hmm, but adding too many modes increases complexity. Let me keep it reasonable:
+- `:entradas`, `:salidas`, `:entradas_salidas`, `:entradas_cbid`, `:entradas_orden`, `:entradas_cbid_orden`.
+Coverage: 36 each for entradas, salidas; 8 for entradas_salidas; 8 for entradas_cbid; 8 for entradas_orden; 8 for entradas_cbid_orden. Total structure 104. `bloque_estructura_ambos >= 5` (entradas_salidas). `bloque_estructura_tres >= 5` (entradas_cbid_orden). Actually I'll name it to reflect.
+
+Hmm, wait. Let me simplify and be precise. The order literally says ≥5 "con los tres defectos a la vez (gana «entradas»)". I'll interpret "los tres defectos" as the three structure sub-defects (entradas, salidas, testigos), but since testigos isn't modelable, I'll ALSO add cases with the three precedence categories to be safe. Let me name the counters clearly:
+- `bloque_estructura` = blocks invalid by `ErrForma(EvidenciaConEntradasOSalidas)`.
+- `bloque_estructura_entradas` / `_salidas` / `_ambos` = first structure sub-defect.
+- `con_tx_estructura` = structure block with a valid monetary tx.
+- `bloque_estructura_cbid_orden` = structure block whose evidence also has cbid ajeno and orden no canónico (three precedence defects; estructura wins).
+
+Then minimums: `bloque_estructura >= 30`, `con_tx_estructura >= 10`, `bloque_estructura_ambos >= 5` (both representable structure defects), `bloque_estructura_cbid_orden >= 5` (three precedence defects). Wait, the order's "tres defectos" with "(gana entradas)" — if I provide `bloque_estructura_ambos >= 5` (entradas+salidas, gana entradas) that's the closest literal. And `bloque_estructura_cbid_orden >= 5` gives the three-category interpretation. Providing both is safest.
+
+OK. Now let me also decide whether to add structure modes to the random generator `evidencia_aleatoria`. To keep the change minimal and avoid perturbing random vectors, I'll add the capability but only include `:con_entradas`/`:con_salidas` with low probability? Hmm. Actually, the dedicated coverage cases provide all needed counts. Adding random structure modes would make run.jl and export more realistic but change many random cases. Since v0.6 is regenerated anyway, it's fine. But it also increases the chance of invalid blocks in IE tests, which should still pass. Let me add a small set to the random tuple to exercise structure in the random histories as the order's "en los vectores" suggests broad coverage. Actually, "≥30 casos en los vectores" is satisfied by dedicated cases. I'll add structure modes to the random generator too, because the order's core is that these blocks invalidate admission, and random vectors are the bulk. But I worry about the `p_ev` evidence coverage counters dropping. Let me check: the order doesn't set minimums for `aplicada` evidence. The exportar minimums are for `bloque_estructura`, etc. So fine.
+
+Hmm, but there's a subtlety: the random generator chooses `modo = rand(rng, (...))`. If I add structure modes, the sequence of random draws changes, which changes ALL subsequent random cases. That's fine since v0.6 is regenerated. But it also changes the `aleatorios` cases used in `DIFERENCIAS`? No, the diff only compares v0.5. And the `ev-aleatorio` cases are regenerated. Fine.
+
+Actually, wait: there's a bigger concern. The `exportar.jl` `main` runs `generar_dag_aleatorio` for `n_aleatorios=2000` (must check the actual command used). If I change the generator, runtime may change, and the coverage counts. The order requires the minimums; I'll ensure they hold.
+
+Let me decide: I'll add structure modes to `evidencia_aleatoria` and include `:con_entradas` and `:con_salidas` in the random tuple with modest frequency. This gives random coverage. But it complicates the count. Alternatively, keep the random generator unchanged and rely on dedicated cases. Given time budget (30 min), minimal changes are better. I'll keep the random generator's mode tuple unchanged, but add the capability to `evidencia_aleatoria` and use it in dedicated cases only. Actually, the dedicated coverage doesn't use `evidencia_aleatoria`; it uses `_evidencia_forma`. So adding to `evidencia_aleatoria` would be unused. Let me not touch it.
+
+Hold on, actually, for the relectura and diff, the dedicated cases are generated by `caso_forma_evidencia` via `casos_forma_cobertura`. Adding modes there is enough. Good.
+
+Let me now write the code.
+
+Actually, let me reconsider adding `:entradas_cbid_orden` to `_evidencia_forma`. That mode returns an Evidencia with cbid+orden defects, and `_tx_evidencia_forma` adds entradas. Let me define:
+- `:entradas_cbid_orden` → evidencia(P.cbid+1, ..., b, a) (cbid ajena + descendente) + entradas.
+
+Let me write `_evidencia_forma` handling:
+```julia
+    if modo == :cbid
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, b)
+    elseif modo == :orden_desc || modo == :orden
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :orden_igual
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, a, a)
+    elseif modo == :ambos
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :ambos_igual
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, a)
+    elseif modo in (:entradas, :salidas, :entradas_salidas)
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, a, b)  # canónica
+    elseif modo == :entradas_cbid
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, b)
+    elseif modo == :entradas_orden
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :entradas_cbid_orden
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, b, a)
+    end
+```
+
+And `_tx_evidencia_forma`:
+```julia
+function _tx_evidencia_forma(P::Transicion.Params, modo::Symbol, slot::Int, i::Int)
+    ev = _evidencia_forma(P, modo, slot, i)
+    ent = modo in (:entradas, :entradas_salidas, :entradas_cbid, :entradas_orden,
+                   :entradas_cbid_orden) ? Int[1] : Int[]
+    sal = modo in (:salidas, :entradas_salidas) ?
+          Transicion.Salida[Transicion.Salida(700900 + 10 * i, UInt64(1), 1,
+                                              Transicion.OrigenTx, -1, -1)] :
+          Transicion.Salida[]
+    isempty(ent) && isempty(sal) && return Transicion.tx_evidencia(ev)
+    return Transicion.Tx(Transicion.TxEvidencia, sal, ent, 0, 0, UInt64(0), 0,
+                         UInt64(0), ev)
+end
+```
+
+Hmm, `Transicion.Salida[...]` syntax is a typed vector literal? In Julia, `Transicion.Salida[...]` is `getindex` on the type? No. You write `Transicion.Salida[...]` as a typed array literal? Actually `T[a, b]` is the syntax for a typed vector where T is a type; `Transicion.Salida[X]` works because it parses as `(Transicion.Salida)[X]`? Hmm, actually `Transicion.Salida[...]` is parsed as `Transicion.Salida[...]` indexing? Let me recall: `Int[1,2]` is valid typed-array syntax. With a qualified name, `Transicion.Salida[1,2]` should also work (the parser treats the dotted name as the type). Existing code uses `Transicion.Tx[...]` (line 749 etc.), so it works. Good.
+
+Now, in `caso_forma_evidencia`, replace:
+```julia
+    ev_bad = _evidencia_forma(P, modo, slot, iter)
+    X = BloquePost(... txs = vcat(txs, Transicion.Tx[Transicion.tx_evidencia(ev_bad)]))
+```
+with:
+```julia
+    tx_bad = _tx_evidencia_forma(P, modo, slot, iter)
+    X = BloquePost(... txs = vcat(txs, Transicion.Tx[tx_bad]))
+```
+
+Now `casos_forma_cobertura`:
+```julia
+function casos_forma_cobertura()
+    out = Tuple{Symbol,Bool,Int}[]
+    for i in 1:36
+        push!(out, (:cbid, true, i))
+    end
+    for i in 1:36
+        push!(out, (:orden_igual, true, 100 + i))
+    end
+    for i in 1:36
+        push!(out, (:orden_desc, true, 300 + i))
+    end
+    for i in 1:8
+        push!(out, (:ambos, true, 200 + i))
+    end
+    # SL-4c-O-C: estructura (EV-04) → forma.
+    for i in 1:36
+        push!(out, (:entradas, true, 400 + i))
+    end
+    for i in 1:36
+        push!(out, (:salidas, true, 500 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_salidas, true, 600 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_cbid, true, 700 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_orden, true, 800 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_cbid_orden, true, 900 + i))
+    end
+    return out
+end
+```
+
+Now, there's a potential id collision concern: `caso_forma_evidencia` builds `Xv` with `ev_ok` and ids `id1+2`; the `iter` is used for seeds and `out_id = 800000 + 1000*iter`. With iter up to ~908, out_id up to 800000+908000 = 1,708,000, fine. The `ev_ok` pre_hash uses `900001 + 2*iter`, fine.
+
+Now, will `caso_forma_evidencia` with `modo=:entradas` produce a block whose transfer is "válida"? Yes, `con_tx=true` adds a valid transfer. But since the block is invalid, the transfer doesn't apply. The test checks `!m.tx_aplicada`. Good.
+
+Wait: `caso_forma_evidencia` builds `Xv` (twin) with `ev_ok` canonical, but it does NOT include the structure-defective tx. So Xv is valid. Good.
+
+Now for `:entradas_cbid_orden`, the evidencia has cbid ajena and orden descendente; plus entradas. The motive should be `MOTIVO_FORMA_ESTRUCTURA`. Good.
+
+Now, `contar_forma_evidencia` in exportar.jl needs to count structure blocks. Let me rewrite it. Current function processes only cbid/orden. I'll extend:
+
+```julia
+function contar_forma_evidencia(A::Admision, acc::Dict{String,Int})
+    cbid_red = A.pd.P.cbid
+    for (id, b) in A.por_id
+        motivo = get(A.motivos, id, :OK)
+        (motivo == MOTIVO_FORMA_CBID || motivo == MOTIVO_FORMA_ORDEN ||
+         motivo == MOTIVO_FORMA_ESTRUCTURA) || continue
+        hay_tx = any(tx -> tx.tipo in (Transicion.TxTransferencia, Transicion.TxDeposito,
+                                       Transicion.TxRetiro, Transicion.TxLiberacion),
+                     b.txs)
+        n_cbid = 0; n_orden = 0; n_ig = 0; n_de = 0
+        n_ent = 0; n_sal = 0; n_amb = 0; n_tres = 0
+        for tx in b.txs
+            tx.tipo == Transicion.TxEvidencia || continue
+            ev = tx.evidencia
+            ev === nothing && continue
+            con_ent = !isempty(tx.entradas)
+            con_sal = !isempty(tx.salidas)
+            con_cbid = ev.id1.cbid != cbid_red || ev.id2.cbid != cbid_red
+            con_orden = !(ev.h1.pre_hash < ev.h2.pre_hash)
+            con_ent && (n_ent += 1)
+            con_sal && (n_sal += 1)
+            (con_ent && con_sal) && (n_amb += 1)
+            (con_ent && con_cbid && con_orden) && (n_tres += 1)
+            con_cbid && (n_cbid += 1)
+            if con_orden
+                n_orden += 1
+                ev.h1.pre_hash == ev.h2.pre_hash ? (n_ig += 1) : (n_de += 1)
+            end
+        end
+        if motivo == MOTIVO_FORMA_ESTRUCTURA
+            inc!(acc, "bloque_estructura")
+            hay_tx && inc!(acc, "con_tx_estructura")
+            d = primer_defecto_forma(A, b)
+            d === :entradas ? inc!(acc, "bloque_estructura_entradas") :
+                d === :salidas ? inc!(acc, "bloque_estructura_salidas") :
+                inc!(acc, "bloque_estructura_ambos")
+            n_tres > 0 && inc!(acc, "bloque_estructura_cbid_orden")
+            acc["ev_estructura"] = get(acc, "ev_estructura", 0) + max(n_ent + n_sal - n_amb, 1)
+        elseif motivo == MOTIVO_FORMA_CBID
+            ...existing...
+        else
+            ...existing...
+        end
+    end
+    return acc
+end
+```
+
+Hmm, `ev_estructura` count is a bit awkward. Let me simplify and count `ev_estructura` as the number of EvidenceTx with any structure defect (n_ent + n_sal - n_amb). Since `n_ent` counts txs with entradas, `n_sal` counts txs with salidas, `n_amb` counts txs with both; so distinct txs with structure = n_ent + n_sal - n_amb. Good. Use `max(..., 1)`? For a structure-motivated block, there's at least one structure tx, so the value is ≥1. `max(...,1)` handles the (impossible) case. Fine.
+
+I'll keep the existing cbid/orden branches.
+
+Then update the coverage header and minimums. Also `contar_evidencia` no longer references `ErrEvidenciaConEntradas`. Let me change line 265-268:
+```julia
+                k = e == Transicion.ErrEvidenciaDuplicada ? "duplicada" :
+                    e == Transicion.ErrEvidenciaTardia    ? "tardia" :
+                    e == Transicion.ErrSinEvidencia       ? "sin_evidencia" : "otro"
+```
+Remove the con_entradas branch. And the docstring line 234: change `con_entradas` description to note it's now form (counted in contar_forma_evidencia). Actually, since `ErrEvidenciaConEntradas` is now `ErrForma(...)` and won't appear as a discard, I'll just remove the counter and note it.
+
+Wait, but there's the `ResultadoTransicion`/`nombre_error`? No.
+
+Now, the exportar `main` minimums:
+```julia
+    minimos_ok = get(af, "bloque_cbid", 0) >= 30 && get(af, "bloque_orden", 0) >= 30 &&
+                 get(af, "con_tx_cbid", 0) >= 10 && get(af, "con_tx_orden", 0) >= 10 &&
+                 get(af, "ambos_cbid", 0) >= 5 &&
+                 get(af, "bloque_orden_desc", 0) >= 10 &&
+                 get(af, "bloque_orden_igual", 0) >= 10 &&
+                 get(af, "bloque_estructura", 0) >= 30 &&
+                 get(af, "con_tx_estructura", 0) >= 10 &&
+                 get(af, "bloque_estructura_ambos", 0) >= 5 &&
+                 get(af, "bloque_estructura_cbid_orden", 0) >= 5
+```
+
+And the coverage print list add the new keys.
+
+And header: version label T04-SL4c-O-C.
+
+Now `run.jl`: add structure counters. And `test/runtests.jl`: extend the coverage testset to include structure modes and assertions.
+
+Let me also update `src/diferencias.jl` to detect structure and update prose.
+
+Now, the comment in `primer_defecto_forma` says structure is out of scope; update it.
+
+Let me now make all the edits. I'll start.
+
+Let me first read the exact current EstadoDAG lines 166-230 again (I have them). Let me make the edits.
+
+Let me plan the todo list.
+dsh: reasoning:
+Let me now make the edits. Start with EstadoDAG.jl.
+
+Edit 1: export MOTIVO_FORMA_ESTRUCTURA. Line 29-30:
+```
+export chequear_forma, chequear_forma_evidencia, primer_defecto_forma,
+       MOTIVO_FORMA_CBID, MOTIVO_FORMA_ORDEN
+```
+dsh: reasoning:
+Now the const and the function. Let me replace lines 166-230 block (the SL-4c-O section). Let me replace from `# SL-4c-O · Forma...` through the end of `chequear_forma_evidencia`.
+
+Current text (lines 166-230):
+```julia
+# ---------------------------------------------------------------------------
+# SL-4c-O · Forma de la EvidenceTx v4 (RAT-1, EV-04)
+# SL-4c-O-B · Precedencia por transacción y los dos tipos de orden no canónico
+# ---------------------------------------------------------------------------
+
+# Motivos de bloque de forma de la v4. Se codifican como `Symbol` con el nombre
+# exacto del contrato (`ErrForma(EvidenciaCbidAjeno)` / `ErrForma(OrdenCanonicoInvalido)`);
+# `string(sym)` produce ese texto en `RES` y en el lector independiente, sin
+# introducir un tipo nuevo ni depender del `Err` de T01 (O1 lo cambia en paralelo).
+const MOTIVO_FORMA_CBID = Symbol("ErrForma(EvidenciaCbidAjeno)")
+const MOTIVO_FORMA_ORDEN = Symbol("ErrForma(OrdenCanonicoInvalido)")
+
+"""
+Primer defecto de **forma v4** de la `EvidenceTx` del bloque, en el orden de las
+transacciones del bloque (SL-4c-O-B).
+
+Para cada `EvidenceTx`, en el orden en que aparece, se comprueba su forma
+completa `cbid` → orden canónico; la **primera transacción defectuosa** fija el
+defecto del bloque. Distingue los dos tipos de orden no canónico:
+`pre_hash(H1) == pre_hash(H2)` (`:orden_igual`) y
+`pre_hash(H1) > pre_hash(H2)` (`:orden_desc`).
+
+Devuelve `:cbid`, `:orden_igual`, `:orden_desc` o `nothing`. Es la precedencia
+exacta que aplica `chequear_forma_evidencia` y la que usan el exportador y la
+cobertura. La estructura vigente de la evidencia no entra aquí (sigue siendo el
+descarte semántico `ErrEvidenciaConEntradas` de T01, fuera del alcance de la
+orden).
+"""
+function primer_defecto_forma(A::Admision, b::BloquePost)
+    cbid_red = A.pd.P.cbid
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        # Forma completa de esta transacción: cbid → orden canónico.
+        (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return :cbid
+        if !(ev.h1.pre_hash < ev.h2.pre_hash)
+            return ev.h1.pre_hash == ev.h2.pre_hash ? :orden_igual : :orden_desc
+        end
+    end
+    return nothing
+end
+
+"""
+Comprueba la **forma v4** de las `EvidenceTx` del bloque (SL-4c-O / SL-4c-O-B,
+RAT-1/EV-04).
+
+Precedencia fija del contrato (idéntica en T01 y T04): las transacciones del
+bloque se comprueban **en su orden**; para cada `EvidenceTx`, su forma completa
+en el orden `cbid` → orden canónico; la **primera transacción defectuosa**
+determina el motivo del rechazo del bloque. Aquí solo se implementan `cbid` y
+orden, que son las que la orden mueve de la capa semántica a la de forma; la
+estructura (entradas/salidas/testigos, campos inactivos, forma de las cabeceras)
+sigue donde estaba y no cambia.
+
+Una `EvidenceTx` sin cabeceras (`evidencia === nothing`) no se toca aquí: sigue
+siendo un rechazo semántico (`ErrSinEvidencia`), fuera del alcance de esta orden.
+
+Devuelve `nothing` si pasa, o el motivo de bloque (`Symbol`).
+"""
+function chequear_forma_evidencia(A::Admision, b::BloquePost)
+    d = primer_defecto_forma(A, b)
+    d === nothing && return nothing
+    return d === :cbid ? MOTIVO_FORMA_CBID : MOTIVO_FORMA_ORDEN
+end
+```
+
+Replace with the new version.
+dsh: reasoning:
+Now update the `chequear_forma` function's comment about the evidence form (line ~267 area). Let me check the current text:
+```julia
+    # SL-4c-O: forma v4 de la evidencia (cbid → orden), después de la estructura.
+    mf = chequear_forma_evidencia(A, b)
+```
+Wait, let me look. Earlier lines 267-269:
+```julia
+    # SL-4c-O: forma v4 de la evidencia (cbid → orden), después de la estructura.
+    mf = chequear_forma_evidencia(A, b)
+```
+Actually it says "después de la estructura" but now structure is inside. Let me update. Let me read that area.
+dsh: reasoning:
+Let me find the `chequear_forma` comment now (line numbers shifted). Let me grep.
+dsh: reasoning:
+Now `dirigidos.jl`. Let me edit `_evidencia_forma`, add `_tx_evidencia_forma`, modify `caso_forma_evidencia`, and extend `casos_forma_cobertura` and `casos_dirigidos`.
+
+Let me re-read the exact current block 715-893 (I have it). Let me do the edits.
+
+First, `_evidencia_forma` + add `_tx_evidencia_forma`.
+dsh: reasoning:
+Now modify `caso_forma_evidencia` to use `_tx_evidencia_forma`. Let me find the exact code:
+```julia
+    ev_bad = _evidencia_forma(P, modo, slot, iter)
+    X = BloquePost(id = id1 + 1, padres = [Tb.id], slot = slot, sd = 0,
+                   productor = 1, peso = 1,
+                   txs = vcat(txs, Transicion.Tx[Transicion.tx_evidencia(ev_bad)]))
+```
+Replace with:
+```julia
+    tx_bad = _tx_evidencia_forma(P, modo, slot, iter)
+    X = BloquePost(id = id1 + 1, padres = [Tb.id], slot = slot, sd = 0,
+                   productor = 1, peso = 1,
+                   txs = vcat(txs, Transicion.Tx[tx_bad]))
+```
+
+Also update docstring D-19 to mention structure. Let me edit the docstring too.
+
+Current docstring:
+```
+"""
+D-19 · Forma v4 de la `EvidenceTx` (SL-4c-O / SL-4c-O-B, RAT-1/EV-04). El bloque
+`X` lleva coinbase, una transferencia válida y una `EvidenceTx` defectuosa
+(`:cbid`, `:orden_igual`, `:orden_desc` o `:ambos`). `X` es **inválido en la
+admisión** (no un descarte) y su hijo `Y` cae por `ErrSinPadre`; el gemelo `Xv`
+con evidencia canónica de la red local es válido, y la transferencia de `X` no
+llega a aplicarse.
+"""
+```
+Update to include structure modes.
+dsh: reasoning:
+Now the body: `ev_bad = _evidencia_forma(...)` and `txs = vcat(...)`. Let me edit.
+dsh: reasoning:
+Now `casos_forma_cobertura` and `casos_dirigidos`. Let me edit `casos_forma_cobertura` to add structure modes and update the docstring.
+
+Current:
+```julia
+"`(modo, con_tx, iter)` de los casos dedicados de forma de la cobertura SL-4c-O."
+function casos_forma_cobertura()
+    out = Tuple{Symbol,Bool,Int}[]
+    for i in 1:36
+        push!(out, (:cbid, true, i))
+    end
+    for i in 1:36
+        push!(out, (:orden_igual, true, 100 + i))
+    end
+    for i in 1:36
+        push!(out, (:orden_desc, true, 300 + i))
+    end
+    for i in 1:8
+        push!(out, (:ambos, true, 200 + i))
+    end
+    return out
+end
+```
+
+New: add structure modes. Let me also make sure `iter` values are unique-ish; seeds use `seed + iter` in `base_dirigida`. With 36+36+36+8+36+36+8+8+8+8 = 220 cases, iter values up to 936. `base_dirigida(pd; seed=seed+iter)` uses StableRNG(seed+iter). Fine.
+
+Let me set:
+```julia
+"`(modo, con_tx, iter)` de los casos dedicados de forma de la cobertura SL-4c-O/-B/-C."
+function casos_forma_cobertura()
+    out = Tuple{Symbol,Bool,Int}[]
+    for i in 1:36
+        push!(out, (:cbid, true, i))
+    end
+    for i in 1:36
+        push!(out, (:orden_igual, true, 100 + i))
+    end
+    for i in 1:36
+        push!(out, (:orden_desc, true, 300 + i))
+    end
+    for i in 1:8
+        push!(out, (:ambos, true, 200 + i))
+    end
+    # SL-4c-O-C: estructura (EV-04) → forma. `:entradas_salidas` son los dos
+    # sub-defectos representables a la vez; `:entradas_cbid_orden` añade los tres
+    # defectos de la precedencia (estructura/cbid/orden) y comprueba que gana
+    # «entradas». `testigos`/`n_wit` no existe en el modelo `Tx` de T01.
+    for i in 1:36
+        push!(out, (:entradas, true, 400 + i))
+    end
+    for i in 1:36
+        push!(out, (:salidas, true, 500 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_salidas, true, 600 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_cbid, true, 700 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_orden, true, 800 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_cbid_orden, true, 900 + i))
+    end
+    return out
+end
+```
+
+Now `casos_dirigidos`: add structure directed cases. Current last part:
+```julia
+    return vcat(base, [caso_evidencia_aplicada(pdev), caso_evidencia_hermanas(pdev),
+                       caso_evidencia_reorg(pdev), caso_evidencia_descartes(pdev),
+                       caso_forma_evidencia(pdev; modo = :cbid, seed = 41),
+                       caso_forma_evidencia(pdev; modo = :orden_igual, seed = 44),
+                       caso_forma_evidencia(pdev; modo = :orden_desc, seed = 42),
+                       caso_forma_evidencia(pdev; modo = :ambos, seed = 43),
+                       caso_forma_dos_evidencias(pdev; primero = :orden, seed = 45),
+                       caso_forma_dos_evidencias(pdev; primero = :cbid, seed = 46)])
+```
+Add structure cases:
+```julia
+                       caso_forma_evidencia(pdev; modo = :entradas, seed = 47),
+                       caso_forma_evidencia(pdev; modo = :salidas, seed = 48),
+                       caso_forma_evidencia(pdev; modo = :entradas_salidas, seed = 49),
+                       caso_forma_evidencia(pdev; modo = :entradas_cbid_orden, seed = 50),
+```
+Good. These are D-22..D-25 (the metadata returns "D-19" always; hmm, `caso_forma_evidencia` returns `"D-19"` regardless of modo). So the directed case name for all is "D-19". That's existing behavior. I could make the name more specific, but let me not change. Actually for run.jl output it'll print DIRIGIDO D-19 multiple times. Fine.
+
+Let me apply the edits.
+dsh: reasoning:
+Now `exportar.jl`. Edits:
+1. Header comments.
+2. `contar_evidencia` remove `con_entradas` branch + docstring.
+3. `contar_forma_evidencia` extend.
+4. Header title.
+5. Coverage print list + minimums + comments.
+
+Let me do them one by one.
+
+First, header lines 14-27. Let me read the current lines 1-34 to edit precisely (I have them from earlier). Let me apply edits.
+
+Line 14-18:
+```
+# SL-4c-O: v0.6 mueve `cbid` ajeno y orden no canónico de la `EvidenceTx` a la
+# forma (bloque inválido, no descarte) y añade casos dedicados de cobertura.
+# SL-4c-O-B: precedencia por transacción (estructura → cbid → orden, primera
+# transacción defectuosa) y cobertura de los dos tipos de orden no canónico
+# (igualdad `H1 = H2` y descendente `pre_hash(H1) > pre_hash(H2)`).
+```
+Add SL-4c-O-C.
+
+Let me apply.
+dsh: reasoning:
+Now `contar_evidencia` docstring and branch. Lines 233-235 and 264-269. Let me edit the docstring line:
+```
+ * `con_entradas` — descartada por `ErrEvidenciaConEntradas` (EV-04 estructural).
+```
+Change to:
+```
+ * `con_entradas` — obsoleto: ya no es descarte semántico; la estructura de
+                    EV-04 invalida el bloque y se cuenta en `contar_forma_evidencia`.
+```
+And the branch:
+```julia
+                k = e == Transicion.ErrEvidenciaDuplicada ? "duplicada" :
+                    e == Transicion.ErrEvidenciaTardia    ? "tardia" :
+                    e == Transicion.ErrEvidenciaConEntradas ? "con_entradas" :
+                    e == Transicion.ErrSinEvidencia       ? "sin_evidencia" : "otro"
+```
+→
+```julia
+                k = e == Transicion.ErrEvidenciaDuplicada ? "duplicada" :
+                    e == Transicion.ErrEvidenciaTardia    ? "tardia" :
+                    e == Transicion.ErrSinEvidencia       ? "sin_evidencia" : "otro"
+```
+
+Let me apply.
+dsh: reasoning:
+Now the `contar_forma_evidencia` function (lines ~297-337 now shifted). Let me rewrite the whole function. Let me read it again to get exact current text after edits.
+dsh: reasoning:
+Now the main() coverage header and minimums and print list. Let me read lines ~350-495 (shifted) to edit. Let me read from 360.
+dsh: reasoning:
+Let me update:
+1. Line 397-398 vector header → SL4c-O-C and mention structure.
+2. Comment line 442-443.
+3. Print label line 452.
+4. Coverage header line 462.
+5. Line 470 con_entradas comment.
+6. Lines 474-481 forma comments add structure.
+7. Lines 489-491 minimums comments add SL-4c-O-C.
+8. Lines 497-501 print list add structure counters.
+9. Lines 503-511 minimums add structure.
+
+Let me apply them.
+
+First header.
+dsh: reasoning:
+Now the coverage header block. Let me replace lines 462-491 region. I'll do it in pieces.
+
+Line 462:
+```
+    println(ioc, "# cobertura T04-SL4c-O-B v0.6 · ", fecha, " · contrato ",
+```
+→ SL4c-O-C.
+
+Line 470 con_entradas → update.
+
+Lines 474-481 → add structure comments.
+
+Lines 489-491 → add SL-4c-O-C minimum comment.
+
+Let me apply.
+dsh: reasoning:
+Now the minimums comments and print list and minimums logic. Let me edit lines around 495-520 now.
+
+Current:
+```julia
+    println(ioc, "# minimos SL-4c-O: bloque_cbid>=30 bloque_orden>=30 con_tx_cbid>=10 ",
+            "con_tx_orden>=10 ambos_cbid>=5")
+    println(ioc, "# minimos SL-4c-O-B: bloque_orden_desc>=10 bloque_orden_igual>=10")
+    EstadoDAG.escribir_cobertura(ioc, "vectores-v0.6 (casos aleatorios)", ac)
+    println(ioc, "SECCION evidencia SL-3b/SL-4c-O (dirigidos + aleatorios C-EVP)")
+    for k in sort(collect(keys(aev)))
+        println(ioc, "EV ", k, " = ", aev[k])
+    end
+    println(ioc, "SECCION forma v4 SL-4c-O/SL-4c-O-B")
+    for k in ("bloque_cbid", "bloque_orden", "bloque_orden_igual", "bloque_orden_desc",
+              "ev_cbid", "ev_orden", "ev_orden_igual", "ev_orden_desc", "ambos_cbid",
+              "con_tx_cbid", "con_tx_orden")
+        println(ioc, "FORMA ", k, " = ", get(af, k, 0))
+    end
+    # La orden SL-4c-O (y su ajuste SL-4c-O-B) exige estos mínimos: si no se
+    # alcanzan, el exportador falla.
+    minimos_ok = get(af, "bloque_cbid", 0) >= 30 && get(af, "bloque_orden", 0) >= 30 &&
+                 get(af, "con_tx_cbid", 0) >= 10 && get(af, "con_tx_orden", 0) >= 10 &&
+                 get(af, "ambos_cbid", 0) >= 5 &&
+                 get(af, "bloque_orden_desc", 0) >= 10 &&
+                 get(af, "bloque_orden_igual", 0) >= 10
+    println(ioc, "FORMA minimos_SL4cO = ", minimos_ok ? "OK" : "NO")
+    minimos_ok || error("cobertura de forma SL-4c-O/SL-4c-O-B por debajo del mínimo: $(af)")
+```
+
+New:
+```julia
+    println(ioc, "# minimos SL-4c-O: bloque_cbid>=30 bloque_orden>=30 con_tx_cbid>=10 ",
+            "con_tx_orden>=10 ambos_cbid>=5")
+    println(ioc, "# minimos SL-4c-O-B: bloque_orden_desc>=10 bloque_orden_igual>=10")
+    println(ioc, "# minimos SL-4c-O-C: bloque_estructura>=30 con_tx_estructura>=10 ",
+            "bloque_estructura_ambos>=5 bloque_estructura_cbid_orden>=5")
+    ...
+    println(ioc, "SECCION forma v4 SL-4c-O/SL-4c-O-B/SL-4c-O-C")
+    for k in ("bloque_estructura", "bloque_estructura_entradas", "bloque_estructura_salidas",
+              "bloque_estructura_ambos", "bloque_estructura_cbid_orden", "ev_estructura",
+              "con_tx_estructura",
+              "bloque_cbid", "bloque_orden", "bloque_orden_igual", "bloque_orden_desc",
+              "ev_cbid", "ev_orden", "ev_orden_igual", "ev_orden_desc", "ambos_cbid",
+              "con_tx_cbid", "con_tx_orden")
+        println(ioc, "FORMA ", k, " = ", get(af, k, 0))
+    end
+    # Las órdenes SL-4c-O, SL-4c-O-B y SL-4c-O-C exigen estos mínimos: si no se
+    # alcanzan, el exportador falla. `bloque_estructura_ambos` cubre los dos
+    # sub-defectos representables (entradas+salidas); `_cbid_orden` cubre los tres
+    # defectos de la precedencia (testigos/n_wit no existe en el modelo).
+    minimos_ok = get(af, "bloque_cbid", 0) >= 30 && get(af, "bloque_orden", 0) >= 30 &&
+                 get(af, "con_tx_cbid", 0) >= 10 && get(af, "con_tx_orden", 0) >= 10 &&
+                 get(af, "ambos_cbid", 0) >= 5 &&
+                 get(af, "bloque_orden_desc", 0) >= 10 &&
+                 get(af, "bloque_orden_igual", 0) >= 10 &&
+                 get(af, "bloque_estructura", 0) >= 30 &&
+                 get(af, "con_tx_estructura", 0) >= 10 &&
+                 get(af, "bloque_estructura_ambos", 0) >= 5 &&
+                 get(af, "bloque_estructura_cbid_orden", 0) >= 5
+    println(ioc, "FORMA minimos_SL4cO = ", minimos_ok ? "OK" : "NO")
+    minimos_ok || error("cobertura de forma SL-4c-O/-B/-C por debajo del mínimo: $(af)")
+```
+
+Let me apply.
+dsh: reasoning:
+Now `run.jl`. Add structure counters and assertions. Let me edit:
+- In the evidence loop section (lines 260-316), add counters `ev_forma_estructura`, `ev_forma_estructura_entradas`, etc.
+- Add directed assertions for structure modes.
+
+Let me first update the directed assertions section (lines 169-190) to include structure modes. Current:
+```julia
+    for (modo, motivo, sd) in ((:cbid, MOTIVO_FORMA_CBID, 51),
+                               (:orden_igual, MOTIVO_FORMA_ORDEN, 55),
+                               (:orden_desc, MOTIVO_FORMA_ORDEN, 52),
+                               (:ambos, MOTIVO_FORMA_CBID, 53))
+        _, Af, mf = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, seed = sd)
+        (mf.invalido && mf.motivo == motivo && mf.hijo_invalido &&
+         mf.gemelo_valido && !mf.tx_aplicada && mf.I1) ||
+            push!(fallos_globales, "dirigido D-19 forma $modo")
+    end
+```
+Add structure modes:
+```julia
+    for (modo, motivo, sd) in ((:cbid, MOTIVO_FORMA_CBID, 51),
+                               (:orden_igual, MOTIVO_FORMA_ORDEN, 55),
+                               (:orden_desc, MOTIVO_FORMA_ORDEN, 52),
+                               (:ambos, MOTIVO_FORMA_CBID, 53),
+                               (:entradas, MOTIVO_FORMA_ESTRUCTURA, 58),
+                               (:salidas, MOTIVO_FORMA_ESTRUCTURA, 59),
+                               (:entradas_salidas, MOTIVO_FORMA_ESTRUCTURA, 60),
+                               (:entradas_cbid_orden, MOTIVO_FORMA_ESTRUCTURA, 61))
+```
+Wait, but `caso_forma_evidencia` uses `base_dirigida(pd; seed=seed+iter)` with iter default 0. Using distinct seeds is fine. But careful: seed 58-61 might collide with other seeds? `caso_forma_evidencia` seeds used: 41,44,42,43 (dirigidos), 47-50 (dirigidos new), 51-55 (run), 56-57 (dos evidencias). 58-61 new. Fine.
+
+Also, `:entradas` with `mf.motivo == MOTIVO_FORMA_ESTRUCTURA`. Good.
+
+Then the evidence loop counters:
+```julia
+    ev_forma_cbid = 0
+    ev_forma_orden = 0
+    ev_forma_orden_igual = 0
+    ev_forma_orden_desc = 0
+```
+Add `ev_forma_estructura = 0` and sub-counters. In the loop:
+```julia
+            for b in values(A.por_id)
+                m = get(A.motivos, b.id, :OK)
+                m == MOTIVO_FORMA_CBID && (ev_forma_cbid += 1)
+                if m == MOTIVO_FORMA_ORDEN
+                    ...
+                end
+            end
+```
+Add:
+```julia
+                m == MOTIVO_FORMA_ESTRUCTURA && (ev_forma_estructura += 1)
+```
+And print in TOTAL-EV.
+
+Also, I should update the `run.jl` header comment (line 8) to mention v0.6? It already says v0.6. Fine. And the header comment line 1-10 mention SL-4c-O? Not necessary.
+
+Let me apply.
+dsh: reasoning:
+Now the TOTAL-EV counters. Let me edit lines 264-316 (now shifted). Let me re-read the area.
+dsh: reasoning:
+Now update the TOTAL-EV print line to include structure counters.
+dsh: reasoning:
+Now `test/runtests.jl`. I already edited earlier? No—wait, the earlier test edits shown in the O1C stderr were O1C's reasoning about T01, not my T04 edits. Actually, I haven't edited T04's test yet. Let me edit the T04 test file now.
+
+Let me update the coverage testset (lines 193-265) to include structure modes and assertions. And add a dedicated structure test in the `SL-4c-O/SL-4c-O-B` testset. Let me modify:
+
+1. In the loop over `(modo, motivo, sd)`, add structure modes.
+2. In the coverage loop `for (modo, con_tx, it) in casos_forma_cobertura()`, extend the classification to handle structure. Let me rewrite that loop.
+3. Add assertions for structure minimums.
+
+Let me re-read the current test file section 193-265 (unchanged from earlier read). Let me rewrite that testset.
+
+Actually I already read it at the start. Let me reconstruct the new testset:
+
+```julia
+    @testset "SL-4c-O/SL-4c-O-B/SL-4c-O-C forma v4 de la EvidenceTx" begin
+        pd = ParamsDAG(PARAMS_DAG_BASE[1], 1)
+        pdev = EstadoDAG._pd_ev(pd)
+        # `cbid` ajeno, los dos tipos de orden no canónico y la estructura de
+        # EV-04 (entradas/salidas) invalidan el bloque entero en admisión; el
+        # gemelo canónico es válido y la tx válida del bloque no se aplica.
+        for (modo, motivo, sd) in ((:cbid, MOTIVO_FORMA_CBID, 61),
+                                   (:orden_igual, MOTIVO_FORMA_ORDEN, 64),
+                                   (:orden_desc, MOTIVO_FORMA_ORDEN, 62),
+                                   (:ambos, MOTIVO_FORMA_CBID, 63),
+                                   (:entradas, MOTIVO_FORMA_ESTRUCTURA, 67),
+                                   (:salidas, MOTIVO_FORMA_ESTRUCTURA, 68),
+                                   (:entradas_salidas, MOTIVO_FORMA_ESTRUCTURA, 69),
+                                   (:entradas_cbid_orden, MOTIVO_FORMA_ESTRUCTURA, 70))
+            nombre, A, m = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, seed = sd)
+            @test m.invalido
+            @test m.motivo == motivo
+            @test m.hijo_invalido
+            @test m.gemelo_valido
+            @test !m.tx_aplicada
+            @test m.I1
+            @test isempty(verificar_ie1_ie2_ie4(A))
+        end
+        # Nombre exacto del contrato y clase: estructura es forma, no semántica.
+        @test string(ErrForma(EvidenciaConEntradasOSalidas)) ==
+              "ErrForma(EvidenciaConEntradasOSalidas)"
+        @test MOTIVO_FORMA_ESTRUCTURA == Symbol("ErrForma(EvidenciaConEntradasOSalidas)")
+        @test !(ErrForma(EvidenciaConEntradasOSalidas) isa ErrSemantico)
+        # SL-4c-O-B: precedencia por transacción con dos evidencias defectuosas.
+        for (primero, motivo, sd) in ((:orden, MOTIVO_FORMA_ORDEN, 65),
+                                      (:cbid, MOTIVO_FORMA_CBID, 66))
+            nombre, A, m = EstadoDAG.caso_forma_dos_evidencias(pdev; primero = primero,
+                                                              seed = sd)
+            @test m.invalido
+            @test m.motivo == motivo
+            @test m.motivo == m.motivo_esperado
+            @test m.hijo_invalido
+            @test m.gemelo_valido
+            @test !m.tx_aplicada
+            @test m.I1
+            @test isempty(verificar_ie1_ie2_ie4(A))
+        end
+        # Cobertura mínima (SL-4c-O/-B/-C): ≥30 `cbid`, ≥30 orden con ≥10 de
+        # igualdad y ≥10 descendentes, ≥10 de cada uno con tx válidas, ≥5 con
+        # ambos defectos, ≥30 de estructura con ≥10 con tx válidas, ≥5 con los
+        # sub-defectos representables a la vez y ≥5 con los tres de la precedencia.
+        af = Dict{String,Int}()
+        for (modo, con_tx, it) in casos_forma_cobertura()
+            _, A, _ = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, con_tx = con_tx,
+                                                     iter = it)
+            for b in values(A.por_id)
+                d = primer_defecto_forma(A, b)
+                d === nothing && continue
+                motivo = get(A.motivos, b.id, :OK)
+                hay_tx = any(tx -> tx.tipo in (Transicion.TxTransferencia, Transicion.TxDeposito,
+                                               Transicion.TxRetiro, Transicion.TxLiberacion),
+                             b.txs)
+                if motivo == MOTIVO_FORMA_ESTRUCTURA
+                    af["bloque_estructura"] = get(af, "bloque_estructura", 0) + 1
+                    d === :entradas ? (af["bloque_estructura_entradas"] = get(af, "bloque_estructura_entradas", 0) + 1) :
+                        d === :salidas ? (af["bloque_estructura_salidas"] = get(af, "bloque_estructura_salidas", 0) + 1) :
+                        (af["bloque_estructura_ambos"] = get(af, "bloque_estructura_ambos", 0) + 1)
+                    hay_tx && (af["con_tx_estructura"] = get(af, "con_tx_estructura", 0) + 1)
+                    # ¿lleva además cbid ajeno y orden no canónico? (tres defectos)
+                    any(tx -> tx.tipo == Transicion.TxEvidencia && tx.evidencia !== nothing &&
+                              (tx.evidencia.id1.cbid != pd.P.cbid ||
+                               tx.evidencia.id2.cbid != pd.P.cbid) &&
+                              !(tx.evidencia.h1.pre_hash < tx.evidencia.h2.pre_hash), b.txs) &&
+                        (af["bloque_estructura_cbid_orden"] = get(af, "bloque_estructura_cbid_orden", 0) + 1)
+                elseif motivo == MOTIVO_FORMA_CBID
+                    ... existing cbid ...
+                else
+                    ... existing orden ...
+                end
+            end
+        end
+        @test get(af, "bloque_cbid", 0) >= 30
+        ...
+        @test get(af, "bloque_estructura", 0) >= 30
+        @test get(af, "con_tx_estructura", 0) >= 10
+        @test get(af, "bloque_estructura_ambos", 0) >= 5
+        @test get(af, "bloque_estructura_cbid_orden", 0) >= 5
+    end
+```
+
+Wait: the existing testset name is `"SL-4c-O/SL-4c-O-B forma v4 de la EvidenceTx"`. I'll rename to include C.
+
+Let me rewrite the whole testset. Let me get its exact current text from the earlier read (lines 193-265). I'll replace it.
+
+Note: `MOTIVO_FORMA_ESTRUCTURA` must be imported in the test module. The test file has `using EstadoDAG` and `using EstadoDAG.Transicion`. `MOTIVO_FORMA_ESTRUCTURA` is exported by EstadoDAG (I added it to the export list). Good. `defecto_estructura_evidencia` also exported.
+
+Let me write the replacement.
+dsh: reasoning:
+Wait — I need to double-check: in the original test, the classification used `d` (primer_defecto_forma) to decide, but for a `MOTIVO_FORMA_CBID` block, `d` is `:cbid`; for orden, `d` is `:orden_igual`/`:orden_desc`. My new version uses `motivo` for the top-level branch and `d` for sub-classification. Good.
+
+Now `src/diferencias.jl`: update `defectos_del_caso` to include structure and update prose. Let me edit.
+
+Current `defectos_del_caso`:
+```julia
+"Defectos de forma v4 por bloque PoST del caso (`:cbid` y/o `:orden`)."
+function defectos_del_caso(caso::CasoLeido, pd::ParamsDAG)
+    cbid_red = pd.P.cbid
+    def = Dict{Int,Vector{Symbol}}()
+    for b in caso.post_bloques
+        ds = Symbol[]
+        for tx in b.txs
+            tx.tipo == Transicion.TxEvidencia || continue
+            ev = tx.evidencia
+            ev === nothing && continue
+            (ev.id1.cbid != cbid_red || ev.id2.cbid != cbid_red) &&
+                !(:cbid in ds) && push!(ds, :cbid)
+            !(ev.h1.pre_hash < ev.h2.pre_hash) && !(:orden in ds) && push!(ds, :orden)
+        end
+        isempty(ds) || (def[b.id] = ds)
+    end
+    return def
+end
+```
+
+New: add `:estructura`. And update the docstring. Also the header prose at lines 117-138. Let me update:
+- Title `# DIFERENCIAS v0.5 → v0.6 · T04 SL-4c-O / SL-4c-O-B` → include SL-4c-O-C.
+- The paragraph at 125-138 mentions only cbid/orden. Add structure.
+
+Also the `resultado_corregido` compares to v0.5; with structure change, v0.5 cases with structure would change. None exist. But `defectos_del_caso` now detects structure.
+
+Let me also update the `fallos` message "cambia sin defecto de forma" — fine.
+
+Let me apply.
+dsh: reasoning:
+Now update the header prose in diferencias.jl. Lines 117-138. Let me apply.
+
+Current:
+```julia
+    println(io, "# DIFERENCIAS v0.5 → v0.6 · T04 SL-4c-O / SL-4c-O-B")
+...
+    println(io, "Cada caso que cambia lleva al menos una `EvidenceTx` con `cbid` ajeno")
+    println(io, "(RAT-1) o con `pre_hash(H1) ≥ pre_hash(H2)` (EV-04). El bloque que la")
+    println(io, "contiene pasa de descartar la transacción y seguir válido a ser")
+    println(io, "**inválido en la admisión**; sus descendientes caen por `ErrSinPadre` y")
+    println(io, "desaparecen sus `DESC`/créditos/incidentes. La precedencia corregida es")
+    println(io, "**por transacción** (SL-4c-O-B): dentro del bloque, en su orden, cada")
+    println(io, "`EvidenceTx` se comprueba `cbid` → orden y la primera defectuosa fija el")
+    println(io, "motivo. v0.5 no contiene ningún caso con orden no canónico (el generador")
+    println(io, "anterior siempre ordenaba), así que todos los cambios observados son de")
+    println(io, "`cbid` ajeno y la precedencia por transacción no altera ningún resultado")
+    println(io, "de este diff. Los casos nuevos de v0.6 (`forma-cbid`, `forma-orden-desc`,")
+    println(io, "`forma-orden-igual`, `forma-ambos`, `forma-dos-evidencias` y los aleatorios")
+    println(io, "con modo de orden no canónico) no forman parte de este diff porque v0.5 no")
+    println(io, "los tenía.")
+```
+
+New: include structure and the new v0.6 case names (`forma-entradas`, etc.).
+
+Let me edit.
+dsh: reasoning:
+Now let me also update the `diferencias.jl` header comment (lines 5-8) to mention structure. Let me do a small edit.
+
+Current:
+```
+# La orden SL-4c-O (ajustada por SL-4c-O-B) exige un informe que liste, caso por
+# caso, los vectores que cambian de resultado entre v0.5 y v0.6, y que **todo**
+# caso que cambie lleve uno de los dos defectos de forma (`cbid` ajeno u orden no
+# canónico). Como el generador de v0.6 se amplía (modos de orden igualdad y
+# descendente) y no reproduce byte a byte los casos aleatorios de v0.5, la
+# comparación exacta se hace reproduciendo las **entradas congeladas** de
+```
+Change "los dos defectos" to "los tres defectos (estructura, cbid ajeno u orden no canónico)". Let me apply.
+dsh: reasoning:
+Now let me also update `src/estado`? No. Let me check for remaining `ErrEvidenciaConEntradas` references in T04. Let me grep.
+dsh: reasoning:
+Only METODO.md references it; I'll update that in the documentation step. Now let me verify the Julia syntax by running a quick parse/load. But T01 is being edited by O1C. Let me check if T01 currently loads. Since T04 `include`s T01, a syntax error in T01 will break. Let me check the current T01 state.
+
+Actually, before running anything, let me check `date` and T01 mtime. O1C might have finished or be mid-edit. Let me check.
+
+Actually, I can test my T04 code's syntax without loading T01? Not easily, since EstadoDAG includes T01. Let me first do a plain Julia parse of the T04 files using `Meta.parseall` on the source text without executing. I can write a short Julia script that parses each file. But that still requires Julia to run. Let me check Julia availability.
+
+Actually, a simpler approach: use `julia --project=. -e 'include("src/EstadoDAG.jl")'` but it will include T01. If T01 is mid-edit, it may fail. Let me check T01's current state first.
+
+Let me check mtime and whether T01 loads. Also check if O1C process finished (stdout non-empty? HORAS?).
+
+Let me run a check.
+dsh: reasoning:
+O1C has already made the key Transicion.jl edits (mtime 23:39:41, and the new class exists, alias exists, return updated). O1C is still running (stdout empty), probably running tests/regenerating. T01 Transicion.jl seems consistent now. Good — my T04 depends on `Transicion.ErrEvidenciaConEntradas` alias existing, which it does.
+
+But O1C may still edit Transicion.jl further (tests, etc.). The order says O2 doesn't run final tests until O1 finished editing Transicion.jl. Since mtime is 23:39:41 and now 23:43, maybe O1C finished the Transicion.jl edits and is running tests. I'll proceed with my own intermediate testing and re-check mtime before final runs.
+
+Now let me try to load T04 to catch syntax errors. But T01 might be mid-edit. Let me try a parse-only check of my edited T04 files first using Julia's `Meta.parseall` (doesn't execute). Let me check the Julia wrapper. Let me look at how tests are run (from INFORME). The command used:
+```
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. ...
+```
+
+Let me check if that's valid. Let me look at `julia-version.toml` and `Project.toml`.
+
+Let me run a parse check. I'll write a small Julia one-liner that parses each edited file.
+
+Actually, `Meta.parseall` is available in Julia 1.13? There's `Meta.parseall(str)` in newer versions. Let me use `Base.parse_input_line`? Simpler: `include` will parse and execute. But to avoid executing, I can use `Meta.parse` on whole file content:
+```julia
+for f in ARGS
+    Meta.parseall(read(f, String))
+end
+```
+`Meta.parseall` exists in Julia 1.6+? It's `Meta.parseall`. Let me just try. If not, use `Meta.parse("begin " * content * " end")`.
+
+Let me run with the wrapper. First check the wrapper exists.
+dsh: reasoning:
+Let me run a parse check of my edited files. Use Meta.parseall if available; otherwise wrap. Let me write a small command:
+
+`env -u LD_LIBRARY_PATH JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true /home/katana/torio/.juliaup/bin/julia --project=. -e '...'`
+
+Actually, the depot path must be absolute or relative to cwd. I'll cd into T04. Let me run parse-only. Note: `Meta.parseall` may not exist; use try.
+
+Let me run.
+dsh: reasoning:
+Syntax is fine. Now let me try to load the module (includes T01) to catch runtime/const issues. Since T01 seems consistent, let me try.
+
+Actually, before that, let me think about a potential issue: `_tx_evidencia_forma` constructs `Transicion.Tx(TxEvidencia, sal, ent, 0, 1, UInt64(0), 0, UInt64(0), ev)`. Wait, I used `clave=1`? Let me check: I wrote `Transicion.Tx(Transicion.TxEvidencia, sal, ent, 0, 1, UInt64(0), 0, UInt64(0), ev)`. Field order: tipo, salidas, entradas, firmante, clave, importe, sector_id, nonce, evidencia. So firmante=0, clave=1, importe=0, sector_id=0, nonce=0. Good.
+
+Now let me try loading the module. If T01 is mid-edit it might fail; let's see.
+
+Let me run a minimal load: `using EstadoDAG`.
+dsh: reasoning:
+The core change works. Now let me run the full test suite? But O1C may still be editing T01. The order says O2 must not run its **final** tests until O1 finishes editing Transicion.jl. Intermediate tests are okay-ish, but if T01 changes mid-run, results could be inconsistent. Let me check O1C's status first. If O1C is still running, I could run the test suite now as a smoke test, but it takes time and might conflict (both use the same machine, disk, and T01). The order says "otra orden usa la máquina con procesos que dependen del reloj" for SL-4c-O; but O-C says O2 waits for O1.
+
+Actually, running `Pkg.test()` now would compile T01 and T04; if O1C simultaneously regenerates T01 vectors and edits files, there could be races. Better to wait for O1C to finish. Meanwhile, I can do more validation that doesn't depend on T01 stability, e.g., unit-level tests of the new functions (already done), and prepare the INFORME/PROGRESO text.
+
+Let me monitor O1C. The current time is ~23:43. O1C started 23:37. It might take ~10-20 min. Let me do useful work while waiting:
+- Update METODO.md line 37.
+- Prepare INFORME/PROGRESO sections.
+- Check that `casos_forma_cobertura` coverage counts reach the minimums (I can test the counter logic locally without running the full export, using the module, which I already loaded).
+
+Let me test the coverage counting directly to make sure the minimums are met. I'll replicate the exportar `contar_forma_evidencia` logic in a quick script by including exportar? No, exportar's `main()` runs at include end. I can't include it. But I can call `caso_forma_evidencia` for all modes and count with `primer_defecto_forma` manually. Let me write a quick script that mimics the coverage counts.
+
+Actually, simpler: I'll run the `casos_forma_cobertura()` loop and count with a small helper. Let me do that.
+
+Let me also verify that the new modes with `con_tx=true` produce a valid transfer that is NOT applied (m.tx_aplicada false was only checked for some). Let me check.
+
+Let me run a quick count script.
+dsh: reasoning:
+All minimums are met:
+- bloque_estructura = 104 ≥ 30
+- con_tx_estructura = 104 ≥ 10
+- estructura_ambos = 8 ≥ 5
+- estructura_cbid_orden = 16 ≥ 5
+- bloque_cbid = 44 ≥ 30
+- bloque_orden = 72 ≥ 30
+- orden_igual/desc = 36 each ≥ 10
+
+Interesting: `bloque_cbid = 44` > 36 because `:entradas_cbid` and `:entradas_cbid_orden` blocks have `cbid` too but motive is structure, so they don't count as cbid. Wait, 44? The cbid modes: 36 `:cbid` + 8 `:ambos`. But `:ambos` has cbid+orden, motive cbid → 8. So 36+8 = 44. Good. `bloque_orden = 72`: 36 igual + 36 desc = 72. Good.
+
+Now, note: `estructura_entradas = 60` (36 `:entradas` + 8 `:entradas_salidas` + 8 `:entradas_cbid` + 8 `:entradas_orden`)... wait that's 36+8+8+8=60, plus `:entradas_cbid_orden` 8 → but the sub-classification for `:entradas_cbid_orden` should be `:entradas` (since it only has entradas, not salidas). 36+8+8+8+8 = 68, but the count says 60. Hmm, let me recount: modes with entradas: `:entradas` (36), `:entradas_salidas` (8, sub=ambos), `:entradas_cbid` (8, sub=entradas), `:entradas_orden` (8, sub=entradas), `:entradas_cbid_orden` (8, sub=entradas). So `estructura_entradas` = 36 + 8 + 8 + 8 = 60. Yes: `:entradas_cbid_orden` contributes to `estructura_cbid_orden` but its sub-defect is `:entradas`... wait, 36+8+8+8 = 60 includes `:entradas` 36, `:entradas_cbid` 8, `:entradas_orden` 8, `:entradas_cbid_orden` 8 = 60. Yes. And `:entradas_salidas` 8 = `estructura_ambos`. Total = 60+36+8 = 104. Good.
+
+Now, the coverage is solid.
+
+Next: update METODO.md line 37. Let me read the context.
+dsh: reasoning:
+Now let me check O1C's status again, and meanwhile, let me look at the current tail of INFORME.md and PROGRESO.md to know where to append. I read INFORME up to 804. Let me read the tail (804-853). And PROGRESO tail. And HORAS.log.
+
+Let me also check the current T01 mtime again.
+dsh: reasoning:
+O1C is at the stage of running `run.jl` (takes ~125s) and then will finish. It has already made its Transicion.jl edits. I should wait for it to finish before running my final tests, because running heavy Julia processes concurrently on 1 thread each is fine (2 threads total), but the order explicitly says wait for O1 to finish editing Transicion.jl. It seems the edits are done. But to be safe, I'll wait until O1C's stdout is non-empty (process finished) before running the T04 test suite and export.
+
+Meanwhile, let me prepare the INFORME/PROGRESO sections and the entrada log. Let me read the tail of INFORME.md (804-853) and PROGRESO tail.
+dsh: reasoning:
+Good. Now let me read the tail of PROGRESO.md to know where to append. Let me read from ~540.
+dsh: reasoning:
+Now I understand the HORAS.log format. Let me append my start time. I started around 23:37 (launch) / 23:38. Let me add `2026-09-26T23:37:49+02:00  # SL-4c-O-C O2 inicio (lanzamiento; entrada congelada 4/4)`.
+
+But I must verify the entrada congelada first. Let me do that now from ZEROX. The order says verify `sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-C.sha256`. Let me run it and log it to `resultados/entrada-SL4c-O-C.log`.
+
+Let me do the entrada check and write the log. This is a file write under T04, allowed.
+
+Also note the `resultados/entrada-SL4c-O-C.log` isn't in the list, but O-B had `entrada-SL4c-O-B.log`. Good.
+
+Let me run the sha256 check and write the log.
+dsh: reasoning:
+4/4 OK. Now append HORAS start.
+
+Let me append to HORAS.log. I'll use bash `printf`. Note the file is under T04. Let me append:
+`2026-09-26T23:37:49+02:00  # SL-4c-O-C O2 inicio (lanzamiento; entrada congelada 4/4 a las 23:43:46)`
+
+Then later append cierre.
+
+Now let me check O1C's status. If it's done (stdout non-empty), I can run the final tests.
+
+Let me check.
+dsh: reasoning:
+O1C still running (running `run.jl` for ~125s, started around 23:43). Let me wait a bit and prepare the documentation text.
+
+Actually, I can start drafting the INFORME/PROGRESO sections now. But I need the final numbers from the runs. Let me prepare the structure and fill numbers after runs.
+
+Let me monitor O1C using a background job? Or just poll periodically. The instruction says don't busy-poll; I should do useful work. Let me review my edits for correctness while waiting.
+
+Let me review the full diff of my edits to catch mistakes. Since no git, I'll just re-read the key changed sections. Let me re-read EstadoDAG's new functions and dirigidos' new functions.
+
+Also, I realize there may be an issue with `caso_forma_evidencia` and the `modo` for structure: the returned metadata's `I1 = invariante_I1(A.post[Xv.id])`. For structure modes, Xv is valid, so A.post[Xv.id] exists. Good.
+
+Another potential issue: In `caso_forma_evidencia`, `tx_bad` for structure modes has entradas `[1]` but the block also has a coinbase and a transfer. The transfer spends a UTXO. Since X is invalid, nothing applies. Fine.
+
+Now, an important check: the `_tx_evidencia_forma` for `:entradas` creates `Transicion.Tx(TxEvidencia, sal=[], ent=[1], 0, 1, 0, 0, 0, ev)`. The `tx_str` in exportar will render `ent=[1] sal=[]` and `ev=...`. The lector's `parsear_tx` for "Evidencia" with `ev` key: if `!isempty(ent) || !isempty(sal)`, it returns `Transicion.Tx(TxEvidencia, sal, ent, firmante, clave, importe, 0, UInt64(0), ev)`. Good. But note: the lector sets `sector_id=0` and `nonce=0`, while the original had `clave=1`, `firmante=0`, `importe=0`. My `_tx_evidencia_forma` sets `clave=1`, `firmante=0`, `importe=0`. The lector reads `clave` from the line (`clave=1`), `firmante=0`, `importe=0`. So reconstruction matches. Good.
+
+Wait, but the `tx_str` for Evidencia with structure: `base = string("TX tipo=", NOMBRE_TIPO[tx.tipo], " firmante=", tx.firmante, " clave=", tx.clave, " importe=", tx.importe, " ent=[", ent, "] sal=[", sal, "]")` and then appends `" ev="` for Evidencia. The salidas are rendered as `id:valor:dueño`. The lector parses them. Good.
+
+Now, the `contar_evidencia` function iterates `orden` (selected history). Structure-invalid blocks aren't in `orden`, so their evidence isn't counted. That's fine.
+
+But wait: `contar_evidencia` is called for `startswith(nombre, "D-1")` directed cases and for random/ev cases. For directed D-19 cases with structure, `nombre = "D-19"` starts with "D-1", so `contar_evidencia` is called, but the structure block is invalid and not in `orden`, so no `construida` count. The `D-19` cases with cbid/orden are also invalid. So `contar_evidencia` on them counts only the twin Xv's evidence if in `orden`. Fine.
+
+Now, there's a subtle issue with `contar_forma_evidencia` and the `n_ent + n_sal - n_amb` formula: for a block with a single tx with both entradas and salidas, n_ent=1, n_sal=1, n_amb=1 → 1. Good. For a block with two txs, one with entradas and one with salidas, n_ent=1, n_sal=1, n_amb=0 → 2. Good.
+
+Now, let me double check `primer_defecto_forma` for the `:entradas_cbid_orden` mode: tx has entradas, ev cbid+orden → returns `:entradas`. Good.
+
+Now, let me think about whether the change affects the *random* vectors' results. The random generator produces EvidenceTx with no entradas/salidas, so no structure. So the only new structure cases are the dedicated `forma-*` ones. That means the v0.6 vector will have 104 new `forma-*` cases (up from 116 to 220 forma cases), and the total case count increases. Wait: previously `casos_forma_cobertura()` had 36+36+36+8 = 116 cases. Now 220. So the v0.6 vector will have 220 - 116 = 104 more cases. The order says "≥30 casos en los vectores, ≥10 en un bloque con transacciones válidas, y ≥5 ...". So adding 104 dedicated cases is fine. The total becomes 2000 + 104 = 2104.
+
+Hmm, but wait: `con_tx=true` for all new structure cases. So `con_tx_estructura=104`. Good.
+
+Now, one concern: the order says "comprueba su mtime y déjalo escrito" for O1's Transicion.jl. I'll record the mtime in INFORME/PROGRESO.
+
+Now, let me also consider the `diferencias.jl` run. It reads v0.5 (1930 cases? 1878 entries). It reconstructs with the corrected oracle. Since v0.5 has no structure cases, `defectos_del_caso` returns empty for them, and results should be unchanged from O-B's diff (135 changes, all cbid). Actually, wait: O-B's diff produced 135 changes. But the v0.5 file was regenerated by O-B (which is the T04 v0.5? Let me clarify).
+
+Hold on. Let me re-examine: In T04, the "v0.5" file `vectores-estado-dag-v0.5.txt` was created by SL-4a/SL-3b before SL-4c-O. It has 1878 entries. T04's v0.6 was created by SL-4c-O and regenerated by O-B. The diff `DIFERENCIAS-v0.5-v0.6.md` compares v0.5 (frozen, pre-SL-4c) with the corrected oracle. So with O-C's structure change, since v0.5 has no structure cases, the diff result should be **identical** to O-B's (135 changes, all cbid). Good. The order says "como v0.5 no tenía casos de este tipo, se espera 0 cambios nuevos por él". So the diff should remain 135 changes. 
+
+But wait: O-B's diff output file `DIFERENCIAS-v0.5-v0.6.md` currently has 135 changes. Running `diferencias.jl` again should produce the same numbers (modulo the prose changes I made). Let me verify the counts after running.
+
+Now let me check: does `diferencias.jl`'s `defectos_del_caso` change affect the "con_defecto" count? v0.5 cases with cbid: 181. Structure adds 0. So `n_con_defecto` stays 181. Good.
+
+Now let me wait for O1C. Let me do a useful check: confirm that the `exportar.jl` `main` will run with the expected args. The O-B command was `--dirigidos 1 --aleatorios 900 --ev-replicas 120`. I'll use the same.
+
+Let me also double check the `fecha_por_defecto()` uses `date -Is`, so the vector header date changes. The `.sha256` will differ. That's fine.
+
+Now, while waiting, let me re-read my new EstadoDAG functions to be sure there are no issues (e.g., the `defecto_estructura_evidencia` export).
+
+Let me read lines 166-290 of EstadoDAG.jl.
+dsh: reasoning:
+Looks good. Now let me check O1C again. It's been ~1.5 min since it started `run.jl`. Let me wait a bit more. Meanwhile, I can prepare the documentation text mentally.
+
+Actually, let me think about a subtle correctness issue with the precedence and the `chequear_forma` order relative to the coinbase check. In T04's `chequear_forma`, coinbase checks come before `chequear_forma_evidencia`. So a block with both an invalid coinbase (e.g., `importe==0`) and structure-defective evidence would return `:ErrSaldo`, not the structure form. Is that consistent with the contract's precedence "estructura vigente → cbid → orden"? The contract's "estructura vigente" includes block-level checks (coinbase, slot, parents) and per-tx structure. The order says the first defective thing in the block's tx order; but T04's block-level checks are not per-tx. This is pre-existing behavior and the order doesn't change block-level precedence. The O-B INFORME already noted this. So fine.
+
+Now, another subtle issue: the order says "Por transacción, en su orden dentro del bloque: entradas/salidas/testigos → cbid → orden canónico; la primera transacción defectuosa fija el motivo." My implementation checks `ev === nothing` first (skip). But what about a tx with `tipo==TxEvidencia` that has entradas AND `ev === nothing`? T01 returns `ErrSinEvidencia` first (no headers), so it's consistent. Good.
+
+Now, let me consider whether the `defecto_estructura_evidencia` should also check `tx.tipo == TxEvidencia`. It's only called from `primer_defecto_forma` after the tipo check. But it's exported, so a caller could pass any tx. The docstring says "de una EvidenceTx". Fine.
+
+Now let me check O1C.
+dsh: reasoning:
+The sleep command timed out/killed, no output. Let me just check status directly.
+dsh: reasoning:
+O1C is still running its run.jl (~2 min elapsed). Let me continue preparing. I'll draft the INFORME/PROGRESO sections now, leaving placeholders for the final numbers, then fill them after running.
+
+Actually, I can't easily edit placeholders and then fill; I'd rather wait for the numbers. But I can prepare the text in a scratch file or just compose later.
+
+Let me instead do more verification: run the T04 test suite now? O1C is running heavy compute; running T04 tests concurrently is allowed (1 thread each), but T01's Transicion.jl is stable (not being edited during run.jl). Actually, it's safe to run T04 tests now since T01 edits are done and mtime hasn't changed. But the order says O2 doesn't run its **final** tests until O1 finished editing Transicion.jl. O1 has finished editing Transicion.jl (it's running tests now, not editing). But O1 might still edit Transicion.jl if its tests fail. To be safe, I'll wait until O1C's process finishes (stdout non-empty). 
+
+Let me use a background job to wait for O1C's stdout to become non-empty, then notify me. Actually, I can run a poll loop as a background bash job that waits until the stdout file is non-empty, then exits. That way I don't busy-poll. Let me start it in the background.
+
+Actually, simpler: I'll start the T04 test suite as a background job now, but only if T01 is stable. Hmm, risk: if O1C edits T01 mid-test, the test could fail spuriously. Better to wait.
+
+Let me start a background waiter job that polls every 5s until O1C's stdout is non-empty (or a timeout of ~15 min), then exits. Then I continue with docs. When it completes, I'll be notified.
+
+Let me do that.
+dsh: reasoning:
+While that runs, let me review the remaining pieces and prepare documentation. Let me also double-check the `exportar.jl` full new `contar_forma_evidencia` and `main` for syntax/logic by re-reading. Already parse-checked.
+
+Let me re-read `dirigidos.jl` new helper and `caso_forma_evidencia` to ensure no mistakes.
+dsh: reasoning:
+Good. Now let me think about whether the new `forma-*` cases have unique `id` collisions. `caso_forma_evidencia` uses `base_dirigida(pd; seed=seed+iter)` which generates PoW with `pow[3]` as the last id. Then ids `id1+1`, `id1+2`, `id1+3`. Different seeds produce different PoW, but ids might collide across cases? Each case is written as a separate CASO block in the vector file, so collisions across cases don't matter (the lector reconstructs per case). Fine.
+
+Now, a concern: `out_id = 800000 + 1000 * iter`. For iter up to 936, out_id = 800000 + 936000 = 1,736,000. For `_tx_evidencia_forma`, salida id = 700900 + 10*i. For i up to 936, that's 700900 + 9360 = 710260. These don't collide with out_id. Fine.
+
+Another concern: `_evidencia_forma` pre_hash `a = 700001 + 2i`, `b = 700002 + 2i`. For i up to 936, a up to 701873. The `ev_ok` uses `900001 + 2*iter`, fine.
+
+Now, let me check the background waiter job status.
+
+Actually, let me also verify that `Pkg.test()` won't fail due to the `relectura de vectores` test reading the OLD v0.6 before I regenerate. In `runtests.jl`, the relectura test reads `resultados/vectores-estado-dag-v0.6.txt` (the old file from O-B) and re-runs the lector. Since the old v0.6 file was generated with the OLD oracle (structure = semantic discard), and now the oracle treats structure as form, but the old v0.6 file has no structure cases, so the recomputation should still match. Wait: does the old v0.6 file have any evidence with entradas/salidas? The random generator never produced them, and the dedicated cases were only cbid/orden. So the old v0.6 has no structure cases. Thus re-running with the new oracle yields the same results. Good. But I'll regenerate v0.6 before the final test anyway.
+
+Actually, the order says run final tests after O1 finishes. I'll regenerate v0.6 first, then Pkg.test, run.jl, lector, diferencias. Order of operations:
+1. exportar.jl → new v0.6 + cobertura
+2. lector_vectores.jl v0.6 → relectura
+3. diferencias.jl v0.5 → DIFERENCIAS
+4. Pkg.test()
+5. run.jl
+
+Actually Pkg.test includes the relectura test, so run it after export. Fine.
+
+Let me check the waiter.
+dsh: reasoning:
+Still running. Let me continue reading/verifying. Let me check the exact `exportar.jl` main's `print` section after my edits to ensure no formatting issues.
+
+Actually, I already parse-checked. Let me now think about the documentation sections in detail, and maybe write the parts that don't depend on numbers.
+
+Let me draft the INFORME.md section:
+
+```
+---
+
+# T04-SL4c-O-C — La evidencia con entradas/salidas también es forma (EV-04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:37–23:5x).
+**Fuente:** `ORDEN-SL4c-O-C.md` (revisión del director de SL-4c-O-B). **Zona:** `T04/`.
+Sin Python; sin commit ni push; sin secretos.
+
+## SL4cOC.0. Entrada congelada (inicio)
+
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-C.sha256` (desde `ZEROX/`): **4/4 OK**
+(`ORDEN-SL4c-O-C.md`, `ORDEN-SL4c-O-B.md`, `ORDEN-SL4c-O.md`, `V-ZRX/LINEO.md`); registro
+`resultados/entrada-SL4c-O-C.log`.
+
+## SL4cOC.1. Falta de definición informada antes de editar
+
+**FD-SL4cOC-1 · `testigos`/`n_wit` no existe en el modelo tipado.** La orden incluye la estructura
+de EV-04 como «entradas, salidas o testigos» y exige «≥5 con los tres defectos a la vez (gana
+entradas)». El contrato EV-04 sí incluye `n_wit ≠ 0`, pero el modelo `Tx` de T01 (que T04 `include`a
+como dependencia de solo lectura) solo tiene `entradas` (`n_in`) y `salidas` (`n_out`); no hay campo
+de testigos y el códec de wire de la v4 está declarado fuera de alcance (FD-5 de SL4a). Añadirlo
+exigiría tocar `Tx` (zona de O1) y el formato de línea de los vectores (que la orden fija como «el
+mismo»). Decisión declarada: se implementan las dos subclases representables (`entradas`, `salidas` y
+ambas) y, para cubrir la precedencia «gana entradas» y la lectura «tres defectos de la precedencia»,
+se añaden además casos con estructura + `cbid` ajeno + orden no canónico. No se toca T01 ni el
+formato. Se documenta en `INFORME.md` §SL4cOC.6 y en la cobertura.
+
+**FD-SL4cOC-2 · `ErrEvidenciaConEntradas` deja de ser semántico.** Igual que SL-4c-O con
+`ErrCbidAjeno`/`ErrOrdenCanonico`, O1 lo retira de `ErrSemantico` y lo deja como alias interno
+`ErrForma(EvidenciaConEntradasOSalidas)`; T04 no depende de él (se retira la única referencia). No
+bloqueante.
+
+**FD-SL4cOC-3 · versionado.** v0.6 se regenera en el mismo fichero (aún sin consumidor), como en
+SL-4c-O-B; v0.5 no se toca y sigue siendo la referencia del diff.
+
+## SL4cOC.2. Cambio aplicado
+
+- `src/EstadoDAG.jl`: `defecto_estructura_evidencia` y `MOTIVO_FORMA_ESTRUCTURA =
+  ErrForma(EvidenciaConEntradasOSalidas)`; `primer_defecto_forma` comprueba, por transacción y en
+  su orden, `estructura → cbid → orden`; `chequear_forma_evidencia` mapea la estructura y el bloque
+  queda **inválido en la admisión** (no descarte).
+- `src/dirigidos.jl`: `_tx_evidencia_forma` (entradas/salidas/ambas y combinaciones con cbid/orden);
+  `caso_forma_evidencia` acepta los modos de estructura; D-19 y la cobertura pasan a 220 casos
+  (36 cbid + 36 igualdad + 36 descenso + 8 ambos + 36 entradas + 36 salidas + 8 entradas+salidas +
+  8 entradas+cbid + 8 entradas+orden + 8 entradas+cbid+orden).
+- `exportar.jl`: cobertura de estructura (`bloque_estructura`, `_entradas`, `_salidas`, `_ambos`,
+  `_cbid_orden`, `ev_estructura`, `con_tx_estructura`) y mínimos nuevos; se retira
+  `ErrEvidenciaConEntradas`.
+- `run.jl`, `test/runtests.jl` y `src/diferencias.jl`: aserciones y detección de estructura.
+
+## SL4cOC.3. Resultados
+
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | **NNN/NNN** (`resultados/test-pkg-v0.6.log`) |
+| `run.jl --seed 0x5a5a --replicas 200` | **ESTADO = SUPERADO**, 0 fallos, X s (`resultados/run-estado-dag-v0.6.log`) |
+| Relectura independiente de v0.6 | **N casos, 0 discrepancias** (`resultados/relectura-v0.6.log`) |
+| `DIFERENCIAS-v0.5-v0.6.md` | 1 878 entradas; **181** con defecto, **135** cambian, **0** sin defecto |
+| Cobertura de forma | `bloque_estructura=...`, `...` (`minimos_SL4cO=OK`) |
+| Entrada congelada | **4/4 OK** |
+
+`run.jl`: ... `forma_estructura=...`.
+
+## SL4cOC.4. Vectores, relectura y diferencias
+...
+## SL4cOC.5. Reproducibilidad
+...
+## SL4cOC.6. Lo que T04-SL4c-O-C NO demuestra
+- `testigos`/`n_wit` no está en el modelo: EV-04 solo se ejerce por `entradas`/`salidas`. La
+  coherencia con el parser de wire (n_wit) queda pendiente del códec de v4 (FD-5 SL4a).
+- Los casos de estructura son dirigidos (D-19 con modos nuevos); el generador aleatorio no produce
+  evidencias con entradas/salidas, así que la cobertura es determinista, no estadística.
+- La coherencia con T01 (O1) depende de que O1 haya dejado `Transicion.jl` estable; se verificó su
+  `mtime` y la batería final se ejecutó con ese fichero.
+```
+
+And PROGRESO similar.
+
+I'll fill numbers after runs.
+
+Now let me check the waiter again. Meanwhile, let me also re-examine: the order says "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas". My `bloque_estructura` count in the coverage (from dedicated cases) is 104, all with con_tx=true. But note: the `contar_forma_evidencia` in exportar also counts structure from any random cases; since random has none, the total is 104. Good.
+
+Hmm, wait: there's a subtlety with `contar_forma_evidencia` being called on the `A` objects from `casos_dirigidos(pd)` too. `casos_dirigidos` includes 4 structure `caso_forma_evidencia` cases. Those will be counted in `af` as well. So the coverage `bloque_estructura` may be 104 (from dedicated coverage) + 4 (from directed) = 108. Let me check: in `exportar.jl` main, for directed cases, `contar_forma_evidencia(A, af)` is called. The directed cases with structure modes (`:entradas`, `:salidas`, `:entradas_salidas`, `:entradas_cbid_orden`) each contribute 1 → 4. Then `casos_forma_cobertura` contributes 104. Total `bloque_estructura` = 108. Fine, ≥30. `estructura_ambos` = 8 (cobertura) + 1 (directed) = 9. `estructura_cbid_orden` = 8 (cobertura) + 1 (directed) = 9. `con_tx_estructura` = 108 (all have con_tx=true). Good.
+
+Actually wait, the directed `caso_forma_evidencia(pdev; modo=:entradas, seed=47)` has `con_tx=true` (default), so yes.
+
+Now let me check the waiter.
+dsh: reasoning:
+Let me check the actual status of the O1C process directly (maybe the waiter will take a while). Let me look at whether O1C has progressed. But I shouldn't busy-poll. Let me instead prepare a scratch document with the report text. Actually, I'll write the docs after runs.
+
+Let me use the time to check for any other references to the old behavior in T04 docs that I should update:
+- INFORME.md has sections SL4cO and SL4cOB that mention the old behavior. I should not rewrite history; I'll add a new section.
+- PROGRESO.md similarly.
+- `bench/benchmarks.jl`? Probably unrelated.
+- `analisis-artefacto/*`? Those are historical artifacts, not to touch.
+
+Let me grep T04 for "descarte semántico" and "ErrEvidenciaConEntradas" in docs to see what needs updating beyond METODO (done) and new sections. The order only requires a new section; historical sections stay.
+
+Let me also double check: does `exportar.jl` still import/use `ErrEvidenciaConEntradas`? Grep said only METODO (fixed). Good.
+
+Now, another important check: T01's `aplicar_evidencia!` now returns `ErrForma(EvidenciaConEntradasOSalidas)` for structure. In T04's fusion, structure txs are pre-filtered by `chequear_forma`, so unreachable. But what about T01's `aplicar_tx!` being called from T04's `aplicar_bloque_fusion!` for a tx inside a block that passed form? Fine.
+
+However, there's a subtle path: In T04, `estado_past!` applies blocks from the mergeset via `aplicar_bloque_fusion!`. These blocks passed `chequear_forma` when processed. But what about blocks that are invalid due to OTHER reasons (e.g., `ErrGarantia`) but still added to GDR? Looking at `procesar_uno!`: if `chequear_forma` fails, it returns `marcar_invalido!` WITHOUT adding to GDR. If GDR addition fails, marks invalid. If `estado_past!` fails, marks invalid but the block IS in GDR (added before). If `ErrGarantia`, marks invalid but in GDR. Could such an invalid block be in the mergeset of another block and get applied? GDR's mergeset includes blocks regardless of `validos`? Let me check. `A.validos` is T04's bookkeeping; GDR doesn't know. The comment on `marcar_invalido!` says: "No altera el estado GHOSTDAG (si el bloque ya fue añadido a GDR, queda ahí pero nunca es ancestro de un bloque válido: los hijos comprueban `validos`)." But `estado_past!` iterates `gd.ms_ordenado` and applies blocks without checking `A.validos`. Hmm, but if a block is invalid, its children are rejected by `chequear_forma` (parents must be valid), so no valid block has it in its past. But the mergeset of a valid block could still include an invalid block? GDR's blue set computation includes the invalid block if it's an ancestor. But the invalid block wasn't added to GDR if `chequear_forma` failed. If it failed at `ErrGarantia`/`ErrMergeDepth` after being added, it's in GDR, and a later valid block could have it as a blue ancestor? The comment says it's never an ancestor of a valid block because children check `validos`. But `estado_past!` applies `ms_ordenado` of the valid block, which could include the invalid block if GDR colored it blue. Hmm, this is pre-existing T04 behavior, not my concern. The order doesn't touch it.
+
+The relevant point: a block with structure defect fails `chequear_forma` and is NOT added to GDR, so it can't be applied in fusion. Good.
+
+Now, let me check the O1C waiter. Let me wait a bit more productively. Let me verify the `diferencias.jl` change doesn't break: the `defectos_del_caso` now detects `:estructura`, but the `defectos_del_caso` is used only to report which blocks have defects. The `resultado_corregido` uses the oracle. For v0.5, no structure, fine.
+
+Let me check the waiter once more.
+dsh: reasoning:
+O1C finished at 23:46:28. Let me read the O1C stdout to confirm it succeeded, and check the T01 Transicion.jl mtime (should be unchanged since 23:39:41 or updated by final edits). Then I can run my final tests.
+
+Let me read the O1C stdout.
+dsh: reasoning:
+O1 finished successfully. T01's `Transicion.jl` mtime is `2026-09-26 23:39:41.298582413 +0200` (epoch 1790458781), stable since 23:39:41. O1's notes confirm this is the final mtime for O2.
+
+Now I can run my final tests. Order of operations:
+1. Regenerate v0.6 with exportar.jl (this also writes cobertura).
+2. Relectura v0.6.
+3. diferencias v0.5.
+4. Pkg.test().
+5. run.jl.
+
+Let me run exportar.jl. It will take a while (O-B's export took some time). Let me run it in the background and capture output to a log.
+
+Command (from O-B INFORME):
+```
+cd T04
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH julia --project=. exportar.jl --dirigidos 1 --aleatorios 900 --ev-replicas 120
+```
+
+Let me run and tee to `resultados/exportar-v0.6-SL4c-OC.log` (using the O-B convention? O-B used `exportar-v0.6.log`). The O1 used `exportar-v0.5-SL4c-OC.log`. For T04, I'll write `resultados/exportar-v0.6-SL4c-OC.log` to avoid overwriting O-B's `exportar-v0.6.log`. Actually, O-B overwrote `exportar-v0.6.log`. Let me just overwrite `exportar-v0.6.log`? The order says regenerate the vectors; the log name isn't specified. To keep history, I'll write a new name. Let me use `resultados/exportar-v0.6.log` (same as O-B) or a distinct one. I'll use `resultados/exportar-v0.6-SL4c-OC.log` for traceability.
+
+Wait, the order says "Regenerar vectores-estado-dag-v0.6.txt (sigue sin consumidor), .sha256, cobertura y DIFERENCIAS-v0.5-v0.6.md". It doesn't mention logs. I'll use distinct log names.
+
+Let me run exportar in the background.
+
+Actually, before that, let me consider: the exportar command takes the default `--fecha` = current date. Good.
+
+Let me start it in background.
+dsh: reasoning:
+While exportar runs, let me update the documentation (INFORME/PROGRESO) with the parts I know, leaving numbers to fill. Actually, I'd rather wait for exportar and then run the rest. But I can prepare the INFORME section text in a scratch, or just wait.
+
+Let me monitor exportar. It took maybe ~2-3 min in O-B. Let me do something useful: check the `resultados` naming and prepare the exact commands for the reproducibility section.
+
+Also, I should verify that `DIFERENCIAS-v0.5-v0.6.md` from O-B is at 76520 bytes; regenerating will overwrite it. Good.
+
+Let me wait for exportar with job_output wait.
+
+Actually, let me use the time to write the INFORME.md section draft to a temp file? Not necessary. Let me just wait.
+
+Let me read the `bench/benchmarks.jl` quickly to make sure nothing else references the old behavior. Actually, `bench` is likely for IE. Let me grep for forma in bench. Probably not needed.
+
+Let me check on the export job.
+dsh: reasoning:
+Exportar succeeded. v0.6: 2108 casos, sha256 `86348a48e32491c9cb3675fa1c2d7e06f4c20f94518f35b227778d28d4a90c19`. Coverage:
+- `bloque_estructura` = 108 (≥30)
+- `bloque_estructura_entradas` = 62, `_salidas` = 37, `_ambos` = 9 (≥5)
+- `bloque_estructura_cbid_orden` = 9 (≥5)
+- `con_tx_estructura` = 108 (≥10)
+- `ev_estructura` = 108
+- cbid 283, orden 243 (igual 115, desc 128), ambos_cbid 161, con_tx_cbid 166, con_tx_orden 152.
+- `minimos_SL4cO=OK` presumably.
+
+Total cases: 2108 = 2000 (previous) + 108? Wait, previously 2000 cases with 116 forma cases. Now `casos_forma_cobertura` has 220 cases, so directed = 24+4 = 28? Let me compute: base directed 14 + evidencia directed 6 (D-15..D-18 + D-19 x4? Actually `casos_dirigidos` now has base 14 + evidencia 4 + forma 8 + dos_evidencias 2 = 28). Hmm, previously it was 24 directed. Now +4 = 28. Random 900, ev 8×120=960, forma 220. Total = 28+900+960+220 = 2108. Yes. Good.
+
+Now let me run the relectura, diferencias, Pkg.test, and run.jl. Let me run relectura and diferencias first (fast), then Pkg.test, then run.jl.
+
+Let me run relectura.
+dsh: reasoning:
+Let me wait for these. They should be quick (relectura reads 2108 cases; diferencias reads 1878 entries). Both will JIT-compile the module, so maybe 1-2 min each. They run concurrently, contending for CPU but fine.
+
+Let me wait for both.
+dsh: reasoning:
+Relectura: 2108 casos, 0 discrepancias. Let me get the diferencias output.
+dsh: reasoning:
+Diferencias: 1878 casos v0.5, 135 cambiados, 181 con defecto, 0 fallos. Same as O-B. Good — structure added no new changes, as expected.
+
+Now let me run `Pkg.test()` and `run.jl`. These are the heavy ones. Let me run them in parallel? The order says 1 thread per part; running two Julia processes concurrently would use 2 threads. The order's budget is 1 hilo per part; running two of my own processes concurrently would exceed that. Better to run sequentially: Pkg.test first, then run.jl. But I could run them concurrently to save wall time; the machine has many cores and other agents. However, the order says "1 hilo por parte" (per part), and I'm one part. Running 2 processes would be 2 threads. Let me be conservative and run sequentially. Pkg.test took ~? O-B's took maybe a minute or two. run.jl takes ~130s. Total ~4-5 min. Fine.
+
+Let me run Pkg.test first, capturing to `resultados/test-pkg-v0.6.log` (overwriting O-B's, consistent with previous parts). Actually to preserve history I could use a distinct name, but the INFORME references `test-pkg-v0.6.log`. O-B overwrote it. I'll overwrite it again (it's the current v0.6 test log). Let me capture to `resultados/test-pkg-v0.6.log` and also tee a copy `test-pkg-v0.6-SL4c-OC.log`. Simpler: just overwrite `test-pkg-v0.6.log`.
+
+Let me run Pkg.test in background.
+dsh: reasoning:
+While Pkg.test runs, let me start drafting the INFORME/PROGRESO sections. But I need the test result. Let me wait for it.
+
+Actually, let me prepare the report body in my head and write it once I have all numbers. Let me wait for Pkg.test. It might take a few minutes.
+
+Let me check the current v0.6 files and cobertura to have the exact numbers. Let me read cobertura-v0.6.txt key lines. But Pkg.test is running and reading; reading files is fine.
+
+Let me read the cobertura header and the FORMA lines.
+dsh: reasoning:
+All good. The `.sha256` path uses `resultados/vectores-estado-dag-v0.6.txt` (relative to T04). The order/existing convention writes it that way. Good.
+
+Now let me wait for Pkg.test. Let me check the job.
+dsh: reasoning:
+Pkg.test: 507/507 passed. (O-B was 472; I added 35 new assertions.)
+
+Now run.jl. Let me run with `--seed 0x5a5a --replicas 200`, capture to `resultados/run-estado-dag-v0.6.log` (overwriting O-B's). It takes ~130s. Let me run in background.
+
+Actually, before run.jl, let me double check the T01 Transicion.jl mtime is unchanged (23:39:41) — required by the order. I'll record it. Let me run run.jl and then check mtime at the end.
+
+Let me start run.jl.
+dsh: reasoning:
+While run.jl runs, let me draft and write the INFORME.md and PROGRESO.md sections. I have all numbers except run.jl's final stats. I'll write the sections after run.jl completes, but I can write the non-run parts now and append run stats later. Actually, editing a file while a background job reads the code is fine (run.jl already loaded). Let me wait for run.jl to avoid a partial section. Meanwhile, let me verify v0.4/v0.5 intact using the O-C entry? The order's entry `ENTRADA-SL4c-O-C.sha256` only lists the orders and LINEO, not the vectors. The O-B entry (`ENTRADA-SL4c-O-B.sha256`) lists the vectors. Let me check what `ENTRADA-SL4c-O-B.sha256` contains and verify v0.4/v0.5 intact. Actually, the O-B INFORME says "sha256sum -c ENTRADA-SL4c-O.sha256 7/7 OK (v0.4 y v0.5 byte a byte)". Let me read `ENTRADA-SL4c-O.sha256` and verify.
+
+Let me do that while run.jl runs.
+dsh: reasoning:
+7/7 OK: v0.4 (T01) and v0.5 (T04) intact. Good.
+
+Interesting: REVISION-RI-3b.md is listed with hash `4e0698...`. Earlier my `ls` didn't show it, but sha256sum -c says OK, so it exists. Let me not worry.
+
+Now let me wait for run.jl. Let me check the job.
+dsh: reasoning:
+run.jl: 0 fallos, 94.1s. Let me read the TOTAL-EV line and TOTAL line from the log.
+dsh: reasoning:
+run.jl: ESTADO = SUPERADO, 0 fallos, 94.1s. `forma_estructura=0` in random ev histories (as expected, since the random generator doesn't produce structure-defective evidence). That's fine; the structure coverage comes from dedicated cases (exportar). The order's requirement is about the vectors ("≥30 casos en los vectores"), which is satisfied by the 108 dedicated cases.
+
+Now let me finalize:
+1. Check T01 Transicion.jl mtime again (should still be 23:39:41) and record.
+2. Update INFORME.md with the SL-4c-O-C section.
+3. Update PROGRESO.md.
+4. Append HORAS.log cierre.
+5. Maybe re-run test-pkg log naming. Done.
+
+Let me also double-check: the order says "O2 no ejecuta sus pruebas finales hasta que O1 haya terminado de editar Transicion.jl (T04 lo incluye): comprueba su mtime y déjalo escrito." I'll record the mtime in INFORME/PROGRESO. Let me verify it's still 23:39:41 now.
+
+Let me get the current mtime and a definitive statement.
+
+Also, let me confirm the `test-pkg-v0.6.log` contains the 507 summary (it does per output).
+
+Let me now write the INFORME section. I'll append to INFORME.md after line 853.
+
+Let me compose the full section with numbers:
+
+- Entrada: 4/4 OK (23:43:46).
+- FD-SL4cOC-1 testigos; FD-2 ErrEvidenciaConEntradas alias; FD-3 versionado.
+- Cambio aplicado.
+- Resultados:
+  - Pkg.test 507/507 (resultados/test-pkg-v0.6.log)
+  - run.jl ESTADO=SUPERADO, 0 fallos, 94.1s; TOTAL-EV: 1600 historias, 11254 válidos, 2208 descartes, 37 duplicadas, 224 tardías, forma_cbid 410, forma_orden 286 (igual 142, desc 144), forma_estructura 0 (aleatorio; la cobertura estructural es dirigida). 3000 historias base, 46500 bloques, 25192 válidos, 4497 descartes, 2078 rojo_U3, 600000 IE-3.
+  - Relectura v0.6: 2108 casos, 0 discrepancias.
+  - DIFERENCIAS: 1878 entradas, 181 con defecto, 135 cambios, 0 sin defecto.
+  - Cobertura: bloque_estructura 108 (entradas 62, salidas 37, ambos 9), cbid_orden 9, ev_estructura 108, con_tx_estructura 108; cbid 283, orden 243 (igual 115, desc 128), ambos_cbid 161, con_tx_cbid 166, con_tx_orden 152. minimos_SL4cO=OK.
+  - Evidencia semántica: aplicada 353, sin_saldo 42, deshecha 59, duplicada 20, tardía 145, construida 560.
+  - Vectores v0.6: 2108 casos (28 dirigidos + 900 aleatorios + 960 evidencia + 220 forma), sha256 86348a...; .sha256 relativo a T04/.
+  - T01 Transicion.jl mtime: 2026-09-26 23:39:41.298582413 +0200 (epoch 1790458781), escrito por O1; final O1 23:46:11; la batería final de T04 se ejecutó con ese fichero.
+  - v0.4 y v0.5 intactos (ENTRADA-SL4c-O 7/7 OK).
+
+- Reproducibilidad: commands.
+- Lo que NO demuestra: testigos gap, generative vs dirigido, etc.
+
+Let me write the INFORME section. I need to be careful with the `edit` tool: append after the last line. The file ends at line 853 with the last bullet. I'll use edit with old_string = the final lines and new_string = same + section.
+
+The final lines are:
+```
+- La coherencia con T01 (O1) depende de que O1 mantenga la precedencia por transacción; T04
+  incluye `Transicion.jl` de T01 como dependencia de solo lectura.
+```
+
+Let me append.
+
+Actually, let me first capture the exact mtime one more time.
+dsh: reasoning:
+Now let me write the INFORME section. Let me append to INFORME.md.
+dsh: reasoning:
+Now append the PROGRESO.md section. Similar content, more concise.
+
+Let me append after line 597.
+dsh: reasoning:
+Now append HORAS.log cierre. Let me use the current time.
+
+Then final verification:
+- Confirm files.
+- Confirm no leftover references.
+- Maybe run a final grep for `ErrEvidenciaConEntradas` in T04 code/docs (should only be historical prose in INFORME/PROGRESO).
+- Check that the T01 Transicion.jl mtime is still 23:39:41 after all runs (yes).
+
+Let me append HORAS cierre and do final checks.
+
+Current time ~23:50. Let me append `2026-09-26T23:50:..  # SL-4c-O-C O2 cierre: ...`.
+
+Let me get exact time via date.
+dsh: reasoning:
+Now final checks:
+1. Verify no leftover `ErrEvidenciaConEntradas` in T04 source (only historical docs).
+2. Verify the test-pkg log has 507.
+3. Verify `vectores-estado-dag-v0.6.sha256` matches the file.
+4. Verify T01 mtime unchanged.
+5. Check that `INFORME.md`/`PROGRESO.md` are valid (no truncation).
+6. Confirm no files written outside T04. I wrote to /tmp/entrada-O-check.txt (outside T04 but /tmp is a temp area, allowed). I also read files. My only writes: T04 files, and the tee logs under T04. Plus the background waiter. Good. Actually, `tee /tmp/entrada-O-check.txt` — that's a temp file, fine.
+
+Wait, I ran `sha256sum -c` which doesn't write. I wrote `/tmp/entrada-O-check.txt` via tee. That's outside the workspace but /tmp is a platform temp area. The order says "nada fuera de tu zona" meaning the ZEROX zone, not /tmp. Should be fine, but let me remove it to be clean. Actually, the DSH file policy allows platform temp areas. I'll leave it or remove. Let me remove it.
+
+Let me also double check the `.sha256` file content matches the actual file.
+
+Let me run final checks.
+dsh: reasoning:
+All checks pass. Let me also verify there are no other places in T04 code that hardcode the old semantic behavior or that reference `con_entradas` incorrectly. The `exportar.jl` docstring still lists `con_entradas` as obsolete (fine). Let me grep for `con_entradas` in T04 code.
+
+Also, let me double check the `diferencias.jl` output header and the DIFERENCIAS file verdict. Let me grep the file for the verdict and counts.
+
+Also, I should double-check that the `INFORME.md` section I appended is coherent (no broken markdown). Let me grep for the new heading.
+
+Let me run these final checks.
+dsh: reasoning:
+Everything is consistent. Let me do a final review of the todo list and mark all complete.
+
+Let me also verify the `T04/resultados` files (v0.6, sha, cobertura, DIFERENCIAS, relectura, test log, run log) exist and are fresh.
+
+Let me check timestamps.
+dsh: reasoning:
+Everything is in place. v0.4 and v0.5 untouched (timestamps 19:20 from before). 
+
+Let me update the todo list to completed.
+
+One more consideration: the order says "≥ 30 casos en los vectores, ≥ 10 en un bloque con transacciones válidas". Our `bloque_estructura=108`, all with con_tx=true (108). Good. And "≥5 con los tres defectos a la vez (gana entradas)" → we have 9 `bloque_estructura_ambos` (entradas+salidas) and 9 `bloque_estructura_cbid_orden` (entradas+cbid+orden). Declared.
+
+Now, is there anything else in the order I might have missed?
+- "Regenerar vectores-estado-dag-v0.6.txt (sigue sin consumidor), .sha256, cobertura y DIFERENCIAS-v0.5-v0.6.md" ✓
+- "Pkg.test() y run.jl en verde, relectura 0 discrepancias" ✓
+- "sección «SL-4c-O-C» en INFORME.md y PROGRESO.md" ✓
+- "O2 no ejecuta sus pruebas finales hasta que O1 haya terminado de editar Transicion.jl (T04 lo incluye): comprueba su mtime y déjalo escrito." ✓ mtime recorded.
+- "Prohibido Python." ✓
+- "Presupuesto: 30 min y 1 hilo por parte." I used 1 thread per run. Wall time ~13 min. ✓
+- "Entrada congelada: P-ZRX/P-SLASHING/ENTRADA-SL4c-O-C.sha256." ✓ 4/4.
+
+I think we're done.
+
+Wait — one more thing: the order says the section name is «SL-4c-O-C» in INFORME.md and PROGRESO.md. My INFORME heading is "# T04-SL4c-O-C — ..." which contains "SL4c-O-C"? No, it's "SL4c-O-C" (without hyphen between SL and 4c). The order says «SL-4c-O-C». Hmm. The prior sections used "T04-SL4c-O-B" and "SL-4c-O-B" in PROGRESO. The order says 'sección «SL-4c-O-C»'. My PROGRESO heading is "# SL-4c-O-C — ..." which matches. My INFORME heading is "# T04-SL4c-O-C — ...". To be safe, let me ensure the literal "SL-4c-O-C" appears in the INFORME section heading. Let me change the INFORME heading to include "SL-4c-O-C". Actually the existing O-B section heading in INFORME was "# T04-SL4c-O-B — ...". Consistency with prior style is good, but the order explicitly says «SL-4c-O-C». Let me add the hyphenated form. I'll change the heading to "# T04-SL4c-O-C (SL-4c-O-C) — ...". Hmm, that's clunky. Or just "# SL-4c-O-C — La evidencia ...". Let me match the order and use "# SL-4c-O-C — ...". But then the "T04" prefix is lost. The previous sections had both "T04-SL4c-O" and "SL-4c-O" forms. Since the order says section «SL-4c-O-C», I'll include "SL-4c-O-C" in the heading. Let me edit to "# T04-SL4c-O-C · SL-4c-O-C — La evidencia ...". Actually simplest: "# SL-4c-O-C (T04) — La evidencia con entradas/salidas también es forma (EV-04)". Let me do that.
+
+Also, the grep showed PROGRESO line 599 has "# SL-4c-O-C — ...", good.
+
+Let me update the INFORME heading.
+dsh: reasoning:
+Now let me mark all todos complete.
+
+Actually, let me reconsider whether I should have run the `run.jl` with the T01 Transicion.jl mtime verified *before* the final tests. I checked it was 23:39:41 right before starting exportar (at 23:46:xx) and again after run.jl (23:49:32), unchanged. So the final battery used the same Transicion.jl. Good.
+
+Let me also double-check that O1C didn't modify Transicion.jl after my checks. The mtime is still 23:39:41 at 23:49:32. Good.
+
+One more: the order says the section in INFORME and PROGRESO should include HORAS.log with date -Is real and the model name. My sections include the model name. HORAS.log has start and close. Good.
+
+Let me finalize the todo list.
+dsh: reasoning:
+Everything is done. Let me provide the final summary to the user, including the falta de definición as required.
+
+Let me double check one last thing: the user asked "Si detectas una falta de definición, infórmala antes de editar." I did inform it in my earlier message before editing. Good.
+
+Let me write the final response summarizing the work, the falta de definición, and the results. I should be concise but complete.

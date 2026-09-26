@@ -1,0 +1,24 @@
+leidos_casos = 2795
+discrepancias = 120
+SOLO-1 RES caso=2060 bloque=6 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2066 bloque=7 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2072 bloque=5 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2078 bloque=6 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2084 bloque=7 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2090 bloque=5 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2096 bloque=6 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2102 bloque=7 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2108 bloque=5 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2114 bloque=6 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2120 bloque=7 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2126 bloque=5 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2132 bloque=6 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2138 bloque=7 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2144 bloque=5 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2150 bloque=6 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2156 bloque=7 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2162 bloque=5 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2168 bloque=6 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+SOLO-1 RES caso=2174 bloque=7 esperado=ErrCbidAjeno obtenido=ErrForma(EvidenciaCbidAjeno)
+VEREDICTO_LECTURA = CON DISCREPANCIAS
+[exit=1]

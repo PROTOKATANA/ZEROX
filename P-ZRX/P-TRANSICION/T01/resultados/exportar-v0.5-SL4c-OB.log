@@ -1,0 +1,11 @@
+exportar: puntos por defecto=8192 n_aleatorios=2000 salida=resultados/vectores-transicion-v0.5.txt
+  aleatorios 500/2000
+  aleatorios 1000/2000
+  aleatorios 1500/2000
+  aleatorios 2000/2000
+  evidencia punto 4/12
+  evidencia punto 8/12
+  evidencia punto 12/12
+exportar: casos=3179 sha256=4c7e424ee786dc22c6c40c3d1b99c780c16414c9803cf2e1d43658af2c948427 -> resultados/vectores-transicion-v0.5.sha256
+exportar: cobertura=resultados/cobertura-v0.5.txt Dict("orden_descendente" => 132, "duplicada" => 40, "sin_saldo" => 120, "ambos" => 120, "orden_canonico" => 252, "orden_igual" => 120, "con_entradas" => 120, "aplicada" => 260, "cbid_ajeno" => 252, "tardia" => 200, "deshecha" => 380)
+exportar: dirigidos_con_error_inesperado=0

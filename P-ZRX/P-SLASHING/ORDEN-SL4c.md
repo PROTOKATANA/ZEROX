@@ -31,15 +31,16 @@ el commit que indique la entrada.
    `ErrorFormaTx::EvidenciaCbidAjeno` (variante nueva); orden canónico estricto por `pre_hash` →
    `ErrorFormaTx::OrdenCanonicoInvalido` (ya existe y hoy nunca se construye). Todo llamante pasa el `cbid`
    de su red; ningún valor por defecto.
-2. **Motor:** desaparecen `ErrCbidAjeno` y `ErrOrdenCanonico` como errores semánticos (el camino queda
+2. **Precedencia (`ORDEN-SL4c-O-B.md` y `-C`):** las transacciones de un bloque se comprueban en su orden; para cada una, entradas/salidas/testigos → `cbid` → orden canónico; la primera defectuosa fija el motivo. En fusión, **todo** error de forma de la v4 (los tres) hace inválido el bloque; si hoy `zx-cadena` o `aplicar_fusion` no invocan la forma de la v4, se invoca.
+3. **Motor:** desaparecen `ErrCbidAjeno`, `ErrOrdenCanonico` y `ErrEvidenciaConEntradas` como errores semánticos (el camino queda
    cubierto por la forma, que se comprueba antes); en fusión, un error de forma de una transacción hace
    **inválido el bloque** (como cualquier otra forma de transacción, `CONTRATO-ESTADO-DAG-v0.md`). Nada más
    cambia en la verificación semántica.
-3. **Red (FD-5):** `tx_desde_bytes` decodifica la v4 (dos cabeceras `PoAS_PoT_DAG` completas, sin bytes
+4. **Red (FD-5):** `tx_desde_bytes` decodifica la v4 (dos cabeceras `PoAS_PoT_DAG` completas, sin bytes
    sobrantes, F-14) en vez de devolver `VersionInactiva`; la **activación** la sigue decidiendo el motor
    (v4 con la evidencia inactiva → el error que hoy devuelve el motor para una versión inactiva). El parser
    rechaza, no adivina: cabecera truncada, sobrante, tamaño fuera de `[589, 1037]` B → error de codificación.
-4. **Arneses:** `diferencial_t01` lee T01 v0.5 y `diferencial_t04` lee T04 v0.6, con las correspondencias de
+5. **Arneses:** `diferencial_t01` lee T01 v0.5 y `diferencial_t04` lee T04 v0.6, con las correspondencias de
    error nuevas declaradas una a una; los vectores van a `testdata/transicion-v0.5/` y
    `testdata/estado-dag-v0.6/` (copiados byte a byte de los resultados de los oráculos, con sus `.sha256`).
    Los directorios v0.4/v0.5 de `testdata/` se quedan (históricos) pero ningún test los lee.

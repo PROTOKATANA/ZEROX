@@ -586,8 +586,11 @@ end
 
     # --- cobertura: cada tipo produce el error esperado --------------------
     esperado = Dict("ev-tardia" => ErrEvidenciaTardia,
-                    "ev-cbid" => ErrCbidAjeno,
-                    "ev-con_entradas" => ErrEvidenciaConEntradas,
+                    "ev-cbid" => ErrForma(EvidenciaCbidAjeno),
+                    "ev-orden" => ErrForma(OrdenCanonicoInvalido),
+                    "ev-orden_igual" => ErrForma(OrdenCanonicoInvalido),
+                    "ev-ambos" => ErrForma(EvidenciaCbidAjeno),
+                    "ev-con_entradas" => ErrForma(EvidenciaConEntradasOSalidas),
                     "ev-duplicada" => ErrEvidenciaDuplicada)
     for (nombre, bl) in casos_evidencia_cobertura(P; n = 1)
         got = _error_neg(bl, P)
@@ -748,11 +751,11 @@ end
                       productor = 1, peso = 1,
                       txs = [tx_coinbase_post(3), tx_evidencia(ev)])
     @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50)), P) ==
-          ErrOrdenCanonico
+          ErrForma(OrdenCanonicoInvalido)
     @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 50)), P) ==
-          ErrOrdenCanonico
+          ErrForma(OrdenCanonicoInvalido)
     @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60)), P) ==
-          ErrCbidAjeno
+          ErrForma(EvidenciaCbidAjeno)
     @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60;
                                    id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0,
                                                             s + 1))), P) ==
@@ -766,7 +769,7 @@ end
     Bmal = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
                     productor = 1, peso = 1,
                     txs = [tx_coinbase_post(3), Bev])
-    @test aplicar(Eb, Bmal, P) == ErrEvidenciaConEntradas
+    @test aplicar(Eb, Bmal, P) == ErrForma(EvidenciaConEntradasOSalidas)
 
     # --- EV-24(i): liberación bloqueada con caso abierto -------------------
     Bla = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
@@ -840,4 +843,234 @@ end
                   txs = [tx_coinbase_post(3),
                          tx_evidencia(evidencia(7, 1, 0, 0, 0, El.slot + 1, 50, 60))])
     @test aplicar(El, Bl, Pl) == ErrFueraDeAlcanceV0
+end
+
+# ---------------------------------------------------------------------------
+# SL-4c-O — `cbid` ajeno y orden canónico como forma (RAT-1, EV-01/EV-04)
+# ---------------------------------------------------------------------------
+
+@testset "SL-4c-O (forma de EvidenceTx)" begin
+    P = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+               S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+               M_rec_slots = 1, R_slots = 4, F_slots = typemax(Int), sec = SEC0,
+               f_num = 1, f_den = 1, Plazo_slots = 3, M_margen_slots = 0,
+               cbid = 7, evp = true)
+    blb, Eb = _base_post(P)
+    s = Eb.slot + 1
+    mk(ev) = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                      productor = 1, peso = 1,
+                      txs = [tx_coinbase_post(3), tx_evidencia(ev)])
+
+    # Los dos defectos por separado ⇒ forma, con el nombre exacto del contrato.
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60)), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    @test string(ErrForma(EvidenciaCbidAjeno)) == "ErrForma(EvidenciaCbidAjeno)"
+    @test string(ErrForma(OrdenCanonicoInvalido)) ==
+          "ErrForma(OrdenCanonicoInvalido)"
+
+    # Precedencia fija: estructura → `cbid` → orden canónico.
+    # La estructura (EV-04) es la primera clase de forma: gana a `cbid` y orden.
+    Bev = Tx(TxEvidencia, [Salida(900010, UInt64(1), 1, OrigenTx, -1, -1)],
+             Int[], 0, 1, UInt64(0), 0, UInt64(0),
+             evidencia(P.cbid + 1, 1, 0, 0, 0, s, 100, 50))
+    Bmal = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                    productor = 1, peso = 1,
+                    txs = [tx_coinbase_post(3), Bev])
+    @test aplicar(Eb, Bmal, P) == ErrForma(EvidenciaConEntradasOSalidas)
+    # `cbid` gana al orden.
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    # La forma gana a la semántica (EV-06, identidad distinta).
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50;
+                                   id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0,
+                                                            s + 1))), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # La forma gana a los sellos (EV-07).
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50;
+                                   sello1 = false)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # `cbid` ajeno gana a la identidad distinta.
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60;
+                                   id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0,
+                                                            s + 1))), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    # Canónico + identidad correcta sigue siendo semántica.
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60;
+                                   sello1 = false)), P) == ErrSinEvidencia
+
+    # Cobertura mínima de la orden: ≥ 30 de cada clase y ≥ 5 con los dos
+    # defectos a la vez.
+    n_cbid = 0
+    n_orden = 0
+    n_ambos = 0
+    n_con_entradas = 0
+    for (nombre, bl) in casos_evidencia_cobertura(P; n = 30)
+        got = _error_neg(bl, P)
+        got == ErrForma(EvidenciaCbidAjeno) && (n_cbid += 1)
+        got == ErrForma(OrdenCanonicoInvalido) && (n_orden += 1)
+        nombre == "ev-ambos" && (n_ambos += 1)
+        nombre == "ev-con_entradas" && got == ErrForma(EvidenciaConEntradasOSalidas) &&
+            (n_con_entradas += 1)
+    end
+    @test n_cbid >= 30
+    @test n_orden >= 30
+    @test n_ambos >= 5
+    @test n_con_entradas == 30
+
+    # La invariante I-1 se conserva en todos los estados válidos alcanzables.
+    for (_, bl) in casos_evidencia_cobertura(P; n = 2)
+        memo, _ = construir_validos(bl, P)
+        @test all(E -> invariante_I1(E), values(memo))
+    end
+end
+
+# ---------------------------------------------------------------------------
+# SL-4c-O-B — precedencia por transacción y los dos órdenes no canónicos
+# ---------------------------------------------------------------------------
+
+@testset "SL-4c-O-B (precedencia y orden por igualdad)" begin
+    P = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+               S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+               M_rec_slots = 1, R_slots = 4, F_slots = typemax(Int), sec = SEC0,
+               f_num = 1, f_den = 1, Plazo_slots = 3, M_margen_slots = 0,
+               cbid = 7, evp = true)
+    blb, Eb = _base_post(P)
+    s = Eb.slot + 1
+    mk(ev) = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                      productor = 1, peso = 1,
+                      txs = [tx_coinbase_post(3), tx_evidencia(ev)])
+
+    # Los dos tipos de orden no canónico son forma: descendente y por igualdad.
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 50)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # La igualdad no se confunde con el canónico estricto.
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60)), P) isa
+          Estado
+
+    # Dos evidencias en un mismo bloque: la primera defectuosa manda.
+    c1 = caso_dos_evidencias(P, :orden)
+    @test c1 !== nothing
+    if c1 !== nothing
+        @test _error_neg(c1[1], P) == ErrForma(OrdenCanonicoInvalido)
+    end
+    c2 = caso_dos_evidencias(P, :cbid)
+    @test c2 !== nothing
+    if c2 !== nothing
+        @test _error_neg(c2[1], P) == ErrForma(EvidenciaCbidAjeno)
+    end
+
+    # Cobertura: ≥ 10 igualdades (además de los descendentes) y los mínimos de
+    # SL-4c-O (≥ 30 `cbid`, ≥ 30 orden, ≥ 5 con los dos defectos).
+    n_igual = 0
+    n_desc = 0
+    n_cbid = 0
+    n_orden = 0
+    n_ambos = 0
+    for (nombre, bl) in casos_evidencia_cobertura(P; n = 30)
+        got = _error_neg(bl, P)
+        got == ErrForma(EvidenciaCbidAjeno) && (n_cbid += 1)
+        got == ErrForma(OrdenCanonicoInvalido) && (n_orden += 1)
+        nombre == "ev-ambos" && (n_ambos += 1)
+        if nombre == "ev-orden_igual" && got == ErrForma(OrdenCanonicoInvalido)
+            n_igual += 1
+        elseif nombre == "ev-orden" && got == ErrForma(OrdenCanonicoInvalido)
+            n_desc += 1
+        end
+    end
+    @test n_igual >= 10
+    @test n_desc >= 10
+    @test n_cbid >= 30
+    @test n_orden >= 30
+    @test n_ambos >= 5
+
+    # Los dirigidos cubren las dos ramas de precedencia.
+    n_dir = 0
+    for (nombre, bl) in casos_evidencia_dirigidos(P)
+        got = _error_neg(bl, P)
+        if nombre == "ev-dir-orden-cbid"
+            @test got == ErrForma(OrdenCanonicoInvalido)
+            n_dir += 1
+        elseif nombre == "ev-dir-cbid-orden"
+            @test got == ErrForma(EvidenciaCbidAjeno)
+            n_dir += 1
+        end
+    end
+    @test n_dir == 2
+
+    # I-1 en todos los estados válidos alcanzables de los dirigidos.
+    for (_, bl) in casos_evidencia_dirigidos(P)
+        memo, _ = construir_validos(bl, P)
+        @test all(E -> invariante_I1(E), values(memo))
+    end
+end
+
+# ---------------------------------------------------------------------------
+# SL-4c-O-C — la evidencia con entradas/salidas/testigos también es forma (EV-04)
+# ---------------------------------------------------------------------------
+
+@testset "SL-4c-O-C (entradas/salidas como forma)" begin
+    P = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+               S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+               M_rec_slots = 1, R_slots = 4, F_slots = typemax(Int), sec = SEC0,
+               f_num = 1, f_den = 1, Plazo_slots = 3, M_margen_slots = 0,
+               cbid = 7, evp = true)
+    blb, Eb = _base_post(P)
+    s = Eb.slot + 1
+    ev_ok = evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60)
+    mk(tx) = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                      productor = 1, peso = 1,
+                      txs = [tx_coinbase_post(3), tx])
+
+    # Nombre exacto del contrato (EV-04): es forma, ya no semántica.
+    @test string(ErrForma(EvidenciaConEntradasOSalidas)) ==
+          "ErrForma(EvidenciaConEntradasOSalidas)"
+    @test ErrForma(EvidenciaConEntradasOSalidas) isa ErrForma
+    @test !(ErrForma(EvidenciaConEntradasOSalidas) isa ErrSemantico)
+
+    # Salidas, entradas y ambas cosas ⇒ la misma clase de forma.
+    Bsal = mk(Tx(TxEvidencia, [Salida(900020, UInt64(1), 1, OrigenTx, -1, -1)],
+                 Int[], 0, 1, UInt64(0), 0, UInt64(0), ev_ok))
+    Bent = mk(Tx(TxEvidencia, Salida[], [1], 0, 1, UInt64(0), 0, UInt64(0), ev_ok))
+    Bboth = mk(Tx(TxEvidencia, [Salida(900021, UInt64(1), 1, OrigenTx, -1, -1)],
+                  [1], 0, 1, UInt64(0), 0, UInt64(0), ev_ok))
+    @test aplicar(Eb, Bsal, P) == ErrForma(EvidenciaConEntradasOSalidas)
+    @test aplicar(Eb, Bent, P) == ErrForma(EvidenciaConEntradasOSalidas)
+    @test aplicar(Eb, Bboth, P) == ErrForma(EvidenciaConEntradasOSalidas)
+
+    # Precedencia: la estructura gana a `cbid` ajeno y al orden no canónico.
+    Bmal = mk(Tx(TxEvidencia, [Salida(900022, UInt64(1), 1, OrigenTx, -1, -1)],
+                 Int[], 0, 1, UInt64(0), 0, UInt64(0),
+                 evidencia(P.cbid + 1, 1, 0, 0, 0, s, 100, 50)))
+    @test aplicar(Eb, Bmal, P) == ErrForma(EvidenciaConEntradasOSalidas)
+    # Y gana a la semántica (EV-06, identidad distinta).
+    Bmal2 = mk(Tx(TxEvidencia, [Salida(900023, UInt64(1), 1, OrigenTx, -1, -1)],
+                  Int[], 0, 1, UInt64(0), 0, UInt64(0),
+                  evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60;
+                            id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0, s + 1))))
+    @test aplicar(Eb, Bmal2, P) == ErrForma(EvidenciaConEntradasOSalidas)
+
+    # La transacción de evidencia bien formada sigue siendo válida.
+    @test aplicar(Eb, mk(tx_evidencia(ev_ok)), P) isa Estado
+
+    # Alias interno transitorio (T04 lo usa cualificado hasta su parte O2).
+    @test Transicion.ErrEvidenciaConEntradas ==
+          ErrForma(EvidenciaConEntradasOSalidas)
+
+    # Las 30 réplicas del generador rotulan la clase nueva.
+    n_ent = 0
+    for (nombre, bl) in casos_evidencia_cobertura(P; n = 30)
+        nombre == "ev-con_entradas" || continue
+        _error_neg(bl, P) == ErrForma(EvidenciaConEntradasOSalidas) && (n_ent += 1)
+    end
+    @test n_ent == 30
+
+    # I-1 en todos los estados válidos alcanzables.
+    for (_, bl) in casos_evidencia_cobertura(P; n = 1)
+        memo, _ = construir_validos(bl, P)
+        @test all(E -> invariante_I1(E), values(memo))
+    end
 end

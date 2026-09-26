@@ -1,0 +1,1980 @@
+dsh: reasoning:
+Let me start by reading the order files.
+dsh: reasoning:
+Now let me explore the T04 directory to understand the current state.
+dsh: reasoning:
+Let me look at the src directory and understand the current structure. Let me also read the SL4c-O2 report from previous run.
+dsh: reasoning:
+So the previous O2 (ORDEN-SL4c-O) already generated v0.6 with the precedence "todos los cbid antes que todos los órdenes" and equality-only cases. The new order SL-4c-O-B revises this:
+
+1. Change precedence to per-transaction: transactions checked in their order within the block; for each, full form (structure → cbid → canonical order); the first defective transaction determines the reason.
+2. Add ≥10 cases of descending order (pre_hash(H1) > pre_hash(H2)) in addition to equality.
+3. Two directed cases: block with [evidence with non-canonical order, evidence with foreign cbid] → ErrForma(OrdenCanonicoInvalido); and reversed order → ErrForma(EvidenciaCbidAjeno).
+4. Regenerate v0.6 vectors, .sha256, coverage, DIFERENCIAS-v0.5-v0.6.md (same criterion: 0 changes without defect).
+
+Interesting: the output file names stay v0.6 (since nobody consumes it yet). So we overwrite/regenerate vectores-estado-dag-v0.6.txt, cobertura-v0.6.txt, DIFERENCIAS-v0.5-v0.6.md.
+
+Let me read the current code files thoroughly. Start with EstadoDAG.jl, generadores.jl, dirigidos.jl, exportar.jl, diferencias.jl, run.jl, runtests.jl.
+
+Let me first look at METODO.md and INFORME.md relevant sections to understand the structure. But most important is code.
+
+Let me read the source files. They're large. Let me read EstadoDAG.jl first.
+dsh: reasoning:
+Now I understand the current precedence: global (all cbid first, then order). Need to change to per-transaction: for each tx in order, check cbid then order for that tx. Actually "para cada una, su forma completa (estructura vigente → cbid → orden canónico)". So for each evidence tx, check cbid then order; the first defective tx determines the reason.
+
+Since structure checks are done before (coinbase) — wait, the structure check for evidence tx? The order says "estructura vigente → cbid → orden canónico" for each transaction. Currently `chequear_forma` does general block structure (padres, slot, coinbase), then `chequear_forma_evidencia`. The previous note said the structural check of v4 (n_in/n_out/n_wit, inactive fields) is elsewhere - probably in the semantic side, not in T04's forma. Let me check. Actually it says in INFORME §SL4cO.7 that structural check of v4 remains where it was. Let me find where the evidence structure is checked.
+
+Let me grep for cbid and orden in the codebase.
+dsh: reasoning:
+Let me read generadores.jl fully. It's 21KB.
+dsh: reasoning:
+Now let me look at the vector reader / exportar.jl and diferencias.jl and dirigidos.jl. Let me first understand `caso_forma_evidencia` and `casos_forma_cobertura`, which are likely in dirigidos.jl. Let me grep.
+dsh: reasoning:
+Let me read the relevant portions of dirigidos.jl around 700-830, and exportar.jl, diferencias.jl, run.jl, and runtests.jl.
+dsh: reasoning:
+Now the key change: per-transaction precedence. The two directed cases required:
+- block with `[evidence with non-canonical order, evidence with foreign cbid]` → ErrForma(OrdenCanonicoInvalido)
+- block with reversed order `[evidence with foreign cbid, evidence with non-canonical order]` → ErrForma(EvidenciaCbidAjeno)
+
+So we need a directed case with a block containing two defective evidence txs in both orders.
+
+Now let me read exportar.jl and diferencias.jl to understand the generation.
+dsh: reasoning:
+Now let me read diferencias.jl and the relevant parts of run.jl and runtests.jl. Also lector_vectores.jl to understand re-reading.
+dsh: reasoning:
+Now let me read run.jl relevant sections.
+dsh: reasoning:
+Now let me check the previous O1B run's stderr to see if it started; it's only 666 bytes. Let me look to see if there's an O1 result already done (T01). Since the rule says precedence must be identical in T01, T04 and Rust, but I only need O2.
+
+Let me now think about what exactly needs to change.
+
+**Key change in `chequear_forma_evidencia`:** per-transaction precedence. For each tx in order: if evidence tx, check cbid then order; first defective determines motivo.
+
+Current code:
+```julia
+function chequear_forma_evidencia(A::Admision, b::BloquePost)
+    cbid_red = A.pd.P.cbid
+    # 1) cbid de ambas cabeceras = red local (RAT-1).
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return MOTIVO_FORMA_CBID
+    end
+    # 2) orden canónico estricto por `pre_hash` (EV-04).
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        ev.h1.pre_hash < ev.h2.pre_hash || return MOTIVO_FORMA_ORDEN
+    end
+    return nothing
+end
+```
+
+New:
+```julia
+function chequear_forma_evidencia(A::Admision, b::BloquePost)
+    cbid_red = A.pd.P.cbid
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        # forma completa de esta transacción: cbid → orden canónico
+        (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return MOTIVO_FORMA_CBID
+        ev.h1.pre_hash < ev.h2.pre_hash || return MOTIVO_FORMA_ORDEN
+    end
+    return nothing
+end
+```
+
+Wait, but the rule says "para cada una, su forma completa (estructura vigente → cbid → orden canónico)". Since structure is outside this function and applies globally to the block (coinbase etc.), maybe not per-tx. But the order asks per-tx within the evidence check. Fine.
+
+Note: For the directed two-evidence cases, the first evidence's defect determines the reason. So the order of `b.txs` matters. For a block with `[orden_bad, cbid_bad]`, first tx is orden_bad → returns MOTIVO_FORMA_ORDEN. For `[cbid_bad, orden_bad]`, first returns MOTIVO_FORMA_CBID. Good.
+
+**Now the "≥10 cases of descending order besides equality":** The current `:orden` mode uses H1 > H2 strictly (descending). Wait: `_evidencia_forma` `:orden` uses `Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)` with b > a, so H1 = b > H2 = a → descending. And `evidencia_aleatoria` `:orden` uses r2 = r1 → equality (H1 = H2). Hmm.
+
+Actually the order SL-4c-O-B says:
+"(2) cada una cubre un solo tipo de orden no canónico: T01 el descendente (`pre_hash(H1) > pre_hash(H2)`) y T04 la igualdad (`H1 = H2`)."
+
+So per the director's revision: T04 only covered equality. But `_evidencia_forma` :orden uses b > a which is descending. Hmm. Let's check: the directed case D-19 with mode :orden uses b>a. But the *generator* `evidencia_aleatoria` :orden uses equality. The coverage counts `bloque_orden` = 125 from random generator (equality) plus random ev grid. But the directed case also. So maybe the director saw T04's random/equality cases dominant. Anyway the order's instruction:
+
+- **O2 (T04):** change precedence to the above rule; add ≥ 10 cases of **descending** order in addition to the equality ones; two directed cases: block with `[evidencia con orden no canónico, evidencia con cbid ajeno]` → `ErrForma(OrdenCanonicoInvalido)` and reversed → `ErrForma(EvidenciaCbidAjeno)`.
+
+So currently T04 has equality (in the random generator `:orden`) and descending in `_evidencia_forma` directed cases. Wait but the directed `:orden` case is descending. And coverage counts `bloque_orden` >= 30 already. So the order wants us to add ≥10 explicit descending cases. Actually maybe the issue is the previous code classified the `:orden` directed case as descending but the director thinks T04 was equality. Hmm, regardless: we need to make sure ≥10 descending cases are present and covered (probably a new mode `:orden_desc` distinct from `:orden` equality?). To be safe and explicit, I'll add a distinct mode for equality and descending and cover both.
+
+Let me re-read: "añadir ≥ 10 casos de orden **descendente** además de los de igualdad". So the existing cases are equality, and we need to add descending. The current generator `:orden` produces equality. The current directed `_evidencia_forma` `:orden` produces descending. Hmm, but the "casos" count is likely from the random generator modes (which contribute to the coverage `bloque_orden`). Since the director's revision says T04 covers equality only, they likely refer to the random generator. Let me treat:
+
+- `:orden` mode in `evidencia_aleatoria` → equality (keep).
+- Add `:orden_desc` mode → descending (H1 > H2).
+- Add both to the random mode pool and coverage.
+
+But wait, if we just add descending to the random generator, we need at least 10. The order says "añadir ≥ 10 casos de orden descendente". So we need explicit coverage guarantee. The current coverage min for `bloque_orden` is ≥30. Perhaps add a dedicated coverage counter or produce ≥10 descending directed cases. Hmm.
+
+Actually let me reconsider. The cleanest interpretation: The precedencia change affects the two directed cases. For "≥10 casos de orden descendente además de los de igualdad", we should have both equality and descending cases among the generated/coverage cases. In T04, the coverage counter `bloque_orden` currently counts all order defects; we could split into `bloque_orden_igual` and `bloque_orden_desc` and require ≥10 each? The order says "≥ 10 casos de orden descendente además de los de igualdad". The original ORDEN-SL4c-O required ≥30 con OrdenCanonicoInvalido + ≥10 with tx. It didn't require a specific split. The revision requires ≥10 descending cases. To be safe, I'll generate ≥10 descending cases and count them distinctly, asserting ≥10 descending and ≥10 equality (or at least the existing ≥30 total). Since the current generator has lots of equality cases (125), and we add descending.
+
+Let me think about how the previous run got `bloque_orden = 125`. Those come from random histories where `evidencia_aleatoria` modo `:orden` (equality) or `:ambos`. And directed `:orden` case (descending) contributes 1 per run of casos_dirigidos. So the equality cases dominate (>100). Descending only ~1. So indeed need ≥10 descending.
+
+So plan: add a mode `:orden_desc` (descending) to `evidencia_aleatoria`, include in the random mode tuple, and add explicit coverage. Also add dedicated directed cases for the two-evidence ordering (D-20 and D-21).
+
+Actually, let me think about coverage. The order says "añadir ≥ 10 casos de orden descendente además de los de igualdad". The vector coverage currently guarantees `bloque_orden>=30`. We should probably split the FORMA coverage into equality vs descending and require descending >=10. But that changes the cobertura output format. The order says regenerate cobertura. It's fine.
+
+Hmm, but let me be careful: the order says the previous work "no cumple" because each oracle covered a single type. For T04 it says T04 covered equality. Wait, actually re-reading the Motivo: "cada una cubre un solo tipo de orden no canónico: T01 el descendente (`pre_hash(H1) > pre_hash(H2)`) y T04 la igualdad (`H1 = H2`)."
+
+So the director believes T04's coverage is equality-only. But `_evidencia_forma` :orden uses descending! Let me double check `Transicion.evidencia` signature to be sure which arg is h1 and which is h2. Let me check T01 `evidencia`.
+dsh: reasoning:
+`evidencia(..., ph1, ph2)` → h1.pre_hash = ph1, h2.pre_hash = ph2. `_evidencia_forma` :orden: `Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)` with b > a, so ph1=b > ph2=a → descending. So directed D-19 :orden is descending.
+
+But the generator `evidencia_aleatoria` :orden uses equality. So the director's statement that T04 covers equality is about the generated coverage (125 cases) — likely almost all equality; the directed descending one is just 1 case in casos_dirigidos. In any case, we need ≥10 descending.
+
+How to count equality vs descending in the coverage? The current `bloque_orden` counter counts blocks invalidated by order. To make sure ≥10 descending, I'll add counters `orden_igual` and `orden_desc` or `bloque_orden_igual`/`bloque_orden_desc`. Let me design it cleanly.
+
+Now let's look at the relectura (lector_vectores.jl) to understand the independent reader and how it re-checks. Let me read the file. Actually the relectura log says 75 bytes; let me look at lector_vectores.jl.
+dsh: reasoning:
+Now I have a good understanding. Let me also check the previous O1B stderr to see whether O1 was completed and what its approach was (for consistency, and maybe to reuse the rule). But that's the other agent's job. Let me quickly check the stderr messages.
+dsh: reasoning:
+Interesting! The stderr for O2B actually contains the reasoning of *this* session? Wait, no. The file `SL4c-O2B-dsh.stderr` was created at 23:24, but it contains reasoning text that matches my current reasoning almost exactly. That is very strange. Actually this is the harness recording my own reasoning to that stderr file as I go? The timestamps: SL4c-O2B-dsh.stderr is 143 bytes in the listing at the very start, but now `cat` produced a huge amount. Hmm, actually the `ls` showed 143 bytes at 23:24. But the cat output shows my entire reasoning. Wait, this is bizarre — it seems the harness is appending my reasoning live to that file? No...
+
+Actually wait. Let me re-read. The first `ls -la` showed `SL4c-O2B-dsh.stderr` size 143 at 23:24. Then I did `cat SL4c-O2B-dsh.stderr` and it printed... my own reasoning including "Now let me read run.jl relevant sections" and then the O1B reasoning. This cannot be from before. Unless... the harness launched me as the O2B process and is teeing my reasoning to that stderr file in real time. That would explain it: I AM the SL4c-O2B process. The stderr is my own session log. The 143 bytes was the initial content before I started reasoning. And then it grew.
+
+And the O1B stderr contains another agent's reasoning (the O1 part) — that's the parallel O1 worker launched at the same time, whose reasoning is being logged. Interesting. So the O1B agent is running in parallel and its reasoning mentions T01. It seems O1B is reading files but hasn't edited yet.
+
+OK so I am O2B (T04). Good. The parallel O1B is doing T01. There's no conflict since we have separate zones, except T04 includes T01's module read-only. The O1B agent will edit T01's Transicion.jl. This matters for T04 because EstadoDAG.jl includes T01's Transicion.jl directly! If O1 changes T01's error types (e.g., adds `ErrForma(clase)`), T04 must still work. The previous O2 run noted that T01's final `ErrForma(clase)` produces identical texts. Since T01 is being modified in parallel, my T04 results depend on T01's state at run time. This is a potential race. But the order says both parts run separately; the previous O2 run apparently handled it by encoding `Symbol("ErrForma(...)")`.
+
+Hmm, this is important: T04 includes T01's `Transicion.jl` (read-only) from the absolute path. If O1B is concurrently editing it, my tests could see a partially-written file. But the timestamp of T01 src files: let me check. The O1B run started at 23:24. The listing showed T01 files at 23:22 (from O1). The O1B agent will edit them. I need to be careful about running tests while O1B modifies T01. But I can't control that. Let me check current state of T01 files periodically.
+
+Actually, wait. Let me reconsider: perhaps the O1B agent is a *separate* process that was launched at 23:24 and is still running. My session is also at 23:24. Let me check if O1B's reasoning is still growing or finished. Let me look at the T01 file modification times and the O1B stderr size.
+
+Let me focus on my task. I'll design the T04 changes to not depend on T01's new error type: keep using `Symbol("ErrForma(...)")`.
+
+Now let me plan the concrete changes.
+
+### Changes to `src/EstadoDAG.jl`
+
+`chequear_forma_evidencia`: per-transaction precedence.
+
+Update the docstring accordingly.
+
+### Changes to `src/generadores.jl`
+
+`evidencia_aleatoria`: add `:orden_desc` mode (descending). Currently:
+- `no_canonico = modo == :orden || modo == :ambos`
+- `modo == :ambos && (c = P.cbid + 1)`
+- if no_canonico: r2 = r1 (equality)
+
+Add `:orden_desc`: r1 > r2 (descending). And `:ambos_desc`? The order only asks for ≥10 descending cases and the two directed cases. Could just add `:orden_desc` and maybe `:ambos_desc` (both defects, descending) — but `:ambos` already covers both defects (equality+cbid). Actually the rule about precedence: with per-transaction precedence, within a single evidence tx, cbid is checked before order, so `:ambos` (same tx has cbid+order) → cbid wins. The two-directed case tests across two different tx. Good.
+
+Let me add `:orden_desc` to the random mode tuple. But would that produce ≥10 descending cases in the export coverage? The `:orden` mode is chosen with probability ~1/8 per evidence, and there are many evidence txs. Currently `bloque_orden` = 125, dominated by equality. Adding `:orden_desc` would produce maybe ~60 more. But we need a guarantee of ≥10. The export already has `casos_forma_cobertura` which we can extend with explicit descending cases. That's the reliable way: add modes to `casos_forma_cobertura` with explicit descending (`:orden_desc`) and count them.
+
+Hmm, but the order says "añadir ≥ 10 casos de orden descendente además de los de igualdad". The cleanest: extend `casos_forma_cobertura` to include e.g. 36 equality `:orden` and 36 descending `:orden_desc` (with con_tx true), plus 36 cbid, plus 8 ambos. Then coverage split counters. Actually currently `casos_forma_cobertura` has 36 `:cbid`, 36 `:orden` (but note `_evidencia_forma` :orden is descending!), 8 `:ambos`.
+
+Ah, here's the contradiction: The dedicated `caso_forma_evidencia` with modo `:orden` uses `_evidencia_forma` which produces descending (b > a). So the 36 dedicated `:orden` cases are descending, not equality. And the random `evidencia_aleatoria` `:orden` is equality. So the current coverage is mixed actually: 36 descending + random equality. The director says T04 covered equality. Maybe the director only looked at the random generator. Anyway.
+
+To satisfy clearly and unambiguously: I'll make the dedicated cases explicit: modes `:orden_igual` (equality) and `:orden_desc` (descending) in both `_evidencia_forma` and `evidencia_aleatoria`. Provide ≥10 of each (I'll do 36 each), plus cbid, plus ambos. And split coverage counters `bloque_orden_igual` / `bloque_orden_desc` and require ≥10 each (or ≥30 total + ≥10 descending). Let me re-read the order's minimum requirement from ORDEN-SL4c-O: "Cobertura mínima en cada oráculo: ≥ 30 casos con EvidenciaCbidAjeno y ≥ 30 con OrdenCanonicoInvalido, en T04 al menos 10 de cada uno en un bloque que además contiene transacciones válidas..., y ≥ 5 con los dos defectos a la vez (gana cbid, por la precedencia)." The B order adds: "añadir ≥ 10 casos de orden descendente además de los de igualdad". So require descending ≥10. I'll require `bloque_orden_igual >= 30` and `bloque_orden_desc >= 10`, or maybe total order ≥30 and desc ≥10. Let me keep `bloque_orden` (total) ≥30 and add `bloque_orden_desc`≥10, `bloque_orden_igual`≥10. Actually to be safe I'll make them explicit and generous.
+
+Wait, there's a subtlety with `:ambos` under per-transaction precedence: `_evidencia_forma` `:ambos` produces a single evidence with cbid foreign and descending order. Per-tx check: cbid first → MOTIVO_FORMA_CBID. Good, still cbid wins. And `evidencia_aleatoria` `:ambos` produces cbid foreign + equality → cbid wins. Good.
+
+### Changes to `src/dirigidos.jl`
+
+1. `_evidencia_forma`: add modes `:orden_igual` and `:orden_desc`; keep `:orden` maybe as alias for descending (for backward compat) or rename. Let me define:
+   - `:cbid` → cbid foreign, canonical order
+   - `:orden` or `:orden_desc` → canonical cbid, descending (H1 > H2)
+   - `:orden_igual` → canonical cbid, equality (H1 = H2)
+   - `:ambos` → cbid foreign + descending order
+   - `:ambos_igual`? not needed.
+   
+2. Add two directed cases in one function, e.g. `caso_forma_precedencia(pd; orden=:primero)`:
+   - Block X with coinbase + valid transfer + [ev_orden, ev_cbid] → motivo MOTIVO_FORMA_ORDEN.
+   - Block X with [ev_cbid, ev_orden] → motivo MOTIVO_FORMA_CBID.
+   Must return metadata to test in runtests/run. Let me create `caso_forma_dos_evidencias(pd; primero::Symbol)` where `primero ∈ (:orden, :cbid)`.
+
+   Actually the order says "dos casos dirigidos: bloque con `[evidencia con orden no canónico, evidencia con cbid ajeno]` → `ErrForma(OrdenCanonicoInvalido)` y con el orden inverso → `ErrForma(EvidenciaCbidAjeno)`."
+
+   So create two cases D-20 and D-21.
+
+3. `casos_forma_cobertura`: return modes including `:orden_igual` and `:orden_desc`.
+
+4. `casos_dirigidos`: add the two new directed cases.
+
+### Changes to `exportar.jl`
+
+- `contar_forma_evidencia`: split order counters. Count per defect type. For a block with motivo MOTIVO_FORMA_ORDEN, determine whether the first defective order tx is equality or descending. Hmm, actually the block's motivo is determined by the first defective tx. To classify, we should find the first evidence tx that has a defect (in order), and classify accordingly. Since with per-tx precedence, the winning defect is the first defect in the tx order. Let me write a helper `_primer_defecto(b, cbid_red)` returning `:cbid`, `:orden_igual`, `:orden_desc`, or `nothing`, exactly matching the oracle. Then coverage uses that.
+
+  Actually, `contar_forma_evidencia` can just look at the motivo and then find the first tx whose (cbid/order) matches. Simpler: compute the first defect deterministically.
+
+  Add counters: `bloque_orden_igual`, `bloque_orden_desc`. Keep `bloque_orden` total. And `ev_orden_igual`, `ev_orden_desc`? Maybe. Let me keep it simple: count blocks.
+
+- Update the coverage header comments and minimum check: `bloque_orden_desc >= 10` (and keep existing). Also maybe `bloque_orden_igual >= 10`. Let me require `bloque_orden_desc >= 10 && bloque_orden_igual >= 10`.
+
+- The output filenames stay v0.6.
+
+- `casos_forma_cobertura` calls `caso_forma_evidencia(pdev1; modo=...)`. With new modes.
+
+- Add the two directed cases to `casos_dirigidos`, so `contar_forma_evidencia` counts them.
+
+### Changes to `test/runtests.jl`
+
+- Update the per-motivo expectations: `:ambos` still `MOTIVO_FORMA_CBID`. Add `:orden_igual` expecting `MOTIVO_FORMA_ORDEN`.
+- Update the coverage minimums with new counters, and verify descending cases have H1 > H2.
+- Add tests for the two directed precedence cases.
+- The `casos_forma_cobertura` loop uses `motivo == MOTIVO_FORMA_CBID || MOTIVO_FORMA_ORDEN`. Add splitting.
+
+### Changes to `run.jl`
+
+- The directed D-19 loop; add the two precedence cases.
+- Maybe split forma counts? Not necessary but nice. The order says `Pkg.test()` and `run.jl` in green.
+
+### `src/diferencias.jl`
+
+- Update the header prose: now v0.6 also has descending cases, but v0.5 comparison is against frozen v0.5 inputs. The diff logic should still work: it reconstructs v0.5 cases and compares. However, the precedence change affects cases where a block has multiple defective evidences. Does the frozen v0.5 have such cases? Possibly (random histories with cbid and order in different txs). With the new per-transaction precedence, the motivo might change from cbid to orden or vice versa for those blocks. But v0.5 didn't have order defects at all (per the previous diffs note: "v0.5 no contiene ningún caso con orden no canónico"). Hmm, but v0.5 vectors might have `:orden`? Wait, the previous O2 run said v0.5 didn't have order defects because the generator only ordered. Actually `_evidencia_forma` directed `:orden` existed in O2? Let me check: the current generic `evidencia_aleatoria` is called in `generar_dag_aleatorio` with modes including `:orden`; that was added by SL-4c-O. In v0.5, was `:orden` present? The previous O2 changed the generator to add `:orden`/`:ambos`, and regenerated v0.6. v0.5 was generated before that (SL-3/SL-4a?). Let me check v0.5 generation. The DIFERENCIAS says v0.5 has no order cases. So the per-transaction precedence doesn't change v0.5 outcomes (all defects are cbid only, and in any block each cbid check would be found in the first pass either way). Wait, but could v0.5 have a block with two txs, first with order defect? No order defects. So no change. Good.
+
+  But hold on: `diferencias.jl`'s `resultado_corregido` uses the new `chequear_forma_evidencia` (through `resolver!`). For v0.5 cases, all defects are cbid, so per-tx vs global gives the same. Fine.
+
+  However, the `defectos_del_caso` marks a block with any defect. Fine.
+
+  I should update the prose to mention the per-transaction precedence. And maybe change the statement "v0.5 no contiene ningún caso con orden no canónico" is still true. Good.
+
+### `INFORME.md` and `PROGRESO.md`
+
+Add a section «SL-4c-O-B» documenting the change. Also `HORAS.log`.
+
+### Regenerate artifacts
+- `resultados/vectores-estado-dag-v0.6.txt` + `.sha256`
+- `resultados/cobertura-v0.6.txt`
+- `resultados/DIFERENCIAS-v0.5-v0.6.md`
+- Possibly `resultados/exportar-v0.6.log`, `run-estado-dag-v0.6.log`, `relectura-v0.6.log`, `test-pkg-v0.6.log`, etc. (overwrite v0.6).
+
+### Potential "falta de definición" to report
+
+The order says: "Si detectas una falta de definición, infórmala antes de editar."
+
+Potential ambiguity: The order says "añadir ≥ 10 casos de orden descendente además de los de igualdad". It's not fully specified whether the descending cases should be a new distinct counter or just extra cases. Also, the exact minimum split. I can decide reasonably.
+
+Another potential ambiguity: The rule says "para cada una, su forma completa (estructura vigente → cbid → orden canónico)". In T04, the structure check for the evidence tx (`ErrEvidenciaConEntradas`, etc.) is semantic/descartable, not part of `chequear_forma`. The order SL-4c-O already noted the structural check remains where it was (semantic). So with per-transaction precedence, "estructura vigente" isn't part of the same function in T04. Should we now also move the structural check? The B order says only "cambiar la precedencia a la regla anterior; añadir ≥10 casos..." It doesn't ask to move structure. And the previous O2 explicitly declared that moving it would change cases without the two defects, which the order prohibits. So I'll keep structure where it is and note it.
+
+Actually there's a subtle point: The two directed cases involve evidence txs that have both defects across two txs. With per-tx precedence, the first tx's defect wins. Good.
+
+Let me also consider: Does the order require the *motivo* of the block to be determined by the first defective *transaction* including non-evidence transactions? E.g., if the block has a malformed coinbase (structure) and an evidence defect, structure (block-level) wins since it's checked first. That's already the case.
+
+Hmm, but "la primera transacción defectuosa determina el motivo" — within the form check, the coinbase checks are separate. There could be a subtle interaction: a block with tx1 = transfer with `ErrEmision` (structure?) and tx2 = evidence cbid. But transfer errors are semantic descartes in T04, not form. So fine.
+
+Now, let me think about a nuance with the `:ambos` case under per-tx: same tx has cbid and order → cbid wins. Good.
+
+Let me now also verify how `caso_forma_evidencia` builds the block: `txs = [coinbase, transfer, ev_bad]`. So the evidence is last. The two-evidence case needs `[coinbase, transfer, evA, evB]`.
+
+Let me write a new directed function `caso_forma_dos_evidencias(pd; primero::Symbol)`.
+
+Design:
+```julia
+function caso_forma_dos_evidencias(pd::ParamsDAG; primero::Symbol = :orden,
+                                   con_tx::Bool = true, seed::Int = 70, iter::Int = 0,
+                                   slot::Int = 2)
+    A, pow = base_dirigida(pd; seed = seed + iter)
+    P = pd.P
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)]
+    out_id = 0
+    o = nothing
+    if con_tx
+        o = utxo_gastable(A.post[Tb.id], P, slot, 2)
+        o === nothing && error("caso_forma_dos_evidencias: sin UTXO gastable")
+        out_id = 800000 + 1000 * iter
+        push!(txs, Transicion.tx_transferencia([o.id],
+            [Transicion.Salida(out_id, o.valor - UInt64(1), o.dueño,
+                               Transicion.OrigenTx, -1, -1)], o.dueño))
+    end
+    ev_orden = _evidencia_forma(P, :orden, slot, iter)       # descendente
+    ev_cbid  = _evidencia_forma(P, :cbid, slot, iter + 500)  # cbid ajeno, orden canónico
+    if primero == :orden
+        push!(txs, Transicion.tx_evidencia(ev_orden))
+        push!(txs, Transicion.tx_evidencia(ev_cbid))
+        motivo = MOTIVO_FORMA_ORDEN
+    elseif primero == :cbid
+        push!(txs, Transicion.tx_evidencia(ev_cbid))
+        push!(txs, Transicion.tx_evidencia(ev_orden))
+        motivo = MOTIVO_FORMA_CBID
+    else
+        error(...)
+    end
+    X = BloquePost(id = id1 + 1, padres = [Tb.id], slot = slot, sd = 0, productor = 1,
+                   peso = 1, txs = txs)
+    procesar_uno!(A, X)
+    ...
+    return "D-20"/"D-21", A, (modo=..., motivo_esperado=motivo, ...)
+end
+```
+
+Wait, there's a subtlety: `_evidencia_forma(P, :cbid, slot, iter+500)` uses `a = 700001 + 2i`, `b = 700002 + 2i` → canonical a < b. Good. And `:orden` uses b > a. Good.
+
+Note: ev with cbid foreign but canonical order must not also be an order defect. `_evidencia_forma` :cbid uses `Transicion.evidencia(P.cbid+1, 1, 0,0,0, slot, a, b)` with a<b → canonical order. Good.
+
+Now, the block's `sd` etc. Both evidence txs in same block, so no dedup issue (dedup is semantic anyway, and the block is invalid before semantics).
+
+For the valid transfer `o = utxo_gastable(...)`: consumes an output. Then `tx_aplicada` should be false because X invalid. Good.
+
+Now the two directed cases in `casos_dirigidos`:
+```julia
+caso_forma_dos_evidencias(pdev; primero = :orden, seed = 71),
+caso_forma_dos_evidencias(pdev; primero = :cbid, seed = 72)
+```
+
+### Now, the coverage counting.
+
+Let me write a shared helper in `EstadoDAG.jl` (or generadores) to classify the first defect. Actually, to avoid duplication, define in `EstadoDAG.jl`:
+
+```julia
+"""
+Primer defecto de forma v4 del bloque en el orden de las transacciones
+(`:cbid`, `:orden_igual`, `:orden_desc`) o `nothing`. Es exactamente la
+precedencia que aplica `chequear_forma_evidencia`.
+"""
+function primer_defecto_forma(A::Admision, b::BloquePost)
+    cbid_red = A.pd.P.cbid
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return :cbid
+        if !(ev.h1.pre_hash < ev.h2.pre_hash)
+            return ev.h1.pre_hash == ev.h2.pre_hash ? :orden_igual : :orden_desc
+        end
+    end
+    return nothing
+end
+```
+
+And `chequear_forma_evidencia` could be implemented with it:
+```julia
+function chequear_forma_evidencia(A, b)
+    d = primer_defecto_forma(A, b)
+    d === nothing && return nothing
+    d === :cbid && return MOTIVO_FORMA_CBID
+    return MOTIVO_FORMA_ORDEN
+end
+```
+Export `primer_defecto_forma`. This centralizes.
+
+Now `exportar.jl`'s `contar_forma_evidencia` uses `primer_defecto_forma`:
+```julia
+function contar_forma_evidencia(A, acc)
+    for (id, b) in A.por_id
+        d = primer_defecto_forma(A, b)
+        d === nothing && continue
+        hay_tx = any(...)
+        if d === :cbid
+            inc!(acc, "bloque_cbid")
+            hay_tx && inc!(acc, "con_tx_cbid")
+            # count if block also has an order defect somewhere
+            any order defect && inc!(acc, "ambos_cbid")
+            # ev_cbid etc.
+        else
+            inc!(acc, "bloque_orden")
+            d === :orden_desc ? inc!(acc, "bloque_orden_desc") : inc!(acc, "bloque_orden_igual")
+            hay_tx && inc!(acc, "con_tx_orden")
+        end
+    end
+end
+```
+Hmm, but the coverage is about blocks that are invalid due to form. But there's a subtlety: a block could be invalid for another reason before `chequear_forma_evidencia` (e.g., ErrSinPadre) so it never reaches the evidence check. So the "motivo" in `A.motivos` might not reflect the form defect. For coverage counting, previously it filtered `motivo == MOTIVO_FORMA_CBID || MOTIVO_FORMA_ORDEN`. Using `primer_defecto_forma` directly counts all blocks with defects regardless of whether they were reached. To stay consistent with "bloque inválido con motivo ErrForma(...)", I should keep the filter on `A.motivos`. Let me use:
+```julia
+motivo = get(A.motivos, id, :OK)
+(motivo == MOTIVO_FORMA_CBID || motivo == MOTIVO_FORMA_ORDEN) || continue
+d = primer_defecto_forma(A, b)
+```
+Good. Same as before.
+
+For `ambos_cbid`: a block whose motivo is cbid but also contains an order defect in some other tx. Under per-tx precedence, "ambos" with cbid winning means the first defect is cbid and there's an order defect later. The existing count checks `n_orden > 0`. Keep.
+
+Also `contar_forma_evidencia` can count `ev_cbid`/`ev_orden`. Keep similar.
+
+Now the minimum check:
+```julia
+minimos_ok = bloque_cbid>=30 && bloque_orden>=30 && con_tx_cbid>=10 && con_tx_orden>=10 &&
+             ambos_cbid>=5 && bloque_orden_desc>=10 && bloque_orden_igual>=10
+```
+
+Let me ensure there are enough descending cases. The dedicated set: 36 `:orden_desc` (con_tx true) → 36 descending blocks. And 36 `:orden_igual` → 36 equality blocks. Plus directed `:orden` (1 descending) and the two-evidence case `primero=:orden` (1 descending, motivo order). Plus random equality. So `bloque_orden_desc` ≈ 37+, `bloque_orden_igual` ≈ 100+. Good.
+
+Now, importantly, the `casos_forma_evidencia` with `modo=:orden_desc` must also be handled in `_evidencia_forma`, and the `casos_forma_cobertura` list.
+
+Let me now decide the exact mode names. I'll use `:orden_igual` and `:orden_desc`, and keep `:orden` as an alias for `:orden_desc` (for backward compat with existing calls in `casos_dirigidos` and tests). Actually to avoid confusion, let me keep `:orden` meaning descending and add `:orden_igual`. The order says "add ≥10 descending besides equality", and the existing `:orden` is descending. Hmm, but then the existing `casos_forma_cobertura` uses `:orden` = descending (36 cases), so we already have ≥36 descending. But the director seems to think T04 was equality. The safest is to be explicit and have both. Let me just use `:orden` = descending (as now), add `:orden_igual`. Then in `casos_forma_cobertura`, use 36 `:orden` (descending) + 36 `:orden_igual`. And the coverage splits.
+
+Hmm wait, but the director's revision says T04 covered equality. If in fact the dedicated `:orden` cases were descending, then the director's claim refers to the coverage counter aggregate. Regardless, adding `:orden_igual` and counting both explicitly satisfies both interpretations: ≥10 descending (36) and ≥10 equality (36). 
+
+But there's a concern: `evidencia_aleatoria` `:orden` produces equality. And `_evidencia_forma` `:orden` produces descending. Same mode name, two different semantics! That's confusing and a hidden inconsistency. To clean it up, I'll introduce explicit mode names in both:
+- `evidencia_aleatoria`: `:orden` → equality (keep), `:orden_desc` → descending (new).
+- `_evidencia_forma`: `:orden` → descending (keep for compat), `:orden_igual` → equality (new), and `:orden_desc` → descending (alias).
+
+Hmm, this is getting messy. Let me unify: I'll define both `:orden_igual` and `:orden_desc` in both functions, and keep `:orden` as an alias of `:orden_desc` in `_evidencia_forma` (since that's the existing behavior) and as an alias of `:orden_igual` in `evidencia_aleatoria` (existing behavior). Document it.
+
+Actually, cleaner: change both to use explicit `:orden_igual`/`:orden_desc` and drop `:orden`? But existing calls in `casos_dirigidos` and runtests use `:orden`. I'll update them. But the random generator mode tuple uses `:orden`; I'll change to `:orden_igual` and add `:orden_desc`. Then no ambiguous alias. But `casos_dirigidos` line 811 uses `modo = :orden`; I'll change to `:orden_desc`. And `casos_forma_cobertura` uses `:orden`; change. And `test/runtests.jl` uses `:orden`; change. That's clean but touches more. Let me do that for clarity, but I might keep `:orden` accepting both for safety. Hmm.
+
+Decision: implement `_evidencia_forma` and `evidencia_aleatoria` to accept `:orden_igual` and `:orden_desc` explicitly; also accept `:orden` as `:orden_desc` in `_evidencia_forma` and `:orden_igual` in `evidencia_aleatoria` with a comment for compatibility. Actually no — a mode name with different meaning in two functions is exactly the kind of ambiguity that caused this order. Let me remove `:orden` entirely and update all call sites. That's the cleanest and prevents future confusion.
+
+Wait, but `evidencia_aleatoria` `:ambos` is used. For `ambos` I'll keep it as cbid+equality. Maybe add `:ambos` only. Fine.
+
+Let me enumerate call sites of `modo = :orden`:
+- `src/evidencia_aleatoria`: internal logic.
+- `src/dirigidos.jl`: `_evidencia_forma` internal; `casos_forma_cobertura`; `casos_dirigidos` line 811 `caso_forma_evidencia(pdev; modo = :orden, seed = 42)`.
+- `test/runtests.jl` line 199: `(:orden, MOTIVO_FORMA_ORDEN, 62)`.
+- `exportar.jl`: uses `casos_forma_cobertura`.
+
+I'll update all to `:orden_desc` where descending intended and `:orden_igual` for equality.
+
+Let me now define the semantics:
+- `_evidencia_forma(P, modo, slot, i)`:
+  - `:cbid`: cbid foreign, order canonical (a<b)
+  - `:orden_desc`: canonical cbid, H1 > H2
+  - `:orden_igual`: canonical cbid, H1 = H2
+  - `:ambos`: cbid foreign, H1 > H2 (both, cbid wins)
+  - maybe `:ambos_igual`: cbid foreign, H1 = H2. Could add for completeness but not required.
+- `evidencia_aleatoria(rng, S, P, slot; modo)`:
+  - `:valida`, `:clave`, `:cbid`, `:tardia`, `:sin_saldo` (existing)
+  - `:orden_igual`: canonical cbid, r2 = r1
+  - `:orden_desc`: canonical cbid, ensure r1 > r2 (swap if needed)
+  - `:ambos`: cbid foreign + equality (existing)
+  - maybe `:ambos_desc`: cbid foreign + descending.
+
+Let me implement `evidencia_aleatoria` carefully:
+```julia
+modo == :cbid && (c = P.cbid + 1)
+modo == :ambos && (c = P.cbid + 1)
+...
+r1 = rand(rng, UInt64)
+r2 = rand(rng, UInt64)
+if modo == :orden_igual || modo == :ambos
+    r2 = r1
+elseif modo == :orden_desc || modo == :ambos_desc
+    if r1 < r2
+        r1, r2 = r2, r1
+    elseif r1 == r2
+        r2 = r1 - UInt64(1)   # could underflow if r1==0
+    end
+elseif r1 == r2
+    r2 = r1 + UInt64(1)
+end
+```
+Underflow risk: if r1==0 and we do r2 = r1 - 1 → wraps to typemax. Then r1=0 < r2=typemax, which is ascending, not descending. Better: if r1 == r2, then r1 = r1 + 1 (or set r2 = r1 == 0 ? 1 : r1 - 1). Simpler: after drawing, if r1 > r2 use as is; else swap; if equal, set r2 = r1 - 1 but guard. Let me do:
+```julia
+elseif modo == :orden_desc || modo == :ambos_desc
+    if r1 <= r2
+        r2 = r1 - UInt64(1)   # r1 >= 1? not guaranteed
+        if r1 == 0
+            r1 = UInt64(1); r2 = UInt64(0)   # H1=1 > H2=0
+        end
+    end
+```
+Hmm, let me just do:
+```julia
+elseif modo == :orden_desc || modo == :ambos_desc
+    (r1 > r2) || ((r1, r2) = (r2 + UInt64(1), r1))   # ensure r1 > r2
+```
+If r1 <= r2, set r1 = r2+1, r2 = old r1. Then r1 = r2+1 > r2 (new r2 = old r1 ≤ old r2 < r2+1). Overflow only if r2 == typemax; then r2+1 wraps to 0 and the relation fails. Handle: if r2 == typemax, then r1 != typemax (since r1 <= r2 and if both typemax then equal; if r1 == typemax and r2 == typemax ... then r1 = r2+1 = 0). Ugh.
+
+Simplest robust:
+```julia
+elseif modo == :orden_desc || modo == :ambos_desc
+    if r1 == r2
+        r2 = r1 == UInt64(0) ? UInt64(1) : r1 - UInt64(1)
+        # if r1 == 0: r1=0, r2=1 → ascending, fix:
+        if r1 == UInt64(0)
+            r1 = UInt64(1)
+        end
+    elseif r1 < r2
+        r1, r2 = r2, r1
+    end
+```
+Hmm, let's just handle cleanly:
+```julia
+elseif modo == :orden_desc || modo == :ambos_desc
+    if r1 <= r2
+        # intercambiar y, si eran iguales, subir H1 (salvo desbordamiento).
+        if r1 == r2
+            if r1 == typemax(UInt64)
+                r2 = r1 - UInt64(1)
+            else
+                r1 = r1 + UInt64(1)
+            end
+        else
+            r1, r2 = r2, r1
+        end
+    end
+```
+If r1 == r2 == typemax: r2 = typemax-1, r1 = typemax → r1 > r2. If r1 == r2 < typemax: r1 += 1 → r1 > r2. If r1 < r2: swap → r1 = old r2 > old r1 = r2. Good.
+
+Actually since we then do `lo, hi = min, max` and pass `evidencia(c,...,lo,hi)`, the resulting `h1=lo, h2=hi` always canonical! Let me re-check the current code:
+
+```julia
+lo, hi = min(r1, r2), max(r1, r2)
+ev = Transicion.evidencia(c, k, 0, 0, 0, s, lo, hi)
+```
+
+Wait! The current `evidencia_aleatoria` computes `lo, hi` and passes `lo, hi` to `evidencia`, which sets h1.pre_hash = lo, h2.pre_hash = hi. So `h1 < h2` always (unless equal)! So the `no_canonico` logic setting `r2 = r1` gives lo=hi=r1 → equality. But if `no_canonico` is false and r1 != r2, then lo<hi canonical. So the current `evidencia_aleatoria` **never** produces descending! It only produces equality when `no_canonico`. That's the bug the director identified: T04's random generator only produces equality. And `_evidencia_forma` `:orden` passes `(b, a)` directly (not through lo/hi), giving descending. OK now it's clear.
+
+So to add descending in `evidencia_aleatoria`, I need to pass `(hi, lo)` for descending, i.e.:
+```julia
+if modo == :orden_desc || modo == :ambos_desc
+    ev = Transicion.evidencia(c, k, 0, 0, 0, s, hi, lo)   # H1 > H2
+else
+    ev = Transicion.evidencia(c, k, 0, 0, 0, s, lo, hi)
+end
+```
+where `lo, hi = min, max`. For equality, lo == hi.
+
+Let me restructure:
+```julia
+r1 = rand(rng, UInt64)
+r2 = rand(rng, UInt64)
+if modo == :orden_igual || modo == :ambos
+    r2 = r1
+elseif r1 == r2
+    r2 = r1 + UInt64(1)
+end
+lo, hi = min(r1, r2), max(r1, r2)
+descendente = modo == :orden_desc || modo == :ambos_desc
+ev = descendente ? Transicion.evidencia(c, k, 0, 0, 0, s, hi, lo) :
+                   Transicion.evidencia(c, k, 0, 0, 0, s, lo, hi)
+```
+But for `:ambos` (equality + cbid), lo==hi. Good. For `:ambos_desc` (descending + cbid), hi>lo. Good.
+
+Now the mode tuple in `generar_dag_aleatorio`:
+```julia
+modo = rand(rng, (:valida, :valida, :clave, :cbid, :orden_igual, :orden_desc,
+                  :tardia, :sin_saldo, :ambos))
+```
+That's 9 entries. Fine. Maybe add `:ambos_desc` too.
+
+Now, will the random generator produce ≥10 descending blocks? Each downloaded fact: `:orden_desc` chosen ~1/9 of evidence txs. There are many. The previous run had `bloque_orden=125` (equality). So descending will be ~60. But the reliable ≥10 comes from dedicated cases anyway. Let me not rely on the random ones for the minimum; dedicated cases guarantee it.
+
+Now let me also double check `_evidencia_forma` for `:ambos`: `Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, b, a)` → h1=b > h2=a (descending) and cbid foreign. Good.
+
+Now let me handle `casos_forma_cobertura`:
+```julia
+function casos_forma_cobertura()
+    out = Tuple{Symbol,Bool,Int}[]
+    for i in 1:36
+        push!(out, (:cbid, true, i))
+    end
+    for i in 1:36
+        push!(out, (:orden_igual, true, 100 + i))
+    end
+    for i in 1:36
+        push!(out, (:orden_desc, true, 300 + i))
+    end
+    for i in 1:8
+        push!(out, (:ambos, true, 200 + i))
+    end
+    return out
+end
+```
+Wait, iter is used to seed different base histories and to set unique `out_id = 800000 + 1000*iter`. If I use overlapping ranges, out_id could collide but each case is independent so it's OK. Still, let me use disjoint ranges: 1:36 (cbid), 100+i (equality), 300+i (descending), 200+i (ambos). Good.
+
+But note: `caso_forma_evidencia` with `iter` also uses `_evidencia_forma(P, modo, slot, iter)` where `i=iter`, giving pre_hash = 700001+2*iter. For large iter ranges (300-336), values fine.
+
+### Coverage counting of `:ambos`
+
+`ambos_cbid` currently requires the block to have motivo CBID and at least one order defect. With per-tx precedence, `:ambos` (single tx, cbid+order) → motivo CBID and has order defect → counted. Good. Also the two-evidence case `primero=:cbid` → motivo CBID and has order defect later → counted. Good.
+
+### Runtests changes
+
+I'll update:
+- D-19 modes: `(:cbid, CBID, 61), (:orden_desc, ORDEN, 62), (:orden_igual, ORDEN, 64), (:ambos, CBID, 63)`.
+- Add the two precedence cases test.
+- Coverage loop: classify by `primer_defecto_forma` or by motivo. Let me compute using the same helper.
+
+Actually the test currently replicates the counting logic. I can just call `primer_defecto_forma(A, b)` and count. Let me simplify the test to use it.
+
+Let me now check the whole `dirigidos.jl` file for `base_dirigida`, `utxo_gastable`, `_ev_bloque`, `_pd_ev` etc. Let me read the top portion and around `_pd_ev`.
+dsh: reasoning:
+Let me read the top of dirigidos.jl and `_pd_ev`/`_ev_bloque`.
+dsh: reasoning:
+Now let me check the CONTRATO-ESTADO-DAG-v0.md to confirm the precedence rule and the reference to EV-04. Let me look at the relevant table row (line 46) and the EV-04 definition. Actually, I need to confirm the exact rule. Let me check the contract for "EvidenciaCbidAjeno", "OrdenCanonicoInvalido", and "primera transacción". Let me grep.
+dsh: reasoning:
+The contract is `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md`, but the grep found nothing? Let me check the file exists and its content.
+dsh: reasoning:
+The contract is only 102 lines. Let me read it fully. The terminology `EvidenciaCbidAjeno`/`OrdenCanonicoInvalido` comes from the evidence contract (`CONTRATO-EVIDENCIA-v0.md`) and T01. Let me read the DAG contract.
+dsh: reasoning:
+The contract's row 46 says "Forma de cabecera y de transacciones (FORMATO-v0 F-03…F-10) → bloque inválido". The `ErrForma(EvidenciaCbidAjeno)`/`ErrForma(OrdenCanonicoInvalido)` come from the evidence contract and T01. Good enough.
+
+Now let me check the T01's current state and whether O1B is editing. Actually, my concern: T04 includes T01's `Transicion.jl`. If O1B changes it (e.g., adds `ErrForma` type), my T04 runs could break or change. But the order says O2 runs from T04 and the previous O2 handled it. Let me check the current T01 `Transicion.jl` around the error definitions to see if O1B has already changed it. The file was last modified 23:22 (before B launch at 23:24). Let me check current mtime.
+dsh: reasoning:
+The T01 `Transicion.jl` already has `ErrForma` defined (from O1's run at 23:15). O1B will now further modify it: add equality cases, etc. It says "Alias de compatibilidad transitorios (T04 incluye este módulo y su parte O2 los retira)". So O1B will remove the aliases from the export list (and maybe the const defs).
+
+Now, critically, T04's `EstadoDAG.jl` uses `Transicion.Err` in `descartes::Dict{Int,Vector{Tuple{Int,Transicion.Err}}}` and elsewhere. Since `Err = Union{ErrSemantico, ErrForma}` still exists, that's fine. Also `aplicar_historia` returns `Tuple{Int,Transicion.Err}`.
+
+Wait, there's a subtle issue: T04's `MOTIVO_FORMA_CBID = Symbol("ErrForma(EvidenciaCbidAjeno)")`. The T01 `ErrForma` show prints `ErrForma(EvidenciaCbidAjeno)`. Good.
+
+But here's the thing: T04's `chequear_forma` currently returns `:ErrSinPadre`, `:ErrSlot`, etc., as Symbol. And `marcar_invalido!` stores Symbol. And `descartes` stores `Transicion.Err` from the semantic application. Fine.
+
+Now, if O1B removes `const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)` definitions, T04 doesn't use them. Fine.
+
+Now, the bigger risk: while O1B edits T01's `Transicion.jl`, if I run my tests at the same time, I might read a partially-edited file. But I can only run after O1B finishes or at least is stable. Since I can't coordinate directly, I'll just proceed and if a run fails due to T01 syntax errors, I'll retry. Actually, I could check if O1B is still running by looking at the mtime and size of its stderr log. Let me check. Actually, the O1B log is at `P-SLASHING/SL4c-O1B-dsh.stderr`. Let me check mtime/size now and later.
+
+Actually, more importantly: O1B's changes to T01 might affect the *semantics* that T04 relies on. E.g., if O1B changes `aplicar_evidencia!` to return `ErrForma(...)`, then T04's semantic application of an invalid evidence... wait, T04 doesn't apply evidence via T01's `aplicar_evidencia!`? It does: `aplicar_bloque_fusion!` calls `Transicion.aplicar_tx!` for evidence txs too. But T04 now rejects blocks with cbid/order defects in `chequear_forma` before applying, so the semantic path with those defects won't run. Good.
+
+But if O1B changes T01 in a way that affects other semantics (e.g., adds a new error), it could affect T04's outputs. The previous O2 run noted T01's final `ErrForma(clase)` produces identical texts. So presumably the T01 change is isolated.
+
+Hmm, but I need to be careful: my regenerated vectors must reproduce with the *current* T01 state. Since T01 is being edited in parallel, and later the director will re-read, it should be consistent with the final T01. The director says the rule is "igual en T01, T04 y Rust". So my T04 vectors depend on T01's evidence semantics. This is a known coupling documented in METODO.
+
+Let me check the METODO to understand the T01 dependency. Let me read METODO.md relevant part. Actually let me check what T01 functions T04 uses, particularly evidence handling. But it's probably fine.
+
+Let me now proceed with the implementation. Before editing, I need to report any missing definitions. Let me think hard about genuine ambiguities:
+
+1. **Descending cases definition**: The order says "añadir ≥ 10 casos de orden descendente además de los de igualdad". It doesn't say whether the total `bloque_orden` minimum of ≥30 stays, nor the split. I'll interpret: keep ≥30 total order blocks, ensure ≥10 descending and ≥10 equality, and document.
+
+2. **Directed cases format**: The order says two directed cases with a block containing `[orden, cbid]` and `[cbid, orden]`. Clear.
+
+3. **Precedence rule for structure**: "estructura vigente → cbid → orden canónico" per transaction. In T04, the evidence structural check (entradas/salidas/testigos) is a semantic descarte, not `chequear_forma`. Moving it would change cases without the two defects, which is prohibited. The B order didn't ask to move it. But there's a real question: the rule says the *first defective transaction* determines the block's motivo, and "su forma completa (estructura vigente → cbid → orden canónico)". If structural evidence checks are semantic in T04, then a block with tx1 = evidence with `ErrEvidenciaConEntradas` (semantic descarte) and tx2 = evidence with cbid foreign would be: per the rule, tx1's structure defect should make the block invalid with a form motivo? But that contradicts the SL-4c-O note and the prohibition. Hmm.
+
+   Let me re-read the rule: "Las transacciones de un bloque se comprueban en su orden dentro del bloque; para cada una, su forma completa (estructura vigente → `cbid` → orden canónico); la primera transacción defectuosa determina el motivo del rechazo del bloque."
+
+   The parenthetical "estructura vigente" refers to the form structure that is *already* checked at the block level (F-03…F-10): entradas/salidas/testigos, campos inactivos, forma de las dos cabeceras. In T01, this is checked in `aplicar_evidencia!`? Actually the previous O2 note says: "la comprobación estructural de la v4 (`n_in/n_out/n_wit`, campos inactivos) sigue donde estaba". In T01, where is it? Let me check `evidencia.jl`. The T01 contract's evidence form (RAT-1/EV-04 etc.) is presumably checked in `aplicar_evidencia!`. In T04, the evidence structural check is not in `chequear_forma`; it's in T01's semantic `aplicar_evidencia!` (descarte). So T04's "forma" only covers cbid and order, and the structural check happens as a semantic descarte at application time.
+
+   The rule says the first defective transaction determines the motivo. In T04, if a block has tx1 = evidence with structural defect (e.g., has entradas) and tx2 = evidence with cbid foreign, then T04's `chequear_forma_evidencia` sees tx1: cbid OK, order OK → no defect from the form function's perspective; tx2: cbid foreign → block invalid with CBID. The structural defect of tx1 never invalidates the block (it'd be a descarte in fusion). Meanwhile T01 (strict mode) checks structure within `aplicar_evidencia!` per tx, so tx1 would produce `ErrForma(...)`? Actually the structure defect `ErrEvidenciaConEntradas` is a semantic error (descarte). Hmm.
+
+   The director's rule says "estructura vigente" is part of "su forma completa". If T01's structure check is inside the same per-tx loop as cbid/order, then T01 already handles it. For T04, the previous O2 declared that moving the structural check into `chequear_forma` would change cases without the two defects, prohibited. The B order does not ask to move it. So I'll keep it as-is and note it.
+
+   However, there's a potential inconsistency: If a block in T04 has tx1 with a structural evidence defect and tx2 with cbid, T01 strict mode might report a form motivo for tx1 while T04 reports CBID for tx2. But T04's tx1 structural defect is a semantic descarte, not a form error — because T04's contract treats evidence structure as... hmm. Actually, per the ORDEN-SL4c-O, only cbid and order were moved to form. The evidence structure was already form in both? Let me check T01's `evidencia.jl` and `aplicar_evidencia!` to see how structure is handled.
+
+Let me read T01's `evidencia.jl` and the `aplicar_evidencia!` function. This is important for the parity rule. But it's O1's domain. Let me read to understand whether there's a missing definition I need to report.
+dsh: reasoning:
+OK. In T01, `aplicar_evidencia!` handles structure (`ErrEvidenciaConEntradas`) then cbid then order, per tx in the block's tx order (assuming `aplicar` loops). So T01 already does per-tx. The B order for O1 adds equality cases and the two directed cases.
+
+Now for T04: The structural check is semantic in T04? Actually, T04's fusion mode applies T01's `aplicar_tx!`, which calls `aplicar_evidencia!`. So in T04, an evidence with entradas/salidas yields `ErrEvidenciaConEntradas` as a semantic descarte (not block invalid). That's the existing behavior: the DAG contract's row 46 says form of transactions invalidates the block, but the order SL-4c-O only moved cbid and order into the T04 form check, leaving structure as descarte. So there's an acknowledged limitation. Fine.
+
+But wait: the director's new rule says the *first defective transaction* determines the block's motivo, and structural form is part of "su forma completa". If in T04 the structural defect is a semantic descarte while cbid/order is form, then a block with tx1 structural defect + tx2 cbid would get CBID (block invalid) in T04 but in T01... T01 is strict mode where any `Err` invalidates the block? Let me check `aplicar` in T01: does `ErrEvidenciaConEntradas` invalidate the block (strict) or descartar? In T01, `aplicar` returns an `Err` → block invalid. So T01 would report `ErrEvidenciaConEntradas` for tx1 (structure first). But T04 reports CBID. That's a divergence in motivo, but the consensus only depends on invalidity. The order explicitly says "el consenso solo depende de la invalidez, no del motivo". So motivo divergence is acceptable.
+
+But is it required that T04 move the structural check into form to match? The order says no (prohibited: "0 cambios sin defecto"). And the previous O2 declared it. I'll keep it and note it.
+
+Hmm, but here's a subtle new issue introduced by the per-transaction precedence in T04: If a block has tx1 = evidence with a *structural* defect and tx2 = evidence with cbid foreign, T04's `chequear_forma_evidencia` checks tx1 for cbid/order only and finds none, then tx2 cbid → invalid. Fine. But what if tx1 has a structural defect AND tx2 has an order defect? T04 returns ORDEN. In T01 strict, tx1 structural → invalid with structure error. Again motivo divergence, not invalidity divergence.
+
+Given the order's explicit "0 cambios sin defecto" and "estructura vigente" staying put, I'll preserve current behavior.
+
+Actually, wait. Let me reconsider whether T04's structural check should count for the "first defective transaction determines motivo" directed cases. The two directed cases use evidence txs that are structurally valid (no entradas/salidas). So no conflict.
+
+OK. Now let me also double-check: does T04's `aplicar_bloque_fusion!` treat `ErrForma` specially? In `aplicar_tx!`, if evidence has cbid foreign, T01 returns `ErrForma(...)`. In T04, such blocks are rejected by form before application. But what about the `rojo_U3` inert blocks? They're skipped. Fine.
+
+Also: `S, d = aplicar_bloque_fusion!(...)` returns `(S, desc)` where `desc` can contain `Transicion.Err` including `ErrForma`. If a block somehow reaches application with cbid foreign... it won't, because form rejects. But `diferencias.jl` reconstructs v0.5 cases where cbid foreign was semantic before; with the new T01, `aplicar_evidencia!` returns `ErrForma(...)`. In v0.5 comparisons, the old recorded v0.5 had `DESC ... motivo=ErrCbidAjeno`? Let me check. The previous O2's `diferencias.jl` reproduced v0.5 with the corrected oracle and compared. The `defectos_del_caso` checks. It worked. So `ErrForma` is handled.
+
+Wait — actually there's a subtlety: `diferencias.jl` uses the *frozen v0.5 vector inputs* and re-runs with the *new* oracle. With per-tx precedence, for v0.5 cases all defects are cbid, so no difference. Good.
+
+Now, let me also ensure that T04's `descartes` typing (`Tuple{Int,Transicion.Err}`) still works with `ErrForma`. Since ALTERNATIVE T01 may remove the alias const but keep `ErrForma`, fine.
+
+Now, let me start implementing. But first, I promised to report lacks of definition *before* editing. Let me decide if there's a genuine one worth reporting. I think there is one worth stating:
+
+**Falta de definición 1 (precedencia y estructura):** The rule says per-transaction "estructura vigente → cbid → orden canónico". In T04, the only structural evidence check (`ErrEvidenciaConEntradas`) is a semantic descarte, not a block-form check (by explicit prior declaration and because moving it would change cases without the two defects, prohibited). Therefore, in T04 the per-transaction loop applies only cbid → order; the "estructura vigente" of the evidence remains block-level/semantic as before. This is not a blocker, but I should inform it.
+
+**Falta de definición 2 (minimum split):** The B order says ≥10 descending cases "in addition to equality" but doesn't specify whether the ≥30 total remains and how equality/descending are counted. I'll keep ≥30 total, add explicit ≥10 descending (and ≥10 equality) counters.
+
+**Falta de definición 3 (file versioning):** B order says regenerate `vectores-estado-dag-v0.6.txt` (same name), which means overwriting artifacts that the previous O2 delivered. Since "aún no lo consume nadie", this is intended. I'll overwrite.
+
+These are not blockers; I'll report them and proceed. The instruction says "Si detectas una falta de definición, infórmala antes de editar." I'll state them in my response and then proceed (I think the intended behavior is to report and continue since they're minor). Actually, should I pause for confirmation? The order says "infórmala antes de editar", not "wait for confirmation". The original order's launch prompt says the same. So report then edit.
+
+Now, let me also verify the frozen inputs hash to ensure I'm reading the right versions. The sha256 file lists hashes. Let me compute. Actually the `ENTRADA-SL4c-O-B.sha256` paths are relative to `/home/katana/zeo/ZEROX`. Let me verify.
+
+Let me now set up a todo list and start implementing.
+
+Actually, let me first check how to run Julia. Let me look at `julia-version.toml` and check for `julia.sh`. The Project.toml has deps. Let me check.
+dsh: reasoning:
+Let me check how tests were previously run, e.g., the test-pkg-v0.6.log, to get the exact command. Let me look at the INFORME's SL4c-O section for the command. And check `JULIA_DEPOT_PATH` usage. Let me look at a previous test log and the exportar log.
+
+Actually let me look at the `INFORME.md` section SL4cO to see documented commands. Let me grep for "JULIA_DEPOT_PATH" in T04.
+dsh: reasoning:
+Good. Now let me check the exact export command used in the previous O2. Let me look at INFORME lines 590-620.
+dsh: reasoning:
+Now let me look at the report section's start to see how the environment model name was recorded, and HORAS.log. Let me read HORAS.log and the tail of INFORME/PROGRESO.
+dsh: reasoning:
+Now I have a clear picture. Let me also verify the PROGRESO tail. Actually I'll append later.
+
+Let me check whether O1B is still modifying T01. The O1B stderr grew. Let me check current state quickly, and also check T01's Transicion.jl mtime.
+
+Actually, I realize a potential issue: if O1B changes T01's `evidencia_aleatoria` semantics or adds `:orden_igual` to T01, that doesn't affect T04. T04's `Transicion.jl` inclusion provides types and `aplicar_tx!`. O1B may change `_caso_evidencia` in `evidencia.jl` (T01), but T04 doesn't include `evidencia.jl`. T04 includes only `Transicion.jl`. Good.
+
+Let me check whether T04's `EstadoDAG.jl` includes any T01 file other than `Transicion.jl`. It includes `GDR.jl` and `RUTA_T01` (Transicion.jl). T01's `Transicion.jl` might include `evidencia.jl`? Let me check. If it does, then O1B's edits to evidencia.jl could matter. Let me grep.
+dsh: reasoning:
+T01's `Transicion.jl` includes `evidencia.jl`! So T04, by including `Transicion.jl`, also loads `evidencia.jl`, `generadores.jl`, etc. That means O1B's edits to `evidencia.jl` will be loaded by T04. But those are generator/test helpers; they don't affect T04's oracle behavior. However, if O1B introduces syntax errors, T04 won't load. I'll need to wait for O1B to finish or be careful. O1B is still active (mtime 23:26:37, current 23:26:37 — actively writing). The O1B files `Transicion.jl` mtime is 23:15:46 unchanged, so O1B hasn't edited T01 yet (still reading/planning).
+
+Given the budget (1h, 1 thread), I should proceed with my edits and test. But my tests depend on T01 loading successfully. If O1B breaks it mid-run, I'll retry. Given the parallel work, maybe I should do my edits now and run tests; if T01 is mid-edit, I'll see errors and retry.
+
+Actually, a smarter approach: snapshot T01's current source into T04? No—T04 intentionally includes T01 read-only. The order says O2 must not touch anything outside T04. Copying T01 into T04 would be a divergence. No.
+
+Let me proceed. First, let me write the todo list and then make edits.
+
+Let me re-read the exact rule once more to make sure I implement per-transaction correctly:
+
+"Las transacciones de un bloque se comprueban en su orden dentro del bloque; para cada una, su forma completa (estructura vigente → cbid → orden canónico); la primera transacción defectuosa determina el motivo del rechazo del bloque."
+
+So in `chequear_forma_evidencia`, iterate `b.txs` in order; for each evidence tx, check cbid then order; return on first defect. Exactly.
+
+Now let me implement the changes.
+
+### 1. EstadoDAG.jl
+
+Replace the `chequear_forma_evidencia` function and docstring, add `primer_defecto_forma`, and export it.
+
+Let me write the new code:
+
+```julia
+"""
+Primer defecto de **forma v4** de la `EvidenceTx` del bloque, en el orden de las
+transacciones del bloque (SL-4c-O-B). Para cada `EvidenceTx` se comprueba su
+forma completa en el orden `cbid` → orden canónico; la primera transacción
+defectuosa fija el defecto del bloque.
+
+Devuelve `:cbid`, `:orden_igual`, `:orden_desc` o `nothing`. Es la precedencia
+exacta que aplica `chequear_forma_evidencia` y la que usan el exportador y el
+lector de cobertura.
+"""
+function primer_defecto_forma(A::Admision, b::BloquePost)
+    cbid_red = A.pd.P.cbid
+    for tx in b.txs
+        tx.tipo == Transicion.TxEvidencia || continue
+        ev = tx.evidencia
+        ev === nothing && continue
+        # Forma completa de esta transacción: cbid → orden canónico.
+        (ev.id1.cbid == cbid_red && ev.id2.cbid == cbid_red) || return :cbid
+        if !(ev.h1.pre_hash < ev.h2.pre_hash)
+            return ev.h1.pre_hash == ev.h2.pre_hash ? :orden_igual : :orden_desc
+        end
+    end
+    return nothing
+end
+
+"""
+Comprueba la **forma v4** de las `EvidenceTx` del bloque (SL-4c-O / SL-4c-O-B,
+RAT-1/EV-04).
+
+Precedencia fija (idéntica en T01 y T04): las transacciones del bloque se
+comprueban **en su orden**; para cada `EvidenceTx`, su forma completa en el orden
+`cbid` → orden canónico; la **primera transacción defectuosa** determina el
+motivo del rechazo del bloque (`ErrForma(EvidenciaCbidAjeno)` o
+`ErrForma(OrdenCanonicoInvalido)`). La estructura vigente (entradas/salidas/
+testigos, campos inactivos, forma de las cabeceras) sigue donde estaba y no
+cambia.
+
+Una `EvidenceTx` sin cabeceras (`evidencia === nothing`) no se toca aquí: sigue
+siendo un rechazo semántico (`ErrSinEvidencia`), fuera del alcance de la orden.
+
+Devuelve `nothing` si pasa, o el motivo de bloque (`Symbol`).
+"""
+function chequear_forma_evidencia(A::Admision, b::BloquePost)
+    d = primer_defecto_forma(A, b)
+    d === nothing && return nothing
+    return d === :cbid ? MOTIVO_FORMA_CBID : MOTIVO_FORMA_ORDEN
+end
+```
+
+Export update line 29: add `primer_defecto_forma`.
+
+### 2. generadores.jl — evidencia_aleatoria
+
+Update docstring and body. Let me rewrite lines 149-182.
+
+New:
+```julia
+"""
+Evidencia aleatoria (SL-3) contra `S`. `modo` selecciona la variante: válida,
+`cbid` ajeno, fuera de plazo, clave sin saldo o una clave con saldo. SL-4c-O
+añadió `:ambos` (cbid ajeno + orden no canónico). SL-4c-O-B distingue los dos
+tipos de orden no canónico: `:orden_igual` (`H1 = H2`) y `:orden_desc`
+(`pre_hash(H1) > pre_hash(H2)`), y añade `:ambos_desc` (cbid + descendente).
+"""
+function evidencia_aleatoria(rng::AbstractRNG, S::Transicion.Estado,
+                             P::Transicion.Params, slot::Int; modo::Symbol = :valida)
+    c = P.cbid
+    k = 1
+    s = slot
+    if modo == :cbid || modo == :ambos
+        c = P.cbid + 1
+    elseif modo == :tardia
+        s = slot - P.Plazo_slots
+    elseif modo == :sin_saldo
+        k = 99
+    elseif modo == :clave
+        ks = sort(collect(keys(S.garantias)))
+        isempty(ks) || (k = ks[rand(rng, 1:length(ks))])
+    end
+    r1 = rand(rng, UInt64)
+    r2 = rand(rng, UInt64)
+    if modo == :orden_igual || modo == :ambos
+        r2 = r1                       # H1 = H2 ⇒ el orden estricto no se cumple
+    elseif r1 == r2
+        r2 = r1 + UInt64(1)
+    end
+    lo, hi = min(r1, r2), max(r1, r2)
+    # `:orden_desc` y `:ambos_desc` invierten el par para que H1 > H2.
+    descendente = modo == :orden_desc || modo == :ambos_desc
+    ev = descendente ? Transicion.evidencia(c, k, 0, 0, 0, s, hi, lo) :
+                       Transicion.evidencia(c, k, 0, 0, 0, s, lo, hi)
+    return Transicion.tx_evidencia(ev)
+end
+```
+
+Wait, for `:ambos_desc` with c foreign, I need `modo == :ambos_desc && (c = P.cbid+1)`. Let me add that. In the first condition I wrote `modo == :cbid || modo == :ambos`; add `:ambos_desc`.
+
+Also update the mode tuple in `generar_dag_aleatorio`.
+
+### 3. dirigidos.jl
+
+Update `_evidencia_forma`:
+```julia
+"Evidencia con el defecto de forma pedido (SL-4c-O/SL-4c-O-B)."
+function _evidencia_forma(P::Transicion.Params, modo::Symbol, slot::Int, i::Int)
+    a = UInt64(700001 + 2 * i)
+    b = UInt64(700002 + 2 * i)
+    if modo == :cbid
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, b)
+    elseif modo == :orden_desc || modo == :orden
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)   # H1 > H2
+    elseif modo == :orden_igual
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, a, a)   # H1 = H2
+    elseif modo == :ambos
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :ambos_igual
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, a)
+    end
+    error("modo de forma desconocido: $modo")
+end
+```
+
+Keep `:orden` as alias for descending for compatibility.
+
+Add `caso_forma_dos_evidencias`:
+
+```julia
+"""
+D-20/D-21 · Precedencia por transacción (SL-4c-O-B): el bloque `X` lleva
+coinbase, una transferencia válida y **dos** `EvidenceTx` defectuosas. Con
+`primero = :orden` van `[orden no canónico, cbid ajeno]` y el motivo es
+`ErrForma(OrdenCanonicoInvalido)`; con `primero = :cbid` van
+`[cbid ajeno, orden no canónico]` y el motivo es `ErrForma(EvidenciaCbidAjeno)`.
+En ambos casos `X` es inválido en la admisión, el gemelo canónico `Xv` es válido
+y la transferencia de `X` no se aplica.
+"""
+function caso_forma_dos_evidencias(pd::ParamsDAG; primero::Symbol = :orden,
+                                   con_tx::Bool = true, seed::Int = 70, iter::Int = 0,
+                                   slot::Int = 2)
+    A, pow = base_dirigida(pd; seed = seed + iter)
+    P = pd.P
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)]
+    o = nothing
+    out_id = 0
+    if con_tx
+        o = utxo_gastable(A.post[Tb.id], P, slot, 2)
+        o === nothing && error("caso_forma_dos_evidencias: sin UTXO gastable")
+        out_id = 800000 + 1000 * iter
+        push!(txs, Transicion.tx_transferencia([o.id],
+            [Transicion.Salida(out_id, o.valor - UInt64(1), o.dueño,
+                               Transicion.OrigenTx, -1, -1)], o.dueño))
+    end
+    ev_orden = _evidencia_forma(P, :orden_desc, slot, iter)
+    ev_cbid = _evidencia_forma(P, :cbid, slot, iter + 900)
+    if primero == :orden
+        push!(txs, Transicion.tx_evidencia(ev_orden))
+        push!(txs, Transicion.tx_evidencia(ev_cbid))
+        motivo = MOTIVO_FORMA_ORDEN
+    elseif primero == :cbid
+        push!(txs, Transicion.tx_evidencia(ev_cbid))
+        push!(txs, Transicion.tx_evidencia(ev_orden))
+        motivo = MOTIVO_FORMA_CBID
+    else
+        error("caso_forma_dos_evidencias: primero debe ser :orden o :cbid")
+    end
+    X = BloquePost(id = id1 + 1, padres = [Tb.id], slot = slot, sd = 0,
+                   productor = 1, peso = 1, txs = txs)
+    procesar_uno!(A, X)
+    ev_ok = Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot,
+                                 UInt64(910001 + 2 * iter), UInt64(910002 + 2 * iter))
+    Xv = BloquePost(id = id1 + 2, padres = [Tb.id], slot = slot, sd = 1,
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                                        Transicion.tx_evidencia(ev_ok)])
+    procesar_uno!(A, Xv)
+    Y = BloquePost(id = id1 + 3, padres = [X.id], slot = slot + 1, sd = 0,
+                   productor = 1, peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Y)
+    S, _, _ = aplicar_historia(A)
+    return "D-20/D-21", A, (primero = primero, con_tx = con_tx, X = X.id, Xv = Xv.id,
+                            Y = Y.id, out_id = out_id, o_id = o === nothing ? 0 : o.id,
+                            invalido = !A.validos[X.id],
+                            motivo = get(A.motivos, X.id, :?),
+                            motivo_esperado = motivo,
+                            primeras = primero == :orden ? :orden_desc : :cbid,
+                            hijo_invalido = !A.validos[Y.id],
+                            gemelo_valido = A.validos[Xv.id],
+                            tx_aplicada = out_id != 0 && haskey(S.utxo, out_id),
+                            I1 = invariante_I1(A.post[Xv.id]))
+end
+```
+
+Wait: which ids to assign to which case? I'll set primero=:orden → "D-20", primero=:cbid → "D-21". Let me return a name based on primero:
+```julia
+nombre = primero == :orden ? "D-20" : "D-21"
+return nombre, A, (...)
+```
+
+Update `casos_forma_cobertura`:
+```julia
+function casos_forma_cobertura()
+    out = Tuple{Symbol,Bool,Int}[]
+    for i in 1:36
+        push!(out, (:cbid, true, i))
+    end
+    for i in 1:36
+        push!(out, (:orden_igual, true, 100 + i))
+    end
+    for i in 1:36
+        push!(out, (:orden_desc, true, 300 + i))
+    end
+    for i in 1:8
+        push!(out, (:ambos, true, 200 + i))
+    end
+    return out
+end
+```
+Wait, iter ranges: 1..36, 101..136, 301..336, 201..208. out_id = 800000+1000*iter. Disjoint. base_dirigida seed = seed + iter → different. Good.
+
+Update `casos_dirigidos`:
+- change `modo = :orden` to `modo = :orden_desc` (or keep :orden, works as alias).
+- add the two new cases.
+
+### 4. exportar.jl
+
+Update `contar_forma_evidencia` to split order counters using `primer_defecto_forma`. Also update header comments and minimums.
+
+New:
+```julia
+function contar_forma_evidencia(A::Admision, acc::Dict{String,Int})
+    cbid_red = A.pd.P.cbid
+    for (id, b) in A.por_id
+        motivo = get(A.motivos, id, :OK)
+        (motivo == MOTIVO_FORMA_CBID || motivo == MOTIVO_FORMA_ORDEN) || continue
+        hay_tx = any(tx -> tx.tipo in (Transicion.TxTransferencia, Transicion.TxDeposito,
+                                       Transicion.TxRetiro, Transicion.TxLiberacion),
+                     b.txs)
+        n_cbid = 0
+        n_orden = 0
+        for tx in b.txs
+            tx.tipo == Transicion.TxEvidencia || continue
+            ev = tx.evidencia
+            ev === nothing && continue
+            (ev.id1.cbid != cbid_red || ev.id2.cbid != cbid_red) && (n_cbid += 1)
+            ev.h1.pre_hash < ev.h2.pre_hash || (n_orden += 1)
+        end
+        if motivo == MOTIVO_FORMA_CBID
+            inc!(acc, "bloque_cbid")
+            acc["ev_cbid"] = get(acc, "ev_cbid", 0) + max(n_cbid, 1)
+            hay_tx && inc!(acc, "con_tx_cbid")
+            n_orden > 0 && inc!(acc, "ambos_cbid")
+        else
+            inc!(acc, "bloque_orden")
+            hay_tx && inc!(acc, "con_tx_orden")
+            d = primer_defecto_forma(A, b)
+            d === :orden_igual ? inc!(acc, "bloque_orden_igual") :
+                                 inc!(acc, "bloque_orden_desc")
+            # nº de evidencias con cada tipo de orden no canónico
+            n_ig = count(tx -> tx.tipo == Transicion.TxEvidencia && tx.evidencia !== nothing &&
+                                tx.evidencia.h1.pre_hash == tx.evidencia.h2.pre_hash, b.txs)
+            n_de = count(tx -> tx.tipo == Transicion.TxEvidencia && tx.evidencia !== nothing &&
+                                tx.evidencia.h1.pre_hash > tx.evidencia.h2.pre_hash, b.txs)
+            acc["ev_orden_igual"] = get(acc, "ev_orden_igual", 0) + max(n_ig, 1)
+            acc["ev_orden_desc"] = get(acc, "ev_orden_desc", 0) + max(n_de, 1)
+        end
+    end
+    return acc
+end
+```
+
+Hmm, the `ev_orden` counter currently is `max(n_orden,1)`. Let me keep `ev_orden` too for continuity, plus the split. Actually, to keep the coverage readable, let me keep `ev_orden` total and add `ev_orden_igual`/`ev_orden_desc`.
+
+But note: the motivo is ORDEN; the first defective tx is order. `d = primer_defecto_forma` returns `:orden_igual` or `:orden_desc`. Good.
+
+Wait, careful: `primer_defecto_forma` returns `:cbid` if a cbid defect appears before the order defect. But if `motivo == MOTIVO_FORMA_ORDEN`, then `primer_defecto_forma` must be an order type. Good. So `d === :orden_igual ? ... : ...` is safe.
+
+Update the header comment block (lines 415-429) and minimum check. Add:
+```
+println(ioc, "#  bloque_orden_igual/desc = el primer defecto de orden es igualdad/descendente")
+...
+println(ioc, "# minimos SL-4c-O-B: bloque_orden_desc>=10 bloque_orden_igual>=10")
+```
+And loop list at lines 436-437 include new keys.
+
+Minimum check:
+```julia
+minimos_ok = get(af, "bloque_cbid", 0) >= 30 && get(af, "bloque_orden", 0) >= 30 &&
+             get(af, "con_tx_cbid", 0) >= 10 && get(af, "con_tx_orden", 0) >= 10 &&
+             get(af, "ambos_cbid", 0) >= 5 &&
+             get(af, "bloque_orden_desc", 0) >= 10 &&
+             get(af, "bloque_orden_igual", 0) >= 10
+```
+
+Also update the top comment of exportar.jl mentioning SL-4c-O-B.
+
+### 5. test/runtests.jl
+
+Update the SL-4c-O testset. Add `:orden_igual`. Add precedence tests. Update coverage.
+
+### 6. run.jl
+
+Add the two directed precedence cases and per-tx checks. Maybe split forma counts. Let me add:
+```julia
+for (primero, motivo, sd) in ((:orden, MOTIVO_FORMA_ORDEN, 54),
+                              (:cbid, MOTIVO_FORMA_CBID, 55))
+    _, Af, mf = EstadoDAG.caso_forma_dos_evidencias(pdev; primero = primero, seed = sd)
+    (mf.invalido && mf.motivo == motivo && mf.hijo_invalido &&
+     mf.gemelo_valido && !mf.tx_aplicada && mf.I1) ||
+        push!(fallos_globales, "dirigido D-20/D-21 precedencia $primero")
+end
+```
+
+Also the D-19 loop: add `:orden_igual`.
+
+### 7. diferencias.jl
+
+Update the header/prose. The logic should still work. But there's a subtlety: with per-tx precedence, `defectos_del_caso` returns the set of defects in a block (both cbid and orden). The check "every changed case has a defect" remains valid. And for v0.5, only cbid defects. Let me update the prose to mention the new precedence and that v0.5 remains unchanged. Also I should confirm the previous `DIFERENCIAS-v0.5-v0.6.md` output remains the same (135 changes). Since per-tx precedence doesn't change v0.5 (all cbid), the diff should be identical. Good—but the file header text will change slightly conceptually.
+
+Actually, wait: with the new per-tx precedence, `resultado_corregido` for v0.5 cases with multiple cbid defects in one block: previously global found the first cbid anywhere; now per-tx finds the first tx's cbid. Same block-level motivo (CBID) either way. And the block is invalid regardless. So no change in RES. Good.
+
+### 8. INFORME.md / PROGRESO.md / HORAS.log
+
+Append SL-4c-O-B sections.
+
+Now let me also double-check the interaction of the `:ambos` same-tx case with per-tx precedence in the random generator. `evidencia_aleatoria` `:ambos` → c = cbid+1, r2 = r1 (equality). `primer_defecto_forma`: cbid check fails → :cbid. Good.
+
+Now, one more important detail: the dedicated `caso_forma_evidencia` currently uses `ev_bad = _evidencia_forma(P, modo, slot, iter)`. With `modo = :orden_igual`, the ev has H1 = H2. But does T01's semantic application also reject it? It's blocked by form. Good.
+
+Also, the "gemelo canónico" uses `ev_ok` with pre_hash = 900001+2iter < 900002+2iter. Good.
+
+Now let me think about `casos_dirigidos` count. Currently base=14 + evidence 4 + forma 3 = 21. Adding two precedence cases + keeping the D-19 three (or four with :orden_igual). The export writes each directed case. So n increases.
+
+Let me also check: `casos_dirigidos` is used by `exportar.jl` with `pd = ParamsDAG(PARAMS_DAG_BASE[1], 1)` and inside it uses `pdev = _pd_ev(pd)`. The D-19 calls use `pdev`. The two new ones should use `pdev` too.
+
+Now, the `run.jl` directed loop calls `casos_dirigidos(pd1)` and prints each. The form metadata isn't checked in the loop except via `verificar_ie1_ie2_ie4` and `ie6`. Then explicit checks. I'll add explicit checks.
+
+Now, will `verificar_ie1_ie2_ie4` pass for the new cases? The invalid block X is in `A.por_id` but not valid. `aplicar_historia` skips it (not in selected chain). Should be fine. Already D-19 passes.
+
+Let me now write the edits. Let me start with EstadoDAG.jl.
+
+Actually, before editing, let me report the falta de definición. The instruction: "Si detectas una falta de definición, infórmala antes de editar." I'll state it in my message text, but since I'm in an agent loop, I should output it as part of my response and then continue. Actually, the model's text between tool calls is visible. Let me write a brief note before editing. But the harness expects me to continue working. I'll include the note in the final response too. Hmm. The instruction likely wants me to not silently invent. I'll mention it now in text and proceed.
+
+Let me write the note and then make edits.
+
+Let me now create the todo list.
+dsh: reasoning:
+Let me now make the edits. First EstadoDAG.jl.
+dsh: reasoning:
+Now generadores.jl.
+dsh: reasoning:
+Now update the mode tuple in `generar_dag_aleatorio`. Lines ~269-271.
+dsh: reasoning:
+Now dirigidos.jl: `_evidencia_forma`, add `caso_forma_dos_evidencias`, update `casos_forma_cobertura`, update `casos_dirigidos`.
+
+Let me edit `_evidencia_forma`.
+dsh: reasoning:
+Now add `caso_forma_dos_evidencias` after `caso_forma_evidencia` (before `casos_forma_cobertura`). Let me insert it before the line `"`(modo, con_tx, iter)` de los casos dedicados...`.
+dsh: reasoning:
+Now update `casos_dirigidos` to add the two new cases and change `:orden` to `:orden_desc` (optional, but clearer). Let me read the current end of dirigidos.jl.
+dsh: reasoning:
+Now exportar.jl. Update `contar_forma_evidencia`, header comments, minimums.
+
+Let me update `contar_forma_evidencia`.
+dsh: reasoning:
+The order of lines in my old_string might differ. Let me re-read the exact lines 275-318. Earlier I saw:
+```
+        if motivo == MOTIVO_FORMA_CBID
+            inc!(acc, "bloque_cbid")
+            acc["ev_cbid"] = get(acc, "ev_cbid", 0) + max(n_cbid, 1)
+            hay_tx && inc!(acc, "con_tx_cbid")
+            n_orden > 0 && inc!(acc, "ambos_cbid")
+        else
+            inc!(acc, "bloque_orden")
+            acc["ev_orden"] = get(acc, "ev_orden", 0) + max(n_orden, 1)
+            hay_tx && inc!(acc, "con_tx_orden")
+        end
+```
+I wrote the else block differently. Let me redo with the exact old text. Let me target the function body only, in smaller pieces.
+
+First, replace the docstring block. Then replace the body. Let me do the body replacement precisely.
+dsh: reasoning:
+Now update the docstring for `contar_forma_evidencia`. Let me view the current lines 275-300.
+dsh: reasoning:
+Hmm, the docstring has soft hyphens? No. Maybe trailing whitespace or the accented characters differ. Let me try a smaller unique replacement: replace the line `Cobertura de la **forma v4** de la `EvidenceTx` (SL-4c-O). Recorre todos los` and the next lines individually. Actually, the issue may be the non-breaking or the em-dash? Let me use sed-like via bash? No, prefer edit. Let me target just line 281-282. Actually let me try replacing just the header line.
+dsh: reasoning:
+Wait — the `old_string` for the "Cobertura..." line must have been found now. Interesting that the earlier full replacement failed but this works. Maybe there was a different whitespace in the middle lines. Anyway.
+
+Now update the header comments in main (lines ~415-445) and the minimums. Let me read current lines 400-470.
+dsh: reasoning:
+Also update the top comment in exportar.jl to mention SL-4c-O-B. Let me update line 14.
+dsh: reasoning:
+Now run.jl. Update the D-19 loop and add the precedence checks. Let me edit lines 169-178.
+dsh: reasoning:
+Wait, I inserted the `for (primero...)` loop but I need to ensure I didn't leave the old text. The edit replaced the old D-19 block with the new D-19 block plus the new loop. Good.
+
+Now, run.jl also has counters for `ev_forma_cbid`/`ev_forma_orden` in the EV section (lines 253-254, 269-274). Those still work. Maybe add `ev_forma_orden_igual`/`desc`? Not strictly needed. But the order asks `run.jl` in green. Let me consider splitting for the report. The run log line prints `forma_cbid` and `forma_orden`. I could add `forma_orden_igual`/`forma_orden_desc` counters to demonstrate coverage in run.jl too. Let me do that for completeness, since the order emphasizes the two types.
+
+Let me update run.jl EV section:
+- declare `ev_forma_orden_igual = 0`, `ev_forma_orden_desc = 0`.
+- in the loop, when `m == MOTIVO_FORMA_ORDEN`, use `primer_defecto_forma(A, b)` to classify.
+- print in TOTAL-EV.
+
+Let me edit.
+dsh: reasoning:
+Now `runtests.jl`. Update the SL-4c-O testset. Let me edit lines 193-240.
+
+Current:
+```julia
+    @testset "SL-4c-O forma v4 de la EvidenceTx" begin
+        pd = ParamsDAG(PARAMS_DAG_BASE[1], 1)
+        pdev = EstadoDAG._pd_ev(pd)
+        # ...
+        for (modo, motivo, sd) in ((:cbid, MOTIVO_FORMA_CBID, 61),
+                                   (:orden, MOTIVO_FORMA_ORDEN, 62),
+                                   (:ambos, MOTIVO_FORMA_CBID, 63))
+            nombre, A, m = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, seed = sd)
+            ...
+        end
+        # Cobertura mínima ...
+        af = Dict{String,Int}()
+        for (modo, con_tx, it) in casos_forma_cobertura()
+            _, A, _ = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, con_tx = con_tx, iter = it)
+            for (id, b) in A.por_id
+                motivo = get(A.motivos, id, :OK)
+                (motivo == MOTIVO_FORMA_CBID || motivo == MOTIVO_FORMA_ORDEN) || continue
+                if motivo == MOTIVO_FORMA_CBID
+                    af["bloque_cbid"] = ...
+                    ...
+                else
+                    af["bloque_orden"] = ...
+                    ...
+                end
+            end
+        end
+        @test ...
+    end
+```
+
+I'll rewrite this testset to:
+- D-19 modes including :orden_igual and :orden_desc.
+- D-20/D-21 precedence.
+- Coverage using `primer_defecto_forma` for split and verify the H1/H2 relation.
+
+Let me write the new testset.
+
+```julia
+    @testset "SL-4c-O/SL-4c-O-B forma v4 de la EvidenceTx" begin
+        pd = ParamsDAG(PARAMS_DAG_BASE[1], 1)
+        pdev = EstadoDAG._pd_ev(pd)
+        # `cbid` ajeno y los dos tipos de orden no canónico invalidan el bloque
+        # entero en admisión; el gemelo canónico es válido y la tx válida del
+        # bloque no se aplica.
+        for (modo, motivo, sd) in ((:cbid, MOTIVO_FORMA_CBID, 61),
+                                   (:orden_igual, MOTIVO_FORMA_ORDEN, 64),
+                                   (:orden_desc, MOTIVO_FORMA_ORDEN, 62),
+                                   (:ambos, MOTIVO_FORMA_CBID, 63))
+            nombre, A, m = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, seed = sd)
+            @test m.invalido
+            @test m.motivo == motivo
+            @test m.hijo_invalido
+            @test m.gemelo_valido
+            @test !m.tx_aplicada
+            @test m.I1
+            @test isempty(verificar_ie1_ie2_ie4(A))
+        end
+        # SL-4c-O-B: precedencia por transacción. Con `[orden, cbid]` gana el
+        # orden; con `[cbid, orden]` gana `cbid`.
+        for (primero, motivo, sd) in ((:orden, MOTIVO_FORMA_ORDEN, 65),
+                                      (:cbid, MOTIVO_FORMA_CBID, 66))
+            nombre, A, m = EstadoDAG.caso_forma_dos_evidencias(pdev; primero = primero,
+                                                              seed = sd)
+            @test m.invalido
+            @test m.motivo == motivo
+            @test m.motivo == m.motivo_esperado
+            @test m.hijo_invalido
+            @test m.gemelo_valido
+            @test !m.tx_aplicada
+            @test m.I1
+            @test isempty(verificar_ie1_ie2_ie4(A))
+        end
+        # Cobertura mínima (SL-4c-O y SL-4c-O-B): ≥30 `cbid`, ≥30 orden con
+        # ≥10 de igualdad y ≥10 descendentes, ≥10 de cada uno con tx válidas y
+        # ≥5 con ambos defectos.
+        af = Dict{String,Int}()
+        for (modo, con_tx, it) in casos_forma_cobertura()
+            _, A, _ = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, con_tx = con_tx,
+                                                     iter = it)
+            for b in values(A.por_id)
+                d = primer_defecto_forma(A, b)
+                d === nothing && continue
+                motivo = get(A.motivos, b.id, :OK)
+                (motivo == MOTIVO_FORMA_CBID || motivo == MOTIVO_FORMA_ORDEN) || continue
+                if d === :cbid
+                    af["bloque_cbid"] = get(af, "bloque_cbid", 0) + 1
+                    any(tx -> tx.tipo in (Transicion.TxTransferencia, Transicion.TxDeposito,
+                                          Transicion.TxRetiro, Transicion.TxLiberacion),
+                        b.txs) && (af["con_tx_cbid"] = get(af, "con_tx_cbid", 0) + 1)
+                    any(tx -> tx.tipo == Transicion.TxEvidencia && tx.evidencia !== nothing &&
+                              !(tx.evidencia.h1.pre_hash < tx.evidencia.h2.pre_hash), b.txs) &&
+                        (af["ambos_cbid"] = get(af, "ambos_cbid", 0) + 1)
+                else
+                    af["bloque_orden"] = get(af, "bloque_orden", 0) + 1
+                    d === :orden_igual ?
+                        (af["bloque_orden_igual"] = get(af, "bloque_orden_igual", 0) + 1) :
+                        (af["bloque_orden_desc"] = get(af, "bloque_orden_desc", 0) + 1)
+                    any(tx -> tx.tipo in (Transicion.TxTransferencia, Transicion.TxDeposito,
+                                          Transicion.TxRetiro, Transicion.TxLiberacion),
+                        b.txs) && (af["con_tx_orden"] = get(af, "con_tx_orden", 0) + 1)
+                end
+            end
+        end
+        @test get(af, "bloque_cbid", 0) >= 30
+        @test get(af, "bloque_orden", 0) >= 30
+        @test get(af, "bloque_orden_igual", 0) >= 10
+        @test get(af, "bloque_orden_desc", 0) >= 10
+        @test get(af, "con_tx_cbid", 0) >= 10
+        @test get(af, "con_tx_orden", 0) >= 10
+        @test get(af, "ambos_cbid", 0) >= 5
+    end
+```
+
+Wait: for the dedicated `:ambos` mode, `primer_defecto_forma` returns `:cbid` (cbid wins). Good. And `bloque_cbid` counts it, with `ambos_cbid` if an order defect exists (yes).
+
+Note: the dedicated set guarantees 36 `:cbid` blocks + 8 `:ambos` blocks = 44 `bloque_cbid`; 36 equality + 36 descending = 72 `bloque_orden`. Good.
+
+Let me apply the edit.
+dsh: reasoning:
+Now `diferencias.jl`: update prose. Let me edit the header and the final explanation. The logic remains. Let me update:
+- Header comment (lines 1-15).
+- The output intro (lines 116-133).
+
+Let me update the output prose to reflect the per-transaction precedence. The key claim stays: every changed case has a defect. Let me edit the paragraphs.
+
+Current output prose:
+```
+    println(io, "Cada caso que cambia lleva al menos una `EvidenceTx` con `cbid` ajeno")
+    println(io, "(RAT-1) o con `pre_hash(H1) ≥ pre_hash(H2)` (EV-04). El bloque que la")
+    println(io, "contiene pasa de descartar la transacción y seguir válido a ser")
+    println(io, "**inválido en la admisión**; sus descendientes caen por `ErrSinPadre` y")
+    println(io, "desaparecen sus `DESC`/créditos/incidentes. v0.5 no contiene ningún caso")
+    println(io, "con orden no canónico (el generador anterior siempre ordenaba), así que")
+    println(io, "todos los cambios observados son de `cbid` ajeno. Los casos nuevos de")
+    println(io, "v0.6 (`forma-cbid`, `forma-orden`, `forma-ambos` y los aleatorios con modo")
+    println(io, "`:orden`/`:ambos`) no forman parte de este diff porque v0.5 no los tenía.")
+```
+
+I'll adjust "v0.6 (`forma-cbid`, `forma-orden`..." to mention both order types. And note the precedence. Let me edit.
+dsh: reasoning:
+Now update the top comment of diferencias.jl to mention SL-4c-O-B. Lines 1-15. Let me update the second paragraph.
+dsh: reasoning:
+Now let me check that `primer_defecto_forma` is exported and accessible from `exportar.jl` (which does `using EstadoDAG`). `exportar.jl` uses `primer_defecto_forma` unqualified. Since the module exports it, `using EstadoDAG` brings it in. Good.
+
+`run.jl` also uses `primer_defecto_forma` unqualified with `using EstadoDAG`. Good.
+
+`runtests.jl` uses `primer_defecto_forma` with `using EstadoDAG`. Good.
+
+Now let me verify the full set of edits by reading the modified regions. Let me also check `casos_forma_cobertura` is exported (it is, via `export ... casos_forma_cobertura` in EstadoDAG.jl line 782). And `caso_forma_dos_evidencias` — is it exported? The export list has `export caso_forma_evidencia, casos_forma_cobertura`. `caso_forma_dos_evidencias` is NOT exported. But `run.jl` calls `EstadoDAG.caso_forma_dos_evidencias(...)` (qualified), and `runtests.jl` calls `EstadoDAG.caso_forma_dos_evidencias(...)`. And `casos_dirigidos` (inside the module) calls it directly. So no export needed. Good.
+
+Now let me do a syntax check by loading the module. T01 might be mid-edit by O1B. Let me check the O1B activity and T01 mtime. Let me try a quick `julia` load. First, let me check T01's current state compiles. Actually, I'll just run a targeted load of EstadoDAG and run the new directed cases quickly.
+
+Let me check O1B status first.
+dsh: reasoning:
+O1B is actively editing T01 now (Transicion.jl 23:27:15, evidencia.jl 23:27:25). It could be mid-edit. T04 loads T01's files. If I load now, I might get errors. Let me check what T01 looks like now (quick syntax). Actually, the risk is real. Let me first check if `Transicion.jl` currently parses. I'll run `julia -e 'include(...)'`? That would take time. Better: use `julia --project=. -e 'using EstadoDAG'` and see. But T01 is being edited concurrently, so a failure might be transient.
+
+Actually, a cleaner strategy: wait for O1B to finish, then run. But the budget is 1h and O1B may take a while. I can continue with other work (writing docs, etc.) while O1B runs, then test at the end.
+
+Alternatively, I could make my tests robust by checking T01 load. But I can't avoid the dependency.
+
+Let me check the O1B stderr tail to see what it's doing and whether it's near completion. Since the file contains reasoning, I can read the tail. But that file is outside my workspace (it's in P-SLASHING). Reading is allowed. Let me tail it.
+dsh: reasoning:
+The O1B agent is also doing its work. It's reading T01's INFORME and PROGRESO. It seems it has already made code edits and is running tests. So T01 may be stable-ish now. But it will continue editing its INFORME/PROGRESO and possibly T01 source.
+
+I'll proceed to test my T04 code. But if T01 is mid-edit, errors could arise. Let me try loading now and see. If it fails on a T01 syntax error, I'll retry later.
+
+Let me run a quick load and the new directed cases. This is a short command. Set JULIA_DEPOT_PATH and unset LD_LIBRARY_PATH.
+
+Actually, note: the test log shows Julia version 1.13.0. Let me run a quick script to exercise the new cases and print coverage counts. This also validates syntax. Let me run in the background? It might take ~1-2 min for first compile. Let me run foreground with a generous timeout.
+
+Command:
+```
+cd T04 && export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true && env -u LD_LIBRARY_PATH julia --project=. -e 'using EstadoDAG; ...'
+```
+Let me write a small script inline. Actually, `-e` with a long script is fine. Let me test:
+- `chequear_forma_evidencia` per-tx.
+- The two directed cases.
+- Coverage counts from `casos_forma_cobertura`.
+
+Let me run.
+dsh: reasoning:
+The new directed cases work and the coverage has 44 cbid, 36 equality, 36 descending. T01 loads fine currently.
+
+Now let me run the full export. But first, there's a concern: `exportar.jl` writes `vectores-estado-dag-v0.6.txt` and coverage. Running export takes a while (previous ~? min). Let me check how long. It's probably a few minutes. Let me run it in the background and meanwhile update the docs. Actually, `run.jl` takes 76s. Export likely similar.
+
+But careful: T01 is being edited by O1B. If O1B changes T01 while export runs, the output could be inconsistent (mix of old/new T01). That's a risk for reproducibility. The director expects the final T04 artifacts to be generated with the final T01. Hmm.
+
+Given the parallel nature, the safest is to wait for O1B to finish before generating the final artifacts. But I don't know when. The O1B agent seems to be running tests and writing reports. Let me monitor. Meanwhile, I can run a full local rehearsal (generating to a temp output) to catch issues, and regenerate final artifacts once O1B settles.
+
+Actually, T04's `Transicion.jl` inclusion means the exported vectors depend on T01's semantic behavior. The B order says the rule is identical in T01/T04/Rust. The T01 change in O1B is: add equality cases + the two directed cases + remove alias exports. Does O1B change the *oracle* semantics? It says "T01 already goes transaction-to-transaction", so no semantic change. It only adds coverage/tests. So T01's oracle semantics won't change; only its generators/tests. Since T04 includes `evidencia.jl` and `generadores.jl` (T01's), those changes don't affect T04's own generators (T04 uses its own `generadores.jl` in `src/`). Wait, but T04 includes T01's `generadores.jl` as part of the module `Transicion`. T04's own module also includes `generadores.jl`? Let me check: `EstadoDAG.jl` includes `GDR.jl`, `RUTA_T01`, then later `include("generadores.jl")`, `include("dirigidos.jl")`, etc. These are relative to T04/src. But T04's `src/generadores.jl` `include`d inside module EstadoDAG defines functions in EstadoDAG. T01's `Transicion.jl` includes its own `generadores.jl` inside module Transicion. No name clash because namespaced.
+
+So O1B's changes to T01's `Transicion.jl` (oracle semantics) are the only ones that matter. If O1B only removes the alias const exports and doesn't change oracle semantics, T04 artifacts are stable. But if O1B does change semantics... it shouldn't, per its reading.
+
+Given the risk is low, but to be safe, I'll wait for O1B to finish before the final generation. Let me check O1B's progress. Actually, let me just proceed: run `Pkg.test()` now (it's the most expensive and validates everything). If T01 changes later, the test would need rerun. Hmm.
+
+Let me think about the value of waiting. The O1B agent has a 1h budget from 23:24, so it could run until ~00:24. That's long. I shouldn't idle. Let me do a rehearsal now and then finalize. If I detect T01 changed after, I can rerun the affected artifacts.
+
+Actually, the key insight: T04's final artifacts must match whatever T01 is at the time they're generated. Since the director will read them, and O1B's final T01 is what matters, ideally I generate after O1B. But the previous SL-4c-O run generated T04 v0.6 at 23:18 while T01 O1 finished at 23:22. So the previous O2 also ran in parallel and its artifacts were generated before T01's final. The previous O2 handled it by noting T01's final `ErrForma` produces identical texts. So this parallel coupling is accepted. I'll do the same and verify at the end that T01's oracle semantics are unchanged (or at least that T04's vectors re-read consistently).
+
+Let me now run `Pkg.test()` in the background. But note the test includes the relectura of the existing v0.6 file (which is the old one until I regenerate). Fine. Let me run tests after regenerating? The test `relectura de vectores` reads `resultados/vectores-estado-dag-v0.6.txt`. If I regenerate first, then test re-reads the new one. Let me order:
+
+1. Run export (regenerate v0.6, coverage).
+2. Run relectura.
+3. Run diferencias.
+4. Run run.jl.
+5. Run Pkg.test().
+
+Actually Pkg.test runs the relectura as part of it. Let me do export first.
+
+Let me run export in the background. It writes big files (~10MB). Let me time it.
+
+Let me start export.
+dsh: reasoning:
+While that runs, let me update `diferencias.jl` prose (done) and prepare the INFORME/PROGRESO sections. But I need numbers. Let me wait for export.
+
+Let me also think about whether the `exportar.jl` output includes the two new directed cases D-20/D-21 (through `casos_dirigidos`). Yes.
+
+Let me check the job output. Meanwhile, let me re-read the modified `exportar.jl` main section to ensure the `primer_defecto_forma` is accessible. Actually `exportar.jl` does `using EstadoDAG` so it should be. Let me wait.
+
+Let me also plan the report additions:
+
+**INFORME.md** new section `# T04-SL4c-O-B — Precedencia por transacción y los dos tipos de orden no canónico` with subsections:
+- SL4cOB.1 Lecturas adoptadas (faltas de definición)
+- SL4cOB.2 Cambio (precedencia per-tx; helper primer_defecto_forma)
+- SL4cOB.3 Cobertura
+- SL4cOB.4 Vectores, relectura y diferencias
+- SL4cOB.5 Reproducibilidad
+- SL4cOB.6 Lo que no demuestra
+
+**PROGRESO.md** similar with entries.
+
+**HORAS.log** append date -Is lines.
+
+Let me poll the job.
+dsh: reasoning:
+Export succeeded. Coverage:
+- bloque_cbid=283 (>=30)
+- bloque_orden=243 (>=30)
+- bloque_orden_desc=128 (>=10)
+- bloque_orden_igual=115 (>=10)
+- con_tx_cbid=166 (>=10)
+- con_tx_orden=152 (>=10)
+- ambos_cbid=161 (>=5)
+- ev_cbid=283, ev_orden=243, ev_orden_igual=243?? 
+
+Wait, `ev_orden_igual`=243 and `ev_orden_desc`=243, but `bloque_orden_igual`+`bloque_orden_desc`=115+128=243. The `ev_orden_igual`/`ev_orden_desc` counters add `max(n_ig,1)` per order block, so each order block contributes 1 to each (since `max(0,1)=1`), which is wrong! The `max(n_ig,1)`/`max(n_de,1)` should only count when the block actually has that type. Let me fix: `ev_orden_igual += n_ig` (not max). But then blocks with 0 of that type contribute 0. The original `ev_orden` used `max(n_orden,1)` which is fine because the block is an order block (n_orden>=1). But splitting needs plain sums.
+
+Actually the current output shows both 243 = total order blocks, clearly wrong. Let me fix `contar_forma_evidencia`:
+```julia
+acc["ev_orden"] = get(acc, "ev_orden", 0) + max(n_orden, 1)
+acc["ev_orden_igual"] = get(acc, "ev_orden_igual", 0) + n_ig
+acc["ev_orden_desc"] = get(acc, "ev_orden_desc", 0) + n_de
+```
+But `n_ig + n_de == n_orden`, so `ev_orden_igual + ev_orden_desc == ev_orden`. Good. However, the "ambos" blocks with cbid motivo don't enter the else branch, so their order defects aren't counted in `ev_orden_*`. That matches the previous semantics where `ev_orden` only counted within order-motivo blocks. Fine.
+
+Let me fix that. It doesn't affect the minimums (which use `bloque_orden_*`), but the counters should be correct.
+
+Also, the export took a while. Let me check the log head for timing. Actually let me just fix and rerun.
+
+Let me also double check the minimum OK line in cobertura-v0.6.txt.
+dsh: reasoning:
+Notice something interesting: the `vectores-estado-dag-v0.6.txt` now has 2000 cases (was 1961). The directed cases increased from 21 to 23? Let's compute: previously 21 directed + 900 + 960 + 80 = 1961. Now directed = 21 + 2 (D-20, D-21) = 23, but also `casos_forma_cobertura` previously 80 (36+36+8), now 36+36+36+8 = 116. So total = 23 + 900 + 960 + 116 = 1999. Hmm, export says 2000. Let me recount: base 14 + evidence 4 + forma cases in `casos_dirigidos` now 5 (cbid, orden_igual, orden_desc, ambos, dos_evidencias×2 = 6). Wait `casos_dirigidos` list: base 14, then 4 evidence + 4 forma (cbid, orden_igual, orden_desc, ambos) + 2 dos_evidencias = 14+4+6 = 24. Then dedicated coverage 36+36+36+8=116. Total = 24 + 900 + 960 + 116 = 2000. Yes, 2000. Good.
+
+Now fix the `ev_orden_igual`/`ev_orden_desc` counters. Then rerun export (it regenerates deterministically with same seed, so the sha will change only in coverage? Actually the vectors themselves don't depend on the counters, so the vectors file and its sha won't change—only `cobertura-v0.6.txt` changes. But rerunning export rewrites both with the same content for vectors (same sha). Good.
+
+Let me fix.
+dsh: reasoning:
+Now rerun export. But before that, note that O1B is modifying T01. The vectors I generated may be based on the T01 state at 23:28-23:31. If O1B changes semantics after, I'd need to regenerate. Let me check O1B's progress and T01 mtimes after the export run.
+
+Actually, since the T01 changes are additive coverage and alias removal, the oracle semantics shouldn't change. But the `Transicion.jl` was modified at 23:27:15. My export started at 23:28:59. So it used the 23:27:15 version. If O1B modifies Transicion.jl again, I'll need to check.
+
+Let me first rerun export to fix coverage, then run relectura and the tests. Let me also check T01 mtime now.
+
+Actually, let me hold off rerunning export until I know T01 is stable, to avoid wasted reruns. But the export is ~2.5 min. Let me check T01 mtime and O1B status.
+dsh: reasoning:
+The O1B stderr hasn't grown since 23:28:34 (now 23:29:31), and T01 files unchanged since 23:27:25. O1B may be running a long test job (like I am). It's likely stable for now. I'll proceed.
+
+Let me rerun export to fix the coverage counters. Since the vectors are deterministic and unchanged, I only need the coverage file. But rerunning export regenerates both. Fine.
+
+Let me run export again, then relectura, then diferencias, then run.jl, then Pkg.test. I'll chain them in one background command to save round trips, capturing logs. But `Pkg.test()` might be heavy; let me chain export + relectura + diferencias first, then run.jl and Pkg.test separately.
+
+Actually, let me chain everything and let it run in the background, then check. But if something fails mid-chain, I want the logs. I'll use `&&`-less sequencing with explicit exit capture. Let me write a script.
+
+Plan:
+```bash
+cd T04
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+J=/home/katana/torio/.juliaup/bin/julia
+# export
+{ date -Is; env -u LD_LIBRARY_PATH $J --project=. exportar.jl --dirigidos 1 --aleatorios 900 --ev-replicas 120; } > resultados/exportar-v0.6.log 2>&1
+# relectura
+env -u LD_LIBRARY_PATH $J --project=. src/lector_vectores.jl resultados/vectores-estado-dag-v0.6.txt > resultados/relectura-v0.6.log 2>&1
+# diferencias
+env -u LD_LIBRARY_PATH $J --project=. src/diferencias.jl resultados/vectores-estado-dag-v0.5.txt > resultados/diferencias-v0.5-v0.6.log 2>&1
+# run.jl
+env -u LD_LIBRARY_PATH $J --project=. run.jl --seed 0x5a5a --replicas 200 > resultados/run-v0.6-stdout.log 2>&1  # wait, run.jl writes to resultados/run-estado-dag-v0.6.log
+```
+
+Hmm, `run.jl` writes its own log file `resultados/run-estado-dag-v0.6.log` and stdout. Let me capture stdout to `resultados/run-v0.6-stdout.log`.
+
+Then Pkg.test:
+```
+env -u LD_LIBRARY_PATH $J --project=. -e 'using Pkg; Pkg.test()' > resultados/test-pkg-v0.6.log 2>&1
+```
+
+Let me estimate: export ~3 min, relectura ~1 min, diferencias ~1 min, run.jl ~80s, tests ~20s + compile. Total maybe 7-8 min. Let me run in background.
+
+But there's a catch: the `relectura` inside `Pkg.test()` reads v0.6, so it must be regenerated first. Good.
+
+Also, `diferencias.jl` exits with code 1 if there are unjustified changes. I need to capture its exit code. Let me add `; echo "[exit $?]"` per step. Let me structure with explicit echo.
+
+Let me write a small shell script in the workspace? The order says write within T04. I can create a temp script but better to just run a single bash command with a here-doc. Let me do it as one command.
+
+One concern: If `Pkg.test()` runs while T01 is mid-edit, it could fail. I'll handle that.
+
+Let me run the chain in the background.
+dsh: reasoning:
+While that runs, let me prepare the report text and check the diferencias logic. Also, let me double-check the `primer_defecto_forma` is exported and used correctly. Already tested.
+
+Let me think about a subtle issue in `diferencias.jl`: The `defectos_del_caso` marks a block with any defect. The diff checks changed cases have a defect. With the new per-tx precedence, for v0.5 inputs all defects are cbid, so it should be unchanged. The `resultado_corregido` calls `resolver!` which uses `chequear_forma` (per-tx now). Fine.
+
+But there's a potential issue: `diferencias.jl` compares `caso.desc` (from v0.5 file) with `nuevo.desc` computed via `aplicar_historia`. For v0.5 inputs, cbid defects were semantic descartes in v0.5 but now invalidate the block. So many blocks change (135 cases). That was the previous result and should remain.
+
+Now let me think about the report numbers I'll need:
+- `Pkg.test()` total passes.
+- `run.jl` ESTADO and forma counts.
+- relectura cases/discrepancias.
+- diferencias changed cases.
+- coverage numbers.
+- v0.6 sha256.
+- v0.6 cases count.
+
+Let me wait for the chain. Meanwhile, let me read the PROGRESO.md tail to match format.
+dsh: reasoning:
+Good, I have the format. Now let me wait for the chain. Let me check the job.
+
+Actually, while waiting, let me examine the `entrada-SL4c-O.log` and see how they recorded the frozen entry. For SL-4c-O-B I should create `resultados/entrada-SL4c-O-B.log` with the 3/3 check. Let me do that now (it's I/O). The order's entry file lists 3 files relative to ZEROX. Let me record.
+dsh: reasoning:
+Now let me check the chain job. Let me wait for it.
+dsh: reasoning:
+All green:
+- export exit 0, sha256 `e9cbf040af5e1548e8721861ec91d3b99652d09195ea1574ae642173cbfef148`. Wait, the sha changed from the first run (`fff984...`) to `e9cbf040...`! But the vectors should be deterministic. Why did the sha change?
+
+Hmm. The first export ran at 23:28:59, the second at 23:29:39. Both use the same seeds. The vectors file includes a header line with the `fecha` (date -Is) written at generation time! Let me check: line 338 in exportar.jl: `println(io, "# vectores-estado-dag-v0.6 · T04-SL4c-O (forma v4: cbid/orden) · ", fecha, ...)`. The `fecha` is `date -Is` by default, so the header differs between runs. Thus the sha changes every run! That's a reproducibility problem.
+
+Wait, in the previous v0.6, the documented sha `c383abab...` was from a specific run. And `.sha256` records that. But the header contains the timestamp, so re-running gives a different sha. The LECTOR ignores `#` lines. But reproducibility per LINEO requires the same command to reproduce. Hmm.
+
+Actually, in the previous O2 report, the relectura and .sha256 were from one run. The order says "Regenerar vectores... su .sha256". The header timestamp is part of the file. The previous version had this same behavior. Let me check the first line of v0.6.
+
+Also, the sha changed because I ran export twice. The `.sha256` now matches the second run (the chain). But the first run's artifacts were overwritten. Fine.
+
+However, there's a real reproducibility concern: the header timestamp. Should I pass `--fecha` a fixed value to make it reproducible? LINEO §7 demands reproducibility. The previous runs documented `--fecha`? Let me check the export log/INFORME reproduction command: they ran `exportar.jl --dirigidos 1 --aleatorios 900 --ev-replicas 120` without `--fecha`, so the sha was not reproducible across runs. Hmm, but the hash in the report is tied to a specific timestamp. That's a known weakness. Actually, the previous run's `vectores-estado-dag-v0.6.txt` first line has the date. Let me check.
+
+The order says "Regenerar vectores-estado-dag-v0.6.txt (aún no lo consume nadie), su .sha256". So the artifacts just need to be consistent: `.sha256` must match the file. It does after the second run. The relectura uses the current file. Good.
+
+But wait: the relectura in the chain ran after export, so it read the just-generated file (sha e9cbf040). Good.
+
+Now the coverage: `ev_orden_igual=115`, `ev_orden_desc=128`, `ev_orden=243` = sum. Correct now.
+
+- diferencias: cambiados=135, con_defecto=181, fallos=0. Same as before. Good.
+- run exit 0, test exit 0.
+
+Now let me check the detailed logs: run.jl ESTADO, TOTAL-EV forma counts, test summary, relectura.
+dsh: reasoning:
+All good:
+- relectura: 2000 cases, 0 discrepancies.
+- run.jl: ESTADO = SUPERADO, 0 fallos, 129.7s; forma_cbid=410, forma_orden=286, forma_orden_igual=142, forma_orden_desc=144.
+- Pkg.test: 472/472.
+
+Now, the header of the vectors says "T04-SL4c-O" not "T04-SL4c-O-B". I should update that header to reflect SL-4c-O-B. Also, the timestamp makes the sha non-reproducible; but that was pre-existing. The order says regenerate; I'll leave the timestamp behavior (or make it deterministic? Let me think).
+
+Actually, for reproducibility (LINEO §7), the exact command should reproduce the same artifact. With `date -Is` in the header, it won't. The previous SL-4c-O did the same, so the director accepted it. But the B order emphasizes "0 cambios sin defecto" and doesn't mention reproducibility. I'll leave it but maybe pass a fixed `--fecha` in the documented command? Hmm, but then the file would contain a fake date. The previous convention records the real generation date in the header. The `.sha256` is tied to that. I'll keep it consistent with the prior artifact and document the generation timestamp.
+
+Wait, actually, maybe I should regenerate once more with the header updated to "T04-SL4c-O-B" and then immediately record the sha. But the sha is automatically written by exportar.jl and relectura runs on it. So I can just update the header text, rerun export + relectura + diferencias + run + test? That's a lot. Actually, only the vectors file header affects the sha; the run.jl and test don't depend on the content header. But if I rerun export, the vectors change (header + timestamp) and the sha changes; relectura should still pass; the `DIFERENCIAS` compares v0.5 vs re-run oracle, independent of the v0.6 file content (it reads v0.5). Actually `diferencias.jl` reads the v0.5 file, so unaffected by the v0.6 header. So I could update the header string, rerun export (regenerating vectors + coverage), then rerun just relectura. But Pkg.test's relectura reads the new file; it would still pass. run.jl is independent of the vectors file.
+
+Let me update the header to say `T04-SL4c-O-B` and rerun export + relectura. Then the test log's relectura is stale (it referenced the old file, but content-wise identical except header which is ignored). Since the test passed on the old file, and the new file differs only in the `#` header line (ignored by the reader), re-running the test would pass identically. But to be rigorous, I should rerun Pkg.test after the final export. Hmm, Pkg.test takes ~30s. Fine.
+
+Let me update the header line in exportar.jl:
+```julia
+println(io, "# vectores-estado-dag-v0.6 · T04-SL4c-O-B (forma v4: precedencia por tx; cbid/orden igual|desc) · ", fecha, ...)
+```
+
+Also update the coverage header line `# cobertura T04-SL4c-O v0.6` → SL4c-O-B.
+
+Let me also reconsider whether to make the date deterministic. The order doesn't require it. I'll keep `--fecha` default but I'll document the real timestamp. Actually, thinking about it more: the `.sha256` is supposed to let someone verify the file. If they regenerate, the header date differs and the hash won't match—but that's the nature of a timestamped artifact. The previous artifacts had the same property. Fine.
+
+Hmm, but there's a subtlety: The `--fecha` argument exists precisely to freeze the date for reproducibility. The previous reproduction command didn't use it. I'll leave the behavior and note the generation timestamp in the report. Actually, wait — let me reconsider: the order says "relectura 0 discrepancias" and "su .sha256". The .sha256 I have matches. Good.
+
+Let me update the header strings and regenerate. Let me do it once more and then rerun relectura + Pkg.test (since test reads the file). Actually I'll rerun export + relectura + Pkg.test. run.jl doesn't need rerun (it doesn't read v0.6). But the test log would then contain a relectura of 2000 cases (same). Let me do that.
+
+Actually, let me minimize churn: update header, rerun export (background), then relectura, then Pkg.test. I'll skip run.jl since it's independent and already green (the code didn't change). But the code DID change? No, only exportar.jl header strings. run.jl unchanged. Good.
+
+Wait, I already ran the full chain with the current code. If I only change the header string in exportar.jl, the oracle code is unchanged, so run.jl result stands. I'll just regenerate the vectors and rerun relectura + Pkg.test (to keep the test log's relectura consistent).
+
+Let me update the header lines.
+dsh: reasoning:
+Now regenerate export + relectura + Pkg.test. Let me also run run.jl again? Since the run.jl log header has a timestamp, and the code hasn't changed, it's fine. But to be thorough and because the run.jl code did change (I added the precedence checks and split counters), the current run log already includes those. Good. No need to rerun after a header-only exportar change.
+
+Let me run export + relectura + Pkg.test in the background.
+dsh: reasoning:
+While that runs, let me start drafting the INFORME and PROGRESO sections. I have most numbers from the earlier run; the final run will produce new timestamps and a new sha, but the counts should be identical (deterministic). Let me wait for the final numbers though.
+
+Let me also prepare the report text and update it once I have the final sha.
+
+Let me think about what to write.
+
+### INFORME.md section
+
+```
+---
+
+# T04-SL4c-O-B — Precedencia por transacción y los dos tipos de orden no canónico
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:24–23:35).
+**Fuente:** `ORDEN-SL4c-O-B.md` (revisión del director de SL-4c-O). **Zona:** `T04/`.
+Sin Python; sin commit ni push; sin secretos.
+
+## SL4cOB.0. Entrada congelada (inicio)
+
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-B.sha256` (desde `ZEROX/`): **3/3 OK**
+(`ORDEN-SL4c-O-B.md`, `ORDEN-SL4c-O.md`, `V-ZRX/LINEO.md`). Registro
+`resultados/entrada-SL4c-O-B.log`.
+
+## SL4cOB.1. Falta de definición detectada antes de editar
+
+Ninguna bloqueante; tres lecturas informadas antes de tocar código:
+
+- **«Estructura vigente» en T04.** La regla manda, por transacción, «estructura vigente → `cbid`
+  → orden». En T04 el único chequeo estructural de la evidencia
+  (`ErrEvidenciaConEntradas`, `n_in/n_out/n_wit`) es un descarte semántico al fusionar, no parte
+  de `chequear_forma`; moverlo cambiaría casos **sin** los dos defectos, que SL-4c-O prohíbe. Por
+  tanto el bucle por transacción de T04 aplica solo `cbid → orden`; la estructura queda donde
+  estaba (declarado también en SL4cO.7).
+- **Reparto de mínimos.** Se mantienen los mínimos de SL-4c-O (`bloque_cbid≥30`,
+  `bloque_orden≥30`, `con_tx_*≥10`, `ambos_cbid≥5`) y se añaden `bloque_orden_desc≥10` y
+  `bloque_orden_igual≥10`.
+- **Versionado.** Los vectores v0.6 se **regeneran** sobrescribiendo los de SL-4c-O (aún no los
+  consume nadie), conservando el nombre `vectores-estado-dag-v0.6.txt`.
+
+## SL4cOB.2. Cambio
+
+- `src/EstadoDAG.jl`: `chequear_forma_evidencia` deja de ser global al bloque (todos los `cbid`
+  antes de todos los órdenes) y pasa a **por transacción**: recorre `b.txs` en su orden y, para
+  cada `EvidenceTx`, comprueba `cbid` → orden canónico; la primera defectuosa fija el motivo.
+  Nuevo helper `primer_defecto_forma` (exportado) que devuelve `:cbid`, `:orden_igual`,
+  `:orden_desc` o `nothing`, usado por el oráculo, el exportador y las pruebas.
+- `src/generadores.jl`: `evidencia_aleatoria` distingue `:orden_igual` (`H1 = H2`) y
+  `:orden_desc` (`H1 > H2`), más `:ambos_desc`; el generador aleatorio usa los dos tipos.
+- `src/dirigidos.jl`: `_evidencia_forma` gana `:orden_igual`; `casos_forma_cobertura` pasa a
+  36 `cbid` + 36 igualdad + 36 descenso + 8 ambos; nuevos D-20/D-21
+  (`caso_forma_dos_evidencias`) con `[orden, cbid]` y `[cbid, orden]`.
+- `exportar.jl`: cobertura desglosada (`bloque_orden_igual/desc`) y mínimos nuevos.
+- `run.jl` y `test/runtests.jl`: aserciones de los dos tipos y de la precedencia.
+- `src/diferencias.jl`: prosa actualizada (la precedencia no altera el diff de v0.5).
+
+## SL4cOB.3. Resultados
+
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | ... |
+| `run.jl --seed 0x5a5a --replicas 200` | ESTADO = SUPERADO, 0 fallos, ... s |
+| Relectura independiente de v0.6 | 2000 casos, 0 discrepancias |
+| `DIFERENCIAS-v0.5-v0.6.md` | 1878 entradas; 181 con defecto; 135 cambian; 0 sin defecto |
+| Cobertura forma | ... |
+| Entrada congelada | 3/3 OK |
+
+## SL4cOB.4. Vectores y relectura
+...
+## SL4cOB.5. Reproducibilidad
+...
+## SL4cOB.6. Lo que T04-SL4c-O-B NO demuestra
+...
+```
+
+### PROGRESO.md similar.
+
+Let me wait for the job.
+
+Let me check the job output.
+dsh: reasoning:
+Final run:
+- sha256: `b1710e4cd0e99a7602555595f23ef050fe174ef9389768b56481927b0d79a331`
+- vectors header timestamp 2026-09-26T23:33:42+02:00
+- relectura, diferencias, test exit 0.
+
+Let me get the final test count, run log remains from previous run (which is fine, code unchanged). Let me verify the test count and relectura, and the coverage/min line. Also verify that the run log is the current one (from the earlier chain at 23:30:18). Let me check.
+dsh: reasoning:
+All final numbers collected:
+- Pkg.test: 472/472.
+- run.jl: SUPERADO, 0 fallos, 129.7 s; forma_cbid=410, forma_orden=286, forma_orden_igual=142, forma_orden_desc=144.
+- relectura: 2000 cases, 0 discrepancies.
+- diferencias: 1878 cases, 181 with defect, 135 changed, 0 unjustified.
+- cobertura: bloque_cbid=283, bloque_orden=243 (igual=115, desc=128), ev_cbid=283, ev_orden=243, ambos_cbid=161, con_tx_cbid=166, con_tx_orden=152; minimos OK. Semantic evidence: aplicada=245, sin_saldo=42, deshecha=59, duplicada=20, tardia=145, construida=452.
+- vectors: 2000 cases, sha256 b1710e4cd0e99a7602555595f23ef050fe174ef9389768b56481927b0d79a331.
+- entrada: 3/3 OK.
+
+Wait, run.jl `tiempo_pared_s = 129.7` but the run started at 23:30:30 and the chain log said run started 23:30:18. Fine.
+
+Now let me verify the T01 dependency: the run was done when T01's Transicion.jl was at 23:27:15. Let me check if O1B changed T01 since. If it did, I should consider regenerating. Let me check.
+
+Also, I should update the vectors' dependency note. Let me check T01 mtime and O1B status.
+dsh: reasoning:
+O1B hasn't changed T01's `Transicion.jl` (still 23:27:15) since my runs. Good. My artifacts are consistent with the current T01.
+
+Now let me update the documentation. Let me first check the last lines of the diffs file and the coverage top to ensure the header reflects SL4c-O-B. Let me look.
+dsh: reasoning:
+The DIFERENCIAS header still says "T04 SL-4c-O". Let me update `diferencias.jl` to say "T04 SL-4c-O / SL-4c-O-B". Then I should rerun diferencias (fast) to update the file. Actually, the difference file only needs the header update; but regenerating is cheap (~10s). Let me update the header in the script and rerun.
+
+Also, the differences `.md` prose mentions "v0.5 no contiene ningún caso con orden no canónico" — good. But the header line "T04 SL-4c-O" should be B.
+
+Let me edit.
+dsh: reasoning:
+Now, let me write the INFORME and PROGRESO sections. I'll append to both files. Let me read the exact tail of INFORME to append cleanly (after line 746). And PROGRESO tail. Then append.
+
+Let me construct the INFORME section. Also note the SL4cO section header "SL4cO.7. Lo que T04-SL4c-O NO demuestra" ends the file. I'll append after.
+
+Let me write the sections.
+
+For the INFORME, I'll add:
+
+```
+---
+
+# T04-SL4c-O-B — Precedencia por transacción y los dos tipos de orden no canónico
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:24–23:35).
+**Fuente:** `ORDEN-SL4c-O-B.md`, revisión del director de SL-4c-O. **Zona:** `T04/`.
+Sin Python; sin commit ni push; sin secretos.
+
+## SL4cOB.0. Entrada congelada (inicio)
+
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-B.sha256` (desde `ZEROX/`): **3/3 OK**
+(`ORDEN-SL4c-O-B.md`, `ORDEN-SL4c-O.md`, `V-ZRX/LINEO.md`); registro
+`resultados/entrada-SL4c-O-B.log`.
+
+## SL4cOB.1. Falta de definición detectada antes de editar
+
+Ninguna bloqueante; tres lecturas informadas antes de tocar código:
+
+- **«Estructura vigente» en T04.** La regla manda, por transacción, «estructura vigente → `cbid`
+  → orden canónico». En T04 el único chequeo estructural de la evidencia
+  (`ErrEvidenciaConEntradas`, `n_in/n_out/n_wit`) es un **descarte semántico** al fusionar, no
+  parte de `chequear_forma`; moverlo cambiaría casos **sin** los dos defectos, que SL-4c-O
+  prohíbe. El bucle por transacción de T04 aplica por tanto solo `cbid → orden`; la estructura
+  queda donde estaba (ya declarado en SL4cO.7).
+- **Reparto de mínimos.** Se conservan los mínimos de SL-4c-O (`bloque_cbid≥30`, `bloque_orden≥30`,
+  `con_tx_cbid/con_tx_orden≥10`, `ambos_cbid≥5`) y se añaden `bloque_orden_desc≥10` y
+  `bloque_orden_igual≥10`.
+- **Versionado.** Los vectores v0.6 se **regeneran** sobrescribiendo los de SL-4c-O (aún no los
+  consume nadie), conservando el nombre `vectores-estado-dag-v0.6.txt`.
+
+## SL4cOB.2. Cambio aplicado
+
+- `src/EstadoDAG.jl`: `chequear_forma_evidencia` deja de ser global al bloque (todos los `cbid`
+  antes que todos los órdenes) y pasa a **por transacción**: recorre `b.txs` en su orden y, para
+  cada `EvidenceTx`, comprueba `cbid` → orden canónico; la primera defectuosa fija el motivo.
+  Nuevo helper **`primer_defecto_forma`** (exportado) que devuelve `:cbid`, `:orden_igual`,
+  `:orden_desc` o `nothing`, usado por el oráculo, el exportador, `run.jl` y las pruebas.
+- `src/generadores.jl`: `evidencia_aleatoria` distingue `:orden_igual` (`H1 = H2`) y `:orden_desc`
+  (`H1 > H2`), más `:ambos_desc`; el generador aleatorio usa los dos tipos de orden.
+- `src/dirigidos.jl`: `_evidencia_forma` gana `:orden_igual`; `casos_forma_cobertura` pasa a 36
+  `cbid` + 36 igualdad + 36 descenso + 8 ambos; nuevos **D-20/D-21**
+  (`caso_forma_dos_evidencias`) con `[orden, cbid]` y `[cbid, orden]`.
+- `exportar.jl`: cobertura desglosada (`bloque_orden_igual/desc`, `ev_orden_igual/desc`) y mínimos
+  nuevos; cabecera v0.6 rotulada SL-4c-O-B.
+- `run.jl` y `test/runtests.jl`: aserciones de los dos tipos de orden y de la precedencia.
+- `src/diferencias.jl`: prosa actualizada; la precedencia por transacción no altera el diff de
+  v0.5 (todos sus defectos son `cbid`).
+
+## SL4cOB.3. Resultados
+
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | **472/472** (`resultados/test-pkg-v0.6.log`) |
+| `run.jl --seed 0x5a5a --replicas 200` | **ESTADO = SUPERADO**, 0 fallos, 129,7 s |
+| Relectura independiente de v0.6 | **2 000 casos, 0 discrepancias** (`relectura-v0.6.log`) |
+| `DIFERENCIAS-v0.5-v0.6.md` | 1 878 entradas; **181** con defecto, **135** cambian, **0** sin defecto |
+| Cobertura de forma | `bloque_cbid=283`, `bloque_orden=243` (igual **115**, desc **128**), `ambos_cbid=161`, `con_tx_cbid=166`, `con_tx_orden=152` (`minimos_SL4cO=OK`) |
+| Entrada congelada | **3/3 OK** |
+
+`run.jl`: 3 000 historias base + 1 600 con C-EVP (11 254 válidos, 2 208 descartes, 37 duplicadas,
+224 tardías), `forma_cbid` **410**, `forma_orden` **286** (igualdad **142**, descenso **144**),
+600 000 órdenes IE-3. La cobertura semántica de evidencia se mantiene sobre mínimos:
+`aplicada` 245, `sin_saldo` 42 (≥30), `deshecha` 59 (≥30), `duplicada` 20, `tardia` 145,
+`construida` 452.
+
+## SL4cOB.4. Vectores, relectura y diferencias
+
+- `resultados/vectores-estado-dag-v0.6.txt`: **2 000 casos** (24 dirigidos + 900 aleatorios +
+  8×120 de evidencia + 116 de forma), sha256
+  `b1710e4cd0e99a7602555595f23ef050fe174ef9389768b56481927b0d79a331`; `.sha256` relativo a
+  `T04/`. Formato de línea idéntico a v0.5.
+- Relectura independiente: **2 000 casos, 0 discrepancias**.
+- `DIFERENCIAS-v0.5-v0.6.md`: **135** cambios, todos con defecto (`cbid` ajeno; v0.5 no tenía
+  orden no canónico); `VEREDICTO = SIN CAMBIOS INJUSTIFICADOS`. La precedencia por transacción no
+  cambia ningún resultado de v0.5.
+- v0.4 y v0.5 **intactos**.
+
+## SL4cOB.5. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl \
+    --dirigidos 1 --aleatorios 900 --ev-replicas 120
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-estado-dag-v0.6.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/diferencias.jl resultados/vectores-estado-dag-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; nada escrito fuera de `T04/`. El sha256 de
+los vectores incluye la fecha real de generación en su cabecera (misma convención que v0…v0.5).
+
+## SL4cOB.6. Lo que T04-SL4c-O-B NO demuestra
+
+- Sigue sin mover la comprobación estructural de la evidencia (`ErrEvidenciaConEntradas`) a la
+  forma: en T04 es descarte semántico; la precedencia por transacción solo cubre `cbid` y orden.
+- Los casos de dos evidencias defectuosas son dirigidos (D-20/D-21); el generador aleatorio
+  produce cada defecto en transacciones separadas con baja probabilidad, así que la precedencia
+  entre defectos de transacciones distintas se demuestra con esos dos casos, no con estadística.
+- La coherencia con T01 (O1) depende de que O1 mantenga la precedencia por transacción; T04
+  incluye `Transicion.jl` de T01 como dependencia de solo lectura.
+```
+
+That's comprehensive. Now the PROGRESO section, more concise.
+
+Let me append to INFORME.md. I'll use the edit tool with old_string being the last lines of the file. Let me get the exact last lines. Tail showed ending with:
+```
+- `DIFERENCIAS-v0.5-v0.6.md` compara las entradas de v0.5; no es un diff de los casos aleatorios
+  nuevos de v0.6 (el generador cambió para cubrir `:orden`/`:ambos`).
+```
+Let me use that as the anchor and append after.
+
+Actually, I need to be careful: the exact last line uses `:orden`/`:ambos`. Let me read the last 3 lines exactly.
+dsh: reasoning:
+Now let me append the INFORME section. Since the edit tool requires old_string uniqueness, I'll anchor on the last two lines. Let me provide the full append.
+
+Actually, I can use `write`? No, that replaces the whole file (45KB). Better to use edit with the last lines as old_string and new_string = last lines + appended section.
+
+Let me do it.
+dsh: reasoning:
+Now append to PROGRESO.md. Anchor on last two lines. Let me write a concise section.
+dsh: reasoning:
+I need to read PROGRESO.md first (I only read the tail via bash). The fs-observation-policy requires the read tool. Let me read it (at least the tail via the read tool with offset). It's 37KB. Let me read with offset near the end to satisfy the policy? The policy probably requires reading the file. Let me read it fully or a portion? The tool says "read the file, then retry". Let me read the whole file (it's ~1000 lines). I'll read with a large limit.
+
+Actually, I can read just a chunk; the policy likely tracks that the file was read at all. Let me read the last 120 lines using offset. But the edit anchors on the last two lines, which I've seen. Let me read the file properly.
+
+Let me get the line count first, then read with offset. Actually, `read` with no offset reads up to 2000 lines, which covers it. Let me just read the whole file. 37KB is fine.
+dsh: reasoning:
+Good, the file is 548 lines. I read the head. The fs policy may require a read of the specific region? It said "file has not been read". I've now read lines 1-40. Let me retry the edit. If it still fails, I'll read the tail region with the read tool.
+
+Let me retry the edit.
+dsh: reasoning:
+Now update HORAS.log with real `date -Is` timestamps. Let me append the relevant times. The instruction says `HORAS.log` with `date -Is` real. Let me append a few entries covering the work. I'll use the actual times I observed: start ~23:24, export 23:29, chain, final 23:34. Let me append.
+
+Actually, HORAS.log is a log of real timestamps. Let me append:
+```
+2026-09-26T23:24:39+02:00  # SL-4c-O-B O2 inicio (lanzamiento)
+2026-09-26T23:28:59+02:00  # SL-4c-O-B exportar v0.6 (primer intento)
+2026-09-26T23:29:39+02:00  # SL-4c-O-B exportar/relectura/diferencias/run/Pkg.test
+2026-09-26T23:33:30+02:00  # SL-4c-O-B exportar v0.6 final
+2026-09-26T23:34:33+02:00  # SL-4c-O-B cierre: 472/472, SUPERADO, 2000 casos, 0 discrepancias
+```
+
+I need to read HORAS.log with the read tool first (I only catted it). Let me read it.
+dsh: reasoning:
+Now I need to regenerate `DIFERENCIAS-v0.5-v0.6.md` because I changed its header in `diferencias.jl` and haven't rerun it. Let me rerun diferencias. Also, I should update `METODO.md`? The order says only INFORME and PROGRESO. METODO documents T01 dependency and ambiguity. It might be good to add a note about the `primer_defecto_forma`/precedence, but not required. Let me check if METODO mentions `chequear_forma_evidencia`. If the method describes the old global precedence, I should update it. Let me grep.
+dsh: reasoning:
+METODO.md line 31-33 describes the old "precedencia global al bloque". This is now wrong. I should update it to reflect per-transaction precedence. Let me read the surrounding lines.
+dsh: reasoning:
+Now rerun diferencias to update the header. Let me also verify the whole thing once more. I'll run diferencias (reads v0.5, writes DIFERENCIAS). That also has an internal check (exit 0). Let me run it foreground; it takes ~10s.
+
+Also, I should double check that `vectores-estado-dag-v0.6.sha256` matches the file after the final run. It does (b1710e...). Let me verify with sha256sum -c for the v0.6 file.
+
+Let me also verify `ENTRADA-SL4c-O.sha256` still 7/7 (v0.4/v0.5 intact) and the new `ENTRADA-SL4c-O-B.sha256` 3/3. Actually the previous order's entry file includes v0.5 vectors sha; if v0.5 intact, good. Let me run both.
+
+Let me do all in one command.
+dsh: reasoning:
+The v0.6 sha check failed because the `.sha256` path is relative to `T04/`, not `ZEROX/`. The file content is `b1710e...  resultados/vectores-estado-dag-v0.6.txt`. I ran `sha256sum -c` from ZEROX with a path argument; it resolves the listed relative path against the cwd. I need to run from T04. Let me verify from T04. Also the `=== ENTRADA-SL4c-O (7/7) ===` output only showed the last 3 lines; let me confirm all 7 coincide.
+
+Let me verify.
+dsh: reasoning:
+All hashes verify:
+- v0.6 sha matches.
+- ENTRADA-SL4c-O 7/7 OK (v0.4 and v0.5 intact).
+- ENTRADA-SL4c-O-B 3/3 OK.
+
+Now, one issue: The DIFERENCIAS file was regenerated with the header "T04 SL-4c-O / SL-4c-O-B". Good.
+
+Now let me double-check the whole chain is consistent with the final artifacts:
+- The vectors file header says SL-4c-O-B, sha b1710e...
+- The `.sha256` matches.
+- The relectura-v0.6.log corresponds to the file with sha b1710e... (it ran at 23:33:42+ after export).
+- The test-pkg-v0.6.log relectura also read the file. The test ran at 23:33:xx after the final export? Let me check the order in bash-3: export (23:33:30), then relectura, then diferencias, then test. Yes, test ran after export. Good.
+- run.jl log is from the earlier chain (23:30:30) with the same oracle code (only exportar header changed after). run.jl doesn't depend on exportar. Good.
+
+Wait — I updated `diferencias.jl` header AFTER the test run? The test doesn't run diferencias.jl. And I reran diferencias just now. Fine.
+
+But I also updated `METODO.md`, `INFORME.md`, `PROGRESO.md`, `HORAS.log` after the test run. Those don't affect tests.
+
+Now, one more consideration: The `Pkg.test()` ran with the final oracle code. Yes.
+
+Now let me review the git-less diff of what I changed to ensure nothing is broken. Let me list the modified files and quickly sanity check the key edited functions by reading them.
+
+Let me re-read `chequear_forma_evidencia`/`primer_defecto_forma` and the `evidencia_aleatoria`. Also verify there are no lingering references to the removed `:orden` mode semantics (which I kept as alias). Let me grep for `:orden` usage.
+dsh: reasoning:
+There's a stale docstring in `dirigidos.jl` line 731-738 (the D-19 docstring) that still mentions `:orden`/`:ambos`. Let me read and update it to mention `:orden_igual`/`:orden_desc`. Let me view lines 730-745.
+dsh: reasoning:
+Also `diferencias.jl` line 35 docstring uses `:orden` as a symbol label for a defect category, not a mode. That's fine.
+
+Now, there's a subtlety in `_evidencia_forma`: I kept `:orden` as an alias for `:orden_desc`. Since I updated all call sites to `:orden_desc`/`:orden_igual`, the `:orden` alias is only for compatibility. Fine.
+
+Now, I changed `src/dirigidos.jl` docstring after running tests. This is a comment-only change, doesn't affect behavior. But to be rigorous, the test log was produced with the code before this comment change. Since comments don't affect behavior, it's fine. But let me consider whether to rerun tests to be safe. The order says Pkg.test() in green; it was green with functionally identical code. A comment change doesn't invalidate. I'll note that.
+
+Actually, to be fully rigorous and avoid any doubt, let me rerun `Pkg.test()` one final time after all edits. It takes ~1 min. Let me do that at the end. Also re-run the relectura? The vectors file hasn't changed since the last export. The test will re-read it.
+
+But wait: O1B might modify T01 while the test runs. Let me check T01 mtime again before the final test. If O1B is still editing, the test could fail. Let me check.
+
+Also, I should consider the INFORME claim "472/472 (447 previas + 25 nuevas)". Let me verify: 472 - 447 = 25. Yes.
+
+Now, before final test, let me also update the `INFORME.md` mention that the test log corresponds to the final code. Fine.
+
+Let me run a final `Pkg.test()` and also a quick relectura to be safe. Let me check T01 stability first.
+dsh: reasoning:
+T01's `Transicion.jl` still at 23:27:15. O1B's stderr grew at 23:35:48 (it's writing its report). T01 source stable. Good.
+
+Let me run the final `Pkg.test()` (which re-reads v0.6). Then I'm done. Let me run it in the background and wait.
+
+Actually, let me also run a final full re-generation to guarantee the artifacts match the exact final code. Since the only post-export code changes are comments/docs, the artifacts are valid. But to be safe and consistent, I could regenerate once more. However, regeneration changes the timestamp/sha, forcing me to update INFORME/PROGRESO with the new sha. That's churn. Since the changes are comment-only, I'll keep the current artifacts and just rerun tests.
+
+Let me run Pkg.test.
+dsh: reasoning:
+While the final test runs, let me review the full diff of my code changes to ensure correctness. Let me read the key modified functions once more.
+
+Let me view the new `chequear_forma_evidencia` region and `evidencia_aleatoria`.
+dsh: reasoning:
+This looks correct.
+
+Now, one important nuance: the rule says "para cada una, su forma completa (estructura vigente → cbid → orden canónico)". My `primer_defecto_forma` skips `ev === nothing` (no headers) and continues to the next tx. But T01's `aplicar_evidencia!` returns `ErrSinEvidencia` for `ev === nothing` — which is a semantic error in T04 (descarte), not form. So skipping is consistent with the declared scope. Good.
+
+Now, another nuance: What if a block has tx1 = evidence with `ev === nothing` (no headers) and tx2 = evidence with cbid? In T04, tx1 is skipped, tx2 → cbid → block invalid. In T01, tx1 would return `ErrSinEvidencia` first (semantic error, invalidates strict block). Motivo divergence, but invalidity in T04... wait, in T04 `ErrSinEvidencia` is a semantic descarte, so without tx2's cbid the block would be valid (tx1 descartada). With tx2 cbid, the block is invalid. In T01, the block is invalid regardless. So invalidity could diverge for a block with only a malformed evidence: T04 valid (descarte), T01 invalid. But that's the pre-existing scope limitation, not introduced by this order. The order only moved cbid/order. Fine.
+
+Now let me check the `evidencia_aleatoria` final code to ensure the descending logic is right. Let me read.
+dsh: reasoning:
+There's a subtle bug: if `modo == :tardia`, `s = slot - P.Plazo_slots`, which could be negative if Plazo > slot. Then `Transicion.evidencia(..., s, ...)` with `s` an Int maybe negative → `div`? Let me check `evidencia` signature: it takes `slot::Integer`? Actually `evidencia(cbid, clave, sector, historia, chunk, slot, ph1, ph2)`. The `slot` here is `sf` (slot field). It was already like that before; not my concern.
+
+Another subtle bug: for `:orden_desc` with `r1 == r2`, we set `r2 = r1 + 1`, so lo=r1, hi=r1+1, then descendente swaps → h1=hi, h2=lo → h1 > h2. Good. If `r1` = typemax and `r2` = typemax (equal), `r2 = r1 + 1` overflows to 0, so lo=0, hi=typemax, swap → h1=typemax, h2=0 → h1 > h2. Actually overflow wraps to 0, and `hi = max(typemax,0)=typemax`, `lo=0`, swap → h1=typemax > h2=0. Fine.
+
+Now, the `es_igual` branch: r2=r1, lo=hi=r1, and for `:ambos` (es_igual true) descendente false → h1=h2. Good.
+
+Now let me check the final test result.
+dsh: reasoning:
+Final test: 472/472, exit 0.
+
+Now let me do a final review of all changed files and check for stray issues. Let me list the modified files by mtime to confirm nothing outside T04 was touched. I only edited files under T04. Let me confirm with a quick check of recent mtimes in T04 and that nothing outside was modified (except no — I did write `resultados/entrada-SL4c-O-B.log` inside T04; and I ran `sha256sum` reads outside). Good.
+
+Let me verify the list of files under T04 modified in the last ~15 min.
+dsh: reasoning:
+The T01 files modified are by O1B (the parallel agent), not me. My writes are all inside T04. Good.
+
+However, O1B has now modified T01's `Transicion.jl`? Let me check: the find for T01 shows `comparar_vectores.jl`, `run.jl`, `test/runtests.jl` at 23:28, and `resultados/*` at 23:32-23:34. It didn't list `src/Transicion.jl` or `src/evidencia.jl` because I filtered `-newermt 23:28:00`, and Transicion.jl was 23:27:15. Wait, the earlier check showed Transicion.jl at 23:27:15. So O1B modified Transicion.jl at 23:27:15 (before my export at 23:33). Let me re-verify the current T01 `Transicion.jl` mtime and whether it changed after my final artifacts. The find output didn't include it, meaning it's older than 23:28. So my artifacts (generated 23:33) used the final T01 Transicion.jl (23:27:15). 
+
+But wait: O1B modified T01's `evidencia.jl` at 23:27:25, which T04 includes. My final export at 23:33:42 used that. Good. So my artifacts are consistent with the current T01.
+
+Hmm, but there's something important: O1B's `exportar.jl` in T01 regenerated `vectores-transicion-v0.5.txt` at 23:34. That means the T01 v0.5 vectors changed (equality cases added). But that doesn't affect T04. The `ENTRADA-SL4c-O.sha256` check requires `P-ZRX/P-TRANSICION/T01/resultados/vectores-transicion-v0.4.txt` to be intact (it is) and `P-ZRX/P-DAG/T04/resultados/vectores-estado-dag-v0.5.txt` intact (it is). v0.5 T01 is overwritten by O1B intentionally (their order). Good.
+
+Now, I should double check one thing: my T04 `DIFERENCIAS-v0.5-v0.6.md` references `resultados/vectores-estado-dag-v0.5.txt` (T04's v0.5), which is intact. Good.
+
+Now, let me reconsider the concern about the T01 `Transicion.jl` alias removal. O1B's `Transicion.jl` (23:27:15) — did it remove the `ErrCbidAjeno`/`ErrOrdenCanonico` const definitions? T04 doesn't use them. Let me grep T04 for them to be sure. Earlier grep found none. Let me re-verify after all the changes.
+
+Also, let me verify T04 loads with O1B's final T01 (it did in the final test at 23:36). Good.
+
+Let me grep T04 for the old aliases.
+dsh: reasoning:
+O1B has already updated T01's export list (line 21-22 exports `ErrForma, ClaseForma, EvidenciaCbidAjeno, ...` and no longer exports `ErrCbidAjeno`/`ErrOrdenCanonico`). Good, and T04 has no references to the aliases.
+
+Let me check T01's export line 21-22 fully to confirm they removed the aliases.
+dsh: reasoning:
+O1B removed the aliases from the export list (they're no longer exported) but kept the const definitions (not exported). That's fine and matches the order's instruction ("Quitar de la lista de exportación los alias"). T04 doesn't use them. Good.
+
+Now, everything is done. Let me do a final consistency check:
+1. `Pkg.test()` green: 472/472 (final run at 23:36).
+2. `run.jl` green: ESTADO = SUPERADO (log at 23:32:40). Wait, the run log at 23:32:40 — that's from the bash-2 chain (run started 23:30:18, finished 23:32:40). That's with the final oracle code (before only comment/header changes). Good.
+3. relectura 0 discrepancies.
+4. diferencias 0 fallos.
+5. INFORME/PROGRESO sections + HORAS.log.
+6. v0.6 sha + coverage + vectors regenerated.
+7. v0.4/v0.5 intact.
+
+Wait, one thing: the `run.jl` log's header says `# run.jl T04 · 2026-09-26 23:30:30`. But I updated `run.jl` (split counters) before the run, so the run log includes the new counters (`forma_orden_igual=142 forma_orden_desc=144`). Good.
+
+Now, there's a subtlety: after the run at 23:32, I did NOT change `run.jl` again. Correct — the last change to run.jl was at 23:28:12. Good.
+
+Also, I changed `src/dirigidos.jl` at 23:35:49 (docstring only) after the run and after the export. The export/run/test were done before. Since it's a comment change, artifacts remain valid. But the `Pkg.test()` final run at 23:36:18 was AFTER the dirigidos.jl comment change (23:35:49), so the test covers the final code. Good. The run.jl log is from before the comment change but functionally identical.
+
+I'm satisfied. Let me also verify the `exportar.jl` and `EstadoDAG.jl` final mtimes vs the export time: EstadoDAG.jl 23:27:09, exportar.jl 23:33:26. The final export ran at 23:33:30, after exportar.jl's final edit at 23:33:26. Good. So the vectors/coverage are from the final code. The `src/diferencias.jl` was edited at 23:34:44 (header) and I reran diferencias at ~23:35:37. Good.
+
+One more: The `INFORME.md` and `PROGRESO.md` were written after all artifacts. They contain the correct sha `b1710e...`. Good.
+
+Let me do a final check that the sha in INFORME/PROGRESO matches the actual `.sha256`. It does (b1710e...). 
+
+Let me also double check that the `cobertura-v0.6.txt` `minimos_SL4cO = OK`. Yes.
+
+Now let me consider whether the "≥10 descending cases" requirement is met in a way the director can verify. The coverage `bloque_orden_desc = 128` and `ev_orden_desc = 128`. Also the dedicated set has 36 descending. And run.jl `forma_orden_desc=144`. Good.
+
+One concern: The order says "añadir ≥ 10 casos de orden descendente además de los de igualdad". My dedicated `casos_forma_cobertura` includes 36 equality and 36 descending, which are new cases relative to the previous O2 (which had 36 `:orden` descending via `_evidencia_forma` and random equality). Hmm, actually the previous O2 had 36 dedicated `:orden` which were DESCENDING, not equality. So I've added 36 equality dedicated and 36 descending dedicated. But the order claimed T04 had equality. Regardless, I now have explicit both. Good.
+
+Now, could there be an issue that the director expects the *coverage minimum* naming to remain `minimos SL-4c-O`? I kept it and added `minimos SL-4c-O-B`. Good.
+
+I think the work is complete. Let me update the todo list to completed.
+
+Actually, wait. Let me re-examine one potential correctness issue with the per-transaction precedence and the two directed cases. In `caso_forma_dos_evidencias`, the block `X` has txs `[coinbase, transfer, evA, evB]`. `chequear_forma` processes: padres/slot/coinbase, then `chequear_forma_evidencia` which iterates txs: coinbase (skip), transfer (skip, not evidence), evA, evB. So it sees evA first. Good. The directed cases passed.
+
+But there's a subtlety: `chequear_forma` checks the coinbase first. In these cases the coinbase is valid. Good.
+
+Now, what about the case where the two defective evidences are the only txs (no transfer)? `con_tx` defaults true; we use true. Good.
+
+Now let me also verify that the `EV-04` "estructura" check in T04: When the invalid block `X` is rejected by form, `chequear_forma` returns the form motivo before any semantic application. Good.
+
+I'm confident. Let me finalize the todo list and write the final summary.
+
+Actually, let me do one more sanity check: re-run the `lector_vectores.jl` on the final v0.6 to confirm 0 discrepancies (already done in the final chain, but the file was regenerated at 23:33:45 and relectura at 23:33:58; test's internal relectura at 23:36 also 0). Good.
+
+Let me finalize.
+
+One more thing: The order says "Regenerar ... su `.sha256`, la cobertura y `DIFERENCIAS-v0.5-v0.6.md`". Done. Also "sección «SL-4c-O-B» en `INFORME.md` y `PROGRESO.md`". Done. "`Pkg.test()` y `run.jl` en verde, relectura 0 discrepancias". Done. "Prohibido Python". No Python used. "Entrada congelada". Verified 3/3.
+
+Let me mark todos complete.
+dsh: reasoning:
+All done. Let me write the final summary to the user. I should mention the falta de definición reported before editing, the changes, and the results.
+
+Let me also double-check the final numbers one more time for the summary:
+- Pkg.test: 472/472
+- run.jl: SUPERADO, 0 fallos, 129.7 s; forma_cbid=410, forma_orden=286 (igual=142, desc=144)
+- relectura: 2000 casos, 0 discrepancias
+- diferencias: 1878 casos, 181 con defecto, 135 cambian, 0 sin defecto
+- cobertura: bloque_cbid=283, bloque_orden=243 (igual 115, desc 128), con_tx_cbid=166, con_tx_orden=152, ambos_cbid=161
+- sha256: b1710e4cd0e99a7602555595f23ef050fe174ef9389768b56481927b0d79a331
+- entrada B: 3/3; entrada SL4c-O: 7/7 (v0.4/v0.5 intactos)
+
+Let me write the summary.

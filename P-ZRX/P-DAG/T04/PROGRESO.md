@@ -488,3 +488,168 @@ orden:
   conserva en `relectura-v0.4-con-RAT2p.log`.
 - **Cierre T04-SL3b: SUPERADO.** Nada escrito fuera de `T04/`; sin commit ni push; sin Python;
   sin secretos.
+
+# SL-4c-O — Parte O2: `cbid` ajeno y orden no canónico son errores de forma (T04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:10–23:20).
+**Fuente:** `ORDEN-SL4c-O.md` parte O2 (motivo: `REVISION-RI-3b.md` H1) y
+`CONTRATO-EVIDENCIA-v0.md` (RAT-1, EV-04). **Zona:** `T04/`. Sin Python; sin commit ni push;
+sin secretos.
+
+## SL4cO.0. Entrada congelada (inicio)
+
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O.sha256` (desde `ZEROX/`): **7/7 OK**, incluido
+`vectores-estado-dag-v0.5.txt` (v0.5 intacto). Registro `resultados/entrada-SL4c-O.log`.
+
+## SL4cO.1. Falta de definición detectada antes de editar
+
+Ninguna regla incompatible; tres lecturas de representación, informadas antes de tocar código:
+
+- **Nombres `ErrForma(...)` en Julia.** T04 no tiene tipo `ErrForma` (los motivos de bloque son
+  `Symbol`). Se codifican como `Symbol("ErrForma(EvidenciaCbidAjeno)")` /
+  `Symbol("ErrForma(OrdenCanonicoInvalido)")`; `string` rinde el texto exacto del contrato y T04
+  no depende del `Err` de T01 (O1 lo cambia en paralelo).
+- **Base del diff.** v0.6 se genera con generador ampliado; el informe de diferencias reproduce
+  las entradas congeladas de v0.5 con el oráculo corregido.
+- **Precedencia global al bloque** (todos los `cbid` antes de todos los órdenes), no por tx.
+
+## SL4cO.2. Diario de ejecución
+
+- *Código*: `src/EstadoDAG.jl` gana `chequear_forma_evidencia` y los motivos de forma, llamado al
+  final de `chequear_forma`; `src/generadores.jl` gana `:orden`/`:ambos`; `src/dirigidos.jl` gana
+  D-19 (`caso_forma_evidencia`) y `casos_forma_cobertura` (36+36+8), y D-18 deja de contar `cbid`;
+  `exportar.jl` pasa a v0.6 con cobertura de forma y falla si no alcanza los mínimos; `run.jl`,
+  `test/runtests.jl` y `src/lector_vectores.jl` pasan a v0.6; `src/diferencias.jl` genera el
+  informe de diferencias. Ninguna referencia a `ErrCbidAjeno`/`ErrOrdenCanonico` queda en T04.
+- *Tests*: `Pkg.test()` **447/447** (422 previas; D-18 pierde su aserción de `cbid` y se añaden
+  26 nuevas de forma v4). Registro `resultados/test-pkg-v0.6.log`.
+- *run.jl* `--seed 0x5a5a --replicas 200`: **ESTADO = SUPERADO**, 0 fallos, 76,7 s; 3 000
+  historias base + 1 600 con C-EVP (11 530 válidos, 2 349 descartes, 34 duplicadas, 305 tardías,
+  **339** `forma_cbid` y **177** `forma_orden`), 600 000 órdenes IE-3. Registro
+  `resultados/run-estado-dag-v0.6.log`.
+- *Vectores v0.6*: **1 961 casos** (21 dirigidos + 900 aleatorios + 8×120 de evidencia + 80 de
+  forma), sha256
+  `c383abab132892ee40bf1b941e0c647903d3ffc71d905b834459d53083e395bc`; relectura independiente
+  **0 discrepancias** (`relectura-v0.6.log`).
+- *Cobertura `cobertura-v0.6.txt`*: forma `bloque_cbid` **279**, `bloque_orden` **125**,
+  `con_tx_cbid` **166**, `con_tx_orden` **78**, `ambos_cbid` **127** (`minimos_SL4cO = OK`);
+  evidencia semántica `sin_saldo` **46**, `deshecha` **67**, `aplicada` 263, `duplicada` 21,
+  `tardia` 197, `construida` 527. Operaciones de garantía sin cambio (depósitos 347, retiros 808,
+  liberaciones 115, `ErrNonce` 853 = 18,29 %, `ErrDobleGasto` 305, reorgs 312).
+- *DIFERENCIAS `DIFERENCIAS-v0.5-v0.6.md`*: 1 878 entradas de v0.5 reproducidas; **181** con
+  defecto de forma, **135** cambian de resultado, **0** cambian sin defecto
+  (`VEREDICTO = SIN CAMBIOS INJUSTIFICADOS`).
+- *Anteriores intactos*: `sha256sum -c ENTRADA-SL4c-O.sha256` 7/7 OK (v0.4 y v0.5 byte a byte).
+- *Coherencia con O1*: `T01` final de O1 (23:15:46) usa `ErrForma(clase)`; sus textos
+  `ErrForma(EvidenciaCbidAjeno)` / `ErrForma(OrdenCanonicoInvalido)` coinciden exactamente con los
+  que produce T04. Toda la batería final se ejecutó con ese `T01`.
+- **Cierre T04-SL4c-O: SUPERADO.** Nada escrito fuera de `T04/`; sin commit ni push; sin Python;
+  sin secretos.
+
+# SL-4c-O-B — Ajuste de O2: precedencia por transacción y los dos tipos de orden no canónico (T04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:24–23:35).
+**Fuente:** `ORDEN-SL4c-O-B.md` (revisión del director de SL-4c-O). **Zona:** `T04/`.
+Sin Python; sin commit ni push; sin secretos.
+
+## SL4cOB.0. Entrada congelada (inicio)
+
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-B.sha256` (desde `ZEROX/`): **3/3 OK**.
+Registro `resultados/entrada-SL4c-O-B.log`.
+
+## SL4cOB.1. Falta de definición informada antes de editar
+
+- **«Estructura vigente»**: en T04 el chequeo estructural de la evidencia es descarte semántico
+  (`ErrEvidenciaConEntradas`), no forma; moverlo cambiaría casos sin los dos defectos. El bucle
+  por transacción aplica solo `cbid → orden`. Declarado en `INFORME.md` §SL4cOB.6.
+- **Reparto de mínimos**: se mantienen los de SL-4c-O y se añaden `bloque_orden_desc≥10` y
+  `bloque_orden_igual≥10`.
+- **Versionado**: se sobrescriben los v0.6 de SL-4c-O (aún sin consumidores), mismo nombre.
+
+## SL4cOB.2. Diario de ejecución
+
+- *Código*: `src/EstadoDAG.jl` → precedencia por transacción y helper `primer_defecto_forma`;
+  `src/generadores.jl` → `:orden_igual`/`:orden_desc`/`:ambos_desc`; `src/dirigidos.jl` → D-20/D-21
+  (`caso_forma_dos_evidencias`) y cobertura 36+36+36+8; `exportar.jl` → desglose igual/desc y
+  mínimos; `run.jl`, `test/runtests.jl` y `src/diferencias.jl` actualizados.
+- *Tests*: `Pkg.test()` **472/472** (447 previas + 25 nuevas). Registro
+  `resultados/test-pkg-v0.6.log`.
+- *run.jl* `--seed 0x5a5a --replicas 200`: **ESTADO = SUPERADO**, 0 fallos, 129,7 s; 3 000
+  historias base + 1 600 con C-EVP (11 254 válidos, 2 208 descartes), `forma_cbid` **410**,
+  `forma_orden` **286** (igualdad **142**, descenso **144**), 600 000 órdenes IE-3. Registro
+  `resultados/run-estado-dag-v0.6.log`.
+- *Vectores v0.6*: **2 000 casos** (24 dirigidos + 900 aleatorios + 960 de evidencia + 116 de
+  forma), sha256
+  `b1710e4cd0e99a7602555595f23ef050fe174ef9389768b56481927b0d79a331`; relectura independiente
+  **2 000 casos, 0 discrepancias** (`relectura-v0.6.log`).
+- *Cobertura `cobertura-v0.6.txt`*: `bloque_cbid` **283**, `bloque_orden` **243**
+  (`bloque_orden_igual` **115**, `bloque_orden_desc` **128**), `con_tx_cbid` **166**,
+  `con_tx_orden` **152**, `ambos_cbid` **161** (`minimos_SL4cO = OK`); evidencia semántica
+  `aplicada` 245, `sin_saldo` **42**, `deshecha` **59**, `duplicada` 20, `tardia` 145,
+  `construida` 452.
+- *DIFERENCIAS `DIFERENCIAS-v0.5-v0.6.md`*: 1 878 entradas de v0.5 reproducidas; **181** con
+  defecto, **135** cambian, **0** sin defecto (`VEREDICTO = SIN CAMBIOS INJUSTIFICADOS`). La
+  precedencia por transacción no altera ningún resultado de v0.5.
+- *Anteriores intactos*: `sha256sum -c ENTRADA-SL4c-O.sha256` 7/7 OK (v0.4 y v0.5 byte a byte).
+- **Cierre T04-SL4c-O-B: SUPERADO.** Nada escrito fuera de `T04/`; sin commit ni push; sin
+  Python; sin secretos.
+
+# SL-4c-O-C — La evidencia con entradas/salidas también es forma (EV-04) (T04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:37–23:50).
+**Fuente:** `ORDEN-SL4c-O-C.md` (revisión del director de SL-4c-O-B). **Zona:** `T04/`.
+Sin Python; sin commit ni push; sin secretos; 1 hilo.
+
+## SL4cOC.0. Entrada congelada (inicio)
+
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-C.sha256` (desde `ZEROX/`): **4/4 OK** a las
+23:43:46. Registro `resultados/entrada-SL4c-O-C.log`.
+
+## SL4cOC.1. Falta de definición informada antes de editar
+
+- **FD-SL4cOC-1 · `testigos`/`n_wit`:** el `Tx` de T01 solo tiene `entradas`/`salidas`; el tercer
+  sub-defecto de EV-04 no es representable sin tocar `Tx` (zona de O1) o el formato de línea. Se
+  implementan entradas/salidas/ambas y, para la precedencia, entradas+`cbid`+orden. Declarado en
+  `INFORME.md` §SL4cOC.6.
+- **FD-SL4cOC-2 · `ErrEvidenciaConEntradas`:** O1 lo deja como constante interna
+  `ErrForma(EvidenciaConEntradasOSalidas)`; T04 retira su única referencia. No bloqueante.
+- **FD-SL4cOC-3 · versionado:** v0.6 se sobrescribe (aún sin consumidores), mismo nombre; v0.5 no se
+  toca.
+
+## SL4cOC.2. Diario de ejecución
+
+- *Código*: `src/EstadoDAG.jl` → `defecto_estructura_evidencia`, `MOTIVO_FORMA_ESTRUCTURA` y
+  precedencia `estructura → cbid → orden` por transacción; `src/dirigidos.jl` →
+  `_tx_evidencia_forma`, D-19 con modos de estructura y cobertura 220 casos; `exportar.jl` →
+  contadores/mínimos de estructura y retirada de `ErrEvidenciaConEntradas`; `run.jl`,
+  `test/runtests.jl`, `src/diferencias.jl` y `METODO.md` actualizados.
+- *mtime de T01*: se comprobó antes de las pruebas finales —
+  `2026-09-26 23:39:41.298582413 +0200` (epoch `1790458781`, md5 `30ef7ec9…`); O1 cerró a las
+  23:46:11 y no volvió a tocar `Transicion.jl`.
+- *Tests*: `Pkg.test()` **507/507** (472 previas + 35 nuevas). Registro
+  `resultados/test-pkg-v0.6.log`.
+- *run.jl* `--seed 0x5a5a --replicas 200`: **ESTADO = SUPERADO**, 0 fallos, 94,1 s; 3 000 historias
+  base (46 500 bloques, 25 192 válidos, 4 497 descartes, 2 078 `rojo_U3`, 600 000 órdenes IE-3) +
+  1 600 con C-EVP (11 254 válidos, 2 208 descartes, 37 duplicadas, 224 tardías), `forma_cbid` **410**,
+  `forma_orden` **286** (igualdad **142**, descenso **144**); `forma_estructura` **0** en aleatorios
+  (la cobertura estructural es dirigida). Registro `resultados/run-estado-dag-v0.6.log`.
+- *Vectores v0.6*: **2 108 casos** (28 dirigidos + 900 aleatorios + 960 de evidencia + 220 de forma),
+  sha256 `86348a48e32491c9cb3675fa1c2d7e06f4c20f94518f35b227778d28d4a90c19`; relectura independiente
+  **2 108 casos, 0 discrepancias** (`resultados/relectura-v0.6-SL4c-OC.log`).
+- *Cobertura `cobertura-v0.6.txt`*: `bloque_estructura` **108** (`_entradas` **62**, `_salidas` **37**,
+  `_ambos` **9**, `_cbid_orden` **9**), `ev_estructura` **108**, `con_tx_estructura` **108**;
+  `bloque_cbid` **283**, `bloque_orden` **243** (`_igual` **115**, `_desc` **128**), `ambos_cbid`
+  **161**, `con_tx_cbid` **166**, `con_tx_orden` **152** (`minimos_SL4cO = OK`); evidencia semántica
+  `aplicada` 353, `sin_saldo` **42**, `deshecha` **59**, `duplicada` 20, `tardia` 145,
+  `construida` 560.
+- *DIFERENCIAS `DIFERENCIAS-v0.5-v0.6.md`*: 1 878 entradas de v0.5 reproducidas; **181** con
+  defecto, **135** cambian, **0** sin defecto (`VEREDICTO = SIN CAMBIOS INJUSTIFICADOS`); la
+  estructura nueva no altera ningún resultado de v0.5 (no tenía casos).
+- *Anteriores intactos*: `sha256sum -c ENTRADA-SL4c-O.sha256` 7/7 OK (v0.4 de T01 y v0.5 de T04
+  byte a byte).
+- **Cierre T04-SL4c-O-C: SUPERADO.** Nada escrito fuera de `T04/`; sin commit ni push; sin Python;
+  sin secretos.
+

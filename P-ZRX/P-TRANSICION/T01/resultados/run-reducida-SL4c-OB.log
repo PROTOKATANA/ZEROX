@@ -1,0 +1,107 @@
+T01 run: semilla=23130 (0x0000000000005a5a) replicas=5 rejilla=reducida puntos=147456 paso=1
+subsidio_pow=10 subsidio_post=3  i3_cada=200 i3_perm=5 ev_historias=5000
+  progreso: punto 2000/147456  historias=10000  t=1s
+  progreso: punto 4000/147456  historias=20000  t=2s
+  progreso: punto 6000/147456  historias=30000  t=3s
+  progreso: punto 8000/147456  historias=40000  t=5s
+  progreso: punto 10000/147456  historias=50000  t=6s
+  progreso: punto 12000/147456  historias=60000  t=7s
+  progreso: punto 14000/147456  historias=70000  t=8s
+  progreso: punto 16000/147456  historias=80000  t=10s
+  progreso: punto 18000/147456  historias=90000  t=11s
+  progreso: punto 20000/147456  historias=100000  t=13s
+  progreso: punto 22000/147456  historias=110000  t=14s
+  progreso: punto 24000/147456  historias=120000  t=15s
+  progreso: punto 26000/147456  historias=130000  t=18s
+  progreso: punto 28000/147456  historias=140000  t=20s
+  progreso: punto 30000/147456  historias=150000  t=22s
+  progreso: punto 32000/147456  historias=160000  t=24s
+  progreso: punto 34000/147456  historias=170000  t=25s
+  progreso: punto 36000/147456  historias=180000  t=27s
+  progreso: punto 38000/147456  historias=190000  t=29s
+  progreso: punto 40000/147456  historias=200000  t=30s
+  progreso: punto 42000/147456  historias=210000  t=31s
+  progreso: punto 44000/147456  historias=220000  t=33s
+  progreso: punto 46000/147456  historias=230000  t=34s
+  progreso: punto 48000/147456  historias=240000  t=36s
+  progreso: punto 50000/147456  historias=250000  t=38s
+  progreso: punto 52000/147456  historias=260000  t=39s
+  progreso: punto 54000/147456  historias=270000  t=41s
+  progreso: punto 56000/147456  historias=280000  t=43s
+  progreso: punto 58000/147456  historias=290000  t=45s
+  progreso: punto 60000/147456  historias=300000  t=47s
+  progreso: punto 62000/147456  historias=310000  t=49s
+  progreso: punto 64000/147456  historias=320000  t=51s
+  progreso: punto 66000/147456  historias=330000  t=53s
+  progreso: punto 68000/147456  historias=340000  t=55s
+  progreso: punto 70000/147456  historias=350000  t=57s
+  progreso: punto 72000/147456  historias=360000  t=59s
+  progreso: punto 74000/147456  historias=370000  t=61s
+  progreso: punto 76000/147456  historias=380000  t=62s
+  progreso: punto 78000/147456  historias=390000  t=63s
+  progreso: punto 80000/147456  historias=400000  t=64s
+  progreso: punto 82000/147456  historias=410000  t=66s
+  progreso: punto 84000/147456  historias=420000  t=67s
+  progreso: punto 86000/147456  historias=430000  t=68s
+  progreso: punto 88000/147456  historias=440000  t=69s
+  progreso: punto 90000/147456  historias=450000  t=71s
+  progreso: punto 92000/147456  historias=460000  t=72s
+  progreso: punto 94000/147456  historias=470000  t=74s
+  progreso: punto 96000/147456  historias=480000  t=75s
+  progreso: punto 98000/147456  historias=490000  t=77s
+  progreso: punto 100000/147456  historias=500000  t=79s
+  progreso: punto 102000/147456  historias=510000  t=82s
+  progreso: punto 104000/147456  historias=520000  t=84s
+  progreso: punto 106000/147456  historias=530000  t=86s
+  progreso: punto 108000/147456  historias=540000  t=89s
+  progreso: punto 110000/147456  historias=550000  t=91s
+  progreso: punto 112000/147456  historias=560000  t=92s
+  progreso: punto 114000/147456  historias=570000  t=93s
+  progreso: punto 116000/147456  historias=580000  t=94s
+  progreso: punto 118000/147456  historias=590000  t=95s
+  progreso: punto 120000/147456  historias=600000  t=97s
+  progreso: punto 122000/147456  historias=610000  t=98s
+  progreso: punto 124000/147456  historias=620000  t=100s
+  progreso: punto 126000/147456  historias=630000  t=102s
+  progreso: punto 128000/147456  historias=640000  t=103s
+  progreso: punto 130000/147456  historias=650000  t=105s
+  progreso: punto 132000/147456  historias=660000  t=107s
+  progreso: punto 134000/147456  historias=670000  t=109s
+  progreso: punto 136000/147456  historias=680000  t=111s
+  progreso: punto 138000/147456  historias=690000  t=114s
+  progreso: punto 140000/147456  historias=700000  t=117s
+  progreso: punto 142000/147456  historias=710000  t=119s
+  progreso: punto 144000/147456  historias=720000  t=121s
+  progreso: punto 146000/147456  historias=730000  t=123s
+
+RESUMEN
+puntos           = 147456
+replicas/punto   = 5
+historias        = 737280
+con sufijo PoST  = 505440
+undos exactos    = 4595520
+permutaciones I-3= 110915
+fallos I-1       = 0
+fallos I-2       = 0
+fallos I-3       = 0
+fallos I-4       = 0
+fallos I-5       = 0
+fallos I-6       = 0
+fallos I-7       = 0
+historias evid.  = 5120
+undos evid.      = 22264
+RAT-3 bloqueadas = 8
+forma cbid/orden/ambos = 1140 / 1140 / 564
+orden por igualdad    = 564
+dirigidos 2 evidencias (orden,cbid) = 12 / 12
+fallos evid I-1 = 0
+fallos evid I-2 = 0
+fallos evid I-3 = 0
+fallos evid I-4 = 0
+fallos evid I-5 = 0
+fallos evid I-6 = 0
+fallos evid I-7 = 0
+dif FC-1 vs FC-3 = 0
+dif FC-2 vs FC-3 = 767
+tiempo de pared  = 124.8 s (2.08 min)
+VEREDICTO        = SIN FALLOS

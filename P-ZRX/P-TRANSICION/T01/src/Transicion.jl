@@ -18,7 +18,8 @@ export Origen, OrigenCoinbasePow, OrigenTx, OrigenLiberacion
 export SectorModo, SEC0, SECA
 export CorteModo, CUT_HWPhi, CUT_H, CUT_W
 export SeleccionModo, FC3, FC1, FC2
-export Err, TipoTx
+export Err, ErrSemantico, ErrForma, ClaseForma, EvidenciaCbidAjeno,
+       OrdenCanonicoInvalido, EvidenciaConEntradasOSalidas, TipoTx
 export TxCoinbase, TxCoinbasePost, TxTransferencia, TxDeposito, TxRetiro,
        TxLiberacion, TxEvidencia, TxAltaSector, TxPruebaSector
 export ErrGenesis, ErrPow, ErrEmision, ErrInmaduro, ErrDepositoTemprano,
@@ -26,8 +27,8 @@ export ErrGenesis, ErrPow, ErrEmision, ErrInmaduro, ErrDepositoTemprano,
        ErrTerminalAmbiguo, ErrGarantia, ErrOperacionFase, ErrPruebaTardia,
        ErrSectorInactivo, ErrSlot, ErrDesbordamiento, ErrFueraDeAlcanceV0,
        ErrRetiroPendiente, ErrNonce,
-       ErrSinEvidencia, ErrCbidAjeno, ErrOrdenCanonico, ErrEvidenciaTardia,
-       ErrEvidenciaDuplicada, ErrEvidenciaConEntradas, ErrCasoAbierto,
+       ErrSinEvidencia, ErrEvidenciaTardia,
+       ErrEvidenciaDuplicada, ErrCasoAbierto,
        ErrVentanaAbierta, ErrPuertaRAT3
 export Salida, Pendiente, EnRetirada, Garantia, RegistroSector, Tx, Bloque, Estado, Params
 export IdentidadEvidencia, CabeceraEvidencia, Evidencia
@@ -51,7 +52,8 @@ export puntos_rejilla, generar_historia, construir_poW, extender_post,
 export CasoNegativo, casos_negativos, casos_bloque, puntos_negativos,
        casos_garantia_insuficiente, casos_garantia_pendiente, cadena_base,
        casos_nonce, casos_nonce_validos
-export casos_evidencia_cobertura, caso_rat3_carrera, caso_autodenuncia,
+export casos_evidencia_cobertura, casos_evidencia_dirigidos,
+       caso_dos_evidencias, caso_rat3_carrera, caso_autodenuncia,
        puntos_evidencia
 
 # ---------------------------------------------------------------------------
@@ -65,7 +67,7 @@ export casos_evidencia_cobertura, caso_rat3_carrera, caso_autodenuncia,
 @enum CorteModo CUT_HWPhi CUT_H CUT_W
 @enum SeleccionModo FC3 FC1 FC2
 
-@enum Err begin
+@enum ErrSemantico begin
     ErrGenesis
     ErrPow
     ErrEmision
@@ -88,15 +90,45 @@ export casos_evidencia_cobertura, caso_rat3_carrera, caso_autodenuncia,
     ErrNonce                # F-15: nonce por clave de garantía
     # SL-3 (CONTRATO-EVIDENCIA-v0 con Ratificación v0)
     ErrSinEvidencia         # EV-06/EV-07: no hay dos decisiones de firma válidas
-    ErrCbidAjeno            # RAT-1: cbid distinto del de la red local (Rust ErrForma)
-    ErrOrdenCanonico        # EV-01: pre_hash(H1) < pre_hash(H2) estricto
     ErrEvidenciaTardia      # EV-14: fuera de Plazo_slots
     ErrEvidenciaDuplicada   # EV-12: incident_id ya procesado
-    ErrEvidenciaConEntradas # EV-04: EvidenceTx con entradas o salidas monetarias
+    # SL-4c-O-C: `ErrEvidenciaConEntradas` deja de ser semántico; EV-04 lo
+    # clasifica como forma (`EvidenciaConEntradasOSalidas`, en `ClaseForma`).
     ErrCasoAbierto          # EV-24(i): incidente admitido y no liquidado
     ErrVentanaAbierta       # EV-24(ii)/EV-15b: producción reciente de P
     ErrPuertaRAT3           # RAT-3: R_slots > Plazo_slots + M_margen_slots
 end
+
+# SL-4c-O · forma de la `EvidenceTx` (RAT-1 y EV-01/EV-04). Igual que
+# `ErrorTransicion::ErrForma(ErrorFormaTx)` en el contrato y en Rust: un
+# contenedor de la clase concreta. `cbid` ajeno y orden no canónico dejan de ser
+# errores semánticos: son forma, y la forma precede a la semántica.
+# SL-4c-O-C: el defecto estructural de EV-04 (entradas/salidas/testigos) también
+# es forma y ocupa el primer lugar de la precedencia.
+@enum ClaseForma begin
+    EvidenciaConEntradasOSalidas  # EV-04: la EvidenceTx trae entradas/salidas (testigos)
+    EvidenciaCbidAjeno      # RAT-1: cbid de alguna cabecera ≠ cbid de la red local
+    OrdenCanonicoInvalido   # EV-01/EV-04: no se cumple pre_hash(H1) < pre_hash(H2)
+end
+
+struct ErrForma
+    clase::ClaseForma
+end
+
+Base.show(io::IO, e::ErrForma) = print(io, "ErrForma(", e.clase, ")")
+
+# `x isa Err` sigue siendo la prueba de «error de transición» en todo el oráculo.
+const Err = Union{ErrSemantico, ErrForma}
+
+# Alias de compatibilidad transitorios, ya **no exportados** (SL-4c-O-B):
+# `comparar_vectores.jl` usa sus nombres como cadenas y los define localmente.
+# Se conservan como constantes internas para no romper a T04, que incluye este
+# módulo y retira los alias en su parte O2.
+const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)
+const ErrOrdenCanonico = ErrForma(OrdenCanonicoInvalido)
+# SL-4c-O-C: mismo tratamiento para `ErrEvidenciaConEntradas` (EV-04), ahora
+# `ErrForma(EvidenciaConEntradasOSalidas)`; T04 lo usa cualificado hasta su O2.
+const ErrEvidenciaConEntradas = ErrForma(EvidenciaConEntradasOSalidas)
 
 @enum TipoTx begin
     TxCoinbase
@@ -1092,18 +1124,29 @@ end
 Aplica una `EvidenceTx` (EV-05…EV-22, RAT-1/RAT-2) en el punto de aplicación
 `punto`. Devuelve `nothing` o el `Err` correspondiente. La transacción nunca
 tiene entradas ni salidas monetarias (EV-01).
+
+SL-4c-O/SL-4c-O-C: la precedencia de **forma** es estructura —entradas/salidas/
+testigos— → `cbid` → orden canónico (RAT-1, EV-04); después corre la
+verificación semántica, cuyo orden y resultado no cambian (EV-06, EV-07, RAT-3,
+ventana, deduplicación).
 """
 function aplicar_evidencia!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
     tx.evidencia === nothing && return ErrSinEvidencia      # EV-01/EV-04
-    # EV-04: sin entradas ni salidas monetarias.
-    (isempty(tx.entradas) && isempty(tx.salidas)) || return ErrEvidenciaConEntradas
+    # EV-04: sin entradas ni salidas monetarias. Es **forma** (SL-4c-O-C), no
+    # semántica. T01 no modela testigos (`n_wit`): solo `Tx.entradas`/`Tx.salidas`.
+    (isempty(tx.entradas) && isempty(tx.salidas)) ||
+        return ErrForma(EvidenciaConEntradasOSalidas)
     ev = tx.evidencia
+    # --- forma (precede a toda la semántica) ------------------------------
     # RAT-1: ambas cabeceras deben ser de la red local.
-    (ev.id1.cbid == P.cbid && ev.id2.cbid == P.cbid) || return ErrCbidAjeno
+    (ev.id1.cbid == P.cbid && ev.id2.cbid == P.cbid) ||
+        return ErrForma(EvidenciaCbidAjeno)
+    # EV-01: orden canónico estricto por pre_hash.
+    ev.h1.pre_hash < ev.h2.pre_hash ||
+        return ErrForma(OrdenCanonicoInvalido)
+    # --- verificación semántica (orden y resultado sin cambios) -----------
     # EV-06: identidad común exacta (los cinco campos + cbid).
     ev.id1 == ev.id2 || return ErrSinEvidencia
-    # EV-01: orden canónico estricto por pre_hash.
-    ev.h1.pre_hash < ev.h2.pre_hash || return ErrOrdenCanonico
     # EV-07: sellos válidos bajo la misma clave.
     (ev.h1.sello_ok && ev.h2.sello_ok) || return ErrSinEvidencia
     # RAT-3: puerta estructural.

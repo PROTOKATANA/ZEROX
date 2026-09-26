@@ -1,0 +1,68 @@
+2026-09-26T23:28:59+02:00
+exportar: puntos=15 aleatorios=900 ev-replicas=120 salida=resultados/vectores-estado-dag-v0.6.txt
+  aleatorios 100/900
+  aleatorios 200/900
+  aleatorios 300/900
+  aleatorios 400/900
+  aleatorios 500/900
+  aleatorios 600/900
+  aleatorios 700/900
+  aleatorios 800/900
+  aleatorios 900/900
+  evidencia punto 1/8
+  evidencia punto 2/8
+  evidencia punto 3/8
+  evidencia punto 4/8
+  evidencia punto 5/8
+  evidencia punto 6/8
+  evidencia punto 7/8
+  evidencia punto 8/8
+  forma SL-4c-O: Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_orden_desc" => 243, "bloque_orden" => 243, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 243)
+exportar: casos=2000 sha256=fff984ad07981eaa1e9e69fff29fe1ff5621e97ff602ae1edf8b8ab87abaceae -> resultados/vectores-estado-dag-v0.6.sha256
+exportar: cobertura -> resultados/cobertura-v0.6.txt evidencia=Dict("tardia" => 145, "construida" => 452, "aplicada" => 245, "duplicada" => 20, "deshecha" => 59, "sin_saldo" => 42) forma=Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_orden_desc" => 243, "bloque_orden" => 243, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 243)
+2026-09-26T23:29:39+02:00
+exportar: puntos=15 aleatorios=900 ev-replicas=120 salida=resultados/vectores-estado-dag-v0.6.txt
+  aleatorios 100/900
+  aleatorios 200/900
+  aleatorios 300/900
+  aleatorios 400/900
+  aleatorios 500/900
+  aleatorios 600/900
+  aleatorios 700/900
+  aleatorios 800/900
+  aleatorios 900/900
+  evidencia punto 1/8
+  evidencia punto 2/8
+  evidencia punto 3/8
+  evidencia punto 4/8
+  evidencia punto 5/8
+  evidencia punto 6/8
+  evidencia punto 7/8
+  evidencia punto 8/8
+  forma SL-4c-O: Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_orden_desc" => 128, "bloque_orden" => 243, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 115)
+exportar: casos=2000 sha256=e9cbf040af5e1548e8721861ec91d3b99652d09195ea1574ae642173cbfef148 -> resultados/vectores-estado-dag-v0.6.sha256
+exportar: cobertura -> resultados/cobertura-v0.6.txt evidencia=Dict("tardia" => 145, "construida" => 452, "aplicada" => 245, "duplicada" => 20, "deshecha" => 59, "sin_saldo" => 42) forma=Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_orden_desc" => 128, "bloque_orden" => 243, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 115)
+[exit 0]
+2026-09-26T23:33:30+02:00
+exportar: puntos=15 aleatorios=900 ev-replicas=120 salida=resultados/vectores-estado-dag-v0.6.txt
+  aleatorios 100/900
+  aleatorios 200/900
+  aleatorios 300/900
+  aleatorios 400/900
+  aleatorios 500/900
+  aleatorios 600/900
+  aleatorios 700/900
+  aleatorios 800/900
+  aleatorios 900/900
+  evidencia punto 1/8
+  evidencia punto 2/8
+  evidencia punto 3/8
+  evidencia punto 4/8
+  evidencia punto 5/8
+  evidencia punto 6/8
+  evidencia punto 7/8
+  evidencia punto 8/8
+  forma SL-4c-O: Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_orden_desc" => 128, "bloque_orden" => 243, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 115)
+exportar: casos=2000 sha256=b1710e4cd0e99a7602555595f23ef050fe174ef9389768b56481927b0d79a331 -> resultados/vectores-estado-dag-v0.6.sha256
+exportar: cobertura -> resultados/cobertura-v0.6.txt evidencia=Dict("tardia" => 145, "construida" => 452, "aplicada" => 245, "duplicada" => 20, "deshecha" => 59, "sin_saldo" => 42) forma=Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_orden_desc" => 128, "bloque_orden" => 243, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 115)
+[exit 0]

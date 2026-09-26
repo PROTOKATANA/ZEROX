@@ -620,3 +620,354 @@ Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; sin secretos; nada escrito
 - La definición de `deshecha` no cubre reorgs que deshacen una evidencia y la reaplican
   después en la misma punta: eso cuenta como aplicación, no como deshecho, en cada cambio de
   punta.
+
+---
+
+# T04-SL4c-O — `cbid` ajeno y orden no canónico son errores de **forma** (bloque inválido)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:10–23:20).
+**Fuente:** `ORDEN-SL4c-O.md` parte O2 (motivo: `REVISION-RI-3b.md` H1) y
+`CONTRATO-EVIDENCIA-v0.md` (RAT-1, EV-04). **Zona:** `T04/`. Sin Python; sin commit ni push;
+sin secretos. Entrada congelada `ENTRADA-SL4c-O.sha256`: **7/7 OK**.
+
+## SL4cO.1. Veredicto
+
+**SUPERADO.** En el oráculo DAG, una `EvidenceTx` con `consensus_branch_id` ajeno (RAT-1) o con
+las dos cabeceras fuera del orden canónico estricto `pre_hash(H1) < pre_hash(H2)` (EV-04) pasa a
+ser un error de **forma**: el bloque que la contiene es **inválido en la admisión**, no un
+descarte. T04 comprueba la forma v4 por sí mismo (no depende del `Err` de T01, que O1 cambia en
+paralelo) con la precedencia fija del contrato — estructura ya vigente → `cbid` → orden canónico
+— y **global al bloque** (primero todos los `cbid`, después todos los órdenes), de modo que
+«gana `cbid`» se cumple aunque los dos defectos estén en transacciones distintas. El resto de la
+verificación semántica (EV-06 identidad, EV-07 sellos, RAT-3, ventana, deduplicación) no cambia
+de orden ni de resultado.
+
+## SL4cO.2. Falta de definición informada antes de editar
+
+1. **Representación Julia de `ErrForma(...)`.** La orden fija los nombres
+   `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`, pero T04 no tiene un tipo
+   `ErrForma`: los motivos de bloque son `Symbol` en `A.motivos` y se vuelcan con `string(...)`.
+   Lectura adoptada: `Symbol("ErrForma(EvidenciaCbidAjeno)")` y
+   `Symbol("ErrForma(OrdenCanonicoInvalido)")`, que `string` rinde exactamente como el contrato en
+   `RES` y en el lector independiente, sin depender del enum de T01 que O1 modifica.
+2. **Base del informe de diferencias.** v0.6 se genera con un generador ampliado (modo `:orden`),
+   así que sus casos aleatorios no son los de v0.5. Lectura adoptada: `DIFERENCIAS-v0.5-v0.6.md`
+   reproduce las **entradas congeladas de v0.5** con el oráculo corregido y las compara con la
+   salida registrada en v0.5 (comparación caso a caso exacta); los casos nuevos de v0.6 se listan
+   aparte como añadidos.
+3. **Alcance de la precedencia.** Aplicada global al bloque, no por transacción (ver SL4cO.3).
+
+## SL4cO.3. Qué se ha implementado
+
+- `src/EstadoDAG.jl`: `chequear_forma_evidencia(A, b)` y los motivos `MOTIVO_FORMA_CBID` /
+  `MOTIVO_FORMA_ORDEN`; se llama al final de `chequear_forma` (después de la estructura de
+  padres/slot/coinbase). Una `EvidenceTx` sin cabeceras sigue siendo semántica
+  (`ErrSinEvidencia`); la estructura de entradas/salidas/testigos no se toca (fuera del alcance).
+- Coherencia con O1 (comprobada): el `T01` final de O1 (`src/Transicion.jl`, mtime
+  2026-09-26 23:15:46) tipa los formales como `ErrForma(clase)` y rinde exactamente
+  `ErrForma(EvidenciaCbidAjeno)` / `ErrForma(OrdenCanonicoInvalido)`; T04 reproduce esos mismos
+  textos con `Symbol` sin acoplarse a su tipo. Toda la batería final (exportar, relectura, diff,
+  tests y `run.jl`) se ejecutó con ese `T01`.
+- `src/generadores.jl`: `evidencia_aleatoria` gana los modos `:orden` (`H1 = H2`) y `:ambos`
+  (`cbid` ajeno + orden), y el generador aleatorio los inyecta.
+- `src/dirigidos.jl`: `caso_forma_evidencia` (D-19) construye un bloque con coinbase, una
+  transferencia válida y una evidencia defectuosa, su hijo inválido y un gemelo canónico válido;
+  `casos_forma_cobertura` da 36 `cbid` + 36 orden + 8 ambos con tx válida. D-18 deja de incluir
+  `cbid` (ya no es un descarte) y conserva tardía + sin saldo.
+- `exportar.jl`: pasa a **v0.6**, añade `contar_forma_evidencia` y los 80 casos dedicados, y
+  **falla** si no se alcanzan los mínimos de la orden. `run.jl` y `test/runtests.jl` pasan a v0.6
+  y añaden las comprobaciones de forma. `src/diferencias.jl` genera el informe de diferencias.
+
+## SL4cO.4. Cobertura (v0.6)
+
+| Contador | Definición | v0.6 | Mínimo |
+|---|---|---:|---:|
+| `bloque_cbid` | bloque inválido `ErrForma(EvidenciaCbidAjeno)` | **279** | ≥ 30 |
+| `bloque_orden` | bloque inválido `ErrForma(OrdenCanonicoInvalido)` | **125** | ≥ 30 |
+| `ev_cbid` | `EvidenceTx` con `cbid` ajeno en esos bloques | **279** | — |
+| `ev_orden` | `EvidenceTx` con orden no canónico en esos bloques | **125** | — |
+| `con_tx_cbid` | bloque `cbid` con además una tx monetaria | **166** | ≥ 10 |
+| `con_tx_orden` | bloque orden con además una tx monetaria | **78** | ≥ 10 |
+| `ambos_cbid` | bloque con los dos defectos (gana `cbid`) | **127** | ≥ 5 |
+
+La sección semántica de evidencia se mantiene por encima de los mínimos de SL-3b: `sin_saldo`
+**46** (≥ 30) y `deshecha` **67** (≥ 30); `aplicada` 263, `duplicada` 21, `tardia` 197,
+`construida` 527. La tabla de operaciones de garantía no cambia (depósitos 347, retiros 808,
+liberaciones 115, `ErrNonce` 853 = 18,29 %, `ErrDobleGasto` 305, reorgs 312).
+
+## SL4cO.5. Vectores, relectura y diferencias
+
+- `resultados/vectores-estado-dag-v0.6.txt`: **1 961 casos** (21 dirigidos + 900 aleatorios +
+  8×120 de evidencia + 80 de forma), sha256
+  `c383abab132892ee40bf1b941e0c647903d3ffc71d905b834459d53083e395bc`; `.sha256` relativo a
+  `T04/`. Formato de línea idéntico a v0.5.
+- Relectura independiente (`src/lector_vectores.jl`): **1 961 casos, 0 discrepancias**
+  (`resultados/relectura-v0.6.log`).
+- `resultados/DIFERENCIAS-v0.5-v0.6.md`: las 1 878 entradas de v0.5 reproducidas con el oráculo
+  corregido; **181** casos con defecto de forma, **135** cambian de resultado y **0** cambian sin
+  defecto (`VEREDICTO = SIN CAMBIOS INJUSTIFICADOS`). v0.5 no contenía ningún caso de orden no
+  canónico, así que todos los cambios observados son de `cbid` ajeno: el bloque pasa a
+  `ErrForma(EvidenciaCbidAjeno)`, sus descendientes a `ErrSinPadre` y desaparecen sus
+  `DESC`/créditos/incidentes.
+- v0.4 y v0.5 **intactos** (`sha256sum -c ENTRADA-SL4c-O.sha256`, 7/7 OK).
+
+## SL4cO.6. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl \
+    --dirigidos 1 --aleatorios 900 --ev-replicas 120
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-estado-dag-v0.6.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/diferencias.jl resultados/vectores-estado-dag-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+`Pkg.test()` **447/447** (422 previas; D-18 pierde su aserción de `cbid` y se añaden 26 nuevas
+de forma v4; registro `resultados/test-pkg-v0.6.log`).
+`run.jl --seed 0x5a5a --replicas 200`: **ESTADO = SUPERADO**, 0 fallos, 76,7 s; 1 600 historias
+con C-EVP (11 530 válidos, 2 349 descartes, 34 duplicadas, 305 tardías, **339** bloques
+`forma_cbid` y **177** `forma_orden`), 3 000 historias base, 600 000 órdenes IE-3
+(`resultados/run-estado-dag-v0.6.log`). Julia 1.13.0; 1 hilo; sin Python; sin commit ni push;
+nada escrito fuera de `T04/`.
+
+## SL4cO.7. Lo que T04-SL4c-O NO demuestra
+
+- No toca T01 (O1) ni Rust (SL-4c): solo corrige el oráculo DAG. La coherencia con T01 depende de
+  que O1 aplique la misma precedencia en el modo estricto.
+- La comprobación usa las cabeceras ya decodificadas del oráculo; no ejerce el parser de bytes
+  (`n_in`/`n_out`/`n_wit`, longitudes, campos inactivos), que sigue fuera de T04.
+- `DIFERENCIAS-v0.5-v0.6.md` compara las entradas de v0.5; no es un diff de los casos aleatorios
+  nuevos de v0.6 (el generador cambió para cubrir `:orden`/`:ambos`).
+
+---
+
+# T04-SL4c-O-B — Precedencia por transacción y los dos tipos de orden no canónico
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:24–23:35).
+**Fuente:** `ORDEN-SL4c-O-B.md`, revisión del director de SL-4c-O. **Zona:** `T04/`.
+Sin Python; sin commit ni push; sin secretos.
+
+## SL4cOB.0. Entrada congelada (inicio)
+
+`sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-B.sha256` (desde `ZEROX/`): **3/3 OK**
+(`ORDEN-SL4c-O-B.md`, `ORDEN-SL4c-O.md`, `V-ZRX/LINEO.md`); registro
+`resultados/entrada-SL4c-O-B.log`.
+
+## SL4cOB.1. Falta de definición detectada antes de editar
+
+Ninguna bloqueante; tres lecturas informadas antes de tocar código:
+
+- **«Estructura vigente» en T04.** La regla manda, por transacción, «estructura vigente → `cbid`
+  → orden canónico». En T04 el único chequeo estructural de la evidencia
+  (`ErrEvidenciaConEntradas`, `n_in/n_out/n_wit`) es un **descarte semántico** al fusionar, no
+  parte de `chequear_forma`; moverlo cambiaría casos **sin** los dos defectos, que SL-4c-O
+  prohíbe. El bucle por transacción de T04 aplica por tanto solo `cbid → orden`; la estructura
+  queda donde estaba (ya declarado en SL4cO.7).
+- **Reparto de mínimos.** Se conservan los mínimos de SL-4c-O (`bloque_cbid≥30`, `bloque_orden≥30`,
+  `con_tx_cbid/con_tx_orden≥10`, `ambos_cbid≥5`) y se añaden `bloque_orden_desc≥10` y
+  `bloque_orden_igual≥10`.
+- **Versionado.** Los vectores v0.6 se **regeneran** sobrescribiendo los de SL-4c-O (aún no los
+  consume nadie), conservando el nombre `vectores-estado-dag-v0.6.txt`.
+
+## SL4cOB.2. Cambio aplicado
+
+- `src/EstadoDAG.jl`: `chequear_forma_evidencia` deja de ser global al bloque (todos los `cbid`
+  antes que todos los órdenes) y pasa a **por transacción**: recorre `b.txs` en su orden y, para
+  cada `EvidenceTx`, comprueba `cbid` → orden canónico; la primera defectuosa fija el motivo.
+  Nuevo helper **`primer_defecto_forma`** (exportado) que devuelve `:cbid`, `:orden_igual`,
+  `:orden_desc` o `nothing`, usado por el oráculo, el exportador, `run.jl` y las pruebas.
+- `src/generadores.jl`: `evidencia_aleatoria` distingue `:orden_igual` (`H1 = H2`) y `:orden_desc`
+  (`H1 > H2`), más `:ambos_desc`; el generador aleatorio usa los dos tipos de orden.
+- `src/dirigidos.jl`: `_evidencia_forma` gana `:orden_igual`; `casos_forma_cobertura` pasa a 36
+  `cbid` + 36 igualdad + 36 descenso + 8 ambos; nuevos **D-20/D-21**
+  (`caso_forma_dos_evidencias`) con `[orden, cbid]` y `[cbid, orden]`.
+- `exportar.jl`: cobertura desglosada (`bloque_orden_igual/desc`, `ev_orden_igual/desc`) y mínimos
+  nuevos; cabecera v0.6 rotulada SL-4c-O-B.
+- `run.jl` y `test/runtests.jl`: aserciones de los dos tipos de orden y de la precedencia.
+- `src/diferencias.jl`: prosa actualizada; la precedencia por transacción no altera el diff de
+  v0.5 (todos sus defectos son `cbid`).
+
+## SL4cOB.3. Resultados
+
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | **472/472** (`resultados/test-pkg-v0.6.log`) |
+| `run.jl --seed 0x5a5a --replicas 200` | **ESTADO = SUPERADO**, 0 fallos, 129,7 s (`resultados/run-estado-dag-v0.6.log`) |
+| Relectura independiente de v0.6 | **2 000 casos, 0 discrepancias** (`resultados/relectura-v0.6.log`) |
+| `DIFERENCIAS-v0.5-v0.6.md` | 1 878 entradas; **181** con defecto, **135** cambian, **0** sin defecto |
+| Cobertura de forma | `bloque_cbid=283`, `bloque_orden=243` (igual **115**, desc **128**), `ambos_cbid=161`, `con_tx_cbid=166`, `con_tx_orden=152` (`minimos_SL4cO=OK`) |
+| Entrada congelada | **3/3 OK** |
+
+`run.jl`: 3 000 historias base + 1 600 con C-EVP (11 254 válidos, 2 208 descartes, 37 duplicadas,
+224 tardías), `forma_cbid` **410**, `forma_orden` **286** (igualdad **142**, descenso **144**),
+600 000 órdenes IE-3. La cobertura semántica de evidencia se mantiene sobre mínimos:
+`aplicada` 245, `sin_saldo` 42 (≥30), `deshecha` 59 (≥30), `duplicada` 20, `tardia` 145,
+`construida` 452.
+
+## SL4cOB.4. Vectores, relectura y diferencias
+
+- `resultados/vectores-estado-dag-v0.6.txt`: **2 000 casos** (24 dirigidos + 900 aleatorios +
+  8×120 de evidencia + 116 de forma), sha256
+  `b1710e4cd0e99a7602555595f23ef050fe174ef9389768b56481927b0d79a331`; `.sha256` relativo a
+  `T04/`. Formato de línea idéntico a v0.5.
+- Relectura independiente: **2 000 casos, 0 discrepancias**.
+- `DIFERENCIAS-v0.5-v0.6.md`: **135** cambios, todos con defecto (`cbid` ajeno; v0.5 no tenía
+  orden no canónico); `VEREDICTO = SIN CAMBIOS INJUSTIFICADOS`. La precedencia por transacción no
+  cambia ningún resultado de v0.5.
+- v0.4 y v0.5 **intactos**.
+
+## SL4cOB.5. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl \
+    --dirigidos 1 --aleatorios 900 --ev-replicas 120
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-estado-dag-v0.6.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/diferencias.jl resultados/vectores-estado-dag-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; nada escrito fuera de `T04/`. El sha256 de
+los vectores incluye la fecha real de generación en su cabecera (misma convención que v0…v0.5).
+
+## SL4cOB.6. Lo que T04-SL4c-O-B NO demuestra
+
+- Sigue sin mover la comprobación estructural de la evidencia (`ErrEvidenciaConEntradas`) a la
+  forma: en T04 es descarte semántico; la precedencia por transacción solo cubre `cbid` y orden.
+- Los casos de dos evidencias defectuosas son dirigidos (D-20/D-21); el generador aleatorio
+  produce cada defecto en transacciones separadas con baja probabilidad, así que la precedencia
+  entre defectos de transacciones distintas se demuestra con esos dos casos, no con estadística.
+- La coherencia con T01 (O1) depende de que O1 mantenga la precedencia por transacción; T04
+  incluye `Transicion.jl` de T01 como dependencia de solo lectura.
+
+---
+
+# SL-4c-O-C (T04) — La evidencia con entradas/salidas también es forma (EV-04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (nombre que devuelve la API: `deepseek-flash`,
+DeepSeek-V4.1-Flash; esfuerzo `high`). **Fecha:** 2026-09-26 (≈ 23:37–23:50).
+**Fuente:** `ORDEN-SL4c-O-C.md`, revisión del director de SL-4c-O-B. **Zona:** `T04/`.
+Sin Python; sin commit ni push; sin secretos; 1 hilo.
+
+## SL4cOC.0. Entrada congelada (inicio)
+
+`cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-C.sha256`
+— **4/4 OK** (`ORDEN-SL4c-O-C.md`, `ORDEN-SL4c-O-B.md`, `ORDEN-SL4c-O.md`, `V-ZRX/LINEO.md`);
+registro `resultados/entrada-SL4c-O-C.log` (2026-09-26T23:43:46+02:00).
+
+## SL4cOC.1. Falta de definición informada antes de editar
+
+**FD-SL4cOC-1 · `testigos`/`n_wit` no existe en el modelo tipado (no bloqueante, declarada).**
+La orden incluye la estructura de EV-04 como «entradas, salidas o testigos» y exige «≥5 con los tres
+defectos a la vez (gana entradas)». El contrato EV-04 sí incluye `n_wit ≠ 0`, pero el modelo `Tx` de
+T01 (que T04 `include`a como dependencia de solo lectura) solo tiene `entradas` (`n_in`) y `salidas`
+(`n_out`); no hay campo de testigos y el códec de wire de la v4 está declarado fuera de alcance
+(FD-5 de SL4a). Añadirlo exigiría modificar `Tx` (zona de O1) y el formato de línea de los vectores
+(que la orden fija como «el mismo»). Decisión declarada: se implementan las dos subclases
+representables (`entradas`, `salidas`, y ambas) y, para cubrir la precedencia «gana entradas» y la
+lectura «los tres defectos de la precedencia», se añaden además casos con estructura + `cbid` ajeno +
+orden no canónico. No se toca T01 ni el formato. Se declara en §SL4cOC.6 y en la cobertura.
+
+**FD-SL4cOC-2 · `ErrEvidenciaConEntradas` deja de ser semántico.** Igual que SL-4c-O hizo con
+`ErrCbidAjeno`/`ErrOrdenCanonico`, O1 lo retira de `ErrSemantico` y de los `export` y lo deja como
+constante interna `ErrForma(EvidenciaConEntradasOSalidas)`, de modo que T04 siga cargando hasta su
+O2. T04 retira su única referencia (`exportar.jl`) y no depende de él. No bloqueante.
+
+**FD-SL4cOC-3 · Versionado.** v0.6 se regenera en el mismo fichero (aún sin consumidor), como en
+SL-4c-O-B; v0.5 no se toca y sigue siendo la referencia del diff.
+
+## SL4cOC.2. Cambio aplicado
+
+- `src/EstadoDAG.jl`: nuevo `MOTIVO_FORMA_ESTRUCTURA = ErrForma(EvidenciaConEntradasOSalidas)` y
+  `defecto_estructura_evidencia` (`:entradas`, `:salidas`, `:entradas_salidas`); `primer_defecto_forma`
+  comprueba, por transacción y en su orden, `estructura → cbid → orden`; `chequear_forma_evidencia`
+  mapea la estructura a `MOTIVO_FORMA_ESTRUCTURA` y el bloque queda **inválido en la admisión** (no
+  descarte). El camino de fusión (`aplicar_bloque_fusion!`) ya no ve estas evidencias.
+- `src/dirigidos.jl`: `_evidencia_forma` y `_tx_evidencia_forma` (entradas/salidas/ambas y sus
+  combinaciones con `cbid`/orden); `caso_forma_evidencia` acepta los modos de estructura (D-19); la
+  cobertura pasa a 220 casos (36 `cbid` + 36 igualdad + 36 descenso + 8 ambos + 36 entradas +
+  36 salidas + 8 entradas+salidas + 8 entradas+cbid + 8 entradas+orden + 8 entradas+cbid+orden).
+- `exportar.jl`: cobertura de estructura (`bloque_estructura`, `_entradas`, `_salidas`, `_ambos`,
+  `_cbid_orden`, `ev_estructura`, `con_tx_estructura`) y mínimos nuevos; se retira de
+  `contar_evidencia` la rama `ErrEvidenciaConEntradas` (ya inalcanzable) y se actualiza la cabecera a
+  `T04-SL4c-O-C`.
+- `run.jl`, `test/runtests.jl` y `src/diferencias.jl`: aserciones, contadores y detección de la
+  estructura; `METODO.md` actualizado.
+
+## SL4cOC.3. Resultados
+
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | **507/507** (`resultados/test-pkg-v0.6.log`) |
+| `run.jl --seed 0x5a5a --replicas 200` | **ESTADO = SUPERADO**, 0 fallos, 94,1 s (`resultados/run-estado-dag-v0.6.log`) |
+| Relectura independiente de v0.6 | **2 108 casos, 0 discrepancias** (`resultados/relectura-v0.6-SL4c-OC.log`) |
+| `DIFERENCIAS-v0.5-v0.6.md` | 1 878 entradas; **181** con defecto, **135** cambian, **0** sin defecto |
+| Cobertura de forma | `bloque_estructura=108` (entradas **62**, salidas **37**, ambos **9**, `cbid_orden` **9**), `con_tx_estructura=108`; `bloque_cbid=283`, `bloque_orden=243` (igual **115**, desc **128**), `ambos_cbid=161`, `con_tx_cbid=166`, `con_tx_orden=152` (`minimos_SL4cO=OK`) |
+| `mtime` de `Transicion.jl` (T01) | `2026-09-26 23:39:41.298582413 +0200` (epoch `1790458781`, md5 `30ef7ec9…`) |
+| Entrada congelada | **4/4 OK** |
+
+`run.jl`: 3 000 historias base (46 500 bloques, 25 192 válidos, 4 497 descartes, 2 078 `rojo_U3`,
+600 000 órdenes IE-3) + 1 600 con C-EVP (11 254 válidos, 2 208 descartes, 37 duplicadas, 224 tardías,
+`forma_cbid` **410**, `forma_orden` **286**: igualdad **142**, descenso **144**). La estructura
+`forma_estructura` es **0** en los casos aleatorios (el generador no produce evidencias con
+entradas/salidas): la cobertura estructural exigida es **determinista**, vía los 220 casos dirigidos
+`forma-*` de `exportar.jl`. Evidencia semántica: `aplicada` 353, `sin_saldo` 42 (≥30), `deshecha` 59
+(≥30), `duplicada` 20, `tardía` 145, `construida` 560.
+
+## SL4cOC.4. Vectores, relectura y diferencias
+
+- `resultados/vectores-estado-dag-v0.6.txt`: **2 108 casos** (28 dirigidos + 900 aleatorios +
+  960 de evidencia + 220 de forma), sha256
+  `86348a48e32491c9cb3675fa1c2d7e06f4c20f94518f35b227778d28d4a90c19`; `.sha256` relativo a `T04/`.
+  Formato de línea idéntico a v0.5 (sin campos nuevos).
+- Relectura independiente: **2 108 casos, 0 discrepancias**.
+- `DIFERENCIAS-v0.5-v0.6.md`: **135** cambios, todos con defecto (`cbid` ajeno); v0.5 no tenía orden
+  no canónico ni estructura defectuosa, así que la adición de entradas/salidas **no cambia ningún
+  resultado** del diff (`VEREDICTO = SIN CAMBIOS INJUSTIFICADOS`, 0 cambios sin defecto).
+- v0.4 y v0.5 **intactos** (`ENTRADA-SL4c-O.sha256`: 7/7 OK).
+
+## SL4cOC.5. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-DAG/T04
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl \
+    --dirigidos 1 --aleatorios 900 --ev-replicas 120
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-estado-dag-v0.6.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/diferencias.jl resultados/vectores-estado-dag-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 200
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin commit ni push; nada escrito fuera de `T04/`. El sha256 de los
+vectores incluye la fecha real de generación en su cabecera (misma convención que v0…v0.5).
+
+## SL4cOC.6. Lo que T04-SL4c-O-C NO demuestra
+
+- **`testigos`/`n_wit` no está en el modelo `Tx` de T01.** EV-04 solo se ejerce aquí por
+  `entradas`/`salidas`; el caso `n_wit ≠ 0` del contrato queda pendiente del códec de wire de la v4
+  (FD-5 de SL4a). La orden pedía «≥5 con los tres defectos a la vez (gana entradas)»: se entregan
+  **9** casos con los dos sub-defectos representables a la vez (`bloque_estructura_ambos`) y **9** con
+  los tres defectos de la **precedencia** (`entradas` + `cbid` ajeno + orden, `bloque_estructura_cbid_orden`),
+  ambos por encima del mínimo de 5; el tercer sub-defecto de EV-04 (testigos) no es representable sin
+  tocar el modelo o el formato.
+- Los casos de estructura son **dirigidos** (D-19 con modos nuevos); el generador aleatorio no produce
+  evidencias con entradas/salidas, así que la cobertura es determinista, no estadística.
+- La coherencia con T01 (O1) se apoya en el `mtime` final registrado arriba; la batería final de T04
+  (`exportar.jl`, relectura, diferencias, `Pkg.test()`, `run.jl`) se ejecutó con ese `Transicion.jl`.
+

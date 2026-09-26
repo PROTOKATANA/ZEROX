@@ -1,0 +1,2108 @@
+dsh: reasoning:
+Let me start by reading the two required files in full.
+dsh: reasoning:
+Now let me explore the T01 directory to understand the existing code and vectors.
+dsh: reasoning:
+Let me look at the src directory and results (excluding .julia-depot).
+dsh: reasoning:
+Let me read the source files. Start with Transicion.jl (main), evidencia.jl, lector_vectores.jl, run.jl, and the SL-3b related reports. Let me read Transicion.jl first.
+dsh: reasoning:
+Now let me read evidencia.jl, lector_vectores.jl, and the run.jl, and the tests. Also the SL-3b reports. Let me read the key files.
+dsh: reasoning:
+Now let me read lector_vectores.jl and exportar.jl, and the tests. Also I need to read the SL-3b INFORME section and PROGRESO to understand the format. Let me first look at lector_vectores.jl.
+dsh: reasoning:
+Now I need to understand the task precisely. The order says:
+
+- H1 from REVISION-RI-3b.md: `EvidenceTx` with foreign `consensus_branch_id` (RAT-1: "si no, ErrForma") or with `pre_hash(H1) ≥_lex pre_hash(H2)` (EV-04: `ErrForma(OrdenCanonicoInvalido)`) is a **form** error, and the DAG state contract says a form error of a transaction makes the **block invalid**. The oracles (SL-3/SL-3b) treat them as semantic (`ErrCbidAjeno`, `ErrOrdenCanonico`): in fusion, discard and valid block. Correct them to the contract.
+
+Directive decisions:
+1. Fixed precedence of v4 form checks (same in both oracles and later in Rust): structure already in force (inputs/outputs/witnesses, inactive fields, form of the two headers) → `cbid` (both headers with the local network's `consensus_branch_id`) → canonical order. Error names: `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`. `ErrCbidAjeno` and `ErrOrdenCanonico` disappear as semantic errors; semantic verification (EV-06 identity, EV-07 seals, RAT-3, window, dedup) doesn't change order or result.
+
+2. Effect: in strict mode (T01), like any other form error of a transaction (block is invalid); in fusion (T04), the block that contains it is **invalid at admission**, not a discard.
+
+3. New vectors: T01 **v0.5** (`vectores-transicion-v0.5.txt`, `.sha256`, `cobertura-v0.5.txt`) and T04 v0.6 (...), with the same line format; v0.4/v0.5 remain intact as historical. **Minimum coverage** in each oracle: ≥ 30 cases with `EvidenciaCbidAjeno` and ≥ 30 with `OrdenCanonicoInvalido`, in T04 at least 10 of each in a block that also contains valid transactions (to show that it invalidates the whole block), and ≥ 5 with both defects at once (cbid wins, by precedence).
+
+4. Exact difference with previous vectors: a report `DIFERENCIAS-v0.4-v0.5.md` (T01) that lists, case by case, those that change result and why; any case that changes without carrying one of the two defects is a **failure** of this order.
+
+Verification: `Pkg.test()` green (all previous tests with their names plus the new ones), main `run.jl` with 0 failures, re-reading of the new vectors with 0 discrepancies, and the list of differences from point 4. **No Python.** Budget 1h/1 thread. "SL-4c-O" section in `INFORME.md` and `PROGRESO.md` of each oracle, with `HORAS.log` (`date -Is` real) and the API model name.
+
+Limits: nothing outside your zone; no git; read no secrets. Frozen input: `P-ZRX/P-SLASHING/ENTRADA-SL4c-O.sha256`.
+
+So I need to:
+1. Read the relevant contracts to be sure about `ErrForma` and the form/semantic distinction. The key issue: "Si detectas una falta de definición, infórmala antes de editar." So I need to check for under-specification. In particular, the contract says `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`. Currently the oracle has a flat `@enum Err`. The order says "Nombres de error: `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`". In T01 (strict mode), what is the observable result for "block invalid"? The current oracle's `Err` enum is flat, and `RES` stringifies `string(r)` -> e.g. "ErrCbidAjeno". For form errors, the expected string might be "ErrForma(EvidenciaCbidAjeno)". I need to check the contract and the revision to determine exactly. Let me read:
+- `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md` (table line 46)
+- `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3b.md` H1
+- The evidence contract `CONTRATO-EVIDENCIA-v0.md` (ratified) to see RAT-1/EV-04 wording, and how ErrForma is represented.
+- `ENTRADA-SL4c-O.sha256`
+- INFORME.md and PROGRESO.md relevant SL-3b section.
+
+Let me search for these files.
+dsh: reasoning:
+There are already SL4c-O1-dsh.stdout and stderr files. Wait — those might be from a prior run of this same order. Let me check. Actually those could be from this current run (the harness captured stdout). Let me check them, but careful: they might contain the current session output (which would be weird). Let me look at timestamps.
+
+Actually, wait: the order was launched. The `.stdout`/`.stderr` files are the harness's capture. Let me not read them as they might be huge or contain secret env. Actually, they'd be from this same session launch. Let me not worry.
+
+Let me read the key contract documents: CONTRATO-EVIDENCIA-v0.md, REVISION-RI-3b.md H1, CONTRATO-ESTADO-DAG-v0.md. Also the SL3b/UPDATES. Let me read them.
+dsh: reasoning:
+Now let me read REVISION-RI-3b.md H1 and CONTRATO-ESTADO-DAG-v0.md line 46 area.
+dsh: reasoning:
+Now I have a good picture. The key ambiguity is: how is `ErrForma` represented in the Julia oracle? The order says "Nombres de error: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`". The current oracle uses a flat `@enum Err`. There are two natural options:
+
+1. Add a new enum type `ErrForma` with variants and make `Err` include it via a union, or add new flat enum members named e.g. `ErrFormaEvidenciaCbidAjeno` and `ErrFormaOrdenCanonicoInvalido`.
+2. Add a struct/wrapper.
+
+But the order also says the T01 vector format must be "el mismo formato de línea". The `RES` field currently is `string(r)` -> "ErrCbidAjeno". If we change to `ErrForma(EvidenciaCbidAjeno)`, the string would become "ErrForma(EvidenciaCbidAjeno)" (Julia's default show for a struct is `ErrForma(EvidenciaCbidAjeno)` only if EvidenciaCbidAjeno is an enum value; actually `string(ErrForma(EvidenciaCbidAjeno))` would be `"ErrForma(EvidenciaCbidAjeno)"`? Let's check: for a struct with one field of enum type, `string(x)` calls `show`, which for a composite type gives `ErrForma(EvidenciaCbidAjeno)`. Yes, Julia's default `show` for a struct is `TypeName(field1, field2)`. So if we define `struct ErrForma; clase::Err...; end`, it would show as `ErrForma(EvidenciaCbidAjeno)`.
+
+But the order says "Desaparecen `ErrCbidAjeno` y `ErrOrdenCanonico` como errores semánticos". Does that mean the `Err` enum no longer should have these members? Probably yes, remove them and add form errors. The names given are `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`. The `EvidenciaCbidAjeno` and `OrdenCanonicoInvalido` are the "clase" of form error. This matches the evidence contract EV-04 which uses `ErrForma(EvidenciaConEntradasOSalidas)`, `ErrForma(OrdenCanonicoInvalido)`, and `ErrFormato`, `ErrCampoInactivo`, `ErrVersionInactiva` etc. Note the ratification RAT-1 says "si no, `ErrForma`".
+
+Hmm, but there's a subtlety. The order says the precedence: "estructura ya vigente (entradas/salidas/testigos, campos inactivos, forma de las dos cabeceras) → **`cbid`** → **orden canónico**". In the current oracle, the structure check `ErrEvidenciaConEntradas` is done first (line 1099), then `cbid` (1102), then identity (1104), then order (1106). The order wants: structure → cbid → order. Note the current oracle checks `evidencia === nothing` first (ErrSinEvidencia), then entradas/salidas (ErrEvidenciaConEntradas). The order's structure list includes "entradas/salidas/testigos, campos inactivos, forma de las dos cabeceras". The current oracle's structure = `ErrEvidenciaConEntradas` and the two-header presence (via `evidencia === nothing`).
+
+Important: the order says `ErrEvidenciaConEntradas` — in the contract it's `ErrForma(EvidenciaConEntradasOSalidas)`. But the order's decision 1 explicitly names only two new error names: `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`, and says structure "ya vigente" (already in force). So `ErrEvidenciaConEntradas` stays as-is (not renamed). The order says "estructura ya vigente" — the existing structure check stays. Good, we only change the two checks.
+
+Now, the key question of representation: Does the order require `ErrForma` to be a wrapper type in the oracles? It says "Nombres de error: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`". Since T01 is Julia and the oracle's `Err` is an enum, the cleanest faithful representation: define a new enum for the form clases, and a struct `ErrForma` that wraps a clase, and make the oracle's error return type `Union{Err, ErrForma}`? That changes a lot of code (`r isa Err` checks everywhere). Alternatively, make `ErrForma` a struct and define a broader abstract type `ErrorOracle` that both `Err` and `ErrForma` subtype, replacing `r isa Err` with `r isa ErrorOracle`. That's a big but mechanical change across the codebase and tests. Hmm.
+
+Actually, maybe there's a simpler approach that is faithful and minimal: Julia enums can't have parameters, but we can define `ErrForma` as a struct with a field `clase::ClaseForma`, and add a method `Base.show`? Wait, default string is fine. Then the return type of `aplicar` becomes `Union{Nothing, Err, ErrForma}`. All existing `r isa Err` checks would treat `ErrForma` as success! That's dangerous: `aplicar` returns `r isa Err && return r`. If we return `ErrForma(...)`, then `aplicar!` returns it, and `aplicar` does `r isa Err && return r; return E2` → it would return `E2` (success) instead of the error. That would be wrong.
+
+So we need to update all the `r isa Err` checks to also catch `ErrForma`. The cleanest: define an abstract type, e.g. `abstract type ErrorTransicion end`, make `Err` and `ErrForma` subtypes, and replace `isa Err` with `isa ErrorTransicion`. Or simpler: make `ErrForma` a subtype of... enums are concrete, can't subtype.
+
+Alternative minimal approach: keep a flat enum but add two members `ErrFormaEvidenciaCbidAjeno` and `ErrFormaOrdenCanonicoInvalido`, and define a helper `string`. But then the RES string would be "ErrFormaEvidenciaCbidAjeno", not "ErrForma(EvidenciaCbidAjeno)". The order names are explicit. Better to match the contract exactly.
+
+Hmm, wait. Let me consider what the grader/director expects. The order says "Nombres de error: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`". This mirrors the Rust `ErrorFormaTx::OrdenCanonicoInvalido` and the contract's `ErrForma(OrdenCanonicoInvalido)`. In the T01 vector format, the `RES` field is a string. The new vectors will record `res=ErrForma(EvidenciaCbidAjeno)`. The lector re-parses and recomputes, converting `r` to string. So as long as the oracle and the lector produce the same string, the re-read passes. But if grading compares against a reference, the exact string matters.
+
+Let me check how T04 handles this (its vectors v0.5 and code), since SL-4c-O2 is the parallel order. That will tell me the convention chosen for the enum/struct and string. But O2 may not have been done yet; the order says both launched separately. Let me check T04 for form errors. Actually, the sibling order is running concurrently perhaps. Let me check the T04 code to see if they've implemented it / what convention. Also check `SL4c-O1-dsh.stdout`? That's our own session output; not helpful.
+
+Let me search the codebase for ErrForma usage in T04 and elsewhere.
+dsh: reasoning:
+Interesting: `SL4c-O2-dsh.stderr` exists (the O2 run). Let me check whether T04 has already been modified by O2. But that's outside my zone (I should not edit T04); I can read it, though the order says "nada fuera de tu zona" (referring to writing). Reading is fine. Let me check T04's current state and the O2 stderr/stdout to see if O2 already ran and what convention was chosen. Actually the concurrent run might be in progress. Let me check quickly.
+
+Wait — the O2 stdout/stderr existed before my run? The `ls` shows SL4c-O1-dsh.stdout and SL4c-O2-dsh.*. These are likely harness logs. If O2 already completed, T04 may have the implementation. Let me check T04's Transicion package or its error handling.
+
+Actually let me look at T04's src structure. T04 uses `Transicion` as dependency? It says `Transicion.ErrCbidAjeno`, so T04 depends on the T01 package? Let me check T04 Project.toml. If T04 depends on the same `Transicion` module (T01), then changing T01's enum affects T04 too! Let me investigate. This is crucial: the order says "Zona escribible: O1 solo P-ZRX/P-TRANSICION/T01/". If T04 uses the T01 module as a dependency, then O1's change to T01 would affect T04. Let me check.
+
+Actually T04 might have its own `Transicion` copy. Let me check.
+dsh: reasoning:
+T04 has its own module `EstadoDAG`, and it references `Transicion.ErrCbidAjeno`. So T04 likely includes T01's `Transicion.jl` via include or it's a separate copy? Let me check T04/src.
+dsh: reasoning:
+T04 includes T01's Transicion.jl via RUTA_T01. Let me see the path.
+dsh: reasoning:
+Important. T04 includes T01's `Transicion.jl` at runtime as a read-only dependency. So if I change T01's `Err` enum (remove `ErrCbidAjeno` / `ErrOrdenCanonico` or rename), T04 will break because T04's code references `Transicion.ErrCbidAjeno` and `Transicion.ErrOrdenCanonico`. That is a cross-zone coupling. The order says O1 is launched from T01 and O2 from T04, each with its own writable zone. If I remove/rename those enum members, T04 (O2) must adapt. Since O2 will run separately (and possibly already ran), there's an ordering/coordination issue.
+
+But wait: the order explicitly says in decision 1: "Desaparecen `ErrCbidAjeno` y `ErrOrdenCanonico` como errores semánticos". This means they should no longer exist as semantic errors. If T04 still references them, T04 would fail to load. Hmm. But perhaps the design is: add `ErrForma` variants while keeping the old names as deprecated? Actually "desaparecen como errores semánticos" means they cease to be semantic errors, but it might not forbid keeping them as enum members. However, keeping them would be confusing.
+
+Let me check whether O2 has already been run and completed. Check the O2 stderr/stdout and T04's current source for `ErrForma`. Note: the grep earlier found T04 still using `Transicion.ErrCbidAjeno`, so O2 hasn't changed T04 yet (or O2 is in progress). Let me check the timestamps and content of the O2 log files.
+
+Actually, careful: those `SL4c-O*-dsh.*` files are in P-SLASHING, created by the launcher. They were probably created at launch time of each part. The order says both parts launched separately. Let me check their mod times.
+dsh: reasoning:
+Both were launched at 23:10:38. O1 and O2 are running concurrently! The stderr has content (14879 bytes for O1, 61459 for O2). But wait — those are stderr logs from the launcher. Is the current session O1? Yes. The O1 stderr file might be capturing the harness's own stderr (progress/logging). Let me not read them as they may interfere; but I'm curious if O2 has progressed. The key coordination issue: O1 modifies T01's `Transicion.jl`, and O2 (running concurrently) reads T01's `Transicion.jl` via `include`. If O1 removes `ErrCbidAjeno` while O2 is mid-run, O2 could break. But the order explicitly instructs both to be launched separately and defines the changes; the director presumably accepts this coupling. Since both are running concurrently, I must be careful.
+
+Hmm, actually, wait. Both were launched at 23:10:38. The current real time? Let me check date. The order is dated 2026-09-26 ≈23:10. Let me check now.
+
+The critical concern: the concurrency of O1 and O2 both touching the same T01 `Transicion.jl` (O2 reads it). If I make a breaking change to the enum, O2's in-flight run could see a partially consistent state. But O2 is a separate agent; presumably it will make T04 robust. Actually the order says O2's writable zone is only T04. O2 cannot edit T01. So O2 must adapt to whatever O1 does to T01. But O2 doesn't know exactly what O1 will do. This is a real coordination risk.
+
+Let me think about what design minimizes breakage for T04 while satisfying the order:
+
+Option A: Keep `ErrCbidAjeno` and `ErrOrdenCanonico` as enum members but never return them (deprecated), and add new `ErrForma`-style errors. Then T04 code referencing them still compiles, but T04 would classify form errors incorrectly (it checks `e == ErrCbidAjeno` to increment counters, and more importantly T04's `admite`/admission logic may treat them as semantic rejects). O2's job is to correct T04's behavior. If O1 keeps the old names, T04 won't crash, and O2 can add its own handling. But the order says the old names "desaparecen como errores semánticos", which arguably means the oracle must never return them; keeping dormant enum members is tolerable but ugly. More importantly, if T04's fusion logic keys off `ErrCbidAjeno` to decide "descarte", and O1 changes T01 to return an `ErrForma` type that T04 doesn't recognize as `Err`, then T04's `r isa Transicion.Err` checks would treat it as success → catastrophic silent wrong behavior. So O1's change of return type interacts heavily with T04.
+
+Let me look at how T04 uses `r isa Err` and the evidence errors. Let me examine T04's EstadoDAG.jl around fusion and error handling. And check `Err` usage. Let me grep.
+dsh: reasoning:
+This is a significant cross-module coupling. T04 has many `Dict{...,Transicion.Err}` and `Tuple{Int,Transicion.Err}` type annotations. If O1 changes T01's `Err` enum (removing members), T04 might still compile as long as the referenced members exist. But if O1 changes the return type of `aplicar_evidencia!` to something not `Transicion.Err`, T04's `r isa Transicion.Err` would miss form errors. O2 is tasked with fixing T04.
+
+But there's a strong argument for a *minimal, non-breaking* approach in T01 that lets T04 continue working until O2 fixes it:
+- Keep the flat `@enum Err` and add new members? Then T04 still compiles. But then T04's checks `e == ErrCbidAjeno` would never match (since T01 returns the new error), and `r isa Transicion.Err` would be true, pushing the form error into `descartes` → T04 would treat it as a discard, which is the exact bug the order wants fixed. O2 must fix T04 to treat form errors as block invalid. That's O2's job.
+
+But the order says `ErrForma(EvidenciaCbidAjeno)`. If I implement it as flat enum members like `ErrFormaEvidenciaCbidAjeno`, the string differs from the contract's notation. Hmm.
+
+Let me reconsider: maybe the intended design is precisely a wrapper `ErrForma` type in the oracle, mirroring Rust's `ErrorFormaTx` enum and `ErrorTransicion::Forma(ErrorFormaTx)`. The order's phrase "Nombres de error: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`" strongly suggests a two-level error: a form-error category wrapping a specific form class. And the contract's EV-04 table uses `ErrForma(EvidenciaConEntradasOSalidas)`, `ErrForma(OrdenCanonicoInvalido)`, etc.
+
+Given the instruction "Si detectas una falta de definición, infórmala antes de editar", this is exactly the kind of under-specification I should flag: the exact Julia representation of `ErrForma` and its string in the vector `RES` field, and the interaction with T04's `Transicion.Err` type annotations (cross-zone). Let me examine T04's implementation more to understand the expected semantics, and also check the T04 order O2? No, O2's text is the same order. Both O1 and O2 share the same order doc.
+
+Actually, wait. Let me reconsider whether I should flag or just proceed with a sound design. The instruction says inform if I detect a lack of definition before editing. I should identify genuine ambiguities. Let me search for whether there's a defined representation somewhere: e.g., in `P-ZRX/P-TRANSICION/CONTRATO-v0.md` or `FORMATO-v0.md`, or the T01 INFORME's "SL-3" section that discussed how to represent Rust errors in Julia. Let me search.
+
+Let me look at the T01 INFORME.md and PROGRESO.md SL-3/SL-3b sections, and search for "ErrForma" in T01's INFORME and CONTRATO-v0.md.
+dsh: reasoning:
+The T01 PROGRESO documents `AMBIGUEDAD-SL3-4`: RAT-1 says "ErrForma"; the flat oracle doesn't have ErrForma; adopted `ErrCbidAjeno`, documented as `ErrForma(CbidAjeno)` in Rust. So the order now says to correct to the contract: the oracle should have `ErrForma`. This is precisely the ambiguity that SL-4c-O resolves by naming `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`.
+
+Let me read the T01 INFORME.md and PROGRESO.md relevant sections to understand conventions and the report format. Let me read the SL-3 section of INFORME (around line 750+) and the PROGRESO around line 700+. Let me also read the beginning of INFORME to know structure.
+
+Actually, INFORME.md is 51975 bytes (~52 KB). Let me read relevant portions. Let me first get section headers.
+dsh: reasoning:
+Let me read the T01 INFORME SL3/SL3b sections and the PROGRESO SL3/SL3b sections to learn conventions (especially how new sections are added and the "falta de definición" reporting). Let me read INFORME lines 733-940.
+dsh: reasoning:
+Now let me read the PROGRESO SL3b section to understand the format for the report and the "falta de definición" style. Let me read lines 671-900 of PROGRESO.
+dsh: reasoning:
+Now I understand the reporting conventions. Let me now check the test file structure and how it tests the evidence errors, so I can update tests. Let me look at the test file for the SL-3 testset and how tests are named/counted.
+
+This is a big task. Let me set up a todo list and plan.
+
+First, though, I must decide on the "falta de definición" — I should report any genuine ambiguity before editing. Let me identify the under-specifications:
+
+1. **Julia representation of `ErrForma`.** The order names `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)` but the T01 oracle's `Err` is a flat enum with no `ErrForma`. Also cross-module: T04 `include`s T01's `Transicion.jl` and types many fields as `Transicion.Err`. If O1 changes the error type, T04's code must adapt (O2's job), but the two run concurrently. The order doesn't specify whether to add a struct/abstract type or whether to keep the old enum members. This is a genuine definition gap.
+
+   However — is this the kind of ambiguity that should "detener" or just be documented? The order says "Si detectas una falta de definición, infórmala antes de editar." So I should report it (e.g., in PROGRESO.md §SL4c.1) and adopt a reasonable reading, then proceed, as prior orders did. It says "informa antes de editar" — I'll report it in my response and in PROGRESO before editing code. Good.
+
+2. **What exactly counts as "structure" precedence for the order canonical check.** The order says structure (inputs/outputs/witnesses, inactive fields, form of the two headers) → cbid → canonical order. In the oracle, `evidencia === nothing` (missing headers) is structure-ish but currently returns `ErrSinEvidencia`. But the key point: the order says canonical order is checked **after** cbid, and both are form errors. But EV-06 (identity common) is semantic and must remain after? The order says the semantic verification (EV-06 identity, EV-07 seals, RAT-3, window, dedup) doesn't change order or result. Current order: `evidencia===nothing` → entradas/salidas → cbid → identidad → orden → sellos → RAT3 → ventana → dup. New required form precedence: structure → cbid → orden. So we must move the canonical-order check to right after cbid (before identity). That means: cbid → orden → then EV-06 identity → EV-07 seals → RAT-3 → window → dedup. That's the change. Also note: if both cbid and order defects, cbid wins (since cbid checked first). Good. If identities differ AND order non-canonical, the form error (order) wins because form is checked before semantic (EV-04 says parser rejects before semantic verification). Good.
+
+3. **`ErrEvidenciaConEntradas` naming.** The order says structure "ya vigente" → keep `ErrEvidenciaConEntradas`. But the contract calls it `ErrForma(EvidenciaConEntradasOSalidas)`. The order does NOT ask to rename it (decision 1 only names the two). So keep it. Actually, wait: it says "estructura ya vigente (entradas/salidas/testigos, campos inactivos, forma de las dos cabeceras)". This means the existing `ErrEvidenciaConEntradas` check stays as-is. Fine.
+
+4. **Vector `RES` string format.** How should form errors appear in the vectors? Presumably `ErrForma(EvidenciaCbidAjeno)`. This is implied. If I define the struct with default show, Julia's `string(x)` yields `"ErrForma(EvidenciaCbidAjeno)"` if the field is an enum instance `EvidenciaCbidAjeno`. Let me verify Julia's behavior: `struct Foo; x::Bar; end` where Bar is enum. `string(Foo(Bar1))` → `"Foo(Bar1)"`. Yes.
+
+5. **Coverage definition:** ≥30 cases with `EvidenciaCbidAjeno` and ≥30 with `OrdenCanonicoInvalido`, ≥5 with both defects. T04 additionally ≥10 each in a block with valid txs. For T01, need to add generators for the canonical-order defect and both-defects. The current `casos_evidencia_cobertura` has `:cbid` but no `:orden`. I need to add `:orden` and `:ambos` (both). And the coverage counter in `exportar.jl` must count them.
+
+6. **`DIFERENCIAS-v0.4-v0.5.md`**: list case by case those whose result changes and why. This requires comparing v0.4 and v0.5 results. How to compute? The v0.4 vectors have `RES` per block. The new v0.5 vectors: cases with only the two defects change RES from OK (v0.4: cbid/orden were semantic errors → for T01 strict mode, they were `Err` so the block was invalid; wait...). Hmm, let's think carefully.
+
+Actually wait. In T01 (strict/chain, `aplicar`), a semantic error of a transaction **also** makes the whole block fail (`aplicar_txs!` returns Err, `aplicar_pow!`/`aplicar_post!` return Err, so `aplicar` returns Err and the block is not valid in the chain). So in T01, the distinction "semantic vs form" doesn't change the *block invalid* outcome! Both return an `Err` and `aplicar` returns Err. So the RES string changes (name of the error) but the outcome (block invalid) is the same. Hmm.
+
+So for T01, what changes? The **error name** changes from `ErrCbidAjeno` to `ErrForma(EvidenciaCbidAjeno)` and from `ErrOrdenCanonico` to `ErrForma(OrdenCanonicoInvalido)`. Also, the **precedence/order** changes: currently, if `evidencia === nothing`? No. Consider a case with both a cbid defect and identity mismatch: currently cbid is checked before identity, so ErrCbidAjeno; same after. Consider a case with non-canonical order AND identity mismatch: currently identity (EV-06) is checked before order (line 1104 vs 1106), so currently returns `ErrSinEvidencia`; after the change, order is checked before identity, so returns `ErrForma(OrdenCanonicoInvalido)`. That's a case where the *error name* changes not just by renaming. But it still invalidates the block.
+
+Also consider a case with non-canonical order AND seals invalid: currently order (1106) before seals (1108), so currently ErrOrdenCanonico; after, order still before seals → ErrForma(OrdenCanonicoInvalido). Same.
+
+Also consider both cbid and orden: currently cbid first → ErrCbidAjeno; after cbid first → ErrForma(EvidenciaCbidAjeno). Just rename.
+
+So for T01, the "resultado" that changes is the RES error string, and possibly the classification when order+identity both fail. The v0.5 has new error names. So the DIFERENCIAS report lists the cases whose `RES` changes from `ErrCbidAjeno`/`ErrOrdenCanonico` to the new form names, plus new precedence cases.
+
+Hmm wait, but the question falsable says "toda historia cuyo bloque lleva una evidencia con `cbid` ajeno u orden no canónico se rechaza entera (T01 y T04, modo estricto y fusión), y nada más cambia: todos los demás casos de los vectores v0.4 (T01) y v0.5 (T04) se reproducen idénticos."
+
+In T01 strict mode, both before and after the block is rejected entirely. So the falsifiable claim's "se rechaza entera" is already true for T01 before. The real change in T01 is the error **classification** (form vs semantic). Hmm. But the order's point 4 says "un informe DIFERENCIAS-v0.4-v0.5.md (T01) que lista, caso por caso, los que cambian de resultado y por qué; todo caso que cambie sin llevar uno de los dos defectos es un fallo de esta orden." So "cambian de resultado" = the RES string changes. Since only cases carrying the defects can change, that's consistent.
+
+But hold on: does the error string actually appear in v0.4 vectors? Yes, in the `RES bloque=... res=ErrCbidAjeno` lines. So v0.5 will have `res=ErrForma(EvidenciaCbidAjeno)`.
+
+Hmm, but there's a subtlety: will the *identity* of which blocks are valid change in T01? No, both are Err. So SEL/UTXO/GAR/EST won't change. Only RES strings for those cases. Good — the DIFERENCIAS report can be generated by diffing the v0.4 and v0.5 files line by line, filtering to RES lines. Cases with `ErrCbidAjeno`→`ErrForma(EvidenciaCbidAjeno)`, `ErrOrdenCanonico`→`ErrForma(OrdenCanonicoInvalido)`, `ErrSinEvidencia`→`ErrForma(OrdenCanonicoInvalido)` (precedence cases), plus new cases only in v0.5? Wait, but v0.5 might have the same set of cases as v0.4 plus new ones. The order says "los v0.4/v0.5 quedan intactos como históricos". It says new vectors v0.5 with the same line format. Does v0.5 need the same 2795 cases as v0.4, or can it be a fresh export? The "Diferencia exacta con los vectores anteriores" suggests v0.5 should be comparable to v0.4 case by case. To compare case by case, the safest approach: regenerate the full v0.5 with the same deterministic generation as v0.4 (same seeds, same points, same directed cases) plus additional targeted cases for the new form defects, so that most cases are byte-identical except for the changed RES. The `exportar.jl` is deterministic given `--fecha`? The header includes the date, but the case content is deterministic. The v0.4 was generated with `exportar.jl --aleatorios 2000` (per INFORME §SL3b.6). So running the updated `exportar.jl` with the same options will produce the same cases, with the new error strings, plus perhaps new coverage cases. Good.
+
+But the report must list "caso por caso, los que cambian de resultado y por qué". I can diff the two vector files' `CASO`/`RES` lines. Best to write a small Julia diff script? The order prohibits Python but permits Julia. But should I add a new script? I could compute the diff with `diff` shell and process it. Actually, to build the report, I can compare the two files using shell tools (diff, awk) — that's allowed (not Python). But "todo caso que cambie sin llevar uno de los dos defectos es un fallo" requires checking that changed cases carry defects. I can verify programmatically in Julia (a small script) or by inspecting the diff.
+
+Let me think about what "case" means for the comparison. A CASO in the vectors can contain multiple blocks; the name is like `aleatorio`, `X-01`, `ev-cbid`, `ev-aplicada`, etc. The comparison should be at the level of the *case* (the whole CASO block). Actually the order says "caso por caso, los que cambian de resultado". A case changes if any of its RES/UTXO/GAR/EST lines differ. Since only RES strings of evidence-defect blocks change, the case changes. I'll produce a list of the CASO `n` and `nombre` that differ, with the reason.
+
+Now, the deeper issue: **the new minimum coverage requires ≥30 `EvidenciaCbidAjeno` and ≥30 `OrdenCanonicoInvalido` and ≥5 both-defects.** The current v0.4 has 120 cbid-ajeno (from the coverage file). So the cbid count is already ≥30 in v0.4. But we need `OrdenCanonicoInvalido`. Currently the generator doesn't produce non-canonical order cases (the `:cbid` case flips cbid; there's no `:orden`). Actually, wait: the `evidencia` helper takes ph1 and ph2. In `_caso_evidencia`, ph1 = 1000+2idx, ph2 = 1001+2idx, so ph1 < ph2 (canonical). There's no case with ph1 >= ph2. So we need to add generators.
+
+Also, the coverage definition in `exportar.jl` `contar_cobertura` maps errors to names; I need to add `orden_canonico` (already there via `ErrOrdenCanonico`) and `cbid_ajeno`. After the change, the errors become `ErrForma(...)`, so the mapping must be updated. And `contar_cobertura` uses `aplicar_con_undo` to detect "deshecha" and `total_garantia` for "aplicada"/"sin_saldo". I need to adapt.
+
+Let me now look at the test/runtests.jl to understand the SL-3 testset and how tests reference errors. Let me grep for the relevant errors in tests.
+dsh: reasoning:
+Let me read the SL-3 testset fully (lines 580-790) and the beginning of the test file to understand the structure.
+dsh: reasoning:
+Let me read the rest of the test file (795-843) and the top (1-60) for helpers.
+dsh: reasoning:
+Now I have a good picture of the T01 codebase. Let me look at the beginning of the test file for `_error_neg` and general structure. Let me grep.
+dsh: reasoning:
+`_error_neg` returns `r isa Err ? r : :ok`. After my change, form errors are not `Err` (if I introduce a separate `ErrForma` type), so `_error_neg` would return `:ok` for form errors. I'll need to update this helper. A robust approach: define an abstract type for oracle errors and use `isa` on that.
+
+Let me now decide the design carefully. I want to minimize the risk of breaking T04 (concurrent O2) while satisfying the contract.
+
+**Design options for `ErrForma`:**
+
+Option 1 (flat enum, new members):
+```julia
+@enum Err begin
+    ...
+    ErrFormaEvidenciaCbidAjeno
+    ErrFormaOrdenCanonicoInvalido
+    ...
+end
+```
+Then RES strings are `ErrFormaEvidenciaCbidAjeno`. Doesn't match `ErrForma(EvidenciaCbidAjeno)`.
+
+Option 2 (flat enum with two-level via a struct and an abstract error supertype):
+```julia
+abstract type ErrorTransicion end
+
+@enum Err <...>  # but @enum creates concrete type; can't subtype
+```
+In Julia, `@enum Err begin ... end` defines `Err` as a concrete primitive type. You cannot make it a subtype of an abstract type. So Option 2 requires redefining `Err` not as an enum but as... hmm. We could keep `Err` enum for semantic errors and introduce a separate `ErrForma` struct, plus a union alias:
+```julia
+@enum Err begin ... end  # remove ErrCbidAjeno, ErrOrdenCanonico
+@enum ClaseForma EvidenciaCbidAjeno OrdenCanonicoInvalido
+struct ErrForma
+    clase::ClaseForma
+end
+const ErrorTransicion = Union{Err, ErrForma}
+```
+Then all checks `r isa Err` must become `r isa ErrorTransicion` (or `!(r === nothing)`). This is the faithful representation. But it changes the public type `Err`? No, `Err` remains the enum; `ErrForma` is new. The return type is now a union. T04 has `Dict{...,Transicion.Err}` annotations: it would fail when trying to store an `ErrForma` (TypeError: cannot convert ErrForma to Err). So T04 breaks at runtime for form-error cases — which O2 must fix. If T04 is running concurrently, O2 needs to know. But O2's order is the same as mine and explicitly requires T04 to treat these as block-invalid, so O2 will necessarily touch those annotations. The concern is only about *timing*: if O2 is reading T01's `Transicion.jl` mid-flight, it might see a partial state. Since I edit files atomically with `write`/`edit`, and T04 `include`s the file at process start, a concurrent T04 Julia process that already started has already loaded the old code; if it starts after my edit, it loads the new code. Either way it gets a consistent file (edits are not partial in a way Julia would read mid-write? `write` truncates then writes; a reader could observe an empty/partial file if it reads exactly during the write. Risk is low but real.)
+
+Hmm, this is a genuine coordination hazard. But the order was designed by the director knowing both run; and the order says both parts launched separately, and "no cambias ninguna otra regla". I should proceed and note the coupling.
+
+Actually, let me reconsider: Does the O1 zone really allow changing the *type* signature that T04 depends on? The order says O1's writable zone is only T01. It says the oracles are corrected to the contract. It says "igual en los dos oráculos". So yes, T01's error representation changes. T04 (O2) must adapt. This is expected.
+
+However, there's a subtle way to make T04 keep compiling without changes: make `ErrForma` an enum too, but with `Base.show`/`string` customized? No, we need `ErrForma(EvidenciaCbidAjeno)` as a *display*. We could keep `Err` as the flat enum and add members, then override `Base.show(io, e::Err)` for those two members to print `"ErrForma(EvidenciaCbidAjeno)"`. But then `Transicion.ErrCbidAjeno` wouldn't exist, breaking T04's references. We could keep the old names *as aliases*? Julia enum members are consts; we could do `const ErrCbidAjeno = ErrFormaEvidenciaCbidAjeno`? But then T04's `e == Transicion.ErrCbidAjeno` still works and matches the new member. And `Dict{Transicion.Err,...}` still works. And `r isa Transicion.Err` still works. That would be maximally compatible: T01 returns a single `Err` enum value (so T04 keeps compiling and treating it as a discard — which is *wrong* behavior for T04 until O2 fixes it, but at least it runs). And the string can be customized to match the contract.
+
+But the order explicitly says `ErrCbidAjeno` and `ErrOrdenCanonico` "desaparecen como errores semánticos". Keeping a const alias `ErrCbidAjeno = ErrFormaEvidenciaCbidAjeno` technically keeps the name but the semantics (form) are correct. Hmm, but it might be considered not faithful.
+
+Also, the `Err` enum members' `string` is used in `representacion_canonica`? No. It's used in vector `res=`. Overriding `Base.show` for specific enum values is possible:
+```julia
+Base.show(io::IO, e::Err) = e == ErrFormaEvidenciaCbidAjeno ? print(io, "ErrForma(EvidenciaCbidAjeno)") : ... 
+```
+But overriding `show` for the whole enum is invasive and affects `@enum` printing everywhere. Also `string(e)` calls `print` → `show`. That could work but is hacky.
+
+I think the cleanest faithful implementation that matches the order wording is a two-level error with a struct `ErrForma`. Let me look at how the actual Rust code models it, since the order says "y, después, en Rust". Let me look at the Rust error model in `deepseek/W03` — `error.rs`. That will tell me the intended shape: likely `ErrorTransicion::Forma(ErrorFormaTx)` and `ErrorFormaTx::EvidenciaCbidAjeno` / `OrdenCanonicoInvalido`. Then the Julia oracle mirroring it would be `ErrForma(clase)`.
+
+Let me read the Rust error.rs quickly.
+dsh: reasoning:
+Confirmed: Rust `ErrorTransicion::ErrForma(ErrorFormaTx)`, displayed as `ErrForma: {0}` (thiserror). The order says names `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`. Let me check `ErrorFormaTx` variants in zx-core to see if `EvidenciaCbidAjeno` exists or if it's called `CbidAjeno`. Let me search.
+dsh: reasoning:
+Let me search specifically for `Cbid` and `OrdenCanonico` in zx-core error.rs.
+dsh: reasoning:
+So in the current Rust W03 code, `ErrorFormaTx` doesn't have `EvidenciaCbidAjeno` or `OrdenCanonicoInvalido` variants yet (maybe in forma.rs). The order says "y, después, en Rust" (SL-4c). So the oracle will define the names first; Rust later. The order says "Nombres de error: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`". So in the Julia oracle, I should use those exact names.
+
+Note the difference from the contract's EV-04 table which says `ErrForma(OrdenCanonicoInvalido)` but calls the entradas one `ErrForma(EvidenciaConEntradasOSalidas)`. The order's `EvidenciaCbidAjeno` for the cbid case is a new name (not in contract; RAT-1 just says `ErrForma`). So the director has chosen these two names.
+
+Now, given the ambiguity around representation, I think the right approach is:
+
+Define:
+```julia
+# SL-4c-O: forma (RAT-1/EV-04). El oráculo plano no tenía ErrForma; se añade
+# la misma forma de dos niveles que el contrato y Rust: ErrForma(clase).
+@enum ClaseForma begin
+    EvidenciaCbidAjeno
+    OrdenCanonicoInvalido
+end
+
+struct ErrForma
+    clase::ClaseForma
+end
+```
+and define an abstract marker? Since `Err` is an enum, `Union{Err,ErrForma}`. Then define:
+```julia
+const ErrorOracle = Union{Err,ErrForma}
+```
+Then replace all internal `r isa Err` with `r isa ErrorOracle`. Hmm, but there are many. Alternatively, define `es_error(x) = x isa Err || x isa ErrForma`. But the code uses `r isa Err` in ~30 places. Let me count.
+
+Actually, a cleaner trick: since we want `r isa Err` to keep working as "is a transition error", and `Err` is an enum, we can't extend `Err`. But we could rename the enum to something and define `Err` as a union alias? Let's think:
+
+Currently `@enum Err begin ... end` creates the type `Err`. If instead I do:
+```julia
+@enum ErrSemantico begin ... end
+const Err = Union{ErrSemantico, ErrForma}
+```
+Then `ErrCbidAjeno` etc. would be members of `ErrSemantico`, and code referencing `ErrGenesis` still works (exported enum members). But `Err` would no longer be the enum type; `Dict{Int,Err}` would become `Dict{Int,Union{...}}` which is abstract and slow but works. And `x isa Err` would correctly catch both. That's elegant! But `Err` is an enum with a `@enum`-generated set of things; tests use `r isa Err`. If `Err` is a `Union`, `r isa Err` works. And `_error_neg` returns `r isa Err ? r : :ok` works. Many functions' return type becomes `Union{Nothing, ErrSemantico, ErrForma}`. The `Dict{Int,Vector{Tuple{Int,Transicion.Err}}}` in T04 would become a `Dict` with union element type — works, though type-unstable. But T04's `descartes::Dict{Int,Vector{Tuple{Int,Transicion.Err}}}` field type would be `Dict{Int, Vector{Tuple{Int,Union{ErrSemantico,ErrForma}}}}` and storing an `ErrForma` works. So T04 would keep loading and running, treating form errors as descartes (wrong semantics for T04, but O2 fixes that). At least no crash.
+
+Hmm, but wait: `const Err = Union{...}` would shadow the exported `Err` name. `@enum Err` no longer exists. But `export Err, TipoTx` — fine. But is `Err` used as a type in a way that requires it to be concrete? e.g., `Dict{Int,Err}` in T01? Let me check T01 usage of `Dict{...,Err}`. The generator files might use `Dict{TipoTx,Dict{Err,Int}}`? Let me grep T01 for `Err}`.
+
+Actually, `@enum Err` defines `Err` as a concrete `Base.Enum` subtype. If I replace with a Union alias, `zeros(Int,...)` etc unaffected. Let me check T01 sources for type annotations with `Err`.
+dsh: reasoning:
+There are type annotations:
+- `src/generadores_negativos.jl:18: esperado::Err` inside `struct CasoNegativo` — if `Err` becomes a Union, `CasoNegativo` becomes a struct with an abstract field (fine, but type-unstable; the oracle is not performance-critical). But more importantly, `CasoNegativo` with `esperado::Err` where Err is a Union is allowed. And constructors comparing `got != c.esperado` would work if values comparable.
+- T01 exportar etc.
+
+So converting `Err` to a Union alias is feasible. But it's a significant semantic change and could slow/alter tests? The test battery uses `@test aplicar(...) == ErrCbidAjeno` etc. Those comparisons still work.
+
+But wait: `@enum Err` also auto-defines things like `instances(Err)`, `Base.Enums.namemax`, etc. If `Err` becomes a Union, `instances(Err)` would fail. Does any code use `instances(Err)`? Let me check. `instances` used in tests? grep. Also `Err` used in `zeros`? Let me check the whole T01 + T04 for `instances(`.
+dsh: reasoning:
+No `instances(Err)`. Good.
+
+But hold on — do I actually need `Err` to be a union? There's an even more conservative option that keeps `Err` concrete and makes the form error an enum member, then customizes `string`. Let me weigh.
+
+The order says "Nombres de error: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`." It does not explicitly require a Julia struct. But fidelity to the contract and to the future Rust naming suggests `ErrForma(clase)`. Also the T04/O2 work will need to distinguish form errors; a two-level representation helps. And the Rust model is `ErrForma(ErrorFormaTx)`.
+
+I think the union approach is good and minimally invasive:
+```julia
+@enum ClaseForma begin
+    EvidenciaCbidAjeno
+    OrdenCanonicoInvalido
+end
+
+struct ErrForma
+    clase::ClaseForma
+end
+
+# `Err` histórico (semántico) + `ErrForma` (forma). Los chequeos `x isa Err`
+# siguen siendo la prueba de "es un error de transición".
+@enum ErrSemantico begin ... end
+const Err = Union{ErrSemantico, ErrForma}
+```
+Wait, but then the enum members are of type `ErrSemantico`, and `const Err = Union{ErrSemantico, ErrForma}`. The exported names `ErrGenesis` etc. remain. `Err` no longer names the enum type, but a union. Tests that do `r isa Err` work. But `Err` is exported and used as `Transicion.Err` in T04: `Dict{Int,Vector{Tuple{Int,Transicion.Err}}}` — a Dict with abstract eltype; storing tuple with `ErrSemantico` or `ErrForma`. Fine.
+
+However, `@enum ErrSemantico` would print as `ErrSemantico` in `show`? No: `@enum` defines a type named `ErrSemantico` but each instance prints by its member name, e.g., `ErrGenesis`, not `ErrSemantico.ErrGenesis`. Actually Julia's `show` for enum instances prints just the member name (e.g. `ErrGenesis`), same as before. So string(r) for semantic errors unchanged. Good.
+
+But there's a catch: `@enum ErrSemantico begin ErrGenesis ... end` — the member names remain the same. But existing code declares `export Err, TipoTx`. Fine.
+
+Now `ErrForma` string: `string(ErrForma(EvidenciaCbidAjeno))`. Default show for a struct: `ErrForma(EvidenciaCbidAjeno)` — let me double check Julia: For a struct `struct Foo; x::Int; end`, `string(Foo(3))` = "Foo(3)". For an enum field, `string(EvidenciaCbidAjeno)` = "EvidenciaCbidAjeno". So `string(ErrForma(EvidenciaCbidAjeno))` = "ErrForma(EvidenciaCbidAjeno)". 
+
+But careful: `CurlyBrace`? No. Good.
+
+Alternatively, to be safe and explicit, define `Base.show(io::IO, e::ErrForma) = print(io, "ErrForma(", e.clase, ")")`. That guarantees the exact format. I'll do that.
+
+Now, do I even need to keep the name `Err` as a union? The alternative is to define the union alias with a new name and replace all `isa Err` with `isa ErrorTransicion`. But keeping `Err` as the union alias means minimal edits and T04 keeps compiling. However, it changes the meaning of `Err` from a concrete enum to a union — T04's `Dict{Transicion.Err,...}` becomes `Dict{Union{...},...}`. That is a type change; but it compiles. Hmm, would T04's `MOTIVOS` etc. still work? Let me check T04's usage of `Transicion.Err` as a type — `descartes::Dict{Int,Vector{Tuple{Int,Transicion.Err}}}`. If `Transicion.Err` is a Union with 2 members, `Tuple{Int,Transicion.Err}` is a UnionAll? No, `Tuple{Int,Union{A,B}}` is a valid concrete-ish type (a Tuple with abstract field). `Dict{Int,Vector{Tuple{Int,Union{A,B}}}}` works. `push!` of a tuple `(i, ErrForma(...))` works. Comparing `d[3] == Transicion.ErrEvidenciaDuplicada` works. So T04 stays functional, just with abstract field types. Given LINEO discourages abstract fields in hot code, but the oracle is not hot and T04 will be corrected by O2 anyway.
+
+Hmm, but one concern: `@enum Err` currently gives `Err <: Base.Enum{...}`. Some code may rely on `Err` being `isbitstype`. For example, `CasoNegativo` has `esperado::Err` and might be stored in vectors; with a Union field, `CasoNegativo` is no longer isbits. That's fine.
+
+But wait, a subtle issue: if I keep `Err` as a union alias, then `Err` can't be used with `@test_throws`? Not relevant.
+
+Alternatively, an even less invasive approach: keep `@enum Err` including the two old names, and *add* two new members `ErrFormaEvidenciaCbidAjeno`/`ErrFormaOrdenCanonicoInvalido`; customize `show` for those two members; and stop returning the old names. But the old names persist. Hmm. Actually the order says the old names disappear "como errores semánticos" — they could remain defined but unused. But then `export` still lists them, and the contract correspondence is muddied. I think the Union approach that removes the old names is more faithful, but it risks breaking T04's compile (since T04 references `Transicion.ErrCbidAjeno` and `Transicion.ErrOrdenCanonico` which would no longer exist). That would make T04 fail to *load* — a hard break that O2 must fix. If O2 is running concurrently and finishes before me, T04 might still reference the old names and break when its tests run after I edit T01. That's bad coordination.
+
+Let me check whether O2 is currently reading T01 and if it has already modified T04. Let me check T04's mtimes and whether `ErrForma` appears in T04 now (a moment ago it didn't). Also let me check the O2 stderr tail to see progress — but reading another agent's stderr might be OK (it's in my read zone? It's under P-SLASHING, outside my writable zone but reading is fine). The order says "no leas ni muestres secretos", not "don't read other files". Let me peek at the tail of SL4c-O2-dsh.stderr, which likely contains the agent's streamed reasoning/output (harness logs). Actually it might contain the current O1 session's logs too. Let me check the tail of O2.
+
+Hmm, but the harness may be logging to stderr the model's output. Reading it could give me O2's decisions, which is useful for coordination. But it also might be considered interfering. It's not secret. Let me peek at the last 40 lines of O2 stderr to understand the state. Actually, these logs are written by the launcher shell redirect; they may include a JSON stream. Let me check size/mtime again and tail.
+
+Actually, wait. I should be careful: the `.stderr` could be a live stream from the *same* harness that is running me, if the launch command's stderr is being teed. Actually no: the launcher files `SL4c-O1-dsh.stderr` and `SL4c-O2-dsh.stderr` are per-part. The harness running me writes to O1's stderr. The O2 file belongs to the other agent. Reading it is reading another process's output; allowed.
+
+However, the content might be huge and contain model reasoning. Let me just check the tail to see O2's progress. This helps me decide whether to keep backward-compatible aliases. Let me do it.
+dsh: reasoning:
+O2 is mid-work, editing T04. It is using a helper `MOTIVO_FORMA_CBID` etc. and treating cbid/orden as form errors that invalidate the block. It hasn't yet had to deal with T01's enum; it seems to be implementing T04-side handling. Let me see if O2 has modified T01? No, O2 can't (zone). O2 is including T01's Transicion.jl. If O2 uses `Transicion.ErrForma` or a new type, it depends on my design! Let me search O2's current T04 for how it detects form errors. Let me grep T04 now for "Forma" and "CbidAjeno".
+dsh: reasoning:
+O2 has decided to implement the form check **in T04 itself** (`chequear_forma`, `chequear_forma_evidencia`, with `MOTIVO_FORMA_CBID = Symbol("ErrForma(EvidenciaCbidAjeno)")`). It defines its own form-check layer in EstadoDAG that intercepts before calling T01's `aplicar`, and uses `Symbol` for the motive. This means O2 does NOT rely on T01 returning a new error type; it re-checks the evidence form on the T04 side. So my T01 representation will not break O2's new code. Good. That resolves the coordination concern substantially: O2 is self-sufficient.
+
+But O2 still references `Transicion.ErrCbidAjeno` in `dirigidos.jl:706-707`, `exportar.jl`, and `run.jl`. If I remove `ErrCbidAjeno` from T01, those O2 files would fail to load with `UndefVarError`. O2 is currently editing those files; it may or may not update those references. Let me check the tail of O2 stderr more to see if it plans to update them. But regardless, if I remove the enum members, O2's remaining references break. That's a hard interlock. However, O2's entire task includes removing those references (they're the semantic `ErrCbidAjeno` checks the order wants gone). The order says both parts are separate; O2's order explicitly says T04 must stop treating them as semantic. So O2 will remove those references. But timing: if O2 finishes before me and its tests run against T01 while T01 still has the old names → fine. If I remove the names first and O2 hasn't fixed all references → O2's tests break, but that's O2's responsibility and its run may fail. Since we're concurrent, there's an inherent race. The director chose to run them concurrently; presumably each oracle's tests import T01 for T04. Hmm.
+
+But there is a strong argument to **keep the old names as deprecated aliases** to avoid breaking O2 and to preserve backward compatibility of the module's API:
+```julia
+const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)  # ??? 
+```
+But we want `Err` (the error type) to include `ErrForma`. If `ErrCbidAjeno` is a constant of type `ErrForma`, then T04's `e == Transicion.ErrCbidAjeno` compiles and compares; `r isa Err` where `Err` is the union catches it. That could keep T04 compiling even if O2 leaves a stray reference. But T04's type annotations `Tuple{Int,Transicion.Err}` with `Err` union accept `ErrForma`. So keeping `const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)` makes everything compile.
+
+But wait: would a stray `e == Transicion.ErrCbidAjeno` in T04's exportar/run now count form errors under `cbid_ajeno`? That's actually semantically fine for coverage labels (form error cbid). And `dirigidos.jl:706` counts them. So it might even be helpful.
+
+However, defining `ErrCbidAjeno` as a const while "desaparecen como errores semánticos" is a slight tension, but it's a *deprecated compatibility alias*, not a semantic error. I can document it. Hmm, but the order says they disappear. A reviewer might flag the alias as not following the order. Yet T01's own code must not reference them (except the alias). Let me think about whether keeping aliases is wise.
+
+Actually, there's a subtlety with `@enum Err` + `const ErrCbidAjeno = ...`. If I keep `Err` as a concrete enum and add a separate `ErrForma` struct, I can't have a union `Err`. I'd need `const Err = Union{ErrSemantico, ErrForma}`. Then `ErrCbidAjeno` can be a const of type `ErrForma`. Fine.
+
+But is it acceptable to keep `ErrCbidAjeno` exported? The order says "Desaparecen `ErrCbidAjeno` y `ErrOrdenCanonico` como errores semánticos". A deprecated alias named `ErrCbidAjeno` that is now a form error arguably "disappears as a semantic error". I'll document it as a compatibility alias for T04's concurrent transition, or maybe better, not export it but still define it (T04 uses `Transicion.ErrCbidAjeno`, which requires it to be accessible even if not exported; `Transicion.X` works for non-exported names). Hmm, actually T04 uses `Transicion.ErrCbidAjeno` so it needn't be exported.
+
+Let me reconsider the whole approach and choose the least risky one:
+
+**Plan A (chosen):**
+- Rename the existing `@enum Err` to `@enum ErrSemantico` (remove `ErrCbidAjeno`, `ErrOrdenCanonico`).
+- Add `@enum ClaseForma EvidenciaCbidAjeno OrdenCanonicoInvalido`.
+- Add `struct ErrForma; clase::ClaseForma; end` with custom `show`.
+- Define `const Err = Union{ErrSemantico, ErrForma}` so `r isa Err` keeps meaning "error de transición" throughout T01 (and T04 compiles).
+- Add compatibility aliases:
+  ```julia
+  const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)
+  const ErrOrdenCanonico = ErrForma(OrdenCanonicoInvalido)
+  ```
+  Wait, but `ErrCbidAjeno` originally was an enum *type* value of type `Err`; now it's a const instance of `ErrForma`. T04's `Dict{Transicion.TipoTx,Dict{Transicion.Err,Int}}` uses `Transicion.Err` (union) as key type, and `e == Transicion.ErrCbidAjeno` compares. OK.
+  
+  But hold on: T01's `export` list includes `Err` and the member names `ErrCbidAjeno`, `ErrOrdenCanonico`. If I export const aliases, they're exported. Fine.
+
+- Update `aplicar_evidencia!`: reorder checks: structure (evidencia nothing? no — that stays semantic `ErrSinEvidencia`? hmm), entradas/salidas, cbid form, orden form, then identity, seals, RAT3, window, dup.
+
+Wait, let me re-examine the "structure" order. The order's precedence: "estructura ya vigente (entradas/salidas/testigos, campos inactivos, forma de las dos cabeceras) → cbid → orden canónico". In the current code:
+1. `tx.evidencia === nothing && return ErrSinEvidencia` (missing headers; EV-01/EV-04)
+2. `(isempty(tx.entradas) && isempty(tx.salidas)) || return ErrEvidenciaConEntradas` (EV-04)
+3. cbid check
+4. identity
+5. order
+...
+
+The "estructura" includes "forma de las dos cabeceras". In the oracle, `evidencia === nothing` represents no/invalid headers. The order says structure is checked before cbid. Currently `ErrSinEvidencia` for missing evidence is before cbid, so that's already consistent. But is `ErrSinEvidencia` a *form* error? The contract says "No hay exactamente dos cabeceras ... ⇒ ErrFormato". But in the oracle, `tx_evidencia(clave)` (no evidencia) returns `ErrSinEvidencia` and is an inherited malformed operation (R-12/X-13). The order says structure "ya vigente" — so leave it as `ErrSinEvidencia`. Fine.
+
+So only reorder: move order check (currently after identity) to right after cbid. Also change the two returns to form errors.
+
+Let me write the new `aplicar_evidencia!`:
+```julia
+function aplicar_evidencia!(E, B, P, punto, tx)
+    tx.evidencia === nothing && return ErrSinEvidencia
+    (isempty(tx.entradas) && isempty(tx.salidas)) || return ErrEvidenciaConEntradas
+    ev = tx.evidencia
+    # SL-4c-O: precedencia de forma = estructura → cbid → orden canónico.
+    (ev.id1.cbid == P.cbid && ev.id2.cbid == P.cbid) ||
+        return ErrForma(EvidenciaCbidAjeno)          # RAT-1
+    ev.h1.pre_hash < ev.h2.pre_hash ||
+        return ErrForma(OrdenCanonicoInvalido)       # EV-01/EV-04
+    # --- semántica (sin cambios) ---
+    ev.id1 == ev.id2 || return ErrSinEvidencia       # EV-06
+    (ev.h1.sello_ok && ev.h2.sello_ok) || return ErrSinEvidencia  # EV-07
+    P.R_slots > P.Plazo_slots + P.M_margen_slots || return ErrPuertaRAT3
+    ...
+end
+```
+Wait: the order says semantic verification (EV-06 identity, EV-07 seals, RAT-3, window, dedup) "no cambia de orden ni de resultado". So among themselves they keep the order EV-06, EV-07, RAT-3, window, dup. But their position relative to the form checks changes (form first). That's the point. Good.
+
+Hmm, but EV-04 requires `pre_hash(H1) < pre_hash(H2)` (strict). The current check `ev.h1.pre_hash < ev.h2.pre_hash || return ErrOrdenCanonico` catches `>=`. Good.
+
+Now, the test at line 750-753: `evidencia(P.cbid, 1,0,0,0,s,100,50)` → ph1=100 > ph2=50 → non-canonical → now `ErrForma(OrdenCanonicoInvalido)`. `evidencia(...,50,50)` → equal → also form error. Good.
+
+Test 756-759: identity mismatch but ph1=50,ph2=60 canonical → `ErrSinEvidencia`. Good (order canonical passes, then identity fails).
+Test 760: sello1=false, canonical → `ErrSinEvidencia`. Good.
+Test 754: cbid+1 with canonical 50,60 → `ErrForma(EvidenciaCbidAjeno)`. Good.
+Test 769: con entradas → `ErrEvidenciaConEntradas`. Good.
+
+Now new precedence tests: cbid foreign AND non-canonical → cbid wins. And non-canonical AND identity mismatch → orden wins. I'll add tests.
+
+**Coverage and vectors**: I need to update the generators to produce `OrdenCanonicoInvalido` cases and both-defect cases. The `_caso_evidencia` function handles tipos. Add `:orden` (ph1 >= ph2) and `:ambos` (foreign cbid + non-canonical). But note: for `:orden`, the current code sets ph1=1000+2idx, ph2=1001+2idx; for `:orden` swap to ph1 > ph2. For `:ambos`, set cbid foreign and ph1 >= ph2. Then `casos_evidencia_cobertura` currently iterates over 6 types and produces n per type. Adding 2 more types yields 8 types. The coverage minimum: need ≥30 each. With `n_ev_por_tipo=40` default in exportar and `pi <= 3` points, that's 40 each × 3 = 120 each. Good. But `exportar.jl` currently only exports `casos_evidencia_cobertura` for `pi <= 3` and `n_ev_por_tipo` default 40 → 40 per type. So `:orden` and `:ambos` get 40 each. ≥30 ✓, ≥5 ✓.
+
+But wait: the run.jl `n_ev_tipo = max(1, cld(ev_historias, 6 * length(puntos_ev)))` uses 6 types. If I add 2 types, this becomes 8 types; should update to `8 * length(puntos_ev)`. Also the coverage counter in `exportar.jl` maps errors; update to count `ErrForma(EvidenciaCbidAjeno)` as `cbid_ajeno` (or a new label `forma_cbid_ajeno`?) and `ErrForma(OrdenCanonicoInvalido)` as `orden_canonico`.
+
+The order says "≥ 30 casos con `EvidenciaCbidAjeno` y ≥ 30 con `OrdenCanonicoInvalido`". The coverage file should count these. Let me name labels `cbid_ajeno` (existing) and `orden_canonico` (existing) and add `ambos` maybe. And `con_entradas` unchanged.
+
+Now, the lector: `parsear_evidencia` and `parsear_tx` for `Evidencia`; `tx_evidencia(ev)` uses `ev.id1.clave`. Fine. The lector's `res_recomputado` uses `r isa Err ? string(r) : "OK"` — with `Err` union, works and yields `ErrForma(EvidenciaCbidAjeno)` string. Good, as long as the string matches what exportar wrote.
+
+Now `generadores_negativos.jl` has `struct CasoNegativo; esperado::Err; ...` — with `Err` a union, the struct field is abstract. The existing negative-case comparisons `got != c.esperado` where `got` may be an `ErrSemantico` value — fine. But there might be a subtle issue: `esperado::Err` where `Err` is a Union is allowed. Good.
+
+Wait: there's a naming conflict. `@enum ClaseForma EvidenciaCbidAjeno OrdenCanonicoInvalido` defines exported names? I need to export them? For tests we may reference `EvidenciaCbidAjeno` and `OrdenCanonicoInvalido`. I'll export `ClaseForma, EvidenciaCbidAjeno, OrdenCanonicoInvalido, ErrForma`.
+
+But careful: `evidencia` function has a parameter named `cbid`; no conflict.
+
+Now, the big question: **is `Err` as a Union alias going to break `@enum` behavior used elsewhere?** The `@enum Err` is replaced by `@enum ErrSemantico`. But the *export list* references `Err` and specific names; fine. One issue: Julia's `@enum` by default creates the type with `Base.Enum`. If we define `const Err = Union{ErrSemantico, ErrForma}`, then `Err` is a `Union`, and `ErrSemantico` isn't exported (unless we export). Tests use `Err` as a type? `_base_post` etc use `r isa Err`. Good. `CasoNegativo.esperado::Err` in the module — fine.
+
+But what about `Err` being used in `@test got == esperado[nombre]`? Fine.
+
+Hmm, but there is a risk: defining `const Err = Union{...}` *after* `@enum ErrSemantico` — the name `Err` was previously the enum. We must remove the old `@enum Err` entirely. Also the exported `Err` symbol. No other file in T01 defines `Err`. Good.
+
+Now, will the T04 package load with `const Err = Union{...}`? T04 does `using .Transicion` and then uses `Transicion.Err` in type annotations and `Transicion.ErrCbidAjeno`. With aliases defined, it loads. Let me double check T04 has `descartes::Dict{Int,Vector{Tuple{Int,Transicion.Err}}}`. With `Err` a Union, that type is `Dict{Int, Vector{Tuple{Int, Union{ErrSemantico, ErrForma}}}}`. `Admision` struct field becomes non-concrete; fine. But there's a potential method ambiguity: `push!(desc, (i, Transicion.ErrEmision))` — `desc = Tuple{Int,Transicion.Err}[]` i.e. `Vector{Tuple{Int,Union{...}}}`. Pushing `(i, ErrEmision)` works. Good.
+
+Potential problem: `MOTIVOS` in T04? Let me check `MOTIVOS` definition. It might be `Dict{String,Transicion.Err}` or use `.Err`. Let me grep. Actually I saw `export ... MOTIVOS` from O2. Let me check.
+
+Actually, since O2 is actively editing T04, its final state will be self-consistent (hopefully). My job is only T01. I should avoid gratuitously breaking T04 if possible, but the order explicitly changes the error type. I'll keep the compatibility aliases to be safe and document them.
+
+Hmm, wait. There's another subtlety: if O2 defines, in T04, its own form-check that returns a `Symbol` motive, and also still calls T01's `aplicar_evidencia!` somewhere (for semantic cases), then T01 returning `ErrForma` is fine. If T04's code does `r isa Transicion.Err && push!(desc, (icb, r))`, then with `Err` union it catches form errors too. But O2's new logic should intercept form before. Fine.
+
+Now, **the "falta de definición"** to report. I'll report:
+(a) Julia representation of `ErrForma` and the RES string format (adopted: `struct ErrForma` + `const Err = Union{ErrSemantico,ErrForma}` + compat aliases), because the order names the Rust/contract-style error but the oracle's flat enum had no such thing (AMBIGUEDAD-SL3-4 expressly deferred it).
+(b) That T01 strict mode already rejected the whole block for both semantic and form errors, so for T01 the observable change is the RES classification (and the precedence with EV-06/EV-07); the "block is invalid" part is unchanged. Actually, that's not a lack of definition; it's a clarification. Good to report.
+(c) Whether the old `ErrCbidAjeno`/`ErrOrdenCanonico` names should remain as compatibility aliases given T04 includes T01 concurrently. I'll state the adopted reading.
+
+Actually, the instruction says "Si detectas una falta de definición, infórmala antes de editar." I should output the report in my message and write it in PROGRESO §SL4c.1 before editing. Let me make sure to do that.
+
+Now, an important question: **Does changing the error string in T01 break the existing `exportar_negativos.jl` / negative vector re-read?** The negative vectors (v0.1/v0.2) contain `res=ErrCbidAjeno`? Let me check. The negative vectors were for transaction negatives (F-15 nonce, etc.), probably not evidence. But there might be `ErrOrdenCanonico`. Let me grep the old vectors. Also the `relectura` of historical vectors v0.1–v0.4 will now produce discrepancies for cases containing the old error strings! The order says "relectura de los vectores nuevos con 0 discrepancias" (only the new vectors). It doesn't require historical re-reads to pass. But it says v0.4 stays intact. If I run the lector on v0.4 after the change, it will find discrepancies in the RES lines for cbid/orden cases (since v0.4 says ErrCbidAjeno, new oracle says ErrForma(...)). That's expected and analogous to the SL3b note about re-reading v0.3 under RAT-2′. I should document it: historical re-reads differ exactly in the reclassified cases; the new v0.5 re-reads clean.
+
+But wait, does exportar's `res_por_bloque` for v0.5 produce the new strings? Yes.
+
+**Now the DIFERENCIAS report.** Generate v0.4 vs v0.5 diff. Since v0.5 re-runs the same deterministic cases, most lines are identical. Differences: RES lines for evidence blocks carrying the two defects, and new cases (`ev-orden`, `ev-ambos`) that don't exist in v0.4. Hmm, if I add new case types to `casos_evidencia_cobertura`, then v0.5 has *more cases* than v0.4 (2795 + extra). The DIFERENCIAS report is about cases that "cambian de resultado", not new cases. New cases aren't "changes". But to make comparison clean, maybe I should structure v0.5 to include both: all v0.4 cases regenerated (with changed RES) plus the new coverage cases. The diff will show:
+- RES changes in existing cases (only defect cases).
+- New CASO blocks appended.
+
+Actually, since the case set changes, comparing "case by case" requires matching cases by identity. The simplest robust method: match CASO by `n` (case number) for the first 2795, assuming the deterministic order is identical. Since I only add new types at the end (or within the evidence section), the numbering of pre-existing cases might shift if I insert types before existing ones. Let me be careful: `casos_evidencia_cobertura(P; n)` loops `for idx in 1:n, for tipo in (list)`. If I append `:orden, :ambos` at the END of the tuple, then for a given idx the first 6 types produce the same cases as before, so the sequence of pre-existing cases is preserved and new cases are interleaved after each idx's 6. That shifts subsequent `n` numbering. But `CASO n=` is just a sequential counter. For the diff report, I can match by `nombre` + content rather than `n`. Or better: compare the two vector files case-by-case by matching on `CASO ... punto=... ...` and the case's block structure. Hmm.
+
+Alternative simpler approach for DIFERENCIAS: Since the only content change is the error name for `cbid`/`orden` defects and the new `ev-orden`/`ev-ambos` cases, I can produce the report by scanning the v0.4 file for lines containing `res=ErrCbidAjeno` or `res=ErrOrdenCanonico`, and the v0.5 file for the corresponding blocks. But the order says "caso por caso, los que cambian de resultado y por qué". So a table with case `n`, `nombre`, old RES → new RES is expected.
+
+Maybe the cleanest: make `exportar.jl` for v0.5 produce **exactly the same case set as v0.4 plus the new form coverage cases**, and generate the DIFERENCIAS report by a small Julia script (or inline in `exportar.jl`) that reads v0.4 and v0.5 and reports per-case differences. But adding a whole new script is more surface.
+
+Actually, I can generate the DIFERENCIAS by comparing v0.4 and v0.5 with a robust matching. Let me think about determinism: `exportar.jl` is deterministic except the header date and the fact that the `dirigidos` section iterates `idxs = unique([1, div(1+N,2), N])` over `puntos_por_defecto()`. The aleatorios section and evidence section are deterministic. So re-running with the updated code gives the same cases in the same order, with new types. If I append the two new types at the end of the type tuple in `casos_evidencia_cobertura`, then within `pi <= 3` the sequence is: for pi=1: RAT3 (if any), autodenuncia, then for idx 1..40: [aplicada, duplicada, tardia, cbid, sin_saldo, con_entradas, orden, ambos]; then pi=2, etc. The pre-existing case *names and data* for `ev-aplicada` etc. remain identical, just interleaved with new ones. So a name+data match works.
+
+I'll write a small Julia diff utility? Or shell. Let me think about the requirement: "un informe `DIFERENCIAS-v0.4-v0.5.md` (T01) que lista, caso por caso, los que cambian de resultado y por qué; todo caso que cambie sin llevar uno de los dos defectos es un fallo de esta orden." The report must exist as a file `DIFERENCIAS-v0.4-v0.5.md`. Where? Probably in `T01/` or `T01/resultados/`. The name is given without path; the order's zone is T01. I'll put it in `T01/` (next to INFORME/PROGRESO) or in `resultados/`. Hmm, previous similar deliverables? Let me check if other oracles have DIFERENCIAS files. Let me search.
+
+Also, the `run.jl` must have 0 failures. `run.jl` currently checks I-1..I-7; it doesn't count `ErrForma` specifically. But the evidence block in run.jl calls `verificar(bl, P; ...)` which uses `aplicar` and treats `r isa Err` correctly (union). Fine. But run.jl's RAT-3 check `rlib == ErrVentanaAbierta` unaffected.
+
+Now `exportar.jl`'s `contar_cobertura`: it computes coverage by applying the evidence block. For form-error cases, the block is invalid (as before), so it goes to the `else` branch where `Ep` exists and `r = aplicar(Ep, b, P)`. It then maps `r` to a label. I'll update the mapping:
+```julia
+nombre = r == ErrEvidenciaDuplicada ? "duplicada" :
+         r == ErrEvidenciaTardia    ? "tardia" :
+         r == ErrForma(EvidenciaCbidAjeno) ? "cbid_ajeno" :
+         r == ErrForma(OrdenCanonicoInvalido) ? "orden_canonico" :
+         r == ErrSinEvidencia       ? "sin_evidencia" :
+         r == ErrEvidenciaConEntradas ? "con_entradas" :
+         r == ErrPuertaRAT3         ? "puerta_rat3" : "otro_error"
+```
+But comparing structs: `ErrForma` is a struct; `==` falls back to `===` for immutables with identical fields; `ErrForma(EvidenciaCbidAjeno) == ErrForma(EvidenciaCbidAjeno)` → for a struct without custom `==`, Julia uses `===`, which for immutable structs compares field bits → true. Actually, for immutable structs, `===` is true if fields are egal. `EvidenciaCbidAjeno` is an enum singleton, so yes. So `==` works. Alternatively use `===`. I'll define `==` not needed.
+
+Also, the "ambos" case: cbid wins → counted as `cbid_ajeno`. To count "ambos" separately, I'd need to inspect the defect, not the error. I could add a counter for both by detection. The order requires ≥5 with both defects; but the coverage counter derived from the resulting error would classify them as cbid_ajeno (since cbid wins). To demonstrate ≥5 both-defect cases, I should count them separately in the coverage file. I can detect "both defects" in `contar_cobertura` by inspecting the evidence `ev` fields: `cbid != P.cbid && !(ph1 < ph2)`. Then inc `ambos`. Let me add that. Actually `contar_cobertura` has `txev.evidencia` available. Good.
+
+Now, the coverage minimum for T01: "≥ 30 casos con `EvidenciaCbidAjeno` y ≥ 30 con `OrdenCanonicoInvalido`, ... y ≥ 5 con los dos defectos a la vez". Note: the ≥30 with `EvidenciaCbidAjeno` should probably count all cases where the returned error is `ErrForma(EvidenciaCbidAjeno)`, including "ambos" (since cbid wins). Or it could count distinct cbid-only cases. To be safe, I'll have labels:
+- `cbid_ajeno` = cases whose error is `ErrForma(EvidenciaCbidAjeno)` (includes ambos, because cbid wins).
+- `orden_canonico` = cases whose error is `ErrForma(OrdenCanonicoInvalido)`.
+- `ambos` = cases with both defects (subset of cbid_ajeno).
+Then cbid_ajeno ≥ 30 + ≥5 ambos = 40+40=... Let's compute: with types `:cbid` and `:ambos` each 40 per point × 3 points = 120 + 120 = 240 cbid_ajeno. And `:orden` 120 orden. Both ≥30. `ambos` 120 ≥5. 
+
+But hold on: do the coverage counters count *cases* or *transactions*? `contar_cobertura` iterates over blocks with TxEvidencia and increments per evidence tx. So a case with one evidence tx contributes 1. Good. And coverage is only run for the cases written by `exportar.jl` (dirigidos? Let me check: `contar_cobertura` is called for EV-RAT3, autodenuncia, and `casos_evidencia_cobertura` for pi<=3). The directed cases (`casos_dirigidos`) are not counted. Fine.
+
+Now, the `cobertura-v0.4.txt` currently reports `cbid_ajeno = 120` and no `orden_canonico` and no `ambos`. In v0.5, with the new types plus the same `:cbid` type, cbid_ajeno should be 120 (from `:cbid`) + 120 (from `:ambos`) = 240; orden_canonico 120; ambos 120. Wait, but the `:cbid` case has foreign cbid and canonical order → error cbid. The `:ambos` case has foreign cbid and non-canonical → error cbid (cbid wins) and both defects. So yes.
+
+But there's an issue: the current `:cbid` generator sets `cbid = P.cbid + 1` but keeps ph1 < ph2. Good.
+
+Now let me also consider the `evidencia` cases for `:orden`. The generator `_caso_evidencia` uses `ph1 = 1000 + 2*idx`, `ph2 = 1001 + 2*idx`. For `:orden`, I need ph1 >= ph2. Let me set `ph1 = 1001 + 2*idx; ph2 = 1000 + 2*idx` (swap). For `:ambos`, set cbid foreign and swap.
+
+Now the run.jl evidence block: `n_ev_tipo = max(1, cld(ev_historias, 6 * length(puntos_ev)))`. With 8 types, use 8. Also `run.jl` doesn't count form errors, but `verificar` handles them.
+
+Wait: run.jl's `verificar` for evidence histories: it builds `memo, por_id = construir_validos(bloques, P)`. Let me check `construir_validos` in `seleccion.jl` to ensure it uses `r isa Err` (union) and handles the invalid form blocks correctly. Let me read seleccion.jl.
+dsh: reasoning:
+There's `ORDEN-SL4c.md` (the Rust part). Let me read it for context on how the form error is meant to be represented. It might clarify naming. Let me read it. Also note there's no existing DIFERENCIAS report, so I create it fresh.
+
+Let me read ORDEN-SL4c.md (Rust) — probably relevant for consistent naming.
+dsh: reasoning:
+The Rust order confirms: `ErrorFormaTx::EvidenciaCbidAjeno` (new variant) and `ErrorFormaTx::OrdenCanonicoInvalido` (already exists). So the form clase names are `EvidenciaCbidAjeno` and `OrdenCanonicoInvalido`. The oracle should mirror `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`. My Plan A matches.
+
+Also importantly: the Rust order says the differential (`diferencial_t01`) reads T01 v0.5 and maps errors one by one. So the exact string that T01 writes in `res=` must be parseable by the Rust differential. If T01 writes `ErrForma(EvidenciaCbidAjeno)`, the Rust harness must map that string. That's consistent with the contract. But the Rust `nombre_t01()` currently returns "ErrForma" for any form error. SL-4c will update the correspondences. The vector string is the oracle's output; using `ErrForma(EvidenciaCbidAjeno)` is the natural choice given the order's phrasing.
+
+Hmm, but wait: the vector `RES` field values are produced by `string(r)`. The Rust differential reads T01 vector `RES`; it needs to recognize `ErrForma(EvidenciaCbidAjeno)`. Since the Rust order explicitly says "con las correspondencias de error nuevas declaradas una a una", the strings must be exactly `ErrForma(EvidenciaCbidAjeno)` and `ErrForma(OrdenCanonicoInvalido)`. Good.
+
+Now let me also verify the sha256 of the frozen inputs before editing, per the order's "Entrada congelada". I should run `sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O.sha256` from ZEROX. Let me do that, and log `date -Is` into HORAS.log.
+
+Also, I need to check the API model name for the reports. The order says "con `HORAS.log` (`date -Is` real) y el nombre de modelo que devuelve la API." How do I obtain the model name? Previous reports used `deepseek-flash`. But the instruction says "el nombre de modelo que devuelve la API". Maybe there's an env var `DSH_*` exposing the model. Let me check the managed DSH_* variables. The bash tool description says "Current harness environment facts are exposed through managed `$DSH_*` variables; inspect them when needed." Let me check `env | grep DSH`.
+
+Let me now do preliminary checks: frozen input verification, DSH vars, date, julia availability. Then report the ambiguity, then implement.
+
+Let me run these.
+dsh: reasoning:
+No model name env var. The order says "el nombre de modelo que devuelve la API". Previous reports state `deepseek-flash` (the model). Maybe the harness writes the model name somewhere (e.g., the stderr log). Let me check the O1 stderr for the model name or the launcher `.env`. Actually, the launch command uses `--profile headless` and doesn't pass `--model`; the `.env` might set `DEEPSEEK_MODEL`. Let me inspect `/home/katana/torio/deepseek-harness/.env`? That might contain secrets. The order says not to read/show secrets. I should avoid it. But I can search the harness config for a model name without exposing secrets. Hmm.
+
+Previous reports (SL-3, SL-3b) wrote "DeepSeek `deepseek-flash`". The task prompt says "You are a coding agent powered by the deepseek-flash model." So the model name is `deepseek-flash`. Good enough. The order says "el nombre de modelo que devuelve la API" — maybe there's a way the API returns it. Let me check the O1 stderr head for a model field. Let me grep for "model" in the O1 stderr, being careful not to print secrets. Actually reading the O1 stderr is fine (it's my own session log). Let me grep for "deepseek" or "model".
+
+Actually, I recall the harness logs might include the model. Let me grep the O2 stderr for `"model"` to find the pattern. It's external data but not secret. Let me just grep for `deepseek-flash`.
+
+Let me also check the `HORAS.log` and append the start time. Let me do a few things.
+
+Actually, let me focus. I have a lot to implement. Let me lay out a todo list.
+
+Plan:
+1. Report ambiguity (in response + PROGRESO.md SL-4c section start).
+2. Edit `src/Transicion.jl`:
+   - Replace `@enum Err` with `@enum ErrSemantico` (remove two members) + `ClaseForma` + `ErrForma` + `const Err = Union{...}` + compat aliases.
+   - Update exports.
+   - Update `aplicar_evidencia!` precedence and returns.
+3. Edit `src/evidencia.jl`: add `:orden`, `:ambos` types; maybe adjust.
+4. Edit `exportar.jl`: version v0.5 outputs, coverage labels, new types count.
+5. Edit `run.jl`: n_ev_tipo uses 8; maybe add counters for form errors (optional).
+6. Edit `src/lector_vectores.jl`: default path v0.5; ensure it handles form errors (it uses `r isa Err` union, fine). Maybe update coverage? No.
+7. Edit `test/runtests.jl`: add new tests for form errors and precedence; keep old test names.
+8. Run `Pkg.test()`, `run.jl`, `exportar.jl`, `lector_vectores.jl`.
+9. Generate `DIFERENCIAS-v0.4-v0.5.md`.
+10. Verify v0.4 intact (sha256sum -c).
+11. Update `INFORME.md`, `PROGRESO.md`, `HORAS.log`.
+
+Let me also consider: does `exportar.jl` include the evidence from `casos_evidencia_cobertura` only for `pi <= 3`? Yes. With 12 points, types 8, n=40 → 40*8*3 = 960 evidence cases + RAT3/autodenuncia. The v0.4 had 40*6*3 = 720. So v0.5 will have 240 more cases. That's fine.
+
+Wait, the order says "≥ 30 casos con EvidenciaCbidAjeno y ≥ 30 con OrdenCanonicoInvalido". With `n_ev_por_tipo=40` and pi<=3, we get 40 cbid (type :cbid) + 40 ambos (also cbid error) = 80 cbid_ajeno, 40 orden_canonico, 40 ambos. Both ≥30 and ambos ≥5. But the `:ambos` counts as cbid_ajeno AND ambos. Good.
+
+Hmm, but the order might interpret "≥30 casos con EvidenciaCbidAjeno" as the error being exactly that, including ambos. Fine.
+
+Now, a concern: `exportar.jl`'s `_caso_evidencia` for `:orden` and `:ambos` uses `_bloque_con_ev`, which builds a block with the evidence. But the `casos_evidencia_cobertura` is called with `n = n_ev_por_tipo` at `pi<=3`. However, `_caso_evidencia` for `:duplicada` returns a 2-block history; for others 1-2 blocks. The lector must re-read them. Should be fine.
+
+Another concern: the lector `parsear_tx` for Evidencia: it parses `ev=`. The `ev_str` includes cbid etc. It reconstructs `tx_evidencia(ev)` if no entradas/salidas, else builds Tx. Fine.
+
+Now, an important detail: `res_recomputado` in the lector and `res_por_bloque` in exportar both compute `r isa Err ? string(r) : "OK"` where `Err` is now the union. They call `aplicar(memo[padre], b, P)`. This works.
+
+But there's a subtlety: `string(r)` for `ErrSemantico` values. Since I renamed the enum type from `Err` to `ErrSemantico`, does `string` still print just the member name? Let me verify Julia's `show` for an enum: `@enum Foo A B; string(A)` → "A". Yes, it prints the instance name without the type, regardless of the type name. Actually, let me double check: for `@enum Fruit apple orange`, `string(apple)` = "apple". Yes. But `repr(apple)` = "apple" too. Good. So semantic error strings are unchanged.
+
+Hmm, one more: `show` for `ErrSemantico` might be `ErrSemantico.ErrGenesis`? No; Julia enum show prints just the symbol name. I'm fairly confident. To be safe, I could define `Base.show(io::IO, e::ErrSemantico) = print(io, Symbol(e))`? That would override the enum's show? Actually you can't easily override enum show for the type without losing the nice behavior; but the default is already correct. Let me just verify in Julia quickly once I make the change, or test now with a tiny snippet.
+
+Let me quickly test the enum behavior and struct show and `const Err = Union{...}` semantics in a Julia snippet. Also test that `Dict{Int,Union{A,B}}` works and that `Tuple{Int,Union{A,B}}` works. Let me run a quick Julia check. This also verifies Julia startup works with the depot.
+
+Let me run:
+```julia
+using Printf
+@enum E1 a b
+@enum C x y
+struct F; c::C; end
+const EE = Union{E1,F}
+println(string(a))
+println(string(F(x)))
+println(F(x) == F(x))
+println(a isa EE, F(x) isa EE)
+```
+Need to set JULIA_DEPOT_PATH? For a standalone snippet, the default depot may work. Let me use env -u LD_LIBRARY_PATH. Let me run.
+dsh: reasoning:
+My test had a bug (`push!` for Dict is `d[1] = [...]`). Let me fix and rerun to see the earlier prints. The tail cut them off. Let me rerun.
+dsh: reasoning:
+All confirmed:
+- `string(a)` = "a" (member name).
+- `string(F(x))` = "ErrForma(x)".
+- `F(x) == F(x)` true.
+- `x isa Union` works.
+- Dict/struct with union fields works.
+
+Now, one concern: T04's `Dict{Int,Vector{Tuple{Int,Transicion.Err}}}`. If T04 initializes with `Tuple{Int,Transicion.Err}[]`, that's fine. But `descartes::Dict{Int,Vector{Tuple{Int,Transicion.Err}}}` as a field of a struct `Admision` — fine.
+
+Now, another concern: T04 might reference `Transicion.ErrSemantico`? No.
+
+Now, backward compat aliases: `const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)`. But wait: T04's `dirigidos.jl:706` counts `x[2] == Transicion.ErrCbidAjeno`. With alias it works. Good. But is `ErrCbidAjeno` still exported? Yes, I'll keep it in the export list (as a const). But defining `const ErrCbidAjeno` when there's an exported name from `@enum`? I removed the enum member, so no conflict.
+
+Hmm, but here's a subtle issue: If I define `const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)` and also `const Err = Union{ErrSemantico, ErrForma}`, then the name `Err` is a Union and `ErrCbidAjeno` is an `ErrForma` value. Fine.
+
+But should I keep the aliases at all? Let me reconsider. The order says the old names disappear as semantic errors. In T01, if I keep the aliases, then `ErrCbidAjeno` still exists as a name. A strict reviewer might say "you didn't remove them". But the aliases point to form errors, so semantically they're not semantic errors. Also, the T01 INFORME SL3.3 table references `ErrCbidAjeno`, and the order expects it corrected. Hmm.
+
+Actually, the cleaner and more faithful approach is to NOT keep aliases in T01, and let O2 fix T04. But the concurrency risk... O2 has already implemented its own form layer and uses `Symbol` motives; the remaining `Transicion.ErrCbidAjeno` references in T04 are exactly things O2 must remove. If O2 finishes after me and runs tests, and hasn't removed all references, it'll fail with UndefVarError — but that's O2's incomplete work, and its own run would reveal it. If O2 finishes before me and already removed the references, then no issue. Given O2 is actively editing and its order explicitly requires removing those, it will almost certainly remove them. And the O2 order's Rust companion says `ErrCbidAjeno` disappears. So O2 will remove them.
+
+But here's the thing: the *frozen input* includes `P-ZRX/P-DAG/T04/resultados/vectores-estado-dag-v0.5.txt` and its sha256 is checked. O2 will produce v0.6. Not my concern.
+
+The decision hinges on: do I want maximal safety for the concurrent O2 run, or maximal fidelity? The order says "no cambias ninguna otra regla (si el cambio exige tocar otra, para e informa antes de editar); nada fuera de tu zona". It doesn't forbid T01 from keeping deprecated names. I think keeping the aliases is defensible and prudent, and I'll document them as *compatibility aliases for the concurrent T04 transition* — but actually, the order doesn't mention coordinating with T04. Hmm.
+
+Wait, there's a stronger reason to NOT keep aliases: T04 must treat form errors as **block invalid** in fusion. If T04's code has `r isa Transicion.Err && push!(desc, ...)`, and `Err` is a union including `ErrForma`, then T04 would treat form errors as *descarte* — which is exactly the bug. But O2 is fixing that with its own form layer, so the remaining `ErrCbidAjeno` references are only in counters/export, which wouldn't change the block-invalidity logic. Actually the important check is in `EstadoDAG.jl` `aplicar_bloque...` where `r isa Transicion.Err && push!(desc, ...)`. With the union, that catches form errors → wrong. But O2 is presumably intercepting form errors before calling T01. If not, keeping the union makes T04 silently wrong; without the union (i.e., if `Err` stayed concrete), T04 would treat `ErrForma` as success → also wrong (worse). Either way O2 must handle it. Since O2 already added `chequear_forma` in T04, it handles it.
+
+OK here's my decision: **Keep `Err` as the union alias (needed so all existing `isa Err` checks in T01 work), but do NOT keep `ErrCbidAjeno`/`ErrOrdenCanonico` aliases.** Wait, but then T01's own `export` list and code must be cleaned. T01 doesn't reference them after my edit except exports. And T04? It will break if it still references them. But that's O2's job. Hmm, risky.
+
+Let me check whether O2 has already removed all `Transicion.ErrCbidAjeno` references. The grep a moment ago showed `dirigidos.jl:706-707`, `exportar.jl:258,260`, `run.jl:257` still reference `Transicion.ErrCbidAjeno`. O2 is still working (mid-edit). So if I complete before O2, and O2 then runs tests against my T01, it'll break. But O2 will have to fix those references anyway as part of its task (they're the semantic checks being removed). If O2 doesn't fix them, its task is incomplete.
+
+Given the director's order explicitly says both parts are launched *separately* (not simultaneously necessarily, but they are), and O2's own order requires removing those semantic errors, I think the aliases are unnecessary and would be a deviation. But safety...
+
+Compromise: Keep the aliases but make them **non-exported** and add a clear comment that they're transitional, OR keep them exported with a comment. Actually, `Transicion.ErrCbidAjeno` works whether or not exported. T01's `export` list currently exports them; I can leave them exported so any `using Transicion` code (tests) still sees them. Keeping them exported doesn't hurt.
+
+Hmm, let me think about what the Rust differential expects. The Rust differential reads T01 v0.5 `RES` strings. If `ErrCbidAjeno` alias exists but is never returned, the Rust test corresponds `ErrForma(EvidenciaCbidAjeno)` → new. Fine.
+
+I'll go with keeping the aliases, documented as "alias de compatibilidad (forma) para no romper a T04 mientras se corrige en O2; no son errores semánticos". This is prudent and doesn't violate the letter ("desaparecen como errores semánticos"). Actually, wait — hmm, the aliases being `const ... = ErrForma(...)` means `ErrCbidAjeno isa Err` is true (since Err is the union). So if T04's old code does `r isa Transicion.Err` it catches them. And `r == Transicion.ErrCbidAjeno` matches. So T04's old counters still work and even count correctly. Good.
+
+But there's a catch: If T04 has a `Dict{Transicion.TipoTx,Dict{Transicion.Err,Int}}` and also iterates `keys`, the union key type is fine.
+
+OK. Let me also double-check: does any T01 code do `collect(instances(Err))` or `Err[...]`? I checked no `instances`. But `generadores_negativos.jl` might do `Dict{Err,Int}`. Let me grep for `Err,` and `Err>` patterns. Earlier grep showed only `esperado::Err`. Let me also grep for `Err[` or `Vector{Err}`. Let me be thorough.
+dsh: reasoning:
+Good, no `Err`-typed containers in T01. Only `esperado::Err` in generadores_negativos.jl. Let me check line 15-25 of that file to see the struct.
+
+Now let me look at the `exportar_negativos.jl` since it may reference errors and v0.5? It exports negative vectors. Since I change the enum, `res=ErrCbidAjeno` in negative vectors? Let me grep the negative vector files for cbid/orden. Actually, negative vectors are transaction negatives; evidence negative weren't part of it. But let me check quickly.
+
+Let me now write the TODO list and start. But first, I must "inform the lack of definition before editing". I'll write it in PROGRESO.md as §SL4c.1 and state it in my response. The instruction says inform before editing. I'll create the PROGRESO section first (that's a doc edit, not code) and state the ambiguity in my message. Then edit code.
+
+Actually the literal order: "Si detectas una falta de definición, infórmala antes de editar." I'll report it now in my message and record it in PROGRESO before touching code. That satisfies it.
+
+Let me enumerate the definitional gaps precisely:
+
+**Falta de definición 1 — representación Julia de `ErrForma`.** The order names `ErrForma(EvidenciaCbidAjeno)` / `ErrForma(OrdenCanonicoInvalido)` (two-level, like Rust `ErrorTransicion::ErrForma(ErrorFormaTx)`), but T01's `Err` is a flat `@enum` and AMBIGUEDAD-SL3-4 explicitly noted the oracle lacks `ErrForma`. The order does not say whether to (a) add a `struct ErrForma` wrapping a form class and widen the oracle error type, or (b) add flat enum members. Reading adopted: (a), mirroring the contract and ORDEN-SL4c §3.1; `Err` becomes `Union{ErrSemantico, ErrForma}` so every existing `isa Err` check keeps meaning "error de transición"; `string(ErrForma(EvidenciaCbidAjeno)) == "ErrForma(EvidenciaCbidAjeno)"` in `RES`. Transitional aliases kept so T04 (which `include`s T01 and is being fixed by O2) still loads. This is a definitional gap, not a rule choice.
+
+**Falta de definición 2 — qué cuenta como "cambio de resultado" en T01.** In strict mode both form and semantic errors already invalidate the whole block, so the observable T01 change is the `RES` classification (and the precedence vs EV-06/EV-07), not block validity. Reading: `DIFERENCIAS-v0.4-v0.5.md` lists every case whose `RES`/state lines change; only cases carrying `cbid` ajeno or non-canonical order may change. Not a rule conflict.
+
+**Falta de definición 3 — "≥30 casos con EvidenciaCbidAjeno" y ambos.** A both-defects case returns cbid (precedence), so whether it counts toward the ≥30 `EvidenciaCbidAjeno` is unspecified. Reading adopted: yes (it is a case whose error is `EvidenciaCbidAjeno`), and `ambos` is additionally counted separately to demonstrate ≥5.
+
+Also potentially: **the exact file location of `DIFERENCIAS-v0.4-v0.5.md`** — unspecified. Reading: `T01/DIFERENCIAS-v0.4-v0.5.md` (next to INFORME/PROGRESO). Minor.
+
+These are all resolvable without choosing between incompatible rules, so I proceed (like prior SL-3 did).
+
+Now let me plan the implementation in detail.
+
+### Transicion.jl changes
+
+Replace lines 68-99:
+```julia
+@enum Err begin
+    ErrGenesis
+    ...
+    ErrSinEvidencia
+    ErrCbidAjeno
+    ErrOrdenCanonico
+    ...
+end
+```
+with:
+```julia
+# SL-4c-O: errores de transición. `ErrSemantico` conserva los nombres de
+# siempre; `ErrForma` transporta la clase de forma (RAT-1/EV-04), como
+# `ErrorTransicion::ErrForma(ErrorFormaTx)` en Rust. `Err` es la unión de
+# ambos: todo `x isa Err` sigue significando «error de transición».
+@enum ErrSemantico begin
+    ErrGenesis
+    ErrPow
+    ...
+    ErrSinEvidencia
+    ErrEvidenciaTardia
+    ...
+end
+
+@enum ClaseForma begin
+    EvidenciaCbidAjeno      # RAT-1
+    OrdenCanonicoInvalido   # EV-01/EV-04
+end
+
+struct ErrForma
+    clase::ClaseForma
+end
+
+Base.show(io::IO, e::ErrForma) = print(io, "ErrForma(", e.clase, ")")
+
+const Err = Union{ErrSemantico, ErrForma}
+
+# Alias de compatibilidad transitorios (T04 incluye este módulo y su orden
+# SL-4c-O/2 los retira): ya NO son errores semánticos, son la forma.
+const ErrCbidAjeno = ErrForma(EvidenciaCbidAjeno)
+const ErrOrdenCanonico = ErrForma(OrdenCanonicoInvalido)
+```
+
+Wait, but there's a problem: `@enum ErrSemantico` and `const Err = Union{...}` — the exported `Err` is now the union. But `@enum` generated `Err` and also generated a `Base.Enums` stuff. Fine.
+
+Also, exporting `ErrSemantico`? Not required, but the doc might use it. I'll export `ErrForma, ClaseForma, EvidenciaCbidAjeno, OrdenCanonicoInvalido`. And keep `Err` exported. And keep `ErrCbidAjeno, ErrOrdenCanonico` exported (aliases).
+
+Hmm, actually there's a risk: `@enum ClaseForma EvidenciaCbidAjeno OrdenCanonicoInvalido` might conflict with a function/field named `EvidenciaCbidAjeno`? No.
+
+Now, export line 21: `export Err, TipoTx`. Add `export ErrForma, ClaseForma, EvidenciaCbidAjeno, OrdenCanonicoInvalido`. But `Err` export stays. The members `ErrGenesis`... are exported via line 24-31; those are now `ErrSemantico` members but the names are the same, so exports work.
+
+Wait, careful: line 24-31 exports `ErrGenesis, ErrPow, ...`. Those names are defined by `@enum ErrSemantico`. Exporting works. Good.
+
+### aplicar_evidencia! changes
+
+```julia
+function aplicar_evidencia!(E::Estado, B::Bloque, P::Params, punto::Int, tx::Tx)
+    tx.evidencia === nothing && return ErrSinEvidencia      # EV-01
+    (isempty(tx.entradas) && isempty(tx.salidas)) || return ErrEvidenciaConEntradas  # EV-04
+    ev = tx.evidencia
+    # SL-4c-O · precedencia de forma: estructura → cbid → orden canónico.
+    (ev.id1.cbid == P.cbid && ev.id2.cbid == P.cbid) ||
+        return ErrForma(EvidenciaCbidAjeno)                 # RAT-1
+    ev.h1.pre_hash < ev.h2.pre_hash ||
+        return ErrForma(OrdenCanonicoInvalido)              # EV-01/EV-04
+    # --- verificación semántica (orden y resultado sin cambios) ---
+    ev.id1 == ev.id2 || return ErrSinEvidencia              # EV-06
+    (ev.h1.sello_ok && ev.h2.sello_ok) || return ErrSinEvidencia  # EV-07
+    P.R_slots > P.Plazo_slots + P.M_margen_slots || return ErrPuertaRAT3  # RAT-3
+    sf = ev.id1.slot
+    (sf <= punto < sf + P.Plazo_slots) || return ErrEvidenciaTardia  # EV-13/EV-14
+    ...
+end
+```
+
+Note: I removed the duplicate `ev = tx.evidencia` line? Currently line 1100 `ev = tx.evidencia`. Keep it.
+
+### evidencia.jl changes
+
+`_caso_evidencia`: add branches for `:orden` and `:ambos`.
+```julia
+    ph1 = UInt64(1000 + 2 * idx)
+    ph2 = UInt64(1001 + 2 * idx)
+    ...
+    if tipo == :tardia
+        ...
+    elseif tipo == :cbid
+        cbid = P.cbid + 1
+    elseif tipo == :orden
+        ph1, ph2 = ph2, ph1       # no canónico
+    elseif tipo == :ambos
+        cbid = P.cbid + 1
+        ph1, ph2 = ph2, ph1
+    elseif tipo == :sin_saldo
+        key = 99
+    end
+```
+Hmm, `ph1`/`ph2` are `UInt64` already; reassign fine.
+
+`casos_evidencia_cobertura`: change the tuple to include `:orden, :ambos`. Should I keep the order `(:aplicada, :duplicada, :tardia, :cbid, :sin_saldo, :con_entradas, :orden, :ambos)`? Appending at the end preserves the relative order of existing cases.
+
+Also update the docstring comment.
+
+### exportar.jl changes
+
+- `SALIDA_DEF = "resultados/vectores-transicion-v0.5.txt"`, `COBERTURA_DEF = "resultados/cobertura-v0.5.txt"`.
+- Header line: "vectores-transicion-v0.5 · T01-SL4c-O ...".
+- Coverage comments: add `orden_canonico` and `ambos`, and note cbid/orden are now `ErrForma`.
+- `contar_cobertura`: map new errors and count `ambos` by inspection.
+- Add the new types: `n_ev_tipo` default 40 still; the loop `pi <= 3`. The new types are included automatically via `casos_evidencia_cobertura`.
+
+Wait, `contar_cobertura` currently is called for EV-RAT3, autodenuncia, and `casos_evidencia_cobertura`. For `ambos`, I need to detect both defects. Let me modify `contar_cobertura`:
+
+```julia
+function contar_cobertura(bloques::Vector{Bloque}, P::Params, acc::Dict{String,Int})
+    memo, _ = construir_validos(bloques, P)
+    for b in bloques
+        txev = nothing
+        for tx in b.txs
+            if tx.tipo == TxEvidencia
+                txev = tx
+                break
+            end
+        end
+        txev === nothing && continue
+        Ep = get(memo, b.padre, nothing)
+        if haskey(memo, b.id)
+            ev = txev.evidencia
+            if ev === nothing
+                inc!(acc, "malformada")
+                continue
+            end
+            V = (Ep !== nothing && haskey(Ep.garantias, ev.id1.clave)) ?
+                total_garantia(Ep.garantias[ev.id1.clave]) : Int128(0)
+            inc!(acc, V == 0 ? "sin_saldo" : "aplicada")
+            if Ep !== nothing
+                r = aplicar_con_undo(Ep, b, P)
+                if !(r isa Err)
+                    E2, undo = r
+                    hash_canonico(deshacer(E2, undo)) == hash_canonico(Ep) &&
+                        inc!(acc, "deshecha")
+                end
+            end
+        elseif Ep === nothing
+            inc!(acc, "sin_padre")
+        else
+            r = aplicar(Ep, b, P)
+            ev = txev.evidencia
+            if ev !== nothing
+                cbid_ajeno = !(ev.id1.cbid == P.cbid && ev.id2.cbid == P.cbid)
+                orden_malo = !(ev.h1.pre_hash < ev.h2.pre_hash)
+                cbid_ajeno && orden_malo && inc!(acc, "ambos")
+            end
+            nombre = r == ErrEvidenciaDuplicada ? "duplicada" :
+                     r == ErrEvidenciaTardia    ? "tardia" :
+                     r == ErrForma(EvidenciaCbidAjeno) ? "cbid_ajeno" :
+                     r == ErrForma(OrdenCanonicoInvalido) ? "orden_canonico" :
+                     r == ErrSinEvidencia       ? "sin_evidencia" :
+                     r == ErrEvidenciaConEntradas ? "con_entradas" :
+                     r == ErrPuertaRAT3         ? "puerta_rat3" : "otro_error"
+            inc!(acc, nombre)
+        end
+    end
+    return acc
+end
+```
+
+Wait, but the `:ambos` case has cbid ajeno and non-canonical. The `else` branch (not in memo) triggers. It increments "ambos" then "cbid_ajeno". Good.
+
+But hold on: for the `:con_entradas` case, the block has a TxEvidencia with `entradas`/`salidas`; the error is `ErrEvidenciaConEntradas`. But wait — in `aplicar_evidencia!`, the check order is `tx.evidencia === nothing` → then `entradas/salidas`. For `:con_entradas`, `tx.evidencia` is set (ev), so it returns `ErrEvidenciaConEntradas`. Good.
+
+But there's a subtlety: for the `:cbid` case with `key=1`, the block's evidence returns `ErrForma(EvidenciaCbidAjeno)`. The coverage maps it. Good.
+
+Now, `inc!` is defined at line 289. Fine.
+
+- `contar_cobertura` uses `ErrForma` etc. Need those names available (exported). Good.
+
+- The main function: `n_aleatorios` default 2000. The evidence loop `if pi <= 3`. And the final `cov` printing. Good.
+
+- The header comment and version. Also `RUTA_DEF`? No, exportar has SALIDA_DEF.
+
+- The sha path: `replace(salida, r"\.txt$" => "") * ".sha256"` → `resultados/vectores-transicion-v0.5.sha256`. Good.
+
+### run.jl changes
+
+- `n_ev_tipo = max(1, cld(ev_historias, 8 * length(puntos_ev)))`.
+- Maybe add counters for form errors in the summary. The order says run.jl with 0 failures; no requirement for new counters, but the INFORME would benefit. Let me add counters `n_forma_cbid`, `n_forma_orden`, `n_forma_ambos` by scanning? That's extra. Actually run.jl's evidence block uses `verificar`, which doesn't classify. I could add a small loop to classify the last block error. But the coverage comes from exportar. Keep run.jl minimal: just update the 6→8. Actually, the summary prints "historias evid." etc. Maybe I'll add a note. To satisfy "run.jl principal con 0 fallos", updating the multiplier is enough.
+
+Hmm, but wait: run.jl's `verificar` computes I-3 permutation checks etc. With form errors, blocks are invalid as before, so no change. The `con_post` etc. fine.
+
+### lector_vectores.jl changes
+
+- `RUTA_DEF = "resultados/vectores-transicion-v0.5.txt"`.
+- The lector's `res_recomputado` uses `r isa Err ? string(r) : "OK"` — works with union.
+- The lector's `verificar_caso` for X-19/X-20 uses `r isa Err && continue` — works.
+- No other change needed. But the lector must parse the new `res=ErrForma(...)` strings? It doesn't parse RES; it recomputes and compares. Good.
+- However, there's a catch in `parsear_tx` for `Evidencia`: it checks `if isempty(ent) && isempty(sal) return tx_evidencia(ev)`. For `:ambos`/`:orden`/`:cbid`, ent/sal empty → tx_evidencia(ev). Good.
+
+- Wait, there's a subtle bug: `parsear_salidas` creates `Salida(..., OrigenTx, -1, -1)`. For the `:con_entradas` case, the evidence tx has a salida `Salida(900777, 1, key, OrigenTx, -1, -1)`. The `tx_str` writes `sal=[900777:1:1]`. The lector parses it back. Good.
+
+### test/runtests.jl changes
+
+- `_error_neg`: `return r isa Err ? r : :ok` — works with union. Good.
+- `esperado` dict: update `"ev-cbid" => ErrForma(EvidenciaCbidAjeno)`, add `"ev-orden" => ErrForma(OrdenCanonicoInvalido)`, `"ev-ambos" => ErrForma(EvidenciaCbidAjeno)`.
+- The EV-01/EV-04 tests at 750-755: update to `ErrForma(...)`.
+- Add new precedence tests.
+- Add a testset maybe named `SL-4c-O (forma de EvidenceTx)` to make the new tests visible with their name. The order says "todos los tests previos con su nombre más los nuevos". Adding a new `@testset` keeps the previous names and adds a new one. Good.
+
+Let me design the new testset concretely, reusing `_base_post`:
+```julia
+@testset "SL-4c-O (forma de EvidenceTx)" begin
+    P = Params(... cbid=7, evp=true, Plazo_slots=3, R_slots=4 ...)
+    blb, Eb = _base_post(P)
+    s = Eb.slot + 1
+    mk(ev) = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                      productor = 1, peso = 1,
+                      txs = [tx_coinbase_post(3), tx_evidencia(ev)])
+    # cbid ajeno (canónico) ⇒ forma
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60)), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    # orden no canónico (misma red) ⇒ forma
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 50)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # ambos defectos: gana cbid (precedencia)
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    # la forma precede a la semántica: identidad distinta + orden no canónico
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50;
+                                   id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0, s + 1))), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # la forma precede a sellos inválidos
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50; sello1 = false)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # cbid ajeno + identidad distinta: gana cbid
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60;
+                                   id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0, s + 1))), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    # la estructura precede a la forma: con salidas ⇒ ErrEvidenciaConEntradas aunque cbid sea ajeno
+    Bev = Tx(TxEvidencia, [Salida(900002, UInt64(1), 1, OrigenTx, -1, -1)],
+             Int[], 0, 1, UInt64(0), 0, UInt64(0),
+             evidencia(P.cbid + 1, 1, 0, 0, 0, s, 100, 50))
+    Bmal = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                    productor = 1, peso = 1, txs = [tx_coinbase_post(3), Bev])
+    @test aplicar(Eb, Bmal, P) == ErrEvidenciaConEntradas
+
+    # cobertura ≥ 30 por tipo y ≥ 5 con ambos defectos
+    Pc = Params(... same ...)
+    casos = casos_evidencia_cobertura(Pc; n = 30)
+    n_cbid = 0; n_orden = 0; n_ambos = 0
+    for (nombre, bl) in casos
+        got = _error_neg(bl, Pc)
+        if got == ErrForma(EvidenciaCbidAjeno); n_cbid += 1; end
+        if got == ErrForma(OrdenCanonicoInvalido); n_orden += 1; end
+        if nombre == "ev-ambos"; n_ambos += 1; end
+    end
+    @test n_cbid >= 30
+    @test n_orden >= 30
+    @test n_ambos >= 5
+end
+```
+
+Wait, `_error_neg` returns `:ok` or the error, using `r isa Err`; with union it returns `ErrForma(...)`. Good. But `casos_evidencia_cobertura(Pc; n=30)` with 8 types produces 240 cases; each type 30. `n_cbid` = 30 (cbid) + 30 (ambos) = 60; `n_orden` = 30. `n_ambos` = 30. Good.
+
+But note: `_error_neg` applies the *last* block on its parent's state; for `ev-duplicada` (2 blocks) etc. For our new types, 1 block after prefix; the last block carries the evidence. Good. But for `ev-aplicada`, `_error_neg` returns `:ok`. Fine.
+
+Also, the testset `SL-3` uses `esperado` with `"ev-cbid"`; if I add `:orden, :ambos` to `casos_evidencia_cobertura`, then the loop over `casos_evidencia_cobertura(P; n=1)` in SL-3 will include `ev-orden` and `ev-ambos`; since `esperado` doesn't have them, they're skipped. But I should add them to the SL-3 `esperado` too, or keep them only in the new testset. Adding to SL-3's esperado is good. But the order says previous tests keep their names; modifying the SL-3 testset content is fine as long as the testset name persists. I'll update the SL-3 `esperado` to include the form errors, and also update the three `ErrOrdenCanonico`/`ErrCbidAjeno` tests at lines 750-755.
+
+Now, one issue: `casos_evidencia_cobertura(P; n=1)` in the SL-3 testset produces `ev-orden` and `ev-ambos` cases now. The SL-3 testset's `esperado` will handle them.
+
+Let me also double-check the `_error_neg` behavior for `ev-ambos`: `_error_neg` returns `ErrForma(EvidenciaCbidAjeno)`. Good.
+
+### DIFERENCIAS report generation
+
+I need to produce `DIFERENCIAS-v0.4-v0.5.md`. Approach: after generating v0.5, run a comparison. I can write a small Julia script? Or do it with bash/awk. The report must list case by case the ones that change and why. I'll generate a machine-assisted table and then write the markdown.
+
+Let me think about how to reliably pair v0.4 and v0.5 cases. Both files have `CASO n=... nombre=... punto=... semilla=...`. The cases are generated in the same order except new evidence cases appended within `casos_evidencia_cobertura`. I can pair by `(nombre, punto, semilla)` plus order. Simpler: since v0.5 is generated by the same code with only added types and changed error names, the sequence of non-evidence cases and evidence cases is deterministic. I'll parse each file into cases (lines from `CASO` to `FIN`), and pair them by their `nombre`+`punto`+`semilla`+`idx-within-group`. Hmm.
+
+Alternative pragmatic approach: I can just diff the two files and show the `RES` lines that differ:
+```
+diff <(grep -E '^(CASO|RES)' v0.4) <(grep -E '^(CASO|RES)' v0.5)
+```
+But because of inserted cases, diff will be noisy. Better to compare per-case by matching case content structurally.
+
+Actually, let me think about what "cambian de resultado" means more narrowly. The only lines that change are `RES` lines where the old error was `ErrCbidAjeno` or `ErrOrdenCanonico` (now `ErrForma(...)`), plus the new cases (not present before). Since all v0.4 cases are reproduced, I can enumerate in v0.4 all RES lines with `res=ErrCbidAjeno` or `res=ErrOrdenCanonico` (and maybe `res=ErrSinEvidencia` in some cases? Would any `ErrSinEvidencia` change to `ErrForma(OrdenCanonicoInvalido)` due to reordering? Only if a case had non-canonical order AND identity mismatch/seal invalid. In v0.4's generated cases, are there such? The `:cbid` case has canonical order and identity equal. The `:tardia`/`:sin_saldo`/`:aplicada`/`:duplicada` cases have canonical order and equal identity. The directed/random cases: do they have evidence? The random `generar_historia` may include evidence? Let me check: `generar_historia` in generadores.jl — does it generate evidence? Probably not; evidence is only in the evidence-specific section. Let me check. And X-cases: no evidence. So likely the only cases with evidence defects are the `ev-*` ones, and their order is canonical except for the newly added types. So the only changes are:
+- `ev-cbid` cases: `ErrCbidAjeno` → `ErrForma(EvidenciaCbidAjeno)`.
+- (no existing `ErrOrdenCanonico` in v0.4 vectors? Let me check: grep `res=ErrOrdenCanonico` in v0.4. There might be none, because the generator never produced a non-canonical order! Indeed, `_caso_evidencia` always had ph1 < ph2. So v0.4 has no `ErrOrdenCanonico` cases. And the tests had manual non-canonical cases but those aren't in the vectors.)
+
+So in v0.4, only the 120 `ev-cbid` cases change RES. All 2795 v0.4 cases are reproduced identically except those 120 RES strings. And v0.5 adds new cases (`ev-orden`, `ev-ambos`) that have no v0.4 counterpart. Great — the DIFERENCIAS report is simple: list the 120 `ev-cbid` cases with old→new, plus state that no other case changes, plus the new cases are additions (not changes).
+
+But I should verify this empirically by diffing v0.4 and v0.5. Let me generate v0.5 first, then compare.
+
+Hmm, wait: if I append `:orden, :ambos` to the type tuple, then the `CASO n=` numbering shifts, but the `nombre`/`punto`/`semilla` of existing cases are unchanged. The DIFERENCIAS report can match by `(nombre, punto, semilla)` and by the block content. For `ev-cbid`, there are 40 per pi × 3 = 120 cases with `nombre=ev-cbid`. Each has a distinct `punto` and the evidence data. I can list them as `nombre=ev-cbid, punto=p, ..., RES old→new`. Since all `ev-cbid` change the same way, I can summarize per punto with the count and give the full list in a compact table. But the order says "caso por caso". I'll list every case (120 rows) or a compact enumeration. To be safe, I'll list each case's `n` (v0.4 n and v0.5 n), `nombre`, `punto`, block id, old RES → new RES.
+
+Actually, a cleaner approach: I can produce the list from the v0.4 file: for each case containing `res=ErrCbidAjeno`, output the case's `n` and `nombre` and `punto`. Then note the new RES. Let me do that with awk after generating v0.5, and cross-check that v0.5's corresponding cases have the new string and no other differences.
+
+Let me now also verify whether v0.4 has any `ErrOrdenCanonico` or `ErrSinEvidencia` that would change. Let me grep v0.4.
+dsh: reasoning:
+Confirmed: v0.4 has 120 `ErrCbidAjeno`, no `ErrOrdenCanonico`, no `ErrSinEvidencia`. So only the 120 `ev-cbid` cases change RES. 
+
+Wait, `ErrEvidenciaConEntradas` appears 120 times; those don't change. Good.
+
+Now, the lector on v0.4 after my change: it will recompute and find the 120 discrepancies (RES expected ErrCbidAjeno, obtained ErrForma(...)). I should not run the lector on v0.4 as a "verification"; instead document the historical delta. The order only requires re-reading the new vectors.
+
+Now, let me also think about whether the v0.5 generation will exactly reproduce the other 2675 cases. The exportar code path is deterministic, and I change nothing else. The header date changes but that's line 1. Good.
+
+But careful: `exportar.jl` uses `--aleatorios 2000` default and `--dirigidos 1`, `--ev-por-tipo 40`. The v0.4 was generated with `exportar.jl --aleatorios 2000` (from INFORME). I need to use the same for v0.5 to reproduce. The `fecha` in the header defaults to `date -Is` (nondeterministic), so the file header differs. To make the diff clean, I could pass `--fecha` same as v0.4's header. Let me read the v0.4 header.
+
+Also, the `dirigidos` section uses `N = length(puntos)` and `idxs = unique([1, div(1+N,2), N])`. Deterministic. The `n_aleatorios` maps points deterministically. Good.
+
+Let me read the first 3 lines of v0.4.
+dsh: reasoning:
+Good. Now I have all the info. Let me create a todo list and start implementing.
+
+One more thing: I should check the `exportar_negativos.jl` to see if it writes `resultados/vectores-transicion-negativos-v0.2.txt` and references errors that changed. It probably doesn't touch evidence. I'll leave it. But let me grep for `ErrCbidAjeno`/`ErrOrdenCanonico` in it. Earlier grep of T01 src didn't show exportar_negativos.jl. Let me double check with a grep of all T01 jl files for these names.
+dsh: reasoning:
+Good, comprehensive list. Now let me set the todos and begin.
+
+Let me first write the ambiguity report into PROGRESO.md (append a new SL-4c-O section start) and HORAS.log. Actually, HORAS.log is append via bash `date -Is >> HORAS.log`. The order says use `date -Is` real. Let me append start time.
+
+Wait — the order is "parte O1", and it says "Sección «SL-4c-O» en INFORME.md y PROGRESO.md de cada oráculo". So I'll add sections titled with "SL-4c-O". Let me create PROGRESO's section now with the ambiguity report (before editing code), then INFORME at the end.
+
+Let me append to HORAS.log and write the PROGRESO section. I'll use bash for the date append (writing to a file in my zone). Actually, the `write`/`edit` tools require reading first; for appending I'll use edit with the last line as anchor, or bash `>>`. Let me use bash for HORAS.log (simple append).
+
+Then edit PROGRESO.md by appending at the end. I'll use `edit` with the last lines as anchor, or `write`? The file is 827 lines; better to append via `edit` on the final line. Let me read the last lines.
+
+Actually, I already have the content up to line 827. The last line is "  Python; sin secretos." Let me append after it.
+
+Let me create the todo list first.
+dsh: reasoning:
+Let me first state the ambiguity in my response text, and also record it in PROGRESO.md before editing code. Let me append to HORAS.log and add the PROGRESO section.
+
+Let me read the last few lines of PROGRESO to anchor.
+dsh: reasoning:
+Now append the PROGRESO section header + ambiguity report. Let me use edit with the final line anchor.
+
+Last lines:
+```
+- **Cierre T01-SL3b: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push; sin
+  Python; sin secretos.
+```
+I'll append after "  Python; sin secretos."
+
+Let me craft the section. I'll write it after the ambiguity analysis. Note the order says "Falta de definición detectada antes de editar (obligatorio informar)". Let me include the three gaps.
+
+I'll add:
+```
+# SL-4c-O — parte O1 (T01): cbid ajeno y orden canónico como forma
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O.md` (motivo: `REVISION-RI-3b.md` H1), `CONTRATO-EVIDENCIA-v0.md`
+(RAT-1, EV-01/EV-04) y `CONTRATO-ESTADO-DAG-v0.md` §3. **Zona:** `T01/`. Sin Python;
+sin commit ni push; sin secretos. **Presupuesto declarado (LINEO §7):** 1 h, 1 hilo,
+8 GiB de RAM, 2 GiB de disco; si se agota, checkpoint y **inconcluso**.
+
+## SL4c.0. Entrada congelada (inicio)
+
+`LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O.sha256`: **7/7 OK** (ORDEN-SL4c-O,
+CONTRATO-EVIDENCIA-v0, CONTRATO-ESTADO-DAG-v0, REVISION-RI-3b, LINEO,
+vectores-transicion-v0.4.txt, vectores-estado-dag-v0.5.txt).
+
+## SL4c.1. Falta de definición detectada antes de editar (obligatorio informar)
+
+...
+```
+
+Let me write it. Use edit.
+dsh: reasoning:
+Now the ambiguity is recorded. Let me now edit `src/Transicion.jl`.
+
+First, the enum block. Let me replace lines 68-99. I have the exact content. Let me do the edit.
+
+Current:
+```julia
+@enum Err begin
+    ErrGenesis
+    ErrPow
+    ErrEmision
+    ErrInmaduro
+    ErrDepositoTemprano
+    ErrAutorizacion
+    ErrSaldo
+    ErrDobleGasto
+    ErrPowTrasCorte
+    ErrSinTerminal
+    ErrTerminalAmbiguo
+    ErrGarantia
+    ErrOperacionFase
+    ErrPruebaTardia
+    ErrSectorInactivo
+    ErrSlot
+    ErrDesbordamiento
+    ErrFueraDeAlcanceV0
+    ErrRetiroPendiente      # AMBIGUEDAD-2
+    ErrNonce                # F-15: nonce por clave de garantía
+    # SL-3 (CONTRATO-EVIDENCIA-v0 con Ratificación v0)
+    ErrSinEvidencia         # EV-06/EV-07: no hay dos decisiones de firma válidas
+    ErrCbidAjeno            # RAT-1: cbid distinto del de la red local (Rust ErrForma)
+    ErrOrdenCanonico        # EV-01: pre_hash(H1) < pre_hash(H2) estricto
+    ErrEvidenciaTardia      # EV-14: fuera de Plazo_slots
+    ErrEvidenciaDuplicada   # EV-12: incident_id ya procesado
+    ErrEvidenciaConEntradas # EV-04: EvidenceTx con entradas o salidas monetarias
+    ErrCasoAbierto          # EV-24(i): incidente admitido y no liquidado
+    ErrVentanaAbierta       # EV-24(ii)/EV-15b: producción reciente de P
+    ErrPuertaRAT3           # RAT-3: R_slots > Plazo_slots + M_margen_slots
+end
+```
+
+Replace with the new structure. Note: `ErrSinEvidencia` stays. Remove `ErrCbidAjeno`, `ErrOrdenCanonico` from the enum. Then define ClaseForma, ErrForma, union, aliases.
+
+Let me write it.
+dsh: reasoning:
+Now update the exports. Line 21 `export Err, TipoTx`. Add `ErrForma, ClaseForma, EvidenciaCbidAjeno, OrdenCanonicoInvalido`. Let me edit.
+
+Also line 29 still exports `ErrCbidAjeno, ErrOrdenCanonico`, which now refer to the const aliases. That's fine, they're still defined. Keep.
+
+Let me add the new exports.
+dsh: reasoning:
+Now the `aplicar_evidencia!` function. Let me view the current lines (the line numbers shifted). Let me read around the function.
+dsh: reasoning:
+Now update `generadores_negativos.jl`? It uses `esperado::Err`. Since `Err` is a union, this struct field is abstract but works. However, there might be a problem: `CasoNegativo` is constructed with `esperado = ErrGenesis` etc. Works. And comparisons `got != c.esperado` work. Let me leave it. But maybe for cleanliness, change to `::Union{ErrSemantico, ErrForma}`? `Err` alias is exactly that. Fine.
+
+Now, update `src/evidencia.jl`: add `:orden` and `:ambos`. Let me edit the `_caso_evidencia` function and `casos_evidencia_cobertura`.
+dsh: reasoning:
+Now update `exportar.jl`:
+1. `SALIDA_DEF` and `COBERTURA_DEF` to v0.5.
+2. Header comment and version strings.
+3. `contar_cobertura` mapping and `ambos` counter.
+4. Coverage file header comments.
+5. The default points, etc. stay.
+
+Let me make the edits. First the constants at lines 21-23.
+dsh: reasoning:
+Now the `contar_cobertura` function. Let me read it again with current line numbers.
+dsh: reasoning:
+Now update the header line and coverage comments in `main`. Let me read lines 355-445.
+dsh: reasoning:
+Let me update:
+- Line 366-367 header: v0.5, SL-4c-O.
+- Comment at 399: SL-4c-O.
+- Coverage header lines 428-438.
+- Perhaps report the count of new cases.
+
+Let me edit the header and coverage.
+dsh: reasoning:
+Now `run.jl` n_ev_tipo uses 6 types. Update to 8. Also update the comment. Let me edit.
+dsh: reasoning:
+Also, `run.jl` might benefit from counting form errors. Let me check the summary section around lines 200-262 to add counters. Actually, the order says `run.jl` principal con 0 fallos; adding counters is optional. But the INFORME can report the evidence-sweep form counts. Let me add a small classification in the evidence loop: for each case, run the last block error and count. Hmm, `verificar` doesn't return the error. I could add a helper in run.jl that, for each evidence case, computes `_error_neg`-like classification. That adds complexity. Alternatively, the coverage file already reports the form counts, and the INFORME references it. I'll keep run.jl minimal, but I should at least make sure the evidence sweep exercises the new types (it does, via `casos_evidencia_cobertura`).
+
+Actually, let me add simple counters to run.jl for the three form errors, to strengthen the run.jl evidence. It's easy: after `append!(casos, casos_evidencia_cobertura(...))`, for each case compute the last-block error via a local function and count. But `run.jl` doesn't have `_error_neg`; I can write a small inline. Let me look at the run.jl evidence block again (lines 201-237) and add counters. Actually, I'll add it since it's useful and cheap.
+
+Let me read the current run.jl lines 200-260.
+dsh: reasoning:
+I'll add form-error counters to the evidence loop. I need a way to get the last block's error. I can define a local helper function inside `main` or module-level. `run.jl` is not a module; it's a script. I can define a top-level function `ultimo_error(bl, P)` similar to `_error_neg`:
+
+```julia
+function ultimo_error(bloques::Vector{Bloque}, P::Params)
+    memo, _ = construir_validos(bloques, P)
+    B = last(bloques)
+    Ep = get(memo, B.padre, nothing)
+    Ep === nothing && return nothing
+    r = aplicar(Ep, B, P)
+    return r isa Err ? r : nothing
+end
+```
+
+Wait, for the `ev-duplicada` case, the last block is the second evidence block, whose parent is invalid (the first evidence block failed) → `Ep === nothing`, so it returns nothing. That's fine for counting form errors. For the `:cbid`, `:orden`, `:ambos` cases, the last block has a valid parent (the prefix) → returns the form error. Good.
+
+But note: `casos_evidencia_cobertura` produces cases where the evidence block is the last block. For `:duplicada`, the first block (with evidence) is pushed and the second only if r1 not Err; since the first is valid... wait `:duplicada` first block applies successfully (r1 is Estado), then B2 with same ev on r1 → ErrEvidenciaDuplicada. So the list has 2 blocks; last block's parent (B1) is valid → returns ErrEvidenciaDuplicada. Good.
+
+Let me add counters:
+```julia
+n_forma_cbid = 0
+n_forma_orden = 0
+n_forma_ambos = 0
+...
+for (nombre, bl) in casos
+    ...
+    if nombre == "ev-ambos"; n_forma_ambos += 1; end
+    e = ultimo_error(bl, P)
+    e == ErrForma(EvidenciaCbidAjeno) && (n_forma_cbid += 1)
+    e == ErrForma(OrdenCanonicoInvalido) && (n_forma_orden += 1)
+end
+```
+Actually counting `ambos` by name is fine.
+
+Then print:
+```
+@printf("forma cbid/orden/ambos = %d / %d / %d\n", n_forma_cbid, n_forma_orden, n_forma_ambos)
+```
+
+This adds useful evidence. Let me implement. I'll add the helper before `main()` (after `verificar`) and counters.
+
+Let me add the helper function near the other functions. I'll insert after `cadena_de` (line 54) or after `verificar`. Let me insert before `function main()`.
+
+Let me add the function and modify the block.
+dsh: reasoning:
+Now update `lector_vectores.jl` default path to v0.5. Also its header comment says "vectores de T01-B" and mentions v0.4? Let me just change `RUTA_DEF`.
+
+Also the lector's `_error_neg`? No, that's tests. The lector's `clasificar`? Not present.
+
+Let me edit the RUTA_DEF.
+dsh: reasoning:
+Now update the header comment of lector_vectores.jl to mention v0.5/SL-4c-O? Optional but nice. Let me check the top comment lines 1-12. It says "relectura INDEPENDIENTE de los vectores de T01-B." and route default. I'll update to mention SL-4c-O. Minor; I'll do it.
+
+Also `exportar.jl` header comment lines 1-13 mention v0.4 default. Let me update to v0.5. Let me check the top.
+dsh: reasoning:
+Now update the tests. Let me handle:
+1. `esperado` in SL-3 testset (lines 588-591): add `ev-orden` and `ev-ambos`, and change `ev-cbid`.
+2. Lines 750-755: change `ErrOrdenCanonico`/`ErrCbidAjeno` to `ErrForma(...)`.
+3. Add the new `SL-4c-O` testset at the end.
+
+Let me do the SL-3 esperado edit.
+dsh: reasoning:
+Now the EV-01/EV-04 semantic tests at lines ~750-755. Let me update those three. Let me read the current block to edit precisely.
+dsh: reasoning:
+There's also line 748 `id = IdentidadEvidencia(...)` which may be unused; leave it.
+
+Now add the new testset at the end of the file (after line 845 `end`). Let me append after the final `end` of the SL-3 testset. I need to ensure the new testset is top-level after the SL-3 `end`. The file ends with:
+```
+    @test aplicar(El, Bl, Pl) == ErrFueraDeAlcanceV0
+end
+```
+Let me append.
+
+Design the testset using a fresh Params. Let me write:
+
+```julia
+# ---------------------------------------------------------------------------
+# SL-4c-O — `cbid` ajeno y orden canónico como forma (RAT-1, EV-01/EV-04)
+# ---------------------------------------------------------------------------
+
+@testset "SL-4c-O (forma de EvidenceTx)" begin
+    P = Params(H_dep = 1, M_cb = 1, M_dep = 0, H_corte_min = 2, W_min = 1,
+               S_min = 1, K_min = 1, q = 1, M_res_slots = 1, M_dep_slots = 1,
+               M_rec_slots = 1, R_slots = 4, F_slots = typemax(Int), sec = SEC0,
+               f_num = 1, f_den = 1, Plazo_slots = 3, M_margen_slots = 0,
+               cbid = 7, evp = true)
+    blb, Eb = _base_post(P)
+    s = Eb.slot + 1
+    mk(ev) = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                      productor = 1, peso = 1,
+                      txs = [tx_coinbase_post(3), tx_evidencia(ev)])
+
+    # Los dos defectos por separado ⇒ forma, con el nombre exacto del contrato.
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60)), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    @test string(ErrForma(EvidenciaCbidAjeno)) == "ErrForma(EvidenciaCbidAjeno)"
+    @test string(ErrForma(OrdenCanonicoInvalido)) ==
+          "ErrForma(OrdenCanonicoInvalido)"
+
+    # Precedencia fija: estructura → cbid → orden.
+    # Estructura gana a la forma.
+    Bev = Tx(TxEvidencia, [Salida(900010, UInt64(1), 1, OrigenTx, -1, -1)],
+             Int[], 0, 1, UInt64(0), 0, UInt64(0),
+             evidencia(P.cbid + 1, 1, 0, 0, 0, s, 100, 50))
+    Bmal = gen_post(id = blb[end].id + 1, padre = blb[end].id, slot = s,
+                    productor = 1, peso = 1,
+                    txs = [tx_coinbase_post(3), Bev])
+    @test aplicar(Eb, Bmal, P) == ErrEvidenciaConEntradas
+    # `cbid` gana a orden.
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 100, 50)), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    # La forma gana a la semántica (EV-06 identidad): orden malo + identidad distinta.
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50;
+                                   id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0,
+                                                            s + 1))), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # La forma gana a los sellos (EV-07).
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 100, 50;
+                                   sello1 = false)), P) ==
+          ErrForma(OrdenCanonicoInvalido)
+    # `cbid` ajeno gana a la identidad distinta.
+    @test aplicar(Eb, mk(evidencia(P.cbid + 1, 1, 0, 0, 0, s, 50, 60;
+                                   id2 = IdentidadEvidencia(P.cbid, 1, 0, 0, 0,
+                                                            s + 1))), P) ==
+          ErrForma(EvidenciaCbidAjeno)
+    # Canónico + identidad correcta sigue siendo semántica (no de forma).
+    @test aplicar(Eb, mk(evidencia(P.cbid, 1, 0, 0, 0, s, 50, 60;
+                                   sello1 = false)), P) == ErrSinEvidencia
+
+    # Cobertura mínima de la orden: ≥ 30 de cada clase y ≥ 5 con los dos defectos.
+    n_cbid = 0
+    n_orden = 0
+    n_ambos = 0
+    n_ok_estructura = 0
+    for (nombre, bl) in casos_evidencia_cobertura(P; n = 30)
+        got = _error_neg(bl, P)
+        got == ErrForma(EvidenciaCbidAjeno) && (n_cbid += 1)
+        got == ErrForma(OrdenCanonicoInvalido) && (n_orden += 1)
+        nombre == "ev-ambos" && (n_ambos += 1)
+        nombre == "ev-con_entradas" && got == ErrEvidenciaConEntradas &&
+            (n_ok_estructura += 1)
+    end
+    @test n_cbid >= 30
+    @test n_orden >= 30
+    @test n_ambos >= 5
+    @test n_ok_estructura == 30
+end
+```
+
+Wait: `n_cbid >= 30` — with n=30, `:cbid` gives 30 and `:ambos` gives 30 → 60. `n_orden` = 30. `n_ambos` = 30. `n_ok_estructura` = 30 (all con_entradas). Good.
+
+But careful: the `:ambos` case has cbid foreign and non-canonical; `_error_neg` returns `ErrForma(EvidenciaCbidAjeno)`. Good.
+
+Also `string(ErrForma(...))` — my custom show. Good.
+
+Now, the `id` variable at line 748 is unused; Julia doesn't complain about unused locals. Fine.
+
+Let me append the testset. I'll use edit with the final lines as anchor:
+```
+    @test aplicar(El, Bl, Pl) == ErrFueraDeAlcanceV0
+end
+```
+This appears once. Let me append after it.
+dsh: reasoning:
+Now let me sanity-check by loading the module and running a quick smoke test before the full test suite. Let me run a small Julia script that:
+- loads the module
+- constructs Params and an evidence block, checks the errors and strings.
+
+Actually, easiest: run `Pkg.test()` but that could take a while (previous logs mention 2178 tests). Let me first do a quick load + smoke test to catch syntax errors. Let me run a small `-e` script.
+
+Careful: `using Transicion` requires the project. Let me run from T01 with `--project=.`.
+
+Let me write a quick smoke test inline. I need helpers like `_base_post` that live in tests; I'll replicate a minimal one, or just call `puntos_evidencia()[1]` and `casos_evidencia_cobertura`. Let me do:
+
+```julia
+using Transicion
+P = puntos_evidencia()[1]
+println("P.cbid=", P.cbid)
+for (nombre, bl) in casos_evidencia_cobertura(P; n=1)
+    memo, _ = construir_validos(bl, P)
+    B = last(bl)
+    Ep = get(memo, B.padre, nothing)
+    if Ep === nothing
+        println(nombre, " -> sin padre valido")
+    else
+        r = aplicar(Ep, B, P)
+        println(nombre, " -> ", r isa Err ? string(r) : "OK")
+    end
+end
+println("string: ", string(ErrForma(EvidenciaCbidAjeno)))
+```
+
+Let me run it.
+dsh: reasoning:
+The smoke test works. Note: `ev-duplicada` with `n=2` returns `ErrEvidenciaTardia` in this particular point? Interesting. Let me look: for `n=2`, the `:duplicada` case: `_bloque_con_ev` builds B1 with `ev`, and if r1 not Err, B2 with same ev at s+1. But the output shows the last block's error is `ErrEvidenciaTardia` for `ev-duplicada`. Hmm, that suggests something: the `_caso_evidencia` for `:duplicada` sets sf = s, but the prefix may have advanced the slot such that the window is closed? Let me check: `puntos_evidencia()[1]` has Plazo_slots=1. `E.slot` from `_prefijo_ev` could be e.g. 2; s=E.slot+1=3; sf=s=3; applying at punto=B.slot=s=3: `sf <= punto < sf+Plazo` = `3 <= 3 < 4` → ok. Hmm, but the output says `ErrEvidenciaTardia`. Wait, maybe for idx=2, `n_post = 1 + (idx % 3) = 1+2 = 3`, so E.slot might be 3, s=4, sf = s? Actually the `:duplicada` branch: `sf = s` initially, then no tarida branch. So sf = s. Then `_bloque_con_ev(P, E, parent, s, ev)` with punto = s. `sf <= s < sf+Plazo` → `s <= s < s+1` → true. So B1 should apply. Then B2 at s+1 with same ev: `s <= s+1 < s+1` false → ErrEvidenciaTardia, not ErrEvidenciaDuplicada! Because the dedup check happens after the window check. Right: the window check (EV-13/14) comes before dedup, so the second evidence in the next slot is outside the window (Plazo=1) → ErrEvidenciaTardia. That's consistent with the existing code/behavior (and v0.4 coverage showed 40 duplicada cases across 12 points; some points have larger Plazo). Fine.
+
+The important thing: `:cbid`, `:orden`, `:ambos` behave as expected. Good.
+
+Now let me run the full `Pkg.test()`. But note the tests use `T01_REPLICAS` default 2 and the reduced grid; previous SL3b run had 2178 tests. This may take a couple of minutes. The budget is 1h. Let me run it in the background and meanwhile generate the v0.5 vectors? Actually, the vectors generation depends on the code being correct, which the tests validate. But I can run the exportar concurrently with the tests (they're independent Julia processes; but they both write? exportar writes to `resultados/`, tests write to their temp). The machine is shared with O2 and the order says "otra orden usa la máquina con procesos que dependen del reloj". The budget is 1 thread per part. Running tests + exportar concurrently would use 2+ threads. The order says "Presupuesto: 1 h y 1 hilo por parte". I should respect 1 hilo. So run sequentially, each with 1 thread.
+
+Let me run `Pkg.test()` first. Use `JULIA_NUM_THREADS=1`. Let me capture output to `resultados/test-pkg-SL4c.log`. Run in background to avoid timeout (the tool default timeout is maybe 60s? The earlier bash find timed out at 60s). The test run likely takes ~1-2 min. Let me run in background and poll via job_output.
+
+Actually, let me first run just the new testset quickly? `Pkg.test()` runs everything. Let me run it in background.
+
+Let me start the test job.
+dsh: reasoning:
+While the tests run, let me think about what else to prepare. I shouldn't run another heavy Julia process in parallel (1 thread budget). But I can do lightweight file work.
+
+Let me prepare the `DIFERENCIAS` generation approach. Actually, I need v0.5 first. But I can also review the changes for correctness. Let me re-read the modified `Transicion.jl` enum block and `aplicar_evidencia!` to be sure.
+
+Also, I should double check the `exportar.jl` `contar_cobertura` change: I removed the `:cbid` mapping to the alias and used `ErrForma(...)`. Good. But I left the else-branch `ev = txev.evidencia` variable shadowing? There's the outer `ev` in the `if haskey(memo, b.id)` branch; in the else branch I declare `ev = txev.evidencia`. Fine.
+
+Let me also think about the `generadores_negativos.jl` `estructura CasoNegativo esperado::Err`. With `Err` a Union, the struct's field is a Union of two types. But Julia requires struct fields to be declared types; `Err` is a `Union` type alias, which is valid. Good. The smoke test loaded the module, which includes generadores_negativos.jl, so it compiled. Good.
+
+Now, one concern: the `@enum ErrSemantico` — is `ErrSemantico` exported? I added it to the export list. Good.
+
+Another concern: `Base.show(io::IO, e::ErrForma)` — but `string(ErrForma(...))` uses `print`, which uses `show`. Good. `@test string(...) == "..."` passes (verified in smoke test).
+
+Now, the historical re-read: `lector_vectores.jl` on v0.4 will have 120 discrepancies. I should document that. The order only requires re-reading the new vectors. But I must be careful not to run the lector on v0.4 as a verification step and claim failure. I'll note it.
+
+Now let me think about `DIFERENCIAS-v0.4-v0.5.md` generation. After tests pass and exportar runs, I'll compare. Let me design a robust comparison script in Julia? Actually shell tools are fine. Let me plan:
+
+Since only `ev-cbid` cases change and new cases are added, I can:
+1. Extract from v0.4 all cases containing `res=ErrCbidAjeno`, with their `n`, `nombre`, `punto`, `semilla`, and the block id of the RES line.
+2. Verify that v0.5 contains exactly the same cases (matched by nombre/punto/semilla/blocks) but with `res=ErrForma(EvidenciaCbidAjeno)`, and that no other RES line differs.
+3. Report.
+
+The clean way: write a small Julia script (not Python) that parses both files into cases, matches them by content hash ignoring the RES line, and reports differences. But that's a new file/script. The order doesn't forbid extra helper scripts. Alternatively, use `diff` and `grep` in bash.
+
+Let me think of a shell approach:
+- `grep -n '^CASO'` gives case boundaries. 
+- I can use `awk` to split v0.4 and v0.5 into per-case blocks and compare.
+
+Actually, a simpler and very convincing approach: produce a normalized "case fingerprint" per case that includes everything except the `RES` values, then for each v0.4 case find the matching v0.5 case and compare RES maps. But writing this in awk is doable but error-prone.
+
+Given the small scope, maybe a Julia helper is cleanest. But then I'd add a file like `comparar_vectores.jl`. The order's deliverables mention `DIFERENCIAS-v0.4-v0.5.md`; a helper script is optional. I could also embed the comparison logic in a one-off `julia -e` command and just capture the output into the report. That avoids adding a file. But the report should be reproducible; a one-off command is fine if documented.
+
+Actually, let me reconsider: I can compute the difference simply because I know exactly which lines change. Let me use a line-oriented diff:
+- The v0.4 and v0.5 files differ in:
+  - line 1 (header)
+  - RES lines for the 120 `ev-cbid` cases: `res=ErrCbidAjeno` → `res=ErrForma(EvidenciaCbidAjeno)`
+  - inserted new cases (`ev-orden`, `ev-ambos`) and consequently all subsequent `CASO n=` numbers shift? Wait: `CASO n=` is written with the sequential counter `n`. New cases are inserted in the middle (within the evidence section for pi=1), so all subsequent CASO `n=` values shift. So `diff` will show massive changes due to `n=` renumbering. Hmm.
+
+To make the diff clean, I have two options:
+(a) Generate v0.5 with the new types but keep the same case numbering as v0.4 for pre-existing cases, perhaps by generating the new cases at the END (after all pi) so that pre-existing `n` values are unchanged. But the order wants the new vectors to have the new cases; where they appear doesn't matter. If I generate the new types only for a separate loop after the main evidence section, then the pre-existing 2795 cases keep their exact `n`, and the new cases are appended. But the current exportar writes `casos_evidencia_cobertura(P; n=...)` covering all 8 types interleaved. To keep numbering, I could split: export the 6 historical types first (for pi<=3), then export the new `:orden`/`:ambos` types. That would require changing `casos_evidencia_cobertura` or adding a parameter. Hmm, but the test uses `casos_evidencia_cobertura` with all 8 types; that's fine.
+
+Actually, simpler: for the DIFERENCIAS report, I don't need line-level diff; I can match cases by `nombre`+`punto`+`semilla` plus the sequence index within that group. The `n=` renumbering doesn't matter. Let me write a Julia comparator that:
+- Parses each file into cases (list of lines from CASO to FIN).
+- For each case, compute `key = (nombre, punto, semilla, group_index)` where group_index is the occurrence number of that key.
+- Compute `body_without_n = join(lines[2:end])` (excluding the CASO line which has `n=`), and `res_lines`.
+- Match v0.4 and v0.5 cases by key; for matching pairs, compare all lines except RES lines; collect RES differences.
+- Cases in v0.5 not in v0.4 are "new".
+- Report any matched pair with a non-RES difference as a failure.
+
+This is clean. I can run it via `julia -e '...'` with the file paths, or write a temporary script. Since the module isn't needed (pure text), I can run with plain Julia. I'll write a small script `comparar_v0.4_v0.5.jl` in T01? The order doesn't forbid it. But maybe cleaner to put it in `resultados/`? Hmm. Actually the report can be generated by a documented command. Let me just write a script `comparar_vectores.jl` in T01 (a utility), run it, and save its output to `resultados/diferencias-v0.4-v0.5.log`, then write the markdown report. That's auditable.
+
+But wait, adding a script increases surface. The order's "Prohibido Python" implies Julia scripts are the norm. I think a small comparator script is acceptable and good practice. Let me do it.
+
+Actually, let me reconsider the simplest robust approach: because I know exactly the semantic change, I can verify the claim by:
+1. `sha256sum -c` on v0.4 (intact).
+2. Grep v0.4 for `res=ErrCbidAjeno` → 120 occurrences; grep v0.5 for `res=ErrForma(EvidenciaCbidAjeno)`.
+3. Check that v0.5's cases, after replacing `ErrForma(EvidenciaCbidAjeno)`→`ErrCbidAjeno` in RES lines and removing the new cases, reproduce v0.4's content (modulo `n=` and header). That's essentially the comparator.
+
+I'll write the comparator script. Let me hold off until exportar runs.
+
+Now, let me check the test job status. Let me poll (non-blocking) — actually I should not busy-poll. Let me do useful work meanwhile: prepare the comparator script text. But I can't run it yet.
+
+Let me check the test log tail to see progress; a single read is fine.
+
+Actually, the instructions say don't busy-poll. But I have work to do (writing the comparator). Let me write it now with the `write` tool (new file). It doesn't depend on the test result. But I should be careful: if tests fail, I'll need to fix code before generating vectors. Writing the comparator now is fine.
+
+Let me design the comparator script:
+
+```julia
+# comparar_vectores.jl — compara dos exportaciones de vectores T01 caso por caso.
+#
+#     julia compare... no, plain julia (sin project) comparar_vectores.jl A.txt B.txt
+#
+# Empareja cada CASO por (nombre, punto, semilla, índice de repetición), compara
+# todas las líneas salvo `RES` y lista los cambios de `RES` (viejo → nuevo) y
+# los casos nuevos. Sale con código ≠ 0 si un par emparejado difiere en algo que
+# no sea una línea `RES`.
+
+function leer_casos(ruta)
+    casos = Dict{Any,Vector{Vector{String}}}()   # clave => lista de bloques
+    actual = String[]
+    clave = nothing
+    idx = Dict{Any,Int}()
+    for linea in eachline(ruta)
+        startswith(linea, "#") && continue
+        isempty(strip(linea)) && continue
+        if startswith(linea, "CASO ")
+            actual = String[linea]
+        elseif startswith(linea, "FIN")
+            push!(actual, linea)
+            # clave sin `n=`
+            m = match(r"CASO n=\d+ nombre=(\S+) punto=(\S+) semilla=(\S+)", actual[1])
+            base = (m[1], m[2], m[3])
+            k = get(idx, base, 0) + 1
+            idx[base] = k
+            key = (base, k)
+            push!(get!(casos, key, Vector{Vector{String}}()), actual)
+            actual = String[]
+        else
+            push!(actual, linea)
+        end
+    end
+    return casos
+end
+```
+
+Hmm, this is getting complicated. Let me simplify: each case is one block (CASO...FIN). There's exactly one case per CASO. Keys can collide (same nombre/punto/semilla), e.g., `ev-cbid` for the same punto but different idx → different `semilla`? The evidence cases are written with `semilla = "-"` and `punto = pi`, and the same `nombre` repeats `n_ev_por_tipo` times for the same punto. So key (nombre,punto,semilla) collides 40 times. I need the occurrence index. The order of occurrences in both files should be the same among pre-existing cases (since the new types are interleaved but the relative order of `ev-cbid` occurrences is preserved). So occurrence-index keying works.
+
+But the pre-existing `ev-aplicada` etc. also repeat; their occurrence order is preserved. Good.
+
+Then compare:
+- For each v0.4 case key present in v0.5, compare line-by-line (excluding the `CASO n=` and the `RES` lines), and collect RES diffs.
+- Actually simpler: for a matched pair, build the multiset/list of non-RES, non-CASO lines; require equality. Then compare RES lines as ordered lists keyed by block id.
+
+Let me define for each case:
+- `extraer_res(block)` → Dict{blockid => resstring}
+- `cuerpo(block)` → join of lines that are not `CASO` and not `RES`.
+
+Then for matched pairs, `cuerpo` must be equal; RES dicts may differ. Report RES diffs.
+New v0.5 keys not in v0.4 → new cases. v0.4 keys not in v0.5 → missing (failure).
+
+Output a markdown table? I'll have the script print a summary and a table. Then I'll paste into the report. Or have the script write the markdown directly. Better: the script writes the markdown report. Then the command is one step. Let me have it take an output path.
+
+Actually, to reduce risk, let me have the script print CSV-ish lines and I'll compose the markdown. But the report must list case by case; a script-generated markdown is more reliable. Let me have it write the `.md`.
+
+Let me write the script after tests. For now, let me check the test job.
+
+Let me poll the job output (non-blocking).
+dsh: reasoning:
+Still running. Let me prepare the comparator script while waiting. I'll write it now.
+
+Actually, let me reconsider whether to include the `n=` renumbering issue. My comparator ignores `n=`. Good.
+
+Let me write the comparator script `comparar_vectores.jl`. It should produce `DIFERENCIAS-v0.4-v0.5.md` directly. Let me write it carefully.
+
+```julia
+# comparar_vectores.jl — diferencia T01 v0.4 vs v0.5 caso por caso (SL-4c-O).
+#
+#     julia comparar_vectores.jl A.txt B.txt SALIDA.md
+#
+# No usa el módulo Transicion: es una comparación de texto. Empareja los CASO
+# por (nombre, punto, semilla, índice de repetición) — el `n=` secuencial cambia
+# al insertar casos nuevos y no se usa —, exige que el cuerpo (todo salvo las
+# líneas `RES`) sea idéntico en cada par y lista los cambios de `RES` y los
+# casos nuevos. Sale con código ≠ 0 si un par emparejado difiere en algo que no
+# sea `RES`, o si falta en B un caso de A.
+
+const RE_CASO = r"^CASO n=\d+ nombre=(\S+) punto=(\S+) semilla=(\S+)"
+const RE_RES = r"^RES bloque=(\d+) res=(\S+)"
+
+function leer(ruta)
+    casos = Dict{Tuple{Tuple{String,String,String},Int},Vector{Vector{String}}}()
+    idx = Dict{Tuple{String,String,String},Int}()
+    actual = String[]
+    clave = nothing
+    for linea in eachline(ruta)
+        if startswith(linea, "CASO ")
+            actual = String[linea]
+            m = match(RE_CASO, linea)
+            base = (String(m[1]), String(m[2]), String(m[3]))
+            k = get(idx, base, 0) + 1
+            idx[base] = k
+            clave = (base, k)
+        elseif startswith(linea, "FIN")
+            push!(actual, linea)
+            push!(get!(casos, clave, Vector{Vector{String}}()), actual)
+            actual = String[]
+            clave = nothing
+        elseif !isempty(actual)
+            push!(actual, linea)
+        end
+    end
+    return casos
+end
+
+function cuerpo_res(bl)
+    cuerpo = String[]
+    res = Dict{Int,String}()
+    for l in bl
+        (startswith(l, "CASO ") || startswith(l, "FIN")) && continue
+        m = match(RE_RES, l)
+        if m !== nothing
+            res[parse(Int, m[1])] = String(m[2])
+        else
+            push!(cuerpo, l)
+        end
+    end
+    return join(cuerpo, "\n"), res
+end
+```
+
+Wait, the RES line format is `RES bloque=1 res=OK`. Good.
+
+Then:
+```julia
+function main()
+    (length(ARGS) == 3) || error("uso: comparar_vectores.jl A.txt B.txt SALIDA.md")
+    A, B, salida = ARGS
+    ca = leer(A); cb = leer(B)
+    cambios = Tuple{String,String,String,String}[]
+    fallos = String[]
+    nuevos = String[]
+    for (k, bls) in sort(collect(ca); by = x -> string(x[1]))
+        if !haskey(cb, k)
+            push!(fallos, "falta en B: $(k)")
+            continue
+        end
+        blsa = bls[1]; blsb = cb[k][1]
+        ca_cur, ra = cuerpo_res(blsa)
+        cb_cur, rb = cuerpo_res(blsb)
+        if ca_cur != cb_cur
+            push!(fallos, "cuerpo distinto: $(k)")
+        end
+        for bid in sort(collect(union(keys(ra), keys(rb))))
+            va = get(ra, bid, "<falta>"); vb = get(rb, bid, "<falta>")
+            va == vb || push!(cambios, (string(k[1]), string(bid), va, vb))
+        end
+    end
+    for (k, _) in sort(collect(cb); by = x -> string(x[1]))
+        haskey(ca, k) || push!(nuevos, string(k))
+    end
+    ...
+end
+```
+
+Hmm, `cuerpo_res` returns dict keyed by block id; a case can have multiple blocks. Good.
+
+Wait: for the new `:ambos` case, the body might be identical to some existing case? No, the `:ambos` case's evidence has cbid+1 and swapped hashes, so its body differs from all v0.4 cases. So `cb` keys for `:ambos` won't match any `ca` key (key = (nombre,punto,semilla, occurrence)). `nombre="ev-ambos"` never appears in v0.4, so it's "nuevo". Good.
+
+But here's a subtlety: the occurrence index for a given `(nombre, punto, semilla)` in v0.4 and v0.5 is the same for pre-existing names, because the relative order of those cases is preserved. Good.
+
+Now, the report should list "caso por caso, los que cambian de resultado y por qué". I'll write a markdown with:
+- Header, command, v0.4 sha, v0.5 sha.
+- Summary: N cases matched, M new, K changed RES, 0 failures (or list them).
+- A table of changes: for the 120 `ev-cbid` cases, list `nombre`, `punto`, `bloque`, `RES v0.4`, `RES v0.5`. That's 120 rows; acceptable. Or group by (nombre, old, new, count) and list the case identifiers. The order says "caso por caso", so list all. I'll list all rows.
+- Statement: no other case changes; every change carries one of the two defects; the new cases (`ev-orden`, `ev-ambos`) are additions.
+
+Let me make the script emit the markdown. It needs the v0.4/v0.5 sha256 — I can pass them or compute with SHA? Plain Julia without the project could use `sha256` from stdlib SHA (available in the default depot). To be safe, I'll read the `.sha256` files instead and embed. Or just print them in the shell and paste. Simpler: the script prints the report without hashes; I'll add hashes via shell when writing. Hmm.
+
+Actually, maybe I'm overengineering. Let me have the script produce the full markdown including computing sha256 via the `sha256` function from `SHA` (stdlib; available). Let me `using SHA`.
+
+Let me write the script. But wait: I should be careful about "no añadas archivos innecesarios". A comparator script is a legitimate audit artifact. I'll keep it concise.
+
+Actually, let me reconsider: maybe I can avoid a new script by doing the comparison within the `exportar.jl`? No, that mixes concerns. A separate comparator is fine.
+
+Let me write the script now.
+
+One more consideration: the script's pairing by occurrence index assumes the pre-existing cases appear in the same relative order in both files. They do, because `exportar.jl` writes them in the same order (the new types only add extra `_caso_evidencia` calls interleaved, but the sequence of each individual tipo is unchanged). Good.
+
+Let me write it.
+dsh: reasoning:
+Now let me check the test job. Let me poll with wait maybe. Actually, let me first check the log tail to see progress. Let me use job_output with wait:false; if still running, I'll wait a bit with wait:true (bounded).
+
+Let me check.
+dsh: reasoning:
+The background job completed (exit 0 for the bash wrapper; the Julia exit code is in the log). Let me check the log tail.
+dsh: reasoning:
+All tests pass: SL-3 2088/2088, SL-4c-O 30/30, and the full suite. The `[exit=0]`.
+
+Wait, the SL-3 testset was 2084 in SL3b; now 2088. That's because I added `ev-orden`/`ev-ambos` to the `esperado` and the loop over `casos_evidencia_cobertura(P; n=1)` now has 8 types, so more assertions. Fine. Test names preserved.
+
+Now let me generate the v0.5 vectors. Use `exportar.jl --aleatorios 2000` with a fixed `--fecha` matching? To reproduce v0.4 content exactly except the changes, the date doesn't matter for case bodies. But for the comparator, the header is ignored. Let me run with default date (real). Actually, for reproducibility and to match the versioning, let me pass `--fecha` as the real date. Default does `date -Is` anyway. Let me just run `exportar.jl --aleatorios 2000`.
+
+Wait, an important subtlety: I changed `casos_evidencia_cobertura` to include 8 types, and `exportar.jl` calls it for `pi <= 3` with `n_ev_por_tipo=40`. So the v0.5 evidence cases: for each pi in 1..3, 40 × 8 = 320 cases, plus RAT3/autodenuncia. The pre-existing 6 types × 40 × 3 = 720 cases are reproduced identically. Good.
+
+Let me run exportar in background (1 thread). Then lector. Then comparator.
+
+Let me run exportar now.
+dsh: reasoning:
+While exportar runs, let me think about the historical re-read and v0.4 integrity.
+
+Let me also verify the frozen input `ENTRADA-SL4c-O.sha256` includes v0.4 and T04 v0.5 — yes, verified 7/7 OK. I need to ensure v0.4 remains byte-identical: I ran `sha256sum -c` and it was OK; exportar writes v0.5 (new files), so v0.4 remains.
+
+Now, the order says `vectores-transicion-v0.5.sha256` and `cobertura-v0.5.txt`. exportar writes those. Good.
+
+Let me wait for exportar. Meanwhile, let me review whether there are any other references in T01 to the old semantics that I missed. Let me grep again after edits.
+
+Also, I should update `METODO.md`? It documents the T01 method. The order doesn't require it. Previous orders (SL-3) didn't update METODO. Skip.
+
+Let me check the exportar job.
+dsh: reasoning:
+Export done: 3035 cases (2795 + 240 new: 40×2×3 = 240). Cobertura: cbid_ajeno=240, orden_canonico=120, ambos=120, con_entradas=120. All minima satisfied.
+
+Now run the independent lector on v0.5. It should give 0 discrepancies. Let me run it.
+
+Also, I want to run the lector on v0.4 to document the historical delta (120 discrepancies), but that's optional. Let me first verify v0.5 re-read.
+dsh: reasoning:
+While the lector runs, let me also run the main `run.jl` with 0 failures. But I should respect 1 thread and not run concurrently. The lector is running; wait for it. Actually the lector on 3035 cases might take a while (it re-applies each case). Let me wait.
+
+Meanwhile, let me prepare the `run.jl` command. The SL3b used `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`, took ~65s. That's the main run. Let me do the same for SL-4c-O. Budget 1h; fine.
+
+Let me wait for the lector.
+dsh: reasoning:
+Excellent: 3035 cases, 0 discrepancies. Now run `run.jl` with 1 thread. Let me use the same options as SL3b. Run in background.
+dsh: reasoning:
+While run.jl runs, let me do lightweight work: verify v0.4 remains intact and compute the sha256 files. Also check the coverage file. But avoid running heavy Julia concurrently. Let me use shell.
+
+Let me verify v0.4 hash and list v0.5 files.
+dsh: reasoning:
+Good. Now let me wait for run.jl to finish, then run the comparator to generate DIFERENCIAS.
+
+Let me wait for the run job.
+dsh: reasoning:
+run.jl: VEREDICTO SIN FALLOS, 5108 evidence histories, forma cbid/orden/ambos = 1272/636/636 (because n_ev_tipo = cld(5000, 8*12) = cld(5000,96)=53; 53*12=636 per type; cbid=636 (:cbid) + 636 (:ambos)=1272; orden=636; ambos=636). 2 minutes.
+
+Now run the comparator to generate `DIFERENCIAS-v0.4-v0.5.md`. It's a lightweight text script; run with plain Julia (no project needed, but SHA stdlib is available). Let me run it.
+
+Note the script uses backticks `date -Is`; fine.
+
+Let me run it.
+dsh: reasoning:
+There's an error. Let me see the full output. I piped tail -5 and lost the error. Let me rerun capturing full output.
+dsh: reasoning:
+My `leer` stores each case as a `String[]` but `get!` default is `String[]` (a Vector{String}), and `push!(get!(casos, clave, String[]), join(...))` pushes a String into a Vector{String}? Wait, `casos` is `Dict{...,Vector{String}}`, so each value is a `Vector{String}`, and I push the joined case string. Then `ca[k]` is a `Vector{String}` with one element (the whole case). But `cuerpo_res` expects an AbstractString. I intended each case value to be the joined string. So `bloque_a` is a `Vector{String}` of length 1. I should store the joined string directly as the value, not a vector. Let me fix `leer` to return `Dict{Key,String}` and `push!` → `casos[clave] = join(actual,"\n")`. But there could be duplicate keys? No, key includes occurrence index, so unique. Let me change to `Dict{Tuple{Tuple{String,String,String},Int},String}` and assign `casos[clave] = ...`. Then `bloque_b = cb[k]` is a String.
+
+Let me fix the script.
+
+Changes:
+- `casos = Dict{Tuple{Tuple{String,String,String},Int},String}()`
+- `push!(get!(casos, clave, String[]), join(actual, "\n"))` → `casos[clave] = join(actual, "\n")`
+
+Let me edit.
+dsh: reasoning:
+Also `bloque_b = cb[k]` is now a String; fine. And `for (k, _) in ...` okay. Let me rerun.
+dsh: reasoning:
+The comparator reports: v0.4=2795, v0.5=3035, cambios=120, nuevos=240, fallos=0. Exactly as expected: the 120 `ev-cbid` cases changed RES from `ErrCbidAjeno` to `ErrForma(EvidenciaCbidAjeno)`; 240 new cases (`ev-orden` and `ev-ambos`); no body differences. This confirms "todo caso que cambie lleva uno de los dos defectos".
+
+Wait — the 120 changes are all `ErrCbidAjeno` → `ErrForma(EvidenciaCbidAjeno)`. There are no `ErrOrdenCanonico` → form changes in v0.4 because v0.4 had no such cases. And no `ErrSinEvidencia` reclassification. Good.
+
+Let me view the generated DIFERENCIAS report to make sure it's well-formed. It has 120 rows; let me check the head and tail.
+dsh: reasoning:
+The report is well-formed but has a small cosmetic issue: the "Casos nuevos" list is sorted alphabetically by the string of the key, so `rep 10` comes before `rep 4` etc. That's fine but a bit ugly. Also, the change table doesn't include the `punto` or the case identifier, so identical rows look repeated. The order says "caso por caso, los que cambian de resultado y por qué". The current table lists each changed block (120 rows) but they're indistinguishable. To be more informative, I should include the `CASO n` from v0.4 (or the punto/semilla) in the table. Let me improve the comparator to include the v0.4 case number and point.
+
+I can extract the `n=` and `punto=` from the CASO line. Let me store per-case metadata. In `leer`, I already parse `nombre`, `punto`, `semilla`; I can also parse `n`. Let me extend the key or store a struct. Simpler: in `main`, for each matched pair, parse the `CASO` line from the block to get `n` and `punto`. Let me add a helper `meta(bloque)` returning `(n, punto)`.
+
+Actually, I already have `k[1]` = (nombre, punto, semilla). The `punto` is available! I just didn't include it. Let me include `punto` and the `n` of v0.4. The `n` can be parsed from the CASO line. Let me add a small helper.
+
+Also, the "casos nuevos" list is verbose (240 lines). That's fine, but I could group them: `ev-orden` (120) and `ev-ambos` (120) with punto distribution. The order doesn't require listing new cases; only changed ones. I'll compress the new-cases section to a table by name/punto count, which is cleaner and still auditable. But the report currently lists them; let me make it a grouped summary.
+
+Let me improve the comparator:
+- For each change row, add columns: `punto`, `CASO n` (v0.4), `bloque`, old, new, motive.
+- For new cases, group counts by (nombre, punto) instead of listing all.
+
+To get the v0.4 `n`, parse the CASO line. Let me modify `cuerpo_res` to also return metadata? Simpler: add a function `meta(bloque)`:
+```julia
+function meta(bloque)
+    l = first(split(bloque, "\n"))
+    m = match(r"^CASO n=(\d+) nombre=(\S+) punto=(\S+) semilla=(\S+)", l)
+    return (parse(Int,m[1]), String(m[2]), String(m[3]), String(m[4]))
+end
+```
+But `bloque` is the joined case; `first(split(...))` gives the CASO line. Good.
+
+Then in the loop, `ma = meta(bloque_a)`. Changes tuple becomes `(ma[2], ma[3], string(ma[1]), string(bid), va, vb)`.
+
+For new cases, count by `(nombre,punto)`.
+
+Let me rewrite the relevant parts.
+
+Actually, wait: The report is already generated and satisfies the requirement. But quality matters (this is the director's audit). Let me improve it. It's low risk.
+
+Let me edit the script.
+
+Also, I realize the change rows all show `ev-cbid` with various block ids. Including `punto` and `n` will make them distinct.
+
+Let me modify:
+1. Add `meta` function.
+2. In the loop: `ma = meta(bloque_a)`.
+3. `push!(cambios, (ma[2], ma[3], string(ma[1]), string(bid), va, vb))`.
+4. Update the table header and row printing, and the `motivo` logic indexing (now c[5], c[6]).
+5. New cases: build `nuevos = Dict{Tuple{String,String},Int}()` counting by (nombre, punto).
+6. Update summary and verdict indexing.
+
+Let me rewrite the file sections with edit. Given the number of changes, let me just rewrite the whole script with `write` (I created it, so I can overwrite). Actually the fs policy requires reading before write if not just created; I created it this session, so fine.
+
+Let me rewrite the script cleanly.
+dsh: reasoning:
+Note: `sum(values(nuevos); init = 0)` — Julia 1.x supports `init` keyword for `sum`? Yes, since Julia 1.6, `sum(f, itr; init)`. For `sum(itr; init)`? Actually `sum(itr; init=...)` is supported since Julia 1.6. Let me verify; if not, I'll use a different approach. Also `sort(collect(nuevos); by = x -> (x[1][1], parse(Int, x[1][2])))` — parse Int of punto; punto is numeric string. Fine.
+
+Let me rerun the comparator.
+dsh: reasoning:
+The report is good. Note the `CASO n` ordering isn't monotonic because the comparator sorts by key string (nombre, punto, semilla, occurrence) and the evidence cases are all `punto` in {1,2,3}; within a punto, occurrences map to n in a strided way. That's fine; the table is traceable.
+
+Now let me handle the historical re-read documentation: run the lector on v0.4 to record the expected 120 discrepancies (optional but good evidence). The order says v0.4 stays intact as historical; the re-read of historical vectors under the new oracle will differ exactly in the 120 cases. Let me run the lector on v0.4 and capture the log `relectura-v0.4-con-SL4cO.log`. This is a light-ish run (2795 cases) — about similar to v0.5, which took maybe ~30-60s. Let me do it; it's good evidence and mirrors the SL3b precedent of `relectura-v0.3-con-RAT2p.log`.
+
+Also, I should double-check: does the lector on v0.4 produce exactly 120 discrepancies (all RES)? Let me run and see.
+
+Let me run in background.
+dsh: reasoning:
+While that runs, let me plan the INFORME and PROGRESO updates. I'll wait for the job, then write.
+
+Let me also consider: should I keep the compatibility aliases? The T04/O2 concern. I'll keep them and document. Let me verify T04 still loads with my T01 change (it's not my zone to fix, but I should at least know if O2's current state breaks). Actually, running T04 would use 1 thread and could interfere with O2's run. I should not run T04 tests. But I can check that `Transicion.ErrCbidAjeno` resolves by loading the T01 module (already done: aliases work). The T04 load is O2's responsibility.
+
+Now, let me also double check: the `exportar_negativos.jl` and its vectors. I didn't change them, but its default path is `vectores-transicion-negativos-v0.2.txt` and it uses `Err` union. It loaded fine during smoke test (module includes generadores_negativos, but exportar_negativos.jl is a script, not included). Let me quickly check if `exportar_negativos.jl` references `Err` in a way that requires concreteness. Let me grep.
+
+Actually, I already grepped all T01 *.jl for `Err` annotations and found none in exportar_negativos. It probably works. But let me run a quick syntax/load check? Running it would regenerate the negative vectors, which I don't want (it would rewrite historical files, though deterministically). Let me just grep for `Err` usage in it.
+
+Let me check the job first, then do the grep.
+dsh: reasoning:
+`exportar_negativos.jl` uses `r isa Err`, which works with the union. Good. It's not run as part of the required verification. Fine.
+
+Now let me check the historical re-read job.
+dsh: reasoning:
+As expected: historical v0.4 re-read gives exactly 120 discrepancies, all `ErrCbidAjeno` → `ErrForma(EvidenciaCbidAjeno)`. This matches the DIFERENCIAS report. The `.sha256` for v0.4 is intact, so v0.4 is unchanged.
+
+Now let me write the INFORME and PROGRESO sections. Let me draft the INFORME section (§SL4c-O) following the pattern of SL3b. It should include:
+- Veredicto
+- Falta de definición
+- Qué cambia y qué no
+- Test/property
+- Cobertura
+- Vectores y relectura
+- Diferencias
+- Reproducibilidad
+- Lo que NO demuestra
+
+And PROGRESO's SL4c.2 diary.
+
+Let me also append the HORAS.log close time later.
+
+Let me now write the INFORME section. I'll append to `INFORME.md` at the end (after line 934). I need to read the end to anchor. The last lines are:
+```
+- Los vectores v0.3 y anteriores **no** se regeneran: su reparto es el de RAT-2 y así se
+  conservan como evidencia histórica.
+```
+Let me append after that.
+
+Let me gather the exact numbers:
+- Pkg.test: SL-4c-O 30/30; SL-3 2088/2088; total? The log has 12 test summaries. Let me compute the total pass count from the log. Let me grep the summary lines and sum. Actually the log shows per-testset; the overall `Testing Transicion tests passed`. Let me extract the numbers.
+
+- run.jl: 147456 puntos, 737280 historias, 4595520 undos, I-1..I-7 = 0; evidencia 5108 historias, 22444 undos, 8 RAT-3, forma cbid/orden/ambos = 1272/636/636, 0 fallos; 119.8s.
+
+- v0.5: 3035 casos, sha256 64d983ac..., cobertura: aplicada 260, sin_saldo 120, duplicada 40, tardia 200, cbid_ajeno 240, orden_canonico 120, ambos 120, con_entradas 120, deshecha 380.
+
+- relectura v0.5: 0 discrepancias. relectura v0.4 bajo el oráculo nuevo: 120 discrepancias, todas el cambio de nombre.
+
+- DIFERENCIAS: 120 cambios (todos ev-cbid), 240 nuevos, 0 cuerpos distintos, 0 cambios no explicados.
+
+Let me compute the total test assertions from the log. Let me grep the "Test Summary" blocks. The log output format has the summary line after each testset. Let me parse.
+dsh: reasoning:
+My awk parsing failed. Let me just grep the summary lines. The log format is:
+```
+Test Summary:                 | Pass  Total  Time
+X-01…X-15 (rechazos) |   38     38  8.7s
+```
+The header line "Test Summary:" then the data line. My `grep -A1` grabs the data line, then `grep -E "\|"` matches the header line too (which has `|`). Let me instead grep lines that have a `|` and a digit after `|`, and skip "Pass Total". Let me do it more simply with a Julia one-liner or python — no Python. Let me use `grep -E '\|[[:space:]]+[0-9]+[[:space:]]+[0-9]+'`.
+
+Actually, let me just extract the data lines: `grep -E '^[^ ].*\|[[:space:]]*[0-9]+[[:space:]]+[0-9]+'`? The testset names contain `|`? No. Let me try `grep -E '\|[[:space:]]+[0-9]+'`.
+
+Let me run and sum with awk.
+dsh: reasoning:
+The `total` column parsing is off because the fields are `Pass  Total  Time` with the third `|`-separated field containing "Total Time" split differently. But I have the pass counts: sum = 2212. Wait: X-01 38, R 10, X-16 2, X-17 2, X-18 2, X-19 2, X-20 2, I-1 9, F-15 10, T01-E 17, SL-3 2088, SL-4c-O 30. Sum = 38+10=48; +2*5=58; +9=67; +10=77; +17=94; +2088=2182; +30=2212. Yes, total pass = 2212. Let me confirm the total from the log summary line if any. The log ends with "Testing Transicion tests passed". There's no grand total printed. I'll report per-testset and total 2212/2212.
+
+Actually, the `X-01…X-15` testset uses a `@testset "$n"` inner loop; the outer shows 38. Fine.
+
+Now let me write the INFORME section. Let me append to INFORME.md.
+
+Let me also get the current date/time for the reports (will use the close time). Let me not include a specific time except in HORAS.log.
+
+Let me write the INFORME section content:
+
+```
+# INFORME — T01-SL4c-O (parte O1: `cbid` ajeno y orden canónico como forma)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O.md` (motivo: `REVISION-RI-3b.md` H1), `CONTRATO-EVIDENCIA-v0.md`
+(RAT-1, EV-01/EV-04) y `CONTRATO-ESTADO-DAG-v0.md` §3. **Zona:** `T01/`. Sin Python;
+sin commit ni push; sin secretos; 1 hilo.
+
+## SL4c.1. Veredicto
+
+**SUPERADO.** En T01, `cbid` ajeno (RAT-1) y orden no canónico (EV-01/EV-04) dejan de
+devolverse como errores semánticos (`ErrCbidAjeno`, `ErrOrdenCanonico`) y pasan a ser
+**forma**: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`, con la
+precedencia fija estructura → `cbid` → orden canónico y, después, la semántica sin
+cambios. `Pkg.test()` **2212/2212** (nuevo testset `SL-4c-O (forma de EvidenceTx)`
+**30/30**); `run.jl` con **I-1…I-7 = 0 fallos** (5108 historias de evidencia, 1272/636/636
+de `cbid`/orden/ambos); vectores `vectores-transicion-v0.5.txt` (3035 casos) releídos con
+**0 discrepancias**; `DIFERENCIAS-v0.4-v0.5.md` con **0 cambios no explicados** por los dos
+defectos.
+
+## SL4c.2. Faltas de definición detectadas antes de editar
+
+Tres, registradas en `PROGRESO.md` §SL4c.1 (FD-SL4c-1…3): representación Julia de
+`ErrForma` (el oráculo era plano; `AMBIGUEDAD-SL3-4` lo había diferido), alcance de
+«cambio de resultado» en modo estricto y cómputo de los casos con los dos defectos.
+Ninguna obliga a elegir entre reglas incompatibles; no se detuvo la ejecución.
+
+## SL4c.3. Qué cambia y qué no
+
+| Elemento | Antes (v0.4) | Ahora (v0.5) |
+|---|---|---|
+| `cbid` ajeno | `ErrCbidAjeno` (semántico) | **`ErrForma(EvidenciaCbidAjeno)`** (forma) |
+| orden no canónico | `ErrOrdenCanonico` (semántico) | **`ErrForma(OrdenCanonicoInvalido)`** (forma) |
+| precedencia | estructura → `cbid` → EV-06 → orden → EV-07 → … | estructura → **`cbid` → orden** → EV-06 → EV-07 → … |
+| EV-06 identidad, EV-07 sellos, RAT-3, ventana, dedup | orden y resultado | **iguales** |
+| bloque inválido en estricto | sí | sí (el cambio observable en T01 es la clase del `RES`) |
+| vectores por defecto | v0.4 | **v0.5** |
+
+En T01 no cambia qué bloques son válidos: la diferencia es de **clasificación**
+(`RES`) y de precedencia. El efecto «bloque inválido en la admisión» (frente a
+descarte) es el que corrige T04 (parte O2).
+
+## SL4c.4. Modelo de forma y cobertura
+
+- `@enum ClaseForma {EvidenciaCbidAjeno, OrdenCanonicoInvalido}`,
+  `struct ErrForma(clase)`, `Base.show` → `ErrForma(<clase>)`.
+- `const Err = Union{ErrSemantico, ErrForma}`: todo `isa Err` existente sigue
+  significando «error de transición»; los nombres viejos quedan como alias
+  transitorios de la clase de forma (T04 incluye este módulo y O2 los retira).
+- `cobertura-v0.5.txt` (mínimos de la orden entre paréntesis): `cbid_ajeno` **240**
+  (≥ 30), `orden_canonico` **120** (≥ 30), `ambos` **120** (≥ 5),
+  `con_entradas` 120, `aplicada` 260, `sin_saldo` 120, `duplicada` 40, `tardia` 200,
+  `deshecha` 380.
+
+## SL4c.5. Tests y run.jl
+
+- `Pkg.test()`: **2212/2212**; el testset nuevo `SL-4c-O (forma de EvidenceTx)` cubre
+  los dos defectos, los nombres exactos (`string`), la precedencia (estructura > `cbid`
+  > orden > EV-06/EV-07) y la cobertura ≥ 30/≥ 30/≥ 5. El testset `SL-3` se mantiene
+  con su nombre (**2088/2088**) y sus casos de `cbid`/orden se actualizan a la forma.
+  Registro `resultados/test-pkg-SL4c.log`.
+- `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`:
+  147 456 puntos, **737 280** historias, 4 595 520 undos, **I-1…I-7 = 0 fallos**;
+  bloque de evidencia **5 108** historias (8 tipos × 12 puntos, `n = 53`), 22 444 undos,
+  **8** RAT-3 bloqueadas, clase `cbid`/orden/ambos = **1272/636/636**, 0 fallos;
+  119,8 s, 1 hilo, `JULIA_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`.
+  Registro `resultados/run-reducida-SL4c.log`.
+
+## SL4c.6. Vectores, relectura y diferencias
+
+- `resultados/vectores-transicion-v0.5.txt`: **3035 casos** (2795 de v0.4 + 240 nuevos),
+  sha256 `64d983acae1078f86b2c60001370249584da89808f11ebb0abedf91fd54be916`, `.sha256` en
+  formato `sha256sum` relativo a `T01/`.
+- Relectura independiente (`src/lector_vectores.jl`, ahora por defecto v0.5):
+  **3035 casos, 0 discrepancias** (`resultados/relectura-v0.5.log`).
+- v0.4 **intacto** (`sha256sum -c` OK). Releerlo con el oráculo nuevo da **120
+  discrepancias**, todas `ErrCbidAjeno` → `ErrForma(EvidenciaCbidAjeno)`; es la
+  corrección exacta y queda registrado en `resultados/relectura-v0.4-con-SL4cO.log`.
+- `DIFERENCIAS-v0.4-v0.5.md` (generado por `comparar_vectores.jl`): de 2795 casos
+  emparejados, **120 cambian de `RES`** (todos `ev-cbid`), **240 son nuevos**
+  (`ev-orden` 120, `ev-ambos` 120), **0 cuerpos difieren** y **0 cambios no llevan**
+  uno de los dos defectos.
+
+## SL4c.7. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/T01
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+env -u LD_LIBRARY_PATH ... run.jl --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000
+env -u LD_LIBRARY_PATH ... exportar.jl --aleatorios 2000
+env -u LD_LIBRARY_PATH ... src/lector_vectores.jl resultados/vectores-transicion-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia comparar_vectores.jl \
+    resultados/vectores-transicion-v0.4.txt resultados/vectores-transicion-v0.5.txt \
+    DIFERENCIAS-v0.4-v0.5.md
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin `@fastmath`/`@simd`/`@inbounds`/`@turbo`; sin commit
+ni push; nada escrito fuera de `T01/`.
+
+## SL4c.8. Lo que T01-SL4c-O NO demuestra
+
+- Sigue siendo un oráculo de **semántica abstracta**: no modela la forma de wire v4
+  (bytes, tamaños, `txid`); la comprobación de `cbid`/orden opera sobre los campos
+  abstractos `IdentidadEvidencia`/`CabeceraEvidencia`.
+- El efecto «bloque inválido en la admisión» (frente a descarte) se ejerce en T04
+  (parte O2); T01 solo fija la clasificación de forma y la precedencia.
+- Los alias `ErrCbidAjeno`/`ErrOrdenCanonico` son transitorios y no deben usarse como
+  errores semánticos; SL-4c (Rust) y O2 los retiran.
+```
+
+Wait, I should double-check the number of cases: v0.5 = 3035 = 2795 + 240. The 240 new = 120 ev-orden + 120 ev-ambos. Correct.
+
+Also, the `DIFERENCIAS` "120 cambian de RES (todos ev-cbid)". Correct.
+
+Let me also check: the INFORME numbering §SL4c.1 etc. The PROGRESO I already wrote uses §SL4c.0 and §SL4c.1. For INFORME, I'll use §SL4c.1 onward (starting at Veredicto). Actually, to be consistent with previous sections (SL3.1 Veredicto, SL3.2 Faltas...), let me use §SL4c.1 Veredicto, §SL4c.2 Faltas, etc. Fine.
+
+Now let me append to INFORME.md. I need the exact last lines. Let me read the tail.
+dsh: reasoning:
+Now update PROGRESO.md with the diary (§SL4c.2) and close. I already wrote §SL4c.0 and §SL4c.1. Let me append the diary after the "Conclusión" line I added.
+
+The current end of PROGRESO is:
+```
+**Conclusión:** ninguna ambigüedad exige elegir entre reglas incompatibles; se aplican las
+lecturas anteriores, se documentan en `INFORME.md` y no se detiene la ejecución.
+```
+
+Let me append §SL4c.2 with the execution diary and closure.
+
+Content:
+```
+## SL4c.2. Diario de ejecución
+
+- **23:15** inicio; `date -Is` en `HORAS.log`; entrada congelada **7/7 OK**.
+- *Lectura íntegra* de `ORDEN-SL4c-O.md`, `CONTRATO-EVIDENCIA-v0.md` (con RAT-1 y
+  RAT-2′), `CONTRATO-ESTADO-DAG-v0.md` §3, `REVISION-RI-3b.md` (H1), `ORDEN-SL4c.md`
+  (Rust, para el nombre y la forma del error) y `LINEO.md`.
+- *Código*: `src/Transicion.jl` — `@enum Err` → `@enum ErrSemantico` +
+  `@enum ClaseForma` + `struct ErrForma` + `const Err = Union{...}`; alias
+  transitorios; `aplicar_evidencia!` con la precedencia estructura → `cbid` → orden
+  y las dos clases de forma. `src/evidencia.jl` — tipos `:orden` y `:ambos`.
+  `exportar.jl` a v0.5 y cobertura con `orden_canonico` y `ambos`; `run.jl` con
+  8 tipos y contadores de forma; `src/lector_vectores.jl` por defecto v0.5;
+  `test/runtests.jl` con el testset `SL-4c-O`. `comparar_vectores.jl` nuevo.
+- *Tests*: `Pkg.test()` **2212/2212** (SL-4c-O **30/30**, SL-3 **2088/2088**).
+  Registro `resultados/test-pkg-SL4c.log`.
+- *run.jl* `--seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`:
+  147 456 puntos, 737 280 historias, 4 595 520 undos, I-1…I-7 = 0; evidencia 5 108
+  historias, 22 444 undos, 8 RAT-3, forma cbid/orden/ambos = 1272/636/636, 0 fallos;
+  119,8 s. `VEREDICTO = SIN FALLOS`. Registro `resultados/run-reducida-SL4c.log`.
+- *Vectores v0.5*: `exportar.jl --aleatorios 2000` → **3 035 casos**, sha256
+  `64d983acae1078f86b2c60001370249584da89808f11ebb0abedf91fd54be916`; cobertura
+  `resultados/cobertura-v0.5.txt`: cbid_ajeno 240, orden_canonico 120, ambos 120,
+  con_entradas 120, aplicada 260, sin_saldo 120, duplicada 40, tardia 200, deshecha
+  380. Relectura independiente: **0 discrepancias** (`relectura-v0.5.log`).
+- *v0.4 intacto*: `sha256sum -c` OK. Relectura histórica bajo el oráculo nuevo:
+  **120 discrepancias** (todas `ErrCbidAjeno` → `ErrForma(EvidenciaCbidAjeno)`),
+  `relectura-v0.4-con-SL4cO.log`.
+- *Diferencias*: `DIFERENCIAS-v0.4-v0.5.md` (comparador propio, sin Python):
+  120 cambios de `RES` (todos `ev-cbid`), 240 casos nuevos, 0 cuerpos distintos,
+  0 cambios sin los dos defectos.
+- **Cierre T01-SL4c-O: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push;
+  sin Python; sin secretos.
+```
+
+Let me append.
+dsh: reasoning:
+Now append the close time to HORAS.log. The order says HORAS.log with `date -Is` real. I'll add a comment line for closure.
+
+Let me append `date -Is` with a comment. But HORAS.log is append-only lines of dates; previous entries include comments after `#`. Format: `2026-09-26T19:25:50+02:00  # SL-3b cierre ...`. Let me append `$(date -Is)  # SL-4c-O cierre (T01)`. I'll use bash with command substitution.
+
+Actually, the order says use `date -Is` real, so I should capture the actual command output. Let me do:
+```
+printf '%s  # SL-4c-O1 cierre (T01): tests 2212/2212, run 0 fallos, v0.5 releído 0 discrepancias\n' "$(date -Is)" >> HORAS.log
+```
+
+Let me do that.
+
+Then final verification:
+- `sha256sum -c ENTRADA-SL4c-O.sha256` again to ensure v0.4 and the frozen inputs are intact (the order says entrada congelada; re-verify at the end).
+- List the final artifacts.
+- Maybe run a final `Pkg.test()`? Already done after all code edits except doc edits, which don't affect tests. The comparator and docs don't change the module. So no need to re-run tests. But wait — did I edit any source after running tests? Let me check: after `Pkg.test()` I only edited `exportar.jl`? No, I edited `exportar.jl`, `run.jl`, `evidencia.jl`, `Transicion.jl`, `lector_vectores.jl`, tests BEFORE running Pkg.test. Let me recall the order:
+  1. Edited Transicion.jl, evidencia.jl, exportar.jl, run.jl, lector, tests.
+  2. Ran Pkg.test → passed.
+  3. Ran exportar.
+  4. Ran lector.
+  5. Ran run.jl.
+  6. Created comparar_vectores.jl and edited it (twice) — not part of Pkg.test.
+  7. Edited docs.
+  
+  Did I edit `exportar.jl`/`run.jl` after Pkg.test? No. The test suite only tests the module `Transicion` and `src/`. `exportar.jl` and `run.jl` are not covered by Pkg.test. But I ran them after the module edits, and they succeeded. Good.
+
+Actually wait: `Pkg.test()` runs `test/runtests.jl`. I added the new testset before running. Good.
+
+One thing: the order says "Pkg.test() en verde (todos los tests previos con su nombre más los nuevos)". I have that.
+
+Now let me also verify the v0.5 `.sha256` passes with `sha256sum -c` from T01 (format is `hash  resultados/...` relative to T01). Let me run `sha256sum -c resultados/vectores-transicion-v0.5.sha256`.
+
+Also, I should double check that the new `DIFERENCIAS` file and `comparar_vectores.jl` are in the right place. The order says `DIFERENCIAS-v0.4-v0.5.md` (T01) — I put it at `T01/DIFERENCIAS-v0.4-v0.5.md`. Good.
+
+Let me run the final verification commands.
+dsh: reasoning:
+All verified. Now let me do a final review of my changes for any issues:
+
+1. Did I leave `ErrCbidAjeno`/`ErrOrdenCanonico` as aliases? Yes, documented. The order says they disappear as semantic errors — they now denote form errors. Fine.
+
+2. Did I verify that `string(r)` for semantic errors is unchanged? The smoke test showed `ErrEvidenciaTardia`, `ErrEvidenciaConEntradas`. Good. And the v0.5 re-read had 0 discrepancies, which means the lector's recomputed strings match exportar's. And the DIFERENCIAS report shows only the cbid cases changed, confirming all other RES strings are identical to v0.4. 
+
+3. Potential issue: the order says "en modo estricto (T01), como cualquier otro error de forma de una transacción (el bloque es inválido)". In T01, both were already invalid. I documented this. Good.
+
+4. The order says "Desaparecen ErrCbidAjeno y ErrOrdenCanonico como errores semánticos". My `@enum ErrSemantico` no longer contains them. Good.
+
+5. The order says "la verificación semántica (EV-06 identidad, EV-07 sellos, RAT-3, ventana, deduplicación) no cambia de orden ni de resultado." Let me double check my reordering didn't change the relative order of those five: EV-06, EV-07, RAT-3, ventana, dedup. In my edit:
+```
+ev.id1 == ev.id2 || ErrSinEvidencia        # EV-06
+sello                                   # EV-07
+P.R_slots > ...                          # RAT-3
+sf/punto window                          # EV-13/14
+clave/g/incidentes dup                   # EV-12
+```
+Yes, same relative order as before. Good.
+
+6. Coverage: `cbid_ajeno = 240` — this includes 120 `:cbid` + 120 `:ambos`. The order wants ≥30 `EvidenciaCbidAjeno`. Good. `orden_canonico = 120` ≥30. `ambos = 120` ≥5. Good.
+
+7. Vectors: v0.5 has the same line format. Good.
+
+8. DIFERENCIAS: lists case by case, 120 changes, all with defects; 0 failures. Good.
+
+9. The comparator script: it's a new file in T01. Fine.
+
+Now, one concern: the order's verification says "relectura de los vectores nuevos con 0 discrepancias". Done. "el listado de diferencias del punto 4". Done.
+
+Let me also double check the `INFORME.md` and `PROGRESO.md` content for the API model name. I used "DeepSeek `deepseek-flash`". The order says "el nombre de modelo que devuelve la API". Hmm. Is there a more precise model name? The system prompt says "powered by the deepseek-flash model". Previous reports use `deepseek-flash`. Let me check if the harness exposes the actual API model name somewhere without reading secrets. The launch `.env` might contain `DSH_MODEL` or similar, but I shouldn't read secrets. Maybe the O2 stderr log has a line like "model: ...". Let me grep the O2 stderr for "model" quickly (it's not a secret, it's the model name). Actually, the `.stderr` might include the launch environment? No, the launch redirected stdout/stderr of the node process. Let me grep for `deepseek` in the O1/O2 stderr.
+
+Let me check without exposing anything sensitive: `grep -o 'deepseek[a-z0-9./-]*' SL4c-O1-dsh.stderr | sort -u | head`. This is safe. But reading another session's log... it's the same model. Let me just do it on O1 (my own session log).
+
+Actually, the instruction says "no leas ni muestres secretos". Model names aren't secrets. Let me check if there's a more specific model id.
+
+Let me grep.
+dsh: reasoning:
+The O1 stderr contains `DEEPSEEK_MODEL` and `deepseek-flash`. The model name is `deepseek-flash`. Good, my reports use that. (The other matches are my own reasoning text being logged.)
+
+Now let me do a final "git diff"-like review of the changed source files to make sure nothing is broken. Since git is forbidden, I'll use `grep`/`read`. Let me verify the key sections once more, and also make sure there are no leftover references to `ErrCbidAjeno` as a semantic error in T01 source (other than the alias definition and export).
+
+Let me grep T01 for `ErrCbidAjeno`/`ErrOrdenCanonico` and `ErrForma`.
+dsh: reasoning:
+Everything is consistent. The old names only appear in the export list and alias definitions.
+
+Now, let me reconsider one subtle thing about the `exportar.jl` mapping order. In `contar_cobertura`, the `nombre` mapping checks:
+```
+r == ErrEvidenciaDuplicada ? "duplicada" :
+r == ErrEvidenciaTardia    ? "tardia" :
+r == ErrForma(EvidenciaCbidAjeno) ? "cbid_ajeno" :
+r == ErrForma(OrdenCanonicoInvalido) ? "orden_canonico" :
+r == ErrSinEvidencia       ? "sin_evidencia" :
+r == ErrEvidenciaConEntradas ? "con_entradas" :
+r == ErrPuertaRAT3         ? "puerta_rat3" : "otro_error"
+```
+Cobertura output showed cbid_ajeno=240, orden_canonico=120, ambos=120, con_entradas=120. Good.
+
+But wait: for the `:con_entradas` case, the evidence has entradas/salidas and also cbid = P.cbid and canonical order. The `aplicar_evidencia!` checks entradas first → ErrEvidenciaConEntradas. Good.
+
+Now, one more consideration: the order's coverage requirement says "≥ 30 casos con `EvidenciaCbidAjeno`". In the coverage file, `cbid_ajeno = 240` counts cases where the resulting error is `ErrForma(EvidenciaCbidAjeno)`. But does it include the `:ambos` cases? Yes, and I documented that. Good.
+
+Now, is there a concern that the `cbid_ajeno` count in v0.5 (240) vs v0.4 (120) changed because of the new `:ambos` type? Yes, and it's expected.
+
+Now let me think about whether I've satisfied "nada más cambia: todos los demás casos de los vectores v0.4 (T01) ... se reproducen idénticos". The DIFERENCIAS report confirms 0 body differences and only 120 RES changes. 
+
+Now, one more check: The order says "T01 v0.5 (`vectores-transicion-v0.5.txt`, `.sha256`, `cobertura-v0.5.txt`), con el mismo formato de línea". Done.
+
+I should also verify that `resultados/vectores-transicion-v0.5.txt` header and a sample show the form error. Let me grep a sample.
+
+Also, I should double-check the test count claim "2212/2212". Let me verify there isn't a trailing overall summary. The log's last line before `[exit=0]` is "Testing Transicion tests passed". There may be a "Test Summary" for the whole suite? Let me check the beginning/end of the log. Actually, `Pkg.test()` output typically ends with "Testing Transicion tests passed". The per-testset counts sum to 2212. I'll report 2212/2212. Good. Let me double check by looking at the very top of the log for a global summary. Let me grep the log for "Testing" and the first lines.
+
+Actually, the log tail already showed the last testset SL-4c-O 30/30 then "Testing Transicion tests passed". There's no global count other than the sum. Fine.
+
+Let me do a final listing of the deliverables and a sample of v0.5.
+
+Also, I realize I should double check the `run.jl` evidence count claim 5108 vs. the expected: `n_ev_tipo = cld(5000, 8*12) = cld(5000,96) = 53`. For each of 12 points: RAT3 (1 if not nothing) + autodenuncia (1) + 8*53=424 evidence cases = ~426 per point → 5112, minus some RAT3 missing. The log says 5108. Fine.
+
+Now, let me consider whether to update `METODO.md` — not required.
+
+Let me also make sure I didn't accidentally leave the `DIFERENCIAS` report relying on a transient `date`. It includes the real date; fine.
+
+One more important thing: the order says the writable zone is only `P-ZRX/P-TRANSICION/T01/`. I wrote only there. Let me confirm I didn't write anywhere else. I read files elsewhere but only wrote inside T01. The `HORAS.log` is in T01. Good. I also ran `sha256sum` etc. which don't write.
+
+Wait — the `comparar_vectores.jl` uses `read(\`date -Is\`, String)` — no file writes outside. Good.
+
+Let me now produce the final summary to the user. But before that, let me verify the deliverables exist and list them. Also verify the v0.5 vector sample shows the new errors.
+
+Let me run a final listing.
+dsh: reasoning:
+Everything is in place. The v0.5 vector has 240 `ErrForma(EvidenciaCbidAjeno)` and 120 `ErrForma(OrdenCanonicoInvalido)` RES lines. Wait: 240 cbid includes the 120 `:cbid` + 120 `:ambos`; 120 orden from `:orden`. That matches the coverage.
+
+Hmm, note the `ev=` line sample shows a canonical case (pre_hash 8002 < 9002). Fine.
+
+Now, let me reconsider one potential issue: the order says the coverage minimum is "≥ 30 casos con `EvidenciaCbidAjeno` y ≥ 30 con `OrdenCanonicoInvalido`" and "≥ 5 con los dos defectos a la vez". My vectors have 240/120/120. Good. But the Rust differential (SL-4c) will read v0.5's `RES` strings and compare. The `res=ErrForma(EvidenciaCbidAjeno)` is parseable. Good.
+
+Let me also double check: does the `RES` string contain spaces or parentheses that break the vector parser? The lector parses `RES` with `campos(linea)` which splits on whitespace and then on `=`; `res=ErrForma(EvidenciaCbidAjeno)` is one token with no spaces. Good. The re-read passed with 0 discrepancies, so parsing works.
+
+Now, one more thought: the order says "T01 v0.5 ... y T04 v0.6 ... con el mismo formato de línea; los v0.4/v0.5 quedan intactos como históricos." It says "los v0.4/v0.5" — referring to T01 v0.4 and T04 v0.5. I kept T01 v0.4 intact and T04 v0.5 is O2's concern. Good.
+
+Now, let me reconsider whether I should have chosen a different representation for `ErrForma` to better match the future Rust differential. The Rust harness `diferencial_t01` reads T01 vectors. The `nombre_t01()` function maps `Self::ErrForma(_) => "ErrForma"` currently, but SL-4c will update it to map the specific variants to `"ErrForma(EvidenciaCbidAjeno)"` etc. So the string format is fine.
+
+Wait, actually, there's a nuance: Rust's `ErrorFormaTx` Display for, say, `EvidenciaCbidAjeno` might be `"RAT-1: ..."` (a message), not `"EvidenciaCbidAjeno"`. The Rust harness's `nombre_t01()` would need to output the oracle's string. The order SL-4c says "con las correspondencias de error nuevas declaradas una a una", so the Rust agent will handle it. Not my concern.
+
+Now, let me think about whether the director might expect the T01 `RES` string to be exactly `ErrForma(EvidenciaCbidAjeno)`. Given the order's phrasing and the contract, yes.
+
+I think the task is complete. Let me update the todo list to completed.
+
+Actually, before finalizing, let me re-run a quick check that the historical negative vectors and `exportar_negativos.jl` still work, since the enum change could affect them. The order's verification doesn't require it, but "todos los tests previos con su nombre" passed via Pkg.test, which tests negative cases (F-15, etc.) through the module. `exportar_negativos.jl` is a separate script; its output vectors are historical (v0.1/v0.2). If I run it now, it would regenerate v0.2 (same as before?) and might overwrite the historical file. I should NOT run it, to keep historical vectors intact. The negative case generation functions are exercised in Pkg.test (F-15 testset), so the code path is validated. Good.
+
+Actually, wait: the negative vectors `vectores-transicion-negativos-v0.2.txt` contain `RES` values for negative transaction cases. Do any contain `ErrCbidAjeno`/`ErrOrdenCanonico`? Those are transaction negatives (nonce, doble gasto, etc.), not evidence, so no. The `res` strings are semantic errors unchanged. So the historical negative vectors remain re-readable. Good.
+
+Let me do a final check: `grep -c "ErrForma\|ErrCbid\|ErrOrden" resultados/vectores-transicion-negativos-v0.2.txt` to confirm none. Not necessary.
+
+One more potential issue: I added the `comparar_vectores.jl` script at the T01 root. The order's zone is T01, so fine.
+
+Let me finalize the todo list and write the summary. Let me also update the todos.
+
+Actually, let me reconsider the "falta de definición" reporting requirement once more. The instruction to me (the user) says: "Si detectas una falta de definición, infórmala antes de editar." I recorded it in PROGRESO before editing code. In my final message I should explicitly report it. Good.
+
+Let me mark todos complete.
+dsh: reasoning:
+All done. Let me write the final summary in Spanish (the task is in Spanish). I'll include:
+- The definition gap I detected and how I resolved it (reported before editing).
+- What I did.
+- Verification results.
+- Deliverables.
+- Note about the aliases/T04 coupling.
+
+Let me be concise but complete.
+
+One thing: I should double check the `INFORME.md` section I wrote doesn't have the typo "§SL4c.1" mismatch. In PROGRESO I have §SL4c.0 and §SL4c.1 (ambiguity) and §SL4c.2 (diary). In INFORME I have §SL4c.1 Veredicto ... §SL4c.8. The INFORME §SL4c.2 references "PROGRESO.md §SL4c.1 (FD-SL4c-1…3)" — correct.
+
+Let me produce the final answer.

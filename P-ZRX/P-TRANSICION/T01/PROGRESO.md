@@ -825,3 +825,207 @@ REVISION-SL3, CONTRATO-EVIDENCIA-v0 con RAT-2′, `V-ZRX/LINEO.md`).
   registrado en `relectura-v0.3-con-RAT2p.log`.
 - **Cierre T01-SL3b: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push; sin
   Python; sin secretos.
+
+# SL-4c-O — parte O1 (T01): `cbid` ajeno y orden canónico como forma
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O.md` (motivo: `REVISION-RI-3b.md` H1), `CONTRATO-EVIDENCIA-v0.md`
+(RAT-1, EV-01/EV-04) y `CONTRATO-ESTADO-DAG-v0.md` §3. **Zona:** `T01/`. Sin Python;
+sin commit ni push; sin secretos. **Presupuesto declarado (LINEO §7):** 1 h, **1 hilo**,
+8 GiB de RAM, 2 GiB de disco; si se agota, checkpoint y estado **inconcluso**.
+
+## SL4c.0. Entrada congelada (inicio)
+
+`LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O.sha256`: **7/7 OK** (ORDEN-SL4c-O,
+CONTRATO-EVIDENCIA-v0, CONTRATO-ESTADO-DAG-v0, REVISION-RI-3b, LINEO,
+`vectores-transicion-v0.4.txt`, `vectores-estado-dag-v0.5.txt`).
+
+## SL4c.1. Falta de definición detectada antes de editar (obligatorio informar)
+
+La orden fija **qué** cambia y con qué nombres, pero no **cómo** se representa en el
+oráculo plano de T01 (que no tiene `ErrForma`; era la `AMBIGUEDAD-SL3-4` de SL-3). Ninguna
+obliga a elegir entre reglas incompatibles; se adoptan las lecturas siguientes **antes** de
+tocar código y no se detiene la ejecución.
+
+- **FD-SL4c-1 — representación Julia de `ErrForma`.** La orden (y `ORDEN-SL4c.md` §3.1,
+  para Rust) usa la forma de dos niveles `ErrForma(EvidenciaCbidAjeno)` /
+  `ErrForma(OrdenCanonicoInvalido)`, pero T01 tiene un `@enum Err` plano. Lectura adoptada:
+  se replica el modelo del contrato/Rust con `@enum ClaseForma EvidenciaCbidAjeno
+  OrdenCanonicoInvalido`, `struct ErrForma(clase::ClaseForma)` y
+  `const Err = Union{ErrSemantico, ErrForma}`; así **todo `x isa Err` existente sigue
+  significando «error de transición»** y `string(r)` en el campo `RES` es exactamente
+  `ErrForma(EvidenciaCbidAjeno)` / `ErrForma(OrdenCanonicoInvalido)`. Los dos nombres viejos
+  quedan como **alias transitorios** de la clase de forma (T04 incluye este módulo y su
+  parte O2 los retira); dejan de ser errores semánticos.
+- **FD-SL4c-2 — «cambio de resultado» en T01 (modo estricto).** En T01 un error semántico
+  y uno de forma ya invalidaban el bloque entero (`aplicar` devuelve `Err` en ambos casos).
+  Por tanto el cambio observable en T01 es la **clasificación del `RES`** (y la precedencia
+  frente a EV-06/EV-07), no la validez del bloque; el efecto «bloque inválido en la
+  admisión» es el que cambia de verdad en T04. Lectura adoptada para
+  `DIFERENCIAS-v0.4-v0.5.md`: se listan los casos cuyo `RES`/estado cambia, y solo pueden
+  cambiar los que llevan uno de los dos defectos.
+- **FD-SL4c-3 — casos con los dos defectos y el mínimo de `EvidenciaCbidAjeno`.** Por la
+  precedencia, un caso con `cbid` ajeno **y** orden no canónico devuelve
+  `EvidenciaCbidAjeno`; la orden no aclara si cuenta para el mínimo de 30. Lectura adoptada:
+  **sí cuenta** (su error es `EvidenciaCbidAjeno`), y además se lleva un contador propio
+  `ambos` en `cobertura-v0.5.txt` para demostrar los ≥ 5 exigidos.
+
+**Conclusión:** ninguna ambigüedad exige elegir entre reglas incompatibles; se aplican las
+lecturas anteriores, se documentan en `INFORME.md` y no se detiene la ejecución.
+
+## SL4c.2. Diario de ejecución
+
+- **23:15** inicio; `date -Is` en `HORAS.log`; entrada congelada **7/7 OK**.
+- *Lectura íntegra* de `ORDEN-SL4c-O.md`, `CONTRATO-EVIDENCIA-v0.md` (con RAT-1 y
+  RAT-2′), `CONTRATO-ESTADO-DAG-v0.md` §3, `REVISION-RI-3b.md` (H1), `ORDEN-SL4c.md`
+  (Rust, para el nombre y la forma del error) y `V-ZRX/LINEO.md`.
+- *Código*: `src/Transicion.jl` — `@enum Err` → `@enum ErrSemantico` +
+  `@enum ClaseForma` + `struct ErrForma` + `const Err = Union{...}`, alias
+  transitorios, y `aplicar_evidencia!` con la precedencia estructura → `cbid` →
+  orden canónico y las dos clases de forma. `src/evidencia.jl` — tipos `:orden` y
+  `:ambos`. `exportar.jl` a **v0.5** con cobertura `orden_canonico` y `ambos`;
+  `run.jl` con 8 tipos y contadores de forma; `src/lector_vectores.jl` por defecto
+  v0.5; `test/runtests.jl` con el testset `SL-4c-O`. `comparar_vectores.jl` nuevo.
+- *Tests*: `Pkg.test()` **2212/2212** (SL-4c-O **30/30**, SL-3 **2088/2088** con su
+  nombre). Registro `resultados/test-pkg-SL4c.log`.
+- *run.jl* `--seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`:
+  147 456 puntos, 737 280 historias, 4 595 520 undos, I-1…I-7 = 0; evidencia 5 108
+  historias, 22 444 undos, 8 RAT-3, forma `cbid`/orden/ambos = 1272/636/636, 0 fallos;
+  119,8 s, 1 hilo. `VEREDICTO = SIN FALLOS`. Registro `resultados/run-reducida-SL4c.log`.
+- *Vectores v0.5*: `exportar.jl --aleatorios 2000` → **3 035 casos**, sha256
+  `64d983acae1078f86b2c60001370249584da89808f11ebb0abedf91fd54be916`; cobertura
+  `resultados/cobertura-v0.5.txt`: `cbid_ajeno` 240, `orden_canonico` 120, `ambos`
+  120, `con_entradas` 120, `aplicada` 260, `sin_saldo` 120, `duplicada` 40, `tardia`
+  200, `deshecha` 380. Relectura independiente: **0 discrepancias**
+  (`resultados/relectura-v0.5.log`).
+- *v0.4 intacto*: `sha256sum -c` OK. Relectura histórica bajo el oráculo nuevo:
+  **120 discrepancias**, todas `ErrCbidAjeno` → `ErrForma(EvidenciaCbidAjeno)`
+  (`resultados/relectura-v0.4-con-SL4cO.log`).
+- *Diferencias*: `DIFERENCIAS-v0.4-v0.5.md` (comparador propio `comparar_vectores.jl`,
+  sin Python): 120 cambios de `RES` (todos `ev-cbid`), 240 casos nuevos (`ev-orden` y
+  `ev-ambos`), 0 cuerpos distintos, 0 cambios sin los dos defectos.
+- **Cierre T01-SL4c-O: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push;
+  sin Python; sin secretos.
+
+# SL-4c-O-B — parte O1 (T01): precedencia por transacción y los dos órdenes no canónicos
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O-B.md`, `ORDEN-SL4c-O.md`, `V-ZRX/LINEO.md`. **Zona:** `T01/`.
+Sin Python; sin commit ni push; sin secretos. **Presupuesto declarado (LINEO §7):** 30 min,
+**1 hilo**, 8 GiB de RAM, 2 GiB de disco; si se agota, checkpoint y estado **inconcluso**.
+
+## SL4cOB.0. Entrada congelada (inicio)
+
+`LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-B.sha256`: **3/3 OK**
+(ORDEN-SL4c-O-B, ORDEN-SL4c-O, LINEO). v0.4 de T01 intacto (`4f0a175a…`).
+
+## SL4cOB.1. Falta de definición detectada antes de editar (obligatorio informar)
+
+Ninguna bloqueante. La orden fija la regla del director y los dos dirigidos; solo hay
+lecturas de forma, adoptadas **antes** de tocar código y documentadas aquí:
+
+- **FD-SL4cOB-1 — T01 ya cumple la precedencia.** `aplicar_txs!` recorre las transacciones
+  en el orden del bloque y `aplicar_evidencia!` comprueba estructura → `cbid` → orden. La
+  regla «la primera transacción defectuosa manda» ya es la de T01; O1 **no** toca el
+  oráculo, solo añade cobertura y dirigidos. La paridad la fija T04 (O2).
+- **FD-SL4cOB-2 — versión de vectores.** La orden dice *regenerar* v0.5 (no crear v0.6):
+  se conserva el nombre de fichero y se reescriben vectores, `.sha256` y cobertura.
+- **FD-SL4cOB-3 — igualdad y dirigidos.** La igualdad entra como tipo propio
+  `ev-orden_igual` (con subtotales `orden_igual`/`orden_descendente` en la cobertura, ambos
+  dentro de `orden_canonico`); los dos dirigidos se emiten para los **12** puntos de
+  evidencia y comprueban que gana el defecto de la primera `EvidenceTx`.
+
+## SL4cOB.2. Diario de ejecución
+
+- **23:24** inicio; `HORAS.log`; entrada congelada **3/3 OK**; v0.4 intacto.
+- *Código*: `src/Transicion.jl` — fuera de la exportación los alias
+  `ErrCbidAjeno`/`ErrOrdenCanonico` (siguen como constantes internas por T04) y nuevos
+  exports `caso_dos_evidencias`/`casos_evidencia_dirigidos`. `src/evidencia.jl` — tipo
+  `:orden_igual` y los dos dirigidos. `exportar.jl` — subtotales de orden y emisión de los
+  dirigidos. `run.jl` — 9 tipos y contadores de igualdad/dirigidos. `comparar_vectores.jl` —
+  alias locales y veredicto genérico. `test/runtests.jl` — testset `SL-4c-O-B`.
+- *Tests*: `Pkg.test()` **2233/2233** (SL-4c-O-B **17/17**, SL-4c-O **32/32**, SL-3
+  **2090/2090**). Registro `resultados/test-pkg-SL4c-OB.log`.
+- *run.jl* `--seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`: 147 456
+  puntos, 737 280 historias, 4 595 520 undos, I-1…I-7 = 0; evidencia 5 120 historias,
+  22 264 undos, 8 RAT-3, `cbid`/orden/ambos = 1140/1140/564, igualdad 564, dirigidos
+  12/12, 0 fallos; 124,8 s, 1 hilo. `VEREDICTO = SIN FALLOS`. Registro
+  `resultados/run-reducida-SL4c-OB.log`.
+- *Vectores v0.5*: `exportar.jl --aleatorios 2000` → **3 179 casos**, sha256
+  `4c7e424ee786dc22c6c40c3d1b99c780c16414c9803cf2e1d43658af2c948427`; cobertura
+  `resultados/cobertura-v0.5.txt`: `cbid_ajeno` 252, `orden_canonico` 252
+  (`orden_descendente` 132, `orden_igual` 120), `ambos` 120, `con_entradas` 120,
+  `aplicada` 260, `sin_saldo` 120, `duplicada` 40, `tardia` 200, `deshecha` 380.
+  Relectura independiente: **0 discrepancias** (`resultados/relectura-v0.5-SL4c-OB.log`).
+- *Diferencias*: `DIFERENCIAS-v0.4-v0.5.md` (comparador propio, sin Python): 120 cambios
+  de `RES` (todos `ev-cbid`), 384 casos nuevos (33 grupos), 0 cuerpos distintos, 0 cambios
+  sin los dos defectos. Registro `resultados/diferencias-v0.4-v0.5-SL4c-OB.log`.
+- **Cierre T01-SL4c-O-B: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push;
+  sin Python; sin secretos.
+
+# SL-4c-O-C — parte O1 (T01): entradas/salidas de la `EvidenceTx` como forma (EV-04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O-C.md`, `CONTRATO-EVIDENCIA-v0.md` EV-04, `V-ZRX/LINEO.md`.
+**Zona:** `T01/`. Sin Python; sin commit ni push; sin secretos. **Presupuesto declarado
+(LINEO §7):** 30 min, **1 hilo**, 8 GiB de RAM, 2 GiB de disco; si se agota, checkpoint y
+estado **inconcluso**.
+
+## SL4cOC.0. Entrada congelada (inicio)
+
+`LC_ALL=C sha256sum -c P-ZRX/P-SLASHING/ENTRADA-SL4c-O-C.sha256` (desde `ZEROX/`):
+**4/4 OK** (ORDEN-SL4c-O-C, ORDEN-SL4c-O-B, ORDEN-SL4c-O, LINEO). v0.4 de T01 intacto
+(`4f0a175a…`).
+
+## SL4cOC.1. Faltas de definición detectadas antes de editar (obligatorio informar)
+
+Ninguna bloqueante. La orden fija la regla (estructura → `cbid` → orden) y el nombre
+`ErrForma(EvidenciaConEntradasOSalidas)`; solo hay lecturas de forma, adoptadas **antes**
+de tocar código y documentadas aquí:
+
+- **FD-SL4cOC-1 — `n_wit`/testigos no modelados.** La fila de EV-04 incluye `n_wit ≠ 0`,
+  pero el `Tx` abstracto de T01 solo tiene `entradas`/`salidas`. Se conserva el modelo
+  existente: la clase nueva cubre entradas/salidas; no se inventa un campo de testigos.
+- **FD-SL4cOC-2 — versión de vectores.** *Regenerar* `vectores-transicion-v0.5.txt` en su
+  sitio (no crear v0.6), como en SL-4c-O-B; v0..v0.4 quedan intactos.
+- **FD-SL4cOC-3 — destino de `ErrEvidenciaConEntradas`.** Igual que `ErrCbidAjeno`/
+  `ErrOrdenCanonico` en SL-4c-O: sale de `ErrSemantico` y de la exportación, y queda como
+  **constante interna** `ErrEvidenciaConEntradas = ErrForma(EvidenciaConEntradasOSalidas)`
+  para que T04 (que incluye el módulo) siga cargando hasta su O2.
+- **FD-SL4cOC-4 — comparador.** `comparar_vectores.jl` admite un tercer renombre
+  v0.4→v0.5 (`ErrEvidenciaConEntradas` → `ErrForma(EvidenciaConEntradasOSalidas)`) como
+  cambio explicado; sigue siendo fallo cualquier otro cambio de `RES`.
+
+## SL4cOC.2. Diario de ejecución
+
+- **23:39** inicio; `HORAS.log`; entrada congelada **4/4 OK**; v0.4 intacto.
+- *Código*: `src/Transicion.jl` — `EvidenciaConEntradasOSalidas` entra en `ClaseForma`
+  (primera), `ErrEvidenciaConEntradas` sale de `ErrSemantico`/exports y queda como alias
+  interno, y `aplicar_evidencia!` devuelve `ErrForma(EvidenciaConEntradasOSalidas)`.
+  `src/evidencia.jl` — comentario del tipo `:con_entradas`. `exportar.jl` — mapeo
+  `con_entradas` por clase de forma y cabeceras SL-4c-O-C. `run.jl` — contador
+  `forma .../entradas/...`. `test/runtests.jl` — referencias actualizadas y testset
+  `SL-4c-O-C`. `comparar_vectores.jl` — tercer renombre y veredicto.
+- *Tests*: `Pkg.test()` **2253/2253** (SL-4c-O-C **20/20**, SL-4c-O-B **17/17**, SL-4c-O
+  **32/32**, SL-3 **2090/2090**). Registro `resultados/test-pkg-SL4c-OC.log`.
+- *run.jl* `--seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`: 147 456
+  puntos, 737 280 historias, 4 595 520 undos, I-1…I-7 = 0; evidencia 5 120 historias,
+  22 264 undos, 8 RAT-3, `cbid`/orden/entradas/ambos = 1140/1140/564/564, igualdad 564,
+  dirigidos 12/12, 0 fallos; 121,5 s, 1 hilo. `VEREDICTO = SIN FALLOS`. Registro
+  `resultados/run-reducida-SL4c-OC.log`.
+- *Vectores v0.5*: `exportar.jl --aleatorios 2000` → **3 179 casos**, sha256
+  `d72c5fd9bd9a988d03cca7168a612a5cbc83c2c088accaba1ad03421c599edc1`; cobertura
+  `resultados/cobertura-v0.5.txt`: `con_entradas` 120 (forma), `cbid_ajeno` 252,
+  `orden_canonico` 252 (`orden_descendente` 132, `orden_igual` 120), `ambos` 120,
+  `aplicada` 260, `sin_saldo` 120, `duplicada` 40, `tardia` 200, `deshecha` 380;
+  dirigidos con error inesperado 0. Relectura independiente: **0 discrepancias**
+  (`resultados/relectura-v0.5-SL4c-OC.log`).
+- *Diferencias*: `DIFERENCIAS-v0.4-v0.5.md` (comparador propio, sin Python): **240**
+  cambios de `RES` (120 `ev-cbid` + 120 `ev-con_entradas`, todos renombres semántico →
+  forma), 384 casos nuevos (33 grupos), 0 cuerpos distintos, 0 cambios sin defecto.
+  Registro `resultados/diferencias-v0.4-v0.5-SL4c-OC.log`.
+- **Coordinación O2 (T04):** `src/Transicion.jl` queda con `mtime`
+  `2026-09-26 23:39:41.298582413 +0200` (epoch `1790458781`). O2 comprueba ese `mtime`
+  antes de ejecutar sus pruebas finales.
+- **Cierre T01-SL4c-O-C: SUPERADO.** Nada escrito fuera de `T01/`; sin commit ni push;
+  sin Python; sin secretos.

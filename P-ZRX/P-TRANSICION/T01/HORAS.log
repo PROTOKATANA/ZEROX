@@ -24,3 +24,9 @@
 2026-09-26T19:13:27+02:00
 2026-09-26T19:14:00+02:00  # SL-3b inicio (aprox., tras ENTRADA-SL3b 4/4 OK)
 2026-09-26T19:25:50+02:00  # SL-3b cierre (tests, run.jl, vectores v0.4)
+2026-09-26T23:15:22+02:00
+2026-09-26T23:23:05+02:00  # SL-4c-O1 cierre (T01): tests 2212/2212, run 0 fallos, v0.5 releído 0 discrepancias
+2026-09-26T23:24:37+02:00  # SL-4c-O-B inicio (O1 T01, lanzamiento)
+2026-09-26T23:35:22+02:00  # SL-4c-O-B cierre (T01): tests 2233/2233, run 0 fallos, v0.5 releido 0 discrepancias
+2026-09-26T23:39:21+02:00  # SL-4c-O-C inicio (O1 T01)
+2026-09-26T23:46:11+02:00  # SL-4c-O-C cierre (O1 T01): tests 2253/2253, run 0 fallos, v0.5 releido 0 discrepancias

@@ -11,7 +11,7 @@ using EstadoDAG
 import EstadoDAG.Transicion
 using SHA
 
-const RUTA_DEF = "resultados/vectores-estado-dag-v0.5.txt"
+const RUTA_DEF = "resultados/vectores-estado-dag-v0.6.txt"
 
 const FAMILIA_DE = Dict("Genesis" => Transicion.Genesis, "PoW" => Transicion.PoW,
                         "PoST" => Transicion.PoST)
@@ -334,4 +334,7 @@ function main()
     exit(salida)
 end
 
-main()
+# Ejecutable como script; `include`ado por `src/diferencias.jl` no arranca `main`.
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

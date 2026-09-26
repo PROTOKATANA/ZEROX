@@ -148,14 +148,18 @@ end
 
 """
 Evidencia aleatoria (SL-3) contra `S`. `modo` selecciona la variante: válida,
-`cbid` ajeno, fuera de plazo, clave sin saldo o una clave con saldo.
+`cbid` ajeno, fuera de plazo, clave sin saldo o una clave con saldo. SL-4c-O
+añadió `:ambos` (las dos anteriores). SL-4c-O-B distingue los **dos tipos** de
+orden no canónico: `:orden_igual` (`pre_hash(H1) = pre_hash(H2)`) y
+`:orden_desc` (`pre_hash(H1) > pre_hash(H2)`), más `:ambos_desc` (cbid ajeno +
+orden descendente). Con `:ambos`/`:ambos_desc` gana `cbid` por la precedencia.
 """
 function evidencia_aleatoria(rng::AbstractRNG, S::Transicion.Estado,
                              P::Transicion.Params, slot::Int; modo::Symbol = :valida)
     c = P.cbid
     k = 1
     s = slot
-    if modo == :cbid
+    if modo == :cbid || modo == :ambos || modo == :ambos_desc
         c = P.cbid + 1
     elseif modo == :tardia
         s = slot - P.Plazo_slots
@@ -165,11 +169,19 @@ function evidencia_aleatoria(rng::AbstractRNG, S::Transicion.Estado,
         ks = sort(collect(keys(S.garantias)))
         isempty(ks) || (k = ks[rand(rng, 1:length(ks))])
     end
+    es_igual = modo == :orden_igual || modo == :ambos
     r1 = rand(rng, UInt64)
     r2 = rand(rng, UInt64)
-    r1 == r2 && (r2 = r1 + UInt64(1))
+    if es_igual
+        r2 = r1                       # H1 = H2 ⇒ el orden estricto no se cumple
+    elseif r1 == r2
+        r2 = r1 + UInt64(1)
+    end
     lo, hi = min(r1, r2), max(r1, r2)
-    ev = Transicion.evidencia(c, k, 0, 0, 0, s, lo, hi)
+    # `:orden_desc` / `:ambos_desc` invierten el par para que `pre_hash(H1) > pre_hash(H2)`.
+    descendente = modo == :orden_desc || modo == :ambos_desc
+    ev = descendente ? Transicion.evidencia(c, k, 0, 0, 0, s, hi, lo) :
+                       Transicion.evidencia(c, k, 0, 0, 0, s, lo, hi)
     return Transicion.tx_evidencia(ev)
 end
 
@@ -258,7 +270,11 @@ function generar_dag_aleatorio(rng::AbstractRNG, pd::ParamsDAG;
             if !isempty(evidencias) && rand(rng) < p_dup
                 push!(txs, Transicion.tx_evidencia(evidencias[rand(rng, 1:length(evidencias))]))
             else
-                modo = rand(rng, (:valida, :valida, :clave, :cbid, :tardia, :sin_saldo))
+                # SL-4c-O / SL-4c-O-B: `:orden_igual`/`:orden_desc` (los dos
+                # tipos de orden no canónico) y `:ambos`/`:ambos_desc`.
+                modo = rand(rng, (:valida, :valida, :clave, :cbid, :orden_igual,
+                                  :orden_desc, :tardia, :sin_saldo, :ambos,
+                                  :ambos_desc))
                 txev = evidencia_aleatoria(rng, S, P, slot; modo = modo)
                 push!(txs, txev)
                 txev.evidencia !== nothing && push!(evidencias, txev.evidencia)

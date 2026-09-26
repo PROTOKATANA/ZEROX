@@ -1,12 +1,16 @@
 # exportar.jl — exportador determinista de vectores de transición (ORDEN-T01-B,
-# revisado por T01-D: campo `nonce=` de F-15; T01-E: id de liberación F-18).
+# revisado por T01-D: campo `nonce=` de F-15; T01-E: id de liberación F-18;
+# SL-3/SL-3b: `ev=` y RAT-2′; SL-4c-O: forma de la `EvidenceTx`;
+# SL-4c-O-B: orden no canónico por igualdad y dos evidencias dirigidas;
+# SL-4c-O-C: la evidencia con entradas/salidas también es forma).
 #
 #     julia --project=. exportar.jl [--fecha <ISO-8601>] [--salida RUTA] \
 #         [--contrato RUTA] [--dirigidos 1] [--aleatorios 2000]
 #
-# Escribe `resultados/vectores-transicion-v0.4.txt` (formato de texto neutral de
-# v0.1, §3.4 de la orden, con el `nonce=` de F-15 y el `ev=` de SL-3) y su
-# sha256 en `resultados/vectores-transicion-v0.4.sha256` (formato `sha256sum`).
+# Escribe `resultados/vectores-transicion-v0.5.txt` (formato de texto neutral de
+# v0.1, §3.4 de la orden, con el `nonce=` de F-15, el `ev=` de SL-3 y los
+# errores de forma `ErrForma(...)` de SL-4c-O/SL-4c-O-C) y su sha256 en
+# `resultados/vectores-transicion-v0.5.sha256` (formato `sha256sum`).
 # Solo interfaces por defecto: CUT_HWPhi, FC3, SEC0. Un hilo, sin Python.
 #
 # El lector independiente vive en `src/lector_vectores.jl` y NO reutiliza ninguna
@@ -18,9 +22,12 @@ using SHA
 using Printf
 
 const CONTRATO_DEF = "/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/CONTRATO-v0.md"
-# SL-3b: vectores v0.4 con RAT-2′ (recompensa `suelo(C·2/8)`); v0..v0.3 se conservan.
-const SALIDA_DEF = "resultados/vectores-transicion-v0.4.txt"
-const COBERTURA_DEF = "resultados/cobertura-v0.4.txt"
+# SL-4c-O/SL-4c-O-B/SL-4c-O-C: vectores v0.5 con la estructura de la evidencia
+# (entradas/salidas), el `cbid` ajeno y el orden canónico como **forma**
+# (`ErrForma(...)`) y con los dos tipos de orden no canónico (descendente e
+# igualdad); v0..v0.4 se conservan intactos como históricos.
+const SALIDA_DEF = "resultados/vectores-transicion-v0.5.txt"
+const COBERTURA_DEF = "resultados/cobertura-v0.5.txt"
 
 # --- nombres del formato ---------------------------------------------------
 
@@ -321,14 +328,30 @@ function contar_cobertura(bloques::Vector{Bloque}, P::Params, acc::Dict{String,I
             inc!(acc, "sin_padre")
         else
             r = aplicar(Ep, b, P)
+            # SL-4c-O: cuenta aparte los casos con los dos defectos de forma
+            # (`cbid` ajeno + orden no canónico); su error es `EvidenciaCbidAjeno`
+            # por la precedencia.
+            ev = txev.evidencia
+            if ev !== nothing
+                cbid_ajeno = !(ev.id1.cbid == P.cbid && ev.id2.cbid == P.cbid)
+                orden_malo = !(ev.h1.pre_hash < ev.h2.pre_hash)
+                (cbid_ajeno && orden_malo) && inc!(acc, "ambos")
+            end
             nombre = r == ErrEvidenciaDuplicada ? "duplicada" :
                      r == ErrEvidenciaTardia    ? "tardia" :
-                     r == ErrCbidAjeno          ? "cbid_ajeno" :
-                     r == ErrOrdenCanonico      ? "orden_canonico" :
+                     r == ErrForma(EvidenciaCbidAjeno) ? "cbid_ajeno" :
+                     r == ErrForma(OrdenCanonicoInvalido) ? "orden_canonico" :
                      r == ErrSinEvidencia       ? "sin_evidencia" :
-                     r == ErrEvidenciaConEntradas ? "con_entradas" :
+                     r == ErrForma(EvidenciaConEntradasOSalidas) ? "con_entradas" :
                      r == ErrPuertaRAT3         ? "puerta_rat3" : "otro_error"
             inc!(acc, nombre)
+            # SL-4c-O-B: los dos tipos de orden no canónico. Solo cuentan aquí
+            # los casos cuyo error es `OrdenCanonicoInvalido` (excluye `ambos`,
+            # donde gana el `cbid`).
+            if r == ErrForma(OrdenCanonicoInvalido) && ev !== nothing
+                inc!(acc, ev.h1.pre_hash == ev.h2.pre_hash ? "orden_igual" :
+                                                             "orden_descendente")
+            end
         end
     end
     return acc
@@ -353,7 +376,7 @@ function main()
 
     mkpath(dirname(salida))
     io = open(salida, "w")
-    println(io, "# vectores-transicion-v0.4 · T01-SL3b (EvidenceTx, RAT-2′) · ",
+    println(io, "# vectores-transicion-v0.5 · T01-SL4c-O-C (forma de la EvidenceTx) · ",
             fecha, " · sha256 del contrato ", sha256_archivo(contrato))
     n = 0
     fallos_dirigidos = Ref(0)
@@ -386,7 +409,7 @@ function main()
                                flush(stdout))
         end
     end
-    # --- SL-3: casos con evidencia ----------------------------------------
+    # --- SL-3/SL-4c-O: casos con evidencia --------------------------------
     puntos_ev = puntos_evidencia()
     for (pi, P) in enumerate(puntos_ev)
         cam = caso_rat3_carrera(P)
@@ -402,6 +425,12 @@ function main()
             escribir_caso(io, n, "EV-autodenuncia", pi, "-", au[1], P)
             contar_cobertura(au[1], P, cov)
         end
+        # SL-4c-O-B: los dos casos dirigidos de dos evidencias en un bloque.
+        for (nombre, bl) in casos_evidencia_dirigidos(P)
+            n += 1
+            escribir_caso(io, n, nombre, pi, "-", bl, P)
+            contar_cobertura(bl, P, cov)
+        end
         if pi <= 3
             for (nombre, bl) in casos_evidencia_cobertura(P; n = n_ev_por_tipo)
                 n += 1
@@ -415,15 +444,21 @@ function main()
     close(io)
 
     open(cobertura, "w") do ioc
-        println(ioc, "# cobertura SL-3b T01 v0.4 · ", fecha)
+        println(ioc, "# cobertura SL-4c-O-C T01 v0.5 · ", fecha)
         println(ioc, "# contadores de EvidenceTx (dirigidos + aleatorios de evidencia):")
         println(ioc, "#  aplicada    = aplicada sin descarte en la historia seleccionada")
         println(ioc, "#  sin_saldo   = aplicada con la clave sin garantía (V=0, EV-22)")
         println(ioc, "#  duplicada   = descartada por ErrEvidenciaDuplicada (EV-12)")
         println(ioc, "#  tardia      = descartada por ErrEvidenciaTardia (EV-14)")
-        println(ioc, "#  cbid_ajeno  = descartada por ErrCbidAjeno (RAT-1)")
-        println(ioc, "#  con_entradas= descartada por ErrEvidenciaConEntradas (EV-04)")
-        println(ioc, "#  orden_canonico / sin_evidencia / puerta_rat3 / otro_error / malformada / sin_padre")
+        println(ioc, "#  cbid_ajeno  = error de forma ErrForma(EvidenciaCbidAjeno) (RAT-1);")
+        println(ioc, "#                incluye los casos `ambos` (precedencia del cbid)")
+        println(ioc, "#  orden_canonico = error de forma ErrForma(OrdenCanonicoInvalido) (EV-01/EV-04)")
+        println(ioc, "#  orden_descendente / orden_igual = subtipos de `orden_canonico`")
+        println(ioc, "#                (pre_hash(H1) > pre_hash(H2) / =); excluyen `ambos`")
+        println(ioc, "#  ambos       = casos con cbid ajeno Y orden no canónico (subconjunto de cbid_ajeno)")
+        println(ioc, "#  con_entradas= error de forma ErrForma(EvidenciaConEntradasOSalidas)")
+        println(ioc, "#                (EV-04, estructura; primera de la precedencia)")
+        println(ioc, "#  sin_evidencia / puerta_rat3 / otro_error / malformada / sin_padre")
         println(ioc, "#  deshecha    = aplicada y deshecha exactamente con `deshacer` (EV-27);")
         println(ioc, "#                T01 no fusiona ramas, así que no mide reorganización")
         for k in sort(collect(keys(cov)))

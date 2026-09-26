@@ -144,6 +144,18 @@ function verificar(bloques::Vector{Bloque}, P::Params;
     return fallos, n_undos, n_perms, con_post
 end
 
+# SL-4c-O: error del último bloque de una historia de evidencia, para contar en
+# el barrido las clases de forma nuevas. Devuelve `nothing` si no hay error o si
+# el padre no es válido.
+function ultimo_error(bloques::Vector{Bloque}, P::Params)
+    memo, _ = construir_validos(bloques, P)
+    B = last(bloques)
+    Ep = get(memo, B.padre, nothing)
+    Ep === nothing && return nothing
+    r = aplicar(Ep, B, P)
+    return r isa Err ? r : nothing
+end
+
 function main()
     cfg = parsear(ARGS)
     semilla = parsear_seed(get(cfg, "seed", "0x5a5a"))
@@ -198,15 +210,23 @@ function main()
             flush(stdout)
         end
     end
-    # --- SL-3b: barrido de evidencia (≥ `ev_historias` historias) ----------
+    # --- SL-3b/SL-4c-O/SL-4c-O-B/SL-4c-O-C: barrido de evidencia (≥ `ev_historias`)
     total_ev = 0
     fallos_ev = zeros(Int, 7)
     undos_ev = 0
     n_rat3 = 0
+    n_forma_cbid = 0
+    n_forma_orden = 0
+    n_forma_igual = 0
+    n_forma_ambos = 0
+    n_forma_entradas = 0
+    n_dir_orden = 0
+    n_dir_cbid = 0
     puntos_ev = puntos_evidencia()
-    # Cada punto aporta 6 tipos de caso (`casos_evidencia_cobertura`); se elige
-    # `n` para cubrir el objetivo sin reducir el barrido principal de arriba.
-    n_ev_tipo = max(1, cld(ev_historias, 6 * length(puntos_ev)))
+    # Cada punto aporta 9 tipos de caso (`casos_evidencia_cobertura`; SL-4c-O-B
+    # añade `orden_igual` a los 8 de SL-4c-O) más los dos dirigidos; se elige `n`
+    # para cubrir el objetivo sin reducir el barrido principal de arriba.
+    n_ev_tipo = max(1, cld(ev_historias, 9 * length(puntos_ev)))
     for P in puntos_ev
         casos = Tuple{String,Vector{Bloque}}[]
         cam = caso_rat3_carrera(P)
@@ -215,12 +235,25 @@ function main()
         end
         au = caso_autodenuncia(P)
         isempty(au[1]) || push!(casos, ("EV-autodenuncia", au[1]))
+        append!(casos, casos_evidencia_dirigidos(P))
         append!(casos, casos_evidencia_cobertura(P; n = n_ev_tipo))
-        for (_, bl) in casos
+        for (nombre, bl) in casos
             f, nu, _, _ = verificar(bl, P; con_i3 = false, i3_perm = 0)
             fallos_ev .+= f
             total_ev += 1
             undos_ev += nu
+            nombre == "ev-ambos" && (n_forma_ambos += 1)
+            e = ultimo_error(bl, P)
+            e == ErrForma(EvidenciaConEntradasOSalidas) && (n_forma_entradas += 1)
+            e == ErrForma(EvidenciaCbidAjeno) && (n_forma_cbid += 1)
+            e == ErrForma(OrdenCanonicoInvalido) && (n_forma_orden += 1)
+            if nombre == "ev-orden_igual"
+                e == ErrForma(OrdenCanonicoInvalido) && (n_forma_igual += 1)
+            elseif nombre == "ev-dir-orden-cbid"
+                e == ErrForma(OrdenCanonicoInvalido) && (n_dir_orden += 1)
+            elseif nombre == "ev-dir-cbid-orden"
+                e == ErrForma(EvidenciaCbidAjeno) && (n_dir_cbid += 1)
+            end
         end
         # RAT-3: la liberación debe caer con ErrVentanaAbierta.
         if cam !== nothing
@@ -249,6 +282,11 @@ function main()
     @printf("historias evid.  = %d\n", total_ev)
     @printf("undos evid.      = %d\n", undos_ev)
     @printf("RAT-3 bloqueadas = %d\n", n_rat3)
+    @printf("forma cbid/orden/entradas/ambos = %d / %d / %d / %d\n", n_forma_cbid,
+            n_forma_orden, n_forma_entradas, n_forma_ambos)
+    @printf("orden por igualdad    = %d\n", n_forma_igual)
+    @printf("dirigidos 2 evidencias (orden,cbid) = %d / %d\n", n_dir_orden,
+            n_dir_cbid)
     for k in 1:7
         @printf("fallos evid I-%d = %d\n", k, fallos_ev[k])
     end

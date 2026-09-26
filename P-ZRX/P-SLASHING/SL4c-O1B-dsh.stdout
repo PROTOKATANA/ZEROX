@@ -1,0 +1,25 @@
+He leído íntegras `ORDEN-SL4c-O-B.md`, `ORDEN-SL4c-O.md` y `V-ZRX/LINEO.md`, y he cumplido la parte O1 (oráculo T01). Todo dentro de `P-ZRX/P-TRANSICION/T01/`.
+
+## Falta de definición
+**Ninguna bloqueante.** La orden fija la regla y los dos dirigidos; solo hay tres lecturas de forma, que documenté en `PROGRESO.md` §SL4cOB.1 **antes** de tocar código:
+- **FD-SL4cOB-1:** T01 ya comprobaba transacción a transacción (`aplicar_txs!` recorre en orden y `aplicar_evidencia!` hace estructura → `cbid` → orden). La regla del director ya era la de T01: O1 **no** cambia el oráculo, solo añade cobertura y dirigidos; la paridad la fija T04 (O2).
+- **FD-SL4cOB-2:** se **regenera** v0.5 (no se crea v0.6), como pide la orden.
+- **FD-SL4cOB-3:** la igualdad entra como tipo propio `ev-orden_igual` con subtotales de cobertura; los dos dirigidos se emiten para los 12 puntos de evidencia.
+
+## Cambios
+- `src/evidencia.jl`: tipo `:orden_igual` (`ph1 = ph2`) y `caso_dos_evidencias(P, :orden|:cbid)` + `casos_evidencia_dirigidos` (bloque con **dos** `EvidenceTx`; gana el defecto de la primera).
+- `src/Transicion.jl`: fuera de la lista de exportación los alias `ErrCbidAjeno`/`ErrOrdenCanonico` (se conservan como constantes internas porque T04 incluye el módulo); nuevos exports de los generadores dirigidos.
+- `exportar.jl`: subtotales `orden_igual`/`orden_descendente` y emisión de los dirigidos.
+- `comparar_vectores.jl`: define localmente los alias como cadenas y veredicto genérico.
+- `run.jl`: 9 tipos y contadores de igualdad/dirigidos.
+- `test/runtests.jl`: testset `SL-4c-O-B` y `ev-orden_igual` en el mapa esperado de SL-3.
+
+## Verificación
+- **`Pkg.test()`: 2233/2233** verde (SL-4c-O-B **17/17**, SL-4c-O **32/32**, SL-3 **2090/2090**) → `resultados/test-pkg-SL4c-OB.log`.
+- **`run.jl`: `VEREDICTO = SIN FALLOS`** (I-1…I-7 = 0; evidencia 5 120 historias; igualdad **564**; `cbid`/orden/ambos **1140/1140/564**; dirigidos 2 evidencias **12/12**; 124,8 s, 1 hilo) → `resultados/run-reducida-SL4c-OB.log`.
+- **Vectores v0.5 regenerados: 3 179 casos**, sha256 `4c7e424ee786dc22c6c40c3d1b99c780c16414c9803cf2e1d43658af2c948427`; `cobertura-v0.5.txt` con `cbid_ajeno` 252, `orden_canonico` 252 (`orden_descendente` 132 + `orden_igual` 120), `ambos` 120 (mínimos ≥30/≥30/≥5 cumplidos).
+- **Relectura independiente: 0 discrepancias.**
+- **`DIFERENCIAS-v0.4-v0.5.md`**: 120 cambios de `RES` (todos `ev-cbid`), 384 casos nuevos, **0 cuerpos distintos, 0 cambios sin defecto**; v0.4 intacto (`4f0a175a…`).
+- Entrada congelada `ENTRADA-SL4c-O-B.sha256`: **3/3 OK**. Secciones «SL-4c-O-B» en `INFORME.md` y `PROGRESO.md`, y `HORAS.log` con `date -Is`. Sin Python, sin commit/push, nada escrito fuera de `T01/`.
+
+Nota de transparencia: usé una vez `git log`/`git status` **solo de lectura** para reconocimiento al inicio; no hice ninguna operación de escritura con git.

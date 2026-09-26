@@ -676,8 +676,9 @@ function caso_evidencia_reorg(pd::ParamsDAG; seed::Int = 33)
 end
 
 """
-D-18/19/20 · Descartes de evidencia en modo fusión: `cbid` ajeno, tardía y
-contra clave sin saldo (aplicada con pérdida cero).
+D-18 · Descartes de evidencia en modo fusión que **no** son de forma: tardía y
+contra clave sin saldo (aplicada con pérdida cero). El `cbid` ajeno y el orden no
+canónico ya no se descartan: invalidan el bloque (SL-4c-O, D-19…).
 """
 function caso_evidencia_descartes(pd::ParamsDAG; seed::Int = 34)
     A, pow = base_dirigida(pd; seed = seed)
@@ -685,36 +686,253 @@ function caso_evidencia_descartes(pd::ParamsDAG; seed::Int = 34)
     Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
                     txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
     procesar_uno!(A, Tb)
-    ev_cbid = Transicion.evidencia(pd.P.cbid + 1, 1, 0, 0, 0, 2, UInt64(501), UInt64(502))
-    Xc = _ev_bloque(id1 + 1, [Tb.id], 2, pd.P, ev_cbid)
-    procesar_uno!(A, Xc)
     ev_tar = Transicion.evidencia(pd.P.cbid, 1, 0, 0, 0,
                                   2 - pd.P.Plazo_slots, UInt64(503), UInt64(504))
-    Xt = _ev_bloque(id1 + 2, [Tb.id], 2, pd.P, ev_tar; sd = 1)
+    Xt = _ev_bloque(id1 + 1, [Tb.id], 2, pd.P, ev_tar; sd = 1)
     procesar_uno!(A, Xt)
     ev_ss = Transicion.evidencia(pd.P.cbid, 99, 0, 0, 0, 2, UInt64(505), UInt64(506))
-    Xs = _ev_bloque(id1 + 3, [Tb.id], 2, pd.P, ev_ss; sd = 2)
+    Xs = _ev_bloque(id1 + 2, [Tb.id], 2, pd.P, ev_ss; sd = 2)
     procesar_uno!(A, Xs)
-    B = BloquePost(id = id1 + 4, padres = [Xc.id, Xt.id, Xs.id], slot = 3,
+    B = BloquePost(id = id1 + 3, padres = [Xt.id, Xs.id], slot = 3,
                    productor = 1, peso = 1,
                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
     procesar_uno!(A, B)
     S = A.past[B.id]
     # `sp(B)` no entra en el mergeset: su descarte vive en `A.descartes[sp]`.
-    dsp = A.descartes[Xc.id]
+    dsp = A.descartes[Xt.id]
     dms = _descartes_mergeset(A, B)
-    cbid = count(x -> x[2] == Transicion.ErrCbidAjeno, dsp) +
-           count(x -> x[3] == Transicion.ErrCbidAjeno, dms)
     tardia = count(x -> x[2] == Transicion.ErrEvidenciaTardia, dsp) +
              count(x -> x[3] == Transicion.ErrEvidenciaTardia, dms)
-    return "D-18", A, (Tb = Tb.id, Xc = Xc.id, Xt = Xt.id, Xs = Xs.id, B = B.id,
-                       cbid = cbid, tardia = tardia,
+    return "D-18", A, (Tb = Tb.id, Xt = Xt.id, Xs = Xs.id, B = B.id,
+                       tardia = tardia,
                        sin_saldo = any(k -> k == 99, keys(S.garantias)) &&
                                    length(S.garantias[99].incidentes) == 1,
                        I1 = invariante_I1(S))
 end
 
-"Todos los casos dirigidos sobre la rejilla T04 (incluye SL-3 con C-EVP activo)."
+# ---------------------------------------------------------------------------
+# SL-4c-O · forma v4 de la EvidenceTx (D-19…)
+# ---------------------------------------------------------------------------
+
+"Evidencia con el defecto de forma pedido (SL-4c-O / SL-4c-O-B / SL-4c-O-C); `a < b`."
+function _evidencia_forma(P::Transicion.Params, modo::Symbol, slot::Int, i::Int)
+    a = UInt64(700001 + 2 * i)
+    b = UInt64(700002 + 2 * i)
+    if modo == :cbid
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, b)
+    elseif modo == :orden_desc || modo == :orden       # H1 > H2 (descendente)
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :orden_igual                        # H1 = H2 (igualdad)
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, a, a)
+    elseif modo == :ambos
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :ambos_igual
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, a)
+    elseif modo in (:entradas, :salidas, :entradas_salidas)
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, a, b)   # canónica
+    elseif modo == :entradas_cbid
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, a, b)
+    elseif modo == :entradas_orden
+        return Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot, b, a)
+    elseif modo == :entradas_cbid_orden
+        return Transicion.evidencia(P.cbid + 1, 1, 0, 0, 0, slot, b, a)
+    end
+    error("modo de forma desconocido: $modo")
+end
+
+"""
+`Tx` de `EvidenceTx` con el defecto pedido (SL-4c-O-C). Añade a `_evidencia_forma`
+las entradas/salidas de EV-04 (estructura), que preceden a `cbid` y al orden:
+
+  * `:entradas`           — `n_in ≠ 0`, evidencia canónica;
+  * `:salidas`            — `n_out ≠ 0`, evidencia canónica;
+  * `:entradas_salidas`   — las dos a la vez (gana `entradas`);
+  * `:entradas_cbid`      — estructura + `cbid` ajeno (gana entradas);
+  * `:entradas_orden`     — estructura + orden descendente (gana entradas);
+  * `:entradas_cbid_orden`— estructura + `cbid` + orden (gana entradas).
+
+T04 no modela `n_wit`/testigos (el modelo `Tx` de T01 solo tiene `entradas` y
+`salidas`); por eso el tercer sub-defecto de EV-04 no tiene caso propio.
+"""
+function _tx_evidencia_forma(P::Transicion.Params, modo::Symbol, slot::Int, i::Int)
+    ev = _evidencia_forma(P, modo, slot, i)
+    ent = modo in (:entradas, :entradas_salidas, :entradas_cbid, :entradas_orden,
+                   :entradas_cbid_orden) ? Int[1] : Int[]
+    sal = modo in (:salidas, :entradas_salidas) ?
+          Transicion.Salida[Transicion.Salida(700900 + 10 * i, UInt64(1), 1,
+                                              Transicion.OrigenTx, -1, -1)] :
+          Transicion.Salida[]
+    isempty(ent) && isempty(sal) && return Transicion.tx_evidencia(ev)
+    return Transicion.Tx(Transicion.TxEvidencia, sal, ent, 0, 1, UInt64(0), 0,
+                         UInt64(0), ev)
+end
+
+"""
+D-19 · Forma v4 de la `EvidenceTx` (SL-4c-O / SL-4c-O-B / SL-4c-O-C,
+RAT-1/EV-04). El bloque `X` lleva coinbase, una transferencia válida y una
+`EvidenceTx` defectuosa: de estructura (`:entradas`, `:salidas`,
+`:entradas_salidas`, `:entradas_cbid`, `:entradas_orden`,
+`:entradas_cbid_orden`), de `cbid`/orden (`:cbid`, `:orden_igual`,
+`:orden_desc`, `:ambos`). `X` es **inválido en la admisión** (no un descarte) y
+su hijo `Y` cae por `ErrSinPadre`; el gemelo `Xv` con evidencia canónica de la
+red local es válido, y la transferencia de `X` no llega a aplicarse.
+"""
+function caso_forma_evidencia(pd::ParamsDAG; modo::Symbol = :cbid, con_tx::Bool = true,
+                              seed::Int = 40, iter::Int = 0, slot::Int = 2)
+    A, pow = base_dirigida(pd; seed = seed + iter)
+    P = pd.P
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    o = nothing
+    out_id = 0
+    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)]
+    if con_tx
+        o = utxo_gastable(A.post[Tb.id], P, slot, 2)
+        o === nothing && error("caso_forma_evidencia: sin UTXO gastable")
+        out_id = 800000 + 1000 * iter
+        push!(txs, Transicion.tx_transferencia([o.id],
+            [Transicion.Salida(out_id, o.valor - UInt64(1), o.dueño,
+                               Transicion.OrigenTx, -1, -1)], o.dueño))
+    end
+    tx_bad = _tx_evidencia_forma(P, modo, slot, iter)
+    X = BloquePost(id = id1 + 1, padres = [Tb.id], slot = slot, sd = 0,
+                   productor = 1, peso = 1,
+                   txs = vcat(txs, Transicion.Tx[tx_bad]))
+    procesar_uno!(A, X)
+    ev_ok = Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot,
+                                 UInt64(900001 + 2 * iter), UInt64(900002 + 2 * iter))
+    Xv = BloquePost(id = id1 + 2, padres = [Tb.id], slot = slot, sd = 1,
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                                        Transicion.tx_evidencia(ev_ok)])
+    procesar_uno!(A, Xv)
+    Y = BloquePost(id = id1 + 3, padres = [X.id], slot = slot + 1, sd = 0,
+                   productor = 1, peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Y)
+    S, _, _ = aplicar_historia(A)
+    return "D-19", A, (modo = modo, con_tx = con_tx, X = X.id, Xv = Xv.id, Y = Y.id,
+                       out_id = out_id, o_id = o === nothing ? 0 : o.id,
+                       invalido = !A.validos[X.id],
+                       motivo = get(A.motivos, X.id, :?),
+                       hijo_invalido = !A.validos[Y.id],
+                       gemelo_valido = A.validos[Xv.id],
+                       tx_aplicada = out_id != 0 && haskey(S.utxo, out_id),
+                       I1 = invariante_I1(A.post[Xv.id]))
+end
+
+"""
+D-20/D-21 · Precedencia por transacción (SL-4c-O-B). El bloque `X` lleva
+coinbase, una transferencia válida y **dos** `EvidenceTx` defectuosas, una con
+orden descendente y otra con `cbid` ajeno. Con `primero = :orden` van
+`[orden, cbid]` ⇒ motivo `ErrForma(OrdenCanonicoInvalido)`; con
+`primero = :cbid` van `[cbid, orden]` ⇒ motivo `ErrForma(EvidenciaCbidAjeno)`.
+En ambos casos `X` es inválido en admisión, su hijo `Y` cae por `ErrSinPadre` y
+el gemelo `Xv` (evidencia canónica) es válido; la transferencia de `X` no aplica.
+"""
+function caso_forma_dos_evidencias(pd::ParamsDAG; primero::Symbol = :orden,
+                                   con_tx::Bool = true, seed::Int = 70, iter::Int = 0,
+                                   slot::Int = 2)
+    (primero == :orden || primero == :cbid) ||
+        error("caso_forma_dos_evidencias: primero debe ser :orden o :cbid")
+    A, pow = base_dirigida(pd; seed = seed + iter)
+    P = pd.P
+    id1 = pow[3]
+    Tb = BloquePost(id = id1, padres = [A._id_T], slot = 1, productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    txs = Transicion.Tx[Transicion.tx_coinbase_post(3)]
+    o = nothing
+    out_id = 0
+    if con_tx
+        o = utxo_gastable(A.post[Tb.id], P, slot, 2)
+        o === nothing && error("caso_forma_dos_evidencias: sin UTXO gastable")
+        out_id = 800000 + 1000 * iter
+        push!(txs, Transicion.tx_transferencia([o.id],
+            [Transicion.Salida(out_id, o.valor - UInt64(1), o.dueño,
+                               Transicion.OrigenTx, -1, -1)], o.dueño))
+    end
+    ev_orden = Transicion.tx_evidencia(_evidencia_forma(P, :orden_desc, slot, iter))
+    ev_cbid = Transicion.tx_evidencia(_evidencia_forma(P, :cbid, slot, iter + 900))
+    if primero == :orden
+        push!(txs, ev_orden)
+        push!(txs, ev_cbid)
+        motivo = MOTIVO_FORMA_ORDEN
+    else
+        push!(txs, ev_cbid)
+        push!(txs, ev_orden)
+        motivo = MOTIVO_FORMA_CBID
+    end
+    X = BloquePost(id = id1 + 1, padres = [Tb.id], slot = slot, sd = 0,
+                   productor = 1, peso = 1, txs = txs)
+    procesar_uno!(A, X)
+    ev_ok = Transicion.evidencia(P.cbid, 1, 0, 0, 0, slot,
+                                 UInt64(910001 + 2 * iter), UInt64(910002 + 2 * iter))
+    Xv = BloquePost(id = id1 + 2, padres = [Tb.id], slot = slot, sd = 1,
+                    productor = 1, peso = 1,
+                    txs = Transicion.Tx[Transicion.tx_coinbase_post(3),
+                                        Transicion.tx_evidencia(ev_ok)])
+    procesar_uno!(A, Xv)
+    Y = BloquePost(id = id1 + 3, padres = [X.id], slot = slot + 1, sd = 0,
+                   productor = 1, peso = 1,
+                   txs = Transicion.Tx[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Y)
+    S, _, _ = aplicar_historia(A)
+    nombre = primero == :orden ? "D-20" : "D-21"
+    return nombre, A, (primero = primero, con_tx = con_tx, X = X.id, Xv = Xv.id,
+                       Y = Y.id, out_id = out_id, o_id = o === nothing ? 0 : o.id,
+                       invalido = !A.validos[X.id],
+                       motivo = get(A.motivos, X.id, :?),
+                       motivo_esperado = motivo,
+                       hijo_invalido = !A.validos[Y.id],
+                       gemelo_valido = A.validos[Xv.id],
+                       tx_aplicada = out_id != 0 && haskey(S.utxo, out_id),
+                       I1 = invariante_I1(A.post[Xv.id]))
+end
+
+"`(modo, con_tx, iter)` de los casos dedicados de forma de la cobertura SL-4c-O/-B/-C."
+function casos_forma_cobertura()
+    out = Tuple{Symbol,Bool,Int}[]
+    for i in 1:36
+        push!(out, (:cbid, true, i))
+    end
+    for i in 1:36
+        push!(out, (:orden_igual, true, 100 + i))
+    end
+    for i in 1:36
+        push!(out, (:orden_desc, true, 300 + i))
+    end
+    for i in 1:8
+        push!(out, (:ambos, true, 200 + i))
+    end
+    # SL-4c-O-C: estructura (EV-04) → forma. `:entradas_salidas` son los dos
+    # sub-defectos representables a la vez; `:entradas_cbid_orden` añade los tres
+    # defectos de la precedencia (estructura/cbid/orden) y comprueba que gana
+    # «entradas». `testigos`/`n_wit` no existe en el modelo `Tx` de T01.
+    for i in 1:36
+        push!(out, (:entradas, true, 400 + i))
+    end
+    for i in 1:36
+        push!(out, (:salidas, true, 500 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_salidas, true, 600 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_cbid, true, 700 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_orden, true, 800 + i))
+    end
+    for i in 1:8
+        push!(out, (:entradas_cbid_orden, true, 900 + i))
+    end
+    return out
+end
+
+"Todos los casos dirigidos sobre la rejilla T04 (incluye SL-3 con C-EVP activo, SL-4c-O, SL-4c-O-B y SL-4c-O-C)."
 function casos_dirigidos(pd::ParamsDAG)
     base = [caso_doble_gasto(pd), caso_coinbase_recortada(pd), caso_deposito_habilita(pd),
             caso_garantia_rama(pd), caso_rojo_u3(pd), caso_una_vez(pd),
@@ -724,5 +942,15 @@ function casos_dirigidos(pd::ParamsDAG)
             caso_liberacion_punto_aplicacion(pd), caso_dos_liberaciones_hermanas(pd)]
     pdev = _pd_ev(pd)
     return vcat(base, [caso_evidencia_aplicada(pdev), caso_evidencia_hermanas(pdev),
-                       caso_evidencia_reorg(pdev), caso_evidencia_descartes(pdev)])
+                       caso_evidencia_reorg(pdev), caso_evidencia_descartes(pdev),
+                       caso_forma_evidencia(pdev; modo = :cbid, seed = 41),
+                       caso_forma_evidencia(pdev; modo = :orden_igual, seed = 44),
+                       caso_forma_evidencia(pdev; modo = :orden_desc, seed = 42),
+                       caso_forma_evidencia(pdev; modo = :ambos, seed = 43),
+                       caso_forma_evidencia(pdev; modo = :entradas, seed = 47),
+                       caso_forma_evidencia(pdev; modo = :salidas, seed = 48),
+                       caso_forma_evidencia(pdev; modo = :entradas_salidas, seed = 49),
+                       caso_forma_evidencia(pdev; modo = :entradas_cbid_orden, seed = 50),
+                       caso_forma_dos_evidencias(pdev; primero = :orden, seed = 45),
+                       caso_forma_dos_evidencias(pdev; primero = :cbid, seed = 46)])
 end

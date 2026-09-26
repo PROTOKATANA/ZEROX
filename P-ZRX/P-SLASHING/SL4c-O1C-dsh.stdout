@@ -1,0 +1,28 @@
+## SL-4c-O-C, parte O1 (T01) — SUPERADO
+
+Leí íntegros `ORDEN-SL4c-O-C.md`, la orden que cita (`ORDEN-SL4c-O.md`, `ORDEN-SL4c-O-B.md`), `CONTRATO-EVIDENCIA-v0.md` (EV-04) y `V-ZRX/LINEO.md` antes de tocar código. Entrada congelada **4/4 OK**.
+
+### Falta de definición informada antes de editar (FD-SL4cOC-1…4)
+1. **`n_wit`/testigos**: EV-04 los incluye, pero el `Tx` abstracto de T01 no tiene campo de testigos. Conservo el modelo (entradas/salidas); no invento el campo.
+2. **Versión de vectores**: se regenera `v0.5` en su sitio (no se crea v0.6), como en SL-4c-O-B.
+3. **`ErrEvidenciaConEntradas`**: sale de `ErrSemantico` y de exports y queda como **constante interna** `= ErrForma(EvidenciaConEntradasOSalidas)`, igual que hicieron `ErrCbidAjeno`/`ErrOrdenCanonico`, para que T04 siga cargando hasta su O2.
+4. **Comparador**: `comparar_vectores.jl` admite un tercer renombre v0.4→v0.5 como cambio explicado.
+
+### Cambio
+- `ClaseForma` gana `EvidenciaConEntradasOSalidas` como **primera** de la precedencia (estructura → `cbid` → orden canónico).
+- `aplicar_evidencia!` devuelve **`ErrForma(EvidenciaConEntradasOSalidas)`** en vez del semántico `ErrEvidenciaConEntradas`; la validez del bloque en estricto no cambia.
+- Actualizados `evidencia.jl`, `exportar.jl`, `run.jl`, `comparar_vectores.jl` y `test/runtests.jl` (testset nuevo `SL-4c-O-C`, 20 aserciones).
+
+### Verificación
+| Prueba | Resultado |
+|---|---|
+| `Pkg.test()` | **2253/2253** (SL-4c-O-C 20/20; SL-4c-O-B 17/17; SL-4c-O 32/32; SL-3 2090/2090) |
+| `run.jl` reducida | I-1…I-7 = 0; evidencia 5120, `cbid`/orden/entradas/ambos = 1140/1140/564/564, igualdad 564, dirigidos 12/12; **SIN FALLOS**, 121,5 s |
+| `vectores-transicion-v0.5.txt` | 3179 casos; sha256 `d72c5fd9…edc1`; relectura independiente **0 discrepancias** |
+| `DIFERENCIAS-v0.4-v0.5.md` | 240 cambios de `RES` (120 `ev-cbid` + 120 `ev-con_entradas`), 384 nuevos, **0 cuerpos distintos, 0 cambios sin defecto** |
+| v0.4 | intacto (`4f0a175a…`, `sha256sum -c` OK) |
+
+Registros: `resultados/test-pkg-SL4c-OC.log`, `exportar-v0.5-SL4c-OC.log`, `relectura-v0.5-SL4c-OC.log`, `diferencias-v0.4-v0.5-SL4c-OC.log`, `run-reducida-SL4c-OC.log`. Secciones «SL-4c-O-C» en `INFORME.md` y `PROGRESO.md` + `HORAS.log` (inicio 23:39:21, cierre 23:46:11, `date -Is` real). Modelo: **DeepSeek `deepseek-flash`, esfuerzo `high`**. Sin Python, 1 hilo, nada fuera de `T01/`.
+
+### Nota para O2 (T04)
+`src/Transicion.jl` queda con `mtime` **`2026-09-26 23:39:41.298582413 +0200`** (epoch `1790458781`), escrito en `INFORME.md` §SL4cOC.6 y `PROGRESO.md` §SL4cOC.2. O2 debe comprobar ese `mtime` antes de ejecutar sus pruebas finales.

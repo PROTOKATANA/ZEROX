@@ -13,7 +13,7 @@
 using Transicion
 using SHA
 
-const RUTA_DEF = "resultados/vectores-transicion-v0.4.txt"
+const RUTA_DEF = "resultados/vectores-transicion-v0.5.txt"
 
 # --- nombres del formato (propios del lector) ------------------------------
 

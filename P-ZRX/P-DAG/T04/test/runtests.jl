@@ -177,7 +177,6 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
         @test !isempty(EstadoDAG.evidencias_deshechas_por_reorg(A))
 
         nombre, A, m = EstadoDAG.caso_evidencia_descartes(pdev)
-        @test m.cbid == 1
         @test m.tardia == 1
         @test m.sin_saldo
         @test m.I1
@@ -189,6 +188,107 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
             @test isempty(verificar_ie1_ie2_ie4(A))
             @test isempty(verificar_ie6(A))
         end
+    end
+
+    @testset "SL-4c-O/SL-4c-O-B/SL-4c-O-C forma v4 de la EvidenceTx" begin
+        pd = ParamsDAG(PARAMS_DAG_BASE[1], 1)
+        pdev = EstadoDAG._pd_ev(pd)
+        # `cbid` ajeno, los dos tipos de orden no canónico y la estructura de
+        # EV-04 (entradas/salidas) invalidan el bloque entero en admisión; el
+        # gemelo canónico es válido y la tx válida del bloque no se aplica.
+        for (modo, motivo, sd) in ((:cbid, MOTIVO_FORMA_CBID, 61),
+                                   (:orden_igual, MOTIVO_FORMA_ORDEN, 64),
+                                   (:orden_desc, MOTIVO_FORMA_ORDEN, 62),
+                                   (:ambos, MOTIVO_FORMA_CBID, 63),
+                                   (:entradas, MOTIVO_FORMA_ESTRUCTURA, 67),
+                                   (:salidas, MOTIVO_FORMA_ESTRUCTURA, 68),
+                                   (:entradas_salidas, MOTIVO_FORMA_ESTRUCTURA, 69),
+                                   (:entradas_cbid_orden, MOTIVO_FORMA_ESTRUCTURA, 70))
+            nombre, A, m = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, seed = sd)
+            @test m.invalido
+            @test m.motivo == motivo
+            @test m.hijo_invalido
+            @test m.gemelo_valido
+            @test !m.tx_aplicada
+            @test m.I1
+            @test isempty(verificar_ie1_ie2_ie4(A))
+        end
+        # Nombre exacto del contrato y clase: estructura es forma, no semántica.
+        @test string(ErrForma(EvidenciaConEntradasOSalidas)) ==
+              "ErrForma(EvidenciaConEntradasOSalidas)"
+        @test MOTIVO_FORMA_ESTRUCTURA == Symbol("ErrForma(EvidenciaConEntradasOSalidas)")
+        @test !(ErrForma(EvidenciaConEntradasOSalidas) isa ErrSemantico)
+        # SL-4c-O-B: precedencia por transacción con dos evidencias defectuosas.
+        # Con `[orden, cbid]` gana el orden; con `[cbid, orden]` gana `cbid`.
+        for (primero, motivo, sd) in ((:orden, MOTIVO_FORMA_ORDEN, 65),
+                                      (:cbid, MOTIVO_FORMA_CBID, 66))
+            nombre, A, m = EstadoDAG.caso_forma_dos_evidencias(pdev; primero = primero,
+                                                              seed = sd)
+            @test m.invalido
+            @test m.motivo == motivo
+            @test m.motivo == m.motivo_esperado
+            @test m.hijo_invalido
+            @test m.gemelo_valido
+            @test !m.tx_aplicada
+            @test m.I1
+            @test isempty(verificar_ie1_ie2_ie4(A))
+        end
+        # Cobertura mínima (SL-4c-O/-B/-C): ≥30 `cbid`, ≥30 estructura, ≥30 orden
+        # con ≥10 de igualdad y ≥10 descendentes, ≥10 de cada uno con tx válidas,
+        # ≥5 con ambos defectos, ≥5 con los sub-defectos de estructura
+        # representables a la vez y ≥5 con los tres defectos de la precedencia.
+        af = Dict{String,Int}()
+        for (modo, con_tx, it) in casos_forma_cobertura()
+            _, A, _ = EstadoDAG.caso_forma_evidencia(pdev; modo = modo, con_tx = con_tx,
+                                                     iter = it)
+            for b in values(A.por_id)
+                d = primer_defecto_forma(A, b)
+                d === nothing && continue
+                motivo = get(A.motivos, b.id, :OK)
+                hay_tx = any(tx -> tx.tipo in (Transicion.TxTransferencia,
+                                               Transicion.TxDeposito,
+                                               Transicion.TxRetiro,
+                                               Transicion.TxLiberacion), b.txs)
+                if motivo == MOTIVO_FORMA_ESTRUCTURA
+                    af["bloque_estructura"] = get(af, "bloque_estructura", 0) + 1
+                    d === :entradas ?
+                        (af["bloque_estructura_entradas"] = get(af, "bloque_estructura_entradas", 0) + 1) :
+                    d === :salidas ?
+                        (af["bloque_estructura_salidas"] = get(af, "bloque_estructura_salidas", 0) + 1) :
+                        (af["bloque_estructura_ambos"] = get(af, "bloque_estructura_ambos", 0) + 1)
+                    hay_tx && (af["con_tx_estructura"] = get(af, "con_tx_estructura", 0) + 1)
+                    any(tx -> tx.tipo == Transicion.TxEvidencia && tx.evidencia !== nothing &&
+                              (tx.evidencia.id1.cbid != pd.P.cbid ||
+                               tx.evidencia.id2.cbid != pd.P.cbid) &&
+                              !(tx.evidencia.h1.pre_hash < tx.evidencia.h2.pre_hash),
+                        b.txs) &&
+                        (af["bloque_estructura_cbid_orden"] = get(af, "bloque_estructura_cbid_orden", 0) + 1)
+                elseif motivo == MOTIVO_FORMA_CBID
+                    af["bloque_cbid"] = get(af, "bloque_cbid", 0) + 1
+                    hay_tx && (af["con_tx_cbid"] = get(af, "con_tx_cbid", 0) + 1)
+                    any(tx -> tx.tipo == Transicion.TxEvidencia && tx.evidencia !== nothing &&
+                              !(tx.evidencia.h1.pre_hash < tx.evidencia.h2.pre_hash), b.txs) &&
+                        (af["ambos_cbid"] = get(af, "ambos_cbid", 0) + 1)
+                else
+                    af["bloque_orden"] = get(af, "bloque_orden", 0) + 1
+                    d === :orden_igual ?
+                        (af["bloque_orden_igual"] = get(af, "bloque_orden_igual", 0) + 1) :
+                        (af["bloque_orden_desc"] = get(af, "bloque_orden_desc", 0) + 1)
+                    hay_tx && (af["con_tx_orden"] = get(af, "con_tx_orden", 0) + 1)
+                end
+            end
+        end
+        @test get(af, "bloque_cbid", 0) >= 30
+        @test get(af, "bloque_orden", 0) >= 30
+        @test get(af, "bloque_orden_igual", 0) >= 10
+        @test get(af, "bloque_orden_desc", 0) >= 10
+        @test get(af, "con_tx_cbid", 0) >= 10
+        @test get(af, "con_tx_orden", 0) >= 10
+        @test get(af, "ambos_cbid", 0) >= 5
+        @test get(af, "bloque_estructura", 0) >= 30
+        @test get(af, "con_tx_estructura", 0) >= 10
+        @test get(af, "bloque_estructura_ambos", 0) >= 5
+        @test get(af, "bloque_estructura_cbid_orden", 0) >= 5
     end
 
     @testset "propiedades IE-1…IE-6" begin
@@ -236,7 +336,7 @@ const REPLICAS_TEST = parse(Int, get(ENV, "T04_REPLICAS_TEST", "5"))
     end
 
     @testset "relectura de vectores" begin
-        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.5.txt")
+        ruta = joinpath(@__DIR__, "..", "resultados", "vectores-estado-dag-v0.6.txt")
         if isfile(ruta)
             cmd = `$(Base.julia_cmd()) --project=$(dirname(@__DIR__)) $(joinpath(@__DIR__, "..", "src", "lector_vectores.jl")) $ruta`
             p = run(ignorestatus(cmd))

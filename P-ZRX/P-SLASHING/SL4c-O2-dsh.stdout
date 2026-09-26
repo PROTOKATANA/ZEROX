@@ -1,0 +1,27 @@
+He cumplido la parte **O2 (T04)** de `ORDEN-SL4c-O`. Resumen:
+
+## Falta de definición informada (antes de editar)
+1. **Representación Julia de `ErrForma(...)`**: T04 no tiene tipo `ErrForma` (sus motivos de bloque son `Symbol`) y T01 se estaba corrigiendo en paralelo (O1). Adopté `Symbol("ErrForma(EvidenciaCbidAjeno)")` / `Symbol("ErrForma(OrdenCanonicoInvalido)")`; `string` rinde exactamente el nombre del contrato. Se comprobó que el `T01` final de O1 (`ErrForma(clase)`) produce **idénticos** textos.
+2. **Base del diff**: como v0.6 usa un generador ampliado (modo orden), `DIFERENCIAS-v0.5-v0.6.md` reproduce las **entradas congeladas de v0.5** con el oráculo corregido (comparación caso a caso exacta).
+3. **Precedencia global al bloque** (todos los `cbid` antes de todos los órdenes), para que «gana `cbid`» valga aunque los defectos estén en transacciones distintas.
+
+Todas quedaron documentadas en `INFORME.md`/`PROGRESO.md` (§SL4cO.1).
+
+## Cambio de comportamiento
+- `src/EstadoDAG.jl`: `chequear_forma_evidencia` al final de `chequear_forma`; `cbid` ajeno (RAT-1) y `pre_hash(H1) ≥ pre_hash(H2)` (EV-04) → **bloque inválido en admisión** (`ErrForma(...)`), no descarte. T04 no depende del tipo `Err` de T01.
+- Generador y dirigidos: modos `:orden`/`:ambos`, `caso_forma_evidencia` (bloque con tx válida + evidencia defectuosa, hijo inválido y gemelo canónico válido), D-18 sin `cbid`.
+- `exportar.jl` → v0.6 con cobertura de forma y **fallo** si no alcanza los mínimos.
+
+## Resultados
+| Comprobación | Resultado |
+|---|---|
+| `Pkg.test()` | **447/447** (`resultados/test-pkg-v0.6.log`) |
+| `run.jl --seed 0x5a5a --replicas 200` | **ESTADO = SUPERADO**, 0 fallos, 76,7 s; `forma_cbid=339`, `forma_orden=177` |
+| Relectura independiente de v0.6 | **1 961 casos, 0 discrepancias** |
+| `DIFERENCIAS-v0.5-v0.6.md` | 1 878 entradas de v0.5; **181** con defecto, **135** cambian, **0** sin defecto |
+| Cobertura forma | `bloque_cbid=279`, `bloque_orden=125`, `con_tx_cbid=166`, `con_tx_orden=78`, `ambos_cbid=127` (`minimos_SL4cO=OK`) |
+| `ENTRADA-SL4c-O.sha256` | **7/7 OK** (v0.4 y v0.5 intactos) |
+
+Artefactos nuevos: `resultados/vectores-estado-dag-v0.6.txt` (+`.sha256`, sha256 `c383abab…e395bc`), `cobertura-v0.6.txt`, `DIFERENCIAS-v0.5-v0.6.md`, `src/diferencias.jl`. Modelo que devuelve la API: **`deepseek-flash`** (DeepSeek-V4.1-Flash, esfuerzo `high`); `HORAS.log` con `date -Is` real. Sin Python, sin git, sin tocar nada fuera de `T04/`.
+
+**Nota de alcance**: la comprobación estructural de la v4 (`n_in/n_out/n_wit`, campos inactivos) sigue donde estaba —es la parte que la orden llama «estructura ya vigente» y no forma parte del cambio pedido—; moverla habría cambiado casos sin los dos defectos, lo que la orden prohíbe. Queda declarado en `INFORME.md` §SL4cO.7.

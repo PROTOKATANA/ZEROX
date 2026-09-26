@@ -1,0 +1,21 @@
+exportar: puntos=15 aleatorios=900 ev-replicas=120 salida=resultados/vectores-estado-dag-v0.6.txt
+  aleatorios 100/900
+  aleatorios 200/900
+  aleatorios 300/900
+  aleatorios 400/900
+  aleatorios 500/900
+  aleatorios 600/900
+  aleatorios 700/900
+  aleatorios 800/900
+  aleatorios 900/900
+  evidencia punto 1/8
+  evidencia punto 2/8
+  evidencia punto 3/8
+  evidencia punto 4/8
+  evidencia punto 5/8
+  evidencia punto 6/8
+  evidencia punto 7/8
+  evidencia punto 8/8
+  forma SL-4c-O/-B/-C: Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_estructura_cbid_orden" => 9, "bloque_estructura" => 108, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_estructura" => 108, "bloque_estructura_entradas" => 62, "con_tx_estructura" => 108, "bloque_estructura_ambos" => 9, "ev_orden_desc" => 128, "bloque_orden" => 243, "bloque_estructura_salidas" => 37, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 115)
+exportar: casos=2108 sha256=86348a48e32491c9cb3675fa1c2d7e06f4c20f94518f35b227778d28d4a90c19 -> resultados/vectores-estado-dag-v0.6.sha256
+exportar: cobertura -> resultados/cobertura-v0.6.txt evidencia=Dict("tardia" => 145, "construida" => 560, "aplicada" => 353, "duplicada" => 20, "deshecha" => 59, "sin_saldo" => 42) forma=Dict("bloque_cbid" => 283, "ev_cbid" => 283, "bloque_estructura_cbid_orden" => 9, "bloque_estructura" => 108, "bloque_orden_desc" => 128, "bloque_orden_igual" => 115, "ambos_cbid" => 161, "con_tx_orden" => 152, "ev_estructura" => 108, "bloque_estructura_entradas" => 62, "con_tx_estructura" => 108, "bloque_estructura_ambos" => 9, "ev_orden_desc" => 128, "bloque_orden" => 243, "bloque_estructura_salidas" => 37, "ev_orden" => 243, "con_tx_cbid" => 166, "ev_orden_igual" => 115)

@@ -932,3 +932,340 @@ push; nada escrito fuera de `T01/`.
   ni de `Plazo_slots` (SL-2/SL-2b).
 - Los vectores v0.3 y anteriores **no** se regeneran: su reparto es el de RAT-2 y así se
   conservan como evidencia histórica.
+
+# INFORME — T01-SL4c-O (parte O1: `cbid` ajeno y orden canónico como forma)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O.md` (motivo: `REVISION-RI-3b.md` H1), `CONTRATO-EVIDENCIA-v0.md`
+(RAT-1, EV-01/EV-04) y `CONTRATO-ESTADO-DAG-v0.md` §3. **Zona:** `T01/`. Sin Python;
+sin commit ni push; sin secretos; 1 hilo.
+
+## SL4c.1. Veredicto
+
+**SUPERADO.** En T01, el `cbid` ajeno (RAT-1) y el orden no canónico (EV-01/EV-04) dejan
+de devolverse como errores semánticos (`ErrCbidAjeno`, `ErrOrdenCanonico`) y pasan a ser
+**forma**: `ErrForma(EvidenciaCbidAjeno)` y `ErrForma(OrdenCanonicoInvalido)`, con la
+precedencia fija estructura → `cbid` → orden canónico y, después, la verificación
+semántica sin cambios. `Pkg.test()` **2212/2212** (testset nuevo `SL-4c-O (forma de
+EvidenceTx)` **30/30**; `SL-3` conserva su nombre, **2088/2088**); `run.jl` con
+**I-1…I-7 = 0 fallos** (5 108 historias de evidencia; clases `cbid`/orden/ambos =
+**1272/636/636**); vectores `vectores-transicion-v0.5.txt` (3 035 casos) releídos con
+**0 discrepancias**; `DIFERENCIAS-v0.4-v0.5.md` con **0 cambios no explicados** por los
+dos defectos.
+
+## SL4c.2. Faltas de definición detectadas antes de editar
+
+Tres, registradas en `PROGRESO.md` §SL4c.1 (FD-SL4c-1…3): representación Julia de
+`ErrForma` (el oráculo era plano; era la `AMBIGUEDAD-SL3-4`, que SL-3 había diferido),
+alcance de «cambio de resultado» en modo estricto y cómputo de los casos con los dos
+defectos. Ninguna obliga a elegir entre reglas incompatibles; no se detuvo la ejecución.
+
+## SL4c.3. Qué cambia y qué no
+
+| Elemento | Antes (v0.4) | Ahora (v0.5) |
+|---|---|---|
+| `cbid` ajeno | `ErrCbidAjeno` (semántico) | **`ErrForma(EvidenciaCbidAjeno)`** (forma) |
+| orden no canónico | `ErrOrdenCanonico` (semántico) | **`ErrForma(OrdenCanonicoInvalido)`** (forma) |
+| precedencia | estructura → `cbid` → EV-06 → orden → EV-07 → … | estructura → **`cbid` → orden** → EV-06 → EV-07 → … |
+| EV-06 identidad, EV-07 sellos, RAT-3, ventana, dedup | orden y resultado | **iguales** |
+| bloque inválido en estricto | sí | sí (en T01 cambia la **clase** del `RES`, no la validez) |
+| vectores por defecto | v0.4 | **v0.5** |
+
+En T01 no cambia qué bloques son válidos: el cambio observable es de **clasificación**
+(`RES`) y de precedencia. El efecto «bloque inválido en la admisión» (frente a descarte
+del bloque válido) es el que corrige T04 en la parte O2.
+
+## SL4c.4. Modelo de forma y cobertura
+
+- `@enum ClaseForma {EvidenciaCbidAjeno, OrdenCanonicoInvalido}`,
+  `struct ErrForma(clase)` y `Base.show` → `ErrForma(<clase>)`, igual que
+  `ErrorTransicion::ErrForma(ErrorFormaTx)` en Rust.
+- `const Err = Union{ErrSemantico, ErrForma}`: todo `isa Err` existente sigue significando
+  «error de transición»; los nombres viejos quedan como **alias transitorios** de la clase
+  de forma (T04 incluye este módulo y O2 los retira).
+- `cobertura-v0.5.txt` (mínimos de la orden entre paréntesis): `cbid_ajeno` **240**
+  (≥ 30), `orden_canonico` **120** (≥ 30), `ambos` **120** (≥ 5), `con_entradas` 120,
+  `aplicada` 260, `sin_saldo` 120, `duplicada` 40, `tardia` 200, `deshecha` 380.
+
+## SL4c.5. Tests y run.jl
+
+- `Pkg.test()`: **2212/2212**. El testset nuevo `SL-4c-O (forma de EvidenceTx)` cubre los
+  dos defectos por separado, el nombre exacto (`string`), la precedencia (estructura >
+  `cbid` > orden > EV-06/EV-07) y la cobertura ≥ 30/≥ 30/≥ 5. El testset `SL-3` conserva
+  su nombre y sus 2 088 aserciones, con los casos de `cbid`/orden actualizados a la forma.
+  Registro `resultados/test-pkg-SL4c.log`.
+- `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`: 147 456
+  puntos, **737 280** historias, 4 595 520 undos, **I-1…I-7 = 0 fallos**; bloque de
+  evidencia **5 108** historias (8 tipos × 12 puntos, `n = 53`), 22 444 undos, **8**
+  liberaciones RAT-3 bloqueadas, clases `cbid`/orden/ambos = **1272/636/636**, 0 fallos;
+  119,8 s de pared, 1 hilo (`JULIA_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`).
+  Registro `resultados/run-reducida-SL4c.log`.
+
+## SL4c.6. Vectores, relectura y diferencias
+
+- `resultados/vectores-transicion-v0.5.txt`: **3 035 casos** (2 795 de v0.4 + 240 nuevos),
+  sha256 `64d983acae1078f86b2c60001370249584da89808f11ebb0abedf91fd54be916`; `.sha256` en
+  formato `sha256sum` relativo a `T01/`.
+- Relectura independiente (`src/lector_vectores.jl`, por defecto ahora v0.5): **3 035
+  casos, 0 discrepancias** (`resultados/relectura-v0.5.log`).
+- v0.4 **intacto** (`sha256sum -c` OK). Releerlo con el oráculo nuevo da **120
+  discrepancias**, todas `ErrCbidAjeno` → `ErrForma(EvidenciaCbidAjeno)`; es la corrección
+  exacta y queda en `resultados/relectura-v0.4-con-SL4cO.log`.
+- `DIFERENCIAS-v0.4-v0.5.md` (generado por `comparar_vectores.jl`): de 2 795 casos
+  emparejados, **120 cambian de `RES`** (todos `ev-cbid`), **240 son nuevos** (`ev-orden`
+  120, `ev-ambos` 120), **0 cuerpos difieren** y **0 cambios carecen** de uno de los dos
+  defectos.
+
+## SL4c.7. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/T01
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl --aleatorios 2000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-transicion-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia comparar_vectores.jl \
+    resultados/vectores-transicion-v0.4.txt resultados/vectores-transicion-v0.5.txt \
+    DIFERENCIAS-v0.4-v0.5.md
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin `@fastmath`/`@simd`/`@inbounds`/`@turbo`; sin commit
+ni push; nada escrito fuera de `T01/`.
+
+## SL4c.8. Lo que T01-SL4c-O NO demuestra
+
+- Sigue siendo un oráculo de **semántica abstracta**: no modela la forma de wire v4
+  (bytes, tamaños, `txid`); la comprobación de `cbid`/orden opera sobre los campos
+  abstractos `IdentidadEvidencia`/`CabeceraEvidencia`.
+- El efecto «bloque inválido en la admisión» (frente a descarte) se ejerce en T04 (parte
+  O2); T01 solo fija la clasificación de forma y la precedencia.
+- Los alias `ErrCbidAjeno`/`ErrOrdenCanonico` son **transitorios**: no deben usarse como
+  errores semánticos, y SL-4c (Rust) y O2 los retiran.
+
+# INFORME — T01-SL4c-O-B (precedencia por transacción y los dos órdenes no canónicos)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O-B.md` (revisión del director de SL-4c-O), `ORDEN-SL4c-O.md` y
+`V-ZRX/LINEO.md`. **Zona:** `T01/`. Sin Python; sin commit ni push; sin secretos; 1 hilo.
+
+## SL4cOB.1. Veredicto
+
+**SUPERADO.** T01 ya comprobaba las transacciones **en su orden dentro del bloque** y, para
+cada una, su forma completa (estructura → `cbid` → orden canónico): la regla que fija el
+director. Por eso O1 no cambia el oráculo; añade los **dos tipos** de orden no canónico
+—descendente y por **igualdad** (`H1 = H2`)— y los **dos casos dirigidos** de dos
+`EvidenceTx` en un mismo bloque que demuestran la precedencia por transacción. `Pkg.test()`
+**2233/2233** (testset nuevo `SL-4c-O-B` **17/17**; `SL-4c-O` **32/32**; `SL-3`
+**2090/2090**); `run.jl` con **I-1…I-7 = 0 fallos** (5 120 historias de evidencia; igualdad
+**564**; dirigidos 2 evidencias **12/12**); vectores `vectores-transicion-v0.5.txt`
+(**3 179** casos) releídos con **0 discrepancias**; `DIFERENCIAS-v0.4-v0.5.md` con **0
+cambios no explicados** y **0 cuerpos distintos**. Los alias `ErrCbidAjeno`/
+`ErrOrdenCanonico` dejan de exportarse.
+
+## SL4cOB.2. Faltas de definición detectadas antes de editar
+
+Ninguna bloqueante. Se documentan tres lecturas adoptadas (FD-SL4cOB-1…3) en `PROGRESO.md`
+§SL4cOB.1: la versión de vectores se **regenera** en v0.5 (no se crea v0.6); la igualdad
+entra como tipo propio `ev-orden_igual` con subtotales de cobertura; los dos dirigidos se
+emiten para los 12 puntos de evidencia. No exigen elegir entre reglas incompatibles.
+
+## SL4cOB.3. Qué cambia y qué no
+
+| Elemento | Antes (v0.5 SL-4c-O) | Ahora (v0.5 SL-4c-O-B) |
+|---|---|---|
+| precedencia en T01 | transacción a transacción | **igual** (ya era la regla del director) |
+| orden no canónico | solo descendente (`H1 > H2`) | descendente **+ igualdad (`H1 = H2`)** |
+| dos evidencias en un bloque | no cubierto | **`ev-dir-orden-cbid` / `ev-dir-cbid-orden`** |
+| alias `ErrCbidAjeno`/`ErrOrdenCanonico` | exportados | **fuera de la lista de exportación** (constantes internas) |
+| `cobertura-v0.5.txt` | `orden_canonico` 120 | `orden_canonico` **252** (`orden_igual` 120, `orden_descendente` 132) |
+| vectores por defecto | v0.5 | **v0.5 regenerado** |
+| semántica (EV-06/EV-07/RAT-3/ventana/dedup) | orden y resultado | **iguales** |
+
+## SL4cOB.4. Precedencia por transacción y cobertura
+
+- `aplicar_txs!` recorre las transacciones en el orden del bloque y devuelve el primer
+  `Err`; `aplicar_evidencia!` comprueba estructura → `cbid` → orden canónico. La primera
+  transacción defectuosa fija el motivo, sin cambiar una línea.
+- Nuevo tipo de cobertura `:orden_igual` (`ph1 = ph2`); `:orden` sigue siendo el
+  descendente. `caso_dos_evidencias(P, :orden|:cbid)` construye el bloque con **dos**
+  `EvidenceTx` y el defecto en la primera; `casos_evidencia_dirigidos` devuelve los dos.
+- `cobertura-v0.5.txt`: `cbid_ajeno` **252** (≥ 30), `orden_canonico` **252** (≥ 30:
+  `orden_descendente` 132 + `orden_igual` 120), `ambos` **120** (≥ 5), `con_entradas` 120,
+  `aplicada` 260, `sin_saldo` 120, `duplicada` 40, `tardia` 200, `deshecha` 380.
+
+## SL4cOB.5. Tests y run.jl
+
+- `Pkg.test()`: **2233/2233**. Testset nuevo `SL-4c-O-B (precedencia y orden por igualdad)`
+  **17/17**: igualdad y descendente son forma; la igualdad no se confunde con el canónico;
+  los dos dirigidos devuelven `ErrForma(OrdenCanonicoInvalido)` /
+  `ErrForma(EvidenciaCbidAjeno)`; ≥ 10 igualdades, ≥ 30/≥ 30/≥ 5 y los mínimos previos.
+  Registro `resultados/test-pkg-SL4c-OB.log`.
+- `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`: 147 456
+  puntos, **737 280** historias, 4 595 520 undos, **I-1…I-7 = 0 fallos**; bloque de
+  evidencia **5 120** historias (9 tipos × 12 puntos, `n = 47`, más 24 dirigidos), 22 264
+  undos, **8** liberaciones RAT-3 bloqueadas, `cbid`/orden/ambos **1140/1140/564**,
+  igualdad **564**, dirigidos **12/12**, **0 fallos**; 124,8 s, 1 hilo. Registro
+  `resultados/run-reducida-SL4c-OB.log`.
+
+## SL4cOB.6. Vectores, relectura y diferencias
+
+- `resultados/vectores-transicion-v0.5.txt`: **3 179 casos** (2 795 de v0.4 + 384 nuevos),
+  sha256 `4c7e424ee786dc22c6c40c3d1b99c780c16414c9803cf2e1d43658af2c948427`; `.sha256` en
+  formato `sha256sum` relativo a `T01/`.
+- Relectura independiente (`src/lector_vectores.jl`): **3 179 casos, 0 discrepancias**
+  (`resultados/relectura-v0.5-SL4c-OB.log`).
+- v0.4 **intacto** (`4f0a175a…`, `sha256sum -c` OK).
+- `DIFERENCIAS-v0.4-v0.5.md` (generado por `comparar_vectores.jl`): de 2 795 casos
+  emparejados, **120 cambian de `RES`** (todos `ev-cbid`, alias → forma), **384 son
+  nuevos** (`ev-orden` 120, `ev-orden_igual` 120, `ev-ambos` 120, `ev-dir-*` 24),
+  **0 cuerpos difieren** y **0 cambios carecen** de uno de los dos defectos. Registro
+  `resultados/diferencias-v0.4-v0.5-SL4c-OB.log`.
+- Los alias viejos viven ahora solo como constantes internas del módulo (T04 incluye
+  `Transicion.jl`); `comparar_vectores.jl` los define localmente como cadenas.
+
+## SL4cOB.7. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/T01
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl --aleatorios 2000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-transicion-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia comparar_vectores.jl \
+    resultados/vectores-transicion-v0.4.txt resultados/vectores-transicion-v0.5.txt \
+    DIFERENCIAS-v0.4-v0.5.md
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin `@fastmath`/`@simd`/`@inbounds`/`@turbo`; sin commit
+ni push; nada escrito fuera de `T01/`. Entrada congelada `ENTRADA-SL4c-O-B.sha256`: **3/3 OK**.
+
+## SL4cOB.8. Lo que T01-SL4c-O-B NO demuestra
+
+- Sigue siendo un oráculo de **semántica abstracta**: no modela la forma de wire v4 (bytes,
+  tamaños, `txid`); la comprobación de `cbid`/orden opera sobre los campos abstractos
+  `IdentidadEvidencia`/`CabeceraEvidencia`.
+- El efecto «bloque inválido en la admisión» (frente a descarte) se ejerce en T04 (parte
+  O2), que debe aplicar la **misma** precedencia por transacción.
+- Los alias `ErrCbidAjeno`/`ErrOrdenCanonico` ya no son API del módulo; podrán retirarse
+  del todo cuando T04 deje de incluir `Transicion.jl`.
+
+# INFORME — T01-SL4c-O-C (parte O1: entradas/salidas como forma, EV-04)
+
+**Ejecutor:** DeepSeek `deepseek-flash` (esfuerzo `high`). **Fecha:** 2026-09-26.
+**Fuente:** `ORDEN-SL4c-O-C.md` (revisión del director de SL-4c-O-B),
+`CONTRATO-EVIDENCIA-v0.md` EV-04 y `V-ZRX/LINEO.md`. **Zona:** `T01/`. Sin Python; sin
+commit ni push; sin secretos; 1 hilo. **Presupuesto declarado (LINEO §7):** 30 min,
+1 hilo, 8 GiB de RAM, 2 GiB de disco; si se agota, checkpoint y estado **inconcluso**.
+
+## SL4cOC.1. Veredicto
+
+**SUPERADO.** En T01, la `EvidenceTx` con **entradas o salidas** deja de devolver el error
+semántico `ErrEvidenciaConEntradas` (EV-04) y pasa a ser **forma**:
+`ErrForma(EvidenciaConEntradasOSalidas)`, la **primera** de la precedencia
+(estructura → `cbid` → orden canónico). En modo estricto ya invalidaba el bloque: cambia
+la clase del `RES`, no la validez. `Pkg.test()` **2253/2253** (testset nuevo
+`SL-4c-O-C (entradas/salidas como forma)` **20/20**; `SL-4c-O-B` **17/17**; `SL-4c-O`
+**32/32**; `SL-3` **2090/2090**, con su nombre); `run.jl` con **I-1…I-7 = 0 fallos** y
+`VEREDICTO = SIN FALLOS`; vectores `vectores-transicion-v0.5.txt` (**3179** casos)
+releídos con **0 discrepancias**; `DIFERENCIAS-v0.4-v0.5.md` con **0 cambios no
+explicados** y **0 cuerpos distintos**.
+
+## SL4cOC.2. Faltas de definición detectadas antes de editar
+
+Cuatro lecturas adoptadas (FD-SL4cOC-1…4) y documentadas en `PROGRESO.md` §SL4cOC.1.
+Ninguna bloqueante ni exige elegir entre reglas incompatibles; no se detuvo la ejecución.
+
+## SL4cOC.3. Qué cambia y qué no
+
+| Elemento | Antes (v0.5 SL-4c-O-B) | Ahora (v0.5 SL-4c-O-C) |
+|---|---|---|
+| evidencia con entradas/salidas | `ErrEvidenciaConEntradas` (semántico) | **`ErrForma(EvidenciaConEntradasOSalidas)`** (forma) |
+| precedencia | estructura → `cbid` → orden | **igual** (la estructura ya iba primero) |
+| `cbid` ajeno / orden no canónico | forma | **iguales** |
+| semántica (EV-06/EV-07/RAT-3/ventana/dedup) | orden y resultado | **iguales** |
+| bloque inválido en estricto | sí | sí (cambia la **clase** del `RES`, no la validez) |
+| vectores por defecto | v0.5 | **v0.5 regenerado** |
+
+`ErrEvidenciaConEntradas` sale de `ErrSemantico` y de la exportación; queda como
+**constante interna** `ErrEvidenciaConEntradas = ErrForma(EvidenciaConEntradasOSalidas)`
+(igual que `ErrCbidAjeno`/`ErrOrdenCanonico`), para que T04 siga cargando hasta su O2.
+
+## SL4cOC.4. Modelo de forma y cobertura
+
+- `@enum ClaseForma {EvidenciaConEntradasOSalidas, EvidenciaCbidAjeno,
+  OrdenCanonicoInvalido}`: la clase estructural abre la precedencia; `aplicar_evidencia!`
+  devuelve `ErrForma(EvidenciaConEntradasOSalidas)` cuando `Tx.entradas` o `Tx.salidas`
+  no están vacías.
+- T01 no modela testigos (`n_wit`); el defecto cubierto es entradas/salidas, como en v0.4
+  (FD-SL4cOC-1).
+- `cobertura-v0.5.txt`: `con_entradas` **120** (clase nueva), `cbid_ajeno` 252,
+  `orden_canonico` 252 (`orden_descendente` 132 + `orden_igual` 120), `ambos` 120,
+  `aplicada` 260, `sin_saldo` 120, `duplicada` 40, `tardia` 200, `deshecha` 380.
+
+## SL4cOC.5. Tests y run.jl
+
+- `Pkg.test()`: **2253/2253**. El testset `SL-4c-O-C` comprueba el nombre exacto
+  (`string`), que es `ErrForma` y **no** `ErrSemantico`, la clase con salidas, con
+  entradas y con ambas, la precedencia estructura > `cbid` > orden > EV-06, que la
+  evidencia bien formada sigue siendo válida, el alias interno para T04 y las 30
+  réplicas del generador. Registro `resultados/test-pkg-SL4c-OC.log`.
+- `run.jl --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000`: 147 456
+  puntos, **737 280** historias, 4 595 520 undos, **I-1…I-7 = 0 fallos**; bloque de
+  evidencia **5 120** historias, 22 264 undos, **8** liberaciones RAT-3 bloqueadas,
+  forma `cbid`/orden/entradas/ambos = **1140/1140/564/564**, igualdad **564**, dirigidos
+  **12/12**, **0 fallos**; 121,5 s de pared, 1 hilo. `VEREDICTO = SIN FALLOS`. Registro
+  `resultados/run-reducida-SL4c-OC.log`.
+
+## SL4cOC.6. Vectores, relectura y diferencias
+
+- `resultados/vectores-transicion-v0.5.txt`: **3 179 casos** (2795 de v0.4 + 384),
+  sha256 `d72c5fd9bd9a988d03cca7168a612a5cbc83c2c088accaba1ad03421c599edc1`; `.sha256`
+  en formato `sha256sum` relativo a `T01/`. v0.4 **intacto** (`4f0a175a…`, `sha256sum -c`
+  OK).
+- Relectura independiente (`src/lector_vectores.jl`, por defecto v0.5): **3 179 casos,
+  0 discrepancias** (`resultados/relectura-v0.5-SL4c-OC.log`).
+- `DIFERENCIAS-v0.4-v0.5.md` (generado por `comparar_vectores.jl`): de 2 795 casos
+  emparejados, **240 cambian de `RES`** (120 `ev-cbid` + 120 `ev-con_entradas`, ambos
+  renombres semántico → forma), **384 son nuevos** (`ev-orden`, `ev-orden_igual`,
+  `ev-ambos`, `ev-dir-*`), **0 cuerpos difieren** y **0 cambios carecen** de uno de los
+  defectos. Registro `resultados/diferencias-v0.4-v0.5-SL4c-OC.log`.
+- **Coordinación O2 (T04):** `src/Transicion.jl` quedó editado con `mtime`
+  **`2026-09-26 23:39:41.298582413 +0200`** (epoch `1790458781`). O2 no debe ejecutar sus
+  pruebas finales hasta comprobar que este `mtime` es el suyo.
+
+## SL4cOC.7. Reproducibilidad
+
+```bash
+cd /home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/T01
+export JULIA_DEPOT_PATH=$PWD/.julia-depot JULIA_PKG_OFFLINE=true
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. -e 'using Pkg; Pkg.test()'
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. run.jl \
+    --seed 0x5a5a --replicas 5 --rejilla reducida --ev-historias 5000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. exportar.jl --aleatorios 2000
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia --project=. \
+    src/lector_vectores.jl resultados/vectores-transicion-v0.5.txt
+env -u LD_LIBRARY_PATH /home/katana/torio/.juliaup/bin/julia comparar_vectores.jl \
+    resultados/vectores-transicion-v0.4.txt resultados/vectores-transicion-v0.5.txt \
+    DIFERENCIAS-v0.4-v0.5.md
+```
+
+Julia 1.13.0; 1 hilo; sin Python; sin `@fastmath`/`@simd`/`@inbounds`/`@turbo`; sin commit
+ni push; nada escrito fuera de `T01/`. Entrada congelada `ENTRADA-SL4c-O-C.sha256`: **4/4 OK**.
+
+## SL4cOC.8. Lo que T01-SL4c-O-C NO demuestra
+
+- Sigue siendo un oráculo de **semántica abstracta**: no modela la forma de wire v4
+  (bytes, tamaños, `txid`) ni testigos (`n_wit`); el defecto estructural se comprueba
+  sobre los campos abstractos `Tx.entradas`/`Tx.salidas`.
+- No añade casos nuevos a los vectores (los 384 nuevos son los de SL-4c-O/SL-4c-O-B): los
+  únicos cambios de `RES` son los 240 renombres (120 `cbid` + 120 entradas).
+- El efecto «bloque inválido en la **admisión**» (frente a descarte) se ejerce en T04
+  (parte O2), que debe aplicar la misma precedencia por transacción.
+- Los alias internos (`ErrCbidAjeno`, `ErrOrdenCanonico`, `ErrEvidenciaConEntradas`) no
+  son API del módulo y podrán retirarse cuando T04 deje de incluir `Transicion.jl`.

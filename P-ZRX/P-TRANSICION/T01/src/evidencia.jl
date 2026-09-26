@@ -43,7 +43,12 @@ function _bloque_con_ev(P::Params, E::Estado, parent::Int, slot::Int, ev::Eviden
 end
 
 # Caso de cobertura `tipo ∈ (:aplicada,:duplicada,:tardia,:cbid,:sin_saldo,
-# :con_entradas)` para el índice `idx` (varía `pre_hash`, clave y rama base).
+# :con_entradas,:orden,:orden_igual,:ambos)` para el índice `idx` (varía
+# `pre_hash`, clave y rama base). SL-4c-O: `:cbid` y `:orden` son defectos de
+# **forma**; `:ambos` lleva los dos y debe devolver `EvidenciaCbidAjeno`
+# (precedencia). SL-4c-O-B añade `:orden_igual` (`H1 = H2`), el otro tipo de
+# orden no canónico, además del descendente `:orden`. SL-4c-O-C: `:con_entradas`
+# también es **forma** (`EvidenciaConEntradasOSalidas`) y precede a `cbid`/orden.
 function _caso_evidencia(P::Params, tipo::Symbol, idx::Int)
     rng = StableRNG(0x5100 + UInt64(idx) * 17 + UInt64(hash(tipo) & 0xffff))
     bloques, estados = _prefijo_ev(rng, P; n_post = 1 + (idx % 3))
@@ -60,6 +65,13 @@ function _caso_evidencia(P::Params, tipo::Symbol, idx::Int)
         sf = s - P.Plazo_slots            # ventana cerrada al aplicar
     elseif tipo == :cbid
         cbid = P.cbid + 1
+    elseif tipo == :orden
+        ph1, ph2 = ph2, ph1               # no canónico (descendente)
+    elseif tipo == :orden_igual
+        ph2 = ph1                         # no canónico por igualdad (H1 = H2)
+    elseif tipo == :ambos
+        cbid = P.cbid + 1
+        ph1, ph2 = ph2, ph1               # cbid ajeno + orden no canónico
     elseif tipo == :sin_saldo
         key = 99
     end
@@ -74,7 +86,8 @@ function _caso_evidencia(P::Params, tipo::Symbol, idx::Int)
         end
         return (string("ev-", tipo), bloques)
     elseif tipo == :con_entradas
-        # EV-04: EvidenceTx con salidas monetarias ⇒ ErrEvidenciaConEntradas.
+        # EV-04 (SL-4c-O-C): EvidenceTx con salidas monetarias ⇒ forma
+        # `ErrForma(EvidenciaConEntradasOSalidas)`, la primera de la precedencia.
         txs = Tx[tx_coinbase_post(3),
                  Tx(TxEvidencia, [Salida(900777, UInt64(1), key, OrigenTx, -1, -1)],
                     Int[], 0, key, UInt64(0), 0, UInt64(0), ev)]
@@ -92,11 +105,51 @@ function casos_evidencia_cobertura(P::Params; n::Int = 40)
     out = Tuple{String,Vector{Bloque}}[]
     for idx in 1:n
         for tipo in (:aplicada, :duplicada, :tardia, :cbid, :sin_saldo,
-                     :con_entradas)
+                     :con_entradas, :orden, :orden_igual, :ambos)
             nombre, bl = _caso_evidencia(P, tipo, idx)
             push!(out, (nombre, bl))
         end
     end
+    return out
+end
+
+# SL-4c-O-B: dos `EvidenceTx` en un mismo bloque (T01 solo tiene modo estricto:
+# el bloque es inválido). La primera transacción defectuosa manda, así que el
+# defecto de la **primera** evidencia fija el motivo. `primer ∈ (:orden, :cbid)`.
+# Devuelve `(bloques, esperado)` o `nothing` si el prefijo no alcanza terminal.
+function caso_dos_evidencias(P::Params, primer::Symbol)
+    rng = StableRNG(0x5c00 + UInt64(primer == :orden ? 1 : 2))
+    bloques, estados = _prefijo_ev(rng, P; n_post = 1)
+    E = estados[end]
+    E.terminal == -1 && return nothing
+    parent = bloques[end].id
+    s = E.slot + 1
+    ok1, ok2 = UInt64(6001), UInt64(6002)          # canónico (ascendente)
+    mal1, mal2 = UInt64(7002), UInt64(7001)        # no canónico (descendente)
+    if primer == :orden
+        e1 = evidencia(P.cbid, 1, 0, 0, 0, s, mal1, mal2)
+        e2 = evidencia(P.cbid + 1, 1, 0, 0, 0, s, ok1, ok2)
+        esperado = ErrForma(OrdenCanonicoInvalido)
+    elseif primer == :cbid
+        e1 = evidencia(P.cbid + 1, 1, 0, 0, 0, s, ok1, ok2)
+        e2 = evidencia(P.cbid, 1, 0, 0, 0, s, mal1, mal2)
+        esperado = ErrForma(EvidenciaCbidAjeno)
+    else
+        error("primer debe ser :orden o :cbid, no $primer")
+    end
+    B = gen_post(id = parent + 1, padre = parent, slot = s, productor = 1,
+                 peso = 1,
+                 txs = [tx_coinbase_post(3), tx_evidencia(e1), tx_evidencia(e2)])
+    return (vcat(bloques, [B]), esperado)
+end
+
+"Los dos casos dirigidos de dos evidencias (orden→cbid y cbid→orden) en `P`."
+function casos_evidencia_dirigidos(P::Params)
+    out = Tuple{String,Vector{Bloque}}[]
+    c1 = caso_dos_evidencias(P, :orden)
+    c1 === nothing || push!(out, ("ev-dir-orden-cbid", c1[1]))
+    c2 = caso_dos_evidencias(P, :cbid)
+    c2 === nothing || push!(out, ("ev-dir-cbid-orden", c2[1]))
     return out
 end
 

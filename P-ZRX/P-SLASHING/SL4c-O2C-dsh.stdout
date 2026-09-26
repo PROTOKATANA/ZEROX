@@ -1,0 +1,24 @@
+He cumplido la parte **O2 (oráculo T04)** de `ORDEN-SL4c-O-C`.
+
+## Falta de definición informada antes de editar (FD-SL4cOC-1)
+La orden pide tratar como forma la evidencia con «entradas, salidas **o testigos**» y «≥5 con los tres defectos a la vez (gana entradas)». El contrato EV-04 incluye `n_wit ≠ 0`, pero el modelo tipado `Transicion.Tx` de T01 (que T04 `include`a en solo lectura) **solo tiene `entradas` (`n_in`) y `salidas` (`n_out`): no existe campo de testigos**, y el códec de wire de la v4 está fuera de alcance (FD-5 de SL4a); el formato de línea de los vectores está fijado como «el mismo». Añadirlo exigiría tocar `Tx` (zona de O1) o el formato. Decisión declarada, sin tocar T01: implemento `entradas`, `salidas` y ambas, y añado además casos con los **tres defectos de la precedencia** (`entradas` + `cbid` ajeno + orden). Otras dos no bloqueantes: O1 deja `ErrEvidenciaConEntradas` como alias interno `ErrForma(EvidenciaConEntradasOSalidas)` (T04 retira su única referencia) y v0.6 se regenera en el mismo fichero.
+
+## Cambio
+- **`src/EstadoDAG.jl`**: `MOTIVO_FORMA_ESTRUCTURA = ErrForma(EvidenciaConEntradasOSalidas)` y `defecto_estructura_evidencia`; `primer_defecto_forma` aplica por transacción y en orden `estructura → cbid → orden`; la evidencia estructural ahora **invalida el bloque en la admisión** (no descarte).
+- **`src/dirigidos.jl`**: `_tx_evidencia_forma` y D-19 con modos de estructura; cobertura de 220 casos.
+- **`exportar.jl`**: contadores/mínimos de estructura (`bloque_estructura`, `_entradas`, `_salidas`, `_ambos`, `_cbid_orden`, `ev_estructura`, `con_tx_estructura`); retirada la rama semántica.
+- **`run.jl`, `test/runtests.jl`, `src/diferencias.jl`, `METODO.md`** actualizados.
+
+## Verificación (1 hilo, sin Python, nada fuera de `T04/`)
+| Prueba | Resultado |
+|---|---|
+| Entrada congelada | **4/4 OK** |
+| `mtime` de `T01/src/Transicion.jl` (O1, antes de las pruebas finales) | `2026-09-26 23:39:41.298582413 +0200` (epoch `1790458781`) |
+| `Pkg.test()` | **507/507** |
+| `run.jl --seed 0x5a5a --replicas 200` | **ESTADO = SUPERADO**, 0 fallos, 94,1 s |
+| Relectura v0.6 | **2 108 casos, 0 discrepancias** |
+| `DIFERENCIAS-v0.5-v0.6.md` | **181** con defecto, **135** cambios, **0** sin defecto |
+| Cobertura | `bloque_estructura=108` (62 entradas, 37 salidas, **9 ambos**), `bloque_estructura_cbid_orden=9`, `con_tx_estructura=108` → `minimos_SL4cO=OK` |
+| v0.4 (T01) y v0.5 (T04) | intactos (`ENTRADA-SL4c-O.sha256` 7/7 OK) |
+
+v0.6 regenerado: **2 108 casos**, sha256 `86348a48…4a90c19`. Secciones «SL-4c-O-C» añadidas a `INFORME.md` y `PROGRESO.md`, con `HORAS.log` (inicio 23:37:49, cierre 23:49:53). **Cierre O2: SUPERADO.**
