@@ -29,7 +29,8 @@ T04 (oráculo del estado DAG).
 | W06c | Red: mensajes y transporte | W02 | DeepSeek |
 | W06d1 | Nodo sin red: configuración dev, claves, `zx-storage` + `zx-cadena`, minero PoW con depósitos propios, productor PoST en régimen con hilo PoT y granjero, contextos `ContextoDag`/`InstantaneaPot` sobre `zx-cadena`, registro estructurado (`P-ZRX/P-MEDICION/ESCENARIOS-0.0.1.md` §1); un proceso con 3 claves cruza el corte y reinicia | W05b3, W06a, W06b | **Sonnet** (integración compleja) con revisor independiente |
 | W06d2 | Red del nodo: anuncio, petición por hash, localizador PoW, huérfanos acotados, penalización; herramienta adversarial separada (E-7, E-8) | W06c, W06d1 | Sonnet o DeepSeek, con revisor independiente |
-| W06e | Integración multinodo en proceso: 3 nodos cruzan el corte, convergen, reinician, se reorganizan | W06d | DeepSeek |
+| W06d3 | PoST por red (justificación en `BloqueRed::Post`), bifurcaciones PoW en el nodo, tres procesos de extremo a extremo (absorbe W06e) | W06d2 | Sonnet |
+| W06e | (absorbida por W06d3) Integración multinodo en proceso: 3 nodos cruzan el corte, convergen, reinician, se reorganizan | W06d | DeepSeek |
 | W07 | Red de procesos reales y mediciones (latencia, recursos, errores, fallos y ataques especificados) | W06e | DeepSeek + revisión Sonnet |
 
 ## 3. Criterio de cierre de W06
