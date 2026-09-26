@@ -1,0 +1,13 @@
+   Compiling zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b3/ws/crates/zx-post)
+    Finished `release` profile [optimized] target(s) in 10.68s
+     Running tests/regimen.rs (/home/katana/zeo/ZEROX/deepseek/W05b3/target/release/deps/regimen-d0c77bb9e3cc966d)
+
+running 1 test
+[V6] N_dev real = 138873760; preparación (historia + parcelas) 9.410 s
+[V6] slot 1: producción 1.852 s, verificación 0.066 s
+[V6] slot 2: producción 1.434 s, verificación 0.066 s
+[V6] slot 3: producción 1.433 s, verificación 0.066 s
+test v6_extremo_a_extremo_con_n_dev_real ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 9.41s
+

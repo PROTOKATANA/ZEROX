@@ -101,6 +101,23 @@ pub enum ErrorContextoTransicion {
         /// El hash del terminal.
         hash: BlockHash,
     },
+    /// **H2 de RI-1b:** dos registros validados del **mismo slot** traen `salida` distinta.
+    ///
+    /// El flujo es único y sin inyecciones (D-P10): `salida(f, s)` es una función determinista del
+    /// flujo y del slot. Dos bloques del mismo slot **comparten** salida (hermanos); dos salidas
+    /// distintas solo pueden venir de un fallo aguas arriba. Antes el segundo registro se
+    /// descartaba en silencio con `or_insert`, ocultándolo.
+    #[error(
+        "dos registros validados del slot {slot} traen salidas distintas: {primera:?} y {otra:?}"
+    )]
+    SalidaDeSlotDiscrepa {
+        /// Slot repetido.
+        slot: u64,
+        /// Salida del primer registro que ocupó el slot.
+        primera: [u8; POT_OUTPUT_BYTES],
+        /// Salida discrepante del registro posterior.
+        otra: [u8; POT_OUTPUT_BYTES],
+    },
 }
 
 /// Entrada interna indexada por `block_hash`.
@@ -174,10 +191,22 @@ impl ContextoTransicion {
                 },
             );
             // El flujo es único y sin inyecciones: la salida de un slot es una función determinista
-            // del flujo y del slot, así que dos bloques del mismo slot comparten salida.
-            salidas_por_slot
-                .entry(registro.slot)
-                .or_insert(registro.salida);
+            // del flujo y del slot, así que dos bloques del mismo slot comparten salida. **H2 de
+            // RI-1b:** si el slot ya está ocupado con otra salida, es un fallo aguas arriba y se
+            // devuelve error explícito en vez de descartar el segundo registro en silencio.
+            match salidas_por_slot.get(&registro.slot) {
+                None => {
+                    salidas_por_slot.insert(registro.slot, registro.salida);
+                }
+                Some(primera) if *primera == registro.salida => {}
+                Some(primera) => {
+                    return Err(ErrorContextoTransicion::SalidaDeSlotDiscrepa {
+                        slot: registro.slot,
+                        primera: *primera,
+                        otra: registro.salida,
+                    });
+                }
+            }
         }
 
         let mut pasado: Vec<BloqueDelPasado> = vec![BloqueDelPasado {
@@ -458,6 +487,38 @@ mod tests {
             ContextoTransicion::nuevo(t, N, SR, vec![a, a]),
             Err(ErrorContextoTransicion::RegistroDuplicado { hash }) if hash == h(0x0A)
         ));
+    }
+
+    /// **H2 de RI-1b.** Dos registros validados del mismo slot con salidas distintas ya no se
+    /// ocultan con `or_insert`: son un error explícito.
+    #[test]
+    fn salidas_distintas_del_mismo_slot_se_rechazan() {
+        let t = h(0x01);
+        let padres = PadresDag::nuevo(t, &[]).expect("p");
+        let a = RegistroValidado::nuevo(h(0x0A), 1, [0xAA; 16], padres);
+        let b = RegistroValidado::nuevo(h(0x0B), 1, [0xBB; 16], padres);
+        assert!(matches!(
+            ContextoTransicion::nuevo(t, N, SR, vec![a, b]),
+            Err(ErrorContextoTransicion::SalidaDeSlotDiscrepa { slot: 1, primera, otra })
+                if primera == [0xAA; 16] && otra == [0xBB; 16]
+        ));
+
+        // La discrepancia también alcanza al ancla del terminal (slot 0 con salida ≠ S1).
+        let s1 = crate::pot::semilla_genesis(&t, &[]);
+        assert_ne!(s1, [0xCC; 16]);
+        let intruso = RegistroValidado::nuevo(h(0x0C), 0, [0xCC; 16], padres);
+        assert!(matches!(
+            ContextoTransicion::nuevo(t, N, SR, vec![intruso]),
+            Err(ErrorContextoTransicion::SalidaDeSlotDiscrepa { slot: 0, .. })
+        ));
+
+        // Dos hermanos del mismo slot con la **misma** salida siguen siendo válidos.
+        let hermano = RegistroValidado::nuevo(h(0x0D), 1, [0xAA; 16], padres);
+        let ctx = ContextoTransicion::nuevo(t, N, SR, vec![a, hermano]).expect("hermanos");
+        assert_eq!(
+            ctx.salida_validada(1).expect("salida del slot 1"),
+            [0xAA; 16]
+        );
     }
 
     #[test]

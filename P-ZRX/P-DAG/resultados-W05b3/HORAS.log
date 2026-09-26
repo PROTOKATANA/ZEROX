@@ -1,0 +1,20 @@
+# HORAS.log — ORDEN-W05b3
+# Marcas `date -Is` (hora local, +02:00). Donde no hubo captura directa, mtime del log asociado.
+# Zona: /home/katana/zeo/ZEROX/deepseek/W05b3/
+2026-09-26T04:11:00+02:00  inicio de sesión; lectura íntegra de ORDEN-W05b3.md, V-ZRX/LINEO.md, DECISIONES-W05.md (D-P07…D-P13), PERFIL-DEV-v0.md, FORMATO-v0.md (con v0.1), REVISION-W05b2.md, REVISION-RI-1b.md y el código de crates/zx-post y crates/zx-dag de la raíz
+2026-09-26T04:14:01+02:00  ENTRADA INICIO: sha256sum -c de ENTRADA-W05b3.sha256 -> 7/7 coinciden, exit=0 (logs/entrada-inicio.log)
+2026-09-26T04:14:21+02:00  línea base: cargo test --list en ws.orig -> 631 tests (logs/raiz-test-list.log)
+2026-09-26T04:15:00+02:00  montaje: ws.orig = raíz tras W02b (8 crates, Cargo.lock raíz); ws = copia; .cargo-home y target copiados de W05b2R; enlace ws/PDF -> raíz/PDF
+2026-09-26T04:18:00+02:00  faltas de definición informadas antes de escribir código (8); interpretaciones declaradas (logs/V0-faltas-de-definicion.md)
+2026-09-26T04:18:15+02:00  primer cargo check -p zx-post (lib + tests nuevos) (logs/check-post.log)
+2026-09-26T04:23:00+02:00  H2: ContextoTransicion::nuevo devuelve ErrorContextoTransicion::SalidaDeSlotDiscrepa si dos registros validados del mismo slot traen salida distinta + test
+2026-09-26T04:23:00+02:00  módulos nuevos servicio_pot.rs (ServicioPot, InstantaneaPot, ventana acotada, registrar_validado) y productor_regimen.rs (producir_en_regimen, CuerpoProductor, ErrorRegimen) con tests internos
+2026-09-26T04:25:05+02:00  tests/regimen.rs (V4 positivos, V5 negativos, V6 ignorado): 15 pasan, 0 fallan, 1 ignorado en debug (logs/regimen-debug.log); los tests buscan el slot con solución, sin mocks
+2026-09-26T04:37:51+02:00  V3 (1ª pasada) cargo test --workspace --all-features --locked -> 655 pasan, 0 fallan, 2 ignorados; 631 previos, 0 perdidos, 26 añadidos (logs/V3-test.log, logs/nombres-*.txt)
+2026-09-26T04:37:57+02:00  V7 bash ci/dependencias-exactas.sh -> OK, 20 dependencias exactas; bash ci/frontera-crates.sh -> 6 fronteras OK, incluida zx-post -> {zx-core,zx-pot,zx-dag,zx-poas}; Cargo.lock idéntico a ws.orig (logs/V7-*.log)
+2026-09-26T04:38:57+02:00  V1 cargo fmt --all -- --check -> exit 0 (logs/V1-fmt.log)
+2026-09-26T04:38:58+02:00  V2 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> exit 0 (logs/V2-clippy.log)
+2026-09-26T04:39:19+02:00  V6 (medida corregida: la producción incluye el avance PoT) cargo test -p zx-post --release --test regimen -- --ignored --nocapture v6_ -> 3 bloques Comprobada; producción 1,852 / 1,434 / 1,433 s, verificación 0,066 s/bloque; preparación 9,41 s (logs/V6-medicion-real.log)
+2026-09-26T04:50:27+02:00  V3 (2ª pasada, árbol final) cargo test --workspace --all-features --locked -> 655 pasan, 0 fallan, 2 ignorados, exit=0 (logs/V3-test.log)
+2026-09-26T04:50:37+02:00  ENTREGA: cambios.patch (6 ficheros, 88 862 B; aplica limpio y reconstruye ws byte a byte), MIGRACION.sha256 (158 huellas, sha256sum -c OK); ENTRADA FINAL 7/7 (logs/entrada-final.log)
+2026-09-26T04:50:37+02:00  fin; presupuesto (2 h / 8 hilos / 16 GiB / 40 GiB) no agotado (~40 min de reloj). Sin secretos, sin commit ni push, nada fuera de la zona.

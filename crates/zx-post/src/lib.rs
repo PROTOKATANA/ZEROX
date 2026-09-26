@@ -1,5 +1,6 @@
 //! Crate `zx-post`: PoT puro, rango PoT, puerta conjunta, contexto de transición dev,
-//! justificación PoT del wire y productor del bloque de transición (D-P14, W05b2).
+//! justificación PoT del wire, productor del bloque de transición (W05b2), servicio PoT local y
+//! productor en régimen (W05b3) (D-P14).
 //!
 //! Depende solo de `zx-core`, `zx-pot`, `zx-dag` y `zx-poas` (frontera §V8). No depende de
 //! `zx-consensus` salvo como `dev-dependency` para minar la cadena PoW de los tests de extremo a
@@ -19,6 +20,8 @@ pub mod justificacion;
 pub mod pot;
 pub mod pot_rango;
 pub mod productor;
+pub mod productor_regimen;
+pub mod servicio_pot;
 
 pub use cabecera_conjunta::{
     EstadoCabeceraConjunta, HechosPost, MotivoCabeceraInvalida, MotivoCabeceraPendiente,
@@ -46,3 +49,5 @@ pub use productor::{
     ErrorProductor, FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de,
     producir,
 };
+pub use productor_regimen::{CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen};
+pub use servicio_pot::{ErrorServicioPot, ServicioPot};

@@ -1,0 +1,13 @@
+**ORDEN-W05b3 cumplida — veredicto SUPERADO.** Zona: `/home/katana/zeo/ZEROX/deepseek/W05b3/`.
+
+**Faltas de definición informadas antes de editar** (`logs/V0-faltas-de-definicion.md`, 8 puntos; interpretación declarada en cada uno): (1) `InstantaneaPot::pasado()` no se deduce del estado PoT ⇒ `ServicioPot::registrar_validado`; (2) el cuerpo llega sin coinbase y con testigos, y el productor antepone la v3; (3) «slot objetivo» = slot exacto; (4) `N_dev` duplicado ⇒ `NDevDiscrepante`; (5) F-17 se rechaza en `zx-consensus` (`aplicar_coinbase_post`, `aplicar.rs:370-373`), no en la puerta; (6) `>15` padres y extras no canónicos se rechazan en el formato de `zx-core`; (7) `ContextoRangoDag` sigue siendo la constante dev D-P11; (8) la frontera de `zx-post` ya estaba en `ci/frontera-crates.sh`.
+
+**Qué se hizo** (solo `zx-post`, 6 ficheros; `producir` de W05b2 intacto):
+- `servicio_pot.rs`: `ServicioPot` puro (sin hilos), arranca de S1, avanza un slot por llamada con `N_dev`, flujo único sin inyecciones `D=0`, ventana acotada configurable con error explícito, `registrar_validado` e `impl InstantaneaPot`.
+- `productor_regimen.rs`: `producir_en_regimen(padres, slot_objetivo, servicio, fuente, clave, parametros, cuerpo)` — varios padres, `slot > slot(sp)`, `d ≤ 150`, justificación `(slot(sp), slot(B)]`, coinbase v3 con el slot del bloque (F-17), sello; `CuerpoProductor`/`ErrorRegimen`.
+- H2 de RI-1b: `ErrorContextoTransicion::SalidaDeSlotDiscrepa` en vez de `or_insert` silencioso.
+- `tests/regimen.rs`: `ContextoDag` = `AlmacenGhostdag` real, `InstantaneaPot` = `ServicioPot`, fuente = `ParcelaDisco` real; los tests buscan el slot con solución (sin mocks).
+
+**Verificación** (logs en `logs/`): V1 fmt exit 0; V2 clippy workspace all-targets exit 0; V3 **655 pasan, 0 fallan, 2 ignorados**, 631 previos, **0 perdidos**, 26 añadidos; V4 5/5 `Comprobada` (cadena de 8, hermanos + fusión, 3 ramas, hueco 150, cuerpo); V5 10/10 con motivo exacto; V6 release con `N_dev=138 873 760` 3/3 `Comprobada` (producción 1,852/1,434/1,433 s; verificación 0,066 s/bloque); V7 scripts OK y `Cargo.lock` idéntico. Entrada congelada 7/7 al inicio y al cierre. `cambios.patch` (6 ficheros) aplica y reconstruye `ws` byte a byte; `MIGRACION.sha256` 158 huellas OK. Sin secretos, sin commit/push, nada fuera de la zona, sin Python, presupuesto no agotado (~40 min).
+
+**No demuestra**: estado/garantía, admisión en nodo, red, sesgo de semilla (A-07), seguridad de parámetros dev ni el controlador de rango (D-P11).

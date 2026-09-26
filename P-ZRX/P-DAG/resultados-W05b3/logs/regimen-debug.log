@@ -1,0 +1,27 @@
+   Compiling zx-post v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W05b3/ws/crates/zx-post)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.50s
+     Running tests/regimen.rs (/home/katana/zeo/ZEROX/deepseek/W05b3/target/debug/deps/regimen-5b13eb0857fd07f5)
+
+running 16 tests
+test v4_cuerpo_con_una_transaccion_extra ... ok
+test v4_cadena_de_ocho_bloques_en_regimen has been running for over 60 seconds
+test v4_fusion_de_tres_ramas has been running for over 60 seconds
+test v4_hermanos_del_mismo_slot_y_fusion has been running for over 60 seconds
+test v4_hueco_de_150_slots ... ok
+test v5_checkpoint_alterado_es_invalido ... ok
+test v4_hermanos_del_mismo_slot_y_fusion ... ok
+test v5_hueco_de_151_slots_es_error ... ok
+test v5_coinbase_v3_con_slot_distinto_se_rechaza_en_consenso ... ok
+test v5_padre_desconocido_queda_pendiente ... ok
+test v5_padres_excesivos_y_no_canonicos_se_rechazan ... ok
+test v5_pot_output_alterado_es_invalido ... ok
+test v5_sello_de_otra_clave_es_invalido ... ok
+test v5_slot_que_no_progresa_es_error ... ok
+test v5_padre_seleccionado_que_no_da_ghostdag_es_invalido ... ok
+test v6_extremo_a_extremo_con_n_dev_real ... ignored, V6: N_dev real (138 873 760); se ejecuta en release con --ignored
+test v5_solucion_de_otra_clave_es_invalida ... ok
+test v4_fusion_de_tres_ramas ... ok
+test v4_cadena_de_ocho_bloques_en_regimen ... ok
+
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 130.02s
+
