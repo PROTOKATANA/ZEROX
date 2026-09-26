@@ -289,3 +289,29 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   traspaso con la sección «Katana ausente». Hallazgo al hacerlo: el código de W06d2…W06d5 y SL-4a no ha tenido
   revisor independiente (IPA E-11 → RI-3).
 - W06d5: suite conjunta (intento 4) en marcha, 461 tests pasados y 0 fallos a las 22:22.
+
+### 22:46–23:01 — sesión nueva (AUTO-ZRX relanzado; Katana ausente)
+
+- Arranque desde `R-ZRX/TRASPASO-2026-09-26.md`. W06d5 sigue en la otra sesión (procesos `zx-node` vivos en
+  `deepseek/W06d5/`): no se toca; no se migra nada a `crates/` hasta su commit de revisión.
+- **RI-3** (`P-REVISION-CODIGO/ORDEN-RI-3.md`, entrada congelada): RI-3a (red: `zx-p2p`, `zx-node/src/red/`) y
+  RI-3b (castigo de SL-4a) lanzadas con Sonnet; RI-3c (lógica del nodo) espera a W06d5.
+- **SL-4b partido en dos.** SL-4b1 (DeepSeek, lanzada 22:54): portar el firmante seguro de `9681061` a
+  **`zx-post/src/firmante/`** (decisión: es política local de producción, FIR-15; en el árbol nuevo
+  `zx-consensus` es validación) con identidad RAT-1 (lleva `consensus_branch_id`, esquema v2), sin `alta.rs`
+  (claves dev deterministas), y variantes **aditivas** `_con_firmante` de los productores para no chocar con
+  W06d5. SL-4b2 (Sonnet, redactada, sin congelar): activación en el perfil dev (`Plazo_slots = 300`,
+  `M_margen_slots = 60`, **`R_SLOTS` 60 → 600** por SL-2b), detector de doble firma que solo indexa cabeceras
+  con puerta conjunta superada (evita llenar memoria con sellos sobre cabeceras inventadas), envío por
+  inclusión propia (no hay relevo de tx), `zx-adversario doble-firma` (re-sella con la clave dev 0 cambiando
+  solo `timestamp`) y prueba de extremo a extremo. Se revierte si RI-3 o SL-4b1 lo desaconsejan.
+- **W07 partido en tres.** Esquema de registro v1 (`P-MEDICION/ESQUEMA-REGISTRO-v1.md`, contrato común): el
+  nodo actual no registra slot, bytes, par ni tiempos por etapa. W07a (instrumentación, DeepSeek; redactada,
+  tras W06d5), W07b (ejecuciones E-1…E-9, Sonnet; por redactar tras leer W06d5) y **W07c** (analizador Julia
+  de los registros, DeepSeek, lanzada 22:58 con los registros v0 de W06d4 como datos reales).
+- `D-ZRX/PREGUNTAS-KATANA.md` abierto: PK-01 (fuente de peso provisional de la capa de votos; recomendación:
+  garantía como peso **solo en la red dev**, tras interfaz, con sectores cuando exista el registro) y PK-02
+  (asegurar los 95 archivos que solo están en `.trash`; recomendación: copiarlos a `R-ZRX/LEGADO/`).
+- **Incidente de carga (22:57):** carga 65 en 32 hilos con mis cuatro trabajos y los cuatro `zx-node` de
+  W06d5 (≈ 5 núcleos cada uno). Para no falsear sus pruebas de reloj, bajé a `nice 19` los 69 procesos de mis
+  trabajos (sin pararlos). Lección: con W06d5 vivo, lanzar como mucho dos compilaciones a la vez.
