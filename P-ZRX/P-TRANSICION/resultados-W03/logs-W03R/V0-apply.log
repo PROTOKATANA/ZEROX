@@ -1,0 +1,3 @@
+$ cd /home/katana/zeo/ZEROX/deepseek/W03R/ws
+$ GIT_CEILING_DIRECTORIES=/home/katana/zeo/ZEROX/deepseek/W03R git apply -p1 --exclude=Cargo.lock /home/katana/zeo/ZEROX/deepseek/W03/cambios.patch
+exit=0

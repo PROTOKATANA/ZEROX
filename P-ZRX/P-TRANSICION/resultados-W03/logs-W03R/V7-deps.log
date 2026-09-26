@@ -1,0 +1,4 @@
+$ cd /home/katana/zeo/ZEROX/deepseek/W03R/ws
+$ bash ci/dependencias-exactas.sh
+OK — 20 dependencias con versión exacta
+exit=0

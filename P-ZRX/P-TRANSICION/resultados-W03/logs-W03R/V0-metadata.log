@@ -1,0 +1,7 @@
+$ cd /home/katana/zeo/ZEROX/deepseek/W03R/ws
+$ cargo metadata --format-version 1 >/dev/null
+
+real	0m0.123s
+user	0m0.094s
+sys	0m0.031s
+exit=0

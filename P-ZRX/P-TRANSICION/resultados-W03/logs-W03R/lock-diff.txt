@@ -1,0 +1,21 @@
+# logs/lock-diff.txt — ORDEN-W03-R, paso 3
+# Raiz actual == ws.orig/Cargo.lock. Tras aplicar el parche (excluyendo Cargo.lock) y ejecutar UNA
+# sola vez `cargo metadata --format-version 1 >/dev/null` dentro de ws (sin `cargo update`).
+# Comando: cd /home/katana/zeo/ZEROX/deepseek/W03R/ws && cargo metadata --format-version 1 >/dev/null
+# Comprobacion: diff -u ws.orig/Cargo.lock ws/Cargo.lock
+
+--- ws.orig/Cargo.lock	2026-09-26 02:40:20.929661170 +0200
++++ ws/Cargo.lock	2026-09-26 03:00:39.794884317 +0200
+@@ -4634,6 +4634,7 @@
+ name = "zx-consensus"
+ version = "0.0.0"
+ dependencies = [
++ "ed25519-zebra",
+  "primitive-types",
+  "proptest",
+  "thiserror 2.0.20",
+
+# Recuento: lineas anadidas que no son cabecera = 1 ; lineas eliminadas = 0
+# Hash sha256 de ambos locks:
+d7cef01347b66f7090e1006592791959cc170d936d22e847f514691fdbe50b72  ws.orig/Cargo.lock
+4da3e37c69fa0e374d7d7b0d5931cb502d3c83f8459485a3318efa1f2ce2257d  ws/Cargo.lock

@@ -1,0 +1,25 @@
+# logs/comparacion-tests.txt — ORDEN-W03-R, criterio de 'todos los tests de la raiz + los de W03'
+# Lista de tests obtenida con: cargo test --workspace --all-features --locked -- --list
+#   raiz actual = ws.orig   -> logs/raiz-test-list.log   (503 entradas)
+#   rebase W03  = ws        -> logs/ws-test-list.log     (517 entradas)
+
+# Tests de la raiz que faltan en ws (debe estar vacio):
+# --- fin (vacio = ningun test previo desaparece) ---
+
+# Tests presentes solo en ws (los 14 anadidos por W03):
+diferencial_t01
+la_aplicacion_es_determinista
+transicion::tests::coinbase_post_a_otra_clave_se_rechaza
+transicion::tests::coinbase_post_en_posicion_dos_se_rechaza
+transicion::tests::coinbase_pow_sin_salidas_se_rechaza
+transicion::tests::deposito_con_cambio_crea_el_cambio_y_acredita_la_garantia
+transicion::tests::dos_coinbases_se_rechazan
+transicion::tests::fusion_descarta_doble_gasto
+transicion::tests::fusion_descarta_liberacion_prematura
+transicion::tests::fusion_descarta_retiro_duplicado
+transicion::tests::fusion_recorta_la_coinbase_post
+transicion::tests::multisig_2_de_3_autoriza_y_el_orden_importa
+transicion::tests::un_testigo_invalido_puede_coincidir_con_el_compromiso
+undo_exacto_e_i1_en_secuencias_validas
+
+# Recuento: raiz=503, ws=517, anadidos=14, perdidos=0.

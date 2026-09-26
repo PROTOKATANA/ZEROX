@@ -4634,6 +4634,7 @@ dependencies = [
 name = "zx-consensus"
 version = "0.0.0"
 dependencies = [
+ "ed25519-zebra",
  "primitive-types",
  "proptest",
  "thiserror 2.0.20",

@@ -1,0 +1,22 @@
+## ORDEN-W03-R — completada. Veredicto: **SUPERADO**
+
+Leí íntegra la orden y `V-ZRX/LINEO.md` antes de ejecutar. Todo el trabajo quedó en la zona `/home/katana/zeo/ZEROX/deepseek/W03R/`.
+
+### Resultado
+- **Parche:** `git apply -p1 --exclude=Cargo.lock deepseek/W03/cambios.patch` aplica limpio; los 13 ficheros nuevos y los 4 modificados quedan **byte a byte idénticos** a `deepseek/W03/ws`.
+- **Lock:** un único `cargo metadata --format-version 1 >/dev/null` (sin `cargo update`) produce **exactamente +1 línea**: `"ed25519-zebra",` en las dependencias de `zx-consensus`; **0 eliminadas, 0 cambios de versión** (`logs/lock-diff.txt`).
+- **Tests:** `cargo test --workspace --all-features --locked` → **516 pasan, 0 fallan, 1 ignorado** (banco preexistente). La raíz actual tenía **503** tests por nombre; `ws` tiene **517**; **0 perdidos, 14 añadidos** (11 unitarios de `transicion/tests.rs`, 1 `diferencial_t01`, 2 proptest).
+- **Diferencial:** `diferencial_t01` → **2 055 casos, 1 947 con PoST, 0 discrepancias** (162,3 s).
+- **fmt/clippy:** limpios (`clippy -D warnings`, 9,06 s con caché caliente).
+- **CI:** `dependencias-exactas.sh` → OK, 20 dependencias exactas; `frontera-crates.sh` → las 5 fronteras OK.
+
+### Entregables
+`cambios.patch` (18 ficheros, 8 356 518 B, `diff -ruN -x target -x .cargo-home -x PDF ws.orig ws`, aplica limpio sobre la raíz), `MIGRACION.sha256` (130 huellas, `sha256sum -c` OK), `logs/` (13 ficheros), `INFORME.md` y `HORAS.log`.
+
+### Incidencias documentadas (sin efecto en el resultado)
+1. `--exclude=Cargo.lock` literal falla porque `ws/` está dentro del repo git de la raíz (git antepone la ruta del repo al patrón); se ejecutó el mismo comando con `GIT_CEILING_DIRECTORIES=$ZONE`. Alternativa equivalente comprobada: `--exclude='*Cargo.lock'`.
+2. `cargo fmt` no admite `--locked`; se ejecutó `cargo fmt --all -- --check` tal cual, y `--locked` se aplicó a `clippy` y `test`.
+3. El primer `cargo metadata` se lanzó desde la raíz de la zona y resolvió el workspace padre; **no modificó nada** (verificado). Se repitió dentro de `ws`.
+4. Compartir `CARGO_TARGET_DIR` entre `ws.orig` y `ws` dejó `zx-consensus` inconsistente al enumerar tests; se resolvió con `cargo clean -p zx-consensus` y el test completo final se re-ejecutó limpio.
+
+Sin Python, sin commit/push, sin secretos, nada escrito fuera de la zona. Presupuesto (1 h / 8 hilos / 16 GiB): ~22 min de reloj.

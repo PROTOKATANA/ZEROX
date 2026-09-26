@@ -37,7 +37,7 @@ pub const LONGITUD_FIRMA: usize = 64;
 ///
 /// Desde P-020 este tipo es también lo que guarda una salida `PubKey`: ZEROX usa **P2K, no P2KH**,
 /// así que no existe ningún `HashClave`. Ver [`crate::tx::Lock`].
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ClavePublica([u8; LONGITUD_CLAVE]);
 
 impl ClavePublica {

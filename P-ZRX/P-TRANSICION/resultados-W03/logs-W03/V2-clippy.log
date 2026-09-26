@@ -1,0 +1,16 @@
+    Checking hex v0.4.3
+    Checking cpufeatures v0.3.1
+    Checking constant_time_eq v0.4.2
+    Checking cpubits v0.1.1
+    Checking arrayvec v0.7.8
+    Checking inout v0.2.2
+    Checking cipher v0.5.2
+    Checking blake3 v1.8.7
+    Checking uint v0.10.1
+    Checking primitive-types v0.14.0
+    Checking aes v0.9.3
+    Checking zx-pot v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W03/ws/crates/zx-pot)
+    Checking zx-core v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W03/ws/crates/zx-core)
+    Checking zx-dag v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W03/ws/crates/zx-dag)
+    Checking zx-consensus v0.0.0 (/home/katana/zeo/ZEROX/deepseek/W03/ws/crates/zx-consensus)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.93s

@@ -18,6 +18,7 @@ pub mod genesis;
 pub mod minero_dev;
 pub mod parametros;
 pub mod timestamps;
+pub mod transicion;
 pub mod verificador;
 
 pub use activacion::{

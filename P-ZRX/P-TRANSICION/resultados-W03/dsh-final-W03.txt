@@ -1,0 +1,12 @@
+He leído íntegros la orden y `LINEO.md`, y completado W03. Resumen final (≤ 40 líneas):
+
+**Veredicto: SUPERADO** (V1–V7).
+
+- **Implementación** en `crates/zx-consensus/src/transicion/` (`error`, `tipos`, `estado`, `aplicar`, `seleccion`, `fusion`, `tests`): `aplicar`, `aplicar_con_undo`, `deshacer` (undo por delta), `seleccionar` (FC‑3), `nodo_en_linea` (C‑FIN‑01), `aplicar_fusion`, `phi`, `gastable_en`, invariantes; sobre tipos reales de `zx-core` (tx v1/v2/v3, `OutPoint`, `ClavePublica`, firmas ZIP‑215).
+- **V4 diferencial T01**: **0 discrepancias en los 2 055 casos** (1 947 con sufijo PoST), comparando `RES`, `SEL`, `UTXO`, `GAR`, `EST`, undo exacto y orden inverso en X‑16 (`logs/V4-diferencial.log`).
+- **V1** fmt limpio; **V2** `clippy -D warnings` limpio; **V3** `cargo test --workspace`: **385 pasan / 0 fallan / 1 ignorado**; **V5** 8 tests nuevos (testigo, cambio F‑07, MultiSig, coinbases, `clave≠productor`, fusión); **V6** proptest (semilla fija) undo+I‑1+I‑1b; **V7** 10 dependencias exactas y `Cargo.lock` con **una sola línea añadida** (`ed25519-zebra`), **cero cambios de versión**.
+- **Correspondencias**: solo las de §4 (p. ej. `ErrFirma↔ErrAutorizacion`, `ErrForma(ImporteCero/TransferenciaSinSalidas)↔ErrSaldo`, `VersionInactiva↔ErrOperacionFase/ErrFueraDeAlcanceV0`); ninguna añadida por mi cuenta.
+- **Faltas de definición informadas antes de editar** (en `PROGRESO.md`): `Ord` para los `BTreeMap` de §3.4 (2 derivas en `zx-core`); cabecera PoST opcional para poder llamar a `validar_forma_cabecera_post`; madurez dual del pendiente; génesis sin padre; F‑07 (cambio) vs igualdad exacta de T01; forma antes que nada; `prueba_valida`; alcance de fusión; y **colisión de `txid`** en coinbases/liberaciones idénticas (resuelta en el arnés con claves de salida únicas y `prox_salida` en el motor).
+- **NO demuestra**: verificación de cabeceras, persistencia, red, parámetros de red dev, `SEC‑A`/`EvidenceTx`, FC‑1/FC‑2/CUT‑H/W, ni el motor DAG completo (ED‑1…ED‑6 es de W06a).
+- **Incidencia final**: `ENTRADA-W03.sha256` da **6/7 OK**; `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md` cambió de `823984e8…` a `614dc72a…` por reescritura **externa de T04** (commit `aa2866f`). W03 no escribió fuera de `deepseek/W03/`.
+- **Entregables** en `deepseek/W03/`: `ws.orig/`, `ws/`, `cambios.patch` (18 ficheros), `MIGRACION.sha256` (100 huellas, `sha256sum -c` OK), `logs/` (entrada inicio/final, V1–V4, V7, 3 pasadas del diferencial), `INFORME.md`, `PROGRESO.md`, `HORAS.log`. Vectores copiados a `ws/testdata/transicion-v0/` con `PROCEDENCIA.md`.

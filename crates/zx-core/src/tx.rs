@@ -17,7 +17,7 @@ pub const MAX_MULTISIG_KEYS: usize = 16;
 /// Deriva `Hash` porque es la clave natural del UTXO set. La igualdad es la de sus dos campos, así
 /// que dos referencias a la misma salida son la misma clave — que es exactamente lo que C-TX-16 y
 /// C-BLK-09 necesitan detectar.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct OutPoint {
     /// Transacción que creó la salida.
     pub prev_txid: TxId,

@@ -1,0 +1,8 @@
+$ cd /home/katana/zeo/ZEROX/deepseek/W03R/ws
+$ bash ci/frontera-crates.sh
+"OK — frontera zx-consensus → {zx-core}"
+"OK — frontera zx-dag → {zx-core}"
+"OK — frontera zx-poas → {zx-core,zx-consensus}"
+"OK — frontera zx-farmer → {zx-core,zx-poas}"
+"OK — frontera zx-p2p → {zx-core}"
+exit=0

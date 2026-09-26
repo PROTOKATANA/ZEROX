@@ -1,0 +1,3 @@
+$ cd /home/katana/zeo/ZEROX/deepseek/W03R/ws
+$ cargo fmt --all -- --check
+exit=0

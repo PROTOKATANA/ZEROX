@@ -17,5 +17,8 @@ zx-core         = { path = "../zx-core" }
 
 # Test: `proptest` ya lo usa el workspace (`zx-core`) y sus versiones ya están resueltas en
 # `Cargo.lock`. No se añade ninguna dependencia externa nueva.
+# `ed25519-zebra` ya está en `Cargo.lock` como dependencia directa de `zx-core`; el arnés
+# diferencial la usa para firmar con claves deterministas (§3.10). No cambia ninguna versión.
 [dev-dependencies]
-proptest = { workspace = true }
+proptest       = { workspace = true }
+ed25519-zebra  = { workspace = true }

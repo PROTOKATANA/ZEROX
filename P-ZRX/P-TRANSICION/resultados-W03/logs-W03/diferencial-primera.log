@@ -1,0 +1,150 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/diferencial_t01.rs (target/debug/deps/diferencial_t01-67e7e38912278acd)
+
+running 1 test
+casos leidos      = 2055
+con sufijo PoST   = 1947
+discrepancias     = 5722
+por nombre de caso:
+  X-01: 3 casos, 0 con discrepancia
+  X-02: 3 casos, 0 con discrepancia
+  X-03: 3 casos, 0 con discrepancia
+  X-03b: 2 casos, 2 con discrepancia
+  X-04: 1 casos, 0 con discrepancia
+  X-05: 3 casos, 0 con discrepancia
+  X-06: 3 casos, 0 con discrepancia
+  X-07: 3 casos, 2 con discrepancia
+  X-08: 3 casos, 2 con discrepancia
+  X-09: 3 casos, 2 con discrepancia
+  X-10: 3 casos, 2 con discrepancia
+  X-11b: 3 casos, 2 con discrepancia
+  X-11c: 3 casos, 3 con discrepancia
+  X-13: 3 casos, 0 con discrepancia
+  X-14: 3 casos, 0 con discrepancia
+  X-16: 3 casos, 2 con discrepancia
+  X-17: 3 casos, 3 con discrepancia
+  X-18: 3 casos, 3 con discrepancia
+  X-19: 1 casos, 1 con discrepancia
+  X-20: 3 casos, 3 con discrepancia
+  aleatorio: 2000 casos, 1994 con discrepancia
+  CASO 11 (X-11c) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 11 (X-11c) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 11 (X-11c) bloque 6 RES esperado=ErrSinTerminal obtenido=ErrSinPadre
+  CASO 11 (X-11c) SEL esperado=5 obtenido=3
+  CASO 11 (X-11c) UTXO esperado=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (1, 10, 0, 3, -1), (1, 10, 0, 4, -1), (2, 5, 0, 1, -1)] obtenido=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (2, 5, 0, 1, -1)]
+  CASO 11 (X-11c) EST esperado=EST emitido=40 quemado=0 fase=FasePoW terminal=-1 altura=4 slot=0 peso_sufijo=0 obtenido=EST emitido=20 quemado=0 fase=FasePoW terminal=-1 altura=2 slot=0 peso_sufijo=0
+  CASO 15 (X-17) GAR esperado=["GAR clave=1 activo=8 pend=[] ret=[] cred=[3@s3] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=["GAR clave=1 activo=8 pend=[3@s3] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"]
+  CASO 16 (X-18) GAR esperado=["GAR clave=1 activo=8 pend=[] ret=[] cred=[3@s3] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=["GAR clave=1 activo=8 pend=[3@s3] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"]
+  CASO 17 (X-19) bloque 3 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 17 (X-19) bloque 4 RES esperado=ErrGarantia obtenido=ErrSinPadre
+  CASO 17 (X-19) SEL esperado=3 obtenido=2
+  CASO 17 (X-19) UTXO esperado=[(2, 10, 0, 2, -1)] obtenido=[(2, 10, 0, 1, -1)]
+  CASO 17 (X-19) GAR esperado=["GAR clave=2 activo=10 pend=[] ret=[] cred=[] congelado=0"] obtenido=[]
+  CASO 17 (X-19) EST esperado=EST emitido=20 quemado=0 fase=FasePoW terminal=3 altura=2 slot=0 peso_sufijo=0 obtenido=EST emitido=10 quemado=0 fase=FasePoW terminal=-1 altura=1 slot=0 peso_sufijo=0
+  CASO 18: construcción: entrada abstracta 999999 sin salida registrada
+  CASO 22 (X-03b) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 22 (X-03b) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 6 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 7 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 8 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 9 RES esperado=ErrInmaduro obtenido=ErrSinPadre
+  CASO 22 (X-03b) SEL esperado=8 obtenido=3
+  CASO 22 (X-03b) UTXO esperado=[(1, 10, 0, 5, -1), (1, 10, 0, 6, -1), (1, 10, 0, 7, -1)] obtenido=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (2, 5, 0, 1, -1)]
+  CASO 22 (X-03b) GAR esperado=["GAR clave=1 activo=15 pend=[10@h8,10@h9] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=[]
+  CASO 22 (X-03b) EST esperado=EST emitido=70 quemado=0 fase=FasePoW terminal=8 altura=7 slot=0 peso_sufijo=0 obtenido=EST emitido=20 quemado=0 fase=FasePoW terminal=-1 altura=2 slot=0 peso_sufijo=0
+  CASO 23 (X-07) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 23 (X-07) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 6 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 7 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 8 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 9 RES esperado=ErrPowTrasCorte obtenido=ErrSinPadre
+  CASO 23 (X-07) SEL esperado=8 obtenido=3
+  CASO 23 (X-07) UTXO esperado=[(1, 10, 0, 5, -1), (1, 10, 0, 6, -1), (1, 10, 0, 7, -1)] obtenido=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (2, 5, 0, 1, -1)]
+  CASO 23 (X-07) GAR esperado=["GAR clave=1 activo=15 pend=[10@h8,10@h9] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=[]
+  CASO 23 (X-07) EST esperado=EST emitido=70 quemado=0 fase=FasePoW terminal=8 altura=7 slot=0 peso_sufijo=0 obtenido=EST emitido=20 quemado=0 fase=FasePoW terminal=-1 altura=2 slot=0 peso_sufijo=0
+  CASO 24 (X-09) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 24 (X-09) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 24 (X-09) bloque 6 RES esperado=OK obtenido=ErrSinPadre
+  CASO 24 (X-09) bloque 7 RES esperado=OK obtenido=ErrSinPadre
+  CASO 24 (X-09) bloque 8 RES esperado=OK obtenido=ErrSinPadre
+
+
+thread 'diferencial_t01' (39) panicked at crates/zx-consensus/tests/diferencial_t01.rs:992:5:
+diferencial T01 con 5722 discrepancias:
+casos leidos      = 2055
+con sufijo PoST   = 1947
+discrepancias     = 5722
+por nombre de caso:
+  X-01: 3 casos, 0 con discrepancia
+  X-02: 3 casos, 0 con discrepancia
+  X-03: 3 casos, 0 con discrepancia
+  X-03b: 2 casos, 2 con discrepancia
+  X-04: 1 casos, 0 con discrepancia
+  X-05: 3 casos, 0 con discrepancia
+  X-06: 3 casos, 0 con discrepancia
+  X-07: 3 casos, 2 con discrepancia
+  X-08: 3 casos, 2 con discrepancia
+  X-09: 3 casos, 2 con discrepancia
+  X-10: 3 casos, 2 con discrepancia
+  X-11b: 3 casos, 2 con discrepancia
+  X-11c: 3 casos, 3 con discrepancia
+  X-13: 3 casos, 0 con discrepancia
+  X-14: 3 casos, 0 con discrepancia
+  X-16: 3 casos, 2 con discrepancia
+  X-17: 3 casos, 3 con discrepancia
+  X-18: 3 casos, 3 con discrepancia
+  X-19: 1 casos, 1 con discrepancia
+  X-20: 3 casos, 3 con discrepancia
+  aleatorio: 2000 casos, 1994 con discrepancia
+  CASO 11 (X-11c) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 11 (X-11c) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 11 (X-11c) bloque 6 RES esperado=ErrSinTerminal obtenido=ErrSinPadre
+  CASO 11 (X-11c) SEL esperado=5 obtenido=3
+  CASO 11 (X-11c) UTXO esperado=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (1, 10, 0, 3, -1), (1, 10, 0, 4, -1), (2, 5, 0, 1, -1)] obtenido=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (2, 5, 0, 1, -1)]
+  CASO 11 (X-11c) EST esperado=EST emitido=40 quemado=0 fase=FasePoW terminal=-1 altura=4 slot=0 peso_sufijo=0 obtenido=EST emitido=20 quemado=0 fase=FasePoW terminal=-1 altura=2 slot=0 peso_sufijo=0
+  CASO 15 (X-17) GAR esperado=["GAR clave=1 activo=8 pend=[] ret=[] cred=[3@s3] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=["GAR clave=1 activo=8 pend=[3@s3] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"]
+  CASO 16 (X-18) GAR esperado=["GAR clave=1 activo=8 pend=[] ret=[] cred=[3@s3] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=["GAR clave=1 activo=8 pend=[3@s3] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"]
+  CASO 17 (X-19) bloque 3 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 17 (X-19) bloque 4 RES esperado=ErrGarantia obtenido=ErrSinPadre
+  CASO 17 (X-19) SEL esperado=3 obtenido=2
+  CASO 17 (X-19) UTXO esperado=[(2, 10, 0, 2, -1)] obtenido=[(2, 10, 0, 1, -1)]
+  CASO 17 (X-19) GAR esperado=["GAR clave=2 activo=10 pend=[] ret=[] cred=[] congelado=0"] obtenido=[]
+  CASO 17 (X-19) EST esperado=EST emitido=20 quemado=0 fase=FasePoW terminal=3 altura=2 slot=0 peso_sufijo=0 obtenido=EST emitido=10 quemado=0 fase=FasePoW terminal=-1 altura=1 slot=0 peso_sufijo=0
+  CASO 18: construcción: entrada abstracta 999999 sin salida registrada
+  CASO 22 (X-03b) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 22 (X-03b) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 6 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 7 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 8 RES esperado=OK obtenido=ErrSinPadre
+  CASO 22 (X-03b) bloque 9 RES esperado=ErrInmaduro obtenido=ErrSinPadre
+  CASO 22 (X-03b) SEL esperado=8 obtenido=3
+  CASO 22 (X-03b) UTXO esperado=[(1, 10, 0, 5, -1), (1, 10, 0, 6, -1), (1, 10, 0, 7, -1)] obtenido=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (2, 5, 0, 1, -1)]
+  CASO 22 (X-03b) GAR esperado=["GAR clave=1 activo=15 pend=[10@h8,10@h9] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=[]
+  CASO 22 (X-03b) EST esperado=EST emitido=70 quemado=0 fase=FasePoW terminal=8 altura=7 slot=0 peso_sufijo=0 obtenido=EST emitido=20 quemado=0 fase=FasePoW terminal=-1 altura=2 slot=0 peso_sufijo=0
+  CASO 23 (X-07) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 23 (X-07) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 6 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 7 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 8 RES esperado=OK obtenido=ErrSinPadre
+  CASO 23 (X-07) bloque 9 RES esperado=ErrPowTrasCorte obtenido=ErrSinPadre
+  CASO 23 (X-07) SEL esperado=8 obtenido=3
+  CASO 23 (X-07) UTXO esperado=[(1, 10, 0, 5, -1), (1, 10, 0, 6, -1), (1, 10, 0, 7, -1)] obtenido=[(1, 5, 0, 1, -1), (1, 10, 0, 2, -1), (2, 5, 0, 1, -1)]
+  CASO 23 (X-07) GAR esperado=["GAR clave=1 activo=15 pend=[10@h8,10@h9] ret=[] cred=[] congelado=0", "GAR clave=2 activo=5 pend=[] ret=[] cred=[] congelado=0"] obtenido=[]
+  CASO 23 (X-07) EST esperado=EST emitido=70 quemado=0 fase=FasePoW terminal=8 altura=7 slot=0 peso_sufijo=0 obtenido=EST emitido=20 quemado=0 fase=FasePoW terminal=-1 altura=2 slot=0 peso_sufijo=0
+  CASO 24 (X-09) bloque 4 RES esperado=OK obtenido=ErrDobleGasto
+  CASO 24 (X-09) bloque 5 RES esperado=OK obtenido=ErrSinPadre
+  CASO 24 (X-09) bloque 6 RES esperado=OK obtenido=ErrSinPadre
+  CASO 24 (X-09) bloque 7 RES esperado=OK obtenido=ErrSinPadre
+  CASO 24 (X-09) bloque 8 RES esperado=OK obtenido=ErrSinPadre
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test diferencial_t01 ... FAILED
+
+failures:
+
+failures:
+    diferencial_t01
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.74s
+
+error: test failed, to rerun pass `-p zx-consensus --test diferencial_t01`

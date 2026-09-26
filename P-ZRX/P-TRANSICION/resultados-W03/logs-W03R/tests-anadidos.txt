@@ -1,0 +1,14 @@
+diferencial_t01
+la_aplicacion_es_determinista
+transicion::tests::coinbase_post_a_otra_clave_se_rechaza
+transicion::tests::coinbase_post_en_posicion_dos_se_rechaza
+transicion::tests::coinbase_pow_sin_salidas_se_rechaza
+transicion::tests::deposito_con_cambio_crea_el_cambio_y_acredita_la_garantia
+transicion::tests::dos_coinbases_se_rechazan
+transicion::tests::fusion_descarta_doble_gasto
+transicion::tests::fusion_descarta_liberacion_prematura
+transicion::tests::fusion_descarta_retiro_duplicado
+transicion::tests::fusion_recorta_la_coinbase_post
+transicion::tests::multisig_2_de_3_autoriza_y_el_orden_importa
+transicion::tests::un_testigo_invalido_puede_coincidir_con_el_compromiso
+undo_exacto_e_i1_en_secuencias_validas
