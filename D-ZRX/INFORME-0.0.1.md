@@ -82,7 +82,11 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
 8. **Varias órdenes necesitaron segunda ronda por errores míos de redacción** (alcances sin fijar, criterios mal
    elegidos, horas escritas a ojo) y dos ejecutores incumplieron reglas (Python para editar texto; eventos retirados
    sin pedirlo), declarados por ellos y registrados.
-9. *Pendiente W07b:* lo que las mediciones revelen.
+9. **El productor honesto no puede gastar sus recompensas mientras produce** con la misma clave: la coinbase PoST va
+   a la garantía (D-T08) y RAT-3 impide liberar hasta 360 slots después de su último bloque (más `R_SLOTS`). No es un
+   fallo de seguridad, pero sí un coste real para el granjero doméstico; lo cuantifica SL-2c y pide una decisión de
+   diseño (IPA C-13). Derivado al cerrar, no medido.
+10. *Pendiente W07b:* lo que las mediciones revelen.
 
 ## 6. Coste absoluto de los ataques relevantes (lo medido o derivado; nada inventado)
 
