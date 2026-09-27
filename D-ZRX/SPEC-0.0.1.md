@@ -10,9 +10,9 @@ sigue es un parámetro de producción** (`P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`).
 contra un oráculo independiente o una prueba de extremo a extremo; «implementada» sin más significa
 código con tests propios pero sin contraste independiente.
 
-**Suite de la raíz:** 723/0/2 tras W06d4 y 729/0/2 tras SL-4a, **medidas por separado**; la primera
-ejecución conjunta es el paso 0 de W06d5 (en curso). Oráculos vigentes: T01 v0.4 (2 795 casos) y T04 v0.5
-(1 878 casos), vectores en `testdata/transicion-v0.4` y `testdata/estado-dag-v0.5`.
+**Suite de la raíz (commit candidato `27dcfeb`):** 832/0/5 con W07a-R y, tras SL-4b2 y SL-4b3, 82 binarios con 0
+fallos (ejecutadas por los ejecutores en sus zonas; la repite E-0 de W07b desde un clon limpio). Oráculos vigentes:
+T01 v0.5 (3 179 casos) y T04 v0.6 (2 108 casos), vectores en `testdata/transicion-v0.5` y `testdata/estado-dag-v0.6`.
 
 ## 1. Formatos (`P-ZRX/P-FORMATO/FORMATO-v0.md`, con la Corrección v0.1)
 
@@ -59,14 +59,17 @@ ejecución conjunta es el paso 0 de W06d5 (en curso). Oráculos vigentes: T01 v0
 | W06b | `zx-storage` (RocksDB), D-N03′ (reinicio repitiendo admisiones), integridad de cabecera y cuerpo | tests; Corrección A | migrada; testigos PoW no comprometidos (declarado) |
 | W06c | `zx-p2p`: transporte libp2p, límites, mensajes del híbrido | 502 tests; integración en memoria | migrada |
 | W06d1 | `zx-node` sin red: cruza el corte, produce en régimen (78 bloques, 0 rechazados), reabre tras 10 `SIGKILL` sin corrupción | V1–V9; prueba de reinicio 5/5 seguidas (W06d3) | migrada |
-| W06d2 | Validación diferida, huérfanos acotados, sincronización PoW por localizador, `zx-adversario`; correcciones RI-2a (error de padre no definitivo) y RI-2b (persistir el bloque propio antes de admitirlo: evita la doble firma tras reinicio) | dos nodos convergen en PoW con procesos reales | migrada (parcial) |
+| W06d2 | Validación diferida, huérfanos acotados, sincronización PoW por localizador, `zx-adversario`; correcciones RI-2a (error de padre no definitivo) y RI-2b (persistir el bloque propio antes de admitirlo; **sustituida en W06d6** por admitir → persistir → difundir, RI-3c) | dos nodos convergen en PoW con procesos reales | migrada (parcial) |
 | W06d3 | PoST verificable por red, FC-3 en el nodo, cuatro fallos reales corregidos | suite 721/0/2 | migrada (parcial) |
 | W06d4 | Depósito sensible a la rama; hueco del `ServicioPot` corregido | **tres procesos reales cruzan el corte y convergen: 528 bloques PoST, 0 rechazos, 0 fatales**; partición y reunión en fase PoW | migrada (parcial). Ejecución con `N_dev` reducido (69 bloques PoST en ≈ 35 s) |
-| W06d5 | Nodo tardío (V5), padres extra, rechazos legítimos frente a invariantes, partición PoST (V6b), `zx-adversario` (V7) | — | **en curso** |
+| W06d5 | Garantía antes de producir, padres extra, rechazos legítimos frente a invariantes, suscripción del adversario | V4 y V6(a) con procesos reales; 736/0/2 | migrada (parcial): nodo tardío y partición PoST sin superar |
+| W06d6 | **Sincronización por páginas del registro de admisión** (cursor por par, contrapresión); correcciones RI-3a (tres DoS de red) y **RI-3c** (orden **admitir → persistir → difundir**: un bloque rechazado ya no se persiste, lo que impedía reiniciar); dial con reintento; `--dejar-de-producir-en-slot` (reposo) | **nodo tardío** tras ≥ 500 bloques PoST: alcanza a la red en < 90 s y, tras el reposo, misma punta y `resumen_estado` en los cuatro (2 repeticiones); `zx-adversario` E-7; 814/0/5 | migrada (parcial): la partición destapó el defecto de FC-3 |
+| W06d7 | **FC-3 real**: un DAG por terminal con sufijo PoST, selección por `blue_work` con el desempate del motor, `C-FIN-01` en el cambio de terminal, servicio PoT de verificación por terminal | I-3 por propiedades (200 órdenes, empates); **E-6b** (terminales distintos) y **V6(b)** (partición PoST, mismo terminal) con procesos reales, 2 repeticiones cada uno; 829/0/5 | migrada; sin oráculo multiterminal independiente |
+| W07a | Registro según `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md` (tiempos por etapa, bytes, profundidad, mergeset, pares) | `registro_esquema`; tres nodos reales; 832/0/5 | migrada (vía W07a-R) |
+| SL-4b2, SL-4b3 | Productor que sigue al terminal seleccionado en caliente; firmante seguro, detector y envío de evidencia en el nodo (ver §6) | procesos reales (ver §6) | migradas |
 
-No demostrado todavía: nodo que llega tarde, reunión tras partición en fase PoST, entrada adversarial
-concluyente (W06d5); revisión independiente del código W06d2–W06d5 y SL-4a (IPA E-11, RI-3); mediciones
-de W07.
+Revisión independiente del código de red, nodo y castigo: RI-3a/b/c hechas, hallazgos corregidos (un crítico).
+**Pendiente:** las mediciones de W07b (`P-ZRX/P-MEDICION/ORDEN-W07b.md`) sobre el commit candidato `27dcfeb`.
 
 ## 6. Evidencia y castigo (`P-ZRX/P-SLASHING/CONTRATO-EVIDENCIA-v0.md` con su «Ratificación v0»)
 
@@ -74,14 +77,14 @@ de W07.
 |---|---|---|---|---|
 | EV-05…EV-09, RAT-1 | Única falta: doble firma de la misma oportunidad; identidad = `consensus_branch_id` + tupla `C-GD-07` (DS-L01, DS-L04) | `zx-core`, `zx-consensus::transicion` | SL-3b (oráculos); SL-4a (0 discrepancias) | validada en motor y cadena |
 | EV-10…EV-28, RAT-2′, RAT-3 | Incidentes, congelación, confiscación `C = mín(V, techo(f·V))`, `suelo(C·2/8)` al incluidor y el resto quemado (DS-L03), liberación con `Plazo_slots + M_margen_slots` desde el último bloque producido (DS-L05), undo; en fusión, la evidencia repetida es un descarte | `zx-consensus::transicion`, `zx-cadena` | SL-4a (V5: 8/8, autodenuncia pierde ≥ 6/8·C) | validada en motor y cadena |
-| Parámetros dev | `f = 1`, `ρ_ret = 0,10`, `T_v = 10⁵` slots, `R_slots ≥ F_slots`, `q = 20` | `ParametrosEvidencia` | SL-2, SL-2b | calibración dev, no producción |
+| Parámetros dev | `f = 1`, `Plazo_slots = 300`, `M_margen_slots = 60`, `R_SLOTS = 600 = F_SLOTS`, `q = 10` ZZK por clave (`crates/zx-node/src/perfil.rs`) | `ParametrosEvidencia`, perfil dev | SL-2b (`R_slots ≥ F_slots`), SL-4b2 | dev, no producción. **No implementada la retención de recompensas** (`ρ_ret`, `T_v` de SL-2/SL-2b), de la que depende la disuasión calculada allí: en 0.0.1 el castigo confisca solo la garantía; **no se reivindica disuasión**. **Corrección del director:** la versión anterior de esta fila daba `ρ_ret`, `T_v` y `q = 20` como parámetros de 0.0.1 |
 | FIR-* | Firmante seguro (registro durable antes de sellar, abstención tras pérdida), detección de doble firma y envío de evidencia por inclusión propia | `zx-post::firmante` (SL-4b1), `zx-node::evidencia` y productor (SL-4b2) | SL-4b1 (durabilidad con proceso abortado 20/20); SL-4b2 con procesos reales: doble firma castigada 3/3, 10 `SIGKILL` honestos sin evidencia, pérdida del registro con abstención exacta | **activo en la red dev** (`Plazo_slots = 300`, `M_margen_slots = 60`, `R_SLOTS = 600`); también el bloque de transición (SL-4b3) y un guardián de CI que impide al nodo usar productores sin firmante |
 
 Sin castigo correlacionado (RFT-15, DS-L02) y sin castigo por ausencia en la producción de bloques.
 
 ## 7. No activo en 0.0.1 (se declara, no se reivindica)
 
-Castigo en el nodo (SL-4b); registro de sectores Filecoin (`SEC-0`); relevo de transacciones;
+Retención de recompensas (`ρ_ret`, `T_v`); registro de sectores Filecoin (`SEC-0`); relevo de transacciones;
 controlador de `SR` y de `N`; inyecciones PoT; semilla del corte no sesgable; algoritmo PoW de producción
 (A-12: con SHA3-256 una GTX 1070 rinde 7,6× una CPU de 16 núcleos en reposo, `P-ZRX/P-POW/REVISION-A10-M1.md`);
 **finalidad por votos** (adoptada en principio por Katana, sin contrato ratificado ni código).

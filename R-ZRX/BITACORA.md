@@ -427,3 +427,7 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - **SL-4b3 migrada** (`de7ae26`): transición con firmante, guardián `ci/firmante-obligatorio.sh`, tests de inclusión.
 - **Commit candidato de 0.0.1: `27dcfeb`.** **W07b** (Sonnet) congelada y lanzada: E-0 desde un clon limpio y E-1…E-9
   con procesos reales, `N_dev` real, tres repeticiones. Mientras mide, nada pesado en la máquina.
+- 10:5x **Hallazgo al poner al día `SPEC-0.0.1`:** la retención de recompensas (`ρ_ret`, `T_v`), de la que depende la
+  disuasión calculada en SL-2/SL-2b, **no está implementada**; `SPEC-0.0.1` la daba como parámetro de 0.0.1 junto con
+  `q = 20` (el nodo usa `q = 10`). Corregido; en 0.0.1 el castigo confisca solo la garantía y **no se reivindica
+  disuasión**. IPA C-12 nuevo. Es la segunda afirmación excesiva mía en `SPEC-0.0.1` (la primera, TRN-09).
