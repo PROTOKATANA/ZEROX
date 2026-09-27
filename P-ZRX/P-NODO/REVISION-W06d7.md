@@ -1,6 +1,6 @@
 # REVISIÓN W06d7 — FC-3 en el nodo: varios terminales con sufijo PoST, selección por peso PoST
 
-**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 06:57). **Ejecutor:** subagente Sonnet, único,
+**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 06:54). **Ejecutor:** subagente Sonnet, único,
 04:57–06:53. Evidencia: `resultados-W06d7/`; ejecuciones reales en `deepseek/W06d7/run/`. **Veredicto:
 SUPERADO, con un límite que se corrige en SL-4b2. Migrada** por parche (7 rutas; base sin cambios desde
 `39519aa`; 7/7 huellas; crates idénticos a la zona; `Cargo.*` sin cambios).
