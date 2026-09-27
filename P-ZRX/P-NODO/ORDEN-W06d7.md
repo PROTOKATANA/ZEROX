@@ -28,7 +28,7 @@ incluidos); léelo íntegro antes de escribir código.
 ## 2. Entradas (congeladas en `P-ZRX/P-NODO/ENTRADA-W06d7.sha256`)
 
 `CONTRATO-v0.md` (TRN-04…TRN-11, D-T03, I-3, I-4, `C-FIN-01`), `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md`,
-`REVISION-W06d6.md` (y `deepseek/W06d6/DEFINICIONES-FALTANTES.md`, solo lectura), `REVISION-T02.md`,
+`REVISION-W06d6.md` y `resultados-W06d6/DEFINICIONES-FALTANTES.md`, `REVISION-T02.md`,
 `crates/zx-consensus/src/transicion/seleccion.rs` (FC-3 del motor, validado contra T01: `comparar_fc3`,
 `comparar_terminal`, `nodo_en_linea`).
 
