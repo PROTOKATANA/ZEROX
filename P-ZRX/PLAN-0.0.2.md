@@ -35,3 +35,28 @@ originales de Katana.
 RFT-03 (un compromiso no fecha nada), RFT-04 (sobre el formato actual, auditar no distingue guardado de regenerado),
 RFT-06 (ningún sellado separa ramas), RFT-14 (ningún mecanismo de Filecoin encarece de forma exigible el doble farmeo
 del atacante con espacio propio). Ningún parámetro de Filecoin se copia como parámetro de ZEROX (`AUTO-ZRX.md` §4).
+
+## Minero PoW (decisión de Katana, 2026-09-27)
+
+**0.0.2 cambia el minero PoW:** SHA3-256, con minero **en Rust para CPU** y **en HIP para GPU AMD**, de modo que se
+pueda minar en CPU y en GPU. Se **corrige y reutiliza** la base que ya existe: `caliza` (kernel HIP/CUDA) y `silicio`
+(bucle Rust), en `/home/katana/zeo/.trash/{caliza,silicio}/`. Con esto IPA A-12 queda decidido (SHA3-256) y A-11
+pasa de «previsto descartar» a «corregir y portar».
+
+**Lo que ya se sabe que hay que corregir** (verificado por lectura, IPA A-11 y `R-ZRX/MAPA-RESCATE.md`):
+- `caliza` aplica Keccak-f **sin relleno ni dominio** de SHA3-256 (falla los vectores NIST CAVP), pone el nonce en
+  los bytes 48–55 (el verificador lo espera en el 96: `zx-core/src/preimage/block.rs`), usa un criterio de «bytes
+  a cero» en vez de `hash < target` de 256 bits, le falta `caxor/proto`, y tiene una carrera y un `__syncthreads`
+  en una rama divergente.
+- `silicio` no compila `minero.rs`, pone el nonce `u128` al final y no compara con el target.
+- Ninguno declara licencia: hay que fijarla antes de portarlos (el proyecto es `AGPL-3.0-or-later`).
+
+**Cómo se hará (plantilla del mandato):** diseño y portado por orden, con prueba **diferencial** contra el
+verificador de `zx-core` (preimagen, nonce, endianidad, target, cancelación y reinicio), vectores CAVP, y medida de
+rendimiento por dispositivo. **Límite de hardware:** la máquina de referencia tiene una **NVIDIA GTX 1070**, no
+una GPU AMD. HIP compila también para NVIDIA, lo que permite comprobar la corrección aquí, pero el **rendimiento
+en AMD solo se puede medir con una GPU AMD**. Hará falta una, o se declarará sin medir.
+
+**Lo que no cambia y se dice:** con SHA3 una GPU de consumo rinde ≈ 7,6 veces una CPU de 16 núcleos (A10-M1). Minar
+en GPU amplía la participación de quien tiene GPU, pero no protege el arranque frente a quien alquila hash o tiene
+hardware especializado (A-10; faltan precios y ASIC). Katana prioriza la accesibilidad CPU + GPU con SHA3.
