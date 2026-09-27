@@ -434,3 +434,8 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - 11:03 **W07b**, primera parada de turno dentro de E-0 (fmt, clippy y build en verde; tests en marcha sin fallos). El
   ejecutor había leído el hallazgo de W06d6 como vigente y preparado E-6b esquivando el cambio de terminal; se le
   corrigió por mensaje (está resuelto en `27dcfeb`: W06d7 + paso 0 de SL-4b2) y se le reanudó.
+- 11:1x Mensaje de la sesión **zerox-e7** (con el visto bueno de Katana) sobre C-12, **verificado en el código**: la
+  retención del modelo nunca se escribió como regla (SL-1 no la pidió; SL-4a la puso como parámetro sin regla), pero
+  D-T08 acredita la coinbase PoST entera a la garantía y EV-17 + RAT-3 la dejan confiscable hasta retirarla y
+  liberarla. C-12, `SPEC-0.0.1` e informe matizados; análisis **SL-2c** (Julia) programado para después de W07b.
+  `PERFIL-DEV-v0.md` estaba desactualizado (`R_slots = 60`): corregido.

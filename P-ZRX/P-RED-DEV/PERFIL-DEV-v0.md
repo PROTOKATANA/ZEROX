@@ -29,13 +29,15 @@ medir»).
 | `M_dep` | 3 bloques PoW | — |
 | `H_corte_min` | 30 | Cumple `H_corte_min ≥ máx(H_dep, 1 + M_cb) + M_dep = 9` con margen para que 3 nodos minen y depositen |
 | `W_min` | `30 · trabajo(máximo dev)` | No liga salvo colapso de la dificultad; símbolo presente y comprobado |
-| `q` (requisito por bloque) | 10 ZZK | Constante (IPA C-02 abierto) |
+| `q` (requisito por bloque) | 10 ZZK | Constante (IPA C-02 abierto). No es comparable con el `q_g = 20` de SL-2/SL-2b, que va en unidades del modelo |
 | `S_min` | `K_min · q` = 30 ZZK | — |
 | `K_min` | 3 | Una clave por nodo de la red de prueba; **no** prueba operadores distintos |
 | `M_res_slots` | 20 | — |
 | `M_dep_slots` | 10 | — |
 | `M_rec_slots` | 30 | — |
-| `R_slots` | 60 | Cumple `R_slots > Q_corr + T_reporte + M_estab` solo formalmente: `C-SLA` inactivo |
+| `R_slots` | **600** (60 hasta SL-4b2) | `= F_slots` (recomendación de SL-2b); puerta RAT-3: `600 > Plazo_slots + M_margen_slots = 360` |
+| `Plazo_slots` | 300 | Ventana de admisión de `EvidenceTx` (EV-13); SL-4b2 |
+| `M_margen_slots` | 60 | EV-15 / RAT-3; SL-4b2 |
 | `F_slots` | 600 | ~10 min con slots de 1 s |
 | `subsidio_pow(h)` | 50 ZZK constante | Sin curva de emisión (A-02 abierto) |
 | `subsidio_post(s)` | 5 ZZK constante | — |
@@ -54,7 +56,7 @@ medir»).
 | Historia plotable | 1 segmento del génesis (D-P12) | `history_size = 1` toda la red dev |
 | Sector dev | `FarmerProtocolInfo` de fixture (W05b1) | — |
 | Sectores (Filecoin) | `SEC-0` | Mecanismo no activo en 0.0.1 |
-| `C-EVP` / `C-SLA` | inactivos | IPA C-04, C-05 |
+| `C-EVP` / `C-SLA` | **`C-EVP` activo** desde SL-4b2 (`f = 1`, firmante seguro obligatorio); `C-SLA` descartado (RFT-15) | IPA C-04, C-05 |
 
 ## 5. Bloqueo de activación accidental
 

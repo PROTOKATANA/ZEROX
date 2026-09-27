@@ -49,7 +49,7 @@ repetición. Detalle regla a regla: `D-ZRX/SPEC-0.0.1.md`.
 | Coste de admisión GHOSTDAG (B-12) | RI-1b: 90 µs → 1,66 ms de 2 000 a 16 000 bloques; *W07b* | Aceptado en dev | Índice de alcanzabilidad acotado |
 | Garantía: forma y cuantía (C-02) | SL-2: por identidad es regresiva (RFT-23) | `q = 10` ZZK por clave, dev | Garantía por unidad de espacio |
 | Evidencia y castigo (C-04, C-09, C-11) | SL-1…SL-4c; RI-3b; procesos reales (SL-4b2) | **Activo en dev**; `EvidenceTx` mal formada invalida el bloque | — |
-| Retención de recompensas (C-12) | **No implementada** (hallazgo de este cierre) | Sin disuasión reivindicada en 0.0.1 | Contrato + oráculo + Rust |
+| Retención de recompensas (C-12) | Sin regla con la forma del modelo; la coinbase PoST va entera a la garantía (D-T08) y es confiscable hasta retirarla y liberarla (EV-17, RAT-3) | Sin disuasión reivindicada en 0.0.1 | SL-2c: ¿basta para la región de SL-2b? |
 | Registro de sectores, PoRep, auditorías (D-01…D-05) | S01 (G1); DS-4: regenerar cuesta ≈ 7,1 GPU y 677 W por TiB (GTX 1070) | **No activo** (`SEC-0`) | Encargos 02–05 en plantilla §6 |
 | Finalidad por votos (X-04) | FV-1, AV-1; RFT-17…RFT-21 | Adoptada en principio (FV-D02); `b = 2`; FV-D08 | FV-2, FV-3, FV-4 tras 0.0.1 |
 
@@ -64,9 +64,10 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
 1. **El doble farmeo en rama privada sigue sin cerrarse** (RFT-01, RFT-14): ningún mecanismo de PoStake ni de
    Filecoin lo encarece de forma exigible frente al atacante con espacio propio suficiente; la finalidad por votos
    lo arrincona, no lo cierra, y aún no existe en código.
-2. **El castigo activo no disuade todavía**: la disuasión calculada (SL-2b) depende de la retención de recompensas,
-   que no está implementada (C-12). En 0.0.1 el castigo es el **mecanismo** (detectar, incluir, confiscar), con
-   parámetros dev.
+2. **La disuasión del castigo está sin comprobar**: el modelo (SL-2b) supone una retención de recompensas que
+   ninguna regla implementa; el código retiene de otra forma (la coinbase PoST va entera a la garantía y es
+   confiscable hasta retirarla y liberarla). Si eso basta lo dirá SL-2c (C-12). En 0.0.1 el castigo es el
+   **mecanismo** (detectar, incluir, confiscar), con parámetros dev.
 3. **Dos afirmaciones excesivas mías en `SPEC-0.0.1`**, corregidas al descubrirlas: TRN-09 «validada con procesos
    reales» (el nodo congelaba el terminal: no era FC-3) y parámetros de retención y `q = 20` como si estuvieran en
    el código.
