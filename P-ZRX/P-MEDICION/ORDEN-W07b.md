@@ -6,7 +6,7 @@ semillas, presupuesto, conservación de datos crudos y separación entre medici�
 
 ## 1. Identidad y contexto
 
-- **ID:** W07b. **Fecha:** 2026-09-26 (borrador ≈ 23:05; se congela y lanza tras migrar SL-4b2 y W07a).
+- **ID:** W07b. **Fecha:** 2026-09-26 (borrador ≈ 23:05, puesta al día 2026-09-27 ≈ 08:05; se congela y lanza tras migrar SL-4b2).
   **Director:** Claude. **Ejecutor:** subagente **Sonnet**, único (orquestación larga de procesos reales;
   `P-ZRX/PLAN-0.0.1.md` D-P06).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/W07b/`.
@@ -22,9 +22,10 @@ semillas, presupuesto, conservación de datos crudos y separación entre medici�
 
 ## 2. Entradas (congeladas en `P-ZRX/P-MEDICION/ENTRADA-W07b.sha256`)
 
-`ESCENARIOS-0.0.1.md`, `ESQUEMA-REGISTRO-v1.md`, `P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`, las revisiones W06d4,
-W06d5, SL-4b2 y W07a, y el instrumento de W07c (`deepseek/W07c/analisis-registro-v1/`, solo lectura: cópialo
-a tu zona). Código: el commit candidato que indique la entrada.
+`ESCENARIOS-0.0.1.md`, `ESQUEMA-REGISTRO-v1.md` (con §1 bis), `P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`, las revisiones
+W06d4…W06d7, W07a, SL-4b2 y W07c, y el instrumento **`P-ZRX/P-MEDICION/analisis-registro-v1/`** (versionado; cópialo a
+tu zona). Los guiones de ejecución de `deepseek/W06d6/`, `deepseek/W06d7/` y `deepseek/SL4b2/` se pueden **leer**
+como punto de partida; ninguna otra zona. Código: el commit candidato que indique la entrada.
 
 ## 3. Decisiones del director
 
@@ -48,15 +49,22 @@ a tu zona). Código: el commit candidato que indique la entrada.
    - **R1** = E-1 → E-2 (30 min de régimen) → E-4 (`SIGKILL` a A, rearranque) → E-3 (convergencia medida tras
      cada suceso).
    - **R2** = E-5 (nodo D desde el génesis cuando la red lleva ≥ 500 bloques).
-   - **R3** = E-6 (partición `{A}` / `{B, C}` de 60 slots en fase PoST y reunión por un nodo puente, técnica de
-     W06d4 V6a) y E-6b (partición en fase PoW cerca del corte).
+   - **R3** = E-6 (partición `{A}` / `{B, C}` de 60 slots en fase PoST y reunión, con la técnica de W06d7 V5 —aislar A reiniciándolo sin pares— o la del nodo puente de W06d4,
+     declarada) y E-6b (partición en fase PoW cerca del corte).
    - **R4** = E-7 (`zx-adversario`, todas las entradas de E-7), E-8 (`zx-adversario doble-firma`, **con
      castigo activo**: se exige lo de SL-4b2 V4) y E-9 (retención del terminal: descriptivo).
 5. **Recursos:** muestreo de `/proc/<pid>/{stat,status,io}` cada 1 s y del tamaño del directorio de datos cada
    10 s, en **bash** (sin Python), con el formato del §2 del esquema; `EJECUCION.txt` con commit, `sha256` de
    los binarios, parámetros, semillas, `getconf CLK_TCK`, `getconf PAGESIZE`, `uname -a`, CPU, carga media al
    empezar y al terminar, y los procesos ajenos que consumían CPU (`ps` al empezar).
-6. **Análisis:** el instrumento de W07c (`run.jl`) sobre cada repetición; tabla por escenario y repetición
+6. **Reposo y comparación de estado (E-3 y todo «mismo estado»):** todos los nodos con el mismo
+   `--dejar-de-producir-en-slot <S>`; se espera al evento `dejar_de_producir` en todos y a que no haya
+   `cambio_punta` durante 30 s; entonces se compara el último `punta` y `resumen_estado` de cada nodo.
+7. **E-6b con producción en marcha** durante la reunión (tras el paso 0 de SL-4b2); E-8 **con castigo activo**
+   (se exige lo de SL-4b2 V4).
+8. **Julia para el análisis:** `env -u LD_LIBRARY_PATH JULIA_DEPOT_PATH=<zona>/.julia-depot:/home/katana/.julia
+   /home/katana/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/julia --project=. run.jl …` (`REVISION-W07c.md`, nº 11).
+9. **Análisis:** el instrumento de W07c (`run.jl`) sobre cada repetición; tabla por escenario y repetición
    (no solo la media). Si el instrumento falla con datos reales, **para** e informa: no lo corrijas tú.
 
 ## 4. Criterios por escenario (fijados antes de medir)
