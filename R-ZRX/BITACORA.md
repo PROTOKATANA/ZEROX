@@ -439,3 +439,7 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   D-T08 acredita la coinbase PoST entera a la garantía y EV-17 + RAT-3 la dejan confiscable hasta retirarla y
   liberarla. C-12, `SPEC-0.0.1` e informe matizados; análisis **SL-2c** (Julia) programado para después de W07b.
   `PERFIL-DEV-v0.md` estaba desactualizado (`R_slots = 60`): corregido.
+- 12:2x **Hallazgo de W07b E-2a** (verificado por el director en los registros): el arnés daba tres claves a cada nodo; B
+  minó 26 de ≈ 31 bloques PoW y cumplió `K_min = 3` solo; A y C llegaron al corte sin garantía y no produjeron nunca.
+  Límite real del producto: **sin relevo de transacciones, quien no tiene garantía al corte queda excluido para
+  siempre** (IPA A-14, informe). Arnés corregido a una clave por nodo (como el perfil dev y W06d4…SL-4b2).

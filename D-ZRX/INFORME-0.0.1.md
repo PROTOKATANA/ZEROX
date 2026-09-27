@@ -86,7 +86,11 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
    a la garantía (D-T08) y RAT-3 impide liberar hasta 360 slots después de su último bloque (más `R_SLOTS`). No es un
    fallo de seguridad, pero sí un coste real para el granjero doméstico; lo cuantifica SL-2c y pide una decisión de
    diseño (IPA C-13). Derivado al cerrar, no medido.
-10. *Pendiente W07b:* lo que las mediciones revelen.
+10. **Tras el corte, la red de 0.0.1 está cerrada a nuevos productores**: sin relevo de transacciones, quien llega al corte
+   sin garantía no puede depositarla nunca (sus depósitos solo irían en sus propios bloques, que no puede producir).
+   Con varias claves por nodo, un solo operador puede cumplir `K_min` y dejar fuera a los demás (visto en W07b E-2a).
+   IPA A-14; el remedio es el relevo de transacciones, fuera de 0.0.1.
+11. *Pendiente W07b:* lo que las mediciones revelen.
 
 ## 6. Coste absoluto de los ataques relevantes (lo medido o derivado; nada inventado)
 
