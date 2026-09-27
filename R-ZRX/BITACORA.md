@@ -401,3 +401,13 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   superados; 829/0/5. Límite: el productor no cambia de terminal en caliente → paso 0 de SL-4b2.
 - **W07a-R** (rebase de la instrumentación sobre W06d7, eventos restaurados, suite completa) lanzada 06:56.
 - Lección repetida: tomar la hora de `date` antes de escribirla (dos correcciones esta noche).
+
+### 07:05–07:58 — decisiones de Katana; W07a migrada; SL-4b2 lanzada
+
+- Katana respondió: **PK-02 sí** (90 archivos por contenido copiados a `R-ZRX/LEGADO/solo-trash/`, `f2fb5b0`;
+  mi primer recuento falló por rutas relativas con `git -C`, detectado y repetido) y **PK-01 opción 2**
+  (FV-D08: garantía como peso de voto solo en dev, tras una interfaz por sector; tras 0.0.1). Sin preguntas
+  pendientes.
+- **W07a migrada** vía W07a-R (`10516d6`): suite completa 832/0/5.
+- **SL-4b2** congelada (`bb648fb`) y lanzada (Sonnet): paso 0 (productor sigue al terminal seleccionado), firmante
+  seguro en el nodo, detector y envío de evidencia, activación dev, doble firma de extremo a extremo.
