@@ -2,7 +2,7 @@
 
 **LINEO (`V-ZRX/LINEO.md`) rige este código Rust**; léelo íntegro antes de escribir código.
 
-- **ID:** W07a-R. **Fecha:** 2026-09-27 (redactada ≈ 06:47; se congela y lanza tras migrar W06d7).
+- **ID:** W07a-R. **Fecha:** 2026-09-27 (redactada ≈ 06:37; se congela y lanza tras migrar W06d7).
   **Director:** Claude. **Ejecutor:** DeepSeek (`deepseek-flash`, esfuerzo `high`).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/W07a-R/`. **Base:** la raíz en el commit de
   `ENTRADA-W07a-R.sha256` (con W06d7). Puedes **leer** `deepseek/W07a/` (su `cambios.patch`, `ws/`, informe y

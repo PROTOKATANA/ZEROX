@@ -1,6 +1,6 @@
 # REVISIÓN W07a — instrumentación del registro según el esquema v1
 
-**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 06:45). **Ejecutor:** DeepSeek, 04:43–06:37.
+**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 06:36). **Ejecutor:** DeepSeek, 04:43–06:37.
 Evidencia: `resultados-W07a/`. **Veredicto: SUPERADO CON CORRECCIÓN PENDIENTE. Migración** por la orden de
 rebase W07a-R, tras W06d7 (las dos tocan `nodo.rs` y `zx-cadena`).
 
