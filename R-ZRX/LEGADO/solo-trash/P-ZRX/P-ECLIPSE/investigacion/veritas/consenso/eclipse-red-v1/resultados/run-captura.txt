@@ -1,0 +1,111 @@
+== eclipse-red-v1 · modo captura ==
+julia 1.13.0 | hilos default=1 interactive=1
+CPU znver5 | RAM 123.4 GiB
+comando: run.jl --captura
+
+SECCIÓN D · captura de las ω salientes por prefijo
+Producto hipergeométrico EXACTO en Rational{BigInt}; fracciones en coma flotante
+sólo para presentación.
+
+D.1 · Modelo de SELECCIÓN UNIFORME: fracción del espacio de grupos necesaria
+      (el resultado que Heilman et al. atribuyen a la contramedida «selección
+       aleatoria»: 50 % → f = 0,5^(1/8) = 0,9170 ; 90 % → f = 0,9^(1/8) = 0,9869)
+     ω | grupos para 50 %       | grupos para 90 %      
+     8 | 0.917004               | 0.986916              
+    10 | 0.933033               | 0.989519              
+    24 | 0.971532               | 0.995620              
+      Con el espacio /16 completo (65536 grupos), esas fracciones son:
+      ω= 8 : 50 % ->   60097 /16 ;  90 % ->   64679 /16
+      ω=10 : 50 % ->   61147 /16 ;  90 % ->   64849 /16
+      ω=24 : 50 % ->   63670 /16 ;  90 % ->   65249 /16
+
+      LECTURA: la exigencia de prefijos CRECE con ω. Pasar de 8 a 24 salientes
+      (lo que ZEROX tiene en `limites.rs:174`) sube el listón de 91,7 % a 97,2 % de
+      los grupos. Es el único efecto protector de ω, y es un efecto del MODELO
+      uniforme: no hay selección implementada que lo realice.
+
+D.2 · Control de Heilman et al. 2015 (verificado abriendo el texto del artículo,
+      research/fuentes/heilman2015-eclipse.txt)
+  · 8 salientes y 117 entrantes (bitcoind 0.9.3): txt:233-236
+  · tried = 64 buckets × 64 = 4096 direcciones (txt:301-302);
+    new = 256 × 64 = 16384 (txt:331-332); cada grupo /16 → hasta 4 buckets de tried
+  · grupo = prefijo /16 IPv4; IPv6 normal /32; Hurricane Electric /36; Tor 4 bits
+    (txt:307-310, 344-348)
+  · ADDR: hasta 1000 direcciones por mensaje; >1000 → peer en lista negra (txt:266-274)
+  · 90 % con f = 72 % de tried, τl = 48 h, τa = 27 min (txt:557-559)
+  · con selección aleatoria, 90 % exige f = 98,7 % (txt:560-561)
+  · peor caso con CM1+2+6 (Core 0.10.1), tried lleno de direcciones frescas:
+    163K direcciones para 50 %, 284K para 90 % (txt:1309-1311)
+  · Table 2, medición de testbed: 32 grupos /24 = 8192 direcciones → 98 %;
+    4600 direcciones (2300 grupos × 2) → 100 % (txt:977, 982, 1033)
+  ATENCIÓN: el artículo NO tiene una tabla 50/90 con IPs y /16. El 50 % del ataque
+  original sólo está en la Figura 2; los «50 %» escritos son BAJO contramedidas.
+
+D.3 · Contramedidas: coste medido o modelado, con fuente abierta en esta sesión
+      (PR #9037, cuerpo, https://api.github.com/repos/bitcoin/bitcoin/pulls/9037)
+configuración del nodo                IPs ~50 %     factor
+default                                     595       1.00x
+default + test-before-evict                 620       1.04x
+feeler                                     5540       9.31x
+feeler + test-before-evict                 8600      14.45x
+      Etiqueta: MODELO/simulación del propio Heilman (2016), escenario realista.
+      NO es medición de testbed. En el artículo, la frecuencia/probabilidad de las
+      feeler NO aparece (NO ENCONTRADO); el «cada 2 minutos» es de Bitcoin Core
+      (src/net.h:61) y del PR #8282.
+      PR #8282 (cuerpo): direcciones obsoletas en tried «the lowest was 72 percent
+      stale, the highest was 95 percent stale» → tried casi vacío de direcciones
+      vivas, que es por qué el peor caso de 163K/284K no es el operativo.
+      `block-relay-only` NO está en el artículo: es de Core 0.19.0 (PR #15759, 2019).
+      `anchor` (CM5) propone 2 conexiones persistentes; el artículo NO da cuánto sube
+      el coste (NO ENCONTRADO) y Core nunca implementó esa tabla (los «anchors» de
+      Core 0.21.0 son los 2 block-relay-only, PR #17428).
+
+      Efecto de sumar salientes, en el modelo uniforme (exacto):
+        ω= 8 -> 50 %: 0.9170 de los grupos ; 90 %: 0.9869
+        ω=10 -> 50 %: 0.9330 de los grupos ; 90 %: 0.9895
+        ω=12 -> 50 %: 0.9439 de los grupos ; 90 %: 0.9913
+        ω=24 -> 50 %: 0.9715 de los grupos ; 90 %: 0.9956
+
+D.4 · Aplicación al esquema de KASPA (verificado en /home/katana/zeo/fuentes/rusty-kaspa)
+  · PrefixBucket: /16 en IPv4 (y en IPv6 mapeada a IPv4); /64 en IPv6 nativa
+    (utils/src/networking.rs:38-68)
+  · outbound_target = 8 (kaspad/src/args.rs:115); inbound_limit = 128 (ib.), y la
+    ayuda larga dice 117 (:624): INCONSISTENCIA del propio repositorio
+  · MAX_ADDRESSES = 4096 (components/addressmanager/src/lib.rs:27)
+  · peso: comentario `64^(x−y)/n`, código `64^(MAX+1−y)/n = 64^(4−y)/n`
+    (lib.rs:421-457): DISCREPANCIA doc/código de un exponente
+  · NO hay tried/new, ni frescura, ni evicción, ni feeler, ni test-before-evict,
+    ni anchor (grep: 0 coincidencias)
+  · La «normalización por prefijo» divide el peso por el número de IP del MISMO
+    PrefixBucket. Consecuencia, y es la lectura que importa: **acumular muchas IP en
+    un mismo /16 se penaliza**, así que el recurso escaso deja de ser «IPs» y pasa a
+    ser «prefijos distintos». El atacante óptimo reparte 1-2 IP por /16 y necesita
+    ~f · (nº de buckets distintos) prefijos, con f = 0,5^(1/8) = 0,9170 para el 50 %.
+    Con `MAX_ADDRESSES = 4096` eso son del orden de 0,9170·4096 ≈ 3757 direcciones en
+    otros tantos /16 — cifra del MODELO, no medida: no existe medición publicada de
+    la resistencia a eclipse de kaspad (NO ENCONTRADO).
+
+D.5 · ZEROX: la pila real y el diseño PROPUESTO
+  (a) LO QUE HAY HOY — código verificado, etiqueta `verificado en fuente`:
+      · 24 salientes / 72 entrantes / 96 totales, por peer 1, pendientes 32
+      · agrupamiento /24 (IPv4) y /64 (IPv6) SÓLO para límites y baneo; máximo 3
+        conexiones por prefijo, y las SALIENTES NO SE CONTABILIZAN POR PREFIJO
+      · no hay selección de salientes de ningún tipo: `zx-node` sólo marca la lista
+        de `--peer` al arrancar; no hay bucle que mantenga un objetivo de conexiones
+      → En este estado, el modelo de Heilman NO APLICA: no hay tabla que llenar ni
+        sorteo que sesgar. El «coste de capturar las 8 salientes» no está definido
+        porque no hay 8 ni hay captura: hay una lista manual.
+  (b) LO QUE HABRÍA QUE CONSTRUIR para que la cuenta tenga sentido, y su coste:
+      con ω = 24 y selección uniforme, 50 % exige el 97,16 % de los grupos y 90 % el
+      99,56 %. Sobre el espacio /24 de IPv4 (2^24 = 16 777 216 prefijos) eso es
+        50 % -> 16299601 prefijos /24 ; 90 % -> 16703725 prefijos /24
+      Sobre /16 sería 97,16 % y 99,56 % de 65536 → 63 691 y 65 246 prefijos.
+      Esas cifras son del MODELO UNIFORME y valen como COTA SUPERIOR del coste:
+      el atacante no necesita poseer el prefijo, le basta con que la víctima lo elija.
+      La cota INFERIOR real depende de la tabla que se construya y no existe.
+
+  (c) El efecto que SÍ es sólido y no depende del diseño: mientras no haya selección
+      diversificada, un atacante que consiga ser marcado ocupa cupo sin sorteo. El
+      límite de 3 por prefijo NO lo frena por la vía saliente (`limites_ip.rs:288-298`),
+      que es un hallazgo de código, no un modelo.
+

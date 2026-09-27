@@ -1,0 +1,25 @@
+# aeslat — reproducción del ancla de medicion-previa/MEDICION.md
+# Comando: gcc -O2 -maes -msse4.1 -o aeslat ../../medicion-previa/aeslat.c && taskset -c 8 ./aeslat
+# El fuente de medicion-previa NO se copió ni se modificó (sha256sum -c al cierre: OK).
+
+ 12:58:53  up 16 days  9:28,  0 users,  carga promedio: 1,47, 4,80, 5,63
+=== corrida 1 ===
+sumidero              c3af66b6e126af3c
+bloques AES-128       50000000
+tiempo                0.3889 s
+ns por bloque         7.7789 ns
+ns por ronda AESENC   0.7779 ns
+=== corrida 2 ===
+sumidero              c3af66b6e126af3c
+bloques AES-128       50000000
+tiempo                0.3882 s
+ns por bloque         7.7636 ns
+ns por ronda AESENC   0.7764 ns
+=== corrida 3 ===
+sumidero              c3af66b6e126af3c
+bloques AES-128       50000000
+tiempo                0.3879 s
+ns por bloque         7.7579 ns
+ns por ronda AESENC   0.7758 ns
+
+# Ancla publicada: 7,7716 ns/bloque. Las tres corridas caen dentro del ruido de máquina.

@@ -1,0 +1,13 @@
+== eclipse-red-v1 · modo entorno ==
+julia 1.13.0 | hilos default=1 interactive=1
+CPU znver5 | RAM 123.4 GiB
+comando: run.jl --entorno
+
+GDR-v0.2 reutilizado desde: /home/katana/zeo/ZEROX/veritas/consenso/ghostdag-rank-v1/src/GhostdagRank.jl
+  P_DEFECTO: k=30 max_parents=15 mergeset_limit=180 s_max=150
+identidad SR=0 <-> peso por conteo: bw = 2^128 * blue_score (comprobada en tests)
+peso_big(0) = 340282366920938463463374607431768211456
+
+RNG: réplica de CPython `random.Random` (MT19937 + init_by_array + sembrado
+     por cadena con SHA-512). Vectores de validación en test/runtests.jl.
+

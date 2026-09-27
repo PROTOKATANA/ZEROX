@@ -1,0 +1,54 @@
+== simular! (transparente) ==
+BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
+ Range (min … max):  16.170 μs …  24.519 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     16.320 μs               ┊ GC (median):    0.00%
+ Time  (mean ± σ):   16.370 μs ± 321.630 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+     ▇█▁                                                        
+  ▂▃▅███▃▂▂▂▁▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂ ▂
+  16.2 μs         Histogram: frequency by time         18.3 μs <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+== simular_rapido! (@inbounds) ==
+BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
+ Range (min … max):  16.560 μs …  25.599 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     16.710 μs               ┊ GC (median):    0.00%
+ Time  (mean ± σ):   16.802 μs ± 596.184 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+   ▃▇█▆                                                        ▂
+  ▇████▇▁▃▁▅▇█▇▆▄▅▄▄▃▄▃▄▄▃▄▄▁▄▄▄▄▄▄▅▅▁▁▅▃▃▄▄▅▅▅▆▅▆▅▆▅▅▄▅▅▅▅▅▆▅ █
+  16.6 μs       Histogram: log(frequency) by time      19.4 μs <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+== asignaciones por llamada ==
+transparente: 0
+rapido:       0
+
+== frontera (1000 × 16 puntos) ==
+BenchmarkTools.Trial: 10000 samples with 193 evaluations per sample.
+ Range (min … max):  501.907 ns …  1.057 μs  ┊ GC (min … max): 0.00% … 0.00%
+ Time  (median):     524.523 ns              ┊ GC (median):    0.00%
+ Time  (mean ± σ):   525.349 ns ± 16.862 ns  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+                        ▁▁▃▆▆▆▆▆▃▃▅▆█▇▇▆▄▂                      
+  ▂▂▂▁▂▂▃▃▃▃▃▃▃▄▄▅▇▇███▇███████████████████▆▅▄▅▄▄▃▃▃▃▃▃▃▃▃▃▃▂▂ ▅
+  502 ns          Histogram: frequency by time          546 ns <
+
+ Memory estimate: 0 bytes, allocs estimate: 0.
+
+== oráculo DP (lo más caro del instrumento) ==
+BenchmarkTools.Trial: 6 samples with 1 evaluation per sample.
+ Range (min … max):  889.295 ms … 961.288 ms  ┊ GC (min … max): 9.86% … 9.34%
+ Time  (median):     906.117 ms               ┊ GC (median):    9.70%
+ Time  (mean ± σ):   912.534 ms ±  25.263 ms  ┊ GC (mean ± σ):  9.66% ± 0.19%
+
+  █       █  █     █ █                                        █  
+  █▁▁▁▁▁▁▁█▁▁█▁▁▁▁▁█▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█ ▁
+  889 ms           Histogram: frequency by time          961 ms <
+
+ Memory estimate: 820.52 MiB, allocs estimate: 1461.
+
+NOTA: el DP es el coste dominante cuando se barre (W, C, δ, φ); se declara con este
+número en vez de describirlo. No se optimizó porque no es el camino de producción.

@@ -1,0 +1,11 @@
+verif16 — paralelismo real de la verificación del PoT (mismo bloque de 10 rondas)
+bloques por carril=400000, repeticiones=3, con PMU
+cada 'bloque' = 10 rondas encadenadas dentro de su carril
+
+1 zmm AESENC  (4 carriles)   carriles=4     1.9189 ns/bloque   10.5059 ciclos/bloque   5.475 GHz  (1.1993 ns por VAES-512)
+2 zmm AESENC  (8 carriles)   carriles=8     0.9603 ns/bloque    5.2524 ciclos/bloque   5.470 GHz  (0.3001 ns por VAES-512)
+3 zmm AESENC (12 carriles)   carriles=12    0.6409 ns/bloque    3.5012 ciclos/bloque   5.463 GHz  (0.1335 ns por VAES-512)
+4 zmm AESENC (16 carriles)   carriles=16    0.4829 ns/bloque    2.6265 ciclos/bloque   5.439 GHz  (0.0755 ns por VAES-512)
+4+4 ENC/DEC   (8 carriles)   carriles=8     0.9201 ns/bloque    5.0017 ciclos/bloque   5.436 GHz  (0.2875 ns por VAES-512)
+1 zmm AESDEC  (4 carriles)   carriles=4     1.8435 ns/bloque   10.0044 ciclos/bloque   5.427 GHz  (1.1522 ns por VAES-512)
+4 zmm AESDEC (16 carriles)   carriles=16    0.4607 ns/bloque    2.5009 ciclos/bloque   5.429 GHz  (0.0720 ns por VAES-512)

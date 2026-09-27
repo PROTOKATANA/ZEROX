@@ -1,0 +1,10 @@
+   12:18:11  up 16 days  8:47,  0 users,  carga promedio: 1,64, 1,87, 1,62
+hilos_de_carga=0  bloques=20000000  ns/bloque=7.7917  ciclos/bloque=42.017  GHz_PMU=5.393  GHz_TSC=4.300
+   12:18:12  up 16 days  8:47,  0 users,  carga promedio: 1,75, 1,89, 1,62
+hilos_de_carga=1  bloques=20000000  ns/bloque=7.7290  ciclos/bloque=42.011  GHz_PMU=5.435  GHz_TSC=4.300
+   12:18:12  up 16 days  8:47,  0 users,  carga promedio: 1,75, 1,89, 1,62
+hilos_de_carga=4  bloques=20000000  ns/bloque=7.7281  ciclos/bloque=42.012  GHz_PMU=5.436  GHz_TSC=4.300
+   12:18:13  up 16 days  8:47,  0 users,  carga promedio: 1,75, 1,89, 1,62
+hilos_de_carga=8  bloques=20000000  ns/bloque=7.7546  ciclos/bloque=42.011  GHz_PMU=5.418  GHz_TSC=4.300
+   12:18:13  up 16 days  8:47,  0 users,  carga promedio: 1,75, 1,89, 1,62
+hilos_de_carga=16  bloques=20000000  ns/bloque=7.8525  ciclos/bloque=42.011  GHz_PMU=5.350  GHz_TSC=4.300

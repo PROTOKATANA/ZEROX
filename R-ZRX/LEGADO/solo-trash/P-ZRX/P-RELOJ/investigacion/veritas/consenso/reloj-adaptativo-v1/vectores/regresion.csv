@@ -1,0 +1,24 @@
+# vectores/regresion.csv — regenerado por run.jl --regenerar
+# Formato: nombre,tp,tv,K,epsilon,admisible
+#   `epsilon` es una EXPRESIÓN de Julia, evaluada al leer: así el vector de frontera
+#   es exactamente tv/(K·tp) y no un decimal escrito a mano.
+#   `admisible` lo calcula la ruta EXACTA (Rational{BigInt}), no el kernel rápido.
+nombre,tp,tv,K,epsilon,admisible
+frontera_exacta_1_3,1.0,1.0,3,1e0/3e0,0
+borde_1_3_prevfloat,1.0,1.0,3,prevfloat(1e0/3e0),0
+borde_1_3_nextfloat,1.0,1.0,3,nextfloat(1e0/3e0),1
+frontera_exacta_3_56_K8,7.0,3.0,8,3e0/56e0,0
+borde_3_56_prevfloat,7.0,3.0,8,prevfloat(3e0/56e0),0
+borde_3_56_nextfloat,7.0,3.0,8,nextfloat(3e0/56e0),1
+frontera_exacta_1_16_K16,1.0,1.0,16,1e0/16e0,1
+borde_1_16_prevfloat,1.0,1.0,16,prevfloat(1e0/16e0),0
+presupuesto_10_K8,7.77e-9,7.77e-9,8,0.1,0
+presupuesto_10_K16,7.77e-9,7.77e-9,16,0.1,1
+presupuesto_3_K8,7.77e-9,7.77e-9,8,0.03,0
+presupuesto_3_K16,7.77e-9,7.77e-9,16,0.03,0
+presupuesto_12p5_K8,7.77e-9,7.77e-9,8,0.125,1
+presupuesto_12p5_K16,7.77e-9,7.77e-9,16,0.125,1
+dispersion_2x_K8_eps_20,1.0,2.0,8,0.2,0
+dispersion_4x_K8_eps_20,1.0,4.0,8,0.2,0
+dispersion_4x_K16_eps_25,1.0,4.0,16,0.25,1
+dispersion_8x_K8_eps_50,1.0,8.0,8,0.5,0

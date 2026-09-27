@@ -1,0 +1,71 @@
+== eclipse-red-v1 · modo sensores ==
+julia 1.13.0 | hilos default=1 interactive=1
+CPU znver5 | RAM 123.4 GiB
+comando: run.jl --sensores
+
+VALIDACIÓN de la CDF normal implementada sin `erf` (no está en Base de Julia):
+  Φ(0) debe ser 0,5; Φ(1,96) ≈ 0,9750021048517795; Φ(−1) = 1 − Φ(1)
+  Φ(0) = 0.50000000000000000
+  Φ(1,96) = 0.97500210485177952
+  Φ(1)+Φ(-1) = 1.00000000000000000
+
+E2 · umbral n_min(W) con menos de 1 falsa alarma al año (Poisson exacto)
+Regla: alarma si la ventana deslizante (t−W, t] trae estrictamente menos de n_min
+bloques. Cuenta una prueba por slot (cota conservadora), como la columna «por slot»
+de 11b §C.1.  [publicado 11b: W=30→6, 60→23, 120→66, 300→211]
+   W (s)      n_min   P(N<n_min) α mín. evadir T=2h
+      30          6    2.257e-08           0.7374
+      60         23    1.596e-08           0.8138
+     120         66    2.788e-08           0.8809
+     300        211    2.483e-08           0.9249
+
+E2 · sensibilidad a la inestabilidad de λ. CONTABILIDAD PROPIA, DECLARADA:
+se recalcula n_min con la media baja μ = (1−s_λ)·λW, que es la lectura literal de
+«la tasa real fluctúa s_λ dentro de la ventana».
+
+  AVISO DE MÉTODO, y es un hallazgo sobre el instrumento histórico: esta contabilidad
+  reproduce EXACTAMENTE la columna s_λ = 0 de 11b §C.1 (6 / 23 / 66 / 211) y su
+  columna de α para evadir (0,9249 a W=300, T=2 h), pero **NO** reproduce su columna
+  s_λ > 0 (11b publica 16 con W=60 y 125 con W=300 a s_λ=0,10, y n_min=0 con W=300 a
+  s_λ=0,20). El texto de 11b NO dice cómo entra s_λ en la cuenta, y la fórmula que
+  declara (`n_min_poisson` sobre μ = λW) no toma s_λ como argumento en absoluto:
+  esa columna se generó por otra vía que el informe no documenta. No se resuelve en
+  silencio: se anota. Lo que se conserva es la DIRECCIÓN —n_min cae al caer μ— y la
+  conclusión cualitativa: si λ es inestable, E2 pierde margen hasta desaparecer.
+   W (s)      s_λ        n_min
+      30     0.00            6
+      30     0.10            4
+      30     0.20            3
+      60     0.00           23
+      60     0.10           19
+      60     0.20           16
+     120     0.00           66
+     120     0.10           57
+     120     0.20           48
+     300     0.00          211
+     300     0.10          186
+     300     0.20          161
+
+E1 · B para menos de 1 falsa alarma al año
+  «por slot» usa la cola de la FRONTERA SECUENCIAL L (un slot retrasado la atasca);
+  «por excursión» usa la cola MARGINAL de D. No son la misma cola.
+[publicado 11b §B.1, lognormal p99=8: ε=0,1 → 20,14 (excursión) y 20,70 (slot);
+ ε=1,0 → 21,04 y 21,60. Pareto p99=8 ε=1 → 76,40 y 138,92.]
+      cola      p99    ε (s)    B (excursión)     B (por slot)
+ lognormal        8      0.1            20.14            20.70
+ lognormal        8      1.0            21.04            21.60
+ lognormal       16      0.1           100.53           132.30
+ lognormal       16      1.0           101.43           133.20
+    pareto        8      0.1            75.50           138.02
+    pareto        8      1.0            76.40           138.92
+    pareto       16      0.1          1421.51         20047.58
+    pareto       16      1.0          1422.41         20048.48
+
+CONTROLES DE CAPACIDAD de E1 — dos identidades que el instrumento DEBE reproducir:
+  (a) por construcción de la lognormal (mediana=4, p99=8), P(D>8) es 0,0100 EXACTO.
+      Un instrumento que no lo dé tiene la CDF mal — y así se cazó el primer intento.
+      P(D>8) = 0.0100000000   (esperado 0,0100000000)
+  (b) la cola SECUENCIAL debe ser ESTRICTAMENTE más pesada que la marginal:
+      11b §B.0 publica P(D>8) = 0,0100 y P(L>8) = 0,014760.
+      P(L>8) = 0.014760   (publicado 0,014760)   ¿más pesada? SÍ
+

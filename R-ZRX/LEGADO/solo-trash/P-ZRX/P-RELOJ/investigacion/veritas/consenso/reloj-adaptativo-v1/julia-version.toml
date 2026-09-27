@@ -1,0 +1,9 @@
+# Versión de Julia con la que se ejecutó y validó este instrumento.
+# Salida literal de `veritas/julia.sh --version`: "julia version 1.13.0"
+julia = "1.13.0"
+
+[entorno]
+depot_escribible = "P-ZRX/P-RELOJ/investigacion/.julia-depot  (el de ~/.julia es de solo lectura)"
+manifest = "copiado de veritas/plantilla/Manifest.toml, sin modificaciones"
+hilos = 1
+nota = "El paquete no instala dependencias: usa Test (stdlib) y las del catálogo de la plantilla."

@@ -1,0 +1,92 @@
+== eclipse-red-v1 · modo flujo ==
+julia 1.13.0 | hilos default=1 interactive=1
+CPU znver5 | RAM 123.4 GiB
+comando: run.jl --flujo
+
+§4.3 · ¿FABRICA UN ADVERSARIO DE RED LA PARTICIÓN DE FLUJO? (F1)
+Aritmética de enteros sobre C-FLU-01/03/04/05/07/14/22 y C-FIN-01.
+
+RESULTADO, y es una DERIVACIÓN, no una simulación:
+  Sea s₀ el slot del último ancestro común P entre la cadena de la víctima y la de la
+  red. La ventana de adopción de C-FLU-22 para la época j es [t_j, s₀ + F_slots), con
+  t_j = slot(I_j) + L_slots ≥ T_j + L_slots. Luego la ventana es VACÍA siempre que
+      s₀ ≤ T_j + L_slots − F_slots.
+  Si además el corte sigue vivo en el corte de vista T_j + L_slots, la vista de época
+  V_j diverge, el ancla diverge y con ella el flujo (C-FLU-10/12). A partir de ahí:
+    · C-FLU-14 impide FUSIONAR los dos flujos, y
+    · C-FIN-01 impide REORGANIZAR en cuanto d ≥ F_slots,
+  y como s₀ + F_slots ≤ T_j + L_slots, cuando llega el corte de vista la prohibición de
+  C-FIN-01 ya está activa. La partición es PERMANENTE sin que nadie haya roto una regla.
+
+  Duración mínima del eclipse: E_min = t_j − s₀ ≥ F_slots slots = F segundos (σ = 1 s).
+  Es decir: **basta un eclipse de duración > F_slots**, y el número coincide con el de
+  la hipótesis §2 del encargo, ahora derivado y no supuesto.
+
+MATIZ QUE CAMBIA EL MECANISMO, y hay que decirlo: un retraso UNIFORME de E < L_slots
+NO fabrica la partición, porque el bloque que cruza T_j se produjo ~L_slots antes y la
+víctima ya lo tiene. Lo que la fabrica es RETENER el bloque que cruza T_j (o el pasado
+entero que lo contiene), y como todo bloque honesto posterior desciende de él, retenerlo
+equivale a cortar el flujo honesto. El eje no es el retardo: es la RETENCIÓN.
+
+Ilustración con F_slots = 7200 (F = 2 h, valor PROVISIONAL de investigación, no del
+SPEC: F_slots es símbolo), S_max_slots = 150 (R-FIN-1a, elección de Katana).
+ L_suelo_slots |    L_slots |       s₀ máx | E_min (slots)
+             0 |       7200 |         7200 |         7200
+          7200 |       7200 |         7200 |         7200
+         14400 |      14400 |        14400 |         7200
+         28800 |      28800 |        28800 |         7200
+  L_suelo_slots NO se fija: es símbolo (SPEC §7.1, C-FLU-01). La tabla lo recorre.
+  Con L_suelo_slots ≥ F_slots, L_slots = L_suelo_slots y el umbral de s₀ depende de él.
+
+§4.3 · COSTE ABSOLUTO DEL ATAQUE (F4) — en IP/prefijos/tiempo, NO en espacio
+  La variante (i) —retener el PoT— no necesita disco (11b A.1: 192 → 0 bloques,
+  reproducible aquí con `run.jl --variantes`). La partición tampoco: el atacante
+  RETIENE, no fabrica. Su coste es:
+   1) ocupar las salientes de la víctima durante E > F_slots, y
+   2) no ser expulsado por lento (C-NET-05 desconecta al que no responde a tiempo).
+  Ancho de banda si el atacante CURSARA el tráfico en vez de descartarlo:
+    E=  7200 slots (  2.0 h): 0.72–1.44 GB  (0.80–1.60 Mbit/s sostenidos)
+    E= 86400 slots ( 24.0 h): 8.64–17.28 GB  (0.80–1.60 Mbit/s sostenidos)
+  DESCARTAR es más barato que cursar: el coste real del ataque NO es ancho de banda,
+  es **sostener la ocupación de las salientes** frente a la renovación de pares.
+  Por eso el borrador de regla que importa es «MUST renovar pares», no un umbral de
+  ancho de banda. Y por eso F4 se responde en IP/prefijos (sección D), no en bits.
+
+§4.3 · COLATERAL HONESTO DE C-FLU-20
+  C-FLU-20 obliga al productor a descartar puntas cuya inclusión cambiaría entropía_j
+  o t_j de una época YA ACTIVADA, y C-FLU-21 impide recalcularla. El SPEC dice la
+  consecuencia con esas palabras: «ese bloque queda INFUSIONABLE PARA SIEMPRE».
+  Cuántos bloques honestos condena un eclipse, como función de los símbolos:
+    · bloque del propio granjero eclipsado: rojo_V = 1,0000 medido (variantes (ii) y
+      (iii) con E ≥ 60 s): pierde el 100 % de su recompensa mientras dure el eclipse.
+    · bloques ajenos que cambiarían un ancla activada: a lo sumo los que caen en la
+      banda de la vista de época, ≈ S_max_slots por época activada; la tasa de épocas
+      es 1/I_slots, luego ≈ E/I_slots épocas en un eclipse de E slots.
+  Lo que NO está medido, y el SPEC lo declara pendiente (TAREAS §2.9): el colateral
+  honesto exacto. Aquí se da la forma y se dice que el número no existe.
+
+F5 · PINZA DE PRESUP_NODO (C-NET-33)
+  Cota INFERIOR, la que el propio SPEC declara: PRESUP_NODO MUST bastar para verificar
+  UNA rama rival completa = F_slots slots, del orden de F_slots × 92 ms.
+    F_slots= 7200 -> 662.4 s de CPU = 11.04 min  [el SPEC dice «≈11 min»]
+    F_slots= 3600 -> 331.2 s de CPU = 5.52 min  [el SPEC dice «≈11 min»]
+  Cota SUPERIOR: el SPEC la declara NO DERIVADA (C-NET-33, comentario final).
+  La tensión, y es de diseño antes que de número:
+    El presupuesto se dimensiona para trabajo AES (92 ms/slot). Pero el MISMO
+    presupuesto lo consume el paso 1b de C-POT-08 —comprobación ESTRUCTURAL de
+    C-FLU-14, SIN AES— y el propio SPEC dice de ese paso: «Lo que sí cuesta es
+    recomputar cadena y flujo del sub-DAG ajeno, que es superficie de DoS».
+    Si forzar trabajo estructural cuesta, por unidad, menos que 92 ms de AES, el
+    atacante agota el presupuesto del nodo con el trabajo MÁS BARATO de los dos y
+    deniega la adopción de la rama legítima. El descuento es 92/ms_estructural.
+    `TAREAS.md` §2.9(a)4 ya declara esa rendija «parcialmente bajo control del
+    atacante». Lo que falta para cerrar el veredicto es UNA medida: los milisegundos
+    de paso 1b por bloque ajeno. NO está medida. Sin ella, la compatibilidad de la
+    cota inferior con la resistencia al agotamiento queda INCONCLUSA, pero la
+    dirección del defecto —presupuesto dimensionado para la carga cara y consumido
+    por la barata— no depende de esa medida.
+
+  Cifra vecina que SÍ está medida, y no es lo mismo (se declara para no confundir):
+    coste por salto de validar antes de reenviar: 1.33–9.86 ms por bloque
+    (veritas/rendimiento/coste-salto-v1, 2026-09-14). Eso NO es el paso 1b.
+

@@ -1,0 +1,15 @@
+== eclipse-red-v1 · modo control ==
+julia 1.13.0 | hilos default=1 interactive=1
+CPU znver5 | RAM 123.4 GiB
+comando: run.jl --control
+
+CONTROL POSITIVO — fila publicada de D8 A3b (salida_a3b.txt, E=200 s, f=5 %):
+  esperado alpha=0.00 -> 0.8218/0.6513/0.5920/0.5460   (n_C=522)
+  esperado alpha=0.25 -> 0.8806/0.7687/0.7289/0.6816   (n_C=402)
+
+  alpha=0.00 GLOBAL | 0.8218/0.6513/0.5920/0.5460 | n_C=522
+  alpha=0.25 GLOBAL | 0.8806/0.7687/0.7289/0.6816 | n_C=402
+
+NOTA: el control se reproduce EXACTAMENTE a cuatro decimales y con el mismo número
+de bloques. Es la puerta que el encargo pone al puerto (§4.1) y está superada.
+

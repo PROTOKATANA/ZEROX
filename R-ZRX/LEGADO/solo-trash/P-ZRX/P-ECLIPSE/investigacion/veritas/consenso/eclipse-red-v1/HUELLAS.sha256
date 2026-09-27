@@ -1,0 +1,40 @@
+# HUELLAS — eclipse-red-v1
+# Generado con: find . -type f ! -name HUELLAS.sha256 -print0 | sort -z | xargs -0 sha256sum
+# Incluye la huella del modulo de GDR-v0.2 reutilizado, para fijar la procedencia.
+#
+b894ab8581dabb34c1f03fdbcf88099955a335abd43185479bc2a5fe259d2ed5  ./bench/benchmarks.jl
+a61ea821de981f4abb2a5c33523c2368df0395adef3d3b7f7e67798e66f9bf7e  ./BITACORA.md
+7cda736223e97d30ab3decf01bedac902ce009a58703408f99e3286d40899646  ./CONTRATO.md
+be3faba7f2df72bfe733ab3819b78963f92bbeee434d09ce3fae07a51c5b0dbc  ./HIPOTESIS.md
+f6c08667abc85830ee6c77b3a3d711a79f75b4a7ac12df9717668c93df9c48f7  ./HIPOTESIS-QUE-CODIFICAN-LA-CONCLUSION.md
+91ea6274bef89139321975c94e449f2458df90819ad278a1440eef11d7684752  ./INFORME.md
+4e9d7d5380b6e7b5698077f00810a4c6e77828441739b3e9647f720a4692ebb2  ./julia-version.toml
+c8881bcc0a0cad8ab5d74dff827b3f5c463541517bd84967318bdb3a3166ca27  ./Manifest.toml
+6f354fb44e7bf6ee7612efb7c76a75b8c0151807d31e4a245515129814e41ea4  ./METODO.md
+078c4287f53763aa5d5a6cefa08389d578324cb610b8bf221a4890d6c1b642a5  ./MODELO.md
+5782c7ef0c966a7701cda28aec37d5c06e3a4ec3f61e2dcc600290c0f1bfc7b0  ./PROCEDENCIA.md
+5443dc69c9ae7cc6f3a6d41139c958d865f1a3cff94a280452887e1619d81934  ./Project.toml
+d310e7db1a8fcc612e64815f5d8e89040c749d8910bb7de4f6fbb7dc9227fee8  ./resultados/BENCH.txt
+4029e119139f6585f8f0556d3982c2d2a6a0d58d2b01ea043905eb13a54805eb  ./resultados/run-captura.txt
+da26ab5b8534d85a3695de208ddb0a70d62ab81451cf7888798e0297826d5245  ./resultados/run-control.txt
+456b96527ec9e94b2a31aa1dc887f88a9d9a1d4c7b315d551878b23796c03f73  ./resultados/run-entorno.txt
+769feddfeb84d00890644ec8546a8aa023a2013cd3e6428e91921a92f7a1bfa2  ./resultados/run-flujo.txt
+4c0a1c9e30b0c8146b832a6a43876e7b294044d566e3e6550bf71cc937830f52  ./resultados/run-regimen.txt
+e38c775b75a2ecc919e46fbfb692be18237bd437b04f1b9cd8ee33c4f76b531c  ./resultados/run-sensores.txt
+d2b9c3bab8425e75576ce45125bc30d03ea2e36fc74620e57b022564d16da943  ./resultados/run-variantes.txt
+3ca4359a99a5c8d7704a0bd45c256aefbcab4fe4328b2692a01fb93bc6a55600  ./resultados/TESTS.txt
+69e1a948fd9f30941fef404e11eddf7db3aa22e9969742e30ab384d28998d2ec  ./run.jl
+890c294ad5dae7ae2fd6bf3600801c85d43af12523de8408d1f4e138f88e56ef  ./src/captura.jl
+3bc281590d462c856db2021c97e8fca2fda92e3bb356dea3f5390989a8bfafe6  ./src/flujo.jl
+8c32dde626f43a2657840c8112906c195c767b242f92f3174efcc71040e770f1  ./src/GDR.jl
+f7bbc511a105edec412ac05e0d9cf8a307b1feb19a1ac0b7aa15b71f6a496428  ./src/mundo.jl
+d9e1eae277577c08a26227570f2149da832f72affc5b55acf78689ad447d7073  ./src/pyrng.jl
+10221dafbceb436c386a142c65b3e532eba11486642ddf9bdcad473a28a9bcf7  ./src/sensores.jl
+8bec643ec04c198fd51f5cc26cbbba485b381cd3687739fdefb5dccb5663b7da  ./test/runtests.jl
+#
+# --- GDR-v0.2 reutilizado (fuera de esta carpeta, NO se modifica) ---
+9643647e6b1762e28da614a00d686cffe4c08d58ece8dbb5dbc88aea85033f1f  /home/katana/zeo/ZEROX/veritas/consenso/ghostdag-rank-v1/src/GhostdagRank.jl
+7769415b749f51133be454f525b12b2eb9f4549081f952e93e17dfa12d3a71b3  /home/katana/zeo/ZEROX/veritas/consenso/ghostdag-rank-v1/src/modelo.jl
+dd9f200b419f7601ca49b8ccba1f18d3bb670012b4a4e52bae5e7091550c4579  /home/katana/zeo/ZEROX/veritas/consenso/ghostdag-rank-v1/src/rapido.jl
+51e3961553bca60b0c3d3dda5d1d1e17a82bb4c8945cbfa417c9845117c7080c  /home/katana/zeo/ZEROX/veritas/consenso/ghostdag-rank-v1/src/referencia.jl
+05dd24d8dd35e349b0f2fb8827b2b564bcce23125c4c888e88901e3e756a879d  /home/katana/zeo/ZEROX/veritas/consenso/ghostdag-rank-v1/src/validacion.jl

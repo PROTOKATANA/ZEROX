@@ -1,0 +1,16 @@
+aesinst v1 — latencia y rendimiento de instrucciones AES/VAES
+CPU: ver /proc/cpuinfo
+n-iter=2000000 por núcleo; con PMU hardware (perf_event_open)
+
+lat pxor xmm [ctl]       0.4598 ns/pxor        2.000 ciclos/pxor     (4.351 GHz reloj real, 4.298 GHz TSC)
+lat AESENC xmm           0.7347 ns/aesenc      4.001 ciclos/aesenc   (5.446 GHz reloj real, 4.300 GHz TSC)
+lat AESENCLAST xmm       0.7369 ns/aesenclast    4.001 ciclos/aesenclast (5.430 GHz reloj real, 4.300 GHz TSC)
+lat bloque PoT xmm       0.7739 ns/instr       4.201 ciclos/instr    (5.428 GHz reloj real, 4.299 GHz TSC)
+thr AESENC xmm           0.0953 ns/aesenc      0.517 ciclos/aesenc   (5.427 GHz reloj real, 4.298 GHz TSC)
+lat VAESENC ymm          0.7370 ns/vaesenc     4.001 ciclos/vaesenc  (5.429 GHz reloj real, 4.299 GHz TSC)
+thr VAESENC ymm          0.1851 ns/vaesenc     1.001 ciclos/vaesenc  (5.407 GHz reloj real, 4.293 GHz TSC)
+lat VAESENC zmm          0.7368 ns/vaesenc     4.001 ciclos/vaesenc  (5.431 GHz reloj real, 4.299 GHz TSC)
+thr VAESENC zmm          0.1840 ns/vaesenc     1.000 ciclos/vaesenc  (5.436 GHz reloj real, 4.293 GHz TSC)
+
+CONTROL DE COHERENCIA: 'lat pxor xmm' debe salir ~1 ciclo/pxor.
+'lat bloque PoT xmm' debe dar ~10x la latencia de una ronda si la cadena manda.

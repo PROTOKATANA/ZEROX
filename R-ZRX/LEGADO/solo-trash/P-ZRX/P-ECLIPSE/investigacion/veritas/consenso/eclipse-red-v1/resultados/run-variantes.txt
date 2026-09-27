@@ -1,0 +1,23 @@
+== eclipse-red-v1 · modo variantes ==
+julia 1.13.0 | hilos default=1 interactive=1
+CPU znver5 | RAM 123.4 GiB
+comando: run.jl --variantes
+
+Validación del puerto contra las tablas publicadas de la ronda 11b
+(research/scripts/d8-ronda11b/salida_a.txt), régimen histórico Δ=4 s, peso por conteo.
+Ventana de régimen [600, 900] s; f_v=0.05; eclipse desde t=300 s.
+
+  variante        inv S=4/20/30/150                 rojo_V   n   | publicado
+  ii paso=0.00   0.7927/0.3109/0.1762/0.0000        1.0000   193  | 0.7927/0.3109/0.1762/0.0000 rojo=1.0000 n=193
+  ii paso=0.33   0.7070/0.0047/0.0000/0.0000        0.0093   215  | 0.7070/0.0047/0.0000/0.0000 rojo=0.0093 n=215
+  ii paso=0.10   0.7316/0.0579/0.0105/0.0000        0.0895   190  | 0.7316/0.0579/0.0105/0.0000 rojo=0.0895 n=190
+  iii E=20       0.7753/0.7022/0.0056/0.0000        0.0449   178  | 0.7753/0.7022/0.0056/0.0000 rojo=0.0449 n=178
+  iii E=60       0.7600/0.6743/0.6743/0.0000        1.0000   175  | 0.7600/0.6743/0.6743/0.0000 rojo=1.0000 n=175
+  iii E=200      0.8167/0.7500/0.7500/0.7500        1.0000   180  | 0.8167/0.7500/0.7500/0.7500 rojo=1.0000 n=180
+
+(i) el atacante RETIENE el PoT: la víctima fabrica 0 bloques tras el eclipse, para
+    todo alpha y toda f_v. Publicado en 11b §A.1: 192 antes / 0 después con f_v=0.05.
+    f_v=0.01 | antes   40 | despues 0
+    f_v=0.05 | antes  192 | despues 0
+    f_v=0.20 | antes  720 | despues 0
+

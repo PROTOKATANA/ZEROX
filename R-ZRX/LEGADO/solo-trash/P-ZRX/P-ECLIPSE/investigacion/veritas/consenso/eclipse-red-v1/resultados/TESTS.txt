@@ -1,0 +1,2 @@
+Test Summary:  | Pass  Total  Time
+eclipse-red-v1 | 1006   1006  3.3s

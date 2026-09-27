@@ -1,0 +1,47 @@
+# HUELLAS.sha256 — instrumento reloj-adaptativo-v1 y mediciones de P-RELOJ
+# Generado: 2026-09-24T16:29:52+02:00
+# Verificado con: LC_ALL=C sha256sum -c HUELLAS.sha256   (desde la raíz ZEROX)
+# Rutas relativas a /home/katana/zeo/ZEROX
+c9c79fd901256cb12d8a9feca95737c24bf291ed819ec8a995433d11a1959b4d  P-ZRX/P-RELOJ/investigacion/DECISIONES-PENDIENTES.md
+f9dd8989100ec91d0ca7a2d37b068d3cf0d40887b0f131a56cc23c6a77572712  P-ZRX/P-RELOJ/investigacion/INFORME.md
+be086e957d0313812334add495bd059e07be4b16d1816642bbfadd2cd11e66de  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/aesinst
+cacc3ff103a0d5ce3107bf78a837a12faf023e1c60ef8971b81ab797c1719830  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/aesinst.c
+6ff7872fa057988ed2950fff45e51b51773dd6f96ab559fb220b2b4e219bd91a  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/aeslat
+bd022495fc932f22e8bee6959a7323d707a2295ea8d462c31b0b99e05895a2ea  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/aeslat-corridas.txt
+a82375f1a2c51279e01f216a5e9fd90b0f2456a5fc687b47bb83ebfddbb0dc0e  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/carga
+0dba4e58efb669173e100e915e1aab7f4a1046ceb1ee299c7aa272208c7d3dd9  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/carga.c
+285e91c8e2404245a8fce3b3e5f025446b622c63572a7f848e976ecde1274e84  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/run-medicion.sh
+3afdc1d3ce948ef670a4419f01e43a89d14f4ba86639cccfbc9a0842a71b247b  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/salida-aesinst-core8-n2e6.txt
+4422437daacd6db4d34272d307fef6c4d6a21022f304b2d297937d75723e12bc  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/salida-aesinst-core8.txt
+b9d2f3f30ba7cf6a699d0f330f18419b5debfb083cc21733eb74272ccdde4e43  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/salida-carga.txt
+f051187602dc4f526b93b8ea8e43bdbde4f7440498639a98b163c45fae258f03  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/salida-verif16.txt
+19459a63618fd2c9eaf8571d70f138860c538b8bf387c4743b59f57a7de88e53  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/salida-verif8.txt
+963d1c53b6e03a74fd10a70d4f7b2b63b685433f66c373e5bebb5721dc30a77e  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/verif16
+e4986c0ee48c2679031621116671b5ccd9eb672f1309143ee9a7378429b823cf  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/verif16.c
+38b308f9453f9c8e6f444da9339257981feb54e8a2bcb733ec507f5ef3e7b534  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/verif8
+f633416718af755e2ad6f48d347157be64b374e2ce5a0a6a4cec1a818e33bf3a  P-ZRX/P-RELOJ/investigacion/mediciones/latencia-aes/verif8.c
+fa0b105de3052b806ccb6662baa162c7189f52778ffec7dccba63f3759cbe66e  P-ZRX/P-RELOJ/investigacion/PROGRESO.md
+317e4c0e913dbf7b09e0dcf175797472efee3127ad96204e24ffe3fffada2ad5  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/bench/benchmarks.jl
+3a96e1e3800a887c97ceb7c6d6e81746b0ae195bb2320e050b85aabeb2ea1cdf  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/BITACORA.md
+5af59bfc9bb2b06ea039925dbc786a76177f41446c9874c00142ec427aefab7c  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/CONTRATO.md
+219593ab24a75bb487b8098863db6414d2dfeaebd8dbd30a0981932b4d5f61fd  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/HIPOTESIS-QUE-CODIFICAN-LA-CONCLUSION.md
+edf74dec76d317e90d38058b2eb40f69bcf6560cf007c599e689cc51f2186a4c  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/julia-version.toml
+61a9b698fcf2d83bf85210df5c7b92a3a9ba626654c6de828a3c0e263f96a407  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/Manifest.toml
+cbf21150eca016064ef354810453933696d57928b2bf5ae8ca6cec720f36b217  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/METODO.md
+6a00002cf50ef6854fc2d56eabb646edc5d6bd459f8887eb82ca71df41ac42fa  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/MODELO.md
+2f5673b08207f96452f9a59a1fa5501c47a2a911f74b8940a0ff9acb657d69c5  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/PROCEDENCIA.md
+37e8738d6352e6e352c8a86b2965be3a74b562a4926447e9ebf5992ccd0d5e0f  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/Project.toml
+6e084ab761358a83d09fd44b23f71c5a072fdff4643c646a4ce9d4aa1487597e  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/resultados/adaptador.md
+1fcfcecffee907e81bde308056510b4174b2272bdf8930306ccd9c83b15fb732  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/resultados/benchmark.txt
+8b8e73b98e4c2aceafcbed7a0da66f0dc86543da134db0d11cfcdbc00685a5f0  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/resultados/frontera.md
+5b00d5bb244f20303fdf5ee22903523781f9dc54a3bc8b5af8824eb69a086a0d  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/resultados/manipulacion.md
+c6eba03ea7dead43969995f9a7b9716cb21ac033e1f5f425bfeae19be3b68fc5  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/resultados/validacion.md
+6725686db88692f4c102540e413201c913f48f6fd4300dcf9cced2441ccada81  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/run.jl
+8e956137d800b2b6a91f25c6bcd8730b522613d4c1b0888427d42daa975de89d  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/src/medicion.jl
+15eb08280451dc8d323cab76dc02e052fcf819bbd529d3fb8faf21d8f3975750  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/src/modelos.jl
+748a990193ed1507126a1c3debc7f4b22521607b11fbc1c70c1d4e2b5a4c81b7  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/src/rapido.jl
+2f99bb14d2f66a25ddc9f132e1fc54f05c2696de8395f84e659266d71c909e99  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/src/referencia.jl
+edf9f3f87fca1de489743330e449e5d8870fbb5148a97d5315fa7678542edb18  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/src/RelojAdaptativo.jl
+4cc19da514f1d7bc473c0a275c6436b2f65a26390e5e1211abcdf9775e97eeb1  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/src/validacion.jl
+f0a18b2bb528bc50f9cf1089b86b16d55f668f65070f2cc9cc50b6c6429a7fd9  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/test/runtests.jl
+2921df8b87abdd62cc8939772957c3e66e654014a39e2814bd0e6e93be7728d6  P-ZRX/P-RELOJ/investigacion/veritas/consenso/reloj-adaptativo-v1/vectores/regresion.csv

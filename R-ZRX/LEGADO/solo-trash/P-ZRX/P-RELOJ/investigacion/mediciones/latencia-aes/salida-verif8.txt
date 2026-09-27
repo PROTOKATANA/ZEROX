@@ -1,0 +1,23 @@
+verif8 — coste de verificar 8 tramos de PoT, medido
+bloques por tramo=300000, repeticiones=3, con PMU
+
+verificar escalar (8 seq)  bloques=2400000       7.7466 ns/bloque    42.014 ciclos/bloque  (5.423 GHz real)
+verificar escalar (8 seq)  bloques=2400000       7.7415 ns/bloque    42.010 ciclos/bloque  (5.427 GHz real)
+verificar escalar (8 seq)  bloques=2400000       7.7347 ns/bloque    42.012 ciclos/bloque  (5.432 GHz real)
+  --> mejor verificar escalar (8 seq): 7.7347 ns/bloque
+
+verificar AVX512+VAES (8 par) bloques=2400000       0.9644 ns/bloque     5.235 ciclos/bloque  (5.428 GHz real)
+verificar AVX512+VAES (8 par) bloques=2400000       0.9655 ns/bloque     5.236 ciclos/bloque  (5.423 GHz real)
+verificar AVX512+VAES (8 par) bloques=2400000       0.9674 ns/bloque     5.236 ciclos/bloque  (5.412 GHz real)
+  --> mejor verificar AVX512+VAES (8 par): 0.9644 ns/bloque
+
+producir (1 seq)           bloques=2400000       0.9684 ns/bloque     5.252 ciclos/bloque  (5.423 GHz real)
+producir (1 seq)           bloques=2400000       0.9706 ns/bloque     5.252 ciclos/bloque  (5.411 GHz real)
+producir (1 seq)           bloques=2400000       0.9677 ns/bloque     5.252 ciclos/bloque  (5.428 GHz real)
+  --> mejor producir (1 seq): 0.9677 ns/bloque
+
+ASIMETRIA medida (mismo trabajo: 8 tramos x 300000 bloques):
+  producir (secuencial)          0.9677 ns/bloque
+  verificar escalar              7.7347 ns/bloque  (factor 7.993x vs producir)
+  verificar AVX512+VAES          0.9644 ns/bloque  (factor 0.997x vs producir)
+  aceleracion por paralelismo 8 tramos: 8.020x (escalar/avx512)
