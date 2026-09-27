@@ -469,3 +469,11 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   el registro no marca como producidos. **Nuevo método de E-3** (sin tocar el nodo): tras el reposo, reinicio aislado y
   sin producir de cada nodo y comparación del resumen tras repetir todo su almacén; se aplica también a rep1 y rep2.
   Si entonces difieren, es una divergencia real.
+
+### 16:46–17:50 — W07d migrada; R1 completa; R2 en marcha
+
+- **W07d migrada** (`22940aa`): `reinicio_completo` y `parada` llevan el estado final (resumen del virtual y compendio
+  de bloques); parada ordenada por señal. **Commit final de código de 0.0.1: `22940aa`** (solo registro respecto al
+  medido `26312ff`). El «mismo estado» de cada repetición se verificará reabriendo cada nodo aislado con este binario.
+- **R1 completa** (3 repeticiones): E-1, E-2 (0 rechazos) y E-4 superados en las tres; E-3 pendiente de la verificación
+  final. **R2 rep1**: nodo tardío sincronizado desde el génesis en ≈ 64 s.
