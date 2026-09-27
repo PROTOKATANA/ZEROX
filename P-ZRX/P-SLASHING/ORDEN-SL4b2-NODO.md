@@ -5,8 +5,7 @@ arneses incluidos); léelo íntegro antes de escribir código y aplica sus regla
 
 ## 1. Identidad y contexto
 
-- **ID:** SL-4b2. **Fecha:** 2026-09-26 (redactada ≈ 23:00; se congela y lanza tras migrar W06d5, SL-4b1, SL-4c y
-  W07a). **Director:** Claude. **Ejecutor:** subagente **Sonnet**, único (integración en el nodo con procesos
+- **ID:** SL-4b2. **Fecha:** 2026-09-26 (redactada ≈ 23:00; se congela y lanza tras migrar W06d7 y W07a; SL-4b1 y SL-4c ya están en la raíz). **Director:** Claude. **Ejecutor:** subagente **Sonnet**, único (integración en el nodo con procesos
   reales, como W06d1…W06d5; `P-ZRX/PLAN-0.0.1.md` D-P06).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/SL4b2/`.
 - **Objetivo único:** que la red dev **castigue** la doble firma de extremo a extremo con las reglas ya
@@ -25,7 +24,7 @@ arneses incluidos); léelo íntegro antes de escribir código y aplica sus regla
 `P-ZRX/P-SLASHING/DECISIONES.md`, `P-ZRX/P-SLASHING/REVISION-SL2b.md`, `REVISION-SL4a.md`,
 `REVISION-SL4b1.md` y `REVISION-SL4c.md` (las escribe el director al migrar; SL-4c hace que la v4 viaje por red y que `cbid` y orden canónico sean forma), `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3c.md` (si deja hallazgos altos en `zx-node`, se corrigen en esta orden como **paso 0**, antes de lo demás), `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md`
 (eventos `evidencia_*`, `firmante_abstenido`), `P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`, `P-ZRX/P-NODO/PLAN-W06.md`
-y las órdenes y revisiones W06d1…W06d5 y W07a. Código: la raíz en el commit que indique la entrada.
+y las órdenes y revisiones W06d1…W06d7 y W07a (en particular el orden **admitir → persistir → difundir** de W06d6, que esta orden conserva: el firmante persiste su registro **antes** de sellar, y el bloque sellado sigue ese orden). Código: la raíz en el commit que indique la entrada.
 
 ## 3. Decisiones del director (no las cambies; si una no se puede cumplir, para e informa)
 
@@ -100,7 +99,7 @@ dos se publican). El castigo de la red dev **no** es una afirmación de disuasi�
 | V4 | **Extremo a extremo con procesos reales** (`127.0.0.1`, tres nodos A, B, C con claves 0, 1, 2, `N_dev` reducido declarado): tras ≥ 20 bloques PoST, `zx-adversario doble-firma --clave-indice 0 --repetir`. Se exige, con los registros conservados: `evidencia_detectada` en B y C; una `EvidenceTx` incluida y aplicada antes de `slot_falta + 300`; la garantía de la clave 0 confiscada entera (`f = 1`: `C = V`), `suelo(C·2/8)` a la coinbase del incluidor y el resto quemado, leído del estado de **los tres** nodos; mismo `resumen_estado` final en los tres; la segunda evidencia del mismo incidente descartada sin invalidar su bloque; A no produce mientras su garantía activa sea menor que `q` (decisión 1 de W06d5; si el nodo vuelve a depositar, se registra cuándo) y B y C siguen produciendo | todo, en 3 repeticiones con semillas distintas |
 | V5 | **Honesto sin castigo:** tres nodos en régimen; 10 `SIGKILL` a A en momentos aleatorios (semilla registrada) con reinicio inmediato; al final, **0** eventos `evidencia_detectada` en B y C y 0 pares de bloques de la clave 0 con el mismo slot en el DAG | 0 y 0 |
 | V6 | **Pérdida del registro:** con A parado, borra `firmante.registro` (conserva el almacén) y rearranca: `firmante_abstenido` con motivo de pérdida en todos los slots `≤ slot_actual + 150` (borde inclusivo, `REVISION-SL4b1.md` DF-9), después produce; 0 evidencias en B y C | exacto y 0 |
-| V7 | `fmt --check`, `clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-features --locked` (todo lo previo con su nombre + lo nuevo), `ci/dependencias-exactas.sh`, `ci/frontera-crates.sh`; y **regresión con procesos reales** de V4, V5, V6b y V7 de W06d5 con la evidencia activa | limpio; mismas conclusiones que W06d5 |
+| V7 | `fmt --check`, `clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-features --locked` (todo lo previo con su nombre + lo nuevo), `ci/dependencias-exactas.sh`, `ci/frontera-crates.sh`; y **regresión con procesos reales** con la evidencia activa: tres nodos (V3 de W06d6), nodo tardío (V4 de W06d6), E-6b y V6(b) de W06d7, y `zx-adversario` E-7 | limpio; mismas conclusiones que W06d5 |
 
 **Tabla de cobertura** (lección de método 1) en el informe: por tipo de evento y resultado del detector y del
 firmante (`evidencia_detectada`, `evidencia_incluida`, descarte por repetición, ventana cerrada,
