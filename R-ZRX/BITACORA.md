@@ -431,3 +431,6 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   disuasión calculada en SL-2/SL-2b, **no está implementada**; `SPEC-0.0.1` la daba como parámetro de 0.0.1 junto con
   `q = 20` (el nodo usa `q = 10`). Corregido; en 0.0.1 el castigo confisca solo la garantía y **no se reivindica
   disuasión**. IPA C-12 nuevo. Es la segunda afirmación excesiva mía en `SPEC-0.0.1` (la primera, TRN-09).
+- 11:03 **W07b**, primera parada de turno dentro de E-0 (fmt, clippy y build en verde; tests en marcha sin fallos). El
+  ejecutor había leído el hallazgo de W06d6 como vigente y preparado E-6b esquivando el cambio de terminal; se le
+  corrigió por mensaje (está resuelto en `27dcfeb`: W06d7 + paso 0 de SL-4b2) y se le reanudó.
