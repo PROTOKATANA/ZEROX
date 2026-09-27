@@ -80,6 +80,32 @@ pub enum ErrorServicioPot {
         /// Slot sin portador.
         slot: u64,
     },
+    /// El slot ya tenía un portador PoT **distinto** registrado (violaría D-P10: el flujo es único,
+    /// así que dos datos verificados del mismo slot deben coincidir siempre).
+    #[error("el slot {slot} ya tenía un portador PoT distinto registrado (D-P10)")]
+    PortadorDiscrepante {
+        /// Slot en conflicto.
+        slot: u64,
+    },
+    /// No se pudieron recompletar los portadores de un rango porque la salida conocida más cercana
+    /// está demasiado atrás: recompletar exigiría más de `MAX_BUNDLES_POT` pruebas. No es una
+    /// violación de invariante: el llamante **omite** la producción de ese slot (`ORDEN-W06d9`).
+    #[error(
+        "no se pueden recompletar los portadores de ({sp_slot}, {b_slot}]: la salida conocida más \
+         cercana es el slot {base_slot} (distancia {d} > MAX_BUNDLES_POT={max})"
+    )]
+    RecompletarExcedeMaximo {
+        /// Slot inicial del rango.
+        sp_slot: u64,
+        /// Slot final del rango.
+        b_slot: u64,
+        /// Slot de la salida conocida desde la que habría que recalcular.
+        base_slot: u64,
+        /// Pruebas que exigiría el recálculo.
+        d: u64,
+        /// Cota `MAX_BUNDLES_POT`.
+        max: u64,
+    },
     /// Se pidió un slot por delante del último calculado.
     #[error("el servicio está en el slot {slot_actual}; se pidió el {slot}")]
     SlotFuturo {
@@ -432,18 +458,79 @@ impl ServicioPot {
             .find_map(|b| (b.hash == *hash).then_some(b.slot))
     }
 
-    /// Portadores de `(sp_slot, b_slot]`, en orden, para construir la justificación PoT.
+    /// Registra los portadores **ya verificados** de `(sp_slot, b_slot]` (los de la justificación
+    /// de un bloque admitido), cada uno en su slot, sin recalcular el PoT.
+    ///
+    /// `ORDEN-W06d9`, causa de origen: `Nodo::actualizar_servicio_verificacion` solo guardaba el
+    /// **último** portador (el del propio bloque) y descartaba los intermedios que la justificación
+    /// ya trae verificados; esos huecos quedaban para siempre y [`Self::portadores_para`] los
+    /// denunciaba. Registrar el rango entero cierra el hueco en su origen.
+    ///
+    /// No toca `slot_actual()` ni las salidas: solo materializa portadores (un portador de un slot
+    /// sin salida calculada es un estado válido del servicio).
     ///
     /// # Errores
-    /// [`ErrorServicioPot::RangoInvalido`] si `sp_slot >= b_slot`;
-    /// [`ErrorServicioPot::RangoExcedeMaximo`] si la diferencia supera `MAX_BUNDLES_POT`;
-    /// [`ErrorServicioPot::SlotFuturo`] si `b_slot` va por delante del servicio;
-    /// [`ErrorServicioPot::PortadorAusente`] si algún slot del rango salió de la ventana.
-    pub fn portadores_para(
-        &self,
+    /// [`ErrorServicioPot::RangoInvalido`] si `sp_slot >= b_slot` o si `portadores.len()` no cuadra
+    /// con el rango; [`ErrorServicioPot::RangoExcedeMaximo`] si la diferencia supera
+    /// `MAX_BUNDLES_POT`; [`ErrorServicioPot::PortadorDiscrepante`] si un slot ya tenía otro
+    /// portador distinto (D-P10).
+    pub fn registrar_portadores(
+        &mut self,
         sp_slot: u64,
         b_slot: u64,
-    ) -> Result<Vec<PotCheckpoints>, ErrorServicioPot> {
+        portadores: &[PotCheckpoints],
+    ) -> Result<(), ErrorServicioPot> {
+        let Some(d) = b_slot.checked_sub(sp_slot) else {
+            return Err(ErrorServicioPot::RangoInvalido { sp_slot, b_slot });
+        };
+        let n = match u64::try_from(portadores.len()) {
+            Ok(n) => n,
+            Err(_) => return Err(ErrorServicioPot::AritmeticaDeSlotsDesbordada),
+        };
+        if d == 0 || d != n {
+            return Err(ErrorServicioPot::RangoInvalido { sp_slot, b_slot });
+        }
+        if d > MAX_BUNDLES_POT as u64 {
+            return Err(ErrorServicioPot::RangoExcedeMaximo {
+                d,
+                max: MAX_BUNDLES_POT as u64,
+            });
+        }
+        for (i, portador) in portadores.iter().enumerate() {
+            // `sp_slot < b_slot` y `i < d <= MAX_BUNDLES_POT` garantizan que `sp_slot + 1 + i`
+            // no desborda ni sale del rango.
+            let slot = sp_slot + 1 + u64::try_from(i).unwrap_or(u64::MAX);
+            if let Some(existente) = self.portadores.get(&slot)
+                && *existente != *portador
+            {
+                return Err(ErrorServicioPot::PortadorDiscrepante { slot });
+            }
+            self.portadores.insert(slot, *portador);
+        }
+        Ok(())
+    }
+
+    /// Completa los portadores **ausentes** de `(sp_slot, b_slot]` recalculándolos de forma
+    /// determinista desde la salida conocida inmediatamente anterior (D-P10: el PoT es un único
+    /// flujo determinista; el cálculo es exactamente el mismo que [`Self::avanzar`]).
+    ///
+    /// Un hueco (un slot dentro de `slot_actual()` cuya salida/portador no se calcularon porque
+    /// [`Self::insertar_calculado`] saltó por encima de él) **no** es una violación de invariante:
+    /// es un dato que el servicio aún no había materializado. Esta función lo materializa sin mover
+    /// `slot_actual()` y sin publicar nada; solo rellena los mapas locales. Si el rango ya está
+    /// completo, no hace nada (camino rápido).
+    ///
+    /// # Errores
+    /// Las mismas cotas de rango que [`Self::portadores_para`], más
+    /// [`ErrorServicioPot::RecompletarExcedeMaximo`] si la salida conocida más cercana está tan
+    /// atrás que recompletar exigiría más de `MAX_BUNDLES_POT` pruebas (el llamante **omite** la
+    /// producción, no falla), y [`ErrorServicioPot::SalidaPasadaDiscrepante`]/
+    /// [`ErrorServicioPot::PortadorDiscrepante`] si un dato ya presente contradice el flujo (D-P10).
+    pub fn completar_portadores(
+        &mut self,
+        sp_slot: u64,
+        b_slot: u64,
+    ) -> Result<(), ErrorServicioPot> {
         let Some(d) = b_slot.checked_sub(sp_slot) else {
             return Err(ErrorServicioPot::RangoInvalido { sp_slot, b_slot });
         };
@@ -462,7 +549,79 @@ impl ServicioPot {
                 slot_actual: self.slot_actual,
             });
         }
-        let mut portadores = Vec::with_capacity(d as usize);
+        // Primer slot del rango sin portador; si no hay ninguno, no hay nada que completar.
+        // `sp_slot < b_slot` garantiza que `sp_slot + 1` no desborda.
+        let Some(primero) =
+            ((sp_slot + 1)..=b_slot).find(|slot| !self.portadores.contains_key(slot))
+        else {
+            return Ok(());
+        };
+        // Salida conocida más cercana por debajo del primer hueco. El slot 0 (S1) siempre existe.
+        let mut base_slot = primero - 1;
+        let base_salida = loop {
+            if base_slot == 0 {
+                break self.s1;
+            }
+            if let Some(salida) = self.salidas.get(&base_slot) {
+                break *salida;
+            }
+            base_slot -= 1;
+        };
+        let trabajo = b_slot - base_slot;
+        if trabajo > MAX_BUNDLES_POT as u64 {
+            return Err(ErrorServicioPot::RecompletarExcedeMaximo {
+                sp_slot,
+                b_slot,
+                base_slot,
+                d: trabajo,
+                max: MAX_BUNDLES_POT as u64,
+            });
+        }
+        let mut anterior = base_salida;
+        for slot in (base_slot + 1)..=b_slot {
+            let semilla = semilla_siguiente(anterior, None);
+            let carrier = zx_pot::prove(PotSeed::from(semilla), self.iteraciones)
+                .map_err(|error| ErrorServicioPot::Pot { slot, error })?;
+            let salida = *carrier.output();
+            let portador = checkpoints_a_wire(&carrier);
+            if let Some(existente) = self.salidas.get(&slot)
+                && *existente != salida
+            {
+                return Err(ErrorServicioPot::SalidaPasadaDiscrepante { slot });
+            }
+            if let Some(existente) = self.portadores.get(&slot)
+                && *existente != portador
+            {
+                return Err(ErrorServicioPot::PortadorDiscrepante { slot });
+            }
+            self.salidas.entry(slot).or_insert(salida);
+            self.portadores.entry(slot).or_insert(portador);
+            anterior = salida;
+        }
+        Ok(())
+    }
+
+    /// Portadores de `(sp_slot, b_slot]`, en orden, para construir la justificación PoT.
+    ///
+    /// `ORDEN-W06d9` decisión 2(a): antes de denunciar un hueco, **intenta completarlo**
+    /// recalculándolo de forma determinista ([`Self::completar_portadores`], acotado a
+    /// `MAX_BUNDLES_POT`). Un hueco no es una violación de invariante del productor: si no se puede
+    /// completar, el llamante omite la producción en ese slot (`produccion_omitida`), nunca
+    /// `fallo_productor`. Por eso el método toma `&mut self`.
+    ///
+    /// # Errores
+    /// [`ErrorServicioPot::RangoInvalido`] si `sp_slot >= b_slot`;
+    /// [`ErrorServicioPot::RangoExcedeMaximo`] si la diferencia supera `MAX_BUNDLES_POT`;
+    /// [`ErrorServicioPot::SlotFuturo`] si `b_slot` va por delante del servicio;
+    /// [`ErrorServicioPot::RecompletarExcedeMaximo`] si un hueco no se pudo recompletar dentro de
+    /// la cota; [`ErrorServicioPot::PortadorAusente`] si tras completar sigue faltando (defensivo).
+    pub fn portadores_para(
+        &mut self,
+        sp_slot: u64,
+        b_slot: u64,
+    ) -> Result<Vec<PotCheckpoints>, ErrorServicioPot> {
+        self.completar_portadores(sp_slot, b_slot)?;
+        let mut portadores = Vec::with_capacity((b_slot - sp_slot) as usize);
         // `sp_slot < b_slot` garantiza que `sp_slot + 1` no desborda.
         for slot in (sp_slot + 1)..=b_slot {
             match self.portadores.get(&slot) {
@@ -529,7 +688,7 @@ mod pruebas {
     use zx_core::digest::Digest;
     use zx_pot::tipos::PotSeed;
 
-    use zx_core::wire_dag::POT_OUTPUT_BYTES;
+    use zx_core::wire_dag::{BUNDLE_BYTES, POT_OUTPUT_BYTES, PotCheckpoints};
 
     use super::{ErrorServicioPot, ServicioPot};
     use crate::pot::semilla_genesis;
@@ -788,5 +947,167 @@ mod pruebas {
         assert_eq!(s.s1(), semilla_genesis(&t, &[]));
         assert_eq!(s.f0(), zx_core::preimage::flow::flujo_genesis(&t));
         assert_eq!(s.slot_actual(), 0);
+    }
+
+    /// `ORDEN-W06d9` V1: reproduce el hueco que tumbó al productor de W07b. Una rama que salta de
+    /// slot (el caso que `insertar_calculado` permite a propósito) deja los slots intermedios sin
+    /// salida ni portador; antes de esta corrección `portadores_para` devolvía
+    /// `PortadorAusente { slot: 6 }` y `regimen.rs` lo convertía en `fallo_productor`. Con la
+    /// corrección, `portadores_para` completa el hueco por recálculo determinista (D-P10) y no
+    /// falla. Es el test que **falla antes** y **pasa después**.
+    #[test]
+    fn portadores_para_completa_un_hueco_por_recalculo() {
+        let mut referencia = servicio(16);
+        referencia.avanzar_hasta(10).expect("referencia densa");
+
+        let mut con_hueco = servicio(16);
+        // Salto del 0 al 10: los slots 1..=9 quedan como huecos.
+        let salida_10 = referencia.salida_de(10).expect("salida de la referencia");
+        let portador_10 = *referencia
+            .portador_de(10)
+            .expect("portador de la referencia");
+        con_hueco
+            .insertar_calculado(10, salida_10, portador_10)
+            .expect("saltar con hueco es válido (D-P10)");
+        assert!(matches!(
+            con_hueco.portador_de(6),
+            Err(ErrorServicioPot::PortadorAusente { slot: 6 })
+        ));
+
+        // Pedir el rango (5, 10] completa por recálculo los portadores 6..=9 y devuelve los cinco.
+        let portadores = con_hueco
+            .portadores_para(5, 10)
+            .expect("un hueco se completa por recálculo determinista");
+        assert_eq!(portadores.len(), 5);
+        for (i, slot) in (6u64..=10).enumerate() {
+            assert_eq!(
+                portadores.get(i).copied().expect("posición"),
+                referencia.portador_de(slot).copied().expect("referencia"),
+                "el portador recalculado del slot {slot} debe coincidir con el de la referencia"
+            );
+        }
+    }
+
+    /// `ORDEN-W06d9` V2: los portadores y salidas recalculados coinciden **byte a byte** con los
+    /// calculados por `avanzar` (misma primitiva, mismo flujo único, D-P10).
+    #[test]
+    fn completar_portadores_coincide_con_avanzar_byte_a_byte() {
+        let mut referencia = servicio(16);
+        referencia.avanzar_hasta(12).expect("referencia densa");
+
+        let mut con_hueco = servicio(16);
+        let salida_12 = referencia.salida_de(12).expect("salida");
+        let portador_12 = *referencia.portador_de(12).expect("portador");
+        con_hueco
+            .insertar_calculado(12, salida_12, portador_12)
+            .expect("salto con hueco");
+
+        con_hueco
+            .completar_portadores(0, 12)
+            .expect("completa todo el rango");
+
+        for slot in 1..=12u64 {
+            assert_eq!(
+                con_hueco.salida_de(slot).expect("salida"),
+                referencia.salida_de(slot).expect("salida"),
+                "salida del slot {slot}"
+            );
+            assert_eq!(
+                con_hueco.portador_de(slot).expect("portador"),
+                referencia.portador_de(slot).expect("portador"),
+                "portador del slot {slot}"
+            );
+        }
+    }
+
+    /// `ORDEN-W06d9` V2: un rango que no se puede recompletar dentro de `MAX_BUNDLES_POT` devuelve
+    /// error explícito (el productor lo traduce en `produccion_omitida`, sin pánico ni `fallo`).
+    #[test]
+    fn rango_no_justificable_es_error_sin_panico() {
+        let mut s = servicio(16);
+        let carrier = zx_pot::prove(PotSeed::from(s.s1()), iteraciones()).expect("N válido");
+        s.insertar_calculado(
+            200,
+            *carrier.output(),
+            crate::pot::checkpoints_a_wire(&carrier),
+        )
+        .expect("salto");
+
+        // `(100, 200]` tiene 100 portadores (<= 150) pero exigiría recalcular desde el slot 0: 200
+        // pruebas, por encima de la cota.
+        assert!(matches!(
+            s.completar_portadores(100, 200),
+            Err(ErrorServicioPot::RecompletarExcedeMaximo {
+                base_slot: 0,
+                d: 200,
+                max: 150,
+                ..
+            })
+        ));
+        assert!(matches!(
+            s.portadores_para(100, 200),
+            Err(ErrorServicioPot::RecompletarExcedeMaximo { .. })
+        ));
+        // Un rango que de por sí excede el formato ni lo intenta.
+        assert!(matches!(
+            s.portadores_para(40, 200),
+            Err(ErrorServicioPot::RangoExcedeMaximo { d: 160, max: 150 })
+        ));
+    }
+
+    /// `ORDEN-W06d9` (causa de origen): registrar los portadores **ya verificados** de la
+    /// justificación de un bloque deja el rango completo sin recalcular nada, de modo que un bloque
+    /// que saltó slots deja de dejar huecos permanentes.
+    #[test]
+    fn registrar_portadores_rellena_el_rango_sin_recalcular() {
+        let mut referencia = servicio(16);
+        referencia.avanzar_hasta(10).expect("referencia densa");
+
+        let mut s = servicio(16);
+        let salida_10 = referencia.salida_de(10).expect("salida");
+        let portador_10 = *referencia.portador_de(10).expect("portador");
+        s.insertar_calculado(10, salida_10, portador_10)
+            .expect("salto");
+
+        // Justificación de un bloque de slot 10 con `sp = 5`: portadores de `(5, 10]`.
+        let justificacion: Vec<PotCheckpoints> = (6..=10)
+            .map(|slot| {
+                *referencia
+                    .portador_de(slot)
+                    .expect("portador de la referencia")
+            })
+            .collect();
+        s.registrar_portadores(5, 10, &justificacion)
+            .expect("registro de datos verificados");
+
+        // El rango queda completo sin que `completar_portadores` tenga que recalcular (no se toca
+        // `salidas`): `portadores_para` devuelve exactamente lo registrado.
+        assert_eq!(
+            s.portadores_para(5, 10).expect("rango completo"),
+            justificacion
+        );
+    }
+
+    /// D-P10: registrar un portador **distinto** para un slot ya presente se detecta, nunca se
+    /// sobrescribe en silencio.
+    #[test]
+    fn registrar_portadores_detecta_discrepancia() {
+        let mut referencia = servicio(16);
+        referencia.avanzar_hasta(10).expect("referencia densa");
+
+        let mut s = servicio(16);
+        let salida_10 = referencia.salida_de(10).expect("salida");
+        let portador_10 = *referencia.portador_de(10).expect("portador");
+        s.insertar_calculado(10, salida_10, portador_10)
+            .expect("salto");
+
+        let mut malo: Vec<PotCheckpoints> = (6..=10)
+            .map(|slot| *referencia.portador_de(slot).expect("portador"))
+            .collect();
+        *malo.last_mut().expect("no vacío") = PotCheckpoints::desde_bytes([0xAB; BUNDLE_BYTES]);
+        assert!(matches!(
+            s.registrar_portadores(5, 10, &malo),
+            Err(ErrorServicioPot::PortadorDiscrepante { slot: 10 })
+        ));
     }
 }

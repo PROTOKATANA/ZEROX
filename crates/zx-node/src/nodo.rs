@@ -21,7 +21,7 @@ use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev};
 use zx_core::digest::Digest;
 use zx_core::preimage::block::BlockHeader;
 use zx_core::wire::cuerpo_desde_bytes;
-use zx_core::wire_dag::{BloqueDag, bloque_dag_desde_bytes};
+use zx_core::wire_dag::{BloqueDag, MAX_BUNDLES_POT, bloque_dag_desde_bytes};
 use zx_core::{BlockHash, PadresDag, Red, Tx, trabajo_bloque};
 use zx_dag::ErrorDag;
 use zx_dag::bloque_dag::{CandidatoSinRango, ContextoRangoDag};
@@ -1254,12 +1254,30 @@ impl Nodo {
         };
         let slot = bloque.cabecera.slot;
         let salida = bloque.cabecera.pot_output;
-        let Some(portador) = bloque.justificacion.bundles().last().copied() else {
+        let bundles = bloque.justificacion.bundles();
+        let Some(portador) = bundles.last().copied() else {
             return Err(ErrorNodo::Otro(format!(
                 "bloque PoST {} sin portadores en su justificación",
                 bloque.cabecera.block_hash()
             )));
         };
+        // `ORDEN-W06d9` (causa de origen del `fallo_productor` de W07b): la justificación de un
+        // bloque PoST trae, **ya verificados**, los portadores de `(slot(sp), slot]`; su longitud es
+        // `slot - slot(sp)` y su i-ésimo portador pertenece al slot `slot - n + 1 + i`. Antes solo se
+        // registraba el último (el del propio bloque), así que un bloque que saltaba slots dejaba los
+        // intermedios como huecos permanentes —`insertar_calculado` no los rellena y `avanzar` solo
+        // avanza hacia delante—, que más tarde `portadores_para` denunciaba como `PortadorAusente` y
+        // el hilo productor convertía en `fallo_productor`. Registrar el rango entero, con datos ya
+        // verificados, los elimina en el origen.
+        if let Ok(n) = u64::try_from(bundles.len())
+            && n >= 1
+            && n <= slot
+            && n <= MAX_BUNDLES_POT as u64
+        {
+            servicio
+                .registrar_portadores(slot - n, slot, bundles)
+                .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
+        }
         // `ORDEN-W06d4` decisión 3: antes, un slot `<= slot_actual()` se reconciliaba solo con
         // `salida_de`, que exige que el slot **ya tenga** una salida calculada. Si el hueco lo dejó
         // un salto de OTRA rama (`insertar_calculado` los permite a propósito, D-P10), `salida_de`

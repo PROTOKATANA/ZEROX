@@ -58,8 +58,8 @@ use zx_post::firmante::{Firmante, Registro as RegistroFirmante};
 use zx_post::productor::{
     FuenteSoluciones, MotivoAbstencion, ParametrosProductor, ProductoFirmado, SolucionCandidata,
 };
-use zx_post::productor_regimen::{CuerpoProductor, producir_en_regimen_con_firmante};
-use zx_post::servicio_pot::ServicioPot;
+use zx_post::productor_regimen::{CuerpoProductor, ErrorRegimen, producir_en_regimen_con_firmante};
+use zx_post::servicio_pot::{ErrorServicioPot, ServicioPot};
 
 use crate::claves::ClaveDev;
 use crate::registro::Registro;
@@ -241,6 +241,49 @@ fn registrar_descarte(registro: &Registro, id_esperado: u64, id_recibido: u64) {
             .u64("id_recibido", id_recibido),
         false,
     );
+}
+
+/// `ORDEN-W06d9` decisión 2(b): escribe el evento de diagnóstico `produccion_omitida` con el slot y
+/// el motivo. No es un evento crítico: el nodo sigue validando y produciendo en los slots
+/// siguientes; solo deja de producir este bloque, que no puede justificar con esos padres.
+fn registrar_produccion_omitida(registro: &Registro, slot: u64, motivo: &str) {
+    let _ = registro.escribir(
+        registro
+            .evento("produccion_omitida")
+            .u64("slot", slot)
+            .str("motivo", motivo),
+        false,
+    );
+}
+
+/// `ORDEN-W06d9` decisión 2: clasifica un fallo de `producir_en_regimen_con_firmante` como una
+/// **producción omitible** (no se pudo justificar el bloque con esos padres: hueco de portadores no
+/// recomputable o rango fuera del formato) o como un fallo interno que sí debe tumbar al productor.
+///
+/// Un portador ausente **no** es una violación de invariante del productor (decisión 2): se omite la
+/// producción de ese slot y se sigue. Cualquier otro error sigue siendo `fallo_productor`.
+fn motivo_produccion_omitida<E>(error: &ErrorRegimen<E>) -> Option<String>
+where
+    E: std::error::Error + 'static,
+{
+    match error {
+        ErrorRegimen::Servicio(ErrorServicioPot::PortadorAusente { slot }) => {
+            Some(format!("portador ausente para el slot {slot}"))
+        }
+        ErrorRegimen::Servicio(ErrorServicioPot::RecompletarExcedeMaximo {
+            base_slot,
+            d,
+            max,
+            ..
+        }) => Some(format!(
+            "no se pudo recompletar el rango de portadores: la salida conocida más cercana está en \
+             el slot {base_slot} (distancia {d} > MAX_BUNDLES_POT={max})"
+        )),
+        ErrorRegimen::RangoExcedeMaximo { d, max } => {
+            Some(format!("el rango {d} excede MAX_BUNDLES_POT={max}"))
+        }
+        _ => None,
+    }
 }
 
 /// Espera el próximo mensaje del bucle aplicando la regla del protocolo numerado: descarta
@@ -589,6 +632,15 @@ pub fn hilo_productor_regimen(
                     continue;
                 }
                 Err(e) => {
+                    // `ORDEN-W06d9` decisión 2: un hueco de portadores que no se pudo recompletar
+                    // (o un rango fuera de formato) no es una violación de invariante del productor:
+                    // el bloque no se puede justificar con esos padres, así que se omite la
+                    // producción de este slot con diagnóstico y se sigue con el siguiente. Cualquier
+                    // otro error sigue siendo un fallo interno del productor.
+                    if let Some(motivo) = motivo_produccion_omitida(&e) {
+                        registrar_produccion_omitida(registro, slot, &motivo);
+                        continue 'outer;
+                    }
                     reportar_fallo(tx, format!("producir_en_regimen_con_firmante falló: {e}"));
                     return;
                 }
@@ -998,5 +1050,70 @@ mod tests_protocolo {
             esperar(&rx, &mut serv, &registro, 0),
             Recepcion::Cerrado
         ));
+    }
+}
+
+/// `ORDEN-W06d9` V2: un portador ausente (o un rango no recompletable) es una **producción
+/// omitida**, no un `fallo_productor`; el evento de diagnóstico lleva slot y motivo.
+#[cfg(test)]
+#[expect(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "el test falla con panic por diseño"
+)]
+mod tests_produccion_omitida {
+    use std::convert::Infallible;
+
+    use zx_post::productor_regimen::ErrorRegimen;
+    use zx_post::servicio_pot::ErrorServicioPot;
+
+    use super::{motivo_produccion_omitida, registrar_produccion_omitida};
+    use crate::registro::Registro;
+
+    /// Un portador ausente que no se pudo recompletar es omitible (nunca `fallo_productor`).
+    #[test]
+    fn un_portador_ausente_es_omisible() {
+        let error: ErrorRegimen<Infallible> =
+            ErrorRegimen::Servicio(ErrorServicioPot::PortadorAusente { slot: 6 });
+        let motivo = motivo_produccion_omitida(&error).expect("omisible");
+        assert!(motivo.contains("slot 6"), "{motivo}");
+    }
+
+    /// Un rango que excede la cota de recálculo o la del formato también es omitible.
+    #[test]
+    fn un_rango_no_recompletable_es_omisible() {
+        let rango: ErrorRegimen<Infallible> =
+            ErrorRegimen::Servicio(ErrorServicioPot::RecompletarExcedeMaximo {
+                sp_slot: 100,
+                b_slot: 200,
+                base_slot: 0,
+                d: 200,
+                max: 150,
+            });
+        assert!(motivo_produccion_omitida(&rango).is_some());
+
+        let formato: ErrorRegimen<Infallible> =
+            ErrorRegimen::RangoExcedeMaximo { d: 160, max: 150 };
+        let motivo = motivo_produccion_omitida(&formato).expect("omisible");
+        assert!(motivo.contains("MAX_BUNDLES_POT"), "{motivo}");
+    }
+
+    /// Un error interno real sigue siendo `fallo_productor` (no se enmascara como omisión).
+    #[test]
+    fn un_error_interno_no_es_omisible() {
+        let error: ErrorRegimen<Infallible> = ErrorRegimen::SinPadres;
+        assert!(motivo_produccion_omitida(&error).is_none());
+    }
+
+    /// El evento `produccion_omitida` se escribe con `slot` y `motivo`.
+    #[test]
+    fn produccion_omitida_escribe_el_evento_con_slot_y_motivo() {
+        let dir = tempfile::tempdir().unwrap();
+        let registro = Registro::abrir(&dir.path().join("registro.jsonl")).unwrap();
+        registrar_produccion_omitida(&registro, 7, "portador ausente para el slot 6");
+        let texto = std::fs::read_to_string(dir.path().join("registro.jsonl")).unwrap();
+        assert!(texto.contains("\"tipo\":\"produccion_omitida\""), "{texto}");
+        assert!(texto.contains("\"slot\":7"), "{texto}");
+        assert!(texto.contains("portador ausente para el slot 6"), "{texto}");
     }
 }

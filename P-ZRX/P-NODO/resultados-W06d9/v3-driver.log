@@ -1,0 +1,168 @@
+2026-09-27T18:37:01+02:00 === V3: 10 repeticiones R60 (3 nodos, slot 60, 2 en paralelo) ===
+2026-09-27T18:37:01+02:00 === R60 2: A,B,C desde el génesis, objetivo slot 60 ===
+2026-09-27T18:37:01+02:00 === R60 1: A,B,C desde el génesis, objetivo slot 60 ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+SLOT_60 alcanzado: slot_a=60 slot_b=61 slot_c=60
+NODO A: bloque_producido=18 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=18 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=21 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 1 TERMINADO ===
+SLOT_60 alcanzado: slot_a=61 slot_b=61 slot_c=61
+NODO A: bloque_producido=22 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=10 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=27 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 2 TERMINADO ===
+2026-09-27T18:39:08+02:00 R60 par 1,2 terminado
+2026-09-27T18:39:08+02:00 === R60 3: A,B,C desde el génesis, objetivo slot 60 ===
+2026-09-27T18:39:08+02:00 === R60 4: A,B,C desde el génesis, objetivo slot 60 ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+SLOT_60 alcanzado: slot_a=62 slot_b=62 slot_c=62
+NODO A: bloque_producido=20 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=25 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=14 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 4 TERMINADO ===
+SLOT_60 alcanzado: slot_a=61 slot_b=61 slot_c=61
+NODO A: bloque_producido=17 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=24 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=17 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 3 TERMINADO ===
+2026-09-27T18:41:10+02:00 R60 par 3,4 terminado
+2026-09-27T18:41:10+02:00 === R60 6: A,B,C desde el génesis, objetivo slot 60 ===
+2026-09-27T18:41:10+02:00 === R60 5: A,B,C desde el génesis, objetivo slot 60 ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+SLOT_60 alcanzado: slot_a=62 slot_b=62 slot_c=62
+SLOT_60 alcanzado: slot_a=60 slot_b=60 slot_c=60
+NODO A: bloque_producido=24 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO A: bloque_producido=20 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=23 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=25 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=8 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+NODO C: bloque_producido=11 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 5 TERMINADO ===
+=== R60 6 TERMINADO ===
+2026-09-27T18:43:08+02:00 R60 par 5,6 terminado
+2026-09-27T18:43:08+02:00 === R60 8: A,B,C desde el génesis, objetivo slot 60 ===
+2026-09-27T18:43:08+02:00 === R60 7: A,B,C desde el génesis, objetivo slot 60 ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+SLOT_60 alcanzado: slot_a=61 slot_b=61 slot_c=61
+NODO A: bloque_producido=27 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=5 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=20 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 8 TERMINADO ===
+SLOT_60 alcanzado: slot_a=61 slot_b=61 slot_c=61
+NODO A: bloque_producido=22 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=25 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=12 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 7 TERMINADO ===
+2026-09-27T18:45:19+02:00 R60 par 7,8 terminado
+2026-09-27T18:45:19+02:00 === R60 9: A,B,C desde el génesis, objetivo slot 60 ===
+2026-09-27T18:45:19+02:00 === R60 10: A,B,C desde el génesis, objetivo slot 60 ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+=== esperando slot >= 60 en A, B y C, plazo 20 min ===
+SLOT_60 alcanzado: slot_a=61 slot_b=61 slot_c=61
+NODO A: bloque_producido=13 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=16 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=30 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 9 TERMINADO ===
+SLOT_60 alcanzado: slot_a=60 slot_b=60 slot_c=60
+NODO A: bloque_producido=16 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO B: bloque_producido=16 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+NODO C: bloque_producido=23 bloque_transicion=1 fallo_productor=0 produccion_omitida=0 panicos=0
+RESULTADO=SUPERADO
+=== R60 10 TERMINADO ===
+2026-09-27T18:47:20+02:00 R60 par 9,10 terminado
+2026-09-27T18:47:20+02:00 === V3: 3 repeticiones E-6 (partición con aislamiento real) ===
+2026-09-27T18:47:20+02:00 === E-6 rep1: A,B,C juntos desde el génesis (mismo terminal) ===
+lanzado A pid=79824
+lanzado B pid=79831
+lanzado C pid=79841
+EXITO total=20
+CONVERGEN punta="punta":"6af3295fa6931f824ac1a6c7a731e14d5e2d9f52db9f2e96befafae9619982b4" resumen="resumen_estado":"833467b36a10dd0c010b447e714fedd65eb64711581b6b48750a1fbdbc77d35b"
+slot_pre(aislamiento)=25
+=== aislando A (puerto NUEVO 49710, sin pares); B,C siguen produciendo en el suyo ===
+lanzado A pid=84051
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===
+60 slots de aislamiento alcanzados: slot_a=86 slot_b=91
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0 (peer_a_aislado=12D3KooWDLx6ediLK9AohvE2FRVPLtfgFDnD5ZE2CJQhehvbKhtJ)
+=== reuniendo: matando y relanzando A (puerto original 49210) con --red-marcar hacia B y C (B,C NO se reinician) ===
+lanzado A pid=89350
+=== esperando convergencia, plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"e9dcadcd5c7448979a3fa02d1f0a682eb8f54deeea338edc4ea3bf081bff5630" resumen="resumen_estado":"652c971bddc29c15f40e7d8bd8654d8ba7c8966bc0eb516f73fda0270e0c4803"
+=== resultado final (método antiguo, informativo) ===
+CONVERGEN punta="punta":"e9dcadcd5c7448979a3fa02d1f0a682eb8f54deeea338edc4ea3bf081bff5630" resumen="resumen_estado":"652c971bddc29c15f40e7d8bd8654d8ba7c8966bc0eb516f73fda0270e0c4803"
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W06d9/run/R3-E6-rep1/*/datos)
+=== R3/E-6 rep1 TERMINADO ===
+2026-09-27T18:50:54+02:00 E-6 rep1 terminado
+2026-09-27T18:50:54+02:00 === E-6 rep2: A,B,C juntos desde el génesis (mismo terminal) ===
+lanzado A pid=93530
+lanzado B pid=93535
+lanzado C pid=93549
+EXITO total=20
+CONVERGEN punta="punta":"ff1a561674b08fb5ec2c5c4f6dbd307c6bf34567536c932166e76c951e2141d0" resumen="resumen_estado":"14b9308d23654c977d1eb12e8b5d783033b8bf9feecaefe23392e33de10fda09"
+slot_pre(aislamiento)=25
+=== aislando A (puerto NUEVO 49720, sin pares); B,C siguen produciendo en el suyo ===
+lanzado A pid=97648
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===
+60 slots de aislamiento alcanzados: slot_a=85 slot_b=89
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0 (peer_a_aislado=12D3KooWMpf7kzuAgEbUbNGkhpCwg7opDQn2wkATLTqP8rWnGbHf)
+=== reuniendo: matando y relanzando A (puerto original 49220) con --red-marcar hacia B y C (B,C NO se reinician) ===
+lanzado A pid=102422
+=== esperando convergencia, plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"7594949940e1567dcdc724d39dab04f2f0d9d84bdbc44e6470797fbb17b2d39e" resumen="resumen_estado":"7c2638d117387a46a0e6ad508e5332fa0959ec192db54a72beb4ef4cc572444b"
+=== resultado final (método antiguo, informativo) ===
+CONVERGEN punta="punta":"7594949940e1567dcdc724d39dab04f2f0d9d84bdbc44e6470797fbb17b2d39e" resumen="resumen_estado":"7c2638d117387a46a0e6ad508e5332fa0959ec192db54a72beb4ef4cc572444b"
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W06d9/run/R3-E6-rep2/*/datos)
+=== R3/E-6 rep2 TERMINADO ===
+2026-09-27T18:54:17+02:00 E-6 rep2 terminado
+2026-09-27T18:54:17+02:00 === E-6 rep3: A,B,C juntos desde el génesis (mismo terminal) ===
+lanzado A pid=106602
+lanzado B pid=106607
+lanzado C pid=106623
+EXITO total=20
+CONVERGEN punta="punta":"14f90cb642f3539b1d6148235712a5bf6afd325e7fd842101574884e35fc7b1e" resumen="resumen_estado":"3736b31a81611531c7cbff83e694525abfd0ad73cdb1acd2181e14c2a268528d"
+slot_pre(aislamiento)=19
+=== aislando A (puerto NUEVO 49730, sin pares); B,C siguen produciendo en el suyo ===
+lanzado A pid=110384
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===
+60 slots de aislamiento alcanzados: slot_a=79 slot_b=87
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0 (peer_a_aislado=12D3KooWMNWuwyPwFzmPW3H89vYba2qsoEMMvqxLUwuosjcHnudJ)
+=== reuniendo: matando y relanzando A (puerto original 49230) con --red-marcar hacia B y C (B,C NO se reinician) ===
+lanzado A pid=115339
+=== esperando convergencia, plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"bab6f9880ab9758b2f2361f704beb6207f9f111279867e67176a8886fddd8a10" resumen="resumen_estado":"59c61939176d6e72e68a13a94cda1bdae41cfccb095dbbcc1e04fcf5a238f264"
+=== resultado final (método antiguo, informativo) ===
+CONVERGEN punta="punta":"bab6f9880ab9758b2f2361f704beb6207f9f111279867e67176a8886fddd8a10" resumen="resumen_estado":"59c61939176d6e72e68a13a94cda1bdae41cfccb095dbbcc1e04fcf5a238f264"
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W06d9/run/R3-E6-rep3/*/datos)
+=== R3/E-6 rep3 TERMINADO ===
+2026-09-27T18:57:40+02:00 E-6 rep3 terminado
+2026-09-27T18:57:40+02:00 === RESUMEN V3 ===
+R60-1: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-10: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-2: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-3: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-4: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-5: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-6: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-7: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-8: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R60-9: resultado=SUPERADO fallo_productor=0 produccion_omitida=0 panicos=0
+R3-E6-rep1: resultado=PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W06d9/run/R3-E6-rep1/*/datos) fallo_productor=0 produccion_omitida=0 panicos=0
+R3-E6-rep2: resultado=PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W06d9/run/R3-E6-rep2/*/datos) fallo_productor=0 produccion_omitida=0 panicos=0
+R3-E6-rep3: resultado=PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W06d9/run/R3-E6-rep3/*/datos) fallo_productor=0 produccion_omitida=0 panicos=0
+2026-09-27T18:57:40+02:00 === V3 TERMINADO ===

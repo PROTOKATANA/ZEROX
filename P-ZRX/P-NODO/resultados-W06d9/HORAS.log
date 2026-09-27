@@ -1,0 +1,48 @@
+HORAS.log — W06d9 (todas las horas con `date -Is`, huso +02:00)
+
+2026-09-27T18:23  orden emitida (ORDEN-W06d9.md); zona deepseek/W06d9/
+2026-09-27T18:26  leídos íntegros ORDEN-W06d9.md y V-ZRX/LINEO.md (obligatorio antes de codificar)
+2026-09-27T18:26  V0: `sha256sum -c ENTRADA-W06d9.sha256` en la raíz: 40/40 archivos de la entrada
+                   presentes y con suma correcta
+2026-09-27T18:26  reconocimiento: servicio_pot.rs (`portadores_para`), regimen.rs (hilo productor),
+                   nodo.rs (`actualizar_servicio_verificacion`), productor_regimen.rs (no editable);
+                   fallo real de W07b en run/R3-E6-rep1/C (portador 6) y guiones de red
+2026-09-27T18:27  montados `ws.orig/` (git archive c539605, sin tocar el repositorio) y `ws/`
+                   (copia); `PDF` enlazado a la raíz viva (dependencia de path del workspace)
+2026-09-27T18:28  causa raíz localizada: huecos de portadores por saltos de `insertar_calculado` +
+                   `actualizar_servicio_verificacion` registrando solo `.last()`; `portadores_para`
+                   exige rango continuo; `regimen.rs` lo convertía en `fallo_productor`
+2026-09-27T18:29  `ws/crates/zx-post/src/servicio_pot.rs`: `completar_portadores`, `registrar_portadores`,
+                   `portadores_para` con recálculo acotado, variantes de error nuevas, tests V1/V2
+2026-09-27T18:29  `ws/crates/zx-node/src/nodo.rs`: registrar todo el rango de la justificación (origen)
+2026-09-27T18:30  `ws/crates/zx-node/src/regimen.rs`: `produccion_omitida` + clasificación de fallos
+2026-09-27T18:30  `cargo fmt --all`: verde; `cargo test --release -p zx-post --lib`: 71/0/1 (nuevos
+                   tests de V1/V2 en verde)
+2026-09-27T18:31  `cargo test --release -p zx-node --lib`: en curso (compilación de dependencias)
+
+2026-09-27T18:31  `cargo test --release -p zx-node --lib`: 70/0/0; los tests nuevos de
+                   `produccion_omitida` en verde
+2026-09-27T18:34  V1: con el comportamiento previo el test reproduce `PortadorAusente { slot: 6 }`
+                   (`logs/v1-antes.log`); con la corrección pasa (`logs/v2-zxpost.log`)
+2026-09-27T18:35  `cargo build --release -p zx-node --bins`: verde; binario para V3
+2026-09-27T18:36  primer arranque de V3 con un bug de arnés (`r60.sh` llamaba a funciones de
+                   `verif.sh` en vez de a sus subcomandos); se mata, se corrige y se relanza
+2026-09-27T18:37 a 18:47  V3 R60: 10 repeticiones de 3 nodos al slot 60 (2 en paralelo): **10/10
+                   SUPERADO**, 0 `fallo_productor`, 0 `produccion_omitida`, 0 pánicos
+2026-09-27T18:47 a 18:51  V3 E-6 rep1: aislamiento real verificado (0 contactos), 0 `fallo_productor`,
+                   0 `produccion_omitida`, 0 pánicos; convergencia en la reunión
+2026-09-27T18:50  `cargo fmt --all -- --check` y los tres guardianes: verdes
+2026-09-27T18:50  clippy 1.ª pasada: 2 `expect_used` en el módulo de test nuevo; se añade
+                   `clippy::expect_used` al `#[expect]` del test (solo test)
+2026-09-27T18:51  clippy 2.ª pasada (`--workspace --all-targets --all-features --locked -D warnings`):
+                   verde
+2026-09-27T18:51 a 18:54  V3 E-6 rep2: aislamiento real verificado, 0 `fallo_productor`,
+                   0 `produccion_omitida`, 0 pánicos
+2026-09-27T18:57 a 18:58  V3 E-6 rep3: aislamiento real verificado, 0 `fallo_productor`,
+                   0 `produccion_omitida`, 0 pánicos; resumen del driver: 13/13 conjuntos con 0
+                   `fallo_productor`, 0 `produccion_omitida`, 0 pánicos
+2026-09-27T18:58 a 19:38  V4: `cargo test --workspace --all-features --locked`: **877 passed,
+                   0 failed, 6 ignored** (T01 v0.5 y T04 v0.6 incluidos); `TEST_EXIT=0`
+2026-09-27T19:39  empaquetado final: `cambios.patch`, `MIGRACION.sha256` (`sha256sum -c` verde),
+                   `HUELLAS.sha256`; `MIGRACION.sha256` como último paso
+2026-09-27T19:39  FIN
