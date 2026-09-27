@@ -1,6 +1,6 @@
 # REVISIÓN W06d10 — penalizar al par que difunde un bloque demostrablemente inválido
 
-**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 23:50). **Ejecutor:** DeepSeek, 21:43–23:43 (dentro de las
+**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 23:44). **Ejecutor:** DeepSeek, 21:43–23:43 (dentro de las
 3 h). Evidencia: `resultados-W06d10/`; ejecuciones reales en `deepseek/W06d10/run/`. **Veredicto: SUPERADO. Migrada** por
 parche (5 archivos y 1 test nuevo; base intacta: `ENTRADA-W06d10.sha256` verde en la raíz, `ws.orig/crates` idéntico a
 la raíz; `MIGRACION.sha256` verde; los 6 archivos de la raíz idénticos a la zona).
