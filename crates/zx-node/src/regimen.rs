@@ -33,6 +33,7 @@
 
 use std::collections::BTreeSet;
 use std::sync::mpsc::{Receiver, Sender};
+use std::time::Instant;
 
 use zx_core::wire_dag::BloqueDag;
 use zx_core::{ClavePublica, PadresDag};
@@ -85,8 +86,9 @@ impl FuenteSoluciones for FuenteParcela<'_> {
 pub enum MsgProductor {
     /// Pide los padres canónicos actuales de un bloque de régimen.
     PeticionPadres,
-    /// Un bloque PoST ya producido y firmado, para verificar y admitir.
-    Post(Box<BloqueDag>),
+    /// Un bloque PoST ya producido y firmado, para verificar y admitir, junto con el instante en
+    /// que este hilo obtuvo la salida PoT del slot (`ORDEN-W07a`: `retraso_slot_ns`).
+    Post(Box<BloqueDag>, Instant),
 }
 
 /// Respuestas del bucle al hilo productor.
@@ -184,6 +186,8 @@ pub fn hilo_productor_regimen(
         let slot = servicio
             .avanzar()
             .unwrap_or_else(|e| panic!("hilo productor: avanzar el PoT falló: {e}"));
+        // `ORDEN-W07a`: instante en que este hilo tuvo la salida PoT del slot, para `retraso_slot_ns`.
+        let instante_salida = Instant::now();
         let salida = servicio
             .salida_de(slot)
             .unwrap_or_else(|e| panic!("hilo productor: salida del slot {slot} ausente: {e}"));
@@ -312,7 +316,10 @@ pub fn hilo_productor_regimen(
                 .registrar_validado(hash, slot)
                 .unwrap_or_else(|e| panic!("hilo productor: registrar el bloque producido: {e}"));
 
-            if tx.send(MsgProductor::Post(Box::new(bloque))).is_err() {
+            if tx
+                .send(MsgProductor::Post(Box::new(bloque), instante_salida))
+                .is_err()
+            {
                 return; // el bucle cerró el canal: apagado normal del proceso.
             }
             match rx.recv() {

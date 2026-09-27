@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
+use std::time::Instant;
 
 use primitive_types::U256;
 use subspace_core_primitives::PublicKey;
@@ -94,7 +95,9 @@ pub struct Nodo {
     params: ParametrosTransicion,
     cadena: Cadena,
     almacen: AlmacenEnDisco,
-    registro: Registro,
+    /// Registro estructurado compartido (`ORDEN-W07a`): el hilo de consenso y la tarea de red
+    /// escriben en él (el `Mutex` interno serializa cada línea).
+    registro: Arc<Registro>,
     claves: Vec<ClaveDev>,
     cbid: u32,
     /// Cadena de cabeceras `[0..=altura]` de la punta PoW **seleccionada** (mayor trabajo
@@ -142,8 +145,39 @@ pub struct Nodo {
     /// [`Self::reintentar_post_pendientes`] cada vez que el propio pasado avanza. Acotada
     /// (`TOPE_POST_PENDIENTES`): el más viejo se descarta sin más si se supera el tope — el riesgo
     /// que se evita es RI-2a (un hueco local guardado para siempre como si fuera un defecto del
-    /// candidato), no un cachá sin límite.
-    post_pendientes: std::collections::VecDeque<BloqueDag>,
+    /// candidato), no un cachá sin límite. `ORDEN-W07a`: cada entrada lleva el `Instant` de llegada
+    /// del bloque, para que el `bloque_red_admitido` del reintento conserve `t_total_ns`.
+    post_pendientes: std::collections::VecDeque<(BloqueDag, Instant)>,
+    /// `ORDEN-W07a`: modo del arranque (`true` = limpio, `false` = reinicio), para el evento
+    /// `arranque`, que se emite al empezar `ejecutar` (cuando ya se conoce, si la hay, la red).
+    modo_limpio: bool,
+    /// `ORDEN-W07a`: `PeerId` de libp2p del nodo, si hay red (para `arranque`).
+    peer_id: Option<String>,
+    /// `ORDEN-W07a`: dirección donde escucha el nodo, si hay red (para `arranque`).
+    red_escuchar: Option<String>,
+    /// `ORDEN-W07a`: desglose de la última admisión (etapas envueltas con `Instant`), para el
+    /// `bloque_red_admitido`/`bloque_red_rechazado`.
+    medicion: Medicion,
+    /// `ORDEN-W07a`: cadena seleccionada en el último `cambio_punta`, para calcular
+    /// `profundidad_reorg` sin tocar `zx-cadena`. `ultima_cadena_indice` es su índice por hash
+    /// (evita reconstruirlo en cada cambio de punta).
+    ultima_cadena_seleccionada: Vec<BlockHash>,
+    /// Índice `hash -> posición` de [`Self::ultima_cadena_seleccionada`].
+    ultima_cadena_indice: BTreeMap<BlockHash, usize>,
+}
+
+/// Desglose de tiempos y etapa de la última llamada a `admitir_pow_interno`/`admitir_post_interno`
+/// (`ORDEN-W07a` decisión 1: solo `Instant` alrededor de llamadas que ya existen).
+#[derive(Clone, Copy, Default)]
+struct Medicion {
+    /// Tiempo de la verificación de cabecera (PoW o cabecera conjunta).
+    cabecera_ns: u64,
+    /// Tiempo de `Cadena::admitir` (GHOSTDAG y estado).
+    admision_ns: u64,
+    /// Tiempo de `Almacen::admitir` (persistencia).
+    persistencia_ns: u64,
+    /// Última etapa **iniciada**; punto de fallo para `bloque_red_rechazado`.
+    etapa: &'static str,
 }
 
 /// Tope de [`Nodo::post_pendientes`]: acotar la cola, no la corrección (D-oS local, no de consenso).
@@ -197,8 +231,7 @@ impl Nodo {
             });
         }
         std::fs::create_dir_all(&cfg.dir_datos)?;
-        let registro = Registro::abrir(&cfg.ruta_registro)?;
-        registro.escribir(registro.evento("arranque").str("fase", "inicio"), true)?;
+        let registro = Arc::new(Registro::abrir(&cfg.ruta_registro)?);
 
         let params = perfil::parametros_transicion_dev()?;
         let cbid = zx_core::CBID_RED_DEV;
@@ -262,9 +295,16 @@ impl Nodo {
             red: None,
             trabajo_red: None,
             post_pendientes: std::collections::VecDeque::new(),
+            modo_limpio: false,
+            peer_id: None,
+            red_escuchar: None,
+            medicion: Medicion::default(),
+            ultima_cadena_seleccionada: Vec::new(),
+            ultima_cadena_indice: BTreeMap::new(),
         };
 
         let longitud = nodo.almacen.longitud_registro()?;
+        nodo.modo_limpio = longitud == 0;
         if longitud == 0 {
             nodo.arranque_limpio(cabecera_genesis, tx_genesis)?;
         } else {
@@ -278,8 +318,6 @@ impl Nodo {
         cabecera_genesis: BlockHeader,
         tx_genesis: Tx,
     ) -> ResultadoNodo<()> {
-        self.registro
-            .escribir(self.registro.evento("arranque").str("fase", "limpio"), true)?;
         let testigos_genesis: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
         // `ORDEN-W06d6` decisión 1: instantánea para el registro de admisión de la vista de red,
         // construida antes de que `tx_genesis` se consuma más abajo.
@@ -327,11 +365,7 @@ impl Nodo {
     /// D-N03′: repite el registro de admisión sobre una `Cadena` fresca, sin re-verificar cabeceras,
     /// y reconstruye el `ServicioPot` de verificación desde las cabeceras almacenadas (decisión 7).
     fn reiniciar(&mut self, longitud: u64) -> ResultadoNodo<()> {
-        let inicio = std::time::Instant::now();
-        self.registro.escribir(
-            self.registro.evento("arranque").str("fase", "reinicio"),
-            true,
-        )?;
+        let inicio = Instant::now();
 
         // `Almacen::repetir` toma un `FnMut` que aquí no puede pedir prestado `self` entero (ya
         // presta `self.almacen`): se recogen primero los pares crudos (el almacén ya comprobó su
@@ -361,7 +395,7 @@ impl Nodo {
         self.registro.escribir(
             self.registro
                 .evento("reinicio_completo")
-                .u64("entradas", indice)
+                .u64("bloques_repetidos", indice)
                 .u64("duracion_ns", inicio.elapsed().as_nanos() as u64),
             true,
         )?;
@@ -415,6 +449,12 @@ impl Nodo {
     ) -> Result<(), ErrorNodo> {
         let hash = cabecera.block_hash();
         let es_genesis = cabecera.height == 0;
+        // `ORDEN-W07a` decisión 1: solo se envuelven con `Instant` llamadas que ya existen. La
+        // etapa se fija para poder etiquetar un rechazo (`bloque_red_rechazado`).
+        self.medicion = Medicion {
+            etapa: "cabecera",
+            ..Medicion::default()
+        };
         // Instantánea para la vista de red (decisión 4): se toma **antes** de que `txs`/`testigos`
         // se consuman más abajo (`into_iter().zip`). Solo se usa si el bloque resulta nuevo
         // (`!ya_admitido`, comprobado antes de publicarla); el coste de clonar es aceptable en la
@@ -426,6 +466,7 @@ impl Nodo {
         };
 
         if verificar && !es_genesis {
+            let inicio_cabecera = Instant::now();
             // `ORDEN-W06d3` decisión 3: el contexto de validación (target, altura, timestamp) se
             // calcula contra el **padre declarado** de este bloque (`cabecera.prev_hash`), nunca
             // contra `historial_pow.last()`: eso es precisamente lo que hacía imposible admitir una
@@ -468,6 +509,7 @@ impl Nodo {
                     clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
                 }
             })?;
+            self.medicion.cabecera_ns = inicio_cabecera.elapsed().as_nanos() as u64;
         }
         // Se registra la cabecera (válida, o el génesis) para poder reconstruir el historial de
         // cualquier rama que la tenga como ancestro, sea o no la punta seleccionada hoy.
@@ -520,6 +562,8 @@ impl Nodo {
             let admitido = BloqueAdmitido::pow(&cabecera, &txs, &testigos);
             let txs_con_testigos: Vec<(Tx, Vec<Vec<u8>>)> = txs.into_iter().zip(testigos).collect();
             let bt = BloqueTransicion::nuevo(hechos, txs_con_testigos);
+            self.medicion.etapa = "admision";
+            let inicio_admision = Instant::now();
             self.cadena.admitir(BloqueCadena::Pow(bt)).map_err(|m| {
                 ErrorNodo::BloquePropioRechazado {
                     hash,
@@ -527,10 +571,14 @@ impl Nodo {
                     clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
                 }
             })?;
+            self.medicion.admision_ns = inicio_admision.elapsed().as_nanos() as u64;
             // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
             // almacén (viene de ahí) y volver a escribirlo sería una vuelta redundante a disco.
             if verificar {
+                self.medicion.etapa = "persistencia";
+                let inicio_persistencia = Instant::now();
                 self.almacen.admitir(&admitido, true)?;
+                self.medicion.persistencia_ns = inicio_persistencia.elapsed().as_nanos() as u64;
             }
             self.vista_red.registrar_pow(cabecera.height, para_vista);
             // Un hijo que esperaba justo este padre puede reintentarse ya (decisión 3).
@@ -678,6 +726,11 @@ impl Nodo {
         verificar: bool,
     ) -> Result<(), ErrorNodo> {
         let hash = bloque.cabecera.block_hash();
+        // `ORDEN-W07a`: misma medición por etapas que `admitir_pow_interno`.
+        self.medicion = Medicion {
+            etapa: "cabecera",
+            ..Medicion::default()
+        };
         // `ORDEN-W06d7` decisión 1/5: los padres deciden a qué terminal pertenece este bloque —
         // necesario **ya** para elegir el `ServicioPot`/contexto de verificación, antes incluso de
         // llamar a `Cadena::admitir` (que hace la misma resolución internamente, pero después). Se
@@ -699,6 +752,7 @@ impl Nodo {
         };
 
         if verificar {
+            let inicio_cabecera = Instant::now();
             self.asegurar_servicios_verificacion()?;
             let servicio = self.servicios_verificacion.get(&terminal).ok_or_else(|| {
                 ErrorNodo::Otro(format!(
@@ -771,6 +825,7 @@ impl Nodo {
                     });
                 }
             }
+            self.medicion.cabecera_ns = inicio_cabecera.elapsed().as_nanos() as u64;
         }
 
         let distancia = zx_poas::verificar_solucion_poas(
@@ -828,6 +883,8 @@ impl Nodo {
         // está en el almacén): no hay bloque fantasma que reproduzca el rechazo, y no hay doble
         // firma observable porque no hubo difusión.
         if !ya_admitido {
+            self.medicion.etapa = "admision";
+            let inicio_admision = Instant::now();
             self.cadena.admitir(BloqueCadena::Post(post)).map_err(|m| {
                 ErrorNodo::BloquePropioRechazado {
                     hash,
@@ -835,11 +892,15 @@ impl Nodo {
                     clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
                 }
             })?;
+            self.medicion.admision_ns = inicio_admision.elapsed().as_nanos() as u64;
             // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
             // almacén (viene de ahí).
             if verificar {
                 let admitido = BloqueAdmitido::post(&bloque);
+                self.medicion.etapa = "persistencia";
+                let inicio_persistencia = Instant::now();
                 self.almacen.admitir(&admitido, true)?;
+                self.medicion.persistencia_ns = inicio_persistencia.elapsed().as_nanos() as u64;
             }
             let para_vista = BloqueRed::Post {
                 cabecera: bloque.cabecera,
@@ -934,16 +995,94 @@ impl Nodo {
             .estado_virtual()
             .map_err(|m| ErrorNodo::Otro(format!("estado virtual: {m}")))?;
         let resumen = resumen_estado(&estado);
-        let evento = self
+        // `ORDEN-W07a` decisión 4: profundidad de reorganización = bloques de la cadena
+        // seleccionada anterior que no están en la nueva (0 si solo la extiende).
+        let profundidad_reorg = punta_actual
+            .map(|p| self.actualizar_cadena_seleccionada(p))
+            .unwrap_or(0);
+
+        let mut evento = self
             .registro
             .evento("cambio_punta")
             .str(
                 "punta",
                 &punta_actual.map(|h| h.to_string()).unwrap_or_default(),
             )
-            .str("resumen_estado", &resumen);
+            .str("resumen_estado", &resumen)
+            .u64("profundidad_reorg", profundidad_reorg);
+        // `blue_score` solo existe para bloques del DAG (PoST); en fase PoW se omite (§0).
+        if let Some(blue_score) = punta_actual.and_then(|h| self.cadena.blue_score(&h)) {
+            evento = evento.u64("blue_score", blue_score);
+        }
         self.registro.escribir(evento, false)?;
         Ok(())
+    }
+
+    /// Actualiza la cadena seleccionada a la que termina en `punta` y devuelve `profundidad_reorg`
+    /// (bloques de la anterior que no están en la nueva). Usa solo lo que `zx-cadena` ya expone
+    /// (`padre_seleccionado`) y recorre únicamente el tramo nuevo: una extensión es un solo paso.
+    fn actualizar_cadena_seleccionada(&mut self, punta: BlockHash) -> u64 {
+        // Fase PoW pura (sin DAG): la cadena seleccionada es `historial_pow`, lineal.
+        if self.cadena.mejor_punta().is_none() {
+            let nueva: Vec<BlockHash> = self
+                .historial_pow
+                .iter()
+                .map(BlockHeader::block_hash)
+                .collect();
+            let comunes = self
+                .ultima_cadena_seleccionada
+                .iter()
+                .zip(nueva.iter())
+                .take_while(|(a, b)| a == b)
+                .count();
+            let profundidad = self
+                .ultima_cadena_seleccionada
+                .len()
+                .saturating_sub(comunes) as u64;
+            self.reemplazar_cadena_seleccionada(&nueva);
+            return profundidad;
+        }
+
+        // Fase PoST: sube por `sp` desde la punta nueva hasta el primer bloque ya presente.
+        let mut sufijo_nuevo = Vec::new();
+        let mut actual = Some(punta);
+        let mut comun = None;
+        while let Some(h) = actual {
+            if let Some(&i) = self.ultima_cadena_indice.get(&h) {
+                comun = Some(i);
+                break;
+            }
+            sufijo_nuevo.push(h);
+            actual = self.cadena.padre_seleccionado(&h);
+        }
+        let profundidad = match comun {
+            Some(i) => self.ultima_cadena_seleccionada.len().saturating_sub(1 + i) as u64,
+            None => self.ultima_cadena_seleccionada.len() as u64,
+        };
+        let descartados: Vec<BlockHash> = match comun {
+            Some(i) => self.ultima_cadena_seleccionada.split_off(i + 1),
+            None => std::mem::take(&mut self.ultima_cadena_seleccionada),
+        };
+        for h in descartados {
+            self.ultima_cadena_indice.remove(&h);
+        }
+        sufijo_nuevo.reverse();
+        for h in sufijo_nuevo {
+            self.ultima_cadena_indice
+                .insert(h, self.ultima_cadena_seleccionada.len());
+            self.ultima_cadena_seleccionada.push(h);
+        }
+        profundidad
+    }
+
+    /// Reemplaza la cadena seleccionada entera (fase PoW, historia lineal).
+    fn reemplazar_cadena_seleccionada(&mut self, nueva: &[BlockHash]) {
+        self.ultima_cadena_seleccionada.clear();
+        self.ultima_cadena_indice.clear();
+        for (i, h) in nueva.iter().enumerate() {
+            self.ultima_cadena_seleccionada.push(*h);
+            self.ultima_cadena_indice.insert(*h, i);
+        }
     }
 
     /// Construye el saludo de red actual (`ORDEN-W06d2` decisión 4) a partir del estado propio.
@@ -1009,8 +1148,8 @@ impl Nodo {
     /// otro padre, ese nuevo padre se deposita **sin** disparar una petición dirigida; queda para el
     /// siguiente ciclo de `sync` basado en el saludo.
     fn resolver_huerfanos_de(&mut self, padre: BlockHash) {
-        for (_hijo, bloque) in self.huerfanos.tomar_para_padre(&padre) {
-            let veredicto = self.intentar_admitir_bloque_red(&bloque, None);
+        for (hijo, bloque) in self.huerfanos.tomar_para_padre(&padre) {
+            let _ = self.intentar_admitir_bloque_red(&bloque, None, Instant::now());
             // Sin `IdDiferido` que informar (no llegó por gossipsub en este turno): el único rastro
             // es el registro. La retransmisión de un huérfano que ahora prospera queda pendiente
             // (límite conocido, ver `PROGRESO.md`): difundirlo exigiría reconstruir un `IdDiferido`
@@ -1018,8 +1157,7 @@ impl Nodo {
             let evento = self
                 .registro
                 .evento("huerfano_resuelto")
-                .str("padre", &padre.to_string())
-                .str("veredicto", &format!("{veredicto:?}"));
+                .str("hash", &hijo.to_string());
             let _ = self.registro.escribir(evento, false);
         }
     }
@@ -1042,28 +1180,63 @@ impl Nodo {
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
             };
             match trabajo {
-                TrabajoRed::BloqueDifundido { id, bloque } => {
+                TrabajoRed::BloqueDifundido {
+                    id,
+                    bloque,
+                    llegada,
+                } => {
                     // Gossipsub no dice quién lo propagó a este nivel (`ManejadorEntrante` no lo
                     // expone); si resulta huérfano, no hay a quién pedirle el padre directamente.
-                    let veredicto = self.intentar_admitir_bloque_red(&bloque, None);
+                    self.registrar_bloque_recibido(&bloque, None);
+                    let veredicto = self.intentar_admitir_bloque_red(&bloque, None, llegada);
                     if let Some(red) = self.red.as_ref() {
                         red.informar_validacion(id, veredicto);
                     }
                 }
-                TrabajoRed::BloqueDeSincronizacion { de, bloque } => {
-                    let veredicto = self.intentar_admitir_bloque_red(&bloque, Some(de));
+                TrabajoRed::BloqueDeSincronizacion {
+                    de,
+                    bloque,
+                    llegada,
+                } => {
+                    self.registrar_bloque_recibido(&bloque, Some(de));
+                    let veredicto = self.intentar_admitir_bloque_red(&bloque, Some(de), llegada);
                     // Un bloque de sincronización demostrablemente inválido sí penaliza: no pasó
                     // por gossipsub (no hay `report_message_validation_result` que llame a esto),
                     // así que la única forma de aplicar C-NET-05/C-EVP es desconectar aquí.
                     if veredicto == VeredictoFinal::Rechazar
                         && let Some(red) = self.red.as_ref()
                     {
+                        // `ORDEN-W07a`: única penalización que el nodo decide y puede trazar (la de
+                        // gossipsub la aplica `zx-p2p` sin exponer el propagador a `zx-node`).
+                        let evento = self
+                            .registro
+                            .evento("par_penalizado")
+                            .str("par", &de.to_string())
+                            .str("motivo", "bloque de sincronización rechazado")
+                            .str("accion", "expulsion");
+                        let _ = self.registro.escribir(evento, false);
                         red.desconectar(de, zx_p2p::error::MotivoDesconexion::ViolacionDeConsenso);
                     }
                 }
             }
         }
         self.trabajo_red = Some(receptor);
+    }
+
+    /// `ORDEN-W07a` §1: `bloque_recibido`, la primera traza de un bloque llegado por red, **antes**
+    /// de verificar nada. `par` se omite en gossip (el propagador no es computable en `zx-node`);
+    /// se escribe para bloques de sincronización.
+    fn registrar_bloque_recibido(&self, bloque: &BloqueRed, origen: Option<libp2p::PeerId>) {
+        let mut evento = self
+            .registro
+            .evento("bloque_recibido")
+            .str("hash", &red::hash_de(bloque).to_string())
+            .str("familia", familia_de(bloque))
+            .u64("bytes", bytes_de(bloque));
+        if let Some(par) = origen {
+            evento = evento.str("par", &par.to_string());
+        }
+        let _ = self.registro.escribir(evento, false);
     }
 
     /// Decide y aplica el veredicto de un bloque llegado por red (gossip o sincronización), sin
@@ -1076,13 +1249,20 @@ impl Nodo {
         &mut self,
         bloque: &BloqueRed,
         origen: Option<libp2p::PeerId>,
+        llegada: Instant,
     ) -> VeredictoFinal {
         match bloque {
             BloqueRed::Pow {
                 cabecera,
                 txs,
                 testigos,
-            } => self.intentar_admitir_pow_de_red(*cabecera, txs.clone(), testigos.clone(), origen),
+            } => self.intentar_admitir_pow_de_red(
+                *cabecera,
+                txs.clone(),
+                testigos.clone(),
+                origen,
+                llegada,
+            ),
             BloqueRed::Post {
                 cabecera,
                 justificacion,
@@ -1094,6 +1274,7 @@ impl Nodo {
                 txs.clone(),
                 testigos.clone(),
                 origen,
+                llegada,
             ),
         }
     }
@@ -1104,6 +1285,7 @@ impl Nodo {
         txs: Vec<Tx>,
         testigos: Vec<Vec<Vec<u8>>>,
         origen: Option<libp2p::PeerId>,
+        llegada: Instant,
     ) -> VeredictoFinal {
         let hash = cabecera.block_hash();
         if self.cadena.es_valido(&hash) {
@@ -1132,17 +1314,19 @@ impl Nodo {
                 let evento = self
                     .registro
                     .evento("huerfano_desalojado")
-                    .str("hijo", &d.hijo.to_string())
-                    .str("padre_esperado", &d.padre_esperado.to_string());
+                    .str("hash", &d.hijo.to_string())
+                    .str("motivo", "desalojado por cupo del depósito de huérfanos");
                 let _ = self.registro.escribir(evento, false);
             }
-            let evento = self
+            let mut evento = self
                 .registro
                 .evento("bloque_red_huerfano")
                 .str("hash", &hash.to_string())
-                .str("padre_ausente", &padre.to_string())
                 .str("familia", "pow")
-                .str("veredicto", "Ignorar");
+                .lista_str("padres_ausentes", &[padre.to_string()]);
+            if let Some(par) = origen {
+                evento = evento.str("par", &par.to_string());
+            }
             let _ = self.registro.escribir(evento, false);
             if let (Some(red), Some(peer)) = (self.red.as_ref(), origen) {
                 red.pedir(
@@ -1156,12 +1340,17 @@ impl Nodo {
         }
         if !self.cadena.es_valido(&padre) {
             // El padre es conocido y definitivamente inválido: este bloque no puede ser válido.
-            let evento = self
+            let mut evento = self
                 .registro
                 .evento("bloque_red_rechazado")
                 .str("hash", &hash.to_string())
                 .str("familia", "pow")
-                .str("motivo", "padre conocido e inválido");
+                .str("etapa", "admision")
+                .str("motivo", "padre conocido e inválido")
+                .u64("t_hasta_rechazo_ns", llegada.elapsed().as_nanos() as u64);
+            if let Some(par) = origen {
+                evento = evento.str("par", &par.to_string());
+            }
             let _ = self.registro.escribir(evento, false);
             return VeredictoFinal::Rechazar;
         }
@@ -1173,27 +1362,50 @@ impl Nodo {
         // resulta ser la rama más pesada, `Self::actualizar_seleccion_pow` conmuta la punta
         // seleccionada (con la profundidad de la reorganización registrada).
         let indice = self.almacen.longitud_registro().unwrap_or(0);
+        // `ORDEN-W07a`: `bytes` (tamaño de la serialización de red) y `altura` se capturan antes de
+        // que `cabecera`/`txs`/`testigos` se muevan a la tubería de admisión.
+        let altura = cabecera.height;
+        let bytes = zx_p2p::codec::bloque_a_bytes(&BloqueRed::Pow {
+            cabecera,
+            txs: txs.clone(),
+            testigos: testigos.clone(),
+        })
+        .len() as u64;
         match self.admitir_pow_interno(cabecera, txs, testigos, indice, true) {
             Ok(()) => {
                 // V9: este evento **solo** se escribe después de que `admitir_pow_interno` terminó
                 // la tubería completa (cabecera, PoW, motor de transición, persistencia): nunca
                 // antes. Es la traza que V9 exige comprobar.
-                let evento = self
+                let mut evento = self
                     .registro
                     .evento("bloque_red_admitido")
                     .str("hash", &hash.to_string())
                     .str("familia", "pow")
-                    .str("veredicto", "Aceptar");
+                    .u64("altura", u64::from(altura))
+                    .u64("bytes", bytes)
+                    .u64("t_cabecera_ns", self.medicion.cabecera_ns)
+                    .u64("t_admision_ns", self.medicion.admision_ns)
+                    .u64("t_persistencia_ns", self.medicion.persistencia_ns)
+                    .u64("t_total_ns", llegada.elapsed().as_nanos() as u64)
+                    .u64("n_bloques_dag", self.cadena.bloques_admitidos());
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
                 let _ = self.registro.escribir(evento, false);
                 VeredictoFinal::Aceptar
             }
             Err(e) => {
-                let evento = self
+                let mut evento = self
                     .registro
                     .evento("bloque_red_rechazado")
                     .str("hash", &hash.to_string())
                     .str("familia", "pow")
-                    .str("motivo", &e.to_string());
+                    .str("etapa", self.medicion.etapa)
+                    .str("motivo", &e.to_string())
+                    .u64("t_hasta_rechazo_ns", llegada.elapsed().as_nanos() as u64);
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
                 let _ = self.registro.escribir(evento, false);
                 VeredictoFinal::Rechazar
             }
@@ -1215,6 +1427,7 @@ impl Nodo {
         txs: Vec<Tx>,
         testigos: Vec<Vec<Vec<u8>>>,
         origen: Option<libp2p::PeerId>,
+        llegada: Instant,
     ) -> VeredictoFinal {
         let hash = cabecera.block_hash();
         if self.cadena.es_valido(&hash) {
@@ -1274,17 +1487,19 @@ impl Nodo {
                     let evento = self
                         .registro
                         .evento("huerfano_desalojado")
-                        .str("hijo", &d.hijo.to_string())
-                        .str("padre_esperado", &d.padre_esperado.to_string());
+                        .str("hash", &d.hijo.to_string())
+                        .str("motivo", "desalojado por cupo del depósito de huérfanos");
                     let _ = self.registro.escribir(evento, false);
                 }
-                let evento = self
+                let mut evento = self
                     .registro
                     .evento("bloque_red_huerfano")
                     .str("hash", &hash.to_string())
-                    .str("padre_ausente", &padre.to_string())
                     .str("familia", "post")
-                    .str("veredicto", "Ignorar");
+                    .lista_str("padres_ausentes", &[padre.to_string()]);
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
                 let _ = self.registro.escribir(evento, false);
                 if let (Some(red), Some(peer)) = (self.red.as_ref(), origen) {
                     red.pedir(
@@ -1297,12 +1512,17 @@ impl Nodo {
                 return VeredictoFinal::Ignorar;
             }
             if !self.cadena.es_valido(&padre) {
-                let evento = self
+                let mut evento = self
                     .registro
                     .evento("bloque_red_rechazado")
                     .str("hash", &hash.to_string())
                     .str("familia", "post")
-                    .str("motivo", "padre conocido e inválido");
+                    .str("etapa", "admision")
+                    .str("motivo", "padre conocido e inválido")
+                    .u64("t_hasta_rechazo_ns", llegada.elapsed().as_nanos() as u64);
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
                 let _ = self.registro.escribir(evento, false);
                 return VeredictoFinal::Rechazar;
             }
@@ -1311,17 +1531,25 @@ impl Nodo {
         let bloque_dag = match BloqueDag::nuevo(cabecera, justificacion, txs, testigos) {
             Ok(b) => b,
             Err(e) => {
-                let evento = self
+                let mut evento = self
                     .registro
                     .evento("bloque_red_rechazado")
                     .str("hash", &hash.to_string())
                     .str("familia", "post")
-                    .str("motivo", &format!("forma: {e}"));
+                    .str("etapa", "decodificacion")
+                    .str("motivo", &format!("forma: {e}"))
+                    .u64("t_hasta_rechazo_ns", llegada.elapsed().as_nanos() as u64);
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
                 let _ = self.registro.escribir(evento, false);
                 return VeredictoFinal::Rechazar;
             }
         };
         let indice = self.almacen.longitud_registro().unwrap_or(0);
+        // `ORDEN-W07a`: tamaño de red y nº de padres del bloque, antes de admitirlo.
+        let n_padres = red::padres_declarados(&bloque_red).len() as u64;
+        let bytes = zx_p2p::codec::bloque_a_bytes(&bloque_red).len() as u64;
         // Aviso del director (`ORDEN-W06d5`, tras el hallazgo de V5): la simplificación que
         // trataba `Invalida` y `Pendiente` como el mismo `Rechazar` (declarada en `W06d4`) es un
         // bug real, no solo una simplificación — el mismo riesgo que RI-2a. `Pot(PasadoIncompleto)`
@@ -1338,13 +1566,29 @@ impl Nodo {
                 // V9: este evento **solo** se escribe después de que `admitir_post_interno` terminó
                 // la tubería completa (cabecera conjunta, PoAS, motor de transición, persistencia):
                 // nunca antes.
-                let evento = self
+                let mut evento = self
                     .registro
                     .evento("bloque_red_admitido")
                     .str("hash", &hash.to_string())
                     .str("familia", "post")
                     .u64("slot", bloque_para_reintento.cabecera.slot)
-                    .str("veredicto", "Aceptar");
+                    .u64("n_padres", n_padres)
+                    .u64("bytes", bytes)
+                    .u64("t_cabecera_ns", self.medicion.cabecera_ns)
+                    .u64("t_admision_ns", self.medicion.admision_ns)
+                    .u64("t_persistencia_ns", self.medicion.persistencia_ns)
+                    .u64("t_total_ns", llegada.elapsed().as_nanos() as u64)
+                    .u64("n_bloques_dag", self.cadena.bloques_admitidos());
+                if let Some((azules, rojos)) = self.cadena.mergeset_de(&hash) {
+                    evento = evento
+                        .u64("azules_mergeset", azules)
+                        .u64("rojos_mergeset", rojos);
+                }
+                let txs_descartadas = self.cadena.descartes(&hash).map_or(0, |d| d.len() as u64);
+                evento = evento.u64("txs_descartadas", txs_descartadas);
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
                 let _ = self.registro.escribir(evento, false);
                 self.reintentar_post_pendientes();
                 VeredictoFinal::Aceptar
@@ -1354,6 +1598,8 @@ impl Nodo {
                 clasificacion,
                 ..
             }) if clasificacion.es_pendiente() => {
+                // `ORDEN-W07a` §1 bis: evento de diagnóstico restaurado (el bloque no es rechazo
+                // demostrable ni huérfano de un padre concreto; se reintenta más tarde).
                 let evento = self
                     .registro
                     .evento("bloque_red_pendiente")
@@ -1362,7 +1608,7 @@ impl Nodo {
                     .str("motivo", &motivo)
                     .str("veredicto", "Ignorar (reintento encolado)");
                 let _ = self.registro.escribir(evento, false);
-                self.encolar_post_pendiente(bloque_para_reintento);
+                self.encolar_post_pendiente(bloque_para_reintento, llegada);
                 VeredictoFinal::Ignorar
             }
             // `ORDEN-W06d6`, RI-3c H2: `PruebaPotIncoherente`/`RangoSinAtadura` no se reintentan
@@ -1375,6 +1621,7 @@ impl Nodo {
                 clasificacion,
                 ..
             }) if !clasificacion.penaliza_en_red() => {
+                // `ORDEN-W07a` §1 bis: se conserva el evento de diagnóstico original.
                 let evento = self
                     .registro
                     .evento("bloque_red_ignorado_sin_penalizar")
@@ -1382,15 +1629,33 @@ impl Nodo {
                     .str("familia", "post")
                     .str("motivo", &motivo);
                 let _ = self.registro.escribir(evento, false);
-                VeredictoFinal::Ignorar
-            }
-            Err(e) => {
-                let evento = self
+                // Y el bloque queda descartado, con su traza de rechazo del §1 (etapa `cabecera`).
+                let mut evento = self
                     .registro
                     .evento("bloque_red_rechazado")
                     .str("hash", &hash.to_string())
                     .str("familia", "post")
-                    .str("motivo", &e.to_string());
+                    .str("etapa", self.medicion.etapa)
+                    .str("motivo", &motivo)
+                    .u64("t_hasta_rechazo_ns", llegada.elapsed().as_nanos() as u64);
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
+                let _ = self.registro.escribir(evento, false);
+                VeredictoFinal::Ignorar
+            }
+            Err(e) => {
+                let mut evento = self
+                    .registro
+                    .evento("bloque_red_rechazado")
+                    .str("hash", &hash.to_string())
+                    .str("familia", "post")
+                    .str("etapa", self.medicion.etapa)
+                    .str("motivo", &e.to_string())
+                    .u64("t_hasta_rechazo_ns", llegada.elapsed().as_nanos() as u64);
+                if let Some(par) = origen {
+                    evento = evento.str("par", &par.to_string());
+                }
                 let _ = self.registro.escribir(evento, false);
                 VeredictoFinal::Rechazar
             }
@@ -1400,11 +1665,11 @@ impl Nodo {
     /// Encola un bloque PoST de red que quedó `Pendiente` (decisión 3 extendida): acotado, el más
     /// viejo se descarta si se supera [`TOPE_POST_PENDIENTES`] — es una cola de mejor esfuerzo, no
     /// una promesa de reintento infinito.
-    fn encolar_post_pendiente(&mut self, bloque: BloqueDag) {
+    fn encolar_post_pendiente(&mut self, bloque: BloqueDag, llegada: Instant) {
         if self.post_pendientes.len() >= TOPE_POST_PENDIENTES {
             self.post_pendientes.pop_front();
         }
-        self.post_pendientes.push_back(bloque);
+        self.post_pendientes.push_back((bloque, llegada));
     }
 
     /// Reintenta los bloques PoST pendientes (decisión 3 extendida, aviso del director tras V5): el
@@ -1417,25 +1682,54 @@ impl Nodo {
         if self.post_pendientes.is_empty() {
             return;
         }
-        let pendientes: Vec<BloqueDag> = self.post_pendientes.drain(..).collect();
-        for bloque in pendientes {
+        let pendientes: Vec<(BloqueDag, Instant)> = self.post_pendientes.drain(..).collect();
+        for (bloque, llegada) in pendientes {
             let hash = bloque.cabecera.block_hash();
             let indice = self.almacen.longitud_registro().unwrap_or(0);
+            let n_padres = {
+                let p = &bloque.cabecera.padres;
+                if p.es_genesis() {
+                    0
+                } else {
+                    (1 + p.extras().len()) as u64
+                }
+            };
+            let bytes = zx_p2p::codec::bloque_a_bytes(&BloqueRed::Post {
+                cabecera: bloque.cabecera,
+                justificacion: bloque.justificacion.clone(),
+                txs: bloque.txs().to_vec(),
+                testigos: bloque.testigos().to_vec(),
+            })
+            .len() as u64;
             match self.admitir_post_interno(bloque.clone(), indice, true) {
                 Ok(()) => {
-                    let evento = self
+                    let mut evento = self
                         .registro
                         .evento("bloque_red_admitido")
                         .str("hash", &hash.to_string())
                         .str("familia", "post")
                         .u64("slot", bloque.cabecera.slot)
-                        .str("veredicto", "Aceptar (reintento)");
+                        .u64("n_padres", n_padres)
+                        .u64("bytes", bytes)
+                        .u64("t_cabecera_ns", self.medicion.cabecera_ns)
+                        .u64("t_admision_ns", self.medicion.admision_ns)
+                        .u64("t_persistencia_ns", self.medicion.persistencia_ns)
+                        .u64("t_total_ns", llegada.elapsed().as_nanos() as u64)
+                        .u64("n_bloques_dag", self.cadena.bloques_admitidos());
+                    if let Some((azules, rojos)) = self.cadena.mergeset_de(&hash) {
+                        evento = evento
+                            .u64("azules_mergeset", azules)
+                            .u64("rojos_mergeset", rojos);
+                    }
+                    let txs_descartadas =
+                        self.cadena.descartes(&hash).map_or(0, |d| d.len() as u64);
+                    evento = evento.u64("txs_descartadas", txs_descartadas);
                     let _ = self.registro.escribir(evento, false);
                 }
                 Err(ErrorNodo::BloquePropioRechazado { clasificacion, .. })
                     if clasificacion.es_pendiente() =>
                 {
-                    self.encolar_post_pendiente(bloque);
+                    self.encolar_post_pendiente(bloque, llegada);
                 }
                 Err(e) => {
                     let evento = self
@@ -1443,7 +1737,9 @@ impl Nodo {
                         .evento("bloque_red_rechazado")
                         .str("hash", &hash.to_string())
                         .str("familia", "post")
-                        .str("motivo", &format!("reintento: {e}"));
+                        .str("etapa", self.medicion.etapa)
+                        .str("motivo", &format!("reintento: {e}"))
+                        .u64("t_hasta_rechazo_ns", llegada.elapsed().as_nanos() as u64);
                     let _ = self.registro.escribir(evento, false);
                 }
             }
@@ -1625,11 +1921,20 @@ impl Nodo {
                 );
                 continue;
             }
+            let n_txs = txs.len() as u64;
+            let bytes = zx_p2p::codec::bloque_a_bytes(&BloqueRed::Pow {
+                cabecera: cabecera_minada,
+                txs: txs.clone(),
+                testigos: testigos.clone(),
+            })
+            .len() as u64;
             let evento = self
                 .registro
                 .evento("bloque_minado")
+                .str("hash", &cabecera_minada.block_hash().to_string())
                 .u64("altura", u64::from(cabecera_minada.height))
-                .str("hash", &cabecera_minada.block_hash().to_string());
+                .u64("bytes", bytes)
+                .u64("n_txs", n_txs);
             self.registro.escribir(evento, false)?;
 
             // `ORDEN-W06d5` decisión 3: mismo criterio que `fase_regimen` — un rechazo legítimo
@@ -1814,20 +2119,46 @@ impl Nodo {
                         break;
                     }
                 }
-                MsgProductor::Post(bloque) => {
+                MsgProductor::Post(bloque, instante_salida) => {
                     let hash = bloque.cabecera.block_hash();
                     let slot = bloque.cabecera.slot;
+                    let n_padres = {
+                        let p = &bloque.cabecera.padres;
+                        if p.es_genesis() {
+                            0
+                        } else {
+                            (1 + p.extras().len()) as u64
+                        }
+                    };
+                    let n_txs = bloque.txs().len() as u64;
+                    let bytes = zx_p2p::codec::bloque_a_bytes(&BloqueRed::Post {
+                        cabecera: bloque.cabecera,
+                        justificacion: bloque.justificacion.clone(),
+                        txs: bloque.txs().to_vec(),
+                        testigos: bloque.testigos().to_vec(),
+                    })
+                    .len() as u64;
+                    let retraso_slot_ns = instante_salida.elapsed().as_nanos() as u64;
                     match self.admitir_post_interno(
                         *bloque,
                         self.almacen.longitud_registro()?,
                         true,
                     ) {
                         Ok(()) => {
-                            let evento = self
+                            let mut evento = self
                                 .registro
                                 .evento("bloque_producido")
                                 .str("hash", &hash.to_string())
-                                .u64("slot", slot);
+                                .u64("slot", slot)
+                                .u64("n_padres", n_padres)
+                                .u64("n_txs", n_txs)
+                                .u64("bytes", bytes)
+                                .u64("retraso_slot_ns", retraso_slot_ns);
+                            if let Some((azules, rojos)) = self.cadena.mergeset_de(&hash) {
+                                evento = evento
+                                    .u64("azules_mergeset", azules)
+                                    .u64("rojos_mergeset", rojos);
+                            }
                             self.registro.escribir(evento, false)?;
                             self.difundir_si_hay_red(hash);
                             // El pasado del `ServicioPot` de verificación acaba de avanzar: algún
@@ -1951,6 +2282,11 @@ impl Nodo {
             .map_err(|e| ErrorNodo::Otro(format!("producir (bloque de transición): {e}")))?;
         let hash = bloque.cabecera.block_hash();
         self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)?;
+        // `ORDEN-W07a`: el bloque de transición es un PoST propio admitido y persistido, pero **no**
+        // se registra como `bloque_producido`: la base (W06d1…W06d6) no lo hacía y el §1 no fija su
+        // `retraso_slot_ns` (no hay hilo productor). Emitirlo antes de que `fase_regimen` abra y
+        // plotee las parcelas cambiaba el instante del primer `bloque_producido` y rompía la
+        // verificación de reinicio tras `SIGKILL` (`reinicio.rs`): se conserva el comportamiento.
         self.difundir_si_hay_red(hash);
         Ok(())
     }
@@ -1962,6 +2298,13 @@ impl Nodo {
         Arc::clone(&self.vista_red)
     }
 
+    /// `ORDEN-W07a`: manija compartida del registro estructurado, para que la red escriba en él los
+    /// eventos no críticos de par y de límite.
+    #[must_use]
+    pub fn registro(&self) -> Arc<Registro> {
+        Arc::clone(&self.registro)
+    }
+
     /// Conecta el nodo a la red (`ORDEN-W06d2`): a partir de aquí, `ejecutar` también procesa el
     /// trabajo de red (bloques difundidos o de sincronización) intercalado con su propia
     /// producción (D-N07: un único hilo de consenso). Sin llamar a esto, el nodo se comporta
@@ -1971,13 +2314,54 @@ impl Nodo {
         self.trabajo_red = Some(receptor);
     }
 
+    /// `ORDEN-W07a`: fija el `peer_id` y la dirección de escucha para el `arranque`. Se llama tras
+    /// arrancar la red (si la hay) y antes de [`Self::ejecutar`].
+    pub fn fijar_arranque_red(&mut self, peer_id: String, red_escuchar: Option<String>) {
+        self.peer_id = Some(peer_id);
+        self.red_escuchar = red_escuchar;
+    }
+
     /// Ejecuta el nodo de punta a punta: fase PoW hasta el corte, luego régimen.
     ///
     /// # Errores
     /// Cualquier fallo fatal de admisión propia (decisión 4).
     pub fn ejecutar(&mut self) -> ResultadoNodo<()> {
+        // `ORDEN-W07a` §1: `arranque`, al terminar el arranque (ya con la red conectada, si la hay).
+        let claves: Vec<String> = self.claves.iter().map(|c| c.indice.to_string()).collect();
+        let mut evento = self
+            .registro
+            .evento("arranque")
+            .u64("version_esquema", 1)
+            .u64("n_dev", self.n_dev)
+            .u64("sr_dev", self.sr_dev_actual)
+            .str("claves", &claves.join(","))
+            .str(
+                "modo",
+                if self.modo_limpio {
+                    "limpio"
+                } else {
+                    "reinicio"
+                },
+            );
+        if let Some(peer_id) = self.peer_id.as_deref() {
+            evento = evento.str("peer_id", peer_id);
+        }
+        if let Some(red) = self.red_escuchar.as_deref() {
+            evento = evento.str("red_escuchar", red);
+        }
+        self.registro.escribir(evento, true)?;
+
         self.fase_pow()?;
-        self.fase_regimen()
+        self.fase_regimen()?;
+        // `ORDEN-W07a` §1: `parada`, salida ordenada (crítico).
+        let motivo = if self.parada_tras_slots.is_some() {
+            "parada_tras_slots"
+        } else {
+            "fin"
+        };
+        self.registro
+            .escribir(self.registro.evento("parada").str("motivo", motivo), true)?;
+        Ok(())
     }
 
     /// Acceso de solo lectura a `zx-cadena` (para pruebas e inspección; no es API de consenso).
@@ -2051,6 +2435,19 @@ fn padres_dag_a_vec(p: &PadresDag) -> Vec<BlockHash> {
     let mut v = vec![p.seleccionado()];
     v.extend_from_slice(p.extras());
     v
+}
+
+/// Familia de un bloque de red, para el registro (`pow`/`post`).
+fn familia_de(bloque: &BloqueRed) -> &'static str {
+    match bloque {
+        BloqueRed::Pow { .. } => "pow",
+        BloqueRed::Post { .. } => "post",
+    }
+}
+
+/// Tamaño en bytes de la serialización de red de un bloque (`ORDEN-W07a`).
+fn bytes_de(bloque: &BloqueRed) -> u64 {
+    zx_p2p::codec::bloque_a_bytes(bloque).len() as u64
 }
 
 /// `w(SR)` (`U256`) a `u128` para `BloquePost::peso` (no debería desbordar con `SR_dev` de la red
@@ -2578,7 +2975,10 @@ mod pruebas_cola_post_pendientes {
         // sobrevive.
         let total = super::TOPE_POST_PENDIENTES * 2;
         for slot in 0..total {
-            nodo.encolar_post_pendiente(bloque_post_de_prueba(slot as u64));
+            nodo.encolar_post_pendiente(
+                bloque_post_de_prueba(slot as u64),
+                std::time::Instant::now(),
+            );
         }
 
         assert_eq!(
@@ -2589,11 +2989,146 @@ mod pruebas_cola_post_pendientes {
         // FIFO: sobreviven los `TOPE_POST_PENDIENTES` últimos, no los primeros.
         let primero_que_sobrevive = nodo.post_pendientes.front().expect("no vacía");
         assert_eq!(
-            primero_que_sobrevive.cabecera.slot,
+            primero_que_sobrevive.0.cabecera.slot,
             (total - super::TOPE_POST_PENDIENTES) as u64,
             "el más viejo de los que sobreviven es exactamente el primero no descartado"
         );
         let ultimo = nodo.post_pendientes.back().expect("no vacía");
-        assert_eq!(ultimo.cabecera.slot, (total - 1) as u64);
+        assert_eq!(ultimo.0.cabecera.slot, (total - 1) as u64);
+    }
+}
+
+/// `ORDEN-W07a-R`: cobertura de eventos de diagnóstico que no aparecen en V3. Los tres se emiten en
+/// rutas que un nodo sin red puede recorrer con bloques construidos a mano (sin minar); así cada uno
+/// queda producido al menos una vez por un test, como pide la tabla de cobertura de la orden.
+#[cfg(test)]
+#[expect(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "el test falla con panic por diseño"
+)]
+mod pruebas_diagnostico_registro {
+    use std::time::Instant;
+
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
+    use zx_core::preimage::block::BlockHeader;
+    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::wire_dag::{JustificacionPot, PotCheckpoints};
+    use zx_p2p::entrante::VeredictoFinal;
+    use zx_p2p::mensaje::BloqueRed;
+
+    use super::{Config, Nodo, Red};
+
+    fn cfg(dir: &std::path::Path) -> Config {
+        Config {
+            dir_datos: dir.join("datos"),
+            ruta_registro: dir.join("registro.jsonl"),
+            red: Red::Dev,
+            semilla: 1,
+            indices_claves: vec![0],
+            n_dev: 16,
+            sr_dev: u64::MAX,
+            parada_tras_slots: Some(0),
+            dejar_de_producir_en_slot: None,
+        }
+    }
+
+    fn h(n: u8) -> BlockHash {
+        BlockHash::from_digest(Digest::from_bytes([n; 32]))
+    }
+
+    fn bloque_pow_red(nonce: u64, prev: BlockHash) -> BloqueRed {
+        BloqueRed::Pow {
+            cabecera: BlockHeader {
+                consensus_branch_id: 0xa8b4_66a7,
+                prev_hash: prev,
+                merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
+                timestamp: 1_000 + nonce,
+                bits: 0x1c07_fff8,
+                nonce,
+                height: 1,
+            },
+            txs: Vec::new(),
+            testigos: Vec::new(),
+        }
+    }
+
+    fn bloque_post_red(slot: u64, padre: BlockHash) -> BloqueRed {
+        let cabecera = DagBlockHeader {
+            consensus_branch_id: 0xa8b4_66a7,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x44; 32])),
+            timestamp: 1_000 + slot,
+            height: 0,
+            slot,
+            pot_output: [0; 16],
+            rango_solucion: 1,
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0x55; 32])),
+            padres: PadresDag::nuevo(padre, &[]).unwrap(),
+            sello: [0; 64],
+        };
+        let portador = PotCheckpoints::desde_outputs([[0; 16]; 8]);
+        let justificacion = JustificacionPot::nueva(vec![portador]).unwrap();
+        BloqueRed::Post {
+            cabecera,
+            justificacion,
+            txs: Vec::new(),
+            testigos: Vec::new(),
+        }
+    }
+
+    fn registro(dir: &std::path::Path) -> String {
+        std::fs::read_to_string(dir.join("registro.jsonl")).expect("leer registro")
+    }
+
+    /// Un PoST de red en fase PoW pura (sin candidatos) deja la traza del §1 bis
+    /// `bloque_post_de_red_sin_terminal`.
+    #[test]
+    fn un_post_sin_terminal_candidato_traza_sin_terminal() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut nodo = Nodo::arrancar(&cfg(dir.path())).expect("arranque limpio");
+        let bloque = bloque_post_red(1, h(0xAB));
+        let veredicto = nodo.intentar_admitir_bloque_red(&bloque, None, Instant::now());
+        assert_eq!(veredicto, VeredictoFinal::Ignorar);
+        let texto = registro(dir.path());
+        assert!(
+            texto.contains("\"tipo\":\"bloque_post_de_red_sin_terminal\""),
+            "falta bloque_post_de_red_sin_terminal: {texto}"
+        );
+    }
+
+    /// El cupo por padre del depósito de huérfanos, al llenarse, traza `huerfano_desalojado`.
+    #[test]
+    fn el_cupo_por_padre_traza_el_desalojo_de_huerfanos() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut nodo = Nodo::arrancar(&cfg(dir.path())).expect("arranque limpio");
+        // Mismo padre ausente para todos: al pasar de `MAX_HUERFANOS_POR_PADRE` hay desalojo FIFO.
+        let padre = h(0xCD);
+        for i in 0..=(crate::red::MAX_HUERFANOS_POR_PADRE as u64) {
+            let bloque = bloque_pow_red(i, padre);
+            let _ = nodo.intentar_admitir_bloque_red(&bloque, None, Instant::now());
+        }
+        let texto = registro(dir.path());
+        assert!(
+            texto.contains("\"tipo\":\"huerfano_desalojado\""),
+            "falta huerfano_desalojado: {texto}"
+        );
+    }
+
+    /// Un huérfano que sale del depósito al resolverse su padre traza `huerfano_resuelto`.
+    #[test]
+    fn un_huerfano_retirado_del_deposito_traza_su_resolucion() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut nodo = Nodo::arrancar(&cfg(dir.path())).expect("arranque limpio");
+        let padre = h(0xEE);
+        let bloque = bloque_pow_red(7, padre);
+        let _ = nodo.intentar_admitir_bloque_red(&bloque, None, Instant::now());
+        // Simula que `padre` acaba de admitirse: el depósito entrega al hijo y este se reintenta.
+        nodo.resolver_huerfanos_de(padre);
+        let texto = registro(dir.path());
+        assert!(
+            texto.contains("\"tipo\":\"huerfano_resuelto\""),
+            "falta huerfano_resuelto: {texto}"
+        );
     }
 }

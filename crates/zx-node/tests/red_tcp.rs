@@ -25,6 +25,15 @@ use zx_p2p::config::ParametrosRed;
 use zx_p2p::mensaje::{Estado, Fase, PuntaPow};
 use zx_p2p::servicio::{EventoRed, ManejoRed, arrancar};
 
+/// Registro estructurado de test (`ORDEN-W07a`).
+fn registro() -> (tempfile::TempDir, Arc<zx_node::registro::Registro>) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let r = Arc::new(
+        zx_node::registro::Registro::abrir(&dir.path().join("registro.jsonl")).expect("registro"),
+    );
+    (dir, r)
+}
+
 fn estado_vacio(n: u8) -> Estado {
     Estado {
         hash_genesis: BlockHash::from_digest(Digest::from_bytes([n; 32])),
@@ -80,7 +89,8 @@ struct NodoDeJuguete {
 fn arrancar_de_juguete() -> (NodoDeJuguete, tokio::task::JoinHandle<()>) {
     let vista = Arc::new(VistaRed::nueva(estado_vacio(9)));
     let (tx_trabajo, _rx_trabajo) = zx_node::red::nueva_cola_trabajo_red();
-    let manejador = Arc::new(ManejadorRed::nuevo(tx_trabajo, vista));
+    let (_dir, reg) = registro();
+    let manejador = Arc::new(ManejadorRed::nuevo(tx_trabajo, vista, reg));
     let piezas = arrancar(swarm_tcp(), manejador);
     let manejo = piezas.manejo;
     let eventos = piezas.eventos;

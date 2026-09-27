@@ -1392,6 +1392,59 @@ impl Cadena {
         let pos = (idx as usize).checked_sub(1)?;
         dt.dag_orden.get(pos).copied()
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Accesos de lectura para el registro estructurado (`ORDEN-W07a` decisión 2, reimplementados
+    // sobre el diseño multi-terminal de `ORDEN-W06d7`). Funciones nuevas y aisladas: no tocan
+    // ninguna existente. Devuelven exactamente lo que ya calcula y guarda el código para el
+    // terminal **seleccionado** (nunca una segunda implementación); `None` si el bloque no está en
+    // el DAG de ese terminal.
+    // ---------------------------------------------------------------------------------------------
+
+    /// `DagTerminal` del terminal **seleccionado**, si ya tiene DAG propio.
+    fn dag_terminal_seleccionado(&self) -> Option<&DagTerminal> {
+        self.terminal_seleccionado.and_then(|t| self.dags.get(&t))
+    }
+
+    /// `DatosGhostdag` guardados de `hash` en el DAG del terminal **seleccionado**. `None` si
+    /// `hash` no pertenece a ese DAG (p. ej. un bloque PoW, o uno de otro terminal).
+    #[must_use]
+    pub fn datos_ghostdag(&self, hash: &BlockHash) -> Option<&zx_dag::ghostdag::DatosGhostdag> {
+        let dt = self.dag_terminal_seleccionado()?;
+        let idx = *dt.dag_idx.get(hash)?;
+        dt.dag.datos(idx)
+    }
+
+    /// `blue_score(B)` (`C-GD-08`) del bloque `hash`, si está en el DAG del terminal seleccionado.
+    #[must_use]
+    pub fn blue_score(&self, hash: &BlockHash) -> Option<u64> {
+        self.datos_ghostdag(hash).map(|d| d.blue_score)
+    }
+
+    /// `(|azules del mergeset|, |rojos|)` de `hash` en el DAG del terminal seleccionado. El
+    /// mergeset completo es `orden_mergeset`; los rojos, `rojos`; los azules son la diferencia.
+    #[must_use]
+    pub fn mergeset_de(&self, hash: &BlockHash) -> Option<(u64, u64)> {
+        let datos = self.datos_ghostdag(hash)?;
+        let azules = datos.orden_mergeset.len().saturating_sub(datos.rojos.len());
+        Some((azules as u64, datos.rojos.len() as u64))
+    }
+
+    /// Número de bloques admitidos (válidos) en esta `Cadena`, contando PoW y PoST.
+    #[must_use]
+    pub fn bloques_admitidos(&self) -> u64 {
+        self.validos.values().filter(|v| **v).count() as u64
+    }
+
+    /// Padre seleccionado (`sp`, `C-GD-03`) de un bloque del DAG del terminal **seleccionado**, como
+    /// hash. `None` para la raíz (el terminal), para un bloque de otro terminal o si `hash` no está
+    /// en ese DAG.
+    #[must_use]
+    pub fn padre_seleccionado(&self, hash: &BlockHash) -> Option<BlockHash> {
+        let terminal = self.terminal_seleccionado?;
+        let datos = self.datos_ghostdag(hash)?;
+        self.hash_de_idx(terminal, datos.sp?)
+    }
 }
 
 /// Construye la entrada de `zx-dag` de un bloque PoST.

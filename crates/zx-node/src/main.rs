@@ -20,6 +20,7 @@ fn main() {
         std::process::exit(2);
     }
 
+    let escuchar_str = cli.red_escuchar.clone();
     let escuchar = match cli.red_escuchar.as_deref().map(str::parse) {
         None => None,
         Some(Ok(a)) => Some(a),
@@ -63,8 +64,10 @@ fn main() {
     // `_red_arrancada` se mantiene viva hasta el final de `main`: soltar el runtime `tokio` que
     // contiene cancelaría el bucle de red y la sincronización (decisión 1/4 de `ORDEN-W06d2`).
     let _red_arrancada = if con_red {
-        match zx_node::red::arrancar(escuchar, marcar, nodo.vista_red()) {
+        match zx_node::red::arrancar(escuchar, marcar, nodo.vista_red(), nodo.registro()) {
             Ok(r) => {
+                // `ORDEN-W07a`: identidad de red para el `arranque`.
+                nodo.fijar_arranque_red(r.peer_id, escuchar_str);
                 nodo.conectar_red(r.manija, r.trabajo);
                 Some(r.runtime)
             }

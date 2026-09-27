@@ -13,16 +13,23 @@ pub mod vista;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
 
 use zx_core::BlockHash;
 use zx_p2p::entrante::IdDiferido;
 use zx_p2p::mensaje::BloqueRed;
+
+use crate::registro::Registro;
 
 /// Lo que el manejador (lado asíncrono) encola para que el hilo de consenso lo procese.
 ///
 /// El manejador **nunca** valida nada: solo mete esto en la cola y devuelve
 /// [`zx_p2p::entrante::Veredicto::Diferir`] de inmediato (decisión 1). El hilo de consenso decide,
 /// a su ritmo, y responde con [`zx_p2p::servicio::ManejoRed::informar_validacion_bloqueante`].
+///
+/// `llegada` (`ORDEN-W07a` decisión 3): instante en que el bloque llegó al nodo, capturado en el
+/// lado asíncrono y transportado con el bloque para que `t_total_ns` mida desde la llegada, cola
+/// incluida.
 #[derive(Debug)]
 pub enum TrabajoRed {
     /// Un bloque llegó por difusión (gossipsub) y su veredicto está diferido con `id`.
@@ -31,6 +38,8 @@ pub enum TrabajoRed {
         id: IdDiferido,
         /// El bloque, ya deserializado.
         bloque: BloqueRed,
+        /// Instante de llegada al nodo.
+        llegada: Instant,
     },
     /// Un bloque llegó como respuesta a una petición de sincronización (no lleva `IdDiferido`: no
     /// pasó por gossipsub, así que no hay nada que informarle a `report_message_validation_result`).
@@ -41,6 +50,8 @@ pub enum TrabajoRed {
         de: libp2p::PeerId,
         /// El bloque.
         bloque: BloqueRed,
+        /// Instante de llegada al nodo.
+        llegada: Instant,
     },
 }
 
@@ -277,12 +288,15 @@ pub struct RedArrancada {
     pub manija: ManijaRed,
     /// Para `Nodo::conectar_red`.
     pub trabajo: ReceptorTrabajoRed,
+    /// `PeerId` de libp2p de este nodo (texto), para el `arranque` del registro.
+    pub peer_id: String,
 }
 
 /// Construye el transporte TCP real (decisión 8 de la orden: `127.0.0.1` en pruebas, cualquier
 /// dirección en un despliegue), el behaviour de la red dev, y arranca el bucle y la tarea de
 /// sincronización en un runtime `tokio` nuevo. Escucha en `escuchar` (si se da) y marca cada
-/// dirección de `marcar`.
+/// dirección de `marcar`. `registro` es el registro estructurado compartido (`ORDEN-W07a`): la
+/// tarea de sincronización escribe allí los eventos de par y el manejador, los límites de cola.
 ///
 /// # Errores
 /// [`zx_p2p::error::P2pError`] si el behaviour o el transporte no se pueden construir; un error
@@ -291,6 +305,7 @@ pub fn arrancar(
     escuchar: Option<libp2p::Multiaddr>,
     marcar: Vec<libp2p::Multiaddr>,
     vista: Arc<vista::VistaRed>,
+    registro: Arc<Registro>,
 ) -> Result<RedArrancada, String> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -299,6 +314,7 @@ pub fn arrancar(
         .map_err(|e| format!("runtime tokio: {e}"))?;
 
     let clave = libp2p::identity::Keypair::generate_ed25519();
+    let peer_id = clave.public().to_peer_id().to_string();
     let behaviour = zx_p2p::behaviour::ZxBehaviour::nueva(
         &clave,
         zx_p2p::config::ParametrosRed::dag_dev(),
@@ -335,6 +351,7 @@ pub fn arrancar(
     let manejador = Arc::new(manejador::ManejadorRed::nuevo(
         tx_trabajo.clone(),
         Arc::clone(&vista),
+        Arc::clone(&registro),
     ));
     let piezas = zx_p2p::servicio::arrancar(swarm, manejador);
     let manejo = piezas.manejo;
@@ -345,6 +362,7 @@ pub fn arrancar(
         manejo.clone(),
         Arc::clone(&vista),
         tx_trabajo,
+        registro,
     ));
 
     if let Some(addr) = escuchar {
@@ -378,6 +396,7 @@ pub fn arrancar(
         },
         runtime,
         trabajo: rx_trabajo,
+        peer_id,
     })
 }
 

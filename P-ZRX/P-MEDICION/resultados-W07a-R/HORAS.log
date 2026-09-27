@@ -1,0 +1,13 @@
+# HORAS.log — ORDEN-W07a-R (date -Is real)
+2026-09-27T06:56:00+02:00 inicio de sesion (reconocimiento; LINEO; ORDEN-W07a-R; REVISION-W07a; ESQUEMA)
+2026-09-27T06:58:00+02:00 entrada ENTRADA-W07a-R.sha256 verificada 46/46 sobre la raiz (commit 5a2e5f9)
+2026-09-27T07:01:00+02:00 FALTAS-DE-DEFINICION.md escrito; ws.orig/ws copiados; port de ficheros intactos
+2026-09-27T07:03:00+02:00 port a mano de cadena.rs (accesos del terminal seleccionado) y nodo.rs (instrumentacion + 6 eventos restaurados)
+2026-09-27T07:04:00+02:00 INCIDENTE: el primer cargo compilo la raiz (sin Cargo.toml en la zona); detectado por el arranque v0 del primer V3
+2026-09-27T07:07:00+02:00 reconstruccion forzada desde ws/ (hashes de ficheros locales); V3 relanzado con el binario correcto
+2026-09-27T07:13:00+02:00 V3 fin: 65 bloques PoST distintos, dejar_de_producir presente, adversario rechazado (4 rechazos etapa cabecera)
+2026-09-27T07:14:00+02:00 suite completa lanzada (cargo test --workspace --all-features --locked --no-fail-fast)
+2026-09-27T07:19:00+02:00 fmt/clippy/check/guardianes VERDES sobre ws/
+2026-09-27T07:53:00+02:00 suite completa: 832 pasan / 0 fallan / 5 ignorados (81 objetivos); T01 2/2; T04 1/1; reinicio 2/2 (corregido)
+2026-09-27T07:56:00+02:00 4 tests de cobertura anadidos y verdes; check/clippy/fmt re-verdes sobre el arbol final
+2026-09-27T07:58:00+02:00 cambios.patch (14 ficheros) y MIGRACION.sha256 (16 lineas, sha256sum -c verde); ws.orig intacto; sin procesos vivos

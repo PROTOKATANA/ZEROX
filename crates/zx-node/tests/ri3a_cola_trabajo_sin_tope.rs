@@ -57,6 +57,7 @@ fn la_cola_de_trabajo_hacia_consenso_tiene_tope_de_elementos() {
         match tx.intentar_enviar(TrabajoRed::BloqueDeSincronizacion {
             de: libp2p::PeerId::random(),
             bloque: bloque(i),
+            llegada: std::time::Instant::now(),
         }) {
             ResultadoEnvioTrabajo::Encolado => encolados += 1,
             ResultadoEnvioTrabajo::Lleno(_) => llenos += 1,

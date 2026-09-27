@@ -27,6 +27,14 @@ use zx_node::red::vista::VistaRed;
 use zx_p2p::entrante::ManejadorEntrante;
 use zx_p2p::mensaje::{BloqueRed, Estado, Fase, PuntaPow};
 
+/// Registro estructurado de test (`ORDEN-W07a`): `ManejadorRed` lo exige aunque este test no lo use.
+fn registro() -> (tempfile::TempDir, Arc<zx_node::registro::Registro>) {
+    let dir = tempfile::tempdir().unwrap();
+    let r =
+        Arc::new(zx_node::registro::Registro::abrir(&dir.path().join("registro.jsonl")).unwrap());
+    (dir, r)
+}
+
 fn h(n: u32) -> BlockHash {
     let mut b = [0u8; 32];
     b[..4].copy_from_slice(&n.to_le_bytes());
@@ -107,7 +115,8 @@ fn pedir_el_mismo_hash_repetido_no_se_duplica_ni_se_clona_de_mas() {
     let hash = zx_node::red::hash_de(&bloque);
 
     let (tx, _rx) = zx_node::red::nueva_cola_trabajo_red();
-    let m = ManejadorRed::nuevo(tx, Arc::clone(&vista));
+    let (_dir, reg) = registro();
+    let m = ManejadorRed::nuevo(tx, Arc::clone(&vista), reg);
 
     // La misma petición que reproducía el hallazgo: el mismo hash repetido K veces.
     let hashes_repetidos = vec![hash; K];
@@ -153,7 +162,8 @@ fn pedir_el_mismo_hash_repetido_no_se_duplica_ni_se_clona_de_mas() {
         hashes_distintos.push(zx_node::red::hash_de(&b));
     }
     let (tx2, _rx2) = zx_node::red::nueva_cola_trabajo_red();
-    let m2 = ManejadorRed::nuevo(tx2, vista2);
+    let (_dir2, reg2) = registro();
+    let m2 = ManejadorRed::nuevo(tx2, vista2, reg2);
     let respuesta2 = m2.bloques_por_hash(&hashes_distintos);
     assert_eq!(
         respuesta2.len(),

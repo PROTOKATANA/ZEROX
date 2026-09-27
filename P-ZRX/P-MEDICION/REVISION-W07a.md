@@ -26,3 +26,14 @@ rebase W07a-R, tras W06d7 (las dos tocan `nodo.rs` y `zx-cadena`).
    diagnóstico de W06d6 se apoyó en `bloque_red_pendiente` y el reposo de W07b en `dejar_de_producir`. **Se
    restauran en W07a-R** (esquema §1 bis).
 3. `par` de los bloques de gossip omitido («no computable»): se acepta por ahora; la latencia no lo necesita.
+
+## W07a-R y migración (2026-09-27 ≈ 07:58)
+
+W07a-R (DeepSeek, 06:55–07:56) llevó la instrumentación a la raíz con W06d7: accesos de lectura sobre el
+`DagTerminal` **seleccionado** (con test contra `zx-dag`), los seis eventos de diagnóstico **restaurados**, la
+corrección de `reinicio.rs`, y cuatro tests de cobertura de eventos. **Suite completa 832/0/5**, diferenciales T01
+v0.5 y T04 v0.6 con 0 discrepancias, `registro_esquema` 1/1, V3 con tres nodos reales (65 bloques PoST,
+`dejar_de_producir` presente, adversario rechazado), `fmt`, `clippy`, guardianes, `Cargo.lock` sin cambios.
+Incidente declarado: un primer `cargo` desde la raíz de la zona compiló la base sin instrumentar; se detectó
+(evento `arranque` v0) y V3 se repitió con el binario correcto. Cinco tipos de evento no observados en V3, con
+causa. **Migrada** por parche (14 archivos), **16/16** huellas, crates idénticos a la zona. `resultados-W07a-R/`.

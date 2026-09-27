@@ -179,3 +179,73 @@ fn el_contexto_dag_es_el_mismo_que_usa_la_admision_real() {
     let padres_ajenos = PadresDag::nuevo(hash(99), &[]).unwrap();
     assert!(ContextoDag::padre_seleccionado(dag, &padres_ajenos).is_err());
 }
+
+/// `ORDEN-W07a` decisión 2: los accesos de lectura nuevos del registro devuelven exactamente lo que
+/// `zx-dag` ya calcula y guarda para el mismo DAG (no una segunda implementación). Se comprueba en
+/// la cadena mínima: génesis + PoW terminal + un PoST hijo del terminal.
+#[test]
+fn accesos_de_lectura_del_registro_coinciden_con_el_dag() {
+    let mut cadena = Cadena::nueva(params(), 1, CBID_RED_DEV, MAX_PADRES_PRODUCCION);
+    cadena
+        .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
+            HechosCabecera::Genesis { hash: hash(0) },
+            Vec::new(),
+        )))
+        .unwrap();
+    cadena
+        .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
+            HechosCabecera::PoW {
+                hash: hash(1),
+                padre: hash(0),
+                altura: 1,
+                trabajo: U256::one(),
+                pow_valido: true,
+            },
+            Vec::new(),
+        )))
+        .unwrap();
+    let terminal = cadena.terminal().unwrap();
+
+    let productor = clave(7);
+    let p1 = BloquePost {
+        hash: hash(10),
+        padres: vec![terminal],
+        slot: 1,
+        productor,
+        peso: 5,
+        prueba_valida: true,
+        requisito_declarado: 0,
+        sr: 1,
+        distancia: 0,
+        identidad: IdentidadGhostdag::Billete(IdentidadTicket::vigente(
+            productor, 0, 1, [0x11; 32], 1,
+        )),
+        txs: vec![(tx_coinbase_post(productor, 3, 1), Vec::new())],
+    };
+    cadena.admitir(BloqueCadena::Post(p1.clone())).unwrap();
+
+    // Tres bloques válidos admitidos: génesis, PoW y el PoST.
+    assert_eq!(cadena.bloques_admitidos(), 3);
+    // El génesis PoW no está en el DAG (no hay `DatosGhostdag` para él).
+    assert!(cadena.datos_ghostdag(&hash(0)).is_none());
+    assert!(cadena.blue_score(&hash(0)).is_none());
+    assert!(cadena.mergeset_de(&hash(0)).is_none());
+    // El terminal PoW es la raíz del DAG (índice 0): azules vacíos y `blue_score` 0.
+    assert_eq!(cadena.blue_score(&terminal), Some(0));
+    assert_eq!(cadena.mergeset_de(&terminal), Some((0, 0)));
+    // `p1` solo tiene al terminal como padre seleccionado. El acceso devuelve exactamente el valor
+    // que `zx-dag` guardó (no una segunda implementación) y los tamaños del mergeset coinciden con
+    // la descomposición `orden_mergeset = azules + rojos`.
+    let datos = cadena.datos_ghostdag(&p1.hash).expect("p1 está en el DAG");
+    assert_eq!(cadena.blue_score(&p1.hash), Some(datos.blue_score));
+    assert_eq!(
+        cadena.mergeset_de(&p1.hash),
+        Some((
+            (datos.orden_mergeset.len() - datos.rojos.len()) as u64,
+            datos.rojos.len() as u64
+        ))
+    );
+    assert!(datos.sp.is_some(), "p1 tiene padre seleccionado");
+    assert_eq!(cadena.padre_seleccionado(&p1.hash), Some(terminal));
+    assert_eq!(cadena.padre_seleccionado(&terminal), None);
+}

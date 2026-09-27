@@ -8,6 +8,7 @@
 //! [`zx_p2p::servicio::ManejoRed::informar_validacion_bloqueante`].
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
@@ -16,19 +17,32 @@ use zx_p2p::mensaje::{BloqueRed, Estado};
 
 use super::vista::VistaRed;
 use super::{EmisorTrabajoRed, ResultadoEnvioTrabajo, TrabajoRed};
+use crate::registro::Registro;
 
 /// El manejador. Barato de clonar (todo dentro es `Arc`/canal clonable), pero se comparte como
 /// `Arc<ManejadorRed>` porque [`zx_p2p::servicio::arrancar_con`] lo exige.
 pub struct ManejadorRed {
     trabajo: EmisorTrabajoRed,
     vista: Arc<VistaRed>,
+    /// Registro estructurado compartido (`ORDEN-W07a`): solo se usa para el evento no crítico
+    /// `limite_alcanzado` (cola de trabajo llena). No se escribe nada por bloque aquí.
+    registro: Arc<Registro>,
 }
 
 impl ManejadorRed {
-    /// Construye el manejador con el canal hacia el hilo de consenso y la vista compartida.
+    /// Construye el manejador con el canal hacia el hilo de consenso, la vista compartida y el
+    /// registro estructurado.
     #[must_use]
-    pub const fn nuevo(trabajo: EmisorTrabajoRed, vista: Arc<VistaRed>) -> Self {
-        Self { trabajo, vista }
+    pub const fn nuevo(
+        trabajo: EmisorTrabajoRed,
+        vista: Arc<VistaRed>,
+        registro: Arc<Registro>,
+    ) -> Self {
+        Self {
+            trabajo,
+            vista,
+            registro,
+        }
     }
 }
 
@@ -42,9 +56,11 @@ impl ManejadorEntrante for ManejadorRed {
         // descarta **sin bloquear la red** (nunca `send().await`) y se registra — un bloque
         // honesto descartado así se recupera por la petición de padres o por la sincronización por
         // registro (decisión 1), nunca queda perdido en silencio sin que nadie lo sepa.
+        let llegada = Instant::now();
         match self.trabajo.intentar_enviar(TrabajoRed::BloqueDifundido {
             id,
             bloque: bloque.clone(),
+            llegada,
         }) {
             ResultadoEnvioTrabajo::Encolado => Veredicto::Diferir,
             ResultadoEnvioTrabajo::Lleno(_) => {
@@ -52,6 +68,17 @@ impl ManejadorEntrante for ManejadorRed {
                     "cola de trabajo hacia el hilo de consenso llena: bloque difundido descartado \
                      sin juzgar (límite alcanzado, RI-3a #3)"
                 );
+                // `ORDEN-W07a`: traza estructurada del único límite que `zx-node` ve descartar algo
+                // (la cola propia; los límites C-NET internos de `zx-p2p` no son observables aquí).
+                let evento = self
+                    .registro
+                    .evento("limite_alcanzado")
+                    .str("limite", "cola_trabajo_consenso")
+                    .str(
+                        "detalle",
+                        "bloque difundido descartado: cola hacia el hilo de consenso llena",
+                    );
+                let _ = self.registro.escribir(evento, false);
                 Veredicto::Ignorar
             }
             ResultadoEnvioTrabajo::Cerrado(_) => {
@@ -111,6 +138,16 @@ mod tests {
         BlockHash::from_digest(Digest::from_bytes([n; 32]))
     }
 
+    /// Registro estructurado de test (fichero temporal que vive todo el test).
+    fn registro() -> (tempfile::TempDir, Arc<crate::registro::Registro>) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let r = Arc::new(
+            crate::registro::Registro::abrir(&dir.path().join("registro.jsonl"))
+                .expect("abrir registro"),
+        );
+        (dir, r)
+    }
+
     fn estado_vacio() -> Estado {
         Estado {
             hash_genesis: h(0),
@@ -164,15 +201,16 @@ mod tests {
 
     #[test]
     fn bloque_difundido_siempre_difiere_y_encola() {
+        let (_dir, reg) = registro();
         let (tx, mut rx) = super::super::nueva_cola_trabajo_red();
-        let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
+        let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())), reg);
 
         let v = m.bloque_difundido(IdDiferido::default(), &bloque_pow(1));
         assert_eq!(v, Veredicto::Diferir);
 
         let recibido = rx.try_recv().expect("debe haber encolado trabajo");
         match recibido {
-            TrabajoRed::BloqueDifundido { id, bloque } => {
+            TrabajoRed::BloqueDifundido { id, bloque, .. } => {
                 assert_eq!(id, IdDiferido::default());
                 assert_eq!(bloque, bloque_pow(1));
             }
@@ -182,9 +220,10 @@ mod tests {
 
     #[test]
     fn sin_hilo_de_consenso_se_ignora_sin_penalizar() {
+        let (_dir, reg) = registro();
         let (tx, rx) = super::super::nueva_cola_trabajo_red();
         drop(rx); // el hilo de consenso "murió": el canal está cerrado.
-        let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
+        let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())), reg);
         assert_eq!(
             m.bloque_difundido(IdDiferido::default(), &bloque_pow(1)),
             Veredicto::Ignorar
@@ -193,11 +232,49 @@ mod tests {
 
     #[test]
     fn estado_y_lecturas_delegan_en_la_vista() {
+        let (_dir, reg) = registro();
         let (tx, _rx) = super::super::nueva_cola_trabajo_red();
         let vista = Arc::new(VistaRed::nueva(estado_vacio()));
-        let m = ManejadorRed::nuevo(tx, Arc::clone(&vista));
+        let m = ManejadorRed::nuevo(tx, Arc::clone(&vista), reg);
         assert_eq!(m.estado(), estado_vacio());
         assert!(m.cabeceras_desde(&[h(5)], None).is_empty());
         assert!(m.bloques_por_hash(&[h(5)]).is_empty());
+    }
+
+    /// `ORDEN-W07a` §1: con la cola de trabajo llena, un bloque difundido se descarta **sin
+    /// bloquear la red** y se traza `limite_alcanzado` (el único límite que `zx-node` ve descartar
+    /// algo; los internos de `zx-p2p` no son observables desde aquí).
+    #[test]
+    fn cola_llena_traza_el_limite_alcanzado() {
+        use super::super::ResultadoEnvioTrabajo;
+
+        let (dir, reg) = registro();
+        let (tx, _rx) = super::super::nueva_cola_trabajo_red();
+        for i in 0..super::super::MAX_TRABAJO_RED {
+            let resultado = tx.intentar_enviar(TrabajoRed::BloqueDifundido {
+                id: IdDiferido::default(),
+                bloque: bloque_pow((i % 200) as u8),
+                llegada: std::time::Instant::now(),
+            });
+            assert!(
+                matches!(resultado, ResultadoEnvioTrabajo::Encolado),
+                "la cola debe admitir hasta su tope declarado"
+            );
+        }
+        let m = ManejadorRed::nuevo(
+            tx,
+            Arc::new(VistaRed::nueva(estado_vacio())),
+            Arc::clone(&reg),
+        );
+        assert_eq!(
+            m.bloque_difundido(IdDiferido::default(), &bloque_pow(3)),
+            Veredicto::Ignorar
+        );
+        let texto =
+            std::fs::read_to_string(dir.path().join("registro.jsonl")).expect("leer registro");
+        assert!(
+            texto.contains("\"tipo\":\"limite_alcanzado\""),
+            "falta limite_alcanzado: {texto}"
+        );
     }
 }

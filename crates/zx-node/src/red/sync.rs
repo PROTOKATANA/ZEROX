@@ -22,7 +22,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use libp2p::PeerId;
 use tokio::sync::mpsc;
@@ -34,6 +34,7 @@ use zx_p2p::servicio::{EventoRed, ManejoRed};
 
 use super::vista::VistaRed;
 use super::{EmisorTrabajoRed, ResultadoEnvioTrabajo, TrabajoRed};
+use crate::registro::Registro;
 
 /// Cuántos hashes se piden a la vez en una `Peticion::Bloques` de sincronización (el tope del
 /// protocolo, no un valor propio: pedir más de golpe es un `Excedido` seguro).
@@ -85,6 +86,7 @@ pub async fn tarea_sincronizacion(
     manejo: ManejoRed,
     vista: Arc<VistaRed>,
     trabajo: EmisorTrabajoRed,
+    registro: Arc<Registro>,
 ) {
     let mut peers: HashMap<PeerId, EstadoPeer> = HashMap::new();
     let mut reintento = time::interval(PLAZO_REINTENTO_SALUDO);
@@ -98,12 +100,23 @@ pub async fn tarea_sincronizacion(
                 let Some(evento) = evento else { break; };
                 match evento {
                     EventoRed::PeerConectado(peer) => {
+                        // `ORDEN-W07a`: traza de conexión (no crítica). `direccion` no es
+                        // computable aquí (`EventoRed::PeerConectado` solo trae el `PeerId`), así
+                        // que el campo se omite (§0).
+                        let evento = registro
+                            .evento("par_conectado")
+                            .str("par", &peer.to_string());
+                        let _ = registro.escribir(evento, false);
                         peers.entry(peer).or_default();
                         if manejo.pedir(peer, Peticion::Estado).await.is_err() {
                             tracing::debug!(%peer, "no se pudo pedir el saludo: el bucle de red ya no está");
                         }
                     }
                     EventoRed::PeerDesconectado(peer) => {
+                        let evento = registro
+                            .evento("par_desconectado")
+                            .str("par", &peer.to_string());
+                        let _ = registro.escribir(evento, false);
                         peers.remove(&peer);
                     }
                     EventoRed::PeticionFallida { peer } => {
@@ -117,7 +130,7 @@ pub async fn tarea_sincronizacion(
                         pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
                     }
                     EventoRed::Respuesta { peer, respuesta, .. } => {
-                        atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await;
+                        atender_respuesta(&manejo, &vista, &trabajo, &registro, &mut peers, peer, *respuesta).await;
                         drenar_pendientes(peer, &mut peers, &trabajo);
                         pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
                     }
@@ -151,7 +164,11 @@ fn drenar_pendientes(
         return;
     };
     while let Some(bloque) = e.pendientes.pop_front() {
-        match trabajo.intentar_enviar(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque }) {
+        match trabajo.intentar_enviar(TrabajoRed::BloqueDeSincronizacion {
+            de: peer,
+            bloque,
+            llegada: Instant::now(),
+        }) {
             ResultadoEnvioTrabajo::Encolado => {
                 e.cursor = e.cursor.saturating_add(1);
             }
@@ -213,6 +230,7 @@ async fn atender_respuesta(
     manejo: &ManejoRed,
     vista: &VistaRed,
     trabajo: &EmisorTrabajoRed,
+    registro: &Registro,
     peers: &mut HashMap<PeerId, EstadoPeer>,
     peer: PeerId,
     respuesta: Respuesta,
@@ -222,6 +240,12 @@ async fn atender_respuesta(
             let nuestro = vista.estado();
             if otro.hash_genesis != nuestro.hash_genesis || otro.red != nuestro.red {
                 tracing::warn!(%peer, "génesis o red ajenos: desconectando");
+                let evento = registro
+                    .evento("par_penalizado")
+                    .str("par", &peer.to_string())
+                    .str("motivo", "génesis o red ajenos")
+                    .str("accion", "expulsion");
+                let _ = registro.escribir(evento, false);
                 manejo
                     .desconectar(peer, MotivoDesconexion::ViolacionDeConsenso)
                     .await
@@ -319,9 +343,11 @@ async fn atender_respuesta(
                 // el bloque perdido se recupera por la propia sincronización (el cursor no avanza
                 // hasta que el hilo de consenso procese, decisión 1) o por la petición de padres.
                 // Solo el canal **cerrado** (hilo de consenso muerto) termina esta tarea.
-                match trabajo
-                    .intentar_enviar(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque })
-                {
+                match trabajo.intentar_enviar(TrabajoRed::BloqueDeSincronizacion {
+                    de: peer,
+                    bloque,
+                    llegada: Instant::now(),
+                }) {
                     ResultadoEnvioTrabajo::Encolado => {}
                     ResultadoEnvioTrabajo::Lleno(_) => {
                         tracing::warn!(
