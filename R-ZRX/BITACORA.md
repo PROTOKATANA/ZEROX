@@ -367,3 +367,16 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   difundir antes de persistir). Decisión: admitir → persistir → difundir.
 - **W06d6 congelada y lanzada** (Sonnet, `394cb6e`): paso previo RI-3c, sincronización por registro de
   admisión, dial con reintento, V7, RI-3a, tests pendientes de W06d5 y parámetro de reposo.
+
+### 02:13–03:50 — SL-4c migrada; hallazgo FC-3 en el nodo
+
+- **SL-4c-R superada y SL-4c migrada** (`ec9c6b9`): primera suite conjunta W06d5 + SL-4b1 + SL-4c, 797/0/5;
+  diferenciales T01 v0.5 y T04 v0.6 con 0 discrepancias. V-ZRX registra los vectores vigentes.
+- **W06d6** (informe provisional, suite final en curso): nodo tardío **superado** (dos repeticiones, misma punta y
+  mismo `resumen_estado` tras el reposo); `zx-adversario` **superado**; la «partición PoST» se hizo aislando A
+  **desde el génesis** (otro escenario: E-6b) y destapó que **`zx-cadena` congela el terminal al primer bloque
+  PoST** y guarda un solo DAG: no es FC-3 (TRN-09, D-T03) y rompe I-3; dos terminales con sufijo PoST no
+  convergen nunca. **Error del director:** `SPEC-0.0.1` presentaba TRN-09 como validada con procesos reales
+  (W06d3 solo probó la bifurcación **antes** del primer PoST); corregido. **W06d7 redactada** (varios DAG, uno por
+  terminal; selección por `blue_work` con el desempate del motor; `C-FIN-01`; V6(b) de verdad). Límite
+  declarado de antemano: sin oráculo del caso multiterminal en DAG (T04-E al IPA).
