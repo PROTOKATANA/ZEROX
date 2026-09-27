@@ -119,6 +119,12 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
   `EvidenceTx` mal formada es forma (invalida el bloque); sincronización por registro de admisión; admitir → persistir
   → difundir; un DAG por terminal (FC-3); criterio del coste de registro reformulado.
 
+## 7 bis. Siguiente versión
+
+**0.0.2 = mecanismos de Filecoin** (decisión de Katana, 2026-09-27): registro de sectores, PoRep, auditorías y ciclo de
+vida en el DAG (`P-ZRX/PLAN-0.0.2.md`). Da el peso definitivo a la futura capa de votos (FV-D01) y la garantía por
+unidad de espacio.
+
 ## 8. Lo que 0.0.1 no mide ni afirma
 
 Red pública adversarial, latencia WAN, más de ~5 nodos, adversario con más espacio o hash que los honestos (solo

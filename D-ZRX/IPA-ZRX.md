@@ -105,6 +105,8 @@ V7). **Siguen:** SL-4b, W07 (`P-ZRX/P-MEDICION/ESCENARIOS-0.0.1.md`), SPEC-0.0.1
 Los encargos 01–05 existentes se escribieron antes de `AUTO-ZRX.md`; para lanzarlos hay que
 reescribirlos en la plantilla §6 (ENTRADA congelada, LINEO, límites de sesión) — fila E-09.
 
+**Katana, 2026-09-27: los mecanismos de Filecoin (D-01…D-05) son el objetivo de la versión 0.0.2** (`P-ZRX/PLAN-0.0.2.md`); en 0.0.1 quedan fuera (`SEC-0`).
+
 | ID | Problema | Estado | Prio | Depende de | Límite ya conocido | Siguiente encargo | Puerta |
 |---|---|---|---|---|---|---|---|
 | D-01 | Compromiso y alta de un sector real (encargo 01, G1) | **G1 superada** en su alcance (S01: pertenencia de la pieza al objeto comprometido; R2 32 B, apertura ~630 B, ~4,6 µs; `investigacion/01-formato-alta/REVISION.md`) | P1 | B-01 | RFT-03: R1/R2 no fechan | Encargo 01 en plantilla §6 | G1 |

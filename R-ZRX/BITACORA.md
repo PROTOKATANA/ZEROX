@@ -477,3 +477,5 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   medido `26312ff`). El «mismo estado» de cada repetición se verificará reabriendo cada nodo aislado con este binario.
 - **R1 completa** (3 repeticiones): E-1, E-2 (0 rechazos) y E-4 superados en las tres; E-3 pendiente de la verificación
   final. **R2 rep1**: nodo tardío sincronizado desde el génesis en ≈ 64 s.
+- 18:0x **Katana: 0.0.2 añadirá los mecanismos de Filecoin** (registro de sectores, PoRep, auditorías, ciclo de vida).
+  `P-ZRX/PLAN-0.0.2.md` creado; IPA (familia D) e informe final anotados.
