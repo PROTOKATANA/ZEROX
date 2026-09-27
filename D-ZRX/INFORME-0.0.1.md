@@ -125,9 +125,9 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
 
 ## 7 bis. Siguiente versión
 
-**0.0.2 = mecanismos de Filecoin** (decisión de Katana, 2026-09-27): registro de sectores, PoRep, auditorías y ciclo de
-vida en el DAG (`P-ZRX/PLAN-0.0.2.md`). Da el peso definitivo a la futura capa de votos (FV-D01) y la garantía por
-unidad de espacio.
+**Hoja de ruta (Katana, 2026-09-27; `P-ZRX/HOJA-DE-RUTA.md`):** 0.0.2 = mecanismos de Filecoin + relevo de
+transacciones + PoStake pendiente (garantía por espacio, disuasión comprobada, liquidez); 0.0.3 = finalidad por votos;
+0.0.4 = minero SHA3 para CPU (Rust) y GPU AMD (HIP).
 
 ## 8. Lo que 0.0.1 no mide ni afirma
 

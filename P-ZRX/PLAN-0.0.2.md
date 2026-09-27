@@ -1,4 +1,7 @@
-# Plan de 0.0.2 — mecanismos de Filecoin (registro de sectores, PoRep, auditorías)
+# Plan de 0.0.2 — mecanismos de Filecoin, relevo de transacciones y PoStake pendiente
+
+> **Hoja de ruta (Katana, 2026-09-27):** 0.0.2 = Filecoin + relevo de transacciones + PoStake pendiente; 0.0.3 = finalidad
+> por votos; 0.0.4 = minero. La sección «Minero PoW» de abajo es de **0.0.4** (`P-ZRX/HOJA-DE-RUTA.md`).
 
 **Decisión de Katana (2026-09-27):** la versión **0.0.2** añade los mecanismos de Filecoin que 0.0.1 dejó fuera
 (`SEC-0`). **Firma del plan:** Claude (director). **Estado:** esbozo; se desarrolla al cerrar 0.0.1.
@@ -36,9 +39,9 @@ RFT-03 (un compromiso no fecha nada), RFT-04 (sobre el formato actual, auditar n
 RFT-06 (ningún sellado separa ramas), RFT-14 (ningún mecanismo de Filecoin encarece de forma exigible el doble farmeo
 del atacante con espacio propio). Ningún parámetro de Filecoin se copia como parámetro de ZEROX (`AUTO-ZRX.md` §4).
 
-## Minero PoW (decisión de Katana, 2026-09-27)
+## Minero PoW (decisión de Katana, 2026-09-27) — **pasa a 0.0.4**
 
-**0.0.2 cambia el minero PoW:** SHA3-256, con minero **en Rust para CPU** y **en HIP para GPU AMD**, de modo que se
+**0.0.4 cambia el minero PoW** (antes previsto en 0.0.2): SHA3-256, con minero **en Rust para CPU** y **en HIP para GPU AMD**, de modo que se
 pueda minar en CPU y en GPU. Se **corrige y reutiliza** la base que ya existe: `caliza` (kernel HIP/CUDA) y `silicio`
 (bucle Rust), en `/home/katana/zeo/.trash/{caliza,silicio}/`. Con esto IPA A-12 queda decidido (SHA3-256) y A-11
 pasa de «previsto descartar» a «corregir y portar».
