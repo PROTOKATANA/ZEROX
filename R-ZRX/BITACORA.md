@@ -443,3 +443,7 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   minó 26 de ≈ 31 bloques PoW y cumplió `K_min = 3` solo; A y C llegaron al corte sin garantía y no produjeron nunca.
   Límite real del producto: **sin relevo de transacciones, quien no tiene garantía al corte queda excluido para
   siempre** (IPA A-14, informe). Arnés corregido a una clave por nodo (como el perfil dev y W06d4…SL-4b2).
+- 12:3x **Panic real del nodo** (W07b E-2a, intento 4; verificado en el código): el protocolo productor↔bucle pierde el
+  paso cuando un cambio de terminal interrumpe la espera (lo introdujo el paso 0 de SL-4b2) y una respuesta `Padres`
+  atrasada provoca `panic!`. **W06d8** (DeepSeek): peticiones numeradas, ningún pánico alcanzable, fallo del
+  productor = parada ordenada. W07b termina la calibración y espera el nuevo candidato para R1…R4 (repite E-0).
