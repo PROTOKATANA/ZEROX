@@ -1,0 +1,9 @@
+# HORAS.log — ORDEN-W07a (date -Is real)
+2026-09-27T05:07:39+02:00 inicio de sesion (reconocimiento, LINEO, entrada, copia ws.orig/ws)
+2026-09-27T05:07:39+02:00 FALTAS-DE-DEFINICION.md escrito antes de editar; instrumentacion en ws/
+2026-09-27T06:17:49+02:00 V1 suite completa: 818 passed / 1 failed (reinicio.rs); causa diagnosticada y corregida; reinicio.rs aislado 2/2 verde
+2026-09-27T06:17:49+02:00 V5 parcial: fmt --check limpio; dependencias-exactas y frontera-crates OK; clippy en curso
+2026-09-27T06:17:49+02:00 V3 lanzado (v3.sh, PIDs 9/12/15) con adversario
+2026-09-27T06:37:06+02:00 V2 registro_esquema 1/1 verde (83 lineas, 6 tipos en proceso)
+2026-09-27T06:37:06+02:00 V3 segundo intento 91 bloques PoST distintos (run/v3); V4 4376 ns/bloque vs 231025 ns mediana = 1.89%
+2026-09-27T06:37:06+02:00 V5 fmt/clippy/dependencias/frontera/lock verdes; cambios.patch y MIGRACION.sha256 (sha256sum -c verde); sin procesos vivos

@@ -65,3 +65,12 @@ Un CSV por nodo y ejecución, `recursos-<nodo>.csv`, una fila por segundo, leíd
 | Profundidad de reorganización | `profundidad_reorg`, `reorganizacion_pow` | parcial |
 | CPU, RSS, E/S y disco por nodo | CSV del §2 | no |
 | Duración del reinicio y de la puesta al día | `reinicio_completo`, `arranque`, `cambio_punta` | parcial |
+
+## 1 bis. Eventos de diagnóstico (añadido 2026-09-27, `REVISION-W07a.md`)
+
+El §1 fija el **mínimo**; el nodo puede escribir además eventos de diagnóstico, que el analizador ignora sin
+error (tipo desconocido). Se conservan estos, introducidos por W06d5/W06d6, con sus campos de entonces:
+`dejar_de_producir` (el nodo alcanza el slot de `--dejar-de-producir-en-slot`; **crítico**: marca el inicio
+del reposo), `bloque_red_pendiente`, `bloque_red_ignorado_sin_penalizar`,
+`bloque_post_gossip_descartado_sincronizando`, `bloque_propio_rechazado_legitimo` y
+`bloque_post_de_red_sin_terminal`. Ningún evento existente se retira sin decisión del director.
