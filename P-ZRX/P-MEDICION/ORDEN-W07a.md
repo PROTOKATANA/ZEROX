@@ -62,6 +62,12 @@ Patrón de las órdenes W (`P-ZRX/P-FORMATO/ORDEN-W02.md` §4): `ws.orig/`, `ws/
 demostrado, nombre de modelo que devuelve la API), `PROGRESO.md`, `HORAS.log` con `date -Is` real. Entorno
 como `deepseek/SL4a/env.sh` con tu zona; caché copiable de `deepseek/SL4a/.cargo-home`.
 
+**Convivencia con W06d7 (en paralelo):** otra orden reestructura `zx-cadena` (varios DAG, uno por terminal) y
+toca `nodo.rs`. Para que el rebase posterior sea mecánico: los accesos de lectura nuevos van en funciones
+**nuevas y aisladas** (al final de su `impl`, sin tocar las existentes); la instrumentación de `nodo.rs` añade
+líneas alrededor de las llamadas, sin mover ni reescribir código; **no modifiques `ws.orig/`** tras copiarlo.
+Tu V3 con procesos reales, corto y con `nice -n 19`. La base es la raíz en el commit de la entrada (con W06d6).
+
 **Límites de la sesión:** `deepseek-flash`, esfuerzo `high`, solo DeepSeek Harness; LINEO antes del código;
 ningún código Python; no cambias reglas ni eliges métricas (si falta una definición, para e informa **antes
 de editar**); nada fuera de tu zona; procesos de nodos en segundo plano con PID en `PROGRESO.md` y ninguno
