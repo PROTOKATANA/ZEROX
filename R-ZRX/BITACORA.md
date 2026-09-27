@@ -480,3 +480,8 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - 18:0x **Katana: 0.0.2 añadirá los mecanismos de Filecoin** (registro de sectores, PoRep, auditorías, ciclo de vida).
   `P-ZRX/PLAN-0.0.2.md` creado; IPA (familia D) e informe final anotados.
 - 18:2x **Katana: 0.0.2 cambia el minero PoW** (SHA3-256; Rust CPU + HIP GPU AMD; corregir y reutilizar `caliza` y `silicio`). A-12 decidido, A-11 pasa a portar; límite: no hay GPU AMD en la máquina de referencia. `PLAN-0.0.2.md` e IPA anotados.
+- 18:3x **Particiones que no lo eran.** W07b E-6 rep1: A «aislado» (relanzado en el mismo puerto, sin `--red-marcar`)
+  tuvo 2 conexiones y recibió 261 bloques de B y C durante la «partición». La misma técnica en **W06d7 V5 (V6(b))**:
+  su punta «aislada» coincidía con la de B/C → **no fue una partición real**; revisión de W06d7 y `SPEC-0.0.1`
+  corregidas (V6(b) no demostrada). W06d7 V4 (E-6b) sí fue real. W07b parada y corregida: puerto nuevo para el aislado y
+  criterio obligatorio de 0 conexiones y 0 bloques del otro lado en la ventana.

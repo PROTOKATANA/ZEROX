@@ -37,3 +37,13 @@ contaminada; el ejecutor lo detectó (hash idéntico imposible) y la repitió li
    perdedora tras una reunión con producción en marcha (no es un fallo de seguridad: sus bloques no desplazan
    la selección de los demás mientras su rama pese menos). **Se corrige en SL-4b2, paso 0** (toca el mismo bucle).
 2. Sin oráculo multiterminal independiente (T04-E, IPA); coste del tope de 8 terminales sin perfilar.
+
+## Corrección del director (2026-09-27 ≈ 18:30): la V5 (V6(b), mismo terminal) **no** fue una partición real
+
+Al revisar W07b (E-6 rep1, misma técnica) se vio que A «aislado» —relanzado **en el mismo puerto**, sin
+`--red-marcar`— recibía conexiones de B y C (que lo tenían en su `--red-marcar`) y admitía sus bloques. En W06d7 V5 rep2
+la punta de A «aislado» antes de reunir es **idéntica** a la de B/C (`d3d254dda09c…`, `run-v5-rep2/RESULTADO.txt`):
+imposible si hubieran estado separados 27 slots. **V5 queda «no demostrado» (sin aislamiento), no superado.** La V4
+(E-6b, terminales distintos) **sí** fue real: A arrancó sin marcar a nadie, nadie marcaba a A, y las puntas previas a la
+reunión eran distintas en las dos repeticiones. La partición con el mismo terminal se mide de nuevo en W07b con
+aislamiento verificable (puerto nuevo; 0 conexiones y 0 bloques del otro lado en la ventana).
