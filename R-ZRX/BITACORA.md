@@ -421,3 +421,9 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   faltan los unitarios de inclusión → **SL-4b3** (DeepSeek) lanzada ≈ 09:49, con un guardián de CI nuevo que
   impide que el nodo llame a productores sin firmante. Reserva: registros crudos de la prueba del paso 0 borrados
   por el ejecutor; W07b la repite.
+
+### 10:43–10:50 — SL-4b3 migrada; W07b lanzada
+
+- **SL-4b3 migrada** (`de7ae26`): transición con firmante, guardián `ci/firmante-obligatorio.sh`, tests de inclusión.
+- **Commit candidato de 0.0.1: `27dcfeb`.** **W07b** (Sonnet) congelada y lanzada: E-0 desde un clon limpio y E-1…E-9
+  con procesos reales, `N_dev` real, tres repeticiones. Mientras mide, nada pesado en la máquina.
