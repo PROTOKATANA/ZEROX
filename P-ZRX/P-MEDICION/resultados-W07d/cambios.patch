@@ -1,0 +1,833 @@
+diff -ruN '--exclude=target' '--exclude=.cargo-home' '--exclude=PDF' '--exclude=testdata' ws.orig/crates/zx-node/src/compendio.rs ws/crates/zx-node/src/compendio.rs
+--- ws.orig/crates/zx-node/src/compendio.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/compendio.rs	2026-09-27 16:52:18.632108644 +0200
+@@ -0,0 +1,126 @@
++//! Compendio de bloques admitidos (`ORDEN-W07d` decisión 1).
++//!
++//! `compendio_bloques` es un identificador de conjunto: `SHA3-256` de la concatenación de los
++//! hashes de **todos** los bloques admitidos (PoW y PoST), ordenados por bytes. Sirve para comparar
++//! el conjunto de bloques de dos nodos (o de dos aperturas) sin depender del orden de admisión, que
++//! en una red real no coincide entre nodos. No es un hash de consenso: es un instrumento de
++//! diagnóstico del registro.
++//!
++//! La orden no fija la codificación exacta; la falta de definición 2 de `FALTAS-DE-DEFINICION.md`
++//! adopta el hash en bruto (32 bytes, `BlockHash::as_bytes()`) y el resultado en hexadecimal
++//! minúsculo de 64 caracteres, igual que el resto del registro.
++
++use zx_core::digest::BlockHash;
++use zx_core::sha3_256_publico;
++use zx_storage::{Almacen, ErrorRepeticion, StorageError};
++
++/// `SHA3-256` de la concatenación de `hashes` ordenados por bytes.
++///
++/// El orden lexicográfico de bytes (`BlockHash` deriva `Ord` sobre `[u8; 32]`) hace el compendio
++/// independiente del orden de admisión: la propiedad que exige la orden.
++#[must_use]
++pub fn compendio_de_hashes(hashes: &[BlockHash]) -> String {
++    let mut ordenados: Vec<BlockHash> = hashes.to_vec();
++    ordenados.sort_unstable_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
++    let mut bytes = Vec::with_capacity(ordenados.len() * 32);
++    for hash in &ordenados {
++        bytes.extend_from_slice(hash.as_bytes());
++    }
++    sha3_256_publico(&bytes).to_string()
++}
++
++/// Reúne todos los hashes admitidos del almacén y devuelve su compendio.
++///
++/// # Errores
++/// El error de E/S del almacén al recorrer su registro ([`StorageError`]).
++pub fn compendio_de_almacen<A: Almacen>(almacen: &A) -> Result<String, StorageError> {
++    let mut hashes: Vec<BlockHash> = Vec::new();
++    let resultado: Result<(), ErrorRepeticion<std::convert::Infallible>> =
++        almacen.repetir(&mut |hash, _valor| {
++            hashes.push(hash);
++            Ok(())
++        });
++    match resultado {
++        Ok(()) => Ok(compendio_de_hashes(&hashes)),
++        Err(ErrorRepeticion::Almacen(e)) => Err(e),
++        // `Infallible` no tiene valores: el destino de esta repetición no puede fallar.
++        Err(ErrorRepeticion::Destino(imposible)) => match imposible {},
++    }
++}
++
++#[cfg(test)]
++#[allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    reason = "los tests fallan con panic por diseño"
++)]
++mod tests {
++    use super::{compendio_de_almacen, compendio_de_hashes};
++    use zx_core::digest::{BlockHash, Digest};
++    use zx_core::preimage::block::{BlockHeader, merkle_root};
++    use zx_core::red::Red;
++    use zx_storage::{Almacen, AlmacenEnMemoria, BloqueAdmitido};
++
++    fn genesis() -> BlockHash {
++        BlockHash::from_digest(Digest::from_bytes([0; 32]))
++    }
++
++    fn cabecera(nonce: u64) -> BlockHeader {
++        BlockHeader {
++            consensus_branch_id: zx_core::CBID_RED_DEV,
++            prev_hash: BlockHash::from_digest(Digest::from_bytes([0x11; 32])),
++            merkle_root: merkle_root(&[]),
++            timestamp: 1_788_480_000 + nonce,
++            bits: 0x1d00_ffff,
++            nonce,
++            height: 1,
++        }
++    }
++
++    fn bloque(nonce: u64) -> BloqueAdmitido<'static> {
++        BloqueAdmitido::pow(&cabecera(nonce), &[], &[])
++    }
++
++    #[test]
++    fn el_compendio_no_depende_del_orden_de_los_hashes() {
++        let a = bloque(0).hash();
++        let b = bloque(1).hash();
++        let c = bloque(2).hash();
++        let directo = compendio_de_hashes(&[a, b, c]);
++        assert_eq!(directo, compendio_de_hashes(&[c, b, a]));
++        assert_eq!(directo, compendio_de_hashes(&[b, c, a]));
++    }
++
++    #[test]
++    fn el_compendio_cambia_si_cambia_el_conjunto() {
++        let a = bloque(0).hash();
++        let b = bloque(1).hash();
++        assert_ne!(
++            compendio_de_hashes(&[a, b]),
++            compendio_de_hashes(&[a, b, bloque(2).hash()])
++        );
++    }
++
++    #[test]
++    fn dos_almacenes_con_el_mismo_conjunto_en_orden_distinto_coinciden() {
++        let b0 = bloque(0);
++        let b1 = bloque(1);
++        let b2 = bloque(2);
++
++        let en_orden = AlmacenEnMemoria::nuevo(Red::Dev, genesis());
++        en_orden.admitir(&b0, true).unwrap();
++        en_orden.admitir(&b1, true).unwrap();
++        en_orden.admitir(&b2, true).unwrap();
++
++        let invertido = AlmacenEnMemoria::nuevo(Red::Dev, genesis());
++        invertido.admitir(&b2, true).unwrap();
++        invertido.admitir(&b0, true).unwrap();
++        invertido.admitir(&b1, true).unwrap();
++
++        assert_eq!(
++            compendio_de_almacen(&en_orden).unwrap(),
++            compendio_de_almacen(&invertido).unwrap()
++        );
++    }
++}
+diff -ruN '--exclude=target' '--exclude=.cargo-home' '--exclude=PDF' '--exclude=testdata' ws.orig/crates/zx-node/src/lib.rs ws/crates/zx-node/src/lib.rs
+--- ws.orig/crates/zx-node/src/lib.rs	2026-09-27 16:46:20.000000000 +0200
++++ ws/crates/zx-node/src/lib.rs	2026-09-27 16:52:29.639340235 +0200
+@@ -9,12 +9,14 @@
+ 
+ pub mod claves;
+ pub mod cli;
++pub mod compendio;
+ pub mod error;
+ pub mod estado_resumen;
+ pub mod evidencia;
+ pub mod identidad;
+ pub mod nodo;
+ pub mod padres;
++pub mod parada;
+ pub mod perfil;
+ pub mod pow;
+ pub mod rechazo;
+diff -ruN '--exclude=target' '--exclude=.cargo-home' '--exclude=PDF' '--exclude=testdata' ws.orig/crates/zx-node/src/main.rs ws/crates/zx-node/src/main.rs
+--- ws.orig/crates/zx-node/src/main.rs	2026-09-27 16:46:20.000000000 +0200
++++ ws/crates/zx-node/src/main.rs	2026-09-27 16:53:31.908650378 +0200
+@@ -53,6 +53,15 @@
+         dejar_de_producir_en_slot: cli.dejar_de_producir_en_slot,
+     };
+ 
++    // `ORDEN-W07d` decisión 2: parada ordenada con `SIGTERM`/`SIGINT`. Se instala antes de abrir el
++    // nodo para que una señal durante el arranque (la repetición del almacén puede ser larga) quede
++    // marcada y `ejecutar` escriba `parada` en cuanto empiece. Si no se puede instalar, el nodo no
++    // arranca: sin manejo, una señal mataría el proceso a mitad de escritura.
++    if let Err(e) = zx_node::parada::instalar() {
++        eprintln!("zx-node: no se pudo instalar el manejo de señales: {e}");
++        std::process::exit(1);
++    }
++
+     let mut nodo = match Nodo::arrancar(&cfg) {
+         Ok(n) => n,
+         Err(e) => {
+@@ -60,7 +69,6 @@
+             std::process::exit(1);
+         }
+     };
+-
+     // `_red_arrancada` se mantiene viva hasta el final de `main`: soltar el runtime `tokio` que
+     // contiene cancelaría el bucle de red y la sincronización (decisión 1/4 de `ORDEN-W06d2`).
+     let _red_arrancada = if con_red {
+diff -ruN '--exclude=target' '--exclude=.cargo-home' '--exclude=PDF' '--exclude=testdata' ws.orig/crates/zx-node/src/nodo.rs ws/crates/zx-node/src/nodo.rs
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-27 16:46:20.000000000 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-27 16:54:38.929074675 +0200
+@@ -40,10 +40,12 @@
+ use zx_storage::{Almacen, BloqueAdmitido, ErrorRepeticion, Familia};
+ 
+ use crate::claves::ClaveDev;
++use crate::compendio::compendio_de_almacen;
+ use crate::error::{ErrorNodo, ResultadoNodo};
+ use crate::estado_resumen::resumen_estado;
+ use crate::identidad::identidad_de_cabecera_post;
+ use crate::padres::padres_de_regimen;
++use crate::parada;
+ use crate::perfil;
+ use crate::pow;
+ use crate::red::huerfanos::DepositoHuerfanos;
+@@ -490,11 +492,61 @@
+         // `self.servicios_verificacion` ya reflejan toda la historia (necesarios para calcular
+         // `slot_actual`).
+         self.abrir_registro_firmante_tras_reinicio()?;
++        // `ORDEN-W07d` decisión 1: el resumen del estado virtual **después** de repetir todo el
++        // almacén, más la punta, el conteo de bloques y el compendio de todos los admitidos. El
++        // resumen usa la misma función que `cambio_punta`; el compendio, el registro persistido
++        // completo (PoW y PoST).
++        let (punta, resumen, n_bloques_dag, compendio) = self.campos_estado_final()?;
+         self.registro.escribir(
+             self.registro
+                 .evento("reinicio_completo")
+                 .u64("bloques_repetidos", indice)
+-                .u64("duracion_ns", inicio.elapsed().as_nanos() as u64),
++                .u64("duracion_ns", inicio.elapsed().as_nanos() as u64)
++                .str("punta", &punta)
++                .str("resumen_estado", &resumen)
++                .u64("n_bloques_dag", n_bloques_dag)
++                .str("compendio_bloques", &compendio),
++            true,
++        )?;
++        Ok(())
++    }
++
++    /// Campos del estado final para `reinicio_completo` y `parada` (`ORDEN-W07d` decisiones 1 y 2):
++    /// `(punta, resumen_estado, n_bloques_dag, compendio_bloques)`.
++    ///
++    /// `punta` es `mejor_punta().or(terminal())`, la misma expresión que `cambio_punta`; si no hay
++    /// ninguna (fase PoW pura) queda vacía (falta de definición 3). `n_bloques_dag` es
++    /// `Cadena::bloques_admitidos()`, la definición que ya usa el esquema v1. El compendio sale del
++    /// almacén persistido, que incluye el génesis (falta de definición 1).
++    fn campos_estado_final(&self) -> ResultadoNodo<(String, String, u64, String)> {
++        let punta = self.cadena.mejor_punta().or(self.cadena.terminal());
++        let estado = self
++            .cadena
++            .estado_virtual()
++            .map_err(|m| ErrorNodo::Otro(format!("estado virtual: {m}")))?;
++        let resumen = resumen_estado(&estado);
++        let n_bloques_dag = self.cadena.bloques_admitidos();
++        let compendio = compendio_de_almacen(&self.almacen).map_err(ErrorNodo::Almacen)?;
++        Ok((
++            punta.map(|h| h.to_string()).unwrap_or_default(),
++            resumen,
++            n_bloques_dag,
++            compendio,
++        ))
++    }
++
++    /// Escribe el evento crítico `parada` (`ORDEN-W07d` decisión 2) con el estado final calculado
++    /// en ese momento.
++    fn escribir_parada(&self, motivo: &str) -> ResultadoNodo<()> {
++        let (punta, resumen, n_bloques_dag, compendio) = self.campos_estado_final()?;
++        self.registro.escribir(
++            self.registro
++                .evento("parada")
++                .str("motivo", motivo)
++                .str("punta", &punta)
++                .str("resumen_estado", &resumen)
++                .u64("n_bloques_dag", n_bloques_dag)
++                .str("compendio_bloques", &compendio),
+             true,
+         )?;
+         Ok(())
+@@ -2094,6 +2146,13 @@
+         let hilo = thread::spawn(move || pow::hilo_minero(rx_trabajo, tx_minado));
+ 
+         loop {
++            // `ORDEN-W07d` decisión 2: parada ordenada por señal. Se cierra el canal del minero (el
++            // hilo termina tras su búsqueda en curso) y se sale para que `ejecutar` escriba `parada`.
++            if parada::hay_solicitud() {
++                drop(tx_trabajo);
++                drop(hilo);
++                return Ok(());
++            }
+             #[expect(
+                 clippy::indexing_slicing,
+                 reason = "historial_pow siempre tiene al menos el génesis"
+@@ -2139,8 +2198,23 @@
+                     "el hilo minero terminó inesperadamente".to_string(),
+                 ));
+             }
+-            let Ok(cabecera_minada) = rx_minado.recv() else {
+-                return Err(ErrorNodo::Otro("el hilo minero cerró el canal".to_string()));
++            // `ORDEN-W07d` decisión 2: `recv_timeout` en vez de `recv` para atender la señal
++            // mientras el minero busca trabajo; un timeout no es una desconexión, solo se vuelve a
++            // esperar. No cambia ninguna decisión del nodo.
++            let cabecera_minada = loop {
++                match rx_minado.recv_timeout(std::time::Duration::from_millis(50)) {
++                    Ok(cabecera) => break cabecera,
++                    Err(mpsc::RecvTimeoutError::Timeout) => {
++                        if parada::hay_solicitud() {
++                            drop(tx_trabajo);
++                            drop(hilo);
++                            return Ok(());
++                        }
++                    }
++                    Err(mpsc::RecvTimeoutError::Disconnected) => {
++                        return Err(ErrorNodo::Otro("el hilo minero cerró el canal".to_string()));
++                    }
++                }
+             };
+             // Se drena el trabajo de red **entre** intentos de minado, nunca durante uno: si se
+             // interleara mientras `rx_minado` está bloqueado, un bloque de red podría admitirse a
+@@ -2291,6 +2365,11 @@
+             // hilo productor de régimen retomará la producción en los slots siguientes en cuanto la
+             // transición esté en la cadena.
+             while self.cadena.tips_validas().is_empty() {
++                // `ORDEN-W07d` decisión 2: la parada por señal también se atiende aquí, antes de
++                // arrancar el hilo productor.
++                if parada::hay_solicitud() {
++                    return Ok(());
++                }
+                 self.procesar_trabajo_red_pendiente();
+                 std::thread::sleep(std::time::Duration::from_millis(50));
+             }
+@@ -2359,6 +2438,13 @@
+         // (decisión 1/3/4 de `ORDEN-W06d2`), o un bloque de red llegaría y esperaría sin motivo
+         // hasta el siguiente mensaje del hilo productor.
+         loop {
++            // `ORDEN-W07d` decisión 2: parada ordenada por señal. Se le pide al productor que pare
++            // (responde a `Parar` en su `esperar`) y se sale del bucle; el `join` de abajo lo
++            // espera.
++            if parada::hay_solicitud() {
++                let _ = tx_a_productor.send(MsgBucle::Parar);
++                break;
++            }
+             let msg = match rx_en_bucle.recv_timeout(std::time::Duration::from_millis(50)) {
+                 Ok(m) => m,
+                 Err(mpsc::RecvTimeoutError::Timeout) => {
+@@ -2615,6 +2701,11 @@
+                 .unwrap_or_else(|| "panic sin mensaje representable".to_string());
+             return self.fallo_productor(&format!("el hilo productor terminó con panic: {motivo}"));
+         }
++        // `ORDEN-W07d` decisión 2: si la parada la pidió una señal, no se entra en el reposo
++        // indefinido de `--dejar-de-producir-en-slot`; `ejecutar` escribe `parada` y sale con 0.
++        if parada::hay_solicitud() {
++            return Ok(());
++        }
+         // `ORDEN-W06d6` decisión 6: si lo que paró de producir fue **solo**
+         // `--dejar-de-producir-en-slot` (no `--parada-tras-slots`), el nodo entero **no** termina
+         // aquí: sigue vivo, validando, propagando y sincronizando, para poder compararse en reposo
+@@ -2627,6 +2718,9 @@
+             );
+             self.registro.escribir(evento, false)?;
+             loop {
++                if parada::hay_solicitud() {
++                    return Ok(());
++                }
+                 self.procesar_trabajo_red_pendiente();
+                 std::thread::sleep(std::time::Duration::from_millis(50));
+             }
+@@ -2698,12 +2792,24 @@
+             }
+         };
+         let hash = bloque.cabecera.block_hash();
++        let slot = bloque.cabecera.slot;
+         self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)?;
+         // `ORDEN-W07a`: el bloque de transición es un PoST propio admitido y persistido, pero **no**
+         // se registra como `bloque_producido`: la base (W06d1…W06d6) no lo hacía y el §1 no fija su
+         // `retraso_slot_ns` (no hay hilo productor). Emitirlo antes de que `fase_regimen` abra y
+         // plotee las parcelas cambiaba el instante del primer `bloque_producido` y rompía la
+         // verificación de reinicio tras `SIGKILL` (`reinicio.rs`): se conserva el comportamiento.
++        //
++        // `ORDEN-W07d` decisión 3: sí se registra como **diagnóstico** con un tipo propio,
++        // `bloque_transicion_producido`, para que el bloque de transición no quede sin rastro sin
++        // alterar lo que prueba `reinicio.rs` (que cuenta `bloque_producido`).
++        self.registro.escribir(
++            self.registro
++                .evento("bloque_transicion_producido")
++                .str("hash", &hash.to_string())
++                .u64("slot", slot),
++            false,
++        )?;
+         self.difundir_si_hay_red(hash);
+         Ok(())
+     }
+@@ -2769,15 +2875,24 @@
+         self.registro.escribir(evento, true)?;
+ 
+         self.fase_pow()?;
++        // `ORDEN-W07d` decisión 2: una señal durante la fase PoW detiene el proceso **sin** entrar
++        // en régimen (todavía no hay terminal y `fase_regimen` fallaría con «fase_regimen sin
++        // terminal»). El flag ya está puesto, así que el motivo es de señal.
++        if let Some(motivo) = parada::motivo_solicitado() {
++            self.escribir_parada(motivo)?;
++            return Ok(());
++        }
+         self.fase_regimen()?;
+-        // `ORDEN-W07a` §1: `parada`, salida ordenada (crítico).
+-        let motivo = if self.parada_tras_slots.is_some() {
++        // `ORDEN-W07a` §1 y `ORDEN-W07d` decisión 2: `parada`, salida ordenada (crítico). Si la
++        // pidió una señal, ese es el motivo; si no, el final normal de la fase.
++        let motivo = if let Some(motivo) = parada::motivo_solicitado() {
++            motivo
++        } else if self.parada_tras_slots.is_some() {
+             "parada_tras_slots"
+         } else {
+             "fin"
+         };
+-        self.registro
+-            .escribir(self.registro.evento("parada").str("motivo", motivo), true)?;
++        self.escribir_parada(motivo)?;
+         Ok(())
+     }
+ 
+diff -ruN '--exclude=target' '--exclude=.cargo-home' '--exclude=PDF' '--exclude=testdata' ws.orig/crates/zx-node/src/parada.rs ws/crates/zx-node/src/parada.rs
+--- ws.orig/crates/zx-node/src/parada.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/src/parada.rs	2026-09-27 16:52:26.967284015 +0200
+@@ -0,0 +1,113 @@
++//! Parada ordenada por señal (`ORDEN-W07d` decisión 2).
++//!
++//! El bucle de consenso es síncrono; para que un `SIGTERM`/`SIGINT` no mate el proceso con el
++//! registro a medias, el manejador solo deja un flag atómico y los bucles de `Nodo` lo consultan en
++//! sus esperas (timeouts de canal y `sleep`). Al verlo, `Nodo::ejecutar` escribe el evento crítico
++//! `parada` con el estado final y sale con código 0.
++//!
++//! No se añade ninguna dependencia: el manejador se instala con `signal(2)` de la libc, que Rust ya
++//! enlaza en Linux. El `unsafe` queda confinado aquí y acotado a dos llamadas.
++
++use std::sync::atomic::{AtomicU8, Ordering};
++
++/// `SIGINT` en Linux.
++const SIGINT: i32 = 2;
++/// `SIGTERM` en Linux.
++const SIGTERM: i32 = 15;
++
++/// Motivo de parada solicitado: `0` = ninguno, `1` = `SIGTERM`, `2` = `SIGINT`.
++static MOTIVO: AtomicU8 = AtomicU8::new(0);
++
++/// Manejador de señal: solo guarda el motivo. Es `async-signal-safe` porque `AtomicU8::store` es una
++/// escritura sin cerrojos (el tipo es siempre *lock-free*).
++#[expect(
++    unsafe_code,
++    reason = "manejador de señal: la libc lo invoca desde contexto asíncrono (ORDEN-W07d)"
++)]
++unsafe extern "C" fn manejador(senal: i32) {
++    let motivo = match senal {
++        SIGTERM => 1,
++        SIGINT => 2,
++        _ => 0,
++    };
++    MOTIVO.store(motivo, Ordering::SeqCst);
++}
++
++#[expect(
++    unsafe_code,
++    reason = "declaración de la libc: no se añade dependencia para dos llamadas (ORDEN-W07d)"
++)]
++unsafe extern "C" {
++    /// `sighandler_t signal(int signum, sighandler_t handler)` de la libc.
++    fn signal(signum: i32, handler: unsafe extern "C" fn(i32)) -> usize;
++}
++
++/// Instala los manejadores de `SIGTERM` y `SIGINT`.
++///
++/// # Errores
++/// Texto con la señal que no se pudo instalar (`signal` devolvió `SIG_ERR`).
++#[expect(
++    unsafe_code,
++    reason = "instalación de los dos manejadores con `signal` (ORDEN-W07d)"
++)]
++pub fn instalar() -> Result<(), String> {
++    for (senal, nombre) in [(SIGTERM, "SIGTERM"), (SIGINT, "SIGINT")] {
++        // `SIG_ERR` es `(void (*)(int))-1`; en un `usize` es `usize::MAX`. El manejador nunca vale
++        // eso (es una función real), así que la comparación distingue el fallo.
++        let anterior = unsafe { signal(senal, manejador) };
++        if anterior == usize::MAX {
++            return Err(format!("signal({nombre}) devolvió SIG_ERR"));
++        }
++    }
++    Ok(())
++}
++
++/// `true` si se pidió parada por señal.
++#[must_use]
++pub fn hay_solicitud() -> bool {
++    MOTIVO.load(Ordering::SeqCst) != 0
++}
++
++/// El motivo de la parada solicitada, si la hay: `"sigterm"` o `"sigint"`.
++#[must_use]
++pub fn motivo_solicitado() -> Option<&'static str> {
++    match MOTIVO.load(Ordering::SeqCst) {
++        1 => Some("sigterm"),
++        2 => Some("sigint"),
++        _ => None,
++    }
++}
++
++#[cfg(test)]
++#[allow(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::panic,
++    reason = "los tests fallan con panic por diseño"
++)]
++mod tests {
++    use super::{MOTIVO, hay_solicitud, motivo_solicitado};
++    use std::sync::atomic::Ordering;
++
++    #[test]
++    fn sin_solicitud_no_hay_motivo() {
++        // El flag es global al proceso; se deja en 0 explícitamente para que el test no dependa del
++        // orden con otros tests.
++        MOTIVO.store(0, Ordering::SeqCst);
++        assert!(!hay_solicitud());
++        assert_eq!(motivo_solicitado(), None);
++    }
++
++    #[test]
++    fn cada_motivo_se_lee_como_su_literal() {
++        MOTIVO.store(1, Ordering::SeqCst);
++        assert!(hay_solicitud());
++        assert_eq!(motivo_solicitado(), Some("sigterm"));
++
++        MOTIVO.store(2, Ordering::SeqCst);
++        assert!(hay_solicitud());
++        assert_eq!(motivo_solicitado(), Some("sigint"));
++
++        MOTIVO.store(0, Ordering::SeqCst);
++    }
++}
+diff -ruN '--exclude=target' '--exclude=.cargo-home' '--exclude=PDF' '--exclude=testdata' ws.orig/crates/zx-node/tests/registro_esquema.rs ws/crates/zx-node/tests/registro_esquema.rs
+--- ws.orig/crates/zx-node/tests/registro_esquema.rs	2026-09-27 16:46:20.000000000 +0200
++++ ws/crates/zx-node/tests/registro_esquema.rs	2026-09-27 16:53:37.633770837 +0200
+@@ -43,7 +43,14 @@
+ fn campos_del_tipo(tipo: &str, familia: Option<&str>) -> Option<&'static [&'static str]> {
+     match tipo {
+         "arranque" => Some(&["version_esquema", "n_dev", "sr_dev", "claves", "modo"]),
+-        "reinicio_completo" => Some(&["bloques_repetidos", "duracion_ns"]),
++        "reinicio_completo" => Some(&[
++            "bloques_repetidos",
++            "duracion_ns",
++            "punta",
++            "resumen_estado",
++            "n_bloques_dag",
++            "compendio_bloques",
++        ]),
+         "bloque_minado" => Some(&["hash", "altura", "bytes", "n_txs"]),
+         "bloque_producido" => Some(&[
+             "hash",
+@@ -95,10 +102,19 @@
+         "par_conectado" | "par_desconectado" => Some(&["par"]),
+         "par_penalizado" => Some(&["par", "motivo", "accion"]),
+         "limite_alcanzado" => Some(&["limite", "detalle"]),
+-        "parada" => Some(&["motivo"]),
++        "parada" => Some(&[
++            "motivo",
++            "punta",
++            "resumen_estado",
++            "n_bloques_dag",
++            "compendio_bloques",
++        ]),
+         // `ESQUEMA-REGISTRO-v1.md` §1 bis: eventos de diagnóstico restaurados por `ORDEN-W07a-R`
+         // (el analizador los ignora sin error; aquí se validan sus campos como los del §1).
+         "dejar_de_producir" => Some(&["motivo"]),
++        // `ORDEN-W07d` decisión 3: el bloque de transición propio ya no queda sin rastro; tipo
++        // propio para no alterar lo que cuenta `reinicio.rs`.
++        "bloque_transicion_producido" => Some(&["hash", "slot"]),
+         "bloque_red_pendiente" => Some(&["hash", "familia", "motivo", "veredicto"]),
+         "bloque_red_ignorado_sin_penalizar" => Some(&["hash", "familia", "motivo"]),
+         "bloque_post_gossip_descartado_sincronizando" => Some(&["hash", "padre_ausente"]),
+diff -ruN '--exclude=target' '--exclude=.cargo-home' '--exclude=PDF' '--exclude=testdata' ws.orig/crates/zx-node/tests/w07d_estado_final.rs ws/crates/zx-node/tests/w07d_estado_final.rs
+--- ws.orig/crates/zx-node/tests/w07d_estado_final.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/w07d_estado_final.rs	2026-09-27 16:57:02.058071912 +0200
+@@ -0,0 +1,276 @@
++//! `ORDEN-W07d`: registro del estado final.
++//!
++//! - **reinicio_completo**: al reabrir, el `resumen_estado` del evento coincide con el estado
++//!   virtual que calcula el propio nodo, y lleva `punta`, `n_bloques_dag` y `compendio_bloques`.
++//! - **compendio_bloques / resumen_estado**: el mismo conjunto de bloques admitidos en órdenes
++//!   distintos da el mismo compendio y el mismo resumen (las funciones exactas que usan los nodos).
++//! - **parada por SIGTERM**: un proceso real atiende la señal, escribe `parada` (crítico) y sale con
++//!   código 0.
++//!
++//! Límite declarado (falta de definición 10): no se levantan dos procesos reales con el mismo
++//! conjunto en órdenes distintos; se comprueba sobre `compendio_de_almacen` y `resumen_estado`, que
++//! son las funciones que esos nodos invocarían.
++
++#![expect(
++    clippy::expect_used,
++    clippy::panic,
++    reason = "el test falla con panic por diseño"
++)]
++
++use std::path::Path;
++use std::process::{Child, Command, Stdio};
++use std::time::{Duration, Instant};
++
++use zx_consensus::transicion::{EntradaUtxo, Estado, Origen, Punto};
++use zx_core::digest::{BlockHash, Digest};
++use zx_core::preimage::block::{BlockHeader, merkle_root};
++use zx_core::red::Red;
++use zx_core::{Amount, ClavePublica, Lock, OutPoint, TxId};
++use zx_node::compendio::compendio_de_almacen;
++use zx_node::estado_resumen::resumen_estado;
++use zx_node::nodo::{Config, Nodo};
++use zx_storage::{Almacen, AlmacenEnMemoria, BloqueAdmitido};
++
++const N_DEV_TEST: u64 = 32;
++const SR_DEV_TEST: u64 = u64::MAX;
++
++fn config_de_test(dir: &Path, parada_tras_slots: u64) -> Config {
++    Config {
++        dir_datos: dir.join("datos"),
++        ruta_registro: dir.join("registro.jsonl"),
++        red: Red::Dev,
++        semilla: 0x1234,
++        indices_claves: vec![0, 1, 2],
++        n_dev: N_DEV_TEST,
++        sr_dev: SR_DEV_TEST,
++        parada_tras_slots: Some(parada_tras_slots),
++        dejar_de_producir_en_slot: None,
++    }
++}
++
++fn lanzar(dir: &Path, parada_tras_slots: u64) -> Child {
++    Command::new(env!("CARGO_BIN_EXE_zx-node"))
++        .args([
++            "--datos",
++            dir.join("datos").to_str().expect("ruta"),
++            "--registro",
++            dir.join("registro.jsonl").to_str().expect("ruta"),
++            "--red",
++            "dev",
++            "--semilla",
++            "4660", // 0x1234
++            "--claves",
++            "0,1,2",
++            "--n-dev",
++            "32",
++            "--sr-dev",
++            "18446744073709551615",
++            "--parada-tras-slots",
++            &parada_tras_slots.to_string(),
++        ])
++        .stdout(Stdio::null())
++        .stderr(Stdio::null())
++        .spawn()
++        .expect("lanza zx-node")
++}
++
++/// Espera a que el registro contenga `aguja` (texto JSON exacto, p. ej. `"bloque_minado"`).
++fn esperar_aguja(ruta_registro: &Path, aguja: &str, plazo_seg: u64) {
++    let limite = Instant::now() + Duration::from_secs(plazo_seg);
++    loop {
++        let contenido = std::fs::read_to_string(ruta_registro).unwrap_or_default();
++        if contenido.contains(aguja) {
++            return;
++        }
++        assert!(
++            Instant::now() < limite,
++            "no se observó {aguja} en {plazo_seg} s"
++        );
++        std::thread::sleep(Duration::from_millis(20));
++    }
++}
++
++/// Valor crudo de `"clave":valor` en una línea JSON plana (cadena sin escapes o número).
++fn campo(linea: &str, clave: &str) -> String {
++    let patron = format!("\"{clave}\":");
++    let inicio = linea
++        .find(&patron)
++        .unwrap_or_else(|| panic!("sin el campo {clave}: {linea}"))
++        + patron.len();
++    let resto = &linea[inicio..];
++    if let Some(sin_comilla) = resto.strip_prefix('"') {
++        let fin = sin_comilla
++            .find('"')
++            .unwrap_or_else(|| panic!("cadena sin cerrar: {linea}"));
++        sin_comilla[..fin].to_string()
++    } else {
++        let fin = resto
++            .find([',', '}'])
++            .unwrap_or_else(|| panic!("valor sin cerrar: {linea}"));
++        resto[..fin].to_string()
++    }
++}
++
++fn es_hex64(v: &str) -> bool {
++    v.len() == 64 && v.bytes().all(|b| b.is_ascii_hexdigit())
++}
++
++/// Última línea del registro con `tipo`.
++fn ultima_de_tipo(contenido: &str, tipo: &str) -> String {
++    contenido
++        .lines()
++        .rev()
++        .find(|l| l.contains(&format!("\"tipo\":\"{tipo}\"")))
++        .unwrap_or_else(|| panic!("no hay ningún evento {tipo}"))
++        .to_string()
++}
++
++/// Bloque PoW sintético para el test de determinismo (mismo patrón que `zx-storage`).
++fn bloque_sintetico(nonce: u64) -> BloqueAdmitido<'static> {
++    let cabecera = BlockHeader {
++        consensus_branch_id: zx_core::CBID_RED_DEV,
++        prev_hash: BlockHash::from_digest(Digest::from_bytes([0x11; 32])),
++        merkle_root: merkle_root(&[]),
++        timestamp: 1_788_480_000 + nonce,
++        bits: 0x1d00_ffff,
++        nonce,
++        height: 1,
++    };
++    BloqueAdmitido::pow(&cabecera, &[], &[])
++}
++
++fn entrada_utxo(valor: i64) -> EntradaUtxo {
++    EntradaUtxo {
++        valor: Amount::nuevo(valor).expect("importe válido"),
++        lock: Lock::PubKey {
++            pubkey: ClavePublica::desde_bytes([0xAA; 32]),
++        },
++        origen: Origen::Tx,
++        creada: Punto::Altura(3),
++    }
++}
++
++fn outpoint(marca: u8) -> OutPoint {
++    OutPoint {
++        prev_txid: TxId::from_digest(Digest::from_bytes([marca; 32])),
++        prev_index: u32::from(marca),
++    }
++}
++
++#[test]
++fn reinicio_completo_coincide_con_el_estado_virtual_reabierto() {
++    let dir = tempfile::tempdir().expect("tempdir");
++    let cfg = config_de_test(dir.path(), 100_000);
++
++    // Proceso real: basta un bloque PoW persistido; luego SIGKILL para forzar la repetición.
++    let mut hijo = lanzar(dir.path(), 100_000);
++    esperar_aguja(&cfg.ruta_registro, "\"bloque_minado\"", 180);
++    hijo.kill().expect("mata al hijo");
++    hijo.wait().expect("lo entierra");
++
++    // Reabrir repite el almacén y escribe `reinicio_completo` con los campos nuevos.
++    let nodo = Nodo::arrancar(&cfg).expect("reabrir y repetir el almacén");
++    let punta = nodo
++        .cadena()
++        .mejor_punta()
++        .or(nodo.cadena().terminal())
++        .map(|h| h.to_string())
++        .unwrap_or_default();
++    let resumen_esperado = nodo
++        .resumen_estado_actual()
++        .expect("el estado virtual del nodo reabierto se calcula");
++    let n_bloques_dag = nodo.cadena().bloques_admitidos();
++    drop(nodo);
++
++    let contenido = std::fs::read_to_string(&cfg.ruta_registro).expect("leer registro");
++    let linea = ultima_de_tipo(&contenido, "reinicio_completo");
++    assert_eq!(campo(&linea, "resumen_estado"), resumen_esperado);
++    assert_eq!(campo(&linea, "punta"), punta);
++    assert_eq!(campo(&linea, "n_bloques_dag"), n_bloques_dag.to_string());
++    assert!(es_hex64(&campo(&linea, "compendio_bloques")));
++}
++
++#[test]
++fn mismo_conjunto_en_orden_distinto_da_el_mismo_compendio_y_resumen() {
++    // Compendio: dos almacenes con el mismo conjunto de bloques en orden y en orden inverso.
++    let bloques: Vec<BloqueAdmitido<'static>> = (0..5).map(bloque_sintetico).collect();
++    let genesis = BlockHash::from_digest(Digest::from_bytes([0; 32]));
++
++    let en_orden = AlmacenEnMemoria::nuevo(Red::Dev, genesis);
++    for b in &bloques {
++        en_orden.admitir(b, true).expect("admitir");
++    }
++    let invertido = AlmacenEnMemoria::nuevo(Red::Dev, genesis);
++    for b in bloques.iter().rev() {
++        invertido.admitir(b, true).expect("admitir");
++    }
++    let compendio_orden = compendio_de_almacen(&en_orden).expect("compendio");
++    assert_eq!(
++        compendio_orden,
++        compendio_de_almacen(&invertido).expect("compendio")
++    );
++    assert!(es_hex64(&compendio_orden));
++
++    // Resumen: dos estados con las mismas entradas insertadas en distinto orden.
++    let mut e1 = Estado::inicial();
++    e1.utxo.insert(outpoint(1), entrada_utxo(10));
++    e1.utxo.insert(outpoint(2), entrada_utxo(20));
++    e1.emitido = 30;
++
++    let mut e2 = Estado::inicial();
++    e2.emitido = 30;
++    e2.utxo.insert(outpoint(2), entrada_utxo(20));
++    e2.utxo.insert(outpoint(1), entrada_utxo(10));
++
++    assert_eq!(e1, e2);
++    assert_eq!(resumen_estado(&e1), resumen_estado(&e2));
++}
++
++#[test]
++fn parada_por_sigterm_en_proceso_real_sale_con_cero() {
++    let dir = tempfile::tempdir().expect("tempdir");
++    let cfg = config_de_test(dir.path(), 100_000);
++    let mut hijo = lanzar(dir.path(), 100_000);
++
++    // El nodo ya cruzó el arranque y está minando (fase PoW): la señal se atiende sin depender del
++    // corte.
++    esperar_aguja(&cfg.ruta_registro, "\"bloque_minado\"", 180);
++    let pid = hijo.id();
++    let estado_kill = Command::new("kill")
++        .args(["-TERM", &pid.to_string()])
++        .status()
++        .expect("ejecutar kill -TERM");
++    assert!(estado_kill.success(), "kill -TERM falló");
++
++    let limite = Instant::now() + Duration::from_secs(60);
++    let estado = loop {
++        match hijo.try_wait().expect("try_wait") {
++            Some(estado) => break estado,
++            None if Instant::now() < limite => std::thread::sleep(Duration::from_millis(50)),
++            None => {
++                let _ = hijo.kill();
++                panic!("el nodo no terminó en 60 s tras SIGTERM");
++            }
++        }
++    };
++    assert_eq!(
++        estado.code(),
++        Some(0),
++        "el nodo debe salir con código 0 tras SIGTERM: {estado:?}"
++    );
++
++    let contenido = std::fs::read_to_string(&cfg.ruta_registro).expect("leer registro");
++    let linea = ultima_de_tipo(&contenido, "parada");
++    assert_eq!(campo(&linea, "motivo"), "sigterm");
++    assert!(
++        !campo(&linea, "resumen_estado").is_empty(),
++        "parada sin resumen_estado: {linea}"
++    );
++    assert!(es_hex64(&campo(&linea, "compendio_bloques")));
++    assert!(
++        campo(&linea, "n_bloques_dag")
++            .bytes()
++            .all(|b| b.is_ascii_digit()),
++        "n_bloques_dag no entero: {linea}"
++    );
++}

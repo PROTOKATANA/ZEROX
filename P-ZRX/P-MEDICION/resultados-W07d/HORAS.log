@@ -1,0 +1,21 @@
+# HORAS.log — ORDEN-W07d (date -Is real)
+
+2026-09-27T16:46:26+02:00 inicio de sesion (lectura de ORDEN-W07d.md y V-ZRX/LINEO.md integros)
+2026-09-27T16:50:00+02:00 base 20214cb extraida a ws.orig/ (Cargo.toml, Cargo.lock, rust-toolchain.toml,
+                          ci/, crates/, .github/, docs); ENTRADA-W07d.sha256 verificada 34/34; ws/ copiada
+                          y testdata/ enlazada de solo lectura; PDF enlazado
+2026-09-27T16:52:00+02:00 FALTAS-DE-DEFINICION.md escrito ANTES de editar (10 huecos, lectura minima adoptada)
+2026-09-27T16:53:30+02:00 edicion: compendio.rs, parada.rs, nodo.rs, main.rs, lib.rs, registro_esquema.rs,
+                          w07d_estado_final.rs
+2026-09-27T16:54:38+02:00 cargo fmt --all limpio
+2026-09-27T16:56:00+02:00 cargo check -p zx-node --all-targets --all-features --locked verde (1m54s)
+2026-09-27T16:57:00+02:00 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings verde
+2026-09-27T16:57:30+02:00 cargo test --workspace --all-features --locked lanzado (4 hilos, nice 19)
+2026-09-27T17:42:00+02:00 cargo test --workspace --all-features --locked verde: 868 passed / 0 failed / 6 ignored
+                          en 72 binarios; T01 (2/2) y T04 (1/1) verdes; w07d_estado_final 3/3 y
+                          registro_esquema 1/1 verdes
+2026-09-27T17:43:00+02:00 guardianes ci/ verdes: dependencias-exactas (24 exactas), firmante-obligatorio,
+                          frontera-crates (9 fronteras)
+2026-09-27T17:43:28+02:00 cambios.patch (7 archivos) y MIGRACION.sha256 (sha256sum -c 7/7 verde);
+                          ENTRADA-W07d.sha256 intacta 30/30 en los archivos no tocados; ws.orig 34/34
+                          sin tocar; sin procesos zx-node vivos

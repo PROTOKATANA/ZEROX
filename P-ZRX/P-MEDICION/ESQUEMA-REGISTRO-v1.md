@@ -74,3 +74,10 @@ error (tipo desconocido). Se conservan estos, introducidos por W06d5/W06d6, con 
 del reposo), `bloque_red_pendiente`, `bloque_red_ignorado_sin_penalizar`,
 `bloque_post_gossip_descartado_sincronizando`, `bloque_propio_rechazado_legitimo` y
 `bloque_post_de_red_sin_terminal`. Ningún evento existente se retira sin decisión del director.
+
+## 1 ter. Estado final (W07d, 2026-09-27)
+
+`reinicio_completo` y `parada` (críticos) añaden `punta`, `resumen_estado` (estado virtual final), `n_bloques_dag` y
+`compendio_bloques` (SHA3-256 de los hashes de todos los bloques persistidos, ordenados por bytes); `parada` admite los
+motivos `sigterm` y `sigint`. Nuevo evento de diagnóstico `bloque_transicion_producido` (`hash`, `slot`). **El «mismo
+estado» entre nodos se decide con estos campos**, no con el último `cambio_punta`.

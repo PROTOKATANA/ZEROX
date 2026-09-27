@@ -40,10 +40,12 @@ use zx_storage::disco::AlmacenEnDisco;
 use zx_storage::{Almacen, BloqueAdmitido, ErrorRepeticion, Familia};
 
 use crate::claves::ClaveDev;
+use crate::compendio::compendio_de_almacen;
 use crate::error::{ErrorNodo, ResultadoNodo};
 use crate::estado_resumen::resumen_estado;
 use crate::identidad::identidad_de_cabecera_post;
 use crate::padres::padres_de_regimen;
+use crate::parada;
 use crate::perfil;
 use crate::pow;
 use crate::red::huerfanos::DepositoHuerfanos;
@@ -490,11 +492,61 @@ impl Nodo {
         // `self.servicios_verificacion` ya reflejan toda la historia (necesarios para calcular
         // `slot_actual`).
         self.abrir_registro_firmante_tras_reinicio()?;
+        // `ORDEN-W07d` decisión 1: el resumen del estado virtual **después** de repetir todo el
+        // almacén, más la punta, el conteo de bloques y el compendio de todos los admitidos. El
+        // resumen usa la misma función que `cambio_punta`; el compendio, el registro persistido
+        // completo (PoW y PoST).
+        let (punta, resumen, n_bloques_dag, compendio) = self.campos_estado_final()?;
         self.registro.escribir(
             self.registro
                 .evento("reinicio_completo")
                 .u64("bloques_repetidos", indice)
-                .u64("duracion_ns", inicio.elapsed().as_nanos() as u64),
+                .u64("duracion_ns", inicio.elapsed().as_nanos() as u64)
+                .str("punta", &punta)
+                .str("resumen_estado", &resumen)
+                .u64("n_bloques_dag", n_bloques_dag)
+                .str("compendio_bloques", &compendio),
+            true,
+        )?;
+        Ok(())
+    }
+
+    /// Campos del estado final para `reinicio_completo` y `parada` (`ORDEN-W07d` decisiones 1 y 2):
+    /// `(punta, resumen_estado, n_bloques_dag, compendio_bloques)`.
+    ///
+    /// `punta` es `mejor_punta().or(terminal())`, la misma expresión que `cambio_punta`; si no hay
+    /// ninguna (fase PoW pura) queda vacía (falta de definición 3). `n_bloques_dag` es
+    /// `Cadena::bloques_admitidos()`, la definición que ya usa el esquema v1. El compendio sale del
+    /// almacén persistido, que incluye el génesis (falta de definición 1).
+    fn campos_estado_final(&self) -> ResultadoNodo<(String, String, u64, String)> {
+        let punta = self.cadena.mejor_punta().or(self.cadena.terminal());
+        let estado = self
+            .cadena
+            .estado_virtual()
+            .map_err(|m| ErrorNodo::Otro(format!("estado virtual: {m}")))?;
+        let resumen = resumen_estado(&estado);
+        let n_bloques_dag = self.cadena.bloques_admitidos();
+        let compendio = compendio_de_almacen(&self.almacen).map_err(ErrorNodo::Almacen)?;
+        Ok((
+            punta.map(|h| h.to_string()).unwrap_or_default(),
+            resumen,
+            n_bloques_dag,
+            compendio,
+        ))
+    }
+
+    /// Escribe el evento crítico `parada` (`ORDEN-W07d` decisión 2) con el estado final calculado
+    /// en ese momento.
+    fn escribir_parada(&self, motivo: &str) -> ResultadoNodo<()> {
+        let (punta, resumen, n_bloques_dag, compendio) = self.campos_estado_final()?;
+        self.registro.escribir(
+            self.registro
+                .evento("parada")
+                .str("motivo", motivo)
+                .str("punta", &punta)
+                .str("resumen_estado", &resumen)
+                .u64("n_bloques_dag", n_bloques_dag)
+                .str("compendio_bloques", &compendio),
             true,
         )?;
         Ok(())
@@ -2094,6 +2146,13 @@ impl Nodo {
         let hilo = thread::spawn(move || pow::hilo_minero(rx_trabajo, tx_minado));
 
         loop {
+            // `ORDEN-W07d` decisión 2: parada ordenada por señal. Se cierra el canal del minero (el
+            // hilo termina tras su búsqueda en curso) y se sale para que `ejecutar` escriba `parada`.
+            if parada::hay_solicitud() {
+                drop(tx_trabajo);
+                drop(hilo);
+                return Ok(());
+            }
             #[expect(
                 clippy::indexing_slicing,
                 reason = "historial_pow siempre tiene al menos el génesis"
@@ -2139,8 +2198,23 @@ impl Nodo {
                     "el hilo minero terminó inesperadamente".to_string(),
                 ));
             }
-            let Ok(cabecera_minada) = rx_minado.recv() else {
-                return Err(ErrorNodo::Otro("el hilo minero cerró el canal".to_string()));
+            // `ORDEN-W07d` decisión 2: `recv_timeout` en vez de `recv` para atender la señal
+            // mientras el minero busca trabajo; un timeout no es una desconexión, solo se vuelve a
+            // esperar. No cambia ninguna decisión del nodo.
+            let cabecera_minada = loop {
+                match rx_minado.recv_timeout(std::time::Duration::from_millis(50)) {
+                    Ok(cabecera) => break cabecera,
+                    Err(mpsc::RecvTimeoutError::Timeout) => {
+                        if parada::hay_solicitud() {
+                            drop(tx_trabajo);
+                            drop(hilo);
+                            return Ok(());
+                        }
+                    }
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        return Err(ErrorNodo::Otro("el hilo minero cerró el canal".to_string()));
+                    }
+                }
             };
             // Se drena el trabajo de red **entre** intentos de minado, nunca durante uno: si se
             // interleara mientras `rx_minado` está bloqueado, un bloque de red podría admitirse a
@@ -2291,6 +2365,11 @@ impl Nodo {
             // hilo productor de régimen retomará la producción en los slots siguientes en cuanto la
             // transición esté en la cadena.
             while self.cadena.tips_validas().is_empty() {
+                // `ORDEN-W07d` decisión 2: la parada por señal también se atiende aquí, antes de
+                // arrancar el hilo productor.
+                if parada::hay_solicitud() {
+                    return Ok(());
+                }
                 self.procesar_trabajo_red_pendiente();
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
@@ -2359,6 +2438,13 @@ impl Nodo {
         // (decisión 1/3/4 de `ORDEN-W06d2`), o un bloque de red llegaría y esperaría sin motivo
         // hasta el siguiente mensaje del hilo productor.
         loop {
+            // `ORDEN-W07d` decisión 2: parada ordenada por señal. Se le pide al productor que pare
+            // (responde a `Parar` en su `esperar`) y se sale del bucle; el `join` de abajo lo
+            // espera.
+            if parada::hay_solicitud() {
+                let _ = tx_a_productor.send(MsgBucle::Parar);
+                break;
+            }
             let msg = match rx_en_bucle.recv_timeout(std::time::Duration::from_millis(50)) {
                 Ok(m) => m,
                 Err(mpsc::RecvTimeoutError::Timeout) => {
@@ -2615,6 +2701,11 @@ impl Nodo {
                 .unwrap_or_else(|| "panic sin mensaje representable".to_string());
             return self.fallo_productor(&format!("el hilo productor terminó con panic: {motivo}"));
         }
+        // `ORDEN-W07d` decisión 2: si la parada la pidió una señal, no se entra en el reposo
+        // indefinido de `--dejar-de-producir-en-slot`; `ejecutar` escribe `parada` y sale con 0.
+        if parada::hay_solicitud() {
+            return Ok(());
+        }
         // `ORDEN-W06d6` decisión 6: si lo que paró de producir fue **solo**
         // `--dejar-de-producir-en-slot` (no `--parada-tras-slots`), el nodo entero **no** termina
         // aquí: sigue vivo, validando, propagando y sincronizando, para poder compararse en reposo
@@ -2627,6 +2718,9 @@ impl Nodo {
             );
             self.registro.escribir(evento, false)?;
             loop {
+                if parada::hay_solicitud() {
+                    return Ok(());
+                }
                 self.procesar_trabajo_red_pendiente();
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
@@ -2698,12 +2792,24 @@ impl Nodo {
             }
         };
         let hash = bloque.cabecera.block_hash();
+        let slot = bloque.cabecera.slot;
         self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)?;
         // `ORDEN-W07a`: el bloque de transición es un PoST propio admitido y persistido, pero **no**
         // se registra como `bloque_producido`: la base (W06d1…W06d6) no lo hacía y el §1 no fija su
         // `retraso_slot_ns` (no hay hilo productor). Emitirlo antes de que `fase_regimen` abra y
         // plotee las parcelas cambiaba el instante del primer `bloque_producido` y rompía la
         // verificación de reinicio tras `SIGKILL` (`reinicio.rs`): se conserva el comportamiento.
+        //
+        // `ORDEN-W07d` decisión 3: sí se registra como **diagnóstico** con un tipo propio,
+        // `bloque_transicion_producido`, para que el bloque de transición no quede sin rastro sin
+        // alterar lo que prueba `reinicio.rs` (que cuenta `bloque_producido`).
+        self.registro.escribir(
+            self.registro
+                .evento("bloque_transicion_producido")
+                .str("hash", &hash.to_string())
+                .u64("slot", slot),
+            false,
+        )?;
         self.difundir_si_hay_red(hash);
         Ok(())
     }
@@ -2769,15 +2875,24 @@ impl Nodo {
         self.registro.escribir(evento, true)?;
 
         self.fase_pow()?;
+        // `ORDEN-W07d` decisión 2: una señal durante la fase PoW detiene el proceso **sin** entrar
+        // en régimen (todavía no hay terminal y `fase_regimen` fallaría con «fase_regimen sin
+        // terminal»). El flag ya está puesto, así que el motivo es de señal.
+        if let Some(motivo) = parada::motivo_solicitado() {
+            self.escribir_parada(motivo)?;
+            return Ok(());
+        }
         self.fase_regimen()?;
-        // `ORDEN-W07a` §1: `parada`, salida ordenada (crítico).
-        let motivo = if self.parada_tras_slots.is_some() {
+        // `ORDEN-W07a` §1 y `ORDEN-W07d` decisión 2: `parada`, salida ordenada (crítico). Si la
+        // pidió una señal, ese es el motivo; si no, el final normal de la fase.
+        let motivo = if let Some(motivo) = parada::motivo_solicitado() {
+            motivo
+        } else if self.parada_tras_slots.is_some() {
             "parada_tras_slots"
         } else {
             "fin"
         };
-        self.registro
-            .escribir(self.registro.evento("parada").str("motivo", motivo), true)?;
+        self.escribir_parada(motivo)?;
         Ok(())
     }
 

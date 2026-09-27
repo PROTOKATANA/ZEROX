@@ -1,0 +1,7 @@
+66896efcafd9cc2af942351a8db69be1e57aa89c15d73ac6e8292ed8658d899e  crates/zx-node/src/compendio.rs
+cd610db616334d558a55d801c9b1b0cd22d73c3259a972c7c597d69a97191612  crates/zx-node/src/parada.rs
+7d269c07a74cddcceefc93d29317c64acd6baf2625c19572f2ddaf5867b75fcf  crates/zx-node/src/lib.rs
+8d506cc59517418e22fdff186998d6cc3cd09801de2ae2437d80b025b8b5f7a5  crates/zx-node/src/main.rs
+5c44d4afd5eab0a1b8c3512e0e048ec0d7c0a68b34f6007694ad746878e03d76  crates/zx-node/src/nodo.rs
+fb7890035ddbd6bbb3535430b46cc80e44b30b2bdc4a00a6e3e07a628800207e  crates/zx-node/tests/registro_esquema.rs
+6097dcd59df7bc659ec9aff2b81f139cdedcb61a9faeb289b16f3f6d770dcfa6  crates/zx-node/tests/w07d_estado_final.rs

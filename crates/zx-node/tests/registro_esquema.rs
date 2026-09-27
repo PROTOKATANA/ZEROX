@@ -43,7 +43,14 @@ fn config_de_test(dir: &std::path::Path) -> Config {
 fn campos_del_tipo(tipo: &str, familia: Option<&str>) -> Option<&'static [&'static str]> {
     match tipo {
         "arranque" => Some(&["version_esquema", "n_dev", "sr_dev", "claves", "modo"]),
-        "reinicio_completo" => Some(&["bloques_repetidos", "duracion_ns"]),
+        "reinicio_completo" => Some(&[
+            "bloques_repetidos",
+            "duracion_ns",
+            "punta",
+            "resumen_estado",
+            "n_bloques_dag",
+            "compendio_bloques",
+        ]),
         "bloque_minado" => Some(&["hash", "altura", "bytes", "n_txs"]),
         "bloque_producido" => Some(&[
             "hash",
@@ -95,10 +102,19 @@ fn campos_del_tipo(tipo: &str, familia: Option<&str>) -> Option<&'static [&'stat
         "par_conectado" | "par_desconectado" => Some(&["par"]),
         "par_penalizado" => Some(&["par", "motivo", "accion"]),
         "limite_alcanzado" => Some(&["limite", "detalle"]),
-        "parada" => Some(&["motivo"]),
+        "parada" => Some(&[
+            "motivo",
+            "punta",
+            "resumen_estado",
+            "n_bloques_dag",
+            "compendio_bloques",
+        ]),
         // `ESQUEMA-REGISTRO-v1.md` §1 bis: eventos de diagnóstico restaurados por `ORDEN-W07a-R`
         // (el analizador los ignora sin error; aquí se validan sus campos como los del §1).
         "dejar_de_producir" => Some(&["motivo"]),
+        // `ORDEN-W07d` decisión 3: el bloque de transición propio ya no queda sin rastro; tipo
+        // propio para no alterar lo que cuenta `reinicio.rs`.
+        "bloque_transicion_producido" => Some(&["hash", "slot"]),
         "bloque_red_pendiente" => Some(&["hash", "familia", "motivo", "veredicto"]),
         "bloque_red_ignorado_sin_penalizar" => Some(&["hash", "familia", "motivo"]),
         "bloque_post_gossip_descartado_sincronizando" => Some(&["hash", "padre_ausente"]),

@@ -9,12 +9,14 @@
 
 pub mod claves;
 pub mod cli;
+pub mod compendio;
 pub mod error;
 pub mod estado_resumen;
 pub mod evidencia;
 pub mod identidad;
 pub mod nodo;
 pub mod padres;
+pub mod parada;
 pub mod perfil;
 pub mod pow;
 pub mod rechazo;

@@ -53,6 +53,15 @@ fn main() {
         dejar_de_producir_en_slot: cli.dejar_de_producir_en_slot,
     };
 
+    // `ORDEN-W07d` decisión 2: parada ordenada con `SIGTERM`/`SIGINT`. Se instala antes de abrir el
+    // nodo para que una señal durante el arranque (la repetición del almacén puede ser larga) quede
+    // marcada y `ejecutar` escriba `parada` en cuanto empiece. Si no se puede instalar, el nodo no
+    // arranca: sin manejo, una señal mataría el proceso a mitad de escritura.
+    if let Err(e) = zx_node::parada::instalar() {
+        eprintln!("zx-node: no se pudo instalar el manejo de señales: {e}");
+        std::process::exit(1);
+    }
+
     let mut nodo = match Nodo::arrancar(&cfg) {
         Ok(n) => n,
         Err(e) => {
@@ -60,7 +69,6 @@ fn main() {
             std::process::exit(1);
         }
     };
-
     // `_red_arrancada` se mantiene viva hasta el final de `main`: soltar el runtime `tokio` que
     // contiene cancelaría el bucle de red y la sincronización (decisión 1/4 de `ORDEN-W06d2`).
     let _red_arrancada = if con_red {
