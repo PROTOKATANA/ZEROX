@@ -5,6 +5,10 @@
 >
 > **Hoja de ruta (Katana, 2026-09-27):** 0.0.2 = Filecoin + relevo de transacciones + PoStake pendiente; 0.0.3 = finalidad
 > por votos; 0.0.4 = minero. La sección «Minero PoW» de abajo es de **0.0.4** (`P-ZRX/HOJA-DE-RUTA.md`).
+>
+> **Requisito de Katana para `N` (2026-09-27):** «que se adapte de forma dinámica sin que nadie lo tenga que calibrar
+> manualmente y sin llave mágica; mitigar los posibles ataques». Encargo: `P-ZRX/P-N-DINAMICO/ENCARGO-ND1.md` (parte de
+> la investigación del paso 1; requisito previo: reglas de timestamp PoST, IPA B-13).
 
 **Decisión de Katana (2026-09-27):** la versión **0.0.2** añade los mecanismos de Filecoin que 0.0.1 dejó fuera
 (`SEC-0`). **Firma del plan:** Claude (director). **Estado:** esbozo; se desarrolla al cerrar 0.0.1.

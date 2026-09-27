@@ -97,7 +97,10 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
    los bloques de red con salto de slots. Corregido en W06d9 (origen + red de seguridad); candidato `3d21b1f`.
 13. **Una prueba que di por superada no lo era:** la partición con el mismo terminal de W06d7 no aisló al nodo (se
    reconectaba). Corregido en `SPEC-0.0.1`; W07b la mide ahora con aislamiento verificable.
-14. *Pendiente W07b:* lo que las mediciones revelen.
+14. **El timestamp de la cabecera PoST no se valida** (ni monotonía ni FTL; el PoW sí). En 0.0.1 no lo consume ninguna
+   regla (`N` y `SR` constantes), pero es el requisito previo de un `N` dinámico (IPA B-13, `ENCARGO-ND1`, 0.0.2).
+15. **W07b, E-7:** los bloques inválidos difundidos por gossip se rechazaban sin penalizar al par (sin puntuación de
+   gossipsub; `par_penalizado` solo en la ruta de sincronización). Corrección: W06d10 (*en curso*).
 
 ## 6. Coste absoluto de los ataques relevantes (lo medido o derivado; nada inventado)
 
