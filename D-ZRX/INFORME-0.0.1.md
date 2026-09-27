@@ -2,7 +2,7 @@
 
 **Estado: BORRADOR** (redactado 2026-09-27 ≈ 11:00, mientras W07b mide). Las secciones marcadas «pendiente
 W07b» se completan con sus resultados. **Firma:** Claude (director, `AUTO-ZRX.md` §8). Todo en commits locales de
-la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato:** `27dcfeb`.
+la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato:** `26312ff` (antes `27dcfeb`; W06d8 corrigió un pánico del productor hallado al medir).
 
 ---
 
@@ -90,7 +90,10 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
    sin garantía no puede depositarla nunca (sus depósitos solo irían en sus propios bloques, que no puede producir).
    Con varias claves por nodo, un solo operador puede cumplir `K_min` y dejar fuera a los demás (visto en W07b E-2a).
    IPA A-14; el remedio es el relevo de transacciones, fuera de 0.0.1.
-11. *Pendiente W07b:* lo que las mediciones revelen.
+11. **Midiendo apareció un pánico del nodo** (el cambio de terminal en caliente desincronizaba el protocolo entre el
+   productor y el bucle: SL-4b2, paso 0). Lo corrigió W06d8 (protocolo numerado, parada ordenada); el candidato pasó
+   de `27dcfeb` a `26312ff` y E-0 se repite sobre él.
+12. *Pendiente W07b:* lo que las mediciones revelen.
 
 ## 6. Coste absoluto de los ataques relevantes (lo medido o derivado; nada inventado)
 

@@ -447,3 +447,13 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   paso cuando un cambio de terminal interrumpe la espera (lo introdujo el paso 0 de SL-4b2) y una respuesta `Padres`
   atrasada provoca `panic!`. **W06d8** (DeepSeek): peticiones numeradas, ningún pánico alcanzable, fallo del
   productor = parada ordenada. W07b termina la calibración y espera el nuevo candidato para R1…R4 (repite E-0).
+
+### 12:35–14:40 — W06d8 migrada; calibración de `SR_dev`; nuevo candidato
+
+- **W06d8 migrada** (`26312ff`): protocolo productor↔bucle numerado, sin pánicos alcanzables en el productor, parada
+  ordenada; 5/5 repeticiones reales sin pánico y dos respuestas atrasadas descartadas de verdad en una partición;
+  860/0/6. **Nuevo candidato de 0.0.1: `26312ff`** (sustituye a `27dcfeb`).
+- **Calibración E-2a** (W07b, `27dcfeb`, una clave por nodo): τ = 1,2816 s por slot; bloques por slot 0,23 (2^60),
+  0,65 (2^62), 0,78 (2^63), **0,99 (2^63,5) → `SR_dev = 13 043 817 825 332 783 104`**. La curva no escala linealmente
+  con el rango (dato para el informe). Mi estimación para 2^63 (≈ 1,3) era errónea.
+- W07b retomada: repite E-0 sobre `26312ff` y sigue con R1…R4.
