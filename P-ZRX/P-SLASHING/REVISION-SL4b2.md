@@ -1,6 +1,6 @@
 # REVISIÓN SL-4b2 — castigo activo en la red dev
 
-**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 09:52). **Ejecutor:** subagente Sonnet, único,
+**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 09:47). **Ejecutor:** subagente Sonnet, único,
 07:58–09:46. Evidencia: `resultados-SL4b2/`; ejecuciones reales en `deepseek/SL4b2/run-*`. **Veredicto: SUPERADO
 CON DOS CORRECCIONES (SL-4b3). Migrada** por parche (7 archivos en `crates/zx-node/`; base sin cambios desde
 `bb648fb`; 7/7 huellas; `crates/zx-node` idéntico a la zona; `Cargo.*` sin cambios).
