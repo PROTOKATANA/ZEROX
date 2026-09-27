@@ -1,0 +1,29 @@
+commit=eb2b8b660cfb0dcc986d8c5ef16dc63213020ef1
+sha256_zx-node=d919d23958c6bec53d5077845b6e2830d91a2e80ca4be4cd1f1b165ac7b69930
+sha256_zx-adversario=7f5eea5d107cadd6701cfe7be47d817bcba7da7414b836389a7c8570f7fe8bb3
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=7.92 9.09 6.72 2/2240 29
+fecha_inicio=2026-09-28T00:12:15+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=51000 B=51001 C=51002
+2026-09-28T00:12:15+02:00 === E-7 rep1: A,B,C desde el génesis ===
+EXITO total=20
+peer_id B=12D3KooWKPhHr6HePaLJkxFNS9SpAYqthTaprTMaS8fqat5C7G6W C=12D3KooWS6MhSG5JyQ6BC4TnidCKcffD89czRstUBqGr7Vaa8E6J
+=== E-7: zx-adversario (ráfaga, identidad nueva por vector) contra A ===
+estado_a_antes="resumen_estado":"3bf9d5fad000f794f67906198169aa2ab7f0c9537d177113b18a9d96db6051a9" estado_a_despues="resumen_estado":"0e0f3c99469e3427240403e6706691d8501a3ac4b3f849ab7732008c6fd18928" (informativo; el estado se decide al final por W07d)
+PeerId del adversario (uno por vector): 12D3KooWB3796JPdS3LvTr3zqFCqTHhqBXxESS4RgFUpxBRKYBRT 12D3KooWBY3fqNZ7bTEB8iwtRkjFaq5md3t5mNiAsbWgmyYKY1CW 12D3KooWE2S5TeppUU6SnSKD7hSWtKLq22GG6kTtQr1qAQr3R3D7 12D3KooWHMaN3jcAdHUN2RTUwFYL5q5g8GtTuXx4ZxFCjv7wYjXg 12D3KooWJBB4XQRP8wvmbEuDHPRncqGXnoYhLm5Pwj8Zi1RjMhT7 
+n_peers_adversario=5
+A: bloque_red_rechazado=4 par_penalizado(distintos)=4
+PeerId penalizados en A: 12D3KooWB3796JPdS3LvTr3zqFCqTHhqBXxESS4RgFUpxBRKYBRT 12D3KooWE2S5TeppUU6SnSKD7hSWtKLq22GG6kTtQr1qAQr3R3D7 12D3KooWHMaN3jcAdHUN2RTUwFYL5q5g8GtTuXx4ZxFCjv7wYjXg 12D3KooWJBB4XQRP8wvmbEuDHPRncqGXnoYhLm5Pwj8Zi1RjMhT7 
+PeerId penalizados que NO son del adversario: 0 (debe ser 0)
+A: par_desconectado de B/C = 0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+SUPERADO (E-7 rep1): rechazos=4 penalizados=4 peers=5 ajenos=0 desconexiones_BC=0 convergen=si
+loadavg_fin=14.23 10.75 7.56 2/2250 1597
+fecha_fin=2026-09-28T00:13:55+02:00

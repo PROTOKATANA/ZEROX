@@ -32,6 +32,17 @@
 //!   nuestra que rompe la garantía que el propio tipo declara). Fatal si es propio, igual que
 //!   `Interno`; si es de red, se rechaza (no se reintenta, no se acepta) pero **sin penalizar** al
 //!   remitente — es la diferencia con `Interno`.
+//! - **VistaLocal** (`ORDEN-W06d10-B`): la aparente invalidez depende de la **vista local** del nodo,
+//!   no de un defecto demostrable del candidato. Las tres familias del hallazgo V1 de W06d10:
+//!   (X1) `ErrorPow::TimestampDemasiadoFuturo` (C-TS-03, `ts ≤ reloj_local + ftl`; el propio tipo lo
+//!   declara **no permanente** en [`zx_consensus::ErrorPow::es_permanente`]), (X2)
+//!   `MotivoBloque::ErrLimiteTerminales` (tope **local** de terminales con DAG, `zx-cadena`) y (X3)
+//!   los fallos **locales** de persistencia/servicio (que en el borde de red llegan como
+//!   `ErrorNodo` sin `BloquePropioRechazado`). Para un bloque de **red**: `Ignorar` — ni se
+//!   desconecta, ni se puntúa, ni se escribe `par_penalizado`, ni se vuelve a marcar como `Rechazar`
+//!   por el motivo cacheado. Para uno **propio**: igual que `Interno` en fatalidad (`es_legitimo()`
+//!   `== false`), porque `ORDEN-W06d10-B` decisión 2 prohíbe cambiar si un fallo local es fatal
+//!   para el nodo.
 //!
 //! # Motivos legítimos y su justificación (`REVISION-W06d4.md`)
 //!
@@ -68,6 +79,7 @@
 //! deliberadamente conservadores (a favor de fatal, no de silenciar un bug).
 
 use zx_cadena::MotivoBloque;
+use zx_consensus::ErrorPow;
 use zx_consensus::transicion::ErrorTransicion;
 use zx_dag::ErrorDag;
 use zx_post::cabecera_conjunta::{MotivoCabeceraInvalida, MotivoCabeceraPendiente};
@@ -94,6 +106,12 @@ pub enum ClasificacionRechazo {
     /// reintenta, no se acepta) pero **sin penalizar** al remitente, porque no hay certeza de que
     /// sea un defecto suyo y no nuestro.
     ImposibleSinPenalizar,
+    /// `ORDEN-W06d10-B`: la aparente invalidez depende de la **vista local** del nodo (reloj local
+    /// de C-TS-03, tope local de terminales con DAG, o un fallo local de persistencia/servicio), no
+    /// de un defecto demostrable del candidato. Fatal si es propio, igual que `Interno` (decisión 2
+    /// de la orden: no cambia la fatalidad de un fallo local); si es de red, `Ignorar` sin
+    /// desconectar, sin puntuar y sin `par_penalizado`. Ver el docstring del módulo.
+    VistaLocal,
 }
 
 impl ClasificacionRechazo {
@@ -110,10 +128,19 @@ impl ClasificacionRechazo {
         matches!(self, Self::Pendiente)
     }
 
+    /// ¿La aparente invalidez depende de la **vista local** del nodo (`ORDEN-W06d10-B`)? Un bloque
+    /// de red con esta clasificación es `Ignorar` (ni penaliza ni se marca como inválido de forma
+    /// permanente); uno propio conserva la fatalidad de `Interno`.
+    #[must_use]
+    pub const fn es_vista_local(self) -> bool {
+        matches!(self, Self::VistaLocal)
+    }
+
     /// ¿Un bloque de red con esta clasificación debe **penalizar** al remitente si se descarta?
     /// (`ORDEN-W06d6`, RI-3c H2). `Legitimo` e `Interno` sí (defecto verificable, atribuible al
-    /// candidato); `ImposibleSinPenalizar` no (podría ser un fallo nuestro); `Pendiente` nunca
-    /// llega a este punto (se reintenta, no se rechaza).
+    /// candidato); `ImposibleSinPenalizar` no (podría ser un fallo nuestro); `VistaLocal` no (la
+    /// invalidación es de la vista local, no del candidato); `Pendiente` nunca llega a este punto
+    /// (se reintenta, no se rechaza).
     #[must_use]
     pub const fn penaliza_en_red(self) -> bool {
         matches!(self, Self::Legitimo | Self::Interno)
@@ -151,20 +178,37 @@ pub const fn clasificar_cabecera_pendiente(m: &MotivoCabeceraPendiente) -> Clasi
 /// Clasifica un [`MotivoBloque`] (`Cadena::admitir`).
 #[must_use]
 pub fn clasificar_motivo_bloque(m: &MotivoBloque) -> ClasificacionRechazo {
-    use ClasificacionRechazo::{Interno, Legitimo};
+    use ClasificacionRechazo::{Interno, Legitimo, VistaLocal};
     match m {
         MotivoBloque::ErrGarantia
         | MotivoBloque::ErrMergeDepth
         | MotivoBloque::ErrMergeset
         | MotivoBloque::ErrU2 => Legitimo,
         MotivoBloque::ErrTransicion(ErrorTransicion::ErrPowTrasCorte) => Legitimo,
+        // `ORDEN-W06d10-B` X2: el tope de `MAX_TERMINALES_CON_DAG` es estado **local** (un nodo con
+        // otra rama lateral decide distinto). No es un defecto demostrable del candidato.
+        MotivoBloque::ErrLimiteTerminales => VistaLocal,
         _ => Interno,
+    }
+}
+
+/// Clasifica un [`ErrorPow`] de `validar_cabecera_pow` (`ORDEN-W06d10-B` X1). El propio tipo declara
+/// con [`ErrorPow::es_permanente`] qué variantes no lo son: hoy solo `TimestampDemasiadoFuturo`
+/// (C-TS-03), cuyo contrato exige **diferir y no banear**. Se usa esa declaración, no una lista
+/// propia, para que una variante futura no permanente herede la misma política.
+#[must_use]
+pub const fn clasificar_error_pow(e: &ErrorPow) -> ClasificacionRechazo {
+    if e.es_permanente() {
+        ClasificacionRechazo::Interno
+    } else {
+        ClasificacionRechazo::VistaLocal
     }
 }
 
 #[cfg(test)]
 mod tests {
     use zx_cadena::MotivoBloque;
+    use zx_consensus::ErrorPow;
     use zx_consensus::transicion::ErrorTransicion;
     use zx_core::BlockHash;
     use zx_dag::ErrorDag;
@@ -173,7 +217,7 @@ mod tests {
 
     use super::{
         ClasificacionRechazo, clasificar_cabecera_invalida, clasificar_cabecera_pendiente,
-        clasificar_motivo_bloque,
+        clasificar_error_pow, clasificar_motivo_bloque,
     };
 
     fn hash_prueba() -> BlockHash {
@@ -253,13 +297,15 @@ mod tests {
         }
     }
 
-    /// `penaliza_en_red`: solo `Legitimo` e `Interno` penalizan; `ImposibleSinPenalizar` no.
+    /// `penaliza_en_red`: solo `Legitimo` e `Interno` penalizan; `ImposibleSinPenalizar`, `Pendiente`
+    /// y `VistaLocal` no.
     #[test]
     fn solo_legitimo_e_interno_penalizan_en_red() {
         assert!(ClasificacionRechazo::Legitimo.penaliza_en_red());
         assert!(ClasificacionRechazo::Interno.penaliza_en_red());
         assert!(!ClasificacionRechazo::ImposibleSinPenalizar.penaliza_en_red());
         assert!(!ClasificacionRechazo::Pendiente.penaliza_en_red());
+        assert!(!ClasificacionRechazo::VistaLocal.penaliza_en_red());
     }
 
     /// `Legitimo` (defecto verificable del candidato, no falta de contexto) no es `Pendiente`: la
@@ -290,5 +336,54 @@ mod tests {
         assert!(!clasificar_cabecera_invalida(&sello_malo).es_legitimo());
         let sin_padres_transicion = MotivoCabeceraInvalida::Padres(ErrorDag::CabeceraPostSinPadres);
         assert!(!clasificar_cabecera_invalida(&sin_padres_transicion).es_legitimo());
+    }
+
+    /// `ORDEN-W06d10-B` **X1**: `ErrorPow::TimestampDemasiadoFuturo` (C-TS-03) depende del reloj
+    /// local y el propio tipo lo declara no permanente: `VistaLocal`, que en red es `Ignorar` sin
+    /// penalizar, y que para un bloque propio conserva la fatalidad (no cambia la decisión 2).
+    #[test]
+    fn x1_ftl_es_vista_local_y_no_penaliza() {
+        let ftl = ErrorPow::TimestampDemasiadoFuturo {
+            ts: 1_541,
+            limite: 1_540,
+        };
+        let c = clasificar_error_pow(&ftl);
+        assert_eq!(c, ClasificacionRechazo::VistaLocal, "{ftl:?}");
+        assert!(c.es_vista_local());
+        assert!(!c.penaliza_en_red(), "C-TS-03 exige diferir, no banear");
+        assert!(!c.es_legitimo(), "para un bloque propio sigue siendo fatal");
+        assert!(
+            !c.es_pendiente(),
+            "no entra en la cola de reintento de PoST"
+        );
+        assert!(!ftl.es_permanente());
+    }
+
+    /// `ORDEN-W06d10-B` **X1** (contraprueba): un fallo PoW **permanente** (p. ej. `PowInsuficiente`)
+    /// sigue siendo un defecto demostrable del candidato: `Interno`, penaliza.
+    #[test]
+    fn x1_fallo_permanente_sigue_penalizando() {
+        for e in [
+            ErrorPow::PowInsuficiente,
+            ErrorPow::DesbordamientoAritmetico,
+        ] {
+            let c = clasificar_error_pow(&e);
+            assert_eq!(c, ClasificacionRechazo::Interno, "{e:?}");
+            assert!(c.penaliza_en_red(), "{e:?}");
+            assert!(e.es_permanente(), "{e:?}");
+        }
+    }
+
+    /// `ORDEN-W06d10-B` **X2**: el tope **local** de terminales con DAG
+    /// (`MotivoBloque::ErrLimiteTerminales`) es `VistaLocal`: `Ignorar` sin penalizar, y para un
+    /// bloque propio conserva la fatalidad.
+    #[test]
+    fn x2_limite_terminales_es_vista_local_y_no_penaliza() {
+        let c = clasificar_motivo_bloque(&MotivoBloque::ErrLimiteTerminales);
+        assert_eq!(c, ClasificacionRechazo::VistaLocal);
+        assert!(c.es_vista_local());
+        assert!(!c.penaliza_en_red());
+        assert!(!c.es_legitimo());
+        assert!(!c.es_pendiente());
     }
 }

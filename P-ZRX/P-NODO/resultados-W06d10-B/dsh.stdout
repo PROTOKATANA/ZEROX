@@ -1,0 +1,23 @@
+Orden W06d10-B cumplida. Resumen de la ejecución:
+
+## Informe previo a editar (obligatorio)
+- **Falta de definición (§0.1)**: «X2 sin cachear» **no** es alcanzable sin editar `zx-cadena` (vedado): `Cadena::admitir` cachea todo rechazo en `validos`/`motivos` (`cadena.rs:403-406`) y lo devuelve en la llamada siguiente (`369-378`), sin API de olvido. Informado **antes** de tocar código, con propuesta mínima (`Cadena::olvidar` o no cachear `ErrLimiteTerminales`). X1 sí queda genuinamente sin cachear; X3 tampoco se cachea.
+- **§0.2**: tabla completa de caminos a `Rechazar`. Hallazgo propio de la decisión 4: el camino **«padre conocido e inválido»** también heredaba la vista local vía un padre X2; tratado como X.
+
+## Cambios (solo archivos permitidos; `Cargo.lock` intacto)
+- `rechazo.rs`: nueva variante `ClasificacionRechazo::VistaLocal` (`es_legitimo()==false`, `penaliza_en_red()==false`), `ErrLimiteTerminales → VistaLocal`, y `clasificar_error_pow` usando el contrato `ErrorPow::es_permanente()`.
+- `nodo.rs`: X1/X2/X3 → `Ignorar` en gossip y sincronización (incluido motivo cacheado y padre-inválido-X2), evento diagnóstico nuevo `bloque_red_vista_local` para X3; los defectos del candidato que eran `ErrorNodo::Otro` (`bits`/`target`/`trabajo`/`peso`) se envuelven como `BloquePropioRechazado{Interno}` para que sigan penalizando. Fatalidad propia sin cambios.
+- Test nuevo de integración X2 (noveno terminal real) + costuras `#[cfg(test)]` `fallo_local_simulado` y `reloj_local_simulado`.
+
+## Verificación
+| Paso | Resultado |
+|---|---|
+| V0 | `sha256sum -c ENTRADA-W06d10-B.sha256` = **53/53**; `ws.orig/` idéntico a la base |
+| V1/V2 | 3 unit `rechazo` + 4 unit `nodo::pruebas_w06d10b` + 1 integración X2, todos verdes |
+| V3 | **E-7 semilla 101: SUPERADO** (4 rechazos, 4 `par_penalizado`, 0 ajenos, 0 desconexiones B/C, convergencia W07d); **R150: SUPERADO** (0 `par_penalizado`, 0 `fallo_productor`, convergencia W07d) |
+| V4 | `fmt --check` verde; `clippy -D warnings` verde; suite **891/0/6** (85 binarios); 3 guardianes verdes; T01/T04 verdes |
+
+## Entregables en `deepseek/W06d10-B/`
+`INFORME.md`, `PROGRESO.md`, `HORAS.log`, `ws.orig/` (base intacta), `ws/`, `cambios.patch` (3 archivos), `MIGRACION.sha256` (verificado), `logs/`, `run/R4-E7-1/`, `run/R150-1/`, `scripts/`.
+
+**Límite declarado**: por estar `zx-cadena` vedado, X2 no puede quitarse de `cadena.motivos`; se garantiza que nunca penaliza ni se reconvierte en `Rechazar`, pero su reevaluación tras cambiar la vista local requiere autorización sobre ese crate.

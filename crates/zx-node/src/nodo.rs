@@ -178,6 +178,16 @@ pub struct Nodo {
     ultima_cadena_seleccionada: Vec<BlockHash>,
     /// Índice `hash -> posición` de [`Self::ultima_cadena_seleccionada`].
     ultima_cadena_indice: BTreeMap<BlockHash, usize>,
+    /// `ORDEN-W06d10-B`, **solo en tests**: fallo **local** inyectado (persistencia/servicio) para
+    /// poder demostrar que el borde de red lo trata como `Ignorar` y lo registra, sin depender de
+    /// romper de verdad el disco. Nunca existe en el binario de producción.
+    #[cfg(test)]
+    fallo_local_simulado: Option<String>,
+    /// `ORDEN-W06d10-B`, **solo en tests**: reloj local inyectado, para poder demostrar que X1
+    /// (timestamp futuro, C-TS-03) se difiere sin cachearse y se admite cuando el reloj avanza, sin
+    /// depender del reloj real de la máquina. Nunca existe en el binario de producción.
+    #[cfg(test)]
+    reloj_local_simulado: Option<i64>,
 }
 
 /// Desglose de tiempos y etapa de la última llamada a `admitir_pow_interno`/`admitir_post_interno`
@@ -342,6 +352,10 @@ impl Nodo {
             medicion: Medicion::default(),
             ultima_cadena_seleccionada: Vec::new(),
             ultima_cadena_indice: BTreeMap::new(),
+            #[cfg(test)]
+            fallo_local_simulado: None,
+            #[cfg(test)]
+            reloj_local_simulado: None,
         };
 
         let longitud = nodo.almacen.longitud_registro()?;
@@ -584,6 +598,23 @@ impl Nodo {
         }
     }
 
+    /// Reloj local en segundos desde la época Unix (`C-TS-04`: nunca una hora de red). En tests
+    /// puede inyectarse con [`Self::reloj_local_simulado`] para probar X1 sin depender del reloj
+    /// real de la máquina.
+    fn reloj_local(&self) -> i64 {
+        #[cfg(test)]
+        if let Some(t) = self.reloj_local_simulado {
+            return t;
+        }
+        i64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        )
+        .unwrap_or(i64::MAX)
+    }
+
     /// Admite un bloque PoW: verificación W04 (si `verificar`), motor de transición, persistencia.
     ///
     /// `verificar = false` en la repetición (D-N03′): la cabecera ya se comprobó cuando se admitió
@@ -599,6 +630,12 @@ impl Nodo {
     ) -> Result<(), ErrorNodo> {
         let hash = cabecera.block_hash();
         let es_genesis = cabecera.height == 0;
+        // `ORDEN-W06d10-B` (solo tests): fallo local inyectado, como el que produciría un error de
+        // persistencia/servicio. Se consume una vez; en producción este bloque no existe.
+        #[cfg(test)]
+        if let Some(motivo) = self.fallo_local_simulado.take() {
+            return Err(ErrorNodo::Otro(motivo));
+        }
         // `ORDEN-W07a` decisión 1: solo se envuelven con `Instant` llamadas que ya existen. La
         // etapa se fija para poder etiquetar un rechazo (`bloque_red_rechazado`).
         self.medicion = Medicion {
@@ -633,7 +670,13 @@ impl Nodo {
                         clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
                     })?;
             let target_esperado = pow::target_de_altura(&historial_padre, cabecera.height)
-                .map_err(|e| ErrorNodo::Otro(e.to_string()))?;
+                .map_err(|e| ErrorNodo::BloquePropioRechazado {
+                    hash,
+                    motivo: format!("target de altura: {e}"),
+                    // Interno: depende del historial del padre declarado (que este nodo ya tiene),
+                    // no de ninguna vista local; cualquier nodo con ese padre calcularía lo mismo.
+                    clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+                })?;
             let ctx = ContextoPow {
                 red: Red::Dev,
                 parametros: PARAMETROS_POW_DEV,
@@ -641,22 +684,17 @@ impl Nodo {
                 hash_padre: padre.block_hash(),
                 target_esperado,
                 ts_padre: i64::try_from(padre.timestamp).unwrap_or(i64::MAX),
-                reloj_local: i64::try_from(
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0),
-                )
-                .unwrap_or(i64::MAX),
+                reloj_local: self.reloj_local(),
             };
             validar_cabecera_pow(&cabecera, &ctx, &Sha3Dev).map_err(|e| {
                 ErrorNodo::BloquePropioRechazado {
                     hash,
                     motivo: format!("validar_cabecera_pow: {e}"),
-                    // Interno: el propio minero acaba de encontrar este PoW contra el contexto que
-                    // el nodo mismo calculó; una discrepancia aquí es un bug de construcción, no
-                    // una carrera con otro proceso.
-                    clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+                    // `ORDEN-W06d10-B` X1: el propio tipo declara con `es_permanente()` qué fallo
+                    // es diferible (C-TS-03, reloj local → `VistaLocal`) y cuál es un defecto
+                    // permanente del candidato (`Interno`). Para un bloque propio la fatalidad no
+                    // cambia (`VistaLocal::es_legitimo() == false`).
+                    clasificacion: crate::rechazo::clasificar_error_pow(&e),
                 }
             })?;
             self.medicion.cabecera_ns = inicio_cabecera.elapsed().as_nanos() as u64;
@@ -668,9 +706,20 @@ impl Nodo {
         let hechos = if es_genesis {
             HechosCabecera::Genesis { hash }
         } else {
-            let target = pow_target_de(&cabecera)?;
-            let trabajo = trabajo_bloque(target)
-                .ok_or_else(|| ErrorNodo::Otro(format!("trabajo del bloque {hash} desborda")))?;
+            let target =
+                pow_target_de(&cabecera).map_err(|e| ErrorNodo::BloquePropioRechazado {
+                    hash,
+                    motivo: e.to_string(),
+                    // Interno: `bits` no canónico del candidato, demostrable por cualquier nodo.
+                    clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+                })?;
+            let trabajo =
+                trabajo_bloque(target).ok_or_else(|| ErrorNodo::BloquePropioRechazado {
+                    hash,
+                    motivo: format!("trabajo del bloque {hash} desborda"),
+                    // Interno: aritmética del propio bloque.
+                    clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+                })?;
             HechosCabecera::PoW {
                 hash,
                 padre: cabecera.prev_hash,
@@ -979,6 +1028,11 @@ impl Nodo {
         verificar: bool,
     ) -> Result<(), ErrorNodo> {
         let hash = bloque.cabecera.block_hash();
+        // `ORDEN-W06d10-B` (solo tests): fallo local inyectado (ver `admitir_pow_interno`).
+        #[cfg(test)]
+        if let Some(motivo) = self.fallo_local_simulado.take() {
+            return Err(ErrorNodo::Otro(motivo));
+        }
         // `ORDEN-W07a`: misma medición por etapas que `admitir_pow_interno`.
         self.medicion = Medicion {
             etapa: "cabecera",
@@ -1120,7 +1174,12 @@ impl Nodo {
             padres,
             slot: bloque.cabecera.slot,
             productor: bloque.cabecera.sol.public_key,
-            peso: peso_u128(&bloque)?,
+            peso: peso_u128(&bloque).map_err(|e| ErrorNodo::BloquePropioRechazado {
+                hash,
+                motivo: e.to_string(),
+                // Interno: el peso w(SR) de la solución declarada es del candidato.
+                clasificacion: crate::rechazo::ClasificacionRechazo::Interno,
+            })?,
             prueba_valida: true,
             requisito_declarado: 0,
             sr: bloque.cabecera.rango_solucion,
@@ -1618,7 +1677,19 @@ impl Nodo {
         if self.cadena.es_valido(&hash) {
             return VeredictoFinal::Ignorar; // ya lo teníamos: nada que hacer, no penaliza.
         }
-        if self.cadena.motivo(&hash).is_some() {
+        if let Some(motivo) = self.cadena.motivo(&hash) {
+            // `ORDEN-W06d10-B`: un motivo cacheado que depende de la vista local (X2,
+            // `ErrLimiteTerminales`) no se convierte en `Rechazar`. Se ignora sin penalizar y se
+            // traza; un motivo demostrable del candidato sigue penalizando igual.
+            if !crate::rechazo::clasificar_motivo_bloque(motivo).penaliza_en_red() {
+                self.trazar_bloque_vista_local(
+                    &hash,
+                    "pow",
+                    &format!("motivo cacheado no penalizable: {motivo}"),
+                    llegada,
+                );
+                return VeredictoFinal::Ignorar;
+            }
             return VeredictoFinal::Rechazar; // ya sabíamos que es inválido.
         }
         if cabecera.height == 0 {
@@ -1666,6 +1737,22 @@ impl Nodo {
             return VeredictoFinal::Ignorar;
         }
         if !self.cadena.es_valido(&padre) {
+            // `ORDEN-W06d10-B` decisión 4: si el motivo cacheado del padre depende de **nuestra**
+            // vista local (X2), el hijo no es demostrablemente inválido — hereda una invalidación
+            // que otro nodo con otra rama lateral no haría. Se ignora sin penalizar.
+            if self
+                .cadena
+                .motivo(&padre)
+                .is_some_and(|m| !crate::rechazo::clasificar_motivo_bloque(m).penaliza_en_red())
+            {
+                self.trazar_bloque_vista_local(
+                    &hash,
+                    "pow",
+                    "padre conocido con motivo de vista local",
+                    llegada,
+                );
+                return VeredictoFinal::Ignorar;
+            }
             // El padre es conocido y definitivamente inválido: este bloque no puede ser válido.
             let mut evento = self
                 .registro
@@ -1722,6 +1809,13 @@ impl Nodo {
                 VeredictoFinal::Aceptar
             }
             Err(e) => {
+                // `ORDEN-W06d10-B`: solo un defecto **atribuible al candidato** penaliza. Un fallo
+                // local (X3: persistencia/servicio) o una clasificación de vista local (X1) se
+                // ignoran sin penalizar y se trazan con su motivo.
+                if !error_atribuible_al_candidato(&e) {
+                    self.trazar_bloque_vista_local(&hash, "pow", &e.to_string(), llegada);
+                    return VeredictoFinal::Ignorar;
+                }
                 let mut evento = self
                     .registro
                     .evento("bloque_red_rechazado")
@@ -1737,6 +1831,29 @@ impl Nodo {
                 VeredictoFinal::Rechazar
             }
         }
+    }
+
+    /// `ORDEN-W06d10-B` §1 bis: traza de diagnóstico de un bloque de red **ignorado** porque su
+    /// aparente invalidez depende de la vista local (X1/X2/X3) o porque el fallo es local. No es un
+    /// rechazo (no penaliza, no desconecta) pero queda visible con su motivo. `&self` para poder
+    /// llamarse mientras un motivo de `self.cadena` sigue prestado.
+    fn trazar_bloque_vista_local(
+        &self,
+        hash: &BlockHash,
+        familia: &str,
+        motivo: &str,
+        llegada: Instant,
+    ) {
+        let evento = self
+            .registro
+            .evento("bloque_red_vista_local")
+            .str("hash", &hash.to_string())
+            .str("familia", familia)
+            .str("etapa", self.medicion.etapa)
+            .str("motivo", motivo)
+            .str("veredicto", "Ignorar")
+            .u64("t_hasta_ignorar_ns", llegada.elapsed().as_nanos() as u64);
+        let _ = self.registro.escribir(evento, false);
     }
 
     /// Decide y aplica el veredicto de un bloque PoST llegado por red (`ORDEN-W06d3` decisión 2).
@@ -1760,7 +1877,18 @@ impl Nodo {
         if self.cadena.es_valido(&hash) {
             return VeredictoFinal::Ignorar; // ya lo teníamos: nada que hacer, no penaliza.
         }
-        if self.cadena.motivo(&hash).is_some() {
+        if let Some(motivo) = self.cadena.motivo(&hash) {
+            // `ORDEN-W06d10-B`: X2 (`ErrLimiteTerminales`) cacheado no se reconvierte en `Rechazar`;
+            // se ignora sin penalizar. Un motivo demostrable del candidato sigue igual.
+            if !crate::rechazo::clasificar_motivo_bloque(motivo).penaliza_en_red() {
+                self.trazar_bloque_vista_local(
+                    &hash,
+                    "post",
+                    &format!("motivo cacheado no penalizable: {motivo}"),
+                    llegada,
+                );
+                return VeredictoFinal::Ignorar;
+            }
             return VeredictoFinal::Rechazar; // ya sabíamos que es inválido.
         }
         // `ORDEN-W06d7`: ya no hace falta un único terminal seleccionado para juzgar un bloque PoST
@@ -1839,6 +1967,21 @@ impl Nodo {
                 return VeredictoFinal::Ignorar;
             }
             if !self.cadena.es_valido(&padre) {
+                // `ORDEN-W06d10-B` decisión 4: si el motivo cacheado del padre depende de nuestra
+                // vista local (X2), el hijo no es demostrablemente inválido. `Ignorar` sin penalizar.
+                if self
+                    .cadena
+                    .motivo(&padre)
+                    .is_some_and(|m| !crate::rechazo::clasificar_motivo_bloque(m).penaliza_en_red())
+                {
+                    self.trazar_bloque_vista_local(
+                        &hash,
+                        "post",
+                        "padre conocido con motivo de vista local",
+                        llegada,
+                    );
+                    return VeredictoFinal::Ignorar;
+                }
                 let mut evento = self
                     .registro
                     .evento("bloque_red_rechazado")
@@ -1938,6 +2081,17 @@ impl Nodo {
                 self.encolar_post_pendiente(bloque_para_reintento, llegada);
                 VeredictoFinal::Ignorar
             }
+            // `ORDEN-W06d10-B` X2: `ErrLimiteTerminales` (tope local de terminales) llega aquí ya
+            // clasificado como `VistaLocal`. No se penaliza, no se desconecta y queda visible con su
+            // motivo en el evento de diagnóstico `bloque_red_vista_local`.
+            Err(ErrorNodo::BloquePropioRechazado {
+                motivo,
+                clasificacion,
+                ..
+            }) if clasificacion.es_vista_local() => {
+                self.trazar_bloque_vista_local(&hash, "post", &motivo, llegada);
+                VeredictoFinal::Ignorar
+            }
             // `ORDEN-W06d6`, RI-3c H2: `PruebaPotIncoherente`/`RangoSinAtadura` no se reintentan
             // (a diferencia de `Pendiente`, el hueco no se va a llenar solo) pero tampoco penalizan
             // al remitente (a diferencia del resto de rechazos): no hay certeza de que el defecto
@@ -1972,6 +2126,13 @@ impl Nodo {
                 VeredictoFinal::Ignorar
             }
             Err(e) => {
+                // `ORDEN-W06d10-B`: un fallo local (X3) se ignora sin penalizar y se traza; solo un
+                // defecto atribuible al candidato (p. ej. PoAS inválido, `RepeticionFallida`) sigue
+                // siendo `Rechazar`.
+                if !error_atribuible_al_candidato(&e) {
+                    self.trazar_bloque_vista_local(&hash, "post", &e.to_string(), llegada);
+                    return VeredictoFinal::Ignorar;
+                }
                 let mut evento = self
                     .registro
                     .evento("bloque_red_rechazado")
@@ -2977,6 +3138,23 @@ fn pow_target_de(cabecera: &BlockHeader) -> Result<primitive_types::U256, ErrorN
         .map_err(|e| ErrorNodo::Otro(format!("bits de la cabecera PoW: {e}")))
 }
 
+/// `ORDEN-W06d10-B`: ¿este error de la tubería de admisión de un bloque de **red** es un defecto
+/// **demostrable del candidato** (penaliza al remitente) o un fallo/vista **local** (X1/X2/X3, se
+/// ignora sin penalizar)?
+///
+/// - `BloquePropioRechazado` con clasificación que penaliza (`Legitimo`/`Interno`, incluidos los
+///   defectos que antes llegaban como `ErrorNodo::Otro`: `bits`, `target`, `trabajo`, `peso`).
+/// - `RepeticionFallida`/`TestigoPowCorrupto` en la ruta en vivo: PoAS o testigo del candidato.
+/// - Todo lo demás (`Otro` de persistencia/servicio/detector, `Almacen`, `Io`, …) es local.
+#[must_use]
+fn error_atribuible_al_candidato(e: &ErrorNodo) -> bool {
+    match e {
+        ErrorNodo::BloquePropioRechazado { clasificacion, .. } => clasificacion.penaliza_en_red(),
+        ErrorNodo::RepeticionFallida { .. } | ErrorNodo::TestigoPowCorrupto { .. } => true,
+        _ => false,
+    }
+}
+
 /// `PadresDag` a `Vec<BlockHash>` (seleccionado primero), para `BloquePost::padres`.
 fn padres_dag_a_vec(p: &PadresDag) -> Vec<BlockHash> {
     if p.es_genesis() {
@@ -3771,5 +3949,267 @@ mod pruebas_diagnostico_registro {
             texto.contains("\"tipo\":\"huerfano_resuelto\""),
             "falta huerfano_resuelto: {texto}"
         );
+    }
+}
+
+/// `ORDEN-W06d10-B`: X1/X2/X3 no penalizan al par en ninguna de las dos rutas y lo demostrablemente
+/// inválido sigue penalizando (V1/V2). Bloque PoW de altura 1 con **PoW real** minado, para que X1
+/// (timestamp futuro) falle exactamente en la comprobación FTL y no antes.
+#[cfg(test)]
+#[expect(
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "el test falla con panic por diseño"
+)]
+mod pruebas_w06d10b {
+    use core::sync::atomic::AtomicBool;
+    use std::time::Instant;
+
+    use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev, minar};
+    use zx_core::digest::Digest;
+    use zx_core::preimage::block::{BlockHeader, merkle_root};
+    use zx_core::{Amount, BlockHash, Tx, decodificar_con, txid};
+    use zx_p2p::entrante::VeredictoFinal;
+    use zx_p2p::mensaje::BloqueRed;
+
+    use super::{Config, ErrorNodo, Nodo, Red};
+    use crate::pow;
+    use crate::rechazo::ClasificacionRechazo;
+
+    fn cfg(dir: &std::path::Path) -> Config {
+        Config {
+            dir_datos: dir.join("datos"),
+            ruta_registro: dir.join("registro.jsonl"),
+            red: Red::Dev,
+            semilla: 7,
+            indices_claves: vec![0],
+            n_dev: 16,
+            sr_dev: u64::MAX,
+            parada_tras_slots: Some(0),
+            dejar_de_producir_en_slot: None,
+        }
+    }
+
+    /// `FTL_dev = N·T/20 = 20·2/20 = 2 s` (`PARAMETROS_POW_DEV`): margen conocido de X1.
+    const FTL_DEV_SEG: u64 = 2;
+
+    fn ahora_seg() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("reloj posterior a 1970")
+            .as_secs()
+    }
+
+    /// Cabecera PoW de altura 1 sobre el génesis del nodo con la `coinbase` dada y `timestamp`
+    /// elegido, con PoW real minado. `bits`/target son los iniciales dev: un bloque válido.
+    fn cabecera_altura_1(nodo: &Nodo, coinbase: Tx, timestamp: u64) -> BlockHeader {
+        let genesis = nodo.historial_pow[nodo.historial_pow.len() - 1];
+        let txid_coinbase = txid(&coinbase, nodo.cbid);
+        let target = decodificar_con(
+            PARAMETROS_POW_DEV.bits_iniciales,
+            &PARAMETROS_POW_DEV.limites,
+        )
+        .expect("bits_iniciales decodifica");
+        let cabecera_base = BlockHeader {
+            consensus_branch_id: nodo.cbid,
+            prev_hash: genesis.block_hash(),
+            merkle_root: merkle_root(&[txid_coinbase]),
+            timestamp,
+            bits: PARAMETROS_POW_DEV.bits_iniciales,
+            nonce: 0,
+            height: 1,
+        };
+        let cancelar = AtomicBool::new(false);
+        minar(&cabecera_base, target, &Sha3Dev, u64::MAX, &cancelar)
+            .expect("un PoW dev se encuentra en ~2^17 intentos")
+    }
+
+    fn coinbase_valida(nodo: &Nodo) -> Tx {
+        let clave = nodo.claves.first().expect("al menos una clave").pk;
+        pow::construir_coinbase_pow(clave, 1)
+    }
+
+    fn bloque_pow_red(cabecera: BlockHeader, coinbase: Tx) -> BloqueRed {
+        BloqueRed::Pow {
+            cabecera,
+            txs: vec![coinbase],
+            testigos: vec![Vec::new()],
+        }
+    }
+
+    fn registro(dir: &std::path::Path) -> String {
+        std::fs::read_to_string(dir.join("registro.jsonl")).expect("leer registro")
+    }
+
+    /// `ORDEN-W06d10-B` **X1** en las dos rutas: un PoW con `timestamp > reloj + FTL` (FTL dev
+    /// `= 20·2/20 = 2 s`) es `Ignorar`, no se cachea ni penaliza, y al reenviarlo con el reloj
+    /// local ya al día se admite (C-TS-03: se difiere, no se castiga). El reloj se inyecta
+    /// (`reloj_local_simulado`) para no depender del reloj real de la máquina.
+    #[test]
+    fn x1_timestamp_futuro_se_ignora_y_se_admite_al_avanzar_el_reloj() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut nodo = Nodo::arrancar(&cfg(dir.path())).expect("arranque limpio");
+        let genesis_ts = i64::try_from(nodo.historial_pow[0].timestamp).unwrap_or(0);
+        let reloj0 = genesis_ts + 1000;
+        nodo.reloj_local_simulado = Some(reloj0);
+        // `FTL_dev + 2 s`: por encima del FTL de 2 s (y con margen).
+        let ts = u64::try_from(reloj0 + (FTL_DEV_SEG as i64) + 2).expect("timestamp representable");
+        let cabecera = cabecera_altura_1(&nodo, coinbase_valida(&nodo), ts);
+        let hash = cabecera.block_hash();
+        let bloque = bloque_pow_red(cabecera, coinbase_valida(&nodo));
+
+        // Ruta gossip (`origen = None`).
+        assert_eq!(
+            nodo.intentar_admitir_bloque_red(&bloque, None, Instant::now()),
+            VeredictoFinal::Ignorar,
+            "C-TS-03: el bloque futuro se difiere, no se rechaza"
+        );
+        assert!(
+            nodo.cadena.motivo(&hash).is_none(),
+            "X1 no debe cachearse como inválido en zx-cadena"
+        );
+        assert!(
+            !nodo.headers_pow.contains_key(&hash),
+            "X1 no debe cachearse en headers_pow"
+        );
+        let texto = registro(dir.path());
+        assert!(
+            texto.contains("\"tipo\":\"bloque_red_vista_local\""),
+            "falta la traza de vista local: {texto}"
+        );
+        assert!(
+            !texto.contains("\"tipo\":\"par_penalizado\""),
+            "X1 no debe penalizar al par: {texto}"
+        );
+
+        // El reloj local avanza (la vista cambia): el mismo bloque vuelve a juzgarse por la ruta de
+        // sincronización y pasa.
+        nodo.reloj_local_simulado = Some(reloj0 + (FTL_DEV_SEG as i64) + 2);
+        assert_eq!(
+            nodo.intentar_admitir_bloque_red(
+                &bloque,
+                Some(libp2p::PeerId::random()),
+                Instant::now()
+            ),
+            VeredictoFinal::Aceptar,
+            "con el reloj al día el mismo bloque debe admitirse"
+        );
+        assert!(nodo.cadena.es_valido(&hash));
+        assert!(registro(dir.path()).contains("\"tipo\":\"bloque_red_admitido\""));
+    }
+
+    /// `ORDEN-W06d10-B` **X3** en las dos rutas: un fallo **local** (persistencia/servicio
+    /// simulado) es `Ignorar`, queda registrado con su motivo y no penaliza; sin el fallo, el mismo
+    /// bloque válido se admite (no quedó cacheado).
+    #[test]
+    fn x3_fallo_local_se_ignora_y_se_registra() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut nodo = Nodo::arrancar(&cfg(dir.path())).expect("arranque limpio");
+        let cabecera = cabecera_altura_1(&nodo, coinbase_valida(&nodo), ahora_seg());
+        let hash = cabecera.block_hash();
+        let bloque = bloque_pow_red(cabecera, coinbase_valida(&nodo));
+
+        nodo.fallo_local_simulado = Some("persistencia simulada de prueba".to_string());
+        assert_eq!(
+            nodo.intentar_admitir_bloque_red(
+                &bloque,
+                Some(libp2p::PeerId::random()),
+                Instant::now()
+            ),
+            VeredictoFinal::Ignorar,
+            "un fallo local no es defecto del candidato"
+        );
+        let texto = registro(dir.path());
+        assert!(
+            texto.contains("\"tipo\":\"bloque_red_vista_local\""),
+            "falta la traza del fallo local: {texto}"
+        );
+        assert!(
+            texto.contains("persistencia simulada de prueba"),
+            "el motivo local debe quedar visible: {texto}"
+        );
+        assert!(!texto.contains("\"tipo\":\"par_penalizado\""), "{texto}");
+        assert!(
+            !texto.contains("\"tipo\":\"bloque_red_admitido\""),
+            "{texto}"
+        );
+        assert!(nodo.cadena.motivo(&hash).is_none());
+
+        // Sin fallo, el bloque válido se admite: el `Ignorar` no dejó nada cacheado.
+        assert_eq!(
+            nodo.intentar_admitir_bloque_red(&bloque, None, Instant::now()),
+            VeredictoFinal::Aceptar
+        );
+    }
+
+    /// `ORDEN-W06d10-B` **V2** (regresión): un bloque **demostrablemente** inválido (coinbase que
+    /// paga de más, `ErrEmision`) sigue dando `Rechazar` en las dos rutas, también cuando ya está
+    /// cacheado el motivo.
+    #[test]
+    fn v2_defecto_demostrable_sigue_rechazando() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut nodo = Nodo::arrancar(&cfg(dir.path())).expect("arranque limpio");
+        let clave = nodo.claves.first().expect("al menos una clave").pk;
+        let mut coinbase = pow::construir_coinbase_pow(clave, 1);
+        let doble = coinbase.outputs[0]
+            .value
+            .brek()
+            .checked_mul(2)
+            .expect("sin desbordar");
+        coinbase.outputs[0].value = Amount::nuevo(doble).expect("importe representable");
+        let cabecera = cabecera_altura_1(&nodo, coinbase.clone(), ahora_seg());
+        let hash = cabecera.block_hash();
+        let bloque = bloque_pow_red(cabecera, coinbase);
+
+        // Primer intento (gossip): defecto demostrable del candidato → Rechazar.
+        assert_eq!(
+            nodo.intentar_admitir_bloque_red(&bloque, None, Instant::now()),
+            VeredictoFinal::Rechazar
+        );
+        // El motivo queda cacheado; un reenvío por sincronización tampoco se libra.
+        assert!(nodo.cadena.motivo(&hash).is_some());
+        assert_eq!(
+            nodo.intentar_admitir_bloque_red(
+                &bloque,
+                Some(libp2p::PeerId::random()),
+                Instant::now()
+            ),
+            VeredictoFinal::Rechazar
+        );
+        assert!(
+            registro(dir.path()).contains("\"tipo\":\"bloque_red_rechazado\""),
+            "lo demostrablemente inválido debe seguir registrándose como rechazo"
+        );
+    }
+
+    /// El mapeo de errores del borde de red: solo un defecto atribuible al candidato penaliza; un
+    /// fallo local (`Otro`/`Almacen`/…) o una clasificación de vista local, no.
+    #[test]
+    fn solo_el_defecto_del_candidato_penaliza() {
+        let hash = BlockHash::from_digest(Digest::from_bytes([0x42; 32]));
+        let con_clasificacion = |clasificacion| ErrorNodo::BloquePropioRechazado {
+            hash,
+            motivo: "prueba".to_string(),
+            clasificacion,
+        };
+        assert!(super::error_atribuible_al_candidato(&con_clasificacion(
+            ClasificacionRechazo::Interno
+        )));
+        assert!(super::error_atribuible_al_candidato(&con_clasificacion(
+            ClasificacionRechazo::Legitimo
+        )));
+        for local in [
+            ClasificacionRechazo::VistaLocal,
+            ClasificacionRechazo::Pendiente,
+            ClasificacionRechazo::ImposibleSinPenalizar,
+        ] {
+            assert!(
+                !super::error_atribuible_al_candidato(&con_clasificacion(local)),
+                "{local:?}"
+            );
+        }
+        assert!(!super::error_atribuible_al_candidato(&ErrorNodo::Otro(
+            "persistencia simulada".to_string()
+        )));
     }
 }

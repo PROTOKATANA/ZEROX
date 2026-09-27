@@ -1,0 +1,1 @@
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"872b73007fb931b8514fde8ac8c5f317c37af1619265c2f813920310832432f4"|"compendio_bloques":"a70da93436eb13c7996c36a33f1fe36e0d4a149a3ffb43ab41ede5d8f59c6a87")

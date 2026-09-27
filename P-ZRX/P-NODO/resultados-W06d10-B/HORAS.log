@@ -1,0 +1,13 @@
+2026-09-27T23:50:15+02:00 inicio W06d10-B (orden 23:45): lectura de ORDEN-W06d10-B.md, REVISION-W06d10.md y V-ZRX/LINEO.md
+2026-09-27T23:50:15+02:00 base: ws.orig/ y ws/ copiados de la raiz commit 5a07027
+2026-09-27T23:50:15+02:00 V0 sha256sum -c P-ZRX/P-NODO/ENTRADA-W06d10-B.sha256 en la raiz = 53/53 verde
+2026-09-27T23:50:15+02:00 falta de definicion informada ANTES de editar (PROGRESO.md 0.1): X2 'sin cachear' no alcanzable sin editar zx-cadena (vedado); X1 si. Tabla V1 en 0.2.
+2026-09-28T00:12:31+02:00 codigo: rechazo.rs VistaLocal + clasificar_error_pow; nodo.rs X1/X2/X3 -> Ignorar en gossip y sync, motivo cacheado y padre-invalido-X2, evento bloque_red_vista_local; P3c/P3d/Po6 -> BloquePropioRechazado{Interno} para que V2 siga penalizando
+2026-09-28T00:12:31+02:00 tests V1/V2: 4 unit en nodo::pruebas_w06d10b + 3 unit en rechazo + 1 integracion tests/w06d10b_x2_limite_terminales.rs; todos verdes
+2026-09-28T00:12:31+02:00 suite completa (1a pasada) 76/77 lib: x1 flaky por reloj real; corregido con costura de reloj de test (reloj_local_simulado)
+2026-09-28T00:21:21+02:00 V3 E-7 semilla 101 (R4-E7-1): SUPERADO; 4 bloque_red_rechazado, 4 par_penalizado (PeerIds del adversario), 0 ajenos, 0 desconexiones B/C, convergencia W07d
+2026-09-28T00:21:21+02:00 V3 R150 (3 nodos honestos al slot 150): SUPERADO; 0 par_penalizado, 0 fallo_productor, 0 panicos, convergencia W07d
+2026-09-28T00:21:21+02:00 V4 clippy --workspace --all-targets --all-features --locked -D warnings: verde
+2026-09-28T00:54:52+02:00 V4 suite completa 2a pasada: 85 binarios, 891 pasados, 0 fallos, 6 ignorados; T01/T04 verdes; 3 guardianes verdes; fmt --check verde
+2026-09-28T00:54:52+02:00 V0 final: sha256sum -c ENTRADA-W06d10-B = 53/53; ws.orig identico a la base
+2026-09-28T00:54:52+02:00 entrega: cambios.patch (3 archivos), MIGRACION.sha256, INFORME.md, PROGRESO.md, logs/, run/
