@@ -1,7 +1,7 @@
 # Plan de 0.0.2 — mecanismos de Filecoin, relevo de transacciones y PoStake pendiente
 
 > **Orden de 0.0.2 (Katana, 2026-09-27):** (1) medición del doble farmeo en la red dev + FV-2 y FV-3 + medición de `ρ_max`
-> y, con ella, decisión del segundo VDF y de `N` (fijo o dinámico con techo) (investigación de viabilidad); (2) relevo de transacciones; (3) PoStake pendiente; (4) coste de admisión GHOSTDAG (B-12); (5) Filecoin.
+> y, con ella, decisión del segundo VDF y de `N` (fijo o dinámico con techo) (investigación de viabilidad) + eclipse (rehacer P-ECLIPSE, coste de captura); (2) relevo de transacciones y prevención del eclipse; (3) PoStake pendiente; (4) coste de admisión GHOSTDAG (B-12); (5) Filecoin.
 >
 > **Hoja de ruta (Katana, 2026-09-27):** 0.0.2 = Filecoin + relevo de transacciones + PoStake pendiente; 0.0.3 = finalidad
 > por votos; 0.0.4 = minero. La sección «Minero PoW» de abajo es de **0.0.4** (`P-ZRX/HOJA-DE-RUTA.md`).

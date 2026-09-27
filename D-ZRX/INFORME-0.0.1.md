@@ -128,9 +128,9 @@ por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma 
 
 ## 7 bis. Siguiente versión
 
-**Hoja de ruta (Katana, 2026-09-27; `P-ZRX/HOJA-DE-RUTA.md`):** 0.0.2 = (1) medición del doble farmeo + FV-2/FV-3 + `ρ_max`, segundo VDF y `N` dinámico,
-(2) relevo de transacciones, (3) PoStake pendiente, (4) coste de admisión GHOSTDAG, (5) Filecoin; 0.0.3 = finalidad por votos
-en el nodo;
+**Hoja de ruta (Katana, 2026-09-27; `P-ZRX/HOJA-DE-RUTA.md`):** 0.0.2 = (1) medición del doble farmeo + FV-2/FV-3 + `ρ_max`, segundo VDF y `N` dinámico + eclipse
+(investigación), (2) relevo de transacciones y prevención del eclipse, (3) PoStake pendiente, (4) coste de admisión GHOSTDAG,
+(5) Filecoin; 0.0.3 = finalidad por votos en el nodo y recuperación del eclipse con los votos;
 0.0.4 = minero SHA3 para CPU (Rust) y GPU AMD (HIP).
 
 ## 8. Lo que 0.0.1 no mide ni afirma
