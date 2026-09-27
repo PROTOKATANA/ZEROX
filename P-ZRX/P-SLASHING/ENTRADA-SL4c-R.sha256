@@ -1,0 +1,8 @@
+4a7cc60df296dca0e7c2681a67e28f2b0c4d8e648f46a963ada99c099b0ec34f  P-ZRX/P-SLASHING/ORDEN-SL4c-R.md
+6f299402ed0ce7ba2a93c6f64203cb8b2055870e6771ecafad7c760e6330955a  P-ZRX/P-SLASHING/resultados-SL4c/cambios.patch
+6f299402ed0ce7ba2a93c6f64203cb8b2055870e6771ecafad7c760e6330955a  deepseek/SL4c/cambios.patch
+0343b83290489fde1b3ba961eb8fdd1f7ccb1bdf1ea1ee7062db993fc48936e1  V-ZRX/LINEO.md
+2372484b673df061b27baa1809a217bcc964f47328d5b3517092a95df6c96f57  Cargo.lock
+b1e76efa240cd341bb4dd9f9d3cb9bd63a42bb141e234e526875fc3175b8886c  crates/zx-post/tests/firmante_identidad_evidencia.rs
+d72c5fd9bd9a988d03cca7168a612a5cbc83c2c088accaba1ad03421c599edc1  P-ZRX/P-TRANSICION/T01/resultados/vectores-transicion-v0.5.txt
+86348a48e32491c9cb3675fa1c2d7e06f4c20f94518f35b227778d28d4a90c19  P-ZRX/P-DAG/T04/resultados/vectores-estado-dag-v0.6.txt

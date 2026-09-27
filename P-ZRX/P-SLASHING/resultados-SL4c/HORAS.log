@@ -1,0 +1,16 @@
+2026-09-26T23:58:00+02:00 inicio: leídos íntegros ORDEN-SL4c.md, ACLARACION-SL4c.md y V-ZRX/LINEO.md; verificada ENTRADA-SL4c.sha256 (22/22)
+2026-09-26T23:58:30+02:00 copiados ws.orig/ y ws/ desde la raíz (commit fa98bec/d8c4ecf): Cargo.toml, Cargo.lock, rust-toolchain.toml, crates/, testdata/, ci/, .github/, enlace PDF; .cargo-home copiado de SL4a; env.sh con 4 hilos
+2026-09-27T00:05:00+02:00 leídos CONTRATO-EVIDENCIA-v0.md (EV-01…EV-04, RAT-1, ratificación), REVISION-RI-3b.md, ORDEN-SL4c-O/-B/-C, REVISION-SL4c-O.md, FORMATO-v0.md (F-04/F-05/F-14), vectores y coberturas T01 v0.5 y T04 v0.6, DIFERENCIAS
+2026-09-27T00:12:00+02:00 V0: suite completa sin cambios en verde (EXIT=0, logs/V0-baseline.log)
+2026-09-27T00:15:00+02:00 zx-core: ErrorFormaTx::EvidenciaCbidAjeno; validar_forma_tx_v4(tx, testigos, cbid_local) con cbid (RAT-1) → orden canónico (EV-01/EV-04); tx_desde_bytes decodifica la v4 (FD-5)
+2026-09-27T00:20:00+02:00 zx-consensus: validar_bloque(bloque, evp) invoca la forma v4 con evp.cbid; eliminados ErrCbidAjeno/ErrOrdenCanonico/ErrEvidenciaConEntradas; nombre_t01 con los nombres completos ErrForma(...); aplicar_evidencia sin las comprobaciones de forma
+2026-09-27T00:25:00+02:00 zx-core tests: V2 ida y vuelta de 210 EvidenceTx firmadas, truncamientos, sobrante y límites 588/1 038 B
+2026-09-27T00:30:00+02:00 arneses: diferencial_t01 lee T01 v0.5 (cobertura con ambos/orden_igual/orden_descendente) y diferencial_t04 lee T04 v0.6 (sección FORMA); testdata/transicion-v0.5 y testdata/estado-dag-v0.6 copiados byte a byte con sus .sha256
+2026-09-27T00:38:00+02:00 compilación limpia (0 warnings) y tests V2/evidencia en verde (22 + 8)
+2026-09-27T00:52:00+02:00 V1a: diferencial_t01 (v0.5, 3 179) y negativos (v0.2, 3 914) con 0 discrepancias y cobertura idéntica; V2 completo en verde
+2026-09-27T01:05:00+02:00 V1b (1ª pasada): 660 discrepancias en T04 por (a) el arnés perdía ent/sal de la evidencia y (b) zx-cadena comprobaba ErrGarantia antes de la forma v4
+2026-09-27T01:12:00+02:00 corregidos (a) en el arnés T04 y (b) en Cadena::chequear_forma (§3.2, autoriza invocar la forma en zx-cadena); filtrada contar_evidencia a los grupos del oráculo
+2026-09-27T01:20:00+02:00 V1b (2ª pasada): T04 v0.6 con 0 discrepancias y cobertura idéntica (sección FORMA completa y mínimos OK); fmt --check y clippy -D warnings en verde; dependencias-exactas (23) y frontera-crates (9/9) en verde
+2026-09-27T01:28:00+02:00 V3: relanzada cargo test --workspace --all-features --locked (la primera pasada se interrumpió durante tests/integracion.rs de zx-post por el timeout de espera del arnés, no por fallo)
+2026-09-27T02:07:00+02:00 V3 en verde: 734 pasan, 0 fallan, 2 ignorados (731/0/2 antes; +3 tests V2); fmt/clippy ya en verde; CI 23 y 9/9
+2026-09-27T02:07:30+02:00 cierre: cambios.patch (11 archivos) y MIGRACION.sha256 (11 huellas) con sha256sum -c en verde; vedados (zx-node, zx-post, zx-p2p, Cargo.lock, Cargo.toml) idénticos a ws.orig; ENTRADA-SL4c.sha256 22/22; sin commit ni push

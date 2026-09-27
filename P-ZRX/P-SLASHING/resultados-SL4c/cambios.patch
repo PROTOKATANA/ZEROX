@@ -1,0 +1,1159 @@
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/src/cadena.rs ws/crates/zx-cadena/src/cadena.rs
+--- ws.orig/crates/zx-cadena/src/cadena.rs	2026-09-26 20:59:03.617721221 +0200
++++ ws/crates/zx-cadena/src/cadena.rs	2026-09-27 00:51:57.304681153 +0200
+@@ -24,7 +24,7 @@
+     Estado, ParametrosEvidencia, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar,
+     aplicar_fusion, deshacer, es_terminal_condiciones,
+ };
+-use zx_core::{Amount, BlockHash, ClavePublica, Tx};
++use zx_core::{Amount, BlockHash, ClavePublica, ExtensionTx, Tx, validar_forma_tx_v4};
+ use zx_dag::ghostdag::{
+     Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, IdentidadGhostdag, Idx, ModoMerge, ModoSp,
+     Parametros as ParametrosGhostdag, Rank,
+@@ -546,6 +546,20 @@
+                 return Err(MotivoBloque::ErrSaldo);
+             }
+         }
++        // SL-4c (§3.2): la forma de la `EvidenceTx` v4 (`EV-04`, `RAT-1`, `EV-01`) es forma de
++        // bloque y se comprueba **antes** de la garantía del productor y de la semántica, igual
++        // que `chequear_forma_evidencia` del oráculo T04 (`EstadoDAG.jl:292-294`). Sin esto, un
++        // bloque con una evidencia defectuosa y un productor sin garantía daría `ErrGarantia` en
++        // vez de `ErrForma(...)`. La evidencia sin cabeceras (`ExtensionTx::Ninguna`) no se toca
++        // aquí: sigue siendo un rechazo semántico.
++        if self.evidencia.evp {
++            for (tx, testigos) in &p.txs {
++                if tx.version == 4 && matches!(tx.extension, ExtensionTx::Evidencia { .. }) {
++                    validar_forma_tx_v4(tx, testigos, self.evidencia.cbid)
++                        .map_err(|e| MotivoBloque::ErrTransicion(e.into()))?;
++                }
++            }
++        }
+         Ok(())
+     }
+ 
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-cadena/tests/diferencial_t04.rs ws/crates/zx-cadena/tests/diferencial_t04.rs
+--- ws.orig/crates/zx-cadena/tests/diferencial_t04.rs	2026-09-26 20:59:03.617721221 +0200
++++ ws/crates/zx-cadena/tests/diferencial_t04.rs	2026-09-27 01:05:41.162325944 +0200
+@@ -1,6 +1,6 @@
+ //! Arnés **diferencial** contra el oráculo T04 (`ORDEN-SL4a`, V4 y V5).
+ //!
+-//! Lee `testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt`, deriva claves Ed25519 deterministas
++//! Lee `testdata/estado-dag-v0.6/vectores-estado-dag-v0.6.txt`, deriva claves Ed25519 deterministas
+ //! por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)`, igual que W03), construye
+ //! transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante` abstracto, traduce cada bloque a
+ //! [`BloqueCadena`] con `padres`, `sr`, `sd`, `ident` y `k` y ejecuta [`Cadena`] en el orden de
+@@ -10,9 +10,9 @@
+ //! reales; el `incident_id` es opaco (se compara número y `@slot_falta`, FD-1).
+ //!
+ //! Compara, por caso: `RES` de cada bloque, `DESC` (transacción descartada y motivo), `SEL`, `UTXO`,
+-//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 1 878 casos; V5 exige que la tabla de
+-//! cobertura de los 900 casos aleatorios y la sección de evidencia sean idénticas a
+-//! `cobertura-v0.5.txt` (la sección `run.jl` no se reproduce desde el fichero de vectores).
++//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 2 108 casos; V5 exige que la tabla de
++//! cobertura (vectores aleatorios, evidencia y forma v4) sea idéntica a
++//! `cobertura-v0.6.txt` (la sección `run.jl` no se reproduce desde el fichero de vectores).
+ 
+ #![expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
+ #![expect(
+@@ -26,7 +26,7 @@
+ 
+ use ed25519_zebra::{SigningKey, VerificationKey};
+ use primitive_types::U256;
+-use zx_cadena::{BloqueCadena, BloquePost, Cadena, Descarte};
++use zx_cadena::{BloqueCadena, BloquePost, Cadena, Descarte, MotivoBloque};
+ use zx_consensus::transicion::{
+     BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
+     total_garantia,
+@@ -35,20 +35,20 @@
+ use zx_core::preimage::tx::txid as calcular_txid;
+ use zx_core::{
+     Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, DagBlockHeader, Digest,
+-    ExtensionTx, HashType, Lock, MerkleRoot, OutPoint, PadresDag, SolucionPoas, SpentOutput,
+-    TipoGarantia, Tx, TxId, TxIn, TxOut,
++    ErrorFormaTx, ExtensionTx, HashType, Lock, MerkleRoot, OutPoint, PadresDag, SolucionPoas,
++    SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
+ };
+ use zx_dag::IdentidadGhostdag;
+ 
+-/// Vectores v0.5 dentro del workspace (`ws/testdata/...`).
++/// Vectores v0.6 dentro del workspace (`ws/testdata/...`).
+ const RUTA_VECTORES: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+-    "/../../testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt"
++    "/../../testdata/estado-dag-v0.6/vectores-estado-dag-v0.6.txt"
+ );
+ /// Tabla de cobertura esperada de T04.
+ const RUTA_COBERTURA: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+-    "/../../testdata/estado-dag-v0.5/cobertura-v0.5.txt"
++    "/../../testdata/estado-dag-v0.6/cobertura-v0.6.txt"
+ );
+ /// Máximo de padres del generador de T04, declarado (`ORDEN-W06a-C` decisión 1): sus vectores no
+ /// admiten más de 3 y la identidad viaja como `u64` de fixture (`IdentidadGhostdag::de_fixture`).
+@@ -856,10 +856,17 @@
+                 let _ = self.claves.id(ev.id1.clave);
+                 let _ = self.claves.id(ev.id2.clave);
+                 let (h1, h2) = cabeceras_de_evidencia(&ev);
++                // SL-4c-O-C: el modelo abstracto lleva `ent`/`sal` también en la evidencia; la
++                // forma v4 (`EV-04`) los rechaza, así que la `Tx` real debe conservarlos.
++                let mut inputs = Vec::with_capacity(tx.ent.len());
++                for id in &tx.ent {
++                    inputs.push(self.txin(*id));
++                }
++                let salidas = self.salidas_reales(&tx.sal);
+                 let real = Tx {
+                     version: 4,
+-                    inputs: Vec::new(),
+-                    outputs: Vec::new(),
++                    inputs,
++                    outputs: salidas,
+                     lock_time: 0,
+                     expiry_height: 0,
+                     extension: ExtensionTx::Evidencia { h1, h2 },
+@@ -1146,6 +1153,8 @@
+     casos: u64,
+     /// SL-4a · contadores `EV ...` de la sección de evidencia.
+     ev: BTreeMap<String, u64>,
++    /// SL-4c · contadores `FORMA ...` de la sección de forma v4.
++    forma: BTreeMap<String, u64>,
+ }
+ 
+ fn tipo_cobertura(tx: &Tx) -> Option<&'static str> {
+@@ -1314,12 +1323,15 @@
+             }
+             *cobertura.ev.entry("construida".to_string()).or_insert(0) += 1;
+             if let Some(motivo) = descartadas.get(&(*hash, i)) {
++                // SL-4c: la forma v4 (entradas/salidas, cbid, orden) ya no es descarte semántico;
++                // estos nombres completos solo aparecerían si el motor dejara de validar la forma
++                // antes, y la cobertura los separa de la sección `FORMA`.
+                 let nombre = match motivo.nombre_t01() {
+                     "ErrEvidenciaDuplicada" => "duplicada",
+                     "ErrEvidenciaTardia" => "tardia",
+-                    "ErrCbidAjeno" => "cbid_ajeno",
+-                    "ErrEvidenciaConEntradas" => "con_entradas",
+-                    "ErrOrdenCanonico" => "orden_canonico",
++                    "ErrForma(EvidenciaCbidAjeno)" => "cbid_ajeno",
++                    "ErrForma(EvidenciaConEntradasOSalidas)" => "con_entradas",
++                    "ErrForma(OrdenCanonicoInvalido)" => "orden_canonico",
+                     "ErrSinEvidencia" => "sin_evidencia",
+                     _ => "otro",
+                 };
+@@ -1344,6 +1356,187 @@
+     }
+ }
+ 
++/// Primer sub-defecto de **forma v4** de un bloque, en el orden de sus transacciones
++/// (`primer_defecto_forma` del oráculo T04, `EstadoDAG.jl:217-232`): estructura →
++/// `cbid` → orden canónico. Devuelve `None` si ninguna `EvidenceTx` con cabeceras tiene defecto.
++#[derive(Clone, Copy, PartialEq, Eq)]
++enum DefectoForma {
++    Entradas,
++    Salidas,
++    EntradasSalidas,
++    Cbid,
++    OrdenIgual,
++    OrdenDesc,
++}
++
++fn primer_defecto_forma(bloque: &BloquePost, cbid_local: u32) -> Option<DefectoForma> {
++    for (tx, _) in &bloque.txs {
++        if tx.version != 4 {
++            continue;
++        }
++        let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
++            continue;
++        };
++        let ent = !tx.inputs.is_empty();
++        let sal = !tx.outputs.is_empty();
++        if ent && sal {
++            return Some(DefectoForma::EntradasSalidas);
++        }
++        if ent {
++            return Some(DefectoForma::Entradas);
++        }
++        if sal {
++            return Some(DefectoForma::Salidas);
++        }
++        if h1.consensus_branch_id != cbid_local || h2.consensus_branch_id != cbid_local {
++            return Some(DefectoForma::Cbid);
++        }
++        let ph1 = h1.pre_hash();
++        let ph2 = h2.pre_hash();
++        let o1 = ph1.as_bytes();
++        let o2 = ph2.as_bytes();
++        if !(o1 < o2) {
++            return Some(if o1 == o2 {
++                DefectoForma::OrdenIgual
++            } else {
++                DefectoForma::OrdenDesc
++            });
++        }
++    }
++    None
++}
++
++/// Incrementa un contador solo si `d > 0` (semántica de `max(n, 1)` del oráculo).
++fn inc_mapa(mapa: &mut BTreeMap<String, u64>, k: &str, d: u64) {
++    if d > 0 {
++        *mapa.entry(k.to_string()).or_insert(0) += d;
++    }
++}
++
++/// Reproduce `contar_forma_evidencia` del oráculo T04 (`exportar.jl:313-377`): recorre **todos**
++/// los bloques construidos (válidos o no) y clasifica los que la forma v4 invalida.
++fn contar_forma_evidencia(
++    reales: &Reales,
++    cadena: &Cadena,
++    cobertura: &mut Cobertura,
++    cbid_local: u32,
++) {
++    for bloque in &reales.bloques {
++        let BloqueCadena::Post(p) = bloque else {
++            continue;
++        };
++        let hash = bloque.hash();
++        let Some(motivo) = cadena.motivo(&hash) else {
++            continue;
++        };
++        let es_forma = |f: &ErrorFormaTx| {
++            matches!(
++                motivo,
++                MotivoBloque::ErrTransicion(ErrorTransicion::ErrForma(x)) if x == f
++            )
++        };
++        let hay_tx = p.txs.iter().any(|(tx, _)| tipo_cobertura(tx).is_some());
++        let mut n_cbid = 0u64;
++        let mut n_orden = 0u64;
++        let mut n_ig = 0u64;
++        let mut n_de = 0u64;
++        let mut n_ent = 0u64;
++        let mut n_sal = 0u64;
++        let mut n_amb = 0u64;
++        let mut n_tres = 0u64;
++        for (tx, _) in &p.txs {
++            if tx.version != 4 {
++                continue;
++            }
++            let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
++                continue;
++            };
++            let c_ent = !tx.inputs.is_empty();
++            let c_sal = !tx.outputs.is_empty();
++            let c_cbid =
++                h1.consensus_branch_id != cbid_local || h2.consensus_branch_id != cbid_local;
++            let ph1 = h1.pre_hash();
++            let ph2 = h2.pre_hash();
++            let o1 = ph1.as_bytes();
++            let o2 = ph2.as_bytes();
++            let c_orden = !(o1 < o2);
++            if c_ent {
++                n_ent += 1;
++            }
++            if c_sal {
++                n_sal += 1;
++            }
++            if c_ent && c_sal {
++                n_amb += 1;
++            }
++            if c_ent && c_cbid && c_orden {
++                n_tres += 1;
++            }
++            if c_cbid {
++                n_cbid += 1;
++            }
++            if c_orden {
++                n_orden += 1;
++                if o1 == o2 {
++                    n_ig += 1;
++                } else {
++                    n_de += 1;
++                }
++            }
++        }
++        if es_forma(&ErrorFormaTx::EvidenciaConEntradasOSalidas) {
++            inc_mapa(&mut cobertura.forma, "bloque_estructura", 1);
++            if hay_tx {
++                inc_mapa(&mut cobertura.forma, "con_tx_estructura", 1);
++            }
++            match primer_defecto_forma(p, cbid_local) {
++                Some(DefectoForma::Entradas) => {
++                    inc_mapa(&mut cobertura.forma, "bloque_estructura_entradas", 1);
++                }
++                Some(DefectoForma::Salidas) => {
++                    inc_mapa(&mut cobertura.forma, "bloque_estructura_salidas", 1);
++                }
++                _ => {
++                    inc_mapa(&mut cobertura.forma, "bloque_estructura_ambos", 1);
++                }
++            }
++            if n_tres > 0 {
++                inc_mapa(&mut cobertura.forma, "bloque_estructura_cbid_orden", 1);
++            }
++            inc_mapa(
++                &mut cobertura.forma,
++                "ev_estructura",
++                (n_ent + n_sal).saturating_sub(n_amb).max(1),
++            );
++        } else if es_forma(&ErrorFormaTx::EvidenciaCbidAjeno) {
++            inc_mapa(&mut cobertura.forma, "bloque_cbid", 1);
++            inc_mapa(&mut cobertura.forma, "ev_cbid", n_cbid.max(1));
++            if hay_tx {
++                inc_mapa(&mut cobertura.forma, "con_tx_cbid", 1);
++            }
++            if n_orden > 0 {
++                inc_mapa(&mut cobertura.forma, "ambos_cbid", 1);
++            }
++        } else if es_forma(&ErrorFormaTx::OrdenCanonicoInvalido) {
++            inc_mapa(&mut cobertura.forma, "bloque_orden", 1);
++            if hay_tx {
++                inc_mapa(&mut cobertura.forma, "con_tx_orden", 1);
++            }
++            match primer_defecto_forma(p, cbid_local) {
++                Some(DefectoForma::OrdenIgual) => {
++                    inc_mapa(&mut cobertura.forma, "bloque_orden_igual", 1);
++                }
++                _ => {
++                    inc_mapa(&mut cobertura.forma, "bloque_orden_desc", 1);
++                }
++            }
++            inc_mapa(&mut cobertura.forma, "ev_orden", n_orden.max(1));
++            inc_mapa(&mut cobertura.forma, "ev_orden_igual", n_ig);
++            inc_mapa(&mut cobertura.forma, "ev_orden_desc", n_de);
++        }
++    }
++}
++
+ fn acumular_caso(
+     cobertura: &mut Cobertura,
+     reales: &Reales,
+@@ -1399,7 +1592,7 @@
+ 
+ fn generar_lineas(c: &Cobertura) -> Vec<String> {
+     let mut out = Vec::new();
+-    out.push("SECCION vectores-v0.5 (casos aleatorios)".to_string());
++    out.push("SECCION vectores-v0.6 (casos aleatorios)".to_string());
+     out.push(format!("casos = {}", c.casos));
+     for t in TIPOS_COBERTURA {
+         let desc_t = c.descartes.get(t);
+@@ -1486,12 +1679,14 @@
+         c.reorgs
+     ));
+     out.extend(generar_lineas_evidencia(c));
++    out.extend(generar_lineas_forma(c));
+     out
+ }
+ 
+ /// Sección `EV ...` de la cobertura de evidencia (orden alfabético como el oráculo).
+ fn generar_lineas_evidencia(c: &Cobertura) -> Vec<String> {
+-    let mut out = vec!["SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)".to_string()];
++    let mut out =
++        vec!["SECCION evidencia SL-3b/SL-4c-O (dirigidos + aleatorios C-EVP)".to_string()];
+     let mut claves: Vec<&String> = c.ev.keys().collect();
+     claves.sort();
+     for k in claves {
+@@ -1500,12 +1695,58 @@
+     out
+ }
+ 
++/// Sección `FORMA ...` de la forma v4, en el orden exacto del oráculo (`exportar.jl:507-513`) y
++/// con la línea final `minimos_SL4cO`.
++fn generar_lineas_forma(c: &Cobertura) -> Vec<String> {
++    const CLAVES: [&str; 18] = [
++        "bloque_estructura",
++        "bloque_estructura_entradas",
++        "bloque_estructura_salidas",
++        "bloque_estructura_ambos",
++        "bloque_estructura_cbid_orden",
++        "ev_estructura",
++        "con_tx_estructura",
++        "bloque_cbid",
++        "bloque_orden",
++        "bloque_orden_igual",
++        "bloque_orden_desc",
++        "ev_cbid",
++        "ev_orden",
++        "ev_orden_igual",
++        "ev_orden_desc",
++        "ambos_cbid",
++        "con_tx_cbid",
++        "con_tx_orden",
++    ];
++    let v = |k: &str| c.forma.get(k).copied().unwrap_or(0);
++    let mut out = vec!["SECCION forma v4 SL-4c-O/SL-4c-O-B/SL-4c-O-C".to_string()];
++    for k in CLAVES {
++        out.push(format!("FORMA {k} = {}", v(k)));
++    }
++    let minimos = v("bloque_cbid") >= 30
++        && v("bloque_orden") >= 30
++        && v("con_tx_cbid") >= 10
++        && v("con_tx_orden") >= 10
++        && v("ambos_cbid") >= 5
++        && v("bloque_orden_desc") >= 10
++        && v("bloque_orden_igual") >= 10
++        && v("bloque_estructura") >= 30
++        && v("con_tx_estructura") >= 10
++        && v("bloque_estructura_ambos") >= 5
++        && v("bloque_estructura_cbid_orden") >= 5;
++    out.push(format!(
++        "FORMA minimos_SL4cO = {}",
++        if minimos { "OK" } else { "NO" }
++    ));
++    out
++}
++
+ fn cobertura_esperada() -> Vec<String> {
+     let texto = fs::read_to_string(RUTA_COBERTURA).expect("leer cobertura");
+     let mut lineas = Vec::new();
+     let mut dentro = false;
+     for linea in texto.lines() {
+-        if linea.starts_with("SECCION vectores-v0.5") {
++        if linea.starts_with("SECCION vectores-v0.6") {
+             dentro = true;
+             lineas.push(linea.to_string());
+             continue;
+@@ -1628,16 +1869,27 @@
+         ));
+     }
+     let evp = parametros_evidencia(&caso.param);
+-    contar_evidencia(
+-        &reales,
+-        &cadena,
+-        &orden,
+-        &desc,
+-        cobertura,
+-        params,
+-        caso.param.k,
+-        evp,
+-    );
++    // El oráculo solo alimenta `contar_evidencia` con los dirigidos `D-1*`, los `ev-aleatorio` y
++    // los `forma-*` (`exportar.jl:407,436,451`); el resto de dirigidos (p. ej. `D-20`/`D-21`) no
++    // cuentan en la sección de evidencia.
++    let cuenta_evidencia = caso.nombre.starts_with("D-1")
++        || caso.nombre == "ev-aleatorio"
++        || caso.nombre.starts_with("forma-");
++    if cuenta_evidencia {
++        contar_evidencia(
++            &reales,
++            &cadena,
++            &orden,
++            &desc,
++            cobertura,
++            params,
++            caso.param.k,
++            evp,
++        );
++    }
++    // SL-4c: la forma v4 (los tres errores) se cuenta sobre **todos** los bloques construidos,
++    // válidos o no, con el `cbid` local del perfil (`evp.cbid`).
++    contar_forma_evidencia(&reales, &cadena, cobertura, evp.cbid);
+     if caso.nombre == "aleatorio" {
+         acumular_caso(cobertura, &reales, &orden, &desc, params, caso.param.k, evp);
+     }
+@@ -1696,7 +1948,7 @@
+     (informe, discrepancias, diferencias_cob, obtenido_cob)
+ }
+ 
+-/// V4 · diferencial completo contra T04-D (`vectores-estado-dag-v0.3.txt`, 914 casos).
++/// V4 · diferencial completo contra T04 (`vectores-estado-dag-v0.6.txt`, 2 108 casos).
+ #[test]
+ fn diferencial_t04() {
+     let (informe, discrepancias, diferencias_cob, _cob) = correr();
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/aplicar.rs ws/crates/zx-consensus/src/transicion/aplicar.rs
+--- ws.orig/crates/zx-consensus/src/transicion/aplicar.rs	2026-09-26 20:59:03.618471247 +0200
++++ ws/crates/zx-consensus/src/transicion/aplicar.rs	2026-09-27 00:11:17.086551954 +0200
+@@ -51,7 +51,7 @@
+     cbid: u32,
+     evp: &ParametrosEvidencia,
+ ) -> Result<(Estado, Undo), ErrorTransicion> {
+-    validar_bloque(bloque, evp.evp)?;
++    validar_bloque(bloque, evp)?;
+     let mut ap = Aplicador::nuevo(estado.clone());
+     match &bloque.hechos {
+         HechosCabecera::Genesis { .. } => aplicar_genesis(&mut ap, &bloque.txs)?,
+@@ -65,16 +65,20 @@
+ ///
+ /// SL-4a: la v4 solo se valida con su forma propia cuando el perfil activa la evidencia (`evp`); en
+ /// otro caso `validar_forma_tx` la rechaza como inactiva, como antes.
++///
++/// SL-4c: la forma de la v4 incluye `RAT-1` (las dos cabeceras con el `consensus_branch_id` de la
++/// red local, `evp.cbid`) y el orden canónico (`EV-01`/`EV-04`); un fallo de forma de una
++/// transacción invalida el bloque entero (el modo fusión también llama a esta función).
+ pub(crate) fn validar_bloque(
+     bloque: &BloqueTransicion,
+-    evidencia_activa: bool,
++    evp: &ParametrosEvidencia,
+ ) -> Result<(), ErrorTransicion> {
+     if let Some(cabecera) = &bloque.cabecera_post {
+         validar_forma_cabecera_post(cabecera)?;
+     }
+     for (tx, testigos) in &bloque.txs {
+-        if tx.version == 4 && evidencia_activa {
+-            validar_forma_tx_v4(tx, testigos)?;
++        if tx.version == 4 && evp.evp {
++            validar_forma_tx_v4(tx, testigos, evp.cbid)?;
+         } else {
+             validar_forma_tx(tx, testigos)?;
+         }
+@@ -635,8 +639,10 @@
+ 
+ /// Aplica una `EvidenceTx` v4 (`EV-01`…`EV-22`, `RAT-1`/`RAT-2′`/`RAT-3`).
+ ///
+-/// El orden de validación es **el del oráculo T01** (identidad antes que orden, ventana antes que
+-/// duplicado), para que el diferencial no dependa de combinaciones de fallos.
++/// `RAT-1` (`cbid` de la red local), `EV-01` (orden canónico) y `EV-04` (sin entradas, salidas ni
++/// testigos) ya son **forma** de la v4 y se comprueban en `validar_forma_tx_v4`, antes de esta
++/// función; aquí solo queda la parte semántica. El orden es el del oráculo T01: identidad, sellos,
++/// puerta RAT-3, ventana y deduplicación.
+ fn aplicar_evidencia(
+     ap: &mut Aplicador,
+     bloque: &BloqueTransicion,
+@@ -653,24 +659,12 @@
+             },
+         ));
+     };
+-    // EV-04: sin entradas ni salidas monetarias.
+-    if !tx.inputs.is_empty() || !tx.outputs.is_empty() {
+-        return Err(ErrorTransicion::ErrEvidenciaConEntradas);
+-    }
+-    // RAT-1: ambas cabeceras, de la red local.
++    // EV-06: identidad común exacta.
+     let id1 = identidad_de_cabecera(h1);
+     let id2 = identidad_de_cabecera(h2);
+-    if id1.cbid != evp.cbid || id2.cbid != evp.cbid {
+-        return Err(ErrorTransicion::ErrCbidAjeno);
+-    }
+-    // EV-06: identidad común exacta.
+     if id1 != id2 {
+         return Err(ErrorTransicion::ErrSinEvidencia);
+     }
+-    // EV-01: orden canónico estricto por `pre_hash`.
+-    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
+-        return Err(ErrorTransicion::ErrOrdenCanonico);
+-    }
+     // EV-07: sellos válidos bajo la misma `sol.public_key`.
+     h1.verificar_sello()
+         .map_err(|_| ErrorTransicion::ErrSinEvidencia)?;
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/error.rs ws/crates/zx-consensus/src/transicion/error.rs
+--- ws.orig/crates/zx-consensus/src/transicion/error.rs	2026-09-26 20:59:03.618489926 +0200
++++ ws/crates/zx-consensus/src/transicion/error.rs	2026-09-27 00:11:06.996341379 +0200
+@@ -87,21 +87,12 @@
+     /// `EV-01`/`EV-06`/`EV-07`: no hay dos decisiones de firma válidas.
+     #[error("ErrSinEvidencia")]
+     ErrSinEvidencia,
+-    /// `RAT-1`: alguna cabecera no pertenece a la red local.
+-    #[error("ErrCbidAjeno")]
+-    ErrCbidAjeno,
+-    /// `EV-01`: `pre_hash(H1) < pre_hash(H2)` no se cumple estrictamente.
+-    #[error("ErrOrdenCanonico")]
+-    ErrOrdenCanonico,
+     /// `EV-14`: `slot_aplicacion ≥ slot_falta + Plazo_slots`.
+     #[error("ErrEvidenciaTardia")]
+     ErrEvidenciaTardia,
+     /// `EV-12`: el `incident_id` ya está registrado.
+     #[error("ErrEvidenciaDuplicada")]
+     ErrEvidenciaDuplicada,
+-    /// `EV-04`: la `EvidenceTx` lleva entradas o salidas monetarias.
+-    #[error("ErrEvidenciaConEntradas")]
+-    ErrEvidenciaConEntradas,
+     /// `EV-24(i)`: la liberación encuentra un incidente admitido y no liquidado.
+     #[error("ErrCasoAbierto")]
+     ErrCasoAbierto,
+@@ -117,7 +108,9 @@
+     /// Nombre del error tal y como lo escribe el oráculo T01, para el diferencial.
+     ///
+     /// Aplica las correspondencias de §4 de la orden: `ErrFirma` se lee como `ErrAutorizacion` y
+-    /// los errores de forma concretos se leen como el nombre de T01 que sustituyen.
++    /// los errores de forma concretos se leen como el nombre que el oráculo escribe en el vector.
++    /// Desde SL-4c, los tres defectos de forma de la `EvidenceTx` (`RAT-1`, `EV-01`/`EV-04`) se
++    /// escriben con el nombre **completo** `ErrForma(...)`, igual que en T01 v0.5 y T04 v0.6.
+     #[must_use]
+     pub fn nombre_t01(&self) -> &'static str {
+         match self {
+@@ -131,8 +124,14 @@
+             // `DepositoSinEntradas` (F-07). Se traduce al nombre del oráculo para el diferencial
+             // (los vectores solo combinan `ent=[]` con firmante ≠ clave, ver `PROGRESO.md` FD-7).
+             Self::ErrForma(ErrorFormaTx::DepositoSinEntradas) => "ErrAutorizacion",
+-            Self::ErrForma(ErrorFormaTx::EvidenciaConEntradasOSalidas) => "ErrEvidenciaConEntradas",
+-            Self::ErrForma(ErrorFormaTx::OrdenCanonicoInvalido) => "ErrOrdenCanonico",
++            // SL-4c · las tres formas de la v4, con el nombre completo del vector.
++            Self::ErrForma(ErrorFormaTx::EvidenciaConEntradasOSalidas) => {
++                "ErrForma(EvidenciaConEntradasOSalidas)"
++            }
++            Self::ErrForma(ErrorFormaTx::EvidenciaCbidAjeno) => "ErrForma(EvidenciaCbidAjeno)",
++            Self::ErrForma(ErrorFormaTx::OrdenCanonicoInvalido) => {
++                "ErrForma(OrdenCanonicoInvalido)"
++            }
+             Self::ErrGenesis => "ErrGenesis",
+             Self::ErrPow => "ErrPow",
+             Self::ErrEmision => "ErrEmision",
+@@ -153,11 +152,8 @@
+             Self::ErrRetiroPendiente => "ErrRetiroPendiente",
+             Self::ErrNonce => "ErrNonce",
+             Self::ErrSinEvidencia => "ErrSinEvidencia",
+-            Self::ErrCbidAjeno => "ErrCbidAjeno",
+-            Self::ErrOrdenCanonico => "ErrOrdenCanonico",
+             Self::ErrEvidenciaTardia => "ErrEvidenciaTardia",
+             Self::ErrEvidenciaDuplicada => "ErrEvidenciaDuplicada",
+-            Self::ErrEvidenciaConEntradas => "ErrEvidenciaConEntradas",
+             Self::ErrCasoAbierto => "ErrCasoAbierto",
+             Self::ErrVentanaAbierta => "ErrVentanaAbierta",
+             Self::ErrPuertaRAT3 => "ErrPuertaRAT3",
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/src/transicion/fusion.rs ws/crates/zx-consensus/src/transicion/fusion.rs
+--- ws.orig/crates/zx-consensus/src/transicion/fusion.rs	2026-09-26 20:59:03.618511936 +0200
++++ ws/crates/zx-consensus/src/transicion/fusion.rs	2026-09-27 00:11:21.787650062 +0200
+@@ -53,7 +53,7 @@
+     cbid: u32,
+     evp: &ParametrosEvidencia,
+ ) -> Result<(Estado, Undo, Vec<TxDescartada>), ErrorTransicion> {
+-    validar_bloque(bloque, evp.evp)?;
++    validar_bloque(bloque, evp)?;
+     if matches!(bloque.hechos, HechosCabecera::Genesis { .. }) {
+         let (nuevo, undo) = aplicar_con_undo(estado, bloque, params, cbid, evp)?;
+         return Ok((nuevo, undo, Vec::new()));
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/tests/diferencial_t01.rs ws/crates/zx-consensus/tests/diferencial_t01.rs
+--- ws.orig/crates/zx-consensus/tests/diferencial_t01.rs	2026-09-26 20:59:03.618557375 +0200
++++ ws/crates/zx-consensus/tests/diferencial_t01.rs	2026-09-27 01:05:41.188326476 +0200
+@@ -1,7 +1,7 @@
+-//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-SL4a` §2.3, V4; vectores v0.4 con
++//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-SL4a` §2.3, V4; vectores v0.5 con
+ //! `EvidenceTx`).
+ //!
+-//! Lee `testdata/transicion-v0.4/vectores-transicion-v0.4.txt` (y su cobertura), deriva claves
++//! Lee `testdata/transicion-v0.5/vectores-transicion-v0.5.txt` (y su cobertura), deriva claves
+ //! Ed25519 deterministas por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)` con
+ //! `ed25519-zebra`), construye transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante`
+ //! abstracto, traduce la salida implícita de una `Liberacion` a su `OutPoint` real `(txid, 0)`,
+@@ -38,14 +38,14 @@
+     SolucionPoas, SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
+ };
+ 
+-/// Rutas a los ficheros de vectores v0.4 dentro del workspace (`ws/testdata/...`).
++/// Rutas a los ficheros de vectores v0.5 dentro del workspace (`ws/testdata/...`).
+ const RUTA_VECTORES: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+-    "/../../testdata/transicion-v0.4/vectores-transicion-v0.4.txt"
++    "/../../testdata/transicion-v0.5/vectores-transicion-v0.5.txt"
+ );
+ const RUTA_COBERTURA: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+-    "/../../testdata/transicion-v0.4/cobertura-v0.4.txt"
++    "/../../testdata/transicion-v0.5/cobertura-v0.5.txt"
+ );
+ const RUTA_NEGATIVOS: &str = concat!(
+     env!("CARGO_MANIFEST_DIR"),
+@@ -1114,7 +1114,11 @@
+     *cov.entry(k.to_string()).or_insert(0) += 1;
+ }
+ 
+-/// Reproduce `contar_cobertura` del oráculo T01 (`exportar.jl:291-335`) sobre el `memo` del BFS.
++/// Reproduce `contar_cobertura` del oráculo T01 (`exportar.jl:298-358`) sobre el `memo` del BFS.
++///
++/// SL-4c: además de los contadores de v0.4, reproduce los subtipos de la forma v4:
++/// `ambos` (cbid ajeno + orden no canónico en la primera evidencia, gana el cbid) y
++/// `orden_igual`/`orden_descendente` (solo cuando el error es `OrdenCanonicoInvalido`).
+ fn contar_cobertura(
+     caso: &Caso,
+     reales: &Reales,
+@@ -1127,7 +1131,12 @@
+         return;
+     }
+     for (i, b) in caso.bloques.iter().enumerate() {
+-        let Some(txev) = b.txs.iter().find(|t| t.tipo == "Evidencia") else {
++        let Some((idx, txev)) = b
++            .txs
++            .iter()
++            .enumerate()
++            .find(|(_, t)| t.tipo == "Evidencia")
++        else {
+             continue;
+         };
+         let ep = memo.get(&b.padre);
+@@ -1150,20 +1159,62 @@
+         } else if ep.is_none() {
+             inc_cov(cov, "sin_padre");
+         } else if let Some(ep) = ep {
++            // Forma v4 de la **primera** evidencia del bloque (la que el oráculo mira): sus dos
++            // defectos de forma, calculados sobre las cabeceras reales.
++            let (cbid_ajeno, orden_malo, orden_igual) = if txev.ev.is_some() {
++                match reales
++                    .bloques
++                    .get(i)
++                    .and_then(|bl| bl.txs.get(idx))
++                    .map(|(t, _)| t)
++                {
++                    Some(Tx {
++                        extension: ExtensionTx::Evidencia { h1, h2 },
++                        ..
++                    }) => {
++                        let ph1 = h1.pre_hash();
++                        let ph2 = h2.pre_hash();
++                        let o1 = ph1.as_bytes();
++                        let o2 = ph2.as_bytes();
++                        (
++                            h1.consensus_branch_id != evp.cbid
++                                || h2.consensus_branch_id != evp.cbid,
++                            !(o1 < o2),
++                            o1 == o2,
++                        )
++                    }
++                    _ => (false, false, false),
++                }
++            } else {
++                (false, false, false)
++            };
++            if cbid_ajeno && orden_malo {
++                inc_cov(cov, "ambos");
++            }
+             let nombre = match aplicar_con_undo(ep, &reales.bloques[i], params, CBID_RED_DEV, evp) {
+                 Ok(_) => "otro_error",
+                 Err(e) => match e.nombre_t01() {
+                     "ErrEvidenciaDuplicada" => "duplicada",
+                     "ErrEvidenciaTardia" => "tardia",
+-                    "ErrCbidAjeno" => "cbid_ajeno",
+-                    "ErrOrdenCanonico" => "orden_canonico",
++                    "ErrForma(EvidenciaCbidAjeno)" => "cbid_ajeno",
++                    "ErrForma(OrdenCanonicoInvalido)" => "orden_canonico",
+                     "ErrSinEvidencia" => "sin_evidencia",
+-                    "ErrEvidenciaConEntradas" => "con_entradas",
++                    "ErrForma(EvidenciaConEntradasOSalidas)" => "con_entradas",
+                     "ErrPuertaRAT3" => "puerta_rat3",
+                     _ => "otro_error",
+                 },
+             };
+             inc_cov(cov, nombre);
++            if nombre == "orden_canonico" && txev.ev.is_some() {
++                inc_cov(
++                    cov,
++                    if orden_igual {
++                        "orden_igual"
++                    } else {
++                        "orden_descendente"
++                    },
++                );
++            }
+         }
+     }
+ }
+@@ -1384,7 +1435,7 @@
+     (informe, discrepancias.len(), cov)
+ }
+ 
+-/// Lee los contadores de `cobertura-v0.4.txt` (líneas `clave = valor`).
++/// Lee los contadores de `cobertura-v0.5.txt` (líneas `clave = valor`).
+ fn cargar_cobertura() -> BTreeMap<String, usize> {
+     let contenido = fs::read_to_string(RUTA_COBERTURA).expect("leer cobertura");
+     let mut mapa = BTreeMap::new();
+@@ -1399,8 +1450,8 @@
+     mapa
+ }
+ 
+-/// V4: diferencial completo contra el oráculo T01 (`vectores-transicion-v0.4.txt`, 2 795 casos) y
+-/// tabla de cobertura **idéntica** a `cobertura-v0.4.txt`.
++/// V4: diferencial completo contra el oráculo T01 (`vectores-transicion-v0.5.txt`, 3 179 casos) y
++/// tabla de cobertura **idéntica** a `cobertura-v0.5.txt`.
+ #[test]
+ fn diferencial_t01() {
+     let casos = cargar_casos(RUTA_VECTORES);
+@@ -1421,7 +1472,7 @@
+     );
+     assert_eq!(
+         cov, esperada,
+-        "cobertura T01 distinta de cobertura-v0.4.txt:\n{cob_informe}"
++        "cobertura T01 distinta de cobertura-v0.5.txt:\n{cob_informe}"
+     );
+ }
+ 
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-consensus/tests/evidencia.rs ws/crates/zx-consensus/tests/evidencia.rs
+--- ws.orig/crates/zx-consensus/tests/evidencia.rs	2026-09-26 20:59:03.618588544 +0200
++++ ws/crates/zx-consensus/tests/evidencia.rs	2026-09-27 01:05:41.190326517 +0200
+@@ -204,16 +204,19 @@
+     evidencia_tx(cbid, clave_idx, slot, 11, 22, true, true, Vec::new())
+ }
+ 
+-/// `cbid` ajeno ⇒ `ErrCbidAjeno` (RAT-1).
++/// `cbid` ajeno ⇒ `ErrForma(EvidenciaCbidAjeno)` (RAT-1, forma de la v4).
+ #[test]
+ fn cbid_ajeno() {
+     let estado = estado_post();
+     let bloque = bloque_post(1, clave_de(1), vec![(ev_valida(99, 1, 1), Vec::new())]);
+     let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
+-    assert_eq!(r, Err(ErrorTransicion::ErrCbidAjeno));
++    assert_eq!(
++        r,
++        Err(ErrorTransicion::ErrForma(ErrorFormaTx::EvidenciaCbidAjeno))
++    );
+ }
+ 
+-/// Orden canónico inválido (`pre_hash` iguales) ⇒ `ErrOrdenCanonico` (EV-01).
++/// Orden canónico inválido (`pre_hash` iguales) ⇒ `ErrForma(OrdenCanonicoInvalido)` (EV-01).
+ #[test]
+ fn orden_canonico_invalido() {
+     let estado = estado_post();
+@@ -221,7 +224,12 @@
+     let tx = evidencia_tx(7, 1, 1, 5, 5, true, true, Vec::new());
+     let bloque = bloque_post(1, clave_de(1), vec![(tx, Vec::new())]);
+     let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
+-    assert_eq!(r, Err(ErrorTransicion::ErrOrdenCanonico));
++    assert_eq!(
++        r,
++        Err(ErrorTransicion::ErrForma(
++            ErrorFormaTx::OrdenCanonicoInvalido
++        ))
++    );
+ }
+ 
+ /// Sellos inválidos ⇒ `ErrSinEvidencia` (EV-07).
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/error.rs ws/crates/zx-core/src/error.rs
+--- ws.orig/crates/zx-core/src/error.rs	2026-09-26 20:59:03.618599864 +0200
++++ ws/crates/zx-core/src/error.rs	2026-09-27 00:10:26.868503940 +0200
+@@ -347,6 +347,11 @@
+     #[error("EV-04: EvidenceTx con entradas, salidas o testigos (MUST ser 0)")]
+     EvidenciaConEntradasOSalidas,
+ 
++    /// `RAT-1`: alguna de las dos cabeceras de una `EvidenceTx` v4 no lleva el
++    /// `consensus_branch_id` de la red local (el que el llamante pasa como `cbid_local`).
++    #[error("RAT-1: cabecera de EvidenceTx con consensus_branch_id ajeno a la red local")]
++    EvidenciaCbidAjeno,
++
+     /// `EV-01`/`EV-04`: las dos cabeceras de una `EvidenceTx` no están en orden canónico
+     /// estrictamente ascendente por `pre_hash`.
+     #[error("EV-01: cabeceras de EvidenceTx fuera de orden canónico por pre_hash")]
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/forma.rs ws/crates/zx-core/src/forma.rs
+--- ws.orig/crates/zx-core/src/forma.rs	2026-09-26 20:59:03.618636314 +0200
++++ ws/crates/zx-core/src/forma.rs	2026-09-27 00:10:35.216678160 +0200
+@@ -200,19 +200,32 @@
+     Ok(())
+ }
+ 
+-/// Valida la **forma** de una `EvidenceTx` v4 (`EV-01`…`EV-04`), sin contexto ni activación.
++/// Valida la **forma** de una `EvidenceTx` v4 (`EV-01`…`EV-04`, `RAT-1`), sin contexto ni activación.
+ ///
+-/// Lo meramente estructural: coherencia `version = 4 ⇔ Evidencia`, `lock_time = 0`,
+-/// `expiry_height = 0`, sin entradas, salidas ni testigos de transacción (`EV-01`, `EV-02`,
+-/// `EV-04`), y cada cabecera con forma válida de `PoAS_PoT_DAG` (F-03).
++/// Comprueba, **en este orden**:
++/// 1. lo meramente estructural: coherencia `version = 4 ⇔ Evidencia`, `lock_time = 0`,
++///    `expiry_height = 0`, sin entradas, salidas ni testigos de transacción (`EV-01`, `EV-02`,
++///    `EV-04`), y cada cabecera con forma válida de `PoAS_PoT_DAG` (F-03);
++/// 2. `RAT-1`: las **dos** cabeceras llevan el `consensus_branch_id` de la red local
++///    (`cbid_local`, que el llamante pasa sin valor por defecto);
++/// 3. `EV-01`/`EV-04`: orden canónico estricto por `pre_hash`, `pre_hash(H1) <_lex pre_hash(H2)`
++///    (incluye rechazar `H1 = H2`).
+ ///
+-/// **No** comprueba el orden canónico ni el `cbid`, la identidad, los sellos, la puerta RAT-3 o la
+-/// ventana: esas comprobaciones son semánticas y viven en `zx_consensus::transicion`, en el mismo
+-/// orden que el oráculo T01 (que comprueba identidad antes que orden).
++/// El llamante (el motor) pasa como `cbid_local` el `consensus_branch_id` de la red local del
++/// perfil (`ParametrosEvidencia::cbid`), **no** el `cbid` semántico de `txid`/sighash. El
++/// `cbid` de cada cabecera es un dato de forma sin contexto: no depende del estado ni del orden
++/// de fusión.
++///
++/// **No** comprueba la identidad, los sellos, la puerta RAT-3 ni la ventana: esas comprobaciones
++/// son semánticas y viven en `zx_consensus::transicion`.
+ ///
+ /// # Errores
+ /// [`ErrorFormaTx`]; ver las variantes usadas.
+-pub fn validar_forma_tx_v4(tx: &Tx, testigos: &[Vec<u8>]) -> Result<(), ErrorFormaTx> {
++pub fn validar_forma_tx_v4(
++    tx: &Tx,
++    testigos: &[Vec<u8>],
++    cbid_local: u32,
++) -> Result<(), ErrorFormaTx> {
+     if tx.version != 4 {
+         return Err(ErrorFormaTx::VersionDesconocida {
+             version: tx.version,
+@@ -240,5 +253,13 @@
+     }
+     validar_forma_cabecera_post(h1)?;
+     validar_forma_cabecera_post(h2)?;
++    // RAT-1: ambas cabeceras, de la red local.
++    if h1.consensus_branch_id != cbid_local || h2.consensus_branch_id != cbid_local {
++        return Err(ErrorFormaTx::EvidenciaCbidAjeno);
++    }
++    // EV-01/EV-04: orden canónico estricto (incluye `H1 = H2`).
++    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
++        return Err(ErrorFormaTx::OrdenCanonicoInvalido);
++    }
+     Ok(())
+ }
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/src/wire.rs ws/crates/zx-core/src/wire.rs
+--- ws.orig/crates/zx-core/src/wire.rs	2026-09-26 20:59:03.618702972 +0200
++++ ws/crates/zx-core/src/wire.rs	2026-09-27 00:10:52.859046344 +0200
+@@ -50,6 +50,7 @@
+ use crate::error::EncodingError;
+ use crate::firma::{ClavePublica, LONGITUD_CLAVE};
+ use crate::preimage::block::{BlockHeader, TAMANO_CABECERA};
++use crate::preimage::dag::dag_header_desde_bytes;
+ use crate::tx::{ExtensionTx, Lock, MAX_MULTISIG_KEYS, OutPoint, TipoGarantia, Tx, TxIn, TxOut};
+ 
+ /// Máximo de entradas, salidas o testigos que un lector acepta declarados.
+@@ -264,7 +265,7 @@
+         }
+         // SL-4a · v4: `H1 ‖ H2`, cada cabecera autodelimitada por su `parent_count`. El contrato
+         // (EV-02) no fija el wire de la v4; esta es la extensión elegida y queda declarada en
+-        // `DEFINICIONES-FALTANTES.md` (FD-5). `tx_desde_bytes` sigue rechazando la v4.
++        // `DEFINICIONES-FALTANTES.md` (FD-5). SL-4c: `tx_desde_bytes` la decodifica (FD-5).
+         ExtensionTx::Evidencia { h1, h2 } => {
+             salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h1));
+             salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h2));
+@@ -287,23 +288,24 @@
+ 
+ /// Lee una transacción y sus testigos (C-WIRE-03, F-14).
+ ///
+-/// F-14: el parser lee `version` y, según ella, **exige** los campos extra de v2/v3 o los prohíbe
+-/// (v1). Tras el último testigo no se consume nada más: el resto se devuelve al llamante, que es
+-/// quien decide (el bloque lo usa para encadenar transacciones; una transacción suelta **MUST**
+-/// exigir que el resto venga vacío).
++/// F-14: el parser lee `version` y, según ella, **exige** los campos extra de v2/v3, las dos
++/// cabeceras `PoAS_PoT_DAG` de la v4 o los prohíbe (v1). Tras el último testigo no se consume nada
++/// más: el resto se devuelve al llamante, que es quien decide (el bloque lo usa para encadenar
++/// transacciones; una transacción suelta **MUST** exigir que el resto venga vacío).
+ ///
+ /// # Errores
+-/// [`EncodingError::VersionInactiva`] para la 4, [`EncodingError::VersionDesconocida`] para el
+-/// resto, [`EncodingError::TipoGarantiaInvalido`] para un `tipo` de v2 fuera de `{1,2,3}`,
+-/// [`EncodingError::Truncado`] si faltan bytes, [`EncodingError::DemasiadosElementos`] si un
+-/// contador declarado supera [`MAX_ELEMENTOS_DECLARADOS`], o el error del campo que no decodifique.
++/// [`EncodingError::VersionDesconocida`] para una versión fuera de `{1,2,3,4}`,
++/// [`EncodingError::TipoGarantiaInvalido`] para un `tipo` de v2 fuera de `{1,2,3}`,
++/// [`EncodingError::Truncado`] si faltan bytes (incluida una cabecera DAG truncada),
++/// [`EncodingError::DemasiadosElementos`] si un contador declarado supera
++/// [`MAX_ELEMENTOS_DECLARADOS`], o el error del campo que no decodifique. La v4 se decodifica aquí;
++/// su **activación** la decide el motor (F-05/FD-5), no el códec.
+ pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingError> {
+     let (version, r) = int::leer_u32(bytes)?;
+-    // F-05: solo 1, 2 y 3 están activas en v0; la 4 está diseñada pero inactiva; el resto se
+-    // rechaza. El parser no acepta una versión fuera de rango.
++    // F-05: 1, 2, 3 y 4 son decodificables; el resto se rechaza. La v4 es la `EvidenceTx` y el
++    // **motor** decide su activación (SL-4c, FD-5): el parser no la confunde con inactiva.
+     match version {
+-        1..=3 => {}
+-        4 => return Err(EncodingError::VersionInactiva { version }),
++        1..=4 => {}
+         v => return Err(EncodingError::VersionDesconocida { version: v }),
+     }
+     let (lock_time, r) = int::leer_u32(r)?;
+@@ -365,6 +367,17 @@
+                 slot,
+             }
+         }
++        4 => {
++            // SL-4c · FD-5: dos cabeceras `PoAS_PoT_DAG` completas, `H1 ‖ H2`, cada una
++            // autodelimitada por su `parent_count` (589–1 037 B, F-02/F-04). El parser no adivina
++            // la familia: delega en el parser de cabecera DAG, que acota `parent_count` y rechaza
++            // truncamiento y orden no canónico de padres. Tras `H2` sigue el recuento de testigos,
++            // igual que en las demás versiones; `EV-01` (n_wit = 0) es forma, no códec.
++            let (h1, resto) = dag_header_desde_bytes(r)?;
++            let (h2, resto) = dag_header_desde_bytes(resto)?;
++            r = resto;
++            ExtensionTx::Evidencia { h1, h2 }
++        }
+         // Ya se validó arriba: solo queda la 1.
+         _ => ExtensionTx::Ninguna,
+     };
+diff -ruN -x target -x .cargo-home -x PDF ws.orig/crates/zx-core/tests/formato_v0.rs ws/crates/zx-core/tests/formato_v0.rs
+--- ws.orig/crates/zx-core/tests/formato_v0.rs	2026-09-26 03:58:34.540853133 +0200
++++ ws/crates/zx-core/tests/formato_v0.rs	2026-09-27 01:09:09.413587008 +0200
+@@ -9,6 +9,7 @@
+ //! los negativos de ORDEN-W02 §6, y la firma de aceptación (válida y rechazos).
+ 
+ #![expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
++#![expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
+ #![expect(
+     clippy::panic,
+     reason = "el test falla ruidosamente si falta el oráculo"
+@@ -21,10 +22,11 @@
+ use zx_core::firma::{ClavePublica, Firma, LONGITUD_FIRMA};
+ use zx_core::wire::{tx_a_bytes, tx_desde_bytes};
+ use zx_core::{
+-    Amount, BodyCommitment, CBID_RED_DEV, DagBlockHeader, Digest, EncodingError, ErrorFormaTx,
+-    ExtensionTx, Lock, MAGIC_DEV, MerkleRoot, OutPoint, PadresDag, SolucionPoas, TipoGarantia, Tx,
+-    TxId, TxIn, TxOut, ZX_VALUE_SANITY_LIMIT, mensaje_aceptacion, sha3_256_publico, txid,
+-    validar_forma_cabecera_post, validar_forma_tx, verificar_aceptacion,
++    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, DagBlockHeader, Digest, EncodingError,
++    ErrorFormaTx, ExtensionTx, Lock, MAGIC_DEV, MerkleRoot, OutPoint, PadresDag, SolucionPoas,
++    TAMANO_CABECERA_MAX, TAMANO_CABECERA_MIN, TipoGarantia, Tx, TxId, TxIn, TxOut,
++    ZX_VALUE_SANITY_LIMIT, dag_header_a_bytes, dag_header_desde_bytes, mensaje_aceptacion,
++    sha3_256_publico, txid, validar_forma_cabecera_post, validar_forma_tx, verificar_aceptacion,
+ };
+ 
+ const CBID_OTRO: u32 = 0x0102_0304;
+@@ -873,13 +875,15 @@
+         );
+     }
+ 
++    // SL-4c: la v4 ya no es `VersionInactiva` en el códec (FD-5); estos bytes son de una v2, así
++    // que el parser v4 no encuentra dos cabeceras DAG y rechaza por truncamiento.
+     let mut b4 = b.clone();
+     b4.get_mut(..4)
+         .unwrap()
+         .copy_from_slice(&4u32.to_le_bytes());
+     assert!(matches!(
+         tx_desde_bytes(&b4),
+-        Err(EncodingError::VersionInactiva { version: 4 })
++        Err(EncodingError::Truncado { .. })
+     ));
+ 
+     for tipo in [0u8, 4, 0xff] {
+@@ -1059,3 +1063,161 @@
+     // `Firma` también es utilizable por la API pública.
+     let _ = Firma::desde_bytes(firma);
+ }
++
++// ── SL-4c · V2: ida y vuelta de la `EvidenceTx` v4 y rechazos del códec ──────
++
++/// Cabecera `PoAS_PoT_DAG` determinista y **firmada**, con `padres` padres (1..=15).
++///
++/// La firma es real (Ed25519): la ida y vuelta del códec se comprueba sobre cabeceras que
++/// satisfacen `C-HDR-04`, no sobre relleno.
++fn cabecera_v4(semilla: u64, padres: u8) -> DagBlockHeader {
++    let sk = SigningKey::from([0x5au8; 32]);
++    let vk: [u8; 32] = VerificationKey::from(&sk).into();
++    let mut extra = Vec::new();
++    for i in 0..padres.saturating_sub(1) {
++        let mut b = [0u8; 32];
++        b[..8].copy_from_slice(&semilla.to_le_bytes());
++        b[8..16].copy_from_slice(&u64::from(i).to_le_bytes());
++        extra.push(BlockHash::from_digest(Digest::from_bytes(b)));
++    }
++    let mut sel = [0u8; 32];
++    sel[..8].copy_from_slice(&semilla.wrapping_add(0x9e37_79b9).to_le_bytes());
++    let mut h = DagBlockHeader {
++        consensus_branch_id: CBID_RED_DEV,
++        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
++        timestamp: semilla,
++        height: 0,
++        slot: semilla,
++        pot_output: [0u8; 16],
++        rango_solucion: semilla,
++        sol: SolucionPoas {
++            public_key: ClavePublica::desde_bytes(vk),
++            sector_index: (semilla & 0xffff) as u16,
++            history_size: semilla,
++            ..Default::default()
++        },
++        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0u8; 32])),
++        padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes(sel)), &extra)
++            .expect("padres deterministas"),
++        sello: [0u8; 64],
++    };
++    let firma: [u8; LONGITUD_FIRMA] = sk.sign(h.pre_hash().as_bytes()).into();
++    h.sello = firma;
++    h
++}
++
++/// Construye una `Tx` v4 a partir de dos cabeceras, ordenándolas en el orden canónico.
++fn tx_v4(mut h1: DagBlockHeader, mut h2: DagBlockHeader) -> Tx {
++    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
++        core::mem::swap(&mut h1, &mut h2);
++    }
++    assert!(h1.pre_hash().as_bytes() < h2.pre_hash().as_bytes());
++    Tx {
++        version: 4,
++        inputs: Vec::new(),
++        outputs: Vec::new(),
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::Evidencia { h1, h2 },
++    }
++}
++
++/// V2 · ≥ 200 `EvidenceTx` v4 con cabeceras reales firmadas: bytes → tx idéntica, sin sobrantes.
++#[test]
++fn la_v4_sobrevive_a_ida_y_vuelta() {
++    let mut generadas = 0usize;
++    for caso in 0u64..210 {
++        let n1 = (caso % 15 + 1) as u8;
++        let n2 = ((caso * 7) % 15 + 1) as u8;
++        let tx = tx_v4(cabecera_v4(caso * 3 + 1, n1), cabecera_v4(caso * 5 + 2, n2));
++        let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
++            unreachable!("tx_v4 siempre es evidencia");
++        };
++        assert!(h1.verificar_sello().is_ok(), "sello H1 real");
++        assert!(h2.verificar_sello().is_ok(), "sello H2 real");
++
++        let mut bytes = Vec::new();
++        tx_a_bytes(&mut bytes, &tx, &[]);
++        let ((leida, testigos), resto) = tx_desde_bytes(&bytes).expect("la v4 decodifica");
++        assert!(resto.is_empty(), "caso {caso}: sin bytes sobrantes");
++        assert!(testigos.is_empty(), "caso {caso}: sin testigos");
++        assert_eq!(leida, tx, "caso {caso}: ida y vuelta exacta");
++        assert_eq!(
++            txid(&leida, CBID_RED_DEV),
++            txid(&tx, CBID_RED_DEV),
++            "caso {caso}: txid comprometido"
++        );
++        generadas += 1;
++    }
++    assert!(generadas >= 200, "se generaron {generadas} EvidenceTx");
++}
++
++/// V2 · truncamiento en cada frontera, sobrante que no se absorbe y extensión ajena.
++#[test]
++fn la_v4_rechaza_truncamientos_y_no_absorbe_sobrantes() {
++    let tx = tx_v4(cabecera_v4(11, 1), cabecera_v4(22, 3));
++    let mut bytes = Vec::new();
++    tx_a_bytes(&mut bytes, &tx, &[]);
++
++    // Cualquier prefijo estricto (incluida cada frontera de campo) MUST rechazarse.
++    for corte in 0..bytes.len() {
++        assert!(
++            tx_desde_bytes(bytes.get(..corte).unwrap()).is_err(),
++            "prefijo de {corte} bytes MUST rechazarse"
++        );
++    }
++
++    // Sobrante de 1 byte: F-14 no consume nada tras el último testigo; queda como resto de la
++    // transacción contenedora (una transacción suelta MUST exigir el resto vacío).
++    let mut con_sobrante = bytes.clone();
++    con_sobrante.push(0xAA);
++    let ((_, _), resto) = tx_desde_bytes(&con_sobrante).expect("cuerpo íntegro");
++    assert_eq!(resto, &[0xAA], "el byte sobrante no se absorbe");
++
++    // `version = 4` con la extensión de otra versión: no hay dos cabeceras DAG que leer.
++    let (t2, w2) = v2_minima();
++    let mut b2 = Vec::new();
++    tx_a_bytes(&mut b2, &t2, &w2);
++    b2.get_mut(..4)
++        .unwrap()
++        .copy_from_slice(&4u32.to_le_bytes());
++    assert!(matches!(
++        tx_desde_bytes(&b2),
++        Err(EncodingError::Truncado { .. })
++    ));
++}
++
++/// V2 · los límites de 589/1 037 B: 588 trunca y una región de 1 038 B (máxima + 1) deja el byte.
++#[test]
++fn los_limites_de_tamano_de_cabecera_se_rechazan() {
++    // 589 es el mínimo (`P = 1`) y 1 037 el máximo (`P = 15`), fijados por `parent_count ≤ 15`.
++    let h_min = cabecera_v4(1, 1);
++    let bytes_min = dag_header_a_bytes(&h_min);
++    assert_eq!(bytes_min.len(), TAMANO_CABECERA_MIN);
++    assert!(matches!(
++        dag_header_desde_bytes(bytes_min.get(..TAMANO_CABECERA_MIN - 1).unwrap()),
++        Err(EncodingError::Truncado { .. })
++    ));
++
++    let h_max = cabecera_v4(2, 15);
++    let bytes_max = dag_header_a_bytes(&h_max);
++    assert_eq!(bytes_max.len(), TAMANO_CABECERA_MAX);
++    let mut con_extra = bytes_max.clone();
++    con_extra.push(0x00);
++    let (leida, resto) = dag_header_desde_bytes(&con_extra).expect("la cabecera máxima decodifica");
++    assert_eq!(leida, h_max);
++    assert_eq!(
++        resto,
++        &[0x00],
++        "el byte extra no forma parte de la cabecera"
++    );
++
++    // A nivel de transacción: una H1 de 588 B trunca; 1 037 B + 1 byte deja ese byte para H2,
++    // que ya no cabe y trunca.
++    let tx = tx_v4(h_max, cabecera_v4(3, 1));
++    let mut bytes = Vec::new();
++    tx_a_bytes(&mut bytes, &tx, &[]);
++    const PREFIJO_TX: usize = 14; // version(4) + lock_time(4) + expiry_height(4) + n_in(1) + n_out(1)
++    assert!(tx_desde_bytes(bytes.get(..PREFIJO_TX + 588).unwrap()).is_err());
++    assert!(tx_desde_bytes(bytes.get(..PREFIJO_TX + TAMANO_CABECERA_MAX + 1).unwrap()).is_err());
++}
