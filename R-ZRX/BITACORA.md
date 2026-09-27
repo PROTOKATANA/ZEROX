@@ -380,3 +380,14 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   (W06d3 solo probó la bifurcación **antes** del primer PoST); corregido. **W06d7 redactada** (varios DAG, uno por
   terminal; selección por `blue_work` con el desempate del motor; `C-FIN-01`; V6(b) de verdad). Límite
   declarado de antemano: sin oráculo del caso multiterminal en DAG (T04-E al IPA).
+
+### 04:43–04:58 — W06d6 migrada (parcial); W06d7 y W07a lanzadas
+
+- **W06d6 migrada** (`b9210ec`, 28 archivos copiados tras comprobar base y alcance; su `ws.orig` llevaba los tests
+  de reproducción y el parche no aplicaba). Nodo tardío **superado** (cierra V5 de W06d5); RI-3a y RI-3c
+  corregidos con pruebas antes/después; adversario superado; 814/0/5. Incumplimiento declarado por el ejecutor:
+  `python3` para tres sustituciones de texto. `Cargo.lock` añade `tracing-subscriber` (lo pedí yo: contradicción
+  en mi orden).
+- **W06d7** (Sonnet, `39519aa`) y **W07a** (DeepSeek, `cf9cd2a`) lanzadas en paralelo: instrucción a W07a de hacer
+  cambios aditivos y aislados para que el rebase sea mecánico; SL-4b2 espera a ambas (dos redes de procesos reales
+  a la vez falsearían las pruebas de reloj). Lección: a los ejecutores, «no modifiques `ws.orig/`».
