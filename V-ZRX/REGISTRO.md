@@ -20,8 +20,8 @@ dependencias (huella: primeros 16 hex de `sha256`).
 
 | Instrumento | Ruta | Commit | `Manifest.toml` | Validado por | Qué garantiza | Límites |
 |---|---|---|---|---|---|---|
-| Oráculo de transición T01 | `P-ZRX/P-TRANSICION/T01/` | `f62c879` | `2ed91d3652493678` | `REVISION-T01…T01-E`, `P-SLASHING/REVISION-SL3b.md` | CONTRATO-v0 v0.1 + FORMATO v0.1 + evidencia (RAT-2′): 29,5 M historias, 0 fallos; genera los vectores v0.4 | Rejilla pequeña; semilla y generador declarados en su `METODO.md` |
-| Oráculo de estado DAG T04 | `P-ZRX/P-DAG/T04/` | `f62c879` | `4f037ea4d70cb059` | `REVISION-T04…T04-D`, `REVISION-SL3b.md` | Contrato de estado DAG, IE-1…IE-6 (46 500 bloques, 600 000 órdenes, 0 fallos); genera los vectores v0.5 | Máximo 3 padres en el generador |
+| Oráculo de transición T01 | `P-ZRX/P-TRANSICION/T01/` | `433f192` | `2ed91d3652493678` | `REVISION-T01…T01-E`, `P-SLASHING/REVISION-SL3b.md`, `REVISION-SL4c-O.md` | CONTRATO-v0 v0.1 + FORMATO v0.1 + evidencia (RAT-2′): 29,5 M historias, 0 fallos; genera los vectores v0.4 | Rejilla pequeña; semilla y generador declarados en su `METODO.md` |
+| Oráculo de estado DAG T04 | `P-ZRX/P-DAG/T04/` | `433f192` | `4f037ea4d70cb059` | `REVISION-T04…T04-D`, `REVISION-SL3b.md`, `REVISION-SL4c-O.md` | Contrato de estado DAG, IE-1…IE-6 (46 500 bloques, 600 000 órdenes, 0 fallos); genera los vectores v0.5 | Máximo 3 padres en el generador |
 | Oráculo de formato v0.1 | `P-ZRX/P-FORMATO/oraculo-formato-v0.1/` | `ccf4b6d` | `998525aba1454555` | `REVISION-W02b.md` | Codificación y forma de FORMATO v0.1 (85/85) | Sin `EvidenceTx` v4 (la cubren T01/T04 v0.4/v0.5) |
 | Modelo adversarial T02 | `P-ZRX/P-TRANSICION/T02/` | `49e4434` | `e05a57a9691d97b8` | `REVISION-T02.md`, `CORRECCION-T02-A.md` | Selección a través del corte (FC-1…FC-4), RFT-13, censura de depósitos (IPA A-08) | Sin latencia ni retarget |
 | Modelo de disuasión DS-3 | `P-ZRX/P-DISUASION/DS3/` | `54add85` | `688b622e36141b6a` | `REVISION-DS3.md` (aceptada con reparos) | Coste mínimo por ataque y mecanismo; cuatro vías coinciden en 4 216 celdas | Escenarios hipotéticos en u.e.; mezcla de magnitudes F5 (SL-2) |
@@ -36,6 +36,8 @@ dependencias (huella: primeros 16 hex de `sha256`).
 |---|---|---|---|---|---|
 | Transición v0.4 (2 795 casos) | `testdata/transicion-v0.4/` | `69cfaa4` | vectores `4f0a175a3b4390e4`, cobertura `f0a7baef80828545` | T01 (`f62c879`) | `zx-consensus/tests/diferencial_t01` |
 | Estado DAG v0.5 (1 878 casos) | `testdata/estado-dag-v0.5/` | `69cfaa4` | vectores `c7de88de1fa8755f`, cobertura `9c67f230989b2a51` | T04 (`f62c879`) | `zx-cadena/tests/diferencial_t04` |
+| **Transición v0.5 (3 179 casos; vigente)** | `testdata/transicion-v0.5/` | `ec9c6b9` | vectores `d72c5fd9bd9a988d`, cobertura `3bc430c35a2f28f5` | T01 (`433f192`, SL-4c-O/-B/-C) | `zx-consensus/tests/diferencial_t01` (0 discrepancias, SL-4c-R) |
+| **Estado DAG v0.6 (2 108 casos; vigente)** | `testdata/estado-dag-v0.6/` | `ec9c6b9` | vectores `86348a48e32491c9`, cobertura `2839de9749857b47` | T04 (`433f192`, SL-4c-O/-B/-C) | `zx-cadena/tests/diferencial_t04` (0 discrepancias, SL-4c-R) |
 | Formato v0.1 | `testdata/formato-v0.1/` | — | vectores `8dadda90384928e8` | oráculo de formato v0.1 | `zx-core` |
 | NIST CAVP SHA3-256 | `testdata/nist-cavp/` | — | ver `R-ZRX/MAPA-RESCATE.md` §1 | fuente externa | `zx-core` |
 
