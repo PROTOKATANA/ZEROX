@@ -347,6 +347,11 @@ pub enum ErrorFormaTx {
     #[error("EV-04: EvidenceTx con entradas, salidas o testigos (MUST ser 0)")]
     EvidenciaConEntradasOSalidas,
 
+    /// `RAT-1`: alguna de las dos cabeceras de una `EvidenceTx` v4 no lleva el
+    /// `consensus_branch_id` de la red local (el que el llamante pasa como `cbid_local`).
+    #[error("RAT-1: cabecera de EvidenceTx con consensus_branch_id ajeno a la red local")]
+    EvidenciaCbidAjeno,
+
     /// `EV-01`/`EV-04`: las dos cabeceras de una `EvidenceTx` no están en orden canónico
     /// estrictamente ascendente por `pre_hash`.
     #[error("EV-01: cabeceras de EvidenceTx fuera de orden canónico por pre_hash")]

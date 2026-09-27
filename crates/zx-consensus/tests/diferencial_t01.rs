@@ -1,7 +1,7 @@
-//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-SL4a` §2.3, V4; vectores v0.4 con
+//! Arnés **diferencial** contra el oráculo Julia T01 (`ORDEN-SL4a` §2.3, V4; vectores v0.5 con
 //! `EvidenceTx`).
 //!
-//! Lee `testdata/transicion-v0.4/vectores-transicion-v0.4.txt` (y su cobertura), deriva claves
+//! Lee `testdata/transicion-v0.5/vectores-transicion-v0.5.txt` (y su cobertura), deriva claves
 //! Ed25519 deterministas por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)` con
 //! `ed25519-zebra`), construye transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante`
 //! abstracto, traduce la salida implícita de una `Liberacion` a su `OutPoint` real `(txid, 0)`,
@@ -38,14 +38,14 @@ use zx_core::{
     SolucionPoas, SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
 
-/// Rutas a los ficheros de vectores v0.4 dentro del workspace (`ws/testdata/...`).
+/// Rutas a los ficheros de vectores v0.5 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/transicion-v0.4/vectores-transicion-v0.4.txt"
+    "/../../testdata/transicion-v0.5/vectores-transicion-v0.5.txt"
 );
 const RUTA_COBERTURA: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/transicion-v0.4/cobertura-v0.4.txt"
+    "/../../testdata/transicion-v0.5/cobertura-v0.5.txt"
 );
 const RUTA_NEGATIVOS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -1114,7 +1114,11 @@ fn inc_cov(cov: &mut BTreeMap<String, usize>, k: &str) {
     *cov.entry(k.to_string()).or_insert(0) += 1;
 }
 
-/// Reproduce `contar_cobertura` del oráculo T01 (`exportar.jl:291-335`) sobre el `memo` del BFS.
+/// Reproduce `contar_cobertura` del oráculo T01 (`exportar.jl:298-358`) sobre el `memo` del BFS.
+///
+/// SL-4c: además de los contadores de v0.4, reproduce los subtipos de la forma v4:
+/// `ambos` (cbid ajeno + orden no canónico en la primera evidencia, gana el cbid) y
+/// `orden_igual`/`orden_descendente` (solo cuando el error es `OrdenCanonicoInvalido`).
 fn contar_cobertura(
     caso: &Caso,
     reales: &Reales,
@@ -1127,7 +1131,12 @@ fn contar_cobertura(
         return;
     }
     for (i, b) in caso.bloques.iter().enumerate() {
-        let Some(txev) = b.txs.iter().find(|t| t.tipo == "Evidencia") else {
+        let Some((idx, txev)) = b
+            .txs
+            .iter()
+            .enumerate()
+            .find(|(_, t)| t.tipo == "Evidencia")
+        else {
             continue;
         };
         let ep = memo.get(&b.padre);
@@ -1150,20 +1159,62 @@ fn contar_cobertura(
         } else if ep.is_none() {
             inc_cov(cov, "sin_padre");
         } else if let Some(ep) = ep {
+            // Forma v4 de la **primera** evidencia del bloque (la que el oráculo mira): sus dos
+            // defectos de forma, calculados sobre las cabeceras reales.
+            let (cbid_ajeno, orden_malo, orden_igual) = if txev.ev.is_some() {
+                match reales
+                    .bloques
+                    .get(i)
+                    .and_then(|bl| bl.txs.get(idx))
+                    .map(|(t, _)| t)
+                {
+                    Some(Tx {
+                        extension: ExtensionTx::Evidencia { h1, h2 },
+                        ..
+                    }) => {
+                        let ph1 = h1.pre_hash();
+                        let ph2 = h2.pre_hash();
+                        let o1 = ph1.as_bytes();
+                        let o2 = ph2.as_bytes();
+                        (
+                            h1.consensus_branch_id != evp.cbid
+                                || h2.consensus_branch_id != evp.cbid,
+                            !(o1 < o2),
+                            o1 == o2,
+                        )
+                    }
+                    _ => (false, false, false),
+                }
+            } else {
+                (false, false, false)
+            };
+            if cbid_ajeno && orden_malo {
+                inc_cov(cov, "ambos");
+            }
             let nombre = match aplicar_con_undo(ep, &reales.bloques[i], params, CBID_RED_DEV, evp) {
                 Ok(_) => "otro_error",
                 Err(e) => match e.nombre_t01() {
                     "ErrEvidenciaDuplicada" => "duplicada",
                     "ErrEvidenciaTardia" => "tardia",
-                    "ErrCbidAjeno" => "cbid_ajeno",
-                    "ErrOrdenCanonico" => "orden_canonico",
+                    "ErrForma(EvidenciaCbidAjeno)" => "cbid_ajeno",
+                    "ErrForma(OrdenCanonicoInvalido)" => "orden_canonico",
                     "ErrSinEvidencia" => "sin_evidencia",
-                    "ErrEvidenciaConEntradas" => "con_entradas",
+                    "ErrForma(EvidenciaConEntradasOSalidas)" => "con_entradas",
                     "ErrPuertaRAT3" => "puerta_rat3",
                     _ => "otro_error",
                 },
             };
             inc_cov(cov, nombre);
+            if nombre == "orden_canonico" && txev.ev.is_some() {
+                inc_cov(
+                    cov,
+                    if orden_igual {
+                        "orden_igual"
+                    } else {
+                        "orden_descendente"
+                    },
+                );
+            }
         }
     }
 }
@@ -1384,7 +1435,7 @@ fn correr_diferencial(casos: &[Caso]) -> (String, usize, BTreeMap<String, usize>
     (informe, discrepancias.len(), cov)
 }
 
-/// Lee los contadores de `cobertura-v0.4.txt` (líneas `clave = valor`).
+/// Lee los contadores de `cobertura-v0.5.txt` (líneas `clave = valor`).
 fn cargar_cobertura() -> BTreeMap<String, usize> {
     let contenido = fs::read_to_string(RUTA_COBERTURA).expect("leer cobertura");
     let mut mapa = BTreeMap::new();
@@ -1399,8 +1450,8 @@ fn cargar_cobertura() -> BTreeMap<String, usize> {
     mapa
 }
 
-/// V4: diferencial completo contra el oráculo T01 (`vectores-transicion-v0.4.txt`, 2 795 casos) y
-/// tabla de cobertura **idéntica** a `cobertura-v0.4.txt`.
+/// V4: diferencial completo contra el oráculo T01 (`vectores-transicion-v0.5.txt`, 3 179 casos) y
+/// tabla de cobertura **idéntica** a `cobertura-v0.5.txt`.
 #[test]
 fn diferencial_t01() {
     let casos = cargar_casos(RUTA_VECTORES);
@@ -1421,7 +1472,7 @@ fn diferencial_t01() {
     );
     assert_eq!(
         cov, esperada,
-        "cobertura T01 distinta de cobertura-v0.4.txt:\n{cob_informe}"
+        "cobertura T01 distinta de cobertura-v0.5.txt:\n{cob_informe}"
     );
 }
 

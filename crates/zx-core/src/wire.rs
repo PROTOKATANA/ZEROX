@@ -50,6 +50,7 @@ use crate::encoding::{compact_size, int};
 use crate::error::EncodingError;
 use crate::firma::{ClavePublica, LONGITUD_CLAVE};
 use crate::preimage::block::{BlockHeader, TAMANO_CABECERA};
+use crate::preimage::dag::dag_header_desde_bytes;
 use crate::tx::{ExtensionTx, Lock, MAX_MULTISIG_KEYS, OutPoint, TipoGarantia, Tx, TxIn, TxOut};
 
 /// Máximo de entradas, salidas o testigos que un lector acepta declarados.
@@ -264,7 +265,7 @@ pub fn tx_a_bytes(salida: &mut Vec<u8>, tx: &Tx, testigos: &[Vec<u8>]) {
         }
         // SL-4a · v4: `H1 ‖ H2`, cada cabecera autodelimitada por su `parent_count`. El contrato
         // (EV-02) no fija el wire de la v4; esta es la extensión elegida y queda declarada en
-        // `DEFINICIONES-FALTANTES.md` (FD-5). `tx_desde_bytes` sigue rechazando la v4.
+        // `DEFINICIONES-FALTANTES.md` (FD-5). SL-4c: `tx_desde_bytes` la decodifica (FD-5).
         ExtensionTx::Evidencia { h1, h2 } => {
             salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h1));
             salida.extend_from_slice(&crate::preimage::dag::dag_header_a_bytes(h2));
@@ -287,23 +288,24 @@ pub type TxConTestigos = (Tx, Vec<Vec<u8>>);
 
 /// Lee una transacción y sus testigos (C-WIRE-03, F-14).
 ///
-/// F-14: el parser lee `version` y, según ella, **exige** los campos extra de v2/v3 o los prohíbe
-/// (v1). Tras el último testigo no se consume nada más: el resto se devuelve al llamante, que es
-/// quien decide (el bloque lo usa para encadenar transacciones; una transacción suelta **MUST**
-/// exigir que el resto venga vacío).
+/// F-14: el parser lee `version` y, según ella, **exige** los campos extra de v2/v3, las dos
+/// cabeceras `PoAS_PoT_DAG` de la v4 o los prohíbe (v1). Tras el último testigo no se consume nada
+/// más: el resto se devuelve al llamante, que es quien decide (el bloque lo usa para encadenar
+/// transacciones; una transacción suelta **MUST** exigir que el resto venga vacío).
 ///
 /// # Errores
-/// [`EncodingError::VersionInactiva`] para la 4, [`EncodingError::VersionDesconocida`] para el
-/// resto, [`EncodingError::TipoGarantiaInvalido`] para un `tipo` de v2 fuera de `{1,2,3}`,
-/// [`EncodingError::Truncado`] si faltan bytes, [`EncodingError::DemasiadosElementos`] si un
-/// contador declarado supera [`MAX_ELEMENTOS_DECLARADOS`], o el error del campo que no decodifique.
+/// [`EncodingError::VersionDesconocida`] para una versión fuera de `{1,2,3,4}`,
+/// [`EncodingError::TipoGarantiaInvalido`] para un `tipo` de v2 fuera de `{1,2,3}`,
+/// [`EncodingError::Truncado`] si faltan bytes (incluida una cabecera DAG truncada),
+/// [`EncodingError::DemasiadosElementos`] si un contador declarado supera
+/// [`MAX_ELEMENTOS_DECLARADOS`], o el error del campo que no decodifique. La v4 se decodifica aquí;
+/// su **activación** la decide el motor (F-05/FD-5), no el códec.
 pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingError> {
     let (version, r) = int::leer_u32(bytes)?;
-    // F-05: solo 1, 2 y 3 están activas en v0; la 4 está diseñada pero inactiva; el resto se
-    // rechaza. El parser no acepta una versión fuera de rango.
+    // F-05: 1, 2, 3 y 4 son decodificables; el resto se rechaza. La v4 es la `EvidenceTx` y el
+    // **motor** decide su activación (SL-4c, FD-5): el parser no la confunde con inactiva.
     match version {
-        1..=3 => {}
-        4 => return Err(EncodingError::VersionInactiva { version }),
+        1..=4 => {}
         v => return Err(EncodingError::VersionDesconocida { version: v }),
     }
     let (lock_time, r) = int::leer_u32(r)?;
@@ -364,6 +366,17 @@ pub fn tx_desde_bytes(bytes: &[u8]) -> Result<(TxConTestigos, &[u8]), EncodingEr
                 importe: Amount::nuevo(brek)?,
                 slot,
             }
+        }
+        4 => {
+            // SL-4c · FD-5: dos cabeceras `PoAS_PoT_DAG` completas, `H1 ‖ H2`, cada una
+            // autodelimitada por su `parent_count` (589–1 037 B, F-02/F-04). El parser no adivina
+            // la familia: delega en el parser de cabecera DAG, que acota `parent_count` y rechaza
+            // truncamiento y orden no canónico de padres. Tras `H2` sigue el recuento de testigos,
+            // igual que en las demás versiones; `EV-01` (n_wit = 0) es forma, no códec.
+            let (h1, resto) = dag_header_desde_bytes(r)?;
+            let (h2, resto) = dag_header_desde_bytes(resto)?;
+            r = resto;
+            ExtensionTx::Evidencia { h1, h2 }
         }
         // Ya se validó arriba: solo queda la 1.
         _ => ExtensionTx::Ninguna,

@@ -53,7 +53,7 @@ pub fn aplicar_fusion(
     cbid: u32,
     evp: &ParametrosEvidencia,
 ) -> Result<(Estado, Undo, Vec<TxDescartada>), ErrorTransicion> {
-    validar_bloque(bloque, evp.evp)?;
+    validar_bloque(bloque, evp)?;
     if matches!(bloque.hechos, HechosCabecera::Genesis { .. }) {
         let (nuevo, undo) = aplicar_con_undo(estado, bloque, params, cbid, evp)?;
         return Ok((nuevo, undo, Vec::new()));

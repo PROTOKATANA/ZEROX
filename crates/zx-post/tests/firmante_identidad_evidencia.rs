@@ -6,7 +6,8 @@
 //!   `zx_core::validar_forma_tx_v4` y **se aplica** en el motor (`zx-consensus`, dev-dependency);
 //! - (c) cambiando **uno** de los seis campos de la identidad (uno por test, incluido
 //!   `consensus_branch_id`), el firmante las trata como oportunidades distintas **y** el motor
-//!   rechaza la evidencia (`ErrSinEvidencia`, o `ErrCbidAjeno` para el `cbid`);
+//!   rechaza la evidencia (`ErrSinEvidencia`; el `cbid` ajeno lo rechaza antes la forma v4 con
+//!   `ErrorFormaTx::EvidenciaCbidAjeno`, `RAT-1`);
 //! - (d) cambiar un campo que no es de la identidad (padres, cuerpo, `timestamp`) no cambia la
 //!   identidad del firmante.
 //!
@@ -24,8 +25,8 @@ use ed25519_zebra::SigningKey;
 use primitive_types::U256;
 use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
 use zx_core::{
-    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, MerkleRoot,
-    Tx, incident_id_evidencia, validar_forma_tx_v4,
+    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, Digest, ErrorFormaTx,
+    ExtensionTx, MerkleRoot, Tx, incident_id_evidencia, validar_forma_tx_v4,
 };
 use zx_post::firmante::{Firmante, Registro, Resultado};
 
@@ -296,7 +297,7 @@ fn v5a_misma_identidad_firmante_si_y_solo_si_mismo_incident_id() {
 fn v5b_evidencia_v4_valida_pasa_forma_y_se_aplica() {
     let (h1, h2) = par_canonico(1, 1);
     let tx = tx_evidencia(h1, h2);
-    validar_forma_tx_v4(&tx, &[]).expect("forma v4 válida");
+    validar_forma_tx_v4(&tx, &[], CBID_EVP).expect("forma v4 válida");
     assert!(
         aplicar(tx).is_ok(),
         "la evidencia de dos firmas reales debe aplicarse"
@@ -322,6 +323,14 @@ fn caso_campo_identidad(
     let mut h2 = cabecera(CBID_EVP, 1, 1, 22, 0);
     let mut clave_h2 = 1u64;
     variar(&mut h2, &mut clave_h2);
+    // El orden canónico (`EV-01`/`EV-04`) también es forma y se comprueba antes que la semántica:
+    // se ajusta el `timestamp` (campo ajeno a la identidad) hasta `pre_hash(h1) < pre_hash(h2)`
+    // para que el motor llegue a la comprobación semántica en los cinco campos no-`cbid`.
+    let mut sal = h2.timestamp;
+    while h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
+        sal += 1;
+        h2.timestamp = sal;
+    }
     firmar(&mut h2, clave_h2);
 
     // (1) El firmante las trata como oportunidades distintas.
@@ -350,7 +359,7 @@ fn v5c_cbid_cambiado_oportunidad_distinta_y_err_cbid_ajeno() {
     caso_campo_identidad(
         "cbid",
         |h2, _| h2.consensus_branch_id = CBID_EVP + 1,
-        ErrorTransicion::ErrCbidAjeno,
+        ErrorTransicion::ErrForma(ErrorFormaTx::EvidenciaCbidAjeno),
     );
 }
 
@@ -403,7 +412,7 @@ fn v5c_slot_cambiado_oportunidad_distinta_y_err_sin_evidencia() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// V5(d) · Un campo que no es de la identidad no cambia la identidad del firmante
+// V5(d) · Campos ajenos a la identidad del firmante y forma v4 (`cbid` de red)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Cambia un campo que **no** es de la identidad y comprueba que la huella del firmante no cambia
@@ -465,17 +474,47 @@ fn v5d_timestamp_distinto_no_cambia_la_identidad() {
     });
 }
 
-/// La forma v4 no depende de la identidad: un par con distinto `cbid`, clave y slot pasa
-/// `validar_forma_tx_v4` (el rechazo por identidad es semántico y vive en el motor).
+/// La forma v4 **sí** mira el `cbid` de red (`RAT-1`) y **no** el resto de la identidad: un par con
+/// el mismo `cbid` y otro campo de identidad cambiado (clave, sector, historial, chunk o slot) pasa
+/// `validar_forma_tx_v4`; el rechazo por identidad es semántico y vive en el motor (`v5c_*`).
 #[test]
-fn v5d_la_forma_v4_no_mira_la_identidad() {
+fn v5d_la_forma_v4_rechaza_cbid_ajeno_y_acepta_el_resto_de_la_identidad() {
+    // (1) `cbid` ajeno en la segunda cabecera ⇒ forma v4 inválida (RAT-1), antes del orden.
     let mut h1 = cabecera(CBID_EVP, 1, 1, 11, 0);
-    let mut h2 = cabecera(CBID_EVP + 1, 3, 2, 22, 0);
+    let mut h2 = cabecera(CBID_EVP + 1, 1, 1, 22, 0);
     firmar(&mut h1, 1);
-    firmar(&mut h2, 3);
+    firmar(&mut h2, 1);
+    let tx = tx_evidencia(h1, h2);
+    assert_eq!(
+        validar_forma_tx_v4(&tx, &[], CBID_EVP),
+        Err(ErrorFormaTx::EvidenciaCbidAjeno),
+        "la forma v4 debe rechazar un cbid ajeno a la red local"
+    );
+
+    // (2) Mismo `cbid` y otro campo de la identidad cambiado ⇒ la forma v4 lo acepta (el rechazo
+    //     por identidad es semántico y lo cubren los `v5c_*`).
+    forma_acepta_identidad_distinta("clave", |h| h.sol.public_key = clave_de(3));
+    forma_acepta_identidad_distinta("sector", |h| h.sol.sector_index += 1);
+    forma_acepta_identidad_distinta("historia", |h| h.sol.history_size += 1);
+    forma_acepta_identidad_distinta("chunk", |h| h.sol.chunk[0] ^= 0x01);
+    forma_acepta_identidad_distinta("slot", |h| h.slot += 1);
+}
+
+/// Con el mismo `cbid` local, cambia la identidad de `H2` y ajusta su `timestamp` hasta que
+/// `pre_hash(H1) < pre_hash(H2)`; la forma v4 debe aceptarlo (no mira el resto de la identidad ni
+/// los sellos, que aquí no se comprueban).
+fn forma_acepta_identidad_distinta(etiqueta: &str, variar: impl FnOnce(&mut DagBlockHeader)) {
+    let h1 = cabecera(CBID_EVP, 1, 1, 11, 0);
+    let mut h2 = cabecera(CBID_EVP, 1, 1, 22, 0);
+    variar(&mut h2);
+    let mut sal = 0u64;
+    while h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
+        sal += 1;
+        h2.timestamp = sal;
+    }
     let tx = tx_evidencia(h1, h2);
     assert!(
-        validar_forma_tx_v4(&tx, &[]).is_ok(),
-        "la forma v4 no mira cbid, identidad ni sellos"
+        validar_forma_tx_v4(&tx, &[], CBID_EVP).is_ok(),
+        "la forma v4 no debe mirar la identidad salvo el cbid ({etiqueta})"
     );
 }

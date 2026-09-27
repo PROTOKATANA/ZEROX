@@ -1,0 +1,28 @@
+# cobertura SL-4c-O-C T01 v0.5 · 2026-09-26T23:43:13+02:00
+# contadores de EvidenceTx (dirigidos + aleatorios de evidencia):
+#  aplicada    = aplicada sin descarte en la historia seleccionada
+#  sin_saldo   = aplicada con la clave sin garantía (V=0, EV-22)
+#  duplicada   = descartada por ErrEvidenciaDuplicada (EV-12)
+#  tardia      = descartada por ErrEvidenciaTardia (EV-14)
+#  cbid_ajeno  = error de forma ErrForma(EvidenciaCbidAjeno) (RAT-1);
+#                incluye los casos `ambos` (precedencia del cbid)
+#  orden_canonico = error de forma ErrForma(OrdenCanonicoInvalido) (EV-01/EV-04)
+#  orden_descendente / orden_igual = subtipos de `orden_canonico`
+#                (pre_hash(H1) > pre_hash(H2) / =); excluyen `ambos`
+#  ambos       = casos con cbid ajeno Y orden no canónico (subconjunto de cbid_ajeno)
+#  con_entradas= error de forma ErrForma(EvidenciaConEntradasOSalidas)
+#                (EV-04, estructura; primera de la precedencia)
+#  sin_evidencia / puerta_rat3 / otro_error / malformada / sin_padre
+#  deshecha    = aplicada y deshecha exactamente con `deshacer` (EV-27);
+#                T01 no fusiona ramas, así que no mide reorganización
+ambos = 120
+aplicada = 260
+cbid_ajeno = 252
+con_entradas = 120
+deshecha = 380
+duplicada = 40
+orden_canonico = 252
+orden_descendente = 132
+orden_igual = 120
+sin_saldo = 120
+tardia = 200

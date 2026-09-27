@@ -1,0 +1,7 @@
+2026-09-27T02:13:19+02:00  inicio SL-4c-R; lectura de ORDEN-SL4c-R.md y LINEO.md; verificacion ENTRADA-SL4c-R.sha256 8/8 verde
+2026-09-27T02:13:19+02:00  copia a ws.orig/ y ws/; cambios.patch de SL-4c aplicado limpio (git apply, 11 archivos); testdata v0.5/v0.6 copiados y vectores identicos a los oraculos
+2026-09-27T02:13:19+02:00  test adaptado; cargo fmt --all -- --check OK
+2026-09-27T02:57:26+02:00  clippy #1 OK; cargo test completo: 5 fallos v5c (el orden canonico de la forma preempta ErrSinEvidencia); corregido el helper caso_campo_identidad
+2026-09-27T02:57:26+02:00  clippy final OK; fmt --check OK; 12/12 en zx-post firmante_identidad_evidencia
+2026-09-27T03:33:35+02:00  suite conjunta final: 797 pasan, 0 fallan, 5 ignorados; diferencial_t01 (3179) y diferencial_t04 (2108) con 0 discrepancias; ci/dependencias-exactas.sh y ci/frontera-crates.sh OK
+2026-09-27T03:33:35+02:00  cambios.patch (18 archivos, con testdata/) y MIGRACION.sha256 (18 entradas); sha256sum -c verde; INFORME.md/PROGRESO.md cerrados

@@ -23,3 +23,15 @@
    traspaso, otra vez: la comparación de `testdata/` detectó la omisión antes de migrar).
 2. Incompatibilidad con el test de SL-4b1 `firmante_identidad_evidencia.rs` (firma antigua y `ErrCbidAjeno`):
    no es un defecto de SL-4c, sino de la secuencia de migraciones.
+
+## SL-4c-R y migración (2026-09-27 ≈ 03:36)
+
+SL-4c-R (DeepSeek, 02:09–03:34) aplicó el parche de SL-4c sobre `9df48b8` (limpio), copió los dos directorios de
+`testdata/` (idénticos a los oráculos) y adaptó **solo** `crates/zx-post/tests/firmante_identidad_evidencia.rs`
+(firma de tres argumentos; `cbid` ajeno → `ErrForma(EvidenciaCbidAjeno)`; `v5d` reescrito: la forma rechaza el
+`cbid` ajeno y acepta los demás campos de la identidad; el ayudante `caso_campo_identidad` ajusta el
+`timestamp` para respetar el orden canónico). **Primera suite conjunta de W06d5 + SL-4b1 + SL-4c: 797 pasan,
+0 fallan, 5 ignorados**; `diferencial_t01` 3 179 + 3 914 negativos y `diferencial_t04` 2 108, **0
+discrepancias**; `fmt`, `clippy -D warnings`, guardianes. Desviación declarada: usó `git apply` como aplicador
+dentro de su zona (no hay `patch`), sin tocar índice ni historial; aceptada. **Migrada** por parche (18 rutas,
+incluido `testdata/`), 18/18 huellas en la raíz, crates y `testdata/` idénticos a la zona. `resultados-SL4c-R/`.

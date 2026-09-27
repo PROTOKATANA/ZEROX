@@ -51,7 +51,7 @@ pub fn aplicar_con_undo(
     cbid: u32,
     evp: &ParametrosEvidencia,
 ) -> Result<(Estado, Undo), ErrorTransicion> {
-    validar_bloque(bloque, evp.evp)?;
+    validar_bloque(bloque, evp)?;
     let mut ap = Aplicador::nuevo(estado.clone());
     match &bloque.hechos {
         HechosCabecera::Genesis { .. } => aplicar_genesis(&mut ap, &bloque.txs)?,
@@ -65,16 +65,20 @@ pub fn aplicar_con_undo(
 ///
 /// SL-4a: la v4 solo se valida con su forma propia cuando el perfil activa la evidencia (`evp`); en
 /// otro caso `validar_forma_tx` la rechaza como inactiva, como antes.
+///
+/// SL-4c: la forma de la v4 incluye `RAT-1` (las dos cabeceras con el `consensus_branch_id` de la
+/// red local, `evp.cbid`) y el orden canónico (`EV-01`/`EV-04`); un fallo de forma de una
+/// transacción invalida el bloque entero (el modo fusión también llama a esta función).
 pub(crate) fn validar_bloque(
     bloque: &BloqueTransicion,
-    evidencia_activa: bool,
+    evp: &ParametrosEvidencia,
 ) -> Result<(), ErrorTransicion> {
     if let Some(cabecera) = &bloque.cabecera_post {
         validar_forma_cabecera_post(cabecera)?;
     }
     for (tx, testigos) in &bloque.txs {
-        if tx.version == 4 && evidencia_activa {
-            validar_forma_tx_v4(tx, testigos)?;
+        if tx.version == 4 && evp.evp {
+            validar_forma_tx_v4(tx, testigos, evp.cbid)?;
         } else {
             validar_forma_tx(tx, testigos)?;
         }
@@ -635,8 +639,10 @@ fn amount_saturado(v: i128) -> Amount {
 
 /// Aplica una `EvidenceTx` v4 (`EV-01`…`EV-22`, `RAT-1`/`RAT-2′`/`RAT-3`).
 ///
-/// El orden de validación es **el del oráculo T01** (identidad antes que orden, ventana antes que
-/// duplicado), para que el diferencial no dependa de combinaciones de fallos.
+/// `RAT-1` (`cbid` de la red local), `EV-01` (orden canónico) y `EV-04` (sin entradas, salidas ni
+/// testigos) ya son **forma** de la v4 y se comprueban en `validar_forma_tx_v4`, antes de esta
+/// función; aquí solo queda la parte semántica. El orden es el del oráculo T01: identidad, sellos,
+/// puerta RAT-3, ventana y deduplicación.
 fn aplicar_evidencia(
     ap: &mut Aplicador,
     bloque: &BloqueTransicion,
@@ -653,23 +659,11 @@ fn aplicar_evidencia(
             },
         ));
     };
-    // EV-04: sin entradas ni salidas monetarias.
-    if !tx.inputs.is_empty() || !tx.outputs.is_empty() {
-        return Err(ErrorTransicion::ErrEvidenciaConEntradas);
-    }
-    // RAT-1: ambas cabeceras, de la red local.
+    // EV-06: identidad común exacta.
     let id1 = identidad_de_cabecera(h1);
     let id2 = identidad_de_cabecera(h2);
-    if id1.cbid != evp.cbid || id2.cbid != evp.cbid {
-        return Err(ErrorTransicion::ErrCbidAjeno);
-    }
-    // EV-06: identidad común exacta.
     if id1 != id2 {
         return Err(ErrorTransicion::ErrSinEvidencia);
-    }
-    // EV-01: orden canónico estricto por `pre_hash`.
-    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
-        return Err(ErrorTransicion::ErrOrdenCanonico);
     }
     // EV-07: sellos válidos bajo la misma `sol.public_key`.
     h1.verificar_sello()

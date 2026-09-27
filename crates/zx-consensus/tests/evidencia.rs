@@ -204,16 +204,19 @@ fn ev_valida(cbid: u32, clave_idx: u64, slot: i64) -> Tx {
     evidencia_tx(cbid, clave_idx, slot, 11, 22, true, true, Vec::new())
 }
 
-/// `cbid` ajeno ⇒ `ErrCbidAjeno` (RAT-1).
+/// `cbid` ajeno ⇒ `ErrForma(EvidenciaCbidAjeno)` (RAT-1, forma de la v4).
 #[test]
 fn cbid_ajeno() {
     let estado = estado_post();
     let bloque = bloque_post(1, clave_de(1), vec![(ev_valida(99, 1, 1), Vec::new())]);
     let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
-    assert_eq!(r, Err(ErrorTransicion::ErrCbidAjeno));
+    assert_eq!(
+        r,
+        Err(ErrorTransicion::ErrForma(ErrorFormaTx::EvidenciaCbidAjeno))
+    );
 }
 
-/// Orden canónico inválido (`pre_hash` iguales) ⇒ `ErrOrdenCanonico` (EV-01).
+/// Orden canónico inválido (`pre_hash` iguales) ⇒ `ErrForma(OrdenCanonicoInvalido)` (EV-01).
 #[test]
 fn orden_canonico_invalido() {
     let estado = estado_post();
@@ -221,7 +224,12 @@ fn orden_canonico_invalido() {
     let tx = evidencia_tx(7, 1, 1, 5, 5, true, true, Vec::new());
     let bloque = bloque_post(1, clave_de(1), vec![(tx, Vec::new())]);
     let r = aplicar_con_undo(&estado, &bloque, &params(), CBID_RED_DEV, &evp(7));
-    assert_eq!(r, Err(ErrorTransicion::ErrOrdenCanonico));
+    assert_eq!(
+        r,
+        Err(ErrorTransicion::ErrForma(
+            ErrorFormaTx::OrdenCanonicoInvalido
+        ))
+    );
 }
 
 /// Sellos inválidos ⇒ `ErrSinEvidencia` (EV-07).

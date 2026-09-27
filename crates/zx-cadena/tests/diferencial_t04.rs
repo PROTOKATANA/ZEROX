@@ -1,6 +1,6 @@
 //! Arnés **diferencial** contra el oráculo T04 (`ORDEN-SL4a`, V4 y V5).
 //!
-//! Lee `testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt`, deriva claves Ed25519 deterministas
+//! Lee `testdata/estado-dag-v0.6/vectores-estado-dag-v0.6.txt`, deriva claves Ed25519 deterministas
 //! por clave abstracta (`semilla = SHA3-256("zx-t01-clave" ‖ k u64 LE)`, igual que W03), construye
 //! transacciones **reales** v1/v2/v3/v4 firmadas por el `firmante` abstracto, traduce cada bloque a
 //! [`BloqueCadena`] con `padres`, `sr`, `sd`, `ident` y `k` y ejecuta [`Cadena`] en el orden de
@@ -10,9 +10,9 @@
 //! reales; el `incident_id` es opaco (se compara número y `@slot_falta`, FD-1).
 //!
 //! Compara, por caso: `RES` de cada bloque, `DESC` (transacción descartada y motivo), `SEL`, `UTXO`,
-//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 1 878 casos; V5 exige que la tabla de
-//! cobertura de los 900 casos aleatorios y la sección de evidencia sean idénticas a
-//! `cobertura-v0.5.txt` (la sección `run.jl` no se reproduce desde el fichero de vectores).
+//! `GAR` y `EST`. V4 exige **0 discrepancias** en los 2 108 casos; V5 exige que la tabla de
+//! cobertura (vectores aleatorios, evidencia y forma v4) sea idéntica a
+//! `cobertura-v0.6.txt` (la sección `run.jl` no se reproduce desde el fichero de vectores).
 
 #![expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
 #![expect(
@@ -26,7 +26,7 @@ use std::fs;
 
 use ed25519_zebra::{SigningKey, VerificationKey};
 use primitive_types::U256;
-use zx_cadena::{BloqueCadena, BloquePost, Cadena, Descarte};
+use zx_cadena::{BloqueCadena, BloquePost, Cadena, Descarte, MotivoBloque};
 use zx_consensus::transicion::{
     BloqueTransicion, Estado, Fase, HechosCabecera, ParametrosEvidencia, ParametrosTransicion,
     total_garantia,
@@ -35,20 +35,20 @@ use zx_consensus::transicion::{ErrorTransicion, Origen, Punto};
 use zx_core::preimage::tx::txid as calcular_txid;
 use zx_core::{
     Amount, BlockHash, BodyCommitment, CBID_RED_DEV, ClavePublica, DagBlockHeader, Digest,
-    ExtensionTx, HashType, Lock, MerkleRoot, OutPoint, PadresDag, SolucionPoas, SpentOutput,
-    TipoGarantia, Tx, TxId, TxIn, TxOut,
+    ErrorFormaTx, ExtensionTx, HashType, Lock, MerkleRoot, OutPoint, PadresDag, SolucionPoas,
+    SpentOutput, TipoGarantia, Tx, TxId, TxIn, TxOut,
 };
 use zx_dag::IdentidadGhostdag;
 
-/// Vectores v0.5 dentro del workspace (`ws/testdata/...`).
+/// Vectores v0.6 dentro del workspace (`ws/testdata/...`).
 const RUTA_VECTORES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/estado-dag-v0.5/vectores-estado-dag-v0.5.txt"
+    "/../../testdata/estado-dag-v0.6/vectores-estado-dag-v0.6.txt"
 );
 /// Tabla de cobertura esperada de T04.
 const RUTA_COBERTURA: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../testdata/estado-dag-v0.5/cobertura-v0.5.txt"
+    "/../../testdata/estado-dag-v0.6/cobertura-v0.6.txt"
 );
 /// Máximo de padres del generador de T04, declarado (`ORDEN-W06a-C` decisión 1): sus vectores no
 /// admiten más de 3 y la identidad viaja como `u64` de fixture (`IdentidadGhostdag::de_fixture`).
@@ -856,10 +856,17 @@ impl Constructor {
                 let _ = self.claves.id(ev.id1.clave);
                 let _ = self.claves.id(ev.id2.clave);
                 let (h1, h2) = cabeceras_de_evidencia(&ev);
+                // SL-4c-O-C: el modelo abstracto lleva `ent`/`sal` también en la evidencia; la
+                // forma v4 (`EV-04`) los rechaza, así que la `Tx` real debe conservarlos.
+                let mut inputs = Vec::with_capacity(tx.ent.len());
+                for id in &tx.ent {
+                    inputs.push(self.txin(*id));
+                }
+                let salidas = self.salidas_reales(&tx.sal);
                 let real = Tx {
                     version: 4,
-                    inputs: Vec::new(),
-                    outputs: Vec::new(),
+                    inputs,
+                    outputs: salidas,
                     lock_time: 0,
                     expiry_height: 0,
                     extension: ExtensionTx::Evidencia { h1, h2 },
@@ -1146,6 +1153,8 @@ struct Cobertura {
     casos: u64,
     /// SL-4a · contadores `EV ...` de la sección de evidencia.
     ev: BTreeMap<String, u64>,
+    /// SL-4c · contadores `FORMA ...` de la sección de forma v4.
+    forma: BTreeMap<String, u64>,
 }
 
 fn tipo_cobertura(tx: &Tx) -> Option<&'static str> {
@@ -1314,12 +1323,15 @@ fn contar_evidencia(
             }
             *cobertura.ev.entry("construida".to_string()).or_insert(0) += 1;
             if let Some(motivo) = descartadas.get(&(*hash, i)) {
+                // SL-4c: la forma v4 (entradas/salidas, cbid, orden) ya no es descarte semántico;
+                // estos nombres completos solo aparecerían si el motor dejara de validar la forma
+                // antes, y la cobertura los separa de la sección `FORMA`.
                 let nombre = match motivo.nombre_t01() {
                     "ErrEvidenciaDuplicada" => "duplicada",
                     "ErrEvidenciaTardia" => "tardia",
-                    "ErrCbidAjeno" => "cbid_ajeno",
-                    "ErrEvidenciaConEntradas" => "con_entradas",
-                    "ErrOrdenCanonico" => "orden_canonico",
+                    "ErrForma(EvidenciaCbidAjeno)" => "cbid_ajeno",
+                    "ErrForma(EvidenciaConEntradasOSalidas)" => "con_entradas",
+                    "ErrForma(OrdenCanonicoInvalido)" => "orden_canonico",
                     "ErrSinEvidencia" => "sin_evidencia",
                     _ => "otro",
                 };
@@ -1341,6 +1353,187 @@ fn contar_evidencia(
     let d = evidencias_deshechas_por_reorg(reales, params, k, evp);
     if d > 0 {
         *cobertura.ev.entry("deshecha".to_string()).or_insert(0) += d;
+    }
+}
+
+/// Primer sub-defecto de **forma v4** de un bloque, en el orden de sus transacciones
+/// (`primer_defecto_forma` del oráculo T04, `EstadoDAG.jl:217-232`): estructura →
+/// `cbid` → orden canónico. Devuelve `None` si ninguna `EvidenceTx` con cabeceras tiene defecto.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DefectoForma {
+    Entradas,
+    Salidas,
+    EntradasSalidas,
+    Cbid,
+    OrdenIgual,
+    OrdenDesc,
+}
+
+fn primer_defecto_forma(bloque: &BloquePost, cbid_local: u32) -> Option<DefectoForma> {
+    for (tx, _) in &bloque.txs {
+        if tx.version != 4 {
+            continue;
+        }
+        let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
+            continue;
+        };
+        let ent = !tx.inputs.is_empty();
+        let sal = !tx.outputs.is_empty();
+        if ent && sal {
+            return Some(DefectoForma::EntradasSalidas);
+        }
+        if ent {
+            return Some(DefectoForma::Entradas);
+        }
+        if sal {
+            return Some(DefectoForma::Salidas);
+        }
+        if h1.consensus_branch_id != cbid_local || h2.consensus_branch_id != cbid_local {
+            return Some(DefectoForma::Cbid);
+        }
+        let ph1 = h1.pre_hash();
+        let ph2 = h2.pre_hash();
+        let o1 = ph1.as_bytes();
+        let o2 = ph2.as_bytes();
+        if !(o1 < o2) {
+            return Some(if o1 == o2 {
+                DefectoForma::OrdenIgual
+            } else {
+                DefectoForma::OrdenDesc
+            });
+        }
+    }
+    None
+}
+
+/// Incrementa un contador solo si `d > 0` (semántica de `max(n, 1)` del oráculo).
+fn inc_mapa(mapa: &mut BTreeMap<String, u64>, k: &str, d: u64) {
+    if d > 0 {
+        *mapa.entry(k.to_string()).or_insert(0) += d;
+    }
+}
+
+/// Reproduce `contar_forma_evidencia` del oráculo T04 (`exportar.jl:313-377`): recorre **todos**
+/// los bloques construidos (válidos o no) y clasifica los que la forma v4 invalida.
+fn contar_forma_evidencia(
+    reales: &Reales,
+    cadena: &Cadena,
+    cobertura: &mut Cobertura,
+    cbid_local: u32,
+) {
+    for bloque in &reales.bloques {
+        let BloqueCadena::Post(p) = bloque else {
+            continue;
+        };
+        let hash = bloque.hash();
+        let Some(motivo) = cadena.motivo(&hash) else {
+            continue;
+        };
+        let es_forma = |f: &ErrorFormaTx| {
+            matches!(
+                motivo,
+                MotivoBloque::ErrTransicion(ErrorTransicion::ErrForma(x)) if x == f
+            )
+        };
+        let hay_tx = p.txs.iter().any(|(tx, _)| tipo_cobertura(tx).is_some());
+        let mut n_cbid = 0u64;
+        let mut n_orden = 0u64;
+        let mut n_ig = 0u64;
+        let mut n_de = 0u64;
+        let mut n_ent = 0u64;
+        let mut n_sal = 0u64;
+        let mut n_amb = 0u64;
+        let mut n_tres = 0u64;
+        for (tx, _) in &p.txs {
+            if tx.version != 4 {
+                continue;
+            }
+            let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
+                continue;
+            };
+            let c_ent = !tx.inputs.is_empty();
+            let c_sal = !tx.outputs.is_empty();
+            let c_cbid =
+                h1.consensus_branch_id != cbid_local || h2.consensus_branch_id != cbid_local;
+            let ph1 = h1.pre_hash();
+            let ph2 = h2.pre_hash();
+            let o1 = ph1.as_bytes();
+            let o2 = ph2.as_bytes();
+            let c_orden = !(o1 < o2);
+            if c_ent {
+                n_ent += 1;
+            }
+            if c_sal {
+                n_sal += 1;
+            }
+            if c_ent && c_sal {
+                n_amb += 1;
+            }
+            if c_ent && c_cbid && c_orden {
+                n_tres += 1;
+            }
+            if c_cbid {
+                n_cbid += 1;
+            }
+            if c_orden {
+                n_orden += 1;
+                if o1 == o2 {
+                    n_ig += 1;
+                } else {
+                    n_de += 1;
+                }
+            }
+        }
+        if es_forma(&ErrorFormaTx::EvidenciaConEntradasOSalidas) {
+            inc_mapa(&mut cobertura.forma, "bloque_estructura", 1);
+            if hay_tx {
+                inc_mapa(&mut cobertura.forma, "con_tx_estructura", 1);
+            }
+            match primer_defecto_forma(p, cbid_local) {
+                Some(DefectoForma::Entradas) => {
+                    inc_mapa(&mut cobertura.forma, "bloque_estructura_entradas", 1);
+                }
+                Some(DefectoForma::Salidas) => {
+                    inc_mapa(&mut cobertura.forma, "bloque_estructura_salidas", 1);
+                }
+                _ => {
+                    inc_mapa(&mut cobertura.forma, "bloque_estructura_ambos", 1);
+                }
+            }
+            if n_tres > 0 {
+                inc_mapa(&mut cobertura.forma, "bloque_estructura_cbid_orden", 1);
+            }
+            inc_mapa(
+                &mut cobertura.forma,
+                "ev_estructura",
+                (n_ent + n_sal).saturating_sub(n_amb).max(1),
+            );
+        } else if es_forma(&ErrorFormaTx::EvidenciaCbidAjeno) {
+            inc_mapa(&mut cobertura.forma, "bloque_cbid", 1);
+            inc_mapa(&mut cobertura.forma, "ev_cbid", n_cbid.max(1));
+            if hay_tx {
+                inc_mapa(&mut cobertura.forma, "con_tx_cbid", 1);
+            }
+            if n_orden > 0 {
+                inc_mapa(&mut cobertura.forma, "ambos_cbid", 1);
+            }
+        } else if es_forma(&ErrorFormaTx::OrdenCanonicoInvalido) {
+            inc_mapa(&mut cobertura.forma, "bloque_orden", 1);
+            if hay_tx {
+                inc_mapa(&mut cobertura.forma, "con_tx_orden", 1);
+            }
+            match primer_defecto_forma(p, cbid_local) {
+                Some(DefectoForma::OrdenIgual) => {
+                    inc_mapa(&mut cobertura.forma, "bloque_orden_igual", 1);
+                }
+                _ => {
+                    inc_mapa(&mut cobertura.forma, "bloque_orden_desc", 1);
+                }
+            }
+            inc_mapa(&mut cobertura.forma, "ev_orden", n_orden.max(1));
+            inc_mapa(&mut cobertura.forma, "ev_orden_igual", n_ig);
+            inc_mapa(&mut cobertura.forma, "ev_orden_desc", n_de);
+        }
     }
 }
 
@@ -1399,7 +1592,7 @@ fn valor(mapa: &BTreeMap<String, u64>, clave: &str) -> u64 {
 
 fn generar_lineas(c: &Cobertura) -> Vec<String> {
     let mut out = Vec::new();
-    out.push("SECCION vectores-v0.5 (casos aleatorios)".to_string());
+    out.push("SECCION vectores-v0.6 (casos aleatorios)".to_string());
     out.push(format!("casos = {}", c.casos));
     for t in TIPOS_COBERTURA {
         let desc_t = c.descartes.get(t);
@@ -1486,12 +1679,14 @@ fn generar_lineas(c: &Cobertura) -> Vec<String> {
         c.reorgs
     ));
     out.extend(generar_lineas_evidencia(c));
+    out.extend(generar_lineas_forma(c));
     out
 }
 
 /// Sección `EV ...` de la cobertura de evidencia (orden alfabético como el oráculo).
 fn generar_lineas_evidencia(c: &Cobertura) -> Vec<String> {
-    let mut out = vec!["SECCION evidencia SL-3b (dirigidos + aleatorios C-EVP)".to_string()];
+    let mut out =
+        vec!["SECCION evidencia SL-3b/SL-4c-O (dirigidos + aleatorios C-EVP)".to_string()];
     let mut claves: Vec<&String> = c.ev.keys().collect();
     claves.sort();
     for k in claves {
@@ -1500,12 +1695,58 @@ fn generar_lineas_evidencia(c: &Cobertura) -> Vec<String> {
     out
 }
 
+/// Sección `FORMA ...` de la forma v4, en el orden exacto del oráculo (`exportar.jl:507-513`) y
+/// con la línea final `minimos_SL4cO`.
+fn generar_lineas_forma(c: &Cobertura) -> Vec<String> {
+    const CLAVES: [&str; 18] = [
+        "bloque_estructura",
+        "bloque_estructura_entradas",
+        "bloque_estructura_salidas",
+        "bloque_estructura_ambos",
+        "bloque_estructura_cbid_orden",
+        "ev_estructura",
+        "con_tx_estructura",
+        "bloque_cbid",
+        "bloque_orden",
+        "bloque_orden_igual",
+        "bloque_orden_desc",
+        "ev_cbid",
+        "ev_orden",
+        "ev_orden_igual",
+        "ev_orden_desc",
+        "ambos_cbid",
+        "con_tx_cbid",
+        "con_tx_orden",
+    ];
+    let v = |k: &str| c.forma.get(k).copied().unwrap_or(0);
+    let mut out = vec!["SECCION forma v4 SL-4c-O/SL-4c-O-B/SL-4c-O-C".to_string()];
+    for k in CLAVES {
+        out.push(format!("FORMA {k} = {}", v(k)));
+    }
+    let minimos = v("bloque_cbid") >= 30
+        && v("bloque_orden") >= 30
+        && v("con_tx_cbid") >= 10
+        && v("con_tx_orden") >= 10
+        && v("ambos_cbid") >= 5
+        && v("bloque_orden_desc") >= 10
+        && v("bloque_orden_igual") >= 10
+        && v("bloque_estructura") >= 30
+        && v("con_tx_estructura") >= 10
+        && v("bloque_estructura_ambos") >= 5
+        && v("bloque_estructura_cbid_orden") >= 5;
+    out.push(format!(
+        "FORMA minimos_SL4cO = {}",
+        if minimos { "OK" } else { "NO" }
+    ));
+    out
+}
+
 fn cobertura_esperada() -> Vec<String> {
     let texto = fs::read_to_string(RUTA_COBERTURA).expect("leer cobertura");
     let mut lineas = Vec::new();
     let mut dentro = false;
     for linea in texto.lines() {
-        if linea.starts_with("SECCION vectores-v0.5") {
+        if linea.starts_with("SECCION vectores-v0.6") {
             dentro = true;
             lineas.push(linea.to_string());
             continue;
@@ -1628,16 +1869,27 @@ fn ejecutar_caso(caso: &Caso, discrepancias: &mut Vec<String>, cobertura: &mut C
         ));
     }
     let evp = parametros_evidencia(&caso.param);
-    contar_evidencia(
-        &reales,
-        &cadena,
-        &orden,
-        &desc,
-        cobertura,
-        params,
-        caso.param.k,
-        evp,
-    );
+    // El oráculo solo alimenta `contar_evidencia` con los dirigidos `D-1*`, los `ev-aleatorio` y
+    // los `forma-*` (`exportar.jl:407,436,451`); el resto de dirigidos (p. ej. `D-20`/`D-21`) no
+    // cuentan en la sección de evidencia.
+    let cuenta_evidencia = caso.nombre.starts_with("D-1")
+        || caso.nombre == "ev-aleatorio"
+        || caso.nombre.starts_with("forma-");
+    if cuenta_evidencia {
+        contar_evidencia(
+            &reales,
+            &cadena,
+            &orden,
+            &desc,
+            cobertura,
+            params,
+            caso.param.k,
+            evp,
+        );
+    }
+    // SL-4c: la forma v4 (los tres errores) se cuenta sobre **todos** los bloques construidos,
+    // válidos o no, con el `cbid` local del perfil (`evp.cbid`).
+    contar_forma_evidencia(&reales, &cadena, cobertura, evp.cbid);
     if caso.nombre == "aleatorio" {
         acumular_caso(cobertura, &reales, &orden, &desc, params, caso.param.k, evp);
     }
@@ -1696,7 +1948,7 @@ fn correr() -> (String, Vec<String>, Vec<String>, Vec<String>) {
     (informe, discrepancias, diferencias_cob, obtenido_cob)
 }
 
-/// V4 · diferencial completo contra T04-D (`vectores-estado-dag-v0.3.txt`, 914 casos).
+/// V4 · diferencial completo contra T04 (`vectores-estado-dag-v0.6.txt`, 2 108 casos).
 #[test]
 fn diferencial_t04() {
     let (informe, discrepancias, diferencias_cob, _cob) = correr();

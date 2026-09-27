@@ -200,19 +200,32 @@ pub fn validar_forma_cabecera_post(c: &DagBlockHeader) -> Result<(), ErrorFormaT
     Ok(())
 }
 
-/// Valida la **forma** de una `EvidenceTx` v4 (`EV-01`…`EV-04`), sin contexto ni activación.
+/// Valida la **forma** de una `EvidenceTx` v4 (`EV-01`…`EV-04`, `RAT-1`), sin contexto ni activación.
 ///
-/// Lo meramente estructural: coherencia `version = 4 ⇔ Evidencia`, `lock_time = 0`,
-/// `expiry_height = 0`, sin entradas, salidas ni testigos de transacción (`EV-01`, `EV-02`,
-/// `EV-04`), y cada cabecera con forma válida de `PoAS_PoT_DAG` (F-03).
+/// Comprueba, **en este orden**:
+/// 1. lo meramente estructural: coherencia `version = 4 ⇔ Evidencia`, `lock_time = 0`,
+///    `expiry_height = 0`, sin entradas, salidas ni testigos de transacción (`EV-01`, `EV-02`,
+///    `EV-04`), y cada cabecera con forma válida de `PoAS_PoT_DAG` (F-03);
+/// 2. `RAT-1`: las **dos** cabeceras llevan el `consensus_branch_id` de la red local
+///    (`cbid_local`, que el llamante pasa sin valor por defecto);
+/// 3. `EV-01`/`EV-04`: orden canónico estricto por `pre_hash`, `pre_hash(H1) <_lex pre_hash(H2)`
+///    (incluye rechazar `H1 = H2`).
 ///
-/// **No** comprueba el orden canónico ni el `cbid`, la identidad, los sellos, la puerta RAT-3 o la
-/// ventana: esas comprobaciones son semánticas y viven en `zx_consensus::transicion`, en el mismo
-/// orden que el oráculo T01 (que comprueba identidad antes que orden).
+/// El llamante (el motor) pasa como `cbid_local` el `consensus_branch_id` de la red local del
+/// perfil (`ParametrosEvidencia::cbid`), **no** el `cbid` semántico de `txid`/sighash. El
+/// `cbid` de cada cabecera es un dato de forma sin contexto: no depende del estado ni del orden
+/// de fusión.
+///
+/// **No** comprueba la identidad, los sellos, la puerta RAT-3 ni la ventana: esas comprobaciones
+/// son semánticas y viven en `zx_consensus::transicion`.
 ///
 /// # Errores
 /// [`ErrorFormaTx`]; ver las variantes usadas.
-pub fn validar_forma_tx_v4(tx: &Tx, testigos: &[Vec<u8>]) -> Result<(), ErrorFormaTx> {
+pub fn validar_forma_tx_v4(
+    tx: &Tx,
+    testigos: &[Vec<u8>],
+    cbid_local: u32,
+) -> Result<(), ErrorFormaTx> {
     if tx.version != 4 {
         return Err(ErrorFormaTx::VersionDesconocida {
             version: tx.version,
@@ -240,5 +253,13 @@ pub fn validar_forma_tx_v4(tx: &Tx, testigos: &[Vec<u8>]) -> Result<(), ErrorFor
     }
     validar_forma_cabecera_post(h1)?;
     validar_forma_cabecera_post(h2)?;
+    // RAT-1: ambas cabeceras, de la red local.
+    if h1.consensus_branch_id != cbid_local || h2.consensus_branch_id != cbid_local {
+        return Err(ErrorFormaTx::EvidenciaCbidAjeno);
+    }
+    // EV-01/EV-04: orden canónico estricto (incluye `H1 = H2`).
+    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
+        return Err(ErrorFormaTx::OrdenCanonicoInvalido);
+    }
     Ok(())
 }

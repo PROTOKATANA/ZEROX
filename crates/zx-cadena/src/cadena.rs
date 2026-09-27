@@ -24,7 +24,7 @@ use zx_consensus::transicion::{
     Estado, ParametrosEvidencia, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar,
     aplicar_fusion, deshacer, es_terminal_condiciones,
 };
-use zx_core::{Amount, BlockHash, ClavePublica, Tx};
+use zx_core::{Amount, BlockHash, ClavePublica, ExtensionTx, Tx, validar_forma_tx_v4};
 use zx_dag::ghostdag::{
     Algoritmo, AlmacenGhostdag, BloqueGhostdag, Color, IdentidadGhostdag, Idx, ModoMerge, ModoSp,
     Parametros as ParametrosGhostdag, Rank,
@@ -544,6 +544,20 @@ impl Cadena {
             }
             if importe_de_coinbase_post(tx).is_some_and(|v| v.brek() == 0) {
                 return Err(MotivoBloque::ErrSaldo);
+            }
+        }
+        // SL-4c (§3.2): la forma de la `EvidenceTx` v4 (`EV-04`, `RAT-1`, `EV-01`) es forma de
+        // bloque y se comprueba **antes** de la garantía del productor y de la semántica, igual
+        // que `chequear_forma_evidencia` del oráculo T04 (`EstadoDAG.jl:292-294`). Sin esto, un
+        // bloque con una evidencia defectuosa y un productor sin garantía daría `ErrGarantia` en
+        // vez de `ErrForma(...)`. La evidencia sin cabeceras (`ExtensionTx::Ninguna`) no se toca
+        // aquí: sigue siendo un rechazo semántico.
+        if self.evidencia.evp {
+            for (tx, testigos) in &p.txs {
+                if tx.version == 4 && matches!(tx.extension, ExtensionTx::Evidencia { .. }) {
+                    validar_forma_tx_v4(tx, testigos, self.evidencia.cbid)
+                        .map_err(|e| MotivoBloque::ErrTransicion(e.into()))?;
+                }
             }
         }
         Ok(())

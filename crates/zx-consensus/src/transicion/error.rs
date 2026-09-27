@@ -87,21 +87,12 @@ pub enum ErrorTransicion {
     /// `EV-01`/`EV-06`/`EV-07`: no hay dos decisiones de firma válidas.
     #[error("ErrSinEvidencia")]
     ErrSinEvidencia,
-    /// `RAT-1`: alguna cabecera no pertenece a la red local.
-    #[error("ErrCbidAjeno")]
-    ErrCbidAjeno,
-    /// `EV-01`: `pre_hash(H1) < pre_hash(H2)` no se cumple estrictamente.
-    #[error("ErrOrdenCanonico")]
-    ErrOrdenCanonico,
     /// `EV-14`: `slot_aplicacion ≥ slot_falta + Plazo_slots`.
     #[error("ErrEvidenciaTardia")]
     ErrEvidenciaTardia,
     /// `EV-12`: el `incident_id` ya está registrado.
     #[error("ErrEvidenciaDuplicada")]
     ErrEvidenciaDuplicada,
-    /// `EV-04`: la `EvidenceTx` lleva entradas o salidas monetarias.
-    #[error("ErrEvidenciaConEntradas")]
-    ErrEvidenciaConEntradas,
     /// `EV-24(i)`: la liberación encuentra un incidente admitido y no liquidado.
     #[error("ErrCasoAbierto")]
     ErrCasoAbierto,
@@ -117,7 +108,9 @@ impl ErrorTransicion {
     /// Nombre del error tal y como lo escribe el oráculo T01, para el diferencial.
     ///
     /// Aplica las correspondencias de §4 de la orden: `ErrFirma` se lee como `ErrAutorizacion` y
-    /// los errores de forma concretos se leen como el nombre de T01 que sustituyen.
+    /// los errores de forma concretos se leen como el nombre que el oráculo escribe en el vector.
+    /// Desde SL-4c, los tres defectos de forma de la `EvidenceTx` (`RAT-1`, `EV-01`/`EV-04`) se
+    /// escriben con el nombre **completo** `ErrForma(...)`, igual que en T01 v0.5 y T04 v0.6.
     #[must_use]
     pub fn nombre_t01(&self) -> &'static str {
         match self {
@@ -131,8 +124,14 @@ impl ErrorTransicion {
             // `DepositoSinEntradas` (F-07). Se traduce al nombre del oráculo para el diferencial
             // (los vectores solo combinan `ent=[]` con firmante ≠ clave, ver `PROGRESO.md` FD-7).
             Self::ErrForma(ErrorFormaTx::DepositoSinEntradas) => "ErrAutorizacion",
-            Self::ErrForma(ErrorFormaTx::EvidenciaConEntradasOSalidas) => "ErrEvidenciaConEntradas",
-            Self::ErrForma(ErrorFormaTx::OrdenCanonicoInvalido) => "ErrOrdenCanonico",
+            // SL-4c · las tres formas de la v4, con el nombre completo del vector.
+            Self::ErrForma(ErrorFormaTx::EvidenciaConEntradasOSalidas) => {
+                "ErrForma(EvidenciaConEntradasOSalidas)"
+            }
+            Self::ErrForma(ErrorFormaTx::EvidenciaCbidAjeno) => "ErrForma(EvidenciaCbidAjeno)",
+            Self::ErrForma(ErrorFormaTx::OrdenCanonicoInvalido) => {
+                "ErrForma(OrdenCanonicoInvalido)"
+            }
             Self::ErrGenesis => "ErrGenesis",
             Self::ErrPow => "ErrPow",
             Self::ErrEmision => "ErrEmision",
@@ -153,11 +152,8 @@ impl ErrorTransicion {
             Self::ErrRetiroPendiente => "ErrRetiroPendiente",
             Self::ErrNonce => "ErrNonce",
             Self::ErrSinEvidencia => "ErrSinEvidencia",
-            Self::ErrCbidAjeno => "ErrCbidAjeno",
-            Self::ErrOrdenCanonico => "ErrOrdenCanonico",
             Self::ErrEvidenciaTardia => "ErrEvidenciaTardia",
             Self::ErrEvidenciaDuplicada => "ErrEvidenciaDuplicada",
-            Self::ErrEvidenciaConEntradas => "ErrEvidenciaConEntradas",
             Self::ErrCasoAbierto => "ErrCasoAbierto",
             Self::ErrVentanaAbierta => "ErrVentanaAbierta",
             Self::ErrPuertaRAT3 => "ErrPuertaRAT3",

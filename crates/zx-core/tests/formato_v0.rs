@@ -9,6 +9,7 @@
 //! los negativos de ORDEN-W02 §6, y la firma de aceptación (válida y rechazos).
 
 #![expect(clippy::unwrap_used, reason = "los tests fallan con panic por diseño")]
+#![expect(clippy::expect_used, reason = "los tests fallan con panic por diseño")]
 #![expect(
     clippy::panic,
     reason = "el test falla ruidosamente si falta el oráculo"
@@ -21,10 +22,11 @@ use ed25519_zebra::{SigningKey, VerificationKey};
 use zx_core::firma::{ClavePublica, Firma, LONGITUD_FIRMA};
 use zx_core::wire::{tx_a_bytes, tx_desde_bytes};
 use zx_core::{
-    Amount, BodyCommitment, CBID_RED_DEV, DagBlockHeader, Digest, EncodingError, ErrorFormaTx,
-    ExtensionTx, Lock, MAGIC_DEV, MerkleRoot, OutPoint, PadresDag, SolucionPoas, TipoGarantia, Tx,
-    TxId, TxIn, TxOut, ZX_VALUE_SANITY_LIMIT, mensaje_aceptacion, sha3_256_publico, txid,
-    validar_forma_cabecera_post, validar_forma_tx, verificar_aceptacion,
+    Amount, BlockHash, BodyCommitment, CBID_RED_DEV, DagBlockHeader, Digest, EncodingError,
+    ErrorFormaTx, ExtensionTx, Lock, MAGIC_DEV, MerkleRoot, OutPoint, PadresDag, SolucionPoas,
+    TAMANO_CABECERA_MAX, TAMANO_CABECERA_MIN, TipoGarantia, Tx, TxId, TxIn, TxOut,
+    ZX_VALUE_SANITY_LIMIT, dag_header_a_bytes, dag_header_desde_bytes, mensaje_aceptacion,
+    sha3_256_publico, txid, validar_forma_cabecera_post, validar_forma_tx, verificar_aceptacion,
 };
 
 const CBID_OTRO: u32 = 0x0102_0304;
@@ -873,13 +875,15 @@ fn el_codec_rechaza_versiones_y_tipos_fuera_de_rango() {
         );
     }
 
+    // SL-4c: la v4 ya no es `VersionInactiva` en el códec (FD-5); estos bytes son de una v2, así
+    // que el parser v4 no encuentra dos cabeceras DAG y rechaza por truncamiento.
     let mut b4 = b.clone();
     b4.get_mut(..4)
         .unwrap()
         .copy_from_slice(&4u32.to_le_bytes());
     assert!(matches!(
         tx_desde_bytes(&b4),
-        Err(EncodingError::VersionInactiva { version: 4 })
+        Err(EncodingError::Truncado { .. })
     ));
 
     for tipo in [0u8, 4, 0xff] {
@@ -1058,4 +1062,162 @@ fn la_firma_de_aceptacion_verifica_y_rechaza() {
 
     // `Firma` también es utilizable por la API pública.
     let _ = Firma::desde_bytes(firma);
+}
+
+// ── SL-4c · V2: ida y vuelta de la `EvidenceTx` v4 y rechazos del códec ──────
+
+/// Cabecera `PoAS_PoT_DAG` determinista y **firmada**, con `padres` padres (1..=15).
+///
+/// La firma es real (Ed25519): la ida y vuelta del códec se comprueba sobre cabeceras que
+/// satisfacen `C-HDR-04`, no sobre relleno.
+fn cabecera_v4(semilla: u64, padres: u8) -> DagBlockHeader {
+    let sk = SigningKey::from([0x5au8; 32]);
+    let vk: [u8; 32] = VerificationKey::from(&sk).into();
+    let mut extra = Vec::new();
+    for i in 0..padres.saturating_sub(1) {
+        let mut b = [0u8; 32];
+        b[..8].copy_from_slice(&semilla.to_le_bytes());
+        b[8..16].copy_from_slice(&u64::from(i).to_le_bytes());
+        extra.push(BlockHash::from_digest(Digest::from_bytes(b)));
+    }
+    let mut sel = [0u8; 32];
+    sel[..8].copy_from_slice(&semilla.wrapping_add(0x9e37_79b9).to_le_bytes());
+    let mut h = DagBlockHeader {
+        consensus_branch_id: CBID_RED_DEV,
+        merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0u8; 32])),
+        timestamp: semilla,
+        height: 0,
+        slot: semilla,
+        pot_output: [0u8; 16],
+        rango_solucion: semilla,
+        sol: SolucionPoas {
+            public_key: ClavePublica::desde_bytes(vk),
+            sector_index: (semilla & 0xffff) as u16,
+            history_size: semilla,
+            ..Default::default()
+        },
+        body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0u8; 32])),
+        padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes(sel)), &extra)
+            .expect("padres deterministas"),
+        sello: [0u8; 64],
+    };
+    let firma: [u8; LONGITUD_FIRMA] = sk.sign(h.pre_hash().as_bytes()).into();
+    h.sello = firma;
+    h
+}
+
+/// Construye una `Tx` v4 a partir de dos cabeceras, ordenándolas en el orden canónico.
+fn tx_v4(mut h1: DagBlockHeader, mut h2: DagBlockHeader) -> Tx {
+    if h1.pre_hash().as_bytes() >= h2.pre_hash().as_bytes() {
+        core::mem::swap(&mut h1, &mut h2);
+    }
+    assert!(h1.pre_hash().as_bytes() < h2.pre_hash().as_bytes());
+    Tx {
+        version: 4,
+        inputs: Vec::new(),
+        outputs: Vec::new(),
+        lock_time: 0,
+        expiry_height: 0,
+        extension: ExtensionTx::Evidencia { h1, h2 },
+    }
+}
+
+/// V2 · ≥ 200 `EvidenceTx` v4 con cabeceras reales firmadas: bytes → tx idéntica, sin sobrantes.
+#[test]
+fn la_v4_sobrevive_a_ida_y_vuelta() {
+    let mut generadas = 0usize;
+    for caso in 0u64..210 {
+        let n1 = (caso % 15 + 1) as u8;
+        let n2 = ((caso * 7) % 15 + 1) as u8;
+        let tx = tx_v4(cabecera_v4(caso * 3 + 1, n1), cabecera_v4(caso * 5 + 2, n2));
+        let ExtensionTx::Evidencia { h1, h2 } = &tx.extension else {
+            unreachable!("tx_v4 siempre es evidencia");
+        };
+        assert!(h1.verificar_sello().is_ok(), "sello H1 real");
+        assert!(h2.verificar_sello().is_ok(), "sello H2 real");
+
+        let mut bytes = Vec::new();
+        tx_a_bytes(&mut bytes, &tx, &[]);
+        let ((leida, testigos), resto) = tx_desde_bytes(&bytes).expect("la v4 decodifica");
+        assert!(resto.is_empty(), "caso {caso}: sin bytes sobrantes");
+        assert!(testigos.is_empty(), "caso {caso}: sin testigos");
+        assert_eq!(leida, tx, "caso {caso}: ida y vuelta exacta");
+        assert_eq!(
+            txid(&leida, CBID_RED_DEV),
+            txid(&tx, CBID_RED_DEV),
+            "caso {caso}: txid comprometido"
+        );
+        generadas += 1;
+    }
+    assert!(generadas >= 200, "se generaron {generadas} EvidenceTx");
+}
+
+/// V2 · truncamiento en cada frontera, sobrante que no se absorbe y extensión ajena.
+#[test]
+fn la_v4_rechaza_truncamientos_y_no_absorbe_sobrantes() {
+    let tx = tx_v4(cabecera_v4(11, 1), cabecera_v4(22, 3));
+    let mut bytes = Vec::new();
+    tx_a_bytes(&mut bytes, &tx, &[]);
+
+    // Cualquier prefijo estricto (incluida cada frontera de campo) MUST rechazarse.
+    for corte in 0..bytes.len() {
+        assert!(
+            tx_desde_bytes(bytes.get(..corte).unwrap()).is_err(),
+            "prefijo de {corte} bytes MUST rechazarse"
+        );
+    }
+
+    // Sobrante de 1 byte: F-14 no consume nada tras el último testigo; queda como resto de la
+    // transacción contenedora (una transacción suelta MUST exigir el resto vacío).
+    let mut con_sobrante = bytes.clone();
+    con_sobrante.push(0xAA);
+    let ((_, _), resto) = tx_desde_bytes(&con_sobrante).expect("cuerpo íntegro");
+    assert_eq!(resto, &[0xAA], "el byte sobrante no se absorbe");
+
+    // `version = 4` con la extensión de otra versión: no hay dos cabeceras DAG que leer.
+    let (t2, w2) = v2_minima();
+    let mut b2 = Vec::new();
+    tx_a_bytes(&mut b2, &t2, &w2);
+    b2.get_mut(..4)
+        .unwrap()
+        .copy_from_slice(&4u32.to_le_bytes());
+    assert!(matches!(
+        tx_desde_bytes(&b2),
+        Err(EncodingError::Truncado { .. })
+    ));
+}
+
+/// V2 · los límites de 589/1 037 B: 588 trunca y una región de 1 038 B (máxima + 1) deja el byte.
+#[test]
+fn los_limites_de_tamano_de_cabecera_se_rechazan() {
+    // 589 es el mínimo (`P = 1`) y 1 037 el máximo (`P = 15`), fijados por `parent_count ≤ 15`.
+    let h_min = cabecera_v4(1, 1);
+    let bytes_min = dag_header_a_bytes(&h_min);
+    assert_eq!(bytes_min.len(), TAMANO_CABECERA_MIN);
+    assert!(matches!(
+        dag_header_desde_bytes(bytes_min.get(..TAMANO_CABECERA_MIN - 1).unwrap()),
+        Err(EncodingError::Truncado { .. })
+    ));
+
+    let h_max = cabecera_v4(2, 15);
+    let bytes_max = dag_header_a_bytes(&h_max);
+    assert_eq!(bytes_max.len(), TAMANO_CABECERA_MAX);
+    let mut con_extra = bytes_max.clone();
+    con_extra.push(0x00);
+    let (leida, resto) = dag_header_desde_bytes(&con_extra).expect("la cabecera máxima decodifica");
+    assert_eq!(leida, h_max);
+    assert_eq!(
+        resto,
+        &[0x00],
+        "el byte extra no forma parte de la cabecera"
+    );
+
+    // A nivel de transacción: una H1 de 588 B trunca; 1 037 B + 1 byte deja ese byte para H2,
+    // que ya no cabe y trunca.
+    let tx = tx_v4(h_max, cabecera_v4(3, 1));
+    let mut bytes = Vec::new();
+    tx_a_bytes(&mut bytes, &tx, &[]);
+    const PREFIJO_TX: usize = 14; // version(4) + lock_time(4) + expiry_height(4) + n_in(1) + n_out(1)
+    assert!(tx_desde_bytes(bytes.get(..PREFIJO_TX + 588).unwrap()).is_err());
+    assert!(tx_desde_bytes(bytes.get(..PREFIJO_TX + TAMANO_CABECERA_MAX + 1).unwrap()).is_err());
 }
