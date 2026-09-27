@@ -1,0 +1,1 @@
+E-3: PENDIENTE DE VERIFICACIÓN CON EL BINARIO DE W07D (datos conservados en /home/katana/zeo/ZEROX/deepseek/W07b/run/R1-rep3/{A,B,C}/datos; ver RESULTADO-metodo-viejo.txt como informativo, no decisivo)

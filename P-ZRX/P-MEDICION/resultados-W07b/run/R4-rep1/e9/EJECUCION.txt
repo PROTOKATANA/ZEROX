@@ -1,0 +1,21 @@
+2026-09-27T20:25:33+02:00 === E-9 rep1: A aislado (retiene su corte), B+C juntos ===
+=== esperando que A y (B o C) fijen su propio T (>=1 bloque_producido), plazo 20 min ===
+A fija su T en t=42305172846ns (retenido, aislado)
+B/C fijan su T en t=42306830424ns
+=== dejando que B/C produzcan 60s más antes de que A publique tarde (reunión) ===
+=== A publica tarde: reunión (reinicio con --red-marcar hacia B y C) ===
+=== qué T queda fijado en cada nodo tras la publicación tardía (descriptivo, sin criterio de éxito) ===
+--- A: último cambio_punta ---
+{"tipo":"cambio_punta","reloj_ns":119253298610,"reloj_pared_ns":1790533755165019083,"punta":"cda189680029d3edffea0b0b82455a98df8028a854e0ee95fee0dfc4b48e04d7","resumen_estado":"cf963ebad0b6fb3e6577cadb8d75f2c2dacf076be782643d991e6c55586e8a9c","profundidad_reorg":0,"blue_score":182}
+--- A: reorganizacion_pow ---
+--- B: último cambio_punta ---
+{"tipo":"cambio_punta","reloj_ns":221751942427,"reloj_pared_ns":1790533755251878242,"punta":"cda189680029d3edffea0b0b82455a98df8028a854e0ee95fee0dfc4b48e04d7","resumen_estado":"cf963ebad0b6fb3e6577cadb8d75f2c2dacf076be782643d991e6c55586e8a9c","profundidad_reorg":0,"blue_score":182}
+--- B: reorganizacion_pow ---
+{"tipo":"reorganizacion_pow","reloj_ns":106374503286,"reloj_pared_ns":1790533639874439081,"punta_anterior":"00002d4f1462678cdd0284b419f393224f5826841fd984e5f7dcb9466ad47059","punta_nueva":"00002baf83c08b36a6f40f81dcc4604aed699cb123f731231501552d20929087","profundidad":30}
+--- C: último cambio_punta ---
+{"tipo":"cambio_punta","reloj_ns":221783191917,"reloj_pared_ns":1790533755284907228,"punta":"cda189680029d3edffea0b0b82455a98df8028a854e0ee95fee0dfc4b48e04d7","resumen_estado":"cf963ebad0b6fb3e6577cadb8d75f2c2dacf076be782643d991e6c55586e8a9c","profundidad_reorg":0,"blue_score":182}
+--- C: reorganizacion_pow ---
+{"tipo":"reorganizacion_pow","reloj_ns":106380314107,"reloj_pared_ns":1790533639882029408,"punta_anterior":"00002d4f1462678cdd0284b419f393224f5826841fd984e5f7dcb9466ad47059","punta_nueva":"00002baf83c08b36a6f40f81dcc4604aed699cb123f731231501552d20929087","profundidad":30}
+t_publicacion_tardia_ns=1790533635804888621
+loadavg_fin=8.40 8.50 7.77 4/2385 3781005
+fecha_fin=2026-09-27T20:29:15+02:00

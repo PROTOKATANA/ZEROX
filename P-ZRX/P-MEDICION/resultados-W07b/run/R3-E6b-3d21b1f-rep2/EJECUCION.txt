@@ -1,0 +1,46 @@
+commit=3d21b1f44301991fb59737e2117cc26a66a4e93f
+sha256_zx-node=e7ef7f19a701188237e38266f5d6361c16228620fcf4039e5a67d3b2339900de
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=7.31 6.22 6.40 1/2071 3737657
+fecha_inicio=2026-09-27T20:17:44+02:00
+ps_inicio_top_cpu:
+semilla=202
+puertos: A=42410 B=42411 C=42412
+tecnica=SL4b2-e6b (A aislado desde el arranque; reunion con produccion en marcha)
+2026-09-27T20:17:44+02:00 === E-6b 3d21b1f-rep2: A aislado desde el arranque, B+C juntos ===
+=== esperando que A y (B o C) crucen el corte por separado, plazo 30 min ===
+listo: A=5 B=2 C=3
+pesos FC-3 antes de reunir: A: bloques_producidos=8 blue_score=7 | BC: bloques_producidos(B+C)=7 blue_score(max B,C)=9 (B=9 C=9)
+prediccion FC-3 (mayor blue_score, proxy exacto de blue_work con SR_dev constante): BC
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0
+=== reuniendo: matando y relanzando A con --red-marcar hacia B y C (B,C NO se reinician) ===
+=== esperando convergencia (mismo resumen_estado en los 3), plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"52a463d76c4e92cb2a4de135927f76dafd40dc55a252a143986dc4300109ca1e" resumen="resumen_estado":"4d27b5b5053fcda883fdb867f77c1bb82fe0e04b0725de2bdccf9e9e91ecb57d"
+t_reunion_inicio_ns=1790533111813277394 t_reunion_fin_ns=1790533117986677521 tiempo_convergencia_ns=6173400127
+=== ¿A produjo sobre el terminal ganador tras la reunión? (últimos bloque_producido de A) ===
+/home/katana/zeo/ZEROX/deepseek/W07b/run/R3-E6b-3d21b1f-rep2/B/registro.jsonl:{"tipo":"reorganizacion_pow","reloj_ns":9072875150,"reloj_pared_ns":1790533073592948869,"punta_anterior":"00004286629cb6f53d408c76459e5d66f0543e4e40af04e1f386e97f80ddce56","punta_nueva":"0000265450bf2c482ea492222ec56a5220a74ae8a4ef24eb2a326c1678fe831d","profundidad":1}
+/home/katana/zeo/ZEROX/deepseek/W07b/run/R3-E6b-3d21b1f-rep2/B/registro.jsonl:{"tipo":"reorganizacion_pow","reloj_ns":51400063621,"reloj_pared_ns":1790533115920137320,"punta_anterior":"000006c948e69fb32eec32f47d82b6885778adf2b511cde3548945796b104936","punta_nueva":"0000040f043f7aee359c3d14e87e7463fca63014621472f54f95c738c950dfa6","profundidad":30}
+/home/katana/zeo/ZEROX/deepseek/W07b/run/R3-E6b-3d21b1f-rep2/C/registro.jsonl:{"tipo":"reorganizacion_pow","reloj_ns":51399567112,"reloj_pared_ns":1790533115922559185,"punta_anterior":"000006c948e69fb32eec32f47d82b6885778adf2b511cde3548945796b104936","punta_nueva":"0000040f043f7aee359c3d14e87e7463fca63014621472f54f95c738c950dfa6","profundidad":30}
+{"tipo":"cambio_punta","reloj_ns":3934714138,"reloj_pared_ns":1790533115855031010,"punta":"a8008add2478b150d70eab0bfdf2f05f49d0e059a5e9a5a5eb655ef958286b9f","resumen_estado":"c05766ea657b024a2408272250913d6096e615ad12467200d54b0538b3af3285","profundidad_reorg":1,"blue_score":7}
+{"tipo":"cambio_punta","reloj_ns":4760240577,"reloj_pared_ns":1790533116680557449,"punta":"75e01ed6795daf204e4e289e196b4af002843de4adeb108f226920a328be8c4c","resumen_estado":"ff2558379a08bf2ccf95e6c348924bff0f7f2ee86878e3617f7317927a145546","profundidad_reorg":36,"blue_score":10}
+{"tipo":"cambio_punta","reloj_ns":4826665432,"reloj_pared_ns":1790533116746982314,"punta":"52a463d76c4e92cb2a4de135927f76dafd40dc55a252a143986dc4300109ca1e","resumen_estado":"4d27b5b5053fcda883fdb867f77c1bb82fe0e04b0725de2bdccf9e9e91ecb57d","profundidad_reorg":0,"blue_score":11}
+=== resultado final (método antiguo, informativo) ===
+blue_score final: A=11 B=11 C=11
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+2026-09-27T20:18:38+02:00 === reposo_y_verificar: calculando slot_reposo ===
+slot_reposo=15
+lanzado A pid=3741865
+lanzado B pid=3741872
+lanzado C pid=3741944
+=== esperando dejar_de_producir en todos, plazo 30 min ===
+reposo alcanzado en todos
+=== esperando 30s sin cambio_punta en ninguno ===
+30s sin cambio_punta en todos
+loadavg_fin=10.70 8.75 7.35 1/2065 3745473
+fecha_fin=2026-09-27T20:19:23+02:00

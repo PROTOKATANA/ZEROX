@@ -1,0 +1,21 @@
+commit=26312ffee1b9fd1aa74b1323e087caa1d64a5a77
+sha256_zx-node=70b0cf2d521c5cbd1bdebd12bb47381c772a498c496861dd77e83d5911cddc01
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=1.78 7.01 9.93 1/2109 3420790
+fecha_inicio=2026-09-27T18:16:14+02:00
+ps_inicio_top_cpu:
+semilla=202
+puertos: A=42310 B=42311 C=42312
+tecnica=W06d7-V5 (aislar A sin pares, mismo terminal)
+2026-09-27T18:16:14+02:00 === E-6 rep2: A,B,C juntos desde el génesis (mismo terminal) ===
+EXITO total=20
+CONVERGEN punta="punta":"c0ac66629503e79d44e8166fbf2411e699fb0dc9a125bbb3ec8b0e17fede2116" resumen="resumen_estado":"b505918fc8cc9458795c4b8623abdff26075d1b32c3e13089f1a89d7242dbb75"
+slot_pre(aislamiento)=22
+=== aislando A (reinicio sin pares); B,C siguen produciendo ===
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===

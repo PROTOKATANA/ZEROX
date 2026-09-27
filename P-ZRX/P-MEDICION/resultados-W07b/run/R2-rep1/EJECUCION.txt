@@ -1,0 +1,28 @@
+commit=26312ffee1b9fd1aa74b1323e087caa1d64a5a77
+sha256_zx-node=70b0cf2d521c5cbd1bdebd12bb47381c772a498c496861dd77e83d5911cddc01
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=5.99 11.63 11.77 2/2595 3207962
+fecha_inicio=2026-09-27T17:26:26+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=42200 B=42201 C=42202 D=42203
+2026-09-27T17:26:26+02:00 === R2 rep1: A,B,C desde el génesis ===
+=== esperando >=500 bloques PoST combinados, plazo 2h ===
+EXITO total=500
+=== lanzando D tardío en frío (claves 9,10,11, --datos nuevo), marcando a los tres ===
+=== midiendo alcance de D, plazo 30 min ===
+D alcanzó a A: slot_a=571 slot_d=571 huerfanos_d=7
+t_ibd_inicio_ns=1790523549789128207 t_ibd_fin_ns=1790523613343981669 duracion_ibd_ns=63554853462
+recursos-D primera_muestra=1790523549792704299,3257959,0,0,13932,0,180224,290 ultima_muestra=1790523612607535999,3257959,11179,290,611616,0,32276480,594238
+=== reposo (mismo --dejar-de-producir-en-slot en los 4) ===
+slot_reposo calculado=576 (max(A=571,B=571,C=571,D=571)+5)
+reposo alcanzado en los 4
+=== resultado final (los 4, método antiguo, informativo) ===
+loadavg_fin=19.62 21.78 17.59 36/2222 3270700
+fecha_fin=2026-09-27T17:41:08+02:00

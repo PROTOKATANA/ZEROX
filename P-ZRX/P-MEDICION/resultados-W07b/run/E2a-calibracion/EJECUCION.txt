@@ -1,0 +1,51 @@
+commit=27dcfeb09e7e0a105c5c55a94766621b99fbfc57
+sha256_zx-node=a9f0ffa1b42e3c7c3eaea0ba6a87a20f9a46dfd2118a3b761f4a26be58bf19e1
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=default_u64_max
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=1.54 3.23 3.93 1/2490 2573303
+fecha_inicio=2026-09-27T12:19:26+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=42000 B=42001 C=42002
+objetivo=[0.8,1.2] bloques/slot; max 6 puntos; bisección en exponentes [56,64]
+2026-09-27T12:19:26+02:00 === E-2a: cruzando el corte con SR_dev por defecto (u64::MAX, sin --sr-dev) ===
+lanzado A pid=2573309
+lanzado B pid=2573314
+lanzado C pid=2573326
+corte cruzado (producción combinada, A=0 B=3 C=0)
+=== midiendo tau (duración real del slot) durante 60s más de producción a SR=u64::MAX ===
+tau_medido=1.281552s (medido en la fase SR=u64::MAX, 2026-09-27T12:21:08+02:00)
+tau_medido=1.281552
+2026-09-27T12:21:09+02:00 === E-2a punto 1: exponente=60 sr_dev=1152921504606846976 ===
+lanzado A pid=2579834
+lanzado B pid=2579839
+lanzado C pid=2579911
+punto 1: segundos_reales=258 (ventana pedida=257s) slots=201.3184 bloques=47 bloques/slot=0.2335 (slot_proxy 0=51 1=284, informativo)
+E-2a punto 1 resultado: exponente=60 bloques_por_slot=0.2335 dentro_del_objetivo=0
+2026-09-27T12:25:31+02:00 === E-2a punto 2: exponente=62 sr_dev=4611686018427387904 ===
+lanzado A pid=2595970
+lanzado B pid=2595977
+lanzado C pid=2596047
+punto 2: segundos_reales=258 (ventana pedida=257s) slots=201.3184 bloques=131 bloques/slot=0.6507 (slot_proxy 0=284 1=516, informativo)
+E-2a punto 2 resultado: exponente=62 bloques_por_slot=0.6507 dentro_del_objetivo=0
+2026-09-27T12:29:52+02:00 === E-2a punto 3: exponente=63 sr_dev=9223372036854775808 ===
+lanzado A pid=2617798
+lanzado B pid=2617803
+lanzado C pid=2617881
+punto 3: segundos_reales=259 (ventana pedida=257s) slots=202.0987 bloques=158 bloques/slot=0.7818 (slot_proxy 0=516 1=725, informativo)
+E-2a punto 3 resultado: exponente=63 bloques_por_slot=0.7818 dentro_del_objetivo=0
+2026-09-27T12:34:14+02:00 === E-2a punto 4: exponente=63 sr_dev=9223372036854775808 ===
+lanzado A pid=2634917
+lanzado B pid=2634924
+lanzado C pid=2634992
+2026-09-27T12:34:47+02:00 === E-2a punto 4 (fraccionario): exponente=63.5 sr_dev=13043817825332783104 ===
+lanzado A pid=2638246
+lanzado B pid=2638251
+lanzado C pid=2638308
+punto 4 (fraccionario): exponente=63.5 bloques/slot=0.9946
+E-2a: SR_dev elegido = 13043817825332783104 (exponente 63.5), tau_medido=1.281552s, confirmado por el director (punto 4 = 0.9946 bloques/slot, dentro de [0.8,1.2])

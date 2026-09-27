@@ -1,0 +1,17 @@
+commit=3d21b1f44301991fb59737e2117cc26a66a4e93f
+sha256_zx-node=e7ef7f19a701188237e38266f5d6361c16228620fcf4039e5a67d3b2339900de
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=9.44 8.37 7.38 1/2058 3705677
+fecha_inicio=2026-09-27T20:08:28+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=42400 B=42401 C=42402
+tecnica=SL4b2-e6b (A aislado desde el arranque; reunion con produccion en marcha)
+2026-09-27T20:08:28+02:00 === E-6b 3d21b1f-rep1: A aislado desde el arranque, B+C juntos ===
+=== esperando que A y (B o C) crucen el corte por separado, plazo 30 min ===

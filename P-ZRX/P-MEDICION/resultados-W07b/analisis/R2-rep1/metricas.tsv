@@ -1,0 +1,47 @@
+metrica	ambito	n	ausentes	p50	p95	max	unidad
+latencia_propagacion_ns	A->B	177	0	118632758	351353360	897074110	ns
+latencia_propagacion_ns	A->C	177	0	118215787	356487634	867188467	ns
+latencia_propagacion_ns	A->D	177	0	444417588231	723168040219	754120732171	ns
+latencia_propagacion_ns	B->A	188	0	122793190	297229180	403494855	ns
+latencia_propagacion_ns	B->C	188	0	125798993	310232024	892768172	ns
+latencia_propagacion_ns	B->D	188	0	342792338826	749018698250	760590047991	ns
+latencia_propagacion_ns	C->A	209	0	139465642	332743217	706048007	ns
+latencia_propagacion_ns	C->B	209	0	128237206	274743795	995898465	ns
+latencia_propagacion_ns	C->D	209	0	365660977205	737735761778	748152009513	ns
+latencia_propagacion_ns	D->A	0	0				ns
+latencia_propagacion_ns	D->B	0	0				ns
+latencia_propagacion_ns	D->C	0	0				ns
+latencia_propagacion_ns	total	1722	0	178934255	660379289256	760590047991	ns
+t_cabecera_ns	todos	1732	0	70664079	157082990	588133671	ns
+t_admision_ns	todos	1732	0	101828	221066	3237109	ns
+t_persistencia_ns	todos	1732	0	796565	5351038	16230092	ns
+t_total_ns	todos	1732	0	171278341	36742997456	40100690798	ns
+bloques_por_slot	todos	576	30	1	2	3	bloques/slot
+padres_por_bloque	todos	547	30	1	2	3	padres
+profundidad_reorg	todos	4082	0	0	1	1	bloques
+arranque_ns	todos	0	4				ns
+duracion_reinicio_ns	todos	4	0	7304935682	7408741822	7408741822	ns
+rss_kib	A	872	0	678456	786636	805092	KiB
+read_bytes_intervalo	A	871	0	0	0	0	bytes
+write_bytes_intervalo	A	871	0	36864	114688	2392064	bytes
+disco_datos_bytes	A	1	0	5049469	5049469	5049469	bytes
+rss_kib	B	872	0	675548	783892	807312	KiB
+read_bytes_intervalo	B	871	0	0	0	0	bytes
+write_bytes_intervalo	B	871	0	36864	114688	2473984	bytes
+disco_datos_bytes	B	1	0	7163914	7163914	7163914	bytes
+rss_kib	C	872	0	675832	784172	805896	KiB
+read_bytes_intervalo	C	871	0	0	0	0	bytes
+write_bytes_intervalo	C	871	0	36864	114688	2449408	bytes
+disco_datos_bytes	C	1	0	9279097	9279097	9279097	bytes
+rss_kib	D	119	0	571764	774176	774380	KiB
+read_bytes_intervalo	D	118	0	0	0	0	bytes
+write_bytes_intervalo	D	118	0	274432	851968	2682880	bytes
+disco_datos_bytes	D	1	0	11366269	11366269	11366269	bytes
+divergencia_fraccion_tiempo	total	1	0	0.784206	0.784206	0.784206	fraccion
+media_bloques_por_slot	todos	1	0	0.949653	0.949653	0.949653	bloques/slot
+fraccion_rojos	todos	1	30	0.000000	0.000000	0.000000	fraccion
+estado_final_igual	total	1	0	1.000000	1.000000	1.000000	booleano
+cpu_util	A	871	0	1.195230	4.566176	10.941005	s/s
+cpu_util	B	871	0	1.172703	4.569712	12.292403	s/s
+cpu_util	C	871	0	1.151868	4.616823	11.045046	s/s
+cpu_util	D	118	0	0.972359	7.680605	23.670603	s/s

@@ -1,0 +1,5 @@
+hallazgo	n	detalle
+slot_distinto_por_bloque	0	bloques cuyo slot difiere entre sus eventos
+padres_distintos_por_bloque	0	bloques cuyo n_padres difiere entre sus eventos
+mergeset_distinto_por_bloque	0	bloques cuyo par (azules,rojos) difiere entre sus eventos
+eventos_bloque_sin_hash	0	eventos bloque_producido/bloque_red_admitido sin hash (no identificables)

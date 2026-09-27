@@ -1,0 +1,67 @@
+2026-09-27T20:22:56+02:00 === E-7/E-8 rep1: A,B,C desde el génesis ===
+EXITO total=20
+=== E-7: zx-adversario (ráfaga completa) contra A ===
+salida de zx-adversario (E-7) en /home/katana/zeo/ZEROX/deepseek/W07b/run/R4-rep1/e7e8/e7-adversario.log
+estado_a_antes="resumen_estado":"e9ff55516204fca2fcf4ffad8d292bbeab519c47a56235738770d6a44c1149f2" estado_a_despues="resumen_estado":"1b428e2f2ffd7b930ee1be9ab82229c371ad44777a4c1f56b2c6c1531e9744f9" (deben coincidir: E-7 no cambia estado)
+=== E-8: zx-adversario doble-firma --clave-indice 0 --semilla 101 --repetir contra A ===
+[2m2026-09-27T18:24:15.151552Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m RANDOM PEERS: Got 0 peers
+[2m2026-09-27T18:24:15.151573Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m JOIN: Inserting 0 random peers into the mesh
+[2m2026-09-27T18:24:15.151582Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Completed JOIN for topic [3mtopic[0m[2m=[0m/zx-dev/bloques/pow/1
+[2m2026-09-27T18:24:15.151586Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Subscribed to topic [3mtopic[0m[2m=[0m/zx-dev/bloques/pow/1
+[2m2026-09-27T18:24:15.151588Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m RANDOM PEERS: Got 0 peers
+[2m2026-09-27T18:24:15.151590Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m JOIN: Inserting 0 random peers into the mesh
+[2m2026-09-27T18:24:15.151592Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Completed JOIN for topic [3mtopic[0m[2m=[0m/zx-dev/bloques/post/1
+[2m2026-09-27T18:24:15.151594Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Subscribed to topic [3mtopic[0m[2m=[0m/zx-dev/bloques/post/1
+[2m2026-09-27T18:24:15.151601Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWE4WSxBpqE2rQVDJmPJinxWpXpMBQtMDfKYVmXDcWRZhx
+zx-adversario: marcando /ip4/127.0.0.1/tcp/42500 ...
+[2m2026-09-27T18:24:15.151634Z[0m [34mDEBUG[0m [2mlibp2p_tcp[0m[2m:[0m dialing address [3maddress[0m[2m=[0m127.0.0.1:42500
+[2m2026-09-27T18:24:15.152437Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_kad::handler[0m[2m:[0m New outbound connection [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mmode[0m[2m=[0mclient
+[2m2026-09-27T18:24:15.152621Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_swarm[0m[2m:[0m Connection established [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mendpoint[0m[2m=[0mDialer { address: /ip4/127.0.0.1/tcp/42500, role_override: Dialer, port_use: Reuse } [3mtotal_peers[0m[2m=[0m1
+[2m2026-09-27T18:24:15.152641Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m New peer connected [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF
+zx-adversario: conectado a 12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF
+[2m2026-09-27T18:24:15.152959Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m New peer type found for peer [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mpeer_type[0m[2m=[0mGossipsub v1.2
+[2m2026-09-27T18:24:15.153207Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m SUBSCRIPTION: Adding gossip peer to topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/pow/1
+[2m2026-09-27T18:24:15.153222Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m SUBSCRIPTION: Adding peer to the mesh for topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/pow/1
+[2m2026-09-27T18:24:15.153226Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Sending GRAFT to peer for topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/pow/1
+[2m2026-09-27T18:24:15.153243Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m SUBSCRIPTION: Adding gossip peer to topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/post/1
+[2m2026-09-27T18:24:15.153246Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m SUBSCRIPTION: Adding peer to the mesh for topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/post/1
+[2m2026-09-27T18:24:15.153254Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Sending GRAFT to peer for topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/post/1
+[2m2026-09-27T18:24:15.153284Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Handling GRAFT message for peer [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF
+[2m2026-09-27T18:24:15.153289Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m GRAFT: Received graft for peer that is already in topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/pow/1
+[2m2026-09-27T18:24:15.153293Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Completed GRAFT handling for peer [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF
+[2m2026-09-27T18:24:15.153297Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Handling GRAFT message for peer [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF
+[2m2026-09-27T18:24:15.153301Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m GRAFT: Received graft for peer that is already in topic [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mtopic[0m[2m=[0m/zx-dev/bloques/post/1
+[2m2026-09-27T18:24:15.153304Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Completed GRAFT handling for peer [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF
+[2m2026-09-27T18:24:15.153350Z[0m [34mDEBUG[0m [1mnew_established_connection[0m[1m{[0m[3mremote_addr[0m[2m=[0m/ip4/127.0.0.1/tcp/42500 [3mid[0m[2m=[0m1 [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF[1m}[0m[2m:[0m[1mConnection::poll[0m[2m:[0m [2mlibp2p_ping::handler[0m[2m:[0m ping succeeded [3mrtt[0m[2m=[0m228.226µs
+zx-adversario: objetivo declara altura PoW 30 fase Post
+zx-adversario: el objetivo confirmó su suscripción a los dos temas de gossipsub
+zx-adversario doble-firma: esperando un bloque PoST de la clave 0 (semilla 101, clave pública ClavePublica([77, 24, 146, 204, 20, 234, 191, 97, 204, 8, 246, 155, 126, 156, 245, 49, 111, 50, 165, 116, 238, 197, 189, 250, 127, 52, 27, 220, 247, 46, 164, 11])), plazo 120s ...
+[2m2026-09-27T18:24:15.230620Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Handling message from peer [3mpeer[0m[2m=[0m12D3KooWQj3VhnvegrX237VHqT1JFM4TKR9cjAwzSDXigHeaC7MF [3mmessage_id[0m[2m=[0md5c56deca86ab44b66d73401906dd507054e699ddad0a5848b0ba9cc24f47cf9
+[2m2026-09-27T18:24:15.230631Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Put message in duplicate_cache and resolve promises [3mmessage_id[0m[2m=[0md5c56deca86ab44b66d73401906dd507054e699ddad0a5848b0ba9cc24f47cf9
+[2m2026-09-27T18:24:15.230636Z[0m [34mDEBUG[0m [1mSwarm::poll[0m[2m:[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Sending received message to user
+zx-adversario doble-firma: bloque original recibido — slot 36 hash d0c498e9006bc95f1827e16a7fe257d705cc61ba4b1a5f8219b7370fa8396f56
+zx-adversario doble-firma: segunda cabecera sellada — slot 36 hash e5e5daf9a3881e6a6d483082febf6272f9794ea980616a62ed5de8f5f364e972 (pre_hash distinto del original, identidad RAT-1 igual, comprobado localmente)
+[2m2026-09-27T18:24:15.230753Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Published message [3mmessage_id[0m[2m=[0m4222519d6dfa22db7f81a16b0dfa161817342ff5a8a59ba887ac779d4d48747c
+zx-adversario doble-firma: segunda cabecera publicada
+zx-adversario doble-firma: tercera cabecera sellada — slot 36 hash cadde377527a03921e0d4fa778f30397d9aa0f877d8ad8693c94a67c9ed16f44 (--repetir, prueba de deduplicación EV-12)
+[2m2026-09-27T18:24:15.431926Z[0m [34mDEBUG[0m [2mlibp2p_gossipsub::behaviour[0m[2m:[0m Published message [3mmessage_id[0m[2m=[0me2976fe2b9805bf735c3c8641280b1c3ba11531c0a259dd37d4c91ecc42f35eb
+zx-adversario doble-firma: tercera cabecera publicada
+zx-adversario doble-firma: fin. El veredicto (evidencia_detectada/evidencia_incluida/confiscación) se lee en el registro estructurado de los nodos objetivo, no aquí.
+=== esperando evidencia_detectada en B y C, plazo 120s ===
+EXITO: evidencia_detectada B=1 C=1
+=== esperando evidencia_incluida, plazo 120s ===
+EXITO: evidencia_incluida A=1 B=0 C=0
+=== 30s más de producción para que la confiscación se refleje y propague ===
+=== resumen_estado final (E-7/E-8), método antiguo, informativo ===
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+2026-09-27T20:24:47+02:00 === reposo_y_verificar: calculando slot_reposo ===
+slot_reposo=66
+lanzado A pid=3763412
+lanzado B pid=3763419
+lanzado C pid=3763490
+=== esperando dejar_de_producir en todos, plazo 30 min ===
+reposo alcanzado en todos
+=== esperando 30s sin cambio_punta en ninguno ===
+30s sin cambio_punta en todos
+loadavg_fin=8.29 8.06 7.41 1/2081 3767028
+fecha_fin=2026-09-27T20:25:33+02:00

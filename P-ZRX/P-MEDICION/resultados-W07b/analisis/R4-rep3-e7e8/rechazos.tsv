@@ -1,0 +1,5 @@
+etapa	motivo	n	p50_t_hasta_rechazo	p95_t_hasta_rechazo	max_t_hasta_rechazo
+cabecera	bloque propio edfc2eb22033d54af8d508203b4600827226ad9042f157951b92aa9258ead289 rechazado en la admisión: Sello(FirmaInvalida { motivo: "la firma no verifica (ZIP-215)" })	1	46189417	46189417	46189417
+cabecera	bloque propio c09aa7c41780b5b2888de783bdd9b492a6f55fe991aff90261d3d41ff345c9da rechazado en la admisión: Pot(DiferenciaDeSlots(NoCoincide { bundles: 1, diferencia: 2 }))	1	24406208	24406208	24406208
+cabecera	bloque propio 0b7d9238cba279cb14b73c26072d0c63eff2886a4534ce5c40591629c72c4698 rechazado en la admisión: Pot(DiferenciaDeSlots(NoCoincide { bundles: 1, diferencia: 2 }))	1	3272718	3272718	3272718
+cabecera	bloque propio 0e288678148ee50e54601b708d6d99e82bee2f2802a37c216ac09d4de6a01e20 rechazado en la admisión: validar_cabecera_pow: C-BLK-05: bits esperado 0x1e2e2de3, encontrado 0x1c07fff8	1	31914778	31914778	31914778

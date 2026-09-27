@@ -1,0 +1,1 @@
+PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W07b/run/R3-E6-3d21b1f-rep3/*/datos)

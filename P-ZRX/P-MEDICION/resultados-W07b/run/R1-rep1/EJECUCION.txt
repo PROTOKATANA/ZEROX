@@ -1,0 +1,36 @@
+commit=26312ffee1b9fd1aa74b1323e087caa1d64a5a77
+sha256_zx-node=70b0cf2d521c5cbd1bdebd12bb47381c772a498c496861dd77e83d5911cddc01
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=1.80 7.40 7.82 1/2486 2808884
+fecha_inicio=2026-09-27T15:21:20+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=42100 B=42101 C=42102
+2026-09-27T15:21:20+02:00 === R1 rep1: E-1, arrancando A,B,C desde el génesis (semilla 101) ===
+=== E-1: esperando que los 3 crucen el corte (>=1 bloque_producido cada uno), plazo 20 min ===
+E-1 EXITO: los 3 cruzaron el corte (A=1 B=2 C=1 bloques PoST)
+t_e1_cruzado_ns=1790515322722651947
+=== E-2: 30 minutos de régimen PoST (sr_dev=13043817825332783104) ===
+E-2: régimen de 1800s completado
+=== E-4: SIGKILL a A, rearranque (mismo --datos, mismos pares) ===
+t_muerte_ns=1790517122750480673 t_puerto_libre_ns=1790517122854963728
+=== E-4: esperando reinicio_completo y que A se ponga al día con B/C, plazo 10 min ===
+E-4 EXITO: reinicio_completo=1, A alcanzó a B (slot_a=1574 slot_b=1574)
+t_puesta_al_dia_ns=1790517240500275060
+=== E-3: reposo (mismo --dejar-de-producir-en-slot en los 3) y comparación ===
+slot_reposo calculado=1579 (max(A=1574,B=1574,C=1574)+5)
+=== esperando dejar_de_producir en los 3, plazo 30 min ===
+reposo alcanzado en los 3
+=== esperando 30s sin cambio_punta en ninguno (decisión 6) ===
+30s sin cambio_punta en los 3
+t_reposo_inicio_ns=1790517240512250884 t_reposo_fin_ns=1790517391602506283 tiempo_convergencia_ns=151090255399
+=== E-3: resultado final ===
+loadavg_fin=4.21 5.50 6.19 1/2759 2926096
+fecha_fin=2026-09-27T15:56:31+02:00
+R1 rep1: FIN 2026-09-27T15:56:31+02:00

@@ -1,0 +1,45 @@
+commit=26312ffee1b9fd1aa74b1323e087caa1d64a5a77
+sha256_zx-node=70b0cf2d521c5cbd1bdebd12bb47381c772a498c496861dd77e83d5911cddc01
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=7.98 9.31 11.17 1/2057 3403783
+fecha_inicio=2026-09-27T18:11:13+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=42300 B=42301 C=42302
+tecnica=W06d7-V5 (aislar A sin pares, mismo terminal)
+2026-09-27T18:11:13+02:00 === E-6 rep1: A,B,C juntos desde el génesis (mismo terminal) ===
+EXITO total=20
+CONVERGEN punta="punta":"eb66488eb8ef91b428ee640c65d0faca2b09773961065150e973863eb6d71306" resumen="resumen_estado":"039df28ada79fee4679125508ca896ce827dc6070f531fe50ec850ee2ca704a1"
+slot_pre(aislamiento)=24
+=== aislando A (reinicio sin pares); B,C siguen produciendo ===
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===
+60 slots de aislamiento alcanzados: slot_a=86 slot_b=86
+t_particion_inicio_ns=1790525540027674488 t_particion_fin_ns=1790525615489895026
+punta_a_aislada: {"tipo":"cambio_punta","reloj_ns":74125369692,"reloj_pared_ns":1790525614259479101,"punta":"af39b41f5ee772f4a792a12f01f2e5f767f0958c822c79e0ef6f6f1036e97855","resumen_estado":"1fb086e57d608350a28f34c37a2a2fe1133d226b4d01d4c9826227b17cd83778","profundidad_reorg":0,"blue_score":74}
+punta_bc: {"tipo":"cambio_punta","reloj_ns":140480981497,"reloj_pared_ns":1790525614231115468,"punta":"af39b41f5ee772f4a792a12f01f2e5f767f0958c822c79e0ef6f6f1036e97855","resumen_estado":"1fb086e57d608350a28f34c37a2a2fe1133d226b4d01d4c9826227b17cd83778","profundidad_reorg":0,"blue_score":74}
+=== reuniendo: matando y relanzando A con --red-marcar hacia B y C (B,C NO se reinician) ===
+=== esperando convergencia, plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"320cb7d6458e95b2d2085cd4422be59ab63a931694cc6a8b6cd8b04a86cbcaf6" resumen="resumen_estado":"f731e3d44922a06badbef466328c01c3764fcc022e527a4063b8818bfec0bc4b"
+t_reunion_inicio_ns=1790525615494160152 t_reunion_fin_ns=1790525624668580531 tiempo_convergencia_ns=9174420379
+{"tipo":"cambio_punta","reloj_ns":4840127630,"reloj_pared_ns":1790525620440910199,"punta":"44be92c90b3830de0aacaa8e1ca47aeb55a378803d0e611d8e4e667fc8681946","resumen_estado":"adceb6b5df2083e2a48bf08554b70b60cb3a5b699195e6ac6db8c7adcc6cfafd","profundidad_reorg":0,"blue_score":77}
+{"tipo":"cambio_punta","reloj_ns":5036636922,"reloj_pared_ns":1790525620637419481,"punta":"22a8e951e13e420e19a2c44d57ab42d2cff7bd8480b51a7333b4cc95bb4e4f1b","resumen_estado":"5a1f903df59963c6b36f7b5bb57dbad870a4c9a5425921da2adfd680d7b89750","profundidad_reorg":1,"blue_score":77}
+{"tipo":"cambio_punta","reloj_ns":6208936447,"reloj_pared_ns":1790525621809719016,"punta":"320cb7d6458e95b2d2085cd4422be59ab63a931694cc6a8b6cd8b04a86cbcaf6","resumen_estado":"f731e3d44922a06badbef466328c01c3764fcc022e527a4063b8818bfec0bc4b","profundidad_reorg":0,"blue_score":79}
+=== resultado final (método antiguo, informativo) ===
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+2026-09-27T18:13:44+02:00 === reposo_y_verificar: calculando slot_reposo ===
+slot_reposo=97
+lanzado A pid=3416520
+lanzado B pid=3416525
+lanzado C pid=3416595
+=== esperando dejar_de_producir en todos, plazo 30 min ===
+reposo alcanzado en todos
+=== esperando 30s sin cambio_punta en ninguno ===
+30s sin cambio_punta en todos
+loadavg_fin=9.05 9.75 11.05 1/2137 3420023
+fecha_fin=2026-09-27T18:14:30+02:00

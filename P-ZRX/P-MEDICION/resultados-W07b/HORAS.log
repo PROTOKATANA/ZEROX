@@ -1,0 +1,12 @@
+2026-09-27T10:45:11+02:00 inicio W07b: checksums de ENTRADA-W07b.sha256 verificados (51/51 coinciden); zona creada; sin procesos zx-node ni puertos ocupados al empezar.
+2026-09-27T11:29:49+02:00 E-0 completo: fmt/clippy/build/test/3 guardianes CI/release, todo verde. sha256 zx-node=a9f0ffa1b42e3c7c3eaea0ba6a87a20f9a46dfd2118a3b761f4a26be58bf19e1 zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+2026-09-27T12:34:00+02:00 E-2a cerrada: SR_dev calibrado = 13043817825332783104, tau medido = 1.281552 s (bisección fraccionaria, intento 5, sin panic).
+2026-09-27T15:19:00+02:00 Nuevo candidato 26312ffee1b9fd1aa74b1323e087caa1d64a5a77 (W06d8, corrige panic de regimen.rs:438); E-0 repetida sobre este commit: todo verde.
+2026-09-27T19:00:00+02:00 R1 (E-1/E-2/E-4/E-3) y R2 (E-5) completas, 3 repeticiones cada una, medidas sobre 26312ff.
+2026-09-27T19:30:00+02:00 Nuevo candidato 3d21b1f44301991fb59737e2117cc26a66a4e93f (W06d9, corrige fallo_productor por portador PoT no retenido); build release construido; R3 y R4 se miden con este binario.
+2026-09-27T20:00:00+02:00 R3 (E-6 x3, E-6b x3) completa sobre 3d21b1f, con aislamiento verificado y veredicto de estado real via verificar_estado_w07d.sh.
+2026-09-27T20:49:36+02:00 R4 (E-7/E-8/E-9 x3) completa sobre 3d21b1f, todas verificadas CONVERGEN.
+2026-09-27T20:51:51+02:00 Instrumento W07c-B (bloques_por_slot/padres_por_bloque/fraccion_rojos por bloque distinto, incluye slots vacíos) copiado y verificado: 525 aserciones en verde.
+2026-09-27T20:53:57+02:00 Re-análisis de las 18 ejecuciones válidas de W07b con el instrumento W07c-B corregido: completo.
+2026-09-27T21:31:18+02:00 E-0 completa sobre el commit definitivo 3d21b1f: fmt/clippy/build/test/3 guardianes/release, todo verde. E-0: SUPERADO.
+2026-09-27T21:37:28+02:00 HUELLAS.sha256 generado (769 ficheros, 237M, excluye datos/ de RocksDB, ver cabecera del propio fichero); verificado con sha256sum -c: 0 fallos. INFORME.md escrito. ORDEN-W07b TERMINADA (con el presupuesto de 8h superado, declarado en PROGRESO.md).

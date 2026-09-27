@@ -1,0 +1,19 @@
+--- A: bloque_red_rechazado ---
+{"tipo":"bloque_red_rechazado","reloj_ns":70054854631,"reloj_pared_ns":1790534176334222198,"hash":"ddcd352df0a882d3ad9c2c4d310a4966da0197ef0572d33207b71b605ea45906","familia":"post","etapa":"cabecera","motivo":"bloque propio ddcd352df0a882d3ad9c2c4d310a4966da0197ef0572d33207b71b605ea45906 rechazado en la admisión: Sello(FirmaInvalida { motivo: \"la firma no verifica (ZIP-215)\" })","t_hasta_rechazo_ns":3076482}
+{"tipo":"bloque_red_rechazado","reloj_ns":70405341880,"reloj_pared_ns":1790534176684709447,"hash":"1d8b971c1623b2d641621b5526ab74b0ccc7890b5a5cb5c6a49eb24187a07f7d","familia":"post","etapa":"cabecera","motivo":"bloque propio 1d8b971c1623b2d641621b5526ab74b0ccc7890b5a5cb5c6a49eb24187a07f7d rechazado en la admisión: Pot(DiferenciaDeSlots(NoCoincide { bundles: 1, diferencia: 2 }))","t_hasta_rechazo_ns":31200301}
+{"tipo":"bloque_red_rechazado","reloj_ns":70405393009,"reloj_pared_ns":1790534176684760576,"hash":"4581ac7119c6e1725f3e2914f53671322fe5feab12d8c7fae1b69d5a1d538383","familia":"post","etapa":"cabecera","motivo":"bloque propio 4581ac7119c6e1725f3e2914f53671322fe5feab12d8c7fae1b69d5a1d538383 rechazado en la admisión: Pot(DiferenciaDeSlots(NoCoincide { bundles: 1, diferencia: 2 }))","t_hasta_rechazo_ns":10034481}
+{"tipo":"bloque_red_rechazado","reloj_ns":70774797090,"reloj_pared_ns":1790534177054164637,"hash":"a6944206961012d4adf30607dd24a1f27dfd0d0fb511b236ced00c5646464132","familia":"pow","etapa":"cabecera","motivo":"bloque propio a6944206961012d4adf30607dd24a1f27dfd0d0fb511b236ced00c5646464132 rechazado en la admisión: validar_cabecera_pow: C-BLK-05: bits esperado 0x1e2e2de3, encontrado 0x1c07fff8","t_hasta_rechazo_ns":53397981}
+--- A: par_penalizado ---
+--- A: limite_alcanzado ---
+--- A: bloque_red_huerfano ---
+256
+--- B: bloque_red_rechazado ---
+--- B: par_penalizado ---
+--- B: limite_alcanzado ---
+--- B: bloque_red_huerfano ---
+0
+--- C: bloque_red_rechazado ---
+--- C: par_penalizado ---
+--- C: limite_alcanzado ---
+--- C: bloque_red_huerfano ---
+0

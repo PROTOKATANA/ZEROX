@@ -1,0 +1,18 @@
+2026-09-27T20:03:56+02:00 === verificación de estado con binario W07d (secuencial, un nodo a la vez, sobre copias) ===
+copias en: /home/katana/zeo/ZEROX/deepseek/W07b/verif/R3-E6-3d21b1f-rep2
+2026-09-27T20:03:56+02:00 A: copiando datos/ (cp -a) a /home/katana/zeo/ZEROX/deepseek/W07b/verif/R3-E6-3d21b1f-rep2/A/datos ...
+2026-09-27T20:03:56+02:00 A: slot_actual_previo=99 dejar=98 puerto_aislado=43070 (sobre copia)
+A reinicio_completo: {"tipo":"reinicio_completo","reloj_ns":3533625277,"reloj_pared_ns":1790532239906083728,"bloques_repetidos":148,"duracion_ns":182542023,"punta":"afb3fa7aeb27c715e90e4cc2c01429d2c2291ebf297ce551ec2e56af353f7a56","resumen_estado":"dd1111feee2de91f1b2b4d40659e5b5a0a14f71e7f444c22c25538b0ddd9cb96","n_bloques_dag":148,"compendio_bloques":"397808912097bd591fe52139e8913b3c2e3cf0e2010f94b575e294a8c9f9a271"}
+A: punta="punta":"afb3fa7aeb27c715e90e4cc2c01429d2c2291ebf297ce551ec2e56af353f7a56" resumen="resumen_estado":"dd1111feee2de91f1b2b4d40659e5b5a0a14f71e7f444c22c25538b0ddd9cb96" compendio="compendio_bloques":"397808912097bd591fe52139e8913b3c2e3cf0e2010f94b575e294a8c9f9a271" n_bloques_dag="n_bloques_dag":148
+A: sha256(registro-w07d.jsonl)=479a043bdc7360f240b0919891f65d9beec29dca185ed7fef90b968cd5854fc4
+2026-09-27T20:04:00+02:00 B: copiando datos/ (cp -a) a /home/katana/zeo/ZEROX/deepseek/W07b/verif/R3-E6-3d21b1f-rep2/B/datos ...
+2026-09-27T20:04:00+02:00 B: slot_actual_previo=99 dejar=98 puerto_aislado=43071 (sobre copia)
+B reinicio_completo: {"tipo":"reinicio_completo","reloj_ns":3541673644,"reloj_pared_ns":1790532244153315821,"bloques_repetidos":148,"duracion_ns":175083744,"punta":"afb3fa7aeb27c715e90e4cc2c01429d2c2291ebf297ce551ec2e56af353f7a56","resumen_estado":"dd1111feee2de91f1b2b4d40659e5b5a0a14f71e7f444c22c25538b0ddd9cb96","n_bloques_dag":148,"compendio_bloques":"397808912097bd591fe52139e8913b3c2e3cf0e2010f94b575e294a8c9f9a271"}
+B: punta="punta":"afb3fa7aeb27c715e90e4cc2c01429d2c2291ebf297ce551ec2e56af353f7a56" resumen="resumen_estado":"dd1111feee2de91f1b2b4d40659e5b5a0a14f71e7f444c22c25538b0ddd9cb96" compendio="compendio_bloques":"397808912097bd591fe52139e8913b3c2e3cf0e2010f94b575e294a8c9f9a271" n_bloques_dag="n_bloques_dag":148
+B: sha256(registro-w07d.jsonl)=cfe25b2ad5fe52eb64951be35245699d88a1a69e43e1a644b9a065d6cb031328
+2026-09-27T20:04:04+02:00 C: copiando datos/ (cp -a) a /home/katana/zeo/ZEROX/deepseek/W07b/verif/R3-E6-3d21b1f-rep2/C/datos ...
+2026-09-27T20:04:04+02:00 C: slot_actual_previo=99 dejar=98 puerto_aislado=43072 (sobre copia)
+C reinicio_completo: {"tipo":"reinicio_completo","reloj_ns":3735681131,"reloj_pared_ns":1790532248587391055,"bloques_repetidos":148,"duracion_ns":174399577,"punta":"afb3fa7aeb27c715e90e4cc2c01429d2c2291ebf297ce551ec2e56af353f7a56","resumen_estado":"dd1111feee2de91f1b2b4d40659e5b5a0a14f71e7f444c22c25538b0ddd9cb96","n_bloques_dag":148,"compendio_bloques":"397808912097bd591fe52139e8913b3c2e3cf0e2010f94b575e294a8c9f9a271"}
+C: punta="punta":"afb3fa7aeb27c715e90e4cc2c01429d2c2291ebf297ce551ec2e56af353f7a56" resumen="resumen_estado":"dd1111feee2de91f1b2b4d40659e5b5a0a14f71e7f444c22c25538b0ddd9cb96" compendio="compendio_bloques":"397808912097bd591fe52139e8913b3c2e3cf0e2010f94b575e294a8c9f9a271" n_bloques_dag="n_bloques_dag":148
+C: sha256(registro-w07d.jsonl)=11813db7ef93cac134fa961b1864b05829c58bb29b79b21b8256de491646dc90
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"dd1111feee2de91f1b2b4d40659e5b5a0a14f71e7f444c22c25538b0ddd9cb96"|"compendio_bloques":"397808912097bd591fe52139e8913b3c2e3cf0e2010f94b575e294a8c9f9a271")

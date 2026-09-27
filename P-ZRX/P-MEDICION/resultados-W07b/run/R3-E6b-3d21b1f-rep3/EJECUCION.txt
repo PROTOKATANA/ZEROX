@@ -1,0 +1,45 @@
+commit=3d21b1f44301991fb59737e2117cc26a66a4e93f
+sha256_zx-node=e7ef7f19a701188237e38266f5d6361c16228620fcf4039e5a67d3b2339900de
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=7.50 8.15 7.20 1/2074 3746461
+fecha_inicio=2026-09-27T20:19:53+02:00
+ps_inicio_top_cpu:
+semilla=303
+puertos: A=42420 B=42421 C=42422
+tecnica=SL4b2-e6b (A aislado desde el arranque; reunion con produccion en marcha)
+2026-09-27T20:19:53+02:00 === E-6b 3d21b1f-rep3: A aislado desde el arranque, B+C juntos ===
+=== esperando que A y (B o C) crucen el corte por separado, plazo 30 min ===
+listo: A=5 B=4 C=2
+pesos FC-3 antes de reunir: A: bloques_producidos=8 blue_score=7 | BC: bloques_producidos(B+C)=9 blue_score(max B,C)=11 (B=11 C=11)
+prediccion FC-3 (mayor blue_score, proxy exacto de blue_work con SR_dev constante): BC
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0
+=== reuniendo: matando y relanzando A con --red-marcar hacia B y C (B,C NO se reinician) ===
+=== esperando convergencia (mismo resumen_estado en los 3), plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"7221fdc86e60b19e0d99d8222b4c40970f42bc5f6a0e8db92c554b1db8ce497b" resumen="resumen_estado":"ebfc8a16c68c4106329a9d0f3d759f60865ad9beae77f4102fbe9aec450a61c8"
+t_reunion_inicio_ns=1790533241105111673 t_reunion_fin_ns=1790533250293685005 tiempo_convergencia_ns=9188573332
+=== ¿A produjo sobre el terminal ganador tras la reunión? (últimos bloque_producido de A) ===
+/home/katana/zeo/ZEROX/deepseek/W07b/run/R3-E6b-3d21b1f-rep3/B/registro.jsonl:{"tipo":"reorganizacion_pow","reloj_ns":51297334656,"reloj_pared_ns":1790533245066709073,"punta_anterior":"00002a59b201ae9c6fe67ed50fd9c32d9f3d65a62ded34b6136e80e375b69f96","punta_nueva":"00001a1817b396b03133904672697acb69396f8ffce6e3f39fd4702633bfcc2e","profundidad":30}
+/home/katana/zeo/ZEROX/deepseek/W07b/run/R3-E6b-3d21b1f-rep3/C/registro.jsonl:{"tipo":"reorganizacion_pow","reloj_ns":51323815986,"reloj_pared_ns":1790533245096228536,"punta_anterior":"00002a59b201ae9c6fe67ed50fd9c32d9f3d65a62ded34b6136e80e375b69f96","punta_nueva":"00001a1817b396b03133904672697acb69396f8ffce6e3f39fd4702633bfcc2e","profundidad":30}
+{"tipo":"cambio_punta","reloj_ns":4921437613,"reloj_pared_ns":1790533246133055364,"punta":"8dfebff96cc0750817567a2d157e78eb08235eead13b8dcab907dcf0925f7fde","resumen_estado":"901987469e0fc827e9895dbbf2fac28232b5742c462bd0c7581433715af22260","profundidad_reorg":0,"blue_score":12}
+{"tipo":"cambio_punta","reloj_ns":4988930028,"reloj_pared_ns":1790533246200547779,"punta":"d8a5eaf06e53aaf39ec9976aa2577b6d383bc405ab551cd16b488e1c46b8b159","resumen_estado":"9fc1a6474391ec75ba60a6e5f2dbfed54269e4d12f5ff4af3076bdc7e47c51f1","profundidad_reorg":0,"blue_score":13}
+{"tipo":"cambio_punta","reloj_ns":6561816692,"reloj_pared_ns":1790533247773434483,"punta":"7221fdc86e60b19e0d99d8222b4c40970f42bc5f6a0e8db92c554b1db8ce497b","resumen_estado":"ebfc8a16c68c4106329a9d0f3d759f60865ad9beae77f4102fbe9aec450a61c8","profundidad_reorg":0,"blue_score":16}
+=== resultado final (método antiguo, informativo) ===
+blue_score final: A=16 B=16 C=16
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+2026-09-27T20:20:50+02:00 === reposo_y_verificar: calculando slot_reposo ===
+slot_reposo=19
+lanzado A pid=3750895
+lanzado B pid=3750901
+lanzado C pid=3750974
+=== esperando dejar_de_producir en todos, plazo 30 min ===
+reposo alcanzado en todos
+=== esperando 30s sin cambio_punta en ninguno ===
+30s sin cambio_punta en todos
+loadavg_fin=7.51 8.41 7.42 1/2064 3754514
+fecha_fin=2026-09-27T20:21:36+02:00

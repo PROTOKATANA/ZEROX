@@ -1,0 +1,3 @@
+tramo_desde	tramo_hasta	n	p50	p95	max	unidad
+0	499	1494	84138	150807	753126	ns
+500	999	266	157317	202936	303214	ns

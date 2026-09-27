@@ -1,0 +1,20 @@
+2026-09-27T20:37:47+02:00 === E-9 rep2: A aislado (retiene su corte), B+C juntos ===
+=== esperando que A y (B o C) fijen su propio T (>=1 bloque_producido), plazo 20 min ===
+A fija su T en t=42267541908ns (retenido, aislado)
+B/C fijan su T en t=42268465330ns
+=== dejando que B/C produzcan 60s más antes de que A publique tarde (reunión) ===
+=== A publica tarde: reunión (reinicio con --red-marcar hacia B y C) ===
+=== qué T queda fijado en cada nodo tras la publicación tardía (descriptivo, sin criterio de éxito) ===
+--- A: último cambio_punta ---
+{"tipo":"cambio_punta","reloj_ns":119167123351,"reloj_pared_ns":1790534488628341277,"punta":"75680ec8b927af87193463ff894ee2c153f727905a21deb15479d059151b5f2f","resumen_estado":"5bd24aa1a16ad5f776d539a49140c4f91ee2c714990a8445438853065b6fd204","profundidad_reorg":1,"blue_score":182}
+--- A: reorganizacion_pow ---
+{"tipo":"reorganizacion_pow","reloj_ns":4098948105,"reloj_pared_ns":1790534373560166031,"punta_anterior":"00001e858e9cb0713e2226d400141d25810d1032cea306a58638abbb30f860bd","punta_nueva":"000007fd6308ef6824c1cdc00d58a72fb90bb1e62efcdf6640bb473f4ca0af0e","profundidad":30}
+--- B: último cambio_punta ---
+{"tipo":"cambio_punta","reloj_ns":221634595663,"reloj_pared_ns":1790534488720782160,"punta":"75680ec8b927af87193463ff894ee2c153f727905a21deb15479d059151b5f2f","resumen_estado":"5bd24aa1a16ad5f776d539a49140c4f91ee2c714990a8445438853065b6fd204","profundidad_reorg":1,"blue_score":182}
+--- B: reorganizacion_pow ---
+--- C: último cambio_punta ---
+{"tipo":"cambio_punta","reloj_ns":221638418842,"reloj_pared_ns":1790534488726646220,"punta":"75680ec8b927af87193463ff894ee2c153f727905a21deb15479d059151b5f2f","resumen_estado":"5bd24aa1a16ad5f776d539a49140c4f91ee2c714990a8445438853065b6fd204","profundidad_reorg":1,"blue_score":182}
+--- C: reorganizacion_pow ---
+t_publicacion_tardia_ns=1790534369353523291
+loadavg_fin=13.33 10.06 7.92 4/2323 3809870
+fecha_fin=2026-09-27T20:41:29+02:00

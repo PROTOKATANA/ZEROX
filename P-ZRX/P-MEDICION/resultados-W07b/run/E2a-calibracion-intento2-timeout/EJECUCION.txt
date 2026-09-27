@@ -1,0 +1,20 @@
+commit=27dcfeb09e7e0a105c5c55a94766621b99fbfc57
+sha256_zx-node=a9f0ffa1b42e3c7c3eaea0ba6a87a20f9a46dfd2118a3b761f4a26be58bf19e1
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=default_u64_max
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=0.28 2.59 5.08 2/2441 2517217
+fecha_inicio=2026-09-27T11:50:58+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=42000 B=42001 C=42002
+objetivo=[0.8,1.2] bloques/slot; max 6 puntos; bisección en exponentes [56,64]
+2026-09-27T11:50:58+02:00 === E-2a: cruzando el corte con SR_dev por defecto (u64::MAX, sin --sr-dev) ===
+lanzado A pid=2517224
+lanzado B pid=2517229
+lanzado C pid=2517241
+TIMEOUT cruzando el corte

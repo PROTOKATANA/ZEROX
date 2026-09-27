@@ -1,0 +1,47 @@
+commit=3d21b1f44301991fb59737e2117cc26a66a4e93f
+sha256_zx-node=e7ef7f19a701188237e38266f5d6361c16228620fcf4039e5a67d3b2339900de
+sha256_zx-adversario=a8bcc9d09cf8d891b84212d367243885fc4e900777cec27e7ebecc0d6b906c38
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=6.21 7.35 6.84 2/2069 3688888
+fecha_inicio=2026-09-27T20:04:17+02:00
+ps_inicio_top_cpu:
+semilla=303
+puertos: A=42320 B=42321 C=42322 (aislado en 42820)
+tecnica=W06d7-V5 (aislar A en puerto NUEVO sin pares, mismo terminal; corrección de aislamiento verificable 2026-09-27)
+2026-09-27T20:04:18+02:00 === E-6 3d21b1f-rep3: A,B,C juntos desde el génesis (mismo terminal) ===
+EXITO total=20
+CONVERGEN punta="punta":"41a31d63c0fed3c1926824c1e4d6ea86126a74a0d3691da1743e7b87508e9885" resumen="resumen_estado":"6b9faf9a59037f3b9249fa7dd2ca56f758536d7716db0af04bef27258642ccfd"
+slot_pre(aislamiento)=25
+=== aislando A (puerto NUEVO 42820, sin pares); B,C siguen produciendo en el suyo ===
+peer_id B=12D3KooWN9fpVKvFD22nTjJem6ShWe6XmyMvHHB2tzQLPzSKLNzB C=12D3KooWHTUNNWMmp22pV7vaTjq8eV6p7iPZL6RLjaeBKVcyJ1SA (para comprobar 0 contacto durante la partición)
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===
+60 slots de aislamiento alcanzados: slot_a=86 slot_b=91
+t_particion_inicio_ns=1790532324307260148 t_particion_fin_ns=1790532405763560506
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0 (peer_a_aislado=12D3KooWD55rgoTukvBhHFTb6bPFNnP6LeCxNencWte7mAiBUKzS)
+punta_a_aislada: {"tipo":"cambio_punta","reloj_ns":79292380510,"reloj_pared_ns":1790532403710098286,"punta":"993568f071128eb84215d4d31b010d8395924ec38cc7bfb7700cdbf23f757503","resumen_estado":"2a09a4419cbddc247b6af705feb419370fc78059ac7f7bf77bf08aac7469522c","profundidad_reorg":0,"blue_score":58}
+punta_bc: {"tipo":"cambio_punta","reloj_ns":147118972743,"reloj_pared_ns":1790532405124575768,"punta":"b5307395821cd8eae751c23bc64f35a4d8853ec5e575151119d1079e8e2faba3","resumen_estado":"d4abfe39cd1d416a83e69d1204059a3fd37defb8a470c826f59eb77aa0bcf2cd","profundidad_reorg":0,"blue_score":73}
+=== reuniendo: matando y relanzando A (puerto original 42320) con --red-marcar hacia B y C (B,C NO se reinician) ===
+=== esperando convergencia, plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"85335f48fe98d4f674badaf4f3148c30dbfdd4ec55bf1a9aa8438ad3aa69fad0" resumen="resumen_estado":"6609684b5703b3434f3b9762f9fa6b06d901bf55b0c680a967a720e95f27a1dc"
+t_reunion_inicio_ns=1790532405777026141 t_reunion_fin_ns=1790532420976593778 tiempo_convergencia_ns=15199567637
+{"tipo":"cambio_punta","reloj_ns":10918549505,"reloj_pared_ns":1790532416802199467,"punta":"f936a096c9adcac76d84f0c42f6c560c1a30d225876e73c6fdd3c98ed7b2da13","resumen_estado":"afe495f00013ec2faa319fdbde06560d952c625ff698ff6161cce60e84c46871","profundidad_reorg":0,"blue_score":80}
+{"tipo":"cambio_punta","reloj_ns":12424083131,"reloj_pared_ns":1790532418307733073,"punta":"ab6c2d1faf9477d23658fa6427119726eab5f2bbd5d4242b51934d2bcc705875","resumen_estado":"563b6abb7b34517592be4e13ecaed441f598151387a5d422ccba5ab123da2896","profundidad_reorg":0,"blue_score":81}
+{"tipo":"cambio_punta","reloj_ns":14576751112,"reloj_pared_ns":1790532420460401074,"punta":"85335f48fe98d4f674badaf4f3148c30dbfdd4ec55bf1a9aa8438ad3aa69fad0","resumen_estado":"6609684b5703b3434f3b9762f9fa6b06d901bf55b0c680a967a720e95f27a1dc","profundidad_reorg":0,"blue_score":83}
+=== resultado final (método antiguo, informativo) ===
+=== reposo (decisión 6) y verificación aislada (método nuevo, decisivo) ===
+2026-09-27T20:07:00+02:00 === reposo_y_verificar: calculando slot_reposo ===
+slot_reposo=106
+lanzado A pid=3701020
+lanzado B pid=3701025
+lanzado C pid=3701109
+=== esperando dejar_de_producir en todos, plazo 30 min ===
+reposo alcanzado en todos
+=== esperando 30s sin cambio_punta en ninguno ===
+30s sin cambio_punta en todos
+loadavg_fin=7.95 7.94 7.21 1/2078 3704634
+fecha_fin=2026-09-27T20:07:46+02:00
