@@ -10,11 +10,12 @@ t_cabecera_ns	todos	0	1227				ns
 t_admision_ns	todos	0	1227				ns
 t_persistencia_ns	todos	0	1227				ns
 t_total_ns	todos	0	1227				ns
-bloques_por_slot	todos	0	2007				bloques/slot
-padres_por_bloque	todos	0	2007				padres
+bloques_por_slot	todos	0	830				bloques/slot
+padres_por_bloque	todos	0	830				padres
 profundidad_reorg	todos	25	1621	1	5	5	bloques
 arranque_ns	todos	3	0	6963656687	7066438864	7066438864	ns
 duracion_reinicio_ns	todos	0	0				ns
 divergencia_fraccion_tiempo	total	1	0	0.348235	0.348235	0.348235	fraccion
-fraccion_rojos	todos	0	2007				fraccion
+media_bloques_por_slot	todos	0	830				bloques/slot
+fraccion_rojos	todos	0	830				fraccion
 estado_final_igual	total	1	0	0.000000	0.000000	0.000000	booleano

@@ -88,6 +88,13 @@ struct FilaRechazo
     max::Union{Missing,Int64}
 end
 
+# W07c-B: hallazgo cuantificado (contador de bloques con información inconsistente, etc.).
+struct FilaHallazgo
+    hallazgo::String
+    detalle::String
+    n::Int
+end
+
 struct FilaConvergencia
     inicio_pared_ns::Int64
     duracion_ns::Int64
@@ -136,6 +143,7 @@ struct Resultado
     latencias::Vector{FilaLatencia}
     tramos::Vector{FilaTramo}
     rechazos::Vector{FilaRechazo}
+    hallazgos::Vector{FilaHallazgo}
     convergencia::Vector{FilaConvergencia}
     divergencia_fraccion::Union{Missing,Float64}
     divergencia_medida::Bool
@@ -341,53 +349,170 @@ end
 
 # ---------------------------------------------------------------------------
 # Bloques por slot, padres por bloque, fracción de rojos (ESQUEMA §3)
+#
+# W07c-B: cada bloque se cuenta UNA vez por `hash` (no una vez por nodo/evento). El valor
+# canónico de `slot`/`n_padres`/`(azules,rojos)` es el del evento más temprano por
+# `(reloj_pared_ns, reloj_ns, nº de línea)`, para que no dependa del orden de los nodos. Si dos
+# eventos del mismo bloque traen valores distintos, se cuenta como hallazgo (no se imputa).
+# `bloques_por_slot` incluye TODOS los slots del intervalo `[mín,máx]`, también los de 0 bloques.
 # ---------------------------------------------------------------------------
+mutable struct _CanonBloque
+    slot::Int64
+    slot_pared::Int64
+    slot_reloj::Int64
+    slot_linea::Int32
+    slot_ok::Bool
+    slot_disc::Bool
+    padres::Int64
+    padres_pared::Int64
+    padres_reloj::Int64
+    padres_linea::Int32
+    padres_ok::Bool
+    padres_disc::Bool
+    azules::Int64
+    rojos::Int64
+    mergeset_pared::Int64
+    mergeset_reloj::Int64
+    mergeset_linea::Int32
+    mergeset_ok::Bool
+    mergeset_disc::Bool
+end
+
+_CanonBloque() = _CanonBloque(
+    NODATO, NODATO, NODATO, Int32(0), false, false,
+    NODATO, NODATO, NODATO, Int32(0), false, false,
+    NODATO, NODATO, NODATO, NODATO, Int32(0), false, false,
+)
+
+@inline function _antes_que(pared::Int64, reloj::Int64, linea::Int32,
+                            bp::Int64, br::Int64, bl::Int32)
+    pared < bp && return true
+    pared > bp && return false
+    reloj < br && return true
+    reloj > br && return false
+    return linea < bl
+end
+
+# Distribución de «bloques por slot» cuando hay `nslots` slots en el intervalo y solo `vals`
+# (todos > 0) tienen bloques: el resto son ceros, computados sin materializar el vector.
+function _distribucion_slots(vals::Vector{Int}, nslots::Int)
+    nslots == 0 && return (0, missing, missing, missing)
+    s = sort(vals)
+    z = nslots - length(s)
+    r50 = div(50 * nslots + 99, 100)
+    r95 = div(95 * nslots + 99, 100)
+    f(r) = r <= z ? Int64(0) : Int64(s[r - z])
+    return (nslots, f(r50), f(r95), f(nslots))
+end
+
 function calcular_bloques_padres_rojos(resumenes::Vector{ResumenNodo}, enteras::Vector{FilaEntera},
-                                       reales::Vector{FilaReal})
-    por_slot = Dict{Int64,Int}()
-    slots_candidatos = 0
-    slots_ausentes = 0
-    padres = Int64[]
-    padres_candidatos = 0
-    padres_ausentes = 0
-    azules = 0
-    rojos = 0
-    mergeset_candidatos = 0
-    mergeset_presentes = 0
+                                       reales::Vector{FilaReal}, hallazgos::Vector{FilaHallazgo})
+    # primera pasada: valor canónico (más temprano) por hash
+    bloques = Dict{Int32,_CanonBloque}()
+    eventos_sin_hash = 0
     for r in resumenes, ev in r.eventos
         (ev.tipo == T_BLOQUE_PRODUCIDO || ev.tipo == T_BLOQUE_RED_ADMITIDO) || continue
-        slots_candidatos += 1
-        if ev.slot == NODATO
-            slots_ausentes += 1
-        else
-            por_slot[ev.slot] = get(por_slot, ev.slot, 0) + 1
+        if ev.hash == 0
+            eventos_sin_hash += 1
+            continue
         end
-        padres_candidatos += 1
-        if ev.n_padres == NODATO
-            padres_ausentes += 1
-        else
-            push!(padres, ev.n_padres)
+        c = get!(_CanonBloque, bloques, ev.hash)
+        if ev.slot != NODATO &&
+           (!c.slot_ok || _antes_que(ev.pared, ev.reloj_ns, ev.linea,
+                                     c.slot_pared, c.slot_reloj, c.slot_linea))
+            c.slot = ev.slot
+            c.slot_pared = ev.pared; c.slot_reloj = ev.reloj_ns; c.slot_linea = ev.linea
+            c.slot_ok = true
         end
-        mergeset_candidatos += 1
-        if ev.azules != NODATO && ev.rojos != NODATO
-            azules += ev.azules
-            rojos += ev.rojos
-            mergeset_presentes += 1
+        if ev.n_padres != NODATO &&
+           (!c.padres_ok || _antes_que(ev.pared, ev.reloj_ns, ev.linea,
+                                       c.padres_pared, c.padres_reloj, c.padres_linea))
+            c.padres = ev.n_padres
+            c.padres_pared = ev.pared; c.padres_reloj = ev.reloj_ns; c.padres_linea = ev.linea
+            c.padres_ok = true
+        end
+        if ev.azules != NODATO && ev.rojos != NODATO &&
+           (!c.mergeset_ok || _antes_que(ev.pared, ev.reloj_ns, ev.linea,
+                                         c.mergeset_pared, c.mergeset_reloj, c.mergeset_linea))
+            c.azules = ev.azules; c.rojos = ev.rojos
+            c.mergeset_pared = ev.pared; c.mergeset_reloj = ev.reloj_ns; c.mergeset_linea = ev.linea
+            c.mergeset_ok = true
+        end
+    end
+    # segunda pasada: discrepancia respecto del canónico (mismo hash, valor distinto)
+    for r in resumenes, ev in r.eventos
+        (ev.tipo == T_BLOQUE_PRODUCIDO || ev.tipo == T_BLOQUE_RED_ADMITIDO) || continue
+        ev.hash == 0 && continue
+        c = bloques[ev.hash]
+        ev.slot != NODATO && ev.slot != c.slot && (c.slot_disc = true)
+        ev.n_padres != NODATO && ev.n_padres != c.padres && (c.padres_disc = true)
+        if ev.azules != NODATO && ev.rojos != NODATO &&
+           (ev.azules != c.azules || ev.rojos != c.rojos)
+            c.mergeset_disc = true
         end
     end
 
-    conteos = collect(values(por_slot))
-    ne, p50, p95, mx = distribucion_entera(conteos)
-    push!(enteras, FilaEntera("bloques_por_slot", "todos", ne, slots_ausentes, p50, p95, mx, "bloques/slot"))
-    ne, p50, p95, mx = distribucion_entera(padres)
-    push!(enteras, FilaEntera("padres_por_bloque", "todos", ne, padres_ausentes, p50, p95, mx, "padres"))
-    if azules + rojos > 0
-        f = rojos / (azules + rojos)
-        push!(reales, FilaReal("fraccion_rojos", "todos", 1, mergeset_candidatos - mergeset_presentes,
-                               f, f, f, "fraccion"))
-    else
-        push!(reales, FilaReal("fraccion_rojos", "todos", 0, mergeset_candidatos, missing, missing, missing, "fraccion"))
+    sin_slot = 0; sin_padres = 0; sin_mergeset = 0
+    disc_slot = 0; disc_padres = 0; disc_mergeset = 0
+    por_slot = Dict{Int64,Int}()
+    padres = Int64[]
+    suma_azules = 0; suma_rojos = 0
+    for c in values(bloques)
+        if c.slot_ok
+            por_slot[c.slot] = get(por_slot, c.slot, 0) + 1
+        else
+            sin_slot += 1
+        end
+        if c.padres_ok
+            push!(padres, c.padres)
+        else
+            sin_padres += 1
+        end
+        if c.mergeset_ok
+            suma_azules += c.azules
+            suma_rojos += c.rojos
+        else
+            sin_mergeset += 1
+        end
+        c.slot_disc && (disc_slot += 1)
+        c.padres_disc && (disc_padres += 1)
+        c.mergeset_disc && (disc_mergeset += 1)
     end
+
+    if isempty(por_slot)
+        push!(enteras, FilaEntera("bloques_por_slot", "todos", 0, sin_slot,
+                                  missing, missing, missing, "bloques/slot"))
+        push!(reales, FilaReal("media_bloques_por_slot", "todos", 0, sin_slot,
+                               missing, missing, missing, "bloques/slot"))
+    else
+        vmin = minimum(keys(por_slot))
+        vmax = maximum(keys(por_slot))
+        nslots = Int(vmax - vmin + 1)
+        conteos = collect(values(por_slot))
+        ne, p50, p95, mx = _distribucion_slots(conteos, nslots)
+        push!(enteras, FilaEntera("bloques_por_slot", "todos", ne, sin_slot, p50, p95, mx, "bloques/slot"))
+        media = sum(conteos) / nslots
+        push!(reales, FilaReal("media_bloques_por_slot", "todos", 1, 0, media, media, media, "bloques/slot"))
+    end
+
+    ne, p50, p95, mx = distribucion_entera(padres)
+    push!(enteras, FilaEntera("padres_por_bloque", "todos", ne, sin_padres, p50, p95, mx, "padres"))
+
+    if suma_azules + suma_rojos > 0
+        f = suma_rojos / (suma_azules + suma_rojos)
+        push!(reales, FilaReal("fraccion_rojos", "todos", 1, sin_mergeset, f, f, f, "fraccion"))
+    else
+        push!(reales, FilaReal("fraccion_rojos", "todos", 0, sin_mergeset, missing, missing, missing, "fraccion"))
+    end
+
+    push!(hallazgos, FilaHallazgo("slot_distinto_por_bloque",
+        "bloques cuyo slot difiere entre sus eventos", disc_slot))
+    push!(hallazgos, FilaHallazgo("padres_distintos_por_bloque",
+        "bloques cuyo n_padres difiere entre sus eventos", disc_padres))
+    push!(hallazgos, FilaHallazgo("mergeset_distinto_por_bloque",
+        "bloques cuyo par (azules,rojos) difiere entre sus eventos", disc_mergeset))
+    push!(hallazgos, FilaHallazgo("eventos_bloque_sin_hash",
+        "eventos bloque_producido/bloque_red_admitido sin hash (no identificables)", eventos_sin_hash))
 end
 
 # ---------------------------------------------------------------------------
@@ -589,6 +714,7 @@ function analizar(ejecucion::AbstractString, nodos::Vector{String};
     latencias = FilaLatencia[]
     tramos = FilaTramo[]
     rechazos = FilaRechazo[]
+    hallazgos = FilaHallazgo[]
 
     muestras_lat, duplicados = calcular_latencias(nodos_info, latencias)
     for f in latencias
@@ -608,7 +734,7 @@ function analizar(ejecucion::AbstractString, nodos::Vector{String};
 
     calcular_etapas(nodos_info, enteras)
     calcular_admision_profundidad(nodos_info, tramos)
-    calcular_bloques_padres_rojos(nodos_info, enteras, reales)
+    calcular_bloques_padres_rojos(nodos_info, enteras, reales, hallazgos)
     calcular_rechazos(nodos_info, rechazos, pool)
     calcular_reorg(nodos_info, enteras)
 
@@ -648,7 +774,7 @@ function analizar(ejecucion::AbstractString, nodos::Vector{String};
         modelo,
         comando,
     )
-    return Resultado(enteras, reales, latencias, tramos, rechazos, episodios,
+    return Resultado(enteras, reales, latencias, tramos, rechazos, hallazgos, episodios,
                      frac === missing ? missing : Float64(frac), medida, estado_igual,
                      detalle, duplicados, proc)
 end

@@ -24,6 +24,7 @@ filas_real(res, metrica, ambito) =
     [f for f in res.filas_reales if f.metrica == metrica && f.ambito == ambito]
 fila_real(res, metrica, ambito="todos") = first(filas_real(res, metrica, ambito))
 lat(res, a, b) = first(f for f in res.latencias if f.nodo_a == a && f.nodo_b == b)
+hall(res, nombre) = first(f for f in res.hallazgos if f.hallazgo == nombre)
 
 function eventos_de(lineas::Vector{String})
     pool = AR.PoolCadenas()
@@ -82,10 +83,17 @@ end
     @test (ta.n, ta.ausentes, ta.p50, ta.p95, ta.max) == (10, 0, Int64(100), Int64(100), Int64(100))
     @test length(res.tramos) == 1
     @test (res.tramos[1].desde, res.tramos[1].hasta, res.tramos[1].n, res.tramos[1].p50) == (0, 499, 10, Int64(100))
+    # W07c-B: un bloque cuenta una vez por hash (no una vez por nodo); 5 bloques, no 15.
     pa = fila_ent(res, "padres_por_bloque")
-    @test (pa.n, pa.p50, pa.p95, pa.max) == (15, Int64(1), Int64(1), Int64(1))
+    @test (pa.n, pa.ausentes, pa.p50, pa.p95, pa.max) == (5, 0, Int64(1), Int64(1), Int64(1))
+    # W07c-B: 5 slots del intervalo [1,5], un bloque distinto cada uno ⇒ distribución de 1.
     bs = fila_ent(res, "bloques_por_slot")
-    @test (bs.n, bs.p50, bs.p95, bs.max) == (5, Int64(3), Int64(3), Int64(3))
+    @test (bs.n, bs.ausentes, bs.p50, bs.p95, bs.max) == (5, 0, Int64(1), Int64(1), Int64(1))
+    med = fila_real(res, "media_bloques_por_slot")
+    @test (med.n, med.max) == (1, 1.0)
+    @test all(hall(res, h).n == 0 for h in
+              ("slot_distinto_por_bloque", "padres_distintos_por_bloque",
+               "mergeset_distinto_por_bloque", "eventos_bloque_sin_hash"))
     fr = fila_real(res, "fraccion_rojos")
     @test fr.n == 1
     @test isapprox(fr.max, 1 / 3; atol = 1e-12)
@@ -213,14 +221,50 @@ end
     # duración del reinicio completo
     dr = fila_ent(res, "duracion_reinicio_ns")
     @test (dr.n, dr.p50, dr.p95, dr.max) == (1, Int64(1234), Int64(1234), Int64(1234))
-    # recursos v1: bloques por slot / padres / rojos con 4 admitidos
+    # recursos v1: bloques por slot / padres / rojos con 4 admitidos distintos
     bs = fila_ent(res, "bloques_por_slot")
     @test (bs.n, bs.p50, bs.max) == (4, Int64(1), Int64(1))
+    @test fila_real(res, "media_bloques_por_slot").max == 1.0
     fr = fila_real(res, "fraccion_rojos")
     @test fr.n == 1 && fr.max == 0.0
     # un solo nodo: latencia y estado final no medidos
     @test isempty(res.latencias)
     @test res.estado_final_igual === missing
+end
+
+# ================================================================================
+@testset "V1(h) — bloques distintos, slots vacíos y hallazgos (W07c-B)" begin
+    # Tres nodos ven los mismos bloques; h5 no lo ve R; slots 1,3,4,4,7 ⇒ vacíos 2,5,6.
+    res = AR.analizar(joinpath(DATOS, "caso-h"), ["P", "Q", "R"])
+    bs = fila_ent(res, "bloques_por_slot")
+    # n = 7 slots de [1,7]; conteos [1,0,1,2,0,0,1] ordenados [0,0,0,1,1,1,2]
+    @test (bs.n, bs.ausentes, bs.p50, bs.p95, bs.max) == (7, 0, Int64(1), Int64(2), Int64(2))
+    med = fila_real(res, "media_bloques_por_slot")
+    @test (med.n, med.max) == (1, 5 / 7)
+    # 5 hashes distintos, no 3 nodos × 5 eventos = 15
+    pa = fila_ent(res, "padres_por_bloque")
+    @test (pa.n, pa.ausentes, pa.p50, pa.p95, pa.max) == (5, 0, Int64(2), Int64(2), Int64(2))
+    fr = fila_real(res, "fraccion_rojos")
+    @test fr.n == 1
+    @test isapprox(fr.max, 1 / 3; atol = 1e-12)
+    @test all(hall(res, h).n == 0 for h in
+              ("slot_distinto_por_bloque", "padres_distintos_por_bloque",
+               "mergeset_distinto_por_bloque", "eventos_bloque_sin_hash"))
+
+    # Un mismo hash con slot/n_padres/mergeset distintos entre dos nodos: se cuenta, no se imputa.
+    res = AR.analizar(joinpath(DATOS, "caso-i"), ["P", "Q"])
+    @test hall(res, "slot_distinto_por_bloque").n == 1
+    @test hall(res, "padres_distintos_por_bloque").n == 1
+    @test hall(res, "mergeset_distinto_por_bloque").n == 1
+    @test hall(res, "eventos_bloque_sin_hash").n == 0
+    # canónico = evento más temprano (P): slot1@1000, h2 slot5@1500
+    bs = fila_ent(res, "bloques_por_slot")
+    @test (bs.n, bs.p50, bs.p95, bs.max) == (5, Int64(0), Int64(1), Int64(1))
+    @test fila_real(res, "media_bloques_por_slot").max == 0.4
+    pa = fila_ent(res, "padres_por_bloque")
+    @test (pa.n, pa.p50, pa.max) == (2, Int64(1), Int64(1))
+    fr = fila_real(res, "fraccion_rojos")
+    @test fr.n == 1 && fr.max == 0.25
 end
 
 # ================================================================================

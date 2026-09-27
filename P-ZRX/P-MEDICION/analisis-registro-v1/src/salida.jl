@@ -65,6 +65,17 @@ function escribir_convergencia(res::Resultado, ruta::AbstractString)
     return ruta
 end
 
+# W07c-B: hallazgos cuantificados (bloques con información inconsistente, hash ausente, ...)
+function escribir_hallazgos(res::Resultado, ruta::AbstractString)
+    open(ruta, "w") do io
+        println(io, join(("hallazgo", "n", "detalle"), '\t'))
+        for f in res.hallazgos
+            println(io, join((f.hallazgo, string(f.n), replace(f.detalle, '\t' => ' ')), '\t'))
+        end
+    end
+    return ruta
+end
+
 # Lista de métricas sin ninguna muestra (no medidas), con el motivo inferido
 function _no_medidas(res::Resultado)
     filas = String[]
@@ -127,6 +138,16 @@ function escribir_resumen(res::Resultado, ruta::AbstractString; fecha::String = 
             println(io, "- **Divergencia no medida:** hacen falta ≥2 nodos con `cambio_punta` y un intervalo no vacío.")
         end
         println(io)
+        println(io, "## Hallazgos (W07c-B: bloques contados una vez por `hash`)")
+        println(io)
+        if isempty(res.hallazgos)
+            println(io, "(ninguno)")
+        else
+            for f in res.hallazgos
+                println(io, "- `", f.hallazgo, "`: ", f.n, " (", f.detalle, ")")
+            end
+        end
+        println(io)
         println(io, "## Métricas sin muestras en esta ejecución")
         println(io)
         nm = _no_medidas(res)
@@ -141,6 +162,7 @@ function escribir_resumen(res::Resultado, ruta::AbstractString; fecha::String = 
         println(io, "## Notas de definición (ver `FALTAS-DE-DEFINICION.md`)")
         println(io)
         println(io, "- Percentiles nearest-rank en enteros: rango = ceil(p·n/100); sin interpolación ni `Float64`.")
+        println(io, "- Bloques por slot / padres por bloque / fracción de rojos: un bloque cuenta una vez por `hash`; `bloques_por_slot` cubre todos los slots de `[mín,máx]`, vacíos incluidos (W07c-B).")
         println(io, "- Latencia: producción más temprana de A y admisión más temprana de B por hash; las negativas entran y se cuentan.")
         println(io, "- Divergencia: barrido O(E log E) sobre `cambio_punta`; episodios no reconvergidos marcados `truncada=1`.")
         println(io, "- Recursos: diferencias entre muestras; `CLK_TCK` de `EJECUCION.txt` o 100 por defecto.")
@@ -155,6 +177,7 @@ function escribir_salidas(res::Resultado, dir_salida::AbstractString; fecha::Str
     escribir_tramos(res, joinpath(dir_salida, "admision-vs-profundidad.tsv"))
     escribir_rechazos(res, joinpath(dir_salida, "rechazos.tsv"))
     escribir_convergencia(res, joinpath(dir_salida, "convergencia.tsv"))
+    escribir_hallazgos(res, joinpath(dir_salida, "hallazgos.tsv"))
     escribir_resumen(res, joinpath(dir_salida, "RESUMEN.md"); fecha = fecha)
     return dir_salida
 end

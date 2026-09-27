@@ -23,3 +23,20 @@ todas son huecos de precisión. Si el director corrige alguna, se re-ejecuta V1�
 
 **Nada de esto se resolvió eligiendo métricas distintas** de las del §3 del esquema ni de la orden: sólo se
 fijó el detalle determinista que faltaba. Las decisiones quedan señaladas como tales en `INFORME.md`.
+
+---
+
+## Anexo W07c-B (2026-09-27) — lagunas al pasar a contar por bloque distinto
+
+**Orden:** `ORDEN-W07c-B.md`. Se informan antes de editar y se adopta la lectura mínima que sigue.
+
+| # | Hueco | Lectura adoptada |
+|---|---|---|
+| 14 | La orden manda tomar el `slot` «de cualquier evento que lo traiga», y los padres/mergeset «una vez por `hash`», sin fijar qué valor gana si varios eventos del mismo `hash` difieren. | Valor canónico = el del evento más temprano por `(reloj_pared_ns, reloj_ns, nº de línea)`; así no depende del orden de los nodos. La discrepancia se cuenta como hallazgo. |
+| 15 | «Si dos nodos informan valores distintos para el mismo bloque» no fija el alcance (¿pares? ¿eventos? ¿solo nodos distintos?). | Se cuenta un **bloque** cuando el conjunto de valores presentes del mismo `hash` tiene ≥2 valores distintos, aunque provengan del mismo nodo repetido. |
+| 16 | FALTAS #4 definió `ausentes` por evento candidato; W07c-B cambia el recuento a por bloque y no redefine `ausentes`. | `ausentes` = nº de **bloques distintos** (hash ≠ 0) sin el campo requerido en ningún evento. Los eventos candidatos sin `hash` (no identificables) se cuentan aparte en el hallazgo `eventos_bloque_sin_hash`. |
+| 17 | `bloques_por_slot` debe incluir los slots vacíos del intervalo, pero no define `n` ni la base de la media. | `n = máx − mín + 1` (nº de slots del intervalo); la media usa solo los bloques que traen `slot`. Se computa sin materializar el vector de slots (los ceros son implícitos). |
+| 18 | La fracción de rojos se agrega una vez por bloque, pero no dice qué par usar si hay discrepancia. | Par canónico más temprano; la discrepancia se informa en `hallazgos.tsv`, nunca se imputa. |
+
+Se añade la salida `hallazgos.tsv` (y su sección en `RESUMEN.md`) porque la orden pide «se cuenta y se
+informa». No se elige ninguna métrica distinta de las del §3.

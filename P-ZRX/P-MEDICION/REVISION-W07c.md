@@ -32,3 +32,15 @@ regenerable con `bench/`), con `HUELLAS.sha256` propias. **Veredicto: SUPERADO.*
 
 Instrumento de análisis de registros, no de consenso. El modelo que usó el ejecutor no se verificó por API
 (declarado). Métricas de v0: 8 no medibles (lo dice su informe).
+
+## W07c-B (2026-09-27, DeepSeek 16:01–16:08) — corrección: métricas por bloque, no por evento
+
+**Hallazgo del director** al revisar R1 rep1 de W07b: «bloques por slot», «padres por bloque» y «fracción de rojos»
+contaban **un evento por nodo** (cada bloque ×3 con tres nodos) y la distribución de bloques por slot ignoraba los
+slots vacíos: en R1 rep1 dio mediana 3 cuando los datos crudos dan ≈ 0,95 bloques distintos por slot. Error del
+director (el esquema no decía «bloques distintos») que la revisión de W07c no vio. **Corregido:** cada bloque cuenta
+una vez por `hash` (valor canónico: su primer evento), los slots vacíos del intervalo entran en la distribución, nueva
+fila `media_bloques_por_slot`, y `hallazgos.tsv` informa de bloques con valores distintos entre nodos. Las demás
+métricas se revisaron y son correctas tal cual (latencias por pareja; tiempos por admisión de cada nodo; resto por
+nodo). Tests nuevos con respuesta a mano (casos h, i), los afectados actualizados uno a uno; `Pkg.test()` en verde;
+`HUELLAS.sha256` 55/55. **W07b repetirá todos sus análisis con esta versión.**

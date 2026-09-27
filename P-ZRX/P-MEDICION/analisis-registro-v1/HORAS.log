@@ -1,0 +1,4 @@
+2026-09-27T16:01:00+02:00
+inicio W07c-B: lectura integra de ORDEN-W07c-B.md y V-ZRX/LINEO.md; auditoria de calcular_bloques_padres_rojos y del resto de metricas del §3; 5 faltas de definicion informadas antes de editar (anexo W07c-B de FALTAS-DE-DEFINICION.md)
+2026-09-27T16:07:44+02:00
+cierre W07c-B: bloques por hash (slot/n_padres/mergeset canonicos, discrepancias contadas), slots vacios del intervalo, media_bloques_por_slot y hallazgos.tsv; casos sinteticos caso-h y caso-i con respuesta a mano; V1(a)/V1(g) actualizados uno a uno; Pkg.test() en verde (proyecto convertido en paquete con src/AnalisisRegistroV1.jl); resultados/v0-W06d4 regenerados (latencias y divergencia identicas; ausentes 2007->830 por bloque); INFORME.md con seccion W07c-B; HUELLAS.sha256 regeneradas

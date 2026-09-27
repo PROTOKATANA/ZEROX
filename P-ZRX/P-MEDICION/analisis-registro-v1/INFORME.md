@@ -263,3 +263,75 @@ ejecución real están en `analisis-registro-v1/resultados/v0-W06d4/` (`metricas
 - **No se verificó por una llamada a la API** (p. ej. `/v1/models`) porque la credencial/base viven en
   `/home/katana/torio/deepseek-harness/.env` y `~/.dsh`, que la orden prohíbe leer. Esta sección es,
   por tanto, la única afirmación del informe no comprobada de forma independiente.
+
+---
+
+## W07c-B — corrección: bloques por `hash`, slots vacíos y hallazgos (2026-09-27)
+
+**Orden:** `P-ZRX/P-MEDICION/ORDEN-W07c-B.md`. **Ejecutor:** DeepSeek Harness, `deepseek-flash`,
+esfuerzo `high`. **Zona:** `P-ZRX/P-MEDICION/analisis-registro-v1/`. **Regla madre:** `V-ZRX/LINEO.md`.
+
+### Qué se corrigió y por qué
+
+`calcular_bloques_padres_rojos` contaba **eventos** `bloque_producido`/`bloque_red_admitido` de todos los
+nodos, de modo que cada bloque se contaba una vez por nodo (×3 con tres nodos) y la distribución
+«bloques por slot» ignoraba los slots sin bloques (la mediana de `caso-a` salía 3 en vez de 1). Ahora:
+
+1. **`bloques_por_slot`**: cada bloque cuenta una vez por `hash`; el `slot` es el del evento más
+   temprano por `(reloj_pared_ns, reloj_ns, nº de línea)`. La muestra son **todos** los slots del
+   intervalo `[mín,máx]` (los de 0 bloques incluidos), computados sin materializar el vector. Se añade
+   `media_bloques_por_slot = bloques distintos / slots del intervalo` (FilaReal).
+2. **`padres_por_bloque`** y **`fraccion_rojos`**: también una vez por `hash`.
+3. **Hallazgos** (`hallazgos.tsv` y sección en `RESUMEN.md`): se cuentan los bloques cuyo `slot`,
+   `n_padres` o par `(azules,rojos)` difiere entre sus eventos, y los eventos sin `hash`. No se imputa
+   ningún valor: el agregado usa el evento canónico.
+
+### Faltas de definición de W07c-B (informadas antes de editar)
+
+| # | Hueco | Lectura adoptada |
+|---|---|---|
+| 14 | La orden no fija qué evento da `slot`/`n_padres`/mergeset si varios difieren. | Evento más temprano por `(reloj_pared_ns, reloj_ns, nº de línea)`. |
+| 15 | «Dos nodos informan valores distintos» no fija el alcance. | ≥2 valores presentes distintos para el mismo `hash` (aunque vengan del mismo nodo); se cuentan **bloques**. |
+| 16 | `ausentes` estaba definido por evento (FALTAS #4); al pasar a por bloque no se redefine. | `ausentes` = nº de bloques distintos sin el campo en ningún evento; los eventos sin `hash` van al hallazgo `eventos_bloque_sin_hash`. |
+| 17 | `n` de `bloques_por_slot` con slots vacíos. | `n = máx−mín+1`; la media usa solo los bloques que traen `slot`. |
+| 18 | Agregado de `fraccion_rojos` con discrepancia. | Par canónico más temprano; la discrepancia se informa aparte. |
+
+### Punto 3 de la orden: ¿otra métrica contaba el mismo bloque dos veces?
+
+Revisadas todas las del §3 del esquema: **solo** `bloques_por_slot`, `padres_por_bloque` y
+`fraccion_rojos` estaban afectadas. Las demás son intrínsecamente por nodo o por pareja: `t_*_ns` y
+`admision-vs-profundidad` se miden **por admisión de cada nodo** (una muestra por nodo, no un recuento
+del bloque); `latencias` es por pareja de nodos (correcto tal cual, dice la orden); los rechazos son por
+intento de admisión; `divergencia`, `estado final`, `reorg`, `arranque` y `reinicio` son por nodo; los
+recursos, por nodo. Ninguna se toca.
+
+### Verificación
+
+- **`Pkg.test()` en verde** (se añadió `name`/`uuid`/`version` a `Project.toml` y la entrada de paquete
+  `src/AnalisisRegistroV1.jl`; `Manifest.toml` no cambió): `Testing AnalisisRegistroV1 tests passed`.
+- Nuevos casos a mano `test/datos/caso-h` (tres nodos que ven los mismos bloques, slots 1,3,4,4,7 con
+  vacíos y un bloque que R no ve) y `caso-i` (mismo bloque con `slot`/`n_padres`/mergeset distintos entre
+  dos nodos). Respuestas exactas en `test/datos/RESPUESTAS.md`: `caso-h` `bloques_por_slot` n=7
+  `[p50=1,p95=2,máx=2]`, media 5/7, `padres_por_bloque` n=5 todos 2, `fraccion_rojos` 1/3; `caso-i`
+  hallazgos 1/1/1/0, `bloques_por_slot` n=5 `[0,1,1]`, media 0,4, `fraccion_rojos` 0,25.
+- Tests existentes: solo se actualizaron los que medían lo erróneo, uno a uno: V1(a)
+  `padres_por_bloque` (15→5) y `bloques_por_slot` (todos 3→todos 1); V1(g) sigue `(4,1,1)` y gana la
+  media. El resto (V1 b–f, V2, V3) no cambia.
+- Recuento: V1(a) 21, V1(b) 5, V1(c) 2, V1(d) 8, V1(e) 5, V1(f) 8, V1(recursos) 7, V1(g) 17,
+  V1(h) 14, V2 36, V3 402.
+
+### Tablas v0 regeneradas
+
+`resultados/v0-W06d4/` se regeneró con los tres registros reales (copiados a `datos/W06d4-real/`, con
+`sha256` idénticos a `ENTRADA-W07c.sha256`). Latencias y divergencia **no cambian** (0,348235; pares
+181/306/186/218/144/188, total 1223); lo que cambia es lo afectado por el recuento por bloque:
+`bloques_por_slot`/`padres_por_bloque`/`fraccion_rojos` pasan de `ausentes=2007` (eventos) a
+`ausentes=830` (bloques distintos sin el campo, que v0 no trae), y se añaden la fila
+`media_bloques_por_slot` y `hallazgos.tsv` (todo 0). En v0 la conclusión no cambia: esas tres métricas
+siguen **no medidas**.
+
+### Entorno y modelo
+
+Comandos con `env -u LD_LIBRARY_PATH`, `JULIA_DEPOT_PATH=<zona>/.julia-depot:/home/katana/.julia`,
+Julia 1.13.0, `--threads=1`, `nice -n 19`; `JULIA_PKG_OFFLINE=true`. Modelo de la sesión:
+`deepseek-flash`, esfuerzo `high` (no verificado por API, §12).

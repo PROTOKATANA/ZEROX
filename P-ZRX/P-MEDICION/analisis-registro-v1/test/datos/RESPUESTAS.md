@@ -19,9 +19,10 @@ Admisiones: h1 Q@1100 R@1200; h2 P@2050 R@2100; h3 P@3100 Q@3200; h4 Q@4300 R@44
 | R→Q | 200 | 200 | 200 | 200 |
 | total | 10 valores | 200 | 600 | 600 |
 
-Derivadas: `t_admision_ns` n=10 todos 100; `padres_por_bloque` n=15 todos 1;
-`bloques_por_slot` n=5 (slots 1..5, 3 eventos cada uno) todos 3; `fraccion_rojos` =
-15 rojos / (30 azules + 15 rojos) = 1/3; `estado_final_igual` no medido (sin `cambio_punta`).
+Derivadas (W07c-B: un bloque cuenta una vez por `hash`): `t_admision_ns` n=10 todos 100;
+`padres_por_bloque` n=5 (h1..h5) todos 1; `bloques_por_slot` n=5 (slots 1..5 del intervalo, uno
+por slot) todos 1, media 5/5=1; `fraccion_rojos` = 5 rojos / (10 azules + 5 rojos) = 1/3;
+`estado_final_igual` no medido (sin `cambio_punta`).
 
 ## (b) `caso-b` — bloque no admitido
 
@@ -75,8 +76,31 @@ motivo `m2`, sin coste); `cambio_punta` con `profundidad_reorg=1`; `reorganizaci
 - Rechazos: `("cabecera","m1")` n=2 p50=100 p95=máx=300; `("admision","m2")` n=1, percentiles missing.
 - `profundidad_reorg`: {1,3} ⇒ n=2 p50=1 p95=máx=3.
 - `duracion_reinicio_ns`: n=1, 1234.
-- `bloques_por_slot`: slots 1..4, uno cada uno ⇒ n=4 p50=máx=1. `fraccion_rojos` = 0/(4+0) = 0.
+- `bloques_por_slot`: slots 1..4, uno cada uno ⇒ n=4 p50=máx=1, media 4/4=1. `fraccion_rojos` = 0/(4+0) = 0.
 - Un solo nodo: `latencias` vacío y `estado_final_igual` no medido.
+
+## (h) `caso-h` — bloques distintos, slots vacíos y un bloque que un nodo no ve (W07c-B)
+
+Tres nodos P,Q,R. P produce h1@slot1, h2@slot3, h3@slot4, h4@slot4, h5@slot7; Q admite los cinco;
+R admite solo h1..h4 (no ve h5). Todos con `n_padres=2`, `azules=2`, `rojos=1`.
+
+- Hay **5 bloques distintos** (h1..h5); P+Q+R generan 14 eventos, y contarlos por evento daría 14
+  (o 15 si R viera h5). Se cuenta una vez por `hash`.
+- Slots observados {1,3,4,7}; intervalo [1,7] ⇒ **7 slots** con conteos 1,0,1,2,0,0,1. Ordenados
+  [0,0,0,1,1,1,2]: p50=rango 4 ⇒ 1; p95=rango 7 ⇒ 2; máx=2. Media = 5/7.
+- `padres_por_bloque`: n=5, todos 2 ⇒ p50=p95=máx=2.
+- `fraccion_rojos` = 5·1 / (5·2 + 5·1) = 1/3. Sin discrepancias (`hallazgos` todos 0).
+
+## (i) `caso-i` — un mismo bloque con datos distintos entre dos nodos (W07c-B)
+
+P produce h1@slot1/`n_padres`=1/`(azules,rojos)`=(2,1) y h2@slot5/1/(1,0); Q admite h1 con
+slot2/`n_padres`=2/(3,1) y h2 idéntico a P. El canónico es el evento más temprano (P).
+
+- `hallazgos`: `slot_distinto_por_bloque`=1, `padres_distintos_por_bloque`=1,
+  `mergeset_distinto_por_bloque`=1, `eventos_bloque_sin_hash`=0. No se imputa ningún valor.
+- Canónico: h1 slot1, h2 slot5 ⇒ slots {1,5}, intervalo [1,5] ⇒ n=5, conteos [1,0,0,0,1] ⇒
+  p50=0, p95=1, máx=1; media = 2/5 = 0.4.
+- `padres_por_bloque`: n=2, todos 1. `fraccion_rojos` = (1+0)/((2+1)+(1+0)) = 1/4 = 0.25.
 
 ## `caso-recursos` — CPU/RSS/E-S/disco
 

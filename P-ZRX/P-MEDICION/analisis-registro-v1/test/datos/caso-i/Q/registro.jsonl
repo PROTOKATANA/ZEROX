@@ -1,0 +1,3 @@
+{"tipo":"arranque","reloj_ns":0,"reloj_pared_ns":0,"version_esquema":1,"fase":"limpio"}
+{"tipo":"bloque_red_admitido","reloj_ns":2000,"reloj_pared_ns":2000,"hash":"1111111111111111111111111111111111111111111111111111111111111111","familia":"post","slot":2,"n_padres":2,"bytes":120,"azules_mergeset":3,"rojos_mergeset":1}
+{"tipo":"bloque_red_admitido","reloj_ns":2500,"reloj_pared_ns":2500,"hash":"2222222222222222222222222222222222222222222222222222222222222222","familia":"post","slot":5,"n_padres":1,"bytes":120,"azules_mergeset":1,"rojos_mergeset":0}

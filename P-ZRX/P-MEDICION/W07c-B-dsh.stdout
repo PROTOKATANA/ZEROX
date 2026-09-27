@@ -1,0 +1,29 @@
+He cumplido `ORDEN-W07c-B.md`. Resumen:
+
+## Cambios de código
+
+**`src/rapido.jl` — `calcular_bloques_padres_rojos` reescrita:**
+- Cada bloque cuenta **una vez por `hash`** (no una vez por nodo/evento). Valor canónico = evento más temprano por `(reloj_pared_ns, reloj_ns, nº de línea)`, independiente del orden de nodos.
+- `bloques_por_slot` incluye **todos los slots de `[mín,máx]`**, vacíos incluidos, y se calcula sin materializar el vector (ceros implícitos). Se publica `n = máx−mín+1`, p50/p95/máx y la nueva fila real **`media_bloques_por_slot = bloques distintos / slots del intervalo`**.
+- `padres_por_bloque` y `fraccion_rojos` también por `hash`.
+- Nuevo `FilaHallazgo` + `hallazgos.tsv` y sección en `RESUMEN.md`: bloques con `slot`/`n_padres`/`(azules,rojos)` distintos entre sus eventos y eventos sin `hash`. No se imputa valor: el agregado usa el canónico.
+- **Punto 3 revisado:** solo esas tres métricas contaban por evento indebidamente. `t_*_ns` y `admision-vs-profundidad` son muestras **por admisión de cada nodo**; latencias por pareja (correcto tal cual); rechazos por intento; divergencia/estado/reorg/arranque/reinicio/recursos por nodo. No se toca ninguna.
+
+**Salida:** `src/rapido.jl`, `src/salida.jl` (`hallazgos.tsv` + sección y nota de definición). Entrada de paquete `src/AnalisisRegistroV1.jl` con alias compatible `src/analisis_registro_v1.jl`, y `name`/`uuid`/`version` en `Project.toml` (`Manifest.toml` no cambió).
+
+## Faltas de definición (informadas antes de editar)
+Añadidas como anexo W07c-B (#14–#18) en `FALTAS-DE-DEFINICION.md`: valor canónico, alcance de «valores distintos», base de `ausentes` por bloque, `n` con slots vacíos y agregado con discrepancia.
+
+## Verificación
+- **`Pkg.test()` en verde**: `Testing AnalisisRegistroV1 tests passed` (con `--threads=1`, `nice -n 19`, 1 hilo, offline).
+- Nuevos casos a mano `test/datos/caso-h` (3 nodos ven los mismos bloques; slots 1,3,4,4,7 con vacíos; R no ve un bloque) y `caso-i` (mismo bloque con `slot`/`n_padres`/mergeset distintos). Respuestas exactas en `RESPUESTAS.md`.
+- Tests actualizados uno a uno y explicados: V1(a) `padres_por_bloque` 15→5 y `bloques_por_slot` todos 3→todos 1; V1(g) gana la media. V1(b–f), V2 y V3(402) intactos.
+- Recuento: V1(a)21, V1(b)5, V1(c)2, V1(d)8, V1(e)5, V1(f)8, V1(recursos)7, V1(g)17, V1(h)14, V2 36, V3 402.
+
+## Artefactos
+- `INFORME.md` (y su copia idéntica `INFORME-W07c.md`) con la sección **W07c-B**.
+- `HORAS.log` con `date -Is` real (`2026-09-27T16:01:00+02:00` → `16:07:44+02:00`), modelo `deepseek-flash` (high).
+- `resultados/v0-W06d4/` regenerado desde los registros reales copiados a `datos/W06d4-real/` (sha256 idénticos a `ENTRADA-W07c.sha256`): latencias y divergencia **idénticas** (0,348235; 1223 muestras), `ausentes` de las tres métricas corregidas 2007→830 (por bloque) y aparecen `media_bloques_por_slot` y `hallazgos.tsv`.
+- `HUELLAS.sha256` regeneradas: **55/55 en verde** (`sha256sum -c` exit 0), excluyendo `.julia-depot/` y la propia `HUELLAS.sha256`.
+
+Sin Python, sin git, sin escribir fuera de `analisis-registro-v1/`.

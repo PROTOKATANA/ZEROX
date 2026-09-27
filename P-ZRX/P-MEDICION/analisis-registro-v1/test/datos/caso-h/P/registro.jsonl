@@ -1,0 +1,6 @@
+{"tipo":"arranque","reloj_ns":0,"reloj_pared_ns":0,"version_esquema":1,"fase":"limpio"}
+{"tipo":"bloque_producido","reloj_ns":1000,"reloj_pared_ns":1000,"hash":"1111111111111111111111111111111111111111111111111111111111111111","slot":1,"n_padres":2,"bytes":120,"azules_mergeset":2,"rojos_mergeset":1}
+{"tipo":"bloque_producido","reloj_ns":1200,"reloj_pared_ns":1200,"hash":"2222222222222222222222222222222222222222222222222222222222222222","slot":3,"n_padres":2,"bytes":120,"azules_mergeset":2,"rojos_mergeset":1}
+{"tipo":"bloque_producido","reloj_ns":1300,"reloj_pared_ns":1300,"hash":"3333333333333333333333333333333333333333333333333333333333333333","slot":4,"n_padres":2,"bytes":120,"azules_mergeset":2,"rojos_mergeset":1}
+{"tipo":"bloque_producido","reloj_ns":1400,"reloj_pared_ns":1400,"hash":"4444444444444444444444444444444444444444444444444444444444444444","slot":4,"n_padres":2,"bytes":120,"azules_mergeset":2,"rojos_mergeset":1}
+{"tipo":"bloque_producido","reloj_ns":1600,"reloj_pared_ns":1600,"hash":"5555555555555555555555555555555555555555555555555555555555555555","slot":7,"n_padres":2,"bytes":120,"azules_mergeset":2,"rojos_mergeset":1}
