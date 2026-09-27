@@ -10,8 +10,8 @@ sigue es un parámetro de producción** (`P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`).
 contra un oráculo independiente o una prueba de extremo a extremo; «implementada» sin más significa
 código con tests propios pero sin contraste independiente.
 
-**Suite de la raíz (commit candidato `27dcfeb`):** 832/0/5 con W07a-R y, tras SL-4b2 y SL-4b3, 82 binarios con 0
-fallos (ejecutadas por los ejecutores en sus zonas; la repite E-0 de W07b desde un clon limpio). Oráculos vigentes:
+**Suite de la raíz (commit candidato `3d21b1f`; antes `27dcfeb` y `26312ff`):** 877/0/6 tras W06d9 (ejecutada por el
+ejecutor en su zona; la repite E-0 de W07b desde un clon limpio). Oráculos vigentes:
 T01 v0.5 (3 179 casos) y T04 v0.6 (2 108 casos), vectores en `testdata/transicion-v0.5` y `testdata/estado-dag-v0.6`.
 
 ## 1. Formatos (`P-ZRX/P-FORMATO/FORMATO-v0.md`, con la Corrección v0.1)
@@ -67,9 +67,12 @@ T01 v0.5 (3 179 casos) y T04 v0.6 (2 108 casos), vectores en `testdata/transicio
 | W06d7 | **FC-3 real**: un DAG por terminal con sufijo PoST, selección por `blue_work` con el desempate del motor, `C-FIN-01` en el cambio de terminal, servicio PoT de verificación por terminal | I-3 por propiedades (200 órdenes, empates); **E-6b** (terminales distintos) con procesos reales, 2 repeticiones; **V6(b) (mismo terminal) no demostrada**: el aislamiento no fue real (corrección del director, 2026-09-27; se mide en W07b); 829/0/5 | migrada; sin oráculo multiterminal independiente |
 | W07a | Registro según `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md` (tiempos por etapa, bytes, profundidad, mergeset, pares) | `registro_esquema`; tres nodos reales; 832/0/5 | migrada (vía W07a-R) |
 | SL-4b2, SL-4b3 | Productor que sigue al terminal seleccionado en caliente; firmante seguro, detector y envío de evidencia en el nodo (ver §6) | procesos reales (ver §6) | migradas |
+| W06d8 | Protocolo productor↔bucle numerado (respuesta atrasada descartada, `Parar` siempre atendido); ningún pánico alcanzable en el productor; fallo del productor = parada ordenada con `fallo_productor` | 6 tests del protocolo; V3 real 5/5 (tres nodos, 0 pánicos; 2 respuestas atrasadas descartadas de verdad); 860/0/6 | migrada. Motivo: pánico real hallado por W07b (E-2a) |
+| W07d | Estado final en el registro: `reinicio_completo` y `parada` con `punta`, `resumen_estado`, `n_bloques_dag`, `compendio_bloques`; parada ordenada con `SIGTERM` | 868/0/6; es el método de «mismo estado» de W07b (reabrir cada nodo aislado sobre copias de sus `datos`) | migrada. Solo registro |
+| W06d9 | Se registran **todos** los portadores PoT de la justificación de un bloque de red (origen del hueco); red de seguridad: el productor recalcula los portadores que falten o **no produce** ese slot (`produccion_omitida`), nunca muere por ello | causa reproducida antes y corregida después; 10/10 cruces reales del corte y 3/3 E-6 con aislamiento real, 0 `fallo_productor`; 877/0/6 | migrada. Motivo: caída real hallada por W07b (R3) |
 
 Revisión independiente del código de red, nodo y castigo: RI-3a/b/c hechas, hallazgos corregidos (un crítico).
-**Pendiente:** las mediciones de W07b (`P-ZRX/P-MEDICION/ORDEN-W07b.md`) sobre el commit candidato `27dcfeb`.
+**Pendiente:** cerrar W07b (`P-ZRX/P-MEDICION/ORDEN-W07b.md`) sobre el candidato `3d21b1f`: R1–R4 hechas (3 repeticiones cada una), faltan la E-0 final y el informe.
 
 ## 6. Evidencia y castigo (`P-ZRX/P-SLASHING/CONTRATO-EVIDENCIA-v0.md` con su «Ratificación v0»)
 
