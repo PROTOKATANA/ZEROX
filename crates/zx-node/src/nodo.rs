@@ -2226,6 +2226,13 @@ impl Nodo {
         }
     }
 
+    /// `ORDEN-W06d8` decisión 3: parada ordenada por fallo del hilo productor. Escribe el evento
+    /// **crítico** `fallo_productor` con el motivo y devuelve error, de modo que `ejecutar`/`main`
+    /// salen con código ≠ 0: nunca queda un nodo que valida pero ha dejado de producir sin decirlo.
+    fn fallo_productor(&self, motivo: &str) -> ResultadoNodo<()> {
+        escribir_fallo_productor(&self.registro, motivo)
+    }
+
     /// Fase PoST en régimen: arranca `ServicioPot` de verificación, las parcelas locales y el hilo
     /// productor, y atiende sus peticiones hasta que se agote (`--parada-tras-slots`) o falle.
     ///
@@ -2326,6 +2333,10 @@ impl Nodo {
                 .as_ref()
                 .ok_or_else(|| ErrorNodo::Otro("fase_regimen sin registro de firmante".into()))?,
         );
+        // `ORDEN-W06d8` decisión 1: el hilo escribe desde su lado el evento de diagnóstico
+        // `productor_respuesta_descartada` cuando descarta una respuesta atrasada; comparte el mismo
+        // registro que el bucle (que ya es `Arc` y serializa con un `Mutex`).
+        let registro_hilo: Arc<Registro> = Arc::clone(&self.registro);
         let hilo = thread::spawn(move || {
             hilo_productor_regimen(
                 servicio_hilo,
@@ -2339,6 +2350,7 @@ impl Nodo {
                 &rx_en_productor,
                 &tx_a_bucle,
                 &registro_firmante_hilo,
+                &registro_hilo,
             );
         });
 
@@ -2368,10 +2380,13 @@ impl Nodo {
             let terminal_cambio =
                 self.sincronizar_terminal_productor(&mut terminal, &tx_a_productor)?;
             match msg {
-                MsgProductor::PeticionPadres(_) if terminal_cambio => {
+                MsgProductor::PeticionPadres { .. } if terminal_cambio => {
                     // Petición del terminal anterior: se descarta sin contestar (ver arriba).
                 }
-                MsgProductor::PeticionPadres(slot_objetivo) => {
+                MsgProductor::PeticionPadres {
+                    id,
+                    slot: slot_objetivo,
+                } => {
                     let padres = padres_de_regimen(&self.cadena)
                         .map_err(|e| ErrorNodo::Otro(format!("padres de régimen: {e}")))?;
                     // `(hash, slot)` de cada padre (seleccionado y extras): el hilo productor
@@ -2418,18 +2433,23 @@ impl Nodo {
                         perfil::MAX_EVIDENCIAS_POR_BLOQUE,
                     );
                     if tx_a_productor
-                        .send(MsgBucle::Padres(
+                        .send(MsgBucle::Padres {
+                            id,
                             padres,
                             info_padres,
                             con_garantia,
                             evidencias,
-                        ))
+                        })
                         .is_err()
                     {
                         break;
                     }
                 }
-                MsgProductor::Post(bloque, instante_salida) => {
+                MsgProductor::Post {
+                    id,
+                    bloque,
+                    instante_salida,
+                } => {
                     let hash = bloque.cabecera.block_hash();
                     let slot = bloque.cabecera.slot;
                     let n_padres = {
@@ -2519,7 +2539,7 @@ impl Nodo {
                                     .is_some_and(|s| s.slot_actual() < limite)
                             });
                             let respuesta = if continuar {
-                                MsgBucle::Continuar
+                                MsgBucle::Continuar { id }
                             } else {
                                 MsgBucle::Parar
                             };
@@ -2549,7 +2569,7 @@ impl Nodo {
                                     .str("hash", &hash.to_string())
                                     .str("motivo", motivo);
                                 self.registro.escribir(evento, false)?;
-                                if tx_a_productor.send(MsgBucle::Continuar).is_err() {
+                                if tx_a_productor.send(MsgBucle::Continuar { id }).is_err() {
                                     break;
                                 }
                                 continue;
@@ -2562,16 +2582,23 @@ impl Nodo {
                 // `ORDEN-SL4b2` decisión 2: el firmante seguro se abstuvo (conflicto de identidad
                 // o pérdida de registro). Evento crítico del esquema v1; el nodo sigue produciendo
                 // (contesta `Continuar`): esta es la única oportunidad perdida, no un fallo.
-                MsgProductor::Abstenido { slot, motivo } => {
+                MsgProductor::Abstenido { id, slot, motivo } => {
                     let evento = self
                         .registro
                         .evento("firmante_abstenido")
                         .u64("slot", slot)
                         .str("motivo", motivo_abstencion_texto(motivo));
                     self.registro.escribir(evento, true)?;
-                    if tx_a_productor.send(MsgBucle::Continuar).is_err() {
+                    if tx_a_productor.send(MsgBucle::Continuar { id }).is_err() {
                         break;
                     }
+                }
+                // `ORDEN-W06d8` decisión 3: el hilo productor detectó una violación de invariante
+                // (o un fallo interno irrecuperable) y pide parar. No es una entrada ajena ni un
+                // `panic` del nodo: es una parada ordenada. Evento crítico `fallo_productor` +
+                // error fatal (salida ≠ 0), nunca un nodo que valida y deja de producir en silencio.
+                MsgProductor::Fallo { motivo } => {
+                    return self.fallo_productor(&motivo);
                 }
             }
         }
@@ -2586,9 +2613,7 @@ impl Nodo {
                 .map(|s| (*s).to_string())
                 .or_else(|| panico.downcast_ref::<String>().cloned())
                 .unwrap_or_else(|| "panic sin mensaje representable".to_string());
-            return Err(ErrorNodo::Otro(format!(
-                "el hilo productor terminó con panic: {motivo}"
-            )));
+            return self.fallo_productor(&format!("el hilo productor terminó con panic: {motivo}"));
         }
         // `ORDEN-W06d6` decisión 6: si lo que paró de producir fue **solo**
         // `--dejar-de-producir-en-slot` (no `--parada-tras-slots`), el nodo entero **no** termina
@@ -2858,6 +2883,19 @@ fn peso_u128(bloque: &BloqueDag) -> Result<u128, ErrorNodo> {
     u128::try_from(peso).map_err(|_| ErrorNodo::Otro(format!("peso {peso} no cabe en u128")))
 }
 
+/// `ORDEN-W06d8` decisión 3: escribe el evento crítico `fallo_productor` y devuelve el error fatal
+/// correspondiente. Separado del método para poder probarlo por unidad sin construir un `Nodo`
+/// entero. La salida ≠ 0 la garantiza `main` al recibir el `Err` de `ejecutar`.
+fn escribir_fallo_productor(registro: &Registro, motivo: &str) -> ResultadoNodo<()> {
+    registro.escribir(
+        registro.evento("fallo_productor").str("motivo", motivo),
+        true,
+    )?;
+    Err(ErrorNodo::Otro(format!(
+        "fallo del hilo productor: {motivo}"
+    )))
+}
+
 /// `ORDEN-SL4b2` V3: la puerta RAT-3 en el punto exacto que usa `Nodo::arrancar`.
 #[cfg(test)]
 mod pruebas_puerta_rat3 {
@@ -2899,6 +2937,31 @@ mod pruebas_puerta_rat3 {
         };
         assert!(comprobar_puerta_rat3(360, &evidencia).is_err());
         assert!(comprobar_puerta_rat3(361, &evidencia).is_ok());
+    }
+}
+
+/// `ORDEN-W06d8` decisión 3 (V1): el fallo del hilo productor no es silencioso: se escribe el
+/// evento crítico `fallo_productor` y se devuelve error (el proceso sale ≠ 0 por `main`).
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
+mod pruebas_fallo_productor {
+    use crate::registro::Registro;
+
+    use super::escribir_fallo_productor;
+
+    #[test]
+    fn fallo_productor_escribe_evento_critico_y_devuelve_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let registro = Registro::abrir(&dir.path().join("registro.jsonl")).unwrap();
+        let err =
+            escribir_fallo_productor(&registro, "respuesta con id 7 > esperado 2").unwrap_err();
+        assert!(
+            err.to_string().contains("fallo del hilo productor"),
+            "{err}"
+        );
+        let texto = std::fs::read_to_string(dir.path().join("registro.jsonl")).unwrap();
+        assert!(texto.contains("\"tipo\":\"fallo_productor\""), "{texto}");
+        assert!(texto.contains("respuesta con id 7 > esperado 2"), "{texto}");
     }
 }
 

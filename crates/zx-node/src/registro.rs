@@ -163,11 +163,9 @@ impl Registro {
     /// El de E/S al escribir o al forzar el volcado.
     pub fn escribir(&self, evento: Evento, sync: bool) -> io::Result<()> {
         let linea = evento.terminar();
-        #[expect(
-            clippy::unwrap_used,
-            reason = "un Mutex envenenado aquí es un panic previo real: no hay estado seguro que fingir"
-        )]
-        let mut archivo = self.archivo.lock().unwrap();
+        let mut archivo = self.archivo.lock().map_err(|_| {
+            io::Error::other("registro estructurado envenenado por un fallo previo")
+        })?;
         archivo.write_all(linea.as_bytes())?;
         if sync {
             archivo.sync_data()?;

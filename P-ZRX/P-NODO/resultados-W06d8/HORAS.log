@@ -1,0 +1,46 @@
+HORAS.log — W06d8 (todas las horas con `date -Is`, huso +02:00)
+
+2026-09-27T12:21  base congelada (commit 2455a55, «W06d8 congelada: panic del productor bajo
+                   cambio de terminal»); `sha256sum -c ENTRADA-W06d8.sha256` en la raíz: 36/36 OK
+2026-09-27T12:21  leídos íntegros `ORDEN-W06d8.md` y `V-ZRX/LINEO.md` (obligatorio antes de codificar)
+2026-09-27T12:22  reconocimiento del protocolo (regimen.rs, nodo.rs, vista.rs, registro.rs) y de los
+                   registros del fallo de W07b (`regimen.rs:438`)
+2026-09-27T12:23  montados `ws.orig/` (git archive 2455a55, sin tocar el repositorio) y `ws/` con el
+                   enlace `PDF`
+2026-09-27T12:24  inventario no-test de pánicos/unwraps/expects/indexación de `crates/zx-node/src/**`
+2026-09-27T12:27  `regimen.rs` reescrito: protocolo numerado, `esperar` con descarte,
+                   `productor_respuesta_descartada`, `MsgProductor::Fallo`, sin pánicos, tests V1
+2026-09-27T12:29  `nodo.rs` (id en respuestas, `fallo_productor`, test), `red/vista.rs` (2
+                   `debug_assert!` → defensa), `registro.rs` (`lock().unwrap()` → error explícito)
+2026-09-27T12:29 a 12:33  `cargo build --release --locked -p zx-node --bins` (4 hilos, nice 19): verde
+2026-09-27T12:35  primer `cargo test --release -p zx-node --lib`: falla con `N_dev=1` en el test
+                   (`NDevInvalido(IteracionesNoMultiploDe16)`); corregido a `N_dev=16`
+2026-09-27T12:36  `cargo test --release -p zx-node --lib`: 61/61 en verde (6 de `tests_protocolo` +
+                   `pruebas_fallo_productor`)
+2026-09-27T12:37 a 12:40  V3 primer intento (100 slots): 97 bloques (<200), 0 pánicos; escenario
+                   correcto pero corto (una clave por nodo produce ~1 de cada 3 slots)
+2026-09-27T12:41  `v3-rep.sh` leía los slots del argumento posicional y no de la variable de entorno;
+                   primer arranque del driver de 5 repeticiones con 100 slots. Se mata, `ss` confirma
+                   puertos libres, se corrige
+2026-09-27T12:42 a 13:13  V3: 5 repeticiones × 230 slots (puertos 46100/46200/46300/46400/46500),
+                   `SR_dev = u64::MAX`, una clave por nodo: bloques 214/225/222/222/219, **0 pánicos**,
+                   0 `fallo_productor`, exits 0, `descartes = 0`
+2026-09-27T13:13 a 13:21  escenario EXTRA de partición con una clave por nodo: no cruza el corte
+                   aislado (`K_min = 3`); sin producción válida
+2026-09-27T13:23 a 13:29  escenario EXTRA de partición con 3 claves por nodo (A aislado vs {B,C},
+                   reunión en caliente): 366 bloques, **0 pánicos**, 0 `fallo_productor` y **2
+                   `productor_respuesta_descartada`** reales (B id 23→22, C id 63→62)
+2026-09-27T13:13 a 13:55  `cargo test --workspace --all-features --locked` (1.ª pasada, dev desde
+                   cero): 860 passed, 0 failed, 6 ignored
+2026-09-27T13:55 a 13:56  `cargo clippy --workspace --all-targets --all-features --locked -- -D
+                   warnings`: falla `large_enum_variant` en `Recepcion` (payload `Padres` de ~553 B);
+                   corregido boxeando `PadresRecibidos`
+2026-09-27T13:58  `cargo fmt --all -- --check` y `cargo clippy … -D warnings`: verdes (ya sin el
+                   `large_enum_variant`)
+2026-09-27T14:00 a 14:34  `cargo test --workspace --all-features --locked` (2.ª pasada, sobre la
+                   fuente final): 860 passed, 0 failed, 6 ignored
+2026-09-27T14:34  guardianes `ci/dependencias-exactas.sh`, `ci/frontera-crates.sh` y
+                   `ci/firmante-obligatorio.sh`: verdes
+2026-09-27T14:35  empaquetado: `cambios.patch` (`diff -ruN --exclude=target ws.orig ws`),
+                   `MIGRACION.sha256` (`sha256sum -c` en verde) y `HUELLAS.sha256`
+2026-09-27T14:35  FIN

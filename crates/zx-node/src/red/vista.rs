@@ -76,7 +76,10 @@ impl VistaRed {
             return;
         };
         let BloqueRed::Pow { cabecera, .. } = &bloque else {
-            debug_assert!(false, "registrar_genesis_pow con un bloque que no es PoW");
+            // Invariante del llamante: los dos únicos llamantes (`Nodo::arranque_limpio` y
+            // `Nodo::admitir_pow_interno`) construyen siempre un `BloqueRed::Pow`. Se defiende sin
+            // pánico (antes `debug_assert!`) en vez de poder tirar el proceso en modo debug.
+            tracing::error!("registrar_genesis_pow con un bloque que no es PoW");
             return;
         };
         let hash = cabecera.block_hash();
@@ -100,7 +103,9 @@ impl VistaRed {
             return;
         };
         let BloqueRed::Pow { cabecera, .. } = &bloque else {
-            debug_assert!(false, "registrar_pow con un bloque que no es PoW");
+            // Invariante del llamante: solo `Nodo::admitir_pow_interno` llama aquí, y siempre con
+            // un `BloqueRed::Pow`. Se defiende sin pánico (antes `debug_assert!`).
+            tracing::error!("registrar_pow con un bloque que no es PoW");
             return;
         };
         let esperado = i.cabeceras_pow.len();
