@@ -411,3 +411,13 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - **W07a migrada** vía W07a-R (`10516d6`): suite completa 832/0/5.
 - **SL-4b2** congelada (`bb648fb`) y lanzada (Sonnet): paso 0 (productor sigue al terminal seleccionado), firmante
   seguro en el nodo, detector y envío de evidencia, activación dev, doble firma de extremo a extremo.
+
+### 07:58–09:52 — SL-4b2 migrada; SL-4b3 lanzada
+
+- **SL-4b2 migrada** (`fbab3b7`): el castigo está **activo en la red dev**. Doble firma real (tercero con la clave
+  dev 0) detectada, incluida y castigada en los tres nodos 3/3; productor honesto con 10 `SIGKILL` sin ninguna
+  evidencia; pérdida del registro con abstención exacta (borde inclusivo); el productor sigue al terminal ganador
+  en caliente (paso 0). **Defectos:** el bloque de transición se produce **sin** firmante (contra la decisión 2) y
+  faltan los unitarios de inclusión → **SL-4b3** (DeepSeek) lanzada ≈ 09:49, con un guardián de CI nuevo que
+  impide que el nodo llame a productores sin firmante. Reserva: registros crudos de la prueba del paso 0 borrados
+  por el ejecutor; W07b la repite.
