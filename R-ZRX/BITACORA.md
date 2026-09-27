@@ -457,3 +457,15 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   0,65 (2^62), 0,78 (2^63), **0,99 (2^63,5) → `SR_dev = 13 043 817 825 332 783 104`**. La curva no escala linealmente
   con el rango (dato para el informe). Mi estimación para 2^63 (≈ 1,3) era errónea.
 - W07b retomada: repite E-0 sobre `26312ff` y sigue con R1…R4.
+
+### 15:20–16:45 — R1 rep1 y rep2; analizador corregido; método de E-3
+
+- **R1 rep1** (candidato `26312ff`): E-1, E-2 (0 rechazos, ≈ 0,95 bloques distintos por slot), E-4 (reinicio y puesta
+  al día ≈ 118 s) y E-3 (misma punta y estado) superados.
+- **W07c-B** (analizador): contaba cada bloque una vez por nodo; corregido (`6a7292c`). Error mío en el esquema.
+- **R1 rep2: DIVERGEN en E-3** (misma punta, `resumen_estado` distinto en C). Diagnóstico leyendo los registros: el
+  resumen solo se escribe en `cambio_punta` y los bloques laterales llegados después no lo actualizan (A y B
+  registraron antes de los últimos bloques, C después); los bloques que parecían faltar son los de **transición**, que
+  el registro no marca como producidos. **Nuevo método de E-3** (sin tocar el nodo): tras el reposo, reinicio aislado y
+  sin producir de cada nodo y comparación del resumen tras repetir todo su almacén; se aplica también a rep1 y rep2.
+  Si entonces difieren, es una divergencia real.
