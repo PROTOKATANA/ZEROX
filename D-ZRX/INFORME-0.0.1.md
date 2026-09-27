@@ -1,8 +1,8 @@
 # Informe final de 0.0.1 del ZEROX híbrido — para Katana
 
-**Estado: BORRADOR** (redactado 2026-09-27 ≈ 11:00, mientras W07b mide). Las secciones marcadas «pendiente
-W07b» se completan con sus resultados. **Firma:** Claude (director, `AUTO-ZRX.md` §8). Todo en commits locales de
-la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato:** `3d21b1f` (antes `27dcfeb` y `26312ff`; W06d8 y W06d9 corrigieron dos caídas del productor halladas al medir). R1 y R2 se midieron con `26312ff`; R3 y R4, con `3d21b1f`.
+**Estado: BORRADOR** (redactado 2026-09-27 desde ≈ 11:00; mediciones de W07b incorporadas a las 23:46). Falta el
+veredicto, que espera a W06d10-B y a la E-0 del candidato final. **Firma:** Claude (director, `AUTO-ZRX.md` §8). Todo en commits locales de
+la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato:** se fija tras W06d10-B (antes `27dcfeb`, `26312ff` y `3d21b1f`; W06d8 y W06d9 corrigieron dos caídas del productor y W06d10 la falta de penalización del par, todas halladas al medir). R1 y R2 se midieron con `26312ff`; R3 y R4, con `3d21b1f`; E-7 con penalización, con W06d10.
 
 ---
 
@@ -38,15 +38,15 @@ repetición. Detalle regla a regla: `D-ZRX/SPEC-0.0.1.md`.
 | Problema | Evidencia | Decisión | Siguiente puerta |
 |---|---|---|---|
 | Transición PoW → PoST (A-01) | Oráculo T01 (29,5 M historias); diferencial 0 discrepancias; tres nodos reales | CONTRATO-v0 v0.1 | — (cerrado para dev) |
-| Selección a través del corte (A-05, FC-3) | T01/T02 (RFT-13); en el nodo, **incumplía** FC-3 hasta W06d7 (congelaba el terminal); I-3 por propiedades; E-6b y V6(b) reales | FC-3 con un DAG por terminal y `C-FIN-01` | Oráculo multiterminal T04-E |
+| Selección a través del corte (A-05, FC-3) | T01/T02 (RFT-13); en el nodo, **incumplía** FC-3 hasta W06d7 (congelaba el terminal); I-3 por propiedades; W07b: E-6 (mismo terminal, aislamiento verificado) y E-6b 3/3 | FC-3 con un DAG por terminal y `C-FIN-01` | Oráculo multiterminal T04-E |
 | Semilla del corte (A-07) | Derivación S1/S2/S3 sin instrumento | Marcador S1 `blake3(T)`, **no se reivindica** | Modelo de sesgo T03 |
 | Fallo de activación y censura de depósitos (A-08) | T02-A E4: con `h = 0,9` la censura domina | Prolongar PoW | Regla de fallo con coste del ataque |
 | Sincronización y nodo tardío (A-09, B-08) | W06d6 (registro de admisión); W06d7 | Sincronización por páginas con cursor por par | Coste lineal por reconexión (E-10) |
 | PoW de arranque (A-10, A-12) | CPU 73,8 MH/s; GTX 1070 561 MH/s = 7,6×; 1,94·10⁻⁷ J/hash (A10-M1) | SHA3-256 dev tras interfaz (Katana) | Algoritmo de producción y precios de alquiler |
-| Parámetros PoT (B-02) | Slot real 1,66 s con `N_dev` (W06d1); *W07b* | `N_dev` fijo, `D = 0` | `ρ_max` por hardware; segundo VDF (RFT-12) |
+| Parámetros PoT (B-02) | Slot real 1,66 s (W06d1) y 1,28 s (W07b) con el mismo `N_dev` en la misma máquina | `N_dev` fijo, `D = 0` | `ρ_max` por hardware; segundo VDF (RFT-12) |
 | Doble farmeo en rama privada (B-04) | RFT-01, RFT-14 | **No evitable** en la familia; mitigación adoptada en principio: finalidad por votos (X-04) | FV-2…FV-4 (FV-D08: peso provisional solo en dev) |
-| `Δ` y `F_slots` (B-05) | *pendiente W07b* | `F_SLOTS = 600` dev | `Δ_p99` medida |
-| Coste de admisión GHOSTDAG (B-12) | RI-1b: 90 µs → 1,66 ms de 2 000 a 16 000 bloques; *W07b* | Aceptado en dev | Índice de alcanzabilidad acotado |
+| `Δ` y `F_slots` (B-05) | W07b en localhost: propagación p50 ≈ 170 ms, p95 ≈ 0,4 s, máx. ≈ 1,2 s (`Δ_p99` sin calcular) | `F_SLOTS = 600` dev | `Δ_p99` medida |
+| Coste de admisión GHOSTDAG (B-12) | RI-1b: 90 µs → 1,66 ms de 2 000 a 16 000 bloques; W07b en red real: p50 0,09 → 0,44 ms de 0–499 a 1 500–1 999 bloques | Aceptado en dev | Índice de alcanzabilidad acotado |
 | Garantía: forma y cuantía (C-02) | SL-2: por identidad es regresiva (RFT-23) | `q = 10` ZZK por clave, dev | Garantía por unidad de espacio |
 | Evidencia y castigo (C-04, C-09, C-11) | SL-1…SL-4c; RI-3b; procesos reales (SL-4b2) | **Activo en dev**; `EvidenceTx` mal formada invalida el bloque | — |
 | Retención de recompensas (C-12) | Sin regla con la forma del modelo; la coinbase PoST va entera a la garantía (D-T08) y es confiscable hasta retirarla y liberarla (EV-17, RAT-3) | Sin disuasión reivindicada en 0.0.1 | SL-2c: ¿basta para la región de SL-2b? |
@@ -55,9 +55,33 @@ repetición. Detalle regla a regla: `D-ZRX/SPEC-0.0.1.md`.
 
 ## 4. Mediciones reales de 0.0.1
 
-*Pendiente W07b:* receta desde clon limpio (E-0), calibración de `SR_dev`, E-1…E-9 × 3 repeticiones, latencia de
-propagación (p50, p95, máx.), tiempo por etapa, admisión frente a profundidad, bloques por slot, rojos, CPU/RSS/disco
-por nodo, reinicio, nodo tardío, particiones, entradas inválidas, doble firma con castigo, retención del terminal.
+Fuente: W07b (`P-ZRX/P-MEDICION/REVISION-W07b.md`, `resultados-W07b/`) y W06d10 (`P-ZRX/P-NODO/REVISION-W06d10.md`).
+Procesos reales en `127.0.0.1`, una máquina de 32 hilos, `N_dev` real, una clave por nodo (salvo E-6b y E-9: 3 claves
+por lado), `SR_dev = 13043817825332783104` (calibrado en E-2a: 0,99 bloques por slot). Veredicto de «mismo estado»:
+reabrir cada nodo aislado sobre una **copia** de sus datos y comparar `resumen_estado` y `compendio_bloques` (W07d).
+
+| Escenario | Commit | Resultado (3 repeticiones salvo indicación) |
+|---|---|---|
+| E-0 receta desde clon limpio | `27dcfeb`, `26312ff`, `3d21b1f` | superada en los tres; en `3d21b1f`: 877/0/6, fmt, clippy, guardianes. *Pendiente: candidato final* |
+| E-1…E-4 cruce del corte, 30 min de régimen, `SIGKILL` y reinicio | `26312ff` | superadas; ≈ 1 500 bloques PoST por repetición, 0 rechazos; reinicio y puesta al día ≈ 104–118 s |
+| E-5 nodo tardío (tras ≥ 500 bloques) | `26312ff` | superada; puesta al día ≈ 60–64 s; mismo estado en los cuatro |
+| E-6 partición en PoST, aislamiento verificado (0 contactos) | `3d21b1f` | superada; reunión en ≈ 12 s |
+| E-6b terminales distintos | `3d21b1f` | superada; FC-3 predijo el lado ganador y los tres convergieron |
+| E-7 entradas inválidas | `3d21b1f`; penalización con W06d10 | rechazo con motivo y sin cambio de estado 3/3; **penalización del par 0/3 con `3d21b1f`** (defecto) → **4/4 por repetición tras W06d10**, 0 falsos positivos |
+| E-8 doble firma con castigo | `3d21b1f` | superada; confiscación total en los tres nodos (comprobada en el estado por el director); en rep1 el propio infractor incluyó la prueba (autodenuncia, DS-L03) |
+| E-9 retención del terminal | `3d21b1f` | descriptivo; en rep1 el terminal retenido **ganó** la reunión (reorganización de 30 en B y C) |
+
+| Métrica (R1, régimen) | Valor | Nota |
+|---|---|---|
+| Slot real con `N_dev` | **1,28 s** (W07b, 3 nodos) | W06d1 midió 1,66 s en la misma máquina; causa no investigada |
+| Verificación de cabecera (PoST + PoT) | p50 66–68 ms, p95 133–192 ms | domina el coste por bloque |
+| Admisión GHOSTDAG | p50 0,09 ms (0–499 bloques) → 0,44 ms (1 500–1 999) | **crece con la profundidad** (B-12) |
+| Persistencia | p50 0,84 ms, p95 4,0 ms | |
+| Propagación productor → admisión | p50 ≈ 170 ms, p95 ≈ 0,35–0,42 s, máx. ≈ 1,2 s | en localhost, con verificación; `Δ_p99` no calculado |
+| Bloques por slot | media 0,92–0,96 | padres por bloque: p50 1, máx. 3 |
+| Tiempo con puntas distintas | 12–22 % | todas reconvergen |
+| RSS por nodo | 0,79 GiB (p50) – 1,48 GiB (máx.) | |
+
 
 ## 5. Malas noticias (completas)
 
