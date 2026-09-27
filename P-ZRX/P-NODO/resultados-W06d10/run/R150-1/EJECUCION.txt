@@ -1,0 +1,28 @@
+commit=caba60a580808c7794ece64a5854d0b0259440ac
+sha256_zx-node=726dd1778fe4f3ce7692dda49e4b5cccfca5b9d165cee40c1b27fed530153e92
+sha256_zx-adversario=7f5eea5d107cadd6701cfe7be47d817bcba7da7414b836389a7c8570f7fe8bb3
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=2.78 7.52 8.27 1/2105 33
+fecha_inicio=2026-09-27T22:48:28+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=52010 B=52011 C=52012
+2026-09-27T22:48:28+02:00 === R150 rep1: A,B,C desde el génesis, objetivo slot 150 ===
+lanzado A pid=41
+lanzado B pid=46
+lanzado C pid=60
+=== esperando slot >= 150 en A, B y C, plazo 30 min ===
+SLOT_150 alcanzado: slot_a=150 slot_b=150 slot_c=150
+NODO A: bloque_producido=42 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO B: bloque_producido=59 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO C: bloque_producido=49 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+par_penalizado_total_entre_honestos=0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+RESULTADO=SUPERADO
+loadavg_fin=7.03 7.45 8.11 1/2137 14637
+fecha_fin=2026-09-27T22:52:21+02:00

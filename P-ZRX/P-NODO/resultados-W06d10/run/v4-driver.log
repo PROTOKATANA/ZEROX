@@ -1,0 +1,43 @@
+2026-09-27T22:34:26+02:00 === V4 E-7 rep1 semilla=101 puerto_base=51010 ===
+2026-09-27T22:34:26+02:00 === E-7 rep1: A,B,C desde el génesis ===
+lanzado A pid=41
+lanzado B pid=46
+lanzado C pid=56
+EXITO total=20
+=== E-7: zx-adversario (ráfaga, identidad nueva por vector) contra A ===
+estado_a_antes="resumen_estado":"d17a3ddf1ece234de8734e3ee0df6aa49dfeebde1b4005c9b96239ff49b19ffa" estado_a_despues="resumen_estado":"f179e9c474e6f7045b392473b669cd2345bf63ea0ea2d22fdf8fe12fc4d4e80f" (informativo; el estado se decide al final por W07d)
+PeerId del adversario (uno por vector): 12D3KooWLEbxDMhb5JM7cuLmAWKeZohGCpFJ8M7Yae6HiPhjgMpY 
+n_peers_adversario=1
+A: bloque_red_rechazado=0 par_penalizado(distintos)=0
+PeerId penalizados en A: 
+PeerId penalizados que NO son del adversario: 0 (debe ser 0)
+A: par_desconectado de B/C = 0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"f179e9c474e6f7045b392473b669cd2345bf63ea0ea2d22fdf8fe12fc4d4e80f"|"compendio_bloques":"90c8b3446fc5b041d73348b77bb04f9a0361f13b518aef6d63a011abdbd98bdb")
+NO_SUPERADO (E-7 rep1): rechazos=0 penalizados=0 ajenos=0 desconexiones_BC=0 convergen=1
+=== R4/E-7 rep1 TERMINADO ===
+2026-09-27T22:37:02+02:00 V4 rep1 terminada
+2026-09-27T22:37:02+02:00 === V4 E-7 rep2 semilla=202 puerto_base=51020 ===
+2026-09-27T22:37:02+02:00 === E-7 rep2: A,B,C desde el génesis ===
+lanzado A pid=8521
+lanzado B pid=8526
+lanzado C pid=8538
+EXITO total=20
+=== E-7: zx-adversario (ráfaga, identidad nueva por vector) contra A ===
+estado_a_antes="resumen_estado":"96b141e8bdb8edc7886049c4003ed202f51e842bd90fa0694ec5aadeb1b42650" estado_a_despues="resumen_estado":"97a6928f4814a4dd76965b77426a1cce41c44438df258cc2bc2b8955868bdd1f" (informativo; el estado se decide al final por W07d)
+PeerId del adversario (uno por vector): 12D3KooWDGcANhKvjC9LLGgxH9Rzvp28zocSP7EKWZHJNhAka2Q5 
+n_peers_adversario=1
+A: bloque_red_rechazado=4 par_penalizado(distintos)=4
+PeerId penalizados en A: 12D3KooWA6eF1d8icYrVBSDPLwPVBmt6FNtBC4SPga9d4jJbV28u 12D3KooWGnmcH38u3KWkDtS6cpztkbaAYudC6t4K8c3YukpwNkpk 12D3KooWLQP9y12MHVxm6fe2VSyz3JC2pmYZHDifBvWAJ1dzRPFr 12D3KooWMMbt4VqUSxFqeG5hzFfyVvg29f9b9ZD4mfDknh2AHzfo 
+PeerId penalizados que NO son del adversario: 4 (debe ser 0)
+A: par_desconectado de B/C = 0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"97a6928f4814a4dd76965b77426a1cce41c44438df258cc2bc2b8955868bdd1f"|"compendio_bloques":"c27e9a3c669dde60ac102fa2ff4a99aff2bf95dee9807ddb5373c023f46acc90")
+NO_SUPERADO (E-7 rep2): rechazos=4 penalizados=4 ajenos=4 desconexiones_BC=0 convergen=1
+=== R4/E-7 rep2 TERMINADO ===
+2026-09-27T22:38:54+02:00 V4 rep2 terminada
+2026-09-27T22:38:54+02:00 === V4 E-7 rep3 semilla=303 puerto_base=51030 ===
+2026-09-27T22:38:54+02:00 === E-7 rep3: A,B,C desde el génesis ===
+lanzado A pid=14976
+lanzado B pid=14981
+lanzado C pid=14991

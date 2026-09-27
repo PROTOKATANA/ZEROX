@@ -1,0 +1,42 @@
+commit=caba60a580808c7794ece64a5854d0b0259440ac
+sha256_zx-node=726dd1778fe4f3ce7692dda49e4b5cccfca5b9d165cee40c1b27fed530153e92
+sha256_zx-adversario=7f5eea5d107cadd6701cfe7be47d817bcba7da7414b836389a7c8570f7fe8bb3
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=11.64 9.06 8.73 1/2122 43765
+fecha_inicio=2026-09-27T23:00:03+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=52300 B=52301 C=52302 (aislado en 52800)
+tecnica=W06d7-V5 (aislar A en puerto NUEVO sin pares, mismo terminal; corrección de aislamiento verificable 2026-09-27)
+2026-09-27T23:00:03+02:00 === E-6 v5: A,B,C juntos desde el génesis (mismo terminal) ===
+EXITO total=20
+CONVERGEN punta="punta":"def2b82ded3228826c3217b218c3493a77951fc99c52f83a04a867fa8c1ec498" resumen="resumen_estado":"05166803194a1e7436931ee15a5e310e5305702a1fccb46c802629479efba7aa"
+slot_pre(aislamiento)=20
+=== aislando A (puerto NUEVO 52800, sin pares); B,C siguen produciendo en el suyo ===
+peer_id B=12D3KooWP4zPbPX7N5567b6Y6RVL8LvqFedcZnwybVzrEhPQMxMn C=12D3KooWMqngakTbgTHPbB5HpKr9QypFUmu496A6195L3PXPivnK (para comprobar 0 contacto durante la partición)
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===
+60 slots de aislamiento alcanzados: slot_a=80 slot_b=83
+t_particion_inicio_ns=1790542865440199563 t_particion_fin_ns=1790542943913995749
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0 (peer_a_aislado=12D3KooW9rik91zvoq98eCmksGDeDoGsseYzk5TjBZfpQ8juDDqE)
+punta_a_aislada: {"tipo":"cambio_punta","reloj_ns":78244604109,"reloj_pared_ns":1790542943792430596,"punta":"b584d9da65388f536b5c8ccdead5440f1e1bb7c001ddfbbaa877ccc97747c5dd","resumen_estado":"deff53e4b577c613bb0da3d9e9ceecafd8bee647a6baa7df44766f2edecb0079","profundidad_reorg":0,"blue_score":57}
+punta_bc: {"tipo":"cambio_punta","reloj_ns":139605725108,"reloj_pared_ns":1790542942716817833,"punta":"2f00d023a7e590dd5f5b2bebba7e702050f661dfdfe261373caa254512a54024","resumen_estado":"d97df27d4a8aca36246d4fff4d59c25eb0196077b8b37bac7901596188ff7fe3","profundidad_reorg":0,"blue_score":74}
+=== reuniendo: matando y relanzando A (puerto original 52300) con --red-marcar hacia B y C (B,C NO se reinician) ===
+=== esperando convergencia, plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"cff310aac0873e392da2e9a7e5255ee182516854448914ef0e83fb366ad2d41f" resumen="resumen_estado":"42ba81376258041c0384e8029f1d67b7dfc3d3934771c0cfa97847a67c7ddb2e"
+t_reunion_inicio_ns=1790542943932468138 t_reunion_fin_ns=1790542953130398417 tiempo_convergencia_ns=9197930279
+{"tipo":"cambio_punta","reloj_ns":8746475738,"reloj_pared_ns":1790542952789452695,"punta":"14367580e843b360f383ae2414d5ac7e87f8522f037cf804f478088f707417c1","resumen_estado":"13dc3883eab736ebe5d31bc763ad4f8af5ace8a338ec37d578cbee4098d0b758","profundidad_reorg":0,"blue_score":76}
+{"tipo":"cambio_punta","reloj_ns":8813757202,"reloj_pared_ns":1790542952856734169,"punta":"d1a98a9d576a967217b105173cbd7fd22f2e779f7c9429891bbe86dcbfd9ac67","resumen_estado":"631d5efc97772c431a6530cbe03750d2d31b04df78f56fbdd589b0e896cefc94","profundidad_reorg":0,"blue_score":77}
+{"tipo":"cambio_punta","reloj_ns":8881413339,"reloj_pared_ns":1790542952924390326,"punta":"cff310aac0873e392da2e9a7e5255ee182516854448914ef0e83fb366ad2d41f","resumen_estado":"42ba81376258041c0384e8029f1d67b7dfc3d3934771c0cfa97847a67c7ddb2e","profundidad_reorg":0,"blue_score":78}
+=== resultado final (método antiguo, informativo) ===
+=== parada y verificación aislada de estado (método W07d, sobre copias) ===
+loadavg_fin=8.06 9.11 8.85 4/2416 53216
+fecha_fin=2026-09-27T23:02:33+02:00
+=== 0 par_penalizado entre honestos (criterio V5) ===
+A: par_penalizado=0
+B: par_penalizado=0
+C: par_penalizado=0

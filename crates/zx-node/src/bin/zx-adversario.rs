@@ -66,8 +66,11 @@ struct Cli {
     #[arg(long, value_name = "MULTIADDR")]
     objetivo: Multiaddr,
 
-    /// Pausa entre escenarios, en milisegundos (para poder leer el registro del objetivo).
-    #[arg(long, default_value_t = 300)]
+    /// Pausa tras difundir cada vector, en milisegundos, para dar tiempo a que el objetivo valide
+    /// y (si procede) corte la conexión, y para poder leer su registro. `ORDEN-W06d10`: con la
+    /// penalización activa, el corte puede tardar lo que tarde la verificación (hasta decenas de ms)
+    /// más el turno del hilo de consenso; 1 s deja margen de sobra.
+    #[arg(long, default_value_t = 1000)]
     pausa_ms: u64,
 
     /// Sin subcomando: la ráfaga E-7/E-8 de siempre (`ORDEN-W06d2`). Con `doble-firma`: `ORDEN-SL4b2`
@@ -455,30 +458,29 @@ async fn main() {
         return;
     }
 
-    // Orden deliberado: primero los escenarios que **no** violan consenso (`Ignorar`, la conexión
-    // sigue viva) y al final los que sí (`Rechazar` con `MotivoDesconexion::ViolacionDeConsenso`,
-    // que banea de un golpe — C-NET-05/`error.rs`). Con una sola conexión persistente por
-    // simplicidad, un baneo temprano dejaría sin mesh de gossipsub los escenarios restantes (medido:
-    // exactamente lo que pasaba con el orden anterior). Reconectar entre escenarios queda para una
-    // versión futura de esta herramienta.
-    ejecutar_escenario(
-        &manejo,
-        &mut eventos,
-        "E-7 ráfaga de huérfanos (256 padres inexistentes)",
+    // La conexión persistente ya cumplió su única función aquí: leer el saludo del objetivo (fase y
+    // terminal) con el que se construyen los bloques. Se cierra **antes** de los vectores: si
+    // siguiera viva, ocuparía el tercer cupo de `MAX_POR_PREFIJO` en `127.0.0.0/24` (B y C ya
+    // ocupan dos) y las identidades nuevas no podrían conectar. El cierre se deja asentar un
+    // instante para que el objetivo descuente la conexión.
+    tarea.abort();
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // `ORDEN-W06d10` decisión 4: con la penalización activa, el primer bloque inválido de un
+    // vector ya cuesta la conexión (el objetivo desconecta y veta al propagador). Para que **todos**
+    // los vectores lleguen a juzgarse, cada uno se envía desde una **identidad nueva** (`PeerId`
+    // nuevo y conexión nueva); el `PeerId` de cada vector queda impreso en la salida.
+    let mut vectores: Vec<(String, Vec<BloqueRed>)> = Vec::new();
+    vectores.push((
+        "E-7 ráfaga de huérfanos (256 padres inexistentes)".to_string(),
         escenario_rafaga_huerfanos(256),
-        pausa,
-    )
-    .await;
+    ));
 
     if let Some(b) = escenario_post_malo(1, 0, &estado_objetivo) {
-        ejecutar_escenario(
-            &manejo,
-            &mut eventos,
-            "E-7 PoST con PoAS/PoT/sello malos (padre = terminal real del objetivo)",
+        vectores.push((
+            "E-7 PoST con PoAS/PoT/sello malos (padre = terminal real del objetivo)".to_string(),
             vec![b],
-            pausa,
-        )
-        .await;
+        ));
     } else {
         println!(
             "zx-adversario: E-7 PoST malo OMITIDO (el objetivo todavía no fijó terminal, sigue en \
@@ -486,49 +488,43 @@ async fn main() {
         );
     }
 
+    // E-8 «equivocación»: dos bloques distintos del mismo slot. Cada uno desde su propia identidad
+    // (con una sola conexión, el primero —ya rechazado— se llevaría por delante al segundo).
     match (
         escenario_post_malo(2, 1, &estado_objetivo),
         escenario_post_malo(2, 2, &estado_objetivo),
     ) {
         (Some(b1), Some(b2)) => {
-            ejecutar_escenario(
-                &manejo,
-                &mut eventos,
-                "E-8 equivocación: dos bloques distintos del mismo slot (limitado: ver docstring)",
-                vec![b1, b2],
-                pausa,
-            )
-            .await;
+            vectores.push((
+                "E-8 equivocación: bloque del mismo slot (variante 1)".to_string(),
+                vec![b1],
+            ));
+            vectores.push((
+                "E-8 equivocación: bloque del mismo slot (variante 2)".to_string(),
+                vec![b2],
+            ));
         }
         _ => println!(
             "zx-adversario: E-8 OMITIDO (el objetivo todavía no fijó terminal, sigue en fase PoW)"
         ),
     }
 
-    // A partir de aquí, cada escenario puede banear la conexión: van al final.
-    ejecutar_escenario(
-        &manejo,
-        &mut eventos,
-        "E-7 PoW nonce malo",
+    vectores.push((
+        "E-7 PoW nonce malo".to_string(),
         vec![escenario_pow_nonce_malo(&estado_objetivo)],
-        pausa,
-    )
-    .await;
+    ));
 
     if let Some(b) = escenario_coinbase_excesiva(&estado_objetivo) {
-        ejecutar_escenario(
-            &manejo,
-            &mut eventos,
-            "E-7 coinbase mayor que el subsidio",
-            vec![b],
-            pausa,
-        )
-        .await;
+        vectores.push(("E-7 coinbase mayor que el subsidio".to_string(), vec![b]));
     } else {
         println!(
             "zx-adversario: E-7 coinbase excesiva OMITIDO (no se encontró nonce PoW real en el \
              presupuesto de esta herramienta; no se manda un PoW falso)"
         );
+    }
+
+    for (nombre, bloques) in vectores {
+        enviar_vector_con_identidad_nueva(&cli.objetivo, &nombre, bloques, pausa).await;
     }
 
     println!(
@@ -617,14 +613,54 @@ async fn pedir_estado_y_suscripciones(
     (estado, pendientes)
 }
 
-async fn ejecutar_escenario(
-    manejo: &zx_p2p::servicio::ManejoRed,
-    eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>,
+/// Envía **un** vector adversarial desde una **identidad nueva** (`ORDEN-W06d10` decisión 4).
+///
+/// Construye un `Swarm` (y por tanto un `PeerId` nuevo), conecta, espera las suscripciones de
+/// gossipsub del objetivo, difunde los bloques y observa si el objetivo corta la conexión. Imprime
+/// el `PeerId` usado en cada vector para dejar constancia en la salida de la herramienta.
+async fn enviar_vector_con_identidad_nueva(
+    objetivo: &Multiaddr,
     nombre: &str,
     bloques: Vec<BloqueRed>,
     pausa: Duration,
 ) {
-    println!("--- {nombre} ({} mensaje(s)) ---", bloques.len());
+    let swarm = match swarm_tcp() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("zx-adversario: vector «{nombre}»: no se pudo construir la red: {e}");
+            return;
+        }
+    };
+    let propio = *swarm.local_peer_id();
+    let espia = std::sync::Arc::new(Espia::default());
+    let piezas = arrancar(swarm, espia);
+    let manejo = piezas.manejo;
+    let mut eventos = piezas.eventos;
+    let tarea = tokio::spawn(piezas.bucle.correr());
+
+    println!(
+        "--- {nombre} ({} mensaje(s)) desde identidad NUEVA (PeerId {propio}) ---",
+        bloques.len()
+    );
+    if let Err(e) = manejo.marcar(objetivo.clone()).await {
+        eprintln!("zx-adversario: vector «{nombre}»: no se pudo marcar: {e}");
+        tarea.abort();
+        return;
+    }
+    let Some(remoto) = esperar_conexion(&mut eventos).await else {
+        eprintln!("zx-adversario: vector «{nombre}»: el objetivo no conectó en el plazo esperado");
+        tarea.abort();
+        return;
+    };
+
+    // Publicar exige esperar las suscripciones de gossipsub del objetivo (si no, `publish` falla
+    // localmente con `NoPeersSubscribedToTopic`). El saludo que devuelve aquí se ignora.
+    let (_estado, pendientes) =
+        pedir_estado_y_suscripciones(&manejo, &mut eventos, remoto, Duration::from_secs(10)).await;
+    if !pendientes.is_empty() {
+        println!("  (el objetivo no confirmó suscripción a {pendientes:?}; se difunde igualmente)");
+    }
+
     for b in &bloques {
         let familia = match b.familia() {
             FamiliaBloque::Pow => "pow",
@@ -636,12 +672,18 @@ async fn ejecutar_escenario(
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
+
     // Ventana corta para ver si el objetivo nos corta la conexión (penalización).
-    let vivo = tokio::time::timeout(pausa, esperar_desconexion(eventos)).await;
+    let vivo = tokio::time::timeout(pausa, esperar_desconexion(&mut eventos)).await;
     match vivo {
-        Ok(Some(_)) => println!("  el objetivo CORTÓ la conexión tras este escenario"),
-        _ => println!("  la conexión sigue viva tras este escenario"),
+        Ok(Some(_)) => println!("  el objetivo CORTÓ la conexión tras este vector"),
+        _ => println!("  la conexión sigue viva tras este vector"),
     }
+    tarea.abort();
+    // Deja que el objetivo procese el cierre antes de la siguiente identidad: `MAX_POR_PREFIJO`
+    // cuenta conexiones establecidas del mismo /24 (B y C ya ocupan dos), y el vector anterior aún
+    // podría contarse como la tercera.
+    tokio::time::sleep(Duration::from_millis(1500)).await;
 }
 
 async fn esperar_desconexion(eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>) -> Option<()> {

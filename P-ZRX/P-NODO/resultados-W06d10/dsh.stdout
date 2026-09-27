@@ -1,0 +1,27 @@
+He cumplido la `ORDEN-W06d10`. Resumen de lo hecho, con los dos avisos previos a editar que exige la orden.
+
+## Avisos antes de editar
+
+1. **Falta de definición:** `crates/zx-node/src/red/sync.rs` es el único consumidor **exhaustivo** de `EventoRed`, pero **no** figura en «Archivos permitidos». Añadir `EventoRed::ParPenalizado` rompía la compilación sin poder tocarlo. Resuelto sin violar el contrato: método **`ManejadorEntrante::par_penalizado`** con implementación por defecto (`entrante.rs`, permitido) que `ManejadorRed` (`red/manejador.rs`, permitido) implementa escribiendo `par_penalizado`. Si prefieres el `EventoRed` literal, basta autorizar `red/sync.rs`.
+2. **V1 (tabla completa en `PROGRESO.md` §0.2 e `INFORME.md` §4):** hay 3 familias de `Rechazar` que **sí** dependen de la vista local y hoy penalizan: **(X1)** `ErrorPow::TimestampDemasiadoFuturo` (C-TS-03, que el propio contrato exige diferir), **(X2)** `MotivoBloque::ErrLimiteTerminales` y **(X3)** errores locales de persistencia/servicio. La orden prohíbe cambiarlas sin respuesta: **las he reportado y no las he tocado**. Ningún ejemplo de la orden (reorg, C-FIN-01, terminal no seleccionado, PoT incompleto, huérfanos, duplicados) está hoy en `Rechazar`: ya son `Ignorar`.
+
+## Implementación
+
+- **Decisión 1:** `zx-p2p::reportar_a_gossipsub` ahora, ante `Rechazar`, conserva el `Reject` de gossipsub, desconecta al propagador con `ViolacionDeConsenso` (puntuación C-NET-05/C-NET-20) y avisa al nodo para escribir `par_penalizado`. `Ignorar`/`Aceptar` no penalizan. Cubre ruta directa y diferida.
+- **Decisión 3:** `LimitesPorIp`: `Prefijo::es_loopback()`, puntos y veto por **`PeerId`** (FIFO acotado a `MAX_BANEADOS`) para loopback; fuera de loopback, prefijo como antes. Excepción de red local documentada.
+- **Decisión 4:** `zx-adversario` envía cada vector desde **identidad nueva**, imprime su `PeerId` propio y cierra la conexión de saludo antes de la ráfaga (el cupo `MAX_POR_PREFIJO=3` del `/24` compartido bloqueaba las identidades nuevas; detectado y corregido en el primer intento de V4).
+
+## Verificación (todo verde)
+
+| Paso | Resultado |
+|---|---|
+| V0 | `sha256sum -c` 52/52; suite base sin fallos (el único `error` fue un doctest por editar mientras corría) |
+| V1 | tabla completa **antes** de editar |
+| V2/V3 | 4 unit `limites_ip` + 2 integración TCP `penalizacion_gossip` (adversario desconectado/penalizado; honestos del mismo `/24` siguen y reconectan; `Ignorar` nunca penaliza) |
+| V4 | E-7 ×3 (101/202/303): **3/3 SUPERADO** — 4 rechazos y 4 `par_penalizado` por rep, 0 ajenos, 0 desconexiones B/C, convergencia W07d |
+| V5 | 3/3 R150 al slot 150 + E-6 con aislamiento real (`contactos_*=0`): **0 `par_penalizado`** entre honestos |
+| V6 | `fmt` verde; `clippy -D warnings` verde; suite **883 pasados / 0 fallos / 6 ignorados** (84 binarios + doctests); 3 guardianes verdes; T01/T04 verdes; `Cargo.lock` sin cambios |
+
+## Artefactos (zona `deepseek/W06d10/`)
+
+`cambios.patch` (5 modificados + 1 test nuevo), `ws.orig/`, `ws/`, `MIGRACION.sha256`, `HUELLAS.sha256` (verificado), `INFORME.md`, `PROGRESO.md`, `HORAS.log`, `scripts/` (V4/V5), `run/` (evidencia de las 7 ejecuciones reales) y `logs/`.

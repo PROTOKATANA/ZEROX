@@ -32,6 +32,7 @@
 //! informe no llega dentro de un plazo declarado, lo trata como `Ignorar` — nunca como `Rechazar`:
 //! un manejador lento o caído no es un peer culpable.
 
+use libp2p::PeerId;
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
 
@@ -121,4 +122,18 @@ pub trait ManejadorEntrante: Send + Sync + 'static {
     fn pagina_registro(&self, _desde: u64) -> (Vec<BloqueRed>, u64) {
         (Vec::new(), 0)
     }
+
+    /// El bucle de red acaba de penalizar a un par por difundir un bloque
+    /// **demostrablemente inválido** (`Veredicto::Rechazar`) — `ORDEN-W06d10` decisión 1.
+    ///
+    /// El bucle ya desconectó al par y le aplicó la puntuación que corresponda (prefijo de red, o
+    /// `PeerId` si es una dirección **loopback**: excepción de la red local, ver
+    /// [`crate::limites_ip::LimitesPorIp::penalizar_peer`]). Este callback es el aviso al nodo para
+    /// que deje la constancia estructurada (`par_penalizado`, `par`/`motivo`/`accion`, según
+    /// `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md`); `motivo` y `accion` los fija `zx-p2p`.
+    ///
+    /// **Nunca se llama con `Aceptar` ni con `Ignorar`.** Tiene implementación por defecto (no hace
+    /// nada) para que los manejadores de test que no observan el registro (`Espia`, `Contador`,
+    /// `Diferidor`…) sigan compilando sin cambios.
+    fn par_penalizado(&self, _peer: PeerId, _motivo: &str, _accion: &str) {}
 }

@@ -1,0 +1,6 @@
+1203b2964d18cb8932cf398b59fd5418f5e7f4bffe903f087dd329e0870743bc  crates/zx-p2p/src/entrante.rs
+abb2b65a0edcebefd3b1a6034bda7e5475c570d833a582df6eab44828d3ddaff  crates/zx-p2p/src/servicio.rs
+d7a3b863c5aa8a3fa4cb795c63489c4db9329d0839b68308d9f612d314d03fa2  crates/zx-p2p/src/limites_ip.rs
+f9d28eef5b6b5afd93812072d0d67a41193ef0b8d718d7c52a9573f8d12a9933  crates/zx-p2p/tests/penalizacion_gossip.rs
+2abfb76be05e05c1b195a582e0c02d86c598eb6147cbe16df3e97dbee61851b8  crates/zx-node/src/red/manejador.rs
+9bc626011686c7048da97a96aa80908ce1d5d944a1a00fb69ccb8fdecd70308c  crates/zx-node/src/bin/zx-adversario.rs

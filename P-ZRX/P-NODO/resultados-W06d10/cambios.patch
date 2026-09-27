@@ -1,0 +1,1058 @@
+diff -ruN '--exclude=target' '--exclude=PDF' '--exclude=.gitignore' ws.orig/crates/zx-node/src/bin/zx-adversario.rs ws/crates/zx-node/src/bin/zx-adversario.rs
+--- ws.orig/crates/zx-node/src/bin/zx-adversario.rs	2026-09-27 09:48:06.189184748 +0200
++++ ws/crates/zx-node/src/bin/zx-adversario.rs	2026-09-27 22:39:55.526275904 +0200
+@@ -66,8 +66,11 @@
+     #[arg(long, value_name = "MULTIADDR")]
+     objetivo: Multiaddr,
+ 
+-    /// Pausa entre escenarios, en milisegundos (para poder leer el registro del objetivo).
+-    #[arg(long, default_value_t = 300)]
++    /// Pausa tras difundir cada vector, en milisegundos, para dar tiempo a que el objetivo valide
++    /// y (si procede) corte la conexión, y para poder leer su registro. `ORDEN-W06d10`: con la
++    /// penalización activa, el corte puede tardar lo que tarde la verificación (hasta decenas de ms)
++    /// más el turno del hilo de consenso; 1 s deja margen de sobra.
++    #[arg(long, default_value_t = 1000)]
+     pausa_ms: u64,
+ 
+     /// Sin subcomando: la ráfaga E-7/E-8 de siempre (`ORDEN-W06d2`). Con `doble-firma`: `ORDEN-SL4b2`
+@@ -455,30 +458,29 @@
+         return;
+     }
+ 
+-    // Orden deliberado: primero los escenarios que **no** violan consenso (`Ignorar`, la conexión
+-    // sigue viva) y al final los que sí (`Rechazar` con `MotivoDesconexion::ViolacionDeConsenso`,
+-    // que banea de un golpe — C-NET-05/`error.rs`). Con una sola conexión persistente por
+-    // simplicidad, un baneo temprano dejaría sin mesh de gossipsub los escenarios restantes (medido:
+-    // exactamente lo que pasaba con el orden anterior). Reconectar entre escenarios queda para una
+-    // versión futura de esta herramienta.
+-    ejecutar_escenario(
+-        &manejo,
+-        &mut eventos,
+-        "E-7 ráfaga de huérfanos (256 padres inexistentes)",
++    // La conexión persistente ya cumplió su única función aquí: leer el saludo del objetivo (fase y
++    // terminal) con el que se construyen los bloques. Se cierra **antes** de los vectores: si
++    // siguiera viva, ocuparía el tercer cupo de `MAX_POR_PREFIJO` en `127.0.0.0/24` (B y C ya
++    // ocupan dos) y las identidades nuevas no podrían conectar. El cierre se deja asentar un
++    // instante para que el objetivo descuente la conexión.
++    tarea.abort();
++    tokio::time::sleep(Duration::from_millis(500)).await;
++
++    // `ORDEN-W06d10` decisión 4: con la penalización activa, el primer bloque inválido de un
++    // vector ya cuesta la conexión (el objetivo desconecta y veta al propagador). Para que **todos**
++    // los vectores lleguen a juzgarse, cada uno se envía desde una **identidad nueva** (`PeerId`
++    // nuevo y conexión nueva); el `PeerId` de cada vector queda impreso en la salida.
++    let mut vectores: Vec<(String, Vec<BloqueRed>)> = Vec::new();
++    vectores.push((
++        "E-7 ráfaga de huérfanos (256 padres inexistentes)".to_string(),
+         escenario_rafaga_huerfanos(256),
+-        pausa,
+-    )
+-    .await;
++    ));
+ 
+     if let Some(b) = escenario_post_malo(1, 0, &estado_objetivo) {
+-        ejecutar_escenario(
+-            &manejo,
+-            &mut eventos,
+-            "E-7 PoST con PoAS/PoT/sello malos (padre = terminal real del objetivo)",
++        vectores.push((
++            "E-7 PoST con PoAS/PoT/sello malos (padre = terminal real del objetivo)".to_string(),
+             vec![b],
+-            pausa,
+-        )
+-        .await;
++        ));
+     } else {
+         println!(
+             "zx-adversario: E-7 PoST malo OMITIDO (el objetivo todavía no fijó terminal, sigue en \
+@@ -486,44 +488,34 @@
+         );
+     }
+ 
++    // E-8 «equivocación»: dos bloques distintos del mismo slot. Cada uno desde su propia identidad
++    // (con una sola conexión, el primero —ya rechazado— se llevaría por delante al segundo).
+     match (
+         escenario_post_malo(2, 1, &estado_objetivo),
+         escenario_post_malo(2, 2, &estado_objetivo),
+     ) {
+         (Some(b1), Some(b2)) => {
+-            ejecutar_escenario(
+-                &manejo,
+-                &mut eventos,
+-                "E-8 equivocación: dos bloques distintos del mismo slot (limitado: ver docstring)",
+-                vec![b1, b2],
+-                pausa,
+-            )
+-            .await;
++            vectores.push((
++                "E-8 equivocación: bloque del mismo slot (variante 1)".to_string(),
++                vec![b1],
++            ));
++            vectores.push((
++                "E-8 equivocación: bloque del mismo slot (variante 2)".to_string(),
++                vec![b2],
++            ));
+         }
+         _ => println!(
+             "zx-adversario: E-8 OMITIDO (el objetivo todavía no fijó terminal, sigue en fase PoW)"
+         ),
+     }
+ 
+-    // A partir de aquí, cada escenario puede banear la conexión: van al final.
+-    ejecutar_escenario(
+-        &manejo,
+-        &mut eventos,
+-        "E-7 PoW nonce malo",
++    vectores.push((
++        "E-7 PoW nonce malo".to_string(),
+         vec![escenario_pow_nonce_malo(&estado_objetivo)],
+-        pausa,
+-    )
+-    .await;
++    ));
+ 
+     if let Some(b) = escenario_coinbase_excesiva(&estado_objetivo) {
+-        ejecutar_escenario(
+-            &manejo,
+-            &mut eventos,
+-            "E-7 coinbase mayor que el subsidio",
+-            vec![b],
+-            pausa,
+-        )
+-        .await;
++        vectores.push(("E-7 coinbase mayor que el subsidio".to_string(), vec![b]));
+     } else {
+         println!(
+             "zx-adversario: E-7 coinbase excesiva OMITIDO (no se encontró nonce PoW real en el \
+@@ -531,6 +523,10 @@
+         );
+     }
+ 
++    for (nombre, bloques) in vectores {
++        enviar_vector_con_identidad_nueva(&cli.objetivo, &nombre, bloques, pausa).await;
++    }
++
+     println!(
+         "zx-adversario: fin. Respuestas de sincronización recibidas: {}. \
+          El veredicto de fondo de cada envío se lee en el registro del objetivo.",
+@@ -617,14 +613,54 @@
+     (estado, pendientes)
+ }
+ 
+-async fn ejecutar_escenario(
+-    manejo: &zx_p2p::servicio::ManejoRed,
+-    eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>,
++/// Envía **un** vector adversarial desde una **identidad nueva** (`ORDEN-W06d10` decisión 4).
++///
++/// Construye un `Swarm` (y por tanto un `PeerId` nuevo), conecta, espera las suscripciones de
++/// gossipsub del objetivo, difunde los bloques y observa si el objetivo corta la conexión. Imprime
++/// el `PeerId` usado en cada vector para dejar constancia en la salida de la herramienta.
++async fn enviar_vector_con_identidad_nueva(
++    objetivo: &Multiaddr,
+     nombre: &str,
+     bloques: Vec<BloqueRed>,
+     pausa: Duration,
+ ) {
+-    println!("--- {nombre} ({} mensaje(s)) ---", bloques.len());
++    let swarm = match swarm_tcp() {
++        Ok(s) => s,
++        Err(e) => {
++            eprintln!("zx-adversario: vector «{nombre}»: no se pudo construir la red: {e}");
++            return;
++        }
++    };
++    let propio = *swarm.local_peer_id();
++    let espia = std::sync::Arc::new(Espia::default());
++    let piezas = arrancar(swarm, espia);
++    let manejo = piezas.manejo;
++    let mut eventos = piezas.eventos;
++    let tarea = tokio::spawn(piezas.bucle.correr());
++
++    println!(
++        "--- {nombre} ({} mensaje(s)) desde identidad NUEVA (PeerId {propio}) ---",
++        bloques.len()
++    );
++    if let Err(e) = manejo.marcar(objetivo.clone()).await {
++        eprintln!("zx-adversario: vector «{nombre}»: no se pudo marcar: {e}");
++        tarea.abort();
++        return;
++    }
++    let Some(remoto) = esperar_conexion(&mut eventos).await else {
++        eprintln!("zx-adversario: vector «{nombre}»: el objetivo no conectó en el plazo esperado");
++        tarea.abort();
++        return;
++    };
++
++    // Publicar exige esperar las suscripciones de gossipsub del objetivo (si no, `publish` falla
++    // localmente con `NoPeersSubscribedToTopic`). El saludo que devuelve aquí se ignora.
++    let (_estado, pendientes) =
++        pedir_estado_y_suscripciones(&manejo, &mut eventos, remoto, Duration::from_secs(10)).await;
++    if !pendientes.is_empty() {
++        println!("  (el objetivo no confirmó suscripción a {pendientes:?}; se difunde igualmente)");
++    }
++
+     for b in &bloques {
+         let familia = match b.familia() {
+             FamiliaBloque::Pow => "pow",
+@@ -636,12 +672,18 @@
+         }
+         tokio::time::sleep(Duration::from_millis(20)).await;
+     }
++
+     // Ventana corta para ver si el objetivo nos corta la conexión (penalización).
+-    let vivo = tokio::time::timeout(pausa, esperar_desconexion(eventos)).await;
++    let vivo = tokio::time::timeout(pausa, esperar_desconexion(&mut eventos)).await;
+     match vivo {
+-        Ok(Some(_)) => println!("  el objetivo CORTÓ la conexión tras este escenario"),
+-        _ => println!("  la conexión sigue viva tras este escenario"),
++        Ok(Some(_)) => println!("  el objetivo CORTÓ la conexión tras este vector"),
++        _ => println!("  la conexión sigue viva tras este vector"),
+     }
++    tarea.abort();
++    // Deja que el objetivo procese el cierre antes de la siguiente identidad: `MAX_POR_PREFIJO`
++    // cuenta conexiones establecidas del mismo /24 (B y C ya ocupan dos), y el vector anterior aún
++    // podría contarse como la tercera.
++    tokio::time::sleep(Duration::from_millis(1500)).await;
+ }
+ 
+ async fn esperar_desconexion(eventos: &mut tokio::sync::mpsc::Receiver<EventoRed>) -> Option<()> {
+diff -ruN '--exclude=target' '--exclude=PDF' '--exclude=.gitignore' ws.orig/crates/zx-node/src/red/manejador.rs ws/crates/zx-node/src/red/manejador.rs
+--- ws.orig/crates/zx-node/src/red/manejador.rs	2026-09-27 07:56:12.654576136 +0200
++++ ws/crates/zx-node/src/red/manejador.rs	2026-09-27 21:56:23.506238081 +0200
+@@ -91,6 +91,20 @@
+         }
+     }
+ 
++    /// `ORDEN-W06d10` decisión 1: `zx-p2p` penalizó al propagador de un bloque difundido
++    /// **demostrablemente inválido** (lo desconectó y puntuó). Escribe `par_penalizado` (`par`,
++    /// `motivo`, `accion`) según `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md` §1. No es crítico: un
++    /// fallo de escritura no debe tumbar nada (el par ya está desconectado).
++    fn par_penalizado(&self, peer: libp2p::PeerId, motivo: &str, accion: &str) {
++        let evento = self
++            .registro
++            .evento("par_penalizado")
++            .str("par", &peer.to_string())
++            .str("motivo", motivo)
++            .str("accion", accion);
++        let _ = self.registro.escribir(evento, false);
++    }
++
+     fn tx_difundida(&self, _tx_serializada: &[u8]) -> Veredicto {
+         // 0.0.1 no tiene tema de transacciones (REVISION-W06c.md): nada que hacer con esto todavía.
+         Veredicto::Ignorar
+diff -ruN '--exclude=target' '--exclude=PDF' '--exclude=.gitignore' ws.orig/crates/zx-p2p/src/entrante.rs ws/crates/zx-p2p/src/entrante.rs
+--- ws.orig/crates/zx-p2p/src/entrante.rs	2026-09-27 01:28:47.931696054 +0200
++++ ws/crates/zx-p2p/src/entrante.rs	2026-09-27 21:54:48.799539167 +0200
+@@ -32,6 +32,7 @@
+ //! informe no llega dentro de un plazo declarado, lo trata como `Ignorar` — nunca como `Rechazar`:
+ //! un manejador lento o caído no es un peer culpable.
+ 
++use libp2p::PeerId;
+ use zx_core::digest::BlockHash;
+ use zx_core::preimage::block::BlockHeader;
+ 
+@@ -121,4 +122,18 @@
+     fn pagina_registro(&self, _desde: u64) -> (Vec<BloqueRed>, u64) {
+         (Vec::new(), 0)
+     }
++
++    /// El bucle de red acaba de penalizar a un par por difundir un bloque
++    /// **demostrablemente inválido** (`Veredicto::Rechazar`) — `ORDEN-W06d10` decisión 1.
++    ///
++    /// El bucle ya desconectó al par y le aplicó la puntuación que corresponda (prefijo de red, o
++    /// `PeerId` si es una dirección **loopback**: excepción de la red local, ver
++    /// [`crate::limites_ip::LimitesPorIp::penalizar_peer`]). Este callback es el aviso al nodo para
++    /// que deje la constancia estructurada (`par_penalizado`, `par`/`motivo`/`accion`, según
++    /// `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md`); `motivo` y `accion` los fija `zx-p2p`.
++    ///
++    /// **Nunca se llama con `Aceptar` ni con `Ignorar`.** Tiene implementación por defecto (no hace
++    /// nada) para que los manejadores de test que no observan el registro (`Espia`, `Contador`,
++    /// `Diferidor`…) sigan compilando sin cambios.
++    fn par_penalizado(&self, _peer: PeerId, _motivo: &str, _accion: &str) {}
+ }
+diff -ruN '--exclude=target' '--exclude=PDF' '--exclude=.gitignore' ws.orig/crates/zx-p2p/src/limites_ip.rs ws/crates/zx-p2p/src/limites_ip.rs
+--- ws.orig/crates/zx-p2p/src/limites_ip.rs	2026-09-26 02:35:06.629673157 +0200
++++ ws/crates/zx-p2p/src/limites_ip.rs	2026-09-27 22:32:52.223613363 +0200
+@@ -28,7 +28,7 @@
+ //!
+ //! IPv4 se agrupa por **/24** y IPv6 por **/64**, que es la unidad que los proveedores asignan.
+ 
+-use std::collections::HashMap;
++use std::collections::{HashMap, HashSet};
+ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+ use std::task::{Context, Poll};
+ 
+@@ -116,6 +116,24 @@
+             _ => None,
+         })
+     }
++
++    /// ¿Es un prefijo **loopback** (`127.0.0.0/8` en IPv4, `::1` en IPv6)?
++    ///
++    /// `ORDEN-W06d10` decisión 3: para loopback la penalización es por `PeerId`, no por prefijo.
++    /// Es una **excepción de la red local** (todos los nodos de la red dev comparten
++    /// `127.0.0.0/24`), no un cambio de producción: en una red real los pares honestos no
++    /// comparten prefijo con el adversario.
++    ///
++    /// En IPv6 se reconoce `::1` por su /64 (`::/64`): `Prefijo::de_v6` guarda solo los ocho
++    /// primeros bytes, así que los bits bajos de `::1` no llegan hasta aquí — y `::/64` no es una
++    /// red enrutable, es justo el ámbito local.
++    #[must_use]
++    pub const fn es_loopback(self) -> bool {
++        matches!(
++            self,
++            Self::V4([127, _, _]) | Self::V6([0, 0, 0, 0, 0, 0, 0, 0])
++        )
++    }
+ }
+ 
+ /// Behaviour que limita y banea por prefijo de red.
+@@ -133,6 +151,14 @@
+     puntos: HashMap<Prefijo, u32>,
+     /// Prefijos baneados, en orden de llegada para desalojar el más antiguo.
+     baneados: Vec<Prefijo>,
++    /// Puntos por `PeerId`, **solo** para pares conectados desde direcciones loopback
++    /// (`ORDEN-W06d10` decisión 3: excepción de la red local, donde vetar el prefijo común
++    /// `127.0.0.0/24` dejaría fuera a los nodos honestos).
++    puntos_peer: HashMap<PeerId, u32>,
++    /// `PeerId` baneados (solo loopback), en orden de llegada para desalojar el más antiguo.
++    baneados_peer: Vec<PeerId>,
++    /// El mismo conjunto que [`Self::baneados_peer`], para consultar en O(1).
++    conjunto_baneados_peer: HashSet<PeerId>,
+ }
+ 
+ /// Por qué se denegó una conexión.
+@@ -141,6 +167,9 @@
+     /// El prefijo está baneado.
+     #[error("prefijo baneado por violación de consenso")]
+     Baneado,
++    /// El `PeerId` está baneado (solo direcciones loopback, `ORDEN-W06d10` decisión 3).
++    #[error("PeerId baneado por violación de consenso (dirección loopback)")]
++    PeerBaneado,
+     /// Demasiadas conexiones establecidas desde ese prefijo.
+     #[error("demasiadas conexiones desde el mismo prefijo de red ({actual}/{max})")]
+     DemasiadasEstablecidas {
+@@ -159,6 +188,18 @@
+     },
+ }
+ 
++/// Lo que se baneó al aplicar una penalización a un par (`ORDEN-W06d10` decisión 3).
++///
++/// Separado para que el bucle pueda registrarlo (`tracing::warn!`) sin volver a consultar el estado,
++/// y para poder probar la política loopback/`PeerId` sin construir un `Swarm`.
++#[derive(Debug, Default, Clone, PartialEq, Eq)]
++pub struct Penalizacion {
++    /// Prefijos de red que cruzaron el umbral con esta penalización.
++    pub prefijos_baneados: Vec<Prefijo>,
++    /// `true` si el `PeerId` (dirección loopback) cruzó el umbral.
++    pub peer_baneado: bool,
++}
++
+ impl LimitesPorIp {
+     /// Uno vacío.
+     #[must_use]
+@@ -214,6 +255,90 @@
+         false
+     }
+ 
++    /// Suma puntos a un `PeerId` y lo banea si cruza el umbral.
++    ///
++    /// Devuelve `true` si acaba de banearse.
++    ///
++    /// **Solo para direcciones loopback** (`ORDEN-W06d10` decisión 3): en la red dev todos los
++    /// nodos comparten el prefijo `127.0.0.0/24`, así que penalizar el prefijo por culpa de un
++    /// adversario vetaría también a los honestos. Fuera de loopback la penalización sigue siendo por
++    /// prefijo ([`Self::puntuar`]), sin cambios. El registro está acotado por [`MAX_BANEADOS`] con
++    /// desalojo FIFO, igual que el de prefijos.
++    pub fn puntuar_peer(&mut self, peer: PeerId, puntos: u32) -> bool {
++        let total = self.puntos_peer.entry(peer).or_insert(0);
++        *total = total.saturating_add(puntos);
++
++        if *total >= UMBRAL_BANEO && !self.conjunto_baneados_peer.contains(&peer) {
++            if self.baneados_peer.len() >= MAX_BANEADOS {
++                let viejo = self.baneados_peer.remove(0);
++                self.puntos_peer.remove(&viejo);
++                self.conjunto_baneados_peer.remove(&viejo);
++            }
++            self.baneados_peer.push(peer);
++            self.conjunto_baneados_peer.insert(peer);
++            return true;
++        }
++        false
++    }
++
++    /// Puntos acumulados por un `PeerId` (solo loopback).
++    #[must_use]
++    pub fn puntos_de_peer(&self, peer: PeerId) -> u32 {
++        self.puntos_peer.get(&peer).copied().unwrap_or(0)
++    }
++
++    /// ¿Está baneado este `PeerId`?
++    #[must_use]
++    pub fn esta_baneado_peer(&self, peer: PeerId) -> bool {
++        self.conjunto_baneados_peer.contains(&peer)
++    }
++
++    /// Cuántos `PeerId` hay baneados.
++    #[must_use]
++    pub fn baneados_peer(&self) -> usize {
++        self.baneados_peer.len()
++    }
++
++    /// Aplica `puntos` a un par con la política de `ORDEN-W06d10` y devuelve qué se baneó.
++    ///
++    /// `prefijos` son los prefijos de red **conocidos** del par (los que devuelve
++    /// [`Self::prefijos_de`]; se reciben explícitos para poder probar la política sin un `Swarm`).
++    ///
++    /// - Con **algún** prefijo loopback (`127.0.0.0/8`, `::1`): se puntúa el `PeerId` (excepción de
++    ///   la red local) y **no** el prefijo.
++    /// - Sin loopback: se puntúa cada prefijo como siempre (C-NET-20). Nada cambia para producción.
++    /// - Sin prefijos conocidos (conexión saliente que no pasó por el handler entrante): no hay
++    ///   nada que penalizar; mismo comportamiento que antes de esta orden.
++    #[must_use]
++    pub fn penalizar_peer(
++        &mut self,
++        peer: PeerId,
++        prefijos: &[Prefijo],
++        puntos: u32,
++    ) -> Penalizacion {
++        let mut resultado = Penalizacion::default();
++        let mut loopback = false;
++        for &p in prefijos {
++            if p.es_loopback() {
++                loopback = true;
++            } else if self.puntuar(p, puntos) {
++                resultado.prefijos_baneados.push(p);
++            }
++        }
++        if loopback && self.puntuar_peer(peer, puntos) {
++            resultado.peer_baneado = true;
++        }
++        resultado
++    }
++
++    /// Un `PeerId` baneado (loopback) no vuelve a entrar, igual que un prefijo baneado.
++    fn comprobar_peer(&self, peer: PeerId) -> Result<(), Denegada> {
++        if self.esta_baneado_peer(peer) {
++            return Err(Denegada::PeerBaneado);
++        }
++        Ok(())
++    }
++
+     fn comprobar(&self, p: Prefijo, pendiente: bool) -> Result<(), Denegada> {
+         if self.baneados.contains(&p) {
+             return Err(Denegada::Baneado);
+@@ -275,6 +400,9 @@
+             *n = n.saturating_sub(1);
+         }
+         self.comprobar(p, false).map_err(ConnectionDenied::new)?;
++        // `ORDEN-W06d10` decisión 3: un `PeerId` vetado (loopback) no vuelve a entrar aunque su
++        // prefijo (compartido con los honestos en la red dev) no esté vetado.
++        self.comprobar_peer(peer).map_err(ConnectionDenied::new)?;
+ 
+         *self.establecidas.entry(p).or_insert(0) += 1;
+         self.de_conexion.insert(id, p);
+@@ -350,13 +478,15 @@
+ #[expect(
+     clippy::unwrap_used,
+     clippy::integer_division,
+-    reason = "los tests fallan con panic por diseño; la división entera genera prefijos distintos"
++    clippy::indexing_slicing,
++    reason = "los tests fallan con panic por diseño; la división entera genera prefijos distintos; \
++              los índices del test de la cota están dentro del rango construido"
+ )]
+ mod tests {
+     use super::{
+         Denegada, LimitesPorIp, MAX_BANEADOS, PUNTOS_VIOLACION_CONSENSO, Prefijo, UMBRAL_BANEO,
+     };
+-    use libp2p::Multiaddr;
++    use libp2p::{Multiaddr, PeerId};
+     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+ 
+     fn v4(a: u8, b: u8, c: u8, d: u8) -> Prefijo {
+@@ -477,4 +607,84 @@
+         assert!(l.comprobar(limpio, true).is_ok());
+         assert!(l.comprobar(limpio, false).is_ok());
+     }
++
++    /// **Loopback se reconoce por prefijo.**
++    ///
++    /// `ORDEN-W06d10` decisión 3: `127.0.0.0/8` y `::1` son la excepción de la red local.
++    #[test]
++    fn el_loopback_se_reconoce_por_su_prefijo() {
++        assert!(v4(127, 0, 0, 1).es_loopback());
++        assert!(v4(127, 5, 6, 7).es_loopback(), "todo 127.0.0.0/8");
++        assert!(!v4(10, 0, 0, 1).es_loopback());
++        assert!(!v4(126, 255, 255, 255).es_loopback());
++
++        let v6_loop = Prefijo::de_ip(IpAddr::V6("::1".parse::<Ipv6Addr>().unwrap()));
++        assert!(v6_loop.es_loopback());
++        let v6 = Prefijo::de_ip(IpAddr::V6("2001:db8::1".parse::<Ipv6Addr>().unwrap()));
++        assert!(!v6.es_loopback());
++    }
++
++    /// **La penalización de loopback es por `PeerId` y no veta el prefijo.**
++    ///
++    /// Es la propiedad que evita que un adversario en `127.0.0.1` arrastre a los nodos honestos de
++    /// la red dev, que comparten el prefijo `127.0.0.0/24`.
++    #[test]
++    fn la_penalizacion_loopback_es_por_peer_id_y_no_veta_el_prefijo() {
++        let mut l = LimitesPorIp::nuevo();
++        let loopback = v4(127, 0, 0, 1);
++        let adversario = PeerId::random();
++        let honesto1 = PeerId::random();
++        let honesto2 = PeerId::random();
++
++        let r = l.penalizar_peer(adversario, &[loopback], PUNTOS_VIOLACION_CONSENSO);
++        assert!(r.peer_baneado, "el PeerId del adversario se veta");
++        assert!(r.prefijos_baneados.is_empty(), "el prefijo NO se veta");
++        assert!(l.esta_baneado_peer(adversario));
++        assert!(
++            !l.esta_baneado(loopback),
++            "127.0.0.0/24 sigue limpio: los honestos pueden reconectar"
++        );
++        assert!(l.comprobar(loopback, false).is_ok());
++        assert!(matches!(
++            l.comprobar_peer(adversario),
++            Err(Denegada::PeerBaneado)
++        ));
++        assert!(l.comprobar_peer(honesto1).is_ok());
++        assert!(l.comprobar_peer(honesto2).is_ok());
++    }
++
++    /// **Fuera de loopback nada cambia:** la puntuación sigue siendo por prefijo (C-NET-20).
++    #[test]
++    fn fuera_de_loopback_la_puntuacion_sigue_siendo_por_prefijo() {
++        let mut l = LimitesPorIp::nuevo();
++        let p = v4(203, 0, 113, 0);
++        let peer = PeerId::random();
++
++        let r = l.penalizar_peer(peer, &[p], PUNTOS_VIOLACION_CONSENSO);
++        assert!(
++            !r.peer_baneado,
++            "un prefijo público no se sustituye por PeerId"
++        );
++        assert_eq!(r.prefijos_baneados, vec![p]);
++        assert!(l.esta_baneado(p));
++        assert!(!l.esta_baneado_peer(peer));
++        // Otro par del mismo prefijo público cae con el prefijo, como antes.
++        assert!(matches!(l.comprobar(p, false), Err(Denegada::Baneado)));
++    }
++
++    /// El registro de `PeerId` baneados está acotado como el de prefijos (desalojo FIFO).
++    #[test]
++    fn el_registro_de_peers_baneados_no_crece_sin_limite() {
++        let mut l = LimitesPorIp::nuevo();
++        let loopback = v4(127, 0, 0, 1);
++        let peers: Vec<PeerId> = (0..(MAX_BANEADOS + 100))
++            .map(|_| PeerId::random())
++            .collect();
++        for &peer in &peers {
++            let _ = l.penalizar_peer(peer, &[loopback], PUNTOS_VIOLACION_CONSENSO);
++        }
++        assert_eq!(l.baneados_peer(), MAX_BANEADOS, "la tabla está acotada");
++        assert!(!l.esta_baneado_peer(peers[0]), "el más viejo se desalojó");
++        assert!(l.esta_baneado_peer(peers[MAX_BANEADOS + 99]));
++    }
+ }
+diff -ruN '--exclude=target' '--exclude=PDF' '--exclude=.gitignore' ws.orig/crates/zx-p2p/src/servicio.rs ws/crates/zx-p2p/src/servicio.rs
+--- ws.orig/crates/zx-p2p/src/servicio.rs	2026-09-27 01:28:57.999902760 +0200
++++ ws/crates/zx-p2p/src/servicio.rs	2026-09-27 22:32:52.228613465 +0200
+@@ -44,6 +44,13 @@
+ /// Capacidad del canal de eventos hacia el nodo.
+ pub const CAPACIDAD_EVENTOS: usize = 1024;
+ 
++/// `motivo` del evento `par_penalizado` que `zx-node` escribe cuando `zx-p2p` penaliza al
++/// propagador de un bloque difundido **demostrablemente inválido** (`ORDEN-W06d10` decisión 1).
++pub const MOTIVO_PAR_PENALIZADO_GOSSIP: &str = "bloque difundido rechazado";
++
++/// `accion` del mismo evento: el par fue expulsado (desconectado y puntuado).
++pub const ACCION_PAR_PENALIZADO_EXPULSION: &str = "expulsion";
++
+ /// Lo que se le pide al bucle desde fuera.
+ #[derive(Debug)]
+ pub(crate) enum Comando {
+@@ -508,23 +515,40 @@
+         }
+     }
+ 
+-    /// Corta con un peer por un motivo dado, puntuando su prefijo de red si el motivo puntúa
+-    /// (C-NET-05 + C-NET-20: la puntuación es del **prefijo**, no del `PeerId`). Compartido por
+-    /// `Comando::Desconectar` y por la penalización directa de una petición abusiva (RI-3a #1).
++    /// Corta con un peer por un motivo dado y aplica la penalización que corresponda.
++    ///
++    /// C-NET-05 + C-NET-20: la puntuación es del **prefijo** de red — **salvo** para direcciones
++    /// loopback (`127.0.0.0/8`, `::1`), donde es del `PeerId` (excepción de la red local,
++    /// `ORDEN-W06d10` decisión 3): en la red dev todos los nodos comparten `127.0.0.0/24`, y vetar
++    /// ese prefijo por culpa de un adversario dejaría fuera a los nodos honestos. La decisión vive
++    /// en [`crate::limites_ip::LimitesPorIp::penalizar_peer`]. Compartido por
++    /// `Comando::Desconectar`, por la penalización directa de una petición abusiva (RI-3a #1) y por
++    /// el veredicto `Rechazar` de un bloque difundido (`ORDEN-W06d10` decisión 1).
+     fn desconectar_con_motivo(&mut self, peer: PeerId, motivo: MotivoDesconexion) {
+         tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
+         let puntos = motivo.puntos();
+         if puntos > 0 {
+             let prefijos = self.swarm.behaviour_mut().limites_ip.prefijos_de(peer);
+-            for p in prefijos {
+-                if self.swarm.behaviour_mut().limites_ip.puntuar(p, puntos) {
+-                    tracing::warn!(
+-                        ?p,
+-                        ?motivo,
+-                        "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
+-                         distintos con motivo Excedido, el nodo desactualizado eres tú."
+-                    );
+-                }
++            let r = self
++                .swarm
++                .behaviour_mut()
++                .limites_ip
++                .penalizar_peer(peer, &prefijos, puntos);
++            for p in r.prefijos_baneados {
++                tracing::warn!(
++                    ?p,
++                    ?motivo,
++                    "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
++                     distintos con motivo Excedido, el nodo desactualizado eres tú."
++                );
++            }
++            if r.peer_baneado {
++                tracing::warn!(
++                    %peer,
++                    ?motivo,
++                    "PeerId baneado (dirección loopback: la penalización es por PeerId, no por \
++                     prefijo, para no vetar a los demás nodos de 127.0.0.0/8)."
++                );
+             }
+         }
+         let _ = self.swarm.disconnect_peer_id(peer);
+@@ -663,6 +687,12 @@
+ 
+     /// Reporta un veredicto a gossipsub. Sin esta llamada el mensaje se queda **pendiente para
+     /// siempre** en la cola de validación de gossipsub: ni se reenvía ni se descarta.
++    ///
++    /// `ORDEN-W06d10` decisión 1: la respuesta a un veredicto `Rechazar` es la **misma** que en la
++    /// ruta de sincronización — se mantiene el `Reject` para gossipsub (C-NET-12), se desconecta al
++    /// propagador con `ViolacionDeConsenso` (puntuación C-NET-05/C-NET-20, con la excepción
++    /// loopback) y se avisa al nodo (`ManejadorEntrante::par_penalizado`) para que escriba
++    /// `par_penalizado`. `Aceptar` e `Ignorar` **nunca** penalizan.
+     fn reportar_a_gossipsub(
+         &mut self,
+         message_id: &gossipsub::MessageId,
+@@ -686,6 +716,18 @@
+                 "el mensaje ya no estaba en la caché de validación"
+             );
+         }
++        if veredicto == Veredicto::Rechazar {
++            tracing::debug!(peer = %propagation_source, "bloque difundido rechazado: penalizando");
++            self.desconectar_con_motivo(
++                *propagation_source,
++                MotivoDesconexion::ViolacionDeConsenso,
++            );
++            self.manejador.par_penalizado(
++                *propagation_source,
++                MOTIVO_PAR_PENALIZADO_GOSSIP,
++                ACCION_PAR_PENALIZADO_EXPULSION,
++            );
++        }
+     }
+ 
+     /// Atiende un comando. No es `async`: nada de lo que hace debe esperar.
+diff -ruN '--exclude=target' '--exclude=PDF' '--exclude=.gitignore' ws.orig/crates/zx-p2p/tests/penalizacion_gossip.rs ws/crates/zx-p2p/tests/penalizacion_gossip.rs
+--- ws.orig/crates/zx-p2p/tests/penalizacion_gossip.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-p2p/tests/penalizacion_gossip.rs	2026-09-27 22:32:52.233613568 +0200
+@@ -0,0 +1,395 @@
++//! `ORDEN-W06d10`: un bloque difundido **demostrablemente inválido** (`Rechazar`) desconecta y
++//! penaliza al propagador, y `Ignorar` nunca penaliza.
++//!
++//! # Por qué TCP real y no el transporte en memoria
++//!
++//! La excepción de la red local (`127.0.0.0/8` → penalización por `PeerId`, no por prefijo) **solo
++//! existe con direcciones IP**: el transporte en memoria no lleva IP y `LimitesPorIp` no limita ahí.
++//! Por eso estas pruebas escuchan en `127.0.0.1:0` y comprueban el comportamiento observable: el
++//! adversario se cae, los demás pares del **mismo** `/24` siguen conectados y uno nuevo puede
++//! reconectar (señal de que el prefijo `127.0.0.0/24` **no** quedó vetado).
++
++#![expect(
++    clippy::expect_used,
++    clippy::unwrap_used,
++    clippy::panic,
++    reason = "los tests fallan con panic por diseño"
++)]
++
++use std::sync::{Arc, Mutex};
++use std::time::Duration;
++
++use libp2p::core::transport::Transport as _;
++use libp2p::core::upgrade;
++use libp2p::{Multiaddr, PeerId, Swarm, identity, noise, yamux};
++use zx_core::amount::Amount;
++use zx_core::digest::{BlockHash, Digest, MerkleRoot, TxId};
++use zx_core::preimage::block::BlockHeader;
++use zx_core::red::Red;
++use zx_core::tx::{ExtensionTx, Lock, OutPoint, Tx, TxIn, TxOut};
++use zx_p2p::behaviour::ZxBehaviour;
++use zx_p2p::config::ParametrosRed;
++use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
++use zx_p2p::limites;
++use zx_p2p::mensaje::{BloqueRed, Estado, Fase, PuntaPow};
++use zx_p2p::servicio::{EventoRed, ManejoRed};
++
++/// `nonce` que marca el bloque que el objetivo debe rechazar (el resto se aceptan).
++const NONCE_MALO: u64 = 0xDEAD_BEEF;
++
++/// Manejador de prueba: rechaza/ignora **solo** el bloque marcado con [`NONCE_MALO`] y acepta el
++/// resto; además registra cada aviso `par_penalizado`.
++struct Objetivo {
++    /// Qué veredicto devuelve para el bloque marcado.
++    veredicto: Veredicto,
++    /// Pares avisados como penalizados (`(peer, motivo, accion)`).
++    penalizados: Mutex<Vec<(PeerId, String, String)>>,
++    /// Bloques juzgados (para comprobar que el bloque bueno llegó al manejador).
++    juzgados: Mutex<usize>,
++}
++
++impl Objetivo {
++    fn nuevo(veredicto: Veredicto) -> Self {
++        Self {
++            veredicto,
++            penalizados: Mutex::new(Vec::new()),
++            juzgados: Mutex::new(0),
++        }
++    }
++
++    fn penalizados(&self) -> Vec<(PeerId, String, String)> {
++        self.penalizados.lock().expect("mutex").clone()
++    }
++
++    fn juzgados(&self) -> usize {
++        *self.juzgados.lock().expect("mutex")
++    }
++}
++
++impl ManejadorEntrante for Objetivo {
++    fn estado(&self) -> Estado {
++        Estado {
++            hash_genesis: BlockHash::from_digest(Digest::from_bytes([0; 32])),
++            red: Red::Dev,
++            fase: Fase::Pow,
++            punta_pow: PuntaPow {
++                hash: BlockHash::from_digest(Digest::from_bytes([1; 32])),
++                altura: 0,
++                trabajo_acumulado: [0; 32],
++            },
++            terminal: None,
++            puntas_post: Vec::new(),
++            blue_work_virtual: [0; 32],
++            longitud_registro: 0,
++        }
++    }
++
++    fn bloque_difundido(&self, _id: IdDiferido, bloque: &BloqueRed) -> Veredicto {
++        *self.juzgados.lock().expect("mutex") += 1;
++        match bloque {
++            BloqueRed::Pow { cabecera, .. } if cabecera.nonce == NONCE_MALO => self.veredicto,
++            _ => Veredicto::Aceptar,
++        }
++    }
++
++    fn tx_difundida(&self, _: &[u8]) -> Veredicto {
++        Veredicto::Ignorar
++    }
++
++    fn cabeceras_desde(&self, _: &[BlockHash], _: Option<BlockHash>) -> Vec<BlockHeader> {
++        Vec::new()
++    }
++
++    fn bloques_por_hash(&self, _: &[BlockHash]) -> Vec<BloqueRed> {
++        Vec::new()
++    }
++
++    fn par_penalizado(&self, peer: PeerId, motivo: &str, accion: &str) {
++        self.penalizados.lock().expect("mutex").push((
++            peer,
++            motivo.to_string(),
++            accion.to_string(),
++        ));
++    }
++}
++
++/// Un nodo TCP real sobre `127.0.0.1:0`, ya escuchando. Devuelve además la dirección de escucha.
++struct Nodo {
++    manejo: ManejoRed,
++    eventos: tokio::sync::mpsc::Receiver<EventoRed>,
++    peer_id: PeerId,
++    direccion: Multiaddr,
++    _tarea: tokio::task::JoinHandle<()>,
++}
++
++async fn nodo<M: ManejadorEntrante>(manejador: Arc<M>) -> Nodo {
++    let clave = identity::Keypair::generate_ed25519();
++    let peer_id = clave.public().to_peer_id();
++    let transporte = libp2p::tcp::tokio::Transport::new(libp2p::tcp::Config::default())
++        .upgrade(upgrade::Version::V1Lazy)
++        .authenticate(noise::Config::new(&clave).expect("noise"))
++        .multiplex(yamux::Config::default())
++        .boxed();
++    let behaviour =
++        ZxBehaviour::nueva(&clave, ParametrosRed::dag_dev(), limites::LIMITE_BLOQUE_DEV)
++            .expect("behaviour dev");
++    let swarm = Swarm::new(
++        transporte,
++        behaviour,
++        peer_id,
++        libp2p::swarm::Config::with_tokio_executor()
++            .with_idle_connection_timeout(Duration::from_secs(30)),
++    );
++
++    let piezas = zx_p2p::servicio::arrancar(swarm, manejador);
++    let manejo = piezas.manejo;
++    let mut eventos = piezas.eventos;
++    let tarea = tokio::spawn(piezas.bucle.correr());
++
++    manejo
++        .escuchar("/ip4/127.0.0.1/tcp/0".parse().expect("multiaddr"))
++        .await
++        .expect("escuchar");
++    let direccion = match esperar(&mut eventos, |e| matches!(e, EventoRed::Escuchando(_))).await {
++        Some(EventoRed::Escuchando(d)) => d,
++        otro => panic!("se esperaba Escuchando, llegó {otro:?}"),
++    };
++
++    Nodo {
++        manejo,
++        eventos,
++        peer_id,
++        direccion,
++        _tarea: tarea,
++    }
++}
++
++/// Espera al primer evento que cumpla el predicado, con tope de tiempo.
++async fn esperar<F>(rx: &mut tokio::sync::mpsc::Receiver<EventoRed>, f: F) -> Option<EventoRed>
++where
++    F: Fn(&EventoRed) -> bool,
++{
++    let plazo = tokio::time::Instant::now() + Duration::from_secs(10);
++    loop {
++        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
++        if resto.is_zero() {
++            return None;
++        }
++        match tokio::time::timeout(resto, rx.recv()).await {
++            Ok(Some(e)) if f(&e) => return Some(e),
++            Ok(Some(_)) => {}
++            Ok(None) | Err(_) => return None,
++        }
++    }
++}
++
++/// ¿No llega el evento buscado en `ventana`? Se usa para afirmar "no pasó".
++async fn no_llega<F>(
++    rx: &mut tokio::sync::mpsc::Receiver<EventoRed>,
++    ventana: Duration,
++    f: F,
++) -> bool
++where
++    F: Fn(&EventoRed) -> bool,
++{
++    let plazo = tokio::time::Instant::now() + ventana;
++    loop {
++        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
++        if resto.is_zero() {
++            return true;
++        }
++        match tokio::time::timeout(resto, rx.recv()).await {
++            Ok(Some(e)) if f(&e) => return false,
++            Ok(Some(_)) => {}
++            Ok(None) | Err(_) => return true,
++        }
++    }
++}
++
++/// Espera a que `observador` vea las **dos** suscripciones de `peer`, para no publicar antes de que
++/// la malla de gossipsub esté formada (mismo motivo que `dos_nodos.rs`).
++async fn esperar_suscripciones(rx: &mut tokio::sync::mpsc::Receiver<EventoRed>, peer: PeerId) {
++    let mut pow = false;
++    let mut post = false;
++    while !(pow && post) {
++        let Some(e) = esperar(rx, |e| matches!(e, EventoRed::Suscripcion { .. })).await else {
++            panic!("no llegaron las dos suscripciones de {peer}");
++        };
++        if let EventoRed::Suscripcion {
++            peer: p,
++            topico,
++            suscrito: true,
++        } = e
++            && p == peer
++        {
++            pow |= topico.ends_with("/bloques/pow/1");
++            post |= topico.ends_with("/bloques/post/1");
++        }
++    }
++}
++
++fn tx_llave(n: u8) -> Tx {
++    Tx {
++        version: 1,
++        inputs: vec![TxIn {
++            outpoint: OutPoint {
++                prev_txid: TxId::from_digest(Digest::from_bytes([n; 32])),
++                prev_index: 0,
++            },
++            sequence: 0,
++        }],
++        outputs: vec![TxOut {
++            value: Amount::nuevo(1_000).unwrap(),
++            lock: Lock::PubKey {
++                pubkey: zx_core::firma::ClavePublica::desde_bytes([n; 32]),
++            },
++        }],
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::Ninguna,
++    }
++}
++
++/// Bloque PoW de fixture, con `nonce` elegible para marcar el que debe rechazarse.
++fn bloque(nonce: u64) -> BloqueRed {
++    BloqueRed::Pow {
++        cabecera: BlockHeader {
++            consensus_branch_id: 0xa8b4_66a7,
++            prev_hash: BlockHash::from_digest(Digest::from_bytes([1; 32])),
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
++            timestamp: 1_788_480_000,
++            bits: 0x1c07_fff8,
++            nonce,
++            height: 1,
++        },
++        txs: vec![tx_llave(0x11)],
++        testigos: vec![vec![vec![0x66; 64]]],
++    }
++}
++
++/// **Decisión 1.** Un `Rechazar` por gossip desconecta al propagador, lo puntúa y avisa al nodo
++/// (`par_penalizado`); el mismo `/24` no queda vetado: un par honesto sigue conectado y uno nuevo
++/// puede reconectar.
++#[tokio::test]
++async fn rechazar_en_gossip_desconecta_penaliza_y_no_veta_el_prefijo() {
++    let objetivo = Arc::new(Objetivo::nuevo(Veredicto::Rechazar));
++    let mut a = nodo(Arc::clone(&objetivo)).await;
++    let direccion = a.direccion.clone();
++
++    // Adversario y dos honestos, todos desde 127.0.0.1 (el mismo /24).
++    let mut adversario = nodo(Arc::new(Objetivo::nuevo(Veredicto::Aceptar))).await;
++    let mut honesto1 = nodo(Arc::new(Objetivo::nuevo(Veredicto::Aceptar))).await;
++    let mut honesto2 = nodo(Arc::new(Objetivo::nuevo(Veredicto::Aceptar))).await;
++
++    for (n, etiqueta) in [
++        (&mut adversario, "adversario"),
++        (&mut honesto1, "honesto1"),
++        (&mut honesto2, "honesto2"),
++    ] {
++        n.manejo.marcar(direccion.clone()).await.expect("marcar");
++        let Some(EventoRed::PeerConectado(p)) =
++            esperar(&mut a.eventos, |e| matches!(e, EventoRed::PeerConectado(_))).await
++        else {
++            panic!("A no vio conectar a {etiqueta}");
++        };
++        assert_eq!(p, n.peer_id, "el conectado debe ser {etiqueta}");
++        esperar_suscripciones(&mut a.eventos, p).await;
++        // Y el cliente ve las suscripciones de A: así `publish` no falla localmente.
++        esperar_suscripciones(&mut n.eventos, a.peer_id).await;
++    }
++    assert_eq!(
++        objetivo.penalizados().len(),
++        0,
++        "aún no hay nada que penalizar"
++    );
++
++    // El adversario difunde el bloque marcado: A lo rechaza.
++    adversario
++        .manejo
++        .difundir_bloque(&bloque(NONCE_MALO))
++        .await
++        .expect("difundir el bloque malo");
++
++    let Some(EventoRed::PeerDesconectado(caido)) = esperar(&mut a.eventos, |e| {
++        matches!(e, EventoRed::PeerDesconectado(_))
++    })
++    .await
++    else {
++        panic!("A debería haber desconectado al adversario");
++    };
++    assert_eq!(caido, adversario.peer_id);
++
++    let penalizados = objetivo.penalizados();
++    assert_eq!(penalizados.len(), 1, "un `par_penalizado` por el rechazo");
++    let (par, motivo, accion) = penalizados.first().expect("un par_penalizado");
++    assert_eq!(*par, adversario.peer_id);
++    assert_eq!(
++        motivo.as_str(),
++        zx_p2p::servicio::MOTIVO_PAR_PENALIZADO_GOSSIP
++    );
++    assert_eq!(
++        accion.as_str(),
++        zx_p2p::servicio::ACCION_PAR_PENALIZADO_EXPULSION
++    );
++
++    // Los dos honestos siguen conectados: no llega su `PeerDesconectado`.
++    for (n, etiqueta) in [(&honesto1, "honesto1"), (&honesto2, "honesto2")] {
++        assert!(
++            no_llega(&mut a.eventos, Duration::from_millis(500), |e| matches!(
++                e,
++                EventoRed::PeerDesconectado(p) if *p == n.peer_id
++            ))
++            .await,
++            "{etiqueta} NO debe caer por la penalización de otro par del mismo /24"
++        );
++    }
++
++    // Y un par **nuevo** en 127.0.0.1 puede reconectar: el prefijo no está vetado.
++    let nuevo = nodo(Arc::new(Objetivo::nuevo(Veredicto::Aceptar))).await;
++    nuevo.manejo.marcar(direccion).await.expect("marcar");
++    let Some(EventoRed::PeerConectado(p)) =
++        esperar(&mut a.eventos, |e| matches!(e, EventoRed::PeerConectado(_))).await
++    else {
++        panic!("un par nuevo de 127.0.0.1 debe poder conectar (prefijo no vetado)");
++    };
++    assert_eq!(p, nuevo.peer_id);
++}
++
++/// **Decisión 1, la otra mitad.** `Ignorar` (pendiente, huérfano, duplicado,
++/// `ImposibleSinPenalizar`…) **nunca** desconecta ni penaliza.
++#[tokio::test]
++async fn ignorar_no_desconecta_ni_penaliza() {
++    let objetivo = Arc::new(Objetivo::nuevo(Veredicto::Ignorar));
++    let mut a = nodo(Arc::clone(&objetivo)).await;
++    let direccion = a.direccion.clone();
++
++    let mut par = nodo(Arc::new(Objetivo::nuevo(Veredicto::Aceptar))).await;
++    par.manejo.marcar(direccion).await.expect("marcar");
++    let Some(EventoRed::PeerConectado(p)) =
++        esperar(&mut a.eventos, |e| matches!(e, EventoRed::PeerConectado(_))).await
++    else {
++        panic!("A no vio conectar al par");
++    };
++    assert_eq!(p, par.peer_id);
++    esperar_suscripciones(&mut a.eventos, p).await;
++    esperar_suscripciones(&mut par.eventos, a.peer_id).await;
++
++    par.manejo
++        .difundir_bloque(&bloque(NONCE_MALO))
++        .await
++        .expect("difundir el bloque ignorado");
++
++    assert!(
++        no_llega(&mut a.eventos, Duration::from_millis(500), |e| matches!(
++            e,
++            EventoRed::PeerDesconectado(_)
++        ))
++        .await,
++        "`Ignorar` no puede desconectar a nadie"
++    );
++    assert!(
++        objetivo.penalizados().is_empty(),
++        "`Ignorar` no puede generar `par_penalizado`"
++    );
++    assert_eq!(objetivo.juzgados(), 1, "el bloque sí se juzgó (Ignorar)");
++}

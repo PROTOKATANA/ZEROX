@@ -91,6 +91,20 @@ impl ManejadorEntrante for ManejadorRed {
         }
     }
 
+    /// `ORDEN-W06d10` decisión 1: `zx-p2p` penalizó al propagador de un bloque difundido
+    /// **demostrablemente inválido** (lo desconectó y puntuó). Escribe `par_penalizado` (`par`,
+    /// `motivo`, `accion`) según `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md` §1. No es crítico: un
+    /// fallo de escritura no debe tumbar nada (el par ya está desconectado).
+    fn par_penalizado(&self, peer: libp2p::PeerId, motivo: &str, accion: &str) {
+        let evento = self
+            .registro
+            .evento("par_penalizado")
+            .str("par", &peer.to_string())
+            .str("motivo", motivo)
+            .str("accion", accion);
+        let _ = self.registro.escribir(evento, false);
+    }
+
     fn tx_difundida(&self, _tx_serializada: &[u8]) -> Veredicto {
         // 0.0.1 no tiene tema de transacciones (REVISION-W06c.md): nada que hacer con esto todavía.
         Veredicto::Ignorar

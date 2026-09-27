@@ -1,0 +1,11 @@
+2026-09-27T21:59:32+02:00 inicio W06d10 (orden 21:43): lectura de ORDEN-W06d10.md y V-ZRX/LINEO.md
+2026-09-27T21:59:32+02:00 V0 sha256sum -c ENTRADA-W06d10.sha256 = 52/52 verde
+2026-09-27T21:59:32+02:00 V1 tabla de caminos Rechazar escrita en PROGRESO.md §0.2 (3 familias vistas locales reportadas: C-TS-03, ErrLimiteTerminales, errores locales)
+2026-09-27T21:59:32+02:00 falta de definicion: red/sync.rs (consumidor exhaustivo de EventoRed) fuera de la lista de permitidos; resuelto con metodo de trait par_penalizado
+2026-09-27T22:32:59+02:00 codigo: p2p penaliza Rechazar en gossip (desconecta + puntua + par_penalizado via ManejadorEntrante); loopback por PeerId; zx-adversario identidad nueva por vector
+2026-09-27T22:32:59+02:00 tests nuevos p2p en verde: 4 unit limites_ip + 2 integracion penalizacion_gossip (TCP 127.0.0.1)
+2026-09-27T22:32:59+02:00 clippy --workspace --all-targets --all-features --locked -D warnings: verde; fmt --check: verde
+2026-09-27T23:42:45+02:00 V4 E-7 x3 (semillas 101/202/303): 3/3 SUPERADO; 4 rechazos y 4 par_penalizado por rep, 0 ajenos, 0 desconexiones B/C, convergencia W07d
+2026-09-27T23:42:45+02:00 V5 sin falsos positivos: 3/3 R150 SUPERADO + E-6 con aislamiento real (contactos_*=0) CONVERGEN; 0 par_penalizado entre honestos
+2026-09-27T23:42:45+02:00 V6: fmt verde, clippy -D warnings verde, guardianes verdes, suite completa 883/0/6, T01/T04 verdes
+2026-09-27T23:43:16+02:00 FIN W06d10: todos los pasos V0-V6 en verde; artefactos en la zona (cambios.patch, INFORME.md, PROGRESO.md, HORAS.log, MIGRACION.sha256, HUELLAS.sha256)

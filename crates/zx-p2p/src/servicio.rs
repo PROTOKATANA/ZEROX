@@ -44,6 +44,13 @@ pub const CAPACIDAD_COMANDOS: usize = 256;
 /// Capacidad del canal de eventos hacia el nodo.
 pub const CAPACIDAD_EVENTOS: usize = 1024;
 
+/// `motivo` del evento `par_penalizado` que `zx-node` escribe cuando `zx-p2p` penaliza al
+/// propagador de un bloque difundido **demostrablemente inválido** (`ORDEN-W06d10` decisión 1).
+pub const MOTIVO_PAR_PENALIZADO_GOSSIP: &str = "bloque difundido rechazado";
+
+/// `accion` del mismo evento: el par fue expulsado (desconectado y puntuado).
+pub const ACCION_PAR_PENALIZADO_EXPULSION: &str = "expulsion";
+
 /// Lo que se le pide al bucle desde fuera.
 #[derive(Debug)]
 pub(crate) enum Comando {
@@ -508,23 +515,40 @@ impl<M: ManejadorEntrante> BucleRed<M> {
         }
     }
 
-    /// Corta con un peer por un motivo dado, puntuando su prefijo de red si el motivo puntúa
-    /// (C-NET-05 + C-NET-20: la puntuación es del **prefijo**, no del `PeerId`). Compartido por
-    /// `Comando::Desconectar` y por la penalización directa de una petición abusiva (RI-3a #1).
+    /// Corta con un peer por un motivo dado y aplica la penalización que corresponda.
+    ///
+    /// C-NET-05 + C-NET-20: la puntuación es del **prefijo** de red — **salvo** para direcciones
+    /// loopback (`127.0.0.0/8`, `::1`), donde es del `PeerId` (excepción de la red local,
+    /// `ORDEN-W06d10` decisión 3): en la red dev todos los nodos comparten `127.0.0.0/24`, y vetar
+    /// ese prefijo por culpa de un adversario dejaría fuera a los nodos honestos. La decisión vive
+    /// en [`crate::limites_ip::LimitesPorIp::penalizar_peer`]. Compartido por
+    /// `Comando::Desconectar`, por la penalización directa de una petición abusiva (RI-3a #1) y por
+    /// el veredicto `Rechazar` de un bloque difundido (`ORDEN-W06d10` decisión 1).
     fn desconectar_con_motivo(&mut self, peer: PeerId, motivo: MotivoDesconexion) {
         tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
         let puntos = motivo.puntos();
         if puntos > 0 {
             let prefijos = self.swarm.behaviour_mut().limites_ip.prefijos_de(peer);
-            for p in prefijos {
-                if self.swarm.behaviour_mut().limites_ip.puntuar(p, puntos) {
-                    tracing::warn!(
-                        ?p,
-                        ?motivo,
-                        "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
-                         distintos con motivo Excedido, el nodo desactualizado eres tú."
-                    );
-                }
+            let r = self
+                .swarm
+                .behaviour_mut()
+                .limites_ip
+                .penalizar_peer(peer, &prefijos, puntos);
+            for p in r.prefijos_baneados {
+                tracing::warn!(
+                    ?p,
+                    ?motivo,
+                    "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
+                     distintos con motivo Excedido, el nodo desactualizado eres tú."
+                );
+            }
+            if r.peer_baneado {
+                tracing::warn!(
+                    %peer,
+                    ?motivo,
+                    "PeerId baneado (dirección loopback: la penalización es por PeerId, no por \
+                     prefijo, para no vetar a los demás nodos de 127.0.0.0/8)."
+                );
             }
         }
         let _ = self.swarm.disconnect_peer_id(peer);
@@ -663,6 +687,12 @@ impl<M: ManejadorEntrante> BucleRed<M> {
 
     /// Reporta un veredicto a gossipsub. Sin esta llamada el mensaje se queda **pendiente para
     /// siempre** en la cola de validación de gossipsub: ni se reenvía ni se descarta.
+    ///
+    /// `ORDEN-W06d10` decisión 1: la respuesta a un veredicto `Rechazar` es la **misma** que en la
+    /// ruta de sincronización — se mantiene el `Reject` para gossipsub (C-NET-12), se desconecta al
+    /// propagador con `ViolacionDeConsenso` (puntuación C-NET-05/C-NET-20, con la excepción
+    /// loopback) y se avisa al nodo (`ManejadorEntrante::par_penalizado`) para que escriba
+    /// `par_penalizado`. `Aceptar` e `Ignorar` **nunca** penalizan.
     fn reportar_a_gossipsub(
         &mut self,
         message_id: &gossipsub::MessageId,
@@ -684,6 +714,18 @@ impl<M: ManejadorEntrante> BucleRed<M> {
             tracing::debug!(
                 ?veredicto,
                 "el mensaje ya no estaba en la caché de validación"
+            );
+        }
+        if veredicto == Veredicto::Rechazar {
+            tracing::debug!(peer = %propagation_source, "bloque difundido rechazado: penalizando");
+            self.desconectar_con_motivo(
+                *propagation_source,
+                MotivoDesconexion::ViolacionDeConsenso,
+            );
+            self.manejador.par_penalizado(
+                *propagation_source,
+                MOTIVO_PAR_PENALIZADO_GOSSIP,
+                ACCION_PAR_PENALIZADO_EXPULSION,
             );
         }
     }

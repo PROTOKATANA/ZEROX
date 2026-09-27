@@ -1,0 +1,14 @@
+--- A: bloque_red_rechazado ---
+{"tipo":"bloque_red_rechazado","reloj_ns":72211284013,"reloj_pared_ns":1790542031782174040,"hash":"fd19b0c9375ee82557fce57eaee3e1a5a9186f6d5e05a2ad0e5d343160114dec","familia":"post","etapa":"cabecera","motivo":"bloque propio fd19b0c9375ee82557fce57eaee3e1a5a9186f6d5e05a2ad0e5d343160114dec rechazado en la admisión: Sello(FirmaInvalida { motivo: \"la firma no verifica (ZIP-215)\" })","t_hasta_rechazo_ns":42596042}
+{"tipo":"bloque_red_rechazado","reloj_ns":73753372446,"reloj_pared_ns":1790542033324262483,"hash":"6701bd973441928c223528e72a68f17c07a1708f8d6b59329dcdfacc7bd22288","familia":"post","etapa":"cabecera","motivo":"bloque propio 6701bd973441928c223528e72a68f17c07a1708f8d6b59329dcdfacc7bd22288 rechazado en la admisión: Pot(DiferenciaDeSlots(NoCoincide { bundles: 1, diferencia: 2 }))","t_hasta_rechazo_ns":37526562}
+{"tipo":"bloque_red_rechazado","reloj_ns":75273801145,"reloj_pared_ns":1790542034844691192,"hash":"dfa6f98a12b4e9cd4be123d60f8eed79c718673c15f884369e49098bf615cebe","familia":"post","etapa":"cabecera","motivo":"bloque propio dfa6f98a12b4e9cd4be123d60f8eed79c718673c15f884369e49098bf615cebe rechazado en la admisión: Pot(DiferenciaDeSlots(NoCoincide { bundles: 1, diferencia: 2 }))","t_hasta_rechazo_ns":16744111}
+{"tipo":"bloque_red_rechazado","reloj_ns":76806385775,"reloj_pared_ns":1790542036377275822,"hash":"a0e9570bd7eea74f3927b45aed1ce4cda1b5647134860f261a10aab04f73db3c","familia":"pow","etapa":"cabecera","motivo":"bloque propio a0e9570bd7eea74f3927b45aed1ce4cda1b5647134860f261a10aab04f73db3c rechazado en la admisión: validar_cabecera_pow: C-BLK-05: bits esperado 0x1e236d65, encontrado 0x1c07fff8","t_hasta_rechazo_ns":24991429}
+--- A: par_penalizado ---
+{"tipo":"par_penalizado","reloj_ns":72211310782,"reloj_pared_ns":1790542031782200829,"par":"12D3KooWEaDrBWmRgsSSYWPzzqrM4jqyhp1hyrN38WLk6WR7YE9E","motivo":"bloque difundido rechazado","accion":"expulsion"}
+{"tipo":"par_penalizado","reloj_ns":73753410345,"reloj_pared_ns":1790542033324300412,"par":"12D3KooWNVqVd9j3xLVV2XrmT6wfWYTbxet7zdvoT1LxwvC7SFz2","motivo":"bloque difundido rechazado","accion":"expulsion"}
+{"tipo":"par_penalizado","reloj_ns":75273833844,"reloj_pared_ns":1790542034844723911,"par":"12D3KooWLReSHcrwNA2JFfgcFSVfzmvQ4NHb6R7JDXi1eVQjxLBc","motivo":"bloque difundido rechazado","accion":"expulsion"}
+{"tipo":"par_penalizado","reloj_ns":76806420384,"reloj_pared_ns":1790542036377310471,"par":"12D3KooWFXVLJzJZr1hhij9B9RGg5UyaD6XJCibvqw2LyQjcw5Jv","motivo":"bloque difundido rechazado","accion":"expulsion"}
+--- B: bloque_red_rechazado ---
+--- B: par_penalizado ---
+--- C: bloque_red_rechazado ---
+--- C: par_penalizado ---

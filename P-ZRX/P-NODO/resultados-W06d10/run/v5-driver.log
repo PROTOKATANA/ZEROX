@@ -1,0 +1,70 @@
+2026-09-27T22:48:28+02:00 === V5: 3 repeticiones R150 (tres nodos, slot 150) ===
+2026-09-27T22:48:28+02:00 === R150 rep1: A,B,C desde el génesis, objetivo slot 150 ===
+=== esperando slot >= 150 en A, B y C, plazo 30 min ===
+SLOT_150 alcanzado: slot_a=150 slot_b=150 slot_c=150
+NODO A: bloque_producido=42 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO B: bloque_producido=59 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO C: bloque_producido=49 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+par_penalizado_total_entre_honestos=0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"f78f7804b6028b4ec9019133c9082ea07c0f5015e28d8f768a0272c35b26502a"|"compendio_bloques":"48eee0cf46b1cc91de6395e27842dea30822447572f41b811892679a0ce65b71")
+RESULTADO=SUPERADO
+=== R150 rep1 TERMINADO ===
+2026-09-27T22:52:21+02:00 R150 rep1 terminada: SUPERADO
+2026-09-27T22:52:21+02:00 === R150 rep2: A,B,C desde el génesis, objetivo slot 150 ===
+=== esperando slot >= 150 en A, B y C, plazo 30 min ===
+SLOT_150 alcanzado: slot_a=150 slot_b=150 slot_c=150
+NODO A: bloque_producido=50 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO B: bloque_producido=42 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO C: bloque_producido=45 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+par_penalizado_total_entre_honestos=0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"2a8331db2f40a59cb5817d638c24461674a8109c540e6afd84a62dd9c74efc4a"|"compendio_bloques":"49617392c58ae7ef44bc0c2bfaf7347103ed8184eb49c417ad87aeb4d7f79207")
+RESULTADO=SUPERADO
+=== R150 rep2 TERMINADO ===
+2026-09-27T22:56:10+02:00 R150 rep2 terminada: SUPERADO
+2026-09-27T22:56:10+02:00 === R150 rep3: A,B,C desde el génesis, objetivo slot 150 ===
+=== esperando slot >= 150 en A, B y C, plazo 30 min ===
+SLOT_150 alcanzado: slot_a=153 slot_b=153 slot_c=153
+NODO A: bloque_producido=46 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO B: bloque_producido=32 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+NODO C: bloque_producido=54 fallo_productor=0 produccion_omitida=0 par_penalizado=0 panicos=0
+par_penalizado_total_entre_honestos=0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"2fb1125f814c33bcd487f797abcaebbfc7ffe24701296878e5e117ee2112ac4f"|"compendio_bloques":"011aa151dbfb970925f6e9613e6c306e7672c2c9eb192813ddf6c8da9761cba2")
+RESULTADO=SUPERADO
+=== R150 rep3 TERMINADO ===
+2026-09-27T23:00:03+02:00 R150 rep3 terminada: SUPERADO
+2026-09-27T23:00:03+02:00 === V5: partición E-6 (aislamiento real) ===
+2026-09-27T23:00:03+02:00 === E-6 v5: A,B,C juntos desde el génesis (mismo terminal) ===
+lanzado A pid=43773
+lanzado B pid=43778
+lanzado C pid=43795
+EXITO total=20
+CONVERGEN punta="punta":"def2b82ded3228826c3217b218c3493a77951fc99c52f83a04a867fa8c1ec498" resumen="resumen_estado":"05166803194a1e7436931ee15a5e310e5305702a1fccb46c802629479efba7aa"
+slot_pre(aislamiento)=20
+=== aislando A (puerto NUEVO 52800, sin pares); B,C siguen produciendo en el suyo ===
+lanzado A pid=47673
+=== esperando >=60 slots de aislamiento real en A y en B/C, plazo 30 min ===
+60 slots de aislamiento alcanzados: slot_a=80 slot_b=83
+verificación de aislamiento: contactos_A_con_BC=0 contactos_B_con_A=0 contactos_C_con_A=0 (peer_a_aislado=12D3KooW9rik91zvoq98eCmksGDeDoGsseYzk5TjBZfpQ8juDDqE)
+=== reuniendo: matando y relanzando A (puerto original 52300) con --red-marcar hacia B y C (B,C NO se reinician) ===
+lanzado A pid=52441
+=== esperando convergencia, plazo 20 min ===
+CONVERGEN: CONVERGEN punta="punta":"cff310aac0873e392da2e9a7e5255ee182516854448914ef0e83fb366ad2d41f" resumen="resumen_estado":"42ba81376258041c0384e8029f1d67b7dfc3d3934771c0cfa97847a67c7ddb2e"
+=== resultado final (método antiguo, informativo) ===
+CONVERGEN punta="punta":"cff310aac0873e392da2e9a7e5255ee182516854448914ef0e83fb366ad2d41f" resumen="resumen_estado":"42ba81376258041c0384e8029f1d67b7dfc3d3934771c0cfa97847a67c7ddb2e"
+=== parada y verificación aislada de estado (método W07d, sobre copias) ===
+CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"42ba81376258041c0384e8029f1d67b7dfc3d3934771c0cfa97847a67c7ddb2e"|"compendio_bloques":"414f279c632f763f1f80a651b1fe548226c78b2b6f8405f683c7d0b89b34fb70")
+=== 0 par_penalizado entre honestos (criterio V5) ===
+A: par_penalizado=0
+B: par_penalizado=0
+C: par_penalizado=0
+=== R3/E-6 v5 TERMINADO ===
+2026-09-27T23:02:48+02:00 E-6 v5 terminada
+2026-09-27T23:02:48+02:00 === RESUMEN V5 ===
+R150-1: resultado=SUPERADO par_penalizado=0
+R150-2: resultado=SUPERADO par_penalizado=0
+R150-3: resultado=SUPERADO par_penalizado=0
+R3-E6-v5: resultado=CONVERGEN (W07d): resumen_estado y compendio_bloques iguales en todos ("resumen_estado":"42ba81376258041c0384e8029f1d67b7dfc3d3934771c0cfa97847a67c7ddb2e"|"compendio_bloques":"414f279c632f763f1f80a651b1fe548226c78b2b6f8405f683c7d0b89b34fb70") par_penalizado=0
+2026-09-27T23:02:48+02:00 === V5 TERMINADO ===

@@ -28,7 +28,7 @@
 //!
 //! IPv4 se agrupa por **/24** y IPv6 por **/64**, que es la unidad que los proveedores asignan.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::task::{Context, Poll};
 
@@ -116,6 +116,24 @@ impl Prefijo {
             _ => None,
         })
     }
+
+    /// ¿Es un prefijo **loopback** (`127.0.0.0/8` en IPv4, `::1` en IPv6)?
+    ///
+    /// `ORDEN-W06d10` decisión 3: para loopback la penalización es por `PeerId`, no por prefijo.
+    /// Es una **excepción de la red local** (todos los nodos de la red dev comparten
+    /// `127.0.0.0/24`), no un cambio de producción: en una red real los pares honestos no
+    /// comparten prefijo con el adversario.
+    ///
+    /// En IPv6 se reconoce `::1` por su /64 (`::/64`): `Prefijo::de_v6` guarda solo los ocho
+    /// primeros bytes, así que los bits bajos de `::1` no llegan hasta aquí — y `::/64` no es una
+    /// red enrutable, es justo el ámbito local.
+    #[must_use]
+    pub const fn es_loopback(self) -> bool {
+        matches!(
+            self,
+            Self::V4([127, _, _]) | Self::V6([0, 0, 0, 0, 0, 0, 0, 0])
+        )
+    }
 }
 
 /// Behaviour que limita y banea por prefijo de red.
@@ -133,6 +151,14 @@ pub struct LimitesPorIp {
     puntos: HashMap<Prefijo, u32>,
     /// Prefijos baneados, en orden de llegada para desalojar el más antiguo.
     baneados: Vec<Prefijo>,
+    /// Puntos por `PeerId`, **solo** para pares conectados desde direcciones loopback
+    /// (`ORDEN-W06d10` decisión 3: excepción de la red local, donde vetar el prefijo común
+    /// `127.0.0.0/24` dejaría fuera a los nodos honestos).
+    puntos_peer: HashMap<PeerId, u32>,
+    /// `PeerId` baneados (solo loopback), en orden de llegada para desalojar el más antiguo.
+    baneados_peer: Vec<PeerId>,
+    /// El mismo conjunto que [`Self::baneados_peer`], para consultar en O(1).
+    conjunto_baneados_peer: HashSet<PeerId>,
 }
 
 /// Por qué se denegó una conexión.
@@ -141,6 +167,9 @@ pub enum Denegada {
     /// El prefijo está baneado.
     #[error("prefijo baneado por violación de consenso")]
     Baneado,
+    /// El `PeerId` está baneado (solo direcciones loopback, `ORDEN-W06d10` decisión 3).
+    #[error("PeerId baneado por violación de consenso (dirección loopback)")]
+    PeerBaneado,
     /// Demasiadas conexiones establecidas desde ese prefijo.
     #[error("demasiadas conexiones desde el mismo prefijo de red ({actual}/{max})")]
     DemasiadasEstablecidas {
@@ -157,6 +186,18 @@ pub enum Denegada {
         /// Cuántas se admiten.
         max: u32,
     },
+}
+
+/// Lo que se baneó al aplicar una penalización a un par (`ORDEN-W06d10` decisión 3).
+///
+/// Separado para que el bucle pueda registrarlo (`tracing::warn!`) sin volver a consultar el estado,
+/// y para poder probar la política loopback/`PeerId` sin construir un `Swarm`.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Penalizacion {
+    /// Prefijos de red que cruzaron el umbral con esta penalización.
+    pub prefijos_baneados: Vec<Prefijo>,
+    /// `true` si el `PeerId` (dirección loopback) cruzó el umbral.
+    pub peer_baneado: bool,
 }
 
 impl LimitesPorIp {
@@ -212,6 +253,90 @@ impl LimitesPorIp {
             return true;
         }
         false
+    }
+
+    /// Suma puntos a un `PeerId` y lo banea si cruza el umbral.
+    ///
+    /// Devuelve `true` si acaba de banearse.
+    ///
+    /// **Solo para direcciones loopback** (`ORDEN-W06d10` decisión 3): en la red dev todos los
+    /// nodos comparten el prefijo `127.0.0.0/24`, así que penalizar el prefijo por culpa de un
+    /// adversario vetaría también a los honestos. Fuera de loopback la penalización sigue siendo por
+    /// prefijo ([`Self::puntuar`]), sin cambios. El registro está acotado por [`MAX_BANEADOS`] con
+    /// desalojo FIFO, igual que el de prefijos.
+    pub fn puntuar_peer(&mut self, peer: PeerId, puntos: u32) -> bool {
+        let total = self.puntos_peer.entry(peer).or_insert(0);
+        *total = total.saturating_add(puntos);
+
+        if *total >= UMBRAL_BANEO && !self.conjunto_baneados_peer.contains(&peer) {
+            if self.baneados_peer.len() >= MAX_BANEADOS {
+                let viejo = self.baneados_peer.remove(0);
+                self.puntos_peer.remove(&viejo);
+                self.conjunto_baneados_peer.remove(&viejo);
+            }
+            self.baneados_peer.push(peer);
+            self.conjunto_baneados_peer.insert(peer);
+            return true;
+        }
+        false
+    }
+
+    /// Puntos acumulados por un `PeerId` (solo loopback).
+    #[must_use]
+    pub fn puntos_de_peer(&self, peer: PeerId) -> u32 {
+        self.puntos_peer.get(&peer).copied().unwrap_or(0)
+    }
+
+    /// ¿Está baneado este `PeerId`?
+    #[must_use]
+    pub fn esta_baneado_peer(&self, peer: PeerId) -> bool {
+        self.conjunto_baneados_peer.contains(&peer)
+    }
+
+    /// Cuántos `PeerId` hay baneados.
+    #[must_use]
+    pub fn baneados_peer(&self) -> usize {
+        self.baneados_peer.len()
+    }
+
+    /// Aplica `puntos` a un par con la política de `ORDEN-W06d10` y devuelve qué se baneó.
+    ///
+    /// `prefijos` son los prefijos de red **conocidos** del par (los que devuelve
+    /// [`Self::prefijos_de`]; se reciben explícitos para poder probar la política sin un `Swarm`).
+    ///
+    /// - Con **algún** prefijo loopback (`127.0.0.0/8`, `::1`): se puntúa el `PeerId` (excepción de
+    ///   la red local) y **no** el prefijo.
+    /// - Sin loopback: se puntúa cada prefijo como siempre (C-NET-20). Nada cambia para producción.
+    /// - Sin prefijos conocidos (conexión saliente que no pasó por el handler entrante): no hay
+    ///   nada que penalizar; mismo comportamiento que antes de esta orden.
+    #[must_use]
+    pub fn penalizar_peer(
+        &mut self,
+        peer: PeerId,
+        prefijos: &[Prefijo],
+        puntos: u32,
+    ) -> Penalizacion {
+        let mut resultado = Penalizacion::default();
+        let mut loopback = false;
+        for &p in prefijos {
+            if p.es_loopback() {
+                loopback = true;
+            } else if self.puntuar(p, puntos) {
+                resultado.prefijos_baneados.push(p);
+            }
+        }
+        if loopback && self.puntuar_peer(peer, puntos) {
+            resultado.peer_baneado = true;
+        }
+        resultado
+    }
+
+    /// Un `PeerId` baneado (loopback) no vuelve a entrar, igual que un prefijo baneado.
+    fn comprobar_peer(&self, peer: PeerId) -> Result<(), Denegada> {
+        if self.esta_baneado_peer(peer) {
+            return Err(Denegada::PeerBaneado);
+        }
+        Ok(())
     }
 
     fn comprobar(&self, p: Prefijo, pendiente: bool) -> Result<(), Denegada> {
@@ -275,6 +400,9 @@ impl NetworkBehaviour for LimitesPorIp {
             *n = n.saturating_sub(1);
         }
         self.comprobar(p, false).map_err(ConnectionDenied::new)?;
+        // `ORDEN-W06d10` decisión 3: un `PeerId` vetado (loopback) no vuelve a entrar aunque su
+        // prefijo (compartido con los honestos en la red dev) no esté vetado.
+        self.comprobar_peer(peer).map_err(ConnectionDenied::new)?;
 
         *self.establecidas.entry(p).or_insert(0) += 1;
         self.de_conexion.insert(id, p);
@@ -350,13 +478,15 @@ impl NetworkBehaviour for LimitesPorIp {
 #[expect(
     clippy::unwrap_used,
     clippy::integer_division,
-    reason = "los tests fallan con panic por diseño; la división entera genera prefijos distintos"
+    clippy::indexing_slicing,
+    reason = "los tests fallan con panic por diseño; la división entera genera prefijos distintos; \
+              los índices del test de la cota están dentro del rango construido"
 )]
 mod tests {
     use super::{
         Denegada, LimitesPorIp, MAX_BANEADOS, PUNTOS_VIOLACION_CONSENSO, Prefijo, UMBRAL_BANEO,
     };
-    use libp2p::Multiaddr;
+    use libp2p::{Multiaddr, PeerId};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     fn v4(a: u8, b: u8, c: u8, d: u8) -> Prefijo {
@@ -476,5 +606,85 @@ mod tests {
         let limpio = v4(198, 51, 100, 1);
         assert!(l.comprobar(limpio, true).is_ok());
         assert!(l.comprobar(limpio, false).is_ok());
+    }
+
+    /// **Loopback se reconoce por prefijo.**
+    ///
+    /// `ORDEN-W06d10` decisión 3: `127.0.0.0/8` y `::1` son la excepción de la red local.
+    #[test]
+    fn el_loopback_se_reconoce_por_su_prefijo() {
+        assert!(v4(127, 0, 0, 1).es_loopback());
+        assert!(v4(127, 5, 6, 7).es_loopback(), "todo 127.0.0.0/8");
+        assert!(!v4(10, 0, 0, 1).es_loopback());
+        assert!(!v4(126, 255, 255, 255).es_loopback());
+
+        let v6_loop = Prefijo::de_ip(IpAddr::V6("::1".parse::<Ipv6Addr>().unwrap()));
+        assert!(v6_loop.es_loopback());
+        let v6 = Prefijo::de_ip(IpAddr::V6("2001:db8::1".parse::<Ipv6Addr>().unwrap()));
+        assert!(!v6.es_loopback());
+    }
+
+    /// **La penalización de loopback es por `PeerId` y no veta el prefijo.**
+    ///
+    /// Es la propiedad que evita que un adversario en `127.0.0.1` arrastre a los nodos honestos de
+    /// la red dev, que comparten el prefijo `127.0.0.0/24`.
+    #[test]
+    fn la_penalizacion_loopback_es_por_peer_id_y_no_veta_el_prefijo() {
+        let mut l = LimitesPorIp::nuevo();
+        let loopback = v4(127, 0, 0, 1);
+        let adversario = PeerId::random();
+        let honesto1 = PeerId::random();
+        let honesto2 = PeerId::random();
+
+        let r = l.penalizar_peer(adversario, &[loopback], PUNTOS_VIOLACION_CONSENSO);
+        assert!(r.peer_baneado, "el PeerId del adversario se veta");
+        assert!(r.prefijos_baneados.is_empty(), "el prefijo NO se veta");
+        assert!(l.esta_baneado_peer(adversario));
+        assert!(
+            !l.esta_baneado(loopback),
+            "127.0.0.0/24 sigue limpio: los honestos pueden reconectar"
+        );
+        assert!(l.comprobar(loopback, false).is_ok());
+        assert!(matches!(
+            l.comprobar_peer(adversario),
+            Err(Denegada::PeerBaneado)
+        ));
+        assert!(l.comprobar_peer(honesto1).is_ok());
+        assert!(l.comprobar_peer(honesto2).is_ok());
+    }
+
+    /// **Fuera de loopback nada cambia:** la puntuación sigue siendo por prefijo (C-NET-20).
+    #[test]
+    fn fuera_de_loopback_la_puntuacion_sigue_siendo_por_prefijo() {
+        let mut l = LimitesPorIp::nuevo();
+        let p = v4(203, 0, 113, 0);
+        let peer = PeerId::random();
+
+        let r = l.penalizar_peer(peer, &[p], PUNTOS_VIOLACION_CONSENSO);
+        assert!(
+            !r.peer_baneado,
+            "un prefijo público no se sustituye por PeerId"
+        );
+        assert_eq!(r.prefijos_baneados, vec![p]);
+        assert!(l.esta_baneado(p));
+        assert!(!l.esta_baneado_peer(peer));
+        // Otro par del mismo prefijo público cae con el prefijo, como antes.
+        assert!(matches!(l.comprobar(p, false), Err(Denegada::Baneado)));
+    }
+
+    /// El registro de `PeerId` baneados está acotado como el de prefijos (desalojo FIFO).
+    #[test]
+    fn el_registro_de_peers_baneados_no_crece_sin_limite() {
+        let mut l = LimitesPorIp::nuevo();
+        let loopback = v4(127, 0, 0, 1);
+        let peers: Vec<PeerId> = (0..(MAX_BANEADOS + 100))
+            .map(|_| PeerId::random())
+            .collect();
+        for &peer in &peers {
+            let _ = l.penalizar_peer(peer, &[loopback], PUNTOS_VIOLACION_CONSENSO);
+        }
+        assert_eq!(l.baneados_peer(), MAX_BANEADOS, "la tabla está acotada");
+        assert!(!l.esta_baneado_peer(peers[0]), "el más viejo se desalojó");
+        assert!(l.esta_baneado_peer(peers[MAX_BANEADOS + 99]));
     }
 }

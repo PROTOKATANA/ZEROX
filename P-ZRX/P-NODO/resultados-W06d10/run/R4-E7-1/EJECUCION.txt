@@ -1,0 +1,29 @@
+commit=caba60a580808c7794ece64a5854d0b0259440ac
+sha256_zx-node=726dd1778fe4f3ce7692dda49e4b5cccfca5b9d165cee40c1b27fed530153e92
+sha256_zx-adversario=7f5eea5d107cadd6701cfe7be47d817bcba7da7414b836389a7c8570f7fe8bb3
+n_dev=138873760
+sr_dev=13043817825332783104
+CLK_TCK=100
+PAGE_SIZE=4096
+uname=Linux localhost 6.18.9-1.0.2.sr20260202-default #1 SMP PREEMPT_DYNAMIC Fri Feb  6 18:53:03 UTC 2026 (6d9f8a8) x86_64 x86_64 x86_64 GNU/Linux
+nproc=32
+loadavg_inicio=2.15 7.13 7.95 1/2151 29
+fecha_inicio=2026-09-27T22:41:12+02:00
+ps_inicio_top_cpu:
+semilla=101
+puertos: A=51010 B=51011 C=51012
+2026-09-27T22:41:12+02:00 === E-7 rep1: A,B,C desde el génesis ===
+EXITO total=20
+peer_id B=12D3KooWMhFkmNHjU6ELTYVFtnWJM7iBuNPxKNctgD9i7csYAHsa C=12D3KooWLk9REr3S4gHuoPSUrhAjVFAhXHKa7XxMGvgTWtfmDWrB
+=== E-7: zx-adversario (ráfaga, identidad nueva por vector) contra A ===
+estado_a_antes="resumen_estado":"e2d7c1dd1be402522cc507b2ee9f5da61d31749a1cbbeb7415870fb0b095f052" estado_a_despues="resumen_estado":"b4e0370413c0702f26b756d7b7f7717a5af1a23a9ccb2bf1aa109df8f244c98c" (informativo; el estado se decide al final por W07d)
+PeerId del adversario (uno por vector): 12D3KooWCv7YVtjXnEsro4ym4g7WEyf33BjoGVCYexDUZoKAaR63 12D3KooWLctHBfVQapsBaixPDuhhCv3Ngr9TYwpXMbLdkUQktW8e 12D3KooWLs57BSadJvmvkBRW3HRZygFje1B82E4eGLJ4KXPCNSqd 12D3KooWRKXR7X8jVPHJCuwmKJA46HgLZKbTV3rrfpGip5eiTHAt 12D3KooWRm7sF9RBo3FsNpMQAa4M2yCUCJV5Up6dJLtKHaqC56Bu 
+n_peers_adversario=5
+A: bloque_red_rechazado=4 par_penalizado(distintos)=4
+PeerId penalizados en A: 12D3KooWLctHBfVQapsBaixPDuhhCv3Ngr9TYwpXMbLdkUQktW8e 12D3KooWLs57BSadJvmvkBRW3HRZygFje1B82E4eGLJ4KXPCNSqd 12D3KooWRKXR7X8jVPHJCuwmKJA46HgLZKbTV3rrfpGip5eiTHAt 12D3KooWRm7sF9RBo3FsNpMQAa4M2yCUCJV5Up6dJLtKHaqC56Bu 
+PeerId penalizados que NO son del adversario: 0 (debe ser 0)
+A: par_desconectado de B/C = 0 (debe ser 0)
+=== verificación aislada de estado (método W07d, sobre copias) ===
+SUPERADO (E-7 rep1): rechazos=4 penalizados=4 peers=5 ajenos=0 desconexiones_BC=0 convergen=si
+loadavg_fin=10.86 8.96 8.55 3/2144 6379
+fecha_fin=2026-09-27T22:43:03+02:00
