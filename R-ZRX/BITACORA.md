@@ -485,3 +485,4 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   su punta «aislada» coincidía con la de B/C → **no fue una partición real**; revisión de W06d7 y `SPEC-0.0.1`
   corregidas (V6(b) no demostrada). W06d7 V4 (E-6b) sí fue real. W07b parada y corregida: puerto nuevo para el aislado y
   criterio obligatorio de 0 conexiones y 0 bloques del otro lado en la ventana.
+- 18:23 **Fallo fatal del nodo** en W07b R3 (E-6 rep1 relanzada): `fallo_productor` «no hay portador retenido para el slot 6» justo tras el corte. Intermitente (no apareció en R1/R2). **W06d9** (DeepSeek): causa exacta + red de seguridad (recalcular portadores o no producir ese slot, nunca morir). R3/R4 en pausa hasta el nuevo candidato; W07b adelanta la verificación del estado final de R1/R2 con el binario de `22940aa`.
