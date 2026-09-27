@@ -2,7 +2,7 @@
 
 **Estado: BORRADOR** (redactado 2026-09-27 desde ≈ 11:00; mediciones de W07b incorporadas a las 23:46). Falta el
 veredicto, que espera a W06d10-B y a la E-0 del candidato final. **Firma:** Claude (director, `AUTO-ZRX.md` §8). Todo en commits locales de
-la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato:** se fija tras W06d10-B (antes `27dcfeb`, `26312ff` y `3d21b1f`; W06d8 y W06d9 corrigieron dos caídas del productor y W06d10 la falta de penalización del par, todas halladas al medir). R1 y R2 se midieron con `26312ff`; R3 y R4, con `3d21b1f`; E-7 con penalización, con W06d10.
+la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato final:** `c107163` (antes `27dcfeb`, `26312ff` y `3d21b1f`; W06d8 y W06d9 corrigieron dos caídas del productor y W06d10 la falta de penalización del par, todas halladas al medir). R1 y R2 se midieron con `26312ff`; R3 y R4, con `3d21b1f`; E-7 con penalización, con W06d10.
 
 ---
 
@@ -124,7 +124,11 @@ reabrir cada nodo aislado sobre una **copia** de sus datos y comparar `resumen_e
 14. **El timestamp de la cabecera PoST no se valida** (ni monotonía ni FTL; el PoW sí). En 0.0.1 no lo consume ninguna
    regla (`N` y `SR` constantes), pero es el requisito previo de un `N` dinámico (IPA B-13, `ENCARGO-ND1`, 0.0.2).
 15. **W07b, E-7:** los bloques inválidos difundidos por gossip se rechazaban sin penalizar al par (sin puntuación de
-   gossipsub; `par_penalizado` solo en la ruta de sincronización). Corrección: W06d10 (*en curso*).
+   gossipsub; `par_penalizado` solo en la ruta de sincronización). Corregido en W06d10. Al corregirlo apareció lo
+   contrario: tres rechazos que dependen de la vista local (FTL del PoW, tope de terminales, fallos locales) **ya
+   penalizaban** al sincronizar; un nodo honesto con el reloj adelantado podía ser vetado. Corregido en W06d10-B.
+16. **Límite que queda** (IPA B-14): un bloque rechazado por el tope local de 8 terminales no se reevalúa si la vista
+   cambia (el rechazo queda cacheado en `zx-cadena`). Solo importa con más de 8 terminales en el corte; 0.0.2.
 
 ## 6. Coste absoluto de los ataques relevantes (lo medido o derivado; nada inventado)
 

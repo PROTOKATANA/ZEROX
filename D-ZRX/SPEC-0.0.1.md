@@ -10,7 +10,7 @@ sigue es un parámetro de producción** (`P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`).
 contra un oráculo independiente o una prueba de extremo a extremo; «implementada» sin más significa
 código con tests propios pero sin contraste independiente.
 
-**Suite de la raíz (candidato final pendiente de W06d10-B; antes `27dcfeb`, `26312ff` y `3d21b1f`):** 883/0/6 tras W06d10 (ejecutada por el
+**Suite de la raíz (candidato final `c107163`; antes `27dcfeb`, `26312ff` y `3d21b1f`):** 891/0/6 tras W06d10-B (ejecutada por el
 ejecutor en su zona; la repite E-0 de W07b desde un clon limpio). Oráculos vigentes:
 T01 v0.5 (3 179 casos) y T04 v0.6 (2 108 casos), vectores en `testdata/transicion-v0.5` y `testdata/estado-dag-v0.6`.
 
@@ -70,10 +70,11 @@ T01 v0.5 (3 179 casos) y T04 v0.6 (2 108 casos), vectores en `testdata/transicio
 | W06d8 | Protocolo productor↔bucle numerado (respuesta atrasada descartada, `Parar` siempre atendido); ningún pánico alcanzable en el productor; fallo del productor = parada ordenada con `fallo_productor` | 6 tests del protocolo; V3 real 5/5 (tres nodos, 0 pánicos; 2 respuestas atrasadas descartadas de verdad); 860/0/6 | migrada. Motivo: pánico real hallado por W07b (E-2a) |
 | W07d | Estado final en el registro: `reinicio_completo` y `parada` con `punta`, `resumen_estado`, `n_bloques_dag`, `compendio_bloques`; parada ordenada con `SIGTERM` | 868/0/6; es el método de «mismo estado» de W07b (reabrir cada nodo aislado sobre copias de sus `datos`) | migrada. Solo registro |
 | W06d9 | Se registran **todos** los portadores PoT de la justificación de un bloque de red (origen del hueco); red de seguridad: el productor recalcula los portadores que falten o **no produce** ese slot (`produccion_omitida`), nunca muere por ello | causa reproducida antes y corregida después; 10/10 cruces reales del corte y 3/3 E-6 con aislamiento real, 0 `fallo_productor`; 877/0/6 | migrada. Motivo: caída real hallada por W07b (R3) |
-| W06d10 | El par que **difunde** un bloque demostrablemente inválido queda desconectado y puntuado como en la sincronización (C-NET-05), con `par_penalizado`; en loopback el veto es por `PeerId` (excepción de la red dev: el /24 de `127.0.0.1` es común) | E-7 × 3 reales: 4 penalizaciones por repetición, 0 desconexiones honestas; 0 falsos positivos (3 redes al slot 150 y E-6); 883/0/6 | migrada. Motivo: W07b E-7. **W06d10-B en curso:** lo que depende de la vista local (FTL, tope de terminales, fallos locales) no debe penalizar |
+| W06d10 | El par que **difunde** un bloque demostrablemente inválido queda desconectado y puntuado como en la sincronización (C-NET-05), con `par_penalizado`; en loopback el veto es por `PeerId` (excepción de la red dev: el /24 de `127.0.0.1` es común) | E-7 × 3 reales: 4 penalizaciones por repetición, 0 desconexiones honestas; 0 falsos positivos (3 redes al slot 150 y E-6); 883/0/6 | migrada. Motivo: W07b E-7 |
+| W06d10-B | Lo que depende de la vista local (FTL PoW, tope de terminales, fallos locales, padre con motivo de vista local) → `Ignorar` sin penalizar, en gossip y sincronización; lo demostrable sigue penalizando | tests por familia; E-7 real (4/4 penalizados) y red al slot 150 (0 falsos positivos); 891/0/6 | migrada. Límite: el rechazo por tope de terminales sigue cacheado en `zx-cadena` (IPA B-14) |
 
 Revisión independiente del código de red, nodo y castigo: RI-3a/b/c hechas, hallazgos corregidos (un crítico).
-**W07b cerrada** (`P-ZRX/P-MEDICION/REVISION-W07b.md`): E-0…E-6b y E-8 superadas ×3; E-7 destapó la falta de penalización del par (W06d10); E-9 descriptivo. **Pendiente:** W06d10-B y la E-0 del candidato final.
+**W07b cerrada** (`P-ZRX/P-MEDICION/REVISION-W07b.md`): E-0…E-6b y E-8 superadas ×3; E-7 destapó la falta de penalización del par (W06d10); E-9 descriptivo. **Pendiente:** la E-0 del candidato final `c107163` (en curso).
 
 ## 6. Evidencia y castigo (`P-ZRX/P-SLASHING/CONTRATO-EVIDENCIA-v0.md` con su «Ratificación v0»)
 
