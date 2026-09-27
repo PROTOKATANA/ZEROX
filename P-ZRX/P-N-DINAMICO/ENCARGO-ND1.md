@@ -12,9 +12,14 @@
 - **Requisito de Katana (2026-09-27, literal):** «lo preferible sería que se adapte de forma dinámica sin que nadie lo
   tenga que calibrar manualmente y sin llave mágica. Mitigar los posibles ataques que puedan existir.» Principio que lo
   enmarca, también suyo: **ZEROX sobrevive por sí solo, sin nadie detrás.**
-- **Qué se excluye por ese principio:** cualquier llave (`root`, comité, votación, firma de un equipo), un trinquete que
-  solo se libere con un hard fork, la calibración manual por red, y una cadena externa como fuente de tiempo (haría a
-  ZEROX depender de otra red; P-RELOJ ya mostró que no resuelve el coste de verificar).
+- **Qué se excluye por ese principio:** que alguien **decida** `N`, sea una llave (`root`, multifirma, firma de un
+  equipo) o un grupo que vote subirlo o bajarlo (eso es calibración manual colectiva); un trinquete que solo se libere
+  con un hard fork; la calibración manual por red; y una cadena externa como fuente de tiempo (haría a ZEROX depender de
+  otra red; P-RELOJ ya mostró que no resuelve el coste de verificar).
+- **Qué no se excluye:** el comité de la finalidad por votos (`P-ZRX/P-FINALIDAD-VOTOS/DECISIONES.md`, FV-D01…FV-D08:
+  sorteo secreto por VRF entre **todos** los registrados, peso por sectores, sin salida del sorteo, sin premio por votar)
+  es consenso, no gobernanza. Puede estudiarse como **fuente de medida** (la hora local en cada voto), nunca como quien
+  decide `N`. *(Aclaración del director, 2026-09-27, a pregunta de Katana.)*
 
 ## 2. Lo que ya se sabe (no lo rehagas; valídalo o refútalo si lo usas)
 
@@ -53,6 +58,13 @@ problema resuelve, qué deja abierto y qué se puede trasladar a ZEROX.
 Analiza qué le pasa a un nodo con el reloj desviado y a una partición.
 
 **N2 · La ley `L`.**
+- **La fuente de tiempo `S` es una entrada con nombre de la ley**: «`N` se ajusta con la ley `L` sobre la fuente `S`»
+  (propuesta de `ESTADO-RELOJ.md` §6.3). Evalúa dos fuentes y su combinación:
+  - `S₁`, los timestamps de los productores, disponible en 0.0.2;
+  - `S₂`, la hora local declarada en los votos del comité de finalidad, que llega en 0.0.3.
+
+  Para cada una, la cota de manipulación de N3 en función del peso honesto. Recuerda que mentir sobre el propio reloj no
+  es demostrable y, por tanto, no es castigable. Di si `S₂` mejora las cotas lo bastante como para justificarla.
 - Estimador sobre una ventana `W` de la cadena seleccionada, objetivo `τ`, ganancia, y límite de cambio por época en las
   dos direcciones.
 - Suelo y techo: el techo sale del presupuesto de verificación `ε·K` del hardware más débil admitido, que es una
