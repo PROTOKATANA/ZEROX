@@ -1,0 +1,2177 @@
+diff -ruN '--exclude=target' ws.orig/crates/zx-cadena/src/cadena.rs ws/crates/zx-cadena/src/cadena.rs
+--- ws.orig/crates/zx-cadena/src/cadena.rs	2026-09-27 04:42:32.000000000 +0200
++++ ws/crates/zx-cadena/src/cadena.rs	2026-09-27 06:14:14.389478087 +0200
+@@ -1,4 +1,4 @@
+-//! Gestor del estado del DAG en memoria (`ORDEN-W06a`, `D-N02`).
++//! Gestor del estado del DAG en memoria (`ORDEN-W06a`, `D-N02`; rediseño `ORDEN-W06d7`).
+ //!
+ //! Implementa `ED-1…ED-6` y `RD-1…RD-10` del contrato `P-ZRX/P-DAG/CONTRATO-ESTADO-DAG-v0.md`
+ //! sobre el motor de W03 (`aplicar` para PoW, `aplicar_fusion` para PoST) y `zx-dag` (GHOSTDAG):
+@@ -14,6 +14,41 @@
+ //! - **RD-9/RD-10** la garantía del productor se comprueba en `Estado(past(B))` promovido en
+ //!   `slot(B)`, una sola vez, en la admisión.
+ //!
++//! # `ORDEN-W06d7`: un DAG por terminal candidato (FC-3 de verdad)
++//!
++//! `W06d6` descubrió que esta implementación **congelaba** el terminal al admitir el primer bloque
++//! PoST (`recalcular_terminal` solo corría mientras `dag.is_none()`) y solo mantenía **un** DAG. Eso
++//! no es `TRN-09` (FC-3): dos nodos que cruzan el corte con terminales distintos no convergían nunca
++//! (I-3 roto). El rediseño (decisiones del director en `ORDEN-W06d7.md` §3):
++//!
++//! 1. **Un [`DagTerminal`] por candidato** (`self.dags`): cada terminal que cumple el corte
++//!    (`TRN-04`, [`es_primero_en_rama`](Cadena::es_primero_en_rama)) y tiene al menos un bloque PoST
++//!    válido cuelga de su propio `AlmacenGhostdag` con raíz en ese terminal. Un bloque PoST
++//!    pertenece al DAG del terminal de su pasado ([`Cadena::terminal_de_bloque_post`]); padres de
++//!    terminales distintos son inválidos (`ErrTerminalAmbiguo`, `I-4`).
++//! 2. **Selección FC-3 entre terminales** ([`Cadena::mejor_terminal_candidato`]): sin ningún DAG
++//!    (sufijo PoST), gana el mayor trabajo PoW acumulado; en cuanto alguno tiene sufijo, solo esos
++//!    compiten por mayor `blue_work` de su virtual, desempate por `comparar_terminal` (menor hash,
++//!    reutilizado de `zx_consensus::transicion`, ya no reimplementado) y, si aún empata, por la
++//!    regla `C-GD` (`solution_distance`, `id`).
++//! 3. **`C-FIN-01` entre terminales** ([`Cadena::recalcular_seleccion`]): un nodo en línea no
++//!    sustituye su terminal seleccionado por otro si el sufijo actual ya abarca `≥ F_slots` desde el
++//!    corte (`s_0 = 0`, `CONTRATO-v0.md` §1); se mide con el `slot` máximo de las puntas válidas del
++//!    terminal actual.
++//! 4. **Tope** [`MAX_TERMINALES_CON_DAG`] = 8 ([`Cadena::dag_de_terminal_mut`]): un noveno candidato
++//!    con sufijo PoST se ignora si su trabajo PoW no supera al peor de los ocho (se marca
++//!    [`Cadena::limite_terminales_alcanzado`]); si lo supera, desaloja al peor.
++//! 5. **API** (`terminal()`, `contexto_dag()`, `estado_virtual()`, `cadena_virtual()`,
++//!    `mejor_punta()`…) devuelve lo del terminal **seleccionado**; hay accesos «_de» explícitos por
++//!    terminal para quien (el nodo) necesite verificar contra un terminal que no es el seleccionado.
++//!
++//! Coste declarado (`V-ZRX/LINEO.md`, disciplina general): cada [`Cadena::dag_virtual_de`]
++//! reconstruye el `AlmacenGhostdag` del virtual de ese terminal desde cero (patrón ya existente en
++//! esta implementación antes de esta orden); con hasta 8 terminales y los tamaños de esta orden
++//! (cientos de bloques), el coste adicional de recorrer varios terminales en cada selección es
++//! aceptable sin banco de pruebas dedicado; si el número de terminales o de bloques creciera muy por
++//! encima de esto, sería el primer punto a perfilar.
++//!
+ //! La verificación de cabeceras no es de esta orden: `pow_valido`/`prueba_valida` llegan decididos.
+ 
+ use std::cmp::Ordering;
+@@ -22,7 +57,7 @@
+ use primitive_types::U256;
+ use zx_consensus::transicion::{
+     Estado, ParametrosEvidencia, ParametrosTransicion, Punto, TxDescartada, Undo, aplicar,
+-    aplicar_fusion, deshacer, es_terminal_condiciones,
++    aplicar_fusion, comparar_terminal, deshacer, es_terminal_condiciones,
+ };
+ use zx_core::{Amount, BlockHash, ClavePublica, ExtensionTx, Tx, validar_forma_tx_v4};
+ use zx_dag::ghostdag::{
+@@ -37,6 +72,9 @@
+ /// Tope de mergeset del oráculo (`C-GD-04`).
+ const MERGESET_LIMITE_ORACULO: u32 = 180;
+ 
++/// Tope de terminales candidatos con DAG propio (`ORDEN-W06d7` decisión 4).
++pub const MAX_TERMINALES_CON_DAG: usize = 8;
++
+ /// Una transacción descartada al aplicar la historia seleccionada, con el bloque del que procede.
+ #[derive(Clone, PartialEq, Eq, Debug)]
+ pub struct Descarte {
+@@ -61,7 +99,49 @@
+     identidad: IdentidadGhostdag,
+ }
+ 
+-/// Almacén virtual `V` (una copia del DAG con la punta virtual añadida).
++/// El DAG GHOSTDAG propio de **un** terminal candidato (`ORDEN-W06d7` decisión 1).
++///
++/// Vive desde que se admite el primer bloque PoST que cuelga de ese terminal
++/// ([`Cadena::dag_de_terminal_mut`]); antes de eso el terminal es solo una entrada de
++/// [`Cadena::terminal_candidatos`], sin `DagTerminal`.
++struct DagTerminal {
++    dag: AlmacenGhostdag,
++    dag_idx: BTreeMap<BlockHash, Idx>,
++    dag_orden: Vec<BlockHash>,
++    dag_datos: BTreeMap<BlockHash, DatosDag>,
++}
++
++impl DagTerminal {
++    /// Crea el almacén con el terminal como raíz (D-P07).
++    fn nueva(terminal: BlockHash, k: u32, max_padres: u8) -> Self {
++        let params = ParametrosGhostdag {
++            k,
++            max_padres,
++            mergeset_limite: MERGESET_LIMITE_ORACULO,
++            s_max: u64::MAX,
++            u2: true,
++            u3_dinamica: true,
++            sp: ModoSp::Zerox,
++            merge: ModoMerge::Terna,
++        };
++        let dag = AlmacenGhostdag::con_raiz_terminal(
++            params,
++            Algoritmo::Referencia,
++            terminal,
++            RangoSolucionValidado::para_oraculos(0),
++        );
++        let mut dag_idx = BTreeMap::new();
++        dag_idx.insert(terminal, 0);
++        Self {
++            dag,
++            dag_idx,
++            dag_orden: Vec::new(),
++            dag_datos: BTreeMap::new(),
++        }
++    }
++}
++
++/// Almacén virtual `V` de **un** terminal (una copia de su DAG con la punta virtual añadida).
+ struct Virtual {
+     dag: AlmacenGhostdag,
+     idx: Idx,
+@@ -83,19 +163,29 @@
+     past: BTreeMap<BlockHash, Estado>,
+     post: BTreeMap<BlockHash, Estado>,
+     descartes: BTreeMap<BlockHash, Vec<TxDescartada>>,
+-    terminal: Option<BlockHash>,
++    /// Terminal **seleccionado** por FC-3 (`ORDEN-W06d7` decisión 2), con `C-FIN-01` entre
++    /// terminales (decisión 3). `None` mientras no hay ningún candidato.
++    terminal_seleccionado: Option<BlockHash>,
++    /// `Estado(terminal_seleccionado)`, cacheado para que [`Cadena::estado_terminal`] pueda seguir
++    /// devolviendo una referencia (compatibilidad de API, decisión 6). Se refresca en
++    /// [`Cadena::recalcular_seleccion`].
+     estado_t: Estado,
+-    dag: Option<AlmacenGhostdag>,
+-    dag_idx: BTreeMap<BlockHash, Idx>,
+-    dag_orden: Vec<BlockHash>,
+-    dag_datos: BTreeMap<BlockHash, DatosDag>,
++    /// Un DAG por terminal que ya tiene al menos un bloque PoST válido (decisión 1). Acotado a
++    /// [`MAX_TERMINALES_CON_DAG`] (decisión 4).
++    dags: BTreeMap<BlockHash, DagTerminal>,
++    /// Terminal al que pertenece cada bloque PoST ya admitido (para resolver `chequear_forma` y los
++    /// accesos «_de» por terminal sin recorrer todo `por_hash`).
++    post_terminal: BTreeMap<BlockHash, BlockHash>,
++    /// Se marcó al menos una vez el tope de [`MAX_TERMINALES_CON_DAG`] (decisión 4, `limite_alcanzado`).
++    limite_alcanzado: bool,
+     /// Puntas PoW válidas conocidas: bloques PoW sin ningún hijo PoW válido todavía
+     /// (`ORDEN-W06d3` decisión 3). Varias a la vez es exactamente una bifurcación PoW.
+     tips_pow: BTreeSet<BlockHash>,
+     /// Bloques PoW que, en su propia rama, ya cumplen `es_terminal_condiciones` (altura, trabajo,
+-    /// `Φ`). Candidatos a terminal mientras no exista ningún bloque PoST (`self.dag.is_none()`):
+-    /// FC-3 (`P-ZRX/P-TRANSICION/ORDEN-T01.md` §CorteSelección) dice que, sin sufijo PoST, gana el
+-    /// de más trabajo PoW, no el primero que llegó.
++    /// `Φ`) y son el **primero** de su rama en cumplirlo (`TRN-04`,
++    /// [`Cadena::es_primero_en_rama`]). Candidatos a terminal para siempre (`ORDEN-W06d7`: ya no se
++    /// deja de admitir candidatos nuevos al aparecer el primer bloque PoST, que era el hallazgo de
++    /// `W06d6`).
+     terminal_candidatos: BTreeSet<BlockHash>,
+ }
+ 
+@@ -105,7 +195,7 @@
+     ///
+     /// `max_padres` no tiene valor por defecto oculto (`ORDEN-W06a-C` decisión 1): el nodo usa el
+     /// del perfil dev (15, `PERFIL-DEV-v0.md` §4) y el arnés diferencial de T04 usa 3, el límite de
+-    /// su generador. Es el tope que `zx-cadena` impone al `AlmacenGhostdag` interno; `zx-dag` lo
++    /// su generador. Es el tope que `zx-cadena` impone a cada `AlmacenGhostdag` interno; `zx-dag` lo
+     /// acota a [`zx_core::MAX_PADRES`] (15) y a `u8`.
+     #[must_use]
+     pub fn nueva(params: ParametrosTransicion, k: u32, cbid: u32, max_padres: u8) -> Self {
+@@ -133,12 +223,11 @@
+             past: BTreeMap::new(),
+             post: BTreeMap::new(),
+             descartes: BTreeMap::new(),
+-            terminal: None,
++            terminal_seleccionado: None,
+             estado_t: Estado::inicial(),
+-            dag: None,
+-            dag_idx: BTreeMap::new(),
+-            dag_orden: Vec::new(),
+-            dag_datos: BTreeMap::new(),
++            dags: BTreeMap::new(),
++            post_terminal: BTreeMap::new(),
++            limite_alcanzado: false,
+             tips_pow: BTreeSet::new(),
+             terminal_candidatos: BTreeSet::new(),
+         }
+@@ -174,43 +263,78 @@
+         self.descartes.get(hash).map(Vec::as_slice)
+     }
+ 
+-    /// Hash del terminal PoW descubierto, si existe.
++    /// Hash del terminal **seleccionado** por FC-3 (`ORDEN-W06d7` decisión 2), si existe algún
++    /// candidato.
+     #[must_use]
+     pub fn terminal(&self) -> Option<BlockHash> {
+-        self.terminal
++        self.terminal_seleccionado
+     }
+ 
+-    /// `Estado(T)`, el estado tras aplicar el terminal.
++    /// `Estado(T)` del terminal seleccionado (el estado tras aplicar ese bloque PoW).
+     #[must_use]
+     pub fn estado_terminal(&self) -> &Estado {
+         &self.estado_t
+     }
+ 
++    /// Todos los terminales candidatos conocidos (con DAG o sin él), en orden de hash.
++    #[must_use]
++    pub fn terminal_candidatos(&self) -> Vec<BlockHash> {
++        self.terminal_candidatos.iter().copied().collect()
++    }
++
++    /// Terminales que ya tienen su propio DAG (al menos un bloque PoST válido), en orden de hash
++    /// (`ORDEN-W06d7` decisión 1).
++    #[must_use]
++    pub fn terminales_con_dag(&self) -> Vec<BlockHash> {
++        self.dags.keys().copied().collect()
++    }
++
++    /// ¿Se alcanzó alguna vez el tope [`MAX_TERMINALES_CON_DAG`] (decisión 4)?
++    #[must_use]
++    pub fn limite_terminales_alcanzado(&self) -> bool {
++        self.limite_alcanzado
++    }
++
++    /// Terminal al que pertenece un bloque PoST ya admitido, si se conoce.
++    #[must_use]
++    pub fn terminal_de(&self, hash: &BlockHash) -> Option<BlockHash> {
++        self.post_terminal.get(hash).copied()
++    }
++
+     /// Acceso al bloque por su hash, si se conoce.
+     #[must_use]
+     pub fn bloque(&self, hash: &BlockHash) -> Option<&BloqueCadena> {
+         self.por_hash.get(hash)
+     }
+ 
+-    /// El `AlmacenGhostdag` real de esta cadena, si el terminal ya se fijó (`ORDEN-W06d1`,
+-    /// «Relanzamiento» punto 3).
++    /// El `AlmacenGhostdag` real del terminal **seleccionado**, si ya tiene DAG (`ORDEN-W06d1`,
++    /// «Relanzamiento» punto 3; multi-terminal desde `ORDEN-W06d7`).
+     ///
+     /// `AlmacenGhostdag` ya implementa [`zx_dag::bloque_dag::ContextoDag`] sobre sus propios
+     /// bloques admitidos, con `padre_seleccionado` calculado por GHOSTDAG real (`comparar_sp`,
+     /// `C-GD-03`), no declarado por el candidato. Este accesor es lo que le faltaba a `Cadena` para
+     /// que un llamante externo (el nodo) pueda verificar la cabecera de un candidato **antes** de
+-    /// admitirlo, sin volver a implementar la selección de padre en otro sitio: el nodo NO debe
+-    /// confiar en `ContextoTransicion::padre_seleccionado` (el atajo dev de `zx-post`) para
+-    /// bloques ajenos, porque ese atajo devuelve el declarado sin comprobarlo.
++    /// admitirlo, sin volver a implementar la selección de padre en otro sitio.
+     ///
+-    /// `None` hasta que se admite el **primer bloque PoST** (`inicializar_dag` vive dentro de
+-    /// [`Self::admitir`] para la variante `Post`, no al fijar el terminal): en la fase PoW pura, y
+-    /// también justo después de fijarse el terminal pero antes de admitir ningún bloque PoST,
+-    /// sigue siendo `None`. El bloque de transición (único padre posible: el terminal) no tiene,
+-    /// por tanto, GHOSTDAG real que consultar; se verifica con `zx_post::ContextoTransicion`.
++    /// `None` hasta que se admite el **primer bloque PoST** del terminal seleccionado. Para
++    /// verificar contra un terminal que no es el seleccionado (varios DAG a la vez), usa
++    /// [`Cadena::contexto_dag_de`].
+     #[must_use]
+     pub fn contexto_dag(&self) -> Option<&zx_dag::ghostdag::AlmacenGhostdag> {
+-        self.dag.as_ref()
++        self.terminal_seleccionado
++            .and_then(|t| self.dags.get(&t))
++            .map(|dt| &dt.dag)
++    }
++
++    /// El `AlmacenGhostdag` real de un terminal concreto, sea o no el seleccionado (`ORDEN-W06d7`
++    /// decisión 5: el nodo necesita un servicio de verificación por terminal con DAG, no solo el
++    /// seleccionado).
++    #[must_use]
++    pub fn contexto_dag_de(
++        &self,
++        terminal: BlockHash,
++    ) -> Option<&zx_dag::ghostdag::AlmacenGhostdag> {
++        self.dags.get(&terminal).map(|dt| &dt.dag)
+     }
+ 
+     /// Bloques PoST conocidos (válidos e inválidos), en orden de hash.
+@@ -231,21 +355,13 @@
+     ///
+     /// # `ErrSinPadre` por una dependencia que **todavía no ha llegado** no se cachea (RI-2a #1)
+     ///
+-    /// Si el padre (o, en PoST, el terminal) del bloque no está disponible **todavía**, el rechazo
+-    /// es provisional: el mismo bloque, sometido otra vez después de que su dependencia llegue,
+-    /// MUST poder admitirse. Antes de este arreglo, `admitir` cacheaba `ErrSinPadre` igual que
+-    /// cualquier otro motivo, y un bloque que llegaba antes que su padre —una condición de carrera
+-    /// de red ordinaria, sin ningún adversario de por medio— quedaba inválido **para siempre** en
+-    /// esta instancia aunque el padre llegara después y fuera válido: dos nodos honestos que
+-    /// reciben los mismos bloques en órdenes distintos divergirían. La comprobación
++    /// Si el padre (o, en PoST, algún terminal candidato) del bloque no está disponible
++    /// **todavía**, el rechazo es provisional: el mismo bloque, sometido otra vez después de que su
++    /// dependencia llegue, MUST poder admitirse. La comprobación
+     /// ([`Self::dependencia_no_disponible`]) se hace **antes** de tocar `admitir_pow`/`admitir_post`
+     /// —y por tanto antes de cualquier mutación del DAG interno—, así que reintentar más tarde
+     /// vuelve a ejecutar la tubería completa desde cero, nunca a medias.
+     ///
+-    /// Los motivos de rechazo que sí dependen únicamente del contenido del propio bloque (padres
+-    /// duplicados, forma inválida, PoW/PoAS/PoT/firma incorrectos, etc.) siguen cacheados como
+-    /// antes: no cambian si se reintentan.
+-    ///
+     /// # Errores
+     /// El [`MotivoBloque`] que haya invalidado el bloque.
+     pub fn admitir(&mut self, bloque: BloqueCadena) -> Result<(), MotivoBloque> {
+@@ -273,6 +389,16 @@
+         match &resultado {
+             Ok(()) => {
+                 self.validos.insert(hash, true);
++                // `ORDEN-W06d7`: la selección FC-3 entre terminales se recalcula **aquí**, después
++                // de marcar `hash` como válido — no dentro de `admitir_pow`/`admitir_post`. Un bloque
++                // PoST recién admitido participa en `tips_validas_de`/`dag_virtual_de` (que filtran
++                // por `Self::es_valido`) solo a partir de este punto; recalcular la selección antes
++                // (como hacía una versión previa de este cambio) veía una vista atrasada de un
++                // bloque —el que se acaba de admitir con éxito—, y un empate de `blue_work` que este
++                // mismo bloque resolvía se evaluaba con el estado de un paso antes: no violaba
++                // ningún invariante de aplicación (`past`/`post` ya estaban completos), pero sí I-3
++                // por un paso de más entre "admitido" y "contado para la selección".
++                self.recalcular_seleccion();
+             }
+             Err(motivo) => {
+                 self.validos.insert(hash, false);
+@@ -282,17 +408,8 @@
+         resultado
+     }
+ 
+-    /// ¿Depende `bloque` de algo (un padre, o el terminal) que esta `Cadena` todavía no tiene?
+-    ///
+-    /// Réplica, **de solo lectura**, exactamente las comprobaciones de disponibilidad que
+-    /// `admitir_pow`/`chequear_forma` hacen de todas formas (mismo padre, misma noción de
+-    /// "conocido y válido", mismo terminal); duplicarlas aquí es necesario porque esta comprobación
+-    /// se hace **antes** de decidir si el resultado se cachea, y ese antes tiene que ser anterior a
+-    /// cualquier mutación del DAG (`anadir_al_dag`). Un padre **conocido y definitivamente
+-    /// inválido** también cuenta como "no disponible" aquí (en vez de "definitivamente inválido
+-    /// para siempre"): es una posición conservadora, nunca insegura — el peor caso es repetir el
+-    /// cómputo si alguien reenvía el mismo bloque doomed, no cachear por error un huérfano como
+-    /// inválido para siempre.
++    /// ¿Depende `bloque` de algo (un padre PoW, o **cualquier** terminal candidato para un PoST)
++    /// que esta `Cadena` todavía no tiene?
+     #[must_use]
+     fn dependencia_no_disponible(&self, bloque: &BloqueCadena) -> bool {
+         match bloque {
+@@ -300,12 +417,12 @@
+                 .padre_seleccionado()
+                 .is_some_and(|p| !self.post.contains_key(&p)),
+             BloqueCadena::Post(p) => {
+-                let Some(terminal) = self.terminal else {
++                if self.terminal_candidatos.is_empty() {
+                     return true;
+-                };
++                }
+                 p.padres
+                     .iter()
+-                    .any(|x| *x != terminal && !self.es_valido(x))
++                    .any(|x| !self.terminal_candidatos.contains(x) && !self.es_valido(x))
+             }
+         }
+     }
+@@ -313,10 +430,6 @@
+     /// Procesa un conjunto de bloques con un orden de llegada arbitrario, reintentando los que
+     /// tienen padres aún no procesados (espejo de `resolver!`/`padres_listos` del oráculo T04).
+     ///
+-    /// `llegada` es una permutación de índices de `bloques`. Un bloque cuyo padre no está en el
+-    /// conjunto se procesa y falla con `ErrSinPadre`; uno cuyo padre está pero aún no se procesó se
+-    /// reintenta.
+-    ///
+     /// # Errores
+     /// `ErrSinPadre` si no se puede progresar (ciclo o padre ausente no rechazable).
+     pub fn resolver(
+@@ -359,7 +472,7 @@
+             return true;
+         }
+         for p in b.padres() {
+-            if Some(p) == self.terminal {
++            if self.terminal_candidatos.contains(&p) {
+                 continue;
+             }
+             if !self.por_hash.contains_key(&p) {
+@@ -376,9 +489,7 @@
+     ///
+     /// Cada bloque se valida contra el estado de **su padre declarado** (`self.post.get(&p)`), no
+     /// contra ninguna noción de "la punta": dos bloques con el mismo padre (una bifurcación PoW) se
+-    /// admiten los dos, cada uno con su propio `Estado(past)`/`Estado(post)` independiente. Es lo
+-    /// que hace posible una bifurcación PoW real sin ningún "undo": los dos ya coexisten en `past`/
+-    /// `post`, indexados por hash (`ORDEN-W06d3` decisión 3).
++    /// admiten los dos, cada uno con su propio `Estado(past)`/`Estado(post)` independiente.
+     fn admitir_pow(&mut self, bloque: &BloqueCadena) -> Result<(), MotivoBloque> {
+         let (hash, padre) = match bloque {
+             BloqueCadena::Pow(b) => (b.hash(), b.padre()),
+@@ -406,42 +517,119 @@
+         }
+         self.tips_pow.insert(hash);
+ 
+-        // FC-3 (`P-ZRX/P-TRANSICION/ORDEN-T01.md` §159): sin ningún sufijo PoST, el terminal es el
+-        // de mayor trabajo PoW entre los que ya cumplen las condiciones de corte, no el primero que
+-        // llegó. Se congela para siempre en cuanto se admite el primer bloque PoST (`self.dag` deja
+-        // de ser `None`): a partir de ahí cambiar el terminal invalidaría todo el DAG construido
+-        // sobre él, así que ni se busca un candidato nuevo ni se recalcula.
+-        let dag_ya_existe = self.dag.is_some();
+-        if !dag_ya_existe
+-            && let Some(altura) = bloque.como_transicion().hechos.altura()
+-            && es_terminal_condiciones(&nuevo, &self.params, altura)
+-        {
+-            self.terminal_candidatos.insert(hash);
+-        }
++        // `ORDEN-W06d7` decisión 1: ya no se congela el primer terminal (hallazgo de W06d6); se
++        // sigue registrando cualquier candidato nuevo, tenga o no otro terminal ya un DAG.
++        let es_candidato = bloque
++            .como_transicion()
++            .hechos
++            .altura()
++            .is_some_and(|altura| es_terminal_condiciones(&nuevo, &self.params, altura))
++            && self.es_primero_en_rama(padre);
++
+         self.past.insert(hash, estado_padre);
+         self.post.insert(hash, nuevo);
+-        if !dag_ya_existe {
+-            self.recalcular_terminal();
++
++        if es_candidato {
++            self.terminal_candidatos.insert(hash);
++            // La recomputación de la selección FC-3 la hace `Cadena::admitir` (el llamante), después
++            // de marcar `hash` como válido (`ORDEN-W06d7`, ver su comentario).
+         }
+         Ok(())
+     }
+ 
+-    /// Recalcula, entre [`Self::terminal_candidatos`], cuál es el terminal según FC-3: mayor
+-    /// `Estado::trabajo` acumulado (empate: hash menor, determinista y ajeno al orden de llegada).
+-    /// Solo se llama mientras `self.dag.is_none()` (sin sufijo PoST todavía): una vez congelado, el
+-    /// terminal ya no se toca desde aquí.
+-    fn recalcular_terminal(&mut self) {
+-        let mejor = self.terminal_candidatos.iter().copied().min_by(|a, b| {
+-            let wa = self.post.get(a).map(|e| e.trabajo).unwrap_or_default();
+-            let wb = self.post.get(b).map(|e| e.trabajo).unwrap_or_default();
+-            wb.cmp(&wa).then_with(|| a.cmp(b))
+-        });
+-        if let Some(hash) = mejor
+-            && let Some(estado) = self.post.get(&hash).cloned()
+-        {
+-            self.terminal = Some(hash);
+-            self.estado_t = estado;
++    /// ¿Es `hash` (de padre `padre`) el **primer** bloque de su rama en cumplir
++    /// `es_terminal_condiciones` (`TRN-04`: «ningún ancestro suyo cumple las tres condiciones»)?
++    fn es_primero_en_rama(&self, padre: Option<BlockHash>) -> bool {
++        let mut actual = padre;
++        while let Some(p) = actual {
++            if self.terminal_candidatos.contains(&p) {
++                return false;
++            }
++            actual = match self.por_hash.get(&p) {
++                Some(BloqueCadena::Pow(bt)) => bt.padre(),
++                _ => None,
++            };
++        }
++        true
++    }
++
++    /// Trabajo PoW acumulado de `hash`, si se conoce (`U256::zero()` si no).
++    fn trabajo_de(&self, hash: &BlockHash) -> U256 {
++        self.post.get(hash).map(|e| e.trabajo).unwrap_or_default()
++    }
++
++    /// Mejor terminal candidato **sin** ningún DAG con sufijo (fase puramente PoW, `TRN-09`
++    /// primera cláusula): mayor trabajo acumulado, empate por menor hash.
++    fn mejor_terminal_por_trabajo(&self) -> Option<BlockHash> {
++        self.terminal_candidatos.iter().copied().min_by(|a, b| {
++            self.trabajo_de(b)
++                .cmp(&self.trabajo_de(a))
++                .then_with(|| a.cmp(b))
++        })
++    }
++
++    /// `Rank` (`blue_work`, `solution_distance`, `id`) del virtual de un terminal con DAG, si existe.
++    fn rank_virtual_de(&self, terminal: BlockHash) -> Option<Rank> {
++        let virtual_dag = self.dag_virtual_de(terminal).ok().flatten()?;
++        virtual_dag.dag.rank(virtual_dag.idx)
++    }
++
++    /// Mejor terminal candidato por FC-3 (`TRN-09`): sin ningún sufijo PoST conocido, por trabajo
++    /// PoW; en cuanto alguno tiene sufijo, solo esos compiten por `blue_work` de su virtual,
++    /// desempate por [`comparar_terminal`] (reutilizado de `zx_consensus::transicion`, menor hash) y,
++    /// si aún empata, por la regla `C-GD` completa (`solution_distance`, `id`) — inalcanzable en la
++    /// práctica porque dos terminales son hashes distintos, pero se conserva por completitud
++    /// (`ORDEN-W06d7` decisión 2, «después la de C-GD»).
++    fn mejor_terminal_candidato(&self) -> Option<BlockHash> {
++        if self.dags.is_empty() {
++            return self.mejor_terminal_por_trabajo();
++        }
++        self.dags.keys().copied().min_by(|a, b| {
++            let ra = self.rank_virtual_de(*a);
++            let rb = self.rank_virtual_de(*b);
++            comparar_blue_work(ra, rb)
++                .then_with(|| comparar_terminal(Some(*a), Some(*b)).reverse())
++                .then_with(|| comparar_rank(ra, rb))
++        })
++    }
++
++    /// `slot` máximo entre las puntas válidas del DAG de `terminal` (0 si no tiene DAG o no tiene
++    /// puntas todavía): es `d` para `C-FIN-01` entre terminales, con `s_0 = 0` (`CONTRATO-v0.md` §1).
++    fn slot_max_de(&self, terminal: BlockHash) -> u64 {
++        self.tips_validas_de(terminal)
++            .iter()
++            .filter_map(|h| self.por_hash.get(h).and_then(BloqueCadena::slot))
++            .max()
++            .unwrap_or(0)
++    }
++
++    /// Recalcula el terminal seleccionado tras un cambio (nuevo candidato o nuevo bloque PoST):
++    /// FC-3 (`TRN-09`) con `C-FIN-01` entre terminales (`ORDEN-W06d7` decisión 3): un nodo en línea
++    /// no sustituye su terminal si el sufijo actual ya abarca `≥ F_slots` desde el corte.
++    fn recalcular_seleccion(&mut self) {
++        if let Some(nuevo) = self.mejor_terminal_candidato() {
++            let acepta = match self.terminal_seleccionado {
++                None => true,
++                Some(actual) if actual == nuevo => false,
++                Some(actual) => match self.dags.get(&actual) {
++                    None => true,
++                    Some(_) => {
++                        let d = self.slot_max_de(actual);
++                        match self.params.f_slots {
++                            None => true,
++                            Some(tope) => d < tope,
++                        }
++                    }
++                },
++            };
++            if acepta {
++                self.terminal_seleccionado = Some(nuevo);
++            }
+         }
++        self.estado_t = self
++            .terminal_seleccionado
++            .and_then(|t| self.post.get(&t).cloned())
++            .unwrap_or_else(Estado::inicial);
+     }
+ 
+     /// Mejor punta PoW conocida por trabajo acumulado (empate: hash menor), sea o no ya terminal
+@@ -450,9 +638,9 @@
+     #[must_use]
+     pub fn mejor_punta_pow(&self) -> Option<BlockHash> {
+         self.tips_pow.iter().copied().min_by(|a, b| {
+-            let wa = self.post.get(a).map(|e| e.trabajo).unwrap_or_default();
+-            let wb = self.post.get(b).map(|e| e.trabajo).unwrap_or_default();
+-            wb.cmp(&wa).then_with(|| a.cmp(b))
++            self.trabajo_de(b)
++                .cmp(&self.trabajo_de(a))
++                .then_with(|| a.cmp(b))
+         })
+     }
+ 
+@@ -463,16 +651,48 @@
+         self.post.get(hash).map(|e| e.trabajo)
+     }
+ 
+-    /// Admite un bloque PoST: forma, GHOSTDAG, `Estado(past(B))`, garantía y `post(B)`.
++    /// Terminal al que resuelve un padre declarado: el propio hash si es un terminal candidato, o
++    /// el terminal del bloque PoST ya admitido en ese hash.
++    fn terminal_de_padre(&self, x: &BlockHash) -> Option<BlockHash> {
++        if self.terminal_candidatos.contains(x) {
++            Some(*x)
++        } else {
++            self.post_terminal.get(x).copied()
++        }
++    }
++
++    /// Terminal único al que pertenecen **todos** los padres de `p` (`ORDEN-W06d7` decisión 1: un
++    /// bloque PoST pertenece al DAG del terminal de su pasado).
++    ///
++    /// # Errores
++    /// `ErrSinPadre` si algún padre es desconocido o inválido; `ErrTerminalAmbiguo` si los padres
++    /// resuelven a más de un terminal distinto (`I-4`).
++    fn terminal_de_bloque_post(&self, p: &BloquePost) -> Result<BlockHash, MotivoBloque> {
++        let mut terminal_ref: Option<BlockHash> = None;
++        for x in &p.padres {
++            let Some(t) = self.terminal_de_padre(x) else {
++                return Err(MotivoBloque::ErrSinPadre);
++            };
++            match terminal_ref {
++                None => terminal_ref = Some(t),
++                Some(prev) if prev != t => return Err(MotivoBloque::ErrTerminalAmbiguo),
++                Some(_) => {}
++            }
++        }
++        terminal_ref.ok_or(MotivoBloque::ErrSinPadre)
++    }
++
++    /// Admite un bloque PoST: forma, terminal de su pasado, GHOSTDAG, `Estado(past(B))`, garantía y
++    /// `post(B)` (`ORDEN-W06d7`: opera sobre el [`DagTerminal`] de `p`, no necesariamente el
++    /// seleccionado).
+     fn admitir_post(&mut self, bloque: &BloqueCadena) -> Result<(), MotivoBloque> {
+         let BloqueCadena::Post(p) = bloque else {
+             return Err(MotivoBloque::ErrSinPadre);
+         };
+-        self.chequear_forma(p)?;
+-        let terminal = self.terminal.ok_or(MotivoBloque::ErrSinPadre)?;
+-        self.inicializar_dag(terminal);
+-        let idx = self.anadir_al_dag(p)?;
+-        let base = self.estado_past_de_idx(idx, p)?;
++        let terminal = self.chequear_forma(p)?;
++        self.dag_de_terminal_mut(terminal)?;
++        let idx = self.anadir_al_dag(terminal, p)?;
++        let base = self.estado_past_de_idx(terminal, idx, p)?;
+         self.comprobar_garantia(&base, p)?;
+         let (mut nuevo, _undo, desc) = aplicar_fusion(
+             &base,
+@@ -492,11 +712,17 @@
+         self.past.insert(p.hash, base);
+         self.post.insert(p.hash, nuevo);
+         self.descartes.insert(p.hash, desc);
++        self.post_terminal.insert(p.hash, terminal);
++        // La recomputación de la selección FC-3 la hace `Cadena::admitir` (el llamante), después de
++        // marcar `p.hash` como válido: solo entonces `tips_validas_de`/`dag_virtual_de` (que filtran
++        // por `Self::es_valido`) cuentan este bloque para el `blue_work` de su terminal
++        // (`ORDEN-W06d7`, ver el comentario en `Cadena::admitir`).
+         Ok(())
+     }
+ 
+-    /// Comprueba forma y padres sin tocar el DAG (`ORDEN-W06a` §3, T04 `chequear_forma`).
+-    fn chequear_forma(&self, p: &BloquePost) -> Result<(), MotivoBloque> {
++    /// Comprueba forma y padres sin tocar el DAG (`ORDEN-W06a` §3, T04 `chequear_forma`); resuelve
++    /// y devuelve el terminal único de `p` (`ORDEN-W06d7`).
++    fn chequear_forma(&self, p: &BloquePost) -> Result<BlockHash, MotivoBloque> {
+         if p.padres.is_empty() {
+             return Err(MotivoBloque::ErrSinPadre);
+         }
+@@ -506,7 +732,7 @@
+                 return Err(MotivoBloque::ErrSinPadre);
+             }
+         }
+-        let terminal = self.terminal.ok_or(MotivoBloque::ErrSinPadre)?;
++        let terminal = self.terminal_de_bloque_post(p)?;
+         if p.padres.contains(&terminal) && p.padres.len() != 1 {
+             return Err(MotivoBloque::ErrSinPadre);
+         }
+@@ -548,10 +774,7 @@
+         }
+         // SL-4c (§3.2): la forma de la `EvidenceTx` v4 (`EV-04`, `RAT-1`, `EV-01`) es forma de
+         // bloque y se comprueba **antes** de la garantía del productor y de la semántica, igual
+-        // que `chequear_forma_evidencia` del oráculo T04 (`EstadoDAG.jl:292-294`). Sin esto, un
+-        // bloque con una evidencia defectuosa y un productor sin garantía daría `ErrGarantia` en
+-        // vez de `ErrForma(...)`. La evidencia sin cabeceras (`ExtensionTx::Ninguna`) no se toca
+-        // aquí: sigue siendo un rechazo semántico.
++        // que `chequear_forma_evidencia` del oráculo T04 (`EstadoDAG.jl:292-294`).
+         if self.evidencia.evp {
+             for (tx, testigos) in &p.txs {
+                 if tx.version == 4 && matches!(tx.extension, ExtensionTx::Evidencia { .. }) {
+@@ -560,40 +783,52 @@
+                 }
+             }
+         }
+-        Ok(())
++        Ok(terminal)
+     }
+ 
+-    /// Inicializa el almacén GHOSTDAG con el terminal como raíz (D-P07).
+-    fn inicializar_dag(&mut self, terminal: BlockHash) {
+-        if self.dag.is_some() {
+-            return;
++    /// Consigue (o crea) el [`DagTerminal`] de `terminal`, aplicando el tope
++    /// [`MAX_TERMINALES_CON_DAG`] (`ORDEN-W06d7` decisión 4): si ya hay 8 y `terminal` es nuevo, se
++    /// desaloja al peor (menor trabajo PoW) si `terminal` lo supera; si no, se ignora
++    /// (`ErrLimiteTerminales`) y se marca [`Cadena::limite_terminales_alcanzado`].
++    fn dag_de_terminal_mut(
++        &mut self,
++        terminal: BlockHash,
++    ) -> Result<&mut DagTerminal, MotivoBloque> {
++        if !self.dags.contains_key(&terminal) {
++            if self.dags.len() >= MAX_TERMINALES_CON_DAG {
++                let Some(peor) = self.dags.keys().copied().min_by(|a, b| {
++                    self.trabajo_de(a)
++                        .cmp(&self.trabajo_de(b))
++                        .then_with(|| b.cmp(a))
++                }) else {
++                    // Inalcanzable: `self.dags.len() >= MAX_TERMINALES_CON_DAG > 0` garantiza al
++                    // menos una clave. Defensivo, no un pánico: se trata como el mismo rechazo que
++                    // el resto de este método ante un estado interno inesperado.
++                    return Err(MotivoBloque::ErrLimiteTerminales);
++                };
++                self.limite_alcanzado = true;
++                if self.trabajo_de(&terminal) <= self.trabajo_de(&peor) {
++                    return Err(MotivoBloque::ErrLimiteTerminales);
++                }
++                self.dags.remove(&peor);
++            }
++            self.dags.insert(
++                terminal,
++                DagTerminal::nueva(terminal, self.k, self.max_padres),
++            );
+         }
+-        let params = ParametrosGhostdag {
+-            k: self.k,
+-            max_padres: self.max_padres,
+-            mergeset_limite: MERGESET_LIMITE_ORACULO,
+-            s_max: u64::MAX,
+-            u2: true,
+-            u3_dinamica: true,
+-            sp: ModoSp::Zerox,
+-            merge: ModoMerge::Terna,
+-        };
+-        let dag = AlmacenGhostdag::con_raiz_terminal(
+-            params,
+-            Algoritmo::Referencia,
+-            terminal,
+-            RangoSolucionValidado::para_oraculos(0),
+-        );
+-        self.dag = Some(dag);
+-        self.dag_idx.insert(terminal, 0);
++        self.dags
++            .get_mut(&terminal)
++            .ok_or(MotivoBloque::ErrSinPadre)
+     }
+ 
+-    /// Añade un bloque PoST al DAG y guarda sus datos para reconstruirlo.
+-    fn anadir_al_dag(&mut self, p: &BloquePost) -> Result<Idx, MotivoBloque> {
+-        let Some(dag) = self.dag.as_mut() else {
++    /// Añade un bloque PoST al DAG de `terminal` y guarda sus datos para reconstruirlo.
++    fn anadir_al_dag(&mut self, terminal: BlockHash, p: &BloquePost) -> Result<Idx, MotivoBloque> {
++        let Some(dt) = self.dags.get_mut(&terminal) else {
+             return Err(MotivoBloque::ErrSinPadre);
+         };
+-        let idx = dag
++        let idx = dt
++            .dag
+             .anadir_sintetico(bloque_ghostdag(
+                 p.hash,
+                 &p.padres,
+@@ -603,9 +838,9 @@
+                 p.identidad,
+             ))
+             .map_err(|e| mapear_error_dag(&e))?;
+-        self.dag_idx.insert(p.hash, idx);
+-        self.dag_orden.push(p.hash);
+-        self.dag_datos.insert(
++        dt.dag_idx.insert(p.hash, idx);
++        dt.dag_orden.push(p.hash);
++        dt.dag_datos.insert(
+             p.hash,
+             DatosDag {
+                 padres: p.padres.clone(),
+@@ -618,27 +853,40 @@
+         Ok(idx)
+     }
+ 
+-    /// `Estado(past(B))` para el bloque `p` ya coloreado en el índice `idx` (`ED-2`, `RD-4`).
+-    fn estado_past_de_idx(&self, idx: Idx, p: &BloquePost) -> Result<Estado, MotivoBloque> {
+-        let Some(dag) = self.dag.as_ref() else {
++    /// `Estado(past(B))` para el bloque `p` ya coloreado en el índice `idx` del DAG de `terminal`
++    /// (`ED-2`, `RD-4`).
++    fn estado_past_de_idx(
++        &self,
++        terminal: BlockHash,
++        idx: Idx,
++        p: &BloquePost,
++    ) -> Result<Estado, MotivoBloque> {
++        let Some(dt) = self.dags.get(&terminal) else {
+             return Err(MotivoBloque::ErrSinPadre);
+         };
+-        let gd = dag.datos(idx).ok_or(MotivoBloque::ErrSinPadre)?;
++        let gd = dt.dag.datos(idx).ok_or(MotivoBloque::ErrSinPadre)?;
+         let sp = gd.sp.ok_or(MotivoBloque::ErrSinPadre)?;
+         let mut base = if sp == 0 {
+-            self.estado_t.clone()
++            self.post
++                .get(&terminal)
++                .cloned()
++                .ok_or(MotivoBloque::ErrSinPadre)?
+         } else {
+-            let sp_hash = self.hash_de_idx(sp).ok_or(MotivoBloque::ErrSinPadre)?;
++            let sp_hash = self
++                .hash_de_idx(terminal, sp)
++                .ok_or(MotivoBloque::ErrSinPadre)?;
+             self.post
+                 .get(&sp_hash)
+                 .cloned()
+                 .ok_or(MotivoBloque::ErrSinPadre)?
+         };
+         for x_idx in &gd.orden_mergeset {
+-            if dag.color_en(idx, *x_idx) == Some(Color::RojoU3) {
++            if dt.dag.color_en(idx, *x_idx) == Some(Color::RojoU3) {
+                 continue;
+             }
+-            let x_hash = self.hash_de_idx(*x_idx).ok_or(MotivoBloque::ErrSinPadre)?;
++            let x_hash = self
++                .hash_de_idx(terminal, *x_idx)
++                .ok_or(MotivoBloque::ErrSinPadre)?;
+             let Some(x) = self.por_hash.get(&x_hash) else {
+                 return Err(MotivoBloque::ErrSinPadre);
+             };
+@@ -673,16 +921,27 @@
+         Ok(())
+     }
+ 
+-    /// Puntas válidas: bloques PoST válidos sin hijo válido (`tips_validas` del oráculo).
++    /// Puntas válidas del terminal **seleccionado** (`tips_validas` del oráculo).
+     #[must_use]
+     pub fn tips_validas(&self) -> Vec<BlockHash> {
++        self.terminal_seleccionado
++            .map(|t| self.tips_validas_de(t))
++            .unwrap_or_default()
++    }
++
++    /// Puntas válidas de un terminal concreto: bloques PoST válidos de su DAG sin hijo válido.
++    #[must_use]
++    pub fn tips_validas_de(&self, terminal: BlockHash) -> Vec<BlockHash> {
+         let mut con_hijo = BTreeSet::new();
+         for (hash, bloque) in &self.por_hash {
+             if !matches!(bloque, BloqueCadena::Post(_)) || !self.es_valido(hash) {
+                 continue;
+             }
++            if self.post_terminal.get(hash) != Some(&terminal) {
++                continue;
++            }
+             for padre in bloque.padres() {
+-                if Some(padre) == self.terminal {
++                if padre == terminal {
+                     continue;
+                 }
+                 if self.es_valido(&padre) {
+@@ -696,6 +955,7 @@
+             .filter(|(hash, bloque)| {
+                 matches!(bloque, BloqueCadena::Post(_))
+                     && self.es_valido(hash)
++                    && self.post_terminal.get(*hash) == Some(&terminal)
+                     && !con_hijo.contains(*hash)
+             })
+             .map(|(hash, _)| *hash)
+@@ -704,25 +964,42 @@
+         tips
+     }
+ 
+-    /// Mejor punta por la regla C: mayor `blue_work`, menor `sd`, menor id (`C-GD-03`).
++    /// Mejor punta del terminal **seleccionado** por la regla C: mayor `blue_work`, menor `sd`,
++    /// menor id (`C-GD-03`).
+     #[must_use]
+     pub fn mejor_punta(&self) -> Option<BlockHash> {
+-        let tips = self.tips_validas();
++        self.terminal_seleccionado
++            .and_then(|t| self.mejor_punta_de(t))
++    }
++
++    /// Como [`Cadena::mejor_punta`], para un terminal concreto.
++    #[must_use]
++    pub fn mejor_punta_de(&self, terminal: BlockHash) -> Option<BlockHash> {
++        let tips = self.tips_validas_de(terminal);
+         if tips.is_empty() {
+             return None;
+         }
+-        let dag = self.dag.as_ref()?;
++        let dt = self.dags.get(&terminal)?;
+         tips.into_iter().min_by(|a, b| {
+-            let ra = self.dag_idx.get(a).and_then(|i| dag.rank(*i));
+-            let rb = self.dag_idx.get(b).and_then(|i| dag.rank(*i));
++            let ra = dt.dag_idx.get(a).and_then(|i| dt.dag.rank(*i));
++            let rb = dt.dag_idx.get(b).and_then(|i| dt.dag.rank(*i));
+             comparar_rank(ra, rb)
+         })
+     }
+ 
+-    /// Cadena seleccionada desde la virtual, sin el terminal (`cadena_virtual`).
++    /// Cadena seleccionada desde la virtual del terminal **seleccionado**, sin el terminal
++    /// (`cadena_virtual`).
+     #[must_use]
+     pub fn cadena_virtual(&self) -> Vec<BlockHash> {
+-        let Some(virtual_dag) = self.dag_virtual().ok().flatten() else {
++        self.terminal_seleccionado
++            .map(|t| self.cadena_virtual_de(t))
++            .unwrap_or_default()
++    }
++
++    /// Como [`Cadena::cadena_virtual`], para un terminal concreto.
++    #[must_use]
++    pub fn cadena_virtual_de(&self, terminal: BlockHash) -> Vec<BlockHash> {
++        let Some(virtual_dag) = self.dag_virtual_de(terminal).ok().flatten() else {
+             return Vec::new();
+         };
+         let Some(sp) = virtual_dag.dag.datos(virtual_dag.idx).and_then(|g| g.sp) else {
+@@ -733,15 +1010,24 @@
+             .cadena_seleccionada(sp)
+             .into_iter()
+             .filter(|i| *i != 0)
+-            .filter_map(|i| self.hash_de_idx(i))
++            .filter_map(|i| self.hash_de_idx(terminal, i))
+             .collect()
+     }
+ 
+-    /// Bloques `rojo_U3` inertes en la historia seleccionada (`u3_virtual`).
++    /// Bloques `rojo_U3` inertes en la historia seleccionada del terminal seleccionado
++    /// (`u3_virtual`).
+     #[must_use]
+     pub fn u3_virtual(&self) -> BTreeSet<BlockHash> {
++        self.terminal_seleccionado
++            .map(|t| self.u3_virtual_de(t))
++            .unwrap_or_default()
++    }
++
++    /// Como [`Cadena::u3_virtual`], para un terminal concreto.
++    #[must_use]
++    pub fn u3_virtual_de(&self, terminal: BlockHash) -> BTreeSet<BlockHash> {
+         let mut inertes = BTreeSet::new();
+-        let Ok(Some(virtual_dag)) = self.dag_virtual() else {
++        let Ok(Some(virtual_dag)) = self.dag_virtual_de(terminal) else {
+             return inertes;
+         };
+         let Some(sp) = virtual_dag.dag.datos(virtual_dag.idx).and_then(|g| g.sp) else {
+@@ -754,7 +1040,7 @@
+             if let Some(gd) = virtual_dag.dag.datos(g) {
+                 for x in &gd.orden_mergeset {
+                     if virtual_dag.dag.color_en(g, *x) == Some(Color::RojoU3)
+-                        && let Some(h) = self.hash_de_idx(*x)
++                        && let Some(h) = self.hash_de_idx(terminal, *x)
+                     {
+                         inertes.insert(h);
+                     }
+@@ -764,7 +1050,7 @@
+         if let Some(gd) = virtual_dag.dag.datos(virtual_dag.idx) {
+             for x in &gd.orden_mergeset {
+                 if virtual_dag.dag.color_en(virtual_dag.idx, *x) == Some(Color::RojoU3)
+-                    && let Some(h) = self.hash_de_idx(*x)
++                    && let Some(h) = self.hash_de_idx(terminal, *x)
+                 {
+                     inertes.insert(h);
+                 }
+@@ -773,27 +1059,47 @@
+         inertes
+     }
+ 
+-    /// `Estado(past(V))` (`ED-3`): merge­set completo de `V` en orden `C-GD-05`, sin `rojo_U3`.
++    /// `Estado(past(V))` (`ED-3`) del terminal **seleccionado**: merge­set completo de `V` en orden
++    /// `C-GD-05`, sin `rojo_U3`.
+     ///
+     /// # Errores
+     /// Un fallo de aplicación en modo fusión.
+     pub fn estado_virtual(&self) -> Result<Estado, MotivoBloque> {
+-        let Ok(Some(virtual_dag)) = self.dag_virtual() else {
+-            return Ok(self.estado_t.clone());
++        match self.terminal_seleccionado {
++            Some(t) => self.estado_virtual_de(t),
++            None => Ok(self.estado_t.clone()),
++        }
++    }
++
++    /// Como [`Cadena::estado_virtual`], para un terminal concreto.
++    ///
++    /// # Errores
++    /// Un fallo de aplicación en modo fusión.
++    pub fn estado_virtual_de(&self, terminal: BlockHash) -> Result<Estado, MotivoBloque> {
++        let estado_terminal = || {
++            self.post
++                .get(&terminal)
++                .cloned()
++                .unwrap_or_else(Estado::inicial)
++        };
++        let Ok(Some(virtual_dag)) = self.dag_virtual_de(terminal) else {
++            return Ok(estado_terminal());
+         };
+         let Some(sp) = virtual_dag.dag.datos(virtual_dag.idx).and_then(|g| g.sp) else {
+-            return Ok(self.estado_t.clone());
++            return Ok(estado_terminal());
+         };
+         let mut estado = if sp == 0 {
+-            self.estado_t.clone()
++            estado_terminal()
+         } else {
+-            let sp_hash = self.hash_de_idx(sp).ok_or(MotivoBloque::ErrSinPadre)?;
++            let sp_hash = self
++                .hash_de_idx(terminal, sp)
++                .ok_or(MotivoBloque::ErrSinPadre)?;
+             self.post
+                 .get(&sp_hash)
+                 .cloned()
+                 .ok_or(MotivoBloque::ErrSinPadre)?
+         };
+-        for x_idx in self.mergeset_virtual(&virtual_dag) {
++        for x_idx in self.mergeset_virtual(terminal, &virtual_dag) {
+             let Some(x) = self.por_hash.get(&x_idx) else {
+                 return Err(MotivoBloque::ErrSinPadre);
+             };
+@@ -810,8 +1116,8 @@
+         Ok(estado)
+     }
+ 
+-    /// Recomputa desde `Estado(T)` la historia seleccionada (`R-FIN-8′(4)`): por cada bloque de
+-    /// cadena, su merge­set a `slot(C)` y luego `C`; al final el merge­set de `V` a `slot(V)`.
++    /// Recomputa desde `Estado(T)` la historia seleccionada del terminal **seleccionado**
++    /// (`R-FIN-8′(4)`).
+     ///
+     /// # Errores
+     /// Un fallo de aplicación en modo fusión.
+@@ -828,16 +1134,26 @@
+     /// # Errores
+     /// Un fallo de aplicación en modo fusión.
+     pub fn aplicar_historia_completa(&self) -> Result<HistoriaAplicada, MotivoBloque> {
+-        let Ok(Some(virtual_dag)) = self.dag_virtual() else {
++        let Some(terminal) = self.terminal_seleccionado else {
++            return Ok((self.estado_t.clone(), Vec::new(), Vec::new(), Vec::new()));
++        };
++        let Ok(Some(virtual_dag)) = self.dag_virtual_de(terminal) else {
+             return Ok((self.estado_t.clone(), Vec::new(), Vec::new(), Vec::new()));
+         };
+         let Some(sp) = virtual_dag.dag.datos(virtual_dag.idx).and_then(|g| g.sp) else {
+             return Ok((self.estado_t.clone(), Vec::new(), Vec::new(), Vec::new()));
+         };
+-        let (mut estado, mut orden, mut descartes, mut undos) =
+-            self.aplicar_cadena(&virtual_dag.dag, sp, Punto::Slot(0), self.estado_t.clone())?;
++        let (mut estado, mut orden, mut descartes, mut undos) = self.aplicar_cadena(
++            terminal,
++            &virtual_dag.dag,
++            sp,
++            self.post
++                .get(&terminal)
++                .cloned()
++                .unwrap_or_else(Estado::inicial),
++        )?;
+         // Merge­set de V a `slot(V)`.
+-        for x_hash in self.mergeset_virtual(&virtual_dag) {
++        for x_hash in self.mergeset_virtual(terminal, &virtual_dag) {
+             let Some(x) = self.por_hash.get(&x_hash) else {
+                 continue;
+             };
+@@ -871,22 +1187,27 @@
+         Ok(self.aplicar_historia_completa()?.1)
+     }
+ 
+-    /// Aplica la rama que termina en `punta` desde `Estado(T)` y devuelve los `Undo` por delta.
+-    ///
+-    /// Es la recomputación que necesita una reorganización (`ED-3`, `C-REORG`): el undo exacto se
+-    /// demuestra deshaciendo los deltas en orden inverso con [`Self::deshacer_historia`].
++    /// Aplica la rama que termina en `punta` desde `Estado(T)` de **su** terminal y devuelve los
++    /// `Undo` por delta (`ED-3`, `C-REORG`); resuelve el terminal de `punta` por
++    /// [`Cadena::terminal_de`].
+     ///
+     /// # Errores
+     /// Un fallo de aplicación en modo fusión, o una punta desconocida.
+     pub fn aplicar_rama(&self, punta: &BlockHash) -> Result<(Estado, Vec<Undo>), MotivoBloque> {
+-        let Some(dag) = self.dag.as_ref() else {
++        let terminal = self.terminal_de(punta).ok_or(MotivoBloque::ErrSinPadre)?;
++        let Some(dt) = self.dags.get(&terminal) else {
+             return Err(MotivoBloque::ErrSinPadre);
+         };
+-        let Some(idx) = self.dag_idx.get(punta).copied() else {
++        let Some(idx) = dt.dag_idx.get(punta).copied() else {
+             return Err(MotivoBloque::ErrSinPadre);
+         };
++        let estado_inicial = self
++            .post
++            .get(&terminal)
++            .cloned()
++            .unwrap_or_else(Estado::inicial);
+         let (estado, _orden, _desc, undos) =
+-            self.aplicar_cadena(dag, idx, Punto::Slot(0), self.estado_t.clone())?;
++            self.aplicar_cadena(terminal, &dt.dag, idx, estado_inicial)?;
+         Ok((estado, undos))
+     }
+ 
+@@ -901,13 +1222,13 @@
+         restaurado
+     }
+ 
+-    /// Aplica la cadena seleccionada desde `sp` (sin el merge­set de `V`) y devuelve el estado, el
+-    /// orden, los descartes y los undos.
++    /// Aplica la cadena seleccionada de `terminal` desde `sp` (sin el merge­set de `V`) y devuelve
++    /// el estado, el orden, los descartes y los undos.
+     fn aplicar_cadena(
+         &self,
++        terminal: BlockHash,
+         dag: &AlmacenGhostdag,
+         sp: Idx,
+-        _punto_inicial: Punto,
+         estado_inicial: Estado,
+     ) -> Result<HistoriaAplicada, MotivoBloque> {
+         let mut estado = estado_inicial;
+@@ -918,7 +1239,9 @@
+             if g == 0 {
+                 continue;
+             }
+-            let c_hash = self.hash_de_idx(g).ok_or(MotivoBloque::ErrSinPadre)?;
++            let c_hash = self
++                .hash_de_idx(terminal, g)
++                .ok_or(MotivoBloque::ErrSinPadre)?;
+             let Some(c) = self.por_hash.get(&c_hash) else {
+                 return Err(MotivoBloque::ErrSinPadre);
+             };
+@@ -930,7 +1253,9 @@
+                 if dag.color_en(g, *x_idx) == Some(Color::RojoU3) {
+                     continue;
+                 }
+-                let x_hash = self.hash_de_idx(*x_idx).ok_or(MotivoBloque::ErrSinPadre)?;
++                let x_hash = self
++                    .hash_de_idx(terminal, *x_idx)
++                    .ok_or(MotivoBloque::ErrSinPadre)?;
+                 let Some(x) = self.por_hash.get(&x_hash) else {
+                     return Err(MotivoBloque::ErrSinPadre);
+                 };
+@@ -985,27 +1310,27 @@
+         Ok((estado, orden, descartes, undos))
+     }
+ 
+-    /// Hashes del merge­set de `V` a aplicar (sin `rojo_U3`), en orden `C-GD-05`.
+-    fn mergeset_virtual(&self, virtual_dag: &Virtual) -> Vec<BlockHash> {
++    /// Hashes del merge­set de `V` a aplicar (sin `rojo_U3`), en orden `C-GD-05`, para `terminal`.
++    fn mergeset_virtual(&self, terminal: BlockHash, virtual_dag: &Virtual) -> Vec<BlockHash> {
+         let Some(gd) = virtual_dag.dag.datos(virtual_dag.idx) else {
+             return Vec::new();
+         };
+         gd.orden_mergeset
+             .iter()
+             .filter(|x| virtual_dag.dag.color_en(virtual_dag.idx, **x) != Some(Color::RojoU3))
+-            .filter_map(|x| self.hash_de_idx(*x))
++            .filter_map(|x| self.hash_de_idx(terminal, *x))
+             .collect()
+     }
+ 
+-    /// Construye el almacén del virtual `V` reproduciendo la copia del GDR de T04.
+-    fn dag_virtual(&self) -> Result<Option<Virtual>, MotivoBloque> {
+-        let tips = self.tips_validas();
++    /// Construye el almacén del virtual `V` de `terminal` reproduciendo la copia del GDR de T04.
++    fn dag_virtual_de(&self, terminal: BlockHash) -> Result<Option<Virtual>, MotivoBloque> {
++        let Some(dt) = self.dags.get(&terminal) else {
++            return Ok(None);
++        };
++        let tips = self.tips_validas_de(terminal);
+         if tips.is_empty() {
+             return Ok(None);
+         }
+-        let Some(terminal) = self.terminal else {
+-            return Ok(None);
+-        };
+         if tips.len() > usize::from(zx_dag::ghostdag::MAX_PADRES_POR_DEFECTO) {
+             // T04 usa `max_parents = typemax` para `V`; `zx-dag` acota a `MAX_PADRES`.
+             return Err(MotivoBloque::ErrSinPadre);
+@@ -1031,8 +1356,8 @@
+             terminal,
+             RangoSolucionValidado::para_oraculos(0),
+         );
+-        for hash in &self.dag_orden {
+-            let Some(datos) = self.dag_datos.get(hash) else {
++        for hash in &dt.dag_orden {
++            let Some(datos) = dt.dag_datos.get(hash) else {
+                 return Err(MotivoBloque::ErrSinPadre);
+             };
+             dag.anadir_sintetico(bloque_ghostdag(
+@@ -1058,13 +1383,14 @@
+         Ok(Some(Virtual { dag, idx, slot }))
+     }
+ 
+-    /// Traduce un índice denso del DAG al `block_hash`.
+-    fn hash_de_idx(&self, idx: Idx) -> Option<BlockHash> {
++    /// Traduce un índice denso del DAG de `terminal` al `block_hash`.
++    fn hash_de_idx(&self, terminal: BlockHash, idx: Idx) -> Option<BlockHash> {
+         if idx == 0 {
+-            return self.terminal;
++            return Some(terminal);
+         }
++        let dt = self.dags.get(&terminal)?;
+         let pos = (idx as usize).checked_sub(1)?;
+-        self.dag_orden.get(pos).copied()
++        dt.dag_orden.get(pos).copied()
+     }
+ }
+ 
+@@ -1138,6 +1464,19 @@
+     }
+ }
+ 
++/// Comparador de **solo** `blue_work` entre virtuales de dos terminales (`ORDEN-W06d7` decisión 2,
++/// primera cláusula de FC-3 entre terminales); el desempate por hash y por el resto de `C-GD` va
++/// aparte (`comparar_terminal`, `comparar_rank`), porque el `id`/`solution_distance` del nodo
++/// sintético `V` no distingue terminales (es la misma constante en todos).
++fn comparar_blue_work(a: Option<Rank>, b: Option<Rank>) -> Ordering {
++    match (a, b) {
++        (Some(x), Some(y)) => y.blue_work.cmp(&x.blue_work),
++        (Some(_), None) => Ordering::Less,
++        (None, Some(_)) => Ordering::Greater,
++        (None, None) => Ordering::Equal,
++    }
++}
++
+ /// Traduce un rechazo de `zx-dag` al motivo de bloque del oráculo (`mapear_motivo_gdr`).
+ fn mapear_error_dag(error: &ErrorDag) -> MotivoBloque {
+     match error {
+diff -ruN '--exclude=target' ws.orig/crates/zx-cadena/src/error.rs ws/crates/zx-cadena/src/error.rs
+--- ws.orig/crates/zx-cadena/src/error.rs	2026-09-27 04:42:32.000000000 +0200
++++ ws/crates/zx-cadena/src/error.rs	2026-09-27 04:53:53.949157911 +0200
+@@ -41,6 +41,14 @@
+     /// El productor no alcanza `q` en `Estado(past(B))` promovido en `slot(B)` (`RD-9`, `TRN-07`).
+     #[error("ErrGarantia")]
+     ErrGarantia,
++    /// Los padres declarados resuelven a más de un terminal distinto: una historia tiene como
++    /// mucho un terminal (`I-4`, `ORDEN-W06d7` decisión 1).
++    #[error("ErrTerminalAmbiguo")]
++    ErrTerminalAmbiguo,
++    /// El terminal candidato no cabe en `MAX_TERMINALES_CON_DAG`: su trabajo PoW no supera al peor
++    /// de los ya admitidos con DAG propio (`ORDEN-W06d7` decisión 4).
++    #[error("ErrLimiteTerminales")]
++    ErrLimiteTerminales,
+     /// Un fallo del motor de transición que invalida el bloque (forma, etc.).
+     #[error("ErrTransicion: {0}")]
+     ErrTransicion(#[from] ErrorTransicion),
+@@ -59,6 +67,8 @@
+             Self::ErrU2 => "ErrU2",
+             Self::ErrMergeDepth => "ErrMergeDepth",
+             Self::ErrGarantia => "ErrGarantia",
++            Self::ErrTerminalAmbiguo => "ErrTerminalAmbiguo",
++            Self::ErrLimiteTerminales => "ErrLimiteTerminales",
+             Self::ErrTransicion(e) => e.nombre_t01(),
+         }
+     }
+diff -ruN '--exclude=target' ws.orig/crates/zx-cadena/src/lib.rs ws/crates/zx-cadena/src/lib.rs
+--- ws.orig/crates/zx-cadena/src/lib.rs	2026-09-27 04:42:32.000000000 +0200
++++ ws/crates/zx-cadena/src/lib.rs	2026-09-27 04:57:08.492166863 +0200
+@@ -10,5 +10,5 @@
+ pub mod error;
+ 
+ pub use bloque::{BloqueCadena, BloquePost};
+-pub use cadena::{Cadena, Descarte};
++pub use cadena::{Cadena, Descarte, MAX_TERMINALES_CON_DAG};
+ pub use error::MotivoBloque;
+diff -ruN '--exclude=target' ws.orig/crates/zx-cadena/tests/multiterminal.rs ws/crates/zx-cadena/tests/multiterminal.rs
+--- ws.orig/crates/zx-cadena/tests/multiterminal.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-cadena/tests/multiterminal.rs	2026-09-27 06:14:14.403478350 +0200
+@@ -0,0 +1,566 @@
++//! `ORDEN-W06d7` — FC-3 de verdad con varios terminales candidatos, cada uno con su propio DAG.
++//!
++//! Cubre el plan de verificación §5:
++//!
++//! - **V1**: I-3 por propiedades — historias con 2 o 3 terminales, sufijos PoST de tamaños
++//!   distintos (incluido un empate exacto de `blue_work`), en ≥ 200 órdenes aleatorios por
++//!   escenario (semilla fija): mismo terminal, misma punta, mismo estado virtual en todos.
++//! - **V2**: casos dirigidos — sufijo PoST más pesado en el terminal con menos trabajo PoW; bloque
++//!   con padres de dos terminales (`ErrTerminalAmbiguo`); cambio de terminal bloqueado por
++//!   `C-FIN-01`; noveno terminal ignorado (`MAX_TERMINALES_CON_DAG`); reinicio que repite el
++//!   registro y acaba con la misma selección.
++//!
++//! **Tabla de cobertura** (`ORDEN-W06d7.md` §5): 0 terminales con sufijo — cubierto por
++//! `crates/zx-cadena/tests/*` existentes (fase PoW pura, sin tocar en esta orden); 1 terminal — los
++//! diferenciales T01/T04 y `contexto_dag.rs`; 2 terminales — `dos_terminales_pequeno` (V1) y
++//! `directed_terminal_ligero_gana_por_post` (V2); 3 terminales — `tres_terminales_tamanos_distintos`
++//! (V1); empate exacto de `blue_work` — `empate_exacto_blue_work` (V1); bloqueo por `C-FIN-01` —
++//! `directed_c_fin_01_bloquea_el_cambio` (V2); tope — `directed_noveno_terminal_ignorado` (V2);
++//! mezcla de terminales (padres de dos terminales) — `directed_padres_de_terminales_distintos` (V2).
++
++#![expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
++
++use std::collections::BTreeSet;
++
++use primitive_types::U256;
++use zx_cadena::{BloqueCadena, BloquePost, Cadena, MAX_TERMINALES_CON_DAG, MotivoBloque};
++use zx_consensus::transicion::{BloqueTransicion, HechosCabecera, ParametrosTransicion};
++use zx_core::{Amount, BlockHash, CBID_RED_DEV, ClavePublica, Digest, ExtensionTx, Tx};
++use zx_dag::IdentidadTicket;
++use zx_dag::ghostdag::IdentidadGhostdag;
++
++const MAX_PADRES: u8 = 15;
++
++fn subsidio_pow(_h: u32) -> Amount {
++    Amount::nuevo(10).unwrap()
++}
++fn subsidio_post(_s: u64) -> Amount {
++    Amount::nuevo(3).unwrap()
++}
++
++/// `q = S_min = 0`; `f_slots` se fija por test (`None` salvo el de `C-FIN-01`).
++fn params(f_slots: Option<u64>) -> ParametrosTransicion {
++    ParametrosTransicion {
++        h_dep: 1,
++        m_cb: 1,
++        m_dep: 0,
++        h_corte_min: 1,
++        w_min: U256::one(),
++        s_min: Amount::CERO,
++        q: Amount::CERO,
++        k_min: 0,
++        m_res_slots: 1,
++        m_dep_slots: 1,
++        m_rec_slots: 1,
++        r_slots: 1,
++        f_slots,
++        subsidio_pow,
++        subsidio_post,
++    }
++}
++
++fn hash(n: u16) -> BlockHash {
++    // 2 bytes de variedad bastan para los tamaños de esta prueba; el resto a cero mantiene el
++    // orden lexicográfico == orden numérico de `n`, que varios tests usan para predecir el
++    // desempate por "menor hash".
++    let mut bytes = [0u8; 32];
++    bytes[30] = (n >> 8) as u8;
++    bytes[31] = (n & 0xff) as u8;
++    BlockHash::from_digest(Digest::from_bytes(bytes))
++}
++
++fn clave(semilla: u8) -> ClavePublica {
++    let mensaje = [b"zx-w06d7-multiterminal", &[semilla][..]].concat();
++    let digest = zx_core::sha3_256_publico(&mensaje);
++    let sk = ed25519_zebra::SigningKey::from(*digest.as_bytes());
++    let vk = ed25519_zebra::VerificationKey::from(&sk);
++    ClavePublica::desde_bytes(vk.into())
++}
++
++fn tx_coinbase_post(clave: ClavePublica, importe: i64, slot: u64) -> Tx {
++    Tx {
++        version: 3,
++        inputs: Vec::new(),
++        outputs: Vec::new(),
++        lock_time: 0,
++        expiry_height: 0,
++        extension: ExtensionTx::CoinbasePost {
++            clave,
++            importe: Amount::nuevo(importe).unwrap(),
++            slot,
++        },
++    }
++}
++
++fn genesis() -> BloqueCadena {
++    BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::Genesis { hash: hash(0) },
++        Vec::new(),
++    ))
++}
++
++/// Bloque PoW hijo directo del génesis con el `trabajo` e `id` dados (candidato a terminal si
++/// `trabajo >= 1`, con `H_corte_min = 1`).
++fn pow_terminal(id: u16, trabajo: u64) -> BloqueCadena {
++    BloqueCadena::Pow(BloqueTransicion::nuevo(
++        HechosCabecera::PoW {
++            hash: hash(id),
++            padre: hash(0),
++            altura: 1,
++            trabajo: U256::from(trabajo),
++            pow_valido: true,
++        },
++        Vec::new(),
++    ))
++}
++
++/// Un bloque PoST de un terminal, con `sr` (que fija su `blue_work`, `w(sr) = 2^128/(sr+1)`) y
++/// productor/identidad únicos por bloque para no chocar con U2.
++fn post(
++    id: u16,
++    padres: Vec<BlockHash>,
++    slot: u64,
++    sr: u64,
++    productor_semilla: u8,
++    chunk: u8,
++) -> BloqueCadena {
++    let productor = clave(productor_semilla);
++    let tx = tx_coinbase_post(productor, 1, slot);
++    let identidad = IdentidadGhostdag::Billete(IdentidadTicket::vigente(
++        productor,
++        0,
++        u64::from(chunk) + 1,
++        [chunk; 32],
++        slot,
++    ));
++    BloqueCadena::Post(BloquePost {
++        hash: hash(id),
++        padres,
++        slot,
++        productor,
++        peso: 1,
++        prueba_valida: true,
++        requisito_declarado: 0,
++        sr,
++        distancia: 0,
++        identidad,
++        txs: vec![(tx, Vec::new())],
++    })
++}
++
++/// Construye una cadena de `n` bloques PoST de un terminal (única identidad y productor por
++/// bloque), todos con el mismo `sr` (mismo peso por bloque), devolviendo los bloques en orden de
++/// construcción (válido para admitir secuencialmente) y el hash de la punta.
++#[allow(clippy::too_many_arguments)]
++fn suceso_suffix(
++    terminal: BlockHash,
++    n: usize,
++    sr: u64,
++    id_base: u16,
++    productor_semilla: u8,
++) -> (Vec<BloqueCadena>, BlockHash) {
++    let mut bloques = Vec::new();
++    let mut padre = terminal;
++    let mut punta = terminal;
++    for i in 0..n {
++        let id = id_base + i as u16;
++        let slot = i as u64 + 1;
++        let b = post(id, vec![padre], slot, sr, productor_semilla, i as u8);
++        punta = b.hash();
++        bloques.push(b);
++        padre = punta;
++    }
++    (bloques, punta)
++}
++
++/// xorshift64* determinista (sin dependencias nuevas): basta para elegir órdenes de llegada
++/// distintos con semilla fija, no para criptografía.
++struct Xorshift64(u64);
++impl Xorshift64 {
++    fn siguiente(&mut self) -> u64 {
++        let mut x = self.0;
++        x ^= x << 13;
++        x ^= x >> 7;
++        x ^= x << 17;
++        self.0 = x;
++        x.wrapping_mul(0x2545_f491_4f6c_dd1d)
++    }
++    fn indice(&mut self, n: usize) -> usize {
++        if n == 0 {
++            0
++        } else {
++            (self.siguiente() as usize) % n
++        }
++    }
++}
++
++/// Orden topológico aleatorio de `bloques` (Kahn con elección aleatoria por `rng`).
++fn orden_topologico_aleatorio(bloques: &[BloqueCadena], rng: &mut Xorshift64) -> Vec<usize> {
++    let n = bloques.len();
++    let mut pos_de = std::collections::BTreeMap::new();
++    for (i, b) in bloques.iter().enumerate() {
++        pos_de.insert(b.hash(), i);
++    }
++    let mut padres: Vec<Vec<usize>> = Vec::with_capacity(n);
++    let mut hijos: Vec<Vec<usize>> = vec![Vec::new(); n];
++    for (i, b) in bloques.iter().enumerate() {
++        let ps: Vec<usize> = b
++            .padres()
++            .iter()
++            .filter_map(|p| pos_de.get(p).copied())
++            .collect();
++        for p in &ps {
++            if let Some(h) = hijos.get_mut(*p) {
++                h.push(i);
++            }
++        }
++        padres.push(ps);
++    }
++    let mut listos: Vec<usize> = (0..n)
++        .filter(|i| padres.get(*i).is_some_and(Vec::is_empty))
++        .collect();
++    let mut orden = Vec::with_capacity(n);
++    while !listos.is_empty() {
++        let j = rng.indice(listos.len());
++        let i = listos.swap_remove(j);
++        orden.push(i);
++        let mut nuevos = Vec::new();
++        if let Some(hs) = hijos.get(i) {
++            for h in hs {
++                if padres
++                    .get(*h)
++                    .is_some_and(|ps| ps.iter().all(|p| orden.contains(p)))
++                {
++                    nuevos.push(*h);
++                }
++            }
++        }
++        listos.extend(nuevos);
++    }
++    orden
++}
++
++/// Resultado observable de una `Cadena` tras admitir un conjunto de bloques (lo que V1 exige que
++/// coincida en todos los órdenes): terminal, punta y estado virtual.
++#[derive(Debug, PartialEq)]
++struct Resultado {
++    terminal: Option<BlockHash>,
++    punta: Option<BlockHash>,
++    virtual_estado: zx_consensus::transicion::Estado,
++}
++
++fn resultado_de(cadena: &Cadena) -> Resultado {
++    Resultado {
++        terminal: cadena.terminal(),
++        punta: cadena.mejor_punta(),
++        virtual_estado: cadena.estado_virtual().unwrap(),
++    }
++}
++
++/// Ejecuta un escenario (`bloques`, en un orden ya válido para construirlo) en 200 órdenes de
++/// llegada aleatorios (semilla fija `0xC0FF_EE00 + variante`) y comprueba que los tres observables
++/// de V1 coinciden en todos. Devuelve el resultado canónico para que el llamante añada sus propias
++/// aserciones (qué terminal exacto se esperaba, etc.).
++fn verificar_i3_multiterminal(bloques: &[BloqueCadena], variante: u64) -> Resultado {
++    let mut canonica = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++    for b in bloques {
++        canonica.admitir(b.clone()).unwrap();
++    }
++    let esperado = resultado_de(&canonica);
++
++    let mut rng = Xorshift64(0xC0FF_EE00 ^ (variante << 1 | 1));
++    for _ in 0..200 {
++        let orden = orden_topologico_aleatorio(bloques, &mut rng);
++        let mut c = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++        c.resolver(bloques, &orden).unwrap();
++        let obtenido = resultado_de(&c);
++        assert_eq!(
++            obtenido, esperado,
++            "I-3 roto: mismo conjunto, orden distinto, resultado distinto (variante {variante})"
++        );
++    }
++    esperado
++}
++
++/// V1, caso «2 terminales»: `TA` (trabajo 1) con sufijo de 5 bloques ligeros (`sr` grande, peso
++/// pequeño); `TB` (trabajo 1) con sufijo de 2 bloques pesados (`sr` pequeño, peso grande) que gana
++/// por `blue_work` a pesar de tener menos bloques.
++#[test]
++fn dos_terminales_pequeno() {
++    let ta = hash(1);
++    let tb = hash(2);
++    let mut bloques = vec![genesis(), pow_terminal(1, 1), pow_terminal(2, 1)];
++    let (suf_a, _) = suceso_suffix(ta, 5, 5_000, 10, 1);
++    let (suf_b, punta_b) = suceso_suffix(tb, 2, 10, 20, 2);
++    bloques.extend(suf_a);
++    bloques.extend(suf_b);
++
++    let resultado = verificar_i3_multiterminal(&bloques, 1);
++    assert_eq!(
++        resultado.terminal,
++        Some(tb),
++        "gana el mayor blue_work, no el mayor recuento"
++    );
++    assert_eq!(resultado.punta, Some(punta_b));
++}
++
++/// V1, caso «3 terminales», sufijos de tamaños 1, 3 y 6, pesos claramente distintos: mismo
++/// terminal/punta/estado en 200 órdenes.
++#[test]
++fn tres_terminales_tamanos_distintos() {
++    let t1 = hash(1);
++    let t2 = hash(2);
++    let t3 = hash(3);
++    let mut bloques = vec![
++        genesis(),
++        pow_terminal(1, 1),
++        pow_terminal(2, 1),
++        pow_terminal(3, 1),
++    ];
++    let (s1, _) = suceso_suffix(t1, 1, 1_000_000, 10, 1);
++    let (s2, _) = suceso_suffix(t2, 3, 500, 20, 2);
++    let (s3, punta3) = suceso_suffix(t3, 6, 50, 30, 3);
++    bloques.extend(s1);
++    bloques.extend(s2);
++    bloques.extend(s3);
++
++    let resultado = verificar_i3_multiterminal(&bloques, 2);
++    assert_eq!(resultado.terminal, Some(t3));
++    assert_eq!(resultado.punta, Some(punta3));
++}
++
++/// V1, «empate exacto de `blue_work`»: `w(sr) = ⌊2^128/(sr+1)⌋`. `TA` con **2** bloques `sr = 1`
++/// (peso `2 · 2^127 = 2^128`) empata exactamente con `TB` con **1** bloque `sr = 0` (peso `2^128`).
++/// `TA = hash(1) < hash(2) = TB`: el desempate de `comparar_terminal` (menor hash) debe elegir `TA`
++/// en los 200 órdenes, de forma determinista.
++#[test]
++fn empate_exacto_blue_work() {
++    let ta = hash(1);
++    let tb = hash(2);
++    let peso_2_128 = U256::one() << 128u32;
++    // Confirmación de la aritmética del propio test (no de `zx-dag`): ambos suman exactamente
++    // `2^128`, con la misma fórmula que usa `zx_dag::ghostdag::peso`.
++    let peso_ta = zx_dag::ghostdag::peso(1) + zx_dag::ghostdag::peso(1);
++    let peso_tb = zx_dag::ghostdag::peso(0);
++    assert_eq!(
++        peso_ta, peso_tb,
++        "el test no está construyendo el empate que dice construir"
++    );
++    assert_eq!(peso_ta, peso_2_128);
++
++    let mut bloques = vec![genesis(), pow_terminal(1, 1), pow_terminal(2, 1)];
++    let (suf_a, punta_a) = suceso_suffix(ta, 2, 1, 10, 1);
++    let (suf_b, _) = suceso_suffix(tb, 1, 0, 20, 2);
++    bloques.extend(suf_a);
++    bloques.extend(suf_b);
++
++    let resultado = verificar_i3_multiterminal(&bloques, 3);
++    assert_eq!(
++        resultado.terminal,
++        Some(ta),
++        "empate exacto: gana el menor hash de terminal"
++    );
++    assert_eq!(resultado.punta, Some(punta_a));
++}
++
++/// V2: sufijo PoST más pesado en el terminal con **menos** trabajo PoW: `TA` (trabajo 1, sufijo
++/// pesado) debe ganar a `TB` (trabajo 1000, sin sufijo hasta que ambos ya tienen DAG, sufijo
++/// ligero).
++#[test]
++fn directed_terminal_ligero_gana_por_post() {
++    let ta = hash(1);
++    let tb = hash(2);
++    let mut cadena = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++    cadena.admitir(genesis()).unwrap();
++    cadena.admitir(pow_terminal(1, 1)).unwrap();
++    cadena.admitir(pow_terminal(2, 1_000)).unwrap();
++    // Sin sufijo todavía: gana el trabajo PoW (TB).
++    assert_eq!(cadena.terminal(), Some(tb));
++
++    let (suf_a, _punta_a) = suceso_suffix(ta, 4, 1, 10, 1);
++    for b in suf_a {
++        cadena.admitir(b).unwrap();
++    }
++    // TA ya tiene sufijo pesado; TB ninguno todavía: FC-3 exige sufijo para competir.
++    assert_eq!(cadena.terminal(), Some(ta));
++
++    let (suf_b, _) = suceso_suffix(tb, 1, 1_000_000, 20, 2);
++    for b in suf_b {
++        cadena.admitir(b).unwrap();
++    }
++    // Ambos con sufijo: gana el de mayor blue_work (TA), pese a que TB tiene 1000x más trabajo PoW.
++    assert_eq!(
++        cadena.terminal(),
++        Some(ta),
++        "el trabajo PoW ya no decide tras el corte (TRN-09)"
++    );
++}
++
++/// V2: un bloque PoST cuyos padres resuelven a dos terminales distintos es inválido (`I-4`).
++#[test]
++fn directed_padres_de_terminales_distintos_es_invalido() {
++    let ta = hash(1);
++    let tb = hash(2);
++    let mut cadena = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++    cadena.admitir(genesis()).unwrap();
++    cadena.admitir(pow_terminal(1, 1)).unwrap();
++    cadena.admitir(pow_terminal(2, 1)).unwrap();
++    let (suf_a, punta_a) = suceso_suffix(ta, 1, 10, 10, 1);
++    let (suf_b, punta_b) = suceso_suffix(tb, 1, 10, 20, 2);
++    for b in suf_a {
++        cadena.admitir(b).unwrap();
++    }
++    for b in suf_b {
++        cadena.admitir(b).unwrap();
++    }
++
++    let mezcla = post(99, vec![punta_a, punta_b], 5, 10, 9, 9);
++    let err = cadena.admitir(mezcla).unwrap_err();
++    assert_eq!(err, MotivoBloque::ErrTerminalAmbiguo);
++}
++
++/// V2: `C-FIN-01` entre terminales — un nodo en línea no cambia de terminal si su sufijo actual ya
++/// abarca `>= F_slots`. Con `F_slots = 3`: un sufijo de 5 slots (`d = 5 >= 3`) bloquea el cambio a
++/// un terminal más pesado que llega después; el mismo terminal más pesado, si el sufijo local solo
++/// tiene 2 slots (`d = 2 < 3`), sí se adopta.
++#[test]
++fn directed_c_fin_01_bloquea_el_cambio() {
++    let ta = hash(1);
++    let tb = hash(2);
++
++    // Caso bloqueado: sufijo de TA ya profundo (5 slots) antes de que aparezca TB, más pesado.
++    let mut bloqueado = Cadena::nueva(params(Some(3)), 1, CBID_RED_DEV, MAX_PADRES);
++    bloqueado.admitir(genesis()).unwrap();
++    bloqueado.admitir(pow_terminal(1, 1)).unwrap();
++    let (suf_a, _) = suceso_suffix(ta, 5, 10, 10, 1);
++    for b in suf_a {
++        bloqueado.admitir(b).unwrap();
++    }
++    assert_eq!(bloqueado.terminal(), Some(ta));
++    bloqueado.admitir(pow_terminal(2, 1)).unwrap();
++    let (suf_b, _) = suceso_suffix(tb, 1, 1, 20, 2); // mucho más pesado por bloque (sr=1 vs sr=10)
++    for b in suf_b {
++        bloqueado.admitir(b).unwrap();
++    }
++    assert_eq!(
++        bloqueado.terminal(),
++        Some(ta),
++        "C-FIN-01 debe impedir el cambio: el sufijo actual ya abarca >= F_slots"
++    );
++
++    // Caso permitido: mismo TB más pesado, pero el sufijo local de TA solo tiene 2 slots (d < F_slots).
++    let mut permitido = Cadena::nueva(params(Some(3)), 1, CBID_RED_DEV, MAX_PADRES);
++    permitido.admitir(genesis()).unwrap();
++    permitido.admitir(pow_terminal(1, 1)).unwrap();
++    let (suf_a2, _) = suceso_suffix(ta, 2, 10, 10, 1);
++    for b in suf_a2 {
++        permitido.admitir(b).unwrap();
++    }
++    assert_eq!(permitido.terminal(), Some(ta));
++    permitido.admitir(pow_terminal(2, 1)).unwrap();
++    let (suf_b2, _) = suceso_suffix(tb, 1, 1, 20, 2);
++    for b in suf_b2 {
++        permitido.admitir(b).unwrap();
++    }
++    assert_eq!(
++        permitido.terminal(),
++        Some(tb),
++        "con d < F_slots, FC-3 sí debe poder sustituir el terminal"
++    );
++}
++
++/// V2: tope `MAX_TERMINALES_CON_DAG` — un noveno candidato con sufijo se ignora si su trabajo PoW
++/// no supera al peor de los ocho ya admitidos.
++#[test]
++fn directed_noveno_terminal_ignorado() {
++    let mut cadena = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++    cadena.admitir(genesis()).unwrap();
++    assert_eq!(MAX_TERMINALES_CON_DAG, 8);
++
++    for i in 1..=8u16 {
++        cadena.admitir(pow_terminal(i, u64::from(i) * 10)).unwrap();
++        let (suf, _) = suceso_suffix(hash(i), 1, 10, 100 + i * 10, i as u8);
++        for b in suf {
++            cadena.admitir(b).unwrap();
++        }
++    }
++    assert_eq!(cadena.terminales_con_dag().len(), 8);
++    assert!(!cadena.limite_terminales_alcanzado());
++
++    // Noveno candidato, con menos trabajo PoW que cualquiera de los 8 (mínimo actual: 10).
++    let t9 = hash(9);
++    cadena.admitir(pow_terminal(9, 1)).unwrap();
++    let (suf9, _) = suceso_suffix(t9, 1, 10, 900, 9);
++    let mut ultimo = Ok(());
++    for b in suf9 {
++        ultimo = cadena.admitir(b);
++    }
++    assert_eq!(ultimo, Err(MotivoBloque::ErrLimiteTerminales));
++    assert!(cadena.limite_terminales_alcanzado());
++    assert_eq!(
++        cadena.terminales_con_dag().len(),
++        8,
++        "el noveno no desaloja: pesaba menos"
++    );
++    assert!(!cadena.terminales_con_dag().contains(&t9));
++}
++
++/// V2: el reinicio repite el registro (mismo orden en el que se admitieron los bloques la primera
++/// vez) y acaba con la misma selección — réplica, a nivel de `zx-cadena`, de lo que `Nodo::reiniciar`
++/// hace admitiendo uno a uno en el orden del almacén (D-N03′).
++#[test]
++fn directed_reinicio_repite_misma_seleccion() {
++    let t1 = hash(1);
++    let t2 = hash(2);
++    let t3 = hash(3);
++    let mut registro: Vec<BloqueCadena> = vec![genesis(), pow_terminal(1, 5), pow_terminal(2, 1)];
++    let (s1, _) = suceso_suffix(t1, 2, 100, 10, 1);
++    let (s2, _) = suceso_suffix(t2, 3, 40, 20, 2);
++    registro.extend(s1);
++    registro.extend(s2);
++    registro.push(pow_terminal(3, 2));
++    let (s3, punta3) = suceso_suffix(t3, 5, 20, 30, 3);
++    registro.extend(s3);
++
++    let mut original = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++    for b in &registro {
++        original.admitir(b.clone()).unwrap();
++    }
++    let esperado = resultado_de(&original);
++    assert_eq!(esperado.terminal, Some(t3));
++    assert_eq!(esperado.punta, Some(punta3));
++
++    // "Reinicio": una `Cadena` nueva, admitiendo el mismo registro en el mismo orden.
++    let mut reiniciada = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++    for b in &registro {
++        reiniciada.admitir(b.clone()).unwrap();
++    }
++    assert_eq!(resultado_de(&reiniciada), esperado);
++}
++
++/// V2 (cobertura auxiliar): 0/1 terminal con sufijo también pasan por la ruta nueva sin romperse
++/// (regresión mínima, ya cubierta a fondo por los diferenciales T01/T04 y `contexto_dag.rs`).
++#[test]
++fn cero_y_un_terminal_no_se_rompen() {
++    let mut cadena = Cadena::nueva(params(None), 1, CBID_RED_DEV, MAX_PADRES);
++    cadena.admitir(genesis()).unwrap();
++    assert_eq!(cadena.terminal(), None);
++    cadena.admitir(pow_terminal(1, 1)).unwrap();
++    assert_eq!(cadena.terminal(), Some(hash(1)));
++    assert!(cadena.terminales_con_dag().is_empty());
++    let (suf, punta) = suceso_suffix(hash(1), 3, 10, 10, 1);
++    for b in suf {
++        cadena.admitir(b).unwrap();
++    }
++    assert_eq!(cadena.terminal(), Some(hash(1)));
++    assert_eq!(cadena.mejor_punta(), Some(punta));
++    assert_eq!(cadena.terminales_con_dag(), vec![hash(1)]);
++}
++
++/// Referencia cruzada de tipos no usados directamente arriba (evita `unused_imports` si el
++/// refactor de arriba cambia): `BTreeSet` se usa aquí para comprobar unicidad de hashes generados.
++#[test]
++fn ids_de_bloques_son_unicos_en_este_arnes() {
++    let ids: BTreeSet<BlockHash> = (0..40).map(hash).collect();
++    assert_eq!(ids.len(), 40);
++}
+diff -ruN '--exclude=target' ws.orig/crates/zx-consensus/src/transicion/mod.rs ws/crates/zx-consensus/src/transicion/mod.rs
+--- ws.orig/crates/zx-consensus/src/transicion/mod.rs	2026-09-27 04:42:32.000000000 +0200
++++ ws/crates/zx-consensus/src/transicion/mod.rs	2026-09-27 04:53:45.065974856 +0200
+@@ -30,7 +30,8 @@
+ };
+ pub use fusion::aplicar_fusion;
+ pub use seleccion::{
+-    ResultadoSeleccion, construir_validos, mapa_por_hash, nodo_en_linea, seleccionar,
++    ResultadoSeleccion, comparar_terminal, construir_validos, mapa_por_hash, nodo_en_linea,
++    seleccionar,
+ };
+ pub use tipos::{
+     BloqueTransicion, EnRetirada, EntradaUtxo, Escalares, Estado, Fase, Garantia, HechosCabecera,
+diff -ruN '--exclude=target' ws.orig/crates/zx-consensus/src/transicion/seleccion.rs ws/crates/zx-consensus/src/transicion/seleccion.rs
+--- ws.orig/crates/zx-consensus/src/transicion/seleccion.rs	2026-09-27 04:42:32.000000000 +0200
++++ ws/crates/zx-consensus/src/transicion/seleccion.rs	2026-09-27 05:15:22.424841142 +0200
+@@ -86,7 +86,12 @@
+ 
+ /// Prioridad de terminales para `FC-3`: `None` (sin terminal) gana; entre terminales, el **menor**
+ /// hash.
+-fn comparar_terminal(a: Option<BlockHash>, b: Option<BlockHash>) -> Ordering {
++///
++/// Pública desde `ORDEN-W06d7` decisión 2: `zx-cadena` la reutiliza como desempate de `FC-3`
++/// **entre terminales candidatos** (varios DAG a la vez), en vez de reimplementar el mismo criterio
++/// («no una segunda implementación divergente»). El comportamiento no cambia: solo la visibilidad.
++#[must_use]
++pub fn comparar_terminal(a: Option<BlockHash>, b: Option<BlockHash>) -> Ordering {
+     match (a, b) {
+         (None, None) => Ordering::Equal,
+         (None, Some(_)) => Ordering::Greater,
+@@ -263,3 +268,33 @@
+     }
+     Ok((punta, estado_punta))
+ }
++
++#[cfg(test)]
++mod tests_comparar_terminal {
++    //! `ORDEN-W06d7`: prueba de la visibilidad nueva de [`comparar_terminal`], sin cambiar su
++    //! comportamiento (los diferenciales T01/T04 siguen siendo la prueba de no-regresión real).
++    use super::comparar_terminal;
++    use std::cmp::Ordering;
++    use zx_core::{BlockHash, Digest};
++
++    fn h(n: u8) -> BlockHash {
++        BlockHash::from_digest(Digest::from_bytes([n; 32]))
++    }
++
++    #[test]
++    fn none_gana_a_cualquier_terminal() {
++        // Convención documentada de `comparar_terminal` («`None` gana»), la misma que usa
++        // `comparar_fc3`: `Greater` = gana el primer argumento.
++        assert_eq!(comparar_terminal(None, Some(h(1))), Ordering::Greater);
++        assert_eq!(comparar_terminal(Some(h(1)), None), Ordering::Less);
++        assert_eq!(comparar_terminal(None, None), Ordering::Equal);
++    }
++
++    #[test]
++    fn entre_terminales_gana_el_menor_hash() {
++        // `Greater` = gana `a` (convención de `comparar_fc3`): con `a` de hash menor que `b`, `a`
++        // debe ganar.
++        assert_eq!(comparar_terminal(Some(h(1)), Some(h(2))), Ordering::Greater);
++        assert_eq!(comparar_terminal(Some(h(2)), Some(h(1))), Ordering::Less);
++    }
++}
+diff -ruN '--exclude=target' ws.orig/crates/zx-node/src/nodo.rs ws/crates/zx-node/src/nodo.rs
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-27 04:42:32.000000000 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-27 05:54:20.082162582 +0200
+@@ -105,11 +105,12 @@
+     /// (`ORDEN-W06d3` decisión 3): permite reconstruir el historial de **cualquier** punta con
+     /// `Nodo::historial_hasta`, no solo el de la rama seleccionada hoy.
+     headers_pow: BTreeMap<BlockHash, BlockHeader>,
+-    /// El terminal sobre el que se construyó `servicio_verificacion`, para saber si hay que
+-    /// reconstruirlo tras un cambio de terminal tentativo (FC-3, antes de que exista ningún bloque
+-    /// PoST; `ORDEN-W06d3` decisión 3).
+-    terminal_servicio: Option<BlockHash>,
+-    servicio_verificacion: Option<ServicioPot>,
++    /// Un `ServicioPot` de verificación **por terminal candidato** (`ORDEN-W06d7` decisión 5: ya no
++    /// hay uno solo, porque puede haber varios terminales con DAG a la vez). Se crea en cuanto
++    /// `zx-cadena` reconoce el candidato ([`Nodo::asegurar_servicios_verificacion`]), antes incluso
++    /// de que tenga DAG propio (el bloque de transición de ese terminal necesita el servicio para
++    /// verificarse, y todavía no hay DAG en ese punto).
++    servicios_verificacion: BTreeMap<BlockHash, ServicioPot>,
+     historia: Arc<HistoriaGenesis>,
+     ultima_punta_registrada: Option<BlockHash>,
+     dir_datos: PathBuf,
+@@ -245,8 +246,7 @@
+             cbid,
+             historial_pow: Vec::new(),
+             headers_pow: BTreeMap::new(),
+-            terminal_servicio: None,
+-            servicio_verificacion: None,
++            servicios_verificacion: BTreeMap::new(),
+             historia,
+             ultima_punta_registrada: None,
+             dir_datos: cfg.dir_datos.clone(),
+@@ -542,32 +542,64 @@
+         // la punta PoW **seleccionada** por `zx-cadena` (mayor trabajo acumulado), lo mismo si este
+         // bloque la extiende como si es un bloque de una rama lateral que no la cambia.
+         self.actualizar_seleccion_pow()?;
+-        // El `ServicioPot` de verificación se necesita en cuanto el terminal existe, tanto en
+-        // producción en vivo (lo crea `fase_regimen` antes de producir) como en la **repetición**
+-        // (D-N03′): si el registro trae ya bloques PoST, `admitir_post_interno` los procesa aquí
+-        // mismo, dentro de `Nodo::arrancar`, antes de que `fase_regimen` llegue a ejecutarse. Sin
+-        // esto, reabrir un nodo que ya había cruzado el corte fallaba siempre en la primera entrada
+-        // PoST del registro (bug real encontrado por `tests/reinicio.rs`, ver `PROGRESO.md`).
+-        //
+-        // Se reconstruye también si el terminal **cambió** desde la última vez (posible mientras
+-        // `Cadena::contexto_dag()` sigue en `None`, FC-3: una rama más pesada puede desplazar al
+-        // terminal tentativo antes de que exista ningún bloque PoST, `ORDEN-W06d3` decisión 3): un
+-        // `ServicioPot` construido sobre el terminal viejo verificaría contra el flujo PoT
+-        // equivocado.
+-        if let Some(terminal) = self.cadena.terminal() {
+-            let necesita_reconstruir =
+-                self.servicio_verificacion.is_none() || self.terminal_servicio != Some(terminal);
+-            if necesita_reconstruir && self.cadena.contexto_dag().is_none() {
+-                let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
+-                    .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
+-                self.servicio_verificacion = Some(servicio);
+-                self.terminal_servicio = Some(terminal);
++        // `ORDEN-W06d7` decisión 5: un `ServicioPot` de verificación **por terminal candidato**, no
++        // solo el seleccionado — puede haber varios terminales con DAG a la vez (decisión 1), y cada
++        // uno necesita su propio flujo PoT para verificar los bloques PoST que declaran ese terminal
++        // en su pasado, tanto en producción en vivo (lo crea también `fase_regimen`) como en la
++        // **repetición** (D-N03′): si el registro trae ya bloques PoST, `admitir_post_interno` los
++        // procesa aquí mismo, dentro de `Nodo::arrancar`, antes de que `fase_regimen` llegue a
++        // ejecutarse. Sin esto, reabrir un nodo que ya había cruzado el corte fallaba siempre en la
++        // primera entrada PoST del registro (bug real encontrado por `tests/reinicio.rs`,
++        // `PROGRESO.md` de `W06d3`).
++        self.asegurar_servicios_verificacion()?;
++        self.registrar_cambio_de_punta()?;
++        Ok(())
++    }
++
++    /// Crea el `ServicioPot` de verificación de todo terminal candidato que todavía no lo tenga
++    /// (`ORDEN-W06d7` decisión 5). Idempotente: un candidato ya conocido no se reconstruye ni
++    /// pierde el pasado PoT que ya llevaba (a diferencia del diseño de un único terminal, donde
++    /// "reconstruir" significaba tirar el servicio anterior — aquí cada terminal tiene el suyo para
++    /// siempre, así que no hace falta).
++    fn asegurar_servicios_verificacion(&mut self) -> Result<(), ErrorNodo> {
++        for terminal in self.cadena.terminal_candidatos() {
++            if let std::collections::btree_map::Entry::Vacant(e) =
++                self.servicios_verificacion.entry(terminal)
++            {
++                let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096).map_err(|err| {
++                    ErrorNodo::Otro(format!("ServicioPot de verificación: {err}"))
++                })?;
++                e.insert(servicio);
+             }
+         }
+-        self.registrar_cambio_de_punta()?;
+         Ok(())
+     }
+ 
++    /// Terminal único al que resuelven `padres` (réplica, de solo lectura, de
++    /// `Cadena::terminal_de_bloque_post`; `ORDEN-W06d7` decisión 5): el nodo necesita saberlo
++    /// **antes** de llamar a `Cadena::admitir`, para elegir el `ServicioPot`/contexto de
++    /// verificación correctos. `None` si algún padre es desconocido o los padres resuelven a más de
++    /// un terminal (en ese caso `Cadena::admitir` lo rechazará con su propio motivo:
++    /// `ErrSinPadre`/`ErrTerminalAmbiguo`; aquí basta con no elegir un servicio equivocado).
++    fn terminal_de_padres(&self, padres: &[BlockHash]) -> Option<BlockHash> {
++        let candidatos = self.cadena.terminal_candidatos();
++        let mut terminal_ref: Option<BlockHash> = None;
++        for x in padres {
++            let t = if candidatos.contains(x) {
++                Some(*x)
++            } else {
++                self.cadena.terminal_de(x)
++            };
++            let t = t?;
++            match terminal_ref {
++                None => terminal_ref = Some(t),
++                Some(prev) if prev != t => return None,
++                Some(_) => {}
++            }
++        }
++        terminal_ref
++    }
++
+     /// Reconstruye, si hace falta, `historial_pow` (y `trabajo_acumulado`) desde la punta PoW que
+     /// `Cadena::mejor_punta_pow` selecciona ahora (`ORDEN-W06d3` decisión 3). Registra la
+     /// profundidad de la reorganización cuando la punta cambia de rama, no solo de altura.
+@@ -646,25 +678,48 @@
+         verificar: bool,
+     ) -> Result<(), ErrorNodo> {
+         let hash = bloque.cabecera.block_hash();
++        // `ORDEN-W06d7` decisión 1/5: los padres deciden a qué terminal pertenece este bloque —
++        // necesario **ya** para elegir el `ServicioPot`/contexto de verificación, antes incluso de
++        // llamar a `Cadena::admitir` (que hace la misma resolución internamente, pero después). Se
++        // calcula **siempre** (también en la repetición, `verificar = false`): el servicio de ese
++        // terminal necesita actualizarse igual al final de la función.
++        let padres_declarados = padres_dag_a_vec(&bloque.cabecera.padres);
++        let Some(terminal) = self.terminal_de_padres(&padres_declarados) else {
++            // Terminal desconocido o ambiguo aquí: no es prueba de invalidez (podría ser un padre
++            // que este nodo todavía no admitió, o una ambigüedad real que `Cadena::admitir`
++            // rechazará más abajo con su propio motivo, `ErrTerminalAmbiguo`/`ErrSinPadre`); tratarlo
++            // como rechazo fatal de un bloque **propio** sería incorrecto para un bloque de **red**
++            // que sincroniza fuera de orden (mismo espíritu que `MotivoCabeceraPendiente`,
++            // `crate::rechazo`).
++            return Err(ErrorNodo::BloquePropioRechazado {
++                hash,
++                motivo: "terminal_no_resoluble".to_string(),
++                clasificacion: crate::rechazo::ClasificacionRechazo::Pendiente,
++            });
++        };
+ 
+         if verificar {
+-            let servicio = self
+-                .servicio_verificacion
+-                .as_ref()
+-                .ok_or_else(|| ErrorNodo::Otro("verificación PoST sin ServicioPot".to_string()))?;
++            self.asegurar_servicios_verificacion()?;
++            let servicio = self.servicios_verificacion.get(&terminal).ok_or_else(|| {
++                ErrorNodo::Otro(format!(
++                    "verificación PoST sin ServicioPot para el terminal {terminal}"
++                ))
++            })?;
+             let params_pieza: PieceCheckParams = self.historia.params_pieza();
+             let mut cache = CachePotVerificada::nueva();
+             let mut presupuesto = PresupuestoIlimitado;
+             let rango = RangoDev(self.cadena_sr_dev());
+ 
+-            // El primer bloque tras el corte (el de transición, decisión 6) se verifica **antes**
+-            // de que `zx-cadena` tenga ningún bloque PoST admitido: `Cadena::contexto_dag()` es
+-            // `None` hasta la primera admisión (`inicializar_dag` vive dentro de `admitir_post`).
+-            // Para ese único bloque, cuyo único padre posible es el terminal, no hay ambigüedad de
+-            // `sp` que temer («Relanzamiento» punto 3 es sobre bloques con más de un padre
+-            // candidato) y se usa `ContextoTransicion` (el mismo contexto dev que `zx-post` define
+-            // para exactamente este caso). Para todo lo demás, el GHOSTDAG real de `zx-cadena`.
+-            let estado = match self.cadena.contexto_dag() {
++            // El primer bloque tras el corte de **cada** terminal (su bloque de transición,
++            // decisión 6) se verifica **antes** de que `zx-cadena` tenga ningún bloque PoST propio
++            // de ese terminal: `Cadena::contexto_dag_de(terminal)` es `None` hasta la primera
++            // admisión (`ORDEN-W06d7` decisión 1: el DAG de un terminal nace con su primer bloque
++            // PoST). Para ese único bloque, cuyo único padre posible es `terminal`, no hay
++            // ambigüedad de `sp` que temer y se usa `ContextoTransicion` (el mismo contexto dev que
++            // `zx-post` define para exactamente este caso). Para todo lo demás, el GHOSTDAG real
++            // **de ese terminal** (no necesariamente el seleccionado: varios terminales pueden tener
++            // DAG a la vez).
++            let estado = match self.cadena.contexto_dag_de(terminal) {
+                 Some(dag) => verificar_cabecera_conjunta(
+                     &bloque,
+                     servicio,
+@@ -677,9 +732,6 @@
+                     self.historia.kzg(),
+                 ),
+                 None => {
+-                    let terminal = self.cadena.terminal().ok_or_else(|| {
+-                        ErrorNodo::Otro("verificación PoST sin terminal fijado".to_string())
+-                    })?;
+                     let ctx = zx_post::contexto_transicion::ContextoTransicion::nuevo(
+                         terminal,
+                         self.n_dev,
+@@ -737,7 +789,7 @@
+         // Identidad real de `C-GD-07` (`ORDEN-W06a-C` decisión 2): la tupla literal derivada de la
+         // misma cabecera que aporta `block_hash`, `slot` y `SR`. Ya **no** se trunca a un `u64`.
+         let identidad = identidad_de_cabecera_post(&bloque.cabecera);
+-        let padres = padres_dag_a_vec(&bloque.cabecera.padres);
++        let padres = padres_declarados;
+         let txs: Vec<(Tx, Vec<Vec<u8>>)> = bloque
+             .txs()
+             .iter()
+@@ -799,7 +851,11 @@
+             self.resolver_huerfanos_de(hash);
+         }
+ 
+-        self.actualizar_servicio_verificacion(&bloque)?;
++        // El terminal de `hash` ya se conoce: la admisión de arriba (o, en la repetición, una
++        // anterior) lo fijó en `zx-cadena` (`ORDEN-W06d7` decisión 1); `terminal` (resuelto arriba
++        // desde los padres declarados) es el mismo valor y sirve de respaldo defensivo.
++        let terminal_del_bloque = self.cadena.terminal_de(&hash).unwrap_or(terminal);
++        self.actualizar_servicio_verificacion(terminal_del_bloque, &bloque)?;
+         self.registrar_cambio_de_punta()?;
+         Ok(())
+     }
+@@ -809,13 +865,19 @@
+         self.sr_dev_actual
+     }
+ 
+-    /// Mantiene al día el `ServicioPot` de verificación (decisión 7, ver `PROGRESO.md`): inserta la
+-    /// salida y el portador **de este bloque**, sin recalcular el PoT. El flujo es único y global
+-    /// (D-P10), así que si el slot ya estaba cubierto por otra rama/hermano, solo se comprueba que
+-    /// coincide (defensa; nunca debería discrepar: lo impediría antes `ContextoTransicion`/H2 en la
+-    /// ruta de producción, pero este servicio de verificación no pasa por ahí).
+-    fn actualizar_servicio_verificacion(&mut self, bloque: &BloqueDag) -> Result<(), ErrorNodo> {
+-        let Some(servicio) = self.servicio_verificacion.as_mut() else {
++    /// Mantiene al día el `ServicioPot` de verificación **de `terminal`** (decisión 7 de
++    /// `ORDEN-W06a`; por terminal desde `ORDEN-W06d7` decisión 5): inserta la salida y el portador
++    /// **de este bloque**, sin recalcular el PoT. El flujo es único y global dentro de cada terminal
++    /// (D-P10), así que si el slot ya estaba cubierto por otra rama/hermano **del mismo terminal**,
++    /// solo se comprueba que coincide (defensa; nunca debería discrepar: lo impediría antes
++    /// `ContextoTransicion`/H2 en la ruta de producción, pero este servicio de verificación no pasa
++    /// por ahí).
++    fn actualizar_servicio_verificacion(
++        &mut self,
++        terminal: BlockHash,
++        bloque: &BloqueDag,
++    ) -> Result<(), ErrorNodo> {
++        let Some(servicio) = self.servicios_verificacion.get_mut(&terminal) else {
+             return Err(ErrorNodo::Otro(
+                 "ServicioPot de verificación ausente tras el terminal".to_string(),
+             ));
+@@ -1161,17 +1223,21 @@
+         if self.cadena.motivo(&hash).is_some() {
+             return VeredictoFinal::Rechazar; // ya sabíamos que es inválido.
+         }
+-        let Some(terminal) = self.cadena.terminal() else {
+-            // Todavía en fase PoW pura: sin terminal no hay `ServicioPot` ni GHOSTDAG con los que
+-            // verificar nada. No es demostrablemente inválido (podríamos cruzar el corte nosotros
+-            // mismos en breve): `Ignorar`, no `Rechazar`.
++        // `ORDEN-W06d7`: ya no hace falta un único terminal seleccionado para juzgar un bloque PoST
++        // de red — puede declarar como padre **cualquier** terminal candidato conocido (el suyo, no
++        // necesariamente el que este nodo tiene seleccionado hoy). Sin ningún candidato todavía
++        // (fase PoW pura), no hay `ServicioPot` ni GHOSTDAG con los que verificar nada: no es
++        // demostrablemente inválido (podríamos cruzar el corte nosotros mismos en breve),
++        // `Ignorar`, no `Rechazar`.
++        if self.cadena.terminal_candidatos().is_empty() {
+             let evento = self
+                 .registro
+                 .evento("bloque_post_de_red_sin_terminal")
+                 .str("hash", &hash.to_string());
+             let _ = self.registro.escribir(evento, false);
+             return VeredictoFinal::Ignorar;
+-        };
++        }
++        let candidatos = self.cadena.terminal_candidatos();
+ 
+         let bloque_red = BloqueRed::Post {
+             cabecera,
+@@ -1180,8 +1246,8 @@
+             testigos: testigos.clone(),
+         };
+         for padre in red::padres_declarados(&bloque_red) {
+-            if padre == terminal {
+-                continue; // el terminal siempre es un padre válido y conocido, por definición.
++            if candidatos.contains(&padre) {
++                continue; // cualquier terminal candidato conocido es un padre válido y conocido.
+             }
+             let padre_conocido =
+                 self.cadena.es_valido(&padre) || self.cadena.motivo(&padre).is_some();
+@@ -1608,16 +1674,13 @@
+             .cadena
+             .terminal()
+             .ok_or_else(|| ErrorNodo::Otro("fase_regimen sin terminal".to_string()))?;
+-        // Mismo ratchet que `admitir_pow_interno` (`ORDEN-W06d3` decisión 3): entre que `fase_pow`
+-        // vio el terminal por última vez y aquí, una rama más pesada llegada por red podría haberlo
+-        // desplazado (FC-3), siempre que todavía no exista ningún bloque PoST (`contexto_dag`
+-        // `None`). Se reconstruye el `ServicioPot` si el terminal no es el que tenía.
+-        if self.servicio_verificacion.is_none() || self.terminal_servicio != Some(terminal) {
+-            let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
+-                .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
+-            self.servicio_verificacion = Some(servicio);
+-            self.terminal_servicio = Some(terminal);
+-        }
++        // `ORDEN-W06d7` decisión 5: un `ServicioPot` por terminal candidato, no uno solo; se
++        // asegura (crea si falta) el de `terminal` y el de cualquier otro candidato ya conocido.
++        // Entre que `fase_pow` vio el terminal seleccionado por última vez y aquí, una rama más
++        // pesada llegada por red pudo haber cambiado la selección (FC-3): `terminal` sigue siendo
++        // válido como terminal candidato (tiene su propio servicio para siempre, no se "pierde" al
++        // dejar de ser el seleccionado), aunque ya no sea `self.cadena.terminal()`.
++        self.asegurar_servicios_verificacion()?;
+ 
+         // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
+         //
+@@ -1662,9 +1725,13 @@
+         // el de transición recién producido, o toda la historia de régimen si esto es un reinicio a
+         // mitad de régimen). El hilo avanza y produce sobre su propio clon; el del bucle solo se usa
+         // para verificar (ver el doc de `hilo_productor_regimen`).
+-        let servicio_hilo = self.servicio_verificacion.clone().ok_or_else(|| {
+-            ErrorNodo::Otro("fase_regimen sin ServicioPot de verificación".to_string())
+-        })?;
++        let servicio_hilo = self
++            .servicios_verificacion
++            .get(&terminal)
++            .cloned()
++            .ok_or_else(|| {
++                ErrorNodo::Otro("fase_regimen sin ServicioPot de verificación".to_string())
++            })?;
+ 
+         let (tx_a_bucle, rx_en_bucle) = mpsc::channel::<MsgProductor>();
+         let (tx_a_productor, rx_en_productor) = mpsc::channel::<MsgBucle>();
+@@ -1768,8 +1835,8 @@
+                             // dejado de estarlo.
+                             self.reintentar_post_pendientes();
+                             let continuar = self.limite_productor().is_none_or(|limite| {
+-                                self.servicio_verificacion
+-                                    .as_ref()
++                                self.servicios_verificacion
++                                    .get(&terminal)
+                                     .is_some_and(|s| s.slot_actual() < limite)
+                             });
+                             let respuesta = if continuar {

@@ -1,0 +1,41 @@
+HORAS.log — W06d7 (todas con `date -Is`, huso +02:00)
+
+2026-09-27T04:42:32+02:00  base congelada (commit 39519aa, "W06d7 congelada")
+2026-09-27T04:57:29+02:00  arranque del ejecutor; sha256sum -c ENTRADA-W06d7.sha256 OK (con la
+                           observación de V-ZRX/LINEO.md no versionado, ver PROGRESO.md)
+2026-09-27T04:58:02+02:00  primer `cargo check -p zx-cadena` limpio tras el rediseño
+2026-09-27T05:03:56+02:00  `cargo check -p zx-node` limpio
+2026-09-27T05:04:08+02:00  `cargo check --workspace` limpio
+2026-09-27T05:07:16 a 05:13  `crates/zx-cadena/tests/multiterminal.rs` escrito y compilado
+2026-09-27T05:08 a 05:12      hallazgo y corrección del bug de orden en `recalcular_seleccion`
+                              (ver PROGRESO.md, "Hallazgo real durante V1")
+2026-09-27T05:13:16+02:00  multiterminal.rs: 11/11 tests en verde (incluida la propiedad de 200
+                           órdenes con empate exacto de blue_work)
+2026-09-27T05:15:28+02:00  cargo test -p zx-consensus: 87/0/0 (tras corregir mi propio test de
+                           comparar_terminal, ver autodenuncia en PROGRESO.md)
+2026-09-27T05:17:16+02:00  binarios release listos (zx-node, zx-adversario)
+2026-09-27T05:53:22+02:00  cargo test --workspace completo: 829 passed, 0 failed, 5 ignored
+2026-09-27T05:54:16 a 05:55  cargo fmt aplicado; clippy: 2 hallazgos reales corregidos
+                              (.expect() prohibido, indexado directo); clippy final verde
+2026-09-27T05:55:34+02:00  V4 (E-6b) repetición 1: lanzada
+2026-09-27T05:58:55+02:00  V4 repetición 1: SUPERADO (convergencia verificada)
+2026-09-27T05:58:55 a 06:02  V4 "repetición 2" (primer intento): lanzada y CONTAMINADA por puertos
+                              reutilizados con procesos de la repetición 1 todavía vivos (hallazgo
+                              de método, ver PROGRESO.md); guiones corregidos (puerto_base propio +
+                              comprobación con `ss` + matar al terminar)
+2026-09-27T06:04:15+02:00  V4 repetición 2 (corregida): lanzada
+2026-09-27T06:06:13+02:00  V4 repetición 2: SUPERADO (ganador distinto al de la repetición 1,
+                           confirmando independencia real) — V4: SUPERADO EN 2 REPETICIONES
+2026-09-27T06:06:45+02:00  V5 ("V6(b) de verdad") repetición 1: lanzada
+2026-09-27T06:08:5x+02:00  V5 repetición 1: SUPERADO (aislamiento real 27 slots, convergencia)
+2026-09-27T06:09:09+02:00  V5 repetición 2: lanzada
+2026-09-27T06:10:2x+02:00  V5 repetición 2: SUPERADO — V5: SUPERADO EN 2 REPETICIONES
+2026-09-27T06:10:26+02:00  V6 (regresión, nodo tardío de W06d6): lanzada
+2026-09-27T06:16:xx+02:00  V6 (nodo tardío): SUPERADO
+2026-09-27T06:1x a 06:53   V7 final: cargo fmt --check (tras un segundo cargo fmt, dos archivos
+                           habían quedado sin formatear tras los arreglos de clippy), clippy verde,
+                           cargo test --workspace: 829 passed, 0 failed, 5 ignored;
+                           ci/dependencias-exactas.sh y ci/frontera-crates.sh verdes
+2026-09-27T06:53:11+02:00  cambios.patch y MIGRACION.sha256 regenerados tras el segundo fmt;
+                           sha256sum -c en verde; 0 procesos huérfanos confirmados
+2026-09-27T06:53:11+02:00  FIN

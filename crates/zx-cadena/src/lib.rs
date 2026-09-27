@@ -10,5 +10,5 @@ pub mod cadena;
 pub mod error;
 
 pub use bloque::{BloqueCadena, BloquePost};
-pub use cadena::{Cadena, Descarte};
+pub use cadena::{Cadena, Descarte, MAX_TERMINALES_CON_DAG};
 pub use error::MotivoBloque;

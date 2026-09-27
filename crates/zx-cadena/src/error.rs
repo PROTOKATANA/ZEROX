@@ -41,6 +41,14 @@ pub enum MotivoBloque {
     /// El productor no alcanza `q` en `Estado(past(B))` promovido en `slot(B)` (`RD-9`, `TRN-07`).
     #[error("ErrGarantia")]
     ErrGarantia,
+    /// Los padres declarados resuelven a más de un terminal distinto: una historia tiene como
+    /// mucho un terminal (`I-4`, `ORDEN-W06d7` decisión 1).
+    #[error("ErrTerminalAmbiguo")]
+    ErrTerminalAmbiguo,
+    /// El terminal candidato no cabe en `MAX_TERMINALES_CON_DAG`: su trabajo PoW no supera al peor
+    /// de los ya admitidos con DAG propio (`ORDEN-W06d7` decisión 4).
+    #[error("ErrLimiteTerminales")]
+    ErrLimiteTerminales,
     /// Un fallo del motor de transición que invalida el bloque (forma, etc.).
     #[error("ErrTransicion: {0}")]
     ErrTransicion(#[from] ErrorTransicion),
@@ -59,6 +67,8 @@ impl MotivoBloque {
             Self::ErrU2 => "ErrU2",
             Self::ErrMergeDepth => "ErrMergeDepth",
             Self::ErrGarantia => "ErrGarantia",
+            Self::ErrTerminalAmbiguo => "ErrTerminalAmbiguo",
+            Self::ErrLimiteTerminales => "ErrLimiteTerminales",
             Self::ErrTransicion(e) => e.nombre_t01(),
         }
     }

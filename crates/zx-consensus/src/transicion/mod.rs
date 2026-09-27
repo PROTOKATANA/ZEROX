@@ -30,7 +30,8 @@ pub use estado::{
 };
 pub use fusion::aplicar_fusion;
 pub use seleccion::{
-    ResultadoSeleccion, construir_validos, mapa_por_hash, nodo_en_linea, seleccionar,
+    ResultadoSeleccion, comparar_terminal, construir_validos, mapa_por_hash, nodo_en_linea,
+    seleccionar,
 };
 pub use tipos::{
     BloqueTransicion, EnRetirada, EntradaUtxo, Escalares, Estado, Fase, Garantia, HechosCabecera,

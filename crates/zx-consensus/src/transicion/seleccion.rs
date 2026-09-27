@@ -86,7 +86,12 @@ pub fn construir_validos(
 
 /// Prioridad de terminales para `FC-3`: `None` (sin terminal) gana; entre terminales, el **menor**
 /// hash.
-fn comparar_terminal(a: Option<BlockHash>, b: Option<BlockHash>) -> Ordering {
+///
+/// Pública desde `ORDEN-W06d7` decisión 2: `zx-cadena` la reutiliza como desempate de `FC-3`
+/// **entre terminales candidatos** (varios DAG a la vez), en vez de reimplementar el mismo criterio
+/// («no una segunda implementación divergente»). El comportamiento no cambia: solo la visibilidad.
+#[must_use]
+pub fn comparar_terminal(a: Option<BlockHash>, b: Option<BlockHash>) -> Ordering {
     match (a, b) {
         (None, None) => Ordering::Equal,
         (None, Some(_)) => Ordering::Greater,
@@ -262,4 +267,34 @@ pub fn nodo_en_linea(
         }
     }
     Ok((punta, estado_punta))
+}
+
+#[cfg(test)]
+mod tests_comparar_terminal {
+    //! `ORDEN-W06d7`: prueba de la visibilidad nueva de [`comparar_terminal`], sin cambiar su
+    //! comportamiento (los diferenciales T01/T04 siguen siendo la prueba de no-regresión real).
+    use super::comparar_terminal;
+    use std::cmp::Ordering;
+    use zx_core::{BlockHash, Digest};
+
+    fn h(n: u8) -> BlockHash {
+        BlockHash::from_digest(Digest::from_bytes([n; 32]))
+    }
+
+    #[test]
+    fn none_gana_a_cualquier_terminal() {
+        // Convención documentada de `comparar_terminal` («`None` gana»), la misma que usa
+        // `comparar_fc3`: `Greater` = gana el primer argumento.
+        assert_eq!(comparar_terminal(None, Some(h(1))), Ordering::Greater);
+        assert_eq!(comparar_terminal(Some(h(1)), None), Ordering::Less);
+        assert_eq!(comparar_terminal(None, None), Ordering::Equal);
+    }
+
+    #[test]
+    fn entre_terminales_gana_el_menor_hash() {
+        // `Greater` = gana `a` (convención de `comparar_fc3`): con `a` de hash menor que `b`, `a`
+        // debe ganar.
+        assert_eq!(comparar_terminal(Some(h(1)), Some(h(2))), Ordering::Greater);
+        assert_eq!(comparar_terminal(Some(h(2)), Some(h(1))), Ordering::Less);
+    }
 }

@@ -1,0 +1,7 @@
+46eeb2599430686b40c929dc2d0e77798ba72b39df54dd7455e14f22b6fe4584  crates/zx-cadena/src/cadena.rs
+4e1f9e3ab05181de86007e11543660599d23117249ff15ad3f808913ec425cde  crates/zx-cadena/src/error.rs
+899db3217e16dddb22c7472a98660e31139c660917712e3369ff422dd38d84f4  crates/zx-cadena/src/lib.rs
+ead2fd19ceb78ff0c0ee6b23bc9b36b350c677a48215c986c0d18add7fac44d4  crates/zx-cadena/tests/multiterminal.rs
+278a0eecb0ff29cfa1b307fc6fdadd65ec4076678d0eb9522a93b6db49eb60da  crates/zx-consensus/src/transicion/mod.rs
+32ec2805c9a92f8d74c0d195167df9e19c4c1963e2f5f6f55975ae8dd85df234  crates/zx-consensus/src/transicion/seleccion.rs
+a5db2b312ecf9c91cf0041b4a92a55dd4c5c80866d5c0fdd4e535a06d1694d73  crates/zx-node/src/nodo.rs

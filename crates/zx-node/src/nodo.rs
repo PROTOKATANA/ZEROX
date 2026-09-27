@@ -105,11 +105,12 @@ pub struct Nodo {
     /// (`ORDEN-W06d3` decisión 3): permite reconstruir el historial de **cualquier** punta con
     /// `Nodo::historial_hasta`, no solo el de la rama seleccionada hoy.
     headers_pow: BTreeMap<BlockHash, BlockHeader>,
-    /// El terminal sobre el que se construyó `servicio_verificacion`, para saber si hay que
-    /// reconstruirlo tras un cambio de terminal tentativo (FC-3, antes de que exista ningún bloque
-    /// PoST; `ORDEN-W06d3` decisión 3).
-    terminal_servicio: Option<BlockHash>,
-    servicio_verificacion: Option<ServicioPot>,
+    /// Un `ServicioPot` de verificación **por terminal candidato** (`ORDEN-W06d7` decisión 5: ya no
+    /// hay uno solo, porque puede haber varios terminales con DAG a la vez). Se crea en cuanto
+    /// `zx-cadena` reconoce el candidato ([`Nodo::asegurar_servicios_verificacion`]), antes incluso
+    /// de que tenga DAG propio (el bloque de transición de ese terminal necesita el servicio para
+    /// verificarse, y todavía no hay DAG en ese punto).
+    servicios_verificacion: BTreeMap<BlockHash, ServicioPot>,
     historia: Arc<HistoriaGenesis>,
     ultima_punta_registrada: Option<BlockHash>,
     dir_datos: PathBuf,
@@ -245,8 +246,7 @@ impl Nodo {
             cbid,
             historial_pow: Vec::new(),
             headers_pow: BTreeMap::new(),
-            terminal_servicio: None,
-            servicio_verificacion: None,
+            servicios_verificacion: BTreeMap::new(),
             historia,
             ultima_punta_registrada: None,
             dir_datos: cfg.dir_datos.clone(),
@@ -542,30 +542,62 @@ impl Nodo {
         // la punta PoW **seleccionada** por `zx-cadena` (mayor trabajo acumulado), lo mismo si este
         // bloque la extiende como si es un bloque de una rama lateral que no la cambia.
         self.actualizar_seleccion_pow()?;
-        // El `ServicioPot` de verificación se necesita en cuanto el terminal existe, tanto en
-        // producción en vivo (lo crea `fase_regimen` antes de producir) como en la **repetición**
-        // (D-N03′): si el registro trae ya bloques PoST, `admitir_post_interno` los procesa aquí
-        // mismo, dentro de `Nodo::arrancar`, antes de que `fase_regimen` llegue a ejecutarse. Sin
-        // esto, reabrir un nodo que ya había cruzado el corte fallaba siempre en la primera entrada
-        // PoST del registro (bug real encontrado por `tests/reinicio.rs`, ver `PROGRESO.md`).
-        //
-        // Se reconstruye también si el terminal **cambió** desde la última vez (posible mientras
-        // `Cadena::contexto_dag()` sigue en `None`, FC-3: una rama más pesada puede desplazar al
-        // terminal tentativo antes de que exista ningún bloque PoST, `ORDEN-W06d3` decisión 3): un
-        // `ServicioPot` construido sobre el terminal viejo verificaría contra el flujo PoT
-        // equivocado.
-        if let Some(terminal) = self.cadena.terminal() {
-            let necesita_reconstruir =
-                self.servicio_verificacion.is_none() || self.terminal_servicio != Some(terminal);
-            if necesita_reconstruir && self.cadena.contexto_dag().is_none() {
-                let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
-                    .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
-                self.servicio_verificacion = Some(servicio);
-                self.terminal_servicio = Some(terminal);
-            }
-        }
+        // `ORDEN-W06d7` decisión 5: un `ServicioPot` de verificación **por terminal candidato**, no
+        // solo el seleccionado — puede haber varios terminales con DAG a la vez (decisión 1), y cada
+        // uno necesita su propio flujo PoT para verificar los bloques PoST que declaran ese terminal
+        // en su pasado, tanto en producción en vivo (lo crea también `fase_regimen`) como en la
+        // **repetición** (D-N03′): si el registro trae ya bloques PoST, `admitir_post_interno` los
+        // procesa aquí mismo, dentro de `Nodo::arrancar`, antes de que `fase_regimen` llegue a
+        // ejecutarse. Sin esto, reabrir un nodo que ya había cruzado el corte fallaba siempre en la
+        // primera entrada PoST del registro (bug real encontrado por `tests/reinicio.rs`,
+        // `PROGRESO.md` de `W06d3`).
+        self.asegurar_servicios_verificacion()?;
         self.registrar_cambio_de_punta()?;
         Ok(())
+    }
+
+    /// Crea el `ServicioPot` de verificación de todo terminal candidato que todavía no lo tenga
+    /// (`ORDEN-W06d7` decisión 5). Idempotente: un candidato ya conocido no se reconstruye ni
+    /// pierde el pasado PoT que ya llevaba (a diferencia del diseño de un único terminal, donde
+    /// "reconstruir" significaba tirar el servicio anterior — aquí cada terminal tiene el suyo para
+    /// siempre, así que no hace falta).
+    fn asegurar_servicios_verificacion(&mut self) -> Result<(), ErrorNodo> {
+        for terminal in self.cadena.terminal_candidatos() {
+            if let std::collections::btree_map::Entry::Vacant(e) =
+                self.servicios_verificacion.entry(terminal)
+            {
+                let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096).map_err(|err| {
+                    ErrorNodo::Otro(format!("ServicioPot de verificación: {err}"))
+                })?;
+                e.insert(servicio);
+            }
+        }
+        Ok(())
+    }
+
+    /// Terminal único al que resuelven `padres` (réplica, de solo lectura, de
+    /// `Cadena::terminal_de_bloque_post`; `ORDEN-W06d7` decisión 5): el nodo necesita saberlo
+    /// **antes** de llamar a `Cadena::admitir`, para elegir el `ServicioPot`/contexto de
+    /// verificación correctos. `None` si algún padre es desconocido o los padres resuelven a más de
+    /// un terminal (en ese caso `Cadena::admitir` lo rechazará con su propio motivo:
+    /// `ErrSinPadre`/`ErrTerminalAmbiguo`; aquí basta con no elegir un servicio equivocado).
+    fn terminal_de_padres(&self, padres: &[BlockHash]) -> Option<BlockHash> {
+        let candidatos = self.cadena.terminal_candidatos();
+        let mut terminal_ref: Option<BlockHash> = None;
+        for x in padres {
+            let t = if candidatos.contains(x) {
+                Some(*x)
+            } else {
+                self.cadena.terminal_de(x)
+            };
+            let t = t?;
+            match terminal_ref {
+                None => terminal_ref = Some(t),
+                Some(prev) if prev != t => return None,
+                Some(_) => {}
+            }
+        }
+        terminal_ref
     }
 
     /// Reconstruye, si hace falta, `historial_pow` (y `trabajo_acumulado`) desde la punta PoW que
@@ -646,25 +678,48 @@ impl Nodo {
         verificar: bool,
     ) -> Result<(), ErrorNodo> {
         let hash = bloque.cabecera.block_hash();
+        // `ORDEN-W06d7` decisión 1/5: los padres deciden a qué terminal pertenece este bloque —
+        // necesario **ya** para elegir el `ServicioPot`/contexto de verificación, antes incluso de
+        // llamar a `Cadena::admitir` (que hace la misma resolución internamente, pero después). Se
+        // calcula **siempre** (también en la repetición, `verificar = false`): el servicio de ese
+        // terminal necesita actualizarse igual al final de la función.
+        let padres_declarados = padres_dag_a_vec(&bloque.cabecera.padres);
+        let Some(terminal) = self.terminal_de_padres(&padres_declarados) else {
+            // Terminal desconocido o ambiguo aquí: no es prueba de invalidez (podría ser un padre
+            // que este nodo todavía no admitió, o una ambigüedad real que `Cadena::admitir`
+            // rechazará más abajo con su propio motivo, `ErrTerminalAmbiguo`/`ErrSinPadre`); tratarlo
+            // como rechazo fatal de un bloque **propio** sería incorrecto para un bloque de **red**
+            // que sincroniza fuera de orden (mismo espíritu que `MotivoCabeceraPendiente`,
+            // `crate::rechazo`).
+            return Err(ErrorNodo::BloquePropioRechazado {
+                hash,
+                motivo: "terminal_no_resoluble".to_string(),
+                clasificacion: crate::rechazo::ClasificacionRechazo::Pendiente,
+            });
+        };
 
         if verificar {
-            let servicio = self
-                .servicio_verificacion
-                .as_ref()
-                .ok_or_else(|| ErrorNodo::Otro("verificación PoST sin ServicioPot".to_string()))?;
+            self.asegurar_servicios_verificacion()?;
+            let servicio = self.servicios_verificacion.get(&terminal).ok_or_else(|| {
+                ErrorNodo::Otro(format!(
+                    "verificación PoST sin ServicioPot para el terminal {terminal}"
+                ))
+            })?;
             let params_pieza: PieceCheckParams = self.historia.params_pieza();
             let mut cache = CachePotVerificada::nueva();
             let mut presupuesto = PresupuestoIlimitado;
             let rango = RangoDev(self.cadena_sr_dev());
 
-            // El primer bloque tras el corte (el de transición, decisión 6) se verifica **antes**
-            // de que `zx-cadena` tenga ningún bloque PoST admitido: `Cadena::contexto_dag()` es
-            // `None` hasta la primera admisión (`inicializar_dag` vive dentro de `admitir_post`).
-            // Para ese único bloque, cuyo único padre posible es el terminal, no hay ambigüedad de
-            // `sp` que temer («Relanzamiento» punto 3 es sobre bloques con más de un padre
-            // candidato) y se usa `ContextoTransicion` (el mismo contexto dev que `zx-post` define
-            // para exactamente este caso). Para todo lo demás, el GHOSTDAG real de `zx-cadena`.
-            let estado = match self.cadena.contexto_dag() {
+            // El primer bloque tras el corte de **cada** terminal (su bloque de transición,
+            // decisión 6) se verifica **antes** de que `zx-cadena` tenga ningún bloque PoST propio
+            // de ese terminal: `Cadena::contexto_dag_de(terminal)` es `None` hasta la primera
+            // admisión (`ORDEN-W06d7` decisión 1: el DAG de un terminal nace con su primer bloque
+            // PoST). Para ese único bloque, cuyo único padre posible es `terminal`, no hay
+            // ambigüedad de `sp` que temer y se usa `ContextoTransicion` (el mismo contexto dev que
+            // `zx-post` define para exactamente este caso). Para todo lo demás, el GHOSTDAG real
+            // **de ese terminal** (no necesariamente el seleccionado: varios terminales pueden tener
+            // DAG a la vez).
+            let estado = match self.cadena.contexto_dag_de(terminal) {
                 Some(dag) => verificar_cabecera_conjunta(
                     &bloque,
                     servicio,
@@ -677,9 +732,6 @@ impl Nodo {
                     self.historia.kzg(),
                 ),
                 None => {
-                    let terminal = self.cadena.terminal().ok_or_else(|| {
-                        ErrorNodo::Otro("verificación PoST sin terminal fijado".to_string())
-                    })?;
                     let ctx = zx_post::contexto_transicion::ContextoTransicion::nuevo(
                         terminal,
                         self.n_dev,
@@ -737,7 +789,7 @@ impl Nodo {
         // Identidad real de `C-GD-07` (`ORDEN-W06a-C` decisión 2): la tupla literal derivada de la
         // misma cabecera que aporta `block_hash`, `slot` y `SR`. Ya **no** se trunca a un `u64`.
         let identidad = identidad_de_cabecera_post(&bloque.cabecera);
-        let padres = padres_dag_a_vec(&bloque.cabecera.padres);
+        let padres = padres_declarados;
         let txs: Vec<(Tx, Vec<Vec<u8>>)> = bloque
             .txs()
             .iter()
@@ -799,7 +851,11 @@ impl Nodo {
             self.resolver_huerfanos_de(hash);
         }
 
-        self.actualizar_servicio_verificacion(&bloque)?;
+        // El terminal de `hash` ya se conoce: la admisión de arriba (o, en la repetición, una
+        // anterior) lo fijó en `zx-cadena` (`ORDEN-W06d7` decisión 1); `terminal` (resuelto arriba
+        // desde los padres declarados) es el mismo valor y sirve de respaldo defensivo.
+        let terminal_del_bloque = self.cadena.terminal_de(&hash).unwrap_or(terminal);
+        self.actualizar_servicio_verificacion(terminal_del_bloque, &bloque)?;
         self.registrar_cambio_de_punta()?;
         Ok(())
     }
@@ -809,13 +865,19 @@ impl Nodo {
         self.sr_dev_actual
     }
 
-    /// Mantiene al día el `ServicioPot` de verificación (decisión 7, ver `PROGRESO.md`): inserta la
-    /// salida y el portador **de este bloque**, sin recalcular el PoT. El flujo es único y global
-    /// (D-P10), así que si el slot ya estaba cubierto por otra rama/hermano, solo se comprueba que
-    /// coincide (defensa; nunca debería discrepar: lo impediría antes `ContextoTransicion`/H2 en la
-    /// ruta de producción, pero este servicio de verificación no pasa por ahí).
-    fn actualizar_servicio_verificacion(&mut self, bloque: &BloqueDag) -> Result<(), ErrorNodo> {
-        let Some(servicio) = self.servicio_verificacion.as_mut() else {
+    /// Mantiene al día el `ServicioPot` de verificación **de `terminal`** (decisión 7 de
+    /// `ORDEN-W06a`; por terminal desde `ORDEN-W06d7` decisión 5): inserta la salida y el portador
+    /// **de este bloque**, sin recalcular el PoT. El flujo es único y global dentro de cada terminal
+    /// (D-P10), así que si el slot ya estaba cubierto por otra rama/hermano **del mismo terminal**,
+    /// solo se comprueba que coincide (defensa; nunca debería discrepar: lo impediría antes
+    /// `ContextoTransicion`/H2 en la ruta de producción, pero este servicio de verificación no pasa
+    /// por ahí).
+    fn actualizar_servicio_verificacion(
+        &mut self,
+        terminal: BlockHash,
+        bloque: &BloqueDag,
+    ) -> Result<(), ErrorNodo> {
+        let Some(servicio) = self.servicios_verificacion.get_mut(&terminal) else {
             return Err(ErrorNodo::Otro(
                 "ServicioPot de verificación ausente tras el terminal".to_string(),
             ));
@@ -1161,17 +1223,21 @@ impl Nodo {
         if self.cadena.motivo(&hash).is_some() {
             return VeredictoFinal::Rechazar; // ya sabíamos que es inválido.
         }
-        let Some(terminal) = self.cadena.terminal() else {
-            // Todavía en fase PoW pura: sin terminal no hay `ServicioPot` ni GHOSTDAG con los que
-            // verificar nada. No es demostrablemente inválido (podríamos cruzar el corte nosotros
-            // mismos en breve): `Ignorar`, no `Rechazar`.
+        // `ORDEN-W06d7`: ya no hace falta un único terminal seleccionado para juzgar un bloque PoST
+        // de red — puede declarar como padre **cualquier** terminal candidato conocido (el suyo, no
+        // necesariamente el que este nodo tiene seleccionado hoy). Sin ningún candidato todavía
+        // (fase PoW pura), no hay `ServicioPot` ni GHOSTDAG con los que verificar nada: no es
+        // demostrablemente inválido (podríamos cruzar el corte nosotros mismos en breve),
+        // `Ignorar`, no `Rechazar`.
+        if self.cadena.terminal_candidatos().is_empty() {
             let evento = self
                 .registro
                 .evento("bloque_post_de_red_sin_terminal")
                 .str("hash", &hash.to_string());
             let _ = self.registro.escribir(evento, false);
             return VeredictoFinal::Ignorar;
-        };
+        }
+        let candidatos = self.cadena.terminal_candidatos();
 
         let bloque_red = BloqueRed::Post {
             cabecera,
@@ -1180,8 +1246,8 @@ impl Nodo {
             testigos: testigos.clone(),
         };
         for padre in red::padres_declarados(&bloque_red) {
-            if padre == terminal {
-                continue; // el terminal siempre es un padre válido y conocido, por definición.
+            if candidatos.contains(&padre) {
+                continue; // cualquier terminal candidato conocido es un padre válido y conocido.
             }
             let padre_conocido =
                 self.cadena.es_valido(&padre) || self.cadena.motivo(&padre).is_some();
@@ -1608,16 +1674,13 @@ impl Nodo {
             .cadena
             .terminal()
             .ok_or_else(|| ErrorNodo::Otro("fase_regimen sin terminal".to_string()))?;
-        // Mismo ratchet que `admitir_pow_interno` (`ORDEN-W06d3` decisión 3): entre que `fase_pow`
-        // vio el terminal por última vez y aquí, una rama más pesada llegada por red podría haberlo
-        // desplazado (FC-3), siempre que todavía no exista ningún bloque PoST (`contexto_dag`
-        // `None`). Se reconstruye el `ServicioPot` si el terminal no es el que tenía.
-        if self.servicio_verificacion.is_none() || self.terminal_servicio != Some(terminal) {
-            let servicio = ServicioPot::nuevo(terminal, self.n_dev, 4096)
-                .map_err(|e| ErrorNodo::Otro(format!("ServicioPot de verificación: {e}")))?;
-            self.servicio_verificacion = Some(servicio);
-            self.terminal_servicio = Some(terminal);
-        }
+        // `ORDEN-W06d7` decisión 5: un `ServicioPot` por terminal candidato, no uno solo; se
+        // asegura (crea si falta) el de `terminal` y el de cualquier otro candidato ya conocido.
+        // Entre que `fase_pow` vio el terminal seleccionado por última vez y aquí, una rama más
+        // pesada llegada por red pudo haber cambiado la selección (FC-3): `terminal` sigue siendo
+        // válido como terminal candidato (tiene su propio servicio para siempre, no se "pierde" al
+        // dejar de ser el seleccionado), aunque ya no sea `self.cadena.terminal()`.
+        self.asegurar_servicios_verificacion()?;
 
         // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
         //
@@ -1662,9 +1725,13 @@ impl Nodo {
         // el de transición recién producido, o toda la historia de régimen si esto es un reinicio a
         // mitad de régimen). El hilo avanza y produce sobre su propio clon; el del bucle solo se usa
         // para verificar (ver el doc de `hilo_productor_regimen`).
-        let servicio_hilo = self.servicio_verificacion.clone().ok_or_else(|| {
-            ErrorNodo::Otro("fase_regimen sin ServicioPot de verificación".to_string())
-        })?;
+        let servicio_hilo = self
+            .servicios_verificacion
+            .get(&terminal)
+            .cloned()
+            .ok_or_else(|| {
+                ErrorNodo::Otro("fase_regimen sin ServicioPot de verificación".to_string())
+            })?;
 
         let (tx_a_bucle, rx_en_bucle) = mpsc::channel::<MsgProductor>();
         let (tx_a_productor, rx_en_productor) = mpsc::channel::<MsgBucle>();
@@ -1768,8 +1835,8 @@ impl Nodo {
                             // dejado de estarlo.
                             self.reintentar_post_pendientes();
                             let continuar = self.limite_productor().is_none_or(|limite| {
-                                self.servicio_verificacion
-                                    .as_ref()
+                                self.servicios_verificacion
+                                    .get(&terminal)
                                     .is_some_and(|s| s.slot_actual() < limite)
                             });
                             let respuesta = if continuar {
