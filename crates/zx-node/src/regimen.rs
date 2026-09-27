@@ -386,3 +386,78 @@ impl FuenteSoluciones for SolucionFija {
         Ok(vec![self.0])
     }
 }
+
+/// `ORDEN-W06d6` decisión 5: test pendiente de `ORDEN-W06d5` decisión 2 (padres extra) —
+/// `filtrar_padres_extra_por_slot` es la función que la implementa; se probaba solo con ejecuciones
+/// reales (V6(b)), sin test unitario.
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
+mod tests_filtrar_padres_extra {
+    use zx_core::digest::Digest;
+    use zx_core::{BlockHash, PadresDag};
+
+    use super::filtrar_padres_extra_por_slot;
+
+    fn h(n: u8) -> BlockHash {
+        BlockHash::from_digest(Digest::from_bytes([n; 32]))
+    }
+
+    /// Un padre extra cuyo slot **no** es anterior al objetivo (`>=`) se descarta; uno anterior se
+    /// conserva. El seleccionado nunca se toca aquí (lo descarta `producir_en_regimen` con gracia,
+    /// no este filtro).
+    #[test]
+    fn descarta_solo_los_extras_cuyo_slot_no_es_anterior_al_objetivo() {
+        let seleccionado = h(1);
+        let extra_valido = h(2); // slot 5 < 10: se conserva.
+        let extra_igual = h(3); // slot 10 == 10: se descarta (no es "anterior").
+        let extra_posterior = h(4); // slot 11 > 10: se descarta.
+
+        let padres =
+            PadresDag::nuevo(seleccionado, &[extra_valido, extra_igual, extra_posterior]).unwrap();
+        let info_padres = vec![
+            (seleccionado, 3), // el slot del seleccionado no importa a este filtro.
+            (extra_valido, 5),
+            (extra_igual, 10),
+            (extra_posterior, 11),
+        ];
+
+        let filtrados = filtrar_padres_extra_por_slot(padres, &info_padres, 10);
+
+        assert_eq!(
+            filtrados.seleccionado(),
+            seleccionado,
+            "el seleccionado no se toca"
+        );
+        assert_eq!(
+            filtrados.extras(),
+            &[extra_valido],
+            "solo sobrevive el extra con slot estrictamente anterior al objetivo"
+        );
+    }
+
+    /// Sin ningún extra que filtrar, la reconstrucción es un no-op.
+    #[test]
+    fn sin_extras_no_cambia_nada() {
+        let seleccionado = h(9);
+        let padres = PadresDag::nuevo(seleccionado, &[]).unwrap();
+        let filtrados = filtrar_padres_extra_por_slot(padres, &[(seleccionado, 1)], 100);
+        assert_eq!(filtrados.seleccionado(), seleccionado);
+        assert!(filtrados.extras().is_empty());
+    }
+
+    /// Todos los extras por debajo del objetivo: ninguno se descarta.
+    #[test]
+    fn todos_los_extras_anteriores_sobreviven() {
+        let seleccionado = h(1);
+        let e1 = h(2);
+        let e2 = h(3);
+        let padres = PadresDag::nuevo(seleccionado, &[e1, e2]).unwrap();
+        let info = vec![(seleccionado, 0), (e1, 1), (e2, 2)];
+        let filtrados = filtrar_padres_extra_por_slot(padres, &info, 100);
+        let mut extras = filtrados.extras().to_vec();
+        extras.sort();
+        let mut esperado = vec![e1, e2];
+        esperado.sort();
+        assert_eq!(extras, esperado);
+    }
+}

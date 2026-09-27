@@ -44,7 +44,7 @@ use crate::perfil;
 use crate::pow;
 use crate::red::huerfanos::DepositoHuerfanos;
 use crate::red::vista::VistaRed;
-use crate::red::{self, ManijaRed, TrabajoRed};
+use crate::red::{self, ManijaRed, ReceptorTrabajoRed, TrabajoRed};
 use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
 use crate::registro::Registro;
 
@@ -84,6 +84,9 @@ pub struct Config {
     pub sr_dev: u64,
     /// Parada tras N slots de régimen (`None` = sin límite).
     pub parada_tras_slots: Option<u64>,
+    /// `ORDEN-W06d6` decisión 6: desde este slot el nodo deja de **producir**, pero sigue
+    /// validando, propagando y sincronizando. `None` = nunca deja de producir por esta vía.
+    pub dejar_de_producir_en_slot: Option<u64>,
 }
 
 /// Estado completo del nodo, dueño único de `zx-cadena` y `zx-storage`.
@@ -113,6 +116,8 @@ pub struct Nodo {
     n_dev: u64,
     sr_dev_actual: u64,
     parada_tras_slots: Option<u64>,
+    /// `ORDEN-W06d6` decisión 6.
+    dejar_de_producir_en_slot: Option<u64>,
     /// Trabajo PoW acumulado de la cadena admitida (para el saludo de red, decisión 4).
     trabajo_acumulado: U256,
     /// Hash del génesis (cacheado: `ORDEN-W06d2` lo necesita en cada saludo).
@@ -128,7 +133,7 @@ pub struct Nodo {
     /// comportamiento de `ORDEN-W06d1`: un nodo sin red.
     red: Option<ManijaRed>,
     /// Cola de trabajo que el manejador de red encola y este hilo drena (decisión 1).
-    trabajo_red: Option<tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>>,
+    trabajo_red: Option<ReceptorTrabajoRed>,
     /// Bloques PoST **de red** descartados como [`crate::rechazo::ClasificacionRechazo::Pendiente`]
     /// (aviso del director, `ORDEN-W06d5`, tras el hallazgo de V5): no son inválidos, solo faltó
     /// contexto local (`Pot(PasadoIncompleto)` mientras este nodo sincroniza fuera de orden). Nunca
@@ -223,6 +228,7 @@ impl Nodo {
             terminal: None,
             puntas_post: Vec::new(),
             blue_work_virtual: [0; 32],
+            longitud_registro: 0,
         };
 
         let mut nodo = Self {
@@ -247,6 +253,7 @@ impl Nodo {
             n_dev: cfg.n_dev,
             sr_dev_actual: cfg.sr_dev,
             parada_tras_slots: cfg.parada_tras_slots,
+            dejar_de_producir_en_slot: cfg.dejar_de_producir_en_slot,
             trabajo_acumulado: U256::zero(),
             hash_genesis: hash_genesis_esperado,
             red_configurada: cfg.red,
@@ -274,6 +281,13 @@ impl Nodo {
         self.registro
             .escribir(self.registro.evento("arranque").str("fase", "limpio"), true)?;
         let testigos_genesis: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
+        // `ORDEN-W06d6` decisión 1: instantánea para el registro de admisión de la vista de red,
+        // construida antes de que `tx_genesis` se consuma más abajo.
+        let para_vista_genesis = BloqueRed::Pow {
+            cabecera: cabecera_genesis,
+            txs: vec![tx_genesis.clone()],
+            testigos: testigos_genesis.clone(),
+        };
         self.cadena
             .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
                 HechosCabecera::Genesis {
@@ -302,6 +316,11 @@ impl Nodo {
         // siempre y el localizador de sincronización nunca llegaba a funcionar. `Self::historial_pow`
         // es la fuente de verdad; `fijar_cabeceras_pow` la copia entera a la vista.
         self.vista_red.fijar_cabeceras_pow(&self.historial_pow);
+        // `ORDEN-W06d6` decisión 1: el registro de admisión de la vista tiene que empezar en el
+        // génesis, igual que el registro real de `zx-storage` (`registrar_pow` no se llama aquí,
+        // así que sin esto el cuerpo y la entrada de registro del génesis nunca existirían en la
+        // vista de red).
+        self.vista_red.registrar_genesis_pow(para_vista_genesis);
         Ok(())
     }
 
@@ -484,17 +503,21 @@ impl Nodo {
 
         let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
         if !ya_admitido {
-            // Persistencia (D-N03′) **antes** de admitir en `zx-cadena`: si el proceso muere entre
-            // las dos, el reinicio repite desde el almacén y vuelve a llegar aquí con `ya_admitido`
-            // falso otra vez (la clave del almacén es el hash, admitir es idempotente); al revés
-            // (admitir en memoria y morir antes de persistir) perdería el bloque sin dejar rastro.
-            // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
-            // almacén (viene de ahí) y volver a escribirlo sería una vuelta redundante a disco.
-            if verificar {
-                let admitido = BloqueAdmitido::pow(&cabecera, &txs, &testigos);
-                self.almacen.admitir(&admitido, true)?;
-            }
-
+            // `ORDEN-W06d6`, paso previo (RI-3c H1, `REVISION-RI-3c.md`): orden **admitir en
+            // `zx-cadena` → persistir → difundir** (la difusión la hace quien llama, ya solo tras
+            // que esta función devuelva `Ok`). Antes se persistía primero: si `cadena.admitir`
+            // rechazaba el bloque con un motivo `Legitimo`/`Interno` normal (`ErrGarantia`,
+            // `ErrMergeDepth`... la propia `ORDEN-W06d5` decisión 3 los declara esperables), la
+            // entrada quedaba en el almacén **sin que nada la deshiciera**: un bloque rechazado
+            // repetía su rechazo en cada reinicio (D-N03′ repite todo el registro) y el nodo no
+            // volvía a arrancar nunca (RI-3c, reproducido con un `ErrEmision`). Con el orden nuevo,
+            // un rechazo de `cadena.admitir` sale de esta función (el `?` de abajo) **antes** de
+            // tocar disco: no hay nada que deshacer. Si el proceso muere justo entre admitir
+            // (memoria) y persistir (disco), el bloque simplemente no salió del nodo — nunca se
+            // difundió (eso ocurre después, en el llamante) y el reinicio no lo repite porque no
+            // está en el almacén; no es la doble firma que RI-2b temía (esa era sobre difundir
+            // antes de persistir, no sobre admitir antes de persistir).
+            let admitido = BloqueAdmitido::pow(&cabecera, &txs, &testigos);
             let txs_con_testigos: Vec<(Tx, Vec<Vec<u8>>)> = txs.into_iter().zip(testigos).collect();
             let bt = BloqueTransicion::nuevo(hechos, txs_con_testigos);
             self.cadena.admitir(BloqueCadena::Pow(bt)).map_err(|m| {
@@ -504,6 +527,11 @@ impl Nodo {
                     clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
                 }
             })?;
+            // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
+            // almacén (viene de ahí) y volver a escribirlo sería una vuelta redundante a disco.
+            if verificar {
+                self.almacen.admitir(&admitido, true)?;
+            }
             self.vista_red.registrar_pow(cabecera.height, para_vista);
             // Un hijo que esperaba justo este padre puede reintentarse ya (decisión 3).
             self.resolver_huerfanos_de(hash);
@@ -732,22 +760,21 @@ impl Nodo {
         };
 
         let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
-        // Aviso del director a mitad de ejecución (RI-2b, `deepseek/RI-2b/INFORME.md` H1): persistir
-        // **antes** de admitir en `zx-cadena`, igual que `admitir_pow_interno` y por el mismo motivo
-        // (su propio comentario, arriba): si el proceso muere entre las dos, el reinicio repite
-        // desde el almacén y vuelve a llegar aquí con `ya_admitido` falso otra vez (idempotente por
-        // hash). Al revés —como estaba— un `SIGKILL` entre `cadena.admitir` (memoria) y
-        // `almacen.admitir` (disco) perdía el bloque **sin dejar rastro**: al reiniciar,
-        // `ServicioPot` se reconstruye solo desde lo persistido (D-N03′), el mismo slot queda
-        // libre otra vez y, con un solo flujo PoT determinista (D-P10), la misma clave puede volver
-        // a ganarlo y firmar un bloque **distinto** para el mismo slot — la doble firma que
-        // «Relanzamiento» punto 4 de `ORDEN-W06d1` prohíbe. Solo en la ruta en vivo (`verificar`):
-        // en la repetición el bloque ya está en el almacén (viene de ahí).
-        if !ya_admitido && verificar {
-            let admitido = BloqueAdmitido::post(&bloque);
-            self.almacen.admitir(&admitido, true)?;
-        }
-
+        // `ORDEN-W06d6`, paso previo (RI-3c H1, `REVISION-RI-3c.md`): orden **admitir en
+        // `zx-cadena` → persistir → difundir**, igual que `admitir_pow_interno` y por el mismo
+        // motivo (ver su comentario). Esto **sustituye** el orden de RI-2b (persistir antes de
+        // admitir): RI-2b acertaba en el objetivo —evitar la doble firma de «Relanzamiento» punto
+        // 4— y se equivocaba en la forma. Lo que de verdad la evita es que la **difusión** ocurra
+        // solo después de persistir (eso no cambia: sigue siendo el llamante, tras que esta función
+        // devuelva `Ok`), no que la persistencia sea el primer paso. Con persistir primero, un
+        // rechazo legítimo de `cadena.admitir` (`ErrGarantia`, `ErrMergeDepth`... la propia
+        // `ORDEN-W06d5` decisión 3 los declara esperables) dejaba una entrada fantasma en el
+        // almacén que D-N03′ repite en cada reinicio sin deshacerla — el nodo no volvía a arrancar
+        // (RI-3c, confirmado). Con el orden nuevo, un rechazo sale por el `?` de abajo antes de
+        // tocar disco. Si el proceso muere entre admitir (memoria) y persistir (disco), el slot
+        // sigue sin observarse fuera del nodo (nunca se difundió) y el reinicio no repite nada (no
+        // está en el almacén): no hay bloque fantasma que reproduzca el rechazo, y no hay doble
+        // firma observable porque no hubo difusión.
         if !ya_admitido {
             self.cadena.admitir(BloqueCadena::Post(post)).map_err(|m| {
                 ErrorNodo::BloquePropioRechazado {
@@ -756,6 +783,12 @@ impl Nodo {
                     clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
                 }
             })?;
+            // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
+            // almacén (viene de ahí).
+            if verificar {
+                let admitido = BloqueAdmitido::post(&bloque);
+                self.almacen.admitir(&admitido, true)?;
+            }
             let para_vista = BloqueRed::Post {
                 cabecera: bloque.cabecera,
                 justificacion: bloque.justificacion.clone(),
@@ -882,6 +915,9 @@ impl Nodo {
             terminal: self.cadena.terminal(),
             puntas_post,
             blue_work_virtual: [0; 32],
+            // `ORDEN-W06d6` decisión 1: longitud real del registro de admisión de la vista, no un
+            // relleno — es lo que el par sincronizando compara contra su propio cursor.
+            longitud_registro: self.vista_red.longitud_registro(),
         }
     }
 
@@ -1150,6 +1186,24 @@ impl Nodo {
             let padre_conocido =
                 self.cadena.es_valido(&padre) || self.cadena.motivo(&padre).is_some();
             if !padre_conocido {
+                // `ORDEN-W06d6` decisión 1: mientras este nodo va muy por detrás de algún par
+                // conocido (`VistaRed::sincronizando`), un huérfano PoST llegado por **gossip**
+                // (`origen.is_none()`: no sabemos de quién pedir el padre directamente) no se
+                // deposita — la sincronización por registro lo traerá en su momento, en orden
+                // causal, sin que este nodo tenga que resolver huérfanos de uno en uno mientras la
+                // red sigue produciendo (la causa raíz de V5/V6(b), `REVISION-W06d5.md`). Un
+                // huérfano de **sincronización** (`origen.is_some()`, llegó como respuesta a una
+                // petición nuestra) sigue depositándose igual: es la resolución por padres para los
+                // huecos pequeños que la propia decisión 1 conserva.
+                if origen.is_none() && self.vista_red.sincronizando() {
+                    let evento = self
+                        .registro
+                        .evento("bloque_post_gossip_descartado_sincronizando")
+                        .str("hash", &hash.to_string())
+                        .str("padre_ausente", &padre.to_string());
+                    let _ = self.registro.escribir(evento, false);
+                    return VeredictoFinal::Ignorar;
+                }
                 for d in self.huerfanos.insertar(padre, hash, bloque_red) {
                     let evento = self
                         .registro
@@ -1223,6 +1277,7 @@ impl Nodo {
                     .evento("bloque_red_admitido")
                     .str("hash", &hash.to_string())
                     .str("familia", "post")
+                    .u64("slot", bloque_para_reintento.cabecera.slot)
                     .str("veredicto", "Aceptar");
                 let _ = self.registro.escribir(evento, false);
                 self.reintentar_post_pendientes();
@@ -1242,6 +1297,25 @@ impl Nodo {
                     .str("veredicto", "Ignorar (reintento encolado)");
                 let _ = self.registro.escribir(evento, false);
                 self.encolar_post_pendiente(bloque_para_reintento);
+                VeredictoFinal::Ignorar
+            }
+            // `ORDEN-W06d6`, RI-3c H2: `PruebaPotIncoherente`/`RangoSinAtadura` no se reintentan
+            // (a diferencia de `Pendiente`, el hueco no se va a llenar solo) pero tampoco penalizan
+            // al remitente (a diferencia del resto de rechazos): no hay certeza de que el defecto
+            // sea suyo y no nuestro. `VeredictoFinal::Ignorar` es exactamente "se descarta sin
+            // penalizar".
+            Err(ErrorNodo::BloquePropioRechazado {
+                motivo,
+                clasificacion,
+                ..
+            }) if !clasificacion.penaliza_en_red() => {
+                let evento = self
+                    .registro
+                    .evento("bloque_red_ignorado_sin_penalizar")
+                    .str("hash", &hash.to_string())
+                    .str("familia", "post")
+                    .str("motivo", &motivo);
+                let _ = self.registro.escribir(evento, false);
                 VeredictoFinal::Ignorar
             }
             Err(e) => {
@@ -1288,6 +1362,7 @@ impl Nodo {
                         .evento("bloque_red_admitido")
                         .str("hash", &hash.to_string())
                         .str("familia", "post")
+                        .u64("slot", bloque.cabecera.slot)
                         .str("veredicto", "Aceptar (reintento)");
                     let _ = self.registro.escribir(evento, false);
                 }
@@ -1596,7 +1671,10 @@ impl Nodo {
         let cbid = self.cbid;
         let n_dev = self.n_dev;
         let sr_dev = self.sr_dev_actual;
-        let parada = self.parada_tras_slots;
+        // `ORDEN-W06d6` decisión 6: el hilo productor para de producir en el primero de los dos
+        // límites que esté fijado (`--parada-tras-slots` sigue parando el nodo entero; el nuevo
+        // `--dejar-de-producir-en-slot` solo para de producir, ver más abajo tras el bucle).
+        let parada = self.limite_productor();
         let importe_coinbase = perfil::subsidio_post(0);
         let historia_hilo: Arc<HistoriaGenesis> = Arc::clone(&self.historia);
         let hilo = thread::spawn(move || {
@@ -1671,6 +1749,7 @@ impl Nodo {
                 }
                 MsgProductor::Post(bloque) => {
                     let hash = bloque.cabecera.block_hash();
+                    let slot = bloque.cabecera.slot;
                     match self.admitir_post_interno(
                         *bloque,
                         self.almacen.longitud_registro()?,
@@ -1680,14 +1759,15 @@ impl Nodo {
                             let evento = self
                                 .registro
                                 .evento("bloque_producido")
-                                .str("hash", &hash.to_string());
+                                .str("hash", &hash.to_string())
+                                .u64("slot", slot);
                             self.registro.escribir(evento, false)?;
                             self.difundir_si_hay_red(hash);
                             // El pasado del `ServicioPot` de verificación acaba de avanzar: algún
                             // bloque de red que quedó `Pendiente` (decisión 3 extendida) puede haber
                             // dejado de estarlo.
                             self.reintentar_post_pendientes();
-                            let continuar = self.parada_tras_slots.is_none_or(|limite| {
+                            let continuar = self.limite_productor().is_none_or(|limite| {
                                 self.servicio_verificacion
                                     .as_ref()
                                     .is_some_and(|s| s.slot_actual() < limite)
@@ -1750,7 +1830,35 @@ impl Nodo {
                 "el hilo productor terminó con panic: {motivo}"
             )));
         }
+        // `ORDEN-W06d6` decisión 6: si lo que paró de producir fue **solo**
+        // `--dejar-de-producir-en-slot` (no `--parada-tras-slots`), el nodo entero **no** termina
+        // aquí: sigue vivo, validando, propagando y sincronizando, para poder compararse en reposo
+        // contra otros nodos (`P-ZRX/P-MEDICION/REVISION-W07c.md`). Solo `--parada-tras-slots`
+        // (con o sin el otro) termina el proceso, como siempre.
+        if self.parada_tras_slots.is_none() && self.dejar_de_producir_en_slot.is_some() {
+            let evento = self.registro.evento("dejar_de_producir").str(
+                "motivo",
+                "--dejar-de-producir-en-slot alcanzado: sigue en reposo activo",
+            );
+            self.registro.escribir(evento, false)?;
+            loop {
+                self.procesar_trabajo_red_pendiente();
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
         Ok(())
+    }
+
+    /// El límite de slot en el que el hilo productor debe dejar de producir (`ORDEN-W06d6`
+    /// decisión 6): el más restrictivo de `--parada-tras-slots` y `--dejar-de-producir-en-slot`,
+    /// si hay alguno.
+    fn limite_productor(&self) -> Option<u64> {
+        match (self.parada_tras_slots, self.dejar_de_producir_en_slot) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        }
     }
 
     fn producir_bloque_transicion(&mut self, terminal: BlockHash) -> ResultadoNodo<()> {
@@ -1791,11 +1899,7 @@ impl Nodo {
     /// trabajo de red (bloques difundidos o de sincronización) intercalado con su propia
     /// producción (D-N07: un único hilo de consenso). Sin llamar a esto, el nodo se comporta
     /// exactamente como en `ORDEN-W06d1` (sin red).
-    pub fn conectar_red(
-        &mut self,
-        manija: ManijaRed,
-        receptor: tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>,
-    ) {
+    pub fn conectar_red(&mut self, manija: ManijaRed, receptor: ReceptorTrabajoRed) {
         self.red = Some(manija);
         self.trabajo_red = Some(receptor);
     }
@@ -1917,6 +2021,7 @@ mod pruebas_v7 {
             n_dev: 16,
             sr_dev: u64::MAX,
             parada_tras_slots: Some(0),
+            dejar_de_producir_en_slot: None,
         };
         let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
         let estado_antes = nodo.resumen_estado_actual();
@@ -2007,6 +2112,7 @@ mod pruebas_deposito_sensible_a_la_rama {
             n_dev: 16,
             sr_dev: u64::MAX,
             parada_tras_slots: Some(0),
+            dejar_de_producir_en_slot: None,
         };
         let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
         let clave_propia = nodo.claves.first().cloned().expect("al menos una clave");
@@ -2121,5 +2227,306 @@ mod pruebas_deposito_sensible_a_la_rama {
              proponer el depósito de la coinbase de A1 (bug de ORDEN-W06d3, corregido en \
              ORDEN-W06d4)"
         );
+    }
+}
+
+/// `ORDEN-W06d6`, paso previo (RI-3c H1, `REVISION-RI-3c.md`): el orden **admitir → persistir**
+/// (sustituye al orden de RI-2b, persistir → admitir) impide la entrada fantasma que bloqueaba el
+/// reinicio, y el punto de inyección de fallo entre admitir y persistir no deja rastro observable.
+#[cfg(test)]
+#[expect(
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "el test falla con panic por diseño"
+)]
+mod pruebas_ri3c_orden_admitir_persistir {
+    use core::sync::atomic::AtomicBool;
+
+    use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev, minar};
+    use zx_core::preimage::block::{BlockHeader, merkle_root};
+    use zx_core::{Amount, decodificar_con, txid};
+
+    use zx_storage::Almacen as _;
+
+    use super::{Config, Nodo, Red};
+    use crate::pow;
+
+    fn cfg_de_test(dir: &std::path::Path) -> Config {
+        Config {
+            dir_datos: dir.join("datos"),
+            ruta_registro: dir.join("registro.jsonl"),
+            red: Red::Dev,
+            semilla: 42,
+            indices_claves: vec![0],
+            n_dev: 16,
+            sr_dev: u64::MAX,
+            parada_tras_slots: Some(0),
+            dejar_de_producir_en_slot: None,
+        }
+    }
+
+    /// Mina un PoW real de altura 1 sobre el génesis del nodo, con la coinbase que se le pase (para
+    /// poder viciarla y forzar un rechazo del motor de transición sin tocar el PoW en sí).
+    fn minar_altura_1(nodo: &Nodo, mut coinbase: zx_core::Tx, importe: i64) -> BlockHeader {
+        coinbase.outputs[0].value = Amount::nuevo(importe).expect("importe representable");
+        let genesis = nodo.historial_pow[nodo.historial_pow.len() - 1];
+        let txid_coinbase = txid(&coinbase, nodo.cbid);
+        let target = decodificar_con(
+            PARAMETROS_POW_DEV.bits_iniciales,
+            &PARAMETROS_POW_DEV.limites,
+        )
+        .expect("bits_iniciales decodifica");
+        let cabecera_base = BlockHeader {
+            consensus_branch_id: nodo.cbid,
+            prev_hash: genesis.block_hash(),
+            merkle_root: merkle_root(&[txid_coinbase]),
+            timestamp: genesis.timestamp + 1,
+            bits: PARAMETROS_POW_DEV.bits_iniciales,
+            nonce: 0,
+            height: 1,
+        };
+        let cancelar = AtomicBool::new(false);
+        minar(&cabecera_base, target, &Sha3Dev, u64::MAX, &cancelar)
+            .expect("un PoW real se encuentra con la dificultad dev inicial (~2^17 intentos)")
+    }
+
+    /// **Regresión de RI-3c H1** (test adaptado de `resultados-RI-3c/ri3c_nodo.diff`, con las
+    /// aserciones invertidas a lo correcto tras la corrección — el original, ejecutado tal cual
+    /// contra la base sin corregir, se conservó como evidencia "antes" en
+    /// `deepseek/W06d6/logs/RI-3c-antes.log`): una coinbase que paga de más se **rechaza** por
+    /// `ErrEmision` y, con el orden nuevo, **nunca llega a persistirse** — el registro sigue en 1
+    /// (solo el génesis) tras el rechazo, y el nodo **reinicia sin problema**.
+    #[test]
+    fn bloque_pow_propio_rechazado_no_persiste_y_el_reinicio_funciona() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = cfg_de_test(dir.path());
+        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
+        let clave = nodo.claves.first().expect("al menos una clave").pk;
+
+        // Coinbase que paga **más** que `subsidio_pow(1)` (perfil dev: 50 ZZK): el motor de
+        // transición la rechaza con `ErrEmision` (`Interno` para `crate::rechazo`).
+        let coinbase = pow::construir_coinbase_pow(clave, 1);
+        let cabecera_minada = minar_altura_1(&nodo, coinbase.clone(), 51);
+        let hash = cabecera_minada.block_hash();
+        let mut coinbase_viciada = coinbase;
+        coinbase_viciada.outputs[0].value = Amount::nuevo(51).expect("importe representable");
+
+        let resultado = nodo.admitir_pow_interno(
+            cabecera_minada,
+            vec![coinbase_viciada],
+            vec![Vec::new()],
+            0,
+            true,
+        );
+        assert!(
+            resultado.is_err(),
+            "la coinbase con importe incorrecto debe rechazarse"
+        );
+        assert!(
+            !nodo.cadena.es_valido(&hash),
+            "el bloque rechazado no debe quedar admitido en zx-cadena"
+        );
+
+        // La corrección: admitir se intenta **antes** de persistir, así que un rechazo no deja
+        // ninguna entrada fantasma en el almacén.
+        let longitud_tras_rechazo = nodo
+            .almacen
+            .longitud_registro()
+            .expect("longitud del almacén");
+        assert_eq!(
+            longitud_tras_rechazo, 1,
+            "el bloque rechazado NO debe persistirse: el registro solo tiene el génesis"
+        );
+
+        drop(nodo);
+
+        // El reinicio ya no repite ninguna entrada fantasma: debe funcionar sin más.
+        let reinicio = Nodo::arrancar(&cfg);
+        if let Err(e) = &reinicio {
+            eprintln!("RI-3c (corregido): Nodo::arrancar (reinicio) devolvió Err inesperado: {e}");
+        }
+        assert!(
+            reinicio.is_ok(),
+            "el reinicio debe funcionar: el bloque rechazado nunca se persistió, así que no hay \
+             nada que repetir ni que vuelva a fallar"
+        );
+    }
+
+    /// **Punto de inyección de fallo entre admitir y persistir** (decisión 7, paso previo): se
+    /// admite un bloque PoW **válido** en `zx-cadena` (memoria) replicando exactamente los pasos
+    /// de `admitir_pow_interno` hasta ese punto, y se simula la caída del proceso **sin** llegar a
+    /// `almacen.admitir` (el paso siguiente, que esta prueba omite a propósito). Comprueba que:
+    /// (a) nada se difunde — estructuralmente imposible, porque `difundir_si_hay_red` solo se
+    /// llama *después* de que `admitir_pow_interno` devuelva `Ok`, y aquí nunca se completa esa
+    /// llamada; y (b) el nodo reinicia bien — el bloque "caído" no está en el almacén, así que el
+    /// reinicio simplemente no lo ve, sin fallar ni dejar rastro.
+    #[test]
+    fn fallo_entre_admitir_y_persistir_no_deja_rastro_y_el_reinicio_funciona() {
+        use zx_cadena::BloqueCadena;
+        use zx_consensus::genesis::HASH_GENESIS_DEV;
+        use zx_consensus::transicion::{BloqueTransicion, HechosCabecera};
+        use zx_core::digest::Digest;
+        use zx_core::{BlockHash, trabajo_bloque};
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cfg = cfg_de_test(dir.path());
+        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
+        let clave = nodo.claves.first().expect("al menos una clave").pk;
+
+        let coinbase = pow::construir_coinbase_pow(clave, 1);
+        let cabecera_minada = minar_altura_1(&nodo, coinbase.clone(), 50); // subsidio exacto: válido
+        let hash = cabecera_minada.block_hash();
+
+        // Replica el paso "admitir en zx-cadena" de `admitir_pow_interno`, **sin** el paso
+        // siguiente (`almacen.admitir`) — exactamente el instante en que un `SIGKILL` real
+        // interrumpiría entre los dos.
+        let target = zx_core::decodificar_con(
+            zx_consensus::PARAMETROS_POW_DEV.bits_iniciales,
+            &zx_consensus::PARAMETROS_POW_DEV.limites,
+        )
+        .expect("bits decodifica");
+        let trabajo = trabajo_bloque(target).expect("trabajo del bloque");
+        let hechos = HechosCabecera::PoW {
+            hash,
+            padre: cabecera_minada.prev_hash,
+            altura: cabecera_minada.height,
+            trabajo,
+            pow_valido: true,
+        };
+        let bt = BloqueTransicion::nuevo(hechos, vec![(coinbase, vec![Vec::new()])]);
+        nodo.cadena
+            .admitir(BloqueCadena::Pow(bt))
+            .expect("un bloque válido se admite en memoria");
+        assert!(
+            nodo.cadena.es_valido(&hash),
+            "el bloque queda admitido en memoria (paso 1, ya ocurrió)"
+        );
+
+        // "Caída": el proceso termina aquí, sin haber llegado a `almacen.admitir` (paso 2) ni,
+        // mucho menos, a la difusión (paso 3, posterior en el llamante real). No hay manejo de red
+        // en este nodo de test, así que "no se difunde" es además estructuralmente cierto: no hay
+        // ningún `ManijaRed` al que `difundir_si_hay_red` pudiera llamar.
+        assert!(
+            nodo.red.is_none(),
+            "sin red conectada: no hay a quién difundir nada"
+        );
+        let longitud_antes_de_caer = nodo
+            .almacen
+            .longitud_registro()
+            .expect("longitud del almacén");
+        assert_eq!(
+            longitud_antes_de_caer, 1,
+            "el bloque admitido en memoria todavía NO está en el almacén: la caída simulada \
+             ocurre exactamente antes de persistir"
+        );
+        drop(nodo);
+
+        // El reinicio: el bloque "caído" no está en el almacén, así que sencillamente no existe
+        // para el nodo que reinicia — ni error, ni entrada fantasma, ni doble firma observable
+        // (nunca se difundió; RI-2b quedaba a salvo por eso, no por el orden de escritura).
+        let reinicio = Nodo::arrancar(&cfg).expect("el reinicio debe funcionar sin problema");
+        assert_eq!(
+            reinicio.historial_pow.len(),
+            1,
+            "el reinicio solo ve el génesis: el bloque de altura 1 nunca se persistió"
+        );
+        assert_eq!(
+            reinicio.headers_pow.keys().find(|h| **h == hash),
+            None,
+            "el bloque que 'cayó' entre admitir y persistir no reaparece tras el reinicio"
+        );
+        // El génesis dev es una constante fija; comprobación de sanidad de que el reinicio partió
+        // del mismo génesis, no de uno distinto por accidente.
+        assert_eq!(
+            reinicio.historial_pow[0].block_hash(),
+            BlockHash::from_digest(Digest::from_bytes(HASH_GENESIS_DEV))
+        );
+    }
+}
+
+/// `ORDEN-W06d6` decisión 5: test pendiente de `ORDEN-W06d5` (la cola de `post_pendientes`) — se
+/// verificaba solo con ejecuciones reales, sin test unitario del propio tope.
+#[cfg(test)]
+#[expect(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "el test falla con panic por diseño"
+)]
+mod pruebas_cola_post_pendientes {
+    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
+    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+    use zx_core::wire_dag::{BloqueDag, JustificacionPot, PotCheckpoints};
+
+    use super::{Config, Nodo, Red};
+
+    fn cabecera_post(slot: u64) -> DagBlockHeader {
+        DagBlockHeader {
+            consensus_branch_id: 0xa8b4_66a7,
+            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([(slot % 251) as u8; 32])),
+            timestamp: 1_000 + slot,
+            height: 0,
+            slot,
+            pot_output: [0; 16],
+            rango_solucion: 1,
+            sol: SolucionPoas::default(),
+            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0xAA; 32])),
+            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0xEE; 32])), &[])
+                .unwrap(),
+            sello: [0; 64],
+        }
+    }
+
+    fn bloque_post_de_prueba(slot: u64) -> BloqueDag {
+        let portador = PotCheckpoints::desde_outputs([[0; 16]; 8]);
+        let justificacion = JustificacionPot::nueva(vec![portador]).unwrap();
+        BloqueDag::nuevo(cabecera_post(slot), justificacion, Vec::new(), Vec::new()).unwrap()
+    }
+
+    fn nodo_de_prueba(dir: &std::path::Path) -> Nodo {
+        let cfg = Config {
+            dir_datos: dir.join("datos"),
+            ruta_registro: dir.join("registro.jsonl"),
+            red: Red::Dev,
+            semilla: 1,
+            indices_claves: vec![0],
+            n_dev: 16,
+            sr_dev: u64::MAX,
+            parada_tras_slots: Some(0),
+            dejar_de_producir_en_slot: None,
+        };
+        Nodo::arrancar(&cfg).expect("arranque limpio")
+    }
+
+    /// **Regresión de la decisión 3 extendida (`ORDEN-W06d5`).** La cola de `Pendiente` está
+    /// acotada a `TOPE_POST_PENDIENTES` (64): superarlo descarta el más viejo (FIFO), nunca crece
+    /// sin límite.
+    #[test]
+    fn la_cola_de_pendientes_esta_acotada_y_descarta_el_mas_viejo() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut nodo = nodo_de_prueba(dir.path());
+
+        assert!(nodo.post_pendientes.is_empty());
+
+        // Encolar bastantes más que el tope: cada slot es distinto para poder identificar cuál
+        // sobrevive.
+        let total = super::TOPE_POST_PENDIENTES * 2;
+        for slot in 0..total {
+            nodo.encolar_post_pendiente(bloque_post_de_prueba(slot as u64));
+        }
+
+        assert_eq!(
+            nodo.post_pendientes.len(),
+            super::TOPE_POST_PENDIENTES,
+            "la cola nunca debe superar el tope declarado"
+        );
+        // FIFO: sobreviven los `TOPE_POST_PENDIENTES` últimos, no los primeros.
+        let primero_que_sobrevive = nodo.post_pendientes.front().expect("no vacía");
+        assert_eq!(
+            primero_que_sobrevive.cabecera.slot,
+            (total - super::TOPE_POST_PENDIENTES) as u64,
+            "el más viejo de los que sobreviven es exactamente el primero no descartado"
+        );
+        let ultimo = nodo.post_pendientes.back().expect("no vacía");
+        assert_eq!(ultimo.cabecera.slot, (total - 1) as u64);
     }
 }

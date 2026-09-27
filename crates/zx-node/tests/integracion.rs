@@ -32,6 +32,7 @@ fn config_de_test(dir: &std::path::Path, parada_tras_slots: u64) -> Config {
         n_dev: N_DEV_TEST,
         sr_dev: SR_DEV_TEST,
         parada_tras_slots: Some(parada_tras_slots),
+        dejar_de_producir_en_slot: None,
     }
 }
 

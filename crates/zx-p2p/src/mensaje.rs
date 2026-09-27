@@ -207,6 +207,11 @@ pub struct Estado {
     pub puntas_post: Vec<BlockHash>,
     /// `blue_work_virtual`, en big-endian de 32 bytes.
     pub blue_work_virtual: [u8; 32],
+    /// `ORDEN-W06d6` decisión 1: longitud del registro de admisión de quien saluda (PoW + PoST, en
+    /// el orden real en que los admitió). Es lo que permite al que sincroniza saber, sin pedir
+    /// nada más, cuánto le falta: compara esto con lo que ya tiene y decide cuántas páginas de
+    /// `Peticion::Registro` pedir.
+    pub longitud_registro: u64,
 }
 
 /// El byte de red en el wire.
@@ -251,6 +256,14 @@ pub enum Peticion {
         /// Los bloques que faltan, como mucho [`crate::limites::MAX_HASHES_POR_PETICION`].
         hashes: Vec<BlockHash>,
     },
+    /// `ORDEN-W06d6` decisión 1: una página del registro de admisión del que responde, empezando
+    /// en el índice `desde` (0 = desde el génesis). Sustituye a la resolución de huérfanos PoST de
+    /// uno en uno como vía **principal** de puesta al día (la resolución por padres se queda para
+    /// los huecos pequeños).
+    Registro {
+        /// Índice del registro de admisión desde el que empezar (0 = el génesis).
+        desde: u64,
+    },
 }
 
 impl Peticion {
@@ -260,6 +273,9 @@ impl Peticion {
     pub const DISC_CABECERAS_POW: u8 = 0x01;
     /// Discriminante de [`Peticion::Bloques`].
     pub const DISC_BLOQUES: u8 = 0x02;
+    /// Discriminante de [`Peticion::Registro`]. Nuevo en `ORDEN-W06d6`: se añade al final, sin
+    /// reordenar los discriminantes existentes.
+    pub const DISC_REGISTRO: u8 = 0x03;
 
     /// El byte que identifica esta variante.
     #[must_use]
@@ -268,6 +284,7 @@ impl Peticion {
             Self::Estado => Self::DISC_ESTADO,
             Self::CabecerasPow { .. } => Self::DISC_CABECERAS_POW,
             Self::Bloques { .. } => Self::DISC_BLOQUES,
+            Self::Registro { .. } => Self::DISC_REGISTRO,
         }
     }
 }
@@ -286,6 +303,19 @@ pub enum Respuesta {
     ///
     /// Distinguirlo de un error de protocolo importa: esto **no puntúa**.
     NoDisponible,
+    /// `ORDEN-W06d6` decisión 1: respuesta a [`Peticion::Registro`]. Como mucho
+    /// [`crate::limites::MAX_BLOQUES_POR_RESPUESTA`] bloques y
+    /// [`crate::limites::MAX_RESPUESTA_BYTES`] bytes, en el orden real de admisión del que
+    /// responde, empezando en `desde`.
+    Registro {
+        /// El mismo `desde` de la petición (para que quien sincroniza pueda casarlo sin ambigüedad
+        /// si algún día hay más de una página en vuelo).
+        desde: u64,
+        /// Los bloques de esta página, en orden de admisión.
+        bloques: Vec<BloqueRed>,
+        /// Longitud **total** del registro del que responde, en el momento de responder.
+        longitud: u64,
+    },
 }
 
 impl Respuesta {
@@ -297,6 +327,8 @@ impl Respuesta {
     pub const DISC_BLOQUES: u8 = 0x02;
     /// Discriminante de [`Respuesta::NoDisponible`].
     pub const DISC_NO_DISPONIBLE: u8 = 0x03;
+    /// Discriminante de [`Respuesta::Registro`]. Nuevo en `ORDEN-W06d6`: al final, sin reordenar.
+    pub const DISC_REGISTRO: u8 = 0x04;
 
     /// El byte que identifica esta variante.
     #[must_use]
@@ -306,6 +338,7 @@ impl Respuesta {
             Self::CabecerasPow(_) => Self::DISC_CABECERAS_POW,
             Self::Bloques(_) => Self::DISC_BLOQUES,
             Self::NoDisponible => Self::DISC_NO_DISPONIBLE,
+            Self::Registro { .. } => Self::DISC_REGISTRO,
         }
     }
 
@@ -323,11 +356,12 @@ impl Respuesta {
             (Self::Estado(_), Peticion::Estado)
                 | (Self::CabecerasPow(_), Peticion::CabecerasPow { .. })
                 | (Self::Bloques(_), Peticion::Bloques { .. })
+                | (Self::Registro { .. }, Peticion::Registro { .. })
                 // NoDisponible vale para cualquier petición de datos, pero NO para el saludo:
                 // un peer que no sabe decir quién es no sirve para nada.
                 | (
                     Self::NoDisponible,
-                    Peticion::CabecerasPow { .. } | Peticion::Bloques { .. }
+                    Peticion::CabecerasPow { .. } | Peticion::Bloques { .. } | Peticion::Registro { .. }
                 )
         )
     }
@@ -359,6 +393,7 @@ mod tests {
             terminal: None,
             puntas_post: vec![h(4)],
             blue_work_virtual: [5; 32],
+            longitud_registro: 42,
         }
     }
 
@@ -373,6 +408,7 @@ mod tests {
                 parada: None,
             },
             Peticion::Bloques { hashes: vec![] },
+            Peticion::Registro { desde: 0 },
         ];
         let mut vistos = Vec::new();
         for p in &peticiones {
@@ -385,6 +421,11 @@ mod tests {
             Respuesta::CabecerasPow(vec![]),
             Respuesta::Bloques(vec![]),
             Respuesta::NoDisponible,
+            Respuesta::Registro {
+                desde: 0,
+                bloques: vec![],
+                longitud: 0,
+            },
         ];
         let mut vistos = Vec::new();
         for r in &respuestas {
@@ -395,10 +436,12 @@ mod tests {
         assert_eq!(Peticion::Estado.discriminante(), 0x00);
         assert_eq!(Peticion::DISC_CABECERAS_POW, 0x01);
         assert_eq!(Peticion::DISC_BLOQUES, 0x02);
+        assert_eq!(Peticion::DISC_REGISTRO, 0x03);
         assert_eq!(Respuesta::DISC_ESTADO, 0x00);
         assert_eq!(Respuesta::DISC_CABECERAS_POW, 0x01);
         assert_eq!(Respuesta::DISC_BLOQUES, 0x02);
         assert_eq!(Respuesta::DISC_NO_DISPONIBLE, 0x03);
+        assert_eq!(Respuesta::DISC_REGISTRO, 0x04);
     }
 
     /// Cada familia y cada fase tiene su byte, y no se interpreta un byte desconocido.
@@ -457,6 +500,22 @@ mod tests {
             locator: vec![],
             parada: None
         }));
+        assert!(Respuesta::NoDisponible.responde_a(&Peticion::Registro { desde: 0 }));
+    }
+
+    /// `ORDEN-W06d6` decisión 1: `Respuesta::Registro` responde solo a `Peticion::Registro`.
+    #[test]
+    fn registro_responde_solo_a_registro() {
+        let peticion_registro = Peticion::Registro { desde: 7 };
+        let respuesta_registro = Respuesta::Registro {
+            desde: 7,
+            bloques: vec![],
+            longitud: 10,
+        };
+        assert!(respuesta_registro.responde_a(&peticion_registro));
+        assert!(!respuesta_registro.responde_a(&Peticion::Estado));
+        assert!(!Respuesta::Bloques(vec![]).responde_a(&peticion_registro));
+        assert!(!Respuesta::CabecerasPow(vec![]).responde_a(&peticion_registro));
     }
 
     /// La cota de puntas PoST es la declarada.

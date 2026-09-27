@@ -16,10 +16,8 @@ use std::time::Duration;
 
 use libp2p::core::transport::Transport as _;
 use libp2p::{Swarm, identity, noise, tcp, yamux};
-use tokio::sync::mpsc::UnboundedReceiver;
 use zx_core::digest::{BlockHash, Digest};
 use zx_core::red::Red;
-use zx_node::red::TrabajoRed;
 use zx_node::red::manejador::ManejadorRed;
 use zx_node::red::vista::VistaRed;
 use zx_p2p::behaviour::ZxBehaviour;
@@ -40,6 +38,7 @@ fn estado_vacio(n: u8) -> Estado {
         terminal: None,
         puntas_post: Vec::new(),
         blue_work_virtual: [0; 32],
+        longitud_registro: 0,
     }
 }
 
@@ -80,10 +79,7 @@ struct NodoDeJuguete {
 
 fn arrancar_de_juguete() -> (NodoDeJuguete, tokio::task::JoinHandle<()>) {
     let vista = Arc::new(VistaRed::nueva(estado_vacio(9)));
-    let (tx_trabajo, _rx_trabajo): (
-        tokio::sync::mpsc::UnboundedSender<TrabajoRed>,
-        UnboundedReceiver<TrabajoRed>,
-    ) = tokio::sync::mpsc::unbounded_channel();
+    let (tx_trabajo, _rx_trabajo) = zx_node::red::nueva_cola_trabajo_red();
     let manejador = Arc::new(ManejadorRed::nuevo(tx_trabajo, vista));
     let piezas = arrancar(swarm_tcp(), manejador);
     let manejo = piezas.manejo;

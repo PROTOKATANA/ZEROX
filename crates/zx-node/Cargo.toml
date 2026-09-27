@@ -37,6 +37,11 @@ zx-p2p          = { path = "../zx-p2p" }
 tokio           = { workspace = true }
 tracing         = { workspace = true }
 libp2p          = { workspace = true, features = ["tokio", "tcp", "noise", "yamux", "macros", "ed25519"] }
+# Solo la usa el binario `zx-adversario` (`ORDEN-W06d6` decisión 3, V7): sin un suscriptor
+# instalado, sus propios `tracing::debug!`/`tracing::warn!` (y los de `zx-p2p`) no se imprimen en
+# ningún sitio. `zx-node` (el binario del nodo real) no la usa: su registro estructurado propio
+# (`registro.rs`) ya cubre esa necesidad con su propio esquema.
+tracing-subscriber = { workspace = true }
 
 # ── Autonomys por ruta al clon fijado `PDF/autonomys-subspace` @ f8842d0 ────────────────────────
 # Mismas instancias que `zx-farmer`/`zx-post`: el nodo no reimplementa PoS, KZG ni erasure coding,

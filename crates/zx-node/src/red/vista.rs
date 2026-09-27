@@ -10,7 +10,7 @@
 //! instantánea protegida por `RwLock`, actualizada por el hilo de consenso cada vez que cambia algo
 //! que el saludo o la sincronización necesitan, resuelve la lectura sin ida y vuelta.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::RwLock;
 
 use zx_core::digest::BlockHash;
@@ -23,11 +23,28 @@ struct Interior {
     cabeceras_pow: Vec<BlockHeader>,
     cuerpos_pow: BTreeMap<BlockHash, BloqueRed>,
     cuerpos_post: BTreeMap<BlockHash, BloqueRed>,
+    /// `ORDEN-W06d6` (RI-3a #4): hash → altura en `cabeceras_pow`, para que `cabeceras_desde` no
+    /// tenga que recorrer todo el historial por cada hash del locator (`REVISION-RI-3a.md`,
+    /// hallazgo 4). Se reconstruye entera cada vez que `fijar_cabeceras_pow` reemplaza el vector
+    /// (una reorganización): nunca queda una entrada apuntando a una altura que ya no es esa.
+    indice_altura: HashMap<BlockHash, usize>,
+    /// `ORDEN-W06d6` decisión 1: los hashes (PoW y PoST) **en el orden real en que este nodo los
+    /// admitió** — el mismo orden del registro de admisión de `zx-storage` (D-N03′), porque se
+    /// añade aquí en los mismos puntos donde el hilo de consenso ya llama a
+    /// `registrar_pow`/`registrar_post` tras `cadena.admitir` (nunca antes). Solo crece; sirve
+    /// `Peticion::Registro` (sincronización por páginas del registro de admisión).
+    registro_admision: Vec<BlockHash>,
 }
 
 /// La instantánea. Ver el docstring del módulo.
 pub struct VistaRed {
     interior: RwLock<Interior>,
+    /// `ORDEN-W06d6` decisión 1: la mayor `longitud_registro` que la tarea de sincronización ha
+    /// visto declarar a **cualquier** par conectado (saludo o `Respuesta::Registro`). Es un
+    /// `Atomic`, no parte de `Interior`: lo escribe la tarea async de sincronización y lo lee el
+    /// hilo de consenso (síncrono) para decidir si "estamos sincronizando" (`Self::sincronizando`),
+    /// sin tomar el `RwLock` completo por una sola comparación.
+    mejor_longitud_par: std::sync::atomic::AtomicU64,
 }
 
 impl VistaRed {
@@ -35,13 +52,37 @@ impl VistaRed {
     #[must_use]
     pub fn nueva(estado_inicial: Estado) -> Self {
         Self {
+            mejor_longitud_par: std::sync::atomic::AtomicU64::new(0),
             interior: RwLock::new(Interior {
                 estado: estado_inicial,
                 cabeceras_pow: Vec::new(),
                 cuerpos_pow: BTreeMap::new(),
                 cuerpos_post: BTreeMap::new(),
+                indice_altura: HashMap::new(),
+                registro_admision: Vec::new(),
             }),
         }
+    }
+
+    /// Registra el **génesis** PoW en la vista: `arranque_limpio` no pasa por
+    /// [`Self::registrar_pow`] (fija `cabeceras_pow` directamente con
+    /// [`Self::fijar_cabeceras_pow`] para no dejar un hueco de altura permanente en el primer
+    /// bloque real, `ORDEN-W06d3` hallazgo en vivo), así que sin esta llamada el cuerpo del génesis
+    /// nunca entraba en `cuerpos_pow` ni en el registro de admisión. `ORDEN-W06d6` la añade porque
+    /// el registro de admisión (decisión 1) tiene que empezar en el génesis, igual que el registro
+    /// real de `zx-storage`.
+    pub fn registrar_genesis_pow(&self, bloque: BloqueRed) {
+        let Ok(mut i) = self.interior.write() else {
+            return;
+        };
+        let BloqueRed::Pow { cabecera, .. } = &bloque else {
+            debug_assert!(false, "registrar_genesis_pow con un bloque que no es PoW");
+            return;
+        };
+        let hash = cabecera.block_hash();
+        i.indice_altura.insert(hash, 0);
+        i.registro_admision.push(hash);
+        i.cuerpos_pow.insert(hash, bloque);
     }
 
     /// El hilo de consenso reemplaza el saludo tras cada cambio de punta.
@@ -65,6 +106,8 @@ impl VistaRed {
         let esperado = i.cabeceras_pow.len();
         if altura as usize == esperado {
             i.cabeceras_pow.push(*cabecera);
+            i.indice_altura.insert(cabecera.block_hash(), esperado);
+            i.registro_admision.push(cabecera.block_hash());
         } else if (altura as usize) < esperado {
             // Repetición al reiniciar (D-N03′): ya está, no se duplica.
         } else {
@@ -95,6 +138,13 @@ impl VistaRed {
         if let Ok(mut i) = self.interior.write() {
             i.cabeceras_pow.clear();
             i.cabeceras_pow.extend_from_slice(cabeceras);
+            // `ORDEN-W06d6` (RI-3a #4): el índice hash→altura se reconstruye entero junto con
+            // `cabeceras_pow` — nunca debe quedar una entrada que apunte a una altura que ya
+            // pertenece a otro bloque tras la reorganización.
+            i.indice_altura.clear();
+            for (altura, c) in cabeceras.iter().enumerate() {
+                i.indice_altura.insert(c.block_hash(), altura);
+            }
         }
     }
 
@@ -102,6 +152,8 @@ impl VistaRed {
     pub fn registrar_post(&self, hash: BlockHash, bloque: BloqueRed) {
         if let Ok(mut i) = self.interior.write() {
             i.cuerpos_post.insert(hash, bloque);
+            // `ORDEN-W06d6` decisión 1: orden real de admisión (PoW y PoST juntos).
+            i.registro_admision.push(hash);
         }
     }
 
@@ -117,6 +169,10 @@ impl VistaRed {
     /// Cabeceras PoW desde el primer hash del locator que reconozcamos, hasta `hasta` o hasta donde
     /// tengamos. Vacío si no reconocemos nada del locator (respuesta legítima, ver
     /// [`zx_p2p::entrante::ManejadorEntrante::cabeceras_desde`]).
+    ///
+    /// `ORDEN-W06d6` (RI-3a #4, `REVISION-RI-3a.md` hallazgo 4, bajo/plausible): antes recorría
+    /// `cabeceras_pow` entero por cada hash del locator (`O(locator × historia)`); ahora es un
+    /// `HashMap` que da la altura en O(1) por hash — `O(locator)` en total.
     #[must_use]
     pub fn cabeceras_desde(
         &self,
@@ -126,10 +182,7 @@ impl VistaRed {
         let Ok(i) = self.interior.read() else {
             return Vec::new();
         };
-        let Some(inicio) = locator
-            .iter()
-            .find_map(|h| i.cabeceras_pow.iter().position(|c| c.block_hash() == *h))
-        else {
+        let Some(inicio) = locator.iter().find_map(|h| i.indice_altura.get(h).copied()) else {
             return Vec::new();
         };
         let mut salida = Vec::new();
@@ -143,20 +196,36 @@ impl VistaRed {
     }
 
     /// Los bloques completos (PoW o PoST) que tengamos de los pedidos, en el orden pedido.
+    ///
+    /// `ORDEN-W06d6` (RI-3a #1, `REVISION-RI-3a.md` hallazgo 1): los hashes se **deduplican y se
+    /// recortan a `MAX_BLOQUES_POR_RESPUESTA` antes de clonar nada**, no después. Antes, una
+    /// petición con el mismo hash repetido hasta `MAX_HASHES_POR_PETICION` (256) veces producía 256
+    /// clones completos del bloque —hasta `256 × MAX_BLOQUE_RED_BYTES`— y **luego** `zx-p2p`
+    /// recortaba a `MAX_BLOQUES_POR_RESPUESTA` (16): 240 de esos clones se tiraban sin usarse,
+    /// dentro del mismo hilo que pollea el `Swarm` (confirmado, `resultados-RI-3a/
+    /// ri3a_bloques_por_hash_duplicados.rs`). Deduplicar primero hace que el peor caso sea
+    /// exactamente `MAX_BLOQUES_POR_RESPUESTA` clones, nunca más, sin depender de que `zx-p2p`
+    /// recorte después.
     #[must_use]
     pub fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed> {
         let Ok(i) = self.interior.read() else {
             return Vec::new();
         };
-        hashes
-            .iter()
-            .filter_map(|h| {
-                i.cuerpos_pow
-                    .get(h)
-                    .or_else(|| i.cuerpos_post.get(h))
-                    .cloned()
-            })
-            .collect()
+        let mut vistos: Vec<BlockHash> = Vec::new();
+        let mut salida = Vec::new();
+        for h in hashes {
+            if vistos.contains(h) {
+                continue;
+            }
+            vistos.push(*h);
+            if let Some(bloque) = i.cuerpos_pow.get(h).or_else(|| i.cuerpos_post.get(h)) {
+                salida.push(bloque.clone());
+                if salida.len() >= zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA {
+                    break;
+                }
+            }
+        }
+        salida
     }
 
     /// ¿Tenemos ya el cuerpo de este hash (PoW o PoST), lo pidamos o no otra vez?
@@ -165,6 +234,83 @@ impl VistaRed {
         self.interior
             .read()
             .is_ok_and(|i| i.cuerpos_pow.contains_key(hash) || i.cuerpos_post.contains_key(hash))
+    }
+
+    /// Longitud actual del registro de admisión (`ORDEN-W06d6` decisión 1): para el `longitud` del
+    /// saludo y de `Respuesta::Registro`.
+    #[must_use]
+    pub fn longitud_registro(&self) -> u64 {
+        self.interior
+            .read()
+            .map(|i| i.registro_admision.len() as u64)
+            .unwrap_or(0)
+    }
+
+    /// La tarea de sincronización llama a esto cada vez que un par declara su `longitud_registro`
+    /// (saludo o `Respuesta::Registro`): mantiene el máximo visto hasta ahora (`ORDEN-W06d6`
+    /// decisión 1). Un par que se desconecta no baja el máximo: es una cota de "cuánto sabemos que
+    /// existe en la red", no "cuánto tiene el par actual".
+    pub fn actualizar_mejor_longitud_par(&self, longitud: u64) {
+        self.mejor_longitud_par
+            .fetch_max(longitud, std::sync::atomic::Ordering::AcqRel);
+    }
+
+    /// La mayor `longitud_registro` vista declarar a cualquier par hasta ahora.
+    #[must_use]
+    pub fn mejor_longitud_par(&self) -> u64 {
+        self.mejor_longitud_par
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// ¿Este nodo va a más de [`super::UMBRAL_SINCRONIZANDO`] bloques por detrás del par más
+    /// avanzado que conoce (`ORDEN-W06d6` decisión 1)? Mientras sea `true`, los bloques PoST de
+    /// **gossip** (no los que trae la propia sincronización por registro) cuyo padre falte se
+    /// descartan en vez de ir al depósito de huérfanos: llegarán por el registro, y depositarlos
+    /// solo alimentaría una avalancha de huérfanos que la producción sigue adelantando (la causa
+    /// raíz de V5/V6(b) en `REVISION-W06d5.md`).
+    #[must_use]
+    pub fn sincronizando(&self) -> bool {
+        self.longitud_registro()
+            .saturating_add(super::UMBRAL_SINCRONIZANDO)
+            < self.mejor_longitud_par()
+    }
+
+    /// Una página del registro de admisión, empezando en el índice `desde` (`ORDEN-W06d6`
+    /// decisión 1): como mucho `max_bloques` bloques y `max_bytes` bytes totales (estimados por su
+    /// tamaño en el wire), en el orden real de admisión. Devuelve también la longitud **actual**
+    /// del registro (puede haber crecido desde que quien pregunta fijó el `longitud` que recuerda).
+    /// Siempre incluye al menos un bloque si `desde` está dentro de rango y hay presupuesto para
+    /// nada más: una página vacía por exceso de tamaño de un único bloque dejaría al que sincroniza
+    /// sin poder avanzar nunca.
+    #[must_use]
+    pub fn pagina_registro(
+        &self,
+        desde: u64,
+        max_bloques: usize,
+        max_bytes: u64,
+    ) -> (Vec<BloqueRed>, u64) {
+        let Ok(i) = self.interior.read() else {
+            return (Vec::new(), 0);
+        };
+        let longitud = i.registro_admision.len() as u64;
+        let inicio = usize::try_from(desde).unwrap_or(usize::MAX);
+        let mut salida = Vec::new();
+        let mut bytes_acumulados: u64 = 0;
+        for hash in i.registro_admision.iter().skip(inicio).take(max_bloques) {
+            let Some(bloque) = i.cuerpos_pow.get(hash).or_else(|| i.cuerpos_post.get(hash)) else {
+                // No debería ocurrir (registro y cuerpos se llenan en el mismo punto de código),
+                // pero un hueco aquí no debe tirar la página entera: se para donde se pueda seguir.
+                tracing::error!(%hash, "pagina_registro: hash del registro sin cuerpo en la vista");
+                break;
+            };
+            let tam = zx_p2p::codec::bloque_a_bytes(bloque).len() as u64;
+            if !salida.is_empty() && bytes_acumulados.saturating_add(tam) > max_bytes {
+                break;
+            }
+            salida.push(bloque.clone());
+            bytes_acumulados = bytes_acumulados.saturating_add(tam);
+        }
+        (salida, longitud)
     }
 
     /// Un *locator* al estilo Bitcoin: denso cerca de la punta, espaciado hacia atrás,
@@ -237,6 +383,7 @@ mod tests {
             terminal: None,
             puntas_post: Vec::new(),
             blue_work_virtual: [0; 32],
+            longitud_registro: 0,
         }
     }
 

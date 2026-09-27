@@ -21,6 +21,7 @@ fn config_con_red(dir: &std::path::Path, red: Red) -> Config {
         n_dev: 32,
         sr_dev: u64::MAX,
         parada_tras_slots: Some(1),
+        dejar_de_producir_en_slot: None,
     }
 }
 

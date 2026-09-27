@@ -12,6 +12,7 @@ pub mod sync;
 pub mod vista;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use zx_core::BlockHash;
 use zx_p2p::entrante::IdDiferido;
@@ -22,6 +23,7 @@ use zx_p2p::mensaje::BloqueRed;
 /// El manejador **nunca** valida nada: solo mete esto en la cola y devuelve
 /// [`zx_p2p::entrante::Veredicto::Diferir`] de inmediato (decisión 1). El hilo de consenso decide,
 /// a su ritmo, y responde con [`zx_p2p::servicio::ManejoRed::informar_validacion_bloqueante`].
+#[derive(Debug)]
 pub enum TrabajoRed {
     /// Un bloque llegó por difusión (gossipsub) y su veredicto está diferido con `id`.
     BloqueDifundido {
@@ -42,6 +44,128 @@ pub enum TrabajoRed {
     },
 }
 
+impl TrabajoRed {
+    /// El bloque que lleva dentro, sea cual sea la variante (para estimar su tamaño, RI-3a #3).
+    const fn bloque(&self) -> &BloqueRed {
+        match self {
+            Self::BloqueDifundido { bloque, .. } | Self::BloqueDeSincronizacion { bloque, .. } => {
+                bloque
+            }
+        }
+    }
+
+    /// Tamaño estimado en bytes de este trabajo, para el tope agregado
+    /// [`MAX_TRABAJO_RED_BYTES`]. No es el tamaño exacto en memoria (eso incluiría la asignación de
+    /// `Vec`s internos con su capacidad, no solo su longitud), pero es el mismo orden de magnitud
+    /// que ya usa `zx-p2p` para acotar el presupuesto de red (`zx_p2p::codec::bloque_a_bytes`), y
+    /// **nunca** subestima: el códec serializa exactamente lo que ocuparía en el wire.
+    fn tamano_estimado(&self) -> usize {
+        zx_p2p::codec::bloque_a_bytes(self.bloque()).len()
+    }
+}
+
+/// Cuántos elementos puede tener [`TrabajoRed`] en cola hacia el hilo de consenso (RI-3a #3,
+/// `REVISION-RI-3a.md` hallazgo 3).
+///
+/// Antes era un `unbounded_channel`: 40 960 bloques de gossipsub —cada uno solo pasado por el
+/// parseo del códec, sin PoW/PoAS/PoT válidos exigidos todavía— se encolaban en 16,7 ms sin que
+/// nada los rechazara, mientras nadie leyera del otro extremo (confirmado,
+/// `resultados-RI-3a/ri3a_cola_trabajo_sin_tope.rs`). Con tope, lo nuevo se descarta sin bloquear
+/// la red: un bloque honesto descartado se recupera por la petición de padres o por la
+/// sincronización por registro (decisión 1 de esta orden), nunca se pierde en silencio para
+/// siempre.
+pub const MAX_TRABAJO_RED: usize = 1_024;
+
+/// Cuántos bytes (estimados, ver [`TrabajoRed::tamano_estimado`]) puede tener [`TrabajoRed`] en
+/// cola a la vez, adicional al tope de elementos: un atacante podría intentar llenar la cola con
+/// pocos elementos pero enormes (hasta `MAX_BLOQUE_RED_BYTES` cada uno) para agotar memoria sin
+/// llegar al tope de 1 024.
+pub const MAX_TRABAJO_RED_BYTES: usize = 256 * 1024 * 1024;
+
+/// El lado que **encola** [`TrabajoRed`] hacia el hilo de consenso, acotado en elementos y en
+/// bytes. Clonable: lo comparten [`manejador::ManejadorRed`] (bloques difundidos) y
+/// [`sync::tarea_sincronizacion`] (bloques de sincronización).
+#[derive(Clone)]
+pub struct EmisorTrabajoRed {
+    tx: tokio::sync::mpsc::Sender<TrabajoRed>,
+    bytes_en_cola: Arc<AtomicUsize>,
+}
+
+/// Lo que puede pasar al intentar encolar un [`TrabajoRed`] (RI-3a #3).
+#[derive(Debug)]
+pub enum ResultadoEnvioTrabajo {
+    /// Se encoló con normalidad.
+    Encolado,
+    /// El tope (de elementos o de bytes) está lleno: se descartó **sin bloquear**. No es que el
+    /// hilo de consenso haya muerto — solo va más lento que la llegada; quien llama decide si
+    /// registrarlo, nunca se tira en silencio.
+    Lleno(TrabajoRed),
+    /// El receptor ya no existe (el hilo de consenso terminó): no hay a quién entregarle nada más.
+    Cerrado(TrabajoRed),
+}
+
+impl EmisorTrabajoRed {
+    /// Intenta encolar `trabajo`. **Nunca bloquea** (`try_send`, no `send().await`).
+    pub fn intentar_enviar(&self, trabajo: TrabajoRed) -> ResultadoEnvioTrabajo {
+        let tamano = trabajo.tamano_estimado();
+        // `fetch_update` compara-e-intercambia: dos productores concurrentes no pueden pasarse los
+        // dos del tope agregado (mismo patrón que `zx_p2p::presupuesto::Presupuesto`).
+        let admitido = self
+            .bytes_en_cola
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |actual| {
+                let nuevo = actual.checked_add(tamano)?;
+                (nuevo <= MAX_TRABAJO_RED_BYTES).then_some(nuevo)
+            })
+            .is_ok();
+        if !admitido {
+            return ResultadoEnvioTrabajo::Lleno(trabajo);
+        }
+        match self.tx.try_send(trabajo) {
+            Ok(()) => ResultadoEnvioTrabajo::Encolado,
+            Err(tokio::sync::mpsc::error::TrySendError::Full(t)) => {
+                // No cupo por elementos: deshacer la reserva de bytes que sí se concedió.
+                self.bytes_en_cola.fetch_sub(tamano, Ordering::AcqRel);
+                ResultadoEnvioTrabajo::Lleno(t)
+            }
+            Err(tokio::sync::mpsc::error::TrySendError::Closed(t)) => {
+                self.bytes_en_cola.fetch_sub(tamano, Ordering::AcqRel);
+                ResultadoEnvioTrabajo::Cerrado(t)
+            }
+        }
+    }
+}
+
+/// El lado que **drena** [`TrabajoRed`] en el hilo de consenso (síncrono, D-N07): envuelve el
+/// receptor bloqueante y libera de `bytes_en_cola` lo que cada elemento reservó al encolarse.
+pub struct ReceptorTrabajoRed {
+    rx: tokio::sync::mpsc::Receiver<TrabajoRed>,
+    bytes_en_cola: Arc<AtomicUsize>,
+}
+
+impl ReceptorTrabajoRed {
+    /// Igual que `Receiver::try_recv`: no bloquea. Libera el tamaño estimado del elemento devuelto.
+    pub fn try_recv(&mut self) -> Result<TrabajoRed, tokio::sync::mpsc::error::TryRecvError> {
+        let trabajo = self.rx.try_recv()?;
+        self.bytes_en_cola
+            .fetch_sub(trabajo.tamano_estimado(), Ordering::AcqRel);
+        Ok(trabajo)
+    }
+}
+
+/// Construye el par (emisor, receptor) acotado de [`TrabajoRed`] (RI-3a #3).
+#[must_use]
+pub fn nueva_cola_trabajo_red() -> (EmisorTrabajoRed, ReceptorTrabajoRed) {
+    let (tx, rx) = tokio::sync::mpsc::channel(MAX_TRABAJO_RED);
+    let bytes_en_cola = Arc::new(AtomicUsize::new(0));
+    (
+        EmisorTrabajoRed {
+            tx,
+            bytes_en_cola: Arc::clone(&bytes_en_cola),
+        },
+        ReceptorTrabajoRed { rx, bytes_en_cola },
+    )
+}
+
 /// Un límite de recursión declarado para el recorrido hacia atrás del DAG (decisión 3 y 4): cuántos
 /// saltos de "pide al padre que falta" se permiten antes de darse por vencido con esa rama. Evita
 /// una cascada sin fin si un par miente sobre una cadena de padres arbitrariamente larga.
@@ -55,6 +179,13 @@ pub const MAX_HUERFANOS_TOTAL: usize = 4_096;
 
 /// Cuántos huérfanos puede tener el depósito esperando al **mismo** padre.
 pub const MAX_HUERFANOS_POR_PADRE: usize = 64;
+
+/// `ORDEN-W06d6` decisión 1: mientras el cursor de sincronización esté a más de esto (en bloques)
+/// de la `longitud_registro` de algún par, un bloque PoST de **gossip** cuyo padre falte se
+/// descarta en vez de depositarse como huérfano (llegará por el registro). Es la vía **principal**
+/// de puesta al día; la resolución por padres se queda para los huecos pequeños, por debajo de este
+/// umbral.
+pub const UMBRAL_SINCRONIZANDO: u64 = 64;
 
 /// Construye el depósito de huérfanos con los topes de producción declarados arriba.
 #[must_use]
@@ -145,7 +276,7 @@ pub struct RedArrancada {
     /// Para `Nodo::conectar_red`.
     pub manija: ManijaRed,
     /// Para `Nodo::conectar_red`.
-    pub trabajo: tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>,
+    pub trabajo: ReceptorTrabajoRed,
 }
 
 /// Construye el transporte TCP real (decisión 8 de la orden: `127.0.0.1` en pruebas, cualquier
@@ -200,7 +331,7 @@ pub fn arrancar(
     };
     let swarm = construir_swarm()?;
 
-    let (tx_trabajo, rx_trabajo) = tokio::sync::mpsc::unbounded_channel();
+    let (tx_trabajo, rx_trabajo) = nueva_cola_trabajo_red();
     let manejador = Arc::new(manejador::ManejadorRed::nuevo(
         tx_trabajo.clone(),
         Arc::clone(&vista),
@@ -225,6 +356,18 @@ pub fn arrancar(
         if let Err(e) = runtime.block_on(manejo.marcar(addr.clone())) {
             tracing::warn!(%addr, %e, "no se pudo marcar la dirección al arrancar");
         }
+        // `ORDEN-W06d6` decisión 2: el primer intento de arriba puede no bastar (el par todavía no
+        // escucha: reproducido en vivo, `REVISION-W06d5.md` reserva 2 — "un intento de V4 minó en
+        // tres cadenas aisladas sin fijar nunca el terminal"). `Swarm::dial` en sí mismo solo falla
+        // localmente (dirección inválida, ya marcando); un rechazo de conexión real (TCP `connection
+        // refused` porque el otro extremo aún no escucha) ocurre más tarde, de forma asíncrona, y
+        // hoy no se refleja en ningún `EventoRed`. En vez de intentar distinguir ese caso, se
+        // reintenta este `marcar` **sin fin**, con espera creciente (1, 2, 4… hasta 30 s): si ya
+        // hay conexión, es un `dial` de más que la propia libp2p descarta sin coste real en esta
+        // red dev de unos pocos nodos.
+        let manejo_reintento = manejo.clone();
+        let addr_reintento = addr.clone();
+        runtime.spawn(reintentar_marcar(manejo_reintento, addr_reintento));
     }
 
     Ok(RedArrancada {
@@ -236,4 +379,25 @@ pub fn arrancar(
         runtime,
         trabajo: rx_trabajo,
     })
+}
+
+/// Espera inicial del reintento de dial (`ORDEN-W06d6` decisión 2).
+const REINTENTO_DIAL_INICIAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Techo de la espera creciente del reintento de dial.
+const REINTENTO_DIAL_MAXIMO: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Reintenta `manejo.marcar(addr)` con espera creciente (1, 2, 4… hasta
+/// [`REINTENTO_DIAL_MAXIMO`]), **sin fin** (`ORDEN-W06d6` decisión 2). Vive en su propia tarea del
+/// runtime `tokio` (`RedArrancada::runtime` la mantiene viva); termina sola si el runtime entero se
+/// suelta.
+async fn reintentar_marcar(manejo: zx_p2p::servicio::ManejoRed, addr: libp2p::Multiaddr) {
+    let mut espera = REINTENTO_DIAL_INICIAL;
+    loop {
+        tokio::time::sleep(espera).await;
+        if let Err(e) = manejo.marcar(addr.clone()).await {
+            tracing::debug!(%addr, %e, "reintento de dial fallido, se sigue intentando");
+        }
+        espera = espera.saturating_mul(2).min(REINTENTO_DIAL_MAXIMO);
+    }
 }

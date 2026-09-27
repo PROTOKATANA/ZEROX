@@ -109,4 +109,16 @@ pub trait ManejadorEntrante: Send + Sync + 'static {
     /// Un peer pide cuerpos de bloque (PoW o PoST). Los que no tengamos simplemente no van en la
     /// respuesta.
     fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed>;
+
+    /// `ORDEN-W06d6` decisión 1: una página del registro de admisión propio, empezando en el
+    /// índice `desde`. Devuelve los bloques de la página (como mucho
+    /// [`crate::limites::MAX_BLOQUES_POR_RESPUESTA`], acotados también en
+    /// [`crate::limites::MAX_RESPUESTA_BYTES`]) y la longitud **total** del registro propio.
+    ///
+    /// Con implementación por defecto (vacía, longitud 0) para no romper los manejadores de test
+    /// que no la necesitan (`Espia`, `Contador`, `Diferidor`...); `zx-node::red::manejador::ManejadorRed`
+    /// la sobrescribe con la real.
+    fn pagina_registro(&self, _desde: u64) -> (Vec<BloqueRed>, u64) {
+        (Vec::new(), 0)
+    }
 }

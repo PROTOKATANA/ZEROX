@@ -457,6 +457,24 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                 request_response::Message::Request {
                     request, channel, ..
                 } => {
+                    // `ORDEN-W06d6` (RI-3a #1, decisión 4): una `Peticion::Bloques` con hashes
+                    // repetidos es la firma del hallazgo confirmado (`REVISION-RI-3a.md`): un par
+                    // honesto no pide el mismo bloque varias veces en la misma petición. El
+                    // recorte/deduplicación que evita el desperdicio de trabajo ya vive en
+                    // `zx-node` (`VistaRed::bloques_por_hash`, aplica pase lo que pase aquí); esto
+                    // es la parte que **penaliza** al que lo pidió, con el mismo motivo `Excedido`
+                    // que ya existe para "mandaste más de lo pactado" (atribuible al emisor, cinco
+                    // avisos antes de banear un prefijo, C-NET-05/`error.rs`).
+                    if let Peticion::Bloques { hashes } = &request
+                        && tiene_hashes_repetidos(hashes)
+                    {
+                        tracing::debug!(
+                            %peer,
+                            n = hashes.len(),
+                            "Peticion::Bloques con hashes repetidos: penalizando (Excedido)"
+                        );
+                        self.desconectar_con_motivo(peer, MotivoDesconexion::Excedido);
+                    }
                     let respuesta = self.servir(&request);
                     if self
                         .swarm
@@ -490,6 +508,28 @@ impl<M: ManejadorEntrante> BucleRed<M> {
         }
     }
 
+    /// Corta con un peer por un motivo dado, puntuando su prefijo de red si el motivo puntúa
+    /// (C-NET-05 + C-NET-20: la puntuación es del **prefijo**, no del `PeerId`). Compartido por
+    /// `Comando::Desconectar` y por la penalización directa de una petición abusiva (RI-3a #1).
+    fn desconectar_con_motivo(&mut self, peer: PeerId, motivo: MotivoDesconexion) {
+        tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
+        let puntos = motivo.puntos();
+        if puntos > 0 {
+            let prefijos = self.swarm.behaviour_mut().limites_ip.prefijos_de(peer);
+            for p in prefijos {
+                if self.swarm.behaviour_mut().limites_ip.puntuar(p, puntos) {
+                    tracing::warn!(
+                        ?p,
+                        ?motivo,
+                        "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
+                         distintos con motivo Excedido, el nodo desactualizado eres tú."
+                    );
+                }
+            }
+        }
+        let _ = self.swarm.disconnect_peer_id(peer);
+    }
+
     /// Construye la respuesta a una petición entrante preguntándole al manejador.
     fn servir(&self, p: &Peticion) -> Respuesta {
         match p {
@@ -506,6 +546,16 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                     Respuesta::NoDisponible
                 } else {
                     Respuesta::Bloques(recortar(bs, crate::limites::MAX_BLOQUES_POR_RESPUESTA))
+                }
+            }
+            Peticion::Registro { desde } => {
+                // `ORDEN-W06d6` decisión 1: el manejador ya acota bloques y bytes (recibe los topes
+                // del protocolo, no los descubre después); aquí solo se envuelve en la respuesta.
+                let (bloques, longitud) = self.manejador.pagina_registro(*desde);
+                Respuesta::Registro {
+                    desde: *desde,
+                    bloques: recortar(bloques, crate::limites::MAX_BLOQUES_POR_RESPUESTA),
+                    longitud,
                 }
             }
         }
@@ -701,7 +751,9 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                     .publish(t, datos)
                     .map_err(|e| {
                         tracing::debug!(%e, "no se pudo difundir");
-                        P2pError::Transporte("gossipsub rechazó la publicación local")
+                        // `ORDEN-W06d6` decisión 3 (V7): el motivo real de `PublishError` viaja en
+                        // el error, no un texto fijo que lo esconde (ver `P2pError::Difusion`).
+                        P2pError::Difusion(e.to_string())
                     })
                     .map(|_| ());
                 let _ = respuesta.send(r);
@@ -724,27 +776,7 @@ impl<M: ManejadorEntrante> BucleRed<M> {
                 };
                 self.reportar_a_gossipsub(&p.message_id, &p.propagador, veredicto);
             }
-            Comando::Desconectar { peer, motivo } => {
-                tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
-
-                // C-NET-05 + C-NET-20 · solo una violación de consenso puntúa, y puntúa contra el
-                // **prefijo de red**, no contra el `PeerId`.
-                let puntos = motivo.puntos();
-                if puntos > 0 {
-                    let prefijos = self.swarm.behaviour_mut().limites_ip.prefijos_de(peer);
-                    for p in prefijos {
-                        if self.swarm.behaviour_mut().limites_ip.puntuar(p, puntos) {
-                            tracing::warn!(
-                                ?p,
-                                ?motivo,
-                                "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
-                                 distintos con motivo Excedido, el nodo desactualizado eres tú."
-                            );
-                        }
-                    }
-                }
-                let _ = self.swarm.disconnect_peer_id(peer);
-            }
+            Comando::Desconectar { peer, motivo } => self.desconectar_con_motivo(peer, motivo),
         }
     }
 
@@ -846,6 +878,19 @@ const fn a_acceptance(v: Veredicto) -> Option<gossipsub::MessageAcceptance> {
     }
 }
 
+/// ¿Tiene `hashes` algún hash repetido? `O(n²)` sobre como mucho
+/// [`crate::limites::MAX_HASHES_POR_PETICION`] (256) entradas de 32 B: barato, y el propio códec
+/// (`peticion_desde_bytes`) ya rechazó cualquier petición con más hashes que ese tope antes de que
+/// esto se llame.
+fn tiene_hashes_repetidos(hashes: &[zx_core::digest::BlockHash]) -> bool {
+    for (i, h) in hashes.iter().enumerate() {
+        if hashes.iter().take(i).any(|otro| otro == h) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Recorta una lista al límite del protocolo.
 fn recortar<T>(mut v: Vec<T>, max: usize) -> Vec<T> {
     if v.len() > max {
@@ -906,6 +951,7 @@ mod tests {
                 terminal: None,
                 puntas_post: vec![],
                 blue_work_virtual: [0; 32],
+                longitud_registro: 0,
             }
         }
 

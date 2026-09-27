@@ -9,27 +9,25 @@
 
 use std::sync::Arc;
 
-use tokio::sync::mpsc::UnboundedSender;
-
 use zx_core::digest::BlockHash;
 use zx_core::preimage::block::BlockHeader;
 use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
 use zx_p2p::mensaje::{BloqueRed, Estado};
 
-use super::TrabajoRed;
 use super::vista::VistaRed;
+use super::{EmisorTrabajoRed, ResultadoEnvioTrabajo, TrabajoRed};
 
 /// El manejador. Barato de clonar (todo dentro es `Arc`/canal clonable), pero se comparte como
 /// `Arc<ManejadorRed>` porque [`zx_p2p::servicio::arrancar_con`] lo exige.
 pub struct ManejadorRed {
-    trabajo: UnboundedSender<TrabajoRed>,
+    trabajo: EmisorTrabajoRed,
     vista: Arc<VistaRed>,
 }
 
 impl ManejadorRed {
     /// Construye el manejador con el canal hacia el hilo de consenso y la vista compartida.
     #[must_use]
-    pub const fn nuevo(trabajo: UnboundedSender<TrabajoRed>, vista: Arc<VistaRed>) -> Self {
+    pub const fn nuevo(trabajo: EmisorTrabajoRed, vista: Arc<VistaRed>) -> Self {
         Self { trabajo, vista }
     }
 }
@@ -40,20 +38,30 @@ impl ManejadorEntrante for ManejadorRed {
     }
 
     fn bloque_difundido(&self, id: IdDiferido, bloque: &BloqueRed) -> Veredicto {
-        if self
-            .trabajo
-            .send(TrabajoRed::BloqueDifundido {
-                id,
-                bloque: bloque.clone(),
-            })
-            .is_err()
-        {
-            // El hilo de consenso ya no existe: no hay a quién diferirle nada. No es un defecto del
-            // par que lo propagó, así que `Ignorar` (nunca `Rechazar`) es la única lectura honesta.
-            tracing::error!("hilo de consenso caído: bloque difundido descartado sin juzgar");
-            return Veredicto::Ignorar;
+        // `ORDEN-W06d6` (RI-3a #3): cola acotada en elementos y en bytes. Si está llena, se
+        // descarta **sin bloquear la red** (nunca `send().await`) y se registra — un bloque
+        // honesto descartado así se recupera por la petición de padres o por la sincronización por
+        // registro (decisión 1), nunca queda perdido en silencio sin que nadie lo sepa.
+        match self.trabajo.intentar_enviar(TrabajoRed::BloqueDifundido {
+            id,
+            bloque: bloque.clone(),
+        }) {
+            ResultadoEnvioTrabajo::Encolado => Veredicto::Diferir,
+            ResultadoEnvioTrabajo::Lleno(_) => {
+                tracing::warn!(
+                    "cola de trabajo hacia el hilo de consenso llena: bloque difundido descartado \
+                     sin juzgar (límite alcanzado, RI-3a #3)"
+                );
+                Veredicto::Ignorar
+            }
+            ResultadoEnvioTrabajo::Cerrado(_) => {
+                // El hilo de consenso ya no existe: no hay a quién diferirle nada. No es un
+                // defecto del par que lo propagó, así que `Ignorar` (nunca `Rechazar`) es la única
+                // lectura honesta.
+                tracing::error!("hilo de consenso caído: bloque difundido descartado sin juzgar");
+                Veredicto::Ignorar
+            }
         }
-        Veredicto::Diferir
     }
 
     fn tx_difundida(&self, _tx_serializada: &[u8]) -> Veredicto {
@@ -67,6 +75,14 @@ impl ManejadorEntrante for ManejadorRed {
 
     fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed> {
         self.vista.bloques_por_hash(hashes)
+    }
+
+    fn pagina_registro(&self, desde: u64) -> (Vec<BloqueRed>, u64) {
+        self.vista.pagina_registro(
+            desde,
+            zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA,
+            zx_p2p::limites::MAX_RESPUESTA_BYTES,
+        )
     }
 }
 
@@ -108,6 +124,7 @@ mod tests {
             terminal: None,
             puntas_post: Vec::new(),
             blue_work_virtual: [0; 32],
+            longitud_registro: 0,
         }
     }
 
@@ -147,7 +164,7 @@ mod tests {
 
     #[test]
     fn bloque_difundido_siempre_difiere_y_encola() {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = super::super::nueva_cola_trabajo_red();
         let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
 
         let v = m.bloque_difundido(IdDiferido::default(), &bloque_pow(1));
@@ -165,7 +182,7 @@ mod tests {
 
     #[test]
     fn sin_hilo_de_consenso_se_ignora_sin_penalizar() {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = super::super::nueva_cola_trabajo_red();
         drop(rx); // el hilo de consenso "murió": el canal está cerrado.
         let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
         assert_eq!(
@@ -176,7 +193,7 @@ mod tests {
 
     #[test]
     fn estado_y_lecturas_delegan_en_la_vista() {
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = super::super::nueva_cola_trabajo_red();
         let vista = Arc::new(VistaRed::nueva(estado_vacio()));
         let m = ManejadorRed::nuevo(tx, Arc::clone(&vista));
         assert_eq!(m.estado(), estado_vacio());

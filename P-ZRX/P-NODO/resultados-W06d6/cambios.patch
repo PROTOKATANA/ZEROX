@@ -1,0 +1,3516 @@
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/Cargo.lock ws/Cargo.lock
+--- ws.orig/Cargo.lock	2026-09-26 14:08:45.172252960 +0200
++++ ws/Cargo.lock	2026-09-27 04:39:12.893516182 +0200
+@@ -2687,6 +2687,15 @@
+ ]
+ 
+ [[package]]
++name = "nu-ansi-term"
++version = "0.50.3"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
++dependencies = [
++ "windows-sys 0.61.2",
++]
++
++[[package]]
+ name = "num-bigint"
+ version = "0.4.8"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -3669,6 +3678,15 @@
+ ]
+ 
+ [[package]]
++name = "sharded-slab"
++version = "0.1.7"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
++dependencies = [
++ "lazy_static",
++]
++
++[[package]]
+ name = "shlex"
+ version = "1.3.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -4054,6 +4072,15 @@
+ ]
+ 
+ [[package]]
++name = "thread_local"
++version = "1.1.10"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "1ad99c4c6d32803332c548b1af0540b357b3f5fc0be8f6c6bfe8b2e6ae784070"
++dependencies = [
++ "cfg-if",
++]
++
++[[package]]
+ name = "threadpool"
+ version = "1.8.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -4228,6 +4255,18 @@
+ ]
+ 
+ [[package]]
++name = "tracing-subscriber"
++version = "0.3.23"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "cb7f578e5945fb242538965c2d0b04418d38ec25c79d160cd279bf0731c8d319"
++dependencies = [
++ "nu-ansi-term",
++ "sharded-slab",
++ "thread_local",
++ "tracing-core",
++]
++
++[[package]]
+ name = "try-lock"
+ version = "0.2.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+@@ -4995,6 +5034,7 @@
+  "thiserror 2.0.20",
+  "tokio",
+  "tracing",
++ "tracing-subscriber",
+  "zx-cadena",
+  "zx-consensus",
+  "zx-core",
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/Cargo.toml ws/Cargo.toml
+--- ws.orig/Cargo.toml	2026-09-26 14:08:45.172252960 +0200
++++ ws/Cargo.toml	2026-09-27 01:09:26.276932052 +0200
+@@ -71,12 +71,20 @@
+ 
+ # --- nodo (W06d1/W06d2) — versión exacta del `Cargo.lock` de `9681061` ---
+ # `clap` para la CLI del binario `zx-node` (directorio de datos, red, claves, papel, `N_dev`,
+-# `SR_dev`, registro, parada tras N slots). No se añade `serde` ni `tracing-subscriber`: no son
+-# imprescindibles (el registro estructurado se escribe a mano con el esquema fijo de
+-# `ESCENARIOS-0.0.1.md` §1). `tokio` **sí** se añade desde `ORDEN-W06d2`: `zx-node` pasa a
+-# depender de `zx-p2p` para hablar la red real; reutiliza la misma instancia de `tokio` que ya
+-# fijó `zx-p2p` más abajo (nunca dos runtimes async con versiones distintas en el mismo binario).
++# `SR_dev`, registro, parada tras N slots). No se añade `serde`: no es imprescindible (el registro
++# estructurado se escribe a mano con el esquema fijo de `ESCENARIOS-0.0.1.md` §1). `tokio` **sí** se
++# añade desde `ORDEN-W06d2`: `zx-node` pasa a depender de `zx-p2p` para hablar la red real;
++# reutiliza la misma instancia de `tokio` que ya fijó `zx-p2p` más abajo (nunca dos runtimes async
++# con versiones distintas en el mismo binario).
+ clap               = { version = "=4.6.6", features = ["derive"] }
++# `tracing-subscriber` **se añade en `ORDEN-W06d6`** (decisión 3, V7): sin un suscriptor instalado,
++# `zx-adversario` no imprime ninguno de los `tracing::debug!`/`tracing::warn!` de `zx-p2p` (motivo
++# real de un rechazo local de gossipsub, penalizaciones...), y esa era la mitad de por qué V7 quedó
++# "parcial" en `REVISION-W06d5.md`: el motivo existía en el código pero nada lo mostraba. Versión
++# fijada al mismo estilo que el resto: la que ya está en la caché local (0.3.23), sin `env-filter`
++# (se activa por variable de entorno `RUST_LOG` con el filtro por defecto de `fmt`, que ya basta
++# para esta herramienta de diagnóstico, no de producción).
++tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["fmt", "ansi"] }
+ 
+ # --- farmer (D1/D2) — versiones exactas del `Cargo.lock` de `9681061` ---
+ # `rand`/`rand_chacha`: relleno propio de la historia génesis dev (D-P12), no el de Autonomys.
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/Cargo.toml ws/crates/zx-node/Cargo.toml
+--- ws.orig/crates/zx-node/Cargo.toml	2026-09-26 14:08:45.173706642 +0200
++++ ws/crates/zx-node/Cargo.toml	2026-09-27 01:09:36.396139103 +0200
+@@ -37,6 +37,11 @@
+ tokio           = { workspace = true }
+ tracing         = { workspace = true }
+ libp2p          = { workspace = true, features = ["tokio", "tcp", "noise", "yamux", "macros", "ed25519"] }
++# Solo la usa el binario `zx-adversario` (`ORDEN-W06d6` decisión 3, V7): sin un suscriptor
++# instalado, sus propios `tracing::debug!`/`tracing::warn!` (y los de `zx-p2p`) no se imprimen en
++# ningún sitio. `zx-node` (el binario del nodo real) no la usa: su registro estructurado propio
++# (`registro.rs`) ya cubre esa necesidad con su propio esquema.
++tracing-subscriber = { workspace = true }
+ 
+ # ── Autonomys por ruta al clon fijado `PDF/autonomys-subspace` @ f8842d0 ────────────────────────
+ # Mismas instancias que `zx-farmer`/`zx-post`: el nodo no reimplementa PoS, KZG ni erasure coding,
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/bin/zx-adversario.rs ws/crates/zx-node/src/bin/zx-adversario.rs
+--- ws.orig/crates/zx-node/src/bin/zx-adversario.rs	2026-09-27 00:37:31.722151789 +0200
++++ ws/crates/zx-node/src/bin/zx-adversario.rs	2026-09-27 02:49:33.946062346 +0200
+@@ -80,11 +80,24 @@
+ 
+ impl ManejadorEntrante for Espia {
+     fn estado(&self) -> Estado {
+-        // La herramienta no es un nodo real: declara un génesis vacío. Si el objetivo comprueba
+-        // esto y desconecta, es exactamente C-NET del lado del objetivo funcionando; no rompe nada
+-        // del lado de la herramienta (no le pedimos que confíe en nuestro estado).
++        // `ORDEN-W06d6` decisión 3 (V7), hallazgo en vivo: la herramienta declaraba un
++        // `hash_genesis` vacío (`[0xEE; 32]`) a propósito ("si el objetivo comprueba esto y
++        // desconecta, no rompe nada del lado de la herramienta"). Eso era cierto con un objetivo
++        // recién arrancado, pero deja de serlo con un objetivo real en marcha (500+ bloques): el
++        // saludo recíproco del propio objetivo (`sync.rs::atender_respuesta`, `Respuesta::Estado`)
++        // ve el génesis ajeno y llama a `desconectar(ViolacionDeConsenso)` **de inmediato** — y como
++        // la respuesta de esta herramienta (trivial) siempre llega antes que la del objetivo
++        // (construir la suya es más caro cuantos más bloques tenga), el objetivo gana la carrera
++        // sistemáticamente y corta la conexión antes de que la herramienta reciba nada, dejando
++        // "el objetivo no respondió el saludo" — la ráfaga de escenarios nunca llegaba a mandarse.
++        // Reproducido en vivo contra un objetivo con 500+ bloques PoST (`PROGRESO.md`). El génesis
++        // dev es una constante pública y fija (`HASH_GENESIS_DEV`); declararlo de verdad no debilita
++        // ningún escenario adversarial (el génesis no es parte de ningún ataque de E-7/E-8) y evita
++        // el corte antes de que la herramienta pueda hacer su trabajo.
+         Estado {
+-            hash_genesis: BlockHash::from_digest(Digest::from_bytes([0xEE; 32])),
++            hash_genesis: BlockHash::from_digest(Digest::from_bytes(
++                zx_consensus::genesis::HASH_GENESIS_DEV,
++            )),
+             red: Red::Dev,
+             fase: Fase::Pow,
+             punta_pow: zx_p2p::mensaje::PuntaPow {
+@@ -95,6 +108,7 @@
+             terminal: None,
+             puntas_post: Vec::new(),
+             blue_work_virtual: [0; 32],
++            longitud_registro: 0,
+         }
+     }
+ 
+@@ -302,6 +316,17 @@
+ 
+ #[tokio::main]
+ async fn main() {
++    // `ORDEN-W06d6` decisión 3 (V7): sin esto, ningún `tracing::debug!`/`tracing::warn!` de esta
++    // herramienta ni de `zx-p2p` (el motivo real de un rechazo local de gossipsub, penalizaciones
++    // de par, etc.) se imprime en ningún sitio — la mitad de por qué V7 quedó "parcial" en
++    // `REVISION-W06d5.md`: el motivo existía en el código pero nada lo mostraba. `DEBUG` fijo (no
++    // `RUST_LOG`): esta es una herramienta de diagnóstico de un solo uso, no un servicio con
++    // configuración propia.
++    tracing_subscriber::fmt()
++        .with_max_level(tracing::Level::DEBUG)
++        .with_target(true)
++        .init();
++
+     let cli = Cli::parse();
+     let swarm = match swarm_tcp() {
+         Ok(s) => s,
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/cli.rs ws/crates/zx-node/src/cli.rs
+--- ws.orig/crates/zx-node/src/cli.rs	2026-09-26 14:08:45.173847950 +0200
++++ ws/crates/zx-node/src/cli.rs	2026-09-27 01:34:50.267135028 +0200
+@@ -81,6 +81,13 @@
+     #[arg(long)]
+     pub parada_tras_slots: Option<u64>,
+ 
++    /// `ORDEN-W06d6` decisión 6: desde este slot el nodo deja de **producir**, pero sigue
++    /// validando, propagando y sincronizando (a diferencia de `--parada-tras-slots`, que para el
++    /// nodo entero). Solo red dev, no es consenso: sirve para el reposo antes de comparar estados
++    /// entre nodos (`P-ZRX/P-MEDICION/REVISION-W07c.md`).
++    #[arg(long)]
++    pub dejar_de_producir_en_slot: Option<u64>,
++
+     /// Dirección donde escuchar (`ORDEN-W06d2`). Sin esto ni `--red-marcar`, el nodo corre
+     /// exactamente como en `ORDEN-W06d1`: sin red.
+     #[arg(long, value_name = "MULTIADDR")]
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/main.rs ws/crates/zx-node/src/main.rs
+--- ws.orig/crates/zx-node/src/main.rs	2026-09-26 14:08:45.173873759 +0200
++++ ws/crates/zx-node/src/main.rs	2026-09-27 01:34:52.982190770 +0200
+@@ -49,6 +49,7 @@
+         n_dev: cli.n_dev,
+         sr_dev: cli.sr_dev,
+         parada_tras_slots: cli.parada_tras_slots,
++        dejar_de_producir_en_slot: cli.dejar_de_producir_en_slot,
+     };
+ 
+     let mut nodo = match Nodo::arrancar(&cfg) {
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/nodo.rs ws/crates/zx-node/src/nodo.rs
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-27 01:11:45.974790433 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-27 02:03:00.147027084 +0200
+@@ -44,7 +44,7 @@
+ use crate::pow;
+ use crate::red::huerfanos::DepositoHuerfanos;
+ use crate::red::vista::VistaRed;
+-use crate::red::{self, ManijaRed, TrabajoRed};
++use crate::red::{self, ManijaRed, ReceptorTrabajoRed, TrabajoRed};
+ use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
+ use crate::registro::Registro;
+ 
+@@ -84,6 +84,9 @@
+     pub sr_dev: u64,
+     /// Parada tras N slots de régimen (`None` = sin límite).
+     pub parada_tras_slots: Option<u64>,
++    /// `ORDEN-W06d6` decisión 6: desde este slot el nodo deja de **producir**, pero sigue
++    /// validando, propagando y sincronizando. `None` = nunca deja de producir por esta vía.
++    pub dejar_de_producir_en_slot: Option<u64>,
+ }
+ 
+ /// Estado completo del nodo, dueño único de `zx-cadena` y `zx-storage`.
+@@ -113,6 +116,8 @@
+     n_dev: u64,
+     sr_dev_actual: u64,
+     parada_tras_slots: Option<u64>,
++    /// `ORDEN-W06d6` decisión 6.
++    dejar_de_producir_en_slot: Option<u64>,
+     /// Trabajo PoW acumulado de la cadena admitida (para el saludo de red, decisión 4).
+     trabajo_acumulado: U256,
+     /// Hash del génesis (cacheado: `ORDEN-W06d2` lo necesita en cada saludo).
+@@ -128,7 +133,7 @@
+     /// comportamiento de `ORDEN-W06d1`: un nodo sin red.
+     red: Option<ManijaRed>,
+     /// Cola de trabajo que el manejador de red encola y este hilo drena (decisión 1).
+-    trabajo_red: Option<tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>>,
++    trabajo_red: Option<ReceptorTrabajoRed>,
+     /// Bloques PoST **de red** descartados como [`crate::rechazo::ClasificacionRechazo::Pendiente`]
+     /// (aviso del director, `ORDEN-W06d5`, tras el hallazgo de V5): no son inválidos, solo faltó
+     /// contexto local (`Pot(PasadoIncompleto)` mientras este nodo sincroniza fuera de orden). Nunca
+@@ -223,6 +228,7 @@
+             terminal: None,
+             puntas_post: Vec::new(),
+             blue_work_virtual: [0; 32],
++            longitud_registro: 0,
+         };
+ 
+         let mut nodo = Self {
+@@ -247,6 +253,7 @@
+             n_dev: cfg.n_dev,
+             sr_dev_actual: cfg.sr_dev,
+             parada_tras_slots: cfg.parada_tras_slots,
++            dejar_de_producir_en_slot: cfg.dejar_de_producir_en_slot,
+             trabajo_acumulado: U256::zero(),
+             hash_genesis: hash_genesis_esperado,
+             red_configurada: cfg.red,
+@@ -274,6 +281,13 @@
+         self.registro
+             .escribir(self.registro.evento("arranque").str("fase", "limpio"), true)?;
+         let testigos_genesis: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
++        // `ORDEN-W06d6` decisión 1: instantánea para el registro de admisión de la vista de red,
++        // construida antes de que `tx_genesis` se consuma más abajo.
++        let para_vista_genesis = BloqueRed::Pow {
++            cabecera: cabecera_genesis,
++            txs: vec![tx_genesis.clone()],
++            testigos: testigos_genesis.clone(),
++        };
+         self.cadena
+             .admitir(BloqueCadena::Pow(BloqueTransicion::nuevo(
+                 HechosCabecera::Genesis {
+@@ -302,6 +316,11 @@
+         // siempre y el localizador de sincronización nunca llegaba a funcionar. `Self::historial_pow`
+         // es la fuente de verdad; `fijar_cabeceras_pow` la copia entera a la vista.
+         self.vista_red.fijar_cabeceras_pow(&self.historial_pow);
++        // `ORDEN-W06d6` decisión 1: el registro de admisión de la vista tiene que empezar en el
++        // génesis, igual que el registro real de `zx-storage` (`registrar_pow` no se llama aquí,
++        // así que sin esto el cuerpo y la entrada de registro del génesis nunca existirían en la
++        // vista de red).
++        self.vista_red.registrar_genesis_pow(para_vista_genesis);
+         Ok(())
+     }
+ 
+@@ -484,17 +503,21 @@
+ 
+         let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
+         if !ya_admitido {
+-            // Persistencia (D-N03′) **antes** de admitir en `zx-cadena`: si el proceso muere entre
+-            // las dos, el reinicio repite desde el almacén y vuelve a llegar aquí con `ya_admitido`
+-            // falso otra vez (la clave del almacén es el hash, admitir es idempotente); al revés
+-            // (admitir en memoria y morir antes de persistir) perdería el bloque sin dejar rastro.
+-            // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
+-            // almacén (viene de ahí) y volver a escribirlo sería una vuelta redundante a disco.
+-            if verificar {
+-                let admitido = BloqueAdmitido::pow(&cabecera, &txs, &testigos);
+-                self.almacen.admitir(&admitido, true)?;
+-            }
+-
++            // `ORDEN-W06d6`, paso previo (RI-3c H1, `REVISION-RI-3c.md`): orden **admitir en
++            // `zx-cadena` → persistir → difundir** (la difusión la hace quien llama, ya solo tras
++            // que esta función devuelva `Ok`). Antes se persistía primero: si `cadena.admitir`
++            // rechazaba el bloque con un motivo `Legitimo`/`Interno` normal (`ErrGarantia`,
++            // `ErrMergeDepth`... la propia `ORDEN-W06d5` decisión 3 los declara esperables), la
++            // entrada quedaba en el almacén **sin que nada la deshiciera**: un bloque rechazado
++            // repetía su rechazo en cada reinicio (D-N03′ repite todo el registro) y el nodo no
++            // volvía a arrancar nunca (RI-3c, reproducido con un `ErrEmision`). Con el orden nuevo,
++            // un rechazo de `cadena.admitir` sale de esta función (el `?` de abajo) **antes** de
++            // tocar disco: no hay nada que deshacer. Si el proceso muere justo entre admitir
++            // (memoria) y persistir (disco), el bloque simplemente no salió del nodo — nunca se
++            // difundió (eso ocurre después, en el llamante) y el reinicio no lo repite porque no
++            // está en el almacén; no es la doble firma que RI-2b temía (esa era sobre difundir
++            // antes de persistir, no sobre admitir antes de persistir).
++            let admitido = BloqueAdmitido::pow(&cabecera, &txs, &testigos);
+             let txs_con_testigos: Vec<(Tx, Vec<Vec<u8>>)> = txs.into_iter().zip(testigos).collect();
+             let bt = BloqueTransicion::nuevo(hechos, txs_con_testigos);
+             self.cadena.admitir(BloqueCadena::Pow(bt)).map_err(|m| {
+@@ -504,6 +527,11 @@
+                     clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
+                 }
+             })?;
++            // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
++            // almacén (viene de ahí) y volver a escribirlo sería una vuelta redundante a disco.
++            if verificar {
++                self.almacen.admitir(&admitido, true)?;
++            }
+             self.vista_red.registrar_pow(cabecera.height, para_vista);
+             // Un hijo que esperaba justo este padre puede reintentarse ya (decisión 3).
+             self.resolver_huerfanos_de(hash);
+@@ -732,22 +760,21 @@
+         };
+ 
+         let ya_admitido = self.cadena.es_valido(&hash) || self.cadena.motivo(&hash).is_some();
+-        // Aviso del director a mitad de ejecución (RI-2b, `deepseek/RI-2b/INFORME.md` H1): persistir
+-        // **antes** de admitir en `zx-cadena`, igual que `admitir_pow_interno` y por el mismo motivo
+-        // (su propio comentario, arriba): si el proceso muere entre las dos, el reinicio repite
+-        // desde el almacén y vuelve a llegar aquí con `ya_admitido` falso otra vez (idempotente por
+-        // hash). Al revés —como estaba— un `SIGKILL` entre `cadena.admitir` (memoria) y
+-        // `almacen.admitir` (disco) perdía el bloque **sin dejar rastro**: al reiniciar,
+-        // `ServicioPot` se reconstruye solo desde lo persistido (D-N03′), el mismo slot queda
+-        // libre otra vez y, con un solo flujo PoT determinista (D-P10), la misma clave puede volver
+-        // a ganarlo y firmar un bloque **distinto** para el mismo slot — la doble firma que
+-        // «Relanzamiento» punto 4 de `ORDEN-W06d1` prohíbe. Solo en la ruta en vivo (`verificar`):
+-        // en la repetición el bloque ya está en el almacén (viene de ahí).
+-        if !ya_admitido && verificar {
+-            let admitido = BloqueAdmitido::post(&bloque);
+-            self.almacen.admitir(&admitido, true)?;
+-        }
+-
++        // `ORDEN-W06d6`, paso previo (RI-3c H1, `REVISION-RI-3c.md`): orden **admitir en
++        // `zx-cadena` → persistir → difundir**, igual que `admitir_pow_interno` y por el mismo
++        // motivo (ver su comentario). Esto **sustituye** el orden de RI-2b (persistir antes de
++        // admitir): RI-2b acertaba en el objetivo —evitar la doble firma de «Relanzamiento» punto
++        // 4— y se equivocaba en la forma. Lo que de verdad la evita es que la **difusión** ocurra
++        // solo después de persistir (eso no cambia: sigue siendo el llamante, tras que esta función
++        // devuelva `Ok`), no que la persistencia sea el primer paso. Con persistir primero, un
++        // rechazo legítimo de `cadena.admitir` (`ErrGarantia`, `ErrMergeDepth`... la propia
++        // `ORDEN-W06d5` decisión 3 los declara esperables) dejaba una entrada fantasma en el
++        // almacén que D-N03′ repite en cada reinicio sin deshacerla — el nodo no volvía a arrancar
++        // (RI-3c, confirmado). Con el orden nuevo, un rechazo sale por el `?` de abajo antes de
++        // tocar disco. Si el proceso muere entre admitir (memoria) y persistir (disco), el slot
++        // sigue sin observarse fuera del nodo (nunca se difundió) y el reinicio no repite nada (no
++        // está en el almacén): no hay bloque fantasma que reproduzca el rechazo, y no hay doble
++        // firma observable porque no hubo difusión.
+         if !ya_admitido {
+             self.cadena.admitir(BloqueCadena::Post(post)).map_err(|m| {
+                 ErrorNodo::BloquePropioRechazado {
+@@ -756,6 +783,12 @@
+                     clasificacion: crate::rechazo::clasificar_motivo_bloque(&m),
+                 }
+             })?;
++            // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
++            // almacén (viene de ahí).
++            if verificar {
++                let admitido = BloqueAdmitido::post(&bloque);
++                self.almacen.admitir(&admitido, true)?;
++            }
+             let para_vista = BloqueRed::Post {
+                 cabecera: bloque.cabecera,
+                 justificacion: bloque.justificacion.clone(),
+@@ -882,6 +915,9 @@
+             terminal: self.cadena.terminal(),
+             puntas_post,
+             blue_work_virtual: [0; 32],
++            // `ORDEN-W06d6` decisión 1: longitud real del registro de admisión de la vista, no un
++            // relleno — es lo que el par sincronizando compara contra su propio cursor.
++            longitud_registro: self.vista_red.longitud_registro(),
+         }
+     }
+ 
+@@ -1150,6 +1186,24 @@
+             let padre_conocido =
+                 self.cadena.es_valido(&padre) || self.cadena.motivo(&padre).is_some();
+             if !padre_conocido {
++                // `ORDEN-W06d6` decisión 1: mientras este nodo va muy por detrás de algún par
++                // conocido (`VistaRed::sincronizando`), un huérfano PoST llegado por **gossip**
++                // (`origen.is_none()`: no sabemos de quién pedir el padre directamente) no se
++                // deposita — la sincronización por registro lo traerá en su momento, en orden
++                // causal, sin que este nodo tenga que resolver huérfanos de uno en uno mientras la
++                // red sigue produciendo (la causa raíz de V5/V6(b), `REVISION-W06d5.md`). Un
++                // huérfano de **sincronización** (`origen.is_some()`, llegó como respuesta a una
++                // petición nuestra) sigue depositándose igual: es la resolución por padres para los
++                // huecos pequeños que la propia decisión 1 conserva.
++                if origen.is_none() && self.vista_red.sincronizando() {
++                    let evento = self
++                        .registro
++                        .evento("bloque_post_gossip_descartado_sincronizando")
++                        .str("hash", &hash.to_string())
++                        .str("padre_ausente", &padre.to_string());
++                    let _ = self.registro.escribir(evento, false);
++                    return VeredictoFinal::Ignorar;
++                }
+                 for d in self.huerfanos.insertar(padre, hash, bloque_red) {
+                     let evento = self
+                         .registro
+@@ -1223,6 +1277,7 @@
+                     .evento("bloque_red_admitido")
+                     .str("hash", &hash.to_string())
+                     .str("familia", "post")
++                    .u64("slot", bloque_para_reintento.cabecera.slot)
+                     .str("veredicto", "Aceptar");
+                 let _ = self.registro.escribir(evento, false);
+                 self.reintentar_post_pendientes();
+@@ -1244,6 +1299,25 @@
+                 self.encolar_post_pendiente(bloque_para_reintento);
+                 VeredictoFinal::Ignorar
+             }
++            // `ORDEN-W06d6`, RI-3c H2: `PruebaPotIncoherente`/`RangoSinAtadura` no se reintentan
++            // (a diferencia de `Pendiente`, el hueco no se va a llenar solo) pero tampoco penalizan
++            // al remitente (a diferencia del resto de rechazos): no hay certeza de que el defecto
++            // sea suyo y no nuestro. `VeredictoFinal::Ignorar` es exactamente "se descarta sin
++            // penalizar".
++            Err(ErrorNodo::BloquePropioRechazado {
++                motivo,
++                clasificacion,
++                ..
++            }) if !clasificacion.penaliza_en_red() => {
++                let evento = self
++                    .registro
++                    .evento("bloque_red_ignorado_sin_penalizar")
++                    .str("hash", &hash.to_string())
++                    .str("familia", "post")
++                    .str("motivo", &motivo);
++                let _ = self.registro.escribir(evento, false);
++                VeredictoFinal::Ignorar
++            }
+             Err(e) => {
+                 let evento = self
+                     .registro
+@@ -1288,6 +1362,7 @@
+                         .evento("bloque_red_admitido")
+                         .str("hash", &hash.to_string())
+                         .str("familia", "post")
++                        .u64("slot", bloque.cabecera.slot)
+                         .str("veredicto", "Aceptar (reintento)");
+                     let _ = self.registro.escribir(evento, false);
+                 }
+@@ -1596,7 +1671,10 @@
+         let cbid = self.cbid;
+         let n_dev = self.n_dev;
+         let sr_dev = self.sr_dev_actual;
+-        let parada = self.parada_tras_slots;
++        // `ORDEN-W06d6` decisión 6: el hilo productor para de producir en el primero de los dos
++        // límites que esté fijado (`--parada-tras-slots` sigue parando el nodo entero; el nuevo
++        // `--dejar-de-producir-en-slot` solo para de producir, ver más abajo tras el bucle).
++        let parada = self.limite_productor();
+         let importe_coinbase = perfil::subsidio_post(0);
+         let historia_hilo: Arc<HistoriaGenesis> = Arc::clone(&self.historia);
+         let hilo = thread::spawn(move || {
+@@ -1671,6 +1749,7 @@
+                 }
+                 MsgProductor::Post(bloque) => {
+                     let hash = bloque.cabecera.block_hash();
++                    let slot = bloque.cabecera.slot;
+                     match self.admitir_post_interno(
+                         *bloque,
+                         self.almacen.longitud_registro()?,
+@@ -1680,14 +1759,15 @@
+                             let evento = self
+                                 .registro
+                                 .evento("bloque_producido")
+-                                .str("hash", &hash.to_string());
++                                .str("hash", &hash.to_string())
++                                .u64("slot", slot);
+                             self.registro.escribir(evento, false)?;
+                             self.difundir_si_hay_red(hash);
+                             // El pasado del `ServicioPot` de verificación acaba de avanzar: algún
+                             // bloque de red que quedó `Pendiente` (decisión 3 extendida) puede haber
+                             // dejado de estarlo.
+                             self.reintentar_post_pendientes();
+-                            let continuar = self.parada_tras_slots.is_none_or(|limite| {
++                            let continuar = self.limite_productor().is_none_or(|limite| {
+                                 self.servicio_verificacion
+                                     .as_ref()
+                                     .is_some_and(|s| s.slot_actual() < limite)
+@@ -1750,9 +1830,37 @@
+                 "el hilo productor terminó con panic: {motivo}"
+             )));
+         }
++        // `ORDEN-W06d6` decisión 6: si lo que paró de producir fue **solo**
++        // `--dejar-de-producir-en-slot` (no `--parada-tras-slots`), el nodo entero **no** termina
++        // aquí: sigue vivo, validando, propagando y sincronizando, para poder compararse en reposo
++        // contra otros nodos (`P-ZRX/P-MEDICION/REVISION-W07c.md`). Solo `--parada-tras-slots`
++        // (con o sin el otro) termina el proceso, como siempre.
++        if self.parada_tras_slots.is_none() && self.dejar_de_producir_en_slot.is_some() {
++            let evento = self.registro.evento("dejar_de_producir").str(
++                "motivo",
++                "--dejar-de-producir-en-slot alcanzado: sigue en reposo activo",
++            );
++            self.registro.escribir(evento, false)?;
++            loop {
++                self.procesar_trabajo_red_pendiente();
++                std::thread::sleep(std::time::Duration::from_millis(50));
++            }
++        }
+         Ok(())
+     }
+ 
++    /// El límite de slot en el que el hilo productor debe dejar de producir (`ORDEN-W06d6`
++    /// decisión 6): el más restrictivo de `--parada-tras-slots` y `--dejar-de-producir-en-slot`,
++    /// si hay alguno.
++    fn limite_productor(&self) -> Option<u64> {
++        match (self.parada_tras_slots, self.dejar_de_producir_en_slot) {
++            (Some(a), Some(b)) => Some(a.min(b)),
++            (Some(a), None) => Some(a),
++            (None, Some(b)) => Some(b),
++            (None, None) => None,
++        }
++    }
++
+     fn producir_bloque_transicion(&mut self, terminal: BlockHash) -> ResultadoNodo<()> {
+         #[expect(clippy::indexing_slicing, reason = "la CLI exige al menos una clave")]
+         let clave = self.claves[0].clone();
+@@ -1791,11 +1899,7 @@
+     /// trabajo de red (bloques difundidos o de sincronización) intercalado con su propia
+     /// producción (D-N07: un único hilo de consenso). Sin llamar a esto, el nodo se comporta
+     /// exactamente como en `ORDEN-W06d1` (sin red).
+-    pub fn conectar_red(
+-        &mut self,
+-        manija: ManijaRed,
+-        receptor: tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>,
+-    ) {
++    pub fn conectar_red(&mut self, manija: ManijaRed, receptor: ReceptorTrabajoRed) {
+         self.red = Some(manija);
+         self.trabajo_red = Some(receptor);
+     }
+@@ -1917,6 +2021,7 @@
+             n_dev: 16,
+             sr_dev: u64::MAX,
+             parada_tras_slots: Some(0),
++            dejar_de_producir_en_slot: None,
+         };
+         let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
+         let estado_antes = nodo.resumen_estado_actual();
+@@ -2007,6 +2112,7 @@
+             n_dev: 16,
+             sr_dev: u64::MAX,
+             parada_tras_slots: Some(0),
++            dejar_de_producir_en_slot: None,
+         };
+         let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
+         let clave_propia = nodo.claves.first().cloned().expect("al menos una clave");
+@@ -2124,24 +2230,16 @@
+     }
+ }
+ 
+-/// RI-3c: `admitir_pow_interno`/`admitir_post_interno` escriben en el almacén (D-N03′) **antes**
+-/// de llamar a `cadena.admitir`, y no deshacen esa escritura si `cadena.admitir` rechaza el
+-/// bloque (`Legitimo` o `Interno`, `crate::rechazo`). El bloque rechazado queda persistido como si
+-/// hubiera sido admitido. `Nodo::reiniciar` repite **todo** el registro sin distinguir esta
+-/// entrada fantasma de una real, y su propio `?` no la absorbe: el rechazo se repite y el reinicio
+-/// entero falla. Reproduce con un motivo `Interno` (`ErrEmision`, coinbase con importe
+-/// incorrecto) porque no requiere el aparato PoST/parcela: el mismo defecto de orden
+-/// (persistir → admitir, sin deshacer) alcanza igual a un motivo `Legitimo` (`ErrGarantia`,
+-/// `ErrMergeDepth`, `ErrMergeset`, `ErrU2`, `ErrPowTrasCorte`), que son precisamente los que
+-/// `ORDEN-W06d5` decisión 3 declara **normales y esperables** en producción (evidenciados en V5-1
+-/// y V6(b) de `REVISION-W06d4.md`).
++/// `ORDEN-W06d6`, paso previo (RI-3c H1, `REVISION-RI-3c.md`): el orden **admitir → persistir**
++/// (sustituye al orden de RI-2b, persistir → admitir) impide la entrada fantasma que bloqueaba el
++/// reinicio, y el punto de inyección de fallo entre admitir y persistir no deja rastro observable.
+ #[cfg(test)]
+ #[expect(
+     clippy::expect_used,
+     clippy::indexing_slicing,
+     reason = "el test falla con panic por diseño"
+ )]
+-mod pruebas_ri3c_persistencia_antes_de_admitir {
++mod pruebas_ri3c_orden_admitir_persistir {
+     use core::sync::atomic::AtomicBool;
+ 
+     use zx_consensus::{PARAMETROS_POW_DEV, Sha3Dev, minar};
+@@ -2153,32 +2251,25 @@
+     use super::{Config, Nodo, Red};
+     use crate::pow;
+ 
+-    #[test]
+-    fn bloque_pow_propio_rechazado_por_cadena_queda_persistido_y_bloquea_el_reinicio() {
+-        let dir = tempfile::tempdir().expect("tempdir");
+-        let cfg = Config {
+-            dir_datos: dir.path().join("datos"),
+-            ruta_registro: dir.path().join("registro.jsonl"),
++    fn cfg_de_test(dir: &std::path::Path) -> Config {
++        Config {
++            dir_datos: dir.join("datos"),
++            ruta_registro: dir.join("registro.jsonl"),
+             red: Red::Dev,
+             semilla: 42,
+             indices_claves: vec![0],
+             n_dev: 16,
+             sr_dev: u64::MAX,
+             parada_tras_slots: Some(0),
+-        };
+-        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
++            dejar_de_producir_en_slot: None,
++        }
++    }
+ 
++    /// Mina un PoW real de altura 1 sobre el génesis del nodo, con la coinbase que se le pase (para
++    /// poder viciarla y forzar un rechazo del motor de transición sin tocar el PoW en sí).
++    fn minar_altura_1(nodo: &Nodo, mut coinbase: zx_core::Tx, importe: i64) -> BlockHeader {
++        coinbase.outputs[0].value = Amount::nuevo(importe).expect("importe representable");
+         let genesis = nodo.historial_pow[nodo.historial_pow.len() - 1];
+-        let clave = nodo.claves.first().expect("al menos una clave").pk;
+-
+-        // Coinbase que paga **más** que `subsidio_pow(1)` (perfil dev: 50 ZZK): el motor de
+-        // transición (`aplicar_txs`, `coinbase_pagada > tope` en `aplicar.rs`) la rechaza con
+-        // `ErrEmision` (`MotivoBloque::ErrTransicion`, `Interno` para
+-        // `crate::rechazo::clasificar_motivo_bloque`). El PoW en sí es real y válido: solo la
+-        // coinbase es incorrecta.
+-        let mut coinbase = pow::construir_coinbase_pow(clave, 1);
+-        coinbase.outputs[0].value = Amount::nuevo(51).expect("importe representable");
+-
+         let txid_coinbase = txid(&coinbase, nodo.cbid);
+         let target = decodificar_con(
+             PARAMETROS_POW_DEV.bits_iniciales,
+@@ -2195,15 +2286,38 @@
+             height: 1,
+         };
+         let cancelar = AtomicBool::new(false);
+-        let cabecera_minada = minar(&cabecera_base, target, &Sha3Dev, u64::MAX, &cancelar)
+-            .expect("un PoW real se encuentra con la dificultad dev inicial (~2^17 intentos)");
++        minar(&cabecera_base, target, &Sha3Dev, u64::MAX, &cancelar)
++            .expect("un PoW real se encuentra con la dificultad dev inicial (~2^17 intentos)")
++    }
++
++    /// **Regresión de RI-3c H1** (test adaptado de `resultados-RI-3c/ri3c_nodo.diff`, con las
++    /// aserciones invertidas a lo correcto tras la corrección — el original, ejecutado tal cual
++    /// contra la base sin corregir, se conservó como evidencia "antes" en
++    /// `deepseek/W06d6/logs/RI-3c-antes.log`): una coinbase que paga de más se **rechaza** por
++    /// `ErrEmision` y, con el orden nuevo, **nunca llega a persistirse** — el registro sigue en 1
++    /// (solo el génesis) tras el rechazo, y el nodo **reinicia sin problema**.
++    #[test]
++    fn bloque_pow_propio_rechazado_no_persiste_y_el_reinicio_funciona() {
++        let dir = tempfile::tempdir().expect("tempdir");
++        let cfg = cfg_de_test(dir.path());
++        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
++        let clave = nodo.claves.first().expect("al menos una clave").pk;
++
++        // Coinbase que paga **más** que `subsidio_pow(1)` (perfil dev: 50 ZZK): el motor de
++        // transición la rechaza con `ErrEmision` (`Interno` para `crate::rechazo`).
++        let coinbase = pow::construir_coinbase_pow(clave, 1);
++        let cabecera_minada = minar_altura_1(&nodo, coinbase.clone(), 51);
+         let hash = cabecera_minada.block_hash();
++        let mut coinbase_viciada = coinbase;
++        coinbase_viciada.outputs[0].value = Amount::nuevo(51).expect("importe representable");
+ 
+-        // Paso 1: admitir con `verificar = true`, la misma ruta que usan la red y la producción
+-        // propia (`intentar_admitir_pow_de_red`, `fase_pow`). El motor de transición debe
+-        // rechazarlo por la coinbase incorrecta.
+-        let resultado =
+-            nodo.admitir_pow_interno(cabecera_minada, vec![coinbase], vec![Vec::new()], 0, true);
++        let resultado = nodo.admitir_pow_interno(
++            cabecera_minada,
++            vec![coinbase_viciada],
++            vec![Vec::new()],
++            0,
++            true,
++        );
+         assert!(
+             resultado.is_err(),
+             "la coinbase con importe incorrecto debe rechazarse"
+@@ -2213,36 +2327,206 @@
+             "el bloque rechazado no debe quedar admitido en zx-cadena"
+         );
+ 
+-        // Paso 2 (el hallazgo): pese al rechazo, el bloque quedó PERSISTIDO en el almacén, porque
+-        // `admitir_pow_interno` escribe en disco (D-N03′) antes de llamar a `cadena.admitir` y no
+-        // deshace esa escritura si el motor rechaza el bloque.
++        // La corrección: admitir se intenta **antes** de persistir, así que un rechazo no deja
++        // ninguna entrada fantasma en el almacén.
+         let longitud_tras_rechazo = nodo
+             .almacen
+             .longitud_registro()
+             .expect("longitud del almacén");
+         assert_eq!(
+-            longitud_tras_rechazo, 2,
+-            "el bloque rechazado quedó persistido en el almacén: génesis (1) + este bloque \
+-             rechazado (2), aunque zx-cadena nunca lo admitió"
++            longitud_tras_rechazo, 1,
++            "el bloque rechazado NO debe persistirse: el registro solo tiene el génesis"
+         );
+ 
+         drop(nodo);
+ 
+-        // Paso 3: reiniciar el nodo desde el mismo directorio de datos. `Nodo::reiniciar` (D-N03′)
+-        // repite **todo** el registro del almacén con `verificar = false` y no distingue esta
+-        // entrada fantasma de una real: `cadena.admitir` vuelve a fallar con el mismo `ErrEmision`,
+-        // y `Nodo::reiniciar`/`Nodo::arrancar` no absorben ese error (no hay ningún `match` sobre
+-        // `ClasificacionRechazo` en el bucle de repetición): el reinicio entero falla.
++        // El reinicio ya no repite ninguna entrada fantasma: debe funcionar sin más.
+         let reinicio = Nodo::arrancar(&cfg);
+-        match &reinicio {
+-            Ok(_) => {}
+-            Err(e) => eprintln!("RI-3c: Nodo::arrancar (reinicio) devolvió Err: {e}"),
++        if let Err(e) = &reinicio {
++            eprintln!("RI-3c (corregido): Nodo::arrancar (reinicio) devolvió Err inesperado: {e}");
+         }
+         assert!(
+-            reinicio.is_err(),
+-            "el nodo debería poder reiniciar (el bloque nunca fue válido, nada que preservar), \
+-             pero el reinicio falla porque repite la entrada fantasma persistida en el paso 1 y \
+-             su rechazo, sin manejo especial, tira todo el arranque"
++            reinicio.is_ok(),
++            "el reinicio debe funcionar: el bloque rechazado nunca se persistió, así que no hay \
++             nada que repetir ni que vuelva a fallar"
++        );
++    }
++
++    /// **Punto de inyección de fallo entre admitir y persistir** (decisión 7, paso previo): se
++    /// admite un bloque PoW **válido** en `zx-cadena` (memoria) replicando exactamente los pasos
++    /// de `admitir_pow_interno` hasta ese punto, y se simula la caída del proceso **sin** llegar a
++    /// `almacen.admitir` (el paso siguiente, que esta prueba omite a propósito). Comprueba que:
++    /// (a) nada se difunde — estructuralmente imposible, porque `difundir_si_hay_red` solo se
++    /// llama *después* de que `admitir_pow_interno` devuelva `Ok`, y aquí nunca se completa esa
++    /// llamada; y (b) el nodo reinicia bien — el bloque "caído" no está en el almacén, así que el
++    /// reinicio simplemente no lo ve, sin fallar ni dejar rastro.
++    #[test]
++    fn fallo_entre_admitir_y_persistir_no_deja_rastro_y_el_reinicio_funciona() {
++        use zx_cadena::BloqueCadena;
++        use zx_consensus::genesis::HASH_GENESIS_DEV;
++        use zx_consensus::transicion::{BloqueTransicion, HechosCabecera};
++        use zx_core::digest::Digest;
++        use zx_core::{BlockHash, trabajo_bloque};
++
++        let dir = tempfile::tempdir().expect("tempdir");
++        let cfg = cfg_de_test(dir.path());
++        let mut nodo = Nodo::arrancar(&cfg).expect("arranque limpio");
++        let clave = nodo.claves.first().expect("al menos una clave").pk;
++
++        let coinbase = pow::construir_coinbase_pow(clave, 1);
++        let cabecera_minada = minar_altura_1(&nodo, coinbase.clone(), 50); // subsidio exacto: válido
++        let hash = cabecera_minada.block_hash();
++
++        // Replica el paso "admitir en zx-cadena" de `admitir_pow_interno`, **sin** el paso
++        // siguiente (`almacen.admitir`) — exactamente el instante en que un `SIGKILL` real
++        // interrumpiría entre los dos.
++        let target = zx_core::decodificar_con(
++            zx_consensus::PARAMETROS_POW_DEV.bits_iniciales,
++            &zx_consensus::PARAMETROS_POW_DEV.limites,
++        )
++        .expect("bits decodifica");
++        let trabajo = trabajo_bloque(target).expect("trabajo del bloque");
++        let hechos = HechosCabecera::PoW {
++            hash,
++            padre: cabecera_minada.prev_hash,
++            altura: cabecera_minada.height,
++            trabajo,
++            pow_valido: true,
++        };
++        let bt = BloqueTransicion::nuevo(hechos, vec![(coinbase, vec![Vec::new()])]);
++        nodo.cadena
++            .admitir(BloqueCadena::Pow(bt))
++            .expect("un bloque válido se admite en memoria");
++        assert!(
++            nodo.cadena.es_valido(&hash),
++            "el bloque queda admitido en memoria (paso 1, ya ocurrió)"
++        );
++
++        // "Caída": el proceso termina aquí, sin haber llegado a `almacen.admitir` (paso 2) ni,
++        // mucho menos, a la difusión (paso 3, posterior en el llamante real). No hay manejo de red
++        // en este nodo de test, así que "no se difunde" es además estructuralmente cierto: no hay
++        // ningún `ManijaRed` al que `difundir_si_hay_red` pudiera llamar.
++        assert!(
++            nodo.red.is_none(),
++            "sin red conectada: no hay a quién difundir nada"
++        );
++        let longitud_antes_de_caer = nodo
++            .almacen
++            .longitud_registro()
++            .expect("longitud del almacén");
++        assert_eq!(
++            longitud_antes_de_caer, 1,
++            "el bloque admitido en memoria todavía NO está en el almacén: la caída simulada \
++             ocurre exactamente antes de persistir"
++        );
++        drop(nodo);
++
++        // El reinicio: el bloque "caído" no está en el almacén, así que sencillamente no existe
++        // para el nodo que reinicia — ni error, ni entrada fantasma, ni doble firma observable
++        // (nunca se difundió; RI-2b quedaba a salvo por eso, no por el orden de escritura).
++        let reinicio = Nodo::arrancar(&cfg).expect("el reinicio debe funcionar sin problema");
++        assert_eq!(
++            reinicio.historial_pow.len(),
++            1,
++            "el reinicio solo ve el génesis: el bloque de altura 1 nunca se persistió"
++        );
++        assert_eq!(
++            reinicio.headers_pow.keys().find(|h| **h == hash),
++            None,
++            "el bloque que 'cayó' entre admitir y persistir no reaparece tras el reinicio"
++        );
++        // El génesis dev es una constante fija; comprobación de sanidad de que el reinicio partió
++        // del mismo génesis, no de uno distinto por accidente.
++        assert_eq!(
++            reinicio.historial_pow[0].block_hash(),
++            BlockHash::from_digest(Digest::from_bytes(HASH_GENESIS_DEV))
++        );
++    }
++}
++
++/// `ORDEN-W06d6` decisión 5: test pendiente de `ORDEN-W06d5` (la cola de `post_pendientes`) — se
++/// verificaba solo con ejecuciones reales, sin test unitario del propio tope.
++#[cfg(test)]
++#[expect(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    reason = "el test falla con panic por diseño"
++)]
++mod pruebas_cola_post_pendientes {
++    use zx_core::digest::{BlockHash, BodyCommitment, Digest, MerkleRoot};
++    use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
++    use zx_core::wire_dag::{BloqueDag, JustificacionPot, PotCheckpoints};
++
++    use super::{Config, Nodo, Red};
++
++    fn cabecera_post(slot: u64) -> DagBlockHeader {
++        DagBlockHeader {
++            consensus_branch_id: 0xa8b4_66a7,
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([(slot % 251) as u8; 32])),
++            timestamp: 1_000 + slot,
++            height: 0,
++            slot,
++            pot_output: [0; 16],
++            rango_solucion: 1,
++            sol: SolucionPoas::default(),
++            body_commitment: BodyCommitment::from_digest(Digest::from_bytes([0xAA; 32])),
++            padres: PadresDag::nuevo(BlockHash::from_digest(Digest::from_bytes([0xEE; 32])), &[])
++                .unwrap(),
++            sello: [0; 64],
++        }
++    }
++
++    fn bloque_post_de_prueba(slot: u64) -> BloqueDag {
++        let portador = PotCheckpoints::desde_outputs([[0; 16]; 8]);
++        let justificacion = JustificacionPot::nueva(vec![portador]).unwrap();
++        BloqueDag::nuevo(cabecera_post(slot), justificacion, Vec::new(), Vec::new()).unwrap()
++    }
++
++    fn nodo_de_prueba(dir: &std::path::Path) -> Nodo {
++        let cfg = Config {
++            dir_datos: dir.join("datos"),
++            ruta_registro: dir.join("registro.jsonl"),
++            red: Red::Dev,
++            semilla: 1,
++            indices_claves: vec![0],
++            n_dev: 16,
++            sr_dev: u64::MAX,
++            parada_tras_slots: Some(0),
++            dejar_de_producir_en_slot: None,
++        };
++        Nodo::arrancar(&cfg).expect("arranque limpio")
++    }
++
++    /// **Regresión de la decisión 3 extendida (`ORDEN-W06d5`).** La cola de `Pendiente` está
++    /// acotada a `TOPE_POST_PENDIENTES` (64): superarlo descarta el más viejo (FIFO), nunca crece
++    /// sin límite.
++    #[test]
++    fn la_cola_de_pendientes_esta_acotada_y_descarta_el_mas_viejo() {
++        let dir = tempfile::tempdir().expect("tempdir");
++        let mut nodo = nodo_de_prueba(dir.path());
++
++        assert!(nodo.post_pendientes.is_empty());
++
++        // Encolar bastantes más que el tope: cada slot es distinto para poder identificar cuál
++        // sobrevive.
++        let total = super::TOPE_POST_PENDIENTES * 2;
++        for slot in 0..total {
++            nodo.encolar_post_pendiente(bloque_post_de_prueba(slot as u64));
++        }
++
++        assert_eq!(
++            nodo.post_pendientes.len(),
++            super::TOPE_POST_PENDIENTES,
++            "la cola nunca debe superar el tope declarado"
++        );
++        // FIFO: sobreviven los `TOPE_POST_PENDIENTES` últimos, no los primeros.
++        let primero_que_sobrevive = nodo.post_pendientes.front().expect("no vacía");
++        assert_eq!(
++            primero_que_sobrevive.cabecera.slot,
++            (total - super::TOPE_POST_PENDIENTES) as u64,
++            "el más viejo de los que sobreviven es exactamente el primero no descartado"
+         );
++        let ultimo = nodo.post_pendientes.back().expect("no vacía");
++        assert_eq!(ultimo.cabecera.slot, (total - 1) as u64);
+     }
+ }
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/rechazo.rs ws/crates/zx-node/src/rechazo.rs
+--- ws.orig/crates/zx-node/src/rechazo.rs	2026-09-27 00:37:31.722244018 +0200
++++ ws/crates/zx-node/src/rechazo.rs	2026-09-27 01:41:32.267387987 +0200
+@@ -22,6 +22,16 @@
+ //!   imposible (forma, firma, cuenta o estructura que el nodo construyó por completo desde su
+ //!   propio estado). Sigue siendo **fatal** para un bloque propio (decisión 4 de `ORDEN-W06d1`, sin
+ //!   cambios); para un bloque de red, penaliza igual que `Legitimo`.
++//! - **ImposibleSinPenalizar** (`ORDEN-W06d6`, RI-3c H2): `MotivoCabeceraPendiente::PruebaPotIncoherente`
++//!   y `MotivoCabeceraPendiente::RangoSinAtadura` documentan, en el propio contrato del tipo
++//!   (`zx_post::cabecera_conjunta`), que **no deberían ocurrir por construcción** —a diferencia del
++//!   resto de `Pendiente`, que sí es carencia de contexto local genuina (`Pot(PasadoIncompleto)` en
++//!   un nodo que sincroniza fuera de orden). Si ocurren de verdad, no tiene sentido reintentar (el
++//!   hueco no se va a llenar solo, no es un problema de orden de llegada) pero tampoco hay certeza
++//!   de que sea un defecto **del candidato**: puede ser un fallo de este nodo (una implementación
++//!   nuestra que rompe la garantía que el propio tipo declara). Fatal si es propio, igual que
++//!   `Interno`; si es de red, se rechaza (no se reintenta, no se acepta) pero **sin penalizar** al
++//!   remitente — es la diferencia con `Interno`.
+ //!
+ //! # Motivos legítimos y su justificación (`REVISION-W06d4.md`)
+ //!
+@@ -78,6 +88,12 @@
+     /// Violación de invariante interna: fatal si es propio (decisión 4 de `ORDEN-W06d1`, sin
+     /// cambios); penaliza igual que `Legitimo` si es de red.
+     Interno,
++    /// `ORDEN-W06d6`, RI-3c H2: comprobación marcada "imposible por construcción" en su propio
++    /// contrato que sin embargo ocurrió (`PruebaPotIncoherente`, `RangoSinAtadura`). Fatal si es
++    /// propio, igual que `Interno`; si es de red, se rechaza (`VeredictoFinal::Ignorar`: no se
++    /// reintenta, no se acepta) pero **sin penalizar** al remitente, porque no hay certeza de que
++    /// sea un defecto suyo y no nuestro.
++    ImposibleSinPenalizar,
+ }
+ 
+ impl ClasificacionRechazo {
+@@ -93,6 +109,15 @@
+     pub const fn es_pendiente(self) -> bool {
+         matches!(self, Self::Pendiente)
+     }
++
++    /// ¿Un bloque de red con esta clasificación debe **penalizar** al remitente si se descarta?
++    /// (`ORDEN-W06d6`, RI-3c H2). `Legitimo` e `Interno` sí (defecto verificable, atribuible al
++    /// candidato); `ImposibleSinPenalizar` no (podría ser un fallo nuestro); `Pendiente` nunca
++    /// llega a este punto (se reintenta, no se rechaza).
++    #[must_use]
++    pub const fn penaliza_en_red(self) -> bool {
++        matches!(self, Self::Legitimo | Self::Interno)
++    }
+ }
+ 
+ /// Clasifica un [`MotivoCabeceraInvalida`] (fallo **del candidato**, `verificar_cabecera_conjunta`).
+@@ -110,11 +135,17 @@
+     }
+ }
+ 
+-/// Toda [`MotivoCabeceraPendiente`] es `Pendiente` (nunca prueba de invalidez) por contrato del
+-/// propio tipo: ver el docstring del módulo.
++/// Casi toda [`MotivoCabeceraPendiente`] es `Pendiente` (nunca prueba de invalidez) por contrato
++/// del propio tipo: ver el docstring del módulo. Las dos excepciones (`ORDEN-W06d6`, RI-3c H2) son
++/// las que el propio tipo documenta como imposibles por construcción: si ocurren de verdad no son
++/// una carencia de contexto que se vaya a resolver reintentando.
+ #[must_use]
+-pub const fn clasificar_cabecera_pendiente(_m: &MotivoCabeceraPendiente) -> ClasificacionRechazo {
+-    ClasificacionRechazo::Pendiente
++pub const fn clasificar_cabecera_pendiente(m: &MotivoCabeceraPendiente) -> ClasificacionRechazo {
++    match m {
++        MotivoCabeceraPendiente::PruebaPotIncoherente
++        | MotivoCabeceraPendiente::RangoSinAtadura => ClasificacionRechazo::ImposibleSinPenalizar,
++        _ => ClasificacionRechazo::Pendiente,
++    }
+ }
+ 
+ /// Clasifica un [`MotivoBloque`] (`Cadena::admitir`).
+@@ -202,6 +233,35 @@
+         assert!(clasificar_cabecera_pendiente(&contexto_ausente).es_pendiente());
+     }
+ 
++    /// `ORDEN-W06d6`, RI-3c H2: `PruebaPotIncoherente` y `RangoSinAtadura` dejan de ser `Pendiente`
++    /// (el propio tipo las documenta como imposibles por construcción, no como carencia de
++    /// contexto): fatal si son propias (como `Interno`), y de red se rechazan sin penalizar.
++    #[test]
++    fn las_dos_imposibles_por_construccion_no_son_pendientes() {
++        for m in [
++            MotivoCabeceraPendiente::PruebaPotIncoherente,
++            MotivoCabeceraPendiente::RangoSinAtadura,
++        ] {
++            let c = clasificar_cabecera_pendiente(&m);
++            assert_eq!(c, ClasificacionRechazo::ImposibleSinPenalizar, "{m:?}");
++            assert!(!c.es_pendiente(), "{m:?}: no debe reintentarse");
++            assert!(!c.es_legitimo(), "{m:?}: fatal si es propia, como Interno");
++            assert!(
++                !c.penaliza_en_red(),
++                "{m:?}: no debe penalizar al remitente"
++            );
++        }
++    }
++
++    /// `penaliza_en_red`: solo `Legitimo` e `Interno` penalizan; `ImposibleSinPenalizar` no.
++    #[test]
++    fn solo_legitimo_e_interno_penalizan_en_red() {
++        assert!(ClasificacionRechazo::Legitimo.penaliza_en_red());
++        assert!(ClasificacionRechazo::Interno.penaliza_en_red());
++        assert!(!ClasificacionRechazo::ImposibleSinPenalizar.penaliza_en_red());
++        assert!(!ClasificacionRechazo::Pendiente.penaliza_en_red());
++    }
++
+     /// `Legitimo` (defecto verificable del candidato, no falta de contexto) no es `Pendiente`: la
+     /// distinción importa para un bloque de red (`Ignorar` sin penalizar frente a `Rechazar` con
+     /// penalización) aunque las dos sean no fatales para uno propio.
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/red/manejador.rs ws/crates/zx-node/src/red/manejador.rs
+--- ws.orig/crates/zx-node/src/red/manejador.rs	2026-09-26 14:08:45.173931208 +0200
++++ ws/crates/zx-node/src/red/manejador.rs	2026-09-27 01:41:32.268388007 +0200
+@@ -9,27 +9,25 @@
+ 
+ use std::sync::Arc;
+ 
+-use tokio::sync::mpsc::UnboundedSender;
+-
+ use zx_core::digest::BlockHash;
+ use zx_core::preimage::block::BlockHeader;
+ use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
+ use zx_p2p::mensaje::{BloqueRed, Estado};
+ 
+-use super::TrabajoRed;
+ use super::vista::VistaRed;
++use super::{EmisorTrabajoRed, ResultadoEnvioTrabajo, TrabajoRed};
+ 
+ /// El manejador. Barato de clonar (todo dentro es `Arc`/canal clonable), pero se comparte como
+ /// `Arc<ManejadorRed>` porque [`zx_p2p::servicio::arrancar_con`] lo exige.
+ pub struct ManejadorRed {
+-    trabajo: UnboundedSender<TrabajoRed>,
++    trabajo: EmisorTrabajoRed,
+     vista: Arc<VistaRed>,
+ }
+ 
+ impl ManejadorRed {
+     /// Construye el manejador con el canal hacia el hilo de consenso y la vista compartida.
+     #[must_use]
+-    pub const fn nuevo(trabajo: UnboundedSender<TrabajoRed>, vista: Arc<VistaRed>) -> Self {
++    pub const fn nuevo(trabajo: EmisorTrabajoRed, vista: Arc<VistaRed>) -> Self {
+         Self { trabajo, vista }
+     }
+ }
+@@ -40,20 +38,30 @@
+     }
+ 
+     fn bloque_difundido(&self, id: IdDiferido, bloque: &BloqueRed) -> Veredicto {
+-        if self
+-            .trabajo
+-            .send(TrabajoRed::BloqueDifundido {
+-                id,
+-                bloque: bloque.clone(),
+-            })
+-            .is_err()
+-        {
+-            // El hilo de consenso ya no existe: no hay a quién diferirle nada. No es un defecto del
+-            // par que lo propagó, así que `Ignorar` (nunca `Rechazar`) es la única lectura honesta.
+-            tracing::error!("hilo de consenso caído: bloque difundido descartado sin juzgar");
+-            return Veredicto::Ignorar;
++        // `ORDEN-W06d6` (RI-3a #3): cola acotada en elementos y en bytes. Si está llena, se
++        // descarta **sin bloquear la red** (nunca `send().await`) y se registra — un bloque
++        // honesto descartado así se recupera por la petición de padres o por la sincronización por
++        // registro (decisión 1), nunca queda perdido en silencio sin que nadie lo sepa.
++        match self.trabajo.intentar_enviar(TrabajoRed::BloqueDifundido {
++            id,
++            bloque: bloque.clone(),
++        }) {
++            ResultadoEnvioTrabajo::Encolado => Veredicto::Diferir,
++            ResultadoEnvioTrabajo::Lleno(_) => {
++                tracing::warn!(
++                    "cola de trabajo hacia el hilo de consenso llena: bloque difundido descartado \
++                     sin juzgar (límite alcanzado, RI-3a #3)"
++                );
++                Veredicto::Ignorar
++            }
++            ResultadoEnvioTrabajo::Cerrado(_) => {
++                // El hilo de consenso ya no existe: no hay a quién diferirle nada. No es un
++                // defecto del par que lo propagó, así que `Ignorar` (nunca `Rechazar`) es la única
++                // lectura honesta.
++                tracing::error!("hilo de consenso caído: bloque difundido descartado sin juzgar");
++                Veredicto::Ignorar
++            }
+         }
+-        Veredicto::Diferir
+     }
+ 
+     fn tx_difundida(&self, _tx_serializada: &[u8]) -> Veredicto {
+@@ -68,6 +76,14 @@
+     fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed> {
+         self.vista.bloques_por_hash(hashes)
+     }
++
++    fn pagina_registro(&self, desde: u64) -> (Vec<BloqueRed>, u64) {
++        self.vista.pagina_registro(
++            desde,
++            zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA,
++            zx_p2p::limites::MAX_RESPUESTA_BYTES,
++        )
++    }
+ }
+ 
+ #[cfg(test)]
+@@ -108,6 +124,7 @@
+             terminal: None,
+             puntas_post: Vec::new(),
+             blue_work_virtual: [0; 32],
++            longitud_registro: 0,
+         }
+     }
+ 
+@@ -147,7 +164,7 @@
+ 
+     #[test]
+     fn bloque_difundido_siempre_difiere_y_encola() {
+-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++        let (tx, mut rx) = super::super::nueva_cola_trabajo_red();
+         let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
+ 
+         let v = m.bloque_difundido(IdDiferido::default(), &bloque_pow(1));
+@@ -165,7 +182,7 @@
+ 
+     #[test]
+     fn sin_hilo_de_consenso_se_ignora_sin_penalizar() {
+-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
++        let (tx, rx) = super::super::nueva_cola_trabajo_red();
+         drop(rx); // el hilo de consenso "murió": el canal está cerrado.
+         let m = ManejadorRed::nuevo(tx, Arc::new(VistaRed::nueva(estado_vacio())));
+         assert_eq!(
+@@ -176,7 +193,7 @@
+ 
+     #[test]
+     fn estado_y_lecturas_delegan_en_la_vista() {
+-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
++        let (tx, _rx) = super::super::nueva_cola_trabajo_red();
+         let vista = Arc::new(VistaRed::nueva(estado_vacio()));
+         let m = ManejadorRed::nuevo(tx, Arc::clone(&vista));
+         assert_eq!(m.estado(), estado_vacio());
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/red/mod.rs ws/crates/zx-node/src/red/mod.rs
+--- ws.orig/crates/zx-node/src/red/mod.rs	2026-09-26 14:08:45.173959498 +0200
++++ ws/crates/zx-node/src/red/mod.rs	2026-09-27 01:45:01.165463694 +0200
+@@ -12,6 +12,7 @@
+ pub mod vista;
+ 
+ use std::sync::Arc;
++use std::sync::atomic::{AtomicUsize, Ordering};
+ 
+ use zx_core::BlockHash;
+ use zx_p2p::entrante::IdDiferido;
+@@ -22,6 +23,7 @@
+ /// El manejador **nunca** valida nada: solo mete esto en la cola y devuelve
+ /// [`zx_p2p::entrante::Veredicto::Diferir`] de inmediato (decisión 1). El hilo de consenso decide,
+ /// a su ritmo, y responde con [`zx_p2p::servicio::ManejoRed::informar_validacion_bloqueante`].
++#[derive(Debug)]
+ pub enum TrabajoRed {
+     /// Un bloque llegó por difusión (gossipsub) y su veredicto está diferido con `id`.
+     BloqueDifundido {
+@@ -42,6 +44,128 @@
+     },
+ }
+ 
++impl TrabajoRed {
++    /// El bloque que lleva dentro, sea cual sea la variante (para estimar su tamaño, RI-3a #3).
++    const fn bloque(&self) -> &BloqueRed {
++        match self {
++            Self::BloqueDifundido { bloque, .. } | Self::BloqueDeSincronizacion { bloque, .. } => {
++                bloque
++            }
++        }
++    }
++
++    /// Tamaño estimado en bytes de este trabajo, para el tope agregado
++    /// [`MAX_TRABAJO_RED_BYTES`]. No es el tamaño exacto en memoria (eso incluiría la asignación de
++    /// `Vec`s internos con su capacidad, no solo su longitud), pero es el mismo orden de magnitud
++    /// que ya usa `zx-p2p` para acotar el presupuesto de red (`zx_p2p::codec::bloque_a_bytes`), y
++    /// **nunca** subestima: el códec serializa exactamente lo que ocuparía en el wire.
++    fn tamano_estimado(&self) -> usize {
++        zx_p2p::codec::bloque_a_bytes(self.bloque()).len()
++    }
++}
++
++/// Cuántos elementos puede tener [`TrabajoRed`] en cola hacia el hilo de consenso (RI-3a #3,
++/// `REVISION-RI-3a.md` hallazgo 3).
++///
++/// Antes era un `unbounded_channel`: 40 960 bloques de gossipsub —cada uno solo pasado por el
++/// parseo del códec, sin PoW/PoAS/PoT válidos exigidos todavía— se encolaban en 16,7 ms sin que
++/// nada los rechazara, mientras nadie leyera del otro extremo (confirmado,
++/// `resultados-RI-3a/ri3a_cola_trabajo_sin_tope.rs`). Con tope, lo nuevo se descarta sin bloquear
++/// la red: un bloque honesto descartado se recupera por la petición de padres o por la
++/// sincronización por registro (decisión 1 de esta orden), nunca se pierde en silencio para
++/// siempre.
++pub const MAX_TRABAJO_RED: usize = 1_024;
++
++/// Cuántos bytes (estimados, ver [`TrabajoRed::tamano_estimado`]) puede tener [`TrabajoRed`] en
++/// cola a la vez, adicional al tope de elementos: un atacante podría intentar llenar la cola con
++/// pocos elementos pero enormes (hasta `MAX_BLOQUE_RED_BYTES` cada uno) para agotar memoria sin
++/// llegar al tope de 1 024.
++pub const MAX_TRABAJO_RED_BYTES: usize = 256 * 1024 * 1024;
++
++/// El lado que **encola** [`TrabajoRed`] hacia el hilo de consenso, acotado en elementos y en
++/// bytes. Clonable: lo comparten [`manejador::ManejadorRed`] (bloques difundidos) y
++/// [`sync::tarea_sincronizacion`] (bloques de sincronización).
++#[derive(Clone)]
++pub struct EmisorTrabajoRed {
++    tx: tokio::sync::mpsc::Sender<TrabajoRed>,
++    bytes_en_cola: Arc<AtomicUsize>,
++}
++
++/// Lo que puede pasar al intentar encolar un [`TrabajoRed`] (RI-3a #3).
++#[derive(Debug)]
++pub enum ResultadoEnvioTrabajo {
++    /// Se encoló con normalidad.
++    Encolado,
++    /// El tope (de elementos o de bytes) está lleno: se descartó **sin bloquear**. No es que el
++    /// hilo de consenso haya muerto — solo va más lento que la llegada; quien llama decide si
++    /// registrarlo, nunca se tira en silencio.
++    Lleno(TrabajoRed),
++    /// El receptor ya no existe (el hilo de consenso terminó): no hay a quién entregarle nada más.
++    Cerrado(TrabajoRed),
++}
++
++impl EmisorTrabajoRed {
++    /// Intenta encolar `trabajo`. **Nunca bloquea** (`try_send`, no `send().await`).
++    pub fn intentar_enviar(&self, trabajo: TrabajoRed) -> ResultadoEnvioTrabajo {
++        let tamano = trabajo.tamano_estimado();
++        // `fetch_update` compara-e-intercambia: dos productores concurrentes no pueden pasarse los
++        // dos del tope agregado (mismo patrón que `zx_p2p::presupuesto::Presupuesto`).
++        let admitido = self
++            .bytes_en_cola
++            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |actual| {
++                let nuevo = actual.checked_add(tamano)?;
++                (nuevo <= MAX_TRABAJO_RED_BYTES).then_some(nuevo)
++            })
++            .is_ok();
++        if !admitido {
++            return ResultadoEnvioTrabajo::Lleno(trabajo);
++        }
++        match self.tx.try_send(trabajo) {
++            Ok(()) => ResultadoEnvioTrabajo::Encolado,
++            Err(tokio::sync::mpsc::error::TrySendError::Full(t)) => {
++                // No cupo por elementos: deshacer la reserva de bytes que sí se concedió.
++                self.bytes_en_cola.fetch_sub(tamano, Ordering::AcqRel);
++                ResultadoEnvioTrabajo::Lleno(t)
++            }
++            Err(tokio::sync::mpsc::error::TrySendError::Closed(t)) => {
++                self.bytes_en_cola.fetch_sub(tamano, Ordering::AcqRel);
++                ResultadoEnvioTrabajo::Cerrado(t)
++            }
++        }
++    }
++}
++
++/// El lado que **drena** [`TrabajoRed`] en el hilo de consenso (síncrono, D-N07): envuelve el
++/// receptor bloqueante y libera de `bytes_en_cola` lo que cada elemento reservó al encolarse.
++pub struct ReceptorTrabajoRed {
++    rx: tokio::sync::mpsc::Receiver<TrabajoRed>,
++    bytes_en_cola: Arc<AtomicUsize>,
++}
++
++impl ReceptorTrabajoRed {
++    /// Igual que `Receiver::try_recv`: no bloquea. Libera el tamaño estimado del elemento devuelto.
++    pub fn try_recv(&mut self) -> Result<TrabajoRed, tokio::sync::mpsc::error::TryRecvError> {
++        let trabajo = self.rx.try_recv()?;
++        self.bytes_en_cola
++            .fetch_sub(trabajo.tamano_estimado(), Ordering::AcqRel);
++        Ok(trabajo)
++    }
++}
++
++/// Construye el par (emisor, receptor) acotado de [`TrabajoRed`] (RI-3a #3).
++#[must_use]
++pub fn nueva_cola_trabajo_red() -> (EmisorTrabajoRed, ReceptorTrabajoRed) {
++    let (tx, rx) = tokio::sync::mpsc::channel(MAX_TRABAJO_RED);
++    let bytes_en_cola = Arc::new(AtomicUsize::new(0));
++    (
++        EmisorTrabajoRed {
++            tx,
++            bytes_en_cola: Arc::clone(&bytes_en_cola),
++        },
++        ReceptorTrabajoRed { rx, bytes_en_cola },
++    )
++}
++
+ /// Un límite de recursión declarado para el recorrido hacia atrás del DAG (decisión 3 y 4): cuántos
+ /// saltos de "pide al padre que falta" se permiten antes de darse por vencido con esa rama. Evita
+ /// una cascada sin fin si un par miente sobre una cadena de padres arbitrariamente larga.
+@@ -56,6 +180,13 @@
+ /// Cuántos huérfanos puede tener el depósito esperando al **mismo** padre.
+ pub const MAX_HUERFANOS_POR_PADRE: usize = 64;
+ 
++/// `ORDEN-W06d6` decisión 1: mientras el cursor de sincronización esté a más de esto (en bloques)
++/// de la `longitud_registro` de algún par, un bloque PoST de **gossip** cuyo padre falte se
++/// descarta en vez de depositarse como huérfano (llegará por el registro). Es la vía **principal**
++/// de puesta al día; la resolución por padres se queda para los huecos pequeños, por debajo de este
++/// umbral.
++pub const UMBRAL_SINCRONIZANDO: u64 = 64;
++
+ /// Construye el depósito de huérfanos con los topes de producción declarados arriba.
+ #[must_use]
+ pub fn nuevo_deposito_huerfanos() -> huerfanos::DepositoHuerfanos {
+@@ -145,7 +276,7 @@
+     /// Para `Nodo::conectar_red`.
+     pub manija: ManijaRed,
+     /// Para `Nodo::conectar_red`.
+-    pub trabajo: tokio::sync::mpsc::UnboundedReceiver<TrabajoRed>,
++    pub trabajo: ReceptorTrabajoRed,
+ }
+ 
+ /// Construye el transporte TCP real (decisión 8 de la orden: `127.0.0.1` en pruebas, cualquier
+@@ -200,7 +331,7 @@
+     };
+     let swarm = construir_swarm()?;
+ 
+-    let (tx_trabajo, rx_trabajo) = tokio::sync::mpsc::unbounded_channel();
++    let (tx_trabajo, rx_trabajo) = nueva_cola_trabajo_red();
+     let manejador = Arc::new(manejador::ManejadorRed::nuevo(
+         tx_trabajo.clone(),
+         Arc::clone(&vista),
+@@ -225,6 +356,18 @@
+         if let Err(e) = runtime.block_on(manejo.marcar(addr.clone())) {
+             tracing::warn!(%addr, %e, "no se pudo marcar la dirección al arrancar");
+         }
++        // `ORDEN-W06d6` decisión 2: el primer intento de arriba puede no bastar (el par todavía no
++        // escucha: reproducido en vivo, `REVISION-W06d5.md` reserva 2 — "un intento de V4 minó en
++        // tres cadenas aisladas sin fijar nunca el terminal"). `Swarm::dial` en sí mismo solo falla
++        // localmente (dirección inválida, ya marcando); un rechazo de conexión real (TCP `connection
++        // refused` porque el otro extremo aún no escucha) ocurre más tarde, de forma asíncrona, y
++        // hoy no se refleja en ningún `EventoRed`. En vez de intentar distinguir ese caso, se
++        // reintenta este `marcar` **sin fin**, con espera creciente (1, 2, 4… hasta 30 s): si ya
++        // hay conexión, es un `dial` de más que la propia libp2p descarta sin coste real en esta
++        // red dev de unos pocos nodos.
++        let manejo_reintento = manejo.clone();
++        let addr_reintento = addr.clone();
++        runtime.spawn(reintentar_marcar(manejo_reintento, addr_reintento));
+     }
+ 
+     Ok(RedArrancada {
+@@ -237,3 +380,24 @@
+         trabajo: rx_trabajo,
+     })
+ }
++
++/// Espera inicial del reintento de dial (`ORDEN-W06d6` decisión 2).
++const REINTENTO_DIAL_INICIAL: std::time::Duration = std::time::Duration::from_secs(1);
++
++/// Techo de la espera creciente del reintento de dial.
++const REINTENTO_DIAL_MAXIMO: std::time::Duration = std::time::Duration::from_secs(30);
++
++/// Reintenta `manejo.marcar(addr)` con espera creciente (1, 2, 4… hasta
++/// [`REINTENTO_DIAL_MAXIMO`]), **sin fin** (`ORDEN-W06d6` decisión 2). Vive en su propia tarea del
++/// runtime `tokio` (`RedArrancada::runtime` la mantiene viva); termina sola si el runtime entero se
++/// suelta.
++async fn reintentar_marcar(manejo: zx_p2p::servicio::ManejoRed, addr: libp2p::Multiaddr) {
++    let mut espera = REINTENTO_DIAL_INICIAL;
++    loop {
++        tokio::time::sleep(espera).await;
++        if let Err(e) = manejo.marcar(addr.clone()).await {
++            tracing::debug!(%addr, %e, "reintento de dial fallido, se sigue intentando");
++        }
++        espera = espera.saturating_mul(2).min(REINTENTO_DIAL_MAXIMO);
++    }
++}
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/red/sync.rs ws/crates/zx-node/src/red/sync.rs
+--- ws.orig/crates/zx-node/src/red/sync.rs	2026-09-26 19:04:09.186421117 +0200
++++ ws/crates/zx-node/src/red/sync.rs	2026-09-27 01:41:32.270388049 +0200
+@@ -20,7 +20,7 @@
+ //! puntas del par" que pide la decisión 4. El límite de saltos
+ //! ([`super::LIMITE_SALTOS_RECORRIDO_ATRAS`]) lo aplica el hilo de consenso, no esta tarea.
+ 
+-use std::collections::HashMap;
++use std::collections::{HashMap, VecDeque};
+ use std::sync::Arc;
+ use std::time::Duration;
+ 
+@@ -29,11 +29,11 @@
+ use tokio::time::{self, MissedTickBehavior};
+ 
+ use zx_p2p::error::MotivoDesconexion;
+-use zx_p2p::mensaje::{Peticion, Respuesta};
++use zx_p2p::mensaje::{BloqueRed, Peticion, Respuesta};
+ use zx_p2p::servicio::{EventoRed, ManejoRed};
+ 
+-use super::TrabajoRed;
+ use super::vista::VistaRed;
++use super::{EmisorTrabajoRed, ResultadoEnvioTrabajo, TrabajoRed};
+ 
+ /// Cuántos hashes se piden a la vez en una `Peticion::Bloques` de sincronización (el tope del
+ /// protocolo, no un valor propio: pedir más de golpe es un `Excedido` seguro).
+@@ -53,9 +53,30 @@
+ const PLAZO_REINTENTO_SALUDO: Duration = Duration::from_secs(5);
+ 
+ /// Qué sabemos de un par para no repetirle la misma petición sin sentido.
++///
++/// `ORDEN-W06d6` decisión 1: `cursor`, `longitud_conocida`, `pagina_en_vuelo` y `pendientes` son la
++/// sincronización por páginas del registro de admisión — la vía **principal** de puesta al día
++/// (la resolución por padres, ya existente, se queda para los huecos pequeños). Un valor `Default`
++/// nuevo (`cursor = 0`) es exactamente "empieza en 0 al conectar": `PeerDesconectado` quita la
++/// entrada entera del mapa, así que una reconexión siempre arranca con un `EstadoPeer` fresco —
++/// tras cada reconexión se vuelve a transferir el registro entero del par (límite declarado,
++/// coste lineal en la historia; aceptable en la red dev, como E-10).
+ #[derive(Default)]
+ struct EstadoPeer {
+     saludo_pedido: bool,
++    /// Siguiente índice del registro de admisión de este par que todavía no hemos encolado.
++    cursor: u64,
++    /// Mayor `longitud_registro` que este par ha declarado (saludo o `Respuesta::Registro`).
++    longitud_conocida: u64,
++    /// ¿Hay una `Peticion::Registro` de este par sin responder todavía? **Una página en vuelo por
++    /// par**: no se pide la siguiente mientras esta sea `true`.
++    pagina_en_vuelo: bool,
++    /// Bloques de la última página que todavía no se han podido encolar hacia el hilo de consenso
++    /// (cola llena, RI-3a #3): se reintentan en cada barrido periódico, en el mismo orden, antes de
++    /// pedir la página siguiente. Esto es la **contrapresión real** de la decisión 1: la siguiente
++    /// página se pide cuando el hilo de consenso ha hecho sitio para la anterior (la cola acotada
++    /// lo señala con `Lleno`), no en un temporizador fijo.
++    pendientes: VecDeque<BloqueRed>,
+ }
+ 
+ /// Corre para siempre (hasta que el canal de eventos se cierra): la tarea de sincronización.
+@@ -63,7 +84,7 @@
+     mut eventos: mpsc::Receiver<EventoRed>,
+     manejo: ManejoRed,
+     vista: Arc<VistaRed>,
+-    trabajo: mpsc::UnboundedSender<TrabajoRed>,
++    trabajo: EmisorTrabajoRed,
+ ) {
+     let mut peers: HashMap<PeerId, EstadoPeer> = HashMap::new();
+     let mut reintento = time::interval(PLAZO_REINTENTO_SALUDO);
+@@ -87,9 +108,18 @@
+                     }
+                     EventoRed::PeticionFallida { peer } => {
+                         tracing::debug!(%peer, "una petición de sincronización no llegó a completarse");
++                        // Pudo ser la `Peticion::Registro` en vuelo: sin esto, `pagina_en_vuelo`
++                        // se quedaría en `true` para siempre y este par dejaría de sincronizar por
++                        // registro hasta la próxima reconexión.
++                        if let Some(e) = peers.get_mut(&peer) {
++                            e.pagina_en_vuelo = false;
++                        }
++                        pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
+                     }
+                     EventoRed::Respuesta { peer, respuesta, .. } => {
+                         atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await;
++                        drenar_pendientes(peer, &mut peers, &trabajo);
++                        pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
+                     }
+                     EventoRed::Escuchando(_) | EventoRed::Suscripcion { .. } => {}
+                 }
+@@ -99,16 +129,90 @@
+                     if manejo.pedir(peer, Peticion::Estado).await.is_err() {
+                         tracing::debug!(%peer, "no se pudo repetir el saludo periódico");
+                     }
++                    // `ORDEN-W06d6` decisión 1: reintenta encolar lo que se quedó atascado por la
++                    // cola llena, y si ya está todo encolado y toca, pide la siguiente página.
++                    drenar_pendientes(peer, &mut peers, &trabajo);
++                    pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
+                 }
+             }
+         }
+     }
+ }
+ 
++/// Reintenta encolar hacia el hilo de consenso lo que quedó pendiente de la última página de este
++/// par (RI-3a #3: la cola puede estar llena). Avanza `cursor` por cada bloque que sí se encola;
++/// para en el primero que no quepa (se reintenta en el próximo barrido, en el mismo orden).
++fn drenar_pendientes(
++    peer: PeerId,
++    peers: &mut HashMap<PeerId, EstadoPeer>,
++    trabajo: &EmisorTrabajoRed,
++) {
++    let Some(e) = peers.get_mut(&peer) else {
++        return;
++    };
++    while let Some(bloque) = e.pendientes.pop_front() {
++        match trabajo.intentar_enviar(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque }) {
++            ResultadoEnvioTrabajo::Encolado => {
++                e.cursor = e.cursor.saturating_add(1);
++            }
++            ResultadoEnvioTrabajo::Lleno(TrabajoRed::BloqueDeSincronizacion { bloque, .. }) => {
++                // Todavía llena: se devuelve al frente y se para — ni este ni los que le siguen se
++                // reordenan (el registro es un orden causal, RI-3a #3 exige no bloquear la red,
++                // así que simplemente no se sigue intentando esta vuelta).
++                e.pendientes.push_front(bloque);
++                break;
++            }
++            ResultadoEnvioTrabajo::Lleno(TrabajoRed::BloqueDifundido { .. }) => {
++                // No debería ocurrir (este bucle solo encola `BloqueDeSincronizacion`): se registra
++                // y se sigue, en vez de entrar en pánico por una variante que no se puede dar.
++                tracing::error!(
++                    "drenar_pendientes: intentar_enviar devolvió una variante inesperada"
++                );
++                break;
++            }
++            ResultadoEnvioTrabajo::Cerrado(_) => {
++                // El hilo de consenso ya no existe: nada más que hacer con esta página. El bucle
++                // principal lo descubrirá pronto por su cuenta (el canal de eventos también se
++                // cerrará cuando el nodo entero termine).
++                e.pendientes.clear();
++                break;
++            }
++        }
++    }
++}
++
++/// Pide la siguiente página del registro de admisión de `peer` si: no hay ya una en vuelo, no
++/// quedan bloques pendientes de encolar de la anterior (la contrapresión de la decisión 1), y el
++/// cursor todavía no alcanzó la longitud que ese par declaró.
++async fn pedir_pagina_si_toca(
++    peer: PeerId,
++    peers: &mut HashMap<PeerId, EstadoPeer>,
++    manejo: &ManejoRed,
++) {
++    let Some(e) = peers.get_mut(&peer) else {
++        return;
++    };
++    if e.pagina_en_vuelo || !e.pendientes.is_empty() || e.cursor >= e.longitud_conocida {
++        return;
++    }
++    e.pagina_en_vuelo = true;
++    let desde = e.cursor;
++    if manejo
++        .pedir(peer, Peticion::Registro { desde })
++        .await
++        .is_err()
++    {
++        tracing::debug!(%peer, desde, "no se pudo pedir una página del registro de admisión");
++        if let Some(e) = peers.get_mut(&peer) {
++            e.pagina_en_vuelo = false;
++        }
++    }
++}
++
+ async fn atender_respuesta(
+     manejo: &ManejoRed,
+     vista: &VistaRed,
+-    trabajo: &mpsc::UnboundedSender<TrabajoRed>,
++    trabajo: &EmisorTrabajoRed,
+     peers: &mut HashMap<PeerId, EstadoPeer>,
+     peer: PeerId,
+     respuesta: Respuesta,
+@@ -126,7 +230,11 @@
+             }
+             if let Some(e) = peers.get_mut(&peer) {
+                 e.saludo_pedido = true;
++                // `ORDEN-W06d6` decisión 1: el saludo trae la longitud del registro del par; es lo
++                // que dispara la primera página (o una más, si el par avanzó desde la última vez).
++                e.longitud_conocida = e.longitud_conocida.max(otro.longitud_registro);
+             }
++            vista.actualizar_mejor_longitud_par(otro.longitud_registro);
+ 
+             // Fase PoW: pedimos cabeceras si el par declara más altura que nosotros, **o** si su
+             // punta declarada es un hash que no reconocemos todavía (aunque su altura sea igual o
+@@ -207,17 +315,54 @@
+         }
+         Respuesta::Bloques(bloques) => {
+             for bloque in bloques {
+-                if trabajo
+-                    .send(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque })
+-                    .is_err()
++                // `ORDEN-W06d6` (RI-3a #3): un tope lleno (sin bloquear la red) descarta y sigue —
++                // el bloque perdido se recupera por la propia sincronización (el cursor no avanza
++                // hasta que el hilo de consenso procese, decisión 1) o por la petición de padres.
++                // Solo el canal **cerrado** (hilo de consenso muerto) termina esta tarea.
++                match trabajo
++                    .intentar_enviar(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque })
+                 {
+-                    tracing::error!("hilo de consenso caído: bloque de sincronización descartado");
+-                    return;
++                    ResultadoEnvioTrabajo::Encolado => {}
++                    ResultadoEnvioTrabajo::Lleno(_) => {
++                        tracing::warn!(
++                            %peer,
++                            "cola de trabajo llena: bloque de sincronización descartado \
++                             (límite alcanzado, RI-3a #3)"
++                        );
++                    }
++                    ResultadoEnvioTrabajo::Cerrado(_) => {
++                        tracing::error!(
++                            "hilo de consenso caído: bloque de sincronización descartado"
++                        );
++                        return;
++                    }
+                 }
+             }
+         }
+         Respuesta::NoDisponible => {
+             // Legítimo (el par podó esa rama, o nunca la tuvo): no penaliza (C-NET-05).
+         }
++        Respuesta::Registro {
++            bloques, longitud, ..
++        } => {
++            // `ORDEN-W06d6` decisión 1: la página en vuelo terminó (haya traído algo o no). Se
++            // encola aquí mismo lo que se pueda (RI-3a #3 acota); lo que no quepa se guarda en
++            // `pendientes` y `drenar_pendientes`/`pedir_pagina_si_toca` (llamadas por el bucle
++            // principal justo después de esto) hacen el resto: reintentar y, cuando ya no quede
++            // nada pendiente, pedir la página siguiente.
++            vista.actualizar_mejor_longitud_par(longitud);
++            if let Some(e) = peers.get_mut(&peer) {
++                e.pagina_en_vuelo = false;
++                e.longitud_conocida = e.longitud_conocida.max(longitud);
++                if bloques.is_empty() {
++                    // El par no tenía nada nuevo en `desde` (p. ej. su propia `longitud` bajó de
++                    // estimación, o ya estábamos al día): no se avanza el cursor; se reintentará
++                    // cuando su `longitud_conocida` vuelva a subir (saludo periódico u otra
++                    // página).
++                } else {
++                    e.pendientes.extend(bloques);
++                }
++            }
++        }
+     }
+ }
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/red/vista.rs ws/crates/zx-node/src/red/vista.rs
+--- ws.orig/crates/zx-node/src/red/vista.rs	2026-09-26 19:04:09.186442646 +0200
++++ ws/crates/zx-node/src/red/vista.rs	2026-09-27 01:41:32.271388069 +0200
+@@ -10,7 +10,7 @@
+ //! instantánea protegida por `RwLock`, actualizada por el hilo de consenso cada vez que cambia algo
+ //! que el saludo o la sincronización necesitan, resuelve la lectura sin ida y vuelta.
+ 
+-use std::collections::BTreeMap;
++use std::collections::{BTreeMap, HashMap};
+ use std::sync::RwLock;
+ 
+ use zx_core::digest::BlockHash;
+@@ -23,11 +23,28 @@
+     cabeceras_pow: Vec<BlockHeader>,
+     cuerpos_pow: BTreeMap<BlockHash, BloqueRed>,
+     cuerpos_post: BTreeMap<BlockHash, BloqueRed>,
++    /// `ORDEN-W06d6` (RI-3a #4): hash → altura en `cabeceras_pow`, para que `cabeceras_desde` no
++    /// tenga que recorrer todo el historial por cada hash del locator (`REVISION-RI-3a.md`,
++    /// hallazgo 4). Se reconstruye entera cada vez que `fijar_cabeceras_pow` reemplaza el vector
++    /// (una reorganización): nunca queda una entrada apuntando a una altura que ya no es esa.
++    indice_altura: HashMap<BlockHash, usize>,
++    /// `ORDEN-W06d6` decisión 1: los hashes (PoW y PoST) **en el orden real en que este nodo los
++    /// admitió** — el mismo orden del registro de admisión de `zx-storage` (D-N03′), porque se
++    /// añade aquí en los mismos puntos donde el hilo de consenso ya llama a
++    /// `registrar_pow`/`registrar_post` tras `cadena.admitir` (nunca antes). Solo crece; sirve
++    /// `Peticion::Registro` (sincronización por páginas del registro de admisión).
++    registro_admision: Vec<BlockHash>,
+ }
+ 
+ /// La instantánea. Ver el docstring del módulo.
+ pub struct VistaRed {
+     interior: RwLock<Interior>,
++    /// `ORDEN-W06d6` decisión 1: la mayor `longitud_registro` que la tarea de sincronización ha
++    /// visto declarar a **cualquier** par conectado (saludo o `Respuesta::Registro`). Es un
++    /// `Atomic`, no parte de `Interior`: lo escribe la tarea async de sincronización y lo lee el
++    /// hilo de consenso (síncrono) para decidir si "estamos sincronizando" (`Self::sincronizando`),
++    /// sin tomar el `RwLock` completo por una sola comparación.
++    mejor_longitud_par: std::sync::atomic::AtomicU64,
+ }
+ 
+ impl VistaRed {
+@@ -35,15 +52,39 @@
+     #[must_use]
+     pub fn nueva(estado_inicial: Estado) -> Self {
+         Self {
++            mejor_longitud_par: std::sync::atomic::AtomicU64::new(0),
+             interior: RwLock::new(Interior {
+                 estado: estado_inicial,
+                 cabeceras_pow: Vec::new(),
+                 cuerpos_pow: BTreeMap::new(),
+                 cuerpos_post: BTreeMap::new(),
++                indice_altura: HashMap::new(),
++                registro_admision: Vec::new(),
+             }),
+         }
+     }
+ 
++    /// Registra el **génesis** PoW en la vista: `arranque_limpio` no pasa por
++    /// [`Self::registrar_pow`] (fija `cabeceras_pow` directamente con
++    /// [`Self::fijar_cabeceras_pow`] para no dejar un hueco de altura permanente en el primer
++    /// bloque real, `ORDEN-W06d3` hallazgo en vivo), así que sin esta llamada el cuerpo del génesis
++    /// nunca entraba en `cuerpos_pow` ni en el registro de admisión. `ORDEN-W06d6` la añade porque
++    /// el registro de admisión (decisión 1) tiene que empezar en el génesis, igual que el registro
++    /// real de `zx-storage`.
++    pub fn registrar_genesis_pow(&self, bloque: BloqueRed) {
++        let Ok(mut i) = self.interior.write() else {
++            return;
++        };
++        let BloqueRed::Pow { cabecera, .. } = &bloque else {
++            debug_assert!(false, "registrar_genesis_pow con un bloque que no es PoW");
++            return;
++        };
++        let hash = cabecera.block_hash();
++        i.indice_altura.insert(hash, 0);
++        i.registro_admision.push(hash);
++        i.cuerpos_pow.insert(hash, bloque);
++    }
++
+     /// El hilo de consenso reemplaza el saludo tras cada cambio de punta.
+     pub fn actualizar_estado(&self, estado: Estado) {
+         if let Ok(mut i) = self.interior.write() {
+@@ -65,6 +106,8 @@
+         let esperado = i.cabeceras_pow.len();
+         if altura as usize == esperado {
+             i.cabeceras_pow.push(*cabecera);
++            i.indice_altura.insert(cabecera.block_hash(), esperado);
++            i.registro_admision.push(cabecera.block_hash());
+         } else if (altura as usize) < esperado {
+             // Repetición al reiniciar (D-N03′): ya está, no se duplica.
+         } else {
+@@ -95,6 +138,13 @@
+         if let Ok(mut i) = self.interior.write() {
+             i.cabeceras_pow.clear();
+             i.cabeceras_pow.extend_from_slice(cabeceras);
++            // `ORDEN-W06d6` (RI-3a #4): el índice hash→altura se reconstruye entero junto con
++            // `cabeceras_pow` — nunca debe quedar una entrada que apunte a una altura que ya
++            // pertenece a otro bloque tras la reorganización.
++            i.indice_altura.clear();
++            for (altura, c) in cabeceras.iter().enumerate() {
++                i.indice_altura.insert(c.block_hash(), altura);
++            }
+         }
+     }
+ 
+@@ -102,6 +152,8 @@
+     pub fn registrar_post(&self, hash: BlockHash, bloque: BloqueRed) {
+         if let Ok(mut i) = self.interior.write() {
+             i.cuerpos_post.insert(hash, bloque);
++            // `ORDEN-W06d6` decisión 1: orden real de admisión (PoW y PoST juntos).
++            i.registro_admision.push(hash);
+         }
+     }
+ 
+@@ -117,6 +169,10 @@
+     /// Cabeceras PoW desde el primer hash del locator que reconozcamos, hasta `hasta` o hasta donde
+     /// tengamos. Vacío si no reconocemos nada del locator (respuesta legítima, ver
+     /// [`zx_p2p::entrante::ManejadorEntrante::cabeceras_desde`]).
++    ///
++    /// `ORDEN-W06d6` (RI-3a #4, `REVISION-RI-3a.md` hallazgo 4, bajo/plausible): antes recorría
++    /// `cabeceras_pow` entero por cada hash del locator (`O(locator × historia)`); ahora es un
++    /// `HashMap` que da la altura en O(1) por hash — `O(locator)` en total.
+     #[must_use]
+     pub fn cabeceras_desde(
+         &self,
+@@ -126,10 +182,7 @@
+         let Ok(i) = self.interior.read() else {
+             return Vec::new();
+         };
+-        let Some(inicio) = locator
+-            .iter()
+-            .find_map(|h| i.cabeceras_pow.iter().position(|c| c.block_hash() == *h))
+-        else {
++        let Some(inicio) = locator.iter().find_map(|h| i.indice_altura.get(h).copied()) else {
+             return Vec::new();
+         };
+         let mut salida = Vec::new();
+@@ -143,20 +196,36 @@
+     }
+ 
+     /// Los bloques completos (PoW o PoST) que tengamos de los pedidos, en el orden pedido.
++    ///
++    /// `ORDEN-W06d6` (RI-3a #1, `REVISION-RI-3a.md` hallazgo 1): los hashes se **deduplican y se
++    /// recortan a `MAX_BLOQUES_POR_RESPUESTA` antes de clonar nada**, no después. Antes, una
++    /// petición con el mismo hash repetido hasta `MAX_HASHES_POR_PETICION` (256) veces producía 256
++    /// clones completos del bloque —hasta `256 × MAX_BLOQUE_RED_BYTES`— y **luego** `zx-p2p`
++    /// recortaba a `MAX_BLOQUES_POR_RESPUESTA` (16): 240 de esos clones se tiraban sin usarse,
++    /// dentro del mismo hilo que pollea el `Swarm` (confirmado, `resultados-RI-3a/
++    /// ri3a_bloques_por_hash_duplicados.rs`). Deduplicar primero hace que el peor caso sea
++    /// exactamente `MAX_BLOQUES_POR_RESPUESTA` clones, nunca más, sin depender de que `zx-p2p`
++    /// recorte después.
+     #[must_use]
+     pub fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed> {
+         let Ok(i) = self.interior.read() else {
+             return Vec::new();
+         };
+-        hashes
+-            .iter()
+-            .filter_map(|h| {
+-                i.cuerpos_pow
+-                    .get(h)
+-                    .or_else(|| i.cuerpos_post.get(h))
+-                    .cloned()
+-            })
+-            .collect()
++        let mut vistos: Vec<BlockHash> = Vec::new();
++        let mut salida = Vec::new();
++        for h in hashes {
++            if vistos.contains(h) {
++                continue;
++            }
++            vistos.push(*h);
++            if let Some(bloque) = i.cuerpos_pow.get(h).or_else(|| i.cuerpos_post.get(h)) {
++                salida.push(bloque.clone());
++                if salida.len() >= zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA {
++                    break;
++                }
++            }
++        }
++        salida
+     }
+ 
+     /// ¿Tenemos ya el cuerpo de este hash (PoW o PoST), lo pidamos o no otra vez?
+@@ -167,6 +236,83 @@
+             .is_ok_and(|i| i.cuerpos_pow.contains_key(hash) || i.cuerpos_post.contains_key(hash))
+     }
+ 
++    /// Longitud actual del registro de admisión (`ORDEN-W06d6` decisión 1): para el `longitud` del
++    /// saludo y de `Respuesta::Registro`.
++    #[must_use]
++    pub fn longitud_registro(&self) -> u64 {
++        self.interior
++            .read()
++            .map(|i| i.registro_admision.len() as u64)
++            .unwrap_or(0)
++    }
++
++    /// La tarea de sincronización llama a esto cada vez que un par declara su `longitud_registro`
++    /// (saludo o `Respuesta::Registro`): mantiene el máximo visto hasta ahora (`ORDEN-W06d6`
++    /// decisión 1). Un par que se desconecta no baja el máximo: es una cota de "cuánto sabemos que
++    /// existe en la red", no "cuánto tiene el par actual".
++    pub fn actualizar_mejor_longitud_par(&self, longitud: u64) {
++        self.mejor_longitud_par
++            .fetch_max(longitud, std::sync::atomic::Ordering::AcqRel);
++    }
++
++    /// La mayor `longitud_registro` vista declarar a cualquier par hasta ahora.
++    #[must_use]
++    pub fn mejor_longitud_par(&self) -> u64 {
++        self.mejor_longitud_par
++            .load(std::sync::atomic::Ordering::Acquire)
++    }
++
++    /// ¿Este nodo va a más de [`super::UMBRAL_SINCRONIZANDO`] bloques por detrás del par más
++    /// avanzado que conoce (`ORDEN-W06d6` decisión 1)? Mientras sea `true`, los bloques PoST de
++    /// **gossip** (no los que trae la propia sincronización por registro) cuyo padre falte se
++    /// descartan en vez de ir al depósito de huérfanos: llegarán por el registro, y depositarlos
++    /// solo alimentaría una avalancha de huérfanos que la producción sigue adelantando (la causa
++    /// raíz de V5/V6(b) en `REVISION-W06d5.md`).
++    #[must_use]
++    pub fn sincronizando(&self) -> bool {
++        self.longitud_registro()
++            .saturating_add(super::UMBRAL_SINCRONIZANDO)
++            < self.mejor_longitud_par()
++    }
++
++    /// Una página del registro de admisión, empezando en el índice `desde` (`ORDEN-W06d6`
++    /// decisión 1): como mucho `max_bloques` bloques y `max_bytes` bytes totales (estimados por su
++    /// tamaño en el wire), en el orden real de admisión. Devuelve también la longitud **actual**
++    /// del registro (puede haber crecido desde que quien pregunta fijó el `longitud` que recuerda).
++    /// Siempre incluye al menos un bloque si `desde` está dentro de rango y hay presupuesto para
++    /// nada más: una página vacía por exceso de tamaño de un único bloque dejaría al que sincroniza
++    /// sin poder avanzar nunca.
++    #[must_use]
++    pub fn pagina_registro(
++        &self,
++        desde: u64,
++        max_bloques: usize,
++        max_bytes: u64,
++    ) -> (Vec<BloqueRed>, u64) {
++        let Ok(i) = self.interior.read() else {
++            return (Vec::new(), 0);
++        };
++        let longitud = i.registro_admision.len() as u64;
++        let inicio = usize::try_from(desde).unwrap_or(usize::MAX);
++        let mut salida = Vec::new();
++        let mut bytes_acumulados: u64 = 0;
++        for hash in i.registro_admision.iter().skip(inicio).take(max_bloques) {
++            let Some(bloque) = i.cuerpos_pow.get(hash).or_else(|| i.cuerpos_post.get(hash)) else {
++                // No debería ocurrir (registro y cuerpos se llenan en el mismo punto de código),
++                // pero un hueco aquí no debe tirar la página entera: se para donde se pueda seguir.
++                tracing::error!(%hash, "pagina_registro: hash del registro sin cuerpo en la vista");
++                break;
++            };
++            let tam = zx_p2p::codec::bloque_a_bytes(bloque).len() as u64;
++            if !salida.is_empty() && bytes_acumulados.saturating_add(tam) > max_bytes {
++                break;
++            }
++            salida.push(bloque.clone());
++            bytes_acumulados = bytes_acumulados.saturating_add(tam);
++        }
++        (salida, longitud)
++    }
++
+     /// Un *locator* al estilo Bitcoin: denso cerca de la punta, espaciado hacia atrás,
+     /// **siempre** termina en el génesis (`ORDEN-W06d2`, decisión 4). Sirve para pedirle a un par
+     /// `CabecerasPow` sin suponer que las dos cadenas coinciden más allá del primer hash que
+@@ -237,6 +383,7 @@
+             terminal: None,
+             puntas_post: Vec::new(),
+             blue_work_virtual: [0; 32],
++            longitud_registro: 0,
+         }
+     }
+ 
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/src/regimen.rs ws/crates/zx-node/src/regimen.rs
+--- ws.orig/crates/zx-node/src/regimen.rs	2026-09-27 00:37:31.722232588 +0200
++++ ws/crates/zx-node/src/regimen.rs	2026-09-27 01:51:29.977676751 +0200
+@@ -386,3 +386,78 @@
+         Ok(vec![self.0])
+     }
+ }
++
++/// `ORDEN-W06d6` decisión 5: test pendiente de `ORDEN-W06d5` decisión 2 (padres extra) —
++/// `filtrar_padres_extra_por_slot` es la función que la implementa; se probaba solo con ejecuciones
++/// reales (V6(b)), sin test unitario.
++#[cfg(test)]
++#[expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
++mod tests_filtrar_padres_extra {
++    use zx_core::digest::Digest;
++    use zx_core::{BlockHash, PadresDag};
++
++    use super::filtrar_padres_extra_por_slot;
++
++    fn h(n: u8) -> BlockHash {
++        BlockHash::from_digest(Digest::from_bytes([n; 32]))
++    }
++
++    /// Un padre extra cuyo slot **no** es anterior al objetivo (`>=`) se descarta; uno anterior se
++    /// conserva. El seleccionado nunca se toca aquí (lo descarta `producir_en_regimen` con gracia,
++    /// no este filtro).
++    #[test]
++    fn descarta_solo_los_extras_cuyo_slot_no_es_anterior_al_objetivo() {
++        let seleccionado = h(1);
++        let extra_valido = h(2); // slot 5 < 10: se conserva.
++        let extra_igual = h(3); // slot 10 == 10: se descarta (no es "anterior").
++        let extra_posterior = h(4); // slot 11 > 10: se descarta.
++
++        let padres =
++            PadresDag::nuevo(seleccionado, &[extra_valido, extra_igual, extra_posterior]).unwrap();
++        let info_padres = vec![
++            (seleccionado, 3), // el slot del seleccionado no importa a este filtro.
++            (extra_valido, 5),
++            (extra_igual, 10),
++            (extra_posterior, 11),
++        ];
++
++        let filtrados = filtrar_padres_extra_por_slot(padres, &info_padres, 10);
++
++        assert_eq!(
++            filtrados.seleccionado(),
++            seleccionado,
++            "el seleccionado no se toca"
++        );
++        assert_eq!(
++            filtrados.extras(),
++            &[extra_valido],
++            "solo sobrevive el extra con slot estrictamente anterior al objetivo"
++        );
++    }
++
++    /// Sin ningún extra que filtrar, la reconstrucción es un no-op.
++    #[test]
++    fn sin_extras_no_cambia_nada() {
++        let seleccionado = h(9);
++        let padres = PadresDag::nuevo(seleccionado, &[]).unwrap();
++        let filtrados = filtrar_padres_extra_por_slot(padres, &[(seleccionado, 1)], 100);
++        assert_eq!(filtrados.seleccionado(), seleccionado);
++        assert!(filtrados.extras().is_empty());
++    }
++
++    /// Todos los extras por debajo del objetivo: ninguno se descarta.
++    #[test]
++    fn todos_los_extras_anteriores_sobreviven() {
++        let seleccionado = h(1);
++        let e1 = h(2);
++        let e2 = h(3);
++        let padres = PadresDag::nuevo(seleccionado, &[e1, e2]).unwrap();
++        let info = vec![(seleccionado, 0), (e1, 1), (e2, 2)];
++        let filtrados = filtrar_padres_extra_por_slot(padres, &info, 100);
++        let mut extras = filtrados.extras().to_vec();
++        extras.sort();
++        let mut esperado = vec![e1, e2];
++        esperado.sort();
++        assert_eq!(extras, esperado);
++    }
++}
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/dial_reintento.rs ws/crates/zx-node/tests/dial_reintento.rs
+--- ws.orig/crates/zx-node/tests/dial_reintento.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/dial_reintento.rs	2026-09-27 01:44:11.536662520 +0200
+@@ -0,0 +1,161 @@
++//! `ORDEN-W06d6` decisión 2: el dial de arranque reintenta con espera creciente mientras el par
++//! todavía no escucha, en vez de rendirse tras un único intento.
++//!
++//! **Regresión**: sin el reintento (un solo `manejo.marcar` al arrancar, como en `ORDEN-W06d5` y
++//! antes), este test falla — el intento único ocurre antes de que el "servidor" empiece a escuchar,
++//! y nadie vuelve a intentarlo. Con el reintento (1, 2, 4… s), el dial que fallaba al principio
++//! acaba conectando cuando el servidor por fin escucha.
++
++#![expect(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    reason = "el test falla con panic por diseño"
++)]
++
++use std::sync::Arc;
++use std::sync::atomic::{AtomicU16, Ordering};
++use std::time::Duration;
++
++use libp2p::core::transport::Transport as _;
++use libp2p::{Swarm, identity, noise, tcp, yamux};
++use zx_core::digest::{BlockHash, Digest};
++use zx_core::red::Red;
++use zx_node::red::manejador::ManejadorRed;
++use zx_node::red::vista::VistaRed;
++use zx_p2p::behaviour::ZxBehaviour;
++use zx_p2p::config::ParametrosRed;
++use zx_p2p::mensaje::{Estado, Fase, PuntaPow};
++use zx_p2p::servicio::EventoRed;
++
++fn estado_vacio(n: u8) -> Estado {
++    Estado {
++        hash_genesis: BlockHash::from_digest(Digest::from_bytes([n; 32])),
++        red: Red::Dev,
++        fase: Fase::Pow,
++        punta_pow: PuntaPow {
++            hash: BlockHash::from_digest(Digest::from_bytes([n; 32])),
++            altura: 0,
++            trabajo_acumulado: [0; 32],
++        },
++        terminal: None,
++        puntas_post: Vec::new(),
++        blue_work_virtual: [0; 32],
++        longitud_registro: 0,
++    }
++}
++
++/// Rango de puertos propio (distinto del de `red_tcp.rs`) para no chocar si los binarios de test
++/// corren en paralelo.
++fn puerto() -> u16 {
++    static SIGUIENTE: AtomicU16 = AtomicU16::new(41_301);
++    SIGUIENTE.fetch_add(1, Ordering::Relaxed)
++}
++
++fn swarm_tcp() -> Swarm<ZxBehaviour> {
++    let clave = identity::Keypair::generate_ed25519();
++    let peer_id = clave.public().to_peer_id();
++    let transporte = tcp::tokio::Transport::new(tcp::Config::default())
++        .upgrade(libp2p::core::upgrade::Version::V1Lazy)
++        .authenticate(noise::Config::new(&clave).expect("noise"))
++        .multiplex(yamux::Config::default())
++        .boxed();
++    let behaviour = ZxBehaviour::nueva(
++        &clave,
++        ParametrosRed::dag_dev(),
++        zx_p2p::limites::LIMITE_BLOQUE_DEV,
++    )
++    .expect("behaviour");
++    Swarm::new(
++        transporte,
++        behaviour,
++        peer_id,
++        libp2p::swarm::Config::with_tokio_executor()
++            .with_idle_connection_timeout(Duration::from_secs(30)),
++    )
++}
++
++async fn esperar_conexion(
++    ev: &mut tokio::sync::mpsc::Receiver<EventoRed>,
++    plazo: Duration,
++) -> bool {
++    let limite = tokio::time::Instant::now() + plazo;
++    loop {
++        let resto = limite.saturating_duration_since(tokio::time::Instant::now());
++        if resto.is_zero() {
++            return false;
++        }
++        match tokio::time::timeout(resto, ev.recv()).await {
++            Ok(Some(EventoRed::PeerConectado(_))) => return true,
++            Ok(Some(_)) => {}
++            Ok(None) | Err(_) => return false,
++        }
++    }
++}
++
++/// Arranca un `Swarm` de juguete que **no** escucha todavía: el test decide cuándo llamar a
++/// `.escuchar(...)`, simulando el par que "todavía no escucha" de la decisión 2.
++fn arrancar_servidor_de_juguete() -> (
++    zx_p2p::servicio::ManejoRed,
++    tokio::sync::mpsc::Receiver<EventoRed>,
++    tokio::task::JoinHandle<()>,
++) {
++    let vista = Arc::new(VistaRed::nueva(estado_vacio(9)));
++    let (tx_trabajo, _rx_trabajo) = zx_node::red::nueva_cola_trabajo_red();
++    let manejador = Arc::new(ManejadorRed::nuevo(tx_trabajo, vista));
++    let piezas = zx_p2p::servicio::arrancar(swarm_tcp(), manejador);
++    let manejo = piezas.manejo;
++    let eventos = piezas.eventos;
++    let tarea = tokio::spawn(piezas.bucle.correr());
++    (manejo, eventos, tarea)
++}
++
++/// **Regresión de la decisión 2.** `zx_node::red::arrancar` (la ruta real de producción, con
++/// reintento) marca una dirección que todavía no escucha; el servidor empieza a escuchar 2,5 s
++/// después (más tarde que el intento único inicial, pero dentro de la ventana de los reintentos con
++/// espera creciente 1, 2, 4…). El servidor debe ver `PeerConectado` bastante antes de que se agoten
++/// los reintentos.
++#[tokio::test]
++async fn el_dial_reintenta_hasta_que_el_par_escucha() {
++    let addr: libp2p::Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", puerto()).parse().unwrap();
++
++    let (manejo_servidor, mut eventos_servidor, tarea_servidor) = arrancar_servidor_de_juguete();
++
++    // El nodo que marca: la ruta real de `zx_node::red::arrancar`, con el reintento de la decisión
++    // 2. Se arranca en un hilo aparte porque construye su propio runtime `tokio` multihilo
++    // (`Builder::new_multi_thread`) y lo bloquea brevemente al marcar por primera vez.
++    let vista_dial = Arc::new(VistaRed::nueva(estado_vacio(1)));
++    let addr_dial = addr.clone();
++    let hilo_dial = std::thread::spawn(move || {
++        zx_node::red::arrancar(None, vec![addr_dial], vista_dial).expect("arrancar (dial)")
++    });
++
++    // El servidor empieza a escuchar bastante después del intento único inicial (t=0), pero dentro
++    // de la ventana de reintentos (1, 2, 4 s...): sin reintento, este dial ya se dio por vencido.
++    tokio::time::sleep(Duration::from_millis(2_500)).await;
++    manejo_servidor
++        .escuchar(addr)
++        .await
++        .expect("el servidor escucha");
++
++    let conectado = esperar_conexion(&mut eventos_servidor, Duration::from_secs(15)).await;
++    assert!(
++        conectado,
++        "el servidor MUST ver una conexión: el dial de arranque MUST reintentar con espera \
++         creciente en vez de rendirse tras el primer intento (ORDEN-W06d6 decisión 2)"
++    );
++
++    tarea_servidor.abort();
++    // Unir el hilo y soltar el `RedArrancada` explícitamente: al soltarlo, su runtime `tokio` se
++    // apaga y cancela sus tareas (el reintento de dial incluido). Sin esto, el hilo seguiría vivo
++    // hasta que el binario de test entero terminara. Soltar un `Runtime` bloquea brevemente para
++    // apagarlo, y eso no está permitido dentro de un contexto async (este test lo es): se hace en
++    // un hilo bloqueante aparte.
++    tokio::task::spawn_blocking(move || {
++        let red_dial = hilo_dial
++            .join()
++            .expect("el hilo del dial no debe entrar en pánico");
++        drop(red_dial);
++    })
++    .await
++    .expect("cerrar el runtime del dial no debe entrar en pánico");
++}
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/integracion.rs ws/crates/zx-node/tests/integracion.rs
+--- ws.orig/crates/zx-node/tests/integracion.rs	2026-09-26 09:50:47.342149106 +0200
++++ ws/crates/zx-node/tests/integracion.rs	2026-09-27 01:36:29.562173618 +0200
+@@ -32,6 +32,7 @@
+         n_dev: N_DEV_TEST,
+         sr_dev: SR_DEV_TEST,
+         parada_tras_slots: Some(parada_tras_slots),
++        dejar_de_producir_en_slot: None,
+     }
+ }
+ 
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/red_no_dev.rs ws/crates/zx-node/tests/red_no_dev.rs
+--- ws.orig/crates/zx-node/tests/red_no_dev.rs	2026-09-26 09:50:47.342188695 +0200
++++ ws/crates/zx-node/tests/red_no_dev.rs	2026-09-27 01:36:23.445968632 +0200
+@@ -21,6 +21,7 @@
+         n_dev: 32,
+         sr_dev: u64::MAX,
+         parada_tras_slots: Some(1),
++        dejar_de_producir_en_slot: None,
+     }
+ }
+ 
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/red_tcp.rs ws/crates/zx-node/tests/red_tcp.rs
+--- ws.orig/crates/zx-node/tests/red_tcp.rs	2026-09-26 14:08:45.173981597 +0200
++++ ws/crates/zx-node/tests/red_tcp.rs	2026-09-27 01:33:09.080057594 +0200
+@@ -16,10 +16,8 @@
+ 
+ use libp2p::core::transport::Transport as _;
+ use libp2p::{Swarm, identity, noise, tcp, yamux};
+-use tokio::sync::mpsc::UnboundedReceiver;
+ use zx_core::digest::{BlockHash, Digest};
+ use zx_core::red::Red;
+-use zx_node::red::TrabajoRed;
+ use zx_node::red::manejador::ManejadorRed;
+ use zx_node::red::vista::VistaRed;
+ use zx_p2p::behaviour::ZxBehaviour;
+@@ -40,6 +38,7 @@
+         terminal: None,
+         puntas_post: Vec::new(),
+         blue_work_virtual: [0; 32],
++        longitud_registro: 0,
+     }
+ }
+ 
+@@ -80,10 +79,7 @@
+ 
+ fn arrancar_de_juguete() -> (NodoDeJuguete, tokio::task::JoinHandle<()>) {
+     let vista = Arc::new(VistaRed::nueva(estado_vacio(9)));
+-    let (tx_trabajo, _rx_trabajo): (
+-        tokio::sync::mpsc::UnboundedSender<TrabajoRed>,
+-        UnboundedReceiver<TrabajoRed>,
+-    ) = tokio::sync::mpsc::unbounded_channel();
++    let (tx_trabajo, _rx_trabajo) = zx_node::red::nueva_cola_trabajo_red();
+     let manejador = Arc::new(ManejadorRed::nuevo(tx_trabajo, vista));
+     let piezas = arrancar(swarm_tcp(), manejador);
+     let manejo = piezas.manejo;
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/registro_paginas.rs ws/crates/zx-node/tests/registro_paginas.rs
+--- ws.orig/crates/zx-node/tests/registro_paginas.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/registro_paginas.rs	2026-09-27 01:50:19.556228906 +0200
+@@ -0,0 +1,157 @@
++//! `ORDEN-W06d6` decisión 1: cobertura de `VistaRed::pagina_registro` (servida por
++//! `Peticion::Registro`/`Respuesta::Registro`) por tipo de resultado — tabla de cobertura de la
++//! orden: página llena, página corta, `desde` más allá del final.
++
++#![expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
++
++use std::sync::Arc;
++
++use zx_core::digest::{BlockHash, Digest, MerkleRoot};
++use zx_core::preimage::block::BlockHeader;
++use zx_core::red::Red;
++use zx_node::red::vista::VistaRed;
++use zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA;
++use zx_p2p::mensaje::{BloqueRed, Estado, Fase, PuntaPow};
++
++fn h(n: u32) -> BlockHash {
++    let mut b = [0u8; 32];
++    b[..4].copy_from_slice(&n.to_le_bytes());
++    BlockHash::from_digest(Digest::from_bytes(b))
++}
++
++fn estado_vacio() -> Estado {
++    Estado {
++        hash_genesis: h(0),
++        red: Red::Dev,
++        fase: Fase::Pow,
++        punta_pow: PuntaPow {
++            hash: h(0),
++            altura: 0,
++            trabajo_acumulado: [0; 32],
++        },
++        terminal: None,
++        puntas_post: Vec::new(),
++        blue_work_virtual: [0; 32],
++        longitud_registro: 0,
++    }
++}
++
++fn bloque(n: u32) -> BloqueRed {
++    BloqueRed::Pow {
++        cabecera: BlockHeader {
++            consensus_branch_id: 0xa8b4_66a7,
++            prev_hash: h(n),
++            merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x44; 32])),
++            timestamp: 1_000 + u64::from(n),
++            bits: 0x1c07_fff8,
++            nonce: u64::from(n),
++            height: n,
++        },
++        txs: Vec::new(),
++        testigos: Vec::new(),
++    }
++}
++
++/// Un registro de admisión con `n` bloques (alturas `0..n`), como si el génesis y `n - 1` bloques
++/// PoW más se hubieran admitido en orden.
++fn vista_con_registro(n: u32) -> Arc<VistaRed> {
++    let vista = Arc::new(VistaRed::nueva(estado_vacio()));
++    for i in 0..n {
++        vista.registrar_pow(i, bloque(i));
++    }
++    vista
++}
++
++/// **Página llena**: pedir desde el principio de un registro más largo que el tope devuelve
++/// exactamente `MAX_BLOQUES_POR_RESPUESTA` bloques, en orden, y la longitud real (mayor que la
++/// página).
++#[test]
++fn pagina_llena_se_recorta_a_max_bloques_por_respuesta() {
++    let total = (MAX_BLOQUES_POR_RESPUESTA * 3) as u32;
++    let vista = vista_con_registro(total);
++
++    let (pagina, longitud) = vista.pagina_registro(0, MAX_BLOQUES_POR_RESPUESTA, u64::MAX);
++    assert_eq!(
++        pagina.len(),
++        MAX_BLOQUES_POR_RESPUESTA,
++        "página llena: el tope de bloques"
++    );
++    assert_eq!(longitud, u64::from(total));
++    for (i, b) in pagina.iter().enumerate() {
++        let esperado = zx_node::red::hash_de(&bloque(i as u32));
++        assert_eq!(
++            zx_node::red::hash_de(b),
++            esperado,
++            "orden de admisión, índice {i}"
++        );
++    }
++}
++
++/// **Página corta**: pedir cerca del final de un registro más corto que el tope devuelve solo lo
++/// que queda, no rellena con nada.
++#[test]
++fn pagina_corta_devuelve_solo_lo_que_queda() {
++    let total = 5u32;
++    let vista = vista_con_registro(total);
++
++    let (pagina, longitud) = vista.pagina_registro(2, MAX_BLOQUES_POR_RESPUESTA, u64::MAX);
++    assert_eq!(
++        pagina.len(),
++        3,
++        "quedan 3 (índices 2, 3, 4) de un registro de 5"
++    );
++    assert_eq!(longitud, u64::from(total));
++    assert_eq!(
++        zx_node::red::hash_de(pagina.first().unwrap()),
++        zx_node::red::hash_de(&bloque(2))
++    );
++    assert_eq!(
++        zx_node::red::hash_de(pagina.last().unwrap()),
++        zx_node::red::hash_de(&bloque(4))
++    );
++}
++
++/// **`desde` más allá del final**: una página vacía, pero con la longitud real (para que quien
++/// sincroniza sepa que no hay nada nuevo todavía, no que el par no tenga registro).
++#[test]
++fn desde_mas_alla_del_final_da_pagina_vacia_con_la_longitud_real() {
++    let total = 5u32;
++    let vista = vista_con_registro(total);
++
++    let (pagina, longitud) = vista.pagina_registro(5, MAX_BLOQUES_POR_RESPUESTA, u64::MAX);
++    assert!(pagina.is_empty(), "nada más allá del final");
++    assert_eq!(longitud, u64::from(total));
++
++    let (pagina_lejos, longitud_lejos) =
++        vista.pagina_registro(1_000_000, MAX_BLOQUES_POR_RESPUESTA, u64::MAX);
++    assert!(pagina_lejos.is_empty());
++    assert_eq!(longitud_lejos, u64::from(total));
++}
++
++/// Un registro vacío (solo estado inicial, sin nada admitido) da longitud 0 y página vacía desde
++/// cualquier `desde`.
++#[test]
++fn registro_vacio_da_longitud_cero() {
++    let vista = Arc::new(VistaRed::nueva(estado_vacio()));
++    assert_eq!(vista.longitud_registro(), 0);
++    let (pagina, longitud) = vista.pagina_registro(0, MAX_BLOQUES_POR_RESPUESTA, u64::MAX);
++    assert!(pagina.is_empty());
++    assert_eq!(longitud, 0);
++}
++
++/// El tope de **bytes** también acota, aunque el de bloques no se alcance: al menos un bloque
++/// siempre entra (para no dejar al que sincroniza sin poder avanzar nunca).
++#[test]
++fn el_tope_de_bytes_acota_pero_deja_avanzar_al_menos_un_bloque() {
++    let vista = vista_con_registro(20);
++    let un_bloque_bytes = zx_p2p::codec::bloque_a_bytes(&bloque(0)).len() as u64;
++
++    // Presupuesto de bytes que solo permite un poco más de un bloque: debe devolver justo 1 o 2,
++    // nunca 0 y nunca el máximo de 16 (con 20 bloques disponibles).
++    let (pagina, _longitud) = vista.pagina_registro(0, MAX_BLOQUES_POR_RESPUESTA, un_bloque_bytes);
++    assert!(!pagina.is_empty(), "al menos un bloque siempre entra");
++    assert!(
++        pagina.len() < MAX_BLOQUES_POR_RESPUESTA,
++        "el tope de bytes MUST cortar antes del tope de bloques aquí"
++    );
++}
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/reinicio.rs ws/crates/zx-node/tests/reinicio.rs
+--- ws.orig/crates/zx-node/tests/reinicio.rs	2026-09-26 14:08:45.174006487 +0200
++++ ws/crates/zx-node/tests/reinicio.rs	2026-09-27 01:36:35.628797850 +0200
+@@ -67,6 +67,7 @@
+         n_dev: N_DEV_TEST.parse().expect("N_dev"),
+         sr_dev: SR_DEV_TEST.parse().expect("SR_dev"),
+         parada_tras_slots: Some(parada_tras_slots),
++        dejar_de_producir_en_slot: None,
+     }
+ }
+ 
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/ri3a_bloques_por_hash_duplicados.rs ws/crates/zx-node/tests/ri3a_bloques_por_hash_duplicados.rs
+--- ws.orig/crates/zx-node/tests/ri3a_bloques_por_hash_duplicados.rs	2026-09-27 01:49:20.007004589 +0200
++++ ws/crates/zx-node/tests/ri3a_bloques_por_hash_duplicados.rs	2026-09-27 01:48:33.005038242 +0200
+@@ -1,24 +1,17 @@
+-//! Reproducción RI-3a (revisor independiente de red, `ORDEN-RI-3.md`).
++//! Regresión RI-3a #1 (`ORDEN-W06d6` decisión 4; `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3a.md`
++//! hallazgo 1).
+ //!
+-//! Hallazgo: `VistaRed::bloques_por_hash` (crates/zx-node/src/red/vista.rs) no deduplica los hashes
+-//! pedidos, y `ManejadorRed::bloques_por_hash` (crates/zx-node/src/red/manejador.rs) los pasa tal
+-//! cual. Una `Peticion::Bloques` acepta hasta `zx_p2p::limites::MAX_HASHES_POR_PETICION` (256)
+-//! hashes, sin exigir que sean distintos (el códec de `zx-p2p` solo comprueba la **cuenta**, no la
+-//! unicidad: `codec.rs::leer_hashes`). El recorte a `MAX_BLOQUES_POR_RESPUESTA` (16) ocurre **después**
+-//! —en `zx_p2p::servicio::BucleRed::servir`, llamando a `recortar` sobre el vector ya construido—,
+-//! así que el manejador ya clonó el bloque completo tantas veces como hashes se pidieron.
++//! **Antes de corregir** (confirmado; el test original de reproducción, ejecutado tal cual contra
++//! la base en `deepseek/W06d6/logs/RI-3a-antes.log`, con las mismas aserciones que documentan el
++//! hallazgo): pedir el mismo hash repetido hasta `MAX_HASHES_POR_PETICION` (256) veces producía 256
++//! clones completos del bloque en `VistaRed::bloques_por_hash` — el recorte a
++//! `MAX_BLOQUES_POR_RESPUESTA` (16) ocurría **después**, en `zx-p2p::servicio::servir`, así que 240
++//! de esos 256 clones se tiraban sin usarse, dentro del mismo hilo que pollea el `Swarm`.
+ //!
+-//! Consecuencia: un par pide, en una única petición pequeña (unos 8 KiB: 256 hashes de 32 B), el
+-//! **mismo** hash de un bloque grande ya admitido 256 veces. El nodo clona ese bloque 256 veces
+-//! —hasta `256 × MAX_BLOQUE_RED_BYTES` en el peor caso— **antes** de descartar 240 de esas copias sin
+-//! usarlas. Esa construcción ocurre dentro de `servir()`, en el mismo hilo que pollea el `Swarm`
+-//! (`atender_swarm → atender_sync → servir`): mientras dura, la red entera deja de atenderse, no solo
+-//! el par que preguntó.
+-//!
+-//! Este test mide, con un bloque de tamaño moderado (para no gastar minutos), que pedir el mismo
+-//! hash `k` veces produce exactamente `k` clones completos del bloque, sin deduplicar — el trabajo
+-//! desperdiciado que después tira `recortar` en `zx-p2p`. `V-ZRX/LINEO.md`: sin Python; sin
+-//! aleatoriedad; medido con `Instant`, no con una suposición.
++//! **Después de corregir**: `VistaRed::bloques_por_hash` deduplica y recorta **antes** de clonar
++//! nada. El mismo hash repetido 256 veces da como mucho **un** clon.
++
++#![expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
+ 
+ use std::sync::Arc;
+ use std::time::Instant;
+@@ -53,6 +46,7 @@
+         terminal: None,
+         puntas_post: Vec::new(),
+         blue_work_virtual: [0; 32],
++        longitud_registro: 0,
+     }
+ }
+ 
+@@ -78,9 +72,8 @@
+     }
+ }
+ 
+-/// Un bloque PoW "grande" (miles de transacciones simples) para que clonarlo repetidamente sea
+-/// medible sin tener que llegar al máximo real de 2 MiB (que solo alargaría el test, no la
+-/// conclusión).
++/// Un bloque PoW "grande" (miles de transacciones simples), igual que el test original de
++/// reproducción: suficiente para que clonarlo de más sea medible sin llegar al máximo real de 2 MiB.
+ fn bloque_grande(n_txs: u32) -> BloqueRed {
+     let txs: Vec<Tx> = (0..n_txs).map(tx_simple).collect();
+     let testigos = vec![vec![vec![0xAAu8; 64]]; n_txs as usize];
+@@ -99,12 +92,10 @@
+     }
+ }
+ 
+-/// **CONFIRMADO.** Pedir el mismo hash repetido no se deduplica: `k` repeticiones producen `k`
+-/// clones completos del bloque, muy por encima de `MAX_BLOQUES_POR_RESPUESTA` (16), el único tope
+-/// que existe y que se aplica **después**, en `zx-p2p`.
++/// **Regresión.** `K` repeticiones del mismo hash ya no producen `K` clones: producen **uno**.
+ #[test]
+-fn pedir_el_mismo_hash_repetido_clona_el_bloque_una_vez_por_repeticion() {
+-    const N_TXS: u32 = 4_000; // unas pocas centenas de KB: suficiente para medir, barato de correr.
++fn pedir_el_mismo_hash_repetido_no_se_duplica_ni_se_clona_de_mas() {
++    const N_TXS: u32 = 4_000;
+     const K: usize = zx_p2p::limites::MAX_HASHES_POR_PETICION; // 256: el máximo que permite el códec.
+ 
+     let bloque = bloque_grande(N_TXS);
+@@ -115,12 +106,10 @@
+     vista.registrar_pow(0, bloque.clone());
+     let hash = zx_node::red::hash_de(&bloque);
+ 
+-    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
++    let (tx, _rx) = zx_node::red::nueva_cola_trabajo_red();
+     let m = ManejadorRed::nuevo(tx, Arc::clone(&vista));
+ 
+-    // Una única "petición" (como la validaría el códec: K <= MAX_HASHES_POR_PETICION) con el
+-    // MISMO hash repetido K veces. Nada en `codec.rs::leer_hashes` ni en `vista.rs` exige que sean
+-    // distintos.
++    // La misma petición que reproducía el hallazgo: el mismo hash repetido K veces.
+     let hashes_repetidos = vec![hash; K];
+ 
+     let inicio = Instant::now();
+@@ -129,32 +118,47 @@
+ 
+     assert_eq!(
+         respuesta.len(),
+-        K,
+-        "las {K} repeticiones del mismo hash producen {K} clones completos, sin deduplicar"
++        1,
++        "las {K} repeticiones del mismo hash deben deduplicarse a un solo bloque, no {K} clones"
+     );
+     let bytes_totales_clonados: usize = respuesta
+         .iter()
+         .map(|b| zx_p2p::codec::bloque_a_bytes(b).len())
+         .sum();
+-
+-    let max_respuesta_real = zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA; // 16: el único tope, y es POSTERIOR
+-    assert!(
+-        K > max_respuesta_real,
+-        "el ataque solo tiene sentido si se piden más copias de las que jamás se van a servir"
+-    );
+-
+     println!(
+-        "RI-3a: {K} hashes IDÉNTICOS -> {} clones completos ({bytes_totales_clonados} B en total) \
+-         en {transcurrido:?}, dentro del hilo que pollea el Swarm; \
+-         zx-p2p recorta a MAX_BLOQUES_POR_RESPUESTA = {max_respuesta_real} DESPUÉS de este trabajo, \
+-         no antes: {} de los {} clones se tiran sin usarse",
+-        respuesta.len(),
+-        K - max_respuesta_real,
+-        K
++        "RI-3a (corregido): {K} hashes idénticos -> {} clon(es) ({bytes_totales_clonados} B) en \
++         {transcurrido:?}: la deduplicación ocurre antes de clonar, no después",
++        respuesta.len()
+     );
+ 
+-    // El desperdicio es de orden MAX_HASHES_POR_PETICION / MAX_BLOQUES_POR_RESPUESTA: con los
+-    // valores de producción, 256 / 16 = 16x el trabajo que hacía falta, pagado por una petición
+-    // de ~8 KiB (256 hashes de 32 B) que cualquier par puede mandar sin coste.
+-    assert_eq!(K / max_respuesta_real, 16);
++    // Con hashes **distintos**, ninguno repetido, la cota sigue siendo
++    // MAX_BLOQUES_POR_RESPUESTA (16): la deduplicación no recorta de más.
++    let vista2 = Arc::new(VistaRed::nueva(estado_vacio()));
++    let mut hashes_distintos = Vec::new();
++    for i in 0..20u32 {
++        let b = BloqueRed::Pow {
++            cabecera: BlockHeader {
++                consensus_branch_id: 0xa8b4_66a7,
++                prev_hash: h(i),
++                merkle_root: MerkleRoot::from_digest(Digest::from_bytes([0x33; 32])),
++                timestamp: 1_000 + u64::from(i),
++                bits: 0x1c07_fff8,
++                nonce: u64::from(i),
++                height: i + 1,
++            },
++            txs: Vec::new(),
++            testigos: Vec::new(),
++        };
++        vista2.registrar_pow(i, b.clone());
++        hashes_distintos.push(zx_node::red::hash_de(&b));
++    }
++    let (tx2, _rx2) = zx_node::red::nueva_cola_trabajo_red();
++    let m2 = ManejadorRed::nuevo(tx2, vista2);
++    let respuesta2 = m2.bloques_por_hash(&hashes_distintos);
++    assert_eq!(
++        respuesta2.len(),
++        zx_p2p::limites::MAX_BLOQUES_POR_RESPUESTA,
++        "20 hashes distintos, todos presentes: la deduplicación no debe recortar más de lo que \
++         ya recortaba MAX_BLOQUES_POR_RESPUESTA (16)"
++    );
+ }
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-node/tests/ri3a_cola_trabajo_sin_tope.rs ws/crates/zx-node/tests/ri3a_cola_trabajo_sin_tope.rs
+--- ws.orig/crates/zx-node/tests/ri3a_cola_trabajo_sin_tope.rs	2026-09-27 01:49:20.007004589 +0200
++++ ws/crates/zx-node/tests/ri3a_cola_trabajo_sin_tope.rs	2026-09-27 01:48:01.389388232 +0200
+@@ -1,32 +1,21 @@
+-//! Reproducción RI-3a (revisor independiente de red, `ORDEN-RI-3.md`).
++//! Regresión RI-3a #3 (`ORDEN-W06d6` decisión 4; `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3a.md`
++//! hallazgo 3).
+ //!
+-//! Hallazgo: `RedArrancada`/`ManijaRed` (crates/zx-node/src/red/mod.rs) usa
+-//! `tokio::sync::mpsc::unbounded_channel()` para `TrabajoRed`, la cola por la que
+-//! `ManejadorRed::bloque_difundido` (crates/zx-node/src/red/manejador.rs) y
+-//! `sync::atender_respuesta` (crates/zx-node/src/red/sync.rs) entregan bloques al hilo de consenso.
+-//! Cada bloque de gossipsub que pasa el parseo del códec de `zx-p2p` (formato válido; **no** hace
+-//! falta que su PoW/PoAS/PoT sea válido, eso lo decide después el hilo de consenso) se clona
+-//! íntegro y se encola **sin ningún tope**, ni de número de elementos ni de bytes. Si el hilo de
+-//! consenso se queda por detrás del ritmo de llegada (un bloque PoST real tarda del orden de
+-//! decenas de milisegundos en verificar PoT+PoAS, según la documentación del propio módulo), la cola
+-//! crece sin límite: no hay *backpressure*, no hay descarte determinista, no hay nada análogo al
+-//! `MAX_DIFERIDOS_PENDIENTES` (4 096) que sí tiene la tabla de correlación de `zx-p2p`.
++//! **Antes de corregir** (confirmado; el test original de reproducción, ejecutado tal cual contra
++//! la base en `deepseek/W06d6/logs/RI-3a-antes.log`): `TrabajoRed` viajaba por un
++//! `unbounded_channel`, así que 40 960 bloques (`MAX_DIFERIDOS_PENDIENTES × 10`) se encolaban sin
++//! que nada los rechazara, aunque nadie leyera del otro extremo.
+ //!
+-//! Este test demuestra la ausencia de tope: encola muchos más elementos que
+-//! `zx_p2p::limites::MAX_DIFERIDOS_PENDIENTES` sin que el productor espere ni falle nunca, y sin
+-//! que nadie lea del otro extremo. `V-ZRX/LINEO.md`: sin Python; sin aleatoriedad; documentado con
+-//! el comando exacto en el informe.
++//! **Después de corregir**: `red::nueva_cola_trabajo_red` da un emisor acotado en elementos
++//! (`MAX_TRABAJO_RED = 1 024`) y en bytes (`MAX_TRABAJO_RED_BYTES = 256 MiB`). Pasado el tope, se
++//! descarta lo nuevo **sin bloquear** (`intentar_enviar` nunca espera) y se informa con
++//! `ResultadoEnvioTrabajo::Lleno`, nunca en silencio.
+ 
+-use std::sync::Arc;
+-use std::time::Instant;
++#![expect(clippy::panic, reason = "el test falla con panic por diseño")]
+ 
+ use zx_core::digest::{BlockHash, Digest, MerkleRoot};
+ use zx_core::preimage::block::BlockHeader;
+-use zx_core::red::Red;
+-use zx_node::red::manejador::ManejadorRed;
+-use zx_node::red::vista::VistaRed;
+-use zx_p2p::entrante::{IdDiferido, ManejadorEntrante, Veredicto};
+-use zx_p2p::mensaje::{BloqueRed, Estado, Fase, PuntaPow};
++use zx_node::red::{MAX_TRABAJO_RED, ResultadoEnvioTrabajo, TrabajoRed};
+ 
+ fn h(n: u32) -> BlockHash {
+     let mut b = [0u8; 32];
+@@ -34,24 +23,8 @@
+     BlockHash::from_digest(Digest::from_bytes(b))
+ }
+ 
+-fn estado_vacio() -> Estado {
+-    Estado {
+-        hash_genesis: h(0),
+-        red: Red::Dev,
+-        fase: Fase::Pow,
+-        punta_pow: PuntaPow {
+-            hash: h(0),
+-            altura: 0,
+-            trabajo_acumulado: [0; 32],
+-        },
+-        terminal: None,
+-        puntas_post: Vec::new(),
+-        blue_work_virtual: [0; 32],
+-    }
+-}
+-
+-fn bloque(n: u32) -> BloqueRed {
+-    BloqueRed::Pow {
++fn bloque(n: u32) -> zx_p2p::mensaje::BloqueRed {
++    zx_p2p::mensaje::BloqueRed::Pow {
+         cabecera: BlockHeader {
+             consensus_branch_id: 0xa8b4_66a7,
+             prev_hash: h(n),
+@@ -66,39 +39,52 @@
+     }
+ }
+ 
+-/// **CONFIRMADO.** La cola `TrabajoRed` no tiene tope: acepta muchísimos más elementos que
+-/// `MAX_DIFERIDOS_PENDIENTES` (la cota que sí existe en `zx-p2p` para la tabla de correlación) sin
+-/// bloquear al productor ni descartar nada, aunque nadie lea del otro extremo.
++/// **Regresión.** Encolar muchos más elementos que `MAX_TRABAJO_RED` ya no crece sin límite: a
++/// partir del tope, `intentar_enviar` devuelve `Lleno` (nunca bloquea, nunca entra en pánico) y el
++/// bloque se descarta en vez de acumularse.
+ #[test]
+-fn la_cola_de_trabajo_hacia_consenso_no_tiene_tope() {
+-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+-    let vista = Arc::new(VistaRed::nueva(estado_vacio()));
+-    let m = ManejadorRed::nuevo(tx, vista);
+-
+-    // Un orden de magnitud por encima de MAX_DIFERIDOS_PENDIENTES (4 096) de zx-p2p, para mostrar
+-    // que aquí no hay un tope equivalente.
+-    let n: u32 = zx_p2p::limites::MAX_DIFERIDOS_PENDIENTES as u32 * 10;
+-    assert!(n > 40_000);
++fn la_cola_de_trabajo_hacia_consenso_tiene_tope_de_elementos() {
++    let (tx, mut rx) = zx_node::red::nueva_cola_trabajo_red();
++
++    // Un orden de magnitud por encima del tope, igual que el test original comparaba contra
++    // `MAX_DIFERIDOS_PENDIENTES` de `zx-p2p`.
++    let n: u32 = (MAX_TRABAJO_RED as u32) * 10;
++    assert!(n > 10_000);
+ 
+-    let inicio = Instant::now();
++    let mut encolados = 0usize;
++    let mut llenos = 0usize;
+     for i in 0..n {
+-        // `bloque_difundido` es exactamente lo que `zx-p2p` llama por cada mensaje de gossipsub que
+-        // pasa el parseo del códec (`servicio.rs::despachar`): no requiere PoW/PoAS válidos.
+-        let v = m.bloque_difundido(IdDiferido::default(), &bloque(i));
+-        assert_eq!(v, Veredicto::Diferir, "siempre difiere y encola (manejador.rs)");
++        match tx.intentar_enviar(TrabajoRed::BloqueDeSincronizacion {
++            de: libp2p::PeerId::random(),
++            bloque: bloque(i),
++        }) {
++            ResultadoEnvioTrabajo::Encolado => encolados += 1,
++            ResultadoEnvioTrabajo::Lleno(_) => llenos += 1,
++            ResultadoEnvioTrabajo::Cerrado(_) => panic!("el receptor sigue vivo: no debe cerrarse"),
++        }
+     }
+-    let transcurrido = inicio.elapsed();
+ 
+     assert_eq!(
+-        rx.len(),
+-        n as usize,
+-        "los {n} bloques quedan todos en cola: nada los ha leído, descartado ni limitado"
++        encolados, MAX_TRABAJO_RED,
++        "el tope de elementos MUST ser exactamente MAX_TRABAJO_RED, ni uno más"
++    );
++    assert_eq!(
++        llenos,
++        n as usize - MAX_TRABAJO_RED,
++        "todo lo que no cupo MUST informarse como Lleno, no perderse en silencio"
++    );
++    let mut recibidos = 0usize;
++    while rx.try_recv().is_ok() {
++        recibidos += 1;
++    }
++    assert_eq!(
++        recibidos, MAX_TRABAJO_RED,
++        "el receptor no había leído nada todavía: debe tener exactamente el tope de elementos"
+     );
+ 
+     eprintln!(
+-        "RI-3a: {n} bloques encolados en {transcurrido:?} sin backpressure ni tope \
+-         (MAX_DIFERIDOS_PENDIENTES de zx-p2p = {}); la cola sigue creciendo mientras el \
+-         hilo de consenso no la vacíe",
+-        zx_p2p::limites::MAX_DIFERIDOS_PENDIENTES
++        "RI-3a (corregido): {n} intentos -> {encolados} encolados, {llenos} descartados por \
++         tope de elementos (MAX_TRABAJO_RED = {MAX_TRABAJO_RED}); antes se habrían encolado los \
++         {n} sin tope alguno"
+     );
+ }
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-p2p/src/codec.rs ws/crates/zx-p2p/src/codec.rs
+--- ws.orig/crates/zx-p2p/src/codec.rs	2026-09-26 19:04:09.186442646 +0200
++++ ws/crates/zx-p2p/src/codec.rs	2026-09-27 01:41:16.102055632 +0200
+@@ -207,36 +207,67 @@
+     }
+ }
+ 
++/// Trozo de lectura de [`leer_acotado`] (`ORDEN-W06d6`, RI-3a #2).
++///
++/// **64 KiB.** Antes, `leer_acotado` reservaba `max + 1` (hasta ≈25,6 MB en una respuesta) **antes**
++/// de leer un solo byte. Un par que abre varios flujos de sincronización y no escribe nada retenía
++/// esa reserva completa durante todo `TIMEOUT_SYNC`, y con menos flujos que `MAX_STREAMS_SYNC`
++/// bastaba para agotar el presupuesto agregado (`Presupuesto`, 256 MiB) — confirmado
++/// (`REVISION-RI-3a.md` hallazgo 2). Reservando por trozos, lo que un par silencioso retiene nunca
++/// pasa de un trozo: el coste de un ataque de silencio deja de escalar con `MAX_RESPUESTA_BYTES`.
++pub const TROZO_LECTURA_BYTES: usize = 64 * 1024;
++
+ /// Lee hasta `max` bytes y **distingue truncamiento de tamaño legítimo**.
+ ///
+-/// Se pide `max + 1`: si llegan `max + 1`, es que había más de lo permitido y se rechaza como
+-/// exceso. Con `take(max)` a secas, el mismo caso llegaría al parser como datos corruptos, y el
+-/// peer se clasificaría como `Ilegible` en vez de `Excedido` (C-NET-05).
++/// `ORDEN-W06d6` (RI-3a #2): la reserva es **incremental**, en trozos de [`TROZO_LECTURA_BYTES`],
++/// cada uno pedido **antes** de leerlo (C-NET-21 se mantiene: nunca se lee sin haber reservado
++/// primero lo que se va a leer). Lo reservado en cualquier instante nunca supera lo ya leído más un
++/// trozo — nunca el máximo del mensaje entero por adelantado. Todas las reservas de esta lectura se
++/// sueltan juntas al terminar (éxito, exceso o error de E/S): el total en vuelo mientras la lectura
++/// está en curso es exactamente lo que se ha leído hasta ahora (redondeado hacia arriba a trozos).
++///
++/// Se pide `max + 1` en total (vía `.take`): si llegan `max + 1`, es que había más de lo permitido
++/// y se rechaza como exceso. Con `take(max)` a secas, el mismo caso llegaría al parser como datos
++/// corruptos, y el peer se clasificaría como `Ilegible` en vez de `Excedido` (C-NET-05).
+ async fn leer_acotado<T>(io: &mut T, max: u64, p: &Presupuesto) -> io::Result<Vec<u8>>
+ where
+     T: AsyncRead + Unpin + Send,
+ {
+-    // C-NET-21 · **reservar ANTES de leer.** Reservar después de haber leído contabilizaría memoria
+-    // que ya está ocupada: el techo no acotaría nada, solo llevaría la cuenta del desastre.
+-    let cupo = usize::try_from(max.saturating_add(1)).unwrap_or(usize::MAX);
+-    let _reserva = p.reservar(cupo).ok_or_else(|| {
+-        io::Error::new(
+-            io::ErrorKind::OutOfMemory,
+-            "C-NET-21: no queda presupuesto de memoria en vuelo",
+-        )
+-    })?;
+-
++    let max_usize = usize::try_from(max).unwrap_or(usize::MAX);
+     let mut buf = Vec::new();
+-    io.take(max.saturating_add(1)).read_to_end(&mut buf).await?;
+-
+-    if buf.len() as u64 > max {
+-        return Err(io::Error::new(
+-            io::ErrorKind::InvalidData,
+-            "C-NET-11: el mensaje supera el límite de tamaño",
+-        ));
++    // Las reservas de todos los trozos de esta lectura viven hasta el final de la función (éxito o
++    // error): sueltan su cupo juntas, como un lote, no una a una a medida que se leen — pero cada
++    // una se pidió **antes** de leer su trozo, así que el máximo en vuelo en cualquier instante
++    // durante la lectura es `trozos_leídos_hasta_ahora × TROZO_LECTURA_BYTES`, nunca `max + 1`.
++    let mut reservas = Vec::new();
++    let mut acotado = io.take(max.saturating_add(1));
++    loop {
++        let reserva = p.reservar(TROZO_LECTURA_BYTES).ok_or_else(|| {
++            io::Error::new(
++                io::ErrorKind::OutOfMemory,
++                "C-NET-21: no queda presupuesto de memoria en vuelo",
++            )
++        })?;
++        reservas.push(reserva);
++
++        let inicio = buf.len();
++        buf.resize(inicio.saturating_add(TROZO_LECTURA_BYTES), 0);
++        let destino = buf.get_mut(inicio..).unwrap_or(&mut []);
++        let leidos = acotado.read(destino).await?;
++        buf.truncate(inicio.saturating_add(leidos));
++
++        if leidos == 0 {
++            break; // EOF: el otro extremo cerró (o `.take` agotó su cupo de `max + 1`).
++        }
++        if buf.len() > max_usize {
++            return Err(io::Error::new(
++                io::ErrorKind::InvalidData,
++                "C-NET-11: el mensaje supera el límite de tamaño",
++            ));
++        }
+     }
+     Ok(buf)
+-    // `_reserva` se suelta aquí y devuelve el cupo — también por los `?` de arriba.
++    // `reservas` se suelta aquí y devuelve todo el cupo — también por los `?` de arriba.
+ }
+ 
+ fn a_io(e: ErrorCodec) -> io::Error {
+@@ -415,6 +446,9 @@
+                 b.extend_from_slice(h.as_bytes());
+             }
+         }
++        Peticion::Registro { desde } => {
++            int::escribir_u64(&mut b, *desde);
++        }
+     }
+     b
+ }
+@@ -446,6 +480,10 @@
+             let (hashes, r) = leer_hashes(r, limites::MAX_HASHES_POR_PETICION)?;
+             (Peticion::Bloques { hashes }, r)
+         }
++        Peticion::DISC_REGISTRO => {
++            let (desde, r) = int::leer_u64(r)?;
++            (Peticion::Registro { desde }, r)
++        }
+         otro => {
+             return Err(ErrorCodec::Codificacion(EncodingError::LockDesconocido {
+                 discriminante: otro,
+@@ -485,6 +523,18 @@
+             }
+         }
+         Respuesta::NoDisponible => {}
++        Respuesta::Registro {
++            desde,
++            bloques,
++            longitud,
++        } => {
++            int::escribir_u64(&mut b, *desde);
++            compact_size::escribir(&mut b, bloques.len() as u64);
++            for bl in bloques {
++                b.extend_from_slice(&bloque_a_bytes(bl));
++            }
++            int::escribir_u64(&mut b, *longitud);
++        }
+     }
+     b
+ }
+@@ -521,6 +571,25 @@
+             (Respuesta::Bloques(bs), r)
+         }
+         Respuesta::DISC_NO_DISPONIBLE => (Respuesta::NoDisponible, r),
++        Respuesta::DISC_REGISTRO => {
++            let (desde, r) = int::leer_u64(r)?;
++            let (n, mut r) = leer_contador(r, limites::MAX_BLOQUES_POR_RESPUESTA)?;
++            let mut bloques = Vec::with_capacity(n);
++            for _ in 0..n {
++                let (bloque, resto) = bloque_desde_bytes_autotag(r)?;
++                bloques.push(bloque);
++                r = resto;
++            }
++            let (longitud, r) = int::leer_u64(r)?;
++            (
++                Respuesta::Registro {
++                    desde,
++                    bloques,
++                    longitud,
++                },
++                r,
++            )
++        }
+         otro => {
+             return Err(ErrorCodec::Codificacion(EncodingError::LockDesconocido {
+                 discriminante: otro,
+@@ -555,6 +624,9 @@
+         b.extend_from_slice(h.as_bytes());
+     }
+     b.extend_from_slice(&e.blue_work_virtual);
++    // `ORDEN-W06d6` decisión 1: campo nuevo, añadido al **final** del saludo (no se reordena nada
++    // de lo existente).
++    int::escribir_u64(b, e.longitud_registro);
+ }
+ 
+ /// Lee un saludo `Estado`.
+@@ -582,6 +654,7 @@
+     };
+     let (punta_post, r) = leer_hashes(r, MAX_PUNTAS_POST)?;
+     let (blue_work, r) = int::leer_32(r)?;
++    let (longitud_registro, r) = int::leer_u64(r)?;
+ 
+     let estado = Estado {
+         hash_genesis: BlockHash::from_digest(Digest::from_bytes(genesis)),
+@@ -595,6 +668,7 @@
+         terminal,
+         puntas_post: punta_post,
+         blue_work_virtual: blue_work,
++        longitud_registro,
+     };
+     Ok((estado, r))
+ }
+@@ -760,6 +834,7 @@
+             terminal: Some(h(9)),
+             puntas_post: vec![h(2), h(3)],
+             blue_work_virtual: [0xcd; 32],
++            longitud_registro: 777,
+         }
+     }
+ 
+@@ -777,6 +852,8 @@
+             Peticion::Bloques {
+                 hashes: vec![h(4), h(5)],
+             },
++            Peticion::Registro { desde: 0 },
++            Peticion::Registro { desde: 123_456 },
+         ]
+     }
+ 
+@@ -788,6 +865,16 @@
+             Respuesta::Bloques(vec![]),
+             Respuesta::Bloques(vec![bloque_pow(1), bloque_post(2)]),
+             Respuesta::NoDisponible,
++            Respuesta::Registro {
++                desde: 0,
++                bloques: vec![],
++                longitud: 0,
++            },
++            Respuesta::Registro {
++                desde: 3,
++                bloques: vec![bloque_pow(1), bloque_post(2)],
++                longitud: 5,
++            },
+         ]
+     }
+ 
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-p2p/src/entrante.rs ws/crates/zx-p2p/src/entrante.rs
+--- ws.orig/crates/zx-p2p/src/entrante.rs	2026-09-26 14:08:45.174006487 +0200
++++ ws/crates/zx-p2p/src/entrante.rs	2026-09-27 01:28:47.931696054 +0200
+@@ -109,4 +109,16 @@
+     /// Un peer pide cuerpos de bloque (PoW o PoST). Los que no tengamos simplemente no van en la
+     /// respuesta.
+     fn bloques_por_hash(&self, hashes: &[BlockHash]) -> Vec<BloqueRed>;
++
++    /// `ORDEN-W06d6` decisión 1: una página del registro de admisión propio, empezando en el
++    /// índice `desde`. Devuelve los bloques de la página (como mucho
++    /// [`crate::limites::MAX_BLOQUES_POR_RESPUESTA`], acotados también en
++    /// [`crate::limites::MAX_RESPUESTA_BYTES`]) y la longitud **total** del registro propio.
++    ///
++    /// Con implementación por defecto (vacía, longitud 0) para no romper los manejadores de test
++    /// que no la necesitan (`Espia`, `Contador`, `Diferidor`...); `zx-node::red::manejador::ManejadorRed`
++    /// la sobrescribe con la real.
++    fn pagina_registro(&self, _desde: u64) -> (Vec<BloqueRed>, u64) {
++        (Vec::new(), 0)
++    }
+ }
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-p2p/src/error.rs ws/crates/zx-p2p/src/error.rs
+--- ws.orig/crates/zx-p2p/src/error.rs	2026-09-26 02:35:06.629673157 +0200
++++ ws/crates/zx-p2p/src/error.rs	2026-09-27 01:09:00.943413699 +0200
+@@ -19,6 +19,17 @@
+     #[error("no se pudo levantar el transporte: {0}")]
+     Transporte(&'static str),
+ 
++    /// `ORDEN-W06d6` decisión 3 (V7): la publicación local por `gossipsub` falló, con el motivo
++    /// **real** que devolvió la librería (`gossipsub::PublishError`), no un texto fijo.
++    ///
++    /// Antes, cualquier fallo de `gossipsub.publish` (sin peers suscritos todavía —normal nada más
++    /// conectar—, mensaje demasiado grande, error de firma, colas llenas...) se colapsaba en el
++    /// mismo `P2pError::Transporte("gossipsub rechazó la publicación local")`: indistinguible entre
++    /// sí y sin valor para diagnosticar `zx-adversario` (`REVISION-W06d5.md`, V7 parcial: «la ráfaga
++    /// sigue fallando localmente... con el motivo real oculto»).
++    #[error("gossipsub rechazó la publicación local: {0}")]
++    Difusion(String),
++
+     /// La dirección de escucha no es válida.
+     #[error("dirección de escucha inválida")]
+     DireccionInvalida,
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-p2p/src/mensaje.rs ws/crates/zx-p2p/src/mensaje.rs
+--- ws.orig/crates/zx-p2p/src/mensaje.rs	2026-09-26 19:04:09.186495915 +0200
++++ ws/crates/zx-p2p/src/mensaje.rs	2026-09-27 01:25:06.676153537 +0200
+@@ -207,6 +207,11 @@
+     pub puntas_post: Vec<BlockHash>,
+     /// `blue_work_virtual`, en big-endian de 32 bytes.
+     pub blue_work_virtual: [u8; 32],
++    /// `ORDEN-W06d6` decisión 1: longitud del registro de admisión de quien saluda (PoW + PoST, en
++    /// el orden real en que los admitió). Es lo que permite al que sincroniza saber, sin pedir
++    /// nada más, cuánto le falta: compara esto con lo que ya tiene y decide cuántas páginas de
++    /// `Peticion::Registro` pedir.
++    pub longitud_registro: u64,
+ }
+ 
+ /// El byte de red en el wire.
+@@ -251,6 +256,14 @@
+         /// Los bloques que faltan, como mucho [`crate::limites::MAX_HASHES_POR_PETICION`].
+         hashes: Vec<BlockHash>,
+     },
++    /// `ORDEN-W06d6` decisión 1: una página del registro de admisión del que responde, empezando
++    /// en el índice `desde` (0 = desde el génesis). Sustituye a la resolución de huérfanos PoST de
++    /// uno en uno como vía **principal** de puesta al día (la resolución por padres se queda para
++    /// los huecos pequeños).
++    Registro {
++        /// Índice del registro de admisión desde el que empezar (0 = el génesis).
++        desde: u64,
++    },
+ }
+ 
+ impl Peticion {
+@@ -260,6 +273,9 @@
+     pub const DISC_CABECERAS_POW: u8 = 0x01;
+     /// Discriminante de [`Peticion::Bloques`].
+     pub const DISC_BLOQUES: u8 = 0x02;
++    /// Discriminante de [`Peticion::Registro`]. Nuevo en `ORDEN-W06d6`: se añade al final, sin
++    /// reordenar los discriminantes existentes.
++    pub const DISC_REGISTRO: u8 = 0x03;
+ 
+     /// El byte que identifica esta variante.
+     #[must_use]
+@@ -268,6 +284,7 @@
+             Self::Estado => Self::DISC_ESTADO,
+             Self::CabecerasPow { .. } => Self::DISC_CABECERAS_POW,
+             Self::Bloques { .. } => Self::DISC_BLOQUES,
++            Self::Registro { .. } => Self::DISC_REGISTRO,
+         }
+     }
+ }
+@@ -286,6 +303,19 @@
+     ///
+     /// Distinguirlo de un error de protocolo importa: esto **no puntúa**.
+     NoDisponible,
++    /// `ORDEN-W06d6` decisión 1: respuesta a [`Peticion::Registro`]. Como mucho
++    /// [`crate::limites::MAX_BLOQUES_POR_RESPUESTA`] bloques y
++    /// [`crate::limites::MAX_RESPUESTA_BYTES`] bytes, en el orden real de admisión del que
++    /// responde, empezando en `desde`.
++    Registro {
++        /// El mismo `desde` de la petición (para que quien sincroniza pueda casarlo sin ambigüedad
++        /// si algún día hay más de una página en vuelo).
++        desde: u64,
++        /// Los bloques de esta página, en orden de admisión.
++        bloques: Vec<BloqueRed>,
++        /// Longitud **total** del registro del que responde, en el momento de responder.
++        longitud: u64,
++    },
+ }
+ 
+ impl Respuesta {
+@@ -297,6 +327,8 @@
+     pub const DISC_BLOQUES: u8 = 0x02;
+     /// Discriminante de [`Respuesta::NoDisponible`].
+     pub const DISC_NO_DISPONIBLE: u8 = 0x03;
++    /// Discriminante de [`Respuesta::Registro`]. Nuevo en `ORDEN-W06d6`: al final, sin reordenar.
++    pub const DISC_REGISTRO: u8 = 0x04;
+ 
+     /// El byte que identifica esta variante.
+     #[must_use]
+@@ -306,6 +338,7 @@
+             Self::CabecerasPow(_) => Self::DISC_CABECERAS_POW,
+             Self::Bloques(_) => Self::DISC_BLOQUES,
+             Self::NoDisponible => Self::DISC_NO_DISPONIBLE,
++            Self::Registro { .. } => Self::DISC_REGISTRO,
+         }
+     }
+ 
+@@ -323,11 +356,12 @@
+             (Self::Estado(_), Peticion::Estado)
+                 | (Self::CabecerasPow(_), Peticion::CabecerasPow { .. })
+                 | (Self::Bloques(_), Peticion::Bloques { .. })
++                | (Self::Registro { .. }, Peticion::Registro { .. })
+                 // NoDisponible vale para cualquier petición de datos, pero NO para el saludo:
+                 // un peer que no sabe decir quién es no sirve para nada.
+                 | (
+                     Self::NoDisponible,
+-                    Peticion::CabecerasPow { .. } | Peticion::Bloques { .. }
++                    Peticion::CabecerasPow { .. } | Peticion::Bloques { .. } | Peticion::Registro { .. }
+                 )
+         )
+     }
+@@ -359,6 +393,7 @@
+             terminal: None,
+             puntas_post: vec![h(4)],
+             blue_work_virtual: [5; 32],
++            longitud_registro: 42,
+         }
+     }
+ 
+@@ -373,6 +408,7 @@
+                 parada: None,
+             },
+             Peticion::Bloques { hashes: vec![] },
++            Peticion::Registro { desde: 0 },
+         ];
+         let mut vistos = Vec::new();
+         for p in &peticiones {
+@@ -385,6 +421,11 @@
+             Respuesta::CabecerasPow(vec![]),
+             Respuesta::Bloques(vec![]),
+             Respuesta::NoDisponible,
++            Respuesta::Registro {
++                desde: 0,
++                bloques: vec![],
++                longitud: 0,
++            },
+         ];
+         let mut vistos = Vec::new();
+         for r in &respuestas {
+@@ -395,10 +436,12 @@
+         assert_eq!(Peticion::Estado.discriminante(), 0x00);
+         assert_eq!(Peticion::DISC_CABECERAS_POW, 0x01);
+         assert_eq!(Peticion::DISC_BLOQUES, 0x02);
++        assert_eq!(Peticion::DISC_REGISTRO, 0x03);
+         assert_eq!(Respuesta::DISC_ESTADO, 0x00);
+         assert_eq!(Respuesta::DISC_CABECERAS_POW, 0x01);
+         assert_eq!(Respuesta::DISC_BLOQUES, 0x02);
+         assert_eq!(Respuesta::DISC_NO_DISPONIBLE, 0x03);
++        assert_eq!(Respuesta::DISC_REGISTRO, 0x04);
+     }
+ 
+     /// Cada familia y cada fase tiene su byte, y no se interpreta un byte desconocido.
+@@ -457,6 +500,22 @@
+             locator: vec![],
+             parada: None
+         }));
++        assert!(Respuesta::NoDisponible.responde_a(&Peticion::Registro { desde: 0 }));
++    }
++
++    /// `ORDEN-W06d6` decisión 1: `Respuesta::Registro` responde solo a `Peticion::Registro`.
++    #[test]
++    fn registro_responde_solo_a_registro() {
++        let peticion_registro = Peticion::Registro { desde: 7 };
++        let respuesta_registro = Respuesta::Registro {
++            desde: 7,
++            bloques: vec![],
++            longitud: 10,
++        };
++        assert!(respuesta_registro.responde_a(&peticion_registro));
++        assert!(!respuesta_registro.responde_a(&Peticion::Estado));
++        assert!(!Respuesta::Bloques(vec![]).responde_a(&peticion_registro));
++        assert!(!Respuesta::CabecerasPow(vec![]).responde_a(&peticion_registro));
+     }
+ 
+     /// La cota de puntas PoST es la declarada.
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-p2p/src/servicio.rs ws/crates/zx-p2p/src/servicio.rs
+--- ws.orig/crates/zx-p2p/src/servicio.rs	2026-09-26 14:08:45.174045676 +0200
++++ ws/crates/zx-p2p/src/servicio.rs	2026-09-27 01:28:57.999902760 +0200
+@@ -457,6 +457,24 @@
+                 request_response::Message::Request {
+                     request, channel, ..
+                 } => {
++                    // `ORDEN-W06d6` (RI-3a #1, decisión 4): una `Peticion::Bloques` con hashes
++                    // repetidos es la firma del hallazgo confirmado (`REVISION-RI-3a.md`): un par
++                    // honesto no pide el mismo bloque varias veces en la misma petición. El
++                    // recorte/deduplicación que evita el desperdicio de trabajo ya vive en
++                    // `zx-node` (`VistaRed::bloques_por_hash`, aplica pase lo que pase aquí); esto
++                    // es la parte que **penaliza** al que lo pidió, con el mismo motivo `Excedido`
++                    // que ya existe para "mandaste más de lo pactado" (atribuible al emisor, cinco
++                    // avisos antes de banear un prefijo, C-NET-05/`error.rs`).
++                    if let Peticion::Bloques { hashes } = &request
++                        && tiene_hashes_repetidos(hashes)
++                    {
++                        tracing::debug!(
++                            %peer,
++                            n = hashes.len(),
++                            "Peticion::Bloques con hashes repetidos: penalizando (Excedido)"
++                        );
++                        self.desconectar_con_motivo(peer, MotivoDesconexion::Excedido);
++                    }
+                     let respuesta = self.servir(&request);
+                     if self
+                         .swarm
+@@ -490,6 +508,28 @@
+         }
+     }
+ 
++    /// Corta con un peer por un motivo dado, puntuando su prefijo de red si el motivo puntúa
++    /// (C-NET-05 + C-NET-20: la puntuación es del **prefijo**, no del `PeerId`). Compartido por
++    /// `Comando::Desconectar` y por la penalización directa de una petición abusiva (RI-3a #1).
++    fn desconectar_con_motivo(&mut self, peer: PeerId, motivo: MotivoDesconexion) {
++        tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
++        let puntos = motivo.puntos();
++        if puntos > 0 {
++            let prefijos = self.swarm.behaviour_mut().limites_ip.prefijos_de(peer);
++            for p in prefijos {
++                if self.swarm.behaviour_mut().limites_ip.puntuar(p, puntos) {
++                    tracing::warn!(
++                        ?p,
++                        ?motivo,
++                        "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
++                         distintos con motivo Excedido, el nodo desactualizado eres tú."
++                    );
++                }
++            }
++        }
++        let _ = self.swarm.disconnect_peer_id(peer);
++    }
++
+     /// Construye la respuesta a una petición entrante preguntándole al manejador.
+     fn servir(&self, p: &Peticion) -> Respuesta {
+         match p {
+@@ -508,6 +548,16 @@
+                     Respuesta::Bloques(recortar(bs, crate::limites::MAX_BLOQUES_POR_RESPUESTA))
+                 }
+             }
++            Peticion::Registro { desde } => {
++                // `ORDEN-W06d6` decisión 1: el manejador ya acota bloques y bytes (recibe los topes
++                // del protocolo, no los descubre después); aquí solo se envuelve en la respuesta.
++                let (bloques, longitud) = self.manejador.pagina_registro(*desde);
++                Respuesta::Registro {
++                    desde: *desde,
++                    bloques: recortar(bloques, crate::limites::MAX_BLOQUES_POR_RESPUESTA),
++                    longitud,
++                }
++            }
+         }
+     }
+ 
+@@ -701,7 +751,9 @@
+                     .publish(t, datos)
+                     .map_err(|e| {
+                         tracing::debug!(%e, "no se pudo difundir");
+-                        P2pError::Transporte("gossipsub rechazó la publicación local")
++                        // `ORDEN-W06d6` decisión 3 (V7): el motivo real de `PublishError` viaja en
++                        // el error, no un texto fijo que lo esconde (ver `P2pError::Difusion`).
++                        P2pError::Difusion(e.to_string())
+                     })
+                     .map(|_| ());
+                 let _ = respuesta.send(r);
+@@ -724,27 +776,7 @@
+                 };
+                 self.reportar_a_gossipsub(&p.message_id, &p.propagador, veredicto);
+             }
+-            Comando::Desconectar { peer, motivo } => {
+-                tracing::debug!(%peer, ?motivo, puntua = motivo.puntua(), "desconectando");
+-
+-                // C-NET-05 + C-NET-20 · solo una violación de consenso puntúa, y puntúa contra el
+-                // **prefijo de red**, no contra el `PeerId`.
+-                let puntos = motivo.puntos();
+-                if puntos > 0 {
+-                    let prefijos = self.swarm.behaviour_mut().limites_ip.prefijos_de(peer);
+-                    for p in prefijos {
+-                        if self.swarm.behaviour_mut().limites_ip.puntuar(p, puntos) {
+-                            tracing::warn!(
+-                                ?p,
+-                                ?motivo,
+-                                "prefijo de red baneado. Si esto se repite desde MUCHOS prefijos \
+-                                 distintos con motivo Excedido, el nodo desactualizado eres tú."
+-                            );
+-                        }
+-                    }
+-                }
+-                let _ = self.swarm.disconnect_peer_id(peer);
+-            }
++            Comando::Desconectar { peer, motivo } => self.desconectar_con_motivo(peer, motivo),
+         }
+     }
+ 
+@@ -846,6 +878,19 @@
+     }
+ }
+ 
++/// ¿Tiene `hashes` algún hash repetido? `O(n²)` sobre como mucho
++/// [`crate::limites::MAX_HASHES_POR_PETICION`] (256) entradas de 32 B: barato, y el propio códec
++/// (`peticion_desde_bytes`) ya rechazó cualquier petición con más hashes que ese tope antes de que
++/// esto se llame.
++fn tiene_hashes_repetidos(hashes: &[zx_core::digest::BlockHash]) -> bool {
++    for (i, h) in hashes.iter().enumerate() {
++        if hashes.iter().take(i).any(|otro| otro == h) {
++            return true;
++        }
++    }
++    false
++}
++
+ /// Recorta una lista al límite del protocolo.
+ fn recortar<T>(mut v: Vec<T>, max: usize) -> Vec<T> {
+     if v.len() > max {
+@@ -906,6 +951,7 @@
+                 terminal: None,
+                 puntas_post: vec![],
+                 blue_work_virtual: [0; 32],
++                longitud_registro: 0,
+             }
+         }
+ 
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-p2p/tests/dos_nodos.rs ws/crates/zx-p2p/tests/dos_nodos.rs
+--- ws.orig/crates/zx-p2p/tests/dos_nodos.rs	2026-09-26 19:04:09.186495915 +0200
++++ ws/crates/zx-p2p/tests/dos_nodos.rs	2026-09-27 02:11:02.245911115 +0200
+@@ -117,6 +117,7 @@
+             terminal: None,
+             puntas_post: Vec::new(),
+             blue_work_virtual: [self.marca; 32],
++            longitud_registro: u64::from(self.marca),
+         }
+     }
+ 
+@@ -628,6 +629,7 @@
+             terminal: None,
+             puntas_post: Vec::new(),
+             blue_work_virtual: [0; 32],
++            longitud_registro: 0,
+         }
+     }
+ 
+@@ -892,3 +894,91 @@
+         t.abort();
+     }
+ }
++
++/// `ORDEN-W06d6` decisión 1 (V1): `Peticion::Registro`/`Respuesta::Registro` viajan de punta a
++/// punta como cualquier otro par petición/respuesta del protocolo.
++#[tokio::test]
++async fn pedir_registro_llega_al_manejador_del_otro_lado() {
++    let (manejo_a, mut ev_a, id_b, tareas, _vivo_b, _ev_b) =
++        dos_conectados(Arc::new(Contador::nuevo(1)), Arc::new(Contador::nuevo(2))).await;
++
++    manejo_a
++        .pedir(id_b, Peticion::Registro { desde: 0 })
++        .await
++        .expect("A pide el registro de B");
++
++    let e = esperar(&mut ev_a, |e| matches!(e, EventoRed::Respuesta { .. }))
++        .await
++        .expect("A debería recibir la página del registro");
++    let EventoRed::Respuesta { respuesta, .. } = e else {
++        panic!("se esperaba una respuesta");
++    };
++    match *respuesta {
++        // `Contador` no implementa `pagina_registro` (usa el valor por defecto del trait): página
++        // vacía y longitud 0, pero el mensaje SÍ viajó de punta a punta con su forma correcta.
++        Respuesta::Registro {
++            desde,
++            bloques,
++            longitud,
++        } => {
++            assert_eq!(desde, 0);
++            assert!(bloques.is_empty());
++            assert_eq!(longitud, 0);
++        }
++        otra => panic!("se esperaba Registro, llegó {otra:?}"),
++    }
++
++    for t in tareas {
++        t.abort();
++    }
++}
++
++/// `ORDEN-W06d6` decisión 1 (V1): un par que "cae" (aquí, se sueltan sus tareas) a mitad de una
++/// petición de registro no cuelga al que pregunta — la petición falla con
++/// `EventoRed::PeticionFallida`, igual que cualquier otra petición de sincronización (documentado
++/// como límite del arnés: "caer" un nodo es soltar su `Swarm`, no matar un proceso real).
++#[tokio::test]
++async fn par_caido_a_mitad_de_una_peticion_de_registro_no_cuelga() {
++    let (manejo_a, mut ev_a, id_b, tareas, vivo_b, ev_b) =
++        dos_conectados(Arc::new(Contador::nuevo(1)), Arc::new(Contador::nuevo(2))).await;
++
++    manejo_a
++        .pedir(id_b, Peticion::Registro { desde: 0 })
++        .await
++        .expect("A pide el registro de B");
++
++    // "B cae" a mitad: se suelta su último `ManejoRed` (cierra el canal de comandos de su bucle,
++    // que entonces termina solo) y su receptor de eventos. **Solo** la tarea de B (índice 1: `dos_
++    // conectados` las devuelve en orden `[A, B]`) se aborta — abortar también la de A le impediría
++    // enterarse de nada.
++    drop(vivo_b);
++    drop(ev_b);
++    if let Some(tarea_b) = tareas.get(1) {
++        tarea_b.abort();
++    }
++
++    // `TIMEOUT_SYNC` (`behaviour.rs`) son 30 s: el `esperar` genérico de este arnés (10 s) es
++    // demasiado corto para este caso concreto, así que aquí se espera explícitamente más que eso.
++    let plazo = tokio::time::Instant::now() + Duration::from_secs(35);
++    let mut visto = None;
++    while tokio::time::Instant::now() < plazo {
++        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
++        match tokio::time::timeout(resto, ev_a.recv()).await {
++            Ok(Some(e @ (EventoRed::PeticionFallida { .. } | EventoRed::PeerDesconectado(_)))) => {
++                visto = Some(e);
++                break;
++            }
++            Ok(Some(_)) => {}
++            Ok(None) | Err(_) => break,
++        }
++    }
++    assert!(
++        visto.is_some(),
++        "A MUST enterarse (fallo de petición o desconexión) dentro de TIMEOUT_SYNC, nunca \
++         quedarse esperando para siempre"
++    );
++
++    if let Some(tarea_a) = tareas.first() {
++        tarea_a.abort();
++    }
++}
+diff -ruN '--exclude=target' '--exclude=*.pid' '--exclude=*.log' ws.orig/crates/zx-p2p/tests/ri3a_presupuesto_agotable.rs ws/crates/zx-p2p/tests/ri3a_presupuesto_agotable.rs
+--- ws.orig/crates/zx-p2p/tests/ri3a_presupuesto_agotable.rs	2026-09-27 01:49:20.008004609 +0200
++++ ws/crates/zx-p2p/tests/ri3a_presupuesto_agotable.rs	2026-09-27 01:48:21.426800197 +0200
+@@ -1,17 +1,21 @@
+-//! Reproducción RI-3a (revisor independiente de red, `ORDEN-RI-3.md`).
++//! Regresión RI-3a #2 (`ORDEN-W06d6` decisión 4; `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3a.md`
++//! hallazgo 2).
+ //!
+-//! Hallazgo: la reserva de `leer_acotado` (crates/zx-p2p/src/codec.rs) se hace por el TAMAÑO MÁXIMO
+-//! del mensaje (`MAX_RESPUESTA_BYTES`), no por lo que de verdad llega, y se hace ANTES de leer ni un
+-//! solo byte. Un par que abre unos pocos streams de sincronización y no escribe nada (silencio total,
+-//! coste cero) retiene esa reserva durante todo `TIMEOUT_SYNC` (30 s) y puede agotar el presupuesto
+-//! agregado (`Presupuesto`, 256 MiB) usando **menos** streams que el propio tope por conexión
+-//! (`MAX_STREAMS_SYNC = 8`). Mientras dure, cualquier otra lectura de respuesta —de cualquier par,
+-//! honesto o no— se rechaza con `OutOfMemory`, aunque su respuesta ya esté completa y esperando en el
+-//! pipe.
++//! Antes de corregir (confirmado; el test original de reproducción, ejecutado tal cual contra la
++//! base en `deepseek/W06d6/logs/RI-3a-antes.log`), `leer_acotado` reservaba `MAX_RESPUESTA_BYTES +
++//! 1` de golpe, antes de leer un solo byte, y unos pocos pares silenciosos (menos que
++//! `MAX_STREAMS_SYNC`) bastaban para agotar el presupuesto agregado (256 MiB) y denegar a un par
++//! honesto cuya respuesta ya estaba completa.
+ //!
+-//! Este test no usa un `Swarm`: llama al códec directamente sobre `futures_ringbuf::Endpoint`, igual
+-//! que los tests propios de `codec.rs`. `V-ZRX/LINEO.md`: nada de Python; determinista (sin RNG);
+-//! documentado con el comando exacto en el informe.
++//! Después de corregir, la reserva es incremental, en trozos de [`TROZO_LECTURA_BYTES`]. Un par
++//! silencioso que nunca escribe solo retiene un trozo (64 KiB), no la respuesta entera.
++
++#![expect(
++    clippy::unwrap_used,
++    clippy::expect_used,
++    clippy::integer_division,
++    reason = "el test falla con panic por diseño; la división entera es deliberada (orden de magnitud)"
++)]
+ 
+ use std::time::Duration;
+ 
+@@ -20,12 +24,12 @@
+ use libp2p::StreamProtocol;
+ use libp2p::request_response::Codec;
+ 
+-use zx_p2p::codec::{ZxCodec, respuesta_a_bytes};
++use zx_core::digest::{BlockHash, Digest};
++use zx_core::red::Red;
++use zx_p2p::codec::{TROZO_LECTURA_BYTES, ZxCodec, respuesta_a_bytes};
+ use zx_p2p::limites::MAX_RESPUESTA_BYTES;
+ use zx_p2p::mensaje::{Estado, Fase, PuntaPow, Respuesta};
+ use zx_p2p::presupuesto::{PRESUPUESTO_BYTES, Presupuesto};
+-use zx_core::digest::{BlockHash, Digest};
+-use zx_core::red::Red;
+ 
+ fn proto() -> StreamProtocol {
+     StreamProtocol::new("/zx-dev/1")
+@@ -48,33 +52,30 @@
+         terminal: None,
+         puntas_post: vec![],
+         blue_work_virtual: [0; 32],
++        longitud_registro: 0,
+     }
+ }
+ 
+-/// **CONFIRMADO.** Un solo par silencioso, con menos streams que `MAX_STREAMS_SYNC`, agota el
+-/// presupuesto agregado de producción y deniega el servicio a un par honesto que ya había mandado
+-/// su respuesta completa.
++/// **Regresión.** El mismo escenario que el hallazgo (`MAX_STREAMS_SYNC` pares silenciosos, menos
++/// streams que el propio tope por conexión): con la reserva incremental, retienen `streams ×
++/// TROZO_LECTURA_BYTES`, muy por debajo del presupuesto total, y un par honesto **sí** recibe su
++/// respuesta.
+ #[tokio::test]
+-async fn un_par_silencioso_agota_el_presupuesto_y_deniega_a_un_par_honesto() {
++async fn muchos_pares_silenciosos_ya_no_agotan_el_presupuesto() {
+     let presupuesto = Presupuesto::nuevo(PRESUPUESTO_BYTES);
+ 
+-    // Cuántas lecturas de MAX_RESPUESTA_BYTES caben en el techo real de producción.
+-    let costo_por_lectura = MAX_RESPUESTA_BYTES + 1; // `leer_acotado` reserva `max + 1`.
+-    let cabida = (PRESUPUESTO_BYTES as u64) / costo_por_lectura;
++    // El mismo número de streams silenciosos que agotaba el presupuesto entero antes de corregir:
++    // por debajo de `MAX_STREAMS_SYNC`, para que sea "un solo par", no varios.
++    let costo_por_lectura_antes = MAX_RESPUESTA_BYTES + 1;
++    let cabida_antes = (PRESUPUESTO_BYTES as u64) / costo_por_lectura_antes;
+     assert!(
+-        cabida >= 1 && cabida < zx_p2p::limites::MAX_STREAMS_SYNC as u64,
+-        "cabida = {cabida}: el ataque MUST caber por debajo del propio tope por conexión \
+-         (MAX_STREAMS_SYNC = {}) para que sea un solo par, no varios",
+-        zx_p2p::limites::MAX_STREAMS_SYNC
++        cabida_antes >= 1 && cabida_antes < zx_p2p::limites::MAX_STREAMS_SYNC as u64,
++        "cabida_antes = {cabida_antes}: MUST caber por debajo de MAX_STREAMS_SYNC"
+     );
+ 
+-    // El "par atacante": abre `cabida` streams de sincronización y NUNCA escribe nada.
+-    // `_silencio` se mantiene vivo (no se cierra, no se escribe) para que la lectura del otro
+-    // extremo se quede esperando datos indefinidamente, exactamente como un peer que abre la
+-    // conexión y calla.
+     let mut silencio = Vec::new();
+     let mut tareas = Vec::new();
+-    for _ in 0..cabida {
++    for _ in 0..cabida_antes {
+         let (a, mut b) = Endpoint::pair(4096, 4096);
+         silencio.push(a);
+         let p = presupuesto.clone();
+@@ -84,35 +85,42 @@
+         }));
+     }
+ 
+-    // Dar tiempo a que las `cabida` tareas hagan su reserva. La reserva ocurre ANTES de leer un
+-    // solo byte (`leer_acotado`), así que no hace falta que el atacante mande nada.
+-    tokio::time::sleep(Duration::from_millis(200)).await;
+-
+-    let reservado_esperado = (cabida * costo_por_lectura) as usize;
+-    assert_eq!(
+-        presupuesto.en_vuelo(),
+-        reservado_esperado,
+-        "el par silencioso ya reservó {reservado_esperado} B sin mandar un solo byte"
++    // Tiempo de sobra para que cada tarea haga su primera reserva (un trozo) y se quede esperando
++    // datos que nunca llegan.
++    tokio::time::sleep(Duration::from_millis(300)).await;
++
++    let reservado_antes_de_corregir = cabida_antes as usize * (costo_por_lectura_antes as usize);
++    let reservado_ahora = presupuesto.en_vuelo();
++    assert!(
++        reservado_ahora <= cabida_antes as usize * TROZO_LECTURA_BYTES,
++        "cada par silencioso MUST retener como mucho un trozo ({TROZO_LECTURA_BYTES} B), no toda \
++         la respuesta: reservado = {reservado_ahora} B"
+     );
+     assert!(
+-        presupuesto.disponible() < MAX_RESPUESTA_BYTES as usize,
+-        "ya no cabe ni una lectura de respuesta más: disponible = {}",
+-        presupuesto.disponible()
++        reservado_ahora < reservado_antes_de_corregir / 100,
++        "la reserva incremental MUST quitar por lo menos dos órdenes de magnitud frente al \
++         {reservado_antes_de_corregir} B que se reservaba antes de corregir; reservado ahora: \
++         {reservado_ahora} B"
+     );
+ 
+-    // Un par HONESTO responde de inmediato con un saludo pequeño y válido, ya completo.
++    // Y sigue habiendo presupuesto de sobra para un par honesto: su respuesta, ya completa, se lee
++    // sin que el presupuesto lo deniegue.
+     let (mut a_honesto, mut b_honesto) = Endpoint::pair(4096, 4096);
+     let bytes = respuesta_a_bytes(&Respuesta::Estado(estado_minimo()));
+     a_honesto.write_all(&bytes).await.unwrap();
+     a_honesto.close().await.unwrap();
+ 
+     let mut codec_honesto = ZxCodec::con_presupuesto(presupuesto.clone());
+-    let err = codec_honesto
++    let leida = codec_honesto
+         .read_response(&proto(), &mut b_honesto)
+         .await
+-        .expect_err("MUST rechazarse: no queda presupuesto, aunque la respuesta ya esté completa");
+-    assert_eq!(err.kind(), std::io::ErrorKind::OutOfMemory);
+-    assert!(err.to_string().contains("C-NET-21"), "{err}");
++        .expect("un par honesto MUST poder leerse: queda presupuesto de sobra");
++    assert_eq!(leida, Respuesta::Estado(estado_minimo()));
++
++    eprintln!(
++        "RI-3a (corregido): {cabida_antes} pares silenciosos retienen {reservado_ahora} B (antes: \
++         {reservado_antes_de_corregir} B); el par honesto SÍ recibió su respuesta"
++    );
+ 
+     for t in tareas {
+         t.abort();

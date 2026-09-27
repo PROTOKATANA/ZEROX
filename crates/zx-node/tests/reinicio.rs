@@ -67,6 +67,7 @@ fn config_de_test(dir: &Path, parada_tras_slots: u64) -> Config {
         n_dev: N_DEV_TEST.parse().expect("N_dev"),
         sr_dev: SR_DEV_TEST.parse().expect("SR_dev"),
         parada_tras_slots: Some(parada_tras_slots),
+        dejar_de_producir_en_slot: None,
     }
 }
 

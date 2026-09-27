@@ -117,6 +117,7 @@ impl ManejadorEntrante for Contador {
             terminal: None,
             puntas_post: Vec::new(),
             blue_work_virtual: [self.marca; 32],
+            longitud_registro: u64::from(self.marca),
         }
     }
 
@@ -628,6 +629,7 @@ impl ManejadorEntrante for Diferidor {
             terminal: None,
             puntas_post: Vec::new(),
             blue_work_virtual: [0; 32],
+            longitud_registro: 0,
         }
     }
 
@@ -890,5 +892,93 @@ async fn un_genesis_ajeno_desconecta() {
 
     for t in tareas {
         t.abort();
+    }
+}
+
+/// `ORDEN-W06d6` decisión 1 (V1): `Peticion::Registro`/`Respuesta::Registro` viajan de punta a
+/// punta como cualquier otro par petición/respuesta del protocolo.
+#[tokio::test]
+async fn pedir_registro_llega_al_manejador_del_otro_lado() {
+    let (manejo_a, mut ev_a, id_b, tareas, _vivo_b, _ev_b) =
+        dos_conectados(Arc::new(Contador::nuevo(1)), Arc::new(Contador::nuevo(2))).await;
+
+    manejo_a
+        .pedir(id_b, Peticion::Registro { desde: 0 })
+        .await
+        .expect("A pide el registro de B");
+
+    let e = esperar(&mut ev_a, |e| matches!(e, EventoRed::Respuesta { .. }))
+        .await
+        .expect("A debería recibir la página del registro");
+    let EventoRed::Respuesta { respuesta, .. } = e else {
+        panic!("se esperaba una respuesta");
+    };
+    match *respuesta {
+        // `Contador` no implementa `pagina_registro` (usa el valor por defecto del trait): página
+        // vacía y longitud 0, pero el mensaje SÍ viajó de punta a punta con su forma correcta.
+        Respuesta::Registro {
+            desde,
+            bloques,
+            longitud,
+        } => {
+            assert_eq!(desde, 0);
+            assert!(bloques.is_empty());
+            assert_eq!(longitud, 0);
+        }
+        otra => panic!("se esperaba Registro, llegó {otra:?}"),
+    }
+
+    for t in tareas {
+        t.abort();
+    }
+}
+
+/// `ORDEN-W06d6` decisión 1 (V1): un par que "cae" (aquí, se sueltan sus tareas) a mitad de una
+/// petición de registro no cuelga al que pregunta — la petición falla con
+/// `EventoRed::PeticionFallida`, igual que cualquier otra petición de sincronización (documentado
+/// como límite del arnés: "caer" un nodo es soltar su `Swarm`, no matar un proceso real).
+#[tokio::test]
+async fn par_caido_a_mitad_de_una_peticion_de_registro_no_cuelga() {
+    let (manejo_a, mut ev_a, id_b, tareas, vivo_b, ev_b) =
+        dos_conectados(Arc::new(Contador::nuevo(1)), Arc::new(Contador::nuevo(2))).await;
+
+    manejo_a
+        .pedir(id_b, Peticion::Registro { desde: 0 })
+        .await
+        .expect("A pide el registro de B");
+
+    // "B cae" a mitad: se suelta su último `ManejoRed` (cierra el canal de comandos de su bucle,
+    // que entonces termina solo) y su receptor de eventos. **Solo** la tarea de B (índice 1: `dos_
+    // conectados` las devuelve en orden `[A, B]`) se aborta — abortar también la de A le impediría
+    // enterarse de nada.
+    drop(vivo_b);
+    drop(ev_b);
+    if let Some(tarea_b) = tareas.get(1) {
+        tarea_b.abort();
+    }
+
+    // `TIMEOUT_SYNC` (`behaviour.rs`) son 30 s: el `esperar` genérico de este arnés (10 s) es
+    // demasiado corto para este caso concreto, así que aquí se espera explícitamente más que eso.
+    let plazo = tokio::time::Instant::now() + Duration::from_secs(35);
+    let mut visto = None;
+    while tokio::time::Instant::now() < plazo {
+        let resto = plazo.saturating_duration_since(tokio::time::Instant::now());
+        match tokio::time::timeout(resto, ev_a.recv()).await {
+            Ok(Some(e @ (EventoRed::PeticionFallida { .. } | EventoRed::PeerDesconectado(_)))) => {
+                visto = Some(e);
+                break;
+            }
+            Ok(Some(_)) => {}
+            Ok(None) | Err(_) => break,
+        }
+    }
+    assert!(
+        visto.is_some(),
+        "A MUST enterarse (fallo de petición o desconexión) dentro de TIMEOUT_SYNC, nunca \
+         quedarse esperando para siempre"
+    );
+
+    if let Some(tarea_a) = tareas.first() {
+        tarea_a.abort();
     }
 }

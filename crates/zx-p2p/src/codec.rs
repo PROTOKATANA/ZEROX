@@ -207,36 +207,67 @@ impl request_response::Codec for ZxCodec {
     }
 }
 
+/// Trozo de lectura de [`leer_acotado`] (`ORDEN-W06d6`, RI-3a #2).
+///
+/// **64 KiB.** Antes, `leer_acotado` reservaba `max + 1` (hasta ≈25,6 MB en una respuesta) **antes**
+/// de leer un solo byte. Un par que abre varios flujos de sincronización y no escribe nada retenía
+/// esa reserva completa durante todo `TIMEOUT_SYNC`, y con menos flujos que `MAX_STREAMS_SYNC`
+/// bastaba para agotar el presupuesto agregado (`Presupuesto`, 256 MiB) — confirmado
+/// (`REVISION-RI-3a.md` hallazgo 2). Reservando por trozos, lo que un par silencioso retiene nunca
+/// pasa de un trozo: el coste de un ataque de silencio deja de escalar con `MAX_RESPUESTA_BYTES`.
+pub const TROZO_LECTURA_BYTES: usize = 64 * 1024;
+
 /// Lee hasta `max` bytes y **distingue truncamiento de tamaño legítimo**.
 ///
-/// Se pide `max + 1`: si llegan `max + 1`, es que había más de lo permitido y se rechaza como
-/// exceso. Con `take(max)` a secas, el mismo caso llegaría al parser como datos corruptos, y el
-/// peer se clasificaría como `Ilegible` en vez de `Excedido` (C-NET-05).
+/// `ORDEN-W06d6` (RI-3a #2): la reserva es **incremental**, en trozos de [`TROZO_LECTURA_BYTES`],
+/// cada uno pedido **antes** de leerlo (C-NET-21 se mantiene: nunca se lee sin haber reservado
+/// primero lo que se va a leer). Lo reservado en cualquier instante nunca supera lo ya leído más un
+/// trozo — nunca el máximo del mensaje entero por adelantado. Todas las reservas de esta lectura se
+/// sueltan juntas al terminar (éxito, exceso o error de E/S): el total en vuelo mientras la lectura
+/// está en curso es exactamente lo que se ha leído hasta ahora (redondeado hacia arriba a trozos).
+///
+/// Se pide `max + 1` en total (vía `.take`): si llegan `max + 1`, es que había más de lo permitido
+/// y se rechaza como exceso. Con `take(max)` a secas, el mismo caso llegaría al parser como datos
+/// corruptos, y el peer se clasificaría como `Ilegible` en vez de `Excedido` (C-NET-05).
 async fn leer_acotado<T>(io: &mut T, max: u64, p: &Presupuesto) -> io::Result<Vec<u8>>
 where
     T: AsyncRead + Unpin + Send,
 {
-    // C-NET-21 · **reservar ANTES de leer.** Reservar después de haber leído contabilizaría memoria
-    // que ya está ocupada: el techo no acotaría nada, solo llevaría la cuenta del desastre.
-    let cupo = usize::try_from(max.saturating_add(1)).unwrap_or(usize::MAX);
-    let _reserva = p.reservar(cupo).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::OutOfMemory,
-            "C-NET-21: no queda presupuesto de memoria en vuelo",
-        )
-    })?;
-
+    let max_usize = usize::try_from(max).unwrap_or(usize::MAX);
     let mut buf = Vec::new();
-    io.take(max.saturating_add(1)).read_to_end(&mut buf).await?;
+    // Las reservas de todos los trozos de esta lectura viven hasta el final de la función (éxito o
+    // error): sueltan su cupo juntas, como un lote, no una a una a medida que se leen — pero cada
+    // una se pidió **antes** de leer su trozo, así que el máximo en vuelo en cualquier instante
+    // durante la lectura es `trozos_leídos_hasta_ahora × TROZO_LECTURA_BYTES`, nunca `max + 1`.
+    let mut reservas = Vec::new();
+    let mut acotado = io.take(max.saturating_add(1));
+    loop {
+        let reserva = p.reservar(TROZO_LECTURA_BYTES).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::OutOfMemory,
+                "C-NET-21: no queda presupuesto de memoria en vuelo",
+            )
+        })?;
+        reservas.push(reserva);
 
-    if buf.len() as u64 > max {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "C-NET-11: el mensaje supera el límite de tamaño",
-        ));
+        let inicio = buf.len();
+        buf.resize(inicio.saturating_add(TROZO_LECTURA_BYTES), 0);
+        let destino = buf.get_mut(inicio..).unwrap_or(&mut []);
+        let leidos = acotado.read(destino).await?;
+        buf.truncate(inicio.saturating_add(leidos));
+
+        if leidos == 0 {
+            break; // EOF: el otro extremo cerró (o `.take` agotó su cupo de `max + 1`).
+        }
+        if buf.len() > max_usize {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "C-NET-11: el mensaje supera el límite de tamaño",
+            ));
+        }
     }
     Ok(buf)
-    // `_reserva` se suelta aquí y devuelve el cupo — también por los `?` de arriba.
+    // `reservas` se suelta aquí y devuelve todo el cupo — también por los `?` de arriba.
 }
 
 fn a_io(e: ErrorCodec) -> io::Error {
@@ -415,6 +446,9 @@ pub fn peticion_a_bytes(p: &Peticion) -> Vec<u8> {
                 b.extend_from_slice(h.as_bytes());
             }
         }
+        Peticion::Registro { desde } => {
+            int::escribir_u64(&mut b, *desde);
+        }
     }
     b
 }
@@ -445,6 +479,10 @@ pub fn peticion_desde_bytes(bytes: &[u8]) -> Result<Peticion, ErrorCodec> {
         Peticion::DISC_BLOQUES => {
             let (hashes, r) = leer_hashes(r, limites::MAX_HASHES_POR_PETICION)?;
             (Peticion::Bloques { hashes }, r)
+        }
+        Peticion::DISC_REGISTRO => {
+            let (desde, r) = int::leer_u64(r)?;
+            (Peticion::Registro { desde }, r)
         }
         otro => {
             return Err(ErrorCodec::Codificacion(EncodingError::LockDesconocido {
@@ -485,6 +523,18 @@ pub fn respuesta_a_bytes(r: &Respuesta) -> Vec<u8> {
             }
         }
         Respuesta::NoDisponible => {}
+        Respuesta::Registro {
+            desde,
+            bloques,
+            longitud,
+        } => {
+            int::escribir_u64(&mut b, *desde);
+            compact_size::escribir(&mut b, bloques.len() as u64);
+            for bl in bloques {
+                b.extend_from_slice(&bloque_a_bytes(bl));
+            }
+            int::escribir_u64(&mut b, *longitud);
+        }
     }
     b
 }
@@ -521,6 +571,25 @@ pub fn respuesta_desde_bytes(bytes: &[u8]) -> Result<Respuesta, ErrorCodec> {
             (Respuesta::Bloques(bs), r)
         }
         Respuesta::DISC_NO_DISPONIBLE => (Respuesta::NoDisponible, r),
+        Respuesta::DISC_REGISTRO => {
+            let (desde, r) = int::leer_u64(r)?;
+            let (n, mut r) = leer_contador(r, limites::MAX_BLOQUES_POR_RESPUESTA)?;
+            let mut bloques = Vec::with_capacity(n);
+            for _ in 0..n {
+                let (bloque, resto) = bloque_desde_bytes_autotag(r)?;
+                bloques.push(bloque);
+                r = resto;
+            }
+            let (longitud, r) = int::leer_u64(r)?;
+            (
+                Respuesta::Registro {
+                    desde,
+                    bloques,
+                    longitud,
+                },
+                r,
+            )
+        }
         otro => {
             return Err(ErrorCodec::Codificacion(EncodingError::LockDesconocido {
                 discriminante: otro,
@@ -555,6 +624,9 @@ fn escribir_estado(b: &mut Vec<u8>, e: &Estado) {
         b.extend_from_slice(h.as_bytes());
     }
     b.extend_from_slice(&e.blue_work_virtual);
+    // `ORDEN-W06d6` decisión 1: campo nuevo, añadido al **final** del saludo (no se reordena nada
+    // de lo existente).
+    int::escribir_u64(b, e.longitud_registro);
 }
 
 /// Lee un saludo `Estado`.
@@ -582,6 +654,7 @@ fn leer_estado(bytes: &[u8]) -> Result<(Estado, &[u8]), ErrorCodec> {
     };
     let (punta_post, r) = leer_hashes(r, MAX_PUNTAS_POST)?;
     let (blue_work, r) = int::leer_32(r)?;
+    let (longitud_registro, r) = int::leer_u64(r)?;
 
     let estado = Estado {
         hash_genesis: BlockHash::from_digest(Digest::from_bytes(genesis)),
@@ -595,6 +668,7 @@ fn leer_estado(bytes: &[u8]) -> Result<(Estado, &[u8]), ErrorCodec> {
         terminal,
         puntas_post: punta_post,
         blue_work_virtual: blue_work,
+        longitud_registro,
     };
     Ok((estado, r))
 }
@@ -760,6 +834,7 @@ mod tests {
             terminal: Some(h(9)),
             puntas_post: vec![h(2), h(3)],
             blue_work_virtual: [0xcd; 32],
+            longitud_registro: 777,
         }
     }
 
@@ -777,6 +852,8 @@ mod tests {
             Peticion::Bloques {
                 hashes: vec![h(4), h(5)],
             },
+            Peticion::Registro { desde: 0 },
+            Peticion::Registro { desde: 123_456 },
         ]
     }
 
@@ -788,6 +865,16 @@ mod tests {
             Respuesta::Bloques(vec![]),
             Respuesta::Bloques(vec![bloque_pow(1), bloque_post(2)]),
             Respuesta::NoDisponible,
+            Respuesta::Registro {
+                desde: 0,
+                bloques: vec![],
+                longitud: 0,
+            },
+            Respuesta::Registro {
+                desde: 3,
+                bloques: vec![bloque_pow(1), bloque_post(2)],
+                longitud: 5,
+            },
         ]
     }
 

@@ -19,6 +19,17 @@ pub enum P2pError {
     #[error("no se pudo levantar el transporte: {0}")]
     Transporte(&'static str),
 
+    /// `ORDEN-W06d6` decisión 3 (V7): la publicación local por `gossipsub` falló, con el motivo
+    /// **real** que devolvió la librería (`gossipsub::PublishError`), no un texto fijo.
+    ///
+    /// Antes, cualquier fallo de `gossipsub.publish` (sin peers suscritos todavía —normal nada más
+    /// conectar—, mensaje demasiado grande, error de firma, colas llenas...) se colapsaba en el
+    /// mismo `P2pError::Transporte("gossipsub rechazó la publicación local")`: indistinguible entre
+    /// sí y sin valor para diagnosticar `zx-adversario` (`REVISION-W06d5.md`, V7 parcial: «la ráfaga
+    /// sigue fallando localmente... con el motivo real oculto»).
+    #[error("gossipsub rechazó la publicación local: {0}")]
+    Difusion(String),
+
     /// La dirección de escucha no es válida.
     #[error("dirección de escucha inválida")]
     DireccionInvalida,

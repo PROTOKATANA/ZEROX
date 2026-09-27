@@ -1,0 +1,13 @@
+2026-09-27T00:59:18+02:00 inicio W06d6, ejecutor Sonnet único; sha256sum -c de la entrada verificado
+2026-09-27T01:00:44+02:00 zona escribible preparada (ws.orig/ ws/); V0 lanzado (primer intento, contaminado, ver PROGRESO.md)
+2026-09-27T01:28:27+02:00 V0 relanzado correctamente contra ws.orig/ (el primer intento se había contaminado editando ws/ en paralelo)
+2026-09-27T01:41:48+02:00 implementación completa de zx-p2p/zx-node compila y pasa clippy/fmt; suites unitarias en verde
+2026-09-27T01:49:29+02:00 RI-3a "antes" lanzado contra ws.orig (los tres hallazgos confirmados)
+2026-09-27T01:53:42+02:00 build release para las corridas V3-V7
+2026-09-27T01:56:00+02:00 V3 lanzado (3 nodos reales, N_dev real); superado en vivo (misma punta y resumen_estado)
+2026-09-27T02:03:25+02:00 V0 confirmado en verde (795/0/5); V3 detenido; recompilando con `slot` en el registro
+2026-09-27T02:05:22+02:00 V4 corrida 1 lanzada (A, B, C con --dejar-de-producir-en-slot 1500); acumulando hacia 500 bloques
+2026-09-27T04:05:00+02:00 Cargo.lock corregido (deriva de versiones eliminada); relanzando test completo con --locked para confirmar
+2026-09-27T04:26:00+02:00 test completo tras fix de Cargo.lock: 814 passed / 0 failed, idéntico a V7; procediendo a regenerar cambios.patch y MIGRACION.sha256
+2026-09-27T04:41:00+02:00 Cargo.lock: segunda deriva (arista syn de data-encoding-macro-internal) encontrada y corregida a mano; cambios.patch regenerado limpio; cargo check --locked EXIT:0
+2026-09-27T04:43:00+02:00 empaquetado final cerrado: cambios.patch (3516 líneas) y MIGRACION.sha256 (28 archivos) verificados en verde con sha256sum -c; sin procesos huérfanos; W06d6 CERRADA

@@ -49,6 +49,7 @@ fn main() {
         n_dev: cli.n_dev,
         sr_dev: cli.sr_dev,
         parada_tras_slots: cli.parada_tras_slots,
+        dejar_de_producir_en_slot: cli.dejar_de_producir_en_slot,
     };
 
     let mut nodo = match Nodo::arrancar(&cfg) {

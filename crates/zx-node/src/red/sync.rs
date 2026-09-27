@@ -20,7 +20,7 @@
 //! puntas del par" que pide la decisión 4. El límite de saltos
 //! ([`super::LIMITE_SALTOS_RECORRIDO_ATRAS`]) lo aplica el hilo de consenso, no esta tarea.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -29,11 +29,11 @@ use tokio::sync::mpsc;
 use tokio::time::{self, MissedTickBehavior};
 
 use zx_p2p::error::MotivoDesconexion;
-use zx_p2p::mensaje::{Peticion, Respuesta};
+use zx_p2p::mensaje::{BloqueRed, Peticion, Respuesta};
 use zx_p2p::servicio::{EventoRed, ManejoRed};
 
-use super::TrabajoRed;
 use super::vista::VistaRed;
+use super::{EmisorTrabajoRed, ResultadoEnvioTrabajo, TrabajoRed};
 
 /// Cuántos hashes se piden a la vez en una `Peticion::Bloques` de sincronización (el tope del
 /// protocolo, no un valor propio: pedir más de golpe es un `Excedido` seguro).
@@ -53,9 +53,30 @@ const LOTE_BLOQUES: usize = zx_p2p::limites::MAX_HASHES_POR_PETICION;
 const PLAZO_REINTENTO_SALUDO: Duration = Duration::from_secs(5);
 
 /// Qué sabemos de un par para no repetirle la misma petición sin sentido.
+///
+/// `ORDEN-W06d6` decisión 1: `cursor`, `longitud_conocida`, `pagina_en_vuelo` y `pendientes` son la
+/// sincronización por páginas del registro de admisión — la vía **principal** de puesta al día
+/// (la resolución por padres, ya existente, se queda para los huecos pequeños). Un valor `Default`
+/// nuevo (`cursor = 0`) es exactamente "empieza en 0 al conectar": `PeerDesconectado` quita la
+/// entrada entera del mapa, así que una reconexión siempre arranca con un `EstadoPeer` fresco —
+/// tras cada reconexión se vuelve a transferir el registro entero del par (límite declarado,
+/// coste lineal en la historia; aceptable en la red dev, como E-10).
 #[derive(Default)]
 struct EstadoPeer {
     saludo_pedido: bool,
+    /// Siguiente índice del registro de admisión de este par que todavía no hemos encolado.
+    cursor: u64,
+    /// Mayor `longitud_registro` que este par ha declarado (saludo o `Respuesta::Registro`).
+    longitud_conocida: u64,
+    /// ¿Hay una `Peticion::Registro` de este par sin responder todavía? **Una página en vuelo por
+    /// par**: no se pide la siguiente mientras esta sea `true`.
+    pagina_en_vuelo: bool,
+    /// Bloques de la última página que todavía no se han podido encolar hacia el hilo de consenso
+    /// (cola llena, RI-3a #3): se reintentan en cada barrido periódico, en el mismo orden, antes de
+    /// pedir la página siguiente. Esto es la **contrapresión real** de la decisión 1: la siguiente
+    /// página se pide cuando el hilo de consenso ha hecho sitio para la anterior (la cola acotada
+    /// lo señala con `Lleno`), no en un temporizador fijo.
+    pendientes: VecDeque<BloqueRed>,
 }
 
 /// Corre para siempre (hasta que el canal de eventos se cierra): la tarea de sincronización.
@@ -63,7 +84,7 @@ pub async fn tarea_sincronizacion(
     mut eventos: mpsc::Receiver<EventoRed>,
     manejo: ManejoRed,
     vista: Arc<VistaRed>,
-    trabajo: mpsc::UnboundedSender<TrabajoRed>,
+    trabajo: EmisorTrabajoRed,
 ) {
     let mut peers: HashMap<PeerId, EstadoPeer> = HashMap::new();
     let mut reintento = time::interval(PLAZO_REINTENTO_SALUDO);
@@ -87,9 +108,18 @@ pub async fn tarea_sincronizacion(
                     }
                     EventoRed::PeticionFallida { peer } => {
                         tracing::debug!(%peer, "una petición de sincronización no llegó a completarse");
+                        // Pudo ser la `Peticion::Registro` en vuelo: sin esto, `pagina_en_vuelo`
+                        // se quedaría en `true` para siempre y este par dejaría de sincronizar por
+                        // registro hasta la próxima reconexión.
+                        if let Some(e) = peers.get_mut(&peer) {
+                            e.pagina_en_vuelo = false;
+                        }
+                        pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
                     }
                     EventoRed::Respuesta { peer, respuesta, .. } => {
                         atender_respuesta(&manejo, &vista, &trabajo, &mut peers, peer, *respuesta).await;
+                        drenar_pendientes(peer, &mut peers, &trabajo);
+                        pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
                     }
                     EventoRed::Escuchando(_) | EventoRed::Suscripcion { .. } => {}
                 }
@@ -99,8 +129,82 @@ pub async fn tarea_sincronizacion(
                     if manejo.pedir(peer, Peticion::Estado).await.is_err() {
                         tracing::debug!(%peer, "no se pudo repetir el saludo periódico");
                     }
+                    // `ORDEN-W06d6` decisión 1: reintenta encolar lo que se quedó atascado por la
+                    // cola llena, y si ya está todo encolado y toca, pide la siguiente página.
+                    drenar_pendientes(peer, &mut peers, &trabajo);
+                    pedir_pagina_si_toca(peer, &mut peers, &manejo).await;
                 }
             }
+        }
+    }
+}
+
+/// Reintenta encolar hacia el hilo de consenso lo que quedó pendiente de la última página de este
+/// par (RI-3a #3: la cola puede estar llena). Avanza `cursor` por cada bloque que sí se encola;
+/// para en el primero que no quepa (se reintenta en el próximo barrido, en el mismo orden).
+fn drenar_pendientes(
+    peer: PeerId,
+    peers: &mut HashMap<PeerId, EstadoPeer>,
+    trabajo: &EmisorTrabajoRed,
+) {
+    let Some(e) = peers.get_mut(&peer) else {
+        return;
+    };
+    while let Some(bloque) = e.pendientes.pop_front() {
+        match trabajo.intentar_enviar(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque }) {
+            ResultadoEnvioTrabajo::Encolado => {
+                e.cursor = e.cursor.saturating_add(1);
+            }
+            ResultadoEnvioTrabajo::Lleno(TrabajoRed::BloqueDeSincronizacion { bloque, .. }) => {
+                // Todavía llena: se devuelve al frente y se para — ni este ni los que le siguen se
+                // reordenan (el registro es un orden causal, RI-3a #3 exige no bloquear la red,
+                // así que simplemente no se sigue intentando esta vuelta).
+                e.pendientes.push_front(bloque);
+                break;
+            }
+            ResultadoEnvioTrabajo::Lleno(TrabajoRed::BloqueDifundido { .. }) => {
+                // No debería ocurrir (este bucle solo encola `BloqueDeSincronizacion`): se registra
+                // y se sigue, en vez de entrar en pánico por una variante que no se puede dar.
+                tracing::error!(
+                    "drenar_pendientes: intentar_enviar devolvió una variante inesperada"
+                );
+                break;
+            }
+            ResultadoEnvioTrabajo::Cerrado(_) => {
+                // El hilo de consenso ya no existe: nada más que hacer con esta página. El bucle
+                // principal lo descubrirá pronto por su cuenta (el canal de eventos también se
+                // cerrará cuando el nodo entero termine).
+                e.pendientes.clear();
+                break;
+            }
+        }
+    }
+}
+
+/// Pide la siguiente página del registro de admisión de `peer` si: no hay ya una en vuelo, no
+/// quedan bloques pendientes de encolar de la anterior (la contrapresión de la decisión 1), y el
+/// cursor todavía no alcanzó la longitud que ese par declaró.
+async fn pedir_pagina_si_toca(
+    peer: PeerId,
+    peers: &mut HashMap<PeerId, EstadoPeer>,
+    manejo: &ManejoRed,
+) {
+    let Some(e) = peers.get_mut(&peer) else {
+        return;
+    };
+    if e.pagina_en_vuelo || !e.pendientes.is_empty() || e.cursor >= e.longitud_conocida {
+        return;
+    }
+    e.pagina_en_vuelo = true;
+    let desde = e.cursor;
+    if manejo
+        .pedir(peer, Peticion::Registro { desde })
+        .await
+        .is_err()
+    {
+        tracing::debug!(%peer, desde, "no se pudo pedir una página del registro de admisión");
+        if let Some(e) = peers.get_mut(&peer) {
+            e.pagina_en_vuelo = false;
         }
     }
 }
@@ -108,7 +212,7 @@ pub async fn tarea_sincronizacion(
 async fn atender_respuesta(
     manejo: &ManejoRed,
     vista: &VistaRed,
-    trabajo: &mpsc::UnboundedSender<TrabajoRed>,
+    trabajo: &EmisorTrabajoRed,
     peers: &mut HashMap<PeerId, EstadoPeer>,
     peer: PeerId,
     respuesta: Respuesta,
@@ -126,7 +230,11 @@ async fn atender_respuesta(
             }
             if let Some(e) = peers.get_mut(&peer) {
                 e.saludo_pedido = true;
+                // `ORDEN-W06d6` decisión 1: el saludo trae la longitud del registro del par; es lo
+                // que dispara la primera página (o una más, si el par avanzó desde la última vez).
+                e.longitud_conocida = e.longitud_conocida.max(otro.longitud_registro);
             }
+            vista.actualizar_mejor_longitud_par(otro.longitud_registro);
 
             // Fase PoW: pedimos cabeceras si el par declara más altura que nosotros, **o** si su
             // punta declarada es un hash que no reconocemos todavía (aunque su altura sea igual o
@@ -207,17 +315,54 @@ async fn atender_respuesta(
         }
         Respuesta::Bloques(bloques) => {
             for bloque in bloques {
-                if trabajo
-                    .send(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque })
-                    .is_err()
+                // `ORDEN-W06d6` (RI-3a #3): un tope lleno (sin bloquear la red) descarta y sigue —
+                // el bloque perdido se recupera por la propia sincronización (el cursor no avanza
+                // hasta que el hilo de consenso procese, decisión 1) o por la petición de padres.
+                // Solo el canal **cerrado** (hilo de consenso muerto) termina esta tarea.
+                match trabajo
+                    .intentar_enviar(TrabajoRed::BloqueDeSincronizacion { de: peer, bloque })
                 {
-                    tracing::error!("hilo de consenso caído: bloque de sincronización descartado");
-                    return;
+                    ResultadoEnvioTrabajo::Encolado => {}
+                    ResultadoEnvioTrabajo::Lleno(_) => {
+                        tracing::warn!(
+                            %peer,
+                            "cola de trabajo llena: bloque de sincronización descartado \
+                             (límite alcanzado, RI-3a #3)"
+                        );
+                    }
+                    ResultadoEnvioTrabajo::Cerrado(_) => {
+                        tracing::error!(
+                            "hilo de consenso caído: bloque de sincronización descartado"
+                        );
+                        return;
+                    }
                 }
             }
         }
         Respuesta::NoDisponible => {
             // Legítimo (el par podó esa rama, o nunca la tuvo): no penaliza (C-NET-05).
+        }
+        Respuesta::Registro {
+            bloques, longitud, ..
+        } => {
+            // `ORDEN-W06d6` decisión 1: la página en vuelo terminó (haya traído algo o no). Se
+            // encola aquí mismo lo que se pueda (RI-3a #3 acota); lo que no quepa se guarda en
+            // `pendientes` y `drenar_pendientes`/`pedir_pagina_si_toca` (llamadas por el bucle
+            // principal justo después de esto) hacen el resto: reintentar y, cuando ya no quede
+            // nada pendiente, pedir la página siguiente.
+            vista.actualizar_mejor_longitud_par(longitud);
+            if let Some(e) = peers.get_mut(&peer) {
+                e.pagina_en_vuelo = false;
+                e.longitud_conocida = e.longitud_conocida.max(longitud);
+                if bloques.is_empty() {
+                    // El par no tenía nada nuevo en `desde` (p. ej. su propia `longitud` bajó de
+                    // estimación, o ya estábamos al día): no se avanza el cursor; se reintentará
+                    // cuando su `longitud_conocida` vuelva a subir (saludo periódico u otra
+                    // página).
+                } else {
+                    e.pendientes.extend(bloques);
+                }
+            }
         }
     }
 }

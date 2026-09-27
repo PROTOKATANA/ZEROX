@@ -80,11 +80,24 @@ struct Espia {
 
 impl ManejadorEntrante for Espia {
     fn estado(&self) -> Estado {
-        // La herramienta no es un nodo real: declara un génesis vacío. Si el objetivo comprueba
-        // esto y desconecta, es exactamente C-NET del lado del objetivo funcionando; no rompe nada
-        // del lado de la herramienta (no le pedimos que confíe en nuestro estado).
+        // `ORDEN-W06d6` decisión 3 (V7), hallazgo en vivo: la herramienta declaraba un
+        // `hash_genesis` vacío (`[0xEE; 32]`) a propósito ("si el objetivo comprueba esto y
+        // desconecta, no rompe nada del lado de la herramienta"). Eso era cierto con un objetivo
+        // recién arrancado, pero deja de serlo con un objetivo real en marcha (500+ bloques): el
+        // saludo recíproco del propio objetivo (`sync.rs::atender_respuesta`, `Respuesta::Estado`)
+        // ve el génesis ajeno y llama a `desconectar(ViolacionDeConsenso)` **de inmediato** — y como
+        // la respuesta de esta herramienta (trivial) siempre llega antes que la del objetivo
+        // (construir la suya es más caro cuantos más bloques tenga), el objetivo gana la carrera
+        // sistemáticamente y corta la conexión antes de que la herramienta reciba nada, dejando
+        // "el objetivo no respondió el saludo" — la ráfaga de escenarios nunca llegaba a mandarse.
+        // Reproducido en vivo contra un objetivo con 500+ bloques PoST (`PROGRESO.md`). El génesis
+        // dev es una constante pública y fija (`HASH_GENESIS_DEV`); declararlo de verdad no debilita
+        // ningún escenario adversarial (el génesis no es parte de ningún ataque de E-7/E-8) y evita
+        // el corte antes de que la herramienta pueda hacer su trabajo.
         Estado {
-            hash_genesis: BlockHash::from_digest(Digest::from_bytes([0xEE; 32])),
+            hash_genesis: BlockHash::from_digest(Digest::from_bytes(
+                zx_consensus::genesis::HASH_GENESIS_DEV,
+            )),
             red: Red::Dev,
             fase: Fase::Pow,
             punta_pow: zx_p2p::mensaje::PuntaPow {
@@ -95,6 +108,7 @@ impl ManejadorEntrante for Espia {
             terminal: None,
             puntas_post: Vec::new(),
             blue_work_virtual: [0; 32],
+            longitud_registro: 0,
         }
     }
 
@@ -302,6 +316,17 @@ fn escenario_post_malo(slot: u8, variante: u8, estado_objetivo: &Estado) -> Opti
 
 #[tokio::main]
 async fn main() {
+    // `ORDEN-W06d6` decisión 3 (V7): sin esto, ningún `tracing::debug!`/`tracing::warn!` de esta
+    // herramienta ni de `zx-p2p` (el motivo real de un rechazo local de gossipsub, penalizaciones
+    // de par, etc.) se imprime en ningún sitio — la mitad de por qué V7 quedó "parcial" en
+    // `REVISION-W06d5.md`: el motivo existía en el código pero nada lo mostraba. `DEBUG` fijo (no
+    // `RUST_LOG`): esta es una herramienta de diagnóstico de un solo uso, no un servicio con
+    // configuración propia.
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_target(true)
+        .init();
+
     let cli = Cli::parse();
     let swarm = match swarm_tcp() {
         Ok(s) => s,

@@ -22,6 +22,16 @@
 //!   imposible (forma, firma, cuenta o estructura que el nodo construyó por completo desde su
 //!   propio estado). Sigue siendo **fatal** para un bloque propio (decisión 4 de `ORDEN-W06d1`, sin
 //!   cambios); para un bloque de red, penaliza igual que `Legitimo`.
+//! - **ImposibleSinPenalizar** (`ORDEN-W06d6`, RI-3c H2): `MotivoCabeceraPendiente::PruebaPotIncoherente`
+//!   y `MotivoCabeceraPendiente::RangoSinAtadura` documentan, en el propio contrato del tipo
+//!   (`zx_post::cabecera_conjunta`), que **no deberían ocurrir por construcción** —a diferencia del
+//!   resto de `Pendiente`, que sí es carencia de contexto local genuina (`Pot(PasadoIncompleto)` en
+//!   un nodo que sincroniza fuera de orden). Si ocurren de verdad, no tiene sentido reintentar (el
+//!   hueco no se va a llenar solo, no es un problema de orden de llegada) pero tampoco hay certeza
+//!   de que sea un defecto **del candidato**: puede ser un fallo de este nodo (una implementación
+//!   nuestra que rompe la garantía que el propio tipo declara). Fatal si es propio, igual que
+//!   `Interno`; si es de red, se rechaza (no se reintenta, no se acepta) pero **sin penalizar** al
+//!   remitente — es la diferencia con `Interno`.
 //!
 //! # Motivos legítimos y su justificación (`REVISION-W06d4.md`)
 //!
@@ -78,6 +88,12 @@ pub enum ClasificacionRechazo {
     /// Violación de invariante interna: fatal si es propio (decisión 4 de `ORDEN-W06d1`, sin
     /// cambios); penaliza igual que `Legitimo` si es de red.
     Interno,
+    /// `ORDEN-W06d6`, RI-3c H2: comprobación marcada "imposible por construcción" en su propio
+    /// contrato que sin embargo ocurrió (`PruebaPotIncoherente`, `RangoSinAtadura`). Fatal si es
+    /// propio, igual que `Interno`; si es de red, se rechaza (`VeredictoFinal::Ignorar`: no se
+    /// reintenta, no se acepta) pero **sin penalizar** al remitente, porque no hay certeza de que
+    /// sea un defecto suyo y no nuestro.
+    ImposibleSinPenalizar,
 }
 
 impl ClasificacionRechazo {
@@ -92,6 +108,15 @@ impl ClasificacionRechazo {
     #[must_use]
     pub const fn es_pendiente(self) -> bool {
         matches!(self, Self::Pendiente)
+    }
+
+    /// ¿Un bloque de red con esta clasificación debe **penalizar** al remitente si se descarta?
+    /// (`ORDEN-W06d6`, RI-3c H2). `Legitimo` e `Interno` sí (defecto verificable, atribuible al
+    /// candidato); `ImposibleSinPenalizar` no (podría ser un fallo nuestro); `Pendiente` nunca
+    /// llega a este punto (se reintenta, no se rechaza).
+    #[must_use]
+    pub const fn penaliza_en_red(self) -> bool {
+        matches!(self, Self::Legitimo | Self::Interno)
     }
 }
 
@@ -110,11 +135,17 @@ pub fn clasificar_cabecera_invalida(m: &MotivoCabeceraInvalida) -> Clasificacion
     }
 }
 
-/// Toda [`MotivoCabeceraPendiente`] es `Pendiente` (nunca prueba de invalidez) por contrato del
-/// propio tipo: ver el docstring del módulo.
+/// Casi toda [`MotivoCabeceraPendiente`] es `Pendiente` (nunca prueba de invalidez) por contrato
+/// del propio tipo: ver el docstring del módulo. Las dos excepciones (`ORDEN-W06d6`, RI-3c H2) son
+/// las que el propio tipo documenta como imposibles por construcción: si ocurren de verdad no son
+/// una carencia de contexto que se vaya a resolver reintentando.
 #[must_use]
-pub const fn clasificar_cabecera_pendiente(_m: &MotivoCabeceraPendiente) -> ClasificacionRechazo {
-    ClasificacionRechazo::Pendiente
+pub const fn clasificar_cabecera_pendiente(m: &MotivoCabeceraPendiente) -> ClasificacionRechazo {
+    match m {
+        MotivoCabeceraPendiente::PruebaPotIncoherente
+        | MotivoCabeceraPendiente::RangoSinAtadura => ClasificacionRechazo::ImposibleSinPenalizar,
+        _ => ClasificacionRechazo::Pendiente,
+    }
 }
 
 /// Clasifica un [`MotivoBloque`] (`Cadena::admitir`).
@@ -200,6 +231,35 @@ mod tests {
         let contexto_ausente = MotivoCabeceraPendiente::ContextoPiezaAusente;
         assert!(clasificar_cabecera_pendiente(&contexto_ausente).es_legitimo());
         assert!(clasificar_cabecera_pendiente(&contexto_ausente).es_pendiente());
+    }
+
+    /// `ORDEN-W06d6`, RI-3c H2: `PruebaPotIncoherente` y `RangoSinAtadura` dejan de ser `Pendiente`
+    /// (el propio tipo las documenta como imposibles por construcción, no como carencia de
+    /// contexto): fatal si son propias (como `Interno`), y de red se rechazan sin penalizar.
+    #[test]
+    fn las_dos_imposibles_por_construccion_no_son_pendientes() {
+        for m in [
+            MotivoCabeceraPendiente::PruebaPotIncoherente,
+            MotivoCabeceraPendiente::RangoSinAtadura,
+        ] {
+            let c = clasificar_cabecera_pendiente(&m);
+            assert_eq!(c, ClasificacionRechazo::ImposibleSinPenalizar, "{m:?}");
+            assert!(!c.es_pendiente(), "{m:?}: no debe reintentarse");
+            assert!(!c.es_legitimo(), "{m:?}: fatal si es propia, como Interno");
+            assert!(
+                !c.penaliza_en_red(),
+                "{m:?}: no debe penalizar al remitente"
+            );
+        }
+    }
+
+    /// `penaliza_en_red`: solo `Legitimo` e `Interno` penalizan; `ImposibleSinPenalizar` no.
+    #[test]
+    fn solo_legitimo_e_interno_penalizan_en_red() {
+        assert!(ClasificacionRechazo::Legitimo.penaliza_en_red());
+        assert!(ClasificacionRechazo::Interno.penaliza_en_red());
+        assert!(!ClasificacionRechazo::ImposibleSinPenalizar.penaliza_en_red());
+        assert!(!ClasificacionRechazo::Pendiente.penaliza_en_red());
     }
 
     /// `Legitimo` (defecto verificable del candidato, no falta de contexto) no es `Pendiente`: la

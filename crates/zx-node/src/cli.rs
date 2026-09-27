@@ -81,6 +81,13 @@ pub struct Cli {
     #[arg(long)]
     pub parada_tras_slots: Option<u64>,
 
+    /// `ORDEN-W06d6` decisión 6: desde este slot el nodo deja de **producir**, pero sigue
+    /// validando, propagando y sincronizando (a diferencia de `--parada-tras-slots`, que para el
+    /// nodo entero). Solo red dev, no es consenso: sirve para el reposo antes de comparar estados
+    /// entre nodos (`P-ZRX/P-MEDICION/REVISION-W07c.md`).
+    #[arg(long)]
+    pub dejar_de_producir_en_slot: Option<u64>,
+
     /// Dirección donde escuchar (`ORDEN-W06d2`). Sin esto ni `--red-marcar`, el nodo corre
     /// exactamente como en `ORDEN-W06d1`: sin red.
     #[arg(long, value_name = "MULTIADDR")]
