@@ -1,0 +1,796 @@
+diff -ruN ws.orig/crates/zx-node/src/evidencia.rs ws/crates/zx-node/src/evidencia.rs
+--- ws.orig/crates/zx-node/src/evidencia.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-node/src/evidencia.rs	2026-09-27 10:03:08.854159789 +0200
+@@ -34,6 +34,7 @@
+ 
+ use std::collections::BTreeMap;
+ 
++use zx_consensus::transicion::Estado;
+ use zx_core::preimage::dag::DagBlockHeader;
+ use zx_core::{ExtensionTx, PreHash, Tx, incident_id_evidencia};
+ use zx_post::firmante::{Firmante, IdentidadTicket};
+@@ -246,14 +247,63 @@
+     if ph_a < ph_b { (a, b) } else { (b, a) }
+ }
+ 
++/// Filtra, de las pendientes del detector, las que un bloque con el estado base y el slot objetivo
++/// dados puede incluir (`ORDEN-SL4b2` decisión 4; unitarios de inclusión de `ORDEN-SL4b3`).
++///
++/// Una pendiente es elegible si su ventana sigue abierta en `slot_objetivo`
++/// (`slot_falta ≤ slot_objetivo < slot_falta + plazo_slots`) y su incidente **no** está ya procesado
++/// en `estado_base` (el estado sobre el que se construye el bloque; `None` cuenta como no
++/// procesado). Devuelve hasta `max_por_bloque` transacciones, en orden de `incident_id`.
++///
++/// No marca nada como incluido: si el bloque portador sale después de la cadena seleccionada, esta
++/// misma consulta vuelve a devolver la pendiente (decisión 4: «vuelve a ser elegible»). La poda de
++/// pendientes por cierre de ventana la hace [`DetectorDobleFirma::podar_pendientes`].
++#[must_use]
++pub fn elegibles(
++    detector: &DetectorDobleFirma,
++    estado_base: Option<&Estado>,
++    slot_objetivo: u64,
++    plazo_slots: u64,
++    max_por_bloque: usize,
++) -> Vec<Tx> {
++    detector
++        .pendientes()
++        .filter(|p| ventana_abierta(p, slot_objetivo, plazo_slots))
++        .filter(|p| !ya_procesado(p, estado_base))
++        .take(max_por_bloque)
++        .map(|p| p.tx.clone())
++        .collect()
++}
++
++/// ¿La ventana de admisión de `p` sigue abierta en `slot_objetivo`? (`EV-13`).
++fn ventana_abierta(p: &Pendiente, slot_objetivo: u64, plazo_slots: u64) -> bool {
++    p.slot_falta <= slot_objetivo && slot_objetivo < p.slot_falta.saturating_add(plazo_slots)
++}
++
++/// ¿El incidente de `p` está ya procesado en `estado_base`? (`EV-11`).
++fn ya_procesado(p: &Pendiente, estado_base: Option<&Estado>) -> bool {
++    estado_base.is_some_and(|estado| {
++        let clave = match &p.tx.extension {
++            ExtensionTx::Evidencia { h1, .. } => h1.sol.public_key,
++            _ => return false,
++        };
++        estado
++            .garantias
++            .get(&clave)
++            .is_some_and(|g| g.incidentes.iter().any(|i| i.id == p.incident_id))
++    })
++}
++
+ #[cfg(test)]
+ #[expect(
+     clippy::panic,
+     clippy::expect_used,
++    clippy::indexing_slicing,
+     reason = "los tests fallan con panic por diseño"
+ )]
+ mod tests {
+-    use super::{DetectorDobleFirma, Observacion};
++    use super::{DetectorDobleFirma, Observacion, elegibles};
++    use zx_consensus::transicion::{Estado, Garantia, Incidente};
+     use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
+     use zx_core::{BodyCommitment, ClavePublica, Digest, MerkleRoot};
+ 
+@@ -426,4 +476,109 @@
+         assert_eq!(podadas.len(), 1);
+         assert_eq!(d.pendientes_len(), 0);
+     }
++
++    // ─────────────────────────────────────────────────────────────────────────────
++    // V2 de `ORDEN-SL4b3`: inclusión de evidencias (unitaria, sin montar un `Nodo`).
++    // ─────────────────────────────────────────────────────────────────────────────
++
++    /// Detector con un único incidente (slot_falta = 100): devuelve también su `incident_id`, la
++    /// clave del firmante y el slot de la falta, para construir el estado base de cada caso.
++    fn detector_con_incidente() -> (DetectorDobleFirma, [u8; 32], ClavePublica, u64) {
++        let mut d = DetectorDobleFirma::nuevo(10);
++        d.observar(cabecera(7, 1, 3, 1 << 20, 5, 100, 1));
++        let (obs, _) = d.observar(cabecera(7, 1, 3, 1 << 20, 5, 100, 2));
++        match obs {
++            Observacion::Incidente(p) => {
++                let clave = match &p.tx.extension {
++                    zx_core::ExtensionTx::Evidencia { h1, .. } => h1.sol.public_key,
++                    _ => panic!("la pendiente debía ser una EvidenceTx"),
++                };
++                (d, p.incident_id, clave, p.slot_falta)
++            }
++            otro => panic!("se esperaba Incidente, llegó {otro:?}"),
++        }
++    }
++
++    /// Estado base con el incidente `id` ya procesado en la garantía de `clave`.
++    fn estado_con_incidente(clave: ClavePublica, id: [u8; 32], slot_falta: u64) -> Estado {
++        let mut estado = Estado::inicial();
++        estado.garantias.insert(
++            clave,
++            Garantia {
++                incidentes: vec![Incidente {
++                    id,
++                    slot_falta: i64::try_from(slot_falta).expect("el slot cabe en i64"),
++                }],
++                ..Garantia::nueva()
++            },
++        );
++        estado
++    }
++
++    /// Pendiente con ventana abierta → se incluye (una `EvidenceTx` v4).
++    #[test]
++    fn pendiente_con_ventana_abierta_se_incluye() {
++        let (d, _id, _clave, _slot) = detector_con_incidente();
++        let incluidas = elegibles(&d, None, 150, 300, 4);
++        assert_eq!(incluidas.len(), 1, "una pendiente con ventana abierta");
++        assert_eq!(incluidas[0].version, 4, "la transacción incluida es la v4");
++        assert!(matches!(
++            incluidas[0].extension,
++            zx_core::ExtensionTx::Evidencia { .. }
++        ));
++    }
++
++    /// Incidente ya procesado en el estado base → no se incluye.
++    #[test]
++    fn incidente_ya_procesado_en_el_estado_base_no_se_incluye() {
++        let (d, id, clave, slot_falta) = detector_con_incidente();
++        let estado = estado_con_incidente(clave, id, slot_falta);
++        assert!(
++            elegibles(&d, Some(&estado), 150, 300, 4).is_empty(),
++            "el estado base ya tiene el incidente: nada que incluir"
++        );
++    }
++
++    /// Ventana cerrada → no se incluye y la pendiente sale de la lista.
++    #[test]
++    fn ventana_cerrada_no_se_incluye_y_sale_de_la_lista() {
++        let (mut d, _id, _clave, _slot) = detector_con_incidente();
++        // `slot_falta = 100`, plazo 300 ⇒ la ventana cierra en 400.
++        assert_eq!(
++            elegibles(&d, None, 399, 300, 4).len(),
++            1,
++            "en 399 la ventana sigue abierta"
++        );
++        assert_eq!(
++            d.podar_pendientes(400, 300).len(),
++            1,
++            "la poda retira la pendiente cerrada"
++        );
++        assert_eq!(d.pendientes_len(), 0);
++        assert!(
++            elegibles(&d, None, 400, 300, 4).is_empty(),
++            "cerrada la ventana, ya no es elegible"
++        );
++    }
++
++    /// El bloque portador sale de la cadena seleccionada tras una reorganización → la pendiente
++    /// vuelve a ser elegible (no hay marca interna de «incluida»).
++    #[test]
++    fn bloque_portador_fuera_de_la_cadena_vuelve_a_ser_elegible() {
++        let (d, id, clave, slot_falta) = detector_con_incidente();
++        let con_bloque = estado_con_incidente(clave, id, slot_falta);
++        assert!(
++            elegibles(&d, Some(&con_bloque), 150, 300, 4).is_empty(),
++            "con el bloque portador en la cadena, el incidente ya está procesado"
++        );
++        // Reorganización: la nueva punta seleccionada no trae el incidente procesado.
++        let sin_bloque = Estado::inicial();
++        let tras_reorg = elegibles(&d, Some(&sin_bloque), 150, 300, 4);
++        assert_eq!(tras_reorg.len(), 1, "vuelve a ser elegible");
++        assert_eq!(
++            d.pendientes_len(),
++            1,
++            "la pendiente nunca se borró del detector"
++        );
++    }
+ }
+diff -ruN ws.orig/crates/zx-node/src/nodo.rs ws/crates/zx-node/src/nodo.rs
+--- ws.orig/crates/zx-node/src/nodo.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-node/src/nodo.rs	2026-09-27 10:00:24.488729883 +0200
+@@ -31,7 +31,10 @@
+ use zx_poas::HistoriaGenesis;
+ use zx_post::cabecera_conjunta::{EstadoCabeceraConjunta, verificar_cabecera_conjunta};
+ use zx_post::pot_rango::{CachePotVerificada, PresupuestoPot};
+-use zx_post::productor::{FuenteSoluciones, ParametrosProductor, SolucionCandidata, producir};
++use zx_post::productor::{
++    FuenteSoluciones, ParametrosProductor, ProductoFirmado, SolucionCandidata,
++    producir_con_firmante,
++};
+ use zx_post::servicio_pot::ServicioPot;
+ use zx_storage::disco::AlmacenEnDisco;
+ use zx_storage::{Almacen, BloqueAdmitido, ErrorRepeticion, Familia};
+@@ -48,7 +51,7 @@
+ use crate::red::{self, ManijaRed, ReceptorTrabajoRed, TrabajoRed};
+ use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
+ use crate::registro::Registro;
+-use zx_post::firmante::Registro as RegistroFirmante;
++use zx_post::firmante::{Firmante, Registro as RegistroFirmante};
+ 
+ /// `SR_dev`/`ContextoRangoDag` constante del perfil dev (D-P11: sin controlador).
+ struct RangoDev(u64);
+@@ -2245,7 +2248,9 @@
+         // dejar de ser el seleccionado), aunque ya no sea `self.cadena.terminal()`.
+         self.asegurar_servicios_verificacion()?;
+ 
+-        // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
++        // El primer bloque de régimen (transición) se produce con el firmante seguro
++        // (`producir_con_firmante`, `ORDEN-SL4b3` decisión 1), ya no con la ruta que sellaba sin
++        // registrar. El resto del comentario conserva el motivo de la espera.
+         //
+         // `ORDEN-W06d5` decisión 1, extensión encontrada **en vivo** al repetir V5 con esta misma
+         // orden ya aplicada (evidencia en `PROGRESO.md`): un nodo que llega tarde también puede
+@@ -2271,10 +2276,16 @@
+                     "sin garantía propia en el terminal: no se intenta producir el bloque de \
+                      transición; se espera a sincronizarlo de otro nodo"
+                 );
+-                while self.cadena.tips_validas().is_empty() {
+-                    self.procesar_trabajo_red_pendiente();
+-                    std::thread::sleep(std::time::Duration::from_millis(50));
+-                }
++            }
++            // `ORDEN-SL4b3` decisión 1: si `producir_bloque_transicion` se abstuvo (conflicto o
++            // pérdida de registro), no produjo nada y `tips_validas()` sigue vacío. Reintentar el
++            // mismo candidato determinista solo repetiría la abstención (misma identidad y slot), así
++            // que la recuperación es la sincronización con la red, no un bucle de producción; el
++            // hilo productor de régimen retomará la producción en los slots siguientes en cuanto la
++            // transición esté en la cadena.
++            while self.cadena.tips_validas().is_empty() {
++                self.procesar_trabajo_red_pendiente();
++                std::thread::sleep(std::time::Duration::from_millis(50));
+             }
+         }
+ 
+@@ -2396,28 +2407,16 @@
+                     // `ORDEN-SL4b2` decisión 4: hasta `MAX_EVIDENCIAS_POR_BLOQUE` pendientes cuyo
+                     // incidente no esté ya procesado en `estado_base` (el estado sobre el que
+                     // construye este bloque) y cuya ventana siga abierta en `slot_objetivo`
+-                    // (`slot_falta ≤ slot_objetivo < slot_falta + Plazo_slots`).
++                    // (`slot_falta ≤ slot_objetivo < slot_falta + Plazo_slots`). El filtro vive en
++                    // `evidencia::elegibles` para poder probarlo por unidad (`ORDEN-SL4b3` V2).
+                     let evp = perfil::parametros_evidencia_dev();
+-                    let evidencias: Vec<zx_core::Tx> = self
+-                        .detector
+-                        .pendientes()
+-                        .filter(|p| {
+-                            let ventana_abierta = p.slot_falta <= slot_objetivo
+-                                && slot_objetivo < p.slot_falta.saturating_add(evp.plazo_slots);
+-                            let ya_procesado = estado_base.is_some_and(|estado| {
+-                                let clave = match &p.tx.extension {
+-                                    zx_core::ExtensionTx::Evidencia { h1, .. } => h1.sol.public_key,
+-                                    _ => return false,
+-                                };
+-                                estado.garantias.get(&clave).is_some_and(|g| {
+-                                    g.incidentes.iter().any(|i| i.id == p.incident_id)
+-                                })
+-                            });
+-                            ventana_abierta && !ya_procesado
+-                        })
+-                        .take(perfil::MAX_EVIDENCIAS_POR_BLOQUE)
+-                        .map(|p| p.tx.clone())
+-                        .collect();
++                    let evidencias = crate::evidencia::elegibles(
++                        &self.detector,
++                        estado_base,
++                        slot_objetivo,
++                        evp.plazo_slots,
++                        perfil::MAX_EVIDENCIAS_POR_BLOQUE,
++                    );
+                     if tx_a_productor
+                         .send(MsgBucle::Padres(
+                             padres,
+@@ -2564,17 +2563,11 @@
+                 // o pérdida de registro). Evento crítico del esquema v1; el nodo sigue produciendo
+                 // (contesta `Continuar`): esta es la única oportunidad perdida, no un fallo.
+                 MsgProductor::Abstenido { slot, motivo } => {
+-                    let motivo_texto = match motivo {
+-                        zx_post::productor::MotivoAbstencion::Conflicto { .. } => "conflicto",
+-                        zx_post::productor::MotivoAbstencion::PerdidaRegistro { .. } => {
+-                            "perdida_registro"
+-                        }
+-                    };
+                     let evento = self
+                         .registro
+                         .evento("firmante_abstenido")
+                         .u64("slot", slot)
+-                        .str("motivo", motivo_texto);
++                        .str("motivo", motivo_abstencion_texto(motivo));
+                     self.registro.escribir(evento, true)?;
+                     if tx_a_productor.send(MsgBucle::Continuar).is_err() {
+                         break;
+@@ -2628,6 +2621,12 @@
+         }
+     }
+ 
++    /// `ORDEN-SL4b3` decisión 1: el bloque de transición se produce con [`producir_con_firmante`] y
++    /// el **mismo** firmante seguro del nodo que usa el régimen (registro único por nodo,
++    /// `C-EVP-06`, FIR-01…FIR-15); ya no hay ninguna ruta que lo selle sin registrar la oportunidad.
++    /// Si el firmante se abstiene, no se produce: se escribe `firmante_abstenido` (esquema v1) y se
++    /// devuelve `Ok`, dejando que `fase_regimen` espere a sincronizar la transición de otro nodo (el
++    /// hilo productor de régimen retomará la producción en cuanto haya puntas).
+     fn producir_bloque_transicion(&mut self, terminal: BlockHash) -> ResultadoNodo<()> {
+         #[expect(clippy::indexing_slicing, reason = "la CLI exige al menos una clave")]
+         let clave = self.claves[0].clone();
+@@ -2647,8 +2646,32 @@
+                 .unwrap_or(0),
+             importe_coinbase: perfil::subsidio_post(0),
+         };
+-        let bloque = producir(terminal, &fuente, &clave.sk, &parametros)
+-            .map_err(|e| ErrorNodo::Otro(format!("producir (bloque de transición): {e}")))?;
++        // `Arc` clonado para no dejar vivo un préstamo inmutable de `self` mientras más abajo se
++        // llama a `admitir_post_interno(&mut self, ...)`.
++        let registro_firmante = Arc::clone(self.registro_firmante.as_ref().ok_or_else(|| {
++            ErrorNodo::Otro("producir_bloque_transicion sin registro de firmante".to_string())
++        })?);
++        let producto = {
++            let mut firmante = Firmante::nuevo(&registro_firmante);
++            producir_con_firmante(terminal, &fuente, &clave.sk, &parametros, &mut firmante)
++                .map_err(|e| {
++                    ErrorNodo::Otro(format!("producir_con_firmante (bloque de transición): {e}"))
++                })?
++        };
++        let bloque = match producto {
++            ProductoFirmado::Bloque(bloque, _) => bloque,
++            ProductoFirmado::Abstenido { slot, motivo } => {
++                // Decisión 1: el bloque no se produce; evento crítico del esquema v1 con el slot
++                // real de la oportunidad y el motivo. El llamante espera a otro nodo.
++                let evento = self
++                    .registro
++                    .evento("firmante_abstenido")
++                    .u64("slot", slot)
++                    .str("motivo", motivo_abstencion_texto(motivo));
++                self.registro.escribir(evento, true)?;
++                return Ok(());
++            }
++        };
+         let hash = bloque.cabecera.block_hash();
+         self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)?;
+         // `ORDEN-W07a`: el bloque de transición es un PoST propio admitido y persistido, pero **no**
+@@ -2806,6 +2829,15 @@
+     v
+ }
+ 
++/// Texto del `motivo` del evento `firmante_abstenido` (esquema v1): el mismo para la abstención de
++/// la transición (`producir_bloque_transicion`) y la del hilo productor de régimen.
++fn motivo_abstencion_texto(motivo: zx_post::productor::MotivoAbstencion) -> &'static str {
++    match motivo {
++        zx_post::productor::MotivoAbstencion::Conflicto { .. } => "conflicto",
++        zx_post::productor::MotivoAbstencion::PerdidaRegistro { .. } => "perdida_registro",
++    }
++}
++
+ /// Familia de un bloque de red, para el registro (`pow`/`post`).
+ fn familia_de(bloque: &BloqueRed) -> &'static str {
+     match bloque {
+diff -ruN ws.orig/crates/zx-node/src/regimen.rs ws/crates/zx-node/src/regimen.rs
+--- ws.orig/crates/zx-node/src/regimen.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-node/src/regimen.rs	2026-09-27 09:56:24.125709213 +0200
+@@ -401,7 +401,7 @@
+             // producir esta.
+             let bloque = match producto {
+                 ProductoFirmado::Bloque(b, _resultado_firmante) => b,
+-                ProductoFirmado::Abstenido { motivo } => {
++                ProductoFirmado::Abstenido { motivo, .. } => {
+                     if tx.send(MsgProductor::Abstenido { slot, motivo }).is_err() {
+                         return; // el bucle cerró el canal: apagado normal del proceso.
+                     }
+diff -ruN ws.orig/crates/zx-node/tests/registro_firmante_transicion.rs ws/crates/zx-node/tests/registro_firmante_transicion.rs
+--- ws.orig/crates/zx-node/tests/registro_firmante_transicion.rs	1970-01-01 01:00:00.000000000 +0100
++++ ws/crates/zx-node/tests/registro_firmante_transicion.rs	1970-01-01 01:00:00.000000000 +0100
+@@ -0,0 +1,57 @@
++//! `ORDEN-SL4b3` verificación real (decisión 1): el registro del firmante de cada nodo contiene la
++//! entrada del slot de su bloque de transición.
++//!
++//! Se ejecuta **explícitamente** después de la ejecución real corta (tres nodos cruzan el corte con
++//! `--parada-tras-slots 1`, de modo que el único bloque PoST que firma cada nodo es su bloque de
++//! transición):
++//!
++//! ```text
++//! ZX_FIRMANTE_A=<run>/A/datos/firmante.registro \
++//! ZX_FIRMANTE_B=<run>/B/datos/firmante.registro \
++//! ZX_FIRMANTE_C=<run>/C/datos/firmante.registro \
++//!   cargo test -p zx-node --test registro_firmante_transicion -- --ignored --nocapture
++//! ```
++//!
++//! No se inventa un formato de lectura: se abre cada fichero con `zx_post::firmante::Registro::abrir`
++//! (la API pública de lectura/validación del registro) y se consulta por la API: `entradas()` y
++//! `max_slot()`. Con el arranque limpio de cada nodo (registro `nueva`, sin abstención) y la parada
++//! en el slot 1, la única entrada posible es la del bloque de transición; su slot es `max_slot()`.
++//!
++//! Si el defecto 1 de `REVISION-SL4b2.md` reapareciera (transición sin firmante), `entradas()` sería
++//! 0 y la aserción falla.
++
++#![expect(
++    clippy::expect_used,
++    clippy::panic,
++    reason = "test de verificación con panic por diseño"
++)]
++
++use std::path::PathBuf;
++
++use zx_post::firmante::Registro;
++
++fn registro_de(variable: &str) -> PathBuf {
++    std::env::var_os(variable)
++        .map(PathBuf::from)
++        .unwrap_or_else(|| panic!("define {variable} con la ruta de firmante.registro"))
++}
++
++#[test]
++#[ignore = "verificación de la ejecución real; se lanza con --ignored y las rutas en el entorno"]
++fn el_registro_de_cada_nodo_contiene_la_entrada_de_su_transicion() {
++    for variable in ["ZX_FIRMANTE_A", "ZX_FIRMANTE_B", "ZX_FIRMANTE_C"] {
++        let ruta = registro_de(variable);
++        let reg = Registro::abrir(&ruta, 0, 1).expect("el registro del firmante es válido");
++        assert_eq!(
++            reg.entradas(),
++            1,
++            "{variable}: con `--parada-tras-slots 1` el único bloque firmado debe ser la transición"
++        );
++        let slot = reg.max_slot();
++        println!("{variable}: entrada del firmante en el slot de transición {slot}");
++        assert!(
++            slot > 0,
++            "{variable}: el slot de la transición debe ser mayor que 0"
++        );
++    }
++}
+diff -ruN ws.orig/crates/zx-post/src/lib.rs ws/crates/zx-post/src/lib.rs
+--- ws.orig/crates/zx-post/src/lib.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-post/src/lib.rs	2026-09-27 09:54:10.368909900 +0200
+@@ -48,10 +48,10 @@
+ };
+ pub use productor::{
+     ErrorProductor, FuenteSoluciones, MotivoAbstencion, ParametrosProductor, ProductoFirmado,
+-    SolucionCandidata, clave_publica_de, producir, producir_con_firmante,
++    SolucionCandidata, clave_publica_de, producir_con_firmante, producir_sin_firmante,
+ };
+ pub use productor_regimen::{
+-    CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen,
+-    producir_en_regimen_con_firmante,
++    CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen_con_firmante,
++    producir_en_regimen_sin_firmante,
+ };
+ pub use servicio_pot::{ErrorServicioPot, ServicioPot};
+diff -ruN ws.orig/crates/zx-post/src/productor.rs ws/crates/zx-post/src/productor.rs
+--- ws.orig/crates/zx-post/src/productor.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-post/src/productor.rs	2026-09-27 09:55:09.260142401 +0200
+@@ -4,7 +4,7 @@
+ //! # Qué produce
+ //!
+ //! Dado el terminal PoW `T`, una fuente de soluciones PoAS (el puente real a `zx-farmer` lo aporta
+-//! el llamante), una clave Ed25519 dev y los parámetros de desarrollo, [`producir`]:
++//! el llamante), una clave Ed25519 dev y los parámetros de desarrollo, [`producir_sin_firmante`]:
+ //!
+ //! 1. arranca el PoT desde S1 (`semilla(f_0, 0)`, D-P09) y **calcula el PoT slot a slot** desde S1
+ //!    con `N_dev` ([`zx_pot::prove`]);
+@@ -24,13 +24,13 @@
+ //! no elige padres con GHOSTDAG (el de transición es hijo único de `T`), no firma con una clave de
+ //! red, no publica y no admite. No arranca desde génesis: el terminal lo aporta el llamante.
+ //!
+-//! # Firmante seguro (SL-4b1)
++//! # Firmante seguro (SL-4b1, SL-4b3)
+ //!
+-//! [`producir`] sella directamente y **no** protege contra la doble firma: es la ruta antigua,
+-//! conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La variante
+-//! [`producir_con_firmante`] construye **exactamente** la misma cabecera y el mismo cuerpo y los
+-//! sella **solo** a través de [`Firmante`], que persiste `(identidad, slot) -> pre_hash` con `fsync`
+-//! antes de emitir el sello (`C-EVP-06`, FIR-01…FIR-15).
++//! [`producir_sin_firmante`] sella directamente y **no** protege contra la doble firma: **solo para
++//! tests y arneses**; el nodo ya no la alcanza (SL-4b2 lo dejó fuera y SL-4b3 lo hace explícito con
++//! un guardián de CI). La variante [`producir_con_firmante`] construye **exactamente** la misma
++//! cabecera y el mismo cuerpo y los sella **solo** a través de [`Firmante`], que persiste
++//! `(identidad, slot) -> pre_hash` con `fsync` antes de emitir el sello (`C-EVP-06`, FIR-01…FIR-15).
+ //!
+ //! # Por qué la parcela es un rasgo
+ //!
+@@ -140,6 +140,10 @@
+     Bloque(BloqueDag, ResultadoFirmante),
+     /// El firmante se abstuvo: no se emitió bloque y el candidato se descarta.
+     Abstenido {
++        /// Slot de la oportunidad que se descartó (`header.slot` del candidato). `ORDEN-SL4b3`: el
++        /// llamante lo necesita para el evento `firmante_abstenido` cuando no tiene el candidato
++        /// (la transición producida por `Nodo::producir_bloque_transicion`).
++        slot: u64,
+         /// Causa de la abstención.
+         motivo: MotivoAbstencion,
+     },
+@@ -269,11 +273,14 @@
+         txs,
+         testigos,
+     } = candidato;
++    // El slot de la oportunidad se conserva antes de que `firmar` pueda negarse: el llamante lo
++    // necesita para registrar la abstención (SL-4b3).
++    let slot = cabecera.slot;
+     let resultado = firmante
+         .firmar(&mut cabecera, clave)
+         .map_err(ErrorSellado::Firmante)?;
+     match motivo_de(resultado) {
+-        Some(motivo) => Ok(ProductoFirmado::Abstenido { motivo }),
++        Some(motivo) => Ok(ProductoFirmado::Abstenido { slot, motivo }),
+         None => {
+             let bloque = BloqueDag::nuevo(cabecera, justificacion, txs, testigos)
+                 .map_err(ErrorSellado::Formato)?;
+@@ -284,9 +291,9 @@
+ 
+ /// Produce el primer bloque PoST hijo de `terminal` (D-P09…D-P11, F-03, F-09).
+ ///
+-/// **No protege contra la doble firma.** Es la ruta antigua: sella directamente con `clave` sin
+-/// consultar registro alguno. La variante segura es [`producir_con_firmante`]; SL-4b2 retirará esta
+-/// del nodo.
++/// **Solo tests y arneses; no protege contra la doble firma.** Sella directamente con `clave` sin
++/// consultar registro alguno. El nodo produce **solo** con [`producir_con_firmante`] (SL-4b2/SL-4b3);
++/// `ci/firmante-obligatorio.sh` comprueba que `crates/zx-node/src/` no invoca esta ruta.
+ ///
+ /// # Procedimiento
+ /// Arranca de S1, avanza el PoT slot a slot con `N_dev` y, en cada slot, pide a `fuente` las
+@@ -296,7 +303,7 @@
+ /// [`ErrorProductor::NDevInvalido`], [`ErrorProductor::MaxSlotsFueraDeRango`],
+ /// [`ErrorProductor::Pot`], [`ErrorProductor::Fuente`], [`ErrorProductor::Formato`],
+ /// [`ErrorProductor::ClaveDeLaSolucionNoCoincide`] o [`ErrorProductor::SinSolucion`].
+-pub fn producir<F>(
++pub fn producir_sin_firmante<F>(
+     terminal: BlockHash,
+     fuente: &F,
+     clave: &SigningKey,
+@@ -312,13 +319,13 @@
+ 
+ /// Produce el primer bloque PoST hijo de `terminal` sellándolo **solo** con `firmante` (SL-4b1).
+ ///
+-/// Construye exactamente el mismo candidato que [`producir`] y lo sella por
++/// Construye exactamente el mismo candidato que [`producir_sin_firmante`] y lo sella por
+ /// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
+ /// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
+ ///
+ /// # Errores
+-/// Los mismos que [`producir`], más [`ErrorProductor::Firmante`] para un fallo real del registro
+-/// (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
++/// Los mismos que [`producir_sin_firmante`], más [`ErrorProductor::Firmante`] para un fallo real del
++/// registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
+ pub fn producir_con_firmante<F>(
+     terminal: BlockHash,
+     fuente: &F,
+diff -ruN ws.orig/crates/zx-post/src/productor_regimen.rs ws/crates/zx-post/src/productor_regimen.rs
+--- ws.orig/crates/zx-post/src/productor_regimen.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-post/src/productor_regimen.rs	2026-09-27 09:54:07.438848576 +0200
+@@ -4,7 +4,7 @@
+ //!
+ //! # Qué produce
+ //!
+-//! [`producir_en_regimen`] recibe los **padres ya elegidos** por el llamante (`PadresDag`),
++//! [`producir_en_regimen_sin_firmante`] recibe los **padres ya elegidos** por el llamante (`PadresDag`),
+ //! el **slot objetivo**, el [`ServicioPot`] ya arrancado en el terminal, una fuente de soluciones
+ //! PoAS, la clave que firma, los parámetros dev y el cuerpo (transacciones sin la coinbase) y
+ //! devuelve el bloque completo con la cabecera sellada.
+@@ -27,12 +27,13 @@
+ //! No decide si la clave tiene garantía: eso es del motor de estado (`zx-cadena`). No elige `SR`
+ //! (constante dev, D-P11), no admite el bloque, no comprueba el cuerpo y no publica.
+ //!
+-//! # Firmante seguro (SL-4b1)
++//! # Firmante seguro (SL-4b1, SL-4b3)
+ //!
+-//! [`producir_en_regimen`] sella directamente y **no** protege contra la doble firma: es la ruta
+-//! antigua, conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La
+-//! variante [`producir_en_regimen_con_firmante`] construye **exactamente** el mismo bloque y lo
+-//! sella **solo** a través de [`Firmante`] (`C-EVP-06`, FIR-01…FIR-15).
++//! [`producir_en_regimen_sin_firmante`] sella directamente y **no** protege contra la doble firma:
++//! **solo para tests y arneses**; el nodo ya no la alcanza (SL-4b2 lo dejó fuera y SL-4b3 lo hace
++//! explícito con un guardián de CI). La variante [`producir_en_regimen_con_firmante`] construye
++//! **exactamente** el mismo bloque y lo sella **solo** a través de [`Firmante`] (`C-EVP-06`,
++//! FIR-01…FIR-15).
+ //!
+ //! # Frontera de confianza
+ //!
+@@ -58,8 +59,8 @@
+ 
+ /// Cuerpo que aporta el llamante: transacciones **sin** la coinbase y sus testigos, en paralelo.
+ ///
+-/// La coinbase v3 la construye [`producir_en_regimen`] con el `slot` del bloque (F-17); por eso
+-/// una coinbase en esta lista es un error explícito y no una segunda coinbase silenciosa.
++/// La coinbase v3 la construye [`producir_en_regimen_sin_firmante`] con el `slot` del bloque (F-17);
++/// por eso una coinbase en esta lista es un error explícito y no una segunda coinbase silenciosa.
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct CuerpoProductor {
+     txs: Vec<Tx>,
+@@ -218,8 +219,9 @@
+ 
+ /// Produce un bloque PoST en régimen para los padres y el slot dados.
+ ///
+-/// **No protege contra la doble firma:** sella directamente con `clave`. La variante segura es
+-/// [`producir_en_regimen_con_firmante`]; SL-4b2 retirará esta del nodo.
++/// **Solo tests y arneses; no protege contra la doble firma:** sella directamente con `clave`. El
++/// nodo produce **solo** con [`producir_en_regimen_con_firmante`] (SL-4b2/SL-4b3);
++/// `ci/firmante-obligatorio.sh` comprueba que `crates/zx-node/src/` no invoca esta ruta.
+ ///
+ /// # Argumentos
+ /// - `padres`: padres ya elegidos por el llamante (seleccionado primero, `≤ 15`). El productor no
+@@ -235,7 +237,7 @@
+ /// [`ErrorRegimen`] con la variante que corresponda. En particular
+ /// [`ErrorRegimen::SlotNoProgreso`] si `slot ≤ slot(sp)` y
+ /// [`ErrorRegimen::RangoExcedeMaximo`] si el rango excede `MAX_BUNDLES_POT`.
+-pub fn producir_en_regimen<F>(
++pub fn producir_en_regimen_sin_firmante<F>(
+     padres: PadresDag,
+     slot_objetivo: u64,
+     servicio: &mut ServicioPot,
+@@ -262,16 +264,16 @@
+ 
+ /// Produce un bloque PoST en régimen sellándolo **solo** con `firmante` (SL-4b1).
+ ///
+-/// Construye exactamente el mismo bloque que [`producir_en_regimen`] y lo sella por
++/// Construye exactamente el mismo bloque que [`producir_en_regimen_sin_firmante`] y lo sella por
+ /// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
+ /// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
+ ///
+ /// # Errores
+-/// Los mismos que [`producir_en_regimen`], más [`ErrorRegimen::Firmante`] para un fallo real del
+-/// registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
++/// Los mismos que [`producir_en_regimen_sin_firmante`], más [`ErrorRegimen::Firmante`] para un fallo
++/// real del registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
+ #[expect(
+     clippy::too_many_arguments,
+-    reason = "firma pública del productor seguro; agrupar rompería la simetría con producir_en_regimen"
++    reason = "firma pública del productor seguro; agrupar rompería la simetría con producir_en_regimen_sin_firmante"
+ )]
+ pub fn producir_en_regimen_con_firmante<F>(
+     padres: PadresDag,
+diff -ruN ws.orig/crates/zx-post/tests/extremo_a_extremo.rs ws/crates/zx-post/tests/extremo_a_extremo.rs
+--- ws.orig/crates/zx-post/tests/extremo_a_extremo.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-post/tests/extremo_a_extremo.rs	2026-09-27 09:54:32.257367988 +0200
+@@ -52,7 +52,8 @@
+     CachePotVerificada, EstadoPot, MotivoPotInvalido, MotivoPotPendiente, PresupuestoPot,
+ };
+ use zx_post::productor::{
+-    FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de, producir,
++    FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de,
++    producir_sin_firmante,
+ };
+ 
+ /// `N_dev` de prueba: pequeño y múltiplo de 16 (`C-POT-04`). **No** es el valor de red.
+@@ -229,7 +230,7 @@
+         parcela: &parcela,
+         historia: historia(),
+     };
+-    producir(terminal(), &fuente, &fondo.sk, &parametros_productor())
++    producir_sin_firmante(terminal(), &fuente, &fondo.sk, &parametros_productor())
+         .expect("el productor debe hallar una solución en la ventana")
+ }
+ 
+diff -ruN ws.orig/crates/zx-post/tests/firmante_productores.rs ws/crates/zx-post/tests/firmante_productores.rs
+--- ws.orig/crates/zx-post/tests/firmante_productores.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-post/tests/firmante_productores.rs	2026-09-27 09:55:03.447020742 +0200
+@@ -50,7 +50,7 @@
+     clave_publica_de,
+ };
+ use zx_post::productor_regimen::{
+-    CuerpoProductor, producir_en_regimen, producir_en_regimen_con_firmante,
++    CuerpoProductor, producir_en_regimen_con_firmante, producir_en_regimen_sin_firmante,
+ };
+ use zx_post::servicio_pot::ServicioPot;
+ 
+@@ -321,7 +321,7 @@
+     let padres = PadresDag::nuevo(terminal(), &[]).expect("un padre");
+     let parametros = c.parametros();
+ 
+-    let antiguo = producir_en_regimen(
++    let antiguo = producir_en_regimen_sin_firmante(
+         padres,
+         slot,
+         &mut c.servicio,
+@@ -347,7 +347,7 @@
+     .expect("productor con firmante");
+     let (nuevo, resultado) = match producto {
+         ProductoFirmado::Bloque(bloque, resultado) => (bloque, resultado),
+-        ProductoFirmado::Abstenido { motivo } => panic!("no debía abstenerse: {motivo:?}"),
++        ProductoFirmado::Abstenido { motivo, .. } => panic!("no debía abstenerse: {motivo:?}"),
+     };
+     (antiguo, nuevo, resultado)
+ }
+@@ -482,6 +482,7 @@
+     match segunda {
+         ProductoFirmado::Abstenido {
+             motivo: MotivoAbstencion::Conflicto { .. },
++            ..
+         } => {}
+         otro => panic!("se esperaba abstención por conflicto, llegó {otro:?}"),
+     }
+@@ -496,7 +497,7 @@
+ /// sellado con la misma clave.
+ #[test]
+ fn v6_primer_bloque_con_firmante_es_identico() {
+-    use zx_post::productor::{producir, producir_con_firmante};
++    use zx_post::productor::{producir_con_firmante, producir_sin_firmante};
+ 
+     let dir = DirTemporal::nuevo("v6-primer");
+     let f = fondo(0);
+@@ -514,7 +515,7 @@
+         importe_coinbase: Amount::nuevo(5).expect("importe"),
+     };
+ 
+-    let antiguo = producir(terminal(), &fuente, &f.sk, &parametros).expect("antiguo");
++    let antiguo = producir_sin_firmante(terminal(), &fuente, &f.sk, &parametros).expect("antiguo");
+     let registro = Registro::nueva(dir.unir("firmante.log")).expect("registro limpio");
+     let mut firmante = Firmante::nuevo(&registro);
+     let producto = producir_con_firmante(terminal(), &fuente, &f.sk, &parametros, &mut firmante)
+diff -ruN ws.orig/crates/zx-post/tests/regimen.rs ws/crates/zx-post/tests/regimen.rs
+--- ws.orig/crates/zx-post/tests/regimen.rs	2026-09-27 09:48:47.000000000 +0200
++++ ws/crates/zx-post/tests/regimen.rs	2026-09-27 09:54:43.416601534 +0200
+@@ -65,7 +65,7 @@
+ use zx_post::productor::{
+     FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de,
+ };
+-use zx_post::productor_regimen::{CuerpoProductor, ErrorRegimen, producir_en_regimen};
++use zx_post::productor_regimen::{CuerpoProductor, ErrorRegimen, producir_en_regimen_sin_firmante};
+ use zx_post::servicio_pot::ServicioPot;
+ 
+ /// `N_dev` de prueba: pequeño y múltiplo de 16 (`C-POT-04`). **No** es el valor de red.
+@@ -304,7 +304,7 @@
+             historia: historia(),
+         };
+         let parametros = self.parametros();
+-        producir_en_regimen(
++        producir_en_regimen_sin_firmante(
+             padres,
+             slot,
+             &mut self.servicio,
+@@ -329,7 +329,7 @@
+             historia: historia(),
+         };
+         let parametros = self.parametros();
+-        producir_en_regimen(
++        producir_en_regimen_sin_firmante(
+             padres,
+             slot,
+             &mut self.servicio,
+diff -ruN ws.orig/ci/firmante-obligatorio.sh ws/ci/firmante-obligatorio.sh
+--- ws.orig/ci/firmante-obligatorio.sh	1970-01-01 01:00:00.000000000 +0100
++++ ws/ci/firmante-obligatorio.sh	1970-01-01 01:00:00.000000000 +0100
+@@ -0,0 +1,40 @@
++#!/usr/bin/env bash
++# Firmante obligatorio en el nodo (ORDEN-SL4b2 decisión 2; ORDEN-SL4b3 decisión 2).
++#
++# El nodo produce **solo** con las funciones `_con_firmante` de `zx-post`: la variante
++# `_sin_firmante` sella sin registrar la oportunidad y no protege contra la doble firma, así que
++# solo la usan tests y arneses. Este guardián falla si `crates/zx-node/src/` menciona la ruta sin
++# firmante; así una recaída en `producir_bloque_transicion` (el defecto 1 de `REVISION-SL4b2.md`) se
++# detecta en CI.
++#
++# Sin Python: solo `bash` + `grep`. Si `grep` falla por un motivo distinto de «sin coincidencias»,
++# el script falla cerrado en vez de dar un OK falso.
++set -euo pipefail
++cd "$(dirname "$0")/.."
++
++objetivo="crates/zx-node/src"
++if [[ ! -d "$objetivo" ]]; then
++    echo "firmante obligatorio: no existe $objetivo" >&2
++    exit 1
++fi
++
++set +e
++coincidencias=$(grep -rn -- "_sin_firmante" "$objetivo")
++estado=$?
++set -e
++
++case "$estado" in
++    0)
++        echo "firmante obligatorio: $objetivo invoca un productor sin firmante:" >&2
++        echo "$coincidencias" >&2
++        echo "Usa las funciones _con_firmante de zx-post (C-EVP-06, FIR-01…FIR-15)." >&2
++        exit 1
++        ;;
++    1)
++        echo "OK — $objetivo no invoca ningún productor _sin_firmante"
++        ;;
++    *)
++        echo "firmante obligatorio: grep falló con estado $estado" >&2
++        exit 1
++        ;;
++esac
+diff -ruN ws.orig/.github/workflows/zerox-ci.yml ws/.github/workflows/zerox-ci.yml
+--- ws.orig/.github/workflows/zerox-ci.yml	2026-09-27 09:48:47.000000000 +0200
++++ ws/.github/workflows/zerox-ci.yml	2026-09-27 09:56:53.703328222 +0200
+@@ -61,3 +61,5 @@
+         run: bash ci/dependencias-exactas.sh
+       - name: Fronteras de dependencias (zx-poas → {zx-core,zx-consensus}; zx-farmer → {zx-core,zx-poas})
+         run: bash ci/frontera-crates.sh
++      - name: Firmante obligatorio (zx-node no usa productores sin firmante)
++        run: bash ci/firmante-obligatorio.sh

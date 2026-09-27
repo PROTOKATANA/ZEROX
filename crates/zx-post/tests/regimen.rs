@@ -65,7 +65,7 @@ use zx_post::pot_rango::{CachePotVerificada, MotivoPotInvalido, PresupuestoPot};
 use zx_post::productor::{
     FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de,
 };
-use zx_post::productor_regimen::{CuerpoProductor, ErrorRegimen, producir_en_regimen};
+use zx_post::productor_regimen::{CuerpoProductor, ErrorRegimen, producir_en_regimen_sin_firmante};
 use zx_post::servicio_pot::ServicioPot;
 
 /// `N_dev` de prueba: pequeño y múltiplo de 16 (`C-POT-04`). **No** es el valor de red.
@@ -304,7 +304,7 @@ impl Cadena {
             historia: historia(),
         };
         let parametros = self.parametros();
-        producir_en_regimen(
+        producir_en_regimen_sin_firmante(
             padres,
             slot,
             &mut self.servicio,
@@ -329,7 +329,7 @@ impl Cadena {
             historia: historia(),
         };
         let parametros = self.parametros();
-        producir_en_regimen(
+        producir_en_regimen_sin_firmante(
             padres,
             slot,
             &mut self.servicio,

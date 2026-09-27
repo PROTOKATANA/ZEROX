@@ -31,3 +31,13 @@ CON DOS CORRECCIONES (SL-4b3). Migrada** por parche (7 archivos en `crates/zx-no
 Detector no persistente entre reinicios (declarado; otro nodo sigue pudiendo detectar); `PeticionPadres` interna
 con el slot añadido (no es mensaje de red); el ejecutor corrigió dos fallos de sus propios diagnósticos y guiones,
 declarados.
+
+## SL-4b3 (2026-09-27, DeepSeek 09:48–10:43) — defectos corregidos. **SUPERADO. Migrada**
+
+Bloque de transición producido con `producir_con_firmante` (en `Abstenido`, evento `firmante_abstenido` con su
+slot; falta de definición informada antes de editar: el reintento determinista se abstendría igual, así que el nodo
+espera a la red); las funciones sin firmante de `zx-post` renombradas `*_sin_firmante` (solo tests y arneses);
+guardián **`ci/firmante-obligatorio.sh`** en el flujo de CI (probado: falla si se reintroduce la llamada; falla
+cerrado si `grep` falla); `evidencia::elegibles` con los cuatro unitarios de inclusión. `fmt`, `clippy -D warnings`,
+suite completa 0 fallos (82 binarios), guardianes; ejecución real: los tres registros de firmante contienen la
+entrada del bloque de transición. Migrada por parche (12 archivos), **12/12** huellas. `resultados-SL4b3/`.

@@ -401,7 +401,7 @@ pub fn hilo_productor_regimen(
             // producir esta.
             let bloque = match producto {
                 ProductoFirmado::Bloque(b, _resultado_firmante) => b,
-                ProductoFirmado::Abstenido { motivo } => {
+                ProductoFirmado::Abstenido { motivo, .. } => {
                     if tx.send(MsgProductor::Abstenido { slot, motivo }).is_err() {
                         return; // el bucle cerró el canal: apagado normal del proceso.
                     }

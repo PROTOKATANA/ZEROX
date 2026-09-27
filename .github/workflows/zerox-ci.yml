@@ -61,3 +61,5 @@ jobs:
         run: bash ci/dependencias-exactas.sh
       - name: Fronteras de dependencias (zx-poas → {zx-core,zx-consensus}; zx-farmer → {zx-core,zx-poas})
         run: bash ci/frontera-crates.sh
+      - name: Firmante obligatorio (zx-node no usa productores sin firmante)
+        run: bash ci/firmante-obligatorio.sh

@@ -34,6 +34,7 @@
 
 use std::collections::BTreeMap;
 
+use zx_consensus::transicion::Estado;
 use zx_core::preimage::dag::DagBlockHeader;
 use zx_core::{ExtensionTx, PreHash, Tx, incident_id_evidencia};
 use zx_post::firmante::{Firmante, IdentidadTicket};
@@ -246,14 +247,63 @@ fn en_orden_canonico(a: DagBlockHeader, b: DagBlockHeader) -> (DagBlockHeader, D
     if ph_a < ph_b { (a, b) } else { (b, a) }
 }
 
+/// Filtra, de las pendientes del detector, las que un bloque con el estado base y el slot objetivo
+/// dados puede incluir (`ORDEN-SL4b2` decisión 4; unitarios de inclusión de `ORDEN-SL4b3`).
+///
+/// Una pendiente es elegible si su ventana sigue abierta en `slot_objetivo`
+/// (`slot_falta ≤ slot_objetivo < slot_falta + plazo_slots`) y su incidente **no** está ya procesado
+/// en `estado_base` (el estado sobre el que se construye el bloque; `None` cuenta como no
+/// procesado). Devuelve hasta `max_por_bloque` transacciones, en orden de `incident_id`.
+///
+/// No marca nada como incluido: si el bloque portador sale después de la cadena seleccionada, esta
+/// misma consulta vuelve a devolver la pendiente (decisión 4: «vuelve a ser elegible»). La poda de
+/// pendientes por cierre de ventana la hace [`DetectorDobleFirma::podar_pendientes`].
+#[must_use]
+pub fn elegibles(
+    detector: &DetectorDobleFirma,
+    estado_base: Option<&Estado>,
+    slot_objetivo: u64,
+    plazo_slots: u64,
+    max_por_bloque: usize,
+) -> Vec<Tx> {
+    detector
+        .pendientes()
+        .filter(|p| ventana_abierta(p, slot_objetivo, plazo_slots))
+        .filter(|p| !ya_procesado(p, estado_base))
+        .take(max_por_bloque)
+        .map(|p| p.tx.clone())
+        .collect()
+}
+
+/// ¿La ventana de admisión de `p` sigue abierta en `slot_objetivo`? (`EV-13`).
+fn ventana_abierta(p: &Pendiente, slot_objetivo: u64, plazo_slots: u64) -> bool {
+    p.slot_falta <= slot_objetivo && slot_objetivo < p.slot_falta.saturating_add(plazo_slots)
+}
+
+/// ¿El incidente de `p` está ya procesado en `estado_base`? (`EV-11`).
+fn ya_procesado(p: &Pendiente, estado_base: Option<&Estado>) -> bool {
+    estado_base.is_some_and(|estado| {
+        let clave = match &p.tx.extension {
+            ExtensionTx::Evidencia { h1, .. } => h1.sol.public_key,
+            _ => return false,
+        };
+        estado
+            .garantias
+            .get(&clave)
+            .is_some_and(|g| g.incidentes.iter().any(|i| i.id == p.incident_id))
+    })
+}
+
 #[cfg(test)]
 #[expect(
     clippy::panic,
     clippy::expect_used,
+    clippy::indexing_slicing,
     reason = "los tests fallan con panic por diseño"
 )]
 mod tests {
-    use super::{DetectorDobleFirma, Observacion};
+    use super::{DetectorDobleFirma, Observacion, elegibles};
+    use zx_consensus::transicion::{Estado, Garantia, Incidente};
     use zx_core::preimage::dag::{DagBlockHeader, PadresDag, SolucionPoas};
     use zx_core::{BodyCommitment, ClavePublica, Digest, MerkleRoot};
 
@@ -425,5 +475,110 @@ mod tests {
         let podadas = d.podar_pendientes(400, 300);
         assert_eq!(podadas.len(), 1);
         assert_eq!(d.pendientes_len(), 0);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // V2 de `ORDEN-SL4b3`: inclusión de evidencias (unitaria, sin montar un `Nodo`).
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /// Detector con un único incidente (slot_falta = 100): devuelve también su `incident_id`, la
+    /// clave del firmante y el slot de la falta, para construir el estado base de cada caso.
+    fn detector_con_incidente() -> (DetectorDobleFirma, [u8; 32], ClavePublica, u64) {
+        let mut d = DetectorDobleFirma::nuevo(10);
+        d.observar(cabecera(7, 1, 3, 1 << 20, 5, 100, 1));
+        let (obs, _) = d.observar(cabecera(7, 1, 3, 1 << 20, 5, 100, 2));
+        match obs {
+            Observacion::Incidente(p) => {
+                let clave = match &p.tx.extension {
+                    zx_core::ExtensionTx::Evidencia { h1, .. } => h1.sol.public_key,
+                    _ => panic!("la pendiente debía ser una EvidenceTx"),
+                };
+                (d, p.incident_id, clave, p.slot_falta)
+            }
+            otro => panic!("se esperaba Incidente, llegó {otro:?}"),
+        }
+    }
+
+    /// Estado base con el incidente `id` ya procesado en la garantía de `clave`.
+    fn estado_con_incidente(clave: ClavePublica, id: [u8; 32], slot_falta: u64) -> Estado {
+        let mut estado = Estado::inicial();
+        estado.garantias.insert(
+            clave,
+            Garantia {
+                incidentes: vec![Incidente {
+                    id,
+                    slot_falta: i64::try_from(slot_falta).expect("el slot cabe en i64"),
+                }],
+                ..Garantia::nueva()
+            },
+        );
+        estado
+    }
+
+    /// Pendiente con ventana abierta → se incluye (una `EvidenceTx` v4).
+    #[test]
+    fn pendiente_con_ventana_abierta_se_incluye() {
+        let (d, _id, _clave, _slot) = detector_con_incidente();
+        let incluidas = elegibles(&d, None, 150, 300, 4);
+        assert_eq!(incluidas.len(), 1, "una pendiente con ventana abierta");
+        assert_eq!(incluidas[0].version, 4, "la transacción incluida es la v4");
+        assert!(matches!(
+            incluidas[0].extension,
+            zx_core::ExtensionTx::Evidencia { .. }
+        ));
+    }
+
+    /// Incidente ya procesado en el estado base → no se incluye.
+    #[test]
+    fn incidente_ya_procesado_en_el_estado_base_no_se_incluye() {
+        let (d, id, clave, slot_falta) = detector_con_incidente();
+        let estado = estado_con_incidente(clave, id, slot_falta);
+        assert!(
+            elegibles(&d, Some(&estado), 150, 300, 4).is_empty(),
+            "el estado base ya tiene el incidente: nada que incluir"
+        );
+    }
+
+    /// Ventana cerrada → no se incluye y la pendiente sale de la lista.
+    #[test]
+    fn ventana_cerrada_no_se_incluye_y_sale_de_la_lista() {
+        let (mut d, _id, _clave, _slot) = detector_con_incidente();
+        // `slot_falta = 100`, plazo 300 ⇒ la ventana cierra en 400.
+        assert_eq!(
+            elegibles(&d, None, 399, 300, 4).len(),
+            1,
+            "en 399 la ventana sigue abierta"
+        );
+        assert_eq!(
+            d.podar_pendientes(400, 300).len(),
+            1,
+            "la poda retira la pendiente cerrada"
+        );
+        assert_eq!(d.pendientes_len(), 0);
+        assert!(
+            elegibles(&d, None, 400, 300, 4).is_empty(),
+            "cerrada la ventana, ya no es elegible"
+        );
+    }
+
+    /// El bloque portador sale de la cadena seleccionada tras una reorganización → la pendiente
+    /// vuelve a ser elegible (no hay marca interna de «incluida»).
+    #[test]
+    fn bloque_portador_fuera_de_la_cadena_vuelve_a_ser_elegible() {
+        let (d, id, clave, slot_falta) = detector_con_incidente();
+        let con_bloque = estado_con_incidente(clave, id, slot_falta);
+        assert!(
+            elegibles(&d, Some(&con_bloque), 150, 300, 4).is_empty(),
+            "con el bloque portador en la cadena, el incidente ya está procesado"
+        );
+        // Reorganización: la nueva punta seleccionada no trae el incidente procesado.
+        let sin_bloque = Estado::inicial();
+        let tras_reorg = elegibles(&d, Some(&sin_bloque), 150, 300, 4);
+        assert_eq!(tras_reorg.len(), 1, "vuelve a ser elegible");
+        assert_eq!(
+            d.pendientes_len(),
+            1,
+            "la pendiente nunca se borró del detector"
+        );
     }
 }

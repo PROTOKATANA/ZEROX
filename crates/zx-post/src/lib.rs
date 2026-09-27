@@ -48,10 +48,10 @@ pub use pot_rango::{
 };
 pub use productor::{
     ErrorProductor, FuenteSoluciones, MotivoAbstencion, ParametrosProductor, ProductoFirmado,
-    SolucionCandidata, clave_publica_de, producir, producir_con_firmante,
+    SolucionCandidata, clave_publica_de, producir_con_firmante, producir_sin_firmante,
 };
 pub use productor_regimen::{
-    CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen,
-    producir_en_regimen_con_firmante,
+    CuerpoProductor, ErrorCuerpo, ErrorRegimen, producir_en_regimen_con_firmante,
+    producir_en_regimen_sin_firmante,
 };
 pub use servicio_pot::{ErrorServicioPot, ServicioPot};

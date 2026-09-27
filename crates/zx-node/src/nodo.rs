@@ -31,7 +31,10 @@ use zx_p2p::mensaje::{BloqueRed, Estado, Fase as FaseRed, PuntaPow};
 use zx_poas::HistoriaGenesis;
 use zx_post::cabecera_conjunta::{EstadoCabeceraConjunta, verificar_cabecera_conjunta};
 use zx_post::pot_rango::{CachePotVerificada, PresupuestoPot};
-use zx_post::productor::{FuenteSoluciones, ParametrosProductor, SolucionCandidata, producir};
+use zx_post::productor::{
+    FuenteSoluciones, ParametrosProductor, ProductoFirmado, SolucionCandidata,
+    producir_con_firmante,
+};
 use zx_post::servicio_pot::ServicioPot;
 use zx_storage::disco::AlmacenEnDisco;
 use zx_storage::{Almacen, BloqueAdmitido, ErrorRepeticion, Familia};
@@ -48,7 +51,7 @@ use crate::red::vista::VistaRed;
 use crate::red::{self, ManijaRed, ReceptorTrabajoRed, TrabajoRed};
 use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
 use crate::registro::Registro;
-use zx_post::firmante::Registro as RegistroFirmante;
+use zx_post::firmante::{Firmante, Registro as RegistroFirmante};
 
 /// `SR_dev`/`ContextoRangoDag` constante del perfil dev (D-P11: sin controlador).
 struct RangoDev(u64);
@@ -2245,7 +2248,9 @@ impl Nodo {
         // dejar de ser el seleccionado), aunque ya no sea `self.cadena.terminal()`.
         self.asegurar_servicios_verificacion()?;
 
-        // El primer bloque de régimen (transición) usa `producir` (W05b2), decisión 6.
+        // El primer bloque de régimen (transición) se produce con el firmante seguro
+        // (`producir_con_firmante`, `ORDEN-SL4b3` decisión 1), ya no con la ruta que sellaba sin
+        // registrar. El resto del comentario conserva el motivo de la espera.
         //
         // `ORDEN-W06d5` decisión 1, extensión encontrada **en vivo** al repetir V5 con esta misma
         // orden ya aplicada (evidencia en `PROGRESO.md`): un nodo que llega tarde también puede
@@ -2271,10 +2276,16 @@ impl Nodo {
                     "sin garantía propia en el terminal: no se intenta producir el bloque de \
                      transición; se espera a sincronizarlo de otro nodo"
                 );
-                while self.cadena.tips_validas().is_empty() {
-                    self.procesar_trabajo_red_pendiente();
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
+            }
+            // `ORDEN-SL4b3` decisión 1: si `producir_bloque_transicion` se abstuvo (conflicto o
+            // pérdida de registro), no produjo nada y `tips_validas()` sigue vacío. Reintentar el
+            // mismo candidato determinista solo repetiría la abstención (misma identidad y slot), así
+            // que la recuperación es la sincronización con la red, no un bucle de producción; el
+            // hilo productor de régimen retomará la producción en los slots siguientes en cuanto la
+            // transición esté en la cadena.
+            while self.cadena.tips_validas().is_empty() {
+                self.procesar_trabajo_red_pendiente();
+                std::thread::sleep(std::time::Duration::from_millis(50));
             }
         }
 
@@ -2396,28 +2407,16 @@ impl Nodo {
                     // `ORDEN-SL4b2` decisión 4: hasta `MAX_EVIDENCIAS_POR_BLOQUE` pendientes cuyo
                     // incidente no esté ya procesado en `estado_base` (el estado sobre el que
                     // construye este bloque) y cuya ventana siga abierta en `slot_objetivo`
-                    // (`slot_falta ≤ slot_objetivo < slot_falta + Plazo_slots`).
+                    // (`slot_falta ≤ slot_objetivo < slot_falta + Plazo_slots`). El filtro vive en
+                    // `evidencia::elegibles` para poder probarlo por unidad (`ORDEN-SL4b3` V2).
                     let evp = perfil::parametros_evidencia_dev();
-                    let evidencias: Vec<zx_core::Tx> = self
-                        .detector
-                        .pendientes()
-                        .filter(|p| {
-                            let ventana_abierta = p.slot_falta <= slot_objetivo
-                                && slot_objetivo < p.slot_falta.saturating_add(evp.plazo_slots);
-                            let ya_procesado = estado_base.is_some_and(|estado| {
-                                let clave = match &p.tx.extension {
-                                    zx_core::ExtensionTx::Evidencia { h1, .. } => h1.sol.public_key,
-                                    _ => return false,
-                                };
-                                estado.garantias.get(&clave).is_some_and(|g| {
-                                    g.incidentes.iter().any(|i| i.id == p.incident_id)
-                                })
-                            });
-                            ventana_abierta && !ya_procesado
-                        })
-                        .take(perfil::MAX_EVIDENCIAS_POR_BLOQUE)
-                        .map(|p| p.tx.clone())
-                        .collect();
+                    let evidencias = crate::evidencia::elegibles(
+                        &self.detector,
+                        estado_base,
+                        slot_objetivo,
+                        evp.plazo_slots,
+                        perfil::MAX_EVIDENCIAS_POR_BLOQUE,
+                    );
                     if tx_a_productor
                         .send(MsgBucle::Padres(
                             padres,
@@ -2564,17 +2563,11 @@ impl Nodo {
                 // o pérdida de registro). Evento crítico del esquema v1; el nodo sigue produciendo
                 // (contesta `Continuar`): esta es la única oportunidad perdida, no un fallo.
                 MsgProductor::Abstenido { slot, motivo } => {
-                    let motivo_texto = match motivo {
-                        zx_post::productor::MotivoAbstencion::Conflicto { .. } => "conflicto",
-                        zx_post::productor::MotivoAbstencion::PerdidaRegistro { .. } => {
-                            "perdida_registro"
-                        }
-                    };
                     let evento = self
                         .registro
                         .evento("firmante_abstenido")
                         .u64("slot", slot)
-                        .str("motivo", motivo_texto);
+                        .str("motivo", motivo_abstencion_texto(motivo));
                     self.registro.escribir(evento, true)?;
                     if tx_a_productor.send(MsgBucle::Continuar).is_err() {
                         break;
@@ -2628,6 +2621,12 @@ impl Nodo {
         }
     }
 
+    /// `ORDEN-SL4b3` decisión 1: el bloque de transición se produce con [`producir_con_firmante`] y
+    /// el **mismo** firmante seguro del nodo que usa el régimen (registro único por nodo,
+    /// `C-EVP-06`, FIR-01…FIR-15); ya no hay ninguna ruta que lo selle sin registrar la oportunidad.
+    /// Si el firmante se abstiene, no se produce: se escribe `firmante_abstenido` (esquema v1) y se
+    /// devuelve `Ok`, dejando que `fase_regimen` espere a sincronizar la transición de otro nodo (el
+    /// hilo productor de régimen retomará la producción en cuanto haya puntas).
     fn producir_bloque_transicion(&mut self, terminal: BlockHash) -> ResultadoNodo<()> {
         #[expect(clippy::indexing_slicing, reason = "la CLI exige al menos una clave")]
         let clave = self.claves[0].clone();
@@ -2647,8 +2646,32 @@ impl Nodo {
                 .unwrap_or(0),
             importe_coinbase: perfil::subsidio_post(0),
         };
-        let bloque = producir(terminal, &fuente, &clave.sk, &parametros)
-            .map_err(|e| ErrorNodo::Otro(format!("producir (bloque de transición): {e}")))?;
+        // `Arc` clonado para no dejar vivo un préstamo inmutable de `self` mientras más abajo se
+        // llama a `admitir_post_interno(&mut self, ...)`.
+        let registro_firmante = Arc::clone(self.registro_firmante.as_ref().ok_or_else(|| {
+            ErrorNodo::Otro("producir_bloque_transicion sin registro de firmante".to_string())
+        })?);
+        let producto = {
+            let mut firmante = Firmante::nuevo(&registro_firmante);
+            producir_con_firmante(terminal, &fuente, &clave.sk, &parametros, &mut firmante)
+                .map_err(|e| {
+                    ErrorNodo::Otro(format!("producir_con_firmante (bloque de transición): {e}"))
+                })?
+        };
+        let bloque = match producto {
+            ProductoFirmado::Bloque(bloque, _) => bloque,
+            ProductoFirmado::Abstenido { slot, motivo } => {
+                // Decisión 1: el bloque no se produce; evento crítico del esquema v1 con el slot
+                // real de la oportunidad y el motivo. El llamante espera a otro nodo.
+                let evento = self
+                    .registro
+                    .evento("firmante_abstenido")
+                    .u64("slot", slot)
+                    .str("motivo", motivo_abstencion_texto(motivo));
+                self.registro.escribir(evento, true)?;
+                return Ok(());
+            }
+        };
         let hash = bloque.cabecera.block_hash();
         self.admitir_post_interno(bloque, self.almacen.longitud_registro()?, true)?;
         // `ORDEN-W07a`: el bloque de transición es un PoST propio admitido y persistido, pero **no**
@@ -2804,6 +2827,15 @@ fn padres_dag_a_vec(p: &PadresDag) -> Vec<BlockHash> {
     let mut v = vec![p.seleccionado()];
     v.extend_from_slice(p.extras());
     v
+}
+
+/// Texto del `motivo` del evento `firmante_abstenido` (esquema v1): el mismo para la abstención de
+/// la transición (`producir_bloque_transicion`) y la del hilo productor de régimen.
+fn motivo_abstencion_texto(motivo: zx_post::productor::MotivoAbstencion) -> &'static str {
+    match motivo {
+        zx_post::productor::MotivoAbstencion::Conflicto { .. } => "conflicto",
+        zx_post::productor::MotivoAbstencion::PerdidaRegistro { .. } => "perdida_registro",
+    }
 }
 
 /// Familia de un bloque de red, para el registro (`pow`/`post`).

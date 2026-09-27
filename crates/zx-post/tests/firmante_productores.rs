@@ -50,7 +50,7 @@ use zx_post::productor::{
     clave_publica_de,
 };
 use zx_post::productor_regimen::{
-    CuerpoProductor, producir_en_regimen, producir_en_regimen_con_firmante,
+    CuerpoProductor, producir_en_regimen_con_firmante, producir_en_regimen_sin_firmante,
 };
 use zx_post::servicio_pot::ServicioPot;
 
@@ -321,7 +321,7 @@ fn producir_par(
     let padres = PadresDag::nuevo(terminal(), &[]).expect("un padre");
     let parametros = c.parametros();
 
-    let antiguo = producir_en_regimen(
+    let antiguo = producir_en_regimen_sin_firmante(
         padres,
         slot,
         &mut c.servicio,
@@ -347,7 +347,7 @@ fn producir_par(
     .expect("productor con firmante");
     let (nuevo, resultado) = match producto {
         ProductoFirmado::Bloque(bloque, resultado) => (bloque, resultado),
-        ProductoFirmado::Abstenido { motivo } => panic!("no debía abstenerse: {motivo:?}"),
+        ProductoFirmado::Abstenido { motivo, .. } => panic!("no debía abstenerse: {motivo:?}"),
     };
     (antiguo, nuevo, resultado)
 }
@@ -482,6 +482,7 @@ fn v6b_otro_cuerpo_mismo_billete_y_slot_se_abstiene() {
     match segunda {
         ProductoFirmado::Abstenido {
             motivo: MotivoAbstencion::Conflicto { .. },
+            ..
         } => {}
         otro => panic!("se esperaba abstención por conflicto, llegó {otro:?}"),
     }
@@ -496,7 +497,7 @@ fn v6b_otro_cuerpo_mismo_billete_y_slot_se_abstiene() {
 /// sellado con la misma clave.
 #[test]
 fn v6_primer_bloque_con_firmante_es_identico() {
-    use zx_post::productor::{producir, producir_con_firmante};
+    use zx_post::productor::{producir_con_firmante, producir_sin_firmante};
 
     let dir = DirTemporal::nuevo("v6-primer");
     let f = fondo(0);
@@ -514,7 +515,7 @@ fn v6_primer_bloque_con_firmante_es_identico() {
         importe_coinbase: Amount::nuevo(5).expect("importe"),
     };
 
-    let antiguo = producir(terminal(), &fuente, &f.sk, &parametros).expect("antiguo");
+    let antiguo = producir_sin_firmante(terminal(), &fuente, &f.sk, &parametros).expect("antiguo");
     let registro = Registro::nueva(dir.unir("firmante.log")).expect("registro limpio");
     let mut firmante = Firmante::nuevo(&registro);
     let producto = producir_con_firmante(terminal(), &fuente, &f.sk, &parametros, &mut firmante)

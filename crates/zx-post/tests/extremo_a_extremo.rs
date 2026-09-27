@@ -52,7 +52,8 @@ use zx_post::pot_rango::{
     CachePotVerificada, EstadoPot, MotivoPotInvalido, MotivoPotPendiente, PresupuestoPot,
 };
 use zx_post::productor::{
-    FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de, producir,
+    FuenteSoluciones, ParametrosProductor, SolucionCandidata, clave_publica_de,
+    producir_sin_firmante,
 };
 
 /// `N_dev` de prueba: pequeño y múltiplo de 16 (`C-POT-04`). **No** es el valor de red.
@@ -229,7 +230,7 @@ fn producir_de(fondo: &Fondo) -> BloqueDag {
         parcela: &parcela,
         historia: historia(),
     };
-    producir(terminal(), &fuente, &fondo.sk, &parametros_productor())
+    producir_sin_firmante(terminal(), &fuente, &fondo.sk, &parametros_productor())
         .expect("el productor debe hallar una solución en la ventana")
 }
 

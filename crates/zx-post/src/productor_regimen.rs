@@ -4,7 +4,7 @@
 //!
 //! # Qué produce
 //!
-//! [`producir_en_regimen`] recibe los **padres ya elegidos** por el llamante (`PadresDag`),
+//! [`producir_en_regimen_sin_firmante`] recibe los **padres ya elegidos** por el llamante (`PadresDag`),
 //! el **slot objetivo**, el [`ServicioPot`] ya arrancado en el terminal, una fuente de soluciones
 //! PoAS, la clave que firma, los parámetros dev y el cuerpo (transacciones sin la coinbase) y
 //! devuelve el bloque completo con la cabecera sellada.
@@ -27,12 +27,13 @@
 //! No decide si la clave tiene garantía: eso es del motor de estado (`zx-cadena`). No elige `SR`
 //! (constante dev, D-P11), no admite el bloque, no comprueba el cuerpo y no publica.
 //!
-//! # Firmante seguro (SL-4b1)
+//! # Firmante seguro (SL-4b1, SL-4b3)
 //!
-//! [`producir_en_regimen`] sella directamente y **no** protege contra la doble firma: es la ruta
-//! antigua, conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La
-//! variante [`producir_en_regimen_con_firmante`] construye **exactamente** el mismo bloque y lo
-//! sella **solo** a través de [`Firmante`] (`C-EVP-06`, FIR-01…FIR-15).
+//! [`producir_en_regimen_sin_firmante`] sella directamente y **no** protege contra la doble firma:
+//! **solo para tests y arneses**; el nodo ya no la alcanza (SL-4b2 lo dejó fuera y SL-4b3 lo hace
+//! explícito con un guardián de CI). La variante [`producir_en_regimen_con_firmante`] construye
+//! **exactamente** el mismo bloque y lo sella **solo** a través de [`Firmante`] (`C-EVP-06`,
+//! FIR-01…FIR-15).
 //!
 //! # Frontera de confianza
 //!
@@ -58,8 +59,8 @@ use crate::servicio_pot::{ErrorServicioPot, ServicioPot};
 
 /// Cuerpo que aporta el llamante: transacciones **sin** la coinbase y sus testigos, en paralelo.
 ///
-/// La coinbase v3 la construye [`producir_en_regimen`] con el `slot` del bloque (F-17); por eso
-/// una coinbase en esta lista es un error explícito y no una segunda coinbase silenciosa.
+/// La coinbase v3 la construye [`producir_en_regimen_sin_firmante`] con el `slot` del bloque (F-17);
+/// por eso una coinbase en esta lista es un error explícito y no una segunda coinbase silenciosa.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CuerpoProductor {
     txs: Vec<Tx>,
@@ -218,8 +219,9 @@ where
 
 /// Produce un bloque PoST en régimen para los padres y el slot dados.
 ///
-/// **No protege contra la doble firma:** sella directamente con `clave`. La variante segura es
-/// [`producir_en_regimen_con_firmante`]; SL-4b2 retirará esta del nodo.
+/// **Solo tests y arneses; no protege contra la doble firma:** sella directamente con `clave`. El
+/// nodo produce **solo** con [`producir_en_regimen_con_firmante`] (SL-4b2/SL-4b3);
+/// `ci/firmante-obligatorio.sh` comprueba que `crates/zx-node/src/` no invoca esta ruta.
 ///
 /// # Argumentos
 /// - `padres`: padres ya elegidos por el llamante (seleccionado primero, `≤ 15`). El productor no
@@ -235,7 +237,7 @@ where
 /// [`ErrorRegimen`] con la variante que corresponda. En particular
 /// [`ErrorRegimen::SlotNoProgreso`] si `slot ≤ slot(sp)` y
 /// [`ErrorRegimen::RangoExcedeMaximo`] si el rango excede `MAX_BUNDLES_POT`.
-pub fn producir_en_regimen<F>(
+pub fn producir_en_regimen_sin_firmante<F>(
     padres: PadresDag,
     slot_objetivo: u64,
     servicio: &mut ServicioPot,
@@ -262,16 +264,16 @@ where
 
 /// Produce un bloque PoST en régimen sellándolo **solo** con `firmante` (SL-4b1).
 ///
-/// Construye exactamente el mismo bloque que [`producir_en_regimen`] y lo sella por
+/// Construye exactamente el mismo bloque que [`producir_en_regimen_sin_firmante`] y lo sella por
 /// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
 /// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
 ///
 /// # Errores
-/// Los mismos que [`producir_en_regimen`], más [`ErrorRegimen::Firmante`] para un fallo real del
-/// registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
+/// Los mismos que [`producir_en_regimen_sin_firmante`], más [`ErrorRegimen::Firmante`] para un fallo
+/// real del registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
 #[expect(
     clippy::too_many_arguments,
-    reason = "firma pública del productor seguro; agrupar rompería la simetría con producir_en_regimen"
+    reason = "firma pública del productor seguro; agrupar rompería la simetría con producir_en_regimen_sin_firmante"
 )]
 pub fn producir_en_regimen_con_firmante<F>(
     padres: PadresDag,

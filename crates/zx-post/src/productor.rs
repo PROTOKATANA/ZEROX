@@ -4,7 +4,7 @@
 //! # Qué produce
 //!
 //! Dado el terminal PoW `T`, una fuente de soluciones PoAS (el puente real a `zx-farmer` lo aporta
-//! el llamante), una clave Ed25519 dev y los parámetros de desarrollo, [`producir`]:
+//! el llamante), una clave Ed25519 dev y los parámetros de desarrollo, [`producir_sin_firmante`]:
 //!
 //! 1. arranca el PoT desde S1 (`semilla(f_0, 0)`, D-P09) y **calcula el PoT slot a slot** desde S1
 //!    con `N_dev` ([`zx_pot::prove`]);
@@ -24,13 +24,13 @@
 //! no elige padres con GHOSTDAG (el de transición es hijo único de `T`), no firma con una clave de
 //! red, no publica y no admite. No arranca desde génesis: el terminal lo aporta el llamante.
 //!
-//! # Firmante seguro (SL-4b1)
+//! # Firmante seguro (SL-4b1, SL-4b3)
 //!
-//! [`producir`] sella directamente y **no** protege contra la doble firma: es la ruta antigua,
-//! conservada sin cambios porque el nodo aún la usa; SL-4b2 la retirará del nodo. La variante
-//! [`producir_con_firmante`] construye **exactamente** la misma cabecera y el mismo cuerpo y los
-//! sella **solo** a través de [`Firmante`], que persiste `(identidad, slot) -> pre_hash` con `fsync`
-//! antes de emitir el sello (`C-EVP-06`, FIR-01…FIR-15).
+//! [`producir_sin_firmante`] sella directamente y **no** protege contra la doble firma: **solo para
+//! tests y arneses**; el nodo ya no la alcanza (SL-4b2 lo dejó fuera y SL-4b3 lo hace explícito con
+//! un guardián de CI). La variante [`producir_con_firmante`] construye **exactamente** la misma
+//! cabecera y el mismo cuerpo y los sella **solo** a través de [`Firmante`], que persiste
+//! `(identidad, slot) -> pre_hash` con `fsync` antes de emitir el sello (`C-EVP-06`, FIR-01…FIR-15).
 //!
 //! # Por qué la parcela es un rasgo
 //!
@@ -140,6 +140,10 @@ pub enum ProductoFirmado {
     Bloque(BloqueDag, ResultadoFirmante),
     /// El firmante se abstuvo: no se emitió bloque y el candidato se descarta.
     Abstenido {
+        /// Slot de la oportunidad que se descartó (`header.slot` del candidato). `ORDEN-SL4b3`: el
+        /// llamante lo necesita para el evento `firmante_abstenido` cuando no tiene el candidato
+        /// (la transición producida por `Nodo::producir_bloque_transicion`).
+        slot: u64,
         /// Causa de la abstención.
         motivo: MotivoAbstencion,
     },
@@ -269,11 +273,14 @@ pub(crate) fn finalizar_con_firmante(
         txs,
         testigos,
     } = candidato;
+    // El slot de la oportunidad se conserva antes de que `firmar` pueda negarse: el llamante lo
+    // necesita para registrar la abstención (SL-4b3).
+    let slot = cabecera.slot;
     let resultado = firmante
         .firmar(&mut cabecera, clave)
         .map_err(ErrorSellado::Firmante)?;
     match motivo_de(resultado) {
-        Some(motivo) => Ok(ProductoFirmado::Abstenido { motivo }),
+        Some(motivo) => Ok(ProductoFirmado::Abstenido { slot, motivo }),
         None => {
             let bloque = BloqueDag::nuevo(cabecera, justificacion, txs, testigos)
                 .map_err(ErrorSellado::Formato)?;
@@ -284,9 +291,9 @@ pub(crate) fn finalizar_con_firmante(
 
 /// Produce el primer bloque PoST hijo de `terminal` (D-P09…D-P11, F-03, F-09).
 ///
-/// **No protege contra la doble firma.** Es la ruta antigua: sella directamente con `clave` sin
-/// consultar registro alguno. La variante segura es [`producir_con_firmante`]; SL-4b2 retirará esta
-/// del nodo.
+/// **Solo tests y arneses; no protege contra la doble firma.** Sella directamente con `clave` sin
+/// consultar registro alguno. El nodo produce **solo** con [`producir_con_firmante`] (SL-4b2/SL-4b3);
+/// `ci/firmante-obligatorio.sh` comprueba que `crates/zx-node/src/` no invoca esta ruta.
 ///
 /// # Procedimiento
 /// Arranca de S1, avanza el PoT slot a slot con `N_dev` y, en cada slot, pide a `fuente` las
@@ -296,7 +303,7 @@ pub(crate) fn finalizar_con_firmante(
 /// [`ErrorProductor::NDevInvalido`], [`ErrorProductor::MaxSlotsFueraDeRango`],
 /// [`ErrorProductor::Pot`], [`ErrorProductor::Fuente`], [`ErrorProductor::Formato`],
 /// [`ErrorProductor::ClaveDeLaSolucionNoCoincide`] o [`ErrorProductor::SinSolucion`].
-pub fn producir<F>(
+pub fn producir_sin_firmante<F>(
     terminal: BlockHash,
     fuente: &F,
     clave: &SigningKey,
@@ -312,13 +319,13 @@ where
 
 /// Produce el primer bloque PoST hijo de `terminal` sellándolo **solo** con `firmante` (SL-4b1).
 ///
-/// Construye exactamente el mismo candidato que [`producir`] y lo sella por
+/// Construye exactamente el mismo candidato que [`producir_sin_firmante`] y lo sella por
 /// [`Firmante::firmar`]. Devuelve [`ProductoFirmado::Abstenido`] cuando el firmante se niega
 /// (conflicto o pérdida de registro) y [`ProductoFirmado::Bloque`] con su veredicto cuando sella.
 ///
 /// # Errores
-/// Los mismos que [`producir`], más [`ErrorProductor::Firmante`] para un fallo real del registro
-/// (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
+/// Los mismos que [`producir_sin_firmante`], más [`ErrorProductor::Firmante`] para un fallo real del
+/// registro (E/S, envenenamiento, corrupción), la clave ajena o un sello inválido.
 pub fn producir_con_firmante<F>(
     terminal: BlockHash,
     fuente: &F,
