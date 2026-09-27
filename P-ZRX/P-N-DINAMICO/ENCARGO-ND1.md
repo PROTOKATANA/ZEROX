@@ -4,7 +4,7 @@
 
 ## 1. Identidad
 
-- **ID:** ND-1. **Redactado:** 2026-09-27 (≈ 22:20) por Claude (director). **Ejecutor:** DeepSeek (`deepseek-flash`,
+- **ID:** ND-1. **Redactado:** 2026-09-27 (≈ 22:00) por Claude (director). **Ejecutor:** DeepSeek (`deepseek-flash`,
   esfuerzo `high`). **Hoja de ruta:** 0.0.2, paso 1 (investigación de viabilidad). **Se lanza al cerrar 0.0.1**, salvo
   indicación de Katana.
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/ND1/`. **Base:** la raíz en el commit de

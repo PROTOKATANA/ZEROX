@@ -1,6 +1,6 @@
 # REVISIÓN W07b — mediciones reales de 0.0.1 (E-0…E-9)
 
-**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 21:50). **Ejecutor:** subagente Sonnet, 10:45–21:37 (≈ 10 h
+**Revisor:** Claude (director). **Fecha:** 2026-09-27 (≈ 21:45). **Ejecutor:** subagente Sonnet, 10:45–21:37 (≈ 10 h
 52 min de 8 h: presupuesto superado y declarado). Evidencia: `resultados-W07b/` (informe, receta, bitácora, guiones,
 18 análisis del instrumento W07c-B y los `EJECUCION.txt`/`RESULTADO*.txt`/`W07D-VERIFICACION.txt` de cada
 repetición); registros crudos (6,1 GiB) y copias de verificación en `deepseek/W07b/`, con `HUELLAS.sha256`.
