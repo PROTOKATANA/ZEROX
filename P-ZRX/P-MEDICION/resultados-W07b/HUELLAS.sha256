@@ -1,14 +1,15 @@
 # HUELLAS.sha256 — sha256 de toda la evidencia cruda de W07b bajo run/
-# Generado: 2026-09-27T21:37:19+02:00
+# Regenerado: 2026-09-28T01:50:43+02:00 (incluye el humo del encargo de E-0 sobre c107163, 2026-09-28)
 # Alcance: TODOS los ficheros de run/ EXCEPTO los directorios datos/ (estado RocksDB de cada
-# nodo: binario, ~6 GiB en total, se toca en cada checkpoint/compactación y no es texto
-# auditable). El contenido de cada datos/ ya queda fingerprinted de forma verificable por
-# resumen_estado y compendio_bloques (SHA3-256 de todos los hashes de bloques persistidos),
-# leídos directamente del binario en cada run/*/W07D-VERIFICACION.txt — ese es el hash que
-# importa para el veredicto de 'mismo estado', no el de los ficheros de RocksDB en disco.
+# nodo: binario, se toca en cada checkpoint/compactación y no es texto auditable). El
+# contenido de cada datos/ ya queda fingerprinted de forma verificable por resumen_estado y
+# compendio_bloques (SHA3-256 de todos los hashes de bloques persistidos), leídos
+# directamente del binario en cada run/*/W07D-VERIFICACION.txt o línea 'parada'/
+# 'reinicio_completo' — ese es el hash que importa para el veredicto de 'mismo estado', no
+# el de los ficheros de RocksDB en disco.
 # Cubre: registro.jsonl de cada nodo, recursos-*.csv, EJECUCION.txt, W07D-VERIFICACION.txt,
-# stdout/stderr, RESULTADO*.txt, logs de e7/e8, y toda ejecución conservada (incluidas las
-# fallidas/contaminadas, nunca borradas).
+# stdout/stderr, RESULTADO*.txt, logs de e7/e8/humo, y toda ejecución conservada (incluidas
+# las fallidas/contaminadas, nunca borradas).
 # Verificar con: sha256sum -c HUELLAS.sha256
 
 9a7cc7ee2e2ac42a9aa402cc4e0cc8ecb4352e061381509af21ecbb3b339576a  run/analisis-r4rep1-e7e8.log
@@ -41,6 +42,9 @@ e40f51b4858d7ecfa2697442a812062e9193a875e841b243c3bc7b48444ca1bd  run/analisis-w
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/e0b-fmt.log
 96de1303fa57afbe3f127598813540a412b6cc04eb3fc7ced86dbfe0e20e6462  run/e0b-resto.log
 158d99e8e61e19703beea7bb97cf074900c704d14ad00f885b93dad6dc688272  run/e0b-resto.pid
+4ab4e8276bae02d24b4dbcc9ab4634e413764d00e07bac89c6d97ec6e5486ede  run/e0-c107163-ci.log
+b272d15bdf3a387b51c23b70733e2fe5d023ea5576cd6ed5ded28b8e3af4e156  run/e0-c107163-ci.pid
+a89ac3878d99ff91e2d0def30ddbe114f430071f848f75ef6310f97f9735a932  run/e0-c107163-ci.sh
 3b84fc8be67d52798b319c6b2b721a814709a09e4d9df89a22b6942f49612eea  run/e0-clippy.log
 b8ee2fa218607a4f7c68e618bd4d54cacc5e2937d95f709ebb3046f761267066  run/e0-clippy.pid
 c5922a4350f95fd770332c179b5d305840159804e6796a1feda94977dead3024  run/e0c-release.log
@@ -167,6 +171,28 @@ dd4947515b9c0e1cdab5c40747f0f46b1ecb434d70b3024674918efe1d3e9610  run/E2a-calibr
 3d3c7b26da778a590c1b101901f0f617c3552fe7f75314ccc75220f456233b24  run/e3-aislado-rep1.log
 407588bdf4a2411455f7d60d1c3c4cf6475a84ca8b5c41c194f5c232af7f1f10  run/e3-aislado-rep1.pid
 dfb176db85121ea39eacc6f96fab22094c885dbfb27cf989567a85a8bb123b91  run/e3-aislado-rep1-v2.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/A/muestreador.log
+3e1266296f79a4ee930e273e0a8f387b2a60f75371528cbdacd2d7ac332c14c5  run/humo-c107163/A/pid
+229dbaff5aa948f6b9bd01a5029f2f06080cbde60ebcc4edf3b59592831f4be5  run/humo-c107163/A/registro.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/A/stderr.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/A/stdout.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/B/muestreador.log
+95e388f0a58b0b4d67fc7ab3cc02cb4d5aa33c5fea54cef13c8abfb6f6607dd5  run/humo-c107163/B/pid
+9eeebaa9090a5be9dd3a270e64cd491cf3e0e18e673d291947df9cb83f639b50  run/humo-c107163/B/registro.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/B/stderr.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/B/stdout.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/C/muestreador.log
+b128b1d986ee2773b5bf0d886266f38de0b9078de9957438a60924cf649e29d2  run/humo-c107163/C/pid
+60a5837496da08b467ec9bd03410ae7a61fc41d7c1127a2c12554d7031709e3c  run/humo-c107163/C/registro.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/C/stderr.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/humo-c107163/C/stdout.log
+9d6603834f28a0720a53a5f31d6f75ce079b7071962b2948f9cdb1c220f04396  run/humo-c107163/EJECUCION.txt
+42d2741f9c36efc7c55364b6460d3472be2dc9a1e20a11131e83e2cd4695712d  run/humo-c107163.log
+72b8a61fe15d0b5121833d33f6961ba5215a1ef5950375bd5406e84421b4a3ad  run/humo-c107163.pid
+526372a860299a8ea1b0e0285ec44b8416941f509794960f7a7d7279b0718ebd  run/humo-c107163/recursos-A.csv
+e47a873c445596602e9836f75361e838474f690885826aa4f734c10b5ded758c  run/humo-c107163/recursos-B.csv
+2c8582f292d414bbde6500f1ce91ef617d2b2279197f1dd20dd8c64c58774e00  run/humo-c107163/recursos-C.csv
+04bf4449e23ec6db8da1d497e3deba1b539dbfefc6e9837ac4250128a402a713  run/humo-c107163.sh
 96c5582cce4e53380bae104b2245581958f922afc023172b6c1c8a61db445649  run/instrumento-test.log
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  run/R1-rep1/A/muestreador.log
 3d50819e8c91e21783c92d68ffcc7f4a92be688021154b5f9e3a04d8a8b8b8c2  run/r1-rep1-analisis.log

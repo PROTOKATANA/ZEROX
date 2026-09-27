@@ -142,3 +142,61 @@ Resultado (completo 2026-09-27T21:31:18+02:00, log en `run/e0-3d21b1f-ci.log`):
 **E-0: SUPERADO. `3d21b1f` es el commit definitivo de 0.0.1 para W07b.**
 
 **R3 (E-6, E-6b) y R4 (E-7, E-8, E-9) se midieron con ESTOS binarios (commit `3d21b1f`).**
+
+## 9. E-0 sobre el candidato FINAL de 0.0.1 (director, 2026-09-28): `c1071636764f4dc2276863c734ab664e42d90e3f`
+
+W06d10 + W06d10-B migradas: penalización del par en gossip, y corrección de que lo que depende de
+la vista local (no verificable objetivamente) ya no penaliza al par. Encargo puntual, separado de
+la medición completa de escenarios de `ORDEN-W07b.md` (esa ya cerró con el commit `3d21b1f` en
+`INFORME.md`); aquí solo se pide E-0 completa + un humo con procesos reales, presupuesto 1h15min.
+
+Clon en `deepseek/W07b/clon-c107163/` (mismo procedimiento: clon limpio, checkout, clon fijado de
+Autonomys en `f8842d0`). Toolchain: `rustc 1.97.0-nightly (20de910db 2026-05-02)`, igual que en los
+candidatos anteriores.
+
+```bash
+cd clon-c107163
+export CARGO_BUILD_JOBS=8
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --jobs 8 -- -D warnings
+cargo build --workspace --all-features --locked --jobs 8
+cargo test --workspace --all-features --locked --jobs 8
+bash ci/dependencias-exactas.sh
+bash ci/frontera-crates.sh
+bash ci/firmante-obligatorio.sh
+cargo build --release --locked -p zx-node --jobs 8
+```
+
+Resultado (completo 2026-09-28T01:45:09+02:00, `nice -n 5`, log en `run/e0-c107163-ci.log`):
+
+- `cargo fmt --all -- --check`: verde.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`: verde, sin avisos.
+- `cargo build --workspace --all-features --locked`: verde.
+- `cargo test --workspace --all-features --locked`: verde. **85 binarios de test, suma exacta de
+  las líneas "test result": 891 pasados, 0 fallados, 6 ignorados** — coincide EXACTAMENTE con lo
+  esperado por el director y con el propio mensaje de commit de `c107163` ("891/0/6").
+- `ci/dependencias-exactas.sh`, `ci/frontera-crates.sh`, `ci/firmante-obligatorio.sh`: verdes.
+- `cargo build --release --locked -p zx-node`: verde. `Finished release profile [optimized]
+  target(s) in 2m 43s`.
+- Commit del clon: `c1071636764f4dc2276863c734ab664e42d90e3f`.
+- `sha256sum clon-c107163/target/release/zx-node` = `d919d23958c6bec53d5077845b6e2830d91a2e80ca4be4cd1f1b165ac7b69930`
+- `sha256sum clon-c107163/target/release/zx-adversario` = `7f5eea5d107cadd6701cfe7be47d817bcba7da7414b836389a7c8570f7fe8bb3`
+  (**primera vez que `zx-adversario` cambia de hash** respecto a `27dcfeb`/`26312ff`/`3d21b1f`, que
+  compartían todos `a8bcc9d0...`; no investigado a fondo, consistente con que W06d10/W06d10-B
+  tocaran una dependencia compartida como `zx-p2p`, de la que `zx-adversario` también depende, sin
+  tocar su propio código fuente).
+
+**Humo con procesos reales** (3 nodos A/B/C, una clave cada uno — `0`,`1`,`2` —, conectados desde
+el arranque, `SR_dev=13043817825332783104`, semilla 101, `--dejar-de-producir-en-slot 60` desde el
+inicio): cruzaron el corte y llegaron a slot 60 en ~85s reales. Tras 30s de reposo y `SIGTERM`
+ordenado a los 3, la línea `parada` de cada uno (método W07d) dio **exactamente el mismo**
+`punta`, `resumen_estado` (`44a5f4bc5dfa5fa53e4ba91a13d17a0e0f99919d9dff1bd05d3f571d6c146f6b`) y
+`compendio_bloques` (`baf46330023b68f6ce3ee305f3f47a88dc7af4760d628ebf59bf63f9b8e475b4`),
+`n_bloques_dag=84`. **`fallo_productor=0` y `par_penalizado=0` en los 3 nodos** — coincide
+exactamente con lo esperado. Log: `run/humo-c107163.log`; datos crudos: `run/humo-c107163/`.
+
+**Limpieza de disco tras terminar** (mismo motivo que en §8): se borró `clon-c107163/target/debug/`
+para no acercarse al presupuesto de disco. Verificado el `sha256` de `target/release/{zx-node,
+zx-adversario}` ANTES y DESPUÉS del borrado: **sin cambios**.
+
+**E-0: SUPERADO. `c1071636764f4dc2276863c734ab664e42d90e3f` es el candidato FINAL de 0.0.1.**

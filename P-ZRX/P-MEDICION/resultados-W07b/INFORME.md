@@ -338,3 +338,43 @@ binarios `release` no cambiaron. Zona final: **21 GiB**, dentro de presupuesto.
 **Este informe no oculta ningún fallo.** Los dos fallos reales del producto (§5.4), el hallazgo de
 penalización de pares no observada (§5.6) y el desbordamiento de presupuesto (§5.8) se reportan tal
 cual, sin ajustar los criterios de éxito a posteriori.
+
+## 7. E-0 del candidato final: `c1071636764f4dc2276863c734ab664e42d90e3f` (2026-09-28)
+
+Encargo puntual y posterior al cierre de `ORDEN-W07b` (que ya midió los 9 escenarios completos
+sobre el commit `3d21b1f`, §0-§6 de este informe). El director pidió, solo para el commit FINAL de
+0.0.1 (W06d10 + W06d10-B: penalización del par en gossip, y que lo que depende de la vista local
+ya no penaliza al par): E-0 completa desde clon limpio y un humo con procesos reales. Presupuesto
+1h15min; duración real ≈53 min, dentro de presupuesto.
+
+**E-0 (CI completa):** SUPERADO. `cargo fmt`/`clippy -D warnings`/`build --workspace`/`test
+--workspace` (85 binarios, **891 pasados, 0 fallados, 6 ignorados** — coincide exactamente con lo
+esperado y con el propio mensaje del commit), los 3 guardianes de `ci/`, y `cargo build --release
+--locked -p zx-node`, todo verde (`nice -n 5`, 8 hilos). Detalle completo en `RECETA.md` §9.
+
+- `sha256(zx-node)` = `d919d23958c6bec53d5077845b6e2830d91a2e80ca4be4cd1f1b165ac7b69930`
+- `sha256(zx-adversario)` = `7f5eea5d107cadd6701cfe7be47d817bcba7da7414b836389a7c8570f7fe8bb3`
+  — **primera vez que este hash cambia** respecto a los 3 commits candidatos anteriores de
+  `ORDEN-W07b` (todos compartían `a8bcc9d0...`); no investigado a fondo, consistente con un cambio
+  en una dependencia compartida (p.ej. `zx-p2p`) más que en el propio código de `zx-adversario`.
+
+**Humo con procesos reales:** 3 nodos A/B/C, una clave cada uno, conectados desde el arranque,
+`SR_dev=13043817825332783104` (el mismo calibrado y usado en toda `ORDEN-W07b`), semilla 101,
+`--dejar-de-producir-en-slot 60` desde el inicio. Cruzaron el corte y llegaron a slot 60 en ~85 s
+reales. Tras 30 s de reposo y `SIGTERM` ordenado a los 3, la línea `parada` (que W07d ya hace
+llevar `resumen_estado`/`compendio_bloques`/`punta`/`n_bloques_dag`, igual que `reinicio_completo`
+— no hizo falta relanzar aislado sobre copias porque son nodos vivos, no reabiertos) dio
+**exactamente el mismo estado en los 3**: `resumen_estado
+=44a5f4bc5dfa5fa53e4ba91a13d17a0e0f99919d9dff1bd05d3f571d6c146f6b`, `compendio_bloques
+=baf46330023b68f6ce3ee305f3f47a88dc7af4760d628ebf59bf63f9b8e475b4`, `n_bloques_dag=84`.
+**`fallo_productor=0` y `par_penalizado=0` en los 3 nodos** — exactamente lo esperado por el
+director; ningún efecto colateral negativo de W06d10/W06d10-B detectado en este humo.
+
+**Disco:** se repitió la limpieza de `target/debug` del clon nuevo (verificado el sha256 de los
+binarios release antes y después: sin cambios), dejando la zona en 25 GiB, dentro del presupuesto
+de 50 GiB.
+
+**c1071636764f4dc2276863c734ab664e42d90e3f queda confirmado como el candidato final de 0.0.1** por
+esta CI y este humo. No se repitieron los 9 escenarios completos de `ORDEN-W07b` sobre este commit
+(no era el alcance de este encargo puntual) — si el director quiere esa cobertura completa sobre
+`c107163` en vez de `3d21b1f`, es un encargo aparte.

@@ -1227,3 +1227,96 @@ ORDEN-W07b: FIN REAL DE LA SESIÓN `2026-09-27T21:38:40+02:00`.
 - ver detalle en run/R3-E6b-3d21b1f-rep3/EJECUCION.txt
 - resultado tras reunir (aislado): PENDIENTE_DE_VERIFICACION_CON_W07D (ningún método de comparación de estado es decisivo hasta que reinicio_completo lleve resumen_estado; datos conservados en /home/katana/zeo/ZEROX/deepseek/W07b/run/R3-E6b-3d21b1f-rep3/*/datos)
 - blue_score final: A=16 B=16 C=16 (predicción era: BC)
+
+# NUEVO ENCARGO (2026-09-28, director): E-0 completa sobre el candidato FINAL de 0.0.1
+
+`c1071636764f4dc2276863c734ab664e42d90e3f` (W06d10 + W06d10-B: penalización del par en gossip y
+rechazos de vista local que NO penalizan). Presupuesto: **1h15min**. Mismas reglas de ORDEN-W07b:
+zona única `deepseek/W07b/`, sin Python, sin git en el repo principal, `nice -n 5`, 8 hilos.
+
+## Paso 1: clon limpio — HECHO
+
+`clon-c107163/` clonado (`git clone --no-hardlinks`), checkout de
+`c1071636764f4dc2276863c734ab664e42d90e3f` confirmado (`git log --oneline -1` =
+"c107163 W06d10-B migrada..."). Autonomys clonado y fijado en `f8842d0` (mismo commit que todos
+los candidatos anteriores). Toolchain: `rustc 1.97.0-nightly (20de910db 2026-05-02)`, coincide con
+lo esperado.
+
+## Paso 2: CI completa EN MARCHA
+
+PID=PGID **58272** (verificado, PPID=1), lanzado 2026-09-28T00:57:24+02:00, `nice -n 5`,
+`CARGO_BUILD_JOBS=8`/`--jobs 8` en cada paso.
+**Para parar: `kill -9 -- -58272`.**
+Guion: `run/e0-c107163-ci.sh` (fmt, clippy, build workspace, test workspace, 3 guardianes de
+`deps`, release build). Log: `run/e0-c107163-ci.log`.
+Se espera contar "test result" hasta sumar **891 pasados, 0 fallos, 6 ignorados en 85 binarios**
+(cifra dada por el director, coincide con el propio mensaje del commit: "891/0/6").
+Siguiente paso al terminar: sha256 de `target/release/{zx-node,zx-adversario}`, sumar las líneas
+"test result", y lanzar el humo de 3 nodos (paso 4).
+
+## Paso 2: CI completa sobre c107163 — SUPERADO (2026-09-28T01:45:09+02:00)
+
+Todo verde: `fmt_exit=0 clippy_exit=0 build_exit=0 test_exit=0 dep1_exit=0 dep2_exit=0 dep3_exit=0
+release_exit=0`. 85 líneas "test result: ok" (85 binarios). Suma exacta: **891 pasados, 0 fallados,
+6 ignorados** — coincide EXACTAMENTE con lo esperado por el director y con el propio mensaje del
+commit ("891/0/6"). `cargo build --release --locked -p zx-node --jobs 8`: `Finished release
+profile [optimized] target(s) in 2m 43s`.
+
+sha256:
+- `zx-node` = `d919d23958c6bec53d5077845b6e2830d91a2e80ca4be4cd1f1b165ac7b69930`
+- `zx-adversario` = `7f5eea5d107cadd6701cfe7be47d817bcba7da7414b836389a7c8570f7fe8bb3`
+
+**Observación (no es un fallo, solo declarado por transparencia):** es la PRIMERA vez en toda la
+orden que `zx-adversario` cambia de hash respecto a los commits anteriores (`27dcfeb`, `26312ff`,
+`3d21b1f` compartían el mismo `a8bcc9d0...`). No investigado a fondo (fuera del alcance de este
+encargo puntual), pero es consistente con que W06d10/W06d10-B tocaran una dependencia compartida
+(p.ej. `zx-p2p`, del que `zx-adversario` también depende) sin tocar `zx-adversario` directamente —
+un cambio en una dependencia común recompila y cambia el hash del binario aunque su propio código
+fuente no cambie.
+
+Log completo en `run/e0-c107163-ci.log`. Siguiente: paso 4, humo con 3 nodos reales.
+
+## Paso 4: humo de 3 nodos reales EN MARCHA
+
+PID=PGID **127671** (verificado, PPID=1), lanzado 2026-09-28T01:46:43+02:00, `nice -n 5`.
+**Para parar: `kill -9 -- -127671`.**
+Guion: `run/humo-c107163.sh` (nuevo, escrito para este encargo). Log: `run/humo-c107163.log`.
+Datos en `run/humo-c107163/`. A=clave 0 puerto 42900, B=clave 1 puerto 42901, C=clave 2 puerto
+42902, todos conectados desde el arranque (`--red-marcar` mutuo), `SR_dev=13043817825332783104`,
+semilla 101, `--dejar-de-producir-en-slot 60` en los 3 desde el inicio (no hace falta relanzar:
+paran de producir solos al llegar a slot 60, siguen validando/sincronizando).
+Procedimiento: esperar `dejar_de_producir` en los 3 → reposo 30s sin `cambio_punta` → `SIGTERM`
+ordenado a los 3 (parada) → leer `resumen_estado`/`compendio_bloques` directamente de la línea
+`parada` de cada uno (método W07d: `parada` lleva estos campos igual que `reinicio_completo`, así
+que no hace falta relanzar aislado sobre copias — son nodos vivos, no hay que reabrir nada) →
+contar `fallo_productor` y `par_penalizado` en los 3 (se esperan 0 de cada).
+
+## Paso 4: humo de 3 nodos reales — SUPERADO (2026-09-28T01:49:04+02:00)
+
+Los 3 cruzaron el corte y llegaron a slot 60 en ~85 s de reloj real (una clave por nodo, red
+conectada desde el arranque). `dejar_de_producir` en los 3 a slot 60. Tras 30s de reposo y
+`SIGTERM` ordenado: **los 3 con `punta`, `resumen_estado` Y `compendio_bloques` EXACTAMENTE
+iguales** (`resumen_estado=44a5f4bc5dfa5fa53e4ba91a13d17a0e0f99919d9dff1bd05d3f571d6c146f6b`,
+`compendio_bloques=baf46330023b68f6ce3ee305f3f47a88dc7af4760d628ebf59bf63f9b8e475b4`,
+`n_bloques_dag=84`). **`fallo_productor=0` y `par_penalizado=0` en los 3 nodos** — coincide
+exactamente con lo esperado por el director. Sin procesos residuales al terminar (trap
+`matar_todo` en `EXIT` limpió los 3). Log completo: `run/humo-c107163.log`. Datos crudos:
+`run/humo-c107163/`.
+
+Siguiente: paso 5 (RECETA.md §9, INFORME.md §7), paso 6 (limpiar target/debug).
+
+## Paso 6: limpieza de target/debug — HECHO (2026-09-28T01:49:59+02:00)
+
+`sha256sum` de `clon-c107163/target/release/{zx-node,zx-adversario}` verificado ANTES
+(`d919d239...`/`7f5eea5d...`) y DESPUÉS (`d919d239...`/`7f5eea5d...` — idénticos) de
+`rm -rf clon-c107163/target/debug`. `clon-c107163`: 26G→3,7G. Zona completa: 21G→25G (dentro del
+presupuesto de 50 GiB).
+
+## ENCARGO DE 2026-09-28 (E-0 sobre candidato final c107163): TERMINADO
+
+Fin real: 2026-09-28T01:50:xx+02:00. Duración desde el aviso del director (00:56:58) hasta aquí:
+**≈53 min, DENTRO del presupuesto de 1h15min**. Todos los pasos superados: clon limpio, CI
+completa (891/0/6 exacto), sha256 de binarios, humo de 3 nodos con veredicto W07d real
+(`resumen_estado`/`compendio_bloques` iguales en los 3), `fallo_productor=0` y `par_penalizado=0`
+en los 3 (exactamente lo esperado), `RECETA.md` §9 e `INFORME.md` §7 escritos, `target/debug`
+limpiado con hashes verificados antes/después. Sin procesos residuales. Nada más en marcha.

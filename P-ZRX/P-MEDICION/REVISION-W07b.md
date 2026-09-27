@@ -60,3 +60,17 @@ produce más de `k` bloques fuera de la vista del otro, no un fallo.
 4. **Límites que se mantienen:** localhost y un reloj; máximo 4 nodos; ningún adversario con más espacio o hash;
    `Δ_p99` sin calcular; `estado_final_igual` del instrumento es descriptivo (el veredicto es el de W07d).
 5. **Pendiente para cerrar 0.0.1:** W06d10 (E-7 con penalización y 0 falsos positivos) y la E-0 del nuevo candidato.
+
+## Anexo (2026-09-28): E-0 del candidato final `c107163`
+
+Encargo del director al mismo ejecutor tras W06d10 y W06d10-B. **Comprobado por el director:**
+- `run/e0-c107163-ci.log`: los ocho códigos de salida a 0; **891/0/6** en 85 binarios; 0 `FAILED` o `panicked`.
+- El clon está en `c1071636…` y sin cambios.
+- `sha256` de los binarios release recalculado: `zx-node` `d919d239…`, `zx-adversario` `7f5eea5d…`. El adversario
+  cambia porque W06d10 lo modificó; el ejecutor lo atribuyó a «una dependencia recompilada», y esa explicación se
+  corrige aquí.
+- Humo de tres nodos al slot 60: las tres líneas `parada` de los registros crudos dan la misma `punta`, el mismo
+  `resumen_estado` (`44a5f4bc…`), el mismo `compendio_bloques` (`baf46330…`) y `n_bloques_dag = 84`; 0
+  `fallo_productor` y 0 `par_penalizado`.
+
+Resumen en `resultados-W07b/run/e0-c107163-resumen.txt` y `humo-c107163-paradas.jsonl`.

@@ -1,20 +1,51 @@
 # Informe final de 0.0.1 del ZEROX híbrido — para Katana
 
-**Estado: BORRADOR** (redactado 2026-09-27 desde ≈ 11:00; mediciones de W07b incorporadas a las 23:46). Falta el
-veredicto, que espera a la E-0 del candidato final (W06d10-B ya migrada). **Firma:** Claude (director, `AUTO-ZRX.md` §8). Todo en commits locales de
+**Estado: CERRADO** (2026-09-28, 01:51; redactado desde el 27 ≈ 11:00). Veredicto en §1. **Firma:** Claude (director, `AUTO-ZRX.md` §8). Todo en commits locales de
 la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato final:** `c107163` (antes `27dcfeb`, `26312ff` y `3d21b1f`; W06d8 y W06d9 corrigieron dos caídas del productor y W06d10 la falta de penalización del par, todas halladas al medir). R1 y R2 se midieron con `26312ff`; R3 y R4, con `3d21b1f`; E-7 con penalización, con W06d10.
 
 ---
 
 ## 1. Veredicto
 
-*Pendiente W07b.* Criterio de `AUTO-ZRX.md` §8: 0.0.1 está lista para mediciones reales si su ruta de consenso está
-integrada y varios nodos independientes producen, validan, propagan, sincronizan, reinician y revierten con reglas
-idénticas; si el corte PoW → PoAS + PoT + DAG se prueba con garantía y espacio elegibles; y si los verificadores de
-los mecanismos **activados** aceptan lo válido y rechazan lo inválido; con receta reproducible, registros y
-medidas de latencia, recursos, errores y conducta ante ataques y fallos especificados.
+**0.0.1 CUMPLE el criterio de `AUTO-ZRX.md` §8 como producto mínimo viable de desarrollo, en el commit `c107163`, con
+los límites de abajo.** El criterio: 0.0.1 está lista para mediciones reales si su ruta de consenso está integrada y
+varios nodos independientes producen, validan, propagan, sincronizan, reinician y revierten con reglas idénticas; si el
+corte PoW → PoAS + PoT + DAG se prueba con garantía y espacio elegibles; y si los verificadores de los mecanismos
+**activados** aceptan lo válido y rechazan lo inválido; con receta reproducible, registros y medidas de latencia,
+recursos, errores y conducta ante ataques y fallos especificados.
 
-**Lo que ya está demostrado antes de W07b** (procesos reales en `127.0.0.1`, órdenes y revisiones citadas):
+Cómo se cumple, punto por punto:
+
+- **Varios nodos con reglas idénticas.** Tres y cuatro procesos reales producen, validan, propagan, sincronizan
+  (nodo tardío), reinician tras `SIGKILL` y se reorganizan tras particiones y reuniones. En **todas** las repeticiones
+  acaban en el mismo estado, comprobado al reabrir cada nodo aislado sobre una copia de sus datos (E-1…E-6b ×3).
+- **El corte**, con garantía y espacio elegibles, se cruza en todas las ejecuciones. FC-3 elige el terminal predicho
+  (E-6b).
+- **Los verificadores de lo activado:**
+  - rechazan las entradas inválidas con su motivo y penalizan a quien las difunde (E-7 con W06d10);
+  - detectan, incluyen y castigan la doble firma, con la confiscación comprobada en el estado (E-8);
+  - no penalizan lo que depende de la vista local (W06d10-B).
+- **Receta reproducible:** E-0 desde un clon limpio sobre `c107163`, verificada por el director. fmt, clippy
+  `-D warnings`, compilación, **891/0/6** en 85 binarios, los tres guardianes y el release, todo verde. Humo de tres
+  nodos al slot 60 con el mismo estado y 0 `fallo_productor` / 0 `par_penalizado`. Binarios:
+  - `zx-node`: `d919d239…69930`;
+  - `zx-adversario`: `7f5eea5d…fe8bb3` (cambia respecto a los candidatos anteriores porque W06d10 modificó el
+    adversario).
+- **Mediciones:** §4.
+
+**Cómo leerlo sin engañarse:**
+
+- R1 y R2 se midieron con `26312ff`, R3 y R4 con `3d21b1f`, y la penalización del par y la ausencia de falsos
+  positivos con W06d10 y W06d10-B. Sobre `c107163` se hicieron la E-0 y un humo, **no** los nueve escenarios completos.
+  Los cambios posteriores a cada medición tocan la red y el productor, y cada uno trae su propia prueba con procesos
+  reales.
+- Todo es **localhost, una máquina, como mucho cuatro nodos**. Ningún adversario tiene más espacio ni más hash que los
+  honestos, y no hay relevo de transacciones. Es una base medible, no una red segura.
+- Lo que 0.0.1 **no resuelve** está en §5: doble farmeo, disuasión del castigo sin comprobar, eclipse en el corte,
+  semilla del corte (en E-9 ganó quien retuvo su terminal), timestamp PoST sin validar, tope de terminales cacheado.
+  0.0.2–0.0.4 tienen que resolverlo (`P-ZRX/HOJA-DE-RUTA.md`).
+
+**Lo que ya estaba demostrado antes de W07b** (procesos reales en `127.0.0.1`, órdenes y revisiones citadas):
 tres nodos cruzan el corte y convergen (W06d4, W06d6); un nodo que llega tras ≥ 500 bloques PoST alcanza a la red
 y termina con el mismo estado (W06d6); una partición PoST con el mismo terminal y una con terminales distintos
 convergen al terminal que dicta FC-3 (W06d7); el productor honesto sobrevive a 10 `SIGKILL` sin ninguna evidencia
@@ -62,7 +93,7 @@ reabrir cada nodo aislado sobre una **copia** de sus datos y comparar `resumen_e
 
 | Escenario | Commit | Resultado (3 repeticiones salvo indicación) |
 |---|---|---|
-| E-0 receta desde clon limpio | `27dcfeb`, `26312ff`, `3d21b1f` | superada en los tres; en `3d21b1f`: 877/0/6, fmt, clippy, guardianes. *Pendiente: candidato final* |
+| E-0 receta desde clon limpio | `27dcfeb`, `26312ff`, `3d21b1f`, **`c107163`** | superada en los cuatro; en `c107163`: 891/0/6 en 85 binarios, fmt, clippy, guardianes, release, y humo de tres nodos al slot 60 con el mismo estado |
 | E-1…E-4 cruce del corte, 30 min de régimen, `SIGKILL` y reinicio | `26312ff` | superadas; ≈ 1 500 bloques PoST por repetición, 0 rechazos; reinicio y puesta al día ≈ 104–118 s |
 | E-5 nodo tardío (tras ≥ 500 bloques) | `26312ff` | superada; puesta al día ≈ 60–64 s; mismo estado en los cuatro |
 | E-6 partición en PoST, aislamiento verificado (0 contactos) | `3d21b1f` | superada; reunión en ≈ 12 s |

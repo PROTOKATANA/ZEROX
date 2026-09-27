@@ -11,7 +11,7 @@ contra un oráculo independiente o una prueba de extremo a extremo; «implementa
 código con tests propios pero sin contraste independiente.
 
 **Suite de la raíz (candidato final `c107163`; antes `27dcfeb`, `26312ff` y `3d21b1f`):** 891/0/6 tras W06d10-B (ejecutada por el
-ejecutor en su zona; la repite E-0 de W07b desde un clon limpio). Oráculos vigentes:
+ejecutor en su zona; repetida por la E-0 desde un clon limpio: 891/0/6 en 85 binarios). Oráculos vigentes:
 T01 v0.5 (3 179 casos) y T04 v0.6 (2 108 casos), vectores en `testdata/transicion-v0.5` y `testdata/estado-dag-v0.6`.
 
 ## 1. Formatos (`P-ZRX/P-FORMATO/FORMATO-v0.md`, con la Corrección v0.1)
@@ -74,7 +74,7 @@ T01 v0.5 (3 179 casos) y T04 v0.6 (2 108 casos), vectores en `testdata/transicio
 | W06d10-B | Lo que depende de la vista local (FTL PoW, tope de terminales, fallos locales, padre con motivo de vista local) → `Ignorar` sin penalizar, en gossip y sincronización; lo demostrable sigue penalizando | tests por familia; E-7 real (4/4 penalizados) y red al slot 150 (0 falsos positivos); 891/0/6 | migrada. Límite: el rechazo por tope de terminales sigue cacheado en `zx-cadena` (IPA B-14) |
 
 Revisión independiente del código de red, nodo y castigo: RI-3a/b/c hechas, hallazgos corregidos (un crítico).
-**W07b cerrada** (`P-ZRX/P-MEDICION/REVISION-W07b.md`): E-0…E-6b y E-8 superadas ×3; E-7 destapó la falta de penalización del par (W06d10); E-9 descriptivo. **Pendiente:** la E-0 del candidato final `c107163` (en curso).
+**W07b cerrada** (`P-ZRX/P-MEDICION/REVISION-W07b.md`): E-0…E-6b y E-8 superadas ×3; E-7 destapó la falta de penalización del par (W06d10); E-9 descriptivo. **0.0.1 cerrada en `c107163`** (2026-09-28): E-0 desde un clon limpio con 891/0/6 y humo de tres nodos con el mismo estado; veredicto en `D-ZRX/INFORME-0.0.1.md` §1.
 
 ## 6. Evidencia y castigo (`P-ZRX/P-SLASHING/CONTRATO-EVIDENCIA-v0.md` con su «Ratificación v0»)
 

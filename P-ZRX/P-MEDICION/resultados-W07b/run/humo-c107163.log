@@ -1,0 +1,40 @@
+2026-09-28T01:46:43+02:00 === humo c107163: A,B,C desde el genesis, una clave cada uno, dejar-de-producir-en-slot=60 ===
+lanzado A pid=127702
+lanzado B pid=127709
+lanzado C pid=127721
+=== esperando que los 3 crucen el corte y lleguen a slot>=60, plazo 20 min ===
+2026-09-28T01:46:43+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:46:48+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:46:53+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:46:58+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:03+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:08+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:13+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:18+02:00 slots: A=0 B=0 C=0 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:23+02:00 slots: A=2 B=2 C=2 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:28+02:00 slots: A=7 B=7 C=7 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:33+02:00 slots: A=10 B=10 C=10 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:38+02:00 slots: A=15 B=15 C=15 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:43+02:00 slots: A=19 B=19 C=19 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:48+02:00 slots: A=25 B=25 C=25 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:53+02:00 slots: A=28 B=28 C=28 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:47:58+02:00 slots: A=33 B=33 C=33 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:48:03+02:00 slots: A=37 B=37 C=37 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:48:08+02:00 slots: A=41 B=41 C=41 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:48:13+02:00 slots: A=46 B=46 C=46 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:48:18+02:00 slots: A=49 B=49 C=49 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:48:23+02:00 slots: A=54 B=54 C=55 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:48:28+02:00 slots: A=58 B=58 C=58 | dejar_de_producir: A=0 B=0 C=0
+2026-09-28T01:48:33+02:00 slots: A=60 B=60 C=60 | dejar_de_producir: A=1 B=1 C=1
+EXITO: los 3 llegaron a dejar_de_producir (slot objetivo 60)
+=== reposo: 30s sin cambio_punta en ninguno ===
+=== parada ordenada (SIGTERM) de los 3: parada lleva resumen_estado/compendio_bloques (W07d) ===
+=== resumen_estado y compendio_bloques de la linea 'parada' de cada nodo ===
+A parada: {"tipo":"parada","reloj_ns":140577429451,"reloj_pared_ns":1790552943842405269,"motivo":"sigterm","punta":"305e5023596e36a4039a0523e62e44fd733f5db9d46b4dbf049b3ea8699fb51b","resumen_estado":"44a5f4bc5dfa5fa53e4ba91a13d17a0e0f99919d9dff1bd05d3f571d6c146f6b","n_bloques_dag":84,"compendio_bloques":"baf46330023b68f6ce3ee305f3f47a88dc7af4760d628ebf59bf63f9b8e475b4"}
+B parada: {"tipo":"parada","reloj_ns":140669024542,"reloj_pared_ns":1790552943936452003,"motivo":"sigterm","punta":"305e5023596e36a4039a0523e62e44fd733f5db9d46b4dbf049b3ea8699fb51b","resumen_estado":"44a5f4bc5dfa5fa53e4ba91a13d17a0e0f99919d9dff1bd05d3f571d6c146f6b","n_bloques_dag":84,"compendio_bloques":"baf46330023b68f6ce3ee305f3f47a88dc7af4760d628ebf59bf63f9b8e475b4"}
+C parada: {"tipo":"parada","reloj_ns":140789343836,"reloj_pared_ns":1790552944060244351,"motivo":"sigterm","punta":"305e5023596e36a4039a0523e62e44fd733f5db9d46b4dbf049b3ea8699fb51b","resumen_estado":"44a5f4bc5dfa5fa53e4ba91a13d17a0e0f99919d9dff1bd05d3f571d6c146f6b","n_bloques_dag":84,"compendio_bloques":"baf46330023b68f6ce3ee305f3f47a88dc7af4760d628ebf59bf63f9b8e475b4"}
+=== conteo fallo_productor y par_penalizado (se esperan 0 de cada) ===
+A: fallo_productor=0 par_penalizado=0
+B: fallo_productor=0 par_penalizado=0
+C: fallo_productor=0 par_penalizado=0
+2026-09-28T01:49:04+02:00 === HUMO c107163 TERMINADO ===
