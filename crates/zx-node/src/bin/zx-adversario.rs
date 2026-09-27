@@ -38,7 +38,7 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use libp2p::core::transport::Transport as _;
 use libp2p::{Multiaddr, PeerId, Swarm, identity, noise, yamux};
 use zx_core::amount::Amount;
@@ -59,7 +59,7 @@ use zx_p2p::servicio::{EventoRed, arrancar};
 #[derive(Parser, Debug)]
 #[command(
     name = "zx-adversario",
-    about = "Herramienta adversarial de ORDEN-W06d2 (E-7/E-8)"
+    about = "Herramienta adversarial de ORDEN-W06d2 (E-7/E-8) y ORDEN-SL4b2 (doble-firma)"
 )]
 struct Cli {
     /// Dirección del nodo objetivo.
@@ -69,13 +69,48 @@ struct Cli {
     /// Pausa entre escenarios, en milisegundos (para poder leer el registro del objetivo).
     #[arg(long, default_value_t = 300)]
     pausa_ms: u64,
+
+    /// Sin subcomando: la ráfaga E-7/E-8 de siempre (`ORDEN-W06d2`). Con `doble-firma`: `ORDEN-SL4b2`
+    /// decisión 5.
+    #[command(subcommand)]
+    modo: Option<Modo>,
+}
+
+/// `ORDEN-SL4b2` decisión 5: subcomandos nuevos del binario existente (nunca un modo del nodo).
+#[derive(Subcommand, Debug)]
+enum Modo {
+    /// Se conecta al objetivo, espera un bloque PoST producido por la clave dev
+    /// `--clave-indice` (derivada con `zx_node::claves::ClaveDev`, la misma función que usa el
+    /// nodo), construye una segunda cabecera **idéntica salvo `timestamp + 1`**, la sella con esa
+    /// misma clave, comprueba localmente que la identidad RAT-1 coincide y el `pre_hash` no, y la
+    /// publica. Con `--repetir`, publica además una tercera (`timestamp + 2`) del mismo billete,
+    /// para probar la deduplicación (EV-12).
+    DobleFirma {
+        /// Índice de la clave dev cuyo bloque se espera y se duplica.
+        #[arg(long)]
+        clave_indice: u32,
+        /// Semilla de derivación (debe coincidir con la del objetivo, `--semilla` de `zx-node`).
+        #[arg(long, default_value_t = 1)]
+        semilla: u64,
+        /// Plazo máximo de espera del primer bloque de la clave, en segundos.
+        #[arg(long, default_value_t = 120)]
+        plazo_espera_s: u64,
+        /// Publica también una tercera cabecera (`timestamp + 2`) del mismo billete (EV-12).
+        #[arg(long)]
+        repetir: bool,
+    },
 }
 
 /// Manejador espía: no se necesita servir nada de verdad (la herramienta no es un nodo, no tiene
 /// cadena que ofrecer); cuenta lo que le llega para el resumen final.
+///
+/// `ORDEN-SL4b2` decisión 5: además reenvía cada `BloqueRed::Post` difundido por el objetivo a
+/// `posts` (si hay un receptor puesto), para que `doble-firma` pueda esperar el primero de una
+/// clave concreta sin bloquear el bucle de red (`bloque_difundido` corre en ese bucle).
 #[derive(Default)]
 struct Espia {
     respuestas: std::sync::atomic::AtomicUsize,
+    posts: std::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<BloqueRed>>>,
 }
 
 impl ManejadorEntrante for Espia {
@@ -112,7 +147,13 @@ impl ManejadorEntrante for Espia {
         }
     }
 
-    fn bloque_difundido(&self, _id: IdDiferido, _bloque: &BloqueRed) -> Veredicto {
+    fn bloque_difundido(&self, _id: IdDiferido, bloque: &BloqueRed) -> Veredicto {
+        if matches!(bloque, BloqueRed::Post { .. })
+            && let Ok(guard) = self.posts.lock()
+            && let Some(tx) = guard.as_ref()
+        {
+            let _ = tx.send(bloque.clone());
+        }
         Veredicto::Ignorar
     }
 
@@ -336,6 +377,17 @@ async fn main() {
         }
     };
     let espia = std::sync::Arc::new(Espia::default());
+    // `ORDEN-SL4b2` decisión 5: el canal se registra **antes** de conectar, para no perder ningún
+    // `BloqueRed::Post` que llegue entre la conexión y que `doble-firma` empiece a esperar
+    // (inocuo para la ráfaga E-7/E-8: nadie lee `rx_posts` en ese camino).
+    let (tx_posts, rx_posts) = tokio::sync::mpsc::unbounded_channel::<BloqueRed>();
+    #[expect(
+        clippy::unwrap_used,
+        reason = "recién creado, sin panic previo posible: un Mutex envenenado aquí sería un bug de este mismo binario"
+    )]
+    {
+        *espia.posts.lock().unwrap() = Some(tx_posts);
+    }
     let piezas = arrancar(swarm, std::sync::Arc::clone(&espia));
     let manejo = piezas.manejo;
     let mut eventos = piezas.eventos;
@@ -379,6 +431,28 @@ async fn main() {
             "zx-adversario: el objetivo no confirmó suscripción a {pendientes:?} en el plazo \
              esperado; prosigo igualmente (la ráfaga puede perder mensajes por esto)"
         );
+    }
+
+    // `ORDEN-SL4b2` decisión 5: con el subcomando `doble-firma`, esta herramienta hace **solo**
+    // eso (no encadena con la ráfaga E-7/E-8 de abajo).
+    if let Some(Modo::DobleFirma {
+        clave_indice,
+        semilla,
+        plazo_espera_s,
+        repetir,
+    }) = cli.modo
+    {
+        ejecutar_doble_firma(
+            &manejo,
+            rx_posts,
+            clave_indice,
+            semilla,
+            Duration::from_secs(plazo_espera_s),
+            repetir,
+        )
+        .await;
+        tarea.abort();
+        return;
     }
 
     // Orden deliberado: primero los escenarios que **no** violan consenso (`Ignorar`, la conexión
@@ -578,4 +652,136 @@ async fn esperar_desconexion(eventos: &mut tokio::sync::mpsc::Receiver<EventoRed
             None => return None,
         }
     }
+}
+
+/// `ORDEN-SL4b2` decisión 5: `zx-adversario doble-firma`.
+///
+/// Espera el primer `BloqueRed::Post` de `clave_indice` (derivada con la misma función que
+/// `zx_node::claves::ClaveDev`), construye una segunda cabecera idéntica salvo `timestamp + 1`, la
+/// sella con la misma clave, comprueba localmente RAT-1 y publica. Con `repetir`, publica también
+/// una tercera (`timestamp + 2`) del mismo billete.
+async fn ejecutar_doble_firma(
+    manejo: &zx_p2p::servicio::ManejoRed,
+    mut posts: tokio::sync::mpsc::UnboundedReceiver<BloqueRed>,
+    clave_indice: u32,
+    semilla: u64,
+    plazo_espera: Duration,
+    repetir: bool,
+) {
+    let clave = zx_node::claves::ClaveDev::derivar(semilla, clave_indice);
+    println!(
+        "zx-adversario doble-firma: esperando un bloque PoST de la clave {clave_indice} \
+         (semilla {semilla}, clave pública {:?}), plazo {plazo_espera:?} ...",
+        clave.pk
+    );
+
+    let encontrado = tokio::time::timeout(plazo_espera, async {
+        loop {
+            match posts.recv().await {
+                Some(BloqueRed::Post {
+                    cabecera,
+                    justificacion,
+                    txs,
+                    testigos,
+                }) if cabecera.sol.public_key == clave.pk => {
+                    return Some((cabecera, justificacion, txs, testigos));
+                }
+                Some(_) => {}
+                None => return None,
+            }
+        }
+    })
+    .await;
+
+    let Ok(Some((original, justificacion, txs, testigos))) = encontrado else {
+        eprintln!(
+            "zx-adversario doble-firma: no llegó ningún bloque PoST de la clave {clave_indice} \
+             en el plazo; nada que duplicar"
+        );
+        std::process::exit(1);
+    };
+    println!(
+        "zx-adversario doble-firma: bloque original recibido — slot {} hash {}",
+        original.slot,
+        original.block_hash()
+    );
+
+    let segunda = resellar_con_otro_timestamp(&original, &clave, 1);
+    verificar_misma_identidad_otro_pre_hash(&original, &segunda);
+    println!(
+        "zx-adversario doble-firma: segunda cabecera sellada — slot {} hash {} (pre_hash \
+         distinto del original, identidad RAT-1 igual, comprobado localmente)",
+        segunda.slot,
+        segunda.block_hash()
+    );
+    let bloque_2 = BloqueRed::Post {
+        cabecera: segunda,
+        justificacion: justificacion.clone(),
+        txs: txs.clone(),
+        testigos: testigos.clone(),
+    };
+    match manejo.difundir_bloque(&bloque_2).await {
+        Ok(()) => println!("zx-adversario doble-firma: segunda cabecera publicada"),
+        Err(e) => eprintln!("zx-adversario doble-firma: fallo al publicar la segunda: {e}"),
+    }
+
+    if repetir {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let tercera = resellar_con_otro_timestamp(&original, &clave, 2);
+        verificar_misma_identidad_otro_pre_hash(&original, &tercera);
+        println!(
+            "zx-adversario doble-firma: tercera cabecera sellada — slot {} hash {} (--repetir, \
+             prueba de deduplicación EV-12)",
+            tercera.slot,
+            tercera.block_hash()
+        );
+        let bloque_3 = BloqueRed::Post {
+            cabecera: tercera,
+            justificacion,
+            txs,
+            testigos,
+        };
+        match manejo.difundir_bloque(&bloque_3).await {
+            Ok(()) => println!("zx-adversario doble-firma: tercera cabecera publicada"),
+            Err(e) => eprintln!("zx-adversario doble-firma: fallo al publicar la tercera: {e}"),
+        }
+    }
+
+    println!(
+        "zx-adversario doble-firma: fin. El veredicto (evidencia_detectada/evidencia_incluida/\
+         confiscación) se lee en el registro estructurado de los nodos objetivo, no aquí."
+    );
+}
+
+/// Cabecera idéntica a `original` salvo `timestamp + delta` (cambia el `pre_hash`, no la identidad
+/// RAT-1), sellada de nuevo con `clave` (decisión 5: «idéntica salvo timestamp + 1»).
+fn resellar_con_otro_timestamp(
+    original: &DagBlockHeader,
+    clave: &zx_node::claves::ClaveDev,
+    delta: u64,
+) -> DagBlockHeader {
+    let mut nueva = *original;
+    nueva.timestamp = nueva.timestamp.wrapping_add(delta);
+    nueva.sello = [0u8; 64];
+    let pre_hash = nueva.pre_hash();
+    nueva.sello = clave.sk.sign(pre_hash.as_bytes()).into();
+    nueva
+}
+
+/// Decisión 5: «verifica localmente que la identidad RAT-1 coincide y el `pre_hash` no». Un
+/// `panic!` aquí sería un bug de esta misma herramienta (nunca de un objetivo remoto): la
+/// construcción de arriba solo cambia `timestamp` y vuelve a firmar, así que ambas condiciones
+/// deben cumplirse siempre.
+fn verificar_misma_identidad_otro_pre_hash(a: &DagBlockHeader, b: &DagBlockHeader) {
+    let id_a = zx_post::firmante::Firmante::identidad(a).huella();
+    let id_b = zx_post::firmante::Firmante::identidad(b).huella();
+    assert_eq!(
+        id_a, id_b,
+        "zx-adversario doble-firma: bug interno, la identidad RAT-1 debía coincidir"
+    );
+    assert_ne!(
+        a.pre_hash(),
+        b.pre_hash(),
+        "zx-adversario doble-firma: bug interno, el pre_hash debía cambiar con el timestamp"
+    );
 }

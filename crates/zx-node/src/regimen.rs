@@ -40,8 +40,11 @@ use zx_core::{ClavePublica, PadresDag};
 use zx_farmer::farmer::ParcelaDisco;
 use zx_farmer::productor_poas::convertir_candidatos_locales;
 use zx_poas::HistoriaGenesis;
-use zx_post::productor::{FuenteSoluciones, ParametrosProductor, SolucionCandidata};
-use zx_post::productor_regimen::{CuerpoProductor, producir_en_regimen};
+use zx_post::firmante::{Firmante, Registro as RegistroFirmante};
+use zx_post::productor::{
+    FuenteSoluciones, MotivoAbstencion, ParametrosProductor, ProductoFirmado, SolucionCandidata,
+};
+use zx_post::productor_regimen::{CuerpoProductor, producir_en_regimen_con_firmante};
 use zx_post::servicio_pot::ServicioPot;
 
 use crate::claves::ClaveDev;
@@ -84,11 +87,23 @@ impl FuenteSoluciones for FuenteParcela<'_> {
 
 /// Mensajes que el hilo productor envía al bucle.
 pub enum MsgProductor {
-    /// Pide los padres canónicos actuales de un bloque de régimen.
-    PeticionPadres,
+    /// Pide los padres canónicos actuales de un bloque de régimen, para el `slot` dado (decisión 4
+    /// de `ORDEN-SL4b2`: el bucle necesita el slot objetivo para filtrar qué evidencias pendientes
+    /// tienen la ventana abierta en el bloque que se va a construir).
+    PeticionPadres(u64),
     /// Un bloque PoST ya producido y firmado, para verificar y admitir, junto con el instante en
     /// que este hilo obtuvo la salida PoT del slot (`ORDEN-W07a`: `retraso_slot_ns`).
     Post(Box<BloqueDag>, Instant),
+    /// `ORDEN-SL4b2` decisión 2: el firmante seguro se abstuvo para esta candidata (conflicto de
+    /// identidad o pérdida de registro): no se produjo bloque. El bucle escribe el evento
+    /// `firmante_abstenido` (esquema v1, crítico) y contesta [`MsgBucle::Continuar`]: el nodo sigue
+    /// validando y propagando, solo no produce esta oportunidad.
+    Abstenido {
+        /// Slot de la candidata abstenida.
+        slot: u64,
+        /// Causa de la abstención.
+        motivo: MotivoAbstencion,
+    },
 }
 
 /// Respuestas del bucle al hilo productor.
@@ -116,11 +131,56 @@ pub enum MsgBucle {
         PadresDag,
         Vec<(zx_core::BlockHash, u64)>,
         BTreeSet<ClavePublica>,
+        /// `ORDEN-SL4b2` decisión 4: hasta `MAX_EVIDENCIAS_POR_BLOQUE` `EvidenceTx` pendientes que
+        /// el bucle ya filtró (incidente no procesado en el estado sobre el que se construye,
+        /// ventana abierta en `slot_objetivo`). El hilo las mete en el cuerpo tal cual, sin volver
+        /// a decidir nada sobre ellas.
+        Vec<zx_core::Tx>,
     ),
     /// El bloque enviado se admitió: sigue produciendo.
     Continuar,
     /// Condición de parada alcanzada (`--parada-tras-slots`): el hilo debe terminar.
     Parar,
+    /// `ORDEN-SL4b2` decisión 0: el terminal **seleccionado** cambió mientras el hilo producía
+    /// (FC-3, `ORDEN-W06d7`). El bucle manda el `ServicioPot` de verificación del nuevo terminal
+    /// (ya avanzado con toda su historia admitida): el hilo lo adopta como su propio `ServicioPot`
+    /// de régimen y abandona cualquier candidata/petición en vuelo del terminal anterior (esas
+    /// candidatas pertenecían a un flujo PoT que ya no es el seleccionado; perder esa única
+    /// oportunidad de slot es preferible a mezclar dos terminales en un mismo bloque, `ErrTerminalAmbiguo`/I-4).
+    /// Puede llegar en cualquier punto de espera del hilo, incluso en medio de un intercambio
+    /// `PeticionPadres`/`Post`.
+    CambiarTerminal(ServicioPot),
+}
+
+/// Resultado de esperar un mensaje del bucle que puede venir intercalado con
+/// [`MsgBucle::CambiarTerminal`] (decisión 0).
+enum Recepcion {
+    /// El mensaje esperado (o cualquier otro no relacionado con el cambio de terminal). Boxeado:
+    /// `MsgBucle::Padres` es grande (lleva un `PadresDag` y vectores) y `Interrumpido`/`Cerrado` no
+    /// llevan nada.
+    Mensaje(Box<MsgBucle>),
+    /// Se aplicó un cambio de terminal: el hilo debe abandonar el intercambio en curso y volver al
+    /// principio de su bucle principal (el próximo `avanzar()` ya usa el `ServicioPot` nuevo).
+    Interrumpido,
+    /// El bucle cerró el canal: apagado normal del proceso.
+    Cerrado,
+}
+
+/// Espera el próximo mensaje del bucle, aplicando en el sitio cualquier
+/// [`MsgBucle::CambiarTerminal`] que llegue (decisión 0 de `ORDEN-SL4b2`): a diferencia de los
+/// demás mensajes, este no es la respuesta a ninguna petición del hilo, así que puede intercalarse
+/// antes de la respuesta que el hilo realmente esperaba. Si eso ocurre, la espera se declara
+/// **interrumpida**: el hilo no debe fingir que recibió la respuesta original (los padres o el
+/// resultado de admisión que esperaba pertenecían al terminal anterior).
+fn recibir_o_cambiar_terminal(rx: &Receiver<MsgBucle>, servicio: &mut ServicioPot) -> Recepcion {
+    match rx.recv() {
+        Ok(MsgBucle::CambiarTerminal(nuevo)) => {
+            *servicio = nuevo;
+            Recepcion::Interrumpido
+        }
+        Ok(otro) => Recepcion::Mensaje(Box::new(otro)),
+        Err(_) => Recepcion::Cerrado,
+    }
 }
 
 /// Una clave dev con su parcela ya abierta.
@@ -156,7 +216,12 @@ pub fn hilo_productor_regimen(
     parada_tras_slots: Option<u64>,
     rx: &Receiver<MsgBucle>,
     tx: &Sender<MsgProductor>,
+    registro_firmante: &RegistroFirmante,
 ) {
+    // `ORDEN-SL4b2` decisión 2: el nodo produce **solo** con el firmante seguro (`C-EVP-06`,
+    // FIR-01…FIR-15); un único `Firmante` para las tres claves del nodo, porque el registro es
+    // único por nodo (la identidad RAT-1 ya distingue `public_key`, FIR-02).
+    let mut firmante = Firmante::nuevo(registro_firmante);
     // `servicio` es un **clon** del `ServicioPot` de verificación del bucle (`Nodo::
     // servicio_verificacion`), no uno construido desde cero: ya trae registrado el terminal y
     // *todo* bloque PoST admitido hasta ahora (el de transición si acaba de producirse, o toda la
@@ -173,7 +238,7 @@ pub fn hilo_productor_regimen(
         importe_coinbase,
     };
 
-    loop {
+    'outer: loop {
         if let Some(limite) = parada_tras_slots
             && servicio.slot_actual() >= limite
         {
@@ -212,14 +277,24 @@ pub fn hilo_productor_regimen(
             continue;
         }
 
-        if tx.send(MsgProductor::PeticionPadres).is_err() {
+        if tx.send(MsgProductor::PeticionPadres(slot)).is_err() {
             return; // el bucle cerró el canal: apagado normal del proceso.
         }
-        let (padres, info_padres, con_garantia) = match rx.recv() {
-            Ok(MsgBucle::Padres(p, info, g)) => (p, info, g),
-            Ok(_otro) => panic!("hilo productor: se esperaba Padres, llegó otro mensaje del bucle"),
-            Err(_) => return, // el bucle cerró el canal: apagado normal del proceso.
-        };
+        let (padres, info_padres, con_garantia, evidencias) =
+            match recibir_o_cambiar_terminal(rx, &mut servicio) {
+                Recepcion::Mensaje(msg) => match *msg {
+                    MsgBucle::Padres(p, info, g, ev) => (p, info, g, ev),
+                    _otro => {
+                        panic!("hilo productor: se esperaba Padres, llegó otro mensaje del bucle")
+                    }
+                },
+                // Decisión 0: el terminal cambió antes de que el bucle contestara esta petición
+                // (era del terminal anterior). Se abandona esta candidata/slot sin fingir una
+                // respuesta: el próximo `avanzar()` ya corre sobre el `ServicioPot` del terminal
+                // nuevo.
+                Recepcion::Interrumpido => continue 'outer,
+                Recepcion::Cerrado => return, // el bucle cerró el canal: apagado normal del proceso.
+            };
         // `ORDEN-W06d5` decisión 2 (`REVISION-W06d4.md`, V5-2): el padre seleccionado que incumple
         // `slot(padre) < slot_objetivo` ya lo descarta con gracia `producir_en_regimen` más abajo
         // (`ErrorRegimen::SlotNoProgreso`), pero ese cheque **no** cubre los padres extra del
@@ -278,16 +353,25 @@ pub fn hilo_productor_regimen(
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
             let fuente_fija = SolucionFija(candidata);
-            let bloque = match producir_en_regimen(
+            // `ORDEN-SL4b2` decisión 4: hasta `MAX_EVIDENCIAS_POR_BLOQUE` `EvidenceTx` ya
+            // filtradas por el bucle (`evidencias`, de `MsgBucle::Padres`); ninguna lleva testigos
+            // (EV-01: sin entradas, salidas ni testigos de transacción).
+            let testigos_evidencias = vec![Vec::new(); evidencias.len()];
+            let cuerpo = CuerpoProductor::nuevo(evidencias.clone(), testigos_evidencias)
+                .unwrap_or_else(|e| {
+                    panic!("hilo productor: cuerpo con evidencias del bucle inválido: {e}")
+                });
+            let producto = match producir_en_regimen_con_firmante(
                 padres,
                 slot,
                 &mut servicio,
                 &fuente_fija,
                 &cp.clave.sk,
                 &parametros_bloque,
-                CuerpoProductor::vacio(),
+                cuerpo,
+                &mut firmante,
             ) {
-                Ok(b) => b,
+                Ok(p) => p,
                 // `ORDEN-W06d3`, hallazgo en vivo (`PROGRESO.md`): con red, el padre elegido por
                 // GHOSTDAG puede ser un bloque **más nuevo** que `slot` (otro nodo ya produjo, para
                 // el mismo slot o uno posterior, con el padre que este hilo eligió cuando pidió
@@ -296,7 +380,7 @@ pub fn hilo_productor_regimen(
                 // este nodo: el candidato ya no puede ser un bloque de cadena válido (`slot(B)` MUST
                 // ser mayor que `slot(sp)`), así que se descarta esta candidata concreta y se sigue
                 // con la siguiente (o con el siguiente slot si no hay más). Cualquier otro error de
-                // `producir_en_regimen` sigue siendo una incoherencia interna real.
+                // `producir_en_regimen_con_firmante` sigue siendo una incoherencia interna real.
                 Err(zx_post::productor_regimen::ErrorRegimen::SlotNoProgreso {
                     slot: slot_bloque,
                     slot_sp,
@@ -309,7 +393,31 @@ pub fn hilo_productor_regimen(
                     );
                     continue;
                 }
-                Err(e) => panic!("hilo productor: producir_en_regimen falló: {e}"),
+                Err(e) => panic!("hilo productor: producir_en_regimen_con_firmante falló: {e}"),
+            };
+            // `ORDEN-SL4b2` decisión 2: el firmante puede negarse (conflicto de identidad o
+            // pérdida de registro, FIR-01…FIR-10). No es un error: se avisa al bucle
+            // (`firmante_abstenido`, esquema v1) y se sigue con la siguiente candidata/slot, sin
+            // producir esta.
+            let bloque = match producto {
+                ProductoFirmado::Bloque(b, _resultado_firmante) => b,
+                ProductoFirmado::Abstenido { motivo } => {
+                    if tx.send(MsgProductor::Abstenido { slot, motivo }).is_err() {
+                        return; // el bucle cerró el canal: apagado normal del proceso.
+                    }
+                    match recibir_o_cambiar_terminal(rx, &mut servicio) {
+                        Recepcion::Mensaje(msg) => match *msg {
+                            MsgBucle::Continuar => continue,
+                            MsgBucle::Parar => return,
+                            _otro => panic!(
+                                "hilo productor: se esperaba Continuar/Parar tras Abstenido, \
+                                 llegó otro mensaje"
+                            ),
+                        },
+                        Recepcion::Cerrado => return,
+                        Recepcion::Interrumpido => continue,
+                    }
+                }
             };
             let hash = bloque.cabecera.block_hash();
             servicio
@@ -322,12 +430,24 @@ pub fn hilo_productor_regimen(
             {
                 return; // el bucle cerró el canal: apagado normal del proceso.
             }
-            match rx.recv() {
-                Ok(MsgBucle::Continuar) => {}
-                Ok(MsgBucle::Parar) | Err(_) => return,
-                Ok(MsgBucle::Padres(..)) => {
-                    panic!("hilo productor: se esperaba Continuar/Parar, llegó Padres")
-                }
+            match recibir_o_cambiar_terminal(rx, &mut servicio) {
+                Recepcion::Mensaje(msg) => match *msg {
+                    MsgBucle::Continuar => {}
+                    MsgBucle::Parar => return,
+                    MsgBucle::Padres(..) => {
+                        panic!("hilo productor: se esperaba Continuar/Parar, llegó Padres")
+                    }
+                    MsgBucle::CambiarTerminal(..) => unreachable!(
+                        "recibir_o_cambiar_terminal absorbe CambiarTerminal antes de devolverlo"
+                    ),
+                },
+                Recepcion::Cerrado => return,
+                // Decisión 0: el bloque ya se mandó y el bucle puede haberlo admitido igualmente
+                // (es válido en su propio terminal, aunque ya no sea el seleccionado); no hace
+                // falta la confirmación explícita para seguir con seguridad: el siguiente `avanzar()`
+                // ya corre sobre el `ServicioPot` del terminal nuevo, y si `parada_tras_slots` se
+                // hubiera alcanzado, el propio `avanzar()`/chequeo de cabecera de bucle lo detiene.
+                Recepcion::Interrumpido => {}
             }
         }
     }

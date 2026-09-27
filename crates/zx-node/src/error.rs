@@ -86,6 +86,20 @@ pub enum ErrorNodo {
     /// Directorio de datos inválido.
     #[error("directorio de datos inválido: {0}")]
     DirectorioInvalido(PathBuf),
+    /// `ORDEN-SL4b2` decisión 1: la puerta RAT-3 (`R_slots > Plazo_slots + M_margen_slots`) no se
+    /// cumple con el perfil configurado. El nodo se niega a arrancar: sin esta desigualdad, un
+    /// infractor podría liberar su garantía antes de que la ventana de admisión de su propia falta
+    /// cierre (`CONTRATO-EVIDENCIA-v0.md` EV-15/EV-24(ii)).
+    #[error(
+        "puerta RAT-3 incumplida: R_slots ({r_slots}) debe ser mayor que Plazo_slots + \
+         M_margen_slots ({plazo_mas_margen})"
+    )]
+    PuertaRat3Incumplida {
+        /// `R_slots` configurado.
+        r_slots: u64,
+        /// `Plazo_slots + M_margen_slots` configurado.
+        plazo_mas_margen: u64,
+    },
     /// Fallo genérico con mensaje libre (última instancia; se documenta en `PROGRESO.md` cada uso).
     #[error("{0}")]
     Otro(String),

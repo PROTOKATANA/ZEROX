@@ -48,6 +48,7 @@ use crate::red::vista::VistaRed;
 use crate::red::{self, ManijaRed, ReceptorTrabajoRed, TrabajoRed};
 use crate::regimen::{ClaveConParcela, MsgBucle, MsgProductor, hilo_productor_regimen};
 use crate::registro::Registro;
+use zx_post::firmante::Registro as RegistroFirmante;
 
 /// `SR_dev`/`ContextoRangoDag` constante del perfil dev (D-P11: sin controlador).
 struct RangoDev(u64);
@@ -98,6 +99,14 @@ pub struct Nodo {
     /// Registro estructurado compartido (`ORDEN-W07a`): el hilo de consenso y la tarea de red
     /// escriben en él (el `Mutex` interno serializa cada línea).
     registro: Arc<Registro>,
+    /// `ORDEN-SL4b2` decisión 2: registro durable del firmante seguro (`C-EVP-06`, FIR-01…FIR-15),
+    /// único por nodo (compartido entre todas sus claves: la identidad RAT-1 ya incluye
+    /// `public_key`). `None` hasta que `arranque_limpio`/`reiniciar` lo abre; `fase_regimen` es lo
+    /// único que lo usa y corre siempre después de que uno de los dos se haya ejecutado.
+    registro_firmante: Option<Arc<RegistroFirmante>>,
+    /// `ORDEN-SL4b2` decisiones 3/4: detector de doble firma y lista de `EvidenceTx` pendientes de
+    /// incluir. En memoria, no persiste entre reinicios (declarado en `DEFINICIONES-FALTANTES.md`).
+    detector: crate::evidencia::DetectorDobleFirma,
     claves: Vec<ClaveDev>,
     cbid: u32,
     /// Cadena de cabeceras `[0..=altura]` de la punta PoW **seleccionada** (mayor trabajo
@@ -183,6 +192,22 @@ struct Medicion {
 /// Tope de [`Nodo::post_pendientes`]: acotar la cola, no la corrección (D-oS local, no de consenso).
 const TOPE_POST_PENDIENTES: usize = 64;
 
+/// `ORDEN-SL4b2` decisión 1: puerta RAT-3, factorizada de [`Nodo::arrancar`] para poder probarla
+/// con un perfil que la incumple sin tener que construir un nodo entero (disco, génesis, parcelas).
+fn comprobar_puerta_rat3(
+    r_slots: u64,
+    evidencia: &zx_consensus::transicion::ParametrosEvidencia,
+) -> ResultadoNodo<()> {
+    if perfil::puerta_rat3(r_slots, evidencia) {
+        Ok(())
+    } else {
+        Err(ErrorNodo::PuertaRat3Incumplida {
+            r_slots,
+            plazo_mas_margen: evidencia.plazo_slots + evidencia.m_margen_slots,
+        })
+    }
+}
+
 fn ruta_parcela(dir_datos: &Path, indice: u32) -> PathBuf {
     dir_datos.join(format!("parcela-{indice}.plot"))
 }
@@ -235,6 +260,11 @@ impl Nodo {
 
         let params = perfil::parametros_transicion_dev()?;
         let cbid = zx_core::CBID_RED_DEV;
+        // `ORDEN-SL4b2` decisión 1: puerta RAT-3, comprobada **antes** de tocar disco (mismo
+        // espíritu que la comprobación de `Red::Dev` de arriba, decisión 2 de `ORDEN-W06d1`). Un
+        // perfil que la incumple no arranca, con el mensaje exacto en el error.
+        let evidencia = perfil::parametros_evidencia_dev();
+        comprobar_puerta_rat3(params.r_slots, &evidencia)?;
         let (cabecera_genesis, tx_genesis) = construir_genesis(GENESIS_DEV)?;
         let hash_genesis_esperado = BlockHash::from_digest(Digest::from_bytes(HASH_GENESIS_DEV));
         if cabecera_genesis.block_hash() != hash_genesis_esperado {
@@ -267,14 +297,20 @@ impl Nodo {
 
         let mut nodo = Self {
             params,
-            cadena: Cadena::nueva(
+            // `ORDEN-SL4b2` decisión 1: `nueva_con_evidencia`, con el perfil de evidencia dev
+            // (`f = 1/1`, `Plazo_slots = 300`, `M_margen_slots = 60`, `cbid`, activa) ya validado
+            // por la puerta RAT-3 de arriba.
+            cadena: Cadena::nueva_con_evidencia(
                 perfil::parametros_transicion_dev()?,
                 perfil::ghostdag_k(),
                 cbid,
                 perfil::ghostdag_max_padres(),
+                evidencia,
             ),
             almacen,
             registro,
+            registro_firmante: None,
+            detector: crate::evidencia::DetectorDobleFirma::nuevo(perfil::MAX_IDENTIDADES_DETECTOR),
             claves,
             cbid,
             historial_pow: Vec::new(),
@@ -359,6 +395,61 @@ impl Nodo {
         // así que sin esto el cuerpo y la entrada de registro del génesis nunca existirían en la
         // vista de red).
         self.vista_red.registrar_genesis_pow(para_vista_genesis);
+        // `ORDEN-SL4b2` decisión 2 (FIR-12): arranque limpio ⇒ `Registro::nueva`, sin historia y
+        // sin abstención — el directorio de datos lo creó este mismo proceso, así que no hay nada
+        // que perder.
+        self.abrir_registro_firmante_limpio()?;
+        Ok(())
+    }
+
+    /// Ruta del registro durable del firmante seguro (decisión 2): un fichero por nodo, compartido
+    /// entre todas sus claves (la identidad RAT-1 ya incluye `public_key`, FIR-02).
+    fn ruta_registro_firmante(&self) -> PathBuf {
+        self.dir_datos.join("firmante.registro")
+    }
+
+    /// `ORDEN-SL4b2` decisión 2, FIR-12: alta atómica sin historia. Solo válido en un arranque
+    /// **limpio** (directorio de datos creado por este proceso): una identidad que ya existía y
+    /// perdió su registro usa [`Self::abrir_registro_firmante_tras_reinicio`], nunca esta ruta.
+    fn abrir_registro_firmante_limpio(&mut self) -> ResultadoNodo<()> {
+        let ruta = self.ruta_registro_firmante();
+        let registro = RegistroFirmante::nueva(ruta).map_err(|e| {
+            ErrorNodo::Otro(format!(
+                "firmante: no se pudo crear el registro nuevo (arranque limpio): {e}"
+            ))
+        })?;
+        self.registro_firmante = Some(Arc::new(registro));
+        Ok(())
+    }
+
+    /// `ORDEN-SL4b2` decisión 2: en todo reinicio, `Registro::abrir(ruta, slot_actual, 150)` con
+    /// `slot_actual = máx(slot más alto de los bloques del almacén, slot PoT reconstruido)`. Se
+    /// llama al final de [`Self::reiniciar`], cuando `self.cadena` y
+    /// `self.servicios_verificacion` ya reflejan toda la historia repetida.
+    fn abrir_registro_firmante_tras_reinicio(&mut self) -> ResultadoNodo<()> {
+        let slot_bloques = self
+            .cadena
+            .bloques_post()
+            .iter()
+            .map(|b| b.slot)
+            .max()
+            .unwrap_or(0);
+        let slot_pot = self
+            .cadena
+            .terminal()
+            .and_then(|t| self.servicios_verificacion.get(&t))
+            .map(ServicioPot::slot_actual)
+            .unwrap_or(0);
+        let slot_actual = slot_bloques.max(slot_pot);
+        let ruta = self.ruta_registro_firmante();
+        let registro =
+            RegistroFirmante::abrir(ruta, slot_actual, perfil::S_MAX_SLOTS).map_err(|e| {
+                ErrorNodo::Otro(format!(
+                    "firmante: no se pudo abrir el registro tras el reinicio (slot_actual \
+                     {slot_actual}): {e}"
+                ))
+            })?;
+        self.registro_firmante = Some(Arc::new(registro));
         Ok(())
     }
 
@@ -392,6 +483,10 @@ impl Nodo {
                 "la repetición procesó {indice} entradas, se esperaban {longitud}"
             )));
         }
+        // `ORDEN-SL4b2` decisión 2: se abre **después** de repetir, cuando `self.cadena` y
+        // `self.servicios_verificacion` ya reflejan toda la historia (necesarios para calcular
+        // `slot_actual`).
+        self.abrir_registro_firmante_tras_reinicio()?;
         self.registro.escribir(
             self.registro
                 .evento("reinicio_completo")
@@ -609,6 +704,65 @@ impl Nodo {
     /// pierde el pasado PoT que ya llevaba (a diferencia del diseño de un único terminal, donde
     /// "reconstruir" significaba tirar el servicio anterior — aquí cada terminal tiene el suyo para
     /// siempre, así que no hace falta).
+    /// `ORDEN-SL4b2` decisiones 3/4: observa `cabecera` en el detector de doble firma y traduce su
+    /// resultado a eventos del esquema v1 (`evidencia_detectada`, `limite_alcanzado`). No falla
+    /// nunca por el resultado del detector en sí (una identidad nueva, una retransmisión o una
+    /// tercera cabecera del mismo incidente no son errores); solo puede fallar al escribir el
+    /// registro estructurado.
+    fn observar_para_detector(
+        &mut self,
+        cabecera: zx_core::preimage::dag::DagBlockHeader,
+    ) -> Result<(), ErrorNodo> {
+        let slot_actual = cabecera.slot;
+        let (observacion, limite) = self.detector.observar(cabecera);
+        if let Some(limite) = limite {
+            let evento = self
+                .registro
+                .evento("limite_alcanzado")
+                .str("par", "local")
+                .str("limite", "MAX_IDENTIDADES_DETECTOR")
+                .str(
+                    "detalle",
+                    &format!(
+                        "desalojada la identidad del slot {} (tope {})",
+                        limite.slot_desalojado,
+                        perfil::MAX_IDENTIDADES_DETECTOR
+                    ),
+                );
+            self.registro.escribir(evento, false)?;
+        }
+        if let crate::evidencia::Observacion::Incidente(pendiente) = observacion {
+            let zx_core::ExtensionTx::Evidencia { h1, h2 } = &pendiente.tx.extension else {
+                return Err(ErrorNodo::Otro(
+                    "detector: pendiente sin ExtensionTx::Evidencia".to_string(),
+                ));
+            };
+            let clave = h1.sol.public_key;
+            let propia = self.claves.iter().any(|c| c.pk == clave);
+            let evento = self
+                .registro
+                .evento("evidencia_detectada")
+                .str(
+                    "incident_id",
+                    &zx_core::digest::Digest::from_bytes(pendiente.incident_id).to_string(),
+                )
+                .str(
+                    "clave",
+                    &zx_core::digest::Digest::from_bytes(*clave.bytes()).to_string(),
+                )
+                .u64("slot_falta", pendiente.slot_falta)
+                .str("hash_1", &h1.block_hash().to_string())
+                .str("hash_2", &h2.block_hash().to_string())
+                .bool("propia", propia);
+            self.registro.escribir(evento, true)?;
+        }
+        // Poda (decisión 3/EV-11): mismo criterio que el registro del firmante, en cada admisión.
+        let evp = perfil::parametros_evidencia_dev();
+        self.detector.podar_vistas(slot_actual, evp.plazo_slots);
+        self.detector.podar_pendientes(slot_actual, evp.plazo_slots);
+        Ok(())
+    }
+
     fn asegurar_servicios_verificacion(&mut self) -> Result<(), ErrorNodo> {
         for terminal in self.cadena.terminal_candidatos() {
             if let std::collections::btree_map::Entry::Vacant(e) =
@@ -621,6 +775,50 @@ impl Nodo {
             }
         }
         Ok(())
+    }
+
+    /// `ORDEN-SL4b2` decisión 0 (paso previo): si `self.cadena.terminal()` (el seleccionado por
+    /// FC-3, `ORDEN-W06d7`) ya no es `*terminal` (el que el hilo productor sigue produciendo),
+    /// manda al hilo el `ServicioPot` de verificación del nuevo terminal —ya avanzado con toda su
+    /// historia admitida, `asegurar_servicios_verificacion` lo garantiza— y actualiza `*terminal`.
+    ///
+    /// El hilo adopta ese `ServicioPot` como propio (`regimen::MsgBucle::CambiarTerminal`) y elige
+    /// sus próximos padres sobre el DAG del terminal nuevo automáticamente: `padres_de_regimen` lee
+    /// `self.cadena.contexto_dag()`/`tips_validas()` del terminal **seleccionado**, sin que este
+    /// método tenga que tocar nada de la elección de padres.
+    ///
+    /// Devuelve `true` si se sincronizó un cambio (el llamante no debe contestar con datos del
+    /// terminal anterior a la petición del hilo que disparó esta llamada, si la había).
+    ///
+    /// # Errores
+    /// El de [`Self::asegurar_servicios_verificacion`].
+    fn sincronizar_terminal_productor(
+        &mut self,
+        terminal: &mut BlockHash,
+        tx_a_productor: &mpsc::Sender<MsgBucle>,
+    ) -> Result<bool, ErrorNodo> {
+        let Some(actual) = self.cadena.terminal() else {
+            return Ok(false);
+        };
+        if actual == *terminal {
+            return Ok(false);
+        }
+        self.asegurar_servicios_verificacion()?;
+        let Some(servicio) = self.servicios_verificacion.get(&actual).cloned() else {
+            // No debería ocurrir tras `asegurar_servicios_verificacion`, pero no es motivo para
+            // matar el proceso: se reintentará en la próxima vuelta del bucle.
+            return Ok(false);
+        };
+        tracing::info!(
+            terminal_anterior = ?*terminal,
+            terminal_nuevo = ?actual,
+            "fase_regimen: el terminal seleccionado cambió; se sincroniza el hilo productor sin \
+             reiniciar el proceso (decisión 0 de ORDEN-SL4b2)"
+        );
+        *terminal = actual;
+        // Si el hilo ya cerró su extremo del canal (apagado en curso), no hay nada que avisar.
+        let _ = tx_a_productor.send(MsgBucle::CambiarTerminal(servicio));
+        Ok(true)
     }
 
     /// Terminal único al que resuelven `padres` (réplica, de solo lectura, de
@@ -828,6 +1026,16 @@ impl Nodo {
             self.medicion.cabecera_ns = inicio_cabecera.elapsed().as_nanos() as u64;
         }
 
+        // `ORDEN-SL4b2` decisión 3: se indexa aquí, **con independencia** de que la admisión que
+        // sigue (GHOSTDAG/estado) acabe aceptando o rechazando este bloque (EV-08: la evidencia no
+        // exige reconstruir la rama perdedora ni demostrar validez PoAS/PoT/padres en contexto).
+        // Corre en la ruta en vivo (`verificar = true`, la puerta ya pasó arriba) y en la
+        // repetición al reiniciar (`verificar = false`: todo lo que hay en el almacén ya pasó la
+        // puerta en una ejecución anterior), para que el detector reconstruya el mismo estado tras
+        // un reinicio. No se llama nunca para una cabecera cuya puerta conjunta falló (decisión 3,
+        // último párrafo): ese caso ya salió por el `?`/`return Err` de arriba.
+        self.observar_para_detector(bloque.cabecera)?;
+
         let distancia = zx_poas::verificar_solucion_poas(
             &bloque.cabecera.sol,
             bloque.cabecera.slot,
@@ -893,6 +1101,52 @@ impl Nodo {
                 }
             })?;
             self.medicion.admision_ns = inicio_admision.elapsed().as_nanos() as u64;
+            // `ORDEN-SL4b2` diagnóstico (no forma parte del esquema mínimo v1): igual que el que
+            // escribe el productor tras incluir su propia `EvidenceTx` (`nodo.rs`, manejo de
+            // `MsgProductor::Post`), pero aquí para **cualquier** bloque admitido por esta única
+            // tubería (propio, de red o repetido): así los tres nodos —no solo el que incluyó la
+            // evidencia— dejan en su registro `activo`/`congelado` de la clave castigada tras cada
+            // aplicación, que es lo que V4 necesita leer "del estado de los tres nodos".
+            //
+            // `estado_post(&hash)` (el estado **tras este bloque concreto**), no
+            // `estado_terminal()`: ese último es `Estado(T)` del terminal PoW-PoST (el corte), no
+            // la punta PoST corriente — leerlo aquí habría dado siempre el estado de antes del
+            // corte, sin ninguna garantía ni incidente (hallazgo real de la primera ejecución de
+            // V4 con procesos reales, `PROGRESO.md`).
+            for (incident_id, clave) in bloque.txs().iter().filter_map(|t| match &t.extension {
+                zx_core::ExtensionTx::Evidencia { h1, .. } => Some((
+                    *zx_core::incident_id_evidencia(
+                        h1.consensus_branch_id,
+                        h1.sol.public_key.bytes(),
+                        h1.sol.sector_index,
+                        h1.sol.history_size,
+                        &h1.sol.chunk,
+                        h1.slot,
+                    )
+                    .as_bytes(),
+                    h1.sol.public_key,
+                )),
+                _ => None,
+            }) {
+                let g = self
+                    .cadena
+                    .estado_post(&hash)
+                    .and_then(|estado| estado.garantias.get(&clave));
+                let evento = self
+                    .registro
+                    .evento("garantia_clave_tras_evidencia")
+                    .str(
+                        "incident_id",
+                        &zx_core::digest::Digest::from_bytes(incident_id).to_string(),
+                    )
+                    .str(
+                        "clave",
+                        &zx_core::digest::Digest::from_bytes(*clave.bytes()).to_string(),
+                    )
+                    .i64("activo", g.map_or(0, |g| g.activo.brek()))
+                    .i64("congelado", g.map_or(0, |g| g.congelado.brek()));
+                self.registro.escribir(evento, false)?;
+            }
             // Solo en la ruta en vivo (`verificar`): en la repetición el bloque ya está en el
             // almacén (viene de ahí).
             if verificar {
@@ -1975,7 +2229,11 @@ impl Nodo {
     /// # Errores
     /// [`ErrorNodo::BloquePropioRechazado`] con `clasificacion` interna (`ORDEN-W06d5` decisión 3, `crate::rechazo`); un rechazo legítimo se descarta y no llega a devolverse.
     fn fase_regimen(&mut self) -> ResultadoNodo<()> {
-        let terminal = self
+        // `ORDEN-SL4b2` decisión 0 (paso previo): `terminal` es el que este bucle sigue
+        // **produciendo** ahora mismo; puede quedar por detrás de `self.cadena.terminal()` (FC-3
+        // puede reseleccionar mientras se produce, `ORDEN-W06d7`). Mutable: lo actualiza
+        // `sincronizar_terminal_productor` en cuanto detecta la discrepancia.
+        let mut terminal = self
             .cadena
             .terminal()
             .ok_or_else(|| ErrorNodo::Otro("fase_regimen sin terminal".to_string()))?;
@@ -2049,6 +2307,14 @@ impl Nodo {
         let parada = self.limite_productor();
         let importe_coinbase = perfil::subsidio_post(0);
         let historia_hilo: Arc<HistoriaGenesis> = Arc::clone(&self.historia);
+        // `ORDEN-SL4b2` decisión 2: el firmante seguro (único por nodo) viaja al hilo por `Arc`,
+        // igual que `self.registro` (registro estructurado); `fase_regimen` corre siempre después
+        // de `arranque_limpio`/`reiniciar`, que ya lo abrieron.
+        let registro_firmante_hilo: Arc<RegistroFirmante> = Arc::clone(
+            self.registro_firmante
+                .as_ref()
+                .ok_or_else(|| ErrorNodo::Otro("fase_regimen sin registro de firmante".into()))?,
+        );
         let hilo = thread::spawn(move || {
             hilo_productor_regimen(
                 servicio_hilo,
@@ -2061,6 +2327,7 @@ impl Nodo {
                 parada,
                 &rx_en_productor,
                 &tx_a_bucle,
+                &registro_firmante_hilo,
             );
         });
 
@@ -2073,13 +2340,27 @@ impl Nodo {
                 Ok(m) => m,
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     self.procesar_trabajo_red_pendiente();
+                    // Decisión 0: entre dos mensajes del hilo (hasta un slot entero) es exactamente
+                    // cuando una reunión con producción en marcha puede haber reseleccionado el
+                    // terminal (E-6b): hay que sincronizar aquí, no solo tras recibir un mensaje.
+                    self.sincronizar_terminal_productor(&mut terminal, &tx_a_productor)?;
                     continue;
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
             };
             self.procesar_trabajo_red_pendiente();
+            // Decisión 0: si el terminal seleccionado cambió, se sincroniza el hilo **antes** de
+            // decidir qué hacer con `msg` — si `msg` es `PeticionPadres`, esa petición era del
+            // terminal anterior y no se contesta (el hilo la abandona al ver `CambiarTerminal`,
+            // `regimen::Recepcion::Interrumpido`); si es `Post`, el bloque se admite igual (sigue
+            // siendo válido en su propio terminal) y el cambio ya viajó como mensaje aparte.
+            let terminal_cambio =
+                self.sincronizar_terminal_productor(&mut terminal, &tx_a_productor)?;
             match msg {
-                MsgProductor::PeticionPadres => {
+                MsgProductor::PeticionPadres(_) if terminal_cambio => {
+                    // Petición del terminal anterior: se descarta sin contestar (ver arriba).
+                }
+                MsgProductor::PeticionPadres(slot_objetivo) => {
                     let padres = padres_de_regimen(&self.cadena)
                         .map_err(|e| ErrorNodo::Otro(format!("padres de régimen: {e}")))?;
                     // `(hash, slot)` de cada padre (seleccionado y extras): el hilo productor
@@ -2101,19 +2382,49 @@ impl Nodo {
                     // hermanos del mismo slot comparten padres), y se manda al hilo productor para
                     // que nunca intente `producir_en_regimen` con una clave que no lo alcance
                     // (causa de `ErrGarantia` fatal en V5 de `REVISION-W06d4.md`).
-                    let con_garantia: std::collections::BTreeSet<zx_core::ClavePublica> = self
-                        .cadena
-                        .estado_post(&padres.seleccionado())
-                        .map(|estado| {
-                            self.claves
-                                .iter()
-                                .filter(|c| estado.activo_de(&c.pk) >= self.params.q)
-                                .map(|c| c.pk)
-                                .collect()
+                    let estado_base = self.cadena.estado_post(&padres.seleccionado());
+                    let con_garantia: std::collections::BTreeSet<zx_core::ClavePublica> =
+                        estado_base
+                            .map(|estado| {
+                                self.claves
+                                    .iter()
+                                    .filter(|c| estado.activo_de(&c.pk) >= self.params.q)
+                                    .map(|c| c.pk)
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                    // `ORDEN-SL4b2` decisión 4: hasta `MAX_EVIDENCIAS_POR_BLOQUE` pendientes cuyo
+                    // incidente no esté ya procesado en `estado_base` (el estado sobre el que
+                    // construye este bloque) y cuya ventana siga abierta en `slot_objetivo`
+                    // (`slot_falta ≤ slot_objetivo < slot_falta + Plazo_slots`).
+                    let evp = perfil::parametros_evidencia_dev();
+                    let evidencias: Vec<zx_core::Tx> = self
+                        .detector
+                        .pendientes()
+                        .filter(|p| {
+                            let ventana_abierta = p.slot_falta <= slot_objetivo
+                                && slot_objetivo < p.slot_falta.saturating_add(evp.plazo_slots);
+                            let ya_procesado = estado_base.is_some_and(|estado| {
+                                let clave = match &p.tx.extension {
+                                    zx_core::ExtensionTx::Evidencia { h1, .. } => h1.sol.public_key,
+                                    _ => return false,
+                                };
+                                estado.garantias.get(&clave).is_some_and(|g| {
+                                    g.incidentes.iter().any(|i| i.id == p.incident_id)
+                                })
+                            });
+                            ventana_abierta && !ya_procesado
                         })
-                        .unwrap_or_default();
+                        .take(perfil::MAX_EVIDENCIAS_POR_BLOQUE)
+                        .map(|p| p.tx.clone())
+                        .collect();
                     if tx_a_productor
-                        .send(MsgBucle::Padres(padres, info_padres, con_garantia))
+                        .send(MsgBucle::Padres(
+                            padres,
+                            info_padres,
+                            con_garantia,
+                            evidencias,
+                        ))
                         .is_err()
                     {
                         break;
@@ -2139,12 +2450,50 @@ impl Nodo {
                     })
                     .len() as u64;
                     let retraso_slot_ns = instante_salida.elapsed().as_nanos() as u64;
+                    // `ORDEN-SL4b2` decisión 4 (`evidencia_incluida`): los `incident_id` de las
+                    // `EvidenceTx` que este bloque lleva, calculados **antes** de mover `bloque` a
+                    // `admitir_post_interno`.
+                    let incidentes_incluidos: Vec<([u8; 32], zx_core::ClavePublica)> = bloque
+                        .txs()
+                        .iter()
+                        .filter_map(|t| match &t.extension {
+                            zx_core::ExtensionTx::Evidencia { h1, .. } => Some((
+                                *zx_core::incident_id_evidencia(
+                                    h1.consensus_branch_id,
+                                    h1.sol.public_key.bytes(),
+                                    h1.sol.sector_index,
+                                    h1.sol.history_size,
+                                    &h1.sol.chunk,
+                                    h1.slot,
+                                )
+                                .as_bytes(),
+                                h1.sol.public_key,
+                            )),
+                            _ => None,
+                        })
+                        .collect();
                     match self.admitir_post_interno(
                         *bloque,
                         self.almacen.longitud_registro()?,
                         true,
                     ) {
                         Ok(()) => {
+                            for (incident_id, _clave) in &incidentes_incluidos {
+                                let evento = self
+                                    .registro
+                                    .evento("evidencia_incluida")
+                                    .str(
+                                        "incident_id",
+                                        &zx_core::digest::Digest::from_bytes(*incident_id)
+                                            .to_string(),
+                                    )
+                                    .str("bloque", &hash.to_string());
+                                self.registro.escribir(evento, false)?;
+                                // `garantia_clave_tras_evidencia` (diagnóstico con `activo`/
+                                // `congelado` para V4) ya lo escribe, para **cualquier** vía de
+                                // admisión, `admitir_post_interno` (única tubería, ver el
+                                // comentario allí); no se repite aquí.
+                            }
                             let mut evento = self
                                 .registro
                                 .evento("bloque_producido")
@@ -2209,6 +2558,26 @@ impl Nodo {
                             let _ = tx_a_productor.send(MsgBucle::Parar);
                             return Err(e);
                         }
+                    }
+                }
+                // `ORDEN-SL4b2` decisión 2: el firmante seguro se abstuvo (conflicto de identidad
+                // o pérdida de registro). Evento crítico del esquema v1; el nodo sigue produciendo
+                // (contesta `Continuar`): esta es la única oportunidad perdida, no un fallo.
+                MsgProductor::Abstenido { slot, motivo } => {
+                    let motivo_texto = match motivo {
+                        zx_post::productor::MotivoAbstencion::Conflicto { .. } => "conflicto",
+                        zx_post::productor::MotivoAbstencion::PerdidaRegistro { .. } => {
+                            "perdida_registro"
+                        }
+                    };
+                    let evento = self
+                        .registro
+                        .evento("firmante_abstenido")
+                        .u64("slot", slot)
+                        .str("motivo", motivo_texto);
+                    self.registro.escribir(evento, true)?;
+                    if tx_a_productor.send(MsgBucle::Continuar).is_err() {
+                        break;
                     }
                 }
             }
@@ -2455,6 +2824,50 @@ fn bytes_de(bloque: &BloqueRed) -> u64 {
 fn peso_u128(bloque: &BloqueDag) -> Result<u128, ErrorNodo> {
     let peso = zx_dag::peso(bloque.cabecera.rango_solucion);
     u128::try_from(peso).map_err(|_| ErrorNodo::Otro(format!("peso {peso} no cabe en u128")))
+}
+
+/// `ORDEN-SL4b2` V3: la puerta RAT-3 en el punto exacto que usa `Nodo::arrancar`.
+#[cfg(test)]
+mod pruebas_puerta_rat3 {
+    use super::comprobar_puerta_rat3;
+    use zx_consensus::transicion::ParametrosEvidencia;
+
+    /// El perfil dev real (`R_slots = 600`, `Plazo_slots = 300`, `M_margen_slots = 60`) arranca.
+    #[test]
+    fn el_perfil_dev_real_pasa_la_puerta() {
+        let evidencia = crate::perfil::parametros_evidencia_dev();
+        assert!(comprobar_puerta_rat3(crate::perfil::R_SLOTS, &evidencia).is_ok());
+    }
+
+    /// Un perfil de prueba con `R_slots` demasiado corto para su propia ventana **no** arranca, y
+    /// el error trae el mensaje con los números exactos.
+    #[test]
+    #[expect(clippy::unwrap_used, reason = "el test falla con panic por diseño")]
+    fn un_perfil_que_incumple_rat3_no_arranca() {
+        let evidencia = ParametrosEvidencia {
+            plazo_slots: 300,
+            m_margen_slots: 60,
+            ..crate::perfil::parametros_evidencia_dev()
+        };
+        let err = comprobar_puerta_rat3(300, &evidencia).unwrap_err();
+        let texto = err.to_string();
+        assert!(texto.contains("puerta RAT-3"), "{texto}");
+        assert!(texto.contains("300"), "{texto}");
+        assert!(texto.contains("360"), "{texto}");
+    }
+
+    /// El caso límite exacto (`R_slots == Plazo_slots + M_margen_slots`) también incumple: la
+    /// desigualdad es estricta (EV-15).
+    #[test]
+    fn el_limite_exacto_tambien_incumple() {
+        let evidencia = ParametrosEvidencia {
+            plazo_slots: 300,
+            m_margen_slots: 60,
+            ..crate::perfil::parametros_evidencia_dev()
+        };
+        assert!(comprobar_puerta_rat3(360, &evidencia).is_err());
+        assert!(comprobar_puerta_rat3(361, &evidencia).is_ok());
+    }
 }
 
 /// `ORDEN-W06d1` V7: un bloque **propio** alterado, inyectado directamente en la tubería de

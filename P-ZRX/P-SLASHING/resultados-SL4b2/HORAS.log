@@ -1,0 +1,8 @@
+2026-09-27T07:59:27+02:00
+07:56:54 inicio (lectura de la orden y documentos)
+2026-09-27T08:43:48+02:00
+09:48 aprox: V0 verde (81/0), decisiones 0-5 implementadas y compiladas, V1/V3 unitarios verdes, clippy+fmt de zx-node verdes, preparando V4 real (build release en curso)
+2026-09-27T09:13:49+02:00
+09:20 aprox: V4 (3/3 reps), V5, V6, decisión 0 (E-6b) todos SUPERADOS con procesos reales; clippy/fmt/CI workspace verdes; V7 suite completa en curso en segundo plano
+2026-09-27T09:46:36+02:00
+09:47 fin: V0-V7 completos y verdes; decisiones 0-5 implementadas y verificadas con procesos reales (V4 3/3, V5, V6, decision-0/E-6b); cambios.patch y MIGRACION.sha256 generados y verificados en verde; ws.orig intacto; sin procesos huerfanos ni puertos abiertos

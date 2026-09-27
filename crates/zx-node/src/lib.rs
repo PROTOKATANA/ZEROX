@@ -11,6 +11,7 @@ pub mod claves;
 pub mod cli;
 pub mod error;
 pub mod estado_resumen;
+pub mod evidencia;
 pub mod identidad;
 pub mod nodo;
 pub mod padres;

@@ -9,7 +9,7 @@ use zx_consensus::PARAMETROS_POW_DEV;
 use zx_core::{Amount, decodificar_con, trabajo_bloque};
 use zx_dag::ghostdag::{Algoritmo, ModoMerge, ModoSp, Parametros as ParametrosGhostdag};
 
-use zx_consensus::transicion::ParametrosTransicion;
+use zx_consensus::transicion::{ParametrosEvidencia, ParametrosTransicion};
 
 /// `H_dep` (§3).
 pub const H_DEP: u32 = 1;
@@ -29,10 +29,32 @@ pub const M_RES_SLOTS: u64 = 20;
 pub const M_DEP_SLOTS: u64 = 10;
 /// `M_rec_slots` (§3).
 pub const M_REC_SLOTS: u64 = 30;
-/// `R_slots` (§3).
-pub const R_SLOTS: u64 = 60;
+/// `R_slots` (`ORDEN-SL4b2` decisión 1: `600`, antes `60`; `= F_SLOTS`, recomendación de SL-2b
+/// «`R_slots ≥ F_slots`»; puerta RAT-3: `600 > PLAZO_SLOTS + M_MARGEN_SLOTS = 360`).
+pub const R_SLOTS: u64 = 600;
 /// `F_slots` (§3).
 pub const F_SLOTS: u64 = 600;
+
+/// `Plazo_slots` (`ORDEN-SL4b2` decisión 1, `CONTRATO-EVIDENCIA-v0.md` EV-13): ventana de admisión
+/// de una `EvidenceTx` desde `slot_falta`. En `localhost` la segunda cabecera llega en menos de un
+/// slot, pero un nodo que reinicia (E-4) o llega tarde (E-5) tiene que poder incluirla todavía: 300
+/// slots son de 2,5 a 8 minutos según `N_dev`.
+pub const PLAZO_SLOTS: u64 = 300;
+/// `M_margen_slots` (`ORDEN-SL4b2` decisión 1, EV-15/EV-15b): margen de inclusión/propagación sobre
+/// `Plazo_slots` que exige la puerta RAT-3.
+pub const M_MARGEN_SLOTS: u64 = 60;
+/// `f = F_NUM/F_DEN` (`ORDEN-SL4b2` decisión 1): fracción confiscada por incidente en la red dev,
+/// `1/1` (se confisca la garantía **entera**, RAT-2′).
+pub const EVP_F_NUM: u64 = 1;
+/// Denominador de `f` (`ORDEN-SL4b2` decisión 1).
+pub const EVP_F_DEN: u64 = 1;
+/// `S_max_slots` del firmante seguro (`ORDEN-SL4b2` decisión 2, `CONTRATO-EVIDENCIA-v0.md` FIR-10):
+/// horizonte de abstención tras perder el registro. Valor nominal de perfil (`SPEC.md` §7.3).
+pub const S_MAX_SLOTS: u64 = 150;
+/// Tope de evidencias que un bloque propio puede incluir (`ORDEN-SL4b2` decisión 4).
+pub const MAX_EVIDENCIAS_POR_BLOQUE: usize = 4;
+/// Tope de identidades que el detector de doble firma indexa a la vez (`ORDEN-SL4b2` decisión 3).
+pub const MAX_IDENTIDADES_DETECTOR: usize = 65_536;
 /// `subsidio_pow(h)`, constante (§3).
 pub const SUBSIDIO_POW_ZZK: i64 = 50;
 /// `subsidio_post(s)`, constante (§3).
@@ -159,9 +181,36 @@ pub const fn ghostdag_max_padres() -> u8 {
     MAX_PADRES
 }
 
+/// `ParametrosEvidencia` del perfil dev (`ORDEN-SL4b2` decisión 1): `f = 1/1`, `Plazo_slots = 300`,
+/// `M_margen_slots = 60`, `cbid = CBID_RED_DEV`, evidencia **activa**.
+#[must_use]
+pub const fn parametros_evidencia_dev() -> ParametrosEvidencia {
+    ParametrosEvidencia {
+        f_num: EVP_F_NUM,
+        f_den: EVP_F_DEN,
+        plazo_slots: PLAZO_SLOTS,
+        m_margen_slots: M_MARGEN_SLOTS,
+        cbid: zx_core::CBID_RED_DEV,
+        evp: true,
+    }
+}
+
+/// Puerta RAT-3 (`CONTRATO-EVIDENCIA-v0.md`, «Ratificación v0»): `R_slots > Plazo_slots +
+/// M_margen_slots`. El nodo (`ORDEN-SL4b2` decisión 1) **se niega a arrancar** si no se cumple: sin
+/// esta desigualdad, un infractor podría completar una liberación de su garantía antes de que la
+/// ventana de admisión de su propia falta cierre (EV-15).
+///
+/// Toma `r_slots` y `evidencia` explícitos (no las constantes del módulo) para que un test pueda
+/// comprobar un perfil que la incumple sin construir un nodo entero.
+#[must_use]
+pub const fn puerta_rat3(r_slots: u64, evidencia: &ParametrosEvidencia) -> bool {
+    r_slots > evidencia.plazo_slots + evidencia.m_margen_slots
+}
+
 #[cfg(test)]
 mod tests {
-    use super::parametros_transicion_dev;
+    use super::{parametros_evidencia_dev, parametros_transicion_dev, puerta_rat3};
+    use zx_consensus::transicion::ParametrosEvidencia;
 
     #[test]
     #[expect(clippy::expect_used, reason = "el test falla con panic por diseño")]
@@ -170,5 +219,26 @@ mod tests {
         assert_eq!(p.h_corte_min, super::H_CORTE_MIN);
         assert_eq!(p.k_min, super::K_MIN);
         assert!(!p.w_min.is_zero());
+    }
+
+    /// El perfil dev real cumple la puerta RAT-3: `600 > 300 + 60`.
+    #[test]
+    fn la_puerta_rat3_se_cumple_con_el_perfil_dev_real() {
+        assert!(puerta_rat3(super::R_SLOTS, &parametros_evidencia_dev()));
+    }
+
+    /// Un perfil de prueba que la incumple (`R_slots` demasiado corto para su propia ventana):
+    /// `puerta_rat3` debe devolver `false`, no un pánico ni un `true` optimista.
+    #[test]
+    fn la_puerta_rat3_detecta_un_perfil_que_la_incumple() {
+        let evidencia_mala = ParametrosEvidencia {
+            plazo_slots: 300,
+            m_margen_slots: 60,
+            ..parametros_evidencia_dev()
+        };
+        // 360 == 300 + 60: la desigualdad es estricta (`>`), así que el igual también incumple.
+        assert!(!puerta_rat3(360, &evidencia_mala));
+        // Y con margen aún más corto que la ventana, sigue incumpliendo.
+        assert!(!puerta_rat3(100, &evidencia_mala));
     }
 }

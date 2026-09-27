@@ -1,0 +1,7 @@
+d0ba805b2e139ef7679c75e6f2eb5638ad6f0c8bd6ce173e5d8173b5bbe6b739  crates/zx-node/src/bin/zx-adversario.rs
+9810fab8d1a73358ea6e044cbf5c62acc608a355e404c556f4197f7565e705a4  crates/zx-node/src/error.rs
+82fc8382ace96a9ab4b0bbf03e132631187cb03365b54c4634f201ef4e8dcfd5  crates/zx-node/src/evidencia.rs
+c7b0df1087e25effd77324106ad511ef3199d010b2d5d90c0bc2de9182c0d0b8  crates/zx-node/src/lib.rs
+d0aae5db99cb5c19cce1ee7affc14d3d9c8be1105b9e9c63068bb3c6e35fc8c4  crates/zx-node/src/nodo.rs
+fe54da9fe41d9c89f71bb2fae34729f7bdd88cd1170c84adb0ec8dd7011379d0  crates/zx-node/src/perfil.rs
+dbdafdecbac23eaeb7c5d4a49d20d44b344a45665776b319e185d9880c02f395  crates/zx-node/src/regimen.rs
