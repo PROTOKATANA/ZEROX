@@ -28,6 +28,13 @@ y las órdenes y revisiones W06d1…W06d7 y W07a (en particular el orden **admit
 
 ## 3. Decisiones del director (no las cambies; si una no se puede cumplir, para e informa)
 
+0. **Paso previo (`P-ZRX/P-NODO/REVISION-W06d7.md`, límite 1):** el productor sigue al terminal **seleccionado** también
+   dentro del bucle de régimen: si `cadena.terminal()` cambia mientras produce, reconstruye su servicio PoT para el
+   nuevo terminal y elige padres en su DAG, sin reiniciar el proceso. Prueba con procesos reales: E-6b de W06d7
+   **con la producción en marcha** durante la reunión (sin `--dejar-de-producir-en-slot` hasta después de
+   reunir); se exige que el lado perdedor pase a producir sobre el terminal ganador y que, tras el reposo, los
+   tres tengan la misma punta y `resumen_estado`.
+
 1. **Activación en el perfil dev** (`crates/zx-node/src/perfil.rs`): `ParametrosEvidencia { f = 1/1,
    plazo_slots = 300, m_margen_slots = 60, cbid = CBID_RED_DEV, evp = true }` y **`R_SLOTS = 600`** (antes
    60; `= F_SLOTS`, recomendación de SL-2b «`R_slots ≥ F_slots`»; puerta RAT-3: `600 > 300 + 60`). El nodo

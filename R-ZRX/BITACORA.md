@@ -391,3 +391,13 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
 - **W06d7** (Sonnet, `39519aa`) y **W07a** (DeepSeek, `cf9cd2a`) lanzadas en paralelo: instrucción a W07a de hacer
   cambios aditivos y aislados para que el rebase sea mecánico; SL-4b2 espera a ambas (dos redes de procesos reales
   a la vez falsearían las pruebas de reloj). Lección: a los ejecutores, «no modifiques `ws.orig/`».
+
+### 06:37–06:57 — W07a revisada, W06d7 migrada, W07a-R lanzada
+
+- **W07a** superada con corrección pendiente: retiró seis eventos de diagnóstico sin que se pidiera (se
+  restauran; esquema §1 bis) y no repitió la suite completa tras su última corrección. El criterio «registro
+  < 1 % de la admisión» estaba mal elegido (denominador sin la verificación PoT/PoAS): 0,007 % del coste real.
+- **W06d7 migrada** (`c8286d3`): FC-3 real en el nodo; I-3 por propiedades; E-6b y V6(b) con procesos reales
+  superados; 829/0/5. Límite: el productor no cambia de terminal en caliente → paso 0 de SL-4b2.
+- **W07a-R** (rebase de la instrumentación sobre W06d7, eventos restaurados, suite completa) lanzada 06:56.
+- Lección repetida: tomar la hora de `date` antes de escribirla (dos correcciones esta noche).
