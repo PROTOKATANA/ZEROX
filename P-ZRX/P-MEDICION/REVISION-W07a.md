@@ -27,7 +27,7 @@ rebase W07a-R, tras W06d7 (las dos tocan `nodo.rs` y `zx-cadena`).
    restauran en W07a-R** (esquema §1 bis).
 3. `par` de los bloques de gossip omitido («no computable»): se acepta por ahora; la latencia no lo necesita.
 
-## W07a-R y migración (2026-09-27 ≈ 07:58)
+## W07a-R y migración (2026-09-27 ≈ 07:56)
 
 W07a-R (DeepSeek, 06:55–07:56) llevó la instrumentación a la raíz con W06d7: accesos de lectura sobre el
 `DagTerminal` **seleccionado** (con test contra `zx-dag`), los seis eventos de diagnóstico **restaurados**, la

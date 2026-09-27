@@ -5,7 +5,7 @@ arneses incluidos); léelo íntegro antes de escribir código y aplica sus regla
 
 ## 1. Identidad y contexto
 
-- **ID:** SL-4b2. **Fecha:** 2026-09-26 (redactada ≈ 23:00; se congela y lanza tras migrar W06d7 y W07a; SL-4b1 y SL-4c ya están en la raíz). **Director:** Claude. **Ejecutor:** subagente **Sonnet**, único (integración en el nodo con procesos
+- **ID:** SL-4b2. **Fecha:** 2026-09-26 (redactada ≈ 23:00; congelada y lanzada 2026-09-27 ≈ 07:58 sobre la raíz con W06d7, W07a, SL-4b1 y SL-4c). **Director:** Claude. **Ejecutor:** subagente **Sonnet**, único (integración en el nodo con procesos
   reales, como W06d1…W06d5; `P-ZRX/PLAN-0.0.1.md` D-P06).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/SL4b2/`.
 - **Objetivo único:** que la red dev **castigue** la doble firma de extremo a extremo con las reglas ya
@@ -22,7 +22,7 @@ arneses incluidos); léelo íntegro antes de escribir código y aplica sus regla
 
 `P-ZRX/P-SLASHING/CONTRATO-EVIDENCIA-v0.md` (§2–§9 y **«Ratificación v0», que prevalece**),
 `P-ZRX/P-SLASHING/DECISIONES.md`, `P-ZRX/P-SLASHING/REVISION-SL2b.md`, `REVISION-SL4a.md`,
-`REVISION-SL4b1.md` y `REVISION-SL4c.md` (las escribe el director al migrar; SL-4c hace que la v4 viaje por red y que `cbid` y orden canónico sean forma), `P-ZRX/P-REVISION-CODIGO/REVISION-RI-3c.md` (si deja hallazgos altos en `zx-node`, se corrigen en esta orden como **paso 0**, antes de lo demás), `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md`
+`REVISION-SL4b1.md` y `REVISION-SL4c.md` (las escribe el director al migrar; SL-4c hace que la v4 viaje por red y que `cbid` y orden canónico sean forma), `P-ZRX/P-MEDICION/ESQUEMA-REGISTRO-v1.md`
 (eventos `evidencia_*`, `firmante_abstenido`), `P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`, `P-ZRX/P-NODO/PLAN-W06.md`
 y las órdenes y revisiones W06d1…W06d7 y W07a (en particular el orden **admitir → persistir → difundir** de W06d6, que esta orden conserva: el firmante persiste su registro **antes** de sellar, y el bloque sellado sigue ese orden). Código: la raíz en el commit que indique la entrada.
 
@@ -118,7 +118,7 @@ procesos reales o en los unitarios, indicando cuál.
 ## 7. Entregables y límites
 
 Patrón de las órdenes W (`ws.orig/`, `ws/` con `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`,
-`crates/`, `testdata/`, `ci/`, `.github/` y el enlace `ws/PDF`; `cambios.patch` y `MIGRACION.sha256` como
+`crates/`, `testdata/`, `ci/`, `.github/` y el enlace `ws/PDF`; **no modifiques `ws.orig/`** tras copiarlo; `cambios.patch` y `MIGRACION.sha256` como
 **último** paso con `sha256sum -c` en verde; `logs/`, `run/`, `INFORME.md`, `PROGRESO.md`, `HORAS.log` con
 `date -Is` real). **Un solo ejecutor: prohibido lanzar subagentes o forks.** Procesos largos en segundo plano
 con su PID y su log anotados en `PROGRESO.md` **antes** de esperarlos; al retomar tras un corte, lee primero
