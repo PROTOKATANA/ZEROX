@@ -8,7 +8,7 @@ depende de ella**; lo que sí depende queda marcado `bloqueado (Katana)` en `D-Z
 
 | ID | Pregunta | Bloquea | Estado |
 |---|---|---|---|
-| PK-01 | Fuente de peso provisional de la capa de votos mientras no exista el registro de sectores | FV-4 (Rust de la capa); **no** bloquea 0.0.1 ni FV-2/FV-3 | abierta |
+| PK-01 | Fuente de peso provisional de la capa de votos mientras no exista el registro de sectores | FV-4 (Rust de la capa); **no** bloquea 0.0.1 ni FV-2/FV-3 | **resuelta** (Katana, 2026-09-27: opción 2) → FV-D08 |
 | PK-02 | ¿Se aseguran los 95 archivos que solo existen en `.trash/zerox`? | nada hoy; su pérdida sería irreversible | **resuelta** (Katana, 2026-09-27: sí): 90 archivos por contenido copiados a `R-ZRX/LEGADO/solo-trash/` (`f2fb5b0`) |
 
 ---
