@@ -6,7 +6,7 @@ semillas, presupuesto, conservación de datos crudos y separación entre medici�
 
 ## 1. Identidad y contexto
 
-- **ID:** W07b. **Fecha:** 2026-09-26 (borrador ≈ 23:05, puesta al día 2026-09-27 ≈ 08:05; se congela y lanza tras migrar SL-4b2).
+- **ID:** W07b. **Fecha:** 2026-09-26 (borrador ≈ 23:05, puesta al día 2026-09-27; congelada y lanzada ≈ 10:44 sobre el commit candidato).
   **Director:** Claude. **Ejecutor:** subagente **Sonnet**, único (orquestación larga de procesos reales;
   `P-ZRX/PLAN-0.0.1.md` D-P06).
 - **Zona (única escribible):** `/home/katana/zeo/ZEROX/deepseek/W07b/`.
