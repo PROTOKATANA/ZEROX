@@ -10,6 +10,28 @@ PoST. La restricción de AGENTS.md contra comités de decisión sigue vigente: e
 diseño **no** introduce votación de finalidad. Si se ratifica POS2T, AGENTS.md,
 SPEC.md y las reglas de activación deberán reflejar la decisión de stake.
 
+## Estado al 2026-09-28 (léase antes que el cuerpo)
+
+*Tabla del director, forma de actualización elegida por Katana el 2026-09-28. **No cambia ninguna regla del cuerpo**:
+dice qué parte sigue en pie, cuál quedó superada y dónde está lo vigente. El cuerpo se reescribirá como especificación
+única al cerrar 0.0.2.* Lo implementado y medido en la red dev está en `D-ZRX/SPEC-0.0.1.md`, y la hoja de ruta en
+`P-ZRX/HOJA-DE-RUTA.md`.
+
+| Sección | Estado | Lo vigente |
+|---|---|---|
+| Cabecera | **Superada en dos puntos.** (1) Katana **adoptó** la finalidad por votos en principio (FV-D02, 2026-09-26; capa en 0.0.3): la frase «no introduce votación de finalidad» ya no describe el diseño. (2) `AGENTS.md` ya no está en el árbol (se borró en `849cb52`). Stake y castigo están **activos en la red dev**. Sigue sin ser normativa para producción | `P-ZRX/P-FINALIDAD-VOTOS/DECISIONES.md` (FV-D01…FV-D08), `AUTO-ZRX.md`, `SPEC-0.0.1.md` §6 |
+| §0 Decisión y límite | **En pie.** PoAS + PoT siguen siendo condición para producir y el stake no da turnos. La ruta de arranque por PoW temporal está **adoptada e implementada** en dev (SHA3-256, sin premine, corte CUT-HWΦ con `K_min = 3`). El objeto castigable es la doble firma de la misma oportunidad C-GD-07, con `consensus_branch_id` (RAT-1). El límite de información se mantiene (RFT-01, RFT-14) | `SPEC-0.0.1.md` §2 y §6; `P-ZRX/P-TRANSICION/CONTRATO-v0.md` |
+| §1 Requisitos E, A, R, C | En pie; verificación parcial con procesos reales | `D-ZRX/INFORME-0.0.1.md` |
+| §2 Mapa de reestructuración | Pendiente; sustituido en la práctica por la hoja de ruta | `P-ZRX/HOJA-DE-RUTA.md` |
+| §3 C-BON colateral | **Implementado en dev con forma propia**: garantía por clave con `q = 10` ZZK, retiro `R_SLOTS = 600`, liberación RAT-3 (`Plazo_slots` 300 + `M_margen_slots` 60 desde el último bloque producido), coinbase PoST acreditada entera a la garantía (D-T08). Pendiente: garantía por unidad de espacio (IPA C-02), retención con la forma del modelo (C-12, SL-2c) y liquidez del productor (C-13) | `P-ZRX/P-RED-DEV/PERFIL-DEV-v0.md`; `SPEC-0.0.1.md` §6 |
+| §4 C-EVP evidencia | **Implementado y activo en dev**: `EvidenceTx` v4, EV-01…EV-28, RAT-1…RAT-3; medido con procesos reales (W07b E-8: confiscación en los tres nodos) | `P-ZRX/P-SLASHING/CONTRATO-EVIDENCIA-v0.md` (con su «Ratificación v0»), `DECISIONES.md` (DS-L01…) |
+| §5 C-SLA penalización por cohortes | **Superada.** El castigo correlacionado quedó refutado (RFT-15: no disuade al grande y castiga a honestos). Lo vigente es la confiscación por incidente `C = mín(V, techo(f·V))`, con `f = 1` en dev, `suelo(C·2/8)` al incluidor y el resto quemado (DS-L03, RAT-2′). La ausencia de voto tendrá su propia falta (FV-D03…FV-D06) | `CONTRATO-EVIDENCIA-v0.md`; `D-ZRX/RFT-ZRX.md` RFT-15 y RFT-22 |
+| §6 C-BOT arranque sin premine | **Ruta B adoptada e implementada** en dev (PoW SHA3-256 tras interfaz; el minero de producción, CPU y GPU AMD, en 0.0.4). La emisión PoST sin garantía queda solo como comparador, como dice el texto | `SPEC-0.0.1.md` §2; `P-ZRX/HOJA-DE-RUTA.md` |
+| §7 Qué puede y qué no puede prometer | En pie. Se añade que el doble farmeo no se cierra (RFT-01, RFT-14) y que la finalidad por votos lo arrincona sin cerrarlo (FV-D02) | `S-ZRX/SEGURIDAD-HIBRIDO-2026-09-26.md` (§6 al día) |
+| §8 Dependencias | Las de 0.0.1 están implementadas (11 crates). Registro de sectores y Filecoin sin activar (`SEC-0`; 0.0.2) | `SPEC-0.0.1.md`; `D-ZRX/IPA-ZRX.md` D-01…D-05 |
+| §9 Puertas | **1 y 2 hechas para dev** en transición, estado y evidencia: oráculos Julia T01 y T04 conforme a LINEO, diferenciales Rust con 0 discrepancias. **3 parcial**: medido en localhost, sin eclipse ni censura (IPA B-07). **4 y 5 no hechas** | `V-ZRX/REGISTRO.md`; `D-ZRX/INFORME-0.0.1.md` |
+| §10 Fuentes | Sin cambios | — |
+
 ## 0. Decisión y límite verificable
 
 ZEROX conserva PoAS + PoT como condición para producir un bloque y GHOSTDAG con
