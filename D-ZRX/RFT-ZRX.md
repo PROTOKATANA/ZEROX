@@ -11,7 +11,7 @@ antigua, esa refutación no está aquí: queda como histórica y **condicional**
 **Procedencia.** RFT-01…RFT-13: todas las fuentes están en el archivo `/home/katana/zeo/.trash/zerox/`
 (= commit `9681061`, salvo los 95 archivos que solo existen en `.trash`). Rutas relativas a esa
 raíz; hash sha256 completo del archivo citado. **Desde RFT-14:** las fuentes están en **este**
-repositorio (rama `rediseno/v1-spec-first`), con el commit que las registró. Cada cita literal se comprobó en la fuente el
+repositorio (rama `main`; hasta el 2026-09-28, `rediseno/v1-spec-first`), con el commit que las registró. Cada cita literal se comprobó en la fuente el
 2026-09-26. **Los números de línea del SPEC antiguo se desplazaron por ediciones concurrentes:
 citar por ID de regla.**
 
@@ -268,6 +268,13 @@ más rápido conoce antes los retos, incluidos los primeros tras `s_0`.
 `P-ZRX/P-SEGUNDO-VDF/segundo-vdf-v1/INFORME.md` (`70bcd72335708dbef153db56e011d4c7711810afd22e7aba886ad1f942d9fe46`);
 `P-ZRX/T-ZRX/ESTADO-RELOJ.md` (`88f436498971ba84ff3a17a1ff908e438021766c13d776cc2f95a0369a1cda4a`).
 
+**Nota del director (2026-09-27; derivación sin instrumento, a verificar en 0.0.2 paso 1).** De la propia fórmula:
+el segundo VDF recorta el adelanto frente a `L` solo mientras `(L + I)(1 − 1/ρ) < L`, es decir, `ρ < 1 + L/I`. Con
+`L = 7200` e `I = 851` el umbral es `ρ ≈ 9,46`, muy por encima de la ventaja realista con AES. Ejemplos: con
+`ρ = 1,5` el adelanto baja de 7 200 a ≈ 2 684 (−63 %); con `ρ = 2`, a ≈ 4 026 (−44 %). Por encima del umbral no
+mejora nada. Depende de `L` e `I`, que están sin revalidar.
+
+
 ---
 
 ## RFT-13 · Ninguna regla de selección protege con PoST los últimos bloques PoW antes del primer bloque PoST
@@ -493,7 +500,8 @@ más de garantía que lo que ingresa: el mecanismo es regresivo.
 **Alcance.** Calibración de SL-2 con los escenarios hipotéticos de DS-2/DS-3; coincide con la
 regresividad que ya señalaban DS-2 y DS-3 (A4 Sybil).
 
-**Aplicación al híbrido.** **Aplica** al perfil dev (`q = 20` por clave): aceptable para la red dev, no
+**Aplicación al híbrido.** **Aplica** al perfil dev (`q = 10` ZZK por clave; el `q_g = 20` de SL-2 está en unidades del
+modelo, no es comparable; corrección del 2026-09-28): aceptable para la red dev, no
 para producción. Recomendación: garantía **por unidad de espacio** (IPA C-02, C-07).
 
 **Fuente.** `P-ZRX/P-SLASHING/REVISION-SL2.md` (`a9b42a7`).
@@ -503,6 +511,87 @@ requisito proporcional al espacio.
 
 ---
 
+## RFT-24 · Un nodo en el mismo puerto y con los mismos pares no está aislado: esa «partición» no prueba nada
+
+**Enunciado.** Relanzar un nodo **en el mismo puerto** sin marcar a nadie **no** lo aísla: los demás, que lo tienen en su
+`--red-marcar`, vuelven a conectarse y le entregan sus bloques. En W06d7 V5 rep2 la punta del nodo «aislado» era idéntica a
+la del otro lado. La V6(b) de W06d7 (partición con el mismo terminal) se dio por demostrada así y era
+falso. Una partición solo cuenta con el nodo aislado en un **puerto nuevo sin pares** y con **0 contactos cruzados**
+(`par_conectado`, `bloque_recibido`) en los registros de los dos lados durante toda la ventana.
+
+**Alcance.** Método de medición con procesos reales; comprobado en W07b E-6 (3/3 con `contactos_* = 0`).
+
+**Aplicación al híbrido.** **Aplica** a toda prueba de partición, eclipse o reunión (0.0.2: investigación del eclipse).
+
+**Fuente.** `P-ZRX/P-NODO/REVISION-W06d7.md` (corrección del director), `P-ZRX/P-MEDICION/REVISION-W07b.md`,
+`resultados-W07b/run/R3-E6-3d21b1f-rep*/EJECUCION.txt`.
+
+**Lo reabriría.** Nada: es método.
+
+---
+
+## RFT-25 · El último `cambio_punta` del registro no decide si dos nodos tienen el mismo estado
+
+**Enunciado.** Comparar el `resumen_estado` del último `cambio_punta` (con o sin reinicio aislado) da falsos
+«DIVERGEN». El resumen solo se escribe al cambiar de punta, y un bloque lateral admitido después altera el estado sin
+dejar un resumen nuevo. En W07b R1 rep2, C salió «DIVERGEN» con la misma punta que A y B. El campo
+`estado_final_igual` del analizador (último evento del registro crudo) dio `false` en R1 ×3 y el estado real era el
+mismo. **Método decisivo (W07d):** reposo, parada ordenada o `reinicio_completo` sobre una **copia** de los datos, y
+comparación de `resumen_estado` **y** `compendio_bloques` calculados sobre el estado final.
+
+**Alcance.** Método; tres iteraciones refutadas con evidencia real antes de W07d.
+
+**Aplicación al híbrido.** **Aplica** a toda medición multinodo.
+
+**Fuente.** `P-ZRX/P-MEDICION/resultados-W07b/INFORME.md` §5.2, `P-ZRX/P-MEDICION/REVISION-W07d.md`.
+
+**Lo reabriría.** Nada: es método.
+
+---
+
+## RFT-26 · Sin relevo de transacciones, el reparto de claves decide quién cruza el corte (`K_min` es por lado)
+
+**Enunciado.** Con `K_min = 3` y sin relevo de transacciones, cada nodo solo incluye sus propios depósitos:
+- con **tres claves en un nodo**, ese nodo cruza solo y los demás no pueden obtener garantía nunca;
+- con una **partición anterior al corte** y claves 1 + 1 + 1, **ningún** lado llega a `K_min`. En W07b, un nodo aislado
+  minó 206 bloques PoW sin cruzar.
+
+**Alcance.** Perfil dev de 0.0.1; comprobado con procesos reales (W07b §5.1 y §5.3).
+
+**Aplicación al híbrido.** **Aplica** hasta que exista el relevo de transacciones (IPA A-14, 0.0.2 paso 2). En
+producción es también un vector: un solo operador con varias claves puede cumplir `K_min` y dejar fuera a los demás.
+
+**Fuente.** `P-ZRX/P-MEDICION/resultados-W07b/INFORME.md` §5.1 y §5.3; ejecución
+`deepseek/W07b/run/R3-E6b-3d21b1f-rep1-kmin-imposible/`.
+
+**Lo reabriría.** El relevo de transacciones, o una regla de corte que no dependa de que cada lado reúna `K_min`.
+
+---
+
+## RFT-27 · Penalizar todo `Rechazar` castiga a pares honestos: lo que depende de la vista local no prueba invalidez
+
+**Enunciado.** Tratar como violación de consenso todo bloque rechazado veta a honestos. Hay rechazos que dependen de
+la **vista local** del nodo y no del bloque:
+- el timestamp PoW por encima del FTL (reloj local);
+- el tope local de terminales con DAG;
+- los fallos locales de disco o servicio;
+- un padre rechazado por cualquiera de esos motivos.
+
+Desde W07a penalizaban en la ruta de sincronización y, con W06d10, lo harían también en gossip. Solo penaliza lo
+**demostrablemente inválido para cualquier nodo que tenga los padres**; ante la duda, `Ignorar`.
+
+**Alcance.** Código del nodo en `c107163` (W06d10-B); tabla de caminos en `resultados-W06d10/PROGRESO.md` §0.2.
+
+**Aplicación al híbrido.** **Aplica** a toda regla de puntuación de pares (0.0.2: gestor de direcciones y prevención
+del eclipse).
+
+**Fuente.** `P-ZRX/P-NODO/REVISION-W06d10.md`, `P-ZRX/P-NODO/REVISION-W06d10-B.md`.
+
+**Lo reabriría.** Nada: un par honesto no puede evitar lo que depende de la vista de otro nodo.
+
+---
+
+
 ## Registro de altas
 
 | Fecha | Filas | Motivo |
@@ -510,3 +599,4 @@ requisito proporcional al espacio.
 | 2026-09-26 | RFT-01 … RFT-12 | Alta inicial tras releer el archivo antiguo para el rediseño híbrido |
 | 2026-09-26 01:40 | RFT-13 | T02-A (ventana previa al primer bloque PoST) |
 | 2026-09-26 22:25 | RFT-14 … RFT-23; actualización de RFT-01 y RFT-04 | P-DISUASION (DS-1…DS-6), P-SLASHING (SL-2, SL-3), P-FINALIDAD-VOTOS (FV-1, dos ejecuciones) y P-AUSENCIA-VOTO (AV-1) |
+| 2026-09-28 02:14 | RFT-24 … RFT-27; nota en RFT-12 (umbral del segundo VDF); corrección de `q` en RFT-23 | W06d7 y W07b (método de partición y de mismo estado; `K_min` por lado), W06d10 y W06d10-B (penalización por vista local) |
