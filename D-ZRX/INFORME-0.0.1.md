@@ -1,7 +1,7 @@
 # Informe final de 0.0.1 del ZEROX híbrido — para Katana
 
 **Estado: CERRADO** (2026-09-28, 01:51; redactado desde el 27 ≈ 11:00). Veredicto en §1. **Firma:** Claude (director, `AUTO-ZRX.md` §8). Todo en commits locales de
-la rama `rediseno/v1-spec-first`; nunca push. **Commit candidato final:** `c107163` (antes `27dcfeb`, `26312ff` y `3d21b1f`; W06d8 y W06d9 corrigieron dos caídas del productor y W06d10 la falta de penalización del par, todas halladas al medir). R1 y R2 se midieron con `26312ff`; R3 y R4, con `3d21b1f`; E-7 con penalización, con W06d10.
+la rama `rediseno/v1-spec-first` (hoy `main`, la única rama); nunca push por parte del director. **Commit candidato final:** `c107163` (antes `27dcfeb`, `26312ff` y `3d21b1f`; W06d8 y W06d9 corrigieron dos caídas del productor y W06d10 la falta de penalización del par, todas halladas al medir). R1 y R2 se midieron con `26312ff`; R3 y R4, con `3d21b1f`; E-7 con penalización, con W06d10.
 
 ---
 
