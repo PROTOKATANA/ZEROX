@@ -1,7 +1,0 @@
-# Perfil de referencia: --check-bounds=yes (anula @inbounds), 1 hilo
-Test Summary:   |  Pass  Total  Time
-espacio-tasa-v1 | 41816  41816  4.1s
-
-# Perfil de rendimiento: sin limites activos, 4 hilos
-Test Summary:   |  Pass  Total  Time
-espacio-tasa-v1 | 41816  41816  3.8s

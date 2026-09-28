@@ -1,2 +1,0 @@
-Test Summary: | Pass  Total  Time
-CRP-v0.2      |  131    131  7.2s

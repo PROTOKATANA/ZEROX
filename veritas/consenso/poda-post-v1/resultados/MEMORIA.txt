@@ -1,4 +1,0 @@
-N=    10000  @allocated=0 B
-N=   100000  @allocated=0 B
-N=  1000000  @allocated=0 B
-summarysize(conteo) = 424 B (48 Int64)

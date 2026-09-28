@@ -1,5 +1,0 @@
-# IB-v0.1 · escalado del Monte Carlo · lun 21 sep 2026 22:30:10 CEST
-# CPU=32 hilos lógicos;  22:30:10  up 13 days 18:59,  0 users,  carga promedio: 2,47, 2,93, 2,75
-hilos=1  tiempo=0.104 s  reduccion(invalidos+herencia)=16474  fecha=2026-09-21T22:30:12.170
-hilos=2  tiempo=0.071 s  reduccion(invalidos+herencia)=16474  fecha=2026-09-21T22:30:13.562
-hilos=4  tiempo=0.040 s  reduccion(invalidos+herencia)=16474  fecha=2026-09-21T22:30:14.689

@@ -1,3 +1,0 @@
-familia 1 (n=120): 1000 órdenes de entrega, resultados idénticos
-familia 2 (n=140): 1000 órdenes de entrega, resultados idénticos
-familia 3 (n=160): 1000 órdenes de entrega, resultados idénticos

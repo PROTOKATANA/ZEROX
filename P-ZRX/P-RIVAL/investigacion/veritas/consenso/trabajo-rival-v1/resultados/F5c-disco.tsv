@@ -1,9 +1,0 @@
-medio (supuesto)	e_hash	θ	vatios PoW	vatios almacenamiento	razón PoW/almacenamiento
-SSD (supuesto 0.1 W/TiB en reposo)	8.20e-07	0.10	9.554e+01	1.024e+02	9.330e-01
-SSD (supuesto 0.1 W/TiB en reposo)	8.20e-07	0.50	8.598e+02	1.024e+02	8.397e+00
-SSD (supuesto 0.1 W/TiB en reposo)	8.20e-11	0.10	9.554e-03	1.024e+02	9.330e-05
-SSD (supuesto 0.1 W/TiB en reposo)	8.20e-11	0.50	8.598e-02	1.024e+02	8.397e-04
-HDD (supuesto 5 W/TB en reposo)	8.20e-07	0.10	9.554e+01	5.120e+03	1.866e-02
-HDD (supuesto 5 W/TB en reposo)	8.20e-07	0.50	8.598e+02	5.120e+03	1.679e-01
-HDD (supuesto 5 W/TB en reposo)	8.20e-11	0.10	9.554e-03	5.120e+03	1.866e-06
-HDD (supuesto 5 W/TB en reposo)	8.20e-11	0.50	8.598e-02	5.120e+03	1.679e-05

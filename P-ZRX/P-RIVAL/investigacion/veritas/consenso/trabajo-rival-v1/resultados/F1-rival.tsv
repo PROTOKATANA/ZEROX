@@ -1,6 +1,0 @@
-recurso	¿rival?	ley de coste	por qué	fuente	etiqueta
-PoW por bloque (reto ligado a los padres)	sí	superaditiva: coste(∪H_i) ≥ Σ coste(H_i)	el intento (nonce, padres) sirve a UNA historia	P-ANCESTRIA F1.2 (oráculo aleatorio); balizas:72-73	demostrado
-lectura de disco con reto independiente de la ancestría	no	reutilizable: coste(∪H_i) ≈ max_i coste(H_i)	una lectura vale para toda la clase de transferencia	P-ANCESTRIA F1.4; P-PRESTAMO §1	demostrado
-VDF por rama	no (peaje por rama)	coste ∝ nº de ramas, no de intentos	el trabajo no escala con el peso duplicado	PROMPT §2.1; P-TASA §2.3 (R2)	derivado
-trabajo rival ligado a los padres (la pata propuesta)	sí	coste ∝ intentos = peso producido	cada bloque de la segunda rama exige intentos nuevos	PROMPT §0; este instrumento	propuesto
-26,8941 % de «trunks»	no aplica a la pata	cota de grinding con re-muestreo GRATIS (c = 1, φ₁ = e)	un PoW no re-muestrea gratis: cada reintento cuesta del presupuesto rival	research/dag-poas-ancla-de-finalidad.md:313-319; P-ANCESTRIA F2.3	derivado (condicional a que el reintento consuma el recurso)

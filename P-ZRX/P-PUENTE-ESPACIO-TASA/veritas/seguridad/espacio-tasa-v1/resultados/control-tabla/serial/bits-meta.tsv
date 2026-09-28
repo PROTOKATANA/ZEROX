@@ -1,9 +1,0 @@
-campo	valor
-piezas	24
-hilos	1
-sector_id_hex	cb2797b41f8a63fc0df8c0e8714e9cca4d5d06cb718332a9cf08685c87d32d14
-bitmap_bytes	8192
-num_s_buckets	65536
-num_chunks	32768
-t_construir_s	17.479337
-camino_tabla	serial

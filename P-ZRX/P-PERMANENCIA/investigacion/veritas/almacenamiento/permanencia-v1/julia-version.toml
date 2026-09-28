@@ -1,6 +1,0 @@
-# Versión fijada del intérprete para los resultados publicados.
-julia = "1.13.0"
-canal = "release"
-juliaup = true
-comando = "veritas/julia.sh --project=. run.jl ..."
-nota = "Ejecutar siempre con veritas/julia.sh (exporta PATH de juliaup y quita LD_LIBRARY_PATH)."

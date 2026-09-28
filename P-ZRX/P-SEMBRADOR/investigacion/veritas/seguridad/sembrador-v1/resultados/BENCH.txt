@@ -1,5 +1,0 @@
-modelo=sembrador-v1 carga=sintetica_solo_rendimiento n=100000
-julia=1.13.0 cpu=znver5 threads=1/0
-kernel_allocated_bytes=0
-kernel median_ns=1.484472e6 median_bytes=0 median_allocs=0 min_ns=1.480172e6
-referencia median_ns=2270.0 median_bytes=3024 median_allocs=57 min_ns=2210.0

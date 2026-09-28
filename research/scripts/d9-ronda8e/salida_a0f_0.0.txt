@@ -1,2 +1,0 @@
-               peso 1   0.00 | m_BS medio    1.00  max   1 | sp!=     0  sort!=     0  peso!=1       0 | P medio     703  bloques del atacante en la banda   0.0
-  desliz W=3083 g=.25   0.00 | m_BS medio    1.00  max   1 | sp!=     0  sort!=     0  peso!=1   43175 | P medio     703  bloques del atacante en la banda   0.0

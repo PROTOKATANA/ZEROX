@@ -1,2 +1,0 @@
-Test Summary: |   Pass   Total  Time
-GDR-v0.1      | 577131  577131  6.9s

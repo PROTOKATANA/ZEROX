@@ -1,6 +1,0 @@
-# P-SEGUNDO-VDF · regimenes · 2026-09-23T22:03:42.972
-== REGÍMENES DE LÍNEAS: monolineal (REV-v1.0) vs revelación precomputada ==
-       I      V_sin   V_monolineal     V_paralelo   red_mono    red_par lin_ocultar  lin_todos lin_timekeeper
-     851    7685.60        4865.60        7685.60     0.3669     0.0000          9       1251         10
-    4666    9974.60        7154.60        9974.60     0.2827     0.0000          2        229          3
-  ⇒ el beneficio vive en el régimen monolineal; una línea dedicada lo anula

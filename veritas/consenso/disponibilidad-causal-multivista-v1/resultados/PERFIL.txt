@@ -1,8 +1,0 @@
-fecha=2026-09-11
-workload=one_history_one_block_snapshot_fixture
-jet_version=0.12.1
-jet_diagnostics=0
-code_warntype_any=false
-return_type=Outcome
-allocated_bytes_including_fresh_view=13840
-profile_entries=650

@@ -1,7 +1,0 @@
-η_h y η_a por separado (S=4, α∈{0.1,0.2,0.3}, T=200, Δ=2, k=30)
-alpha  η_h(media)  η_a(media)  n_rojos_h  n_rojos_a
-0.10   0.9928      1.0000      0          0
-0.20   0.9927      1.0000      0          0
-0.30   0.9940      1.0000      0          0
-η se mide, no se supone η_h=η_a. Sin IC de bloque (muestra de rojos);
-si la muestra de rojos es insuficiente, la curva con rojos queda INCONCLUSA.

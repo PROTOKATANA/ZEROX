@@ -1,5 +1,0 @@
-Controles de correlación de flujos (S=4, α=0.3, T=200, Δ=2, k=30)
-perfecta  W_priv distintos=1  W_priv[1]=12420306392614253916413173171259539718144  η_h=1.000  η_a=[1.0, 1.0, 1.0, 1.0]
-iid       W_priv distintos=4  W_priv[1]=8677200356483930818316052489510089392128  η_h=0.993  η_a=[1.0, 1.0, 1.0, 1.0]
-derivada  W_priv distintos=4  W_priv[1]=9357765090325807745242801704373625815040  η_h=1.000  η_a=[1.0, 1.0, 1.0, 1.0]
-perfecta ⇒ S flujos idénticos (recupera S=1). iid ⇒ identidad 1−E[F^S].

@@ -1,2 +1,0 @@
-Test Summary:   | Pass  Total  Time
-sellado-rama-v1 |   76     76  1.2s

@@ -1,6 +1,0 @@
-model=ventana-retarget-causal-v1
-cases=7
-assertions=85
-event_identity=context_id:block_id
-retarget_formula=pending_not_implemented
-result=structural_contract_ok

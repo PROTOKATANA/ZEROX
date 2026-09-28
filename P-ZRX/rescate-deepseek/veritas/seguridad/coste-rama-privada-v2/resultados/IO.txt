@@ -1,7 +1,0 @@
-I/O solo lectura — destino=/tmp/opencode/crp-v02-io.bin bytes=67108864
-caché = PAGE CACHE CALIENTE (no se ejecutó drop_caches)
-no distingue page cache de almacenamiento; profundidad de cola = 1 (secuencial síncrona)
-p50=0.002 ms  p95=0.003 ms  p99=0.003 ms  max=0.084 ms
-rendimiento medio sostenido = 2284.1 MiB/s (bloque=4096 B)
-S_microbenchmark = NO acreditado como flujo completo (solo componente I/O de lectura).
-S_adversario = PENDIENTE: falta perfil de hardware compatible (CPU, PoAS/KZG, PoT por slot).

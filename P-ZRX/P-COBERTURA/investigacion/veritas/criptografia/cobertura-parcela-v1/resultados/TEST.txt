@@ -1,2 +1,0 @@
-Test Summary:        |  Pass  Total  Time
-cobertura-parcela-v1 | 11833  11833  2.6s

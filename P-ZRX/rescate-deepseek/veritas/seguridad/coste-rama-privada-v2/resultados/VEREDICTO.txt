@@ -1,9 +1,0 @@
-Reglas que impiden cerrar el umbral protocolario:
- - C-HDR-06/§7.2 controlador → Pendiente: ventana, arranque, redondeos
- - flujo PoT conjunto (R-FIN-5) → candidata, no integrada
- - PoT AES real → no integrado (IntegracionPotPendiente)
- - C-GD-11 → 5 pendientes: métrica, valor, bootstrap, borde, finalidad
- - finalidad R-FIN-7/F → F=2h provisional; Δ sin medir en red DAG
- - S_adversario → sin medición de hardware compatible
-
-Umbral protocolario inconcluso; el baseline idealizado no sustituye las reglas pendientes.

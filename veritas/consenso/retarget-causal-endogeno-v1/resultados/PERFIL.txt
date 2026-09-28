@@ -1,8 +1,0 @@
-fecha=2026-09-11
-workload=1000_slots_3_attempts_body_hold_16_synthetic
-jet_version=0.12.1
-jet_diagnostics=0
-code_warntype_any=false
-return_type=SimulationMetrics
-allocated_bytes=345344
-profile_entries=2611

@@ -1,7 +1,0 @@
-Scripts analizados: 10
-
-research/scripts/d9-ronda10c/r10c_lib.py
-   [T1] L41: hf_delta0() recibe 'alpha' y NO lo usa
-
-======================================================================
-Sospechas totales: 1

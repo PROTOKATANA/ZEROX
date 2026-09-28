@@ -1,7 +1,0 @@
-# P-SEGUNDO-VDF · regimenes · 2026-09-23T23:06:43.425
-== REGÍMENES: espera REV-v1.0, línea causal finita, control instantáneo ==
-       I      V_sin       V_espera       V_causal        V_ideal red_espera red_causal lin_capacidad  cap_150x1  cap_150x2 lin_timekeeper
-     851    7685.60        4865.60        4885.60        7685.60     0.3669     0.3643          9       1243       2486         10
-    4666    9974.60        7154.60        7174.60        9974.60     0.2827     0.2807          2        227        454          3
-  control ideal: salida disponible sin ejecutar AES; no es un adversario causal
-  cap_150x{1,2}: capacidad hipotética para 150 slots × variantes de chunk, NO cota del DAG

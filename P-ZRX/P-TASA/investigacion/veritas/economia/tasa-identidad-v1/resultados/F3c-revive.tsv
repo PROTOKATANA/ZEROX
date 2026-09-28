@@ -1,8 +1,0 @@
-defensa	por_que_se_descarto	que_haria_falta	la_tasa_la_revive	τ_o_κq_minimo	coste_de_la_revivencia	etiqueta
-D1 exclusividad de reloj por identidad	teorema de partición: identidades gratis	tasa τ > 0 Y castigo κq > 0	si	τ=1.781797436e-08; κq=9.73659801e-12	regresiva: carga = f*/f sobre las granjas menores	derivado
-D1 exclusividad de reloj por identidad	teorema de partición: identidades gratis	tasa τ > 0 Y castigo κq > 0	si	τ=2.498049532e-08; κq=1.365054389e-11	regresiva: carga = f*/f sobre las granjas menores	derivado
-D1 exclusividad de reloj por identidad	teorema de partición: identidades gratis	tasa τ > 0 Y castigo κq > 0	si	τ=3.823622453e-08; κq=2.089411177e-11	regresiva: carga = f*/f sobre las granjas menores	derivado
-D2 cuota/tope de espacio por identidad	no había coste de identidad	tope S_max por identidad	si	τ·⌈f/S_max⌉	se vuelve ∝ f: es la variante (a) disfrazada	derivado
-D3 detección estadística / cuota por identidad	Sybil gratis	que crear identidad cueste algo	no	—	coste fijo por identidad: absorbible por la granja grande	derivado
-D4 atribución de pool	P-POOLS: el operador hostil firma por el granjero	atar la coinbase a sol.public_key	no	—	la tasa no toca la firma	verificado en fuente (P-POOLS)
-D5 castigo por clave (P-CLAVE)	claves de saldo casi cero y nuevas: soborno 0	registro o moneda previa, inexistentes	no	—	encarecer identidades no crea evidencia (κ=0 sigue)	verificado en fuente (P-CLAVE F4/F6)

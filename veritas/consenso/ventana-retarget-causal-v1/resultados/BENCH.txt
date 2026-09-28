@@ -1,8 +1,0 @@
-workload=180_blocks_70_ticket_cycle_fixture
-samples=100
-reference_median_ns=54849.0
-reference_median_bytes=119384
-reference_median_allocs=282
-kernel_median_ns=14784.5
-kernel_median_bytes=95952
-kernel_median_allocs=110

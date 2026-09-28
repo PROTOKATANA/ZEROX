@@ -1,9 +1,0 @@
-Auditoría: veritas/seguridad/segundo-vdf-v1 (SegundoVdfV1)
-Julia: 1.13.0
-CPU: znver5  hilos lógicos: 32
-RAM total (GiB): 123.4
-Hilos Julia (default, interactive): 16, 0
-Semilla maestra: 0x0000000000005a5a
-git HEAD: 98abede40b1534756385ce64db5335fb4480ff99
-Fecha: 2026-09-23T22:03:39.913
-Presupuesto declarado: 24 hilos, 64 GiB RAM, 8 GiB disco temporal

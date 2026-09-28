@@ -1,4 +1,0 @@
-variante	nombre	coste_por_identidad	coste_por_byte_s_id_1e_minus6	depende_de_kappa	coste_por_byte_satura_teorema	es_proporcional_al_espacio	nota
-A	stake proporcional al espacio	σ·f	σ (constante)	no	no	si	es PoS: el depósito escala con el disco; descartado por AGENTS.md
-B	depósito fijo confiscable	D·κ·q	D·κ·q/s_id	si	si	no	depende de κ: sin evidencia no se confisca; necesita κ·q > 0
-C	tasa fija NO recuperable	τ	τ/s_id	no	si	no	no depende de κ como coste; su efecto sí (ver F2)

@@ -1,0 +1,710 @@
+dsh: reasoning:
+Let me start by reading the ordered files. The user wants me to read /home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/ORDEN-T02.md in full and comply. Before writing/executing code, read LINEO.md and CONTRATO-v0.md in full. If I detect a lack of definition, report it before editing.
+
+Let me read these files.
+dsh: reasoning:
+Let me understand the task. This is a complex Julia modeling task. I need to:
+
+1. Read the ORDER T02, LINEO.md, CONTRATO-v0.md (done).
+2. Check for ambiguities/lack of definition before editing.
+3. Build a Julia project in /home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/T02/.
+
+Let me first check the current state of the workspace and the frozen input hash. Let me also read the other context files mentioned: NOTA-A07-SEMILLA.md, RFT-ZRX.md maybe. Let me check the workspace.
+
+The instruction says: "Si detectas una falta de definición, infórmala antes de editar." So I should report ambiguity before editing. But I also need to do the work. Let me first explore the environment.
+
+Let me check:
+- The T02 directory state.
+- ENTRADA-T02.sha256.
+- The context files.
+- Julia availability.
+
+Let me do some exploration.
+
+Also this is a long-running objective — per instructions, "create_goal may infer goal intent from a direct human request". This is a long-running objective. Should I create a goal? The direct human request is to comply with order T02, which is substantial. This qualifies as long-running. Let me create a goal. Actually, let me first explore a bit to detect ambiguities. But the goal should be created. Let me think: create_goal says "Create one persisted same-session completion goal when the current direct human request is a long-running objective that should continue across autonomous goal rounds." This is definitely a long-running objective. I'll create it.
+
+But wait — the user explicitly says "Si detectas una falta de definición, infórmala antes de editar." So I should report. There will be a first-turn response reporting ambiguities. Then continue.
+
+Let me plan carefully. This is a big task. Let me start exploring.
+
+Let me run commands to inspect the environment. Note: workspace-write mode allows writing under T02. Reading elsewhere? The sandbox may allow reads. Let me try.
+
+Let me check directory, the sha256 file, Julia version, RAM, CPU.
+dsh: reasoning:
+Let me verify the frozen input hash now and check the RFT-ZRX.md for RFT-01, RFT-07. Also let me look at the T02-dsh.stderr to see if there's relevant info. And check the Julia project template perhaps. Let me verify hash.
+dsh: reasoning:
+No veritas directory. Let me read RFT-ZRX.md (RFT-01, RFT-07) and maybe the T01 order to understand conventions but ORDER says don't read T01 code. It says don't read or use code from P-ZRX/P-TRANSICION/T01/. Reading ORDEN-T01.md is probably fine (it's not code). But actually it says "No leas ni uses código de T01". ORDEN-T01.md is a document, not code, and it's in the parent dir. But to be safe, I can avoid it. I have enough from ORDEN-T02.
+
+Let me read RFT-ZRX.md. Also, let me check the T02-dsh.stderr (my own session's stderr?) Actually that's likely the harness stderr, maybe useful. Let me check it but careful about secrets. It's 2315 bytes.
+
+Let me also check what Julia packages are available in the depot. There might be a shared depot. The command sets JULIA_DEPOT_PATH to T02/.julia-depot, which would be empty. Instantiate would need network access. Let me check if there's a global depot with packages. /home/katana/.julia/packages. Let me check.
+
+Actually the ORDER command: `export JULIA_DEPOT_PATH=/home/katana/zeo/ZEROX/P-ZRX/P-TRANSICION/T02/.julia-depot:` (trailing colon means append default depot). So it uses T02/.julia-depot first plus default ~/.julia. Good. But the default depot might have packages or not.
+
+Let me check the default julia depot.
+dsh: reasoning:
+Packages available. Let me check for StableRNGs, Random123, SpecialFunctions, Distributions, BenchmarkTools, Arblib, IntervalArithmetic. Let me list the rest.
+
+Also the T02-dsh.stderr contains my own reasoning echoed — that's the harness capturing reasoning. Not useful. I should not read it further (it's my own stream). Fine.
+
+Let me check packages list fully.
+dsh: reasoning:
+All packages available. Good — no network needed likely, but instantiate may still need to resolve. The registries are present (General.tar.zst). Offline instantiate might work if packages are already in depot and Manifest resolves. Let me consider. The default depot has packages; Project.toml with deps plus instantiate should resolve from local registry tarball without network unless registry needs updating. We can use `Pkg.offline(true)` maybe. But the ORDER gives an exact command `Pkg.instantiate()` without offline. We'll follow it; network may or may not be available. Let me test network quickly? Not necessary now.
+
+Now, this is a substantial task. Let me think about the model deeply and identify ambiguities before coding, as required.
+
+Let me carefully parse the specification and identify missing definitions / potential ambiguities. This is the key intellectual work.
+
+We need to build a Julia project measuring:
+
+**Objective**: Under the same adversary, network, horizon, measure cost and probability of success of a rewrite around the PoW→PoST cut with each selection rule (FC-1, FC-2, FC-3), and how much a hash majority censoring deposits can delay the cut.
+
+**Falsifiable question**: "With FC-3, no adversary with PoST space fraction a < 1/2 manages to make an online node abandon the honest history after the cut, whatever its hash fraction h < 1, within the abstraction of §3." Refuted with combination (h,a,k,F_slots) with a<1/2 and non-negligible success probability (threshold §7).
+
+Scenarios:
+- E1: Rewrite before cut. Adversary forks k blocks before a payment waiting z confirmations (classic). Measure success probability without cut in between. Control: must reproduce Nakamoto §11 table for z=0..10, q∈{0.1,0.3}, error <1e-6 vs formula.
+- E2: Private alternative terminal + space. Adversary forks at depth k from honest terminal, mines privately to its own terminal at height H*, builds privately a PoST suffix with fraction a, publishes when its history wins per rule, or abandons after horizon M slots. Success = online node (with F_slots) adopts its history; secondary metric: success vs a node syncing from scratch.
+- E3: Late heavier PoW branch after cut. Adversary ignores PoST phase and only accumulates more PoW work in its branch than honest prefix up to H* (forking at depth k). With FC-1 it can win; with FC-3, not without PoST weight. Measure both.
+- E4: Deposit censorship. With h>1/2, adversary excludes every deposit from its blocks and reorganizes honest blocks that include them, to keep Φ false. Measure expected delay of the cut in T_pow and fraction of PoW emission captured during the delay, as function of h. With h≤1/2, measure delay by partial reorganizations.
+- E5: Low-difficulty chain (qualitative only): explain in writing why W_min matters against an adversary that fabricates a branch with reduced difficulty, and why this model (no retarget) doesn't measure it. Do not invent a retarget model.
+
+Grid: h ∈ {0.1; 0.25; 0.4; 0.5; 0.6; 0.9}, a ∈ {0.1; 0.25; 0.4; 0.45; 0.5; 0.55}, k ∈ {1,3,6,12}, z ∈ {0,1,3,6}, r ∈ {1/60,1/10,1}, p ∈ {0.5;0.9}, F_slots ∈ {100,1000,10000,∞}, M = 10·F_slots (with F_slots=∞, M=10^5).
+
+Let me identify ambiguities/missing definitions:
+
+1. **E2 success condition and the role of the cut / honest terminal.** The adversary forks at depth k from the honest terminal. "bifurca a profundidad k del terminal honesto, mina en privado hasta su propio terminal a altura H*". So H* is the honest terminal height? The adversary forks k blocks before the terminal (at height H*-k) and mines its own branch to height H*. Then builds a private PoST suffix. Question: does the adversary's branch need to satisfy Φ to be a terminal? In E2 Φ is assumed true in both branches (per §3.2: "Φ se supone verdadera en ambas ramas salvo en el escenario E4"). So adversary branch reaches its own terminal at H*. It builds PoST suffix with fraction a.
+
+But there's an important subtlety: the honest chain after the cut continues building PoST suffix too. The adversary publishes "when its history wins per rule, or abandons after horizon M slots". So the race in the PoST phase: honest chain starts PoST at the cut (slot 0), adversary also starts building its PoST suffix from its own terminal. But the adversary's terminal might be at a different "slot" reference. In the abstract model, after the cut, both build PoST blocks per slot. But the adversary's terminal is a different PoW block at height H*, so its s_0 is its own terminal. The adversary is mining PoW privately from H*-k to H*. Meanwhile the honest chain reaches its terminal at H* and starts PoST. So the adversary's PoST phase starts later (when it reaches its terminal). Meanwhile honest PoST is already progressing. Hmm.
+
+Actually wait. Let's think about the timing. The honest terminal at height H* is the first honest block meeting TRN-04. The cut happens when Φ becomes true. In E2, adversary forks at depth k from the honest terminal. But the terminal is defined by Φ; if adversary forks k before, it must also satisfy Φ on its branch. In the model Φ true in both. So honest terminal is at H*. The adversary mines a private branch from height H*-k. It needs k+? blocks to reach H*. Actually if it forks at the honest block at height H*-k, to reach height H* it needs k new blocks (heights H*-k+1 ... H*).
+
+The question: When does the honest PoST phase start relative to adversary's? The honest chain reaches H* at some time; PoST starts. The adversary's private branch reaches H* later (on average). But does the adversary's PoST suffix race against the honest one from the moment the honest cut occurs? In E2 the metric is whether an online node adopts adversary's history. The adversary publishes when it wins. It can only win if its total history (PoW prefix + PoST suffix) beats honest per rule. For FC-3: compare PoST suffix weights; if adversary's PoST weight > honest's PoST weight at publication time, and d = distance from common ancestor... Actually C-FIN-01: online node doesn't change history if d ≥ F_slots, where d = slot of its tip − slot of common ancestor (0 if ancestor is PoW). Hmm. This is about the node's current tip vs candidate.
+
+Let me think about how the online node's F_slots rule works. The common ancestor between honest history (tip at slot d_h) and adversary history: since adversary forked in the PoW prefix at height H*-k, the common ancestor is a PoW block, so d = 0 by the rule "(0 si el ancestro es PoW)". Wait: "d = slot de su punta − slot del ancestro común (0 si el ancestro es PoW)". So if the histories diverge in the PoW prefix, the common ancestor is a PoW block, so d=0, and the node WILL switch? That can't be right — then F_slots wouldn't protect E2 at all.
+
+Hmm, wait. Let me re-read §3.4:
+"**Nodo en línea** (`C-FIN-01`): no cambia de historia si `d ≥ F_slots`, con `d` = slot de su punta − slot del ancestro común (0 si el ancestro es PoW)."
+
+So d = slot(honest tip) − slot(common ancestor). If the common ancestor is PoW, d=0. If the adversary forked k blocks before the honest terminal, the common ancestor is a PoW block ⇒ d=0 < F_slots, so the node DOES switch. That seems to make F_slots irrelevant for E2 (which forks at depth k in PoW). Hmm. But then what's the role of F_slots in E2?
+
+Actually wait — maybe the intent is different. Let me reconsider. Perhaps the adversary forks *at the terminal* — no. E2 says "bifurca a profundidad k del terminal honesto". That's a PoW fork. The common ancestor is PoW. So d=0. So F_slots never blocks. That would make the falsifiable question trivially refuted by any a>0? Because with a<1/2 the adversary can wait long enough (M slots) to accumulate more PoST weight than honest? Actually no: if a<1/2, the honest PoST chain grows faster, so adversary's PoST weight will be less than honest at the same slot. But the adversary can publish much later after honest tip has advanced far; by then d = slot(honest tip) would be large. But d is computed relative to the common ancestor, not the honest tip vs adversary tip? Let me re-read: "d = slot de su punta − slot del ancestro común". "su punta" = the node's tip (honest selected history). "slot del ancestro común" = slot of the common ancestor between the node's current history and the candidate. If the common ancestor is PoW, d=0.
+
+Hmm, so the adversary forking in PoW always has d=0 regardless of how long it waits? That makes C-FIN-01 useless and the question "no adversary with a<1/2 makes an online node abandon honest history" clearly refutable: adversary with a=0.45 (<1/2) could, with small probability, get lucky and build a heavier PoST suffix than honest within M slots. Actually with a<1/2, the probability that adversary's PoST chain ahead at some point before M is non-negligible for large M (random walk with negative drift; probability of ever being ahead is a/(1-a) for two independent Bernoulli processes? The gambler's ruin / ballot problem: for two independent Poisson/ Bernoulli processes with rates a and 1-a, probability that adversary ever gets strictly ahead = a/(1-a) < 1). With a=0.45, 0.45/0.55=0.818. That's huge. So the falsifiable question would be false immediately. That can't be the intent.
+
+So my reading of d must be wrong, or F_slots must be about something else.
+
+Let me re-read carefully: "**Nodo en línea** (`C-FIN-01`): no cambia de historia si `d ≥ F_slots`, con `d` = slot de su punta − slot del ancestro común (0 si el ancestro es PoW)."
+
+Hmm, maybe "slot de su punta" and "slot del ancestro común" — but the common ancestor in E2 might be the *terminal*? If the adversary forks k blocks before the terminal, the honest terminal's PoST suffix starts at slot 1. The common ancestor of the two PoST suffixes... Actually the adversary's PoST suffix hangs from its own terminal, which is a descendant of the fork point. The common ancestor of the two full histories is the fork point PoW block. But maybe the relevant "common ancestor" is where they diverge in the *PoST* phase, and since adversary's PoST is a separate tree from a different terminal, the common ancestor is PoW → d=0.
+
+Hmm. Unless the model intends the adversary to fork at the *honest terminal itself*, i.e., build a competing PoST suffix from the *same* terminal? No — E2 is "terminal alternativo privado" — a private alternative terminal. So the fork is in PoW.
+
+Wait, maybe the intent is: the online node's protection is about the *depth since the cut*. Let me reconsider: perhaps "slot de su punta" means the node's tip is in PoST, and "ancestro común" is the common ancestor *in the PoST suffix*. If the adversary's alternative terminal is different, there's no common ancestor in PoST, so d = slot of honest tip − 0? Actually the rule says 0 if the ancestor is PoW. Hmm.
+
+Let me look at CONTRATO's C-FIN-01 to see the original definition. It's not in the excerpt except TRN-09: "Un nodo en línea MUST NOT sustituir su selección por una candidata con d ≥ F_slots". And §1: F_slots = "Profundidad máxima de sustitución". So d is the "depth" of the substitution: how far back you're changing history. For a candidate whose common ancestor is PoW, the depth would be the number of slots since the cut, i.e., the whole PoST suffix? Actually "profundidad máxima de sustitución" likely means: the number of slots of history that would be reverted/replaced. If the candidate forks at the common PoW ancestor, then the entire PoST suffix (from slot 0) is replaced, so d = current slot. Hmm, that reading makes more sense: d = depth (number of slots) of the reorg = slot(tip) − slot(common ancestor), and if the ancestor is PoW (slot 0 / s_0), then d = slot(tip) − s_0 = slot(tip). The parenthetical "(0 si el ancestro es PoW)" is confusing though.
+
+Hmm, let me reconsider the parenthetical. Maybe it means: d = slot of tip − slot of common ancestor, where slot of a PoW block is taken as 0 (since s_0=0 in the oracle v0). So if the ancestor is PoW, its slot = 0, so d = slot(tip) − 0 = slot(tip). The parenthetical "(0 si el ancestro es PoW)" might mean "the ancestor contributes 0". Ambiguous! This is a genuine ambiguity that changes results dramatically.
+
+Actually re-reading: "con `d` = slot de su punta − slot del ancestro común (0 si el ancestro es PoW)". Grammatically, "(0 si el ancestro es PoW)" most naturally modifies `d`, giving d=0. But that leads to a nonsensical/trivial result contradicting the whole premise of the falsifiable question. So perhaps the intended reading is the other one. This is exactly the kind of ambiguity I must report.
+
+Hmm, but wait. Let me reconsider the whole E2 design. Maybe the C-FIN-01 protection isn't meant to be the thing that makes a<1/2 safe. Let me reconsider: maybe in E2, the adversary's success is defined as the online node adopting its history *because* the honest PoST chain doesn't exist/advance? No, honest PoST advances at rate (1-a)p.
+
+Let me think about what "the adversary publishes when its history wins according to the rule" means for FC-3. FC-3: if there's any PoST suffix, the one with more PoST weight wins. The adversary's PoST suffix starts at its own terminal. Honest suffix starts at honest terminal. But these are on different histories. The node compares candidate histories. FC-3 says compare PoST weight of suffix. It doesn't say compare prefix PoW. Since both have a PoST suffix (honest has one, adversary has one), the one with more PoST weight wins. If adversary publishes at a moment when honest tip has weight w_h and adversary private suffix has weight w_a > w_h, then adversary wins... unless C-FIN-01 blocks because d too large.
+
+Now the honest tip keeps growing. The adversary needs to publish at a moment when w_a > w_h. Since a<1/2, w_a grows slower, so if it publishes at the same wall-clock, w_a < w_h almost surely. But the adversary could have started... no, both start at the cut. Actually, the adversary's PoST start is delayed because it mines private PoW to reach H*. Hmm, that makes it worse for the adversary. Unless the adversary starts PoST on its terminal *as soon as it's mined* while honest is still in PoW. Actually the adversary's chain reaches its terminal H* privately; the honest chain might reach H* earlier or later. Since honest has (1-h) hash and adversary h, and they start at the fork... this is getting complicated.
+
+Let me step back. Maybe the intended model is simpler: after the cut, the honest PoST chain advances, and the adversary tries to build a longer/heavier PoST suffix with fraction a<1/2. The only way to succeed is by withholding and publishing when ahead; but C-FIN-01 prevents the online node from switching if the reorg depth d ≥ F_slots. Since d = current slot (if reading 2), and the adversary needs to wait until its suffix weight exceeds honest's *at the node's tip*, and it can only get ahead by luck, which takes time → d grows → eventually ≥ F_slots blocks the switch. So with a<1/2 and large F_slots, maybe the adversary can only win early. But the probability of being ahead early is small if a<1/2? Actually being ahead early is easier in some sense because fewer blocks. Hmm.
+
+Hmm, actually the gambler's ruin result for two independent chains starting at 0: P(adversary ever strictly ahead) = a/(1-a) if a<1/2. Wait that's for the "negative drift random walk" starting at 0, the probability of ever reaching +1 is p/q = a/(1-a). For a=0.45 that's 0.818. So the adversary gets ahead at some point with high probability, but the first time it gets ahead is typically early? Let's see: with a=0.45, probability it's ahead after 1 slot: a(1-(1-a))? Actually after 1 slot, P(adv=1, honest=0)=a(1-p?) Hmm both processes can produce at most 1 block per slot. After slot 1: adv ahead if adv wins and honest doesn't: a(1-(1-a)p... no. Let me define per slot: honest block with prob (1-a)p, adv with prob a p, both? "Cada slot produce un bloque PoST honesto con probabilidad (1−a)·p y uno del adversario con probabilidad a·p (procesos independientes por slot)". So both can happen in the same slot. So difference per slot D = A - H where A~Bernoulli(ap), H~Bernoulli((1-a)p) independent. If both 0 → no change (but that doesn't happen when p=1). For p=1, D ∈ {-1,0,+1} with P(+1)=a(1-a)? Wait independent: P(A=1,H=0)=ap(1-(1-a)p); P(A=1,H=1)=a(1-a)p²; P(A=0,H=1)=(1-(ap))((1-a)p). Difference is +1 only if A=1,H=0. So P(+1)=ap(1-(1-a)p). For p=1: a(1-(1-a)) = a·a = a². Hmm interesting. And P(-1)=(1-a)(1-a)= (1-a)². P(0)=2a(1-a). So the difference process is like a random walk with steps +1 prob a², -1 prob (1-a)², 0 otherwise. Drift negative for a<1/2. Probability of ever reaching +1 from 0 with negative drift = p_+/p_- = a²/(1-a)². For a=0.45: (0.45/0.55)²=0.669. Still large.
+
+So if the adversary can withhold and publish when ahead, and if C-FIN-01 doesn't block, it would win with prob ~0.67. That refutes the question. Therefore C-FIN-01 must be the blocking mechanism, and the reading of d must be the one that makes d grow with time.
+
+But here's the thing: the adversary wants to be ahead *at the node's tip*. If the node is honest and keeps extending, the adversary needs w_a > w_h where w_h is the honest weight at the current slot. If the adversary has been mining privately since the cut, w_a and w_h are both at the same slot count? Not exactly: the adversary's suffix slot numbering starts at its own terminal. Hmm.
+
+Actually, maybe the model intends: adversary builds a suffix that is longer than honest's *current* suffix by exploiting the fact that honest's suffix is what the node has. If adversary's suffix weight exceeds honest's at the time of publication, and d < F_slots, it wins. Waiting longer makes it harder to exceed (negative drift) and increases d. So the probability of success is P(hit ahead at time t with t < F_slots). If F_slots is large, the adversary gets many attempts, so P≈ a²/(1-a)² regardless of F_slots. Hmm, still high.
+
+Wait, but the adversary's suffix is built from a different terminal. There might be an additional cost: the adversary must also win the PoW race to reach H*. And "publica cuando su historia gana". Let me think about the race more concretely as intended by E2:
+
+- Common ancestor at height H*-k (honest block).
+- Honest chain continues: to reach H* it needs k blocks (from H*-k to H*). Each block Poisson rate (1-h). Time to reach H* ~ Gamma(k, 1-h). Then PoST starts.
+- Adversary builds private branch from H*-k: also needs k blocks to reach H*, at rate h. So P(adversary reaches H* first) — this is the classic Nakamoto race with k blocks. If adversary reaches H* first, it has a private terminal; then it builds PoST suffix from there. But the honest chain will reach H* too and start PoST.
+
+Hmm, this is subtle. Actually, "El adversario bifuca a profundidad k del terminal honesto, mina en privado hasta su propio terminal a altura H*". So the adversary's terminal is at the same height H*. It's a competing terminal. Then both build PoST suffixes. The node selects based on FC-3 (PoST weight). The adversary wins if its PoST suffix has more weight than honest's *and* C-FIN-01 allows.
+
+But if both start PoST at roughly the same time (when each reaches H*), and a<1/2, adversary's suffix is behind in expectation. To get ahead it needs luck. The probability of eventually getting ahead is p_+/p_- (or a/(1-a) if single process). With a=0.45 that's large. But C-FIN-01 caps the time/depth: once d ≥ F_slots, no more switching. So success probability = P(adversary gets strictly ahead before depth F_slots).
+
+Wait, but the adversary's suffix is a separate chain; its "weight" is the number of its PoST blocks. Honest's suffix weight at the node's tip is the honest's chain. If the adversary gets ahead by 1 at some point and publishes, does it win? FC-3 says more PoST weight wins. But tie-break by hash etc. So yes, being ahead by ≥1 suffices (assuming no other tie-break). Then d at that moment = slot of the node's current tip. If the adversary publishes right when it gets ahead and the honest tip is at slot t, d = t (if reading 2). If t < F_slots, win. So success probability = P(sup_{t<F_slots} (A(t)-H(t)) > 0).
+
+Actually wait, the adversary can publish at its own time. Once ahead, it publishes, and the node sees d = slot(honest tip) − s_0 = t_honest. Note A(t) and H(t) are at different times if adversary's PoST started later. Hmm.
+
+I think the intended simpler model: both suffix races start at the cut (slot 0) simultaneously. The adversary's prefix alternative terminal is just a device to have a competing history; the PoST race is symmetric in time. The cost of the PoW rewrite is the k blocks. Under this reading, success prob = P(adversary ahead before depth F_slots). And for FC-3 the falsifiable question becomes: is there (h,a<1/2,k,F_slots) with success prob > 1e-3? Given a²/(1-a)² for a=0.25 is 0.111, and P(ever ahead before F_slots) grows with F_slots, yes, there will be such points. So the question would be refuted. Hmm, that seems odd for an order asking to test a likely-true hypothesis. But maybe that's the point — the order explicitly says "Se refuta con una combinación..." and wants us to find truth, not to confirm. Actually wait: maybe FC-3 *does* prevent this because of C-FIN-01 combined with the fact that the adversary's history is only "valid" if its terminal satisfies Φ, and Φ might not hold... no, Φ assumed true.
+
+Hmm, let me reconsider. Actually maybe the neglection: For FC-3, the honest PoST chain has *higher weight than the adversary's at the time the adversary's terminal is built*, because honest started earlier. Let me think about the actual sequence:
+
+The cut for the honest chain occurs when the honest chain first hits terminal at H*. But the adversary forked k blocks back. The adversary's branch reaches its own terminal H* at a random time. For the adversary to have a competing terminal at all, it doesn't need to be ahead — it just needs to build its private branch. But then when it starts PoST, the honest chain already has a suffix of some length (possibly large if the adversary took long). So the adversary's suffix starts behind. Then it needs to catch up with negative drift, within F_slots depth.
+
+But actually here's the key: The adversary can build its PoST suffix *in private while honest also builds*. Both progress. For the adversary to overtake, it needs luck. But the depth d when it publishes = honest tip slot. If the adversary took T slots to reach its terminal, honest has T slots of suffix. Then the adversary needs to catch up from -T. With negative drift, the probability of ever catching up from -T is ((1-a)/a)^T... wait for biased random walk starting at -T, probability of ever reaching +1 is (p_+/p_-)^T? Let me recall: for a random walk with +1 prob p, -1 prob q, p<q, starting at -m, probability of ever hitting +1 is (p/q)^{m+1}. For a=0.45, p_+/p_- = (0.45/0.55)=0.818 for the "clean" random walk (or a²/(1-a)²=0.669). So decays as m grows. So if the adversary takes long to build its terminal, it starts far behind and can't catch up. That's the real protection. And if it's quick (lucky), it starts nearly even.
+
+OK so regardless of the exact C-FIN-01 reading, E2 is nontrivial and the a<1/2 question is meaningful. But C-FIN-01 changes things. The ambiguity about d matters. I should report it.
+
+Actually, hold on. Let me reconsider whether the eager honest chain matters. In E2, does the honest chain keep building PoST during the whole thing? Yes. So the adversary can only win if it gets ahead within F_slots depth. This is a well-defined gambler's ruin problem. Fine.
+
+Let me now enumerate the genuine ambiguities I've found so far:
+
+**A1. C-FIN-01 `d` definition.** "(0 si el ancestro es PoW)" — does d=0 (switch allowed) when common ancestor is PoW, or does d = current slot (since s_0=0)? This changes E2/E3 success. If d=0, FC-1/FC-3 online node always switches when the candidate wins by weight, making F_slots irrelevant and refuting the question. If d = slot of tip (ancestor PoW counted as slot 0), F_slots bounds how long adversary can try. The falsifiable question only makes sense under the second reading. Report it; default to the reading favorable to the adversary (per §3: "si no lo cambia, aplica la lectura más favorable al adversario"). But here it changes the result, so §3 says "detente si cambia un resultado". Hmm: "Si algo de esto admite dos implementaciones incompatibles, antes de editar descríbelo en PROGRESO.md como AMBIGÜEDAD-n y detente si cambia un resultado". So I should report and stop? That would halt the whole task. But the user says "Si detectas una falta de definición, infórmala antes de editar." The intended workflow: report, then presumably proceed with the most reasonable interpretation, or wait? The order says "detente si cambia un resultado". Hmm. But as a harness agent, I can't get an answer mid-turn unless the user replies. Actually the harness may allow a turn-based conversation — the user will see my message and can reply. The instruction says "infórmala antes de editar" (report it before editing). So the correct behavior is: report the ambiguities in this turn and wait for the director's decision? But then I'd do nothing. The order is from a director (Claude) to an executor; the user relays it. Given the explicit instruction "Si detectas una falta de definición, infórmala antes de editar", I think I should report the ambiguity and ask, then in the same session continue after the user responds. But if I stop entirely, the task isn't done.
+
+Hmm. Let me re-read §3's exact wording: "Si algo de esto admite dos implementaciones incompatibles, **antes de editar** descríbelo en `PROGRESO.md` como `AMBIGÜEDAD-n` y detente si cambia un resultado; si no lo cambia, aplica la lectura más favorable al **adversario** y decláralo."
+
+So the prescribed handling: write it in PROGRESO.md as AMBIGÜEDAD-n and stop if it changes a result. Writing PROGRESO.md is itself editing... but it's the mandated documentation, so "antes de editar [código]". So step 1: create PROGRESO.md with the ambiguities. Then, "detente si cambia un resultado". Does that mean stop the whole task and wait? Or stop that particular point and mark it inconclusive? I think it means: don't guess; halt and report. Then the director resolves.
+
+But the user's top-level instruction also says "Si detectas una falta de definición, infórmala antes de editar." This strongly implies: surface it to the user now.
+
+Given the nature of this harness, I think the best approach is:
+1. Do the reconnaissance.
+2. Identify ambiguities.
+3. Report them to the user in this turn (before writing code), and ask for resolution, OR proceed with the documented adversary-favorable reading where it doesn't change results.
+4. Actually, to make progress, for ambiguities that clearly have a dominant reasonable interpretation matching intent, I can proceed and declare them. For the ones that genuinely change the verdict, I should flag them.
+
+Hmm, but this is a one-shot order with a 2h budget. If I stop to ask, I waste time. But the user explicitly requested reporting before editing. Let me consider: is there a canonical resolution available? The C-FIN-01 definition might exist in the actual SPEC.md or in T01's contract, but I'm told not to read T01 code. I could search the wider repo for C-FIN-01 definition. Let me grep in D-ZRX/SPEC.md and elsewhere (not T01). That might resolve the ambiguity from an authoritative source.
+
+Let me grep for "C-FIN-01" in the repo (excluding T01).
+
+Also, I should look for a `fork_choice` or FC definitions. Let me search.
+
+Let me also reconsider: the phrase in TRN-09: "Un nodo en línea MUST NOT sustituir su selección por una candidata con d ≥ F_slots". And §1 F_slots = "Profundidad máxima de sustitución". In the original SPEC, C-FIN-01 likely says something like "un nodo no revierte más de F_slots slots". Let me grep.
+
+Let me search the repo for C-FIN-01 and "profundidad".
+
+I'll run grep tool (ripgrep) across /home/katana/zeo/ZEROX excluding T01? The grep tool doesn't support exclusion directly but I can search specific files. Let me grep in D-ZRX/SPEC.md and P-ZRX.
+
+Let me do that.
+
+Also there are other ambiguities:
+
+**A2. E1 exact formula and the cut.** E1: "El adversario bifurca k bloques antes de un pago que espera z confirmaciones (clásico). Mide probabilidad de éxito sin corte en medio (control: debe reproducir la tabla de Nakamoto §11 para z = 0…10, q ∈ {0,1; 0,3}, con error < 10⁻⁶ frente a la fórmula)." Nakamoto §11 formula for the probability that an attacker catches up from z blocks behind with attacker fraction q:
+P = 1 - Σ_{i=0}^{z} (λ^i e^{-λ}/i!) (1 - (q/p)^{z-i}) for q<p, with λ = z q/p; if q≥p, P=1. Actually Nakamoto's formula: P(z) = 1 - Σ_{k=0}^{z} (λ^k e^{-λ}/k!) * (1 - (q/p)^{z-k}) for q<p, λ=z q/p. Wait let me recall exactly. The standard formula:
+
+P = 1 - Σ_{k=0}^{z} (λ^k e^{-λ}/k!) · (1 - (q/p)^{z-k}), where λ = z(q/p), for q<p. And P=1 for q≥p.
+
+Note: this gives the probability the attacker ever catches up when the honest chain has z-block lead. For z=0, P = 1 - e^{-0}(1-(q/p)^0) = 1 - 1*(1-1) = 0? That gives 0, but for z=0 the attacker is already... hmm. Actually the formula for z=0: Σ_{k=0}^0 (0^k e^0/k!)(1-(q/p)^0) = 1*(1-1)=0, so P=1. OK good, 1-0=1. Wait λ=0 for z=0, 0^0=1, e^0=1, (q/p)^0=1, term = 1*(1-1)=0, P=1. Good.
+
+There's a subtlety: Nakamoto's table in the paper lists q=0.1: z=0:1.0000000, z=1:0.2045873, z=2:0.0509779, z=3:0.0131722, z=4:0.0034552, z=5:0.0009137, z=6:0.0002428, z=7:0.0000647, z=8:0.0000173, z=9:0.0000046, z=10:0.0000012. And q=0.3: z=0:1, z=1:0.1773523, z=2:0.0416605, z=3:0.0101008, z=4:0.0024804, z=5:0.0006132, z=6:0.0001522, z=7:0.0000379, z=8:0.0000095, z=9:0.0000024, z=10:0.0000006. Good.
+
+But note: the E1 grid has z ∈ {0,1,3,6} and q=h, h ∈ {0.1;0.25;0.4;0.5;0.6;0.9}. For h ≥ 0.5, P=1. The control requires reproducing the q ∈ {0.1,0.3} table with error <1e-6. The formula is well-defined. Potential ambiguity: "k bloques antes de un pago" — k is the fork depth, but the Nakamoto table uses z confirmations and the attacker starts z behind. How does k relate to z? The success probability depends on z (the lead the honest chain has when attacker starts). k is the reorg depth = z (number of blocks to reverse). In E1, "bifurca k bloques antes de un pago que espera z confirmaciones". So the reorg depth is z (the payment has z confirmations), and k is also the fork depth? That's redundant unless they differ. Hmm. Maybe k is the fork depth and z the confirmations; the attacker needs to catch up z? Actually in Nakamoto, the attacker starts when the payment is broadcast and then the merchant waits z confirmations; the attacker's chain is z blocks behind at that point. The "k blocks before" is the same as z in the classic model. So E1 probably uses z as the depth and k as a grid parameter that's separate? The grid includes both k and z. Hmm.
+
+Possibly E1 uses k for something else: "El adversario bifurca k bloques antes de un pago que espera z confirmaciones". So the attacker forks k blocks before the payment block, and the payment waits z confirmations. The reorg depth from the honest tip at the time of attack is k + z? Or z? If the attacker forked k blocks before the payment, then by the time the payment has z confirmations, the attacker has been working for z blocks and is z+k... no.
+
+Actually, in the standard "double spend" analysis, the attacker starts mining a private branch at the moment the payment transaction is included (or before), and needs to overtake the honest chain of z blocks. If the attacker forks k blocks before the payment, then at the time the payment is included, the attacker already has some private blocks (k of them potentially), giving it a head start. This is the "fork before payment" variant. Hmm. The ORDEN says "clásico" and "control: debe reproducir la tabla de Nakamoto §11" — but the Nakamoto table is for the attacker starting z behind with no pre-mine. So E1's control is reproducing Nakamoto, presumably with k=0 or with k not affecting the formula. The formula with a pre-mine of k blocks: attacker's lead starts at k? Actually if the attacker forked k blocks before the payment block and mined them, then at payment time it has k blocks. Honest has k+... hmm.
+
+I think E1 is likely: the attacker's chain diverges k blocks before the current honest tip; the payment has z confirmations on the honest chain. The attacker needs to produce a chain longer than the honest chain. The gap is z − k? Let me not overthink. The key control requirement is the Nakamoto table with z=0..10, q∈{0.1,0.3}. The natural implementation: the attacker's deficit is z blocks at the start (or z−k?). For the control to reproduce Nakamoto exactly, the formula must use deficit = z. So likely in the control, k is set such that it doesn't matter, or the reference formula uses z.
+
+I'll define E1 carefully: The payment waits z confirmations. The attacker forks at the block containing the payment or k before. The classic Nakamoto race is: honest chain grows at rate p, attacker at rate q, attacker needs to catch up from z behind. If the attacker pre-mined k blocks before the payment, the deficit at payment time (after z confirmations) is z − k... This is a genuine modeling ambiguity. I'll report it and adopt: E1 uses deficit = z (Nakamoto classic) for the control, and treats k as the pre-mine offset by considering the attacker's effective deficit = max(z - k, 0) or the "k blocks before" as the starting gap. Hmm.
+
+Let me look at ORDEN-T01 for context? It says not to read T01 code but ORDEN-T01 is a doc. Actually the instruction is "No leas ni uses código de P-ZRX/P-TRANSICION/T01/". Reading ORDEN-T01.md (in the parent) is allowed and may clarify conventions used by the director. But T01 is a different oracle (transition accounting and selection), not this adversarial model. E1 is new here. Let me maybe read ORDEN-T01 briefly for the formula conventions? The order T02 references "igual que en T01" for k=0 abstraction. Might help. But it's 21KB. I'll consider.
+
+Let me focus: The task is huge. I have a 2h budget. I need to be efficient. Let me think about what's actually being asked and produce a correct, defensible instrument.
+
+Given the complexity, let me now think about whether to report ambiguities and wait, or proceed. The safest interpretation of the user's instruction: they want me to notify them if something is undefined, *before editing*. Since this is an interactive session, I can output a message now listing the ambiguities and my proposed resolutions, and continue in subsequent turns after their input. But the task is long-running; if I wait, I do nothing. However, the harness instructions say for long-running objectives, use goal tools and continue across autonomous goal rounds. The user might not respond.
+
+Hmm, the meta-instruction: "Current runtime context... Approval policy: ask." And the task is launched headless. So likely no interactive user; I should proceed autonomously. The phrase "Si detectas una falta de definición, infórmala antes de editar" means: write it in PROGRESO.md (as §3 mandates) before editing code. So I'll document ambiguities in PROGRESO.md, then proceed with the most adversary-favorable / intent-consistent reading and declare it. That satisfies "infórmala antes de editar". I'll also include them in the final report.
+
+Actually, re-reading §3: "detente si cambia un resultado". If an ambiguity changes a result, I must stop. But stopping the entire task over one ambiguity seems contrary to the goal. Perhaps the right reading: stop that measurement / mark that specific point inconclusive, per LINEO ("si el intervalo contiene el umbral o el resultado cambia con precisión, declarar inconcluso"). Hmm.
+
+I think the best practical approach, given autonomous execution and a real deliverable expectation: document AMBIGÜEDAD-n in PROGRESO.md with the chosen reading, apply the reading most favorable to the adversary where it doesn't change the verdict, and where it does, present both readings in the report (and mark the affected point inconclusive if genuinely indeterminate). This is defensible and matches LINEO's spirit.
+
+But the user literally said "infórmala antes de editar" — report it before editing. I can write PROGRESO.md first (that's the required reporting channel) and then proceed. I'll make the first tool call write PROGRESO.md with ambiguities before any code. That satisfies it.
+
+Hold on, though. Maybe the smartest move is to actually spend this first turn reporting to the user in chat (since the user is present in this conversation and can respond). The user's instruction is addressed to me directly. If I just barrel ahead, I might violate "infórmala antes de editar". But if I stop, I produce nothing. The harness says "You are a coding agent". I think reporting in the response plus writing PROGRESO.md, then continuing to implement is the balance. But the user might have wanted to resolve it before I spend 2h.
+
+Hmm. Let me reconsider the phrase: "Si detectas una falta de definición, infórmala antes de editar." This is a standard instruction from these ZEROX orders: the executor should not silently guess; it should write AMBIGÜEDAD-n in PROGRESO.md and stop if it changes a result. The intended behavior is to stop and report so the director can fix the order. In a headless harness, "stop" means end the turn with the report, and the director (Claude/katana) reads it and decides.
+
+Given the strength of that instruction, I believe the correct behavior is:
+1. Do reconnaissance (done).
+2. Identify genuine ambiguities/lack of definition.
+3. Write PROGRESO.md with the ambiguities (or at least report them).
+4. STOP and ask for resolution before writing code, because at least one ambiguity (C-FIN-01 d) changes results.
+
+But wait — this would be the first of possibly several rounds, and I can use the goal. The user explicitly asked me to inform before editing. Let me be careful: Are the ambiguities real show-stoppers, or can they be resolved from other authoritative sources in the repo (SPEC.md)? If I can resolve them from SPEC.md (which is authoritative and referenced), then there's no "lack of definition" — it's defined elsewhere. Let me search SPEC.md for C-FIN-01 and the selection rules. That would be the responsible move before declaring ambiguity. Let me grep.
+
+Let me search the whole repo for C-FIN-01, "F_slots", "blue_work", "FC-1", etc., excluding T01 code. The grep tool has an include filter but not path exclusion; I can target D-ZRX and P-ZRX directories, and just avoid T01 by not reading its matches (or filter with grep -v in bash? The tool returns matches; I can note which are T01). Actually the grep tool searches a path; I can search D-ZRX specifically and P-ZRX/P-TRANSICION/CONTRATO-v0.md. Let me search D-ZRX/SPEC.md.
+
+Let me do several greps.
+dsh: reasoning:
+The SPEC.md is about POS2T, not the old ZEROX. It doesn't define C-FIN-01. The old SPEC is in .trash/zerox. Let me check if it exists and grep it. Referenced hash `b59905c5…d4e0ae`. Path /home/katana/zeo/.trash/zerox/SPEC.md maybe. Let me check.
+
+Also maybe there's an "archivo" directory. Let me find old SPEC.md and C-FIN-01 definition. This might resolve the F_slots ambiguity. Let me search.
+dsh: reasoning:
+Let me grep the old SPEC for C-FIN-01 to get the exact definition.
+dsh: reasoning:
+Let me read the C-FIN-01 definition around line 2550-2600 and 2077, 1825, 1872.
+dsh: reasoning:
+Important: The authoritative C-FIN-01 definition: `d = slot(punta actual) − slot(último ancestro común con la punta candidata)`, in slot indices. And "La profundidad de una reorganización se mide en slots, slot(punta) − slot(último ancestro común), nunca en bloques."
+
+So d is the depth measured in slots. For a PoW ancestor, what is its "slot"? In the original DAG spec, blocks have slot indices. But in the transition model, PoW blocks have no slot; the contraction says "slot(punta) = slot(último ancestro común)" but if the common ancestor is PoW, it has no slot. The ORDEN's parenthetical "(0 si el ancestro es PoW)" — following the original definition and the note that "s_0 ... en el oráculo v0, s_0 = 0" — the PoW ancestor is assigned slot 0 (s_0), so d = slot(punta) − 0 = slot(punta). That is: the parenthetical means the ancestor's slot is 0, so the difference is the tip slot. Under this reading, d grows with time and C-FIN-01 is meaningful.
+
+Wait, but the ORDEN text says "(0 si el ancestro es PoW)". Could be shorthand for "the common ancestor contributes 0". Given the authoritative definition (d = slot(tip) − slot(common ancestor), ancestor's slot measured in slot indices) and the fact that PoW ancestors precede s_0 (slot 0), the natural formalization is slot(PoW ancestor) = 0 = s_0 (or −∞? no). Actually in the contract, PoST blocks have slot > s_0, and s_0=0 in the oracle. The PoW ancestor is "before s_0", so assigning it slot 0 makes d = slot(tip). If we assigned it −∞, d would be infinite and C-FIN-01 always blocks, which is absurd. If we assigned it as "0 depth" (d=0), C-FIN-01 never blocks, also absurd. The sensible and contract-consistent reading: d = slot(tip) − 0 = slot(tip). I'll adopt that and declare AMBIGÜEDAD resolved in favor of the adversary where it doesn't change... Actually this reading is *less* favorable to the adversary than d=0? Let's see: d=0 allows all switches (favorable to adversary). d=slot(tip) allows switches only while tip slot < F_slots. So d=0 is more adversary-favorable. But d=0 makes the whole model trivial and contradicts the contract's purpose. I'll adopt the contract-consistent reading (d = tip slot) and document it. Actually per §3, "si no lo cambia, aplica la lectura más favorable al adversario y decláralo" — but it DOES change results, so I must report. I'll report AMBIGÜEDAD-1 and adopt the contract-consistent reading, presenting both if feasible.
+
+Hmm wait, but hold on. Let me reconsider E2 again. If the common ancestor is PoW, and d = slot(honest tip), then C-FIN-01 blocks once honest tip reaches F_slots. But the adversary can win only while honest tip < F_slots (i.e., early). That's a clean model: the adversary has a "window" of F_slots slots after the cut to catch up. Given negative drift, the chance to catch up within F_slots is small for large F_slots? No — more attempts → higher chance. Hmm, actually the probability of ever getting ahead is the limit as F_slots→∞, and it's ≤1. For a<1/2, the gambler's ruin probability starting at 0 is P(ever ahead) = p_+/p_- <1. So the falsifiable question would be refuted for a close to 1/2 (e.g., a=0.45 gives ~0.67). So the question is false under this model! Unless the adversary's suffix doesn't start even.
+
+Let me reconsider: the adversary's suffix starts behind because it must first build its alternative terminal. At the moment the honest chain reaches the cut, the honest PoST suffix starts. The adversary may reach its terminal at a different time. If the adversary reaches its terminal *before* the honest one, it could start PoST earlier and build a lead. But the adversary's chain is private; does it start PoST before the honest cut? The cut is when Φ becomes true at H*. Both honest and adversary branches have terminals at H*. The adversary mining private branch from H*-k: if it reaches H* before honest, then adversary has a terminal and can start PoST. But honest hasn't cut yet, so honest is still in PoW. The adversary builds PoST; then honest reaches H* and cuts, starting PoST behind. So the adversary can get a head start if it wins the private PoW race. That's the "advanced-start" advantage. Its size depends on the race.
+
+Alternatively the adversary could fork at the terminal and just build PoST, not needing pre-mine. But E2 explicitly says fork at depth k.
+
+OK. The exact timing of PoST start matters. This is another ambiguity: when does each side's PoST clock start?
+
+Given the complexity, I think the order intends a simpler and well-known "selfish mining / PoST private chain" model where the relevant race is symmetric. But the order deliberately says "mismo adversario, red y horizonte". Let me look for T01 to see how they modeled "k=0 abstraction of blue_work". T01 is about the transition oracle; ORDER says don't read T01 code. But maybe I can read ORDEN-T01.md (the doc) to understand the director's conventions. Hmm.
+
+Actually, I realize the task is enormous and I risk over-analyzing. Let me reconsider the strategic situation:
+
+The user's message is a launch command for a long task. The order itself anticipates ambiguities and tells me to report them. Given the number and depth of genuine ambiguities (at least 3-4 that change results), the correct and expected action per the order is to STOP and report before editing code. Trying to guess would produce an instrument that may not match the director's intent, and the order explicitly forbids choosing architecture/criteria ("No elijas arquitectura, parámetros ni criterios").
+
+But there's tension: if I stop, I deliver nothing. However, the order says "detente si cambia un resultado". This is a hard instruction. I think the right move is:
+1. Do thorough reconnaissance and identify ambiguities precisely.
+2. Write PROGRESO.md with AMBIGÜEDAD-1..n documenting the chosen or candidate readings.
+3. Report to the user, and ask for the director's resolution before writing code.
+
+But should I actually stop, or should I proceed with reasonable defaults and mark affected results inconclusive? Let me re-read the user's own words: "Si detectas una falta de definición, infórmala antes de editar." — "if you detect a lack of definition, report it before editing." It does NOT say "stop and wait". It says report before editing. The order says stop if it changes a result. Combined: report it (in PROGRESO.md) before editing; if it changes a result, stop.
+
+I think the safest interpretation that still makes progress: identify whether the ambiguities truly "change a result" in the sense of making the verdict indeterminate. If I can resolve them from the authoritative contract/SPEC or adopt a defensible reading with a declared parameter, I can proceed. The one that genuinely changes the verdict (C-FIN-01 d) is resolvable from the authoritative SPEC (d = slot(tip) − slot(common ancestor), ancestor slot 0). So it's not a "lack of definition" — it's defined in the old SPEC, which the contract references. Good, I can resolve it.
+
+Let me re-examine each potential ambiguity and see if the authoritative sources define them. If I can close them all with authoritative readings, I proceed. If not, I report and (per order) stop only if it changes the result.
+
+Given the time budget (2h) and the depth, let me make a decision: I will proceed, but first write PROGRESO.md documenting the ambiguities and my resolutions, and state in my final report that these are assumptions. Actually, the user wants to be informed before editing. Let me do this: I'll present the ambiguities in my response now and write PROGRESO.md, then continue implementing in the same turn? The harness supports multiple tool calls per turn and a final message. The user sees the final message. If I want them to weigh in, I should stop.
+
+Hmm, let me think about what a reasonable human director would want. This is a headless run with a 2h budget. If the executor stops immediately on ambiguity, the run is wasted. The order explicitly anticipates ambiguities and says stop "si cambia un resultado". The key ambiguities DO change results. So the director would expect a stop-and-report. But the director also gave a launcher that runs headless and dumps stderr. So maybe the expected outcome is indeed a report.
+
+But actually, wait. Let me reconsider whether the ambiguities are real or whether I'm overcomplicating. Let me carefully re-read §3 and the scenarios. Perhaps the model is more precisely specified than I think, and the ambiguities dissolve under careful reading.
+
+§3.1 Time: PoW blocks Poisson, honest rate 1-h, adversary h. Each PoW block = 1 work.
+§3.2 Cut: honest terminal height H*; terminal is the first block of its branch at that height. W_min doesn't bind when adversary forks from a recent honest block (reuses prefix work); so FC-2 ≡ FC-3 except E5. Declare it.
+§3.3 PoST abstract phase: after cut, time in slots of duration τ (r = τ/T_pow). Each slot produces honest PoST block with prob (1-a)p and adversary with prob a p (independent processes per slot; p = prob slot has any winner). Weight per block = 1. This is k=0 abstraction of blue_work. Adversary builds PoST suffix in private on *its* terminal; honest on theirs.
+§3.4 Selection:
+- FC-1: history with more PoW work in prefix wins; tie → more PoST weight.
+- FC-3: if there's any PoST suffix, the one with more PoST weight wins; else more PoW work.
+- FC-2: FC-3 without W_min (only differs in E5).
+- Online node (C-FIN-01): doesn't change history if d ≥ F_slots, d = slot of its tip − slot of common ancestor (0 if ancestor is PoW). Node syncing from scratch: applies rule without C-FIN-01.
+
+Given the authoritative C-FIN-01, "(0 si el ancestro es PoW)" = the common ancestor is PoW so its slot index is taken as 0 (s_0). So d = slot(tip). I'm now fairly confident.
+
+But wait: in E2, the adversary forks k blocks before the honest terminal. So the common ancestor between honest history and adversary history is a PoW block ⇒ d = slot(honest tip). So the online node switches to the adversary's history only if the adversary's candidate wins the selection rule (FC-3: more PoST weight) AND d < F_slots. The adversary must therefore overtake before the honest tip reaches F_slots.
+
+Hmm, but here's the subtlety I raised: does the honest PoST suffix count include the "cut" slot? The honest tip slot at the time of comparison. Fine.
+
+Now, "Éxito = un nodo en línea (con F_slots) adopta su historia". So for E2 we measure P(adversary's PoST suffix weight > honest's at some slot t < F_slots, with the adversary's suffix starting from its own terminal).
+
+Now the timing of PoST starts: §3.3 says "El adversario construye su sufijo PoST en privado sobre su terminal; los honestos, sobre el suyo." It doesn't specify start time relative to each other. Natural: each starts when its terminal is reached. In E2, both terminals are at height H* on different branches. The honest terminal is reached first? Not necessarily. Actually, E2 says the adversary "bifurca a profundidad k del terminal honesto". This presupposes the honest terminal exists (height H*). So honest reached H* at time 0 (reference). Adversary forked at H*-k (before), so it started mining its branch k blocks back; at time 0 it has some private progress. Then it continues to H*. Hmm, but if the adversary started at H*-k at the same time the honest was at H*-k, and both race, the honest already got to H* by time 0. So the adversary's branch is behind but not necessarily at H*-k at time 0.
+
+This is getting really intricate. I suspect the intended E2 model is the standard "private alternative chain" where:
+- The adversary forks from the honest chain at depth k *from the tip* (i.e., at height H*-k, which is H*-k). Then it races to build a heavier branch. But for an alternative *terminal* at the same height H*, it just needs to match height H* and then build PoST.
+- The key adversarial advantage: it can build a PoST suffix in private and reveal it when heavier.
+
+Honestly, I think the cleanest and most defensible interpretation, consistent with "same adversary, network, horizon" and the abstraction:
+- At the cut, the honest chain has terminal at height H*. The adversary, having forked k blocks back, must first win the PoW race to reach height H* (its terminal) — this takes a random number of blocks with the adversary's rate. Then both build PoST from their terminals.
+- But for measuring "adopt vs online node with F_slots", the relevant d is measured from the honest tip; and the adversary is trying to get its PoST suffix ahead.
+
+Hmm, this is very complex to implement exactly. The order says "fórmula cerrada" where possible, and "simulador evento a evento transparente". We can implement an event-driven simulator of the full race. That's doable but the semantics must be pinned.
+
+Given the genuine ambiguity in E2's timing and success condition, and E1's k meaning, and E4's model, I think reporting is genuinely necessary.
+
+Let me now list all ambiguities I can identify, then decide on stop vs proceed.
+
+**AMB-1 (C-FIN-01 d when common ancestor is PoW).** Resolvable from old SPEC: d = slot(tip) − slot(common ancestor); PoW ancestor precedes s_0=0, so d = slot(tip). I'll adopt this. Not a blocker.
+
+Actually, hmm, is that right? The old SPEC's slot indices start from the DAG genesis. In the transition, PoW blocks have no slot; s_0 is the reference slot occupied virtually by the terminal. So a PoW common ancestor is "before s_0", and s_0 = 0 in the oracle. So slot(common ancestor PoW) = 0. d = slot(tip). Adopted.
+
+**AMB-2 (E1: role of k vs z, and the exact Nakamoto formula / starting deficit).** The control requires reproducing Nakamoto §11 for z=0..10. The grid has both k and z. The order says the adversary forks k blocks before a payment that waits z confirmations. Interpretation: the reassignment depth is k; the payment waits z confirmations. If the attacker forks k blocks before the payment, then when the payment is z deep, the attacker needs to catch up... Standard modeling: attacker's deficit at the moment it starts = z + k? or the attacker pre-mined k? Let me think physically:
+- Payment included in block at height h_p. Merchant waits z confirmations ⇒ at height h_p + z.
+- Attacker forked at height h_p − k (k blocks before the payment) and mined privately.
+- At height h_p + z (honest), the attacker's private chain has length (number of attacker blocks since fork) = random. The honest chain since fork has k + z blocks. The attacker needs its private chain length > k + z to have a longer chain. So the deficit is k+z? But the classic Nakamoto model starts the attacker at 0 and honest at z; the attacker needs to catch up to z. If the attacker forked earlier (k>0), the honest has an extra k block lead, so deficit k+z. But then the control (Nakamoto) would correspond to k=0. The order says "Mide probabilidad de éxito sin corte en medio (control: debe reproducir la tabla de Nakamoto §11 para z = 0…10, q ∈ {0,1; 0,3}...)". So the reference formula uses deficit z; E1's simulation should reduce to it when k=0. So E1's formula: deficit = z + k? Or maybe the "k blocks before" means the attacker's branch diverges k blocks before the payment, and during the z confirmations the attacker mines; the attacker will have an advantage of having started k blocks earlier. Hmm.
+
+Actually there's a well-known "pre-mining" double-spend: attacker starts k blocks before the payment, so at the payment time it already has a private chain of expected length k (or k blocks). The merchant waits z. The attacker wins if its private chain (which had a k-block head start) surpasses the honest chain. If the attacker has exactly k blocks when the payment is broadcast (deterministic), then it needs k + (z+1) vs... This is getting complicated.
+
+Simplest reading consistent with "control reproduces Nakamoto": E1's probability of success is P(attacker catches up from deficit D) where D = z (the confirmations). And k is a separate parameter that describes how far back the fork is for the *reorg depth cost* metric (work spent), not affecting the probability. But the order says "bifurca k bloques antes de un pago que espera z confirmaciones (clásico)". In the classic analysis, the merchant waits z confirmations and the attacker needs to catch up z blocks. The k could equal z (the fork depth). But then why both in the grid?
+
+Alternatively, maybe E1 uses k as the number of confirmations and z as... no.
+
+Hmm, actually re-reading: "El adversario bifurca `k` bloques antes de un pago que espera `z` confirmaciones (clásico)." Possibly: the attacker forks k blocks before the tip at the time the merchant checks (i.e., the reorg would undo k blocks), and the payment waits z confirmations. If the payment is at the tip and waits z, then by the time of the decision the honest chain is z blocks ahead of the payment, and the fork point is k blocks before the payment? That double counts.
+
+I think the safest: E1's probability formula is Nakamoto's P(catch-up from z) with attacker fraction q=h, independent of k; k only determines the PoW work spent / reorg depth metric (the attacker must produce enough blocks, and the reorg depth is k+z or similar). Actually, the order's metric for E1 isn't fully specified beyond "probabilidad de éxito". The reorg depth could be reported.
+
+Given the control requirement, I'll define E1 as: attacker deficit = z (classic Nakamoto), and k is the fork depth used to compute reorg depth = z (the blocks between the fork and the honest tip at decision time). Hmm but then k is unused. 
+
+Wait, maybe the intended classic variant: The attacker tries to double-spend a payment. It forges a private branch starting k blocks before the payment. The merchant waits z confirmations. The attacker needs to overtake the honest chain, whose lead over the *fork point* is k+z. But the attacker also has had time to mine; the standard result for a pre-mined fork is P = Nakamoto with deficit z (because from the fork point, the honest advantage at decision time is k+z but the attacker had k blocks of head start, netting z). Actually yes! If the attacker starts mining its private branch at height h_p − k at the same time the honest chain is at h_p − k, then after the honest reaches h_p + z, the honest has k+z blocks from the fork; the attacker has been mining the whole time and needs > k+z blocks. The attacker's deficit from the fork is k+z, but it has already been mining. The net is the same as if it started with 0 and needed z. Indeed, the difference process over the k+z blocks: attacker needs to exceed the honest. Starting from 0 at the fork, the attacker needs its total > honest total after the honest completes k+z blocks. But the honest completes at a random time. The standard Nakamoto analysis says: the attacker wins if it ever catches up while honest gains z blocks from the payment. With a k-block head start (fork earlier), the attacker's total needed is k+z, but the honest's total is k+z, so it's the same race as needing to catch up z after the honest has k? No...
+
+Let me just compute: process: honest blocks and attacker blocks are independent Poisson processes over continuous time. At the moment the honest chain reaches h_p + z (i.e., the merchant's decision), the honest has k+z blocks since the fork point. The attacker has some number A of blocks in the same interval. Attacker wins if A > k+z at that moment (then publishes; but also could win later via catch-up). Actually the classic analysis with continuous time: attacker wins if at the time honest reaches z confirmations, the attacker's private chain is longer than honest's. The standard formula P(z) is exactly for honest reaching z blocks (from the start) and attacker needing to exceed. If the fork is k blocks before the payment and the merchant waits z, then the decision is when honest reaches k+z from the fork, and attacker needs to exceed k+z. But the attacker's process started at the same time. By scaling, this is the same as Nakamoto with deficit k+z. Hmm, that suggests deficit = k+z.
+
+But hold on: if the attacker forks k blocks before the payment, the attacker is trying to reverse the payment plus k more blocks. That's harder, not the same. So deficit = k+z. Then k=0 gives Nakamoto. That's consistent with the control needing k=0. And the grid's k matters. I'll go with deficit = k+z. But is the payment at the honest tip? "bifurca k bloques antes de un pago" — the payment is some block, and the fork is k before it. The merchant waits z confirmations after the payment. So from the fork, honest has k+z blocks. Attacker must exceed. Deficit = k+z. I think that's the intended "k blocks before".
+
+But actually, there's a subtlety: if the attacker forks k blocks before the payment and mines, it could publish its longer chain *before* the merchant's decision to prevent the payment from being included. But the payment is already... hmm, the scenario is double-spend: the attacker wants to reverse an already-accepted payment. So the fork is before the payment, and the attacker's branch excludes the payment. The merchant waits z confirmations. The attacker must overtake the honest chain that includes the payment. Deficit from the fork = k+z. OK.
+
+But then the control "reproduce Nakamoto table with error <1e-6" would be at k=0. The grid z ∈ {0,1,3,6} and k ∈ {1,3,6,12}; with deficit k+z. Hmm z=0,k=0 gives deficit 0 → P=1. Fine.
+
+I'll document this as a reading.
+
+Actually, wait. Let me reconsider. The Nakamoto formula P(z) for attacker behind by z. If deficit = k+z, then the "payment waits z confirmations" and "fork k before" gives deficit k+z. That's plausible. But the order's E1 metric might just be P. I'll compute P via the exact formula for deficit k+z and simulate.
+
+Hmm, but the formula with λ = D·q/p and sum to D. For D = k+z. That's fine.
+
+Alternatively the deficit is z and k is the fork depth for the reorg cost only. I'll present both? No, pick one and declare. To be favorable to the adversary (smaller deficit), deficit = z favors the adversary (easier). §3 says if it doesn't change a result apply adversary-favorable. But it does change results (P). Hmm. But note: the control explicitly fixes the interpretation to Nakamoto for the table. I'll implement deficit = z + k as the main reading? Actually the adversary-favorable reading is deficit = z (since k+z ≥ z). And the order says "aplica la lectura más favorable al adversario" only when it doesn't change a result. Since it changes results, I should report. Ugh, ANOTHER blocker.
+
+OK, I'm now confident there are multiple genuine gaps. Let me collect them properly, write PROGRESO.md, and decide.
+
+Let me identify the full list:
+
+**AMB-1: C-FIN-01 d when common ancestor is PoW.** Resolution available from old SPEC (d = slot(tip) − slot(common ancestor); PoW ancestor slot = 0 = s_0). Adopt; declare. Effect: significant.
+
+**AMB-2: E1 deficit (k vs z).** Two incompatible readings: deficit = z (k only cost) vs deficit = z + k. Changes E1 probabilities. Report.
+
+**AMB-3: E2 timing/PoST start and success condition.** Multiple sub-issues:
+  (a) When does each side's PoST phase start? Simultaneously at the cut, or each when its terminal is reached?
+  (b) Does the adversary's k-block-deep fork need to win a PoW race to reach H*, and does it then start PoST behind?
+  (c) Does the honest chain continue extending PoST while the adversary builds privately (yes)?
+  (d) Success = strictly greater PoST weight? (tie → honest? tie-break by hash?)
+Changes results.
+
+**AMB-4: E3 model.** "El adversario ignora la fase PoST y solo acumula más trabajo PoW en su rama que en el prefijo honesto hasta H* (bifurcando a profundidad k)." Under FC-1 (PoW work first), if adversary's prefix work exceeds honest's, it wins. But after the cut, honest stops PoW (TRN-05: PoW descendants of terminal invalid). So the adversary cannot extend PoW after the cut validly. So "acumula más trabajo PoW en su rama ... hasta H*" means its branch up to its own terminal at H* has more work than the honest prefix up to H*. Then with FC-1, does the adversary win? FC-1 compares PoW work in prefix; if adversary's prefix work > honest's, yes. But the adversary's branch has no PoST suffix (it ignored it). FC-1 says "gana la historia con más trabajo PoW en el prefijo; a igualdad, más peso PoST." So an adversary branch with more PoW prefix but no PoST suffix beats honest (which has PoST suffix)? That's the point of E3: FC-1 is vulnerable. But is the adversary's branch *valid* without a terminal/Φ? It says "ignora la fase PoST" — its branch up to H* is a valid PoW chain and a terminal (Φ assumed true). It just doesn't build PoST. Is a PoW-only history valid after the cut? TRN-06 requires PoST blocks to have a terminal; but a PoW history with no PoST blocks is just a PoW chain. A node would apply FC-1 and compare PoW prefix work. Hmm, but the honest history has a terminal too, and the adversary's branch has a (different) terminal. Both have terminals. The comparison uses PoW work. The adversary's branch overtook the honest PoW prefix (mined a heavier chain to H*). So under FC-1 it wins. Under FC-3, the presence of a PoST suffix on the honest side makes PoST weight decisive; adversary has zero PoST suffix, so loses. That's the intended contrast. Model: to accumulate more work in the prefix, adversary needs to produce a chain from H*-k to H* heavier than the honest's k blocks... Actually "más trabajo ... que en el prefijo honesto hasta H*": total work of adversary prefix (from genesis to its H*) > honest prefix (genesis to H*). Since they share the prefix up to H*-k, the adversary needs its k blocks to have more total work than the honest's k blocks. With uniform work=1 per block, it needs more blocks, i.e., to have caught up and surpassed. This is the classic race from deficit k. So E3 P(adversary wins) = P(private chain length > honest length from fork) = Nakamoto with deficit k? Or the adversary just needs to reach H* with more blocks? Actually to have a longer chain (more work) from the fork point, the adversary needs to overtake the honest chain. That's the same catch-up problem with deficit k. Then C-FIN-01? The adversary's branch has no PoST suffix. For an online node, switching to a PoW-only history after the cut... the online node has a PoST suffix; d = slot(tip) − slot(common ancestor=PoW)=slot(tip) ≥ F_slots quickly. So C-FIN-01 blocks it. Hmm, so E3 under FC-1 with an online node might be blocked by C-FIN-01 if it takes too long. The order says "Con FC-1 puede ganar; con FC-3, no sin peso PoST. Mide ambos." "Mide ambos" = measure both rules. Maybe also both node types (online vs from scratch). §3.4 defines both node types. E2 explicitly distinguishes; E3 says "Mide ambos" (both rules). Could include from-scratch node. Ambiguity: does E3 use online node or from-scratch? Likely both, but not explicit.
+
+**AMB-5: E4 model.** "Con h > 1/2, el adversario excluye todo depósito de sus bloques y reorganiza los bloques honestos que los incluyen, para mantener Φ falso. Mide el retraso esperado del corte en T_pow y la fracción de emisión PoW capturada durante el retraso, en función de h. Con h ≤ 1/2, mide el retraso por reorganizaciones parciales." This scenario is about the cut depending on Φ (deposits). The adversary with majority hash can censor deposits by reorging honest blocks that include deposits. To keep Φ false, it must ensure no honest block containing a deposit survives. With h>1/2, it can always reorg any honest block. Delay: the cut is delayed until Φ true. If deposits never get in, the cut never happens — delay infinite? The order says "prolongar PoW puede sostenerse indefinidamente" (D-T04). So E4 measures the delay distribution and emission captured. But how are deposits attempted? At what rate? This is very underspecified:
+  - Rate of deposit arrivals (per block? Poisson?).
+  - The adversary's strategy: it mines its own blocks censoring deposits, and reorgs honest blocks that contain them. With majority hash, it can maintain this forever.
+  - "fracción de emisión PoW capturada durante el retraso" = share of blocks/emission the adversary gets.
+  - With h≤1/2: "retraso por reorganizaciones parciales" — but with h≤1/2, the adversary can't sustain reorgs; the order says "mide el retraso por reorganizaciones parciales". Hmm. Under h≤1/2, occasionally the adversary can reorg a block containing a deposit (by luck), causing delays. But the model of deposit arrival and reorg is needed.
+  
+  This is severely underspecified: no deposit arrival process, no Φ/S_min/K_min values, no H_corte_min/W_min. The order says Φ assumed true in both branches except E4, but for E4 we need a model of when Φ becomes true. "mantener Φ falso" implies Φ is a boolean that becomes true when a deposit is included and matured. To measure delay, we need deposit arrival rate and maturity M_dep. The order's grid provides no such parameters. This is a genuine lack of definition → report.
+
+**AMB-6: E4 "emisión capturada"** — need emission schedule; only relative fraction matters, so could use fraction of blocks.
+
+**AMB-7: p and the slot race.** p = probability that the slot has some winner. "Cada slot produce un bloque PoST honesto con probabilidad (1−a)·p y uno del adversario con probabilidad a·p (procesos independientes por slot)". If p<1, neither may produce. For E2's catch-up race, the time unit is slots. Fine. But note the honest and adversary each can produce at most one block per slot; both can in the same slot. This matches my earlier analysis.
+
+**AMB-8: what is a "history" and what exactly does the online node compare?** The candidate histories: honest and adversary. Are there multiple honest PoST blocks per slot forming a DAG? k=0 abstraction means one block per slot per producer, linear. Fine.
+
+**AMB-9: E2 "M = 10·F_slots" horizon and "abandona tras M slots".** With F_slots=∞, M=1e5. Since d must be < F_slots to switch, and F_slots=∞ allows unlimited time up to M. Fine.
+
+**AMB-10: E1 "sin corte en medio"** — the simulation should not involve the cut; pure PoW. Fine.
+
+**AMB-11: FC-1 in E2/E3 and validity of a PoW branch past the terminal.** Under FC-1, compare prefix PoW work. But after the cut, honest stops PoW; the adversary's alternative branch at H* has some prefix work. If the adversary forked k before and built to H* privately, its prefix work might exceed honest's if it produced more blocks (possible with h). But does FC-1 also require a valid PoST suffix? It says "gana la historia con más trabajo PoW en el prefijo; a igualdad, más peso PoST." So a history with more PoW prefix wins even without PoST. That's the vulnerability.
+
+Hmm, actually there's a deeper point. In E2, the adversary's branch to H* has the same height H* but potentially more work (if it produced more blocks than honest in its k-block race... no, to reach H* from H*-k it produces exactly k+? blocks; the honest also produced k blocks from H*-k to H*. But the honest chain might have produced more than k blocks if there were forks; in a linear model, exactly k blocks on the canonical chain. But the adversary's branch count is random; to reach height H*, it needs exactly k blocks (since heights). Work = k for both if work=1/block and no difficulty variation. So all branches at the same height have the same work! Then FC-1 ties and falls back to PoST weight. Hmm. That breaks E2/E3's FC-1 distinction.
+
+Unless "work" is not 1 per block. §3.1: "Cada bloque PoW vale 1 unidad de trabajo." And no retarget. So work = number of blocks = height. So two branches at the same height have equal work. Then FC-1 ties → PoST weight. So FC-1 would behave like FC-3 (minus W_min) for equal-height terminals. Then why would E3's FC-1 "puede ganar"? Because the adversary accumulates *more work in its branch than the honest prefix* — i.e., its branch is *longer* (more blocks) than the honest prefix, not just equal height. But E2/E3 say "mina en privado hasta su propio terminal a altura H*". If both are at height H*, work is equal. Unless the adversary's terminal is at a *higher* height? The order says "a altura H*". Hmm.
+
+Wait, maybe the adversary can produce a *heavier* branch at the same height if some blocks have different work? No retarget, uniform work 1. So height determines work. So E3's "más trabajo PoW en su rama que en el prefijo honesto hasta H*" requires the adversary branch to have height > H*, i.e., more blocks. But then it's not a terminal at H*; it's a longer PoW chain. TRN-05: PoW descendants of a terminal are invalid. But the adversary's chain is a separate branch; if its terminal is at height H*' > H*, that's fine (it's the first block meeting TRN-04 on its branch). Its prefix work exceeds honest's. So FC-1 picks it.
+
+Hmm, but E3 says "bifurcando a profundidad k" and "solo acumula más trabajo PoW en su rama que en el prefijo honesto hasta H*". I read this as: the adversary's PoW branch (which reaches its own terminal) has more cumulative work than the honest prefix up to H*. With uniform work, this means the adversary's branch height > H*. It forked k blocks back and mined a longer chain. So the adversary's success probability is P(private chain overtakes honest chain from deficit k) — but the honest chain is still in PoW? No, the honest cut happened at H*. After the cut, the honest chain stopped PoW (TRN-05), so it can't be overtaken in PoW. The adversary must overtake the honest PoW prefix *up to H** before the cut. So it's a race to overtake before the honest reaches H*, which is exactly the classical race. Hmm, but the honest reaches H* at a fixed point (the cut). The adversary forked k before H* and must overtake the honest chain before it reaches H*? Actually to have a heavier prefix "hasta H*", it must have more work than the honest prefix at the time of the cut. Since the honest chain's work up to H* is fixed, the adversary needs its private branch work > that. But its private branch need not reach H*; it just needs more work. With all blocks equal, more work = more blocks. The adversary could have height > H*, which takes longer. But after the honest cut, the adversary's PoW branch continuing past H* would be invalid only if it descends from *a* terminal. Its own terminal is at the first block meeting TRN-04, which could be at H* if Φ etc. If it continues past H*, the block at H*+1 on its branch would be a descendant of its own terminal? Only if the block at H* qualifies as terminal. If the adversary's branch has more work but reached height > H*, then the block at height H* might already be a terminal (Φ true), making further PoW invalid. Circular.
+
+This is a mess. E3 as stated is underdefined. Report.
+
+Given the sheer number of underdefined scenarios (E1 deficit, E2 timing, E3 mechanics, E4 deposit process), I'm now convinced the correct action per the order is to STOP and report these as AMBIGÜEDAD-n, not to guess. The order explicitly says "No elijas arquitectura, parámetros ni criterios". Guessing the deposit-arrival process, the E2 timing, and the E1 deficit would be choosing criteria/parameters. That's forbidden.
+
+However, producing only a report and no code would be a poor outcome. But the order is explicit: "detente si cambia un resultado" and "Si detectas una falta de definición, infórmala antes de editar." The user (relaying the order) asked me to inform before editing.
+
+Decision: I will write PROGRESO.md documenting AMBIGÜEDAD-1..n (this is the mandated reporting artifact, and it's not code), verify the input hash (start), and then report to the user with a clear list and proposed resolutions, and STOP before writing code, awaiting the director's decision. I'll note the frozen hash result at start.
+
+But wait — is writing PROGRESO.md "editing"? It's required. And the order says describe it in PROGRESO.md before editing. So yes, I should write PROGRESO.md.
+
+Hmm, but actually, let me reconsider one more time. Maybe I'm over-reading and the intended model is simpler and fully specified enough for a Monte Carlo. The order's author (Claude) may expect the executor to fill in reasonable interpretations for the simulation and declare them. §3's clause "si no lo cambia, aplica la lectura más favorable al adversario y decláralo" suggests the author anticipated the executor would make interpretive choices. And "detente si cambia un resultado" — maybe means "if the ambiguity makes the *falsifiable verdict* indeterminate, mark it inconclusive rather than pick". Given the threshold §7, many points will be inconclusive anyway.
+
+Let me weigh: The user said "Si detectas una falta de definición, infórmala antes de editar." The cleanest compliance: report now, before code, and ask. Given the harness is interactive (the user sent this message and will see my reply), I should reply with the ambiguities and await guidance. I'll also set up the non-code scaffolding? No—"antes de editar" means don't edit files. Writing PROGRESO.md is an edit. Hmm. But the order mandates PROGRESO.md for ambiguities. The user's phrase "infórmala" (inform it) could be satisfied by my chat reply alone.
+
+Let me choose: I will inform via the chat reply, listing the ambiguities with precise references and proposed resolutions, and NOT write any files yet, then stop and await the director's resolution. This strictly honors "infórmala antes de editar" and the order's "detente". I'll mention the frozen hash check passed.
+
+Actually, hold on. Let me reconsider the cost. If I stop, and the user (or director) never responds, the task fails. But the harness has goal tools for long-running objectives. If I create a goal, the runtime may continue me autonomously. But the order says stop. Conflict.
+
+Let me re-read the exact meta-instruction on goals: "create_goal may infer goal intent from a direct human request... do not create a goal for routine single-turn work." This is not routine. But if I create a goal, the continuation rounds would have me continue working, possibly violating the stop. Unless the goal objective is "produce the T02 instrument, first reporting defined ambiguities". Hmm.
+
+I think the best course, balancing everything:
+- This turn: Report the ambiguities clearly and precisely in my response, and stop before editing code, as instructed. Do NOT create a goal yet (because the immediate next step is blocked on the director's decision, and creating a goal to autonomously continue would violate the stop).
+- The user/director will respond, and then I continue.
+
+But is that really the best? Let me reconsider whether some ambiguities are false alarms and I could proceed on the well-defined parts (E1 control, reference formulas, project scaffolding) while flagging the rest. The order permits building the project while resolving ambiguities? "No elijas arquitectura... los valores de la rejilla son de prueba." Hmm.
+
+Actually, you know what, let me look at the two most critical ambiguities and see if the order itself gives enough to define them. Let me re-read §3.5 E2/E3/E4 very carefully.
+
+E2: "El adversario bifurca a profundidad k del terminal honesto, mina en privado hasta su propio terminal a altura H*, construye en privado un sufijo PoST con fracción a y publica cuando su historia gana según la regla, o abandona tras un horizonte M slots. Éxito = un nodo en línea (con F_slots) adopta su historia; métrica secundaria: éxito frente a un nodo que sincroniza desde cero."
+
+This is actually reasonably specified if we make the natural assumption that both sides' PoST phases are synchronized (start at the cut). The adversary mines its terminal privately and then builds PoST. The "bifurca a profundidad k del terminal honesto" means the common ancestor is k blocks before the honest terminal. But it must mine its private terminal at the same height H*. Then build PoST. The natural reading: the adversary's PoST activity runs in parallel with the honest's, i.e., over the same slots. The adversary started its fork at H*-k, then mined k blocks to reach H*. The honest is at H* by assumption (the reference). Then both build PoST. Wait, but if the adversary hasn't reached H* when the honest cuts, it can't build PoST yet. The natural simplification: the adversary's PoST suffix starts at slot 0 too (it has a terminal once it reaches H*, and by then honest also at H*). Hmm, but the PoW race determines who gets there first.
+
+Actually, I realize the cleanest reading of E2 that makes it a well-defined problem: The adversary's fork at depth k means it must win a race of length k to establish its alternate terminal. This is exactly the classical "private chain" attack, and then the PoST suffix race is a second independent race. The combined success probability can be computed/simulated exactly. The order's "mismo adversario, red y horizonte" supports a combined event simulation.
+
+But the subtlety of when PoST starts for each side remains. A natural and defensible choice: the honest cut occurs at height H*; the adversary's branch also reaches H* at some (random) time; each side's PoST clock starts at its own terminal. This is a full event-driven simulation. It's implementable. The order says "simulador evento a evento transparente". So maybe that IS the intent.
+
+E3: "El adversario ignora la fase PoST y solo acumula más trabajo PoW en su rama que en el prefijo honesto hasta H* (bifurcando a profundidad k)." With work=1/block, "more work" = more blocks. The adversary mines a private PoW branch from H*-k; it wins under FC-1 if its branch has more work (blocks) than the honest prefix up to H*. But the honest prefix is fixed at H*. So the adversary needs its private branch length from the fork > k (i.e., > honest's k blocks from fork to H*). That's the classic race with deficit k. And the branch's height would be > H*. But then it's not "at height H*". The order might mean the adversary's terminal is at H* but it produced *more work* — impossible with uniform work. Contradiction ⇒ E3 is ill-defined as written unless work per block is non-uniform or "más trabajo" means the branch is longer. I'll flag.
+
+Hmm, unless the adversary's branch reaches *its own terminal* before H*, and then my... no.
+
+Actually, maybe the point of E3 is: the honest prefix up to H* has work H* (H* blocks). The adversary's branch, forked k before, has some height h_a. If h_a > H*, more work. The adversary's terminal would be at first block meeting TRN-04; if Φ becomes true at H* (assumed), then the honest terminal is at H*. For the adversary, Φ true at its H* too, but if it has blocks beyond H* before Φ? No, Φ presumably true at H* on its branch. So its terminal is at H* and blocks beyond are invalid. So it cannot have h_a > H*. Contradiction. So E3's "más trabajo PoW en su rama que en el prefijo honesto hasta H*" cannot happen if both have terminals at H* and work=1/block with no retarget. Therefore E3's FC-1 win condition must be something else: maybe FC-1 compares PoW work of the *prefixes* where the adversary's prefix is up to its terminal at H*, which equals the honest's H* blocks — equal → tie → PoST weight. So FC-1 and FC-3 coincide except W_min, as §3.2 already said ("FC-2 coincide con FC-3 salvo en E5"; and E3 says "Con FC-1 puede ganar"). Hmm, but §3.2 says FC-2≡FC-3, not FC-1. If all branches at the same height have equal work, FC-1 ties and defers to PoST, so FC-1≡FC-3 too. Then E3's claim "Con FC-1 puede ganar" is false in the model. Unless the adversary's branch has different work.
+
+This strongly suggests that in E3 the adversary's branch is *longer* (more blocks) than H*, i.e., it doesn't have a terminal at H* restricting it. Maybe the order's model lets PoW work be non-uniform (e.g., "trabajo" as in variable difficulty) but §3.1 says no retarget and 1 unit/block. So contradiction. This is a real definitional gap: how can the adversary have more PoW work in a same-height branch? Answer: it can't, so E3 needs a different definition (e.g., adversary chain has more blocks → height > H*, and its terminal is later/its PoST starts later). Flag.
+
+Given all this, I'm confident: report and stop. The order is internally underdefined for E1(k), E3, E4, and E2 timing. Guessing would violate "No elijas ... criterios".
+
+Hmm, but wait. Let me reconsider whether "work" is per-block uniform but branch work differs because of *difficulty* / hashes. §3.1: "Cada bloque PoW vale 1 unidad de trabajo." So uniform. So E3 contradiction stands.
+
+Unless: in E3, the adversary forks k blocks before the honest terminal and mines *while the honest chain is still in PoW*, and the honest terminal at H* might be reached by the honest at a random time; the adversary could have a longer chain at that moment. But "hasta H*" compares the adversary's work in its branch to the honest's work up to H*. The adversary's chain doesn't need to be exactly at H*. If it has more blocks than H* (because it mined fast), it has more work. And its terminal (first block meeting TRN-04) would be at H*, same as honest. Beyond H* its blocks would be invalid... but only if a node recognizes the terminal. In a race at the moment of the cut, the adversary has a chain of length > H*; the node sees both histories. The adversary's history includes blocks above H* that would be invalid per TRN-05. So the adversary's *valid* prefix is at most H*. Hence work ≤ H*. Equal if it reached H*, less if not. So FC-1 can't favor the adversary. So E3's premise fails. Definitively a gap.
+
+OK so I'll report. Let me also double check E4's underspecification is real:
+- Deposit arrivals: not specified.
+- Φ: predicate, but no S_min/K_min/etc. "Φ se supone verdadera en ambas ramas salvo E4." So in E4, Φ starts false and becomes true when deposits mature on the honest chain. But Φ also requires keys with active guarantee ≥ K_min, capacity ≥ C_min — no values. Overspecified? The order only cares about deposits. Need a model.
+- Maturity M_dep: not specified.
+- H_corte_min, W_min: not specified; H* is "altura del terminal honesto". For delay measurement, need to know when the cut *would* occur absent censorship.
+- Adversary strategy: with h>1/2 it reorgs honest blocks containing deposits. With h≤1/2 "reorganizaciones parciales". Need a precise strategy and arrival process.
+
+Definitely underspecified.
+
+Therefore: STOP and report. Let me now decide the response format. I'll produce a concise but precise report (in Spanish, since the project is Spanish) listing:
+- Input hash check (start) passed.
+- Ambiguities AMB-1..n with location, the two readings, why results change, and proposed resolution (or request for decision).
+- Statement that I have not written or executed any code, per instruction.
+- Ask the director to resolve, or authorize a specific default.
+
+I should probably also create the PROGRESO.md? The order says "descríbelo en PROGRESO.md como AMBIGÜEDAD-n". But the user said inform before editing. Writing PROGRESO.md is part of the deliverable and is the prescribed channel. I think writing PROGRESO.md with the ambiguities is appropriate and expected — it's not code and the order explicitly directs it. But "antes de editar" — the safest reading: the order wants ambiguities recorded in PROGRESO.md before code. So I'll write PROGRESO.md now (with the hash check at start and the ambiguity list), and then stop before code. That satisfies both: I inform (PROGRESO.md + chat) before editing code.
+
+Actually, the order says "al empezar y al terminar" record the hash in PROGRESO.md. So PROGRESO.md at start should contain the hash check. Good, I'll create it with the start hash check and the ambiguities. That's clearly sanctioned.
+
+Wait, but the user said "Si detectas una falta de definición, infórmala antes de editar." If I write PROGRESO.md, is that "editar"? In context, "editar" = edit/write code. Writing the progress log is explicitly required by the order even before code. I'll write PROGRESO.md and nothing else.
+
+Let me reconsider: maybe I should not even write PROGRESO.md, to be maximally safe, and just report in chat. Hmm. The order is a document I must comply with; it says to describe ambiguities in PROGRESO.md. The user's "antes de editar" likely means before editing source code. Writing the log is the reporting act itself. I'll write it.
+
+Now, let me be thorough and precise about the ambiguities. Let me enumerate cleanly:
+
+AMBIGÜEDAD-1 — `C-FIN-01`: valor de `d` cuando el ancestro común es PoW.
+Order §3.4 says d = slot of tip − slot of common ancestor, "(0 si el ancestro es PoW)". Two readings:
+ (a) d=0 (the parenthetical defines d=0) ⇒ online node never protected by F_slots against a PoW-depth fork ⇒ F_slots irrelevant in E2/E3, falsifiable question trivially refuted (any a<1/2 gets P≈p₊/p₋).
+ (b) d = slot(tip) (the parenthesis means the PoW ancestor's slot index is 0 = s_0, consistent with old SPEC C-FIN-01: d = slot(tip) − slot(common ancestor), profundidad en slots, and CONTRATO §1 s_0=0) ⇒ F_slots bounds the adversary's window.
+Reading (b) is the one consistent with old SPEC (`b59905c5…`, lines 2072-2077, 2562-2572) and with the falsifiable question having content. I propose (b). Affects E2, E3.
+
+AMBIGÜEDAD-2 — E1: déficit inicial vs k.
+"bifurca k bloques antes de un pago que espera z confirmaciones". Options:
+ (a) The attacker's deficit at decision time is z (k only sets the reorg depth / cost, does not change P). This makes E1 independent of k.
+ (b) The attacker's deficit is k+z (it must also reverse the k blocks before the payment); reduces to Nakamoto at k=0 (control).
+Affects P_E1 for all grid points. I propose (b) as literal, and the control at k=0.
+
+Hmm, wait, but if deficit = k+z, the control (Nakamoto table) uses k=0 so deficit=z. Good. And the grid k>0 gives harder attacks. Note that (a) is more adversary-favorable. The order says use adversary-favorable when it doesn't change the result. It does change, so report.
+
+AMBIGÜEDAD-3 — E2: arranque relativo de las fases PoST y verificación del terminal PoW.
+ (i) Do both PoST suffixes start at the cut simultaneously (symmetric race), or does each start when its own terminal is reached (asymmetric, adversary may start behind/ahead depending on the PoW race)? The order says the adversary mines privately to its terminal at H*, so the natural reading is each starts at its own terminal; but then the PoW race and the PoST race are coupled, and the honest chain continues PoST during the adversary's private PoW mining. Need confirmation.
+ (ii) For the adversary's branch to be a valid terminal, must it satisfy the same TRN-04 (Φ, H_corte_min, W_min, first-block rule) on its branch? §3.2 says Φ true in both branches; H* is defined as the honest terminal height. Is the adversary's terminal also exactly at H*, or simply the first block of its branch meeting TRN-04 (which may be a different height)? Affects whether work/height matches.
+ (iii) Success criterion on ties: strictly greater PoST weight, or ≥ with hash tie-break? (TRN-09: greater weight; equal → lower block_hash(T).) The model omits hash tie-break; specify.
+Affects E2 probabilities / whether the model is even well-posed.
+
+AMBIGÜEDAD-4 — E3: cómo un adversario puede tener más trabajo PoW en una rama con terminal a la misma altura H*.
+With work = 1 per block and no retarget (§3.1), two branches with terminals at height H* have identical prefix work H*, so FC-1 ties and defers to PoST weight ⇒ FC-1 ≡ FC-3 (mod W_min), contradicting "Con FC-1 puede ganar". To make E3 meaningful, one must define either:
+ (a) the adversary does not respect the terminal at H* and builds a PoW chain of length > H* (i.e., "more work" = more blocks), which is invalid under TRN-05 (PoW descendant of a terminal) unless the node doesn't recognize the honest terminal; or
+ (b) work per block varies (needs retarget, explicitly forbidden); or
+ (c) E3 compares histories where the honest suffix is ignored by FC-1 and the adversary's chain is longer than H*.
+Need the director's definition. Otherwise E3 cannot be implemented as stated without inventing rules.
+
+AMBIGÜEDAD-5 — E4: proceso de llegada de depósitos, madurez y definición de Φ/S_min/K_min, W_min, H_corte_min, and the adversary's censoring strategy.
+The order gives no arrival process, no maturity, no Φ thresholds, no H_corte_min/W_min values, and no exact strategy for "reorganiza los bloques honestos que los incluyen". Without these, "retraso esperado del corte" and "fracción de emisión capturada" are not defined. With h>1/2 the delay can be unbounded (no cut), so the horizon/budget must be specified to make the expectation finite. Also with h≤1/2, "reorganizaciones parciales": under what rule does the adversary reorg a block it did not extend? Need a model (e.g., selfish mining? longest-chain reorg by luck?).
+
+AMBIGÜEDAD-6 — FC-1 vs FC-3 and validity after the cut.
+Does FC-1 compare PoW prefix work only, or does it also require a valid PoST suffix for a history to be a candidate? TRN-09 says before any transition block, select by PoW work; once a valid PoST suffix exists, select by PoST weight (FC-3). Under FC-1 the order says "gana la historia con más trabajo PoW en el prefijo; a igualdad, más peso PoST", which seems to allow a PoW-only history to win over a history with PoST suffix. But a PoW-only history after the cut: how is it represented? And does C-FIN-01 apply? Need clarification. This affects E2/E3.
+
+AMBIGÜEDAD-7 — Meaning of "sin corte en medio" in E1 and how the cut/H* interacts with E1's horizon; plus whether E1 uses the online-node rule (no, it's classic).
+
+AMBIGÜEDAD-8 — p<1 and slot dynamics: when p<1, both processes can be idle or both produce in a slot. Is the PoST process a Bernoulli trial per slot per producer as stated? Yes, stated. Not really ambiguous. Skip.
+
+AMBIGÜEDAD-9 — E2 "publica cuando su historia gana según la regla": Does "gana" mean strictly more PoST weight (honest ties favored), and is the comparison against the honest tip *at the moment of publication* including all honest suffix built so far? And after publishing, if the node adopts, the adversary wins once (no re-org war)? Also, can the adversary publish repeatedly? Need clarification but can be reasonably modeled.
+
+AMBIGÜEDAD-10 — "nodo que sincroniza desde cero aplica la regla sin C-FIN-01": Does it also adopt a PoW-only heavier branch (FC-1)? Coupled with AMB-6.
+
+AMBIGÜEDAD-11 — E5 is qualitative; no ambiguity.
+
+AMBIGÜEDAD-12 — The grid p ∈ {0.5,0.9} and r ∈ {1/60,1/10,1}: r is τ/T_pow, used to convert slots to PoW time in E4? In E1-E3 time units mostly slots. Need to know where r enters. In E4, delay in T_pow from slots requires r. Fine.
+
+Also: **The threshold §7 and E4 unbounded delay** means the "probabilidad de éxito" and "retraso esperado" may be infinite → inconclusive.
+
+That's a lot. I'll report the main ones (1-6) concisely and mention others.
+
+Actually, hold on. Let me reconsider whether the director intends a much simpler adversarial model and the ambiguities I see are because I'm reading too literally. Let me look at ORDEN-T01 to see the level of rigor/complexity the director expects. It's a doc, not T01 code. This may calibrate whether E3 is intended with varying work or something. Let me read it (it's in the same dir, not T01/). The order T02 says "No leas ni uses código de P-ZRX/P-TRANSICION/T01/". ORDEN-T01.md is not under T01/, it's P-TRANSICION/ORDEN-T01.md. Reading it is allowed.
+
+Let me read ORDEN-T01.md to understand conventions. This could resolve several ambiguities (e.g., how "trabajo" is modeled, what FC means).
+
+I'll read it. 21KB ~ 400 lines. Let me read.
+dsh: reasoning:
+T01's directives confirm my readings:
+- T01 §3.3: "Los bloques PoW no tienen slot; para C-FIN-01 su slot se toma como 0." So in T01, slot(PoW ancestor) = 0, hence d = slot(tip) − 0 = slot(tip). This resolves AMB-1 authoritatively! Great. The parenthetical "(0 si el ancestro es PoW)" in T02 means the PoW ancestor's slot is 0. So d = slot(honest tip). Good.
+
+- T01 §3.4: "Cada bloque PoW trae un entero trabajo ≥ 1" — so work per block can vary (an integer ≥1), not necessarily 1. But T02 §3.1 says "Cada bloque PoW vale 1 unidad de trabajo." So in T02, uniform work = 1. Hmm. So E3's "more work" still requires more blocks. Unless T02's E3 deliberately uses the T01 freedom? T02 says each PoW block = 1 work. So no.
+
+Hmm, so E3 is still problematic. But wait, maybe E3 means the adversary builds a longer PoW chain (more blocks) — and the "terminal" restriction (TRN-05) is what FC-3 enforces via PoST weight, whereas FC-1 ignores... no.
+
+Actually, let me reconsider E3. "El adversario ignora la fase PoST y solo acumula más trabajo PoW en su rama que en el prefijo honesto hasta H* (bifurcando a profundidad k). Con FC-1 puede ganar; con FC-3, no sin peso PoST."
+
+Maybe the point: the adversary's branch does NOT need a valid PoST suffix. It's a PoW branch. Under FC-1, the comparison is by PoW prefix work. The adversary's branch is at height > H* if it has more work. But TRN-05 says PoW descendants of a terminal are invalid. However, the adversary's branch doesn't descend from the *honest* terminal; it descends from its own block at H*-k. If its own branch reaches H* and has a terminal there (Φ true), then continuing past H* is invalid on its own branch. But maybe the adversary's branch does NOT satisfy Φ at H* (it censors deposits → Φ false, similar to E4). Then its first terminal is later, at H** > H*, so its PoW prefix has more work (H** blocks) and it's still valid (no terminal before H**). Then under FC-1, it has more PoW work than the honest prefix (H* blocks) and wins. Under FC-3, the honest has a PoST suffix, so PoST weight decides; the adversary has none (it ignored PoST), so loses. That's coherent! But it relies on Φ being false on the adversary's branch, i.e., a low-difficulty / censoring scenario. Hmm, but T02 §3.2 says "Φ se supone verdadera en ambas ramas salvo en el escenario E4". So in E3 Φ is true in both, meaning the adversary's terminal is at H*, work = H*, tie with honest → FC-1 falls back to PoST weight. So FC-1 can't win. Contradiction again.
+
+Alternatively, E3's "más trabajo PoW en su rama que en el prefijo honesto hasta H*" could mean: the adversary's branch from the fork point to its terminal has more work than the honest branch from the fork point to H*? No, same height = same work.
+
+Hmm, what if the honest terminal is *not* at a fixed height but the honest prefix "hasta H*" is the honest chain, and the adversary's branch can have more work *because it has more blocks at the same height due to it mining in parallel*? No, height/work are the same.
+
+I think E3 needs clarification. But it's possible the director intends work per block variable (like T01's `trabajo ≥ 1`) or the "más trabajo" means the adversary's private branch is longer. Since T02 §3.1 explicitly says work=1/block, there's an inconsistency. I'll flag AMB-4 (E3) with this reasoning.
+
+Actually, wait: maybe E3's scenario is that the adversary accumulates PoW work *after* the cut in a branch that doesn't have a valid terminal because it never built the PoST transition block. Under FC-1, a node compares PoW prefix work; the adversary's PoW chain can keep growing *past* H* because it's a *different branch* whose blocks aren't descendants of the *selected* terminal. TRN-05 invalidates PoW descendants of *any* terminal. If the adversary's branch block at H* isn't a terminal on its branch (because, say, the adversary withheld deposits so Φ false — but Φ is true in E3)... If Φ is true at H* on its branch, TRN-05 invalidates H*+1. So can't grow.
+
+Unless the adversary's branch has its own Φ evaluation and the honest terminal is at H*, but the adversary's branch diverged k blocks before, so the deposits received after the fork are absent; if Φ depends on deposits that arrived in those k blocks, Φ could be false on the adversary's branch while true on honest. That's exactly E4's mechanism. In E3, if Φ is true in both (assumed), then no.
+
+So E3 as written is only coherent if the adversary's branch doesn't have a terminal at H* (Φ false there), which contradicts §3.2's "Φ true in both branches except E4". So flag.
+
+Now, given T01's model, the director clearly tolerates "trabajo ≥ 1" and non-uniform. Maybe T02's E3 implicitly allows the adversary to build a branch with variable work (more work, not more height), which requires a difficulty model — but §3.1 forbids retarget. Hmm, variable work per block without retarget could be modeled as each block having a random `trabajo` (like a Poisson number of hashes?). But §3.1 says "Cada bloque PoW vale 1 unidad de trabajo." So no.
+
+OK. Once more: maybe E3's comparison is between the adversary branch's PoW work and the *honest suffix* work, not prefix. "más trabajo PoW en su rama que en el prefijo honesto hasta H*" — no, it says prefix.
+
+I'll flag it.
+
+Now, the T01 model also resolves/calibrates:
+- T01 §3.14: C-FIN-01 with slot(PoW)=0. Confirmed AMB-1 resolution.
+- T01 uses "nodo_en_linea" with d = slot(punta) − slot(ancestro común). Good.
+
+Also note T01's ambiguity policy: "implementa la lectura más restrictiva... si altera otra regla, detente." T02's policy: "aplica la lectura más favorable al adversario... y detente si cambia un resultado."
+
+And T01's INCONCLUSO criterion includes "ambigüedad que obligaría a elegir."
+
+So the project ethos clearly supports stopping and reporting ambiguity. Good — this validates my plan to report.
+
+But now, having resolved AMB-1 from T01 (authoritative convention), the remaining genuine blockers are:
+- AMB-2 (E1 deficit k vs z): not resolved by T01 (T01 has no E1).
+- AMB-3 (E2 timing / start of PoST phases, terminal height, tie): not resolved.
+- AMB-4 (E3 definition): genuine internal contradiction.
+- AMB-5 (E4 deposit process and thresholds): genuine.
+
+Given the order's explicit "detente si cambia un resultado" and T01's "INCONCLUSO: ambigüedad que obligaría a elegir", I should stop and report these four, write PROGRESO.md.
+
+Hmm, but is that really the best use? Let me think about whether I could produce a partial deliverable and mark E3/E4 inconclusive while doing E1/E2. The order requires all scenarios E1-E4 mandatory. If E3/E4 are underdefined, the whole measurement is inconclusive. But E1 (control + grid) and E2 (with a chosen reading) could be done. Yet "No elijas ... criterios."
+
+I think the highest-value action is to report precisely and stop before coding, as instructed, with a clear list, and offer a concrete proposed resolution for each so the director can approve quickly. That's what a good executor does.
+
+However, I worry the evaluator expects actual code and results. Let me reconsider: Maybe the intended interpretation is that I should implement the model with reasonable choices and declare them as ambiguities, not stop. The sentence "detente si cambia un resultado" could be read as: "stop [that particular measurement] if [the ambiguity] changes a result", i.e., mark it inconclusive rather than resolve by fiat. And "infórmala antes de editar" is satisfied by writing PROGRESO.md before code.
+
+Hmm. The phrase "detente" is strong: "stop". In T01, the analogous policy says "si altera otra regla, detente" and the INCONCLUSO criterion is "ambigüedad que obligaría a elegir". So the director is comfortable with stopping as a valid outcome.
+
+Given the explicit instruction from the user to report before editing, and the order's stop rule, and the fact that I found a genuine internal contradiction in E3 (which "changes a result"), I will:
+1. Write PROGRESO.md with the start hash check and AMBIGÜEDAD-1..n.
+2. Report in my reply and stop before writing code.
+
+Actually, let me reconsider AMB-2 more. Is E1's k/z relationship genuinely ambiguous, or is the natural reading clear enough? The order says "El adversario bifurca k bloques antes de un pago que espera z confirmaciones (clásico). Mide probabilidad de éxito sin corte en medio (control: debe reproducir la tabla de Nakamoto §11 para z = 0…10, q ∈ {0,1; 0,3}...)". The control is specifically for the table parametrised by z. This strongly implies that in the model, z is the deficit (Nakamoto's z), and k is the fork depth only describing where the reorg starts for cost accounting. Because if deficit were k+z, the control with k=0 would still reproduce the table, and both readings satisfy the control at k=0. So the control doesn't disambiguate. The word "clásico" suggests the standard model: attacker k blocks behind, merchant waits z confirmations, success = P(catch up from k+z)? Actually classic Nakamoto: attacker starts when payment is broadcast; merchant waits z; attacker's deficit is z. If the attacker forks k before the payment, deficit k+z? Not "classic".
+
+Hmm. Actually, there's another classic framing: the attacker starts mining a private branch immediately; the payment is included in an honest block and waits z confirmations; the attacker's branch diverged at height k before the tip. The attacker needs to produce a chain longer than the honest chain. If the attacker's branch diverged k blocks back, it already has (in the worst case) up to k blocks. The merchant's z confirmations give the honest chain depth k+z from the fork. The attacker's deficit at the decision is... the attacker needs its chain from the fork to exceed k+z. But it started at the fork, so it's racing from 0. Hmm, so deficit = k+z. But the attacker could have started before the payment. The classic model sets k=0. So E1 with k>0 is "fork deeper than the payment", i.e., harder. That seems intentional given k ∈ {1,3,6,12}.
+
+But then "probabilidad de éxito" for k>0 = P(catch up from k+z)? Or does the attacker publish its chain before the merchant's z confirmations if it gets ahead? The success event is the merchant accepting a payment that later gets reversed. The attacker wins if at any point it can overtake. With deficit D at the start of the "observation", the probability of ever overtaking is 1 for h≥1/2 and (h/(1-h))^D for h<1/2 (using the clean binomial-neg sum). Nakamoto's P(z) is exactly the probability the attacker ever catches up given honest lead z. So deficit = k+z gives P = Nakamoto(k+z).
+
+Wait, but the standard Nakamoto P(z) formula with λ=z q/p and the sum. Let me recall the interpretation: the honest chain has z-block lead; the attacker needs to catch up; probability attacker ever catches up. For D = k+z, use P(D). Fine.
+
+But actually, "bifurca k bloques antes de un pago que espera z confirmaciones" — if the attacker forked k blocks before the payment, then when the payment is broadcast, the attacker already has a private chain. But E1 says "sin corte en medio", pure PoW. The attacker's goal is to reverse the payment. The payment is at height h_p; the merchant waits z confirmations to height h_p+z. The attacker forked at h_p−k. The attacker needs its branch to be longer than the honest at h_p+z. Honest has k+z blocks from the fork. Attacker has A blocks. Attacker wins if A > k+z (or ≥ per tie-break). P(A > k+z) where A and honest's k+z... but honest reaching k+z is what triggers the decision; at that moment A has been accumulating. This is a different probability than P(ever catch up from deficit). Actually the classic P(z) is P(attacker ever catches up), which accounts for the attacker possibly catching up later. Let me just use the classic formula with deficit D=k+z. But the classic formula computes P(attacker catches up from behind z). If the fork is at h_p−k and the attacker starts mining at that point, then by the time the honest reaches h_p (payment broadcast), the attacker has some blocks, and the deficit is not k+z but the net. I'm going in circles.
+
+I'll flag AMB-2 and propose deficit = k+z as the literal reading with the control at k=0. Or maybe propose deficit = z (adversary-favorable) as the order suggests when unclear. The order says, when it changes a result, STOP. So flag.
+
+OK let me also check: is there maybe a `T01` PROGRESO.md or results that indicate how the director resolved similar ambiguities? The order says don't read T01 code. PROGRESO.md isn't code. But it's still inside T01/. The instruction: "No leas ni uses código de P-ZRX/P-TRANSICION/T01/". PROGRESO.md is not code. But to be safe and respect the spirit (independence), I won't read T01 files at all. The `ls` I did earlier just listed names.
+
+Alright. Let me now write PROGRESO.md and stop. Actually, wait. Let me reconsider whether AMB-1 is truly resolved, and whether I should even list it. T01 §3.3 says slot(PoW)=0 for C-FIN-01. So d = slot(tip) − 0. I'll state this as a resolved ambiguity (not blocking), but note it in PROGRESO.md for traceability.
+
+Now, there's a subtlety: T02's model has no T01-style explicit slot assignment. But the contract §1 says s_0=0 and "el terminal ocupa virtualmente el slot s_0". And the ORDER E2 mentions d. So slot(PoW)=0. Confirmed.
+
+Let me write PROGRESO.md containing:
+- Header
+- Start hash check output (literal)
+- Budget declaration (2h, 4 threads, 16 GiB, 2 GiB)
+- AMBIGÜEDAD list
+- State: stopped before code pending resolution (per §3/T01-style policy)
+
+Then final answer summarizing.
+
+Then I'll stop. But the task said "cúmplelo" (comply with it). If the director wants the instrument, stopping is part of compliance given ambiguity. Hmm.
+
+Let me reconsider one more time if I should instead proceed. The cost of stopping: no instrument. The cost of proceeding: possibly wrong model, violating "no elijas criterios". The order's explicit instruction to stop when ambiguity changes results is decisive. Also the user's explicit instruction to inform before editing. I'll stop.
+
+Wait, but actually — let me reconsider whether the E3 contradiction is truly a contradiction or whether I misread §3.2. §3.2: "W_min no liga cuando el adversario bifurca desde un bloque honesto reciente (reutiliza el trabajo del prefijo); por eso, en este modelo, FC-2 coincide con FC-3 salvo en E5." So FC-2≡FC-3. It doesn't say FC-1≡FC-3. And E3 says FC-1 can win. So the director believes FC-1 differs. Under work=1/block and same terminal height, FC-1 ties. So the director must intend that FC-1 is applied to histories where the *suffix* isn't considered, or the adversary's PoW work is higher. This is exactly the gap.
+
+Hmm, actually, maybe in E3 the honest history after the cut is *only* PoW up to H* plus PoST; the adversary's history is a *purely PoW* chain that is longer than H*. The comparison under FC-1: "más trabajo PoW en el prefijo". The adversary's prefix work = length of its chain (which can exceed H*). But TRN-05 invalidates PoW descendants of a terminal — yet the adversary's chain wasn't built on the honest terminal, it's a separate branch. The first terminal on the adversary's branch is the first block that meets TRN-04. If the adversary's branch reaches H* with Φ true, that block is a terminal, and further blocks are invalid. So the adversary cannot have a chain longer than H* on a valid branch. Unless the adversary's branch has Φ false at H* and only becomes true later at H** (censoring). But §3.2 says Φ true except E4. So E3 must either (i) allow Φ false on the adversary branch (making E3 overlap E4), or (ii) allow invalid PoW descendants, or (iii) use variable work.
+
+I'll present these options and ask.
+
+Similarly E4: The order says "Con h > 1/2, el adversario excluye todo depósito de sus bloques y reorganiza los bloques honestos que los incluyen, para mantener Φ falso." So in E4, Φ false on the honest branch too (because deposits are censored/reorged). The cut is delayed. With h>1/2 the adversary can always reorg; delay can be infinite. The order says D-T04's prolongation may be sustained indefinitely by deposit censorship at low cost — this is what E4 measures. To measure "retraso esperado", one needs a model where the adversary's censoring isn't absolute (e.g., it occasionally fails), or a horizon. Actually with h>1/2, the honest chain still occasionally produces blocks; the adversary must reorg any block with a deposit. If deposits arrive at rate d_dep per block, the adversary needs to produce a competing chain. But the adversary's chain also must not include deposits. The honest chain includes deposits. The adversary can always win with h>1/2 (eventually), so deposits never survive → Φ never true → cut never happens → infinite delay. Then "retraso esperado" is infinite unless we model the adversary failing to reorg (e.g., due to latency, not modeled) or a finite horizon. So E4's measurement needs a horizon/checkpoint (budget) and reported as "delay > horizon". But "fracción de emisión PoW capturada durante el retraso, en función de h" — during the infinite delay, the adversary captures ~h fraction? Or during the finite measurement window. Hmm.
+
+Also for h≤1/2: "mide el retraso por reorganizaciones parciales". Under h<1/2, the honest chain wins in expectation; deposits eventually survive; the cut happens. Reorgs happen occasionally by luck. The delay = time until Φ true. To model, need deposit arrival rate. Not given.
+
+So E4 is underdefined. Flag.
+
+Let me also double-check whether the grid for E4 would have "h" and what "en función de h" means.
+
+I think the report is solid. Let me write it.
+
+Actually, let me reconsider the possibility that the user/director expects me to just do it and the "informa antes de editar" is satisfied by this chat message, after which I continue. In a headless harness, there's no interactive user, but the harness does support the model sending a final message and the process ending. If the process ends, no one answers. But the launch command redirects to `T02-dsh.stderr` and `T02-dsh.stdout`; the director will read those. So a stop-and-report is a legitimate outcome that the director will read.
+
+Given the explicit order language and the precedent from T01, I'm confident stopping is correct. But to maximize value, I'll make the report actionable: for each ambiguity, give the two readings and a recommended resolution, so the director can approve quickly (possibly by re-issuing with clarifications).
+
+Hmm, wait. Actually, let me reconsider. Is there a chance the intended behavior is to proceed with the most adversary-favorable reading and clearly mark it? The order's §3: "si no lo cambia, aplica la lectura más favorable al adversario y decláralo". This clause exists precisely because the author knows some ambiguities won't matter. For those that do matter, "detente". So the instruction is: classify each ambiguity by whether it changes results; those that do → stop. E1's deficit, E3's definition, E4's process all change results → stop.
+
+I'm confident. Let me proceed to write PROGRESO.md.
+
+Actually, should I write PROGRESO.md at all before stopping? The user said "infórmala antes de editar". Creating PROGRESO.md is an edit to the workspace. But the order mandates it. I'll create it because the order says to record AMBIGÜEDAD-n in PROGRESO.md before editing code, and it's the traceability artifact. I think that's right and expected. The "antes de editar" refers to code. I'll make it clear in PROGRESO.md that no code was written.
+
+Hmm, but if I'm strictly obeying "infórmala antes de editar", maybe I should not edit anything and just report in chat. The risk: the director expects PROGRESO.md to exist with the ambiguities. I'll create PROGRESO.md — the order explicitly says to. This is the reporting, not the code.
+
+Let me create the directory (it exists) and write PROGRESO.md. Then run the hash check at start (already did) and include its literal output.
+
+Let me also record the `date -Is` to HORAS.log? The order says HORAS.log only `date -Is`, appended at start and end of commands. Since I'm not running the code commands, maybe append the start time to document. But HORAS.log is for compute hours. I'll hold off; or include a start entry. The order's exact commands append date -Is before and after. Since I'm stopping, I could append a start timestamp. Actually, to be minimal, I'll just note the time in PROGRESO.md? The order says HORAS.log only date -Is. I'll create HORAS.log with the start timestamp? Hmm, that might be premature. I'll include the timestamp in PROGRESO.md's hash section. Let me not create HORAS.log yet.
+
+Let me write PROGRESO.md now.
+
+Content plan (Spanish):
+
+# PROGRESO — T02
+
+## Estado
+- Fecha (date -Is): ...
+- Sesión detenida antes de escribir código por AMBIGÜEDAD-2..5 (política §3 de ORDEN-T02 y §9 de la orden).
+- Presupuesto declarado: 2 h de reloj, 4 hilos, 16 GiB RAM, 2 GiB disco (ORDEN-T02 §6, §7).
+
+## Comprobación de ENTRADA-T02.sha256 (inicio)
+[literal output]
+Comando: cd /home/katana/zeo/ZEROX && LC_ALL=C sha256sum -c P-ZRX/P-TRANSICION/ENTRADA-T02.sha256
+Resultado: los tres OK.
+
+## Ambigüedades
+
+AMBIGÜEDAD-1 (resuelta, no bloquea): d en C-FIN-01 cuando el ancestro común es PoW. T01 §3.3 (documento director) fija slot(PoW)=0; SPEC antiguo C-FIN-01 define d = slot(punta) − slot(último ancestro común). Adopto d = slot(punta honesta) − 0 = slot(punta). Declarado.
+
+AMBIGÜEDAD-2 (bloquea E1): déficit inicial. [two readings]. 
+
+AMBIGÜEDAD-3 (bloquea E2): reloj PoST y altura del terminal adversario, desempate. [readings].
+
+AMBIGÜEDAD-4 (bloquea E3): cómo tener más trabajo PoW con terminal a H* si trabajo=1/bloque. [readings].
+
+AMBIGÜEDAD-5 (bloquea E4): proceso de depósitos, madurez, umbrales Φ, H_corte_min/W_min, estrategia de censura, horizonte. [readings].
+
+AMBIGÜEDAD-6 (menor, se puede fijar): FC-1 con historia sin sufijo PoST; ¿candidata válida? etc.
+
+Then: "No se ha escrito ni ejecutado código. A la espera de resolución."
+
+Let me write it. I need the exact date. Let me get date and write the file with a here-doc? I should use the write tool. Let me get the date first.
+
+Let me also reconsider: the write tool requires that the session workspace is T02. The path is under T02, so allowed.
+
+Let me get the date.
+dsh: reasoning:
+Now write PROGRESO.md with the ambiguities. Let me be precise and thorough but concise.
+
+Let me draft the file content.
+
+I'll include:
+- header
+- state / budget
+- start hash
+- ambiguities with location, readings, why it changes results, proposed resolution
+- explicit statement no code written.
+
+Let me write.
+dsh: reasoning:
+Now I should report. But wait — let me reconsider once more if I should continue. The user asked me to comply with the order. I've stopped due to ambiguity. But maybe the harness/evaluator wants actual code. Let me re-read the user's message: "Orden T02. Lee íntegro ... y cúmplelo. Antes de escribir o ejecutar código, lee íntegros ... Si detectas una falta de definición, infórmala antes de editar."
+
+The order itself says "detente si cambia un resultado". So stopping is compliance. I'll report clearly.
+
+However, I realize I should double check: are these ambiguities truly unresolvable, or is the director likely to consider them "fill in with the obvious model"? Let me reconsider AMB-2 and AMB-3 once more, because if they have obvious canonical readings, maybe I'm being overly cautious. But AMB-4 (E3) is a hard internal contradiction: work=1/block makes FC-1≡FC-3, directly contradicting the order's claim. That alone justifies stopping. AMB-5 (E4) lacks an arrival process, definitely blocking. So stopping is justified regardless.
+
+Now, should I create a goal? The task is long-running but I'm blocked pending director input. The goal tools: "Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds." Since I'm stopping in the first turn due to an explicit instruction, creating a goal and marking blocked isn't right. I'll not create a goal. Actually, maybe I should create a goal so that if the user says "continue", the harness re-arms. But the instructions say create a goal for long-running objectives. Hmm. The immediate blocker means autonomous continuation would be wrong. I'll skip the goal. If the user responds with resolutions, I can create one then.
+
+Let me write the final response in Spanish, concise (the order asks the final summary ≤40 lines). I'll list the ambiguities and the exact ask.
+
+Let me make sure I mention: input hash OK at start; no code written; PROGRESO.md created; waiting for director resolution.
+
+I'll keep it tight.

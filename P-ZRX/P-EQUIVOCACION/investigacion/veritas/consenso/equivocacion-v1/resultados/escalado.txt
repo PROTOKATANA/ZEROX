@@ -1,3 +1,0 @@
-hilos=1 celdas=384 pared=0.1751 s slots=5256 kappa_flujo_global=0.764079
-hilos=2 celdas=384 pared=0.1162 s slots=5256 kappa_flujo_global=0.764079
-hilos=4 celdas=384 pared=0.0656 s slots=5256 kappa_flujo_global=0.764079

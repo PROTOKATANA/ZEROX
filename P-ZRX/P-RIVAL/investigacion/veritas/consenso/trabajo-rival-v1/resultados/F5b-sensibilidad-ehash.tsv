@@ -1,7 +1,0 @@
-e_hash (J/hash)	θ	razón PoW/espacio	escenario
-8.20e-07	0.10	3.439e-01	CPU: 1,82e7 hash/s por hilo (medido en el repo) × 15 W/hilo (supuesto)
-8.20e-07	0.50	3.095e+00	CPU: 1,82e7 hash/s por hilo (medido en el repo) × 15 W/hilo (supuesto)
-8.20e-09	0.10	3.439e-03	GPU/ASIC intermedio (supuesto)
-8.20e-09	0.50	3.095e-02	GPU/ASIC intermedio (supuesto)
-8.20e-11	0.10	3.439e-05	ASIC (supuesto)
-8.20e-11	0.50	3.095e-04	ASIC (supuesto)

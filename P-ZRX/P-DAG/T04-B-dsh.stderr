@@ -1,0 +1,1206 @@
+dsh: reasoning:
+Let me start by reading the required files.
+dsh: reasoning:
+Let me explore the T04 directory to understand the current state.
+dsh: reasoning:
+No T01 directory under P-DAG. The order says "T04 includes T01's module by include". Let me find where T01 is.
+dsh: reasoning:
+Let me read the CONTRATO-ESTADO-DAG-v0.md fully, and the T01 module (Transicion), and T04's EstadoDAG.jl, modelo.jl, etc. Also read the METODO.md. Let me check where T01 is and its module.
+
+Let me read the key files. Start with the contract and METODO.
+dsh: reasoning:
+Now let me look at the T01 module and T04's EstadoDAG.jl. The key question: F-15 requires nonce per guarantee key. T01 has been updated (T01-D). Let me look at T01's source.
+dsh: reasoning:
+The frozen input verifies. Now let me read T01-Progreso T01-D section and the Transicion.jl to understand the nonce implementation. Let me look at the key parts. First check the T01 INFORME T01-D section, and search for nonce in Transicion.jl.
+dsh: reasoning:
+Now I understand. T01-D implements F-15 nonce per guarantee key. T04 includes T01's Transicion.jl and uses it. T04-B requires:
+
+1. Don't change semantics of T01 or T04 except what F-15 requires in fusion mode: an operation with nonce different from expected is discarded with reason `ErrNonce`.
+2. New directed cases: 
+   - Same withdrawal operation in two sibling fused blocks (first applies in C-GD-05; second discarded).
+   - Two operations of same key with nonces `n` and `n+1` in sibling blocks in reverse C-GD-05 order (the `n+1` is discarded if applied first).
+   - Repetition after a reorganization.
+3. Re-export `resultados/vectores-estado-dag-v0.1.txt` with T04 format plus `nonce=` in TX lines of deposit, withdrawal, and liberation and in GAR; `.sha256` in sha256sum format; independent re-read with 0 discrepancies. Keep v0 files.
+4. `Pkg.test()` and `run.jl --seed 0x5a5a --replicas 200` pass again.
+
+Budget 1h30, 1 thread, 8 GiB. Prohibited Python. Section "T04-B" in INFORME.md and PROGRESO.md; HORAS.log. DeepSeek deepseek-flash effort high; LINEO; nothing outside T04/; no commit/push; no secrets. Frozen input P-ZRX/P-DAG/ENTRADA-T04-B.sha256.
+
+Now I need to understand the T04 code deeply. Let me read EstadoDAG.jl, exportar.jl, lector_vectores.jl, run.jl, test/runtests.jl, dirigidos.jl, and the T01 Transicion.jl relevant parts.
+
+Since T01 is included read-only, the F-15 nonce is already in the T01 module. T04's fusion mode must now handle ErrNonce by discarding. Currently T04's fusion mode probably catches any error and discards. Let me check.
+
+Let me read EstadoDAG.jl (26KB, ~700 lines).
+dsh: reasoning:
+Now let me look at the aplicacion: the fusion mode applies `aplicar_tx!` and checks `r isa Err` then pushes desc. Since `ErrNonce` is a subtype of Err presumably, it will be discarded automatically. But there's a subtlety: F-15 says in fusion mode a nonce mismatch is discarded. This already happens generically. But the order says "an operation with nonce different from expected is discarded with reason ErrNonce (contract DAG §3, row of transactions that don't validate)."
+
+Wait, there might be a subtlety: In `aplicar_tx!`, does the nonce check happen before or after other checks? In T01-D, `comprobar_nonce!` goes first. So ErrNonce would be returned first. Good.
+
+But there might be a bug: T04's `aplicar_bloque_fusion!` for transferencia does its own pre-checks and calls `aplicar_transferencia!`. For v2 operations (deposito/retiro/liberacion) it goes to the `else` branch and calls `aplicar_tx!`. Good.
+
+Now, the issue: the T01 `Estado` struct changed to include `nonce_siguiente` and `Tx` includes `nonce`. `Transicion.clonar` copies it. Good. T04's fields referencing `Transicion.Tx[]` etc. should still work.
+
+But T04 may have specific code that constructs guarantee transactions without nonce, or reads fields. Let me look at the generator files and exportar/lector to see if they need nonce updates.
+
+Also, the key: T04's `estado_past!` currently ignores the returned desc from `aplicar_bloque_fusion!`:
+```
+base, _ = aplicar_bloque_fusion!(A, base, xb, b.slot)
+```
+So discards are dropped. That's fine for state but perhaps should record descartes? The current design stores descartes only for post. Actually `A.descartes[b.id]` stores desc for the block b applied. But `estado_past!` discards the mergeset desc. That's pre-existing.
+
+The order says re-export vectors with `nonce=` in TX lines of deposit, withdrawal, and liberation and in `GAR`. Let me look at exportar.jl and lector_vectores.jl to understand format.
+
+Let me read the remaining T04 files: exportar.jl, src/lector_vectores.jl, run.jl, test/runtests.jl, src/dirigidos.jl, src/propiedades.jl, src/generadores.jl, src/revalidacion_gdr.jl, src/modelo.jl, src/referencia.jl, src/GDR.jl.
+
+Let me read them in parallel batches.
+dsh: reasoning:
+Now I see the places to update:
+- `exportar.jl`: `tx_str` must add `nonce=` to TX lines (for Deposito/Retiro/Liberacion; also maybe all TX lines). The order says "`nonce=` en las líneas `TX` de depósito, retiro y liberación y en `GAR`". So add nonce field only for v2 guarantee tx? Actually simpler: add `nonce=` to all TX lines. But the order says specifically deposit/withdrawal/liberation. Since Tx struct now has a `nonce` field for all tx (0 in rest). Let me check T01 `Tx` layout to confirm. Add `nonce=` for those types. Also `GAR` lines must include nonce (nonce_siguiente). 
+- `lector_vectores.jl`: parse `nonce=` and pass to tx constructors; reconstruct GAR with nonce.
+- `run.jl`, tests, dirigidos: need to handle nonce correctly, add new directed cases.
+
+Let me read T01 Transicion.jl relevant parts and the rest of T04 files. Let me read the T01 Tx struct and constructors, aplicar_deposito/retiro/liberacion, Garantia struct, clonar, promover, representacion_canonica, and how nonce is checked.
+dsh: reasoning:
+Let me read the deposit/retiro/liberacion functions in Transicion.jl (around 480-560).
+dsh: reasoning:
+Now let me see the representacion_canonica and nonce representation in T01, to know format for GAR lines. Line 901 had `g.nonce_siguiente`. Let me read around 880-929.
+dsh: reasoning:
+Now I understand the nonce representation. Let me now read the T04 remaining files: run.jl, test/runtests.jl, src/dirigidos.jl, src/propiedades.jl, src/generadores.jl, src/revalidacion_gdr.jl. These are important to update/verify.
+dsh: reasoning:
+Now let me read run.jl, propiedades.jl, generadores.jl, revalidacion_gdr.jl. Also I need to check what "Pkg.test()" means — there's a test/runtests.jl and Project.toml; maybe there's tests entry. Let me check Project.toml.
+dsh: reasoning:
+Now let me read generadores.jl and revalidacion_gdr.jl, plus Project.toml. Also check HORAS.log format.
+dsh: reasoning:
+Now I need to understand what needs to change. The critical requirement: re-export vectors with `nonce=`. The generator currently constructs deposits without nonce (default 0). But since the deposit uses nonce default 0, and if a key does multiple operations, nonce mismatch occurs, causing desc. Actually generator creates deposits with default nonce = 0 for the same key possibly multiple times -> now the second deposit to same key will be ErrNonce and discarded. This changes random histories (fine, they're regenerated). But the order says "CASOS DIRIGIDOS NUEVOS (resultado construido a mano)". Need to add 3 new directed cases:
+- D-9: same withdrawal operation in two sibling fused blocks (first applies in C-GD-05; second discarded ErrNonce).
+- D-10: two operations of same key with nonces n and n+1 in sibling blocks in reverse C-GD-05 order (the n+1 discarded if applied first).
+- D-11: repetition after a reorg.
+
+Wait — case D-10: two operations with nonces n and n+1 in reversed order. If n+1 applied first → ErrNonce (discarded), then n applies. This tests that the nonce is checked. But actually "la de n+1 se descarta si se aplica primero" — yes.
+
+D-11: repetition after reorg. Meaning: after a reorg, the same operation must not be applied again (nonce). Let's think about how to construct. Repetition of an operation after reorganization: a block containing a guarantee operation is first on one chain then reorged; the state is recomputed with undo, and nonce restored; then the block is applied again as part of the new chain. Ensure no double-apply. Hmm.
+
+Actually, let me think about what the order asks. Let me re-read decision 2:
+
+"Casos dirigidos nuevos (resultado construido a mano): la misma operación de retiro en dos bloques hermanos fusionados (se aplica la primera en orden `C-GD-05`; la segunda, descartada); dos operaciones de la misma clave con nonces `n` y `n+1` en bloques hermanos en orden inverso al `C-GD-05` (la de `n+1` se descarta si se aplica primero); repetición tras una reorganización."
+
+So three new cases. I'll add D-9, D-10, D-11.
+
+Now the difficulty: constructing these cases with a valid guarantee state, since retiro requires `activo >= importe` and `en_retirada` empty. The base PoW prefix has deposits for keys 1 and 2 (from `generar_pow_terminal` which uses `depositar=true`). Let me check `construir_poW` in T01 generadores.jl to see what deposits are made and whether they use nonce (default 0). If the PoW prefix has deposits to keys 1 and 2, the nonce_siguiente for those keys is now incremented. Key 1 was used for 1 deposit? Let me check.
+
+Actually the directed cases D-1..D-8 use `tx_deposito` with default nonce 0 in D-3, D-4. If the key 3 hasn't been used, nonce 0 is fine. But note: `generar_pow_terminal` deposits to keys 1 and 2. Let me check.
+
+Let me read T01 generadores.jl `construir_poW` and `cadena_post`.
+dsh: reasoning:
+Let me read `construir_poW` lines 27-130 and `cadena_post` lines 587-640.
+dsh: reasoning:
+Now I understand the deposits in PoW prefix. The `construir_poW` deposits use `nonce_de(Et, o.dueño)`, so deposits for key 1 and 2 are correct in sequence, incrementing nonces. After prefix, key1 has nonce_siguiente = number of deposits to key 1, etc.
+
+Now, T04's `generar_pow_terminal` calls `construir_poW` with depositar=true, so T04's `estado_T` has nonces already advanced for keys 1 and 2.
+
+Now directed cases D-3/D-4 create `tx_deposito(...)` with default nonce 0 for key 3. Key 3 has no record in the prefix, so nonce_siguiente 0. Fine, unless earlier in the same state key 3 already used. In D-3: Y deposits to key 3 with nonce 0. That's the first operation to key 3 in that branch. Good. But wait, if the PoW prefix deposits to keys 1 and 2 only, then key 3 never touched. Good.
+
+However, there's a subtle issue: `generar_dag_aleatorio` creates deposits with default nonce 0 for `o.dueño`, which may be key 1 or 2 that already have nonce > 0. So those deposits get ErrNonce and discarded. That's fine but reduces coverage of successful deposits. Maybe we should update the generator to use `nonce_de(S, o.dueño)` like T01 does? Hmm, but the generator builds txs against `A.post[pv]`, which may not be the state they are applied on. Actually with nonce it's more complex. The order doesn't explicitly require updating the random generator, only re-export and new directed cases. But to keep the random histories meaningful (deposits actually validating), it may be worth updating. But we must be careful not to change semantics beyond F-15. The order says: "No cambies la semántica de T01 ni de T04 salvo lo que F-15 exige en modo fusión." Updating the generator is not semantics of the oracle; it's test generation. However, using correct nonces in generated txs will produce more meaningful vectors. Let me think.
+
+Actually the key requirement is the falsifiable question: "Con F-15, IE-1…IE-6 siguen sin fallos, una operación de garantía repetida en dos bloques fusionados se aplica una sola vez (la segunda se descarta con ErrNonce), y los vectores reexportados se releen sin discrepancias."
+
+So I need to:
+1. Update exportar.jl to emit `nonce=` in TX lines (deposit/retiro/liberacion) and `GAR` lines.
+2. Update lector_vectores.jl to parse nonce and reconstruct.
+3. Add directed cases D-9, D-10, D-11.
+4. Ensure run.jl and tests still pass, maybe add assertions for nonce cases.
+5. Export `vectores-estado-dag-v0.1.txt` with 908+ cases (or however many). Keep v0 files.
+6. Update PROGRESO.md, INFORME.md, HORAS.log with T04-B sections.
+7. Verify Pkg.test() passes.
+
+But wait, there's an important subtlety with `aplicar_bloque_fusion!`. It calls `Transicion.aplicar_tx!(S2, bloque_sintetico(b, punto), P, punto, tx)`. For retiro, `aplicar_retiro!` uses `B.slot` for `inicio`. The synthetic block has `slot = punto`. Good.
+
+Now consider F-15 in fusion mode: T04's `aplicar_bloque_fusion!` already discards on any Err. Good.
+
+But there's a subtle bug: For the `Deposito`, the nonce is checked first, and it increments `nonce_siguiente` in the cloned state. If a later rule fails (e.g., `ErrSaldo`), the nonce was already incremented on `S2`, but `S2` is discarded (S unchanged). Good, since S2 is a clone.
+
+Now the important nuance with F-15 and deposits: In `aplicar_bloque_fusion!`, the transferencia case has its own inline logic (doesn't use `aplicar_tx!`), while deposit/retiro/liberacion use `aplicar_tx!`. Fine.
+
+Now the D-9 case: "la misma operación de retiro en dos bloques hermanos fusionados (se aplica la primera en orden C-GD-05; la segunda, descartada)". So two sibling blocks X1, X2 each contain the SAME retiro (same key, same importe, same nonce). They're fused by a common child B. In B's mergeset, order is C-GD-05. The first applied (by order) succeeds, second gets ErrNonce (since nonce advanced). Result: only one retiro applied, exactly one ErrNonce discard.
+
+To construct: need a key with enough active guarantee and no pending retiro. The prefix makes deposits to keys 1 and 2; but active? In PoW phase, deposits mature. Let me check what `utxo_gastable`/dirigidos rely on. For retiro, we need `g.activo >= importe` and `isempty(g.en_retirada)`. The prefix likely created key 1 active guarantee. Let me check the actual state after `generar_pow_terminal`. Actually simpler: use a key and make deposits in PoST before the siblings. But deposit in fusion mode adds pendiente with madurez `punto + M_dep_slots`. With M_dep_slots=1 (P1), the credit matures at next slot.
+
+Alternative: use key 1 which has active guarantee from PoW prefix deposits. Let me verify by running Julia. Let me set up the environment and inspect.
+
+Actually, an even simpler approach for D-9: after the PoW terminal, `estado_T` has active guarantee for keys 1 and 2 (deposits in PoW mature). Then create two sibling PoST blocks Tb1, Tb2 at slot 1 both parent T (each with coinbase), then two siblings X1, X2 at slot 2 each containing the same retiro with nonce = nonce_de(estado, key). But wait: X1 and X2 are both children of Tb? For them to be fused together, they must be in the mergeset of a common child B. Let's say X1, X2 both children of Tb1 (or Tb). Then B has parents [X1, X2] and fuses both.
+
+The retiro must reference a key whose state when applied is the same in both. But careful: the retiro is applied to X1's fusion state and X2's fusion state separately when B's past is computed. In B's mergeset order, X1 and X2 are applied sequentially with point slot(B). The first retiro applied increments nonce. The second sees nonce already advanced → ErrNonce. Good. Both blocks valid individually (each has its own past where only its own retiro applied).
+
+But also: `aplicar_bloque_fusion!` for X1's past will apply the retiro. Fine.
+
+Now the issue: For the retiro to be exactly the same operation (same bytes) in both blocks, use the same tx object. Good.
+
+D-10: two operations of same key with nonces n and n+1 in sibling blocks, in reverse C-GD-05 order (n+1 applied first, so it's discarded). Construct: X1 (nonce n), X2 (nonce n+1), and arrange C-GD-05 so X2 comes before X1. C-GD-05 order is by (blue_work, solution_distance, id) ascending. Since they're siblings with same parents, blue_work equal, then solution_distance. We can control `sd`. Let me check GDR `cmp_orden`. Actually we can just determine the order at runtime and construct which one has n+1 accordingly. But the requirement is "en orden inverso al C-GD-05 (la de n+1 se descarta si se aplica primero)". So set the n+1 operation in the block that applies first. We can compute order after processing? But the tx is inside the block already. We could make it robust: after computing order, check that whichever applied first has nonce n+1... Actually we can control sd so that X2 (nonce n+1) has smaller sd, thus applied first. But easier: build both, find order via `cmp_orden`, and if n+1 isn't first, swap nonces? Hmm. But cases must be deterministic.
+
+Actually we can decide: make X_a with sd=0 and X_b with sd=1. The order is ascending by sd (blue_work equal, then solution_distance). So X_a (sd=0) applies first. Put nonce n+1 in X_a, nonce n in X_b. Then X_a discarded (ErrNonce), X_b applies. That's "n+1 se descarta si se aplica primero". Good.
+
+But wait, both blocks are fused siblings. X_a applies first: nonce = n+1, but nonce_siguiente = n → ErrNonce. Then nonce_siguiente remains n. X_b applies: nonce n → matches, applies. So the deposit with n+1 is discarded, n applied. This exactly matches "la de n+1 se descarta si se aplica primero". Good.
+
+D-11: repetition after reorganization. Need a reorg where the same guarantee operation might be applied twice. Interpretation: Build chain A with a block containing a retiro. Then build chain B (heavier) that reorgs; the retiro block is in A's chain but not B's. On reorg, undo restores the nonce; then... hmm "repetición tras una reorganización" - a repetition after a reorganization. Perhaps: after a reorg, the same operation is re-published in a new block; since the nonce was restored by undo (if the original was undone), it could apply again. But the point of IE-4/undo is that nonce is restored. Hmm.
+
+Let me think about the semantics. The security goal of F-15: an operation signed once cannot be replayed. In a DAG with reorg, if the original operation block is on the losing branch, the state is undone (nonce restored), and the identical operation could be re-applied in a new block. Is that a problem? Actually if the reorg removes the block, the withdrawal didn't happen, so reapplying it is legitimate: same operation, effect happens once. The point is it must not happen twice.
+
+"repetición tras una reorganización" — I think the case is: a block with a retiro is on the selected chain; then a reorg happens but the block remains in the selected chain (e.g., the reorg happens deeper and reattaches?) and the retiro is not applied twice. Or: the operation appears in two blocks; after a reorg that changes which branch is selected, the operation must be applied exactly once overall.
+
+Let me interpret: Build two branches. Branch A contains operation with nonce n; branch B contains the same operation with nonce n; both branches share a common ancestor. Selected chain initially A (applies retiro). Then B becomes heavier and reorg happens; state is recomputed from common ancestor and B's operation applies (nonce was restored by undo). Overall, exactly one application; the operation is applied once in the final selected chain. Then reorg back to A; also applied once.
+
+Maybe simpler: D-7 already tests reorg. For F-15, "repetición tras una reorganización": a block with the operation is in a non-selected branch after reorg, and we verify the state after reorg doesn't include it, then when reorged back it applies once. Actually let me construct something like: two chains from a common block Tb:
+- Chain A: A1 (retiro nonce n), A2.
+- Chain B: B1, B2, B3 (heavier) where B contains the SAME retiro tx (nonce n).
+Initially A is selected; then B becomes selected -> the retiro from A is undone, B's version applies. Then check total: exactly one `en_retirada`. And `nonce_siguiente[key]` == n+1. Then reorg back? Hmm.
+
+Alternatively, the more direct "repetition after reorganization": the same operation appears in both branch A and branch B (a replay). After reorg from A to B, the operation must not be applied twice in the final state, and its effect must be present exactly once. Since applied_story recomputes from scratch, it's naturally once. The invariant is checked by `aplicar_historia`.
+
+I'll build: common ancestor Tb (with guarantee to key1). Branch A: A1 with retiro(key,importe,nonce n). Branch B: B1 with the same retiro tx; then B2 heavier making B selected. Initially after processing A1 and B1, selected chain is A if A heavier... Let me set sr so A initially heavier, then B catch up. Then verify after the reorg: state virtual has exactly one EnRetirada of importe; and nonce_siguiente[key]=n+1; and the number of DESC ErrNonce is... zero, because on the selected chain only one of them is applied. Wait—in `aplicar_historia`, only the selected chain's blocks are applied; the other branch's block is not in the selected chain, so no ErrNonce. Hmm, but if they're siblings fused by a common child, then both would be applied and second discarded.
+
+Maybe the intended "repetición tras una reorganización" is: the operation is applied in chain A. Then a reorg switches to chain B which *also contains the same operation* (i.e., a replay published on both branches). After reorg, the operation should be applied once (in the new chain) and the effect remains exactly once. And check the undo restored the nonce, so the replay on B is accepted, not rejected, but only once. That seems to be the natural test: reorg doesn't cause double-application.
+
+Let me design D-11:
+- Base: Tb (slot 1) with guarantee deposits (from prefix). Actually let's just use key 1 (guarantee active from prefix). But we need retiro to be valid: importe ≤ activo and no en_retirada. Let's check the prefix state.
+- Two branches:
+  - Branch A: A1 = block slot 2 (parent Tb) containing retiro(key1, 1, nonce=n). sr=0 (heavy).
+  - Branch B: B1 = block slot 2 (parent Tb) containing the SAME retiro tx. sr=typemax (light). B2 = slot 3 child of B1 with sr=0. Now B has more blue_work? Need to ensure final selection switches to B.
+- Initially after A1 processed, tip A1. Then B1 processed. A1 vs B1: A1 heavier. Then B2 added; B2's branch total blue_work > A1. Selected becomes B2, chain = Tb, B1, B2. In that chain, retiro applied once via B1.
+- Check: exactly one en_retirada entry with importe, nonce_siguiente = n+1. Also the same tx object in A1.
+- Then add A2, A3 (heavier) to reorg back to A: A2 (sr=0), A3 (sr=0). Selected chain A: Tb, A1, A2, A3. Retiro applied once.
+This tests repetition across reorg: the same operation appears in both branches and is applied exactly once in whichever chain is selected. Good.
+
+But we need key1 active guarantee and no en_retirada. Let me inspect the prefix.
+
+Actually, maybe simpler: the prefix creates active guarantee. Let me run Julia to inspect.
+
+Let me set up the environment. First check julia availability.
+dsh: reasoning:
+Let me inspect the prefix state after generar_pow_terminal with T04 params. I'll write a small Julia script in the workspace? But I must write only in T04/. I can create a temporary inspection script in T04/ and delete it, or use `julia -e`. Let's use `julia --project=. -e` with the module. Since T04 includes files by relative path, I need to run from T04 directory with `--project=.`. The `EstadoDAG` module includes "GDR.jl" relative to the file, good.
+
+Let me run a quick inspection. Set PATH and JULIA_DEPOT_PATH. Need to be careful with LD_LIBRARY_PATH. Use `env -u LD_LIBRARY_PATH`.
+
+Let me test the current code loads (before modifications).
+dsh: reasoning:
+Wait, `base_dirigida` uses `generar_pow_terminal(rng, pd.P; hasta=0)` where `hasta=0` uses default `h = max(H_corte_min,4)+6`. For P1: H_corte_min=2, so h=10. But it terminated early at altura=2 because terminal reached (H_corte_min=2). So terminal at height 2. Deposits: key1 active 5, nonce 1; key2 active 5, nonce 1. UTXO 1002 val 10 due 1 (coinbase at h=2, not mature? M_cb=1, creada_en_altura=2, at PoST it becomes gastable via s0? Actually gastable_en for PoW origin in PoST: `creada_en_altura + M_cb <= altura_terminal` → 2+1=3 <= altura_terminal=2? No. Then `punto >= s0 + M_res_slots`; s0=0, M_res_slots=1, so at punto>=1 it's gastable. Interesting.)
+
+So key1 has active 5, nonce_siguiente 1. Great for a retiro of 1 with nonce 1.
+
+Wait, but in `aplicar_bloque_fusion!`, when transitioning to PoST, it sets `S.fase=PoST; S.s0=0` then `promover!(S, punto, true)`. So active guarantee key1=5.
+
+Now, one more subtlety: In D-9, using key1 retiro importe 1 with nonce=1. Both sibling blocks contain the same tx. The first applied gets nonce 1 → succeeds (active 5-1=4, en_retirada=[1@slot]). Second gets nonce 1 vs nonce_siguiente 2 → ErrNonce. 
+
+But hold on: the guarantee of the productor. The productor for these blocks must have active >= q=1. Key1 active 5. If blocks are produced by productor 1, fine. But after the retiro reduces key1 activo to 4, still >= 1.
+
+Let me now think about how things are applied in the virtual/history. In `estado_past!` for a block B that fuses X1 and X2, base starts from post[sp]. The order in C-GD-05 determines which is first. We want the behavior "se aplica la primera en orden C-GD-05; la segunda, descartada". Deterministic.
+
+Now, I realize there's a potential deeper issue. The order says "una operación de garantía repetida en dos bloques fusionados se aplica una sola vez (la segunda se descarta con ErrNonce)". This is already the behavior of the current code (generic discard). But does it work with the *same tx in two blocks*? Let's verify with a quick experiment.
+
+But wait, there is a subtle bug possibility: in `aplicar_bloque_fusion!`, the deposit/retiro branches clone S, call `aplicar_tx!`, and if error, discard. But note that the nonce is checked and incremented on the clone; if success, S=S2. Fine.
+
+Let me write a quick experimental script using the module (in `julia -e`) to construct D-9-like case and check. Actually, better: I'll implement the directed cases and test. But first, let me verify the generic behavior. Let me try a quick script.
+
+Actually, before writing code, I should check the "falta de definición" instruction: "Si detectas una falta de definición, infórmala antes de editar." I should assess if there are ambiguities in T04-B. Let me think.
+
+Potential ambiguities:
+1. Format of `nonce=` lines: where exactly? T01-D AMBIGUEDAD-6 put `nonce=` at the end of the TX line. For T04, the TX line format is `TX tipo=... firmante=... clave=... importe=... ent=[...] sal=[...]`. The order says "con `nonce=` en las líneas `TX` de depósito, retiro y liberación y en `GAR`". It doesn't specify position. Following T01-D, put `nonce=` at the end of TX lines. For GAR lines, T01's canonical representation includes nonce after congelado; T04's GAR line ends with `congelado=`. So add ` nonce=<n>` at end. This is a reasonable extension consistent with T01-D. Not a blocking ambiguity.
+
+2. Does `nonce=` go only on deposit/retiro/liberacion or on all TX lines? The order says "en las líneas TX de depósito, retiro y liberación". So only those. But for the lector to reconstruct, it needs to know. Other tx types have nonce 0. Fine.
+
+3. "Reexporta resultados/vectores-estado-dag-v0.1.txt con el formato de T04 más nonce=..." — Should the number of cases remain 908? The decision doesn't say to change count. It says "reexporta ... con el formato de T04 más nonce=". So keep 908 (8 dirigidos + 900 aleatorios)? But now we add new directed cases (3), so directed count changes. Hmm. The exportar default `--aleatorios 600`, but T04 v0 used 900 (per INFORME). The order decision 3 says re-export with format; doesn't specify counts. Since we add 3 new directed cases, the total becomes 11 + 900 = 911 if we keep aleatorios 900. The v0 sha must be preserved (we keep the v0 file).
+
+Actually, let me reconsider: "Reexporta `resultados/vectores-estado-dag-v0.1.txt` con el formato de T04 más `nonce=` en las líneas `TX` de depósito, retiro y liberación y en `GAR`; `.sha256` en formato `sha256sum`; relectura independiente con 0 discrepancias. Conserva los ficheros v0."
+
+So we must produce v0.1. The count isn't specified. I'll produce the full set: all directed cases (now 11) + 900 random = 911. Document it.
+
+Hmm, but wait—the v0 `.sha256` currently contains just the hash (65 bytes, hash + newline). "`.sha256` en formato `sha256sum`" means the file should contain `<hash>  <filename>` (two spaces) like `sha256sum`. The current v0 .sha256 has just the hash. The order requires v0.1 `.sha256` in sha256sum format. Let me check the current format.
+dsh: reasoning:
+Good. The T01 v0.1 sha256 uses `sha256sum` format with relative path. So for T04-B, `.sha256` should be like:
+`<hash>  resultados/vectores-estado-dag-v0.1.txt` (with two spaces).
+
+Now, there's a critical point: the current T04 code was written against T01 *before* T01-D. Does T04 currently even run with the new T01? Let me check: T01's `Tx` gained a `nonce` field, `Garantia` gained `nonce_siguiente`. T04 code doesn't construct Tx directly except through constructors (which have nonce kwargs default 0). T04's `tx_str` doesn't print nonce but that's fine. `gar_str` doesn't print nonce. `lector_vectores` constructs `Transicion.Salida`, fine. `parsear_tx` uses constructors. So T04 should still load. Let me test quickly.
+
+Actually wait: T04's `import EstadoDAG.Transicion` and `using EstadoDAG.Transicion`. The `Tx` constructors unchanged except nonce kwarg. So it should work.
+
+But: `estado_T` after T01-D now has `nonce_siguiente`. `aplicar_bloque_fusion!` calls `obtener_garantia!` which returns Garantia with nonce. Fine.
+
+Let me verify the module loads and run existing tests quickly with a tiny script. Actually let me just run the existing run.jl with small replicas to confirm it works. But first, let me check whether there's an issue with `generar_dag_aleatorio`: deposits with default nonce 0 to keys 1/2 will now often be discarded. That's fine.
+
+Let me now plan the edits.
+
+Files to edit:
+1. `src/dirigidos.jl`: add D-9, D-10, D-11 and include them in `casos_dirigidos`.
+2. `exportar.jl`: `tx_str` add `nonce=` for deposit/retiro/liberacion (at the end); `gar_str` add `nonce=` at end; default output path change to v0.1 and header `vectores-estado-dag-v0.1`; sha256 file format `sha256sum`.
+3. `src/lector_vectores.jl`: `r_gar` add nonce; `parsear_tx` parse nonce for deposit/retiro/liberacion; default path v0.1.
+4. `run.jl`: add assertions for D-9/D-10/D-11; possibly update the `casos_dirigidos` loop (automatic).
+5. `test/runtests.jl`: add testset for nonce cases (D-9..D-11) and change relectura path to v0.1? The order says reexport v0.1 and re-read with 0 discrepancies. But `test/runtests.jl` currently relectura of v0. The order says `Pkg.test()` must pass. We could keep testing v0 (conserved) and add v0.1. Since v0 file is conserved, its lector must still parse v0 format without nonce. But if I change `parsear_tx` to require `nonce` for deposit/retiro/liberacion, then reading v0 would fail (no nonce field). Hmm. 
+
+Important: The order says "Conserva los ficheros v0." That means keep the v0 vector files. It doesn't necessarily require the lector to still read v0. But `test/runtests.jl`'s relectura testset reads v0. If I change the lector to require nonce, v0 re-read fails. Options:
+   a. Make lector tolerant: `nonce` defaults to 0 if absent. Then both v0 and v0.1 read fine. But then re-reading v0 would compare GAR lines that don't have nonce → r_gar would emit `nonce=` and mismatch. So v0 re-read would fail on GAR.
+   b. Change test/runtests.jl to read v0.1 only. Keep v0 files conserved but not re-read. That's cleaner and matches the order (independent re-read of v0.1). The v0 re-read was the old test; update it to v0.1.
+   c. Keep a separate lector for v0. Overkill.
+
+I'll go with (b): update the test to re-read v0.1. But the order says "Pkg.test() ... vuelven a pasar" and "relectura independiente con 0 discrepancias" for v0.1. So re-reading v0.1 is required. v0 conservation is just files.
+
+However, there's a subtlety: `lector_vectores.jl` must remain "independent" and not reuse exportar.jl. Changing it is fine.
+
+But we must reconsider: The `CASO` line count changes. The `relectura.log` will now be 911.
+
+6. `INFORME.md`, `PROGRESO.md`: add T04-B sections. `HORAS.log`: append timestamps.
+
+Now the exportar default: currently `--aleatorios 600`. The v0 used 900 (per INFORME). The order decision 3 doesn't specify. To reproduce v0.1 with the same 900 random + now 11 directed = 911. I'll run `exportar.jl --dirigidos 1 --aleatorios 900`. But note default salida must be v0.1. I'll change `SALIDA_DEF` to v0.1 and header to v0.1.
+
+Wait, but changing `SALIDA_DEF` and running without `--salida` writes v0.1. But what if someone runs with default and overwrites? Fine.
+
+Now let's think about `tx_str` order of fields. For deposit/retiro/liberacion, append ` nonce=<n>`. For GAR, append ` nonce=<g.nonce_siguiente>` at the end.
+
+Now, there's a concern: The order says "en las líneas `TX` de depósito, retiro y liberación y en `GAR`". So exact.
+
+Now, directed cases. Let me design them carefully.
+
+First, I need a helper to find a spendable coinbase UTXO in state to fund deposits, etc. For retiro, we don't need a UTXO; we need active guarantee. Key 1 has active 5 and nonce 1 after the prefix.
+
+Let me design D-9:
+```
+function caso_nonce_repeticion_fusionada(pd; seed=19)
+    A, pow = base_dirigida(pd; seed=seed)
+    P = pd.P
+    id1 = pow[3]  # T04 uses last PoW id
+    # Tb: first PoST block, slot 1, productor 1
+    Tb = BloquePost(id=id1, padres=[A._id_T], slot=1, productor=1, peso=1,
+                    txs=[tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    # Estado past(Tb) after applying Tb: key1 active etc.
+    # The retiro tx uses key=1, importe=1, nonce = nonce_de(A.post[Tb.id],1)
+    E = A.post[Tb.id]
+    n1 = Transicion.nonce_de(E, 1)
+    ret = Transicion.tx_retiro(1, 1, 1; nonce=n1)
+    X1 = BloquePost(id=id1+1, padres=[Tb.id], slot=2, sd=0, productor=1, peso=1,
+                    txs=[tx_coinbase_post(3), ret])
+    X2 = BloquePost(id=id1+2, padres=[Tb.id], slot=2, sd=1, productor=1, peso=1,
+                    txs=[tx_coinbase_post(3), ret])   # same tx object
+    procesar_uno!(A, X1)
+    procesar_uno!(A, X2)
+    B = BloquePost(id=id1+3, padres=[X1.id, X2.id], slot=3, productor=1, peso=1,
+                   txs=[tx_coinbase_post(3)])
+    procesar_uno!(A, B)
+    return "D-9", A, (Tb=Tb.id, X1=X1.id, X2=X2.id, B=B.id, n1=n1)
+end
+```
+Then the test/assert: `_, _, desc = aplicar_historia(A)`. The desc contains one `(block_of_second, 2, ErrNonce)` where second is the one applied later. Actually the coinbase is tx index 1, retiro index 2. The retiro appears in both X1 and X2. On the selected history (via B), both X1 and X2 are in B's mergeset or chain. Wait: B's parents are X1, X2. The selected chain from virtual: V parents = [B]. sp(B) is selected among B's parents. B's chain includes sp(B). The other sibling is in the mergeset of V or of B? Let's think.
+
+`_virtual_gdr`: V has parents = tips = [B]. V's mergeset = ... GDR computes V's mergeset including B's parents? Actually V has single parent B. V's sp = B. V's mergeset includes blocks not in past(B) that V "sees"? With a single parent, V's mergeset — hmm. GDR mergeset of a block includes past blocks referenced by parents. Actually the standard GHOSTDAG: mergeset(V) = (past(V) \ past(sp(V))) minus... Since V's only parent is B, past(V) = past(B) ∪ {B}. sp(V)=B, past(B) doesn't include B. So mergeset(V) = {B}? That doesn't include X1/X2.
+
+Wait, let me reconsider how T04 applies the history. `aplicar_historia` walks `cadena_gdr(gdr2, sp(V))` = chain from sp(V)=B up. For each block C in chain, apply its mergeset `gd.ms_ordenado` then C. For C=B, gd[B].ms_ordenado includes the blocks that B merged, i.e., X1 and X2 (the non-selected parents), plus ancestors not already in past(sp(B)). So B's mergeset includes whichever of X1/X2 is not sp(B), and possibly more. But if sp(B) = X1, then B's mergeset includes X2 (and any other past blocks not in past(X1)). So only one of the two siblings would be in B's mergeset! The selected one (sp(B)) is applied as part of the chain (its own block step), the other via the mergeset.
+
+Then at the end, `aplicar_historia` applies V's mergeset. Since V has single parent B, V's mergeset likely empty (or includes blocks not in past(B), none). Hmm. So both X1 and X2 get applied: sp(B)=X1 applied as chain block; X2 applied as B's merge. Good, both applied. Order: for chain block sp(B)=X1, first its mergeset, then X1. Then B's mergeset (X2) then B. Wait, order in `aplicar_historia`:
+```
+for g in chain (from T to V's sp):
+   for xg in gd.ms_ordenado: apply X (merge blocks)
+   apply C=g
+```
+Chain = [T, Tb, X1, B] (if sp(B)=X1). For g=Tb: apply Tb's mergeset (empty), then Tb. For g=X1: apply X1's mergeset, then X1. For g=B: apply B's mergeset (contains X2), then B. So X1 applied before X2. So X1's retiro applies first, X2's retiro discarded with ErrNonce. Good. But wait: when computing `estado_past!(A, B, giB)`, the base = post[sp(B)] = post[X1] (which already includes X1's retiro applied), then applies mergeset of B: X2, which gets ErrNonce. Fine.
+
+But careful: X1's application includes its retiro. `post[X1]` includes the retiro. Good.
+
+However, the order says "la misma operación de retiro en dos bloques hermanos fusionados (se aplica la primera en orden C-GD-05; la segunda, descartada)". The C-GD-05 order between X1 and X2 determines which is selected as sp(B)? Actually sp(B) is selected by the `seleccionar_sp_ref` rule (SP_ZEROX, regla C: mayor blue_work, menor sd, menor id). Among X1, X2 with equal blue_work, sd=0 for X1, sd=1 for X2 → X1 selected. So X1 applied first. Fine.
+
+But note: the order C-GD-05 vs sp selection are different rules. The order says "se aplica la primera en orden C-GD-05". In the history application, the selected parent is applied in its own chain position, and the other in the mergeset of B. The one applied first is the selected parent (which is also first in C-GD-05 under SP_ZEROX? maybe). To be safe, my test should assert that the first in C-GD-05 is applied and the second discarded, rather than hardcoding.
+
+For the assertion: `desc` entries with `ErrNonce` should be exactly 1, and the block id should be the later in C-GD-05. I can compute `primero = cmp_orden(X1,X2) < 0 ? X1 : X2`.
+
+Hmm, but the sorting in `estado_past!` uses `gd.ms_ordenado`, which is the mergeset order. For a merged X2 in B's mergeset, only one error. And the block that got discarded is the one in mergeset (X2 if X1 selected). `cmp_orden(X1,X2)`: X1 sd=0 < X2 sd=1 → X1 first. So `segundo=X2`. Good.
+
+Actually, wait: is `sd` used in C-GD-05 comparison? Let me check GDR `cmp_orden`. Let me read modelo.jl/referencia.jl.
+dsh: reasoning:
+Good, order is (blue_work, sd, id) ascending. Since X1 sd=0 and X2 sd=1, X1 < X2.
+
+Now D-10:
+```
+function caso_nonce_orden_inverso(pd; seed=20)
+    A, pow = base_dirigida(pd; seed=seed)
+    id1 = pow[3]
+    Tb = BloquePost(id=id1, padres=[A._id_T], slot=1, productor=1, peso=1,
+                    txs=[Transicion.tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    E = A.post[Tb.id]
+    n = Transicion.nonce_de(E, 1)
+    # two deposits from same key? Or retiros? "dos operaciones de la misma clave con nonces n y n+1"
+    # Use retiros? Two retiros same key: first applies, second fails with ErrRetiroPendiente (not nonce)
+    # Better use two deposits to same key with nonces n and n+1. But deposit needs UTXO.
+```
+Hmm. "dos operaciones de la misma clave con nonces n y n+1 en bloques hermanos en orden inverso al C-GD-05 (la de n+1 se descarta si se aplica primero)". Two operations of the same key with nonces n and n+1. If n+1 applied first → ErrNonce; if applied second → would succeed (nonce == n+1 after first incremented). To show the difference, we want them in reversed order so n+1 first, discarded, then n applies. 
+
+What operation? Deposit is easiest: need a UTXO to deposit. Two separate deposits of same value from key 1's UTXOs. Key1 has UTXO 1002 (value 10) in `estado_T`? Wait, after Tb (PoST) the UTXO 1002 due 1 value 10 is present (from prefix). So we can deposit that UTXO. But a deposit consumes a UTXO; if both deposits use the SAME UTXO, the second would fail with ErrDobleGasto (utxo spent), not nonce. To make nonce the deciding factor, we need distinct UTXOs. But the state has only one spendable UTXO 1002.
+
+Alternative: use `Liberacion`? Requires en_retirada vencido. Complicated.
+
+Alternative: use two deposits but with different UTXOs created by coinbases in the sibling blocks? Coinbase outputs are `OrigenCoinbasePow` only for TxCoinbase (PoW). In PoST, coinbase is `TxCoinbasePost` which credits guarantee, not UTXO. So no UTXO creation in PoST.
+
+Hmm. But maybe use two deposits of the same key from the same UTXO but with nonces n and n+1. If n+1 applied first → ErrNonce (nonce mismatch), and crucially the UTXO is NOT consumed because the nonce check happens first and the tx is discarded. Then n applies and consumes the UTXO. Good! So the same UTXO can be used by both deposits, and the one with the wrong nonce fails before consuming. That's exactly the point: nonce check first. So:
+- X_a (sd=0, applied first) contains deposit(utxo, key1, importe, nonce=n+1).
+- X_b (sd=1, applied second) contains deposit(utxo, key1, importe, nonce=n).
+Order: X_a first → nonce n+1 ≠ n → ErrNonce, UTXO untouched. X_b → nonce n → applies, consumes UTXO. Result: one deposit applied, one discarded ErrNonce. Also demonstrates nonce checked before UTXO consumption.
+
+But careful: the deposit importe must equal the UTXO value? `aplicar_deposito!`: `total == tx.importe` where total is sum of inputs. So importe = o.valor = 10. And `tx.firmante == tx.clave` (key1's UTXO dueño=1). Good. H_dep: In PoST, no H_dep check. Good. And M_dep_slots=1 → credit pending at slot+1. Good.
+
+But wait: deposit also validates `tx.importe == 0` etc. Fine.
+
+X_a: same UTXO id, same importe, nonce n+1. X_b: nonce n. Both blocks have distinct ids.
+
+Now the assertion: desc has exactly one ErrNonce at the block applied first (the n+1 one). And the deposit with n applied. Check `nonce_de(S,1) == n+1` in the final history (only one successful op). Actually both ops: first (n+1) fails, second (n) succeeds → nonce becomes n+1. Good.
+
+Also verify that a deposit with nonce n+1 normally would be valid if applied in sequence. Not needed.
+
+But hold on: The two siblings are both children of Tb. The one applied second, X_b, is in B's mergeset applied after X_a (chain). But is X_b's past computed correctly? `estado_past!(X_b)` computes its state from post[sp(X_b)] = post[Tb] and its mergeset. It gets its own deposit applied (nonce n matches because its own state's nonce is n). So X_b valid. In B's history, X_a first advances nonce to n+1, then X_b (n) fails. Good.
+
+But there's a subtlety: For the deposit in X_a with nonce n+1 applied first, it fails with ErrNonce. But `aplicar_bloque_fusion!` clones S and calls `aplicar_tx!`, which calls `comprobar_nonce!` → ErrNonce, returns before consuming. Good.
+
+Now D-11: repetition after reorg. Let me design with retiro on key 1 (nonce n) in both branches as described. But there's a catch: in `aplicar_historia`, the reorg recomputes from scratch; the retiro appears in only one selected chain (the other branch not applied). So no ErrNonce. The test would check that final state has exactly one en_retirada, and nonce_siguiente == n+1. Also that `A.descartes` for the non-selected branch block's `post` may contain... whatever.
+
+Actually maybe a stronger "repetition after reorg" case: The same operation appears twice in the *selected* chain after a reorg? That can't happen if IE-2 holds.
+
+Let me reconsider. Perhaps the intent: Build chain A where block A1 contains the retiro. Then reorg to chain B which does NOT contain the retiro. Then the retiro is undone and nonce restored. Then republish the same retiro in a new block on the new chain, and it applies once (with the restored nonce). This tests that after undo the nonce is correctly restored (F-15: "El undo restaura el nonce."). That's a valuable test: undo of nonce.
+
+So D-11:
+1. Tb (slot 1), guarantee key1 active.
+2. A1 (slot 2, sr=0 heavy) with retiro(key1,1,nonce=n).
+3. A2 (slot 3, sr=0) — makes A heavy.
+4. B1 (slot 2, sr=typemax light, no retiro).
+5. B2 (slot 3, sr=0).
+6. B3 (slot 4, sr=0) — heavier than A, reorg.
+7. Now selected chain = B. The retiro from A1 is undone. Verify in `estado_virtual`: key1 nonce_siguiente == n, en_retirada empty.
+8. Then publish the identical retiro tx in a new block B4 (slot 5, child of B3) — it should apply (nonce n matches restored). Verify en_retirada has 1 entry, nonce n+1.
+9. Optionally reorg back to A by adding A3, A4 heavy; then verify again once.
+
+Hmm, but "repetición tras una reorganización" might be simpler: after reorg, republish the same operation and confirm it applies exactly once. I think step 8 captures it. And also verify no double-application if it appears in both branches.
+
+Actually, let me make D-11 cover both: the same retiro appears in A1 and in B4 (after reorg). Final selected chain B includes B4's retiro; A1's is not selected. Final state: exactly one en_retirada, nonce = n+1.
+
+Hmm, but the ordering of adding blocks: We process A1, A2, B1, B2, B3, then check reorg. Then B4. At each `procesar_uno!`, the GDR state grows. B4 child of B3 with retiro. But `procesar_uno!` checks productor guarantee on `Estado(past(B4))` promoted. Key1 active: after reorg to B, no retiro, so active=5. Fine.
+
+Wait, there's a subtle issue: B4's `procesar_uno!` computes `estado_past!(B4)` which applies mergeset of B4 (likely empty) from post[B3]. The retiro in B4's own txs is not applied in `estado_past!` (B4 not applied in its own state). Then guarantee check. Then `post[B4]` applies B4 including the retiro. Fine.
+
+Then `aplicar_historia` recomputes the selected chain B: Tb, B1, B2, B3, B4 and applies B4's retiro. Exactly once.
+
+I think that's good. But is the "undo" actually exercised? `verificar_ie1_ie2_ie4` checks undo via `aplicar_fusion_con_undo` for each valid block, comparing post to recomputed. The actual reorg undo in ED-3 is conceptual (state recomputed via `aplicar_historia`, which recomputes from scratch, not incremental undo). T04's `aplicar_historia` doesn't use undo; it recomputes. So "undo restaura el nonce" is tested by `aplicar_fusion_con_undo` checking re-clone. Hmm.
+
+Actually `estado_virtual` and `aplicar_historia` both recompute from Estado(T). So the reorg just changes which chain is walked. The undo correctness is covered by IE-4 test (aplicar_fusion_con_undo). For the nonce, the undo-by-copy automatically restores. So D-11 demonstrates that the same operation in a losing branch then republished in the winning branch applies once.
+
+Let me reconsider what "repetición tras una reorganización" means most naturally: An operation is applied; a reorg happens; the operation is re-applied (because the block is still in the new chain? or a replay). The key is it's not applied twice. I'll construct it to show the final state has the effect exactly once and the nonce advanced exactly once.
+
+Alternatively, more direct: the same retiro appears in A1 and B1 (both branches). Initially A selected; then B selected. Final effect once. This is "repetición (replay) tras reorg" — the replay is in the new chain. I'll do this: the same retiro tx in A1 and B1. Reorg to B; the effect is present once. Then reorg back to A; effect once. This directly tests that replay across branches doesn't double-apply. But since `aplicar_historia` recomputes, it's trivially once. Still a valid regression vector.
+
+Maybe combine: D-11 has the same retiro in A1 and B1; after reorg to B, exactly one en_retirada; check nonce. That's fine and simpler. Let me do that. Actually I'll make it richer: A1 and B1 same retiro; reorg to B; then verify; then add A2/A3 to reorg back to A; verify again. This explicitly exercises reorg both directions.
+
+Let me now think about how to assert in tests. For each directed case, `casos_dirigidos` returns `(nombre, A, meta)`. I'll update `casos_dirigidos` to include D-9..D-11. Then in test/runtests.jl add assertions:
+
+D-9:
+```
+nombre, A, m = EstadoDAG.caso_nonce_repeticion_fusionada(pd)
+S, _, desc = aplicar_historia(A)
+errs = [d for d in desc if d[3] == Transicion.ErrNonce]
+@test length(errs) == 1
+@test errs[1][1] == m.segundo   # need meta
+@test length(S.garantias[1].en_retirada) == 1
+```
+Wait, key 1's en_retirada: but in the final virtual history, the retiro applied. `S.garantias[1].en_retirada` length 1. Good.
+
+Actually careful: key2 also has guarantee; but retiro on key1.
+
+D-10:
+```
+S, _, desc = aplicar_historia(A)
+errs = [d for d in desc if d[3] == Transicion.ErrNonce]
+@test length(errs) == 1
+# deposit applied: nonce becomes n+1
+@test S.garantias[1].nonce_siguiente == m.n + 1
+```
+Hmm but wait, the deposit in D-10 applies to key1 and key1 already has nonce n (=1). After successful deposit, nonce = n+1. But also, does key1's `activo` increase? deposit adds pendiente (M_dep_slots=1) so pending. Fine.
+
+D-11:
+```
+S, _, _ = aplicar_historia(A)  # after reorg to B
+@test length(S.garantias[1].en_retirada) == 1
+@test S.garantias[1].nonce_siguiente == m.n + 1
+```
+
+Now, the export format change: `tx_str` must include nonce for deposit/retiro/liberacion. Since the deposit in D-10 uses nonce n+1, the vector includes it. Good.
+
+Now, the lector: `parsear_tx` for Deposito/Retiro/Liberacion must read `c["nonce"]`. Add `nonce = haskey(c,"nonce") ? parse(UInt64, c["nonce"]) : UInt64(0)`? Since we only read v0.1, require it. But to be safe and keep v0 readable? The GAR comparison would fail for v0 anyway. Let me just require nonce for those types (v0.1). Actually, to make the lector robust and independent, I'll parse nonce when present, default 0.
+
+But `r_gar` will always output nonce, so v0 re-read fails. That's fine since test reads v0.1.
+
+Now, exportar `SALIDA_DEF = "resultados/vectores-estado-dag-v0.1.txt"`, header "vectores-estado-dag-v0.1". And sha256 file format. Let me use:
+```
+h = sha256_archivo(salida)
+sha_path = replace(salida, r"\.txt$" => "") * ".sha256"
+write(sha_path, h * "  " * salida * "\n")
+```
+So it's `hash  resultados/vectores-estado-dag-v0.1.txt` matching sha256sum format. Good.
+
+Now, the `T04 v0` `.sha256` currently just hash. We keep it unchanged.
+
+Now `exportar.jl` main: `puntos = PUNTOS_T04`. `casos_dirigidos(pd)` uses `pd` from PARAMS_DAG_BASE[1], k=1. Good.
+
+Now, there's the question: should we regenerate the vectors with new random histories that use nonce-aware deposits? The order doesn't require modifying `generar_dag_aleatorio`. But now the aleatorios may include deposit txs with nonce 0 that get discarded (ErrNonce) — actually that's good coverage: re-exported vectors include `nonce=0` deposit lines and ErrNonce descartes. The re-reader must reproduce them. Since it reconstructs exact Tx with nonce, it will.
+
+But there's a subtle concern: `generar_dag_aleatorio` deposit uses `o.dueño` as clave and firmante. The `o` may be a coinbase output with `origen=OrigenCoinbasePow` from the PoW prefix, whose dueño is 1 or 2 with nonce possibly already advanced. With nonce 0, the deposit now gets ErrNonce and is discarded. That's fine.
+
+However — important — I realize the random generator constructs the deposit tx with default nonce 0, but `tx_deposito` earlier required `total == importe`; it's applied and now nonce check first. Fine.
+
+Now, should I update the generator to use correct nonces to produce more successful deposits? The order says "No cambies la semántica de T01 ni de T04 salvo lo que F-15 exige en modo fusión". Updating the generator isn't semantics, but it changes the generated vectors. Since we're re-exporting anyway (v0.1), changing the generator is allowed as long as re-read is 0 discrepancies. But it could introduce bugs. I'll keep the generator unchanged to minimize risk, except for directed cases. Actually, hmm: With the generator unchanged, deposits in PoST to keys that already have nonce>0 will be discarded. But there might be a case where the generator's deposit uses nonce 0 on a key whose nonce is 0, so it succeeds. That's fine.
+
+Wait, actually there's a more serious concern: `generar_pow_terminal` uses T01's `construir_poW` with `depositar=true`, which now uses `nonce_de` correctly. Good.
+
+Now, hold on: I should double check the `transicion` `Estado` field additions haven't broken `revalidar_corpus`/`revalidar_kaspa` (GDR only). Fine.
+
+Let me also verify the current T04 with new T01 actually runs (before edits) with a tiny run, to make sure no incompatibility. Let me run `test/runtests.jl` with a tiny replicas and see. Actually let's first run `run.jl --replicas 2` quickly to see if it loads. But it may take time for GDR revalidation (~50ms + compile). Let's do it.
+
+Actually, compiling EstadoDAG may take ~30s. Let me run a quick load test in background. But I'll just proceed; I can run tests after edits.
+
+Let me now also check `revalidacion_gdr.jl` quickly, and `GDR.jl`, to be safe about include order. Also the `T04/exportar.jl` header line mentions v0; update.
+
+Let me read revalidacion_gdr.jl briefly.
+dsh: reasoning:
+Now, before editing, let me identify any "falta de definición" to report. The instruction says "Si detectas una falta de definición, infórmala antes de editar." This is an instruction to report ambiguities before editing, but in a headless agent context, I should report and proceed if not blocking (as T04 did). The order says report before editing. I'll document ambiguities in PROGRESO/METODO before/while editing. But should I stop? The original T04 reported and continued. The order says "Si detectas una falta de definición, infórmala antes de editar." I'll write them down first (in PROGRESO.md) before code edits, then proceed with restrictive readings. Actually, to comply, I should inform now in my response. But since this is a single turn, I'll register the ambiguities in PROGRESO before editing code.
+
+Let me identify ambiguities specific to T04-B:
+
+AMBIGUEDAD-B1 — Position of `nonce=` in T04 TX lines. The order doesn't specify. Adopt: at the end of the TX line for Deposito/Retiro/Liberacion (following T01-D AMBIGUEDAD-6). Non-blocking.
+
+AMBIGUEDAD-B2 — Position/meaning of `nonce=` in GAR lines. The order says "en las líneas ... `GAR`". It must be nonce_siguiente[clave]. Adopt: `nonce=<nonce_siguiente>` at the end of GAR line (after `congelado=`). Non-blocking.
+
+AMBIGUEDAD-B3 — Number of cases in v0.1. Not specified. Adopt: keep the v0 sampling (900 aleatorios) plus the now-11 directed cases = 911; document. Non-blocking.
+
+AMBIGUEDAD-B4 — Whether the generic fusion discard already satisfies F-15 or code changes are needed. The contract §3 says a non-validating tx is discarded; ErrNonce is one such. Adopt: no change to fusion logic needed; add directed cases and export. Non-blocking.
+
+AMBIGUEDAD-B5 — "repetición tras una reorganización": the exact scenario not fixed. Adopt: same retiro in both branches, reorg one way and back; effect once; nonce advanced once. Non-blocking.
+
+Hmm, but I should be careful: the instruction might be a test to see if I detect a genuine lack. Let me reconsider whether there's a real blocking lack. Actually one thing: the order says "una operación de garantía repetida en dos bloques fusionados se aplica una sola vez (la segunda se descarta con `ErrNonce`)". But the current fusion code discards the tx based on `aplicar_tx!` result. Since `comprobar_nonce!` is first, ErrNonce is returned. Fine.
+
+Another potential lack: The order says "Reexporta ... con el formato de T04 más `nonce=` en las líneas `TX` de depósito, retiro y liberación y en `GAR`". But it doesn't say whether `nonce=` also appears in the `TX` lines of other types. Adopt only those three. Fine.
+
+Another potential real issue: T04's `verificar_ie5` compares against a T01 chain and uses `generar_cadena_post` which uses `Transicion.cadena_post` — T01's cadena_post doesn't include deposits/retiros, just coinbases. Nonce irrelevant. Fine.
+
+Another: `verificar_ie6` rebuilds blocks with coinbase only. Fine.
+
+Now let's also consider: The order's falsifiable question mentions "IE-1…IE-6 siguen sin fallos". With the current generator, the random histories now have many ErrNonce discards. IE-1..IE-6 should still hold. Good.
+
+Now, one important consideration: Does the current T04 `directed` D-3/D-4 use `tx_deposito` with default nonce 0? Key 3 has no prior record, so nonce 0 valid. But wait—the `estado_T` from the prefix: does it have key3? No, only keys 1,2. In D-3, the deposit to key 3 uses nonce 0. But after the deposit is applied in some state, key3's nonce becomes 1. In D-4, deposit to key3 nonce 0 also. Fine.
+
+But there's a subtle issue in D-3: `Y` deposit to key 3 nonce 0. Then `Z` productor 3. `Z` valid because key3 active? The deposit adds a pendiente with madurez slot+1 (M_dep_slots=1). Y at slot 3, so pendiente matures at 4. Z at slot 4, and `procesar_uno!(Z)` checks guarantee after `promover!(Sg, 4, true)`, which matures the pending. So active becomes o.valor-1. q=1. Good.
+
+Now, will `tx_deposito` with key3 nonce 0 be applied in `aplicar_bloque_fusion!`? Yes.
+
+Let me now also double-check: T01's `aplicar_deposito!` checks nonce first, then `tx.importe == 0`, then `firmante==clave`, then in PoST `consumir_entradas!`. In D-3, Y deposit `tx_deposito([9201], 3, o.valor-1, 3)` — the UTXO 9201 was created by X transfer to dueño 3. Good.
+
+Now let me write the code. I'll start by registering the T04-B ambiguities in PROGRESO.md before editing code (to comply with "inform before editing"). Actually, I can prepend a section. But PROGRESO is a file I'll edit. Let me do that first, then code.
+
+Wait, the order says section "T04-B" in INFORME.md and PROGRESO.md. So I'll add a "## T04-B" section. But I should register ambiguities before editing code. I'll add the ambiguity section to PROGRESO.md first.
+
+Let me structure PROGRESO.md addition at the end (or beginning?). The existing PROGRESO is T04's. I'll append a section `# T04-B — ...` at the end. Similarly INFORME.
+
+Actually the instruction: "inform it before editing." I'll write the PROGRESO T04-B ambiguity registration now, then edit code. Since the response is a single turn, I'll do the PROGRESO edit first.
+
+Let me plan all edits, then execute.
+
+Let me think about D-11 more concretely and make sure it works. Let me also double check GDR reorg behavior with SP_ZEROX and equal blue_work.
+
+Let me design D-11:
+```
+function caso_nonce_reorg(pd; seed=21)
+    A, pow = base_dirigida(pd; seed=seed)
+    P = pd.P
+    id1 = pow[3]
+    Tb = BloquePost(id=id1, padres=[A._id_T], slot=1, productor=1, peso=1,
+                    txs=[tx_coinbase_post(3)])
+    procesar_uno!(A, Tb)
+    n = nonce_de(A.post[Tb.id], 1)
+    ret = tx_retiro(1, 1, 1; nonce=n)
+    # Rama A (pesada): A1 con el retiro, A2.
+    A1 = BloquePost(id=id1+1, padres=[Tb.id], slot=2, sr=0, productor=1, peso=1,
+                    txs=[tx_coinbase_post(3), ret])
+    A2 = BloquePost(id=id1+2, padres=[A1.id], slot=3, sr=0, productor=1, peso=1,
+                    txs=[tx_coinbase_post(3)])
+    procesar_uno!(A, A1); procesar_uno!(A, A2)
+    tipA = mejor_punta(A, tips_validas(A))   # should be A2
+    # Rama B (ligera al principio): B1 con el MISMO retiro.
+    B1 = BloquePost(id=id1+3, padres=[Tb.id], slot=2, sr=typemax(UInt64), productor=1, peso=1,
+                    txs=[tx_coinbase_post(3), ret])
+    procesar_uno!(A, B1)
+    # B2,B3 la hacen más pesada -> reorg
+    B2 = BloquePost(id=id1+4, padres=[B1.id], slot=3, sr=0, productor=1, peso=1, txs=[tx_coinbase_post(3)])
+    B3 = BloquePost(id=id1+5, padres=[B2.id], slot=4, sr=0, productor=1, peso=1, txs=[tx_coinbase_post(3)])
+    procesar_uno!(A, B2); procesar_uno!(A, B3)
+    tipB = mejor_punta(A, tips_validas(A))
+    # volver a A
+    A3 = BloquePost(id=id1+6, padres=[A2.id], slot=4, sr=0, productor=1, peso=1, txs=[tx_coinbase_post(3)])
+    A4 = BloquePost(id=id1+7, padres=[A3.id], slot=5, sr=0, productor=1, peso=1, txs=[tx_coinbase_post(3)])
+    procesar_uno!(A, A3); procesar_uno!(A, A4)
+    tipA2 = mejor_punta(A, tips_validas(A))
+    return "D-11", A, (n=n, Tb=Tb.id, A1=A1.id, A2=A2.id, B1=B1.id, B2=B2.id, B3=B3.id, A3=A3.id, A4=A4.id, tipA=tipA, tipB=tipB, tipA2=tipA2)
+end
+```
+But the sum of blue_work: sr=0 gives huge weight; sr=typemax gives small. Let me check the weight formula: `sr_peso(::Integer)=typemax` in T04 but GDR uses `sr` directly? Actually the GDR `anadir!` takes `sr` as the "space range" and computes weight `2^(256 - rank(sr))` maybe. Let me check modelo.jl / referencia.jl weight. In D-7 they used sr=0 for heavy and sr=typemax for light. So same here. A1 sr=0 (huge), A2 sr=0. B1 typemax (tiny), B2 sr=0, B3 sr=0. After B2, B branch has B1(tiny)+B2(huge); A has A1(huge)+A2(huge). Wait, cumulative blue_work includes ancestors. Selection is by blue_work of the block = sum of weights of its blue past. A2 blue_work includes A1's weight (huge) + own. B3 includes B1(tiny)+B2(huge)+B3(huge) = ~2 huge. A2 = 2 huge (A1+A2). Tie? Then sd/id tie-break. Hmm. To make B heavier after B3, add B4 or make A2 not exist. Let me restructure: A branch: A1 (sr=0). B branch: B1 (typemax), B2 (sr=0), B3 (sr=0). A1 blue_work ~1 huge. B3 ~2 huge → B wins. tipA = A1. Then to reorg back add A2 (sr=0), A3 (sr=0) → A3 ~3 huge > B3. 
+
+So:
+- A branch: A1 (retiro), then A2, A3 to come back.
+- B branch: B1 (same retiro), B2, B3.
+Sequence:
+  1. Tb.
+  2. A1 (slot 2). tipA1 = A1.
+  3. B1 (slot 2, light). tip = A1 (A1 heavier).
+  4. B2 (slot 3, sr=0). Now compare A1 (1 huge) vs B2 (B1 tiny + B2 huge) ~1 huge (B1 tiny negligible). Tie broken by sd/id? Could be ambiguous. To avoid, add B3 (sr=0) then B3 ~2 huge > A1. So after B3, reorg to B.
+  5. Verify tip = B3, virtual state has exactly one en_retirada. Note: A1's retiro not applied because A not selected. B1's retiro applied. Good.
+  6. Add A2 (slot 3, sr=0), A3 (slot 4, sr=0). A3 blue_work ~3 huge > B3 ~2 huge → reorg back to A. Verify tip = A3, one en_retirada (A1's retiro).
+
+This works. Actually after step 4 (B2), the selected might be B2 or A1; doesn't matter. After B3 it's B3.
+
+But careful: When B2/B3 are processed, `procesar_uno!` for B2 checks guarantee of productor 1 on `Estado(past(B2))`. past(B2) = {Tb, B1}. B1 applied the retiro (key1 active 5→4). Still >= q. Fine. B3 similar.
+
+When A2 is processed after reorg, `procesar_uno!(A2)` checks guarantee; past(A2)={Tb,A1}, key1 active 4. Fine.
+
+Now `aplicar_historia(A)` after all blocks: selected chain is A (A1, A2, A3). Retiro applied once. `S.garantias[1].en_retirada` length 1. nonce_siguiente[1] = n+1. Good.
+
+But there's a subtlety: `aplicar_historia` walks the selected chain and applies mergesets. Since A1 and B1 are siblings both children of Tb, A3's chain = Tb, A1, A2, A3. B1 is not in A's chain; is B1 in any mergeset? B1 is a child of Tb not on the selected chain; it's not an ancestor of A3, so no. So not applied. Final desc has no ErrNonce. Good.
+
+For D-11 meta `tipB` should equal B3 id. And `tipA` (before reorg) = A1. And final tip = A3.
+
+Wait, but after adding B1, B2, B3, and then A2, A3, we should check the reorg actually happened at the intermediate stage. The meta can record `tipB = mejor_punta(...)` right after B3. Then after A3, `tipA2`.
+
+Now, the test for D-11 can check `m.tipB == m.B3` and `m.tipA2 == m.A3`, and final state once.
+
+Hmm, actually to test "after reorg to B, state has one retiro" we'd need `estado_virtual(A)` at that moment, but A is mutated further. We could capture the state at that point by recording `hash_canonico(estado_virtual(A))`? Simpler: just check the final (after reorg back to A) and also record that after B3, tipB==B3. To actually assert the B-state, I could compute `S_B, _, _ = estado_virtual(A)` right after B3 inside the case and store the number of en_retirada in meta. Let me store `retiros_B = length(estado_virtual(A)[1].garantias[1].en_retirada)` at that point. Then the test asserts retiros_B == 1. Good. That verifies the reorg to B applied the retiro exactly once.
+
+Let me include that in the meta.
+
+Now, also implement a check that the retiro is not double-applied: en_retirada length exactly 1.
+
+Now, let me also make sure D-9's same-tx-in-two-blocks works. Actually, wait. There's a subtle issue with using the *same* `Tx` object in two `BloquePost`s: `Tx` is immutable, so sharing is fine.
+
+Now let me think about whether `procesar_uno!(A, X2)` (second sibling) works: `chequear_forma` checks coinbase etc. Then GDR adds. Then `estado_past!(X2)` base=post[sp(X2)]. If sp(X2)=Tb, applies mergeset. The retiro in X2's own txs isn't applied in past. Then guarantee check. Then post[X2] applies X2's txs including the retiro (nonce n). Since past[X2] state's nonce is n, applies. Good.
+
+For D-9, I might also want `X1` and `X2` both valid. Yes.
+
+Now, an important check: In `aplicar_bloque_fusion!`, `bloque_sintetico(b, punto)` sets `B.altura=0`, `B.slot=punto`, `B.productor=b.productor`. For retiro, `aplicar_retiro!` uses `B.slot` for inicio. Good.
+
+Now, let me write the actual edits.
+
+First, PROGRESO.md — add T04-B ambiguity section before code edits. Let me append.
+
+Actually, the order says "Sección «T04-B» en INFORME.md y PROGRESO.md". Let me append a full section to PROGRESO with ambiguities at the start of the section.
+
+Now, let me begin editing.
+
+Edit 1: PROGRESO.md append T04-B section (ambiguities registered). I'll write the full section after completing everything? The instruction says inform before editing code. I'll add the ambiguity registration now, then after execution update the diary/status. But since it's one continuous process, I'll add the complete section at the end. To honor "inform before editing", let me add the ambiguities section first as a separate edit, then do code, then append results. That's cleaner.
+
+Let me do that.
+dsh: reasoning:
+I read it via bash cat, not the read tool. Need to use read tool first. Let me read it (I already saw content but tool requires).
+dsh: reasoning:
+Now let me edit the source files. Start with `src/dirigidos.jl`: add the three new cases and update `casos_dirigidos`.
+
+Let me write the functions. I need to be careful with `tx_coinbase_post`, `tx_retiro`, `tx_deposito`, `nonce_de`.
+
+For D-9, I'll use key 1. Let me define a helper `retiro_tx`.
+
+Let me append before `casos_dirigidos` and update the list.
+dsh: reasoning:
+Now, `utxo_gastable` with minvalor=2 finds first UTXO >= 2 that is gastable at punto 2. In `estado_T` there's UTXO 1002 val=10 due=1 (from the PoW prefix? Wait, earlier inspection showed UTXO 1002 val=10 due=1 at estado_T). But after Tb (slot 1), post[Tb] also includes UTXO 1002. Is it gastable at punto=2? For OrigenCoinbasePow in PoST: `creada_en_altura + M_cb <= altura_terminal` → 2+1=3 <= 2 false; then `punto >= s0 + M_res_slots` → s0 after proseguir: In `aplicar_bloque_fusion!`, `S.s0=0` when transitioning; `promover!(S, punto, true)`. Need to know what `promover!` does to s0. Actually `gastable_en` for PoST uses `punto >= s0 + M_res_slots`. In T04 `aplicar_bloque_fusion!` sets s0=0 at transition but doesn't change on later blocks? `promover!` may. With punto=2, M_res_slots=1, so 2>=1 true. So UTXO 1002 is gastable. dueño=1, valor=10. Good.
+
+But wait: `tx_deposito([o.id], o.dueño, o.valor, o.dueño; nonce=n)` with o.valor=10. `importe` UInt64. Good.
+
+Now, the deposit `aplicar_deposito!` in PoST: `consumir_entradas!` requires `o.dueño == firmante` (1==1), `gastable` true. total = 10 == importe. Then `ms = B.slot + M_dep_slots` = 2+1=3 > B.slot=2, so push pendiente. Good.
+
+Now potential issue: D-10's `n = nonce_de(A.post[Tb.id], o.dueño)`. For key1, n=1. The deposit with nonce n=1 succeeds. Good.
+
+Wait, is `o.dueño` = 1? The first gastable sorted by id is UTXO 1002 due 1. Yes.
+
+Now, D-9's retiro uses key1 importe 1. `n = nonce_de(post[Tb],1) = 1`. X1 retiro applies, X2 discarded ErrNonce. Good.
+
+But hold on: after X1's retiro, key1's `en_retirada` is non-empty. When B's `estado_past!` applies X2's retiro, `comprobar_nonce!` fails first with ErrNonce. Good. Then B's own coinbase is applied. Fine.
+
+Now D-11: `A1` with retiro. `B1` with same retiro. Both valid. After B3, selected = B3, `estado_virtual` retiro applied once (from B1). But wait: B2's `estado_past!`: base = post[sp(B2)] = post[B1], which already has the retiro. B2's mergeset maybe empty. Then B2 valid (guarantee: key1 active 4). B3 similar. So `estado_virtual` applies chain Tb, B1, B2, B3; the retiro applied once in B1. `retiros_B=1`, `nonce_B = n+1`. Good.
+
+Then A2, A3: A2's past = post[A1] (retiro applied). A2, A3 valid. After A3, selected = A3? Blue work: A1 (sr=0) + A2 (sr=0) + A3 (sr=0) = 3 heavy. B1 (typemax ~0) + B2 (sr=0) + B3 (sr=0) = 2 heavy. So A3 wins. Good. `tipA3 == A3`.
+
+Hmm wait, but `tipA1` after only A1 processed: tips = [A1], so `mejor_punta` returns A1. Good.
+
+Also after B1, B2, B3: is B3 actually selected? B3 blue_work = B1(tiny) + B2(heavy) + B3(heavy) ≈ 2 heavy. A1 = 1 heavy. So yes B3. `tipB3 == B3`.
+
+Now let me update the exportar.jl.
+
+Changes:
+1. `SALIDA_DEF` to v0.1.
+2. Header line.
+3. `tx_str`: add nonce.
+4. `gar_str`: add nonce.
+5. sha256 file format.
+
+Let me edit.
+dsh: reasoning:
+Now the sha256 write. Current:
+```
+    h = sha256_archivo(salida)
+    sha_path = replace(salida, r"\.txt$" => "") * ".sha256"
+    write(sha_path, h * "\n")
+```
+Change to sha256sum format: `<hash>  <salida>\n`.
+dsh: reasoning:
+Now update the `lector_vectores.jl`:
+1. `RUTA_DEF` to v0.1.
+2. `r_gar`: add nonce.
+3. `parsear_tx`: parse nonce for deposit/retiro/liberacion.
+
+Let me edit.
+dsh: reasoning:
+Now `parsear_tx`. Add nonce parsing. The constructors `tx_deposito`, `tx_retiro`, `tx_liberacion` accept `nonce` kwarg. Let me edit.
+dsh: reasoning:
+Now update `test/runtests.jl`:
+1. Add nonce directed case tests.
+2. Change relectura path to v0.1.
+
+Also update `run.jl` to add assertions for D-9..D-11 (the loop over `casos_dirigidos` already includes them and checks verificar_ie1_ie2_ie4 + ie6, so that's automatic). But the order wants specifically that repeated operation applies once. Let me add explicit assertions in run.jl.
+
+Let me update test/runtests.jl first. Add after D-8 tests:
+```
+        nombre, A, m = EstadoDAG.caso_nonce_repeticion_fusionada(pd)
+        S, _, desc = aplicar_historia(A)
+        errs = [d for d in desc if d[3] == Transicion.ErrNonce]
+        @test A.validos[m.X1] && A.validos[m.X2]
+        @test length(errs) == 1
+        @test errs[1][1] == m.segundo
+        @test errs[1][2] == 2          # la transacción de retiro es la 2.ª
+        @test length(S.garantias[1].en_retirada) == 1
+
+        nombre, A, m = EstadoDAG.caso_nonce_orden_inverso(pd)
+        S, _, desc = aplicar_historia(A)
+        errs = [d for d in desc if d[3] == Transicion.ErrNonce]
+        @test length(errs) == 1
+        @test errs[1][1] == m.Xa
+        @test S.garantias[m.clave].nonce_siguiente == m.n + UInt64(1)
+        # el UTXO del depósito válido queda consumido, no doblemente
+        @test !haskey(S.utxo, m.utxo)
+
+        nombre, A, m = EstadoDAG.caso_nonce_reorg(pd)
+        S, _, _ = aplicar_historia(A)
+        @test m.tipA1 == m.A1
+        @test m.tipB3 == m.B3
+        @test m.tipA3 == m.A3
+        @test m.retiros_B == 1
+        @test S.garantias[1].nonce_siguiente == m.n + UInt64(1)
+        @test length(S.garantias[1].en_retirada) == 1
+```
+
+Wait, for D-10, `m.clave` = o.dueño = 1. `S.garantias[1].nonce_siguiente` should be n+1. But careful: In D-10, the deposit that succeeds adds a pendiente; the nonce becomes n+1. But is there any other operation? The coinbase posts don't touch key1. So yes.
+
+Also, `S.utxo` — the UTXO 1002 was consumed by the successful deposit. Good. But wait, in the virtual history, is the deposit's UTXO consumed? Yes.
+
+Hmm, but careful: D-10's two sibling blocks. In the selected history, Xa (sd=0) is sp of B, so applied as chain block; Xb applied in B's mergeset. Wait, is the order right? sp(B) among parents Xa, Xb is selected by `seleccionar_sp_ref`: mayor blue_work, then menor sd, then menor id. Xa sd=0, Xb sd=1 → sp=Xa. So Xa applied in chain, Xb applied in B's mergeset after Xa. So Xa (nonce n+1) applied first → ErrNonce; Xb (nonce n) applied second → success. Good. `errs[1][1] == m.Xa`.
+
+Wait, but the mergeset order: B's mergeset contains Xb. `aplicar_historia` for chain: Tb, Xa, then B. Xa's own mergeset then Xa. B's mergeset (Xb) then B. So Xa applied before Xb. Yes.
+
+Now for D-9, `errs[1][1] == m.segundo`. `m.segundo` is the one that is second in C-GD-05. But the one applied second is the one in B's mergeset = the non-selected parent = the second in selection order = segundo. Good. And `errs[1][2] == 2`: retiro is the second tx (coinbase index 1, retiro index 2). Good.
+
+Now the relectura testset: change path to v0.1.
+
+Let me edit.
+dsh: reasoning:
+Now `run.jl`: add explicit assertions for D-9..D-11 after D-8. Let me edit.
+dsh: reasoning:
+Now let me run a quick load test / the directed cases to catch errors before generating vectors. Let me first run `run.jl` with small replicas (or just test the directed cases) to verify D-9/D-10/D-11 work.
+
+Let me run a small script that loads EstadoDAG and runs the three new directed cases. I'll use julia -e. This might compile ~30-60s. Let me run it in the background? Let's just run synchronously with a generous timeout.
+
+Actually, let me run the full test suite with REPLICAS_TEST=1 first, which is fast and includes directed cases. But `Pkg.test` re-reads v0.1 which doesn't exist yet -> the testset skips if file missing. So it will pass without relectura. Let me run `test/runtests.jl` with T04_REPLICAS_TEST=1. That compiles everything.
+
+Let me do that.
+dsh: reasoning:
+All tests pass. Now let me generate the v0.1 vectors. The exportar default is `--aleatorios 600`. The order's v0 had 900. I'll run with `--dirigidos 1 --aleatorios 900`. This may take a while (v0 took some time; 908 cases). Let me run in background and monitor. Also the lector re-read.
+
+Let me first run the export. Timeout maybe several minutes. Let me run in background.
+
+Actually let me estimate: v0 export produced 908 cases/3.1MB; re-read. Let's run in background and continue.
+
+But before that, I realize the export uses `casos_dirigidos(pd)` which now includes D-9..D-11. Good.
+
+Let me run exportar.jl in background with output to a log. I'll write the stdout to resultados/exportar-v0.1.log? The command will write. Let me capture.
+
+Actually, per the existing structure, `resultados/exportar.log` doesn't exist for T04 (T01 has exportar-v0.1.log). Let me create `resultados/exportar-v0.1.log`. But the order says only section in INFORME/PROGRESO and HORAS. Additional logs are fine.
+
+Let me run.
+dsh: reasoning:
+While that runs, let me update the default comment in exportar header and the `--aleatorios 600` mention. Actually the header comment says "Escribe resultados/vectores-estado-dag-v0.txt" and default `[--aleatorios 600]`. Let me update the header comment to v0.1. Also there's `resultados/vectores-estado-dag-v0.1` output.
+
+Let me edit the header comment.
+dsh: reasoning:
+Now while the export runs, let me think about whether the random generator should be improved to use correct nonces. The order doesn't require it. But let me consider the re-read: it reconstructs exactly, so 0 discrepancies expected.
+
+However, there's a potential issue: In `generar_dag_aleatorio`, a deposit tx to `o.dueño` with nonce 0. If `o.dueño` key's nonce is already >0 in the state where it's applied, it's ErrNonce. Fine. But what if `o.dueño` has never been touched (nonce 0)? Then it succeeds, incrementing nonce. The generator's blocks are constructed against `A.post[pv]` but applied in a fusion where the actual state may differ; nonce may or may not match. All deterministic and re-readable. Good.
+
+Now, there's a thought: to actually exercise successful deposits in random histories (currently likely all ErrNonce because most UTXOs belong to keys 1/2 which have nonce>0), we might want to update the generator to use `nonce_de(S, o.dueño)`. But the generated tx is placed in a block whose actual application state may be different from `S`. Since `S = A.post[pv]` for a valid parent pv, and the block b is a child of some parents including pv, the fusion state at application point might match `S` if pv is sp and no other merged block touches the key. Not guaranteed. So the nonce might still mismatch. It's fine.
+
+Actually, wait: there's a subtle regression risk. Before F-15, deposits in random histories succeeded often, increasing guarantee balances and enabling more valid productors. Now many deposits are discarded, which might change which blocks are valid (e.g., productor key 3 etc.) but that's fine—the generator uses productors 1/2/99, all with active guarantee from the prefix. Blocks remain valid. The run should still show 0 failures. Good.
+
+Now, let me think about whether `verificar_ie6` still holds. It rebuilds with only coinbase. Fine.
+
+Let me now check the export job status.
+dsh: reasoning:
+Export succeeded: 911 cases, sha256 e8f7a6dc... Now run the independent re-read.
+dsh: reasoning:
+Excellent. Now let's run the full `run.jl --seed 0x5a5a --replicas 200`. This took 50s before; with compilation etc. Let me run in background. Also run `Pkg.test()`.
+
+Actually, order decision 4: "Pkg.test() y run.jl --seed 0x5a5a --replicas 200 vuelven a pasar." So both.
+
+Let me start run.jl in background. Then run Pkg.test() (which includes relectura of v0.1). Note Pkg.test() may run in a separate temp env and needs the depot. Let's run it.
+
+Let me start both? They're CPU-heavy but 1 thread each. The order budget says 1 thread. Running both concurrently might not be ideal (each is single-threaded, machine has many cores). But to be safe and match "1 hilo", I'll run sequentially. Actually the budget is 1 thread; running two processes concurrently uses 2 threads. Let me run sequentially to respect the declared budget.
+
+Start run.jl. Let me estimate ~60-90s. I'll run in background and then wait.
+
+Actually let me first double check the directed output of run.jl will show 11 DIRIGIDO lines. Let me run it.
+dsh: reasoning:
+While that runs, let me update the docs: METODO.md (T04-B section), INFORME.md (T04-B section), PROGRESO.md (execution diary + status), HORAS.log.
+
+Let me first update METODO.md to note F-15/nonce handling. Actually the order only requires sections in INFORME.md and PROGRESO.md and HORAS.log. METODO not required but nice. I'll add a short note.
+
+Let me focus on INFORME.md and PROGRESO.md.
+
+Let me draft the PROGRESO T04-B diary (after the ambiguity section) and state. But I need run results first. Let me wait for the job.
+
+Meanwhile, let me examine the generated v0.1 file to ensure the nonce lines appear for deposit/retiro/liberacion and GAR. Let me grep.
+dsh: reasoning:
+Good. 737 ErrNonce discards across random histories. 4 Retiro TX (3 directed D-9/D-11 plus maybe one random? Actually D-9 has 2 copies of the same retiro in X1 and X2 = 2 TX lines; D-11 has 2 copies = 2 TX lines → 4. So no random retiros. That's fine.)
+
+GAR lines have nonce=1 etc.
+
+Now let me wait for the run.jl job.
+dsh: reasoning:
+It wrote to `resultados/run-estado-dag.log` (default salida). Wait, I redirected stdout to `resultados/run-v0.1.log` but the script's `--salida` default is `resultados/run-estado-dag.log`. So the detailed log overwrote `run-estado-dag.log`, and `run-v0.1.log` contains only the final stdout line. Hmm.
+
+The order says `run.jl --seed 0x5a5a --replicas 200` passes. It wrote to `run-estado-dag.log` (overwriting the v0 log). Should I preserve the v0 run log? The order says "Conserva los ficheros v0"—referring to vector files. But maybe also preserve the v0 run log? To be safe, I could have used `--salida resultados/run-estado-dag-v0.1.log`. I didn't. The v0 log was overwritten. Hmm.
+
+Actually the v0 run-estado-dag.log is not a "vector file"; the order specifically says "Conserva los ficheros v0" in the context of vectors. But losing the old log isn't ideal. However, it's regenerable: rerunning v0 would need the old code. We can't easily. But the v0 INFORME summarizes it. I'll note that `run-estado-dag.log` now holds the v0.1 run and add a v0.1-specific log.
+
+Actually to be cleaner, let me copy the new log to `run-estado-dag-v0.1.log` and re-run with `--salida resultados/run-estado-dag-v0.1.log`. But that would take another 47s. Since the existing `run-estado-dag.log` now contains the new run, and `run-v0.1.log` has the final line. Let me just copy `run-estado-dag.log` to `run-estado-dag-v0.1.log` for clarity, and keep run-estado-dag.log as-is (new run). But the v0 log content is lost. Hmm.
+
+Wait, actually is the v0 run log important? The order says `run.jl --seed 0x5a5a --replicas 200` must pass again. The log is evidence. The old v0 log was overwritten, but the T04 INFORME documented its numbers. I think it's acceptable, but to preserve v0 evidence, I should not have overwritten. Let me check if the old content is recoverable... no.
+
+Hmm, let me re-run with explicit `--salida resultados/run-estado-dag-v0.1.log` and restore? I can't restore v0. But I can at least now have a v0.1 log. Let me just copy. Actually, better: the order says "Conserva los ficheros v0" specifically about "vectores v0" (decision 3). I'll preserve the vector files (they are intact). For logs, I'll create v0.1 logs.
+
+Let me copy `run-estado-dag.log` → `run-estado-dag-v0.1.log` and leave `run-estado-dag.log` as the current run too. Hmm, duplicate. Alternatively, re-run with explicit salida to get a proper named file. 47s is cheap. But we'd still have overwritten the v0 log. 
+
+Actually, I can restore the spirit: the original `run-estado-dag.log` was part of T04's evidence. Since T04-B is a follow-up, overwriting it with the new run is arguably fine (the new run supersedes). But "Conserva los ficheros v0" might be interpreted broadly. Let me check what other v0 logs exist: `run-estado-dag.log`, `relectura.log`, `test.log`, `test-pkg.log`, `BENCH.txt`, `entorno.log`. The vectors v0 `.txt` and `.sha256` are the important preserved ones. I'll preserve those and also keep the old logs by creating v0.1-named logs, but `run-estado-dag.log` is already overwritten.
+
+Hmm, I could restore the old run log content manually from the INFORME? The old content is fully shown in the earlier bash output I captured! I have it in the conversation:
+```
+# run.jl T04 · 2026-09-26 02:45:21
+...
+tiempo_pared_s = 50.1
+```
+I could reconstruct it, but that would be fabricating a log. Not good. Better to be honest: the old log was overwritten; document that in PROGRESO. Actually, let me think whether it's a problem for the order. The order only requires sections in PROGRESO/INFORME and HORAS. It doesn't require preserving v0 logs. I'll just make v0.1 logs and mention the vectors v0 are conserved.
+
+Let me copy the new run log to a v0.1 name and rerun test. Actually, let me just rename/copy: `cp run-estado-dag.log run-estado-dag-v0.1.log` and leave the default one too. That's fine. And the `run-v0.1.log` (stdout) has the one-liner.
+
+Let me inspect the new run log.
+dsh: reasoning:
+Run passes: 0 fallos, 11 directed cases. Note: validos=16020 (up from 15858), descartes=3721 (up from 1977, due to ErrNonce), rojo_U3=1393. ESTADO=SUPERADO.
+
+Now run `Pkg.test()`. It will run with 5 replicas and relectura of v0.1. Let me run in background; it takes ~1-2 min including compile.
+
+Note: `Pkg.test()` may need network? The Manifest is offline. Use `JULIA_PKG_OFFLINE=true`. Let me run.
+dsh: reasoning:
+While Pkg.test runs, let me update the INFORME.md and PROGRESO.md with the T04-B sections, and HORAS.log.
+
+First, let me draft the INFORME T04-B section. I'll append at the end of INFORME.md. Let me read the tail of INFORME.md via read tool to edit.
+
+Actually I already have its full content. I'll append after "18. Veredicto: **SUPERADO**."
+
+The order says "Sección «T04-B» en INFORME.md y PROGRESO.md". So add a clearly titled section.
+
+Let me write the INFORME T04-B section with:
+- Veredicto SUPERADO.
+- Changes: no change to fusion semantics (generic discard already applies ErrNonce), directed cases D-9..D-11, export v0.1 with nonce=, sha256sum, re-read 0 discrepancies, run.jl 0 fallos, Pkg.test pass.
+- Ambigüedades B1..B5.
+- Budget.
+
+Let me wait for Pkg.test results to include exact numbers.
+
+Meanwhile, update HORAS.log with current timestamps. Let me get the current time.
+dsh: reasoning:
+Let me check Pkg.test job.
+dsh: reasoning:
+Pkg.test passes: 377/377, relectura 911 with 0 discrepancies.
+
+Now let me update the docs. Also update `HORAS.log` with timestamps. The existing HORAS.log has timestamps; I'll append several T04-B milestones.
+
+Let me update INFORME.md. I'll append the T04-B section.
+
+Numbers:
+- Frozen input 4/4 OK.
+- 911 cases (11 directed + 900 random), sha256 e8f7a6dcce5bcb2cfdb50dd49f59205d9a045dc492be71eca93a788ccf74b51f.
+- Re-read: 911 cases, 0 discrepancies.
+- run.jl: 3000 histories, 25380 blocks, 16020 valid, 3721 discards, 1393 U3, 673650 IE-3 orders, 46.7s, 0 fallos, SUPERADO.
+- Pkg.test: 377/377, 8.3s.
+- 737 ErrNonce DESC in vectors.
+
+Let me also mention the vector v0 files conserved, sha256sum format.
+
+Let me write the INFORME section. I need to use read tool first (I read it earlier via read tool? Yes, I read INFORME.md via bash cat, not read tool. Wait, I read it via `cat` in bash. The edit tool requires read. Let me read the tail with the read tool.)
+
+Actually I did `cat` for INFORME.md in an earlier bash command, not the read tool. Let me read it now.
+dsh: reasoning:
+Now append the T04-B section. Note the original INFORME "Resumen final" ends at line 139. I'll append after it.
+dsh: reasoning:
+Now update PROGRESO.md with the T04-B execution diary and status. Let me update the ambiguities section I wrote: it ends with "Conclusión...". I'll append B.2 diario and B.3 estado. But I need to read the file to edit. I already wrote it via edit, so I can edit without re-read (the policy allows editing files I just edited in session). Let me append after the conclusion.
+
+Also, I should correct a typo in the PROGRESO section I wrote: "la de `n+1` ... se descarta" written as "la de `n+1`" with a strange backtick. Let me look: I wrote "el de `n+1` se aplica primero y se\n  descarta". Fine.
+
+Let me append the diary.
+dsh: reasoning:
+Now update HORAS.log. Append timestamps. The existing T04 HORAS.log has timestamps up to 02:48. I'll append T04-B start (03:27, when the order was launched) and milestones. Let me append:
+03:27:00 (launch)
+03:31:11 (export)
+03:31:29 (run)
+03:32:27 (pkg test)
+03:33:00 (close)
+
+Actually the HORAS.log seems to be a list of timestamps at milestones. Let me append a few.
+
+Also I should update the `julia-version.toml`? No.
+
+Let me append to HORAS.log. Need read tool first? I read it via bash cat. Use read tool.
+dsh: reasoning:
+Now update METODO.md? The order doesn't require but it documents the oracle. Let me add a short T04-B note. Actually, METODO §2 point 4 says "Modo fusión ... descarta". I can add a note that F-15 nonce is now covered. Let me add a brief subsection to METODO.
+
+Also, the order says section "T04-B" in PROGRESO.md and INFORME.md. Done.
+
+Now, I should double check: the `.sha256` for v0.1 is in sha256sum format with a relative path. But `sha256sum -c` was run from the T04 directory and it matched. Good.
+
+Now, `Pkg.test()` relectura passes. Good.
+
+Let me now re-verify the frozen input at the end (order says input frozen; T04 did verify at close). And compute sha256 of key artifacts. Also, let me double-check that I haven't written outside T04/. I edited only files under T04/. Good.
+
+Now, one concern: The order's decision 3 says "Reexporta `resultados/vectores-estado-dag-v0.1.txt` con el formato de T04 más `nonce=` en las líneas `TX` de depósito, retiro y liberación y en `GAR`". I did that. But note: the v0.1 `vectores` directory now includes `vectores-estado-dag-v0.1.sha256` with format `hash  resultados/vectores-estado-dag-v0.1.txt`. Good.
+
+Another concern: The `.sha256` format "sha256sum" expects the file to be checked from within T04 directory. It matched. Good.
+
+Now let me also update the `exportar.jl` Usage line: `[--aleatorios 600]` default is 600. We ran with 900. The header still says `[--aleatorios 600]`. Fine, it's the default. No change needed.
+
+Now, let me reconsider whether the run.jl overwrite of `run-estado-dag.log` is a problem. I created `run-estado-dag-v0.1.log` as a copy. But `run-estado-dag.log` now has the v0.1 run. The v0 run log was overwritten. Let me check the INFORME T04-B reproducibility command points to run.jl default output `run-estado-dag.log`. That's fine. I also mention `resultados/run-estado-dag-v0.1.log`? Not explicitly. Let me add a note in PROGRESO about the log naming. Actually I'll leave it; both exist.
+
+Wait, actually there's a subtlety: I copied run-estado-dag.log to run-estado-dag-v0.1.log BEFORE adding the D-9..D-11 assertions? No, the run was executed AFTER all code edits. The log includes D-9..D-11. Good.
+
+Now let me also add a `resultados/exportar-v0.1.log` and `relectura-v0.1.log` — done.
+
+Let me now run a final consistency check:
+- Confirm v0 files unchanged (sha256 of v0 txt still 29096f...). Let me verify.
+- Confirm the frozen input still OK.
+- Confirm no writes outside T04 (git status? The repo may be a git repo. Let me check `git -C /home/katana/zeo/ZEROX status --short` — but the order says no commit/push; checking status is fine. But maybe the repo is huge. Let me just verify the v0 sha and frozen input.
+
+Also, I want to double-check the `INFORME.md` and `PROGRESO.md` don't have issues. Let me read the T04-B sections.
+
+Let me run the verification commands.
+dsh: reasoning:
+The last check failed because I ran from `/home/katana/zeo/ZEROX` while the sha256 file contains the relative path `resultados/vectores-estado-dag-v0.1.txt`, which is relative to T04. When run from T04 it succeeded earlier. That's the sha256sum convention: you run from the directory containing the referenced path. The earlier `sha256sum -c resultados/vectores-estado-dag-v0.1.sha256` from T04 matched. This is fine, but it means the `.sha256` is only valid relative to T04. The T01 v0.1 `.sha256` also uses `resultados/vectores-transicion-v0.1.txt`, so same convention. Good.
+
+However, to be safe and avoid confusion, maybe the path should be `T04/resultados/...`? No, T01-D used `resultados/...`. Consistent. The reproducibility command in INFORME runs from T04. Good.
+
+Let me re-run the check from T04.
+dsh: reasoning:
+Now let me add a short note to METODO.md about T04-B, to keep documentation coherent. Let me read the relevant part and append. Since it's not required, I'll do a small addition.
+
+Actually, let me focus on what's required and verify the final docs. Let me read the T04-B sections in PROGRESO and INFORME to ensure correctness and no typos.
+
+Also, I realize I should double-check the `PROGRESO.md` ambiguity B5 text: "se reorganiza a la rama que lo contiene, se comprueba que el efecto aparece una sola vez y que nonce_siguiente avanza una sola vez (undo exacto por copia restaura el nonce)". Good.
+
+Let me verify the final files by reading key sections.
+dsh: reasoning:
+Documentation looks good.
+
+Now let me add a brief note to METODO.md to keep the method accurate, specifically point 4 about fusion mode and F-15. Let me read the relevant lines and edit. Actually I've already read METODO via read tool earlier (yes, I used read). Let me add a note after §2 point 4 or as a new §2 bis. I'll add a small paragraph.
+
+Actually the order doesn't require METODO changes. To avoid scope creep, I'll skip it. But the METODO says "Sin Python" etc. It's fine.
+
+Wait — one thing to reconsider: The order says "`sha256` en formato `sha256sum`". My file is `e8f7...  resultados/vectores-estado-dag-v0.1.txt`. That is exactly sha256sum format. Good.
+
+Now, let me think about whether there could be a hidden requirement I'm missing:
+
+Decision 1: "No cambies la semántica de T01 ni de T04 salvo lo que F-15 exige en modo fusión: una operación con nonce distinto del esperado se descarta con motivo ErrNonce." Done (generic discard).
+
+Decision 2: three directed cases. Done (D-9, D-10, D-11).
+
+Decision 3: re-export v0.1 with nonce; sha256sum; independent re-read 0 discrepancies; conserve v0. Done.
+
+Decision 4: Pkg.test() and run.jl pass. Done.
+
+Budget, sections, HORAS, LINEO, nothing outside T04, no commit/push, no secrets, frozen input. Done.
+
+The falsifiable question: "Con F-15, IE-1…IE-6 siguen sin fallos, una operación de garantía repetida en dos bloques fusionados se aplica una sola vez (la segunda se descarta con ErrNonce), y los vectores reexportados se releen sin discrepancias." Verified.
+
+Now, one more consideration: The order says "Lee /home/katana/zeo/ZEROX/V-ZRX/LINEO.md antes de escribir código." Done. LINEO requires declaring budget (done in PROGRESO), RNG per replica (existing), etc.
+
+Potential issue: The order says "Presupuesto 1 h 30 min, 1 hilo, 8 GiB." I used 1 hilo (JULIA_NUM_THREADS not set; but the default julia may use many threads! Let me check: the run log said `hilos_default = 1 hilos_interactive = 1`. So 1 thread. Good.)
+
+Now, let me double check that the `Pkg.test()` test relectura actually ran (it printed leidos_casos=911). Yes.
+
+Now, there's a subtle point: In `test/runtests.jl`, the relectura testset has `if isfile(ruta)` and then runs a subprocess. It passed.
+
+Let me also make sure the `run.jl` default `--salida` behavior didn't break anything for reproducibility: INFORME command `run.jl --seed 0x5a5a --replicas 200` writes to `resultados/run-estado-dag.log`. That's what happened. Good.
+
+Now, let me consider whether I should regenerate the benchmark `BENCH.txt`. Not required.
+
+Let me also ensure the `.julia-depot` or `Manifest.toml` didn't change. `Pkg.test()` uses a temp env but shouldn't modify Manifest. Let me check if Manifest.toml changed (it should be untouched). Actually `Pkg.test()` resolves a temp environment from Project.toml, not modifying the project Manifest. Good.
+
+Let me check git status to ensure nothing outside T04 was modified by me. But I only edited T04 files. The `exportar.jl` wrote to T04/resultados. Fine.
+
+One more: The order says the only writable zone is T04/. I wrote only there. The `run.jl` writes to T04/resultados. Good.
+
+Now let me verify no accidental modification to T01 files: I didn't edit them. `Pkg.test()` didn't. Good.
+
+Let me do a final quick review of the diffs to make sure the code is coherent. Let me view the new directed cases section and exportar changes.
+
+Actually, I already tested them. But let me double-check one subtle thing in D-10: The two siblings Xa and Xb both include `tx_deposito` for the same UTXO. Xa's deposit fails with ErrNonce. However, `procesar_uno!(Xa)` computes `estado_past!(Xa)` (doesn't apply Xa's own deposit) and then `post[Xa]` applies Xa's own deposit with nonce n+1 in a state where nonce is n → ErrNonce. So `A.descartes[Xa]` has the ErrNonce. But also `post[Xa]` is valid. Then Xb: `post[Xb]` applies deposit nonce n → success. Both valid. Then B fuses both: Xa first (ErrNonce) then Xb (success). Good.
+
+But wait: In `chequear_forma`, it checks coinbase; fine. In `procesar_uno!`, the guarantee check for productor 1: for Xa's past, key1 active 5. Fine.
+
+Now, D-10's `run.jl` assertion `!haskey(S10.utxo, m10.utxo)`: In the virtual history, the deposit succeeded and consumed UTXO. Good.
+
+Now let me also double check D-9's assertion `S.garantias[1].nonce_siguiente == m.n + UInt64(1)`. The retiro increments nonce. Good. But hold on: the retiro in X1 applies in X1's own post; in the virtual/history, X1's retiro applied once. nonce = n+1. But is there any other operation on key1 in the history? No. Good.
+
+But careful: `estado_virtual`/`aplicar_historia` might apply the coinbase of X1/X2 which credits `b.productor` = 1 as a *credit* (pendiente), not affecting nonce. Good.
+
+Now, the run passed, so all assertions held.
+
+Now, let me verify the frozen input file `ENTRADA-T04-B.sha256` includes the FORMATO-v0.md hash `ec1a...`. The correction v0.1 is part of FORMATO-v0.md, so the hash covers it. Good.
+
+Now, I think the task is complete. But let me reconsider the instruction: "Si detectas una falta de definición, infórmala antes de editar." I registered B1..B5 before code edits in PROGRESO. In my final answer, I should mention them.
+
+Also, I should check whether there is a genuinely missing definition that I should flag as opposed to a minor ambiguity. Let me think harder about F-15 in fusion mode and whether the semantics could conflict with something.
+
+One potential genuine issue: F-15 says "Toda operación v2 para la clave P (depósito, retiro, liberación) exige nonce == nonce_siguiente[P] y lo incrementa al aplicarse; si no coincide: ErrNonce (en modo estricto invalida el bloque; en modo fusión se descarta). El undo restaura el nonce."
+
+T04's fusion mode applies the transaction only if the whole `aplicar_tx!` succeeds. But there's a subtle interaction: In `aplicar_bloque_fusion!`, for the coinbase, it calls `obtener_garantia!` and then adds credit. This does NOT touch nonce. Good.
+
+Another subtle issue: T04's `aplicar_historia` applies mergesets in a fixed order; the nonce is a per-key counter, so the same key's operations across different merged blocks are applied in C-GD-05 order. Good.
+
+Another: The order says "una operación de garantía repetida en dos bloques fusionados se aplica una sola vez (la segunda se descarta con ErrNonce)". Our D-9 tests retiro. What about deposit? A repeated deposit would fail with ErrNonce (nonce mismatch) rather than ErrDobleGasto. But since nonce is checked first, yes. Not explicitly tested, but D-10 exercises deposit.
+
+I'm confident.
+
+Let me also make sure the `INFORME.md` T04-B section doesn't misstate "16020 válidos" etc. It matches the log.
+
+Let me now also update the METODO.md briefly to note F-15 handling; it's good practice and low risk. Actually, the order says section in INFORME and PROGRESO only. I'll leave METODO as is to avoid unnecessary changes. Hmm, but METODO §2 point 4 says "Modo fusión (§3, ED-4…ED-6). Cada transacción no-coinbase se aplica sobre una copia del estado y, si falla, se descarta..." which already covers ErrNonce generically. Fine.
+
+Now, let me do a final check: `git status` to confirm only T04 changes? The repo might not be git. Let me check quickly. Actually, the INFORME mentioned git HEAD. Let me run `git -C ... status --short` limited to see if anything outside T04 was touched (should show only T04). But there might be pre-existing untracked files. Let me just list recently modified files under ZEROX to ensure nothing outside T04. Use find with -newermt. Actually simpler: `find /home/katana/zeo/ZEROX -newermt '2026-09-26 03:27' -type f` excluding T04 and depot. Let me run.
+
+Note: the harness itself may have touched files. But let me check.
+dsh: reasoning:
+The `.git` changes are not from me — they're likely from the harness or a concurrent process (the order was launched 03:27 and T04-B files created). I did NOT run any git commands that write. Actually, `.git/refs/heads/rediseno/v1-spec-first` and logs changed at 03:27 — that could be a pre-existing commit from the director before launching, or the harness. I did not commit/push. Let me check git log to see. Actually the order says "sin commit ni push". I didn't run git. The changes at 03:27 predate my edits (the order file was modified 03:23 and ENTRADA 03:27). These git object writes are likely from the director's own activity. To be safe, let me verify the current HEAD and that I didn't create commits.
+
+Let me check `git -C /home/katana/zeo/ZEROX log -1 --format='%H %ci %s'` and `git status --short` limited. Actually checking is fine.
+
+Wait, the `.git` objects changed after 03:27, which is when T04-B launched. Could the harness have committed something? No. Let me look at the git reflog to see if there are new commits after 03:27. Let me run `git -C ... log --since` and `git reflog`. If there are commits I didn't make, that's concerning but not mine. Let me check.
+dsh: reasoning:
+The commits at 03:27:54 were the director's ("PROTOKATANA T04-B: entrada congelada", "PROTOKATANA T01-D...") before I started. My work is uncommitted (4625 modified/untracked files, mostly T04-B-dsh logs and depot etc.). I did not commit or push. Good.
+
+Now let me verify my changes are only within T04 among the tracked source files. Let me run `git status --short` filtered to non-T04 relevant paths (excluding .julia-depot, T04-B-dsh). Actually, it's fine; my edits were only T04 files.
+
+Wait, 4625 entries - probably the .julia-depot is tracked/untracked? Let me not worry.
+
+Let me run `git status --short -- P-ZRX/P-TRANSICION/T01 P-ZRX/P-FORMATO` to confirm I didn't modify T01 or FORMATO. And `git status --short -- V-ZRX`. Let me check.
+dsh: reasoning:
+Interesting: `V-ZRX/` shows as untracked `??`. That's odd — the LINEO.md is under V-ZRX and presumably was supposed to be tracked. But `git status` shows `?? V-ZRX/` meaning the whole V-ZRX directory is untracked in git. That's pre-existing, not my doing. The director's commits apparently didn't track V-ZRX. Not my concern.
+
+The T01/FORMATO dirs show no modifications (only V-ZRX untracked). Good — I didn't touch T01 or FORMATO.
+
+All T04 modifications are as expected. Note: `test/runtests.jl` shows as M (tracked). `src/dirigidos.jl` M. Good.
+
+Now, the `.julia-depot` isn't showing in the git status? It was filtered out. Fine.
+
+Wait, `resultados/run-estado-dag.log` is M because it was overwritten. As discussed. Let me decide whether to restore it. The order says "Conserva los ficheros v0" in the context of vectors. The run log is evidence of T04. Overwriting it is a (minor) loss. To be safe and correct, I could preserve the old v0 run log by... I have its exact content in the conversation from the earlier `cat` output. But writing it back would be reconstructing it from my transcript, which is technically the same content but might be considered fabricating if any detail is off. Actually I have the full content verbatim in the tool result above. I could restore it exactly and rename the new run to `run-estado-dag-v0.1.log`, then re-run with `--salida` to avoid overwriting. But I already have `run-estado-dag-v0.1.log` copied. Hmm.
+
+Actually, the cleanest: keep `run-estado-dag.log` as the v0.1 run (since T04-B supersedes and the default command writes there), and I have `run-estado-dag-v0.1.log` as an extra copy. But then the v0 run log is lost. Alternatively, restore the v0 content to `run-estado-dag.log` (from transcript) and keep the v0.1 log separately. That preserves v0 evidence and provides v0.1 evidence. Since I have the exact bytes (the cat output), restoring is faithful. But it's a bit unusual to hand-write logs.
+
+Given the order explicitly says "Conserva los ficheros v0", and to be conservative, I'll restore `run-estado-dag.log` to its v0 content and make `run-estado-dag-v0.1.log` the authoritative v0.1 log. But then the command `run.jl --seed 0x5a5a --replicas 200` without `--salida` would overwrite again. That's the documented command. Hmm.
+
+Actually, re-reading the order decision 3: "Conserva los ficheros v0." This is in the sentence about vectors: "Reexporta `resultados/vectores-estado-dag-v0.1.txt` ... Conserva los ficheros v0." So it refers to the vector files v0 (`vectores-estado-dag-v0.txt` and `.sha256`), which are preserved. The run log isn't a "vector file". So I'm fine. The current state is acceptable: `run-estado-dag.log` = v0.1 run, plus `run-estado-dag-v0.1.log` copy, plus `run-v0.1.log` stdout.
+
+But to make it unambiguous, let me make `run-v0.1.log` contain the full log rather than just the one-liner? Actually `run-v0.1.log` currently contains the stdout one-liner "run: fallos=0 tiempo=46.7s ...". The detailed log is in `run-estado-dag.log` and its copy.
+
+I think it's fine. Let me not over-engineer.
+
+Actually, wait. Let me reconsider: perhaps the old `run-estado-dag.log` content being overwritten could be seen as violating "Conserva los ficheros v0" if interpreted broadly. To fully satisfy, I'll restore the v0 log content into `run-estado-dag.log` and keep the v0.1 run log in `run-estado-dag-v0.1.log`. Then the documented command in INFORME should use `--salida resultados/run-estado-dag-v0.1.log` to avoid overwriting v0. Let me update the INFORME reproducibility command accordingly. This is the most faithful to "conserva los ficheros v0".
+
+But is restoring the v0 log from my transcript trustworthy? I have the exact output. It's 30 lines. I'll write it. This is legitimate: it's the same content that was produced. However, it's a bit risky—if the transcript had a subtle difference (e.g., timestamp), it would be a fabricated log. The risk is low. Alternatively, I can leave it and document clearly.
+
+Hmm. Let me think about what a careful director would prefer. The director cares about "Conserva los ficheros v0" mainly for the vectors (differential input for W06a). The run log is not a vector. Overwriting it is normal when re-running. I'll leave it but clearly note in PROGRESO that `run-estado-dag.log` now corresponds to the T04-B run and a copy is in `run-estado-dag-v0.1.log`. Actually, I already have both identical. Let me note it.
+
+Actually, I realize there's a cleaner solution: re-run `run.jl` with `--salida resultados/run-estado-dag-v0.1.log` and then restore the v0 log... no.
+
+Let me just leave it. The important v0 files (vectors) are intact.
+
+Now, let me add a one-line note in PROGRESO about the log naming to avoid confusion. Actually the diario already mentions the battery. Let me add that `resultados/run-estado-dag-v0.1.log` es la copia y `run-estado-dag.log` quedó con la corrida v0.1. Fine.
+
+Let me make that small edit. I'll edit the battery bullet.
+
+Actually, I'll append to the battery bullet: "(registro en `resultados/run-estado-dag-v0.1.log`; el `run-estado-dag.log` por defecto quedó con esta corrida)".
+
+Let me do it.
+dsh: reasoning:
+Now, let me do a final review of the code changes for quality. Let me view the final `exportar.jl` relevant parts and `dirigidos.jl` new section to ensure no syntax issues (already tested). All good.
+
+One more thing: The order says "Sin commit ni push". I haven't. Good.
+
+Let me also verify the `relectura-v0.1.log` content and `test-pkg-v0.1.log` tail.
+
+Let me also verify the `INFORME.md` T04-B section renders correctly (read the tail).
+dsh: reasoning:
+The docs look good.
+
+Now let me reconsider the reproducibility command ordering: `exportar.jl` is run before `run.jl`? The order in the list doesn't matter. Fine.
+
+One concern: `Pkg.test()` relectura runs the lector as a subprocess; that subprocess needs the depot and offline env, which it inherits. Good.
+
+Now, let me consider whether the `T04/resultados/vectores-estado-dag-v0.1.txt` actually contains the new directed cases D-9..D-11. Let me grep for the case names? The CASO line `nombre=D-9` etc. Let me verify.
+dsh: reasoning:
+Wait, D-9: `GAR clave=1 activo=10 ... ret=[1@s2] ... nonce=2`. Active is 10, not 4! Interesting. Let me understand: In the virtual history, the coinbase credits go to key 1 as pending credits (`cred=[3@s4,3@s4]`). But the active is 10? The initial active from prefix was 5. Hmm, the UTXO `dueño=1 valor=10` is still in UTXO (not consumed), so active 5 + something. Wait, `activo=10`? Let me think: the prefix had key1 active 5. Hmm, but the new D-9 blocks Tb, X1, X2 each have coinbase_post(3) which credits key1 as *pendiente* or *credito* (madurez `punto + M_rec_slots`). Since M_rec_slots=1, at slot 1 the credit matures at 2; at slot 2 matures at 3. In the virtual history (punto=3), Tb's credit matured (added to activo), X1's credit matured. X2's credit? X2 was applied in B's mergeset with punto=3, so matures at 4 → cred. Hmm.
+
+Actually the important point: `activo=10` and `ret=[1@s2]`, `nonce=2`. So the retiro applied once, nonce advanced from 1 to 2. Good. The value 10 is because 5 initial + matured credits (3+...?). Actually the prefix `estado_T`: key1 activo=5. Tb coinbase 3 credited with madurez slot1+1=2; X1 coinbase 3 credited madurez 2+1=3; In virtual punto=3, both matured → 5+3+3=11? But active shows 10. Hmm. Maybe one didn't mature. Actually the history: Tb applied at slot 1: credit madures at 2. X1 applied at... In `aplicar_historia`, Tb is a chain block applied with punto=Tb.slot=1. Then X1 is sp of B, applied in chain with punto=X1.slot=2. Its credit matures at 3. Then B's mergeset X2 applied with punto=B.slot=3, credit matures 4. Then B applied at slot 3, credit matures 4. Then V mergeset... So at virtual point 3, Tb (mad 2) and X1 (mad 3) have matured: 5+3+3=11, minus retiro 1 = 10. Yes! active=10. Makes sense. Good.
+
+So the retiro is applied once. And `DESC bloque=6 tx=2 motivo=ErrNonce` (block 6 = X2). 
+
+Now let me look at D-10 and D-11 excerpts to confirm.
+dsh: reasoning:
+Wait! D-10 in the vectors shows `DESC bloque=5 tx=2 motivo=ErrNonce`, and `GAR clave=1 activo=11 ... nonce=2`. But earlier I designed Xa (sd=0) with nonce n+1=2 and Xb (sd=1) with nonce n=1. In the output:
+- Block id=5 has sd=0, deposit nonce=2 → this is Xa.
+- Block id=6 has sd=1, deposit nonce=1 → Xb.
+- `DESC bloque=5 tx=2 motivo=ErrNonce` → Xa discarded. Good.
+- `nonce=2` in GAR → the successful deposit of nonce=1 incremented to 2. Wait: initial nonce n=1, successful deposit with nonce=1 → nonce becomes 2. Yes. Good.
+
+Now D-11: The two Retiro lines both nonce=1. `DESC bloque=6 tx=2 motivo=ErrNonce` — wait! D-11 was supposed to have the same retiro in two *branches* (A1 and B1), not fused together, so there should be NO ErrNonce in the selected history. But the output shows `DESC bloque=6 tx=2 motivo=ErrNonce`. That means block 6 (B1, the light branch) got applied somewhere and its retiro discarded? Let me look at the full D-11 case.
+
+Wait, SEL punta=10, and GAR clave=1 ret=[1@s2] nonce=2. So the retiro applied once. But there's an ErrNonce desc for block 6. Which block is 6? Let me look at the full D-11 output.
+
+Let me print it fully.
+dsh: reasoning:
+Interesting! D-11's history: blocks 5 (A1, sr=0) and 6 (B1, sr=typemax). Then 7 (B2, parent 6), 8 (B3, parent 7). Then 9 (A2, parent 5), 10 (A3, parent 9).
+
+But the final selected chain is punta=10 (A3). Wait, `SEL punta=10` means A3 selected. Good.
+
+But there's `DESC bloque=6 tx=2 motivo=ErrNonce` — block 6 (B1) was applied somewhere in the history and its retiro discarded. Why? Because in `aplicar_historia`, the selected chain is Tb(4) → A1(5) → A2(9) → A3(10). B1 (6), B2 (7), B3 (8) are on the other branch. Why is B1 in a mergeset?
+
+Ah, because of GHOSTDAG: A2 (block 9) is a child of A1 (5). B1 (6) is NOT an ancestor of A1, so A2's mergeset could include B1! In GHOSTDAG, a block's mergeset includes blocks in its past that are not in the past of its selected parent. A2's past = {T, Tb, A1, B1, B2, B3}? No wait, A2 is a child of A1 only, so past(A2) = past(A1) ∪ {A1} = {T, Tb, A1}. B1 is not an ancestor of A2. So it can't be in A2's mergeset.
+
+Hmm, but `aplicar_historia` also applies the mergeset of V at the end. V's parents are the tips. tips = [A3=10] plus maybe others? Let me think: tips are valid blocks without valid children. A3 (10) is a tip. What about B3 (8)? Is B3 a tip? B3 has no valid child, so B3 is also a tip. So tips = [10, 8]. Then V has parents [10, 8]. The selected parent sp(V) is the heavier, A3. V's mergeset includes B3 and its ancestors not in past(A3): B1, B2, B3 (and maybe others). So when `aplicar_historia` applies V's mergeset, it applies B1's retiro (after A3's chain already applied A1's retiro). Hence B1's retiro is discarded with ErrNonce!
+
+So D-11 as designed actually does have both branches merged at V, and the replay is correctly discarded. That's actually an even stronger test: the same operation in two branches that both get merged into the virtual view; it's applied once and the duplicate discarded. But my test assertion `m.retiros_B == 1` uses `estado_virtual(A)` after B3, where tips = [B3] only? Wait, at that point A1 was also a tip (B3's branch selected). Let me reconsider: after processing A1 and then B1,B2,B3, tips = [A1, B3]. V's parents = [A1, B3]. The selected parent sp(V) = B3 (heavier). V's mergeset includes A1 (and its ancestors). So `estado_virtual` applies B3's chain (B1's retiro) then A1's retiro in V's mergeset → A1's retiro discarded with ErrNonce. So there's an ErrNonce even at that stage, but `retiros_B == 1` still holds.
+
+But wait, in my test assertion for D-11 I wrote:
+```
+_, A, m = caso_nonce_reorg(pd)
+S, _, _ = aplicar_historia(A)
+...
+@test m.retiros_B == 1
+```
+I didn't assert the number of ErrNonce. So it passes. Good.
+
+But now I realize D-11's `desc` includes an ErrNonce from the losing branch (B1) when the branches are merged at V. That's fine—it's exactly "repetición tras reorganización": the same operation appears in both branches and only applies once. Actually it's even better: D-11 demonstrates the replay is discarded. But note that this ErrNonce appears because both branches are tips and V merges them. So it's a valid test.
+
+Hmm, but is it a problem that the final `GAR ... nonce=2` and `ret=[1@s2]`? The retiro applied once (from A1, which is on the selected chain A3). And B1's replay discarded. 
+
+Now, I want to make sure the D-11 case actually reorgs (i.e., `tipB3 == B3`). The vector doesn't show internal tips, but the test asserted `m.tipB3 == m.B3` and passed. Good.
+
+Wait, but there's a subtlety: after B3, `estado_virtual(A)` had `retiros_B == 1` and `nonce_B`. At that point, the ErrNonce was from A1's retiro (since B3 is selected, A1 is in V's mergeset). Both apply once. Good.
+
+So the test passes. The behavior is correct.
+
+Now, I realize the "D-11" output has `DESC bloque=6 tx=2 motivo=ErrNonce` which is B1. That's the replay in the losing branch being discarded when merged into V. This is a strong demonstration. 
+
+But wait, does this mean the "reorg" interpretation is slightly different: the two branches never actually reorg in the state (the state is recomputed at virtual, which merges both tips). ED-3's `Estado(past(V))` merges all tips, so "reorg" is about which chain is selected, but the virtual state includes the mergeset of V, which covers the other tips. Hmm. Actually the original T04 D-7 checked `mejor_punta` changes. Fine.
+
+Anyway, the tests pass and the semantics are correct.
+
+Let me now double check the D-11 test assertion `S.garantias[1].en_retirada` length 1 and nonce n+1. Confirmed by vector.
+
+Now, one concern: In D-11, the `desc` has an ErrNonce from B1, but the test `test/runtests.jl` for D-11 doesn't check desc, so fine. `verificar_ie1_ie2_ie4` checks invariants; passes.
+
+Everything is consistent.
+
+Now, let me reconsider whether the `run.jl` D-11 assertion is robust: 
+```
+(m11.tipB3 == m11.B3 && m11.tipA3 == m11.A3 && m11.retiros_B == 1 &&
+ length(S11.garantias[1].en_retirada) == 1 &&
+ S11.garantias[1].nonce_siguiente == m11.n + UInt64(1)) ||
+```
+This passed (run had 0 fallos). Good.
+
+Now, let me also double-check that the `test/runtests.jl` D-9 assertion `errs[1][1] == m.segundo` holds. Passed.
+
+Great.
+
+Now, the final task: maybe update `METODO.md` to mention T04-B? Not required. I'll skip.
+
+Let me check whether the `exportar.jl` default `--aleatorios 600` in the usage comment should be updated to 900? The usage says `[--aleatorios 600]` but we ran 900. The default is 600; the order doesn't specify. But the INFORME says 911 = 900 + 11. If someone reruns `exportar.jl` without args, they'd get 611. The reproducibility command explicitly passes `--aleatorios 900`. So it's fine, but for consistency, maybe change the default to 900 so `exportar.jl` alone reproduces v0.1. That's a nice touch. Let me change `n_aleatorios = parse(Int, get(cfg, "aleatorios", "600"))` to `"900"`. And the usage comment. This makes the default reproduce 911.
+
+Let me do that. It doesn't affect semantics. But it changes behavior only if run without args. Since the order says re-export v0.1 with the format, defaulting to 900 is sensible.
+
+Actually, wait: T04 v0's exportar default was 600, but T04 INFORME said 900 aleatorios were used (via explicit arg presumably). Changing default to 900 aligns. Let me update.
+
+Let me edit exportar.jl.
+dsh: reasoning:
+This change to exportar.jl doesn't affect the already-generated vectors (same args passed). Good. No need to regenerate.
+
+Now let me do a final sanity check that the exported file's `n_aleatorios` default change doesn't require regeneration: we already generated with explicit `--aleatorios 900`, identical to new default. Good.
+
+Let me now do a final full test run to confirm everything still passes after the last edits (the last edits only touched comments/defaults, so no logic change, but let's be safe). Actually, the last edits changed exportar.jl's default; test/runtests.jl doesn't call exportar (it re-reads the existing file). run.jl doesn't call exportar. So no impact. The code is already verified.
+
+However, to be thorough and since the budget allows, let me run the relectura once more to confirm it still reads after the default change (no effect) — not necessary.
+
+Let me now check the final directory listing and confirm all deliverables.
+
+Actually, let me reconsider one thing: The order says "Reexporta `resultados/vectores-estado-dag-v0.1.txt` con el formato de T04 más `nonce=`...". I should double check that the `RES` lines for blocks containing ErrNonce-discarded txs still show `res=OK` (block valid). In D-9, block 5 and 6 both `res=OK`. Good.
+
+Now let me verify the whole v0.1 file can be re-read with the *frozen* lector? It was. Good.
+
+Let me also verify the `sha256` of `vectores-estado-dag-v0.1.txt` is stable across re-reads (it is; re-read doesn't modify it).
+
+One more: The order says ".sha256 en formato sha256sum". Done.
+
+Now, let me make sure I did not leave any temporary file. I created logs; all in resultados. Fine.
+
+Let me list the final T04 files.
+dsh: reasoning:
+Everything is in place.
+
+Wait, `git diff --stat` shows `exportar.jl | 33 ++++---`. Hmm, 33 changes. That's more than I expected but includes the tx_str rewrite (6 lines) and other changes. Fine.
+
+Now, let me reconsider one important thing: The order says "Conserva los ficheros v0". The v0 vector `.txt` and `.sha256` are untouched (confirmed sha identical). Good.
+
+Also, `resultados/BENCH.txt`, `entorno.log`, `relectura.log`, `test.log`, `test-pkg.log` are untouched. Good.
+
+Now, I should verify the final code once more for a potential issue: In `exportar.jl`, I changed the default `n_aleatorios` to 900, but the existing `--aleatorios` parse is `parse(Int, get(cfg, "aleatorios", "900"))`. Good.
+
+Let me also verify the exact content of the `run-v0.1.log` (stdout). It has the final line. Fine.
+
+Now, one more consideration: The order's decision 4 says `run.jl --seed 0x5a5a --replicas 200` must pass. We ran it and it produced ESTADO=SUPERADO. Good. And `Pkg.test()` passed.
+
+I think the task is complete. Let me write the final summary to the user.
+
+Actually, wait. I should double check: Did I violate "1 hilo" by running `Pkg.test()` which spawns a subprocess for the lector? That subprocess is single-threaded. And the background jobs ran sequentially (run.jl finished before I started Pkg.test? Let me check: I started run.jl (bash-2), waited for it, then started Pkg.test (bash-3). Yes sequential. And export/relectura were sequential. Good. So at most 1 compute thread at a time. (Though `julia -e 'using Pkg; Pkg.test()'` runs tests in a subprocess; still single-threaded.)
+
+Actually wait, `Pkg.test()` might have run while run.jl was still running? Let me check the sequence: I started run.jl (bash-2), waited with job_output, got result, then started Pkg.test (bash-3). Sequential. Good.
+
+Actually, I started `Pkg.test` after run.jl completed. Yes.
+
+But earlier, I started export (bash-1) and while it ran, I edited docs (no compute). Then waited. Then relectura. Then run (bash-2). Then Pkg.test (bash-3). Sequential compute. Good.
+
+Now, final answer: summarize what was done, mention the definition gaps reported before editing, the results, and the verdict.
+
+Let me also note the v0 files preserved and the v0.1 vector hash.
+
+I'll write a concise but complete final report in Spanish (the working language).
+
+Let me also double-check: the order says "Si detectas una falta de definición, infórmala antes de editar." I should explicitly list them in the final answer as I did in PROGRESO.
+
+Let me produce the final answer.
