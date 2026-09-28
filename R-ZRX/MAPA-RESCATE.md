@@ -112,6 +112,7 @@ casos que **no** entraron en RFT.
 | stake | `LEGADO/stake/MAPA.md` | `P-ZRX/P-STAKE/MAPA.md` (solo `.trash`) | `0261f56c55ad81dbd2f10997d5f2b8933374f78222cdabc6bba1077e6fb0d9ae` | Citado por `D-ZRX/SPEC.md` §10 e IPA X-02 |
 | reloj | `LEGADO/reloj/ESTADO-RELOJ.md` | `P-ZRX/T-ZRX/ESTADO-RELOJ.md` (solo `.trash`) | `88f436498971ba84ff3a17a1ff908e438021766c13d776cc2f95a0369a1cda4a` | Citado por RFT-12 |
 | eclipse | `LEGADO/eclipse/INFORME.md` | `P-ZRX/P-ECLIPSE/investigacion/INFORME.md` (solo `.trash`) | `afd8481f3c686636c8b34fada67fd25dc0b6534a743ef4e3fecc5a887b8873c5` | Citado por IPA B-07 |
+| todo lo que solo estaba en `.trash` | `LEGADO/solo-trash/` (90 archivos + `HUELLAS-ORIGEN.sha256` + `LEEME.md`) | `/home/katana/zeo/.trash/zerox/` (los que no están en `9681061`) | `LEGADO/solo-trash/HUELLAS-ORIGEN.sha256` | **PK-02 (Katana, 2026-09-27: sí)**, IPA E-07 cerrado. Usados después: P-RELOJ (`ENCARGO-ND1`, `N` dinámico) y P-ECLIPSE (investigación del eclipse de 0.0.2) |
 
 Procedencia y huellas: `R-ZRX/LEGADO/PROCEDENCIA.txt`, `R-ZRX/LEGADO/HUELLAS.sha256`. **Una copia
 aquí no es un instrumento validado** y no se promueve a `V-ZRX/`.
