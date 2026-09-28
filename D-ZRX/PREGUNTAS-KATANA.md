@@ -10,6 +10,7 @@ depende de ella**; lo que sí depende queda marcado `bloqueado (Katana)` en `D-Z
 |---|---|---|---|
 | PK-01 | Fuente de peso provisional de la capa de votos mientras no exista el registro de sectores | FV-4 (Rust de la capa); **no** bloquea 0.0.1 ni FV-2/FV-3 | **resuelta** (Katana, 2026-09-27: opción 2) → FV-D08 |
 | PK-02 | ¿Se aseguran los 95 archivos que solo existen en `.trash/zerox`? | nada hoy; su pérdida sería irreversible | **resuelta** (Katana, 2026-09-27: sí): 90 archivos por contenido copiados a `R-ZRX/LEGADO/solo-trash/` (`f2fb5b0`) |
+| PK-03 | ¿En qué CPU y GPU se mide `ρ_max` (latencia de AES encadenado)? | solo la medición de `ρ_max` (0.0.2 paso 1); ND-1 y lo demás siguen | **abierta** (2026-09-28 02:38) |
 
 ---
 
@@ -65,3 +66,24 @@ perdería el resto sin vuelta atrás.
 **Recomendación: A.** Es barata y evita una pérdida irreversible; el mandato ya pide conservar lo necesario
 para reproducir decisiones (`AUTO-ZRX.md` §2). La pregunto porque decide qué entra en el repositorio y
 porque la papelera es tuya.
+
+---
+
+## PK-03 · Hardware para medir `ρ_max` (0.0.2, paso 1)
+
+**Contexto.** `ρ_max` es la ventaja de la máquina más rápida sobre la más lenta admitida en el reloj PoT (AES
+encadenado). De él salen el segundo VDF (RFT-12), el techo del `N` dinámico (ENCARGO-ND1) y si «cualquier CPU de gama
+media-alta» puede ser timelord (`ρ_max = ε·K`). Hoy solo está medida **esta** máquina (Ryzen 9950X3D con VAES:
+7,74 ns por bloque de 10 rondas, `K = 16`), y la GTX 1070, que **no** es AMD. El programa de medida ya existe y está
+sellado: `R-ZRX/LEGADO/solo-trash/P-ZRX/P-RELOJ/medicion-previa/aeslat.c`. Es C sin dependencias y tarda minutos por
+máquina.
+
+| Opción | Implica | Coste |
+|---|---|---|
+| **1. Solo lo que hay aquí** | Un punto de gama alta y la GPU; la dispersión se completa con latencias citadas | Nada; pero `ρ_max` queda como estimación y no como medida (el mismo defecto que ya tenía) |
+| **2. Máquinas tuyas o de conocidos** | Compilar y correr `aeslat.c` en 3–5 CPU: idealmente una Intel reciente de frecuencia alta (el atacante plausible), una de gama media antigua con AES-NI sin VAES (la más lenta admitida) y, si hay, un ARM (Apple M o similar) | Tu tiempo o el de quien preste la máquina; ninguna instalación |
+| **3. Alquilar instancias en la nube** | CPU de servidor variadas (Intel, AMD, ARM Graviton) | Dinero (poco) y una cuenta: acción externa tuya. No cubre la CPU de escritorio con frecuencia alta, que es la del atacante |
+
+**Recomendación del director: 2 y 1 juntas.** La cifra que decide es el cociente entre el escritorio más rápido y la
+CPU más débil que quieras admitir, y eso solo lo dan máquinas reales de esos dos extremos. La nube, solo si no hay
+acceso a ninguna Intel reciente. Mientras tanto, ND-1 trabaja con `ρ_max` como símbolo.

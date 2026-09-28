@@ -512,3 +512,4 @@ bloquearía para siempre a un productor cuyas recompensas son garantía (D-T08) 
   - **R-ZRX:** al día.
   - **SPEC.md** (de Katana): muy desfasada; se le pregunta cómo actualizarla.
 - 02:34 **SPEC.md (de Katana):** opción elegida por Katana, «tabla de estado ahora»: sección «Estado al 2026-09-28» al principio, sin cambiar reglas del cuerpo. Superado: cabecera (votos adoptados, FV-D02; AGENTS.md fuera del árbol) y §5 C-SLA (RFT-15; vigente: confiscación por incidente, DS-L03 y RAT-2′). Implementado en dev: §3 C-BON, §4 C-EVP y §6 C-BOT (ruta B). Puertas §9: 1 y 2 hechas para dev, 3 parcial, 4 y 5 no. Reescritura completa al cerrar 0.0.2.
+- 02:39 **Katana:** «entonces la 0.0.1 está cerrada; guarda contexto porque vamos a ejecutar la 0.0.2». Contexto guardado: traspaso §2 bis (primeros encargos de 0.0.2 y regla de la máquina), PK-03 (hardware para `ρ_max`) en PREGUNTAS-KATANA, memoria (arranque de 0.0.2 y lección de las horas).
